@@ -145,6 +145,16 @@ def run_training(
     if benchmark_interval > 0:
         print(f'Benchmark: every {benchmark_interval} epochs, {benchmark_matches} matches')
 
+    # Estimated completion time
+    from datetime import datetime, timedelta
+    avg_game_secs = 130 if mcts_iterations > 0 else 15  # rough estimate
+    est_total_secs = total_games * avg_game_secs
+    if benchmark_interval > 0:
+        num_benchmarks = epochs // benchmark_interval
+        est_total_secs += num_benchmarks * benchmark_matches * avg_game_secs
+    est_end = datetime.now() + timedelta(seconds=est_total_secs)
+    print(f'Estimated finish: ~{est_end.strftime("%H:%M")} ({est_total_secs // 3600}h {(est_total_secs % 3600) // 60}m)')
+
     # Curriculum
     curriculum_stages = [
         {'opponent': 'random', 'win_rate_threshold': 0.65},
