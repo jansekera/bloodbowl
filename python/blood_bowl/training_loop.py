@@ -357,14 +357,12 @@ def run_training(
                 bm_sd = bench_results['random']['avg_score_diff']
                 snap_name = f'weights_snap_e{epoch}_{bm_wr:.0%}_{bm_sd:+.1f}.json'
                 snap_path = weights_path.parent / snap_name
-                import shutil
                 shutil.copy2(str(weights_path), str(snap_path))
                 # Update weights_best.json if this is the best benchmark
                 best_path = weights_path.parent / 'weights_best.json'
                 best_wr = 0.0
                 if best_path.exists():
                     try:
-                        import json
                         with open(best_path) as f:
                             best_meta = json.load(f)
                         best_wr = best_meta.get('benchmark_win_rate', 0.0)
