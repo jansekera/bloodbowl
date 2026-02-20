@@ -341,6 +341,37 @@ def run_training(
                 print(f'  Benchmark vs {opp_name}: {stats["win_rate"]:.1%} '
                       f'(score diff {stats["avg_score_diff"]:+.2f})')
 
+            # Auto-snapshot weights after benchmark
+            if 'random' in bench_results:
+                bm_wr = bench_results['random']['win_rate']
+                bm_sd = bench_results['random']['avg_score_diff']
+                snap_name = f'weights_snap_e{epoch}_{bm_wr:.0%}_{bm_sd:+.1f}.json'
+                snap_path = weights_path.parent / snap_name
+                import shutil
+                shutil.copy2(str(weights_path), str(snap_path))
+                # Update weights_best.json if this is the best benchmark
+                best_path = weights_path.parent / 'weights_best.json'
+                best_wr = 0.0
+                if best_path.exists():
+                    try:
+                        import json
+                        with open(best_path) as f:
+                            best_meta = json.load(f)
+                        best_wr = best_meta.get('benchmark_win_rate', 0.0)
+                    except Exception:
+                        pass
+                if bm_wr > best_wr:
+                    shutil.copy2(str(weights_path), str(best_path))
+                    # Store benchmark info in best weights
+                    with open(best_path) as f:
+                        best_data = json.load(f)
+                    best_data['benchmark_win_rate'] = bm_wr
+                    best_data['benchmark_epoch'] = epoch
+                    with open(best_path, 'w') as f:
+                        json.dump(best_data, f)
+                    print(f'  New best! Saved to {best_path.name}')
+                print(f'  Snapshot: {snap_name}')
+
         # Curriculum advancement
         if curriculum:
             curriculum_win_rates.append(win_rate)
