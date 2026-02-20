@@ -1,0 +1,32 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}My Matches - Blood Bowl{% endblock %}
+
+{% block content %}
+<div class="matches">
+    <div class="matches__header">
+        <h1>My Matches</h1>
+        <a href="/matches/new" class="btn btn--primary">New Match</a>
+    </div>
+
+    {% if matches is empty %}
+        <p class="matches__empty">No matches yet. Start a new match!</p>
+    {% else %}
+        <div class="matches__list">
+            {% for match in matches %}
+                <a href="/matches/{{ match.id }}" class="match-card">
+                    <div class="match-card__teams">
+                        <span class="match-card__team">{{ match.home_team_name }}</span>
+                        <span class="match-card__vs">vs</span>
+                        <span class="match-card__team">{{ match.away_team_name }}</span>
+                    </div>
+                    <div class="match-card__info">
+                        <span class="match-card__score">{{ match.home_score }} - {{ match.away_score }}</span>
+                        <span class="badge badge--{{ match.status }}">{{ match.status }}</span>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

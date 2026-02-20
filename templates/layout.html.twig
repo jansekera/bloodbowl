@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Blood Bowl{% endblock %}</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="navbar__brand">Blood Bowl</a>
+        <div class="navbar__links">
+            <a href="/races" class="navbar__link">Races</a>
+            {% if isLoggedIn %}
+                <a href="/teams" class="navbar__link">My Teams</a>
+                <span class="navbar__coach">{{ coach.name }}</span>
+                <a href="/logout" class="navbar__link navbar__link--logout">Logout</a>
+            {% else %}
+                <a href="/login" class="navbar__link">Login</a>
+                <a href="/register" class="navbar__link">Register</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>Blood Bowl &copy; Games Workshop. This is a fan project.</p>
+    </footer>
+</body>
+</html>

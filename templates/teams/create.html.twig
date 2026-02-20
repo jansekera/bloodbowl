@@ -1,0 +1,52 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Create Team - Blood Bowl{% endblock %}
+
+{% block content %}
+<h1>Create New Team</h1>
+
+{% if errors is defined and errors %}
+    <div class="alert alert--error">
+        {% for error in errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<form method="POST" action="/teams/create" class="create-team-form">
+    <div class="form-group">
+        <label for="name">Team Name</label>
+        <input type="text" id="name" name="name" required maxlength="100"
+               value="{{ formData.name is defined ? formData.name : '' }}">
+    </div>
+
+    <div class="form-group">
+        <label>Select Race</label>
+        <div class="race-select-grid">
+            {% for race in races %}
+            <label class="race-option">
+                <input type="radio" name="race_id" value="{{ race.id }}"
+                       {{ formData.race_id is defined and formData.race_id == race.id ? 'checked' : '' }}>
+                <div class="race-option__content">
+                    <h3>{{ race.name }}</h3>
+                    <div class="race-option__info">
+                        <span>Reroll: {{ (race.rerollCost / 1000)|number_format(0) }}k</span>
+                        {% if race.hasApothecary %}
+                            <span class="badge badge--green">Apo</span>
+                        {% endif %}
+                    </div>
+                    <div class="race-option__positionals">
+                        {% for pos in race.positionals %}
+                            <span class="race-option__pos">{{ pos.name }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn--primary">Create Team</button>
+    <a href="/teams" class="btn btn--secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,55 @@
+# PHP
+/vendor/
+.php-cs-fixer.cache
+.phpunit.cache/
+
+# Frontend
+/node_modules/
+/frontend/dist/
+
+# C++ engine build
+/engine/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+
+# Training logs (large, regenerable)
+*.log
+/logs/
+/training_logs*/
+
+# Training weights (small but versioned separately)
+# Keep weights_best.json in git, ignore the rest
+/weights*.json
+!/weights_best.json
+
+# Coverage
+/coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Replay buffers (large)
+*.replay
+replay_buffer*.json
+
+# Decision logs from training
+decisions_*.json
+*.bak
+
+# CSV results (regenerable)
+*.csv
+
+# Training scripts (local)
+run_rotation.sh

@@ -1,0 +1,39 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Dashboard - Blood Bowl{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    {% if isLoggedIn %}
+        <h1>Welcome, Coach {{ coach.name }}!</h1>
+        <div class="dashboard__grid">
+            <a href="/races" class="dashboard__card">
+                <h2>Races</h2>
+                <p>Browse available races and their positionals</p>
+            </a>
+            <a href="/teams" class="dashboard__card">
+                <h2>My Teams</h2>
+                <p>Create and manage your teams</p>
+            </a>
+            <a href="/matches" class="dashboard__card">
+                <h2>Matches</h2>
+                <p>Start a match and play on the pitch</p>
+            </a>
+            <a href="/match/demo" class="dashboard__card">
+                <h2>Pitch Demo</h2>
+                <p>Preview the Blood Bowl pitch canvas renderer</p>
+            </a>
+        </div>
+    {% else %}
+        <div class="hero">
+            <h1>Blood Bowl</h1>
+            <p class="hero__subtitle">The classic fantasy football board game</p>
+            <p>Manage your team, develop your players, and crush your opponents on the pitch!</p>
+            <div class="hero__actions">
+                <a href="/register" class="btn btn--primary">Create Account</a>
+                <a href="/login" class="btn btn--secondary">Login</a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

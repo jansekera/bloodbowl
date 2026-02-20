@@ -1,0 +1,54 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Races - Blood Bowl{% endblock %}
+
+{% block content %}
+<h1>Races</h1>
+
+<div class="races-grid">
+    {% for race in races %}
+    <div class="race-card">
+        <h2 class="race-card__name">{{ race.name }}</h2>
+        <div class="race-card__info">
+            <span>Reroll: {{ (race.rerollCost / 1000)|number_format(0) }}k</span>
+            {% if race.hasApothecary %}
+                <span class="badge badge--green">Apothecary</span>
+            {% endif %}
+        </div>
+
+        <table class="roster-table">
+            <thead>
+                <tr>
+                    <th>Position</th>
+                    <th>MA</th>
+                    <th>ST</th>
+                    <th>AG</th>
+                    <th>AV</th>
+                    <th>Cost</th>
+                    <th>Max</th>
+                    <th>Skills</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pos in race.positionals %}
+                <tr>
+                    <td>{{ pos.name }}</td>
+                    <td>{{ pos.stats.movement }}</td>
+                    <td>{{ pos.stats.strength }}</td>
+                    <td>{{ pos.stats.agility }}</td>
+                    <td>{{ pos.stats.armour }}</td>
+                    <td>{{ (pos.cost / 1000)|number_format(0) }}k</td>
+                    <td>{{ pos.maxCount }}</td>
+                    <td>
+                        {% for skill in pos.startingSkills %}
+                            <span class="skill-tag">{{ skill.name }}</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

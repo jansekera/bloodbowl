@@ -1,0 +1,31 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}My Teams - Blood Bowl{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>My Teams</h1>
+    <a href="/teams/create" class="btn btn--primary">Create Team</a>
+</div>
+
+{% if teams is empty %}
+    <div class="empty-state">
+        <p>You don't have any teams yet.</p>
+        <a href="/teams/create" class="btn btn--primary">Create Your First Team</a>
+    </div>
+{% else %}
+    <div class="teams-grid">
+        {% for team in teams %}
+        <a href="/teams/{{ team.id }}" class="team-card">
+            <h2 class="team-card__name">{{ team.name }}</h2>
+            <div class="team-card__race">{{ team.raceName }}</div>
+            <div class="team-card__stats">
+                <span>Players: {{ team.playerCount }}</span>
+                <span>Rerolls: {{ team.rerolls }}</span>
+                <span>Treasury: {{ (team.treasury.gold / 1000)|number_format(0) }}k</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}

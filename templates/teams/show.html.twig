@@ -1,0 +1,150 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}{{ team.name }} - Blood Bowl{% endblock %}
+
+{% block content %}
+{% if app_error is defined and app_error %}
+    <div class="alert alert--error">{{ app_error }}</div>
+{% endif %}
+
+<div class="page-header">
+    <div>
+        <h1>{{ team.name }}</h1>
+        <span class="team-detail__race">{{ team.raceName }}</span>
+    </div>
+    <a href="/teams" class="btn btn--secondary">Back to Teams</a>
+</div>
+
+{# Team Stats Bar #}
+<div class="team-stats-bar">
+    <div class="team-stat">
+        <span class="team-stat__label">Treasury</span>
+        <span class="team-stat__value">{{ (team.treasury.gold / 1000)|number_format(0) }}k</span>
+    </div>
+    <div class="team-stat">
+        <span class="team-stat__label">Players</span>
+        <span class="team-stat__value">{{ team.playerCount }}</span>
+    </div>
+    <div class="team-stat">
+        <span class="team-stat__label">Rerolls</span>
+        <span class="team-stat__value">{{ team.rerolls }}</span>
+    </div>
+    <div class="team-stat">
+        <span class="team-stat__label">Apothecary</span>
+        <span class="team-stat__value">{{ team.hasApothecary ? 'Yes' : 'No' }}</span>
+    </div>
+</div>
+
+{# Quick Actions #}
+<div class="team-actions">
+    {% if race is not null %}
+        <form method="POST" action="/teams/{{ team.id }}/buy-reroll" class="inline-form">
+            <button type="submit" class="btn btn--secondary btn--small"
+                    {{ team.treasury.gold < race.rerollCost ? 'disabled' : '' }}>
+                Buy Reroll ({{ (race.rerollCost / 1000)|number_format(0) }}k)
+            </button>
+        </form>
+    {% endif %}
+    {% if race is not null and race.hasApothecary and not team.hasApothecary %}
+        <form method="POST" action="/teams/{{ team.id }}/buy-apothecary" class="inline-form">
+            <button type="submit" class="btn btn--secondary btn--small"
+                    {{ team.treasury.gold < 50000 ? 'disabled' : '' }}>
+                Hire Apothecary (50k)
+            </button>
+        </form>
+    {% endif %}
+    <form method="POST" action="/teams/{{ team.id }}/retire" class="inline-form"
+          onsubmit="return confirm('Are you sure you want to retire this team?')">
+        <button type="submit" class="btn btn--danger btn--small">Retire Team</button>
+    </form>
+</div>
+
+{# Roster #}
+<h2>Roster</h2>
+{% if team.players is empty %}
+    <p class="text-muted">No players yet. Hire your first player below!</p>
+{% else %}
+    <table class="roster-table roster-table--team">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Position</th>
+                <th>MA</th>
+                <th>ST</th>
+                <th>AG</th>
+                <th>AV</th>
+                <th>Skills</th>
+                <th>SPP</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for player in team.players %}
+            <tr class="{{ player.status.value != 'active' ? 'roster-row--inactive' : '' }}">
+                <td>{{ player.number }}</td>
+                <td>{{ player.name }}</td>
+                <td>{{ player.positionalName }}</td>
+                <td>{{ player.stats.movement }}</td>
+                <td>{{ player.stats.strength }}</td>
+                <td>{{ player.stats.agility }}</td>
+                <td>{{ player.stats.armour }}</td>
+                <td>
+                    {% for skill in player.skills %}
+                        <span class="skill-tag">{{ skill.name }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ player.spp }}</td>
+                <td>
+                    <span class="status-badge status-badge--{{ player.status.value }}">
+                        {{ player.status.value }}
+                    </span>
+                </td>
+                <td>
+                    {% if player.status.value == 'active' %}
+                    <form method="POST" action="/teams/{{ team.id }}/players/{{ player.id }}/fire"
+                          class="inline-form"
+                          onsubmit="return confirm('Fire {{ player.name }}?')">
+                        <button type="submit" class="btn btn--danger btn--tiny">Fire</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{# Hire Player #}
+{% if team.playerCount < 16 and race is not null %}
+<h2>Hire Player</h2>
+<div class="hire-grid">
+    {% for pos in race.positionals %}
+    <form method="POST" action="/teams/{{ team.id }}/hire" class="hire-card">
+        <input type="hidden" name="template_id" value="{{ pos.id }}">
+        <h3>{{ pos.name }}</h3>
+        <div class="hire-card__stats">
+            <span>MA {{ pos.stats.movement }}</span>
+            <span>ST {{ pos.stats.strength }}</span>
+            <span>AG {{ pos.stats.agility }}</span>
+            <span>AV {{ pos.stats.armour }}</span>
+        </div>
+        <div class="hire-card__skills">
+            {% for skill in pos.startingSkills %}
+                <span class="skill-tag">{{ skill.name }}</span>
+            {% endfor %}
+        </div>
+        <div class="hire-card__cost">{{ (pos.cost / 1000)|number_format(0) }}k</div>
+        <div class="hire-card__input">
+            <input type="text" name="player_name" placeholder="Player name" required>
+            <button type="submit" class="btn btn--primary btn--small"
+                    {{ team.treasury.gold < pos.cost ? 'disabled' : '' }}>
+                Hire
+            </button>
+        </div>
+    </form>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

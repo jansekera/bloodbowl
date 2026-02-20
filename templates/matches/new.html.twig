@@ -1,0 +1,49 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}New Match - Blood Bowl{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <h1>New Match</h1>
+
+    {% if error is defined and error %}
+        <div class="alert alert--error">{{ error }}</div>
+    {% endif %}
+
+    {% if teams|length < 2 %}
+        <div class="alert alert--warning">
+            You need at least 2 teams with 11+ players to start a match.
+            <a href="/teams/create">Create a team</a>
+        </div>
+    {% else %}
+        <form method="POST" action="/matches/new" class="form">
+            <div class="form__group">
+                <label for="home_team_id">Home Team</label>
+                <select name="home_team_id" id="home_team_id" required>
+                    {% for team in teams %}
+                        <option value="{{ team.getId() }}">{{ team.getName() }} ({{ team.getRaceName() }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form__group">
+                <label for="away_team_id">Away Team</label>
+                <select name="away_team_id" id="away_team_id" required>
+                    {% for team in teams %}
+                        <option value="{{ team.getId() }}">{{ team.getName() }} ({{ team.getRaceName() }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form__group form__group--checkbox">
+                <label>
+                    <input type="checkbox" name="vs_ai" checked>
+                    Play vs AI (Greedy AI controls away team)
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn--primary">Start Match</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

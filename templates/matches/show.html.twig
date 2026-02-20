@@ -1,0 +1,26 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Match #{{ matchId }} - Blood Bowl{% endblock %}
+
+{% block content %}
+<div class="match-container" data-match-id="{{ matchId }}">
+    <div class="match-container__top">
+        <div id="scoreboard"></div>
+    </div>
+
+    <div class="match-container__main">
+        <div id="reserves-panel"></div>
+        <canvas id="pitch-canvas"></canvas>
+    </div>
+
+    <div class="match-container__bottom">
+        <div id="action-panel"></div>
+        <div id="replay-controls" style="display: none;"></div>
+        <div id="game-log"></div>
+    </div>
+
+    <div id="tooltip" class="tooltip" style="display: none;"></div>
+</div>
+
+<script type="module" src="/dist/match.js"></script>
+{% endblock %}

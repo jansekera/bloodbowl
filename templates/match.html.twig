@@ -1,0 +1,11 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Match - Blood Bowl{% endblock %}
+
+{% block content %}
+<div id="match-container" class="match-container">
+    <canvas id="pitch-canvas"></canvas>
+</div>
+
+<script type="module" src="dist/main.js"></script>
+{% endblock %}
