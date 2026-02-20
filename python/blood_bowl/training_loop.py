@@ -370,6 +370,8 @@ def run_training(
                     with open(best_path, 'w') as f:
                         json.dump(best_data, f)
                     print(f'  New best! Saved to {best_path.name}')
+                    # Auto-push weights_best.json to GitHub
+                    _git_push_weights_best(best_path, bm_wr, bm_sd, epoch)
                 print(f'  Snapshot: {snap_name}')
 
         # Curriculum advancement
@@ -404,6 +406,32 @@ def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lamb
         trainer.train_td_lambda(game_log, gamma=gamma, lambda_=lambda_)
     else:
         raise ValueError(f'Unknown training method: {method}')
+
+
+def _git_push_weights_best(best_path: Path, win_rate: float, score_diff: float, epoch: int) -> None:
+    """Auto-commit and push weights_best.json to GitHub."""
+    import subprocess
+    repo_dir = best_path.parent
+    try:
+        subprocess.run(
+            ['git', 'add', 'weights_best.json'],
+            cwd=str(repo_dir), capture_output=True, timeout=10
+        )
+        msg = f'Update weights_best.json: {win_rate:.0%} win rate, {score_diff:+.1f} score diff (epoch {epoch})'
+        subprocess.run(
+            ['git', 'commit', '-m', msg],
+            cwd=str(repo_dir), capture_output=True, timeout=10
+        )
+        result = subprocess.run(
+            ['git', 'push'],
+            cwd=str(repo_dir), capture_output=True, timeout=30
+        )
+        if result.returncode == 0:
+            print(f'  Pushed weights_best.json to GitHub')
+        else:
+            print(f'  Git push failed (non-critical): {result.stderr.decode()[:100]}')
+    except Exception as e:
+        print(f'  Git push skipped: {e}')
 
 
 def _append_benchmark_csv(csv_path: Path, epoch: int, results: dict) -> None:
