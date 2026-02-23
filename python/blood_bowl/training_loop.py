@@ -369,7 +369,8 @@ def run_training(
                     except Exception:
                         pass
                 if bm_wr > best_wr:
-                    shutil.copy2(str(weights_path), str(best_path))
+                    if str(weights_path.resolve()) != str(best_path.resolve()):
+                        shutil.copy2(str(weights_path), str(best_path))
                     # Store benchmark info in best weights
                     with open(best_path) as f:
                         best_data = json.load(f)
