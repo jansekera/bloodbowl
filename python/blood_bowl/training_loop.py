@@ -330,6 +330,10 @@ def run_training(
             msg += f' | policy: {n_dec} decisions, loss={policy_loss:.3f}'
         print(msg)
 
+        # Print per-game scores
+        scores = [f'{r.home_score}-{r.away_score}' for r in result.results]
+        print(f'  Scores: {", ".join(scores)}')
+
         # Benchmark
         if benchmark_interval > 0 and epoch % benchmark_interval == 0:
             from .benchmark import run_benchmark
