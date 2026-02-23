@@ -131,7 +131,10 @@ def run_training(
         print(f'Policy training: lr={policy_lr}')
     if opp_weights_path:
         print(f'Opponent weights: {opp_weights_path}')
-    # Replay buffer
+    # Replay buffer — auto-enable for MCTS training to prevent forgetting
+    if replay_buffer_size == 0 and mcts_iterations > 0:
+        replay_buffer_size = 10000  # ~50 games worth of transitions
+        replay_batch_size = max(replay_batch_size, 64)
     replay_buffer = None
     if replay_buffer_size > 0:
         from .replay_buffer import ReplayBuffer
@@ -139,7 +142,9 @@ def run_training(
         replay_path = root / 'replay_buffer.pkl'
         if replay_path.exists():
             replay_buffer.load(str(replay_path))
-        print(f'Replay buffer: size={replay_buffer_size}, batch={replay_batch_size}')
+            print(f'Replay buffer: loaded {len(replay_buffer)} transitions, capacity={replay_buffer_size}')
+        else:
+            print(f'Replay buffer: new, capacity={replay_buffer_size}, batch={replay_batch_size}')
 
     # Benchmark
     if benchmark_interval > 0:
@@ -427,6 +432,31 @@ def run_training(
                     # Auto-push weights_best.json to GitHub
                     _git_push_weights_best(best_path, bm_wr, bm_sd, epoch)
                 print(f'  Snapshot: {snap_name}')
+
+                # Auto-revert: if benchmark drops >5% below best, revert and stop
+                if best_wr > 0 and bm_wr < best_wr - 0.05:
+                    print(f'  Over-specialization detected: {bm_wr:.1%} < {best_wr:.1%} - 5%')
+                    if str(weights_path.resolve()) != str(best_path.resolve()):
+                        shutil.copy2(str(best_path), str(weights_path))
+                        print(f'  Reverted weights to best ({best_wr:.1%})')
+                    else:
+                        # Training on weights_best.json directly — restore from snapshot
+                        # Find the best snapshot
+                        best_snap = None
+                        for sp in sorted(weights_path.parent.glob('weights_snap_*.json')):
+                            try:
+                                with open(sp) as f:
+                                    sm = json.load(f)
+                                swr = sm.get('benchmark_win_rate', 0.0)
+                                if swr >= best_wr:
+                                    best_snap = sp
+                            except Exception:
+                                pass
+                        if best_snap:
+                            shutil.copy2(str(best_snap), str(weights_path))
+                            print(f'  Reverted from snapshot {best_snap.name}')
+                    print(f'  Stopping training early to prevent further degradation.')
+                    break
 
         # Curriculum advancement
         if curriculum:
