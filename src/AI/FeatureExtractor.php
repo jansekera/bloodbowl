@@ -214,8 +214,15 @@ final class FeatureExtractor
             }
         }
 
-        // Stall incentive (compound: scoreAdvantage * turnsRemaining * nearEndzone)
-        $stallIncentive = $scoreAdvantageWithBall * $turnsRemaining * $carrierNearEndzone;
+        // Stall incentive: reward holding ball when leading/tied with turns remaining
+        // $turnsRemaining is already normalized (0..1), threshold >2 turns = >0.25
+        $stallIncentive = 0.0;
+        if ($iHaveBall > 0 && $scoreAdvantageWithBall >= 0.0 && $turnsRemaining > 0.25) {
+            $stallIncentive = $turnsRemaining;  // higher when more turns remain
+            if ($scoreAdvantageWithBall > 0.0) {
+                $stallIncentive *= 1.5;  // stronger when leading
+            }
+        }
 
         // Carrier tackle zone count: opp standing adjacent to my carrier
         $carrierTzCount = 0.0;

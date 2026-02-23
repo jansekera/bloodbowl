@@ -231,9 +231,15 @@ void extractFeatures(const GameState& state, TeamSide perspective, float* out) {
     // Carrier near endzone
     bool carrierNearEndzone = iHaveBall && carrierDistToTD <= 3;
 
-    // Stall incentive
-    float stallIncentive = scoreAdvWithBall * (turnsRemaining / 8.0f) *
-                           (carrierNearEndzone ? 1.0f : 0.0f);
+    // Stall incentive: reward holding ball when leading/tied with turns remaining
+    // Active when: have ball, not trailing, turns remaining > 2
+    float stallIncentive = 0.0f;
+    if (iHaveBall && scoreAdvWithBall >= 0.0f && turnsRemaining > 2) {
+        stallIncentive = (turnsRemaining / 8.0f);  // higher when more turns remain
+        if (scoreAdvWithBall > 0.0f) {
+            stallIncentive *= 1.5f;  // stronger incentive when leading
+        }
+    }
 
     // Cage count (adjacent friendly standing players to ball carrier)
     int cageCount = 0;

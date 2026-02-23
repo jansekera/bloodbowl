@@ -184,9 +184,9 @@ final class FeatureExtractorTest extends TestCase
 
         $features = FeatureExtractor::extract($state, TeamSide::HOME);
 
-        // scoreAdvantage = (1+1)/4 = 0.5, turnsRemaining = 8/8 = 1.0, nearEndzone = 1.0
-        // stallIncentive = 0.5 * 1.0 * 1.0 = 0.5
-        $this->assertEqualsWithDelta(0.5, $features[35], 0.001);
+        // iHaveBall=true, leading (scoreAdv>0), turnsRemaining=8/8=1.0
+        // stallIncentive = 1.0 * 1.5 (leading bonus) = 1.5
+        $this->assertEqualsWithDelta(1.5, $features[35], 0.001);
     }
 
     public function testCarrierTzCount(): void

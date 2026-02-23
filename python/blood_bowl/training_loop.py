@@ -229,24 +229,65 @@ def run_training(
         policy_weights_arg = str(weights_path) if use_policy else None
 
         # Run simulation games (timeout is per-game)
-        result = runner.simulate(
-            home_ai=home_ai_type,
-            away_ai=away_ai,
-            matches=games_per_epoch,
-            timeout=timeout,
-            timeout_per_game=True,
-            weights=str(weights_path),
-            epsilon=epsilon,
-            log_dir=str(epoch_log_dir),
-            progress_callback=on_game_done,
-            home_race=home_race,
-            away_race=away_race,
-            away_weights=away_weights_arg,
-            away_epsilon=away_epsilon_arg,
-            tv=tv if tv != 1000 else None,
-            mcts_iterations=mcts_iterations,
-            policy_weights=policy_weights_arg,
-        )
+        # Support mixed away races: "orc,skaven,dwarf,wood-elf"
+        away_races = [r.strip() for r in away_race.split(',')]
+        if len(away_races) > 1:
+            # Distribute games evenly across races
+            all_results = []
+            games_per_race = games_per_epoch // len(away_races)
+            remainder = games_per_epoch % len(away_races)
+            for race_idx, race in enumerate(away_races):
+                race_games = games_per_race + (1 if race_idx < remainder else 0)
+                if race_games == 0:
+                    continue
+                sub_result = runner.simulate(
+                    home_ai=home_ai_type,
+                    away_ai=away_ai,
+                    matches=race_games,
+                    timeout=timeout,
+                    timeout_per_game=True,
+                    weights=str(weights_path),
+                    epsilon=epsilon,
+                    log_dir=str(epoch_log_dir),
+                    progress_callback=on_game_done,
+                    home_race=home_race,
+                    away_race=race,
+                    away_weights=away_weights_arg,
+                    away_epsilon=away_epsilon_arg,
+                    tv=tv if tv != 1000 else None,
+                    mcts_iterations=mcts_iterations,
+                    policy_weights=policy_weights_arg,
+                )
+                all_results.extend(sub_result.results)
+            # Merge into single TournamentResult
+            from .cli_runner import TournamentResult
+            hw = sum(1 for r in all_results if r.winner == 'home')
+            aw = sum(1 for r in all_results if r.winner == 'away')
+            dr = len(all_results) - hw - aw
+            result = TournamentResult(
+                home_ai=home_ai_type, away_ai=away_ai,
+                matches=len(all_results), home_wins=hw, away_wins=aw,
+                draws=dr, results=all_results,
+            )
+        else:
+            result = runner.simulate(
+                home_ai=home_ai_type,
+                away_ai=away_ai,
+                matches=games_per_epoch,
+                timeout=timeout,
+                timeout_per_game=True,
+                weights=str(weights_path),
+                epsilon=epsilon,
+                log_dir=str(epoch_log_dir),
+                progress_callback=on_game_done,
+                home_race=home_race,
+                away_race=away_race,
+                away_weights=away_weights_arg,
+                away_epsilon=away_epsilon_arg,
+                tv=tv if tv != 1000 else None,
+                mcts_iterations=mcts_iterations,
+                policy_weights=policy_weights_arg,
+            )
 
         # Clear progress line
         sys.stdout.write('\r' + ' ' * 80 + '\r')

@@ -216,10 +216,13 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
         int turnsRemaining = std::max(0, 9 - myTeam.turnNumber);
         int scoreDiff = myTeam.score - oppTeam.score;
         bool trailing2plus = (scoreDiff <= -2);
+        bool leading = (scoreDiff >= 1);
+        bool isFirstTurn = (myTeam.turnNumber == 1);
         bool needsRenorm = false;
 
         for (int i = 0; i < n; ++i) {
             float minPrior = 0.0f;
+            float maxPrior = 1.0f;  // cap for SCORE suppression
             switch (macros[i].type) {
                 case MacroType::SCORE:
                 case MacroType::BLITZ_AND_SCORE: {
@@ -236,6 +239,12 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     } else if (trailing2plus) {
                         // Losing badly: score ASAP, no stalling (H2.10)
                         minPrior = 0.50f;
+                    } else if (isFirstTurn && !trailing2plus) {
+                        // Turn 1 of attack: advance with cage, don't OTTD (H12.1)
+                        maxPrior = 0.05f;
+                    } else if (leading && turnsRemaining > 2) {
+                        // Leading with >2 turns: stall, don't give ball back (H12.1)
+                        maxPrior = 0.02f;
                     } else if (turnsRemaining <= 2) {
                         minPrior = 0.35f;
                     } else if (turnsRemaining <= 4) {
@@ -268,6 +277,10 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
             }
             if (minPrior > 0.0f && priors[i] < minPrior) {
                 priors[i] = minPrior;
+                needsRenorm = true;
+            }
+            if (maxPrior < 1.0f && priors[i] > maxPrior) {
+                priors[i] = maxPrior;
                 needsRenorm = true;
             }
         }
