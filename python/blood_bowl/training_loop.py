@@ -241,6 +241,7 @@ def run_training(
             all_results = []
             games_per_race = games_per_epoch // len(away_races)
             remainder = games_per_epoch % len(away_races)
+            game_offset = 0
             for race_idx, race in enumerate(away_races):
                 race_games = games_per_race + (1 if race_idx < remainder else 0)
                 if race_games == 0:
@@ -262,8 +263,10 @@ def run_training(
                     tv=tv if tv != 1000 else None,
                     mcts_iterations=mcts_iterations,
                     policy_weights=policy_weights_arg,
+                    game_offset=game_offset,
                 )
                 all_results.extend(sub_result.results)
+                game_offset += race_games
             # Merge into single TournamentResult
             from .cli_runner import TournamentResult
             hw = sum(1 for r in all_results if r.winner == 'home')

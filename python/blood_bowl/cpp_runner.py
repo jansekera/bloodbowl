@@ -49,6 +49,7 @@ class CPPRunner:
         tv: Optional[int] = None,
         mcts_iterations: int = 0,
         policy_weights: Optional[str] = None,
+        game_offset: int = 0,
     ) -> TournamentResult:
         results: list[MatchResult] = []
         home_wins = 0
@@ -85,13 +86,14 @@ class CPPRunner:
                 # Write JSONL log for trainer
                 if log_path:
                     log_path.mkdir(parents=True, exist_ok=True)
-                    log_file = log_path / f'game_{i + 1:04d}.jsonl'
+                    game_num = game_offset + i + 1
+                    log_file = log_path / f'game_{game_num:04d}.jsonl'
                     self._write_log(log_file, logged, result)
 
                     # Write policy decisions if available
                     decisions = logged.get_policy_decisions()
                     if decisions:
-                        dec_file = log_path / f'decisions_{i + 1:04d}.json'
+                        dec_file = log_path / f'decisions_{game_num:04d}.json'
                         self._write_decisions(dec_file, decisions)
             else:
                 result = self.bb.simulate_game(
