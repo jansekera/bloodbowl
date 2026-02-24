@@ -185,8 +185,12 @@ def extract_features(state: dict, perspective: str) -> list[float]:
                 if dist_to_td <= 3:
                     carrier_near_endzone = 1.0
 
-    # Stall incentive (compound)
-    stall_incentive = score_advantage_with_ball * turns_remaining * carrier_near_endzone
+    # Stall incentive: reward holding ball when leading/tied with turns remaining
+    stall_incentive = 0.0
+    if i_have_ball > 0 and score_advantage_with_ball >= 0.0 and turns_remaining > 0.25:
+        stall_incentive = turns_remaining
+        if score_advantage_with_ball > 0.0:
+            stall_incentive *= 1.5
 
     # --- New tactical features (40-47) ---
 

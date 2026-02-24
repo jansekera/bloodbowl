@@ -113,6 +113,12 @@ def run_training(
     training_start = time.time()
     game_times: list[float] = []
 
+    # Score distribution CSV
+    score_csv_path = csv_path.parent / 'score_log.csv'
+    with open(score_csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['epoch', 'game', 'home_score', 'away_score', 'away_race', 'score_diff'])
+
     effective_opponent = 'learning (self-play)' if self_play else opponent
 
     # Resolve opponent weights path
@@ -159,6 +165,11 @@ def run_training(
         est_total_secs += num_benchmarks * benchmark_matches * avg_game_secs
     est_end = datetime.now() + timedelta(seconds=est_total_secs)
     print(f'Estimated finish: ~{est_end.strftime("%H:%M")} ({est_total_secs // 3600}h {(est_total_secs % 3600) // 60}m)')
+
+    # Kill condition: 3 epochs no improvement
+    epoch_win_rates: list[float] = []
+    epoch_score_diffs: list[float] = []
+    NO_IMPROVE_LIMIT = 3
 
     # Curriculum
     curriculum_stages = [
@@ -383,6 +394,37 @@ def run_training(
         scores = [f'{r.home_score}-{r.away_score}' for r in result.results]
         print(f'  Scores: {", ".join(scores)}')
 
+        # Score distribution CSV + stalling check
+        avg_goals = sum(r.home_score + r.away_score for r in result.results) / max(len(result.results), 1)
+        with open(score_csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            race_list = [r.strip() for r in away_race.split(',')]
+            for gi, r in enumerate(result.results):
+                race_for_game = race_list[gi % len(race_list)] if len(race_list) > 1 else away_race
+                writer.writerow([epoch, gi + 1, r.home_score, r.away_score,
+                                race_for_game, r.home_score - r.away_score])
+        if avg_goals > 4.0:
+            print(f'  WARNING: avg goals/game = {avg_goals:.1f} (>4) — stalling may not be working')
+
+        # Kill condition: 3 epochs with no improvement
+        epoch_win_rates.append(win_rate)
+        epoch_score_diffs.append(avg_score_diff)
+        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT:
+            recent_wr = epoch_win_rates[-NO_IMPROVE_LIMIT:]
+            recent_sd = epoch_score_diffs[-NO_IMPROVE_LIMIT:]
+            # Check if all recent epochs are worse or equal to the one before the window
+            if len(epoch_win_rates) > NO_IMPROVE_LIMIT:
+                prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])
+                prev_best_sd = max(epoch_score_diffs[:-NO_IMPROVE_LIMIT])
+                all_wr_stagnant = all(wr <= prev_best_wr for wr in recent_wr)
+                all_sd_stagnant = all(sd <= prev_best_sd for sd in recent_sd)
+                if all_wr_stagnant and all_sd_stagnant:
+                    print(f'  KILL CONDITION: {NO_IMPROVE_LIMIT} epochs without improvement '
+                          f'(win_rate {[f"{w:.0%}" for w in recent_wr]}, '
+                          f'best before: {prev_best_wr:.0%})')
+                    print(f'  Stopping training. Review strategy before restarting.')
+                    break
+
         # Benchmark
         if benchmark_interval > 0 and epoch % benchmark_interval == 0:
             from .benchmark import run_benchmark
@@ -391,7 +433,7 @@ def run_training(
                 opponents=['random', 'greedy'],
                 matches_per_opponent=benchmark_matches,
                 project_root=str(root),
-                timeout=benchmark_timeout or timeout,
+                timeout=benchmark_timeout or max(timeout, 300),
                 skip_greedy=skip_greedy_benchmark,
                 tv=tv if tv != 1000 else None,
                 use_cpp=use_cpp if cpp_available else False,
@@ -403,6 +445,9 @@ def run_training(
             for opp_name, stats in bench_results.items():
                 print(f'  Benchmark vs {opp_name}: {stats["win_rate"]:.1%} '
                       f'(score diff {stats["avg_score_diff"]:+.2f})')
+
+            # Regression check: compare vs historical best for each opponent
+            _check_regression(bench_csv, epoch, bench_results)
 
             # Auto-snapshot weights after benchmark
             if 'random' in bench_results:
@@ -535,6 +580,33 @@ def _append_benchmark_csv(csv_path: Path, epoch: int, results: dict) -> None:
                 f'{stats["avg_score_diff"]:.2f}',
                 stats['matches'],
             ])
+
+
+def _check_regression(bench_csv: Path, current_epoch: int, current_results: dict) -> None:
+    """Check if benchmark results regressed >10% from historical best."""
+    if not bench_csv.exists():
+        return
+    # Read historical best per opponent
+    best_per_opp: dict[str, float] = {}
+    try:
+        with open(bench_csv) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if int(row['epoch']) >= current_epoch:
+                    continue  # skip current epoch (just written)
+                opp = row['opponent']
+                wr = float(row['win_rate'])
+                if opp not in best_per_opp or wr > best_per_opp[opp]:
+                    best_per_opp[opp] = wr
+    except Exception:
+        return
+
+    for opp, stats in current_results.items():
+        if opp in best_per_opp:
+            best = best_per_opp[opp]
+            current = stats['win_rate']
+            if best > 0 and current < best - 0.10:
+                print(f'  REGRESSION vs {opp}: {current:.1%} (was {best:.1%}, drop {best - current:.1%})')
 
 
 def _read_jsonl(path: Path) -> list[dict]:
