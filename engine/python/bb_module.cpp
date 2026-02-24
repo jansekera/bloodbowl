@@ -235,7 +235,9 @@ PYBIND11_MODULE(bb_engine, m) {
         return bb::executeAction(state, action, base, nullptr);
     });
 
-    m.def("setup_half", &bb::setupHalf);
+    m.def("setup_half", &bb::setupHalf,
+          py::arg("state"), py::arg("home"), py::arg("away"),
+          py::arg("kicking_team") = bb::TeamSide::AWAY);
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
         bb::simpleKickoff(state, base);

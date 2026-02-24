@@ -35,6 +35,25 @@ constexpr FormationPos AWAY_FORMATION[11] = {
     {3, 3}, {3, 7}, {3, 11},
 };
 
+// Defensive formation for kicking team: 3 LOS (wide), 7 wall, 1 deep safety
+constexpr FormationPos HOME_DEFENSIVE_FORMATION[11] = {
+    // 3 on LOS (x=12, wide spread)
+    {0, 4}, {0, 7}, {0, 10},
+    // 7 wall (x=11, continuous y=3..9)
+    {-1, 3}, {-1, 4}, {-1, 5}, {-1, 6}, {-1, 7}, {-1, 8}, {-1, 9},
+    // 1 safety deep (x=7)
+    {-5, 7},
+};
+
+constexpr FormationPos AWAY_DEFENSIVE_FORMATION[11] = {
+    // 3 on LOS (x=13, wide spread)
+    {0, 4}, {0, 7}, {0, 10},
+    // 7 wall (x=14, continuous y=3..9)
+    {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7}, {1, 8}, {1, 9},
+    // 1 safety deep (x=18)
+    {5, 7},
+};
+
 void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
                const FormationPos formation[11]) {
     int baseId = (side == TeamSide::HOME) ? 1 : 12;
@@ -167,7 +186,8 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
 
 } // anonymous namespace
 
-void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away) {
+void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
+               TeamSide kickingTeam) {
     // Reset all players to off-pitch
     for (auto& p : state.players) {
         p.state = PlayerState::OFF_PITCH;
@@ -179,13 +199,38 @@ void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away)
         p.proUsedThisTurn = false;
     }
 
-    // Place teams
-    buildTeam(state, TeamSide::HOME, home, HOME_FORMATION);
-    buildTeam(state, TeamSide::AWAY, away, AWAY_FORMATION);
+    // Kicking team uses defensive formation, receiving team uses standard
+    const auto* homeForm = (kickingTeam == TeamSide::HOME)
+        ? HOME_DEFENSIVE_FORMATION : HOME_FORMATION;
+    const auto* awayForm = (kickingTeam == TeamSide::AWAY)
+        ? AWAY_DEFENSIVE_FORMATION : AWAY_FORMATION;
+
+    buildTeam(state, TeamSide::HOME, home, homeForm);
+    buildTeam(state, TeamSide::AWAY, away, awayForm);
+
+    // Give the kicking team's deep safety the Kick skill (halves kick scatter)
+    // Slot 10 in defensive formation = deep safety position
+    {
+        int kickBaseId = (kickingTeam == TeamSide::HOME) ? 1 : 12;
+        Player& safety = state.getPlayer(kickBaseId + 10);
+        if (safety.isOnPitch()) {
+            safety.skills.add(SkillName::Kick);
+        }
+    }
 
     // Ball off pitch until kickoff
     state.ball = BallState::offPitch();
     state.turnoverPending = false;
+}
+
+// Check if kicking team has a standing player with Kick skill
+bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
+    bool found = false;
+    state.forEachOnPitch(kickingTeam, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING && p.hasSkill(SkillName::Kick))
+            found = true;
+    });
+    return found;
 }
 
 void simpleKickoff(GameState& state, DiceRollerBase& dice) {
@@ -203,12 +248,16 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
     recvTeam.resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
 
-    // Kick target: center of receiving half
-    int kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
+    // Kick target: deep in receiving half (3 sq from endzone)
+    int kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
     int kickY = 7;
 
     // Scatter: D6 for distance, D8 for direction
     int dist = dice.rollD6();
+    // Kick skill: halve scatter distance (round up)
+    if (hasKickPlayer(state, state.kickingTeam)) {
+        dist = (dist + 1) / 2;  // ceil(dist/2)
+    }
     int dir = dice.rollD8();
     Position scatter = scatterDirection(dir);
     int landX = kickX + scatter.x * dist;
@@ -259,7 +308,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     // First half
     state.half = 1;
     state.kickingTeam = TeamSide::AWAY;  // Home receives first
-    setupHalf(state, home, away);
+    setupHalf(state, home, away, state.kickingTeam);
     doKickoff();
 
     std::vector<Action> actions;
@@ -269,7 +318,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         // Handle touchdown → setup + kickoff
         if (state.phase == GamePhase::TOUCHDOWN) {
             state.kickingTeam = opponent(state.kickingTeam);
-            setupHalf(state, home, away);
+            setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }
@@ -278,7 +327,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         if (state.phase == GamePhase::HALF_TIME) {
             state.half = 2;
             state.kickingTeam = opponent(state.kickingTeam);
-            setupHalf(state, home, away);
+            setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }
@@ -332,7 +381,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     // First half
     state.half = 1;
     state.kickingTeam = TeamSide::AWAY;
-    setupHalf(state, home, away);
+    setupHalf(state, home, away, state.kickingTeam);
     doKickoff();
 
     std::vector<Action> actions;
@@ -351,7 +400,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
         if (state.phase == GamePhase::TOUCHDOWN) {
             state.kickingTeam = opponent(state.kickingTeam);
-            setupHalf(state, home, away);
+            setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }
@@ -359,7 +408,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
         if (state.phase == GamePhase::HALF_TIME) {
             state.half = 2;
             state.kickingTeam = opponent(state.kickingTeam);
-            setupHalf(state, home, away);
+            setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }

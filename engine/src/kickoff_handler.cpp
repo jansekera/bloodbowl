@@ -185,6 +185,16 @@ void resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
     }
 }
 
+// Check if kicking team has a standing player with Kick skill
+bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
+    bool found = false;
+    state.forEachOnPitch(kickingTeam, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING && p.hasSkill(SkillName::Kick))
+            found = true;
+    });
+    return found;
+}
+
 } // anonymous namespace
 
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
@@ -201,12 +211,16 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     recvTeam.resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
 
-    // Kick target: center of receiving half
-    int kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
+    // Kick target: deep in receiving half (3 sq from endzone)
+    int kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
     int kickY = 7;
 
     // Scatter: D6 for distance, D8 for direction
     int dist = dice.rollD6();
+    // Kick skill: halve scatter distance (round up)
+    if (hasKickPlayer(state, state.kickingTeam)) {
+        dist = (dist + 1) / 2;  // ceil(dist/2)
+    }
     int dir = dice.rollD8();
     Position scatter = scatterDirection(dir);
     int landX = kickX + scatter.x * dist;

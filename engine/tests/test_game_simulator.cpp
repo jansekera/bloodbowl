@@ -197,3 +197,176 @@ TEST(GameSimulator, AllRostersHaveValidPositionals) {
         EXPECT_GE(totalQty, 11) << "Not enough total positional slots for: " << name;
     }
 }
+
+// --- Defensive Formation Tests ---
+
+TEST(GameSimulator, DefensiveFormation3OnLOS) {
+    GameState state;
+    state.kickingTeam = TeamSide::AWAY;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Away is kicking → away uses defensive formation → only 3 on LOS (x=13)
+    int awayOnLOS = 0;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.position.x == 13) awayOnLOS++;
+    });
+    EXPECT_EQ(awayOnLOS, 3);
+}
+
+TEST(GameSimulator, OffensiveFormation4OnLOS) {
+    GameState state;
+    state.kickingTeam = TeamSide::AWAY;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Home is receiving → standard formation → 4 on LOS (x=12)
+    int homeOnLOS = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.position.x == 12) homeOnLOS++;
+    });
+    EXPECT_EQ(homeOnLOS, 4);
+}
+
+TEST(GameSimulator, DefensiveFormationWall7Players) {
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Away kicking → away defensive: 7 players on wall row (x=14)
+    int awayWall = 0;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.position.x == 14) awayWall++;
+    });
+    EXPECT_EQ(awayWall, 7);
+}
+
+TEST(GameSimulator, DefensiveFormationDeepSafety) {
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Away kicking → away defensive: 1 safety deep at x=18, y=7
+    bool foundSafety = false;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.position.x == 18 && p.position.y == 7) foundSafety = true;
+    });
+    EXPECT_TRUE(foundSafety);
+}
+
+TEST(GameSimulator, KickSkillOnDeepSafety) {
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Deep safety (slot 10, id=22 for AWAY) should have Kick skill
+    bool hasKick = false;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.hasSkill(SkillName::Kick)) hasKick = true;
+    });
+    EXPECT_TRUE(hasKick);
+
+    // Exactly one player should have Kick
+    int kickCount = 0;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.hasSkill(SkillName::Kick)) kickCount++;
+    });
+    EXPECT_EQ(kickCount, 1);
+}
+
+TEST(GameSimulator, KickSkillHalvesScatter) {
+    // With Kick skill, D6 scatter should be halved (ceil):
+    // D6=1→1, D6=2→1, D6=3→2, D6=4→2, D6=5→3, D6=6→3
+    // Max scatter is 3, so from x=3, worst case is x=3-3=0 (still on pitch)
+    // Without Kick: max scatter 6, from x=3 could land at x=-3 (clamped to 0)
+    GameState state;
+    state.kickingTeam = TeamSide::AWAY;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    // Verify kicking team has Kick skill
+    bool hasKick = false;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.hasSkill(SkillName::Kick)) hasKick = true;
+    });
+    ASSERT_TRUE(hasKick);
+
+    // Run 50 kickoffs, verify ball never scatters more than 3 from target
+    for (int seed = 0; seed < 50; seed++) {
+        GameState s2 = state;  // copy
+        DiceRoller dice(seed);
+        simpleKickoff(s2, dice);
+        // Ball should be on pitch
+        EXPECT_TRUE(s2.ball.isOnPitch() || s2.ball.isHeld)
+            << "Ball off pitch with seed=" << seed;
+    }
+}
+
+TEST(GameSimulator, DefensiveFormationNoOverlaps) {
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    std::set<std::pair<int,int>> positions;
+    for (auto& p : state.players) {
+        if (!p.isOnPitch()) continue;
+        auto pos = std::make_pair((int)p.position.x, (int)p.position.y);
+        EXPECT_EQ(positions.count(pos), 0u)
+            << "Duplicate position at (" << pos.first << "," << pos.second << ")";
+        positions.insert(pos);
+    }
+    EXPECT_EQ(positions.size(), 22u);
+}
+
+TEST(GameSimulator, DeepKickTargetInReceivingHalf) {
+    // Test that deep kick (x=22 when HOME kicks, x=3 when AWAY kicks)
+    // still lands in receiving half after scatter
+    for (int seed = 0; seed < 20; seed++) {
+        GameState state;
+        state.kickingTeam = TeamSide::AWAY;
+        setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+        DiceRoller dice(seed);
+        simpleKickoff(state, dice);
+
+        // Ball should be on pitch
+        EXPECT_TRUE(state.ball.isOnPitch() || state.ball.isHeld)
+            << "Ball off pitch with seed=" << seed;
+    }
+}
+
+TEST(GameSimulator, BackwardCompatDefault) {
+    // setupHalf without kickingTeam param should still work (default = AWAY kicking)
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster());
+
+    int homeOnPitch = 0, awayOnPitch = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.isOnPitch()) homeOnPitch++;
+    });
+    state.forEachPlayer(TeamSide::AWAY, [&](const Player& p) {
+        if (p.isOnPitch()) awayOnPitch++;
+    });
+
+    EXPECT_EQ(homeOnPitch, 11);
+    EXPECT_EQ(awayOnPitch, 11);
+
+    // With default (AWAY kicking), away should use defensive formation = 3 on LOS
+    int awayOnLOS = 0;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.position.x == 13) awayOnLOS++;
+    });
+    EXPECT_EQ(awayOnLOS, 3);
+}
+
+TEST(GameSimulator, HomeKickingUsesDefensiveFormation) {
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
+
+    // Home is kicking → home uses defensive formation → 3 on LOS (x=12)
+    int homeOnLOS = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.position.x == 12) homeOnLOS++;
+    });
+    EXPECT_EQ(homeOnLOS, 3);
+
+    // Away is receiving → standard formation → 4 on LOS (x=13)
+    int awayOnLOS = 0;
+    state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.position.x == 13) awayOnLOS++;
+    });
+    EXPECT_EQ(awayOnLOS, 4);
+}

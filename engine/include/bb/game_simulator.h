@@ -16,8 +16,10 @@ struct GameResult {
     int totalActions = 0;
 };
 
-// Set up 11 players per team in standard formation, initialize team state
-void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away);
+// Set up 11 players per team in formation, initialize team state
+// kickingTeam selects defensive formation for kicking side (default AWAY = HOME receives)
+void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
+               TeamSide kickingTeam = TeamSide::AWAY);
 
 // Simplified kickoff: place ball with scatter, transition to PLAY
 void simpleKickoff(GameState& state, DiceRollerBase& dice);
