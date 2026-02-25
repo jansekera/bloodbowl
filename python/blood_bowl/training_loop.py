@@ -166,10 +166,10 @@ def run_training(
     est_end = datetime.now() + timedelta(seconds=est_total_secs)
     print(f'Estimated finish: ~{est_end.strftime("%H:%M")} ({est_total_secs // 3600}h {(est_total_secs % 3600) // 60}m)')
 
-    # Kill condition: 3 epochs no improvement
+    # Kill condition: 5 epochs no improvement in either win_rate or score_diff
     epoch_win_rates: list[float] = []
     epoch_score_diffs: list[float] = []
-    NO_IMPROVE_LIMIT = 3
+    NO_IMPROVE_LIMIT = 5
 
     # Curriculum
     curriculum_stages = [
@@ -394,8 +394,22 @@ def run_training(
         scores = [f'{r.home_score}-{r.away_score}' for r in result.results]
         print(f'  Scores: {", ".join(scores)}')
 
+        # Detailed stats for analysis
+        n_games = len(result.results)
+        wins = sum(1 for r in result.results if r.home_score > r.away_score)
+        draws = sum(1 for r in result.results if r.home_score == r.away_score)
+        losses = sum(1 for r in result.results if r.home_score < r.away_score)
+        shutouts = sum(1 for r in result.results if r.home_score > 0 and r.away_score == 0)
+        shutout_losses = sum(1 for r in result.results if r.home_score == 0 and r.away_score > 0)
+        nil_nil = sum(1 for r in result.results if r.home_score == 0 and r.away_score == 0)
+        avg_goals = sum(r.home_score + r.away_score for r in result.results) / max(n_games, 1)
+        avg_home = sum(r.home_score for r in result.results) / max(n_games, 1)
+        avg_away = sum(r.away_score for r in result.results) / max(n_games, 1)
+        max_total = max((r.home_score + r.away_score for r in result.results), default=0)
+        print(f'  Stats: {wins}W {draws}D {losses}L | avg goals {avg_goals:.1f} (home {avg_home:.1f}, away {avg_away:.1f}) | '
+              f'max {max_total} | shutouts {shutouts} | 0-0s {nil_nil}')
+
         # Score distribution CSV + stalling check
-        avg_goals = sum(r.home_score + r.away_score for r in result.results) / max(len(result.results), 1)
         with open(score_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             race_list = [r.strip() for r in away_race.split(',')]
@@ -406,24 +420,22 @@ def run_training(
         if avg_goals > 4.0:
             print(f'  WARNING: avg goals/game = {avg_goals:.1f} (>4) — stalling may not be working')
 
-        # Kill condition: 3 epochs with no improvement
+        # Kill condition: 5 epochs with no improvement in EITHER metric
         epoch_win_rates.append(win_rate)
         epoch_score_diffs.append(avg_score_diff)
-        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT:
+        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT and len(epoch_win_rates) > NO_IMPROVE_LIMIT:
             recent_wr = epoch_win_rates[-NO_IMPROVE_LIMIT:]
             recent_sd = epoch_score_diffs[-NO_IMPROVE_LIMIT:]
-            # Check if all recent epochs are worse or equal to the one before the window
-            if len(epoch_win_rates) > NO_IMPROVE_LIMIT:
-                prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])
-                prev_best_sd = max(epoch_score_diffs[:-NO_IMPROVE_LIMIT])
-                all_wr_stagnant = all(wr <= prev_best_wr for wr in recent_wr)
-                all_sd_stagnant = all(sd <= prev_best_sd for sd in recent_sd)
-                if all_wr_stagnant and all_sd_stagnant:
-                    print(f'  KILL CONDITION: {NO_IMPROVE_LIMIT} epochs without improvement '
-                          f'(win_rate {[f"{w:.0%}" for w in recent_wr]}, '
-                          f'best before: {prev_best_wr:.0%})')
-                    print(f'  Stopping training. Review strategy before restarting.')
-                    break
+            prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])
+            prev_best_sd = max(epoch_score_diffs[:-NO_IMPROVE_LIMIT])
+            all_wr_stagnant = all(wr <= prev_best_wr for wr in recent_wr)
+            all_sd_stagnant = all(sd <= prev_best_sd for sd in recent_sd)
+            if all_wr_stagnant and all_sd_stagnant:
+                print(f'  KILL CONDITION: {NO_IMPROVE_LIMIT} epochs without improvement')
+                print(f'    win_rate {[f"{w:.0%}" for w in recent_wr]} (best before: {prev_best_wr:.0%})')
+                print(f'    score_diff {[f"{s:+.2f}" for s in recent_sd]} (best before: {prev_best_sd:+.2f})')
+                print(f'  Stopping training. Review strategy before restarting.')
+                break
 
         # Benchmark
         if benchmark_interval > 0 and epoch % benchmark_interval == 0:

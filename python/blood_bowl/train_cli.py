@@ -21,7 +21,7 @@ def main():
     parser.add_argument('--opponent', default='random', help='Opponent AI type (random/greedy)')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--epsilon-start', type=float, default=0.3, help='Starting epsilon')
-    parser.add_argument('--epsilon-end', type=float, default=0.05, help='Ending epsilon')
+    parser.add_argument('--epsilon-end', type=float, default=0.10, help='Ending epsilon (floor)')
     parser.add_argument('--weights', default='weights.json', help='Weights file path')
     parser.add_argument('--log-dir', default='training_logs', help='Log directory')
     parser.add_argument('--output-csv', default='training_results.csv', help='CSV output path')
