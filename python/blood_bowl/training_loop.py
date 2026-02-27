@@ -409,6 +409,24 @@ def run_training(
         print(f'  Stats: {wins}W {draws}D {losses}L | avg goals {avg_goals:.1f} (home {avg_home:.1f}, away {avg_away:.1f}) | '
               f'max {max_total} | shutouts {shutouts} | 0-0s {nil_nil}')
 
+        # Per-race breakdown (if mixed races)
+        race_list = [r.strip() for r in away_race.split(',')]
+        if len(race_list) > 1:
+            race_stats: dict[str, list] = {}
+            for gi, r in enumerate(result.results):
+                race = race_list[gi % len(race_list)]
+                race_stats.setdefault(race, []).append(r)
+            parts = []
+            for race in race_list:
+                games = race_stats.get(race, [])
+                if not games:
+                    continue
+                rw = sum(1 for g in games if g.home_score > g.away_score)
+                rd = sum(1 for g in games if g.home_score == g.away_score)
+                rl = sum(1 for g in games if g.home_score < g.away_score)
+                parts.append(f'{race}: {rw}W{rd}D{rl}L')
+            print(f'  Races: {" | ".join(parts)}')
+
         # Score distribution CSV + stalling check
         with open(score_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
