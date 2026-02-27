@@ -406,8 +406,18 @@ def run_training(
         avg_home = sum(r.home_score for r in result.results) / max(n_games, 1)
         avg_away = sum(r.away_score for r in result.results) / max(n_games, 1)
         max_total = max((r.home_score + r.away_score for r in result.results), default=0)
+        # Game length stats (total actions per game)
+        actions = [r.total_actions for r in result.results]
+        actions_min = min(actions) if actions else 0
+        actions_max = max(actions) if actions else 0
+        actions_avg = sum(actions) / len(actions) if actions else 0
+        actions_sorted = sorted(actions)
+        actions_med = (actions_sorted[len(actions_sorted)//2] if len(actions_sorted) % 2 == 1
+                       else (actions_sorted[len(actions_sorted)//2 - 1] + actions_sorted[len(actions_sorted)//2]) / 2
+                       ) if actions_sorted else 0
         print(f'  Stats: {wins}W {draws}D {losses}L | avg goals {avg_goals:.1f} (home {avg_home:.1f}, away {avg_away:.1f}) | '
               f'max {max_total} | shutouts {shutouts} | 0-0s {nil_nil}')
+        print(f'  Actions: min={actions_min} max={actions_max} avg={actions_avg:.0f} median={actions_med:.0f}')
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
