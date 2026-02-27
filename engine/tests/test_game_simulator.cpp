@@ -226,28 +226,30 @@ TEST(GameSimulator, OffensiveFormation4OnLOS) {
     EXPECT_EQ(homeOnLOS, 4);
 }
 
-TEST(GameSimulator, DefensiveFormationWall7Players) {
+TEST(GameSimulator, DefensiveFormation2DeepColumns) {
     GameState state;
     setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
 
-    // Away kicking → away defensive: 7 players on wall row (x=14)
-    int awayWall = 0;
+    // Away kicking → 2-deep columns: 3 at x=14 (fronts) + 3 at x=15 (backs)
+    int awayFronts = 0, awayBacks = 0;
     state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
-        if (p.position.x == 14) awayWall++;
+        if (p.position.x == 14) awayFronts++;
+        if (p.position.x == 15) awayBacks++;
     });
-    EXPECT_EQ(awayWall, 7);
+    EXPECT_EQ(awayFronts, 3);
+    EXPECT_EQ(awayBacks, 3);
 }
 
-TEST(GameSimulator, DefensiveFormationDeepSafety) {
+TEST(GameSimulator, DefensiveFormationDeepSafeties) {
     GameState state;
     setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
 
-    // Away kicking → away defensive: 1 safety deep at x=18, y=7
-    bool foundSafety = false;
+    // Away kicking → 2 deep safeties at x=18, y=5 and y=9
+    int safetyCount = 0;
     state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
-        if (p.position.x == 18 && p.position.y == 7) foundSafety = true;
+        if (p.position.x == 18) safetyCount++;
     });
-    EXPECT_TRUE(foundSafety);
+    EXPECT_EQ(safetyCount, 2);
 }
 
 TEST(GameSimulator, KickSkillOnDeepSafety) {

@@ -35,23 +35,29 @@ constexpr FormationPos AWAY_FORMATION[11] = {
     {3, 3}, {3, 7}, {3, 11},
 };
 
-// Defensive formation for kicking team: 3 LOS (wide), 7 wall, 1 deep safety
+// Defensive formation for kicking team: 2-deep columns (P..P..P pattern)
+// 3 columns at y=4,7,10 — each 3 deep (LOS + 2 behind) — 2 sq gaps between
+// 2 deep safeties covering the gaps
 constexpr FormationPos HOME_DEFENSIVE_FORMATION[11] = {
     // 3 on LOS (x=12, wide spread)
     {0, 4}, {0, 7}, {0, 10},
-    // 7 wall (x=11, continuous y=3..9)
-    {-1, 3}, {-1, 4}, {-1, 5}, {-1, 6}, {-1, 7}, {-1, 8}, {-1, 9},
-    // 1 safety deep (x=7)
-    {-5, 7},
+    // 3 column fronts (x=11, behind LOS)
+    {-1, 4}, {-1, 7}, {-1, 10},
+    // 3 column backs (x=10, behind fronts)
+    {-2, 4}, {-2, 7}, {-2, 10},
+    // 2 deep safeties (x=7, covering gaps)
+    {-5, 5}, {-5, 9},
 };
 
 constexpr FormationPos AWAY_DEFENSIVE_FORMATION[11] = {
     // 3 on LOS (x=13, wide spread)
     {0, 4}, {0, 7}, {0, 10},
-    // 7 wall (x=14, continuous y=3..9)
-    {1, 3}, {1, 4}, {1, 5}, {1, 6}, {1, 7}, {1, 8}, {1, 9},
-    // 1 safety deep (x=18)
-    {5, 7},
+    // 3 column fronts (x=14, behind LOS)
+    {1, 4}, {1, 7}, {1, 10},
+    // 3 column backs (x=15, behind fronts)
+    {2, 4}, {2, 7}, {2, 10},
+    // 2 deep safeties (x=18, covering gaps)
+    {5, 5}, {5, 9},
 };
 
 void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
