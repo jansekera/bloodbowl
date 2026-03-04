@@ -204,4 +204,7 @@ inline KickoffEvent kickoffEventFromRoll(int roll) {
     return static_cast<KickoffEvent>(roll);
 }
 
+// --- RosterSpeed ---
+enum class RosterSpeed : uint8_t { SLOW, MIXED, FAST };
+
 } // namespace bb

@@ -211,8 +211,13 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     recvTeam.resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
 
-    // Kick target: deep in receiving half (3 sq from endzone)
-    int kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
+    // Kick target: short vs fast, deep vs slow/mixed
+    int kickX;
+    if (state.receiverSpeed == RosterSpeed::FAST) {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
+    } else {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
+    }
     int kickY = 7;
 
     // Scatter: D6 for distance, D8 for direction

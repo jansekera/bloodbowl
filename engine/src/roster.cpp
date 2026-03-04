@@ -468,6 +468,29 @@ const TeamRoster& getChaosPactRoster() {
     return roster;
 }
 
+RosterSpeed classifyRosterSpeed(const TeamRoster& roster) {
+    // Build 11-player team same as buildTeam: specialists from back, linemen fill rest
+    int maSum = 0;
+    int specSlot = 10;
+
+    for (int t = 1; t < roster.positionalCount && specSlot >= 0; ++t) {
+        int qty = std::min((int)roster.positionals[t].quantity, specSlot + 1);
+        for (int q = 0; q < qty && specSlot >= 0; ++q) {
+            maSum += roster.positionals[t].stats.movement;
+            specSlot--;
+        }
+    }
+    // Fill remaining with linemen (index 0)
+    for (int i = 0; i <= specSlot; ++i) {
+        maSum += roster.positionals[0].stats.movement;
+    }
+
+    float avgMA = static_cast<float>(maSum) / 11.0f;
+    if (avgMA > 7.0f) return RosterSpeed::FAST;
+    if (avgMA <= 5.0f) return RosterSpeed::SLOW;
+    return RosterSpeed::MIXED;
+}
+
 const TeamRoster* getRosterByName(const std::string& name) {
     std::string lower = toLower(name);
 

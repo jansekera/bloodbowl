@@ -51,4 +51,7 @@ const TeamRoster& getChaosPactRoster();
 // Lookup roster by name (case-insensitive)
 const TeamRoster* getRosterByName(const std::string& name);
 
+// Classify roster speed based on average MA of an 11-player team
+RosterSpeed classifyRosterSpeed(const TeamRoster& roster);
+
 } // namespace bb

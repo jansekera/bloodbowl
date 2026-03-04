@@ -60,6 +60,54 @@ constexpr FormationPos AWAY_DEFENSIVE_FORMATION[11] = {
     {5, 5}, {5, 9},
 };
 
+// Pressure formation vs fast teams: compact, more players near LOS
+// 3 LOS + 4 contain line (dx=-1/+1) + 3 second row (dx=-2/+2) + 1 sweeper (dx=-4/+4)
+constexpr FormationPos HOME_PRESSURE_FORMATION[11] = {
+    // 3 on LOS (x=12)
+    {0, 4}, {0, 7}, {0, 10},
+    // 4 contain line (x=11, filling gaps)
+    {-1, 3}, {-1, 6}, {-1, 8}, {-1, 11},
+    // 3 second row (x=10)
+    {-2, 5}, {-2, 7}, {-2, 9},
+    // 1 sweeper with Kick (x=8)
+    {-4, 7},
+};
+
+constexpr FormationPos AWAY_PRESSURE_FORMATION[11] = {
+    // 3 on LOS (x=13)
+    {0, 4}, {0, 7}, {0, 10},
+    // 4 contain line (x=14)
+    {1, 3}, {1, 6}, {1, 8}, {1, 11},
+    // 3 second row (x=15)
+    {2, 5}, {2, 7}, {2, 9},
+    // 1 sweeper with Kick (x=17)
+    {4, 7},
+};
+
+// Deep receiver formation for receiving team: better ball pickup
+// 4 LOS + 4 second row + 2 mid backfield + 1 deep receiver (specialist in slot 10)
+constexpr FormationPos HOME_DEEP_RECEIVER_FORMATION[11] = {
+    // 4 on LOS (x=12)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // 4 second row (x=11)
+    {-1, 4}, {-1, 6}, {-1, 8}, {-1, 10},
+    // 2 mid backfield (x=9)
+    {-3, 5}, {-3, 9},
+    // 1 deep receiver (x=7, slot 10 = specialist)
+    {-5, 7},
+};
+
+constexpr FormationPos AWAY_DEEP_RECEIVER_FORMATION[11] = {
+    // 4 on LOS (x=13)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // 4 second row (x=14)
+    {1, 4}, {1, 6}, {1, 8}, {1, 10},
+    // 2 mid backfield (x=16)
+    {3, 5}, {3, 9},
+    // 1 deep receiver (x=18, slot 10 = specialist)
+    {5, 7},
+};
+
 void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
                const FormationPos formation[11]) {
     int baseId = (side == TeamSide::HOME) ? 1 : 12;
@@ -205,17 +253,29 @@ void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
         p.proUsedThisTurn = false;
     }
 
-    // Kicking team uses defensive formation, receiving team uses standard
+    // Classify receiver speed for roster-aware decisions
+    const TeamRoster& receivingRoster = (kickingTeam == TeamSide::HOME) ? away : home;
+    RosterSpeed recvSpeed = classifyRosterSpeed(receivingRoster);
+    state.receiverSpeed = recvSpeed;
+
+    // Kicking team: pressure vs fast, 2-deep columns vs slow/mixed
+    const FormationPos* homeKickForm = HOME_DEFENSIVE_FORMATION;
+    const FormationPos* awayKickForm = AWAY_DEFENSIVE_FORMATION;
+    if (recvSpeed == RosterSpeed::FAST) {
+        homeKickForm = HOME_PRESSURE_FORMATION;
+        awayKickForm = AWAY_PRESSURE_FORMATION;
+    }
+
+    // Receiving team always uses deep receiver formation
     const auto* homeForm = (kickingTeam == TeamSide::HOME)
-        ? HOME_DEFENSIVE_FORMATION : HOME_FORMATION;
+        ? homeKickForm : HOME_DEEP_RECEIVER_FORMATION;
     const auto* awayForm = (kickingTeam == TeamSide::AWAY)
-        ? AWAY_DEFENSIVE_FORMATION : AWAY_FORMATION;
+        ? awayKickForm : AWAY_DEEP_RECEIVER_FORMATION;
 
     buildTeam(state, TeamSide::HOME, home, homeForm);
     buildTeam(state, TeamSide::AWAY, away, awayForm);
 
-    // Give the kicking team's deep safety the Kick skill (halves kick scatter)
-    // Slot 10 in defensive formation = deep safety position
+    // Give the kicking team's slot 10 player the Kick skill (sweeper/deep safety)
     {
         int kickBaseId = (kickingTeam == TeamSide::HOME) ? 1 : 12;
         Player& safety = state.getPlayer(kickBaseId + 10);
@@ -254,8 +314,13 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
     recvTeam.resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
 
-    // Kick target: deep in receiving half (3 sq from endzone)
-    int kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
+    // Kick target: short vs fast, deep vs slow/mixed
+    int kickX;
+    if (state.receiverSpeed == RosterSpeed::FAST) {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
+    } else {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
+    }
     int kickY = 7;
 
     // Scatter: D6 for distance, D8 for direction

@@ -171,6 +171,11 @@ def run_training(
     epoch_score_diffs: list[float] = []
     NO_IMPROVE_LIMIT = 5
 
+    # Track best training weights per-epoch (separate from benchmark best)
+    best_train_wr = 0.0
+    best_train_sd = -999.0
+    best_train_epoch = 0
+
     # Curriculum
     curriculum_stages = [
         {'opponent': 'random', 'win_rate_threshold': 0.65},
@@ -369,6 +374,18 @@ def run_training(
         else:
             trainer.save_weights(str(weights_path))
 
+        # Track best training weights (save separately from benchmark best)
+        train_wr = result.home_win_rate
+        train_sd = sum(
+            r.home_score - r.away_score for r in result.results
+        ) / max(len(result.results), 1)
+        if train_wr > best_train_wr or (train_wr == best_train_wr and train_sd > best_train_sd):
+            best_train_wr = train_wr
+            best_train_sd = train_sd
+            best_train_epoch = epoch
+            train_best_path = weights_path.parent / 'weights_train_best.json'
+            shutil.copy2(str(weights_path), str(train_best_path))
+
         # Compute metrics
         win_rate = result.home_win_rate  # learning AI is home
         avg_score_diff = sum(
@@ -448,24 +465,7 @@ def run_training(
         if avg_goals > 4.0:
             print(f'  WARNING: avg goals/game = {avg_goals:.1f} (>4) — stalling may not be working')
 
-        # Kill condition: 5 epochs with no improvement in EITHER metric
-        epoch_win_rates.append(win_rate)
-        epoch_score_diffs.append(avg_score_diff)
-        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT and len(epoch_win_rates) > NO_IMPROVE_LIMIT:
-            recent_wr = epoch_win_rates[-NO_IMPROVE_LIMIT:]
-            recent_sd = epoch_score_diffs[-NO_IMPROVE_LIMIT:]
-            prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])
-            prev_best_sd = max(epoch_score_diffs[:-NO_IMPROVE_LIMIT])
-            all_wr_stagnant = all(wr <= prev_best_wr for wr in recent_wr)
-            all_sd_stagnant = all(sd <= prev_best_sd for sd in recent_sd)
-            if all_wr_stagnant and all_sd_stagnant:
-                print(f'  KILL CONDITION: {NO_IMPROVE_LIMIT} epochs without improvement')
-                print(f'    win_rate {[f"{w:.0%}" for w in recent_wr]} (best before: {prev_best_wr:.0%})')
-                print(f'    score_diff {[f"{s:+.2f}" for s in recent_sd]} (best before: {prev_best_sd:+.2f})')
-                print(f'  Stopping training. Review strategy before restarting.')
-                break
-
-        # Benchmark
+        # Benchmark (before kill condition so it always runs at interval)
         if benchmark_interval > 0 and epoch % benchmark_interval == 0:
             from .benchmark import run_benchmark
             bench_results = run_benchmark(
@@ -493,7 +493,7 @@ def run_training(
             if 'random' in bench_results:
                 bm_wr = bench_results['random']['win_rate']
                 bm_sd = bench_results['random']['avg_score_diff']
-                snap_name = f'weights_snap_e{epoch}_{bm_wr:.0%}_{bm_sd:+.1f}.json'
+                snap_name = f'weights_snap_e{epoch}_{bm_wr*100:.0f}pct_{bm_sd:+.1f}.json'
                 snap_path = weights_path.parent / snap_name
                 shutil.copy2(str(weights_path), str(snap_path))
                 # Update weights_best.json if this is the best benchmark
@@ -560,10 +560,29 @@ def run_training(
                     print(f'  >> Curriculum: advancing to stage {curriculum_stage} '
                           f'({next_stage["opponent"]})')
 
+        # Kill condition: 5 epochs with no improvement in EITHER metric
+        epoch_win_rates.append(win_rate)
+        epoch_score_diffs.append(avg_score_diff)
+        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT and len(epoch_win_rates) > NO_IMPROVE_LIMIT:
+            recent_wr = epoch_win_rates[-NO_IMPROVE_LIMIT:]
+            recent_sd = epoch_score_diffs[-NO_IMPROVE_LIMIT:]
+            prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])
+            prev_best_sd = max(epoch_score_diffs[:-NO_IMPROVE_LIMIT])
+            all_wr_stagnant = all(wr <= prev_best_wr for wr in recent_wr)
+            all_sd_stagnant = all(sd <= prev_best_sd for sd in recent_sd)
+            if all_wr_stagnant and all_sd_stagnant:
+                print(f'  KILL CONDITION: {NO_IMPROVE_LIMIT} epochs without improvement')
+                print(f'    win_rate {[f"{w:.0%}" for w in recent_wr]} (best before: {prev_best_wr:.0%})')
+                print(f'    score_diff {[f"{s:+.2f}" for s in recent_sd]} (best before: {prev_best_sd:+.2f})')
+                print(f'  Stopping training. Review strategy before restarting.')
+                break
+
     total_time = time.time() - training_start
     mins, secs = divmod(int(total_time), 60)
     hours, mins = divmod(mins, 60)
     print(f'\nTraining complete in {hours}h{mins:02d}m{secs:02d}s')
+    if best_train_epoch > 0:
+        print(f'Best training epoch: {best_train_epoch} ({best_train_wr:.1%} WR, {best_train_sd:+.2f} SD) → weights_train_best.json')
 
 
 def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lambda_: float) -> None:

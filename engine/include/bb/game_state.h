@@ -21,6 +21,7 @@ public:
     bool turnoverPending = false;
     TeamSide kickingTeam = TeamSide::AWAY;
     Weather weather = Weather::NICE;
+    RosterSpeed receiverSpeed = RosterSpeed::MIXED;
 
     GameState();
 
