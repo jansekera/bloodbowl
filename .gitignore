@@ -32,6 +32,8 @@ __pycache__/
 # Keep weights_best.json in git, ignore the rest
 /weights*.json
 !/weights_best.json
+!/weights_train_best.json
+!/weights_snap_*.json
 
 # Coverage
 /coverage/
