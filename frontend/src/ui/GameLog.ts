@@ -45,7 +45,29 @@ export class GameLog {
 
     private renderEvent(event: GameEvent): string {
         const cssClass = this.getEventClass(event.type);
-        return `<div class="game-log__event game-log__event--${cssClass}">${this.escapeHtml(event.description)}</div>`;
+        let desc = this.escapeHtml(event.description);
+
+        // Replace block dice names with icons
+        if (event.type === 'block' || event.type === 'multiple_block') {
+            desc = this.addDiceIcons(desc);
+        }
+
+        return `<div class="game-log__event game-log__event--${cssClass}">${desc}</div>`;
+    }
+
+    private addDiceIcons(text: string): string {
+        const diceMap: Record<string, { icon: string; css: string; title: string }> = {
+            'defender_down': { icon: 'DD', css: 'pow', title: 'Defender Down' },
+            'defender_stumbles': { icon: 'DS', css: 'stumble', title: 'Defender Stumbles' },
+            'pushed': { icon: '>', css: 'push', title: 'Push' },
+            'attacker_down': { icon: 'AD', css: 'skull', title: 'Attacker Down' },
+            'both_down': { icon: 'BD', css: 'bothdown', title: 'Both Down' },
+        };
+
+        for (const [name, { icon, css, title }] of Object.entries(diceMap)) {
+            text = text.replaceAll(name, `<span class="dice-icon dice-icon--${css}" title="${title}">${icon}</span>`);
+        }
+        return text;
     }
 
     private getEventClass(type: string): string {

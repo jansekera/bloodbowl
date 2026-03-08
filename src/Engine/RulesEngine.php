@@ -207,7 +207,7 @@ final class RulesEngine
     /**
      * Get valid move targets for a specific player.
      *
-     * @return list<array{x: int, y: int, dodges: int, gfis: int}>
+     * @return list<array{x: int, y: int, dodges: int, gfis: int, path: list<array{x: int, y: int, dodge: bool, gfi: bool}>}>
      */
     public function getValidMoveTargets(GameState $state, int $playerId): array
     {
@@ -227,16 +227,28 @@ final class RulesEngine
                 'y' => $pos->getY(),
                 'dodges' => 0,
                 'gfis' => 0,
+                'path' => [],
             ];
         }
 
         foreach ($moves as $path) {
             $dest = $path->getDestination();
+            $pathSteps = [];
+            foreach ($path->getSteps() as $step) {
+                $stepPos = $step->getPosition();
+                $pathSteps[] = [
+                    'x' => $stepPos->getX(),
+                    'y' => $stepPos->getY(),
+                    'dodge' => $step->requiresDodge(),
+                    'gfi' => $step->isGfi(),
+                ];
+            }
             $targets[] = [
                 'x' => $dest->getX(),
                 'y' => $dest->getY(),
                 'dodges' => $path->getDodgeCount(),
                 'gfis' => $path->getGfiCount(),
+                'path' => $pathSteps,
             ];
         }
 

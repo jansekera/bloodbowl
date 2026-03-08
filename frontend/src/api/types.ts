@@ -73,12 +73,21 @@ export interface TeamState {
     foulUsedThisTurn: boolean;
 }
 
+/** Single step in a movement path */
+export interface PathStep {
+    x: number;
+    y: number;
+    dodge: boolean;
+    gfi: boolean;
+}
+
 /** Move target with risk info */
 export interface MoveTarget {
     x: number;
     y: number;
     dodges: number;
     gfis: number;
+    path?: PathStep[];
 }
 
 /** Action result from submitting an action */

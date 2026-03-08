@@ -13,6 +13,8 @@ import { MatchSummary, buildSummaryData } from './ui/MatchSummary';
 import { PhaseBanner } from './ui/PhaseBanner';
 import { Toast } from './ui/Toast';
 import { LevelUpModal } from './ui/LevelUpModal';
+import { DugoutPanel } from './ui/DugoutPanel';
+import { PlayerCard } from './ui/PlayerCard';
 
 const api = new ApiClient();
 
@@ -44,6 +46,11 @@ const reservesPanel = new ReservesPanel(reservesPanelEl, handleReservesSelect);
 const replayControlsEl = document.getElementById('replay-controls')!;
 const replayControls = new ReplayControls(replayControlsEl);
 
+const dugoutPanelEl = document.getElementById('dugout-panel')!;
+const dugoutPanel = new DugoutPanel(dugoutPanelEl);
+
+const playerCard = new PlayerCard(actionPanelEl);
+
 const tooltipEl = document.getElementById('tooltip')!;
 const tooltip = new Tooltip(tooltipEl.parentElement!);
 
@@ -62,6 +69,18 @@ const animationQueue = new AnimationQueue(
 );
 renderer.setAnimationState(animationQueue.state);
 
+function drawPathOverlay(sel: ReturnType<typeof stateManager.getSelection>): void {
+    if (sel.mode !== 'move' || !sel.hoveredCell || !sel.selectedPlayerId) return;
+    const hovered = sel.hoveredCell;
+    const target = moveTargets.find(t => t.x === hovered.x && t.y === hovered.y);
+    if (!target?.path?.length) return;
+    const state = stateManager.getGameState();
+    if (!state) return;
+    const player = state.players.find(p => p.id === sel.selectedPlayerId);
+    if (!player?.position) return;
+    renderer.drawMovePath(player.position, target.path);
+}
+
 function renderFrame(): void {
     const state = stateManager.getGameState();
     if (!state) return;
@@ -78,6 +97,7 @@ function renderFrame(): void {
     );
     if (useRisk) {
         renderer.drawRiskHighlights(moveTargets);
+        drawPathOverlay(sel);
     }
     if (state.phase === 'setup') {
         renderer.drawSetupZone(state.activeTeam);
@@ -155,6 +175,7 @@ stateManager.onChange(() => {
     );
     if (useRisk) {
         renderer.drawRiskHighlights(moveTargets);
+        drawPathOverlay(sel);
     }
 
     // Draw setup zone overlay
@@ -181,6 +202,19 @@ stateManager.onChange(() => {
     scoreboard.update(state);
     actionPanel.update(state, stateManager.isPlayerTurn());
     reservesPanel.update(state, stateManager.isPlayerTurn());
+    dugoutPanel.update(state);
+
+    // Player card: show when a player is selected
+    if (sel.selectedPlayerId) {
+        const selected = state.players.find(p => p.id === sel.selectedPlayerId);
+        if (selected) {
+            playerCard.show(selected);
+        } else {
+            playerCard.hide();
+        }
+    } else {
+        playerCard.hide();
+    }
 });
 
 // Canvas mouse events

@@ -1,4 +1,4 @@
-import type { MatchPlayer, BallState, Position, MoveTarget } from '../api/types';
+import type { MatchPlayer, BallState, Position, MoveTarget, PathStep } from '../api/types';
 import type { AnimationState } from '../animation/animations';
 import { PitchGeometry } from './PitchGeometry';
 
@@ -36,6 +36,61 @@ export interface TeamColors {
 
 const HOME_COLORS: TeamColors = { primary: '#2980b9', secondary: '#1a5276', text: '#fff' };
 const AWAY_COLORS: TeamColors = { primary: '#c0392b', secondary: '#7b241c', text: '#fff' };
+
+/** Position-based colors (override team primary) */
+interface PositionStyle {
+    fill: string;
+    stroke: string;
+}
+
+const POSITION_COLORS: Record<string, PositionStyle> = {
+    // Blitzers — red/orange
+    'Blitzer':          { fill: '#e74c3c', stroke: '#a93226' },
+    'Blitz-Ra':         { fill: '#e74c3c', stroke: '#a93226' },
+    'Berserker':        { fill: '#e74c3c', stroke: '#a93226' },
+    'Werewolf':         { fill: '#e74c3c', stroke: '#a93226' },
+    'Blocker':          { fill: '#e74c3c', stroke: '#a93226' },
+    'Bull Centaur':     { fill: '#e74c3c', stroke: '#a93226' },
+    'Khorne Herald':    { fill: '#e74c3c', stroke: '#a93226' },
+    'Pit Fighter':      { fill: '#e74c3c', stroke: '#a93226' },
+    // Catchers — cyan/teal
+    'Catcher':          { fill: '#1abc9c', stroke: '#148f77' },
+    'Gutter Runner':    { fill: '#1abc9c', stroke: '#148f77' },
+    'Runner':           { fill: '#1abc9c', stroke: '#148f77' },
+    'Pogoer':           { fill: '#1abc9c', stroke: '#148f77' },
+    // Throwers — gold/yellow
+    'Thrower':          { fill: '#f39c12', stroke: '#b7770d' },
+    'Passer':           { fill: '#f39c12', stroke: '#b7770d' },
+    // Big guys — purple
+    'Ogre':             { fill: '#8e44ad', stroke: '#6c3483' },
+    'Troll':            { fill: '#8e44ad', stroke: '#6c3483' },
+    'Treeman':          { fill: '#8e44ad', stroke: '#6c3483' },
+    'Minotaur':         { fill: '#8e44ad', stroke: '#6c3483' },
+    'Kroxigor':         { fill: '#8e44ad', stroke: '#6c3483' },
+    'Rat Ogre':         { fill: '#8e44ad', stroke: '#6c3483' },
+    'Deathroller':      { fill: '#8e44ad', stroke: '#6c3483' },
+    'Beast of Nurgle':  { fill: '#8e44ad', stroke: '#6c3483' },
+    'Tomb Guardian':    { fill: '#8e44ad', stroke: '#6c3483' },
+    'Bloodthirster':    { fill: '#8e44ad', stroke: '#6c3483' },
+    'Warpstone Troll':  { fill: '#8e44ad', stroke: '#6c3483' },
+    // Special weapons — dark orange
+    'Bombardier':       { fill: '#d35400', stroke: '#a04000' },
+    'Looney':           { fill: '#d35400', stroke: '#a04000' },
+    'Fanatic':          { fill: '#d35400', stroke: '#a04000' },
+    'Bloodletter':      { fill: '#d35400', stroke: '#a04000' },
+};
+
+function getPositionStyle(player: MatchPlayer, teamColors: TeamColors): PositionStyle {
+    return POSITION_COLORS[player.positionalName] ?? { fill: teamColors.primary, stroke: teamColors.secondary };
+}
+
+function getRadiusScale(player: MatchPlayer): number {
+    const st = player.stats.strength;
+    if (st >= 5) return 1.15;
+    if (st >= 4) return 1.07;
+    if (st <= 2) return 0.85;
+    return 1.0;
+}
 
 export class PitchRenderer {
     private ctx: CanvasRenderingContext2D;
@@ -222,8 +277,9 @@ export class PitchRenderer {
             py += shake.offsetY;
         }
 
-        const radius = g.cellSize * 0.38;
-        const colors = player.teamSide === 'home' ? HOME_COLORS : AWAY_COLORS;
+        const teamColors = player.teamSide === 'home' ? HOME_COLORS : AWAY_COLORS;
+        const posStyle = getPositionStyle(player, teamColors);
+        const radius = g.cellSize * 0.38 * getRadiusScale(player);
 
         // Selection ring
         if (isSelected) {
@@ -234,17 +290,45 @@ export class PitchRenderer {
             ctx.stroke();
         }
 
-        // Player circle
+        // Skill ring: Block = solid white, Dodge = dashed green, both = solid gold
+        const hasBlock = player.skills.includes('Block');
+        const hasDodge = player.skills.includes('Dodge');
+        if (hasBlock || hasDodge) {
+            ctx.save();
+            if (hasDodge && !hasBlock) {
+                ctx.setLineDash([3, 3]);
+                ctx.strokeStyle = 'rgba(100, 255, 100, 0.8)';
+            } else if (hasBlock && hasDodge) {
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+            } else {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            }
+            ctx.beginPath();
+            ctx.arc(px, py, radius + 1.5, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        // Player circle — position-based color
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = colors.primary;
+        ctx.fillStyle = posStyle.fill;
         ctx.fill();
-        ctx.strokeStyle = colors.secondary;
+        ctx.strokeStyle = posStyle.stroke;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Team indicator: thin inner ring in team color (so you can tell home/away)
+        ctx.beginPath();
+        ctx.arc(px, py, radius - 2, 0, Math.PI * 2);
+        ctx.strokeStyle = teamColors.primary;
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
         // Player number
-        ctx.fillStyle = colors.text;
+        ctx.fillStyle = teamColors.text;
         ctx.font = `bold ${Math.round(g.cellSize * 0.38)}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -361,6 +445,96 @@ export class PitchRenderer {
                 ctx.fillText(label, px + g.cellSize / 2, py + g.cellSize - 1);
             }
         }
+    }
+
+    /** Draw the movement path line from player to hovered destination */
+    drawMovePath(playerPos: Position, path: PathStep[]): void {
+        if (path.length === 0) return;
+
+        const { ctx, geometry: g } = this;
+        const cs = g.cellSize;
+
+        // Build full list of positions: start from player, then each step
+        const points: Position[] = [playerPos, ...path];
+
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Draw path segments with color based on step risk
+        for (let i = 0; i < points.length - 1; i++) {
+            const from = g.gridToPixel(points[i]);
+            const to = g.gridToPixel(points[i + 1]);
+            const step = path[i]; // path[i] = the step entering points[i+1]
+
+            // Color by risk: green=safe, yellow=dodge, orange=GFI, red=dodge+GFI
+            if (step.dodge && step.gfi) {
+                ctx.strokeStyle = 'rgba(255, 80, 80, 0.9)';
+            } else if (step.dodge) {
+                ctx.strokeStyle = 'rgba(255, 200, 50, 0.9)';
+            } else if (step.gfi) {
+                ctx.strokeStyle = 'rgba(255, 165, 0, 0.9)';
+            } else {
+                ctx.strokeStyle = 'rgba(100, 255, 100, 0.8)';
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(from.px, from.py);
+            ctx.lineTo(to.px, to.py);
+            ctx.stroke();
+        }
+
+        // Draw dots at each step
+        for (let i = 0; i < path.length; i++) {
+            const step = path[i];
+            const { px, py } = g.gridToPixel(step);
+            const dotRadius = cs * 0.08;
+
+            ctx.beginPath();
+            ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
+
+            if (step.dodge) {
+                ctx.fillStyle = '#ffcc00';
+            } else if (step.gfi) {
+                ctx.fillStyle = '#ff8800';
+            } else {
+                ctx.fillStyle = '#66ff66';
+            }
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.lineWidth = 3;
+        }
+
+        // Arrow at destination
+        const last = g.gridToPixel(path[path.length - 1]);
+        const prev = points.length >= 2
+            ? g.gridToPixel(points[points.length - 2])
+            : last;
+
+        const angle = Math.atan2(last.py - prev.py, last.px - prev.px);
+        const arrowSize = cs * 0.2;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.beginPath();
+        ctx.moveTo(
+            last.px + Math.cos(angle) * arrowSize,
+            last.py + Math.sin(angle) * arrowSize,
+        );
+        ctx.lineTo(
+            last.px + Math.cos(angle + 2.5) * arrowSize * 0.7,
+            last.py + Math.sin(angle + 2.5) * arrowSize * 0.7,
+        );
+        ctx.lineTo(
+            last.px + Math.cos(angle - 2.5) * arrowSize * 0.7,
+            last.py + Math.sin(angle - 2.5) * arrowSize * 0.7,
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
     }
 
     /** Draw a "selected target" ring around a cell (used for multi-block first target) */
