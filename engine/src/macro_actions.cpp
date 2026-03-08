@@ -180,17 +180,27 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
     }
 
     // BLITZ: not used this turn, at least one standing enemy
+    // Defense-aware: prioritizes ball carrier and scoring threats
     if (!myTeam.blitzUsedThisTurn) {
-        // Find best blitz target (scoring: dice * 2 + sideline * 3 + near carrier * 2)
-        int bestScore = -999;
-        int bestTargetId = -1;
+        bool onDef = !iHaveBall && !ballOnGround; // opponent has ball
+        int oppCarrierId = (state.ball.isHeld && state.ball.carrierId > 0)
+                            ? state.ball.carrierId : -1;
 
-        state.forEachOnPitch(mySide, [&](const Player& blitzer) {
-            if (!isFreeToAct(blitzer)) return;
-            if (blitzer.hasSkill(SkillName::BallAndChain)) return;
+        // Score each target (best blitzer for each)
+        struct BlitzCandidate {
+            int targetId;
+            int bestScore;
+        };
+        std::vector<BlitzCandidate> candidates;
 
-            state.forEachOnPitch(opponent(mySide), [&](const Player& def) {
-                if (def.state != PlayerState::STANDING) return;
+        state.forEachOnPitch(opponent(mySide), [&](const Player& def) {
+            if (def.state != PlayerState::STANDING) return;
+
+            int targetBestScore = -999;
+
+            state.forEachOnPitch(mySide, [&](const Player& blitzer) {
+                if (!isFreeToAct(blitzer)) return;
+                if (blitzer.hasSkill(SkillName::BallAndChain)) return;
 
                 int dice = getBlockDiceCount(state, blitzer, def, true);
                 int score = dice * 2;
@@ -199,24 +209,53 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 if (def.position.y == 0 || def.position.y == Position::PITCH_HEIGHT - 1) {
                     score += 3;
                 }
-                // Near carrier bonus
-                if (iHaveBall && def.position.distanceTo(carrier->position) <= 2) {
-                    score += 2;
-                }
-                // Ball carrier target bonus
-                if (state.ball.isHeld && state.ball.carrierId == def.id) {
-                    score += 5;
+
+                if (onDef) {
+                    // DEFENSE: ball carrier is top priority
+                    if (def.id == oppCarrierId) {
+                        score += 10;
+                    }
+                    // Opponent scoring threat (can score this turn)
+                    int oppEzX = (def.teamSide == TeamSide::HOME) ? 25 : 0;
+                    int distEz = std::abs(def.position.x - oppEzX);
+                    if (def.stats.movement + 2 >= distEz) {
+                        score += 4;
+                    }
+                    // Free opponent (no friendly TZ on them) — more dangerous
+                    if (countTacklezones(state, def.position, def.teamSide) == 0) {
+                        score += 2;
+                    }
+                } else {
+                    // OFFENSE: near carrier bonus + ball carrier bonus
+                    if (iHaveBall && def.position.distanceTo(carrier->position) <= 2) {
+                        score += 2;
+                    }
+                    if (state.ball.isHeld && state.ball.carrierId == def.id) {
+                        score += 5;
+                    }
                 }
 
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestTargetId = def.id;
+                if (score > targetBestScore) {
+                    targetBestScore = score;
                 }
             });
+
+            if (targetBestScore > -999) {
+                candidates.push_back({def.id, targetBestScore});
+            }
         });
 
-        if (bestTargetId > 0) {
-            out.push_back({MacroType::BLITZ, -1, bestTargetId, {-1, -1}});
+        // Sort by score descending
+        std::sort(candidates.begin(), candidates.end(),
+                  [](const BlitzCandidate& a, const BlitzCandidate& b) {
+                      return a.bestScore > b.bestScore;
+                  });
+
+        // On defense: top 2 targets for MCTS choice; on offense: top 1
+        int maxBlitz = (onDef && candidates.size() > 1) ? 2 : 1;
+        maxBlitz = std::min(maxBlitz, static_cast<int>(candidates.size()));
+        for (int i = 0; i < maxBlitz; ++i) {
+            out.push_back({MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}});
         }
     }
 
@@ -325,6 +364,28 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
     int myEndzone = endzoneX(opponent(mySide));  // our own endzone to defend
     bool onDefense = !iHaveBall && !ballOnGround;
     bool safetyPlaced = false;
+    bool markerPlaced = false;
+    int endzoneGuardCount = 0;
+    int screenSlot = 0;
+
+    // Pre-compute defensive info
+    const Player* oppCarrierPtr = nullptr;
+    int oppScoringThreatCount = 0;
+    if (onDefense) {
+        if (state.ball.isHeld && state.ball.carrierId > 0) {
+            oppCarrierPtr = &state.getPlayer(state.ball.carrierId);
+            if (!oppCarrierPtr->isOnPitch()) oppCarrierPtr = nullptr;
+        }
+        state.forEachOnPitch(opponent(mySide), [&](const Player& op) {
+            if (op.state != PlayerState::STANDING) return;
+            int oppEzX = (op.teamSide == TeamSide::HOME) ? 25 : 0;
+            int dist = std::abs(op.position.x - oppEzX);
+            if (op.stats.movement + 2 >= dist &&
+                countTacklezones(state, op.position, op.teamSide) == 0) {
+                oppScoringThreatCount++;
+            }
+        });
+    }
 
     state.forEachOnPitch(mySide, [&](const Player& p) {
         if (!isFreeToAct(p)) return;
@@ -363,21 +424,37 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 target = carrier->position;
             }
         } else if (onDefense) {
-            // Defense: safety player (H6.9) + screen between ball and endzone (H6.1, H6.2)
+            // Defense: safety + marker on carrier + endzone guard + screen
+            Position oppBallPos = state.ball.isOnPitch() ? state.ball.position
+                : Position{static_cast<int8_t>(endzoneX(mySide)), 7};
+
+            // Strategy 1: Safety player (fast, near our endzone)
             if (!safetyPlaced && p.stats.movement >= 6) {
-                // Safety player: fast player near our endzone
                 target = {static_cast<int8_t>(myEndzone),
                           static_cast<int8_t>(7)};
                 safetyPlaced = true;
-            } else {
-                // Defensive screen: position between ball and our endzone
-                Position ballPos = state.ball.isOnPitch() ? state.ball.position
-                    : Position{static_cast<int8_t>(endzoneX(mySide)), 7};
-                int screenX = (ballPos.x + myEndzone) / 2;
-                // Spread Y across the pitch
-                int screenY = 3 + (p.id % 9);  // distribute 3-11
-                target = {static_cast<int8_t>(screenX),
-                          static_cast<int8_t>(std::clamp(screenY, 1, 13))};
+            }
+            // Strategy 2: Pressure marker — move toward opponent carrier
+            else if (!markerPlaced && oppCarrierPtr != nullptr) {
+                target = oppCarrierPtr->position;
+                markerPlaced = true;
+            }
+            // Strategy 3: Endzone guard — prevent one-turn TD
+            else if (oppScoringThreatCount > 0 && endzoneGuardCount < 2) {
+                int guardX = myEndzone + forwardDx(mySide) * 4;
+                int guardY = (endzoneGuardCount == 0) ? 5 : 9;
+                target = {static_cast<int8_t>(std::clamp(guardX, 1, 24)),
+                          static_cast<int8_t>(guardY)};
+                endzoneGuardCount++;
+            }
+            // Strategy 4: Defensive screen — evenly spread between ball and endzone
+            else {
+                int screenX = (oppBallPos.x + myEndzone) / 2;
+                static const int screenYs[] = {3, 5, 7, 9, 11};
+                int screenY = screenYs[screenSlot % 5];
+                screenSlot++;
+                target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
+                          static_cast<int8_t>(screenY)};
             }
         } else {
             // Move forward toward center
@@ -524,29 +601,32 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
                                          DiceRollerBase& dice) {
     MacroExpansionResult result;
 
-    // Find the best blitzer that can reach the target
     const Player& target = state.getPlayer(macro.targetId);
 
-    // Look for BLITZ action for this target in available actions
+    // Find best BLITZ action for this target (prefer more dice, closer blitzer)
     std::vector<Action> actions;
     getAvailableActions(state, actions);
 
+    Action bestBlitzAction{};
+    bool found = false;
+    int bestScore = -999;
+
     for (auto& a : actions) {
-        if (a.type == ActionType::BLITZ && a.targetId == macro.targetId) {
-            executeAndRecord(state, a, dice, result);
-            return result;
+        if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
+        const Player& blitzer = state.getPlayer(a.playerId);
+        int diceCount = getBlockDiceCount(state, blitzer, target, true);
+        int dist = blitzer.position.distanceTo(target.position);
+        int score = diceCount * 10 - dist; // more dice + closer = better
+        if (score > bestScore) {
+            bestScore = score;
+            bestBlitzAction = a;
+            found = true;
         }
     }
 
-    // If no direct blitz, try to find any blitz on this target
-    // (different blitzer might be available)
-    for (auto& a : actions) {
-        if (a.type == ActionType::BLITZ && a.targetId == macro.targetId) {
-            executeAndRecord(state, a, dice, result);
-            return result;
-        }
-    }
+    if (!found) return result;
 
+    executeAndRecord(state, bestBlitzAction, dice, result);
     return result;
 }
 

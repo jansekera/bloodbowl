@@ -220,6 +220,11 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
         bool isFirstTurn = (myTeam.turnNumber == 1);
         bool needsRenorm = false;
 
+        // Detect defensive situation (opponent has ball)
+        bool activeHasBall = (state.ball.isHeld && state.ball.carrierId > 0 &&
+                              state.getPlayer(state.ball.carrierId).teamSide == state.activeTeam);
+        bool onDef = !activeHasBall && state.ball.isHeld;
+
         for (int i = 0; i < n; ++i) {
             float minPrior = 0.0f;
             float maxPrior = 1.0f;  // cap for SCORE suppression
@@ -258,12 +263,20 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     // When trailing 2+, advance aggressively (H2.10)
                     if (trailing2plus) minPrior = 0.15f;
                     break;
+                case MacroType::BLITZ:
+                    // On defense, BLITZ is critical (strip ball, mark carrier)
+                    if (onDef) minPrior = 0.20f;
+                    break;
                 case MacroType::BLOCK:
                     minPrior = 0.12f;  // Safe 2D blocks = always worth doing
                     break;
                 case MacroType::CAGE:
                     // Protect carrier (H3.1) — cage is important when we have ball
                     minPrior = 0.08f;
+                    break;
+                case MacroType::REPOSITION:
+                    // On defense, repositioning matters (screen, marker, guard)
+                    if (onDef) minPrior = 0.05f;
                     break;
                 case MacroType::END_TURN:
                     // Penalize END_TURN: cap at 10% (don't waste a turn)
@@ -356,6 +369,18 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         }
     } else if (!state.ball.isHeld && state.ball.isOnPitch()) {
         heuristic -= 0.1;  // loose ball is bad
+    }
+
+    // Defense: bonus for marking opponent carrier with tackle zones
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& ballHolder = state.getPlayer(state.ball.carrierId);
+        if (ballHolder.teamSide != perspective && ballHolder.isOnPitch() &&
+            ballHolder.state == PlayerState::STANDING) {
+            int carrierTZ = countTacklezones(state, ballHolder.position, ballHolder.teamSide);
+            if (carrierTZ > 0) {
+                heuristic += 0.08 * std::min(carrierTZ, 3); // max +0.24
+            }
+        }
     }
 
     // Player count advantage (H8.8-H8.9): more players = better

@@ -45,6 +45,7 @@ def run_training(
     use_cpp: bool | None = None,
     mcts_iterations: int = 0,
     policy_lr: float = 0.0,
+    policy_model: str = 'linear',
 ) -> None:
     """Run the full training loop.
 
@@ -83,14 +84,18 @@ def run_training(
     policy_trainer = None
     use_policy = policy_lr > 0 and mcts_iterations > 0
     if use_policy:
-        from .policy_trainer import PolicyTrainer, save_combined_weights, load_combined_weights
+        from .policy_trainer import (PolicyTrainer, NeuralPolicyTrainer,
+                                      create_policy_trainer,
+                                      save_combined_weights, load_combined_weights)
         if weights_path.exists():
             trainer, policy_trainer = load_combined_weights(
-                str(weights_path), value_lr=learning_rate, policy_lr=policy_lr)
+                str(weights_path), value_lr=learning_rate, policy_lr=policy_lr,
+                policy_model=policy_model)
         else:
             trainer = create_trainer(
                 model_type=model_type, hidden_size=hidden_size, learning_rate=learning_rate)
-            policy_trainer = PolicyTrainer(learning_rate=policy_lr)
+            policy_trainer = create_policy_trainer(
+                policy_model=policy_model, hidden_size=hidden_size, learning_rate=policy_lr)
     else:
         # Load existing weights or create new trainer
         if weights_path.exists():

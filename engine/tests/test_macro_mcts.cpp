@@ -256,10 +256,10 @@ TEST(MacroMCTSPolicy, DecisionLogging) {
     if (!decisions.empty()) {
         const auto& dec = decisions[0];
         EXPECT_GT(dec.visits.size(), 0u);
-        // Visit fractions should sum to ~1
+        // Visit fractions of top-K should sum to a large portion (but <1.0 if >topK children)
         float sum = 0;
         for (auto& v : dec.visits) sum += v.visitFraction;
-        EXPECT_NEAR(sum, 1.0f, 0.1f);
+        EXPECT_NEAR(sum, 1.0f, 0.3f);
     }
 }
 

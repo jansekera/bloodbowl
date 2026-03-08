@@ -521,3 +521,280 @@ TEST(MacroFeatures, FeatureCountMatchesActionFeatures) {
     // Also check that the function uses exactly 15 features
     EXPECT_EQ(NUM_ACTION_FEATURES, 15);
 }
+
+// =============================================================
+// Vrstva 4: Defensive Strategy Tests
+// =============================================================
+
+// Helper: create a defensive state (opponent has ball)
+GameState makeDefensiveState() {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+
+    // Home player 1 (free, fast)
+    Player& p1 = state.getPlayer(1);
+    p1.id = 1;
+    p1.teamSide = TeamSide::HOME;
+    p1.state = PlayerState::STANDING;
+    p1.position = {5, 7};
+    p1.stats = {7, 3, 3, 8};
+    p1.movementRemaining = 7;
+    p1.hasMoved = false;
+    p1.hasActed = false;
+
+    // Home player 2 (free)
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {6, 4};
+    p2.stats = {6, 3, 3, 8};
+    p2.movementRemaining = 6;
+    p2.hasMoved = false;
+    p2.hasActed = false;
+
+    // Home player 3 (free)
+    Player& p3 = state.getPlayer(3);
+    p3.id = 3;
+    p3.teamSide = TeamSide::HOME;
+    p3.state = PlayerState::STANDING;
+    p3.position = {4, 10};
+    p3.stats = {6, 3, 3, 8};
+    p3.movementRemaining = 6;
+    p3.hasMoved = false;
+    p3.hasActed = false;
+
+    // Away player 12 — ball carrier at x=15
+    Player& p12 = state.getPlayer(12);
+    p12.id = 12;
+    p12.teamSide = TeamSide::AWAY;
+    p12.state = PlayerState::STANDING;
+    p12.position = {15, 7};
+    p12.stats = {6, 3, 3, 8};
+    p12.movementRemaining = 6;
+
+    // Ball held by away player 12
+    state.ball = BallState::carried({15, 7}, 12);
+
+    return state;
+}
+
+TEST(MacroActions, BlitzDefensePrioritizesCarrier) {
+    GameState state = makeDefensiveState();
+    state.homeTeam.blitzUsedThisTurn = false;
+
+    // Add another away player far away
+    Player& p13 = state.getPlayer(13);
+    p13.id = 13;
+    p13.teamSide = TeamSide::AWAY;
+    p13.state = PlayerState::STANDING;
+    p13.position = {20, 10};
+    p13.stats = {6, 3, 3, 8};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // First BLITZ macro should target the ball carrier (player 12)
+    ASSERT_TRUE(hasMacroType(macros, MacroType::BLITZ));
+    for (auto& m : macros) {
+        if (m.type == MacroType::BLITZ) {
+            EXPECT_EQ(m.targetId, 12) << "First BLITZ should target ball carrier";
+            break;
+        }
+    }
+}
+
+TEST(MacroActions, BlitzDefenseMultipleTargets) {
+    GameState state = makeDefensiveState();
+    state.homeTeam.blitzUsedThisTurn = false;
+
+    // Add second away player
+    Player& p13 = state.getPlayer(13);
+    p13.id = 13;
+    p13.teamSide = TeamSide::AWAY;
+    p13.state = PlayerState::STANDING;
+    p13.position = {18, 5};
+    p13.stats = {6, 3, 3, 8};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // On defense with multiple targets, should have 2 BLITZ macros
+    int blitzCount = countMacroType(macros, MacroType::BLITZ);
+    EXPECT_EQ(blitzCount, 2);
+}
+
+TEST(MacroActions, BlitzOffenseSingleTarget) {
+    GameState state = makeMinimalState();
+    // Offense: we have the ball
+    state.ball = BallState::carried({10, 7}, 1);
+    state.homeTeam.blitzUsedThisTurn = false;
+
+    // Add second away player
+    Player& p13 = state.getPlayer(13);
+    p13.id = 13;
+    p13.teamSide = TeamSide::AWAY;
+    p13.state = PlayerState::STANDING;
+    p13.position = {18, 5};
+    p13.stats = {6, 3, 3, 8};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // On offense: only 1 BLITZ macro (best target)
+    int blitzCount = countMacroType(macros, MacroType::BLITZ);
+    EXPECT_EQ(blitzCount, 1);
+}
+
+TEST(MacroActions, RepositionDefenseMarksCarrier) {
+    GameState state = makeDefensiveState();
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // One REPOSITION macro should target near the carrier position (marker)
+    bool hasMarkerRepo = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION) {
+            if (m.targetPos.distanceTo(state.getPlayer(12).position) <= 1) {
+                hasMarkerRepo = true;
+            }
+        }
+    }
+    EXPECT_TRUE(hasMarkerRepo) << "Should have a REPOSITION targeting carrier (marker)";
+}
+
+TEST(MacroActions, RepositionDefenseSafetyPlayer) {
+    GameState state = makeDefensiveState();
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // One REPOSITION should target near our endzone (safety)
+    // Home endzone is at x=0
+    bool hasSafety = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.targetPos.x <= 2) {
+            hasSafety = true;
+        }
+    }
+    EXPECT_TRUE(hasSafety) << "Should have a safety REPOSITION near endzone";
+}
+
+TEST(MacroActions, RepositionDefenseEndzoneGuard) {
+    GameState state = makeDefensiveState();
+
+    // Add opponent with scoring threat (near our endzone, fast, uncontested)
+    Player& p13 = state.getPlayer(13);
+    p13.id = 13;
+    p13.teamSide = TeamSide::AWAY;
+    p13.state = PlayerState::STANDING;
+    p13.position = {4, 3};  // near home endzone (x=0)
+    p13.stats = {7, 3, 3, 8};  // MA 7, can score (dist=4, MA+2=9)
+    p13.movementRemaining = 7;
+
+    // Add more home players for endzone guard assignment
+    Player& p4 = state.getPlayer(4);
+    p4.id = 4;
+    p4.teamSide = TeamSide::HOME;
+    p4.state = PlayerState::STANDING;
+    p4.position = {3, 12};
+    p4.stats = {6, 3, 3, 8};
+    p4.movementRemaining = 6;
+    p4.hasMoved = false;
+    p4.hasActed = false;
+
+    Player& p5 = state.getPlayer(5);
+    p5.id = 5;
+    p5.teamSide = TeamSide::HOME;
+    p5.state = PlayerState::STANDING;
+    p5.position = {2, 2};
+    p5.stats = {6, 3, 3, 8};
+    p5.movementRemaining = 6;
+    p5.hasMoved = false;
+    p5.hasActed = false;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // Should have endzone guard REPOSITION(s) targeting x=4 area (4 sq from EZ)
+    bool hasGuard = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.targetPos.x >= 3 && m.targetPos.x <= 5 &&
+            (m.targetPos.y == 5 || m.targetPos.y == 9)) {
+            hasGuard = true;
+        }
+    }
+    EXPECT_TRUE(hasGuard) << "Should have endzone guard REPOSITION";
+}
+
+TEST(MacroExpansion, BlitzSelectsBestBlitzer) {
+    GameState state = makeMinimalState();
+    // Two home players that can blitz the target
+    state.getPlayer(1).position = {10, 7};
+    state.getPlayer(1).stats.strength = 3;
+    state.getPlayer(1).movementRemaining = 6;
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {12, 7};  // closer to target
+    p2.stats = {6, 4, 3, 8}; // ST4 = better dice
+    p2.movementRemaining = 6;
+    p2.hasMoved = false;
+    p2.hasActed = false;
+
+    state.getPlayer(12).position = {14, 7};
+    state.getPlayer(12).stats.strength = 3;
+    state.homeTeam.blitzUsedThisTurn = false;
+    state.ball = BallState::onGround({20, 7});
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    ASSERT_GE(result.actions.size(), 1u);
+    EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
+    // Should select player 2 (ST4 = 2-dice, closer)
+    EXPECT_EQ(result.actions[0].playerId, 2);
+}
+
+TEST(MacroActions, DefensiveScreenEvenSpread) {
+    GameState state = makeDefensiveState();
+
+    // Add many free home players (no adjacent enemies)
+    for (int i = 4; i <= 8; ++i) {
+        Player& p = state.getPlayer(i);
+        p.id = i;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = {static_cast<int8_t>(2 + i), static_cast<int8_t>(2)};
+        p.stats = {5, 3, 3, 8};  // slow (MA5, won't get safety)
+        p.movementRemaining = 5;
+        p.hasMoved = false;
+        p.hasActed = false;
+    }
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // Collect screen REPOSITION Y targets (exclude safety and marker)
+    std::set<int> screenYs;
+    for (auto& m : macros) {
+        if (m.type != MacroType::REPOSITION) continue;
+        // Exclude safety (near endzone) and marker (near carrier)
+        if (m.targetPos.x <= 2) continue;  // safety
+        if (m.targetPos.distanceTo(state.getPlayer(12).position) <= 1) continue;  // marker
+        screenYs.insert(m.targetPos.y);
+    }
+
+    // Screen should have diverse Y values (not all the same)
+    EXPECT_GE(screenYs.size(), 3u) << "Screen should spread across Y values";
+}

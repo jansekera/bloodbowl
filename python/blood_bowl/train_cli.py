@@ -69,6 +69,8 @@ def main():
     # Policy network
     parser.add_argument('--policy-lr', type=float, default=0.0,
                         help='Policy network learning rate (0 = disabled, recommended 0.01)')
+    parser.add_argument('--policy-model', default='linear', choices=['linear', 'neural'],
+                        help='Policy network type (linear or neural)')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -123,6 +125,7 @@ def main():
         use_cpp=use_cpp,
         mcts_iterations=args.mcts_iterations,
         policy_lr=args.policy_lr,
+        policy_model=args.policy_model,
     )
 
 
