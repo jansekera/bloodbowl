@@ -287,3 +287,12 @@ blood-bowl/
 
 29. **Full AlphaZero loop**
     - Self-play → train → evaluate → repeat, plně automatický cyklus
+
+### Plánované — UI / PHP
+
+30. **Reroll dialog**
+    - Server pozastaví akci při neúspěšném hodu a pošle klientovi nabídku rerollu
+    - Klient zobrazí dialog "Použít reroll?" (Ano/Ne)
+    - Vyžaduje nový game phase nebo pending state v ActionResolver
+    - Přepis reroll logiky v MoveHandler, BlockHandler, PassResolver, BallResolver
+    - Aktuálně: backend automaticky používá skill reroll → Pro → team reroll
