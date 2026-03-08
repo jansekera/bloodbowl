@@ -184,17 +184,106 @@ blood-bowl/
 - Každá fáze: ruční test v prohlížeči (team management, match play)
 - AI stress test: 100 AI vs AI zápasů bez chyb
 
-# test
+## C++ Engine & AI — Kroky
 
-cd /home/jenda/claude/blood-bowl/python && python3 -m blood_bowl.train_cli --epochs=10 --games=15 --opponent=random --lr=0.01
+### Hotovo
 
-# Evaluate trained agent
-python -m blood_bowl.evaluate --weights=weights.json --opponent=random --matches=100
+1. **Phase 1 — Data struktury** ✅
+   - Enums, Position, Player, SkillSet, GameState, DiceRoller, BallState, TeamState, GameEvent
 
-# Visualize training curve
-python -m blood_bowl.visualize --csv=training_results.csv
+2. **Phase 2 — Core mechaniky** ✅
+   - Move/dodge/GFI, block, foul, injury, ball handling, pathfinder, rules engine, action resolver
 
-# Výstupy:
-- weights.json — natrénované váhy (použitelné v PHP)
-- training_results.csv — win rate po každé epoše
-- training_logs/ — JSONL logy ze všech her
+3. **Phase 3 — MCTS simulace** ✅
+   - 26 rosterů, game simulator, feature extractor (70 features), value function (linear+neural), MCTS tree search, random/greedy/MCTS policies, CLI
+
+4. **Phase 4A — Rosters + Pass/HandOff** ✅
+   - Všech 26 rosterů s CRP stats, resolvePass, resolveHandOff, Bresenham interception, accuracy rolls, HailMaryPass, SafeThrow, StrongArm, NervesOfSteel
+
+5. **Phase 4B — BigGuy checks + skills** ✅
+   - BoneHead, ReallyStupid, WildAnimal, TakeRoot, Bloodlust, Leap, Tentacles, Shadowing
+
+6. **Phase 4C — Kickoff events** ✅
+   - Celá 2D6 tabulka: Riot, High Kick, Cheering, Coaching, Weather, Quick Snap, Blitz, Throw A Rock, Pitch Invasion, touchback, Kick-Off Return
+
+7. **Phase 4D — pybind11 binding** ✅
+   - `bb_engine` Python modul, enums, GameState, actions, features (numpy), simulate_game
+
+8. **Phase 5 — Zbylé action handlery** ✅
+   - TTM, BombThrow, HypnoticGaze, BallAndChain, MultipleBlock
+
+9. **Phase 6 — Policy Network** ✅
+   - Lineární policy 85→1, PUCT formula, PolicyDecision logging, Python PolicyTrainer, combined weights save/load
+
+10. **Macro-actions** ✅
+    - 11 makro typů (SCORE, ADVANCE, CAGE, BLITZ, BLOCK, PICKUP, PASS_ACTION, FOUL, REPOSITION, END_TURN, BLITZ_AND_SCORE)
+    - Branching ~200→~15, MCTS hloubka 2-3 s 400 iteracemi
+    - MacroMCTSPolicy: stateful search → expand → validate
+
+11. **MCTS quality fixes** ✅
+    - FPU (First Play Urgency), tanh VF normalizace, progressive widening (maxChildren=40), Dirichlet noise (alpha=0.3)
+
+12. **Heuristiky fáze 1** ✅
+    - BLITZ_AND_SCORE, macro ordering, last-turn scoring, prior boosts (BLOCK 12%, CAGE 8%, END_TURN cap 10%)
+
+13. **Heuristiky fáze 2** ✅
+    - Urgency (trailing 2+ → SCORE 50%), carrier safety (cage prior), sideline avoidance (+6), safety player, screen formation
+
+14. **Vrstva 2 — Defensive kickoff** ✅
+    - 3 LOS + 7 contain wall + 1 deep safety, deep kick (x=22/3), Kick skill (halves scatter)
+
+15. **Vrstva 3 — Roster-aware kickoff** ✅
+    - RosterSpeed enum (SLOW/MIXED/FAST), classifyRosterSpeed (avg MA), pressure formace vs fast, deep receiver formace, short/deep kick
+
+16. **Vrstva 4 — Defensivní strategie** ✅
+    - BLITZ: carrier targeting (+10), scoring threat (+4), multi-target na obraně
+    - REPOSITION: 4-layer defense (safety, carrier marker, endzone guard, screen)
+    - Best-blitzer selection, MCTS defense priors (BLITZ 20%, REPOSITION 5%, TZ-on-carrier heuristic)
+
+17. **Neural policy network** ✅
+    - 85→32(ReLU)→1, ~2752 parametrů
+    - C++ forward pass + JSON loading, Python NeuralPolicyTrainer s backprop
+    - `--policy-model=neural` CLI argument
+
+### Probíhá
+
+18. **Trénink neural policy** 🔄
+    - 6 epoch × 20 her, Human vs orc/skaven/dwarf/wood-elf, 400 MCTS iterací
+    - Benchmark: best 86.7% vs random (30 her)
+
+### Plánované — heuristiky & search
+
+19. **Policy tuning**
+    - Temperature optimalizace, hidden size (32→64), learning rate, více epoch
+
+20. **One-turn TD**
+    - Rozpoznání a realizace 1-tahového touchdownu (sprint do endzone)
+
+21. **Vs bash/agility adaptace**
+    - Dodge-back vs bash, contain & squeeze vs agility, sideline traps, hunter/shield split, tag cage corners
+
+22. **Transposition table**
+    - Sdílení MCTS uzlů mezi podobnými stavy
+
+23. **Deeper search**
+    - Víc MCTS iterací, efektivnější expand, pruning
+
+### Plánované — AlphaZero
+
+24. **Value function trénink**
+    - Zapnout VF learning (teď lr=0), neural VF (70→32→1), trénovat z MCTS outcomes
+
+25. **Self-play pipeline**
+    - Generování trénovacích dat self-play místo vs greedy/random
+
+26. **Joint training**
+    - Policy + value simultánně z jedné hry
+
+27. **Deeper policy network**
+    - 85→64→32→1 (2 hidden layers), případně residual connections
+
+28. **Iterativní self-play**
+    - Checkpoint systém, ELO tracking, best-model gating (nový model musí porazit starý)
+
+29. **Full AlphaZero loop**
+    - Self-play → train → evaluate → repeat, plně automatický cyklus
