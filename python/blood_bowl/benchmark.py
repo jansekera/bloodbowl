@@ -45,10 +45,13 @@ def run_benchmark(
     if skip_greedy:
         opponents = [o for o in opponents if o != 'greedy']
 
+    import time
+
     runner = _make_runner(project_root, use_cpp)
     results = {}
 
     home_ai_type = 'macro_mcts' if mcts_iterations > 0 else 'learning'
+    t0 = time.time()
 
     for opponent in opponents:
         try:
@@ -81,6 +84,10 @@ def run_benchmark(
                 'avg_score_diff': 0.0,
                 'matches': 0,
             }
+
+    elapsed = time.time() - t0
+    for opp in results:
+        results[opp]['elapsed_s'] = elapsed
 
     return results
 
@@ -124,6 +131,9 @@ def main():
         print(f'MCTS: {args.mcts_iterations} iterations')
     print()
 
+    import time
+    t0 = time.time()
+
     results = run_benchmark(
         weights_file=weights_path,
         opponents=args.opponents,
@@ -137,10 +147,12 @@ def main():
         policy_weights=policy_path,
     )
 
+    elapsed = time.time() - t0
     for opponent, stats in results.items():
         print(f'vs {opponent:>8}: win_rate={stats["win_rate"]:.1%}, '
               f'avg_score_diff={stats["avg_score_diff"]:+.2f}, '
               f'matches={stats["matches"]}')
+    print(f'\nBenchmark completed in {int(elapsed//60)}m {int(elapsed%60)}s')
 
 
 if __name__ == '__main__':
