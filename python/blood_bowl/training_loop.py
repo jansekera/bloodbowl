@@ -381,7 +381,10 @@ def run_training(
                 all_decisions.extend(decisions)
 
             if all_decisions:
-                policy_loss = policy_trainer.train_on_decisions(all_decisions)
+                # Imitation phase: multiple passes over data for faster convergence
+                passes = 5 if (imitation_epochs > 0 and epoch <= imitation_epochs) else 1
+                policy_loss = policy_trainer.train_on_decisions(
+                    all_decisions, passes=passes, batch_size=32)
                 n_dec = len(all_decisions)
             else:
                 policy_loss = 0.0
@@ -587,9 +590,11 @@ def run_training(
                           f'({next_stage["opponent"]})')
 
         # Kill condition: 5 epochs with no improvement in EITHER metric
+        # Skip during imitation phase (WR is irrelevant, only policy loss matters)
         epoch_win_rates.append(win_rate)
         epoch_score_diffs.append(avg_score_diff)
-        if len(epoch_win_rates) >= NO_IMPROVE_LIMIT and len(epoch_win_rates) > NO_IMPROVE_LIMIT:
+        in_imitation = imitation_epochs > 0 and epoch <= imitation_epochs
+        if not in_imitation and len(epoch_win_rates) >= NO_IMPROVE_LIMIT and len(epoch_win_rates) > NO_IMPROVE_LIMIT:
             recent_wr = epoch_win_rates[-NO_IMPROVE_LIMIT:]
             recent_sd = epoch_score_diffs[-NO_IMPROVE_LIMIT:]
             prev_best_wr = max(epoch_win_rates[:-NO_IMPROVE_LIMIT])

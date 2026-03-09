@@ -29,7 +29,8 @@ class PolicyTrainer:
         self.lr = learning_rate
         self.temperature = temperature  # Inference-time softmax temperature (C++ side)
 
-    def train_on_decisions(self, decisions: list[dict]) -> float:
+    def train_on_decisions(self, decisions: list[dict], passes: int = 1,
+                           batch_size: int = 0) -> float:
         """Train on MCTS visit distributions using cross-entropy loss.
 
         Each decision contains:
@@ -147,85 +148,113 @@ class NeuralPolicyTrainer:
         self.W2 = np.random.randn(hidden_size) * scale2
         self.b2 = 0.0
 
-    def train_on_decisions(self, decisions: list[dict]) -> float:
-        """Train on MCTS visit distributions with backprop through hidden layer."""
+    def train_on_decisions(self, decisions: list[dict], passes: int = 1,
+                           batch_size: int = 32) -> float:
+        """Train on MCTS visit distributions with mini-batch SGD.
+
+        Args:
+            decisions: list of {state_features, visits: [{action_features, visit_fraction}]}
+            passes: number of passes over the data (default 1)
+            batch_size: mini-batch size for gradient updates (default 32)
+        """
         if not decisions:
             return 0.0
 
         total_loss = 0.0
         n_decisions = 0
 
-        # Accumulate gradients over all decisions
-        dW1 = np.zeros_like(self.W1)
-        db1 = np.zeros_like(self.b1)
-        dW2 = np.zeros_like(self.W2)
-        db2 = 0.0
+        for pass_idx in range(passes):
+            # Shuffle decisions each pass
+            if passes > 1:
+                indices = np.random.permutation(len(decisions))
+            else:
+                indices = np.arange(len(decisions))
 
-        for dec in decisions:
-            state_feats = np.array(dec['state_features'], dtype=np.float64)
-            visits = dec.get('visits', [])
-            if not visits:
-                continue
+            # Mini-batch accumulators
+            dW1 = np.zeros_like(self.W1)
+            db1 = np.zeros_like(self.b1)
+            dW2 = np.zeros_like(self.W2)
+            db2 = 0.0
+            batch_count = 0
 
-            n_actions = len(visits)
-            inputs = np.zeros((n_actions, self.n_features), dtype=np.float64)
-            targets = np.zeros(n_actions, dtype=np.float64)
+            for idx in indices:
+                dec = decisions[idx]
+                state_feats = np.array(dec['state_features'], dtype=np.float64)
+                visits = dec.get('visits', [])
+                if not visits:
+                    continue
 
-            for i, v in enumerate(visits):
-                action_feats = np.array(v['action_features'], dtype=np.float64)
-                n_state = min(len(state_feats), NUM_FEATURES)
-                n_action = min(len(action_feats), NUM_ACTION_FEATURES)
-                inputs[i, :n_state] = state_feats[:n_state]
-                inputs[i, NUM_FEATURES:NUM_FEATURES + n_action] = action_feats[:n_action]
-                targets[i] = v['visit_fraction']
+                n_actions = len(visits)
+                inputs = np.zeros((n_actions, self.n_features), dtype=np.float64)
+                targets = np.zeros(n_actions, dtype=np.float64)
 
-            target_sum = targets.sum()
-            if target_sum > 0:
-                targets /= target_sum
+                for i, v in enumerate(visits):
+                    action_feats = np.array(v['action_features'], dtype=np.float64)
+                    n_state = min(len(state_feats), NUM_FEATURES)
+                    n_action = min(len(action_feats), NUM_ACTION_FEATURES)
+                    inputs[i, :n_state] = state_feats[:n_state]
+                    inputs[i, NUM_FEATURES:NUM_FEATURES + n_action] = action_feats[:n_action]
+                    targets[i] = v['visit_fraction']
 
-            # Forward: hidden = ReLU(inputs @ W1 + b1), logits = hidden @ W2 + b2
-            z1 = inputs @ self.W1 + self.b1     # (N, H)
-            h1 = np.maximum(0, z1)               # ReLU
-            logits = h1 @ self.W2 + self.b2      # (N,)
+                target_sum = targets.sum()
+                if target_sum > 0:
+                    targets /= target_sum
 
-            # Softmax
-            logits_shifted = logits - logits.max()
-            exp_logits = np.exp(logits_shifted)
-            probs = exp_logits / exp_logits.sum()
+                # Forward: hidden = ReLU(inputs @ W1 + b1), logits = hidden @ W2 + b2
+                z1 = inputs @ self.W1 + self.b1     # (N, H)
+                h1 = np.maximum(0, z1)               # ReLU
+                logits = h1 @ self.W2 + self.b2      # (N,)
 
-            # Cross-entropy loss
-            loss = -np.sum(targets * np.log(probs + 1e-8))
-            total_loss += loss
+                # Softmax
+                logits_shifted = logits - logits.max()
+                exp_logits = np.exp(logits_shifted)
+                probs = exp_logits / exp_logits.sum()
 
-            # Backward: d_logits = probs - targets
-            d_logits = probs - targets  # (N,)
+                # Cross-entropy loss (only count on last pass for reporting)
+                if pass_idx == passes - 1:
+                    loss = -np.sum(targets * np.log(probs + 1e-8))
+                    total_loss += loss
+                    n_decisions += 1
 
-            # d_W2 = h1.T @ d_logits, d_b2 = sum(d_logits)
-            dW2 += h1.T @ d_logits    # (H,)
-            db2 += d_logits.sum()
+                # Backward: d_logits = probs - targets
+                d_logits = probs - targets  # (N,)
 
-            # d_h1 = outer(d_logits, W2)
-            d_h1 = np.outer(d_logits, self.W2)  # (N, H)
+                dW2 += h1.T @ d_logits
+                db2 += d_logits.sum()
+                d_h1 = np.outer(d_logits, self.W2)
+                d_z1 = d_h1 * (z1 > 0)
+                dW1 += inputs.T @ d_z1
+                db1 += d_z1.sum(axis=0)
 
-            # ReLU backward
-            d_z1 = d_h1 * (z1 > 0)  # (N, H)
+                batch_count += 1
 
-            # d_W1 = inputs.T @ d_z1, d_b1 = sum(d_z1, axis=0)
-            dW1 += inputs.T @ d_z1   # (85, H)
-            db1 += d_z1.sum(axis=0)   # (H,)
+                # Apply gradient update every batch_size decisions
+                if batch_count >= batch_size:
+                    scale = 1.0 / batch_count
+                    self.W1 -= self.lr * dW1 * scale
+                    self.b1 -= self.lr * db1 * scale
+                    self.W2 -= self.lr * dW2 * scale
+                    self.b2 -= self.lr * db2 * scale
+                    # Reset accumulators
+                    dW1[:] = 0
+                    db1[:] = 0
+                    dW2[:] = 0
+                    db2 = 0.0
+                    batch_count = 0
 
-            n_decisions += 1
+            # Apply remaining gradients
+            if batch_count > 0:
+                scale = 1.0 / batch_count
+                self.W1 -= self.lr * dW1 * scale
+                self.b1 -= self.lr * db1 * scale
+                self.W2 -= self.lr * dW2 * scale
+                self.b2 -= self.lr * db2 * scale
 
-        if n_decisions > 0:
-            scale = 1.0 / n_decisions
-            self.W1 -= self.lr * dW1 * scale
-            self.b1 -= self.lr * db1 * scale
-            self.W2 -= self.lr * dW2 * scale
-            self.b2 -= self.lr * db2 * scale
+        # Clip weights
+        np.clip(self.W1, -5.0, 5.0, out=self.W1)
+        np.clip(self.W2, -5.0, 5.0, out=self.W2)
 
-            # Clip weights
-            np.clip(self.W1, -5.0, 5.0, out=self.W1)
-            np.clip(self.W2, -5.0, 5.0, out=self.W2)
+        return total_loss / max(n_decisions, 1)
 
         return total_loss / max(n_decisions, 1)
 
