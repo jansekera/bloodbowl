@@ -266,6 +266,13 @@ PYBIND11_MODULE(bb_engine, m) {
             vf = bb::loadValueFunction(weightsPath);
         }
 
+        // Load policy network from weights file (if it contains policy data)
+        std::unique_ptr<bb::PolicyNetwork> policyNet;
+        if (!weightsPath.empty() && (homeAI == "mcts" || awayAI == "mcts" ||
+            homeAI == "macro_mcts" || awayAI == "macro_mcts")) {
+            policyNet = bb::loadPolicyNetworkFromFile(weightsPath);
+        }
+
         // MCTS/MacroMCTS policies need to persist across calls (they hold state)
         std::shared_ptr<bb::MCTSPolicy> homeMcts, awayMcts;
         std::shared_ptr<bb::MacroMCTSPolicy> homeMacroMcts, awayMacroMcts;
@@ -281,6 +288,9 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.timeBudgetMs = 0;
                 cfg.explorationC = 1.0;   // Eval: low C for exploitation
                 cfg.dirichletAlpha = 0.0f; // No noise during evaluation
+                if (policyNet) {
+                    cfg.policy = policyNet.get();
+                }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
                 return [m = macroMctsOut](const bb::GameState& s) { return (*m)(s); };
             } else if (ai == "mcts" && vf && mctsIterations > 0) {
@@ -288,6 +298,10 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.maxIterations = mctsIterations;
                 cfg.timeBudgetMs = 0;
                 cfg.maxChildren = 40;
+                if (policyNet) {
+                    cfg.policy = policyNet.get();
+                    cfg.explorationC = 2.5;
+                }
                 mctsOut = std::make_shared<bb::MCTSPolicy>(vf.get(), cfg, seed);
                 return [mcts = mctsOut](const bb::GameState& s) { return (*mcts)(s); };
             } else if (ai == "learning" && vf) {
