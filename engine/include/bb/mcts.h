@@ -21,6 +21,7 @@ struct MCTSConfig {
     int maxChildren = 0;   // Progressive widening: max children per node (0 = unlimited)
     float dirichletAlpha = 0.0f;   // Dirichlet noise alpha (0 = disabled, 0.3 for training)
     float dirichletWeight = 0.25f; // prior = (1-w)*policy + w*Dir(alpha)
+    float policyBlend = 0.0f;     // Blend policy with heuristics: 0.0 = heuristics only, 1.0 = policy only
 };
 
 struct MCTSNode {

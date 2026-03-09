@@ -180,9 +180,13 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
 
     int n = static_cast<int>(macros.size());
 
-    // Compute priors from policy network
+    // Compute priors: blend policy network with heuristic priors
     std::vector<float> priors(n, 1.0f / std::max(n, 1));
-    if (config_.policy && n > 0) {
+
+    // A) Compute policy network priors (if available)
+    std::vector<float> policyPriors;
+    if (config_.policy && n > 0 && config_.policyBlend > 0.0f) {
+        policyPriors.resize(n);
         float stateFeats[NUM_FEATURES];
         extractFeatures(state, state.activeTeam, stateFeats);
 
@@ -191,26 +195,24 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
             extractMacroFeatures(state, macros[i], &macroFeats[i * NUM_ACTION_FEATURES]);
         }
 
-        // A) Compute raw logits and apply softmax with temperature=1.0
-        //    (override saved temperature which may be too low)
         float maxLogit = -1e30f;
         for (int i = 0; i < n; ++i) {
-            priors[i] = config_.policy->evaluateAction(
+            policyPriors[i] = config_.policy->evaluateAction(
                 stateFeats, &macroFeats[i * NUM_ACTION_FEATURES]);
-            if (priors[i] > maxLogit) maxLogit = priors[i];
+            if (policyPriors[i] > maxLogit) maxLogit = policyPriors[i];
         }
         float sumExp = 0.0f;
         for (int i = 0; i < n; ++i) {
-            priors[i] = std::exp(priors[i] - maxLogit); // temp=1.0
-            sumExp += priors[i];
+            policyPriors[i] = std::exp(policyPriors[i] - maxLogit); // temp=1.0
+            sumExp += policyPriors[i];
         }
         if (sumExp > 0.0f) {
-            for (int i = 0; i < n; ++i) priors[i] /= sumExp;
+            for (int i = 0; i < n; ++i) policyPriors[i] /= sumExp;
         }
+    }
 
-        // B) Time-aware SCORE/ADVANCE priors (stall strategy)
-        //    Last 1-2 turns: strongly prefer SCORE (40%)
-        //    Early turns: prefer ADVANCE over SCORE to approach gradually
+    if (config_.policy && n > 0) {
+        // B) Compute heuristic priors (when policy is set, blend with heuristics)
         const auto& myTeam = state.getTeamState(state.activeTeam);
         const auto& oppTeam = state.getTeamState(opponent(state.activeTeam));
         int turnsRemaining = std::max(0, 9 - myTeam.turnNumber);
@@ -227,12 +229,11 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
 
         for (int i = 0; i < n; ++i) {
             float minPrior = 0.0f;
-            float maxPrior = 1.0f;  // cap for SCORE suppression
+            float maxPrior = 1.0f;
             switch (macros[i].type) {
                 case MacroType::SCORE:
                 case MacroType::BLITZ_AND_SCORE: {
                     if (turnsRemaining <= 1) {
-                        // Last turn: score is nearly mandatory
                         if (macros[i].playerId > 0) {
                             const Player& p = state.getPlayer(macros[i].playerId);
                             int dist = distToEndzone(p.position, state.activeTeam);
@@ -242,13 +243,10 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                             minPrior = 0.40f;
                         }
                     } else if (trailing2plus) {
-                        // Losing badly: score ASAP, no stalling (H2.10)
                         minPrior = 0.50f;
                     } else if (isFirstTurn && !trailing2plus) {
-                        // Turn 1 of attack: advance with cage, don't OTTD (H12.1)
                         maxPrior = 0.05f;
                     } else if (leading && turnsRemaining > 2) {
-                        // Leading with >2 turns: stall, don't give ball back (H12.1)
                         maxPrior = 0.02f;
                     } else if (turnsRemaining <= 2) {
                         minPrior = 0.35f;
@@ -260,26 +258,21 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     break;
                 }
                 case MacroType::ADVANCE:
-                    // When trailing 2+, advance aggressively (H2.10)
                     if (trailing2plus) minPrior = 0.15f;
                     break;
                 case MacroType::BLITZ:
-                    // On defense, BLITZ is critical (strip ball, mark carrier)
                     if (onDef) minPrior = 0.20f;
                     break;
                 case MacroType::BLOCK:
-                    minPrior = 0.12f;  // Safe 2D blocks = always worth doing
+                    minPrior = 0.12f;
                     break;
                 case MacroType::CAGE:
-                    // Protect carrier (H3.1) — cage is important when we have ball
                     minPrior = 0.08f;
                     break;
                 case MacroType::REPOSITION:
-                    // On defense, repositioning matters (screen, marker, guard)
                     if (onDef) minPrior = 0.05f;
                     break;
                 case MacroType::END_TURN:
-                    // Penalize END_TURN: cap at 10% (don't waste a turn)
                     if (priors[i] > 0.10f && n > 2) {
                         priors[i] = 0.10f;
                         needsRenorm = true;
@@ -300,7 +293,24 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
         if (needsRenorm) {
             float sum = 0.0f;
             for (int i = 0; i < n; ++i) sum += priors[i];
-            for (int i = 0; i < n; ++i) priors[i] /= sum;
+            if (sum > 0.0f) {
+                for (int i = 0; i < n; ++i) priors[i] /= sum;
+            }
+        }
+
+        // C) Blend heuristic priors with policy priors
+        //    prior = (1 - blend) * heuristic + blend * policy
+        if (!policyPriors.empty() && config_.policyBlend > 0.0f) {
+            float blend = config_.policyBlend;
+            for (int i = 0; i < n; ++i) {
+                priors[i] = (1.0f - blend) * priors[i] + blend * policyPriors[i];
+            }
+            // Renormalize after blending
+            float sum = 0.0f;
+            for (int i = 0; i < n; ++i) sum += priors[i];
+            if (sum > 0.0f) {
+                for (int i = 0; i < n; ++i) priors[i] /= sum;
+            }
         }
     }
 

@@ -290,6 +290,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletAlpha = 0.0f; // No noise during evaluation
                 if (policyNet) {
                     cfg.policy = policyNet.get();
+                    cfg.policyBlend = 0.5f;  // Eval: blend 50% policy + 50% heuristics
                 }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
                 return [m = macroMctsOut](const bb::GameState& s) { return (*m)(s); };
@@ -363,6 +364,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletWeight = 0.25f; // 75% policy + 25% noise
                 if (policyNet) {
                     cfg.policy = policyNet.get();
+                    cfg.policyBlend = 0.3f;  // Training: blend 30% policy + 70% heuristics
                 }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
                 macroMctsOut->setLogDecisions(true, 20);
