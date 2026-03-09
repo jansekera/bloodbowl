@@ -71,6 +71,10 @@ def main():
                         help='Policy network learning rate (0 = disabled, recommended 0.01)')
     parser.add_argument('--policy-model', default='linear', choices=['linear', 'neural'],
                         help='Policy network type (linear or neural)')
+    parser.add_argument('--policy-blend', type=float, default=0.0,
+                        help='Policy-heuristic blend ratio (0.0=heuristic only, 1.0=policy only)')
+    parser.add_argument('--imitation-epochs', type=int, default=0,
+                        help='Imitation learning epochs (policyBlend=0, train policy on heuristic MCTS)')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -126,6 +130,8 @@ def main():
         mcts_iterations=args.mcts_iterations,
         policy_lr=args.policy_lr,
         policy_model=args.policy_model,
+        policy_blend=args.policy_blend,
+        imitation_epochs=args.imitation_epochs,
     )
 
 

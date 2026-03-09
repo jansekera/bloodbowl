@@ -50,6 +50,7 @@ class CPPRunner:
         mcts_iterations: int = 0,
         policy_weights: Optional[str] = None,
         game_offset: int = 0,
+        policy_blend: float = 0.0,
     ) -> TournamentResult:
         results: list[MatchResult] = []
         home_wins = 0
@@ -80,6 +81,7 @@ class CPPRunner:
                     seed=seed, weights_path=weights_path, epsilon=eps,
                     mcts_iterations=mcts_iterations,
                     policy_weights_path=policy_path,
+                    policy_blend=policy_blend,
                 )
                 result = logged.result
 

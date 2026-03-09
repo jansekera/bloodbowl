@@ -46,6 +46,8 @@ def run_training(
     mcts_iterations: int = 0,
     policy_lr: float = 0.0,
     policy_model: str = 'linear',
+    policy_blend: float = 0.0,
+    imitation_epochs: int = 0,
 ) -> None:
     """Run the full training loop.
 
@@ -139,7 +141,11 @@ def run_training(
     if mcts_iterations > 0:
         print(f'MCTS: {mcts_iterations} iterations per action')
     if use_policy:
-        print(f'Policy training: lr={policy_lr}')
+        print(f'Policy training: lr={policy_lr}, model={policy_model}')
+        if imitation_epochs > 0:
+            print(f'Imitation learning: {imitation_epochs} epochs (policyBlend=0.0), then blend={policy_blend}')
+        else:
+            print(f'Policy blend: {policy_blend}')
     if opp_weights_path:
         print(f'Opponent weights: {opp_weights_path}')
     # Replay buffer — auto-enable for MCTS training to prevent forgetting
@@ -254,6 +260,12 @@ def run_training(
         # Policy weights path for MCTS
         policy_weights_arg = str(weights_path) if use_policy else None
 
+        # Imitation learning: policyBlend=0.0 during imitation epochs, then target blend
+        if imitation_epochs > 0 and epoch <= imitation_epochs:
+            epoch_blend = 0.0
+        else:
+            epoch_blend = policy_blend
+
         # Run simulation games (timeout is per-game)
         # Support mixed away races: "orc,skaven,dwarf,wood-elf"
         away_races = [r.strip() for r in away_race.split(',')]
@@ -285,6 +297,7 @@ def run_training(
                     mcts_iterations=mcts_iterations,
                     policy_weights=policy_weights_arg,
                     game_offset=game_offset,
+                    policy_blend=epoch_blend,
                 )
                 all_results.extend(sub_result.results)
                 game_offset += race_games
@@ -316,6 +329,7 @@ def run_training(
                 tv=tv if tv != 1000 else None,
                 mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights_arg,
+                policy_blend=epoch_blend,
             )
 
         # Clear progress line
@@ -405,9 +419,15 @@ def run_training(
             writer = csv.writer(f)
             writer.writerow([epoch, f'{win_rate:.3f}', f'{avg_score_diff:.2f}', f'{epsilon:.3f}'])
 
+        phase_tag = ''
+        if imitation_epochs > 0 and epoch <= imitation_epochs:
+            phase_tag = ' [IMITATION]'
+        elif imitation_epochs > 0 and epoch > imitation_epochs:
+            phase_tag = f' [BLEND={epoch_blend:.1f}]'
+
         msg = (f'Epoch {epoch}/{epochs}: win_rate={win_rate:.1%}, '
                f'avg_score_diff={avg_score_diff:+.2f}, epsilon={epsilon:.3f} '
-               f'({epoch_elapsed:.0f}s, total {total_elapsed:.0f}s)')
+               f'({epoch_elapsed:.0f}s, total {total_elapsed:.0f}s){phase_tag}')
         if policy_trainer and n_dec > 0:
             msg += f' | policy: {n_dec} decisions, loss={policy_loss:.3f}'
         print(msg)
@@ -484,6 +504,7 @@ def run_training(
                 use_cpp=use_cpp if cpp_available else False,
                 mcts_iterations=mcts_iterations,
                 policy_weights=str(weights_path) if use_policy else None,
+                policy_blend=epoch_blend,
             )
             bench_csv = csv_path.parent / 'benchmark_results.csv'
             _append_benchmark_csv(bench_csv, epoch, bench_results)

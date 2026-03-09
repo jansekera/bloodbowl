@@ -34,6 +34,7 @@ def run_benchmark(
     use_cpp: Optional[bool] = None,
     mcts_iterations: int = 0,
     policy_weights: Optional[str] = None,
+    policy_blend: float = 0.0,
 ) -> Dict[str, dict]:
     """Run benchmark matches against each opponent, return results.
 
@@ -66,6 +67,7 @@ def run_benchmark(
                 tv=tv,
                 mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights if mcts_iterations > 0 else None,
+                policy_blend=policy_blend if mcts_iterations > 0 else 0.0,
             )
 
             avg_score_diff = sum(
@@ -112,6 +114,8 @@ def main():
                         help='Force C++ engine')
     parser.add_argument('--policy-weights', default=None,
                         help='Policy weights file (defaults to --weights)')
+    parser.add_argument('--policy-blend', type=float, default=0.0,
+                        help='Policy-heuristic blend ratio (0.0=heuristic only)')
     args = parser.parse_args()
 
     project_root = args.project_root
@@ -145,6 +149,7 @@ def main():
         use_cpp=True if args.use_cpp else None,
         mcts_iterations=args.mcts_iterations,
         policy_weights=policy_path,
+        policy_blend=args.policy_blend,
     )
 
     elapsed = time.time() - t0

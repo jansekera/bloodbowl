@@ -72,6 +72,7 @@ class CLIRunner:
         away_weights: Optional[str] = None,
         away_epsilon: Optional[float] = None,
         tv: Optional[int] = None,
+        **kwargs,  # Accept extra params (mcts_iterations, policy_blend, etc.) for CPPRunner compat
     ) -> TournamentResult:
         cmd = [
             'php', str(self.project_root / 'cli' / 'simulate.php'),

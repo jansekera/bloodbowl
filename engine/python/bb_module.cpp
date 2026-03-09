@@ -255,7 +255,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                uint32_t seed,
                                const std::string& weightsPath,
                                float epsilon,
-                               int mctsIterations) {
+                               int mctsIterations,
+                               float policyBlend) {
         bb::DiceRoller dice(seed);
 
         // Load value function if needed
@@ -290,7 +291,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletAlpha = 0.0f; // No noise during evaluation
                 if (policyNet) {
                     cfg.policy = policyNet.get();
-                    cfg.policyBlend = 0.5f;  // Eval: blend 50% policy + 50% heuristics
+                    cfg.policyBlend = policyBlend;
                 }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
                 return [m = macroMctsOut](const bb::GameState& s) { return (*m)(s); };
@@ -322,7 +323,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("seed") = 42,
        py::arg("weights_path") = "",
        py::arg("epsilon") = 0.3f,
-       py::arg("mcts_iterations") = 0);
+       py::arg("mcts_iterations") = 0,
+       py::arg("policy_blend") = 0.0f);
 
     // simulate_game_logged: returns result + features at turn boundaries + policy decisions
     m.def("simulate_game_logged", [](const bb::TeamRoster& home, const bb::TeamRoster& away,
@@ -331,7 +333,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       const std::string& weightsPath,
                                       float epsilon,
                                       int mctsIterations,
-                                      const std::string& policyWeightsPath) {
+                                      const std::string& policyWeightsPath,
+                                      float policyBlend) {
         bb::DiceRoller dice(seed);
 
         std::unique_ptr<bb::ValueFunction> vf;
@@ -364,7 +367,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletWeight = 0.25f; // 75% policy + 25% noise
                 if (policyNet) {
                     cfg.policy = policyNet.get();
-                    cfg.policyBlend = 0.3f;  // Training: blend 30% policy + 70% heuristics
+                    cfg.policyBlend = policyBlend;
                 }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
                 macroMctsOut->setLogDecisions(true, 20);
@@ -426,7 +429,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("weights_path") = "",
        py::arg("epsilon") = 0.3f,
        py::arg("mcts_iterations") = 0,
-       py::arg("policy_weights_path") = "");
+       py::arg("policy_weights_path") = "",
+       py::arg("policy_blend") = 0.0f);
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {
