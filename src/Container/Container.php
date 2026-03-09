@@ -18,9 +18,15 @@ final class Container
         unset($this->instances[$id]);
     }
 
+    /**
+     * @template T of object
+     * @param class-string<T> $id
+     * @return T
+     */
     public function get(string $id): object
     {
         if (isset($this->instances[$id])) {
+            /** @var T */
             return $this->instances[$id];
         }
 
@@ -29,6 +35,7 @@ final class Container
         }
 
         $this->instances[$id] = ($this->factories[$id])($this);
+        /** @var T */
         return $this->instances[$id];
     }
 

@@ -76,7 +76,11 @@ final class GameLogger
             if (!is_dir($dir)) {
                 mkdir($dir, 0777, true);
             }
-            $this->handle = fopen($this->outputPath, 'a');
+            $h = fopen($this->outputPath, 'a');
+            if ($h === false) {
+                return;
+            }
+            $this->handle = $h;
         }
 
         fwrite($this->handle, json_encode($record, JSON_UNESCAPED_UNICODE) . "\n");

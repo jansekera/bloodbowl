@@ -16,15 +16,11 @@ use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\ScatterCalculator;
-use App\Engine\StrengthCalculator;
-use App\Engine\TacklezoneCalculator;
 
 final class BallAndChainHandler implements ActionHandlerInterface
 {
     public function __construct(
         private readonly DiceRollerInterface $dice,
-        private readonly StrengthCalculator $strCalc,
-        private readonly TacklezoneCalculator $tzCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly ScatterCalculator $scatterCalc,

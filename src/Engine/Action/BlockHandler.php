@@ -9,6 +9,7 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingBlockDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -147,50 +148,81 @@ final class BlockHandler implements ActionHandlerInterface
             $faces[] = $this->rollBlockDie();
         }
 
-        // Auto-choose best face
-        $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
+        $isBlitz = !empty($params['isBlitz']);
+        $activeSide = $state->getActiveTeam();
 
-        // Pro reroll on bad block result
-        if ($attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn()) {
-            $chosenScore = $this->scoreBlockFace($chosenFace, $attacker, $defender);
-            if ($chosenScore < 0) {
-                $proRoll = $this->dice->rollD6();
-                $attacker = $attacker->withProUsedThisTurn(true);
-                $state = $state->withPlayer($attacker);
-                if ($proRoll >= 4) {
-                    // Reroll the worst die
-                    $worstIdx = 0;
-                    $worstScore = PHP_INT_MAX;
-                    foreach ($faces as $idx => $f) {
-                        $s = $this->scoreBlockFace($f, $attacker, $defender);
-                        if ($s < $worstScore) {
-                            $worstScore = $s;
-                            $worstIdx = $idx;
-                        }
-                    }
-                    $faces[$worstIdx] = $this->rollBlockDie();
-                    $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
-                    $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
-                } else {
-                    $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, false, null);
-                }
-            }
+        // Create pending block for interactive resolution
+        $pending = new PendingBlockDTO(
+            attackerId: $attackerId,
+            defenderId: $targetId,
+            faces: $faces,
+            attackerChooses: $attackerChooses,
+            isBlitz: $isBlitz,
+            isFrenzy: false,
+            brawlerAvailable: $attacker->hasSkill(SkillName::Brawler),
+            proAvailable: $attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn(),
+            teamRerollAvailable: $state->getTeamState($activeSide)->canUseReroll(),
+        );
+
+        $state = $state->withPendingBlock($pending);
+
+        return ActionResult::success($state, $events);
+    }
+
+    /**
+     * Resolve block choice: apply chosen die face from pending block.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function resolveBlockChoice(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingBlock();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending block');
+        }
+
+        $faceIndex = (int) $params['faceIndex'];
+        $faces = $pending->getFaces();
+
+        if ($faceIndex < 0 || $faceIndex >= count($faces)) {
+            throw new \InvalidArgumentException('Invalid face index');
+        }
+
+        $chosenFace = $faces[$faceIndex];
+
+        $attacker = $state->getPlayer($pending->getAttackerId());
+        $defender = $state->getPlayer($pending->getDefenderId());
+
+        if ($attacker === null || $defender === null) {
+            throw new \InvalidArgumentException('Player not found');
+        }
+
+        // Validate chooser can pick this face
+        if ($pending->isAttackerChooses()) {
+            // Attacker chooses: any face is valid
+        } else {
+            // Defender chooses: picks worst for attacker (already handled by auto, but validate anyway)
         }
 
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
+        $events = [];
         $events[] = GameEvent::blockAttempt(
-            $attackerId, $targetId, $diceCount, $attackerChooses, $faceValues, $chosenFace->value,
+            $pending->getAttackerId(), $pending->getDefenderId(),
+            count($faces), $pending->isAttackerChooses(),
+            $faceValues, $chosenFace->value,
         );
 
-        // Apply block result
-        $isBlitz = !empty($params['isBlitz']);
+        // Clear pending block
+        $state = $state->withPendingBlock(null);
+
+        $isBlitz = $pending->isBlitz();
         $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz);
 
         // Frenzy: mandatory second block if both still standing and adjacent
-        if (!$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy)) {
+        if (!$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
             $frenzyState = $result->getNewState();
-            $frenzyAttacker = $frenzyState->getPlayer($attackerId);
-            $frenzyDefender = $frenzyState->getPlayer($targetId);
+            $frenzyAttacker = $frenzyState->getPlayer($pending->getAttackerId());
+            $frenzyDefender = $frenzyState->getPlayer($pending->getDefenderId());
 
             if ($frenzyAttacker !== null && $frenzyDefender !== null
                 && $frenzyAttacker->getState() === PlayerState::STANDING
@@ -199,7 +231,7 @@ final class BlockHandler implements ActionHandlerInterface
                 && $frenzyAttacker->getPosition()->distanceTo($frenzyDefender->getPosition()) === 1
             ) {
                 $frenzyEvents = $result->getEvents();
-                $frenzyEvents[] = GameEvent::frenzyBlock($attackerId, $targetId);
+                $frenzyEvents[] = GameEvent::frenzyBlock($pending->getAttackerId(), $pending->getDefenderId());
 
                 // Recalculate strengths at new positions
                 $attStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyAttacker, $frenzyDefender->getPosition());
@@ -211,20 +243,27 @@ final class BlockHandler implements ActionHandlerInterface
                     $faces2[] = $this->rollBlockDie();
                 }
 
-                $chosenFace2 = $this->autoChooseBlockDie($faces2, $diceInfo2['attackerChooses'], $frenzyAttacker, $frenzyDefender);
-
-                $faceValues2 = array_map(fn(BlockDiceFace $f) => $f->value, $faces2);
-                $frenzyEvents[] = GameEvent::blockAttempt(
-                    $attackerId, $targetId, $diceInfo2['count'], $diceInfo2['attackerChooses'], $faceValues2, $chosenFace2->value,
+                $activeSide = $frenzyState->getActiveTeam();
+                $frenzyPending = new PendingBlockDTO(
+                    attackerId: $pending->getAttackerId(),
+                    defenderId: $pending->getDefenderId(),
+                    faces: $faces2,
+                    attackerChooses: $diceInfo2['attackerChooses'],
+                    isBlitz: $isBlitz,
+                    isFrenzy: true,
+                    brawlerAvailable: $frenzyAttacker->hasSkill(SkillName::Brawler),
+                    proAvailable: $frenzyAttacker->hasSkill(SkillName::Pro) && !$frenzyAttacker->isProUsedThisTurn(),
+                    teamRerollAvailable: $frenzyState->getTeamState($activeSide)->canUseReroll(),
                 );
 
-                $result = $this->applyBlockResult($frenzyState, $frenzyAttacker, $frenzyDefender, $chosenFace2, $frenzyEvents, $isBlitz);
+                $frenzyState = $frenzyState->withPendingBlock($frenzyPending);
+                return ActionResult::success($frenzyState, $frenzyEvents);
             }
         }
 
-        // Mark attacker as acted (get fresh from result state)
+        // Mark attacker as acted
         $finalState = $result->getNewState();
-        $updatedAttacker = $finalState->getPlayer($attackerId);
+        $updatedAttacker = $finalState->getPlayer($pending->getAttackerId());
         if ($updatedAttacker !== null) {
             $finalState = $finalState->withPlayer(
                 $updatedAttacker->withHasActed(true)->withHasMoved(true),
@@ -236,6 +275,193 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         return ActionResult::success($finalState, $result->getEvents());
+    }
+
+    /**
+     * Reroll block dice: Brawler (free, Both Down only), Pro (4+, one die), or Team Reroll (all dice).
+     *
+     * @param array<string, mixed> $params
+     */
+    public function resolveBlockReroll(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingBlock();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending block');
+        }
+
+        $type = (string) $params['type'];
+        $attacker = $state->getPlayer($pending->getAttackerId());
+        $defender = $state->getPlayer($pending->getDefenderId());
+
+        if ($attacker === null || $defender === null) {
+            throw new \InvalidArgumentException('Player not found');
+        }
+
+        $events = [];
+        $faces = $pending->getFaces();
+
+        switch ($type) {
+            case 'brawler':
+                if (!$pending->isBrawlerAvailable()) {
+                    throw new \InvalidArgumentException('Brawler not available');
+                }
+                // Brawler: free reroll of ONE die showing Both Down
+                $bdIdx = -1;
+                foreach ($faces as $idx => $f) {
+                    if ($f === BlockDiceFace::BOTH_DOWN) {
+                        $bdIdx = $idx;
+                        break;
+                    }
+                }
+                if ($bdIdx === -1) {
+                    throw new \InvalidArgumentException('Brawler requires Both Down in roll');
+                }
+                $events[] = GameEvent::rerollUsed($attacker->getId(), 'Brawler');
+                $faces[$bdIdx] = $this->rollBlockDie();
+                $pending = $pending->withBrawlerUsed()->withFaces(array_values($faces));
+                $state = $state->withPendingBlock($pending);
+                return ActionResult::success($state, $events);
+
+            case 'pro':
+                if (!$pending->isProAvailable()) {
+                    throw new \InvalidArgumentException('Pro not available');
+                }
+                $proRoll = $this->dice->rollD6();
+                $attacker = $attacker->withProUsedThisTurn(true);
+                $state = $state->withPlayer($attacker);
+                if ($proRoll >= 4) {
+                    // Reroll worst die
+                    $worstIdx = 0;
+                    $worstScore = PHP_INT_MAX;
+                    foreach ($faces as $idx => $f) {
+                        $s = $this->scoreBlockFace($f, $attacker, $defender);
+                        if ($s < $worstScore) {
+                            $worstScore = $s;
+                            $worstIdx = $idx;
+                        }
+                    }
+                    $faces[$worstIdx] = $this->rollBlockDie();
+                    $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
+                    $pending = $pending->withProUsed()->withFaces(array_values($faces));
+                } else {
+                    $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, false, null);
+                    $pending = $pending->withProUsed();
+                }
+                $state = $state->withPendingBlock($pending);
+                return ActionResult::success($state, $events);
+
+            case 'team':
+                if (!$pending->isTeamRerollAvailable()) {
+                    throw new \InvalidArgumentException('Team reroll not available');
+                }
+                $activeSide = $state->getActiveTeam();
+                $lonerBlocked = false;
+                if ($attacker->hasSkill(SkillName::Loner)) {
+                    $lonerRoll = $this->dice->rollD6();
+                    $lonerBlocked = $lonerRoll < 4;
+                    $events[] = GameEvent::lonerCheck($attacker->getId(), $lonerRoll, !$lonerBlocked);
+                }
+                // Consume the reroll regardless of Loner
+                $state = $state->withTeamState(
+                    $activeSide,
+                    $state->getTeamState($activeSide)->withRerollUsed(),
+                );
+                if (!$lonerBlocked) {
+                    $events[] = GameEvent::rerollUsed($attacker->getId(), 'Team Reroll');
+                    $newFaces = [];
+                    for ($i = 0; $i < count($faces); $i++) {
+                        $newFaces[] = $this->rollBlockDie();
+                    }
+                    $pending = $pending->withTeamRerollUsed()->withFaces($newFaces);
+                } else {
+                    $pending = $pending->withTeamRerollUsed();
+                }
+                $state = $state->withPendingBlock($pending);
+                return ActionResult::success($state, $events);
+
+            default:
+                throw new \InvalidArgumentException("Unknown reroll type: $type");
+        }
+    }
+
+    /**
+     * Auto-resolve a pending block (for AI): choose best face, use rerolls if beneficial.
+     */
+    public function autoResolvePendingBlock(GameState $state): ActionResult
+    {
+        $pending = $state->getPendingBlock();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending block');
+        }
+
+        $attacker = $state->getPlayer($pending->getAttackerId());
+        $defender = $state->getPlayer($pending->getDefenderId());
+        if ($attacker === null || $defender === null) {
+            throw new \InvalidArgumentException('Player not found');
+        }
+
+        /** @var list<GameEvent> $accumulatedEvents */
+        $accumulatedEvents = [];
+
+        // Try Brawler first if Both Down is best choice
+        $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
+        if ($bestFace === BlockDiceFace::BOTH_DOWN && $pending->isBrawlerAvailable()) {
+            $result = $this->resolveBlockReroll($state, ['type' => 'brawler']);
+            $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
+            $state = $result->getNewState();
+            $pending = $state->getPendingBlock();
+            if ($pending === null) {
+                return $result;
+            }
+            $attacker = $state->getPlayer($pending->getAttackerId());
+            $defender = $state->getPlayer($pending->getDefenderId());
+            if ($attacker === null || $defender === null) {
+                return $result;
+            }
+            $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
+        }
+
+        // Try Pro if result is bad
+        $bestScore = $this->scoreBlockFace($bestFace, $attacker, $defender);
+        if ($bestScore < 0 && $pending->isProAvailable()) {
+            $result = $this->resolveBlockReroll($state, ['type' => 'pro']);
+            $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
+            $state = $result->getNewState();
+            $pending = $state->getPendingBlock();
+            if ($pending === null) {
+                return $result;
+            }
+            $attacker = $state->getPlayer($pending->getAttackerId());
+            $defender = $state->getPlayer($pending->getDefenderId());
+            if ($attacker === null || $defender === null) {
+                return $result;
+            }
+            $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
+        }
+
+        // Note: team rerolls are NOT auto-used on blocks (available through interactive dialog only)
+
+        // Choose best face
+        $bestIdx = 0;
+        foreach ($pending->getFaces() as $idx => $f) {
+            if ($f === $bestFace) {
+                $bestIdx = $idx;
+                break;
+            }
+        }
+
+        $choiceResult = $this->resolveBlockChoice($state, ['faceIndex' => $bestIdx]);
+
+        // Merge accumulated reroll events with choice events
+        if ($accumulatedEvents !== []) {
+            $allEvents = array_merge($accumulatedEvents, $choiceResult->getEvents());
+            if ($choiceResult->isTurnover()) {
+                return ActionResult::turnover($choiceResult->getNewState(), $allEvents);
+            }
+            return ActionResult::success($choiceResult->getNewState(), $allEvents);
+        }
+
+        return $choiceResult;
     }
 
     /**
@@ -413,7 +639,7 @@ final class BlockHandler implements ActionHandlerInterface
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
-            if ($wasBallCarrier && $defender->getState() !== PlayerState::STANDING && $defenderPos !== null) {
+            if ($wasBallCarrier && $defender->getState() !== PlayerState::STANDING) {
                 [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $defender, $events);
             }
             return [$state, $events, false];
@@ -464,6 +690,7 @@ final class BlockHandler implements ActionHandlerInterface
                         }
                     }
                     $faces[$worstIdx] = $this->rollBlockDie();
+                    $faces = array_values($faces);
                     $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
                 } else {
@@ -561,9 +788,11 @@ final class BlockHandler implements ActionHandlerInterface
 
             // Mark as acted
             $freshAttacker = $state->getPlayer($attacker->getId());
-            $state = $state->withPlayer(
-                $freshAttacker->withHasActed(true)->withHasMoved(true),
-            );
+            if ($freshAttacker !== null) {
+                $state = $state->withPlayer(
+                    $freshAttacker->withHasActed(true)->withHasMoved(true),
+                );
+            }
             return ActionResult::success($state, $events);
         }
 
@@ -592,9 +821,12 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         // Mark attacker as acted
-        $state = $state->withPlayer(
-            $state->getPlayer($attacker->getId())->withHasActed(true)->withHasMoved(true),
-        );
+        $freshAttacker = $state->getPlayer($attacker->getId());
+        if ($freshAttacker !== null) {
+            $state = $state->withPlayer(
+                $freshAttacker->withHasActed(true)->withHasMoved(true),
+            );
+        }
 
         return ActionResult::success($state, $events);
     }
@@ -644,7 +876,9 @@ final class BlockHandler implements ActionHandlerInterface
                     $wState = $state->withPlayer($attacker)->withPlayer($defender);
                     [$wState, $events] = $this->ballResolver->handleBallOnPlayerDown($wState, $attacker, $events);
                     $defender = $wState->getPlayer($defender->getId());
-                    [$wState, $events] = $this->ballResolver->handleBallOnPlayerDown($wState, $defender, $events);
+                    if ($defender !== null) {
+                        [$wState, $events] = $this->ballResolver->handleBallOnPlayerDown($wState, $defender, $events);
+                    }
                     return ActionResult::success($wState, $events);
                 }
                 if (!$attacker->hasSkill(SkillName::Block)) {
@@ -690,6 +924,9 @@ final class BlockHandler implements ActionHandlerInterface
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
+            if ($defender === null) {
+                return ActionResult::turnover($currentState, $events);
+            }
         }
 
         // Follow-up: attacker moves to defender's old position
@@ -706,12 +943,13 @@ final class BlockHandler implements ActionHandlerInterface
             if ($currentState->getBall()->getCarrierId() === $attacker->getId()) {
                 $currentState = $currentState->withBall(BallState::carried($defenderPos, $attacker->getId()));
             }
-        } elseif (!$noFollowUp && $defenderPushed && $defender->hasSkill(SkillName::Fend) && !$defenderDown) {
+        } elseif ($defenderPushed) {
+            // Fend: defender has Fend and is not down (guaranteed by previous branch logic)
             $events[] = GameEvent::fend($defender->getId());
         }
 
         // Handle defender knockdown
-        if ($defenderDown && $defender !== null && $defender->getPosition() !== null) {
+        if ($defenderDown && $defender->getPosition() !== null) {
             $events[] = GameEvent::playerFell($defender->getId());
             $defender = $defender->withState(PlayerState::PRONE);
             $currentState = $currentState->withPlayer($defender);

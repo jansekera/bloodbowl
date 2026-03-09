@@ -17,7 +17,7 @@ final class BigGuyCheckResolver
      * Resolve pre-action check for Big Guy negatraits.
      * Returns null if the action can proceed, or an ActionResult if blocked.
      *
-     * @return array{state: GameState, events: list<GameEvent>}|null null = action proceeds
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool}|null null = action proceeds
      */
     public function resolvePreActionCheck(
         GameState $state,

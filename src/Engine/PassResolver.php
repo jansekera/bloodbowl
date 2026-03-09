@@ -90,6 +90,9 @@ final class PassResolver
             return $this->resolveHailMaryPass($state, $thrower, $from, $target);
         }
 
+        // After HMP early return, range is guaranteed non-null
+        assert($range !== null);
+
         // Pass Block: opposing players with PassBlock within 3 of thrower or target move toward target
         $passBlockResult = $this->resolvePassBlock($state, $thrower, $from, $target);
         $state = $passBlockResult['state'];
@@ -99,8 +102,10 @@ final class PassResolver
         $interceptResult = $this->checkInterceptions($state, $from, $target, $thrower);
         if ($interceptResult['intercepted']) {
             // Prepend pass block events to interception result
-            $interceptEvents = array_merge($animosityEvents, $passBlockEvents, $interceptResult['result']->getEvents());
-            return ActionResult::turnover($interceptResult['result']->getNewState(), $interceptEvents);
+            $interceptedResult = $interceptResult['result'];
+            assert($interceptedResult !== null);
+            $interceptEvents = array_merge($animosityEvents, $passBlockEvents, $interceptedResult->getEvents());
+            return ActionResult::turnover($interceptedResult->getNewState(), $interceptEvents);
         }
 
         // Accuracy roll with reroll support
@@ -630,6 +635,7 @@ final class PassResolver
         }
 
         $pos = $bestPlayer->getPosition();
+        assert($pos !== null); // bestPlayer was selected from loop that skips null positions
         $currentPos = $pos;
         for ($step = 0; $step < 3; $step++) {
             $nextPos = $this->stepToward($currentPos, $target);

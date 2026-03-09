@@ -114,7 +114,11 @@ final class FeatureExtractor
             $sumArmour = 0.0;
             $sumAgility = 0.0;
             foreach ($myStandingOnPitch as $p) {
-                $sumX += self::normalizeX($p->getPosition()->getX(), $perspective);
+                $pos = $p->getPosition();
+                if ($pos === null) {
+                    continue;
+                }
+                $sumX += self::normalizeX($pos->getX(), $perspective);
                 $sumStr += $p->getStats()->getStrength();
                 $sumArmour += $p->getStats()->getArmour();
                 $sumAgility += $p->getStats()->getAgility();
@@ -132,7 +136,11 @@ final class FeatureExtractor
             $sumArmour = 0.0;
             $sumAgility = 0.0;
             foreach ($oppStandingOnPitch as $p) {
-                $sumX += self::normalizeX($p->getPosition()->getX(), $perspective);
+                $pos = $p->getPosition();
+                if ($pos === null) {
+                    continue;
+                }
+                $sumX += self::normalizeX($pos->getX(), $perspective);
                 $sumStr += $p->getStats()->getStrength();
                 $sumArmour += $p->getStats()->getArmour();
                 $sumAgility += $p->getStats()->getAgility();
@@ -178,14 +186,22 @@ final class FeatureExtractor
         // Sideline awareness: fraction of standing players on Y=0 or Y=14
         $mySidelineCount = 0;
         foreach ($myStandingOnPitch as $p) {
-            $y = $p->getPosition()->getY();
+            $pos = $p->getPosition();
+            if ($pos === null) {
+                continue;
+            }
+            $y = $pos->getY();
             if ($y === 0 || $y === 14) {
                 $mySidelineCount++;
             }
         }
         $oppSidelineCount = 0;
         foreach ($oppStandingOnPitch as $p) {
-            $y = $p->getPosition()->getY();
+            $pos = $p->getPosition();
+            if ($pos === null) {
+                continue;
+            }
+            $y = $pos->getY();
             if ($y === 0 || $y === 14) {
                 $oppSidelineCount++;
             }
@@ -232,6 +248,9 @@ final class FeatureExtractor
                 $cPos = $carrier->getPosition();
                 foreach ($oppStandingOnPitch as $opp_p) {
                     $oppPos = $opp_p->getPosition();
+                    if ($oppPos === null) {
+                        continue;
+                    }
                     if (max(abs($oppPos->getX() - $cPos->getX()), abs($oppPos->getY() - $cPos->getY())) === 1) {
                         $carrierTzCount += 1.0;
                     }
@@ -267,8 +286,14 @@ final class FeatureExtractor
         $myEngaged = 0;
         foreach ($myStandingOnPitch as $p) {
             $pPos = $p->getPosition();
+            if ($pPos === null) {
+                continue;
+            }
             foreach ($oppStandingOnPitch as $opp_p) {
                 $oppPos = $opp_p->getPosition();
+                if ($oppPos === null) {
+                    continue;
+                }
                 if (max(abs($oppPos->getX() - $pPos->getX()), abs($oppPos->getY() - $pPos->getY())) === 1) {
                     $myEngaged++;
                     break;
@@ -278,8 +303,14 @@ final class FeatureExtractor
         $oppEngaged = 0;
         foreach ($oppStandingOnPitch as $opp_p) {
             $oppPos = $opp_p->getPosition();
+            if ($oppPos === null) {
+                continue;
+            }
             foreach ($myStandingOnPitch as $p) {
                 $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
                 if (max(abs($pPos->getX() - $oppPos->getX()), abs($pPos->getY() - $oppPos->getY())) === 1) {
                     $oppEngaged++;
                     break;
@@ -350,7 +381,8 @@ final class FeatureExtractor
                 foreach ($diags as [$dx, $dy]) {
                     if ($dx < 0 || $dx > 25 || $dy < 0 || $dy > 14) continue;
                     foreach ($myStandingOnPitch as $p) {
-                        if ($p->getPosition()->getX() === $dx && $p->getPosition()->getY() === $dy) {
+                        $pPos = $p->getPosition();
+                        if ($pPos !== null && $pPos->getX() === $dx && $pPos->getY() === $dy) {
                             $cageDiagonal++;
                             break;
                         }
@@ -376,7 +408,8 @@ final class FeatureExtractor
                 foreach ($diags as [$dx, $dy]) {
                     if ($dx < 0 || $dx > 25 || $dy < 0 || $dy > 14) continue;
                     foreach ($oppStandingOnPitch as $p) {
-                        if ($p->getPosition()->getX() === $dx && $p->getPosition()->getY() === $dy) {
+                        $pPos = $p->getPosition();
+                        if ($pPos !== null && $pPos->getX() === $dx && $pPos->getY() === $dy) {
                             $oppCageDiagonal++;
                             break;
                         }
@@ -406,6 +439,9 @@ final class FeatureExtractor
                 foreach ($myStandingOnPitch as $p) {
                     if ($p->getId() === $carrier->getId()) continue;
                     $pPos = $p->getPosition();
+                    if ($pPos === null) {
+                        continue;
+                    }
                     $distToCarrier = max(abs($pPos->getX() - $cPos->getX()), abs($pPos->getY() - $cPos->getY()));
                     if ($distToCarrier <= 10) {
                         $distTD = self::distanceToEndzone($pPos->getX(), $perspective);
@@ -425,8 +461,14 @@ final class FeatureExtractor
             $myFrenzyCount++;
             $adjOpp = 0;
             $pPos = $p->getPosition();
+            if ($pPos === null) {
+                continue;
+            }
             foreach ($oppStandingOnPitch as $opp_p) {
                 $oppPos = $opp_p->getPosition();
+                if ($oppPos === null) {
+                    continue;
+                }
                 if (max(abs($oppPos->getX() - $pPos->getX()), abs($oppPos->getY() - $pPos->getY())) === 1) {
                     $adjOpp++;
                 }
@@ -441,7 +483,11 @@ final class FeatureExtractor
             if ($carrier !== null && $carrier->getPosition() !== null) {
                 $ballX = $carrier->getPosition()->getX();
                 foreach ($myStandingOnPitch as $p) {
-                    $px = $p->getPosition()->getX();
+                    $pPos = $p->getPosition();
+                    if ($pPos === null) {
+                        continue;
+                    }
+                    $px = $pPos->getX();
                     if ($perspective === TeamSide::HOME) {
                         if ($px < $ballX) $screenCount++;
                     } else {
@@ -459,6 +505,9 @@ final class FeatureExtractor
                 $cPos = $carrier->getPosition();
                 foreach ($oppStandingOnPitch as $opp_p) {
                     $oppPos = $opp_p->getPosition();
+                    if ($oppPos === null) {
+                        continue;
+                    }
                     $dist = max(abs($oppPos->getX() - $cPos->getX()), abs($oppPos->getY() - $cPos->getY()));
                     if ($dist <= $opp_p->getStats()->getMovement()) {
                         $carrierBlitzable = 1.0;
@@ -471,12 +520,20 @@ final class FeatureExtractor
         // [64] surfable_opponents: opponents on sideline within blitz range
         $surfableOpps = 0;
         foreach ($oppStandingOnPitch as $opp_p) {
-            $oy = $opp_p->getPosition()->getY();
+            $oppPos = $opp_p->getPosition();
+            if ($oppPos === null) {
+                continue;
+            }
+            $oy = $oppPos->getY();
             if ($oy !== 0 && $oy !== 14) continue;
             foreach ($myStandingOnPitch as $p) {
+                $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
                 $dist = max(
-                    abs($p->getPosition()->getX() - $opp_p->getPosition()->getX()),
-                    abs($p->getPosition()->getY() - $opp_p->getPosition()->getY())
+                    abs($pPos->getX() - $oppPos->getX()),
+                    abs($pPos->getY() - $oppPos->getY())
                 );
                 if ($dist <= $p->getStats()->getMovement()) {
                     $surfableOpps++;
@@ -489,8 +546,14 @@ final class FeatureExtractor
         $favorableBlocks = 0;
         foreach ($myStandingOnPitch as $p) {
             $pPos = $p->getPosition();
+            if ($pPos === null) {
+                continue;
+            }
             foreach ($oppStandingOnPitch as $opp_p) {
                 $oppPos = $opp_p->getPosition();
+                if ($oppPos === null) {
+                    continue;
+                }
                 if (max(abs($oppPos->getX() - $pPos->getX()), abs($oppPos->getY() - $pPos->getY())) !== 1) continue;
                 // Simplified: count my adjacent (excl attacker) - opp adjacent (excl defender)
                 $myAssist = 0;
@@ -498,12 +561,18 @@ final class FeatureExtractor
                 foreach ($myStandingOnPitch as $helper) {
                     if ($helper->getId() === $p->getId()) continue;
                     $hPos = $helper->getPosition();
+                    if ($hPos === null) {
+                        continue;
+                    }
                     if (max(abs($hPos->getX() - $oppPos->getX()), abs($hPos->getY() - $oppPos->getY())) === 1) {
                         // Check if helper is free from enemy TZ (excluding defender)
                         $helperInOppTz = false;
                         foreach ($oppStandingOnPitch as $check) {
                             if ($check->getId() === $opp_p->getId()) continue;
                             $cPos2 = $check->getPosition();
+                            if ($cPos2 === null) {
+                                continue;
+                            }
                             if (max(abs($cPos2->getX() - $hPos->getX()), abs($cPos2->getY() - $hPos->getY())) === 1) {
                                 if (!$helper->hasSkill(SkillName::Guard)) {
                                     $helperInOppTz = true;
@@ -517,11 +586,17 @@ final class FeatureExtractor
                 foreach ($oppStandingOnPitch as $helper) {
                     if ($helper->getId() === $opp_p->getId()) continue;
                     $hPos = $helper->getPosition();
+                    if ($hPos === null) {
+                        continue;
+                    }
                     if (max(abs($hPos->getX() - $pPos->getX()), abs($hPos->getY() - $pPos->getY())) === 1) {
                         $helperInMyTz = false;
                         foreach ($myStandingOnPitch as $check) {
                             if ($check->getId() === $p->getId()) continue;
                             $cPos2 = $check->getPosition();
+                            if ($cPos2 === null) {
+                                continue;
+                            }
                             if (max(abs($cPos2->getX() - $hPos->getX()), abs($cPos2->getY() - $hPos->getY())) === 1) {
                                 if (!$helper->hasSkill(SkillName::Guard)) {
                                     $helperInMyTz = true;
@@ -545,14 +620,22 @@ final class FeatureExtractor
         // [66] one_turn_td_vulnerability: opp can score in one turn (MA+2 >= dist, not in TZ)
         $oneTurnTDVuln = 0.0;
         foreach ($oppStandingOnPitch as $opp_p) {
-            $dist = self::distanceToEndzone($opp_p->getPosition()->getX(), $opp);
+            $oppPos = $opp_p->getPosition();
+            if ($oppPos === null) {
+                continue;
+            }
+            $dist = self::distanceToEndzone($oppPos->getX(), $opp);
             if ($opp_p->getStats()->getMovement() + 2 >= $dist) {
                 // Check if in my TZ
                 $inMyTZ = false;
                 foreach ($myStandingOnPitch as $p) {
+                    $pPos = $p->getPosition();
+                    if ($pPos === null) {
+                        continue;
+                    }
                     $d = max(
-                        abs($p->getPosition()->getX() - $opp_p->getPosition()->getX()),
-                        abs($p->getPosition()->getY() - $opp_p->getPosition()->getY())
+                        abs($pPos->getX() - $oppPos->getX()),
+                        abs($pPos->getY() - $oppPos->getY())
                     );
                     if ($d === 1) { $inMyTZ = true; break; }
                 }
@@ -570,11 +653,19 @@ final class FeatureExtractor
             $myClosest = 99;
             $oppClosest = 99;
             foreach ($myStandingOnPitch as $p) {
-                $d = max(abs($p->getPosition()->getX() - $bPos->getX()), abs($p->getPosition()->getY() - $bPos->getY()));
+                $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
+                $d = max(abs($pPos->getX() - $bPos->getX()), abs($pPos->getY() - $bPos->getY()));
                 if ($d < $myClosest) $myClosest = $d;
             }
             foreach ($oppStandingOnPitch as $p) {
-                $d = max(abs($p->getPosition()->getX() - $bPos->getX()), abs($p->getPosition()->getY() - $bPos->getY()));
+                $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
+                $d = max(abs($pPos->getX() - $bPos->getX()), abs($pPos->getY() - $bPos->getY()));
                 if ($d < $oppClosest) $oppClosest = $d;
             }
             $looseBallProx = self::clamp(($oppClosest - $myClosest + 5) / 10.0, 0.0, 1.0);
@@ -585,15 +676,23 @@ final class FeatureExtractor
         if ($oppStandingOnPitch !== []) {
             $minOppDistToMyEZ = 99;
             foreach ($oppStandingOnPitch as $p) {
+                $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
                 $dToMyEZ = ($perspective === TeamSide::HOME)
-                    ? $p->getPosition()->getX()
-                    : (25 - $p->getPosition()->getX());
+                    ? $pPos->getX()
+                    : (25 - $pPos->getX());
                 if ($dToMyEZ < $minOppDistToMyEZ) $minOppDistToMyEZ = $dToMyEZ;
             }
             foreach ($myStandingOnPitch as $p) {
+                $pPos = $p->getPosition();
+                if ($pPos === null) {
+                    continue;
+                }
                 $dToMyEZ = ($perspective === TeamSide::HOME)
-                    ? $p->getPosition()->getX()
-                    : (25 - $p->getPosition()->getX());
+                    ? $pPos->getX()
+                    : (25 - $pPos->getX());
                 if ($dToMyEZ < $minOppDistToMyEZ) $deepSafeties++;
             }
         }
@@ -601,12 +700,20 @@ final class FeatureExtractor
         // [69] isolation_count: players with no friendly within 3 squares
         $isolatedCount = 0;
         foreach ($myStandingOnPitch as $p) {
+            $pPos = $p->getPosition();
+            if ($pPos === null) {
+                continue;
+            }
             $hasNearby = false;
             foreach ($myStandingOnPitch as $other) {
                 if ($other->getId() === $p->getId()) continue;
+                $otherPos = $other->getPosition();
+                if ($otherPos === null) {
+                    continue;
+                }
                 $d = max(
-                    abs($other->getPosition()->getX() - $p->getPosition()->getX()),
-                    abs($other->getPosition()->getY() - $p->getPosition()->getY())
+                    abs($otherPos->getX() - $pPos->getX()),
+                    abs($otherPos->getY() - $pPos->getY())
                 );
                 if ($d <= 3) { $hasNearby = true; break; }
             }

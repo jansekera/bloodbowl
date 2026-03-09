@@ -12,10 +12,10 @@ final class ContainerTest extends TestCase
     public function testGetReturnsSingleton(): void
     {
         $container = new Container();
-        $container->set('service', fn() => new \stdClass());
+        $container->set(\stdClass::class, fn() => new \stdClass());
 
-        $a = $container->get('service');
-        $b = $container->get('service');
+        $a = $container->get(\stdClass::class);
+        $b = $container->get(\stdClass::class);
 
         $this->assertSame($a, $b);
     }
@@ -35,18 +35,18 @@ final class ContainerTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Service not found: unknown');
-        $container->get('unknown');
+        $container->get('unknown'); // @phpstan-ignore argument.type
     }
 
     public function testSetOverridesPrevious(): void
     {
         $container = new Container();
-        $container->set('svc', fn() => (object) ['v' => 1]);
-        $first = $container->get('svc');
+        $container->set(\stdClass::class, fn() => (object) ['v' => 1]);
+        $first = $container->get(\stdClass::class);
         $this->assertSame(1, $first->v);
 
-        $container->set('svc', fn() => (object) ['v' => 2]);
-        $second = $container->get('svc');
+        $container->set(\stdClass::class, fn() => (object) ['v' => 2]);
+        $second = $container->get(\stdClass::class);
         $this->assertSame(2, $second->v);
         $this->assertNotSame($first, $second);
     }
@@ -54,13 +54,14 @@ final class ContainerTest extends TestCase
     public function testFactoryReceivesContainer(): void
     {
         $container = new Container();
-        $container->set('dep', fn() => (object) ['name' => 'dependency']);
+        $container->set(\stdClass::class, fn() => (object) ['name' => 'dependency']);
         $container->set('svc', function (Container $c) {
-            $dep = $c->get('dep');
+            $dep = $c->get(\stdClass::class);
             return (object) ['dep' => $dep];
         });
 
-        $svc = $container->get('svc');
+        $svc = $container->get('svc'); // @phpstan-ignore argument.type
+        /** @var object{dep: object{name: string}} $svc */
         $this->assertSame('dependency', $svc->dep->name);
     }
 
@@ -70,6 +71,7 @@ final class ContainerTest extends TestCase
         $container->set('a', fn() => new \stdClass());
         $container->set('b', fn() => new \stdClass());
 
+        // @phpstan-ignore argument.type, argument.type
         $this->assertNotSame($container->get('a'), $container->get('b'));
     }
 }

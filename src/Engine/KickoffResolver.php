@@ -541,7 +541,7 @@ final class KickoffResolver
         }
 
         $pos = $bestPlayer->getPosition();
-        if ($pos->equals($ballPos)) {
+        if ($pos === null || $pos->equals($ballPos)) {
             return ['state' => $state, 'events' => []];
         }
 

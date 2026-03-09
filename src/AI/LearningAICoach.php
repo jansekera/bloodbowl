@@ -36,7 +36,8 @@ final class LearningAICoach implements AICoachInterface
         $this->epsilon = $epsilon;
 
         if ($weightsFile !== null && file_exists($weightsFile)) {
-            $data = json_decode(file_get_contents($weightsFile), true);
+            $json = file_get_contents($weightsFile);
+            $data = $json !== false ? json_decode($json, true) : null;
             if (is_array($data) && isset($data['type']) && $data['type'] === 'neural') {
                 $this->modelType = 'neural';
                 $this->W1 = $data['W1'];
@@ -44,7 +45,7 @@ final class LearningAICoach implements AICoachInterface
                 $this->W2 = $data['W2'];
                 $this->b2 = $data['b2'];
             } else {
-                $this->weights = array_map('floatval', $data);
+                $this->weights = array_values(array_map('floatval', $data));
             }
         } else {
             $this->weights = array_fill(0, FeatureExtractor::NUM_FEATURES, 0.0);
@@ -505,7 +506,7 @@ final class LearningAICoach implements AICoachInterface
         $bestTarget = $targets[0];
 
         foreach ($targets as $target) {
-            $rangePenalty = match ($target['range'] ?? 'short') {
+            $rangePenalty = match ($target['range']) {
                 'quick' => 0.0,
                 'short' => 0.02,
                 'long' => 0.05,

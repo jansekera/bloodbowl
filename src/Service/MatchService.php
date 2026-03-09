@@ -12,6 +12,7 @@ use App\DTO\MatchPlayerDTO;
 use App\DTO\TeamStateDTO;
 use App\Engine\DiceRollerInterface;
 use App\Engine\RulesEngine;
+use App\Engine\StrengthCalculator;
 use App\Enum\ActionType;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
@@ -38,7 +39,7 @@ final class MatchService
         private readonly TeamRepository $teamRepo,
         private readonly RulesEngine $rulesEngine,
         private readonly DiceRollerInterface $dice,
-        private readonly AICoachInterface $aiCoach,
+        AICoachInterface $aiCoach,
         private readonly SPPService $sppService = new SPPService(),
         private readonly ?PlayerRepository $playerRepo = null,
     ) {
@@ -104,6 +105,7 @@ final class MatchService
                 'skills' => (string) json_encode(array_map(fn($s) => $s->getName(), $player->getSkills())),
             ]);
 
+            $learnedSkills = $this->playerRepo?->getLearnedSkillNames($player->getId()) ?? [];
             $mp = MatchPlayerDTO::create(
                 id: (int) $mpRow['id'],
                 playerId: $player->getId(),
@@ -114,6 +116,7 @@ final class MatchService
                 skills: array_map(fn($s) => SkillName::from($s->getName()), $player->getSkills()),
                 teamSide: TeamSide::HOME,
                 position: new Position(-1, -1), // Off pitch until setup
+                learnedSkills: $learnedSkills,
             );
             $mp = $mp->withPosition(null)->withState(\App\Enum\PlayerState::OFF_PITCH);
             $players[$mp->getId()] = $mp;
@@ -134,6 +137,7 @@ final class MatchService
                 'skills' => (string) json_encode(array_map(fn($s) => $s->getName(), $player->getSkills())),
             ]);
 
+            $learnedSkills = $this->playerRepo?->getLearnedSkillNames($player->getId()) ?? [];
             $mp = MatchPlayerDTO::create(
                 id: (int) $mpRow['id'],
                 playerId: $player->getId(),
@@ -144,6 +148,7 @@ final class MatchService
                 skills: array_map(fn($s) => SkillName::from($s->getName()), $player->getSkills()),
                 teamSide: TeamSide::AWAY,
                 position: new Position(-1, -1),
+                learnedSkills: $learnedSkills,
             );
             $mp = $mp->withPosition(null)->withState(\App\Enum\PlayerState::OFF_PITCH);
             $players[$mp->getId()] = $mp;
@@ -278,7 +283,7 @@ final class MatchService
     /**
      * Get block targets for a specific player.
      *
-     * @return list<array{playerId: int, name: string, x: int, y: int}>
+     * @return list<array{playerId: int, name: string, x: int, y: int, diceCount: int, attackerChooses: bool}>
      */
     public function getBlockTargets(int $matchId, int $playerId): array
     {
@@ -289,15 +294,25 @@ final class MatchService
         }
 
         $targets = $this->rulesEngine->getBlockTargets($state, $player);
+        $strengthCalc = new StrengthCalculator();
         $result = [];
         foreach ($targets as $target) {
             $pos = $target->getPosition();
             if ($pos !== null) {
+                $playerPos = $player->getPosition();
+                if ($playerPos === null) {
+                    continue;
+                }
+                $attackerST = $strengthCalc->calculateEffectiveStrength($state, $player, $pos);
+                $defenderST = $strengthCalc->calculateEffectiveStrength($state, $target, $playerPos);
+                $diceInfo = $strengthCalc->getBlockDiceInfo($attackerST, $defenderST);
                 $result[] = [
                     'playerId' => $target->getId(),
                     'name' => $target->getName(),
                     'x' => $pos->getX(),
                     'y' => $pos->getY(),
+                    'diceCount' => $diceInfo['count'],
+                    'attackerChooses' => $diceInfo['attackerChooses'],
                 ];
             }
         }

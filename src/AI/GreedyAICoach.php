@@ -506,7 +506,7 @@ final class GreedyAICoach implements AICoachInterface
 
         $ball = $state->getBall();
         $bestScore = -1;
-        $bestTargetId = null;
+        $bestTargetId = $targets[0]->getId();
 
         foreach ($targets as $target) {
             $score = 120;
@@ -525,10 +525,6 @@ final class GreedyAICoach implements AICoachInterface
                 $bestScore = $score;
                 $bestTargetId = $target->getId();
             }
-        }
-
-        if ($bestTargetId === null) {
-            return null;
         }
 
         // Penalty for gazer being in many tackle zones (reduces success chance)
