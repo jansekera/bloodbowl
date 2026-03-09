@@ -99,6 +99,12 @@ def main():
                         help='Skip greedy opponent in benchmark')
     parser.add_argument('--tv', type=int, default=None,
                         help='Team value level (e.g. 1500 for developed rosters)')
+    parser.add_argument('--mcts-iterations', type=int, default=0,
+                        help='MCTS iterations per action (0 = use learning AI)')
+    parser.add_argument('--use-cpp', action='store_true',
+                        help='Force C++ engine')
+    parser.add_argument('--policy-weights', default=None,
+                        help='Policy weights file (defaults to --weights)')
     args = parser.parse_args()
 
     project_root = args.project_root
@@ -109,9 +115,13 @@ def main():
     if not Path(weights_path).is_absolute():
         weights_path = str(Path(project_root) / weights_path)
 
+    policy_path = args.policy_weights or weights_path
+
     print(f'Benchmarking {weights_path}')
     print(f'Opponents: {", ".join(args.opponents)}')
     print(f'Matches per opponent: {args.matches}')
+    if args.mcts_iterations > 0:
+        print(f'MCTS: {args.mcts_iterations} iterations')
     print()
 
     results = run_benchmark(
@@ -122,6 +132,9 @@ def main():
         timeout=args.timeout,
         skip_greedy=args.skip_greedy,
         tv=args.tv,
+        use_cpp=True if args.use_cpp else None,
+        mcts_iterations=args.mcts_iterations,
+        policy_weights=policy_path,
     )
 
     for opponent, stats in results.items():

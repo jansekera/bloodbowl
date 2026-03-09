@@ -68,6 +68,12 @@ final class BlitzHandler implements ActionHandlerInterface
                 return $moveResult;
             }
 
+            // Pending reroll from dodge/GFI during blitz movement
+            if ($moveResult->getNewState()->getPendingReroll() !== null) {
+                $events = array_merge($events, $moveResult->getEvents());
+                return ActionResult::success($moveResult->getNewState(), $events);
+            }
+
             $state = $moveResult->getNewState();
             $events = array_merge($events, $moveResult->getEvents());
 

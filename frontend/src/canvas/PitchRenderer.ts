@@ -1,4 +1,4 @@
-import type { MatchPlayer, BallState, Position, MoveTarget, PathStep } from '../api/types';
+import type { MatchPlayer, BallState, Position, MoveTarget, PathStep, BlockTarget, PassTarget, HandOffTarget, FoulTarget } from '../api/types';
 import type { AnimationState } from '../animation/animations';
 import { PitchGeometry } from './PitchGeometry';
 
@@ -444,6 +444,17 @@ export class PitchRenderer {
                 ctx.textBaseline = 'bottom';
                 ctx.fillText(label, px + g.cellSize / 2, py + g.cellSize - 1);
             }
+
+            // Show success percentage at top of cell
+            if (t.successChance !== undefined && t.successChance < 100) {
+                const pct = t.successChance;
+                ctx.fillStyle = pct >= 67 ? 'rgba(100, 255, 100, 0.8)' :
+                                pct >= 50 ? 'rgba(255, 255, 100, 0.8)' : 'rgba(255, 100, 100, 0.8)';
+                ctx.font = `${Math.round(g.cellSize * 0.25)}px system-ui, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`${pct}%`, px + g.cellSize / 2, py + 1);
+            }
         }
     }
 
@@ -575,5 +586,93 @@ export class PitchRenderer {
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 0.5;
         ctx.stroke();
+    }
+
+    /** Draw block target highlights with dice count labels */
+    drawBlockTargets(targets: BlockTarget[]): void {
+        const { ctx, geometry: g } = this;
+
+        for (const t of targets) {
+            const { px, py } = g.gridToTopLeft({ x: t.x, y: t.y });
+
+            // Highlight color: red tinted for blocks
+            ctx.fillStyle = 'rgba(255, 100, 100, 0.25)';
+            ctx.fillRect(px + 1, py + 1, g.cellSize - 2, g.cellSize - 2);
+
+            // Dice label: "2D" for 2-dice attacker chooses, "-2D" for defender chooses
+            const label = t.attackerChooses ? `${t.diceCount}D` : `-${t.diceCount}D`;
+            const color = t.attackerChooses
+                ? (t.diceCount >= 2 ? 'rgba(100, 255, 100, 0.9)' : 'rgba(255, 255, 100, 0.9)')  // green for 2D+, yellow for 1D
+                : 'rgba(255, 100, 100, 0.9)';  // red for defender chooses
+
+            ctx.fillStyle = color;
+            ctx.font = `bold ${Math.round(g.cellSize * 0.32)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, px + g.cellSize / 2, py + g.cellSize / 2 - g.cellSize * 0.22);
+        }
+    }
+
+    /** Draw hand-off target highlights */
+    drawHandoffTargets(targets: HandOffTarget[]): void {
+        const { ctx, geometry: g } = this;
+        for (const t of targets) {
+            const { px, py } = g.gridToTopLeft({ x: t.x, y: t.y });
+            ctx.fillStyle = 'rgba(100, 255, 200, 0.25)';
+            ctx.fillRect(px + 1, py + 1, g.cellSize - 2, g.cellSize - 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = `${Math.round(g.cellSize * 0.25)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('HO', px + g.cellSize / 2, py + g.cellSize - 1);
+        }
+    }
+
+    /** Draw foul target highlights */
+    drawFoulTargets(targets: FoulTarget[]): void {
+        const { ctx, geometry: g } = this;
+        for (const t of targets) {
+            const { px, py } = g.gridToTopLeft({ x: t.x, y: t.y });
+            ctx.fillStyle = 'rgba(180, 50, 180, 0.25)';
+            ctx.fillRect(px + 1, py + 1, g.cellSize - 2, g.cellSize - 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.font = `${Math.round(g.cellSize * 0.25)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('F', px + g.cellSize / 2, py + g.cellSize - 1);
+        }
+    }
+
+    /** Draw pass target highlights with range labels */
+    drawPassTargets(targets: PassTarget[]): void {
+        const { ctx, geometry: g } = this;
+
+        const rangeColors: Record<string, string> = {
+            'quick_pass': 'rgba(100, 255, 100, 0.2)',
+            'short_pass': 'rgba(255, 255, 100, 0.2)',
+            'long_pass': 'rgba(255, 165, 0, 0.2)',
+            'long_bomb': 'rgba(255, 80, 80, 0.2)',
+        };
+        const rangeLabels: Record<string, string> = {
+            'quick_pass': 'Q',
+            'short_pass': 'S',
+            'long_pass': 'L',
+            'long_bomb': 'LB',
+        };
+
+        for (const t of targets) {
+            const { px, py } = g.gridToTopLeft({ x: t.x, y: t.y });
+            const color = rangeColors[t.range] ?? 'rgba(200, 200, 200, 0.2)';
+            ctx.fillStyle = color;
+            ctx.fillRect(px + 1, py + 1, g.cellSize - 2, g.cellSize - 2);
+
+            // Range label in corner
+            const label = rangeLabels[t.range] ?? '?';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.font = `${Math.round(g.cellSize * 0.25)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(label, px + g.cellSize / 2, py + g.cellSize - 1);
+        }
     }
 }

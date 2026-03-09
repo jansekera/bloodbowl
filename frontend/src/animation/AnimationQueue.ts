@@ -132,7 +132,12 @@ export class AnimationQueue {
                 }
 
                 case 'block': {
+                    const attackerId = data['attackerId'] as number | undefined;
                     const targetId = data['targetId'] as number | undefined;
+                    // Flash attacker (impact), then shake defender
+                    if (attackerId) {
+                        anims.push(createShakeAnimation(this.state, attackerId, 2, 150));
+                    }
                     if (targetId) {
                         anims.push(createShakeAnimation(this.state, targetId, 4, 250));
                     }
@@ -322,6 +327,62 @@ export class AnimationQueue {
 
                 case 'multiple_block': {
                     // Marker event — individual block events follow
+                    break;
+                }
+
+                case 'dodge': {
+                    const success = data['success'] as boolean;
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        const color = success ? 'rgba(100, 255, 100, 1)' : 'rgba(255, 100, 100, 1)';
+                        anims.push(createFlashAnimation(this.state, pos, color, 200));
+                    }
+                    break;
+                }
+
+                case 'gfi': {
+                    const success = data['success'] as boolean;
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        const color = success ? 'rgba(255, 200, 50, 1)' : 'rgba(255, 50, 50, 1)';
+                        anims.push(createFlashAnimation(this.state, pos, color, 200));
+                    }
+                    break;
+                }
+
+                case 'pickup': {
+                    const success = data['success'] as boolean;
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        const color = success ? 'rgba(255, 215, 0, 1)' : 'rgba(255, 100, 100, 1)';
+                        anims.push(createFlashAnimation(this.state, pos, color, 250));
+                    }
+                    break;
+                }
+
+                case 'catch': {
+                    const success = data['success'] as boolean;
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        const color = success ? 'rgba(100, 200, 255, 1)' : 'rgba(255, 100, 100, 1)';
+                        anims.push(createFlashAnimation(this.state, pos, color, 250));
+                    }
+                    break;
+                }
+
+                case 'injury': {
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        anims.push(createFlashAnimation(this.state, pos, 'rgba(200, 0, 0, 1)', 400));
+                    }
+                    break;
+                }
+
+                case 'armor_break': {
+                    const pos = this.parsePosition(data['position'] as string);
+                    if (pos) {
+                        anims.push(createFlashAnimation(this.state, pos, 'rgba(255, 150, 0, 1)', 300));
+                    }
                     break;
                 }
             }

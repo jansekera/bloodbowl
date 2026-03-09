@@ -15,6 +15,8 @@ import { Toast } from './ui/Toast';
 import { LevelUpModal } from './ui/LevelUpModal';
 import { DugoutPanel } from './ui/DugoutPanel';
 import { PlayerCard } from './ui/PlayerCard';
+import { BlockDiceModal } from './ui/BlockDiceModal';
+import { RerollModal } from './ui/RerollModal';
 
 const api = new ApiClient();
 
@@ -43,6 +45,20 @@ const actionPanel = new ActionPanel(actionPanelEl, handlePanelAction);
 const reservesPanelEl = document.getElementById('reserves-panel')!;
 const reservesPanel = new ReservesPanel(reservesPanelEl, handleReservesSelect);
 
+reservesPanel.setOnFormation(async (formation: string) => {
+    if (isProcessing) return;
+    isProcessing = true;
+    try {
+        const result = await api.submitAction(matchId, 'auto_setup', { formation });
+        stateManager.setGameState(result.state);
+        gameLog.addEvents(result.events);
+    } catch (err) {
+        toast.error('Formation setup failed');
+    } finally {
+        isProcessing = false;
+    }
+});
+
 const replayControlsEl = document.getElementById('replay-controls')!;
 const replayControls = new ReplayControls(replayControlsEl);
 
@@ -61,6 +77,9 @@ const toast = new Toast(container);
 const levelUpEl = document.createElement('div');
 container.appendChild(levelUpEl);
 const levelUpModal = new LevelUpModal(levelUpEl);
+
+const blockDiceModal = new BlockDiceModal(container);
+const rerollModal = new RerollModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -102,6 +121,23 @@ function renderFrame(): void {
     if (state.phase === 'setup') {
         renderer.drawSetupZone(state.activeTeam);
     }
+    // Block/blitz target highlights
+    const currentMode = actionPanel.getSelectedMode();
+    if ((currentMode === 'block' || currentMode === 'blitz') && blockTargets.length > 0) {
+        renderer.drawBlockTargets(blockTargets);
+    }
+    // Pass target highlights
+    if (currentMode === 'pass' && passTargets.length > 0) {
+        renderer.drawPassTargets(passTargets);
+    }
+    // Handoff target highlights
+    if (currentMode === 'handoff' && handoffTargets.length > 0) {
+        renderer.drawHandoffTargets(handoffTargets);
+    }
+    // Foul target highlights
+    if (currentMode === 'foul' && foulTargets.length > 0) {
+        renderer.drawFoulTargets(foulTargets);
+    }
     if (state.ball.isHeld && state.ball.carrierId) {
         const carrier = state.players.find(p => p.id === state.ball.carrierId);
         if (carrier?.position) {
@@ -140,6 +176,82 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     }
 
     stateManager.setGameState(result.state);
+
+    // Show block dice modal if there's a pending block
+    if (result.state.pendingBlock && result.state.aiTeam !== result.state.activeTeam) {
+        showBlockDiceModal(result.state);
+    }
+
+    // Show reroll modal if there's a pending reroll
+    if (result.state.pendingReroll && result.state.aiTeam !== result.state.activeTeam) {
+        showRerollModal(result.state);
+    }
+}
+
+function showBlockDiceModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingBlock;
+    if (!pending) return;
+
+    const attacker = state.players.find(p => p.id === pending.attackerId);
+    const defender = state.players.find(p => p.id === pending.defenderId);
+    const attackerName = attacker?.name ?? `#${pending.attackerId}`;
+    const defenderName = defender?.name ?? `#${pending.defenderId}`;
+
+    blockDiceModal.show(
+        pending,
+        attackerName,
+        defenderName,
+        async (faceIndex: number) => {
+            isProcessing = true;
+            try {
+                const result = await api.submitAction(matchId, 'choose_block_die', { faceIndex });
+                await handleActionResult(result);
+                clearAllTargets();
+                actionPanel.setSelectedMode(null);
+            } catch (err) {
+                toast.error('Block choice failed');
+            } finally {
+                isProcessing = false;
+            }
+        },
+        async (type: string) => {
+            isProcessing = true;
+            try {
+                const result = await api.submitAction(matchId, 'reroll_block', { type });
+                await handleActionResult(result);
+            } catch (err) {
+                toast.error('Reroll failed');
+            } finally {
+                isProcessing = false;
+            }
+        },
+    );
+}
+
+function showRerollModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingReroll;
+    if (!pending) return;
+
+    const player = state.players.find(p => p.id === pending.playerId);
+    const playerName = player?.name ?? `#${pending.playerId}`;
+
+    rerollModal.show(
+        pending,
+        playerName,
+        async (choice: string) => {
+            isProcessing = true;
+            try {
+                const result = await api.submitAction(matchId, 'resolve_reroll', { choice });
+                await handleActionResult(result);
+                clearAllTargets();
+                actionPanel.setSelectedMode(null);
+            } catch (err) {
+                toast.error('Reroll failed');
+            } finally {
+                isProcessing = false;
+            }
+        },
+    );
 }
 
 let moveTargets: MoveTarget[] = [];
@@ -181,6 +293,24 @@ stateManager.onChange(() => {
     // Draw setup zone overlay
     if (state.phase === 'setup') {
         renderer.drawSetupZone(state.activeTeam);
+    }
+
+    // Block/blitz target highlights
+    const currentMode2 = actionPanel.getSelectedMode();
+    if ((currentMode2 === 'block' || currentMode2 === 'blitz') && blockTargets.length > 0) {
+        renderer.drawBlockTargets(blockTargets);
+    }
+    // Pass target highlights
+    if (currentMode2 === 'pass' && passTargets.length > 0) {
+        renderer.drawPassTargets(passTargets);
+    }
+    // Handoff target highlights
+    if (currentMode2 === 'handoff' && handoffTargets.length > 0) {
+        renderer.drawHandoffTargets(handoffTargets);
+    }
+    // Foul target highlights
+    if (currentMode2 === 'foul' && foulTargets.length > 0) {
+        renderer.drawFoulTargets(foulTargets);
     }
 
     // Draw ball on carrier
@@ -447,7 +577,9 @@ canvas.addEventListener('mousemove', (e: MouseEvent) => {
     if (gridPos) {
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player) {
-            tooltip.show(player, e.clientX, e.clientY);
+            const gs = stateManager.getGameState();
+            const team = gs ? (player.teamSide === 'home' ? gs.homeTeam : gs.awayTeam) : null;
+            tooltip.show(player, e.clientX, e.clientY, team?.raceName);
         } else {
             tooltip.hide();
         }
@@ -459,6 +591,34 @@ canvas.addEventListener('mousemove', (e: MouseEvent) => {
 canvas.addEventListener('mouseleave', () => {
     tooltip.hide();
     stateManager.setHoveredCell(null);
+});
+
+// Drag & drop for setup phase
+canvas.addEventListener('dragover', (e: DragEvent) => {
+    const state = stateManager.getGameState();
+    if (!state || state.phase !== 'setup' || !stateManager.isPlayerTurn()) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+});
+
+canvas.addEventListener('drop', async (e: DragEvent) => {
+    e.preventDefault();
+    const state = stateManager.getGameState();
+    if (!state || state.phase !== 'setup' || !stateManager.isPlayerTurn()) return;
+    if (isProcessing) return;
+
+    const playerIdStr = e.dataTransfer?.getData('text/plain');
+    if (!playerIdStr) return;
+    const playerId = parseInt(playerIdStr, 10);
+    if (isNaN(playerId)) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const gridPos = renderer.geometry.pixelToGrid(x, y);
+    if (!gridPos) return;
+
+    await submitSetupPlayer(playerId, gridPos.x, gridPos.y);
 });
 
 function clearAllTargets(): void {
@@ -613,10 +773,18 @@ async function handlePanelAction(action: string): Promise<void> {
 document.addEventListener('keydown', (e: KeyboardEvent) => {
     const state = stateManager.getGameState();
     if (!state) return;
-    if (isProcessing || animationQueue.isAnimating) return;
-    if (!stateManager.isPlayerTurn()) return;
 
     const key = e.key.toLowerCase();
+
+    // Toggle skill display mode: S (works anytime)
+    if (key === 's' && !e.ctrlKey && !e.metaKey) {
+        const mode = tooltip.toggleSkillMode();
+        toast.info(mode === 'learned' ? 'Skills: learned only' : 'Skills: all');
+        return;
+    }
+
+    if (isProcessing || animationQueue.isAnimating) return;
+    if (!stateManager.isPlayerTurn()) return;
 
     // End Turn: Space or Enter (only during PLAY phase)
     if ((key === ' ' || key === 'enter') && state.phase === 'play') {
@@ -722,6 +890,11 @@ async function init(): Promise<void> {
     try {
         const state = await api.getMatchState(matchId);
         stateManager.setGameState(state);
+
+        // Show block dice modal if there's a pending block on load
+        if (state.pendingBlock && state.aiTeam !== state.activeTeam) {
+            showBlockDiceModal(state);
+        }
 
         // Initialize replay controls for finished games
         if (state.phase === 'game_over') {

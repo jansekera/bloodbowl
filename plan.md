@@ -290,9 +290,21 @@ blood-bowl/
 
 ### Plánované — UI / PHP
 
-30. **Reroll dialog**
-    - Server pozastaví akci při neúspěšném hodu a pošle klientovi nabídku rerollu
-    - Klient zobrazí dialog "Použít reroll?" (Ano/Ne)
-    - Vyžaduje nový game phase nebo pending state v ActionResolver
-    - Přepis reroll logiky v MoveHandler, BlockHandler, PassResolver, BallResolver
-    - Aktuálně: backend automaticky používá skill reroll → Pro → team reroll
+30. **Block reroll dialog** ✅
+    - Two-phase block: server hodí kostky → pending block → klient zobrazí modal
+    - Hráč vybírá kostku kliknutím, může použít Brawler/Pro/Team Reroll
+    - Brawler skill (General): free reroll jedné kostky s Both Down
+    - Team reroll na blocích (nově implementovaný)
+    - AI auto-resolve: Brawler → Pro → nejlepší kostka (bez team rerollu)
+    - Frenzy vytváří druhý pending block
+
+31. **AI team reroll na blocích**
+    - autoResolvePendingBlock: přidat team reroll při špatném výsledku (score < 0)
+    - Rozhodovací logika: rerollovat jen při 1-die AD nebo 1-die BD bez Block skillu
+    - Upravit testy (dice sekvence se změní kvůli extra reroll spotřebě)
+    - C++ engine: přidat team reroll logiku do block resolveru (pro MCTS)
+
+32. **Reroll dialog pro ostatní akce**
+    - Dodge, GFI, pickup, pass, catch — stejný pattern jako block
+    - Pending state v MoveHandler, PassResolver, BallResolver
+    - Klient: univerzální "Použít reroll?" dialog

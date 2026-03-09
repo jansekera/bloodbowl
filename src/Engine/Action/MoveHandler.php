@@ -13,6 +13,7 @@ use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\Weather;
 use App\ValueObject\Position;
+use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\Pathfinder;
@@ -20,12 +21,19 @@ use App\Engine\TacklezoneCalculator;
 
 final class MoveHandler implements ActionHandlerInterface
 {
+    private bool $interactiveRerolls = false;
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly Pathfinder $pathfinder,
         private readonly BallResolver $ballResolver,
     ) {
+    }
+
+    public function setInteractiveRerolls(bool $interactive): void
+    {
+        $this->interactiveRerolls = $interactive;
     }
 
     /**
@@ -214,7 +222,29 @@ final class MoveHandler implements ActionHandlerInterface
                         }
                     }
 
-                    // Pro reroll (after skill reroll, before team reroll)
+                    if (!$success) {
+                        // Check for interactive reroll opportunity
+                        $proAvail = $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
+                        $teamRerollAvail = !$skillRerollUsed && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
+
+                        if ($this->interactiveRerolls && ($proAvail || $teamRerollAvail)) {
+                            $pending = new PendingRerollDTO(
+                                rollType: 'dodge',
+                                playerId: $playerId,
+                                target: $target,
+                                roll: $roll,
+                                proAvailable: $proAvail,
+                                teamRerollAvailable: $teamRerollAvail,
+                                targetX: $to->getX(),
+                                targetY: $to->getY(),
+                            );
+                            $currentState = $currentState->withPlayer($currentPlayer);
+                            $currentState = $currentState->withPendingReroll($pending);
+                            return ActionResult::success($currentState, $events);
+                        }
+                    }
+
+                    // Non-interactive: Pro reroll (after skill reroll, before team reroll)
                     if (!$success && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
                         $proRoll = $this->dice->rollD6();
                         $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
@@ -229,7 +259,7 @@ final class MoveHandler implements ActionHandlerInterface
                         }
                     }
 
-                    // Try team reroll (only if no skill reroll was used)
+                    // Non-interactive: Try team reroll (only if no skill reroll was used)
                     if (!$success && !$skillRerollUsed && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
                         $teamRerollUsed = true;
                         $currentState = $currentState->withTeamState(
@@ -323,7 +353,29 @@ final class MoveHandler implements ActionHandlerInterface
                     $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
                 }
 
-                // Pro reroll (after skill reroll, before team reroll)
+                if (!$success) {
+                    // Check for interactive reroll opportunity
+                    $proAvailGfi = $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
+                    $teamRerollAvailGfi = !$skillRerollUsedGfi && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
+
+                    if ($this->interactiveRerolls && ($proAvailGfi || $teamRerollAvailGfi)) {
+                        $pending = new PendingRerollDTO(
+                            rollType: 'gfi',
+                            playerId: $playerId,
+                            target: $gfiThreshold,
+                            roll: $roll,
+                            proAvailable: $proAvailGfi,
+                            teamRerollAvailable: $teamRerollAvailGfi,
+                            targetX: $to->getX(),
+                            targetY: $to->getY(),
+                        );
+                        $currentState = $currentState->withPlayer($currentPlayer);
+                        $currentState = $currentState->withPendingReroll($pending);
+                        return ActionResult::success($currentState, $events);
+                    }
+                }
+
+                // Non-interactive: Pro reroll (after skill reroll, before team reroll)
                 if (!$success && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
                     $proRoll = $this->dice->rollD6();
                     $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
@@ -338,7 +390,7 @@ final class MoveHandler implements ActionHandlerInterface
                     }
                 }
 
-                // Try team reroll (only if no skill reroll was used)
+                // Non-interactive: Try team reroll (only if no skill reroll was used)
                 if (!$success && !$skillRerollUsedGfi && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
                     $teamRerollUsed = true;
                     $currentState = $currentState->withTeamState(

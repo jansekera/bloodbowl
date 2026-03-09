@@ -91,7 +91,7 @@ export class PlayerCard {
 
     private skillCategory(skill: string): string {
         // General skills
-        const general = ['Block', 'Dodge', 'Fend', 'Wrestle', 'Kick', 'Kick-Off Return', 'Pass Block', 'Dirty Player', 'Sneaky Git', 'Sure Feet', 'Sure Hands', 'Catch', 'Strip Ball', 'Tackle'];
+        const general = ['Block', 'Dodge', 'Fend', 'Wrestle', 'Kick', 'Kick-Off Return', 'Pass Block', 'Dirty Player', 'Sneaky Git', 'Sure Feet', 'Sure Hands', 'Catch', 'Strip Ball', 'Tackle', 'Brawler'];
         const strength = ['Guard', 'Mighty Blow', 'Stand Firm', 'Grab', 'Piling On', 'Break Tackle', 'Thick Skull', 'Multiple Block', 'Strong Arm'];
         const agility = ['Dodge', 'Sprint', 'Jump Up', 'Leap', 'Side Step', 'Diving Catch', 'Diving Tackle', 'Two Heads', 'Extra Arms', 'Nerves of Steel', 'Accurate', 'Safe Throw', 'Hail Mary Pass', 'Dump-Off'];
         const mutation = ['Horns', 'Claw', 'Prehensile Tail', 'Disturbing Presence', 'Foul Appearance', 'Tentacles', 'Big Hand', 'Very Long Legs', 'Titchy', "Nurgle's Rot"];

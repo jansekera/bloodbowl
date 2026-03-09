@@ -34,6 +34,7 @@ export interface MatchPlayer {
     teamSide: 'home' | 'away';
     lostTacklezones?: boolean;
     proUsedThisTurn?: boolean;
+    learnedSkills?: string[];
 }
 
 /** Ball state */
@@ -41,6 +42,32 @@ export interface BallState {
     position: Position | null;
     isHeld: boolean;
     carrierId: number | null;
+}
+
+/** Pending block dice waiting for player choice */
+export interface PendingBlock {
+    attackerId: number;
+    defenderId: number;
+    faces: string[];
+    attackerChooses: boolean;
+    isBlitz: boolean;
+    isFrenzy: boolean;
+    brawlerAvailable: boolean;
+    proAvailable: boolean;
+    teamRerollAvailable: boolean;
+    rerollUsed: boolean;
+}
+
+/** Pending reroll waiting for player choice (dodge/GFI/pickup) */
+export interface PendingReroll {
+    rollType: 'dodge' | 'gfi' | 'pickup';
+    playerId: number;
+    target: number;
+    roll: number;
+    proAvailable: boolean;
+    teamRerollAvailable: boolean;
+    targetX: number;
+    targetY: number;
 }
 
 /** Full game state sent from the server */
@@ -57,6 +84,8 @@ export interface GameState {
     kickingTeam: 'home' | 'away' | null;
     aiTeam: 'home' | 'away' | null;
     weather: string;
+    pendingBlock?: PendingBlock | null;
+    pendingReroll?: PendingReroll | null;
 }
 
 export interface TeamState {
@@ -79,6 +108,7 @@ export interface PathStep {
     y: number;
     dodge: boolean;
     gfi: boolean;
+    dodgeTarget?: number;
 }
 
 /** Move target with risk info */
@@ -88,6 +118,7 @@ export interface MoveTarget {
     dodges: number;
     gfis: number;
     path?: PathStep[];
+    successChance?: number;
 }
 
 /** Action result from submitting an action */
@@ -111,6 +142,8 @@ export interface BlockTarget {
     name: string;
     x: number;
     y: number;
+    diceCount: number;
+    attackerChooses: boolean;
 }
 
 /** Available action for the UI */

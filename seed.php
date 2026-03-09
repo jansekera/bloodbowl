@@ -110,6 +110,9 @@ $skills = [
 
     // Phase 24
     ['Multiple Block', 'Strength', 'Block 2 adjacent opponents (each at +2 ST, no follow-up)'],
+
+    // Phase 25
+    ['Brawler', 'General', 'Once per turn, reroll all block dice when Both Down appears'],
 ];
 
 $skillStmt = $pdo->prepare('INSERT INTO skills (name, category, description) VALUES (:name, :category, :description) ON CONFLICT (name) DO NOTHING');

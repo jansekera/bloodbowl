@@ -13,6 +13,7 @@ final class MatchPlayerDTO
 {
     /**
      * @param list<SkillName> $skills
+     * @param list<string> $learnedSkills
      */
     public function __construct(
         private readonly int $id,
@@ -32,11 +33,13 @@ final class MatchPlayerDTO
         private bool $lostTacklezones = false,
         private bool $proUsedThisTurn = false,
         private readonly ?string $raceName = null,
+        private readonly array $learnedSkills = [],
     ) {
     }
 
     /**
      * @param list<SkillName> $skills
+     * @param list<string> $learnedSkills
      */
     public static function create(
         int $id,
@@ -49,6 +52,7 @@ final class MatchPlayerDTO
         TeamSide $teamSide,
         Position $position,
         ?string $raceName = null,
+        array $learnedSkills = [],
     ): self {
         return new self(
             id: $id,
@@ -66,6 +70,7 @@ final class MatchPlayerDTO
             movementRemaining: $stats->getMovement(),
             usedBlitz: false,
             raceName: $raceName,
+            learnedSkills: $learnedSkills,
         );
     }
 
@@ -87,6 +92,8 @@ final class MatchPlayerDTO
     public function hasLostTacklezones(): bool { return $this->lostTacklezones; }
     public function isProUsedThisTurn(): bool { return $this->proUsedThisTurn; }
     public function getRaceName(): ?string { return $this->raceName; }
+    /** @return list<string> */
+    public function getLearnedSkills(): array { return $this->learnedSkills; }
 
     public function hasSkill(SkillName $skillName): bool
     {
@@ -207,6 +214,7 @@ final class MatchPlayerDTO
             'lostTacklezones' => $this->lostTacklezones,
             'proUsedThisTurn' => $this->proUsedThisTurn,
             'raceName' => $this->raceName,
+            'learnedSkills' => $this->learnedSkills,
         ];
     }
 
@@ -238,6 +246,7 @@ final class MatchPlayerDTO
             lostTacklezones: (bool) ($data['lostTacklezones'] ?? false),
             proUsedThisTurn: (bool) ($data['proUsedThisTurn'] ?? false),
             raceName: $data['raceName'] ?? null,
+            learnedSkills: array_values((array) ($data['learnedSkills'] ?? [])),
         );
     }
 }

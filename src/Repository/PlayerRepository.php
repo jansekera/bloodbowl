@@ -198,4 +198,20 @@ final class PlayerRepository
 
         return array_values(array_map(Skill::fromRow(...), $stmt->fetchAll()));
     }
+
+    /**
+     * @return list<string>
+     */
+    public function getLearnedSkillNames(int $playerId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT s.name FROM skills s
+             JOIN player_skills ps ON s.id = ps.skill_id
+             WHERE ps.player_id = :player_id AND ps.is_starting = FALSE
+             ORDER BY s.name'
+        );
+        $stmt->execute(['player_id' => $playerId]);
+
+        return array_values(array_map(fn(array $row) => (string) $row['name'], $stmt->fetchAll()));
+    }
 }

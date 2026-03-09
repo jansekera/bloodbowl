@@ -75,35 +75,52 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
     'Titchy': '+1 dodge, opponents easier to dodge away from',
     'Stakes': 'Blocks Regeneration when causing a casualty',
     'Multiple Block': 'Block 2 adjacent opponents (each at +2 ST, no follow-up)',
+    'Brawler': 'Once per turn, reroll all block dice when Both Down appears',
 };
 
 /**
  * Hover tooltip that shows player info when hovering over a player on the pitch.
  */
+export type SkillDisplayMode = 'all' | 'learned';
+
 export class Tooltip {
     private element: HTMLDivElement;
+    private skillMode: SkillDisplayMode = 'all';
 
     constructor(container: HTMLElement) {
         this.element = document.createElement('div');
         this.element.className = 'pitch-tooltip';
         this.element.style.display = 'none';
         container.appendChild(this.element);
+
+        // Load saved preference
+        const saved = localStorage.getItem('bb_skill_display');
+        if (saved === 'learned') this.skillMode = 'learned';
     }
 
-    show(player: MatchPlayer, px: number, py: number): void {
-        const skillsHtml = player.skills.length > 0
-            ? player.skills.map(s => {
-                const desc = SKILL_DESCRIPTIONS[s];
-                return desc
-                    ? `<span class="pitch-tooltip__skill" title="${desc}">${s}</span>`
-                    : `<span class="pitch-tooltip__skill">${s}</span>`;
-            }).join(', ')
-            : 'None';
+    getSkillMode(): SkillDisplayMode { return this.skillMode; }
+
+    setSkillMode(mode: SkillDisplayMode): void {
+        this.skillMode = mode;
+        localStorage.setItem('bb_skill_display', mode);
+    }
+
+    toggleSkillMode(): SkillDisplayMode {
+        const next = this.skillMode === 'all' ? 'learned' : 'all';
+        this.setSkillMode(next);
+        return next;
+    }
+
+    show(player: MatchPlayer, px: number, py: number, raceName?: string): void {
+        const learned = new Set(player.learnedSkills ?? []);
+        const skillsHtml = this.buildSkillsHtml(player.skills, learned);
+
+        const raceLabel = raceName ? ` <span class="pitch-tooltip__race">(${raceName})</span>` : '';
 
         this.element.innerHTML = `
             <div class="pitch-tooltip__header">
                 <strong>#${player.number} ${player.name}</strong>
-                <span>${player.positionalName}</span>
+                <span>${player.positionalName}${raceLabel}</span>
             </div>
             <div class="pitch-tooltip__stats">
                 MA ${player.stats.movement} |
@@ -135,5 +152,35 @@ export class Tooltip {
 
     destroy(): void {
         this.element.remove();
+    }
+
+    private buildSkillsHtml(skills: string[], learned: Set<string>): string {
+        if (skills.length === 0) return 'None';
+
+        const startingSkills = skills.filter(s => !learned.has(s));
+        const learnedSkills = skills.filter(s => learned.has(s));
+
+        if (this.skillMode === 'learned') {
+            // Compact: show learned skills + starting count
+            const parts: string[] = [];
+            if (startingSkills.length > 0) {
+                parts.push(`<span class="pitch-tooltip__starting-count">${startingSkills.length} starting</span>`);
+            }
+            if (learnedSkills.length > 0) {
+                parts.push(learnedSkills.map(s => this.skillSpan(s, true)).join(', '));
+            }
+            return parts.length > 0 ? parts.join(' + ') : 'None';
+        }
+
+        // All mode: show all with visual distinction
+        return skills.map(s => this.skillSpan(s, learned.has(s))).join(', ');
+    }
+
+    private skillSpan(skill: string, isLearned: boolean): string {
+        const desc = SKILL_DESCRIPTIONS[skill];
+        const cls = isLearned ? 'pitch-tooltip__skill pitch-tooltip__skill--learned' : 'pitch-tooltip__skill';
+        return desc
+            ? `<span class="${cls}" title="${desc}">${skill}</span>`
+            : `<span class="${cls}">${skill}</span>`;
     }
 }

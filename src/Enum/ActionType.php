@@ -19,11 +19,15 @@ enum ActionType: string
     case END_TURN = 'end_turn';
     case SETUP_PLAYER = 'setup_player';
     case END_SETUP = 'end_setup';
+    case CHOOSE_BLOCK_DIE = 'choose_block_die';
+    case REROLL_BLOCK = 'reroll_block';
+    case AUTO_SETUP = 'auto_setup';
+    case RESOLVE_REROLL = 'resolve_reroll';
 
     public function requiresPlayer(): bool
     {
         return match ($this) {
-            self::END_TURN, self::END_SETUP => false,
+            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL => false,
             default => true,
         };
     }

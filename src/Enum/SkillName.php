@@ -99,4 +99,7 @@ enum SkillName: string
 
     // Phase 24 new skills:
     case MultipleBlock = 'Multiple Block';
+
+    // Phase 25 new skills:
+    case Brawler = 'Brawler';
 }

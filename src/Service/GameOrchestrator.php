@@ -54,9 +54,28 @@ final class GameOrchestrator
 
         // Resolve
         $resolver = new ActionResolver($this->dice);
+
+        // Enable interactive blocks and rerolls for human players
+        $aiTeam = $state->getAiTeam();
+        $isHumanTurn = $aiTeam === null || $state->getActiveTeam() !== $aiTeam;
+        if ($isHumanTurn) {
+            $resolver->setInteractiveBlocks(true);
+            $resolver->setInteractiveRerolls(true);
+        }
+
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();
         $newState = $result->getNewState();
+
+        // If there's a pending block or reroll (human player), return immediately
+        if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null) {
+            return [
+                'state' => $newState,
+                'events' => $allEvents,
+                'isSuccess' => $result->isSuccess(),
+                'isTurnover' => false,
+            ];
+        }
 
         // Handle turnover → END_TURN
         if ($result->isTurnover()) {
@@ -118,4 +137,5 @@ final class GameOrchestrator
             'isTurnover' => $result->isTurnover(),
         ];
     }
+
 }

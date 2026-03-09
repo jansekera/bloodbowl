@@ -37,10 +37,22 @@ final class RulesEngine
         $errors = [];
 
         // Check game phase
-        if ($action === ActionType::SETUP_PLAYER || $action === ActionType::END_SETUP) {
+        if ($action === ActionType::SETUP_PLAYER || $action === ActionType::END_SETUP || $action === ActionType::AUTO_SETUP) {
             if (!$state->getPhase()->isSetup()) {
                 $errors[] = 'Can only set up players during setup phase';
             }
+        } elseif ($action === ActionType::CHOOSE_BLOCK_DIE || $action === ActionType::REROLL_BLOCK) {
+            if ($state->getPendingBlock() === null) {
+                $errors[] = 'No pending block to resolve';
+            }
+        } elseif ($action === ActionType::RESOLVE_REROLL) {
+            if ($state->getPendingReroll() === null) {
+                $errors[] = 'No pending reroll to resolve';
+            }
+        } elseif ($state->getPendingBlock() !== null) {
+            $errors[] = 'Must resolve pending block first';
+        } elseif ($state->getPendingReroll() !== null) {
+            $errors[] = 'Must resolve pending reroll first';
         } elseif ($action !== ActionType::END_TURN) {
             if (!$state->getPhase()->isPlayable()) {
                 $errors[] = 'Game is not in a playable phase';
@@ -66,6 +78,10 @@ final class RulesEngine
             ActionType::END_TURN => [],
             ActionType::SETUP_PLAYER => $this->validateSetupPlayer($state, $params),
             ActionType::END_SETUP => $this->validateEndSetup($state),
+            ActionType::CHOOSE_BLOCK_DIE => [],
+            ActionType::REROLL_BLOCK => [],
+            ActionType::AUTO_SETUP => [],
+            ActionType::RESOLVE_REROLL => [],
         };
     }
 
@@ -78,6 +94,16 @@ final class RulesEngine
     {
         $actions = [];
         $side = $state->getActiveTeam();
+
+        // When there's a pending block, only block-choice actions are available
+        if ($state->getPendingBlock() !== null) {
+            $actions[] = ['type' => ActionType::CHOOSE_BLOCK_DIE->value];
+            $pending = $state->getPendingBlock();
+            if ($pending->isBrawlerAvailable() || $pending->isProAvailable() || $pending->isTeamRerollAvailable()) {
+                $actions[] = ['type' => ActionType::REROLL_BLOCK->value];
+            }
+            return $actions;
+        }
 
         if ($state->getPhase()->isPlayable()) {
             $teamState = $state->getTeamState($side);
@@ -198,6 +224,7 @@ final class RulesEngine
             foreach ($state->getTeamPlayers($side) as $player) {
                 $actions[] = ['type' => ActionType::SETUP_PLAYER->value, 'playerId' => $player->getId()];
             }
+            $actions[] = ['type' => ActionType::AUTO_SETUP->value];
             $actions[] = ['type' => ActionType::END_SETUP->value];
         }
 
@@ -207,7 +234,7 @@ final class RulesEngine
     /**
      * Get valid move targets for a specific player.
      *
-     * @return list<array{x: int, y: int, dodges: int, gfis: int, path: list<array{x: int, y: int, dodge: bool, gfi: bool}>}>
+     * @return list<array{x: int, y: int, dodges: int, gfis: int, successChance: int, path: list<array{x: int, y: int, dodge: bool, gfi: bool, dodgeTarget: int}>}>
      */
     public function getValidMoveTargets(GameState $state, int $playerId): array
     {
@@ -227,6 +254,7 @@ final class RulesEngine
                 'y' => $pos->getY(),
                 'dodges' => 0,
                 'gfis' => 0,
+                'successChance' => 100,
                 'path' => [],
             ];
         }
@@ -241,13 +269,24 @@ final class RulesEngine
                     'y' => $stepPos->getY(),
                     'dodge' => $step->requiresDodge(),
                     'gfi' => $step->isGfi(),
+                    'dodgeTarget' => $step->getDodgeTarget(),
                 ];
+            }
+            $chance = 1.0;
+            foreach ($path->getSteps() as $step) {
+                if ($step->requiresDodge()) {
+                    $chance *= (7 - $step->getDodgeTarget()) / 6.0;
+                }
+                if ($step->isGfi()) {
+                    $chance *= 5.0 / 6.0;
+                }
             }
             $targets[] = [
                 'x' => $dest->getX(),
                 'y' => $dest->getY(),
                 'dodges' => $path->getDodgeCount(),
                 'gfis' => $path->getGfiCount(),
+                'successChance' => (int) round($chance * 100),
                 'path' => $pathSteps,
             ];
         }

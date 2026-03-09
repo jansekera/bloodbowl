@@ -507,8 +507,17 @@ a:hover {
 }
 
 .btn--tiny {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    background: var(--color-secondary);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+}
+
+.btn--tiny:hover {
+    background: var(--color-secondary-hover);
 }
 
 .btn--danger {
@@ -758,6 +767,11 @@ a:hover {
     color: var(--color-text-muted);
     font-size: 0.75rem;
     margin-bottom: 0.25rem;
+}
+
+.pitch-tooltip__race {
+    color: var(--color-text-muted);
+    font-size: 0.8em;
 }
 
 .pitch-tooltip__skills {
@@ -1131,6 +1145,15 @@ a:hover {
     cursor: pointer;
 }
 
+.reserves-player[draggable="true"] {
+    cursor: grab;
+}
+
+.reserves-player[draggable="true"]:active {
+    cursor: grabbing;
+    opacity: 0.6;
+}
+
 .reserves-player--interactive:hover {
     background: var(--color-bg-hover);
     border-color: var(--color-border);
@@ -1163,6 +1186,22 @@ a:hover {
     font-family: var(--font-mono);
     color: var(--color-text-muted);
     font-size: 0.7rem;
+}
+
+.reserves__formations {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-border);
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.reserves__label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-right: 4px;
 }
 
 /* Match container with reserves */
@@ -1507,6 +1546,19 @@ a:hover {
 .pitch-tooltip__skill {
     cursor: help;
     border-bottom: 1px dotted var(--color-text-muted);
+    color: var(--color-text-muted);
+}
+
+.pitch-tooltip__skill--learned {
+    color: #4fc3f7;
+    font-weight: bold;
+    border-bottom-color: #4fc3f7;
+}
+
+.pitch-tooltip__starting-count {
+    color: var(--color-text-muted);
+    font-size: 0.85em;
+    font-style: italic;
 }
 
 /* Scoreboard - Turn Progress */
@@ -1573,6 +1625,58 @@ a:hover {
 .scoreboard__weather {
     font-size: 0.85em;
 }
+
+.scoreboard__turn-dots {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    margin: 4px 0;
+}
+
+.scoreboard__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.scoreboard__dot--done {
+    background: var(--color-success);
+}
+
+.scoreboard__dot--current {
+    background: var(--color-accent);
+    box-shadow: 0 0 6px var(--color-accent);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.scoreboard__dot--future {
+    background: var(--color-border);
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.scoreboard__arrow {
+    color: var(--color-accent);
+    font-size: 0.8em;
+    margin-right: 4px;
+    animation: pulse-arrow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-arrow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.scoreboard__phase--play { color: var(--color-success); }
+.scoreboard__phase--setup { color: var(--color-accent); }
+.scoreboard__phase--kickoff { color: #42a5f5; }
+.scoreboard__phase--touchdown { color: #ffd700; }
+.scoreboard__phase--half_time { color: var(--color-text-muted); }
+.scoreboard__phase--game_over { color: var(--color-error); }
 
 /* Dugout Panel */
 .dugout-panel {
@@ -1668,5 +1772,247 @@ a:hover {
 .dice-icon--bothdown {
     background: #9b59b6;
     color: white;
+}
+
+/* Block Dice Modal */
+.block-dice-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.block-dice-modal__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.block-dice-modal__content {
+    position: relative;
+    background: var(--color-bg-card);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    min-width: 280px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.block-dice-modal__title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--color-text);
+}
+
+.block-dice-modal__frenzy {
+    color: var(--color-error);
+    font-size: 0.9rem;
+}
+
+.block-dice-modal__info {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.block-dice-modal__dice {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.block-dice-modal__die {
+    width: 56px;
+    height: 56px;
+    border: 3px solid transparent;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.block-dice-modal__die:hover {
+    transform: scale(1.15);
+    border-color: white;
+}
+
+.block-dice-modal__die--pow {
+    background: #27ae60;
+    color: white;
+}
+
+.block-dice-modal__die--skull {
+    background: var(--color-error);
+    color: white;
+}
+
+.block-dice-modal__die--push {
+    background: #3498db;
+    color: white;
+}
+
+.block-dice-modal__die--stumble {
+    background: #e67e22;
+    color: white;
+}
+
+.block-dice-modal__die--bothdown {
+    background: #9b59b6;
+    color: white;
+}
+
+.block-dice-modal__rerolls {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 0.5rem;
+}
+
+.block-dice-modal__reroll {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-secondary);
+    color: var(--color-text);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.block-dice-modal__reroll:hover {
+    background: var(--color-secondary-hover);
+}
+
+.block-dice-modal__reroll--brawler {
+    border-color: #9b59b6;
+}
+
+.block-dice-modal__reroll--pro {
+    border-color: #e67e22;
+}
+
+.block-dice-modal__reroll--team {
+    border-color: #3498db;
+}
+
+/* Reroll Modal (dodge/GFI/pickup) */
+.reroll-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reroll-modal__backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.reroll-modal__content {
+    position: relative;
+    background: var(--color-bg-card);
+    border: 2px solid var(--color-error);
+    border-radius: var(--radius);
+    padding: 1.5rem 2rem;
+    min-width: 300px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    animation: reroll-appear 0.2s ease-out;
+}
+
+@keyframes reroll-appear {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.reroll-modal__title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--color-error);
+    margin-bottom: 0.5rem;
+}
+
+.reroll-modal__info {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+
+.reroll-modal__info strong {
+    color: var(--color-error);
+    font-size: 1.1rem;
+}
+
+.reroll-modal__buttons {
+    display: flex;
+    gap: 0.6rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.reroll-modal__btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-secondary);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.reroll-modal__btn:hover {
+    transform: scale(1.05);
+}
+
+.reroll-modal__btn--pro {
+    border-color: #e67e22;
+}
+
+.reroll-modal__btn--pro:hover {
+    background: rgba(230, 126, 34, 0.2);
+}
+
+.reroll-modal__btn--team {
+    border-color: #3498db;
+}
+
+.reroll-modal__btn--team:hover {
+    background: rgba(52, 152, 219, 0.2);
+}
+
+.reroll-modal__btn--decline {
+    border-color: var(--color-error);
+    opacity: 0.7;
+}
+
+.reroll-modal__btn--decline:hover {
+    background: rgba(231, 76, 60, 0.2);
+    opacity: 1;
 }
 

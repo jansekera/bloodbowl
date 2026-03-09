@@ -119,7 +119,29 @@ final class SetupHandler implements ActionHandlerInterface
         return ActionResult::success($newState, $kickoffResult['events']);
     }
 
-    private function autoSetupTeam(GameState $state, TeamSide $side): GameState
+    /**
+     * Auto-setup: place all available players using a formation template.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function resolveAutoSetup(GameState $state, array $params): ActionResult
+    {
+        $formation = (string) ($params['formation'] ?? 'standard');
+        $side = $state->getActiveTeam();
+
+        // Clear existing on-pitch players back to off_pitch
+        foreach ($state->getPlayersOnPitch($side) as $player) {
+            $state = $state->withPlayer(
+                $player->withPosition(null)->withState(PlayerState::OFF_PITCH),
+            );
+        }
+
+        $state = $this->autoSetupTeam($state, $side, $formation);
+
+        return ActionResult::success($state, []);
+    }
+
+    private function autoSetupTeam(GameState $state, TeamSide $side, string $formation = 'standard'): GameState
     {
         $offPitchPlayers = [];
         foreach ($state->getTeamPlayers($side) as $player) {
@@ -128,21 +150,7 @@ final class SetupHandler implements ActionHandlerInterface
             }
         }
 
-        // Default formation: 3 on LoS, 4 midfield, 4 backfield
-        // Wide zone limits respected (max 2 per wide zone)
-        if ($side === TeamSide::HOME) {
-            $positions = [
-                new Position(12, 6), new Position(12, 7), new Position(12, 8),
-                new Position(8, 4), new Position(8, 6), new Position(8, 8), new Position(8, 10),
-                new Position(4, 3), new Position(4, 5), new Position(4, 9), new Position(4, 11),
-            ];
-        } else {
-            $positions = [
-                new Position(13, 6), new Position(13, 7), new Position(13, 8),
-                new Position(17, 4), new Position(17, 6), new Position(17, 8), new Position(17, 10),
-                new Position(21, 3), new Position(21, 5), new Position(21, 9), new Position(21, 11),
-            ];
-        }
+        $positions = $this->getFormationPositions($side, $formation);
 
         $count = min(count($offPitchPlayers), count($positions));
         for ($i = 0; $i < $count; $i++) {
@@ -154,5 +162,42 @@ final class SetupHandler implements ActionHandlerInterface
         }
 
         return $state;
+    }
+
+    /**
+     * @return list<Position>
+     */
+    private function getFormationPositions(TeamSide $side, string $formation): array
+    {
+        $isHome = $side === TeamSide::HOME;
+        $losX = $isHome ? 12 : 13;
+        $mid = $isHome ? 8 : 17;
+        $back = $isHome ? 4 : 21;
+        $deep = $isHome ? 2 : 23;
+
+        return match ($formation) {
+            'spread' => [
+                // 3 on LOS spread wide
+                new Position($losX, 4), new Position($losX, 7), new Position($losX, 10),
+                // 4 midfield spread
+                new Position($mid, 3), new Position($mid, 6), new Position($mid, 8), new Position($mid, 11),
+                // 4 backfield
+                new Position($back, 4), new Position($back, 7), new Position($back, 10), new Position($deep, 7),
+            ],
+            'heavy_los' => [
+                // 5 on LOS
+                new Position($losX, 5), new Position($losX, 6), new Position($losX, 7), new Position($losX, 8), new Position($losX, 9),
+                // 3 midfield
+                new Position($mid, 4), new Position($mid, 7), new Position($mid, 10),
+                // 3 backfield
+                new Position($back, 5), new Position($back, 7), new Position($back, 9),
+            ],
+            default => [
+                // Standard: 3 on LOS, 4 midfield, 4 backfield
+                new Position($losX, 6), new Position($losX, 7), new Position($losX, 8),
+                new Position($mid, 4), new Position($mid, 6), new Position($mid, 8), new Position($mid, 10),
+                new Position($back, 3), new Position($back, 5), new Position($back, 9), new Position($back, 11),
+            ],
+        };
     }
 }

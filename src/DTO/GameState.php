@@ -7,6 +7,8 @@ use App\Enum\GamePhase;
 use App\Enum\TeamSide;
 use App\Enum\Weather;
 use App\ValueObject\Position;
+use App\DTO\PendingBlockDTO;
+use App\DTO\PendingRerollDTO;
 
 final class GameState
 {
@@ -26,6 +28,8 @@ final class GameState
         private ?TeamSide $kickingTeam,
         private ?TeamSide $aiTeam = null,
         private Weather $weather = Weather::NICE,
+        private ?PendingBlockDTO $pendingBlock = null,
+        private ?PendingRerollDTO $pendingReroll = null,
     ) {
     }
 
@@ -64,6 +68,8 @@ final class GameState
     public function getKickingTeam(): ?TeamSide { return $this->kickingTeam; }
     public function getAiTeam(): ?TeamSide { return $this->aiTeam; }
     public function getWeather(): Weather { return $this->weather; }
+    public function getPendingBlock(): ?PendingBlockDTO { return $this->pendingBlock; }
+    public function getPendingReroll(): ?PendingRerollDTO { return $this->pendingReroll; }
 
     public function getTeamState(TeamSide $side): TeamStateDTO
     {
@@ -202,6 +208,20 @@ final class GameState
         return $clone;
     }
 
+    public function withPendingBlock(?PendingBlockDTO $pendingBlock): self
+    {
+        $clone = clone $this;
+        $clone->pendingBlock = $pendingBlock;
+        return $clone;
+    }
+
+    public function withPendingReroll(?PendingRerollDTO $pendingReroll): self
+    {
+        $clone = clone $this;
+        $clone->pendingReroll = $pendingReroll;
+        return $clone;
+    }
+
     /**
      * Reset all players' hasMoved/hasActed for a new turn.
      */
@@ -249,6 +269,8 @@ final class GameState
             'kickingTeam' => $this->kickingTeam?->value,
             'aiTeam' => $this->aiTeam?->value,
             'weather' => $this->weather->value,
+            'pendingBlock' => $this->pendingBlock?->toArray(),
+            'pendingReroll' => $this->pendingReroll?->toArray(),
         ];
     }
 
@@ -276,6 +298,8 @@ final class GameState
             kickingTeam: isset($data['kickingTeam']) ? TeamSide::from((string) $data['kickingTeam']) : null,
             aiTeam: isset($data['aiTeam']) ? TeamSide::from((string) $data['aiTeam']) : null,
             weather: Weather::from((string) ($data['weather'] ?? 'nice')),
+            pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
+            pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
         );
     }
 }
