@@ -1056,3 +1056,124 @@ TEST(MacroActions, HandOffScoreExpansionProducesActions) {
     EXPECT_TRUE(hasHandOff) << "Expansion should include HAND_OFF action";
     EXPECT_FALSE(result.turnover) << "Should not turnover on success";
 }
+
+TEST(MacroActions, PassScoreAvailableWhenCarrierStuck) {
+    // Carrier stuck far from EZ, teammate in pass range can score
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    carrier.movementRemaining = 2; // can't reach EZ
+    state.ball = BallState::carried({10, 7}, 1);
+
+    // Teammate at pass range (dist=5), can score (dist to EZ = 5, MA=6+2GFI=8)
+    Player& receiver = state.getPlayer(2);
+    receiver.id = 2;
+    receiver.teamSide = TeamSide::HOME;
+    receiver.state = PlayerState::STANDING;
+    receiver.position = {20, 7};
+    receiver.stats = {6, 3, 3, 8};
+    receiver.movementRemaining = 6;
+    receiver.hasActed = false;
+    receiver.hasMoved = false;
+
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::PASS_SCORE));
+}
+
+TEST(MacroActions, ChainScoreAvailableWith3Players) {
+    // 3-player chain: carrier passes to relay, relay hand-offs to scorer
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {5, 7};
+    carrier.movementRemaining = 2; // stuck far from EZ
+    state.ball = BallState::carried({5, 7}, 1);
+
+    // Relay player: in pass range from carrier, near scorer
+    Player& relay = state.getPlayer(2);
+    relay.id = 2;
+    relay.teamSide = TeamSide::HOME;
+    relay.state = PlayerState::STANDING;
+    relay.position = {15, 7};
+    relay.stats = {6, 3, 3, 8};
+    relay.movementRemaining = 6;
+    relay.hasActed = false;
+    relay.hasMoved = false;
+
+    // Scorer: adjacent to relay, can reach endzone
+    Player& scorer = state.getPlayer(3);
+    scorer.id = 3;
+    scorer.teamSide = TeamSide::HOME;
+    scorer.state = PlayerState::STANDING;
+    scorer.position = {16, 7};
+    scorer.stats = {8, 3, 3, 8}; // MA=8
+    scorer.movementRemaining = 8; // dist to EZ = 9, MA+2=10
+    scorer.hasActed = false;
+    scorer.hasMoved = false;
+
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::CHAIN_SCORE))
+        << "Should generate CHAIN_SCORE with 3 eligible players";
+}
+
+TEST(MacroActions, ChainScoreNotAvailableWithout3Players) {
+    // Only carrier + one teammate — not enough for 3-player chain
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {5, 7};
+    carrier.movementRemaining = 2;
+    state.ball = BallState::carried({5, 7}, 1);
+
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::CHAIN_SCORE));
+}
+
+TEST(MacroActions, ReceiverSetupWhenTurnsLeft2) {
+    // When 2 turns left with ball, REPOSITION should place receiver near endzone
+    GameState state = makeMinimalState();
+    state.homeTeam.turnNumber = 7; // turnsLeft = max(0, 9-7) = 2
+
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({10, 7}, 1);
+
+    // Fast free teammate far from carrier
+    Player& fast = state.getPlayer(2);
+    fast.id = 2;
+    fast.teamSide = TeamSide::HOME;
+    fast.state = PlayerState::STANDING;
+    fast.position = {15, 5};
+    fast.stats = {7, 3, 3, 8}; // MA=7 (fast)
+    fast.movementRemaining = 7;
+    fast.hasActed = false;
+    fast.hasMoved = false;
+
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // Should have REPOSITION targeting near endzone (x >= 20)
+    bool hasReceiverSetup = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.playerId == 2) {
+            if (m.targetPos.x >= 20) {
+                hasReceiverSetup = true;
+            }
+        }
+    }
+    EXPECT_TRUE(hasReceiverSetup) << "Should place receiver near endzone when 2 turns left";
+}
