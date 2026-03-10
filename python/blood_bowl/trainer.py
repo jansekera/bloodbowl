@@ -578,6 +578,11 @@ def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer,
         weights = data.get('value_weights', [0.0] * NUM_FEATURES)
         trainer = LinearTrainer(learning_rate=learning_rate)
         trainer.weights = np.array(weights, dtype=np.float64)
+        if len(trainer.weights) < NUM_FEATURES:
+            padded = np.zeros(NUM_FEATURES, dtype=np.float64)
+            padded[:len(trainer.weights)] = trainer.weights
+            trainer.weights = padded
+        return trainer
     else:
         trainer = LinearTrainer(learning_rate=learning_rate)
         trainer.weights = np.array(data, dtype=np.float64)
