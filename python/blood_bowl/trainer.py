@@ -573,6 +573,11 @@ def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer,
         trainer.W2 = np.array(data['W2'], dtype=np.float64)
         trainer.b2 = np.array(data['b2'], dtype=np.float64)
         return trainer
+    elif isinstance(data, dict) and data.get('type') in ('alphazero_linear', 'alphazero_neural'):
+        # AlphaZero format: value_weights + optional policy
+        weights = data.get('value_weights', [0.0] * NUM_FEATURES)
+        trainer = LinearTrainer(learning_rate=learning_rate)
+        trainer.weights = np.array(weights, dtype=np.float64)
     else:
         trainer = LinearTrainer(learning_rate=learning_rate)
         trainer.weights = np.array(data, dtype=np.float64)

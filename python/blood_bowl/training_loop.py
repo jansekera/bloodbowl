@@ -426,6 +426,9 @@ def run_training(
         # Save updated weights
         if policy_trainer:
             save_combined_weights(trainer, policy_trainer, str(weights_path))
+        elif vf_blend > 0:
+            # Save in alphazero format so C++ engine can load VF weights
+            save_combined_weights(trainer, None, str(weights_path))
         else:
             trainer.save_weights(str(weights_path))
 

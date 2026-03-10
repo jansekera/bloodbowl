@@ -315,8 +315,10 @@ def save_combined_weights(value_trainer, policy_trainer, path: str) -> None:
             'value_weights': value_trainer.weights.tolist(),
         }
 
-    # Add policy data
-    if isinstance(policy_trainer, NeuralPolicyTrainer):
+    # Add policy data (skip if no policy trainer)
+    if policy_trainer is None:
+        pass
+    elif isinstance(policy_trainer, NeuralPolicyTrainer):
         data['policy_type'] = 'neural'
         data['policy_hidden_size'] = policy_trainer.hidden_size
         data['policy_W1'] = policy_trainer.W1.flatten().tolist()
