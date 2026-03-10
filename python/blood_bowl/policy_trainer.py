@@ -256,8 +256,6 @@ class NeuralPolicyTrainer:
 
         return total_loss / max(n_decisions, 1)
 
-        return total_loss / max(n_decisions, 1)
-
     def save_weights(self, path: str) -> None:
         """Save neural policy weights as JSON."""
         Path(path).parent.mkdir(parents=True, exist_ok=True)

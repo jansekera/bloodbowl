@@ -75,6 +75,10 @@ def main():
                         help='Policy-heuristic blend ratio (0.0=heuristic only, 1.0=policy only)')
     parser.add_argument('--imitation-epochs', type=int, default=0,
                         help='Imitation learning epochs (policyBlend=0, train policy on heuristic MCTS)')
+    parser.add_argument('--vf-blend', type=float, default=0.0,
+                        help='VF-heuristic blend in MCTS eval (0.0=heuristic only, 0.3=recommended)')
+    parser.add_argument('--vf-ramp-epochs', type=int, default=3,
+                        help='Ramp up VF blend over N epochs (gradual introduction)')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -132,6 +136,8 @@ def main():
         policy_model=args.policy_model,
         policy_blend=args.policy_blend,
         imitation_epochs=args.imitation_epochs,
+        vf_blend=args.vf_blend,
+        vf_ramp_epochs=args.vf_ramp_epochs,
     )
 
 

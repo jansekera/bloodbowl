@@ -35,6 +35,7 @@ def run_benchmark(
     mcts_iterations: int = 0,
     policy_weights: Optional[str] = None,
     policy_blend: float = 0.0,
+    vf_blend: float = 0.0,
 ) -> Dict[str, dict]:
     """Run benchmark matches against each opponent, return results.
 
@@ -68,6 +69,7 @@ def run_benchmark(
                 mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights if mcts_iterations > 0 else None,
                 policy_blend=policy_blend if mcts_iterations > 0 else 0.0,
+                vf_blend=vf_blend if mcts_iterations > 0 else 0.0,
             )
 
             avg_score_diff = sum(

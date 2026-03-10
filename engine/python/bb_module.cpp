@@ -256,7 +256,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                const std::string& weightsPath,
                                float epsilon,
                                int mctsIterations,
-                               float policyBlend) {
+                               float policyBlend,
+                               float vfBlend) {
         bb::DiceRoller dice(seed);
 
         // Load value function if needed
@@ -289,6 +290,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.timeBudgetMs = 0;
                 cfg.explorationC = 1.0;   // Eval: low C for exploitation
                 cfg.dirichletAlpha = 0.0f; // No noise during evaluation
+                cfg.vfBlend = vfBlend;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -324,7 +326,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("weights_path") = "",
        py::arg("epsilon") = 0.3f,
        py::arg("mcts_iterations") = 0,
-       py::arg("policy_blend") = 0.0f);
+       py::arg("policy_blend") = 0.0f,
+       py::arg("vf_blend") = 0.0f);
 
     // simulate_game_logged: returns result + features at turn boundaries + policy decisions
     m.def("simulate_game_logged", [](const bb::TeamRoster& home, const bb::TeamRoster& away,
@@ -334,7 +337,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       float epsilon,
                                       int mctsIterations,
                                       const std::string& policyWeightsPath,
-                                      float policyBlend) {
+                                      float policyBlend,
+                                      float vfBlend) {
         bb::DiceRoller dice(seed);
 
         std::unique_ptr<bb::ValueFunction> vf;
@@ -365,6 +369,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.explorationC = 2.0;  // Training: higher C for diverse data
                 cfg.dirichletAlpha = 0.3f;   // Dirichlet noise for exploration
                 cfg.dirichletWeight = 0.25f; // 75% policy + 25% noise
+                cfg.vfBlend = vfBlend;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -430,7 +435,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("epsilon") = 0.3f,
        py::arg("mcts_iterations") = 0,
        py::arg("policy_weights_path") = "",
-       py::arg("policy_blend") = 0.0f);
+       py::arg("policy_blend") = 0.0f,
+       py::arg("vf_blend") = 0.0f);
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

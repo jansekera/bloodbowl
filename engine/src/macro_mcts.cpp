@@ -406,6 +406,17 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
 
     heuristic = std::clamp(heuristic, -1.0, 1.0);
 
+    // Blend with value function if available
+    if (valueFn_ && config_.vfBlend > 0.0f) {
+        float features[NUM_FEATURES];
+        extractFeatures(state, perspective, features);
+        double vfRaw = static_cast<double>(valueFn_->evaluate(features, NUM_FEATURES));
+        double vfValue = std::clamp(vfRaw, -1.0, 1.0);
+
+        double blend = static_cast<double>(config_.vfBlend);
+        return (1.0 - blend) * heuristic + blend * vfValue;
+    }
+
     return heuristic;
 }
 

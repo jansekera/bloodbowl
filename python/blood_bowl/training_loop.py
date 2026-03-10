@@ -48,6 +48,8 @@ def run_training(
     policy_model: str = 'linear',
     policy_blend: float = 0.0,
     imitation_epochs: int = 0,
+    vf_blend: float = 0.0,
+    vf_ramp_epochs: int = 3,
 ) -> None:
     """Run the full training loop.
 
@@ -146,6 +148,8 @@ def run_training(
             print(f'Imitation learning: {imitation_epochs} epochs (policyBlend=0.0), then blend={policy_blend}')
         else:
             print(f'Policy blend: {policy_blend}')
+    if vf_blend > 0:
+        print(f'VF blend: {vf_blend} (ramp-up over {vf_ramp_epochs} epochs)')
     if opp_weights_path:
         print(f'Opponent weights: {opp_weights_path}')
     # Replay buffer — auto-enable for MCTS training to prevent forgetting
@@ -266,6 +270,12 @@ def run_training(
         else:
             epoch_blend = policy_blend
 
+        # VF blend: gradual ramp-up over first N epochs
+        if vf_blend > 0 and vf_ramp_epochs > 0:
+            epoch_vf_blend = min(vf_blend, vf_blend * epoch / vf_ramp_epochs)
+        else:
+            epoch_vf_blend = vf_blend
+
         # Run simulation games (timeout is per-game)
         # Support mixed away races: "orc,skaven,dwarf,wood-elf"
         away_races = [r.strip() for r in away_race.split(',')]
@@ -298,6 +308,7 @@ def run_training(
                     policy_weights=policy_weights_arg,
                     game_offset=game_offset,
                     policy_blend=epoch_blend,
+                    vf_blend=epoch_vf_blend,
                 )
                 all_results.extend(sub_result.results)
                 game_offset += race_games
@@ -330,6 +341,7 @@ def run_training(
                 mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights_arg,
                 policy_blend=epoch_blend,
+                vf_blend=epoch_vf_blend,
             )
 
         # Clear progress line
@@ -370,6 +382,27 @@ def run_training(
 
             # Save replay buffer periodically
             replay_buffer.save(str(root / 'replay_buffer.pkl'))
+
+        # VF monitoring: check for perspective inversion
+        vf_msg = ''
+        if vf_blend > 0 and log_files:
+            home_vals, away_vals = [], []
+            for lf in log_files[:3]:
+                for rec in _read_jsonl(lf):
+                    if rec.get('type') == 'state' and 'features' in rec:
+                        val = trainer.evaluate(rec['features'])
+                        if rec['perspective'] == 'home':
+                            home_vals.append(val)
+                        else:
+                            away_vals.append(val)
+            if home_vals and away_vals:
+                avg_h = sum(home_vals) / len(home_vals)
+                avg_a = sum(away_vals) / len(away_vals)
+                vf_msg = f'  VF avg: home={avg_h:.3f}, away={avg_a:.3f}'
+                if avg_h > 0.3 and avg_a > 0.3:
+                    vf_msg += ' WARNING: both positive — possible inversion!'
+                elif avg_h < -0.3 and avg_a < -0.3:
+                    vf_msg += ' WARNING: both negative — possible inversion!'
 
         # Train policy on MCTS decisions
         if policy_trainer:
@@ -427,6 +460,8 @@ def run_training(
             phase_tag = ' [IMITATION]'
         elif imitation_epochs > 0 and epoch > imitation_epochs:
             phase_tag = f' [BLEND={epoch_blend:.1f}]'
+        if epoch_vf_blend > 0:
+            phase_tag += f' [VF={epoch_vf_blend:.2f}]'
 
         msg = (f'Epoch {epoch}/{epochs}: win_rate={win_rate:.1%}, '
                f'avg_score_diff={avg_score_diff:+.2f}, epsilon={epsilon:.3f} '
@@ -463,6 +498,8 @@ def run_training(
         print(f'  Stats: {wins}W {draws}D {losses}L | avg goals {avg_goals:.1f} (home {avg_home:.1f}, away {avg_away:.1f}) | '
               f'max {max_total} | shutouts {shutouts} | 0-0s {nil_nil}')
         print(f'  Actions: min={actions_min} max={actions_max} avg={actions_avg:.0f} median={actions_med:.0f}')
+        if vf_blend > 0 and vf_msg:
+            print(vf_msg)
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
@@ -508,6 +545,7 @@ def run_training(
                 mcts_iterations=mcts_iterations,
                 policy_weights=str(weights_path) if use_policy else None,
                 policy_blend=epoch_blend,
+                vf_blend=epoch_vf_blend,
             )
             bench_csv = csv_path.parent / 'benchmark_results.csv'
             _append_benchmark_csv(bench_csv, epoch, bench_results)
