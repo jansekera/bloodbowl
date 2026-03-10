@@ -86,11 +86,12 @@ def run_training(
 
     # Policy training setup
     policy_trainer = None
+    from .policy_trainer import save_combined_weights
     use_policy = policy_lr > 0 and mcts_iterations > 0
     if use_policy:
         from .policy_trainer import (PolicyTrainer, NeuralPolicyTrainer,
                                       create_policy_trainer,
-                                      save_combined_weights, load_combined_weights)
+                                      load_combined_weights)
         if weights_path.exists():
             trainer, policy_trainer = load_combined_weights(
                 str(weights_path), value_lr=learning_rate, policy_lr=policy_lr,
