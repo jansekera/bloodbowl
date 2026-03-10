@@ -798,3 +798,261 @@ TEST(MacroActions, DefensiveScreenEvenSpread) {
     // Screen should have diverse Y values (not all the same)
     EXPECT_GE(screenYs.size(), 3u) << "Screen should spread across Y values";
 }
+
+// =============================================================
+// Vrstva 5: Scoring Chains Tests
+// =============================================================
+
+TEST(MacroActions, HandOffScoreAvailableWhenTeammateCanScore) {
+    // Carrier stuck (far from endzone), but adjacent teammate can reach EZ
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {18, 7};
+    carrier.movementRemaining = 2; // can't reach EZ (dist=7)
+    state.ball = BallState::carried({18, 7}, 1);
+
+    // Teammate adjacent (HOME slot 2), can reach endzone
+    Player& teammate = state.getPlayer(2);
+    teammate.id = 2;
+    teammate.teamSide = TeamSide::HOME;
+    teammate.state = PlayerState::STANDING;
+    teammate.position = {19, 7};
+    teammate.stats = {6, 3, 3, 8};
+    teammate.movementRemaining = 6; // dist to EZ = 6, can reach
+    teammate.hasActed = false;
+    teammate.hasMoved = false;
+
+    // Move away player out of the way
+    Player& away1 = state.getPlayer(12);
+    away1.position = {5, 5};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::HAND_OFF_SCORE));
+}
+
+TEST(MacroActions, HandOffScoreNotAvailableWhenCarrierCanScore) {
+    // Carrier CAN reach endzone directly and isn't in TZ → no hand-off needed
+    GameState state = makeScoringState();
+    // Add teammate (HOME slot 2)
+    Player& tm = state.getPlayer(2);
+    tm.id = 2;
+    tm.teamSide = TeamSide::HOME;
+    tm.state = PlayerState::STANDING;
+    tm.position = {24, 7};
+    tm.stats = {6, 3, 3, 8};
+    tm.movementRemaining = 6;
+    tm.hasActed = false;
+    tm.hasMoved = false;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    // Carrier at 23 with MA=6, no TZ → not "stuck"
+    EXPECT_FALSE(hasMacroType(macros, MacroType::HAND_OFF_SCORE));
+}
+
+TEST(MacroActions, HandOffScoreNotAvailableWhenPassUsed) {
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {18, 7};
+    carrier.movementRemaining = 2;
+    state.ball = BallState::carried({18, 7}, 1);
+    state.homeTeam.passUsedThisTurn = true;
+
+    // HOME slot 2
+    Player& teammate = state.getPlayer(2);
+    teammate.id = 2;
+    teammate.teamSide = TeamSide::HOME;
+    teammate.state = PlayerState::STANDING;
+    teammate.position = {19, 7};
+    teammate.stats = {6, 3, 3, 8};
+    teammate.movementRemaining = 6;
+    teammate.hasActed = false;
+    teammate.hasMoved = false;
+
+    Player& away = state.getPlayer(12);
+    away.position = {5, 5};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::HAND_OFF_SCORE));
+}
+
+TEST(MacroActions, HandOffScoreAvailableWhenCarrierInHeavyTZ) {
+    // Carrier CAN reach endzone but is in 2+ enemy TZ (risky dodge)
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {23, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({23, 7}, 1);
+
+    // Two enemies adjacent to carrier (2+ TZ)
+    Player& e1 = state.getPlayer(12);
+    e1.position = {23, 6};
+    e1.state = PlayerState::STANDING;
+
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13;
+    e2.teamSide = TeamSide::AWAY;
+    e2.state = PlayerState::STANDING;
+    e2.position = {23, 8};
+    e2.stats = {6, 3, 3, 8};
+
+    // Free teammate adjacent, can score (HOME slot 2)
+    Player& teammate = state.getPlayer(2);
+    teammate.id = 2;
+    teammate.teamSide = TeamSide::HOME;
+    teammate.state = PlayerState::STANDING;
+    teammate.position = {24, 7};
+    teammate.stats = {6, 3, 3, 8};
+    teammate.movementRemaining = 6;
+    teammate.hasActed = false;
+    teammate.hasMoved = false;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::HAND_OFF_SCORE));
+}
+
+TEST(MacroActions, ScoreAvoidsEnemyTZ) {
+    // Carrier at y=7, enemies blocking y=7 path to endzone
+    // expandScore should route around (y=5 or y=9)
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {22, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({22, 7}, 1);
+
+    // Enemies blocking direct path at y=7
+    Player& e1 = state.getPlayer(12);
+    e1.position = {23, 7};
+    e1.state = PlayerState::STANDING;
+
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13;
+    e2.teamSide = TeamSide::AWAY;
+    e2.state = PlayerState::STANDING;
+    e2.position = {24, 7};
+    e2.stats = {6, 3, 3, 8};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    ASSERT_TRUE(hasMacroType(macros, MacroType::SCORE));
+
+    // Expand and verify carrier moves toward endzone (should route around)
+    Macro scoreMacro;
+    for (auto& m : macros) {
+        if (m.type == MacroType::SCORE) { scoreMacro = m; break; }
+    }
+
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    GameState sim = state;
+    auto result = greedyExpandMacro(sim, scoreMacro, dice);
+
+    // Should have moved (not empty expansion)
+    EXPECT_FALSE(result.actions.empty());
+}
+
+TEST(MacroActions, PickupPrefersHighAG) {
+    // AG4 player slightly farther should beat AG3 player closer
+    GameState state = makeMinimalState();
+    state.ball = BallState::onGround({13, 7});
+
+    Player& p1 = state.getPlayer(1);
+    p1.position = {12, 7}; // dist=1
+    p1.stats = {6, 3, 3, 8}; // AG3
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {11, 7}; // dist=2
+    p2.stats = {6, 3, 4, 7}; // AG4
+    p2.movementRemaining = 6;
+    p2.hasMoved = false;
+    p2.hasActed = false;
+
+    // Remove away player from path
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    ASSERT_TRUE(hasMacroType(macros, MacroType::PICKUP));
+
+    for (auto& m : macros) {
+        if (m.type == MacroType::PICKUP) {
+            // AG4 player (id=2) should be picked over AG3 (id=1)
+            // AG4: 4*10 - 2*3 = 34
+            // AG3: 3*10 - 1*3 = 27
+            EXPECT_EQ(m.playerId, 2);
+            break;
+        }
+    }
+}
+
+TEST(MacroActions, PickupAdvancesAfterPickup) {
+    // After picking up ball, expansion should advance toward endzone
+    GameState state = makeMinimalState();
+    state.ball = BallState::onGround({10, 7});
+
+    Player& p1 = state.getPlayer(1);
+    p1.position = {9, 7};
+    p1.movementRemaining = 6;
+
+    // Remove away from path
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    Macro pickup{MacroType::PICKUP, 1, -1, {10, 7}};
+    // Use dice that succeed on pickup (3+ on AG3)
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    GameState sim = state;
+    auto result = greedyExpandMacro(sim, pickup, dice);
+
+    // Should move to ball (1 step) + advance toward endzone (more steps)
+    EXPECT_GT(result.actions.size(), 1u) << "Should advance after pickup";
+
+    // Player should have moved forward (x > 10)
+    const Player& p = sim.getPlayer(1);
+    if (p.isOnPitch()) {
+        EXPECT_GT(p.position.x, 10) << "Should advance toward endzone after pickup";
+    }
+}
+
+TEST(MacroActions, HandOffScoreExpansionProducesActions) {
+    // Verify expansion produces hand-off + move actions
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {20, 7};
+    carrier.movementRemaining = 2;
+    state.ball = BallState::carried({20, 7}, 1);
+
+    // HOME slot 2 as receiver
+    Player& receiver = state.getPlayer(2);
+    receiver.id = 2;
+    receiver.teamSide = TeamSide::HOME;
+    receiver.state = PlayerState::STANDING;
+    receiver.position = {21, 7}; // adjacent
+    receiver.stats = {6, 3, 3, 8};
+    receiver.movementRemaining = 6; // can reach EZ (dist=4)
+    receiver.hasActed = false;
+    receiver.hasMoved = false;
+
+    // Move away player out of path
+    Player& away = state.getPlayer(12);
+    away.position = {1, 1};
+
+    Macro handoff{MacroType::HAND_OFF_SCORE, 1, 2, {-1, -1}};
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    GameState sim = state;
+    auto result = greedyExpandMacro(sim, handoff, dice);
+
+    // Should produce at least a HAND_OFF action
+    bool hasHandOff = false;
+    for (auto& a : result.actions) {
+        if (a.type == ActionType::HAND_OFF) hasHandOff = true;
+    }
+    EXPECT_TRUE(hasHandOff) << "Expansion should include HAND_OFF action";
+    EXPECT_FALSE(result.turnover) << "Should not turnover on success";
+}

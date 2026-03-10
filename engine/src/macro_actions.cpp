@@ -157,6 +157,33 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
     }
 
+    // HAND_OFF_SCORE: carrier can't score (or path is risky), but nearby teammate can
+    if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
+        int carrierDist = distToEndzone(carrier->position, mySide);
+        int carrierMaxReach = carrier->movementRemaining + 2;
+        // Carrier in heavy TZ? (hand-off may be safer)
+        int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
+        bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
+
+        if (carrierStuck) {
+            state.forEachOnPitch(mySide, [&](const Player& teammate) {
+                if (teammate.id == carrier->id) return;
+                if (teammate.state != PlayerState::STANDING) return;
+                if (teammate.hasActed) return;
+                if (teammate.hasSkill(SkillName::NoHands)) return;
+
+                int adjDist = carrier->position.distanceTo(teammate.position);
+                if (adjDist > 2) return; // carrier must reach adjacency (1 move max)
+
+                int receiverDist = distToEndzone(teammate.position, mySide);
+                int receiverMaxReach = teammate.movementRemaining + 2;
+                if (receiverDist > 0 && receiverDist <= receiverMaxReach) {
+                    out.push_back({MacroType::HAND_OFF_SCORE, carrier->id, teammate.id, {-1, -1}});
+                }
+            });
+        }
+    }
+
     // ADVANCE: carrier can move forward but can't score
     if (iHaveBall && carrier->canAct() && carrier->movementRemaining > 0) {
         int dist = distToEndzone(carrier->position, mySide);
@@ -317,11 +344,36 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
     });
 
-    // PICKUP: ball on ground, move nearest player to ball
+    // PICKUP: ball on ground, move best player to ball (AG-aware)
     if (ballOnGround) {
-        const Player* nearest = findNearestFreePlayer(state, state.ball.position);
-        if (nearest) {
-            out.push_back({MacroType::PICKUP, nearest->id, -1, state.ball.position});
+        const Player* bestPicker = nullptr;
+        int bestPickerScore = -999;
+
+        state.forEachOnPitch(mySide, [&](const Player& p) {
+            if (!isFreeToAct(p)) return;
+            if (p.hasSkill(SkillName::BallAndChain)) return;
+            if (p.hasSkill(SkillName::NoHands)) return;
+
+            int dist = p.position.distanceTo(state.ball.position);
+            int maxReach = p.movementRemaining + 2;
+            if (dist > maxReach) return;
+
+            int score = p.stats.agility * 10 - dist * 3;
+            if (p.hasSkill(SkillName::SureHands)) score += 15;
+            if (p.hasSkill(SkillName::BigHand)) score += 5;
+
+            if (score > bestPickerScore) {
+                bestPickerScore = score;
+                bestPicker = &p;
+            }
+        });
+
+        // Fallback: nearest free player (even if can't reach this turn)
+        if (!bestPicker) {
+            bestPicker = findNearestFreePlayer(state, state.ball.position);
+        }
+        if (bestPicker) {
+            out.push_back({MacroType::PICKUP, bestPicker->id, -1, state.ball.position});
         }
     }
 
@@ -517,7 +569,36 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
     MacroExpansionResult result;
     const Player& carrier = state.getPlayer(macro.playerId);
     int targetX = endzoneX(carrier.teamSide);
-    Position target{static_cast<int8_t>(targetX), carrier.position.y};
+    int dx = forwardDx(carrier.teamSide);
+
+    // Evaluate TZ exposure for different Y-target routes, pick safest
+    int bestY = carrier.position.y;
+    int bestTZ = 999;
+
+    for (int yOff = -2; yOff <= 2; ++yOff) {
+        int testY = carrier.position.y + yOff;
+        if (testY < 1 || testY > 13) continue; // avoid sidelines
+
+        // Count enemy TZ along approximate path
+        int tzSum = 0;
+        int cx = carrier.position.x;
+        int cy = carrier.position.y;
+        while (cx != targetX || cy != testY) {
+            if (cy < testY) cy++;
+            else if (cy > testY) cy--;
+            if (cx != targetX) cx += dx;
+            Position p{static_cast<int8_t>(cx), static_cast<int8_t>(cy)};
+            if (p.isOnPitch()) {
+                tzSum += countTacklezones(state, p, carrier.teamSide);
+            }
+        }
+        if (tzSum < bestTZ) {
+            bestTZ = tzSum;
+            bestY = testY;
+        }
+    }
+
+    Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(bestY)};
     movePlayerToward(state, macro.playerId, target, dice, result, 14);
     return result;
 }
@@ -723,6 +804,21 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
                                           DiceRollerBase& dice) {
     MacroExpansionResult result;
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, 8);
+    if (result.turnover) return result;
+
+    // After pickup: if we now have the ball, advance toward endzone
+    const Player& p = state.getPlayer(macro.playerId);
+    if (state.ball.isHeld && state.ball.carrierId == macro.playerId &&
+        p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
+        int targetX = endzoneX(p.teamSide);
+        // Bias Y toward center
+        int targetY = p.position.y;
+        if (targetY < 5) targetY++;
+        else if (targetY > 9) targetY--;
+        Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(targetY)};
+        movePlayerToward(state, macro.playerId, target, dice, result,
+                          p.movementRemaining);
+    }
     return result;
 }
 
@@ -778,6 +874,50 @@ static MacroExpansionResult expandEndTurn(GameState& state, const Macro& /*macro
     return result;
 }
 
+static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& macro,
+                                                 DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    int carrierId = macro.playerId;
+    int receiverId = macro.targetId;
+
+    const Player& carrier = state.getPlayer(carrierId);
+    const Player& receiver = state.getPlayer(receiverId);
+
+    // Step 1: Move carrier adjacent to receiver if not already
+    if (carrier.position.distanceTo(receiver.position) > 1) {
+        movePlayerToward(state, carrierId, receiver.position, dice, result, 2);
+        if (result.turnover) return result;
+
+        // Verify adjacency achieved
+        const Player& carrierNow = state.getPlayer(carrierId);
+        if (carrierNow.position.distanceTo(receiver.position) > 1) return result;
+    }
+
+    // Step 2: Hand off to receiver
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+
+    bool handedOff = false;
+    for (auto& a : actions) {
+        if (a.type == ActionType::HAND_OFF && a.playerId == carrierId &&
+            a.targetId == receiverId) {
+            if (executeAndRecord(state, a, dice, result)) return result;
+            handedOff = true;
+            break;
+        }
+    }
+    if (!handedOff) return result;
+
+    // Step 3: Move receiver to endzone
+    const Player& rcv = state.getPlayer(receiverId);
+    if (!rcv.isOnPitch() || rcv.lostTacklezones) return result;
+
+    int targetX = endzoneX(rcv.teamSide);
+    Position target{static_cast<int8_t>(targetX), rcv.position.y};
+    movePlayerToward(state, receiverId, target, dice, result, 14);
+    return result;
+}
+
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
                                        DiceRollerBase& dice) {
     switch (macro.type) {
@@ -792,6 +932,7 @@ MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
         case MacroType::REPOSITION:  return expandReposition(state, macro, dice);
         case MacroType::END_TURN:    return expandEndTurn(state, macro, dice);
         case MacroType::BLITZ_AND_SCORE: return expandBlitzAndScore(state, macro, dice);
+        case MacroType::HAND_OFF_SCORE:  return expandHandOffScore(state, macro, dice);
         default:                     return {};
     }
 }
@@ -803,9 +944,11 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
 
     int typeIdx = static_cast<int>(macro.type);
 
-    // [0-9] one-hot macro type (BLITZ_AND_SCORE shares BLITZ slot)
+    // [0-9] one-hot macro type (BLITZ_AND_SCORE shares BLITZ slot, HAND_OFF_SCORE shares SCORE slot)
     if (macro.type == MacroType::BLITZ_AND_SCORE) {
         out[static_cast<int>(MacroType::BLITZ)] = 1.0f;  // shares BLITZ slot
+    } else if (macro.type == MacroType::HAND_OFF_SCORE) {
+        out[static_cast<int>(MacroType::SCORE)] = 1.0f;  // shares SCORE slot
     } else if (typeIdx >= 0 && typeIdx < 10) {
         out[typeIdx] = 1.0f;
     }
@@ -813,7 +956,8 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     TeamSide mySide = state.activeTeam;
 
     // [10] scoring_potential
-    if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE) {
+    if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE ||
+        macro.type == MacroType::HAND_OFF_SCORE) {
         out[10] = 1.0f;
     } else if (macro.type == MacroType::ADVANCE && macro.playerId > 0) {
         const Player& p = state.getPlayer(macro.playerId);
@@ -826,7 +970,7 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
 
     // [11] block_dice_quality
     if ((macro.type == MacroType::BLOCK || macro.type == MacroType::BLITZ ||
-         macro.type == MacroType::BLITZ_AND_SCORE) &&
+         macro.type == MacroType::BLITZ_AND_SCORE || macro.type == MacroType::HAND_OFF_SCORE) &&
         macro.targetId > 0 && macro.playerId > 0) {
         const Player& att = state.getPlayer(macro.playerId);
         const Player& def = state.getPlayer(macro.targetId);
@@ -871,6 +1015,9 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
                 }
             }
             break;
+        case MacroType::HAND_OFF_SCORE:
+            out[13] = 0.25f; // hand-off catch roll + movement risk
+            break;
         case MacroType::PICKUP:
             out[13] = 0.33f; // pickup roll
             break;
@@ -886,7 +1033,8 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     }
 
     // [14] positional_gain
-    if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE) {
+    if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE ||
+        macro.type == MacroType::HAND_OFF_SCORE) {
         out[14] = 1.0f;
     } else if (macro.type == MacroType::ADVANCE && macro.playerId > 0) {
         const Player& p = state.getPlayer(macro.playerId);

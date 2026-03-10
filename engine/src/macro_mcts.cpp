@@ -232,7 +232,8 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
             float maxPrior = 1.0f;
             switch (macros[i].type) {
                 case MacroType::SCORE:
-                case MacroType::BLITZ_AND_SCORE: {
+                case MacroType::BLITZ_AND_SCORE:
+                case MacroType::HAND_OFF_SCORE: {
                     if (turnsRemaining <= 1) {
                         if (macros[i].playerId > 0) {
                             const Player& p = state.getPlayer(macros[i].playerId);
@@ -268,6 +269,11 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     break;
                 case MacroType::CAGE:
                     minPrior = 0.08f;
+                    break;
+                case MacroType::PICKUP:
+                    minPrior = 0.20f;
+                    if (scoreDiff < 0) minPrior = 0.30f;
+                    if (turnsRemaining <= 3) minPrior = 0.35f;
                     break;
                 case MacroType::REPOSITION:
                     if (onDef) minPrior = 0.05f;
@@ -369,6 +375,22 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             if (turnsLeft <= 2 && dist <= ma + 2) {
                 heuristic += 0.3;
             }
+
+            // Hand-off scoring potential: carrier can't reach EZ but adjacent teammate can
+            if (dist > static_cast<int>(carrier.movementRemaining) + 2) {
+                auto adj = carrier.position.getAdjacent();
+                for (auto& apos : adj) {
+                    if (!apos.isOnPitch()) continue;
+                    const Player* tm = state.getPlayerAtPosition(apos);
+                    if (!tm || tm->teamSide != perspective) continue;
+                    if (tm->state != PlayerState::STANDING) continue;
+                    int tmDist = distToEndzone(tm->position, perspective);
+                    if (tmDist > 0 && tmDist <= static_cast<int>(tm->movementRemaining) + 2) {
+                        heuristic += 0.15;
+                        break;
+                    }
+                }
+            }
         } else {
             heuristic -= 0.1;
             heuristic -= 0.25 * proximity;
@@ -379,6 +401,16 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         }
     } else if (!state.ball.isHeld && state.ball.isOnPitch()) {
         heuristic -= 0.1;  // loose ball is bad
+
+        // Bonus for having a player near the loose ball (quick pickup potential)
+        int nearestDist = 999;
+        state.forEachOnPitch(perspective, [&](const Player& p) {
+            if (p.state != PlayerState::STANDING) return;
+            int d = p.position.distanceTo(state.ball.position);
+            if (d < nearestDist) nearestDist = d;
+        });
+        if (nearestDist <= 2) heuristic += 0.08;
+        else if (nearestDist <= 4) heuristic += 0.04;
     }
 
     // Defense: bonus for marking opponent carrier with tackle zones
