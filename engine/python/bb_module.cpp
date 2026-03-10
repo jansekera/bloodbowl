@@ -193,6 +193,73 @@ PYBIND11_MODULE(bb_engine, m) {
                 result.append(d);
             }
             return result;
+        })
+        .def("get_turn_logs", [](const bb::LoggedGameResult& lgr) {
+            py::list result;
+            // GameEvent type names
+            static const char* eventNames[] = {
+                "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
+                "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
+                "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
+                "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION"
+            };
+            for (auto& turn : lgr.turnLogs) {
+                py::dict t;
+                t["half"] = turn.half;
+                t["turn"] = turn.turnNumber;
+                t["active_team"] = turn.activeTeam == bb::TeamSide::HOME ? "home" : "away";
+                t["home_score"] = turn.homeScore;
+                t["away_score"] = turn.awayScore;
+                t["ball_x"] = turn.ballX;
+                t["ball_y"] = turn.ballY;
+                t["ball_held"] = turn.ballHeld;
+                t["ball_carrier_id"] = turn.ballCarrierId;
+                t["turnover"] = turn.turnover;
+                t["touchdown"] = turn.touchdown;
+
+                // Player snapshots
+                py::list home_players, away_players;
+                for (auto& p : turn.homePlayers) {
+                    py::dict pd;
+                    pd["id"] = p.id;
+                    pd["x"] = p.x;
+                    pd["y"] = p.y;
+                    pd["state"] = p.state;
+                    pd["has_ball"] = p.hasBall;
+                    home_players.append(pd);
+                }
+                for (auto& p : turn.awayPlayers) {
+                    py::dict pd;
+                    pd["id"] = p.id;
+                    pd["x"] = p.x;
+                    pd["y"] = p.y;
+                    pd["state"] = p.state;
+                    pd["has_ball"] = p.hasBall;
+                    away_players.append(pd);
+                }
+                t["home_players"] = home_players;
+                t["away_players"] = away_players;
+
+                // Events
+                py::list events;
+                for (auto& ev : turn.events) {
+                    py::dict ed;
+                    int typeIdx = static_cast<int>(ev.type);
+                    ed["type"] = (typeIdx < 20) ? eventNames[typeIdx] : "UNKNOWN";
+                    ed["player_id"] = ev.playerId;
+                    ed["target_id"] = ev.targetId;
+                    ed["from_x"] = ev.from.x;
+                    ed["from_y"] = ev.from.y;
+                    ed["to_x"] = ev.to.x;
+                    ed["to_y"] = ev.to.y;
+                    ed["roll"] = ev.roll;
+                    ed["success"] = ev.success;
+                    events.append(ed);
+                }
+                t["events"] = events;
+                result.append(t);
+            }
+            return result;
         });
 
     // --- DiceRoller ---

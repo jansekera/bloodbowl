@@ -433,6 +433,44 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     return result;
 }
 
+// Helper: take a snapshot of the board state for replay
+static TurnLog captureTurnSnapshot(const GameState& state) {
+    TurnLog turn;
+    turn.half = state.half;
+    turn.turnNumber = state.getTeamState(state.activeTeam).turnNumber;
+    turn.activeTeam = state.activeTeam;
+    turn.homeScore = state.homeTeam.score;
+    turn.awayScore = state.awayTeam.score;
+
+    // Ball state
+    if (state.ball.isOnPitch()) {
+        turn.ballX = state.ball.position.x;
+        turn.ballY = state.ball.position.y;
+    }
+    turn.ballHeld = state.ball.isHeld;
+    turn.ballCarrierId = state.ball.carrierId;
+
+    // Player snapshots
+    auto snapshotTeam = [&](TeamSide side, std::vector<PlayerSnapshot>& out) {
+        state.forEachOnPitch(side, [&](const Player& p) {
+            PlayerSnapshot snap;
+            snap.id = p.id;
+            snap.x = p.position.x;
+            snap.y = p.position.y;
+            if (p.state == PlayerState::STANDING) snap.state = 0;
+            else if (p.state == PlayerState::PRONE) snap.state = 1;
+            else if (p.state == PlayerState::STUNNED) snap.state = 2;
+            else snap.state = 3;
+            snap.hasBall = (state.ball.isHeld && state.ball.carrierId == p.id);
+            out.push_back(snap);
+        });
+    };
+    snapshotTeam(TeamSide::HOME, turn.homePlayers);
+    snapshotTeam(TeamSide::AWAY, turn.awayPlayers);
+
+    return turn;
+}
+
 LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& away,
                                     ActionSelector homePolicy, ActionSelector awayPolicy,
                                     DiceRollerBase& dice, bool useFullKickoff) {
@@ -456,20 +494,27 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     doKickoff();
 
     std::vector<Action> actions;
+    std::vector<GameEvent> turnEvents;
     int totalActions = 0;
     TeamSide lastActiveTeam = state.activeTeam;
     int lastTurnNumber = state.getTeamState(state.activeTeam).turnNumber;
 
-    // Capture initial state features
+    // Capture initial state features + first turn snapshot
     {
         StateLog log;
         log.perspective = state.activeTeam;
         extractFeatures(state, log.perspective, log.features);
         logged.states.push_back(log);
+
+        logged.turnLogs.push_back(captureTurnSnapshot(state));
     }
 
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
         if (state.phase == GamePhase::TOUCHDOWN) {
+            // Mark touchdown in current turn log
+            if (!logged.turnLogs.empty()) {
+                logged.turnLogs.back().touchdown = true;
+            }
             state.kickingTeam = opponent(state.kickingTeam);
             setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
@@ -492,6 +537,11 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             log.perspective = curTeam;
             extractFeatures(state, log.perspective, log.features);
             logged.states.push_back(log);
+
+            // Save previous turn events and start new turn log
+            logged.turnLogs.push_back(captureTurnSnapshot(state));
+            turnEvents.clear();
+
             lastActiveTeam = curTeam;
             lastTurnNumber = curTurn;
         }
@@ -510,7 +560,21 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
         ActionSelector& policy = (state.activeTeam == TeamSide::HOME)
                                     ? homePolicy : awayPolicy;
         Action chosen = policy(state);
-        executeAction(state, chosen, dice, nullptr);
+
+        // Execute with event capture
+        turnEvents.clear();
+        executeAction(state, chosen, dice, &turnEvents);
+
+        // Append events to current turn log
+        if (!logged.turnLogs.empty()) {
+            auto& curLog = logged.turnLogs.back();
+            for (auto& ev : turnEvents) {
+                curLog.events.push_back(ev);
+                if (ev.type == GameEvent::Type::TURNOVER) curLog.turnover = true;
+                if (ev.type == GameEvent::Type::TOUCHDOWN) curLog.touchdown = true;
+            }
+        }
+
         totalActions++;
     }
 
