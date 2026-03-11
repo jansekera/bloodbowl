@@ -21,7 +21,8 @@ enum class MacroType : uint8_t {
     REPOSITION,
     END_TURN,
     BLITZ_AND_SCORE,
-    MACRO_COUNT  // = 11
+    HAND_OFF_SCORE,
+    MACRO_COUNT  // = 12
 };
 
 struct Macro {
