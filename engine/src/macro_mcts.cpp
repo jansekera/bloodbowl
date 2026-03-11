@@ -375,6 +375,22 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
                 heuristic += 0.3;
             }
 
+            // Hand-off scoring potential: carrier can't reach EZ but adjacent teammate can
+            if (dist > static_cast<int>(carrier.movementRemaining) + 2) {
+                auto adj = carrier.position.getAdjacent();
+                for (auto& apos : adj) {
+                    if (!apos.isOnPitch()) continue;
+                    const Player* tm = state.getPlayerAtPosition(apos);
+                    if (!tm || tm->teamSide != perspective) continue;
+                    if (tm->state != PlayerState::STANDING) continue;
+                    int tmDist = distToEndzone(tm->position, perspective);
+                    if (tmDist > 0 && tmDist <= static_cast<int>(tm->movementRemaining) + 2) {
+                        heuristic += 0.15;
+                        break;
+                    }
+                }
+            }
+
         } else {
             heuristic -= 0.1;
             heuristic -= 0.25 * proximity;
