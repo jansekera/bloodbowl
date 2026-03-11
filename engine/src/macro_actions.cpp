@@ -317,11 +317,35 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
     });
 
-    // PICKUP: ball on ground, nearest free player moves toward ball
+    // PICKUP: ball on ground, best player by AG/distance/skills
     if (ballOnGround) {
-        const Player* nearest = findNearestFreePlayer(state, state.ball.position);
-        if (nearest) {
-            out.push_back({MacroType::PICKUP, nearest->id, -1, state.ball.position});
+        const Player* bestPicker = nullptr;
+        int bestPickerScore = -999;
+
+        state.forEachOnPitch(mySide, [&](const Player& p) {
+            if (!isFreeToAct(p)) return;
+            if (p.hasSkill(SkillName::BallAndChain)) return;
+            if (p.hasSkill(SkillName::NoHands)) return;
+
+            int dist = p.position.distanceTo(state.ball.position);
+            int maxReach = p.movementRemaining + 2;
+            if (dist > maxReach) return;
+
+            int score = p.stats.agility * 10 - dist * 3;
+            if (p.hasSkill(SkillName::SureHands)) score += 15;
+            if (p.hasSkill(SkillName::BigHand)) score += 5;
+
+            if (score > bestPickerScore) {
+                bestPickerScore = score;
+                bestPicker = &p;
+            }
+        });
+
+        if (!bestPicker) {
+            bestPicker = findNearestFreePlayer(state, state.ball.position);
+        }
+        if (bestPicker) {
+            out.push_back({MacroType::PICKUP, bestPicker->id, -1, state.ball.position});
         }
     }
 
