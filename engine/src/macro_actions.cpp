@@ -753,6 +753,20 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
                                           DiceRollerBase& dice) {
     MacroExpansionResult result;
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, 8);
+    if (result.turnover) return result;
+
+    // After pickup: if we now have the ball, advance toward endzone
+    const Player& p = state.getPlayer(macro.playerId);
+    if (state.ball.isHeld && state.ball.carrierId == macro.playerId &&
+        p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
+        int targetX = endzoneX(p.teamSide);
+        int targetY = p.position.y;
+        if (targetY < 5) targetY++;
+        else if (targetY > 9) targetY--;
+        Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(targetY)};
+        movePlayerToward(state, macro.playerId, target, dice, result,
+                          p.movementRemaining);
+    }
     return result;
 }
 
