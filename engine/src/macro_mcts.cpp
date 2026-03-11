@@ -270,6 +270,9 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     minPrior = 0.08f;
                     break;
                 case MacroType::PICKUP:
+                    minPrior = 0.20f;
+                    if (scoreDiff < 0) minPrior = 0.30f;
+                    if (turnsRemaining <= 3) minPrior = 0.35f;
                     break;
                 case MacroType::REPOSITION:
                     if (onDef) minPrior = 0.05f;
