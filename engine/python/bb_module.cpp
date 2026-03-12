@@ -405,14 +405,21 @@ PYBIND11_MODULE(bb_engine, m) {
                                       int mctsIterations,
                                       const std::string& policyWeightsPath,
                                       float policyBlend,
-                                      float vfBlend) {
+                                      float vfBlend,
+                                      const std::string& awayWeightsPath) {
         bb::DiceRoller dice(seed);
 
+        // Home VF (training weights)
         std::unique_ptr<bb::ValueFunction> vf;
-        if ((homeAI == "learning" || awayAI == "learning" ||
-             homeAI == "mcts" || awayAI == "mcts" ||
-             homeAI == "macro_mcts" || awayAI == "macro_mcts") && !weightsPath.empty()) {
+        if ((homeAI == "learning" || homeAI == "mcts" || homeAI == "macro_mcts") && !weightsPath.empty()) {
             vf = bb::loadValueFunction(weightsPath);
+        }
+
+        // Away VF: frozen weights if provided, otherwise same as home
+        std::unique_ptr<bb::ValueFunction> awayVf;
+        const std::string& awayWPath = awayWeightsPath.empty() ? weightsPath : awayWeightsPath;
+        if ((awayAI == "learning" || awayAI == "mcts" || awayAI == "macro_mcts") && !awayWPath.empty()) {
+            awayVf = bb::loadValueFunction(awayWPath);
         }
 
         // Load policy network if provided
@@ -425,6 +432,7 @@ PYBIND11_MODULE(bb_engine, m) {
         std::shared_ptr<bb::MacroMCTSPolicy> homeMacroMcts, awayMacroMcts;
 
         auto makePolicy = [&](const std::string& ai,
+                              bb::ValueFunction* vfPtr,
                               std::shared_ptr<bb::MCTSPolicy>& mctsOut,
                               std::shared_ptr<bb::MacroMCTSPolicy>& macroMctsOut) -> bb::ActionSelector {
             if (ai == "greedy") {
@@ -433,15 +441,15 @@ PYBIND11_MODULE(bb_engine, m) {
                 bb::MCTSConfig cfg;
                 cfg.maxIterations = mctsIterations;
                 cfg.timeBudgetMs = 0;
-                cfg.explorationC = 2.0;  // Training: higher C for diverse data
-                cfg.dirichletAlpha = 0.3f;   // Dirichlet noise for exploration
-                cfg.dirichletWeight = 0.25f; // 75% policy + 25% noise
+                cfg.explorationC = 2.0;
+                cfg.dirichletAlpha = 0.3f;
+                cfg.dirichletWeight = 0.25f;
                 cfg.vfBlend = vfBlend;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
                 }
-                macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
+                macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vfPtr, cfg, seed);
                 macroMctsOut->setLogDecisions(true, 20);
                 return [m = macroMctsOut](const bb::GameState& s) { return (*m)(s); };
             } else if (ai == "mcts" && mctsIterations > 0) {
@@ -453,12 +461,12 @@ PYBIND11_MODULE(bb_engine, m) {
                     cfg.policy = policyNet.get();
                     cfg.explorationC = 2.5;
                 }
-                mctsOut = std::make_shared<bb::MCTSPolicy>(vf.get(), cfg, seed);
+                mctsOut = std::make_shared<bb::MCTSPolicy>(vfPtr, cfg, seed);
                 mctsOut->setLogDecisions(true, 20);
                 return [mcts = mctsOut](const bb::GameState& s) { return (*mcts)(s); };
-            } else if (ai == "learning" && vf) {
-                return [&dice, &vf, epsilon](const bb::GameState& s) {
-                    return bb::learningPolicy(s, dice, *vf, epsilon);
+            } else if (ai == "learning" && vfPtr) {
+                return [&dice, vfPtr, epsilon](const bb::GameState& s) {
+                    return bb::learningPolicy(s, dice, *vfPtr, epsilon);
                 };
             } else {
                 return [&dice](const bb::GameState& s) { return bb::randomPolicy(s, dice); };
@@ -467,8 +475,8 @@ PYBIND11_MODULE(bb_engine, m) {
 
         auto logged = bb::simulateGameLogged(
             home, away,
-            makePolicy(homeAI, homeMcts, homeMacroMcts),
-            makePolicy(awayAI, awayMcts, awayMacroMcts),
+            makePolicy(homeAI, vf.get(), homeMcts, homeMacroMcts),
+            makePolicy(awayAI, awayVf.get(), awayMcts, awayMacroMcts),
             dice);
 
         // Copy policy decisions from MCTS policies
@@ -503,7 +511,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("mcts_iterations") = 0,
        py::arg("policy_weights_path") = "",
        py::arg("policy_blend") = 0.0f,
-       py::arg("vf_blend") = 0.0f);
+       py::arg("vf_blend") = 0.0f,
+       py::arg("away_weights_path") = "");
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

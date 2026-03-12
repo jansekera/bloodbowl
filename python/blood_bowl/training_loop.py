@@ -136,6 +136,17 @@ def run_training(
     if opponent_weights is not None:
         opp_weights_path = str(root / opponent_weights) if not Path(opponent_weights).is_absolute() else opponent_weights
 
+    # Frozen self-play: snapshot current best as frozen opponent at training start
+    frozen_weights_path: str | None = None
+    if self_play and opp_weights_path is None:
+        best_path = root / 'weights_best.json'
+        frozen_path = root / 'weights_frozen.json'
+        if best_path.exists():
+            import shutil as _shutil
+            _shutil.copy2(str(best_path), str(frozen_path))
+            frozen_weights_path = str(frozen_path)
+            print(f'Frozen self-play: opponent frozen at weights_best.json → weights_frozen.json')
+
     actual_model = type(trainer).__name__
     print(f'Training: {epochs} epochs x {games_per_epoch} games = {total_games} games total')
     print(f'Model: {actual_model}, Opponent: {effective_opponent}, LR: {learning_rate}, Epsilon: {epsilon_start:.2f} -> {epsilon_end:.2f}')
@@ -259,8 +270,10 @@ def run_training(
         away_ai = home_ai_type if self_play else opponent
 
         # Opponent weights: frozen separate weights for away learning AI
-        away_weights_arg = opp_weights_path if opp_weights_path else None
-        away_epsilon_arg = 0.0 if opp_weights_path else None
+        # Frozen self-play uses frozen_weights_path; explicit opponent_weights overrides
+        _away_w = opp_weights_path or frozen_weights_path
+        away_weights_arg = _away_w if _away_w else None
+        away_epsilon_arg = 0.0 if _away_w else None
 
         # Policy weights path for MCTS
         policy_weights_arg = str(weights_path) if use_policy else None

@@ -84,6 +84,7 @@ class CPPRunner:
                     policy_weights_path=policy_path,
                     policy_blend=policy_blend,
                     vf_blend=vf_blend,
+                    away_weights_path=away_weights or '',
                 )
                 result = logged.result
 
