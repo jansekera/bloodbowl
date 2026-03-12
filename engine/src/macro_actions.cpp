@@ -183,6 +183,42 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
     }
 
+    // PASS_SCORE: carrier stuck, pass (longer range) to teammate who can score
+    if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
+        int carrierDist = distToEndzone(carrier->position, mySide);
+        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
+        bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
+
+        if (carrierStuck) {
+            int bestScore = -999;
+            int bestTargetId = -1;
+            state.forEachOnPitch(mySide, [&](const Player& teammate) {
+                if (teammate.id == carrier->id) return;
+                if (teammate.state != PlayerState::STANDING) return;
+                if (teammate.hasActed) return;
+                if (teammate.hasSkill(SkillName::NoHands)) return;
+
+                int passDist = carrier->position.distanceTo(teammate.position);
+                if (passDist < 2 || passDist > 10) return; // hand-off is separate; max pass ~10
+
+                int receiverDist = distToEndzone(teammate.position, mySide);
+                int receiverMaxReach = teammate.movementRemaining + 2;
+                if (receiverDist <= 0 || receiverDist > receiverMaxReach) return;
+
+                int score = teammate.stats.agility * 5 - passDist;
+                if (teammate.hasSkill(SkillName::Catch)) score += 5;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestTargetId = teammate.id;
+                }
+            });
+            if (bestTargetId > 0) {
+                out.push_back({MacroType::PASS_SCORE, carrier->id, bestTargetId, {-1, -1}});
+            }
+        }
+    }
+
     // ADVANCE: carrier can move forward but can't score
     if (iHaveBall && carrier->canAct() && carrier->movementRemaining > 0) {
         int dist = distToEndzone(carrier->position, mySide);
@@ -921,6 +957,39 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
     return result;
 }
 
+static MacroExpansionResult expandPassScore(GameState& state, const Macro& macro,
+                                             DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    int carrierId = macro.playerId;
+    int receiverId = macro.targetId;
+    if (carrierId <= 0 || receiverId <= 0) return result;
+
+    // Step 1: Pass to receiver
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+
+    bool passed = false;
+    for (auto& a : actions) {
+        if (a.type == ActionType::PASS && a.playerId == carrierId &&
+            a.targetId == receiverId) {
+            if (executeAndRecord(state, a, dice, result)) return result;
+            passed = true;
+            break;
+        }
+    }
+    if (!passed) return result;
+
+    // Step 2: Move receiver to endzone (if catch succeeded)
+    if (!state.ball.isHeld || state.ball.carrierId != receiverId) return result;
+    const Player& rcv = state.getPlayer(receiverId);
+    if (!rcv.isOnPitch() || rcv.lostTacklezones) return result;
+
+    int targetX = endzoneX(rcv.teamSide);
+    Position target{static_cast<int8_t>(targetX), rcv.position.y};
+    movePlayerToward(state, receiverId, target, dice, result, 14);
+    return result;
+}
+
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
                                        DiceRollerBase& dice) {
     switch (macro.type) {
@@ -936,6 +1005,7 @@ MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
         case MacroType::END_TURN:    return expandEndTurn(state, macro, dice);
         case MacroType::BLITZ_AND_SCORE: return expandBlitzAndScore(state, macro, dice);
         case MacroType::HAND_OFF_SCORE:  return expandHandOffScore(state, macro, dice);
+        case MacroType::PASS_SCORE:      return expandPassScore(state, macro, dice);
         default:                     return {};
     }
 }
@@ -950,7 +1020,8 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     // [0-9] one-hot macro type (BLITZ_AND_SCORE shares BLITZ slot, HAND_OFF_SCORE shares SCORE slot)
     if (macro.type == MacroType::BLITZ_AND_SCORE) {
         out[static_cast<int>(MacroType::BLITZ)] = 1.0f;
-    } else if (macro.type == MacroType::HAND_OFF_SCORE) {
+    } else if (macro.type == MacroType::HAND_OFF_SCORE ||
+               macro.type == MacroType::PASS_SCORE) {
         out[static_cast<int>(MacroType::SCORE)] = 1.0f;
     } else if (typeIdx >= 0 && typeIdx < 10) {
         out[typeIdx] = 1.0f;
@@ -960,7 +1031,8 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
 
     // [10] scoring_potential
     if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE ||
-        macro.type == MacroType::HAND_OFF_SCORE) {
+        macro.type == MacroType::HAND_OFF_SCORE ||
+        macro.type == MacroType::PASS_SCORE) {
         out[10] = 1.0f;
     } else if (macro.type == MacroType::ADVANCE && macro.playerId > 0) {
         const Player& p = state.getPlayer(macro.playerId);
@@ -1024,6 +1096,9 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
         case MacroType::PASS_ACTION:
             out[13] = 0.4f; // catch + interception risk
             break;
+        case MacroType::PASS_SCORE:
+            out[13] = 0.40f; // pass accuracy + catch + interception risk
+            break;
         case MacroType::FOUL:
             out[13] = 0.08f; // ejection risk
             break;
@@ -1034,7 +1109,8 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
 
     // [14] positional_gain
     if (macro.type == MacroType::SCORE || macro.type == MacroType::BLITZ_AND_SCORE ||
-        macro.type == MacroType::HAND_OFF_SCORE) {
+        macro.type == MacroType::HAND_OFF_SCORE ||
+        macro.type == MacroType::PASS_SCORE) {
         out[14] = 1.0f;
     } else if (macro.type == MacroType::ADVANCE && macro.playerId > 0) {
         const Player& p = state.getPlayer(macro.playerId);
