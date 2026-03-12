@@ -317,9 +317,11 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 int dice = getBlockDiceCount(state, blitzer, def, true);
                 int score = dice * 2;
 
-                // Sideline bonus: target on edge
-                if (def.position.y == 0 || def.position.y == Position::PITCH_HEIGHT - 1) {
+                // Sideline trap: target near sideline = fewer escape routes
+                if (def.position.y <= 2 || def.position.y >= Position::PITCH_HEIGHT - 3) {
                     score += 3;
+                } else if (def.position.y <= 4 || def.position.y >= Position::PITCH_HEIGHT - 5) {
+                    score += 1;
                 }
 
                 if (onDef) {
@@ -500,6 +502,8 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
     int myEndzone = endzoneX(opponent(mySide));  // our own endzone to defend
     bool onDefense = !iHaveBall && !ballOnGround;
     bool receiverPlaced = false;
+    bool hunterPlaced = false;
+    bool cageTagPlaced = false;
     bool safetyPlaced = false;
     bool markerPlaced = false;
     int turnsLeft = std::max(0, 9 - myTeam.turnNumber);
@@ -554,9 +558,26 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             int carrierDist = p.position.distanceTo(carrier->position);
             int ezX = endzoneX(mySide);
 
+            // Hunter/shield split: fast players (MA≥7) pressure opponent scoring threats
+            // while slow players stay as shields near carrier
+            if (!hunterPlaced && p.stats.movement >= 7 && carrierDist > 4) {
+                Position huntTarget = carrier->position;
+                int bestThreat = -999;
+                state.forEachOnPitch(opponent(mySide), [&](const Player& opp) {
+                    if (opp.state != PlayerState::STANDING) return;
+                    int threat = opp.stats.movement * 2 + opp.stats.agility;
+                    if (countTacklezones(state, opp.position, opp.teamSide) == 0) threat += 5;
+                    if (threat > bestThreat) {
+                        bestThreat = threat;
+                        huntTarget = opp.position;
+                    }
+                });
+                target = huntTarget;
+                hunterPlaced = true;
+            }
             // Receiver setup: when ≤2 turns left, send fast player near endzone
             // as a pass/hand-off target for next turn's scoring chain
-            if (!receiverPlaced && turnsLeft <= 2 && p.stats.movement >= 6 &&
+            else if (!receiverPlaced && turnsLeft <= 2 && p.stats.movement >= 6 &&
                 carrierDist > 3) {
                 int recvY = carrier->position.y + ((p.position.y > carrier->position.y) ? 2 : -2);
                 recvY = std::clamp(recvY, 2, 12);
@@ -577,6 +598,38 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             Position oppBallPos = state.ball.isOnPitch() ? state.ball.position
                 : Position{static_cast<int8_t>(endzoneX(mySide)), 7};
 
+            // Strategy 0: Cage corner tag — break opponent cage (one player at a time)
+            bool usedCageTag = false;
+            if (!cageTagPlaced && oppCarrierPtr != nullptr) {
+                int cageCount = 0;
+                state.forEachOnPitch(opponent(mySide), [&](const Player& opp) {
+                    if (opp.id == oppCarrierPtr->id) return;
+                    if (opp.state != PlayerState::STANDING) return;
+                    if (oppCarrierPtr->position.distanceTo(opp.position) == 1) cageCount++;
+                });
+                if (cageCount >= 2) {
+                    Position bestCorner = oppCarrierPtr->position;
+                    int minFriendlyTZ = 999;
+                    auto adj = oppCarrierPtr->position.getAdjacent();
+                    for (auto& apos : adj) {
+                        if (!apos.isOnPitch()) continue;
+                        if (state.getPlayerAtPosition(apos)) continue;
+                        int friendlyTZ = countTacklezones(state, apos, opponent(mySide));
+                        if (friendlyTZ < minFriendlyTZ) {
+                            minFriendlyTZ = friendlyTZ;
+                            bestCorner = apos;
+                        }
+                    }
+                    if (bestCorner.x != oppCarrierPtr->position.x ||
+                        bestCorner.y != oppCarrierPtr->position.y) {
+                        target = bestCorner;
+                        cageTagPlaced = true;
+                        usedCageTag = true;
+                    }
+                }
+            }
+            // Strategies 1-4: only when cage tag not used this iteration
+            if (!usedCageTag) {
             // Strategy 1: Safety player (fast, near our endzone)
             if (!safetyPlaced && p.stats.movement >= 6) {
                 target = {static_cast<int8_t>(myEndzone),
@@ -605,6 +658,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
                           static_cast<int8_t>(screenY)};
             }
+            } // end !usedCageTag
         } else {
             // Move forward toward center
             int dx = forwardDx(mySide);

@@ -438,6 +438,47 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         }
     }
 
+    // Dodge-back vs bash: penalty when our players are adjacent to strong (ST≥4) opponents
+    {
+        int bashExposure = 0;
+        state.forEachOnPitch(perspective, [&](const Player& p) {
+            if (p.state != PlayerState::STANDING) return;
+            auto adj = p.position.getAdjacent();
+            for (auto& apos : adj) {
+                if (!apos.isOnPitch()) continue;
+                const Player* opp = state.getPlayerAtPosition(apos);
+                if (opp && opp->teamSide != perspective &&
+                    opp->state == PlayerState::STANDING &&
+                    opp->stats.strength >= 4) {
+                    bashExposure++;
+                    break; // count once per our player
+                }
+            }
+        });
+        heuristic -= 0.05 * bashExposure;
+    }
+
+    // Sideline trap: bonus when opponent carrier is near sideline (limited escape routes)
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& bh = state.getPlayer(state.ball.carrierId);
+        if (bh.teamSide != perspective && bh.isOnPitch() &&
+            bh.state == PlayerState::STANDING) {
+            int y = bh.position.y;
+            if (y <= 2 || y >= 12) heuristic += 0.10;
+            else if (y <= 4 || y >= 10) heuristic += 0.05;
+        }
+    }
+
+    // Contain vs agility: bonus when we TZ agile (AG≥4) opponent carrier from multiple sides
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& bh = state.getPlayer(state.ball.carrierId);
+        if (bh.teamSide != perspective && bh.isOnPitch() &&
+            bh.state == PlayerState::STANDING && bh.stats.agility >= 4) {
+            int tzCount = countTacklezones(state, bh.position, bh.teamSide);
+            if (tzCount >= 2) heuristic += 0.06 * std::min(tzCount - 1, 2); // max +0.12
+        }
+    }
+
     // Player count advantage (H8.8-H8.9): more players = better
     int myPlayers = 0, oppPlayers = 0;
     state.forEachOnPitch(perspective, [&](const Player& p) {
