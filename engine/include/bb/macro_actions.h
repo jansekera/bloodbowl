@@ -23,14 +23,16 @@ enum class MacroType : uint8_t {
     BLITZ_AND_SCORE,
     HAND_OFF_SCORE,
     PASS_SCORE,
-    MACRO_COUNT  // = 13
+    CHAIN_SCORE,
+    MACRO_COUNT  // = 14
 };
 
 struct Macro {
     MacroType type = MacroType::END_TURN;
     int playerId = -1;      // primary player
-    int targetId = -1;      // target (blitz/block/foul/pass)
+    int targetId = -1;      // target (blitz/block/foul/pass/relay)
     Position targetPos{-1, -1}; // target position (reposition)
+    int thirdId = -1;       // third player (CHAIN_SCORE scorer)
 };
 
 struct MacroExpansionResult {

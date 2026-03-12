@@ -234,7 +234,8 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                 case MacroType::SCORE:
                 case MacroType::BLITZ_AND_SCORE:
                 case MacroType::HAND_OFF_SCORE:
-                case MacroType::PASS_SCORE: {
+                case MacroType::PASS_SCORE:
+                case MacroType::CHAIN_SCORE: {
                     if (turnsRemaining <= 1) {
                         if (macros[i].playerId > 0) {
                             const Player& p = state.getPlayer(macros[i].playerId);
