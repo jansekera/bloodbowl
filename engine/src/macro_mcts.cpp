@@ -237,13 +237,14 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                 case MacroType::PASS_SCORE:
                 case MacroType::CHAIN_SCORE: {
                     if (turnsRemaining <= 1) {
+                        // One-turn TD: last turn, force scoring attempt
                         if (macros[i].playerId > 0) {
                             const Player& p = state.getPlayer(macros[i].playerId);
                             int dist = distToEndzone(p.position, state.activeTeam);
                             bool safeWalkIn = (dist <= static_cast<int>(p.movementRemaining));
-                            minPrior = safeWalkIn ? 0.60f : 0.40f;
+                            minPrior = safeWalkIn ? 0.90f : 0.70f;
                         } else {
-                            minPrior = 0.40f;
+                            minPrior = 0.70f;
                         }
                     } else if (trailing2plus) {
                         minPrior = 0.50f;
@@ -376,6 +377,15 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             // Urgency: last 2 turns and near endzone — must score!
             if (turnsLeft <= 2 && dist <= ma + 2) {
                 heuristic += 0.3;
+            }
+
+            // One-turn TD: last turn, carrier can score NOW — massive bonus
+            if (turnsLeft <= 1) {
+                if (dist <= static_cast<int>(carrier.movementRemaining)) {
+                    heuristic += 0.8;  // safe walk-in on last turn
+                } else if (dist <= carrier.movementRemaining + 2) {
+                    heuristic += 0.5;  // GFI needed but scoreable
+                }
             }
 
             // Hand-off scoring potential: carrier can't reach EZ but adjacent teammate can
