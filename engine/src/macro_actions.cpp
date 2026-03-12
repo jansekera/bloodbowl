@@ -499,8 +499,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
     // Smart targeting: carrier protection, safety player, defensive screen
     int myEndzone = endzoneX(opponent(mySide));  // our own endzone to defend
     bool onDefense = !iHaveBall && !ballOnGround;
+    bool receiverPlaced = false;
     bool safetyPlaced = false;
     bool markerPlaced = false;
+    int turnsLeft = std::max(0, 9 - myTeam.turnNumber);
     int endzoneGuardCount = 0;
     int screenSlot = 0;
 
@@ -552,7 +554,17 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             int carrierDist = p.position.distanceTo(carrier->position);
             int ezX = endzoneX(mySide);
 
-            if (carrierDist <= 3) {
+            // Receiver setup: when ≤2 turns left, send fast player near endzone
+            // as a pass/hand-off target for next turn's scoring chain
+            if (!receiverPlaced && turnsLeft <= 2 && p.stats.movement >= 6 &&
+                carrierDist > 3) {
+                int recvY = carrier->position.y + ((p.position.y > carrier->position.y) ? 2 : -2);
+                recvY = std::clamp(recvY, 2, 12);
+                int recvX = ezX - dx * 3; // 3 squares from endzone (reachable next turn)
+                recvX = std::clamp(recvX, 1, 24);
+                target = {static_cast<int8_t>(recvX), static_cast<int8_t>(recvY)};
+                receiverPlaced = true;
+            } else if (carrierDist <= 3) {
                 // Already near carrier — move to cage/screen position ahead of carrier
                 target = {static_cast<int8_t>(carrier->position.x + dx * 2),
                           static_cast<int8_t>(carrier->position.y)};
