@@ -196,7 +196,7 @@ def run_training(
     # Kill condition: 5 epochs no improvement in either win_rate or score_diff
     epoch_win_rates: list[float] = []
     epoch_score_diffs: list[float] = []
-    NO_IMPROVE_LIMIT = 5
+    NO_IMPROVE_LIMIT = 999  # effectively disabled — self-play win rate is too noisy to use as stopping criterion
 
     # Track best training weights per-epoch (separate from benchmark best)
     best_train_wr = 0.0
