@@ -548,7 +548,7 @@ def run_training(
             print(f'  WARNING: avg goals/game = {avg_goals:.1f} (>4) — stalling may not be working')
 
         # Benchmark (before kill condition so it always runs at interval)
-        if benchmark_interval > 0 and epoch % benchmark_interval == 0:
+        if benchmark_interval > 0 and (epoch % benchmark_interval == 0 or epoch == epochs):
             from .benchmark import run_benchmark
             bench_results = run_benchmark(
                 weights_file=str(weights_path),
