@@ -583,11 +583,13 @@ def run_training(
                 # Update weights_best.json if this is the best benchmark
                 best_path = weights_path.parent / 'weights_best.json'
                 best_wr = 0.0
+                best_mcts = None
                 if best_path.exists():
                     try:
                         with open(best_path) as f:
                             best_meta = json.load(f)
                         best_wr = best_meta.get('benchmark_win_rate', 0.0)
+                        best_mcts = best_meta.get('benchmark_mcts_iterations', None)
                     except Exception:
                         pass
                 if bm_wr > best_wr:
@@ -598,6 +600,7 @@ def run_training(
                         best_data = json.load(f)
                     best_data['benchmark_win_rate'] = bm_wr
                     best_data['benchmark_epoch'] = epoch
+                    best_data['benchmark_mcts_iterations'] = mcts_iterations
                     with open(best_path, 'w') as f:
                         json.dump(best_data, f)
                     print(f'  New best! Saved to {best_path.name}')
@@ -606,7 +609,9 @@ def run_training(
                 print(f'  Snapshot: {snap_name}')
 
                 # Auto-revert: if benchmark drops >5% below best, revert and stop
-                if best_wr > 0 and bm_wr < best_wr - 0.05:
+                # Skip comparison if MCTS iterations differ (different baseline)
+                mcts_mismatch = best_mcts is not None and best_mcts != mcts_iterations
+                if best_wr > 0 and bm_wr < best_wr - 0.05 and not mcts_mismatch:
                     print(f'  Over-specialization detected: {bm_wr:.1%} < {best_wr:.1%} - 5%')
                     if str(weights_path.resolve()) != str(best_path.resolve()):
                         shutil.copy2(str(best_path), str(weights_path))
