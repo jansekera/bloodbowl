@@ -185,7 +185,14 @@ def run_training(
 
     # Estimated completion time
     from datetime import datetime, timedelta
-    avg_game_secs = 130 if mcts_iterations > 0 else 15  # rough estimate
+    if mcts_iterations > 0:
+        if self_play or opponent == 'macro_mcts':
+            avg_game_secs = int(mcts_iterations * 0.65)   # oba hráči MCTS (self-play): ~130s při 200 iter
+        else:
+            avg_game_secs = int(mcts_iterations * 0.20)   # jen domácí MCTS (greedy/random): ~10s při 50 iter
+    else:
+        avg_game_secs = 15
+    avg_game_secs = max(5, avg_game_secs)
     est_total_secs = total_games * avg_game_secs
     if benchmark_interval > 0:
         num_benchmarks = epochs // benchmark_interval
