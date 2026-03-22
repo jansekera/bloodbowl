@@ -599,17 +599,21 @@ def run_training(
                         best_mcts = best_meta.get('benchmark_mcts_iterations', None)
                     except Exception:
                         pass
+                # Always store benchmark result in training weights (for gating)
+                with open(weights_path) as f:
+                    train_data = json.load(f)
+                train_data['benchmark_win_rate'] = bm_wr
+                train_data['benchmark_epoch'] = epoch
+                train_data['benchmark_mcts_iterations'] = mcts_iterations
+                with open(weights_path, 'w') as f:
+                    json.dump(train_data, f)
+
                 if bm_wr > best_wr:
                     if str(weights_path.resolve()) != str(best_path.resolve()):
                         shutil.copy2(str(weights_path), str(best_path))
-                    # Store benchmark info in best weights
-                    with open(best_path) as f:
-                        best_data = json.load(f)
-                    best_data['benchmark_win_rate'] = bm_wr
-                    best_data['benchmark_epoch'] = epoch
-                    best_data['benchmark_mcts_iterations'] = mcts_iterations
-                    with open(best_path, 'w') as f:
-                        json.dump(best_data, f)
+                    else:
+                        # Training on weights_best.json directly — metadata already written
+                        pass
                     print(f'  New best! Saved to {best_path.name}')
                     # Auto-push weights_best.json to GitHub
                     _git_push_weights_best(best_path, bm_wr, bm_sd, epoch)
