@@ -105,6 +105,10 @@ def run_training(
         # Load existing weights or create new trainer
         if weights_path.exists():
             trainer = load_trainer(str(weights_path), learning_rate=learning_rate)
+            # If requested model type doesn't match loaded type, start fresh
+            if model_type == 'neural' and isinstance(trainer, LinearTrainer):
+                print(f'Note: {weights_path.name} has linear weights; starting fresh NeuralTrainer (hidden={hidden_size})')
+                trainer = create_trainer(model_type=model_type, hidden_size=hidden_size, learning_rate=learning_rate)
         else:
             trainer = create_trainer(
                 model_type=model_type,
