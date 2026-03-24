@@ -599,14 +599,15 @@ def run_training(
                         best_mcts = best_meta.get('benchmark_mcts_iterations', None)
                     except Exception:
                         pass
-                # Always store benchmark result in training weights (for gating)
-                with open(weights_path) as f:
-                    train_data = json.load(f)
-                train_data['benchmark_win_rate'] = bm_wr
-                train_data['benchmark_epoch'] = epoch
-                train_data['benchmark_mcts_iterations'] = mcts_iterations
-                with open(weights_path, 'w') as f:
-                    json.dump(train_data, f)
+                # Always store benchmark result in sidecar metadata file (for gating)
+                # Cannot write to weights_path directly as LinearTrainer saves plain list
+                meta_path = weights_path.parent / (weights_path.stem + '_meta.json')
+                with open(meta_path, 'w') as f:
+                    json.dump({
+                        'benchmark_win_rate': bm_wr,
+                        'benchmark_epoch': epoch,
+                        'benchmark_mcts_iterations': mcts_iterations,
+                    }, f)
 
                 if bm_wr > best_wr:
                     if str(weights_path.resolve()) != str(best_path.resolve()):
