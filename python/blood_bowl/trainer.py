@@ -49,21 +49,11 @@ class LinearTrainer:
 
     @staticmethod
     def _compute_potential(features: np.ndarray, shaping_weights: list[tuple[int, float]]) -> float:
-        """Compute potential Φ(s) from features using shaping weights.
-
-        Scoring features (carrier_can_score=59, carrier_near_endzone=34) get an
-        urgency multiplier that grows as turns run out:
-          urgency = 1.0 + (1 - turns_remaining) * 3.0
-          → early game: 1×, mid: 2.5×, last turn: 4×
-        """
-        _SCORING_FEATURES = {59, 34}  # carrier_can_score, carrier_near_endzone
-        turns_remaining = features[32] if 32 < len(features) else 0.5
-        urgency = 1.0 + (1.0 - turns_remaining) * 3.0
+        """Compute potential Φ(s) from features using shaping weights."""
         potential = 0.0
         for idx, w in shaping_weights:
             if idx < len(features):
-                effective_w = w * urgency if idx in _SCORING_FEATURES else w
-                potential += effective_w * features[idx]
+                potential += w * features[idx]
         return potential
 
     def train_monte_carlo(self, game_log: list[dict]) -> None:
@@ -306,15 +296,11 @@ class NeuralTrainer:
 
     @staticmethod
     def _compute_potential(features: np.ndarray, shaping_weights: list[tuple[int, float]]) -> float:
-        """Same urgency scaling as LinearTrainer: scoring features scaled by turn urgency."""
-        _SCORING_FEATURES = {59, 34}
-        turns_remaining = features[32] if 32 < len(features) else 0.5
-        urgency = 1.0 + (1.0 - turns_remaining) * 3.0
+        """Compute potential Φ(s) from features using shaping weights."""
         potential = 0.0
         for idx, w in shaping_weights:
             if idx < len(features):
-                effective_w = w * urgency if idx in _SCORING_FEATURES else w
-                potential += effective_w * features[idx]
+                potential += w * features[idx]
         return potential
 
     def forward(self, features: np.ndarray) -> tuple[float, np.ndarray]:
