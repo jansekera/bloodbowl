@@ -109,6 +109,10 @@ def run_training(
             if model_type == 'neural' and isinstance(trainer, LinearTrainer):
                 print(f'Note: {weights_path.name} has linear weights; starting fresh NeuralTrainer (hidden={hidden_size})')
                 trainer = create_trainer(model_type=model_type, hidden_size=hidden_size, learning_rate=learning_rate)
+            # If hidden_size mismatch, start fresh with new architecture
+            elif model_type == 'neural' and hasattr(trainer, 'hidden_size') and trainer.hidden_size != hidden_size:
+                print(f'Note: hidden_size mismatch ({trainer.hidden_size} → {hidden_size}); starting fresh NeuralTrainer')
+                trainer = create_trainer(model_type=model_type, hidden_size=hidden_size, learning_rate=learning_rate)
         else:
             trainer = create_trainer(
                 model_type=model_type,
