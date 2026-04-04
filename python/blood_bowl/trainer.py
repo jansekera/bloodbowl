@@ -19,7 +19,7 @@ DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     (9, 0.3),     # opp injured (good)
     (34, 0.5),    # carrier_near_endzone (binary: ≤3 sq od endzone)
     (35, 0.5),    # stall_incentive — jen při vedení (bug >= opraveno na > v features.py)
-    (59, 0.8),    # carrier_can_score — zvýšeno z 0.5 (silnější motivace využít scoring příležitost)
+    (59, 0.6),    # carrier_can_score — sníženo z 0.8 (kompromis pro stabilnější trénink)
 ]
 
 
