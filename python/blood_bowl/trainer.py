@@ -556,6 +556,42 @@ class NeuralTrainer:
             )
 
 
+def warm_start_expand(trainer: 'NeuralTrainer', new_hidden_size: int) -> 'NeuralTrainer':
+    """Expand a NeuralTrainer to a larger hidden size, preserving existing weights.
+
+    New neurons are initialized with small random weights so they don't disturb
+    the model's current output. The existing neurons are copied exactly.
+    """
+    old_h = trainer.hidden_size
+    assert new_hidden_size > old_h, f'new_hidden_size {new_hidden_size} must be > {old_h}'
+    extra = new_hidden_size - old_h
+
+    new_trainer = NeuralTrainer(
+        n_features=trainer.n_features,
+        hidden_size=new_hidden_size,
+        learning_rate=trainer.lr,
+    )
+
+    # W1: (n_features, old_h) → (n_features, new_h)
+    # New columns: small random (1% of Xavier scale) so new neurons start near-zero
+    limit_extra = np.sqrt(6.0 / (trainer.n_features + new_hidden_size)) * 0.01
+    W1_extra = np.random.uniform(-limit_extra, limit_extra, (trainer.n_features, extra))
+    new_trainer.W1 = np.concatenate([trainer.W1, W1_extra], axis=1)
+
+    # b1: copy + zeros
+    new_trainer.b1 = np.concatenate([trainer.b1, np.zeros(extra)])
+
+    # W2: (old_h, 1) → (new_h, 1)
+    # New rows near-zero so new neurons don't affect output initially
+    W2_extra = np.zeros((extra, 1))
+    new_trainer.W2 = np.concatenate([trainer.W2, W2_extra], axis=0)
+
+    # b2: unchanged
+    new_trainer.b2 = trainer.b2.copy()
+
+    return new_trainer
+
+
 def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer, NeuralTrainer]:
     """Auto-detect weight format and return the appropriate trainer."""
     with open(path) as f:
