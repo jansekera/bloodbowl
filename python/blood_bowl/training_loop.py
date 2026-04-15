@@ -178,9 +178,12 @@ def run_training(
     if opp_weights_path:
         print(f'Opponent weights: {opp_weights_path}')
     # Replay buffer — auto-enable for MCTS training to prevent forgetting
+    # Use -1 to explicitly disable; 0 = auto (enables when MCTS active)
     if replay_buffer_size == 0 and mcts_iterations > 0:
         replay_buffer_size = 10000  # ~50 games worth of transitions
         replay_batch_size = max(replay_batch_size, 64)
+    elif replay_buffer_size < 0:
+        replay_buffer_size = 0  # explicitly disabled
     replay_buffer = None
     if replay_buffer_size > 0:
         from .replay_buffer import ReplayBuffer
