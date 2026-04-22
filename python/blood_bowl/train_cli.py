@@ -79,6 +79,9 @@ def main():
                         help='VF-heuristic blend in MCTS eval (0.0=heuristic only, 0.3=recommended)')
     parser.add_argument('--vf-ramp-epochs', type=int, default=3,
                         help='Ramp up VF blend over N epochs (gradual introduction)')
+    parser.add_argument('--opponent-mix-ratio', type=float, default=0.0,
+                        help='Fraction of games per epoch vs random (rest vs frozen self). '
+                             '0.5 = 50/50 mix. Only active with --self-play.')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -138,6 +141,7 @@ def main():
         imitation_epochs=args.imitation_epochs,
         vf_blend=args.vf_blend,
         vf_ramp_epochs=args.vf_ramp_epochs,
+        opponent_mix_ratio=args.opponent_mix_ratio,
     )
 
 

@@ -50,6 +50,7 @@ def run_training(
     imitation_epochs: int = 0,
     vf_blend: float = 0.0,
     vf_ramp_epochs: int = 3,
+    opponent_mix_ratio: float = 0.0,
 ) -> None:
     """Run the full training loop.
 
@@ -143,6 +144,8 @@ def run_training(
         writer.writerow(['epoch', 'game', 'home_score', 'away_score', 'away_race', 'score_diff'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
+    if self_play and opponent_mix_ratio > 0:
+        effective_opponent = f'mixed(self={1-opponent_mix_ratio:.0%}, random={opponent_mix_ratio:.0%})'
 
     # Resolve opponent weights path
     opp_weights_path: str | None = None
@@ -203,7 +206,9 @@ def run_training(
     from datetime import datetime, timedelta
     if mcts_iterations > 0:
         if self_play or opponent == 'macro_mcts':
-            avg_game_secs = int(mcts_iterations * 0.65)   # oba hráči MCTS (self-play): ~130s při 200 iter
+            self_secs = mcts_iterations * 0.65
+            rand_secs = mcts_iterations * 0.20
+            avg_game_secs = int(self_secs * (1 - opponent_mix_ratio) + rand_secs * opponent_mix_ratio)
         else:
             avg_game_secs = int(mcts_iterations * 0.20)   # jen domácí MCTS (greedy/random): ~10s při 50 iter
     else:
@@ -316,69 +321,41 @@ def run_training(
         # Run simulation games (timeout is per-game)
         # Support mixed away races: "orc,skaven,dwarf,wood-elf"
         away_races = [r.strip() for r in away_race.split(',')]
-        if len(away_races) > 1:
-            # Distribute games evenly across races
-            all_results = []
-            games_per_race = games_per_epoch // len(away_races)
-            remainder = games_per_epoch % len(away_races)
-            game_offset = 0
-            for race_idx, race in enumerate(away_races):
-                race_games = games_per_race + (1 if race_idx < remainder else 0)
-                if race_games == 0:
-                    continue
-                sub_result = runner.simulate(
-                    home_ai=home_ai_type,
-                    away_ai=away_ai,
-                    matches=race_games,
-                    timeout=timeout,
-                    timeout_per_game=True,
-                    weights=str(weights_path),
-                    epsilon=epsilon,
-                    log_dir=str(epoch_log_dir),
-                    progress_callback=on_game_done,
-                    home_race=home_race,
-                    away_race=race,
-                    away_weights=away_weights_arg,
-                    away_epsilon=away_epsilon_arg,
-                    tv=tv if tv != 1000 else None,
-                    mcts_iterations=mcts_iterations,
-                    policy_weights=policy_weights_arg,
-                    game_offset=game_offset,
-                    policy_blend=epoch_blend,
-                    vf_blend=epoch_vf_blend,
-                )
-                all_results.extend(sub_result.results)
-                game_offset += race_games
-            # Merge into single TournamentResult
+        _sim_kwargs = dict(
+            weights=str(weights_path), epsilon=epsilon,
+            log_dir=str(epoch_log_dir), progress_callback=on_game_done,
+            home_race=home_race, tv=tv if tv != 1000 else None,
+            mcts_iterations=mcts_iterations, policy_weights=policy_weights_arg,
+            policy_blend=epoch_blend, vf_blend=epoch_vf_blend,
+            timeout=timeout, timeout_per_game=True,
+        )
+
+        if self_play and opponent_mix_ratio > 0 and not curriculum:
+            n_mix = max(1, round(games_per_epoch * opponent_mix_ratio))
+            n_self = games_per_epoch - n_mix
+            self_batch = (_run_simulation_batch(
+                runner, home_ai_type, away_ai, n_self, away_races,
+                away_weights_arg, away_epsilon_arg, game_offset=0, **_sim_kwargs,
+            ).results if n_self > 0 else [])
+            rand_batch = _run_simulation_batch(
+                runner, home_ai_type, 'random', n_mix, away_races,
+                None, None, game_offset=n_self, **_sim_kwargs,
+            ).results
+            all_results = self_batch + rand_batch
             from .cli_runner import TournamentResult
             hw = sum(1 for r in all_results if r.winner == 'home')
             aw = sum(1 for r in all_results if r.winner == 'away')
             dr = len(all_results) - hw - aw
             result = TournamentResult(
-                home_ai=home_ai_type, away_ai=away_ai,
-                matches=len(all_results), home_wins=hw, away_wins=aw,
-                draws=dr, results=all_results,
+                home_ai=home_ai_type,
+                away_ai=f'mixed(self={1-opponent_mix_ratio:.0%},random={opponent_mix_ratio:.0%})',
+                matches=len(all_results), home_wins=hw, away_wins=aw, draws=dr,
+                results=all_results,
             )
         else:
-            result = runner.simulate(
-                home_ai=home_ai_type,
-                away_ai=away_ai,
-                matches=games_per_epoch,
-                timeout=timeout,
-                timeout_per_game=True,
-                weights=str(weights_path),
-                epsilon=epsilon,
-                log_dir=str(epoch_log_dir),
-                progress_callback=on_game_done,
-                home_race=home_race,
-                away_race=away_race,
-                away_weights=away_weights_arg,
-                away_epsilon=away_epsilon_arg,
-                tv=tv if tv != 1000 else None,
-                mcts_iterations=mcts_iterations,
-                policy_weights=policy_weights_arg,
-                policy_blend=epoch_blend,
-                vf_blend=epoch_vf_blend,
+            result = _run_simulation_batch(
+                runner, home_ai_type, away_ai, games_per_epoch, away_races,
+                away_weights_arg, away_epsilon_arg, game_offset=0, **_sim_kwargs,
             )
 
         # Clear progress line
@@ -702,6 +679,45 @@ def run_training(
     print(f'\nTraining complete in {hours}h{mins:02d}m{secs:02d}s')
     if best_train_epoch > 0:
         print(f'Best training epoch: {best_train_epoch} ({best_train_wr:.1%} WR, {best_train_sd:+.2f} SD) → weights_train_best.json')
+
+
+def _run_simulation_batch(
+    runner, home_ai: str, away_ai: str, games: int, away_races: list[str],
+    away_weights: str | None, away_epsilon: float | None, game_offset: int,
+    **kwargs,
+):
+    """Run a batch of games across all away races and return a merged TournamentResult."""
+    from .cli_runner import TournamentResult
+    if len(away_races) > 1:
+        all_results = []
+        games_per_race = games // len(away_races)
+        remainder = games % len(away_races)
+        offset = game_offset
+        for race_idx, race in enumerate(away_races):
+            race_games = games_per_race + (1 if race_idx < remainder else 0)
+            if race_games == 0:
+                continue
+            sub = runner.simulate(
+                home_ai=home_ai, away_ai=away_ai, matches=race_games,
+                away_race=race, away_weights=away_weights, away_epsilon=away_epsilon,
+                game_offset=offset, **kwargs,
+            )
+            all_results.extend(sub.results)
+            offset += race_games
+        hw = sum(1 for r in all_results if r.winner == 'home')
+        aw = sum(1 for r in all_results if r.winner == 'away')
+        dr = len(all_results) - hw - aw
+        return TournamentResult(
+            home_ai=home_ai, away_ai=away_ai,
+            matches=len(all_results), home_wins=hw, away_wins=aw, draws=dr,
+            results=all_results,
+        )
+    else:
+        return runner.simulate(
+            home_ai=home_ai, away_ai=away_ai, matches=games,
+            away_race=away_races[0], away_weights=away_weights, away_epsilon=away_epsilon,
+            game_offset=game_offset, **kwargs,
+        )
 
 
 def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lambda_: float) -> None:
