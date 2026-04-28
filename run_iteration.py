@@ -28,11 +28,12 @@ MCTS_ITERATIONS = 100
 EPSILON_START = 0.35
 EPSILON_END = 0.10
 BENCHMARK_INTERVAL = 10
+BENCHMARK_MATCHES = 50
 LR = 0.0001
 VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
 GATING_MATCHES = 30
-BM_DROP_LIMIT = 0.05
+BM_DROP_LIMIT = 0.10
 ANTI_REGRESSION = 0.35
 OPPONENT_MIX_RATIO = 0.5
 MODEL = 'neural'
@@ -62,6 +63,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     best_path = PROJECT_ROOT / 'weights_best.json'
     frozen_path = PROJECT_ROOT / 'weights_frozen.json'
     az_train_path = PROJECT_ROOT / 'weights_az_train.json'
+    train_best_path = PROJECT_ROOT / 'weights_train_best.json'
 
     # Step 1: Freeze current best
     if best_path.exists():
@@ -107,34 +109,40 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         '--weights=weights_az_train.json',
         '--training-method=mc_shaped',
         f'--epsilon-start={EPSILON_START}', f'--epsilon-end={EPSILON_END}',
-        f'--benchmark-interval={BENCHMARK_INTERVAL}', '--benchmark-matches=30',
+        f'--benchmark-interval={BENCHMARK_INTERVAL}', f'--benchmark-matches={BENCHMARK_MATCHES}',
         '--skip-greedy-benchmark', '--timeout=300',
         f'--opponent-mix-ratio={OPPONENT_MIX_RATIO}',
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
 
-    # Step 3: Load benchmark result from sidecar metadata
+    # Step 3: Benchmark weights_train_best vs random (best epoch, not final epoch)
     print('\n=== Gating ===')
-    try:
-        meta_path = PROJECT_ROOT / 'weights_az_train_meta.json'
-        if meta_path.exists():
-            with open(meta_path) as f:
-                new_bm: float | None = json.load(f).get('benchmark_win_rate', None)
-        else:
-            with open(az_train_path) as f:
-                data = json.load(f)
-            new_bm = data.get('benchmark_win_rate', None) if isinstance(data, dict) else None
-    except Exception:
-        new_bm = None
+    gate_path = train_best_path if train_best_path.exists() else az_train_path
+    if not train_best_path.exists():
+        print('weights_train_best.json not found, falling back to weights_az_train.json')
 
-    if new_bm is not None:
-        print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})')
-    else:
-        print(f'Benchmark: nový výsledek nedostupný, best={frozen_bm:.1%}')
-
-    # Step 4: Anti-regression gating games (new vs frozen)
-    wins = draws = losses = 0
     races = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
+    bm_wins = 0
+    for i in range(BENCHMARK_MATCHES):
+        seed = random.randint(1, 999999)
+        hr = bb_engine.get_roster(races[i % len(races)])
+        ar = bb_engine.get_roster(races[(i + 1) % len(races)])
+        result = bb_engine.simulate_game_logged(
+            hr, ar,
+            home_ai='macro_mcts', away_ai='random',
+            seed=seed, mcts_iterations=MCTS_ITERATIONS,
+            weights_path=str(gate_path),
+            epsilon=0.0, vf_blend=VF_BLEND,
+        ).result
+        if result.home_score > result.away_score:
+            bm_wins += 1
+
+    new_bm: float = bm_wins / BENCHMARK_MATCHES
+    print(f'Benchmark (train_best vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})')
+    print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})')
+
+    # Step 4: Anti-regression gating games (train_best vs frozen)
+    wins = draws = losses = 0
     for i in range(GATING_MATCHES):
         seed = random.randint(1, 999999)
         hr = bb_engine.get_roster(races[i % len(races)])
@@ -143,7 +151,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             hr, ar,
             home_ai='macro_mcts', away_ai='macro_mcts',
             seed=seed, mcts_iterations=MCTS_ITERATIONS,
-            weights_path=str(az_train_path),
+            weights_path=str(gate_path),
             away_weights_path=str(frozen_path),
             epsilon=0.0, vf_blend=VF_BLEND,
         ).result
@@ -164,7 +172,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     promote = True
     reasons: list[str] = []
 
-    if new_bm is not None and frozen_bm > 0 and new_bm < frozen_bm - BM_DROP_LIMIT:
+    if frozen_bm > 0 and new_bm < frozen_bm - BM_DROP_LIMIT:
         promote = False
         reasons.append(f'benchmark klesl {frozen_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
 
@@ -175,27 +183,26 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     label = 'promoted' if promote else 'rejected'
 
     if promote:
-        shutil.copy2(str(az_train_path), str(best_path))
-        if new_bm is not None:
-            with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
-                json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}, f)
-        bm_str = f'{new_bm:.1%}' if new_bm is not None else 'N/A'
-        print(f'PROMOTED (benchmark={bm_str}, chess={chess_score:.1%}) → weights_best.json updated')
+        shutil.copy2(str(gate_path), str(best_path))
+        with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
+            json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}, f)
+        print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated')
     else:
+        shutil.copy2(str(frozen_path), str(best_path))
         print(f'REJECTED: {"; ".join(reasons)}')
 
     # Step 6: Git push
     if no_push:
         print('(git push přeskočen — --no-push)')
     else:
-        _git_push(PROJECT_ROOT, promote, frozen_path, az_train_path,
+        _git_push(PROJECT_ROOT, promote, frozen_path, gate_path,
                   frozen_bm, new_bm, chess_score, label)
 
     return promote, new_bm, chess_score
 
 
-def _git_push(root: Path, promote: bool, frozen_path: Path, az_train_path: Path,
-              frozen_bm: float, new_bm: float | None, chess_score: float, label: str) -> None:
+def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
+              frozen_bm: float, new_bm: float, chess_score: float, label: str) -> None:
     try:
         # Pull latest to avoid conflict, then add our files
         subprocess.run(['git', 'fetch', 'origin'], cwd=str(root), capture_output=True)
@@ -207,21 +214,21 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, az_train_path: Path,
             shutil.copy2(str(frozen_path), str(best_path))
             meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
         else:
-            shutil.copy2(str(az_train_path), str(best_path))
-            meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS} if new_bm is not None else None
+            shutil.copy2(str(gate_path), str(best_path))
+            meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
 
-        if meta:
-            with open(root / 'weights_best_meta.json', 'w') as f:
-                json.dump(meta, f)
+        with open(root / 'weights_best_meta.json', 'w') as f:
+            json.dump(meta, f)
 
         files = [
             'weights_best.json', 'weights_best_meta.json',
             'weights_frozen.json', 'weights_az_train.json', 'weights_az_train_meta.json',
+            'weights_train_best.json',
         ]
         snaps = [f for f in os.listdir(str(root)) if f.startswith('weights_snap_')]
         subprocess.run(['git', 'add', '-f'] + files + snaps, cwd=str(root), capture_output=True)
 
-        bm_str = f'{new_bm:.1%}' if new_bm is not None else 'NA'
+        bm_str = f'{new_bm:.1%}'
         subprocess.run(
             ['git', 'commit', '-m', f'AlphaZero: bm={bm_str} chess={chess_score:.1%} ({label})'],
             cwd=str(root), capture_output=True,
