@@ -204,6 +204,12 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
               frozen_bm: float, new_bm: float, chess_score: float, label: str) -> None:
     try:
+        # Read weights into memory BEFORE git reset (reset overwrites working tree)
+        with open(gate_path, 'rb') as f:
+            gate_data = f.read()
+        with open(frozen_path, 'rb') as f:
+            frozen_data = f.read()
+
         # Pull latest to avoid conflict, then add our files
         subprocess.run(['git', 'fetch', 'origin'], cwd=str(root), capture_output=True)
         subprocess.run(['git', 'reset', '--hard', 'origin/main'], cwd=str(root), capture_output=True)
@@ -211,10 +217,10 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
         # Re-apply weights after reset (reset overwrites working tree)
         best_path = root / 'weights_best.json'
         if not promote:
-            shutil.copy2(str(frozen_path), str(best_path))
+            best_path.write_bytes(frozen_data)
             meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
         else:
-            shutil.copy2(str(gate_path), str(best_path))
+            best_path.write_bytes(gate_data)
             meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
 
         with open(root / 'weights_best_meta.json', 'w') as f:
