@@ -47,7 +47,7 @@ if [ ! -d "venv" ]; then
 fi
 source venv/bin/activate
 pip install -q --upgrade pip
-pip install -q pybind11 numpy
+pip install -q pybind11 numpy requests
 
 # 4. Build C++ engine
 echo ""
