@@ -116,10 +116,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
 
     # Step 3: Benchmark weights_train_best vs random (best epoch, not final epoch)
-    print('\n=== Gating ===')
+    print('\n=== Gating ===', flush=True)
     gate_path = train_best_path if train_best_path.exists() else az_train_path
     if not train_best_path.exists():
-        print('weights_train_best.json not found, falling back to weights_az_train.json')
+        print('weights_train_best.json not found, falling back to weights_az_train.json', flush=True)
 
     races = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
     bm_wins = 0
@@ -138,8 +138,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             bm_wins += 1
 
     new_bm: float = bm_wins / BENCHMARK_MATCHES
-    print(f'Benchmark (train_best vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})')
-    print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})')
+    print(f'Benchmark (train_best vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
+    print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
 
     # Step 4: Anti-regression gating games (train_best vs frozen)
     wins = draws = losses = 0
@@ -162,11 +162,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             draws += 1
         else:
             losses += 1
-        print(f'  Game {i + 1}: {hs}-{as_}')
+        print(f'  Game {i + 1}: {hs}-{as_}', flush=True)
 
     total = wins + draws + losses
     chess_score = (wins + 0.5 * draws) / total
-    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%}')
+    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%}', flush=True)
 
     # Step 5: Gate decision
     promote = True
@@ -186,10 +186,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         shutil.copy2(str(gate_path), str(best_path))
         with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
             json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}, f)
-        print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated')
+        print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
-        print(f'REJECTED: {"; ".join(reasons)}')
+        print(f'REJECTED: {"; ".join(reasons)}', flush=True)
 
     # Step 6: Git push
     if no_push:
@@ -250,6 +250,7 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
 
 
 def main() -> None:
+    sys.stdout.reconfigure(line_buffering=True)
     parser = argparse.ArgumentParser(description='AlphaZero iteration runner')
     parser.add_argument('--loop', type=int, default=1, metavar='N',
                         help='Počet iterací za sebou (default: 1)')
