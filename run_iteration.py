@@ -33,7 +33,8 @@ LR = 0.0001
 VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
 GATING_MATCHES = 50
-BM_DROP_LIMIT = 0.05
+BM_DROP_LIMIT = 0.10
+BM_FLOOR = 0.80
 ANTI_REGRESSION = 0.35
 OPPONENT_MIX_RATIO = 0.5
 MODEL = 'neural'
@@ -175,6 +176,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     if frozen_bm > 0 and new_bm < frozen_bm - BM_DROP_LIMIT:
         promote = False
         reasons.append(f'benchmark klesl {frozen_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
+
+    if new_bm < BM_FLOOR:
+        promote = False
+        reasons.append(f'benchmark pod minimem ({new_bm:.1%} < {BM_FLOOR:.0%})')
 
     if chess_score < ANTI_REGRESSION:
         promote = False
