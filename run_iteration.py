@@ -116,35 +116,12 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
 
-    # Step 3: Pre-select better candidate (train_best vs final epoch), then benchmark vs random
+    # Step 3: Gate on final epoch (az_train) — already benchmarked during training (100 games).
+    # train_best is selected by self-play WR which doesn't correlate with benchmark vs random.
     print('\n=== Gating ===', flush=True)
     races = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
-
-    PRE_SELECT = 20
     gate_path = az_train_path
-    gate_label = 'az_train'
-    best_pre = -1
-    for label, path in [('train_best', train_best_path), ('az_train', az_train_path)]:
-        if not path.exists():
-            continue
-        wins = 0
-        for i in range(PRE_SELECT):
-            seed = random.randint(1, 999999)
-            r = bb_engine.simulate_game_logged(
-                bb_engine.get_roster(races[i % len(races)]),
-                bb_engine.get_roster(races[(i + 1) % len(races)]),
-                home_ai='macro_mcts', away_ai='random',
-                seed=seed, mcts_iterations=MCTS_ITERATIONS,
-                weights_path=str(path), epsilon=0.0, vf_blend=VF_BLEND,
-            ).result
-            if r.home_score > r.away_score:
-                wins += 1
-        print(f'  Pre-select {label}: {wins}/{PRE_SELECT} = {wins/PRE_SELECT:.1%}', flush=True)
-        if wins > best_pre:
-            best_pre = wins
-            gate_path = path
-            gate_label = label
-    print(f'Selected for gating: {gate_label}', flush=True)
+    print('Gating on: az_train (final epoch)', flush=True)
 
     bm_wins = 0
     for i in range(BENCHMARK_MATCHES):
