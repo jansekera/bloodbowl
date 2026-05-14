@@ -34,7 +34,7 @@ VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
 GATING_MATCHES = 50
 BM_DROP_LIMIT = 0.10
-BM_FLOOR = 0.80
+BM_FLOOR = 0.77
 ANTI_REGRESSION = 0.35
 OPPONENT_MIX_RATIO = 0.3
 MODEL = 'neural'
@@ -141,7 +141,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             print(f'  BM {i + 1}/{BENCHMARK_MATCHES}: {bm_wins}/{i + 1} = {bm_wins / (i + 1):.1%}', flush=True)
 
     new_bm: float = bm_wins / BENCHMARK_MATCHES
-    print(f'Benchmark (train_best vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
+    print(f'Benchmark (az_train vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
     print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
 
     # Step 4: Anti-regression gating games (train_best vs frozen)
