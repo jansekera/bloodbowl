@@ -17,6 +17,7 @@ import random
 import shutil
 import subprocess
 import sys
+from multiprocessing import Pool
 from pathlib import Path
 
 # ─── Configuration ────────────────────────────────────────────────────────────
@@ -39,9 +40,48 @@ ANTI_REGRESSION = 0.35
 OPPONENT_MIX_RATIO = 0.3
 MODEL = 'neural'
 HIDDEN_SIZE = 64
+WORKERS = min(12, os.cpu_count() or 1)
 # ──────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
+
+_RACES = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
+
+
+def _pool_init(engine_build: str, python_src: str) -> None:
+    if engine_build not in sys.path:
+        sys.path.insert(0, engine_build)
+    if python_src not in sys.path:
+        sys.path.insert(0, python_src)
+
+
+def _benchmark_game(args: tuple) -> bool:
+    seed, race_idx, gate_path, mcts_iterations, vf_blend = args
+    import bb_engine
+    hr = bb_engine.get_roster(_RACES[race_idx % len(_RACES)])
+    ar = bb_engine.get_roster(_RACES[(race_idx + 1) % len(_RACES)])
+    result = bb_engine.simulate_game_logged(
+        hr, ar,
+        home_ai='macro_mcts', away_ai='random',
+        seed=seed, mcts_iterations=mcts_iterations,
+        weights_path=gate_path, epsilon=0.0, vf_blend=vf_blend,
+    ).result
+    return result.home_score > result.away_score
+
+
+def _gate_game(args: tuple) -> tuple[int, int]:
+    seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend = args
+    import bb_engine
+    hr = bb_engine.get_roster(_RACES[race_idx % len(_RACES)])
+    ar = bb_engine.get_roster(_RACES[(race_idx + 1) % len(_RACES)])
+    result = bb_engine.simulate_game_logged(
+        hr, ar,
+        home_ai='macro_mcts', away_ai='macro_mcts',
+        seed=seed, mcts_iterations=mcts_iterations,
+        weights_path=gate_path, away_weights_path=frozen_path,
+        epsilon=0.0, vf_blend=vf_blend,
+    ).result
+    return result.home_score, result.away_score
 
 
 def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
@@ -119,46 +159,34 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # Step 3: Gate on final epoch (az_train) — already benchmarked during training (100 games).
     # train_best is selected by self-play WR which doesn't correlate with benchmark vs random.
     print('\n=== Gating ===', flush=True)
-    races = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
     gate_path = az_train_path
-    print('Gating on: az_train (final epoch)', flush=True)
+    print(f'Gating on: az_train (final epoch), {WORKERS} workers', flush=True)
 
-    bm_wins = 0
-    for i in range(BENCHMARK_MATCHES):
-        seed = random.randint(1, 999999)
-        hr = bb_engine.get_roster(races[i % len(races)])
-        ar = bb_engine.get_roster(races[(i + 1) % len(races)])
-        result = bb_engine.simulate_game_logged(
-            hr, ar,
-            home_ai='macro_mcts', away_ai='random',
-            seed=seed, mcts_iterations=MCTS_ITERATIONS,
-            weights_path=str(gate_path),
-            epsilon=0.0, vf_blend=VF_BLEND,
-        ).result
-        if result.home_score > result.away_score:
-            bm_wins += 1
-        if (i + 1) % 10 == 0:
-            print(f'  BM {i + 1}/{BENCHMARK_MATCHES}: {bm_wins}/{i + 1} = {bm_wins / (i + 1):.1%}', flush=True)
+    init_args = (str(engine_build), str(python_src))
+    bm_tasks = [
+        (random.randint(1, 999999), i, str(gate_path), MCTS_ITERATIONS, VF_BLEND)
+        for i in range(BENCHMARK_MATCHES)
+    ]
+    print(f'Benchmark: {BENCHMARK_MATCHES} games...', flush=True)
+    with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
+        bm_results = pool.map(_benchmark_game, bm_tasks)
+    bm_wins = sum(bm_results)
 
     new_bm: float = bm_wins / BENCHMARK_MATCHES
     print(f'Benchmark (az_train vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
     print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
 
-    # Step 4: Anti-regression gating games (train_best vs frozen)
+    # Step 4: Anti-regression gating games (az_train vs frozen)
+    gate_tasks = [
+        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND)
+        for i in range(GATING_MATCHES)
+    ]
+    print(f'Anti-regression: {GATING_MATCHES} games...', flush=True)
+    with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
+        gate_results = pool.map(_gate_game, gate_tasks)
+
     wins = draws = losses = 0
-    for i in range(GATING_MATCHES):
-        seed = random.randint(1, 999999)
-        hr = bb_engine.get_roster(races[i % len(races)])
-        ar = bb_engine.get_roster(races[(i + 1) % len(races)])
-        result = bb_engine.simulate_game_logged(
-            hr, ar,
-            home_ai='macro_mcts', away_ai='macro_mcts',
-            seed=seed, mcts_iterations=MCTS_ITERATIONS,
-            weights_path=str(gate_path),
-            away_weights_path=str(frozen_path),
-            epsilon=0.0, vf_blend=VF_BLEND,
-        ).result
-        hs, as_ = result.home_score, result.away_score
+    for i, (hs, as_) in enumerate(gate_results):
         if hs > as_:
             wins += 1
         elif hs == as_:
