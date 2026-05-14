@@ -137,6 +137,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         ).result
         if result.home_score > result.away_score:
             bm_wins += 1
+        if (i + 1) % 10 == 0:
+            print(f'  BM {i + 1}/{BENCHMARK_MATCHES}: {bm_wins}/{i + 1} = {bm_wins / (i + 1):.1%}', flush=True)
 
     new_bm: float = bm_wins / BENCHMARK_MATCHES
     print(f'Benchmark (train_best vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
