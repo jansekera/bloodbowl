@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 import time
+from multiprocessing import Pool
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -19,6 +21,81 @@ RACE_NAMES = [
 ]
 
 
+def _pool_init(paths: list) -> None:
+    for p in paths:
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
+def _simulate_game_worker(args: tuple) -> dict:
+    """Worker for parallel game simulation — called in a child process."""
+    (seed, home_race_name, away_race_name, home_ai, away_ai,
+     weights_path, epsilon, mcts_iterations, policy_path, policy_blend,
+     vf_blend, away_weights, log_dir_str, game_num) = args
+
+    import bb_engine
+
+    hr = bb_engine.get_roster(home_race_name)
+    ar = bb_engine.get_roster(away_race_name)
+
+    logged = bb_engine.simulate_game_logged(
+        hr, ar, home_ai, away_ai,
+        seed=seed, weights_path=weights_path, epsilon=epsilon,
+        mcts_iterations=mcts_iterations,
+        policy_weights_path=policy_path,
+        policy_blend=policy_blend,
+        vf_blend=vf_blend,
+        away_weights_path=away_weights,
+    )
+    result = logged.result
+
+    if log_dir_str:
+        log_path = Path(log_dir_str)
+        log_path.mkdir(parents=True, exist_ok=True)
+
+        winner = ('home' if result.home_score > result.away_score
+                  else 'away' if result.away_score > result.home_score else None)
+        log_file = log_path / f'game_{game_num:04d}.jsonl'
+        with open(log_file, 'w') as f:
+            for state in logged.get_states():
+                f.write(json.dumps({
+                    'type': 'state',
+                    'features': state['features'].tolist(),
+                    'perspective': state['perspective'],
+                }) + '\n')
+            f.write(json.dumps({
+                'type': 'result',
+                'home_score': result.home_score,
+                'away_score': result.away_score,
+                'winner': winner,
+            }) + '\n')
+
+        decisions = logged.get_policy_decisions()
+        if decisions:
+            dec_file = log_path / f'decisions_{game_num:04d}.json'
+            with open(dec_file, 'w') as f:
+                json.dump([
+                    {
+                        'state_features': d['state_features'].tolist(),
+                        'perspective': d['perspective'],
+                        'visits': [
+                            {
+                                'action_features': v['action_features'].tolist(),
+                                'visit_fraction': float(v['visit_fraction']),
+                            }
+                            for v in d['visits']
+                        ],
+                    }
+                    for d in decisions
+                ], f)
+
+    return {
+        'home_score': result.home_score,
+        'away_score': result.away_score,
+        'total_actions': result.total_actions,
+    }
+
+
 class CPPRunner:
     """Run Blood Bowl simulations via bb_engine C++ module."""
 
@@ -29,6 +106,7 @@ class CPPRunner:
             self.project_root = Path(project_root)
         else:
             self.project_root = Path(__file__).parent.parent.parent
+        self._sys_path = list(sys.path)
 
     def simulate(
         self,
@@ -52,7 +130,19 @@ class CPPRunner:
         game_offset: int = 0,
         policy_blend: float = 0.0,
         vf_blend: float = 0.0,
+        workers: int = 1,
     ) -> TournamentResult:
+        if workers > 1 and matches > 1:
+            return self._simulate_parallel(
+                home_ai=home_ai, away_ai=away_ai, matches=matches,
+                weights=weights, epsilon=epsilon, log_dir=log_dir,
+                progress_callback=progress_callback,
+                home_race=home_race, away_race=away_race,
+                away_weights=away_weights, mcts_iterations=mcts_iterations,
+                policy_weights=policy_weights, game_offset=game_offset,
+                policy_blend=policy_blend, vf_blend=vf_blend, workers=workers,
+            )
+
         results: list[MatchResult] = []
         home_wins = 0
         away_wins = 0
@@ -137,15 +227,77 @@ class CPPRunner:
             results=results,
         )
 
+    def _simulate_parallel(
+        self,
+        home_ai: str, away_ai: str, matches: int,
+        weights: Optional[str], epsilon: Optional[float],
+        log_dir: Optional[str],
+        progress_callback: Optional[Callable],
+        home_race: Optional[str], away_race: Optional[str],
+        away_weights: Optional[str], mcts_iterations: int,
+        policy_weights: Optional[str], game_offset: int,
+        policy_blend: float, vf_blend: float, workers: int,
+    ) -> TournamentResult:
+        weights_path = weights or ''
+        eps = epsilon if epsilon is not None else 0.3
+        policy_path = policy_weights or ''
+        cpp_home_ai = self._map_ai(home_ai)
+        cpp_away_ai = self._map_ai(away_ai)
+
+        tasks = [
+            (
+                random.randint(0, 2**31 - 1),
+                self._resolve_race_name(home_race),
+                self._resolve_race_name(away_race),
+                cpp_home_ai, cpp_away_ai,
+                weights_path, eps, mcts_iterations,
+                policy_path, policy_blend, vf_blend,
+                away_weights or '', log_dir or '', game_offset + i + 1,
+            )
+            for i in range(matches)
+        ]
+
+        actual_workers = min(workers, matches)
+        with Pool(actual_workers, initializer=_pool_init, initargs=(self._sys_path,)) as pool:
+            game_results = pool.map(_simulate_game_worker, tasks)
+
+        results: list[MatchResult] = []
+        home_wins = away_wins = draws = 0
+        for i, gr in enumerate(game_results):
+            mr = MatchResult(
+                home_score=gr['home_score'],
+                away_score=gr['away_score'],
+                total_actions=gr['total_actions'],
+                phase='GAME_OVER',
+                half=2,
+            )
+            results.append(mr)
+            if mr.home_score > mr.away_score:
+                home_wins += 1
+            elif mr.away_score > mr.home_score:
+                away_wins += 1
+            else:
+                draws += 1
+            if progress_callback:
+                progress_callback(game_offset + i + 1, game_offset + matches, 0.0,
+                                  f'{mr.home_score}-{mr.away_score}')
+
+        return TournamentResult(
+            home_ai=home_ai, away_ai=away_ai, matches=matches,
+            home_wins=home_wins, away_wins=away_wins, draws=draws,
+            results=results,
+        )
+
     def _get_roster(self, race: Optional[str]):
-        if race is None or race == 'random':
-            name = random.choice(RACE_NAMES)
-        else:
-            name = race
-        roster = self.bb.get_roster(name)
+        roster = self.bb.get_roster(self._resolve_race_name(race))
         if roster is None:
-            raise ValueError(f'Unknown roster: {name}')
+            raise ValueError(f'Unknown roster: {race}')
         return roster
+
+    def _resolve_race_name(self, race: Optional[str]) -> str:
+        if race is None or race == 'random':
+            return random.choice(RACE_NAMES)
+        return race
 
     def _map_ai(self, ai_name: str) -> str:
         """Map Python AI names to C++ engine AI names."""

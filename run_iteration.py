@@ -153,6 +153,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         f'--benchmark-interval={BENCHMARK_INTERVAL}', f'--benchmark-matches={BENCHMARK_MATCHES}',
         '--skip-greedy-benchmark', '--timeout=300',
         f'--opponent-mix-ratio={OPPONENT_MIX_RATIO}',
+        f'--workers={WORKERS}',
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
 

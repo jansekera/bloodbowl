@@ -51,6 +51,7 @@ def run_training(
     vf_blend: float = 0.0,
     vf_ramp_epochs: int = 3,
     opponent_mix_ratio: float = 0.0,
+    workers: int = 1,
 ) -> None:
     """Run the full training loop.
 
@@ -335,11 +336,11 @@ def run_training(
             n_self = games_per_epoch - n_mix
             self_batch = (_run_simulation_batch(
                 runner, home_ai_type, away_ai, n_self, away_races,
-                away_weights_arg, away_epsilon_arg, game_offset=0, **_sim_kwargs,
+                away_weights_arg, away_epsilon_arg, game_offset=0, workers=workers, **_sim_kwargs,
             ).results if n_self > 0 else [])
             rand_batch = _run_simulation_batch(
                 runner, home_ai_type, 'random', n_mix, away_races,
-                None, None, game_offset=n_self, **_sim_kwargs,
+                None, None, game_offset=n_self, workers=workers, **_sim_kwargs,
             ).results
             all_results = self_batch + rand_batch
             from .cli_runner import TournamentResult
@@ -355,7 +356,7 @@ def run_training(
         else:
             result = _run_simulation_batch(
                 runner, home_ai_type, away_ai, games_per_epoch, away_races,
-                away_weights_arg, away_epsilon_arg, game_offset=0, **_sim_kwargs,
+                away_weights_arg, away_epsilon_arg, game_offset=0, workers=workers, **_sim_kwargs,
             )
 
         # Clear progress line
@@ -684,6 +685,7 @@ def run_training(
 def _run_simulation_batch(
     runner, home_ai: str, away_ai: str, games: int, away_races: list[str],
     away_weights: str | None, away_epsilon: float | None, game_offset: int,
+    workers: int = 1,
     **kwargs,
 ):
     """Run a batch of games across all away races and return a merged TournamentResult."""
@@ -700,7 +702,7 @@ def _run_simulation_batch(
             sub = runner.simulate(
                 home_ai=home_ai, away_ai=away_ai, matches=race_games,
                 away_race=race, away_weights=away_weights, away_epsilon=away_epsilon,
-                game_offset=offset, **kwargs,
+                game_offset=offset, workers=workers, **kwargs,
             )
             all_results.extend(sub.results)
             offset += race_games
@@ -716,7 +718,7 @@ def _run_simulation_batch(
         return runner.simulate(
             home_ai=home_ai, away_ai=away_ai, matches=games,
             away_race=away_races[0], away_weights=away_weights, away_epsilon=away_epsilon,
-            game_offset=game_offset, **kwargs,
+            game_offset=game_offset, workers=workers, **kwargs,
         )
 
 

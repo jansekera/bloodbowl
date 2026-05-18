@@ -82,6 +82,8 @@ def main():
     parser.add_argument('--opponent-mix-ratio', type=float, default=0.0,
                         help='Fraction of games per epoch vs random (rest vs frozen self). '
                              '0.5 = 50/50 mix. Only active with --self-play.')
+    parser.add_argument('--workers', type=int, default=1,
+                        help='Parallel workers for self-play games (default: 1 = sequential)')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -142,6 +144,7 @@ def main():
         vf_blend=args.vf_blend,
         vf_ramp_epochs=args.vf_ramp_epochs,
         opponent_mix_ratio=args.opponent_mix_ratio,
+        workers=args.workers,
     )
 
 
