@@ -31,10 +31,9 @@ EPSILON_END = 0.10
 BENCHMARK_INTERVAL = 10
 BENCHMARK_MATCHES = 200
 LR = 0.0001
-# VF_BLEND: od zavedení (2026-04-22, commit 22ae314) bylo vždy 0.0 (čistá heuristika v MCTS).
-# Model dosáhl maxima 88% s 0.0. Zkusíme 0.3 — MCTS bude mix 30% neural VF + 70% heuristika.
-# Pokud benchmark klesne pod ~76% nebo se chess score zhorší, vrátit na 0.0.
-VF_BLEND = 0.3
+# VF_BLEND: experiment s 0.3 (commit caa99da) selhal — benchmark klesl na 76.0% a VF inversion
+# v epochách 6, 7, 10 (oba avg VF pozitivní = MCTS dostával špatný signál). Vráceno na 0.0.
+VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
 GATING_MATCHES = 100
 BM_DROP_LIMIT = 0.05
