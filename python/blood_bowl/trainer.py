@@ -18,8 +18,12 @@ DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     (8, -0.3),    # my injured (bad)
     (9, 0.3),     # opp injured (good)
     (34, 0.5),    # carrier_near_endzone (binary: ≤3 sq od endzone)
-    (35, 0.5),    # stall_incentive — jen při vedení (bug >= opraveno na > v features.py)
-    (59, 0.6),    # carrier_can_score — sníženo z 0.8 (kompromis pro stabilnější trénink)
+    # (35, 0.5),  # stall_incentive — ODLOŽENO: bylo součástí 2:1 grind mechaniky
+    #              (score v 1. poločase, pak bash + stall). Odsunuto dokud AI nedosáhne
+    #              stabilního 90%+ — vrstvit grind na nestabilní základ způsobuje regresi.
+    #              TODO: navrhnout jako explicitní half-aware reward (bash při vedení, turn context).
+    (59, 0.8),    # carrier_can_score — vráceno na 0.8 (bylo při rekordu 96.7%; sníženo na 0.6
+                  # jako kompromis pro 2:1 grind, ale grind je odložen)
 ]
 
 
