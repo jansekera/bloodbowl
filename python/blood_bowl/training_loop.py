@@ -8,6 +8,8 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
+
 from .cli_runner import CLIRunner
 from .trainer import LinearTrainer, NeuralTrainer, create_trainer, load_trainer
 
@@ -143,6 +145,12 @@ def run_training(
     with open(score_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['epoch', 'game', 'home_score', 'away_score', 'away_race', 'score_diff'])
+
+    # Observability metrics CSV
+    metrics_csv_path = csv_path.parent / 'epoch_metrics.csv'
+    with open(metrics_csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
     if self_play and opponent_mix_ratio > 0:
@@ -364,6 +372,7 @@ def run_training(
 
         # Train on all game logs from this epoch
         log_files = sorted(epoch_log_dir.glob('game_*.jsonl'))
+        w_norm_before = _weight_norm(trainer)
         for log_file in log_files:
             game_log = _read_jsonl(log_file)
 
@@ -397,6 +406,19 @@ def run_training(
 
             # Save replay buffer periodically
             replay_buffer.save(str(root / 'replay_buffer.pkl'))
+
+        # Observability: weight norm change + grad norm
+        w_norm_after = _weight_norm(trainer)
+        weight_norm_change = w_norm_after - w_norm_before
+        grad_norm = trainer.pop_mean_grad_norm() if hasattr(trainer, 'pop_mean_grad_norm') else 0.0
+
+        # mean |V(s)| across all games — VF confidence indicator
+        _vf_abs: list[float] = []
+        for _lf in log_files:
+            for _rec in _read_jsonl(_lf):
+                if _rec.get('type') == 'state' and 'features' in _rec:
+                    _vf_abs.append(abs(trainer.evaluate(_rec['features'])))
+        mean_abs_vf = sum(_vf_abs) / len(_vf_abs) if _vf_abs else 0.0
 
         # VF monitoring: check for perspective inversion
         vf_msg = ''
@@ -518,6 +540,15 @@ def run_training(
         print(f'  Actions: min={actions_min} max={actions_max} avg={actions_avg:.0f} median={actions_med:.0f}')
         if vf_blend > 0 and vf_msg:
             print(vf_msg)
+
+        # Observability metrics — log to epoch_metrics.csv
+        nil_nil_rate = nil_nil / n_games if n_games > 0 else 0.0
+        print(f'  Metrics: nil_nil={nil_nil_rate:.1%} mean_abs_vf={mean_abs_vf:.3f} '
+              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}')
+        with open(metrics_csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, f'{nil_nil_rate:.3f}', f'{mean_abs_vf:.4f}',
+                             f'{weight_norm_change:.4f}', f'{grad_norm:.4f}'])
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
@@ -793,3 +824,14 @@ def _read_jsonl(path: Path) -> list[dict]:
             if line:
                 records.append(json.loads(line))
     return records
+
+
+def _weight_norm(trainer) -> float:
+    """Frobenius norm of all trainable weights."""
+    from .trainer import NeuralTrainer
+    if isinstance(trainer, NeuralTrainer):
+        return float(np.sqrt(
+            np.sum(trainer.W1 ** 2) + np.sum(trainer.b1 ** 2) +
+            np.sum(trainer.W2 ** 2) + np.sum(trainer.b2 ** 2)
+        ))
+    return float(np.linalg.norm(trainer.weights))

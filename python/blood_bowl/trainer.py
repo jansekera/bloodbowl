@@ -281,6 +281,8 @@ class NeuralTrainer:
         self.W2 = np.random.uniform(-limit2, limit2, (hidden_size, 1))
         self.b1 = np.zeros(hidden_size)
         self.b2 = np.zeros(1)
+        self._grad_norm_sum = 0.0
+        self._grad_norm_count = 0
 
     @staticmethod
     def _get_reward(winner: str | None, perspective: str) -> float:
@@ -356,6 +358,17 @@ class NeuralTrainer:
         self.b1 -= self.lr * db1
         self.W2 -= self.lr * dW2
         self.b2 -= self.lr * db2
+        self._grad_norm_sum += float(np.linalg.norm(dW1) + np.linalg.norm(dW2))
+        self._grad_norm_count += 1
+
+    def pop_mean_grad_norm(self) -> float:
+        """Return mean gradient norm since last call, then reset accumulator."""
+        if self._grad_norm_count == 0:
+            return 0.0
+        result = self._grad_norm_sum / self._grad_norm_count
+        self._grad_norm_sum = 0.0
+        self._grad_norm_count = 0
+        return result
 
     def train_monte_carlo(self, game_log: list[dict]) -> None:
         """Update weights using Monte Carlo."""
