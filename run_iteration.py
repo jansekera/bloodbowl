@@ -171,9 +171,15 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         (random.randint(1, 999999), i, str(gate_path), MCTS_ITERATIONS, VF_BLEND)
         for i in range(BENCHMARK_MATCHES)
     ]
-    print(f'Benchmark: {BENCHMARK_MATCHES} games...', flush=True)
+    print(f'Benchmark: {BENCHMARK_MATCHES} games ({WORKERS} workers)...', flush=True)
+    bm_results: list[bool] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        bm_results = pool.map(_benchmark_game, bm_tasks)
+        for result in pool.imap_unordered(_benchmark_game, bm_tasks):
+            bm_results.append(result)
+            done = len(bm_results)
+            if done % 20 == 0 or done == BENCHMARK_MATCHES:
+                wins_so_far = sum(bm_results)
+                print(f'  Benchmark {done}/{BENCHMARK_MATCHES}: {wins_so_far/done:.1%}', flush=True)
     bm_wins = sum(bm_results)
 
     new_bm: float = bm_wins / BENCHMARK_MATCHES
@@ -185,9 +191,14 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND)
         for i in range(GATING_MATCHES)
     ]
-    print(f'Anti-regression: {GATING_MATCHES} games...', flush=True)
+    print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
+    gate_results: list[tuple[int, int]] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        gate_results = pool.map(_gate_game, gate_tasks)
+        for hs, as_ in pool.imap_unordered(_gate_game, gate_tasks):
+            gate_results.append((hs, as_))
+            done = len(gate_results)
+            if done % 10 == 0 or done == GATING_MATCHES:
+                print(f'  Anti-regression {done}/{GATING_MATCHES}', flush=True)
 
     wins = draws = losses = 0
     for i, (hs, as_) in enumerate(gate_results):
