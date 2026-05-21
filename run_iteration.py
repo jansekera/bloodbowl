@@ -29,8 +29,8 @@ MCTS_ITERATIONS = 100
 EPSILON_START = 0.35
 EPSILON_END = 0.10
 BENCHMARK_INTERVAL = 10
-BENCHMARK_MATCHES = 200
-LR = 0.0001
+BENCHMARK_MATCHES = 400
+LR = 0.0003
 # VF_BLEND: experiment s 0.3 (commit caa99da) selhal — benchmark klesl na 76.0% a VF inversion
 # v epochách 6, 7, 10 (oba avg VF pozitivní = MCTS dostával špatný signál). Vráceno na 0.0.
 VF_BLEND = 0.0
