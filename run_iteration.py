@@ -278,7 +278,7 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
         files = [
             'weights_best.json', 'weights_best_meta.json',
             'weights_frozen.json', 'weights_az_train.json', 'weights_az_train_meta.json',
-            'weights_train_best.json',
+            'weights_train_best.json', 'epoch_metrics.csv',
         ]
         snaps = [f for f in os.listdir(str(root)) if f.startswith('weights_snap_')]
         subprocess.run(['git', 'add', '-f'] + files + snaps, cwd=str(root), capture_output=True)
