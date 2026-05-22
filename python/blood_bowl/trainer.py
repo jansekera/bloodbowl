@@ -24,6 +24,9 @@ DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     #              TODO: navrhnout jako explicitní half-aware reward (bash při vedení, turn context).
     (59, 0.8),    # carrier_can_score — vráceno na 0.8 (bylo při rekordu 96.7%; sníženo na 0.6
                   # jako kompromis pro 2:1 grind, ale grind je odložen)
+    (42, -0.8),   # opp_scoring_threat — soupeřův nosič blízko endzone (Team 2)
+    (40, -0.6),   # carrier_tz_count — nosič v tackle zones = nebezpečí (Team 2)
+    (63, -0.4),   # carrier_blitzable — nosič je zasažitelný blitzem (Team 2)
 ]
 
 
