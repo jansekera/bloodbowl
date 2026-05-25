@@ -159,33 +159,47 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
 
-    # Step 3: Gate on final epoch (az_train) — already benchmarked during training (100 games).
-    # train_best is selected by self-play WR which doesn't correlate with benchmark vs random.
+    # Step 3: Benchmark az_train (final epoch) AND train_best (best self-play epoch),
+    # then gate on whichever scores higher vs random. Each gets BENCHMARK_MATCHES/2 games.
     print('\n=== Gating ===', flush=True)
-    gate_path = az_train_path
-    print(f'Gating on: az_train (final epoch), {WORKERS} workers', flush=True)
-
     init_args = (str(engine_build), str(python_src))
-    bm_tasks = [
-        (random.randint(1, 999999), i, str(gate_path), MCTS_ITERATIONS, VF_BLEND)
-        for i in range(BENCHMARK_MATCHES)
-    ]
-    print(f'Benchmark: {BENCHMARK_MATCHES} games ({WORKERS} workers)...', flush=True)
-    bm_results: list[bool] = []
-    with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        for result in pool.imap_unordered(_benchmark_game, bm_tasks):
-            bm_results.append(result)
-            done = len(bm_results)
-            if done % 20 == 0 or done == BENCHMARK_MATCHES:
-                wins_so_far = sum(bm_results)
-                print(f'  Benchmark {done}/{BENCHMARK_MATCHES}: {wins_so_far/done:.1%}', flush=True)
-    bm_wins = sum(bm_results)
+    half_bm = BENCHMARK_MATCHES // 2
 
-    new_bm: float = bm_wins / BENCHMARK_MATCHES
-    print(f'Benchmark (az_train vs random): {new_bm:.1%} ({bm_wins}/{BENCHMARK_MATCHES})', flush=True)
+    def _run_benchmark(path: Path, label: str) -> float:
+        tasks = [
+            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND)
+            for i in range(half_bm)
+        ]
+        print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
+        results: list[bool] = []
+        with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
+            for result in pool.imap_unordered(_benchmark_game, tasks):
+                results.append(result)
+                done = len(results)
+                if done % 20 == 0 or done == half_bm:
+                    print(f'  {label} {done}/{half_bm}: {sum(results)/done:.1%}', flush=True)
+        score = sum(results) / half_bm
+        print(f'  {label} final: {score:.1%} ({sum(results)}/{half_bm})', flush=True)
+        return score
+
+    bm_az = _run_benchmark(az_train_path, 'az_train')
+    bm_tb = _run_benchmark(train_best_path, 'train_best') if train_best_path.exists() else 0.0
+    if not train_best_path.exists():
+        print('train_best not found, using az_train', flush=True)
+
+    if bm_tb > bm_az:
+        gate_path = train_best_path
+        new_bm = bm_tb
+        gate_label = f'train_best ({new_bm:.1%}) > az_train ({bm_az:.1%})'
+    else:
+        gate_path = az_train_path
+        new_bm = bm_az
+        gate_label = f'az_train ({new_bm:.1%}) >= train_best ({bm_tb:.1%})'
+
+    print(f'Gating on: {gate_label}', flush=True)
     print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
 
-    # Step 4: Anti-regression gating games (az_train vs frozen)
+    # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND)
         for i in range(GATING_MATCHES)
