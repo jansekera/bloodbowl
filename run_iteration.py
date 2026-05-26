@@ -116,19 +116,24 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             meta_path = PROJECT_ROOT / 'weights_best_meta.json'
             if meta_path.exists():
                 with open(meta_path) as f:
-                    frozen_bm = json.load(f).get('benchmark_win_rate', 0.0)
+                    meta = json.load(f)
+                frozen_bm = meta.get('benchmark_win_rate', 0.0)
+                all_time_best_bm = meta.get('all_time_best_benchmark', frozen_bm)
             else:
                 with open(best_path) as f:
                     data = json.load(f)
                 frozen_bm = data.get('benchmark_win_rate', 0.0) if isinstance(data, dict) else 0.0
+                all_time_best_bm = frozen_bm
             print(f'Frozen benchmark: {frozen_bm:.1%}')
         except Exception:
             frozen_bm = 0.0
+            all_time_best_bm = 0.0
     else:
         with open(best_path, 'w') as f:
             json.dump({'type': 'alphazero_neural', 'value_weights': [0.0] * 70}, f)
         shutil.copy2(str(best_path), str(frozen_path))
         frozen_bm = 0.0
+        all_time_best_bm = 0.0
         print('First run: created fresh weights')
 
     shutil.copy2(str(best_path), str(az_train_path))
@@ -197,7 +202,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         gate_label = f'az_train ({new_bm:.1%}) >= train_best ({bm_tb:.1%})'
 
     print(f'Gating on: {gate_label}', flush=True)
-    print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
+    print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  all_time_best={all_time_best_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
 
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
@@ -231,9 +236,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     promote = True
     reasons: list[str] = []
 
-    if frozen_bm > 0 and new_bm < frozen_bm - BM_DROP_LIMIT:
+    if all_time_best_bm > 0 and new_bm < all_time_best_bm - BM_DROP_LIMIT:
         promote = False
-        reasons.append(f'benchmark klesl {frozen_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
+        reasons.append(f'benchmark klesl {all_time_best_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
 
     if new_bm < BM_FLOOR:
         promote = False
@@ -247,8 +252,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     if promote:
         shutil.copy2(str(gate_path), str(best_path))
+        new_all_time = max(all_time_best_bm, new_bm)
         with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
-            json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}, f)
+            json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                       'all_time_best_benchmark': new_all_time}, f)
         print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
