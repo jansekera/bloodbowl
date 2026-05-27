@@ -21,14 +21,14 @@ from multiprocessing import Pool
 from pathlib import Path
 
 # ─── Configuration ────────────────────────────────────────────────────────────
-EPOCHS = 10
+EPOCHS = 16
 GAMES_PER_EPOCH = 40
 HOME_RACE = 'human'
 AWAY_RACE = 'orc,skaven,dwarf,wood-elf'
 MCTS_ITERATIONS = 100
 EPSILON_START = 0.35
 EPSILON_END = 0.10
-BENCHMARK_INTERVAL = 10
+BENCHMARK_INTERVAL = 16
 BENCHMARK_MATCHES = 400
 LR = 0.0003
 # VF_BLEND: experiment s 0.3 (commit caa99da) selhal — benchmark klesl na 76.0% a VF inversion
