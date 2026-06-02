@@ -13,7 +13,9 @@ from .features import NUM_FEATURES
 DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     (1, 3.0),     # my_score advantage
     (2, -3.0),    # opp_score disadvantage
-    (12, 0.5),    # having ball (zvýšeno — důležitější)
+    (12, 1.2),    # having ball (zvýšeno — EV pickup fix)
+    (14, -0.8),   # ball_on_ground: penalizace za míč na zemi, pickup = +0.8 bonus
+    (67, 0.8),    # loose_ball_proximity: incentiva přibližovat se k míči
     (15, -1.5),   # carrier_dist_to_td (3× silnější signál pro postup k endzone)
     (8, -0.3),    # my injured (bad)
     (9, 0.3),     # opp injured (good)
