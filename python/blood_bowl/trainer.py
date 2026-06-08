@@ -20,7 +20,7 @@ DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     (8, -0.3),    # my injured (bad)
     (9, 0.3),     # opp injured (good)
     (34, 0.5),    # carrier_near_endzone (binary: ≤3 sq od endzone)
-    (35, 0.2),    # stall_incentive — kompromis: 0.5 způsobovalo grind/pasivitu, 0.0 = motivační vakuum
+    (35, -0.1),   # stall_incentive — negativní: penalizuje pasivní čekání, urgency konzistentní s carrier_dist_to_td
     (59, 0.8),    # carrier_can_score — vráceno na 0.8 (bylo při rekordu 96.7%; sníženo na 0.6
                   # jako kompromis pro 2:1 grind, ale grind je odložen)
     (42, -0.8),   # opp_scoring_threat — soupeřův nosič blízko endzone (Team 2)
