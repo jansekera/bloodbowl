@@ -14,7 +14,7 @@ namespace bb {
 struct MCTSConfig {
     int timeBudgetMs = 1000;
     int maxIterations = 100000;
-    double explorationC = 1.41;  // UCT constant (sqrt(2))
+    double explorationC = 2.0;   // UCT constant (zvýšeno z 1.41 pro větší exploraci)
     int rolloutDepth = 0;        // 0 = pure value function eval
     bool verbose = false;
     const PolicyNetwork* policy = nullptr;  // If set, use PUCT instead of UCT
