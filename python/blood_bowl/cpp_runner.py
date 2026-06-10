@@ -31,12 +31,12 @@ def _simulate_game_worker(args: tuple) -> dict:
     """Worker for parallel game simulation — called in a child process."""
     (seed, home_race_name, away_race_name, home_ai, away_ai,
      weights_path, epsilon, mcts_iterations, policy_path, policy_blend,
-     vf_blend, away_weights, log_dir_str, game_num) = args
+     vf_blend, away_weights, log_dir_str, game_num, tv) = args
 
     import bb_engine
 
-    hr = bb_engine.get_roster(home_race_name)
-    ar = bb_engine.get_roster(away_race_name)
+    hr = bb_engine.get_developed_roster(home_race_name, tv)
+    ar = bb_engine.get_developed_roster(away_race_name, tv)
 
     logged = bb_engine.simulate_game_logged(
         hr, ar, home_ai, away_ai,
@@ -132,6 +132,8 @@ class CPPRunner:
         vf_blend: float = 0.0,
         workers: int = 1,
     ) -> TournamentResult:
+        # Team value level for roster resolution (>=1200 fields developed/skilled rosters).
+        self._tv = tv if tv else 1000
         if workers > 1 and matches > 1:
             return self._simulate_parallel(
                 home_ai=home_ai, away_ai=away_ai, matches=matches,
@@ -141,6 +143,7 @@ class CPPRunner:
                 away_weights=away_weights, mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights, game_offset=game_offset,
                 policy_blend=policy_blend, vf_blend=vf_blend, workers=workers,
+                tv=self._tv,
             )
 
         results: list[MatchResult] = []
@@ -237,6 +240,7 @@ class CPPRunner:
         away_weights: Optional[str], mcts_iterations: int,
         policy_weights: Optional[str], game_offset: int,
         policy_blend: float, vf_blend: float, workers: int,
+        tv: int = 1000,
     ) -> TournamentResult:
         weights_path = weights or ''
         eps = epsilon if epsilon is not None else 0.3
@@ -253,6 +257,7 @@ class CPPRunner:
                 weights_path, eps, mcts_iterations,
                 policy_path, policy_blend, vf_blend,
                 away_weights or '', log_dir or '', game_offset + i + 1,
+                tv,
             )
             for i in range(matches)
         ]
@@ -288,8 +293,9 @@ class CPPRunner:
             results=results,
         )
 
-    def _get_roster(self, race: Optional[str]):
-        roster = self.bb.get_roster(self._resolve_race_name(race))
+    def _get_roster(self, race: Optional[str], tv: Optional[int] = None):
+        tv = tv if tv is not None else getattr(self, '_tv', 1000)
+        roster = self.bb.get_developed_roster(self._resolve_race_name(race), tv)
         if roster is None:
             raise ValueError(f'Unknown roster: {race}')
         return roster

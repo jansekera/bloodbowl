@@ -519,6 +519,12 @@ PYBIND11_MODULE(bb_engine, m) {
         return bb::getRosterByName(name);
     }, py::return_value_policy::reference);
 
+    // Developed (skilled) roster for a team value; tv >= 1200 returns a TV~1200
+    // variant for orc/human/dwarf/skaven, otherwise falls back to the base roster.
+    m.def("get_developed_roster", [](const std::string& name, int tv) -> const bb::TeamRoster* {
+        return bb::getDevelopedRoster(name, tv);
+    }, py::arg("name"), py::arg("tv") = 1000, py::return_value_policy::reference);
+
     m.def("get_human_roster", &bb::getHumanRoster, py::return_value_policy::reference);
     m.def("get_orc_roster", &bb::getOrcRoster, py::return_value_policy::reference);
     m.def("get_skaven_roster", &bb::getSkavenRoster, py::return_value_policy::reference);

@@ -533,3 +533,92 @@ TEST(GameSimulator, PressureFormationNoOverlaps) {
     }
     EXPECT_EQ(positions.size(), 22u);
 }
+
+// === Developed (TV~1200) rosters ===
+
+// Count, among the 11 fielded HOME players, how many have a given skill.
+static int countHomeSkill(const GameState& state, SkillName skill) {
+    int n = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.isOnPitch() && p.hasSkill(skill)) n++;
+    });
+    return n;
+}
+
+TEST(DevelopedRoster, OrcNoGoblinsGuardAndStripBall) {
+    const TeamRoster* r = getDevelopedRoster("orc", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    int onPitch = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.isOnPitch()) onPitch++;
+    });
+    EXPECT_EQ(onPitch, 11);
+    // Goblins (Stunty) removed entirely.
+    EXPECT_EQ(countHomeSkill(state, SkillName::Stunty), 0);
+    // 2 Blitzers + 4 Black Orcs with Guard.
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
+    // Exactly one ball-hunter Blitzer with Strip Ball.
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+}
+
+TEST(DevelopedRoster, HumanOgreBlockAndStripBall) {
+    const TeamRoster* r = getDevelopedRoster("human", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 2);
+    // Ogre (ST5) is fielded with Block.
+    bool ogreHasBlock = false;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.isOnPitch() && p.stats.strength == 5 && p.hasSkill(SkillName::Block)) {
+            ogreHasBlock = true;
+        }
+    });
+    EXPECT_TRUE(ogreHasBlock);
+}
+
+TEST(DevelopedRoster, DwarfLotsOfGuard) {
+    const TeamRoster* r = getDevelopedRoster("dwarf", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    // 4 Longbeards + 1 Blitzer + 2 Troll Slayers with Guard.
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 7);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+}
+
+TEST(DevelopedRoster, SkavenSureFeetGutterRunners) {
+    const TeamRoster* r = getDevelopedRoster("skaven", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    // All 4 Gutter Runners have Sure Feet.
+    EXPECT_EQ(countHomeSkill(state, SkillName::SureFeet), 4);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+}
+
+TEST(DevelopedRoster, WoodElfWardancerStripBall) {
+    const TeamRoster* r = getDevelopedRoster("woodelf", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    // One ball-hunter Wardancer with Strip Ball, one with Side Step, Treeman with Guard.
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::SideStep), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 1);
+}
+
+TEST(DevelopedRoster, BelowTVFallsBackToBase) {
+    // tv < 1200 returns the base roster (which has goblins for Orc).
+    const TeamRoster* base = getDevelopedRoster("orc", 1000);
+    ASSERT_NE(base, nullptr);
+    EXPECT_STREQ(base->name, "Orc");
+}

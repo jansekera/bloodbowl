@@ -491,6 +491,119 @@ RosterSpeed classifyRosterSpeed(const TeamRoster& roster) {
     return RosterSpeed::MIXED;
 }
 
+// === Developed (TV~1200) rosters ===
+// Per-player skill variation is expressed by splitting a position into
+// separate positional templates (e.g. Blitzer +Guard vs Blitzer ball-hunter).
+// buildTeam fields specialists (index 1+) first, then fills with linemen (index 0).
+
+// Orc TV~1200: goblins removed. 4 Blitzers, 4 Black Orcs, 1 Thrower, 2 Linemen.
+const TeamRoster& getOrcRoster1200() {
+    static const TeamRoster roster = {
+        "Orc (TV1200)",
+        {
+            {{5, 3, 3, 9}, {}, 11},  // Lineman (fill)
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard}), 4},  // Black Orc +Guard
+            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Human TV~1200: 4 Blitzers, 1 Thrower, 2 Catchers, 1 Ogre, 3 Linemen.
+const TeamRoster& getHumanRoster1200() {
+    static const TeamRoster roster = {
+        "Human (TV1200)",
+        {
+            {{6, 3, 3, 8}, {}, 11},  // Lineman (fill)
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block}), 2},  // Catcher +Block
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow,
+                SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1},  // Ogre +Block
+        },
+        7, 50, true
+    };
+    return roster;
+}
+
+// Dwarf TV~1200: lots of Guard. 6 Longbeards, 2 Blitzers, 2 Troll Slayers, 2 Runners (no Deathroller).
+const TeamRoster& getDwarfRoster1200() {
+    static const TeamRoster roster = {
+        "Dwarf (TV1200)",
+        {
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11},  // Longbeard (fill)
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 4},  // Longbeard +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard}), 1},  // Blitzer +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::StripBall}), 1},  // Blitzer ball-hunter
+            {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
+                SkillName::Dauntless, SkillName::Guard}), 2},  // Troll Slayer +Guard
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2},  // Runner +Block
+        },
+        6, 40, true
+    };
+    return roster;
+}
+
+// Skaven TV~1200: Sure Feet on all Gutter Runners. 4 Gutter Runners, 2 Blitzers, 1 Thrower, 4 Linemen.
+const TeamRoster& getSkavenRoster1200() {
+    static const TeamRoster roster = {
+        "Skaven (TV1200)",
+        {
+            {{7, 3, 3, 7}, {}, 11},  // Lineman (fill)
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet}), 4},  // Gutter Runner +Sure Feet
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 1},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2},  // Lineman +Wrestle
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Wood Elf TV~1200: agile/passing. 2 Wardancers, 2 Catchers, 1 Thrower, 1 Treeman, 5 Linemen.
+const TeamRoster& getWoodElfRoster1200() {
+    static const TeamRoster roster = {
+        "Wood Elf (TV1200)",
+        {
+            {{7, 3, 4, 7}, {}, 11},  // Lineman (fill)
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::StripBall}), 1},  // Wardancer ball-hunter
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::SideStep}), 1},  // Wardancer +Side Step
+            {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
+                SkillName::Block}), 2},  // Catcher +Block
+            {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1},  // Treeman +Guard
+        },
+        6, 50, true
+    };
+    return roster;
+}
+
+const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
+    if (tv >= 1200) {
+        std::string lower = toLower(name);
+        std::string normalized;
+        for (char c : lower) {
+            if (c != ' ' && c != '_' && c != '-') normalized += c;
+        }
+        if (normalized == "orc") return &getOrcRoster1200();
+        if (normalized == "human") return &getHumanRoster1200();
+        if (normalized == "dwarf") return &getDwarfRoster1200();
+        if (normalized == "skaven") return &getSkavenRoster1200();
+        if (normalized == "woodelf") return &getWoodElfRoster1200();
+    }
+    return getRosterByName(name);
+}
+
 const TeamRoster* getRosterByName(const std::string& name) {
     std::string lower = toLower(name);
 

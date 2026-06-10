@@ -42,6 +42,9 @@ ANTI_REGRESSION = 0.51
 OPPONENT_MIX_RATIO = 0.5
 MODEL = 'neural'
 HIDDEN_SIZE = 64
+# TV=1200 fields developed (skilled) rosters: goblins removed from Orc, Guard density,
+# Strip Ball ball-hunter blitzer, Sure Feet gutter runners. tv<1200 = base rosters.
+TV = 1200
 WORKERS = min(12, os.cpu_count() or 1)
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -58,10 +61,10 @@ def _pool_init(engine_build: str, python_src: str) -> None:
 
 
 def _benchmark_game(args: tuple) -> bool:
-    seed, race_idx, gate_path, mcts_iterations, vf_blend = args
+    seed, race_idx, gate_path, mcts_iterations, vf_blend, tv = args
     import bb_engine
-    hr = bb_engine.get_roster(_RACES[race_idx % len(_RACES)])
-    ar = bb_engine.get_roster(_RACES[(race_idx + 1) % len(_RACES)])
+    hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
+    ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
     result = bb_engine.simulate_game_logged(
         hr, ar,
         home_ai='macro_mcts', away_ai='random',
@@ -72,10 +75,10 @@ def _benchmark_game(args: tuple) -> bool:
 
 
 def _gate_game(args: tuple) -> tuple[int, int]:
-    seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend = args
+    seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv = args
     import bb_engine
-    hr = bb_engine.get_roster(_RACES[race_idx % len(_RACES)])
-    ar = bb_engine.get_roster(_RACES[(race_idx + 1) % len(_RACES)])
+    hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
+    ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
     result = bb_engine.simulate_game_logged(
         hr, ar,
         home_ai='macro_mcts', away_ai='macro_mcts',
@@ -155,6 +158,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         f'--vf-blend={VF_BLEND}', f'--vf-ramp-epochs={VF_RAMP_EPOCHS}',
         '--policy-lr=0',
         '--weights=weights_az_train.json',
+        f'--tv={TV}',
         '--training-method=mc_shaped',
         f'--epsilon-start={EPSILON_START}', f'--epsilon-end={EPSILON_END}',
         f'--benchmark-interval={BENCHMARK_INTERVAL}', f'--benchmark-matches={BENCHMARK_MATCHES}',
@@ -172,7 +176,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     def _run_benchmark(path: Path, label: str) -> float:
         tasks = [
-            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND)
+            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV)
             for i in range(half_bm)
         ]
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
@@ -206,7 +210,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
-        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND)
+        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND, TV)
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)

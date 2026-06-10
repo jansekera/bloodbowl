@@ -51,6 +51,11 @@ const TeamRoster& getChaosPactRoster();
 // Lookup roster by name (case-insensitive)
 const TeamRoster* getRosterByName(const std::string& name);
 
+// Lookup developed (skilled) roster for a given team value.
+// tv >= 1200 returns a TV~1200 developed variant for supported races
+// (orc, human, dwarf, skaven); otherwise falls back to the base roster.
+const TeamRoster* getDevelopedRoster(const std::string& name, int tv);
+
 // Classify roster speed based on average MA of an 11-player team
 RosterSpeed classifyRosterSpeed(const TeamRoster& roster);
 
