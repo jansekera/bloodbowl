@@ -240,6 +240,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         promote = False
         reasons.append(f'benchmark klesl {all_time_best_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
 
+    if frozen_bm > 0 and new_bm < frozen_bm - 0.02:
+        promote = False
+        reasons.append(f'benchmark pod frozen ({new_bm:.1%} < {frozen_bm:.1%} - 2%)')
+
     if new_bm < BM_FLOOR:
         promote = False
         reasons.append(f'benchmark pod minimem ({new_bm:.1%} < {BM_FLOOR:.0%})')
