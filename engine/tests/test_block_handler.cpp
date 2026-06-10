@@ -290,6 +290,31 @@ TEST(BlockHandler, StripBall) {
     EXPECT_FALSE(gs.ball.isHeld);
 }
 
+TEST(BlockHandler, StripBallNegatedBySureHands) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::StripBall);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::SureHands);
+    gs.ball = BallState::carried({11, 7}, 12);
+    // Roll PUSHED. Defender pushed to (12,7). Sure Hands negates Strip Ball (BB2016)
+    // → ball stays with the carrier, and a SKILL_USED(SureHands) event is emitted.
+    FixedDiceRoller dice({3, 3});
+    BlockParams params{1, 12, false, false};
+    std::vector<GameEvent> events;
+    auto result = resolveBlock(gs, params, dice, &events);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 12);
+    bool sawSureHands = false;
+    for (const auto& e : events) {
+        if (e.type == GameEvent::Type::SKILL_USED &&
+            e.roll == static_cast<int>(SkillName::SureHands)) {
+            sawSureHands = true;
+        }
+    }
+    EXPECT_TRUE(sawSureHands);
+}
+
 TEST(BlockHandler, AutoChoosePrefersDDOverAD) {
     Player att, def;
     att.id = 1; att.teamSide = TeamSide::HOME;

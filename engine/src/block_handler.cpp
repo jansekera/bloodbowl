@@ -455,11 +455,18 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
 
-        // StripBall: if defender has ball and not knocked down, and attacker has StripBall
+        // StripBall: if defender has ball and not knocked down, and attacker has StripBall.
         if (!defKnockedDown && state.ball.isHeld && state.ball.carrierId == def.id &&
             att.hasSkill(SkillName::StripBall)) {
-            state.ball = BallState::onGround(def.position);
-            resolveBounce(state, def.position, dice, 0, events);
+            if (def.hasSkill(SkillName::SureHands)) {
+                // Sure Hands negates Strip Ball (BB2016/LRB6) — ball stays with carrier.
+                emitEvent(events, {GameEvent::Type::SKILL_USED, def.id, att.id,
+                                  def.position, {},
+                                  static_cast<int>(SkillName::SureHands), true});
+            } else {
+                state.ball = BallState::onGround(def.position);
+                resolveBounce(state, def.position, dice, 0, events);
+            }
         }
 
         // Follow-up: attacker moves to old defender position
