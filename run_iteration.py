@@ -111,6 +111,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     az_train_path = PROJECT_ROOT / 'weights_az_train.json'
     train_best_path = PROJECT_ROOT / 'weights_train_best.json'
 
+    # baseline_reset: set when the TV (roster set) changed since the frozen
+    # model was benchmarked — its win rate is on a different game and not comparable.
+    baseline_reset = False
     # Step 1: Freeze current best
     if best_path.exists():
         shutil.copy2(str(best_path), str(frozen_path))
@@ -122,11 +125,20 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                     meta = json.load(f)
                 frozen_bm = meta.get('benchmark_win_rate', 0.0)
                 all_time_best_bm = meta.get('all_time_best_benchmark', frozen_bm)
+                meta_tv = meta.get('tv', 1000)
             else:
                 with open(best_path) as f:
                     data = json.load(f)
                 frozen_bm = data.get('benchmark_win_rate', 0.0) if isinstance(data, dict) else 0.0
                 all_time_best_bm = frozen_bm
+                meta_tv = 1000
+            if meta_tv != TV:
+                print(f'⚠ Změna TV {meta_tv}→{TV}: gating baseline RESET — předchozí '
+                      f'benchmark {frozen_bm:.1%} byl na jiných rosterech a neplatí. '
+                      f'První TV{TV} model se promotne jako nový baseline.', flush=True)
+                frozen_bm = 0.0
+                all_time_best_bm = 0.0
+                baseline_reset = True
             print(f'Frozen benchmark: {frozen_bm:.1%}')
         except Exception:
             frozen_bm = 0.0
@@ -248,13 +260,18 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         promote = False
         reasons.append(f'benchmark pod frozen ({new_bm:.1%} < {frozen_bm:.1%} - 2%)')
 
-    if new_bm < BM_FLOOR:
+    if new_bm < BM_FLOOR and not baseline_reset:
         promote = False
         reasons.append(f'benchmark pod minimem ({new_bm:.1%} < {BM_FLOOR:.0%})')
 
-    if chess_score < ANTI_REGRESSION:
+    if chess_score < ANTI_REGRESSION and not baseline_reset:
         promote = False
         reasons.append(f'horší než frozen ({chess_score:.1%} < {ANTI_REGRESSION:.0%})')
+
+    if baseline_reset:
+        promote = True  # force-establish the new TV baseline regardless of absolute score
+        print(f'Baseline reset: TV{TV} model promoted as new baseline '
+              f'(benchmark={new_bm:.1%}, chess vs old={chess_score:.1%})', flush=True)
 
     label = 'promoted' if promote else 'rejected'
 
@@ -263,7 +280,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         new_all_time = max(all_time_best_bm, new_bm)
         with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
             json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                       'all_time_best_benchmark': new_all_time}, f)
+                       'all_time_best_benchmark': new_all_time, 'tv': TV}, f)
         print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
