@@ -17,7 +17,8 @@ import random
 import shutil
 import subprocess
 import sys
-from multiprocessing import Pool
+import time
+from multiprocessing import Pool, TimeoutError as MPTimeoutError
 from pathlib import Path
 
 # ─── Configuration ────────────────────────────────────────────────────────────
@@ -46,9 +47,38 @@ HIDDEN_SIZE = 64
 # Strip Ball ball-hunter blitzer, Sure Feet gutter runners. tv<1200 = base rosters.
 TV = 1200
 WORKERS = min(12, os.cpu_count() or 1)
+# Watchdog: a healthy macro_mcts vs macro_mcts game finishes in ~50s and with
+# WORKERS in flight a result lands every few seconds. If NOTHING completes in
+# this window a worker is wedged (e.g. an engine infinite loop) — abort the pool
+# and log it instead of hanging the whole run forever, as happened 2026-06-10
+# when the anti-regression pool froze at 150/400.
+STALL_TIMEOUT = 300
 # ──────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
+
+
+def _imap_watchdog(pool: Pool, fn, tasks: list, label: str):
+    """Yield results from pool.imap_unordered with a stall watchdog.
+
+    If no result arrives within STALL_TIMEOUT seconds the pool is terminated and
+    iteration stops (partial results), turning a permanent hang into a logged,
+    recoverable event. Callers must compute scores over the yielded count.
+    """
+    n = len(tasks)
+    it = pool.imap_unordered(fn, tasks)
+    got = 0
+    while got < n:
+        try:
+            r = it.next(timeout=STALL_TIMEOUT)
+        except MPTimeoutError:
+            print(f'  ⚠ WATCHDOG: {label} stalled — no game finished in '
+                  f'{STALL_TIMEOUT}s at {got}/{n}. Aborting pool (engine hang?). '
+                  f'Inspect with fuzz_gate.py.', flush=True)
+            pool.terminate()
+            return
+        got += 1
+        yield r
 
 _RACES = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
 
@@ -194,13 +224,13 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
         results: list[bool] = []
         with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-            for result in pool.imap_unordered(_benchmark_game, tasks):
+            for result in _imap_watchdog(pool, _benchmark_game, tasks, label):
                 results.append(result)
                 done = len(results)
                 if done % 20 == 0 or done == half_bm:
                     print(f'  {label} {done}/{half_bm}: {sum(results)/done:.1%}', flush=True)
-        score = sum(results) / half_bm
-        print(f'  {label} final: {score:.1%} ({sum(results)}/{half_bm})', flush=True)
+        score = sum(results) / len(results) if results else 0.0
+        print(f'  {label} final: {score:.1%} ({sum(results)}/{len(results)})', flush=True)
         return score
 
     bm_az = _run_benchmark(az_train_path, 'az_train')
@@ -228,7 +258,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
     gate_results: list[tuple[int, int]] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        for hs, as_ in pool.imap_unordered(_gate_game, gate_tasks):
+        for hs, as_ in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression'):
             gate_results.append((hs, as_))
             done = len(gate_results)
             if done % 10 == 0 or done == GATING_MATCHES:
@@ -245,8 +275,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'  Game {i + 1}: {hs}-{as_}', flush=True)
 
     total = wins + draws + losses
-    chess_score = (wins + 0.5 * draws) / total
-    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%}', flush=True)
+    chess_score = (wins + 0.5 * draws) / total if total else 0.0
+    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} '
+          f'({total}/{GATING_MATCHES} games)', flush=True)
 
     # Step 5: Gate decision
     promote = True

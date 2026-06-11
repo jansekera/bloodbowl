@@ -21,8 +21,14 @@ int getPassPath(Position src, Position dst, Position* out, int maxOut) {
     int sy = (y0 < y1) ? 1 : -1;
     int err = dx - dy;
 
-    // Skip the start position
-    while (true) {
+    // The line spans exactly max(dx, dy) steps along the dominant axis. Bounding
+    // the loop to that many iterations guarantees termination: previously this was
+    // `while (true)` that broke only on (x0==x1 && y0==y1), but the strict `>`/`<`
+    // comparisons can overshoot the endpoint on degenerate inputs, so the break
+    // never fired and the game hung forever (the `count < maxOut` guard only stops
+    // writing, not looping). Skip the start position; never record the endpoint.
+    int steps = std::max(dx, dy);
+    for (int s = 0; s < steps; ++s) {
         int e2 = 2 * err;
         if (e2 > -dy) {
             err -= dy;
