@@ -9,8 +9,10 @@
 
 ## TIER 1 — potenciálně lámou plateau (ověřit → opravit, vysoký dopad)
 
-### T1.1 MCTS value backup — perspektiva napříč tahy `[OVĚŘIT PRVNÍ]`
-`macro_mcts.cpp:509-515`, `mcts.cpp:276-286`. Backprop přičítá leaf value **stejným znaménkem** ve všech uzlech; END_TURN přepíná `activeTeam` bez negace. Pokud value net vrací hodnotu z pohledu side-to-move → potřeba negamax flip na hranici tahu; pokud z fixní perspektivy → současný kód OK. **Nutno přečíst `value_function.cpp` perspektivu před jakýmkoli zásahem.** Reprodukční test: END_TURN pouštějící soupeře na TD musí mít nižší Q než blokující makro.
+### T1.1 MCTS value backup — perspektiva napříč tahy `[OVĚŘENO 2026-06-12 → MEDIUM, ne CRITICAL]`
+**Verdikt: agentova CRITICAL teze NEPLATÍ.** Value se v `simulate` počítá z **fixní `searchingSide` perspektivy** (`macro_mcts.cpp:107` `searchingSide=state.activeTeam` na kořeni, `:132` `simulate(sim, searchingSide)`, `:498` `extractFeatures(state, perspective=searchingSide)`). `value_function.cpp` jen mapuje featury→skalár, perspektivu nese feature extrakce. Same-sign `backpropagate` (`:509-515`) je tedy **interně konzistentní**, ne obrácené znaménko. Žádná korupce Q-values ani tréninkových targetů.
+
+**Skutečný (mírnější) problém:** `bestChildPUCT` (`:18-45`) vždy maximalizuje `q=totalValue/visits` bez `activeTeam` na uzlu → uzly za `END_TURN` (soupeřův tah) modelují **kooperujícího soupeře** (chybí min-uzly/negamax). Dopad omezený: většina stromu = vlastní tah (BB dělá mnoho macro před END_TURN), za END_TURN se 100 iterací zřídka zajde hluboko; sedí s 85-87 %. → **MEDIUM**, legitimní search improvement (proper opponent modeling), ale mění chování → vyžaduje A/B přes trénink. NENÍ urgentní příčina stropu.
 
 ### T1.2 Replay buffer credit assignment `[CONFIRMED korupce]`
 `training_loop.py:386-405` + `replay_buffer.py:50-69`. Replay razí finální výsledek hry (±1) na KAŽDÝ stav (i nepoterminální) a staví fake 2-stavové mini-hry → mezilehlá odměna (0) se nikdy nereprezentuje, bootstrap o krok dřív. Auto-zapnuté pro každý MCTS běh. Ničí intra-game credit assignment. **Top kandidát na plateau/43% draws.**

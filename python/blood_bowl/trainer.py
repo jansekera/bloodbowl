@@ -142,6 +142,31 @@ class LinearTrainer:
                 v = float(np.dot(self.weights, features))
                 self.weights += self.lr * (shaped_reward - v) * features
 
+    def train_transition_shaped(
+        self,
+        features: list,
+        next_features: list,
+        final_reward: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        shaping_weights: list[tuple[int, float]] | None = None,
+    ) -> None:
+        """One potential-shaped MC update for a single replay transition.
+
+        Same target as train_monte_carlo_shaped for this state; next_features is
+        only the Φ(s') lookahead, never trained as a spurious terminal state.
+        Pass shaping_weights=[] for plain MC (Φ≡0 → target = final_reward)."""
+        sw = shaping_weights if shaping_weights is not None else DEFAULT_SHAPING_WEIGHTS
+        f = self._align_features(np.array(features, dtype=np.float64))
+        phi_current = self._compute_potential(f, sw)
+        if is_terminal:
+            shaped_reward = final_reward - phi_current
+        else:
+            nf = self._align_features(np.array(next_features, dtype=np.float64))
+            shaped_reward = final_reward + gamma * self._compute_potential(nf, sw) - phi_current
+        v = float(np.dot(self.weights, f))
+        self.weights += self.lr * (shaped_reward - v) * f
+
     def train_td0(self, game_log: list[dict], gamma: float = 0.99) -> None:
         """Update weights using TD(0) per perspective.
 
@@ -430,6 +455,32 @@ class NeuralTrainer:
 
                 dW1, db1, dW2, db2 = self._backprop(features, shaped_reward)
                 self._update(dW1, db1, dW2, db2)
+
+    def train_transition_shaped(
+        self,
+        features: list,
+        next_features: list,
+        final_reward: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        shaping_weights: list[tuple[int, float]] | None = None,
+    ) -> None:
+        """One potential-shaped MC update for a single replay transition.
+
+        Identical target to what train_monte_carlo_shaped computes for this
+        state in the full game log — next_features is used ONLY as the Φ(s')
+        lookahead, never trained as its own (spurious terminal) state. Pass
+        shaping_weights=[] for plain MC (Φ≡0 → target = final_reward)."""
+        sw = shaping_weights if shaping_weights is not None else DEFAULT_SHAPING_WEIGHTS
+        f = self._align_features(np.array(features, dtype=np.float64))
+        phi_current = self._compute_potential(f, sw)
+        if is_terminal:
+            shaped_reward = final_reward - phi_current
+        else:
+            nf = self._align_features(np.array(next_features, dtype=np.float64))
+            shaped_reward = final_reward + gamma * self._compute_potential(nf, sw) - phi_current
+        dW1, db1, dW2, db2 = self._backprop(f, shaped_reward)
+        self._update(dW1, db1, dW2, db2)
 
     def train_td0(self, game_log: list[dict], gamma: float = 0.99) -> None:
         """Update weights using TD(0) per perspective."""

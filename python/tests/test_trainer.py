@@ -436,3 +436,42 @@ class TestLoadTrainer:
             trainer = load_trainer(path)
             assert isinstance(trainer, NeuralTrainer)
             assert abs(trainer.evaluate(features) - v_original) < 1e-10
+
+
+class TestTrainTransitionShaped:
+    """Replay single-transition shaped update (review T1.2)."""
+
+    def test_linear_pure_mc_target_equals_final_reward(self):
+        # shaping_weights=[] → Φ≡0 → target == final_reward for both terminal
+        # and non-terminal; from zero weights Δw = lr * final_reward * features.
+        f = [1.0, 0.0, 0.0, 0.0, 0.0]
+        nf = [0.0, 1.0, 0.0, 0.0, 0.0]
+        for is_terminal in (False, True):
+            t = LinearTrainer(n_features=5, learning_rate=0.1)
+            t.train_transition_shaped(f, nf, final_reward=1.0,
+                                      is_terminal=is_terminal, shaping_weights=[])
+            assert abs(t.weights[0] - 0.1) < 1e-9   # lr * 1.0 * f[0]
+            assert abs(t.weights[1]) < 1e-9          # next_features NOT trained
+
+    def test_matches_monte_carlo_shaped_first_state(self):
+        # train_transition_shaped on (f, nf, non-terminal) must equal the state[0]
+        # update of train_monte_carlo_shaped on a [f, nf, result] single-perspective
+        # log — and must NOT also train nf (which the old 2-state mini-log did).
+        np.random.seed(0)
+        f = list(np.random.randn(5))
+        nf = list(np.random.randn(5))
+        sw = [(0, 0.5), (2, -0.3)]
+
+        a = LinearTrainer(n_features=5, learning_rate=0.05)
+        a.train_transition_shaped(f, nf, final_reward=1.0, is_terminal=False,
+                                  gamma=0.99, shaping_weights=sw)
+
+        # Reference: a single state's shaped update target r + γΦ(nf) − Φ(f).
+        b = LinearTrainer(n_features=5, learning_rate=0.05)
+        fa = np.array(f); nfa = np.array(nf)
+        phi_f = sum(w * fa[i] for i, w in sw)
+        phi_nf = sum(w * nfa[i] for i, w in sw)
+        target = 1.0 + 0.99 * phi_nf - phi_f
+        b.weights += 0.05 * (target - float(np.dot(b.weights, fa))) * fa
+
+        assert np.allclose(a.weights, b.weights, atol=1e-9)

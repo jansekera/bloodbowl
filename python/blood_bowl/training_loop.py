@@ -382,27 +382,12 @@ def run_training(
 
             _train_on_log(trainer, game_log, training_method, gamma, lambda_)
 
-        # Replay buffer: train on random samples
+        # Replay buffer: train on random samples (one correct shaped update per
+        # transition — see review T1.2)
         if replay_buffer is not None and len(replay_buffer) > 0:
             batch = replay_buffer.sample(replay_batch_size)
             for transition in batch:
-                # Create a minimal game log from transition
-                mini_log = [
-                    {'type': 'state', 'features': transition.features, 'perspective': transition.perspective},
-                ]
-                if not transition.is_terminal:
-                    mini_log.append(
-                        {'type': 'state', 'features': transition.next_features, 'perspective': transition.perspective},
-                    )
-                mini_log.append({
-                    'type': 'result',
-                    'home_score': 1 if transition.reward > 0 else 0,
-                    'away_score': 1 if transition.reward < 0 else 0,
-                    'winner': transition.perspective if transition.reward > 0 else (
-                        ('away' if transition.perspective == 'home' else 'home') if transition.reward < 0 else None
-                    ),
-                })
-                _train_on_log(trainer, mini_log, training_method, gamma, lambda_)
+                _train_on_transition(trainer, transition, training_method, gamma, lambda_)
 
             # Save replay buffer periodically
             replay_buffer.save(str(root / 'replay_buffer.pkl'))
@@ -765,6 +750,37 @@ def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lamb
         trainer.train_td_lambda(game_log, gamma=gamma, lambda_=lambda_)
     else:
         raise ValueError(f'Unknown training method: {method}')
+
+
+def _train_on_transition(trainer, tr, method: str, gamma: float, lambda_: float) -> None:
+    """Train on one replay Transition.
+
+    For MC / MC-shaped this does a SINGLE correct potential-shaped update on the
+    transition's own state, using tr.next_features only as the Φ(s') lookahead.
+    The old code built a 2-state mini-log that also re-trained next_features as a
+    spurious *terminal* state (target missing the future potential γΦ(s'')) —
+    review finding T1.2. TD methods (not currently active) keep the (s, s', r)
+    mini-log form, which is their natural representation.
+    """
+    if method == 'mc':
+        trainer.train_transition_shaped(
+            tr.features, tr.next_features, tr.reward, tr.is_terminal,
+            gamma=gamma, shaping_weights=[])
+    elif method == 'mc_shaped':
+        trainer.train_transition_shaped(
+            tr.features, tr.next_features, tr.reward, tr.is_terminal, gamma=gamma)
+    else:
+        mini_log = [{'type': 'state', 'features': tr.features, 'perspective': tr.perspective}]
+        if not tr.is_terminal:
+            mini_log.append({'type': 'state', 'features': tr.next_features, 'perspective': tr.perspective})
+        mini_log.append({
+            'type': 'result',
+            'home_score': 1 if tr.reward > 0 else 0,
+            'away_score': 1 if tr.reward < 0 else 0,
+            'winner': tr.perspective if tr.reward > 0 else (
+                ('away' if tr.perspective == 'home' else 'home') if tr.reward < 0 else None),
+        })
+        _train_on_log(trainer, mini_log, method, gamma, lambda_)
 
 
 def _git_push_weights_best(best_path: Path, win_rate: float, score_diff: float, epoch: int) -> None:
