@@ -14,8 +14,8 @@
 
 **Skutečný (mírnější) problém:** `bestChildPUCT` (`:18-45`) vždy maximalizuje `q=totalValue/visits` bez `activeTeam` na uzlu → uzly za `END_TURN` (soupeřův tah) modelují **kooperujícího soupeře** (chybí min-uzly/negamax). Dopad omezený: většina stromu = vlastní tah (BB dělá mnoho macro před END_TURN), za END_TURN se 100 iterací zřídka zajde hluboko; sedí s 85-87 %. → **MEDIUM**, legitimní search improvement (proper opponent modeling), ale mění chování → vyžaduje A/B přes trénink. NENÍ urgentní příčina stropu.
 
-### T1.2 Replay buffer credit assignment `[CONFIRMED korupce]`
-`training_loop.py:386-405` + `replay_buffer.py:50-69`. Replay razí finální výsledek hry (±1) na KAŽDÝ stav (i nepoterminální) a staví fake 2-stavové mini-hry → mezilehlá odměna (0) se nikdy nereprezentuje, bootstrap o krok dřív. Auto-zapnuté pro každý MCTS běh. Ničí intra-game credit assignment. **Top kandidát na plateau/43% draws.**
+### T1.2 Replay buffer credit assignment `[OPRAVENO 2026-06-12, commit b055e65]`
+**Ověřeno + opraveno.** Aktivní metoda je `mc_shaped` (NE TD), kde base-target je `final_reward` pro každý stav (korektní MC) + potenciálový shaping. Agentova „TD bootstrap o krok dřív" tedy neplatí. Skutečná chyba (mírnější): replay stavěl 2-stavový mini-log a `train_monte_carlo_shaped` trénoval OBA stavy — state[0] správně, ale `next_features` jako **falešně terminální** (`final_reward − Φ(s')`, chybí budoucí potenciál γΦ(s'')). Fix: `train_transition_shaped()` = jeden správný update na vlastní stav, next_features jen jako Φ(s') lookahead. +2 testy, suite green.
 
 ### T1.3 Feature parity drift C++ ↔ Python `[latentní landmine]`
 `features.py[15]` carrier_dist_to_td (nejtěžší shaping váha −1.5) a `[17/18]` avg-x se liší od C++ ve větvích: soupeř nese míč / prázdná strana / stojící carrier. Dnes latentní (C++ loguje vlastní featury), ale **parity test je slepý** — porovnává s PHP, ne s `bb_engine`, a netestuje tyto větve (`tests/test_features.py` H3). Smrtelné pro plánovaný per-player přechod (warm start přes `_align_features` tiše pad/truncate).
