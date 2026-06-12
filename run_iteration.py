@@ -322,13 +322,14 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print('(git push přeskočen — --no-push)')
     else:
         _git_push(PROJECT_ROOT, promote, frozen_path, gate_path,
-                  frozen_bm, new_bm, chess_score, label)
+                  frozen_bm, new_bm, chess_score, label, all_time_best_bm)
 
     return promote, new_bm, chess_score
 
 
 def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
-              frozen_bm: float, new_bm: float, chess_score: float, label: str) -> None:
+              frozen_bm: float, new_bm: float, chess_score: float, label: str,
+              all_time_best_bm: float) -> None:
     try:
         # Read weights into memory BEFORE git reset (reset overwrites working tree)
         with open(gate_path, 'rb') as f:
@@ -344,10 +345,12 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
         best_path = root / 'weights_best.json'
         if not promote:
             best_path.write_bytes(frozen_data)
-            meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
+            meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                    'all_time_best_benchmark': all_time_best_bm, 'tv': TV}
         else:
             best_path.write_bytes(gate_data)
-            meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS}
+            meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                    'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV}
 
         with open(root / 'weights_best_meta.json', 'w') as f:
             json.dump(meta, f)
