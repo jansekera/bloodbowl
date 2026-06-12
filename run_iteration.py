@@ -58,6 +58,17 @@ STALL_TIMEOUT = 300
 PROJECT_ROOT = Path(__file__).parent.resolve()
 
 
+def _atomic_write_json(path: Path, obj) -> None:
+    """Write JSON via temp file + os.replace so a kill mid-write can't leave a
+    truncated/corrupt file (the corrupt-meta feeder behind the abort path)."""
+    tmp = path.with_name(path.name + '.tmp')
+    with open(tmp, 'w') as f:
+        json.dump(obj, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def _imap_watchdog(pool: Pool, fn, tasks: list, label: str):
     """Yield results from pool.imap_unordered with a stall watchdog.
 
@@ -144,6 +155,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # baseline_reset: set when the TV (roster set) changed since the frozen
     # model was benchmarked — its win rate is on a different game and not comparable.
     baseline_reset = False
+    # abort_promote: hard failures (corrupt meta / hung engine) where we must
+    # neither promote nor push — keep the current best untouched. Overrides
+    # baseline_reset's force-promote.
+    abort_promote: list[str] = []
     # Step 1: Freeze current best
     if best_path.exists():
         shutil.copy2(str(best_path), str(frozen_path))
@@ -170,9 +185,17 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 all_time_best_bm = 0.0
                 baseline_reset = True
             print(f'Frozen benchmark: {frozen_bm:.1%}')
-        except Exception:
+        except Exception as e:
+            # Corrupt/unreadable meta while weights exist: the baseline is
+            # unknown. Do NOT silently zero it and proceed — that disabled the
+            # regression gates and could overwrite all_time_best with a lower
+            # score (sibling of the _git_push meta bug). Keep current best,
+            # skip promote+push this iteration.
+            print(f'⛔ weights_best_meta.json nečitelné ({e!r}) — ponechávám '
+                  f'současný best, přeskakuji promote+push.', flush=True)
             frozen_bm = 0.0
             all_time_best_bm = 0.0
+            abort_promote.append(f'corrupt meta read: {e!r}')
     else:
         with open(best_path, 'w') as f:
             json.dump({'type': 'alphazero_neural', 'value_weights': [0.0] * 70}, f)
@@ -180,6 +203,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         frozen_bm = 0.0
         all_time_best_bm = 0.0
         print('First run: created fresh weights')
+
+    if abort_promote:
+        print('⛔ ABORT iterace (před tréninkem): ' + '; '.join(abort_promote), flush=True)
+        shutil.copy2(str(frozen_path), str(best_path))  # best == frozen, beze změny
+        return False, None, 0.0
 
     shutil.copy2(str(best_path), str(az_train_path))
 
@@ -216,7 +244,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     init_args = (str(engine_build), str(python_src))
     half_bm = BENCHMARK_MATCHES // 2
 
-    def _run_benchmark(path: Path, label: str) -> float:
+    def _run_benchmark(path: Path, label: str) -> tuple[float, bool]:
         tasks = [
             (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV)
             for i in range(half_bm)
@@ -230,13 +258,18 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 if done % 20 == 0 or done == half_bm:
                     print(f'  {label} {done}/{half_bm}: {sum(results)/done:.1%}', flush=True)
         score = sum(results) / len(results) if results else 0.0
+        complete = len(results) >= half_bm
         print(f'  {label} final: {score:.1%} ({sum(results)}/{len(results)})', flush=True)
-        return score
+        return score, complete
 
-    bm_az = _run_benchmark(az_train_path, 'az_train')
-    bm_tb = _run_benchmark(train_best_path, 'train_best') if train_best_path.exists() else 0.0
-    if not train_best_path.exists():
+    bm_az, az_complete = _run_benchmark(az_train_path, 'az_train')
+    if train_best_path.exists():
+        bm_tb, tb_complete = _run_benchmark(train_best_path, 'train_best')
+    else:
+        bm_tb, tb_complete = 0.0, True
         print('train_best not found, using az_train', flush=True)
+    if not (az_complete and tb_complete):
+        abort_promote.append('benchmark incomplete (engine hang? — viz WATCHDOG výše)')
 
     if bm_tb > bm_az:
         gate_path = train_best_path
@@ -278,6 +311,16 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     chess_score = (wins + 0.5 * draws) / total if total else 0.0
     print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} '
           f'({total}/{GATING_MATCHES} games)', flush=True)
+    if total < GATING_MATCHES:
+        abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES} — engine hang?)')
+
+    # A hard failure during benchmark/gating means the gate scores are based on
+    # partial data — never promote (or push) on that. Overrides baseline_reset.
+    if abort_promote:
+        print('⛔ ABORT promote: ' + '; '.join(abort_promote), flush=True)
+        print('   Ponechávám weights_best.json beze změny, nepushuju.', flush=True)
+        shutil.copy2(str(frozen_path), str(best_path))
+        return False, new_bm, chess_score
 
     # Step 5: Gate decision
     promote = True
@@ -309,9 +352,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     if promote:
         shutil.copy2(str(gate_path), str(best_path))
         new_all_time = max(all_time_best_bm, new_bm)
-        with open(PROJECT_ROOT / 'weights_best_meta.json', 'w') as f:
-            json.dump({'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                       'all_time_best_benchmark': new_all_time, 'tv': TV}, f)
+        _atomic_write_json(PROJECT_ROOT / 'weights_best_meta.json',
+                           {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                            'all_time_best_benchmark': new_all_time, 'tv': TV})
         print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
@@ -352,8 +395,7 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
             meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
                     'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV}
 
-        with open(root / 'weights_best_meta.json', 'w') as f:
-            json.dump(meta, f)
+        _atomic_write_json(root / 'weights_best_meta.json', meta)
 
         files = [
             'weights_best.json', 'weights_best_meta.json',
