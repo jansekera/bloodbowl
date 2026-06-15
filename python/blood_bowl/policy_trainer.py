@@ -28,6 +28,7 @@ class PolicyTrainer:
         self.bias = 0.0
         self.lr = learning_rate
         self.temperature = temperature  # Inference-time softmax temperature (C++ side)
+        self.last_top1_agreement = 0.0  # podíl rozhodnutí, kde policy argmax == nejnavštěvovanější MCTS tah
 
     def train_on_decisions(self, decisions: list[dict], passes: int = 1,
                            batch_size: int = 0) -> float:
@@ -44,6 +45,7 @@ class PolicyTrainer:
 
         total_loss = 0.0
         n_decisions = 0
+        n_top1 = 0
 
         for dec in decisions:
             state_feats = np.array(dec['state_features'], dtype=np.float64)
@@ -83,6 +85,10 @@ class PolicyTrainer:
             loss = -np.sum(targets * np.log(probs + 1e-8))
             total_loss += loss
 
+            # Prior↔visit shoda: vybrala by policy nejnavštěvovanější MCTS tah?
+            if np.argmax(probs) == np.argmax(targets):
+                n_top1 += 1
+
             # Gradient: d_loss/d_logits = probs - targets (softmax + CE)
             grad_logits = probs - targets  # shape (n_actions,)
 
@@ -100,6 +106,7 @@ class PolicyTrainer:
 
             n_decisions += 1
 
+        self.last_top1_agreement = n_top1 / max(n_decisions, 1)
         return total_loss / max(n_decisions, 1)
 
     def save_weights(self, path: str) -> None:
@@ -147,6 +154,7 @@ class NeuralPolicyTrainer:
         scale2 = np.sqrt(2.0 / hidden_size)
         self.W2 = np.random.randn(hidden_size) * scale2
         self.b2 = 0.0
+        self.last_top1_agreement = 0.0  # podíl rozhodnutí, kde policy argmax == nejnavštěvovanější MCTS tah
 
     def train_on_decisions(self, decisions: list[dict], passes: int = 1,
                            batch_size: int = 32) -> float:
@@ -162,6 +170,7 @@ class NeuralPolicyTrainer:
 
         total_loss = 0.0
         n_decisions = 0
+        n_top1 = 0
 
         for pass_idx in range(passes):
             # Shuffle decisions each pass
@@ -215,6 +224,8 @@ class NeuralPolicyTrainer:
                     loss = -np.sum(targets * np.log(probs + 1e-8))
                     total_loss += loss
                     n_decisions += 1
+                    if np.argmax(probs) == np.argmax(targets):
+                        n_top1 += 1
 
                 # Backward: d_logits = probs - targets
                 d_logits = probs - targets  # (N,)
@@ -254,6 +265,7 @@ class NeuralPolicyTrainer:
         np.clip(self.W1, -5.0, 5.0, out=self.W1)
         np.clip(self.W2, -5.0, 5.0, out=self.W2)
 
+        self.last_top1_agreement = n_top1 / max(n_decisions, 1)
         return total_loss / max(n_decisions, 1)
 
     def save_weights(self, path: str) -> None:

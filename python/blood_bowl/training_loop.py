@@ -150,7 +150,8 @@ def run_training(
     metrics_csv_path = csv_path.parent / 'epoch_metrics.csv'
     with open(metrics_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm'])
+        writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm',
+                         'policy_loss', 'policy_top1_agreement'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
     if self_play and opponent_mix_ratio > 0:
@@ -427,6 +428,9 @@ def run_training(
                     vf_msg += ' WARNING: both negative — possible inversion!'
 
         # Train policy on MCTS decisions
+        policy_loss = 0.0
+        policy_agreement = 0.0
+        n_dec = 0
         if policy_trainer:
             decision_files = sorted(epoch_log_dir.glob('decisions_*.json'))
             all_decisions = []
@@ -440,10 +444,8 @@ def run_training(
                 passes = 5 if (imitation_epochs > 0 and epoch <= imitation_epochs) else 1
                 policy_loss = policy_trainer.train_on_decisions(
                     all_decisions, passes=passes, batch_size=32)
+                policy_agreement = getattr(policy_trainer, 'last_top1_agreement', 0.0)
                 n_dec = len(all_decisions)
-            else:
-                policy_loss = 0.0
-                n_dec = 0
 
         # Save updated weights
         if policy_trainer:
@@ -529,11 +531,14 @@ def run_training(
         # Observability metrics — log to epoch_metrics.csv
         nil_nil_rate = nil_nil / n_games if n_games > 0 else 0.0
         print(f'  Metrics: nil_nil={nil_nil_rate:.1%} mean_abs_vf={mean_abs_vf:.3f} '
-              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}')
+              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}'
+              + (f' | policy_loss={policy_loss:.3f} top1_agree={policy_agreement:.1%}'
+                 if policy_trainer else ''))
         with open(metrics_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([epoch, f'{nil_nil_rate:.3f}', f'{mean_abs_vf:.4f}',
-                             f'{weight_norm_change:.4f}', f'{grad_norm:.4f}'])
+                             f'{weight_norm_change:.4f}', f'{grad_norm:.4f}',
+                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}'])
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
