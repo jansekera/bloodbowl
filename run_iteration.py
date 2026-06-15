@@ -36,10 +36,11 @@ LR = 0.0003
 # v epochách 6, 7, 10 (oba avg VF pozitivní = MCTS dostával špatný signál). Vráceno na 0.0.
 VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
-GATING_MATCHES = 400
+GATING_MATCHES = 600  # bumped 400→600 (2026-06-15): chess gate is decisive-only,
+                      # ~75% her končí remízou → víc her = víc rozhodnutých = míň šumu
 BM_DROP_LIMIT = 0.05
 BM_FLOOR = 0.77
-ANTI_REGRESSION = 0.51
+ANTI_REGRESSION = 0.51  # práh na DECISIVE-only chess score (W/(W+L)), ne (W+0.5D)/N
 OPPONENT_MIX_RATIO = 0.5
 MODEL = 'neural'
 HIDDEN_SIZE = 64
@@ -308,9 +309,13 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'  Game {i + 1}: {hs}-{as_}', flush=True)
 
     total = wins + draws + losses
-    chess_score = (wins + 0.5 * draws) / total if total else 0.0
-    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} '
-          f'({total}/{GATING_MATCHES} games)', flush=True)
+    # Decisive-only chess score: při ~75% remíz formule (W+0.5D)/N stlačí skóre
+    # k 50% a práh ANTI_REGRESSION padne dovnitř šumového pásma (mince). Skórujeme
+    # jen rozhodnuté hry → statistická síla. Remízy nenesou signál o síle modelu.
+    decisive = wins + losses
+    chess_score = wins / decisive if decisive else 0.5
+    print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} decisive '
+          f'({decisive} decisive / {total} games)', flush=True)
     if total < GATING_MATCHES:
         abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES} — engine hang?)')
 
@@ -340,7 +345,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     if chess_score < ANTI_REGRESSION and not baseline_reset:
         promote = False
-        reasons.append(f'horší než frozen ({chess_score:.1%} < {ANTI_REGRESSION:.0%})')
+        reasons.append(f'horší než frozen (decisive {chess_score:.1%} < {ANTI_REGRESSION:.0%})')
 
     if baseline_reset:
         promote = True  # force-establish the new TV baseline regardless of absolute score
