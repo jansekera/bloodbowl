@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import random
 import shutil
@@ -40,7 +41,12 @@ GATING_MATCHES = 600  # bumped 400→600 (2026-06-15): chess gate is decisive-on
                       # ~75% her končí remízou → víc her = víc rozhodnutých = míň šumu
 BM_DROP_LIMIT = 0.05
 BM_FLOOR = 0.77
-ANTI_REGRESSION = 0.51  # práh na DECISIVE-only chess score (W/(W+L)), ne (W+0.5D)/N
+# Gate dual-signal: požadovaná HtH výhra = 0.5 + k·σ, σ=0.5/√rozhodnuté.
+# k podle benchmarku vs all-time-best (zlepšen/~stejný/klesl). Nahradilo pevné
+# ANTI_REGRESSION=0.51, které leželo uvnitř šumu (mince). Viz Step 5.
+GATE_SIGMA_IMPROVED = 1.0   # benchmark ≥ best
+GATE_SIGMA_SAME = 1.5       # benchmark do 2 % pod best
+GATE_SIGMA_DROPPED = 2.0    # benchmark 2–5 % pod best (>5 % = HARD-REJECT)
 OPPONENT_MIX_RATIO = 0.5
 MODEL = 'neural'
 HIDDEN_SIZE = 64
@@ -327,25 +333,48 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         shutil.copy2(str(frozen_path), str(best_path))
         return False, new_bm, chess_score
 
-    # Step 5: Gate decision
+    # Step 5: Gate decision — dual-signal (head-to-head vs frozen + benchmark vs best).
+    # Head-to-head je PRIMÁRNÍ signál (přímé párové srovnání, nedá se ošálit šťastným
+    # benchmark hodem). Benchmark vs all-time-best OHÝBÁ požadovanou HtH laťku: čím
+    # hůř na benchmarku, tím přesvědčivější HtH výhru vyžadujeme. Práh = 0,5 + k·σ,
+    # kde σ = 0,5/√rozhodnuté_hry (šum 50/50 mince). Víc rozhodnutých her → nižší
+    # laťka. Nahrazuje pevné ANTI_REGRESSION=0.51 (bylo uvnitř šumu → mince).
+    # Viz paměť project-gating-redesign.
     promote = True
     reasons: list[str] = []
 
-    if all_time_best_bm > 0 and new_bm < all_time_best_bm - BM_DROP_LIMIT:
-        promote = False
-        reasons.append(f'benchmark klesl {all_time_best_bm:.1%}→{new_bm:.1%} (>{BM_DROP_LIMIT:.0%})')
+    sigma = 0.5 / math.sqrt(decisive) if decisive else 0.5
 
-    if frozen_bm > 0 and new_bm < frozen_bm - 0.02:
+    if all_time_best_bm <= 0:
+        # První baseline / neznámý best — žádná benchmark reference, jen mírná HtH laťka.
+        k, tier = GATE_SIGMA_IMPROVED, 'bez reference'
+    elif new_bm >= all_time_best_bm:
+        k, tier = GATE_SIGMA_IMPROVED, 'benchmark zlepšen'
+    elif new_bm > all_time_best_bm - 0.02:
+        k, tier = GATE_SIGMA_SAME, 'benchmark ~stejný'
+    elif new_bm > all_time_best_bm - BM_DROP_LIMIT:
+        k, tier = GATE_SIGMA_DROPPED, 'benchmark klesl'
+    else:
+        k, tier = None, 'benchmark propadl'
+
+    if k is None:
         promote = False
-        reasons.append(f'benchmark pod frozen ({new_bm:.1%} < {frozen_bm:.1%} - 2%)')
+        reasons.append(f'benchmark propadl >{BM_DROP_LIMIT:.0%} pod best '
+                       f'({new_bm:.1%} < {all_time_best_bm:.1%}) — HARD-REJECT')
+        required = None
+    else:
+        required = 0.5 + k * sigma
+        if chess_score < required and not baseline_reset:
+            promote = False
+            reasons.append(f'head-to-head {chess_score:.1%} < práh {required:.1%} '
+                           f'({tier}: {k:.1f}σ, σ={sigma:.1%}, {decisive} rozhodnutých)')
 
     if new_bm < BM_FLOOR and not baseline_reset:
         promote = False
         reasons.append(f'benchmark pod minimem ({new_bm:.1%} < {BM_FLOOR:.0%})')
 
-    if chess_score < ANTI_REGRESSION and not baseline_reset:
-        promote = False
-        reasons.append(f'horší než frozen (decisive {chess_score:.1%} < {ANTI_REGRESSION:.0%})')
+    bar_str = f'{required:.1%}' if required is not None else 'HARD-REJECT'
+    print(f'Gate práh: HtH ≥ {bar_str} ({tier}), benchmark {new_bm:.1%} vs best {all_time_best_bm:.1%}', flush=True)
 
     if baseline_reset:
         promote = True  # force-establish the new TV baseline regardless of absolute score
