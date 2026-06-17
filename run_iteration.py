@@ -233,7 +233,15 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         f'--mcts-iterations={MCTS_ITERATIONS}',
         f'--lr={LR}', f'--model={MODEL}', f'--hidden-size={HIDDEN_SIZE}',
         f'--vf-blend={VF_BLEND}', f'--vf-ramp-epochs={VF_RAMP_EPOCHS}',
-        '--policy-lr=0',
+        # AZ bring-up krok 1: imitation-only. Policy trainer se zapne (lr>0) a učí se
+        # imitovat MCTS visit distribuci, ALE blend=0 po CELÝ běh (imitation-epochs=16
+        # = všechny epochy) → search bere pořád heuristické priory, value se trénuje
+        # beztoho stejně. Cíl: ověřit policy_loss↓ a že value drží (benchmark ~beze změny).
+        # Blend se zapne až v kroku 5. Viz paměť project-bloodbowl / project-gating-redesign.
+        '--policy-lr=0.01',
+        '--policy-model=linear',
+        '--policy-blend=0.0',
+        '--imitation-epochs=16',
         '--weights=weights_az_train.json',
         f'--tv={TV}',
         '--training-method=mc_shaped',
