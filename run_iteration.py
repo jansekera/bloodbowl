@@ -233,13 +233,15 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         f'--mcts-iterations={MCTS_ITERATIONS}',
         f'--lr={LR}', f'--model={MODEL}', f'--hidden-size={HIDDEN_SIZE}',
         f'--vf-blend={VF_BLEND}', f'--vf-ramp-epochs={VF_RAMP_EPOCHS}',
-        # AZ bring-up krok 1: imitation-only. Policy trainer se zapne (lr>0) a učí se
-        # imitovat MCTS visit distribuci, ALE blend=0 po CELÝ běh (imitation-epochs=16
-        # = všechny epochy) → search bere pořád heuristické priory, value se trénuje
-        # beztoho stejně. Cíl: ověřit policy_loss↓ a že value drží (benchmark ~beze změny).
-        # Blend se zapne až v kroku 5. Viz paměť project-bloodbowl / project-gating-redesign.
+        # AZ bring-up krok 1 (NEURAL varianta): imitation-only. Lineární policy plató
+        # na top1≈38 % / loss≈2.24 (kapacita + linear ignoruje passes, bug #5) →
+        # přechod na neural. Neural RESPEKTUJE passes (policy_trainer.py:175), sdílí
+        # --hidden-size=64 (na C++ stropu min(H,64), bez ořezu). Blend=0 po CELÝ běh
+        # (imitation-epochs=16) → search bere heuristické priory, value se trénuje
+        # stejně. Cíl: prolomí neural plató 38 %? klesá loss? drží value (~89 %)?
+        # Blend až krok 5. Viz team_neural_policy_brief.md + paměť project-bloodbowl.
         '--policy-lr=0.01',
-        '--policy-model=linear',
+        '--policy-model=neural',
         '--policy-blend=0.0',
         '--imitation-epochs=16',
         '--weights=weights_az_train.json',
