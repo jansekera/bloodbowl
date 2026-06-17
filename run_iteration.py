@@ -421,6 +421,12 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
             gate_data = f.read()
         with open(frozen_path, 'rb') as f:
             frozen_data = f.read()
+        # epoch_metrics.csv je výstup běhu (neregeneruje se z ničeho), takže ho musíme
+        # zachytit před resetem stejně jako váhy — jinak `git reset --hard` přepíše
+        # čerstvé metriky committed (zastaralou) verzí DŘÍV, než je commitneme, a
+        # policy_loss / top1_agreement se do gitu nikdy nedostanou.
+        metrics_path = root / 'epoch_metrics.csv'
+        metrics_data = metrics_path.read_bytes() if metrics_path.exists() else None
 
         # Pull latest to avoid conflict, then add our files
         subprocess.run(['git', 'fetch', 'origin'], cwd=str(root), capture_output=True)
@@ -438,6 +444,10 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
                     'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV}
 
         _atomic_write_json(root / 'weights_best_meta.json', meta)
+
+        # Re-apply epoch_metrics.csv after reset (reset clobbered it back to committed)
+        if metrics_data is not None:
+            metrics_path.write_bytes(metrics_data)
 
         files = [
             'weights_best.json', 'weights_best_meta.json',
