@@ -41,6 +41,13 @@ GATING_MATCHES = 600  # bumped 400→600 (2026-06-15): chess gate is decisive-on
                       # ~75% her končí remízou → víc her = víc rozhodnutých = míň šumu
 BM_DROP_LIMIT = 0.05
 BM_FLOOR = 0.77
+
+# Smoke-test přepisy přes env (defaulty pro normální běh beze změny).
+EPOCHS = int(os.environ.get('BB_EPOCHS', EPOCHS))
+GAMES_PER_EPOCH = int(os.environ.get('BB_GAMES', GAMES_PER_EPOCH))
+MCTS_ITERATIONS = int(os.environ.get('BB_MCTS', MCTS_ITERATIONS))
+BENCHMARK_MATCHES = int(os.environ.get('BB_BM', BENCHMARK_MATCHES))
+GATING_MATCHES = int(os.environ.get('BB_GATE', GATING_MATCHES))
 # Gate dual-signal: požadovaná HtH výhra = 0.5 + k·σ, σ=0.5/√rozhodnuté.
 # k podle benchmarku vs all-time-best (zlepšen/~stejný/klesl). Nahradilo pevné
 # ANTI_REGRESSION=0.51, které leželo uvnitř šumu (mince). Viz Step 5.
@@ -137,6 +144,58 @@ def _gate_game(args: tuple) -> tuple[int, int]:
     return result.home_score, result.away_score
 
 
+def _carry_over_policy(az_path: Path, best_path: Path, policy_path: Path) -> None:
+    """Přenese uloženou policy hlavu do az_train PŘED tréninkem.
+
+    BUG FIX (2026-06-18): copy best→az_train (níže) je value-only ('neural' plain),
+    takže load_combined_weights spadne do legacy větve a neural policy startuje z
+    RANDOM každou iteraci → nic se nekumuluje. Tady value bereme z best (frozen,
+    gating záměr), ale policy hlavu přeneseme z minulé iterace, takže se policy
+    učí napříč iteracemi. Viz paměť project-neural-policy-rootcause.
+    """
+    if not policy_path.exists():
+        return  # 1. iterace: žádná uložená policy → trénuje se z random (OK)
+    with open(policy_path) as f:
+        pol = json.load(f)
+    if 'policy_W1' not in pol:
+        return
+    with open(best_path) as f:
+        val = json.load(f)
+    data: dict = {'type': 'alphazero_neural'}
+    if str(val.get('type', '')).startswith('alphazero'):
+        for k in ('hidden_size', 'n_features', 'value_W1', 'value_b1', 'value_W2', 'value_b2'):
+            if k in val:
+                data[k] = val[k]
+    else:  # plain 'neural' value: W1/b1/W2/b2 → value_*
+        data['hidden_size'] = val['hidden_size']
+        data['n_features'] = val['n_features']
+        data['value_W1'] = val['W1']
+        data['value_b1'] = val['b1']
+        data['value_W2'] = val['W2']
+        data['value_b2'] = val['b2']
+    for k in ('policy_type', 'policy_hidden_size', 'policy_W1', 'policy_b1',
+              'policy_W2', 'policy_b2', 'policy_temperature'):
+        if k in pol:
+            data[k] = pol[k]
+    with open(az_path, 'w') as f:
+        json.dump(data, f)
+    print('Policy carry-over: policy hlava z předchozí iterace vložena do az_train', flush=True)
+
+
+def _stash_policy(az_path: Path, policy_path: Path) -> None:
+    """Uloží vytrénovanou policy hlavu z az_train pro další iteraci."""
+    with open(az_path) as f:
+        data = json.load(f)
+    if 'policy_W1' not in data:
+        return
+    pol = {k: data[k] for k in ('policy_type', 'policy_hidden_size', 'policy_W1',
+                                'policy_b1', 'policy_W2', 'policy_b2', 'policy_temperature')
+           if k in data}
+    with open(policy_path, 'w') as f:
+        json.dump(pol, f)
+    print('Policy stash: vytrénovaná policy hlava uložena pro další iteraci', flush=True)
+
+
 def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     os.chdir(str(PROJECT_ROOT))
 
@@ -217,6 +276,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         return False, None, 0.0
 
     shutil.copy2(str(best_path), str(az_train_path))
+    policy_cache_path = PROJECT_ROOT / 'weights_policy.json'
+    _carry_over_policy(az_train_path, best_path, policy_cache_path)
 
     # Step 2: Self-play training
     print(f'\n=== Self-play training ({EPOCHS} epochs x {GAMES_PER_EPOCH} games) ===')
@@ -254,6 +315,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         f'--workers={WORKERS}',
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
+    _stash_policy(az_train_path, policy_cache_path)
 
     # Step 3: Benchmark az_train (final epoch) AND train_best (best self-play epoch),
     # then gate on whichever scores higher vs random. Each gets BENCHMARK_MATCHES/2 games.
