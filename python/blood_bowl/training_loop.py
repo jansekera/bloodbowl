@@ -99,7 +99,7 @@ def run_training(
         if weights_path.exists():
             trainer, policy_trainer = load_combined_weights(
                 str(weights_path), value_lr=learning_rate, policy_lr=policy_lr,
-                policy_model=policy_model)
+                policy_model=policy_model, policy_hidden_size=hidden_size)
         else:
             trainer = create_trainer(
                 model_type=model_type, hidden_size=hidden_size, learning_rate=learning_rate)

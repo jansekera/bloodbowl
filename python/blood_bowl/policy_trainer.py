@@ -352,6 +352,7 @@ def load_combined_weights(
     value_lr: float = 0.01,
     policy_lr: float = 0.01,
     policy_model: str = 'auto',
+    policy_hidden_size: int = 32,
 ):
     """Load both value and policy trainers from a combined weights file.
 
@@ -367,7 +368,8 @@ def load_combined_weights(
 
     # Create appropriate policy trainer
     if saved_policy_type == 'neural' or (policy_model == 'neural' and saved_policy_type != 'neural'):
-        policy_trainer = NeuralPolicyTrainer(learning_rate=policy_lr)
+        policy_trainer = NeuralPolicyTrainer(learning_rate=policy_lr,
+                                             hidden_size=policy_hidden_size)
     else:
         policy_trainer = PolicyTrainer(learning_rate=policy_lr)
 
