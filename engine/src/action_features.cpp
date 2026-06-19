@@ -117,6 +117,48 @@ void extractActionFeatures(const GameState& state, const Action& action, float* 
                 out[14] = 1.0f;
             }
         }
+
+        // [15-22] MOVE IDENTITY — make distinct actions distinguishable (break collisions).
+        // All coords are perspective-normalized along the acting team's attack axis so
+        // they generalize across HOME/AWAY: progress = 0 own endzone, 1 opponent endzone.
+        auto progress = [&](int x) {
+            int p = (player.teamSide == TeamSide::HOME) ? x : (25 - x);
+            return std::clamp(p / 25.0f, 0.0f, 1.0f);
+        };
+
+        // Effective target square: move target if on pitch, else defender position (block/blitz/foul).
+        Position eff{-1, -1};
+        if (action.target.isOnPitch()) {
+            eff = action.target;
+        } else if (action.targetId > 0 && action.targetId <= 22) {
+            const Player& tgtP = state.getPlayer(action.targetId);
+            if (tgtP.isOnPitch()) eff = tgtP.position;
+        }
+
+        if (player.isOnPitch()) {
+            // [15] source progress toward opponent endzone
+            out[15] = progress(player.position.x);
+            // [16] source lateral position
+            out[16] = player.position.y / 14.0f;
+        }
+
+        if (eff.isOnPitch()) {
+            // [17] target progress toward opponent endzone
+            out[17] = progress(eff.x);
+            // [18] target lateral position
+            out[18] = eff.y / 14.0f;
+            if (player.isOnPitch()) {
+                // [19] forward delta (signed: + toward opponent endzone)
+                out[19] = progress(eff.x) - progress(player.position.x);
+                // [20] lateral delta
+                out[20] = (eff.y - player.position.y) / 14.0f;
+                // [21] move distance (Chebyshev) normalized
+                out[21] = std::min(player.position.distanceTo(eff), 14) / 14.0f;
+            }
+        }
+
+        // [22] acting player identity within team (distinguishes same-typed moves by different players)
+        out[22] = ((action.playerId - 1) % 11) / 10.0f;
     }
 }
 

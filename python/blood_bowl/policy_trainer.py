@@ -15,8 +15,8 @@ import numpy as np
 
 from .features import NUM_FEATURES
 
-NUM_ACTION_FEATURES = 15
-POLICY_INPUT_SIZE = NUM_FEATURES + NUM_ACTION_FEATURES  # 85
+NUM_ACTION_FEATURES = 23  # keep in sync with engine/include/bb/action_features.h
+POLICY_INPUT_SIZE = NUM_FEATURES + NUM_ACTION_FEATURES  # 70 + 23 = 93
 
 
 class PolicyTrainer:
