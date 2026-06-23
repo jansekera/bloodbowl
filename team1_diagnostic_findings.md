@@ -79,3 +79,28 @@ More sims alone barely helps (0.936→0.926); lowering `exploration_c` to 0.5 (w
 800 sims) drops H_norm to 0.812 and lifts top1 to 0.40 — meaningful, but still above
 the ~0.70 bar. So `exploration_c=0.5` is a cheap config win; proceed to step 2 (cut
 open-loop macro Q-variance in `macro_mcts.cpp:509-540`).
+
+## Update — T2 step 2 (averaging K rollouts, measured): NO EFFECT
+Added an `n_rollouts` knob (average K open-loop rollouts per leaf eval; default 1 =
+unchanged) and measured at `exploration_c=0.5`, heads connected:
+
+| sims | n_rollouts | H_norm | top1 |
+|---:|---:|---:|---:|
+| 400 | 1 | 0.830 | 0.374 |
+| 400 | 4 | 0.825 | 0.345 |
+| 400 | 8 | 0.839 | 0.341 |
+| 800 | 4 | 0.792 | 0.380 |
+
+Increasing K does nothing (0.830→0.825→0.839, within noise; top1 does not rise). The
+small gain at 800/K=4 is from the extra sims, not K. **Open-loop macro Q-variance is
+NOT the binding constraint.**
+
+### Where this leaves the search investigation
+Levers tried: wiring (no), more sims (small), `exploration_c` (REAL: H_norm
+0.94→0.81), rollout averaging (no). The one cheap, real win is **`exploration_c≈0.5`**.
+The residual H_norm ~0.81 looks largely irreducible by search — consistent with many
+Blood Bowl macro decisions being genuinely near-equivalent (move-forward,
+interchangeable linemen), i.e. a partly *correct* flat target. Next: (T3) fix the
+value-training target to address value drift / gate rejects, plus a validation
+TRAINING run with `exploration_c=0.5` to confirm the sharper target → stronger play.
+(The `n_rollouts` knob is retained default-off for reproducibility; revert if unused.)

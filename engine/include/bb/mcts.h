@@ -23,6 +23,7 @@ struct MCTSConfig {
     float dirichletWeight = 0.25f; // prior = (1-w)*policy + w*Dir(alpha)
     float policyBlend = 0.0f;     // Blend policy with heuristics: 0.0 = heuristics only, 1.0 = policy only
     float vfBlend = 0.0f;         // Blend VF with heuristic eval: 0.0 = heuristic only, 1.0 = VF only
+    int nRollouts = 1;            // Rollouts averaged per leaf eval (open-loop): >1 cuts macro Q-variance ~sqrt(K)
 };
 
 struct MCTSNode {

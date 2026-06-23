@@ -111,7 +111,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
         // 1. Select
         MacroMCTSNode* node = select(&root);
 
-        // 2. Replay state to this node
+        // 2. Replay state to this node (open-loop: fresh dice each replay)
         GameState sim = state.clone();
         if (!replayToNode(sim, node)) {
             iterations++;
@@ -128,8 +128,17 @@ Macro MacroMCTSSearch::search(const GameState& state) {
             }
         }
 
-        // 4. Evaluate leaf
+        // 4. Evaluate leaf, averaging nRollouts open-loop samples to cut
+        //    Q-variance (~sqrt(K)). The first rollout reuses the already-replayed
+        //    `sim`; extra rollouts re-replay with fresh dice from this node.
         double value = simulate(sim, searchingSide);
+        int nRollouts = std::max(1, config_.nRollouts);
+        for (int r = 1; r < nRollouts; ++r) {
+            GameState extra = state.clone();
+            if (!replayToNode(extra, node)) continue;
+            value += simulate(extra, searchingSide);
+        }
+        value /= static_cast<double>(nRollouts);
 
         // 5. Backpropagate
         backpropagate(node, value);

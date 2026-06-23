@@ -408,7 +408,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       float vfBlend,
                                       const std::string& awayWeightsPath,
                                       float dirichletAlpha,
-                                      float explorationC) {
+                                      float explorationC,
+                                      int nRollouts) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -447,6 +448,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletAlpha = dirichletAlpha;
                 cfg.dirichletWeight = 0.25f;
                 cfg.vfBlend = vfBlend;
+                cfg.nRollouts = nRollouts;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -516,7 +518,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("vf_blend") = 0.0f,
        py::arg("away_weights_path") = "",
        py::arg("dirichlet_alpha") = 0.3f,
-       py::arg("exploration_c") = 2.0f);
+       py::arg("exploration_c") = 2.0f,
+       py::arg("n_rollouts") = 1);
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {
