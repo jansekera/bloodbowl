@@ -48,6 +48,11 @@ GAMES_PER_EPOCH = int(os.environ.get('BB_GAMES', GAMES_PER_EPOCH))
 MCTS_ITERATIONS = int(os.environ.get('BB_MCTS', MCTS_ITERATIONS))
 BENCHMARK_MATCHES = int(os.environ.get('BB_BM', BENCHMARK_MATCHES))
 GATING_MATCHES = int(os.environ.get('BB_GATE', GATING_MATCHES))
+# Team1 v2 validation knobs (defaulty = původní chování beze změny):
+VF_BLEND = float(os.environ.get('BB_VF_BLEND', VF_BLEND))
+POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
+IMITATION_EPOCHS = int(os.environ.get('BB_IMITATION_EPOCHS', 16))
+TRAINING_METHOD = os.environ.get('BB_TRAINING_METHOD', 'mc_shaped')
 # Gate dual-signal: požadovaná HtH výhra = 0.5 + k·σ, σ=0.5/√rozhodnuté.
 # k podle benchmarku vs all-time-best (zlepšen/~stejný/klesl). Nahradilo pevné
 # ANTI_REGRESSION=0.51, které leželo uvnitř šumu (mince). Viz Step 5.
@@ -303,11 +308,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         # Blend až krok 5. Viz team_neural_policy_brief.md + paměť project-bloodbowl.
         '--policy-lr=0.01',
         '--policy-model=neural',
-        '--policy-blend=0.0',
-        '--imitation-epochs=16',
+        f'--policy-blend={POLICY_BLEND}',
+        f'--imitation-epochs={IMITATION_EPOCHS}',
         '--weights=weights_az_train.json',
         f'--tv={TV}',
-        '--training-method=mc_shaped',
+        f'--training-method={TRAINING_METHOD}',
         f'--epsilon-start={EPSILON_START}', f'--epsilon-end={EPSILON_END}',
         f'--benchmark-interval={BENCHMARK_INTERVAL}', f'--benchmark-matches={BENCHMARK_MATCHES}',
         '--skip-greedy-benchmark', '--timeout=300',
