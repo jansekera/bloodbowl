@@ -62,3 +62,20 @@ it is NOT the cause of the flat policy target (the value still discriminates).
 
 Code refs: `engine/src/macro_mcts.cpp:188,496,509-540`; `engine/src/value_function.cpp:34-53`;
 `python/blood_bowl/policy_trainer.py`; `python/blood_bowl/trainer.py:421-483`.
+
+## Update — T2 step 1 (sims / exploration_c sweep, measured)
+With both heads connected (vf=0.5, pol=0.15), `exploration_c` is a real lever; the
+training/ceiling default of 2.0 was over-exploring and flattening the target:
+
+| sims | exploration_c | H_norm | top1 |
+|---:|---:|---:|---:|
+| 100 | 2.0 | 0.936 | 0.283 |
+| 800 | 2.0 | 0.926 | 0.271 |
+| 400 | 1.0 | 0.923 | 0.267 |
+| 400 | 0.5 | 0.855 | 0.337 |
+| 800 | 0.5 | 0.812 | 0.400 |
+
+More sims alone barely helps (0.936→0.926); lowering `exploration_c` to 0.5 (with
+800 sims) drops H_norm to 0.812 and lifts top1 to 0.40 — meaningful, but still above
+the ~0.70 bar. So `exploration_c=0.5` is a cheap config win; proceed to step 2 (cut
+open-loop macro Q-variance in `macro_mcts.cpp:509-540`).
