@@ -518,7 +518,7 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("vf_blend") = 0.0f,
        py::arg("away_weights_path") = "",
        py::arg("dirichlet_alpha") = 0.3f,
-       py::arg("exploration_c") = 2.0f,
+       py::arg("exploration_c") = 0.5f,   // T2: 2.0 over-explored, flat target; 0.5 sharpens. eval path (simulate_game) uses its own 1.0
        py::arg("n_rollouts") = 1);
 
     // --- Roster getters ---
