@@ -1,0 +1,14 @@
+== bez policy (uniformní priory = jako strop 1/3/4) ==
+  [BEZ policy (uniform)] 852 decisí, n_act mean=9.8
+== s policy (heuristické priory aktivní = jako trénink) ==
+  [S policy (heuristic)] 841 decisí, n_act mean=10.1
+
+===== STROP 1b: VLIV PRIORŮ NA ŠPIČATOST CÍLE (MCTS=100) =====
+                config   H(nats)   H_norm    top1    top3   near%
+  BEZ policy (uniform)     2.055    0.958   0.249   0.537    36.6
+  S policy (heuristic)     2.034    0.944   0.262   0.563    38.3
+
+INTERPRETACE:
+  S policy výrazně NIŽŠÍ H / VYŠŠÍ top1 → moje strop měření byla zkreslená uniform priory.
+    → závěr "value neumí rozlišit → per-player" PADÁ, přeměřit strop 3/4 správně.
+  ~stejné → priory to nebyly, plochý cíl drží i s heuristikami → původní závěr platí.

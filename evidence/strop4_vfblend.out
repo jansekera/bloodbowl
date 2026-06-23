@@ -1,0 +1,16 @@
+== měřím vfBlend=0.0 (MCTS=400, 4 her) ==
+  [vfBlend=0.0] 567 decisí, n_act mean=10.4
+== měřím vfBlend=0.5 (MCTS=400, 4 her) ==
+  [vfBlend=0.5] 464 decisí, n_act mean=10.7
+== měřím vfBlend=1.0 (MCTS=400, 4 her) ==
+  [vfBlend=1.0] 511 decisí, n_act mean=9.8
+
+========= STROP 4: VALUE V SEARCHI vs ŠPIČATOST CÍLE (MCTS=400) =========
+ vfBlend   H(nats)   H_norm    top1    top3  near-tie%
+     0.0     2.111    0.954   0.245   0.517       33.9
+     0.5     2.090    0.947   0.247   0.534       43.3
+     1.0     1.988    0.932   0.266   0.574       45.0
+
+INTERPRETACE:
+  H výrazně klesá s vfBlend → value ROZLIŠUJE akce → FIX: zapnout vfBlend v self-play (sami)
+  H ~stejná i s vfBlend=1.0 → value je taky plochá → hlubší problém → Tým 1

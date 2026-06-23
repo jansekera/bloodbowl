@@ -1,0 +1,9 @@
+C-primárně: 2 blendů × 12 her = 24 her, 12 workers, soupeř=learning, MCTS=100
+
+=========== C-PRIMÁRNĚ: HERNÍ SÍLA POLICY JAKO PRIOR ===========
+ blend    W    D    L    win%   scoreΔ
+   0.0    3    9    0   62.5%    +0.33
+   0.3    3    9    0   62.5%    +0.25
+
+INTERPRETACE: vyšší blend → vyšší win% / scoreΔ = policy jako prior POMÁHÁ (náš fix).
+              plochý/horší s blendem = policy jako prior nepomáhá → per-player/Tým 1.

@@ -1,0 +1,20 @@
+== train  (D0.3,C2.0) ==
+  [train  (D0.3,C2.0)] 828 decisí
+== no-dir (D0.0,C2.0) ==
+  [no-dir (D0.0,C2.0)] 813 decisí
+== low-C  (D0.3,C1.0) ==
+  [low-C  (D0.3,C1.0)] 745 decisí
+== eval   (D0.0,C1.0) ==
+  [eval   (D0.0,C1.0)] 992 decisí
+
+===== STROP 1c: ZDROJ PLOCHOSTI CÍLE (MCTS=100, heuristické priory) =====
+              config   H(nats)   H_norm    top1    top3   near%
+  train  (D0.3,C2.0)     2.028    0.938   0.265   0.566    35.4
+  no-dir (D0.0,C2.0)     2.107    0.963   0.223   0.489    47.8
+  low-C  (D0.3,C1.0)     2.009    0.921   0.280   0.575    40.3
+  eval   (D0.0,C1.0)     1.968    0.935   0.260   0.542    56.8
+
+INTERPRETACE:
+  eval výrazně ostřejší než train (H dolů, top1 nahoru) → plochost = explorační ŠUM
+     → FIX NÁŠ: generovat tréninková data s menším šumem. per-player NETŘEBA (zatím).
+  eval ~stejně plochý jako train → šum to není, value/search opravdu nerozlišuje → per-player/Tým 1.

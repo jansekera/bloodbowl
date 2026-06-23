@@ -1,0 +1,64 @@
+4:ITERACE 1/4
+28:  Metrics: nil_nil=45.0% mean_abs_vf=0.565 w_norm_Δ=-0.0004 grad_norm=4.0784 | policy_loss=2.257 top1_agree=37.0%
+34:  Metrics: nil_nil=47.5% mean_abs_vf=0.594 w_norm_Δ=+0.0000 grad_norm=3.7569 | policy_loss=2.234 top1_agree=38.4%
+40:  Metrics: nil_nil=37.5% mean_abs_vf=0.594 w_norm_Δ=+0.0023 grad_norm=3.8724 | policy_loss=2.236 top1_agree=37.6%
+46:  Metrics: nil_nil=32.5% mean_abs_vf=0.580 w_norm_Δ=+0.0012 grad_norm=4.3024 | policy_loss=2.218 top1_agree=41.5%
+52:  Metrics: nil_nil=45.0% mean_abs_vf=0.564 w_norm_Δ=+0.0009 grad_norm=3.6695 | policy_loss=2.234 top1_agree=37.6%
+58:  Metrics: nil_nil=40.0% mean_abs_vf=0.594 w_norm_Δ=+0.0020 grad_norm=3.8309 | policy_loss=2.233 top1_agree=37.9%
+64:  Metrics: nil_nil=40.0% mean_abs_vf=0.586 w_norm_Δ=+0.0016 grad_norm=4.1021 | policy_loss=2.236 top1_agree=37.7%
+70:  Metrics: nil_nil=50.0% mean_abs_vf=0.550 w_norm_Δ=-0.0004 grad_norm=3.9642 | policy_loss=2.211 top1_agree=39.0%
+76:  Metrics: nil_nil=40.0% mean_abs_vf=0.591 w_norm_Δ=+0.0003 grad_norm=3.6709 | policy_loss=2.232 top1_agree=39.9%
+82:  Metrics: nil_nil=32.5% mean_abs_vf=0.605 w_norm_Δ=+0.0029 grad_norm=4.0681 | policy_loss=2.240 top1_agree=37.1%
+88:  Metrics: nil_nil=25.0% mean_abs_vf=0.636 w_norm_Δ=+0.0039 grad_norm=3.8409 | policy_loss=2.231 top1_agree=37.6%
+94:  Metrics: nil_nil=37.5% mean_abs_vf=0.585 w_norm_Δ=-0.0001 grad_norm=4.0126 | policy_loss=2.236 top1_agree=39.5%
+100:  Metrics: nil_nil=37.5% mean_abs_vf=0.618 w_norm_Δ=+0.0038 grad_norm=3.7119 | policy_loss=2.237 top1_agree=39.8%
+106:  Metrics: nil_nil=35.0% mean_abs_vf=0.638 w_norm_Δ=+0.0024 grad_norm=3.5688 | policy_loss=2.260 top1_agree=39.6%
+112:  Metrics: nil_nil=37.5% mean_abs_vf=0.567 w_norm_Δ=+0.0024 grad_norm=4.2569 | policy_loss=2.208 top1_agree=39.2%
+118:  Metrics: nil_nil=37.5% mean_abs_vf=0.600 w_norm_Δ=+0.0004 grad_norm=4.0528 | policy_loss=2.251 top1_agree=37.8%
+155:Benchmark: new=85.0%  best=89.0%  all_time_best=89.0%  (max pokles 5%)
+817:New vs Frozen: 77W 444D 79L = 49.4% decisive (156 decisive / 600 games)
+818:Gate práh: HtH ≥ 58.0% (benchmark klesl), benchmark 85.0% vs best 89.0%
+819:REJECTED: head-to-head 49.4% < práh 58.0% (benchmark klesl: 2.0σ, σ=4.0%, 156 rozhodnutých)
+823:ITERACE 2/4
+847:  Metrics: nil_nil=32.5% mean_abs_vf=0.577 w_norm_Δ=+0.0033 grad_norm=4.1877 | policy_loss=2.209 top1_agree=40.8%
+853:  Metrics: nil_nil=47.5% mean_abs_vf=0.572 w_norm_Δ=-0.0003 grad_norm=3.7504 | policy_loss=2.219 top1_agree=38.1%
+859:  Metrics: nil_nil=30.0% mean_abs_vf=0.636 w_norm_Δ=+0.0025 grad_norm=4.0171 | policy_loss=2.228 top1_agree=37.6%
+865:  Metrics: nil_nil=40.0% mean_abs_vf=0.574 w_norm_Δ=+0.0016 grad_norm=3.9146 | policy_loss=2.245 top1_agree=39.5%
+871:  Metrics: nil_nil=27.5% mean_abs_vf=0.625 w_norm_Δ=+0.0007 grad_norm=4.5675 | policy_loss=2.261 top1_agree=38.2%
+877:  Metrics: nil_nil=42.5% mean_abs_vf=0.613 w_norm_Δ=+0.0026 grad_norm=3.3124 | policy_loss=2.243 top1_agree=37.8%
+883:  Metrics: nil_nil=35.0% mean_abs_vf=0.601 w_norm_Δ=+0.0033 grad_norm=3.6840 | policy_loss=2.279 top1_agree=37.5%
+889:  Metrics: nil_nil=42.5% mean_abs_vf=0.598 w_norm_Δ=-0.0005 grad_norm=3.7493 | policy_loss=2.222 top1_agree=38.9%
+895:  Metrics: nil_nil=30.0% mean_abs_vf=0.588 w_norm_Δ=+0.0016 grad_norm=4.2105 | policy_loss=2.204 top1_agree=40.4%
+901:  Metrics: nil_nil=40.0% mean_abs_vf=0.618 w_norm_Δ=+0.0006 grad_norm=3.7486 | policy_loss=2.231 top1_agree=39.5%
+907:  Metrics: nil_nil=40.0% mean_abs_vf=0.608 w_norm_Δ=+0.0025 grad_norm=3.6654 | policy_loss=2.260 top1_agree=40.1%
+913:  Metrics: nil_nil=35.0% mean_abs_vf=0.648 w_norm_Δ=+0.0025 grad_norm=3.5805 | policy_loss=2.253 top1_agree=37.4%
+919:  Metrics: nil_nil=47.5% mean_abs_vf=0.576 w_norm_Δ=+0.0001 grad_norm=3.9421 | policy_loss=2.240 top1_agree=38.9%
+925:  Metrics: nil_nil=32.5% mean_abs_vf=0.613 w_norm_Δ=+0.0002 grad_norm=3.9280 | policy_loss=2.217 top1_agree=38.4%
+931:  Metrics: nil_nil=40.0% mean_abs_vf=0.601 w_norm_Δ=-0.0001 grad_norm=3.5877 | policy_loss=2.244 top1_agree=39.7%
+937:  Metrics: nil_nil=42.5% mean_abs_vf=0.543 w_norm_Δ=+0.0002 grad_norm=4.2905 | policy_loss=2.217 top1_agree=41.7%
+974:Benchmark: new=87.5%  best=89.0%  all_time_best=89.0%  (max pokles 5%)
+1636:New vs Frozen: 66W 446D 88L = 42.9% decisive (154 decisive / 600 games)
+1637:Gate práh: HtH ≥ 56.0% (benchmark ~stejný), benchmark 87.5% vs best 89.0%
+1638:REJECTED: head-to-head 42.9% < práh 56.0% (benchmark ~stejný: 1.5σ, σ=4.0%, 154 rozhodnutých)
+1642:ITERACE 3/4
+1666:  Metrics: nil_nil=35.0% mean_abs_vf=0.613 w_norm_Δ=+0.0029 grad_norm=4.1081 | policy_loss=2.225 top1_agree=39.7%
+1672:  Metrics: nil_nil=32.5% mean_abs_vf=0.586 w_norm_Δ=+0.0024 grad_norm=4.1048 | policy_loss=2.220 top1_agree=41.2%
+1678:  Metrics: nil_nil=42.5% mean_abs_vf=0.562 w_norm_Δ=+0.0004 grad_norm=3.8906 | policy_loss=2.215 top1_agree=39.6%
+1684:  Metrics: nil_nil=37.5% mean_abs_vf=0.616 w_norm_Δ=+0.0008 grad_norm=3.8856 | policy_loss=2.251 top1_agree=37.3%
+1690:  Metrics: nil_nil=37.5% mean_abs_vf=0.581 w_norm_Δ=+0.0022 grad_norm=4.0234 | policy_loss=2.268 top1_agree=38.4%
+1696:  Metrics: nil_nil=42.5% mean_abs_vf=0.577 w_norm_Δ=-0.0001 grad_norm=3.8401 | policy_loss=2.256 top1_agree=37.3%
+1702:  Metrics: nil_nil=37.5% mean_abs_vf=0.598 w_norm_Δ=+0.0017 grad_norm=3.6829 | policy_loss=2.238 top1_agree=41.3%
+1708:  Metrics: nil_nil=42.5% mean_abs_vf=0.588 w_norm_Δ=+0.0009 grad_norm=3.6638 | policy_loss=2.274 top1_agree=35.4%
+1714:  Metrics: nil_nil=32.5% mean_abs_vf=0.616 w_norm_Δ=+0.0020 grad_norm=3.5951 | policy_loss=2.212 top1_agree=38.6%
+1720:  Metrics: nil_nil=37.5% mean_abs_vf=0.616 w_norm_Δ=-0.0000 grad_norm=3.9355 | policy_loss=2.222 top1_agree=39.0%
+1726:  Metrics: nil_nil=35.0% mean_abs_vf=0.607 w_norm_Δ=+0.0001 grad_norm=3.9948 | policy_loss=2.247 top1_agree=39.0%
+1732:  Metrics: nil_nil=30.0% mean_abs_vf=0.624 w_norm_Δ=+0.0026 grad_norm=3.9357 | policy_loss=2.227 top1_agree=41.2%
+1738:  Metrics: nil_nil=37.5% mean_abs_vf=0.608 w_norm_Δ=+0.0004 grad_norm=3.8102 | policy_loss=2.222 top1_agree=39.5%
+1744:  Metrics: nil_nil=40.0% mean_abs_vf=0.590 w_norm_Δ=+0.0013 grad_norm=3.8114 | policy_loss=2.242 top1_agree=40.3%
+1750:  Metrics: nil_nil=37.5% mean_abs_vf=0.617 w_norm_Δ=+0.0024 grad_norm=3.6588 | policy_loss=2.262 top1_agree=36.5%
+1756:  Metrics: nil_nil=37.5% mean_abs_vf=0.578 w_norm_Δ=+0.0014 grad_norm=4.3482 | policy_loss=2.233 top1_agree=38.6%
+1793:Benchmark: new=85.5%  best=89.0%  all_time_best=89.0%  (max pokles 5%)
+2455:New vs Frozen: 73W 434D 93L = 44.0% decisive (166 decisive / 600 games)
+2456:Gate práh: HtH ≥ 57.8% (benchmark klesl), benchmark 85.5% vs best 89.0%
+2457:REJECTED: head-to-head 44.0% < práh 57.8% (benchmark klesl: 2.0σ, σ=3.9%, 166 rozhodnutých)
+2461:ITERACE 4/4
