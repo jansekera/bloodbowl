@@ -348,6 +348,12 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
     const TeamState& my = state.getTeamState(perspective);
     const TeamState& opp = state.getTeamState(opponent(perspective));
     double heuristic = 0.0;
+    // fix #1 (2026-06-24): offensive forward/scoring pull is accumulated
+    // separately and added AFTER the vf blend, so a calibrated value head —
+    // which is flat/negative on the rare scoring-frontier states — cannot
+    // dilute the only signal telling MCTS to carry the ball into the endzone
+    // (root cause of the 0-0 draw collapse).
+    double scoringBonus = 0.0;
 
     // Score advantage (dominant signal)
     heuristic += (my.score - opp.score) * 0.5;
@@ -363,16 +369,17 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         double proximity = 1.0 - dist / 25.0; // 0..1, 1=at endzone
 
         if (carrier.teamSide == perspective) {
-            heuristic += 0.1;  // have ball
-            heuristic += 0.25 * proximity;  // closer to endzone = better
+            heuristic += 0.1;  // have ball (possession value — may be blended)
+            // fix #1: all offensive endzone/scoring pull below -> scoringBonus
+            scoringBonus += 0.25 * proximity;  // closer to endzone = better
 
             // Can score without GFI (safe walk-in)
             if (dist <= static_cast<int>(carrier.movementRemaining)) {
-                heuristic += 0.4;  // strong bonus — safe TD
+                scoringBonus += 0.4;  // strong bonus — safe TD
             }
             // Can score with GFI (risky but possible)
             else if (dist <= carrier.movementRemaining + 2) {
-                heuristic += 0.2;
+                scoringBonus += 0.2;
             }
 
             // Stall pacing: reward being on-track to score on last turn
@@ -380,20 +387,20 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             if (turnsLeft > 0 && dist > 0) {
                 int idealDist = turnsLeft * ma;
                 double pacing = 1.0 - std::abs(dist - idealDist) / (double)std::max(idealDist, 1);
-                if (pacing > 0) heuristic += 0.1 * pacing;
+                if (pacing > 0) scoringBonus += 0.1 * pacing;
             }
 
             // Urgency: last 2 turns and near endzone — must score!
             if (turnsLeft <= 2 && dist <= ma + 2) {
-                heuristic += 0.3;
+                scoringBonus += 0.3;
             }
 
             // One-turn TD: last turn, carrier can score NOW — massive bonus
             if (turnsLeft <= 1) {
                 if (dist <= static_cast<int>(carrier.movementRemaining)) {
-                    heuristic += 0.8;  // safe walk-in on last turn
+                    scoringBonus += 0.8;  // safe walk-in on last turn
                 } else if (dist <= carrier.movementRemaining + 2) {
-                    heuristic += 0.5;  // GFI needed but scoreable
+                    scoringBonus += 0.5;  // GFI needed but scoreable
                 }
             }
 
@@ -407,7 +414,7 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
                     if (tm->state != PlayerState::STANDING) continue;
                     int tmDist = distToEndzone(tm->position, perspective);
                     if (tmDist > 0 && tmDist <= static_cast<int>(tm->movementRemaining) + 2) {
-                        heuristic += 0.15;
+                        scoringBonus += 0.15;
                         break;
                     }
                 }
@@ -501,7 +508,11 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
 
     heuristic = std::clamp(heuristic, -1.0, 1.0);
 
-    // Blend with value function if available
+    // Blend with value function if available. fix #1: the offensive scoring
+    // pull (scoringBonus) is added AFTER the blend so vf_blend never dilutes
+    // it — the VF is flat/negative on scoring-frontier states and would
+    // otherwise steer the search to the safe 0-0 line.
+    double leaf;
     if (valueFn_ && config_.vfBlend > 0.0f) {
         float features[NUM_FEATURES];
         extractFeatures(state, perspective, features);
@@ -509,10 +520,12 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         double vfValue = std::clamp(vfRaw, -1.0, 1.0);
 
         double blend = static_cast<double>(config_.vfBlend);
-        return (1.0 - blend) * heuristic + blend * vfValue;
+        leaf = (1.0 - blend) * heuristic + blend * vfValue;
+    } else {
+        leaf = heuristic;
     }
 
-    return heuristic;
+    return std::clamp(leaf + scoringBonus, -1.0, 1.0);
 }
 
 void MacroMCTSSearch::backpropagate(MacroMCTSNode* node, double value) {
