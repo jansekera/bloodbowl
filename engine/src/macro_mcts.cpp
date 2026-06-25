@@ -373,6 +373,27 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             // fix #1: all offensive endzone/scoring pull below -> scoringBonus
             scoringBonus += 0.25 * proximity;  // closer to endzone = better
 
+            // search-side #2 (2026-06-25): advance the whole CAGE, not just the carrier.
+            // search-side #1 (stronger lone-carrier pull) was a no-op in smoke: the
+            // search correctly refuses to push an UNESCORTED carrier forward (exposure ->
+            // turnover risk pulls it back). The missing signal is the protective cage
+            // moving up. Reward EARLY-TURN forward progress of standing teammates near
+            // the carrier so "cage advanced, carrier screened" outranks "cage sat back";
+            // the carrier then follows safely. Inside scoringBonus (post-vfBlend) -> no dilution.
+            if (turnsLeft >= 3) {  // early/mid turns — late turns are already urgency-driven
+                double cageProxSum = 0.0;
+                int cageN = 0;
+                state.forEachOnPitch(perspective, [&](const Player& p) {
+                    if (p.state != PlayerState::STANDING) return;
+                    if (p.id == carrier.id) return;
+                    if (p.position.distanceTo(carrier.position) > 4) return;  // in/near the cage
+                    int pd = std::abs(p.position.x - ezX);
+                    cageProxSum += 1.0 - pd / 25.0;   // this escort's forward progress
+                    cageN++;
+                });
+                if (cageN > 0) scoringBonus += 0.20 * (cageProxSum / cageN);
+            }
+
             // Can score without GFI (safe walk-in)
             if (dist <= static_cast<int>(carrier.movementRemaining)) {
                 scoringBonus += 0.4;  // strong bonus — safe TD
