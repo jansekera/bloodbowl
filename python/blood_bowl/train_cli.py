@@ -32,8 +32,11 @@ def main():
     parser.add_argument('--self-play', action='store_true', help='Both sides use learning AI')
     parser.add_argument('--lr-decay', type=float, default=1.0, help='Multiplicative LR decay per epoch')
     parser.add_argument('--training-method', default='mc',
-                        choices=['mc', 'mc_shaped', 'td0', 'td_lambda'],
-                        help='Training method (mc, mc_shaped, td0, td_lambda)')
+                        choices=['mc', 'mc_shaped', 'mc_return', 'mc_return_shaped',
+                                 'td0', 'td_lambda'],
+                        help='Training method. mc_return = true discounted MC return '
+                             'G_t=gamma^(T-t)*final_reward (A/B vs mc_shaped); '
+                             'mc_return_shaped adds potential shaping on top.')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
     parser.add_argument('--lambda', type=float, default=0.8, dest='lambda_',
                         help='Trace decay for td_lambda')

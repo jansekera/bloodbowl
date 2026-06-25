@@ -17,7 +17,7 @@ class TestFeatureExtractor:
         state = _make_simple_state()
         features = extract_features(state, 'home')
         assert len(features) == NUM_FEATURES
-        assert NUM_FEATURES == 70
+        assert NUM_FEATURES == 73
 
     def test_bias_is_always_one(self):
         state = _make_simple_state()

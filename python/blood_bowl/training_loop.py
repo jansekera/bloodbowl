@@ -379,7 +379,7 @@ def run_training(
 
             # Add to replay buffer if enabled
             if replay_buffer is not None:
-                replay_buffer.add_game(game_log)
+                replay_buffer.add_game(game_log, gamma=gamma)
 
             _train_on_log(trainer, game_log, training_method, gamma, lambda_)
 
@@ -749,6 +749,11 @@ def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lamb
         trainer.train_monte_carlo(game_log)
     elif method == 'mc_shaped':
         trainer.train_monte_carlo_shaped(game_log, gamma=gamma)
+    elif method in ('mc_return', 'mc_return_shaped'):
+        # True discounted MC return G_t = gamma^(T-t)*final_reward. The PBRS
+        # variant adds potential shaping on top in the transition path; on the
+        # full-log path the per-state return already carries graded credit.
+        trainer.train_monte_carlo_return(game_log, gamma=gamma)
     elif method == 'td0':
         trainer.train_td0(game_log, gamma=gamma)
     elif method == 'td_lambda':
@@ -774,6 +779,15 @@ def _train_on_transition(trainer, tr, method: str, gamma: float, lambda_: float)
     elif method == 'mc_shaped':
         trainer.train_transition_shaped(
             tr.features, tr.next_features, tr.reward, tr.is_terminal, gamma=gamma)
+    elif method in ('mc_return', 'mc_return_shaped'):
+        # Use the precomputed discounted return; old buffers (mc_return=None)
+        # fall back to the one-step terminal reward so training never crashes.
+        from .trainer import DEFAULT_SHAPING_WEIGHTS
+        g = tr.mc_return if tr.mc_return is not None else tr.reward
+        sw = DEFAULT_SHAPING_WEIGHTS if method == 'mc_return_shaped' else []
+        trainer.train_transition_return(
+            tr.features, tr.next_features, g, tr.is_terminal,
+            gamma=gamma, shaping_weights=sw)
     else:
         mini_log = [{'type': 'state', 'features': tr.features, 'perspective': tr.perspective}]
         if not tr.is_terminal:

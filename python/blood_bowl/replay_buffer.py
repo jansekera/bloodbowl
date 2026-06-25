@@ -11,12 +11,21 @@ from typing import List, Optional
 
 @dataclass
 class Transition:
-    """A single state transition."""
+    """A single state transition.
+
+    `reward` is the broadcast final game outcome (+1/-1/0) for the state's
+    perspective. `mc_return` is the TRUE discounted Monte-Carlo return
+    G_t = gamma^(T-t) * final_reward, precomputed at add_game() time where the
+    full per-perspective ordering is available (replay sampling loses t/T).
+    Defaults to None for buffers pickled before this field existed; consumers
+    fall back to the one-step shaped target in that case.
+    """
     features: list
     reward: float
     next_features: list
     perspective: str
     is_terminal: bool
+    mc_return: Optional[float] = None
 
 
 class ReplayBuffer:
@@ -26,8 +35,13 @@ class ReplayBuffer:
         self.buffer: deque = deque(maxlen=capacity)
         self.capacity = capacity
 
-    def add_game(self, game_log: list) -> None:
-        """Extract transitions from a game log and add them to the buffer."""
+    def add_game(self, game_log: list, gamma: float = 0.99) -> None:
+        """Extract transitions from a game log and add them to the buffer.
+
+        `gamma` is used to precompute the discounted MC return
+        G_t = gamma^(T-t) * final_reward per transition (stored as mc_return),
+        since the replay buffer otherwise loses the per-game time index needed
+        for it. Defaults to the trainer's gamma (0.99)."""
         result_record = None
         for record in reversed(game_log):
             if record.get('type') == 'result':
@@ -55,10 +69,14 @@ class ReplayBuffer:
             else:
                 reward = -1.0
 
+            n_states = len(states)
             for i, record in enumerate(states):
                 features = record['features']
-                is_terminal = (i == len(states) - 1)
+                is_terminal = (i == n_states - 1)
                 next_features = states[i + 1]['features'] if not is_terminal else features
+                # True discounted MC return: G_t = gamma^(T-t) * final_reward.
+                steps_to_end = (n_states - 1) - i
+                mc_return = (gamma ** steps_to_end) * reward
 
                 self.buffer.append(Transition(
                     features=features,
@@ -66,6 +84,7 @@ class ReplayBuffer:
                     next_features=next_features,
                     perspective=perspective,
                     is_terminal=is_terminal,
+                    mc_return=mc_return,
                 ))
 
     def sample(self, batch_size: int = 64) -> List[Transition]:

@@ -63,6 +63,8 @@ def train_from_logs(
             trainer.train_monte_carlo(game_log)
         elif method == 'mc_shaped':
             trainer.train_monte_carlo_shaped(game_log, gamma=gamma)
+        elif method in ('mc_return', 'mc_return_shaped'):
+            trainer.train_monte_carlo_return(game_log, gamma=gamma)
         elif method == 'td0':
             trainer.train_td0(game_log, gamma=gamma)
         elif method == 'td_lambda':
@@ -88,7 +90,8 @@ def main():
     parser.add_argument('--logs-dir', required=True, help='Directory with .jsonl game logs')
     parser.add_argument('--weights', default='weights.json', help='Weights file path')
     parser.add_argument('--method', default='td_lambda',
-                        choices=['mc', 'mc_shaped', 'td0', 'td_lambda'],
+                        choices=['mc', 'mc_shaped', 'mc_return', 'mc_return_shaped',
+                                 'td0', 'td_lambda'],
                         help='Training method')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')

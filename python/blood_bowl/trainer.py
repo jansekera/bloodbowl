@@ -26,6 +26,9 @@ DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
     (42, -0.8),   # opp_scoring_threat — soupeřův nosič blízko endzone (Team 2)
     (40, -0.6),   # carrier_tz_count — nosič v tackle zones = nebezpečí (Team 2)
     (63, -0.4),   # carrier_blitzable — nosič je zasažitelný blitzem (Team 2)
+    (70, -0.5),   # fix #3: loose_ball_dist_to_td — míč blíž mojí endzóně = lepší šance skórovat
+    (71, -0.3),   # fix #3: my_nearest_to_ball — můj hráč blíž volnému míči = lepší
+    (72, 0.3),    # fix #3: pickup_clear — čistý (nehlídaný) pickup = dobrý
 ]
 
 
@@ -37,10 +40,21 @@ class LinearTrainer:
         self.lr = learning_rate
 
     @staticmethod
-    def _get_reward(winner: str | None, perspective: str) -> float:
-        if winner is None:
-            return 0.0
-        return 1.0 if winner == perspective else -1.0
+    def _get_reward(result_record: dict | None, perspective: str) -> float:
+        # Score-aware asymmetric terminal reward (fix #2, 2026-06-24). Win/loss
+        # stay at +1/-1, but a DRAW is graded by how much WE scored: 0-0 = -0.10
+        # (breaks the safe-draw Nash equilibrium that drives the 0-0 collapse),
+        # +0.05 per own TD (1-1 = -0.05, 2-2 = 0.0). The bonus can never outweigh
+        # a real loss, so no suicidal attacks. Unlike PBRS this is asymmetric ->
+        # it changes the optimal policy and reaches the value target via mc_return.
+        home = result_record.get('home_score', 0) if result_record else 0
+        away = result_record.get('away_score', 0) if result_record else 0
+        my, opp = (home, away) if perspective == 'home' else (away, home)
+        if my > opp:
+            return 1.0
+        if my < opp:
+            return -1.0
+        return -0.10 + 0.05 * min(my, 2)
 
     @staticmethod
     def _group_by_perspective(game_log: list[dict]) -> dict[str, list[dict]]:
@@ -88,7 +102,7 @@ class LinearTrainer:
 
             features = self._align_features(np.array(record['features'], dtype=np.float64))
             perspective = record.get('perspective', 'home')
-            reward = self._get_reward(winner, perspective)
+            reward = self._get_reward(result_record, perspective)
 
             # Current value estimate
             v = float(np.dot(self.weights, features))
@@ -123,7 +137,7 @@ class LinearTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
 
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
@@ -167,6 +181,60 @@ class LinearTrainer:
         v = float(np.dot(self.weights, f))
         self.weights += self.lr * (shaped_reward - v) * f
 
+    def train_monte_carlo_return(self, game_log: list[dict], gamma: float = 0.99) -> None:
+        """Update weights using the TRUE discounted MC return per state.
+
+        Target at state t: G_t = γ^(T−t) · final_reward (graded credit toward the
+        outcome), instead of the same ±1 broadcast to every state. States are
+        grouped by perspective (home/away independently)."""
+        result_record = None
+        for record in reversed(game_log):
+            if record.get('type') == 'result':
+                result_record = record
+                break
+        if result_record is None:
+            return
+
+        winner = result_record.get('winner')
+        groups = self._group_by_perspective(game_log)
+
+        for perspective, states in groups.items():
+            final_reward = self._get_reward(result_record, perspective)
+            n_states = len(states)
+            for i, record in enumerate(states):
+                features = self._align_features(np.array(record['features'], dtype=np.float64))
+                g_return = (gamma ** ((n_states - 1) - i)) * final_reward
+                v = float(np.dot(self.weights, features))
+                self.weights += self.lr * (g_return - v) * features
+
+    def train_transition_return(
+        self,
+        features: list,
+        next_features: list,
+        mc_return: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        shaping_weights: list[tuple[int, float]] | None = None,
+    ) -> None:
+        """One discounted-MC-return update for a single replay transition.
+
+        Target: G_t [+ γΦ(s') − Φ(s)] where G_t is the precomputed discounted
+        return (replay_buffer.Transition.mc_return). Pass shaping_weights=[]
+        (default) for the pure return; pass DEFAULT_SHAPING_WEIGHTS to add
+        potential-based shaping (PBRS) on top of the return."""
+        sw = shaping_weights if shaping_weights is not None else []
+        f = self._align_features(np.array(features, dtype=np.float64))
+        target = mc_return
+        if sw:
+            phi_current = self._compute_potential(f, sw)
+            if is_terminal:
+                target += -phi_current
+            else:
+                nf = self._align_features(np.array(next_features, dtype=np.float64))
+                target += gamma * self._compute_potential(nf, sw) - phi_current
+        v = float(np.dot(self.weights, f))
+        self.weights += self.lr * (target - v) * f
+
     def train_td0(self, game_log: list[dict], gamma: float = 0.99) -> None:
         """Update weights using TD(0) per perspective.
 
@@ -187,7 +255,7 @@ class LinearTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
 
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
@@ -230,7 +298,7 @@ class LinearTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
             e = np.zeros_like(self.weights)  # eligibility trace
 
             for i, record in enumerate(states):
@@ -312,10 +380,21 @@ class NeuralTrainer:
         self._grad_norm_count = 0
 
     @staticmethod
-    def _get_reward(winner: str | None, perspective: str) -> float:
-        if winner is None:
-            return 0.0
-        return 1.0 if winner == perspective else -1.0
+    def _get_reward(result_record: dict | None, perspective: str) -> float:
+        # Score-aware asymmetric terminal reward (fix #2, 2026-06-24). Win/loss
+        # stay at +1/-1, but a DRAW is graded by how much WE scored: 0-0 = -0.10
+        # (breaks the safe-draw Nash equilibrium that drives the 0-0 collapse),
+        # +0.05 per own TD (1-1 = -0.05, 2-2 = 0.0). The bonus can never outweigh
+        # a real loss, so no suicidal attacks. Unlike PBRS this is asymmetric ->
+        # it changes the optimal policy and reaches the value target via mc_return.
+        home = result_record.get('home_score', 0) if result_record else 0
+        away = result_record.get('away_score', 0) if result_record else 0
+        my, opp = (home, away) if perspective == 'home' else (away, home)
+        if my > opp:
+            return 1.0
+        if my < opp:
+            return -1.0
+        return -0.10 + 0.05 * min(my, 2)
 
     @staticmethod
     def _group_by_perspective(game_log: list[dict]) -> dict[str, list[dict]]:
@@ -414,7 +493,7 @@ class NeuralTrainer:
                 continue
             features = self._align_features(np.array(record['features'], dtype=np.float64))
             perspective = record.get('perspective', 'home')
-            reward = self._get_reward(winner, perspective)
+            reward = self._get_reward(result_record, perspective)
             dW1, db1, dW2, db2 = self._backprop(features, reward)
             self._update(dW1, db1, dW2, db2)
 
@@ -439,7 +518,7 @@ class NeuralTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
                 phi_current = self._compute_potential(features, sw)
@@ -482,6 +561,56 @@ class NeuralTrainer:
         dW1, db1, dW2, db2 = self._backprop(f, shaped_reward)
         self._update(dW1, db1, dW2, db2)
 
+    def train_monte_carlo_return(self, game_log: list[dict], gamma: float = 0.99) -> None:
+        """Update weights using the TRUE discounted MC return per state.
+
+        Target at state t: G_t = γ^(T−t) · final_reward, grouped by perspective."""
+        result_record = None
+        for record in reversed(game_log):
+            if record.get('type') == 'result':
+                result_record = record
+                break
+        if result_record is None:
+            return
+
+        winner = result_record.get('winner')
+        groups = self._group_by_perspective(game_log)
+
+        for perspective, states in groups.items():
+            final_reward = self._get_reward(result_record, perspective)
+            n_states = len(states)
+            for i, record in enumerate(states):
+                features = self._align_features(np.array(record['features'], dtype=np.float64))
+                g_return = (gamma ** ((n_states - 1) - i)) * final_reward
+                dW1, db1, dW2, db2 = self._backprop(features, g_return)
+                self._update(dW1, db1, dW2, db2)
+
+    def train_transition_return(
+        self,
+        features: list,
+        next_features: list,
+        mc_return: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        shaping_weights: list[tuple[int, float]] | None = None,
+    ) -> None:
+        """One discounted-MC-return update for a single replay transition.
+
+        Target: G_t [+ γΦ(s') − Φ(s)]. Pass shaping_weights=[] (default) for the
+        pure return; pass DEFAULT_SHAPING_WEIGHTS to add PBRS on top."""
+        sw = shaping_weights if shaping_weights is not None else []
+        f = self._align_features(np.array(features, dtype=np.float64))
+        target = mc_return
+        if sw:
+            phi_current = self._compute_potential(f, sw)
+            if is_terminal:
+                target += -phi_current
+            else:
+                nf = self._align_features(np.array(next_features, dtype=np.float64))
+                target += gamma * self._compute_potential(nf, sw) - phi_current
+        dW1, db1, dW2, db2 = self._backprop(f, target)
+        self._update(dW1, db1, dW2, db2)
+
     def train_td0(self, game_log: list[dict], gamma: float = 0.99) -> None:
         """Update weights using TD(0) per perspective."""
         result_record = None
@@ -496,7 +625,7 @@ class NeuralTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
                 v, _ = self.forward(features)
@@ -533,7 +662,7 @@ class NeuralTrainer:
         groups = self._group_by_perspective(game_log)
 
         for perspective, states in groups.items():
-            final_reward = self._get_reward(winner, perspective)
+            final_reward = self._get_reward(result_record, perspective)
 
             # Eligibility traces for each parameter
             eW1 = np.zeros_like(self.W1)
@@ -662,6 +791,17 @@ def warm_start_expand(trainer: 'NeuralTrainer', new_hidden_size: int) -> 'Neural
     return new_trainer
 
 
+def _expand_value_W1(W1: np.ndarray, target_n_features: int) -> np.ndarray:
+    """Warm-start expansion for added INPUT features (fix #3, 2026-06-24).
+    Pads the value head's W1 with zero rows so the new features start at zero
+    weight -> the loaded model's output is preserved EXACTLY, and the new
+    features are learned from scratch during training. No-op if already sized."""
+    if W1.shape[0] >= target_n_features:
+        return W1
+    pad = np.zeros((target_n_features - W1.shape[0], W1.shape[1]), dtype=np.float64)
+    return np.vstack([W1, pad])
+
+
 def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer, NeuralTrainer]:
     """Auto-detect weight format and return the appropriate trainer."""
     with open(path) as f:
@@ -671,11 +811,11 @@ def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer,
         n_features = data.get('n_features', len(data['W1']))
         hidden_size = data.get('hidden_size', len(data['b1']))
         trainer = NeuralTrainer(
-            n_features=n_features,
+            n_features=max(n_features, NUM_FEATURES),
             hidden_size=hidden_size,
             learning_rate=learning_rate,
         )
-        trainer.W1 = np.array(data['W1'], dtype=np.float64)
+        trainer.W1 = _expand_value_W1(np.array(data['W1'], dtype=np.float64), trainer.n_features)
         trainer.b1 = np.array(data['b1'], dtype=np.float64)
         trainer.W2 = np.array(data['W2'], dtype=np.float64)
         trainer.b2 = np.array(data['b2'], dtype=np.float64)
@@ -685,11 +825,11 @@ def load_trainer(path: str, learning_rate: float = 0.01) -> Union[LinearTrainer,
         n_features = data.get('n_features', len(data['value_W1']))
         hidden_size = data.get('hidden_size', len(data['value_b1']))
         trainer = NeuralTrainer(
-            n_features=n_features,
+            n_features=max(n_features, NUM_FEATURES),
             hidden_size=hidden_size,
             learning_rate=learning_rate,
         )
-        trainer.W1 = np.array(data['value_W1'], dtype=np.float64)
+        trainer.W1 = _expand_value_W1(np.array(data['value_W1'], dtype=np.float64), trainer.n_features)
         trainer.b1 = np.array(data['value_b1'], dtype=np.float64)
         trainer.W2 = np.array(data['value_W2'], dtype=np.float64)
         trainer.b2 = np.array(data['value_b2'], dtype=np.float64)

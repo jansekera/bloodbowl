@@ -6,7 +6,7 @@ is mainly for verification and re-computation from raw state dicts.
 """
 from __future__ import annotations
 
-NUM_FEATURES = 70
+NUM_FEATURES = 73  # fix #3: +3 loose-ball field-position features (70-72)
 
 
 def extract_features(state: dict, perspective: str) -> list[float]:
@@ -596,8 +596,11 @@ def _compute_strategic_features(
                 one_turn_vuln = 1.0
                 break
 
-    # [67] loose_ball_proximity
+    # [67] loose_ball_proximity  + fix #3: [70-72] loose-ball field position (parity with C++)
     loose_prox = 0.5
+    loose_dist_to_td = 0.5    # [70]
+    my_nearest_to_ball = 1.0  # [71]
+    pickup_clear = 0.0        # [72]
     ball_pos = ball.get('position')
     if ball_on_ground > 0 and ball_pos:
         my_closest = min(
@@ -607,6 +610,11 @@ def _compute_strategic_features(
             (_chebyshev(p['position'], ball_pos) for p in opp_standing), default=99
         )
         loose_prox = _clamp((opp_closest - my_closest + 5) / 10.0, 0.0, 1.0)
+        loose_dist_to_td = _clamp(_distance_to_endzone(ball_pos['x'], perspective) / 25.0, 0.0, 1.0)
+        if my_closest < 99:
+            my_nearest_to_ball = _clamp(my_closest / 8.0, 0.0, 1.0)
+        tz_on_ball = sum(1 for p in opp_standing if _chebyshev(p['position'], ball_pos) == 1)
+        pickup_clear = _clamp(1.0 - tz_on_ball / 3.0, 0.0, 1.0)
 
     # [68] deep_safety_count
     deep_safeties = 0
@@ -646,6 +654,9 @@ def _compute_strategic_features(
         loose_prox,                                                      # 67
         min(deep_safeties / 3.0, 1.0),                                   # 68
         isolated / my_standing_count if my_standing_count > 0 else 0.0,  # 69
+        loose_dist_to_td,                                                # 70 (fix #3)
+        my_nearest_to_ball,                                              # 71 (fix #3)
+        pickup_clear,                                                    # 72 (fix #3)
     ]
 
 

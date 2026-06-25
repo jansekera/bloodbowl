@@ -358,7 +358,7 @@ def load_combined_weights(
 
     Returns (value_trainer, policy_trainer).
     """
-    from .trainer import LinearTrainer, NeuralTrainer, load_trainer
+    from .trainer import LinearTrainer, NeuralTrainer, load_trainer, _expand_value_W1
 
     with open(path) as f:
         data = json.load(f)
@@ -377,14 +377,21 @@ def load_combined_weights(
         # Load policy weights
         if saved_policy_type == 'neural' and 'policy_W1' in data:
             if isinstance(policy_trainer, NeuralPolicyTrainer):
-                policy_trainer.hidden_size = data['policy_hidden_size']
+                saved_hidden = data['policy_hidden_size']
                 W1_flat = np.array(data['policy_W1'], dtype=np.float64)
-                policy_trainer.W1 = W1_flat.reshape(policy_trainer.n_features,
-                                                     policy_trainer.hidden_size)
-                policy_trainer.b1 = np.array(data['policy_b1'], dtype=np.float64)
-                policy_trainer.W2 = np.array(data['policy_W2'], dtype=np.float64)
-                policy_trainer.b2 = data.get('policy_b2', 0.0)
-                policy_trainer.temperature = data.get('policy_temperature', 0.3)
+                # fix #3: NUM_FEATURES changed -> POLICY_INPUT_SIZE (state+action)
+                # changed, so the saved policy_W1 layout no longer matches. Only
+                # warm-start the policy when the size still fits; otherwise keep the
+                # fresh init (imitation re-learns it; with blend=0 the search is
+                # unaffected anyway).
+                if W1_flat.size == policy_trainer.n_features * saved_hidden:
+                    policy_trainer.hidden_size = saved_hidden
+                    policy_trainer.W1 = W1_flat.reshape(policy_trainer.n_features,
+                                                         saved_hidden)
+                    policy_trainer.b1 = np.array(data['policy_b1'], dtype=np.float64)
+                    policy_trainer.W2 = np.array(data['policy_W2'], dtype=np.float64)
+                    policy_trainer.b2 = data.get('policy_b2', 0.0)
+                    policy_trainer.temperature = data.get('policy_temperature', 0.3)
         elif 'policy_weights' in data:
             if isinstance(policy_trainer, PolicyTrainer) and not isinstance(policy_trainer, NeuralPolicyTrainer):
                 policy_trainer.weights = np.array(data['policy_weights'], dtype=np.float64)
@@ -400,11 +407,13 @@ def load_combined_weights(
             n_features = data.get('n_features', len(data['value_W1']))
             hidden_size = data.get('hidden_size', len(data['value_b1']))
             value_trainer = NeuralTrainer(
-                n_features=n_features,
+                n_features=max(n_features, NUM_FEATURES),
                 hidden_size=hidden_size,
                 learning_rate=value_lr,
             )
-            value_trainer.W1 = np.array(data['value_W1'], dtype=np.float64)
+            # fix #3: zero-pad W1 rows for the 3 new input features (warm-start preserved)
+            value_trainer.W1 = _expand_value_W1(
+                np.array(data['value_W1'], dtype=np.float64), value_trainer.n_features)
             value_trainer.b1 = np.array(data['value_b1'], dtype=np.float64)
             value_trainer.W2 = np.array(data['value_W2'], dtype=np.float64)
             value_trainer.b2 = np.array(data['value_b2'], dtype=np.float64)

@@ -421,7 +421,15 @@ void extractFeatures(const GameState& state, TeamSide perspective, float* out) {
     }
 
     // [67] loose_ball_proximity: who's closer to loose ball (1.0 = I'm much closer)
+    // fix #3 (2026-06-24): make the loose-ball SCORING OPPORTUNITY representable.
+    // The 70 aggregates hide the loose ball's field position (carrier_dist_to_td is
+    // frozen at 0.5 while the ball is on the ground), so a strong value head still
+    // can't tell a high-value pickup from a worthless one -> 0-0 collapse. These
+    // three features expose it.
     float looseBallProx = 0.5f;
+    float looseBallDistToTd = 0.5f;  // [70] loose ball's distance to the endzone I attack
+    float myNearestToBall = 1.0f;    // [71] absolute distance of my closest player to the ball
+    float pickupClear = 0.0f;        // [72] loose ball is uncontested (clean pickup)
     if (ballOnGround && state.ball.isOnPitch()) {
         Position ballPos = state.ball.position;
         int myClosest = 99, oppClosest = 99;
@@ -434,6 +442,16 @@ void extractFeatures(const GameState& state, TeamSide perspective, float* out) {
             if (d < oppClosest) oppClosest = d;
         }
         looseBallProx = clampf((oppClosest - myClosest + 5) / 10.0f, 0.0f, 1.0f);
+        // [70] field position of the scoring chance (0 = ball on my target endzone)
+        looseBallDistToTd = clampf(distanceToEndzone(ballPos.x, perspective) / 25.0f, 0.0f, 1.0f);
+        // [71] absolute reach: 0 = my player is on the ball, 1 = far (>=8 squares)
+        if (myClosest < 99) myNearestToBall = clampf(myClosest / 8.0f, 0.0f, 1.0f);
+        // [72] clean pickup: 1 = no opponent tackle zones on the ball square
+        int tzOnBall = 0;
+        for (int j = 0; j < oppStandingIdx; j++) {
+            if (chebyshev(oppStandingPlayers[j].pos, ballPos) == 1) tzOnBall++;
+        }
+        pickupClear = clampf(1.0f - tzOnBall / 3.0f, 0.0f, 1.0f);
     }
 
     // [68] deep_safety_count: my players behind the furthest-forward opponent
@@ -602,6 +620,10 @@ void extractFeatures(const GameState& state, TeamSide perspective, float* out) {
     out[68] = std::min(deepSafeties / 3.0f, 1.0f);
     // [69] isolation_count (/my_standing, higher = worse)
     out[69] = myStanding > 0 ? static_cast<float>(isolatedCount) / myStanding : 0.0f;
+    // fix #3: loose-ball field-position features (representability of the scoring opportunity)
+    out[70] = looseBallDistToTd;  // loose ball's distance to the endzone I attack (0.5 if held/off-pitch)
+    out[71] = myNearestToBall;    // absolute distance of my closest standing player to the ball
+    out[72] = pickupClear;        // loose ball is uncontested by opponent tackle zones
 }
 
 } // namespace bb

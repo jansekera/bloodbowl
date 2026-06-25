@@ -5,7 +5,7 @@
 
 namespace bb {
 
-constexpr int NUM_FEATURES = 70;
+constexpr int NUM_FEATURES = 73;  // fix #3: +3 loose-ball field-position features (70-72)
 
 // Extract 70 features from game state, from the given team's perspective.
 // out must point to at least NUM_FEATURES floats.
