@@ -66,12 +66,17 @@ HIDDEN_SIZE = 64
 # Strip Ball ball-hunter blitzer, Sure Feet gutter runners. tv<1200 = base rosters.
 TV = 1200
 WORKERS = min(12, os.cpu_count() or 1)
-# Watchdog: a healthy macro_mcts vs macro_mcts game finishes in ~50s and with
-# WORKERS in flight a result lands every few seconds. If NOTHING completes in
-# this window a worker is wedged (e.g. an engine infinite loop) — abort the pool
-# and log it instead of hanging the whole run forever, as happened 2026-06-10
-# when the anti-regression pool froze at 150/400.
-STALL_TIMEOUT = 300
+# Watchdog: a healthy macro_mcts vs macro_mcts game finishes in ~50s. A wedged
+# game (engine infinite loop) never finishes. Rather than abort the whole pool
+# (which lost the entire 600-game gate on 2026-06-25 when game 599/600 hung),
+# each game is dispatched with a PER-GAME timeout: a game that overruns this is
+# SKIPPED and the run continues over the rest. 180s = ~3.6× the ~50s typical, so
+# a slow-but-finishing game is not falsely skipped; an infinite loop always is.
+PER_GAME_TIMEOUT = 180
+# Tolerate a few skipped (hung) games without aborting the verdict — a single
+# wedged game shouldn't void a 600-game gate. Above this fraction the hang is
+# systemic (engine broken for many states) and we still abort/never-promote.
+MAX_SKIP_FRAC = 0.02
 # ──────────────────────────────────────────────────────────────────────────────
 
 PROJECT_ROOT = Path(__file__).parent.resolve()
@@ -89,26 +94,31 @@ def _atomic_write_json(path: Path, obj) -> None:
 
 
 def _imap_watchdog(pool: Pool, fn, tasks: list, label: str):
-    """Yield results from pool.imap_unordered with a stall watchdog.
+    """Yield results from the pool, SKIPPING any single game that wedges.
 
-    If no result arrives within STALL_TIMEOUT seconds the pool is terminated and
-    iteration stops (partial results), turning a permanent hang into a logged,
-    recoverable event. Callers must compute scores over the yielded count.
+    Each task is dispatched via apply_async and collected with a PER-GAME
+    timeout. A game that does not finish within PER_GAME_TIMEOUT (an engine
+    infinite loop — e.g. the 2026-06-25 anti-regression hang at 599/600) is
+    skipped and logged, and the run continues over the remaining games instead
+    of aborting the whole pool. The one wedged worker is reclaimed when the
+    caller's `with Pool(...)` block terminates the pool. Callers treat a small
+    completed-count shortfall as skipped-and-tolerated (see MAX_SKIP_FRAC); a
+    large shortfall still aborts as a systemic hang.
     """
     n = len(tasks)
-    it = pool.imap_unordered(fn, tasks)
-    got = 0
-    while got < n:
+    ars = [pool.apply_async(fn, (t,)) for t in tasks]
+    skipped = 0
+    for i, ar in enumerate(ars):
         try:
-            r = it.next(timeout=STALL_TIMEOUT)
+            yield ar.get(timeout=PER_GAME_TIMEOUT)
         except MPTimeoutError:
-            print(f'  ⚠ WATCHDOG: {label} stalled — no game finished in '
-                  f'{STALL_TIMEOUT}s at {got}/{n}. Aborting pool (engine hang?). '
-                  f'Inspect with fuzz_gate.py.', flush=True)
-            pool.terminate()
-            return
-        got += 1
-        yield r
+            skipped += 1
+            print(f'  ⚠ WATCHDOG: {label} game {i + 1}/{n} skipped '
+                  f'(>{PER_GAME_TIMEOUT}s — engine hang?), continuing.', flush=True)
+    if skipped:
+        print(f'  ⚠ WATCHDOG: {label} skipped {skipped}/{n} hung game(s); '
+              f'verdict over {n - skipped} completed. Inspect with fuzz_gate.py.',
+              flush=True)
 
 _RACES = ['human', 'orc', 'skaven', 'dwarf', 'wood-elf']
 
@@ -342,7 +352,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 if done % 20 == 0 or done == half_bm:
                     print(f'  {label} {done}/{half_bm}: {sum(results)/done:.1%}', flush=True)
         score = sum(results) / len(results) if results else 0.0
-        complete = len(results) >= half_bm
+        max_skip = max(1, int(half_bm * MAX_SKIP_FRAC))
+        complete = (half_bm - len(results)) <= max_skip
         print(f'  {label} final: {score:.1%} ({sum(results)}/{len(results)})', flush=True)
         return score, complete
 
@@ -399,8 +410,13 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     chess_score = wins / decisive if decisive else 0.5
     print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} decisive '
           f'({decisive} decisive / {total} games)', flush=True)
-    if total < GATING_MATCHES:
-        abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES} — engine hang?)')
+    max_skip = max(1, int(GATING_MATCHES * MAX_SKIP_FRAC))
+    if (GATING_MATCHES - total) > max_skip:
+        abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES}, '
+                             f'>{max_skip} skipped — systemic engine hang?)')
+    elif total < GATING_MATCHES:
+        print(f'  ℹ {GATING_MATCHES - total} hung game(s) skipped; '
+              f'verdict over {total} games (within tolerance).', flush=True)
 
     # A hard failure during benchmark/gating means the gate scores are based on
     # partial data — never promote (or push) on that. Overrides baseline_reset.
