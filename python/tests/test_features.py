@@ -1,5 +1,6 @@
 """Tests for feature extraction."""
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -48,6 +49,8 @@ class TestFeatureExtractor:
         # weather_nice
         assert features[24] == 1.0
 
+    @pytest.mark.skipif(shutil.which('php') is None,
+                        reason='php binary not available in this environment')
     def test_cross_validation_with_php(self):
         """Run PHP FeatureExtractor via CLI and compare with Python version."""
         project_root = get_project_root()
@@ -138,8 +141,9 @@ echo json_encode(['features' => $features, 'state' => $state->toArray()]);
         assert abs(features[33] - 0.5) < 0.001
         # turns_remaining = (9-1)/8 = 1.0
         assert abs(features[32] - 1.0) < 0.001
-        # stall_incentive = 0.5 * 1.0 * 1.0 = 0.5
-        assert abs(features[35] - 0.5) < 0.001
+        # stall_incentive = turns_remaining (1.0); leading -> *1.5 = 1.5
+        # (matches features.py; test previously asserted a stale 0.5 formula).
+        assert abs(features[35] - 1.5) < 0.001
 
     def test_carrier_tz_count(self):
         state = _make_simple_state()

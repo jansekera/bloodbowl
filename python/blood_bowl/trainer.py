@@ -8,6 +8,7 @@ from typing import Union
 import numpy as np
 
 from .features import NUM_FEATURES
+from .rewards import episode_returns, terminal_value
 
 # Default shaping weights: (feature_index, weight)
 DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
@@ -41,20 +42,11 @@ class LinearTrainer:
 
     @staticmethod
     def _get_reward(result_record: dict | None, perspective: str) -> float:
-        # Score-aware asymmetric terminal reward (fix #2, 2026-06-24). Win/loss
-        # stay at +1/-1, but a DRAW is graded by how much WE scored: 0-0 = -0.10
-        # (breaks the safe-draw Nash equilibrium that drives the 0-0 collapse),
-        # +0.05 per own TD (1-1 = -0.05, 2-2 = 0.0). The bonus can never outweigh
-        # a real loss, so no suicidal attacks. Unlike PBRS this is asymmetric ->
-        # it changes the optimal policy and reaches the value target via mc_return.
+        # Terminal reward SSOT (break-the-draw 2026-06-26): win >> draw >> loss,
+        # and a TD has value even in a loss. See rewards.terminal_value.
         home = result_record.get('home_score', 0) if result_record else 0
         away = result_record.get('away_score', 0) if result_record else 0
-        my, opp = (home, away) if perspective == 'home' else (away, home)
-        if my > opp:
-            return 1.0
-        if my < opp:
-            return -1.0
-        return -0.10 + 0.05 * min(my, 2)
+        return terminal_value(home, away, perspective)
 
     @staticmethod
     def _group_by_perspective(game_log: list[dict]) -> dict[str, list[dict]]:
@@ -201,9 +193,22 @@ class LinearTrainer:
         for perspective, states in groups.items():
             final_reward = self._get_reward(result_record, perspective)
             n_states = len(states)
+            # Lever B: fold the per-TD step reward into the return (mirrors
+            # replay_buffer.add_game). Needs the running score per logged state;
+            # old logs without it fall back to the terminal-only return, which is
+            # exactly episode_returns with no TD scored.
+            if all('home_score' in s for s in states):
+                my_scores = [s['away_score'] if perspective == 'away'
+                             else s['home_score'] for s in states]
+                opp_scores = [s['home_score'] if perspective == 'away'
+                              else s['away_score'] for s in states]
+                returns = episode_returns(my_scores, opp_scores, final_reward, gamma)
+            else:
+                returns = [(gamma ** ((n_states - 1) - i)) * final_reward
+                           for i in range(n_states)]
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
-                g_return = (gamma ** ((n_states - 1) - i)) * final_reward
+                g_return = returns[i]
                 v = float(np.dot(self.weights, features))
                 self.weights += self.lr * (g_return - v) * features
 
@@ -381,20 +386,11 @@ class NeuralTrainer:
 
     @staticmethod
     def _get_reward(result_record: dict | None, perspective: str) -> float:
-        # Score-aware asymmetric terminal reward (fix #2, 2026-06-24). Win/loss
-        # stay at +1/-1, but a DRAW is graded by how much WE scored: 0-0 = -0.10
-        # (breaks the safe-draw Nash equilibrium that drives the 0-0 collapse),
-        # +0.05 per own TD (1-1 = -0.05, 2-2 = 0.0). The bonus can never outweigh
-        # a real loss, so no suicidal attacks. Unlike PBRS this is asymmetric ->
-        # it changes the optimal policy and reaches the value target via mc_return.
+        # Terminal reward SSOT (break-the-draw 2026-06-26): win >> draw >> loss,
+        # and a TD has value even in a loss. See rewards.terminal_value.
         home = result_record.get('home_score', 0) if result_record else 0
         away = result_record.get('away_score', 0) if result_record else 0
-        my, opp = (home, away) if perspective == 'home' else (away, home)
-        if my > opp:
-            return 1.0
-        if my < opp:
-            return -1.0
-        return -0.10 + 0.05 * min(my, 2)
+        return terminal_value(home, away, perspective)
 
     @staticmethod
     def _group_by_perspective(game_log: list[dict]) -> dict[str, list[dict]]:

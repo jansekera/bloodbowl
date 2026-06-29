@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
+from .rewards import episode_returns, terminal_value
+
 
 @dataclass
 class Transition:
@@ -51,7 +53,13 @@ class ReplayBuffer:
         if result_record is None:
             return
 
-        winner = result_record.get('winner')
+        # Disconnect A fix (break-the-draw 2026-06-26): use the score-based
+        # terminal_value SSOT instead of a winner-only +1/0/-1 (which scored every
+        # draw as cost-free 0.0 and bypassed the score-aware reward entirely). Now
+        # the replay path — dominant under MCTS — carries the same win>>draw>>loss,
+        # TD-in-loss signal as the full-log path.
+        home_score = result_record.get('home_score', 0)
+        away_score = result_record.get('away_score', 0)
 
         # Group by perspective
         groups: dict = {}
@@ -62,21 +70,31 @@ class ReplayBuffer:
             groups.setdefault(perspective, []).append(record)
 
         for perspective, states in groups.items():
-            if winner is None:
-                reward = 0.0
-            elif winner == perspective:
-                reward = 1.0
-            else:
-                reward = -1.0
-
+            reward = terminal_value(home_score, away_score, perspective)
             n_states = len(states)
+
+            # Lever B (break-the-draw): fold a per-TD step reward into the MC
+            # return so mid-game states leading up to a TD get a positive
+            # discounted target (the missing "carry -> TD" pull). Needs the
+            # running score at each logged state (home_score/away_score, added to
+            # the state log alongside features). Old logs lack it -> fall back to
+            # the terminal-only return G_t = gamma^(T-t) * final_reward, which is
+            # exactly what episode_returns yields when no TD is scored.
+            has_scores = all('home_score' in s for s in states)
+            if has_scores:
+                my_scores = [s['away_score'] if perspective == 'away'
+                             else s['home_score'] for s in states]
+                opp_scores = [s['home_score'] if perspective == 'away'
+                              else s['away_score'] for s in states]
+                returns = episode_returns(my_scores, opp_scores, reward, gamma)
+            else:
+                returns = [(gamma ** ((n_states - 1) - i)) * reward
+                           for i in range(n_states)]
+
             for i, record in enumerate(states):
                 features = record['features']
                 is_terminal = (i == n_states - 1)
                 next_features = states[i + 1]['features'] if not is_terminal else features
-                # True discounted MC return: G_t = gamma^(T-t) * final_reward.
-                steps_to_end = (n_states - 1) - i
-                mc_return = (gamma ** steps_to_end) * reward
 
                 self.buffer.append(Transition(
                     features=features,
@@ -84,7 +102,7 @@ class ReplayBuffer:
                     next_features=next_features,
                     perspective=perspective,
                     is_terminal=is_terminal,
-                    mc_return=mc_return,
+                    mc_return=returns[i],
                 ))
 
     def sample(self, batch_size: int = 64) -> List[Transition]:

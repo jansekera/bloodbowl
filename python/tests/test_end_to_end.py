@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -22,6 +23,8 @@ def get_project_root():
     return str(Path(__file__).parent.parent.parent)
 
 
+@pytest.mark.skipif(shutil.which('php') is None,
+                    reason='php binary not available in this environment')
 class TestEndToEnd:
     """Integration tests that run real PHP simulations.
 

@@ -32,8 +32,11 @@ class TestReplayBuffer:
         transitions = list(buf.buffer)
         home_transitions = [t for t in transitions if t.perspective == 'home']
         away_transitions = [t for t in transitions if t.perspective == 'away']
+        # Score-aware terminal_value SSOT (break-the-draw): 2-1 game ->
+        # home wins (+1.0); away loses but scored 1 TD -> TD-in-loss value
+        # -1.0 + 0.12*1 = -0.88 (strictly above 0 own TDs).
         assert all(t.reward == 1.0 for t in home_transitions)
-        assert all(t.reward == -1.0 for t in away_transitions)
+        assert all(abs(t.reward - (-0.88)) < 1e-9 for t in away_transitions)
 
     def test_transition_terminal_flag(self):
         buf = ReplayBuffer(capacity=100)
@@ -52,7 +55,10 @@ class TestReplayBuffer:
         ]
         buf.add_game(game_log)
         assert len(buf) == 1
-        assert buf.buffer[0].reward == 0.0
+        # Draw is no longer cost-free: terminal_value(1,1) = -0.5 + 0.15*1 = -0.35
+        # (graded by own TDs; 0-0 would be -0.5). This re-pricing is what breaks
+        # the "don't lose" Nash equilibrium behind the 0-0 collapse.
+        assert abs(buf.buffer[0].reward - (-0.35)) < 1e-9
 
     def test_sample_returns_correct_count(self):
         buf = ReplayBuffer(capacity=100)

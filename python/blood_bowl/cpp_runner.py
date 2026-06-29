@@ -57,11 +57,20 @@ def _simulate_game_worker(args: tuple) -> dict:
                   else 'away' if result.away_score > result.home_score else None)
         log_file = log_path / f'game_{game_num:04d}.jsonl'
         with open(log_file, 'w') as f:
-            for state in logged.get_states():
+            # states and turn_logs are pushed 1:1 in the engine (game_simulator.cpp),
+            # so zip gives the running score at each logged state -> per-TD step
+            # reward (Lever B, rewards.episode_returns).
+            states = logged.get_states()
+            turns = logged.get_turn_logs()
+            assert len(states) == len(turns), \
+                f'state/turn log mismatch: {len(states)} vs {len(turns)}'
+            for state, turn in zip(states, turns):
                 f.write(json.dumps({
                     'type': 'state',
                     'features': state['features'].tolist(),
                     'perspective': state['perspective'],
+                    'home_score': turn['home_score'],
+                    'away_score': turn['away_score'],
                 }) + '\n')
             f.write(json.dumps({
                 'type': 'result',
@@ -315,14 +324,19 @@ class CPPRunner:
     def _write_log(self, path: Path, logged, result) -> None:
         """Write JSONL log compatible with Python trainer."""
         states = logged.get_states()
+        turns = logged.get_turn_logs()
+        assert len(states) == len(turns), \
+            f'state/turn log mismatch: {len(states)} vs {len(turns)}'
         with open(path, 'w') as f:
-            for state in states:
+            for state, turn in zip(states, turns):
                 features = state['features'].tolist()
                 perspective = state['perspective']
                 record = {
                     'type': 'state',
                     'features': features,
                     'perspective': perspective,
+                    'home_score': turn['home_score'],
+                    'away_score': turn['away_score'],
                 }
                 f.write(json.dumps(record) + '\n')
 

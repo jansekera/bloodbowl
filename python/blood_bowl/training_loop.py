@@ -151,7 +151,7 @@ def run_training(
     with open(metrics_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm',
-                         'policy_loss', 'policy_top1_agreement'])
+                         'policy_loss', 'policy_top1_agreement', 'mcts_visit_entropy'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
     if self_play and opponent_mix_ratio > 0:
@@ -431,6 +431,7 @@ def run_training(
         policy_loss = 0.0
         policy_agreement = 0.0
         n_dec = 0
+        mcts_visit_entropy = None
         if policy_trainer:
             decision_files = sorted(epoch_log_dir.glob('decisions_*.json'))
             all_decisions = []
@@ -446,6 +447,26 @@ def run_training(
                     all_decisions, passes=passes, batch_size=32)
                 policy_agreement = getattr(policy_trainer, 'last_top1_agreement', 0.0)
                 n_dec = len(all_decisions)
+
+                # MCTS target sharpness: mean normalized entropy of the visit
+                # distributions. 1.0 = uniform (no signal for the policy to imitate
+                # -> flat policy_loss); falling over epochs = the value head is
+                # discriminating actions in search, the precondition for the policy
+                # head to start learning. See neural-policy root-cause / Lever B.
+                ents = []
+                for d in all_decisions:
+                    fr = [v['visit_fraction'] for v in d.get('visits', [])]
+                    n = len(fr)
+                    if n < 2:
+                        continue
+                    p = np.array(fr, dtype=np.float64)
+                    s = p.sum()
+                    if s <= 0:
+                        continue
+                    p = p[p > 0] / s
+                    ents.append(float(-np.sum(p * np.log(p)) / np.log(n)))
+                if ents:
+                    mcts_visit_entropy = sum(ents) / len(ents)
 
         # Save updated weights
         if policy_trainer:
@@ -530,15 +551,17 @@ def run_training(
 
         # Observability metrics — log to epoch_metrics.csv
         nil_nil_rate = nil_nil / n_games if n_games > 0 else 0.0
+        entropy_str = f'{mcts_visit_entropy:.3f}' if mcts_visit_entropy is not None else ''
         print(f'  Metrics: nil_nil={nil_nil_rate:.1%} mean_abs_vf={mean_abs_vf:.3f} '
               f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}'
               + (f' | policy_loss={policy_loss:.3f} top1_agree={policy_agreement:.1%}'
+                 f' mcts_H={entropy_str}'
                  if policy_trainer else ''))
         with open(metrics_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([epoch, f'{nil_nil_rate:.3f}', f'{mean_abs_vf:.4f}',
                              f'{weight_norm_change:.4f}', f'{grad_norm:.4f}',
-                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}'])
+                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}', entropy_str])
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
