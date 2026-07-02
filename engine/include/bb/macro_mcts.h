@@ -55,6 +55,8 @@ private:
     double simulate(const GameState& state, TeamSide perspective);
     void backpropagate(MacroMCTSNode* node, double value);
     bool replayToNode(GameState& state, MacroMCTSNode* node);
+    // Bounded greedy one-ply forward look from a leaf state (see macro_mcts.cpp).
+    double greedyLookaheadBonus(const GameState& leafState, TeamSide perspective);
 };
 
 // Stateful policy: searches over macros, expands best into action plan,

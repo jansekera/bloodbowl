@@ -409,7 +409,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       const std::string& awayWeightsPath,
                                       float dirichletAlpha,
                                       float explorationC,
-                                      int nRollouts) {
+                                      int nRollouts,
+                                      bool leafLookahead) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -449,6 +450,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.dirichletWeight = 0.25f;
                 cfg.vfBlend = vfBlend;
                 cfg.nRollouts = nRollouts;
+                cfg.leafLookahead = leafLookahead;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -519,7 +521,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("away_weights_path") = "",
        py::arg("dirichlet_alpha") = 0.3f,
        py::arg("exploration_c") = 0.5f,   // T2: 2.0 over-explored, flat target; 0.5 sharpens. eval path (simulate_game) uses its own 1.0
-       py::arg("n_rollouts") = 1);
+       py::arg("n_rollouts") = 1,
+       py::arg("leaf_lookahead") = false);  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

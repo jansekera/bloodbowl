@@ -13,6 +13,43 @@ static int distToEndzone(Position pos, TeamSide side) {
     return std::abs(pos.x - ezX);
 }
 
+// Bounded greedy leaf look-ahead (2026-07-02).
+//
+// The leaf eval otherwise has ZERO lookahead (pure static heuristic on the
+// current snapshot). This ranks a leaf's own available macros by a fixed,
+// hand-coded priority (score-family > advance-the-ball > everything else),
+// applies ONLY the single top-ranked one to a CLONE via the existing
+// greedyExpandMacro() (real atomic-action resolution, real dice), and turns
+// the resulting one-ply-deeper state into a small bonus/penalty term. This
+// is mechanistically NOT the reverted carrierTDHorizon lever (2026-06-26):
+// that transformed an EXISTING value with a floor/max clamp applied AFTER
+// the vf blend, which flattened the landscape. This computes a genuinely
+// NEW, independent signal from an extra forward-simulated ply and is folded
+// into scoringBonus (added post-vf-blend, same bucket as the existing
+// offensive pull terms below) -- nothing here clamps or transforms a prior
+// value, it only adds evidence the static pacing formula cannot see (e.g.
+// whether continuing this drive one more macro actually loses the ball or
+// gains no real ground, vs. the static idealDist=turnsLeft*ma formula which
+// scores pure book-keeping distance regardless of whether the path is open).
+static int greedyMacroRank(MacroType t) {
+    switch (t) {
+        case MacroType::SCORE:            return 100;
+        case MacroType::BLITZ_AND_SCORE:  return 95;
+        case MacroType::HAND_OFF_SCORE:   return 90;
+        case MacroType::PASS_SCORE:       return 88;
+        case MacroType::CHAIN_SCORE:      return 86;
+        case MacroType::ADVANCE:          return 50;
+        case MacroType::CAGE:             return 45;
+        case MacroType::PICKUP:           return 40;
+        case MacroType::BLITZ:            return 20;
+        case MacroType::BLOCK:            return 15;
+        case MacroType::REPOSITION:       return 10;
+        case MacroType::FOUL:             return 5;
+        case MacroType::END_TURN:         return 0;
+        default:                          return 1;
+    }
+}
+
 // --- MacroMCTSNode ---
 
 MacroMCTSNode* MacroMCTSNode::bestChildPUCT(double C) const {
@@ -343,6 +380,62 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
     node->expanded = true;
 }
 
+double MacroMCTSSearch::greedyLookaheadBonus(const GameState& leafState, TeamSide perspective) {
+    // Only meaningful while it is still OUR turn: getAvailableMacros() and
+    // greedyExpandMacro() both operate on state.activeTeam, so if the turn
+    // has already passed to the opponent this would silently simulate THEIR
+    // next macro instead of ours. Bail out rather than mislabel that signal.
+    if (leafState.phase != GamePhase::PLAY) return 0.0;
+    if (leafState.activeTeam != perspective) return 0.0;
+    if (!leafState.ball.isHeld || leafState.ball.carrierId <= 0) return 0.0;
+
+    const Player& carrier = leafState.getPlayer(leafState.ball.carrierId);
+    if (carrier.teamSide != perspective) return 0.0;
+
+    int distBefore = distToEndzone(carrier.position, perspective);
+    if (distBefore <= 0) return 0.0;  // already in the endzone somehow
+
+    std::vector<Macro> macros;
+    getAvailableMacros(leafState, macros);
+    if (macros.empty()) return 0.0;
+
+    int bestIdx = -1, bestRank = -1;
+    for (size_t i = 0; i < macros.size(); ++i) {
+        int r = greedyMacroRank(macros[i].type);
+        if (r > bestRank) {
+            bestRank = r;
+            bestIdx = static_cast<int>(i);
+        }
+    }
+    if (bestIdx < 0 || macros[static_cast<size_t>(bestIdx)].type == MacroType::END_TURN) {
+        return 0.0;  // nothing constructive left to try from here
+    }
+
+    // Apply exactly ONE more macro on a clone -- bounded cost, never mutates
+    // the real leaf/search state. Real dice (via dice_) resolve the atomic
+    // actions, same as every other macro application in this search.
+    GameState projected = leafState.clone();
+    auto result = greedyExpandMacro(projected, macros[static_cast<size_t>(bestIdx)], dice_);
+
+    if (result.turnover) {
+        // The greedy continuation actually loses the ball one ply out --
+        // real information the static idealDist=turnsLeft*ma pacing formula
+        // has no way to see. Small, bounded penalty.
+        return -0.10;
+    }
+    if (projected.phase == GamePhase::TOUCHDOWN) {
+        return 0.30;  // the forced greedy continuation actually scores
+    }
+
+    if (!projected.ball.isHeld || projected.ball.carrierId <= 0) return 0.0;
+    const Player& carrierAfter = projected.getPlayer(projected.ball.carrierId);
+    if (carrierAfter.teamSide != perspective) return 0.0;
+
+    int distAfter = distToEndzone(carrierAfter.position, perspective);
+    double progress = (distBefore - distAfter) / 25.0;  // normalized pitch-length progress
+    return std::clamp(progress, -0.10, 0.20) * 0.5;      // bounded, modest weight
+}
+
 double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
     // Heuristic baseline — always computed (provides signal even with zero VF)
     const TeamState& my = state.getTeamState(perspective);
@@ -439,6 +532,12 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
                         break;
                     }
                 }
+            }
+
+            // Bounded greedy 1-ply forward look (2026-07-02 experiment, off by
+            // default via config_.leafLookahead): see greedyLookaheadBonus().
+            if (config_.leafLookahead) {
+                scoringBonus += greedyLookaheadBonus(state, perspective);
             }
 
         } else {

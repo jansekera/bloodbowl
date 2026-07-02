@@ -161,7 +161,14 @@ def _benchmark_game(args: tuple) -> bool:
 
 
 def _gate_game(args: tuple) -> tuple[int, int]:
-    seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv = args
+    # 8th element (leaf_lookahead) optional/backward-compatible: existing
+    # callers passing 7-tuples (production gating, diag_mirror_budget.py)
+    # are unaffected and get the engine default (off).
+    if len(args) >= 8:
+        seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv, leaf_lookahead = args[:8]
+    else:
+        seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv = args
+        leaf_lookahead = False
     import bb_engine
     hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
@@ -171,6 +178,7 @@ def _gate_game(args: tuple) -> tuple[int, int]:
         seed=seed, mcts_iterations=mcts_iterations,
         weights_path=gate_path, away_weights_path=frozen_path,
         epsilon=0.0, vf_blend=vf_blend,
+        leaf_lookahead=leaf_lookahead,
     ).result
     return result.home_score, result.away_score
 
