@@ -456,7 +456,18 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         });
 
         if (!bestPicker) {
-            bestPicker = findNearestFreePlayer(state, state.ball.position);
+            // findNearestFreePlayer() is a generic helper (also used for CAGE
+            // movement, where "can't reach this turn" is fine) -- it has no
+            // reach or NoHands check. For PICKUP specifically, an unreachable
+            // or NoHands fallback pick would emit a macro that's a guaranteed
+            // wasted action (2026-07-02, project_bloodbowl_roadmap_20260702
+            // Tier 1 item 3, Opus 4.8 finding). Apply the same checks the main
+            // loop above already applies before accepting the fallback.
+            const Player* fallback = findNearestFreePlayer(state, state.ball.position);
+            if (fallback && !fallback->hasSkill(SkillName::NoHands) &&
+                fallback->position.distanceTo(state.ball.position) <= fallback->movementRemaining + 2) {
+                bestPicker = fallback;
+            }
         }
         if (bestPicker) {
             out.push_back({MacroType::PICKUP, bestPicker->id, -1, state.ball.position});

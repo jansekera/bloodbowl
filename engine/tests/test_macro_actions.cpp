@@ -510,16 +510,19 @@ TEST(MacroFeatures, AllOneHotExclusive) {
 }
 
 TEST(MacroFeatures, FeatureCountMatchesActionFeatures) {
-    // Verify macro features output size matches NUM_ACTION_FEATURES (15)
-    // This ensures policy network compatibility
+    // Verify macro features output size matches NUM_ACTION_FEATURES.
+    // This ensures policy network compatibility. NUM_ACTION_FEATURES was
+    // deliberately expanded 15->23 (2026-06-19 Phase 1, see
+    // project_neural_policy_rootcause memory) to fix ~50% best-action
+    // collisions from the original coarse featurization -- this assertion
+    // was stale from before that change.
     GameState state = makeMinimalState();
     float feats[NUM_ACTION_FEATURES];
     Macro macro{MacroType::END_TURN, -1, -1, {-1, -1}};
     extractMacroFeatures(state, macro, feats);
 
     // If we got here without segfault, the size is correct
-    // Also check that the function uses exactly 15 features
-    EXPECT_EQ(NUM_ACTION_FEATURES, 15);
+    EXPECT_EQ(NUM_ACTION_FEATURES, 23);
 }
 
 // =============================================================

@@ -124,6 +124,15 @@ TEST(PolicyNetwork, TemperatureAffectsSoftmax) {
 }
 
 TEST(PolicyNetwork, LoadFromJSON) {
+    // Weight layout is [0, NUM_FEATURES) state weights then
+    // [NUM_FEATURES, NUM_FEATURES+NUM_ACTION_FEATURES) action weights. This
+    // fixture was stale from before NUM_FEATURES was expanded 70->73 (+3
+    // loose-ball field-position features, fix #3) -- the "first action
+    // weight" must sit at index NUM_FEATURES (73), not the old 70, or the
+    // action-weight loop in evaluateAction() silently reads a state-side
+    // zero instead (was failing: 0.35 instead of 0.85, i.e. missing exactly
+    // the 0.5 action-weight contribution).
+    static_assert(NUM_FEATURES == 73, "update this fixture's weight indices if NUM_FEATURES changes");
     std::string json = R"({
         "policy_weights": [0.1, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -132,8 +141,8 @@ TEST(PolicyNetwork, LoadFromJSON) {
                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                           0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                           0.0, 0.0, 0.0, 0.0, 0.0],
+                           0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                           0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         "policy_bias": 0.05
     })";
 
@@ -145,7 +154,7 @@ TEST(PolicyNetwork, LoadFromJSON) {
     stateFeats[1] = 1.0f;
 
     float actionFeats[NUM_ACTION_FEATURES] = {};
-    actionFeats[0] = 1.0f;  // This maps to weight index 70 (= 0.5)
+    actionFeats[0] = 1.0f;  // This maps to weight index NUM_FEATURES (73) = 0.5
 
     // logit = 0.1*1 + 0.2*1 + 0.5*1 + 0.05 = 0.85
     float logit = pn->evaluateAction(stateFeats, actionFeats);

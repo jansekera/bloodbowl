@@ -48,7 +48,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out);
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
                                        DiceRollerBase& dice);
 
-// Extract 15 features for a macro (same count as NUM_ACTION_FEATURES for policy reuse)
+// Extract NUM_ACTION_FEATURES features for a macro (shared count with action_features.h for policy reuse)
 void extractMacroFeatures(const GameState& state, const Macro& macro, float* out);
 
 } // namespace bb

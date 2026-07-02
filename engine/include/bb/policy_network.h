@@ -8,14 +8,14 @@
 
 namespace bb {
 
-constexpr int POLICY_INPUT_SIZE = NUM_FEATURES + NUM_ACTION_FEATURES; // 70 + 15 = 85
+constexpr int POLICY_INPUT_SIZE = NUM_FEATURES + NUM_ACTION_FEATURES; // 70 + 23 = 93
 
 class PolicyNetwork {
     // Linear mode
-    std::vector<float> weights_;  // 85 weights (70 state + 15 action)
+    std::vector<float> weights_;  // POLICY_INPUT_SIZE weights (70 state + 23 action)
     float bias_ = 0.0f;
 
-    // Neural mode: input(85) → hidden(ReLU) → output(1)
+    // Neural mode: input(POLICY_INPUT_SIZE) → hidden(ReLU) → output(1)
     bool neural_ = false;
     int hiddenSize_ = 0;
     std::vector<float> W1_;  // POLICY_INPUT_SIZE * hiddenSize, row-major
