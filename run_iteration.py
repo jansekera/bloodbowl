@@ -51,6 +51,21 @@ GATING_MATCHES = int(os.environ.get('BB_GATE', GATING_MATCHES))
 # Team1 v2 validation knobs (defaulty = původní chování beze změny):
 VF_BLEND = float(os.environ.get('BB_VF_BLEND', VF_BLEND))
 POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
+# Gate/benchmark policy priors (2026-07-02, project_bloodbowl_roadmap_20260702
+# Tier 1 item 1): ON by default. Loading a policy net -- even with
+# policy_blend=0 -- activates dormant heuristic prior floors/caps in
+# macro_mcts.cpp expand() (PICKUP/SCORE-family/END_TURN/...) that self-play
+# always gets but gating/benchmark never did before this. Validated via
+# diag_gate_policy_prior.py: N=150 self-mirror, same run, baseline 62.6% ->
+# dormant-priors 50.0% draws (suggestive, not airtight -- the baseline itself
+# is noisy run-to-run at this N -- but the mechanism carries zero risk of the
+# "VF inversion" failure mode since no learned content is blended in, only
+# fixed heuristic caps already proven safe by weeks of self-play). Uses the
+# SAME dynamically-produced policy_cache_path for both sides (blend=0, so
+# content doesn't matter, only presence) -- NOT yet per-side trained-policy
+# sensitivity, that's Tier 2 item 6. Set BB_GATE_USE_POLICY_PRIORS=0 to
+# force off (rollback/isolation testing).
+GATE_USE_POLICY_PRIORS = os.environ.get('BB_GATE_USE_POLICY_PRIORS', '1') != '0'
 IMITATION_EPOCHS = int(os.environ.get('BB_IMITATION_EPOCHS', 16))
 TRAINING_METHOD = os.environ.get('BB_TRAINING_METHOD', 'mc_shaped')
 # Gate dual-signal: požadovaná HtH výhra = 0.5 + k·σ, σ=0.5/√rozhodnuté.
@@ -147,7 +162,13 @@ def _pool_init(engine_build: str, python_src: str) -> None:
 
 
 def _benchmark_game(args: tuple) -> bool:
-    seed, race_idx, gate_path, mcts_iterations, vf_blend, tv = args
+    # 7th element (policy_path) optional/backward-compatible: existing 6-tuple
+    # callers are unaffected and get no policy net (engine default).
+    if len(args) >= 7:
+        seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path = args[:7]
+    else:
+        seed, race_idx, gate_path, mcts_iterations, vf_blend, tv = args
+        policy_path = ''
     import bb_engine
     hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
@@ -156,19 +177,35 @@ def _benchmark_game(args: tuple) -> bool:
         home_ai='macro_mcts', away_ai='random',
         seed=seed, mcts_iterations=mcts_iterations,
         weights_path=gate_path, epsilon=0.0, vf_blend=vf_blend,
+        policy_weights_path=policy_path,
     ).result
     return result.home_score > result.away_score
 
 
 def _gate_game(args: tuple) -> tuple[int, int]:
-    # 8th element (leaf_lookahead) optional/backward-compatible: existing
-    # callers passing 7-tuples (production gating, diag_mirror_budget.py)
-    # are unaffected and get the engine default (off).
-    if len(args) >= 8:
+    # 8th element (leaf_lookahead) and 9th (policy_path) optional/backward-
+    # compatible: existing 7-tuple callers (production gating,
+    # diag_mirror_budget.py) are unaffected and get the engine defaults (no
+    # lookahead, no policy net -> flat+Dirichlet priors as before).
+    #
+    # policy_path (2026-07-02): loading ANY policy net (even with
+    # policy_blend=0, unset here) activates a battery of hand-coded prior
+    # floor/cap rules in macro_mcts.cpp expand() (PICKUP floor, SCORE-family
+    # situational floors, END_TURN cap) that are gated on `config_.policy !=
+    # nullptr`, NOT on policy_blend. Self-play always loads a policy file so
+    # always gets this heuristic regime; gating/benchmark never did. This
+    # activates that dormant regime WITHOUT touching any learned weight
+    # content (policy_blend stays 0) -- see project memory
+    # project_bloodbowl_roadmap_20260702 Tier 1 item 1.
+    if len(args) >= 9:
+        seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv, leaf_lookahead, policy_path = args[:9]
+    elif len(args) >= 8:
         seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv, leaf_lookahead = args[:8]
+        policy_path = ''
     else:
         seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv = args
         leaf_lookahead = False
+        policy_path = ''
     import bb_engine
     hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
@@ -179,6 +216,7 @@ def _gate_game(args: tuple) -> tuple[int, int]:
         weights_path=gate_path, away_weights_path=frozen_path,
         epsilon=0.0, vf_blend=vf_blend,
         leaf_lookahead=leaf_lookahead,
+        policy_weights_path=policy_path,
     ).result
     return result.home_score, result.away_score
 
@@ -361,10 +399,16 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     print('\n=== Gating ===', flush=True)
     init_args = (str(engine_build), str(python_src))
     half_bm = BENCHMARK_MATCHES // 2
+    # 2026-07-02 roadmap item 1: use the SAME policy net self-play just produced
+    # (policy_cache_path, already fresh from _stash_policy above) to activate the
+    # dormant heuristic prior floors in gating/benchmark too. policy_blend stays
+    # 0 (unset) so the net's learned content is never evaluated -- see
+    # GATE_USE_POLICY_PRIORS comment above.
+    gate_policy_path = str(policy_cache_path) if GATE_USE_POLICY_PRIORS and policy_cache_path.exists() else ''
 
     def _run_benchmark(path: Path, label: str) -> tuple[float, bool]:
         tasks = [
-            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV)
+            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV, gate_policy_path)
             for i in range(half_bm)
         ]
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
@@ -405,7 +449,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
-        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND, TV)
+        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND, TV,
+         False, gate_policy_path)
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
