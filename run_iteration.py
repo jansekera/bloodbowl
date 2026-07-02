@@ -72,7 +72,12 @@ WORKERS = min(12, os.cpu_count() or 1)
 # each game is dispatched with a PER-GAME timeout: a game that overruns this is
 # SKIPPED and the run continues over the rest. 180s = ~3.6× the ~50s typical, so
 # a slow-but-finishing game is not falsely skipped; an infinite loop always is.
+# NOTE: 180s is calibrated at MCTS=100 (PER_GAME_TIMEOUT_BASE_MCTS). Game wall
+# time scales ~linearly with the MCTS budget, so _imap_watchdog scales the
+# timeout by mcts_iterations/100 (2026-07-02: fixed 180s at MCTS=400 falsely
+# skipped 28/150 = 18.7% of legitimate slow games in diag_mirror_budget.py).
 PER_GAME_TIMEOUT = 180
+PER_GAME_TIMEOUT_BASE_MCTS = 100
 # Tolerate a few skipped (hung) games without aborting the verdict — a single
 # wedged game shouldn't void a 600-game gate. Above this fraction the hang is
 # systemic (engine broken for many states) and we still abort/never-promote.
@@ -93,28 +98,39 @@ def _atomic_write_json(path: Path, obj) -> None:
     os.replace(tmp, path)
 
 
-def _imap_watchdog(pool: Pool, fn, tasks: list, label: str):
+def _imap_watchdog(pool: Pool, fn, tasks: list, label: str,
+                   mcts_iterations: int = PER_GAME_TIMEOUT_BASE_MCTS):
     """Yield results from the pool, SKIPPING any single game that wedges.
 
     Each task is dispatched via apply_async and collected with a PER-GAME
-    timeout. A game that does not finish within PER_GAME_TIMEOUT (an engine
+    timeout. A game that does not finish within the timeout (an engine
     infinite loop — e.g. the 2026-06-25 anti-regression hang at 599/600) is
     skipped and logged, and the run continues over the remaining games instead
     of aborting the whole pool. The one wedged worker is reclaimed when the
     caller's `with Pool(...)` block terminates the pool. Callers treat a small
     completed-count shortfall as skipped-and-tolerated (see MAX_SKIP_FRAC); a
     large shortfall still aborts as a systemic hang.
+
+    The timeout scales linearly with the caller's MCTS budget: PER_GAME_TIMEOUT
+    (180s) is calibrated at MCTS=100, and game wall time grows ~linearly with
+    mcts_iterations, so a fixed 180s at e.g. MCTS=400 falsely skips legitimate
+    slow games (18.7% skip rate observed 2026-07-02 in diag_mirror_budget.py).
+    Callers below the 100-iter baseline keep the full 180s (max(1, ...)) —
+    never less headroom than today. Default (no argument) = exact pre-existing
+    180s behavior.
     """
+    timeout = int(PER_GAME_TIMEOUT
+                  * max(1.0, mcts_iterations / PER_GAME_TIMEOUT_BASE_MCTS))
     n = len(tasks)
     ars = [pool.apply_async(fn, (t,)) for t in tasks]
     skipped = 0
     for i, ar in enumerate(ars):
         try:
-            yield ar.get(timeout=PER_GAME_TIMEOUT)
+            yield ar.get(timeout=timeout)
         except MPTimeoutError:
             skipped += 1
             print(f'  ⚠ WATCHDOG: {label} game {i + 1}/{n} skipped '
-                  f'(>{PER_GAME_TIMEOUT}s — engine hang?), continuing.', flush=True)
+                  f'(>{timeout}s — engine hang?), continuing.', flush=True)
     if skipped:
         print(f'  ⚠ WATCHDOG: {label} skipped {skipped}/{n} hung game(s); '
               f'verdict over {n - skipped} completed. Inspect with fuzz_gate.py.',
@@ -346,7 +362,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
         results: list[bool] = []
         with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-            for result in _imap_watchdog(pool, _benchmark_game, tasks, label):
+            for result in _imap_watchdog(pool, _benchmark_game, tasks, label,
+                                         mcts_iterations=MCTS_ITERATIONS):
                 results.append(result)
                 done = len(results)
                 if done % 20 == 0 or done == half_bm:
@@ -386,7 +403,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
     gate_results: list[tuple[int, int]] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        for hs, as_ in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression'):
+        for hs, as_ in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression',
+                                      mcts_iterations=MCTS_ITERATIONS):
             gate_results.append((hs, as_))
             done = len(gate_results)
             if done % 10 == 0 or done == GATING_MATCHES:
