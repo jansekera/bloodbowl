@@ -150,7 +150,16 @@ Macro MacroMCTSSearch::search(const GameState& state) {
 
         // 2. Replay state to this node (open-loop: fresh dice each replay)
         GameState sim = state.clone();
-        if (!replayToNode(sim, node)) {
+        ReplayOutcome replay = replayToNode(sim, node);
+        if (!replay.complete) {
+            // A turnover or terminal phase cut the replay short. This is a
+            // real outcome of the macro that was attempted, not a replay to
+            // discard — backpropagate it against the state it actually
+            // produced instead of silently dropping the whole iteration
+            // (which previously starved risky-but-scoring branches of any
+            // penalty signal, since only "lucky" replays ever contributed).
+            double value = simulate(sim, searchingSide);
+            backpropagate(replay.reached, value);
             iterations++;
             continue;
         }
@@ -172,7 +181,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
         int nRollouts = std::max(1, config_.nRollouts);
         for (int r = 1; r < nRollouts; ++r) {
             GameState extra = state.clone();
-            if (!replayToNode(extra, node)) continue;
+            if (!replayToNode(extra, node).complete) continue;
             value += simulate(extra, searchingSide);
         }
         value /= static_cast<double>(nRollouts);
@@ -656,7 +665,7 @@ void MacroMCTSSearch::backpropagate(MacroMCTSNode* node, double value) {
     }
 }
 
-bool MacroMCTSSearch::replayToNode(GameState& state, MacroMCTSNode* node) {
+ReplayOutcome MacroMCTSSearch::replayToNode(GameState& state, MacroMCTSNode* node) {
     // Build path from root to node
     std::vector<MacroMCTSNode*> path;
     MacroMCTSNode* cur = node;
@@ -664,21 +673,27 @@ bool MacroMCTSSearch::replayToNode(GameState& state, MacroMCTSNode* node) {
         path.push_back(cur);
         cur = cur->parent;
     }
+    MacroMCTSNode* root = cur;
 
-    // Replay in root-to-leaf order (open-loop: fresh dice each time)
+    // Replay in root-to-leaf order (open-loop: fresh dice each time).
+    // `reached` tracks the deepest node whose macro was actually attempted,
+    // so a turnover/terminal-phase cutoff can still be backpropagated
+    // against the real outcome instead of silently discarded.
+    MacroMCTSNode* reached = root;
     for (int i = static_cast<int>(path.size()) - 1; i >= 0; --i) {
         if (state.phase == GamePhase::GAME_OVER ||
             state.phase == GamePhase::TOUCHDOWN ||
             state.phase == GamePhase::HALF_TIME) {
-            return false;
+            return {reached, false};
         }
         auto result = greedyExpandMacro(state, path[i]->macro, dice_);
+        reached = path[i];
         if (result.turnover) {
-            return false;
+            return {reached, false};
         }
     }
 
-    return true;
+    return {node, true};
 }
 
 // --- MacroMCTSPolicy ---
