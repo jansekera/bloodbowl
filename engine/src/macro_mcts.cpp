@@ -340,7 +340,19 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     minPrior = 0.12f;
                     break;
                 case MacroType::CAGE:
-                    minPrior = 0.08f;
+                    // 2026-07-03: was 0.08 vs BLOCK's 0.12 -- but BLOCK gets
+                    // one candidate PER favorable attacker/defender pair
+                    // (~2.17 on average) while CAGE only ever emits one
+                    // candidate, so the floors alone gave BLOCK-type macros
+                    // ~3.3x the total prior mass. Outcome-level mining
+                    // (97 games, drive-level Fisher exact p=0.036) found
+                    // CAGE leads to more TDs and fewer lost balls than BLOCK
+                    // from comparable situations, including in the exact
+                    // "carrier already marked" states BLOCK is supposed to
+                    // protect best -- i.e. CAGE was being starved by prior
+                    // structure, not correctly deprioritized by merit.
+                    // Raised to per-candidate parity with BLOCK.
+                    minPrior = 0.12f;
                     break;
                 case MacroType::PICKUP:
                     minPrior = 0.20f;
