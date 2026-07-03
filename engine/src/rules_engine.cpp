@@ -76,7 +76,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                 if (teammate.state != PlayerState::STANDING) return;
                 int dist = p.position.distanceTo(teammate.position);
                 if (dist > 13) return;
-                out.push_back({ActionType::PASS, p.id, -1, teammate.position});
+                out.push_back({ActionType::PASS, p.id, teammate.id, teammate.position});
             });
         }
 
