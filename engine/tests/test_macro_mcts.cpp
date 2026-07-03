@@ -88,10 +88,38 @@ TEST(MacroMCTSNode, BestChildPUCTWithFPU) {
     root.children[2].prior = 0.34f;
     root.children[2].parent = &root;
 
-    auto* best = root.bestChildPUCT(2.5);
+    auto* best = root.bestChildPUCT(2.5, /*maximize=*/true);
     ASSERT_NE(best, nullptr);
     // Unvisited child has high exploration bonus, should be selected
     EXPECT_EQ(best->visits, 0);
+}
+
+TEST(MacroMCTSNode, BestChildPUCTMinimizeForOpponentNode) {
+    // When this node represents the OPPONENT's decision (maximize=false),
+    // ranking should flip: with no exploration bonus advantage, the child
+    // with the WORST value for searchingSide (i.e. best for the opponent)
+    // should be favored over one with a better value.
+    MacroMCTSNode root;
+    root.visits = 30;
+    root.children.resize(2);
+
+    root.children[0].visits = 15;
+    root.children[0].totalValue = 12.0;  // avg 0.8 -- great for searchingSide
+    root.children[0].prior = 0.5f;
+    root.children[0].parent = &root;
+
+    root.children[1].visits = 15;
+    root.children[1].totalValue = -12.0;  // avg -0.8 -- bad for searchingSide
+    root.children[1].prior = 0.5f;
+    root.children[1].parent = &root;
+
+    auto* bestCooperative = root.bestChildPUCT(0.0, /*maximize=*/true);
+    ASSERT_NE(bestCooperative, nullptr);
+    EXPECT_DOUBLE_EQ(bestCooperative->totalValue, 12.0);
+
+    auto* bestAdversarial = root.bestChildPUCT(0.0, /*maximize=*/false);
+    ASSERT_NE(bestAdversarial, nullptr);
+    EXPECT_DOUBLE_EQ(bestAdversarial->totalValue, -12.0);
 }
 
 // =============================================================

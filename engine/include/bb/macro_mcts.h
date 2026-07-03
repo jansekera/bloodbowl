@@ -21,8 +21,16 @@ struct MacroMCTSNode {
     double totalValue = 0.0;
     bool expanded = false;
     float prior = 1.0f;
+    // Team whose macro choice this node's CHILDREN represent (= activeTeam
+    // of the state this node was expand()-ed from). totalValue/Q is always
+    // stored in the search's fixed searchingSide perspective (simulate()
+    // never sign-flips) — bestChildPUCT uses this to know whether to
+    // maximize or minimize Q when picking among children, since a node
+    // whose actingTeam differs from searchingSide represents the
+    // opponent's decision (adversarial, not cooperative).
+    TeamSide actingTeam = TeamSide::HOME;
 
-    MacroMCTSNode* bestChildPUCT(double C) const;
+    MacroMCTSNode* bestChildPUCT(double C, bool maximize) const;
     MacroMCTSNode* mostVisitedChild() const;
 };
 
@@ -61,7 +69,7 @@ public:
     const std::vector<MacroChildVisitInfo>& lastChildVisits() const { return lastChildVisits_; }
 
 private:
-    MacroMCTSNode* select(MacroMCTSNode* root);
+    MacroMCTSNode* select(MacroMCTSNode* root, TeamSide searchingSide);
     void expand(MacroMCTSNode* node, const GameState& state);
     double simulate(const GameState& state, TeamSide perspective);
     void backpropagate(MacroMCTSNode* node, double value);

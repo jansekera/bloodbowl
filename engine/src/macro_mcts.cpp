@@ -52,16 +52,23 @@ static int greedyMacroRank(MacroType t) {
 
 // --- MacroMCTSNode ---
 
-MacroMCTSNode* MacroMCTSNode::bestChildPUCT(double C) const {
+MacroMCTSNode* MacroMCTSNode::bestChildPUCT(double C, bool maximize) const {
     if (children.empty()) return nullptr;
     double parentVisits = static_cast<double>(visits);
+    // totalValue/Q is always stored in the search's fixed searchingSide
+    // perspective. When this node's children represent the OPPONENT's
+    // decision (maximize == false), the opponent picks what's worst for
+    // searchingSide, i.e. we rank children by -Q instead of Q (the
+    // exploration bonus U stays sign-agnostic — it's about visit counts,
+    // not value).
+    double sign = maximize ? 1.0 : -1.0;
 
     // FPU: average Q of visited children
     double visitedSum = 0.0;
     int visitedCount = 0;
     for (auto& child : children) {
         if (child.visits > 0) {
-            visitedSum += child.totalValue / child.visits;
+            visitedSum += sign * (child.totalValue / child.visits);
             visitedCount++;
         }
     }
@@ -70,7 +77,7 @@ MacroMCTSNode* MacroMCTSNode::bestChildPUCT(double C) const {
     MacroMCTSNode* best = nullptr;
     double bestScore = -std::numeric_limits<double>::max();
     for (auto& child : const_cast<std::vector<MacroMCTSNode>&>(children)) {
-        double q = (child.visits == 0) ? fpu : child.totalValue / child.visits;
+        double q = (child.visits == 0) ? fpu : sign * (child.totalValue / child.visits);
         double u = C * child.prior * std::sqrt(parentVisits) / (1.0 + child.visits);
         double score = q + u;
         if (score > bestScore) {
@@ -146,7 +153,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     int iterations = 0;
     while (iterations < config_.maxIterations) {
         // 1. Select
-        MacroMCTSNode* node = select(&root);
+        MacroMCTSNode* node = select(&root, searchingSide);
 
         // 2. Replay state to this node (open-loop: fresh dice each replay)
         GameState sim = state.clone();
@@ -212,10 +219,11 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     return macros[0];
 }
 
-MacroMCTSNode* MacroMCTSSearch::select(MacroMCTSNode* root) {
+MacroMCTSNode* MacroMCTSSearch::select(MacroMCTSNode* root, TeamSide searchingSide) {
     MacroMCTSNode* node = root;
     while (node->expanded && !node->children.empty()) {
-        MacroMCTSNode* child = node->bestChildPUCT(config_.explorationC);
+        bool maximize = (node->actingTeam == searchingSide);
+        MacroMCTSNode* child = node->bestChildPUCT(config_.explorationC, maximize);
         if (!child) break;
         node = child;
     }
@@ -223,6 +231,12 @@ MacroMCTSNode* MacroMCTSSearch::select(MacroMCTSNode* root) {
 }
 
 void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
+    // Children about to be generated represent whichever team is active in
+    // `state` — needed by select()/bestChildPUCT to tell a cooperative
+    // (searchingSide's own) decision node from an adversarial (opponent's)
+    // one.
+    node->actingTeam = state.activeTeam;
+
     if (state.phase == GamePhase::GAME_OVER ||
         state.phase == GamePhase::TOUCHDOWN ||
         state.phase == GamePhase::HALF_TIME) {
