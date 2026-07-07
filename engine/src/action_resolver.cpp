@@ -99,6 +99,7 @@ ActionResult resolveAction(GameState& state, const Action& action,
 
                 if (bestNext.x < 0) return ActionResult::fail();
 
+                Position beforeStep = player.position;
                 ActionResult moveResult = resolveMoveStep(state, action.playerId,
                                                            bestNext, dice, events);
                 if (moveResult.turnover) return moveResult;
@@ -106,6 +107,14 @@ ActionResult resolveAction(GameState& state, const Action& action,
 
                 // Check if player is still standing (might have been knocked down)
                 if (player.state != PlayerState::STANDING) return ActionResult::turnovr();
+
+                // A step that reports success without actually moving the player
+                // (e.g. caught by Tentacles: resolveMoveStep returns ok() but the
+                // player stays at `from`, see move_handler.cpp's checkTentacles)
+                // would otherwise retry the identical step forever — this loop has
+                // no other progress guard. Treat no-progress as "can't reach",
+                // consistent with the other bail-out paths above.
+                if (player.position == beforeStep) return ActionResult::fail();
             }
 
             // Now adjacent — perform block
