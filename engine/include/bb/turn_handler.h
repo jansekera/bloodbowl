@@ -6,7 +6,7 @@
 
 namespace bb {
 
-void resolveEndTurn(GameState& state, std::vector<GameEvent>* events);
+void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTurnover = false);
 bool checkTouchdown(const GameState& state);
 bool checkHalfOver(const GameState& state);
 

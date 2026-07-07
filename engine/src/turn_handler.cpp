@@ -3,7 +3,7 @@
 
 namespace bb {
 
-void resolveEndTurn(GameState& state, std::vector<GameEvent>* events) {
+void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTurnover) {
     TeamSide current = state.activeTeam;
 
     // Eject Secret Weapon players
@@ -28,8 +28,10 @@ void resolveEndTurn(GameState& state, std::vector<GameEvent>* events) {
     // Clear turnover flag
     state.turnoverPending = false;
 
-    emitEvent(events, {GameEvent::Type::TURNOVER, -1, -1, {}, {},
-                      newTeam.turnNumber, true});
+    if (wasTurnover) {
+        emitEvent(events, {GameEvent::Type::TURNOVER, -1, -1, {}, {},
+                          newTeam.turnNumber, true});
+    }
 }
 
 bool checkTouchdown(const GameState& state) {

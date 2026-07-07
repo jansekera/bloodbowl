@@ -174,7 +174,7 @@ ActionResult executeAction(GameState& state, const Action& action,
     // Auto end turn on turnover
     if (result.turnover) {
         state.turnoverPending = true;
-        resolveEndTurn(state, events);
+        resolveEndTurn(state, events, /*wasTurnover=*/true);
     }
 
     // Check touchdown
