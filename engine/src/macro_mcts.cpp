@@ -175,7 +175,16 @@ Macro MacroMCTSSearch::search(const GameState& state) {
         if (!node->expanded && node->visits > 0) {
             expand(node, sim);
             if (!node->children.empty()) {
-                node = &node->children[0];
+                // Descend into the highest-prior child, not always children[0]
+                // (getAvailableMacros always emits END_TURN first, so index 0
+                // would otherwise make every node's first-ever realized value
+                // the passive END_TURN continuation regardless of its actual
+                // prior -- systematically biasing the tree toward passivity).
+                MacroMCTSNode* bestChild = &node->children[0];
+                for (auto& child : node->children) {
+                    if (child.prior > bestChild->prior) bestChild = &child;
+                }
+                node = bestChild;
                 // Execute this child's macro to get leaf state
                 greedyExpandMacro(sim, node->macro, dice_);
             }
