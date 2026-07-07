@@ -155,8 +155,11 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
 }
 
 // Build a standard 11-player team: fill specialized positions first, then linemen
+// resetHalfState: true at true half boundaries (game start, half-time) -- resets the
+// turn clock and reroll allowance. false for a post-touchdown drive restart, which
+// only re-places players/ball and must NOT grant a fresh 8-turn clock or reroll pool.
 void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
-               const FormationPos formation[11]) {
+               const FormationPos formation[11], bool resetHalfState) {
     int baseId = (side == TeamSide::HOME) ? 1 : 12;
     int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
 
@@ -230,18 +233,27 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     // Set team state
     TeamState& ts = state.getTeamState(side);
     ts.side = side;
-    ts.score = ts.score;  // preserve score across halves
-    ts.rerolls = 3;
-    ts.turnNumber = 0;
+    ts.score = ts.score;  // preserve score across halves/drives
     ts.hasApothecary = roster.hasApothecary;
-    ts.apothecaryUsed = false;
+    if (resetHalfState) {
+        ts.rerolls = 3;
+        ts.turnNumber = 0;
+        ts.apothecaryUsed = false;
+    }
     ts.resetForNewTurn();
 }
 
 } // anonymous namespace
 
-void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
-               TeamSide kickingTeam) {
+namespace {
+
+// Shared by setupHalf (true half boundaries) and setupDrive (post-touchdown
+// restart): places both teams in formation and resets the ball/kickoff state.
+// isNewHalf additionally resets each team's turn clock and reroll pool --
+// must be false for setupDrive, or every touchdown grants both teams a fresh
+// 8-turn half (see project_bloodbowl_audit_findings_20260703 finding 2).
+void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
+                      TeamSide kickingTeam, bool isNewHalf) {
     // Reset all players to off-pitch
     for (auto& p : state.players) {
         p.state = PlayerState::OFF_PITCH;
@@ -272,8 +284,8 @@ void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
     const auto* awayForm = (kickingTeam == TeamSide::AWAY)
         ? awayKickForm : AWAY_DEEP_RECEIVER_FORMATION;
 
-    buildTeam(state, TeamSide::HOME, home, homeForm);
-    buildTeam(state, TeamSide::AWAY, away, awayForm);
+    buildTeam(state, TeamSide::HOME, home, homeForm, isNewHalf);
+    buildTeam(state, TeamSide::AWAY, away, awayForm, isNewHalf);
 
     // Give the kicking team's slot 10 player the Kick skill (sweeper/deep safety)
     {
@@ -287,6 +299,18 @@ void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
     // Ball off pitch until kickoff
     state.ball = BallState::offPitch();
     state.turnoverPending = false;
+}
+
+} // anonymous namespace
+
+void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
+               TeamSide kickingTeam) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true);
+}
+
+void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
+                TeamSide kickingTeam) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false);
 }
 
 // Check if kicking team has a standing player with Kick skill
@@ -390,7 +414,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         if (state.phase == GamePhase::TOUCHDOWN) {
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
-            setupHalf(state, home, away, state.kickingTeam);
+            setupDrive(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }
@@ -518,7 +542,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             }
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
-            setupHalf(state, home, away, state.kickingTeam);
+            setupDrive(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
         }

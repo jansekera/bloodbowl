@@ -23,6 +23,12 @@ struct GameResult {
 void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
                TeamSide kickingTeam = TeamSide::AWAY);
 
+// Same player/ball placement as setupHalf, for restarting play after a touchdown
+// mid-half -- does NOT reset each team's turn clock or reroll pool (unlike
+// setupHalf, which is reserved for true half boundaries: game start, half-time).
+void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
+                TeamSide kickingTeam = TeamSide::AWAY);
+
 // Simplified kickoff: place ball with scatter, transition to PLAY
 void simpleKickoff(GameState& state, DiceRollerBase& dice);
 

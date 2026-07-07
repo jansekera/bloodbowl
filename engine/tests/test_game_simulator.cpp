@@ -534,6 +534,45 @@ TEST(GameSimulator, PressureFormationNoOverlaps) {
     EXPECT_EQ(positions.size(), 22u);
 }
 
+TEST(GameSimulator, SetupDrivePreservesTurnClockAndRerolls) {
+    // Regression test for project_bloodbowl_audit_findings_20260703 finding 2:
+    // a post-touchdown drive restart must NOT grant either team a fresh
+    // 8-turn half or a fresh reroll pool -- only setupHalf (true half
+    // boundaries) may do that.
+    GameState state;
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    state.getTeamState(TeamSide::HOME).turnNumber = 5;
+    state.getTeamState(TeamSide::AWAY).turnNumber = 4;
+    state.getTeamState(TeamSide::HOME).rerolls = 1;
+    state.getTeamState(TeamSide::AWAY).rerolls = 0;
+
+    setupDrive(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+    EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 5);
+    EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 4);
+    EXPECT_EQ(state.getTeamState(TeamSide::HOME).rerolls, 1);
+    EXPECT_EQ(state.getTeamState(TeamSide::AWAY).rerolls, 0);
+
+    // Players are still re-placed exactly like setupHalf
+    int homeOnPitch = 0, awayOnPitch = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.isOnPitch()) homeOnPitch++;
+    });
+    state.forEachPlayer(TeamSide::AWAY, [&](const Player& p) {
+        if (p.isOnPitch()) awayOnPitch++;
+    });
+    EXPECT_EQ(homeOnPitch, 11);
+    EXPECT_EQ(awayOnPitch, 11);
+
+    // setupHalf (true half boundary), by contrast, DOES reset both
+    setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+    EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 0);
+    EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 0);
+    EXPECT_EQ(state.getTeamState(TeamSide::HOME).rerolls, 3);
+    EXPECT_EQ(state.getTeamState(TeamSide::AWAY).rerolls, 3);
+}
+
 // === Developed (TV~1200) rosters ===
 
 // Count, among the 11 fielded HOME players, how many have a given skill.
