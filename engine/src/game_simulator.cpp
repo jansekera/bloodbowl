@@ -388,7 +388,8 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
         // Handle touchdown → setup + kickoff
         if (state.phase == GamePhase::TOUCHDOWN) {
-            state.kickingTeam = opponent(state.kickingTeam);
+            // The scoring team kicks off next, not simply "whoever didn't kick last".
+            state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
             setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
@@ -515,7 +516,8 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             if (!logged.turnLogs.empty()) {
                 logged.turnLogs.back().touchdown = true;
             }
-            state.kickingTeam = opponent(state.kickingTeam);
+            // The scoring team kicks off next, not simply "whoever didn't kick last".
+            state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
             setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
