@@ -973,7 +973,14 @@ static MacroExpansionResult expandBlock(GameState& state, const Macro& macro,
 static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
                                           DiceRollerBase& dice) {
     MacroExpansionResult result;
-    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, 8);
+    // Candidate generation (getAvailableMacros) admits pickers up to
+    // movementRemaining+2 squares away (2 GFI) -- the move-to-ball step must
+    // allow the same reach, or a picker legitimately selected at distance
+    // 9-11 (e.g. MA9 Skaven Gutter Runners) walks the previously-hardcoded
+    // 8 steps, stops short, and wastes the whole activation with the ball
+    // still loose (project_bloodbowl_audit_findings_20260703 finding 6).
+    int maxSteps = state.getPlayer(macro.playerId).movementRemaining + 2;
+    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
     if (result.turnover) return result;
 
     // After pickup: if we now have the ball, advance toward endzone.
