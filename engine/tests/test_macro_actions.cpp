@@ -845,3 +845,33 @@ TEST(MacroActions, ScoreAvoidsEnemyTZ) {
     EXPECT_FALSE(result.actions.empty());
 }
 
+TEST(MacroActions, ScoreOffPitchCarrierDoesNotHang) {
+    // Regression test for a real ~100-200s stall (confirmed via live gdb
+    // repro) found in the 2026-07-08 gate run: replayToNode replays a cached
+    // SCORE macro open-loop (fresh dice each MCTS iteration), so the player
+    // referenced by macro.playerId can have been KO'd/crowd-surfed off pitch
+    // by an *earlier* macro in that same replay by the time this SCORE macro
+    // is expanded, even though the macro was only ever generated for an
+    // on-pitch carrier. expandScore read carrier.position without checking
+    // carrier.isOnPitch() first; for an AWAY carrier with the {-1,-1}
+    // off-pitch sentinel position, the TZ-probe walk's cx decremented away
+    // from targetX=0 and only terminated via signed-integer-overflow
+    // wraparound (~4 billion iterations). This test constructs exactly that
+    // state -- an AWAY carrier flagged as the ball holder but KO'd and off
+    // pitch -- and asserts expansion returns immediately (empty result, no
+    // stall) instead of spinning.
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(12);  // AWAY player (id 12 from makeMinimalState)
+    carrier.teamSide = TeamSide::AWAY;
+    carrier.state = PlayerState::KO;
+    carrier.position = {-1, -1};
+    state.ball = BallState::carried({-1, -1}, 12);
+    state.activeTeam = TeamSide::AWAY;
+
+    Macro scoreMacro{MacroType::SCORE, 12, -1, {-1, -1}};
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    auto result = greedyExpandMacro(state, scoreMacro, dice);
+
+    EXPECT_TRUE(result.actions.empty());
+}
+

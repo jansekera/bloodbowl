@@ -730,6 +730,23 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
                                          DiceRollerBase& dice) {
     MacroExpansionResult result;
     const Player& carrier = state.getPlayer(macro.playerId);
+
+    // Guard against a stale SCORE macro replayed against a carrier who is no
+    // longer on pitch. replayToNode replays a macro path open-loop (fresh
+    // dice each MCTS iteration), so the player cached in macro.playerId can
+    // have been KO'd/crowd-surfed off pitch by an earlier macro *in this
+    // same replay* even though the macro itself was only ever generated for
+    // an on-pitch carrier. Without this check carrier.position is the
+    // {-1,-1} off-pitch sentinel, and the TZ-probe walk below assumes
+    // position.x is between the carrier and their own endzone -- for an
+    // AWAY carrier (dx=-1, targetX=0) starting at x=-1, cx walks away from
+    // 0 and only terminates after a signed-integer-overflow wraparound
+    // (confirmed via gdb on a live hang: cx observed at 224583956 mid-spin,
+    // i.e. ~4 billion iterations in, ~100-200s of wall time and technically
+    // undefined behavior). Mirrors the same guard expandBlitzAndScore
+    // already has before its own movePlayerToward call (:934).
+    if (!carrier.isOnPitch()) return result;
+
     int targetX = endzoneX(carrier.teamSide);
     int dx = forwardDx(carrier.teamSide);
 
@@ -745,7 +762,15 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
         int tzSum = 0;
         int cx = carrier.position.x;
         int cy = carrier.position.y;
-        while (cx != targetX || cy != testY) {
+        // Hard iteration cap as defense-in-depth: cx/cy each converge
+        // monotonically toward (targetX, testY) by exactly one square per
+        // step, so a legitimate on-pitch carrier never needs more than
+        // PITCH_WIDTH + PITCH_HEIGHT steps. Bail rather than spin if that
+        // invariant is ever violated again (e.g. by a future bug reintroducing
+        // an off-pitch/invalid carrier here).
+        constexpr int MAX_TZ_PROBE_STEPS = Position::PITCH_WIDTH + Position::PITCH_HEIGHT;
+        int guard = 0;
+        while ((cx != targetX || cy != testY) && guard++ < MAX_TZ_PROBE_STEPS) {
             if (cy < testY) cy++;
             else if (cy > testY) cy--;
             if (cx != targetX) cx += dx;
