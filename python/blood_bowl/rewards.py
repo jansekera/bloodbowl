@@ -16,6 +16,7 @@ winner-only reward (draw == 0.0), bypassing the score-aware reward entirely.
 Both the replay path and the full-log path now route through terminal_value().
 """
 from __future__ import annotations
+import os
 from typing import List
 
 
@@ -51,3 +52,34 @@ def episode_returns(my_scores: List[int], opp_scores: List[int],
             - C * max(0, opp_scores[i + 1] - opp_scores[i])
         G[i] = max(-1.0, min(1.0, sr + gamma * G[i + 1]))
     return G
+
+
+def board_potential(features) -> float:
+    """Φ(s): scoring-proximity potential, perspective-relative, from the feature
+    vector (out[12]=iHaveBall, out[15]=carrierDistToTD/26). Possession × proximity
+    to the attacked endzone: 0.3 for merely holding the ball, rising to 1.0 with the
+    carrier at the endzone; 0.0 when we don't hold the ball.
+
+    Used as a LEVEL shaping term added to the regression target (target += β·Φ(s)),
+    NOT the PBRS difference form (γΦ(s')−Φ(s)). Root cause (2026-06-30): the flat MC
+    target γ^(T−t)·terminal gives every state in a drawn game ~the same label, so the
+    value head never learns that advancing the carrier is better. A LEVEL potential
+    makes within-game targets rise monotonically with carrier progress, teaching that
+    gradient directly. β is kept small and gated on benchmark, since a level term
+    biases the value off a pure outcome predictor. The PBRS difference variant
+    (mc_return_shaped + DEFAULT_SHAPING_WEIGHTS) telescopes to ~constant and already
+    failed (89→80)."""
+    if features[12] <= 0.5:          # out[12] = iHaveBall
+        return 0.0
+    proximity = 1.0 - float(features[15])   # out[15] = carrierDistToTD/26 ∈ [0,1]
+    proximity = max(0.0, min(1.0, proximity))
+    return 0.3 + 0.7 * proximity
+
+
+def value_potential_beta() -> float:
+    """β weight for board_potential() level shaping. BB_VALUE_POTENTIAL_BETA env
+    (default 0.0 = off → identical to the unshaped MC return)."""
+    try:
+        return float(os.environ.get('BB_VALUE_POTENTIAL_BETA', '0.0'))
+    except (TypeError, ValueError):
+        return 0.0
