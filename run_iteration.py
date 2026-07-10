@@ -66,6 +66,30 @@ POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
 # sensitivity, that's Tier 2 item 6. Set BB_GATE_USE_POLICY_PRIORS=0 to
 # force off (rollback/isolation testing).
 GATE_USE_POLICY_PRIORS = os.environ.get('BB_GATE_USE_POLICY_PRIORS', '1') != '0'
+# Gate/benchmark eval-parity (2026-07-10). Both knobs below exist because
+# gating and benchmarking run through simulate_game_logged -- the binding built
+# for SELF-PLAY -- rather than simulate_game, the eval binding, which cannot
+# express away_weights_path/leaf_lookahead and so was never usable here. The
+# logged binding defaults its search knobs to training values, and neither
+# _gate_game nor _benchmark_game ever overrode them, so every measurement this
+# project has ever taken ran with a training-tuned search:
+#   * dirichlet_alpha: logged default 0.3 injects Dirichlet exploration noise
+#     into the root priors of every move. simulate_game hardcodes 0.0 ("No
+#     noise during evaluation") -- that is the intent, and it never applied to
+#     the path we actually measure on. Noise in a measurement game is pure
+#     variance at best; at worst it manufactures decisive results at random and
+#     dilutes an already weak signal (the gate is scored decisive-only).
+#   * exploration_c: logged default 0.5 sharpens the training target;
+#     simulate_game hardcodes 1.0 for exploitation. Deterministic and symmetric
+#     across both sides of a head-to-head, so it does not bias a comparison --
+#     but it means "eval" was never evaluating at the eval C. Same seed:
+#     173 vs 307 total actions, so the behavioural difference is not subtle.
+# Set BB_GATE_DIRICHLET_ALPHA=0.3 BB_GATE_EXPLORATION_C=0.5 to reproduce the
+# pre-fix regime exactly (post-hoc isolation without reverting anything).
+# Self-play is untouched: it calls the same binding without these overrides,
+# and 0.3/0.5 remain the right values there.
+GATE_DIRICHLET_ALPHA = float(os.environ.get('BB_GATE_DIRICHLET_ALPHA', '0.0'))
+GATE_EXPLORATION_C = float(os.environ.get('BB_GATE_EXPLORATION_C', '1.0'))
 IMITATION_EPOCHS = int(os.environ.get('BB_IMITATION_EPOCHS', 16))
 TRAINING_METHOD = os.environ.get('BB_TRAINING_METHOD', 'mc_shaped')
 # Gate dual-signal: požadovaná HtH výhra = 0.5 + k·σ, σ=0.5/√rozhodnuté.
@@ -178,6 +202,8 @@ def _benchmark_game(args: tuple) -> bool:
         seed=seed, mcts_iterations=mcts_iterations,
         weights_path=gate_path, epsilon=0.0, vf_blend=vf_blend,
         policy_weights_path=policy_path,
+        dirichlet_alpha=GATE_DIRICHLET_ALPHA,
+        exploration_c=GATE_EXPLORATION_C,
     ).result
     return result.home_score > result.away_score
 
@@ -217,6 +243,8 @@ def _gate_game(args: tuple) -> tuple[int, int]:
         epsilon=0.0, vf_blend=vf_blend,
         leaf_lookahead=leaf_lookahead,
         policy_weights_path=policy_path,
+        dirichlet_alpha=GATE_DIRICHLET_ALPHA,
+        exploration_c=GATE_EXPLORATION_C,
     ).result
     return result.home_score, result.away_score
 
