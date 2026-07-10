@@ -560,7 +560,10 @@ class NeuralTrainer:
     def train_monte_carlo_return(self, game_log: list[dict], gamma: float = 0.99) -> None:
         """Update weights using the TRUE discounted MC return per state.
 
-        Target at state t: G_t = γ^(T−t) · final_reward, grouped by perspective."""
+        Target at state t: G_t per rewards.episode_returns -- the discounted
+        return with the Lever-B per-TD step reward folded in, the same definition
+        LinearTrainer.train_monte_carlo_return and replay_buffer.add_game use.
+        Old logs without per-state scores fall back to γ^(T−t)·final_reward."""
         result_record = None
         for record in reversed(game_log):
             if record.get('type') == 'result':
@@ -575,9 +578,27 @@ class NeuralTrainer:
         for perspective, states in groups.items():
             final_reward = self._get_reward(result_record, perspective)
             n_states = len(states)
+            # Lever B: fold the per-TD step reward into the return (mirrors
+            # replay_buffer.add_game). This class was missed when Lever B landed
+            # in 6fb5b9b -- it went into LinearTrainer and the replay buffer but
+            # not here, so the neural head (the one actually in production) was
+            # trained on a pure terminal broadcast from the full-log path while
+            # the replay path fed it the folded-in return: two different targets
+            # for the same game. Needs the running score per logged state; old
+            # logs without it fall back to the terminal-only return, which is
+            # exactly episode_returns with no TD scored.
+            if all('home_score' in s for s in states):
+                my_scores = [s['away_score'] if perspective == 'away'
+                             else s['home_score'] for s in states]
+                opp_scores = [s['home_score'] if perspective == 'away'
+                              else s['away_score'] for s in states]
+                returns = episode_returns(my_scores, opp_scores, final_reward, gamma)
+            else:
+                returns = [(gamma ** ((n_states - 1) - i)) * final_reward
+                           for i in range(n_states)]
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
-                g_return = (gamma ** ((n_states - 1) - i)) * final_reward
+                g_return = returns[i]
                 dW1, db1, dW2, db2 = self._backprop(features, g_return)
                 self._update(dW1, db1, dW2, db2)
 

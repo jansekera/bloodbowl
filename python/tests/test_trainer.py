@@ -475,3 +475,73 @@ class TestTrainTransitionShaped:
         b.weights += 0.05 * (target - float(np.dot(b.weights, fa))) * fa
 
         assert np.allclose(a.weights, b.weights, atol=1e-9)
+
+
+class TestMonteCarloReturnLeverB:
+    """Both trainers must compute the same MC return.
+
+    Lever B (per-TD step reward, 6fb5b9b) folds a small reward for scoring and
+    conceding into the discounted return via rewards.episode_returns. It landed
+    in LinearTrainer and in ReplayBuffer.add_game but not in NeuralTrainer, so
+    the neural head -- the one in production -- was trained on a pure terminal
+    broadcast whenever a game arrived through the full-log path, and on the
+    folded-in return whenever the same game arrived through the replay buffer.
+    """
+
+    GAMMA = 0.9
+
+    @staticmethod
+    def _log_with_midgame_td() -> list[dict]:
+        """Home scores a TD between state 1 and state 2; running score logged."""
+        return [
+            {'type': 'state', 'features': [1.0, 0.0, 0.5, 0.0, 1.0], 'perspective': 'home',
+             'home_score': 0, 'away_score': 0},
+            {'type': 'state', 'features': [0.5, 0.2, 0.6, 0.0, 1.0], 'perspective': 'home',
+             'home_score': 0, 'away_score': 0},
+            {'type': 'state', 'features': [0.2, 0.4, 0.7, 0.0, 1.0], 'perspective': 'home',
+             'home_score': 1, 'away_score': 0},
+            {'type': 'result', 'home_score': 1, 'away_score': 0, 'winner': 'home'},
+        ]
+
+    def _captured_neural_targets(self, game_log: list[dict]) -> list[float]:
+        np.random.seed(42)
+        trainer = NeuralTrainer(n_features=5, hidden_size=4, learning_rate=0.1)
+        captured: list[float] = []
+        orig = trainer._backprop
+        trainer._backprop = lambda f, t: (captured.append(t), orig(f, t))[1]
+        trainer.train_monte_carlo_return(game_log, gamma=self.GAMMA)
+        return captured
+
+    def test_neural_targets_match_episode_returns(self):
+        from blood_bowl.rewards import episode_returns, terminal_value
+        targets = self._captured_neural_targets(self._log_with_midgame_td())
+        term = terminal_value(1, 0, 'home')
+        expected = episode_returns([0, 0, 1], [0, 0, 0], term, self.GAMMA)
+        assert targets == pytest.approx(expected)
+
+        # Non-degenerate: the pre-TD state's target must differ from the pure
+        # terminal broadcast. Without this the test would pass on the old code.
+        broadcast = [(self.GAMMA ** (2 - i)) * term for i in range(3)]
+        assert abs(targets[0] - broadcast[0]) > 1e-9
+
+    def test_neural_falls_back_to_broadcast_without_scores(self):
+        from blood_bowl.rewards import terminal_value
+        log = [{k: v for k, v in r.items() if k not in ('home_score', 'away_score')}
+               if r['type'] == 'state' else r
+               for r in self._log_with_midgame_td()]
+        targets = self._captured_neural_targets(log)
+        term = terminal_value(1, 0, 'home')
+        broadcast = [(self.GAMMA ** (2 - i)) * term for i in range(3)]
+        assert targets == pytest.approx(broadcast)
+
+    def test_linear_and_neural_agree_on_the_return(self):
+        """The whole point: one game, one return definition, both trainers."""
+        from blood_bowl.rewards import episode_returns, terminal_value
+        log = self._log_with_midgame_td()
+        neural = self._captured_neural_targets(log)
+
+        lin = LinearTrainer(n_features=5, learning_rate=0.0)  # lr=0: read targets only
+        term = terminal_value(1, 0, 'home')
+        linear_expected = episode_returns([0, 0, 1], [0, 0, 0], term, self.GAMMA)
+        lin.train_monte_carlo_return(log, gamma=self.GAMMA)
+        assert neural == pytest.approx(linear_expected)
