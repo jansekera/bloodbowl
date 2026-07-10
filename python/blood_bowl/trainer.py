@@ -8,8 +8,7 @@ from typing import Union
 import numpy as np
 
 from .features import NUM_FEATURES
-from .rewards import (episode_returns, terminal_value,
-                      board_potential, value_potential_beta)
+from .rewards import episode_returns, terminal_value
 
 # Default shaping weights: (feature_index, weight)
 DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
@@ -207,12 +206,9 @@ class LinearTrainer:
             else:
                 returns = [(gamma ** ((n_states - 1) - i)) * final_reward
                            for i in range(n_states)]
-            beta = value_potential_beta()
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
                 g_return = returns[i]
-                if beta:
-                    g_return = max(-1.0, min(1.0, g_return + beta * board_potential(features)))
                 v = float(np.dot(self.weights, features))
                 self.weights += self.lr * (g_return - v) * features
 
@@ -234,9 +230,6 @@ class LinearTrainer:
         sw = shaping_weights if shaping_weights is not None else []
         f = self._align_features(np.array(features, dtype=np.float64))
         target = mc_return
-        beta = value_potential_beta()
-        if beta:
-            target = max(-1.0, min(1.0, target + beta * board_potential(f)))
         if sw:
             phi_current = self._compute_potential(f, sw)
             if is_terminal:
@@ -579,15 +572,12 @@ class NeuralTrainer:
         winner = result_record.get('winner')
         groups = self._group_by_perspective(game_log)
 
-        beta = value_potential_beta()
         for perspective, states in groups.items():
             final_reward = self._get_reward(result_record, perspective)
             n_states = len(states)
             for i, record in enumerate(states):
                 features = self._align_features(np.array(record['features'], dtype=np.float64))
                 g_return = (gamma ** ((n_states - 1) - i)) * final_reward
-                if beta:
-                    g_return = max(-1.0, min(1.0, g_return + beta * board_potential(features)))
                 dW1, db1, dW2, db2 = self._backprop(features, g_return)
                 self._update(dW1, db1, dW2, db2)
 
@@ -607,9 +597,6 @@ class NeuralTrainer:
         sw = shaping_weights if shaping_weights is not None else []
         f = self._align_features(np.array(features, dtype=np.float64))
         target = mc_return
-        beta = value_potential_beta()
-        if beta:
-            target = max(-1.0, min(1.0, target + beta * board_potential(f)))
         if sw:
             phi_current = self._compute_potential(f, sw)
             if is_terminal:
