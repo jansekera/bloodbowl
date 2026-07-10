@@ -201,13 +201,17 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     TeamSide receiving = opponent(state.kickingTeam);
     state.activeTeam = receiving;
 
-    // Reset turn counters for both teams
-    state.getTeamState(TeamSide::HOME).turnNumber = 0;
-    state.getTeamState(TeamSide::AWAY).turnNumber = 0;
-
-    // Advance to first turn for receiving team
+    // Advance to the receiving team's NEXT turn (2026-07-10 fix: do not
+    // reset turnNumber here -- at a true half boundary setupHalf() already
+    // zeroed both teams' turnNumber before doKickoff() runs, so ++ still
+    // yields 1; after a post-TD kickoff mid-half, setupDrive() deliberately
+    // PRESERVES turnNumber (676bb50), and this function used to stomp that
+    // right back to 0/1, silently reviving the "every TD grants a fresh
+    // 8-turn clock" bug the 676bb50 fix was meant to close. The kicking
+    // team's own turnNumber is left untouched -- it's advanced by the
+    // normal turn-end flow, not by kickoff.
     TeamState& recvTeam = state.getTeamState(receiving);
-    recvTeam.turnNumber = 1;
+    recvTeam.turnNumber++;
     recvTeam.resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
 

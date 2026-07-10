@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "bb/game_simulator.h"
+#include "bb/kickoff_handler.h"
 #include "bb/roster.h"
 #include "bb/policies.h"
 #include "bb/dice.h"
@@ -571,6 +572,59 @@ TEST(GameSimulator, SetupDrivePreservesTurnClockAndRerolls) {
     EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 0);
     EXPECT_EQ(state.getTeamState(TeamSide::HOME).rerolls, 3);
     EXPECT_EQ(state.getTeamState(TeamSide::AWAY).rerolls, 3);
+}
+
+// 2026-07-10: the test above passes even with the half-clock bug live, because
+// it stops at setupDrive. The real post-touchdown path is setupDrive() followed
+// immediately by a kickoff (game_simulator.cpp's doKickoff lambda), and BOTH
+// kickoff implementations used to re-zero turnNumber for both teams -- undoing
+// what setupDrive had just preserved and silently reviving the "every TD grants
+// a fresh 8-turn clock" bug. These tests drive the real sequence.
+TEST(GameSimulator, PostTouchdownKickoffPreservesTurnClock) {
+    for (bool useFullKickoff : {false, true}) {
+        GameState state;
+        setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+
+        // Mid-half state: HOME just scored on its 5th turn, so HOME kicks off.
+        state.getTeamState(TeamSide::HOME).turnNumber = 5;
+        state.getTeamState(TeamSide::AWAY).turnNumber = 4;
+        state.kickingTeam = TeamSide::HOME;
+
+        setupDrive(state, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
+        DiceRoller dice(7);
+        if (useFullKickoff) {
+            resolveKickoff(state, dice, nullptr);
+        } else {
+            simpleKickoff(state, dice);
+        }
+
+        // The kicking team's clock is untouched; the receiving team advances to
+        // its next turn -- NOT back to turn 1.
+        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 5)
+            << "useFullKickoff=" << useFullKickoff;
+        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 5)
+            << "useFullKickoff=" << useFullKickoff;
+    }
+}
+
+TEST(GameSimulator, HalfBoundaryKickoffStillStartsAtTurnOne) {
+    // The same ++ must still yield turn 1 at a true half boundary, where
+    // setupHalf has already zeroed both clocks before the kickoff runs.
+    for (bool useFullKickoff : {false, true}) {
+        GameState state;
+        setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+        DiceRoller dice(7);
+        if (useFullKickoff) {
+            resolveKickoff(state, dice, nullptr);
+        } else {
+            simpleKickoff(state, dice);
+        }
+
+        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 1)
+            << "useFullKickoff=" << useFullKickoff;
+        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 0)
+            << "useFullKickoff=" << useFullKickoff;
+    }
 }
 
 // === Developed (TV~1200) rosters ===
