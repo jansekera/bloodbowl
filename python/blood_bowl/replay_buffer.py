@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .rewards import episode_returns, terminal_value
+from .rewards import episode_returns, episode_step_rewards, terminal_value
 
 
 @dataclass
@@ -21,6 +21,14 @@ class Transition:
     full per-perspective ordering is available (replay sampling loses t/T).
     Defaults to None for buffers pickled before this field existed; consumers
     fall back to the one-step shaped target in that case.
+
+    `reward_step` is the per-step reward r_t consistent with the fold-in
+    inside mc_return (rewards.episode_step_rewards) — the immediate-reward
+    half of a TD target. Only r_t is stored, NEVER a bootstrapped V(s'):
+    values must be recomputed with the head's current weights at training
+    time (a value cached at buffer-write time goes stale as the head moves).
+    None for buffers pickled before this field existed; consumers fall back
+    to 0.0 (correct for any transition without a TD).
     """
     features: list
     reward: float
@@ -28,6 +36,7 @@ class Transition:
     perspective: str
     is_terminal: bool
     mc_return: Optional[float] = None
+    reward_step: Optional[float] = None
 
 
 class ReplayBuffer:
@@ -87,9 +96,11 @@ class ReplayBuffer:
                 opp_scores = [s['home_score'] if perspective == 'away'
                               else s['away_score'] for s in states]
                 returns = episode_returns(my_scores, opp_scores, reward, gamma)
+                step_rewards = episode_step_rewards(my_scores, opp_scores)
             else:
                 returns = [(gamma ** ((n_states - 1) - i)) * reward
                            for i in range(n_states)]
+                step_rewards = [0.0] * n_states
 
             for i, record in enumerate(states):
                 features = record['features']
@@ -103,6 +114,7 @@ class ReplayBuffer:
                     perspective=perspective,
                     is_terminal=is_terminal,
                     mc_return=returns[i],
+                    reward_step=step_rewards[i],
                 ))
 
     def sample(self, batch_size: int = 64) -> List[Transition]:

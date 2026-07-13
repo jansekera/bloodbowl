@@ -51,3 +51,20 @@ def episode_returns(my_scores: List[int], opp_scores: List[int],
             - C * max(0, opp_scores[i + 1] - opp_scores[i])
         G[i] = max(-1.0, min(1.0, sr + gamma * G[i + 1]))
     return G
+
+
+def episode_step_rewards(my_scores: List[int], opp_scores: List[int],
+                         C: float = 0.2) -> List[float]:
+    """Per-step reward r_t = the exact term episode_returns folds into G_t.
+
+    r_t = C*(my TD scored between t and t+1) - C*(opp TD ...); r_T = 0 (no
+    successor). Exposed separately so TD-bootstrap targets (mc_td_mix) mix
+    the SAME step reward the MC return already discounts — a mismatched r_t
+    would make the two estimator halves target different value functions.
+    """
+    n = len(my_scores)
+    r = [0.0] * n
+    for i in range(n - 1):
+        r[i] = C * max(0, my_scores[i + 1] - my_scores[i]) \
+            - C * max(0, opp_scores[i + 1] - opp_scores[i])
+    return r
