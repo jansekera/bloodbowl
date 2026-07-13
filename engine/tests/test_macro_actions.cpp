@@ -377,6 +377,55 @@ TEST(MacroExpansion, AdvanceProducesMoveActions) {
     }
 }
 
+// Carrier at x=5 with MA6 on turn 6: 20 squares from the endzone with 3 turns
+// left wants 7 steps, but the stall throttle caps it at half the remaining
+// movement (3). The throttle keeps movement in reserve so teammates can cage
+// the carrier next turn -- which is only worth anything if the carrier is
+// still standing there next turn.
+GameState makeThrottledCarrierState() {
+    GameState state = makeAdvanceState();
+    state.homeTeam.turnNumber = 6;
+    return state;
+}
+
+TEST(MacroExpansion, AdvanceThrottlesCarrierWhenNoBlitzThreat) {
+    GameState state = makeThrottledCarrierState();
+    DiceRoller dice(42);
+
+    // Nearest opponent is at {20,7}: 15 squares away, far out of blitz range.
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    EXPECT_EQ(result.actions.size(), 3u);
+    EXPECT_EQ(state.getPlayer(1).position.x, 8);
+    EXPECT_EQ(state.getPlayer(1).movementRemaining, 3);
+}
+
+TEST(MacroExpansion, AdvanceSprintsWhenCarrierIsBlitzable) {
+    GameState state = makeThrottledCarrierState();
+    DiceRoller dice(42);
+
+    // Standing opponent 5 squares from the carrier, inside its MA6 blitz
+    // range, but off the carrier's movement lane (y=7) so it neither blocks
+    // the path nor puts the carrier in a tacklezone.
+    Player& threat = state.getPlayer(13);
+    threat.id = 13;
+    threat.teamSide = TeamSide::AWAY;
+    threat.state = PlayerState::STANDING;
+    threat.position = {6, 12};
+    threat.stats = {6, 3, 3, 8};
+    threat.movementRemaining = 6;
+
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    // Reserving movement buys nothing once the carrier can already be blitzed,
+    // so it spends the full budget instead of the throttled 3 steps.
+    EXPECT_EQ(result.actions.size(), 6u);
+    EXPECT_EQ(state.getPlayer(1).position.x, 11);
+    EXPECT_EQ(state.getPlayer(1).movementRemaining, 0);
+}
+
 TEST(MacroExpansion, BlockProducesBlockAction) {
     GameState state = makeMinimalState();
     state.getPlayer(1).stats.strength = 4;

@@ -790,12 +790,28 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
     return result;
 }
 
+// Can any standing opponent reach the carrier with a blitz on their next
+// activation? Same approximation as feature f63 (carrier_blitzable,
+// feature_extractor.cpp): chebyshev(opp, carrier) <= opp MA.
+static bool carrierIsBlitzable(const GameState& state, const Player& carrier) {
+    bool blitzable = false;
+    state.forEachOnPitch(opponent(carrier.teamSide), [&](const Player& opp) {
+        if (blitzable) return;
+        if (opp.state != PlayerState::STANDING) return;
+        if (opp.position.distanceTo(carrier.position) <= opp.stats.movement) {
+            blitzable = true;
+        }
+    });
+    return blitzable;
+}
+
 // Stall-aware step budget for a ball carrier's own movement: advance just
 // enough to reach the endzone by the last turn of the half, keeping the rest
 // of the carrier's movement in reserve so teammates still have a decision
 // window to form a cage around them (unless the half is about to end, in
 // which case a full sprint is worth the exposure).
-static int carrierStallAwareSteps(const Player& carrier, const TeamState& myTeam) {
+static int carrierStallAwareSteps(const GameState& state, const Player& carrier,
+                                  const TeamState& myTeam) {
     int dist = distToEndzone(carrier.position, carrier.teamSide);
     int turnsRemaining = std::max(1, 9 - myTeam.turnNumber); // turns left including this one
 
@@ -807,8 +823,10 @@ static int carrierStallAwareSteps(const Player& carrier, const TeamState& myTeam
     int mvRemaining = static_cast<int>(carrier.movementRemaining);
     int maxSafe = std::max(1, mvRemaining / 2);
     int steps = std::min(idealStepsThisTurn, maxSafe);
-    // But if last 2 turns, use all remaining movement
-    if (turnsRemaining <= 2) {
+    // Holding movement back only buys a cage if the carrier is still standing
+    // there next turn. Once an opponent is already in blitz range that reserve
+    // buys nothing, so spend it: same full-sprint branch as the last 2 turns.
+    if (turnsRemaining <= 2 || carrierIsBlitzable(state, carrier)) {
         steps = std::min(idealStepsThisTurn, mvRemaining);
     }
     return steps;
@@ -821,7 +839,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     int dx = forwardDx(carrier.teamSide);
     const auto& myTeam = state.getTeamState(carrier.teamSide);
 
-    int steps = carrierStallAwareSteps(carrier, myTeam);
+    int steps = carrierStallAwareSteps(state, carrier, myTeam);
 
     int targetX = carrier.position.x + dx * steps;
     targetX = std::clamp(targetX, 1, 24); // stay on pitch
@@ -1016,7 +1034,7 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     if (state.ball.isHeld && state.ball.carrierId == macro.playerId &&
         p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
         const auto& myTeam = state.getTeamState(p.teamSide);
-        int steps = carrierStallAwareSteps(p, myTeam);
+        int steps = carrierStallAwareSteps(state, p, myTeam);
         int targetX = endzoneX(p.teamSide);
         int targetY = p.position.y;
         if (targetY < 5) targetY++;
