@@ -11,7 +11,7 @@ use App\Enum\Weather;
 
 final class FeatureExtractor
 {
-    public const NUM_FEATURES = 70;
+    public const NUM_FEATURES = 73;  // fix #3: +3 loose-ball field-position features (70-72)
 
     /**
      * Extract normalized features from game state for a given perspective.
@@ -647,11 +647,17 @@ final class FeatureExtractor
         }
 
         // [67] loose_ball_proximity: who's closer (1.0 = I'm much closer)
+        // [70-72] the same loose ball's field position, reach and contest state
+        // (fix #3: without these, a loose ball's scoring value is invisible)
         $looseBallProx = 0.5;
+        $looseBallDistToTd = 0.5;  // [70] loose ball's distance to the endzone I attack
+        $myNearestToBall = 1.0;    // [71] absolute distance of my closest player to the ball
+        $pickupClear = 0.0;        // [72] loose ball is uncontested (clean pickup)
         if ($ballOnGround > 0 && $ball->isOnPitch() && $ball->getPosition() !== null) {
             $bPos = $ball->getPosition();
             $myClosest = 99;
             $oppClosest = 99;
+            $tzOnBall = 0;
             foreach ($myStandingOnPitch as $p) {
                 $pPos = $p->getPosition();
                 if ($pPos === null) {
@@ -667,8 +673,19 @@ final class FeatureExtractor
                 }
                 $d = max(abs($pPos->getX() - $bPos->getX()), abs($pPos->getY() - $bPos->getY()));
                 if ($d < $oppClosest) $oppClosest = $d;
+                if ($d === 1) $tzOnBall++;
             }
             $looseBallProx = self::clamp(($oppClosest - $myClosest + 5) / 10.0, 0.0, 1.0);
+            // [70] field position of the scoring chance (0 = ball on my target endzone)
+            $looseBallDistToTd = self::clamp(
+                self::distanceToEndzone($bPos->getX(), $perspective) / 25.0, 0.0, 1.0
+            );
+            // [71] absolute reach: 0 = my player is on the ball, 1 = far (>=8 squares)
+            if ($myClosest < 99) {
+                $myNearestToBall = self::clamp($myClosest / 8.0, 0.0, 1.0);
+            }
+            // [72] clean pickup: 1 = no opponent tackle zones on the ball square
+            $pickupClear = self::clamp(1.0 - $tzOnBall / 3.0, 0.0, 1.0);
         }
 
         // [68] deep_safety_count: my players behind deepest opponent penetration
@@ -791,6 +808,9 @@ final class FeatureExtractor
             /* 67 loose_ball_proximity */  $looseBallProx,
             /* 68 deep_safety_count */     min($deepSafeties / 3.0, 1.0),
             /* 69 isolation_count */       $myStandingCount > 0 ? $isolatedCount / $myStandingCount : 0.0,
+            /* 70 loose_ball_dist_to_td */ $looseBallDistToTd,
+            /* 71 my_nearest_to_ball */    $myNearestToBall,
+            /* 72 pickup_clear */          $pickupClear,
         ];
     }
 
