@@ -963,6 +963,16 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
     // After blitz, continue with any follow-up moves/blocks from the blitz action
     // The blitz action may generate further MOVE/BLOCK actions
     for (int step = 0; step < 12; ++step) {
+        // The blitz may have surfed/KO'd the blocker off the pitch, leaving
+        // its position at the {-1,-1} sentinel. findMoveToward would then
+        // walk the blitzer toward that square. Today the chase is unreachable
+        // -- resolveBlock leaves the blitzer with hasActed=true on every path,
+        // so no MOVE is generated for it after a completed block -- but that
+        // is a non-local invariant of block_handler's bookkeeping, not of this
+        // loop. Bail locally rather than depend on it (same defense-in-depth
+        // idiom as MAX_TZ_PROBE_STEPS above). break, not return: Step 2
+        // (carrier scores) must still run.
+        if (!blocker.isOnPitch()) break;
         actions.clear();
         getAvailableActions(state, actions);
 

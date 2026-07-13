@@ -401,6 +401,75 @@ TEST(MacroExpansion, AdvanceThrottlesCarrierWhenNoBlitzThreat) {
     EXPECT_EQ(state.getPlayer(1).movementRemaining, 3);
 }
 
+// Blocker on the sideline, blitzer pushing from one square in: every push
+// square is off-pitch, so any push/POW result crowd-surfs the blocker and
+// leaves its position at the {-1,-1} sentinel. Pins the surf outcome: no
+// follow-up MOVE may chase the sentinel (today doubly prevented -- the
+// blitzer's hasActed plus the loop's isOnPitch guard; this test can't tell
+// the two apart, so it is a tripwire for the pair, not proof of the guard
+// alone) and the carrier's Step-2 scoring run must still happen.
+TEST(MacroExpansion, BlitzAndScoreStopsFollowUpWhenBlockerSurfedOffPitch) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(1);
+    carrier.id = 1;
+    carrier.teamSide = TeamSide::HOME;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {21, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+
+    Player& blitzer = state.getPlayer(2);
+    blitzer.id = 2;
+    blitzer.teamSide = TeamSide::HOME;
+    blitzer.state = PlayerState::STANDING;
+    blitzer.position = {20, 1};
+    blitzer.stats = {6, 6, 3, 8};
+    blitzer.movementRemaining = 6;
+
+    Player& blocker = state.getPlayer(12);
+    blocker.id = 12;
+    blocker.teamSide = TeamSide::AWAY;
+    blocker.state = PlayerState::STANDING;
+    blocker.position = {20, 0};
+    blocker.stats = {6, 1, 3, 7};
+    blocker.movementRemaining = 6;
+
+    state.ball = BallState::carried({21, 7}, 1);
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::BLITZ_AND_SCORE, 1, 12, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    // Precondition, not the assertion under test: ST6 vs ST1 is a 3-die
+    // attacker-chooses block and all three push squares are off-pitch, so the
+    // blocker must end up surfed. If a dice-seed change ever breaks this,
+    // re-pick the seed rather than weakening the assertions below.
+    ASSERT_FALSE(state.getPlayer(12).isOnPitch());
+
+    // No follow-up MOVE may chase the {-1,-1} sentinel.
+    for (auto& a : result.actions) {
+        if (a.type == ActionType::MOVE && a.playerId == 2) {
+            ADD_FAILURE() << "blitzer chased the off-pitch sentinel to ("
+                          << int(a.target.x) << "," << int(a.target.y) << ")";
+        }
+    }
+
+    // break, not return: the carrier's Step-2 scoring run must still happen.
+    int carrierMoves = 0;
+    for (auto& a : result.actions) {
+        if (a.type == ActionType::MOVE && a.playerId == 1) carrierMoves++;
+    }
+    EXPECT_GT(carrierMoves, 0);
+}
+
 TEST(MacroExpansion, AdvanceSprintsWhenCarrierIsBlitzable) {
     GameState state = makeThrottledCarrierState();
     DiceRoller dice(42);
