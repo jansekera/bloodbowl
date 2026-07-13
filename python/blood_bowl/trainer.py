@@ -8,7 +8,7 @@ from typing import Union
 import numpy as np
 
 from .features import NUM_FEATURES
-from .rewards import episode_returns, terminal_value
+from .rewards import episode_returns, episode_step_rewards, terminal_value
 
 # Default shaping weights: (feature_index, weight)
 DEFAULT_SHAPING_WEIGHTS: list[tuple[int, float]] = [
@@ -237,6 +237,92 @@ class LinearTrainer:
             else:
                 nf = self._align_features(np.array(next_features, dtype=np.float64))
                 target += gamma * self._compute_potential(nf, sw) - phi_current
+        v = float(np.dot(self.weights, f))
+        self.weights += self.lr * (target - v) * f
+
+    def train_mc_td_mix(self, game_log: list[dict], gamma: float = 0.99,
+                        alpha: float = 0.7) -> None:
+        """Update weights using the MC/TD-bootstrap mixed value target.
+
+        Target at non-terminal state t:
+            clamp(alpha*G_t + (1-alpha)*(r_t + gamma*V(s_{t+1})), -1, 1)
+        with G_t/r_t from rewards.episode_returns/episode_step_rewards and
+        V(s_{t+1}) evaluated with the CURRENT weights at update time. The
+        terminal state keeps the plain terminal_value anchor (== G_T). Both
+        halves estimate the same V^pi, so the target is policy-invariant by
+        construction — no new reward terms, no potential. alpha=1.0 reduces
+        bit-exactly to train_monte_carlo_return (built-in null test); alpha<1
+        trades MC variance for within-game TD signal (the flat-value-target
+        root cause, research_fable_20260709.md section 7).
+        """
+        result_record = None
+        for record in reversed(game_log):
+            if record.get('type') == 'result':
+                result_record = record
+                break
+        if result_record is None:
+            return
+
+        groups = self._group_by_perspective(game_log)
+
+        for perspective, states in groups.items():
+            final_reward = self._get_reward(result_record, perspective)
+            n_states = len(states)
+            # Same G_t as train_monte_carlo_return (Lever B fold-in; old logs
+            # without per-state scores fall back to the terminal-only return,
+            # with r_t = 0 to match: no scores recorded means no TD terms).
+            if all('home_score' in s for s in states):
+                my_scores = [s['away_score'] if perspective == 'away'
+                             else s['home_score'] for s in states]
+                opp_scores = [s['home_score'] if perspective == 'away'
+                              else s['away_score'] for s in states]
+                returns = episode_returns(my_scores, opp_scores, final_reward, gamma)
+                step_rewards = episode_step_rewards(my_scores, opp_scores)
+            else:
+                returns = [(gamma ** ((n_states - 1) - i)) * final_reward
+                           for i in range(n_states)]
+                step_rewards = [0.0] * n_states
+            for i, record in enumerate(states):
+                features = self._align_features(np.array(record['features'], dtype=np.float64))
+                if i == n_states - 1:
+                    target = returns[i]  # terminal anchor, never bootstrapped
+                else:
+                    next_features = self._align_features(
+                        np.array(states[i + 1]['features'], dtype=np.float64)
+                    )
+                    v_next = float(np.dot(self.weights, next_features))
+                    target = alpha * returns[i] \
+                        + (1.0 - alpha) * (step_rewards[i] + gamma * v_next)
+                    target = max(-1.0, min(1.0, target))
+                v = float(np.dot(self.weights, features))
+                self.weights += self.lr * (target - v) * features
+
+    def train_transition_td_mix(
+        self,
+        features: list,
+        next_features: list,
+        mc_return: float,
+        reward_step: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        alpha: float = 0.7,
+    ) -> None:
+        """One mixed MC/TD-bootstrap update for a single replay transition.
+
+        Same target as train_mc_td_mix for this state. V(s') is computed from
+        the trainer's CURRENT weights at call time — the buffer stores only
+        r_t (Transition.reward_step), never a value, so the bootstrap can't
+        go stale. alpha=1.0 reduces bit-exactly to train_transition_return
+        with no shaping (mc_return is already clamped at buffer-write time).
+        """
+        f = self._align_features(np.array(features, dtype=np.float64))
+        if is_terminal:
+            target = mc_return  # terminal anchor, never bootstrapped
+        else:
+            nf = self._align_features(np.array(next_features, dtype=np.float64))
+            v_next = float(np.dot(self.weights, nf))
+            target = alpha * mc_return + (1.0 - alpha) * (reward_step + gamma * v_next)
+            target = max(-1.0, min(1.0, target))
         v = float(np.dot(self.weights, f))
         self.weights += self.lr * (target - v) * f
 
@@ -625,6 +711,87 @@ class NeuralTrainer:
             else:
                 nf = self._align_features(np.array(next_features, dtype=np.float64))
                 target += gamma * self._compute_potential(nf, sw) - phi_current
+        dW1, db1, dW2, db2 = self._backprop(f, target)
+        self._update(dW1, db1, dW2, db2)
+
+    def train_mc_td_mix(self, game_log: list[dict], gamma: float = 0.99,
+                        alpha: float = 0.7) -> None:
+        """Update weights using the MC/TD-bootstrap mixed value target.
+
+        Same target as LinearTrainer.train_mc_td_mix:
+            clamp(alpha*G_t + (1-alpha)*(r_t + gamma*V(s_{t+1})), -1, 1)
+        with V(s_{t+1}) a semi-gradient bootstrap from the CURRENT weights at
+        update time (never cached). Terminal state keeps the terminal_value
+        anchor. alpha=1.0 reduces bit-exactly to train_monte_carlo_return.
+        """
+        result_record = None
+        for record in reversed(game_log):
+            if record.get('type') == 'result':
+                result_record = record
+                break
+        if result_record is None:
+            return
+
+        groups = self._group_by_perspective(game_log)
+
+        for perspective, states in groups.items():
+            final_reward = self._get_reward(result_record, perspective)
+            n_states = len(states)
+            # Same G_t as train_monte_carlo_return (Lever B fold-in; old logs
+            # without per-state scores fall back to the terminal-only return,
+            # with r_t = 0 to match: no scores recorded means no TD terms).
+            if all('home_score' in s for s in states):
+                my_scores = [s['away_score'] if perspective == 'away'
+                             else s['home_score'] for s in states]
+                opp_scores = [s['home_score'] if perspective == 'away'
+                              else s['away_score'] for s in states]
+                returns = episode_returns(my_scores, opp_scores, final_reward, gamma)
+                step_rewards = episode_step_rewards(my_scores, opp_scores)
+            else:
+                returns = [(gamma ** ((n_states - 1) - i)) * final_reward
+                           for i in range(n_states)]
+                step_rewards = [0.0] * n_states
+            for i, record in enumerate(states):
+                features = self._align_features(np.array(record['features'], dtype=np.float64))
+                if i == n_states - 1:
+                    target = returns[i]  # terminal anchor, never bootstrapped
+                else:
+                    next_features = self._align_features(
+                        np.array(states[i + 1]['features'], dtype=np.float64)
+                    )
+                    v_next, _ = self.forward(next_features)
+                    target = alpha * returns[i] \
+                        + (1.0 - alpha) * (step_rewards[i] + gamma * v_next)
+                    target = max(-1.0, min(1.0, target))
+                dW1, db1, dW2, db2 = self._backprop(features, target)
+                self._update(dW1, db1, dW2, db2)
+
+    def train_transition_td_mix(
+        self,
+        features: list,
+        next_features: list,
+        mc_return: float,
+        reward_step: float,
+        is_terminal: bool,
+        gamma: float = 0.99,
+        alpha: float = 0.7,
+    ) -> None:
+        """One mixed MC/TD-bootstrap update for a single replay transition.
+
+        Same target as train_mc_td_mix for this state. V(s') is computed from
+        the trainer's CURRENT weights at call time — the buffer stores only
+        r_t (Transition.reward_step), never a value, so the bootstrap can't
+        go stale. alpha=1.0 reduces bit-exactly to train_transition_return
+        with no shaping (mc_return is already clamped at buffer-write time).
+        """
+        f = self._align_features(np.array(features, dtype=np.float64))
+        if is_terminal:
+            target = mc_return  # terminal anchor, never bootstrapped
+        else:
+            nf = self._align_features(np.array(next_features, dtype=np.float64))
+            v_next, _ = self.forward(nf)
+            target = alpha * mc_return + (1.0 - alpha) * (reward_step + gamma * v_next)
+            target = max(-1.0, min(1.0, target))
         dW1, db1, dW2, db2 = self._backprop(f, target)
         self._update(dW1, db1, dW2, db2)
 
