@@ -152,7 +152,8 @@ def run_training(
     with open(metrics_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm',
-                         'policy_loss', 'policy_top1_agreement', 'mcts_visit_entropy'])
+                         'policy_loss', 'policy_top1_agreement', 'mcts_visit_entropy',
+                         'pre_td_ramp'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
     if self_play and opponent_mix_ratio > 0:
@@ -411,6 +412,13 @@ def run_training(
                     _vf_abs.append(abs(trainer.evaluate(_rec['features'])))
         mean_abs_vf = sum(_vf_abs) / len(_vf_abs) if _vf_abs else 0.0
 
+        # Pre-TD value ramp — primary Stage-1 metric for mc_td_mix, logged for
+        # EVERY method so baseline runs stay comparable. None (no TD scored
+        # this epoch / old logs) is recorded as an empty CSV cell.
+        from .evaluate import pre_td_value_ramp
+        pre_td_ramp = pre_td_value_ramp(
+            (_read_jsonl(_lf) for _lf in log_files), trainer.evaluate)
+
         # VF monitoring: check for perspective inversion
         vf_msg = ''
         if vf_blend > 0 and log_files:
@@ -557,8 +565,10 @@ def run_training(
         # Observability metrics — log to epoch_metrics.csv
         nil_nil_rate = nil_nil / n_games if n_games > 0 else 0.0
         entropy_str = f'{mcts_visit_entropy:.3f}' if mcts_visit_entropy is not None else ''
+        ramp_str = f'{pre_td_ramp:+.4f}' if pre_td_ramp is not None else ''
         print(f'  Metrics: nil_nil={nil_nil_rate:.1%} mean_abs_vf={mean_abs_vf:.3f} '
-              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}'
+              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f} '
+              f'pre_td_ramp={ramp_str or "n/a"}'
               + (f' | policy_loss={policy_loss:.3f} top1_agree={policy_agreement:.1%}'
                  f' mcts_H={entropy_str}'
                  if policy_trainer else ''))
@@ -566,7 +576,8 @@ def run_training(
             writer = csv.writer(f)
             writer.writerow([epoch, f'{nil_nil_rate:.3f}', f'{mean_abs_vf:.4f}',
                              f'{weight_norm_change:.4f}', f'{grad_norm:.4f}',
-                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}', entropy_str])
+                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}', entropy_str,
+                             ramp_str])
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
