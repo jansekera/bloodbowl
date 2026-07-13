@@ -9,6 +9,7 @@ Usage: python -m blood_bowl.train_cli --epochs=50 --games=20 --opponent=random -
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from .training_loop import run_training
@@ -33,10 +34,16 @@ def main():
     parser.add_argument('--lr-decay', type=float, default=1.0, help='Multiplicative LR decay per epoch')
     parser.add_argument('--training-method', default='mc',
                         choices=['mc', 'mc_shaped', 'mc_return', 'mc_return_shaped',
-                                 'td0', 'td_lambda'],
+                                 'mc_td_mix', 'td0', 'td_lambda'],
                         help='Training method. mc_return = true discounted MC return '
                              'G_t=gamma^(T-t)*final_reward (A/B vs mc_shaped); '
-                             'mc_return_shaped adds potential shaping on top.')
+                             'mc_return_shaped adds potential shaping on top; '
+                             'mc_td_mix = alpha*G_t + (1-alpha)*(r_t + gamma*V(s\')), '
+                             'clamped — alpha=1.0 == mc_return exactly.')
+    parser.add_argument('--td-mix-alpha', type=float,
+                        default=float(os.environ.get('BB_TD_MIX_ALPHA', '0.7')),
+                        help='MC weight in the mc_td_mix target (env BB_TD_MIX_ALPHA; '
+                             'only used with --training-method=mc_td_mix)')
     parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
     parser.add_argument('--lambda', type=float, default=0.8, dest='lambda_',
                         help='Trace decay for td_lambda')
@@ -127,6 +134,7 @@ def main():
         training_method=args.training_method,
         gamma=args.gamma,
         lambda_=args.lambda_,
+        td_mix_alpha=args.td_mix_alpha,
         opponent_weights=args.opponent_weights,
         model_type=args.model,
         hidden_size=args.hidden_size,

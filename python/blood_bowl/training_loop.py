@@ -33,6 +33,7 @@ def run_training(
     training_method: str = 'mc',
     gamma: float = 0.99,
     lambda_: float = 0.8,
+    td_mix_alpha: float = 0.7,
     opponent_weights: str | None = None,
     model_type: str = 'linear',
     hidden_size: int = 32,
@@ -151,7 +152,8 @@ def run_training(
     with open(metrics_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['epoch', 'nil_nil_rate', 'mean_abs_vf', 'weight_norm_change', 'grad_norm',
-                         'policy_loss', 'policy_top1_agreement', 'mcts_visit_entropy'])
+                         'policy_loss', 'policy_top1_agreement', 'mcts_visit_entropy',
+                         'pre_td_ramp'])
 
     effective_opponent = 'learning (self-play)' if self_play else opponent
     if self_play and opponent_mix_ratio > 0:
@@ -176,7 +178,9 @@ def run_training(
     actual_model = type(trainer).__name__
     print(f'Training: {epochs} epochs x {games_per_epoch} games = {total_games} games total')
     print(f'Model: {actual_model}, Opponent: {effective_opponent}, LR: {learning_rate}, Epsilon: {epsilon_start:.2f} -> {epsilon_end:.2f}')
-    print(f'Method: {training_method}' + (f', gamma={gamma}' if training_method != 'mc' else '') + (f', lambda={lambda_}' if training_method == 'td_lambda' else ''))
+    print(f'Method: {training_method}' + (f', gamma={gamma}' if training_method != 'mc' else '')
+          + (f', lambda={lambda_}' if training_method == 'td_lambda' else '')
+          + (f', alpha={td_mix_alpha}' if training_method == 'mc_td_mix' else ''))
     print(f'Races: {home_race} vs {away_race}' + (f', LR decay: {lr_decay}' if lr_decay != 1.0 else ''))
     if mcts_iterations > 0:
         print(f'MCTS: {mcts_iterations} iterations per action')
@@ -381,14 +385,16 @@ def run_training(
             if replay_buffer is not None:
                 replay_buffer.add_game(game_log, gamma=gamma)
 
-            _train_on_log(trainer, game_log, training_method, gamma, lambda_)
+            _train_on_log(trainer, game_log, training_method, gamma, lambda_,
+                          td_mix_alpha=td_mix_alpha)
 
         # Replay buffer: train on random samples (one correct shaped update per
         # transition — see review T1.2)
         if replay_buffer is not None and len(replay_buffer) > 0:
             batch = replay_buffer.sample(replay_batch_size)
             for transition in batch:
-                _train_on_transition(trainer, transition, training_method, gamma, lambda_)
+                _train_on_transition(trainer, transition, training_method, gamma, lambda_,
+                                     td_mix_alpha=td_mix_alpha)
 
             # Save replay buffer periodically
             replay_buffer.save(str(root / 'replay_buffer.pkl'))
@@ -405,6 +411,13 @@ def run_training(
                 if _rec.get('type') == 'state' and 'features' in _rec:
                     _vf_abs.append(abs(trainer.evaluate(_rec['features'])))
         mean_abs_vf = sum(_vf_abs) / len(_vf_abs) if _vf_abs else 0.0
+
+        # Pre-TD value ramp — primary Stage-1 metric for mc_td_mix, logged for
+        # EVERY method so baseline runs stay comparable. None (no TD scored
+        # this epoch / old logs) is recorded as an empty CSV cell.
+        from .evaluate import pre_td_value_ramp
+        pre_td_ramp = pre_td_value_ramp(
+            (_read_jsonl(_lf) for _lf in log_files), trainer.evaluate)
 
         # VF monitoring: check for perspective inversion
         vf_msg = ''
@@ -552,8 +565,10 @@ def run_training(
         # Observability metrics — log to epoch_metrics.csv
         nil_nil_rate = nil_nil / n_games if n_games > 0 else 0.0
         entropy_str = f'{mcts_visit_entropy:.3f}' if mcts_visit_entropy is not None else ''
+        ramp_str = f'{pre_td_ramp:+.4f}' if pre_td_ramp is not None else ''
         print(f'  Metrics: nil_nil={nil_nil_rate:.1%} mean_abs_vf={mean_abs_vf:.3f} '
-              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f}'
+              f'w_norm_Δ={weight_norm_change:+.4f} grad_norm={grad_norm:.4f} '
+              f'pre_td_ramp={ramp_str or "n/a"}'
               + (f' | policy_loss={policy_loss:.3f} top1_agree={policy_agreement:.1%}'
                  f' mcts_H={entropy_str}'
                  if policy_trainer else ''))
@@ -561,7 +576,8 @@ def run_training(
             writer = csv.writer(f)
             writer.writerow([epoch, f'{nil_nil_rate:.3f}', f'{mean_abs_vf:.4f}',
                              f'{weight_norm_change:.4f}', f'{grad_norm:.4f}',
-                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}', entropy_str])
+                             f'{policy_loss:.4f}', f'{policy_agreement:.4f}', entropy_str,
+                             ramp_str])
 
         # Per-race breakdown (if mixed races)
         race_list = [r.strip() for r in away_race.split(',')]
@@ -766,7 +782,8 @@ def _run_simulation_batch(
         )
 
 
-def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lambda_: float) -> None:
+def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lambda_: float,
+                  td_mix_alpha: float = 0.7) -> None:
     """Train on a single game log using the specified method."""
     if method == 'mc':
         trainer.train_monte_carlo(game_log)
@@ -777,6 +794,9 @@ def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lamb
         # variant adds potential shaping on top in the transition path; on the
         # full-log path the per-state return already carries graded credit.
         trainer.train_monte_carlo_return(game_log, gamma=gamma)
+    elif method == 'mc_td_mix':
+        # MC/TD-bootstrap mixed target; alpha=1.0 == mc_return exactly.
+        trainer.train_mc_td_mix(game_log, gamma=gamma, alpha=td_mix_alpha)
     elif method == 'td0':
         trainer.train_td0(game_log, gamma=gamma)
     elif method == 'td_lambda':
@@ -785,7 +805,8 @@ def _train_on_log(trainer, game_log: list[dict], method: str, gamma: float, lamb
         raise ValueError(f'Unknown training method: {method}')
 
 
-def _train_on_transition(trainer, tr, method: str, gamma: float, lambda_: float) -> None:
+def _train_on_transition(trainer, tr, method: str, gamma: float, lambda_: float,
+                         td_mix_alpha: float = 0.7) -> None:
     """Train on one replay Transition.
 
     For MC / MC-shaped this does a SINGLE correct potential-shaped update on the
@@ -811,6 +832,15 @@ def _train_on_transition(trainer, tr, method: str, gamma: float, lambda_: float)
         trainer.train_transition_return(
             tr.features, tr.next_features, g, tr.is_terminal,
             gamma=gamma, shaping_weights=sw)
+    elif method == 'mc_td_mix':
+        # Buffers pickled before mc_return/reward_step existed fall back to the
+        # one-step terminal reward and r_t = 0 so training never crashes. V(s')
+        # is recomputed inside the trainer from CURRENT weights — never stored.
+        g = tr.mc_return if tr.mc_return is not None else tr.reward
+        r = tr.reward_step if tr.reward_step is not None else 0.0
+        trainer.train_transition_td_mix(
+            tr.features, tr.next_features, g, r, tr.is_terminal,
+            gamma=gamma, alpha=td_mix_alpha)
     else:
         mini_log = [{'type': 'state', 'features': tr.features, 'perspective': tr.perspective}]
         if not tr.is_terminal:
