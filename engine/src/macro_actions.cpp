@@ -1095,7 +1095,18 @@ static MacroExpansionResult expandFoul(GameState& state, const Macro& macro,
 static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
                                               DiceRollerBase& dice) {
     MacroExpansionResult result;
-    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, 4);
+    // Candidate generation (getAvailableMacros) hands out REPOSITION targets
+    // with no reach check at all (safety/screen spots are routinely 5-10+
+    // squares away), but the walk here was hardcoded to maxSteps=4 -- any
+    // player repositioning farther than 4 squares stopped short every single
+    // turn, so defensive screens/safeties never actually formed
+    // (research_fable_20260709 section 3b; same bug class as the PICKUP step
+    // cap fix, 2899cd5). Cap at the player's real movement budget instead.
+    // Deliberately NO +2 GFI headroom (unlike expandPickup): REPOSITION is
+    // the only dice-free macro, and a failed GFI on a free repositioning
+    // player is pure downside with no ball at stake.
+    int maxSteps = state.getPlayer(macro.playerId).movementRemaining;
+    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
     return result;
 }
 

@@ -528,6 +528,34 @@ TEST(MacroExpansion, PickupMoveTowardBall) {
     }
 }
 
+// Regression for the REPOSITION step cap (research_fable_20260709 section
+// 3b, same bug class as the PICKUP step cap fix 2899cd5): candidate
+// generation hands out REPOSITION targets with no reach check, so the
+// expansion must walk the player's real movement budget, not a fixed 4.
+// NEGATIVE CONTROL: pre-patch expandReposition hard-caps the walk at 4
+// steps, so this MA8 player stops at x=14 and the last three EXPECTs
+// below fail (actions.size()==4, position=={14,7}).
+TEST(MacroExpansion, RepositionWalksFullMovementBudget) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.position = {10, 7};
+    p1.stats = {8, 3, 3, 8};
+    p1.movementRemaining = 8;
+    // Ball held by the far-away opponent so no PICKUP/loose-ball logic runs.
+    state.getPlayer(12).position = {22, 11};
+    state.ball = BallState::carried({22, 11}, 12);
+
+    DiceRoller dice(42);
+    // Screen spot 7 squares away across an open lane (no TZ, no GFI needed).
+    Macro macro{MacroType::REPOSITION, 1, -1, {17, 7}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(result.actions.size(), 7u);
+    EXPECT_EQ(state.getPlayer(1).position.x, 17);
+    EXPECT_EQ(state.getPlayer(1).position.y, 7);
+}
+
 TEST(MacroExpansion, FoulProducesFoulAction) {
     GameState state = makeMinimalState();
     state.getPlayer(12).state = PlayerState::PRONE;
