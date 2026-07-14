@@ -515,6 +515,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
     bool receiverPlaced = false;
     bool hunterPlaced = false;
     bool cageTagPlaced = false;
+    bool interceptPlaced = false;
     bool safetyPlaced = false;
     bool markerPlaced = false;
     int turnsLeft = std::max(0, 9 - myTeam.turnNumber);
@@ -639,8 +640,39 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                     }
                 }
             }
-            // Strategies 1-4: only when cage tag not used this iteration
+            // Strategies 0.5-4: only when cage tag not used this iteration
             if (!usedCageTag) {
+            // Strategy 0.5: Intercept lane -- put a defender between the
+            // carrier and the defended endzone in the carrier's ACTUAL Y
+            // lane. The fixed safety spot (y=7) and the fixed screen Ys
+            // {3,5,7,9,11} never cover a carrier sprinting the flank
+            // (y=1-2 / 12-13), so nothing ever actually stood in his lane
+            // (research_fable_20260709 section 3b, "screen=0" hole). One
+            // interceptor per generation pass; cheap point geometry only,
+            // no pathfinding -- MCTS arbitrates whether the macro is used.
+            bool usedIntercept = false;
+            if (!interceptPlaced && oppCarrierPtr != nullptr) {
+                int dxOpp = forwardDx(opponent(mySide)); // carrier's attack direction
+                // Intercept point: halfway between the carrier and the
+                // defended endzone (same X idiom as Strategy 4's screenX),
+                // in the carrier's own lane, clamped off the sidelines.
+                int laneX = (oppCarrierPtr->position.x + myEndzone) / 2;
+                int laneY = std::clamp(static_cast<int>(oppCarrierPtr->position.y), 1, 13);
+                Position lane{static_cast<int8_t>(std::clamp(laneX, 1, 24)),
+                              static_cast<int8_t>(laneY)};
+                // Gate: only a defender who is goal-side of the carrier
+                // (2-square slack to cut back in) and can reach the lane
+                // within two activations commits to it; everyone else
+                // falls through to Strategies 1-4 unchanged.
+                bool goalSide =
+                    (p.position.x - oppCarrierPtr->position.x) * dxOpp >= -2;
+                if (goalSide && p.position.distanceTo(lane) <= p.stats.movement * 2) {
+                    target = lane;
+                    interceptPlaced = true;
+                    usedIntercept = true;
+                }
+            }
+            if (!usedIntercept) {
             // Strategy 1: Safety player (fast, near our endzone)
             if (!safetyPlaced && p.stats.movement >= 6) {
                 target = {static_cast<int8_t>(myEndzone),
@@ -669,6 +701,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
                           static_cast<int8_t>(screenY)};
             }
+            } // end !usedIntercept
             } // end !usedCageTag
         } else {
             // Move forward toward center

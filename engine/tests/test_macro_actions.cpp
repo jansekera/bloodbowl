@@ -284,6 +284,60 @@ TEST(MacroActions, RepositionNotForEngagedPlayer) {
     EXPECT_FALSE(hasRepoForP1);
 }
 
+// Regression for Strategy 0.5 (intercept lane, research_fable_20260709
+// section 3b): on defense the first goal-side defender must be sent into
+// the carrier's ACTUAL Y lane, between the carrier and the defended
+// endzone -- not to a fixed-Y spot.
+// NEGATIVE CONTROL: pre-patch the defensive chain can only emit fixed Ys
+// (safety y=7, guards y=5/9, screen y in {3,5,7,9,11}) or the carrier's
+// own square as marker ({8,2} here); the intercept point {4,2} is emitted
+// by nothing, and this defender gets the safety spot {0,7} instead -- the
+// EXPECT_TRUE below fails without the patch.
+TEST(MacroActions, DefensiveRepositionTargetsCarrierLane) {
+    GameState state = makeMinimalState();
+    // AWAY carrier sprinting the flank at y=2, attacking toward x=0.
+    state.getPlayer(12).position = {8, 2};
+    state.ball = BallState::carried({8, 2}, 12);
+    // Free HOME defender (MA6), goal-side of the carrier, off the lane.
+    state.getPlayer(1).position = {5, 7};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // Intercept point = {(8 + 0) / 2, clamp(2, 1, 13)} = {4, 2}.
+    bool hasLaneIntercept = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.playerId == 1 &&
+            m.targetPos.x == 4 && m.targetPos.y == 2) {
+            hasLaneIntercept = true;
+        }
+    }
+    EXPECT_TRUE(hasLaneIntercept);
+}
+
+// Guard (passes pre- and post-patch): a defender already beaten by the
+// carrier (not goal-side) must NOT chase the intercept lane; it falls
+// through to Strategy 1 (safety) exactly as before the patch.
+TEST(MacroActions, DefensiveRepositionInterceptRequiresGoalSide) {
+    GameState state = makeMinimalState();
+    // Same flank carrier, but the defender starts 4 squares BEHIND the
+    // play (carrier attacks toward x=0, defender at x=12): not goal-side.
+    state.getPlayer(12).position = {8, 2};
+    state.ball = BallState::carried({8, 2}, 12);
+    state.getPlayer(1).position = {12, 7};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    bool hasSafety = false;
+    for (auto& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        EXPECT_NE(m.targetPos.y, 2);
+        if (m.targetPos.x == 0 && m.targetPos.y == 7) hasSafety = true;
+    }
+    EXPECT_TRUE(hasSafety);
+}
+
 TEST(MacroActions, PassAvailableWithTeammateAhead) {
     GameState state = makeMinimalState();
     state.getPlayer(1).position = {5, 7};
