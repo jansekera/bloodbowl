@@ -627,6 +627,84 @@ TEST(GameSimulator, HalfBoundaryKickoffStillStartsAtTurnOne) {
     }
 }
 
+// Regression for the H2 kickoff bug (project_bloodbowl_h2_kickoff_bug_20260713):
+// the half-time branch derived the H2 kicking team from whoever kicked the last
+// H1 drive (opponent(state.kickingTeam)) instead of from the opening kickoff,
+// so whenever HOME scored last in H1, HOME received the H2 ball again. Correct:
+// the second half reverses the OPENING roles -- the H1 receiver (HOME, since
+// the opening kick is fixed to AWAY) kicks the second half, always.
+// This has to run through the simulate loops themselves: the buggy line lives
+// inline in both game loops, not in any helper (same lesson as the half-clock
+// fix above, which is why observation happens via the policy callbacks).
+// NEGATIVE CONTROL: pre-fix, every game whose last H1 scorer was HOME records
+// secondHalfKicker == AWAY and the EXPECT_EQ below fails.
+TEST(GameSimulator, SecondHalfKickoffReversesOpeningRoles) {
+    for (bool useLoggedVariant : {false, true}) {
+        bool sawHomeScoredLastInH1 = false;
+        int gamesReachingH2 = 0;
+
+        for (uint32_t seed = 1; seed <= 60; ++seed) {
+            DiceRoller dice(seed);
+            DiceRoller policyDice(seed * 7919 + 1);
+
+            int lastHome = 0, lastAway = 0;
+            TeamSide lastH1Scorer = TeamSide::AWAY;
+            bool anyH1Score = false;
+            bool h2Seen = false;
+            TeamSide h2Kicker = TeamSide::AWAY;
+
+            auto creditH1Scorer = [&](const GameState& s) {
+                int h = s.getTeamState(TeamSide::HOME).score;
+                int a = s.getTeamState(TeamSide::AWAY).score;
+                if (h > lastHome) { lastH1Scorer = TeamSide::HOME; anyH1Score = true; }
+                if (a > lastAway) { lastH1Scorer = TeamSide::AWAY; anyH1Score = true; }
+                lastHome = h; lastAway = a;
+            };
+            auto policy = [&](const GameState& s) {
+                if (s.half == 1) {
+                    creditH1Scorer(s);
+                } else if (!h2Seen) {
+                    // A TD on the very last H1 action gets no PLAY policy
+                    // call before the half-time kickoff -- credit it here,
+                    // where the scores are still exactly the H1 finals.
+                    creditH1Scorer(s);
+                    h2Seen = true;
+                    h2Kicker = s.kickingTeam;
+                }
+                return greedyPolicy(s, policyDice);
+            };
+
+            if (useLoggedVariant) {
+                simulateGameLogged(getHumanRoster(), getHumanRoster(),
+                                   policy, policy, dice);
+            } else {
+                simulateGame(getHumanRoster(), getHumanRoster(),
+                             policy, policy, dice);
+            }
+
+            if (!h2Seen) continue;  // game hit MAX_ACTIONS inside H1
+            gamesReachingH2++;
+            // Post-fix invariant: H2 is kicked by the H1 receiver (HOME),
+            // no matter who kicked or scored last in H1.
+            EXPECT_EQ(h2Kicker, TeamSide::HOME)
+                << "seed=" << seed << " logged=" << useLoggedVariant
+                << " lastH1Scorer=" << (int)lastH1Scorer
+                << " anyH1Score=" << anyH1Score;
+            if (anyH1Score && lastH1Scorer == TeamSide::HOME) {
+                sawHomeScoredLastInH1 = true;
+            }
+            // Enough coverage for this variant once the discriminating case
+            // (HOME scored last in H1) has been seen at least once.
+            if (sawHomeScoredLastInH1 && gamesReachingH2 >= 5) break;
+        }
+
+        // The invariant only discriminates pre-fix when HOME scored last in
+        // H1 -- make sure the seed sweep actually produced that case.
+        EXPECT_TRUE(sawHomeScoredLastInH1) << "logged=" << useLoggedVariant;
+        EXPECT_GE(gamesReachingH2, 1) << "logged=" << useLoggedVariant;
+    }
+}
+
 // === Developed (TV~1200) rosters ===
 
 // Count, among the 11 fielded HOME players, how many have a given skill.

@@ -405,8 +405,12 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     };
 
     // First half
+    // No coin toss (yet): the opening kick is fixed. Named so the half-time
+    // branch below can derive the H2 kicker from the opening, not from
+    // whoever happened to kick the last H1 drive.
+    const TeamSide openingKickingTeam = TeamSide::AWAY;  // Home receives first
     state.half = 1;
-    state.kickingTeam = TeamSide::AWAY;  // Home receives first
+    state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam);
     doKickoff();
 
@@ -426,7 +430,11 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         // Handle half time
         if (state.phase == GamePhase::HALF_TIME) {
             state.half = 2;
-            state.kickingTeam = opponent(state.kickingTeam);
+            // The second half reverses the OPENING kickoff roles: the H1
+            // receiver kicks. Deriving this from the current kickingTeam
+            // (i.e. from the last H1 drive) handed the H2 ball back to
+            // whichever team scored last in H1.
+            state.kickingTeam = opponent(openingKickingTeam);
             setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
@@ -517,8 +525,10 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     };
 
     // First half
+    // Same fixed opening as simulateGame(); see the comment there.
+    const TeamSide openingKickingTeam = TeamSide::AWAY;
     state.half = 1;
-    state.kickingTeam = TeamSide::AWAY;
+    state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam);
     doKickoff();
 
@@ -553,7 +563,9 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
 
         if (state.phase == GamePhase::HALF_TIME) {
             state.half = 2;
-            state.kickingTeam = opponent(state.kickingTeam);
+            // H2 reverses the OPENING kickoff roles, not the last H1 drive;
+            // see the comment in simulateGame().
+            state.kickingTeam = opponent(openingKickingTeam);
             setupHalf(state, home, away, state.kickingTeam);
             doKickoff();
             continue;
