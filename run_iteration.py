@@ -186,9 +186,18 @@ def _pool_init(engine_build: str, python_src: str) -> None:
 
 
 def _benchmark_game(args: tuple) -> bool:
+    # 8th element (cand_is_away) optional/backward-compatible (2026-07-14
+    # side-swap): odd games put the measured model in the AWAY slot vs a
+    # random HOME. away VF falls back to weights_path when away_weights_path
+    # is empty (bb_module.cpp:424), and a 'random' home never loads a VF
+    # (:418), so no extra path plumbing is needed.
+    #
     # 7th element (policy_path) optional/backward-compatible: existing 6-tuple
     # callers are unaffected and get no policy net (engine default).
-    if len(args) >= 7:
+    cand_is_away = False
+    if len(args) >= 8:
+        seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path, cand_is_away = args[:8]
+    elif len(args) >= 7:
         seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path = args[:7]
     else:
         seed, race_idx, gate_path, mcts_iterations, vf_blend, tv = args
@@ -196,19 +205,28 @@ def _benchmark_game(args: tuple) -> bool:
     import bb_engine
     hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
+    home_ai, away_ai = (('random', 'macro_mcts') if cand_is_away
+                        else ('macro_mcts', 'random'))
     result = bb_engine.simulate_game_logged(
         hr, ar,
-        home_ai='macro_mcts', away_ai='random',
+        home_ai=home_ai, away_ai=away_ai,
         seed=seed, mcts_iterations=mcts_iterations,
         weights_path=gate_path, epsilon=0.0, vf_blend=vf_blend,
         policy_weights_path=policy_path,
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
-    return result.home_score > result.away_score
+    return (result.away_score > result.home_score) if cand_is_away \
+        else (result.home_score > result.away_score)
 
 
-def _gate_game(args: tuple) -> tuple[int, int]:
+def _gate_game(args: tuple) -> tuple:
+    # 10th element (cand_is_away) optional/backward-compatible: production
+    # side-swap (2026-07-14). Legacy <=9-tuple callers unchanged (candidate
+    # always HOME, 2-tuple return). With cand_is_away the weights paths are
+    # swapped and the return is STILL candidate-first, plus a 3rd element
+    # echoing the orientation (skip-proof attribution for the side audit).
+    #
     # 8th element (leaf_lookahead) and 9th (policy_path) optional/backward-
     # compatible: existing 7-tuple callers (production gating,
     # diag_mirror_budget.py) are unaffected and get the engine defaults (no
@@ -223,7 +241,11 @@ def _gate_game(args: tuple) -> tuple[int, int]:
     # activates that dormant regime WITHOUT touching any learned weight
     # content (policy_blend stays 0) -- see project memory
     # project_bloodbowl_roadmap_20260702 Tier 1 item 1.
-    if len(args) >= 9:
+    cand_is_away = False
+    if len(args) >= 10:
+        (seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend,
+         tv, leaf_lookahead, policy_path, cand_is_away) = args[:10]
+    elif len(args) >= 9:
         seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv, leaf_lookahead, policy_path = args[:9]
     elif len(args) >= 8:
         seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend, tv, leaf_lookahead = args[:8]
@@ -235,17 +257,23 @@ def _gate_game(args: tuple) -> tuple[int, int]:
     import bb_engine
     hr = bb_engine.get_developed_roster(_RACES[race_idx % len(_RACES)], tv)
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
+    home_w, away_w = ((frozen_path, gate_path) if cand_is_away
+                      else (gate_path, frozen_path))
     result = bb_engine.simulate_game_logged(
         hr, ar,
         home_ai='macro_mcts', away_ai='macro_mcts',
         seed=seed, mcts_iterations=mcts_iterations,
-        weights_path=gate_path, away_weights_path=frozen_path,
+        weights_path=home_w, away_weights_path=away_w,
         epsilon=0.0, vf_blend=vf_blend,
         leaf_lookahead=leaf_lookahead,
         policy_weights_path=policy_path,
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
+    if len(args) >= 10:
+        cs, fs = ((result.away_score, result.home_score) if cand_is_away
+                  else (result.home_score, result.away_score))
+        return cs, fs, int(cand_is_away)
     return result.home_score, result.away_score
 
 
@@ -436,7 +464,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     def _run_benchmark(path: Path, label: str) -> tuple[float, bool]:
         tasks = [
-            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV, gate_policy_path)
+            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV,
+             gate_policy_path, i % 2 == 1)
             for i in range(half_bm)
         ]
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
@@ -478,28 +507,29 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND, TV,
-         False, gate_policy_path)
+         False, gate_policy_path, i % 2 == 1)   # sudé i: cand=HOME, liché: cand=AWAY
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
-    gate_results: list[tuple[int, int]] = []
+    gate_results: list[tuple[int, int, int]] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
-        for hs, as_ in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression',
-                                      mcts_iterations=MCTS_ITERATIONS):
-            gate_results.append((hs, as_))
+        for res in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression',
+                                  mcts_iterations=MCTS_ITERATIONS):
+            gate_results.append((res[0], res[1], res[2] if len(res) > 2 else 0))
             done = len(gate_results)
             if done % 10 == 0 or done == GATING_MATCHES:
                 print(f'  Anti-regression {done}/{GATING_MATCHES}', flush=True)
 
     wins = draws = losses = 0
-    for i, (hs, as_) in enumerate(gate_results):
-        if hs > as_:
-            wins += 1
-        elif hs == as_:
-            draws += 1
+    arm = {0: [0, 0, 0], 1: [0, 0, 0]}   # orientace -> [W, D, L] kandidáta
+    for i, (cs, fs, ca) in enumerate(gate_results):
+        if cs > fs:
+            wins += 1; arm[ca][0] += 1
+        elif cs == fs:
+            draws += 1; arm[ca][1] += 1
         else:
-            losses += 1
-        print(f'  Game {i + 1}: {hs}-{as_}', flush=True)
+            losses += 1; arm[ca][2] += 1
+        print(f'  Game {i + 1} [{"A" if ca else "H"}]: cand {cs}-{fs}', flush=True)
 
     total = wins + draws + losses
     # Decisive-only chess score: při ~75% remíz formule (W+0.5D)/N stlačí skóre
@@ -509,6 +539,13 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     chess_score = wins / decisive if decisive else 0.5
     print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} decisive '
           f'({decisive} decisive / {total} games)', flush=True)
+    hW, hD, hL = arm[0]; aW, aD, aL = arm[1]
+    home_slot_wins = hW + aL          # výhry HOME slotu bez ohledu na to, kdo v něm sedí
+    hs_dec = hW + hL + aW + aL
+    print(f'Side audit: cand@H {hW}W {hD}D {hL}L | cand@A {aW}W {aD}D {aL}L | '
+          f'home-slot wins {home_slot_wins}/{hs_dec} '
+          f'({home_slot_wins / hs_dec:.1%} decisive)' if hs_dec else
+          'Side audit: no decisive games', flush=True)
     max_skip = max(1, int(GATING_MATCHES * MAX_SKIP_FRAC))
     if (GATING_MATCHES - total) > max_skip:
         abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES}, '
