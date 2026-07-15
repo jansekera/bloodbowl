@@ -139,7 +139,9 @@ def run_arm(label: str, tasks: list[tuple], game_fn=_gate_game,
         for idx, res in _imap_watchdog(pool, _tagged_game, tagged, label,
                                        mcts_iterations=mcts_iterations):
             results[idx] = res
-            if isinstance(res, tuple) and len(res) == 2:   # gate (hs, as)
+            # gate results: 2-tuple (hs, as) legacy, 3-tuple (cs, fs, ca)
+            # side-swap (2026-07-14) -- both are candidate/home-first scores
+            if isinstance(res, tuple) and len(res) in (2, 3):
                 if res[0] > res[1]:
                     w += 1
                 elif res[0] == res[1]:
