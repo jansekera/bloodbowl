@@ -148,9 +148,22 @@ TEST(BallHandler, HandleBallOnPlayerDownNotCarrier) {
 TEST(BallHandler, ThrowIn) {
     GameState gs;
     // Ball thrown in from edge. D8=3 (East), distance 2D6=3+2=5
-    // From (0,7): direction E, 5 squares → (5,7)
-    FixedDiceRoller dice({3, 3, 2});
+    // From (0,7): direction E, 5 squares → (5,7). A throw-in always ends
+    // with one mandatory bounce from the landing square: D8=3 (East) → (6,7).
+    FixedDiceRoller dice({3, 3, 2, 3});
     resolveThrowIn(gs, {0, 7}, dice, nullptr);
-    EXPECT_EQ(gs.ball.position, (Position{5, 7}));
+    EXPECT_EQ(gs.ball.position, (Position{6, 7}));
     EXPECT_FALSE(gs.ball.isHeld);
+}
+
+TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
+    GameState gs;
+    placePlayer(gs, 1, {6, 7}, TeamSide::HOME);
+    // Throw-in lands at (5,7) (D8=3 East, distance 5), then the mandatory
+    // final bounce (D8=3 East) lands on the player at (6,7), who must
+    // attempt a catch (AG3 target 4, roll 5 → success).
+    FixedDiceRoller dice({3, 3, 2, 3, 5});
+    resolveThrowIn(gs, {0, 7}, dice, nullptr);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
 }

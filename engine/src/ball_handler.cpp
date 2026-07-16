@@ -106,17 +106,9 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, DiceRollerBase& dice
     emitEvent(events, {GameEvent::Type::BALL_BOUNCE, -1, -1, lastOnPitch, dest,
                       distance, true});
 
-    // Check if a standing player is at dest
-    const Player* p = state.getPlayerAtPosition(dest);
-    if (p && canAct(p->state)) {
-        state.ball = BallState::onGround(dest);
-        bool caught = resolveCatch(state, p->id, dice, 0, events);
-        if (!caught) {
-            resolveBounce(state, dest, dice, 0, events);
-        }
-    } else {
-        state.ball = BallState::onGround(dest);
-    }
+    // A throw-in always ends with one standard bounce from the landing
+    // square, regardless of whether that square is occupied.
+    resolveBounce(state, dest, dice, 0, events);
 }
 
 void handleBallOnPlayerDown(GameState& state, int playerId, DiceRollerBase& dice,
