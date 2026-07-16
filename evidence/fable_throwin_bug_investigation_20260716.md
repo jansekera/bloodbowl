@@ -51,6 +51,55 @@ An authoritative BB2020 rules-text lookup for the exact throw-in template is
 likely to be hard to track down cheaply (per user) -- treat as a flagged
 suspicion for later, not a blocker on shipping Finding 1's fix.
 
+## Finding 2 UPDATE: CONFIRMED + FIXED (2026-07-16)
+
+User recalled the exact LRB6/BB2016 throw-in template mechanic precisely
+(cross-checked and confirmed against LRB6/CRP reference material found via
+web search): for a **side** exit, a D6 picks one of 3 directions -- 1-2
+diagonal one way, 3-4 straight back onto the pitch, 5-6 diagonal the other
+way (a distinct, non-uniform template, not the 8-way Bounce scatter). For a
+**corner** exit, a D3 picks one of 3 directions -- straight along one edge,
+the pure diagonal into the corner, or straight along the other edge (D3
+implemented as a D6 collapsed in pairs, `(d6+1)/2` -- mathematically
+identical to a real D3, standard practice since physical D3 dice roll
+poorly).
+
+**Fix implemented:** `resolveThrowIn` now takes the off-pitch exit position
+as an added parameter, classifies it into one of 4 side-edges or 4 corners
+(`classifyExit`), and picks direction via `throwInDirection` per the template
+above -- replacing the old uniform-8-way `scatterDirection` reuse. Updated
+both call sites (`ball_handler.cpp`'s off-pitch-bounce path,
+`pass_handler.cpp`'s two inaccurate-pass-off-pitch paths). 420/420 C++ tests
+pass (2 new regression tests: `ThrowInSideExitDiagonal`, `ThrowInCornerExit`;
+existing `ThrowIn`/`ThrowInFinalBounceOntoPlayer` renamed/updated to the new
+signature and exact template math).
+
+**Paired-seed A/B (N=300):**
+
+```
+[baseline (pre-fix)]  58W 185D 57L  draws 61.7%  TD/game 0.46  decisive share 50.4% (n=115)
+[candidate (post-fix)] 61W 177D 62L  draws 59.0%  TD/game 0.47  decisive share 49.6% (n=123)
+
+PAIRED A/B (draw)      post-fix 59.0% vs pre-fix 61.7%  delta -2.7pp  SE 3.9pp
+                       95% CI [-10.3, +5.0]pp  VERDICT: INCONCLUSIVE
+
+PAIRED A/B (home_win)  post-fix 20.3% vs pre-fix 19.3%  delta +1.0pp  SE 3.1pp
+                       95% CI [-5.2, +7.2]pp  VERDICT: INCONCLUSIVE
+
+PAIRED TD/game         post-fix 0.47 vs pre-fix 0.46  delta +0.010  SE 0.044
+                       95% CI [-0.076, +0.096]  -- includes 0
+
+watchdog skips: pre-fix 0/300, post-fix 0/300
+```
+
+**No crash/watchdog regression -- primary validation goal met.** All three
+behavior metrics inconclusive at this N, as expected for a mechanic this rare
+(only throw-ins whose exit edge/corner would have produced a materially
+different direction distribution are affected at all). Scripts:
+`diag_throwin_direction_fix_ab_20260716.py`, `run_throwindir_ab_20260716.sh`;
+log: `diag_throwindir_ab_20260716.log`; arms: `arm_throwindir_base_20260716.json`
+/ `arm_throwindir_fix_20260716.json`.
+
 ## Finding 3: throw-in AND kick-off catch modifier -- RETRACTED, CONFIRMED via primary source
 
 Went through two rounds of suspicion (first "throw-in -1", then "throw-in

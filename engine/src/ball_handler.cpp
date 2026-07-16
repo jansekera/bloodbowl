@@ -66,7 +66,7 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
 
     if (!dest.isOnPitch()) {
         // Ball goes off pitch — throw-in from last on-pitch position
-        resolveThrowIn(state, from, dice, events);
+        resolveThrowIn(state, from, dest, dice, events);
         return;
     }
 
@@ -84,11 +84,92 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
     }
 }
 
-void resolveThrowIn(GameState& state, Position lastOnPitch, DiceRollerBase& dice,
-                    std::vector<GameEvent>* events) {
-    int d8 = dice.rollD8();
+namespace {
+
+enum class ExitEdge { LEFT, RIGHT, TOP, BOTTOM,
+                      TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT };
+
+ExitEdge classifyExit(Position offPitchExit) {
+    bool left = offPitchExit.x < 0;
+    bool right = offPitchExit.x >= Position::PITCH_WIDTH;
+    bool top = offPitchExit.y < 0;
+    bool bottom = offPitchExit.y >= Position::PITCH_HEIGHT;
+    if (top && left) return ExitEdge::TOP_LEFT;
+    if (top && right) return ExitEdge::TOP_RIGHT;
+    if (bottom && left) return ExitEdge::BOTTOM_LEFT;
+    if (bottom && right) return ExitEdge::BOTTOM_RIGHT;
+    if (top) return ExitEdge::TOP;
+    if (bottom) return ExitEdge::BOTTOM;
+    if (left) return ExitEdge::LEFT;
+    return ExitEdge::RIGHT;
+}
+
+// LRB6 throw-in template: for a side exit, a D6 picks one of 3 directions --
+// 1-2 diagonal one way, 3-4 straight back onto the pitch, 5-6 diagonal the
+// other way (verified against LRB6/CRP reference material, distinct from the
+// uniform 8-way Bounce scatter template). For a corner exit, a D3 picks one
+// of 3 directions -- straight along one edge, the pure diagonal into the
+// corner, or straight along the other edge.
+Position throwInDirection(ExitEdge edge, DiceRollerBase& dice) {
+    switch (edge) {
+        case ExitEdge::TOP: {
+            int d6 = dice.rollD6();
+            if (d6 <= 2) return {-1, 1};   // SW
+            if (d6 <= 4) return {0, 1};    // S (straight back in)
+            return {1, 1};                  // SE
+        }
+        case ExitEdge::BOTTOM: {
+            int d6 = dice.rollD6();
+            if (d6 <= 2) return {-1, -1};  // NW
+            if (d6 <= 4) return {0, -1};   // N
+            return {1, -1};                 // NE
+        }
+        case ExitEdge::LEFT: {
+            int d6 = dice.rollD6();
+            if (d6 <= 2) return {1, -1};   // NE
+            if (d6 <= 4) return {1, 0};    // E
+            return {1, 1};                  // SE
+        }
+        case ExitEdge::RIGHT: {
+            int d6 = dice.rollD6();
+            if (d6 <= 2) return {-1, -1};  // NW
+            if (d6 <= 4) return {-1, 0};   // W
+            return {-1, 1};                 // SW
+        }
+        case ExitEdge::TOP_LEFT: {
+            int d3 = (dice.rollD6() + 1) / 2;
+            if (d3 == 1) return {1, 0};    // E, along the top edge
+            if (d3 == 2) return {1, 1};    // SE, pure diagonal
+            return {0, 1};                   // S, along the left edge
+        }
+        case ExitEdge::TOP_RIGHT: {
+            int d3 = (dice.rollD6() + 1) / 2;
+            if (d3 == 1) return {-1, 0};   // W, along the top edge
+            if (d3 == 2) return {-1, 1};   // SW, pure diagonal
+            return {0, 1};                   // S, along the right edge
+        }
+        case ExitEdge::BOTTOM_LEFT: {
+            int d3 = (dice.rollD6() + 1) / 2;
+            if (d3 == 1) return {1, 0};    // E, along the bottom edge
+            if (d3 == 2) return {1, -1};   // NE, pure diagonal
+            return {0, -1};                  // N, along the left edge
+        }
+        default: {  // BOTTOM_RIGHT
+            int d3 = (dice.rollD6() + 1) / 2;
+            if (d3 == 1) return {-1, 0};   // W, along the bottom edge
+            if (d3 == 2) return {-1, -1};  // NW, pure diagonal
+            return {0, -1};                  // N, along the right edge
+        }
+    }
+}
+
+} // namespace
+
+void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExit,
+                    DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    ExitEdge edge = classifyExit(offPitchExit);
+    Position offset = throwInDirection(edge, dice);
     int distance = dice.roll2D6();
-    Position offset = scatterDirection(d8);
 
     Position dest{
         static_cast<int8_t>(lastOnPitch.x + offset.x * distance),

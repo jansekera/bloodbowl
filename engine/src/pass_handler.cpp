@@ -156,7 +156,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         }
 
         if (!landPos.isOnPitch()) {
-            resolveThrowIn(state, target, dice, events);
+            resolveThrowIn(state, target, landPos, dice, events);
             return ActionResult::turnovr();
         }
 
@@ -322,7 +322,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         };
 
         if (!landPos.isOnPitch()) {
-            resolveThrowIn(state, target, dice, events);
+            resolveThrowIn(state, target, landPos, dice, events);
             return ActionResult::turnovr();
         }
 

@@ -145,25 +145,48 @@ TEST(BallHandler, HandleBallOnPlayerDownNotCarrier) {
     EXPECT_EQ(gs.ball.carrierId, 2);
 }
 
-TEST(BallHandler, ThrowIn) {
+TEST(BallHandler, ThrowInSideExitStraight) {
     GameState gs;
-    // Ball thrown in from edge. D8=3 (East), distance 2D6=3+2=5
-    // From (0,7): direction E, 5 squares → (5,7). A throw-in always ends
-    // with one mandatory bounce from the landing square: D8=3 (East) → (6,7).
+    // Ball exited off the TOP edge (offPitchExit y<0). LRB6 throw-in
+    // template for a side exit: D6 1-2/3-4/5-6 = diagonal/straight-in/
+    // diagonal. D6=3 -> straight in (0,+1). Distance 2D6=3+2=5:
+    // (10,0) + (0,1)*5 = (10,5). Mandatory final bounce: D8=3 (East) -> (11,5).
     FixedDiceRoller dice({3, 3, 2, 3});
-    resolveThrowIn(gs, {0, 7}, dice, nullptr);
-    EXPECT_EQ(gs.ball.position, (Position{6, 7}));
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_EQ(gs.ball.position, (Position{11, 5}));
     EXPECT_FALSE(gs.ball.isHeld);
+}
+
+TEST(BallHandler, ThrowInSideExitDiagonal) {
+    GameState gs;
+    // Same TOP exit, but D6=1 (<=2) -> diagonal SW (-1,+1), not straight.
+    // Distance 2D6=4+3=7: (10,0) + (-1,1)*7 = (3,7). Final bounce D8=3
+    // (East) -> (4,7).
+    FixedDiceRoller dice({1, 4, 3, 3});
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_EQ(gs.ball.position, (Position{4, 7}));
+}
+
+TEST(BallHandler, ThrowInCornerExit) {
+    GameState gs;
+    // Ball exited off the TOP-LEFT corner (x<0 and y<0). LRB6 corner
+    // throw-in: D3 picks straight-along-one-edge / diagonal / straight-
+    // along-the-other-edge. D6=5 -> D3=(5+1)/2=3 -> "S, along the left
+    // edge" (0,+1). Distance 2D6=2+2=4: (0,0) + (0,1)*4 = (0,4). Final
+    // bounce D8=3 (East) -> (1,4).
+    FixedDiceRoller dice({5, 2, 2, 3});
+    resolveThrowIn(gs, {0, 0}, {-1, -1}, dice, nullptr);
+    EXPECT_EQ(gs.ball.position, (Position{1, 4}));
 }
 
 TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
     GameState gs;
-    placePlayer(gs, 1, {6, 7}, TeamSide::HOME);
-    // Throw-in lands at (5,7) (D8=3 East, distance 5), then the mandatory
-    // final bounce (D8=3 East) lands on the player at (6,7), who must
-    // attempt a catch (AG3 target 4, roll 5 → success).
+    placePlayer(gs, 1, {11, 5}, TeamSide::HOME);
+    // Same as ThrowInSideExitStraight, but a player sits at the final
+    // bounce destination (11,5) and must attempt a catch (AG3 target 4,
+    // roll 5 -> success).
     FixedDiceRoller dice({3, 3, 2, 3, 5});
-    resolveThrowIn(gs, {0, 7}, dice, nullptr);
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
     EXPECT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, 1);
 }
