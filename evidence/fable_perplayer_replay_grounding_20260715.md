@@ -282,6 +282,46 @@ added to `diag_perplayer_grounding.py` (role-letter legend below each board; `@`
 `*`=loose ball, `+`=prone, `_`=stunned; HOME=UPPERCASE, away=lowercase). Reproduce any of these
 with `python3 diag_perplayer_grounding.py show main <file> <snapshot>`.
 
+**MASTER CORRECTION (doplněno od uživatele 2026-07-16, VYSOKÁ PRIORITA): tenhle celý
+survey je postavený na datech z PŘED hasActed fixem, a je to systémově vidět.** Tenhle
+150-her korpus (`diag_perplayer_grounding_data/main/`) byl vygenerován 2026-07-15, hasActed
+fix (viz [[project_bloodbowl_hasacted_bug_investigation_20260715]]) přišel až 2026-07-16.
+Napsán a spuštěn systematický kontrolní skript (hledá vzorec: hráč jedná -> JINÍ hráči
+jednají -> STEJNÝ hráč jedná znovu ve stejném tahu -- přesná signatura bugu) přes všech 12
+situací v tomhle survey. **Výsledek: 7 z 12 situací (1, 3, 4, 7, 9, 10 + částečně 8/11/12
+nekontrolovány/čisté) vykazuje ten vzorec.** Ručně ověřeno 4/4 jako GENUINNÍ reaktivace
+(ne false positive z groupingu):
+
+- **Situace 1** (`g0000.json.gz` snap 0): id11 MOVE×7+PICKUP -> id9,id10,id4(SKILL+BLOCK),id2
+  jednají -> id11 znovu jedná: **PASS** (ten "unforced risky pass", co byl 15.07. jen
+  "podezřelý", je teď POTVRZENĚ bug artefakt).
+- **Situace 3** (`g0002.json.gz` snap 7): id19 DODGE+MOVE -> id18,id15,id20,id21,id22 jednají
+  -> id19 znovu jedná: **FOUL**. Celý "foul místo pickupu" rámec situace 3 je tedy postavený
+  na bonusové, nelegální akci -- nebylo to jednorázové rozhodnutí "foul vs pickup", bylo to
+  legitimní aktivace (dodge+move) plus bugem umožněná bonusová akce (foul) navíc.
+- **Situace 4** (`g0001.json.gz` idx23, domácí tah 4): id9 MOVE×3 -> id8,id10,id11,id4,id6,id7
+  jednají -> id9 znovu jedná: **FOUL na id21**.
+- **Situace 9** (`g0016.json.gz` snap 10): id4 MOVE×2 -> id3(FOUL),id2(CATCH) jednají -> id4
+  znovu jedná: MOVE+**BLOCK**.
+- **Situace 10** (`g0014.json.gz` snap 27): už zdokumentováno níže -- id10 MOVE+PICKUP ->
+  id6,id9,id7,id8 jednají -> id10 znovu jedná: **PASS**. Ověřeno navíc, že ten "vyčišťovací"
+  blok (id6) míří úplně jinam (11,9) než receiver chytá (6,2) -- nebyla to koordinovaná
+  sekvence, jen náhodně proložené nesouvisející akce.
+- Situace 7 (`g0003.json.gz`, tři různé půl-tahy) taky flagnuta skriptem, neověřeno ručně
+  do detailu, ale vzhledem k 4/4 potvrzeným je pravděpodobně taky genuinní.
+
+**Důsledek: NEBRAT tenhle survey (situace 1-12, včetně už zapsaných korekcí a
+cross-cutting vzorců výše) jako finální bez výhrady.** Několik "GOOD decision" i "chyba"
+verdiktů může být postaveno na bonusových, nelegálních akcích, ne na skutečném
+jednorázovém rozhodnutí AI. **Doporučení: přegenerovat celý 150-her korpus na
+opraveném (post-hasActed-fix) enginu**, než se z něj dál těží další nálezy nebo než se
+tenhle survey bere jako hotový podklad pro cokoliv dalšího (Phase A, capacity-vs-features
+test a další analýzy založené na stejném korpusu by měly být taky přehodnoceny/
+přegenerovány). Cross-cutting vzorec "AI preferuje kontakt/boj před strategickou pozicí"
+(situace 4/5/6/7 výše) zůstává pravděpodobně platný i po přegenerování (jde o jiný typ
+rozhodování -- volba makra, ne bonusová aktivace), ale mělo by se to ověřit znovu na
+čistých datech, ne předpokládat.
+
 ### 1. Opening deployment + immediate first-turn scramble
 
 `g0000.json.gz`, snapshot 0 (Human home vs Orc away, half 1 turn 1)
@@ -596,9 +636,53 @@ means a naive `screen_count` per-player feature could be *misleading* on its own
 carriers — screens matter less against high-MA Dodge players than the raw defender count
 suggests.
 
-### 7. Loose-ball scramble after a turnover (multi-turn, two balls loose at once)
+**ZPŘESNĚNÍ (doplněno od uživatele 2026-07-16): skutečný nedostatek + příčina, ne jen
+"chytrá kombinace".** Všech 5 stojících Human obránců sedí v pásu y=3-10 -- **celý horní
+pruh hřiště (y=0-2) je bez obrany.** Příčina vystopována z tahů 2-3: Human obrana se celá
+stáhla doprava a doprostřed-dolů (x=14-25, y=3-9), v podstatě **honila míč/akci** místo
+udržení pokrytí přes celou šířku hřiště. Wood Elf mezitím ve svém tahu 3 poslal čtyři
+různé podpůrné hráče (id5, id9, id7, id10) systematicky přes y=1-2 -- jasně opakovaný
+vzorec, vypadá jako záměrné vyzvědění/předpřipravení únikového koridoru předtím, než ho
+nosič v tahu 4 skutečně použil. **Třetí instance stejného cross-cutting vzorce jako
+situace 4 (Orc) a 5 (Dwarf): obrana nechá pokrytí zkolabovat do jednoho pásu/oblasti**
+(tady honěním akce, u situace 5 rvačkou, u situace 4 na útočné straně) -- **a soupeř to
+systematicky využije.** Uživatel: tohle přesně platí i pro lidského hráče/trenéra --
+hlídat, aby se obrana nikdy celá nestáhla za akcí a nenechala jednu stranu/pruh hřiště
+bez pokrytí, protože soupeř takové mezery aktivně vyhledává a využívá.
+
+### 7. Loose-ball scramble after a turnover (multi-turn, ball ignored for several turns)
 
 `g0003.json.gz`, snapshots 16-19 (Dwarf home vs Wood Elf away, half 2 turns 1-2, score 0-0)
+
+**KOREKCE (doplněno od uživatele 2026-07-16): the title/framing "two balls loose at once"
+was WRONG.** The game's own data model tracks exactly one ball (`ball_x`/`ball_y`/
+`ball_held`/`ball_carrier_id`, a single field) -- there is no second ball anywhere in the
+data, and the engine has no such concept. Verified directly against the raw events: away
+picks up the ball (turn 1), attempts a **PASS that fails**, **BALL_BOUNCE** (14,11)->(15,11),
+**TURNOVER**. From that point the ball sits at (15,11) untouched -- **neither team goes near
+it for the rest of this window (away turn 2, home turn 2)**, both sides instead doing
+unrelated blocks/repositioning elsewhere on the pitch. So the correct description is: ONE
+ball, scattered loose after a failed pass, then **ignored by both teams for 2+ full
+team-turns** -- not "two balls loose at once". This actually reinforces the underlying point
+even more directly (both sides show zero urgency to recover a live ball) than the original
+mis-framing did.
+
+**Not "nobody was close enough" -- but not "trivially free" either; corrected picture
+(doplněno od uživatele 2026-07-16):** checked proximity directly. On BOTH ignored turns,
+the ball square (15,11) had **exactly 2 enemy tackle zones** on it (idx18/away's turn:
+home id3 + id6 both adjacent; idx19/home's turn: away id18 + id19 both adjacent) -- so a
+direct pickup attempt would have faced a **-2 modifier**, not a free/trivial action as
+first framed. HOWEVER: both teams actually did the first half of the smart play --
+**each team blocked away one of the two markers on the ball square that very turn**
+(away's `BLOCK id18->id6`, pushing id6 off the marking square; home's `BLOCK id3->id18`
+next turn, pushing/knocking down/injuring/fouling id18) -- correctly reducing the TZ
+count on the ball from 2 to 1. **But neither team followed up with the pickup itself**
+despite the now-reduced penalty -- both just moved on to other things instead. So the
+precise finding isn't "ignored a free pickup", it's **"correctly cleared one contesting
+marker each turn, then failed to complete the sequence with the actual pickup"** --
+still a real inefficiency, but a more specific and more sophisticated-partial-success one
+than the original framing suggested. Consistent with the 07-14 mining's loose-ball
+statistic (40.8% of nil-nil turn boundaries have the ball on the ground).
 
 Turn sequence (condensed): away PICKUP → PASS FAIL → BALL_BOUNCE → TURNOVER (snap 16); home
 repositions without touching the ball (snap 17); away dodges twice, blocks, ball still loose
@@ -675,6 +759,16 @@ unrelated part of the board the same turn. 84 confirmed clean hand-offs found ac
 recoveries as hand-offs — noted here for anyone reusing the script). **GOOD decision** on the
 main sequence.
 
+**ZPŘESNĚNÍ k tomu foulu (doplněno od uživatele 2026-07-16): není to jen "zbytečný foul",
+je to foul ŠPATNÝM hráčem.** Fouler (id3) je **Thrower** (Block+SureHands+**Pass**skill --
+jediný/hlavní přihrávač týmu), ne obyčejný Lineman. Princip "foulovat, když nemám nic
+lepšího na práci" je sám o sobě rozumný (nízké riziko u nahraditelného hráče), ale volba
+KONKRÉTNÍHO hráče tady je špatná -- ztráta vzácného specialisty (Pass skill) na vyloučení
+by bolela mnohem víc než ztráta nahraditelného Linemana. **Pravidlo: vždy foulovat
+nejlevnějším/nejnahraditelnějším hráčem v dosahu, nikdy cenným nebo unikátním**
+(specialista se vzácnou skill kombinací, Big Guy). Zapsáno jako `foul_candidate`
+per-player feature implikace v `team1_brief_per_player.md`.
+
 ### 10. A successful long pass
 
 `g0014.json.gz`, snapshot 27 (Wood Elf home vs Human away, half 2 turn 6, score 1-0)
@@ -740,6 +834,29 @@ does appear capable of "protecting a lead" by simply not acting, distinct from t
 nil-nil stalling (this game is not nil-nil; the lead is real and the pass-turn is a rational
 clock-killing move, not obviously a bug).
 
+**KOREKCE (doplněno od uživatele 2026-07-16): "rational clock-killing move" je neúplné --
+Dwarf může tuhle klec příští tah bezpečně obklíčit skoro celým týmem.** Not a hasActed
+artifact (zero events -- nothing to check). Cage má 5 eskort místo standardních 4 (extra
+Lineman id16 přímo západně od nosiče, ne na diagonále). Spočítáno přesně: **7 z 9
+stojících trpaslíků se dostane bezpečně (bez GFI) na pole sousedící s klecí v jediném
+tahu**, zbylí 2 jen s jedním GFI -- viz Dwarf roster (5× Guard napříč rosterem pro
+asistence, Blitzer+StripBall id6 cílený přímo na nosiče, 2 TrollSlayers). To je vážná
+poziční zranitelnost, ne neutrální clock management.
+
+**Ale riziko je asymetrické -- nosič pravděpodobně unikne, eskorta ne (doplněno od
+uživatele 2026-07-16):** nosič id22 (Wardancer+StripBall, **Dodge+Leap**) i jedna eskorta
+id21 (druhý Wardancer, taky **Dodge+Leap**) mají silné úniky i při plném obklíčení --
+Leap umožňuje přeskočit obsazené pole, Dodge s AG4 je spolehlivý. Ale zbytek klece je
+mnohem zranitelnější: **id16 (Lineman) nemá žádné skilly vůbec** (nejslabší článek),
+**id18 (Thrower, Block+Pass) nemá Dodge ani Leap**, id19/id20 (Catcheři) mají Dodge ale
+ne Leap (slušná šance, ne jistota). **Skutečné riziko tedy není ztráta míče** (nosič i
+druhý Wardancer pravděpodobně uniknou), **ale attrition na slabších eskortách**
+(Lineman, Thrower) -- Dwarf s přesilou a Guard-asistencemi je může vytipovat a rozbít,
+zatímco pohybliví Wardanceři přežijí. **Implikace pro per-player features:** hodnocení
+"je klec v ohrožení" by mělo rozlišovat mezi ohrožením nosiče (kritické) a ohrožením
+jednotlivých eskort podle jejich mobility/skillů (Dodge/Leap = nízké riziko, bez nich =
+vysoké riziko) -- ne jen agregátní "kolik soupeřů dosáhne na klec".
+
 ### 12. Crowd-surf casualty (rare, one-off in this sample)
 
 `g0076.json.gz`, snapshot 27 (Orc home vs Skaven away, half 2 turn 6, score 0-0)
@@ -770,6 +887,22 @@ in 45 opportunities across the whole 150-game sample (matches the UNCLEAR verdic
 `adjacent_to_sideline` above) — included here as a real, if rare, observed instance rather than
 a manufactured one. **Relevant to:** `adjacent_to_sideline` — confirms the mechanism exists and
 works when it triggers, just triggers rarely in this play style/roster pool.
+
+**Ověřeno (doplněno od uživatele 2026-07-16): tahle instance NENÍ příklad vícekrokového
+"dotlač o pole, pak surfni" comba** -- id14 (Lineman+Wrestle) stál na (2,0), už skoro v
+rohu hřiště, takže stačil jeden přímý blok (diagonální push na (-1,-1), mimo obě hranice
+najednou). Wrestle se neuplatnil (řeší jen "Both Down", tady šlo o čistý Push). Ten
+2-krokový trik (dotlačit cíl 1 pole od kraje blíž, pak ho druhým blokem/Frenzy follow-upem
+dostrkat ven) zůstává dobré DOPORUČENÍ do brief, ne pozorovaný vzorec v datech.
+
+**Frenzy dokáže totéž jedinou akcí (doplněno od uživatele 2026-07-16):** Frenzy
+(`block_handler.cpp:510-511`) vynucuje povinný druhý blok po prvním push/Both Down --
+jeden Frenzy hráč (např. Skaven **Rat Ogre**, `roster.cpp:69-70`, MA6/ST5/AG2/Frenzy)
+tak může cíl odtlačit o 2 pole JEDINOU aktivací, ne přes dva samostatné bloky. Existující
+feature 61 (`frenzy_trap_risk`) tohle neřeší -- měří jen riziko pro VLASTNÍ Frenzy hráče,
+ne hrozbu od soupeřova Frenzy. Obrana: Stand Firm nebo Side Step na hráčích do 2 polí od
+kraje proti známým Frenzy soupeřům. Zapsáno jako nová per-player feature implikace v
+`team1_brief_per_player.md`.
 
 ---
 
