@@ -393,6 +393,15 @@ games (~1.5/game). **Relevant to:** not one of the 5 original per-player candida
 reinforces the 07-14 mining's mechanical finding (FOUL crowds out PICKUP in macro selection) —
 per-player features alone would not fix this; it is a macro-priority issue.
 
+**KOREKCE (doplněno od uživatele 2026-07-16): tohle NENÍ instance chybějícího pickupu.**
+Míč na (7,4) sedí obklopený 3 nepřátelskými (Skaven) tackle zónami — pro Dwarf útočníka
+(AG2) je to fakticky nesebratelný pickup, ne "volný míč 2 pole daleko" jak text naznačuje.
+Foulení místo riskantního pickupu byla pravděpodobně správná volba, ne bug instance.
+Obecně platí, že statistika "231 instancí" neumí rozlišit kontestované vs. otevřené pickupy —
+neznámý zlomek z nich může být podobně odůvodněný. Zobecněno do `team1_brief_per_player.md`:
+`can_reach_loose_ball` musí nést dva parametry — (1) počet nepřátelských TZ na poli s míčem,
+(2) útočníkovo AG/Sure Hands — ne jen binární dosažitelnost.
+
 ### 4. Attrition: a mid-drive casualty as part of ongoing multi-block pressure
 
 `g0001.json.gz`, snapshot 27 (Orc home vs Skaven away, half 2 turn 6, score 1-0)
@@ -424,6 +433,75 @@ principle in action — the leading side (orc, 1-0) is grinding the opponent dow
 contact rather than just racing the clock. 912 INJURY/CASUALTY events recorded turn≥2 across 150
 games — attrition is a large, recurring part of how these games are actually played, not just a
 theoretical concern from Okruh 4.
+
+**KOREKCE (doplněno od uživatele 2026-07-16):** the ball carrier (id3, Thrower) sits at x=0,
+which is Orc's OWN endzone column (Orc scored at x=25 in half 1, see the touchdown event
+earlier in this game) -- not near the scoring end as the diagram's raw position might suggest.
+Combined with the sideline-hugging cluster formation shown on the board, this is a genuinely
+bad starting position, not a deliberate stall: a boundary-hugging cage only pays off near the
+OPPONENT's endzone (fewer attack angles right before scoring); here it just traps the carrier
+in a corner with no retreat squares if the formation breaks, particularly risky against
+Skaven's mobility/Dodge. Generalized into `team1_brief_per_player.md`'s "Útočná formace"
+section: cage-near-own-endzone vs cage-near-opponent-endzone need to be distinguished, not
+lumped together as one "boundary cage" category.
+
+**Neefektivní/riskantní pathing (doplněno od uživatele 2026-07-16, ze situace 4, tah 3):**
+id6 (BlackOrc+Guard) startoval na (8,4), cílová pozice pro blok na id18 byla (9,3) —
+sousedící pole, Chebyshevova vzdálenost jen **1** (přímý diagonální krok, bez rizika).
+Místo toho engine zvolil cestu (8,4)→(8,3)→(9,3) [vstup do id18 tackle zóny] →
+**DODGE** (9,3)→(8,3) [musel se vydodgovat, protože pokračoval v pohybu ze
+označkovaného pole] → MOVE zpátky (8,3)→(9,3) [vstup do stejné TZ znovu] → BLOCK.
+Tedy **4 kroky pohybu + jeden zbytečně riskovaný dodge hod** k dosažení pole
+dostupného jedním bezpečným krokem -- kdyby dodge selhal, id6 by spadl a blok na
+id18 (klíčový pro odvetu po jeho blitzi) by vůbec neproběhl. Konkrétní, ověřený
+příklad stejné třídy problému jako `carrier_blitzable` nález (Chebyshev vs BFS) --
+naivní/neoptimální pathing generuje zbytečné riziko i mimo případ nosiče míče,
+tady u obyčejného podpůrného bloku. **Implikace:** pathing pro Block/Blitz cíle by
+měl preferovat nejkratší bezpečnou cestu k libovolnému poli sousedícímu s cílem,
+ne první nalezenou.
+
+**Skaven neaktivně se nevyhýbá kontaktu -- oběť kazuality stála 4 tahy nehybně
+(doplněno od uživatele 2026-07-16):** agentův původní text rámoval tuhle situaci jako
+"attrition jako strategie" (Orc cíleně drtí soupeře). Uživatelova alternativní hypotéza
+-- že tu jde spíš o Skaven SELHÁNÍ ve vyhýbání kontaktu -- není to, co agent psal, ale
+má oporu v datech: oběť (id14) stála na (12,6) **úplně nehybně 4 tahy v řadě** (od
+domácího tahu 3 až po hostující tah 6, přes vlastní i Orcovy tahy mezitím), než ji Orc
+konečně zablitzoval. Pro rasu s MA7-9 a Dodge, jejíž celá herní identita je "vyhýbat se
+kontaktu pohybem" (viz rasová tabulka výše), je to reálná pasivita -- ne aktivní vběhnutí
+do bloku, ale **neaktivní nepřesunutí se pryč z rostoucí hrozby**, jak se Orc postupně
+přibližoval. Sedí to na stejný vzorec jako id20 (nosič, co si taky "naběhl" vedle
+stojícího soupeře v tahu 3) -- Skaven v týhle hře opakovaně nevyužívá svou klíčovou
+racionální výhodu (mobilitu k vyhýbání se kontaktu), ať už jde o nosiče nebo o obyčejného
+hráče v poli. **Implikace pro per-player features:** signál "kolik tahů stojím na
+stejném poli, zatímco se ke mně soupeř přibližuje" by měl být relevantní zejména pro
+vysoké-MA/Dodge rasy (Skaven, Wood Elf), kde stání na místě je odchylka od racionálního
+chování rasy, ne neutrální volba jako u pomalých ras (Dwarf).
+
+**Konkurenční hypotéza zvažena a NEPOTVRZENA (doplněno od uživatele 2026-07-16): "chrání
+vedení 1:0"?** Alternativní čtení: Orc drží míč co nejdál od kontaktu záměrně, aby chránil
+vedení, ne z nedbalosti. Argumenty proti: (1) je to teprve tah 4/8 -- brzy na "jen bránit",
+je čas i na bezpečné 2:0; (2) stání na místě reálně riziko nesnižuje -- oba sólo skavení
+blitzy (tah 3 i 4) přežily jen díky Block skillu na nosiči, ne díky pozici, riziko se
+opakovaně vystavuje místo využití k postupu; (3) skutečná "protect the lead" taktika by
+zahrnovala kryté stání (klec), ne osamoceného nosiče v rohu. Převažující čtení zůstává
+"promarněná příležitost" (žádný receiver, žádná klec, žádný pokus o postup), ale
+alternativa je tu zaznamenaná jako zvážená, ne přehlédnutá.
+
+**ZAPARKOVÁNO (16.07., k dořešení později):** otevřená otázka k tahu 3 (turnover
+recovery) -- byl Orcův dvojitý GFI risk s Throwerem (id3), který doběhl přes
+půl hřiště a sebral volný míč v rohu, rozumná sázka, nebo mohl Orc zahrát
+bezpečněji (např. nechat míč ležet a nechat ho sebrat pomalejším, blíž
+stojícím hráčem)? Nedořešeno, vrátit se k tomu.
+
+**Druhá chyba (doplněno od uživatele 2026-07-16): žádný receiver připravený u soupeřovy
+endzóny s blížícím se koncem poločasu.** Poločas 2 má 8 tahů/stranu; tohle je domácí tah 6
+(zbývají jen 2). Soupeřova (Skaven) skórovací endzóna je x=25. Nejdál, kam se JAKÝKOLIV
+stojící Orc hráč v celém poločase 2 dostal, je x=15 (Ogre, mezitím sražen) -- aktuálně
+nejdál stojící hráč je na x=12. Nikdo tedy není připravený jako cíl pro short pass/handoff
+kombinaci, přestože brief (`team1_brief_per_player.md:120`) uvádí přesně tuhle kombinaci
+jako standardní Orcí způsob, jak překonat vzdálenost bez vysokého AG. Navazuje na
+`is_free_receiver`/deployment nález ze situace 1 (nikdo posunutý dopředu od tahu 1) -- tady
+je to stejný kořenový problém, jen pozdě ve druhém poločase, kde už čas na nápravu dochází.
 
 ### 5. Defensive screen absent → conceded one-turn touchdown
 
@@ -459,6 +537,30 @@ positionally, unrelated to a single decision error, more a standing-formation ga
 *(Note: an earlier draft of the screen-detection code in this survey measured proximity to the
 wrong endzone — it's fixed now; `analyze in cmd_survey` `defensive screen` section of
 `diag_perplayer_grounding.py`, screen_present/absent counts above reflect the corrected version.)*
+
+**ZPŘESNĚNÍ po ruční rekonstrukci tahů 1-4 (doplněno od uživatele 2026-07-16): není to
+chybějící OTTD deployment, je to mid-drive kolaps pokrytí ze rvačky.** Tahy 1-3 byly
+chaotická rvačka na LOS (x~10-14): série bloků, kazualit, faulů, sražených hráčů (id13,
+id2 2x, id12, id16, id11, id17...) + scramble o volný míč. Během téhle rvačky Skaven
+nosič id10 sebral míč (tah 3, x=10,y=8) a **odběhl na volný bok** (x=17,y=9), zatímco
+VŠICHNI trpasličí hráči zůstali zapletení uprostřed. Dwarf v tahu 3 zkusil jediný DODGE
+-- ten selhal a způsobil **TURNOVER**, takže přišli o jedinou šanci se přeskupit dřív,
+než Skaven v tahu 4 doběhl 7 polí rovně do endzóny. Ověřeno výpočtem: i bez toho selhání
+by žádný stojící trpaslík (nejblíž MA4-5) nebyl v dosahu k tomu boku hřiště -- bylo už
+pozdě na cokoliv reaktivního. Web research (grumbbl.co.uk aj.) potvrzuje obecný princip
+"nenech rvačku stáhnout 100 % těl na jedno místo, drž pokrytí i po stranách", ale
+konkrétní OTTD-formace na kickoff by tady vůbec nepomohla -- problém vznikl o 2-3 tahy
+dřív, uprostřed drivu.
+
+**Stejný vzorec jako situace 4, jen na obranné straně (doplněno od uživatele
+2026-07-16): rvačka/blok má v rozhodování vyšší prioritu než strategická pozice.** V
+situaci 4 Orc preferoval příležitostný blok před postupem s míčem (ofenzivní strana). Tady
+Dwarf/celý tým nechal rvačku na LOS pohltit všechny hráče místo udržení pokrytí šířky
+hřiště (obranná strana). **Obojí je stejný kořenový vzorec: AI dává příležitostnému
+kontaktu/boji vyšší váhu než širší strategické pozici** (ať už je to postup s míčem, nebo
+udržení obranného pokrytí) -- ne rasa-specifická ani útok/obrana-specifická věc, ale
+obecná vlastnost rozhodovacího mechanismu. Propojuje se s `carrierStallAwareSteps`/
+macro-generation záhadou výše -- stojí za společné prošetření, ne dvě oddělené věci.
 
 ### 6. Screen present (5 defenders) but broken by a cleared path + fast dodge-and-GFI dash
 
