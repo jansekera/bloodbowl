@@ -1,0 +1,187 @@
+vf=loaded policy=loaded (vfBlend=0 so VF unused in leaf; policy non-null gates prior floors)
+p3  side=H (0,4) st=0 MA5 ST3 AG3 block=1 dodge=0 sureHands=1
+p21 side=A (0,3) st=0 MA9 ST2 AG4 block=0 dodge=1 sureHands=0
+p9  side=H (4,3) st=0 MA6 ST3 AG3 block=1 dodge=0 sureHands=0
+p18 side=A (11,5) st=0 MA7 ST3 AG3 block=1 dodge=0 sureHands=0
+p1  side=H (10,5) st=0 MA5 ST3 AG3 block=0 dodge=0 sureHands=0
+
+=== ROOT MACROS (real expand(), n=21) ===
+  prior=0.0369  END_TURN p-1 t-1
+  prior=0.0369  ADVANCE p3 t-1
+  prior=0.0931  CAGE p3 t-1
+  prior=0.0369  BLITZ p-1 t21
+  prior=0.0931  BLOCK p1 t18
+  prior=0.0931  BLOCK p3 t21
+  prior=0.0931  BLOCK p6 t18
+  prior=0.0369  PASS_ACTION p3 t1
+  prior=0.0369  PASS_ACTION p3 t6
+  prior=0.0369  PASS_ACTION p3 t7
+  prior=0.0369  PASS_ACTION p3 t8
+  prior=0.0369  PASS_ACTION p3 t9
+  prior=0.0369  PASS_ACTION p3 t10
+  prior=0.0369  PASS_ACTION p3 t11
+  prior=0.0369  FOUL p4 t12
+  prior=0.0369  REPOSITION p4->(0,4)
+  prior=0.0369  REPOSITION p7->(0,4)
+  prior=0.0369  REPOSITION p8->(0,4)
+  prior=0.0369  REPOSITION p9->(0,4)
+  prior=0.0369  REPOSITION p10->(0,4)
+  prior=0.0369  REPOSITION p11->(0,4)
+
+=== ROOT STATE simulate() decomposition (perspective HOME) ===
+      SB:cageAdvance     +0.0320
+      SB:proximity       +0.0000
+      SB:stallPacing     +0.1000
+      playerDiff*0.03    +0.0600
+      possession         +0.1000
+      scoreDiff*0.5      +0.5000
+      (dist=25 idealDist=25 cageN=1)
+      heuristic=+0.6600 scoringBonus=+0.1320 TOTAL=+0.7920
+  real simulate()=0.792000 mirror=0.792000 MATCH
+
+=== ONE-PLY MC Q (greedyExpandMacro + real simulate(), K=3000) ===
+macro                           meanQ       sd    p(TO)     Q|noTO       Q|TO
+END_TURN p-1 t-1              +0.7920   0.0000    0.000    +0.7920    +0.0000
+ADVANCE p3 t-1                +0.7562   0.1525    0.233    +0.8400    +0.4808
+CAGE p3 t-1                   +0.7720   0.0000    0.000    +0.7720    +0.0000
+BLITZ p-1 t21                 +0.8088   0.0161    0.000    +0.8089    +0.4700
+BLOCK p1 t18                  +0.8098   0.0155    0.013    +0.8104    +0.7620
+BLOCK p3 t21                  +0.8088   0.0161    0.000    +0.8089    +0.4700
+BLOCK p6 t18                  +0.8098   0.0155    0.013    +0.8104    +0.7620
+PASS_ACTION p3 t1             +0.5904   0.1593    0.797    +0.8888    +0.5144
+PASS_ACTION p3 t6             +0.5778   0.1606    0.831    +0.8968    +0.5130
+PASS_ACTION p3 t7             +0.5955   0.1777    0.767    +0.8937    +0.5048
+PASS_ACTION p3 t8             +0.6351   0.2137    0.615    +0.8489    +0.5013
+PASS_ACTION p3 t9             +0.6230   0.2048    0.611    +0.8160    +0.5003
+PASS_ACTION p3 t10            +0.5995   0.1721    0.754    +0.8565    +0.5156
+PASS_ACTION p3 t11            +0.5911   0.1603    0.772    +0.8653    +0.5100
+FOUL p4 t12                   +0.7873   0.0109    0.000    +0.7873    +0.0000
+REPOSITION p4->(0,4)          +0.7920   0.0000    0.000    +0.7920    +0.0000
+REPOSITION p7->(0,4)          +0.7920   0.0000    0.000    +0.7920    +0.0000
+REPOSITION p8->(0,4)          +0.7840   0.0000    0.000    +0.7840    +0.0000
+REPOSITION p9->(0,4)          +0.7760   0.0000    0.000    +0.7760    +0.0000
+REPOSITION p10->(0,4)         +0.7840   0.0000    0.000    +0.7840    +0.0000
+REPOSITION p11->(0,4)         +0.7840   0.0000    0.000    +0.7840    +0.0000
+
+=== REPRESENTATIVE POST-STATES ===
+  -- post BLOCK 3->21, no turnover (seed 1): carrier(3)@(0,3) st=0 ball@(0,3) held=1 carrierId=3 TO=0
+      SB:cageAdvance     +0.0320
+      SB:proximity       +0.0000
+      SB:stallPacing     +0.1000
+      playerDiff*0.03    +0.0900
+      possession         +0.1000
+      scoreDiff*0.5      +0.5000
+      (dist=25 idealDist=25 cageN=1)
+      heuristic=+0.6900 scoringBonus=+0.1320 TOTAL=+0.8220
+      real=0.822000 mirror=0.822000 MATCH
+
+  -- post BLOCK 3->21, turnover (seed 2980): carrier(3)@(0,4) st=1 ball@(1,5) held=0 carrierId=-1 TO=1
+      looseBall          -0.1000
+      nearLoose          +0.0400
+      playerDiff*0.03    +0.0300
+      scoreDiff*0.5      +0.5000
+      heuristic=+0.4700 scoringBonus=+0.0000 TOTAL=+0.4700
+      real=0.470000 mirror=0.470000 MATCH
+
+  -- post ADVANCE(3), no turnover (seed 1): carrier(3)@(5,5) st=0 ball@(5,5) held=1 carrierId=3 TO=0
+      SB:cageAdvance     +0.0500
+      SB:proximity       +0.0500
+      SB:stallPacing     +0.0800
+      playerDiff*0.03    +0.0600
+      possession         +0.1000
+      scoreDiff*0.5      +0.5000
+      (dist=20 idealDist=25 cageN=4)
+      heuristic=+0.6600 scoringBonus=+0.1800 TOTAL=+0.8400
+      real=0.840000 mirror=0.840000 MATCH
+
+  -- post ADVANCE(3), turnover (seed 2): carrier(3)@(1,5) st=1 ball@(1,6) held=0 carrierId=-1 TO=1
+      looseBall          -0.1000
+      nearLoose          +0.0400
+      playerDiff*0.03    +0.0300
+      scoreDiff*0.5      +0.5000
+      heuristic=+0.4700 scoringBonus=+0.0000 TOTAL=+0.4700
+      real=0.470000 mirror=0.470000 MATCH
+
+=== FULL SEARCH x400 seeds: exact turn-23 state (rerolls=2) ===
+  chosen 72.5%  avg-visit-share  14.0%  BLOCK p3 t21
+  chosen 22.5%  avg-visit-share  12.9%  BLOCK p6 t18
+  chosen  4.0%  avg-visit-share  10.6%  BLOCK p1 t18
+  chosen  0.8%  avg-visit-share  10.5%  CAGE p3 t-1
+  chosen  0.2%  avg-visit-share   3.6%  ADVANCE p3 t-1
+
+=== FULL SEARCH x200 seeds: rerolls=0 ===
+  chosen 63.0%  avg-visit-share  13.5%  BLOCK p3 t21
+  chosen 28.5%  avg-visit-share  12.9%  BLOCK p6 t18
+  chosen  4.5%  avg-visit-share  10.4%  BLOCK p1 t18
+  chosen  4.0%  avg-visit-share  10.7%  CAGE p3 t-1
+
+=== FULL SEARCH x400 seeds: id21 moved to (11,1): carrier UNMARKED ===
+  chosen 69.5%  avg-visit-share  12.9%  BLOCK p6 t18
+  chosen 16.8%  avg-visit-share  11.3%  CAGE p3 t-1
+  chosen 12.8%  avg-visit-share  10.5%  BLOCK p1 t18
+  chosen  0.8%  avg-visit-share   7.7%  ADVANCE p3 t-1
+  chosen  0.2%  avg-visit-share   2.2%  PASS_ACTION p3 t8
+
+  unmarked-state root priors:
+    prior=0.0413  END_TURN p-1 t-1
+    prior=0.0413  ADVANCE p3 t-1
+    prior=0.0992  CAGE p3 t-1
+    prior=0.0413  BLITZ p-1 t16
+    prior=0.0992  BLOCK p1 t18
+    prior=0.0992  BLOCK p6 t18
+    prior=0.0413  PASS_ACTION p3 t1
+    prior=0.0413  PASS_ACTION p3 t6
+    prior=0.0413  PASS_ACTION p3 t7
+    prior=0.0413  PASS_ACTION p3 t8
+    prior=0.0413  PASS_ACTION p3 t9
+    prior=0.0413  PASS_ACTION p3 t10
+    prior=0.0413  PASS_ACTION p3 t11
+    prior=0.0413  FOUL p4 t12
+    prior=0.0413  REPOSITION p4->(0,4)
+    prior=0.0413  REPOSITION p7->(0,4)
+    prior=0.0413  REPOSITION p8->(0,4)
+    prior=0.0413  REPOSITION p9->(0,4)
+    prior=0.0413  REPOSITION p10->(0,4)
+    prior=0.0413  REPOSITION p11->(0,4)
+  one-ply MC Q (K=3000):
+    END_TURN p-1 t-1             meanQ=+0.7920 p(TO)=0.000
+    ADVANCE p3 t-1               meanQ=+0.8120 p(TO)=0.000
+    CAGE p3 t-1                  meanQ=+0.7720 p(TO)=0.000
+    BLITZ p-1 t16                meanQ=+0.8099 p(TO)=0.013
+    BLOCK p1 t18                 meanQ=+0.8098 p(TO)=0.013
+    BLOCK p6 t18                 meanQ=+0.8098 p(TO)=0.013
+    PASS_ACTION p3 t1            meanQ=+0.6412 p(TO)=0.668
+    PASS_ACTION p3 t6            meanQ=+0.6197 p(TO)=0.732
+    PASS_ACTION p3 t7            meanQ=+0.6500 p(TO)=0.642
+    PASS_ACTION p3 t8            meanQ=+0.7070 p(TO)=0.440
+    PASS_ACTION p3 t9            meanQ=+0.6872 p(TO)=0.444
+    PASS_ACTION p3 t10           meanQ=+0.6561 p(TO)=0.606
+    PASS_ACTION p3 t11           meanQ=+0.6501 p(TO)=0.612
+    FOUL p4 t12                  meanQ=+0.7873 p(TO)=0.000
+    REPOSITION p4->(0,4)         meanQ=+0.7712 p(TO)=0.693
+    REPOSITION p7->(0,4)         meanQ=+0.7920 p(TO)=0.000
+    REPOSITION p8->(0,4)         meanQ=+0.7760 p(TO)=0.000
+    REPOSITION p9->(0,4)         meanQ=+0.7600 p(TO)=0.000
+    REPOSITION p10->(0,4)        meanQ=+0.7800 p(TO)=0.000
+    REPOSITION p11->(0,4)        meanQ=+0.7840 p(TO)=0.000
+
+=== carrierStallAwareSteps context ===
+  dist=25 turnsRemaining=5 -> idealStepsThisTurn=ceil(25/5)=5
+  id21 adjacent (blitzable) -> steps=min(5, mvRemaining=5)=5
+  simulate() pacing: idealDist=turnsLeft*MA=5*5=25 == dist -> pacing=1.0 (MAX at own goal line)
+  hypothetical carrier x -> leaf total (all else fixed, id21 removed):
+    x= 0 total=+0.8220  prox=+0.0000 pacing=+0.1000 cage=+0.0320 (cageN=1)
+    x= 1 total=+0.8280  prox=+0.0100 pacing=+0.0960 cage=+0.0320 (cageN=1)
+    x= 2 total=+0.8420  prox=+0.0200 pacing=+0.0920 cage=+0.0400 (cageN=2)
+    x= 3 total=+0.8533  prox=+0.0300 pacing=+0.0880 cage=+0.0453 (cageN=3)
+    x= 4 total=+0.8640  prox=+0.0400 pacing=+0.0840 cage=+0.0500 (cageN=4)
+    x= 5 total=+0.8700  prox=+0.0500 pacing=+0.0800 cage=+0.0500 (cageN=4)
+    x= 6 total=+0.8889  prox=+0.0600 pacing=+0.0760 cage=+0.0629 (cageN=7)
+    x= 7 total=+0.8980  prox=+0.0700 pacing=+0.0720 cage=+0.0660 (cageN=8)
+    x= 8 total=+0.9040  prox=+0.0800 pacing=+0.0680 cage=+0.0660 (cageN=8)
+    x= 9 total=+0.9149  prox=+0.0900 pacing=+0.0640 cage=+0.0709 (cageN=7)
+    x=10 total=+0.9209  prox=+0.1000 pacing=+0.0600 cage=+0.0709 (cageN=7)
+    x=11 total=+0.9371  prox=+0.1100 pacing=+0.0560 cage=+0.0811 (cageN=7)
+    x=12 total=+0.9473  prox=+0.1200 pacing=+0.0520 cage=+0.0853 (cageN=6)
+
+DONE

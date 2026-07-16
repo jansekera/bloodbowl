@@ -340,7 +340,22 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     break;
                 }
                 case MacroType::ADVANCE:
-                    if (trailing2plus) minPrior = 0.15f;
+                    // 2026-07-16: was floorless unless trailing by 2+, while
+                    // BLOCK/CAGE get an unconditional 0.12 floor. Diagnosed
+                    // (evidence/fable_advance_vs_block_diagnostic_20260716.md,
+                    // 400-seed reconstruction of a real stalled-carrier state)
+                    // as a structural cause of a ball carrier never advancing
+                    // even in a counterfactual where ADVANCE is the objectively
+                    // best (risk-free) macro on the board: with no floor its
+                    // prior trails BLOCK/CAGE whenever those are also
+                    // candidates, so it never accumulates enough MCTS visits to
+                    // be chosen on Q alone (full search picked it 0.8% of the
+                    // time there despite having the highest one-ply Q of ~20
+                    // candidates). Same mechanism as CAGE's 2026-07-03 fix,
+                    // extended here to ADVANCE -- raised to floor parity (0.12)
+                    // unconditionally; trailing 2+ keeps its higher, more
+                    // urgent 0.15 floor.
+                    minPrior = trailing2plus ? 0.15f : 0.12f;
                     break;
                 case MacroType::BLITZ:
                     if (onDef) minPrior = 0.20f;
