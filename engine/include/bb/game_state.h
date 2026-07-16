@@ -19,6 +19,11 @@ public:
     std::array<Player, 22> players{};  // 0-10 = home (IDs 1-11), 11-21 = away (IDs 12-22)
     BallState ball;
     bool turnoverPending = false;
+    // One-activation-per-player tracking: id of the player whose activation is
+    // currently open (-1 = none). Used by executeAction to close out a mover's
+    // activation (hasActed = true) when a different player starts acting, so a
+    // player who moved cannot be reactivated later in the same team-turn.
+    int currentActivationId = -1;
     TeamSide kickingTeam = TeamSide::AWAY;
     Weather weather = Weather::NICE;
     RosterSpeed receiverSpeed = RosterSpeed::MIXED;

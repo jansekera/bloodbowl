@@ -55,6 +55,8 @@ const TeamState& GameState::getTeamState(TeamSide side) const {
 }
 
 void GameState::resetPlayersForNewTurn(TeamSide side) {
+    // New turn (or new drive via kickoff): no activation is open.
+    currentActivationId = -1;
     forEachPlayer(side, [](Player& p) {
         if (p.state == PlayerState::STUNNED) {
             p.state = PlayerState::PRONE;

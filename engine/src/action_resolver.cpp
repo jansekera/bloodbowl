@@ -178,6 +178,22 @@ ActionResult resolveAction(GameState& state, const Action& action,
 
 ActionResult executeAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    // Activation close-out at the actor-switch boundary: a successful MOVE never
+    // sets hasActed (only failure paths do), so without this a player who moved
+    // could be independently reactivated later in the same team-turn (free
+    // blitz / second action bug, see evidence/fable_hasacted_bug_20260715.md).
+    // When a DIFFERENT player starts acting, the previous player's activation is
+    // over: if they had moved, mark them as having acted. Continuous multi-step
+    // moves and move->pass/foul/score sequences by the SAME player are untouched.
+    if (requiresPlayer(action.type) && action.playerId > 0) {
+        if (state.currentActivationId > 0 &&
+            state.currentActivationId != action.playerId) {
+            Player& prev = state.getPlayer(state.currentActivationId);
+            if (prev.hasMoved) prev.hasActed = true;
+        }
+        state.currentActivationId = action.playerId;
+    }
+
     ActionResult result = resolveAction(state, action, dice, events);
 
     // Auto end turn on turnover

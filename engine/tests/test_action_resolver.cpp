@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "bb/action_resolver.h"
+#include "bb/rules_engine.h"
 #include "bb/helpers.h"
 
 using namespace bb;
@@ -158,6 +159,95 @@ TEST(ActionResolver, GameOverSecondHalf) {
     FixedDiceRoller dice({});
     auto result = executeAction(gs, action, dice, nullptr);
     EXPECT_EQ(gs.phase, GamePhase::GAME_OVER);
+}
+
+// --- One-activation-per-player close-out (hasActed double-activation fix) ---
+// Negative control for the bug where a successful MOVE never set hasActed,
+// letting a player be reactivated for BLOCK/PASS/FOUL later in the same turn
+// after other players acted in between (evidence/fable_hasacted_bug_20260715.md).
+// This test FAILS against the pre-fix engine.
+TEST(ActionResolver, InterleavedReactivationClosedOut) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {5, 5}, TeamSide::HOME);
+    placePlayer(gs, 12, {12, 7}, TeamSide::AWAY); // adjacent to p1's destination
+
+    FixedDiceRoller dice({});
+
+    // Player 1 completes a successful move (ends adjacent to opponent 12).
+    Action move1{ActionType::MOVE, 1, -1, {11, 7}};
+    auto r1 = executeAction(gs, move1, dice, nullptr);
+    ASSERT_TRUE(r1.success);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed); // activation still open
+
+    // A DIFFERENT player acts: player 1's activation must be closed out.
+    Action move2{ActionType::MOVE, 2, -1, {5, 6}};
+    auto r2 = executeAction(gs, move2, dice, nullptr);
+    ASSERT_TRUE(r2.success);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed); // pre-fix: false (the bug)
+
+    // Player 1 must no longer be offered any action (pre-fix: free BLOCK on 12).
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    int p1Actions = 0;
+    for (const auto& a : actions) {
+        if (a.playerId == 1) p1Actions++;
+    }
+    EXPECT_EQ(p1Actions, 0);
+}
+
+// Positive control: multi-step movement and continuous same-player sequences
+// stay legal — the close-out only fires on an actor SWITCH.
+TEST(ActionResolver, SamePlayerMultiStepMoveStaysOpen) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+
+    FixedDiceRoller dice({});
+    Action step1{ActionType::MOVE, 1, -1, {11, 7}};
+    Action step2{ActionType::MOVE, 1, -1, {12, 7}};
+    ASSERT_TRUE(executeAction(gs, step1, dice, nullptr).success);
+    ASSERT_TRUE(executeAction(gs, step2, dice, nullptr).success);
+
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+    EXPECT_EQ(gs.currentActivationId, 1);
+
+    // Player 1 is still offered actions (continuous activation).
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    int p1Actions = 0;
+    for (const auto& a : actions) {
+        if (a.playerId == 1) p1Actions++;
+    }
+    EXPECT_GT(p1Actions, 0);
+}
+
+// The tracker resets at the turn boundary: an opponent acting on the next turn
+// must not close out (or be linked to) the previous turn's mover.
+TEST(ActionResolver, ActivationTrackerResetsOnEndTurn) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {15, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({});
+    Action move1{ActionType::MOVE, 1, -1, {11, 7}};
+    ASSERT_TRUE(executeAction(gs, move1, dice, nullptr).success);
+    EXPECT_EQ(gs.currentActivationId, 1);
+
+    Action endTurn{ActionType::END_TURN, -1, -1, {-1, -1}};
+    executeAction(gs, endTurn, dice, nullptr);
+    EXPECT_EQ(gs.currentActivationId, -1);
+
+    // Away player acts: no spurious close-out of home player 1.
+    Action move12{ActionType::MOVE, 12, -1, {16, 7}};
+    ASSERT_TRUE(executeAction(gs, move12, dice, nullptr).success);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+    EXPECT_EQ(gs.currentActivationId, 12);
 }
 
 TEST(ActionResolver, BlitzAdjacentBlock) {
