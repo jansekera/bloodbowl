@@ -340,14 +340,24 @@ position). **Not a uniquely bad or good decision** — representative baseline o
 14|..........................|
    --------------------------
 ```
-Events this turn: BLOCK id22→id2 (2-dice, attacker choice, OK) → knockdown+armor break; BLOCK
+Events this turn: BLOCK id22→id2 (**3-dice**, attacker choice, OK) → knockdown+armor break; BLOCK
 id17→id5 (2-dice, OK) → knockdown+armor break; BLOCK id20→id10 (2-dice, OK) → push; then FOUL
 id21→id2 (on the just-downed player).
 
-Three consecutive **objectively good blocks** (net dice ≥2, attacker-choice, all independently
-confirmed against `good_block` scan hits) chain together to knock down 3 human players in one
-away turn — this is the AI executing `net_st_for_block`-style reasoning well when the assist math
-favors it, a useful counterpoint to the bad-block example in the candidate section above. **GOOD
+**KOREKCE (doplněno od uživatele 2026-07-15, přepočítáno přesně přes `block_dice()`/assist
+algoritmus, ne odhad):** první blok (id22→id2) byl ve skutečnosti **3-dice** (4 offensive
+assisti: id17, id18, id19, id20 — dva s Guardem, dva volní — proti 0 defensive assistům; net
++4), ne 2-dice jak text tvrdil. Bloky 2 a 3 byly správně 2-dice (net +1 každý). Všechny tři
+tedy byly **minimálně 2-dice, attacker-choice** — žádný nebyl rizikový. Nuance: id17
+(BlackOrc+Guard) **nemá Block skill** (jen Guard) — na rozdíl od id22 a id20 (oba Blitzer
+varianty s Block), takže druhý blok postrádal Block-skill pojistku proti Both-Down výsledku,
+i když šance byla nízká (2-dice attacker-choice). Foul id21→id2 měl 3 offensive assisty
+(id17, id19, id20).
+
+Three consecutive **objectively good blocks** (all independently confirmed against
+`good_block` scan hits) chain together to knock down 3 human players in one away turn — this
+is the AI executing `net_st_for_block`-style reasoning well when the assist math favors it,
+a useful counterpoint to the bad-block example in the candidate section above. **GOOD
 decision.** Immediately followed by a FOUL on the player it just downed — consistent with the
 07-14 mining's "FOUL overuse" finding, now visible in situ.
 

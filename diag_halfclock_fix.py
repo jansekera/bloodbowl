@@ -62,11 +62,11 @@ for seed in range(5):
         seed=seed, mcts_iterations=MCTS_ITERS, policy_weights_path=POLICY_PATH,
     )
     turns = len(r.get_turn_logs())
-    total_actions = r.result.totalActions
+    total_actions = r.result.total_actions
     if total_actions >= 5000:
         max_actions_hits += 1
     print(f"  seed={seed} totalActions={total_actions} turnLogs={turns} "
-          f"score={r.result.homeScore}-{r.result.awayScore}", flush=True)
+          f"score={r.result.home_score}-{r.result.away_score}", flush=True)
 print(f"  MAX_ACTIONS(5000) hit: {max_actions_hits}/5 -- should be 0, flag if >0", flush=True)
 
 # --- Part 2: pooled gate-style win/draw/loss tally ---
