@@ -157,6 +157,81 @@ TEST(MacroActions, PickupNotAvailableWhenBallHeld) {
     EXPECT_FALSE(hasMacroType(macros, MacroType::PICKUP));
 }
 
+// Regression for master-list item 7 (top-2 PICKUP pickers): with two
+// comparable pickers in reach, generation must emit BOTH, best-first.
+// The best-first ORDER is a contract the prior-floor split in
+// macro_mcts.cpp relies on -- the order assertions below pin it.
+// NEGATIVE CONTROL: pre-patch generation emits a single bestPicker, so
+// countMacroType == 1 and this test fails.
+TEST(MacroActions, PickupEmitsTopTwoPickersBestFirst) {
+    GameState state = makeMinimalState();  // ball on ground at {13,7}
+    // Player 1: dist 3 from ball, AG3 -> score 30 - 9 = 21 (secondary).
+    state.getPlayer(1).position = {10, 7};
+    // Player 2: dist 2 from ball, AG3 -> score 30 - 6 = 24 (primary).
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {15, 7};
+    p2.stats = {6, 3, 3, 8};
+    p2.movementRemaining = 6;
+    p2.hasMoved = false;
+    p2.hasActed = false;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    ASSERT_EQ(countMacroType(macros, MacroType::PICKUP), 2);
+    std::vector<int> pickerIds;
+    for (auto& m : macros) {
+        if (m.type == MacroType::PICKUP) pickerIds.push_back(m.playerId);
+    }
+    EXPECT_EQ(pickerIds[0], 2);  // higher score first (best-first contract)
+    EXPECT_EQ(pickerIds[1], 1);
+}
+
+// Guard (passes pre- and post-patch): a categorically worse second picker
+// (score gap > 15) must NOT be emitted -- no floored prior mass for a
+// picker that is strictly dominated on the pickup itself.
+TEST(MacroActions, PickupSecondPickerGatedByScoreGap) {
+    GameState state = makeMinimalState();
+    // Player 1: dist 1, AG4 -> score 40 - 3 = 37.
+    state.getPlayer(1).position = {12, 7};
+    state.getPlayer(1).stats = {6, 3, 4, 8};
+    // Player 2: dist 8 (reach 6+2 -- still eligible), AG2 -> 20 - 24 = -4.
+    // Gap 41 > 15 -> gated out.
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {5, 7};
+    p2.stats = {6, 3, 2, 8};
+    p2.movementRemaining = 6;
+    p2.hasMoved = false;
+    p2.hasActed = false;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    ASSERT_EQ(countMacroType(macros, MacroType::PICKUP), 1);
+    for (auto& m : macros) {
+        if (m.type == MacroType::PICKUP) EXPECT_EQ(m.playerId, 1);
+    }
+}
+
+// Guard (passes pre- and post-patch): a single eligible picker keeps
+// today's behavior bit-exactly -- one PICKUP macro, no phantom second.
+TEST(MacroActions, PickupSinglePickerUnchanged) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {10, 7};   // dist 3, in reach
+    // (only home player near the ball; player 12 is AWAY at {20,7})
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    ASSERT_EQ(countMacroType(macros, MacroType::PICKUP), 1);
+}
+
 TEST(MacroActions, BlockAvailableWithFavorableDice) {
     GameState state = makeMinimalState();
     // Place ST4 player adjacent to ST3 enemy

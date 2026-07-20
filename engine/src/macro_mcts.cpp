@@ -214,7 +214,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     lastChildVisits_.clear();
     for (auto& child : root.children) {
         if (child.visits > 0) {
-            lastChildVisits_.push_back({child.macro, child.visits});
+            lastChildVisits_.push_back({child.macro, child.visits, child.prior});
         }
     }
 
@@ -305,6 +305,11 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                               state.getPlayer(state.ball.carrierId).teamSide == state.activeTeam);
         bool onDef = !activeHasBall && state.ball.isHeld;
 
+        // Item 7 (top-2 PICKUP pickers): generation emits PICKUP candidates
+        // best-first (ordering contract documented at the generation site,
+        // macro_actions.cpp). Track how many we've floored so the secondary
+        // gets half the floor -- see the PICKUP case below.
+        int pickupSeen = 0;
         for (int i = 0; i < n; ++i) {
             float minPrior = 0.0f;
             float maxPrior = 1.0f;
@@ -382,6 +387,15 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     minPrior = 0.20f;
                     if (scoreDiff < 0) minPrior = 0.30f;
                     if (turnsRemaining <= 3) minPrior = 0.35f;
+                    // Secondary picker gets HALF the floor: the PICKUP
+                    // family's floored mass then grows 1.5x, not 2x
+                    // (master-list interaction risk #1 -- naive doubling
+                    // would give the family +78% post-renorm mass and
+                    // dilute every non-floored candidate by ~15%; the
+                    // split keeps it at ~+43% / ~-9%, numbers in
+                    // proposals_item7_pickup_top2_20260714.md section 3).
+                    if (pickupSeen > 0) minPrior *= 0.5f;
+                    ++pickupSeen;
                     break;
                 case MacroType::REPOSITION:
                     // 2026-07-14/20 (master-list item 10): priors start

@@ -37,6 +37,7 @@ struct MacroMCTSNode {
 struct MacroChildVisitInfo {
     Macro macro;
     int visits;
+    float prior = 0.0f;  // post-renorm root prior (diagnostics/tests)
 };
 
 // Outcome of an open-loop replay toward a target node: `reached` is the

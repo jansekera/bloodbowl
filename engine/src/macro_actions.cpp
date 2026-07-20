@@ -431,10 +431,23 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
     });
 
-    // PICKUP: ball on ground, best player by AG/distance/skills
+    // PICKUP: ball on ground, top-2 pickers by AG/distance/skills.
+    // A single bestPicker candidate left the search with no alternative
+    // recoverer at all: per-turn ground recovery sat at ~28% and the
+    // near-ball pickup miss at 82% across two independent minings
+    // (evidence/fable_replay_mining_findings.md 07-02, _20260714 07-14;
+    // master-list item 7). The macro list is emitted BEST-FIRST -- the
+    // prior-floor split in macro_mcts.cpp (expand(), case PICKUP) relies
+    // on this ordering contract.
     if (ballOnGround) {
         const Player* bestPicker = nullptr;
         int bestPickerScore = -999;
+        const Player* secondPicker = nullptr;
+        int secondPickerScore = -999;
+        // Gate: a second picker more than 15 points behind (= the SureHands
+        // bonus, ~5 squares of extra distance or ~1.5 AG) is categorically
+        // worse -- emitting it would only donate floored prior mass.
+        constexpr int kSecondPickerMaxGap = 15;
 
         state.forEachOnPitch(mySide, [&](const Player& p) {
             if (!isFreeToAct(p)) return;
@@ -450,8 +463,13 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             if (p.hasSkill(SkillName::BigHand)) score += 5;
 
             if (score > bestPickerScore) {
+                secondPickerScore = bestPickerScore;
+                secondPicker = bestPicker;
                 bestPickerScore = score;
                 bestPicker = &p;
+            } else if (score > secondPickerScore) {
+                secondPickerScore = score;
+                secondPicker = &p;
             }
         });
 
@@ -471,6 +489,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         }
         if (bestPicker) {
             out.push_back({MacroType::PICKUP, bestPicker->id, -1, state.ball.position});
+        }
+        // Secondary picker: only from the main loop (never from the
+        // findNearestFreePlayer fallback -- secondPicker stays null there).
+        if (secondPicker &&
+            bestPickerScore - secondPickerScore <= kSecondPickerMaxGap) {
+            out.push_back({MacroType::PICKUP, secondPicker->id, -1, state.ball.position});
         }
     }
 

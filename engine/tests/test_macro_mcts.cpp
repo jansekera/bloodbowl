@@ -48,6 +48,14 @@ GameState makeScoringState() {
     return state;
 }
 
+int countMacroType(const std::vector<Macro>& macros, MacroType type) {
+    int count = 0;
+    for (auto& m : macros) {
+        if (m.type == type) count++;
+    }
+    return count;
+}
+
 } // anonymous namespace
 
 // =============================================================
@@ -469,6 +477,75 @@ TEST(MacroMCTS, OffensivePriorsUntouchedByDefensiveRebalance) {
     // onDef=false -> neither the REPOSITION floor nor the FOUL cap applies;
     // both stay raw uniform, identical pre- and post-patch.
     EXPECT_NEAR(repoPrior, foulPrior, 1e-6f);
+}
+
+// Item 7 prior-floor split: with two PICKUP candidates the secondary must
+// carry HALF the primary's floor, so after renormalization the primary's
+// root prior is exactly 2x the secondary's. Requires n >= 11 candidates so
+// both floors (0.20 / 0.10) actually bind against the 1/n base.
+// NEGATIVE CONTROL is two-stage (see protocol): before the generation
+// patch this test fails at the ASSERT (no second PICKUP child exists);
+// after generation but before the floor split it fails at EXPECT_NEAR
+// with ratio == 1.0 -- the naive doubling this split is designed to avoid.
+TEST(MacroMCTS, SecondaryPickupPriorIsHalfOfPrimary) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 2;   // turnsRemaining 7 > 3, scoreDiff 0 -> floor 0.20
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+    state.ball = BallState::onGround({13, 7});
+
+    // 10 free HOME players -> ~10 REPOSITION + 2 PICKUP + END_TURN, n >= 11.
+    auto mk = [&](int id, Position pos) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        p.hasMoved = false;
+        p.hasActed = false;
+    };
+    mk(1, {12, 7});                       // dist 1 -> score 27 (primary)
+    mk(2, {10, 7});                       // dist 3 -> score 21 (secondary, gap 6)
+    for (int i = 3; i <= 9; ++i) mk(i, {2, static_cast<int8_t>(2 * i - 5)});
+    mk(10, {4, 7});                       // all i>=3: dist > MA+2 from the ball
+    // One AWAY player far from everyone (no BLOCK/BLITZ/FOUL candidates).
+    Player& away = state.getPlayer(12);
+    away.id = 12;
+    away.teamSide = TeamSide::AWAY;
+    away.state = PlayerState::STANDING;
+    away.position = {25, 13};
+    away.stats = {6, 3, 3, 8};
+    away.movementRemaining = 6;
+
+    // Precondition: floors must bind (base 1/n < 0.10) and both pickers emit.
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    ASSERT_GE(macros.size(), 11u);
+    ASSERT_EQ(countMacroType(macros, MacroType::PICKUP), 2);
+
+    PolicyNetwork pn;  // zero weights -- activates the heuristic floor block
+    MCTSConfig cfg;
+    cfg.policy = &pn;          // policyBlend stays 0.0 (production regime)
+    cfg.maxIterations = 400;   // enough to visit every root child
+    cfg.timeBudgetMs = 10000;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    search.search(state);
+
+    float primary = -1.0f, secondary = -1.0f;
+    for (const auto& cv : search.lastChildVisits()) {
+        if (cv.macro.type != MacroType::PICKUP) continue;
+        if (cv.macro.playerId == 1) primary = cv.prior;
+        if (cv.macro.playerId == 2) secondary = cv.prior;
+    }
+    ASSERT_GT(primary, 0.0f);
+    ASSERT_GT(secondary, 0.0f);
+    EXPECT_NEAR(primary / secondary, 2.0f, 0.01f);
 }
 
 TEST(MacroMCTS, ChildVisitsRecorded) {
