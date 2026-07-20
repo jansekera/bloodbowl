@@ -187,6 +187,290 @@ TEST(MacroMCTS, ScoringPositionFindsScore) {
     EXPECT_EQ(result.type, MacroType::SCORE);
 }
 
+// =============================================================
+// Item 10 (proposals_item10_prior_floor_validation_20260714): defensive
+// prior-floor rebalance -- REPOSITION floor 0.05->0.08, new FOUL cap 0.08
+// (onDef-gated). Ratios survive the shared renorm, so assertions compare
+// ratios, not absolute priors; each test asserts its candidate count n
+// first since the floor/cap binding thresholds depend on it.
+// =============================================================
+
+TEST(MacroMCTS, DefensiveRepositionFloorBindsAtLargeNodes) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(12);
+    carrier.id = 12;
+    carrier.teamSide = TeamSide::AWAY;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {5, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({5, 7}, 12);
+
+    Player& away2 = state.getPlayer(13);
+    away2.id = 13;
+    away2.teamSide = TeamSide::AWAY;
+    away2.state = PlayerState::STANDING;
+    away2.position = {6, 9};
+    away2.stats = {6, 3, 3, 8};
+    away2.movementRemaining = 6;
+
+    // 14 free HOME players -> 14 REPOSITION + 2 BLITZ + END_TURN.
+    int id = 1;
+    for (int i = 0; i < 14; ++i) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        int x = 18 + (i % 3);
+        int y = std::min(1 + i, 13);
+        p.position = {static_cast<int8_t>(x), static_cast<int8_t>(y)};
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        id++;
+        if (id == 12) id = 14; // skip reserved ids 12/13
+    }
+
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg;
+    cfg.policy = &zeroPolicy;
+    cfg.policyBlend = 0.0f;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    auto priors = search.expandRootPriorsForTest(state);
+    ASSERT_GE(priors.size(), 13u);
+    ASSERT_LE(priors.size(), 20u);
+
+    float repoPrior = -1, blitzPrior = -1;
+    for (auto& [m, prior] : priors) {
+        if (m.type == MacroType::REPOSITION) repoPrior = prior;
+        if (m.type == MacroType::BLITZ) blitzPrior = prior;
+    }
+    ASSERT_GE(repoPrior, 0.0f);
+    ASSERT_GE(blitzPrior, 0.0f);
+    // Post-patch: 0.08/0.20 = 0.400. Pre-patch (negative control): REPOSITION
+    // is raw uniform (1/14 ~= 0.0714, the old 0.05 floor doesn't bind at
+    // n=14) -> ratio ~= 0.357, outside this tolerance.
+    EXPECT_NEAR(repoPrior / blitzPrior, 0.08f / 0.20f, 0.02f);
+}
+
+TEST(MacroMCTS, DefensiveFoulCapBindsAtSparseNodes) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(12);
+    carrier.id = 12;
+    carrier.teamSide = TeamSide::AWAY;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {5, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({5, 7}, 12);
+
+    Player& prone = state.getPlayer(13);
+    prone.id = 13;
+    prone.teamSide = TeamSide::AWAY;
+    prone.state = PlayerState::PRONE;
+    prone.position = {15, 8};
+
+    Player& blockTarget = state.getPlayer(14);
+    blockTarget.id = 14;
+    blockTarget.teamSide = TeamSide::AWAY;
+    blockTarget.state = PlayerState::STANDING;
+    blockTarget.position = {18, 4};
+    blockTarget.stats = {6, 3, 3, 8};
+    blockTarget.movementRemaining = 6;
+
+    Player& fouler = state.getPlayer(1);
+    fouler.id = 1;
+    fouler.teamSide = TeamSide::HOME;
+    fouler.state = PlayerState::STANDING;
+    fouler.position = {15, 7};
+    fouler.stats = {6, 3, 3, 8};
+    fouler.movementRemaining = 6;
+
+    Player& blocker = state.getPlayer(2);
+    blocker.id = 2;
+    blocker.teamSide = TeamSide::HOME;
+    blocker.state = PlayerState::STANDING;
+    blocker.position = {18, 5};
+    blocker.stats = {6, 4, 3, 8};
+    blocker.movementRemaining = 6;
+
+    // 2 free HOME REPOSITION fillers -> n=8: 2 BLITZ, 1 BLOCK, 1 FOUL, 3
+    // REPOSITION, 1 END_TURN. At n=8, raw uniform 1/8=0.125 is ABOVE both
+    // the old 0.05 REPOSITION floor and BLOCK's 0.12 floor (neither binds),
+    // so pre-patch FOUL and BLOCK are exactly equal (both raw uniform).
+    for (int i = 0; i < 2; ++i) {
+        int id = 3 + i;
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = {static_cast<int8_t>(20 + i), static_cast<int8_t>(1 + i)};
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+    }
+
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg;
+    cfg.policy = &zeroPolicy;
+    cfg.policyBlend = 0.0f;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    auto priors = search.expandRootPriorsForTest(state);
+    ASSERT_GE(priors.size(), 6u);
+    ASSERT_LE(priors.size(), 12u);
+
+    float foulPrior = -1, blitzPrior = -1, blockPrior = -1;
+    for (auto& [m, prior] : priors) {
+        if (m.type == MacroType::FOUL) foulPrior = prior;
+        if (m.type == MacroType::BLITZ) blitzPrior = prior;
+        if (m.type == MacroType::BLOCK) blockPrior = prior;
+    }
+    ASSERT_GE(foulPrior, 0.0f);
+    ASSERT_GE(blitzPrior, 0.0f);
+    ASSERT_GE(blockPrior, 0.0f);
+    // Post-patch: 0.08/0.20 = 0.400. Pre-patch (negative control): FOUL is
+    // raw uniform (1/8 = 0.125, uncapped) -> ratio 0.625, outside tolerance.
+    EXPECT_NEAR(foulPrior / blitzPrior, 0.08f / 0.20f, 0.02f);
+    // Pre-patch: FOUL == BLOCK (both raw uniform, EXPECT_LT fails).
+    // Post-patch: FOUL capped to 0.08 < BLOCK's uncapped ~0.125 -> passes.
+    EXPECT_LT(foulPrior, blockPrior);
+}
+
+TEST(MacroMCTS, RepositionFloorNoOpAtSmallNodes) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(12);
+    carrier.id = 12;
+    carrier.teamSide = TeamSide::AWAY;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {5, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({5, 7}, 12);
+
+    Player& away2 = state.getPlayer(13);
+    away2.id = 13;
+    away2.teamSide = TeamSide::AWAY;
+    away2.state = PlayerState::STANDING;
+    away2.position = {6, 9};
+    away2.stats = {6, 3, 3, 8};
+    away2.movementRemaining = 6;
+
+    // 3 free HOME players, no FOUL candidate (no prone/stunned enemy) ->
+    // n=6: 2 BLITZ, 3 REPOSITION, 1 END_TURN.
+    for (int i = 0; i < 3; ++i) {
+        int id = 1 + i;
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = {static_cast<int8_t>(20 + i), static_cast<int8_t>(1 + i)};
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+    }
+
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg;
+    cfg.policy = &zeroPolicy;
+    cfg.policyBlend = 0.0f;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    auto priors = search.expandRootPriorsForTest(state);
+    ASSERT_LE(priors.size(), 12u);
+    int n = static_cast<int>(priors.size());
+
+    float repoPrior = -1, blitzPrior = -1;
+    for (auto& [m, prior] : priors) {
+        if (m.type == MacroType::REPOSITION) repoPrior = prior;
+        if (m.type == MacroType::BLITZ) blitzPrior = prior;
+    }
+    ASSERT_GE(repoPrior, 0.0f);
+    ASSERT_GE(blitzPrior, 0.0f);
+    // At n<=12, raw uniform 1/n >= 0.0833 > 0.08, so the new floor never
+    // binds -- priors must be identical to the pre-patch code (no-op).
+    EXPECT_NEAR(repoPrior / blitzPrior, (1.0f / n) / 0.20f, 1e-4f);
+}
+
+TEST(MacroMCTS, OffensivePriorsUntouchedByDefensiveRebalance) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(1);
+    carrier.id = 1;
+    carrier.teamSide = TeamSide::HOME;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {12, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({12, 7}, 1);
+
+    Player& prone = state.getPlayer(12);
+    prone.id = 12;
+    prone.teamSide = TeamSide::AWAY;
+    prone.state = PlayerState::PRONE;
+    prone.position = {18, 8};
+
+    Player& fouler = state.getPlayer(2);
+    fouler.id = 2;
+    fouler.teamSide = TeamSide::HOME;
+    fouler.state = PlayerState::STANDING;
+    fouler.position = {18, 7};
+    fouler.stats = {6, 3, 3, 8};
+    fouler.movementRemaining = 6;
+
+    Player& free1 = state.getPlayer(3);
+    free1.id = 3;
+    free1.teamSide = TeamSide::HOME;
+    free1.state = PlayerState::STANDING;
+    free1.position = {20, 2};
+    free1.stats = {6, 3, 3, 8};
+    free1.movementRemaining = 6;
+
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg;
+    cfg.policy = &zeroPolicy;
+    cfg.policyBlend = 0.0f;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    auto priors = search.expandRootPriorsForTest(state);
+
+    float repoPrior = -1, foulPrior = -1;
+    for (auto& [m, prior] : priors) {
+        if (m.type == MacroType::REPOSITION) repoPrior = prior;
+        if (m.type == MacroType::FOUL) foulPrior = prior;
+    }
+    ASSERT_GE(repoPrior, 0.0f);
+    ASSERT_GE(foulPrior, 0.0f);
+    // onDef=false -> neither the REPOSITION floor nor the FOUL cap applies;
+    // both stay raw uniform, identical pre- and post-patch.
+    EXPECT_NEAR(repoPrior, foulPrior, 1e-6f);
+}
+
 TEST(MacroMCTS, ChildVisitsRecorded) {
     GameState state = makePlayState();
 

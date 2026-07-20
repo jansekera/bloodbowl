@@ -68,6 +68,13 @@ public:
     double lastBestValue() const { return lastBestValue_; }
     const std::vector<MacroChildVisitInfo>& lastChildVisits() const { return lastChildVisits_; }
 
+    // Test-only: expand a fresh root for `state` and return each child's
+    // (macro, prior) after floor/cap + renorm. Pure wrapper over the private
+    // expand(); exists so the prior floor/cap regime is pinnable by gtest
+    // (2026-07-10 audit: 8/11 shipped prior-floor fixes had zero C++
+    // regression tests).
+    std::vector<std::pair<Macro, float>> expandRootPriorsForTest(const GameState& state);
+
 private:
     MacroMCTSNode* select(MacroMCTSNode* root, TeamSide searchingSide);
     void expand(MacroMCTSNode* node, const GameState& state);

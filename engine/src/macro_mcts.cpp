@@ -384,7 +384,26 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     if (turnsRemaining <= 3) minPrior = 0.35f;
                     break;
                 case MacroType::REPOSITION:
-                    if (onDef) minPrior = 0.05f;
+                    // 2026-07-14/20 (master-list item 10): priors start
+                    // uniform at 1/n, so the old 0.05 floor only ever bound
+                    // at n>=21 candidates -- a near no-op on real defensive
+                    // nodes. 0.08 binds at n>=13 (large defensive nodes,
+                    // where the fixed-Y screen/safety spots plus the
+                    // intercept-lane targets live) and stays a deliberate
+                    // no-op at n<=12 (proposals_item10_prior_floor_validation_20260714.md).
+                    if (onDef) minPrior = 0.08f;
+                    break;
+                case MacroType::FOUL:
+                    // 2026-07-14/20 (item 10): FOUL used to fall through to
+                    // default: -- uncapped, inheriting the full uniform 1/n
+                    // (up to ~0.17 at sparse n=6 nodes), i.e. more prior
+                    // than BLOCK's 0.12 floor guarantees, for a niche
+                    // action that cannot touch the ball. Defensive cap
+                    // mirrors the REPOSITION floor boundary: binds only at
+                    // n<=12. Deliberately onDef-gated: loose-ball FOUL
+                    // overuse is item 7 (PICKUP candidates) territory, not
+                    // rebalanced here.
+                    if (onDef) maxPrior = 0.08f;
                     break;
                 case MacroType::END_TURN:
                     if (priors[i] > 0.10f && n > 2) {
@@ -437,6 +456,16 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
         node->children.push_back(std::move(child));
     }
     node->expanded = true;
+}
+
+std::vector<std::pair<Macro, float>> MacroMCTSSearch::expandRootPriorsForTest(
+        const GameState& state) {
+    MacroMCTSNode root;
+    expand(&root, state);
+    std::vector<std::pair<Macro, float>> out;
+    out.reserve(root.children.size());
+    for (auto& c : root.children) out.emplace_back(c.macro, c.prior);
+    return out;
 }
 
 double MacroMCTSSearch::greedyLookaheadBonus(const GameState& leafState, TeamSide perspective) {
