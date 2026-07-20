@@ -175,6 +175,20 @@ PYBIND11_MODULE(bb_engine, m) {
             return result;
         })
         .def("get_policy_decisions", [](const bb::LoggedGameResult& lgr) {
+            auto playersToList = [](const std::vector<bb::PlayerSnapshot>& players) {
+                py::list out;
+                for (auto& p : players) {
+                    py::dict pd;
+                    pd["id"] = p.id;
+                    pd["x"] = p.x;
+                    pd["y"] = p.y;
+                    pd["state"] = p.state;
+                    pd["has_ball"] = p.hasBall;
+                    out.append(pd);
+                }
+                return out;
+            };
+
             py::list result;
             for (auto& dec : lgr.policyDecisions) {
                 py::dict d;
@@ -190,6 +204,15 @@ PYBIND11_MODULE(bb_engine, m) {
                     visits.append(vd);
                 }
                 d["visits"] = visits;
+
+                // Raw board snapshot at decision time (offline per-player feature research)
+                d["home_players"] = playersToList(dec.board.homePlayers);
+                d["away_players"] = playersToList(dec.board.awayPlayers);
+                d["ball_x"] = dec.board.ballX;
+                d["ball_y"] = dec.board.ballY;
+                d["ball_held"] = dec.board.ballHeld;
+                d["ball_carrier_id"] = dec.board.ballCarrierId;
+
                 result.append(d);
             }
             return result;

@@ -7,6 +7,7 @@
 #include "bb/rules_engine.h"
 #include "bb/feature_extractor.h"
 #include "bb/policies.h"
+#include "bb/board_snapshot.h"
 #include <functional>
 #include <string>
 
@@ -45,15 +46,6 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
 struct StateLog {
     float features[NUM_FEATURES];
     TeamSide perspective;
-};
-
-// Snapshot of a single player for replay
-struct PlayerSnapshot {
-    int id = -1;
-    int8_t x = -1, y = -1;
-    uint8_t state = 0;  // 0=standing, 1=prone, 2=stunned, 3=off
-    bool hasBall = false;
-    std::string name;    // positional name (e.g., "Blitzer")
 };
 
 // Turn-level replay log

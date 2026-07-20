@@ -37,6 +37,7 @@ add_library(bb_engine SHARED
     src/ball_and_chain_handler.cpp
     src/macro_actions.cpp
     src/macro_mcts.cpp
+    src/board_snapshot.cpp
 )
 target_include_directories(bb_engine PUBLIC include third_party)
 

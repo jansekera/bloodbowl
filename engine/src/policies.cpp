@@ -178,6 +178,7 @@ Action MCTSPolicy::operator()(const GameState& state) {
             // Extract state features
             extractFeatures(state, state.activeTeam, decision.stateFeatures);
             decision.perspective = state.activeTeam;
+            decision.board = captureBoardSnapshot(state);
 
             // Compute total visits for fraction calculation
             int totalVisits = 0;

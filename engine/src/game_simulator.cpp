@@ -479,31 +479,14 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     turn.homeScore = state.homeTeam.score;
     turn.awayScore = state.awayTeam.score;
 
-    // Ball state
-    if (state.ball.isOnPitch()) {
-        turn.ballX = state.ball.position.x;
-        turn.ballY = state.ball.position.y;
-    }
-    turn.ballHeld = state.ball.isHeld;
-    turn.ballCarrierId = state.ball.carrierId;
-
-    // Player snapshots
-    auto snapshotTeam = [&](TeamSide side, std::vector<PlayerSnapshot>& out) {
-        state.forEachOnPitch(side, [&](const Player& p) {
-            PlayerSnapshot snap;
-            snap.id = p.id;
-            snap.x = p.position.x;
-            snap.y = p.position.y;
-            if (p.state == PlayerState::STANDING) snap.state = 0;
-            else if (p.state == PlayerState::PRONE) snap.state = 1;
-            else if (p.state == PlayerState::STUNNED) snap.state = 2;
-            else snap.state = 3;
-            snap.hasBall = (state.ball.isHeld && state.ball.carrierId == p.id);
-            out.push_back(snap);
-        });
-    };
-    snapshotTeam(TeamSide::HOME, turn.homePlayers);
-    snapshotTeam(TeamSide::AWAY, turn.awayPlayers);
+    // Board (players + ball) — shared with policy-decision logging
+    BoardSnapshot board = captureBoardSnapshot(state);
+    turn.homePlayers = std::move(board.homePlayers);
+    turn.awayPlayers = std::move(board.awayPlayers);
+    turn.ballX = board.ballX;
+    turn.ballY = board.ballY;
+    turn.ballHeld = board.ballHeld;
+    turn.ballCarrierId = board.ballCarrierId;
 
     return turn;
 }

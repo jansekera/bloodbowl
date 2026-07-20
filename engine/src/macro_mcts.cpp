@@ -786,6 +786,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
             PolicyDecision decision;
             extractFeatures(state, state.activeTeam, decision.stateFeatures);
             decision.perspective = state.activeTeam;
+            decision.board = captureBoardSnapshot(state);
 
             int totalVisits = 0;
             for (auto& cv : childVisits) totalVisits += cv.visits;

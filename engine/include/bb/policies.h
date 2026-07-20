@@ -7,6 +7,7 @@
 #include "bb/value_function.h"
 #include "bb/feature_extractor.h"
 #include "bb/action_features.h"
+#include "bb/board_snapshot.h"
 
 namespace bb {
 
@@ -29,6 +30,7 @@ struct PolicyDecision {
         float visitFraction;
     };
     std::vector<ActionVisit> visits;  // top-K visited actions
+    BoardSnapshot board;  // raw per-player state at decision time (offline feature research)
 };
 
 // MCTS-powered selection with optional decision logging
