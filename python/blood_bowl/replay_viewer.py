@@ -29,6 +29,7 @@ EVENT_ICONS = {
     'CATCH': '🤲',
     'PICKUP': '⬆',
     'FOUL': '🦶',
+    'EJECTED': '🟥',
     'KNOCKED_DOWN': '⬇',
     'ARMOR_BREAK': '💥',
     'CASUALTY': '☠',

@@ -37,6 +37,18 @@ LR = 0.0003
 # v epochách 6, 7, 10 (oba avg VF pozitivní = MCTS dostával špatný signál). Vráceno na 0.0.
 VF_BLEND = 0.0
 VF_RAMP_EPOCHS = 10
+# GATE_VF_BLEND (2026-07-21): gate (anti-regression, gate_tasks below) dosud
+# běžel na VF_BLEND=0.0 sdíleném s tréninkem -- macro_mcts.cpp:738 přeskočí
+# valueFn_ úplně, když vfBlend<=0, takže gate NEMOHL ocenit rozdíl mezi
+# natrénovanými váhami kandidáta a zamrzlého nejlepšího (ověřeno
+# diag_null_weights.py, project_bloodbowl_gate_vf_blend_gap_20260721).
+# Navrženo už 09.07. (research_fable_20260709.md), nikdy nenasazeno -- teď
+# doplněno jako SAMOSTATNÁ konstanta jen pro gate; VF_BLEND (trénink) a
+# _run_benchmark zůstávají beze změny (0.0), viz plán v paměti. 0.15 = stejná
+# hodnota, jakou projekt už dřív používal jako "on" testovací arm pro
+# vf_blend bring-up (arm_vfb*015* soubory) -- konzervativní start, ne nový
+# odhad naslepo.
+GATE_VF_BLEND = float(os.environ.get('BB_GATE_VF_BLEND', 0.15))
 GATING_MATCHES = 600  # bumped 400→600 (2026-06-15): chess gate is decisive-only,
                       # ~75% her končí remízou → víc her = víc rozhodnutých = míň šumu
 BM_DROP_LIMIT = 0.05
@@ -506,7 +518,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
-        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, VF_BLEND, TV,
+        (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
          False, gate_policy_path, i % 2 == 1)   # sudé i: cand=HOME, liché: cand=AWAY
         for i in range(GATING_MATCHES)
     ]

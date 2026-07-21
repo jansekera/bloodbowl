@@ -10,7 +10,10 @@ struct GameEvent {
         PLAYER_MOVE, DODGE, GFI, BLOCK, PUSH, INJURY,
         TOUCHDOWN, TURNOVER, BALL_BOUNCE, PASS, CATCH,
         PICKUP, FOUL, KICKOFF, WEATHER_CHANGE, SKILL_USED,
-        KNOCKED_DOWN, ARMOR_BREAK, CASUALTY, REGENERATION
+        KNOCKED_DOWN, ARMOR_BREAK, CASUALTY, REGENERATION,
+        EJECTED  // 2026-07-21: fouler sent off on doubles -- previously
+                 // reused INJURY, ambiguous in raw event logs (see
+                 // evidence/foul_success_field_bug_20260721.md)
     };
 
     Type type;

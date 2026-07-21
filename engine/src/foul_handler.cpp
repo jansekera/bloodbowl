@@ -33,10 +33,10 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     int armourRoll = die1 + die2 + assistMod;
     bool isDoubles = (die1 == die2);
 
-    emitEvent(events, {GameEvent::Type::FOUL, fouler.id, target.id,
-                      fouler.position, target.position, armourRoll, true});
-
     bool armourBroken = (armourRoll > target.stats.armour);
+
+    emitEvent(events, {GameEvent::Type::FOUL, fouler.id, target.id,
+                      fouler.position, target.position, armourRoll, armourBroken});
 
     if (armourBroken) {
         emitEvent(events, {GameEvent::Type::ARMOR_BREAK, target.id, -1,
@@ -93,8 +93,8 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
             fouler.state = PlayerState::EJECTED;
             fouler.position = {-1, -1};
             handleBallOnPlayerDown(state, fouler.id, dice, events);
-            emitEvent(events, {GameEvent::Type::INJURY, fouler.id, -1, {}, {},
-                              0, false}); // ejection event
+            emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},
+                              0, false});
         }
     }
 

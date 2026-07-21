@@ -224,7 +224,8 @@ PYBIND11_MODULE(bb_engine, m) {
                 "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
                 "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
                 "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
-                "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION"
+                "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
+                "EJECTED"
             };
             for (auto& turn : lgr.turnLogs) {
                 py::dict t;
@@ -268,7 +269,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 for (auto& ev : turn.events) {
                     py::dict ed;
                     int typeIdx = static_cast<int>(ev.type);
-                    ed["type"] = (typeIdx < 20) ? eventNames[typeIdx] : "UNKNOWN";
+                    ed["type"] = (typeIdx < 21) ? eventNames[typeIdx] : "UNKNOWN";
                     ed["player_id"] = ev.playerId;
                     ed["target_id"] = ev.targetId;
                     ed["from_x"] = ev.from.x;
