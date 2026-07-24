@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include "bb/foul_handler.h"
 #include "bb/helpers.h"
 
@@ -105,4 +106,47 @@ TEST(FoulHandler, FoulOnStandingFails) {
     FixedDiceRoller dice({});
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_FALSE(result.success);
+}
+
+TEST(FoulHandler, FoulEmitsInjuryEvent) {
+    // 2026-07-24 (item 3.6): FOUL used to reimplement injury resolution
+    // inline and never emit an INJURY event, unlike every other injury-
+    // causing path (BLOCK, bomb, ball-and-chain). Now delegates to the
+    // shared resolveInjuryRoll helper -- assert the event actually shows up.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    // Armor: 5+4=9 > 8, broken. Injury: 3+3=6 → stunned.
+    FixedDiceRoller dice({5, 4, 3, 3});
+    std::vector<GameEvent> events;
+    auto result = resolveFoul(gs, 1, 12, dice, &events);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+    auto it = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::INJURY;
+    });
+    ASSERT_NE(it, events.end());
+    EXPECT_EQ(it->playerId, 12);
+    EXPECT_EQ(it->roll, 6);
+}
+
+TEST(FoulHandler, FoulDecayTakesWorseRoll) {
+    // 2026-07-24 (item 3.6): the InjuryContext built for FOUL always set
+    // hasDecay from the target's skills, but the old inline reimplementation
+    // never passed ctx anywhere -- Decay was silently inert on FOUL-caused
+    // injuries. Mirrors Injury.DecayTakesWorseRoll (test_injury.cpp) but
+    // through resolveFoul, to confirm the shared-helper delegation actually
+    // wires it up.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.getPlayer(12).skills.add(SkillName::Decay);
+    // Armor: 5+4=9 > 8, broken. Injury roll 1: 3+3=6 (stunned).
+    // Decay roll 2: 5+4=9 (KO). Takes worse: 9 → KO.
+    FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
 }

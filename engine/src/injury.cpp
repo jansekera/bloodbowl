@@ -4,8 +4,8 @@
 
 namespace bb {
 
-static int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
-                             const InjuryContext& ctx, std::vector<GameEvent>* events) {
+int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
+                      const InjuryContext& ctx, std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
 
     int injuryRoll = dice.roll2D6() + ctx.injuryModifier;

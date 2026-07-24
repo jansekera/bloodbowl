@@ -42,47 +42,20 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         emitEvent(events, {GameEvent::Type::ARMOR_BREAK, target.id, -1,
                           target.position, {}, armourRoll, true});
 
-        // Injury roll
+        // Injury roll -- delegate to the shared helper (also used by
+        // BLOCK/bomb/ball-and-chain) instead of the previous inline
+        // reimplementation, which built this same InjuryContext but never
+        // actually passed it anywhere: Decay was silently inert on FOUL-
+        // caused injuries (no roll-twice-take-worse), and no INJURY/
+        // CASUALTY/SKILL_USED/REGENERATION event was ever emitted, unlike
+        // every other injury-causing path (see
+        // project_bloodbowl_why_not_beating_frozen_20260723, item 3.6).
         InjuryContext ctx;
         ctx.armourModifier = 0; // already applied to armor roll
         if (target.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
         if (fouler.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
 
-        int injuryRoll = dice.roll2D6();
-
-        // Stunty: +1 to injury
-        if (target.hasSkill(SkillName::Stunty)) injuryRoll += 1;
-
-        if (injuryRoll <= 7) {
-            target.state = PlayerState::STUNNED;
-        } else if (injuryRoll <= 9) {
-            if (target.hasSkill(SkillName::ThickSkull)) {
-                int tsRoll = dice.rollD6();
-                if (tsRoll >= 4) {
-                    target.state = PlayerState::STUNNED;
-                } else {
-                    target.state = PlayerState::KO;
-                    target.position = {-1, -1};
-                }
-            } else {
-                target.state = PlayerState::KO;
-                target.position = {-1, -1};
-            }
-        } else {
-            // Casualty
-            if (target.hasSkill(SkillName::Regeneration) && !ctx.hasStakes) {
-                int regenRoll = dice.rollD6();
-                if (regenRoll >= 4) {
-                    target.state = PlayerState::STUNNED;
-                } else {
-                    target.state = PlayerState::INJURED;
-                    target.position = {-1, -1};
-                }
-            } else {
-                target.state = PlayerState::INJURED;
-                target.position = {-1, -1};
-            }
-        }
+        resolveInjuryRoll(state, target.id, dice, ctx, events);
 
         handleBallOnPlayerDown(state, target.id, dice, events);
     }
