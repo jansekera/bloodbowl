@@ -129,6 +129,16 @@ TEST(FoulHandler, FoulEmitsInjuryEvent) {
     ASSERT_NE(it, events.end());
     EXPECT_EQ(it->playerId, 12);
     EXPECT_EQ(it->roll, 6);
+    EXPECT_EQ(it->die1, 3);
+    EXPECT_EQ(it->die2, 3);
+
+    // FOUL and ARMOR_BREAK events also carry the individual armour dice.
+    auto foulEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::FOUL;
+    });
+    ASSERT_NE(foulEvt, events.end());
+    EXPECT_EQ(foulEvt->die1, 5);
+    EXPECT_EQ(foulEvt->die2, 4);
 }
 
 TEST(FoulHandler, FoulDecayTakesWorseRoll) {

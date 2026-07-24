@@ -278,6 +278,8 @@ PYBIND11_MODULE(bb_engine, m) {
                     ed["to_y"] = ev.to.y;
                     ed["roll"] = ev.roll;
                     ed["success"] = ev.success;
+                    ed["die1"] = ev.die1;
+                    ed["die2"] = ev.die2;
                     events.append(ed);
                 }
                 t["events"] = events;
@@ -312,7 +314,9 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("from_pos", &bb::GameEvent::from)
         .def_readwrite("to_pos", &bb::GameEvent::to)
         .def_readwrite("roll", &bb::GameEvent::roll)
-        .def_readwrite("success", &bb::GameEvent::success);
+        .def_readwrite("success", &bb::GameEvent::success)
+        .def_readwrite("die1", &bb::GameEvent::die1)
+        .def_readwrite("die2", &bb::GameEvent::die2);
 
     // --- Free functions ---
     m.def("get_available_actions", [](const bb::GameState& state) {

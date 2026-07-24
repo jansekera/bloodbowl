@@ -36,11 +36,12 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     bool armourBroken = (armourRoll > target.stats.armour);
 
     emitEvent(events, {GameEvent::Type::FOUL, fouler.id, target.id,
-                      fouler.position, target.position, armourRoll, armourBroken});
+                      fouler.position, target.position, armourRoll, armourBroken,
+                      die1, die2});
 
     if (armourBroken) {
         emitEvent(events, {GameEvent::Type::ARMOR_BREAK, target.id, -1,
-                          target.position, {}, armourRoll, true});
+                          target.position, {}, armourRoll, true, die1, die2});
 
         // Injury roll -- delegate to the shared helper (also used by
         // BLOCK/bomb/ball-and-chain) instead of the previous inline

@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include "bb/injury.h"
 #include "bb/helpers.h"
 
@@ -36,6 +37,62 @@ TEST(Injury, ArmourBrokenStunned) {
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+}
+
+TEST(Injury, EventsCarryIndividualDice) {
+    // 2026-07-24 (item 3.6): `roll` alone can't tell an unmodified 2d6
+    // result apart from a modified one during forensic replay analysis --
+    // ARMOR_BREAK/INJURY events now also carry the individual d6 faces.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    // AV8: 5+4=9 > 8, broken. Injury: 2+3=5 ≤ 7 → stunned
+    FixedDiceRoller dice({5, 4, 2, 3});
+    InjuryContext ctx;
+    std::vector<GameEvent> events;
+    bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, &events);
+    ASSERT_TRUE(broken);
+
+    auto armorEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::ARMOR_BREAK;
+    });
+    ASSERT_NE(armorEvt, events.end());
+    EXPECT_EQ(armorEvt->die1, 5);
+    EXPECT_EQ(armorEvt->die2, 4);
+
+    auto injuryEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::INJURY;
+    });
+    ASSERT_NE(injuryEvt, events.end());
+    EXPECT_EQ(injuryEvt->die1, 2);
+    EXPECT_EQ(injuryEvt->die2, 3);
+}
+
+TEST(Injury, DecayEventDiceMatchWinningRoll) {
+    // Decay rolls injury twice and takes the worse -- die1/die2 on the
+    // emitted event must reflect whichever roll actually won, not always
+    // the first attempt.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::Decay);
+    // Armor: 5+4=9. Injury roll 1: 3+3=6 (stunned). Decay roll 2: 5+4=9 (KO).
+    // Takes worse: 9 → KO, dice should be the SECOND roll's (5, 4).
+    FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
+    InjuryContext ctx;
+    ctx.hasDecay = true;
+    std::vector<GameEvent> events;
+    bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, &events);
+    ASSERT_TRUE(broken);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+
+    auto injuryEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::INJURY;
+    });
+    ASSERT_NE(injuryEvt, events.end());
+    EXPECT_EQ(injuryEvt->roll, 9);
+    EXPECT_EQ(injuryEvt->die1, 5);
+    EXPECT_EQ(injuryEvt->die2, 4);
 }
 
 TEST(Injury, ArmourBrokenKO) {
