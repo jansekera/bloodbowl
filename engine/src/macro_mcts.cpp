@@ -363,7 +363,20 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     minPrior = trailing2plus ? 0.15f : 0.12f;
                     break;
                 case MacroType::BLITZ:
-                    if (onDef) minPrior = 0.20f;
+                    // 2026-07-23 (item 6): offense side had NO floor at all,
+                    // same starvation mechanism as the 2026-07-16 ADVANCE fix
+                    // -- BLITZ could rank top-2 one-ply Q and still get
+                    // starved of MCTS visits. Diagnosed and floor value
+                    // chosen empirically (scratchpad/blitz_floor_20260723/,
+                    // 400-seed harness across 8 real offensive states):
+                    // mirroring defense's 0.20 unconditionally OVERSHOOTS,
+                    // flipping BLITZ from under- to over-selected (78-99%
+                    // chosen at Q-rank 8-18 in low-quality states). 0.12 --
+                    // parity with BLOCK/CAGE/ADVANCE's existing floors --
+                    // closes the starvation gap (floor-gap symptom 3-4/8
+                    // states down to 1/8) while preserving Q-rank ordering.
+                    // Defense keeps its stronger, previously-validated 0.20.
+                    minPrior = onDef ? 0.20f : 0.12f;
                     break;
                 case MacroType::BLOCK:
                     minPrior = 0.12f;
