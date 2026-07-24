@@ -53,6 +53,12 @@ GATING_MATCHES = 600  # bumped 400→600 (2026-06-15): chess gate is decisive-on
                       # ~75% her končí remízou → víc her = víc rozhodnutých = míň šumu
 BM_DROP_LIMIT = 0.05
 BM_FLOOR = 0.77
+# SELECTION_H2H_MATCHES (2026-07-24, item 3.5): direct az_train-vs-train_best
+# head-to-head match count for picking which candidate proceeds to the real
+# gate. 150 = the N already empirically exercised in
+# diag_item35_selection_pathA_20260724.py (project_bloodbowl_item35_selection_progress_20260724),
+# not a fresh guess.
+SELECTION_H2H_MATCHES = 150
 
 # Smoke-test přepisy přes env (defaulty pro normální běh beze změny).
 EPOCHS = int(os.environ.get('BB_EPOCHS', EPOCHS))
@@ -60,6 +66,7 @@ GAMES_PER_EPOCH = int(os.environ.get('BB_GAMES', GAMES_PER_EPOCH))
 MCTS_ITERATIONS = int(os.environ.get('BB_MCTS', MCTS_ITERATIONS))
 BENCHMARK_MATCHES = int(os.environ.get('BB_BM', BENCHMARK_MATCHES))
 GATING_MATCHES = int(os.environ.get('BB_GATE', GATING_MATCHES))
+SELECTION_H2H_MATCHES = int(os.environ.get('BB_SELECTION_H2H', SELECTION_H2H_MATCHES))
 # Team1 v2 validation knobs (defaulty = původní chování beze změny):
 VF_BLEND = float(os.environ.get('BB_VF_BLEND', VF_BLEND))
 POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
@@ -462,8 +469,28 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
     _stash_policy(az_train_path, policy_cache_path)
 
-    # Step 3: Benchmark az_train (final epoch) AND train_best (best self-play epoch),
-    # then gate on whichever scores higher vs random. Each gets BENCHMARK_MATCHES/2 games.
+    # Step 3: pick which trained candidate (az_train = final epoch, train_best =
+    # best self-play epoch) proceeds to the real HtH gate below.
+    #
+    # 2026-07-24 (item 3.5, project_bloodbowl_candidate_selection_saturated_20260723):
+    # selection USED to be "whichever scores higher vs a random opponent"
+    # (_run_benchmark below) -- but that vs-random score saturates at 93-97%
+    # regardless of true relative strength (all 4 iterations of
+    # training_gatefix_20260722.log landed in that band despite the internally-
+    # best epoch bouncing 11/1/16/1). Empirically confirmed non-discriminating:
+    # a direct az_train-vs-train_best head-to-head on iteration 4's actual
+    # candidate pair was a statistical toss-up (45W/38W/67D of 150, 52.3% incl.
+    # half-draws, well inside noise) despite the vs-random filter reporting a
+    # confident-looking 94.5% vs 93.0% split
+    # (diag_item35_selection_pathA_20260724.py,
+    # project_bloodbowl_item35_selection_progress_20260724). Selection now uses
+    # a direct H2H (same _gate_game mechanism as the real anti-regression gate
+    # below: GATE_VF_BLEND, policy priors, side-swapped) to pick the winner.
+    # The vs-random benchmark is KEPT, unchanged, for its separate role:
+    # new_bm (the winner's vs-random score) still feeds the cross-iteration
+    # regression-sanity checks further down (BM_DROP_LIMIT/BM_FLOOR/
+    # all_time_best_bm, all calibrated on that vs-random scale) -- only the
+    # SELECTOR changed, not the sanity-metric.
     print('\n=== Gating ===', flush=True)
     init_args = (str(engine_build), str(python_src))
     half_bm = BENCHMARK_MATCHES // 2
@@ -504,14 +531,47 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     if not (az_complete and tb_complete):
         abort_promote.append('benchmark incomplete (engine hang? — viz WATCHDOG výše)')
 
-    if bm_tb > bm_az:
-        gate_path = train_best_path
-        new_bm = bm_tb
-        gate_label = f'train_best ({new_bm:.1%}) > az_train ({bm_az:.1%})'
+    if train_best_path.exists():
+        h2h_tasks = [
+            (random.randint(1, 999999), i, str(az_train_path), str(train_best_path),
+             MCTS_ITERATIONS, GATE_VF_BLEND, TV, False, gate_policy_path, i % 2 == 1)
+            for i in range(SELECTION_H2H_MATCHES)
+        ]
+        print(f'Selection H2H: az_train vs train_best, {SELECTION_H2H_MATCHES} games '
+              f'({WORKERS} workers)...', flush=True)
+        az_w = tb_w = h2h_draws = 0
+        with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
+            for cs, fs, _side in _imap_watchdog(pool, _gate_game, h2h_tasks, 'Selection H2H',
+                                                mcts_iterations=MCTS_ITERATIONS):
+                if cs > fs:
+                    az_w += 1
+                elif cs == fs:
+                    h2h_draws += 1
+                else:
+                    tb_w += 1
+                done = az_w + tb_w + h2h_draws
+                if done % 20 == 0 or done == SELECTION_H2H_MATCHES:
+                    print(f'  Selection H2H {done}/{SELECTION_H2H_MATCHES}: '
+                          f'az_train {az_w}W train_best {tb_w}W {h2h_draws}D', flush=True)
+        h2h_done = az_w + tb_w + h2h_draws
+        max_h2h_skip = max(1, int(SELECTION_H2H_MATCHES * MAX_SKIP_FRAC))
+        if (SELECTION_H2H_MATCHES - h2h_done) > max_h2h_skip:
+            abort_promote.append('selection H2H incomplete (engine hang? — viz WATCHDOG výše)')
+
+        if tb_w > az_w:
+            gate_path = train_best_path
+            new_bm = bm_tb
+            gate_label = (f'train_best (H2H {tb_w}W/{az_w}W/{h2h_draws}D, '
+                          f'benchmark {bm_tb:.1%}) > az_train (benchmark {bm_az:.1%})')
+        else:
+            gate_path = az_train_path
+            new_bm = bm_az
+            gate_label = (f'az_train (H2H {az_w}W/{tb_w}W/{h2h_draws}D, '
+                          f'benchmark {bm_az:.1%}) >= train_best (benchmark {bm_tb:.1%})')
     else:
         gate_path = az_train_path
         new_bm = bm_az
-        gate_label = f'az_train ({new_bm:.1%}) >= train_best ({bm_tb:.1%})'
+        gate_label = f'az_train ({new_bm:.1%}) — train_best unavailable'
 
     print(f'Gating on: {gate_label}', flush=True)
     print(f'Benchmark: new={new_bm:.1%}  best={frozen_bm:.1%}  all_time_best={all_time_best_bm:.1%}  (max pokles {BM_DROP_LIMIT:.0%})', flush=True)
