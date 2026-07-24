@@ -145,6 +145,30 @@ MAX_SKIP_FRAC = 0.02
 PROJECT_ROOT = Path(__file__).parent.resolve()
 
 
+def _wilson_ci(wins: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for a binomial proportion (default 95% two-sided).
+
+    2026-07-24 (item 3.6, project_bloodbowl_why_not_beating_frozen_20260723):
+    the gate previously only ever reported a point estimate (chess_score)
+    against a threshold -- no interval, so there was no way to see directly
+    how much an observed rate like 43.2% could plausibly vary. Wilson is
+    preferred over a fixed-null normal approximation (the sigma used for the
+    ACCEPT THRESHOLD below, which deliberately assumes p=0.5 for computing
+    noise) because it stays well-behaved away from 50% and at small n --
+    but this function is purely a REPORTING addition. It does not feed the
+    accept/reject decision; the k/sigma threshold logic is unchanged (that
+    would require a decision about what confidence level the gate SHOULD
+    require, flagged in memory as its own conversation, not assumed here).
+    """
+    if n <= 0:
+        return (0.0, 1.0)
+    p = wins / n
+    denom = 1.0 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return (max(0.0, center - margin), min(1.0, center + margin))
+
+
 def _atomic_write_json(path: Path, obj) -> None:
     """Write JSON via temp file + os.replace so a kill mid-write can't leave a
     truncated/corrupt file (the corrupt-meta feeder behind the abort path)."""
@@ -609,8 +633,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # jen rozhodnuté hry → statistická síla. Remízy nenesou signál o síle modelu.
     decisive = wins + losses
     chess_score = wins / decisive if decisive else 0.5
+    ci_lo, ci_hi = _wilson_ci(wins, decisive)
     print(f'New vs Frozen: {wins}W {draws}D {losses}L = {chess_score:.1%} decisive '
           f'({decisive} decisive / {total} games)', flush=True)
+    print(f'  95% CI (Wilson): [{ci_lo:.1%}, {ci_hi:.1%}]  '
+          f'(reporting only -- accept threshold below is unchanged)', flush=True)
     hW, hD, hL = arm[0]; aW, aD, aL = arm[1]
     home_slot_wins = hW + aL          # výhry HOME slotu bez ohledu na to, kdo v něm sedí
     hs_dec = hW + hL + aW + aL
