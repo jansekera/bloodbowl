@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import math
 import os
@@ -167,6 +168,23 @@ def _wilson_ci(wins: int, n: int, z: float = 1.96) -> tuple[float, float]:
     center = (p + z * z / (2 * n)) / denom
     margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
     return (max(0.0, center - margin), min(1.0, center + margin))
+
+
+def _append_gate_history(record: dict) -> None:
+    """Append one JSON line to gate_history.jsonl (item 3.6).
+
+    project_bloodbowl_why_not_beating_frozen_20260723: iteration results
+    previously lived only in free-text .log files, requiring hand-parsing
+    for every cross-iteration "why aren't we learning" analysis (done
+    manually multiple times in this project's history). One line per
+    iteration, append-only, never rewritten -- safe to append from a live
+    run without corrupting prior history if interrupted mid-iteration
+    (worst case: the current line is simply missing, not truncated, since
+    it's only written once fully formed).
+    """
+    path = PROJECT_ROOT / 'gate_history.jsonl'
+    with open(path, 'a') as f:
+        f.write(json.dumps(record) + '\n')
 
 
 def _atomic_write_json(path: Path, obj) -> None:
@@ -593,6 +611,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             gate_label = (f'az_train (H2H {az_w}W/{tb_w}W/{h2h_draws}D, '
                           f'benchmark {bm_az:.1%}) >= train_best (benchmark {bm_tb:.1%})')
     else:
+        az_w = tb_w = h2h_draws = 0
         gate_path = az_train_path
         new_bm = bm_az
         gate_label = f'az_train ({new_bm:.1%}) — train_best unavailable'
@@ -721,6 +740,27 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     else:
         shutil.copy2(str(frozen_path), str(best_path))
         print(f'REJECTED: {"; ".join(reasons)}', flush=True)
+
+    _append_gate_history({
+        'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'tv': TV,
+        'mcts_iterations': MCTS_ITERATIONS,
+        'selection': {'winner': gate_path.stem.replace('weights_', ''),
+                      'az_train_wins': az_w, 'train_best_wins': tb_w, 'draws': h2h_draws},
+        'benchmark_vs_random': {'az_train': bm_az, 'train_best': bm_tb, 'winner': new_bm},
+        'anti_regression_gate': {
+            'wins': wins, 'draws': draws, 'losses': losses,
+            'decisive': decisive, 'total': total,
+            'chess_score': chess_score,
+            'wilson_ci_95': [ci_lo, ci_hi],
+        },
+        'threshold': {'k': k, 'tier': tier, 'required': required, 'sigma': sigma},
+        'frozen_bm': frozen_bm,
+        'all_time_best_bm': all_time_best_bm,
+        'baseline_reset': baseline_reset,
+        'promote': promote,
+        'reasons': reasons,
+    })
 
     # Step 6: Git push
     if no_push:
