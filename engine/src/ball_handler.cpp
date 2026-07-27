@@ -73,13 +73,19 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
         return;
     }
 
-    // Check if a standing player is at dest
+    // Check if a player is at dest
     const Player* p = state.getPlayerAtPosition(dest);
-    if (p && canAct(p->state)) {
-        // Attempt catch (no modifier for bounced ball)
+    if (p) {
         state.ball = BallState::onGround(dest);
-        bool caught = resolveCatch(state, p->id, dice, 0, events);
-        if (!caught) {
+        if (canAct(p->state)) {
+            // Attempt catch (no modifier for bounced ball)
+            bool caught = resolveCatch(state, p->id, dice, 0, events);
+            if (!caught) {
+                resolveBounce(state, dest, dice, depth + 1, events);
+            }
+        } else {
+            // Prone/stunned players can't attempt a catch -- automatic
+            // fail, ball keeps bouncing rather than resting on them.
             resolveBounce(state, dest, dice, depth + 1, events);
         }
     } else {

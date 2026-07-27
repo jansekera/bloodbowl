@@ -139,6 +139,32 @@ TEST(BallHandler, HandleBallOnPlayerDown) {
     EXPECT_EQ(gs.ball.position, (Position{11, 7}));
 }
 
+TEST(BallHandler, BounceOffPronePlayerContinues) {
+    GameState gs;
+    placePlayer(gs, 1, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    // Bounce -> (11,7), a prone player -- no catch attempt (automatic
+    // fail), ball keeps bouncing. Second bounce: D8=3 -> (12,7), empty.
+    FixedDiceRoller dice({3, 3});
+    resolveBounce(gs, {10, 7}, dice, 0, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{12, 7}));
+}
+
+TEST(BallHandler, BounceChainsThroughMultiplePronePlayers) {
+    GameState gs;
+    placePlayer(gs, 1, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 2, {12, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+    // Bounce -> (11,7) prone, -> (12,7) prone, -> (13,7) empty. Each
+    // D8=3 (East).
+    FixedDiceRoller dice({3, 3, 3});
+    resolveBounce(gs, {10, 7}, dice, 0, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{13, 7}));
+}
+
 TEST(BallHandler, HandleBallOnPlayerDownFallsOnLooseBall) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
