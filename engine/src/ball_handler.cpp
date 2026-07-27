@@ -10,6 +10,7 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
     if (player.hasSkill(SkillName::NoHands)) {
         emitEvent(events, {GameEvent::Type::PICKUP, playerId, -1, player.position, {},
                           0, false});
+        resolveBounce(state, player.position, dice, 0, events);
         return false;
     }
 
@@ -22,6 +23,8 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
 
     if (success) {
         state.ball = BallState::carried(player.position, playerId);
+    } else {
+        resolveBounce(state, player.position, dice, 0, events);
     }
     return success;
 }
@@ -194,12 +197,19 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
 
 void handleBallOnPlayerDown(GameState& state, int playerId, DiceRollerBase& dice,
                             std::vector<GameEvent>* events) {
-    if (!state.ball.isHeld || state.ball.carrierId != playerId) return;
-
-    // Ball drops at player's position and bounces
     Position pos = state.getPlayer(playerId).position;
-    state.ball = BallState::onGround(pos);
-    resolveBounce(state, pos, dice, 0, events);
+
+    if (state.ball.isHeld && state.ball.carrierId == playerId) {
+        // Ball drops at player's position and bounces
+        state.ball = BallState::onGround(pos);
+        resolveBounce(state, pos, dice, 0, events);
+        return;
+    }
+
+    if (!state.ball.isHeld && pos.isOnPitch() && state.ball.position == pos) {
+        // Player fell onto a loose ball -- it scatters from under them
+        resolveBounce(state, pos, dice, 0, events);
+    }
 }
 
 } // namespace bb

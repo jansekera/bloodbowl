@@ -151,6 +151,9 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
             // Move chain-pushed player
             if (state.ball.isHeld && state.ball.carrierId == occupant->id) {
                 state.ball.position = chainDest;
+            } else if (!state.ball.isHeld && state.ball.position == chainDest) {
+                // Pushed onto a loose ball -- it scatters, no catch attempt/turnover
+                resolveBounce(state, chainDest, dice, 0, events);
             }
             occupant->position = chainDest;
         }
@@ -169,6 +172,9 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     defender.position = pushDest;
     if (state.ball.isHeld && state.ball.carrierId == defender.id) {
         state.ball.position = pushDest;
+    } else if (!state.ball.isHeld && state.ball.position == pushDest) {
+        // Pushed onto a loose ball -- it scatters, no catch attempt/turnover
+        resolveBounce(state, pushDest, dice, 0, events);
     }
 
     return false;

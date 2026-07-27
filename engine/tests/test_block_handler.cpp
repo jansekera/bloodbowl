@@ -114,6 +114,44 @@ TEST(BlockHandler, PushbackBasic) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
 }
 
+TEST(BlockHandler, PushOntoLooseBallBounces) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({12, 7});
+    // Roll PUSHED (D6=3). Pushed east onto the loose ball at (12,7) -- it
+    // scatters (D8=3 -> East -> (13,7)); no catch attempt, no turnover.
+    FixedDiceRoller dice({3, 3});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{13, 7}));
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BlockHandler, ChainPushOntoLooseBallBounces) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    // All 3 of the defender's primary pushback squares occupied, so the
+    // default "prefer empty" logic falls through to pushSquares[0]=(12,7)
+    // -- forcing the chain push.
+    placePlayer(gs, 13, {12, 7}, TeamSide::AWAY); // chain-push occupant
+    placePlayer(gs, 14, {12, 8}, TeamSide::AWAY);
+    placePlayer(gs, 15, {12, 6}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({13, 7});
+    // Roll PUSHED (D6=3). Defender pushed east into the occupant's square;
+    // occupant chain-pushed further east onto the loose ball at (13,7) --
+    // it scatters (D8=3 -> East -> (14,7)).
+    FixedDiceRoller dice({3, 3});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{13, 7}));
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{14, 7}));
+}
+
 TEST(BlockHandler, CrowdSurf) {
     GameState gs;
     placePlayer(gs, 1, {24, 7}, TeamSide::HOME);
