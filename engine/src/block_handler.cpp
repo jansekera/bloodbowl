@@ -448,6 +448,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 att.position = defOldPos;
                 if (state.ball.isHeld && state.ball.carrierId == att.id) {
                     state.ball.position = att.position;
+                } else if (!state.ball.isHeld && state.ball.position == att.position) {
+                    // Following up onto a loose ball attempts a pickup,
+                    // same as deliberately moving onto one.
+                    if (!resolvePickup(state, att.id, dice, events)) {
+                        turnover = true;
+                    }
                 }
             }
             att.hasActed = true;
@@ -481,6 +487,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             att.position = defOldPos;
             if (state.ball.isHeld && state.ball.carrierId == att.id) {
                 state.ball.position = att.position;
+            } else if (!state.ball.isHeld && state.ball.position == att.position) {
+                // Following up onto a loose ball attempts a pickup, same
+                // as deliberately moving onto one.
+                if (!resolvePickup(state, att.id, dice, events)) {
+                    turnover = true;
+                }
             }
         }
 

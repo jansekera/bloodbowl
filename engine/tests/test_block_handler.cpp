@@ -152,6 +152,41 @@ TEST(BlockHandler, ChainPushOntoLooseBallBounces) {
     EXPECT_EQ(gs.ball.position, (Position{14, 7}));
 }
 
+TEST(BlockHandler, FollowUpOntoLooseBallPicksUp) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({11, 7}); // defender stands on a loose ball
+    // Roll PUSHED (D6=3). Defender pushed east to (12,7); the ball wasn't
+    // carried, so it stays at (11,7). Attacker follows up onto (11,7) and
+    // attempts a pickup: AG3 target 3, roll 4 -> success.
+    FixedDiceRoller dice({3, 4});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BlockHandler, FollowUpOntoLooseBallFailedPickupTurnsOver) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({11, 7});
+    // Roll PUSHED (D6=3). Follow-up pickup fails (roll 2), ball bounces
+    // (D8=3 -> East -> (12,7)) instead of resting under the attacker --
+    // and (12,7) is exactly where the pushed defender now stands, who
+    // then attempts (and makes, AG3 target 4, roll 5) the catch.
+    FixedDiceRoller dice({3, 2, 3, 5});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 12);
+    EXPECT_TRUE(result.turnover);
+}
+
 TEST(BlockHandler, CrowdSurf) {
     GameState gs;
     placePlayer(gs, 1, {24, 7}, TeamSide::HOME);

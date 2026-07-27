@@ -54,8 +54,11 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
 
 void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
                    int depth, std::vector<GameEvent>* events) {
-    if (depth > 5) {
-        // Ball stays on ground at from
+    if (depth > 200) {
+        // Pathological chain (e.g. a dense ring of prone/failed-catch
+        // players) -- this is purely a recursion-safety valve, not a
+        // realistic gameplay limit; real dice make a chain anywhere near
+        // this long vanishingly unlikely.
         state.ball = BallState::onGround(from);
         return;
     }
