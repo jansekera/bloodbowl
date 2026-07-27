@@ -187,6 +187,25 @@ TEST(BlockHandler, FollowUpOntoLooseBallFailedPickupTurnsOver) {
     EXPECT_TRUE(result.turnover);
 }
 
+TEST(BlockHandler, KnockdownBounceCanLandOnFollowedUpAttacker) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 7}, 12);
+    // Roll DEFENDER_DOWN (D6=6): defender pushed to (12,7) and knocked
+    // down. Armor: 3+3=6, not broken (no injury roll). The attacker
+    // follows up into (11,7) -- the defender's vacated square -- BEFORE
+    // the knockdown code runs and drops+bounces the ball from (12,7):
+    // D8=7 -> West -> lands right back on (11,7), where the attacker now
+    // stands. AG3 target 4, roll 5 -> catch succeeds.
+    FixedDiceRoller dice({6, 3, 3, 7, 5});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}
+
 TEST(BlockHandler, CrowdSurf) {
     GameState gs;
     placePlayer(gs, 1, {24, 7}, TeamSide::HOME);
