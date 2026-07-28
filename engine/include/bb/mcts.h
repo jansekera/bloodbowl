@@ -25,6 +25,7 @@ struct MCTSConfig {
     float vfBlend = 0.0f;         // Blend VF with heuristic eval: 0.0 = heuristic only, 1.0 = VF only
     int nRollouts = 1;            // Rollouts averaged per leaf eval (open-loop): >1 cuts macro Q-variance ~sqrt(K)
     bool leafLookahead = false;   // Macro-MCTS only: bounded greedy 1-ply forward look at leaf eval (2026-07-02 experiment)
+    bool riskDeferral = false;    // Macro-MCTS only: Q-guarded risk-sequencing defer at search() return (queue item 10, 2026-07-28)
 };
 
 struct MCTSNode {

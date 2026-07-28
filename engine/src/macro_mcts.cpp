@@ -222,10 +222,94 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     if (best) {
         lastBestValue_ = best->visits > 0
             ? best->totalValue / best->visits : 0.0;
-        return best->macro;
+        Macro pick = best->macro;
+        if (config_.riskDeferral) {
+            pick = applyRiskDeferral(root, state, pick, searchingSide);
+        }
+        return pick;
     }
 
     return macros[0];
+}
+
+static bool sameMacro(const Macro& a, const Macro& b) {
+    return a.type == b.type && a.playerId == b.playerId && a.targetId == b.targetId &&
+           a.targetPos == b.targetPos && a.thirdId == b.thirdId;
+}
+
+// Q-guarded risk-sequencing defer (queue item 10, gated by
+// config_.riskDeferral, off by default). The search's own visit-based pick
+// has no notion of intra-turn ordering: it may put a dice-risky macro
+// (BLITZ/DODGE/PICKUP/GFI, pTO>=RISKY_PTO) first even when other players on
+// the team have risk-free macros available, forfeiting every later
+// activation on a turnover that a different ORDER would have avoided
+// (corpus scan: 65.3% of risky team-turns hit this pattern, 97% of
+// forfeited activations attributable to sequencing alone --
+// project_bloodbowl_item10_risk_sequencing_result_20260724).
+//
+// A naive "always defer risky" rule overcorrects: in states where the risky
+// macro has a large genuine Q edge over every safe alternative (e.g. a
+// path-clearing BLITZ), blind deferral destroys real value for no benefit
+// (measured up to -28.9 SE in one tested state). This Q-guarded version
+// only defers to a safe (dice-free, non-no-op) alternative whose own probed
+// one-ply Q is within Q_MARGIN of the risky pick's Q -- the risky macro
+// keeps going first whenever it has a real value edge, and only steps aside
+// when a comparably-good safe option exists to bank first (the deferred
+// risky macro gets reconsidered on a later search() call this same turn,
+// once the safe options run out -- risk-LAST, never risk-never).
+//
+// Validated in diag_risk_sequencing_harness.cpp (worktree
+// .claude/worktrees/agent-afb72a985ab5cf7f3/scratchpad/risk_sequencing_20260724/),
+// Stage 5: whole-turn A/C paired-seed testing (200 seeds x 5 real mined
+// turnover states) found turnover-rate cuts with value deltas of +0.6 to
+// +6.2 SE in 4/5 states and an exact reproduction of production (0 SE) in
+// the one state where the risky macro had a genuine large Q edge (S7) --
+// resolving the naive-defer failure mode. One state (S2) showed a
+// borderline -2.0 SE anomaly at N=200; a 2026-07-28 sanity re-check (traced
+// execution, S2 specifically) found no evidence of a real causal mechanism
+// (probed pTO of the eventually-executed risky macro does not increase
+// across the deferred safe activations) and the effect did not reproduce at
+// smaller N -- consistent with N=200 sampling noise on a borderline effect,
+// not a real Q-guard failure mode.
+constexpr double RISK_DEFER_RISKY_PTO = 0.10;
+constexpr double RISK_DEFER_SAFE_PTO  = 0.02;
+constexpr double RISK_DEFER_Q_MARGIN  = 0.04;
+constexpr int    RISK_DEFER_PROBE_K   = 48;
+
+Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
+                                         const Macro& pick, TeamSide perspective) {
+    auto probe = [&](const Macro& m) {
+        struct { double pto = 0, q = 0, meanActions = 0; } r;
+        int nTO = 0; double qs = 0, acts = 0;
+        for (int k = 0; k < RISK_DEFER_PROBE_K; ++k) {
+            GameState sim = state.clone();
+            auto res = greedyExpandMacro(sim, m, dice_);
+            if (res.turnover) nTO++;
+            qs += simulate(sim, perspective);
+            acts += static_cast<double>(res.actions.size());
+        }
+        r.pto = static_cast<double>(nTO) / RISK_DEFER_PROBE_K;
+        r.q = qs / RISK_DEFER_PROBE_K;
+        r.meanActions = acts / RISK_DEFER_PROBE_K;
+        return r;
+    };
+
+    auto pickProbe = probe(pick);
+    if (pickProbe.pto < RISK_DEFER_RISKY_PTO) return pick;  // not risky, nothing to defer
+
+    double bestQ = -1e9;
+    const Macro* bestAlt = nullptr;
+    for (const auto& child : root.children) {
+        const Macro& m = child.macro;
+        if (m.type == MacroType::END_TURN) continue;
+        if (sameMacro(m, pick)) continue;
+        auto pr = probe(m);
+        if (pr.pto > RISK_DEFER_SAFE_PTO) continue;       // must be dice-free
+        if (pr.meanActions < 0.5) continue;                // must not be a no-op
+        if (pr.q < pickProbe.q - RISK_DEFER_Q_MARGIN) continue;  // Q-guard
+        if (pr.q > bestQ) { bestQ = pr.q; bestAlt = &m; }
+    }
+    return bestAlt ? *bestAlt : pick;
 }
 
 MacroMCTSNode* MacroMCTSSearch::select(MacroMCTSNode* root, TeamSide searchingSide) {

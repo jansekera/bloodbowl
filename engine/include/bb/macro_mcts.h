@@ -84,6 +84,10 @@ private:
     ReplayOutcome replayToNode(GameState& state, MacroMCTSNode* node);
     // Bounded greedy one-ply forward look from a leaf state (see macro_mcts.cpp).
     double greedyLookaheadBonus(const GameState& leafState, TeamSide perspective);
+    // Q-guarded risk-sequencing defer (queue item 10, config_.riskDeferral):
+    // see macro_mcts.cpp for the full rationale and validation reference.
+    Macro applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
+                            const Macro& pick, TeamSide perspective);
 };
 
 // Stateful policy: searches over macros, expands best into action plan,

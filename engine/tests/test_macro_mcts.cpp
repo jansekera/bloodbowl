@@ -5,6 +5,7 @@
 #include "bb/roster.h"
 #include "bb/value_function.h"
 #include "bb/action_resolver.h"
+#include "bb/policy_network.h"
 #include <cmath>
 
 using namespace bb;
@@ -54,6 +55,111 @@ int countMacroType(const std::vector<Macro>& macros, MacroType type) {
         if (m.type == type) count++;
     }
     return count;
+}
+
+// =============================================================
+// Item 10 risk-deferral fixtures: two real turn-start states mined and
+// deeply validated by diag_risk_sequencing_harness.cpp (worktree
+// .claude/worktrees/agent-afb72a985ab5cf7f3/scratchpad/risk_sequencing_20260724/,
+// project_bloodbowl_item10_risk_sequencing_result_20260724) -- ported here
+// (not re-derived) so the exact validated Q-guard defer/no-defer behavior
+// is pinned by a real regression test, not just a diagnostic run.
+// =============================================================
+
+struct RiskSnap { int id, x, y, st; };
+
+GameState makeRiskSeqState(const char* homeRace, const char* awayRace, TeamSide active,
+                           int half, int turn, int homeScore, int awayScore,
+                           int ballX, int ballY, int carrierId,
+                           const std::vector<RiskSnap>& snaps,
+                           const std::vector<int>& koIds) {
+    GameState s;
+    const TeamRoster* home = getDevelopedRoster(homeRace, 1200);
+    const TeamRoster* away = getDevelopedRoster(awayRace, 1200);
+    setupHalf(s, *home, *away, TeamSide::AWAY);
+
+    s.half = half;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = active;
+    s.weather = Weather::NICE;
+    s.kickingTeam = TeamSide::AWAY;
+    s.turnoverPending = false;
+    s.currentActivationId = -1;
+
+    s.homeTeam.score = homeScore; s.awayTeam.score = awayScore;
+    s.homeTeam.turnNumber = turn; s.awayTeam.turnNumber = turn;
+    s.homeTeam.rerolls = 2; s.awayTeam.rerolls = 2;
+    s.homeTeam.rerollUsedThisTurn = s.awayTeam.rerollUsedThisTurn = false;
+    s.homeTeam.blitzUsedThisTurn = s.awayTeam.blitzUsedThisTurn = false;
+    s.homeTeam.passUsedThisTurn = s.awayTeam.passUsedThisTurn = false;
+    s.homeTeam.foulUsedThisTurn = s.awayTeam.foulUsedThisTurn = false;
+
+    for (auto& p : s.players) {
+        p.state = PlayerState::OFF_PITCH;
+        p.position = {0, 0};
+        p.hasMoved = p.hasActed = p.usedBlitz = false;
+        p.lostTacklezones = p.proUsedThisTurn = false;
+    }
+    for (const auto& sn : snaps) {
+        Player& p = s.getPlayer(sn.id);
+        p.state = (sn.st == 0) ? PlayerState::STANDING
+                : (sn.st == 1) ? PlayerState::PRONE : PlayerState::STUNNED;
+        p.position = {static_cast<int8_t>(sn.x), static_cast<int8_t>(sn.y)};
+        p.movementRemaining = p.stats.movement;
+    }
+    for (int id : koIds) s.getPlayer(id).state = PlayerState::KO;
+
+    s.ball.position = {static_cast<int8_t>(ballX), static_cast<int8_t>(ballY)};
+    if (carrierId > 0) {
+        s.ball.isHeld = true;
+        s.ball.carrierId = carrierId;
+    } else {
+        s.ball.isHeld = false;
+        s.ball.carrierId = -1;
+    }
+    return s;
+}
+
+// S3 (diag_risk_sequencing_harness.cpp states_risk_seq.inc): a DODGE-first
+// real turnover state where 5 REPOSITION alternatives sit within Q_MARGIN
+// of the risky BLITZ's Q -- Stage 5 measured turnover 32.5%->7.0%, value
+// +0.0424 (+6.2 SE), the cleanest validated Q-guard win in the corpus.
+GameState makeS3State() {
+    return makeRiskSeqState("wood-elf", "human", TeamSide::AWAY, 1, 4, 0, 0, 15, 7, 10,
+        {{1,13,8,0},{2,15,12,0},{3,16,7,0},{4,14,8,0},{5,14,9,0},{6,15,6,0},{7,14,11,0},{8,14,10,0},
+         {9,13,10,0},{10,15,7,0},{11,10,10,0},{13,14,6,1},{14,11,11,1},{15,13,5,1},{16,16,6,1},
+         {17,16,9,0},{18,13,11,1},{19,16,10,0},{20,19,11,0},{21,17,7,1},{22,19,9,0}},
+        {12});
+}
+
+// S7 (diag_risk_sequencing_harness.cpp states_risk_seq.inc): a PICKUP-first
+// midgame turnover state where the risky PICKUP has a large genuine Q edge
+// (~0.25) over every safe alternative -- Stage 5 measured turnover
+// unchanged (17.0%->17.0%), value delta exactly 0 SE: the Q-guard must
+// refuse to defer here, reproducing production exactly (this is the
+// negative control that rules out the naive "always defer risky" rule,
+// which lost -25.9 SE on this same state).
+GameState makeS7State() {
+    return makeRiskSeqState("human", "orc", TeamSide::HOME, 2, 6, 1, 0, 5, 8, -1,
+        {{1,6,2,0},{2,11,6,1},{3,13,8,1},{4,12,7,1},{5,10,6,1},{6,3,4,0},{7,8,2,0},{8,8,7,1},
+         {9,5,10,0},{10,5,7,0},{11,5,5,0},{12,14,4,1},{13,15,10,0},{14,6,9,0},{15,10,7,0},
+         {16,13,3,1},{17,15,8,0},{18,11,7,0},{19,13,7,0},{20,14,8,0},{21,14,7,0},{22,4,9,1}},
+        {});
+}
+
+MCTSConfig makeRiskSeqConfig(PolicyNetwork* zeroPolicy, bool riskDeferral) {
+    MCTSConfig cfg;
+    cfg.maxIterations = 100;
+    cfg.timeBudgetMs = 0;
+    cfg.explorationC = 1.0;
+    cfg.dirichletAlpha = 0.0f;
+    cfg.vfBlend = 0.0f;
+    cfg.nRollouts = 1;
+    cfg.policy = zeroPolicy;      // non-null only to activate heuristic prior
+    cfg.policyBlend = 0.0f;       // floors (matches production replay config);
+                                   // blend=0 means the (zero) weights are never used.
+    cfg.riskDeferral = riskDeferral;
+    return cfg;
 }
 
 } // anonymous namespace
@@ -567,6 +673,58 @@ TEST(MacroMCTS, ChildVisitsRecorded) {
         totalVisits += cv.visits;
     }
     EXPECT_GT(totalVisits, 0);
+}
+
+// =============================================================
+// Item 10 (project_bloodbowl_item10_risk_sequencing_result_20260724):
+// Q-guarded risk-sequencing defer, config_.riskDeferral (off by default).
+// =============================================================
+
+TEST(MacroMCTS, RiskDeferralOffMatchesBaselineOnS3) {
+    // Baseline regression guard: riskDeferral=false must reproduce exactly
+    // production's undeferred pick (BLITZ) on S3 -- the feature is fully
+    // inert unless explicitly enabled.
+    GameState state = makeS3State();
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    Macro result = search.search(state);
+    EXPECT_EQ(result.type, MacroType::BLITZ);
+}
+
+TEST(MacroMCTS, RiskDeferralDefersToSafeAlternativeOnS3) {
+    // S3: the risky BLITZ's Q sits within Q_MARGIN of 5 safe REPOSITION
+    // alternatives -- Stage 5 harness validation (200 paired seeds) found
+    // this the cleanest Q-guard win in the corpus (turnover 32.5%->7.0%,
+    // value +6.2 SE). With riskDeferral=true the search must defer away
+    // from BLITZ this step.
+    GameState state = makeS3State();
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    Macro result = search.search(state);
+    EXPECT_EQ(result.type, MacroType::REPOSITION);
+}
+
+TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {
+    // S7: the risky PICKUP has a genuine ~0.25 Q edge over every safe
+    // alternative -- the state that exposed naive "always defer risky" as
+    // overcorrecting (-25.9 SE). The Q-guard must recognize the margin and
+    // execute the risky pick anyway, exactly reproducing production
+    // (Stage 5: turnover unchanged 17.0%->17.0%, value delta 0 SE).
+    GameState state = makeS7State();
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    MacroMCTSSearch searchOff(nullptr, cfgOff, 42);
+    Macro baseline = searchOff.search(state);
+
+    MCTSConfig cfgOn = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
+    MacroMCTSSearch searchOn(nullptr, cfgOn, 42);
+    Macro guarded = searchOn.search(state);
+
+    EXPECT_EQ(guarded.type, baseline.type);
+    EXPECT_EQ(guarded.playerId, baseline.playerId);
+    EXPECT_EQ(guarded.targetId, baseline.targetId);
 }
 
 // =============================================================

@@ -352,7 +352,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                float epsilon,
                                int mctsIterations,
                                float policyBlend,
-                               float vfBlend) {
+                               float vfBlend,
+                               bool riskDeferral) {
         bb::DiceRoller dice(seed);
 
         // Load value function if needed
@@ -386,6 +387,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.explorationC = 1.0;   // Eval: low C for exploitation
                 cfg.dirichletAlpha = 0.0f; // No noise during evaluation
                 cfg.vfBlend = vfBlend;
+                cfg.riskDeferral = riskDeferral;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -422,7 +424,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("epsilon") = 0.3f,
        py::arg("mcts_iterations") = 0,
        py::arg("policy_blend") = 0.0f,
-       py::arg("vf_blend") = 0.0f);
+       py::arg("vf_blend") = 0.0f,
+       py::arg("risk_deferral") = false);  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
 
     // simulate_game_logged: returns result + features at turn boundaries + policy decisions
     m.def("simulate_game_logged", [](const bb::TeamRoster& home, const bb::TeamRoster& away,
@@ -438,7 +441,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       float dirichletAlpha,
                                       float explorationC,
                                       int nRollouts,
-                                      bool leafLookahead) {
+                                      bool leafLookahead,
+                                      bool riskDeferral) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -479,6 +483,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.vfBlend = vfBlend;
                 cfg.nRollouts = nRollouts;
                 cfg.leafLookahead = leafLookahead;
+                cfg.riskDeferral = riskDeferral;
                 if (policyNet) {
                     cfg.policy = policyNet.get();
                     cfg.policyBlend = policyBlend;
@@ -550,7 +555,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("dirichlet_alpha") = 0.3f,
        py::arg("exploration_c") = 0.5f,   // T2: 2.0 over-explored, flat target; 0.5 sharpens. eval path (simulate_game) uses its own 1.0
        py::arg("n_rollouts") = 1,
-       py::arg("leaf_lookahead") = false);  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
+       py::arg("leaf_lookahead") = false,  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
+       py::arg("risk_deferral") = false);  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {
