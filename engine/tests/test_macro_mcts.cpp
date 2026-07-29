@@ -743,6 +743,93 @@ TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {
     EXPECT_EQ(guarded.targetId, baseline.targetId);
 }
 
+// S3/S7 above are real mined game states -- faithful but dense (21 players,
+// cryptic coordinates). This is a small hand-built fixture demonstrating the
+// same Q-guard mechanism transparently: exactly 2 candidate macros exist for
+// HOME, one deliberately lopsided, one deliberately risk-free.
+//
+// Player 1 (ST1) is already adjacent to player 12 (ST6): defST(6) > 2*attST(1)
+// gives the DEFENDER 3 dice (getBlockDiceInfo), i.e. they pick the
+// worst-for-attacker of 3 rolls. Without Block, ATTACKER_DOWN or BOTH_DOWN
+// (2/6 faces each die) force a turnover -- P(no bad face in 3 dice) =
+// (4/6)^3 ~= 0.30, so BLITZ/BLOCK's real turnover chance here is ~70%,
+// nowhere near a close call, comfortably clearing RISK_DEFER_RISKY_PTO.
+// Player 2 is isolated with no adjacent enemies and nothing but open squares
+// to move into -- its REPOSITION is a genuine zero-dice, zero-dodge action,
+// nowhere near RISK_DEFER_SAFE_PTO's ceiling. Player 12 carries the ball
+// (held, not on the ground) so PICKUP never enters the candidate set and
+// the risky BLITZ has a real upside (knocking the carrier down) -- the root
+// has exactly END_TURN/BLITZ/REPOSITION, nothing else to confound which
+// macro production would pick. The carrier is deliberately placed far from
+// AWAY's own endzone (low `proximity` in simulate()'s heuristic) so that
+// upside is small enough to land the risky pick's Q within
+// RISK_DEFER_Q_MARGIN of the safe REPOSITION's -- dice probabilities are
+// quantized (1/6, 1/36, ...) and can't be tuned to hit an exact margin, but
+// this board-position term is continuous and can.
+TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.homeTeam.blitzUsedThisTurn = false;
+    state.weather = Weather::NICE;
+
+    Player& weakBlitzer = state.getPlayer(1);
+    weakBlitzer.id = 1;
+    weakBlitzer.teamSide = TeamSide::HOME;
+    weakBlitzer.state = PlayerState::STANDING;
+    weakBlitzer.position = {15, 7};
+    weakBlitzer.stats = {6, 1, 3, 8};
+    weakBlitzer.movementRemaining = 6;
+
+    // Positioned far from AWAY's own endzone (x=0) -- low `proximity` in
+    // simulate()'s heuristic means dropping the ball here is a much smaller
+    // swing than dropping it near their scoring end, a continuous knob for
+    // narrowing the Q gap that dice-count stats can't provide (dice
+    // probabilities are quantized: 1/6, 1/36, etc., not freely tunable).
+    Player& strongDefender = state.getPlayer(12);
+    strongDefender.id = 12;
+    strongDefender.teamSide = TeamSide::AWAY;
+    strongDefender.state = PlayerState::STANDING;
+    strongDefender.position = {16, 7};
+    strongDefender.stats = {6, 6, 3, 9};
+    strongDefender.movementRemaining = 6;
+
+    Player& freePlayer = state.getPlayer(2);
+    freePlayer.id = 2;
+    freePlayer.teamSide = TeamSide::HOME;
+    freePlayer.state = PlayerState::STANDING;
+    freePlayer.position = {5, 3};
+    freePlayer.stats = {6, 3, 3, 8};
+    freePlayer.movementRemaining = 6;
+
+    // AWAY's own defender carries the ball -- gives the risky BLITZ a real
+    // upside (knocking down the carrier is a genuine strategic win, not
+    // just removing a body), so unguarded production actually picks it
+    // despite the ~70% fail chance, and the guard's deferral is doing real
+    // work rather than agreeing with what plain visit-based search would
+    // have picked anyway.
+    state.ball.isHeld = true;
+    state.ball.carrierId = 12;
+    state.ball.position = strongDefender.position;
+
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    MacroMCTSSearch searchOff(nullptr, cfgOff, 42);
+    Macro baseline = searchOff.search(state);
+    ASSERT_EQ(baseline.type, MacroType::BLITZ)
+        << "fixture precondition: undeferred production must pick the risky BLITZ";
+
+    MCTSConfig cfgOn = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
+    MacroMCTSSearch searchOn(nullptr, cfgOn, 42);
+    Macro guarded = searchOn.search(state);
+    EXPECT_EQ(guarded.type, MacroType::REPOSITION);
+    EXPECT_EQ(guarded.playerId, 2);
+}
+
 // =============================================================
 // MacroMCTSPolicy Tests
 // =============================================================
