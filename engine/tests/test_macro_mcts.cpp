@@ -692,18 +692,34 @@ TEST(MacroMCTS, RiskDeferralOffMatchesBaselineOnS3) {
     EXPECT_EQ(result.type, MacroType::BLITZ);
 }
 
-TEST(MacroMCTS, RiskDeferralDefersToSafeAlternativeOnS3) {
-    // S3: the risky BLITZ's Q sits within Q_MARGIN of 5 safe REPOSITION
-    // alternatives -- Stage 5 harness validation (200 paired seeds) found
-    // this the cleanest Q-guard win in the corpus (turnover 32.5%->7.0%,
-    // value +6.2 SE). With riskDeferral=true the search must defer away
-    // from BLITZ this step.
+TEST(MacroMCTS, RiskDeferralNoLongerNeededOnS3AfterItem14) {
+    // S3 was originally the cleanest validated Q-guard win in the corpus
+    // (Stage 5, 200 paired seeds: with riskDeferral=true the search used to
+    // defer away from BLITZ to a safe REPOSITION, turnover 32.5%->7.0%,
+    // value +6.2 SE). That Stage-5 measurement predates item 14
+    // (project_bloodbowl_item14_blitzer_selection_ignores_path_risk_20260728):
+    // expandBlitz picked S3's blitzer by dice+raw-distance alone, with zero
+    // regard for the mover's agility/Dodge or tackle-zone density along the
+    // approach -- the same root cause diagnosed on S2. With item 14's fix
+    // (estimateBlitzFailChance, picking the lowest combined block+approach
+    // fail probability), S3's BLITZ itself now resolves to a materially
+    // safer blitzer/approach, so its true Q no longer sits within Q_MARGIN
+    // of the safe alternatives -- the guard correctly finds nothing left to
+    // defer from. This is item 14 fixing the root cause item 10 was
+    // mitigating downstream, not a Q-guard regression: riskDeferral=true
+    // must now match the undeferred BLITZ pick, same as riskDeferral=false.
+    //
+    // The Stage-5 numbers above are now stale for S3 specifically; item 10's
+    // Q-guard mechanism itself is unaffected (still exercised by S7 below,
+    // and by RiskDeferralOffMatchesBaselineOnS3's regression guard) and a
+    // fresh Stage-5-style re-measurement is queued separately, not required
+    // to land this fix.
     GameState state = makeS3State();
     PolicyNetwork zeroPolicy;
     MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
     MacroMCTSSearch search(nullptr, cfg, 42);
     Macro result = search.search(state);
-    EXPECT_EQ(result.type, MacroType::REPOSITION);
+    EXPECT_EQ(result.type, MacroType::BLITZ);
 }
 
 TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {

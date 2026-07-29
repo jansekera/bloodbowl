@@ -131,7 +131,15 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     // Dirichlet noise on root priors (AlphaZero-style exploration)
     if (config_.dirichletAlpha > 0.0f && !root.children.empty()) {
         int n = static_cast<int>(root.children.size());
-        std::mt19937 rng(dice_.rollD6() * 1000 + dice_.rollD6());
+        // Base-6 encode 6 D6 rolls for 6^6 = 46,656 distinct seeds, instead
+        // of combining just 2 rolls (36 seeds) -- widens exploration-noise
+        // RNG stream diversity. Training-only (dirichletAlpha is 0 in eval
+        // config), not a correctness fix.
+        uint32_t seed = 0;
+        for (int i = 0; i < 6; ++i) {
+            seed = seed * 6 + static_cast<uint32_t>(dice_.rollD6() - 1);
+        }
+        std::mt19937 rng(seed);
         std::gamma_distribution<float> gamma(config_.dirichletAlpha, 1.0f);
         std::vector<float> noise(n);
         float noiseSum = 0.0f;

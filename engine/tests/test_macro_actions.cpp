@@ -599,6 +599,87 @@ TEST(MacroExpansion, BlitzAndScoreStopsFollowUpWhenBlockerSurfedOffPitch) {
     EXPECT_GT(carrierMoves, 0);
 }
 
+// Item 14: expandBlitz historically picked the blitzer with the most dice
+// and shortest raw distance, with zero regard for the mover's agility/Dodge
+// or how many enemy tackle zones the approach crosses -- root-caused item
+// 10's S2 test state's 82% BLITZ turnover rate (a low-agility, no-Dodge
+// player sent through a crowded midfield purely because it had good block
+// dice). This fixture reproduces that shape: blitzer 1 has better dice and
+// is "closer" by raw distance, but must dodge through 3 tackle zones with
+// AG2/no-Dodge to get there; blitzer 2 is already adjacent with worse dice
+// but zero approach risk. The old diceCount*10-dist formula picks blitzer 1
+// (20-6=14 beats 10-1=9); the fixed fail-probability estimate must pick
+// blitzer 2 instead (~96% combined fail vs ~33%).
+TEST(MacroExpansion, BlitzPrefersSaferBlitzerOverRiskyApproach) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    // Risky blitzer: good dice (ST5 + Block vs ST3 -> 2 dice, attacker
+    // chooses, ~2.8% block-fail), but AG2/no-Dodge and 6 squares from the
+    // target -- straight-line path crosses 3 enemy tackle zones.
+    Player& risky = state.getPlayer(1);
+    risky.id = 1;
+    risky.teamSide = TeamSide::HOME;
+    risky.state = PlayerState::STANDING;
+    risky.position = {12, 7};
+    risky.stats = {6, 5, 2, 8};
+    risky.movementRemaining = 6;
+    risky.skills.add(SkillName::Block);
+
+    // Safe blitzer: already adjacent to the target (zero approach risk),
+    // but even dice (ST3 vs ST3 -> 1 die, attacker chooses, ~33% block-fail)
+    // and no Block skill.
+    Player& safe = state.getPlayer(2);
+    safe.id = 2;
+    safe.teamSide = TeamSide::HOME;
+    safe.state = PlayerState::STANDING;
+    safe.position = {19, 7};
+    safe.stats = {6, 3, 3, 8};
+    safe.movementRemaining = 6;
+
+    Player& target = state.getPlayer(12);
+    target.id = 12;
+    target.teamSide = TeamSide::AWAY;
+    target.state = PlayerState::STANDING;
+    target.position = {18, 7};
+    target.stats = {6, 3, 3, 8};
+    target.movementRemaining = 6;
+
+    // Tackle zones on squares (14,7),(15,7),(16,7) along the risky blitzer's
+    // straight-line path -- placed one row off (y=6) and >=2 squares from
+    // the risky blitzer's own start so they don't perturb its block-dice
+    // assist count, only its approach.
+    int guardIds[] = {13, 14, 15};
+    int guardXs[] = {14, 15, 16};
+    for (int i = 0; i < 3; ++i) {
+        Player& g = state.getPlayer(guardIds[i]);
+        g.id = guardIds[i];
+        g.teamSide = TeamSide::AWAY;
+        g.state = PlayerState::STANDING;
+        g.position = {static_cast<int8_t>(guardXs[i]), 6};
+        g.stats = {6, 3, 3, 8};
+        g.movementRemaining = 6;
+    }
+
+    state.ball = BallState::onGround({5, 7});
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    ASSERT_FALSE(result.actions.empty());
+    EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
+    EXPECT_EQ(result.actions[0].playerId, 2)
+        << "expandBlitz picked the risky no-Dodge blitzer despite a safe "
+           "already-adjacent alternative";
+}
+
 TEST(MacroExpansion, AdvanceSprintsWhenCarrierIsBlitzable) {
     GameState state = makeThrottledCarrierState();
     DiceRoller dice(42);

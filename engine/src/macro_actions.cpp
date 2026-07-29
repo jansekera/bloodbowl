@@ -113,6 +113,80 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
     return info.attackerChooses ? info.count : -info.count;
 }
 
+// Fraction of a single block die's 6 faces that are bad for the attacker
+// (ATTACKER_DOWN always; BOTH_DOWN too unless the attacker has Block --
+// mirrors block_handler.cpp's shouldRerollBlock). A simplified proxy for
+// the chooser -- doesn't model defender Block/Dodge/Tackle nuance the way
+// autoChooseBlockDie's scoreFace does, deliberately: this runs on every
+// macro expansion during MCTS (thousands of times per search), so it needs
+// to stay cheap, not skill-exact.
+static double blockDieBadFraction(bool attackerHasBlock) {
+    return attackerHasBlock ? (1.0 / 6.0) : (2.0 / 6.0);
+}
+
+// Estimated probability that the block itself goes badly for the attacker,
+// from a diceCount as returned by getBlockDiceCount (positive = attacker
+// chooses N dice, negative = defender chooses N dice).
+static double estimateBlockFailChance(int diceCount, bool attackerHasBlock) {
+    int n = std::abs(diceCount);
+    if (n == 0) return 1.0;
+    double bad = blockDieBadFraction(attackerHasBlock);
+    if (diceCount > 0) {
+        // Attacker picks the best of n dice -> fails only if ALL n are bad.
+        return std::pow(bad, n);
+    }
+    // Defender picks the worst-for-attacker of n dice -> fails if ANY is bad.
+    return 1.0 - std::pow(1.0 - bad, n);
+}
+
+// Cheap approximate fail-probability for the APPROACH move to a square
+// adjacent to `target` -- a mover with no Dodge skill crossing a crowded
+// midfield can easily be riskier than the block itself, but expandBlitz's
+// scoring historically had zero visibility into this (item 14). This walks
+// a straight line toward the target one square at a time (ignoring
+// occupancy -- legality is already gated elsewhere by canReachAdjacentTo;
+// this is a risk proxy, not a path/legality check), accumulating dodge
+// fail chance (via calculateDodgeTarget) for each square left while
+// standing in an enemy tackle zone, plus GFI fail chance (1/6, natural 1)
+// for each square beyond movementRemaining.
+static double estimateApproachFailChance(const GameState& state, const Player& mover,
+                                          Position target) {
+    if (mover.position.distanceTo(target) <= 1) return 0.0;
+
+    Position cur = mover.position;
+    int moveLeft = mover.movementRemaining;
+    double failChance = 0.0;
+
+    for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
+        int dx = target.x > cur.x ? 1 : (target.x < cur.x ? -1 : 0);
+        int dy = target.y > cur.y ? 1 : (target.y < cur.y ? -1 : 0);
+        Position next{static_cast<int8_t>(cur.x + dx), static_cast<int8_t>(cur.y + dy)};
+
+        if (countTacklezones(state, cur, mover.teamSide) > 0) {
+            int dodgeTarget = calculateDodgeTarget(state, mover, next, cur);
+            double dodgeFail = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
+            failChance += dodgeFail * (1.0 - failChance);
+        }
+        if (moveLeft <= 0) {
+            failChance += (1.0 / 6.0) * (1.0 - failChance);
+        }
+        moveLeft -= 1;
+        cur = next;
+    }
+    return failChance;
+}
+
+// Combined estimate used to rank blitzer candidates for a fixed target:
+// block-dice risk and approach risk are treated as independent enough for
+// a cheap combination. Lower is better (0 = certain success).
+static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
+                                       const Player& target) {
+    int diceCount = getBlockDiceCount(state, blitzer, target, true);
+    double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block));
+    double approachFail = estimateApproachFailChance(state, blitzer, target.position);
+    return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
+}
+
 // Find nearest free standing teammate to a position (excluding specific player)
 static const Player* findNearestFreePlayer(const GameState& state, Position target,
                                             int excludeId = -1) {
@@ -960,16 +1034,18 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
 
     Action bestBlitzAction{};
     bool found = false;
-    int bestScore = -999;
+    double bestFail = 2.0; // worse than any real fail chance (max 1.0)
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
-        int diceCount = getBlockDiceCount(state, blitzer, target, true);
-        int dist = blitzer.position.distanceTo(target.position);
-        int score = diceCount * 10 - dist; // more dice + closer = better
-        if (score > bestScore) {
-            bestScore = score;
+        // Prefer the candidate least likely to fail (block dice + approach
+        // path combined), not just the most dice + shortest raw distance --
+        // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
+        // blitzer through a crowded midfield over a safer alternative.
+        double fail = estimateBlitzFailChance(state, blitzer, target);
+        if (fail < bestFail) {
+            bestFail = fail;
             bestBlitzAction = a;
             found = true;
         }
@@ -992,21 +1068,23 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
     std::vector<Action> actions;
     getAvailableActions(state, actions);
 
-    // Find the best blitzer for this target (prefer non-carrier with good dice)
+    // Find the best blitzer for this target: least likely to fail (block
+    // dice + approach path, item 14), tie-broken toward non-carrier so the
+    // ball carrier isn't risked on the blitz when an equally-safe teammate
+    // is available.
     Action bestBlitz{};
     bool foundBlitz = false;
-    int bestDice = -99;
+    double bestScore = -2.0; // worse than any real -fail (min -1.0)
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ) continue;
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
-        int dice_count = getBlockDiceCount(state, blitzer, blocker, true);
-        // Prefer non-carrier blitzer; if same dice count, use non-carrier
+        double fail = estimateBlitzFailChance(state, blitzer, blocker);
         bool isCarrier = (a.playerId == carrierId);
-        int score = dice_count * 10 + (isCarrier ? 0 : 5);
-        if (score > bestDice) {
-            bestDice = score;
+        double score = -fail + (isCarrier ? 0.0 : 0.001);
+        if (score > bestScore) {
+            bestScore = score;
             bestBlitz = a;
             foundBlitz = true;
         }
