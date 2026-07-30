@@ -55,3 +55,7 @@ decisions_*.json
 
 # Training scripts (local)
 run_rotation.sh
+
+# runtime training artifacts — never track (N3, fable_pipeline_audit_20260730)
+replay_buffer.pkl
+replay_buffer_prevalidation.pkl

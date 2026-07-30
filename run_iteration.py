@@ -415,6 +415,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # baseline_reset: set when the TV (roster set) changed since the frozen
     # model was benchmarked — its win rate is on a different game and not comparable.
     baseline_reset = False
+    # frozen_bm_stale: uložená benchmark baseline vznikla pod jinou
+    # konfigurací (vf_blend/mcts) — frozen se přeběhne pod aktuální.
+    frozen_bm_stale = False
     # abort_promote: hard failures (corrupt meta / hung engine) where we must
     # neither promote nor push — keep the current best untouched. Overrides
     # baseline_reset's force-promote.
@@ -431,6 +434,20 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 frozen_bm = meta.get('benchmark_win_rate', 0.0)
                 all_time_best_bm = meta.get('all_time_best_benchmark', frozen_bm)
                 meta_tv = meta.get('tv', 1000)
+                # Srovnatelnost baseline: benchmark skóre závisí na
+                # vf_blend a MCTS budgetu. Při mismatchi NElze použít
+                # baseline_reset (ten force-promotuje) — místo toho se
+                # frozen přeběhne pod aktuální konfigurací (níže,
+                # frozen_bm_stale), aby tier srovnával stejné metriky.
+                meta_vfb = meta.get('benchmark_vf_blend', 0.0)
+                meta_mcts = meta.get('benchmark_mcts_iterations', MCTS_ITERATIONS)
+                if meta_vfb != GATE_VF_BLEND or meta_mcts != MCTS_ITERATIONS:
+                    print(f'⚠ Benchmark konfigurace se změnila (vf_blend '
+                          f'{meta_vfb}→{GATE_VF_BLEND}, mcts {meta_mcts}→'
+                          f'{MCTS_ITERATIONS}): uložená baseline '
+                          f'{frozen_bm:.1%} není srovnatelná — frozen se '
+                          f'přeběhne pod novou konfigurací.', flush=True)
+                    frozen_bm_stale = True
             else:
                 with open(best_path) as f:
                     data = json.load(f)
@@ -544,8 +561,14 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     gate_policy_path = str(policy_cache_path) if GATE_USE_POLICY_PRIORS and policy_cache_path.exists() else ''
 
     def _run_benchmark(path: Path, label: str) -> tuple[float, bool]:
+        # GATE_VF_BLEND, ne VF_BLEND (fable_pipeline_audit_20260730 N2):
+        # s tréninkovým VF_BLEND=0 benchmark vůbec nečetl měřené váhy
+        # (macro_mcts přeskočí value net při blend=0) — skóre bylo
+        # null-test nezávislý na kandidátovi, a přitom řídil tier
+        # laťku, BM_FLOOR i HARD-REJECT. Stejná třída chyby, jaká byla
+        # 21.07 opravena v gate (GATE_VF_BLEND gap).
         tasks = [
-            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, VF_BLEND, TV,
+            (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
              gate_policy_path, i % 2 == 1)
             for i in range(half_bm)
         ]
@@ -563,6 +586,16 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         complete = (half_bm - len(results)) <= max_skip
         print(f'  {label} final: {score:.1%} ({sum(results)}/{len(results)})', flush=True)
         return score, complete
+
+    if frozen_bm_stale:
+        frozen_bm, frozen_ok = _run_benchmark(frozen_path, 'frozen re-benchmark')
+        if not frozen_ok:
+            abort_promote.append('frozen re-benchmark incomplete (engine hang?)')
+        # all_time_best ze staré konfigurace není srovnatelný — restart
+        # sledování od přeběhnuté frozen hodnoty (zdokumentováno v
+        # evidence/fable_pipeline_audit_20260730.md N2/N7).
+        all_time_best_bm = frozen_bm
+        print(f'Frozen re-benchmark (nová konfigurace): {frozen_bm:.1%}', flush=True)
 
     bm_az, az_complete = _run_benchmark(az_train_path, 'az_train')
     if train_best_path.exists():
@@ -797,10 +830,12 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
         if not promote:
             best_path.write_bytes(frozen_data)
             meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                    'benchmark_vf_blend': GATE_VF_BLEND,
                     'all_time_best_benchmark': all_time_best_bm, 'tv': TV}
         else:
             best_path.write_bytes(gate_data)
             meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                    'benchmark_vf_blend': GATE_VF_BLEND,
                     'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV}
 
         _atomic_write_json(root / 'weights_best_meta.json', meta)
