@@ -84,7 +84,11 @@ ActionResult resolveAction(GameState& state, const Action& action,
             // square is still taken when it's the only one making progress
             // (a blitz through an unavoidable TZ wall must not fail outright).
             while (player.position.distanceTo(target.position) > 1) {
-                // Find adjacent square closer to target using pathfinder
+                // Reachability gate only: canReachAdjacentTo's adjPos (BFS by
+                // pure movement cost, TZ-blind) is deliberately ignored — the
+                // TZ-scored picker below owns both the route and the final
+                // adjacent square (fewer enemies next to the blitzer = fewer
+                // defender assists on the block, see getBlockDiceCount).
                 Position adjPos;
                 if (!canReachAdjacentTo(state, player, target.position, adjPos)) {
                     // Can't reach — shouldn't happen if actions are valid
