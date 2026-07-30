@@ -74,7 +74,15 @@ ActionResult resolveAction(GameState& state, const Action& action,
                 if (!standResult.success) return standResult;
             }
 
-            // Move toward target if not adjacent
+            // Move toward target if not adjacent. Distance stays the primary
+            // criterion (progress toward the target is guaranteed, same as the
+            // old raw-distance picker), but enemy tackle zones now break ties
+            // between equally-close squares — this loop was the one movement
+            // path in the engine with zero TZ awareness (item 7), unlike every
+            // macro routed through scoreMoveAction. Weights mirror
+            // scoreMoveAction's 20/12 split; both are < 100 so a TZ-laden
+            // square is still taken when it's the only one making progress
+            // (a blitz through an unavoidable TZ wall must not fail outright).
             while (player.position.distanceTo(target.position) > 1) {
                 // Find adjacent square closer to target using pathfinder
                 Position adjPos;
@@ -83,16 +91,19 @@ ActionResult resolveAction(GameState& state, const Action& action,
                     return ActionResult::fail();
                 }
 
-                // Find next step toward adjPos using simple greedy approach
+                bool currentlyInTZ =
+                    countTacklezones(state, player.position, player.teamSide) > 0;
                 Position bestNext{-1, -1};
-                int bestDist = 999;
+                int bestScore = 99999;
                 auto adj = player.position.getAdjacent();
                 for (auto& pos : adj) {
                     if (!pos.isOnPitch()) continue;
                     if (state.getPlayerAtPosition(pos) != nullptr) continue;
-                    int d = pos.distanceTo(target.position);
-                    if (d < bestDist) {
-                        bestDist = d;
+                    int destTZ = countTacklezones(state, pos, player.teamSide);
+                    int score = pos.distanceTo(target.position) * 100
+                              + (currentlyInTZ ? 12 : 20) * destTZ;
+                    if (score < bestScore) {
+                        bestScore = score;
                         bestNext = pos;
                     }
                 }

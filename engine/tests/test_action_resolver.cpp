@@ -264,3 +264,44 @@ TEST(ActionResolver, BlitzAdjacentBlock) {
     EXPECT_TRUE(result.success);
     EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
 }
+
+// Item 7: the BLITZ approach walk historically picked each step by raw
+// distance to the target alone -- the only movement path in the engine
+// with zero tackle-zone awareness (every macro's movement routes through
+// scoreMoveAction's TZ penalty). Reproduces the 21.07 wrong-direction-
+// dodge shape: the guard at (12,6) puts tackle zones on the straight-line
+// steps (11,6)/(11,7), while the equally-close (11,8)->(12,8) route is
+// dodge-free. The old picker stepped into (11,6) (first equally-close
+// square in getAdjacent order) and had to dodge out; the fixed picker
+// must take the safe row and never roll a dodge.
+TEST(ActionResolver, BlitzApproachAvoidsTacklezonesOnEquallyCloseSteps) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 6}, TeamSide::AWAY);  // TZ on (11,6),(11,7),(12,7)
+
+    Action action{ActionType::BLITZ, 1, 12, {13, 7}};
+    // ST3 vs ST3 = 1 die; 3 = PUSHED. No dodge roll may be requested --
+    // FixedDiceRoller throws if the approach burns dice it shouldn't need.
+    FixedDiceRoller dice({3, 3, 3});
+    std::vector<GameEvent> events;
+    auto result = resolveAction(gs, action, dice, &events);
+
+    EXPECT_TRUE(result.success);
+    // The approach must run along the safe row (11,8)->(12,8) -- the old
+    // raw-distance walk went (11,6)->(12,7) through the guard's tackle
+    // zones. (Final position is NOT asserted: the post-block follow-up
+    // legitimately moves the blitzer again after a push.)
+    for (auto& ev : events) {
+        EXPECT_NE(ev.type, GameEvent::Type::DODGE)
+            << "blitz approach rolled a dodge despite a dodge-free route";
+        if (ev.type == GameEvent::Type::PLAYER_MOVE && ev.playerId == 1) {
+            EXPECT_NE(ev.to, (Position{11, 6}))
+                << "approach stepped into the guard's tackle zone";
+            EXPECT_NE(ev.to, (Position{11, 7}))
+                << "approach stepped into the guard's tackle zone";
+        }
+    }
+}
