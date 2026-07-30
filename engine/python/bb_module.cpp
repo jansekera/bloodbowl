@@ -464,7 +464,9 @@ PYBIND11_MODULE(bb_engine, m) {
                                       float explorationC,
                                       int nRollouts,
                                       bool leafLookahead,
-                                      bool riskDeferral) {
+                                      bool riskDeferral,
+                                      const std::string& awayPolicyWeightsPath,
+                                      float awayPolicyBlend) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -480,10 +482,17 @@ PYBIND11_MODULE(bb_engine, m) {
             awayVf = bb::loadValueFunction(awayWPath);
         }
 
-        // Load policy network if provided
+        // Load policy network if provided. A separate away-side net (plus
+        // blend) enables a fair policy A/B -- with a single shared net a
+        // candidate-policy-vs-champion-policy match was impossible to set up
+        // (fable_pipeline_audit_20260730 N1).
         std::unique_ptr<bb::PolicyNetwork> policyNet;
         if (!policyWeightsPath.empty()) {
             policyNet = bb::loadPolicyNetworkFromFile(policyWeightsPath);
+        }
+        std::unique_ptr<bb::PolicyNetwork> awayPolicyNet;
+        if (!awayPolicyWeightsPath.empty()) {
+            awayPolicyNet = bb::loadPolicyNetworkFromFile(awayPolicyWeightsPath);
         }
 
         std::shared_ptr<bb::MCTSPolicy> homeMcts, awayMcts;
@@ -491,6 +500,8 @@ PYBIND11_MODULE(bb_engine, m) {
 
         auto makePolicy = [&](const std::string& ai,
                               bb::ValueFunction* vfPtr,
+                              bb::PolicyNetwork* polPtr,
+                              float polBlend,
                               std::shared_ptr<bb::MCTSPolicy>& mctsOut,
                               std::shared_ptr<bb::MacroMCTSPolicy>& macroMctsOut) -> bb::ActionSelector {
             if (ai == "greedy") {
@@ -506,9 +517,9 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.nRollouts = nRollouts;
                 cfg.leafLookahead = leafLookahead;
                 cfg.riskDeferral = riskDeferral;
-                if (policyNet) {
-                    cfg.policy = policyNet.get();
-                    cfg.policyBlend = policyBlend;
+                if (polPtr) {
+                    cfg.policy = polPtr;
+                    cfg.policyBlend = polBlend;
                 }
                 macroMctsOut = std::make_shared<bb::MacroMCTSPolicy>(vfPtr, cfg, seed);
                 macroMctsOut->setLogDecisions(true, 20);
@@ -518,8 +529,8 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.maxIterations = mctsIterations;
                 cfg.timeBudgetMs = 0;
                 cfg.maxChildren = 40;
-                if (policyNet) {
-                    cfg.policy = policyNet.get();
+                if (polPtr) {
+                    cfg.policy = polPtr;
                     cfg.explorationC = 2.5;
                 }
                 mctsOut = std::make_shared<bb::MCTSPolicy>(vfPtr, cfg, seed);
@@ -536,8 +547,12 @@ PYBIND11_MODULE(bb_engine, m) {
 
         auto logged = bb::simulateGameLogged(
             home, away,
-            makePolicy(homeAI, vf.get(), homeMcts, homeMacroMcts),
-            makePolicy(awayAI, awayVf.get(), awayMcts, awayMacroMcts),
+            makePolicy(homeAI, vf.get(), policyNet.get(), policyBlend,
+                       homeMcts, homeMacroMcts),
+            makePolicy(awayAI, awayVf.get(),
+                       awayPolicyNet ? awayPolicyNet.get() : policyNet.get(),
+                       awayPolicyBlend < 0.0f ? policyBlend : awayPolicyBlend,
+                       awayMcts, awayMacroMcts),
             dice);
 
         // Copy policy decisions from MCTS policies
@@ -578,7 +593,9 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("exploration_c") = 0.5f,   // T2: 2.0 over-explored, flat target; 0.5 sharpens. eval path (simulate_game) uses its own 1.0
        py::arg("n_rollouts") = 1,
        py::arg("leaf_lookahead") = false,  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
-       py::arg("risk_deferral") = false);  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
+       py::arg("risk_deferral") = false,
+       py::arg("away_policy_weights_path") = "",
+       py::arg("away_policy_blend") = -1.0f);  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {
