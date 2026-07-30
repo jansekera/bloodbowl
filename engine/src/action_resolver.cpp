@@ -95,23 +95,9 @@ ActionResult resolveAction(GameState& state, const Action& action,
                     return ActionResult::fail();
                 }
 
-                bool currentlyInTZ =
-                    countTacklezones(state, player.position, player.teamSide) > 0;
-                Position bestNext{-1, -1};
-                int bestScore = 99999;
-                auto adj = player.position.getAdjacent();
-                for (auto& pos : adj) {
-                    if (!pos.isOnPitch()) continue;
-                    if (state.getPlayerAtPosition(pos) != nullptr) continue;
-                    int destTZ = countTacklezones(state, pos, player.teamSide);
-                    int score = pos.distanceTo(target.position) * 100
-                              + (currentlyInTZ ? 12 : 20) * destTZ;
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestNext = pos;
-                    }
-                }
-
+                Position bestNext = pickApproachStep(state, player,
+                                                     player.position,
+                                                     target.position);
                 if (bestNext.x < 0) return ActionResult::fail();
 
                 Position beforeStep = player.position;

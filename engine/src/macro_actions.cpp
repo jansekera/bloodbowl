@@ -144,16 +144,16 @@ static double estimateBlockFailChance(int diceCount, bool attackerHasBlock) {
     return 1.0 - std::pow(1.0 - bad, n);
 }
 
-// Cheap approximate fail-probability for the APPROACH move to a square
-// adjacent to `target` -- a mover with no Dodge skill crossing a crowded
-// midfield can easily be riskier than the block itself, but expandBlitz's
-// scoring historically had zero visibility into this (item 14). This walks
-// a straight line toward the target one square at a time (ignoring
-// occupancy -- legality is already gated elsewhere by canReachAdjacentTo;
-// this is a risk proxy, not a path/legality check), accumulating dodge
-// fail chance (via calculateDodgeTarget) for each square left while
-// standing in an enemy tackle zone, plus GFI fail chance (1/6, natural 1)
-// for each square beyond movementRemaining.
+// Approximate fail-probability for the APPROACH move to a square adjacent
+// to `target` -- a mover with no Dodge skill crossing a crowded midfield
+// can easily be riskier than the block itself, but expandBlitz's scoring
+// historically had zero visibility into this (item 14). Walks the SAME
+// route the BLITZ executor will actually take (pickApproachStep, shared --
+// unified per the item7 post-implementation review so the estimate can't
+// drift from execution again), accumulating dodge fail chance (via
+// calculateDodgeTarget) for each square left while standing in an enemy
+// tackle zone, plus GFI fail chance (1/6, natural 1) for each square
+// beyond movementRemaining.
 static double estimateApproachFailChance(const GameState& state, const Player& mover,
                                           Position target) {
     if (mover.position.distanceTo(target) <= 1) return 0.0;
@@ -163,9 +163,8 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     double failChance = 0.0;
 
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
-        int dx = target.x > cur.x ? 1 : (target.x < cur.x ? -1 : 0);
-        int dy = target.y > cur.y ? 1 : (target.y < cur.y ? -1 : 0);
-        Position next{static_cast<int8_t>(cur.x + dx), static_cast<int8_t>(cur.y + dy)};
+        Position next = pickApproachStep(state, mover, cur, target);
+        if (next.x < 0) return 1.0;  // executor would fail the blitz outright
 
         if (countTacklezones(state, cur, mover.teamSide) > 0) {
             int dodgeTarget = calculateDodgeTarget(state, mover, next, cur);

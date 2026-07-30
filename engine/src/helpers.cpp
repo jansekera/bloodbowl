@@ -30,6 +30,26 @@ int countDisturbingPresence(const GameState& state, Position pos, TeamSide frien
     return count;
 }
 
+Position pickApproachStep(const GameState& state, const Player& mover,
+                          Position from, Position targetPos) {
+    bool currentlyInTZ = countTacklezones(state, from, mover.teamSide) > 0;
+    Position bestNext{-1, -1};
+    int bestScore = 99999;
+    for (auto& pos : from.getAdjacent()) {
+        if (!pos.isOnPitch()) continue;
+        const Player* occ = state.getPlayerAtPosition(pos);
+        if (occ && occ->id != mover.id) continue;
+        int destTZ = countTacklezones(state, pos, mover.teamSide);
+        int score = pos.distanceTo(targetPos) * 100
+                  + (currentlyInTZ ? 12 : 20) * destTZ;
+        if (score < bestScore) {
+            bestScore = score;
+            bestNext = pos;
+        }
+    }
+    return bestNext;
+}
+
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source) {
     int ag = player.stats.agility;

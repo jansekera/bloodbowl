@@ -651,18 +651,25 @@ TEST(MacroExpansion, BlitzPrefersSaferBlitzerOverRiskyApproach) {
     target.stats = {6, 3, 3, 8};
     target.movementRemaining = 6;
 
-    // Tackle zones on squares (14,7),(15,7),(16,7) along the risky blitzer's
-    // straight-line path -- placed one row off (y=6) and >=2 squares from
-    // the risky blitzer's own start so they don't perturb its block-dice
-    // assist count, only its approach.
-    int guardIds[] = {13, 14, 15};
-    int guardXs[] = {14, 15, 16};
-    for (int i = 0; i < 3; ++i) {
+    // Tackle-zone wall across the risky blitzer's approach. Since the item7
+    // review unified estimateApproachFailChance with the executor's
+    // TZ-scored walk (pickApproachStep), a single row of guards no longer
+    // makes the approach risky -- the walk (correctly) routes around it.
+    // Guards on BOTH flanking rows (y=6 and y=8) leave no dodge-free route,
+    // preserving this fixture's original intent: an AG2/no-Dodge blitzer
+    // that must dodge repeatedly to arrive. All guards sit >=2 squares from
+    // both blitzers and the target so they don't perturb block-dice assists,
+    // only the approach.
+    int guardIds[] = {13, 14, 15, 16, 17, 18};
+    int guardXs[] = {14, 15, 16, 14, 15, 16};
+    int guardYs[] = {6, 6, 6, 8, 8, 8};
+    for (int i = 0; i < 6; ++i) {
         Player& g = state.getPlayer(guardIds[i]);
         g.id = guardIds[i];
         g.teamSide = TeamSide::AWAY;
         g.state = PlayerState::STANDING;
-        g.position = {static_cast<int8_t>(guardXs[i]), 6};
+        g.position = {static_cast<int8_t>(guardXs[i]),
+                      static_cast<int8_t>(guardYs[i])};
         g.stats = {6, 3, 3, 8};
         g.movementRemaining = 6;
     }

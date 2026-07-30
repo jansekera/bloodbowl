@@ -23,6 +23,16 @@ int countTacklezones(const GameState& state, Position pos, TeamSide friendlySide
                      int excludeId = -1);
 int countDisturbingPresence(const GameState& state, Position pos, TeamSide friendlySide);
 
+// Next step of a blitz-style approach walk toward targetPos: among free
+// on-pitch squares adjacent to `from`, distance stays primary and enemy
+// tackle zones break ties (scoreMoveAction's 20/12 weights). The mover's
+// own current square counts as free (it vacates it). Returns {-1,-1} when
+// no candidate exists. Shared by the BLITZ executor (action_resolver) and
+// the blitzer-selection risk estimate (macro_actions) so the estimate
+// prices exactly the walk that will happen (items 7+14).
+Position pickApproachStep(const GameState& state, const Player& mover,
+                          Position from, Position targetPos);
+
 // Agility roll targets (clamped to 2-6)
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source);
