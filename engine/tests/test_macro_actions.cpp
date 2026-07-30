@@ -1231,3 +1231,95 @@ TEST(MacroActions, ScoreOffPitchCarrierDoesNotHang) {
     EXPECT_TRUE(result.actions.empty());
 }
 
+
+// Item 11: the loose-ball "surround it" REPOSITION historically targeted the
+// ball's EXACT square -- movePlayerToward walked the player onto it and
+// move_handler auto-triggered a real pickup roll (failure = turnover),
+// silently breaking REPOSITION's dice-free contract and making a genuine
+// "deny without grabbing" play impossible. The target must be a square
+// ADJACENT to the ball, and a player already adjacent should stay put.
+TEST(MacroActions, RepositionLooseBallTargetsAdjacentSquareNotBall) {
+    GameState state = makeMinimalState();
+    // Ball loose at (13,7); free home player 1 at (10,7); away player far.
+    state.getPlayer(12).position = {20, 2};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    bool found = false;
+    for (auto& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        found = true;
+        EXPECT_NE(m.targetPos, state.ball.position)
+            << "loose-ball REPOSITION still targets the ball's own square";
+        EXPECT_EQ(m.targetPos.distanceTo(state.ball.position), 1);
+    }
+    EXPECT_TRUE(found) << "no REPOSITION macro generated for the free player";
+}
+
+TEST(MacroActions, RepositionLooseBallAlreadyAdjacentStaysPut) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {12, 7};  // adjacent to the loose ball
+    state.getPlayer(12).position = {20, 2};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    for (auto& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        EXPECT_EQ(m.targetPos, (Position{12, 7}))
+            << "already-denying player sent on a pointless walk";
+    }
+}
+
+// Item 11, waypoint variant: retargeting alone is not enough -- when the only
+// free square adjacent to the ball lies on the far side, the step-by-step
+// walk must not cross the ball's square en route (any step landing there
+// triggers the auto-pickup). Corridor fixture: every square adjacent to the
+// ball is occupied by friendly statues except (14,7); the mover approaches
+// from the right, so the straight-line path runs (16,7)->(15,7)->(14,7)
+// straight over the ball. The fixed walk must go around and leave the ball
+// untouched on the ground.
+TEST(MacroActions, RepositionLooseBallNeverStepsOntoBallSquare) {
+    GameState state = makeMinimalState();
+    state.ball = BallState::onGround({15, 7});
+    state.getPlayer(12).position = {24, 1};  // away player far off
+
+    Player& mover = state.getPlayer(1);
+    mover.position = {17, 7};
+    mover.stats = {8, 3, 3, 8};
+    mover.movementRemaining = 8;
+
+    // Friendly statues sealing off every ball-adjacent square except (14,7).
+    int sx[] = {14, 15, 16, 14, 15, 16, 16};
+    int sy[] = {6, 6, 6, 8, 8, 8, 7};
+    for (int i = 0; i < 7; ++i) {
+        Player& s = state.getPlayer(2 + i);
+        s.id = 2 + i;
+        s.teamSide = TeamSide::HOME;
+        s.state = PlayerState::STANDING;
+        s.position = {static_cast<int8_t>(sx[i]), static_cast<int8_t>(sy[i])};
+        s.stats = {6, 3, 3, 8};
+        s.movementRemaining = 6;
+        s.hasMoved = true;  // occupancy only, not macro candidates
+    }
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* repo = nullptr;
+    for (auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) repo = &m;
+    }
+    ASSERT_NE(repo, nullptr);
+    ASSERT_EQ(repo->targetPos, (Position{14, 7}));
+
+    DiceRoller dice(42);
+    Macro macro = *repo;
+    greedyExpandMacro(state, macro, dice);
+
+    // The ball must still be loose and untouched -- the old walk stepped on
+    // (15,7) and rolled a real pickup (held ball or bounce+turnover).
+    EXPECT_FALSE(state.ball.isHeld);
+    EXPECT_EQ(state.ball.position, (Position{15, 7}));
+    EXPECT_NE(state.getPlayer(1).position, (Position{15, 7}));
+}

@@ -71,11 +71,16 @@ static int scoreMoveAction(const GameState& state, const Action& a,
 // Prefers safe routes (avoids enemy tackle zones and GFI).
 static bool findMoveToward(const std::vector<Action>& actions, int playerId,
                            Position target, Action& bestMove,
-                           const GameState* state = nullptr) {
+                           const GameState* state = nullptr,
+                           Position avoid = {-1, -1}) {
     int bestScore = 9999;
     bool found = false;
     for (auto& a : actions) {
         if (a.type != ActionType::MOVE || a.playerId != playerId) continue;
+        // Hard exclusion (item 11): a square the caller must never enter,
+        // even as a mere waypoint -- landing on a loose ball's square
+        // auto-triggers a real pickup roll regardless of intent.
+        if (avoid.x >= 0 && a.target == avoid) continue;
 
         int score;
         if (state) {
@@ -660,8 +665,29 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         Position target;
 
         if (ballOnGround) {
-            // Loose ball: surround it
-            target = state.ball.position;
+            // Loose ball: surround it -- stand ADJACENT, never on the ball's
+            // own square. Any move landing there auto-triggers a real pickup
+            // roll (move_handler.cpp), which would make this the one
+            // REPOSITION that secretly gambles; an actual pickup attempt is
+            // the PICKUP macro's job (item 11). Already adjacent = already
+            // denying, stay put.
+            if (p.position.distanceTo(state.ball.position) == 1) {
+                target = p.position;
+            } else {
+                Position bestAdj{-1, -1};
+                int bestDist = 999;
+                for (auto& apos : state.ball.position.getAdjacent()) {
+                    if (!apos.isOnPitch()) continue;
+                    if (state.getPlayerAtPosition(apos) != nullptr) continue;
+                    int d = p.position.distanceTo(apos);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestAdj = apos;
+                    }
+                }
+                if (bestAdj.x < 0) return;  // ball fully surrounded
+                target = bestAdj;
+            }
         } else if (iHaveBall) {
             // Offense: support carrier (cage corners, screen ahead, receiver setup)
             int dx = forwardDx(mySide);
@@ -830,7 +856,7 @@ static bool executeAndRecord(GameState& state, const Action& action,
 // Uses state-aware scoring to avoid enemy tackle zones (prefers safe routes).
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
-                              int maxSteps = 12) {
+                              int maxSteps = 12, Position avoid = {-1, -1}) {
     Position lastPos{-1, -1};  // Detect loops
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
@@ -843,7 +869,7 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
 
         // Find best move toward target (with TZ avoidance)
         Action bestMove;
-        if (!findMoveToward(actions, playerId, target, bestMove, &state)) return false;
+        if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) return false;
 
         // Allow sideways moves to dodge around opponents, but don't go too far
         int currentDist = p.position.distanceTo(target);
@@ -1241,7 +1267,12 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // the only dice-free macro, and a failed GFI on a free repositioning
     // player is pure downside with no ball at stake.
     int maxSteps = state.getPlayer(macro.playerId).movementRemaining;
-    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
+    // Loose ball: never step onto its square, not even as a waypoint --
+    // the auto-pickup in move_handler.cpp would turn this dice-free macro
+    // into a real gamble (item 11).
+    Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
+    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
+                     maxSteps, avoid);
     return result;
 }
 
