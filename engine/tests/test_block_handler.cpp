@@ -513,3 +513,58 @@ TEST(BlockHandler, MultipleBlockFAFailSkipsBlock) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING); // Skipped
     EXPECT_EQ(gs.getPlayer(13).state, PlayerState::PRONE); // Hit
 }
+
+// CRP: a block thrown during a Blitz costs 1 MP; out of movement it takes
+// a GFI (2+), and with no GFI left it cannot be thrown. User-supplied
+// scenario (30.07): first GFI gets the blitzer adjacent, the second GFI
+// pays for the first block, so Frenzy's mandatory second block is DENIED.
+TEST(BlockHandler, BlitzFrenzySecondBlockDeniedWithoutMovement) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    gs.getPlayer(1).movementRemaining = -1;  // first GFI already spent arriving
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<GameEvent> events;
+    // GFI for the block (roll 6), then 1st block PUSHED (D6=3): defender
+    // pushed to (12,7), attacker follows -- both standing and adjacent, but
+    // movementRemaining is now -2 = GFI limit, so the 2nd block must NOT
+    // be thrown (FixedDiceRoller would throw on any extra roll).
+    FixedDiceRoller dice({6, 3});
+    BlockParams params{1, 12, true, false};
+    auto result = resolveBlock(gs, params, dice, nullptr, false, false);
+    // events not passed above -- rerun pattern kept simple: assert via state
+    EXPECT_TRUE(result.success);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, -2);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));  // followed up once
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));  // pushed once, not twice
+    EXPECT_EQ(dice.remaining(), 0u);  // no dice consumed beyond GFI + 1 block die
+}
+
+TEST(BlockHandler, BlitzBlockGfiFailKnocksAttackerDown) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 0;  // block itself needs a GFI
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    // GFI roll 1 = fail -> attacker falls before the block. Armor 3+3=6 <= 8.
+    FixedDiceRoller dice({1, 3, 3});
+    BlockParams params{1, 12, true, false};
+    auto result = resolveBlock(gs, params, dice, nullptr, false, false);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);  // never blocked
+}
+
+TEST(BlockHandler, PlainBlockCostsNoMovement) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({3});  // PUSHED
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr, false, false);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 6);  // unchanged
+}

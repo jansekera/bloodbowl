@@ -188,6 +188,37 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     Position attOldPos = att.position;
     Position defOldPos = def.position;
 
+    // CRP: a block thrown as part of a Blitz costs 1 point of movement.
+    // Out of normal movement the blitzer may GFI into the block (2+, 3+
+    // in a blizzard, counts against the GFI limit); with no GFI left the
+    // block cannot be thrown at all. This is what denies a Frenzy second
+    // block after "GFI to arrive + GFI for the first block".
+    if (params.isBlitz) {
+        int gfiFloor = att.hasSkill(SkillName::Sprint) ? -3 : -2;
+        if (att.movementRemaining - 1 < gfiFloor) {
+            // No movement and no GFI left: no block is thrown.
+            att.hasActed = true;
+            return ActionResult::ok();
+        }
+        att.movementRemaining--;
+        if (att.movementRemaining < 0) {
+            int gfiTarget = (state.weather == Weather::BLIZZARD) ? 3 : 2;
+            bool gfiOk = attemptRoll(state, att.id, dice, gfiTarget,
+                                     SkillName::SureFeet, false, true, events);
+            emitEvent(events, {GameEvent::Type::GFI, att.id, -1, att.position,
+                              att.position, gfiTarget, gfiOk});
+            if (!gfiOk) {
+                // Falls before the block is thrown
+                att.state = PlayerState::PRONE;
+                att.hasActed = true;
+                InjuryContext ctx;
+                resolveArmourAndInjury(state, att.id, dice, ctx, events);
+                handleBallOnPlayerDown(state, att.id, dice, events);
+                return ActionResult::turnovr();
+            }
+        }
+    }
+
     // 1. FoulAppearance check
     if (def.hasSkill(SkillName::FoulAppearance)) {
         int faRoll = dice.rollD6();
@@ -529,6 +560,16 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     if (!frenzySecondBlock && att.hasSkill(SkillName::Frenzy) &&
         canAct(att.state) && canAct(def.state) &&
         att.position.distanceTo(def.position) == 1) {
+        // CRP: during a Blitz the second block costs movement too — with
+        // no movement and no GFI left it is not thrown. Gated here (not
+        // only via the charge in the recursive call) so the first block's
+        // outcome is preserved unchanged when the second is impossible.
+        if (params.isBlitz) {
+            int gfiFloor = att.hasSkill(SkillName::Sprint) ? -3 : -2;
+            if (att.movementRemaining - 1 < gfiFloor) {
+                return turnover ? ActionResult::turnovr() : ActionResult::ok();
+            }
+        }
         // Mandatory second block
         BlockParams secondParams = params;
         secondParams.hornsBonus = false; // no Horns on 2nd block

@@ -159,7 +159,9 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     if (mover.position.distanceTo(target) <= 1) return 0.0;
 
     Position cur = mover.position;
-    int moveLeft = mover.movementRemaining;
+    // The blitz block itself costs 1 MP (CRP) -- reserve it so a
+    // budget-tight approach correctly prices the trailing GFI risk.
+    int moveLeft = mover.movementRemaining - 1;
     double failChance = 0.0;
 
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {

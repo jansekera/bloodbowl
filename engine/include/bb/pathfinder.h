@@ -13,8 +13,11 @@ struct MoveTarget {
 
 // Can the player reach any square adjacent to target?
 // If yes, returns true and sets outAdjacent to the best adjacent square.
+// reserveMove: movement points to hold back from the budget (a blitz must
+// keep 1 for the block itself -- CRP: the block costs 1 MP/GFI).
 bool canReachAdjacentTo(const GameState& state, const Player& player,
-                        Position target, Position& outAdjacent);
+                        Position target, Position& outAdjacent,
+                        int reserveMove = 0);
 
 // Get all valid single-step move targets for a player.
 // Returns the number of targets written to out (up to maxOut).

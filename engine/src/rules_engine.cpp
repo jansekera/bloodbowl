@@ -60,9 +60,12 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                     return;
                 }
 
-                // Check if we can reach adjacent to enemy
+                // Check if we can reach adjacent to enemy with 1 MP still in
+                // the budget -- the blitz block itself costs a movement point
+                // (CRP), so an approach burning the full MA+GFI range would
+                // arrive unable to throw the block at all.
                 Position adjPos;
-                if (canReachAdjacentTo(state, p, enemy.position, adjPos)) {
+                if (canReachAdjacentTo(state, p, enemy.position, adjPos, 1)) {
                     out.push_back({ActionType::BLITZ, p.id, enemy.id, enemy.position});
                 }
             });

@@ -18,7 +18,8 @@ static constexpr int GRID_SIZE = GRID_W * GRID_H;
 static inline int gridIdx(int x, int y) { return y * GRID_W + x; }
 
 bool canReachAdjacentTo(const GameState& state, const Player& player,
-                        Position target, Position& outAdjacent) {
+                        Position target, Position& outAdjacent,
+                        int reserveMove) {
     if (!player.isOnPitch() || player.state == PlayerState::STUNNED) return false;
 
     int maxMove = player.movementRemaining;
@@ -31,7 +32,7 @@ bool canReachAdjacentTo(const GameState& state, const Player& player,
     }
 
     int maxGfi = player.hasSkill(SkillName::Sprint) ? 3 : 2;
-    int maxRange = maxMove + maxGfi;
+    int maxRange = maxMove + maxGfi - reserveMove;
 
     if (maxRange <= 0) return false;
 
