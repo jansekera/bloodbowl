@@ -23,6 +23,11 @@ BoardSnapshot captureBoardSnapshot(const GameState& state) {
             else if (p.state == PlayerState::STUNNED) ps.state = 2;
             else ps.state = 3;
             ps.hasBall = (state.ball.isHeld && state.ball.carrierId == p.id);
+            ps.name = p.positionName ? p.positionName : "";
+            ps.ma = p.stats.movement;
+            ps.st = p.stats.strength;
+            ps.ag = p.stats.agility;
+            ps.av = p.stats.armour;
             out.push_back(ps);
         });
     };

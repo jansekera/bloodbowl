@@ -26,6 +26,9 @@ struct Player {
     Position position{0, 0};
     PlayerStats stats{};
     SkillSet skills;
+    // Static roster-template label (replay logging only, no gameplay effect);
+    // points into the static TeamRoster data, cheap to copy with the state.
+    const char* positionName = "";
     int8_t movementRemaining = 0;
     bool hasMoved = false;
     bool hasActed = false;

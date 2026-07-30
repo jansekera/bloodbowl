@@ -11,6 +11,10 @@ struct PlayerTemplate {
     PlayerStats stats;
     SkillSet skills;
     int8_t quantity;  // max count on roster
+    // Positional label for replay logs (e.g. "Blitzer +Guard"). Last field
+    // with a default so the many name-less base-roster initializers stay
+    // valid; currently only the TV1200 training rosters are labeled.
+    const char* name = "";
 };
 
 struct TeamRoster {

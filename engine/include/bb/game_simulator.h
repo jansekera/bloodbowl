@@ -63,6 +63,10 @@ struct TurnLog {
     bool ballHeld = false;
     int ballCarrierId = -1;
 
+    // Weather at the start of the turn (can change mid-game via the
+    // kickoff table's Changing Weather result)
+    Weather weather = Weather::NICE;
+
     // Events that happened during this turn
     std::vector<GameEvent> events;
 

@@ -501,12 +501,12 @@ const TeamRoster& getOrcRoster1200() {
     static const TeamRoster roster = {
         "Orc (TV1200)",
         {
-            {{5, 3, 3, 9}, {}, 11},  // Lineman (fill)
-            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
-            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
-            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
-            {{4, 4, 2, 9}, makeSkills({SkillName::Guard}), 4},  // Black Orc +Guard
-            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{5, 3, 3, 9}, {}, 11, "Lineman"},  // Lineman (fill)
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2, "Blitzer +Guard"},  // Blitzer +Guard
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1, "Blitzer +Mighty Blow"},  // Blitzer +Mighty Blow
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard}), 4, "Black Orc +Guard"},  // Black Orc +Guard
+            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
         },
         6, 60, true
     };
@@ -518,14 +518,14 @@ const TeamRoster& getHumanRoster1200() {
     static const TeamRoster roster = {
         "Human (TV1200)",
         {
-            {{6, 3, 3, 8}, {}, 11},  // Lineman (fill)
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
-            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
-            {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block}), 2},  // Catcher +Block
+            {{6, 3, 3, 8}, {}, 11, "Lineman"},  // Lineman (fill)
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 2, "Blitzer +Guard"},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1, "Blitzer +Mighty Blow"},  // Blitzer +Mighty Blow
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
             {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow,
-                SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1},  // Ogre +Block
+                SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1, "Ogre +Block"},  // Ogre +Block
         },
         7, 50, true
     };
@@ -537,13 +537,13 @@ const TeamRoster& getDwarfRoster1200() {
     static const TeamRoster roster = {
         "Dwarf (TV1200)",
         {
-            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11},  // Longbeard (fill)
-            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 4},  // Longbeard +Guard
-            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard}), 1},  // Blitzer +Guard
-            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::StripBall}), 1},  // Blitzer ball-hunter
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11, "Longbeard"},  // Longbeard (fill)
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 4, "Longbeard +Guard"},  // Longbeard +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard}), 1, "Blitzer +Guard"},  // Blitzer +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::StripBall}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
             {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
-                SkillName::Dauntless, SkillName::Guard}), 2},  // Troll Slayer +Guard
-            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2},  // Runner +Block
+                SkillName::Dauntless, SkillName::Guard}), 2, "Troll Slayer +Guard"},  // Troll Slayer +Guard
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},  // Runner +Block
         },
         6, 40, true
     };
@@ -555,12 +555,12 @@ const TeamRoster& getSkavenRoster1200() {
     static const TeamRoster roster = {
         "Skaven (TV1200)",
         {
-            {{7, 3, 3, 7}, {}, 11},  // Lineman (fill)
-            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet}), 4},  // Gutter Runner +Sure Feet
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 1},  // Blitzer +Guard
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
-            {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
-            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2},  // Lineman +Wrestle
+            {{7, 3, 3, 7}, {}, 11, "Lineman"},  // Lineman (fill)
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet}), 4, "Gutter Runner +Sure Feet"},  // Gutter Runner +Sure Feet
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 1, "Blitzer +Guard"},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
+            {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
         },
         6, 60, true
     };
@@ -572,16 +572,16 @@ const TeamRoster& getWoodElfRoster1200() {
     static const TeamRoster roster = {
         "Wood Elf (TV1200)",
         {
-            {{7, 3, 4, 7}, {}, 11},  // Lineman (fill)
+            {{7, 3, 4, 7}, {}, 11, "Lineman"},  // Lineman (fill)
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
-                SkillName::StripBall}), 1},  // Wardancer ball-hunter
+                SkillName::StripBall}), 1, "Wardancer ball-hunter"},  // Wardancer ball-hunter
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
-                SkillName::SideStep}), 1},  // Wardancer +Side Step
+                SkillName::SideStep}), 1, "Wardancer +Side Step"},  // Wardancer +Side Step
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
-                SkillName::Block}), 2},  // Catcher +Block
-            {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+                SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
+            {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
-                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1},  // Treeman +Guard
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},  // Treeman +Guard
         },
         6, 50, true
     };

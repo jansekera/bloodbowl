@@ -184,6 +184,11 @@ PYBIND11_MODULE(bb_engine, m) {
                     pd["y"] = p.y;
                     pd["state"] = p.state;
                     pd["has_ball"] = p.hasBall;
+                    pd["name"] = p.name;
+                    pd["ma"] = p.ma;
+                    pd["st"] = p.st;
+                    pd["ag"] = p.ag;
+                    pd["av"] = p.av;
                     out.append(pd);
                 }
                 return out;
@@ -240,6 +245,13 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["ball_carrier_id"] = turn.ballCarrierId;
                 t["turnover"] = turn.turnover;
                 t["touchdown"] = turn.touchdown;
+                switch (turn.weather) {
+                    case bb::Weather::SWELTERING_HEAT: t["weather"] = "sweltering_heat"; break;
+                    case bb::Weather::VERY_SUNNY:      t["weather"] = "very_sunny"; break;
+                    case bb::Weather::NICE:            t["weather"] = "nice"; break;
+                    case bb::Weather::POURING_RAIN:    t["weather"] = "pouring_rain"; break;
+                    case bb::Weather::BLIZZARD:        t["weather"] = "blizzard"; break;
+                }
 
                 // Player snapshots
                 py::list home_players, away_players;
@@ -250,6 +262,11 @@ PYBIND11_MODULE(bb_engine, m) {
                     pd["y"] = p.y;
                     pd["state"] = p.state;
                     pd["has_ball"] = p.hasBall;
+                    pd["name"] = p.name;
+                    pd["ma"] = p.ma;
+                    pd["st"] = p.st;
+                    pd["ag"] = p.ag;
+                    pd["av"] = p.av;
                     home_players.append(pd);
                 }
                 for (auto& p : turn.awayPlayers) {
@@ -259,6 +276,11 @@ PYBIND11_MODULE(bb_engine, m) {
                     pd["y"] = p.y;
                     pd["state"] = p.state;
                     pd["has_ball"] = p.hasBall;
+                    pd["name"] = p.name;
+                    pd["ma"] = p.ma;
+                    pd["st"] = p.st;
+                    pd["ag"] = p.ag;
+                    pd["av"] = p.av;
                     away_players.append(pd);
                 }
                 t["home_players"] = home_players;

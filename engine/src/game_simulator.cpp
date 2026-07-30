@@ -129,6 +129,7 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         };
         p.stats = roster.positionals[templateIdx].stats;
         p.skills = roster.positionals[templateIdx].skills;
+        p.positionName = roster.positionals[templateIdx].name;
         p.movementRemaining = p.stats.movement;
         p.hasMoved = false;
         p.hasActed = false;
@@ -199,6 +200,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
             };
             player.stats = roster.positionals[placements[p].templateIdx].stats;
             player.skills = roster.positionals[placements[p].templateIdx].skills;
+            player.positionName = roster.positionals[placements[p].templateIdx].name;
             player.movementRemaining = player.stats.movement;
             player.hasMoved = false;
             player.hasActed = false;
@@ -222,6 +224,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         };
         player.stats = roster.positionals[0].stats;
         player.skills = roster.positionals[0].skills;
+        player.positionName = roster.positionals[0].name;
         player.movementRemaining = player.stats.movement;
         player.hasMoved = false;
         player.hasActed = false;
@@ -487,6 +490,7 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     turn.ballY = board.ballY;
     turn.ballHeld = board.ballHeld;
     turn.ballCarrierId = board.ballCarrierId;
+    turn.weather = state.weather;
 
     return turn;
 }
