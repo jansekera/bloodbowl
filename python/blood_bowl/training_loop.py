@@ -663,12 +663,12 @@ def run_training(
                         'benchmark_mcts_iterations': mcts_iterations,
                     }, f)
 
-                if bm_wr > best_wr:
-                    if str(weights_path.resolve()) != str(best_path.resolve()):
-                        shutil.copy2(str(weights_path), str(best_path))
-                    else:
-                        # Training on weights_best.json directly — metadata already written
-                        pass
+                # Best-tracking and auto-revert are standalone-only: when an
+                # external orchestrator (run_iteration.py) owns weights_best.json,
+                # this vs-random benchmark must not overwrite its gated decision.
+                standalone = str(weights_path.resolve()) == str(best_path.resolve())
+                if standalone and bm_wr > best_wr:
+                    # Training on weights_best.json directly — metadata already written
                     print(f'  New best! Saved to {best_path.name}')
                     # Auto-push weights_best.json to GitHub
                     _git_push_weights_best(best_path, bm_wr, bm_sd, epoch)
@@ -677,27 +677,23 @@ def run_training(
                 # Auto-revert: if benchmark drops >5% below best, revert and stop
                 # Skip comparison if MCTS iterations differ (different baseline)
                 mcts_mismatch = best_mcts is not None and best_mcts != mcts_iterations
-                if best_wr > 0 and bm_wr < best_wr - 0.05 and not mcts_mismatch:
+                if standalone and best_wr > 0 and bm_wr < best_wr - 0.05 and not mcts_mismatch:
                     print(f'  Over-specialization detected: {bm_wr:.1%} < {best_wr:.1%} - 5%')
-                    if str(weights_path.resolve()) != str(best_path.resolve()):
-                        shutil.copy2(str(best_path), str(weights_path))
-                        print(f'  Reverted weights to best ({best_wr:.1%})')
-                    else:
-                        # Training on weights_best.json directly — restore from snapshot
-                        # Find the best snapshot
-                        best_snap = None
-                        for sp in sorted(weights_path.parent.glob('weights_snap_*.json')):
-                            try:
-                                with open(sp) as f:
-                                    sm = json.load(f)
-                                swr = sm.get('benchmark_win_rate', 0.0)
-                                if swr >= best_wr:
-                                    best_snap = sp
-                            except Exception:
-                                pass
-                        if best_snap:
-                            shutil.copy2(str(best_snap), str(weights_path))
-                            print(f'  Reverted from snapshot {best_snap.name}')
+                    # Training on weights_best.json directly — restore from snapshot
+                    # Find the best snapshot
+                    best_snap = None
+                    for sp in sorted(weights_path.parent.glob('weights_snap_*.json')):
+                        try:
+                            with open(sp) as f:
+                                sm = json.load(f)
+                            swr = sm.get('benchmark_win_rate', 0.0)
+                            if swr >= best_wr:
+                                best_snap = sp
+                        except Exception:
+                            pass
+                    if best_snap:
+                        shutil.copy2(str(best_snap), str(weights_path))
+                        print(f'  Reverted from snapshot {best_snap.name}')
                     print(f'  Stopping training early to prevent further degradation.')
                     break
 
