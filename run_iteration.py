@@ -70,6 +70,12 @@ GATING_MATCHES = int(os.environ.get('BB_GATE', GATING_MATCHES))
 SELECTION_H2H_MATCHES = int(os.environ.get('BB_SELECTION_H2H', SELECTION_H2H_MATCHES))
 # Team1 v2 validation knobs (defaulty = původní chování beze změny):
 VF_BLEND = float(os.environ.get('BB_VF_BLEND', VF_BLEND))
+# No-reset akumulační experiment (evidence/fable_noreset_design_20260730.md):
+# BB_NO_RESET=1 → (B) gate frozen = fixní kotva weights_anchor_noreset.json,
+# (C) trénink pokračuje z minulého kandidáta místo resetu na best,
+# (D) verdikt se jen zaznamená, weights_best se NIKDY nezapíše. S vypnutým
+# flagem je chování bajtově původní.
+NO_RESET = os.environ.get('BB_NO_RESET', '0') == '1'
 POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
 # Gate/benchmark policy priors (2026-07-02, project_bloodbowl_roadmap_20260702
 # Tier 1 item 1): ON by default. Loading a policy net -- even with
@@ -423,9 +429,17 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # baseline_reset's force-promote.
     abort_promote: list[str] = []
     # Step 1: Freeze current best
+    anchor_path = PROJECT_ROOT / 'weights_anchor_noreset.json'
     if best_path.exists():
-        shutil.copy2(str(best_path), str(frozen_path))
-        print('Frozen: weights_best.json → weights_frozen.json')
+        if NO_RESET:
+            if not anchor_path.exists():
+                shutil.copy2(str(best_path), str(anchor_path))
+                print('[NO-RESET] kotva založena: weights_best.json → weights_anchor_noreset.json')
+            shutil.copy2(str(anchor_path), str(frozen_path))
+            print('[NO-RESET] Frozen: weights_anchor_noreset.json → weights_frozen.json (fixní kotva)')
+        else:
+            shutil.copy2(str(best_path), str(frozen_path))
+            print('Frozen: weights_best.json → weights_frozen.json')
         try:
             meta_path = PROJECT_ROOT / 'weights_best_meta.json'
             if meta_path.exists():
@@ -486,9 +500,14 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         shutil.copy2(str(frozen_path), str(best_path))  # best == frozen, beze změny
         return False, None, 0.0
 
-    shutil.copy2(str(best_path), str(az_train_path))
     policy_cache_path = PROJECT_ROOT / 'weights_policy.json'
-    _carry_over_policy(az_train_path, best_path, policy_cache_path)
+    if NO_RESET and az_train_path.exists():
+        # az_train už nese value i policy z minulé iterace — nekopírovat nic
+        # (_carry_over_policy by přepsala akumulovanou hlavu)
+        print('[NO-RESET] pokračuji z minulého kandidáta, az_train ponechán', flush=True)
+    else:
+        shutil.copy2(str(best_path), str(az_train_path))
+        _carry_over_policy(az_train_path, best_path, policy_cache_path)
 
     # Step 2: Self-play training
     print(f'\n=== Self-play training ({EPOCHS} epochs x {GAMES_PER_EPOCH} games) ===')
@@ -763,7 +782,22 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
 
     label = 'promoted' if promote else 'rejected'
 
-    if promote:
+    if NO_RESET:
+        # Verdikt jen zaznamenat; weights_best se experimentu nikdy nedotkne.
+        # Kandidátem pro další iteraci je vítěz selekce.
+        print(f'[NO-RESET] verdikt {label} pouze zaznamenán (chess={chess_score:.1%}); '
+              f'weights_best beze změny', flush=True)
+        if str(gate_path) != str(az_train_path):
+            shutil.copy2(str(gate_path), str(az_train_path))
+            print('[NO-RESET] selekci vyhrál train_best → kopíruji do az_train pro další iteraci', flush=True)
+        # Archiv per-iterační stopy (počítadlo = existující archivy + 1)
+        it_n = len([f for f in os.listdir(str(PROJECT_ROOT))
+                    if f.startswith('weights_noreset_iter')]) + 1
+        shutil.copy2(str(gate_path), str(PROJECT_ROOT / f'weights_noreset_iter{it_n}.json'))
+        em = PROJECT_ROOT / 'epoch_metrics.csv'
+        if em.exists():
+            shutil.copy2(str(em), str(PROJECT_ROOT / f'epoch_metrics_noreset_iter{it_n}.csv'))
+    elif promote:
         shutil.copy2(str(gate_path), str(best_path))
         new_all_time = max(all_time_best_bm, new_bm)
         _atomic_write_json(PROJECT_ROOT / 'weights_best_meta.json',
