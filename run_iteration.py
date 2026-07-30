@@ -130,7 +130,7 @@ HIDDEN_SIZE = 64
 # TV=1200 fields developed (skilled) rosters: goblins removed from Orc, Guard density,
 # Strip Ball ball-hunter blitzer, Sure Feet gutter runners. tv<1200 = base rosters.
 TV = 1200
-WORKERS = min(12, os.cpu_count() or 1)
+WORKERS = min(int(os.environ.get('BB_WORKERS', 12)), os.cpu_count() or 1)
 # Watchdog: a healthy macro_mcts vs macro_mcts game finishes in ~50s. A wedged
 # game (engine infinite loop) never finishes. Rather than abort the whole pool
 # (which lost the entire 600-game gate on 2026-06-25 when game 599/600 hung),
