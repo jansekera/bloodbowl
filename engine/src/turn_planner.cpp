@@ -151,7 +151,7 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
         auto isRejected = [&](int id) {
             return std::find(rejected.begin(), rejected.end(), id) != rejected.end();
         };
-        while (true) {
+        while (static_cast<int>(accepted.size()) < MAX_SAFE_BACKUPS) {
             std::vector<Macro> cur;
             getAvailableMacros(projected, cur);
             std::vector<Macro> cands;
@@ -161,10 +161,22 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
                 if (isRejected(m.playerId)) continue;
                 cands.push_back(m);
             }
+            // Pick the RIGHT (at most) two backups, not merely the first two
+            // generated: prefer players who actually ARRIVE at their target
+            // square this turn (a backup that stops short denies nothing),
+            // then the player nearest the ball (cheapest -- fewest squares
+            // of positioning spent on this job).
             std::sort(cands.begin(), cands.end(),
                       [&](const Macro& a, const Macro& b) {
-                          int da = a.targetPos.distanceTo(state.ball.position);
-                          int db = b.targetPos.distanceTo(state.ball.position);
+                          const Player& pa = projected.getPlayer(a.playerId);
+                          const Player& pb = projected.getPlayer(b.playerId);
+                          bool arriveA = pa.position.distanceTo(a.targetPos) <=
+                                         static_cast<int>(pa.movementRemaining);
+                          bool arriveB = pb.position.distanceTo(b.targetPos) <=
+                                         static_cast<int>(pb.movementRemaining);
+                          if (arriveA != arriveB) return arriveA;
+                          int da = pa.position.distanceTo(state.ball.position);
+                          int db = pb.position.distanceTo(state.ball.position);
                           if (da != db) return da < db;
                           return a.playerId < b.playerId;
                       });
