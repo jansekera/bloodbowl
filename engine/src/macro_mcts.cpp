@@ -1,4 +1,5 @@
 #include "bb/macro_mcts.h"
+#include "bb/turn_planner.h"
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
 #include <algorithm>
@@ -897,7 +898,59 @@ ReplayOutcome MacroMCTSSearch::replayToNode(GameState& state, MacroMCTSNode* nod
 // --- MacroMCTSPolicy ---
 
 MacroMCTSPolicy::MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uint32_t seed)
-    : search_(vf, config, seed), expansionDice_(seed + 12345) {}
+    : search_(vf, config, seed), expansionDice_(seed + 12345) {
+    if (config.stagedPickupPlanner) {
+        stagedPlanner_ = std::make_unique<StagedTurnPlanner>(vf, config, seed + 777);
+    }
+}
+
+MacroMCTSPolicy::~MacroMCTSPolicy() = default;
+
+bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
+    if (state.phase != GamePhase::PLAY) return false;
+
+    // Team-turn boundary: any change of team/turn/half resets planner state
+    // (this also covers a mid-plan turnover -- the turn simply ends).
+    const TeamState& ts = state.getTeamState(state.activeTeam);
+    if (stagedPlanTeam_ != state.activeTeam || stagedPlanTurn_ != ts.turnNumber ||
+        stagedPlanHalf_ != state.half) {
+        stagedMacros_.clear();
+        stagedIndex_ = 0;
+        stagedPlanBuilt_ = false;
+        stagedPlanTeam_ = state.activeTeam;
+        stagedPlanTurn_ = ts.turnNumber;
+        stagedPlanHalf_ = state.half;
+    }
+
+    // At most one build per team-turn: once the plan is exhausted or
+    // abandoned, the rest of the turn belongs to per-macro search().
+    if (!stagedPlanBuilt_) {
+        stagedPlanBuilt_ = true;
+        if (classifyTurnGoal(state) == TurnGoal::PICKUP_BALL) {
+            StagedPlan plan = stagedPlanner_->build(state);
+            if (plan.valid) {
+                stagedMacros_ = std::move(plan.safeMacros);
+                stagedMacros_.push_back(plan.pickupMacro);
+                stagedIndex_ = 0;
+            }
+        }
+    }
+
+    if (stagedIndex_ >= stagedMacros_.size()) return false;
+
+    const Macro& next = stagedMacros_[stagedIndex_];
+    if (stagedMacroStillValid(state, next)) {
+        out = next;
+        stagedIndex_++;
+        return true;
+    }
+
+    // Deviation (anything the plan didn't model): abandon the remainder and
+    // fall back to the existing search() re-planning for the rest of the turn.
+    stagedMacros_.clear();
+    stagedIndex_ = 0;
+    return false;
+}
 
 void MacroMCTSPolicy::setLogDecisions(bool log, int topK) {
     logDecisions_ = log;
@@ -924,11 +977,17 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         planIndex_ = 0;
     }
 
-    // Search for best macro
-    Macro bestMacro = search_.search(state);
+    // Item 13 (config-gated, default off): an active staged plan supplies
+    // the next macro directly; otherwise search as today.
+    Macro bestMacro;
+    bool fromStagedPlan = stagedPlanner_ && nextStagedMacro(state, bestMacro);
+    if (!fromStagedPlan) {
+        bestMacro = search_.search(state);
+    }
 
-    // Log decision if enabled
-    if (logDecisions_) {
+    // Log decision if enabled (search-only: a staged-plan macro has no fresh
+    // visit distribution -- lastChildVisits() would be stale)
+    if (logDecisions_ && !fromStagedPlan) {
         const auto& childVisits = search_.lastChildVisits();
         if (!childVisits.empty()) {
             PolicyDecision decision;
@@ -961,6 +1020,19 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     // Expand the chosen macro into a plan
     GameState planState = state.clone();
     auto expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
+
+    if (expansion.actions.empty() && fromStagedPlan) {
+        // The planned macro no-opped against the real state (drift the
+        // semantic validator couldn't see). Without this, the empty-plan
+        // fallthrough below would return END_TURN and forfeit the turn's
+        // remaining activations. Treat as a deviation instead: abandon the
+        // staged plan and re-plan with the normal search.
+        stagedMacros_.clear();
+        stagedIndex_ = 0;
+        bestMacro = search_.search(state);
+        planState = state.clone();
+        expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
+    }
 
     currentPlan_ = std::move(expansion.actions);
     planIndex_ = 0;
