@@ -79,6 +79,13 @@ public:
     static constexpr int PROBE_K = 48;
     // Branch sampling for pSuccess / V(success) / V(fail).
     static constexpr int BRANCH_K = 64;
+    // Safe-stage cap (user design constraint, 2026-07-31): send ONE, at most
+    // TWO players as backups to the loose ball -- committing more strips the
+    // rest of the pitch (and an uncapped stage degenerated into a whole-team
+    // column converging on the ball, observed on mined state g0000).
+    // Candidate ordering below picks WHICH two: arrivals-this-turn first,
+    // then nearest player to the ball.
+    static constexpr int MAX_SAFE_BACKUPS = 2;
     // Fixed fail-branch penalty, same spirit and magnitude as
     // greedyLookaheadBonus's observed-turnover term (macro_mcts.cpp).
     static constexpr double FAIL_PENALTY = -0.10;

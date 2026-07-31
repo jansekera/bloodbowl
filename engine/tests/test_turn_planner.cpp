@@ -19,6 +19,9 @@ namespace {
 //         REPOSITION generation targets free ball-adjacent squares for
 //         them (item 11), i.e. exactly the "bring backup" behavior the
 //         staged plan must sequence BEFORE the pickup roll.
+//   p4 -- a THIRD free teammate, far from the ball: with the safe-stage cap
+//         (MAX_SAFE_BACKUPS=2, user constraint 2026-07-31) it must be the
+//         one left out -- the plan sends the two nearest backups only.
 //   p12 -- lone AWAY player far away: keeps macro generation realistic
 //         (BLITZ candidates exist) without any tackle zone near the action.
 // Rerolls 0 on both sides so pSuccess reflects the bare pickup roll
@@ -48,6 +51,7 @@ GameState makeLooseBallState(int pickerAgility = 4) {
     mk(1, TeamSide::HOME, {11, 7}, static_cast<int8_t>(pickerAgility));
     mk(2, TeamSide::HOME, {9, 4}, 3);
     mk(3, TeamSide::HOME, {16, 10}, 3);
+    mk(4, TeamSide::HOME, {5, 12}, 3);
     mk(12, TeamSide::AWAY, {24, 13}, 3);
     return state;
 }
@@ -130,7 +134,7 @@ TEST(TurnPlanner, PlanSequencesBackupsBeforePickup) {
 
     // Item 11 closure: teammates' backup REPOSITIONs are IN the plan and by
     // construction precede the branch (safeMacros execute before pickupMacro).
-    ASSERT_GE(plan.safeMacros.size(), 2u);
+    ASSERT_EQ(plan.safeMacros.size(), 2u);  // exactly the capped two
     EXPECT_GE(plan.backupCount, 2);
     for (const auto& m : plan.safeMacros) {
         EXPECT_EQ(m.type, MacroType::REPOSITION);
@@ -140,6 +144,27 @@ TEST(TurnPlanner, PlanSequencesBackupsBeforePickup) {
         // (stepping on it would auto-trigger a real pickup roll -- item 11).
         EXPECT_NE(m.targetPos, state.ball.position);
     }
+}
+
+TEST(TurnPlanner, SafeBackupCapAtTwo) {
+    // User design constraint (2026-07-31): send ONE, at most TWO backups to
+    // the loose ball -- more strips the rest of the pitch. The fixture has
+    // THREE free teammates (p2, p3, p4); the plan must accept exactly two,
+    // and specifically leave out p4 (the farthest -- the ordering prefers
+    // arrivals-this-turn, then the player nearest the ball).
+    GameState state = makeLooseBallState();
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+
+    ASSERT_TRUE(plan.valid);
+    ASSERT_EQ(plan.safeMacros.size(),
+              static_cast<size_t>(StagedTurnPlanner::MAX_SAFE_BACKUPS));
+    for (const auto& m : plan.safeMacros) {
+        EXPECT_NE(m.playerId, 4) << "farthest teammate must be the one left out";
+    }
+    // The two chosen are the near teammates, ordered nearest-to-ball first.
+    EXPECT_EQ(plan.safeMacros[0].playerId, 3);  // dist 3 to the ball
+    EXPECT_EQ(plan.safeMacros[1].playerId, 2);  // dist 4
 }
 
 TEST(TurnPlanner, PlanValueIsTwoBranchCombination) {
