@@ -15,6 +15,12 @@ existující statický `simulate()` heuristik. Žádný BLITZ/LOS/FOUL/multi-tur
 - `9e63d43` — feat(engine): StagedTurnPlanner + config gate + integrace do
   MacroMCTSPolicy + 15 unit testů
 - `aabd4c1` — feat(diag): harness + miner + 12 mined stavů
+- `8586d53` — feat(engine): **cap safe backupů na 2** (design constraint od
+  uživatele 31.07.: k volnému míči posílat jednoho, max dva hráče — víc jich
+  chybí jinde na hřišti; řeší i riziko „konvergující kolony") + preference
+  kandidátů, kteří na cíl REÁLNĚ dorazí tento tah, pak nejbližší k míči;
+  nový test SafeBackupCapAtTwo (3 volní spoluhráči → přijati přesně 2,
+  nejvzdálenější vynechán)
 
 ## Design rozhodnutí
 
@@ -38,7 +44,10 @@ existující statický `simulate()` heuristik. Žádný BLITZ/LOS/FOUL/multi-tur
    dalšího backupu proti aktuální obsazenosti. Terminace: přijatý hráč má
    hasMoved (mizí z poolu), odmítnutí hráči se pamatují — pool striktně
    klesá. Picker je ze safe stage vyloučen (hraje jen jednou, v branchi).
-   Řazení: cíl nejblíž míči první.
+   **Cap MAX_SAFE_BACKUPS=2** (uživatel, 31.07.): jeden, max dva backup
+   hráči — víc jich chybí jinde na hřišti. Výběr „správných dvou": napřed
+   kandidáti, kteří na cílové pole tento tah reálně DORAZÍ (backup, co
+   zastaví o pole dřív, nic nebrání), pak hráč nejblíž míči (nejlevnější).
 
 3. **Branch** — `sampleBranch` (BRANCH_K=64 vzorků `greedyExpandMacro(PICKUP)`
    na projektovaném stavu): success = makro končí s míčem v našem držení.
@@ -98,18 +107,22 @@ existující statický `simulate()` heuristik. Žádný BLITZ/LOS/FOUL/multi-tur
 
 ## Testy
 
-Celá suita: **468 testů, 467 zelených + 1 pre-existing wall-clock flake**
-(`MCTS.TimeBudgetRespected` — padá jen pod plnou zátěží stroje s tréninkem,
-izolovaně 3× po sobě zelený; s item13 nesouvisí). Všech 15 nových zelených.
+Celá suita po capu (`8586d53`): **469 testů, všech 469 zelených** (16 nových
+TurnPlanner*). Pozn.: v prvním plném běhu (pod plnou zátěží tréninku) jednou
+spadl pre-existing wall-clock flake `MCTS.TimeBudgetRespected` — izolovaně
+3× po sobě zelený, v opakovaném plném běhu zelený; s item13 nesouvisí.
 
 ## Mini-smoke harnessu (jediné spuštěné běhy; nPairs=4, ~1 min)
 
-- Stav 0 (g0000 h1t4): plán 6 safe + PICKUP p22, pSuccess=0.83;
-  **item11 metrika: B=1.00 vs A=0.00 adjacent backupů při pickup hodu**;
+- Stav 0 (g0000 h1t4), **s capem**: plán 2 safe s ROZDÍLNÝMI cíli
+  (21,8)+(21,9) + PICKUP p22, pSuccess=0.83, backupCount=2;
+  **item11 metrika: B=2.00 vs A=0.00 adjacent backupů při pickup hodu**;
   hodnota delta +0.00 (N=4 — bez výpovědi, jen sanity).
-- Stav 8 (g0008 h2t6, reálný TO): planner korektně ocenil **pSuccess=0.000**
-  (míč tento tah nedosažitelný — obě ramena shodně nezajistí míč);
-  item11 metrika opět B=1.00 vs A=0.00.
+- Stav 8 (g0008 h2t6, reálný TO; běh před capem): planner korektně ocenil
+  **pSuccess=0.000** (míč tento tah nedosažitelný — obě ramena shodně
+  nezajistí míč); item11 metrika B=1.00 vs A=0.00.
+- (Historicky, před capem: stav 0 dával 6 safe maker se STEJNÝM cílem a
+  1 příchodem — přesně „konvergující kolona", kterou cap řeší.)
 
 ## Jak spustit plnou validaci (po víkendu, až skončí trénink)
 
@@ -144,10 +157,8 @@ main vahám dát `/home/jan/claude/bloodbowl` jako repoRoot — JEN čtení).
   aspoň dojde k míči). Otázka pro post-validaci: má plán v takovém případě
   raději jen stavět backup a pickup nechat na příští tah? (multi-turn úvaha
   → mimo MVP scope.)
-- Konvergující kolona: když první backup nedorazí na cílové pole, další
-  regenerovaní kandidáti dostanou totéž pole (stále volné) — chová se jako
-  kolona k míči; ne chyba, ale plná validace ukáže, zda to proti produkci
-  neplýtvá aktivacemi.
+- ~~Konvergující kolona~~ — VYŘEŠENO capem `8586d53` (max 2 backupy +
+  preference reálně dorazivších); plná validace poběží už s capem.
 - Plán se staví max 1× za team-turn; po deviaci zbytek tahu řeší search
   (nový plán až příští tah) — vědomé MVP zjednodušení.
 - Náklad stavby plánu: ~((#přijatých+odmítnutých) × 48 + 2×64) expanzí makra
