@@ -9,9 +9,12 @@
 #include "bb/policies.h"
 #include "bb/dice.h"
 #include <vector>
+#include <memory>
 #include <cstdint>
 
 namespace bb {
+
+class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
 
 struct MacroMCTSNode {
     Macro macro;
@@ -76,6 +79,15 @@ public:
     // regression tests).
     std::vector<std::pair<Macro, float>> expandRootPriorsForTest(const GameState& state);
 
+    // Public wrapper over the private static leaf heuristic (simulate()).
+    // The item13 staged turn planner evaluates its projected branch states
+    // with the SAME leaf eval the search uses -- confirmed MVP design: no
+    // new value function. Non-const because the (config-gated) leafLookahead
+    // path inside simulate() rolls real dice.
+    double evaluateLeaf(const GameState& state, TeamSide perspective) {
+        return simulate(state, perspective);
+    }
+
 private:
     MacroMCTSNode* select(MacroMCTSNode* root, TeamSide searchingSide);
     void expand(MacroMCTSNode* node, const GameState& state);
@@ -103,8 +115,27 @@ class MacroMCTSPolicy {
     bool logDecisions_ = false;
     int topK_ = 20;
 
+    // Item 13 staged safe-then-PICKUP planner (config_.stagedPickupPlanner,
+    // default off). When a turn's goal is PICKUP_BALL, the planner supplies
+    // the whole turn's macro sequence up front (safe backups first, PICKUP
+    // branch last); any deviation falls back to per-macro search() for the
+    // rest of the turn -- the existing re-planning path, unchanged.
+    std::unique_ptr<StagedTurnPlanner> stagedPlanner_;
+    std::vector<Macro> stagedMacros_;
+    size_t stagedIndex_ = 0;
+    bool stagedPlanBuilt_ = false;  // at most one plan build per team-turn
+    int stagedPlanTurn_ = -1;
+    int stagedPlanHalf_ = -1;
+    TeamSide stagedPlanTeam_ = TeamSide::HOME;
+
+    // Next staged macro if an active plan covers this state (validates the
+    // macro against the current state; on deviation clears the plan and
+    // reports none so the caller re-enters search()).
+    bool nextStagedMacro(const GameState& state, Macro& out);
+
 public:
     MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
+    ~MacroMCTSPolicy();  // out-of-line: unique_ptr over fwd-declared planner
 
     Action operator()(const GameState& state);
 
