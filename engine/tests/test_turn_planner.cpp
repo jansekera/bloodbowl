@@ -167,6 +167,56 @@ TEST(TurnPlanner, SafeBackupCapAtTwo) {
     EXPECT_EQ(plan.safeMacros[1].playerId, 2);  // dist 4
 }
 
+TEST(TurnPlanner, SupportGateSkipsPlanWhenHelpPlentiful) {
+    // User directive (2026-08-03, "neplytvat -- kdyz uz tam nekdo je"):
+    // with plentiful standing teammates already near the loose ball the
+    // staged plan must NOT engage -- validation state g0005 (support=6)
+    // showed the forced backup ordering wastes activations there
+    // (turnovers 41%->49%, value -13.7 SE vs production).
+    GameState state = makeLooseBallState();
+    auto mk = [&](int id, Position pos) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+    };
+    // Base fixture has p1,p2,p3 within Chebyshev 6 of ball {13,7} (support
+    // 2). Four more nearby teammates -> 7 standing within radius, support 6
+    // > MAX_PICKUP_SUPPORT(4).
+    mk(5, {14, 9});
+    mk(6, {12, 10});
+    mk(7, {15, 5});
+    mk(8, {10, 9});
+
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+    EXPECT_FALSE(plan.valid) << "support gate must skip the plan at support > 4";
+}
+
+TEST(TurnPlanner, SupportGateAllowsPlanAtThreshold) {
+    // Boundary: support == MAX_PICKUP_SUPPORT(4) still plans (validation
+    // states with support <= 4 were neutral-to-positive).
+    GameState state = makeLooseBallState();
+    auto mk = [&](int id, Position pos) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+    };
+    mk(5, {14, 9});
+    mk(6, {12, 10});  // 5 standing within radius -> support 4 == threshold
+
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+    EXPECT_TRUE(plan.valid);
+}
+
 TEST(TurnPlanner, PlanValueIsTwoBranchCombination) {
     GameState state = makeLooseBallState();
     StagedTurnPlanner planner(nullptr, plannerConfig(), 42);

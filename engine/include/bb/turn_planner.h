@@ -86,6 +86,17 @@ public:
     // Candidate ordering below picks WHICH two: arrivals-this-turn first,
     // then nearest player to the ball.
     static constexpr int MAX_SAFE_BACKUPS = 2;
+    // Support gate (user directive 2026-08-03, "neplytvat -- kdyz uz tam
+    // nekdo je"): the staged plan only engages when the ball is genuinely
+    // unsupported. Validation over 12 mined states x 200 paired replays
+    // split cleanly on the miner's own support metric (standing teammates
+    // within Chebyshev SUPPORT_RADIUS of the ball, excluding the picker):
+    // support <= 4 -> paired value deltas neutral-to-positive (+4.0/+6.6 SE
+    // wins), support >= 5 -> mostly significant losses (worst -13.7 SE,
+    // g0005) because forced backup ordering wastes activations the
+    // production search already spends better when help is plentiful.
+    static constexpr int SUPPORT_RADIUS = 6;
+    static constexpr int MAX_PICKUP_SUPPORT = 4;
     // Fixed fail-branch penalty, same spirit and magnitude as
     // greedyLookaheadBonus's observed-turnover term (macro_mcts.cpp).
     static constexpr double FAIL_PENALTY = -0.10;
