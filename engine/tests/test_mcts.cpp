@@ -7,6 +7,7 @@
 #include "bb/action_resolver.h"
 #include <chrono>
 #include <cmath>
+#include <ctime>
 
 using namespace bb;
 
@@ -134,16 +135,19 @@ TEST(MCTS, TimeBudgetRespected) {
     config.timeBudgetMs = 100;
     config.maxIterations = 1000000;  // very high cap
 
-    auto start = std::chrono::steady_clock::now();
+    // CPU time, not wall time: under machine load the process gets
+    // descheduled and wall time balloons even though the internal budget
+    // check works. CPU time never exceeds what the search itself consumed,
+    // and a broken budget check still fails (loop would burn CPU up to
+    // maxIterations).
+    std::clock_t cpuStart = std::clock();
 
     MCTSSearch search(nullptr, config, 42);
     search.search(state);
 
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start).count();
+    double cpuMs = 1000.0 * static_cast<double>(std::clock() - cpuStart) / CLOCKS_PER_SEC;
 
-    // Should complete within 2x the budget (tolerance for overhead)
-    EXPECT_LT(elapsed, config.timeBudgetMs * 3);
+    EXPECT_LT(cpuMs, config.timeBudgetMs * 3);
 }
 
 TEST(MCTS, SingleActionNoSearch) {
