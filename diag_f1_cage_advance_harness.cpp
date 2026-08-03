@@ -226,6 +226,7 @@ int main(int argc, char** argv) {
 
         std::vector<PairResult> pairs;
         int candW = 0, candD = 0, candL = 0;
+        long candPlansTotal = 0;  // "did the gate even fire" diagnostics
         for (int i = 0; i < nPairs; ++i) {
             uint32_t seed = SEED_BASE + static_cast<uint32_t>(mi) * 1'000'000u
                             + static_cast<uint32_t>(i);
@@ -246,6 +247,8 @@ int main(int argc, char** argv) {
                     [&](const GameState& s) { return awayPol(s); },
                     seed * 2u + static_cast<uint32_t>(orient));
 
+                int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
+                candPlansTotal += candPlans;
                 int cs = candHome ? g.homeScore : g.awayScore;
                 int bs = candHome ? g.awayScore : g.homeScore;
                 double chess = cs > bs ? 1.0 : (cs < bs ? 0.0 : 0.5);
@@ -278,11 +281,12 @@ int main(int argc, char** argv) {
                             "{\"matchup\":%d,\"seed_idx\":%d,\"cand_home\":%s,"
                             "\"race_h\":\"%s\",\"race_a\":\"%s\",\"cand\":%d,"
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
-                            "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d}\n",
+                            "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
+                            "\"cand_plans\":%d}\n",
                             mi, i, candHome ? "true" : "false", mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
-                            g.away.dead, g.away.ejected, g.totalActions);
+                            g.away.dead, g.away.ejected, g.totalActions, candPlans);
                     fflush(rows);
                 }
             }
@@ -311,9 +315,11 @@ int main(int argc, char** argv) {
         double wr = dec > 0 ? static_cast<double>(candW) / dec : 0.0;
         printf("SUMMARY matchup %d (%s vs %s), %d pairs (%d games):\n",
                mi, mu.home, mu.away, static_cast<int>(n), 2 * static_cast<int>(n));
-        printf("  cand overall: W%d D%d L%d decisiveWR=%.3f chess=%.4f\n",
+        printf("  cand overall: W%d D%d L%d decisiveWR=%.3f chess=%.4f | "
+               "cage plans adopted %.2f/game\n",
                candW, candD, candL, wr,
-               (candW + 0.5 * candD) / (2.0 * n));
+               (candW + 0.5 * candD) / (2.0 * n),
+               candPlansTotal / (2.0 * n));
         printf("  PAIRED delta chess as %s: %+.4f +- %.4f SE (~%.1f SE) "
                "[pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]\n",
                mu.home, mean, se, se > 0 ? mean / se : 0.0);

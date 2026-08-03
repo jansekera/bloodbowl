@@ -131,6 +131,7 @@ class MacroMCTSPolicy {
     std::vector<Macro> stagedMacros_;
     size_t stagedIndex_ = 0;
     bool stagedPlanBuilt_ = false;  // at most one plan build per team-turn
+    int stagedPlansAdopted_ = 0;    // diagnostics: valid plans taken (game total)
     int stagedPlanTurn_ = -1;
     int stagedPlanHalf_ = -1;
     TeamSide stagedPlanTeam_ = TeamSide::HOME;
@@ -152,6 +153,10 @@ public:
 
     int lastIterations() const { return search_.lastIterations(); }
     double lastBestValue() const { return search_.lastBestValue(); }
+    // Diagnostics: how many staged plans (item13 pickup or F1 cage advance)
+    // this policy adopted over its lifetime -- harnesses report "did the
+    // gated feature even fire" alongside outcome deltas.
+    int stagedPlansAdopted() const { return stagedPlansAdopted_; }
 };
 
 } // namespace bb

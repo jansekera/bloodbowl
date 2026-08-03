@@ -417,6 +417,8 @@ TEST(CageAdvancePolicy, CornersActBeforeCarrierWhenEnabled) {
     // the A/B harness, see evidence report).
     EXPECT_GE(state.getPlayer(1).position.x, 14);
     EXPECT_EQ(state.getPlayer(1).position.y, 7);
+    // Diagnostics counter the A/B harness reports ("did the gate fire?").
+    EXPECT_EQ(policy.stagedPlansAdopted(), 1);
 }
 
 TEST(CageAdvancePolicy, DisabledGateMatchesSearchPath) {

@@ -937,6 +937,7 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
                 stagedMacros_ = std::move(plan.safeMacros);
                 stagedMacros_.push_back(plan.pickupMacro);
                 stagedIndex_ = 0;
+                stagedPlansAdopted_++;
             }
         } else if (cagePlanner_ && goal == TurnGoal::ADVANCE_BALL) {
             // F1 cage advance: shift the whole cage 1-2 squares (corners
@@ -948,6 +949,7 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
             if (plan.valid) {
                 stagedMacros_ = std::move(plan.macros);
                 stagedIndex_ = 0;
+                stagedPlansAdopted_++;
             }
         }
     }
