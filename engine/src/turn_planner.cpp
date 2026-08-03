@@ -118,6 +118,22 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
     plan.goal = classifyTurnGoal(state);
     if (plan.goal != TurnGoal::PICKUP_BALL) return plan;
 
+    // Support gate: with plentiful help already near the loose ball the
+    // production search outperforms the forced safe->pickup ordering
+    // (see MAX_PICKUP_SUPPORT rationale in the header). Mirrors the state
+    // miner's metric exactly: standing active-team players within
+    // Chebyshev SUPPORT_RADIUS of the ball, minus one for the picker.
+    {
+        int nearBall = 0;
+        state.forEachPlayer(state.activeTeam, [&](const Player& p) {
+            if (p.state != PlayerState::STANDING) return;
+            int dx = std::abs(p.position.x - state.ball.position.x);
+            int dy = std::abs(p.position.y - state.ball.position.y);
+            if (std::max(dx, dy) <= SUPPORT_RADIUS) nearBall++;
+        });
+        if (nearBall - 1 > MAX_PICKUP_SUPPORT) return plan;
+    }
+
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
