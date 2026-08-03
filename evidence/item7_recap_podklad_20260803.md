@@ -63,3 +63,22 @@ bychom se jen delší trasou), tedy vědomě odložený scope (backlog rozhodnut
    (oba body se potkávají v „kam přesně doskočit a kudy")?
 3. Souhlas s uzavřením item7 TZ tiebreak rekapitulace (fix funguje na 100 % svého
    scope, regresní test drží)?
+
+
+## DODATEK z rekapitulace (03.08. ~13:15, proběhla dřív) — KOREKCE a závěry
+
+1. **Korekce „odměn":** v 5 z 10 hazardních approachů byl sražen ÚTOČNÍK (KNOCKED_DOWN
+   player_id == blocker), ne obránce: bilance 10 hazardů = 5× push, 5× útočník down +
+   TURNOVER (1× vlastní INJURY, g0022), **0× sražený obránce**. Logika: dodge do 3-4 TZ
+   = cíl má plné protiassisty = blok 1d/proti → vysoká šance attacker down. Chyby se násobí.
+2. **P(celá cesta) úspěchu 2,6–33 %** (výpočet 7−AG+destTZ; survivor bias — korpus-wide
+   344 dodge, 28 % fail, 90× okamžitý turnover).
+3. **Kontext: NOUZE to nebyla** — 3 hazardy při vedení, 2 v 1. tahu hry; jediný kandidát
+   na nouzi g0009 (0:1, 2. poločas), odměnou ale jen push.
+4. **ZÁVĚR REKAPITULACE (dohodnuto s uživatelem):** tiebreak fix uzavřen (100 % svého
+   scope). Detoury samostatně NE — nová malá MR v BLITZ sérii: **celo-hrové acceptance
+   kritérium** = P(cesta) × P(blok nespadne — kostky/protiassisty na finálním poli) ×
+   hodnota odměny dle účelu − odveta na tělo blitzera; **práh ≥ ~50 % na SOUČIN, podkročení
+   jen v nouzi (skóre deficit × turnsLeft) a jen pro účel MÍČ/SCORE, nikdy push**.
+   Block-dice skórování finálního pole tím přestává být samostatná vrstva — je povinnou
+   součástí acceptance.
