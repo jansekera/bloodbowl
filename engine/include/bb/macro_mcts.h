@@ -15,6 +15,7 @@
 namespace bb {
 
 class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
+class CageAdvancePlanner; // bb/cage_advance.h (F1, 2026-08-03)
 
 struct MacroMCTSNode {
     Macro macro;
@@ -121,6 +122,12 @@ class MacroMCTSPolicy {
     // branch last); any deviation falls back to per-macro search() for the
     // rest of the turn -- the existing re-planning path, unchanged.
     std::unique_ptr<StagedTurnPlanner> stagedPlanner_;
+    // F1 cage advance (config_.cageAdvance, default off): when a turn's goal
+    // is ADVANCE_BALL and a cage stands around the carrier, this planner may
+    // supply the whole cage-shift macro sequence (corners first, carrier
+    // last) through the same staged-plan machinery. Mutually exclusive with
+    // the pickup plan by goal (PICKUP_BALL vs ADVANCE_BALL).
+    std::unique_ptr<CageAdvancePlanner> cagePlanner_;
     std::vector<Macro> stagedMacros_;
     size_t stagedIndex_ = 0;
     bool stagedPlanBuilt_ = false;  // at most one plan build per team-turn
