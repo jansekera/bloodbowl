@@ -147,6 +147,84 @@ class TestBenchmarkGameSideSwap:
         assert res is True                # home 7 - away 3, candidate always HOME
 
 
+class TestGatePolicyBlend:
+    """Krok 2 policy aktivace (2026-08-03): 11. prvek _gate_game je trojice
+    (cand_policy_blend, frozen_policy_path, frozen_policy_blend); 9. prvek
+    _benchmark_game je cand_policy_blend. Default = bajtově původní chování
+    (blend 0, away sdílí home síť)."""
+
+    def test_gate_11tuple_cand_home_shared_frozen(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
+                    (0.2, '', 0.0)))
+        call = fake_engine.calls[-1]
+        assert call['policy_weights_path'] == 'POL'
+        assert call['policy_blend'] == 0.2
+        assert call['away_policy_weights_path'] == ''   # frozen sdílí síť
+        assert call['away_policy_blend'] == 0.0
+
+    def test_gate_11tuple_cand_away_shared_frozen(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
+                    (0.2, '', 0.0)))
+        call = fake_engine.calls[-1]
+        # HOME = frozen sdílí stash síť s blendem 0; AWAY = kandidát s blendem
+        assert call['policy_weights_path'] == 'POL'
+        assert call['policy_blend'] == 0.0
+        assert call['away_policy_weights_path'] == ''
+        assert call['away_policy_blend'] == 0.2
+
+    def test_gate_11tuple_cand_home_frozen_own_policy(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
+                    (0.2, 'BESTPOL', 0.1)))
+        call = fake_engine.calls[-1]
+        assert call['policy_weights_path'] == 'POL'
+        assert call['policy_blend'] == 0.2
+        assert call['away_policy_weights_path'] == 'BESTPOL'
+        assert call['away_policy_blend'] == 0.1
+
+    def test_gate_11tuple_cand_away_frozen_own_policy(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
+                    (0.2, 'BESTPOL', 0.1)))
+        call = fake_engine.calls[-1]
+        assert call['policy_weights_path'] == 'BESTPOL'   # HOME = frozen
+        assert call['policy_blend'] == 0.1
+        assert call['away_policy_weights_path'] == 'POL'  # AWAY = kandidát
+        assert call['away_policy_blend'] == 0.2
+
+    def test_gate_selection_h2h_blend_both_sides(self, fake_engine):
+        """Selection H2H: obě strany stejný blend nad sdílenou stash policy."""
+        _gate_game((1, 0, 'AZ', 'TB', 100, 0.0, 1200, False, 'POL', False,
+                    (0.2, '', 0.2)))
+        call = fake_engine.calls[-1]
+        assert call['policy_blend'] == 0.2
+        assert call['away_policy_blend'] == 0.2
+        assert call['away_policy_weights_path'] == ''
+
+    def test_gate_10tuple_default_is_byte_identical(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False))
+        call = fake_engine.calls[-1]
+        assert call['policy_blend'] == 0.0
+        assert call['away_policy_blend'] == 0.0
+        assert call['away_policy_weights_path'] == ''
+
+    def test_benchmark_9tuple_cand_home(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', False, 0.2))
+        call = fake_engine.calls[-1]
+        assert call['policy_blend'] == 0.2
+        assert call['away_policy_blend'] == 0.0
+
+    def test_benchmark_9tuple_cand_away(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True, 0.2))
+        call = fake_engine.calls[-1]
+        assert call['policy_blend'] == 0.0
+        assert call['away_policy_blend'] == 0.2
+
+    def test_benchmark_8tuple_default_blend_zero(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True))
+        call = fake_engine.calls[-1]
+        assert call['policy_blend'] == 0.0
+        assert call['away_policy_blend'] == 0.0
+
+
 class TestScheduleBalance:
     """The production schedules assign orientation i % 2 and matchup
     races[i%5] vs races[(i+1)%5]; gcd(2,5)=1 -> period 10, so every

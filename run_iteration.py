@@ -92,6 +92,14 @@ POLICY_BLEND = float(os.environ.get('BB_POLICY_BLEND', 0.0))
 # sensitivity, that's Tier 2 item 6. Set BB_GATE_USE_POLICY_PRIORS=0 to
 # force off (rollback/isolation testing).
 GATE_USE_POLICY_PRIORS = os.environ.get('BB_GATE_USE_POLICY_PRIORS', '1') != '0'
+# Krok 2 policy aktivace (evidence/fable_policy_activation_design_20260731.md §4,
+# potvrzeno krokem 1: diag_policy_confirm_20260731 N=1600, decisive WR 54,26 % >=
+# práh 52,65 %). Blend naučeného obsahu policy do measurement path: kandidátní
+# strana gate + benchmark + selection H2H (obě strany). Default 0.0 = bajtově
+# původní chování (vzor BB_NO_RESET). Frozen strana hraje s policy_blend, se
+# kterým byla promotnuta (weights_best_meta.json 'policy_blend', do první
+# promoce s blendem tedy 0.0 a sdílená síť = jen prior floors).
+GATE_POLICY_BLEND = float(os.environ.get('BB_GATE_POLICY_BLEND', '0.0'))
 # Gate/benchmark eval-parity (2026-07-10). Both knobs below exist because
 # gating and benchmarking run through simulate_game_logged -- the binding built
 # for SELF-PLAY -- rather than simulate_game, the eval binding, which cannot
@@ -261,8 +269,16 @@ def _benchmark_game(args: tuple) -> bool:
     #
     # 7th element (policy_path) optional/backward-compatible: existing 6-tuple
     # callers are unaffected and get no policy net (engine default).
+    #
+    # 9th element (cand_policy_blend) optional/backward-compatible (krok 2,
+    # 2026-08-03): blend naučeného obsahu policy na měřené (macro_mcts) straně.
+    # Default 0.0 = dnešní chování (jen prior floors z policy_path).
     cand_is_away = False
-    if len(args) >= 8:
+    cand_policy_blend = 0.0
+    if len(args) >= 9:
+        (seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path,
+         cand_is_away, cand_policy_blend) = args[:9]
+    elif len(args) >= 8:
         seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path, cand_is_away = args[:8]
     elif len(args) >= 7:
         seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path = args[:7]
@@ -280,6 +296,8 @@ def _benchmark_game(args: tuple) -> bool:
         seed=seed, mcts_iterations=mcts_iterations,
         weights_path=gate_path, epsilon=0.0, vf_blend=vf_blend,
         policy_weights_path=policy_path,
+        policy_blend=(0.0 if cand_is_away else cand_policy_blend),
+        away_policy_blend=(cand_policy_blend if cand_is_away else 0.0),
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
@@ -308,8 +326,20 @@ def _gate_game(args: tuple) -> tuple:
     # activates that dormant regime WITHOUT touching any learned weight
     # content (policy_blend stays 0) -- see project memory
     # project_bloodbowl_roadmap_20260702 Tier 1 item 1.
+    # 11th element (policy_cfg) optional/backward-compatible (krok 2,
+    # 2026-08-03): trojice (cand_policy_blend, frozen_policy_path,
+    # frozen_policy_blend). Kandidátní strana čte sdílenou stash policy
+    # (policy_path) s cand_policy_blend; frozen strana hraje s policy a
+    # blendem, se kterými byla promotnuta (weights_best_policy.json /
+    # weights_best_meta.json) — frozen_policy_path='' znamená sdílet síť
+    # kandidáta (obsah se při frozen_policy_blend=0 nečte, jen floors).
+    # Default (0.0, '', 0.0) = bajtově dnešní chování.
     cand_is_away = False
-    if len(args) >= 10:
+    policy_cfg = (0.0, '', 0.0)
+    if len(args) >= 11:
+        (seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend,
+         tv, leaf_lookahead, policy_path, cand_is_away, policy_cfg) = args[:11]
+    elif len(args) >= 10:
         (seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend,
          tv, leaf_lookahead, policy_path, cand_is_away) = args[:10]
     elif len(args) >= 9:
@@ -326,6 +356,16 @@ def _gate_game(args: tuple) -> tuple:
     ar = bb_engine.get_developed_roster(_RACES[(race_idx + 1) % len(_RACES)], tv)
     home_w, away_w = ((frozen_path, gate_path) if cand_is_away
                       else (gate_path, frozen_path))
+    cand_pb, frozen_ppath, frozen_pb = policy_cfg
+    if cand_is_away:
+        # HOME = frozen: vlastní zmrazená policy, nebo sdílí kandidátovu síť
+        home_policy = frozen_ppath if frozen_ppath else policy_path
+        away_policy = policy_path if frozen_ppath else ''
+        home_pb, away_pb = frozen_pb, cand_pb
+    else:
+        home_policy = policy_path
+        away_policy = frozen_ppath   # '' -> away sdílí home síť (dnešní chování)
+        home_pb, away_pb = cand_pb, frozen_pb
     result = bb_engine.simulate_game_logged(
         hr, ar,
         home_ai='macro_mcts', away_ai='macro_mcts',
@@ -333,7 +373,10 @@ def _gate_game(args: tuple) -> tuple:
         weights_path=home_w, away_weights_path=away_w,
         epsilon=0.0, vf_blend=vf_blend,
         leaf_lookahead=leaf_lookahead,
-        policy_weights_path=policy_path,
+        policy_weights_path=home_policy,
+        policy_blend=home_pb,
+        away_policy_weights_path=away_policy,
+        away_policy_blend=away_pb,
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
@@ -428,6 +471,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # neither promote nor push — keep the current best untouched. Overrides
     # baseline_reset's force-promote.
     abort_promote: list[str] = []
+    # policy_blend, se kterým byl šampion promotnut (0.0 = před první promocí
+    # s blendem); čte se z weights_best_meta.json ve Step 1.
+    frozen_policy_blend = 0.0
     # Step 1: Freeze current best
     anchor_path = PROJECT_ROOT / 'weights_anchor_noreset.json'
     if best_path.exists():
@@ -455,10 +501,17 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 # frozen_bm_stale), aby tier srovnával stejné metriky.
                 meta_vfb = meta.get('benchmark_vf_blend', 0.0)
                 meta_mcts = meta.get('benchmark_mcts_iterations', MCTS_ITERATIONS)
-                if meta_vfb != GATE_VF_BLEND or meta_mcts != MCTS_ITERATIONS:
+                # policy_blend, se kterým byl šampion promotnut (krok 2):
+                # frozen strana gate s ním hraje; mismatch vůči aktuálnímu
+                # GATE_POLICY_BLEND dělá uloženou benchmark baseline
+                # nesrovnatelnou (stejná třída jako vf_blend/mcts mismatch).
+                frozen_policy_blend = float(meta.get('policy_blend', 0.0))
+                if (meta_vfb != GATE_VF_BLEND or meta_mcts != MCTS_ITERATIONS
+                        or frozen_policy_blend != GATE_POLICY_BLEND):
                     print(f'⚠ Benchmark konfigurace se změnila (vf_blend '
                           f'{meta_vfb}→{GATE_VF_BLEND}, mcts {meta_mcts}→'
-                          f'{MCTS_ITERATIONS}): uložená baseline '
+                          f'{MCTS_ITERATIONS}, policy_blend '
+                          f'{frozen_policy_blend}→{GATE_POLICY_BLEND}): uložená baseline '
                           f'{frozen_bm:.1%} není srovnatelná — frozen se '
                           f'přeběhne pod novou konfigurací.', flush=True)
                     frozen_bm_stale = True
@@ -494,6 +547,19 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         frozen_bm = 0.0
         all_time_best_bm = 0.0
         print('First run: created fresh weights')
+
+    # Frozen strana gate hraje se SVOU zmrazenou policy (promotion snapshot).
+    # Chybějící snapshot při frozen_policy_blend > 0 = nekonzistentní stav
+    # (šampion byl promotnut s policy, kterou nemáme) → abort, ne tichý
+    # fallback na driftující stash.
+    best_policy_path = PROJECT_ROOT / 'weights_best_policy.json'
+    frozen_policy_gate_path = ''
+    if frozen_policy_blend > 0.0:
+        if best_policy_path.exists():
+            frozen_policy_gate_path = str(best_policy_path)
+        else:
+            abort_promote.append(f'weights_best_meta policy_blend='
+                                 f'{frozen_policy_blend} ale weights_best_policy.json chybí')
 
     if abort_promote:
         print('⛔ ABORT iterace (před tréninkem): ' + '; '.join(abort_promote), flush=True)
@@ -579,16 +645,19 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # GATE_USE_POLICY_PRIORS comment above.
     gate_policy_path = str(policy_cache_path) if GATE_USE_POLICY_PRIORS and policy_cache_path.exists() else ''
 
-    def _run_benchmark(path: Path, label: str) -> tuple[float, bool]:
+    def _run_benchmark(path: Path, label: str, policy_path: str | None = None,
+                       policy_blend: float | None = None) -> tuple[float, bool]:
         # GATE_VF_BLEND, ne VF_BLEND (fable_pipeline_audit_20260730 N2):
         # s tréninkovým VF_BLEND=0 benchmark vůbec nečetl měřené váhy
         # (macro_mcts přeskočí value net při blend=0) — skóre bylo
         # null-test nezávislý na kandidátovi, a přitom řídil tier
         # laťku, BM_FLOOR i HARD-REJECT. Stejná třída chyby, jaká byla
         # 21.07 opravena v gate (GATE_VF_BLEND gap).
+        pp = gate_policy_path if policy_path is None else policy_path
+        pb = GATE_POLICY_BLEND if policy_blend is None else policy_blend
         tasks = [
             (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
-             gate_policy_path, i % 2 == 1)
+             pp, i % 2 == 1, pb)
             for i in range(half_bm)
         ]
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
@@ -607,7 +676,13 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         return score, complete
 
     if frozen_bm_stale:
-        frozen_bm, frozen_ok = _run_benchmark(frozen_path, 'frozen re-benchmark')
+        # Frozen se benchmarkuje se SVOU policy konfigurací (promotion
+        # snapshot + blend), ne s kandidátovou — jinak by re-benchmark
+        # měřil jiný systém, než jaký frozen v gate reálně hraje.
+        frozen_bm, frozen_ok = _run_benchmark(
+            frozen_path, 'frozen re-benchmark',
+            policy_path=(frozen_policy_gate_path or gate_policy_path),
+            policy_blend=frozen_policy_blend)
         if not frozen_ok:
             abort_promote.append('frozen re-benchmark incomplete (engine hang?)')
         # all_time_best ze staré konfigurace není srovnatelný — restart
@@ -626,9 +701,12 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         abort_promote.append('benchmark incomplete (engine hang? — viz WATCHDOG výše)')
 
     if train_best_path.exists():
+        # az_train i train_best sdílejí TUTÉŽ stash policy → blend na OBĚ
+        # strany stejně (srovnává se value hlava za identického policy režimu).
         h2h_tasks = [
             (random.randint(1, 999999), i, str(az_train_path), str(train_best_path),
-             MCTS_ITERATIONS, GATE_VF_BLEND, TV, False, gate_policy_path, i % 2 == 1)
+             MCTS_ITERATIONS, GATE_VF_BLEND, TV, False, gate_policy_path, i % 2 == 1,
+             (GATE_POLICY_BLEND, '', GATE_POLICY_BLEND))
             for i in range(SELECTION_H2H_MATCHES)
         ]
         print(f'Selection H2H: az_train vs train_best, {SELECTION_H2H_MATCHES} games '
@@ -674,7 +752,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # Step 4: Anti-regression gating games (winner vs frozen)
     gate_tasks = [
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
-         False, gate_policy_path, i % 2 == 1)   # sudé i: cand=HOME, liché: cand=AWAY
+         False, gate_policy_path, i % 2 == 1,   # sudé i: cand=HOME, liché: cand=AWAY
+         (GATE_POLICY_BLEND, frozen_policy_gate_path, frozen_policy_blend))
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
@@ -800,9 +879,25 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     elif promote:
         shutil.copy2(str(gate_path), str(best_path))
         new_all_time = max(all_time_best_bm, new_bm)
-        _atomic_write_json(PROJECT_ROOT / 'weights_best_meta.json',
-                           {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                            'all_time_best_benchmark': new_all_time, 'tv': TV})
+        new_meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                    'all_time_best_benchmark': new_all_time, 'tv': TV,
+                    'policy_blend': GATE_POLICY_BLEND}
+        if GATE_POLICY_BLEND > 0.0:
+            # Promotion snapshot policy: gate schválil kombinaci (value,
+            # policy@teď) — bez zmrazení by stash dál driftovala a šampion
+            # by hrál s jinou policy, než s jakou prošel (design §4.1 bod 5).
+            if gate_policy_path:
+                shutil.copy2(gate_policy_path, str(PROJECT_ROOT / 'weights_best_policy.json'))
+                import hashlib
+                with open(gate_policy_path, 'rb') as pf:
+                    new_meta['policy_md5'] = hashlib.md5(pf.read()).hexdigest()
+                print(f'  policy snapshot: weights_best_policy.json (blend={GATE_POLICY_BLEND})', flush=True)
+            else:
+                print('⚠ GATE_POLICY_BLEND > 0 ale gate běžel bez policy souboru '
+                      '(BB_GATE_USE_POLICY_PRIORS=0?) — blend neměl účinek, '
+                      'snapshot se nezapisuje, meta policy_blend=0.', flush=True)
+                new_meta['policy_blend'] = 0.0
+        _atomic_write_json(PROJECT_ROOT / 'weights_best_meta.json', new_meta)
         print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
@@ -822,6 +917,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             'wilson_ci_95': [ci_lo, ci_hi],
         },
         'threshold': {'k': k, 'tier': tier, 'required': required, 'sigma': sigma},
+        'gate_policy_blend': GATE_POLICY_BLEND,
+        'frozen_policy_blend': frozen_policy_blend,
         'frozen_bm': frozen_bm,
         'all_time_best_bm': all_time_best_bm,
         'baseline_reset': baseline_reset,
