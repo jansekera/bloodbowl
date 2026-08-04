@@ -878,29 +878,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             shutil.copy2(str(em), str(PROJECT_ROOT / f'epoch_metrics_noreset_iter{it_n}.csv'))
     elif promote:
         shutil.copy2(str(gate_path), str(best_path))
-        new_all_time = max(all_time_best_bm, new_bm)
-        new_meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                    'all_time_best_benchmark': new_all_time, 'tv': TV,
-                    'policy_blend': GATE_POLICY_BLEND}
-        if GATE_POLICY_BLEND > 0.0:
-            # Promotion snapshot policy: gate schválil kombinaci (value,
-            # policy@teď) — bez zmrazení by stash dál driftovala a šampion
-            # by hrál s jinou policy, než s jakou prošel (design §4.1 bod 5).
-            if gate_policy_path:
-                shutil.copy2(gate_policy_path, str(PROJECT_ROOT / 'weights_best_policy.json'))
-                import hashlib
-                with open(gate_policy_path, 'rb') as pf:
-                    new_meta['policy_md5'] = hashlib.md5(pf.read()).hexdigest()
-                print(f'  policy snapshot: weights_best_policy.json (blend={GATE_POLICY_BLEND})', flush=True)
-            else:
-                print('⚠ GATE_POLICY_BLEND > 0 ale gate běžel bez policy souboru '
-                      '(BB_GATE_USE_POLICY_PRIORS=0?) — blend neměl účinek, '
-                      'snapshot se nezapisuje, meta policy_blend=0.', flush=True)
-                new_meta['policy_blend'] = 0.0
-        _atomic_write_json(PROJECT_ROOT / 'weights_best_meta.json', new_meta)
+        _promote_meta_write(PROJECT_ROOT, new_bm, all_time_best_bm, gate_policy_path)
         print(f'PROMOTED (benchmark={new_bm:.1%}, chess={chess_score:.1%}) → weights_best.json updated', flush=True)
     else:
         shutil.copy2(str(frozen_path), str(best_path))
+        _reject_meta_write(PROJECT_ROOT, frozen_bm, all_time_best_bm)
         print(f'REJECTED: {"; ".join(reasons)}', flush=True)
 
     _append_gate_history({
@@ -931,14 +913,63 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print('(git push přeskočen — --no-push)')
     else:
         _git_push(PROJECT_ROOT, promote, frozen_path, gate_path,
-                  frozen_bm, new_bm, chess_score, label, all_time_best_bm)
+                  new_bm, chess_score, label)
 
     return promote, new_bm, chess_score
 
 
+def _promote_meta_write(root: Path, new_bm: float, all_time_best_bm: float,
+                        gate_policy_path: str) -> dict:
+    """Meta šampiona po PROMOCI: kompletní benchmark konfigurace (vč.
+    benchmark_vf_blend — bez něj další iterace zbytečně re-benchmarkuje
+    frozen) + promotion snapshot policy s policy_blend/policy_md5."""
+    new_meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                'benchmark_vf_blend': GATE_VF_BLEND,
+                'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV,
+                'policy_blend': GATE_POLICY_BLEND}
+    if GATE_POLICY_BLEND > 0.0:
+        # Promotion snapshot policy: gate schválil kombinaci (value,
+        # policy@teď) — bez zmrazení by stash dál driftovala a šampion
+        # by hrál s jinou policy, než s jakou prošel (design §4.1 bod 5).
+        if gate_policy_path:
+            shutil.copy2(gate_policy_path, str(root / 'weights_best_policy.json'))
+            import hashlib
+            with open(gate_policy_path, 'rb') as pf:
+                new_meta['policy_md5'] = hashlib.md5(pf.read()).hexdigest()
+            print(f'  policy snapshot: weights_best_policy.json (blend={GATE_POLICY_BLEND})', flush=True)
+        else:
+            print('⚠ GATE_POLICY_BLEND > 0 ale gate běžel bez policy souboru '
+                  '(BB_GATE_USE_POLICY_PRIORS=0?) — blend neměl účinek, '
+                  'snapshot se nezapisuje, meta policy_blend=0.', flush=True)
+            new_meta['policy_blend'] = 0.0
+    _atomic_write_json(root / 'weights_best_meta.json', new_meta)
+    return new_meta
+
+
+def _reject_meta_write(root: Path, frozen_bm: float, all_time_best_bm: float) -> dict:
+    """Meta šampiona po REJECTED iteraci: šampion beze změny, ale baseline
+    mohla být přeběhnuta pod aktuální konfigurací — zapsat, ať se re-benchmark
+    netriggeruje každou iteraci znovu. Policy pole (policy_blend/policy_md5)
+    popisují PROMOCI šampiona a musí přežít nedotčená — jinak by frozen příští
+    iteraci hrál bez policy, se kterou byl promotnut."""
+    meta_path = root / 'weights_best_meta.json'
+    meta = {}
+    if meta_path.exists():
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+        except Exception:
+            meta = {}
+    meta.update({'benchmark_win_rate': frozen_bm,
+                 'benchmark_mcts_iterations': MCTS_ITERATIONS,
+                 'benchmark_vf_blend': GATE_VF_BLEND,
+                 'all_time_best_benchmark': all_time_best_bm, 'tv': TV})
+    _atomic_write_json(meta_path, meta)
+    return meta
+
+
 def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
-              frozen_bm: float, new_bm: float, chess_score: float, label: str,
-              all_time_best_bm: float) -> None:
+              new_bm: float, chess_score: float, label: str) -> None:
     try:
         # Read weights into memory BEFORE git reset (reset overwrites working tree)
         with open(gate_path, 'rb') as f:
@@ -951,6 +982,14 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
         # policy_loss / top1_agreement se do gitu nikdy nedostanou.
         metrics_path = root / 'epoch_metrics.csv'
         metrics_data = metrics_path.read_bytes() if metrics_path.exists() else None
+        # weights_best_meta.json už kompletně zapsala promote/reject větev
+        # (vč. policy_blend/policy_md5) — zachytit a po resetu vrátit BEZE
+        # ZMĚNY. Rebuild od nuly tady policy pole tiše zahazoval → frozen by
+        # příští iteraci hrál bez policy své promoce.
+        meta_path = root / 'weights_best_meta.json'
+        meta_data = meta_path.read_bytes() if meta_path.exists() else None
+        policy_snap_path = root / 'weights_best_policy.json'
+        policy_snap_data = policy_snap_path.read_bytes() if policy_snap_path.exists() else None
 
         # Pull latest to avoid conflict, then add our files
         subprocess.run(['git', 'fetch', 'origin'], cwd=str(root), capture_output=True)
@@ -958,18 +997,11 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
 
         # Re-apply weights after reset (reset overwrites working tree)
         best_path = root / 'weights_best.json'
-        if not promote:
-            best_path.write_bytes(frozen_data)
-            meta = {'benchmark_win_rate': frozen_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                    'benchmark_vf_blend': GATE_VF_BLEND,
-                    'all_time_best_benchmark': all_time_best_bm, 'tv': TV}
-        else:
-            best_path.write_bytes(gate_data)
-            meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
-                    'benchmark_vf_blend': GATE_VF_BLEND,
-                    'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV}
-
-        _atomic_write_json(root / 'weights_best_meta.json', meta)
+        best_path.write_bytes(gate_data if promote else frozen_data)
+        if meta_data is not None:
+            meta_path.write_bytes(meta_data)
+        if policy_snap_data is not None:
+            policy_snap_path.write_bytes(policy_snap_data)
 
         # Re-apply epoch_metrics.csv after reset (reset clobbered it back to committed)
         if metrics_data is not None:
@@ -980,6 +1012,8 @@ def _git_push(root: Path, promote: bool, frozen_path: Path, gate_path: Path,
             'weights_frozen.json', 'weights_az_train.json', 'weights_az_train_meta.json',
             'weights_train_best.json', 'epoch_metrics.csv',
         ]
+        if policy_snap_data is not None:
+            files.append('weights_best_policy.json')
         snaps = [f for f in os.listdir(str(root)) if f.startswith('weights_snap_')]
         subprocess.run(['git', 'add', '-f'] + files + snaps, cwd=str(root), capture_output=True)
 
