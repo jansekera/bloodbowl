@@ -1,0 +1,31 @@
+vf=loaded policy=loaded (fairtest config: iters=100, vfBlend=0.15, policyBlend=0 w/ policy loaded => prior floors ACTIVE)
+
+=== matchup 3: orc (home race) vs skaven ===
+  [25/400 pairs] cand W17 D14 L19 | paired delta(orc) so far -0.0400
+  [50/400 pairs] cand W33 D35 L32 | paired delta(orc) so far +0.0100
+  [75/400 pairs] cand W48 D54 L48 | paired delta(orc) so far +0.0000
+  [100/400 pairs] cand W66 D73 L61 | paired delta(orc) so far +0.0250
+  [125/400 pairs] cand W80 D89 L81 | paired delta(orc) so far -0.0040
+  [150/400 pairs] cand W98 D102 L100 | paired delta(orc) so far -0.0067
+  [175/400 pairs] cand W112 D124 L114 | paired delta(orc) so far -0.0057
+  [200/400 pairs] cand W134 D139 L127 | paired delta(orc) so far +0.0175
+  [225/400 pairs] cand W155 D155 L140 | paired delta(orc) so far +0.0333
+  [250/400 pairs] cand W163 D182 L155 | paired delta(orc) so far +0.0160
+  [275/400 pairs] cand W174 D203 L173 | paired delta(orc) so far +0.0018
+  [300/400 pairs] cand W192 D220 L188 | paired delta(orc) so far +0.0067
+  [325/400 pairs] cand W208 D236 L206 | paired delta(orc) so far +0.0031
+  [350/400 pairs] cand W232 D249 L219 | paired delta(orc) so far +0.0186
+  [375/400 pairs] cand W249 D270 L231 | paired delta(orc) so far +0.0240
+  [400/400 pairs] cand W259 D295 L246 | paired delta(orc) so far +0.0163
+SUMMARY matchup 3 (orc vs skaven), 400 pairs (800 games):
+  cand overall: W259 D295 L246 decisiveWR=0.513 chess=0.5081 | cage plans adopted 0.00/game
+  PAIRED delta chess as orc: +0.0163 +- 0.0293 SE (~0.6 SE) [pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]
+
+=== ATTRITION / SURVIVAL (end-of-game states per race, split by whether the OPPONENT ran cageAdvance) ===
+race       opp gate        games     KO/g    INJ/g   DEAD/g     EJ/g    surv/11
+orc        off               400     0.16     0.13     0.00     0.12      10.87
+orc        cageAdvance ON    400     0.17     0.09     0.00     0.10      10.91
+skaven     off               400     0.69     0.34     0.00     0.08      10.66
+skaven     cageAdvance ON    400     0.68     0.47     0.00     0.13      10.53
+
+DONE

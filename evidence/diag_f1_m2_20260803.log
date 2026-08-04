@@ -1,0 +1,29 @@
+vf=loaded policy=loaded (fairtest config: iters=100, vfBlend=0.15, policyBlend=0 w/ policy loaded => prior floors ACTIVE)
+
+=== matchup 2: dwarf (home race) vs dwarf ===
+  [25/400 pairs] cand W11 D28 L11 | paired delta(dwarf) so far +0.0000
+  [50/400 pairs] cand W17 D65 L18 | paired delta(dwarf) so far -0.0100
+  [75/400 pairs] cand W25 D100 L25 | paired delta(dwarf) so far +0.0000
+  [100/400 pairs] cand W31 D130 L39 | paired delta(dwarf) so far -0.0400
+  [125/400 pairs] cand W42 D162 L46 | paired delta(dwarf) so far -0.0160
+  [150/400 pairs] cand W45 D202 L53 | paired delta(dwarf) so far -0.0267
+  [175/400 pairs] cand W53 D233 L64 | paired delta(dwarf) so far -0.0314
+  [200/400 pairs] cand W63 D264 L73 | paired delta(dwarf) so far -0.0250
+  [225/400 pairs] cand W69 D297 L84 | paired delta(dwarf) so far -0.0333
+  [250/400 pairs] cand W73 D335 L92 | paired delta(dwarf) so far -0.0380
+  [275/400 pairs] cand W85 D361 L104 | paired delta(dwarf) so far -0.0345
+  [300/400 pairs] cand W97 D389 L114 | paired delta(dwarf) so far -0.0283
+  [325/400 pairs] cand W102 D427 L121 | paired delta(dwarf) so far -0.0292
+  [350/400 pairs] cand W110 D465 L125 | paired delta(dwarf) so far -0.0214
+  [375/400 pairs] cand W118 D504 L128 | paired delta(dwarf) so far -0.0133
+  [400/400 pairs] cand W126 D537 L137 | paired delta(dwarf) so far -0.0138
+SUMMARY matchup 2 (dwarf vs dwarf), 400 pairs (800 games):
+  cand overall: W126 D537 L137 decisiveWR=0.479 chess=0.4931 | cage plans adopted 0.00/game
+  PAIRED delta chess as dwarf: -0.0138 +- 0.0205 SE (~-0.7 SE) [pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]
+
+=== ATTRITION / SURVIVAL (end-of-game states per race, split by whether the OPPONENT ran cageAdvance) ===
+race       opp gate        games     KO/g    INJ/g   DEAD/g     EJ/g    surv/11
+dwarf      off               800     0.16     0.26     0.00     0.15      10.74
+dwarf      cageAdvance ON    800     0.17     0.23     0.00     0.16      10.77
+
+DONE
