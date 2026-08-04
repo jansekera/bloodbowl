@@ -235,3 +235,19 @@ def test_backup_retention_keeps_newest_30(tmp_path):
     backups = sorted(bdir.glob('weights_policy_*.json'))
     assert len(backups) == 30
     assert backups[-1].name.endswith('.json') and '2026' in backups[-1].name
+
+
+def test_archive_epoch_metrics_creates_labeled_copy(tmp_path):
+    (tmp_path / 'epoch_metrics.csv').write_text('epoch,policy_loss\n1,1.97\n')
+    ri._archive_epoch_metrics(tmp_path, 'rejected')
+    ri._archive_epoch_metrics(tmp_path, 'promoted')
+    names = sorted(p.name for p in (tmp_path / 'metrics_archive').iterdir())
+    assert len(names) == 2
+    assert any(n.endswith('_rejected.csv') for n in names)
+    assert any(n.endswith('_promoted.csv') for n in names)
+    assert (tmp_path / 'metrics_archive' / names[0]).read_text().startswith('epoch,')
+
+
+def test_archive_epoch_metrics_noop_without_csv(tmp_path):
+    ri._archive_epoch_metrics(tmp_path, 'rejected')
+    assert not (tmp_path / 'metrics_archive').exists()

@@ -409,6 +409,21 @@ def _restore_policy_from_backup(policy_path: Path) -> bool:
     return True
 
 
+def _archive_epoch_metrics(root: Path, label: str) -> None:
+    """Per-iterační archiv learning křivek (uživatel 2026-08-04: „i kdybychom
+    zůstali v šumu okolo 50 %, chci mít k ruce logy, co podpoří, že
+    postupujeme"). Gate HtH měří proti POHYBLIVÉ laťce a při reálném postupu
+    ukazuje ~50 % pořád — důkaz učení musí nést epoch_metrics historie
+    (policy_loss/top1/entropie napříč iteracemi), a ta se dosud přepisovala."""
+    em = root / 'epoch_metrics.csv'
+    if not em.exists():
+        return
+    adir = root / 'metrics_archive'
+    adir.mkdir(exist_ok=True)
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')
+    shutil.copy2(str(em), str(adir / f'epoch_metrics_{ts}_{label}.csv'))
+
+
 def _carry_over_policy(az_path: Path, best_path: Path, policy_path: Path) -> None:
     """Přenese uloženou policy hlavu do az_train PŘED tréninkem.
 
@@ -919,8 +934,20 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         _reject_meta_write(PROJECT_ROOT, frozen_bm, all_time_best_bm)
         print(f'REJECTED: {"; ".join(reasons)}', flush=True)
 
+    _archive_epoch_metrics(PROJECT_ROOT, label)
+    # Provázání gate záznamu s policy artefaktem téhle iterace: stash md5
+    # umožňuje kdykoli retro párové měření policy(iter N) vs policy(iter M)
+    # z policy_backups/ — na rozdíl od HtH vs šampion je to absolutní stopa.
+    _stash_md5 = None
+    try:
+        import hashlib as _hl
+        _stash_md5 = _hl.md5(
+            (PROJECT_ROOT / 'weights_policy.json').read_bytes()).hexdigest()
+    except OSError:
+        pass
     _append_gate_history({
         'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'policy_stash_md5': _stash_md5,
         'tv': TV,
         'mcts_iterations': MCTS_ITERATIONS,
         'selection': {'winner': gate_path.stem.replace('weights_', ''),
