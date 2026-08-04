@@ -50,6 +50,15 @@ static int scoreMoveAction(const GameState& state, const Action& a,
     // Distance is primary (each square = 10 points)
     // TZ penalty must exceed distance savings (10 per square) to prefer going around
     int score = dist * 10;
+    // Stepping ONTO the walk's target square is never penalized for tackle
+    // zones or sidelines (2026-08-04): the macro that chose the target owns
+    // that risk decision (cage corners deliberately stand next to
+    // defenders), and the pre-execution probes price it. Penalizing the
+    // final square made walkers stop one short of any marked slot forever.
+    if (a.target == target) {
+        if (needsGfi) score += 8;
+        return score;
+    }
     // Straight-route tiebreak (2026-08-04, sibling of the cage corner-pick
     // Manhattan tiebreak): at equal Chebyshev distance the adjacency order
     // used to pick a DIAGONAL drift first, wasting a square of walk budget --

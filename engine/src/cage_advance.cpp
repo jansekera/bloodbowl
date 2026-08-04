@@ -174,6 +174,15 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         auto better = [&](const Player* a, bool aGfi,
                           const Player* b, bool bGfi) {
             if (aGfi != bGfi) return !aGfi;
+            // Tempo sustainability (user design input 2026-08-03, wired
+            // 2026-08-04): a corner slower than the planned step caps the
+            // whole cage's pace NEXT turn -- prefer corners whose MA
+            // sustains the step, above mere closeness (slow-strong pieces
+            // stay great corners for a STATIC cage, but they throttle a
+            // rolling one).
+            bool aKeeps = static_cast<int>(a->stats.movement) >= step;
+            bool bKeeps = static_cast<int>(b->stats.movement) >= step;
+            if (aKeeps != bKeeps) return aKeeps;
             int da = a->position.distanceTo(slot);
             int db = b->position.distanceTo(slot);
             if (da != db) return da < db;
@@ -348,12 +357,19 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
         return plan;
     }
 
-    // Final step: meet the schedule, never outrun it (grind doctrine keeps
-    // the reserve; stalling deeper is the existing stall logic's job).
-    // Dice-free preference: carrier GFI squares are spent ONLY when the
-    // schedule cannot be met within plain MA (tempo emergency).
-    int finalStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
-                               1, static_cast<int>(plan.achievablePace));
+    // Final step -- "bank while the corridor is clear" (user doctrine
+    // 2026-08-04, applies to ALL bash-style drives, not just dwarfs):
+    // resistance arrives MID-drive almost always, so a clear corridor is
+    // walked at MAX dice-free pace to build schedule cushion; end-of-drive
+    // overshoot is the existing stall logic's job. With opponents already
+    // in the corridor the plan reverts to schedule pace (grind). Carrier
+    // GFI squares are spent ONLY when the schedule cannot be met within
+    // plain MA (tempo emergency) -- banking never buys dice risk.
+    int scheduleStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
+                                  1, static_cast<int>(plan.achievablePace));
+    int bankStep = std::min(plan.rawAchievableStep, maxNoGfi);
+    int finalStep = (plan.resistance == 0) ? std::max(scheduleStep, bankStep)
+                                           : scheduleStep;
     plan.carrierGfi = std::clamp(finalStep - maxNoGfi, 0, CARRIER_GFI_MAX);
     if (finalStep != plan.rawAchievableStep) {
         AssignmentResult a = tryAssign(state, carrier, finalStep, reservedPlayerIds);

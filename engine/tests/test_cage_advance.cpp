@@ -142,9 +142,10 @@ TEST(CageAdvance, TempoIsComputedFromDistanceAndSchedule) {
     // dist 13, turnsLeft 8, mandatory reserve 1 -> usable 7. NOT 13/8: the
     // reserve turn is part of the tempo contract.
     EXPECT_NEAR(plan.requiredPace, 13.0 / 7.0, 1e-9);
-    // Schedule-driven step: meet the pace, never outrun it -- even though
-    // the roles could sustain step 4 (MA4 all around, straight walks).
-    EXPECT_EQ(plan.step, 2);
+    // Bank-while-clear (user doctrine 2026-08-04): the corridor is empty,
+    // so the cage rolls at MAX dice-free pace (step 4 = everyone's MA4
+    // straight walk), building schedule cushion for when resistance comes.
+    EXPECT_EQ(plan.step, 4);
     EXPECT_EQ(plan.rawAchievableStep, 4);
     EXPECT_EQ(plan.resistance, 0);
     EXPECT_NEAR(plan.achievablePace, 4.0, 1e-9);
@@ -257,12 +258,80 @@ TEST(CageAdvance, CarrierGfiFiresOnlyInTempoEmergency) {
     EXPECT_EQ(plan.macros.back().gfiAllowance, 1);
 }
 
+TEST(CageAdvance, BankWhileClearRevertsToScheduleUnderResistance) {
+    // Same geometry twice; the only difference is one opponent in the
+    // corridor. Clear corridor -> bank at max dice-free pace (4);
+    // resistance -> grind at schedule pace only.
+    GameState clear = makeCageState();
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan bankPlan = planner.build(clear);
+    ASSERT_TRUE(bankPlan.valid);
+    EXPECT_EQ(bankPlan.step, 4);
+    EXPECT_EQ(bankPlan.carrierGfi, 0) << "banking must never buy GFI risk";
+
+    GameState contested = makeCageState();
+    Player& opp = contested.getPlayer(13);
+    opp.id = 13;
+    opp.teamSide = TeamSide::AWAY;
+    opp.state = PlayerState::STANDING;
+    opp.position = {16, 8};  // ahead 4, |dy| 1 -> in corridor
+    opp.stats = {6, 3, 3, 8};
+    opp.movementRemaining = 6;
+    CageAdvancePlan grindPlan = planner.build(contested);
+    ASSERT_TRUE(grindPlan.valid) << "verdict=" << static_cast<int>(grindPlan.verdict);
+    EXPECT_EQ(grindPlan.resistance, 1);
+    EXPECT_EQ(grindPlan.step, 2) << "schedule pace (ceil 13/7), no banking into bodies";
+}
+
+TEST(CageAdvance, FasterCornerPreferredWhenTempoDemandsIt) {
+    // User design input 2026-08-03 (wired 2026-08-04): a corner slower than
+    // the planned step throttles the rolling cage next turn. A closer MA4
+    // longbeard must lose the front slot to a farther MA6 runner once the
+    // planned step exceeds 4.
+    GameState state = makeCageState();
+    state.homeTeam.turnNumber = 4;  // usable 4, dist 20 -> required 5
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats.movement = 6;
+    state.getPlayer(1).movementRemaining = 6;
+    state.ball = BallState::carried({5, 7}, 1);
+    auto put = [&](int id, Position pos, int8_t ma) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {ma, 3, 2, 9};
+        p.movementRemaining = ma;
+    };
+    put(2, {4, 6}, 6);
+    put(3, {4, 8}, 6);
+    put(5, {7, 9}, 6);
+    put(4, {10, 6}, 4);  // slow longbeard CLOSER to the front slot...
+    put(6, {7, 5}, 6);   // ...must lose it to the sustainable runner
+
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    ASSERT_GE(plan.step, 5);
+    Position frontTop{static_cast<int8_t>(5 + plan.step + 1), 6};
+    bool fastGotIt = false;
+    for (const auto& m : plan.macros) {
+        if (m.targetPos == frontTop) fastGotIt = (m.playerId == 6);
+    }
+    EXPECT_TRUE(fastGotIt) << "MA6 must outrank the closer MA4 for a step-"
+                           << plan.step << " rolling cage";
+}
+
 TEST(CageAdvance, CarrierTargetBlockedByTeammateGetsVacatedFirst) {
     // A teammate parked straight ahead of the carrier (post-scrum pile,
     // user doctrine: "the ones in FRONT move first so they stop blocking").
     // He is drafted into a corner slot of the NEW cage and his macro runs
     // before the carrier's.
     GameState state = makeCageState();
+    // Pin the carrier's reach to 2 so the plan's target is deterministically
+    // {14,7} -- this test is about the vacate mechanics, not step choice.
+    state.getPlayer(1).stats.movement = 2;
+    state.getPlayer(1).movementRemaining = 2;
     auto& blocker = state.getPlayer(6);
     blocker.id = 6;
     blocker.teamSide = TeamSide::HOME;
@@ -297,16 +366,18 @@ TEST(CageAdvance, PlanShiftsWholeCageCornersFirstCarrierLast) {
     ASSERT_EQ(plan.macros.size(), 5u);  // 4 corner movers + carrier
     for (const auto& m : plan.macros) EXPECT_EQ(m.type, MacroType::REPOSITION);
 
+    // Step-agnostic geometry: the new cage centre is carrier.x + step.
+    const int nx = 12 + plan.step;
     // Carrier strictly LAST: the screen forms before the ball commits.
     const Macro& last = plan.macros.back();
     EXPECT_EQ(last.playerId, 1);
-    EXPECT_EQ(last.targetPos, (Position{14, 7}));
+    EXPECT_EQ(last.targetPos, (Position{static_cast<int8_t>(nx), 7}));
     for (size_t i = 0; i + 1 < plan.macros.size(); ++i) {
         EXPECT_NE(plan.macros[i].playerId, 1);
     }
     // Front slots are claimed first (macro order = slot order).
-    EXPECT_EQ(plan.macros[0].targetPos, (Position{15, 6}));
-    EXPECT_EQ(plan.macros[1].targetPos, (Position{15, 8}));
+    EXPECT_EQ(plan.macros[0].targetPos, (Position{static_cast<int8_t>(nx + 1), 6}));
+    EXPECT_EQ(plan.macros[1].targetPos, (Position{static_cast<int8_t>(nx + 1), 8}));
 
     EXPECT_EQ(plan.filledCorners, 4);
     EXPECT_EQ(plan.openCorners, 0);
@@ -320,12 +391,12 @@ TEST(CageAdvance, PlanShiftsWholeCageCornersFirstCarrierLast) {
         auto res = greedyExpandMacro(state, m, dice);
         ASSERT_FALSE(res.turnover);
     }
-    EXPECT_EQ(state.getPlayer(1).position, (Position{14, 7}));
+    EXPECT_EQ(state.getPlayer(1).position, (Position{static_cast<int8_t>(nx), 7}));
     int corners = 0;
     for (auto& d : state.getPlayer(1).position.getAdjacent()) {
         const Player* p = state.getPlayerAtPosition(d);
         if (p && p->teamSide == TeamSide::HOME &&
-            std::abs(d.x - 14) == 1 && std::abs(d.y - 7) == 1) {
+            std::abs(d.x - nx) == 1 && std::abs(d.y - 7) == 1) {
             corners++;
         }
     }
@@ -338,6 +409,10 @@ TEST(CageAdvance, PlanShiftsWholeCageCornersFirstCarrierLast) {
 
 TEST(CageAdvance, GuardPreferredAtEqualDistanceAndReliability) {
     GameState state = makeCageState();
+    // Pin the carrier to step 2 (this test is about the Guard tiebreak,
+    // not step choice under the bank policy).
+    state.getPlayer(1).stats.movement = 2;
+    state.getPlayer(1).movementRemaining = 2;
     // Back corners stay (already acted); the two front slots {15,6}/{15,8}
     // must be drafted from two fresh players equidistant to {15,6}:
     // p6 (no skills) and p7 (+Guard) -> Guard wins the first slot.
@@ -423,6 +498,11 @@ TEST(CageAdvance, EligibilityIsGenericOverSkills) {
 
 TEST(CageAdvance, GfiAllowanceAtMostOneCornerRestOpen) {
     GameState state = makeCageState();
+    // Pin the carrier to step 2 so the allowance branch is exercised
+    // deterministically (bank policy would otherwise pick a farther step
+    // whose slots these candidates cannot reach at all).
+    state.getPlayer(1).stats.movement = 2;
+    state.getPlayer(1).movementRemaining = 2;
     state.getPlayer(2).state = PlayerState::OFF_PITCH;
     state.getPlayer(3).state = PlayerState::OFF_PITCH;
     state.getPlayer(4).hasMoved = true;
