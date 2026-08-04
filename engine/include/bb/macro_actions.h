@@ -33,6 +33,11 @@ struct Macro {
     int targetId = -1;      // target (blitz/block/foul/pass/relay)
     Position targetPos{-1, -1}; // target position (reposition)
     int thirdId = -1;       // third player (CHAIN_SCORE scorer)
+    // REPOSITION only: extra GFI squares the walk may roll for (0-2).
+    // Default 0 keeps REPOSITION dice-free; the cage-advance planner sets
+    // it for the ball carrier in tempo emergencies (user doctrine 2026-08-04:
+    // "the carrier MUST arrive even at GFI dice cost near the end").
+    int gfiAllowance = 0;
 };
 
 struct MacroExpansionResult {

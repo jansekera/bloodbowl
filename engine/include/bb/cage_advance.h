@@ -100,6 +100,7 @@ struct CageAdvancePlan {
     int filledCorners = 0;       // slots filled after the advance (movers+stays)
     int openCorners = 0;
     int gfiCorners = 0;          // slots on the 1-GFI allowance (0 or 1)
+    int carrierGfi = 0;          // real GFI rolls the carrier leg takes (0-2)
 
     double planValue = 0.0;      // leaf eval of the projected end state (diag)
 
@@ -110,7 +111,13 @@ struct CageAdvancePlan {
 
 class CageAdvancePlanner {
 public:
-    static constexpr int MAX_STEP = 2;            // doctrine: 1-2 squares/turn
+    // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,
+    // re-affirmed 2026-08-04: "a dwarf with 8 turns MUST be able to arrive" --
+    // the old hard MAX_STEP=2 made the schedule unsatisfiable from own half
+    // and the plan never fired). The carrier may add up to CARRIER_GFI_MAX
+    // real GFI rolls in a tempo emergency; corner sustainability emerges from
+    // tryAssign's per-slot reach checks.
+    static constexpr int CARRIER_GFI_MAX = 2;     // BB rules: 2 GFI/turn
     static constexpr int RESERVE_TURNS = 1;       // mandatory schedule slack
     static constexpr int MAX_HALF_TURNS = 8;      // team-turns per half cap
     static constexpr int TRIGGER_MIN_CORNERS = 2; // diagonal corners built
@@ -120,6 +127,15 @@ public:
     // turn_planner.h): a macro is safe only if its MC-probed expansion is
     // dice-free in practice and not a no-op.
     static constexpr double SAFE_PTO = 0.02;
+    // Relaxed probe ceilings for the carrier's GFI leg ONLY (tempo emergency,
+    // user doctrine 2026-08-04: the carrier must arrive even at dice cost).
+    // 1 GFI fails 1/6 ~= 0.167, 2 GFI ~= 0.31; the PROBE_K=48 MC estimate
+    // has sd ~= 0.054, so each ceiling sits ~1.5 sd above its true rate --
+    // tight enough to still reject plans with EXTRA danger on the walk
+    // (tackle-zone dodges on top of the GFI), loose enough not to veto the
+    // sanctioned GFI risk itself on sampling noise.
+    static constexpr double SAFE_PTO_GFI1 = 0.25;
+    static constexpr double SAFE_PTO_GFI2 = 0.40;
     static constexpr int PROBE_K = 48;
 
     CageAdvancePlanner(const ValueFunction* vf, MCTSConfig config,

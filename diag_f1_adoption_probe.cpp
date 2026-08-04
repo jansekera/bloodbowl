@@ -77,6 +77,34 @@ static const char* verdictName(CageAdvanceVerdict v) {
     return "?";
 }
 
+// mini-map around `center`, forward of `side` drawn to the RIGHT.
+// C=carrier, T=teammate of `side`, O=opponent, b=loose ball, .=empty, #=off
+static void printLocalMap(const GameState& state, Position center, TeamSide side,
+                          int back = 2, int fwd = 4) {
+    int dx = (side == TeamSide::HOME) ? 1 : -1;
+    for (int ry = -2; ry <= 2; ++ry) {
+        printf("    ");
+        for (int rx = -back; rx <= fwd; ++rx) {
+            Position q{static_cast<int8_t>(center.x + dx * rx),
+                       static_cast<int8_t>(center.y + ry)};
+            char c;
+            if (!q.isOnPitch()) c = '#';
+            else {
+                const Player* o = state.getPlayerAtPosition(q);
+                if (!o) {
+                    c = (!state.ball.isHeld && state.ball.position == q) ? 'b' : '.';
+                } else if (state.ball.isHeld && state.ball.carrierId == o->id) {
+                    c = 'C';
+                } else {
+                    c = (o->teamSide == side) ? 'T' : 'O';
+                }
+            }
+            putchar(c);
+        }
+        putchar('\n');
+    }
+}
+
 static void probeTurn(const GameState& state, CageAdvancePlanner& planner,
                       ProbeAgg& agg) {
     agg.turns++;
@@ -95,6 +123,49 @@ static void probeTurn(const GameState& state, CageAdvancePlanner& planner,
     if (plan.verdict == CageAdvanceVerdict::TEMPO_INSUFFICIENT) {
         const TeamState& my = state.getTeamState(carrier.teamSide);
         int turnsLeft = std::max(0, 9 - my.turnNumber);
+        static int dumped = 0;
+        if (dumped < 12) {
+            int ezX = (carrier.teamSide == TeamSide::HOME) ? 25 : 0;
+            int dx = (carrier.teamSide == TeamSide::HOME) ? 1 : -1;
+            // occupancy straight ahead of the carrier (the only lane
+            // tryAssign's carrier leg accepts): '.'=free, 'T'=teammate,
+            // 'O'=opponent, '#'=off pitch
+            char ahead[3] = {0, 0, 0};
+            for (int s = 1; s <= 2; ++s) {
+                Position q{static_cast<int8_t>(carrier.position.x + dx * s),
+                           carrier.position.y};
+                if (!q.isOnPitch()) { ahead[s - 1] = '#'; continue; }
+                const Player* o = state.getPlayerAtPosition(q);
+                ahead[s - 1] = !o ? '.' : (o->teamSide == carrier.teamSide ? 'T' : 'O');
+            }
+            printf("  [TEMPO] %s H%d T%d carrier(%d,%d) dist=%d corners=%d "
+                   "req=%.2f ach=%.2f rawStep=%d resist=%d ahead=%s\n",
+                   carrier.teamSide == TeamSide::HOME ? "HOME" : "AWAY",
+                   state.half, my.turnNumber, carrier.position.x,
+                   carrier.position.y, std::abs(carrier.position.x - ezX),
+                   plan.builtCorners, plan.requiredPace, plan.achievablePace,
+                   plan.rawAchievableStep, plan.resistance, ahead);
+            // mini-map: rows y-2..y+2, columns from 2 behind to 4 ahead of
+            // the carrier (in HIS forward direction). C=carrier, T=teammate,
+            // O=opponent, .=empty, #=off pitch. Forward is always RIGHT.
+            for (int ry = -2; ry <= 2; ++ry) {
+                printf("    ");
+                for (int rx = -2; rx <= 4; ++rx) {
+                    Position q{static_cast<int8_t>(carrier.position.x + dx * rx),
+                               static_cast<int8_t>(carrier.position.y + ry)};
+                    char c;
+                    if (!q.isOnPitch()) c = '#';
+                    else if (q == carrier.position) c = 'C';
+                    else {
+                        const Player* o = state.getPlayerAtPosition(q);
+                        c = !o ? '.' : (o->teamSide == carrier.teamSide ? 'T' : 'O');
+                    }
+                    putchar(c);
+                }
+                putchar('\n');
+            }
+            dumped++;
+        }
         if (turnsLeft - CageAdvancePlanner::RESERVE_TURNS < 1) agg.tempoUsableLt1++;
         else agg.tempoPaceShort++;
         agg.reqPaceSum += plan.requiredPace;
@@ -186,6 +257,22 @@ int main(int argc, char** argv) {
             const TeamState& ts = state.getTeamState(state.activeTeam);
             if (!haveLast || lastHalf != state.half || lastTurn != ts.turnNumber ||
                 lastTeam != state.activeTeam) {
+                // trace mode: game 0, HOME half 1 -- formation at each
+                // team-turn start, to answer "how did the blob form?"
+                if (gi == 0 && state.half == 1 &&
+                    state.activeTeam == TeamSide::HOME) {
+                    Position center = state.ball.isHeld
+                        ? state.getPlayer(state.ball.carrierId).position
+                        : state.ball.position;
+                    bool ours = state.ball.isHeld &&
+                        state.getPlayer(state.ball.carrierId).teamSide ==
+                            TeamSide::HOME;
+                    printf("  --- HOME T%d (ball %s at %d,%d) ---\n",
+                           ts.turnNumber,
+                           !state.ball.isHeld ? "LOOSE" : (ours ? "OURS" : "THEIRS"),
+                           center.x, center.y);
+                    printLocalMap(state, center, TeamSide::HOME);
+                }
                 probeTurn(state, planner, agg);
                 haveLast = true;
                 lastHalf = state.half;
