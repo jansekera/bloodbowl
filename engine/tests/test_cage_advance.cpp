@@ -89,9 +89,10 @@ TEST(CageAdvance, ConfigDefaultIsOff) {
     EXPECT_FALSE(cfg.cageAdvance);
 }
 
-TEST(CageAdvance, NotApplicableWithoutEnoughCorners) {
+TEST(CageAdvance, NotApplicableWhenTooFewBodiesForACage) {
     GameState state = makeCageState();
-    // Strip down to a single corner: 1 < TRIGGER_MIN_CORNERS(2).
+    // One teammate can never make a >= 2-corner cage at any destination:
+    // a formation problem -> NOT_APPLICABLE (not a tempo verdict).
     state.getPlayer(3).state = PlayerState::OFF_PITCH;
     state.getPlayer(4).state = PlayerState::OFF_PITCH;
     state.getPlayer(5).state = PlayerState::OFF_PITCH;
@@ -99,6 +100,26 @@ TEST(CageAdvance, NotApplicableWithoutEnoughCorners) {
     CageAdvancePlan plan = planner.build(state);
     EXPECT_EQ(plan.verdict, CageAdvanceVerdict::NOT_APPLICABLE);
     EXPECT_FALSE(plan.valid);
+}
+
+TEST(CageAdvance, CageIsBuiltFromScratchAtCarrierDestination) {
+    // User standard 2026-08-04: "build a proper cage, ALWAYS" -- zero
+    // corners currently built, but four teammates loiter within reach of
+    // the destination slots. The plan drafts them into a fresh cage around
+    // the carrier's TARGET square (never around his starting square).
+    GameState state = makeCageState();
+    state.getPlayer(2).position = {10, 5};
+    state.getPlayer(3).position = {10, 9};
+    state.getPlayer(4).position = {12, 4};
+    state.getPlayer(5).position = {12, 10};
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    EXPECT_EQ(plan.builtCorners, 0);
+    EXPECT_GE(plan.filledCorners, 2);
+    // Carrier still advances -- the cage forms at the destination.
+    EXPECT_EQ(plan.macros.back().playerId, 1);
+    EXPECT_EQ(plan.macros.back().targetPos.x, 12 + plan.step);
 }
 
 TEST(CageAdvance, NotApplicableOnLooseBall) {

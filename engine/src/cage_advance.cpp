@@ -291,7 +291,11 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
         if (p && p->teamSide == mySide && p->state == PlayerState::STANDING)
             plan.builtCorners++;
     }
-    if (plan.builtCorners < TRIGGER_MIN_CORNERS) return plan;
+    // No minimum on ALREADY-built corners (user standard 2026-08-04: "build
+    // a proper cage, always"): the cage is built AT THE CARRIER'S TARGET
+    // square from whoever can reach the slots. builtCorners stays a
+    // diagnostic; tryAssign's feasibility (>= TRIGGER_MIN_CORNERS slots
+    // FILLED after the move, never degrading a standing cage) is the gate.
 
     // --- Tempo: computed, never a constant (constraint 1). Same
     // turnsLeft = 9 - turnNumber schedule simulate()'s idealDist pacing uses.
@@ -332,7 +336,13 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
         }
     }
     plan.achievablePace = plan.rawAchievableStep - penalty;
-    if (plan.rawAchievableStep < 1 || plan.achievablePace < 1.0 ||
+    if (plan.rawAchievableStep < 1) {
+        // No step has a feasible cage at the destination (not enough bodies
+        // in reach) -- a formation problem, not a schedule one.
+        plan.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
+        return plan;
+    }
+    if (plan.achievablePace < 1.0 ||
         plan.achievablePace + 1e-9 < plan.requiredPace) {
         plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
         return plan;
