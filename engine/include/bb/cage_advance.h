@@ -107,6 +107,18 @@ struct CageAdvancePlan {
     // Ordered: front-slot movers, back-slot movers, carrier LAST (the screen
     // forms before the carrier commits). All macros are REPOSITION.
     std::vector<Macro> macros;
+
+    // --- DICEY diagnostics (2026-08-04 corner-release groundwork probe).
+    // Populated only when verdict == DICEY: which planned leg failed the
+    // dice-free probe and the full ordered leg list, so external tooling can
+    // reconstruct the exact situation. No behavior change.
+    int diceyLegIdx = -1;            // index into diagMacros
+    double diceyPto = 0.0;           // probed pTO of the failing leg
+    double diceyCeil = 0.0;          // ceiling it was held against
+    double diceyMeanActs = 0.0;
+    bool diceyExecFail = false;      // failed projection-execution, not probe
+    std::vector<Macro> diagMacros;           // ordered legs as planned
+    std::vector<uint8_t> diagMacroCornerGfi; // 1 = the 1-GFI corner allowance
 };
 
 class CageAdvancePlanner {

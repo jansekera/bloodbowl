@@ -464,6 +464,12 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
                         m.targetPos.x, m.targetPos.y);
             }
             plan.verdict = CageAdvanceVerdict::DICEY;
+            plan.diceyLegIdx = static_cast<int>(i);
+            plan.diceyPto = pr.pto;
+            plan.diceyCeil = ceiling;
+            plan.diceyMeanActs = pr.meanActions;
+            plan.diagMacros = macros;
+            plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
             return plan;
         }
         // Execute on the projection. The macro is probed within its risk
@@ -502,6 +508,13 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
                         r.actions.size());
             }
             plan.verdict = CageAdvanceVerdict::DICEY;
+            plan.diceyLegIdx = static_cast<int>(i);
+            plan.diceyPto = pr.pto;
+            plan.diceyCeil = ceiling;
+            plan.diceyMeanActs = pr.meanActions;
+            plan.diceyExecFail = true;
+            plan.diagMacros = macros;
+            plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
             return plan;
         }
     }
