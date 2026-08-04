@@ -387,6 +387,28 @@ def _gate_game(args: tuple) -> tuple:
     return result.home_score, result.away_score
 
 
+def _policy_backup_dir(policy_path: Path) -> Path:
+    return policy_path.parent / 'policy_backups'
+
+
+def _restore_policy_from_backup(policy_path: Path) -> bool:
+    """Self-healing (incident 2026-08-04: stash po iteraci beze stopy zmizel,
+    přestože log potvrdil zápis — ztráta stashe tiše přeruší akumulaci policy
+    přes rejecty, tj. přesně mechanismus, který vyrobil první promoci).
+    Chybí-li stash, obnoví se HLASITĚ z nejnovější zálohy."""
+    bdir = _policy_backup_dir(policy_path)
+    if not bdir.is_dir():
+        return False
+    backups = sorted(bdir.glob('weights_policy_*.json'))
+    if not backups:
+        return False
+    newest = backups[-1]
+    shutil.copy2(str(newest), str(policy_path))
+    print(f'⚠ POLICY STASH CHYBĚL — obnoven ze zálohy {newest.name} '
+          f'(akumulace přes rejecty by se jinak tiše přerušila)', flush=True)
+    return True
+
+
 def _carry_over_policy(az_path: Path, best_path: Path, policy_path: Path) -> None:
     """Přenese uloženou policy hlavu do az_train PŘED tréninkem.
 
@@ -396,7 +418,7 @@ def _carry_over_policy(az_path: Path, best_path: Path, policy_path: Path) -> Non
     gating záměr), ale policy hlavu přeneseme z minulé iterace, takže se policy
     učí napříč iteracemi. Viz paměť project-neural-policy-rootcause.
     """
-    if not policy_path.exists():
+    if not policy_path.exists() and not _restore_policy_from_backup(policy_path):
         return  # 1. iterace: žádná uložená policy → trénuje se z random (OK)
     with open(policy_path) as f:
         pol = json.load(f)
@@ -436,7 +458,19 @@ def _stash_policy(az_path: Path, policy_path: Path) -> None:
            if k in data}
     with open(policy_path, 'w') as f:
         json.dump(pol, f)
-    print('Policy stash: vytrénovaná policy hlava uložena pro další iteraci', flush=True)
+    # Preventivní záloha (uživatel 2026-08-04, po incidentu se zmizelým
+    # stashem): každá stash verze se archivuje s časem+md5 v názvu; carry-over
+    # se z nejnovější umí sám obnovit. Retence 30 nejnovějších.
+    import hashlib
+    md5 = hashlib.md5(json.dumps(pol).encode()).hexdigest()
+    bdir = _policy_backup_dir(policy_path)
+    bdir.mkdir(exist_ok=True)
+    ts = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')
+    shutil.copy2(str(policy_path), str(bdir / f'weights_policy_{ts}_{md5[:8]}.json'))
+    for old in sorted(bdir.glob('weights_policy_*.json'))[:-30]:
+        old.unlink()
+    print(f'Policy stash: vytrénovaná policy hlava uložena pro další iteraci '
+          f'(md5 {md5[:8]}, záloha {ts})', flush=True)
 
 
 def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:

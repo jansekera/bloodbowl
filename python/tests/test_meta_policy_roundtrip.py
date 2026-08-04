@@ -178,3 +178,60 @@ def test_git_push_without_snapshot_omits_it_from_add(push_repo, monkeypatch):
     add = next(c for c in calls if c[:3] == ['git', 'add', '-f'])
     assert 'weights_best_policy.json' not in add
     assert not (root / 'weights_best_policy.json').exists()
+
+
+# ------------------------------------------------- policy stash backup (04.08.)
+
+def _policy_head(tag='x'):
+    return {'policy_type': 'mlp', 'policy_hidden_size': 8,
+            'policy_W1': [1.0], 'policy_b1': [0.5],
+            'policy_W2': [[0.1]], 'policy_b2': [0.2],
+            'policy_temperature': 1.0, 'policy_tag': tag}
+
+
+def test_stash_creates_timestamped_backup(tmp_path):
+    az = tmp_path / 'weights_az_train.json'
+    az.write_text(json.dumps({'type': 'alphazero_neural', **_policy_head()}))
+    stash = tmp_path / 'weights_policy.json'
+    ri._stash_policy(az, stash)
+    assert stash.exists()
+    backups = list((tmp_path / 'policy_backups').glob('weights_policy_*.json'))
+    assert len(backups) == 1
+    assert json.loads(backups[0].read_text()) == json.loads(stash.read_text())
+
+
+def test_carry_over_restores_missing_stash_from_backup(tmp_path):
+    # Incident 2026-08-04: stash zmizel po iteraci -> carry-over se musí sám
+    # obnovit z nejnovější zálohy, jinak se akumulace přes rejecty tiše přeruší.
+    bdir = tmp_path / 'policy_backups'
+    bdir.mkdir()
+    (bdir / 'weights_policy_20260803_120000_aaaa.json').write_text(
+        json.dumps({k: v for k, v in _policy_head('old').items() if k != 'policy_tag'}))
+    newer = {k: v for k, v in _policy_head('new').items() if k != 'policy_tag'}
+    newer['policy_b1'] = [9.9]
+    (bdir / 'weights_policy_20260804_130000_bbbb.json').write_text(json.dumps(newer))
+    best = tmp_path / 'weights_best.json'
+    best.write_text(json.dumps({'type': 'neural', 'hidden_size': 4, 'n_features': 2,
+                                'W1': [0.0], 'b1': [0.0], 'W2': [[0.0]], 'b2': [0.0]}))
+    az = tmp_path / 'weights_az_train.json'
+    stash = tmp_path / 'weights_policy.json'
+
+    ri._carry_over_policy(az, best, stash)
+
+    assert stash.exists(), 'stash must be self-healed from the newest backup'
+    assert json.loads(stash.read_text())['policy_b1'] == [9.9]
+    assert 'policy_W1' in json.loads(az.read_text())
+
+
+def test_backup_retention_keeps_newest_30(tmp_path):
+    az = tmp_path / 'weights_az_train.json'
+    stash = tmp_path / 'weights_policy.json'
+    bdir = tmp_path / 'policy_backups'
+    bdir.mkdir()
+    for i in range(35):
+        (bdir / f'weights_policy_20260701_{i:06d}_old.json').write_text('{}')
+    az.write_text(json.dumps({'type': 'alphazero_neural', **_policy_head()}))
+    ri._stash_policy(az, stash)
+    backups = sorted(bdir.glob('weights_policy_*.json'))
+    assert len(backups) == 30
+    assert backups[-1].name.endswith('.json') and '2026' in backups[-1].name
