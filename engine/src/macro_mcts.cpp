@@ -1,5 +1,6 @@
 #include "bb/macro_mcts.h"
 #include "bb/turn_planner.h"
+#include "bb/cage_advance.h"
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
 #include <algorithm>
@@ -902,6 +903,9 @@ MacroMCTSPolicy::MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uin
     if (config.stagedPickupPlanner) {
         stagedPlanner_ = std::make_unique<StagedTurnPlanner>(vf, config, seed + 777);
     }
+    if (config.cageAdvance) {
+        cagePlanner_ = std::make_unique<CageAdvancePlanner>(vf, config, seed + 888);
+    }
 }
 
 MacroMCTSPolicy::~MacroMCTSPolicy() = default;
@@ -926,12 +930,26 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
     // abandoned, the rest of the turn belongs to per-macro search().
     if (!stagedPlanBuilt_) {
         stagedPlanBuilt_ = true;
-        if (classifyTurnGoal(state) == TurnGoal::PICKUP_BALL) {
+        TurnGoal goal = classifyTurnGoal(state);
+        if (stagedPlanner_ && goal == TurnGoal::PICKUP_BALL) {
             StagedPlan plan = stagedPlanner_->build(state);
             if (plan.valid) {
                 stagedMacros_ = std::move(plan.safeMacros);
                 stagedMacros_.push_back(plan.pickupMacro);
                 stagedIndex_ = 0;
+                stagedPlansAdopted_++;
+            }
+        } else if (cagePlanner_ && goal == TurnGoal::ADVANCE_BALL) {
+            // F1 cage advance: shift the whole cage 1-2 squares (corners
+            // first, carrier last). TEMPO_INSUFFICIENT / DICEY verdicts
+            // leave the plan invalid -- no blind push, search() keeps the
+            // turn as today. Role budget: no reservations from this call
+            // site yet (see bb/cage_advance.h, constraint 3).
+            CageAdvancePlan plan = cagePlanner_->build(state);
+            if (plan.valid) {
+                stagedMacros_ = std::move(plan.macros);
+                stagedIndex_ = 0;
+                stagedPlansAdopted_++;
             }
         }
     }
@@ -980,7 +998,8 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     // Item 13 (config-gated, default off): an active staged plan supplies
     // the next macro directly; otherwise search as today.
     Macro bestMacro;
-    bool fromStagedPlan = stagedPlanner_ && nextStagedMacro(state, bestMacro);
+    bool fromStagedPlan = (stagedPlanner_ || cagePlanner_) &&
+                          nextStagedMacro(state, bestMacro);
     if (!fromStagedPlan) {
         bestMacro = search_.search(state);
     }

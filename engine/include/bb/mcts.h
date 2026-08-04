@@ -27,6 +27,7 @@ struct MCTSConfig {
     bool leafLookahead = false;   // Macro-MCTS only: bounded greedy 1-ply forward look at leaf eval (2026-07-02 experiment)
     bool riskDeferral = false;    // Macro-MCTS only: Q-guarded risk-sequencing defer at search() return (queue item 10, 2026-07-28)
     bool stagedPickupPlanner = false; // Macro-MCTS only: item13 MVP staged safe-then-PICKUP whole-turn planner (2026-07-31), see bb/turn_planner.h
+    bool cageAdvance = false;         // Macro-MCTS only: F1 cage-advance whole-turn plan (2026-08-03), see bb/cage_advance.h
 };
 
 struct MCTSNode {

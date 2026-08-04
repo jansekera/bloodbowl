@@ -38,6 +38,7 @@ add_library(bb_engine SHARED
     src/macro_actions.cpp
     src/macro_mcts.cpp
     src/turn_planner.cpp
+    src/cage_advance.cpp
     src/board_snapshot.cpp
 )
 target_include_directories(bb_engine PUBLIC include third_party)
@@ -84,6 +85,7 @@ add_executable(bb_tests
     tests/test_macro_actions.cpp
     tests/test_macro_mcts.cpp
     tests/test_turn_planner.cpp
+    tests/test_cage_advance.cpp
 )
 target_link_libraries(bb_tests PRIVATE bb_engine GTest::gtest_main)
 
