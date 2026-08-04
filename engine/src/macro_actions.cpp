@@ -50,6 +50,24 @@ static int scoreMoveAction(const GameState& state, const Action& a,
     // Distance is primary (each square = 10 points)
     // TZ penalty must exceed distance savings (10 per square) to prefer going around
     int score = dist * 10;
+    // Stepping ONTO the walk's target square is never penalized for tackle
+    // zones or sidelines (2026-08-04): the macro that chose the target owns
+    // that risk decision (cage corners deliberately stand next to
+    // defenders), and the pre-execution probes price it. Penalizing the
+    // final square made walkers stop one short of any marked slot forever.
+    if (a.target == target) {
+        if (needsGfi) score += 8;
+        return score;
+    }
+    // Straight-route tiebreak (2026-08-04, sibling of the cage corner-pick
+    // Manhattan tiebreak): at equal Chebyshev distance the adjacency order
+    // used to pick a DIAGONAL drift first, wasting a square of walk budget --
+    // an exact-reach walk (dist == MA+GFI, e.g. the cage carrier's tempo-
+    // emergency leg) then stops one square off target every time. The
+    // surplus is capped under one distance point so it can never override
+    // a genuinely shorter or safer square.
+    int manhattan = std::abs(a.target.x - target.x) + std::abs(a.target.y - target.y);
+    score += std::min(manhattan - dist, 9);
     if (destTZ > 0 && !currentlyInTZ) {
         score += 20 * destTZ;  // Entering enemy TZ from safe = very bad
     } else if (destTZ > 0) {
@@ -1266,8 +1284,12 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // cap fix, 2899cd5). Cap at the player's real movement budget instead.
     // Deliberately NO +2 GFI headroom (unlike expandPickup): REPOSITION is
     // the only dice-free macro, and a failed GFI on a free repositioning
-    // player is pure downside with no ball at stake.
-    int maxSteps = state.getPlayer(macro.playerId).movementRemaining;
+    // player is pure downside with no ball at stake. Exception (2026-08-04):
+    // macro.gfiAllowance (0-2) opts a SPECIFIC walk into real GFI rolls --
+    // set only by the cage-advance planner for the ball carrier in a tempo
+    // emergency, where not arriving loses the drive anyway.
+    int maxSteps = state.getPlayer(macro.playerId).movementRemaining
+                   + std::clamp(macro.gfiAllowance, 0, 2);
     // Loose ball: never step onto its square, not even as a waypoint --
     // the auto-pickup in move_handler.cpp would turn this dice-free macro
     // into a real gamble (item 11).
