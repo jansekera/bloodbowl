@@ -1,5 +1,6 @@
 #include "bb/cage_advance.h"
 #include "bb/turn_planner.h"
+#include "bb/helpers.h"
 #include <algorithm>
 #include <cmath>
 
@@ -174,6 +175,15 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         auto better = [&](const Player* a, bool aGfi,
                           const Player* b, bool bGfi) {
             if (aGfi != bGfi) return !aGfi;
+            // Corner substitution (user 2026-08-04): a candidate standing in
+            // an enemy tackle zone must DODGE out (dwarf AG2: ~50% fail) --
+            // the probe then vetoes the whole plan. Prefer a FREE body for
+            // the new corner and leave the engaged one standing where it
+            // binds defenders. Block/blitz corner-release is the later,
+            // complex layer (queued with the blitz-priority discussion).
+            bool aFree = countTacklezones(state, a->position, mySide, a->id) == 0;
+            bool bFree = countTacklezones(state, b->position, mySide, b->id) == 0;
+            if (aFree != bFree) return aFree;
             // Tempo sustainability (user design input 2026-08-03, wired
             // 2026-08-04): a corner slower than the planned step caps the
             // whole cage's pace NEXT turn -- prefer corners whose MA

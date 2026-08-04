@@ -322,6 +322,41 @@ TEST(CageAdvance, FasterCornerPreferredWhenTempoDemandsIt) {
                            << plan.step << " rolling cage";
 }
 
+TEST(CageAdvance, FreeBodyPreferredOverMarkedCandidateForNewCorner) {
+    // Corner substitution (user 2026-08-04): the marked teammate would have
+    // to dodge out (probe would veto the plan) -- a farther FREE body takes
+    // the new corner instead, and the engaged one stays put binding his
+    // marker. The marker sits outside the advance corridor so tempo math
+    // stays untouched.
+    GameState state = makeCageState();
+    state.getPlayer(3).state = PlayerState::OFF_PITCH;
+    auto put = [&](int id, TeamSide side, Position pos) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = side;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {4, 3, 2, 9};
+        p.movementRemaining = 4;
+    };
+    put(7, TeamSide::HOME, {14, 9});   // closer to the open back slot, but...
+    put(13, TeamSide::AWAY, {15, 10}); // ...marked by this opponent
+    put(6, TeamSide::HOME, {11, 10});  // farther and FREE -> must win
+
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    Position backBottom{static_cast<int8_t>(12 + plan.step - 1), 8};
+    bool freeGotIt = false, markedDrafted = false;
+    for (const auto& m : plan.macros) {
+        if (m.targetPos == backBottom && m.playerId == 6) freeGotIt = true;
+        if (m.playerId == 7) markedDrafted = true;
+    }
+    EXPECT_TRUE(freeGotIt) << "free body must take the new corner (step="
+                           << plan.step << ")";
+    EXPECT_FALSE(markedDrafted) << "engaged teammate stays put, no dodge";
+}
+
 TEST(CageAdvance, CarrierTargetBlockedByTeammateGetsVacatedFirst) {
     // A teammate parked straight ahead of the carrier (post-scrum pile,
     // user doctrine: "the ones in FRONT move first so they stop blocking").
