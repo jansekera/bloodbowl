@@ -466,7 +466,9 @@ PYBIND11_MODULE(bb_engine, m) {
                                       bool leafLookahead,
                                       bool riskDeferral,
                                       const std::string& awayPolicyWeightsPath,
-                                      float awayPolicyBlend) {
+                                      float awayPolicyBlend,
+                                      bool stagedPickup,
+                                      bool awayStagedPickup) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -502,6 +504,7 @@ PYBIND11_MODULE(bb_engine, m) {
                               bb::ValueFunction* vfPtr,
                               bb::PolicyNetwork* polPtr,
                               float polBlend,
+                              bool stagedPlanner,
                               std::shared_ptr<bb::MCTSPolicy>& mctsOut,
                               std::shared_ptr<bb::MacroMCTSPolicy>& macroMctsOut) -> bb::ActionSelector {
             if (ai == "greedy") {
@@ -517,6 +520,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.nRollouts = nRollouts;
                 cfg.leafLookahead = leafLookahead;
                 cfg.riskDeferral = riskDeferral;
+                cfg.stagedPickupPlanner = stagedPlanner;
                 if (polPtr) {
                     cfg.policy = polPtr;
                     cfg.policyBlend = polBlend;
@@ -548,11 +552,11 @@ PYBIND11_MODULE(bb_engine, m) {
         auto logged = bb::simulateGameLogged(
             home, away,
             makePolicy(homeAI, vf.get(), policyNet.get(), policyBlend,
-                       homeMcts, homeMacroMcts),
+                       stagedPickup, homeMcts, homeMacroMcts),
             makePolicy(awayAI, awayVf.get(),
                        awayPolicyNet ? awayPolicyNet.get() : policyNet.get(),
                        awayPolicyBlend < 0.0f ? policyBlend : awayPolicyBlend,
-                       awayMcts, awayMacroMcts),
+                       awayStagedPickup, awayMcts, awayMacroMcts),
             dice);
 
         // Copy policy decisions from MCTS policies
@@ -595,7 +599,9 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("leaf_lookahead") = false,  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
        py::arg("risk_deferral") = false,
        py::arg("away_policy_weights_path") = "",
-       py::arg("away_policy_blend") = -1.0f);  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
+       py::arg("away_policy_blend") = -1.0f,  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
+       py::arg("staged_pickup") = false,       // 2026-08-05 (item 13): staged safe-then-PICKUP whole-turn planner, per side
+       py::arg("away_staged_pickup") = false); // so the gate can run candidate-only while frozen keeps its promoted config
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

@@ -29,9 +29,17 @@ def _pool_init(paths: list) -> None:
 
 def _simulate_game_worker(args: tuple) -> dict:
     """Worker for parallel game simulation — called in a child process."""
-    (seed, home_race_name, away_race_name, home_ai, away_ai,
-     weights_path, epsilon, mcts_iterations, policy_path, policy_blend,
-     vf_blend, away_weights, log_dir_str, game_num, tv) = args
+    # 16th element (staged_pickup) optional/backward-compatible (item 13,
+    # 2026-08-05): self-play is symmetric, so one flag drives both sides.
+    staged_pickup = False
+    if len(args) >= 16:
+        (seed, home_race_name, away_race_name, home_ai, away_ai,
+         weights_path, epsilon, mcts_iterations, policy_path, policy_blend,
+         vf_blend, away_weights, log_dir_str, game_num, tv, staged_pickup) = args[:16]
+    else:
+        (seed, home_race_name, away_race_name, home_ai, away_ai,
+         weights_path, epsilon, mcts_iterations, policy_path, policy_blend,
+         vf_blend, away_weights, log_dir_str, game_num, tv) = args
 
     import bb_engine
 
@@ -46,6 +54,8 @@ def _simulate_game_worker(args: tuple) -> dict:
         policy_blend=policy_blend,
         vf_blend=vf_blend,
         away_weights_path=away_weights,
+        staged_pickup=staged_pickup,
+        away_staged_pickup=staged_pickup,
     )
     result = logged.result
 
@@ -140,6 +150,7 @@ class CPPRunner:
         policy_blend: float = 0.0,
         vf_blend: float = 0.0,
         workers: int = 1,
+        staged_pickup: bool = False,
     ) -> TournamentResult:
         # Team value level for roster resolution (>=1200 fields developed/skilled rosters).
         self._tv = tv if tv else 1000
@@ -152,7 +163,7 @@ class CPPRunner:
                 away_weights=away_weights, mcts_iterations=mcts_iterations,
                 policy_weights=policy_weights, game_offset=game_offset,
                 policy_blend=policy_blend, vf_blend=vf_blend, workers=workers,
-                tv=self._tv,
+                tv=self._tv, staged_pickup=staged_pickup,
             )
 
         results: list[MatchResult] = []
@@ -187,6 +198,8 @@ class CPPRunner:
                     policy_blend=policy_blend,
                     vf_blend=vf_blend,
                     away_weights_path=away_weights or '',
+                    staged_pickup=staged_pickup,
+                    away_staged_pickup=staged_pickup,
                 )
                 result = logged.result
 
@@ -250,6 +263,7 @@ class CPPRunner:
         policy_weights: Optional[str], game_offset: int,
         policy_blend: float, vf_blend: float, workers: int,
         tv: int = 1000,
+        staged_pickup: bool = False,
     ) -> TournamentResult:
         weights_path = weights or ''
         eps = epsilon if epsilon is not None else 0.3
@@ -266,7 +280,7 @@ class CPPRunner:
                 weights_path, eps, mcts_iterations,
                 policy_path, policy_blend, vf_blend,
                 away_weights or '', log_dir or '', game_offset + i + 1,
-                tv,
+                tv, staged_pickup,
             )
             for i in range(matches)
         ]

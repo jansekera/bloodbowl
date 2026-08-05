@@ -39,6 +39,7 @@ def cfg(monkeypatch):
     monkeypatch.setattr(ri, 'GATE_POLICY_BLEND', 0.2)
     monkeypatch.setattr(ri, 'MCTS_ITERATIONS', 100)
     monkeypatch.setattr(ri, 'TV', 1200)
+    monkeypatch.setattr(ri, 'STAGED_PICKUP', False)
 
 
 # ---------------------------------------------------------------- promote meta
@@ -78,21 +79,40 @@ def test_promote_meta_without_policy_file_zeroes_blend(cfg, tmp_path):
     assert meta['benchmark_vf_blend'] == 0.15
 
 
+def test_promote_meta_records_staged_pickup(cfg, tmp_path, monkeypatch):
+    """Item 13: promoce s plánovačem se musí zapsat do meta — frozen strana
+    příští gate s ním hraje (stejná třída fairness jako policy_blend)."""
+    monkeypatch.setattr(ri, 'STAGED_PICKUP', True)
+    policy = tmp_path / 'stash_policy.json'
+    policy.write_text('{}')
+    meta = ri._promote_meta_write(tmp_path, 0.985, 0.99, str(policy))
+    assert meta['staged_pickup'] is True
+
+
+def test_promote_meta_staged_default_false(cfg, tmp_path):
+    policy = tmp_path / 'stash_policy.json'
+    policy.write_text('{}')
+    meta = ri._promote_meta_write(tmp_path, 0.985, 0.99, str(policy))
+    assert meta['staged_pickup'] is False
+
+
 # ----------------------------------------------------------------- reject meta
 
 def test_reject_meta_preserves_policy_fields(cfg, tmp_path):
     (tmp_path / 'weights_best_meta.json').write_text(json.dumps({
         'benchmark_win_rate': 0.985, 'benchmark_mcts_iterations': 100,
         'benchmark_vf_blend': 0.15, 'all_time_best_benchmark': 0.99,
-        'tv': 1200, 'policy_blend': 0.2, 'policy_md5': 'cafebabe'}))
+        'tv': 1200, 'policy_blend': 0.2, 'policy_md5': 'cafebabe',
+        'staged_pickup': True}))
 
     meta = ri._reject_meta_write(tmp_path, 0.98, 0.99)
 
     on_disk = json.loads((tmp_path / 'weights_best_meta.json').read_text())
     assert on_disk == meta
-    # policy pole šampiona přežila
+    # pole promoce šampiona přežila
     assert meta['policy_blend'] == 0.2
     assert meta['policy_md5'] == 'cafebabe'
+    assert meta['staged_pickup'] is True
     # benchmark baseline aktualizována (re-benchmark se nesmí triggerovat znovu)
     assert meta['benchmark_win_rate'] == 0.98
     assert meta['benchmark_vf_blend'] == 0.15

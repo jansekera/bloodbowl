@@ -94,6 +94,10 @@ def main():
                              '0.5 = 50/50 mix. Only active with --self-play.')
     parser.add_argument('--workers', type=int, default=1,
                         help='Parallel workers for self-play games (default: 1 = sequential)')
+    parser.add_argument('--staged-pickup', type=int, choices=[0, 1],
+                        default=int(os.environ.get('BB_STAGED_PICKUP', '0') != '0'),
+                        help='Item 13: staged safe-then-PICKUP whole-turn planner in '
+                             'self-play (both sides; env BB_STAGED_PICKUP; C++ engine only)')
     # C++ engine
     cpp_group = parser.add_mutually_exclusive_group()
     cpp_group.add_argument('--use-cpp', action='store_true', default=False,
@@ -156,6 +160,7 @@ def main():
         vf_ramp_epochs=args.vf_ramp_epochs,
         opponent_mix_ratio=args.opponent_mix_ratio,
         workers=args.workers,
+        staged_pickup=bool(args.staged_pickup),
     )
 
 

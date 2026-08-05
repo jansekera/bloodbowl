@@ -55,6 +55,7 @@ def run_training(
     vf_ramp_epochs: int = 3,
     opponent_mix_ratio: float = 0.0,
     workers: int = 1,
+    staged_pickup: bool = False,
 ) -> None:
     """Run the full training loop.
 
@@ -343,6 +344,10 @@ def run_training(
             policy_blend=epoch_blend, vf_blend=epoch_vf_blend,
             timeout=timeout, timeout_per_game=True,
         )
+        # Item 13 (2026-08-05): staged planner jen pro self-play data; klíč se
+        # přidává podmíněně — CLIRunner (PHP fallback) parametr nezná.
+        if staged_pickup:
+            _sim_kwargs['staged_pickup'] = True
 
         if self_play and opponent_mix_ratio > 0 and not curriculum:
             n_mix = max(1, round(games_per_epoch * opponent_mix_ratio))

@@ -225,6 +225,60 @@ class TestGatePolicyBlend:
         assert call['away_policy_blend'] == 0.0
 
 
+class TestStagedPickup:
+    """Item 13 wiring (2026-08-05): 12. prvek _gate_game je dvojice
+    (cand_staged, frozen_staged); 10. prvek _benchmark_game je cand_staged.
+    Default = plánovač vypnutý na obou stranách (dnešní chování)."""
+
+    def test_gate_12tuple_cand_home(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
+                    (0.2, '', 0.0), (True, False)))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is True        # HOME = kandidát
+        assert call['away_staged_pickup'] is False  # AWAY = frozen bez plánovače
+
+    def test_gate_12tuple_cand_away(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
+                    (0.2, '', 0.0), (True, False)))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is False       # HOME = frozen
+        assert call['away_staged_pickup'] is True   # AWAY = kandidát
+
+    def test_gate_12tuple_frozen_promoted_with_planner(self, fake_engine):
+        """Šampion promotnutý s plánovačem (meta staged_pickup=true) s ním
+        hraje i ve frozen slotu — fairness vzor policy_blend."""
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
+                    (0.2, 'BESTPOL', 0.2), (True, True)))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is True
+        assert call['away_staged_pickup'] is True
+
+    def test_gate_11tuple_default_off_both_sides(self, fake_engine):
+        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
+                    (0.2, '', 0.0)))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is False
+        assert call['away_staged_pickup'] is False
+
+    def test_benchmark_10tuple_cand_home(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', False, 0.2, True))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is True
+        assert call['away_staged_pickup'] is False  # random strana nikdy
+
+    def test_benchmark_10tuple_cand_away(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True, 0.2, True))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is False
+        assert call['away_staged_pickup'] is True
+
+    def test_benchmark_9tuple_default_off(self, fake_engine):
+        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True, 0.2))
+        call = fake_engine.calls[-1]
+        assert call['staged_pickup'] is False
+        assert call['away_staged_pickup'] is False
+
+
 class TestScheduleBalance:
     """The production schedules assign orientation i % 2 and matchup
     races[i%5] vs races[(i+1)%5]; gcd(2,5)=1 -> period 10, so every

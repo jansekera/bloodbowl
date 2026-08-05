@@ -100,6 +100,13 @@ GATE_USE_POLICY_PRIORS = os.environ.get('BB_GATE_USE_POLICY_PRIORS', '1') != '0'
 # kterým byla promotnuta (weights_best_meta.json 'policy_blend', do první
 # promoce s blendem tedy 0.0 a sdílená síť = jen prior floors).
 GATE_POLICY_BLEND = float(os.environ.get('BB_GATE_POLICY_BLEND', '0.0'))
+
+# Item 13 (2026-08-05): stagedPickupPlanner (celo-tahový safe-then-PICKUP
+# plánovač) v self-play datech A na kandidátní straně gate/benchmarku.
+# Frozen strana hraje s konfigurací, se kterou byla promotnuta
+# (weights_best_meta.json 'staged_pickup', default False) — stejný fairness
+# vzor jako policy_blend. Default 0 = dnešní chování beze změny.
+STAGED_PICKUP = os.environ.get('BB_STAGED_PICKUP', '0') != '0'
 # Gate/benchmark eval-parity (2026-07-10). Both knobs below exist because
 # gating and benchmarking run through simulate_game_logged -- the binding built
 # for SELF-PLAY -- rather than simulate_game, the eval binding, which cannot
@@ -273,9 +280,15 @@ def _benchmark_game(args: tuple) -> bool:
     # 9th element (cand_policy_blend) optional/backward-compatible (krok 2,
     # 2026-08-03): blend naučeného obsahu policy na měřené (macro_mcts) straně.
     # Default 0.0 = dnešní chování (jen prior floors z policy_path).
+    # 10th element (cand_staged) optional/backward-compatible (item 13,
+    # 2026-08-05): stagedPickupPlanner na měřené (macro_mcts) straně.
     cand_is_away = False
     cand_policy_blend = 0.0
-    if len(args) >= 9:
+    cand_staged = False
+    if len(args) >= 10:
+        (seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path,
+         cand_is_away, cand_policy_blend, cand_staged) = args[:10]
+    elif len(args) >= 9:
         (seed, race_idx, gate_path, mcts_iterations, vf_blend, tv, policy_path,
          cand_is_away, cand_policy_blend) = args[:9]
     elif len(args) >= 8:
@@ -298,6 +311,8 @@ def _benchmark_game(args: tuple) -> bool:
         policy_weights_path=policy_path,
         policy_blend=(0.0 if cand_is_away else cand_policy_blend),
         away_policy_blend=(cand_policy_blend if cand_is_away else 0.0),
+        staged_pickup=(False if cand_is_away else cand_staged),
+        away_staged_pickup=(cand_staged if cand_is_away else False),
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
@@ -334,9 +349,17 @@ def _gate_game(args: tuple) -> tuple:
     # weights_best_meta.json) — frozen_policy_path='' znamená sdílet síť
     # kandidáta (obsah se při frozen_policy_blend=0 nečte, jen floors).
     # Default (0.0, '', 0.0) = bajtově dnešní chování.
+    # 12th element (staged_cfg) optional/backward-compatible (item 13,
+    # 2026-08-05): dvojice (cand_staged, frozen_staged) — stagedPickupPlanner
+    # per strana; frozen hraje s konfigurací své promoce (meta 'staged_pickup').
     cand_is_away = False
     policy_cfg = (0.0, '', 0.0)
-    if len(args) >= 11:
+    staged_cfg = (False, False)
+    if len(args) >= 12:
+        (seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend,
+         tv, leaf_lookahead, policy_path, cand_is_away, policy_cfg,
+         staged_cfg) = args[:12]
+    elif len(args) >= 11:
         (seed, race_idx, gate_path, frozen_path, mcts_iterations, vf_blend,
          tv, leaf_lookahead, policy_path, cand_is_away, policy_cfg) = args[:11]
     elif len(args) >= 10:
@@ -357,15 +380,18 @@ def _gate_game(args: tuple) -> tuple:
     home_w, away_w = ((frozen_path, gate_path) if cand_is_away
                       else (gate_path, frozen_path))
     cand_pb, frozen_ppath, frozen_pb = policy_cfg
+    cand_staged, frozen_staged = staged_cfg
     if cand_is_away:
         # HOME = frozen: vlastní zmrazená policy, nebo sdílí kandidátovu síť
         home_policy = frozen_ppath if frozen_ppath else policy_path
         away_policy = policy_path if frozen_ppath else ''
         home_pb, away_pb = frozen_pb, cand_pb
+        home_staged, away_staged = frozen_staged, cand_staged
     else:
         home_policy = policy_path
         away_policy = frozen_ppath   # '' -> away sdílí home síť (dnešní chování)
         home_pb, away_pb = cand_pb, frozen_pb
+        home_staged, away_staged = cand_staged, frozen_staged
     result = bb_engine.simulate_game_logged(
         hr, ar,
         home_ai='macro_mcts', away_ai='macro_mcts',
@@ -377,6 +403,8 @@ def _gate_game(args: tuple) -> tuple:
         policy_blend=home_pb,
         away_policy_weights_path=away_policy,
         away_policy_blend=away_pb,
+        staged_pickup=home_staged,
+        away_staged_pickup=away_staged,
         dirichlet_alpha=GATE_DIRICHLET_ALPHA,
         exploration_c=GATE_EXPLORATION_C,
     ).result
@@ -523,6 +551,9 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     # policy_blend, se kterým byl šampion promotnut (0.0 = před první promocí
     # s blendem); čte se z weights_best_meta.json ve Step 1.
     frozen_policy_blend = 0.0
+    # staged_pickup, se kterým byl šampion promotnut (item 13; False = před
+    # prvním nasazením plánovače); čte se z weights_best_meta.json ve Step 1.
+    frozen_staged = False
     # Step 1: Freeze current best
     anchor_path = PROJECT_ROOT / 'weights_anchor_noreset.json'
     if best_path.exists():
@@ -555,12 +586,18 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
                 # GATE_POLICY_BLEND dělá uloženou benchmark baseline
                 # nesrovnatelnou (stejná třída jako vf_blend/mcts mismatch).
                 frozen_policy_blend = float(meta.get('policy_blend', 0.0))
+                # staged_pickup promoce (item 13): mismatch vůči aktuálnímu
+                # STAGED_PICKUP = kandidátní benchmark poběží s jiným
+                # plánovačem než uložená baseline → nesrovnatelné.
+                frozen_staged = bool(meta.get('staged_pickup', False))
                 if (meta_vfb != GATE_VF_BLEND or meta_mcts != MCTS_ITERATIONS
-                        or frozen_policy_blend != GATE_POLICY_BLEND):
+                        or frozen_policy_blend != GATE_POLICY_BLEND
+                        or frozen_staged != STAGED_PICKUP):
                     print(f'⚠ Benchmark konfigurace se změnila (vf_blend '
                           f'{meta_vfb}→{GATE_VF_BLEND}, mcts {meta_mcts}→'
                           f'{MCTS_ITERATIONS}, policy_blend '
-                          f'{frozen_policy_blend}→{GATE_POLICY_BLEND}): uložená baseline '
+                          f'{frozen_policy_blend}→{GATE_POLICY_BLEND}, staged_pickup '
+                          f'{frozen_staged}→{STAGED_PICKUP}): uložená baseline '
                           f'{frozen_bm:.1%} není srovnatelná — frozen se '
                           f'přeběhne pod novou konfigurací.', flush=True)
                     frozen_bm_stale = True
@@ -658,6 +695,7 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         '--skip-greedy-benchmark', '--timeout=300',
         f'--opponent-mix-ratio={OPPONENT_MIX_RATIO}',
         f'--workers={WORKERS}',
+        f'--staged-pickup={int(STAGED_PICKUP)}',
     ]
     subprocess.run(cmd, env=env, cwd=str(PROJECT_ROOT), check=True)
     _stash_policy(az_train_path, policy_cache_path)
@@ -695,7 +733,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     gate_policy_path = str(policy_cache_path) if GATE_USE_POLICY_PRIORS and policy_cache_path.exists() else ''
 
     def _run_benchmark(path: Path, label: str, policy_path: str | None = None,
-                       policy_blend: float | None = None) -> tuple[float, bool]:
+                       policy_blend: float | None = None,
+                       staged: bool | None = None) -> tuple[float, bool]:
         # GATE_VF_BLEND, ne VF_BLEND (fable_pipeline_audit_20260730 N2):
         # s tréninkovým VF_BLEND=0 benchmark vůbec nečetl měřené váhy
         # (macro_mcts přeskočí value net při blend=0) — skóre bylo
@@ -704,9 +743,10 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         # 21.07 opravena v gate (GATE_VF_BLEND gap).
         pp = gate_policy_path if policy_path is None else policy_path
         pb = GATE_POLICY_BLEND if policy_blend is None else policy_blend
+        sp = STAGED_PICKUP if staged is None else staged
         tasks = [
             (random.randint(1, 999999), i, str(path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
-             pp, i % 2 == 1, pb)
+             pp, i % 2 == 1, pb, sp)
             for i in range(half_bm)
         ]
         print(f'Benchmark {label}: {half_bm} games ({WORKERS} workers)...', flush=True)
@@ -731,7 +771,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         frozen_bm, frozen_ok = _run_benchmark(
             frozen_path, 'frozen re-benchmark',
             policy_path=(frozen_policy_gate_path or gate_policy_path),
-            policy_blend=frozen_policy_blend)
+            policy_blend=frozen_policy_blend,
+            staged=frozen_staged)
         if not frozen_ok:
             abort_promote.append('frozen re-benchmark incomplete (engine hang?)')
         # all_time_best ze staré konfigurace není srovnatelný — restart
@@ -755,7 +796,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         h2h_tasks = [
             (random.randint(1, 999999), i, str(az_train_path), str(train_best_path),
              MCTS_ITERATIONS, GATE_VF_BLEND, TV, False, gate_policy_path, i % 2 == 1,
-             (GATE_POLICY_BLEND, '', GATE_POLICY_BLEND))
+             (GATE_POLICY_BLEND, '', GATE_POLICY_BLEND),
+             (STAGED_PICKUP, STAGED_PICKUP))   # oba kandidáti trénovali se stejným plánovačem
             for i in range(SELECTION_H2H_MATCHES)
         ]
         print(f'Selection H2H: az_train vs train_best, {SELECTION_H2H_MATCHES} games '
@@ -802,7 +844,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
     gate_tasks = [
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
          False, gate_policy_path, i % 2 == 1,   # sudé i: cand=HOME, liché: cand=AWAY
-         (GATE_POLICY_BLEND, frozen_policy_gate_path, frozen_policy_blend))
+         (GATE_POLICY_BLEND, frozen_policy_gate_path, frozen_policy_blend),
+         (STAGED_PICKUP, frozen_staged))   # frozen s plánovačem své promoce (item 13)
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
@@ -962,6 +1005,8 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         'threshold': {'k': k, 'tier': tier, 'required': required, 'sigma': sigma},
         'gate_policy_blend': GATE_POLICY_BLEND,
         'frozen_policy_blend': frozen_policy_blend,
+        'gate_staged_pickup': STAGED_PICKUP,
+        'frozen_staged_pickup': frozen_staged,
         'frozen_bm': frozen_bm,
         'all_time_best_bm': all_time_best_bm,
         'baseline_reset': baseline_reset,
@@ -987,7 +1032,10 @@ def _promote_meta_write(root: Path, new_bm: float, all_time_best_bm: float,
     new_meta = {'benchmark_win_rate': new_bm, 'benchmark_mcts_iterations': MCTS_ITERATIONS,
                 'benchmark_vf_blend': GATE_VF_BLEND,
                 'all_time_best_benchmark': max(all_time_best_bm, new_bm), 'tv': TV,
-                'policy_blend': GATE_POLICY_BLEND}
+                'policy_blend': GATE_POLICY_BLEND,
+                # Item 13: šampion byl promotnut s tímto plánovačem — frozen
+                # strana příští gate s ním musí hrát (fairness, vzor policy_blend).
+                'staged_pickup': STAGED_PICKUP}
     if GATE_POLICY_BLEND > 0.0:
         # Promotion snapshot policy: gate schválil kombinaci (value,
         # policy@teď) — bez zmrazení by stash dál driftovala a šampion
@@ -1010,9 +1058,10 @@ def _promote_meta_write(root: Path, new_bm: float, all_time_best_bm: float,
 def _reject_meta_write(root: Path, frozen_bm: float, all_time_best_bm: float) -> dict:
     """Meta šampiona po REJECTED iteraci: šampion beze změny, ale baseline
     mohla být přeběhnuta pod aktuální konfigurací — zapsat, ať se re-benchmark
-    netriggeruje každou iteraci znovu. Policy pole (policy_blend/policy_md5)
-    popisují PROMOCI šampiona a musí přežít nedotčená — jinak by frozen příští
-    iteraci hrál bez policy, se kterou byl promotnut."""
+    netriggeruje každou iteraci znovu. Pole popisující PROMOCI šampiona
+    (policy_blend/policy_md5/staged_pickup) musí přežít nedotčená — jinak by
+    frozen příští iteraci hrál s jinou konfigurací, než se kterou byl
+    promotnut."""
     meta_path = root / 'weights_best_meta.json'
     meta = {}
     if meta_path.exists():
