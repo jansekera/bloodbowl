@@ -1,10 +1,12 @@
 # Tempo doktrína cage advance — report (Fable, 06.08.2026)
 
 Zadání: `evidence/fable_tempo_doctrine_20260810.md` (dispatch předsunut na
-06.08.). Stav: **ROZPRACOVÁNO — měření čekají na doběh run_iteration.py**
-(verdikt ~13:30 UTC), kód sondy a A/B hotov a commitnut (41fd8c5).
+06.08.). Stav: **FINÁLNÍ (06.08. ~14:30 UTC)** — všechna měření doběhla
+(session-nezávislý řetěz `run_tempo_measure_20260806.sh`, ALL_DONE 14:18);
+kód sondy a A/B commitnut (41fd8c5). Report začal původní Fable agent
+(do ~09:30, konec tokenů), dokončil navazující agent.
 
-## Závěry napřed (průběžné — finalizace po měřeních řetězu)
+## Závěry napřed
 
 1. TEMPO veto je hlavní brzda adoption (54–68 % ADVANCE turnů na 3
    matchupech, sekce 1) a grind ho umí otevřít: shadow měření 74–82 %
@@ -32,6 +34,13 @@ Zadání: `evidence/fable_tempo_doctrine_20260810.md` (dispatch předsunut na
    (přední sloty feasibility) se o toto pravidlo rozšiřuje a jde PŘED
    zapnutí grindu jako defaultu — grind počet tahů klece do kontaktu
    zvyšuje (pořadí v sekci 5).
+8. Grind A/B first read (40 párů/matchup, sekce 2): **dw-sk Δchess
+   +13,75 pp (1,6 SE), dwarf TD/hru 0,42→0,65, soupeřovo TD/hru kleslo
+   0,65→0,42, vícególové dwarf hry (2:0, 2:1) existují jen s grindem**;
+   dw-we beze změny (−0,8 SE — DICEY zeď přesně dle shadow predikce).
+   Doporučení GO pro grind daty potvrzeno na kritériích uživatele;
+   plný efekt proti hbitým rasám vyžaduje ještě koridorovou vrstvu +
+   risk budget. Potvrdit A/B na 400 párech (SE ~±2,8 pp) po GO.
 
 ### Slovníček (lidsky)
 - **Adoption** = jak často se doktrinální plán klece skutečně ujme tahu
@@ -168,7 +177,46 @@ ta menšina jsou ale právě dokončovací nohy drivu.
 
 ## 2. Grind A/B (otázka 3)
 
-(čeká na měření)
+Měření řetězu 06.08. (`tempo_measure_20260806/ab_m{0,1}/`): first read
+**40 párů/matchup (80 her)** — párované hry se stejným seedem a
+prohozenými stranami; kandidát = cage plán s grindem, baseline = cage
+plán s dnešním tempo vetem (fallback na search). Pozor na malé N:
+SE párové Δchess ~±8–9 pp, jemné efekty tenhle běh nerozliší.
+
+| metrika | dw-sk | dw-we |
+|---|---|---|
+| párová Δchess (grind − fallback) | **+13,75 pp ± 8,84 SE (1,6 SE)** | −6,25 pp ± 8,33 SE (−0,8 SE) |
+| plánů/hru (adoption) | **0,93 vs 0,42 (2,2×)** | 0,84 vs 0,55 (1,5×) |
+| dwarf TD/hru (rameno grind vs fallback) | **0,65 vs 0,42 (+55 % rel.)** | 0,12 vs 0,15 (≈nic) |
+| soupeř TD/hru proti dwarfovi | **0,42 vs 0,65 (klesl!)** | 0,82 vs 0,68 (šum, 33 vs 27 TD) |
+| 0:0 v rameni dwarfa | 11/40 vs 9/40 (šum) | 11/40 vs 13/40 (šum) |
+
+Distribuce skóre (rameno „dwarf hraje grind" vs „dwarf hraje fallback"),
+dw-sk: grind 0:0×11 1:0×10 **2:0×5** 0:1×7 1:1×3 **2:1×1** …; fallback
+1:0×11 0:1×11 0:0×9 1:1×4 … — **vícególové dwarf hry (2:0, 2:1) existují
+JEN v grind rameni**; přesně posun distribuce, který uživatel žádá
+(sekce 2b: „prohra 1:2 místo 0:1 už je pokrok" — tady rovnou výhry 2:0).
+dw-we: obě ramena téměř identická (0:1×17/×16, 0:0×11/×13) — grind sám
+proti elfům distribucí nehne.
+
+Čtení vůči kritériím 2b (závazný vstup uživatele):
+- **dw-sk: grind plní všechna tři kritéria směrem** — dwarf TD/hru +55 %,
+  soupeřovo TD/hru KLESLO (obranná noha drží: zamčený míč = skaven nemá
+  co nést), distribuce se posouvá k 2:0/2:1. Δchess +13,75 pp je při
+  first-read N těsně pod 2 SE — směr silný, potvrdit větším N (400 párů
+  jako ab_run_20260804 dá SE ~±2,8 pp).
+- **dw-we: grind sám nestačí** — přesně dle shadow predikce (sekce 1:
+  PLAN_READY +1, otevřená veta spadla do DICEY zdi). Δchess −0,8 SE =
+  šum, ne prokázaná regrese; ale mechanismus je jasný: proti hbitým
+  elfům (TZ stíny v koridoru) grind bez koridorové vrstvy a risk budgetu
+  jen mele na místě. Pořadí implementace v sekci 5 to respektuje.
+- Kalibrace „skaven ~2:1": AI-vs-AI baseline tuhle asymetrii nereprodukuje
+  (skaven AI je daleko od lidského skaven stropu) — proto zůstává
+  primární metrikou posun dwarf TD/0:0/distribuce, ne absolutní poměr.
+- Attrition (kontrola, ne cíl): přeživší/11 prakticky beze změny v obou
+  matchupech (Δ < 0,2 těla); grind nezvyšuje ubití soupeře, jeho efekt
+  jde přes držení a posun míče. Potvrzuje 2b bod 2: attrition sama
+  nevyhrává — a grind na ní ani nestojí.
 
 ### Referenční baseline (A/B 04.08., cage vs. off, 400 párů/matchup;
 ### remízy/0:0 dopočteny z rows 06.08., Wilson 95% CI)
@@ -431,24 +479,26 @@ po jednom čísle.
 
 ## 5. Podklad rozhodnutí pro uživatele
 
-(čísla v závorkách se doplní z měření; struktura rozhodnutí je nezávislá)
-
 **Kritéria úspěchu (závazný vstup uživatele 06.08., sekce 2b):** růst
 dwarf TD/hru, pokles 0:0, posun distribuce skóre — NE 50% WR (matchup je
 intrinsicky nakloněný; „prohra 1:2 místo 0:1 už je pokrok").
 
 **Rozhodnutí A — doktrína při nevyšlém rozvrhu.** Doporučení: GRIND
 (opce a; opce b je v dnešním kódu totéž). Argumenty: (1) TEMPO veto je
-68 % relevantních turnů — plánovač dnes většinou rezignuje dřív, než
-začal; (2) držení míče v kleci má obrannou hodnotu (soupeř neskóruje,
-dokud meleme; hráčská zkušenost 06.08.: attrition sama 2 TD skavenů
-nezastaví, zamčený míč ano) — i grind „bez šance na TD" je lepší než
-fallback, který umí ztratit míč sólo úprkem; (3) A/B výsledek dle kritérií
-2b (doplnit: dwarf TD/hru, 0:0, distribuce skóre, Δchess).
+54–68 % ADVANCE turnů (sekce 1) a 77–85 % vet má dosažitelný krok ≥ 2 —
+plánovač rezignuje, i když by se klec reálně hýbala; (2) držení míče
+v kleci má obrannou hodnotu (soupeř neskóruje, dokud meleme; hráčská
+zkušenost 06.08.: attrition sama 2 TD skavenů nezastaví, zamčený míč
+ano) — dnešní fallback po vetu ztrácí držení ve 41–47 % dotčených drivů
+(sekce 1); (3) A/B dle kritérií 2b (sekce 2): dw-sk dwarf TD/hru
+0,42→0,65, soupeřovo TD/hru 0,65→0,42, distribuce nově obsahuje 2:0
+a 2:1, Δchess +13,75 pp (1,6 SE, first read 40 párů — před defaultem
+potvrdit na 400 párech).
 Rizika: grind část vet jen přesune do DICEY zdi (koridor) — proti dnešku
-to nic nezhoršuje, ale plný účinek přijde až s koridorovou vrstvou
-(blitz-release / route-fix). Alternativa „nechat dnešní veto" je v přímém
-rozporu se závazným rámováním z 05.08.
+to nic nezhoršuje (dw-we A/B: −0,8 SE = šum, žádná prokázaná regrese),
+ale plný účinek proti hbitým rasám přijde až s koridorovou vrstvou
+(blitz-release / route-fix) a risk budgetem. Alternativa „nechat dnešní
+veto" je v přímém rozporu se závazným rámováním z 05.08. i s daty sekce 1.
 
 **Rozhodnutí B — druhá příčka hierarchie (cage-fill).** Když ani grind
 krok nejde: doplnit/zpevnit klec bez posunu = tryAssign se step=0 na
@@ -511,31 +561,14 @@ budget modulu (sekce 4), ne jako další lokální heuristika klece.
   run_tempo_measure běží (chain.log 08:58 start, čeká na konec tréninku).
 - 13:37: trénink doběhl, řetěz postavil binárky a odjel PROBE fázi;
   13:47 PROBE_DONE, A/B fáze (40 párů × dw-sk, dw-we) běží.
-- 14:00: sekce 1 zapsána z analyze_tempo_probe.py (dw-sk baseline
+- 13:50: sekce 1 zapsána z analyze_tempo_probe.py (dw-sk baseline
   reprodukuje 05.08. přesně 53/17/8); doplněny návaznosti v 3b/3c a
-  Závěry bod 1. Čekám na ALL_DONE (odhad ~14:30–15:00).
-
-### HANDOFF pro pokračovatele (zapsáno 10:35 UTC, aktualizovat u checkpointu)
-Session navazujícího agenta končí ~15:45 UTC; měřicí řetěz
-`run_tempo_measure_20260806.sh` (PID 119460, setsid) je session-NEZÁVISLÝ
-a data doteče sám: `tempo_measure_20260806/PROBE_DONE` ~15:00–15:30 UTC,
-`ALL_DONE` ~17:30 UTC. NIC nerestartovat; když chain.log hlásí BUILD FAIL
-nebo řetěz zmizel z ps, jen to poznamenat sem — neopravovat.
-Zbývající kroky (jen spustit skripty a vložit čísla):
-1. Po PROBE_DONE: `python3 tempo_measure_20260806/analyze_tempo_probe.py`
-   (čte `probe_m{0,1,3}_g{0,1}.log` tamtéž). Výstup → **sekce 1**:
-   rozpad TEMPO vet (větve u/p/r; raw≥2 vs ≤1 = otázka 2 zadání;
-   fullHalf vs midHalf = šikmá otázka 1; drive outcomy po vetu; grind
-   SHADOW konverze TEMPO→READY/DICEY). Navázat na místa v sekci 3
-   („Měřeno … shadow konverzí"), 3b (přeměření DICEY pto histogramu na
-   větším N) a 3c bod 1.
-2. Po ALL_DONE: `python3 tempo_measure_20260806/analyze_grind_ab.py`
-   (čte `ab_m{0,1}/diag_f1_grind_rows.jsonl`). Výstup → **sekce 2**:
-   vyhodnotit dle kritérií sekce 2b (dwarf TD/hru, 0:0, distribuce skóre
-   po ramenech — NE 50% WR) + vůči referenční tabulce 04.08. v sekci 2;
-   pozor: reference je jiné rameno (cage vs off), jen orientačně.
-   N=40 párů = first read, Δchess pod ±5 pp bude šum (SE ~±5 pp).
-3. Finalizace: doplnit čísla do Rozhodnutí A bod (3) v sekci 5,
-   přeformulovat „Závěry napřed" body 1/6 podle výsledků a odstranit
-   „(průběžné…)" z nadpisu, aktualizovat hlavičku reportu (Stav:
-   FINÁLNÍ) a dopsat log. Commit+push reportu (md) je povolen.
+  Závěry bod 1; commit+push (mezitím řetěz jel A/B fázi).
+- 14:18: ALL_DONE (řetěz doběhl výrazně dřív, než se čekalo — trénink
+  skončil už 13:37). 14:25: sekce 2 zapsána z analyze_grind_ab.py.
+- 14:30: finalizace — hlavička FINÁLNÍ, Závěry napřed (body 1 a 8),
+  sekce 5 Rozhodnutí A s čísly; HANDOFF poznámka odstraněna (splněno,
+  nic nezbývá). Surová data: `tempo_measure_20260806/` (probe_m*.log,
+  ab_m*/diag_f1_grind_rows.jsonl + ab_grind logy, chain.log).
+  Doporučený navazující krok po GO: potvrzující A/B 400 párů dw-sk
+  (SE ~±2,8 pp), vzor ab_run_20260804.
