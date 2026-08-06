@@ -63,3 +63,4 @@ replay_buffer_prevalidation.pkl
 # archiv kandidátů (promotion freeze 2026-08-06) + policy zálohy — lokální artefakty
 candidates_archive/
 policy_backups/
+replay_archive/

@@ -1110,6 +1110,23 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'REJECTED: {"; ".join(reasons)}', flush=True)
 
     _archive_epoch_metrics(PROJECT_ROOT, label)
+    # Archiv replay bufferu (2026-08-06, „ať se data z tréninku neztratí"):
+    # self-play vzorky téhle iterace se dosud každý běh PŘEPISOVALY; od item13
+    # wiringu obsahují staged-plánovačové situace = vstup pro analýzu učicího
+    # mechanismu (zadání 20260811). ~7 MB/iterace, retention neřešíme (23G+).
+    try:
+        _rb = PROJECT_ROOT / 'replay_buffer.pkl'
+        if _rb.exists():
+            _rb_dir = PROJECT_ROOT / 'replay_archive'
+            _rb_dir.mkdir(exist_ok=True)
+            _rb_stamp = datetime.datetime.now(
+                datetime.timezone.utc).strftime('%Y%m%d_%H%M')
+            shutil.copy2(str(_rb),
+                         str(_rb_dir / f'replay_{_rb_stamp}_{label}.pkl'))
+            print(f'Replay buffer archivován: replay_archive/replay_'
+                  f'{_rb_stamp}_{label}.pkl', flush=True)
+    except OSError as _e:
+        print(f'⚠ archiv replay bufferu selhal: {_e}', flush=True)
     # Provázání gate záznamu s policy artefaktem téhle iterace: stash md5
     # umožňuje kdykoli retro párové měření policy(iter N) vs policy(iter M)
     # z policy_backups/ — na rozdíl od HtH vs šampion je to absolutní stopa.
