@@ -6,8 +6,11 @@ Zadání: `evidence/fable_tempo_doctrine_20260810.md` (dispatch předsunut na
 
 ## Závěry napřed (průběžné — finalizace po měřeních řetězu)
 
-1. TEMPO veto je hlavní brzda adoption (68 % relevantních turnů 05.08.;
-   61 % na 4 matchupech 04.08.) a grind ho umí otevřít (smoke: 4→1 veto).
+1. TEMPO veto je hlavní brzda adoption (54–68 % ADVANCE turnů na 3
+   matchupech, sekce 1) a grind ho umí otevřít: shadow měření 74–82 %
+   vet pryč. 77–85 % vet má přitom dosažitelný krok ≥ 2 pole — klec by
+   se hýbala, rezignuje jen kvůli nesplnitelnému rozvrhu. Fallback po
+   vetu dnes ztrácí držení míče ve 41–47 % dotčených drivů.
 2. Trpasličí bezriziková doktrína prokazatelně produkuje 0:0 (zrcadlo
    dw-dw: 57 % her 0:0, 0,48 TD/hru) — potvrzuje „bez rizika není TD".
 3. DICEY zeď není primárně o kostkách: 65 % jsou bezkostkové exec-faily
@@ -89,12 +92,79 @@ a `analyze_grind_ab.py`.
 
 ## 1. Datový rozpad TEMPO vet (otázka 2 + šikmá otázka 1)
 
-(čeká na měření)
+Měření řetězu 06.08. (`tempo_measure_20260806/probe_m{0,1,3}_g{0,1}.log`;
+8 her/matchup, 256 team-turnů/matchup). Sanity: dw-sk baseline reprodukuje
+sondu 05.08. přesně (53/17/8 — stejné seedy, deterministické). Historický
+kontext: corner-release sonda 04.08. (24 her, 4 matchupy) měla TEMPO
+137/225 ADVANCE turnů (60,9 %) — konzistentní.
 
-### Kontext z 05.08. (8 her dw-sk, 78 relevantních turnů)
-TEMPO_INSUFFICIENT 53 (68 %), DICEY 17 (22 %), PLAN_READY 8 (10 %).
-Corner-release sonda 04.08. (24 her, 4 matchupy): TEMPO 137/225 ADVANCE
-turnů (60,9 %) — veto dominuje napříč matchupy.
+### Verdikty na ADVANCE turnech (baseline = dnešní kód)
+| matchup | ADVANCE turnů | TEMPO | DICEY | PLAN_READY |
+|---|---|---|---|---|
+| dw-sk | 78 | 53 (68 %) | 17 | 8 |
+| dw-we | 72 | 39 (54 %) | 23 | 10 |
+| orc-sk | 84 | 46 (55 %) | 33 | 3 (+2 N/A) |
+
+Veto dominuje i pro orka — makro je rasově agnostické, nejde o „dwarf
+specifikum" (orc má dokonce nejnižší PLAN_READY ze všech).
+
+### Otázka 2 — je achievablePace fér? Rozpad podle dosažitelného kroku
+| matchup | raw ≥ 2 („grind by reálně jel") | raw = 1 | raw = 0 |
+|---|---|---|---|
+| dw-sk | 41 (77 %) | 0 | 12 |
+| dw-we | 33 (85 %) | 0 | 6 |
+| orc-sk | 39 (85 %) | 0 | 7 |
+
+**77–85 % TEMPO vet má dosažitelný krok ≥ 2 pole** — klec by se reálně
+hýbala; veto padá čistě kvůli nesplnitelnému ROZVRHU (nestihne endzónu),
+ne kvůli neschopnosti udělat krok. raw = 0 připadá výhradně na větev
+u (poslední kolo poločasu — nezbývá použitelné kolo); „skutečně
+zaseknuto" s raw = 1 neexistuje ani jednou. achievablePace tedy fér JE —
+nespravedlivý je binární důsledek (úplná rezignace).
+Větve vet: p (tempo nevychází) 51–67 %, r (tempo vychází, ale finální
+krok nešel obsadit — problém formace, souvisí s nálezem 2 cage review)
+15–28 %, u (došla kola) 13–23 %.
+
+### Šikmá otázka 1 — kontext drivu
+87–89 % vet padá v drivech od ZAČÁTKU poločasu (celých 8 kol k dispozici)
+— ale nikoli na jeho začátku: p-větev má při vetu průměrně dist ~16 polí
+a turnsLeft ~3. Výpočet required/achievable chybný není — jde o
+**sebeposilující smyčku**: veto → fallback na search → klec se neposune →
+příští kolo rozvrh vychází ještě hůř → veto znovu. Drive s plnými 8 koly
+prostojí úvodní kola a pak už tempo matematicky nevychází nikdy.
+Mid-half drivy tvoří jen 11–13 % vet (meanDist ~19, req 12–14 — tam
+rozvrh nevychází reálně a od začátku).
+37–42 % vet má turnsLeft ≤ 2 (konec poločasu): TD se už koupit nedá,
+jediná smysluplná doktrína je DRŽET míč (obranný grind / cage-fill).
+
+### Co se dnes po vetu s drivem děje (fallback na search)
+| matchup | drive-stran s ≥1 vetem | TD pro | TD proti | bez bodu | ztráta držení po vetu |
+|---|---|---|---|---|---|
+| dw-sk | 22 | 3 | 1 | 18 (82 %) | 9 (41 %) |
+| dw-we | 17 | 4 | 1 | 12 (71 %) | 8 (47 %) |
+| orc-sk | 16 | 2 | 0 | 14 (88 %) | 7 (44 %) |
+
+Fallback po vetu ztrácí držení míče ve **41–47 % drive-stran** a v
+71–88 % nedoveze bod — kvantifikace „sólo úprku/rezignace", kterou
+uživatel odmítá. (Ztráta držení se hned nepřetavuje v soupeřovo TD —
+i soupeř trpí stejnou neschopností dovézt; o to víc platí, že míč
+zamčený v kleci je lepší obrana než míč ztracený fallbackem.)
+
+### Grind SHADOW — co by grind řekl na TÝCHŽ stavech (stejné seedy, hry identické)
+| matchup | TEMPO | PLAN_READY | DICEY |
+|---|---|---|---|
+| dw-sk | 53 → 14 (otevřeno 39 = 74 %) | 8 → 23 (2,9×) | 17 → 41 |
+| dw-we | 39 → 7 (otevřeno 32 = 82 %) | 10 → 11 (+1) | 23 → 54 |
+
+Grind otevírá **74–82 % tempo vet**, ale většina otevřených narazí na
+DICEY zeď (přesně dle predikce sekcí 3/3c: mechanika = vstupenka, ne
+výhra): v dw-sk se PLAN_READY ztrojnásobí, v dw-we (hbití elfové, husté
+TZ stíny v koridoru) projde navíc jediný. Rozpad DICEY zdi u grindu:
+exec-fail (bez kostek — problém trasy) 19/41 (46 %) resp. 30/54 (56 %);
+z kostkových failů by strop 0,25 pustil 5/22 resp. 6/24 a strop 0,40
+8/22 resp. 10/24. Potvrzuje sekci 3b na ~3× větším N: většinu zdi
+otevře route-fix + koridorová (bojová) vrstva, risk budget menšinu —
+ta menšina jsou ale právě dokončovací nohy drivu.
 
 ## 2. Grind A/B (otázka 3)
 
@@ -222,20 +292,24 @@ Rozpad 17 DICEY případů z 05.08. (dw-sk):
 - 6/17 = skutečný kostkový risk (pTO probe > strop 0,02):
   hodnoty 0,00(no-op)/0,23/0,29/0,31/0,88/0,94. Strop zvednutý na 0,25
   pustí 1, na 0,35 pustí 3; dvě situace ≥0,88 jsou právem vetované.
-- Závěr: risk budget otevře jen MENŠINU DICEY (~3/17 zde; přeměří se na
-  větším N). Většinu DICEY otevírá (i) route/leg fix bez kostek a
-  (ii) block/blitz release vrstva (56 % dle corner-release). Risk budget
-  je přesto nutný pro DOKONČENÍ drivu (dodge/GFI/blitz nohy blízko
-  endzóny) — viz sekce 4.
+- **Přeměřeno na větším N (grind shadow 06.08., sekce 1):** exec-fail
+  46–56 % DICEY failů; z kostkových by strop 0,25 pustil 5/22 (dw-sk)
+  resp. 6/24 (dw-we), strop 0,40 pak 8/22 resp. 10/24 — tedy ~23–42 %
+  kostkových failů, menšina celé zdi. Poměry z 05.08. drží.
+- Závěr: risk budget otevře jen MENŠINU DICEY. Většinu DICEY otevírá
+  (i) route/leg fix bez kostek a (ii) block/blitz release vrstva (56 %
+  dle corner-release). Risk budget je přesto nutný pro DOKONČENÍ drivu
+  (dodge/GFI/blitz nohy blízko endzóny) — viz sekce 4.
 
 ## 3c. Kde leží delta mezi průměrnou a top hrou (vstup uživatele 06.08., bod 3)
 
 Uživatelova teze: trpaslíci vyžadují top-úroveň hry — mechanický posun
 klece nestačí. Data ji PODPORUJÍ a lokalizují, kde expertní vrstvy leží:
 
-1. **Mechanický posun (grind) je nutný, ale otevře jen část:** smoke +
-   shadow konverze (sekce 1 po doplnění) — TEMPO veta se otevřou, ale
-   významná část skončí na DICEY zdi. Mechanika = vstupenka, ne výhra.
+1. **Mechanický posun (grind) je nutný, ale otevře jen část:** shadow
+   konverze (sekce 1) — grind otevře 74–82 % TEMPO vet, ale PLAN_READY
+   naroste jen 2,9× (dw-sk) resp. +1 (dw-we); zbytek skončí na DICEY
+   zdi koridoru. Mechanika = vstupenka, ne výhra.
 2. **Největší jednotlivá delta = práce s koridorem a rohy** (expertní
    technika „uvolni si cestu bojem"): block+blitz release odemyká ~56 %
    DICEY (corner-release 04.08.), block-only jen 19 %. To je přesně
@@ -435,6 +509,11 @@ budget modulu (sekce 4), ne jako další lokální heuristika klece.
   přilehlosti" + pořadí implementace rozšířeno o fix nálezu 2 jako krok 2).
   Ověřeny analyze skripty (py_compile + prázdný běh OK); řetěz
   run_tempo_measure běží (chain.log 08:58 start, čeká na konec tréninku).
+- 13:37: trénink doběhl, řetěz postavil binárky a odjel PROBE fázi;
+  13:47 PROBE_DONE, A/B fáze (40 párů × dw-sk, dw-we) běží.
+- 14:00: sekce 1 zapsána z analyze_tempo_probe.py (dw-sk baseline
+  reprodukuje 05.08. přesně 53/17/8); doplněny návaznosti v 3b/3c a
+  Závěry bod 1. Čekám na ALL_DONE (odhad ~14:30–15:00).
 
 ### HANDOFF pro pokračovatele (zapsáno 10:35 UTC, aktualizovat u checkpointu)
 Session navazujícího agenta končí ~15:45 UTC; měřicí řetěz
