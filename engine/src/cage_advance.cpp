@@ -321,10 +321,20 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
     const TeamState& my = state.getTeamState(mySide);
     int dist = distToEndzone(carrier.position, mySide);
     int turnsLeft = std::clamp(9 - my.turnNumber, 0, MAX_HALF_TURNS);
+    // DIAG/EXPERIMENT (2026-08-06 tempo doctrine A/B, config_.cageGrind,
+    // DEFAULT OFF -- no behavior change in production): option (a) "grind".
+    // When the schedule cannot be met, push the cage at the max DICE-FREE
+    // achievable step anyway instead of returning TEMPO_INSUFFICIENT.
+    // Grind never spends carrier GFI: the schedule is unmeetable, so dice
+    // risk buys nothing (banking never buys dice risk -- doctrine above).
+    const bool grind = config_.cageGrind;
     int usable = turnsLeft - RESERVE_TURNS;
     if (usable < 1) {
-        plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
-        return plan;
+        if (!grind) {
+            plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
+            return plan;
+        }
+        usable = 1;  // grind: keep the pace math defined; tempoFail below
     }
     plan.requiredPace = static_cast<double>(dist) / usable;
 
@@ -361,8 +371,9 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
         plan.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
         return plan;
     }
-    if (plan.achievablePace < 1.0 ||
-        plan.achievablePace + 1e-9 < plan.requiredPace) {
+    const bool tempoFail = (plan.achievablePace < 1.0 ||
+                            plan.achievablePace + 1e-9 < plan.requiredPace);
+    if (tempoFail && !grind) {
         plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
         return plan;
     }
@@ -375,14 +386,33 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
     // in the corridor the plan reverts to schedule pace (grind). Carrier
     // GFI squares are spent ONLY when the schedule cannot be met within
     // plain MA (tempo emergency) -- banking never buys dice risk.
-    int scheduleStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
-                                  1, static_cast<int>(plan.achievablePace));
-    int bankStep = std::min(plan.rawAchievableStep, maxNoGfi);
-    int finalStep = (plan.resistance == 0) ? std::max(scheduleStep, bankStep)
+    int finalStep;
+    if (tempoFail) {
+        // Grind branch (config_.cageGrind only): max dice-free step, no GFI.
+        plan.grindMode = true;
+        plan.carrierGfi = 0;
+        finalStep = std::min(plan.rawAchievableStep, maxNoGfi);
+        if (finalStep < 1) {
+            plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
+            return plan;
+        }
+    } else {
+        int scheduleStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
+                                      1, static_cast<int>(plan.achievablePace));
+        int bankStep = std::min(plan.rawAchievableStep, maxNoGfi);
+        finalStep = (plan.resistance == 0) ? std::max(scheduleStep, bankStep)
                                            : scheduleStep;
-    plan.carrierGfi = std::clamp(finalStep - maxNoGfi, 0, CARRIER_GFI_MAX);
+        plan.carrierGfi = std::clamp(finalStep - maxNoGfi, 0, CARRIER_GFI_MAX);
+    }
     if (finalStep != plan.rawAchievableStep) {
         AssignmentResult a = tryAssign(state, carrier, finalStep, reservedPlayerIds);
+        if (!a.feasible && plan.grindMode) {
+            // grind: walk down to any feasible dice-free step
+            for (int s = finalStep - 1; s >= 1 && !a.feasible; --s) {
+                AssignmentResult a2 = tryAssign(state, carrier, s, reservedPlayerIds);
+                if (a2.feasible) { a = std::move(a2); finalStep = s; }
+            }
+        }
         if (!a.feasible) {
             plan.verdict = CageAdvanceVerdict::TEMPO_INSUFFICIENT;
             return plan;

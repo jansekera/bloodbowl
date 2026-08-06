@@ -45,7 +45,13 @@
 // 2 games x 2 arms... no: head-to-head means 1 pair = 2 games total):
 //   nice -n 19 ./diag_f1_cage_advance . 2 0     # 4 games, one matchup
 //
-// argv: [repoRoot=.] [nPairs=400] [matchupFilter=-1 (all)]
+// argv: [repoRoot=.] [nPairs=400] [matchupFilter=-1 (all)] [mode=0]
+//
+// mode 1 (2026-08-06 tempo doctrine, option (a) GRIND A/B): candidate =
+// cageAdvance + cageGrind (on TEMPO_INSUFFICIENT push at max dice-free
+// step), baseline = cageAdvance WITHOUT grind = today's fallback-to-search
+// behavior. Seeds move to 37M (disjoint), rows go to
+// diag_f1_grind_rows.jsonl.
 //
 // Per-game JSONL rows go to diag_f1_cage_advance_rows.jsonl (append) in the
 // F0 row format {seed_idx, cand_home, race_h, race_a, cand, base, ...} so
@@ -162,7 +168,7 @@ static FullGameOutcome playGame(const TeamRoster& home, const TeamRoster& away,
 }
 
 static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* pol,
-                             bool cageAdvanceOn) {
+                             bool cageAdvanceOn, bool cageGrindOn = false) {
     // Champion fairtest config (diag_policy_confirm_20260731.py): MCTS-100,
     // vf_blend 0.15, policy net loaded with blend 0 => heuristic prior
     // floors ACTIVE (expand() only computes floors when a policy is set).
@@ -176,6 +182,7 @@ static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* p
     cfg.policy = pol;
     cfg.policyBlend = 0.0f;
     cfg.cageAdvance = cageAdvanceOn;
+    cfg.cageGrind = cageGrindOn;
     return cfg;
 }
 
@@ -192,7 +199,12 @@ int main(int argc, char** argv) {
     std::string root = (argc > 1) ? argv[1] : ".";
     int nPairs = (argc > 2) ? atoi(argv[2]) : 400;
     int matchupFilter = (argc > 3) ? atoi(argv[3]) : -1;
+    int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B (header)
+    uint32_t seedBase = (mode == 1) ? 37'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
+    printf("mode=%d (%s)\n", mode,
+           mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
+                     : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
     auto pol = loadPolicyNetworkFromFile(root + "/weights_policy.json");
@@ -205,7 +217,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    FILE* rows = fopen("diag_f1_cage_advance_rows.jsonl", "a");
+    FILE* rows = fopen(mode == 1 ? "diag_f1_grind_rows.jsonl"
+                                 : "diag_f1_cage_advance_rows.jsonl", "a");
 
     // attrition aggregation: race -> opponent-gate-on? -> sums
     struct AttrAgg {
@@ -228,13 +241,14 @@ int main(int argc, char** argv) {
         int candW = 0, candD = 0, candL = 0;
         long candPlansTotal = 0;  // "did the gate even fire" diagnostics
         for (int i = 0; i < nPairs; ++i) {
-            uint32_t seed = SEED_BASE + static_cast<uint32_t>(mi) * 1'000'000u
+            uint32_t seed = seedBase + static_cast<uint32_t>(mi) * 1'000'000u
                             + static_cast<uint32_t>(i);
             PairResult pr;
             for (int orient = 0; orient < 2; ++orient) {
                 bool candHome = (orient == 0);
-                MCTSConfig candCfg = makeConfig(vf.get(), pol.get(), true);
-                MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(), false);
+                MCTSConfig candCfg = makeConfig(vf.get(), pol.get(), true,
+                                                mode == 1);
+                MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(), mode == 1);
                 MacroMCTSPolicy homePol(vf.get(),
                                         candHome ? candCfg : baseCfg,
                                         seed * 2654435761u + 11u + orient);
@@ -248,6 +262,7 @@ int main(int argc, char** argv) {
                     seed * 2u + static_cast<uint32_t>(orient));
 
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
+                int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
                 int cs = candHome ? g.homeScore : g.awayScore;
                 int bs = candHome ? g.awayScore : g.homeScore;
@@ -282,11 +297,12 @@ int main(int argc, char** argv) {
                             "\"race_h\":\"%s\",\"race_a\":\"%s\",\"cand\":%d,"
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
-                            "\"cand_plans\":%d}\n",
+                            "\"cand_plans\":%d,\"base_plans\":%d,\"mode\":%d}\n",
                             mi, i, candHome ? "true" : "false", mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
-                            g.away.dead, g.away.ejected, g.totalActions, candPlans);
+                            g.away.dead, g.away.ejected, g.totalActions, candPlans,
+                            basePlans, mode);
                     fflush(rows);
                 }
             }

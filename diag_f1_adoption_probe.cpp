@@ -14,7 +14,15 @@
 //       diag_f1_adoption_probe.cpp \
 //       -Lengine/build -lbb_engine -Wl,-rpath,$PWD/engine/build -o probe
 // Run (measurement only, nice -n 19, max 2 concurrent):
-//   ./probe . <nGames=6> <matchup:0=dw-sk,1=dw-we,2=dw-dw,3=orc-sk>
+//   ./probe . <nGames=6> <matchup:0=dw-sk,1=dw-we,2=dw-dw,3=orc-sk> [grind=0]
+//
+// 2026-08-06 tempo-doctrine edition: additionally dumps EVERY
+// TEMPO_INSUFFICIENT verdict ([TEMPO] lines: required/achievable pace,
+// raw step, resistance, veto branch, drive context) and per-drive records
+// ([DRIVE] lines: outcome, tempo-veto counts per side, possession lost
+// after a veto) -- the data behind evidence/fable_tempo_doctrine_report.
+// argv[4]=1 sets cageGrind on the SHADOW planner only (games still played
+// by the production policy, observation only).
 //
 // Seeds: 36M base -- disjoint from 30/31/34/35M runs.
 
@@ -117,6 +125,26 @@ struct ProbeAgg {
     std::map<char, long> unlockBlockByCat, unlockBlitzByCat, collisionByCat;
     long unlockBlock = 0, unlockBlitz = 0;   // situations release layer unlocks
     long blitzCollisions = 0;                // release would need >1 blitz
+    // --- TEMPO aggregates (2026-08-06 tempo doctrine)
+    long tempo = 0;
+    std::map<char, long> tempoBranch;        // u=turns exhausted, p=pace, r=reassign
+    long tempoRawGE2 = 0, tempoRaw1 = 0, tempoRaw0 = 0;
+    long tempoFullHalf = 0, tempoMid = 0;    // drive started turn 1 of half vs later
+    long tempoFullHalfRawGE2 = 0;
+    double tempoReqSum = 0.0, tempoAchSum = 0.0;
+    // --- drive aggregates: perspective of a side with >=1 TEMPO veto in drive
+    long drives = 0, drivesTempo = 0;
+    long dTdFor = 0, dTdAgainst = 0, dNoScore = 0, dPossLost = 0;
+};
+
+// Per-drive record (2026-08-06): counts indexed 0=HOME 1=AWAY.
+struct DriveRec {
+    int half = 0;
+    int firstTurn[2] = {-1, -1};   // side's turnNumber when drive first observed
+    int lastTurn[2] = {0, 0};
+    long tempo[2] = {0, 0}, ready[2] = {0, 0}, dicey[2] = {0, 0};
+    int lastHolder = -1;           // 0/1, -1 unknown
+    bool possLost[2] = {false, false};  // holder change AFTER side's 1st veto
 };
 
 static const char* goalName(TurnGoal g) {
@@ -422,8 +450,54 @@ static void analyzeDicey(const GameState& state, const CageAdvancePlan& plan,
     printMap(state, carrier, fail.playerId, fail.targetPos);
 }
 
+// [TEMPO] dump + aggregates (2026-08-06). Branch classification mirrors
+// cage_advance.cpp build() (grind OFF reading): u = usable turns < 1,
+// r = pace fine but the finalStep re-assignment failed, p = pace veto.
+static void analyzeTempo(const GameState& state, const CageAdvancePlan& plan,
+                         const char* tag, int gi, int driveStartTurn,
+                         ProbeAgg& agg) {
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    TeamSide side = carrier.teamSide;
+    const TeamState& my = state.getTeamState(side);
+    int ezX = (side == TeamSide::HOME) ? 25 : 0;
+    int dist = std::abs(carrier.position.x - ezX);
+    int turnsLeft = std::clamp(9 - my.turnNumber, 0, 8);
+    int usable = turnsLeft - 1;  // RESERVE_TURNS
+    char br;
+    if (usable < 1) br = 'u';
+    else if (plan.rawAchievableStep >= 1 &&
+             !(plan.achievablePace < 1.0 ||
+               plan.achievablePace + 1e-9 < plan.requiredPace)) br = 'r';
+    else br = 'p';
+
+    agg.tempo++;
+    agg.tempoBranch[br]++;
+    if (plan.rawAchievableStep >= 2) agg.tempoRawGE2++;
+    else if (plan.rawAchievableStep == 1) agg.tempoRaw1++;
+    else agg.tempoRaw0++;
+    bool fullHalf = (driveStartTurn <= 1);
+    if (fullHalf) {
+        agg.tempoFullHalf++;
+        if (plan.rawAchievableStep >= 2) agg.tempoFullHalfRawGE2++;
+    } else {
+        agg.tempoMid++;
+    }
+    agg.tempoReqSum += plan.requiredPace;
+    agg.tempoAchSum += plan.achievablePace;
+
+    printf("[TEMPO] %s-g%d H%d T%d %s dist=%d turnsLeft=%d usable=%d "
+           "req=%.2f raw=%d ach=%.2f resist=%d br=%c carMA=%d carTZ=%d "
+           "driveStart=%d built=%d\n",
+           tag, gi, state.half, my.turnNumber,
+           side == TeamSide::HOME ? "HOME" : "AWAY", dist, turnsLeft, usable,
+           plan.requiredPace, plan.rawAchievableStep, plan.achievablePace,
+           plan.resistance, br, carrier.stats.movement,
+           countTacklezones(state, carrier.position, side, carrier.id),
+           driveStartTurn, plan.builtCorners);
+}
+
 static void probeTurn(const GameState& state, CageAdvancePlanner& planner,
-                      const char* tag, int gi, ProbeAgg& agg) {
+                      const char* tag, int gi, ProbeAgg& agg, DriveRec* drive) {
     agg.turns++;
     TurnGoal goal = classifyTurnGoal(state);
     agg.goals[goalName(goal)]++;
@@ -435,9 +509,41 @@ static void probeTurn(const GameState& state, CageAdvancePlanner& planner,
     }
     CageAdvancePlan plan = planner.build(state);
     agg.verdicts[verdictName(plan.verdict)]++;
+    int si = (carrier.teamSide == TeamSide::HOME) ? 0 : 1;
+    if (drive) {
+        if (plan.verdict == CageAdvanceVerdict::TEMPO_INSUFFICIENT) drive->tempo[si]++;
+        if (plan.verdict == CageAdvanceVerdict::PLAN_READY) drive->ready[si]++;
+        if (plan.verdict == CageAdvanceVerdict::DICEY) drive->dicey[si]++;
+    }
+    if (plan.verdict == CageAdvanceVerdict::TEMPO_INSUFFICIENT) {
+        int ds = drive ? drive->firstTurn[si] : -1;
+        analyzeTempo(state, plan, tag, gi, ds, agg);
+    }
     if (plan.verdict == CageAdvanceVerdict::DICEY && plan.diceyLegIdx >= 0 &&
         plan.diceyLegIdx < static_cast<int>(plan.diagMacros.size())) {
         analyzeDicey(state, plan, tag, gi, agg);
+    }
+}
+
+// Finalize a drive: dump + fold into aggregates. outcome: 0=TD HOME,
+// 1=TD AWAY, 2=half/game end without a score in this drive.
+static void finishDrive(DriveRec& d, int outcome, const char* tag, int gi,
+                        ProbeAgg& agg) {
+    if (d.firstTurn[0] < 0 && d.firstTurn[1] < 0) return;  // nothing observed
+    agg.drives++;
+    const char* oname = outcome == 0 ? "TD_HOME" : outcome == 1 ? "TD_AWAY" : "NO_SCORE";
+    printf("[DRIVE] %s-g%d H%d start=H:%d/A:%d end=H:%d/A:%d outcome=%s "
+           "tempo=%ld/%ld ready=%ld/%ld dicey=%ld/%ld possLost=%d/%d\n",
+           tag, gi, d.half, d.firstTurn[0], d.firstTurn[1], d.lastTurn[0],
+           d.lastTurn[1], oname, d.tempo[0], d.tempo[1], d.ready[0], d.ready[1],
+           d.dicey[0], d.dicey[1], d.possLost[0] ? 1 : 0, d.possLost[1] ? 1 : 0);
+    for (int si = 0; si < 2; ++si) {
+        if (d.tempo[si] < 1) continue;
+        agg.drivesTempo++;
+        if (outcome == 2) agg.dNoScore++;
+        else if (outcome == si) agg.dTdFor++;
+        else agg.dTdAgainst++;
+        if (d.possLost[si]) agg.dPossLost++;
     }
 }
 
@@ -445,6 +551,7 @@ int main(int argc, char** argv) {
     std::string root = (argc > 1) ? argv[1] : ".";
     int nGames = (argc > 2) ? atoi(argv[2]) : 6;
     int mi = (argc > 3) ? atoi(argv[3]) : 0;
+    int grind = (argc > 4) ? atoi(argv[4]) : 0;  // shadow planner only
     setvbuf(stdout, nullptr, _IOLBF, 0);
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -468,11 +575,13 @@ int main(int argc, char** argv) {
     const TeamRoster* homeRoster = getDevelopedRoster(mu.home, 1200);
     const TeamRoster* awayRoster = getDevelopedRoster(mu.away, 1200);
     if (!homeRoster || !awayRoster) { fprintf(stderr, "roster load failed\n"); return 1; }
-    printf("probe[%s]: %d games, seeds %uM+, production config\n",
-           mu.tag, nGames, SEED_BASE / 1'000'000);
+    printf("probe[%s]: %d games, seeds %uM+, production config, grind=%d\n",
+           mu.tag, nGames, SEED_BASE / 1'000'000, grind);
 
     ProbeAgg agg;
-    CageAdvancePlanner planner(vf.get(), cfg, 424242);
+    MCTSConfig plannerCfg = cfg;
+    plannerCfg.cageGrind = (grind != 0);
+    CageAdvancePlanner planner(vf.get(), plannerCfg, 424242);
 
     for (int gi = 0; gi < nGames; ++gi) {
         uint32_t seed = SEED_BASE + static_cast<uint32_t>(mi) * 100'000u
@@ -492,17 +601,26 @@ int main(int argc, char** argv) {
         int lastHalf = -1, lastTurn = -1;
         TeamSide lastTeam = TeamSide::HOME;
         bool haveLast = false;
+        DriveRec drive;
+        drive.half = 1;
 
         std::vector<Action> actions;
         int totalActions = 0;
         while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
             if (state.phase == GamePhase::TOUCHDOWN) {
-                state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
+                TeamSide scorer = state.getPlayer(state.ball.carrierId).teamSide;
+                finishDrive(drive, scorer == TeamSide::HOME ? 0 : 1, mu.tag, gi, agg);
+                drive = DriveRec{};
+                drive.half = state.half;
+                state.kickingTeam = scorer;
                 setupDrive(state, *homeRoster, *awayRoster, state.kickingTeam);
                 simpleKickoff(state, dice);
                 continue;
             }
             if (state.phase == GamePhase::HALF_TIME) {
+                finishDrive(drive, 2, mu.tag, gi, agg);
+                drive = DriveRec{};
+                drive.half = 2;
                 state.half = 2;
                 state.kickingTeam = opponent(openingKickingTeam);
                 setupHalf(state, *homeRoster, *awayRoster, state.kickingTeam);
@@ -521,7 +639,10 @@ int main(int argc, char** argv) {
             const TeamState& ts = state.getTeamState(state.activeTeam);
             if (!haveLast || lastHalf != state.half || lastTurn != ts.turnNumber ||
                 lastTeam != state.activeTeam) {
-                probeTurn(state, planner, mu.tag, gi, agg);
+                int si = (state.activeTeam == TeamSide::HOME) ? 0 : 1;
+                if (drive.firstTurn[si] < 0) drive.firstTurn[si] = ts.turnNumber;
+                drive.lastTurn[si] = ts.turnNumber;
+                probeTurn(state, planner, mu.tag, gi, agg, &drive);
                 haveLast = true;
                 lastHalf = state.half;
                 lastTurn = ts.turnNumber;
@@ -531,7 +652,20 @@ int main(int argc, char** argv) {
                                                                  : awayPol(state);
             executeAction(state, chosen, dice, nullptr);
             totalActions++;
+            // Possession tracking: a held-ball holder flip after a side's
+            // first TEMPO veto in this drive = "resigned plan, then lost it".
+            if (state.ball.isHeld && state.ball.carrierId >= 0 &&
+                state.phase == GamePhase::PLAY) {
+                int hs = (state.getPlayer(state.ball.carrierId).teamSide
+                          == TeamSide::HOME) ? 0 : 1;
+                if (drive.lastHolder >= 0 && hs != drive.lastHolder &&
+                    drive.tempo[drive.lastHolder] > 0) {
+                    drive.possLost[drive.lastHolder] = true;
+                }
+                drive.lastHolder = hs;
+            }
         }
+        finishDrive(drive, 2, mu.tag, gi, agg);
         printf("  game %d done (%d:%d, %d actions)\n", gi,
                state.homeTeam.score, state.awayTeam.score, totalActions);
     }
@@ -540,6 +674,18 @@ int main(int argc, char** argv) {
     for (auto& [k, v] : agg.goals) printf("  goal %-8s %ld\n", k.c_str(), v);
     printf("  ADVANCE carrier busy: %ld\n", agg.advCarrierBusy);
     for (auto& [k, v] : agg.verdicts) printf("  verdict %-18s %ld\n", k.c_str(), v);
+    printf("  TEMPO=%ld branch:", agg.tempo);
+    for (auto& [k, v] : agg.tempoBranch) printf(" %c=%ld", k, v);
+    printf(" | raw>=2:%ld raw=1:%ld raw=0:%ld | fullHalfDrive=%ld "
+           "(raw>=2:%ld) midDrive=%ld | meanReq=%.2f meanAch=%.2f\n",
+           agg.tempoRawGE2, agg.tempoRaw1, agg.tempoRaw0,
+           agg.tempoFullHalf, agg.tempoFullHalfRawGE2, agg.tempoMid,
+           agg.tempo ? agg.tempoReqSum / agg.tempo : 0.0,
+           agg.tempo ? agg.tempoAchSum / agg.tempo : 0.0);
+    printf("  DRIVES=%ld withTempoVeto=%ld (side-perspective) tdFor=%ld "
+           "tdAgainst=%ld noScore=%ld possLostAfterVeto=%ld\n",
+           agg.drives, agg.drivesTempo, agg.dTdFor, agg.dTdAgainst,
+           agg.dNoScore, agg.dPossLost);
     printf("  DICEY=%ld cats:", agg.dicey);
     for (auto& [k, v] : agg.cats) printf(" %c=%ld", k, v);
     printf(" carrierLegFails=%ld\n", agg.carrierLegFails);

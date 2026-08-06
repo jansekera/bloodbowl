@@ -28,6 +28,7 @@ struct MCTSConfig {
     bool riskDeferral = false;    // Macro-MCTS only: Q-guarded risk-sequencing defer at search() return (queue item 10, 2026-07-28)
     bool stagedPickupPlanner = false; // Macro-MCTS only: item13 MVP staged safe-then-PICKUP whole-turn planner (2026-07-31), see bb/turn_planner.h
     bool cageAdvance = false;         // Macro-MCTS only: F1 cage-advance whole-turn plan (2026-08-03), see bb/cage_advance.h
+    bool cageGrind = false;           // DIAG/EXPERIMENT only (2026-08-06 tempo doctrine A/B): cage advance option (a) "grind" -- on TEMPO_INSUFFICIENT push at max dice-free achievable step instead of falling back to search(). DEFAULT OFF = no behavior change; only diag harnesses set it.
 };
 
 struct MCTSNode {

@@ -104,6 +104,11 @@ struct CageAdvancePlan {
 
     double planValue = 0.0;      // leaf eval of the projected end state (diag)
 
+    // DIAG (2026-08-06 tempo doctrine): true when the plan was produced by
+    // the experimental grind branch (config.cageGrind, default off) -- the
+    // schedule was NOT met and the cage pushed at max dice-free step anyway.
+    bool grindMode = false;
+
     // Ordered: front-slot movers, back-slot movers, carrier LAST (the screen
     // forms before the carrier commits). All macros are REPOSITION.
     std::vector<Macro> macros;
