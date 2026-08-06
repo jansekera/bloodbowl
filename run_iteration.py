@@ -107,6 +107,26 @@ GATE_POLICY_BLEND = float(os.environ.get('BB_GATE_POLICY_BLEND', '0.0'))
 # (weights_best_meta.json 'staged_pickup', default False) — stejný fairness
 # vzor jako policy_blend. Default 0 = dnešní chování beze změny.
 STAGED_PICKUP = os.environ.get('BB_STAGED_PICKUP', '0') != '0'
+# Rasová pojistka promoce (2026-08-06, směrnice uživatele „neprohlubovat elfí
+# rozdíl": trénovat/měřit ano, ale dokud trpaslíci nejsou spravení a
+# zkontrolovaní, nesmí projít promoce, která je dál kazí). Mechanismus:
+# z existující rasové rotace gate (120 her/párování) se párově srovná
+# „kandidát hraje danou rasu" vs „frozen hraje tutéž rasu" na zrcadlové
+# směsi soupeřů; promoce dostane VETO, když kandidát za hlídanou rasu
+# regreduje o >= RACE_GUARD_Z sigma (jednostranné). Kontext: Elfí intuice
+# prošla agregátem +4-6pp a trpaslíky kazí -17pp; Živá drift stejným směrem
+# (H2H 05.08.: wood-elf 73,8 %, dwarf 37,8 %). BB_RACE_GUARD='' vypne.
+RACE_GUARD_RACE = os.environ.get('BB_RACE_GUARD', 'dwarf')
+RACE_GUARD_Z = float(os.environ.get('BB_RACE_GUARD_Z', '1.28'))
+# PROMOTION FREEZE (2026-08-06, směrnice uživatele, ZPŘÍSNĚNÍ nad rasovou
+# pojistku): dokud trpaslíci nejsou spravení a ZKONTROLOVANÍ, žádná promoce
+# šampiona vůbec — trénink i vyhodnocení běží dál (verdikt se počítá a
+# zaznamenává vč. per-race čísel), ale weights_best se nemění a would-be-
+# PROMOTED kandidát se archivuje do candidates_archive/ k pozdějšímu
+# re-vyhodnocení („ať se data z tréninku neztratí"). DEFAULT ON; zrušit
+# BB_PROMOTION_FREEZE=0 až po opravě + kontrole trpasličího stylu (rasová
+# pojistka výše pak zůstává jako trvalá ochrana).
+PROMOTION_FREEZE = os.environ.get('BB_PROMOTION_FREEZE', '1') != '0'
 # Gate/benchmark eval-parity (2026-07-10). Both knobs below exist because
 # gating and benchmarking run through simulate_game_logged -- the binding built
 # for SELF-PLAY -- rather than simulate_game, the eval binding, which cannot
@@ -189,6 +209,38 @@ def _wilson_ci(wins: int, n: int, z: float = 1.96) -> tuple[float, float]:
     center = (p + z * z / (2 * n)) / denom
     margin = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
     return (max(0.0, center - margin), min(1.0, center + margin))
+
+
+def _race_guard_verdict(per_race_cand: dict, per_race_frozen: dict,
+                        race: str, z_thr: float) -> dict | None:
+    """Rasová pojistka promoce (2026-08-06).
+
+    Párové srovnání na zrcadlové směsi párování gate rotace: cand_wr =
+    decisive WR kandidáta ve hrách, kde hraje `race`; frozen_wr = decisive
+    WR frozen ve hrách, kde `race` hraje frozen (obojí W/D/L z pohledu
+    KANDIDÁTA — frozen výhra = kandidátova prohra). Obě směsi obsahují
+    stejná párování se stejným rozložením stran, jen s prohozenými rolemi,
+    takže delta měří čistě rozdíl v síle hraní dané rasy.
+
+    Veto: z = delta/sigma <= -z_thr (jednostranný test; sigma konzervativně
+    z p(1-p)=0.25). Vrací dict pro log/gate_history, None při nedostatku
+    rozhodnutých her (sigma by byla nesmyslná).
+    """
+    cw, _cd, cl = per_race_cand.get(race, (0, 0, 0))
+    fw, _fd, fl = per_race_frozen.get(race, (0, 0, 0))
+    c_dec = cw + cl
+    f_dec = fw + fl
+    if c_dec == 0 or f_dec == 0:
+        return None
+    cand_wr = cw / c_dec
+    frozen_wr = fl / f_dec        # frozen výhry = kandidátovy prohry
+    delta = cand_wr - frozen_wr
+    sigma = math.sqrt(0.25 / c_dec + 0.25 / f_dec)
+    z = delta / sigma
+    return {'race': race, 'cand_wr': cand_wr, 'frozen_wr': frozen_wr,
+            'cand_decisive': c_dec, 'frozen_decisive': f_dec,
+            'delta': delta, 'sigma': sigma, 'z': z,
+            'veto': z <= -z_thr}
 
 
 def _append_gate_history(record: dict) -> None:
@@ -352,6 +404,11 @@ def _gate_game(args: tuple) -> tuple:
     # 12th element (staged_cfg) optional/backward-compatible (item 13,
     # 2026-08-05): dvojice (cand_staged, frozen_staged) — stagedPickupPlanner
     # per strana; frozen hraje s konfigurací své promoce (meta 'staged_pickup').
+    # 13th element (echo_race) optional/backward-compatible (rasová pojistka,
+    # 2026-08-06): True -> návrat je 4-tuple (cs, fs, cand_is_away,
+    # race_idx % len(_RACES)). Atribuci rasy MUSÍ echovat worker, nikdy ji
+    # neodvozovat z pořadí výsledků (viz test_gate_sideswap.py: _imap_watchdog
+    # zahazuje přeskočené hry ze streamu).
     cand_is_away = False
     policy_cfg = (0.0, '', 0.0)
     staged_cfg = (False, False)
@@ -411,6 +468,8 @@ def _gate_game(args: tuple) -> tuple:
     if len(args) >= 10:
         cs, fs = ((result.away_score, result.home_score) if cand_is_away
                   else (result.home_score, result.away_score))
+        if len(args) >= 13 and args[12]:
+            return cs, fs, int(cand_is_away), race_idx % len(_RACES)
         return cs, fs, int(cand_is_away)
     return result.home_score, result.away_score
 
@@ -845,28 +904,39 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         (random.randint(1, 999999), i, str(gate_path), str(frozen_path), MCTS_ITERATIONS, GATE_VF_BLEND, TV,
          False, gate_policy_path, i % 2 == 1,   # sudé i: cand=HOME, liché: cand=AWAY
          (GATE_POLICY_BLEND, frozen_policy_gate_path, frozen_policy_blend),
-         (STAGED_PICKUP, frozen_staged))   # frozen s plánovačem své promoce (item 13)
+         (STAGED_PICKUP, frozen_staged),   # frozen s plánovačem své promoce (item 13)
+         True)   # echo_race pro rasovou pojistku (2026-08-06)
         for i in range(GATING_MATCHES)
     ]
     print(f'Anti-regression: {GATING_MATCHES} games ({WORKERS} workers)...', flush=True)
-    gate_results: list[tuple[int, int, int]] = []
+    gate_results: list[tuple[int, int, int, int]] = []
     with Pool(WORKERS, initializer=_pool_init, initargs=init_args) as pool:
         for res in _imap_watchdog(pool, _gate_game, gate_tasks, 'Anti-regression',
                                   mcts_iterations=MCTS_ITERATIONS):
-            gate_results.append((res[0], res[1], res[2] if len(res) > 2 else 0))
+            gate_results.append((res[0], res[1],
+                                 res[2] if len(res) > 2 else 0,
+                                 res[3] if len(res) > 3 else -1))
             done = len(gate_results)
             if done % 10 == 0 or done == GATING_MATCHES:
                 print(f'  Anti-regression {done}/{GATING_MATCHES}', flush=True)
 
     wins = draws = losses = 0
     arm = {0: [0, 0, 0], 1: [0, 0, 0]}   # orientace -> [W, D, L] kandidáta
-    for i, (cs, fs, ca) in enumerate(gate_results):
+    # Rasová pojistka (2026-08-06): W/D/L kandidáta rozpadlé podle toho, kdo
+    # hraje kterou rasu. ri echované workerem (skip-proof), -1 = neznámé.
+    per_race_cand = {r: [0, 0, 0] for r in _RACES}     # kandidát hraje rasu r
+    per_race_frozen = {r: [0, 0, 0] for r in _RACES}   # frozen hraje rasu r
+    for i, (cs, fs, ca, ri) in enumerate(gate_results):
+        outcome = 0 if cs > fs else (1 if cs == fs else 2)
         if cs > fs:
             wins += 1; arm[ca][0] += 1
         elif cs == fs:
             draws += 1; arm[ca][1] += 1
         else:
             losses += 1; arm[ca][2] += 1
+        if ri >= 0:
+            per_race_cand[_RACES[(ri + ca) % len(_RACES)]][outcome] += 1
+            per_race_frozen[_RACES[(ri + 1 - ca) % len(_RACES)]][outcome] += 1
         print(f'  Game {i + 1} [{"A" if ca else "H"}]: cand {cs}-{fs}', flush=True)
 
     total = wins + draws + losses
@@ -887,6 +957,24 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
           f'home-slot wins {home_slot_wins}/{hs_dec} '
           f'({home_slot_wins / hs_dec:.1%} decisive)' if hs_dec else
           'Side audit: no decisive games', flush=True)
+    print('Per-race audit (decisive WR kandidáta, když danou rasu hraje kandidát | frozen):', flush=True)
+    for r in _RACES:
+        cw_, cd_, cl_ = per_race_cand[r]
+        fw_, fd_, fl_ = per_race_frozen[r]
+        c_dec_ = cw_ + cl_
+        f_dec_ = fw_ + fl_
+        c_s = f'{cw_ / c_dec_:.1%} ({cw_}W {cd_}D {cl_}L)' if c_dec_ else 'n/a'
+        f_s = f'{fw_ / f_dec_:.1%} ({fw_}W {fd_}D {fl_}L)' if f_dec_ else 'n/a'
+        print(f'  {r:>9}: cand {c_s} | frozen-side {f_s}', flush=True)
+    race_guard = (_race_guard_verdict(per_race_cand, per_race_frozen,
+                                      RACE_GUARD_RACE, RACE_GUARD_Z)
+                  if RACE_GUARD_RACE else None)
+    if race_guard:
+        print(f"Pojistka [{race_guard['race']}]: kandidát {race_guard['cand_wr']:.1%} "
+              f"vs frozen {race_guard['frozen_wr']:.1%} za tutéž rasu, "
+              f"Δ {race_guard['delta']:+.1%} (z={race_guard['z']:+.2f}, "
+              f"veto při z≤−{RACE_GUARD_Z:.2f}) → "
+              f"{'VETO' if race_guard['veto'] else 'OK'}", flush=True)
     max_skip = max(1, int(GATING_MATCHES * MAX_SKIP_FRAC))
     if (GATING_MATCHES - total) > max_skip:
         abort_promote.append(f'anti-regression incomplete ({total}/{GATING_MATCHES}, '
@@ -943,6 +1031,17 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         promote = False
         reasons.append(f'benchmark pod minimem ({new_bm:.1%} < {BM_FLOOR:.0%})')
 
+    # Rasová pojistka (2026-08-06): agregátní zisk se nesmí koupit za těžkou
+    # regresi hlídané rasy. Při baseline_reset se nevyhodnocuje (jiné rostery,
+    # srovnání s frozen neplatí — stejná výjimka jako HtH práh).
+    if race_guard and race_guard['veto'] and not baseline_reset:
+        promote = False
+        reasons.append(
+            f"rasová pojistka [{race_guard['race']}]: kandidát "
+            f"{race_guard['cand_wr']:.1%} vs frozen {race_guard['frozen_wr']:.1%} "
+            f"za tutéž rasu (Δ {race_guard['delta']:+.1%}, z={race_guard['z']:+.2f} "
+            f"≤ −{RACE_GUARD_Z:.2f}) — VETO regrese")
+
     bar_str = f'{required:.1%}' if required is not None else 'HARD-REJECT'
     print(f'Gate práh: HtH ≥ {bar_str} ({tier}), benchmark {new_bm:.1%} vs best {all_time_best_bm:.1%}', flush=True)
 
@@ -951,7 +1050,40 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
         print(f'Baseline reset: TV{TV} model promoted as new baseline '
               f'(benchmark={new_bm:.1%}, chess vs old={chess_score:.1%})', flush=True)
 
+    # PROMOTION FREEZE (2026-08-06): verdikt spočítán a zaznamenán, ale šampion
+    # se nemění. Baseline reset (změna TV rosterů) freeze obchází — tam je nový
+    # baseline nutný a srovnání se starým šampionem stejně neplatí.
+    promote_would_be = promote
+    if PROMOTION_FREEZE and promote and not baseline_reset:
+        promote = False
+        reasons.append('PROMOTION FREEZE (směrnice 06.08.): verdikt by byl '
+                       'PROMOTED — kandidát archivován, weights_best beze změny')
+        print('🧊 PROMOTION FREEZE: kandidát by PROŠEL bránou — promoce '
+              'zmrazena směrnicí 06.08. (trpaslíci), kandidát jde do '
+              'candidates_archive/.', flush=True)
+
     label = 'promoted' if promote else 'rejected'
+
+    # Archiv kandidátů (2026-08-06, „ať se data z tréninku neztratí"): value
+    # váhy vítěze selekce KAŽDÉ vyhodnocené iterace s verdiktem v názvu;
+    # policy stranu už kryjí policy_backups/ + stash md5 v gate_history.
+    # NO_RESET má vlastní archiv (weights_noreset_iterN). Untracked — git
+    # reset --hard v _git_push se ho nedotkne.
+    if not NO_RESET:
+        try:
+            arch_label = ('wouldbe-promoted' if promote_would_be and not promote
+                          else label)
+            import hashlib as _hl_c
+            _cand_md5 = _hl_c.md5(Path(gate_path).read_bytes()).hexdigest()
+            arch_dir = PROJECT_ROOT / 'candidates_archive'
+            arch_dir.mkdir(exist_ok=True)
+            _stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M')
+            shutil.copy2(str(gate_path),
+                         str(arch_dir / f'weights_cand_{_stamp}_{arch_label}_{_cand_md5[:8]}.json'))
+            print(f'Kandidát archivován: candidates_archive/weights_cand_{_stamp}_'
+                  f'{arch_label}_{_cand_md5[:8]}.json', flush=True)
+        except OSError as _e:
+            print(f'⚠ archiv kandidáta selhal: {_e}', flush=True)
 
     if NO_RESET:
         # Verdikt jen zaznamenat; weights_best se experimentu nikdy nedotkne.
@@ -1003,6 +1135,11 @@ def run_iteration(no_push: bool = False) -> tuple[bool, float | None, float]:
             'wilson_ci_95': [ci_lo, ci_hi],
         },
         'threshold': {'k': k, 'tier': tier, 'required': required, 'sigma': sigma},
+        'per_race_cand': per_race_cand,
+        'per_race_frozen': per_race_frozen,
+        'race_guard': race_guard,
+        'promotion_freeze': PROMOTION_FREEZE,
+        'promote_would_be': promote_would_be,
         'gate_policy_blend': GATE_POLICY_BLEND,
         'frozen_policy_blend': frozen_policy_blend,
         'gate_staged_pickup': STAGED_PICKUP,

@@ -30,7 +30,8 @@ PROJECT_ROOT = str(Path(__file__).parent.parent.parent)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from run_iteration import _RACES, _benchmark_game, _gate_game
+from run_iteration import (_RACES, _benchmark_game, _gate_game,
+                           _race_guard_verdict)
 
 
 class _FakeResult:
@@ -303,3 +304,79 @@ class TestScheduleBalance:
         assert orient[False] == orient[True] == 100
         assert len(cells) == 10
         assert all(v == 20 for v in cells.values())
+
+
+class TestRaceGuardEcho:
+    """13th tuple element (echo_race, 2026-08-06): worker echoes race_idx so
+    the caller can attribute races skip-proof (never from result order)."""
+
+    def test_13tuple_echoes_race_idx_cand_home(self, fake_engine):
+        res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
+                          False, 'POL', False, (0.2, '', 0.0), (True, False),
+                          True))
+        assert res == (7, 3, 0, 3)
+
+    def test_13tuple_echoes_race_idx_cand_away(self, fake_engine):
+        res = _gate_game((123, 7, 'GATE', 'FROZEN', 100, 0.0, 1200,
+                          False, 'POL', True, (0.2, '', 0.0), (True, False),
+                          True))
+        # home 7 - away 3, cand AWAY -> (3, 7); race_idx 7 % 5 = 2
+        assert res == (3, 7, 1, 2)
+
+    def test_13tuple_false_keeps_3tuple(self, fake_engine):
+        res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
+                          False, 'POL', False, (0.2, '', 0.0), (True, False),
+                          False))
+        assert res == (7, 3, 0)
+
+    def test_12tuple_unchanged(self, fake_engine):
+        res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
+                          False, 'POL', False, (0.2, '', 0.0), (True, False)))
+        assert res == (7, 3, 0)
+
+    def test_race_attribution_formula(self):
+        # home = _RACES[ri%5], away = _RACES[(ri+1)%5]; cand away kdyz ca=1.
+        # Kandidatova rasa = _RACES[(ri+ca)%5], frozen = _RACES[(ri+1-ca)%5].
+        for ri in range(10):
+            for ca in (0, 1):
+                home, away = _RACES[ri % 5], _RACES[(ri + 1) % 5]
+                cand = _RACES[(ri % 5 + ca) % 5]
+                frozen = _RACES[(ri % 5 + 1 - ca) % 5]
+                assert cand == (away if ca else home)
+                assert frozen == (home if ca else away)
+
+
+class TestRaceGuardVerdict:
+    def test_big_regression_vetoes(self):
+        # Elfi-intuice-style: cand-as-dwarf 33 %, frozen-as-dwarf 50 %.
+        pc = {'dwarf': [25, 45, 50]}          # 75 decisive, 33.3 %
+        pf = {'dwarf': [40, 40, 40]}          # frozen wr = L/(W+L) = 50 %
+        v = _race_guard_verdict(pc, pf, 'dwarf', 1.28)
+        assert v is not None and v['veto']
+        assert v['cand_wr'] < 0.35 and abs(v['frozen_wr'] - 0.5) < 1e-9
+
+    def test_noise_passes(self):
+        pc = {'dwarf': [36, 45, 39]}          # 48 %
+        pf = {'dwarf': [39, 45, 36]}          # frozen wr 48 % -> delta 0
+        v = _race_guard_verdict(pc, pf, 'dwarf', 1.28)
+        assert v is not None and not v['veto']
+
+    def test_improvement_passes(self):
+        pc = {'dwarf': [50, 40, 25]}
+        pf = {'dwarf': [45, 40, 40]}          # frozen wr 40/85 = 47 %
+        v = _race_guard_verdict(pc, pf, 'dwarf', 1.28)
+        assert v is not None and not v['veto'] and v['delta'] > 0
+
+    def test_no_decisive_returns_none(self):
+        assert _race_guard_verdict({'dwarf': [0, 10, 0]},
+                                   {'dwarf': [5, 5, 5]}, 'dwarf', 1.28) is None
+        assert _race_guard_verdict({}, {}, 'dwarf', 1.28) is None
+
+    def test_frozen_wr_is_from_candidate_perspective(self):
+        # Ve hrach, kde dwarf hraje FROZEN, je W/D/L porad z pohledu
+        # kandidata: frozen vyhry = kandidatovy prohry (L).
+        pc = {'dwarf': [30, 0, 30]}           # cand 50 %
+        pf = {'dwarf': [10, 0, 50]}           # frozen wr = 50/60 = 83 %
+        v = _race_guard_verdict(pc, pf, 'dwarf', 1.28)
+        assert abs(v['frozen_wr'] - 50 / 60) < 1e-9
+        assert v['veto']                      # 50 % vs 83 % = tezka regrese

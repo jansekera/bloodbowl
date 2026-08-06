@@ -59,3 +59,7 @@ run_rotation.sh
 # runtime training artifacts — never track (N3, fable_pipeline_audit_20260730)
 replay_buffer.pkl
 replay_buffer_prevalidation.pkl
+
+# archiv kandidátů (promotion freeze 2026-08-06) + policy zálohy — lokální artefakty
+candidates_archive/
+policy_backups/
