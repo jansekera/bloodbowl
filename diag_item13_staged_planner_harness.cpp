@@ -49,6 +49,8 @@
 #include "bb/macro_actions.h"
 #include "bb/macro_mcts.h"
 #include "bb/turn_planner.h"
+#include "bb/cage_advance.h"
+#include "bb/helpers.h"
 #include "bb/mcts.h"
 #include "bb/value_function.h"
 #include "bb/policy_network.h"
@@ -346,6 +348,56 @@ int main(int argc, char** argv) {
                bool(st["real_touchdown"]) ? 1 : 0,
                st["real_recovered_by_next_own_turn"].is_null() ? "?"
                    : (bool(st["real_recovered_by_next_own_turn"]) ? "yes" : "no"));
+
+        // ---- STAGE D (2026-08-07, user doctrine "go for the ball vs deny
+        // it"): both decision members, priced per PICKUP candidate and
+        // printed for EVERY state -- including ones where no plan is
+        // adopted, which is exactly where the numbers matter.
+        //   (1) chance  = computed pickup success at the ball square
+        //                 (engine's own target + Sure Hands personal reroll)
+        //   (2) corners = cage support AFTER a successful pickup: slots our
+        //                 still-unmoved bodies can fill around the projected
+        //                 post-pickup carrier square (CageAdvancePlanner::
+        //                 tryAssign on the projection). A pickup that lands
+        //                 a lone carrier in enemy territory is not a win.
+        {
+            MCTSConfig dcfg = makeConfig(pol.get());
+            CageAdvancePlanner cageHelper(vf.get(), dcfg, 4242);
+            std::vector<Macro> dmacros;
+            getAvailableMacros(state, dmacros);
+            TeamSide side = state.activeTeam;
+            int fdx = (side == TeamSide::HOME) ? 1 : -1;
+            for (const auto& m : dmacros) {
+                if (m.type != MacroType::PICKUP) continue;
+                const Player& pk = state.getPlayer(m.playerId);
+                int dist = pk.position.distanceTo(state.ball.position);
+                int target = calculatePickupTargetAt(state, pk, state.ball.position);
+                double chance = (7.0 - target) / 6.0;
+                if (pk.hasSkill(SkillName::SureHands)) {
+                    chance += (1.0 - chance) * chance;
+                }
+                GameState proj = state.clone();
+                Player& pp = proj.getPlayer(m.playerId);
+                int mvAfter = static_cast<int>(pp.movementRemaining) - dist;
+                pp.position = state.ball.position;
+                pp.movementRemaining = static_cast<int8_t>(std::max(0, mvAfter));
+                pp.hasMoved = true;
+                proj.ball = BallState::carried(state.ball.position, pp.id);
+                int steps = (mvAfter > 0)
+                    ? carrierStallAwareSteps(proj, pp, proj.getTeamState(side)) : 0;
+                int filled = -1, open = -1;
+                if (steps >= 1) {
+                    auto ar = cageHelper.tryAssign(proj, pp, steps, {pp.id});
+                    filled = ar.filled;
+                    open = ar.open;
+                }
+                printf("STAGE D: picker p%d AG%d%s dist=%d target=%d+ "
+                       "chance=%.0f%% | advance=%d corners filled=%d open=%d\n",
+                       m.playerId, pk.stats.agility,
+                       pk.hasSkill(SkillName::SureHands) ? "+SH" : "",
+                       dist, target, 100.0 * chance, steps, filled, open);
+            }
+        }
 
         // ---- STAGE P: build & report the staged plan
         MCTSConfig cfg = makeConfig(pol.get());
