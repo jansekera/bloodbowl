@@ -731,6 +731,9 @@ TEST(DevelopedRoster, OrcNoGoblinsGuardAndStripBall) {
     EXPECT_EQ(countHomeSkill(state, SkillName::Stunty), 0);
     // 2 Blitzers + 4 Black Orcs with Guard.
     EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
+    // Cage doctrine 2026-08-07 (holders need Block): 4 Blitzers + 4 Black Orcs
+    // + Thrower.
+    EXPECT_EQ(countHomeSkill(state, SkillName::Block), 9);
     // Exactly one ball-hunter Blitzer with Strip Ball.
     EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
 }

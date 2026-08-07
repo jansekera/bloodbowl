@@ -496,7 +496,10 @@ RosterSpeed classifyRosterSpeed(const TeamRoster& roster) {
 // separate positional templates (e.g. Blitzer +Guard vs Blitzer ball-hunter).
 // buildTeam fields specialists (index 1+) first, then fills with linemen (index 0).
 
-// Orc TV~1200: goblins removed. 4 Blitzers, 4 Black Orcs, 1 Thrower, 2 Linemen.
+// Orc TV~1280: goblins removed. 4 Blitzers, 4 Black Orcs, 1 Thrower, 2 Linemen.
+// Cage doctrine 2026-08-07: holders need Block -- Black Orcs (the ST4 wall /
+// slow-cage bodies; MA4 disqualifies them as mobile-cage corners) get Block on
+// top of Guard.
 const TeamRoster& getOrcRoster1200() {
     static const TeamRoster roster = {
         "Orc (TV1200)",
@@ -505,7 +508,7 @@ const TeamRoster& getOrcRoster1200() {
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2, "Blitzer +Guard"},  // Blitzer +Guard
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1, "Blitzer +Mighty Blow"},  // Blitzer +Mighty Blow
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
-            {{4, 4, 2, 9}, makeSkills({SkillName::Guard}), 4, "Black Orc +Guard"},  // Black Orc +Guard
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block}), 4, "Black Orc +Guard+Block"},  // Black Orc holder
             {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
         },
         6, 60, true
