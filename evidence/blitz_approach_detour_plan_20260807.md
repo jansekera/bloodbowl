@@ -195,3 +195,39 @@ exekuce trasy (23d652a), jen o patro výš.
 Pozn.: volba finálního pole je tím pádem SPOLEČNÁ optimalizace (cesta ×
 kostky), ne dvě nezávislá rozhodnutí — naměřená varianta B2 („optimum přes
 všechna sousední pole") je její poloviny, chybí jí jen člen kostek.
+
+---
+
+# 🐛 NÁLEZ 07.08. (dotaz uživatele k BLOKU): asistent u bloku se ztrácí DVAKRÁT
+
+Dotaz: „u samotné akce block — co kdyby nám přišel na pomoc kamarád,
+zlepšilo by to na dvě kostky?" **Ano** — a dnešní kód to nemá jak najít:
+
+1. **Asistent se neuvažuje.** Nikde neexistuje krok „pošli spoluhráče
+   vedle obránce, aby přidal útočnou asistenci". Kostky se počítají
+   z rozestavení, jaké právě je.
+2. **Blok by ani nebyl v seznamu.** Generace (macro_actions.cpp:525-527)
+   emituje BLOCK makro **jen když `dice >= 2` UŽ TEĎ**:
+   ```cpp
+   int dice = getBlockDiceCount(state, att, *def, false);
+   if (dice >= 2) out.push_back({MacroType::BLOCK, ...});
+   ```
+   Vyrovnaný souboj (ST3 vs ST3 = 1 kostka) se tedy nenabídne vůbec —
+   přitom po příchodu JEDNOHO asistenta je z něj 4 vs 3 = **2 kostky
+   s volbou pro nás**.
+
+Výpočet je přesný a levný (`getBlockDiceCount`), bez kostek předem.
+U bloku je přínos větší než u blitzu: bloků je za tah libovolně mnoho
+(blitz jediný), přesun asistenta je bezkostkový, a trpasličí doktrína
+na mlácení přímo stojí.
+
+**Podmínky (pravidlově):** asistent musí sousedit s OBRÁNCEM a nesmí sám
+stát v cizí tackle zóně (kromě blokovaného) — **ledaže má Guard**. To je
+přesně důvod Guard preference z 03.08. i Guard rohů klece.
+**Cena:** asistent po tahu stojí vedle soupeře → probed exposure
+(„nestůj vedle někoho, kdo tě praští") musí vstoupit do rozhodnutí.
+
+⇒ Zařazeno do fronty jako bod **7c** (rozšířen z „asistent před blitzem"
+na „asistent před blokem i blitzem"), se stejnou podmínkou „pomáhat
+a zároveň nezavazet" (průchodnostní kontrola, vzor „vlastní těla si
+překážejí").
