@@ -79,7 +79,56 @@ Když se ukáže, že C nestačí:
 * **Předčasný konec**: první vytažený cílový uzel je optimum (max-heap
   Dijkstra) — už implementováno v měřicím nástroji.
 
-## Vrstva 4: MEMOIZACE (až kdyby vrstvy 1-3 nestačily)
+## ⭐ Vrstva 3b: JEDEN VÝPOČET PRO VŠECHNY BLITZERY (obrácený směr + branch & bound)
+Otázka uživatele (07.08.): „jde cache nachystat levněji, aby se trasy
+nepočítaly pro každý rizikový pohyb zvlášť?" — jde, a nejde přitom o cache
+v obvyklém smyslu (ukládání výsledků), ale o **jiný tvar výpočtu**.
+
+**(1) Obrátit směr hledání.** `expandBlitz` má cíl PEVNÝ a prochází
+kandidátní blitzery. Dijkstra ale umí jedním během spočítat cestu ze
+*všech* polí — stačí ho pustit **od cíle po obrácených hranách**
+(single-destination místo single-source). Výsledkem je mapa
+„nejlepší přežití trasy z pole X do některého pole u cíle"; odpověď pro
+každého kandidáta je pak **jen čtení z mapy na jeho startovním poli**.
+⇒ z „jeden výpočet na (blitzer, cíl)" se stane **jeden výpočet na cíl**.
+* Hrana není symetrická (dodge se hází při OPUŠTĚNÍ pole a obtížnost dává
+  pole cílové) — proto se obrácená sousednost musí ohodnotit cenou
+  PŮVODNÍ hrany. Standardní postup, jen na to nezapomenout.
+* Obsazená pole: blokují průchod pro všechny; **startovní pole kandidáta
+  musí být přesto ohodnoceno** (do obsazeného pole se smí „vstoupit" jako
+  do zdroje, ale nepokračuje se skrz něj). Jeden řádek v relaxaci.
+* Předčasný konec: skončit, jakmile jsou vyřešena startovní pole všech
+  kandidátů — ti stojí typicky blízko cíle, takže se prohledá malý ostrov.
+
+**(2) Seskupit kandidáty podle profilu.** Cena hrany závisí na hráči jen
+přes `7 − AG` a skilly (Dodge, Break Tackle, Stunty). V rosteru jsou
+takové profily 2-3, ne 11 ⇒ **jedna mapa na (cíl, profil)**, ne na hráče.
+Rozpočet pohybu (GFI) profil nemění: mapa se drží po délkách trasy
+(pole × délka), takže každý kandidát si z ní vybere délku podle SVÉHO
+rozpočtu. Tabulka je tatáž, jen se čte jinde.
+
+**(3) Branch & bound nad kandidáty — nepočítat přesně ty, co nemůžou
+vyhrát.** `expandBlitz` hledá jen ARGMIN, ne přesné hodnoty:
+* horní mez kandidáta = kombinace(kostky bloku, greedy trasa) — levné,
+  počítá se dnes;
+* dolní mez = kombinace(kostky bloku, **nulové** riziko cesty);
+* kdo má dolní mez horší než nejlepší známou horní mez, **nemůže vyhrát
+  ani při dokonalé cestě** → přesný výpočet se pro něj nespouští.
+Protože člen kostek bloku bývá dominantní, tohle odřízne většinu pole
+kandidátů dřív, než se sáhne na trasy.
+
+**Výsledná posloupnost v jednom volání `expandBlitz`:**
+```
+pro každého kandidáta: kostky bloku + greedy trasa   (dnešní cena)
+if žádný kandidát nemá rizikovou trasu -> hotovo     (84 % volání)
+ořež kandidáty branch & bound                        (zbytek zlevní)
+pro každý zbylý profil: 1x obrácený Dijkstra od cíle (ne na hráče!)
+odpovědi = čtení z mapy
+```
+⇒ místo „N rizikových kandidátů × plný výpočet" typicky **1-2 výpočty na
+volání**, a jen v tom šestnáctiprocentním zbytku.
+
+## Vrstva 4: MEMOIZACE (až kdyby vrstvy 1-3b nestačily)
 MCTS **opakovaně přehrává tytéž cesty maker** (`replayToNode` jede
 open-loop s čerstvými kostkami) ⇒ tytéž stavy se v rámci jednoho
 rozhodnutí vracejí. Nabízí se memo:
@@ -108,10 +157,15 @@ kroky nehýbou).
    (trénink je hlavní odběratel). Nad to → zůstat u C.
 4. Až po výkonu párové A/B na kvalitu (mění i výběr blitzera).
 
-## Doporučené pořadí
-**C (lookahead 2) → změřit zachycený zisk → jen když nestačí, A* +
-vrstvy 1/3 → memo teprve když ani to nestačí.** Nejlevnější varianta,
-která sebere většinu zisku, vyhrává; přesnost sama o sobě není cíl.
+## Doporučené pořadí (AKTUALIZOVÁNO po měření — původní návrh viz historie)
+Varianta C odpadá (vyvrácena). Zbývá:
+**vrstva 1 (přeskoč, když greedy nemá riziko — 84 % volání)
++ vrstva 3b (branch & bound nad kandidáty, pak 1 obrácený Dijkstra od cíle
+na profil) + ořezy z vrstvy 3 → změřit výkon → memo (vrstva 4) jen kdyby
+to nestačilo.**
+Poznámka k pořadí implementace: vrstva 1 a branch & bound jsou levné
+a dávají smysl i samostatně; obrácený směr je větší zásah, ale je to
+právě on, kdo mění složitost z „na kandidáta" na „na cíl".
 
 ---
 
