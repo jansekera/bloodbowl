@@ -158,3 +158,40 @@ turnoveru na hru** (turnover = celý týmový tah). Netriviální.
   zpomalit — před nasazením změřit, případně cachovat per (blitzer, cíl)
   nebo použít omezený lookahead (2 kroky) místo plné optimalizace.
 * Změna se dotkne i VÝBĚRU blitzera (sdílená funkce) → párové A/B, ne sonda.
+
+---
+
+# 🐛 NÁLEZ 07.08. (při rekapitulaci item14): KOSTKY SE POČÍTAJÍ Z NESPRÁVNÉHO POLE
+
+`getBlockDiceCount` (macro_actions.cpp:125-136) počítá:
+```cpp
+int attAssists = countAssists(state, def.position, att.teamSide, ...);  // OK
+int defAssists = countAssists(state, att.position, def.teamSide, ...);  // ⚠️
+```
+Obranné asistence se berou z okolí **`att.position` = pole, kde útočník
+STOJÍ V DOBĚ VÝPOČTU**. U BLOKU (soused) to sedí. U **BLITZE ne**: blitzer
+se teprve přesune a blokuje z jiného pole, kde je kolem něj jiná sada
+soupeřů. Všechna tři dnešní volání pro blitz (generace cíle :415,
+`expandBlitz` :1122, `expandBlitzAndScore` :1159) tedy vybírají podle
+kostek, které při skutečném bloku nenastanou.
+(Útočné asistence jsou naopak korektní — počítají se z okolí OBRÁNCE,
+což se pohybem blitzera nemění.)
+
+## ⇒ SJEDNOCENÍ (pokyn uživatele 07.08.)
+Čtyři dnešní dílčí pohledy na tentýž blitz:
+| kde | kostky | cesta | finální pole |
+|---|---|---|---|
+| generace cíle (:415) | z pole PŘED pohybem | ✗ | ✗ |
+| výběr blitzera (:1122) | z pole PŘED pohybem | greedy | ✗ |
+| exekutor (action_resolver) | ✗ | greedy | podle TZ |
+| asistent před blitzem | neexistuje | | |
+
+Cílový tvar = **jedna funkce**: pro každé kandidátní finální pole u cíle
+spočítat současně riziko trasy tam a skutečné kostky Z TOHO pole, vybrat
+nejlepší kombinaci, vrátit `{finální pole, riziko cesty, kostky, celkové
+selhání}` — a tímtéž výsledkem krmit generaci, výběr blitzera, exekutor
+i rozhodnutí o asistentovi. Je to táž úloha jako sjednocení odhadu a
+exekuce trasy (23d652a), jen o patro výš.
+Pozn.: volba finálního pole je tím pádem SPOLEČNÁ optimalizace (cesta ×
+kostky), ne dvě nezávislá rozhodnutí — naměřená varianta B2 („optimum přes
+všechna sousední pole") je její poloviny, chybí jí jen člen kostek.
