@@ -422,3 +422,75 @@ TEST(TurnPlannerPolicy, DisabledPlannerMatchesSearchPath) {
     EXPECT_EQ(a1.playerId, a2.playerId);
     EXPECT_EQ(a1.target, a2.target);
 }
+
+// --- Item13 step 2 (2026-08-07): cage-fill stage ---
+
+TEST(TurnPlannerStep2, GuardKeepsActivationAndFillsCorner) {
+    // Passive-guard choreography (user 2026-08-05): p5 already stands next
+    // to the loose ball -- the safe stage must NOT spend their activation as
+    // a backup (they physically are one); the cage-fill stage may then walk
+    // them onto a corner slot of the carrier's projected post-pickup square.
+    // Projection here: picker p1 {11,7} -> ball {13,7} (approach 2, 4 MV
+    // left), stall throttle 2 steps -> carrier at {15,7}, corner slots
+    // {16,6} {16,8} {14,6} {14,8}.
+    GameState state = makeLooseBallState();
+    Player& p5 = state.getPlayer(5);
+    p5.id = 5;
+    p5.teamSide = TeamSide::HOME;
+    p5.state = PlayerState::STANDING;
+    p5.position = {14, 7};
+    p5.stats = {6, 3, 3, 8};
+    p5.movementRemaining = 6;
+
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+
+    for (const auto& m : plan.safeMacros) {
+        EXPECT_NE(m.playerId, 5) << "guard spent as a safe backup";
+    }
+
+    ASSERT_FALSE(plan.cageFillMacros.empty());
+    const Position slots[4] = {{16, 6}, {16, 8}, {14, 6}, {14, 8}};
+    for (const auto& m : plan.cageFillMacros) {
+        EXPECT_EQ(m.type, MacroType::REPOSITION);
+        bool onSlot = false;
+        for (const auto& s : slots) {
+            if (m.targetPos == s) onSlot = true;
+        }
+        EXPECT_TRUE(onSlot) << "cage-fill target off the projected corners";
+        // Role budget (reservedPlayerIds): never the picker or a spent
+        // safe backup.
+        EXPECT_NE(m.playerId, plan.pickupMacro.playerId);
+        for (const auto& s : plan.safeMacros) {
+            EXPECT_NE(m.playerId, s.playerId);
+        }
+        // No double occupation: a corner slot a safe backup already parks
+        // on is a finished corner, not a fill target.
+        for (const auto& s : plan.safeMacros) {
+            EXPECT_FALSE(m.targetPos == s.targetPos);
+        }
+    }
+    // The guard is the cheapest corner body and must be among the fills.
+    bool guardFills = false;
+    for (const auto& m : plan.cageFillMacros) {
+        if (m.playerId == 5) guardFills = true;
+    }
+    EXPECT_TRUE(guardFills);
+}
+
+TEST(TurnPlannerStep2, CageFillMacroInvalidWithoutHeldBall) {
+    // Fail-pickup semantics: cage-fill macros carry requireHeldBall -- with
+    // the ball loose or in enemy hands the whole stage is invalid and the
+    // policy falls back to search().
+    GameState state = makeLooseBallState();
+    Macro m{MacroType::REPOSITION, 3, -1, {14, 8}};
+    EXPECT_TRUE(stagedMacroStillValid(state, m));
+    EXPECT_FALSE(stagedMacroStillValid(state, m, true));  // ball still loose
+
+    state.ball = BallState::carried({24, 13}, 12);        // opponent recovered
+    EXPECT_FALSE(stagedMacroStillValid(state, m, true));
+
+    state.ball = BallState::carried({11, 7}, 1);          // our carrier
+    EXPECT_TRUE(stagedMacroStillValid(state, m, true));
+}

@@ -53,6 +53,13 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out);
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
                                        DiceRollerBase& dice);
 
+// Stall-aware step budget for a ball carrier's own movement (shared by the
+// ADVANCE expansion and the PICKUP advance continuation). Exported so the
+// staged pickup planner can project the carrier's post-pickup position for
+// its cage-fill stage with the SAME arithmetic the executor will use.
+int carrierStallAwareSteps(const GameState& state, const Player& carrier,
+                           const TeamState& myTeam);
+
 // Extract NUM_ACTION_FEATURES features for a macro (shared count with action_features.h for policy reuse)
 void extractMacroFeatures(const GameState& state, const Macro& macro, float* out);
 

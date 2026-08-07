@@ -3,6 +3,7 @@
 #include "bb/game_state.h"
 #include "bb/macro_actions.h"
 #include "bb/macro_mcts.h"
+#include "bb/cage_advance.h"
 #include "bb/mcts.h"
 #include "bb/dice.h"
 #include <vector>
@@ -48,7 +49,17 @@ struct StagedPlan {
     bool valid = false;
 
     std::vector<Macro> safeMacros;  // deterministic stage, executed in order
-    Macro pickupMacro{};            // the single stochastic branch point (last)
+    Macro pickupMacro{};            // the single stochastic branch point
+
+    // Step 2 (2026-08-07): cage-fill stage AFTER the pickup -- dice-free
+    // REPOSITIONs of still-unmoved teammates onto the diagonal corner slots
+    // around the carrier's PROJECTED post-pickup position (slot assignment
+    // reuses CageAdvancePlanner::tryAssign; probes reuse SAFE_PTO). Choreo-
+    // graphy (user 2026-08-05): passive guard keeps their activation for
+    // this stage; goal "pick up the ball AND build a cage around it in ONE
+    // turn". These macros are only valid while OUR side holds the ball --
+    // a failed pickup invalidates the stage (search fallback, as today).
+    std::vector<Macro> cageFillMacros;
 
     // 2-branch value model (all values in the planning side's perspective)
     double pSuccess = 0.0;      // P(pickup macro ends with us holding the ball)
@@ -67,8 +78,11 @@ struct StagedPlan {
 // square shifts as teammates arrive), so exact-match validation would flag a
 // healthy plan as deviated after its own first step. Only the macro types a
 // staged plan can contain (REPOSITION, PICKUP) get real checks; anything
-// else is conservatively invalid.
-bool stagedMacroStillValid(const GameState& state, const Macro& m);
+// else is conservatively invalid. `requireHeldBall` is set for cage-fill
+// stage macros: they additionally require the ball to be held by the acting
+// player's own side (fail pickup -> whole stage invalid -> search fallback).
+bool stagedMacroStillValid(const GameState& state, const Macro& m,
+                           bool requireHeldBall = false);
 
 class StagedTurnPlanner {
 public:
@@ -111,6 +125,9 @@ private:
     MCTSConfig config_;
     MacroMCTSSearch evaler_;  // leaf eval only (evaluateLeaf)
     DiceRoller dice_;
+    // Slot-assignment reuse for the cage-fill stage (tryAssign +
+    // eligibleCornerPlayer) -- no second corner assigner.
+    CageAdvancePlanner cageHelper_;
 
     struct BranchStats {
         double pSuccess = 0.0;

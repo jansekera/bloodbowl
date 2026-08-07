@@ -986,8 +986,8 @@ static bool carrierIsBlitzable(const GameState& state, const Player& carrier) {
 // of the carrier's movement in reserve so teammates still have a decision
 // window to form a cage around them (unless the half is about to end, in
 // which case a full sprint is worth the exposure).
-static int carrierStallAwareSteps(const GameState& state, const Player& carrier,
-                                  const TeamState& myTeam) {
+int carrierStallAwareSteps(const GameState& state, const Player& carrier,
+                           const TeamState& myTeam) {
     int dist = distToEndzone(carrier.position, carrier.teamSide);
     int turnsRemaining = std::max(1, 9 - myTeam.turnNumber); // turns left including this one
 

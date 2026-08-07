@@ -192,6 +192,9 @@ struct TurnOutcome {
     int activations = 0;
     bool pickupAttempted = false;
     int backupsAtPickup = -1;  // adjacent standing teammates when pickup ran
+    int cornersAtEnd = -1;     // step 2 metric: standing teammates on the 4
+                               // diagonal slots around the carrier at end of
+                               // turn (only when ballSecured)
 };
 
 static void finishOutcome(TurnOutcome& out, GameState& state, TeamSide mySide,
@@ -200,6 +203,21 @@ static void finishOutcome(TurnOutcome& out, GameState& state, TeamSide mySide,
     if (state.getTeamState(mySide).score > myScore0) out.td = true;
     out.ballSecured = state.ball.isHeld && state.ball.carrierId > 0 &&
                       state.getPlayer(state.ball.carrierId).teamSide == mySide;
+    if (out.ballSecured) {
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        out.cornersAtEnd = 0;
+        for (int sx : {-1, 1}) {
+            for (int sy : {-1, 1}) {
+                Position d{static_cast<int8_t>(c.position.x + sx),
+                           static_cast<int8_t>(c.position.y + sy)};
+                const Player* occ = state.getPlayerAtPosition(d);
+                if (occ && occ->teamSide == mySide &&
+                    occ->state == PlayerState::STANDING) {
+                    out.cornersAtEnd++;
+                }
+            }
+        }
+    }
     out.value = evaler.evaluateLeaf(state, mySide);
 }
 
@@ -279,6 +297,17 @@ static TurnOutcome playTurnStaged(const GameState& start, const StagedPlan& plan
         auto res = greedyExpandMacro(state, plan.pickupMacro, turnDice);
         if (res.turnover) out.turnover = true;
     }
+    // Step 2: cage-fill stage -- only while our side holds the ball
+    // (requireHeldBall), each macro re-validated; deviation skips the rest,
+    // mirroring the MacroMCTSPolicy integration.
+    if (!out.turnover) {
+        for (const auto& m : plan.cageFillMacros) {
+            if (state.phase != GamePhase::PLAY || state.activeTeam != mySide) break;
+            if (!stagedMacroStillValid(state, m, true)) break;
+            auto res = greedyExpandMacro(state, m, turnDice);
+            if (res.turnover) { out.turnover = true; break; }
+        }
+    }
     if (!out.turnover) {
         runSearchTail(state, out, mySide, myScore0, vf, pol, turnDice, seed, 100);
     }
@@ -346,6 +375,8 @@ int main(int argc, char** argv) {
         int attA = 0, attB = 0;
         double bkA = 0, bkB = 0;
         int bkAn = 0, bkBn = 0;
+        double crA = 0, crB = 0;
+        int crAn = 0, crBn = 0;
         for (int i = 0; i < nPairs; ++i) {
             TurnOutcome a = playTurnProduction(state, vf.get(), pol.get(), 20000 + i);
             TurnOutcome b = playTurnStaged(state, plan, vf.get(), pol.get(), 20000 + i);
@@ -359,6 +390,8 @@ int main(int argc, char** argv) {
             attA += a.pickupAttempted; attB += b.pickupAttempted;
             if (a.backupsAtPickup >= 0) { bkA += a.backupsAtPickup; bkAn++; }
             if (b.backupsAtPickup >= 0) { bkB += b.backupsAtPickup; bkBn++; }
+            if (a.cornersAtEnd >= 0) { crA += a.cornersAtEnd; crAn++; }
+            if (b.cornersAtEnd >= 0) { crB += b.cornersAtEnd; crBn++; }
         }
         double n = nPairs;
         double mD = sumD / n;
@@ -377,6 +410,10 @@ int main(int argc, char** argv) {
         printf("  %-30s %10.2f %10.2f   (item 11 closure metric)\n",
                "backups adj at pickup",
                bkAn > 0 ? bkA / bkAn : -1.0, bkBn > 0 ? bkB / bkBn : -1.0);
+        printf("  %-30s %10.2f %10.2f   (step 2 metric, secured turns only; plan fills=%zu)\n",
+               "corners at end (secured)",
+               crAn > 0 ? crA / crAn : -1.0, crBn > 0 ? crB / crBn : -1.0,
+               plan.cageFillMacros.size());
         printf("  CALIBRATION: planValue=%.4f vs realized B mean=%.4f (delta %+.4f)\n",
                plan.planValue, sumB / n, plan.planValue - sumB / n);
     }

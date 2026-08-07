@@ -920,6 +920,7 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
         stagedPlanHalf_ != state.half) {
         stagedMacros_.clear();
         stagedIndex_ = 0;
+        stagedCageFillFrom_ = SIZE_MAX;
         stagedPlanBuilt_ = false;
         stagedPlanTeam_ = state.activeTeam;
         stagedPlanTurn_ = ts.turnNumber;
@@ -936,6 +937,14 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
             if (plan.valid) {
                 stagedMacros_ = std::move(plan.safeMacros);
                 stagedMacros_.push_back(plan.pickupMacro);
+                // Item13 step 2: cage-fill macros ride behind the pickup and
+                // are only valid while our side holds the ball.
+                stagedCageFillFrom_ = plan.cageFillMacros.empty()
+                                          ? SIZE_MAX
+                                          : stagedMacros_.size();
+                for (const auto& m : plan.cageFillMacros) {
+                    stagedMacros_.push_back(m);
+                }
                 stagedIndex_ = 0;
                 stagedPlansAdopted_++;
             }
@@ -957,7 +966,8 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
     if (stagedIndex_ >= stagedMacros_.size()) return false;
 
     const Macro& next = stagedMacros_[stagedIndex_];
-    if (stagedMacroStillValid(state, next)) {
+    bool requireHeldBall = (stagedIndex_ >= stagedCageFillFrom_);
+    if (stagedMacroStillValid(state, next, requireHeldBall)) {
         out = next;
         stagedIndex_++;
         return true;

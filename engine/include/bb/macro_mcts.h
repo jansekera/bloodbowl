@@ -130,6 +130,10 @@ class MacroMCTSPolicy {
     std::unique_ptr<CageAdvancePlanner> cagePlanner_;
     std::vector<Macro> stagedMacros_;
     size_t stagedIndex_ = 0;
+    // Index of the first cage-fill macro (item13 step 2) in stagedMacros_;
+    // macros from here on are validated with requireHeldBall (a failed
+    // pickup drops the stage). SIZE_MAX = plan has no cage-fill stage.
+    size_t stagedCageFillFrom_ = SIZE_MAX;
     bool stagedPlanBuilt_ = false;  // at most one plan build per team-turn
     int stagedPlansAdopted_ = 0;    // diagnostics: valid plans taken (game total)
     int stagedPlanTurn_ = -1;

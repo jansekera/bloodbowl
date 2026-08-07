@@ -31,12 +31,22 @@ TurnGoal classifyTurnGoal(const GameState& state) {
     return TurnGoal::ADVANCE_BALL;
 }
 
-bool stagedMacroStillValid(const GameState& state, const Macro& m) {
+bool stagedMacroStillValid(const GameState& state, const Macro& m,
+                           bool requireHeldBall) {
     if (state.phase != GamePhase::PLAY) return false;
     if (m.playerId <= 0) return false;
     const Player& p = state.getPlayer(m.playerId);
     if (!p.isOnPitch() || p.state != PlayerState::STANDING) return false;
     if (p.hasMoved || p.hasActed) return false;
+    if (requireHeldBall) {
+        // Cage-fill stage: only meaningful while OUR side holds the ball.
+        // A failed pickup (or any bounce to the opponent) invalidates the
+        // whole stage and the turn falls back to search().
+        if (!state.ball.isHeld || state.ball.carrierId <= 0) return false;
+        if (state.getPlayer(state.ball.carrierId).teamSide != p.teamSide) {
+            return false;
+        }
+    }
 
     switch (m.type) {
         case MacroType::REPOSITION: {
@@ -62,7 +72,8 @@ bool stagedMacroStillValid(const GameState& state, const Macro& m) {
 
 StagedTurnPlanner::StagedTurnPlanner(const ValueFunction* vf, MCTSConfig config,
                                      uint32_t seed)
-    : config_(config), evaler_(vf, config, seed), dice_(seed + 4242) {}
+    : config_(config), evaler_(vf, config, seed), dice_(seed + 4242),
+      cageHelper_(vf, config, seed + 999) {}
 
 StagedTurnPlanner::ProbeStats StagedTurnPlanner::probeMacro(const GameState& state,
                                                             const Macro& m) {
@@ -146,9 +157,68 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
     if (pickups.empty()) return plan;
 
     TeamSide mySide = state.activeTeam;
+    int fdx = (mySide == TeamSide::HOME) ? 1 : -1;
     double bestValue = -1e9;
+    GameState bestProjected;
+
+    // Passive guard choreography (user 2026-08-05): a teammate ALREADY
+    // standing next to the loose ball guards it for free -- spending their
+    // activation as a safe-stage "backup" buys nothing (they physically are
+    // one) and costs the cage-fill stage its cheapest corner. Excluded from
+    // the safe stage, kept unmoved for cage-fill.
+    std::vector<int> guardIds;
+    state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (p.state != PlayerState::STANDING) return;
+        if (p.hasMoved || p.hasActed) return;
+        if (p.position.distanceTo(state.ball.position) == 1) {
+            guardIds.push_back(p.id);
+        }
+    });
+
+    // Deterministic projection of the carrier's post-pickup square, using
+    // the SAME stall-aware arithmetic expandPickup's advance continuation
+    // runs (carrierStallAwareSteps is shared, not replicated). Returns the
+    // advance step count, or 0 when no continuation is projected.
+    auto projectAdvanceSteps = [&](const GameState& s, int pickerId) {
+        const Player& pk = s.getPlayer(pickerId);
+        int approach = pk.position.distanceTo(s.ball.position);
+        int mvAfter = static_cast<int>(pk.movementRemaining) - approach;
+        if (mvAfter <= 0) return 0;
+        Player tmp = pk;
+        tmp.position = s.ball.position;
+        tmp.movementRemaining = static_cast<int8_t>(mvAfter);
+        return carrierStallAwareSteps(s, tmp, s.getTeamState(mySide));
+    };
 
     for (const Macro& pickup : pickups) {
+        // Projected corner slots for this pickup (step-2 smart targeting): a
+        // safe backup parked on a FUTURE corner slot is both the pickup
+        // insurance and a finished corner -- one figure, two jobs. Used as a
+        // candidate-ordering tiebreak only; arrival keeps precedence (user
+        // 2026-08-05: the bounce insurance comes first).
+        Position futureSlots[4];
+        int nFutureSlots = 0;
+        {
+            int s = projectAdvanceSteps(state, pickup.playerId);
+            Position np{static_cast<int8_t>(state.ball.position.x + fdx * s),
+                        state.ball.position.y};
+            if (s >= 1 && np.isOnPitch()) {
+                futureSlots[nFutureSlots++] = {static_cast<int8_t>(np.x + fdx),
+                                               static_cast<int8_t>(np.y - 1)};
+                futureSlots[nFutureSlots++] = {static_cast<int8_t>(np.x + fdx),
+                                               static_cast<int8_t>(np.y + 1)};
+                futureSlots[nFutureSlots++] = {static_cast<int8_t>(np.x - fdx),
+                                               static_cast<int8_t>(np.y - 1)};
+                futureSlots[nFutureSlots++] = {static_cast<int8_t>(np.x - fdx),
+                                               static_cast<int8_t>(np.y + 1)};
+            }
+        }
+        auto isFutureSlot = [&](Position p) {
+            for (int i = 0; i < nFutureSlots; ++i) {
+                if (futureSlots[i] == p) return true;
+            }
+            return false;
+        };
         // --- Safe stage: dice-free backup positioning, ordered ball-first.
         // With a loose ball, generation targets a free ball-adjacent square
         // for every free player (item 11's REPOSITION fix). Candidates are
@@ -164,6 +234,9 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
         GameState projected = state.clone();
         std::vector<Macro> accepted;
         std::vector<int> rejected;
+        for (int gid : guardIds) {
+            if (gid != pickup.playerId) rejected.push_back(gid);
+        }
         auto isRejected = [&](int id) {
             return std::find(rejected.begin(), rejected.end(), id) != rejected.end();
         };
@@ -191,6 +264,12 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
                           bool arriveB = pb.position.distanceTo(b.targetPos) <=
                                          static_cast<int>(pb.movementRemaining);
                           if (arriveA != arriveB) return arriveA;
+                          // Step-2 smart targeting: among equally-arriving
+                          // backups prefer the one whose target doubles as a
+                          // projected corner slot.
+                          bool slotA = isFutureSlot(a.targetPos);
+                          bool slotB = isFutureSlot(b.targetPos);
+                          if (slotA != slotB) return slotA;
                           int da = pa.position.distanceTo(state.ball.position);
                           int db = pb.position.distanceTo(state.ball.position);
                           if (da != db) return da < db;
@@ -243,6 +322,69 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
             plan.planValue = value;
             plan.backupCount = backups;
             plan.valid = true;
+            bestProjected = projected.clone();
+        }
+    }
+    if (!plan.valid) return plan;
+
+    // --- Step 2 (2026-08-07): cage-fill stage on the winning branch.
+    // Still-unmoved teammates (the passive guard first among them) walk onto
+    // the diagonal corner slots around the carrier's projected post-pickup
+    // square. Slot assignment reuses CageAdvancePlanner::tryAssign; every
+    // emitted macro passes the same dice-free probe regime as the safe
+    // stage. The stage rides the SUCCESS branch only -- its macros carry the
+    // requireHeldBall validity condition, so a failed pickup drops them and
+    // the turn falls back to search().
+    {
+        GameState proj = bestProjected.clone();
+        Player& picker = proj.getPlayer(plan.pickupMacro.playerId);
+        int steps = projectAdvanceSteps(proj, picker.id);
+        if (steps < 1) return plan;  // no advance continuation projected
+
+        int approach = picker.position.distanceTo(state.ball.position);
+        Position newPos{static_cast<int8_t>(state.ball.position.x + fdx * steps),
+                        state.ball.position.y};
+        if (!newPos.isOnPitch()) return plan;
+        // The executor moves the carrier BEFORE the fills, so the vacate-
+        // first choreography tryAssign supports for a blocked carrier square
+        // cannot run here -- an occupied projection square means the carrier
+        // will stop short and the whole slot geometry shifts. Skip the stage.
+        if (proj.getPlayerAtPosition(newPos) != nullptr) return plan;
+
+        picker.movementRemaining = static_cast<int8_t>(
+            std::max(0, static_cast<int>(picker.movementRemaining) - approach));
+        picker.position = state.ball.position;
+        picker.hasMoved = true;
+        proj.ball = BallState::carried(state.ball.position, picker.id);
+
+        // First real use of the reservedPlayerIds role budget (design
+        // 2026-08-06): the picker and the spent safe backups must not be
+        // drafted as corners. (Both are also excluded structurally --
+        // carrier param / hasMoved -- the reservation is the explicit
+        // contract.)
+        std::vector<int> reserved;
+        reserved.push_back(picker.id);
+        for (const auto& m : plan.safeMacros) reserved.push_back(m.playerId);
+
+        auto ar = cageHelper_.tryAssign(proj, picker, steps, reserved);
+
+        // Probe/execute the fills on the post-advance projection: the
+        // carrier stands on the projected square while the corners walk.
+        picker.position = newPos;
+        proj.ball = BallState::carried(newPos, picker.id);
+        for (const auto& sa : ar.slots) {
+            if (sa.playerId <= 0 || sa.stayPut) continue;
+            Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
+            auto pr = probeMacro(proj, m);
+            if (pr.pto > SAFE_PTO || pr.meanActions < 0.5) continue;
+            GameState next = proj.clone();
+            auto res = greedyExpandMacro(next, m, dice_);
+            if (res.turnover || next.phase != GamePhase::PLAY ||
+                next.activeTeam != mySide) {
+                continue;
+            }
+            proj = std::move(next);
+            plan.cageFillMacros.push_back(m);
         }
     }
 

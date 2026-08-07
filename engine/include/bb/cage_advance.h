@@ -168,11 +168,11 @@ public:
     // tests and future planners.
     static bool eligibleCornerPlayer(const Player& p);
 
-private:
-    MCTSConfig config_;
-    MacroMCTSSearch evaler_;  // leaf eval only (evaluateLeaf)
-    DiceRoller dice_;
-
+    // Corner-slot assignment around the carrier's position after a `step`
+    // squares forward move. Public since 2026-08-07: the item13 staged
+    // pickup planner reuses it for its cage-fill stage (corners around the
+    // projected post-pickup carrier) instead of growing a second slot
+    // assigner. Semantics unchanged.
     struct SlotAssignment {
         Position slot{-1, -1};
         int playerId = -1;   // -1 = open
@@ -188,6 +188,11 @@ private:
     AssignmentResult tryAssign(const GameState& state, const Player& carrier,
                                int step,
                                const std::vector<int>& reservedPlayerIds) const;
+
+private:
+    MCTSConfig config_;
+    MacroMCTSSearch evaler_;  // leaf eval only (evaluateLeaf)
+    DiceRoller dice_;
 
     struct ProbeStats {
         double pto = 0.0;
