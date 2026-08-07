@@ -52,20 +52,27 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         }
     }
 
-    // WildAnimal: D6, 1-2=fail. Auto-pass for Block/Blitz
+    // WildAnimal: D6, +2 when the declared action is a Block or a Blitz,
+    // 1-3 fails. Same shape as ReallyStupid above: needs 4+ normally, 2+
+    // with the bonus. There is NO auto-pass -- a natural 1 fails even when
+    // blocking or blitzing, because a roll of 1 before modifiers always
+    // fails (rules correction, user 2026-08-07; before this the block/blitz
+    // branch skipped the roll entirely, making a Rat Ogre / Minotaur a
+    // sixth more reliable at hitting than the rules allow).
     if (player.hasSkill(SkillName::WildAnimal)) {
-        if (actionType != ActionType::BLOCK && actionType != ActionType::BLITZ) {
-            int roll = dice.rollD6();
-            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(SkillName::WildAnimal), roll >= 3});
-            if (roll < 3) {
-                // WildAnimal keeps tacklezones (unlike BoneHead/ReallyStupid)
-                player.hasActed = true;
-                player.hasMoved = true;
-                result.actionBlocked = true;
-                result.proceed = false;
-                return result;
-            }
+        bool hitting = (actionType == ActionType::BLOCK ||
+                        actionType == ActionType::BLITZ);
+        int target = hitting ? 2 : 4;
+        int roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                          static_cast<int>(SkillName::WildAnimal), roll >= target});
+        if (roll < target) {
+            // WildAnimal keeps tacklezones (unlike BoneHead/ReallyStupid)
+            player.hasActed = true;
+            player.hasMoved = true;
+            result.actionBlocked = true;
+            result.proceed = false;
+            return result;
         }
     }
 

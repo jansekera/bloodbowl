@@ -99,13 +99,28 @@ TEST(BigGuyHandler, ReallyStupidAlonePass) {
 
 // ===== WILD ANIMAL TESTS =====
 
-TEST(BigGuyHandler, WildAnimalAutoPassBlock) {
+// Block/Blitz gets +2, so the check needs a 2+ -- but it IS rolled: a
+// natural 1 fails even when hitting (a roll of 1 before modifiers always
+// fails). The old code skipped the roll for Block/Blitz entirely.
+TEST(BigGuyHandler, WildAnimalNaturalOneFailsEvenOnBlock) {
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::WildAnimal);
 
-    FixedDiceRoller dice({});  // No roll needed for Block
+    FixedDiceRoller dice({1});
     auto result = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
+
+    EXPECT_TRUE(result.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);  // keeps tackle zones
+}
+
+TEST(BigGuyHandler, WildAnimalPassesBlockOnTwo) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::WildAnimal);
+
+    FixedDiceRoller dice({2});  // 2 + 2 = 4 -> passes
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::BLITZ, dice, nullptr);
 
     EXPECT_FALSE(result.actionBlocked);
 }
@@ -115,13 +130,24 @@ TEST(BigGuyHandler, WildAnimalFailMove) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::WildAnimal);
 
-    FixedDiceRoller dice({2});  // Fail on MOVE (need 3+)
+    FixedDiceRoller dice({3});  // no bonus without Block/Blitz -> needs 4+
     auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
 
     EXPECT_TRUE(result.actionBlocked);
     // WildAnimal keeps tacklezones
     EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
     EXPECT_TRUE(gs.getPlayer(1).hasActed);
+}
+
+TEST(BigGuyHandler, WildAnimalPassesMoveOnFour) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::WildAnimal);
+
+    FixedDiceRoller dice({4});
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_FALSE(result.actionBlocked);
 }
 
 // ===== TAKE ROOT TESTS =====
