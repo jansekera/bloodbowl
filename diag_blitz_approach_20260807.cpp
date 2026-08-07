@@ -238,6 +238,65 @@ struct Sample {
 
 std::vector<Sample> g_samples;
 
+// --- Vlastní tělo v hrdle (podnět uživatele 07.08.): jak často je blitz na
+// nějakého soupeře nemožný JEN kvůli vlastnímu spoluhráči v cestě, tj. dal
+// by se odemknout tím, že se ten spoluhráč aktivuje dřív (vacate-first)?
+// Čistá dosažitelnost (BFS, bez kostek), stejná mez jako generace: MA+2.
+int g_turnsScanned = 0, g_turnsWithSelfBlock = 0, g_pairsSelfBlocked = 0;
+int g_targetsUnlockable = 0;
+
+bool reachableAdjacent(const GameState& s, const Player& mover, Position target,
+                       bool teammatesPassable) {
+    int budget = static_cast<int>(mover.movementRemaining) + 2;
+    std::vector<int> dist(32 * 20, -1);
+    auto id = [](Position p) { return p.y * 32 + p.x; };
+    std::vector<Position> frontier{mover.position}, next;
+    dist[id(mover.position)] = 0;
+    for (int d = 0; d < budget && !frontier.empty(); ++d) {
+        next.clear();
+        for (Position cur : frontier) {
+            for (Position p : cur.getAdjacent()) {
+                if (!p.isOnPitch() || dist[id(p)] >= 0) continue;
+                const Player* occ = s.getPlayerAtPosition(p);
+                if (occ && occ->id != mover.id) {
+                    if (occ->teamSide != mover.teamSide) continue;      // soupeř blokuje vždy
+                    if (!teammatesPassable) continue;                    // spoluhráč blokuje
+                }
+                dist[id(p)] = d + 1;
+                if (p.distanceTo(target) <= 1) return true;
+                next.push_back(p);
+            }
+        }
+        frontier.swap(next);
+    }
+    return false;
+}
+
+void scanSelfBlocking(const GameState& s) {
+    g_turnsScanned++;
+    TeamSide side = s.activeTeam;
+    bool turnHasIt = false;
+    s.forEachOnPitch(opponent(side), [&](const Player& def) {
+        if (def.state != PlayerState::STANDING) return;
+        bool anyReaches = false, anyWouldReach = false;
+        s.forEachOnPitch(side, [&](const Player& p) {
+            if (p.state != PlayerState::STANDING) return;
+            if (p.hasMoved || p.hasActed) return;
+            if (p.position.distanceTo(def.position) <= 1) { anyReaches = true; return; }
+            bool now = reachableAdjacent(s, p, def.position, false);
+            bool ifFree = now || reachableAdjacent(s, p, def.position, true);
+            if (now) anyReaches = true;
+            if (ifFree) anyWouldReach = true;
+            if (!now && ifFree) g_pairsSelfBlocked++;
+        });
+        if (!anyReaches && anyWouldReach) {   // cíl je blitzovatelný JEN po uvolnění
+            g_targetsUnlockable++;
+            turnHasIt = true;
+        }
+    });
+    if (turnHasIt) g_turnsWithSelfBlock++;
+}
+
 // Copy of simulateGame's loop with a hook before every executed action.
 void playGameInstrumented(const TeamRoster& home, const TeamRoster& away,
                           ActionSelector homePolicy, ActionSelector awayPolicy,
@@ -276,6 +335,20 @@ void playGameInstrumented(const TeamRoster& home, const TeamRoster& away,
             totalActions++;
             continue;
         }
+        // Jednou za týmový tah: sken „vlastní tělo v hrdle".
+        {
+            static int lastTurn = -1, lastHalf = -1;
+            static TeamSide lastSide = TeamSide::HOME;
+            const TeamState& ts = state.getTeamState(state.activeTeam);
+            if (ts.turnNumber != lastTurn || state.half != lastHalf ||
+                state.activeTeam != lastSide) {
+                lastTurn = ts.turnNumber;
+                lastHalf = state.half;
+                lastSide = state.activeTeam;
+                scanSelfBlocking(state);
+            }
+        }
+
         ActionSelector& policy = (state.activeTeam == TeamSide::HOME)
                                      ? homePolicy : awayPolicy;
         Action chosen = policy(state);
@@ -450,6 +523,14 @@ int main(int argc, char** argv) {
                100.0 * s.b2.fail, s.b2.steps, s.b2.detourSteps,
                s.b2.finalSquare.x, s.b2.finalSquare.y);
     }
+    printf("\n=== VLASTNI TELO V HRDLE (vacate-first kandidat) ===\n");
+    printf("  tymovych tahu skenovano: %d\n", g_turnsScanned);
+    printf("  tahu, kde je nejaky cil blitzovatelny JEN po uvolneni spoluhrace:"
+           " %d (%.1f%%)\n", g_turnsWithSelfBlock,
+           g_turnsScanned ? 100.0 * g_turnsWithSelfBlock / g_turnsScanned : 0.0);
+    printf("  takovych cilu celkem: %d | zablokovanych dvojic (blitzer,cil): %d\n",
+           g_targetsUnlockable, g_pairsSelfBlocked);
+
     printf("\nDONE\n");
     return 0;
 }

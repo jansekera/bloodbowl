@@ -1,0 +1,94 @@
+vf=loaded policy=loaded | 4 her/matchup, seedBase=91000
+  dwarf-woodelf hra 0 hotova (vzorku celkem 23)
+  dwarf-woodelf hra 1 hotova (vzorku celkem 43)
+  dwarf-woodelf hra 2 hotova (vzorku celkem 62)
+  dwarf-woodelf hra 3 hotova (vzorku celkem 78)
+
+=== dwarf-woodelf: N=78 blitzu s chuzi ===
+  dnesni trasa A: dorazi 76/78 (97%), stredni riziko cesty 7.1%
+  B1 (stejne finalni pole, optimalni cesta): stredni riziko 6.3% | zlepsi >1pp: 4 (5%), >5pp: 4 (5%), stredni zisk 2.60 pp
+  B2 (i jine finalni pole):                  stredni riziko 4.5% | zlepsi >5pp: 5 (6%), stredni zisk 2.57 pp
+  B1 pouziva detour (krok bez postupu): 44 (56%)
+  B2 konci na JINEM finalnim poli nez A: 30 (38%)
+  A nedorazi, ale B2 ano: 2 | nejvetsi jednotlivy zisk 83.3 pp
+  C (lookahead 2, bez detouru): stredni riziko 7.1% | zlepsi >5pp: 0 (0%), zhorsi: 0, stredni zisk 0.00 pp => zachyti 0% zisku B1
+  rozlozeni rizika A: 0%: 68 (87%) | <5%: 0 | 5-20%: 2 | >20%: 8  => drahy vypocet lze preskocit v 87% pripadu
+  dwarf-skaven hra 0 hotova (vzorku celkem 95)
+  dwarf-skaven hra 1 hotova (vzorku celkem 112)
+  dwarf-skaven hra 2 hotova (vzorku celkem 135)
+  dwarf-skaven hra 3 hotova (vzorku celkem 157)
+
+=== dwarf-skaven: N=79 blitzu s chuzi ===
+  dnesni trasa A: dorazi 78/79 (99%), stredni riziko cesty 11.7%
+  B1 (stejne finalni pole, optimalni cesta): stredni riziko 10.7% | zlepsi >1pp: 3 (4%), >5pp: 3 (4%), stredni zisk 1.80 pp
+  B2 (i jine finalni pole):                  stredni riziko 9.5% | zlepsi >5pp: 4 (5%), stredni zisk 2.19 pp
+  B1 pouziva detour (krok bez postupu): 38 (48%)
+  B2 konci na JINEM finalnim poli nez A: 22 (28%)
+  A nedorazi, ale B2 ano: 1 | nejvetsi jednotlivy zisk 83.3 pp
+  C (lookahead 2, bez detouru): stredni riziko 11.8% | zlepsi >5pp: 0 (0%), zhorsi: 1, stredni zisk -0.14 pp => zachyti -15% zisku B1
+  rozlozeni rizika A: 0%: 66 (84%) | <5%: 0 | 5-20%: 1 | >20%: 12  => drahy vypocet lze preskocit v 84% pripadu
+  orc-skaven hra 0 hotova (vzorku celkem 174)
+  orc-skaven hra 1 hotova (vzorku celkem 187)
+  orc-skaven hra 2 hotova (vzorku celkem 205)
+  orc-skaven hra 3 hotova (vzorku celkem 226)
+
+=== orc-skaven: N=69 blitzu s chuzi ===
+  dnesni trasa A: dorazi 67/69 (97%), stredni riziko cesty 12.0%
+  B1 (stejne finalni pole, optimalni cesta): stredni riziko 11.3% | zlepsi >1pp: 6 (9%), >5pp: 6 (9%), stredni zisk 1.54 pp
+  B2 (i jine finalni pole):                  stredni riziko 11.0% | zlepsi >5pp: 6 (9%), stredni zisk 1.04 pp
+  B1 pouziva detour (krok bez postupu): 25 (36%)
+  B2 konci na JINEM finalnim poli nez A: 16 (23%)
+  A nedorazi, ale B2 ano: 2 | nejvetsi jednotlivy zisk 50.0 pp
+  C (lookahead 2, bez detouru): stredni riziko 12.0% | zlepsi >5pp: 0 (0%), zhorsi: 0, stredni zisk 0.00 pp => zachyti 0% zisku B1
+  rozlozeni rizika A: 0%: 56 (81%) | <5%: 0 | 5-20%: 3 | >20%: 10  => drahy vypocet lze preskocit v 81% pripadu
+
+=== CELKEM: N=226 blitzu s chuzi ===
+  dnesni trasa A: dorazi 221/226 (98%), stredni riziko cesty 10.2%
+  B1 (stejne finalni pole, optimalni cesta): stredni riziko 9.4% | zlepsi >1pp: 13 (6%), >5pp: 13 (6%), stredni zisk 2.00 pp
+  B2 (i jine finalni pole):                  stredni riziko 8.2% | zlepsi >5pp: 15 (7%), stredni zisk 1.97 pp
+  B1 pouziva detour (krok bez postupu): 107 (47%)
+  B2 konci na JINEM finalnim poli nez A: 68 (30%)
+  A nedorazi, ale B2 ano: 5 | nejvetsi jednotlivy zisk 83.3 pp
+  C (lookahead 2, bez detouru): stredni riziko 10.2% | zlepsi >5pp: 0 (0%), zhorsi: 1, stredni zisk -0.05 pp => zachyti -6% zisku B1
+  rozlozeni rizika A: 0%: 190 (84%) | <5%: 0 | 5-20%: 6 | >20%: 30  => drahy vypocet lze preskocit v 84% pripadu
+
+=== 8 situaci s nejvetsim rozdilem ===
+  [dwarf-woodelf] p20 (15,10) -> cil p8 (7,12), vzdalenost 8
+      A: riziko 83.3% kroku 7 dorazi=1 konci (8,11)
+      B1: riziko 0.0% kroku 7 detouru 0 dorazi=1
+      B2: riziko 0.0% kroku 7 detouru 0 konci (8,13)
+  [dwarf-skaven] p8 (10,5) -> cil p16 (13,3), vzdalenost 3
+      A: riziko 83.3% kroku 2 dorazi=1 konci (12,3)
+      B1: riziko 0.0% kroku 4 detouru 1 dorazi=1
+      B2: riziko 0.0% kroku 4 detouru 1 konci (12,2)
+  [dwarf-woodelf] p22 (17,9) -> cil p7 (9,12), vzdalenost 8
+      A: riziko 83.3% kroku 7 dorazi=1 konci (10,12)
+      B1: riziko 0.0% kroku 7 detouru 0 dorazi=1
+      B2: riziko 0.0% kroku 7 detouru 0 konci (10,11)
+  [dwarf-woodelf] p7 (14,4) -> cil p20 (17,6), vzdalenost 3
+      A: riziko 83.3% kroku 2 dorazi=1 konci (16,6)
+      B1: riziko 83.3% kroku 4 detouru 1 dorazi=1
+      B2: riziko 16.7% kroku 5 detouru 3 konci (18,5)
+  [dwarf-skaven] p12 (13,5) -> cil p3 (7,2), vzdalenost 6
+      A: riziko 50.0% kroku 5 dorazi=1 konci (8,3)
+      B1: riziko 0.0% kroku 6 detouru 1 dorazi=1
+      B2: riziko 0.0% kroku 6 detouru 1 konci (8,3)
+  [orc-skaven] p18 (13,4) -> cil p10 (7,2), vzdalenost 6
+      A: riziko 50.0% kroku 5 dorazi=1 konci (8,1)
+      B1: riziko 0.0% kroku 6 detouru 1 dorazi=1
+      B2: riziko 0.0% kroku 6 detouru 1 konci (8,1)
+  [dwarf-skaven] p18 (14,6) -> cil p8 (10,5), vzdalenost 4
+      A: riziko 30.6% kroku 8 dorazi=0 konci (-1,-1)
+      B1: riziko 100.0% kroku 0 detouru 0 dorazi=0
+      B2: riziko 0.0% kroku 6 detouru 3 konci (9,6)
+  [dwarf-woodelf] p21 (12,8) -> cil p5 (7,12), vzdalenost 5
+      A: riziko 88.9% kroku 5 dorazi=1 konci (7,11)
+      B1: riziko 69.1% kroku 9 detouru 3 dorazi=1
+      B2: riziko 69.1% kroku 9 detouru 3 konci (7,11)
+
+=== VLASTNI TELO V HRDLE (vacate-first kandidat) ===
+  tymovych tahu skenovano: 385
+  tahu, kde je nejaky cil blitzovatelny JEN po uvolneni spoluhrace: 3 (0.8%)
+  takovych cilu celkem: 3 | zablokovanych dvojic (blitzer,cil): 404
+
+DONE

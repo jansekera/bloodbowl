@@ -222,3 +222,24 @@ jde o volbu koridoru několik kroků předem.
 (a rozložení je ostře bimodální: 0 % → 190, mezi 0-5 % → 0, 5-20 % → 6,
 nad 20 % → 30). Drahý trasový výpočet by tedy běžel na **16 %** volání,
 práh netřeba ladit.
+
+---
+
+# MĚŘENÍ „VLASTNÍ TĚLO V HRDLE" (07.08., podnět uživatele) — JEV JE VZÁCNÝ
+Sken jednou za týmový tah přes 12 her: existuje soupeř, na kterého se
+**nikdo nedostane teď, ale dostal by se, kdyby spoluhráči nepřekáželi**?
+
+| | |
+|---|---|
+| týmových tahů skenováno | 385 |
+| tahů s cílem blitzovatelným JEN po uvolnění spoluhráče | **3 (0,8 %)** |
+| zablokovaných dvojic (blitzer, cíl) | 404 |
+
+Těch 404 dvojic vypadá hrozivě, ale je to jiný jev: „tenhle konkrétní
+hráč neprojde, jiný ano" — blitz se prostě provede někým jiným, nikdo
+nepřichází o nic. Rozhodující je první řádek: **reálná ztráta nastává
+v 0,8 % tahů.**
+
+⇒ **Vacate-first jen kvůli blitzu se nevyplatí stavět.** Položka se
+uzavírá; zůstává jako člen obecného mechanismu (rozpočet polí), pokud se
+ten bude stavět kvůli jiným fázím tahu. Data: `evidence/blitz_selfblock_measure_20260807.log`.
