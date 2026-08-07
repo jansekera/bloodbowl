@@ -81,6 +81,20 @@ pravděpodobností řetězu dodgů prohraje s bezpečnějším stejně blízkým
   změna mění i to, KDO a KOHO blitzuje. Měřit párově, ne jen na sondě.
 * Pořadí: **fáze 0 (měření) → fáze 1 (rozdělení skórování) → znovu změřit
   → fáze 2 (detoury) jen při doložené výhře.**
-* Zařazení: BLITZ série (D1 review ~17.08.) — tohle je její přirozený
-  první technický kus; před ní má přednost trpasličí fronta z 07.08.
-  (denial člen → dvojrozměrné rozhodnutí → otevírací blitz).
+
+## ⚑ ZAŘAZENÍ (rozhodnutí uživatele 07.08.): FÁZE 0 PROBĚHNE **PŘED DOKONČENÍM BLITZ AKCE**
+Fáze 0 není dodatek na konci — je to **vstupní podmínka BLITZ série**: bez
+jejích čísel se o pohybu blitzera rozhoduje odhadem a D1 review nemá čím
+podložit „detoury ano/ne".
+
+* **Fáze 0 (měření) musí doběhnout PŘED D1 review / před finálním
+  dokončením BLITZ vrstvy** (~17.08.). Její výstup je podklad pro D1.
+* Fáze 1 se rozhoduje na jejích datech; fáze 2 jen při doložené výhře.
+* Uvnitř série je to její přirozený první technický kus.
+* Přednost před ní má jen trpasličí fronta ze 07.08. (denial člen →
+  dvojrozměrné rozhodnutí → otevírací blitz). Pozor na vazbu: „otevírací
+  blitz" se přiblížení blitzera přímo dotýká → pustit měření hned, jak
+  bude volné CPU/noční okno, ideálně PŘED ním.
+* Náklad: diagnostika, ~hodina práce + minuty běhu; nulový zásah do
+  produkce, takže nekoliduje se zmrazením stromu ani s měřicími řetězy
+  (jen o CPU).
