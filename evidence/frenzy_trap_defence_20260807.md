@@ -63,9 +63,15 @@ Pro každý blok Frenzy hráče F na cíl D spočítat:
    1 proti = 56 %, 2 proti = 80 %.
 
 ### B. TVRDÁ PRAVIDLA PRO BIG GUYE BEZ BLOCKU
-1. **Neblokovat pod 3 kostky**, pokud to není doktrinálně vynucené
-   (poslední kolo, míč). 3 kostky proti ST3 = ST5 + **2 asistenti**
-   (7 vs 3) ⇒ přímý odběratel bodu 7c.
+1. **Práh kostek se řídí BLOCKEM, ne rolí** (upřesněno 07.08.):
+   * **bez Blocku** (Rat Ogre): 1 kostka = 33 %, 2 = 11 %, **3 = 3,7 %**
+     ⇒ neblokovat pod 3 kostky. 3 kostky proti ST3 = ST5 + **2 asistenti**
+     (7 vs 3) ⇒ přímý odběratel bodu 7c.
+   * **s Blockem** (trpasličí Slayeři, Blitzeři): 1 kostka = 17 %,
+     **2 kostky = 2,8 %** ⇒ stačí 2, tedy JEDEN asistent (např. Slayer ST3
+     vs elf ST3: 1 kostka → s asistentem 4 vs 3 = 2 kostky).
+   Formulovat přes skill, ne přes jméno: „blokuj od prahu, kde riziko
+   klesne pod ~4 %".
 2. **Zakázat blok, jehož nejhorší druhý blok je „kostky proti nám"**
    (`dice₂ ≤ −1`) — to je definice pasti.
 3. **Proti Side Step cíli požadovat rezervu** — obránce si vybere pole,
