@@ -5,6 +5,7 @@
 #include "bb/roster.h"
 #include "bb/dice.h"
 #include "bb/action_features.h"
+#include "bb/helpers.h"
 #include <algorithm>
 #include <set>
 
@@ -1206,6 +1207,87 @@ TEST(MacroActions, ScoreAvoidsEnemyTZ) {
 
     // Should have moved (not empty expansion)
     EXPECT_FALSE(result.actions.empty());
+}
+
+TEST(MacroExpansion, AdvanceTargetPulledBackFromEnemyTZ) {
+    // Cage technical review 2026-08-06, finding 1: ADVANCE picks its target
+    // arithmetically, and since the walk's final square is TZ-exempt
+    // (2026-08-04) the carrier walked right up to a defender and ended the
+    // turn in his tackle zone -- a free block on the ball next turn. The
+    // target must pull back to the nearest unoccupied TZ-free square.
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({10, 7}, 1);
+    state.homeTeam.turnNumber = 6;  // 3 turns left, dist 15 -> wants 5 steps
+
+    // Defender straight ahead: arithmetic target {15,7} is in his TZ,
+    // {14,7} is his own square, {13,7} is in TZ again -> stop at {12,7}.
+    state.getPlayer(12).position = {14, 7};
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+
+    const Player& after = state.getPlayer(1);
+    EXPECT_EQ(after.position.x, 12);
+    EXPECT_EQ(after.position.y, 7);
+    EXPECT_EQ(countTacklezones(state, after.position, TeamSide::HOME), 0);
+}
+
+TEST(MacroExpansion, AdvanceWalksStraightAtEqualChebyshev) {
+    // Manhattan tiebreak in scoreMoveAction (2026-08-04): at equal Chebyshev
+    // distance the walk must take the straight square, not a diagonal drift
+    // that wastes walk budget on exact-reach legs. Open field ahead: every
+    // step of the ADVANCE walk stays on the carrier's row.
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({10, 7}, 1);
+    // Default enemy at {20,7} is out of blitz range: throttle caps steps at
+    // min(ideal 2, MA/2) = 2 -> target {12,7}.
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    ASSERT_EQ(result.actions.size(), 2u);
+    for (auto& a : result.actions) {
+        EXPECT_EQ(a.type, ActionType::MOVE);
+        EXPECT_EQ(a.target.y, 7);
+    }
+    EXPECT_EQ(state.getPlayer(1).position.x, 12);
+}
+
+TEST(MacroActions, ScoreEntersDefendedEndzone) {
+    // Cage technical review 2026-08-06, finding 3 (positive side effect of
+    // the 2026-08-04 final-square TZ exemption, previously unprotected):
+    // a carrier must be willing to step INTO a defended endzone and score.
+    // Before the exemption the endzone square's TZ penalty made stopping one
+    // square short score better forever (walk abort via loop guard).
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {23, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({23, 7}, 1);
+
+    // Two defenders whose tackle zones cover every endzone square the SCORE
+    // route probe considers (y 5..9).
+    state.getPlayer(12).position = {24, 6};
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13;
+    e2.teamSide = TeamSide::AWAY;
+    e2.state = PlayerState::STANDING;
+    e2.position = {24, 8};
+    e2.stats = {6, 3, 3, 8};
+
+    FixedDiceRoller dice({6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    Macro macro{MacroType::SCORE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+
+    EXPECT_EQ(state.getPlayer(1).position.x, 25);
 }
 
 TEST(MacroActions, ScoreOffPitchCarrierDoesNotHang) {

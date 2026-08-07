@@ -1025,6 +1025,21 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     else if (targetY > 9) targetY--;
 
     Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(targetY)};
+    // The walk's final square is exempt from TZ scoring on the premise that
+    // the macro which chose it owns the risk (cage corners deliberately stand
+    // next to defenders, probes price it). ADVANCE has no such pricing: the
+    // target is pure arithmetic, and a carrier parked in a tackle zone hands
+    // the opponent a free block on the ball. Pull the target back to the
+    // nearest unoccupied TZ-free square; if none exists ahead, don't advance
+    // at all and let the search's other macros handle the turn.
+    while (steps > 0 &&
+           (state.getPlayerAtPosition(target) != nullptr ||
+            countTacklezones(state, target, carrier.teamSide) > 0)) {
+        --steps;
+        targetX = std::clamp(carrier.position.x + dx * steps, 1, 24);
+        target.x = static_cast<int8_t>(targetX);
+    }
+    if (steps <= 0) return result;
     movePlayerToward(state, macro.playerId, target, dice, result, steps + 2);
     return result;
 }
