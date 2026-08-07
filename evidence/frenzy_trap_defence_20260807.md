@@ -166,3 +166,63 @@ množina k optimalizaci, ale jedna dopočitatelná hodnota** (resp. dvě
 větve: SideStep = obránce, jinak deterministicky). Riziko sekvence tedy:
 `p₁ + (1−p₁)·[druhý blok nastane]·p₂`, kde druhý blok nastane, právě když
 po pushi oba stojí a sousedí (u blitzu navíc zbývá pohyb/GFI).
+
+
+---
+
+# 6) RIZIKA A BENEFITY — SPOČÍTÁNO (07.08., na žádost uživatele)
+
+## Obecný tvar (jediný vzorec, zbytek jsou dosazení)
+Kostka bloku má 6 stěn: 1× Attacker Down, 1× Both Down, 2× Push,
+1× Defender Stumbles, 1× Defender Down. Označme **b = kolik stěn je pro
+TUHLE dvojici špatných**. Pak:
+* **vybíráme my** (n kostek pro nás): `riziko = (b/6)^n`
+* **vybírá soupeř** (n kostek proti nám): `riziko = 1 − ((6−b)/6)^n`
+
+| b | 1 kostka | 2 pro nás | 3 pro nás | 2 proti | 3 proti |
+|---|---|---|---|---|---|
+| **1** (s Blockem) | 16,7 % | **2,8 %** | 0,5 % | 30,6 % | 42,1 % |
+| **2** (bez Blocku) | 33,3 % | 11,1 % | **3,7 %** | 55,6 % | 70,4 % |
+
+Prahy „2 kostky s Blockem / 3 bez něj" = jen řádky téhle tabulky pod ~4 %.
+
+## Případ A: Gutter Runner (Wrestle + Strip Ball) vs nosič BEZ Sure Hands
+Rozbor stěn **pro tuhle dvojici** (proto b = 1, ne 2):
+* Attacker Down — jediná špatná (GR na zemi, turnover);
+* **Both Down — Wrestle: oba na zem, bez zbroje a BEZ turnoveru**
+  (block_handler.cpp:383-399) + nosič leží ⇒ **míč padá**;
+* Push ×2 — **Strip Ball shodí míč** (Sure Hands by to zrušil, :501-511);
+* Defender Stumbles / Defender Down — nosič dolů ⇒ míč padá.
+
+**Dvě kostky PROTI (soupeř vybírá):**
+| výsledek | pravděpodobnost |
+|---|---|
+| turnover (Attacker Down) | **30,6 %** |
+| Both Down — míč padá, ale náš GR leží | 25,0 % |
+| míč padá, GR STOJÍ | 44,4 % |
+| **míč uvolněn celkem** | **69,4 %** |
+
+⇒ Skaven kupuje **69% šanci sebrat míč** za 31% riziko konce tahu. Pro tým,
+jehož celá hra je míč, dobrý obchod — a proto je 2 kostky PROTI legitimní
+volba, ne chyba. (S 1 kostkou by to bylo 16,7 % / 83,3 %.)
+
+## Případ B: trpaslík s Block + Tackle, JEDNA kostka, proti elfovi s Dodge
+| výsledek | pravděpodobnost |
+|---|---|
+| turnover (Attacker Down) | **16,7 %** |
+| **srazí elfa** (Both Down díky Blocku + Stumbles díky Tackle + Def Down) | **50,0 %** |
+| odstrčí (2× Push) | 33,3 % |
+
+⇒ Za 17 % riziko kupuje 50% sražení markera a v dalších 33 % aspoň odsun.
+Náklad pádu je u trpaslíka nejnižší v lize (AV9 + Thick Skull) a cena
+turnoveru závisí na okamžiku tahu — po dokončení bezkostkové práce je
+téměř nulová. **Proto smí do jednokostkových bloků.**
+Pozn.: bez Tackle by Stumbles proti Dodge byl jen push → sražení 33 %,
+ne 50 %. Tackle na rozích klece se tím vyplácí i mimo klec.
+
+## Co z toho pro implementaci
+Nepočítat „kolik mám kostek", ale **ocenit stěny pro konkrétní dvojici**
+(Block, Wrestle, Tackle, Strip Ball, Sure Hands obránce, drží míč?),
+zvážit rozdělením podle počtu kostek a toho, kdo vybírá, a porovnat
+s **cenou turnoveru v daném okamžiku tahu**. Obě tabulky výše jsou
+zároveň akceptační testy.
