@@ -532,20 +532,24 @@ const TeamRoster& getHumanRoster1200() {
     return roster;
 }
 
-// Dwarf TV~1200: lots of Guard. 6 Longbeards, 2 Blitzers, 2 Troll Slayers, 2 Runners (no Deathroller).
+// Dwarf TV~1240 (cage-corner doctrine 2026-08-07): the four cage corners are
+// Slayers+Blitzers with Guard AND Tackle (assist survives being marked; blocks
+// knock down Dodge markers), carrier = Runner. Compensated by trimming Guard
+// to 2 Longbeards and dropping the Strip Ball ball-hunter; user accepted the
+// mild TV overshoot. 6 Longbeards, 2 Blitzers, 2 Troll Slayers, 2 Runners
+// (no Deathroller).
 const TeamRoster& getDwarfRoster1200() {
     static const TeamRoster roster = {
         "Dwarf (TV1200)",
         {
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11, "Longbeard"},  // Longbeard (fill)
-            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 4, "Longbeard +Guard"},  // Longbeard +Guard
-            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard}), 1, "Blitzer +Guard"},  // Blitzer +Guard
-            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::StripBall}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 2, "Longbeard +Guard"},  // Longbeard +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard, SkillName::Tackle}), 2, "Blitzer +Guard+Tackle"},  // cage corner
             {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
-                SkillName::Dauntless, SkillName::Guard}), 2, "Troll Slayer +Guard"},  // Troll Slayer +Guard
+                SkillName::Dauntless, SkillName::Guard, SkillName::Tackle}), 2, "Troll Slayer +Guard+Tackle"},  // cage corner
             {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},  // Runner +Block
         },
-        6, 40, true
+        5, 40, true
     };
     return roster;
 }

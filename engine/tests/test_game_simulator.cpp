@@ -759,9 +759,12 @@ TEST(DevelopedRoster, DwarfLotsOfGuard) {
     GameState state;
     setupHalf(state, *r, *r);
 
-    // 4 Longbeards + 1 Blitzer + 2 Troll Slayers with Guard.
-    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 7);
-    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+    // Cage-corner doctrine 2026-08-07: 2 Longbeards + 2 Blitzers + 2 Troll
+    // Slayers with Guard; all four corner pieces (Blitzers+Slayers) also carry
+    // Tackle on top of the Longbeards' innate one. Strip Ball hunter dropped.
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Tackle), 9);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 0);
 }
 
 TEST(DevelopedRoster, SkavenSureFeetGutterRunners) {
