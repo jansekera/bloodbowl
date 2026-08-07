@@ -37,6 +37,11 @@ Position pickApproachStep(const GameState& state, const Player& mover,
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source);
 int calculatePickupTarget(const GameState& state, const Player& player);
+// Same roll, priced as if `player` stood on `at` -- macro generation needs
+// the target BEFORE the picker walks to the ball (tackle zones are counted
+// on the ball's square, not on the picker's current one).
+int calculatePickupTargetAt(const GameState& state, const Player& player,
+                            Position at);
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0);
 
 // Block helpers

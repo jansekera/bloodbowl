@@ -542,10 +542,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
         int bestPickerScore = -999;
         const Player* secondPicker = nullptr;
         int secondPickerScore = -999;
-        // Gate: a second picker more than 15 points behind (= the SureHands
-        // bonus, ~5 squares of extra distance or ~1.5 AG) is categorically
+        // Gate: a second picker more than 25 points behind (~1.5 pips of
+        // pickup chance, ~5 squares of extra distance) is categorically
         // worse -- emitting it would only donate floored prior mass.
-        constexpr int kSecondPickerMaxGap = 15;
+        constexpr int kSecondPickerMaxGap = 25;
 
         state.forEachOnPitch(mySide, [&](const Player& p) {
             if (!isFreeToAct(p)) return;
@@ -556,9 +556,25 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             int maxReach = p.movementRemaining + 2;
             if (dist > maxReach) return;
 
-            int score = p.stats.agility * 10 - dist * 3;
-            if (p.hasSkill(SkillName::SureHands)) score += 15;
-            if (p.hasSkill(SkillName::BigHand)) score += 5;
+            // Rank by the COMPUTED chance of coming up with the ball, not by
+            // a linear AG/skill proxy (2026-08-07, user doctrine "prefer the
+            // reliable handler"). The proxy was blind to what makes a pickup
+            // hard in practice: tackle zones ON THE BALL and weather. Those
+            // hurt a low-AG body disproportionately (a marked ball costs an
+            // AG2 dwarf a third of his chance but an AG4 runner far less),
+            // so on exactly the situations the staged planner kept failing
+            // (mined g0003) the proxy still nominated the nearest dwarf.
+            // Priced by the engine's own target formula evaluated at the
+            // ball square, plus Sure Hands' personal reroll; the team reroll
+            // is deliberately NOT assumed (shared scarce resource). Distance
+            // stays secondary at ~1 square = 5 chance points, keeping the
+            // old trade-off (1 AG pip ~ 3.3 squares).
+            int target = calculatePickupTargetAt(state, p, state.ball.position);
+            double chance = (7.0 - target) / 6.0;
+            if (p.hasSkill(SkillName::SureHands)) {
+                chance += (1.0 - chance) * chance;  // personal reroll
+            }
+            int score = static_cast<int>(std::lround(chance * 100.0)) - dist * 5;
 
             if (score > bestPickerScore) {
                 secondPickerScore = bestPickerScore;

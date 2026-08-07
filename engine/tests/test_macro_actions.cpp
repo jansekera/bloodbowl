@@ -166,9 +166,9 @@ TEST(MacroActions, PickupNotAvailableWhenBallHeld) {
 // countMacroType == 1 and this test fails.
 TEST(MacroActions, PickupEmitsTopTwoPickersBestFirst) {
     GameState state = makeMinimalState();  // ball on ground at {13,7}
-    // Player 1: dist 3 from ball, AG3 -> score 30 - 9 = 21 (secondary).
+    // Player 1: dist 3, AG3, clear ball -> 67% - 15 = 52 (secondary).
     state.getPlayer(1).position = {10, 7};
-    // Player 2: dist 2 from ball, AG3 -> score 30 - 6 = 24 (primary).
+    // Player 2: dist 2, AG3 -> 67% - 10 = 57 (primary).
     Player& p2 = state.getPlayer(2);
     p2.id = 2;
     p2.teamSide = TeamSide::HOME;
@@ -192,15 +192,15 @@ TEST(MacroActions, PickupEmitsTopTwoPickersBestFirst) {
 }
 
 // Guard (passes pre- and post-patch): a categorically worse second picker
-// (score gap > 15) must NOT be emitted -- no floored prior mass for a
+// (score gap > 25) must NOT be emitted -- no floored prior mass for a
 // picker that is strictly dominated on the pickup itself.
 TEST(MacroActions, PickupSecondPickerGatedByScoreGap) {
     GameState state = makeMinimalState();
-    // Player 1: dist 1, AG4 -> score 40 - 3 = 37.
+    // Player 1: dist 1, AG4, clear ball -> 83% - 5 = 78.
     state.getPlayer(1).position = {12, 7};
     state.getPlayer(1).stats = {6, 3, 4, 8};
-    // Player 2: dist 8 (reach 6+2 -- still eligible), AG2 -> 20 - 24 = -4.
-    // Gap 41 > 15 -> gated out.
+    // Player 2: dist 8 (reach 6+2 -- still eligible), AG2 -> 50% - 40 = 10.
+    // Gap 68 > 25 -> gated out.
     Player& p2 = state.getPlayer(2);
     p2.id = 2;
     p2.teamSide = TeamSide::HOME;
@@ -1411,4 +1411,74 @@ TEST(MacroActions, RepositionLooseBallNeverStepsOntoBallSquare) {
     EXPECT_FALSE(state.ball.isHeld);
     EXPECT_EQ(state.ball.position, (Position{15, 7}));
     EXPECT_NE(state.getPlayer(1).position, (Position{15, 7}));
+}
+
+// --- Picker ranking by computed pickup chance (2026-08-07) ---
+
+TEST(MacroActions, PickupTargetPricedAtBallSquare) {
+    // Generation must price the roll where the pickup HAPPENS: tackle zones
+    // on the ball's square, not on the picker's current one. The picker here
+    // stands in the clear; the ball is marked by two opponents.
+    GameState state = makeMinimalState();
+    Player& picker = state.getPlayer(1);
+    picker.position = {10, 7};
+    picker.stats = {6, 3, 3, 8};
+
+    state.getPlayer(12).position = {13, 6};
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13;
+    e2.teamSide = TeamSide::AWAY;
+    e2.state = PlayerState::STANDING;
+    e2.position = {13, 8};
+    e2.stats = {6, 3, 3, 8};
+
+    EXPECT_EQ(calculatePickupTarget(state, picker), 3);           // clear square
+    EXPECT_EQ(calculatePickupTargetAt(state, picker, {13, 7}), 5); // +2 TZ
+}
+
+TEST(MacroActions, PickerRankedByComputedChanceNotAgilityProxy) {
+    // The old proxy (AG*10 - dist*3 + flat skill bonuses) was blind to what
+    // actually makes a pickup hard: tackle zones on the ball and weather.
+    // Big Hand ignores both -- so under a marked ball in pouring rain the
+    // Big Hand carrier is by far the most reliable recoverer even from
+    // distance, while the proxy still nominated the nearer, higher-AG body
+    // whose real chance had collapsed to 33%.
+    GameState state = makeMinimalState();
+    state.weather = Weather::POURING_RAIN;
+
+    // p1: AG4, adjacent to the ball, no skills -> 6-4+2 TZ+1 rain = 5+ (33%).
+    Player& near = state.getPlayer(1);
+    near.position = {12, 7};
+    near.stats = {6, 3, 4, 8};
+    near.movementRemaining = 6;
+
+    // p2: AG3 with Big Hand, six squares out -> 3+ regardless (67%).
+    Player& handler = state.getPlayer(2);
+    handler.id = 2;
+    handler.teamSide = TeamSide::HOME;
+    handler.state = PlayerState::STANDING;
+    handler.position = {7, 7};
+    handler.stats = {6, 3, 3, 8};
+    handler.skills.add(SkillName::BigHand);
+    handler.movementRemaining = 6;
+
+    // Two markers on the ball at {13,7}.
+    state.getPlayer(12).position = {13, 6};
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13;
+    e2.teamSide = TeamSide::AWAY;
+    e2.state = PlayerState::STANDING;
+    e2.position = {13, 8};
+    e2.stats = {6, 3, 3, 8};
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    // Macros are emitted best-first (prior-floor ordering contract).
+    const Macro* firstPickup = nullptr;
+    for (const auto& m : macros) {
+        if (m.type == MacroType::PICKUP) { firstPickup = &m; break; }
+    }
+    ASSERT_NE(firstPickup, nullptr);
+    EXPECT_EQ(firstPickup->playerId, 2) << "nominated the unreliable nearer body";
 }

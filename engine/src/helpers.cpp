@@ -111,11 +111,12 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
     return std::clamp(target, 2, 6);
 }
 
-int calculatePickupTarget(const GameState& state, const Player& player) {
+int calculatePickupTargetAt(const GameState& state, const Player& player,
+                            Position at) {
     int target = 6 - player.stats.agility;
 
     if (!player.hasSkill(SkillName::BigHand)) {
-        target += countTacklezones(state, player.position, player.teamSide);
+        target += countTacklezones(state, at, player.teamSide);
         if (state.weather == Weather::POURING_RAIN) {
             target += 1;
         }
@@ -124,6 +125,10 @@ int calculatePickupTarget(const GameState& state, const Player& player) {
     if (player.hasSkill(SkillName::ExtraArms)) target -= 1;
 
     return std::clamp(target, 2, 6);
+}
+
+int calculatePickupTarget(const GameState& state, const Player& player) {
+    return calculatePickupTargetAt(state, player, player.position);
 }
 
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier) {

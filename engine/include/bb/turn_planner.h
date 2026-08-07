@@ -119,8 +119,8 @@ public:
     // g0003/g0008 it forced a 6+ pickup into elf tackle zones (0.109) and a
     // physically walled-off approach (0.000) while plain search secured the
     // ball 83-88% of the time (-5.8 / -10.3 SE). Measured pSuccess is
-    // bimodal (healthy >= 0.8, sick <= 0.11); 0.25 keeps a clean AG2 dwarf
-    // pickup (5+ ~= 0.33) plannable and vetoes marked/hopeless rolls, which
+    // bimodal (healthy >= 0.8, sick <= 0.11); 0.25 keeps even a marked AG2
+    // dwarf pickup (5+ = 0.33) plannable and vetoes hopeless rolls, which
     // fall back to search() (it can blitz the marker off the ball first).
     static constexpr double MIN_PICKUP_SUCCESS = 0.25;
 
