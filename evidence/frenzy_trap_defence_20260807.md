@@ -72,6 +72,13 @@ Pro každý blok Frenzy hráče F na cíl D spočítat:
      vs elf ST3: 1 kostka → s asistentem 4 vs 3 = 2 kostky).
    Formulovat přes skill, ne přes jméno: „blokuj od prahu, kde riziko
    klesne pod ~4 %".
+   * **VÝJIMKA — BIG GUY VŽDY 3 KOSTKY** (uživatel 07.08.), i s Blockem.
+     Důvody: **Loner** (block_handler.cpp:343-346 — týmový reroll se
+     spotřebuje a teprve pak se hází 4+; při neúspěchu je pryč bez efektu,
+     takže si big guy blok fakticky neopraví), **aktivační riziko**
+     nega-traitů, a **cena kusu** (sražený big guy = nejdražší tělo na
+     zemi a magnet na foul). Rat Ogre je z big guyů nejcitlivější:
+     bez Blocku 2 kostky = 11 %, a Frenzy to hází dvakrát.
 2. **Zakázat blok, jehož nejhorší druhý blok je „kostky proti nám"**
    (`dice₂ ≤ −1`) — to je definice pasti.
 3. **Proti Side Step cíli požadovat rezervu** — obránce si vybere pole,
