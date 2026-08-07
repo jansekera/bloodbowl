@@ -231,3 +231,36 @@ přesně důvod Guard preference z 03.08. i Guard rohů klece.
 na „asistent před blokem i blitzem"), se stejnou podmínkou „pomáhat
 a zároveň nezavazet" (průchodnostní kontrola, vzor „vlastní těla si
 překážejí").
+
+## Rozšíření uživatele 07.08.: BIG GUY a cílení na TŘI kostky
+
+Prahy (helpers.cpp:176-183, shodné s pravidly): `att > 2×def` → 3 kostky
+útočník vybírá; `att > def` → 2; rovnost → 1; opačně zrcadlově pro obránce.
+Skoková funkce ⇒ počet potřebných asistentů se dá spočítat PŘESNĚ:
+
+| útočník | proti ST3 | dnes | asistentů na 3 kostky |
+|---|---|---|---|
+| Treeman ST6 | 6 vs 3 = přesně 2× | 2 kostky | **1** (7 vs 3) |
+| Rat Ogre / big guy ST5 | 5 vs 3 | 2 kostky | **2** (7 vs 3) |
+| lineman ST3 | 3 vs 3 | **1 kostka** (blok se ani negeneruje!) | 1 na 2 kostky |
+
+⛔ **Strop podle prahu:** asistent nad rámec prahu nepřidá NIC (hodnota je
+schodová), zato stojí aktivaci a chybí jinde. Pravidlo: spočítej minimální
+počet asistentů pro další práh; pošli přesně tolik, nebo nikoho.
+(Uživatel: „nesmí přijít 4 pomocníci — zavazeli by si a navíc by jinde
+chyběli.")
+
+### Nega-traity big guyů hrají PRO blok/blitz (ověřeno big_guy_handler.cpp)
+* **WildAnimal** (Rat Ogre): u BLOCK i BLITZ se **vůbec nehází**
+  (auto-pass, :55-57). Nespolehlivý na pozicování, spolehlivý na mlácení —
+  proto je Rat Ogre dobrá volba pro blitz, i když je vyloučený z rohů klece.
+* **ReallyStupid** (Troll): 2+ se sousedícím spoluhráčem, 4+ o samotě
+  (:26-44) ⇒ **asistent pomáhá dvakrát** (aktivace + kostky).
+* **TakeRoot** (Treeman): hází i u BLITZE (:73-75) ⇒ skvělý na BLOCK
+  (nehází se), nespolehlivý na blitz.
+* **BoneHead** (Ogre): hází vždy, 1 = fail.
+
+Dnešní výběr blokaře/blitzera nega-traity NEZNÁ. Zobecnit přes skilly, ne
+přes jména rosterů (F5 princip). Pozor na kontrast s klecí: tam jsou big
+guyové z rohů vyloučeni (`eligibleCornerPlayer`) — jiná role, jiná pravidla,
+obojí správně.
