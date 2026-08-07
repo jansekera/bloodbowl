@@ -114,6 +114,15 @@ public:
     // Fixed fail-branch penalty, same spirit and magnitude as
     // greedyLookaheadBonus's observed-turnover term (macro_mcts.cpp).
     static constexpr double FAIL_PENALTY = -0.10;
+    // pSuccess adoption floor (validation finding 2026-08-07): the plan used
+    // to adopt its best pickup regardless of pSuccess -- on mined states
+    // g0003/g0008 it forced a 6+ pickup into elf tackle zones (0.109) and a
+    // physically walled-off approach (0.000) while plain search secured the
+    // ball 83-88% of the time (-5.8 / -10.3 SE). Measured pSuccess is
+    // bimodal (healthy >= 0.8, sick <= 0.11); 0.25 keeps a clean AG2 dwarf
+    // pickup (5+ ~= 0.33) plannable and vetoes marked/hopeless rolls, which
+    // fall back to search() (it can blitz the marker off the ball first).
+    static constexpr double MIN_PICKUP_SUCCESS = 0.25;
 
     StagedTurnPlanner(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
 

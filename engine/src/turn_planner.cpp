@@ -4,6 +4,17 @@
 
 namespace bb {
 
+namespace {
+// All-sixes roller for the picker-corridor check: with every die pinned to
+// its best face the ONLY thing that can stop the pickup expansion is
+// geometry -- the deterministic greedy walk hitting bodies. Exactly the
+// walk the executor will take, so the check cannot disagree with execution.
+struct MaxDiceRoller : DiceRollerBase {
+    int rollD6() override { return 6; }
+    int rollD8() override { return 8; }
+};
+}  // namespace
+
 TurnGoal classifyTurnGoal(const GameState& state) {
     if (state.phase != GamePhase::PLAY) return TurnGoal::NONE;
 
@@ -291,6 +302,28 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
                     rejected.push_back(m.playerId);  // <=2% tail materialized
                     continue;
                 }
+                // Picker-corridor check (user doctrine 2026-08-07, mined
+                // state g0008): a backup must never wall off the picker's
+                // physical route to the ball -- with only 2-3 free squares
+                // around it, "nearest free adjacent" targets can consume the
+                // picker's entire approach and the plan zeroes itself out.
+                // Deterministic (all dice pinned to 6, greedy walk is the
+                // executor's own): if the pickup no longer reaches the ball
+                // on this projection, reject the backup; candidate
+                // regeneration offers the next square/body. Backup cap
+                // (MAX_SAFE_BACKUPS=2) is untouched -- this only vetoes
+                // squares, never adds bodies.
+                {
+                    GameState reach = next.clone();
+                    MaxDiceRoller sixes;
+                    greedyExpandMacro(reach, pickup, sixes);
+                    bool pickerReaches = reach.ball.isHeld &&
+                                         reach.ball.carrierId == pickup.playerId;
+                    if (!pickerReaches) {
+                        rejected.push_back(m.playerId);
+                        continue;
+                    }
+                }
                 projected = std::move(next);
                 accepted.push_back(m);
                 tookOne = true;
@@ -309,6 +342,10 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
 
         // --- The single branch point.
         BranchStats bs = sampleBranch(projected, pickup, mySide);
+        // Adoption floor (see MIN_PICKUP_SUCCESS): a hopeless roll is not a
+        // plan -- leave the turn to search(), which can blitz the marker off
+        // the ball or refuse the pickup entirely.
+        if (bs.pSuccess < MIN_PICKUP_SUCCESS) continue;
         double value = bs.pSuccess * bs.valueSuccess +
                        (1.0 - bs.pSuccess) * bs.valueFail;
 

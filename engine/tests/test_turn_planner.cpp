@@ -494,3 +494,80 @@ TEST(TurnPlannerStep2, CageFillMacroInvalidWithoutHeldBall) {
     state.ball = BallState::carried({11, 7}, 1);          // our carrier
     EXPECT_TRUE(stagedMacroStillValid(state, m, true));
 }
+
+// --- Corridor + adoption floor (2026-08-07, z validace kroku 2) ---
+
+TEST(TurnPlannerCorridor, BackupNeverWallsOffPicker) {
+    // Mined state g0008 in miniature: the ball sits in a pocket with only
+    // two free adjacent squares; "nearest free adjacent" backup targeting
+    // would park a backup on the picker's only entry square and zero the
+    // whole plan out (validated pSuccess=0.000, -10.3 SE vs search). The
+    // corridor check must veto that placement; the rejected player stays
+    // unspent -- usable elsewhere (user doctrine 2026-08-07).
+    GameState state = makeLooseBallState();
+    int id = 5;
+    for (Position pos : {Position{12, 6}, Position{13, 6}, Position{14, 6},
+                         Position{12, 8}, Position{13, 8}, Position{14, 8}}) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::HOME;
+        p.state = PlayerState::PRONE;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        id++;
+    }
+    // Picker approaches from the west: (12,7) is his only sane entry.
+    state.getPlayer(1).position = {10, 7};
+    // The would-be backup whose nearest free ball-adjacent square is exactly
+    // that entry ((12,7) at distance 2 beats (14,7) at 3).
+    state.getPlayer(2).position = {11, 5};
+    state.getPlayer(3).position = {3, 3};
+    state.getPlayer(4).position = {4, 12};
+
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+
+    for (const auto& m : plan.safeMacros) {
+        if (m.playerId == 2) {
+            EXPECT_FALSE(m.targetPos == (Position{12, 7}))
+                << "arriving backup parked on the picker's entry square";
+        }
+    }
+    // The invariant itself: after the whole safe stage the picker still
+    // physically reaches the ball (dice pinned to 6 = geometry only).
+    GameState sim = state.clone();
+    DiceRoller walkDice(7);
+    for (const auto& m : plan.safeMacros) {
+        greedyExpandMacro(sim, m, walkDice);
+    }
+    FixedDiceRoller sixes(std::vector<int>(30, 6));
+    greedyExpandMacro(sim, plan.pickupMacro, sixes);
+    EXPECT_TRUE(sim.ball.isHeld);
+    EXPECT_EQ(sim.ball.carrierId, plan.pickupMacro.playerId);
+}
+
+TEST(TurnPlannerFloor, HopelessPickupNotAdopted) {
+    // g0003 in miniature: three standing opponents mark the ball (3 TZ) and
+    // pouring rain adds one more modifier -- every candidate rolls a clamped
+    // 6+ behind a dodge-taxed approach, so sampled pSuccess sits far under
+    // MIN_PICKUP_SUCCESS. The plan must NOT be adopted; search keeps the
+    // turn (it can blitz the marker off the ball, the staged plan cannot).
+    GameState state = makeLooseBallState();
+    state.weather = Weather::POURING_RAIN;
+    int id = 13;
+    for (Position pos : {Position{14, 6}, Position{14, 8}, Position{12, 6}}) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::AWAY;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        id++;
+    }
+    StagedTurnPlanner planner(nullptr, plannerConfig(), 42);
+    StagedPlan plan = planner.build(state);
+    EXPECT_FALSE(plan.valid);
+}
