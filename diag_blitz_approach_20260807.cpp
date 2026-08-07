@@ -160,8 +160,76 @@ Route routeOptimal(const GameState& s, const Player& mover, Position target,
     return r;  // arrives=false
 }
 
+// Route C: the CHEAP candidate fix -- keep distance strictly primary (no
+// detours, no arrival risk, same route length as today) but break ties by
+// the real dodge cost of THIS step plus the cheapest forced dodge of the
+// NEXT one. The measured disasters are exactly one-step myopia (walk into a
+// tackle zone, then have to dodge out of it at 6+), so a depth-2 tiebreak
+// should capture most of the oracle's gain at ~8x the cost of today's rule
+// instead of a full route search.
+Route routeLookahead2(const GameState& s, const Player& mover, Position target) {
+    Route r;
+    Position cur = mover.position;
+    int moveLeft = static_cast<int>(mover.movementRemaining) - 1;
+    int maxSteps = std::max(0, moveLeft) + MAX_GFI;
+    double survive = 1.0;
+
+    while (cur.distanceTo(target) > 1) {
+        if (r.steps >= maxSteps) { r.arrives = false; r.fail = 1.0 - survive; return r; }
+        int minDist = 99;
+        for (Position p : cur.getAdjacent()) {
+            if (!p.isOnPitch()) continue;
+            const Player* occ = s.getPlayerAtPosition(p);
+            if (occ && occ->id != mover.id) continue;
+            minDist = std::min(minDist, p.distanceTo(target));
+        }
+        if (minDist == 99) { r.fail = 1.0; r.arrives = false; return r; }
+
+        Position best{-1, -1};
+        double bestCost = 1e9;
+        for (Position p : cur.getAdjacent()) {
+            if (!p.isOnPitch()) continue;
+            const Player* occ = s.getPlayerAtPosition(p);
+            if (occ && occ->id != mover.id) continue;
+            if (p.distanceTo(target) != minDist) continue;  // distance stays primary
+            double cost = dodgeFailChance(s, mover, cur, p);
+            if (p.distanceTo(target) > 1) {
+                // cheapest forced continuation from p (one ply deeper)
+                double nextBest = 1e9;
+                int nd = 99;
+                for (Position q : p.getAdjacent()) {
+                    if (!q.isOnPitch()) continue;
+                    const Player* o2 = s.getPlayerAtPosition(q);
+                    if (o2 && o2->id != mover.id) continue;
+                    nd = std::min(nd, q.distanceTo(target));
+                }
+                for (Position q : p.getAdjacent()) {
+                    if (!q.isOnPitch()) continue;
+                    const Player* o2 = s.getPlayerAtPosition(q);
+                    if (o2 && o2->id != mover.id) continue;
+                    if (q.distanceTo(target) != nd) continue;
+                    nextBest = std::min(nextBest, dodgeFailChance(s, mover, p, q));
+                }
+                if (nextBest < 1e8) cost += nextBest;
+            }
+            if (cost < bestCost - 1e-9) { bestCost = cost; best = p; }
+        }
+        if (best.x < 0) { r.fail = 1.0; r.arrives = false; return r; }
+
+        survive *= (1.0 - dodgeFailChance(s, mover, cur, best));
+        if (moveLeft <= 0) survive *= (1.0 - GFI_FAIL);
+        moveLeft -= 1;
+        r.steps++;
+        cur = best;
+    }
+    r.arrives = true;
+    r.fail = 1.0 - survive;
+    r.finalSquare = cur;
+    return r;
+}
+
 struct Sample {
-    Route a, b1, b2;
+    Route a, b1, b2, c;
     int blitzerId = 0, targetId = 0;
     Position from{-1, -1}, to{-1, -1};
     int startDist = 0;
@@ -231,6 +299,7 @@ void playGameInstrumented(const TeamRoster& home, const TeamRoster& away,
                     sm.b1 = routeOptimal(state, mover, tgt.position, &sm.a.finalSquare);
                 }
                 sm.b2 = routeOptimal(state, mover, tgt.position, nullptr);
+                sm.c = routeLookahead2(state, mover, tgt.position);
                 g_samples.push_back(sm);
             }
         }
@@ -289,6 +358,32 @@ void report(const char* title, const std::vector<Sample>& v) {
            n - b2SameSquare, 100.0 * (n - b2SameSquare) / n);
     printf("  A nedorazi, ale B2 ano: %d | nejvetsi jednotlivy zisk %.1f pp\n",
            aFailsB2Arrives, 100.0 * maxGain);
+
+    // Levna varianta C (lookahead 2, zadne detoury) + rozlozeni rizika A:
+    // kolik % pripadu by drahy vypocet slo uplne preskocit.
+    int cArrive = 0, zeroA = 0, tinyA = 0, midA = 0, bigA = 0;
+    double sumC = 0, sumDC = 0;
+    int cBetter5 = 0, cWorse = 0;
+    for (const auto& s : v) {
+        cArrive += s.c.arrives ? 1 : 0;
+        sumC += s.c.fail;
+        double dc = s.a.fail - s.c.fail;
+        sumDC += dc;
+        if (dc > 0.05) cBetter5++;
+        if (dc < -0.001) cWorse++;
+        if (s.a.fail < 0.005) zeroA++;
+        else if (s.a.fail < 0.05) tinyA++;
+        else if (s.a.fail < 0.20) midA++;
+        else bigA++;
+    }
+    double captured = (sumA - sumB1) > 1e-9 ? 100.0 * sumDC / (sumA - sumB1) : 0.0;
+    printf("  C (lookahead 2, bez detouru): stredni riziko %.1f%% | zlepsi >5pp: %d"
+           " (%.0f%%), zhorsi: %d, stredni zisk %.2f pp => zachyti %.0f%% zisku B1\n",
+           100.0 * sumC / n, cBetter5, 100.0 * cBetter5 / n, cWorse,
+           100.0 * sumDC / n, captured);
+    printf("  rozlozeni rizika A: 0%%: %d (%.0f%%) | <5%%: %d | 5-20%%: %d | >20%%: %d"
+           "  => drahy vypocet lze preskocit v %.0f%% pripadu\n",
+           zeroA, 100.0 * zeroA / n, tinyA, midA, bigA, 100.0 * zeroA / n);
 }
 
 }  // namespace
