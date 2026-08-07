@@ -98,3 +98,63 @@ podložit „detoury ano/ne".
 * Náklad: diagnostika, ~hodina práce + minuty běhu; nulový zásah do
   produkce, takže nekoliduje se zmrazením stromu ani s měřicími řetězy
   (jen o CPU).
+
+---
+
+# VÝSLEDKY FÁZE 0 (změřeno 07.08., `diag_blitz_approach_20260807.cpp`)
+
+Vzorek: 12 plných her (dwarf-woodelf, dwarf-skaven, orc-skaven × 4),
+šampion config (MCTS-100, vf_blend 0,15, prior floory aktivní),
+**N=226 blitzů, kde blitzer musí jít** (sousední cíle vyřazeny).
+Log: `diag_blitz_approach_20260807.log`.
+
+| | riziko cesty (Ø) | zlepší >5 pp | Ø zisk |
+|---|---|---|---|
+| A = dnešní greedy | **10,2 %** | — | — |
+| B1 = optimální do TÉHOŽ finálního pole | 9,4 % | 13/226 (6 %) | 2,00 pp |
+| B2 = optimální do libovolného pole u cíle | **8,2 %** | 15/226 (7 %) | 1,97 pp |
+
+Doražení: A dorazí v 98 % (221/226); **v 5 případech A nedorazí, ale B2 ano**.
+B2 končí na jiném finálním poli než A ve 30 % případů.
+
+## Odpovědi na tři podmínky uživatele (30.07.)
+1. **Je to bezpečnější?** V průměru málo (~2 pp), ALE rozdělení je
+   těžkoocasé: 6-7 % blitzů ztrácí >5 pp a nejhorší jednotlivé případy
+   **83 pp** (83,3 % riziko vs 0 %).
+2. **Dorazí?** Ano — optimalizace běží pod rozpočtem pohybu (+2 GFI);
+   navíc A v 5 případech nedorazí tam, kde B2 ano.
+3. **Dodge dopředu vs dozadu + GFI:** oceněno celou trasou (GFI 1/6 za
+   krok nad rámec pohybu), takže „bezpečnější krok, dražší cesta" je
+   v číslech zahrnutý.
+
+## Hlavní nález: problém NENÍ hlavně detour, ale KRÁTKOZRAKOST
+Dva nejhorší případy (83,3 % → 0 %) mají **stejnou délku trasy, stejné
+finální pole a NULA kroků stranou**. Mechanika: greedy vybírá podle TZ
+pole, na které vstupuje, ale nevidí, že z něj bude muset PŘÍŠTÍ krok
+dodgovat — AG2 trpaslík pak hází 6+ (5/6 selhání), zatímco stejně dlouhá
+cesta vede úplně mimo zóny. Chebyshevova metrika nabízí mnoho nejkratších
+cest a dnešní pravidlo mezi nimi volí lokálně.
+
+⇒ **Podstatná část zisku je dosažitelná BEZ detourů** = bez rizika
+nedoražení. Fáze 1 a 2 se tím slučují: nahradit krokový výběr
+**oceněním celé trasy** (Dijkstra přes (pole, počet kroků), maximalizuje
+pravděpodobnost přežití; detoury z něj vypadnou samy tam, kde se vyplatí,
+a rozpočet je tvrdá podmínka). Implementace = přesně to, co dnes dělá
+měřicí nástroj (~40 řádků), sdílené exekutorem i odhadem jako dnes.
+
+## Kolik to je v praxi
+~19 blitzů s chůzí na hru; 2 pp snížení rizika ≈ **0,4 ušetřeného
+turnoveru na hru** (turnover = celý týmový tah). Netriviální.
+
+## ⚠️ Výhrady
+* B1/B2 jsou **horní mez** (dokonalá znalost trasy) — reálná heuristika
+  vezme jen část.
+* Vzorek je **zkreslený dnešním výběrem**: blitzer/cíl vybírá item14 podle
+  greedy trasy, takže se vůbec nezvolí blitzy, jejichž greedy cesta je
+  hrozná → skutečný potenciál je VYŠŠÍ, než měříme.
+* **Výkon:** `pickApproachStep` je v horké cestě (volá ho
+  `estimateApproachFailChance` pro každého kandidáta při generaci maker,
+  ve 100 MCTS iteracích na tah). Plný Dijkstra na kandidáta může trénink
+  zpomalit — před nasazením změřit, případně cachovat per (blitzer, cíl)
+  nebo použít omezený lookahead (2 kroky) místo plné optimalizace.
+* Změna se dotkne i VÝBĚRU blitzera (sdílená funkce) → párové A/B, ne sonda.
