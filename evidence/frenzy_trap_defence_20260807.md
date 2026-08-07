@@ -226,3 +226,51 @@ Nepočítat „kolik mám kostek", ale **ocenit stěny pro konkrétní dvojici**
 zvážit rozdělením podle počtu kostek a toho, kdo vybírá, a porovnat
 s **cenou turnoveru v daném okamžiku tahu**. Obě tabulky výše jsou
 zároveň akceptační testy.
+
+
+## 7) BENEFIT PROTI RIZIKU — druhá strana rovnice (07.08.)
+
+Prahy zbroje/zranění ověřeny v `injury.cpp`: zbroj prolomena při
+`2d6 > AV`; zranění 2-7 omráčen, 8-9 KO, 10+ zraněn; **Thick Skull
+zachrání před KO na 4+** (zůstane jen omráčen).
+
+**Cena jednoho sražení podle toho, KDO leží:**
+| tělo | prolomená zbroj | odejde ze hry (KO+) | z toho zranění |
+|---|---|---|---|
+| elf / skaven AV7 | 41,7 % | **17,4 %** | 6,9 % |
+| trpaslík AV9 + Thick Skull | 16,7 % | **4,9 %** | 2,8 % |
+
+### Trpaslík, 1 kostka, vs elf s Dodge — attrition bilance
+| | |
+|---|---|
+| srazí elfa | 50,0 % (Block + Tackle ruší Dodge) |
+| **elf odejde ze hry** | **8,7 %** |
+| trpaslík padne | 16,7 % |
+| **trpaslík odejde ze hry** | **0,8 %** |
+| **poměr výměny** | **11 : 1 pro nás** |
+| skutečná cena | 16,7 % turnover (ne zranění) |
+
+⇒ **Tohle je celý smysl trpasličí hry:** i jednokostkový blok je
+attrition směna 11:1, protože AV9 + Thick Skull dělá z jeho pádu
+skoro neškodnou událost. Jediná reálná cena je turnover — a ten se
+řídí okamžikem tahu (risk-last ⇒ blokovat po dobrané bezkostkové práci).
+⚠️ Zesiluje to bod 16 (mrtví se vracejí): dnes se těch 8,7 % po
+touchdownu smaže, takže se výměna 11:1 v datech vůbec neprojeví.
+
+### Gutter Runner (Wrestle + Strip Ball), 2 kostky PROTI
+| | |
+|---|---|
+| **míč uvolněn** | **69,4 %** |
+| turnover | 30,6 % |
+| **GR odejde ze hry** | **5,3 %** |
+
+⇒ Benefit není attrition, ale **míč**. A Wrestle riziko sráží dvakrát:
+u Both Down se **nehází na zbroj vůbec** (oba jen položeni), takže
+jediná cesta ke zranění je Attacker Down. Skaven tedy kupuje 69% šanci
+na míč za 31% konec tahu a 5% ztrátu hráče.
+
+### Souhrn: jiný tým, jiná měna
+* **trpaslík** platí turnoverem a kupuje **attrition** (11:1);
+* **skaven** platí turnoverem i hráčem a kupuje **míč** (69 %).
+Proto nemá smysl jeden práh kostek pro oba — práh je jen důsledek toho,
+co si daný tým za dané riziko kupuje.
