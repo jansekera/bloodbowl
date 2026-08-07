@@ -572,3 +572,34 @@ budget modulu (sekce 4), ne jako další lokální heuristika klece.
   ab_m*/diag_f1_grind_rows.jsonl + ab_grind logy, chain.log).
   Doporučený navazující krok po GO: potvrzující A/B 400 párů dw-sk
   (SE ~±2,8 pp), vzor ab_run_20260804.
+
+---
+
+## ADDENDUM 07.08.: potvrzovací grind A/B 400 párů dw-sk — VERDIKT: INCONCLUSIVE (pozitivní směr, primární práh nesplněn)
+
+Noční běh 06.→07.08. (run_grind_confirm_20260806.sh, 400 párů = 800 her,
+seedy 37M+idx, nadmnožina first-readu). Data: tempo_measure_20260806/ab400_m0/.
+⚠️ **Měřeno na STARÉM rosteru** (před doktrinálními změnami f7aa61c/2e5b7b7)
+— slouží jako baseline staré éry pro srovnání; re-run na novém rosteru
+naplánován na noc 07.→08.08.
+
+**Pre-reg vyhodnocení:**
+- PRIMÁRNÍ: párová Δchess **+4,37 pp ± 2,77 (1,6 SE) < práh +5,6 pp** →
+  NESPLNĚNO (first-read +13,75 pp na 40 párech byl optimistický výsek;
+  regrese k průměru).
+- SEKUNDÁRNÍ (2b): dwarf TD/hru 0,42→0,48 (**+0,06 < +0,10** ✗);
+  soupeřovo TD 0,61→0,51 (pokles ✓); výhry 2:0/2:1: grind 14× vs
+  fallback 7× (✓, zdvojnásobení).
+- Dle pre-reg pravidla („jen sekundární = INCONCLUSIVE; Δ ≤ 0 =
+  NEPOTVRZENO"): **INCONCLUSIVE** — směr konzistentně pozitivní
+  (Δ>0, méně těžkých proher: 0:2 37→26, 0:3 6→0, více 1:1 38→48),
+  ale pod průkazným prahem.
+- Attrition beze změny i na N=800 (dwarf surv 10,84→10,86;
+  skaven 10,63→10,61) — potvrzuje first-read: grind drží, neubíjí.
+- Adoption: 0,86 plánů/hru grind vs 0,43 fallback; remízy 36,1 %
+  (ref. 04.08. 39,0 %), 0:0 25,4 % (ref. 28,7 %).
+
+**Důsledek:** GO na default ON se z těchto dat NEUDĚLUJE. Rozhodne
+re-run na novém rosteru (Guard+Tackle rohy mohou grind zesílit —
+doktrinální synergii měří poprvé); srovnání staré vs nové éry bude
+vedlejší produkt.
