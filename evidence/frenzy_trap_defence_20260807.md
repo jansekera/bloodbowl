@@ -79,6 +79,16 @@ Pro každý blok Frenzy hráče F na cíl D spočítat:
      nega-traitů, a **cena kusu** (sražený big guy = nejdražší tělo na
      zemi a magnet na foul). Rat Ogre je z big guyů nejcitlivější:
      bez Blocku 2 kostky = 11 %, a Frenzy to hází dvakrát.
+   * ⚑ **PRÁH ALE NENÍ KONSTANTA** (uživatel 07.08.): plyne z toho, co
+     jednotlivé stěny znamenají pro KONKRÉTNÍ dvojici. Protipříklady:
+     (a) **Gutter Runner s Wrestle + Strip Ball na nosiče bez Sure Hands
+     smí i do 2 kostek PROTI** — Wrestle = oba na zem bez turnoveru
+     (block_handler.cpp:383-399), Strip Ball shodí míč při pushi
+     (:501-511) ⇒ jediná špatná stěna je Attacker Down, tedy ~31 %
+     turnover vs ~69 % uvolněný míč; (b) **trpaslík s Blockem smí do
+     1 kostky** (17 %, AV9 + Thick Skull, odsun markera je pro grind
+     cenný). ⇒ Prahy jsou jen časté případy obecné formule
+     „hodnota stěn × rozdělení kostek vs cena turnoveru TEĎ".
 2. **Zakázat blok, jehož nejhorší druhý blok je „kostky proti nám"**
    (`dice₂ ≤ −1`) — to je definice pasti.
 3. **Proti Side Step cíli požadovat rezervu** — obránce si vybere pole,
