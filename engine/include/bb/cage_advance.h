@@ -57,9 +57,10 @@ namespace bb {
 //     In TV1200 this excludes the human Ogre (BoneHead) and the wood-elf
 //     Treeman (TakeRoot) despite the Treeman's Guard+StandFirm.
 //     GFI feasibility: every corner must arrive WITHOUT GFI; at most ONE
-//     corner may be assigned at distance movement+1. Because REPOSITION is
-//     the engine's only dice-free macro and deliberately never GFIs
-//     (expandReposition caps at movementRemaining), that one "1-GFI corner"
+//     corner may be assigned at distance movement+1. Because REPOSITION
+//     never GFIs unless the planner hands it a gfiAllowance (expandReposition
+//     otherwise caps at movementRemaining; the allowance is set only for the
+//     carrier's tempo-emergency leg, 3e04189), that one "1-GFI corner"
 //     is executed as a dice-free walk that stops ONE square short and
 //     closes next turn -- the allowance is an assignment-VALUE rule, not a
 //     real GFI gamble. Anything needing more counts as an open corner
@@ -90,7 +91,10 @@ struct CageAdvancePlan {
     CageAdvanceVerdict verdict = CageAdvanceVerdict::NOT_APPLICABLE;
     bool valid = false;          // verdict == PLAN_READY
 
-    int step = 0;                // squares the cage advances this turn (1..2)
+    int step = 0;                // squares the cage advances this turn; the
+                                 // ceiling is computed from real role MA
+                                 // (carrier movement + CARRIER_GFI_MAX),
+                                 // NOT the old hard 1..2 cap (3e04189)
     double requiredPace = 0.0;   // dist / usable turns (reserve deducted)
     int rawAchievableStep = 0;   // role-limited step before resistance
     double achievablePace = 0.0; // rawAchievableStep - resistance penalty
@@ -109,8 +113,11 @@ struct CageAdvancePlan {
     // schedule was NOT met and the cage pushed at max dice-free step anyway.
     bool grindMode = false;
 
-    // Ordered: front-slot movers, back-slot movers, carrier LAST (the screen
-    // forms before the carrier commits). All macros are REPOSITION.
+    // Base order: front-slot movers, back-slot movers, carrier LAST (the
+    // screen forms before the carrier commits). The dependency sort may
+    // reorder this -- a mover standing on someone else's target square goes
+    // first so it vacates in time (vacate-first, user doctrine 2026-08-04).
+    // All macros are REPOSITION.
     std::vector<Macro> macros;
 
     // --- DICEY diagnostics (2026-08-04 corner-release groundwork probe).
@@ -158,9 +165,12 @@ public:
     CageAdvancePlanner(const ValueFunction* vf, MCTSConfig config,
                        uint32_t seed = 0);
 
-    // Build a cage-advance plan. valid=false unless the goal is
-    // ADVANCE_BALL, >= TRIGGER_MIN_CORNERS diagonal corners stand around the
-    // carrier, and tempo + probes clear (see verdict for why not).
+    // Build a cage-advance plan. valid=false unless the goal is ADVANCE_BALL,
+    // at least TRIGGER_MIN_CORNERS slots are FILLED AFTER the advance (movers
+    // + stay-puts), and tempo + probes clear (see verdict for why not). No
+    // minimum is placed on corners already standing at plan time: the plan
+    // builds a cage from scratch on the carrier's destination square (user
+    // standard "always build the right cage", a5634c7).
     CageAdvancePlan build(const GameState& state,
                           const std::vector<int>& reservedPlayerIds = {});
 
