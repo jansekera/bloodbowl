@@ -94,3 +94,41 @@ blitzera (bod 7).
 - https://bbtactics.com/frenzy/
 - https://www.goonhammer.com/blood-bowl-the-ultimate-guide-to-frenzy/
 - https://steamcommunity.com/sharedfiles/filedetails/?id=827210711
+
+---
+
+## 5) OVĚŘENÍ PŘED IMPLEMENTACÍ (07.08.) — dvě zjištění, jedno mění plán
+
+### ✅ Výběr push pole je v enginu DETERMINISTICKÝ, ne „útočník si vybere"
+`block_handler.cpp:82-100`: default je **`chosenIdx = 0`** — první prázdné,
+jinak první dostupné. Volbu mění jen dvě dovednosti: **SideStep** (vybírá
+obránce, pole nejdál od útočníka) a **Grab** (útočník, pole nejblíž čáře,
+jen mimo blitz).
+⇒ **Korekce plánu:** dnes NEMÁME „bereme MAX přes push pole" — engine
+odstrčí, kam padne pořadí sousedů. Plánovač tedy musí počítat s tím, KTERÉ
+pole engine skutečně zvolí (deterministické, dopočitatelné), ne s ideálem.
+Dvě cesty, obě legitimní, rozhodnout při implementaci:
+ (a) modelovat realitu (číst tutéž logiku volby) — levné, konzistentní;
+ (b) doplnit volbu push pole útočníkem dle pravidel (CRP: útočník vybírá
+     z dostupných polí) — pravidlově správnější, ale je to změna chování
+     enginu = samostatná měřená položka, ne součást tohoto plánu.
+**Pozn.: (b) je pravděpodobně další rules-parity nález** — v pravidlech si
+útočník vybírá vždy; u nás jen s Grabem. Zapsat do skupiny parity oprav.
+
+### ⚠️ Follow-up je v enginu POVINNÝ pro všechny, ne jen pro Frenzy
+`resolveBlock` má parametr `noFollowUp`, ale **nikdo ho nikdy nenastaví na
+true** (jediné volání s ním je Fend uvnitř, :516-517). V pravidlech je
+follow-up **volitelný** (kromě Frenzy, kde je povinný).
+⇒ Bereme tím obraně jednu možnost: nesledovat push a zůstat stát. Pro
+Rat Ogra to nevadí (Frenzy ho stejně nutí), ale pro VŠECHNY ostatní hráče
+je to odchylka — a zrovna trpaslíci by nesledování využili (zůstat ve
+formaci klece místo vytažení z ní). **Samostatný parity nález**, souvisí
+s doktrínou klece (roh nesmí být vytažen follow-upem — obava u Frenzy
+slayerů z 07.08.).
+
+### Co z toho plyne pro matematiku
+Sekvenční výpočet zůstává platný, jen se zjednodušuje: **push pole není
+množina k optimalizaci, ale jedna dopočitatelná hodnota** (resp. dvě
+větve: SideStep = obránce, jinak deterministicky). Riziko sekvence tedy:
+`p₁ + (1−p₁)·[druhý blok nastane]·p₂`, kde druhý blok nastane, právě když
+po pushi oba stojí a sousedí (u blitzu navíc zbývá pohyb/GFI).
