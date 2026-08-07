@@ -128,6 +128,40 @@ odpovědi = čtení z mapy
 ⇒ místo „N rizikových kandidátů × plný výpočet" typicky **1-2 výpočty na
 volání**, a jen v tom šestnáctiprocentním zbytku.
 
+### ⚠️ PLATNOST MAPY (upozornění uživatele 07.08. — KORektnostní podmínka, ne optimalizace)
+„Máš spočítané cesty k jednomu elfovi platné toto kolo — a navíc, když
+někoho pošleš směrem k němu blíž (třeba ani ne až do jeho TZ), tak si
+následné cesty změníš."
+
+**Mapa platí pro JEDNU konfiguraci hřiště, ne pro tah.** Každá aktivace ji
+zneplatňuje, i když se hráč nikam „nedostal": tělo, které se posunulo,
+(a) uvolnilo pole, kterým teď cesta vede levněji, a (b) obsadilo jiné
+pole, kterým cesta vést přestala. Nejde jen o blitzera, který dojde k cíli
+— stačí libovolný spoluhráč, který se pohnul kamkoli.
+**A může ji i ZABLOKOVAT ÚPLNĚ** (doplnění uživatele): vlastní tělo
+postavené do úzkého hrdla může být jediná cesta, kterou blitzer měl —
+pak nejde o dražší trasu, ale o **žádnou trasu**. Zastaralá mapa by
+v takové situaci tvrdila „jde to za X %", zatímco skutečnost je „nejde to
+vůbec" (exekutor by blitz odmítl / došel by nakrátko a spálil aktivaci).
+Proto se mapa nesmí přenášet přes aktivace ani „konzervativně" — mýlí se
+oběma směry, ne jen v ceně.
+
+Důsledky, závazné pro implementaci:
+* Mapa se smí sdílet **jen v rámci jednoho volání `expandBlitz`** (tam je
+  hřiště pevné a kandidáti se jen porovnávají) — to je i celý zdroj úspory.
+  Přes aktivace se NIKDY nepřenáší.
+* Kdyby se někdy sahalo na memo (vrstva 4), klíč musí obsahovat **plnou
+  obsazenost hřiště**, ne jen číslo tahu / id cíle. Jinak vrací tiše
+  špatné trasy. Tohle je teď důvod korektnosti, ne výkonu.
+* Táž výhrada platí pro **kostky bloku** v branch & bound: asistence se
+  mění s tím, jak se spoluhráči přesouvají, takže i ta čísla jsou snímek
+  okamžiku.
+* Známá (dnes už existující) modelová hrubost: trasa počítá spoluhráče
+  jako **neprůchodné**, i když se za chvíli pohnou. Proto může být odhad
+  pesimistický u cest vedoucích „skrz vlastní chumel". Souvisí s pořadím
+  aktivací a vacate-first z klecové doktríny; NEŘEŠIT spolu s touhle
+  změnou (jedna věc najednou), jen si toho být vědom.
+
 ## Vrstva 4: MEMOIZACE (až kdyby vrstvy 1-3b nestačily)
 MCTS **opakovaně přehrává tytéž cesty maker** (`replayToNode` jede
 open-loop s čerstvými kostkami) ⇒ tytéž stavy se v rámci jednoho
