@@ -6,6 +6,16 @@ vešel na TV 1300) a musí si „dát pozor na frenzy trap a vždy mít nachysta
 plán obrany. Souvisí: fronta 14b/14c (roster revize), 7c (asistent před
 blokem), 7/7b (kostky z pole, kde se skutečně bloká).
 
+## 0) ⚠️ ROZSAH (upřesnění uživatele 07.08.) — tenhle dokument je o AKCI
+Název svádí, ale obsah je z drtivé většiny **rozhodování o konkrétním
+bloku** (spočítat oba bloky, jít/nejít, poskládat 3 kostky) = fronta
+bod **6b**, dělá se hned.
+**Poziční OBRANA před pastí** — nenechat se do ní vůbec navést: kam
+Frenzy hráče postavit, aby ho soupeř neměl čím nalákat (volná těla
+u cíle, Side Step v dosahu, konfigurace kde je každý blok past) — je
+**samostatná, odložená vrstva** (fronta bod 12b, rodina probed exposure).
+V tomhle dokumentu je jen naznačená.
+
 ## 1) Co říká komunita (rešerše 07.08.)
 * **Mechanika pasti:** Frenzy nutí druhý blok, když první skončil Pushed
   nebo Defender Stumbles a oba pořád stojí a sousedí. Druhý blok už se
@@ -119,9 +129,10 @@ Dvě cesty, obě legitimní, rozhodnout při implementaci:
 `resolveBlock` má parametr `noFollowUp`, ale **nikdo ho nikdy nenastaví na
 true** (jediné volání s ním je Fend uvnitř, :516-517). V pravidlech je
 follow-up **volitelný** (kromě Frenzy, kde je povinný).
+**Frenzy je JEDINÁ výjimka z volitelnosti** (upřesnění uživatele 07.08.).
 ⇒ Bereme tím obraně jednu možnost: nesledovat push a zůstat stát. Pro
-Rat Ogra to nevadí (Frenzy ho stejně nutí), ale pro VŠECHNY ostatní hráče
-je to odchylka — a zrovna trpaslíci by nesledování využili (zůstat ve
+Rat Ogra a trpasličí Slayery to nevadí (Frenzy je nutí tak jako tak), ale
+pro VŠECHNY ostatní hráče je to odchylka — a zrovna trpaslíci by nesledování využili (zůstat ve
 formaci klece místo vytažení z ní). **Samostatný parity nález**, souvisí
 s doktrínou klece (roh nesmí být vytažen follow-upem — obava u Frenzy
 slayerů z 07.08.).
