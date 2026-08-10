@@ -979,3 +979,43 @@ byla na řadě.
 ⇒ **Vedlejší přínos: `orc-sk` je díky tomu ČISTÁ KONTROLA** pro noční
 srovnání ér — není dotčená přihrávkovými zvláštnostmi, jen obecnými
 změnami (dodge, leap, počasí, mřížka dosahů, zachycení).
+
+---
+
+## 10. KICK-OFF RETURN (dotaz uživatele 10.08.) — dvojnásobně mrtvý
+
+**Nápad:** dát nosiči u trpaslíků/orků Kick-Off Return, aby se klec dostala
+blíž k míči a ušetřilo se kolo přiblížení.
+
+**Stav:**
+1. **Nemá ho NIKDO** z měřené pětky (`grep KickOffReturn roster.cpp` = 0).
+2. **I kdyby ho měl, nedělal by nic.** Je implementovaný pouze
+   v `kickoff_handler.cpp:278-296`, tedy v **plné** výkopové sekvenci —
+   a ta je vypnutá (`useFullKickoff = false`, nikdo ji nezapíná). Naše hry
+   jedou přes `simpleKickoff`, který se KOR nedotkne.
+   ⇒ Týž nález jako u přelosovávání počasí (§5b/f): **celá Kick-Off tabulka
+   je v našich bězích neaktivní.**
+3. Naše implementace navíc neodpovídá pravidlům. CRP:
+   > „A player on the receiving team that is **not on the Line of Scrimmage
+   > or in an opposing tackle zone** may use this skill (…) move up to 3
+   > squares **after the ball has been scattered but before rolling on the
+   > Kick-Off table**. **Only one player** may use this skill each kick-off.
+   > **May not be used for a touchback** and **does not allow the player to
+   > cross into the opponent's half**."
+
+   My jen najdeme nejbližšího KOR hráče a posuneme ho k míči — bez kontroly
+   LoS, cizí TZ i poloviny hřiště, a **až PO** vyhodnocení Kick-Off události
+   (`:271-276`), ne před ní.
+
+### 📐 Tempo, kvůli kterému to vzniklo (výpočet uživatele ověřen)
+Longbeard MA4, půle = 8 kol, první kolo na sběr ⇒ **7 kol na postup**.
+
+| odkud | vzdálenost | pole/kolo | % MA4 |
+|---|---|---|---|
+| celé hřiště | 25 | **3,6** | 89 % — jde to, ale bez rezervy |
+| reálný výkop (x≈8-10) | ~16 | **2,3** | 57 % — pohodlné |
+| reálný výkop + KOR (−3) | ~13 | **1,9** | 48 % — snese i jednu nehodu |
+
+⇒ Nápad je věcně dobrý; **KOR má ale smysl teprve po zprovoznění plné
+výkopové sekvence**, jinak by se za něj platilo TV za nic.
+**Zařazení: balík E (roster revize), podmíněno Kick-Off tabulkou.**
