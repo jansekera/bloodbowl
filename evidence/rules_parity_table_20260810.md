@@ -569,6 +569,35 @@ Engine volá `checkInterception` **před** hodem na přesnost
 (`pass_handler.cpp:188` vs `:202`) ⇒ **správně, nesahat.** Souhlasí to
 i s pořadím v CRP FAQ („4. Check for interceptors … 5. Roll D6 to throw").
 
+### ⛔⛔ PÁSMA PŘIHRÁVKY POČÍTÁME ŠPATNOU METRIKOU (nález 10.08.)
+Engine: `passRangeFromDistance(dist)` s prahy **3 / 6 / 10**
+(`enums.h:168-173`), kde `dist` je `Position::distanceTo` =
+**Chebyshev** `max(|dx|,|dy|)` (`position.h:30-32`).
+
+**Jenže pravítko je fyzická šablona a měří SKUTEČNOU (eukleidovskou)
+vzdálenost.** Chebyshev se s ní shoduje jen u přihrávek podél os;
+u úhlopříčky je skutečná vzdálenost až **√2 ≈ 1,41×** delší.
+⇒ **Úhlopříčné přihrávky jsou u nás systematicky o celé pásmo levnější:**
+
+| Chebyshev (náš práh) | skutečná vzdálenost po úhlopříčce | naše pásmo | mělo by být |
+|---|---|---|---|
+| 3 | 4,24 | Quick (+1) | **Short (0)** |
+| 6 | 8,49 | Short (0) | **Long (−1)** |
+| 10 | 14,14 | Long (−1) | **mimo dosah** (LB končí ~13,2) |
+
+⇒ dvojí chyba: **modifikátor o stupeň štědřejší** a **nejdelší
+úhlopříčky vůbec povolené**, ačkoli na pravítko nedosáhnou.
+**Směr: nadržuje to přihrávající straně, tedy rychlým rasám.**
+
+**Oprava (levná):** nahradit Chebyshev **skutečnou vzdáleností**, nebo
+rovnou předpočítanou **mřížkou podle (|dx|,|dy|)** — to je ten „plánek
+s grafem", který se v referenčních listech tiskne.
+⚠️ **Přesné hranice pásem ověřit ze zdroje:** hobby měření pravítka udává
+~3,49 pole na QP/SP/LP a ~2,75 na LB (celkem ~13,2), ale to **není
+citace z pravidel**. Strukturální část (Chebyshev ≠ vzdálenost pravítka)
+je jistá i bez těch čísel. **PDF referenčního listu se mi nepodařilo
+přečíst** (komprimovaný binární obsah) — mřížku dohledat jinde.
+
 ### ⚠️ Drobná odchylka: kdo SMÍ zachytávat
 Pravidla: (a) **pravítko musí přejít aspoň část pole**, na kterém stojí,
 (b) má tackle zónu, (c) je blíž házeči, než je házeč k cíli, (d) je blíž
@@ -577,7 +606,19 @@ Engine jde po Bresenhamově přímce a bere prvního stojícího soupeře **na**
 ní. Body (b) a „jen jeden" ✅; (c)+(d) plynou z toho, že leží na úsečce ✅.
 **Ale skutečné pravítko má ŠÍŘKU** — přejede i pole, která matematická
 přímka mine ⇒ **náš engine připouští MÉNĚ zachytávačů, než pravidla**.
-Drobné, a nadržuje to přihrávající straně (tedy rychlým týmům).
+
+**📐 UPŘESNĚNÍ (dohledáno na webu 10.08. na pokyn uživatele) — dá se to
+implementovat přesně:** vede se úsečka **ze středu pole házeče do středu
+cílového pole**, a **zachytávat smí hráč, jehož střed pole je od
+nejbližšího bodu té úsečky vzdálen ≤ 1 šířku pole**.
+⇒ Není to přímka, je to **koridor o poloměru 1**. Náš Bresenham bere
+prakticky jen „vzdálenost 0", takže povolujeme řádově **~třetinu**
+oprávněných zachytávačů.
+Ostatní podmínky (má TZ · je blíž házeči, než je házeč k cíli · je blíž
+cíli, než je házeč k cíli · jen jeden hráč) zůstávají.
+⇒ **Implementace:** kolmá vzdálenost středu pole od úsečky ≤ 1.
+Levné, a odstraní to i dnešní závislost na Bresenhamově diskretizaci.
+**Směr: nadržuje to přihrávající straně (rychlým týmům).**
 
 ### ❌ ODVOLÁNO: „házeč se po přihrávce nemůže hýbat" NENÍ CHYBA
 **Původně jsem to 10.08. zapsal jako nález a bylo to ŠPATNĚ.** Vzal jsem
@@ -621,6 +662,39 @@ předání ani faul se s ní neslučují.
 | **Very Long Legs** | „+1 (…) whenever he attempts to **intercept** or uses the **Leap** skill" | zachycení ✅ (`pass_handler.cpp:75`), leap ✅ (`move_handler.cpp:240`), do **chytání se NEPLETE** ✅ | ✅ **správně** |
 | **Extra Arms** | „+1 to any attempt to **pick up, catch or intercept**" | všechny tři ✅ (`helpers.cpp:125`, `:143`, `pass_handler.cpp:76`) | ✅ **správně** |
 | **Pass Block** | pohyb až o 3 pole mimo pořadí, po změření vzdálenosti a **před pokusy o zachycení** | v enginu **není vůbec** (grep = 0) | ➕ chybí; žádný roster ho nemá ⇒ latentní, a je to **mimořádová akce** = větší kus |
+
+### ⭐⭐ RODINA MIMOPOŘADOVÝCH SCHOPNOSTÍ — a systematický vzorec
+Uživatel 10.08.: „**největší šílenost je tam Pass Block**." Souhlas —
+a při kontrole vyšlo najevo, že patří do rodiny tří, u které náš engine
+dělá **pokaždé tutéž chybu**.
+
+| skill | pravidla | engine |
+|---|---|---|
+| **Pass Block** | mimopořadový pohyb až o 3 pole; hází se dodge, hráč může spadnout | **neexistuje** |
+| **Shadowing** | při opuštění TZ „**for any reason**"; 2D6 + MA soupeře − MA stínujícího ≤ 7 ⇒ smí následovat | `checkShadowing` **existuje** (`move_handler.cpp:44-71`), ale váže se **jen na dodge** ⇒ únik **leapem** z TZ ho nespustí (leap se nedodgeuje) |
+| **Diving Tackle** | „**MAY use this skill**"; −2 soupeři, ale **Diving Tackle hráč je Placed Prone** v poli, které soupeř opustil | `helpers.cpp:99-108`: +2 k cíli **automaticky**, a **nikdy se nepokládá** ⇒ **efekt zdarma a bez volby** |
+
+**⚑ VZOREC, KTERÝ Z TOHO PLYNE (a je doložený 4× nezávisle):**
+**náš engine mění VOLITELNÁ obranná rozhodnutí na AUTOMATICKÉ pasivní
+modifikátory a zahazuje jejich CENU.**
+* Stand Firm — vynucený, bez volby (§4c/a)
+* Diving Tackle — automatický, bez ceny (položení na zem)
+* follow-up — vynucený všem (§4)
+* Fend — špatně podmíněný (§4b)
+
+**Dva důsledky:**
+1. **Obranná strana je u nás systematicky levnější, než má být** — dostane
+   efekty zadarmo a nikdy za ně neplatí pozicí.
+2. **AI se ta rozhodnutí nemá jak naučit**, protože je nikdy nedělá.
+   Souvisí s otevřenou otázkou 3 („co bude default u volitelných
+   schopností") — tohle je její čtvrtý a pátý výskyt.
+
+**Zařazení:** Diving Tackle (volitelnost + položení na zem) a Shadowing
+(spouštěč „any reason") patří **k D-vlně 2** mezi rozhodovací uzly.
+**Pass Block je jiná liga** — vyžaduje, aby *pasivní* strana rozhodovala
+uprostřed cizí akce, včetně vlastních kostek a vlastního pádu. To není
+parity řádek, je to **změna řízení toku**; navíc ho nikdo z rosterů nemá.
+⇒ **mimo D i P1**, k evidenci jako známý dluh.
 
 **⚠️ KOREKCE dodaného popisu:** Very Long Legs **nedává +1 k chytání**
 (jen k zachycení a leapu) — engine to má správně, popis ne. Opět platí
