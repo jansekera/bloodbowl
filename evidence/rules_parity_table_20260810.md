@@ -501,13 +501,15 @@ Blok „kdykoli během pohybu" tedy v našem modelu neexistuje — je to vždy
   ze kterého se blokuje, protože jiné už nebude.
 * Fendova věta o pokračování v pohybu je tím pádem bezpředmětná.
 
-### Zařazení
-**Je to pravidlová chyba (patří do D), ale NENÍ řádková** — vyžaduje
-změnu modelu akce z „přiblížení + blok" na „přiblížení + blok + zbytek
-pohybu". ⇒ **vlastní položka, ne součást D-vlny1.**
-⚖ Doporučení: zařadit k **balíku C (blitz série)**, ne do D-vlny2 —
-věcně to patří k bodům 7/7b/6d a bez toho se ty body nedají dokončit
-správně. Rozhodnout s uživatelem.
+### Zařazení — ✅ ROZHODNUTO (uživatel 10.08.)
+**Balík C (blitz série), priorita P1, před body 7/7b a 6d.**
+Je to pravidlová chyba, ale **NENÍ řádková** — vyžaduje změnu modelu akce
+z „přiblížení + blok" na „přiblížení + blok + zbytek pohybu", proto do D
+nepatří.
+**⚑ Vyhodnocení = SPOLEČNÁ TECHNICKÁ REVIEW nad konkrétní změnou**
+(„je to větší oprava, tak na vyhodnocení spolu kouknem, jak koukáme na
+technická review"), **ne jen A/B verdikt** — hlavní otázka je
+**„jaké to má dopady mimo záměr"**.
 
 ---
 
