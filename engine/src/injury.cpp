@@ -1,8 +1,27 @@
 #include "bb/injury.h"
 #include "bb/helpers.h"
 #include "bb/ball_handler.h"
+#include <string>
 
 namespace bb {
+
+// CRP Casualty table as a D68: a D6 gives the tens digit, a D8 the units.
+// 11-38 Badly Hurt (24/48 = 50%), 41-48 miss next game, 51-52 Niggling,
+// 53-54 -1 MA, 55-56 -1 AV, 57 -1 AG, 58 -1 ST, 61-68 DEAD (8/48 = 1 in 6).
+CasualtyResult rollCasualty(DiceRollerBase& dice) {
+    int tens = dice.rollD6();
+    int units = dice.rollD8();
+    if (tens <= 3) return CasualtyResult::BADLY_HURT;
+    if (tens == 4) return CasualtyResult::MISS_NEXT_GAME;
+    if (tens == 6) return CasualtyResult::DEAD;
+    switch (units) {                      // tens == 5
+        case 1: case 2: return CasualtyResult::NIGGLING;
+        case 3: case 4: return CasualtyResult::MA_LOSS;
+        case 5: case 6: return CasualtyResult::AV_LOSS;
+        case 7:         return CasualtyResult::AG_LOSS;
+        default:        return CasualtyResult::ST_LOSS;
+    }
+}
 
 int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
                       const InjuryContext& ctx, std::vector<GameEvent>* events) {
@@ -54,21 +73,67 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, {}, {},
                           injuryRoll, false, d1, d2});
     } else {
-        // Casualty (10+)
-        // Regeneration save (4+), blocked by Stakes
+        // Casualty (10+) -- roll on the CASUALTY TABLE (package G, 2026-08-10).
+        // Until now a 10+ was flatly INJURED, so death could not occur at all:
+        // DEAD/game read 0.00 across 3200 games. CRP rolls D68 here; a sixth
+        // of casualties are fatal.
+        CasualtyResult cas = rollCasualty(dice);
+
+        // Apothecary: "immediately after the player suffers the Casualty, you
+        // can use the Apothecary to make your opponent roll again on the
+        // Casualty table and then you choose which of the two results to
+        // apply." Once per match. Taking the milder result is free, so it is
+        // automatic. This is the apothecary's first use in the engine -- the
+        // flags existed but nothing ever read them.
+        // ⚠️ PLACEHOLDER POLICY, not a decision layer. The apothecary is
+        // once per match, so WHEN to spend it is a real choice -- on the
+        // lineman in front of you, or held for the Gutter Runner who may
+        // never get hurt? Casualties suffered run ~0.4/game for dwarves and
+        // ~1.5-2 for skaven, so "hold out" often means "never use it".
+        // Until that decision is modelled we apply the cheapest defensible
+        // rule: never burn it on the cheapest body (positional template 0 =
+        // lineman), spend it on anyone else. Queued as its own item.
+        TeamState& ts = state.getTeamState(player.teamSide);
+        bool worthSaving = (player.positionName != nullptr &&
+                            std::string(player.positionName).find("Lineman")
+                                == std::string::npos);
+        if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving) {
+            ts.apothecaryUsed = true;
+            CasualtyResult second = rollCasualty(dice);
+            if (casualtySeverity(second) < casualtySeverity(cas)) cas = second;
+            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                              static_cast<int>(cas), true});
+            // "If the player is only Badly Hurt after this roll (even if it
+            // was the original Casualty roll) the Apothecary has managed to
+            // patch him up ... the player may be moved into the Reserves box."
+            if (cas == CasualtyResult::BADLY_HURT) {
+                player.state = PlayerState::OFF_PITCH;   // Reserves
+                player.position = {-1, -1};
+                return injuryRoll;
+            }
+        }
+
+        // Regeneration: rolled AFTER the casualty roll and after any
+        // Apothecary, and may not be re-rolled. On 4+ the player "is placed
+        // in the Reserves box instead" -- he is available again, not left
+        // standing stunned on the pitch as we used to have it.
         if (player.hasSkill(SkillName::Regeneration) && !ctx.hasStakes) {
             int regenRoll = dice.rollD6();
             emitEvent(events, {GameEvent::Type::REGENERATION, playerId, -1, {}, {},
                               regenRoll, regenRoll >= 4});
             if (regenRoll >= 4) {
-                player.state = PlayerState::STUNNED;
+                player.state = PlayerState::OFF_PITCH;   // Reserves
+                player.position = {-1, -1};
                 return injuryRoll;
             }
         }
-        player.state = PlayerState::INJURED;
+
+        player.state = (cas == CasualtyResult::DEAD) ? PlayerState::DEAD
+                                                     : PlayerState::INJURED;
         player.position = {-1, -1};
-        emitEvent(events, {GameEvent::Type::CASUALTY, playerId, -1, {}, {},
-                          injuryRoll, false, d1, d2});
+        emitEvent(events, {GameEvent::Type::CASUALTY, playerId,
+                          static_cast<int>(cas), {}, {},
+                          injuryRoll, cas == CasualtyResult::DEAD, d1, d2});
 
         if (ctx.hasNurglesRot) {
             emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},

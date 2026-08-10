@@ -166,6 +166,23 @@ inline int passModifier(PassRange r) {
 }
 
 
+// --- CasualtyResult ---
+// CRP Casualty table, rolled as D68 (a D6 for the tens digit, a D8 for the
+// units): 11-38 Badly Hurt, 41-48 miss the next game, 51-58 lasting damage,
+// 61-68 DEAD. Within a single match only two of these behave differently --
+// Badly Hurt lets an Apothecary return the player to Reserves, and DEAD is
+// permanent - but the rest are recorded so a league model has them later.
+enum class CasualtyResult : uint8_t {
+    BADLY_HURT, MISS_NEXT_GAME, NIGGLING, MA_LOSS, AV_LOSS, AG_LOSS, ST_LOSS, DEAD
+};
+
+// Lower is milder. Used when an Apothecary lets us pick between two rolls:
+// taking the milder is free and never wrong, so it is automatic (user's rule
+// 2026-08-10: optional skills default ON when they cost nothing).
+inline int casualtySeverity(CasualtyResult c) {
+    return static_cast<int>(c);
+}
+
 // --- Weather ---
 enum class Weather : uint8_t {
     SWELTERING_HEAT, VERY_SUNNY, NICE, POURING_RAIN, BLIZZARD

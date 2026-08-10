@@ -114,8 +114,9 @@ TEST(Injury, ArmourBrokenCasualty) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
-    // AV8: 5+4=9 > 8. Injury: 5+5=10 → casualty
-    FixedDiceRoller dice({5, 4, 5, 5});
+    // AV8: 5+4=9 > 8. Injury: 5+5=10 -> casualty.
+    // Casualty table is D68: tens=1 -> Badly Hurt, out for the match.
+    FixedDiceRoller dice({5, 4, 5, 5, 1, 1});
     InjuryContext ctx;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);
@@ -183,12 +184,15 @@ TEST(Injury, RegenerationSaves) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::Regeneration);
-    // Armor: 5+5=10. Injury: 5+5=10 → casualty. Regen: 4 → saves
-    FixedDiceRoller dice({5, 5, 5, 5, 4});
+    // Armour 5+5=10, injury 5+5=10 -> casualty; D68 6,1 -> DEAD; regen 4 saves.
+    // CRP: a successful Regeneration puts the player "in the Reserves box" --
+    // available again -- not standing stunned on the pitch as we used to have
+    // it. And it saves from DEATH too, not just from a lesser casualty.
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 4});
     InjuryContext ctx;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH) << "back in Reserves";
 }
 
 TEST(Injury, StakesBlocksRegeneration) {
@@ -196,8 +200,8 @@ TEST(Injury, StakesBlocksRegeneration) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::Regeneration);
-    // Armor: 5+5=10. Injury: 5+5=10. Stakes blocks regen.
-    FixedDiceRoller dice({5, 5, 5, 5});
+    // Armour 5+5=10, injury 5+5=10, D68 1,1 -> Badly Hurt. Stakes blocks regen.
+    FixedDiceRoller dice({5, 5, 5, 5, 1, 1});
     InjuryContext ctx;
     ctx.hasStakes = true;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
@@ -245,4 +249,53 @@ TEST(Injury, StuntyInjuryBonus) {
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+}
+
+
+// --- Casualty table (package G, 2026-08-10) ---------------------------
+
+TEST(Injury, CasualtyTableCanKill) {
+    // Until the table existed a 10+ was flatly INJURED, so DEAD/game read
+    // 0.00 across 3200 games. D68 with tens=6 is the fatal band, 8 of 48.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 3});   // armour, injury 10, D68 63
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::DEAD);
+}
+
+TEST(Injury, ApothecaryPicksTheMilderOfTwoCasualties) {
+    // CRP: the opponent rolls again and you choose which result to apply;
+    // if the outcome is only Badly Hurt the player goes to Reserves -- back
+    // into this match. That is the whole reason a single-match engine needs
+    // the casualty table at all.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Blitzer";     // not a lineman: worth saving
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    // armour, injury 10, first D68 = 6,1 (DEAD), apothecary D68 = 1,1 (BH)
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+    EXPECT_TRUE(gs.getTeamState(TeamSide::HOME).apothecaryUsed);
+}
+
+TEST(Injury, ApothecaryIsNotSpentOnALineman) {
+    // Placeholder policy, not a decision layer: the apothecary is once per
+    // match, so it is never burned on the cheapest body. Choosing WHEN to
+    // spend it properly is queued separately.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Lineman";
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1});    // DEAD, no apothecary reroll
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::DEAD);
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).apothecaryUsed) << "kept for someone better";
 }
