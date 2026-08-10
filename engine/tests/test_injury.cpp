@@ -299,3 +299,38 @@ TEST(Injury, ApothecaryIsNotSpentOnALineman) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::DEAD);
     EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).apothecaryUsed) << "kept for someone better";
 }
+
+TEST(Injury, ApothecaryIsHeldOnTheWeakMiddleBand) {
+    // Spending on "miss next game" buys only a coin flip on the re-roll,
+    // for a once-per-match asset. Badly Hurt (a certain return) and Dead
+    // (the only irreversible result) are the cases worth it; the middle is
+    // not. Placeholder policy - the real decision is queued.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Blitzer";
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    // armour, injury 10, D68 = 4,1 -> Miss next game
+    FixedDiceRoller dice({5, 5, 5, 5, 4, 1});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).apothecaryUsed) << "kept back";
+}
+
+TEST(Injury, ApothecaryOnAnOriginalBadlyHurtIsACertainReturn) {
+    // CRP: the Reserves rescue applies "even if it was the original Casualty
+    // roll" -- no second roll is needed to earn it. This is the strongest
+    // possible use of the apothecary and must not be missed.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Gutter Runner";
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    // armour, injury 10, D68 = 1,1 -> Badly Hurt already
+    FixedDiceRoller dice({5, 5, 5, 5, 1, 1, 6, 8});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH) << "back in Reserves";
+    EXPECT_TRUE(gs.getTeamState(TeamSide::HOME).apothecaryUsed);
+}

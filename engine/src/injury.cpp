@@ -90,14 +90,24 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         // lineman in front of you, or held for the Gutter Runner who may
         // never get hurt? Casualties suffered run ~0.4/game for dwarves and
         // ~1.5-2 for skaven, so "hold out" often means "never use it".
-        // Until that decision is modelled we apply the cheapest defensible
-        // rule: never burn it on the cheapest body (positional template 0 =
-        // lineman), spend it on anyone else. Queued as its own item.
+        //
+        // Two conditions, both derived rather than invented:
+        //  * WHO: not the cheapest body. Getting a lineman back is worth
+        //    little, and the bench already covers him.
+        //  * WHAT WAS ROLLED: the value of spending depends on the result.
+        //    Badly Hurt is a CERTAIN return -- CRP says the Reserves rescue
+        //    applies "even if it was the original Casualty roll", so no
+        //    re-roll is needed. Dead is worth it for the opposite reason:
+        //    it is the only irreversible outcome. The middle band (miss next
+        //    game, stat loss) is the weak case -- there you would spend a
+        //    once-per-match asset on a coin flip, so hold it instead.
         TeamState& ts = state.getTeamState(player.teamSide);
         bool worthSaving = (player.positionName != nullptr &&
                             std::string(player.positionName).find("Lineman")
                                 == std::string::npos);
-        if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving) {
+        bool worthSpendingOn = (cas == CasualtyResult::BADLY_HURT ||
+                                cas == CasualtyResult::DEAD);
+        if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving && worthSpendingOn) {
             ts.apothecaryUsed = true;
             CasualtyResult second = rollCasualty(dice);
             if (casualtySeverity(second) < casualtySeverity(cas)) cas = second;
