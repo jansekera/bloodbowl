@@ -223,6 +223,123 @@ opravit **až v G**; v D udělat jen nález a (jeden řádek, `injuryModifier`).
 
 ---
 
+## 4c. ⛔ STAND FIRM A TAKE ROOT (doplnil uživatel 10.08.) — ŽIVÉ, NE LATENTNÍ
+
+**Pokyn uživatele: „ball and chain nehne ani se stand firm ani s take root
+— stand firm je volitelné jako většina aktivních schopností."**
+Obojí text potvrzuje, a **na rozdíl od §4b to NENÍ latentní.**
+
+### Pravidla
+
+> **Stand Firm (Strength):** „A player with this skill **may choose** to
+> not be pushed back as the result of a block. He may choose to ignore
+> being pushed by 'Pushed' results, and to have 'Knock-down' results knock
+> the player down in the square where he started. **If a player is pushed
+> back into a player using Stand Firm then neither player moves.**"
+>
+> **Take Root (Extraordinary):** „**Immediately after declaring an Action**
+> with this player, roll a D6. On a 2 or more, the player may take his
+> Action as normal. On a 1, the player 'takes root', and **his MA is
+> considered 0 until a drive ends**, or he is Knocked Down or Placed Prone.
+> A player that has taken root may not Go For It, **be pushed back for any
+> reason**, or use any skill that would allow him to move out of his
+> current square (…). **The player may block adjacent players without
+> following-up as part of a Block Action**, however if a player fails his
+> Take Root roll as part of a Blitz Action he may not block that turn."
+
+Uživatelův bod o Ball & Chain z těchto dvou skillů **plyne** — není to
+zvláštní pravidlo B&C. B&C „musí následovat, **pokud odstrčí**"; proti
+Stand Firm / zakořeněnému se odstrčení nekoná, takže se nekoná ani
+follow-up. (U nás je to zatím bezpředmětné, protože náš B&C neodstrkuje
+nikoho — §4b/d.)
+
+### ⚑⚑ ROZSAH: TOHLE JE ŽIVÉ V dw-we
+
+`getWoodElfRoster1200()` obsahuje **Treeman +Guard** se skilly
+`Loner, TakeRoot, StandFirm, MightyBlow, ThickSkull, Guard`
+(`roster.cpp:590-591`). ⇒ **Obě schopnosti byly aktivní ve víkendovém
+dw-we běhu (400 párů).** Ostatní výskyty (`:89` Deathroller, `:105`,
+`:181`, `:260`) jsou v plných rosterech, ne v měřené pětce.
+
+### Nálezy — Stand Firm
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| a | **Stand Firm je vynucený, ne volitelný.** `if (defender.hasSkill(StandFirm)) { pushDest = defender.position; return false; }` — obránce nikdy nedostane volbu. Pravidla: „**may choose**". | `block_handler.cpp:62-69` | ⛔ **BUG** |
+| b | **Chain push se o Stand Firm nezajímá.** Když je na cílovém poli hráč se Stand Firm, pravidla říkají „**neither player moves**" — tedy zastaví se i původní odstrčení. Náš chain push jen hledá volné pole a tlačí dál. | `block_handler.cpp:122-145` | ⛔ **BUG** |
+| c | Knock-down výsledek srazí hráče na jeho původním poli | `block_handler.cpp:65-67` (`pushDest = defender.position`) | ✅ správně |
+| d | Juggernaut při blitzu Stand Firm ruší | `block_handler.cpp:64` | ✅ správně |
+
+### Nálezy — Take Root
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| e | **Hází se jen u MOVE a BLITZ.** Pravidla: „immediately after declaring **an Action**" — tedy i Block, Pass, Hand-off, Foul. | `big_guy_handler.cpp:81` | ⛔ **BUG** (= známý bod 11 „TakeRoot u bloku") |
+| f | **⭐ Zakořenění vůbec NEPŘETRVÁVÁ.** Při hodu 1 engine jen zruší tu jednu akci (`actionBlocked`, `hasActed = true`). Pravidla: **MA = 0 až do konce drivu** (nebo do sražení). Žádný příznak „zakořeněn" v enginu neexistuje (grep `rooted/takenRoot` = 0). | `big_guy_handler.cpp:85-91` | ⛔ **BUG, největší z téhle sekce** |
+| g | **„Nesmí být odstrčen z jakéhokoli důvodu" — neimplementováno** (a nemá se ani o co opřít, dokud chybí f). Přesně bod uživatele. | `block_handler.cpp:62` testuje jen StandFirm | ⛔ **BUG** |
+| h | **Zakořeněný smí blokovat sousedy bez follow-upu** — my mu akci zamítneme celou. | `big_guy_handler.cpp:85-91` | ⛔ **BUG** |
+| i | Při neúspěchu Take Root v rámci Blitz Action nesmí ten tah blokovat | tamtéž | ✅ správně (shodou okolností) |
+
+### ✅ STAND FIRM NEZASTAVÍ DRUHÝ ÚDER FRENZY — a engine to má SPRÁVNĚ
+
+**Pokyn uživatele 10.08.: „V BB2016 (i BB2) platí klíčové pravidlo:
+Stand Firm nezastaví druhý úder z dovednosti Frenzy."** Ověřeno proti
+textu i kódu — **tady nic neopravovat.**
+
+Proč to tak vychází z pravidel: Frenzy vyžaduje druhý blok, „*so long as
+they are both still standing and adjacent*". Stand Firm odstrčení zruší,
+takže se **nikdo nepohne** — oba tedy stojí a sousedí. Podmínka je
+splněná, druhý blok se hází. Stand Firm ho nejenže nezastaví, on ho
+**zaručí** (sousednost je zachovaná z definice).
+
+**Engine** (`block_handler.cpp:559-562`):
+```cpp
+if (!frenzySecondBlock && att.hasSkill(SkillName::Frenzy) &&
+    canAct(att.state) && canAct(def.state) &&
+    att.position.distanceTo(def.position) == 1)
+```
+`canAct` = pouze `STANDING` (`enums.h:23-25`) ⇒ podmínka je doslova
+„oba stojí a sousedí". Engine netestuje, která stěna padla, ale vychází
+to nastejno: Attacker Down / Both Down / jakékoli sražení obránce →
+někdo neSTOJÍ → druhý blok nepadá ✓; Pushed i Defender Stumbles s Dodge →
+oba stojí → padá ✓. **Shoda s pravidly ve všech větvích.**
+
+**Kontrast s Fendem (§4b):** Fend druhý úder naopak **zastaví** — zakáže
+follow-up, takže odstrčený obránce skončí 2 pole daleko a sousednost
+zmizí. ⇒ **Proti Frenzy je Fend obrana, Stand Firm ne.**
+
+**⚑⚑ DOKTRINÁLNÍ DŮSLEDEK PRO ROHY KLECE (nový, plyne z toho přímo):**
+platí obráceně, než zní obecná obava „Frenzy roh se nechá vytáhnout
+z klece". Proti obránci se Stand Firm **se roh nikam neposune** — není
+push, tedy není follow-up — a přesto dostane druhý blok.
+⇒ **Pro Frenzy roh (Slayera) je blok na Stand Firm obránce pozičně
+ZDARMA.** Elfí Treeman je přesně takový cíl a v dw-we stojí na hřišti.
+Zařadit k bodu 5 fronty (feasibility rohů) jako výjimku z pravidla
+„roh se nesmí nechat vytáhnout".
+
+**⚠️ Co z toho plyne pro opravu §4c/a:** jakmile bude Stand Firm
+**volitelný**, rozhodovací vrstva musí vědět, že **zvolit Stand Firm
+proti Frenzy útočníkovi si kupuje druhý blok**. Není to tedy jen flag
+„nechat se odstrčit ano/ne" — je to obchod: zůstat na pozici výměnou za
+další blok proti sobě. Přesně ten typ ocenění, který už máme rozepsaný
+pro Frenzy sekvence (fronta 6b, `evidence/frenzy_trap_defence_20260807.md`).
+
+### ⚑ SMĚR: tohle je první položka balíku D, která hraje PRO NÁS
+
+Náš Take Root je **výrazně mírnější než pravidla**: Treeman u nás ztratí
+jednu akci, podle pravidel by měl stát s MA 0 **celý zbytek drivu**.
+A náš Stand Firm je **vynucený**, takže Treeman je nepohnutelný vždy,
+i když by pro elfa bylo lepší se nechat odstrčit.
+⇒ **Obojí dnes nadržuje wood-elfovi.** Oprava by měla trpaslíkům v dw-we
+pomoct — na rozdíl od leapu (§3) a přihrávkových nálezů (§5b), které
+hrají opačně.
+⚠️ **Důsledek pro čtení víkendových dat:** dw-we výsledek (+1,25 pp ± 2,40)
+byl naměřen s mírnějším Treemanem, než mají pravidla. Není to důvod ho
+přepočítávat (grind byl nula tak jako tak), ale je to důvod **neopírat
+o něj budoucí dw-we kalibraci**, dokud D nedoběhne.
+
+---
+
 ## 5b. POČASÍ (na dotaz uživatele 10.08.) — pět nálezů
 
 ### Pravidla
@@ -340,8 +457,15 @@ Sbalit do JEDNÉ změny „engine hraje podle pravidel" a změřit JEDNOU
 7. **tabulka počasí posunutá o jedna** (§5b a) — dva řádky v `enums.h`
 8. **Pouring Rain u interception; Rain/Blizzard NEsmí zdražovat pass;
    Blizzard omezuje dosah** (§5b c, d, e)
-9. **nega-traity** (TakeRoot u bloku, ReallyStupid soused) — z fronty,
-   dosud neověřeno proti textu; **doplnit do téhle tabulky před opravou**
+9. **⭐ Stand Firm volitelný + chain push se o něj zastaví** (§4c a, b) —
+   **ŽIVÉ v dw-we**, potřebuje rozhodovací vrstvu „nechat se odstrčit?",
+   ne jen flag
+10. **⭐⭐ Take Root: hod u KAŽDÉ akce + PŘETRVÁVAJÍCÍ zakořenění
+    (MA 0 do konce drivu) + nelze odstrčit + smí blokovat bez follow-upu**
+    (§4c e–h) — **ŽIVÉ v dw-we a hraje PRO NÁS**; jediná položka D, která
+    potřebuje nový stav na hráči, ne jen řádek
+11. **zbytek nega-traitů** (ReallyStupid soused) — dosud neověřeno proti
+    textu; **doplnit do téhle tabulky před opravou**
 
 **ODLOŽIT DO BALÍKU G** (všechno jsou to varianty „stav musí přežít konec
 drivu", psát jednou, ne třikrát):
@@ -352,6 +476,14 @@ drivu", psát jednou, ne třikrát):
 netýká): Ball & Chain push/follow-up (§4b d), Kick-Off tabulka jako celek
 včetně Changing Weather (§5b f, g — dnes neaktivní, `useFullKickoff=false`).
 
-⚠️ Body 2, 8 a 9 hrají spíš proti nám (usnadní elfům leap do klece,
-zlevní přihrávkovou hru rychlým rasám, zpřísní naše big guye), body 1,
-5, 6 jsou obousměrné. **Proto pojistka, ne hypotéza.**
+⚠️ **Směry se míchají, proto pojistka a ne hypotéza:**
+* **proti nám:** leap bez modifikátorů (§3), přihrávkové nálezy (§5b c–e)
+  — zlevní hru rychlým rasám
+* **pro nás:** Stand Firm a Take Root (§4c) — dnes obojí nadržuje
+  wood-elfovi
+* **obousměrné:** dodge +1, follow-up, throw-in po surfu, surf injury
+
+⚠️ **Jediná položka, která NENÍ řádková: Take Root** (§4c/f potřebuje
+příznak „zakořeněn" přežívající do konce drivu). Kdyby se D mělo držet
+čistě u řádkových oprav, je to jediný kandidát na vyčlenění — ale patří
+věcně sem, protože je to pravidlová chyba, ne feature.

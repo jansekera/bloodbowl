@@ -1,0 +1,22 @@
+=== a) END_TURN ranking policy, kdyz ho search jednoznacne voli ===
+  ('A', 'dwarf'): n=9 jednoznacnych END_TURN; policy je ma jako top1: 0x (0 %); median rank 4 z mediane 5 kandidatu; prumerny policy prior na END_TURN 14.3 %
+  ('C', 'wood-elf'): n=11 jednoznacnych END_TURN; policy je ma jako top1: 0x (0 %); median rank 3 z mediane 4 kandidatu; prumerny policy prior na END_TURN 13.6 %
+
+=== b) REPOS: rozlisitelnost kandidatu pro policy ===
+  n=946 rozhodnuti s >=3 REPOS kandidaty; prumerny podil ODLISNYCH prior hodnot mezi REPOS kandidaty: 22 % (100 % = kazdy kandidat jiny prior, nizke = policy je nerozezna)
+  spread (max-min) mezi REPOS kandidaty: search visity 0.109 vs policy priory 0.000
+
+=== c) PICKUP prior v loose-ball stavech podle rasy ===
+  ('A', 'dwarf'): n=127; policy prior masa na PICKUP 45.1 % vs search visit masa 42.4 % (delta +2.7 pp)
+  ('C', 'wood-elf'): n=53; policy prior masa na PICKUP 47.1 % vs search visit masa 57.3 % (delta -10.3 pp)
+  ('A', 'skaven'): n=90; policy prior masa na PICKUP 50.6 % vs search visit masa 53.9 % (delta -3.2 pp)
+
+=== d) prumerna riskovost ZVOLENEHO makra (feature[13]) ===
+  ('A', 'dwarf'): n=1258, mean chosen risk 0.1275
+  ('B', 'dwarf'): n=1374, mean chosen risk 0.1337
+  ('A', 'skaven'): n=1121, mean chosen risk 0.1330
+  ('B', 'skaven'): n=1125, mean chosen risk 0.1371
+
+=== e) pocet rozhodnuti na hru (proxy delky tahu) ===
+  ('A', 'dwarf'): prumer 78.6 rozhodnuti/hru
+  ('B', 'dwarf'): prumer 85.9 rozhodnuti/hru
