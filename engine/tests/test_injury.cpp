@@ -147,26 +147,31 @@ TEST(Injury, ArmourModifier) {
     EXPECT_TRUE(broken);
 }
 
-TEST(Injury, ThickSkullSavesFromKO) {
+TEST(Injury, ThickSkullTurnsAnEightIntoStunned) {
+    // CRP Thick Skull: "treats a roll of 8 on the Injury table, after any
+    // modifiers have been applied, as a Stunned result rather than a KO'd
+    // result." Deterministic -- no save roll, so no extra die is consumed.
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::ThickSkull);
-    // Armor: 5+4=9 > 8. Injury: 4+5=9 → KO range. ThickSkull: 4 → saves
-    FixedDiceRoller dice({5, 4, 4, 5, 4});
+    // Armour: 5+4=9 > 8, broken. Injury: 4+4=8 -> Stunned.
+    FixedDiceRoller dice({5, 4, 4, 4});
     InjuryContext ctx;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
 }
 
-TEST(Injury, ThickSkullFails) {
+TEST(Injury, ThickSkullDoesNotSaveANine) {
+    // Only an 8 is downgraded; a 9 is still a KO. We used to roll a D6 and
+    // save on 4+ for ANY KO result, which rescued nines that should stand.
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::ThickSkull);
-    // Armor: 5+4=9. Injury: 4+4=8 → KO. ThickSkull: 3 → fails
-    FixedDiceRoller dice({5, 4, 4, 4, 3});
+    // Armour: 5+4=9. Injury: 4+5=9 -> KO despite Thick Skull.
+    FixedDiceRoller dice({5, 4, 4, 5});
     InjuryContext ctx;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_TRUE(broken);

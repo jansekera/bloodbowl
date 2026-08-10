@@ -33,15 +33,21 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
                           injuryRoll, false, d1, d2});
     } else if (injuryRoll <= 9) {
-        // KO — ThickSkull: 4+ saves from KO (stays stunned)
-        if (player.hasSkill(SkillName::ThickSkull)) {
-            int thickSkullRoll = dice.rollD6();
-            if (thickSkullRoll >= 4) {
-                player.state = PlayerState::STUNNED;
-                emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                                  static_cast<int>(SkillName::ThickSkull), true});
-                return injuryRoll;
-            }
+        // Thick Skull is DETERMINISTIC and applies to a modified 8 only
+        // (rules parity, 2026-08-10). CRP: "This player treats a roll of 8 on
+        // the Injury table, after any modifiers have been applied, as a
+        // Stunned result rather than a KO'd result." We used to roll a D6 on
+        // any KO result and save on 4+, which is wrong in both directions: an
+        // 8 that should always be Stunned went to KO half the time, and a 9
+        // that should always be a KO was saved half the time. Since 8 is the
+        // commoner roll (5/36 vs 4/36) the net effect was HARSHER than the
+        // rules -- KO on 12.5% of injury rolls instead of 11.1% -- and every
+        // dwarf has this skill, so it was live and it cost us.
+        if (player.hasSkill(SkillName::ThickSkull) && injuryRoll == 8) {
+            player.state = PlayerState::STUNNED;
+            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                              static_cast<int>(SkillName::ThickSkull), true});
+            return injuryRoll;
         }
         player.state = PlayerState::KO;
         player.position = {-1, -1};
