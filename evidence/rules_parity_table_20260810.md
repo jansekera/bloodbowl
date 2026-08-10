@@ -611,6 +611,27 @@ uprostřed pohybu a pohyb pokračuje po něm:
 ⇒ **§5c (blitz) PLATÍ a zůstává samostatnou položkou P1**; přihrávka,
 předání ani faul se s ní neslučují.
 
+### 5e. CHYTACÍ A ZACHYTÁVACÍ SKILLY (uživatel dodal 10.08.) — audit
+
+| skill | pravidla (CRP) | engine | verdikt |
+|---|---|---|---|
+| **Catch** | „re-roll the D6 if he fails a catch roll. It also allows the player to re-roll the D6 if he drops a hand-off or **fails to make an interception**." | `resolveCatch` reroll ✅, ale **zachycení hází holým `dice.rollD6()`** bez rerollu (`pass_handler.cpp:~85`) | ⛔ **BUG, AKTIVNÍ** |
+| **Diving Catch** | „+1 to any catch roll **from an accurate pass targeted to his square**" | `helpers.cpp:144` dává −1 k cíli **bezpodmínečně** — tedy i u nepřesných přihrávek, odrazů, vhazování a předání | ⛔ **BUG** (příliš štědré), latentní |
+| **Diving Catch, 2. půlka** | může chytit míč padající do **prázdného pole ve své TZ** (ne odražený) jako by padl na něj | **neimplementováno** | ⛔ chybí, latentní |
+| **Very Long Legs** | „+1 (…) whenever he attempts to **intercept** or uses the **Leap** skill" | zachycení ✅ (`pass_handler.cpp:75`), leap ✅ (`move_handler.cpp:240`), do **chytání se NEPLETE** ✅ | ✅ **správně** |
+| **Extra Arms** | „+1 to any attempt to **pick up, catch or intercept**" | všechny tři ✅ (`helpers.cpp:125`, `:143`, `pass_handler.cpp:76`) | ✅ **správně** |
+| **Pass Block** | pohyb až o 3 pole mimo pořadí, po změření vzdálenosti a **před pokusy o zachycení** | v enginu **není vůbec** (grep = 0) | ➕ chybí; žádný roster ho nemá ⇒ latentní, a je to **mimořádová akce** = větší kus |
+
+**⚠️ KOREKCE dodaného popisu:** Very Long Legs **nedává +1 k chytání**
+(jen k zachycení a leapu) — engine to má správně, popis ne. Opět platí
+[[feedback-ask-rules-questions-in-game-terms]] bod 5: dodaný text je
+vstup, ne verdikt.
+
+**Rozsah:** `Catch` **MÁ** wood-elf (2× Catcher, `roster.cpp:587`)
+⇒ **oprava rerollu zachycení je AKTIVNÍ a hraje PROTI nám** (elfové budou
+zachytávat spolehlivěji). `DivingCatch` má jen Slann (`:393`),
+`PassBlock` nikdo ⇒ latentní.
+
 ### 📌 SPP (Star Player Points) — v enginu NEEXISTUJÍ
 `grep -i spp` v `engine/` = **0 výskytů**. Existují jen v PHP ligové
 části (`src/Service/SPPService.php`). ⇒ Pro AI **není za úspěšnou
