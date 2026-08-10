@@ -875,3 +875,40 @@ TEST(GameSimulator, KOdPlayerStaysOutOnThreeOrLess) {
     EXPECT_EQ(state.getPlayer(5).state, PlayerState::KO);
     EXPECT_FALSE(state.getPlayer(5).isOnPitch());
 }
+
+TEST(GameSimulator, SwelteringHeatHoldsAPlayerOutForOneSetup) {
+    // CRP Sweltering Heat: "Roll a D6 for each player on the pitch at the end
+    // of a drive. On a roll of 1 the player collapses and may not be set up
+    // for the next kick-off." One drive out, then back -- there is no
+    // recovery roll, unlike a KO.
+    GameState state;
+    setupHalf(state, getDwarfRoster(), getSkavenRoster());
+    state.weather = Weather::SWELTERING_HEAT;
+
+    // Every heat roll a 1: everyone on the pitch collapses.
+    class AllOnes : public DiceRollerBase {
+    public:
+        int rollD6() override { return 1; }
+        int rollD8() override { return 1; }
+        int roll2D6() override { return 2; }
+        BlockDiceFace rollBlockDie() override { return BlockDiceFace::PUSHED; }
+    } ones;
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &ones);
+
+    int standing = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING) standing++;
+    });
+    // The eleven who were on the pitch all collapse; the two substitutes were
+    // in Reserves, so the heat never touched them and they are all that is
+    // left to field. Heat and the bench interacting, in one assertion.
+    EXPECT_EQ(standing, 2) << "only the bench survives the heat";
+
+    // Next drive they are available again -- the flag lasts one set-up only.
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, nullptr);
+    standing = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING) standing++;
+    });
+    EXPECT_EQ(standing, 11);
+}

@@ -212,18 +212,25 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.position = {static_cast<int8_t>(baseLOS + formation[formSlot].dx),
                       formation[formSlot].y};
     };
+    // Available = in Reserves AND not held out by Sweltering Heat. The heat
+    // flag is consumed here, so a collapsed player misses exactly one set-up.
+    auto takeAvailability = [](Player& p) {
+        bool ok = (p.state == PlayerState::OFF_PITCH) && !p.outNextSetup;
+        p.outNextSetup = false;
+        return ok;
+    };
     int vacancies[STARTERS];
     int nVacant = 0;
     for (int i = 0; i < STARTERS; ++i) {
         Player& p = state.getPlayer(GameState::squadId(side, i));
-        if (p.state == PlayerState::OFF_PITCH) place(p, i);
+        if (takeAvailability(p)) place(p, i);
         else vacancies[nVacant++] = i;      // his spot needs a substitute
     }
 
     // --- 4. Substitutes come on for the missing ------------------------
     for (int b = STARTERS, v = 0; b < SQUAD && v < nVacant; ++b) {
         Player& p = state.getPlayer(GameState::squadId(side, b));
-        if (p.state != PlayerState::OFF_PITCH) continue;   // bench man also out
+        if (!takeAvailability(p)) continue;   // bench man also out
         place(p, vacancies[v++]);
     }
 
@@ -264,6 +271,15 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // roll of 1-3 he must remain in the KO'd box (...). On a roll of 4-6 you
     // must return the player to the Reserves box." 10-12 Casualty -- "The
     // player must miss the rest of the match."
+    // Sweltering Heat is resolved at the END of the drive that just finished,
+    // so it looks at who was still on the pitch. A collapsed player misses the
+    // NEXT set-up only -- no recovery roll, unlike a KO.
+    if (state.weather == Weather::SWELTERING_HEAT && dice) {
+        for (auto& p : state.players) {
+            if (p.isOnPitch() && dice->rollD6() == 1) p.outNextSetup = true;
+        }
+    }
+
     for (auto& p : state.players) {
         // KO recovery happens BEFORE anyone is set up, per the rules above.
         if (p.state == PlayerState::KO && dice) {
@@ -282,6 +298,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
             p.proUsedThisTurn = false;
             continue;
         }
+        // NB: outNextSetup (heat) is deliberately NOT cleared here --
+        // buildTeam reads it to hold the player out of THIS set-up and
+        // clears it there, so he sits out exactly one drive.
         p.state = PlayerState::OFF_PITCH;   // = in Reserves, available
         p.position = {-1, -1};
         p.hasMoved = false;

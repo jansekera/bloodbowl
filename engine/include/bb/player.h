@@ -35,6 +35,12 @@ struct Player {
     bool usedBlitz = false;
     bool lostTacklezones = false;
     bool proUsedThisTurn = false;
+    // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on
+    // the pitch at the end of a drive. On a roll of 1 the player collapses and
+    // may not be set up for the next kick-off." One drive out, then back --
+    // unlike a KO there is no recovery roll, so it needs its own flag rather
+    // than a PlayerState.
+    bool outNextSetup = false;
 
     bool hasSkill(SkillName s) const { return skills.has(s); }
 

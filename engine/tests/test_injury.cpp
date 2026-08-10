@@ -230,11 +230,14 @@ TEST(Injury, CrowdSurfHasNoInjuryModifier) {
 TEST(Injury, CrowdSurf) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    // Crowd surf: injury with +1 modifier. Roll: 3+3+1=7 → stunned → forced to KO
+    // No modifier (the +1 was ours, not the rules'). Roll 3+3=6 -> Stunned,
+    // and CRP sends a Stunned crowd-surf result to the RESERVES box, not to
+    // the KO box: "must remain there until a touchdown is scored or the half
+    // ends." We used to force a KO, which is harsher -- a KO then needs 4+ to
+    // return at all.
     FixedDiceRoller dice({3, 3});
     resolveCrowdSurf(gs, 1, dice, nullptr);
-    // Crowd surf always removes from pitch, even if injury says stunned
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{-1, -1}));
 }
 

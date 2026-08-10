@@ -211,13 +211,13 @@ TEST(BlockHandler, CrowdSurf) {
     placePlayer(gs, 1, {24, 7}, TeamSide::HOME);
     placePlayer(gs, 12, {25, 7}, TeamSide::AWAY);
     // Defender at edge. Roll DD (D6=6) → pushed off pitch
-    // Crowd surf injury: 3+3+1=7 → stunned → forced KO
+    // Crowd surf injury 3+3=6 -> Stunned -> Reserves (CRP), not KO.
     FixedDiceRoller dice({6, 3, 3});
     BlockParams params{1, 12, false, false};
     auto result = resolveBlock(gs, params, dice, nullptr);
     EXPECT_TRUE(result.success);
-    // Defender crowd surfed
-    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::OFF_PITCH);
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch());
 }
 
 TEST(BlockHandler, StandFirmPrevents) {

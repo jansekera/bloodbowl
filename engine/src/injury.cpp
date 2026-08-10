@@ -202,10 +202,14 @@ void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
     // No armor roll — go straight to injury
     resolveInjuryRoll(state, playerId, dice, ctx, events);
 
-    // If player survived (KO), they're already placed off-pitch by injury resolver
-    // If still on pitch (STUNNED from ThickSkull), remove them
+    // A Stunned result from the crowd sends him to RESERVES, not to the KO
+    // box (rules parity / package G, 2026-08-10). CRP: "If a 'Stunned' result
+    // is rolled on the Injury table the player should be placed in the
+    // Reserves box of the Dugout, and must remain there until a touchdown is
+    // scored or the half ends." We used to convert it to a KO, which is
+    // harsher: a KO must then roll 4+ to come back at all.
     if (isOnPitch(player.state)) {
-        player.state = PlayerState::KO;
+        player.state = PlayerState::OFF_PITCH;   // Reserves
         player.position = {-1, -1};
     }
 }
