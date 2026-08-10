@@ -191,13 +191,22 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     for (int p = 0; p < nPlacements && specSlot >= 0; ++p) {
         for (int q = 0; q < placements[p].count && specSlot >= 0; ++q) {
             Player& player = state.getPlayer(baseId + specSlot);
+            bool available = (player.state == PlayerState::OFF_PITCH);
             player.id = baseId + specSlot;
             player.teamSide = side;
-            player.state = PlayerState::STANDING;
-            player.position = {
-                static_cast<int8_t>(baseLOS + formation[specSlot].dx),
-                formation[specSlot].y
-            };
+            // Identity is re-derived every setup, but an unavailable player
+            // (KO/INJURED/DEAD/EJECTED, package G) keeps his state and stays
+            // off the pitch -- the team simply plays a man short. His slot in
+            // the formation is left empty rather than being back-filled: a
+            // coach would re-arrange, but modelling that is setup
+            // optimisation and belongs with the kick-off work.
+            if (available) {
+                player.state = PlayerState::STANDING;
+                player.position = {
+                    static_cast<int8_t>(baseLOS + formation[specSlot].dx),
+                    formation[specSlot].y
+                };
+            }
             player.stats = roster.positionals[placements[p].templateIdx].stats;
             player.skills = roster.positionals[placements[p].templateIdx].skills;
             player.positionName = roster.positionals[placements[p].templateIdx].name;
@@ -215,13 +224,16 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     // Fill remaining slots (0 to specSlot) with linemen (template index 0)
     for (int i = 0; i <= specSlot; ++i) {
         Player& player = state.getPlayer(baseId + i);
+        bool available = (player.state == PlayerState::OFF_PITCH);
         player.id = baseId + i;
         player.teamSide = side;
-        player.state = PlayerState::STANDING;
-        player.position = {
-            static_cast<int8_t>(baseLOS + formation[i].dx),
-            formation[i].y
-        };
+        if (available) {
+            player.state = PlayerState::STANDING;
+            player.position = {
+                static_cast<int8_t>(baseLOS + formation[i].dx),
+                formation[i].y
+            };
+        }
         player.stats = roster.positionals[0].stats;
         player.skills = roster.positionals[0].skills;
         player.positionName = roster.positionals[0].name;
@@ -256,10 +268,39 @@ namespace {
 // must be false for setupDrive, or every touchdown grants both teams a fresh
 // 8-turn half (see project_bloodbowl_audit_findings_20260703 finding 2).
 void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                      TeamSide kickingTeam, bool isNewHalf) {
-    // Reset all players to off-pitch
+                      TeamSide kickingTeam, bool isNewHalf, DiceRollerBase* dice) {
+    // Package G, layer 1 (2026-08-10): casualties must SURVIVE the end of a
+    // drive. This loop used to reset EVERY player to OFF_PITCH with no branch
+    // for KO/INJURED/DEAD, and buildTeam then stood them all up again -- so
+    // each drive began with eleven healthy players a side and the dead came
+    // back. Measured consequence: DEAD/game 0.00 across 3200 games, and an
+    // attrition exchange of 11:1 in the dwarves' favour that showed up as a
+    // 0.2-player difference at the final whistle.
+    //
+    // CRP injury table: 8-9 KO'd -- "At the next kick-off, before you set up
+    // any players, roll for each of your players that have been KO'd. On a
+    // roll of 1-3 he must remain in the KO'd box (...). On a roll of 4-6 you
+    // must return the player to the Reserves box." 10-12 Casualty -- "The
+    // player must miss the rest of the match."
     for (auto& p : state.players) {
-        p.state = PlayerState::OFF_PITCH;
+        // KO recovery happens BEFORE anyone is set up, per the rules above.
+        if (p.state == PlayerState::KO && dice) {
+            if (dice->rollD6() >= 4) p.state = PlayerState::OFF_PITCH;
+        }
+        // Out for the rest of the match: casualties, deaths, sendings-off,
+        // and any KO that failed its recovery roll. Keep the state, keep them
+        // off the pitch -- do NOT hand them back to buildTeam.
+        if (p.state == PlayerState::KO || p.state == PlayerState::INJURED ||
+            p.state == PlayerState::DEAD || p.state == PlayerState::EJECTED) {
+            p.position = {-1, -1};
+            p.hasMoved = false;
+            p.hasActed = false;
+            p.usedBlitz = false;
+            p.lostTacklezones = false;
+            p.proUsedThisTurn = false;
+            continue;
+        }
+        p.state = PlayerState::OFF_PITCH;   // = in Reserves, available
         p.position = {-1, -1};
         p.hasMoved = false;
         p.hasActed = false;
@@ -307,13 +348,13 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
 } // anonymous namespace
 
 void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
-               TeamSide kickingTeam) {
-    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true);
+               TeamSide kickingTeam, DiceRollerBase* dice) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true, dice);
 }
 
 void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                TeamSide kickingTeam) {
-    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false);
+                TeamSide kickingTeam, DiceRollerBase* dice) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false, dice);
 }
 
 // Check if kicking team has a standing player with Kick skill
@@ -414,7 +455,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     const TeamSide openingKickingTeam = TeamSide::AWAY;  // Home receives first
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
-    setupHalf(state, home, away, state.kickingTeam);
+    setupHalf(state, home, away, state.kickingTeam, &dice);
     doKickoff();
 
     std::vector<Action> actions;
@@ -425,7 +466,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         if (state.phase == GamePhase::TOUCHDOWN) {
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
-            setupDrive(state, home, away, state.kickingTeam);
+            setupDrive(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;
         }
@@ -438,7 +479,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
             // (i.e. from the last H1 drive) handed the H2 ball back to
             // whichever team scored last in H1.
             state.kickingTeam = opponent(openingKickingTeam);
-            setupHalf(state, home, away, state.kickingTeam);
+            setupHalf(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;
         }
@@ -516,7 +557,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     const TeamSide openingKickingTeam = TeamSide::AWAY;
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
-    setupHalf(state, home, away, state.kickingTeam);
+    setupHalf(state, home, away, state.kickingTeam, &dice);
     doKickoff();
 
     std::vector<Action> actions;
@@ -543,7 +584,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             }
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
-            setupDrive(state, home, away, state.kickingTeam);
+            setupDrive(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;
         }
@@ -553,7 +594,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             // H2 reverses the OPENING kickoff roles, not the last H1 drive;
             // see the comment in simulateGame().
             state.kickingTeam = opponent(openingKickingTeam);
-            setupHalf(state, home, away, state.kickingTeam);
+            setupHalf(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;
         }

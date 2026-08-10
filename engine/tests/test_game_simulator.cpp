@@ -799,3 +799,57 @@ TEST(DevelopedRoster, BelowTVFallsBackToBase) {
     ASSERT_NE(base, nullptr);
     EXPECT_STREQ(base->name, "Orc");
 }
+
+// --- Package G (2026-08-10): casualties must survive the end of a drive ---
+
+TEST(GameSimulator, CasualtiesSurviveADriveRestart) {
+    // Before this, setupHalfOrDrive reset EVERY player to OFF_PITCH and
+    // buildTeam stood them all up again, so each drive began with eleven
+    // healthy players a side and the dead came back. CRP: a Casualty "must
+    // miss the rest of the match".
+    GameState state;
+    setupHalf(state, getDwarfRoster(), getSkavenRoster());
+    state.getPlayer(3).state = PlayerState::INJURED;
+    state.getPlayer(3).position = {-1, -1};
+    state.getPlayer(4).state = PlayerState::DEAD;
+    state.getPlayer(4).position = {-1, -1};
+
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY);
+
+    EXPECT_EQ(state.getPlayer(3).state, PlayerState::INJURED);
+    EXPECT_EQ(state.getPlayer(4).state, PlayerState::DEAD);
+    EXPECT_FALSE(state.getPlayer(3).isOnPitch());
+    EXPECT_FALSE(state.getPlayer(4).isOnPitch());
+
+    int standing = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING) standing++;
+    });
+    EXPECT_EQ(standing, 9) << "team should field nine, not a fresh eleven";
+}
+
+TEST(GameSimulator, KOdPlayerRecoversOnFourPlus) {
+    // CRP: "At the next kick-off, before you set up any players, roll for
+    // each of your players that have been KO'd. On 1-3 he must remain in the
+    // KO'd box; on 4-6 you must return the player to the Reserves box."
+    GameState state;
+    setupHalf(state, getDwarfRoster(), getSkavenRoster());
+    state.getPlayer(5).state = PlayerState::KO;
+    state.getPlayer(5).position = {-1, -1};
+
+    FixedDiceRoller good({4});   // 4+ -> back to Reserves, so he is set up
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &good);
+    EXPECT_EQ(state.getPlayer(5).state, PlayerState::STANDING);
+}
+
+TEST(GameSimulator, KOdPlayerStaysOutOnThreeOrLess) {
+    GameState state;
+    setupHalf(state, getDwarfRoster(), getSkavenRoster());
+    state.getPlayer(5).state = PlayerState::KO;
+    state.getPlayer(5).position = {-1, -1};
+
+    FixedDiceRoller bad({3});    // 1-3 -> stays in the KO'd box
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &bad);
+    EXPECT_EQ(state.getPlayer(5).state, PlayerState::KO);
+    EXPECT_FALSE(state.getPlayer(5).isOnPitch());
+}

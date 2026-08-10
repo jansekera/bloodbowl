@@ -352,7 +352,14 @@ PYBIND11_MODULE(bb_engine, m) {
         return bb::executeAction(state, action, base, nullptr);
     });
 
-    m.def("setup_half", &bb::setupHalf,
+    // KO recovery (package G) needs a dice source; the Python binding keeps
+    // its old 4-argument shape and passes nullptr, which simply means KO'd
+    // players stay out rather than rolling to return.
+    m.def("setup_half",
+          [](bb::GameState& state, const bb::TeamRoster& home,
+             const bb::TeamRoster& away, bb::TeamSide kickingTeam) {
+              bb::setupHalf(state, home, away, kickingTeam, nullptr);
+          },
           py::arg("state"), py::arg("home"), py::arg("away"),
           py::arg("kicking_team") = bb::TeamSide::AWAY);
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {

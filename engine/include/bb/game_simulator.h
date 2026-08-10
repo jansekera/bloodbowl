@@ -21,14 +21,16 @@ struct GameResult {
 
 // Set up 11 players per team in formation, initialize team state
 // kickingTeam selects defensive formation for kicking side (default AWAY = HOME receives)
+// dice is needed for the KO recovery roll at each kick-off (package G);
+// pass nullptr in tests that do not care -- KO'd players then simply stay out.
 void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
-               TeamSide kickingTeam = TeamSide::AWAY);
+               TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr);
 
 // Same player/ball placement as setupHalf, for restarting play after a touchdown
 // mid-half -- does NOT reset each team's turn clock or reroll pool (unlike
 // setupHalf, which is reserved for true half boundaries: game start, half-time).
 void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                TeamSide kickingTeam = TeamSide::AWAY);
+                TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr);
 
 // Simplified kickoff: place ball with scatter, transition to PLAY
 void simpleKickoff(GameState& state, DiceRollerBase& dice);
