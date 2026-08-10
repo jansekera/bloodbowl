@@ -543,6 +543,66 @@ technická review"), **ne jen A/B verdikt** — hlavní otázka je
 
 ---
 
+## 5d. PŘIHRÁVKOVÁ SEKVENCE (uživatel dodal celou 10.08.) — audit
+
+**Většina je SPRÁVNĚ.** Ověřeno proti `pass_handler.cpp`:
+* jedna přihrávka za tah (`passUsedThisTurn`) ✅
+* rozsahy QP +1 / SP 0 / LP −1 / LB −2 (`passModifier`) ✅
+* **Strong Arm**: engine snižuje pásmo o jedno a vynechává QUICK
+  (`:197-200`). Je to **přesně ekvivalentní** pravidlu „+1 pro Short,
+  Long a Long Bomb" (každý posun pásma = +1) ✅
+* Accurate +1 ✅ · −1 za TZ na házeči, rušeno Nerves of Steel ✅
+* přirozená 1 = vždy fumble (`:227`) ✅
+* nepřesná = 3× rozptyl (`:315-320`) ✅
+* **⛔ ale Rain a Blizzard u přihrávky NEMAJÍ co dělat** — viz §5b/d.
+
+### ✅ ZACHYCENÍ: `7 − AG + 2` je SPRÁVNĚ (uzavírá otevřenou otázku 2)
+Pravidla dávají −2 k hodu ⇒ +2 k cílovému číslu. **Není to náš přídavek.**
+
+### ⚠️ POŘADÍ: engine má PRAVDU, popis uživatele měl kroky prohozené
+Uživatel uvedl „2. hod na přesnost → 3. zachycení (pokud nebyl fumble)".
+Text CRP je ale jednoznačný:
+> „The coach must declare that one of his players will try to intercept
+> **before the thrower rolls to see if he is on target**."
+
+Engine volá `checkInterception` **před** hodem na přesnost
+(`pass_handler.cpp:188` vs `:202`) ⇒ **správně, nesahat.** Souhlasí to
+i s pořadím v CRP FAQ („4. Check for interceptors … 5. Roll D6 to throw").
+
+### ⚠️ Drobná odchylka: kdo SMÍ zachytávat
+Pravidla: (a) **pravítko musí přejít aspoň část pole**, na kterém stojí,
+(b) má tackle zónu, (c) je blíž házeči, než je házeč k cíli, (d) je blíž
+cíli, než je házeč k cíli; **jen jeden hráč**.
+Engine jde po Bresenhamově přímce a bere prvního stojícího soupeře **na**
+ní. Body (b) a „jen jeden" ✅; (c)+(d) plynou z toho, že leží na úsečce ✅.
+**Ale skutečné pravítko má ŠÍŘKU** — přejede i pole, která matematická
+přímka mine ⇒ **náš engine připouští MÉNĚ zachytávačů, než pravidla**.
+Drobné, a nadržuje to přihrávající straně (tedy rychlým týmům).
+
+### ⛔⛔ NOVÝ NÁLEZ: HÁZEČ SE PO PŘIHRÁVCE NEMŮŽE HÝBAT
+Uživatel: „Hráč s míčem se může **před hodem i po něm** normálně
+pohybovat (pokud mu zbývají body pohybu)."
+Engine: `passer.hasActed = true` (`pass_handler.cpp:119`) hned při
+zahájení ⇒ **veškerý pohyb končí přihrávkou.** Totéž u hand-offu
+(`:362`).
+
+**⭐⭐ ZOBECNĚNÍ — TOHLE NENÍ CHYBA BLITZU ANI PŘIHRÁVKY, JE TO CHYBA
+MODELU AKCE.** Je to **druhý výskyt** téhož kořene jako §5c (blitzer se
+po bloku nemůže hýbat). V pravidlech je pohyb **součástí** akce a smí být
+před i po jejím jádru: `pohyb → jádro (blok/hod/předání/faul) → pohyb`.
+U nás je akce **atomická** a pohyb se dá utratit jen předem.
+⇒ **Sjednotit s položkou P1 „blitz po bloku" a řešit JAKO JEDNU ZMĚNU
+modelu akce**, ne třikrát zvlášť. Zkontrolovat i FOUL.
+
+### 📌 SPP (Star Player Points) — v enginu NEEXISTUJÍ
+`grep -i spp` v `engine/` = **0 výskytů**. Existují jen v PHP ligové
+části (`src/Service/SPPService.php`). ⇒ Pro AI **není za úspěšnou
+přihrávku žádná odměna** kromě výsledku zápasu; C++ engine je
+jednozápasový bez ligové progrese. Relevantní až pro balík G/E (ligový
+model), ne pro D.
+
+---
+
 ## 6. ✅ CO JE SPRÁVNĚ (ověřeno, nesahat)
 
 | pravidlo | citace | engine |
