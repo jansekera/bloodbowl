@@ -206,13 +206,43 @@ Text pravidel to potvrzuje doslova:
 | c | Engine **nemá stav „rezervy"**: `PlayerState` je STANDING/PRONE/STUNNED/KO/INJURED/DEAD/EJECTED/OFF_PITCH | `enums.h:15-17` | ⚠️ chybí nosič stavu; `OFF_PITCH` se dá použít |
 | d | Bez hodu na zbroj ✅, jeden hod na Injury ✅ | `injury.cpp:114-120` | ✅ správně |
 
-**Detail k rozhodnutí „žádné modifikátory":** engine kromě `injuryModifier`
-pouští do hodu ještě `hasDecay` (`injury.cpp:117`) a Stunty
-(`injury.cpp:29-31`). Obojí jsou ale **vlastnosti oběti**, ne útočníka ani
-davu — věta „the crowd does not have any injury modifying skills" míří na
-útočníkovy skilly typu Mighty Blow. **Čtu tvůj pokyn tak, že se ruší jen
-útočníkovy/naše přídavky (`injuryModifier`), a Decay/Stunty zůstávají.**
-Kdyby to bylo myšleno jinak, řekni — je to jeden řádek.
+### ✅ VYŘEŠENO 10.08. — Stunty a Decay u surfu (odpověď uživatele + text + web)
+
+**Obojí u divácké odplaty PLATÍ** — jsou to vlastnosti vyhozeného hráče,
+ne davu. Ruší se tedy **jen náš `injuryModifier = 1`**. Ale při ověřování
+vyšly najevo dvě věci navíc:
+
+**1. ⛔ DECAY MÁME ZÁSADNĚ ŠPATNĚ (nová chyba, nesouvisí se surfem).**
+> „**When this player suffers a Casualty result on the Injury table**,
+> roll twice on **the Casualty table** and apply both results. The player
+> will only ever miss one future match (…). A successful Regeneration roll
+> will heal both results."
+
+Engine (`injury.cpp:17-26`) hází **hod na ZRANĚNÍ dvakrát a bere horší**
+⇒ dělá hráče s Decay **snáz vyřaditelným ze zápasu**. Pravidlo přitom do
+hodu na zranění **vůbec nesahá**; spustí se až PO casualty a zdvojí hod
+na *následky*. ⇒ **Správně implementovaný Decay má v jednom zápase NULOVÝ
+efekt.** Oprava = vyndat ho z hodu na zranění úplně.
+
+**2. ⚠️ STUNTY není modifikátor, je to PŘEMAPOVÁNÍ — ale u nás na tom
+nesejde.**
+> „treats a roll of **7 and 9** on the Injury table after any modifiers
+> have been applied as a **KO'd** and **Badly Hurt** result respectively."
+
+Engine dává ploché `+1` (`injury.cpp:29-31`). Liší se to **jen u hodu 9**:
+pravidla dávají zaručeně Badly Hurt, +1 udělá náhodnou casualty.
+**Jenže náš engine žádnou tabulku následků nemá** (`injuryRoll >= 10`
+→ `PlayerState::INJURED`, konec, `injury.cpp:64-66`), takže Badly Hurt
+a Casualty jsou pro nás totéž. ⇒ **v modelu jednoho zápasu je ploché +1
+chováním totožné**; rozešlo by se to až v lize. **Nesahat.**
+
+**3. ⭐ VEDLEJŠÍ NÁLEZ — proč je `DEAD/hru = 0,00`:** tabulka trvalých
+následků v enginu **neexistuje**, takže smrt nemůže nastat. Ranní
+pozorování ze 3200 her je tím vysvětlené. Patří k **balíku G** (spolu
+s persistencí), ne do D.
+
+**Rozsah 1-3:** Decay ani Stunty nemá nikdo z měřené pětky
+(ověřeno v `roster.cpp`) ⇒ latentní.
 
 **⚑ Vazba na balík G (třetí výskyt téhož):** „rezervy do konce půle /
 do TD" je **týž chybějící mechanismus** jako přetrvávající zranění
