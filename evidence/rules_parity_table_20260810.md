@@ -758,6 +758,54 @@ model), ne pro D.
 
 ---
 
+## 5f. VOLBA PUSH POLE + SIDE STEP × GRAB (doplnil uživatel 10.08.)
+
+> **Push Backs:** „**The coach of the player who made the block may decide
+> which square** the player is moved to." (u řetězových odsunů rozhoduje
+> kouč táhnoucího týmu)
+>
+> **Side Step:** „his coach may choose which square the player is moved
+> to (…) **rather than the opposing coach**. Furthermore, the coach may
+> choose to move the player to **ANY adjacent square, not just the three
+> squares** shown on the Push Back diagram."
+>
+> **Grab:** „**only while making a Block Action** (…) he may choose **any
+> empty square adjacent to his opponent**. **When making a Block or Blitz
+> Action, Grab and Side Step will cancel each other out and the standard
+> pushback rules apply.**"
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| a | **Volba útočníka se vůbec nemodeluje** — bere se **první volné** pole z trojice | `block_handler.cpp:113-118` | ⛔ **BUG** (pátý výskyt vzorce „automaticky místo volby") |
+| b | **Side Step má jen 3 pole místo 8** — vybírá nejvzdálenější z `pushSquares` | `:88-95` | ⛔ **BUG** (příliš slabý) |
+| c | **Grab má taky jen 3 pole místo všech volných sousedních** | `:96-108` | ⛔ **BUG** (příliš slabý) |
+| d | **Rušení Grab × Side Step chybí.** Pravidla: při Block **i Blitz** se navzájem **ruší** ⇒ platí standard (volí útočník ze 3). Engine: u **bloku** dá plný Grab útočníkovi, u **blitzu** dá Side Step obránci | `:88-96` | ⛔ **BUG obojím směrem** |
+| e | Grab funguje jen mimo blitz (`!isBlitz`) | `:96` | ✅ správně |
+
+**Rozsah:** Side Step **má** wood-elf Wardancer (`roster.cpp:585-586`)
+⇒ body b a d jsou **AKTIVNÍ v dw-we**. Grab v měřené pětce nikdo.
+
+## 5g. ⭐ MŘÍŽKA DOSAHŮ PŘIHRÁVEK — HOTOVÁ
+Plná tabulka: **`evidence/pass_range_grid_20260810.txt`**.
+Zdroj: obrázek uživatele + jeho oprava řady 7 („0 až 7 je L, pak 3× B")
++ **kontrola symetrie** `band(dx,dy) == band(dy,dx)` (pravítko nezajímá
+směr) — prošla, a uživatelovy hodnoty pro řady 8/9/10 (poslední L na
+6/4/3) z rekonstrukce **vyšly samy** = nezávislé potvrzení.
+
+**Dopad: 79 ze 196 polí je u nás špatně**, a **všechna v náš neprospěch**:
+
+| máme | má být | počet |
+|---|---|---|
+| B | mimo dosah | 45 |
+| L | B | 19 |
+| S | L | 6 |
+| L | mimo dosah | 6 |
+| Q | S | 3 |
+
+⇒ **Ve 45 polích povolujeme přihrávku, která podle pravidel není možná**,
+a ve zbytku je o pásmo levnější. Systematicky to nadržuje přihrávkové
+hře, tedy rychlým rasám.
+
 ## 7. OTEVŘENÉ OTÁZKY K PROJITÍ
 
 1. ✅ **VYŘEŠENO 10.08. uživatelem** — surf: žádné +1, žádné modifikátory,

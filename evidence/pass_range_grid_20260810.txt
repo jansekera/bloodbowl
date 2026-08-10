@@ -1,0 +1,28 @@
+REGULAR THROWING RANGES — mřížka pro |dx|,|dy| (BB2016/CRP)
+Zdroj: obrázek uživatele 10.08.2026 + oprava řady 7 + kontrola symetrie.
+Q=Quick(+1) S=Short(0) L=Long(-1) B=LongBomb(-2) .=mimo dosah
+
+13 | B  B  B  .  .  .  .  .  .  .  .  .  .  .
+12 | B  B  B  B  B  .  .  .  .  .  .  .  .  .
+11 | B  B  B  B  B  B  B  .  .  .  .  .  .  .
+10 | L  L  L  L  B  B  B  B  .  .  .  .  .  .
+ 9 | L  L  L  L  L  B  B  B  B  .  .  .  .  .
+ 8 | L  L  L  L  L  L  L  B  B  B  .  .  .  .
+ 7 | L  L  L  L  L  L  L  L  B  B  B  .  .  .
+ 6 | S  S  S  S  L  L  L  L  L  B  B  B  .  .
+ 5 | S  S  S  S  S  L  L  L  L  B  B  B  .  .
+ 4 | S  S  S  S  S  S  L  L  L  L  B  B  B  .
+ 3 | Q  Q  S  S  S  S  S  L  L  L  L  B  B  .
+ 2 | Q  Q  Q  S  S  S  S  L  L  L  L  B  B  B
+ 1 | Q  Q  Q  Q  S  S  S  L  L  L  L  B  B  B
+ 0 | T  Q  Q  Q  S  S  S  L  L  L  L  B  B  B
+     0  1  2  3  4  5  6  7  8  9  0  1  2  3
+
+NESHOD s naším Chebyshevem (prahy 3/6/10): 79 ze 196 polí
+  máme B → má být . : 45×
+  máme L → má být B : 19×
+  máme S → má být L : 6×
+  máme L → má být . : 6×
+  máme Q → má být S : 3×
+
+VŠECHNY neshody jsou v NÁŠ neprospěch (přihrávka je u nás levnější nebo vůbec možná).
