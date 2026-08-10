@@ -589,14 +589,27 @@ u úhlopříčky je skutečná vzdálenost až **√2 ≈ 1,41×** delší.
 úhlopříčky vůbec povolené**, ačkoli na pravítko nedosáhnou.
 **Směr: nadržuje to přihrávající straně, tedy rychlým rasám.**
 
-**Oprava (levná):** nahradit Chebyshev **skutečnou vzdáleností**, nebo
-rovnou předpočítanou **mřížkou podle (|dx|,|dy|)** — to je ten „plánek
-s grafem", který se v referenčních listech tiskne.
-⚠️ **Přesné hranice pásem ověřit ze zdroje:** hobby měření pravítka udává
-~3,49 pole na QP/SP/LP a ~2,75 na LB (celkem ~13,2), ale to **není
-citace z pravidel**. Strukturální část (Chebyshev ≠ vzdálenost pravítka)
-je jistá i bez těch čísel. **PDF referenčního listu se mi nepodařilo
-přečíst** (komprimovaný binární obsah) — mřížku dohledat jinde.
+**⭐ MŘÍŽKU DODAL UŽIVATEL 10.08.** („Regular Throwing Ranges", `~/pass.png`).
+Tři kontrolní pole, čitelná bezpečně, potvrzují nález:
+
+| pole | mřížka | náš engine |
+|---|---|---|
+| (3,3) | **S** | Q |
+| (6,6) | **L** | S |
+| (10,10) | **mimo dosah** | L |
+
+**⛔⛔ A NAVÍC: NENÍ TO ANI VZDÁLENOSTNÍ VZOREC.**
+`(13,0)` je na mřížce **B**, ale `(5,12)` je **šedá** — obě mají
+skutečnou vzdálenost **přesně 13,00**. Žádná funkce vzdálenosti to
+nerozliší. ⇒ pravítko je **tvarovaná fyzická šablona**, ne kružítko.
+**⇒ IMPLEMENTOVAT TABULKOU (14×14 lookup podle |dx|,|dy|), NE VZORCEM.**
+Eukleidovská aproximace (hranice 3,49/6,98/10,47/13,22) sedí ve většině
+polí, ale na okrajích pásem se rozchází — jako náhrada nestačí.
+
+⚠️ **Tabulku je ještě potřeba PŘESNĚ OPSAT z obrázku.** Krajní pole se
+mi z rozlišení nedají číst spolehlivě a **PIL v prostředí není**
+(nešlo výřez zvětšit). ⇒ **implementační krok: opsat mřížku a nechat
+uživatele zkontrolovat** — je to 196 polí, jednou a navždy.
 
 ### ⚠️ Drobná odchylka: kdo SMÍ zachytávat
 Pravidla: (a) **pravítko musí přejít aspoň část pole**, na kterém stojí,
@@ -619,6 +632,22 @@ cíli, než je házeč k cíli · jen jeden hráč) zůstávají.
 ⇒ **Implementace:** kolmá vzdálenost středu pole od úsečky ≤ 1.
 Levné, a odstraní to i dnešní závislost na Bresenhamově diskretizaci.
 **Směr: nadržuje to přihrávající straně (rychlým týmům).**
+
+**⚠️ POZOR NA EDICI (uživatel poslal 10.08. odkaz na `bloodbowlbase.ru/bb2025`):
+to je BB2025, NE naše 2016 — čísla odtud NEPŘEBÍRAT.** Rozdíly:
+
+| | BB2016 / CRP (naše) | BB2025 |
+|---|---|---|
+| kdy | zachycení se deklaruje **PŘED** hodem na přesnost | pravítko se pokládá **AŽ PO** určení výsledku |
+| kam | pravítko k **cílovému** poli | k poli, **kam míč skutečně dopadne** |
+| postih | plochých **−2** | **−3** přesná / **−2** nepřesná |
+| markeři | (nemodifikuje) | **−1 za každého** markera zachytávače |
+
+**Jediné, co je z toho přenosné** (a potvrzuje to nezávisle náš závěr):
+formulace „*If the Range Ruler **overlaps any squares** containing a
+Standing opposition player*" — tedy **překryv PLOCHY, ne průsečík
+s přímkou**. Náš Bresenham je tím pádem prokazatelně špatně i podle
+novější edice.
 
 ### ❌ ODVOLÁNO: „házeč se po přihrávce nemůže hýbat" NENÍ CHYBA
 **Původně jsem to 10.08. zapsal jako nález a bylo to ŠPATNĚ.** Vzal jsem
