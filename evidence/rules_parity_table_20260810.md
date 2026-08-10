@@ -579,20 +579,37 @@ ní. Body (b) a „jen jeden" ✅; (c)+(d) plynou z toho, že leží na úsečce
 přímka mine ⇒ **náš engine připouští MÉNĚ zachytávačů, než pravidla**.
 Drobné, a nadržuje to přihrávající straně (tedy rychlým týmům).
 
-### ⛔⛔ NOVÝ NÁLEZ: HÁZEČ SE PO PŘIHRÁVCE NEMŮŽE HÝBAT
-Uživatel: „Hráč s míčem se může **před hodem i po něm** normálně
-pohybovat (pokud mu zbývají body pohybu)."
-Engine: `passer.hasActed = true` (`pass_handler.cpp:119`) hned při
-zahájení ⇒ **veškerý pohyb končí přihrávkou.** Totéž u hand-offu
-(`:362`).
+### ❌ ODVOLÁNO: „házeč se po přihrávce nemůže hýbat" NENÍ CHYBA
+**Původně jsem to 10.08. zapsal jako nález a bylo to ŠPATNĚ.** Vzal jsem
+za hotové tvrzení z dodaného popisu („hráč se může pohybovat před hodem
+i po něm"), místo abych sáhl do `rules_crp2016.txt`. **Korekce uživatele
+(„po pass se může hýbat jen podle nějakých nových skillů a pravidel —
+ne v 2016") je správná** a text ji potvrzuje doslova:
 
-**⭐⭐ ZOBECNĚNÍ — TOHLE NENÍ CHYBA BLITZU ANI PŘIHRÁVKY, JE TO CHYBA
-MODELU AKCE.** Je to **druhý výskyt** téhož kořene jako §5c (blitzer se
-po bloku nemůže hýbat). V pravidlech je pohyb **součástí** akce a smí být
-před i po jejím jádru: `pohyb → jádro (blok/hod/předání/faul) → pohyb`.
-U nás je akce **atomická** a pohyb se dá utratit jen předem.
-⇒ **Sjednotit s položkou P1 „blitz po bloku" a řešit JAKO JEDNU ZMĚNU
-modelu akce**, ne třikrát zvlášť. Zkontrolovat i FOUL.
+> **Pass:** „Pass: The player may move a number of squares equal to his MA.
+> **At the end of the move** the player may pass the ball." · „Once you
+> have thrown the ball, however, **you may not move the throwing player
+> any farther that turn, even if he has spare MA left**."
+>
+> **Hand-off:** „A player may move before performing the hand-off, but
+> **once he attempts to hand-off the ball, he may not move the player
+> performing the Hand-Off Action any farther that turn**."
+>
+> **Foul:** „move a number of squares equal to his MA **and then** make
+> a foul."
+
+⇒ `passer.hasActed = true` (`pass_handler.cpp:119`), totéž u hand-offu
+(`:362`) i faulu (`foul_handler.cpp:75`) je **SPRÁVNĚ. Nesahat.**
+
+**⚑ A tím padá i zobecnění „chyba modelu akce se čtyřmi výskyty".**
+**BLITZ je v pravidlech VÝJIMKA** — jediná akce, kde se jádro provádí
+uprostřed pohybu a pohyb pokračuje po něm:
+> „The block may be made **at any point during the move** (…) The player
+> **may carry on moving after** the effects of the block have been worked
+> out if he has any squares of movement left."
+
+⇒ **§5c (blitz) PLATÍ a zůstává samostatnou položkou P1**; přihrávka,
+předání ani faul se s ní neslučují.
 
 ### 📌 SPP (Star Player Points) — v enginu NEEXISTUJÍ
 `grep -i spp` v `engine/` = **0 výskytů**. Existují jen v PHP ligové
