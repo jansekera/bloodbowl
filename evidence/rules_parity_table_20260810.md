@@ -98,6 +98,66 @@ nenastaví, viz `block_handler.cpp:478`). ⇒ parity bug.
 Dopad na doktrínu: zadní Longbeard dnes nemůže odstrčit markera a zůstat
 stát — sám se vytáhne z pozice zálohy (fronta, bod 5, varianta 2).
 
+### 4b. ⛔ FEND — ZÁKAZ follow-upu (doplnil uživatel 10.08.)
+
+Follow-up tedy není dvoustavový (volitelný / povinný u Frenzy), ale
+**třístavový**, a Fend je ten třetí stav — ZÁKAZ:
+
+> **Fend (General):** „Opposing players **may not follow-up** blocks made
+> against this player **even if the Fend player is Knocked Down**. The
+> opposing player may still continue moving after blocking if he had
+> declared a Blitz Action."
+
+A Fend má dvě výjimky, obě potvrzené textem:
+
+> **Juggernaut (Strength):** „If this player takes a Blitz Action, the
+> opposing player **may not use his Fend, Stand Firm or Wrestle skills**
+> against the Juggernaut player's blocks."
+>
+> **Ball & Chain (Extraordinary):** „**The player must follow up** if he
+> will push back another player, and will then carry on with his move."
+
+**Výsledná hierarchie follow-upu:**
+1. základ = **volitelný** (kouč útočníka volí před hodem kostkami)
+2. útočník má **Frenzy** → **povinný**
+3. obránce má **Fend** → **zakázaný** (i když Fend hráč padne)
+4. výjimky z bodu 3: útočník **Juggernaut při Blitz Action**, nebo
+   útočník **Ball & Chain** (ten musí)
+
+**Co dělá engine — TŘI nálezy:**
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| a | `bool fendPrevents = def.hasSkill(Fend) && **!defKnockedDown**;` | `block_handler.cpp:516` | ⛔ **BUG** — pravidla výslovně říkají „even if the Fend player is Knocked Down". Naše podmínka Fend vypne přesně v těch případech, kde se follow-up nejčastěji řeší (Defender Down / Defender Stumbles). Fend u nás fakticky funguje jen na čistý Pushed. |
+| b | Juggernaut Fend **neruší** | `block_handler.cpp:516` (chybí test `isBlitz && att.hasSkill(Juggernaut)`) | ⛔ **BUG**. Engine přitom Juggernaut jinde ZNÁ: ruší StandFirm (`:64`) a mění Both Down → Pushed (`:310`). Jen u Fendu chybí. |
+| c | Juggernaut **neruší ani Wrestle** | `block_handler.cpp:384` — `defWrestle` se aplikuje bezpodmínečně | ⛔ **BUG**, tatáž věta pravidel („Fend, Stand Firm **or Wrestle**"). |
+| d | Ball & Chain vůbec **nikoho neposouvá** — `PUSHED` case jen vrátí `false`, žádný push, žádný follow-up | `ball_and_chain_handler.cpp:60-63` | ⚠️ zjednodušená implementace; pravidlo „B&C musí následovat" v ní nejde ani vyjádřit. Větší kus práce, viz níže. |
+
+**⚑ DŮLEŽITÉ PRO ROZSAH: nic z 4b se dnes nemůže projevit v našich
+číslech.** Podle `roster.cpp`:
+* **Fend** má jen **Bretonnian** (`:277`),
+* **Juggernaut** jen plný **Dwarf** roster (`:88` — Deathroller) a
+  **Khorne** (`:434-435`),
+* **Ball & Chain** jen **Goblin** (`:308`).
+
+Měřená pětka jede přes `get*Roster1200()` (dwarf/skaven/wood-elf/human/orc)
+a **žádný z těch pěti tyhle skilly nemá**. ⇒ Nálezy a–c jsou levné
+korektnostní opravy s **nulovým očekávaným dopadem na naše A/B** — což je
+dobrá vlastnost, ne špatná: nijak neohrozí trpasličí pojistku balíku D.
+Nález d (Ball & Chain) je samostatný kus práce, do balíku D **nepatří**.
+
+**⚑ DOKTRINÁLNÍ DŮSLEDEK (proč to není jen kosmetika): Fend vypíná
+Frenzy.** Frenzy vyžaduje druhý blok, jen když oba **stojí a sousedí**.
+Proti Fendu se útočník neposune, takže odstrčený obránce je po prvním
+bloku o 2 pole daleko ⇒ **žádný druhý blok**. Až budeme mít Fend správně,
+je to levná obrana proti Slayerům (2 ze 4 rohů klece mají Frenzy) i proti
+Rat Ogrovi — a naopak vodítko pro balík E, kdyby se Fend zvažoval do
+některého rosteru.
+
+**K ověření (nedodělek):** Fend říká, že blitzující útočník *smí dál
+pokračovat v pohybu* i když nesmí následovat. Zkontrolovat, že mu naše
+blitz cesta pohyb po bloku neukončí.
+
 ---
 
 ## 5. ⛔ VYSURFOVANÝ NOSITEL — míč mají vhodit DIVÁCI (bod 11c)
@@ -123,6 +183,115 @@ z pass/kick cest), jen se sem nezavolá.
 *a zároveň* míč hned vedle sebe. Ovlivňuje to sideline doktrínu (L-pin,
 bod 12) a nejspíš i ocenění pushů k čáře v plánovači.
 
+### 5a. SURF — HOD NA ZRANĚNÍ (rozhodnuto uživatelem 10.08.)
+
+**Rozhodnutí uživatele: „při vysurfování žádné plus 1 a žádné
+modifikátory — diváci hážou na zranění, ne útočník — a jde do rezerv,
+když je OK."** Tím se ruší otevřená otázka 1 z první verze téhle tabulky.
+Text pravidel to potvrzuje doslova:
+
+> „A player pushed off the pitch, even if Knocked Down, is beaten up
+> **only by the crowd** and receives **one roll on the Injury table**.
+> **The crowd does not have any injury modifying skills.** Note that
+> **no Armour roll is made** for a player that is pushed off the pitch,
+> they are automatically injured. **If a 'Stunned' result is rolled on the
+> Injury table the player should be placed in the Reserves box** of the
+> Dugout, and must remain there until a touchdown is scored or the half
+> ends."
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| a | `ctx.injuryModifier = 1` — náš vlastní přídavek, v pravidlech pro něj není opora | `injury.cpp:116` | ⛔ **BUG → nastavit 0** |
+| b | **Stunned výsledek se u nás mění na KO** a hráč jde pryč: po hodu `if (isOnPitch(...)) { state = KO; position = {-1,-1}; }` | `injury.cpp:124-127` | ⛔ **BUG** — má jít do REZERV (vrací se po TD / konci půle), ne do KO (to vyžaduje záchranný hod) |
+| c | Engine **nemá stav „rezervy"**: `PlayerState` je STANDING/PRONE/STUNNED/KO/INJURED/DEAD/EJECTED/OFF_PITCH | `enums.h:15-17` | ⚠️ chybí nosič stavu; `OFF_PITCH` se dá použít |
+| d | Bez hodu na zbroj ✅, jeden hod na Injury ✅ | `injury.cpp:114-120` | ✅ správně |
+
+**Detail k rozhodnutí „žádné modifikátory":** engine kromě `injuryModifier`
+pouští do hodu ještě `hasDecay` (`injury.cpp:117`) a Stunty
+(`injury.cpp:29-31`). Obojí jsou ale **vlastnosti oběti**, ne útočníka ani
+davu — věta „the crowd does not have any injury modifying skills" míří na
+útočníkovy skilly typu Mighty Blow. **Čtu tvůj pokyn tak, že se ruší jen
+útočníkovy/naše přídavky (`injuryModifier`), a Decay/Stunty zůstávají.**
+Kdyby to bylo myšleno jinak, řekni — je to jeden řádek.
+
+**⚑ Vazba na balík G (třetí výskyt téhož):** „rezervy do konce půle /
+do TD" je **týž chybějící mechanismus** jako přetrvávající zranění
+(bod 16) a jako Sweltering Heat (5b/b) — stav, který musí přežít konec
+drivu. **Dnes je rozdíl KO vs rezervy prakticky nulový**, protože se po
+každém TD staví 11 čerstvých hráčů, takže se vrátí obojí. ⇒ nález b
+opravit **až v G**; v D udělat jen nález a (jeden řádek, `injuryModifier`).
+
+---
+
+## 5b. POČASÍ (na dotaz uživatele 10.08.) — pět nálezů
+
+### Pravidla
+
+> **WEATHER TABLE (2D6, na začátku hry):** 2 Sweltering Heat · 3 Very Sunny
+> (−1 na všechny passing rolls) · **4-10 Nice** · 11 Pouring Rain (−1 na
+> **catch, intercept, pick-up**) · 12 Blizzard (GFI sráží na **1-2**;
+> „only quick or short passes can be attempted")
+>
+> **Sweltering Heat:** „Roll a D6 for each player on the pitch **at the end
+> of a drive**. On a roll of 1 the player collapses and may not be set up
+> for the next kick-off."
+>
+> **Změna počasí ve hře = JEDINĚ Kick-Off table výsledek 7:** „Changing
+> Weather: Make a new roll on the Weather table. Apply the new Weather roll.
+> If the new Weather roll was a 'Nice' result, then a gentle gust of wind
+> makes the ball scatter one extra square in a random direction before
+> landing."
+
+### Nálezy
+
+| # | nález | kód | verdikt |
+|---|---|---|---|
+| a | **Tabulka počasí je posunutá o jedna**: `roll <= 3 → HEAT` a `roll == 4 → VERY_SUNNY`. Podle pravidel je 3 = Very Sunny a 4 = Nice. | `engine/include/bb/enums.h:181-182` | ⛔ **BUG** |
+| b | **Sweltering Heat není vůbec implementovaný** — v celém enginu není jediná reference (grep „heat/swelter" = 0 mimo enum). Je to hodnota bez efektu. | — | ⛔ **BUG** (a viz vazba na balík G níže) |
+| c | **Pouring Rain chybí u interception.** Pravidla ho jmenují výslovně („catch, intercept, or pick-up"). | `pass_handler.cpp:73-79` — žádný weather člen | ⛔ **BUG** |
+| d | **Pouring Rain a Blizzard NEOPRÁVNĚNĚ zdražují PŘIHRÁVKU** o +1. Podle pravidel dává −1 na passing **jen Very Sunny**; Blizzard místo toho omezuje DOSAH, Rain se přihrávky netýká vůbec. | `pass_handler.cpp:213-216` (všechny tři v jedné podmínce) | ⛔ **BUG** |
+| e | **Omezení dosahu v Blizzardu („jen quick/short") není implementované.** | — | ⛔ **BUG** |
+| f | **Počasí se přelosovává při KAŽDÉM výkopu**, ne jen na výsledku 7. Komentář „Roll weather (if not changed by CHANGING_WEATHER)" je čtení pravidla naruby: `if (koEvent != CHANGING_WEATHER) state.weather = weatherFromRoll(...)`. | `kickoff_handler.cpp:273-276` | ⛔ **BUG, ale LATENTNÍ** — viz níže |
+| g | „Extra pole rozptylu, když nové počasí vyjde Nice" (rider u výsledku 7) není implementované. | `kickoff_handler.cpp:113-119` | ⚠️ bezpředmětné, dokud platí „latentní" níže |
+
+### ⚑ Rozsah: co z toho se dnes vůbec projeví
+
+`simulateGame(..., bool useFullKickoff = false)`
+(`engine/include/bb/game_simulator.h:43`) a **žádný volající nepředává
+`true`** ⇒ naše měřené hry jedou přes `simpleKickoff`, které se počasí
+**vůbec nedotýká**. Počasí se tedy losuje **jednou na začátku hry**
+(`game_simulator.cpp:391`) — správně.
+⇒ **Nálezy f a g jsou latentní** (celá Kick-Off tabulka je v našich bězích
+neaktivní — což je samo o sobě fakt, který stojí za zapamatování a
+navazuje na nález 21.07. o výkopovém rozestavení). Nálezy **a–e jsou
+aktivní**.
+
+### ⚑ Jak moc a–b bolí: míň, než to vypadá — chyby se navzájem ruší
+
+| počasí | CRP | engine | efekt v enginu |
+|---|---|---|---|
+| Sweltering Heat | 2,8 % | **8,3 %** | žádný (nález b) ⇒ chová se jako Nice |
+| Very Sunny | 5,6 % | **8,3 %** | −1 na přihrávky |
+| Nice | 83,3 % | **75,0 %** | žádný |
+| Pouring Rain | 5,6 % | 5,6 % ✅ | |
+| Blizzard | 2,8 % | 2,8 % ✅ | |
+
+Protože Heat nic nedělá, „počasí bez efektu" vyjde 75 + 8,3 = **83,3 %** —
+shodou okolností přesně jako v pravidlech. **Jediná reálná odchylka je
+Very Sunny navíc (8,3 % vs 5,6 %)**, tedy přihrávky jsou zdražené asi
+ve 3 % her navíc. Rain i Blizzard máme ve správné četnosti.
+⇒ Nálezy a+b jsou **korektnostní, ne měřicí**: opravovat ano, ale
+neočekávat posun v číslech. **Nálezy c–e jsou věcnější** (mění, jak drahá
+je přihrávková hra — tedy hru rychlých ras, ne trpaslíků).
+
+### ⚑ Vazba na balík G
+
+Sweltering Heat (nález b) je **týž mechanismus jako bod 16**: hráč
+„may not be set up for the next kick-off" = **stav, který musí přežít
+konec drivu**. Dnes takový stav neumíme (proto se mažou i zranění).
+⇒ **Heat implementovat AŽ v rámci G**, ne v D — jinak by se psal
+dvakrát. V D nechat jen opravu tabulky (nález a).
+
 ---
 
 ## 6. ✅ CO JE SPRÁVNĚ (ověřeno, nesahat)
@@ -133,23 +302,23 @@ bod 12) a nejspíš i ocenění pushů k čáře v plánovači.
 | **Catch** | „Catching an accurate pass +1 / missed pass, kick-off, bouncing ball, throw-in **+0** / per TZ −1" | `helpers.cpp:135` `7 - AG - modifier` + TZ ✅ |
 | **GFI** | „On a roll of 1 the player trips up" | target 2+ ✅ |
 | **GFI v Blizzardu** | „will slip and be Knocked Down on a roll of **1-2**" | target 3+ ✅ |
-| **Pouring Rain** | „−1 modifier applies to all catch, intercept, or pick-up rolls" | +1 k targetu u pickup i catch ✅ |
+| **Pouring Rain** | „−1 modifier applies to all catch, intercept, or pick-up rolls" | +1 k targetu u pickup i catch ✅ (⚠️ ale chybí u intercept a navíc se aplikuje na pass — viz 5b/c,d) |
+| **Počáteční los počasí** | „At the start of the game each coach should roll a D6. Add the results together" | `game_simulator.cpp:391` jednou na začátku hry ✅ |
 | **Surf zranění** | „no Armour roll (…) automatically injured", „one roll on the Injury table" | `injury.cpp:114-120` bez zbroje, injuryModifier=1 ⚠️ (viz otázka níže) |
 
 ---
 
 ## 7. OTEVŘENÉ OTÁZKY K PROJITÍ
 
-1. **Surf = +1 k Injury?** Pravidla říkají „receives one roll on the
-   Injury table" a „The crowd does not have any injury modifying skills" —
-   o modifikátoru +1 tam nic není. Engine dává `injuryModifier = 1`
-   (`injury.cpp:116`). **Vypadá to jako náš přídavek navíc** — potvrdit
-   nebo vyvrátit.
+1. ✅ **VYŘEŠENO 10.08. uživatelem** — surf: žádné +1, žádné modifikátory,
+   Stunned → rezervy. Viz 5a.
 2. **Interception target** `7 − AG + 2` (`pass_handler.cpp:74`) — základní
    modifikátor +2 jsem v textu CRP zatím neověřil, dohledat.
 3. **Volba pole pro push** (bod 11b, druhá půlka) — pravidla dávají volbu
    koučovi útočníka mezi eligible poli; ověřit, jak to dělá
    `getPushbackSquares` a kdo volí.
+4. **Decay a Stunty u surfu** zůstávají (jsou to vlastnosti oběti, ne davu)
+   — potvrdit, viz 5a.
 
 ## 8. NÁVRH POŘADÍ OPRAV V RÁMCI BALÍKU D
 
@@ -157,14 +326,32 @@ Sbalit do JEDNÉ změny „engine hraje podle pravidel" a změřit JEDNOU
 (pojistková pre-registrace: **trpaslíci nesmí regredovat; neutrální =
 úspěch**; žádná hypotéza o zlepšení).
 
-1. dodge +1 (řádek 2) — největší dopad, jedna řádka
-2. leap bez modifikátorů (řádek 3) — jedna řádka, hraje proti nám
-3. follow-up volitelný mimo Frenzy (řádek 4) — potřebuje rozhodovací
-   vrstvu „následovat, nebo zůstat", ne jen flag
-4. throw-in u vysurfovaného nositele (řádek 5) — přesměrovat na
+**DO BALÍKU D (levné, řádkové):**
+1. **dodge +1** (§2) — největší dopad, jedna řádka
+2. **leap bez modifikátorů** (§3) — jedna řádka, hraje proti nám
+3. **follow-up volitelný mimo Frenzy** (§4) — potřebuje rozhodovací vrstvu
+   „následovat, nebo zůstat", ne jen flag
+4. **Fend: zrušit podmínku `!defKnockedDown`** + **Juggernaut ruší Fend,
+   StandFirm i Wrestle při blitzu** (§4b a, b, c) — tři řádky, nulový
+   očekávaný dopad na naši pětku (nikdo z nich ty skilly nemá)
+5. **throw-in u vysurfovaného nositele** (§5) — přesměrovat na
    `resolveThrowIn`, funkce existuje
-5. nega-traity (TakeRoot u bloku, ReallyStupid soused) — z fronty, dosud
-   neověřeno proti textu; **doplnit do téhle tabulky před opravou**
+6. **surf: `injuryModifier = 1` → `0`** (§5a a) — jedna řádka
+7. **tabulka počasí posunutá o jedna** (§5b a) — dva řádky v `enums.h`
+8. **Pouring Rain u interception; Rain/Blizzard NEsmí zdražovat pass;
+   Blizzard omezuje dosah** (§5b c, d, e)
+9. **nega-traity** (TakeRoot u bloku, ReallyStupid soused) — z fronty,
+   dosud neověřeno proti textu; **doplnit do téhle tabulky před opravou**
 
-⚠️ Body 2 a 5 hrají spíš proti nám (usnadní elfům leap do klece, zpřísní
-naše big guye), body 1 a 4 jsou obousměrné. Proto pojistka, ne hypotéza.
+**ODLOŽIT DO BALÍKU G** (všechno jsou to varianty „stav musí přežít konec
+drivu", psát jednou, ne třikrát):
+* Sweltering Heat (§5b b)
+* surf Stunned → rezervy místo KO (§5a b) + stav „rezervy" (§5a c)
+
+**MIMO OBA BALÍKY** (samostatná práce, žádná z našich pěti ras se jich
+netýká): Ball & Chain push/follow-up (§4b d), Kick-Off tabulka jako celek
+včetně Changing Weather (§5b f, g — dnes neaktivní, `useFullKickoff=false`).
+
+⚠️ Body 2, 8 a 9 hrají spíš proti nám (usnadní elfům leap do klece,
+zlevní přihrávkovou hru rychlým rasám, zpřísní naše big guye), body 1,
+5, 6 jsou obousměrné. **Proto pojistka, ne hypotéza.**
