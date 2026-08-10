@@ -86,6 +86,11 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                                          range)) {
                     return;
                 }
+                // Blizzard: "only quick or short passes can be attempted".
+                if (state.weather == Weather::BLIZZARD &&
+                    (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
+                    return;
+                }
                 out.push_back({ActionType::PASS, p.id, teammate.id, teammate.position});
             });
         }

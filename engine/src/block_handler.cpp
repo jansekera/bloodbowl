@@ -55,6 +55,17 @@ static bool shouldRerollBlock(BlockDiceFace face, const Player& att) {
     return false;
 }
 
+// The square a pushed player leaves the pitch through: one step directly
+// away from whoever pushed him. resolvePushback reports a surf as
+// pushDest = {-1,-1}, which classifyExit cannot read, so the throw-in
+// template needs this reconstructed exit to know which edge it is centred on.
+static Position pushOffPitchExit(Position pusher, Position pushed) {
+    int dx = pushed.x - pusher.x;
+    int dy = pushed.y - pusher.y;
+    return Position{static_cast<int8_t>(pushed.x + (dx > 0) - (dx < 0)),
+                    static_cast<int8_t>(pushed.y + (dy > 0) - (dy < 0))};
+}
+
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
                             bool isBlitz, DiceRollerBase& dice,
@@ -132,7 +143,16 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
             Position occupantOldPos = occupant->position;
             emitEvent(events, {GameEvent::Type::PUSH, occupant->id, -1,
                               occupant->position, {-1, -1}, 0, true});
-            handleBallOnPlayerDown(state, occupant->id, dice, events);
+            // Same throw-in rule on a chain push off the pitch: the pusher
+            // here is the defender being shoved into this occupant.
+            if (state.ball.isHeld && state.ball.carrierId == occupant->id) {
+                state.ball = BallState::onGround(occupantOldPos);
+                resolveThrowIn(state, occupantOldPos,
+                               pushOffPitchExit(defender.position, occupantOldPos),
+                               dice, events);
+            } else {
+                handleBallOnPlayerDown(state, occupant->id, dice, events);
+            }
             resolveCrowdSurf(state, occupant->id, dice, events);
         } else {
             // Find empty chain destination
@@ -471,9 +491,23 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                                           pushDest, events);
 
         if (crowdSurf) {
-            // Crowd surf
-            handleBallOnPlayerDown(state, def.id, dice, events);
+            // Crowd surf. A surfed BALL CARRIER does not just drop the ball
+            // at the touchline (rules parity, 2026-08-10). CRP: "If the
+            // player who is holding the ball is pushed out of bounds, then
+            // he is beaten up by the fans, who are more than happy to throw
+            // the ball back into play! The Throw-in template is centred on
+            // the last square the player was in before he was pushed off
+            // the pitch." We used to call handleBallOnPlayerDown, leaving
+            // the ball a single bounce from the edge -- so a surf won us the
+            // removal AND the ball, and was badly overpaid.
             Position lastPos = def.position;
+            if (state.ball.isHeld && state.ball.carrierId == def.id) {
+                state.ball = BallState::onGround(lastPos);
+                resolveThrowIn(state, lastPos, pushOffPitchExit(att.position, lastPos),
+                               dice, events);
+            } else {
+                handleBallOnPlayerDown(state, def.id, dice, events);
+            }
             def.position = {-1, -1};
             resolveCrowdSurf(state, def.id, dice, events);
 

@@ -8,68 +8,73 @@ namespace bb {
 
 namespace {
 
-// Bresenham line from src to dst, returning all positions along the path
-// (excluding src and dst themselves)
-int getPassPath(Position src, Position dst, Position* out, int maxOut) {
-    int count = 0;
-    int x0 = src.x, y0 = src.y;
-    int x1 = dst.x, y1 = dst.y;
-
-    int dx = std::abs(x1 - x0);
-    int dy = std::abs(y1 - y0);
-    int sx = (x0 < x1) ? 1 : -1;
-    int sy = (y0 < y1) ? 1 : -1;
-    int err = dx - dy;
-
-    // The line spans exactly max(dx, dy) steps along the dominant axis. Bounding
-    // the loop to that many iterations guarantees termination: previously this was
-    // `while (true)` that broke only on (x0==x1 && y0==y1), but the strict `>`/`<`
-    // comparisons can overshoot the endpoint on degenerate inputs, so the break
-    // never fired and the game hung forever (the `count < maxOut` guard only stops
-    // writing, not looping). Skip the start position; never record the endpoint.
-    int steps = std::max(dx, dy);
-    for (int s = 0; s < steps; ++s) {
-        int e2 = 2 * err;
-        if (e2 > -dy) {
-            err -= dy;
-            x0 += sx;
-        }
-        if (e2 < dx) {
-            err += dx;
-            y0 += sy;
-        }
-
-        // Reached destination
-        if (x0 == x1 && y0 == y1) break;
-
-        if (count < maxOut) {
-            out[count++] = {static_cast<int8_t>(x0), static_cast<int8_t>(y0)};
-        }
+// Squared distance from a square centre to the segment thrower->target,
+// scaled by 4 so it stays in integers (half-square precision is enough).
+static int distSqToSegment4(Position p, Position a, Position b) {
+    int apx = 2 * (p.x - a.x), apy = 2 * (p.y - a.y);
+    int abx = 2 * (b.x - a.x), aby = 2 * (b.y - a.y);
+    int denom = abx * abx + aby * aby;
+    if (denom == 0) return apx * apx + apy * apy;
+    int t = apx * abx + apy * aby;          // projection numerator
+    if (t <= 0) return apx * apx + apy * apy;
+    if (t >= denom) {
+        int bpx = apx - abx, bpy = apy - aby;
+        return bpx * bpx + bpy * bpy;
     }
-    return count;
+    // Perpendicular component, kept exact: |ap|^2 - t^2/denom, times denom.
+    long long num = static_cast<long long>(apx * apx + apy * apy) * denom
+                    - static_cast<long long>(t) * t;
+    return static_cast<int>(num / denom);
 }
 
-// Check for interception along pass path
-// Returns interceptor player ID or -1
+// Check for interception. The RANGE RULER HAS WIDTH (rules parity,
+// 2026-08-10): eligibility is "have the plastic Range Ruler pass over at
+// least part of the square the intercepting player is standing in", i.e. a
+// CORRIDOR of about one square either side of the thrower->target line, not
+// the mathematical line itself. The BB2025 wording is blunter and agrees:
+// "if the Range Ruler overlaps any squares containing a Standing opposition
+// player". Walking a Bresenham line demanded distance ~0 and so allowed only
+// a fraction of the players the rules let try -- which quietly favoured the
+// throwing side. CRP also requires the interceptor to have a tackle zone and
+// to be closer to each end than the ends are to each other, and lets only
+// ONE player attempt; where several qualify we take the likeliest, since a
+// free choice with no downside is always used (user's rule, 2026-08-10).
 int checkInterception(GameState& state, int passerId, Position target,
                       DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& passer = state.getPlayer(passerId);
     TeamSide enemySide = opponent(passer.teamSide);
 
-    // Get pass path
-    Position path[30];
-    int pathLen = getPassPath(passer.position, target, path, 30);
+    // Pick the single best eligible interceptor inside the ruler corridor.
+    const Player* interceptor = nullptr;
+    int bestTarget = 99;
+    int throwLen = passer.position.distanceTo(target);
+    state.forEachOnPitch(enemySide, [&](const Player& p) {
+        if (!canAct(p.state) || p.lostTacklezones) return;   // must have a TZ
+        if (p.hasSkill(SkillName::NoHands)) return;
+        if (p.position == passer.position || p.position == target) return;
+        // Closer to each end than the ends are to each other (CRP).
+        if (p.position.distanceTo(passer.position) >= throwLen) return;
+        if (p.position.distanceTo(target) >= throwLen) return;
+        // Ruler overlaps the square: centre within ~1 square of the line.
+        if (distSqToSegment4(p.position, passer.position, target) > 4) return;
 
-    // Find first eligible interceptor along path
-    for (int i = 0; i < pathLen; i++) {
-        if (!path[i].isOnPitch()) continue;
+        int t = 7 - p.stats.agility + 2;
+        if (p.hasSkill(SkillName::VeryLongLegs)) t -= 1;
+        if (p.hasSkill(SkillName::ExtraArms)) t -= 1;
+        if (!p.hasSkill(SkillName::NervesOfSteel)) {
+            t += countTacklezones(state, p.position, p.teamSide);
+        }
+        if (state.weather == Weather::POURING_RAIN) t += 1;
+        t = std::clamp(t, 2, 6);
+        if (t < bestTarget || (t == bestTarget && interceptor &&
+                               p.hasSkill(SkillName::Catch) &&
+                               !interceptor->hasSkill(SkillName::Catch))) {
+            bestTarget = t;
+            interceptor = &p;
+        }
+    });
 
-        // Check for standing enemy at this position
-        const Player* interceptor = state.getPlayerAtPosition(path[i]);
-        if (!interceptor || interceptor->teamSide != enemySide) continue;
-        if (!canAct(interceptor->state) || interceptor->lostTacklezones) continue;
-        if (interceptor->hasSkill(SkillName::NoHands)) continue;
-
+    if (interceptor) {
         // Interception target: 7 - AG + 2 (base modifier)
         int intTarget = 7 - interceptor->stats.agility + 2;
         if (interceptor->hasSkill(SkillName::VeryLongLegs)) intTarget -= 1;
@@ -125,8 +130,6 @@ int checkInterception(GameState& state, int passerId, Position target,
                               interceptor->position, {}, intTarget, true});
             return interceptor->id;
         }
-        // Only first eligible interceptor gets a chance (simplified)
-        break;
     }
     return -1;
 }
@@ -222,6 +225,15 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     PassRange range = PassRange::LONG_BOMB;
     if (!passRangeFromOffset(target.x - passer.position.x,
                              target.y - passer.position.y, range)) {
+        return ActionResult::fail();
+    }
+
+    // Blizzard restricts the RANGE, it does not tax the roll (rules parity,
+    // 2026-08-10). CRP: "the snow means that only quick or short passes can
+    // be attempted." Checked on the ruler band before Strong Arm, which
+    // improves the modifier rather than the distance actually thrown.
+    if (state.weather == Weather::BLIZZARD &&
+        (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
         return ActionResult::fail();
     }
 
