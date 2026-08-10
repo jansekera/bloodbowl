@@ -53,9 +53,16 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         }
     }
 
-    // 2. Accuracy roll
-    int dist = thrower.position.distanceTo(target);
-    PassRange range = passRangeFromDistance(dist);
+    // 2. Accuracy roll. Range comes from the ruler grid (rules parity,
+    // 2026-08-10), and CRP Throw Team-Mate caps it: "Long Pass or Long Bomb
+    // range passes are not possible" -- Short Pass is the ceiling, which is
+    // what the printed grid marks as "Max. TTM".
+    PassRange range;
+    if (!passRangeFromOffset(target.x - thrower.position.x,
+                             target.y - thrower.position.y, range) ||
+        range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB) {
+        return ActionResult::fail();
+    }
 
     if (thrower.hasSkill(SkillName::StrongArm) && range != PassRange::QUICK_PASS) {
         range = static_cast<PassRange>(static_cast<int>(range) - 1);

@@ -165,12 +165,6 @@ inline int passModifier(PassRange r) {
     return 0;
 }
 
-inline PassRange passRangeFromDistance(int dist) {
-    if (dist <= 3)  return PassRange::QUICK_PASS;
-    if (dist <= 6)  return PassRange::SHORT_PASS;
-    if (dist <= 10) return PassRange::LONG_PASS;
-    return PassRange::LONG_BOMB;
-}
 
 // --- Weather ---
 enum class Weather : uint8_t {
@@ -181,6 +175,46 @@ enum class Weather : uint8_t {
 // 11 Pouring Rain, 12 Blizzard. Ours used to be shifted by one (a 3 gave
 // Heat and a 4 gave Very Sunny), over-generating both bad-weather results
 // at Nice's expense -- rules parity, 2026-08-10.
+// Regular Throwing Ranges, keyed on the |dx|,|dy| offset from the thrower
+// (rules parity, 2026-08-10). The range ruler is a SHAPED PHYSICAL TEMPLATE,
+// not a radius: (13,0) is a Long Bomb while (5,12) cannot be thrown at all,
+// and both sit at exactly 13.00 squares, so no distance function reproduces
+// it. We used Chebyshev distance with 3/6/10 thresholds, which disagreed
+// with 81 of the 196 cells -- every one of them in the throwing side's
+// favour, including 45 where we allowed a pass the rules forbid outright.
+// Source: the printed grid, transcribed with the symmetry constraint
+// band(dx,dy) == band(dy,dx); see evidence/pass_range_grid_20260810.txt.
+inline bool passRangeFromOffset(int dx, int dy, PassRange& out) {
+    constexpr auto Q = PassRange::QUICK_PASS;
+    constexpr auto S = PassRange::SHORT_PASS;
+    constexpr auto L = PassRange::LONG_PASS;
+    constexpr auto B = PassRange::LONG_BOMB;
+    constexpr auto X = static_cast<PassRange>(0xFF);  // no pass possible
+    static constexpr PassRange GRID[14][14] = {
+        { Q, Q, Q, Q, S, S, S, L, L, L, L, B, B, B },  // dy=0
+        { Q, Q, Q, Q, S, S, S, L, L, L, L, B, B, B },  // dy=1
+        { Q, Q, Q, S, S, S, S, L, L, L, L, B, B, B },  // dy=2
+        { Q, Q, S, S, S, S, S, L, L, L, B, B, B, X },  // dy=3
+        { S, S, S, S, S, S, L, L, L, L, B, B, B, X },  // dy=4
+        { S, S, S, S, S, L, L, L, L, B, B, B, X, X },  // dy=5
+        { S, S, S, S, L, L, L, L, L, B, B, B, X, X },  // dy=6
+        { L, L, L, L, L, L, L, L, B, B, B, X, X, X },  // dy=7
+        { L, L, L, L, L, L, L, B, B, B, X, X, X, X },  // dy=8
+        { L, L, L, L, L, B, B, B, B, X, X, X, X, X },  // dy=9
+        { L, L, L, B, B, B, B, B, X, X, X, X, X, X },  // dy=10
+        { B, B, B, B, B, B, B, X, X, X, X, X, X, X },  // dy=11
+        { B, B, B, B, B, X, X, X, X, X, X, X, X, X },  // dy=12
+        { B, B, B, X, X, X, X, X, X, X, X, X, X, X },  // dy=13
+    };
+    int adx = dx < 0 ? -dx : dx;
+    int ady = dy < 0 ? -dy : dy;
+    if (adx >= 14 || ady >= 14) return false;
+    PassRange r = GRID[ady][adx];
+    if (r == X) return false;
+    out = r;
+    return true;
+}
+
 inline Weather weatherFromRoll(int roll) {
     if (roll <= 2)  return Weather::SWELTERING_HEAT;
     if (roll == 3)  return Weather::VERY_SUNNY;

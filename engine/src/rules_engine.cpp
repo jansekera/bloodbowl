@@ -77,8 +77,15 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             state.forEachOnPitch(side, [&](const Player& teammate) {
                 if (teammate.id == p.id) return;
                 if (teammate.state != PlayerState::STANDING) return;
-                int dist = p.position.distanceTo(teammate.position);
-                if (dist > 13) return;
+                // Reach comes from the ruler grid, not a Chebyshev radius
+                // (rules parity, 2026-08-10): "within 13" offered 45 targets
+                // the ruler cannot actually reach.
+                PassRange range;
+                if (!passRangeFromOffset(teammate.position.x - p.position.x,
+                                         teammate.position.y - p.position.y,
+                                         range)) {
+                    return;
+                }
                 out.push_back({ActionType::PASS, p.id, teammate.id, teammate.position});
             });
         }
@@ -134,12 +141,22 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             }
         }
 
-        // BOMB_THROW: Bombardier player, target positions within range 13
-        if (p.hasSkill(SkillName::Bombardier) && !team.passUsedThisTurn) {
+        // BOMB_THROW (rules parity, 2026-08-10). CRP Bombardier: the throw
+        // "does not use the team's Pass Action for the turn", so it is NOT
+        // gated on passUsedThisTurn; but "the player may not move or stand
+        // up before throwing it (he needs time to light the fuse!)", so a
+        // player who has already moved -- or who is Prone/Stunned -- cannot.
+        // Reach comes from the ruler grid, not a Chebyshev radius.
+        if (p.hasSkill(SkillName::Bombardier) && !p.hasMoved &&
+            p.state == PlayerState::STANDING) {
             state.forEachOnPitch(enemySide, [&](const Player& enemy) {
                 if (enemy.state != PlayerState::STANDING) return;
-                int dist = p.position.distanceTo(enemy.position);
-                if (dist > 13) return;
+                PassRange range;
+                if (!passRangeFromOffset(enemy.position.x - p.position.x,
+                                         enemy.position.y - p.position.y,
+                                         range)) {
+                    return;
+                }
                 out.push_back({ActionType::BOMB_THROW, p.id, -1, enemy.position});
             });
         }

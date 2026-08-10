@@ -10,12 +10,21 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
                               DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& thrower = state.getPlayer(throwerId);
 
+    // A bomb does NOT consume the team's Pass Action (rules parity,
+    // 2026-08-10). CRP Bombardier: "A coach may choose to have a Bombardier
+    // (...) throw a bomb instead of taking any other Action with the player.
+    // This does not use the team's Pass Action for the turn." We used to
+    // spend it, which silently cost the team its throw for the turn.
     thrower.hasActed = true;
-    state.getTeamState(thrower.teamSide).passUsedThisTurn = true;
 
     // 1. Accuracy roll (same as pass)
-    int dist = thrower.position.distanceTo(target);
-    PassRange range = passRangeFromDistance(dist);
+    // Bombs use the ball's throwing rules, so the same ruler grid
+    // (rules parity, 2026-08-10).
+    PassRange range;
+    if (!passRangeFromOffset(target.x - thrower.position.x,
+                             target.y - thrower.position.y, range)) {
+        return ActionResult::fail();
+    }
 
     int passTarget = 7 - thrower.stats.agility;
     passTarget -= passModifier(range);

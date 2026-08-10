@@ -848,6 +848,48 @@ mechanika**: post-hoc deklarace s cenou, ne předhozený modifikátor.
 **Správně implementovaný Diving Tackle je pro obránce SILNĚJŠÍ** (nikdy
 se neplýtvá) **a zároveň DRAŽŠÍ** (skončí na zemi) než ten náš.
 
+## 5i. BOMBA vs PŘIHRÁVKA vs TTM (uživatel dodal srovnání 10.08.)
+
+Ověřeno proti CRP — **uživatel měl pravdu ve všech třech bodech, které se
+týkaly bomb, a náš engine je měl obráceně.**
+
+> **Bombardier:** „throw a bomb instead of taking any other Action with the
+> player. **This does not use the team's Pass Action for the turn.** The
+> bomb is thrown using the rules for throwing the ball (…) except that
+> **the player may not move or stand up before throwing it**. **Intercepted
+> bomb passes are not turnovers.** (…) the player catching it **must throw
+> it again immediately. This is a special bonus Action that takes place out
+> of the normal sequence of play.** (…) The bomb explodes when it lands in
+> an empty square or an opportunity to catch it fails or is declined
+> (**bombs don't 'bounce'**). If the bomb is fumbled it explodes in the bomb
+> thrower's square. If a bomb lands in the crowd, it explodes with no
+> effect."
+
+| # | nález | verdikt |
+|---|---|---|
+| a | **Bomba spotřebovávala týmovou Pass akci** — `bomb_handler.cpp:14` nastavoval `passUsedThisTurn`, a `rules_engine.cpp` bombu navíc **gatoval** na `!passUsedThisTurn` ⇒ tým tiše přišel o přihrávku | ✅ **OPRAVENO 10.08.** |
+| b | **Chybělo „nesmí se hnout ani vstát"** — bombu šlo hodit po pohybu i vleže | ✅ **OPRAVENO** (`!p.hasMoved && STANDING`) |
+| c | dosah bomby byl Chebyshev ≤13 | ✅ **OPRAVENO** — mřížka pravítka |
+| d | **Zachycená bomba: „interceptor ji musí ihned hodit znovu"** — mimopořadová bonusová akce | ⛔ **CHYBÍ** — táž třída jako Pass Block (§4b), řízení toku |
+| e | „bomby se neodrážejí" · fumble vybuchne u vrhače · dopad do davu bez efektu | ⚠️ neověřeno v kódu, doplnit |
+
+**Rozsah:** Bombardier má jen **Goblin** (`roster.cpp:305`) ⇒ latentní.
+
+### TTM — ověřeno, většinou správně
+> „The pass is worked out exactly the same as if the player with Throw
+> Team-Mate was passing a ball, except **the player must subtract 1** from
+> the D6 roll, **fumbles are not automatically turnovers**, and **Long Pass
+> or Long Bomb range passes are not possible**. (…) accurate passes are
+> **treated instead as inaccurate** thus **scattering the thrown player
+> three times**. The thrown player **cannot be intercepted**. A fumbled
+> team-mate will **land in the square he originally occupied**."
+
+✅ **Max Short Pass DOPLNĚNO 10.08.** (dřív šel TTM na Long Bomb).
+To je i ten žlutý „Max. TTM" v legendě mřížky.
+⚠️ Zbytek (−1, nikdy accurate, 3× scatter, bez interceptu, fumble na
+původní pole, fumble není turnover) **ověřit v `ttm_handler.cpp`** —
+zatím neprojito.
+
 ## 7. OTEVŘENÉ OTÁZKY K PROJITÍ
 
 1. ✅ **VYŘEŠENO 10.08. uživatelem** — surf: žádné +1, žádné modifikátory,

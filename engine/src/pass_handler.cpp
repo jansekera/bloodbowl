@@ -215,7 +215,15 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     }
 
     // Calculate pass accuracy target
-    PassRange range = passRangeFromDistance(dist);
+    // Range comes from the ruler GRID, not a distance (rules parity,
+    // 2026-08-10). Out-of-range targets are filtered out when actions are
+    // generated; falling back to Long Bomb here is a belt-and-braces guard
+    // so a hand-built Action can never silently become a free long throw.
+    PassRange range = PassRange::LONG_BOMB;
+    if (!passRangeFromOffset(target.x - passer.position.x,
+                             target.y - passer.position.y, range)) {
+        return ActionResult::fail();
+    }
 
     // StrongArm reduces range by one band
     if (passer.hasSkill(SkillName::StrongArm) && range != PassRange::QUICK_PASS) {

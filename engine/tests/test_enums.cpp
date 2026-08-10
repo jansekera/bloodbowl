@@ -67,14 +67,34 @@ TEST(PassRange, Modifier) {
     EXPECT_EQ(passModifier(PassRange::LONG_BOMB), -2);
 }
 
-TEST(PassRange, FromDistance) {
-    EXPECT_EQ(passRangeFromDistance(1), PassRange::QUICK_PASS);
-    EXPECT_EQ(passRangeFromDistance(3), PassRange::QUICK_PASS);
-    EXPECT_EQ(passRangeFromDistance(4), PassRange::SHORT_PASS);
-    EXPECT_EQ(passRangeFromDistance(6), PassRange::SHORT_PASS);
-    EXPECT_EQ(passRangeFromDistance(7), PassRange::LONG_PASS);
-    EXPECT_EQ(passRangeFromDistance(10), PassRange::LONG_PASS);
-    EXPECT_EQ(passRangeFromDistance(11), PassRange::LONG_BOMB);
+TEST(PassRange, FromOffsetGridIsSymmetric) {
+    // The range ruler does not care about direction, so the grid must be
+    // symmetric in dx/dy. This is the invariant the table was reconstructed
+    // under; it catches a mistyped cell immediately.
+    for (int dy = 0; dy < 14; ++dy) {
+        for (int dx = 0; dx < 14; ++dx) {
+            PassRange a, b;
+            bool okA = passRangeFromOffset(dx, dy, a);
+            bool okB = passRangeFromOffset(dy, dx, b);
+            EXPECT_EQ(okA, okB) << "asymmetric reachability at " << dx << "," << dy;
+            if (okA && okB) {
+                EXPECT_EQ(a, b) << "asymmetric band at " << dx << "," << dy;
+            }
+        }
+    }
+}
+
+TEST(PassRange, FromOffsetIsNotAChebyshevRadius) {
+    // (13,0) is a Long Bomb but (5,12) cannot be thrown at all, even though
+    // both are 13.00 squares away -- the ruler is a shaped template, which is
+    // exactly why a distance function cannot stand in for the grid.
+    PassRange r;
+    EXPECT_TRUE(passRangeFromOffset(13, 0, r));
+    EXPECT_EQ(r, PassRange::LONG_BOMB);
+    EXPECT_FALSE(passRangeFromOffset(5, 12, r));
+    // Negative offsets mirror.
+    EXPECT_TRUE(passRangeFromOffset(-13, 0, r));
+    EXPECT_EQ(r, PassRange::LONG_BOMB);
 }
 
 TEST(Weather, FromRoll) {
