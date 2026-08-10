@@ -1,0 +1,17 @@
+decisions=6639 games=48
+
+=== arm old (mean over seeds [1, 2, 3]) ===
+CE=1.8961 top1=0.584 cfTV=0.0116
+A END_TURN[all]: n=11 top1_share=0.0 median_rank=12.0
+A END_TURN[dwarf]: n=10 top1_share=0.0 median_rank=12.0
+B REPOS[dwarf]: n=1775 spread=5.377805660361527e-18 hit=0.9126760563380282 chance=0.21091465967522305 search_spread=0.025507293502342394
+B REPOS[all]: n=4612 spread=0.002394135543990554 hit=0.6480196588609425 chance=0.21793374364384768 search_spread=0.02686633247874488
+C PICKUP: delta_dwarf=-0.10118753330889822 delta_skaven=-0.1635671814598463 delta_wood-elf=-0.02807825970952529 n_dwarf=162.0 n_pickup_cands=882.0 n_skaven=222.0 n_wood-elf=100.0 spearman_p=0.0015331800153318004 spearman_rho=0.13218768762605845
+
+=== arm new (mean over seeds [1, 2, 3]) ===
+CE=1.8953 top1=0.449 cfTV=0.0116
+A END_TURN[all]: n=11 top1_share=0.0 median_rank=11.333333333333334
+A END_TURN[dwarf]: n=10 top1_share=0.0 median_rank=11.0
+B REPOS[dwarf]: n=1775 spread=0.011030305555590472 hit=0.24187793427230045 chance=0.21091465967522305 search_spread=0.025507293502342394
+B REPOS[all]: n=4612 spread=0.014384901836716394 hit=0.21480196588609424 chance=0.21793374364384768 search_spread=0.02686633247874488
+C PICKUP: delta_dwarf=-0.0940985203095659 delta_skaven=-0.14593081736529287 delta_wood-elf=-0.01206496889033957 n_dwarf=162.0 n_pickup_cands=882.0 n_skaven=222.0 n_wood-elf=100.0 spearman_p=9.999000099990002e-05 spearman_rho=0.362019165631476
