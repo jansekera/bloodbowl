@@ -818,6 +818,36 @@ směr) — prošla, a uživatelovy hodnoty pro řady 8/9/10 (poslední L na
 a ve zbytku je o pásmo levnější. Systematicky to nadržuje přihrávkové
 hře, tedy rychlým rasám.
 
+## 5h. ⭐ DIVING TACKLE — deklaruje se AŽ PO HODU (a po rerollech)
+
+Ověřeno v CRP (uživatel na to upozornil 10.08.):
+> „Diving Tackle **may be used on a re-rolled dodge if not declared for
+> use on the first Dodge roll**. **Once the dodge is resolved** but before
+> any armour roll for the opponent, the Diving Tackle Player is **Placed
+> Prone in the square vacated by the dodging player**, but do not make an
+> Armour or Injury roll for the Diving Tackle player."
+
+**⇒ Pořadí je: hod → (Dodge reroll / týmový reroll) → TEPRVE PAK se
+obránce rozhoduje o Diving Tackle → −2 na finální výsledek.**
+Útočník už pak nepřehazuje.
+
+**Co z toho plyne prakticky:**
+* Obránce **vidí výsledek, než zaplatí**. Nedeklaruje naslepo ⇒
+  **nikdy ho neutratí zbytečně**: při přirozené 1 (dodge stejně selhal)
+  ani při hodu tak vysokém, že by i s −2 prošel, nemá důvod ho použít.
+* Cena se platí **jen když to změní výsledek**.
+* **Diving Tackle NERUŠÍ skill Dodge** — to dělá `Tackle`. Je to jen
+  plošných −2, takže útočník svůj Dodge reroll použít smí.
+
+**⛔ NÁŠ ENGINE TO MÁ JINAK, A TO DVOJÍ CHYBOU** (`helpers.cpp:99-108`):
+1. **aplikuje +2 k cíli PŘED hodem a automaticky** ⇒ rozhoduje naslepo
+   tam, kde pravidla dávají informaci;
+2. **nikdy nepokládá Diving Tackle hráče na zem** ⇒ efekt je zadarmo.
+⇒ Není to „volitelné vs vynucené" jako Stand Firm — je to **jiná
+mechanika**: post-hoc deklarace s cenou, ne předhozený modifikátor.
+**Správně implementovaný Diving Tackle je pro obránce SILNĚJŠÍ** (nikdy
+se neplýtvá) **a zároveň DRAŽŠÍ** (skončí na zemi) než ten náš.
+
 ## 7. OTEVŘENÉ OTÁZKY K PROJITÍ
 
 1. ✅ **VYŘEŠENO 10.08. uživatelem** — surf: žádné +1, žádné modifikátory,
