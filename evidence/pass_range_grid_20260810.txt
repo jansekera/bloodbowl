@@ -2,7 +2,8 @@ REGULAR THROWING RANGES - mrizka pro |dx|,|dy| (BB2016/CRP)
 Zdroj: obrazek uzivatele 10.08.2026; L profil dle jeho zapisu
   'L 10 - 0,1,2 ; L 9 - 3,4 ; L 8 - 5,6 ; L 7 - 7', zbytek ze symetrie.
 Kontrola band(dx,dy)==band(dy,dx): PROSLA
-POTVRZENO uzivatelem 10.08.: pole (10,3) je B. Mrizka je uzavrena.
+POTVRZENO 10.08.: (10,3) je B; cela mrizka overena proti DRUHEMU renderu
+  (pass2.png) rada po rade - Q i S pasma sedi, ne jen odvozeni ze symetrie.
 Q=Quick(+1) S=Short(0) L=Long(-1) B=LongBomb(-2) .=mimo dosah
 
 13 | B  B  B  .  .  .  .  .  .  .  .  .  .  .
