@@ -168,7 +168,8 @@ static FullGameOutcome playGame(const TeamRoster& home, const TeamRoster& away,
 }
 
 static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* pol,
-                             bool cageAdvanceOn, bool cageGrindOn = false) {
+                             bool cageAdvanceOn, bool cageGrindOn = false,
+                             float policyBlend = 0.0f) {
     // Champion fairtest config (diag_policy_confirm_20260731.py): MCTS-100,
     // vf_blend 0.15, policy net loaded with blend 0 => heuristic prior
     // floors ACTIVE (expand() only computes floors when a policy is set).
@@ -180,7 +181,7 @@ static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* p
     cfg.vfBlend = 0.15f;
     cfg.nRollouts = 1;
     cfg.policy = pol;
-    cfg.policyBlend = 0.0f;
+    cfg.policyBlend = policyBlend;
     cfg.cageAdvance = cageAdvanceOn;
     cfg.cageGrind = cageGrindOn;
     return cfg;
@@ -199,18 +200,20 @@ int main(int argc, char** argv) {
     std::string root = (argc > 1) ? argv[1] : ".";
     int nPairs = (argc > 2) ? atoi(argv[2]) : 400;
     int matchupFilter = (argc > 3) ? atoi(argv[3]) : -1;
-    int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B, 2 = era
+    int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B, 2 = era, 3 = M1
     // mode 2 (2026-08-10, rules-parity era comparison): BOTH sides run the
     // production config, so there is no candidate arm at all. A rules change
     // alters the game for both teams, which means it cannot be A/B'd inside
     // one binary -- you run the SAME seeds through two builds and compare
     // per seed. Seeds are disjoint from the other modes so runs never mix.
     uint32_t seedBase = (mode == 1) ? 37'000'000u
-                      : (mode == 2) ? 51'000'000u : SEED_BASE;
+                      : (mode == 2) ? 51'000'000u
+                      : (mode == 3) ? 63'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
          : mode == 2 ? "ERA: single arm, production config, both sides"
+         : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -226,6 +229,7 @@ int main(int argc, char** argv) {
 
     FILE* rows = fopen(mode == 1 ? "diag_f1_grind_rows.jsonl"
                      : mode == 2 ? "diag_era_rows.jsonl"
+                     : mode == 3 ? "diag_m1_rows.jsonl"
                                  : "diag_f1_cage_advance_rows.jsonl", "a");
 
     // attrition aggregation: race -> opponent-gate-on? -> sums
@@ -257,8 +261,15 @@ int main(int argc, char** argv) {
                 // mode 0: cand=cage on,  base=cage off
                 // mode 1: cand=cage+grind, base=cage without grind
                 // mode 2: BOTH production (cage off, grind off) -- era run
+                // mode 3 (M1, Fable §M1): both arms keep the policy LOADED so
+                // the hand-coded prior floors stay active in both; only the
+                // LEARNED content differs (blend 0.2 vs 0.0). That isolates
+                // "does the learned policy help or hurt the dwarf" from "do
+                // the floors help". Cage/grind off, as in production.
                 MCTSConfig candCfg = makeConfig(vf.get(), pol.get(),
-                                                mode != 2, mode == 1);
+                                                mode != 2 && mode != 3,
+                                                mode == 1,
+                                                mode == 3 ? 0.2f : 0.0f);
                 MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(),
                                                 mode == 1);
                 MacroMCTSPolicy homePol(vf.get(),
