@@ -104,3 +104,32 @@ s tréninkem), rozpočet ≤150k tokenů.
       re-benchmarkován (staleness), stash carry-over proběhl (nová Živá
       7e962a41). → Self-play korpus této iterace = první data se staged
       plánovačem (páka 4 — kvalita dat); k dispozici pro analýzu.
+
+## DOPLNĚNO 10.08. RÁNO (odbavení víkendu — přímý vstup pro páku 1 a 4)
+
+- [x] **GRIND (koridor) = NULA, linka uzavřena.** Dva pre-registrované A/B
+      běhy na NOVÉM rosteru: dw-sk **−0,88 pp ± 2,76** (tempo_measure_20260807),
+      dw-we **+1,25 pp ± 2,40** (tempo_measure_20260808), práh byl ≥ +3 pp →
+      oba NO-GO; vážený průměr ≈ +0,3 pp ± 1,8. Historie tří čtení
+      **+13,75 → +4,37 → −0,88 pp** = regrese k nule.
+      **Důležité pro tebe: mechanismus se ZAPÍNAL** (plánů 0,75/hru vs
+      fallback 0,38) a nepřinesl nic ⇒ není to bug v bráně, je to prázdná
+      doktrína. Vezmi to jako varování pro páku 4: „plátek generuje nová
+      data" ještě neznamená, že ta data nesou signál.
+- [x] **Roster f7aa61c je OBRANNÝ fix, ne útočný** (párové srovnání ér,
+      dw-sk, 400 stejných seedů): chess trpaslíka 0,479 → 0,501
+      (+2,1 pp ± 2,0, nevýznamné), ale **TD skavena/hru 0,56 → 0,42
+      (−0,14 ± 0,03 = −4,2 SE)** a zároveň TD trpaslíka 0,45 → 0,40
+      (−1,8 SE). Zápasy se posunuly do remíz. Confound vyloučen: dw-sk hraje
+      `getSkavenRoster1200()` bez Rat Ogra ⇒ WildAnimal fix se sem nepromítá.
+      **Otázka pro páku 1:** trpaslík umí bránit, ale neumí skórovat —
+      našeptává mu policy tahy, které drží pozici a nikdy nedokončí drive?
+- [x] **Attrition se v datech NEMÁ JAK projevit.** Trpaslík rozdává
+      0,60 KO + 0,38 INJ/hru, sám dostává 0,12 + 0,16 (~5:1), a rozdíl
+      v přeživších na konci zápasu je **10,83 vs 10,61 = 0,2 hráče**;
+      `DEAD/hru = 0,00` ve všech 3200 hrách. Zranění se po každém TD mažou
+      (fronta balík G). **Důsledek pro tvou analýzu: jakýkoli učicí signál
+      odměňující trpasličí mlácení je dnes fakticky umlčený** — value funkce
+      nemá z čeho poznat, že attrition výměna 11:1 je dobrý obchod. Zvaž,
+      jestli tohle není spoluviník „elfí intuice" (páka 1), a jestli páky
+      2/4 nemají počkat na opravu persistence.
