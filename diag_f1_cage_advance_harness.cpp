@@ -199,11 +199,18 @@ int main(int argc, char** argv) {
     std::string root = (argc > 1) ? argv[1] : ".";
     int nPairs = (argc > 2) ? atoi(argv[2]) : 400;
     int matchupFilter = (argc > 3) ? atoi(argv[3]) : -1;
-    int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B (header)
-    uint32_t seedBase = (mode == 1) ? 37'000'000u : SEED_BASE;
+    int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B, 2 = era
+    // mode 2 (2026-08-10, rules-parity era comparison): BOTH sides run the
+    // production config, so there is no candidate arm at all. A rules change
+    // alters the game for both teams, which means it cannot be A/B'd inside
+    // one binary -- you run the SAME seeds through two builds and compare
+    // per seed. Seeds are disjoint from the other modes so runs never mix.
+    uint32_t seedBase = (mode == 1) ? 37'000'000u
+                      : (mode == 2) ? 51'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
+         : mode == 2 ? "ERA: single arm, production config, both sides"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -218,6 +225,7 @@ int main(int argc, char** argv) {
     }
 
     FILE* rows = fopen(mode == 1 ? "diag_f1_grind_rows.jsonl"
+                     : mode == 2 ? "diag_era_rows.jsonl"
                                  : "diag_f1_cage_advance_rows.jsonl", "a");
 
     // attrition aggregation: race -> opponent-gate-on? -> sums
@@ -246,9 +254,13 @@ int main(int argc, char** argv) {
             PairResult pr;
             for (int orient = 0; orient < 2; ++orient) {
                 bool candHome = (orient == 0);
-                MCTSConfig candCfg = makeConfig(vf.get(), pol.get(), true,
+                // mode 0: cand=cage on,  base=cage off
+                // mode 1: cand=cage+grind, base=cage without grind
+                // mode 2: BOTH production (cage off, grind off) -- era run
+                MCTSConfig candCfg = makeConfig(vf.get(), pol.get(),
+                                                mode != 2, mode == 1);
+                MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(),
                                                 mode == 1);
-                MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(), mode == 1);
                 MacroMCTSPolicy homePol(vf.get(),
                                         candHome ? candCfg : baseCfg,
                                         seed * 2654435761u + 11u + orient);
