@@ -1,28 +1,30 @@
-REGULAR THROWING RANGES — mrizka pro |dx|,|dy| (BB2016/CRP)
-Zdroj: obrazek uzivatele 10.08.2026 + jeho korekce L profilu
-       (rady 0-3 => 10, pak 9,9 / 8,8 / 7, symetricky zpet).
-Kontrola symetrie band(dx,dy)==band(dy,dx): PROSLA
+REGULAR THROWING RANGES - mrizka pro |dx|,|dy| (BB2016/CRP)
+Zdroj: obrazek uzivatele 10.08.2026; L profil dle jeho zapisu
+  'L 10 - 0,1,2 ; L 9 - 3,4 ; L 8 - 5,6 ; L 7 - 7', zbytek ze symetrie.
+Kontrola band(dx,dy)==band(dy,dx): PROSLA
+OTEVRENE: pole (10,3)/(3,10) - zde B; starsi udaj uzivatele '10:3' by
+  znamenal L a soucasne L(3)=10. Overit pri implementaci.
 Q=Quick(+1) S=Short(0) L=Long(-1) B=LongBomb(-2) .=mimo dosah
 
 13 | B  B  B  .  .  .  .  .  .  .  .  .  .  .
 12 | B  B  B  B  B  .  .  .  .  .  .  .  .  .
 11 | B  B  B  B  B  B  B  .  .  .  .  .  .  .
-10 | L  L  L  L  B  B  B  B  .  .  .  .  .  .
- 9 | L  L  L  L  L  L  B  B  B  .  .  .  .  .
- 8 | L  L  L  L  L  L  L  L  B  B  .  .  .  .
- 7 | L  L  L  L  L  L  L  L  L  B  B  .  .  .
+10 | L  L  L  B  B  B  B  B  .  .  .  .  .  .
+ 9 | L  L  L  L  L  B  B  B  B  .  .  .  .  .
+ 8 | L  L  L  L  L  L  L  B  B  B  .  .  .  .
+ 7 | L  L  L  L  L  L  L  L  B  B  B  .  .  .
  6 | S  S  S  S  L  L  L  L  L  B  B  B  .  .
- 5 | S  S  S  S  S  L  L  L  L  L  B  B  .  .
+ 5 | S  S  S  S  S  L  L  L  L  B  B  B  .  .
  4 | S  S  S  S  S  S  L  L  L  L  B  B  B  .
- 3 | Q  Q  S  S  S  S  S  L  L  L  L  B  B  .
+ 3 | Q  Q  S  S  S  S  S  L  L  L  B  B  B  .
  2 | Q  Q  Q  S  S  S  S  L  L  L  L  B  B  B
  1 | Q  Q  Q  Q  S  S  S  L  L  L  L  B  B  B
  0 | T  Q  Q  Q  S  S  S  L  L  L  L  B  B  B
      0  1  2  3  4  5  6  7  8  9  0  1  2  3
 
-NESHOD s nasim Chebyshevem (prahy 3/6/10): 75 ze 196 poli
+NESHOD s nasim Chebyshevem (prahy 3/6/10): 81 ze 196 poli
   mame B -> ma byt . : 45x
-  mame L -> ma byt B : 15x
+  mame L -> ma byt B : 21x
   mame S -> ma byt L : 6x
   mame L -> ma byt . : 6x
   mame Q -> ma byt S : 3x
