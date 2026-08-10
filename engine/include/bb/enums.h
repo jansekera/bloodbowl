@@ -177,9 +177,13 @@ enum class Weather : uint8_t {
     SWELTERING_HEAT, VERY_SUNNY, NICE, POURING_RAIN, BLIZZARD
 };
 
+// CRP Weather table (2D6): 2 Sweltering Heat, 3 Very Sunny, 4-10 Nice,
+// 11 Pouring Rain, 12 Blizzard. Ours used to be shifted by one (a 3 gave
+// Heat and a 4 gave Very Sunny), over-generating both bad-weather results
+// at Nice's expense -- rules parity, 2026-08-10.
 inline Weather weatherFromRoll(int roll) {
-    if (roll <= 3)  return Weather::SWELTERING_HEAT;
-    if (roll == 4)  return Weather::VERY_SUNNY;
+    if (roll <= 2)  return Weather::SWELTERING_HEAT;
+    if (roll == 3)  return Weather::VERY_SUNNY;
     if (roll <= 10) return Weather::NICE;
     if (roll == 11) return Weather::POURING_RAIN;
     return Weather::BLIZZARD;

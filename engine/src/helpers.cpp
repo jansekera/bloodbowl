@@ -58,7 +58,16 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
         ag = player.stats.strength;
     }
 
-    int target = 7 - ag;
+    // Agility table (7 - AG) MINUS the flat +1 every dodge gets (rules
+    // parity, 2026-08-10). CRP "DODGING MODIFIERS: Making a dodge roll +1
+    // / Per enemy tackle zone on the square that the player is dodging to
+    // -1", and the worked example in the rules: AG3 needs a basic 4+, gets
+    // +1 for making a dodge, -2 for two tackle zones on the destination,
+    // and a roll of 5 succeeds. We were missing the +1, so every dodge in
+    // the game was one step harder than it should be -- the most frequent
+    // roll there is, and it hurt Dodge-less teams the most since they had
+    // no re-roll to cushion it.
+    int target = 6 - ag;
 
     // TZ at destination
     target += countTacklezones(state, dest, player.teamSide);

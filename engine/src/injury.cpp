@@ -12,18 +12,15 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
     int d2 = dice.rollD6();
     int injuryRoll = d1 + d2 + ctx.injuryModifier;
 
-    // Decay: roll twice, take worse. die1/die2 follow whichever roll wins,
-    // so the emitted event's dice always match its own `roll` value.
-    if (ctx.hasDecay) {
-        int d1b = dice.rollD6();
-        int d2b = dice.rollD6();
-        int secondRoll = d1b + d2b + ctx.injuryModifier;
-        if (secondRoll > injuryRoll) {
-            injuryRoll = secondRoll;
-            d1 = d1b;
-            d2 = d2b;
-        }
-    }
+    // Decay does NOT touch the Injury roll (rules parity, 2026-08-10). CRP:
+    // "When this player suffers a Casualty result on the Injury table, roll
+    // twice on the Casualty table and apply both results." It fires AFTER a
+    // Casualty and doubles the CASUALTY roll -- it never made the injury
+    // itself worse. We used to roll the injury twice and keep the worse,
+    // which made a Decay player markedly easier to remove from the match.
+    // Since this engine models a single match and has no Casualty table
+    // (10+ is simply INJURED), a correct Decay has no in-match effect at
+    // all; ctx.hasDecay is kept for the day a league/Casualty model exists.
 
     // Stunty: +1 to injury
     if (player.hasSkill(SkillName::Stunty)) {
@@ -111,9 +108,14 @@ void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
     emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
                       0, true});
 
-    // Crowd injury: injury roll with +1
+    // Crowd injury: one plain Injury roll, NO modifiers (rules parity,
+    // 2026-08-10; user decision). CRP: "beaten up only by the crowd and
+    // receives one roll on the Injury table. The crowd does not have any
+    // injury modifying skills." The +1 we used to add here had no basis in
+    // the text. The victim's own traits (Stunty, Decay) still apply -- that
+    // sentence is about the CROWD lacking skills like Mighty Blow.
     InjuryContext ctx;
-    ctx.injuryModifier = 1;
+    ctx.injuryModifier = 0;
     if (player.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
 
     // No armor roll — go straight to injury

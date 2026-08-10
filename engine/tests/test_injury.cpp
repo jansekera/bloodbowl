@@ -68,31 +68,33 @@ TEST(Injury, EventsCarryIndividualDice) {
     EXPECT_EQ(injuryEvt->die2, 3);
 }
 
-TEST(Injury, DecayEventDiceMatchWinningRoll) {
-    // Decay rolls injury twice and takes the worse -- die1/die2 on the
-    // emitted event must reflect whichever roll actually won, not always
-    // the first attempt.
+TEST(Injury, DecayDoesNotAffectTheInjuryRoll) {
+    // Rules parity 2026-08-10: Decay fires only AFTER a Casualty result and
+    // doubles the CASUALTY roll -- it never modifies the Injury roll itself.
+    // We used to roll the injury twice and keep the worse, which made a Decay
+    // player markedly easier to remove. With no Casualty table in this
+    // single-match engine, a correct Decay is inert here.
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::Decay);
-    // Armor: 5+4=9. Injury roll 1: 3+3=6 (stunned). Decay roll 2: 5+4=9 (KO).
-    // Takes worse: 9 → KO, dice should be the SECOND roll's (5, 4).
+    // Armour: 5+4=9 > 8, broken. Injury: 3+3=6 -> Stunned, and that stands.
+    // The trailing 5,4 must NOT be consumed as a second injury roll.
     FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
     InjuryContext ctx;
     ctx.hasDecay = true;
     std::vector<GameEvent> events;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, &events);
     ASSERT_TRUE(broken);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
 
     auto injuryEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
         return e.type == GameEvent::Type::INJURY;
     });
     ASSERT_NE(injuryEvt, events.end());
-    EXPECT_EQ(injuryEvt->roll, 9);
-    EXPECT_EQ(injuryEvt->die1, 5);
-    EXPECT_EQ(injuryEvt->die2, 4);
+    EXPECT_EQ(injuryEvt->roll, 6);
+    EXPECT_EQ(injuryEvt->die1, 3);
+    EXPECT_EQ(injuryEvt->die2, 3);
 }
 
 TEST(Injury, ArmourBrokenKO) {
@@ -198,19 +200,22 @@ TEST(Injury, StakesBlocksRegeneration) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
 }
 
-TEST(Injury, DecayTakesWorseRoll) {
+TEST(Injury, CrowdSurfHasNoInjuryModifier) {
+    // Rules parity 2026-08-10 (user decision): "beaten up only by the crowd
+    // and receives one roll on the Injury table. The crowd does not have any
+    // injury modifying skills." The +1 we used to add had no basis in the
+    // text. 3+3=6 is a Stunned result, so the player only leaves the pitch
+    // through the crowd-surf removal below, not through the injury itself.
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    gs.getPlayer(1).state = PlayerState::PRONE;
-    gs.getPlayer(1).skills.add(SkillName::Decay);
-    // Armor: 5+4=9. Injury roll 1: 3+3=6 (stunned). Decay roll 2: 5+4=9 (KO).
-    // Takes worse: 9 → KO
-    FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
-    InjuryContext ctx;
-    ctx.hasDecay = true;
-    bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
-    EXPECT_TRUE(broken);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    FixedDiceRoller dice({3, 3});
+    std::vector<GameEvent> events;
+    resolveCrowdSurf(gs, 1, dice, &events);
+    auto injuryEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
+        return e.type == GameEvent::Type::INJURY && e.roll > 0;
+    });
+    ASSERT_NE(injuryEvt, events.end());
+    EXPECT_EQ(injuryEvt->roll, 6);  // was 7 with the old +1
 }
 
 TEST(Injury, CrowdSurf) {

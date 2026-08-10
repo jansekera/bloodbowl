@@ -25,14 +25,20 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
 
     // ReallyStupid: D6, need 2+ with adjacent ally, 4+ alone
     if (player.hasSkill(SkillName::ReallyStupid)) {
-        // Check for adjacent standing ally (non-ReallyStupid or any ally)
+        // Adjacent standing ally who is NOT himself Really Stupid (rules
+        // parity, 2026-08-10). CRP: "If there are one or more players from
+        // the same team standing adjacent to the Really Stupid player's
+        // square, AND WHO AREN'T REALLY STUPID, then add 2 to the D6 roll."
+        // We used to accept any ally, so two Really Stupid players propped
+        // each other up.
         bool hasAdjacentAlly = false;
         auto adj = player.position.getAdjacent();
         for (auto& pos : adj) {
             if (!pos.isOnPitch()) continue;
             const Player* ally = state.getPlayerAtPosition(pos);
             if (ally && ally->teamSide == player.teamSide &&
-                canAct(ally->state) && !ally->lostTacklezones) {
+                canAct(ally->state) && !ally->lostTacklezones &&
+                !ally->hasSkill(SkillName::ReallyStupid)) {
                 hasAdjacentAlly = true;
                 break;
             }

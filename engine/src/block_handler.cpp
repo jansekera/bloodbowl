@@ -380,8 +380,13 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         }
 
         case BlockDiceFace::BOTH_DOWN: {
-            // Check Wrestle
-            bool defWrestle = def.hasSkill(SkillName::Wrestle);
+            // Check Wrestle. Juggernaut cancels the DEFENDER's Wrestle on a
+            // Blitz (rules parity, 2026-08-10) -- CRP Juggernaut: "the
+            // opposing player may not use his Fend, Stand Firm or Wrestle
+            // skills against the Juggernaut player's blocks." Stand Firm was
+            // already handled (resolvePushback), Fend and Wrestle were not.
+            bool defWrestle = def.hasSkill(SkillName::Wrestle) &&
+                              !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
             bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
                               !att.hasSkill(SkillName::Block);
 
@@ -512,8 +517,17 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             }
         }
 
-        // Follow-up: attacker moves to old defender position
-        bool fendPrevents = def.hasSkill(SkillName::Fend) && !defKnockedDown;
+        // Follow-up: attacker moves to old defender position.
+        // Fend forbids the follow-up EVEN IF the Fend player goes down
+        // (rules parity, 2026-08-10). CRP Fend: "Opposing players may not
+        // follow-up blocks made against this player even if the Fend player
+        // is Knocked Down." Our `!defKnockedDown` guard switched Fend off in
+        // exactly the results where a follow-up is usually at stake, leaving
+        // it working only on a clean Pushed. Juggernaut cancels it on a
+        // Blitz: "the opposing player may not use his Fend, Stand Firm or
+        // Wrestle skills against the Juggernaut player's blocks."
+        bool fendPrevents = def.hasSkill(SkillName::Fend) &&
+                            !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
         if (!noFollowUp && !fendPrevents) {
             att.position = defOldPos;
             if (state.ball.isHeld && state.ball.carrierId == att.id) {

@@ -60,14 +60,15 @@ TEST(Helpers, CountTacklezonesLostTZNotCounted) {
 TEST(Helpers, DodgeTargetBasicAG3) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    // AG3, no TZ at dest
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 4);
+    // CRP: AG3 needs 4+ from the table, +1 for making a dodge => 3+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
 }
 
 TEST(Helpers, DodgeTargetAG4) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 4, 8);
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
+    // AG4: 3+ from the table, +1 for the dodge => 2+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 2);
 }
 
 TEST(Helpers, DodgeTargetWithTZAtDest) {
@@ -75,7 +76,8 @@ TEST(Helpers, DodgeTargetWithTZAtDest) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     placePlayer(gs, 12, {12, 7}, TeamSide::AWAY); // adjacent to dest (11,7)
 
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 5);
+    // AG3 4+, +1 dodge, -1 per TZ on the destination => 4+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 4);
 }
 
 TEST(Helpers, DodgeTargetWithDodgeSkill) {
@@ -83,7 +85,8 @@ TEST(Helpers, DodgeTargetWithDodgeSkill) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Dodge);
 
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
+    // AG3 4+, +1 dodge, -1 Dodge skill => 2+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 2);
 }
 
 TEST(Helpers, DodgeTargetDodgeNegatedByTackle) {
@@ -93,8 +96,8 @@ TEST(Helpers, DodgeTargetDodgeNegatedByTackle) {
     placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
     gs.getPlayer(12).skills.add(SkillName::Tackle);
 
-    // Tackle at source negates Dodge
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 4);
+    // Tackle at source negates Dodge: AG3 4+, +1 dodge => 3+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
 }
 
 TEST(Helpers, DodgeTargetStuntyAndTwoHeads) {
@@ -112,8 +115,8 @@ TEST(Helpers, DodgeTargetBreakTackle) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3, 8);
     gs.getPlayer(1).skills.add(SkillName::BreakTackle);
 
-    // Uses ST4 instead of AG3: 7-4 = 3
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
+    // Uses ST4 instead of AG3: 7-4 = 3, +1 for the dodge => 2+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 2);
 }
 
 TEST(Helpers, DodgeTargetPrehensileTail) {
@@ -122,8 +125,8 @@ TEST(Helpers, DodgeTargetPrehensileTail) {
     placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
     gs.getPlayer(12).skills.add(SkillName::PrehensileTail);
 
-    // +1 from PrehensileTail at source
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 5);
+    // AG3 4+, +1 dodge, +1 from PrehensileTail at source => 4+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 4);
 }
 
 TEST(Helpers, DodgeTargetClamped) {

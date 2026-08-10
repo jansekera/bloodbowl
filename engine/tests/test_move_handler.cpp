@@ -86,9 +86,10 @@ TEST(MoveHandler, TackleNegatesDodgeReroll) {
     gs.getPlayer(1).skills.add(SkillName::Dodge);
     placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
     gs.getPlayer(12).skills.add(SkillName::Tackle);
-    // Tackle negates Dodge reroll AND Dodge -1. Target = 4. Roll 3 → fail
-    // Armor: 3+3=6
-    FixedDiceRoller dice({3, 3, 3});
+    // Tackle negates the Dodge re-roll AND the Dodge -1. AG3 is 4+ from
+    // the table with +1 for making the dodge => target 3; a roll of 2 fails.
+    // Armour: 3+3=6
+    FixedDiceRoller dice({2, 3, 3});
     auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
     EXPECT_TRUE(result.turnover);
 }

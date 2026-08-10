@@ -234,9 +234,12 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
         needsGfi = true;
     }
 
-    // Leap agility check: target = max(2, min(6, 7-AG+TZ_at_dest))
+    // Leap agility check: plain Agility roll, NO modifiers except Very Long
+    // Legs (rules parity, 2026-08-10). CRP Leap: "make an Agility roll for
+    // the player. No modifiers apply to this D6 roll unless he has Very
+    // Long Legs." We used to add the destination's tackle zones, which made
+    // leaping into a cage far dearer than the rules intend.
     int target = 7 - player.stats.agility;
-    target += countTacklezones(state, to, player.teamSide);
     if (player.hasSkill(SkillName::VeryLongLegs)) target -= 1;
     target = std::clamp(target, 2, 6);
 

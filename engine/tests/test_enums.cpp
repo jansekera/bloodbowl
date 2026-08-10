@@ -78,9 +78,10 @@ TEST(PassRange, FromDistance) {
 }
 
 TEST(Weather, FromRoll) {
+    // CRP weather table: 2 Heat, 3 Very Sunny, 4-10 Nice, 11 Rain, 12 Blizzard
     EXPECT_EQ(weatherFromRoll(2), Weather::SWELTERING_HEAT);
-    EXPECT_EQ(weatherFromRoll(3), Weather::SWELTERING_HEAT);
-    EXPECT_EQ(weatherFromRoll(4), Weather::VERY_SUNNY);
+    EXPECT_EQ(weatherFromRoll(3), Weather::VERY_SUNNY);
+    EXPECT_EQ(weatherFromRoll(4), Weather::NICE);
     EXPECT_EQ(weatherFromRoll(5), Weather::NICE);
     EXPECT_EQ(weatherFromRoll(10), Weather::NICE);
     EXPECT_EQ(weatherFromRoll(11), Weather::POURING_RAIN);

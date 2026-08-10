@@ -79,14 +79,37 @@ int checkInterception(GameState& state, int passerId, Position target,
             intTarget += countTacklezones(state, interceptor->position, interceptor->teamSide);
         }
 
+        // Pouring Rain applies to interceptions too (rules parity,
+        // 2026-08-10). CRP: "A -1 modifier applies to all catch, intercept,
+        // or pick-up rolls." We had it on catch and pick-up but not here.
+        if (state.weather == Weather::POURING_RAIN) intTarget += 1;
+
         intTarget = std::clamp(intTarget, 2, 6);
 
         // Interception attempt
         int roll = dice.rollD6();
         bool success = (roll >= intTarget);
 
-        // SafeThrow: if intercepted, passer can force a reroll
-        if (success && passer.hasSkill(SkillName::SafeThrow)) {
+        // Catch re-rolls a FAILED interception (rules parity, 2026-08-10).
+        // CRP Catch: "allowed to re-roll the D6 if he fails a catch roll.
+        // It also allows the player to re-roll the D6 if he drops a hand-off
+        // or fails to make an interception." A skill re-roll is free and
+        // never competes with the scarce team re-roll, so it is always taken
+        // (user's rule, 2026-08-10: optional skills default ON when they
+        // cost nothing).
+        if (!success && interceptor->hasSkill(SkillName::Catch)) {
+            emitEvent(events, {GameEvent::Type::SKILL_USED, interceptor->id, -1, {}, {},
+                              static_cast<int>(SkillName::Catch), true});
+            roll = dice.rollD6();
+            success = (roll >= intTarget);
+        }
+
+        // SafeThrow: if intercepted, passer can force a reroll -- but Very
+        // Long Legs blocks it (rules parity, 2026-08-10). CRP Very Long
+        // Legs: "the Safe Throw skill may not be used to affect any
+        // Interception rolls made by this player."
+        if (success && passer.hasSkill(SkillName::SafeThrow) &&
+            !interceptor->hasSkill(SkillName::VeryLongLegs)) {
             int reroll = dice.rollD6();
             if (reroll < intTarget) {
                 success = false;
@@ -210,9 +233,13 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
 
     passTarget += countDisturbingPresence(state, passer.position, passer.teamSide);
 
-    // Weather
-    if (state.weather == Weather::POURING_RAIN || state.weather == Weather::BLIZZARD ||
-        state.weather == Weather::VERY_SUNNY) {
+    // Weather: ONLY Very Sunny penalises a throw (rules parity,
+    // 2026-08-10). CRP: "Very Sunny: the blinding sunshine causes a -1
+    // modifier on all passing rolls"; Pouring Rain's -1 is on "catch,
+    // intercept, or pick-up" and never on the throw, and Blizzard restricts
+    // the RANGE ("only quick or short passes can be attempted") rather than
+    // taxing the roll. We used to charge all three.
+    if (state.weather == Weather::VERY_SUNNY) {
         passTarget += 1;
     }
 
