@@ -781,6 +781,18 @@ model), ne pro D.
 | c | **Grab má taky jen 3 pole místo všech volných sousedních** | `:96-108` | ⛔ **BUG** (příliš slabý) |
 | d | **Rušení Grab × Side Step chybí.** Pravidla: při Block **i Blitz** se navzájem **ruší** ⇒ platí standard (volí útočník ze 3). Engine: u **bloku** dá plný Grab útočníkovi, u **blitzu** dá Side Step obránci | `:88-96` | ⛔ **BUG obojím směrem** |
 | e | Grab funguje jen mimo blitz (`!isBlitz`) | `:96` | ✅ správně |
+| f | **Side Step bez volného pole se NEPOUŽIJE** — „the player **may not use this skill if there are no open squares on the pitch adjacent** to this player" ⇒ vrací se to k **určení útočníkem** (a dál standardní řetězový odsun). Engine podmínku **nekontroluje** a vybírá z trojice bez ohledu na obsazenost | `:88-95` | ⛔ **BUG** (doplnil uživatel 10.08.) |
+| g | Side Step platí **i když je hráč po odsunu sražen** („even if the player is Knocked Down after the push back") — engine na výsledek bloku nepodmiňuje | `:88` | ✅ správně |
+
+**⚑ Pořadí vyhodnocení, které z toho plyne** (a je to celé jedna větev,
+ne čtyři nezávislé podmínky):
+1. má obránce **Side Step** a **existuje volné sousední pole**?
+   → ale **má útočník Grab?** (Block i Blitz) → **ruší se** → bod 3
+2. ano → **obránce volí z KTERÉHOKOLI volného sousedního pole** (8, ne 3)
+3. jinak → **útočník volí ze tří standardních polí**; má-li Grab a jde
+   o **Block Action**, volí z **kteréhokoli volného sousedního**
+4. není-li volné pole ⇒ řetězový odsun (směr určuje kouč táhnoucího týmu)
+   / vytlačení z hřiště
 
 **Rozsah:** Side Step **má** wood-elf Wardancer (`roster.cpp:585-586`)
 ⇒ body b a d jsou **AKTIVNÍ v dw-we**. Grab v měřené pětce nikdo.
