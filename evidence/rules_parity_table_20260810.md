@@ -324,6 +324,62 @@ proti Frenzy útočníkovi si kupuje druhý blok**. Není to tedy jen flag
 další blok proti sobě. Přesně ten typ ocenění, který už máme rozepsaný
 pro Frenzy sekvence (fronta 6b, `evidence/frenzy_trap_defence_20260807.md`).
 
+### ⚑⚑ DRUHÁ STRANA MINCE (uživatel 10.08.): NEPOUŽÍT Stand Firm = NÁSTRAHA
+
+**Pozorování uživatele: „asi v AI není moc možností vyhodnotit, že se
+aktuálně nehodí použít Stand Firm a vlákat dwarfa do pasti frenzy trap —
+i když on asi často na silný strom neútočí."** Obojí platí a dá se
+vyčíslit.
+
+**Proč je odmítnutí Stand Firm zbraň:** když se Treeman nechá odstrčit,
+Slayer **musí** následovat (Frenzy) a **musí** hodit druhý blok — jenže
+už **z jiného pole**. Elf tím Slayera fyzicky vytáhne z pozice a druhý
+blok se počítá z geometrie, kterou si elf mohl připravit.
+
+**Dnes je to nemožné DVAKRÁT:**
+1. elf **nemá volbu** — Stand Firm je u nás vynucený (§4c/a);
+2. i kdyby ji měl, **náš Slayer past neuvidí** — plánovač ocení jen první
+   blok z aktuálních pozic a druhý vůbec neuvažuje (fronta 6b).
+
+**Proč „na silný strom stejně neútočí" — čísla:**
+Pravidla: shodná ST = 1 kostka · silnější = 2 kostky pro silnějšího ·
+více než dvojnásobek = 3. Slayer ST3 vs Treeman ST6 ⇒ **2 kostky PROTI
+nám** (6 není *víc* než 2×3, takže ne 3). S asistencemi
+(`macro_actions.cpp:131-135` sčítá `ST + asistence` na obou stranách):
+
+| asistence u Treemana | poměr | kostky |
+|---|---|---|
+| 0 | 3 vs 6 | 2 proti nám |
+| 3 | 6 vs 6 | 1 (shoda) |
+| **4** | 7 vs 6 | **2 pro nás** |
+
+A generace tahů nabídne BLOCK **jen při `dice >= 2` v náš prospěch**
+(`macro_actions.cpp:525-528`) ⇒ **Slayerovi se blok na Treemana vůbec
+nenabídne, dokud vedle stromu nestojí 4 trpaslíci.** Spouštěč pasti je
+tedy úzký — přesně jak uživatel odhadl.
+
+**Kde past přesto kousne:** těch 6 asistencí je adjacentních ke
+**starému** poli Treemana. Po pushi a follow-upu se druhý blok hází
+z nové pozice, kde část Guardů už nesousedí ⇒ druhý blok může spadnout
+na 1 kostku nebo do kostek proti. To je doslova fronta **7c-II**
+(„asistent musí pokrývat i pole PO PUSHI").
+
+**⇒ POŘADOVÉ PRAVIDLO: nešipovat „Stand Firm volitelný" (§4c/a) dřív
+než 6b.** Jinak dáme obránci zbraň, kterou náš vlastní útočník neumí
+předvídat.
+*Poctivá výhrada:* v self-play běží obě strany týmž kódem, takže by
+lákadlo **nepoužil nikdo** — chybí táž mašinerie oběma. Na naše A/B to
+tedy nemá vliv; je to pravidlo pro **hru člověk vs AI** (položka fronty
+z 07.08.) a pro okamžik, kdy budeme mít silnějšího soupeře.
+
+**A obecnější poučení, které z toho plyne:** udělat schopnost volitelnou
+znamená **vyrobit nový rozhodovací uzel**. Kdo ho vyhodnotí? MCTS ho
+umí navzorkovat, ale u frenzy pasti je ten signál slabý a šumivý
+(1 rollout na iteraci, zjištěno 07.08.) — takže odpověď je táž jako
+u 6b: **explicitní deterministický výpočet**, ne doufat ve vzorkování.
+Je levný: ≤3 push pole z `getPushbackSquares`, follow-up pozice je daná,
+kostky z projektovaných pozic jsou uzavřený vzorec.
+
 ### ⚑ SMĚR: tohle je první položka balíku D, která hraje PRO NÁS
 
 Náš Take Root je **výrazně mírnější než pravidla**: Treeman u nás ztratí
