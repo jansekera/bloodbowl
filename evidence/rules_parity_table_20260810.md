@@ -952,3 +952,30 @@ včetně Changing Weather (§5b f, g — dnes neaktivní, `useFullKickoff=false`
 příznak „zakořeněn" přežívající do konce drivu). Kdyby se D mělo držet
 čistě u řádkových oprav, je to jediný kandidát na vyčlenění — ale patří
 věcně sem, protože je to pravidlová chyba, ne feature.
+
+---
+
+## 9. ROSTERY: proč tam některé schopnosti NEJSOU (uživatel 10.08.)
+
+**Orkové nemají Trolla, a tím ani Throw Team-Mate — je to VĚDOMÉ
+rozhodnutí, ne opomenutí.** Uživatel 10.08.: *„TTM u orků jsme schválně
+dali pryč kvůli nespolehlivosti."*
+Důvod je dvouvrstvý a v pravidlech doložitelný:
+1. **Troll je Really Stupid** ⇒ aktivace selže na 1-3 (bez souseda, který
+   sám není Really Stupid) — investice do přípravy hodu se často nekoná;
+2. **TTM navíc NIKDY není přesný** — CRP: „accurate passes are treated
+   instead as inaccurate thus **scattering the thrown player three times**"
+   ⇒ i po úspěšném hodu je dopad náhodný.
+⇒ Dvě nespolehlivosti za sebou; roster `getOrcRoster1200()` má místo Trolla
+4 Black Orky. **Nevracet Trolla zpět bez nového důvodu.**
+
+### 📌 Rozsah přihrávkových zvláštností v měřené pětce = NULA
+Ověřeno `grep` přes `getDwarfRoster1200 / Skaven / WoodElf / Human /
+Orc1200`: **nikdo nemá ThrowTeamMate, RightStuff ani Bombardier.**
+⇒ Všechna dnešní práce na TTM a bombách je **latentní** — korektnostní,
+s nulovým dopadem na jakékoli měření. Zapsáno i jako poznámka
+o prioritizaci: udělal jsem ji proto, že přišla v hovoru, ne proto, že
+byla na řadě.
+⇒ **Vedlejší přínos: `orc-sk` je díky tomu ČISTÁ KONTROLA** pro noční
+srovnání ér — není dotčená přihrávkovými zvláštnostmi, jen obecnými
+změnami (dodge, leap, počasí, mřížka dosahů, zachycení).
