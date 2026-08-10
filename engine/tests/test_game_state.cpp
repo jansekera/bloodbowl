@@ -27,9 +27,14 @@ TEST(GameState, PlayerLookupById) {
     EXPECT_EQ(gs.getPlayer(22).id, 22);
     EXPECT_EQ(gs.getPlayer(22).teamSide, TeamSide::AWAY);
 
+    // Benches sit after the two starting elevens (package G, layer 2), so
+    // the pre-existing IDs 1-22 are untouched and 23+ are the substitutes.
+    EXPECT_EQ(gs.getPlayer(23).teamSide, TeamSide::HOME);
+    EXPECT_EQ(gs.getPlayer(GameState::PLAYERS_TOTAL).teamSide, TeamSide::AWAY);
+
     // Out of range
     EXPECT_THROW(gs.getPlayer(0), std::out_of_range);
-    EXPECT_THROW(gs.getPlayer(23), std::out_of_range);
+    EXPECT_THROW(gs.getPlayer(GameState::PLAYERS_TOTAL + 1), std::out_of_range);
 }
 
 TEST(GameState, PlayerAtPosition) {
@@ -68,14 +73,14 @@ TEST(GameState, ForEachPlayer) {
         EXPECT_EQ(p.teamSide, TeamSide::HOME);
         ++count;
     });
-    EXPECT_EQ(count, 11);
+    EXPECT_EQ(count, GameState::SQUAD_SIZE) << "starters plus the bench";
 
     count = 0;
     gs.forEachPlayer(TeamSide::AWAY, [&](Player& p) {
         EXPECT_EQ(p.teamSide, TeamSide::AWAY);
         ++count;
     });
-    EXPECT_EQ(count, 11);
+    EXPECT_EQ(count, GameState::SQUAD_SIZE);
 }
 
 TEST(GameState, ForEachOnPitch) {

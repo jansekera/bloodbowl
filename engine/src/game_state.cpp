@@ -8,28 +8,27 @@ GameState::GameState() {
     awayTeam.side = TeamSide::AWAY;
 
     // Initialize player IDs and team sides
-    for (int i = 0; i < 11; ++i) {
-        players[i].id = i + 1;          // IDs 1-11
-        players[i].teamSide = TeamSide::HOME;
-    }
-    for (int i = 0; i < 11; ++i) {
-        players[11 + i].id = 12 + i;    // IDs 12-22
-        players[11 + i].teamSide = TeamSide::AWAY;
+    for (TeamSide side : {TeamSide::HOME, TeamSide::AWAY}) {
+        for (int n = 0; n < SQUAD_SIZE; ++n) {
+            int id = squadId(side, n);
+            players[id - 1].id = id;
+            players[id - 1].teamSide = side;
+        }
     }
 }
 
 Player& GameState::getPlayer(int id) {
-    if (id < 1 || id > 22) {
-        throw std::out_of_range("Player ID must be 1-22");
+    if (id < 1 || id > PLAYERS_TOTAL) {
+        throw std::out_of_range("Player ID out of range");
     }
-    return players[id <= 11 ? id - 1 : id - 12 + 11];
+    return players[id - 1];   // IDs are contiguous across both squads
 }
 
 const Player& GameState::getPlayer(int id) const {
-    if (id < 1 || id > 22) {
-        throw std::out_of_range("Player ID must be 1-22");
+    if (id < 1 || id > PLAYERS_TOTAL) {
+        throw std::out_of_range("Player ID out of range");
     }
-    return players[id <= 11 ? id - 1 : id - 12 + 11];
+    return players[id - 1];   // IDs are contiguous across both squads
 }
 
 Player* GameState::getPlayerAtPosition(Position pos) {

@@ -821,11 +821,33 @@ TEST(GameSimulator, CasualtiesSurviveADriveRestart) {
     EXPECT_FALSE(state.getPlayer(3).isOnPitch());
     EXPECT_FALSE(state.getPlayer(4).isOnPitch());
 
+    // Two men down, two on the bench: substitutes take their places, so the
+    // side still fields eleven -- that is layer 2. Layer 1 alone left holes.
     int standing = 0;
     state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
         if (p.state == PlayerState::STANDING) standing++;
     });
-    EXPECT_EQ(standing, 9) << "team should field nine, not a fresh eleven";
+    EXPECT_EQ(standing, 11) << "substitutes should fill the two vacancies";
+    EXPECT_TRUE(state.getPlayer(GameState::benchBaseId(TeamSide::HOME)).isOnPitch());
+    EXPECT_TRUE(state.getPlayer(GameState::benchBaseId(TeamSide::HOME) + 1).isOnPitch());
+}
+
+TEST(GameSimulator, TeamPlaysShortOnceTheBenchIsEmpty) {
+    // Three casualties against a two-man bench: the substitutes come on and
+    // the side is still one short. Without reserves a team simply plays down.
+    GameState state;
+    setupHalf(state, getDwarfRoster(), getSkavenRoster());
+    for (int id : {3, 4, 5}) {
+        state.getPlayer(id).state = PlayerState::INJURED;
+        state.getPlayer(id).position = {-1, -1};
+    }
+    setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY);
+
+    int standing = 0;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING) standing++;
+    });
+    EXPECT_EQ(standing, 10);
 }
 
 TEST(GameSimulator, KOdPlayerRecoversOnFourPlus) {

@@ -110,7 +110,7 @@ constexpr FormationPos AWAY_DEEP_RECEIVER_FORMATION[11] = {
 
 void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
                const FormationPos formation[11]) {
-    int baseId = (side == TeamSide::HOME) ? 1 : 12;
+    int baseId = GameState::baseIdFor(side);
     int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
     int idx = 0;
 
@@ -155,94 +155,76 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     ts.apothecaryUsed = false;
 }
 
-// Build a standard 11-player team: fill specialized positions first, then linemen
+// Build a squad: assign identity to every slot, then put the eleven
+// available starters on the pitch. Package G, layer 2 (2026-08-10): slots
+// 0..10 keep exactly the identities they had before substitutes existed, so
+// the starting eleven is unchanged; the remaining SQUAD_SIZE-11 slots are the
+// BENCH, drawn as linemen, and they take the formation places vacated by
+// anyone KO'd or hurt. That keeps the shape intact instead of leaving a hole,
+// which is what layer 1 alone did.
+//
 // resetHalfState: true at true half boundaries (game start, half-time) -- resets the
 // turn clock and reroll allowance. false for a post-touchdown drive restart, which
 // only re-places players/ball and must NOT grant a fresh 8-turn clock or reroll pool.
 void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
                const FormationPos formation[11], bool resetHalfState) {
-    int baseId = (side == TeamSide::HOME) ? 1 : 12;
-    int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
+    const int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
+    constexpr int SQUAD = GameState::SQUAD_SIZE;
+    constexpr int STARTERS = GameState::STARTERS;
 
-    // First pass: assign specialized positionals (non-linemen, index > 0)
-    int slot = 0;
-    // Start with special positionals to fill key positions
-    // Blitzers in backfield/second row, catchers in backfield, thrower in back
-    // For simplicity: fill from back of formation (backfield first) with specialists
-
-    // Collect how many of each positional to place
-    struct Placement { int templateIdx; int count; };
-    Placement placements[8];
-    int nPlacements = 0;
-
-    // Specialists first (indices 1+)
-    for (int t = 1; t < roster.positionalCount; ++t) {
-        int qty = std::min((int)roster.positionals[t].quantity, 11);
-        if (qty > 0) {
-            placements[nPlacements++] = {t, qty};
-        }
-    }
-
-    // Fill from end of formation (backfield) with specialists, rest with linemen
-    int placed = 0;
-    int specSlot = 10; // start filling from backfield
-
-    // Place specialists in the "best" positions (backfield/second row)
-    for (int p = 0; p < nPlacements && specSlot >= 0; ++p) {
-        for (int q = 0; q < placements[p].count && specSlot >= 0; ++q) {
-            Player& player = state.getPlayer(baseId + specSlot);
-            bool available = (player.state == PlayerState::OFF_PITCH);
-            player.id = baseId + specSlot;
-            player.teamSide = side;
-            // Identity is re-derived every setup, but an unavailable player
-            // (KO/INJURED/DEAD/EJECTED, package G) keeps his state and stays
-            // off the pitch -- the team simply plays a man short. His slot in
-            // the formation is left empty rather than being back-filled: a
-            // coach would re-arrange, but modelling that is setup
-            // optimisation and belongs with the kick-off work.
-            if (available) {
-                player.state = PlayerState::STANDING;
-                player.position = {
-                    static_cast<int8_t>(baseLOS + formation[specSlot].dx),
-                    formation[specSlot].y
-                };
+    // --- 1. Which template does each slot get? -------------------------
+    // Specialists fill the back of the starting eleven (backfield/second
+    // row), exactly as before; everything else, bench included, is a lineman.
+    int templateOf[SQUAD];
+    for (int i = 0; i < SQUAD; ++i) templateOf[i] = 0;
+    {
+        int specSlot = STARTERS - 1;   // start filling from the backfield
+        for (int t = 1; t < roster.positionalCount && specSlot >= 0; ++t) {
+            int qty = std::min((int)roster.positionals[t].quantity, STARTERS);
+            for (int q = 0; q < qty && specSlot >= 0; ++q) {
+                templateOf[specSlot--] = t;
             }
-            player.stats = roster.positionals[placements[p].templateIdx].stats;
-            player.skills = roster.positionals[placements[p].templateIdx].skills;
-            player.positionName = roster.positionals[placements[p].templateIdx].name;
-            player.movementRemaining = player.stats.movement;
-            player.hasMoved = false;
-            player.hasActed = false;
-            player.usedBlitz = false;
-            player.lostTacklezones = false;
-            player.proUsedThisTurn = false;
-            specSlot--;
-            placed++;
         }
     }
 
-    // Fill remaining slots (0 to specSlot) with linemen (template index 0)
-    for (int i = 0; i <= specSlot; ++i) {
-        Player& player = state.getPlayer(baseId + i);
-        bool available = (player.state == PlayerState::OFF_PITCH);
-        player.id = baseId + i;
-        player.teamSide = side;
-        if (available) {
-            player.state = PlayerState::STANDING;
-            player.position = {
-                static_cast<int8_t>(baseLOS + formation[i].dx),
-                formation[i].y
-            };
-        }
-        player.stats = roster.positionals[0].stats;
-        player.skills = roster.positionals[0].skills;
-        player.positionName = roster.positionals[0].name;
-        player.movementRemaining = player.stats.movement;
-        player.hasMoved = false;
-        player.hasActed = false;
-        player.usedBlitz = false;
-        player.lostTacklezones = false;
-        player.proUsedThisTurn = false;
+    // --- 2. Identity for every squad member, starters and bench alike ---
+    for (int i = 0; i < SQUAD; ++i) {
+        Player& p = state.getPlayer(GameState::squadId(side, i));
+        const PlayerTemplate& tpl = roster.positionals[templateOf[i]];
+        p.id = GameState::squadId(side, i);
+        p.teamSide = side;
+        p.stats = tpl.stats;
+        p.skills = tpl.skills;
+        p.positionName = tpl.name;
+        p.movementRemaining = p.stats.movement;
+        p.hasMoved = false;
+        p.hasActed = false;
+        p.usedBlitz = false;
+        p.lostTacklezones = false;
+        p.proUsedThisTurn = false;
+    }
+
+    // --- 3. Put the available starters in their usual places ------------
+    // A player is available iff setupHalfOrDrive left him in Reserves; the
+    // unavailable keep their KO/INJURED/DEAD/EJECTED state untouched.
+    auto place = [&](Player& p, int formSlot) {
+        p.state = PlayerState::STANDING;
+        p.position = {static_cast<int8_t>(baseLOS + formation[formSlot].dx),
+                      formation[formSlot].y};
+    };
+    int vacancies[STARTERS];
+    int nVacant = 0;
+    for (int i = 0; i < STARTERS; ++i) {
+        Player& p = state.getPlayer(GameState::squadId(side, i));
+        if (p.state == PlayerState::OFF_PITCH) place(p, i);
+        else vacancies[nVacant++] = i;      // his spot needs a substitute
+    }
+
+    // --- 4. Substitutes come on for the missing ------------------------
+    for (int b = STARTERS, v = 0; b < SQUAD && v < nVacant; ++b) {
+        Player& p = state.getPlayer(GameState::squadId(side, b));
+        if (p.state != PlayerState::OFF_PITCH) continue;   // bench man also out
+        place(p, vacancies[v++]);
     }
 
     // Set team state
@@ -333,7 +315,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
 
     // Give the kicking team's slot 10 player the Kick skill (sweeper/deep safety)
     {
-        int kickBaseId = (kickingTeam == TeamSide::HOME) ? 1 : 12;
+        int kickBaseId = GameState::baseIdFor(kickingTeam);
         Player& safety = state.getPlayer(kickBaseId + 10);
         if (safety.isOnPitch()) {
             safety.skills.add(SkillName::Kick);
