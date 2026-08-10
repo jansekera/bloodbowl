@@ -467,6 +467,50 @@ dvakrát. V D nechat jen opravu tabulky (nález a).
 
 ---
 
+## 5c. ⛔⛔ NOVÝ NÁLEZ: BLITZER NEMŮŽE POKRAČOVAT V POHYBU PO BLOKU
+
+Vyšlo najevo až při dodatečné kontrole Fendu („*may still continue moving
+after blocking if he had declared a Blitz Action*") — ukázalo se, že to
+není detail Fendu, ale **obecné pravidlo blitzu, které nemáme vůbec**.
+
+> **BLITZ MOVES:** „A blitz allows the player to move and make a block.
+> The block may be made **at any point during the move**, but costs one
+> square of movement (…). **The player may carry on moving after the
+> effects of the block have been worked out if he has any squares of
+> movement left.**"
+
+**Engine:** `ActionType::BLITZ` (`action_resolver.cpp:63-131`) je
+atomický: `while (distance > 1) { krok }` → `return resolveBlock(...)`.
+A `resolveBlock` na konci nastaví `att.hasActed = true`
+(`block_handler.cpp:557`, plus všechny dřívější returny). ⇒ **veškerý
+pohyb se spotřebuje PŘED blokem a po bloku už hráč nemůže nic.**
+Blok „kdykoli během pohybu" tedy v našem modelu neexistuje — je to vždy
+„dojdi až k cíli, praš, konec".
+
+### ⚑ PROČ JE TO VÁŽNÉ: rozbíjí to větve doktríny, které UŽ MÁME navržené
+
+* **Samouvolnění rohu klece** (04.08. i 07.08.): „srazit prvním blokem
+  **+ mít MP na návrat na slot**" — tahle větev je dnes **fyzicky
+  neproveditelná**. Celá diskuze o tom, jestli Slayer stihne zpátky na
+  roh, byla o možnosti, kterou engine nemá.
+* **„Otevři a běž" (fronta 6d):** „blitz na nejslabší marker → dodge
+  nositele do uvolněného pole → **běh k už stojícím rohům**" — blitzer
+  po bloku nikam neběží.
+* **Blitz série (fronta 7, 7b):** „úhel příchodu = finální pole podle
+  kostek" dostává jiný význam — dnes je finální pole **vynuceně** to,
+  ze kterého se blokuje, protože jiné už nebude.
+* Fendova věta o pokračování v pohybu je tím pádem bezpředmětná.
+
+### Zařazení
+**Je to pravidlová chyba (patří do D), ale NENÍ řádková** — vyžaduje
+změnu modelu akce z „přiblížení + blok" na „přiblížení + blok + zbytek
+pohybu". ⇒ **vlastní položka, ne součást D-vlny1.**
+⚖ Doporučení: zařadit k **balíku C (blitz série)**, ne do D-vlny2 —
+věcně to patří k bodům 7/7b/6d a bez toho se ty body nedají dokončit
+správně. Rozhodnout s uživatelem.
+
+---
+
 ## 6. ✅ CO JE SPRÁVNĚ (ověřeno, nesahat)
 
 | pravidlo | citace | engine |
