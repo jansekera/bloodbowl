@@ -85,6 +85,8 @@ enum class CageAdvanceVerdict : uint8_t {
     TEMPO_INSUFFICIENT,   // computed pace cannot meet the schedule -> fallback
     DICEY,                // a required move failed the dice-free probe -> fallback
     PLAN_READY,
+    FILL_ONLY,            // the advance is off, but the cage still re-forms
+                          // around the carrier where he stands (2026-08-11)
 };
 
 struct CageAdvancePlan {
@@ -182,6 +184,12 @@ public:
     // was decided (bb/turn_plan_record.h).
     CageAdvancePlan buildImpl(const GameState& state,
                               const std::vector<int>& reservedPlayerIds);
+
+    // Mandated minimum when the advance will not run (user, 2026-08-05):
+    // fill the incomplete cage with everything that can reach, carrier
+    // stays put. Hierarchy: advance -> fill -> never a solo run.
+    CageAdvancePlan buildFillOnly(const GameState& state,
+                                  const std::vector<int>& reservedPlayerIds);
 
     // Corner-slot assignment around the carrier's position after a `step`
     // squares forward move. Public since 2026-08-07: the item13 staged

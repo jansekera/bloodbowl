@@ -253,12 +253,13 @@ PYBIND11_MODULE(bb_engine, m) {
                     static const char* goalNames[] = {
                         "NONE", "PICKUP_BALL", "ADVANCE_BALL", "SCORE_BALL"};
                     static const char* verdictNames[] = {
-                        "NOT_APPLICABLE", "TEMPO_INSUFFICIENT", "DICEY", "PLAN_READY"};
+                        "NOT_APPLICABLE", "TEMPO_INSUFFICIENT", "DICEY", "PLAN_READY",
+                        "FILL_ONLY"};
                     const auto& pl = turn.plan;
                     py::dict pd;
                     pd["written"] = pl.written;
                     pd["goal"] = (pl.goal < 4) ? goalNames[pl.goal] : "UNKNOWN";
-                    pd["verdict"] = (pl.verdict < 4) ? verdictNames[pl.verdict]
+                    pd["verdict"] = (pl.verdict < 5) ? verdictNames[pl.verdict]
                                                      : "NOT_CONSULTED";
                     pd["adopted"] = pl.adopted;
                     pd["dist_to_endzone"] = pl.distToEndzone;
@@ -504,7 +505,9 @@ PYBIND11_MODULE(bb_engine, m) {
                                       const std::string& awayPolicyWeightsPath,
                                       float awayPolicyBlend,
                                       bool stagedPickup,
-                                      bool awayStagedPickup) {
+                                      bool awayStagedPickup,
+                                      bool cageAdvance,
+                                      bool awayCageAdvance) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -541,6 +544,7 @@ PYBIND11_MODULE(bb_engine, m) {
                               bb::PolicyNetwork* polPtr,
                               float polBlend,
                               bool stagedPlanner,
+                              bool cageOn,
                               std::shared_ptr<bb::MCTSPolicy>& mctsOut,
                               std::shared_ptr<bb::MacroMCTSPolicy>& macroMctsOut) -> bb::ActionSelector {
             if (ai == "greedy") {
@@ -557,6 +561,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.leafLookahead = leafLookahead;
                 cfg.riskDeferral = riskDeferral;
                 cfg.stagedPickupPlanner = stagedPlanner;
+                cfg.cageAdvance = cageOn;
                 if (polPtr) {
                     cfg.policy = polPtr;
                     cfg.policyBlend = polBlend;
@@ -588,11 +593,11 @@ PYBIND11_MODULE(bb_engine, m) {
         auto logged = bb::simulateGameLogged(
             home, away,
             makePolicy(homeAI, vf.get(), policyNet.get(), policyBlend,
-                       stagedPickup, homeMcts, homeMacroMcts),
+                       stagedPickup, cageAdvance, homeMcts, homeMacroMcts),
             makePolicy(awayAI, awayVf.get(),
                        awayPolicyNet ? awayPolicyNet.get() : policyNet.get(),
                        awayPolicyBlend < 0.0f ? policyBlend : awayPolicyBlend,
-                       awayStagedPickup, awayMcts, awayMacroMcts),
+                       awayStagedPickup, awayCageAdvance, awayMcts, awayMacroMcts),
             dice);
 
         // Copy policy decisions from MCTS policies
@@ -637,7 +642,9 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("away_policy_weights_path") = "",
        py::arg("away_policy_blend") = -1.0f,  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
        py::arg("staged_pickup") = false,       // 2026-08-05 (item 13): staged safe-then-PICKUP whole-turn planner, per side
-       py::arg("away_staged_pickup") = false); // so the gate can run candidate-only while frozen keeps its promoted config
+       py::arg("away_staged_pickup") = false,  // so the gate can run candidate-only while frozen keeps its promoted config
+       py::arg("cage_advance") = false,        // 2026-08-11: F1 cage-advance planner, per side. Default off = production.
+       py::arg("away_cage_advance") = false);  // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

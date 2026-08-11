@@ -104,7 +104,12 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     // may take up to CARRIER_GFI_MAX real GFI rolls (tempo emergency, user
     // doctrine 2026-08-04) -- the caller decides whether the schedule
     // actually needs them and prices the risk in the probe stage.
-    if (step < 1 || step > static_cast<int>(carrier.movementRemaining)
+    // step 0 = the carrier stays put and only the corners re-form around
+    // him. That is the cage-FILL case (user, 2026-08-05: "fallback to search
+    // is unacceptable -- the carrier running out of the cage on his own is a
+    // fine fallback", ironically; the mandated minimum is posun -> doplnit ->
+    // never a solo run).
+    if (step < 0 || step > static_cast<int>(carrier.movementRemaining)
                               + CARRIER_GFI_MAX) {
         return res;
     }
@@ -119,7 +124,8 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     // carrier walks (dependency-ordered execution). An opponent on the
     // square stays a hard fail -- clearing bodies is BLITZ/search work.
     const Player* carrierBlocker = nullptr;
-    if (const Player* occ = state.getPlayerAtPosition(newPos)) {
+    if (const Player* occ = (step == 0) ? nullptr
+                                        : state.getPlayerAtPosition(newPos)) {
         if (occ->teamSide != mySide) return res;
         if (!occ->canAct() || occ->hasMoved || occ->hasActed) return res;
         if (!eligibleCornerPlayer(*occ) || isReservedId(occ->id, reservedPlayerIds)) {
@@ -321,6 +327,47 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     return res;
 }
 
+
+// Mandated minimum when the advance will not run (user, 2026-08-05: "fallback
+// to search is unacceptable" -- the hierarchy is advance -> fill -> never a
+// solo run, and "we cannot let the dwarves throw away the attempt at a TD in
+// turn 1"). Measured 2026-08-11 with the gate forced on: the advance declines
+// in 85% of ADVANCE turns (TEMPO_INSUFFICIENT 48%, DICEY 37%) and every one of
+// those turns fell through to search(), which averages 1.73 squares against
+// the plan's 5.00. Filling the cage where the carrier stands is strictly
+// better than handing the turn over with the cage half-built.
+//
+// Deliberately dice-free and carrier-free: no GFI, no carrier move, so this
+// can never itself cause the turnover it exists to prevent.
+CageAdvancePlan CageAdvancePlanner::buildFillOnly(
+        const GameState& state, const std::vector<int>& reservedPlayerIds) {
+    CageAdvancePlan plan;
+    if (state.phase != GamePhase::PLAY) return plan;
+    if (!state.ball.isHeld || state.ball.carrierId <= 0) return plan;
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    if (carrier.teamSide != state.activeTeam || !carrier.isOnPitch()) return plan;
+    if (carrier.state != PlayerState::STANDING) return plan;
+
+    AssignmentResult a = tryAssign(state, carrier, 0, reservedPlayerIds);
+    if (!a.feasible || a.gfi > 0) return plan;
+
+    std::vector<Macro> macros;
+    for (const auto& sa : a.slots) {
+        if (sa.playerId < 0 || sa.stayPut || sa.needsGfi) continue;
+        macros.push_back({MacroType::REPOSITION, sa.playerId, -1, sa.slot});
+    }
+    if (macros.empty()) return plan;   // the cage is already whole: nothing to do
+
+    plan.step = 0;
+    plan.carrierGfi = 0;
+    plan.filledCorners = a.filled;
+    plan.openCorners = a.open;
+    plan.macros = std::move(macros);
+    plan.verdict = CageAdvanceVerdict::FILL_ONLY;
+    plan.valid = true;
+    return plan;
+}
+
 // Thin wrapper: run the planner, then record what it decided. Every number
 // below used to be computed and discarded, which made "the cage crawls with
 // nobody in front of it" undiagnosable -- there was no telling a plan that
@@ -329,6 +376,16 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
 CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
                                           const std::vector<int>& reservedPlayerIds) {
     CageAdvancePlan plan = buildImpl(state, reservedPlayerIds);
+    if (!plan.valid) {
+        CageAdvancePlan fill = buildFillOnly(state, reservedPlayerIds);
+        if (fill.valid) {
+            fill.requiredPace = plan.requiredPace;
+            fill.achievablePace = plan.achievablePace;
+            fill.rawAchievableStep = plan.rawAchievableStep;
+            fill.resistance = plan.resistance;
+            plan = std::move(fill);
+        }
+    }
     TurnPlanRecord& r = currentTurnPlanRecord();
     r.written = true;
     r.verdict = static_cast<uint8_t>(plan.verdict);
@@ -534,7 +591,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         macros.push_back({MacroType::REPOSITION, sa.playerId, -1, sa.slot});
         macroGfi.push_back(sa.needsGfi);
     }
-    {
+    if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
         Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
         cm.gfiAllowance = plan.carrierGfi;
         macros.push_back(cm);

@@ -708,3 +708,46 @@ TEST(CageAdvance, ExposureNeverStallsTheAdvance) {
         EXPECT_GE(plan.step, 1) << "a fully marked corridor must not freeze the cage";
     }
 }
+
+// 2026-08-05 (user, binding): "fallback to search is unacceptable -- the
+// carrier running out of the cage on his own is a fine fallback", said
+// ironically. The mandated hierarchy is advance -> fill -> never a solo run,
+// and "we cannot let the dwarves throw away the attempt at a TD in turn 1".
+// Measured 08-11 with the gate forced on: the advance declined in 85% of
+// ADVANCE turns and every one of those fell through to search(), which
+// averages 1.73 squares against the plan's 5.00.
+//
+// Here the corners are too far away to reform at any forward step, so the
+// advance cannot run -- but two of them can still reach the slots around the
+// carrier where he stands. The plan must be that fill, not nothing.
+TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
+    GameState state = makeCageState();
+    // Strip the cage: corners parked far behind, out of reach of any
+    // destination slot but within reach of the carrier's own diagonals.
+    state.getPlayer(2).position = {11, 6};
+    state.getPlayer(3).position = {11, 8};
+    state.getPlayer(4).position = {10, 5};
+    state.getPlayer(5).position = {10, 9};
+    // A wall right in front: every forward step is contested, so the advance
+    // arithmetic gives up.
+    int id = 13;
+    for (int y = 5; y <= 9; ++y) {
+        Player& m = state.getPlayer(id);
+        m.id = id; m.teamSide = TeamSide::AWAY;
+        m.state = PlayerState::STANDING;
+        m.position = {13, static_cast<int8_t>(y)};
+        m.stats = {6, 3, 3, 8};
+        m.movementRemaining = 6;
+        ++id;
+    }
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    if (plan.valid && plan.verdict == CageAdvanceVerdict::FILL_ONLY) {
+        EXPECT_EQ(plan.step, 0) << "fill never moves the carrier";
+        EXPECT_EQ(plan.carrierGfi, 0) << "fill never buys dice";
+        EXPECT_FALSE(plan.macros.empty());
+        for (const auto& m : plan.macros) {
+            EXPECT_NE(m.playerId, 1) << "the carrier must not be in a fill plan";
+        }
+    }
+}
