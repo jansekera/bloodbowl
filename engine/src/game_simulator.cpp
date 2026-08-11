@@ -504,18 +504,25 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
 
     Position landPos{static_cast<int8_t>(landX), static_cast<int8_t>(landY)};
 
-    // Check if a player is at landing position
+    // Put the ball down BEFORE anyone tries to catch it. Until 2026-08-11 it
+    // was placed only in the else-branch, so a kick landing on a standing
+    // receiver who then dropped it left the ball where setupHalf had put it:
+    // off the pitch, at (-1,-1). resolveCatch does nothing with the ball when
+    // it fails -- the comment here claimed it bounced, and it does not -- so
+    // the drive carried on with no ball anywhere.
+    //
+    // Seen once in 120 games (g0040): an entire second half of 108 moves, 19
+    // blocks, three fouls and a casualty, played without a ball. The full
+    // kickoff path (resolveKickoff) always had this right; only the simplified
+    // one was wrong, and the simplified one is what the corpora run on.
+    state.ball = BallState::onGround(landPos);
+
     Player* catcher = state.getPlayerAtPosition(landPos);
     if (catcher && catcher->teamSide == receiving &&
         catcher->state == PlayerState::STANDING) {
-        // Attempt catch
-        if (resolveCatch(state, catcher->id, dice, 0, nullptr)) {
-            // Ball caught
+        if (!resolveCatch(state, catcher->id, dice, 0, nullptr)) {
+            resolveBounce(state, landPos, dice, 0, nullptr);
         }
-        // If catch fails, ball bounces (handled by resolveCatch/bounce)
-    } else {
-        // Ball on ground
-        state.ball = BallState::onGround(landPos);
     }
 
     state.phase = GamePhase::PLAY;

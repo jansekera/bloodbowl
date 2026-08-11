@@ -994,3 +994,34 @@ TEST(GameSimulator, NoTurnNineIsEverPlayed) {
     }
     EXPECT_LE(worst, 8) << "a half is eight turns; turn " << worst << " was played";
 }
+
+// 2026-08-11: the simplified kickoff placed the ball only when the landing
+// square held nobody catchable. Land it on a standing receiver who then drops
+// it, and the ball stayed where setupHalf had left it -- off the pitch at
+// (-1,-1) -- because resolveCatch does nothing with the ball when it fails.
+// Seen once in 120 corpus games (g0040): a whole second half of 108 moves, 19
+// blocks and a casualty, played with no ball on the field.
+//
+// This is the path the corpora actually run: neither the python binding nor
+// the diagnostic harnesses ask for the full kickoff.
+TEST(GameSimulator, SimpleKickoffAlwaysLeavesTheBallOnThePitch) {
+    const TeamRoster* dwarf = getDevelopedRoster("dwarf", 1200);
+    const TeamRoster* skaven = getDevelopedRoster("skaven", 1200);
+    ASSERT_NE(dwarf, nullptr);
+    ASSERT_NE(skaven, nullptr);
+
+    for (uint32_t seed = 5200; seed < 5320; ++seed) {
+        DiceRoller dice(seed);
+        LoggedGameResult lgr = simulateGameLogged(
+            *dwarf, *skaven,
+            [&dice](const GameState& s) { return randomPolicy(s, dice); },
+            [&dice](const GameState& s) { return randomPolicy(s, dice); },
+            dice);
+        for (const auto& t : lgr.turnLogs) {
+            ASSERT_TRUE(t.ballHeld || (t.ballX >= 0 && t.ballY >= 0))
+                << "seed " << seed << ": half " << t.half << " turn "
+                << t.turnNumber << " played with the ball at ("
+                << int(t.ballX) << "," << int(t.ballY) << ")";
+        }
+    }
+}
