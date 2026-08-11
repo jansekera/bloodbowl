@@ -287,20 +287,51 @@ TEST(Injury, ApothecaryPicksTheMilderOfTwoCasualties) {
     EXPECT_TRUE(gs.getTeamState(TeamSide::HOME).apothecaryUsed);
 }
 
-TEST(Injury, ApothecaryIsNotSpentOnALineman) {
-    // Placeholder policy, not a decision layer: the apothecary is once per
-    // match, so it is never burned on the cheapest body. Choosing WHEN to
-    // spend it properly is queued separately.
+// Rewritten 2026-08-11. The old rule asked whether the position was called
+// "Lineman", which is a label rather than a property -- and it silently did
+// nothing for the dwarves, whose roster has no such name, so every Longbeard
+// counted as irreplaceable. The generic question is whether an identical
+// team-mate is already sitting in Reserves: if one is, a once-per-match asset
+// buys nothing.
+TEST(Injury, ApothecaryIsNotSpentWhenTheBenchCanReplaceHim) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
-    gs.getPlayer(1).positionName = "Lineman";
+    gs.getPlayer(1).positionName = "Longbeard";
+    // An identical team-mate waiting in Reserves.
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::OFF_PITCH;
+    gs.getPlayer(2).positionName = "Longbeard";
     gs.getTeamState(TeamSide::HOME).hasApothecary = true;
     FixedDiceRoller dice({5, 5, 5, 5, 6, 1});    // DEAD, no apothecary reroll
     InjuryContext ctx;
     resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::DEAD);
-    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).apothecaryUsed) << "kept for someone better";
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).apothecaryUsed)
+        << "an identical body is on the bench -- keep it for someone scarce";
+}
+
+// The converse, which the name test could never express: the same cheap
+// position IS worth saving once the bench has run out of him.
+TEST(Injury, ApothecaryIsSpentWhenNobodyCanReplaceHim) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Longbeard";
+    // A team-mate of a different type on the bench does not replace him.
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::OFF_PITCH;
+    gs.getPlayer(2).positionName = "Runner +Block";
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    // armour, injury 10, casualty D68 = 6,1 -> DEAD, then the apothecary
+    // re-roll 1,1 -> Badly Hurt, which returns him to Reserves.
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_TRUE(gs.getTeamState(TeamSide::HOME).apothecaryUsed)
+        << "nobody on the bench can take his place";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH)
+        << "patched up to Badly Hurt goes back to Reserves";
 }
 
 TEST(Injury, ApothecaryIsHeldOnTheWeakMiddleBand) {

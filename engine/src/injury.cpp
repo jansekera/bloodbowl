@@ -102,9 +102,24 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         //    game, stat loss) is the weak case -- there you would spend a
         //    once-per-match asset on a coin flip, so hold it instead.
         TeamState& ts = state.getTeamState(player.teamSide);
-        bool worthSaving = (player.positionName != nullptr &&
-                            std::string(player.positionName).find("Lineman")
-                                == std::string::npos);
+        // WHO is worth it, derived rather than named: a player is worth the
+        // apothecary only if the bench cannot replace him. The old test asked
+        // whether his position was called "Lineman", which is a label, not a
+        // property -- and it silently did nothing for the dwarves, whose
+        // roster contains no such name, so every Longbeard counted as
+        // irreplaceable. The generic question is whether an identical
+        // team-mate is sitting in Reserves ready to take his place; if one
+        // is, spending a once-per-match asset on him buys nothing.
+        bool replaceable = false;
+        state.forEachPlayer(player.teamSide, [&](const Player& mate) {
+            if (mate.id == player.id) return;
+            if (mate.state != PlayerState::OFF_PITCH) return;
+            if (mate.positionName == nullptr || player.positionName == nullptr) return;
+            if (std::string(mate.positionName) == std::string(player.positionName)) {
+                replaceable = true;
+            }
+        });
+        bool worthSaving = !replaceable;
         bool worthSpendingOn = (cas == CasualtyResult::BADLY_HURT ||
                                 cas == CasualtyResult::DEAD);
         if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving && worthSpendingOn) {
