@@ -348,15 +348,20 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
     if (carrier.teamSide != state.activeTeam || !carrier.isOnPitch()) return plan;
     if (carrier.state != PlayerState::STANDING) return plan;
 
+    // A slot that would need a GFI is left open rather than killing the whole
+    // fill -- the first cut rejected the plan outright whenever any single
+    // corner needed a rush. Feasibility is still required: filling one corner
+    // out of four is not a cage, and a lone body next to the carrier is the
+    // formation problem the ADVANCE path already reports as NOT_APPLICABLE.
     AssignmentResult a = tryAssign(state, carrier, 0, reservedPlayerIds);
-    if (!a.feasible || a.gfi > 0) return plan;
+    if (!a.feasible) return plan;
 
     std::vector<Macro> macros;
     for (const auto& sa : a.slots) {
         if (sa.playerId < 0 || sa.stayPut || sa.needsGfi) continue;
         macros.push_back({MacroType::REPOSITION, sa.playerId, -1, sa.slot});
     }
-    if (macros.empty()) return plan;   // the cage is already whole: nothing to do
+    if (macros.empty()) return plan;   // cage already whole, or nobody reaches
 
     plan.step = 0;
     plan.carrierGfi = 0;
