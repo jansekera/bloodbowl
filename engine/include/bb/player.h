@@ -41,6 +41,13 @@ struct Player {
     // unlike a KO there is no recovery roll, so it needs its own flag rather
     // than a PlayerState.
     bool outNextSetup = false;
+    // Was he actually placed on the pitch for the drive currently being
+    // played? Secret Weapon ejection needs this as a fact rather than an
+    // inference: a player can sit in the KO box across a drive boundary --
+    // a bribe at the end of one drive leaves him in the game but off the
+    // field for the next -- and inferring "he must have played" from a KO
+    // state would send off a man who never took the field (user, 2026-08-11).
+    bool playedThisDrive = false;
 
     bool hasSkill(SkillName s) const { return skills.has(s); }
 

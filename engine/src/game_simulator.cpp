@@ -312,6 +312,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.state = PlayerState::STANDING;
         p.position = {static_cast<int8_t>(baseLOS + formation[slot].dx),
                       formation[slot].y};
+        p.playedThisDrive = true;
     }
 
     // Set team state
@@ -358,19 +359,25 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // PITCH for it is sent off now -- CRP: "Once a drive ends that this player
     // has played in at any point."
     //
-    // On the pitch, or in the KO box -- which amounts to the same thing here.
-    // The worry was that a KO'd man might have spent the whole drive in the
-    // box without taking the field, but a secret weapon cannot carry a KO
-    // across drives: had he played an earlier one he would already have been
-    // sent off at the end of it. So finding him KO'd now means he was on the
-    // pitch for the drive that just ended (user, 2026-08-11).
+    // The drive that just ended is over, so a secret weapon who took the field
+    // for it is sent off -- CRP: "Once a drive ends that this player has
+    // played in at any point."
+    //
+    // Read from a recorded fact, not inferred from his current state. The
+    // tempting inference is that a KO'd secret weapon must have played,
+    // because playing an earlier drive would already have sent him off -- but
+    // a bribe breaks exactly that chain: it cancels the ejection and leaves
+    // him in the game, so he can sit out the NEXT drive in the KO box and be
+    // sent off for a drive he never took the field in (user, 2026-08-11).
+    // Bribes are not implemented yet; the flag costs nothing and does not
+    // depend on that staying true.
     for (auto& p : state.players) {
-        if (!p.hasSkill(SkillName::SecretWeapon)) continue;
-        if (p.isOnPitch() || p.state == PlayerState::KO) {
+        if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive) {
             p.state = PlayerState::EJECTED;
             p.position = {-1, -1};
         }
     }
+    for (auto& p : state.players) p.playedThisDrive = false;
 
     if (state.weather == Weather::SWELTERING_HEAT && dice) {
         for (auto& p : state.players) {
