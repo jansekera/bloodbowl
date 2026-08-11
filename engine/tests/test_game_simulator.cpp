@@ -827,7 +827,13 @@ TEST(GameSimulator, CasualtiesSurviveADriveRestart) {
     state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
         if (p.state == PlayerState::STANDING) standing++;
     });
-    EXPECT_EQ(standing, 11) << "substitutes should fill the two vacancies";
+    // Ten, not eleven: the bench covers the injured man and the dead one, but
+    // the base dwarf roster also fields a Deathroller, and since 2026-08-11 a
+    // Secret Weapon player is sent off when the drive ends (CRP: "once a drive
+    // ends that this player has played in at any point"). That is a third
+    // vacancy and the bench has only two men.
+    EXPECT_EQ(standing, 10)
+        << "substitutes fill the casualties; the Deathroller is sent off";
     EXPECT_TRUE(state.getPlayer(GameState::benchBaseId(TeamSide::HOME)).isOnPitch());
     EXPECT_TRUE(state.getPlayer(GameState::benchBaseId(TeamSide::HOME) + 1).isOnPitch());
 }
@@ -850,30 +856,47 @@ TEST(GameSimulator, TeamPlaysShortOnceTheBenchIsEmpty) {
     EXPECT_EQ(standing, 10);
 }
 
+// The base dwarf roster carries a Deathroller, and since 2026-08-11 a Secret
+// Weapon player is sent off when the drive ends (CRP), so fixtures that want
+// an ordinary body must not pick him by accident.
+static int firstPlainHomePlayer(const GameState& state) {
+    int found = -1;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (found < 0 && p.isOnPitch() && !p.skills.has(SkillName::SecretWeapon)) {
+            found = p.id;
+        }
+    });
+    return found;
+}
+
 TEST(GameSimulator, KOdPlayerRecoversOnFourPlus) {
     // CRP: "At the next kick-off, before you set up any players, roll for
     // each of your players that have been KO'd. On 1-3 he must remain in the
     // KO'd box; on 4-6 you must return the player to the Reserves box."
     GameState state;
     setupHalf(state, getDwarfRoster(), getSkavenRoster());
-    state.getPlayer(5).state = PlayerState::KO;
-    state.getPlayer(5).position = {-1, -1};
+    const int id = firstPlainHomePlayer(state);
+    ASSERT_GT(id, 0);
+    state.getPlayer(id).state = PlayerState::KO;
+    state.getPlayer(id).position = {-1, -1};
 
     FixedDiceRoller good({4});   // 4+ -> back to Reserves, so he is set up
     setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &good);
-    EXPECT_EQ(state.getPlayer(5).state, PlayerState::STANDING);
+    EXPECT_EQ(state.getPlayer(id).state, PlayerState::STANDING);
 }
 
 TEST(GameSimulator, KOdPlayerStaysOutOnThreeOrLess) {
     GameState state;
     setupHalf(state, getDwarfRoster(), getSkavenRoster());
-    state.getPlayer(5).state = PlayerState::KO;
-    state.getPlayer(5).position = {-1, -1};
+    const int id = firstPlainHomePlayer(state);
+    ASSERT_GT(id, 0);
+    state.getPlayer(id).state = PlayerState::KO;
+    state.getPlayer(id).position = {-1, -1};
 
     FixedDiceRoller bad({3});    // 1-3 -> stays in the KO'd box
     setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &bad);
-    EXPECT_EQ(state.getPlayer(5).state, PlayerState::KO);
-    EXPECT_FALSE(state.getPlayer(5).isOnPitch());
+    EXPECT_EQ(state.getPlayer(id).state, PlayerState::KO);
+    EXPECT_FALSE(state.getPlayer(id).isOnPitch());
 }
 
 TEST(GameSimulator, SwelteringHeatHoldsAPlayerOutForOneSetup) {

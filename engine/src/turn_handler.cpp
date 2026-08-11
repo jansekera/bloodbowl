@@ -6,13 +6,12 @@ namespace bb {
 void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTurnover) {
     TeamSide current = state.activeTeam;
 
-    // Eject Secret Weapon players
-    state.forEachOnPitch(current, [&](Player& p) {
-        if (p.hasSkill(SkillName::SecretWeapon)) {
-            p.state = PlayerState::EJECTED;
-            p.position = {-1, -1};
-        }
-    });
+    // Secret Weapon players are NOT sent off here. CRP: "Once a DRIVE ends
+    // that this player has played in at any point, the referee orders the
+    // player to be sent off." This used to fire at the end of every team
+    // turn, so a Deathroller left the pitch after his own first turn instead
+    // of playing the drive out. The ejection now happens where the drive
+    // actually ends, in setupHalfOrDrive (game_simulator.cpp).
 
     // Switch active team
     state.activeTeam = opponent(current);

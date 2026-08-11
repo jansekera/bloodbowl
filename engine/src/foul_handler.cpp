@@ -75,6 +75,15 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     fouler.hasActed = true;
     state.getTeamState(fouler.teamSide).foulUsedThisTurn = true;
 
+    // Being sent off for a foul ends the turn. CRP says so from the other
+    // direction, in the Bribe text: a bribe is worth buying because it
+    // prevents "a turnover if the player was ejected for fouling". Until
+    // 2026-08-11 this returned ok() either way, which made fouling cheaper
+    // than the rules make it -- for both sides, and by the largest margin
+    // for whoever fouls most.
+    if (fouler.state == PlayerState::EJECTED) {
+        return ActionResult::turnovr();
+    }
     return ActionResult::ok();
 }
 

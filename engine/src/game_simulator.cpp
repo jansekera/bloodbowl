@@ -354,6 +354,24 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // Sweltering Heat is resolved at the END of the drive that just finished,
     // so it looks at who was still on the pitch. A collapsed player misses the
     // NEXT set-up only -- no recovery roll, unlike a KO.
+    // The drive that just ended is over, so a secret weapon that was ON THE
+    // PITCH for it is sent off now -- CRP: "Once a drive ends that this player
+    // has played in at any point."
+    //
+    // On the pitch, or in the KO box -- which amounts to the same thing here.
+    // The worry was that a KO'd man might have spent the whole drive in the
+    // box without taking the field, but a secret weapon cannot carry a KO
+    // across drives: had he played an earlier one he would already have been
+    // sent off at the end of it. So finding him KO'd now means he was on the
+    // pitch for the drive that just ended (user, 2026-08-11).
+    for (auto& p : state.players) {
+        if (!p.hasSkill(SkillName::SecretWeapon)) continue;
+        if (p.isOnPitch() || p.state == PlayerState::KO) {
+            p.state = PlayerState::EJECTED;
+            p.position = {-1, -1};
+        }
+    }
+
     if (state.weather == Weather::SWELTERING_HEAT && dice) {
         for (auto& p : state.players) {
             if (p.isOnPitch() && dice->rollD6() == 1) p.outNextSetup = true;
