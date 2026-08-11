@@ -414,25 +414,74 @@ TEST(MacroActions, DefensiveRepositionInterceptRequiresGoalSide) {
     EXPECT_TRUE(hasSafety);
 }
 
-TEST(MacroActions, PassAvailableWithTeammateAhead) {
+// Rewritten 2026-08-11. A pass used to be offered to anyone with the ball,
+// at any agility, toward any team-mate ahead. For a dwarf side that is a
+// standing invitation to lose the drive: 21 turnovers on the 08-11 corpus
+// came from our own AG2 throws and catches. Two rolls at AG2 complete about
+// a quarter of the time. The rule now is the user's: dwarves pass "only in
+// an emergency", and emergency is defined, not felt.
+TEST(MacroActions, ShortPassBetweenGoodHandsIsOffered) {
     GameState state = makeMinimalState();
     state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {6, 3, 4, 8};      // AG4 thrower
     state.ball = BallState::carried({5, 7}, 1);
     state.homeTeam.passUsedThisTurn = false;
 
-    // Add a teammate ahead
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {8, 7};                          // short, no tackle zones
+    p2.stats = {6, 3, 4, 8};                       // AG4 catcher
+    p2.movementRemaining = 6;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::PASS_ACTION));
+}
+
+TEST(MacroActions, LowAgilityPassIsNotOfferedAsARoutineOption) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {4, 3, 2, 9};      // AG2 Longbeard
+    state.ball = BallState::carried({5, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 1;                 // plenty of time left
+
     Player& p2 = state.getPlayer(2);
     p2.id = 2;
     p2.teamSide = TeamSide::HOME;
     p2.state = PlayerState::STANDING;
     p2.position = {12, 7};
-    p2.stats = {6, 3, 3, 8};
+    p2.stats = {4, 3, 2, 9};                       // AG2 catcher
+    p2.movementRemaining = 4;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::PASS_ACTION))
+        << "two AG2 rolls complete about a quarter of the time";
+}
+
+TEST(MacroActions, TheSameBadPassIsOfferedWhenTheHalfEndsWithoutIt) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {14, 7};         // 11 from the endzone, MA4
+    state.getPlayer(1).stats = {4, 3, 2, 9};
+    state.ball = BallState::carried({14, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 8;                 // last turn of the half
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {18, 7};                         // 7 out, MA6 -> he reaches it
+    p2.stats = {6, 3, 2, 9};
     p2.movementRemaining = 6;
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
-
-    EXPECT_TRUE(hasMacroType(macros, MacroType::PASS_ACTION));
+    EXPECT_TRUE(hasMacroType(macros, MacroType::PASS_ACTION))
+        << "the carrier cannot reach the endzone and the half ends anyway";
 }
 
 TEST(MacroActions, BranchingFactorReasonable) {
