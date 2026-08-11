@@ -204,6 +204,81 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.proUsedThisTurn = false;
     }
 
+    // --- 2b. Which formation slot does each starter stand in? -----------
+    // Slots carry ROLES; who fills them must not be decided by where a
+    // positional happens to sit in the roster list. Until 2026-08-11 a
+    // starter simply stood in the slot with his own squad index, and for the
+    // dwarves that inverted the two placements that matter most: the deepest
+    // slot -- the one nearest where a deep kick lands -- went to a Longbeard
+    // (MA4, AG2, no Sure Hands) while both Runners ended up on or beside the
+    // line of scrimmage. Measured on the 07-30 corpus: median Runner-to-ball
+    // distance at turn 1 was 7.5 squares and 14 of 40 Runners could not reach
+    // the ball at all, so the pickup fell to whoever was standing deep -- and
+    // a Longbeard carrying advances 1.50 squares a turn against a Runner's
+    // 3.41 (project_bloodbowl_setup_slot_rootcause_20260811,
+    // project_bloodbowl_pace_root_cause_20260811).
+    //
+    // Two rules, both read off the slot's depth rather than off any race
+    // label: the deepest slot takes the best ball handler, and the line of
+    // scrimmage never takes one. Identity (templateOf) is deliberately left
+    // alone -- it must stay stable across drives, or a KO'd player would come
+    // back as somebody else.
+    int formSlotOf[STARTERS];
+    {
+        auto handlerScore = [&](int i) {
+            const PlayerTemplate& t = roster.positionals[templateOf[i]];
+            return (t.skills.has(SkillName::SureHands) ? 100 : 0)
+                 + t.stats.agility * 10 + t.stats.movement;
+        };
+        // Bodies on the line: armour first, Block next, and a handler is
+        // pushed out of contention entirely -- he is worth more deep than he
+        // is worth absorbing the opponent's opening blocks.
+        auto lineScore = [&](int i) {
+            const PlayerTemplate& t = roster.positionals[templateOf[i]];
+            return t.stats.armour * 10 + (t.skills.has(SkillName::Block) ? 5 : 0)
+                 - (t.skills.has(SkillName::SureHands) ? 100 : 0);
+        };
+
+        int maxDepth = 0;
+        for (int s = 0; s < STARTERS; ++s) {
+            maxDepth = std::max(maxDepth, std::abs(static_cast<int>(formation[s].dx)));
+        }
+
+        bool slotTaken[STARTERS] = {};
+        bool manTaken[STARTERS] = {};
+        for (int i = 0; i < STARTERS; ++i) formSlotOf[i] = i;
+
+        auto claim = [&](int man, int slot) {
+            formSlotOf[man] = slot;
+            manTaken[man] = true;
+            slotTaken[slot] = true;
+        };
+        auto bestMan = [&](auto score) {
+            int best = -1;
+            for (int i = 0; i < STARTERS; ++i) {
+                if (manTaken[i]) continue;
+                if (best < 0 || score(i) > score(best)) best = i;
+            }
+            return best;
+        };
+
+        for (int s = 0; s < STARTERS; ++s) {   // deepest slots first
+            if (std::abs(static_cast<int>(formation[s].dx)) != maxDepth) continue;
+            int man = bestMan(handlerScore);
+            if (man >= 0) claim(man, s);
+        }
+        for (int s = 0; s < STARTERS; ++s) {   // then the line of scrimmage
+            if (slotTaken[s] || formation[s].dx != 0) continue;
+            int man = bestMan(lineScore);
+            if (man >= 0) claim(man, s);
+        }
+        for (int s = 0; s < STARTERS; ++s) {   // everyone else keeps his order
+            if (slotTaken[s]) continue;
+            int man = bestMan([](int) { return 0; });
+            if (man >= 0) claim(man, s);
+        }
+    }
+
     // --- 3. Put the available starters in their usual places ------------
     // A player is available iff setupHalfOrDrive left him in Reserves; the
     // unavailable keep their KO/INJURED/DEAD/EJECTED state untouched.
@@ -223,8 +298,8 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     int nVacant = 0;
     for (int i = 0; i < STARTERS; ++i) {
         Player& p = state.getPlayer(GameState::squadId(side, i));
-        if (takeAvailability(p)) place(p, i);
-        else vacancies[nVacant++] = i;      // his spot needs a substitute
+        if (takeAvailability(p)) place(p, formSlotOf[i]);
+        else vacancies[nVacant++] = formSlotOf[i];   // that spot needs a sub
     }
 
     // --- 4. Substitutes come on for the missing ------------------------
@@ -332,13 +407,24 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     buildTeam(state, TeamSide::HOME, home, homeForm, isNewHalf);
     buildTeam(state, TeamSide::AWAY, away, awayForm, isNewHalf);
 
-    // Give the kicking team's slot 10 player the Kick skill (sweeper/deep safety)
+    // Give the kicking team's sweeper/deep safety the Kick skill. This used
+    // to read squad slot 10, which was the deepest man only because identity
+    // and formation slot were the same index; now that starters are placed by
+    // role (buildTeam step 2b) the deep man is found by looking, which is what
+    // the rule meant all along. CRP also forbids the kicker standing on the
+    // line of scrimmage or in a wide zone, and the deepest slot is neither.
     {
-        int kickBaseId = GameState::baseIdFor(kickingTeam);
-        Player& safety = state.getPlayer(kickBaseId + 10);
-        if (safety.isOnPitch()) {
-            safety.skills.add(SkillName::Kick);
-        }
+        int losX = (kickingTeam == TeamSide::HOME) ? 12 : 13;
+        Player* safety = nullptr;
+        int bestDepth = -1;
+        state.forEachOnPitch(kickingTeam, [&](const Player& p) {
+            int depth = std::abs(p.position.x - losX);
+            if (depth > bestDepth) {
+                bestDepth = depth;
+                safety = &state.getPlayer(p.id);
+            }
+        });
+        if (safety) safety->skills.add(SkillName::Kick);
     }
 
     // Ball off pitch until kickoff
