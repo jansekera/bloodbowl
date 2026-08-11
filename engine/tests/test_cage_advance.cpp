@@ -4,6 +4,7 @@
 #include "bb/turn_planner.h"
 #include "bb/game_state.h"
 #include "bb/action_resolver.h"
+#include "bb/helpers.h"
 #include <algorithm>
 #include <vector>
 
@@ -646,4 +647,64 @@ TEST(CageAdvancePolicy, DisabledGateMatchesSearchPath) {
     EXPECT_EQ(a1.type, a2.type);
     EXPECT_EQ(a1.playerId, a2.playerId);
     EXPECT_EQ(a1.target, a2.target);
+}
+
+// 2026-08-11: the planner had no notion of tackle zones -- corner slots were
+// picked purely geometrically -- so the cage happily parked itself inside
+// them. Measured on the replay corpus: the carrier ended marked at the end of
+// 40% of our advance turns. The standing rule (user, since 08-04) is that a
+// marked corner is no corner at all: the opponent blocks it out and the cage
+// opens.
+//
+// Fixture: one AWAY marker at {17,7}, deliberately just OUTSIDE the resistance
+// corridor (ahead=5 > CORRIDOR_DEPTH), so the corridor still reads as clear
+// and the bank policy reaches for the full step of 4 -- which parks the
+// carrier on {16,7}, right beside him, with both front corners marked too.
+// Stepping 2 instead meets the schedule exactly and touches nobody. Banking is
+// a bonus; not standing next to an opponent is not.
+TEST(CageAdvance, CarrierAvoidsEndingInsideATacklezoneWhenItIsFree) {
+    GameState state = makeCageState();
+    Player& marker = state.getPlayer(13);
+    marker.id = 13;
+    marker.teamSide = TeamSide::AWAY;
+    marker.state = PlayerState::STANDING;
+    marker.position = {17, 7};
+    marker.stats = {6, 3, 3, 8};
+    marker.movementRemaining = 6;
+
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+
+    Position dest{static_cast<int8_t>(12 + plan.step), 7};
+    EXPECT_EQ(countTacklezones(state, dest, TeamSide::HOME), 0)
+        << "carrier ends marked at {" << int(dest.x) << "," << int(dest.y) << "}"
+        << " with step " << plan.step;
+    // The schedule is never sacrificed for it: requiredPace ~1.86 -> step >= 2.
+    EXPECT_GE(plan.step, 2) << "schedule pace must still be met";
+    EXPECT_EQ(plan.carrierGfi, 0) << "tempo is never bought with dice";
+}
+
+// The other half of the bound: when every reachable square is marked there is
+// nothing to choose, and the planner must still advance rather than stall.
+// Tempo is the binding constraint -- we score in a minority of matches, so a
+// marked carrier that keeps moving beats a clean one that does not.
+TEST(CageAdvance, ExposureNeverStallsTheAdvance) {
+    GameState state = makeCageState();
+    int id = 13;
+    for (int x = 13; x <= 17; ++x) {
+        Player& m = state.getPlayer(id);
+        m.id = id;
+        m.teamSide = TeamSide::AWAY;
+        m.state = PlayerState::STANDING;
+        m.position = {static_cast<int8_t>(x), 6};
+        m.stats = {6, 3, 3, 8};
+        m.movementRemaining = 6;
+        ++id;
+    }
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    if (plan.valid) {
+        EXPECT_GE(plan.step, 1) << "a fully marked corridor must not freeze the cage";
+    }
 }

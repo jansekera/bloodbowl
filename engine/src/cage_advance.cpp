@@ -24,6 +24,35 @@ int distToEndzone(Position pos, TeamSide side) {
     return std::abs(pos.x - endzoneX(side));
 }
 
+// How much of the cage would end the turn inside an opponent's tackle zone if
+// the carrier stepped `step` squares forward. A marked corner is not merely a
+// weaker corner: the opponent blocks it out and the cage opens, which is why
+// the standing rule (user, since 2026-08-04 "release the marked corners"; and
+// bbtactics "Cage Basics": none of the five may end the turn in a tackle zone)
+// treats it as no corner at all.
+//
+// The carrier counts double. Measured 2026-08-11 on the replay corpus: he ends
+// marked in 40% of our advance turns against 11% for the occupied corners, so
+// he is the bigger hole by a wide margin -- which was the opposite of what the
+// code review predicted.
+int cageExposure(const GameState& state, const Player& carrier, int step) {
+    const int dx = forwardDx(carrier.teamSide);
+    Position dest{static_cast<int8_t>(carrier.position.x + dx * step),
+                  carrier.position.y};
+    if (!dest.isOnPitch()) return 99;
+    int e = 2 * countTacklezones(state, dest, carrier.teamSide);
+    for (int sx : {dx, -dx}) {
+        for (int sy : {-1, 1}) {
+            Position slot{static_cast<int8_t>(dest.x + sx),
+                          static_cast<int8_t>(dest.y + sy)};
+            if (slot.isOnPitch()) {
+                e += countTacklezones(state, slot, carrier.teamSide);
+            }
+        }
+    }
+    return e;
+}
+
 } // anonymous namespace
 
 bool CageAdvancePlanner::eligibleCornerPlayer(const Player& p) {
@@ -387,6 +416,8 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
     // GFI squares are spent ONLY when the schedule cannot be met within
     // plain MA (tempo emergency) -- banking never buys dice risk.
     int finalStep;
+    int scheduleStep = 1;   // hoisted: the exposure pass below needs the
+                            // shortest step that still meets the schedule
     if (tempoFail) {
         // Grind branch (config_.cageGrind only): max dice-free step, no GFI.
         plan.grindMode = true;
@@ -397,13 +428,45 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
             return plan;
         }
     } else {
-        int scheduleStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
-                                      1, static_cast<int>(plan.achievablePace));
+        scheduleStep = std::clamp(static_cast<int>(std::ceil(plan.requiredPace - 1e-9)),
+                                  1, static_cast<int>(plan.achievablePace));
         int bankStep = std::min(plan.rawAchievableStep, maxNoGfi);
         finalStep = (plan.resistance == 0) ? std::max(scheduleStep, bankStep)
                                            : scheduleStep;
         plan.carrierGfi = std::clamp(finalStep - maxNoGfi, 0, CARRIER_GFI_MAX);
     }
+
+    // Pick the least exposed destination among the steps that cost us nothing.
+    // Until now the planner had no notion of tackle zones at all -- corner
+    // slots were purely geometric -- so the cage routinely parked itself
+    // inside them.
+    //
+    // The bounds are the whole design, because tempo is the one thing we must
+    // not trade away: we score in only 18-35% of matches, so reaching the
+    // endzone at all is the binding constraint.
+    //   upper: never add a GFI, never exceed what the corners can sustain;
+    //   lower: never drop below the schedule -- but banking IS negotiable,
+    //          since a banked square is a bonus and an unmarked carrier is
+    //          not. In grind mode the schedule is already unmeetable, so
+    //          shortening is off the table entirely.
+    {
+        const int loStep = tempoFail ? finalStep : std::min(scheduleStep, finalStep);
+        const int hiStep = (plan.carrierGfi > 0)
+                               ? finalStep
+                               : std::min(plan.rawAchievableStep, maxNoGfi);
+        int bestStep = finalStep;
+        int bestExposure = cageExposure(state, carrier, finalStep);
+        for (int s = hiStep; s >= loStep; --s) {   // ties keep the longer step
+            if (s == finalStep) continue;
+            const int e = cageExposure(state, carrier, s);
+            if (e >= bestExposure) continue;
+            if (!tryAssign(state, carrier, s, reservedPlayerIds).feasible) continue;
+            bestStep = s;
+            bestExposure = e;
+        }
+        finalStep = bestStep;
+    }
+
     if (finalStep != plan.rawAchievableStep) {
         AssignmentResult a = tryAssign(state, carrier, finalStep, reservedPlayerIds);
         if (!a.feasible && plan.grindMode) {
