@@ -1,6 +1,7 @@
 #include "bb/cage_advance.h"
 #include "bb/turn_planner.h"
 #include "bb/helpers.h"
+#include "bb/turn_plan_record.h"
 #include <algorithm>
 #include <cmath>
 
@@ -320,8 +321,41 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     return res;
 }
 
+// Thin wrapper: run the planner, then record what it decided. Every number
+// below used to be computed and discarded, which made "the cage crawls with
+// nobody in front of it" undiagnosable -- there was no telling a plan that
+// runs and chooses to crawl from one that bails out with TEMPO_INSUFFICIENT
+// and hands the turn to search(). Those two want opposite fixes.
 CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
                                           const std::vector<int>& reservedPlayerIds) {
+    CageAdvancePlan plan = buildImpl(state, reservedPlayerIds);
+    TurnPlanRecord& r = currentTurnPlanRecord();
+    r.written = true;
+    r.verdict = static_cast<uint8_t>(plan.verdict);
+    r.requiredPace = static_cast<float>(plan.requiredPace);
+    r.achievablePace = static_cast<float>(plan.achievablePace);
+    r.rawAchievableStep = static_cast<int8_t>(plan.rawAchievableStep);
+    r.step = static_cast<int8_t>(plan.step);
+    r.resistance = static_cast<int8_t>(plan.resistance);
+    r.filledCorners = static_cast<int8_t>(plan.filledCorners);
+    r.openCorners = static_cast<int8_t>(plan.openCorners);
+    r.carrierGfi = static_cast<int8_t>(plan.carrierGfi);
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        if (c.teamSide == state.activeTeam && c.isOnPitch()) {
+            r.distToEndzone = static_cast<int16_t>(distToEndzone(c.position, c.teamSide));
+            r.turnsLeft = static_cast<int16_t>(
+                std::max(0, 9 - state.getTeamState(c.teamSide).turnNumber));
+            r.exposure = static_cast<int8_t>(std::min(
+                127, cageExposure(state, c, plan.step > 0 ? plan.step : 1)));
+        }
+    }
+    return plan;
+}
+
+CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
+                                          const std::vector<int>& reservedPlayerIds) {
+
     CageAdvancePlan plan;
 
     // --- Trigger: our held ball, ADVANCE goal, movable carrier, cage built.

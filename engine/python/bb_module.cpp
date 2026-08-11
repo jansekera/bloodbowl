@@ -245,6 +245,35 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["ball_carrier_id"] = turn.ballCarrierId;
                 t["turnover"] = turn.turnover;
                 t["touchdown"] = turn.touchdown;
+
+                // What the turn planner decided (bb/turn_plan_record.h).
+                // plan_written == false means no planner ran at all -- the
+                // whole turn belonged to per-macro search().
+                {
+                    static const char* goalNames[] = {
+                        "NONE", "PICKUP_BALL", "ADVANCE_BALL", "SCORE_BALL"};
+                    static const char* verdictNames[] = {
+                        "NOT_APPLICABLE", "TEMPO_INSUFFICIENT", "DICEY", "PLAN_READY"};
+                    const auto& pl = turn.plan;
+                    py::dict pd;
+                    pd["written"] = pl.written;
+                    pd["goal"] = (pl.goal < 4) ? goalNames[pl.goal] : "UNKNOWN";
+                    pd["verdict"] = (pl.verdict < 4) ? verdictNames[pl.verdict]
+                                                     : "NOT_CONSULTED";
+                    pd["adopted"] = pl.adopted;
+                    pd["dist_to_endzone"] = pl.distToEndzone;
+                    pd["turns_left"] = pl.turnsLeft;
+                    pd["required_pace"] = pl.requiredPace;
+                    pd["achievable_pace"] = pl.achievablePace;
+                    pd["raw_achievable_step"] = pl.rawAchievableStep;
+                    pd["step"] = pl.step;
+                    pd["resistance"] = pl.resistance;
+                    pd["filled_corners"] = pl.filledCorners;
+                    pd["open_corners"] = pl.openCorners;
+                    pd["carrier_gfi"] = pl.carrierGfi;
+                    pd["exposure"] = pl.exposure;
+                    t["plan"] = pd;
+                }
                 switch (turn.weather) {
                     case bb::Weather::SWELTERING_HEAT: t["weather"] = "sweltering_heat"; break;
                     case bb::Weather::VERY_SUNNY:      t["weather"] = "very_sunny"; break;

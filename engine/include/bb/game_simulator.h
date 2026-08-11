@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bb/game_state.h"
+#include "bb/turn_plan_record.h"
 #include "bb/game_event.h"
 #include "bb/roster.h"
 #include "bb/dice.h"
@@ -71,6 +72,10 @@ struct TurnLog {
 
     // Events that happened during this turn
     std::vector<GameEvent> events;
+
+    // What the turn planner decided this turn (bb/turn_plan_record.h).
+    // plan.written == false means no planner ran -- the turn was pure search().
+    TurnPlanRecord plan;
 
     // Summary flags
     bool turnover = false;

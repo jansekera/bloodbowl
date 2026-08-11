@@ -38,6 +38,7 @@ add_library(bb_engine SHARED
     src/macro_actions.cpp
     src/macro_mcts.cpp
     src/turn_planner.cpp
+    src/turn_plan_record.cpp
     src/cage_advance.cpp
     src/board_snapshot.cpp
 )

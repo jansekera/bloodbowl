@@ -661,6 +661,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
         logged.states.push_back(log);
 
         logged.turnLogs.push_back(captureTurnSnapshot(state));
+        resetTurnPlanRecord();
     }
 
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
@@ -698,6 +699,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             // Save previous turn events and start new turn log
             logged.turnLogs.push_back(captureTurnSnapshot(state));
             turnEvents.clear();
+            resetTurnPlanRecord();   // the planner writes it during this turn
 
             lastActiveTeam = curTeam;
             lastTurnNumber = curTurn;
@@ -725,6 +727,9 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
         // Append events to current turn log
         if (!logged.turnLogs.empty()) {
             auto& curLog = logged.turnLogs.back();
+            // The planner runs once per team-turn, inside the policy call
+            // above; take the record the first time it appears.
+            if (!curLog.plan.written) curLog.plan = currentTurnPlanRecord();
             for (auto& ev : turnEvents) {
                 curLog.events.push_back(ev);
                 if (ev.type == GameEvent::Type::TURNOVER) curLog.turnover = true;

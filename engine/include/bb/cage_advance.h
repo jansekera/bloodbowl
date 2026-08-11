@@ -178,6 +178,11 @@ public:
     // tests and future planners.
     static bool eligibleCornerPlayer(const Player& p);
 
+    // The planner proper. build() is a thin wrapper that also records what
+    // was decided (bb/turn_plan_record.h).
+    CageAdvancePlan buildImpl(const GameState& state,
+                              const std::vector<int>& reservedPlayerIds);
+
     // Corner-slot assignment around the carrier's position after a `step`
     // squares forward move. Public since 2026-08-07: the item13 staged
     // pickup planner reuses it for its cage-fill stage (corners around the

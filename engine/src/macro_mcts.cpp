@@ -1,4 +1,5 @@
 #include "bb/macro_mcts.h"
+#include "bb/turn_plan_record.h"
 #include "bb/turn_planner.h"
 #include "bb/cage_advance.h"
 #include "bb/action_resolver.h"
@@ -932,6 +933,12 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
     if (!stagedPlanBuilt_) {
         stagedPlanBuilt_ = true;
         TurnGoal goal = classifyTurnGoal(state);
+        {   // the goal is recorded even when no planner handles it -- "search
+            // took the whole turn" is itself the answer we keep failing to have
+            TurnPlanRecord& rec = currentTurnPlanRecord();
+            rec.written = true;
+            rec.goal = static_cast<uint8_t>(goal);
+        }
         if (stagedPlanner_ && goal == TurnGoal::PICKUP_BALL) {
             StagedPlan plan = stagedPlanner_->build(state);
             if (plan.valid) {
@@ -947,6 +954,7 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
                 }
                 stagedIndex_ = 0;
                 stagedPlansAdopted_++;
+                currentTurnPlanRecord().adopted = true;
             }
         } else if (cagePlanner_ && goal == TurnGoal::ADVANCE_BALL) {
             // F1 cage advance: shift the whole cage 1-2 squares (corners
@@ -959,6 +967,7 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
                 stagedMacros_ = std::move(plan.macros);
                 stagedIndex_ = 0;
                 stagedPlansAdopted_++;
+                currentTurnPlanRecord().adopted = true;
             }
         }
     }
@@ -1003,6 +1012,28 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         // Plan invalidated — search again
         currentPlan_.clear();
         planIndex_ = 0;
+    }
+
+    // Record the turn's goal even when no planner is configured -- "search
+    // took the whole turn" is itself the fact we kept failing to have. This
+    // sits OUTSIDE the planner branch on purpose: cageAdvance and
+    // stagedPickupPlanner are both default off in production, so without this
+    // the log would be empty exactly where the behaviour is.
+    {
+        const TeamState& ts = state.getTeamState(state.activeTeam);
+        TurnPlanRecord& rec = currentTurnPlanRecord();
+        if (!rec.written || rec.goal == 0) {
+            rec.written = true;
+            rec.goal = static_cast<uint8_t>(classifyTurnGoal(state));
+            rec.turnsLeft = static_cast<int16_t>(std::max(0, 9 - ts.turnNumber));
+            if (state.ball.isHeld && state.ball.carrierId > 0) {
+                const Player& c = state.getPlayer(state.ball.carrierId);
+                if (c.teamSide == state.activeTeam && c.isOnPitch()) {
+                    int ezX = (c.teamSide == TeamSide::HOME) ? 25 : 0;
+                    rec.distToEndzone = static_cast<int16_t>(std::abs(c.position.x - ezX));
+                }
+            }
+        }
     }
 
     // Item 13 (config-gated, default off): an active staged plan supplies
