@@ -964,3 +964,33 @@ TEST(GameSimulator, DeepSlotGoesToTheBestAvailableHandlerAfterInjuries) {
     EXPECT_GE(d1->stats.agility, 3) << "deep slot fell to " << d1->positionName;
     EXPECT_GE(d1->stats.movement, 5) << "deep slot fell to " << d1->positionName;
 }
+
+// 2026-08-11: the half could end without anyone taking an action, and nothing
+// noticed. checkHalfOver was consulted only at the end of executeAction, but
+// the kickoff advances the receiving team's turn number on its own -- so a
+// touchdown on turn 8 was followed by a kickoff that bumped the receiver to
+// turn 9, and that ninth turn was played out in full. Measured on the corpus:
+// 9 such turns across 120 games. Riot can push the marker the same way.
+//
+// Rare, but it matters more than its frequency: every schedule in the dwarf
+// drill is arithmetic over exactly eight turns per half.
+TEST(GameSimulator, NoTurnNineIsEverPlayed) {
+    const TeamRoster* dwarf = getDevelopedRoster("dwarf", 1200);
+    const TeamRoster* skaven = getDevelopedRoster("skaven", 1200);
+    ASSERT_NE(dwarf, nullptr);
+    ASSERT_NE(skaven, nullptr);
+
+    int worst = 0;
+    for (uint32_t seed = 4100; seed < 4140; ++seed) {
+        DiceRoller dice(seed);
+        LoggedGameResult lgr = simulateGameLogged(
+            *dwarf, *skaven,
+            [&dice](const GameState& s) { return randomPolicy(s, dice); },
+            [&dice](const GameState& s) { return randomPolicy(s, dice); },
+            dice, /*useFullKickoff=*/true);
+        for (const auto& t : lgr.turnLogs) {
+            worst = std::max(worst, t.turnNumber);
+        }
+    }
+    EXPECT_LE(worst, 8) << "a half is eight turns; turn " << worst << " was played";
+}

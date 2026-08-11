@@ -554,6 +554,23 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     int totalActions = 0;
 
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
+        // The half can end without anyone taking an action. checkHalfOver was
+        // only ever consulted at the end of executeAction, but the kickoff
+        // advances the receiving team's turn number by itself
+        // (kickoff_handler.cpp) -- so a touchdown scored on turn 8 was
+        // followed by a kickoff that bumped the receiver to turn 9, and the
+        // ninth turn was played out before anything asked whether the half
+        // was over. Measured on the 08-11 corpus: 9 such turns across 120
+        // games. Riot can do the same by pushing the marker forward.
+        //
+        // This matters more than its frequency: every schedule in the dwarf
+        // drill is arithmetic over exactly eight turns.
+        if (state.phase == GamePhase::PLAY && checkHalfOver(state)) {
+            state.phase = (state.half >= 2) ? GamePhase::GAME_OVER
+                                            : GamePhase::HALF_TIME;
+            continue;
+        }
+
         // Handle touchdown → setup + kickoff
         if (state.phase == GamePhase::TOUCHDOWN) {
             // The scoring team kicks off next, not simply "whoever didn't kick last".
@@ -670,6 +687,23 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     }
 
     while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
+        // The half can end without anyone taking an action. checkHalfOver was
+        // only ever consulted at the end of executeAction, but the kickoff
+        // advances the receiving team's turn number by itself
+        // (kickoff_handler.cpp) -- so a touchdown scored on turn 8 was
+        // followed by a kickoff that bumped the receiver to turn 9, and the
+        // ninth turn was played out before anything asked whether the half
+        // was over. Measured on the 08-11 corpus: 9 such turns across 120
+        // games. Riot can do the same by pushing the marker forward.
+        //
+        // This matters more than its frequency: every schedule in the dwarf
+        // drill is arithmetic over exactly eight turns.
+        if (state.phase == GamePhase::PLAY && checkHalfOver(state)) {
+            state.phase = (state.half >= 2) ? GamePhase::GAME_OVER
+                                            : GamePhase::HALF_TIME;
+            continue;
+        }
+
         if (state.phase == GamePhase::TOUCHDOWN) {
             // Mark touchdown in current turn log
             if (!logged.turnLogs.empty()) {
