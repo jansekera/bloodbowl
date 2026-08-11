@@ -155,25 +155,37 @@ TEST(CageAdvance, TempoIsComputedFromDistanceAndSchedule) {
     EXPECT_EQ(plan.macros.back().gfiAllowance, 0);
 }
 
-TEST(CageAdvance, TempoInsufficientWhenBehindSchedule) {
+// Rewritten 2026-08-11. This used to assert that falling behind schedule
+// abandons the plan outright, and that is precisely the behaviour being
+// replaced: the abandoned turn went back to search(), which averages 1.73
+// squares where this planner averages 5.00, and the user's standing
+// instruction is the hierarchy advance -> fill -> never a solo run, with the
+// stated preference "move more squares forward when it is possible".
+// Behind schedule now means walk as far as is safe, never give up the turn.
+TEST(CageAdvance, BehindScheduleStillAdvancesInsteadOfGivingUp) {
     GameState state = makeCageState();
     state.homeTeam.turnNumber = 6;  // turnsLeft 3, usable 2 -> required 6.5
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
-    EXPECT_EQ(plan.verdict, CageAdvanceVerdict::TEMPO_INSUFFICIENT);
-    EXPECT_FALSE(plan.valid);
-    EXPECT_TRUE(plan.macros.empty()) << "no blind push on insufficient tempo";
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    EXPECT_FALSE(plan.macros.empty());
+    EXPECT_GE(plan.step, 1) << "the schedule is unmeetable, the advance is not";
+    EXPECT_EQ(plan.carrierGfi, 0) << "a hopeless schedule never buys dice";
 }
 
-TEST(CageAdvance, TempoInsufficientWhenNoUsableTurnsLeft) {
+// Likewise: out of usable turns is not a reason to hand the turn over. Either
+// the cage still walks, or it at least closes up where it stands.
+TEST(CageAdvance, NoUsableTurnsLeftStillProducesAPlan) {
     GameState state = makeCageState();
     state.homeTeam.turnNumber = 8;  // turnsLeft 1, reserve eats it -> usable 0
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
-    EXPECT_EQ(plan.verdict, CageAdvanceVerdict::TEMPO_INSUFFICIENT);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    EXPECT_TRUE(plan.verdict == CageAdvanceVerdict::PLAN_READY ||
+                plan.verdict == CageAdvanceVerdict::FILL_ONLY);
 }
 
-TEST(CageAdvance, OpponentScreenInCorridorKillsTempo) {
+TEST(CageAdvance, OpponentScreenInCorridorKillsPaceButNotTheTurn) {
     GameState state = makeCageState();
     // Three standing opponents dead ahead in the corridor (x 13..16,
     // |dy| <= 2): a real screen -> pace penalty 2 -> achievable 0.
@@ -192,7 +204,13 @@ TEST(CageAdvance, OpponentScreenInCorridorKillsTempo) {
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
     EXPECT_EQ(plan.resistance, 3);
-    EXPECT_EQ(plan.verdict, CageAdvanceVerdict::TEMPO_INSUFFICIENT);
+    // A screen still crushes the PACE -- that reading is unchanged and is
+    // what the resistance penalty is for. What it no longer does is end the
+    // turn: the cage walks what it can, or closes up where it stands.
+    EXPECT_LE(plan.achievablePace, 2.0);
+    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
+    EXPECT_TRUE(plan.verdict == CageAdvanceVerdict::PLAN_READY ||
+                plan.verdict == CageAdvanceVerdict::FILL_ONLY);
 }
 
 TEST(CageAdvance, SingleStrayMarkerSlowsButStillAdvances) {

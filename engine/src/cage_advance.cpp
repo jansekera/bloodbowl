@@ -447,7 +447,20 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     // achievable step anyway instead of returning TEMPO_INSUFFICIENT.
     // Grind never spends carrier GFI: the schedule is unmeetable, so dice
     // risk buys nothing (banking never buys dice risk -- doctrine above).
-    const bool grind = config_.cageGrind;
+    //
+    // 2026-08-11: the "walk as far as you safely can when the schedule cannot
+    // be met" branch is no longer config-gated. The user's hierarchy is
+    // advance -> fill -> never a solo run, and his stated preference is "move
+    // more squares forward when it is possible". Bailing out of the advance
+    // put the turn back in search()'s hands, which manages 1.73 squares
+    // against this planner's 5.00; now that a cage-FILL fallback exists
+    // underneath, the branch below is the middle tier of that hierarchy
+    // rather than an alternative to giving up.
+    //
+    // The 08-10 A/B that measured cageGrind at zero compared it against
+    // fallback-to-search with no fill underneath, so it does not settle this
+    // arrangement -- it still owes its own A/B.
+    const bool grind = true;
     int usable = turnsLeft - RESERVE_TURNS;
     if (usable < 1) {
         if (!grind) {
