@@ -912,3 +912,55 @@ TEST(GameSimulator, SwelteringHeatHoldsAPlayerOutForOneSetup) {
     });
     EXPECT_EQ(standing, 11);
 }
+
+// 2026-08-11: slots carry roles, and the assignment must run over whoever is
+// AVAILABLE rather than over the nominal starting eleven. Package G gave
+// casualties persistence and the squad a bench the day before, so a KO'd
+// Runner is now an ordinary occurrence -- and the old code filled the hole he
+// left with a bench lineman, which would have put a Longbeard back in the
+// deep slot and reintroduced the defect the role rules exist to prevent
+// (measured: a Longbeard carrying advances 1.50 squares a turn against a
+// Runner's 3.41).
+TEST(GameSimulator, DeepSlotGoesToTheBestAvailableHandlerAfterInjuries) {
+    const TeamRoster* dwarf = getDevelopedRoster("dwarf", 1200);
+    const TeamRoster* skaven = getDevelopedRoster("skaven", 1200);
+    ASSERT_NE(dwarf, nullptr);
+    ASSERT_NE(skaven, nullptr);
+
+    GameState state;
+    DiceRoller dice(12345);
+    setupHalf(state, *dwarf, *skaven, TeamSide::AWAY, &dice);
+
+    // The receiving side's deep slot starts with the Sure Hands carrier.
+    auto deepest = [&]() -> const Player* {
+        const Player* best = nullptr;
+        state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+            if (!best || p.position.x < best->position.x) {
+                best = &state.getPlayer(p.id);
+            }
+        });
+        return best;
+    };
+    const Player* d0 = deepest();
+    ASSERT_NE(d0, nullptr);
+    EXPECT_TRUE(d0->skills.has(SkillName::SureHands))
+        << "deep slot started with " << d0->positionName;
+
+    // Take both Sure Hands players out of the match, then re-set up.
+    int removed = 0;
+    for (auto& p : state.players) {
+        if (p.teamSide == TeamSide::HOME && p.skills.has(SkillName::SureHands)) {
+            p.state = PlayerState::INJURED;
+            removed++;
+        }
+    }
+    ASSERT_GE(removed, 1);
+    setupDrive(state, *dwarf, *skaven, TeamSide::AWAY, &dice);
+
+    const Player* d1 = deepest();
+    ASSERT_NE(d1, nullptr);
+    // No handler left, so the next best by agility/movement takes the slot --
+    // never simply whoever the bench happens to offer.
+    EXPECT_GE(d1->stats.agility, 3) << "deep slot fell to " << d1->positionName;
+    EXPECT_GE(d1->stats.movement, 5) << "deep slot fell to " << d1->positionName;
+}

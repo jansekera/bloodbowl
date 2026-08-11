@@ -5,6 +5,7 @@
 #include "bb/helpers.h"
 #include "bb/turn_handler.h"
 #include <algorithm>
+#include <vector>
 
 namespace bb {
 
@@ -204,7 +205,25 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.proUsedThisTurn = false;
     }
 
-    // --- 2b. Which formation slot does each starter stand in? -----------
+    // --- 3. Who is actually available -----------------------------------
+    // Available = in Reserves AND not held out by Sweltering Heat. The heat
+    // flag is consumed here, so a collapsed player misses exactly one set-up.
+    auto takeAvailability = [](Player& p) {
+        bool ok = (p.state == PlayerState::OFF_PITCH) && !p.outNextSetup;
+        p.outNextSetup = false;
+        return ok;
+    };
+    int available[SQUAD];
+    int nAvail = 0;
+    for (int i = 0; i < SQUAD; ++i) {
+        Player& p = state.getPlayer(GameState::squadId(side, i));
+        bool ok = takeAvailability(p);          // called once for everyone:
+        if (ok && nAvail < STARTERS) {          // it clears the heat flag
+            available[nAvail++] = i;
+        }
+    }
+
+    // --- 4. Which formation slot does each of them stand in? -------------
     // Slots carry ROLES; who fills them must not be decided by where a
     // positional happens to sit in the roster list. Until 2026-08-11 a
     // starter simply stood in the slot with his own squad index, and for the
@@ -215,98 +234,84 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     // distance at turn 1 was 7.5 squares and 14 of 40 Runners could not reach
     // the ball at all, so the pickup fell to whoever was standing deep -- and
     // a Longbeard carrying advances 1.50 squares a turn against a Runner's
-    // 3.41 (project_bloodbowl_setup_slot_rootcause_20260811,
-    // project_bloodbowl_pace_root_cause_20260811).
+    // 3.41 (project_bloodbowl_setup_slot_rootcause_20260811).
     //
     // Two rules, both read off the slot's depth rather than off any race
     // label: the deepest slot takes the best ball handler, and the line of
-    // scrimmage never takes one. Identity (templateOf) is deliberately left
-    // alone -- it must stay stable across drives, or a KO'd player would come
-    // back as somebody else.
-    int formSlotOf[STARTERS];
+    // scrimmage never takes one.
+    //
+    // Assignment runs over whoever is AVAILABLE, substitutes included, not
+    // over the nominal starting eleven. Package G gave casualties persistence
+    // and the squad a bench on 2026-08-10, so a KO'd Runner is now a normal
+    // occurrence -- and slotting a bench lineman into the hole he left would
+    // put a Longbeard back in the deep slot, reintroducing the very defect
+    // the role rules exist to prevent. Identity (templateOf) is deliberately
+    // untouched: it must stay stable across drives, or a KO'd player would
+    // come back as somebody else.
+    int formSlotOf[SQUAD];
+    for (int i = 0; i < SQUAD; ++i) formSlotOf[i] = -1;
     {
-        auto handlerScore = [&](int i) {
-            const PlayerTemplate& t = roster.positionals[templateOf[i]];
+        auto handlerScore = [&](int k) {
+            const PlayerTemplate& t = roster.positionals[templateOf[available[k]]];
             return (t.skills.has(SkillName::SureHands) ? 100 : 0)
                  + t.stats.agility * 10 + t.stats.movement;
         };
         // Bodies on the line: armour first, Block next, and a handler is
         // pushed out of contention entirely -- he is worth more deep than he
         // is worth absorbing the opponent's opening blocks.
-        auto lineScore = [&](int i) {
-            const PlayerTemplate& t = roster.positionals[templateOf[i]];
+        auto lineScore = [&](int k) {
+            const PlayerTemplate& t = roster.positionals[templateOf[available[k]]];
             return t.stats.armour * 10 + (t.skills.has(SkillName::Block) ? 5 : 0)
                  - (t.skills.has(SkillName::SureHands) ? 100 : 0);
         };
 
         int maxDepth = 0;
-        for (int s = 0; s < STARTERS; ++s) {
-            maxDepth = std::max(maxDepth, std::abs(static_cast<int>(formation[s].dx)));
+        for (int s2 = 0; s2 < STARTERS; ++s2) {
+            maxDepth = std::max(maxDepth, std::abs(static_cast<int>(formation[s2].dx)));
         }
 
         bool slotTaken[STARTERS] = {};
-        bool manTaken[STARTERS] = {};
-        for (int i = 0; i < STARTERS; ++i) formSlotOf[i] = i;
+        std::vector<bool> manTaken(nAvail, false);
 
-        auto claim = [&](int man, int slot) {
-            formSlotOf[man] = slot;
-            manTaken[man] = true;
+        auto claim = [&](int k, int slot) {
+            formSlotOf[available[k]] = slot;
+            manTaken[k] = true;
             slotTaken[slot] = true;
         };
         auto bestMan = [&](auto score) {
             int best = -1;
-            for (int i = 0; i < STARTERS; ++i) {
-                if (manTaken[i]) continue;
-                if (best < 0 || score(i) > score(best)) best = i;
+            for (int k = 0; k < nAvail; ++k) {
+                if (manTaken[k]) continue;
+                if (best < 0 || score(k) > score(best)) best = k;
             }
             return best;
         };
 
-        for (int s = 0; s < STARTERS; ++s) {   // deepest slots first
-            if (std::abs(static_cast<int>(formation[s].dx)) != maxDepth) continue;
-            int man = bestMan(handlerScore);
-            if (man >= 0) claim(man, s);
+        for (int s2 = 0; s2 < STARTERS; ++s2) {   // deepest slots first
+            if (std::abs(static_cast<int>(formation[s2].dx)) != maxDepth) continue;
+            int k = bestMan(handlerScore);
+            if (k >= 0) claim(k, s2);
         }
-        for (int s = 0; s < STARTERS; ++s) {   // then the line of scrimmage
-            if (slotTaken[s] || formation[s].dx != 0) continue;
-            int man = bestMan(lineScore);
-            if (man >= 0) claim(man, s);
+        for (int s2 = 0; s2 < STARTERS; ++s2) {   // then the line of scrimmage
+            if (slotTaken[s2] || formation[s2].dx != 0) continue;
+            int k = bestMan(lineScore);
+            if (k >= 0) claim(k, s2);
         }
-        for (int s = 0; s < STARTERS; ++s) {   // everyone else keeps his order
-            if (slotTaken[s]) continue;
-            int man = bestMan([](int) { return 0; });
-            if (man >= 0) claim(man, s);
+        for (int s2 = 0; s2 < STARTERS; ++s2) {   // everyone else keeps order
+            if (slotTaken[s2]) continue;
+            int k = bestMan([](int) { return 0; });
+            if (k >= 0) claim(k, s2);
         }
     }
 
-    // --- 3. Put the available starters in their usual places ------------
-    // A player is available iff setupHalfOrDrive left him in Reserves; the
-    // unavailable keep their KO/INJURED/DEAD/EJECTED state untouched.
-    auto place = [&](Player& p, int formSlot) {
+    // --- 5. Put them on the pitch ---------------------------------------
+    for (int k = 0; k < nAvail; ++k) {
+        Player& p = state.getPlayer(GameState::squadId(side, available[k]));
+        int slot = formSlotOf[available[k]];
+        if (slot < 0) continue;
         p.state = PlayerState::STANDING;
-        p.position = {static_cast<int8_t>(baseLOS + formation[formSlot].dx),
-                      formation[formSlot].y};
-    };
-    // Available = in Reserves AND not held out by Sweltering Heat. The heat
-    // flag is consumed here, so a collapsed player misses exactly one set-up.
-    auto takeAvailability = [](Player& p) {
-        bool ok = (p.state == PlayerState::OFF_PITCH) && !p.outNextSetup;
-        p.outNextSetup = false;
-        return ok;
-    };
-    int vacancies[STARTERS];
-    int nVacant = 0;
-    for (int i = 0; i < STARTERS; ++i) {
-        Player& p = state.getPlayer(GameState::squadId(side, i));
-        if (takeAvailability(p)) place(p, formSlotOf[i]);
-        else vacancies[nVacant++] = formSlotOf[i];   // that spot needs a sub
-    }
-
-    // --- 4. Substitutes come on for the missing ------------------------
-    for (int b = STARTERS, v = 0; b < SQUAD && v < nVacant; ++b) {
-        Player& p = state.getPlayer(GameState::squadId(side, b));
-        if (!takeAvailability(p)) continue;   // bench man also out
-        place(p, vacancies[v++]);
+        p.position = {static_cast<int8_t>(baseLOS + formation[slot].dx),
+                      formation[slot].y};
     }
 
     // Set team state
