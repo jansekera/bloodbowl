@@ -522,8 +522,27 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             if (!def || def->teamSide == mySide) continue;
             if (def->state != PlayerState::STANDING) continue;
 
+            // One-die blocks were not merely rejected, they were never
+            // generated -- the search could not weigh one even when it was
+            // the right play. For a player with Block that is wrong: Both
+            // Down costs him nothing, so the only turnover face left is
+            // Attacker Down at 1/6, against a 4.6% casualty chance per
+            // knockdown on AV8. The dwarf guide puts it plainly -- Block and
+            // Tackle "make even 1D blocks with confidence" -- and a team of
+            // AV9 Blockers throwing 1.26 blocks a turn is the reason our
+            // attrition funnel starts too narrow to produce casualties
+            // (2026-08-11: 0.87 casualties and 0.14 deaths a game, with the
+            // casualty table itself verified exact against CRP).
+            //
+            // Without Block a one-die block is a 1/3 turnover and stays out,
+            // and so do uphill blocks where the defender picks the die
+            // (negative count). The ball carrier is excluded outright: his
+            // turnovers are the ones that end drives.
             int dice = getBlockDiceCount(state, att, *def, false);
-            if (dice >= 2) {
+            bool oneDieWorthOffering =
+                dice == 1 && att.hasSkill(SkillName::Block) &&
+                !(state.ball.isHeld && state.ball.carrierId == att.id);
+            if (dice >= 2 || oneDieWorthOffering) {
                 out.push_back({MacroType::BLOCK, att.id, def->id, {-1, -1}});
             }
         }
