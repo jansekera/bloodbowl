@@ -128,9 +128,18 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
 // runs his crowd surf itself, because it has to read his last square and then
 // run the attacker's follow-up.  Further down the chain nobody else will, so
 // those surfs are resolved here.
+// Stand Firm reaches down the chain too: "If a player is pushed back into a
+// player using Stand Firm then neither player moves." It is optional ("may
+// choose to not be pushed back"), so it is used when it helps its owner --
+// a bystander on the blocking team wants the free square a chain hands him,
+// an opponent wants to jam the push.
+static bool holdsGround(const Player& p, TeamSide blockingSide) {
+    return p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
+}
+
 static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                     bool sideStep, bool grab, bool resolveSurfHere,
-                    DiceRollerBase& dice, Position& dest,
+                    TeamSide blockingSide, DiceRollerBase& dice, Position& dest,
                     std::vector<GameEvent>* events, int depth) {
     Position cand[8];
     int count = pushCandidates(state, pusherPos, pushed.position,
@@ -159,9 +168,26 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
     dest = cand[choosePushSquare(state, cand, count, pusherPos,
                                  sideStep && !grab, grab && !sideStep)];
 
+    Player* occupant = state.getPlayerAtPosition(dest);
+    if (occupant && holdsGround(*occupant, blockingSide)) {
+        // The coach picks the direction, so try any other body that will not
+        // dig in before giving the push up.
+        for (int i = 0; i < count; i++) {
+            Player* other = state.getPlayerAtPosition(cand[i]);
+            if (other && !holdsGround(*other, blockingSide)) {
+                dest = cand[i];
+                occupant = other;
+                break;
+            }
+        }
+    }
+    if (occupant && holdsGround(*occupant, blockingSide)) {
+        dest = pushed.position;   // "neither player moves"
+        return false;
+    }
+
     // Chain. Depth is bounded by how many players can stand in a line, and the
     // guard keeps a corrupt board from recursing forever.
-    Player* occupant = state.getPlayerAtPosition(dest);
     if (occupant && depth < GameState::PLAYERS_TOTAL) {
         // "The coach of the moving team decides all push back directions for
         // secondary push backs unless the pushed player has a skill that
@@ -170,7 +196,8 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
         Position chainDest;
         pushOne(state, pushed.position, *occupant,
                 occupant->hasSkill(SkillName::SideStep), false,
-                /*resolveSurfHere=*/true, dice, chainDest, events, depth + 1);
+                /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
+                depth + 1);
     }
 
     emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1,
@@ -205,7 +232,8 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     if (sideStep && grab) { sideStep = false; grab = false; }
 
     return pushOne(state, attacker.position, defender, sideStep, grab,
-                   /*resolveSurfHere=*/false, dice, pushDest, events, 0);
+                   /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
+                   events, 0);
 }
 
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
@@ -570,7 +598,11 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // Wrestle skills against the Juggernaut player's blocks."
         bool fendPrevents = def.hasSkill(SkillName::Fend) &&
                             !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
-        if (!noFollowUp && !fendPrevents) {
+        // A follow-up needs a square that was actually vacated. Stand Firm (and
+        // a chain that jams against one) leaves the defender where he stood, and
+        // we used to walk the attacker onto him -- two players on one square.
+        bool defVacated = def.position != defOldPos;
+        if (!noFollowUp && !fendPrevents && defVacated) {
             att.position = defOldPos;
             if (state.ball.isHeld && state.ball.carrierId == att.id) {
                 state.ball.position = att.position;

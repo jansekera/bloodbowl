@@ -628,3 +628,47 @@ TEST(BlockHandler, ChainPushKeepsChainingAndNeverStacksPlayers) {
         }
     }
 }
+
+TEST(BlockHandler, StandFirmDefenderIsNotFollowedUpOnto) {
+    // The defender holds his square, so there is nothing to follow up into.
+    // The follow-up used to fire regardless and put the attacker on top of him.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+}
+
+TEST(BlockHandler, ChainIntoStandFirmMovesNobody) {
+    // CRP Stand Firm: "If a player is pushed back into a player using Stand
+    // Firm then neither player moves." That reaches down the chain too.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 7}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 6}, TeamSide::AWAY);
+    placePlayer(gs, 15, {12, 8}, TeamSide::AWAY);
+    gs.getPlayer(13).skills.add(SkillName::StandFirm);
+    gs.getPlayer(14).skills.add(SkillName::StandFirm);
+    gs.getPlayer(15).skills.add(SkillName::StandFirm);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+}
