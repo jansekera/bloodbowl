@@ -66,6 +66,125 @@ static Position pushOffPitchExit(Position pusher, Position pushed) {
                     static_cast<int8_t>(pushed.y + (dy > 0) - (dy < 0))};
 }
 
+static int distanceToEdge(Position p) {
+    return std::min({(int)p.x, Position::PITCH_WIDTH - 1 - p.x,
+                     (int)p.y, Position::PITCH_HEIGHT - 1 - p.y});
+}
+
+// The squares a pushed player may be moved into.
+//   normal — the three squares directly away from the pusher (push-back diagram)
+//   wide   — any adjacent square.  Side Step: "the coach may choose to move the
+//            player to any adjacent square, not just the three squares shown on
+//            the Push Back diagram".  Grab: "he may choose any empty square
+//            adjacent to his opponent".
+// Both skills lapse when nothing adjacent is open ("may not use this skill if
+// there are no open squares on the pitch adjacent to this player" / "Grab will
+// not work if there are no empty adjacent squares"), so a wide set that turns
+// up empty-handed falls back to the standard three and the push chains as usual.
+static int pushCandidates(const GameState& state, Position pusherPos,
+                          Position pushedPos, bool wide, Position out[8]) {
+    if (wide) {
+        int n = 0;
+        for (Position p : pushedPos.getAdjacent()) {
+            if (p.isOnPitch() && !state.getPlayerAtPosition(p)) out[n++] = p;
+        }
+        if (n > 0) return n;
+    }
+    return getPushbackSquares(pusherPos, pushedPos, out);
+}
+
+// CRP: "The player must be pushed back into an empty square if possible."  That
+// holds no matter who is doing the choosing, so empty candidates always win and
+// the skill heuristics only rank within them.  Only when every candidate is
+// occupied does the push go into an occupied square and chain.
+static int choosePushSquare(const GameState& state, const Position* cand, int count,
+                            Position pusherPos, bool defenderChooses, bool towardEdge) {
+    bool anyEmpty = false;
+    for (int i = 0; i < count; i++) {
+        if (!state.getPlayerAtPosition(cand[i])) { anyEmpty = true; break; }
+    }
+
+    int best = -1, bestScore = 0;
+    for (int i = 0; i < count; i++) {
+        if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
+        int score;
+        if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
+        else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
+        else                   score = count - i;                       // straight back first
+        if (best < 0 || score > bestScore) { best = i; bestScore = score; }
+    }
+    return best < 0 ? 0 : best;
+}
+
+// Push one player a square away from `pusherPos`, chaining into whoever is in
+// the way.  CRP: "If all such squares are occupied by other players, then the
+// player is pushed into an occupied square, and the player that originally
+// occupied the square is pushed back in turn.  This secondary push back is
+// treated exactly like a normal push back as if the second player had been
+// blocked by the first" — hence the recursion rather than a single hop.
+// Returns true when the pushed player left the pitch.
+//
+// resolveSurfHere is false for the player who was actually blocked: resolveBlock
+// runs his crowd surf itself, because it has to read his last square and then
+// run the attacker's follow-up.  Further down the chain nobody else will, so
+// those surfs are resolved here.
+static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
+                    bool sideStep, bool grab, bool resolveSurfHere,
+                    DiceRollerBase& dice, Position& dest,
+                    std::vector<GameEvent>* events, int depth) {
+    Position cand[8];
+    int count = pushCandidates(state, pusherPos, pushed.position,
+                               sideStep || grab, cand);
+
+    // "Players must be pushed off the pitch if there are no eligible empty
+    // squares on the pitch" — reached when nothing away from the pusher is on
+    // the pitch at all.
+    if (count == 0) {
+        Position last = pushed.position;
+        emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1, last, {-1, -1}, 0, true});
+        dest = {-1, -1};
+        if (resolveSurfHere) {
+            if (state.ball.isHeld && state.ball.carrierId == pushed.id) {
+                state.ball = BallState::onGround(last);
+                resolveThrowIn(state, last, pushOffPitchExit(pusherPos, last), dice, events);
+            } else {
+                handleBallOnPlayerDown(state, pushed.id, dice, events);
+            }
+            pushed.position = {-1, -1};
+            resolveCrowdSurf(state, pushed.id, dice, events);
+        }
+        return true;
+    }
+
+    dest = cand[choosePushSquare(state, cand, count, pusherPos,
+                                 sideStep && !grab, grab && !sideStep)];
+
+    // Chain. Depth is bounded by how many players can stand in a line, and the
+    // guard keeps a corrupt board from recursing forever.
+    Player* occupant = state.getPlayerAtPosition(dest);
+    if (occupant && depth < GameState::PLAYERS_TOTAL) {
+        // "The coach of the moving team decides all push back directions for
+        // secondary push backs unless the pushed player has a skill that
+        // overrides this" — so Side Step carries down the chain, Grab does not
+        // (it only ever applies to the player its owner blocked).
+        Position chainDest;
+        pushOne(state, pushed.position, *occupant,
+                occupant->hasSkill(SkillName::SideStep), false,
+                /*resolveSurfHere=*/true, dice, chainDest, events, depth + 1);
+    }
+
+    emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1,
+                       pushed.position, dest, 0, true});
+    pushed.position = dest;
+    if (state.ball.isHeld && state.ball.carrierId == pushed.id) {
+        state.ball.position = dest;
+    } else if (!state.ball.isHeld && state.ball.position == dest) {
+        // Pushed onto a loose ball -- it scatters, no catch attempt/turnover
+        resolveBounce(state, dest, dice, 0, events);
+    }
+    return false;
+}
+
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
                             bool isBlitz, DiceRollerBase& dice,
@@ -79,125 +198,14 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         }
     }
 
-    Position pushSquares[3];
-    int pushCount = getPushbackSquares(attacker.position, defender.position, pushSquares);
+    bool sideStep = defender.hasSkill(SkillName::SideStep);
+    // "Grab only works on a Block Action" and "Grab and Side Step will cancel
+    // each other out and the standard pushback rules apply".
+    bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
+    if (sideStep && grab) { sideStep = false; grab = false; }
 
-    if (pushCount == 0) {
-        // Off pitch — crowd surf
-        emitEvent(events, {GameEvent::Type::PUSH, defender.id, -1,
-                          defender.position, {-1, -1}, 0, true});
-        pushDest = {-1, -1};
-        return true;
-    }
-
-    // SideStep: defender picks best square (furthest from attacker)
-    // Grab: attacker picks worst square for defender
-    // Default: pick first empty, then first available
-    int chosenIdx = 0;
-
-    if (defender.hasSkill(SkillName::SideStep) &&
-        !(attacker.hasSkill(SkillName::Grab) && !isBlitz)) {
-        // Defender picks: choose square furthest from attacker
-        int bestDist = -1;
-        for (int i = 0; i < pushCount; i++) {
-            int dist = pushSquares[i].distanceTo(attacker.position);
-            if (dist > bestDist) { bestDist = dist; chosenIdx = i; }
-        }
-    } else if (attacker.hasSkill(SkillName::Grab) && !isBlitz) {
-        // Grab only works on non-blitz blocks
-        // Attacker picks: choose square closest to sideline (worst for defender)
-        int bestWide = -1;
-        for (int i = 0; i < pushCount; i++) {
-            // Prefer edges
-            int edgeDist = std::min({
-                (int)pushSquares[i].x,
-                Position::PITCH_WIDTH - 1 - pushSquares[i].x,
-                (int)pushSquares[i].y,
-                Position::PITCH_HEIGHT - 1 - pushSquares[i].y
-            });
-            int score = 100 - edgeDist; // closer to edge = higher score
-            if (score > bestWide) { bestWide = score; chosenIdx = i; }
-        }
-    } else {
-        // Default: prefer empty square, then center push direction
-        for (int i = 0; i < pushCount; i++) {
-            if (!state.getPlayerAtPosition(pushSquares[i])) {
-                chosenIdx = i;
-                break;
-            }
-        }
-    }
-
-    pushDest = pushSquares[chosenIdx];
-
-    // Check if destination is occupied → chain push
-    Player* occupant = state.getPlayerAtPosition(pushDest);
-    if (occupant) {
-        // Chain push: push occupant in the same direction
-        Position chainPushDest;
-        Position chainSquares[3];
-        int chainCount = getPushbackSquares(defender.position, occupant->position, chainSquares);
-
-        if (chainCount == 0) {
-            // Chain push off pitch
-            Position occupantOldPos = occupant->position;
-            emitEvent(events, {GameEvent::Type::PUSH, occupant->id, -1,
-                              occupant->position, {-1, -1}, 0, true});
-            // Same throw-in rule on a chain push off the pitch: the pusher
-            // here is the defender being shoved into this occupant.
-            if (state.ball.isHeld && state.ball.carrierId == occupant->id) {
-                state.ball = BallState::onGround(occupantOldPos);
-                resolveThrowIn(state, occupantOldPos,
-                               pushOffPitchExit(defender.position, occupantOldPos),
-                               dice, events);
-            } else {
-                handleBallOnPlayerDown(state, occupant->id, dice, events);
-            }
-            resolveCrowdSurf(state, occupant->id, dice, events);
-        } else {
-            // Find empty chain destination
-            int chainIdx = 0;
-            for (int i = 0; i < chainCount; i++) {
-                if (!state.getPlayerAtPosition(chainSquares[i])) {
-                    chainIdx = i;
-                    break;
-                }
-            }
-            Position chainDest = chainSquares[chainIdx];
-
-            emitEvent(events, {GameEvent::Type::PUSH, occupant->id, -1,
-                              occupant->position, chainDest, 0, true});
-
-            // Move chain-pushed player
-            if (state.ball.isHeld && state.ball.carrierId == occupant->id) {
-                state.ball.position = chainDest;
-            } else if (!state.ball.isHeld && state.ball.position == chainDest) {
-                // Pushed onto a loose ball -- it scatters, no catch attempt/turnover
-                resolveBounce(state, chainDest, dice, 0, events);
-            }
-            occupant->position = chainDest;
-        }
-    }
-
-    // Check if push goes off pitch
-    if (!pushDest.isOnPitch()) {
-        return true; // crowd surf
-    }
-
-    emitEvent(events, {GameEvent::Type::PUSH, defender.id, -1,
-                      defender.position, pushDest, 0, true});
-
-    // Move defender
-    Position defOldPos = defender.position;
-    defender.position = pushDest;
-    if (state.ball.isHeld && state.ball.carrierId == defender.id) {
-        state.ball.position = pushDest;
-    } else if (!state.ball.isHeld && state.ball.position == pushDest) {
-        // Pushed onto a loose ball -- it scatters, no catch attempt/turnover
-        resolveBounce(state, pushDest, dice, 0, events);
-    }
-
-    return false;
+    return pushOne(state, attacker.position, defender, sideStep, grab,
+                   /*resolveSurfHere=*/false, dice, pushDest, events, 0);
 }
 
 ActionResult resolveBlock(GameState& state, const BlockParams& params,

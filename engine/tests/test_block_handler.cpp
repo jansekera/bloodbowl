@@ -568,3 +568,63 @@ TEST(BlockHandler, PlainBlockCostsNoMovement) {
     EXPECT_TRUE(result.success);
     EXPECT_EQ(gs.getPlayer(1).movementRemaining, 6);  // unchanged
 }
+
+// --- Push backs: "must be pushed back into an empty square if possible" -----
+
+TEST(BlockHandler, SideStepStillHasToLandOnAnEmptySquare) {
+    // Side Step lets the defender pick the square, but not an occupied one:
+    // it used to skip the empty-square check entirely and chain-push a
+    // bystander while two empty squares stood open.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    placePlayer(gs, 13, {12, 7}, TeamSide::AWAY);   // straight back is blocked
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3});          // 2 dice, both PUSHED
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_NE(gs.getPlayer(12).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);      // one of the empty diagonals
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 7}));  // bystander unmoved
+}
+
+TEST(BlockHandler, ChainPushKeepsChainingAndNeverStacksPlayers) {
+    // "This secondary push back is treated exactly like a normal push back" --
+    // so when the chain target has no empty square either, it chains on. The
+    // single-hop version parked two players on the same square.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 2, {12, 7}, TeamSide::HOME);
+    placePlayer(gs, 3, {12, 6}, TeamSide::HOME);
+    placePlayer(gs, 4, {12, 8}, TeamSide::HOME);
+    placePlayer(gs, 5, {13, 7}, TeamSide::HOME);
+    placePlayer(gs, 6, {13, 6}, TeamSide::HOME);
+    placePlayer(gs, 7, {13, 8}, TeamSide::HOME);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{13, 7}));
+    EXPECT_EQ(gs.getPlayer(5).position, (Position{14, 7}));   // chained on again
+
+    for (int i = 1; i <= GameState::PLAYERS_TOTAL; i++) {
+        for (int j = i + 1; j <= GameState::PLAYERS_TOTAL; j++) {
+            const Player& a = gs.getPlayer(i);
+            const Player& b = gs.getPlayer(j);
+            if (a.isOnPitch() && b.isOnPitch()) {
+                EXPECT_NE(a.position, b.position) << "players " << i << " and " << j;
+            }
+        }
+    }
+}
