@@ -332,24 +332,35 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         attST += 1;
     }
 
+    // Dauntless, before assists are counted. CRP: "The skill only works when the
+    // player attempts to block an opponent who is stronger than himself ... If
+    // the total is greater, then the player with the Dauntless skill counts as
+    // having a Strength equal to his opponent's when he makes the block. The
+    // strength of both players is calculated before any defensive or offensive
+    // assists are added but after all other modifiers."
+    //
+    // It used to be tested after assists, against effDefST > effAttST, which
+    // fired it whenever the opponent merely out-assisted us -- and then it could
+    // not fail, since d6 + ST > ST always holds at equal strength. It also
+    // equalised onto the opponent's assisted total, handing our player their
+    // assists instead of his own. Both are gone: the comparison, the roll and
+    // the equalisation now all happen on the modified pre-assist strengths, and
+    // assists are added on top afterwards.
+    if (att.hasSkill(SkillName::Dauntless) && defST > attST) {
+        int dauntlessRoll = dice.rollD6();
+        bool psyched = dauntlessRoll + attST > defST;
+        if (psyched) {
+            attST = defST;
+        }
+        emitEvent(events, {GameEvent::Type::SKILL_USED, att.id, -1, {}, {},
+                          static_cast<int>(SkillName::Dauntless), psyched});
+    }
+
     int attAssists = countAssists(state, def.position, att.teamSide, att.id, def.id, def.id);
     int defAssists = countAssists(state, att.position, def.teamSide, att.id, def.id, att.id);
 
     int effAttST = attST + attAssists;
     int effDefST = defST + defAssists;
-
-    // Dauntless
-    if (att.hasSkill(SkillName::Dauntless) && effDefST > effAttST) {
-        int dauntlessRoll = dice.rollD6();
-        if (dauntlessRoll + att.stats.strength > def.stats.strength) {
-            effAttST = effDefST; // treat as equal
-            emitEvent(events, {GameEvent::Type::SKILL_USED, att.id, -1, {}, {},
-                              static_cast<int>(SkillName::Dauntless), true});
-        } else {
-            emitEvent(events, {GameEvent::Type::SKILL_USED, att.id, -1, {}, {},
-                              static_cast<int>(SkillName::Dauntless), false});
-        }
-    }
 
     // Roll block dice
     BlockDiceInfo diceInfo = getBlockDiceInfo(effAttST, effDefST);

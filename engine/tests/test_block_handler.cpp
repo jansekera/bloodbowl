@@ -672,3 +672,60 @@ TEST(BlockHandler, ChainIntoStandFirmMovesNobody) {
     EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 7}));
     EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
 }
+
+TEST(BlockHandler, DauntlessIgnoresAssists) {
+    // CRP: "The strength of both players is calculated before any defensive or
+    // offensive assists are added but after all other modifiers", and the skill
+    // "only works when the player attempts to block an opponent who is stronger
+    // than himself". Equal base strength plus enemy assists is not stronger --
+    // this used to fire Dauntless, which then could not fail.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);            // ST3, Dauntless
+    gs.getPlayer(1).skills.add(SkillName::Dauntless);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);           // ST3
+    placePlayer(gs, 13, {10, 6}, TeamSide::AWAY);           // defensive assists
+    placePlayer(gs, 14, {10, 8}, TeamSide::AWAY);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    std::vector<GameEvent> events;
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &events);
+
+    for (const auto& e : events) {
+        EXPECT_FALSE(e.type == GameEvent::Type::SKILL_USED &&
+                     e.roll == static_cast<int>(SkillName::Dauntless))
+            << "Dauntless fired against an equally strong opponent";
+    }
+}
+
+TEST(BlockHandler, DauntlessEqualisesBeforeOurOwnAssistsAreAdded) {
+    // Psyched up against ST5 the ST3 blocker counts as ST5, and his own
+    // offensive assist then puts him ahead -- he keeps his assists rather than
+    // inheriting the defender's total.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);            // ST3, Dauntless
+    gs.getPlayer(1).skills.add(SkillName::Dauntless);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    placePlayer(gs, 2, {11, 6}, TeamSide::HOME);            // offensive assist
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 5, 3, 9);  // ST5
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    std::vector<GameEvent> events;
+    // Dauntless D6=4 -> 4+3 > 5 psyched; then 2 dice (4+1=5... vs 5) attacker
+    FixedDiceRoller dice({4, 6, 6, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &events);
+
+    bool psyched = false;
+    for (const auto& e : events) {
+        if (e.type == GameEvent::Type::SKILL_USED &&
+            e.roll == static_cast<int>(SkillName::Dauntless)) psyched = e.success;
+    }
+    EXPECT_TRUE(psyched);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
