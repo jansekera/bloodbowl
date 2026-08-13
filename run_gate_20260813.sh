@@ -44,10 +44,18 @@ mkdir -p "$OUT"
 [ -f "$OUT/GATE_DONE" ] && { echo "[$(STAMP)] hotovo, končím" >> "$LOG"; exit 0; }
 if ! mkdir "$LOCK" 2>/dev/null; then echo "[$(STAMP)] ABORT: drží lock" >> "$LOG"; exit 1; fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
-# -x na jméno procesu, ne -f na cmdline: `pgrep -f "diag_f1_cage_advance $ROOT"`
-# matchne sám sebe (vlastní cmdline ten řetězec obsahuje) a launcher se odmítne
-# spustit na prázdném stroji. Táž past jako u pkill.
-if pgrep -x diag_f1_cage_advance > /dev/null; then
+# Pojistka proti dvojímu běhu má TŘI způsoby, jak selhat, a dva z nich jsme
+# dnes potkali:
+#   `pgrep -f "diag_f1_cage_advance $ROOT"` matchne sám sebe -- vlastní cmdline
+#       ten řetězec obsahuje, takže launcher zabortuje na prázdném stroji;
+#   `pgrep -x diag_f1_cage_advance` nematchne NIKDY: jméno procesu má 22 znaků
+#       a jádro ho ořezává na 15, takže pojistka mlčky zmizí (horší varianta --
+#       falešný poplach je vidět, mrtvá pojistka ne);
+#   `pgrep -f` na holé jméno souboru chytne i cizí shell, který ten soubor jen
+#       zmiňuje (`git add ...`).
+# Hledá se tedy binárka spuštěná z absolutní cesty, což je přesně to, co
+# spouští `run_one` níž, a nic jiného.
+if pgrep -f "^$BIN " > /dev/null; then
     echo "[$(STAMP)] ABORT: měření už běží" >> "$LOG"; exit 1; fi
 if ps -eo args | grep -v grep | grep -qE "python3 run_iteration"; then
     echo "[$(STAMP)] ABORT: běží run_iteration" >> "$LOG"; exit 1; fi

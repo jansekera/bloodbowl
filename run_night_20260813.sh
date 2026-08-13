@@ -38,7 +38,11 @@ if ! mkdir "$LOCK" 2>/dev/null; then echo "[$(STAMP)] ABORT: drží lock" >> "$L
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 if pgrep -f "[d]iag_f1_cage_advance" > /dev/null; then
     echo "[$(STAMP)] ABORT: běží ještě měření brány" >> "$LOG"; exit 1; fi
-if pgrep -f "[d]iag_replay_mine_20260813_gate" > /dev/null; then
+# Musí hledat BĚŽÍCÍ interpret s tímhle skriptem, ne jakoukoli zmínku jména:
+# `pgrep -f "[d]iag_replay_mine_20260813_gate"` chytne i shell, jehož příkazová
+# řádka ten soubor jen zmiňuje (`git add ...gate.py`), a launcher pak
+# zabortuje na prázdném stroji. Druhá varianta téže pasti co u pkill.
+if pgrep -f "python3 .*diag_replay_mine_20260813_gate" > /dev/null; then
     echo "[$(STAMP)] ABORT: sběr korpusu už běží" >> "$LOG"; exit 1; fi
 
 cd "$ROOT" || exit 1
@@ -90,7 +94,10 @@ for f in checks_gate_off checks_gate_on; do
     grep -q "K33" "$OUT/$f.txt" || ok=0
 done
 for f in drives_gate_off drives_gate_on; do
-    grep -qE "SKÓROVALI|DOŠLA KOLA" "$OUT/$f.txt" || ok=0
+    # Hledat text, který výstup SKUTEČNĚ tiskne, ne názvy kategorií z
+    # dokumentace skriptu -- ta podmínka označila za PARTIAL běh, který
+    # doběhl celý. Potřetí týž vzor: ověřuje se něco jiného, než se chce.
+    grep -qE "^VŠE " "$OUT/$f.txt" || ok=0
 done
 if [ "$ok" = 1 ]; then
     echo "[$(STAMP)] DONE — porovnej $OUT/{checks,drives}_gate_{off,on}.txt" >> "$LOG"

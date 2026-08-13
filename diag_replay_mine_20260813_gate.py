@@ -38,9 +38,18 @@ OPPONENTS = ["skaven", "wood-elf", "orc", "human"]
 W = "weights_best.json"
 POLICY_PATH = "weights_policy.json"
 TV, VF_BLEND, MCTS = 1200, 0.0, 100
-BASE_SEED = 20260811
-DATA_ROOT = Path("diag_replay_mine_20260813_gate_data")
 WORKERS = int(os.environ.get("WORKERS", "10"))
+
+# Parametrizace přes prostředí, aby existovala JEDNA implementace sběru místo
+# třetí kopie téhož souboru. Defaulty reprodukují gate korpus z 13.08. beze
+# změny; velký noční korpus si přepíná bránu, adresář i seed.
+#   CAGE_GATE=1  brána zapnutá na NAŠÍ straně (default, gate korpus)
+#   CAGE_GATE=0  produkční stav -- A/B brány 13.08. NEPROŠLO, takže korpus,
+#                který má popisovat hranou hru, ji má vypnutou
+CAGE_GATE = os.environ.get("CAGE_GATE", "1") != "0"
+BASE_SEED = int(os.environ.get("SEED_BASE", "20260811"))
+DATA_ROOT = Path(os.environ.get(
+    "DATA_ROOT", "diag_replay_mine_20260813_gate_data"))
 
 
 def _add_engine_to_path() -> None:
@@ -69,8 +78,8 @@ def _game_worker(args: tuple) -> dict:
         epsilon=0.0, vf_blend=VF_BLEND,
         policy_weights_path=POLICY_PATH,
         # jediný rozdíl proti 20260811b: brána na trpasličí straně
-        cage_advance=dwarf_home,
-        away_cage_advance=not dwarf_home,
+        cage_advance=CAGE_GATE and dwarf_home,
+        away_cage_advance=CAGE_GATE and not dwarf_home,
     )
     turns = lgr.get_turn_logs()
     rec = {
