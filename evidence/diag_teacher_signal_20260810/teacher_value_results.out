@@ -1,0 +1,75 @@
+decisions with >=3 REPOS cands: 2211
+
+=== dwarf (n=846) ===
+  S_val_median = 0.005765999999999993
+  S_val_mean = 0.025557424665484635
+  S_val_p90 = 0.0758045
+  S_heur_median = 0.0026670000000000305
+  S_nn_median = 0.022720000000000018
+  search_spread_mean = 0.02405437352245863
+  search_spread_median = 0.010000000000000009
+  chance_maxset_mean = 0.5181615632856768
+  D_val_median = 0.06539450000000002
+  n_doctrinal_pairs = 720
+  coverage_doctrinal = 0.28132387706855794
+  tz_range_median = 0.0
+  prog_range_median = 0.0
+  corr_v015_visits_mean = 0.11518556692225419
+  corr_n = 670
+  best_minus_base_median = 0.0058635000000000215
+
+=== wood-elf (n=382) ===
+  S_val_median = 0.006804499999999991
+  S_val_mean = 0.0373531457591623
+  S_val_p90 = 0.11890610000000003
+  S_heur_median = 0.0034279999999999866
+  S_nn_median = 0.022141999999999995
+  search_spread_mean = 0.02272251308900524
+  search_spread_median = 0.010000000000000009
+  chance_maxset_mean = 0.5522916147261697
+  D_val_median = 0.06820599999999999
+  n_doctrinal_pairs = 519
+  coverage_doctrinal = 0.38219895287958117
+  tz_range_median = 0.0
+  prog_range_median = 0.08
+  corr_v015_visits_mean = 0.07337048098246345
+  corr_n = 291
+  best_minus_base_median = 0.011096249999999988
+
+=== skaven (n=983) ===
+  S_val_median = 0.011776999999999982
+  S_val_mean = 0.0385351556439471
+  S_val_p90 = 0.07925119999999998
+  S_heur_median = 0.0040000000000000036
+  S_nn_median = 0.03006000000000003
+  search_spread_mean = 0.025330620549338757
+  search_spread_median = 0.010000000000000009
+  chance_maxset_mean = 0.5338936524084031
+  D_val_median = 0.06932300000000001
+  n_doctrinal_pairs = 1175
+  coverage_doctrinal = 0.4252288911495422
+  tz_range_median = 1.0
+  prog_range_median = 0.44
+  corr_v015_visits_mean = 0.1480021366080407
+  corr_n = 780
+  best_minus_base_median = 0.06130799999999999
+
+=== all (n=2211) ===
+  S_val_median = 0.007317000000000018
+  S_val_mean = 0.033365237876526455
+  S_val_p90 = 0.081971
+  S_heur_median = 0.0030000000000000027
+  S_nn_median = 0.02639999999999998
+  search_spread_mean = 0.02439167797376753
+  search_spread_median = 0.010000000000000009
+  chance_maxset_mean = 0.5310527090377837
+  D_val_median = 0.06833365
+  n_doctrinal_pairs = 2414
+  coverage_doctrinal = 0.3627317955676165
+  tz_range_median = 0.0
+  prog_range_median = 0.040000000000000036
+  corr_v015_visits_mean = 0.1228987974486381
+  corr_n = 1741
+  best_minus_base_median = 0.012519999999999976
+
+VERDIKT (predregistrovane pravidlo, dwarf): (b) slepa value funkce (median S_val < 0.010)

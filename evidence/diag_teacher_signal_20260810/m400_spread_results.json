@@ -1,0 +1,31 @@
+{
+ "dwarf": {
+  "n": 2078,
+  "search_spread_mean": 0.03424566891241579,
+  "search_spread_median": 0.0225,
+  "chance_maxset_mean": 0.274911774141803
+ },
+ "wood-elf": {
+  "n": 994,
+  "search_spread_mean": 0.03587273641851107,
+  "search_spread_median": 0.020000000000000004,
+  "chance_maxset_mean": 0.28256163967934594
+ },
+ "skaven": {
+  "n": 2002,
+  "search_spread_mean": 0.04567932067932067,
+  "search_spread_median": 0.024999999999999994,
+  "chance_maxset_mean": 0.2762652210704159
+ },
+ "all": {
+  "n": 5074,
+  "search_spread_mean": 0.03907567993693339,
+  "search_spread_median": 0.022500000000000006,
+  "chance_maxset_mean": 0.27694440462966285
+ },
+ "baseline_100_dwarf": {
+  "search_spread_mean": 0.02405437352245863,
+  "chance_maxset_mean": 0.5181615632856768
+ },
+ "verdict_preregistered": "search se rozpoctem PROBUDI"
+}
