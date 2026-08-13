@@ -222,11 +222,16 @@ def render(S, pad=2, w=None):
 
     out = ["       " + "".join(f"{x:^{w}} " for x in range(X0, X1 + 1)) + "  x",
            bar("┌", "┬", "┐")]
+    # Volný míč: stav ho drží zvlášť, protože v okamžiku, kdy ho nikdo nemá,
+    # je jeho poloha nejdůležitější -- a zrovna tehdy by z desky zmizel.
+    loose = tuple(S["ball"]) if S.get("ball") else None
     for y in range(Y0, Y1 + 1):
         row = []
         for x in range(X0, X1 + 1):
             if (x, y) in cells:
                 row.append(obarvi(f"{cells[(x, y)]:^{w}}", owner[(x, y)]))
+            elif loose == (x, y):
+                row.append(obarvi(f"{'*':^{w}}", None))
             else:
                 n = tz.get((x, y), 0)
                 row.append(obarvi(f"{(str(n) if n else '·'):^{w}}", None))
@@ -306,7 +311,8 @@ def legend():
             "  číslo ve volném poli = kolik soupeřových tackle zón na něj dosáhne.\n"
             "  · = nula ⇒ jediná pole, kam smí ROH KLECE.\n"
             "  /N u našeho hráče = v kolika TZ stojí (přirážka k dodge při odchodu).\n"
-            "  * drží míč · _ leží · MALÝMI PÍSMENY = omráčen\n"
+            "  * u hráče = drží míč · * ve volném poli = míč LEŽÍ NA ZEMI\n"
+            "  _ leží · MALÝMI PÍSMENY = omráčen\n"
             "  - už se v tomhle kole aktivoval · -B provedl blitz · -P přihrával\n"
             "  G Guard · F Stand Firm · S Side Step  (ostatní skilly v panelu níž)\n"
             "  kód = RASA + POZICE, každé jedním písmenem, pak index a skilly:\n"
@@ -332,6 +338,16 @@ def main():
                 q["acted"] = False
                 q["act"] = ""
             S["log"].append("--- nové kolo ---")
+            continue
+        if arg.startswith("ball@"):   # volný míč na zem: `ball@12,5`
+            d = arg.split("@", 1)[1]
+            if d in ("", "none"):
+                S["ball"] = None
+            else:
+                S["ball"] = [int(v) for v in d.split(",")]
+                for q in S["players"].values():
+                    q["ball"] = False
+            S["log"].append(f"míč na zemi {d or '—'}")
             continue
         pid, dest = arg.split("@")
         # Druh akce za dvojtečkou: `3@12,5:B` = přesun a blitz, `3@:P` = jen
