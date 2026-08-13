@@ -70,10 +70,32 @@ echo "[$(STAMP)] START kontroly K29–K36 (brána ON)" >> "$LOG"
 nice -n 19 python3 diag_rules_checks_20260812.py "$NEW/*.json.gz" \
     > "$OUT/checks_gate_on.txt" 2>&1
 
-if grep -q "K33" "$OUT/checks_gate_off.txt" && grep -q "K33" "$OUT/checks_gate_on.txt"; then
-    echo "[$(STAMP)] DONE — porovnej $OUT/checks_gate_{off,on}.txt" >> "$LOG"
+# ---- 3) rozklad drivů na obou korpusech -----------------------------------
+# Uživatelova otázka 13.08.: „postoupili o tolik kupředu, přestože pořád
+# nedali TD?" — kontroly K29–K36 měří KOLO, tohle měří DRIVE, a přesně tam
+# se ta otázka rozhoduje. Kategorie jsou vzájemně výlučné (A skórovali /
+# B míč nikdy nezískán / C ztratili / D došla kola, D1 pozdní start,
+# D2 pomalá klec), takže se dá vidět, KAM se drivy přesunuly, když se
+# postup zrychlil a výsledek ne. Hypotéza k vyvrácení: rychlejší postup
+# posune drivy z D1 do C, protože nosič je dřív hluboko a tím i vystavený.
+echo "[$(STAMP)] START rozklad drivů (brána OFF)" >> "$LOG"
+nice -n 19 python3 diag_drive_failure_20260811.py "$OLD" \
+    > "$OUT/drives_gate_off.txt" 2>&1
+echo "[$(STAMP)] START rozklad drivů (brána ON)" >> "$LOG"
+nice -n 19 python3 diag_drive_failure_20260811.py "$NEW" \
+    > "$OUT/drives_gate_on.txt" 2>&1
+
+ok=1
+for f in checks_gate_off checks_gate_on; do
+    grep -q "K33" "$OUT/$f.txt" || ok=0
+done
+for f in drives_gate_off drives_gate_on; do
+    grep -qE "SKÓROVALI|DOŠLA KOLA" "$OUT/$f.txt" || ok=0
+done
+if [ "$ok" = 1 ]; then
+    echo "[$(STAMP)] DONE — porovnej $OUT/{checks,drives}_gate_{off,on}.txt" >> "$LOG"
     touch "$OUT/NIGHT_DONE"
 else
-    echo "[$(STAMP)] PARTIAL: kontroly nedoběhly celé" >> "$LOG"
+    echo "[$(STAMP)] PARTIAL: některý výstup nedoběhl celý" >> "$LOG"
     touch "$OUT/NIGHT_PARTIAL"
 fi
