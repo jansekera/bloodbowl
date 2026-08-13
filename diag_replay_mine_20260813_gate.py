@@ -43,9 +43,19 @@ DATA_ROOT = Path("diag_replay_mine_20260813_gate_data")
 WORKERS = int(os.environ.get("WORKERS", "10"))
 
 
+def _add_engine_to_path() -> None:
+    """bb_engine je zkompilovaná .so v engine/build, ne nainstalovaný balík.
+    Stejně jako `diag_utils.py:69-70`; ve workeru zvlášť, aby to platilo i při
+    startovací metodě `spawn` (fork by cestu zdědil, spawn ne)."""
+    for p in ("engine/build", "python"):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+
 def _game_worker(args: tuple) -> dict:
     seed, idx, out_path = args
     os.nice(19)
+    _add_engine_to_path()
     import bb_engine
     opp = OPPONENTS[(idx // 2) % len(OPPONENTS)]
     dwarf_home = (idx % 2 == 0)          # obě orientace, ať se nemíchá bias
