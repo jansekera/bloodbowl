@@ -41,8 +41,15 @@ Opraveno navíc věcně:
          jmenovatel bral všechna kola.
 """
 import glob, gzip, json, math, sys
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+
+# E1/E2 (ČÁST 13) se počítají netriviálně — REACH0 je BFS s dodge-free
+# variantou, FB2 potřebuje kostky bloku i s Guard asistencemi na obou
+# stranách.  Přepisovat to sem znamená vyrobit druhou definici téhož, a to
+# je přesně ta vada, kvůli které se tenhle soubor 13.08. přepisoval.
+# Importuje se tedy Fableho implementace; jediná definice, dvě použití.
+from diag_exposure_scan_20260812 import Board, predictors
 
 STANDING, PRONE, STUNNED = 0, 1, 2
 
@@ -143,6 +150,49 @@ class Check:
         return s
 
 
+@dataclass
+class Bucket:
+    """Kontrola, která nemá podobu ano/ne — koše prediktoru proti výsledku.
+
+    Platí pro ni totéž co pro `Check`: bez `n` u každého koše je průměr
+    nečitelný, protože se nedá poznat koš o třech vzorcích od koše o třech
+    stech.  Koš pod `MIN_N` se proto tiskne, ale označí.
+    """
+    label: str
+    xname: str
+    yname: str
+    cuts: tuple
+    data: dict = field(default_factory=lambda: defaultdict(list))
+    deg: int = 0
+    MIN_N: int = 30
+
+    def add(self, x, y):
+        k = next((i for i, c in enumerate(self.cuts) if x <= c), len(self.cuts))
+        self.data[k].append(y)
+
+    def skip(self):
+        self.deg += 1
+
+    def lines(self):
+        out = [f"  {self.label}   ({self.xname} → {self.yname}, "
+               f"{self.deg} degenerovaných)"]
+        if not self.data:
+            out.append("      N/A — žádný použitelný vzorek")
+            return out
+        names = []
+        lo = None
+        for c in self.cuts:
+            names.append(f"≤{c}" if lo is None else f"{lo + 1}–{c}")
+            lo = c
+        names.append(f"{lo + 1}+")
+        for k in sorted(self.data):
+            v = self.data[k]
+            mark = "  ⚠ málo vzorků" if len(v) < self.MIN_N else ""
+            out.append(f"      {names[k]:<8} n={len(v):<6} "
+                       f"{self.yname} = {sum(v) / len(v):+.2f}{mark}")
+        return out
+
+
 def threatens(p):
     """Ohrozí roh klece, aniž by to soupeře stálo blitz (pravidlo R1, 12.08.).
 
@@ -185,6 +235,16 @@ def analyse(paths, race="dwarf"):
         "K30cheap": Check("K30b levný dodge je držený (nemá cenu)", "podíl soupeřů"),
         "K31": Check("K31 (R4) kolo BEZ těla bez úkolu"),
         "K33": Check("K33 kolo s aspoň jedním blokem"),
+        # E1/E2 z ČÁSTI 13 (exposure scan, 12.08.) jako vynucované kontroly
+        "K34": Check("K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge"),
+        "K35": Check("K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky"),
+    }
+    # K36: hypotéza z odehrané situace 12.08. — postup vykoupený kontaktem
+    # zamyká vlastní těla, a zamčené tělo neumí být rohem klece příští kolo.
+    B = {
+        "K36": Bucket("K36 LOCKED → postup nosiče v NÁSLEDUJÍCÍM našem kole",
+                      "našich stojících v jejich TZ", "Δx nosiče",
+                      cuts=(2, 5, 8)),
     }
     corners_filled, corners_clean, idle_per_turn = [], [], []
     for path in paths:
@@ -278,6 +338,34 @@ def analyse(paths, race="dwarf"):
                 if markers and not legal:
                     st["K30 drženo jen klecí/nosičem (R1 zakazuje)"] += 1
 
+            # --- K34/K35 (E1/E2): co deska na konci našeho kola dává soupeři.
+            # Board i predictors jsou Fableho, aby existovala jediná definice.
+            board = Board(E, ours)
+            P = predictors(board)
+            C["K35"].hit(P["FB2"] <= 1)
+            if "REACH0" in P:
+                C["K34"].hit(P["REACH0"] == 0)
+            else:
+                C["K34"].skip()   # bez stojícího nosiče predikát nedává smysl
+
+            # --- K36: LOCKED = naši stojící, kteří na konci kola stojí
+            # v soupeřově tackle zóně. Nemohou se příště hnout bez hodu.
+            locked = sum(1 for p in board.us_st if board.th_tz[(p["x"], p["y"])] > 0)
+            st["K36 locked celkem"] += locked
+            # Postup nosiče v našem PŘÍŠTÍM kole: logs[i+2] je jeho začátek,
+            # logs[i+3] konec. Nosič musí být týž, jinak by to byl rozdíl
+            # pozic dvou hráčů (táž past jako u K9a).
+            if i + 3 >= len(logs) or logs[i + 3]["half"] != S["half"] \
+                    or logs[i + 2].get("touchdown"):
+                B["K36"].skip()
+            else:
+                n0 = next((p for p in players(logs[i + 2], ours) if p["has_ball"]), None)
+                n1 = next((p for p in players(logs[i + 3], ours) if p["has_ball"]), None)
+                if n0 is None or n1 is None or n0["id"] != n1["id"]:
+                    B["K36"].skip()
+                else:
+                    B["K36"].add(locked, (n1["x"] - n0["x"]) * fwd)
+
             if car is None:
                 st["bez míče na konci kola"] += 1
                 C["K29"].skip()
@@ -315,13 +403,13 @@ def analyse(paths, race="dwarf"):
                 C["K9a"].vals.append(got - need)
                 C["K9a"].hit(got >= need)
 
-    return st, C, corners_filled, corners_clean, idle_per_turn, unknown
+    return st, C, B, corners_filled, corners_clean, idle_per_turn, unknown
 
 
 def main():
     pats = sys.argv[1:] or ["diag_replay_mine_20260811b_data/*.json.gz"]
     paths = sorted(p for pat in pats for p in glob.glob(pat))
-    st, C, cf, cc, idle, unknown = analyse(paths)
+    st, C, B, cf, cc, idle, unknown = analyse(paths)
     print(f"korpus: {len(paths)} her\n")
     for k in ("našich kol", "vyřazeno (TD/poločas mezi snímky)",
               "s míčem na konci kola", "bez míče na konci kola"):
@@ -351,6 +439,14 @@ def main():
     print(f"    těl bez úkolu na kolo                      "
           f"{st['K31 těl bez úkolu celkem'] / kol:.2f} z 11")
     print(C["K33"].line())
+    print("\n--- E1/E2: co deska dává soupeři (ČÁST 13) ---")
+    print(C["K34"].line())
+    print(C["K35"].line())
+    print(f"\n--- zámky (hypotéza 12.08.) ---")
+    print(f"  našich stojících v jejich TZ na kolo        "
+          f"{st['K36 locked celkem'] / kol:.2f} z 11")
+    for ln in B["K36"].lines():
+        print(ln)
 
     print("\nplán enginu (X6 / brána klece)")
     for k, v in st.items():
