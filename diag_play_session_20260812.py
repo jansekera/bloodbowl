@@ -168,11 +168,16 @@ def threatens_R1(p):
     return p["st"] == STANDING or (p["st"] == PRONE and "Jump Up" in skills(p))
 
 
-def tz_map(S):
-    """Kolik soupeřových tackle zón dosáhne na které pole — podle R1."""
+def tz_map(S, ours=False):
+    """Kolik tackle zón dosáhne na které pole — podle R1.
+
+    `ours=False` (výchozí): zóny SOUPEŘE, kreslí se do volných polí a k našim
+    hráčům. `ours=True`: zóny NAŠE, kreslí se k soupeřovým hráčům, aby se dalo
+    přečíst i to, koho držíme my — jinak deska ukazuje jen jednu stranu vazby.
+    """
     tz = {}
     for p in S["players"].values():
-        if p["us"] or not threatens_R1(p):
+        if p["us"] is not ours or not threatens_R1(p):
             continue
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
@@ -190,6 +195,7 @@ def render(S, pad=2, w=None):
     """
     P = S["players"]
     tz = tz_map(S)
+    tz_us = tz_map(S, ours=True)
     med = sorted(p["x"] for p in P.values())[len(P) // 2]
     core = [p for p in P.values() if abs(p["x"] - med) <= 9]
     X0, X1 = max(0, min(p["x"] for p in core) - pad), min(25, max(p["x"] for p in core) + pad)
@@ -210,8 +216,10 @@ def render(S, pad=2, w=None):
             # Blitz a přihrávka jsou jednou za kolo na CELÝ tým, takže se na
             # desce musí poznat, že jsou spotřebované -- ne jen že se hráč hnul.
             mark += "-" + p.get("act", "")
-        n = tz.get((p["x"], p["y"]), 0)
-        cells[(p["x"], p["y"])] = f"{c}{i}{mark}" + (f"/{n}" if n and p["us"] else "")
+        # /N = v kolika tackle zónách PROTISTRANY hráč stojí, tedy co ho stojí
+        # odchod. U našich to říká, kdo je zamčený; u soupeře, koho držíme my.
+        n = (tz if p["us"] else tz_us).get((p["x"], p["y"]), 0)
+        cells[(p["x"], p["y"])] = f"{c}{i}{mark}" + (f"/{n}" if n else "")
 
     # šířka buňky se dopočítá z nejdelšího obsahu, ať se nic neořízne
     if w is None:
