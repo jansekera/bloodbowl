@@ -201,6 +201,12 @@ int main(int argc, char** argv) {
     int nPairs = (argc > 2) ? atoi(argv[2]) : 400;
     int matchupFilter = (argc > 3) ? atoi(argv[3]) : -1;
     int mode = (argc > 4) ? atoi(argv[4]) : 0;  // 1 = grind A/B, 2 = era, 3 = M1
+    // Shard offset (2026-08-13): one matchup runs in one process, so a run
+    // long enough to see past the +-5.3pp noise floor took a whole day on one
+    // core while eleven sat idle. The offset shifts the seed index, so the
+    // same matchup can be split across processes -- shard k covers pairs
+    // [k*nPairs, (k+1)*nPairs). Offset 0 reproduces every earlier run exactly.
+    int seedOffset = (argc > 5) ? atoi(argv[5]) : 0;
     // mode 2 (2026-08-10, rules-parity era comparison): BOTH sides run the
     // production config, so there is no candidate arm at all. A rules change
     // alters the game for both teams, which means it cannot be A/B'd inside
@@ -254,7 +260,7 @@ int main(int argc, char** argv) {
         long candPlansTotal = 0;  // "did the gate even fire" diagnostics
         for (int i = 0; i < nPairs; ++i) {
             uint32_t seed = seedBase + static_cast<uint32_t>(mi) * 1'000'000u
-                            + static_cast<uint32_t>(i);
+                            + static_cast<uint32_t>(seedOffset + i);
             PairResult pr;
             for (int orient = 0; orient < 2; ++orient) {
                 bool candHome = (orient == 0);
@@ -321,7 +327,8 @@ int main(int argc, char** argv) {
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
                             "\"cand_plans\":%d,\"base_plans\":%d,\"mode\":%d}\n",
-                            mi, i, candHome ? "true" : "false", mu.home, mu.away,
+                            mi, seedOffset + i, candHome ? "true" : "false",
+                            mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
