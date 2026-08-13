@@ -355,26 +355,49 @@ int main(int argc, char** argv) {
         printf("SUMMARY matchup %d (%s vs %s), %d pairs (%d games):\n",
                mi, mu.home, mu.away, static_cast<int>(n), 2 * static_cast<int>(n));
         printf("  cand overall: W%d D%d L%d decisiveWR=%.3f chess=%.4f | "
-               "cage plans adopted %.2f/game\n",
+               "cage plans adopted %.2f/game%s\n",
                candW, candD, candL, wr,
                (candW + 0.5 * candD) / (2.0 * n),
-               candPlansTotal / (2.0 * n));
-        printf("  PAIRED delta chess as %s: %+.4f +- %.4f SE (~%.1f SE) "
-               "[pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]\n",
-               mu.home, mean, se, se > 0 ? mean / se : 0.0);
+               candPlansTotal / (2.0 * n),
+               mode == 2 ? " (cage is OFF in both arms -- 0.00 says nothing"
+                           " about the gate)"
+                         : "");
+        // In mode 2 the two arms are the SAME configuration; only the MCTS RNG
+        // seed differs. The delta is therefore a null test, not a measurement,
+        // and printing it next to the pre-registered threshold invites reading
+        // a gate effect that is not there. Say what it is instead.
+        if (mode == 2) {
+            printf("  NULL-TEST delta chess as %s: %+.4f +- %.4f SE (~%.1f SE)"
+                   " [same config both arms, RNG seed only -- expected 0;"
+                   " this IS the noise floor]\n",
+                   mu.home, mean, se, se > 0 ? mean / se : 0.0);
+        } else {
+            printf("  PAIRED delta chess as %s: %+.4f +- %.4f SE (~%.1f SE) "
+                   "[pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]\n",
+                   mu.home, mean, se, se > 0 ? mean / se : 0.0);
+        }
     }
 
+    // The split is by which arm the OPPONENT ran. Only outside mode 2 does that
+    // arm correspond to the cageAdvance gate; in mode 2 both arms are the same
+    // configuration, so the two rows are one race measured twice and their
+    // spread is the per-race noise floor.
     printf("\n=== ATTRITION / SURVIVAL (end-of-game states per race, split by "
-           "whether the OPPONENT ran cageAdvance) ===\n");
-    printf("%-10s %-14s %6s %8s %8s %8s %8s %10s\n", "race", "opp gate", "games",
+           "which arm the OPPONENT ran%s) ===\n",
+           mode == 2 ? ": SAME config, RNG seed only -- rows are a noise floor"
+                     : ": cageAdvance on/off");
+    printf("%-10s %-14s %6s %8s %8s %8s %8s %10s\n", "race",
+           mode == 2 ? "opp arm" : "opp gate", "games",
            "KO/g", "INJ/g", "DEAD/g", "EJ/g", "surv/11");
     for (auto& [race, byGate] : attrition) {
         for (auto& [gate, a] : byGate) {
             if (a.n == 0) continue;
             double inj = static_cast<double>(a.injured) / a.n;
             double dead = static_cast<double>(a.dead) / a.n;
+            const char* label = mode == 2 ? (gate ? "RNG-A" : "RNG-B")
+                                          : (gate ? "cageAdvance ON" : "off");
             printf("%-10s %-14s %6ld %8.2f %8.2f %8.2f %8.2f %10.2f\n",
-                   race.c_str(), gate ? "cageAdvance ON" : "off", a.n,
+                   race.c_str(), label, a.n,
                    static_cast<double>(a.ko) / a.n, inj, dead,
                    static_cast<double>(a.ejected) / a.n, 11.0 - inj - dead);
         }
