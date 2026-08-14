@@ -66,3 +66,4 @@ policy_backups/
 replay_archive/
 rules_crp_lrb6.txt
 rules_bb2016.txt
+.claude/worktrees/
