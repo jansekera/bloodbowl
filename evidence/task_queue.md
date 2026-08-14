@@ -276,7 +276,37 @@ ne Dauntless. **Tohle je levnější než měřit obojí zvlášť.**
 ⇒ Možná cesta ven: **opravit celý řetěz, ale každou úroveň vybavit čítačem**,
 a atribuci dělat z čítačů místo z oddělených běhů.
 
-# ⭐⭐⭐ NÁSTROJ, KTERÝ NÁM CHYBÍ: TEST ROZHODNUTÍ NAD POSTAVENOU POZICÍ
+# ⭐⭐⭐ Q1 vs Q2 — DVĚ OTÁZKY, KTERÉ SPLÝVAJÍ A NESMÍ
+*(uživatel 14.08.: „mám DTS vedle BO a LO a v A/B jej donutím v jedné z větví
+vybrat BO a ve druhé náhodně — pak ale změřím, že vybral BO vs vybral náhodně —
+nevidím přidanou hodnotu, ale ani nevím, co chci tím dokázat")*
+
+**Ta pochybnost je správná: vynutit volbu a pak měřit, že se ta volba stala, je
+měření DODRŽOVÁNÍ, ne měření HODNOTY.** Přesně to udělala brána klece — zlepšila
+skoro všechny kontroly a chess se nehnul. Je to **otevřená otázka č. 1 vyslovená
+na úrovni návrhu experimentu.**
+
+| | **Q1 — VYBERE SI TO SÁM?** | **Q2 — JE TO VŮBEC LEPŠÍ?** |
+|---|---|---|
+| **vynucuje se volba?** | ⛔ **NE** — policy je volná | ✅ **ANO** — jedna větev cíl vynutí |
+| **co se měří** | **podíl voleb** proti náhodě mezi nabídnutými | **výsledek** — chess, měna drivů |
+| **na co odpovídá** | stačí **nabídnout**, nebo to spolkne plochý prior? | vyplatí se ta **doktrína**? |
+| **cena** | minuty *(postavená pozice)* | noc |
+| **čemu slouží** | **diagnostika** — aby se nespustila zbytečná noc | **hodnota** — kvůli tomu se rozhoduje |
+
+⛔ **Nejčastější chyba je Q1 řešené nástrojem pro Q2:** vynutit volbu a změřit,
+že se stala. Vyjde to vždycky a nedokazuje to nic.
+
+⭐ **Q2 je zajímavější experiment než dnešní Dauntless**, protože netestuje
+instalatérskou opravu, ale **doktrínu**: *vyplatí se cílit bloky na nejsilnější
+tělo u nosiče?* Odpověď platí bez ohledu na to, čím se toho dosáhne — Dauntless,
+prior, nebo něco třetího. **A kdyby vyšla záporně, ušetří naráz P13, P15
+i balík proti Black Orkovi.**
+
+⇒ **U každé položky fronty napsat, jestli je to Q1, nebo Q2**, a podle toho
+zvolit nástroj i metriku.
+
+# ⭐⭐⭐ NÁSTROJ PRO Q1: TEST ROZHODNUTÍ NAD POSTAVENOU POZICÍ
 *(uživatel 14.08.: „pokud to nevynutíš podstrčením situace — kdy má na výběr —
 a porovnáváš náhodu vs vybrání"; „dal jsem při bloku s Dauntless vědomě cíl ST4
 proti náhodně — je pro mne měřitelné")*
