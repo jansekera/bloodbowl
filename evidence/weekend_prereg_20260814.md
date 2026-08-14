@@ -76,10 +76,31 @@ co otevřená otázka č. 1 od změny žádá.
 soupeři**. Držet míč před čárou a překročit ji co nejpozději. Baseline: dnešní
 chování.
 
+### Podmínka zdržení — ⭐ upřesněno uživatelem 14.08.
+
+> *„Když jsem v tahu 6 blízko TD s míčem a vím, že WD ke mně příští kolo
+> doběhne a možná sebere míč — je nejlepší dát TD teď."*
+
+Psal jsem to vágně jako *„když míč držíš bezpečně"*. Podmínka má tenhle tvar:
+
+**Zdržuj jen tehdy, když na nosiče do našeho příštího kola NIKDO nedosáhne.**
+Jakmile dosáhne, **skóruj hned** — odložený TD je pak žádný TD.
+
+⇒ Není to „skóruj co nejpozději", je to **obchod mezi dvěma riziky**: odepřít
+soupeři čas na odpověď proti riziku, že o míč přijdeme dřív, než čáru
+překročíme.
+
+⭐ **Sjednocuje to P11 s P12 i s E1.** Všechny tři se ptají na totéž:
+*„kdo na tohle pole dosáhne dřív než my"*. Jeden predikát pronásledování
+obslouží:
+* **P11** — mám skórovat teď, nebo počkat?
+* **P12** — kdy pustit Runnera na sólo výběh?
+* **E1/REACH0** — je nosič vystavený?
+
+⇒ Stavět **jeden** predikát, ne tři. ([[feedback_implement_the_rule_not_the_outcome]])
+
 ### Riziko, které se musí napsat předem
-**Odložený TD může být žádný TD.** Kdo čeká, může přijít o míč a skončit 0:0
-místo 1:0. Rameno proto **nesmí** být „nikdy neskóruj dřív", ale „neskóruj
-dřív, **když míč držíš bezpečně**". Když vyjde záporně, je to poctivý výsledek
+**Odložený TD může být žádný TD.** Když vyjde záporně, je to poctivý výsledek
 a doktrína záporné rezervy dostane první skutečný protidůkaz od 10.08.
 
 ### Metrika a práh
