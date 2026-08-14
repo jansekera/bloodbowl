@@ -165,6 +165,21 @@ Korpus: `diag_replay_mine_20260813_big_data`, **3000 her**, brána OFF, HEAD `e4
   říká, že **nehraje ani vlastní hru**. ⇒ **ÚKOL: soupeřova AI má hrát plán své
   rasy** — patří k **T5.13** (přestavba rosterů), protože roster bez plánu je
   jen jiná čísla na papíře.
+  ⭐ **Rozpadá se to na dvě velmi různě drahé části** *(uživatel 14.08.: „tohle
+  bude možná těžší než odstřihnout dwarfa od učení rutinou, co musí stihnout
+  dodržet")*:
+  **(A) rasově citlivé hodnocení — LEVNÉ, a platíme za ně tak jako tak.**
+  Heuristika není trpasličí doktrína, je **slepá k rase**: `heuristic -= 0.1`
+  za volný míč dostane skaven s MA9 stejně jako trpaslík s MA4 — **proto hraje
+  jako elf**. ⇒ **Je to týž člen, který opravujeme kvůli P10a.** Udělat cenu
+  volného míče funkcí toho, kdo je blíž a **kdo rychlejší**, zlepší **naše**
+  rozhodování **a zároveň** naučí skavena hrát skavena. **Jedna oprava, obě
+  strany**; odhadem pokryje největší půlku rozdílu.
+  **(B) skutečný plán rasy — DRAHÉ.** Přihrávky za klec, Nerves of Steel, kdy
+  obětovat tělo. Z (A) nevypadne. Srovnatelné s trpasličím projektem (doktrína
+  + ~60 povinností + kontroly). **Vlastní projekt, ne úkol.**
+  ⇒ **(A) zkusit samostatně**, protože se za ni platí prací, kterou stejně
+  děláme.
 * **Soupeřova AI nehraje proti našim slabinám cíleně.** Runner nevypadne ze
   hřiště ani jednou ve 120 hrách, protože si pro něj nikdo nechodí. Lidský
   soupeř by to dělal (AG3 máme jen 4 z 11).

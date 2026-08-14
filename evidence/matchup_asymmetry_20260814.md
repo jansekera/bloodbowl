@@ -162,6 +162,38 @@ naměřených čísel najednou.
 našim slabinám cíleně"*. Ta říkala, že nás **netrestá**. Tahle říká, že
 **nehraje ani vlastní hru**.
 
+### ⭐ Jak drahé to je: rozpadá se to na dvě velmi různě drahé části
+
+*Uživatel 14.08.: „tohle bude možná těžší než odstřihnout dwarfa od učení
+rutinou, co musí stihnout dodržet."* — Pravděpodobně ano, **pro tu druhou část**.
+U trpaslíka máme doktrínu, ~60 povinností, kontroly a uživatelovu expertizu.
+Napsat druhou takovou sadu pro každou rasu je práce na měsíce.
+
+**Část A — rasově citlivé hodnocení. LEVNÁ, a platíme za ni tak jako tak.**
+Heuristika není „trpasličí doktrína", je **slepá k rase**:
+```cpp
+heuristic -= 0.1;                          // volný míč je špatný -- VŽDYCKY
+if (nearestDist <= 2) heuristic += 0.08;   // a ptá se jen na nás
+```
+Skaven s **MA9** dostane tutéž větu jako trpaslík s **MA4**. ⇒ **Proto hraje
+jako elf** — nikdo mu neřekl, že volný míč je pro něj **příležitost**.
+
+⭐ **A je to týž člen, který stejně opravujeme kvůli P10a.** Udělat cenu volného
+míče funkcí toho, **kdo je blíž a kdo rychlejší**, znamená:
+* **naše** rozhodování se zlepší *(to je P10a)*,
+* **a skaven začne sám od sebe hrát skavena**, protože heuristika mu konečně
+  řekne, že za volný míč stojí riskovat těla.
+
+**Jedna oprava, obě strany.** Odhad: pokryje **největší půlku** rozdílu, protože
+skavení hra stojí právě na závodu k míči.
+
+**Část B — skutečný plán rasy. DRAHÁ.** Přihrávky za klec, Nerves of Steel,
+volba, kdy obětovat tělo — z části A nevypadnou. Srovnatelné s trpasličím
+projektem.
+
+⇒ **Část A zkusit samostatně**, protože se za ni platí prací, kterou stejně
+děláme. Část B je vlastní projekt, ne úkol.
+
 ## ⛔ CO Z TOHO PLYNE PRO VŠECHNA NAŠE ČÍSLA
 
 **Průměr přes čtyři soupeře míchá dva opačné světy.** Doktrína laděná na
