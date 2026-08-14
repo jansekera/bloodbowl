@@ -8,7 +8,25 @@ Náš stažený text `rules_crp2016.txt` je ve skutečnosti **CRP** — viz T5.1
 | soubor | co to je |
 |---|---|
 | `rules_crp_lrb6.txt` | CRP / LRB6, 243 kB *(dřív matoucí název `rules_crp2016.txt`)* |
-| `rules_bb2016.txt` | **BB2016**, 107 stran / 432 kB — Rulebook 11/2016 + **Death Zone Season 1** + Bugman's Star Players |
+| `rules_bb2016.txt` | **BB2016**, 107 stran / 432 kB — viz rozpis níž |
+
+### Co `rules_bb2016.txt` obsahuje (podle vlastního obsahu)
+
+Rulebook 11/2016 · **Death Zone Season 1** 11/2016 · **Death Zone Season 2**
+5/2017 · Bugman's Star Players 5/2016 · ⭐ **Errata and FAQ (pdf, 5/2017)** ·
+Referees (White Dwarf 1/2017) · Winter Weather Table · Blitzmania Kick-off
+table · Special Play Variant rules v3 · team-specific ball rules · Match Events.
+**Kompilace k říjnu 2017 — errata jsou už zapracovaná v textu.**
+
+⚠️ **Není to oficiální dokument GW, je to komunitní kompilace**
+(*„Author: Baxx @ dakkadakka"*). Kompilátor dělal redakční rozhodnutí
+(*„Incorporated White Dwarf Goblin & Halfling Referees to the Death Zone
+Season 2 Referee table"*) a sám uvádí nedodělky (*„Todo: -Skaven Vermin
+Pestilent match events (missing details for 1)…"*).
+⇒ **Dobrý pracovní referenční text; u sporného bodu dohledat oficiální zdroj.**
+
+✅ **Ověřeno, že to NENÍ BB2020:** „Second Season" 0× · „Passing Ability" 0× ·
+„Team Draft" 0× · „Agility" 51× (statline 2016). Nic z 2018/2019.
 
 Postup byl týž jako 07.08.: `WebFetch` uloží PDF na disk i když ho neumí
 přečíst → `venv/bin/python3` + `pypdf` → grep. Zdroj PDF:
