@@ -76,9 +76,31 @@ hřiště se mu brání.** A S7 boxing-in = **32,4 % našich kol** je právě te
 **Proč před P2:** P2 staví novou doktrínu nad evaluací, která úspěch té
 doktríny hodnotí záporně. Opravit tohle je levnější a míří to **pod** ni.
 
-### Rameno
-Volný míč se přestane hodnotit jako paušálně špatný: rozlišit, komu byl vyražen
-z ruky. Baseline: dnešní chování.
+### Rameno — ⚠️ PŘEPSÁNO 14.08. po uživatelově námitce
+
+Původní znění bylo *„volný míč se přestane hodnotit jako paušálně špatný"*.
+**To by vyrobilo pravidlo „bij nosiče vždycky", a to je proti Wardancerovi
+špatně.** Uživatel: *„zkontroluj před blitz Wardancera na balon, že máš
+v záloze druhého pro pickup a třetího pro zablokování cesty k uzmutému
+balonu."*
+
+⇒ **Vyražený míč je zisk jen tehdy, když ho posbíráme.** Jinak jen vyrobíme
+volný míč uprostřed hřiště a dáme ho rychlejšímu týmu — a trpaslík je
+v souboji o volný míč nejhorší možná rasa (MA4, AG2 u většiny těl).
+⇒ `loose ball is bad` **není nesmysl, je to správné pravidlo se špatnou
+podmínkou**: platí, když scramble prohrajeme, neplatí, když ho vyhrajeme.
+
+**Rameno tedy zní: sražení nosiče se odmění tehdy, když scramble vyhrajeme** —
+a to je **rozpočet tří těl**: ① kdo srazí · ② kdo sebere · ③ kdo zavře cestu.
+Dnešní člen se ptá jen na **našeho** nejbližšího (`nearestDist`, max +0,08)
+a nikdy na to, **kdo je blíž — my, nebo oni**; tělo zavírající cestu
+nemodeluje vůbec.
+
+Baseline: dnešní chování.
+
+⚠️ Tím se běh 1 dotýká **tří těl na jednu akci** a spadá pod zákaz *„nesmíme
+otevřít prostor jinde"*. Rozpočet je proto součástí ramene, ne jeho vedlejší
+efekt: když třetí tělo není volné, pravidlo se **nespustí**.
 
 ### Metrika a práh *(pre-registrováno)*
 * Primární: **párová delta chess na `dw-we` a `dw-sk`, 1500 párů.**
@@ -91,6 +113,7 @@ z ruky. Baseline: dnešní chování.
 |---|---|
 | bloky na nosiče | **nahoru** — to je mechanismus |
 | K33 bloky celkem | ±2 pp; velký růst = rameno bije všechno, ne nosiče |
+| **volných míčů získaných NÁMI / vyrobených** | **nahoru** — tohle je ta podmínka; když roste jen jmenovatel, rameno vyrábí scrambly a prohrává je |
 | DEAD/hru soupeře | nahoru nebo beze změny |
 | K9a tempo | beze změny |
 | ztráta míče soupeřem | **nahoru** |
