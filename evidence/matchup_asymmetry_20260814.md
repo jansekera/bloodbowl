@@ -92,11 +92,42 @@ Doloženo výsledkem *(Fable 14.08.)* — **stojících hráčů v kole 8**:
 
 ⇒ **Ork je jediný matchup, kde soupeř bije víc než my.**
 
-### Důsledek pro krádeže
-Skaven nám dá **198 krádežových TD**, ork jen **31**. Skaven nám míč **brát
-neumí** — ale nemusí: počká, až ho upustíme sami, a je na něm dřív (**MA9 proti
-MA4**). ⇒ Jejich hrozba není odebrání, je to **rychlost k volnému míči**.
-*(Ověřuje Fable v přepočtu.)*
+### ⭐⭐ SKUTEČNÝ SKAVENÍ PLÁN — nebrat míč, ale vyhrát závod k němu
+*(uživatel 14.08.)*
+
+Skaven nám dá **198 krádežových TD**, ork jen **31**. Dávalo mi to smysl až
+s tímhle: **oni míč odebírat nepotřebují. Potřebují, aby chvíli ležel.**
+
+| krok | čím |
+|---|---|
+| míč se uvolní | Wrestle · blitz · **nebo prostě náš fumble** |
+| **jsou u něj dřív** | **MA9 proti MA4** |
+| *(varianta)* chytí ho **v obklíčení** | **Nerves of Steel** — bez postihu za naše TZ |
+| uvolní si cestu | blitz |
+| utečou a skórují | **Dodge**, dvě kola |
+
+⇒ **Proto se za skavena vyplatí blitz na míč i za cenu ztráty těl** — jedno
+uvolnění míče se u nich blíží gólu. Nemusí ho protlačit, stačí, aby spadl.
+Tělo je pro ně levnější než pro nás.
+
+### ⛔ CO Z TOHO PLYNE PRO NÁS: cena ztráty míče NENÍ konstanta
+
+**Je to funkce rychlosti soupeře k míči.** Proti skavenovi je upuštěný míč skoro
+inkasovaný gól; proti orkovi (MA4–5, AG2–3) je to nepříjemnost, kterou často
+sebereme zpátky.
+
+Engine to hodnotí **plošně** (`macro_mcts.cpp:762`):
+```cpp
+heuristic -= 0.1;                          // loose ball is bad
+if (nearestDist <= 2) heuristic += 0.08;   // ptá se JEN na nás
+```
+Ráno *(P10a)* jsme našli, že se neptá, **kdo je blíž**. Teď víme, že se musí
+ptát i **kdo je rychlejší** — je to táž jedna oprava se dvěma vstupy místo
+jednoho.
+
+⇒ A symetricky to potvrzuje uživatelovu podmínku k P10a z druhé strany:
+**my potřebujeme tři těla, abychom scramble vyhráli** (kdo srazí, kdo sebere,
+kdo zavře cestu). **Oni jedno.**
 
 ---
 
