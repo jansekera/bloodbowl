@@ -577,6 +577,56 @@ TEST(MacroActions, TheSamePairIsStillRefusedOnceItIsAThrow) {
         << "out of hand-off range the throw roll is real and AG2 still fails it";
 }
 
+TEST(MacroActions, ASlayerIsOfferedTheBlockDauntlessWouldEqualise) {
+    // ST3 with Dauntless beside a ST4 Black Orc. Priced raw this is uphill, the
+    // dice count comes out negative and the offer never reaches the search --
+    // for a block that resolves at equal strength on a 2+, i.e. 83% of the time.
+    GameState state = makeMinimalState();
+    Player& slayer = state.getPlayer(1);
+    slayer.position = {10, 7};
+    slayer.stats = {5, 3, 2, 8};                   // Troll Slayer, ST3
+    slayer.skills.add(SkillName::Block);
+    slayer.skills.add(SkillName::Dauntless);
+
+    Player& orc = state.getPlayer(12);
+    orc.position = {11, 7};
+    orc.stats = {4, 4, 2, 9};                      // Black Orc, ST4
+    orc.state = PlayerState::STANDING;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros, /*dauntlessInOffer=*/true);
+
+    bool offered = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::BLOCK && m.playerId == 1 && m.targetId == 12) offered = true;
+    }
+    EXPECT_TRUE(offered) << "Dauntless equalises ST3 onto ST4 before assists";
+}
+
+TEST(MacroActions, WithoutDauntlessTheSameUphillBlockStaysOut) {
+    // Guard on the other side: the offer must still refuse a genuinely uphill
+    // block. Same two players, minus the skill.
+    GameState state = makeMinimalState();
+    Player& blocker = state.getPlayer(1);
+    blocker.position = {10, 7};
+    blocker.stats = {5, 3, 2, 8};
+    blocker.skills.add(SkillName::Block);
+
+    Player& orc = state.getPlayer(12);
+    orc.position = {11, 7};
+    orc.stats = {4, 4, 2, 9};
+    orc.state = PlayerState::STANDING;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros, /*dauntlessInOffer=*/true);
+
+    bool offered = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::BLOCK && m.playerId == 1 && m.targetId == 12) offered = true;
+    }
+    EXPECT_FALSE(offered) << "ST3 into ST4 with no way to equalise is the defender's block";
+}
+
 TEST(MacroActions, BranchingFactorReasonable) {
     // Full game state should produce ~10-25 macros, not ~200
     GameState state;

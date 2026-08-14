@@ -111,7 +111,7 @@ MacroMCTSSearch::MacroMCTSSearch(const ValueFunction* vf, MCTSConfig config, uin
 
 Macro MacroMCTSSearch::search(const GameState& state) {
     std::vector<Macro> macros;
-    getAvailableMacros(state, macros);
+    getAvailableMacros(state, macros, config_.dauntlessInOffer);
 
     if (macros.empty()) {
         return {MacroType::END_TURN, -1, -1, {-1, -1}};
@@ -349,7 +349,7 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
     }
 
     std::vector<Macro> macros;
-    getAvailableMacros(state, macros);
+    getAvailableMacros(state, macros, config_.dauntlessInOffer);
 
     int n = static_cast<int>(macros.size());
 
@@ -606,7 +606,7 @@ double MacroMCTSSearch::greedyLookaheadBonus(const GameState& leafState, TeamSid
     if (distBefore <= 0) return 0.0;  // already in the endzone somehow
 
     std::vector<Macro> macros;
-    getAvailableMacros(leafState, macros);
+    getAvailableMacros(leafState, macros, config_.dauntlessInOffer);
     if (macros.empty()) return 0.0;
 
     int bestIdx = -1, bestRank = -1;

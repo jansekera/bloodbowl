@@ -8,8 +8,14 @@
 namespace bb {
 
 struct InjuryContext {
-    int armourModifier = 0;   // MightyBlow, DirtyPlayer, foul assists
-    int injuryModifier = 0;   // MightyBlow, Stunty
+    int armourModifier = 0;   // DirtyPlayer, foul assists
+    int injuryModifier = 0;   // Stunty
+    // Mighty Blow is a flag, not a modifier, because CRP spends it on ONE roll:
+    // "you only modify one of the dice rolls, so if you decide to use Mighty
+    // Blow to modify the Armour roll, you may not modify the Injury roll as
+    // well." It used to be added to both at once. resolveArmourAndInjury picks
+    // which roll it lands on -- see there.
+    bool mightyBlow = false;
     bool hasClaw = false;     // armor broken on 8+
     bool hasStakes = false;   // blocks Regeneration
     bool hasDecay = false;    // roll injury twice, take worse

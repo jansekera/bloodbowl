@@ -46,7 +46,18 @@ struct MacroExpansionResult {
 };
 
 // Generate all available macros for the current game state
-void getAvailableMacros(const GameState& state, std::vector<Macro>& out);
+// dauntlessInOffer: price a block at the strength Dauntless would equalise to
+// (MCTSConfig::dauntlessInOffer). Defaults off so every existing caller and test
+// keeps today's behaviour; the A/B arm and, if it passes, production turn it on.
+void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
+                        bool dauntlessInOffer = false);
+
+// How many times the block offer priced a block at the strength Dauntless would
+// equalise to, since the last call -- and resets. Diagnostics for the A/B: an
+// arm that changes nothing must be distinguishable from a change that does
+// nothing. Only ever non-zero where dauntlessInOffer is set, so it needs no
+// per-side bookkeeping.
+long takeDauntlessOfferCount();
 
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.

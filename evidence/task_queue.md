@@ -240,6 +240,35 @@ Platí na **P2 ⑤**, **P9c**, **T1.8** i na Fableho „idle těla dosáhnou".
 ⭐ **Obecný tvar:** *dosažitelnost není povinnost.* Zapsat jako zákaz do spec
 vedle S7.1, ne jen sem.
 
+# ⛔ METODA: NEJDŘÍV POJISTKA MECHANISMU, TEPRVE PAK MĚŘENÍ
+*(uživatel 14.08.: „když jdeme měřit Dauntless — naučili jsme se jej nabízet
+a logovat předtím? tohle zobecnit")*
+
+**Rameno, které nic nezměnilo, se MUSÍ dát poznat od změny, která nemá efekt.**
+Bez toho se nula čte jako verdikt, přestože je to porucha měřidla.
+
+**Dvakrát za jeden den to málem chybělo:**
+* **Hand-off** — oprava ceny shipnuta, ověřovací běh hlásil **„0 hand-offů ve
+  3000 hrách"**. `HAND_OFF` v enumu událostí **neexistoval**; počítal se řetězec,
+  který engine nikdy neemitoval. *(Doplněno `3b11d33`.)*
+* **Dauntless** — řádek A/B nesl jen `cand_plans`, což je diagnostika **brány
+  klece** a v mode 4 je nula. Gate analyzer přitom takovou pojistku **měl**
+  (*„BRÁNA NEADOPTOVALA ANI JEDEN PLÁN — měření neměří bránu"*).
+  *(Doplněn čítač `cand_daunt` do řádku i do vyhodnocení.)*
+
+## Povinný postup před KAŽDÝM A/B
+
+| # | krok |
+|---|---|
+| **1** | **Je akce vůbec v nabídce?** Filtr, který ji zahodí, znamená, že search nedostane co vážit. |
+| **2** | **Nechává po sobě stopu v datech?** Vlastní událost nebo čítač — ne odvozování z něčeho jiného. |
+| **3** | **Nese tu stopu TÁŽ data, ze kterých se čte verdikt?** Korpus vedle A/B nestačí: když spadne noc, zůstane verdikt bez pojistky. |
+| **4** | **Vyhodnocení tiskne „rameno nic nezměnilo" jako VLASTNÍ hlášku**, ne jako nulovou deltu. |
+
+⚠️ **Krok 3 je ten, na který se zapomíná.** Dauntless by se dal spočítat
+z `SKILL_USED` v korpusu — jenže korpus běží **až po** A/B, takže verdikt by se
+četl bez něj.
+
 # ⭐ METODA: VÝBĚR MATCHUPŮ SE DĚLÁ PODLE MECHANISMU
 *(uživatel 14.08.: „tohle jsou specifická měření a moje zobecnění na všechny rasy
 by tu nic nepřineslo")*

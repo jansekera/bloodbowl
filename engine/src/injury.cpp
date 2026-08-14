@@ -176,21 +176,40 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
 
     int aD1 = dice.rollD6();
     int aD2 = dice.rollD6();
-    int armourRoll = aD1 + aD2 + ctx.armourModifier;
+    int base = aD1 + aD2 + ctx.armourModifier;
 
-    // Claw: armor broken on 8+ regardless of AV
-    bool broken;
-    if (ctx.hasClaw) {
-        broken = (armourRoll >= 8) || (armourRoll > av);
-    } else {
-        broken = (armourRoll > av);
+    // Claw: armor broken on 8+ regardless of AV, after modifications.
+    auto breaksArmour = [&](int roll) {
+        return ctx.hasClaw ? (roll >= 8 || roll > av) : (roll > av);
+    };
+
+    // Mighty Blow buys ONE roll, and which one is the coach's to choose: "if you
+    // decide to use Mighty Blow to modify the Armour roll, you may not modify
+    // the Injury roll as well." We used to add it to both at once, which is
+    // wrong in every edition of the rules -- and, since Mighty Blow sits on the
+    // orc Blitzer, the human Blitzer and Ogre and the wood elf Treeman while
+    // neither our dwarves nor the Skaven field one, the error only ever hit us.
+    //
+    // Spend it where it does work: on the armour roll only when armour needs it
+    // to break, and otherwise keep it for the injury roll. The naive repair --
+    // always spend it on armour -- would weaken opponents further than the rules
+    // do. Note this composes with Claw exactly as it should, since the +1 may
+    // legitimately push a 7 up to the 8 Claw asks for.
+    int armourRoll = base;
+    bool spentOnArmour = false;
+    if (ctx.mightyBlow && !breaksArmour(base) && breaksArmour(base + 1)) {
+        armourRoll = base + 1;
+        spentOnArmour = true;
     }
+    bool broken = breaksArmour(armourRoll);
 
     emitEvent(events, {GameEvent::Type::ARMOR_BREAK, playerId, -1, player.position, {},
                       armourRoll, broken, aD1, aD2});
 
     if (broken) {
-        resolveInjuryRoll(state, playerId, dice, ctx, events);
+        InjuryContext injCtx = ctx;
+        if (ctx.mightyBlow && !spentOnArmour) injCtx.injuryModifier += 1;
+        resolveInjuryRoll(state, playerId, dice, injCtx, events);
         return true;
     }
 

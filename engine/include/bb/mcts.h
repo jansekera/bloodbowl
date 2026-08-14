@@ -29,6 +29,15 @@ struct MCTSConfig {
     bool stagedPickupPlanner = false; // Macro-MCTS only: item13 MVP staged safe-then-PICKUP whole-turn planner (2026-07-31), see bb/turn_planner.h
     bool cageAdvance = false;         // Macro-MCTS only: F1 cage-advance whole-turn plan (2026-08-03), see bb/cage_advance.h
     bool cageGrind = false;           // DIAG/EXPERIMENT only (2026-08-06 tempo doctrine A/B): cage advance option (a) "grind" -- on TEMPO_INSUFFICIENT push at max dice-free achievable step instead of falling back to search(). DEFAULT OFF = no behavior change; only diag harnesses set it.
+    // Offer a block whose strength Dauntless would equalise (2026-08-14).
+    // getBlockDiceCount weighs Horns but never Dauntless, so a ST3 Slayer beside
+    // a ST4 Black Orc prices as uphill, the count goes negative and the offer is
+    // discarded -- for a block that resolves at equal strength on a 2+. Orcs are
+    // the only side we face fielding four ST4 bodies, and they are also the side
+    // we score 86 touchdowns against in 750 games versus 451 against Skaven.
+    // DEFAULT OFF so production is unchanged until the A/B says otherwise, the
+    // same way cageAdvance was introduced.
+    bool dauntlessInOffer = false;
 };
 
 struct MCTSNode {

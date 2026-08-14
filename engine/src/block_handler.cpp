@@ -670,10 +670,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                               def.position, {}, 0, false});
 
             InjuryContext defCtx;
-            if (att.hasSkill(SkillName::MightyBlow)) {
-                defCtx.armourModifier += 1;
-                defCtx.injuryModifier += 1;
-            }
+            // One flag, not two modifiers: resolveArmourAndInjury decides which
+            // roll it lands on, because CRP spends Mighty Blow on one of them.
+            if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
             if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
             if (att.hasSkill(SkillName::Stakes)) defCtx.hasStakes = true;
             if (def.hasSkill(SkillName::Decay)) defCtx.hasDecay = true;

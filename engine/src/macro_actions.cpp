@@ -122,12 +122,47 @@ static bool isFreeToAct(const Player& p) {
     return p.canAct() && !p.hasMoved;
 }
 
+// See takeDauntlessOfferCount(): incremented only on the candidate arm, since
+// the branch that touches it is gated on dauntlessInOffer.
+thread_local long g_dauntlessOffers = 0;
+
+long takeDauntlessOfferCount() {
+    long v = g_dauntlessOffers;
+    g_dauntlessOffers = 0;
+    return v;
+}
+
 // Count block dice for attacker vs defender
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
-                             bool isBlitz) {
+                             bool isBlitz, bool dauntlessInOffer) {
     int attST = att.stats.strength;
     int defST = def.stats.strength;
     if (isBlitz && att.hasSkill(SkillName::Horns)) attST += 1;
+    // Dauntless, the same way block_handler resolves it: before assists, and
+    // equalising onto the opponent's pre-assist strength. Leaving it out here
+    // priced a Slayer beside a Black Orc as ST3 against ST4 -- uphill, negative
+    // dice, offer discarded -- for a block that resolves at equal strength 83%
+    // of the time (d6 + 3 > 4 is a 2+). The Slayer was never offered a block he
+    // would mostly have won the strength contest for.
+    //
+    // The gate takes the equalised value rather than a probability-weighted one
+    // because failing the roll is not a turnover, only a worse block, and the
+    // search rolls the real Dauntless die when it expands the macro. The job
+    // here is to stop excluding the option, not to price it exactly.
+    //
+    // It matters most exactly where it is most likely: the roll is a 2+ against
+    // ST4, a 3+ against ST5 and a 4+ against a ST6 Treeman -- and orcs are the
+    // only side we face fielding four ST4 Black Orcs.
+    if (dauntlessInOffer && att.hasSkill(SkillName::Dauntless) && defST > attST) {
+        attST = defST;
+        // Mechanism counter, diagnostics only. A measurement has to be able to
+        // show that the thing it measures actually happened -- the hand-off run
+        // this morning reported "0 hand-offs" across 3000 games because the
+        // event did not exist, and read as "no effect" rather than "no change".
+        // The branch is only reachable with the flag on, i.e. in the candidate
+        // arm, so the count needs no per-policy plumbing.
+        ++g_dauntlessOffers;
+    }
     int attAssists = countAssists(state, def.position, att.teamSide,
                                   att.id, def.id, def.id);
     int defAssists = countAssists(state, att.position, def.teamSide,
@@ -205,7 +240,9 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // a cheap combination. Lower is better (0 = certain success).
 static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
                                        const Player& target) {
-    int diceCount = getBlockDiceCount(state, blitzer, target, true);
+    // Risk estimate and feature extraction keep the raw strengths: they describe
+    // the block as thrown, not whether to offer it.
+    int diceCount = getBlockDiceCount(state, blitzer, target, true, false);
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block));
     double approachFail = estimateApproachFailChance(state, blitzer, target.position);
     return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
@@ -231,7 +268,8 @@ static const Player* findNearestFreePlayer(const GameState& state, Position targ
 
 // --- Macro Generation ---
 
-void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
+void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
+                        bool dauntlessInOffer) {
     out.clear();
 
     if (state.phase != GamePhase::PLAY) return;
@@ -412,7 +450,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 if (!isFreeToAct(blitzer)) return;
                 if (blitzer.hasSkill(SkillName::BallAndChain)) return;
 
-                int dice = getBlockDiceCount(state, blitzer, def, true);
+                int dice = getBlockDiceCount(state, blitzer, def, true, dauntlessInOffer);
                 int score = dice * 2;
 
                 // Sideline trap: target near sideline = fewer escape routes
@@ -538,7 +576,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             // and so do uphill blocks where the defender picks the die
             // (negative count). The ball carrier is excluded outright: his
             // turnovers are the ones that end drives.
-            int dice = getBlockDiceCount(state, att, *def, false);
+            int dice = getBlockDiceCount(state, att, *def, false, dauntlessInOffer);
             bool oneDieWorthOffering =
                 dice == 1 && att.hasSkill(SkillName::Block) &&
                 !(state.ball.isHeld && state.ball.carrierId == att.id);
@@ -1650,7 +1688,7 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
         const Player& def = state.getPlayer(macro.targetId);
         if (att.isOnPitch() && def.isOnPitch()) {
             bool isBlitz = (macro.type == MacroType::BLITZ);
-            int dice = getBlockDiceCount(state, att, def, isBlitz);
+            int dice = getBlockDiceCount(state, att, def, isBlitz, false);
             out[11] = dice / 3.0f;
         }
     } else if (macro.type == MacroType::BLITZ && macro.targetId > 0 && macro.playerId <= 0) {

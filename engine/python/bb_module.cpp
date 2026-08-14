@@ -508,7 +508,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       bool stagedPickup,
                                       bool awayStagedPickup,
                                       bool cageAdvance,
-                                      bool awayCageAdvance) {
+                                      bool awayCageAdvance,
+                                      bool dauntlessInOffer) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -563,6 +564,12 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.riskDeferral = riskDeferral;
                 cfg.stagedPickupPlanner = stagedPlanner;
                 cfg.cageAdvance = cageOn;
+                // 2026-08-14: applies to BOTH sides on purpose. Unlike the cage
+                // planner this is not a doctrine we are trying on our dwarves --
+                // it is the block offer refusing to see a skill the resolver
+                // already honours, so leaving it on one side would compare two
+                // different engines rather than two arms.
+                cfg.dauntlessInOffer = dauntlessInOffer;
                 if (polPtr) {
                     cfg.policy = polPtr;
                     cfg.policyBlend = polBlend;
@@ -645,7 +652,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("staged_pickup") = false,       // 2026-08-05 (item 13): staged safe-then-PICKUP whole-turn planner, per side
        py::arg("away_staged_pickup") = false,  // so the gate can run candidate-only while frozen keeps its promoted config
        py::arg("cage_advance") = false,        // 2026-08-11: F1 cage-advance planner, per side. Default off = production.
-       py::arg("away_cage_advance") = false);  // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
+       py::arg("away_cage_advance") = false,   // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
+       py::arg("dauntless_in_offer") = false);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. Default off = production.
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

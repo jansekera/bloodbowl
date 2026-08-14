@@ -157,7 +157,7 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
     }
 
     std::vector<Macro> macros;
-    getAvailableMacros(state, macros);
+    getAvailableMacros(state, macros, config_.dauntlessInOffer);
 
     // PICKUP candidates arrive best-first (generation ordering contract,
     // macro_actions.cpp; item 7 emits at most two).
@@ -253,7 +253,7 @@ StagedPlan StagedTurnPlanner::build(const GameState& state) {
         };
         while (static_cast<int>(accepted.size()) < MAX_SAFE_BACKUPS) {
             std::vector<Macro> cur;
-            getAvailableMacros(projected, cur);
+            getAvailableMacros(projected, cur, config_.dauntlessInOffer);
             std::vector<Macro> cands;
             for (const auto& m : cur) {
                 if (m.type != MacroType::REPOSITION) continue;

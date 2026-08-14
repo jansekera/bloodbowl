@@ -61,6 +61,7 @@
 #include "bb/game_simulator.h"
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
+#include "bb/macro_actions.h"
 #include "bb/mcts.h"
 #include "bb/roster.h"
 #include "bb/rules_engine.h"
@@ -316,6 +317,10 @@ int main(int argc, char** argv) {
                     [&](const GameState& s) { return awayPol(s); },
                     seed * 2u + static_cast<uint32_t>(orient));
 
+                // mode 4: kolikrát nabídka ocenila blok silou, na kterou by
+                // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
+                // JINÉHO než „změna nemá efekt".
+                long candDaunt = bb::takeDauntlessOfferCount();
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
                 int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
@@ -352,13 +357,14 @@ int main(int argc, char** argv) {
                             "\"race_h\":\"%s\",\"race_a\":\"%s\",\"cand\":%d,"
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
-                            "\"cand_plans\":%d,\"base_plans\":%d,\"mode\":%d}\n",
+                            "\"cand_plans\":%d,\"base_plans\":%d,"
+                            "\"cand_daunt\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
-                            basePlans, mode);
+                            basePlans, candDaunt, mode);
                     fflush(rows);
                 }
             }

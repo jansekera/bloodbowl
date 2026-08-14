@@ -48,6 +48,7 @@ def score(cand, base):
 def main():
     rows = defaultdict(dict)
     plans = defaultdict(lambda: [0, 0])
+    daunt = defaultdict(int)
     modes = set()
     files = sorted(glob.glob(os.path.join(OUT, "*_s*", "diag_dauntless_rows.jsonl")))
     if not files:
@@ -56,6 +57,7 @@ def main():
         for line in open(f):
             r = json.loads(line)
             rows[r["matchup"]][(r["seed_idx"], r["cand_home"])] = r
+            daunt[r["matchup"]] += r.get("cand_daunt", 0)
             plans[r["matchup"]][0] += r.get("cand_plans", 0)
             plans[r["matchup"]][1] += r.get("base_plans", 0)
             modes.add(r.get("mode"))
@@ -113,6 +115,16 @@ def main():
               f"{cas_c / (2.0 * n):>13.2f}{cas_b / (2.0 * n):>7.2f}   {v}")
         if skipped:
             print(f"{'':10}⚠️  {skipped} neúplných párů vynecháno")
+        # POJISTKA MECHANISMU: rameno, které nic nezměnilo, se musí poznat od
+        # změny, která nemá efekt. Gate analyzer tohle měl, my jsme na to málem
+        # zapomněli.
+        dz = daunt[mi]
+        print(f"{'':10}Dauntless nabídek/hru: {dz / (2.0 * n):.2f}"
+              + ("   ⛔ NULA — RAMENO NIC NEZMĚNILO, měření neměří Dauntless"
+                 if dz == 0 and mi not in NULL_CONTROL else
+                 "   ✅ (null: očekáváno 0)" if dz == 0 else ""))
+        if dz and mi in NULL_CONTROL:
+            print(f"{'':10}⛔ NULL matchup nabídek {dz} — měl mít 0, podezřelý harness")
         cp, bp = plans[mi]
         if cp or bp:
             print(f"{'':10}⛔ adoptované plány klece {cp}/{bp} — mode 4 má mít "

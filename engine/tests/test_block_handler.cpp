@@ -282,13 +282,59 @@ TEST(BlockHandler, MightyBlowAndClaw) {
     gs.getPlayer(1).skills.add(SkillName::MightyBlow);
     gs.getPlayer(1).skills.add(SkillName::Claw);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 9);
-    // Roll DD. Defender pushed + knocked down
-    // Claw: armor broken on 8+. MB: +1 to armor and injury
-    // Armor: 4+3+1=8, Claw=8 → broken! Injury: 3+3+1=7 → stunned
+    // Roll DD. Defender pushed + knocked down.
+    // Armour 4+3=7 does not break AV9 and is not the 8 Claw wants, so Mighty
+    // Blow is spent there to make it 8 -- and is therefore NOT available to the
+    // injury roll, which stands at 3+3=6. Stunned either way; the point of the
+    // case is that Claw and Mighty Blow still compose on the armour roll.
     FixedDiceRoller dice({6, 4, 3, 3, 3});
     BlockParams params{1, 12, false, false};
     auto result = resolveBlock(gs, params, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}
+
+TEST(BlockHandler, MightyBlowIsKeptForTheInjuryWhenArmourBreaksWithoutIt) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::MightyBlow);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 8);   // AV8
+    // DD, then armour 4+5=9, which already beats AV8. Nothing to spend there,
+    // so the +1 goes to the injury roll: 4+4=8, +1 = 9 -> KO rather than Stunned.
+    std::vector<GameEvent> events;
+    FixedDiceRoller dice({6, 4, 5, 4, 4});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &events);
+
+    for (auto& e : events) {
+        if (e.type == GameEvent::Type::ARMOR_BREAK) {
+            EXPECT_EQ(e.roll, 9) << "unspent Mighty Blow must not inflate the armour roll";
+        }
+    }
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KNOCKED_OUT);
+}
+
+TEST(BlockHandler, MightyBlowIsSpentOnArmourOnlyWhenArmourNeedsIt) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::MightyBlow);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 8);   // AV8
+    // DD, then armour 4+4=8, which does NOT beat AV8 -- the +1 is what breaks it.
+    // Having been spent, it cannot also lift the injury: 4+4=8 stays a KO
+    // boundary rather than becoming 9.
+    std::vector<GameEvent> events;
+    FixedDiceRoller dice({6, 4, 4, 4, 4});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &events);
+
+    for (auto& e : events) {
+        if (e.type == GameEvent::Type::ARMOR_BREAK) {
+            EXPECT_EQ(e.roll, 9) << "the +1 is what took 8 past AV8";
+            EXPECT_TRUE(e.success);
+        }
+        if (e.type == GameEvent::Type::INJURY) {
+            EXPECT_EQ(e.roll, 8) << "Mighty Blow was already spent on the armour";
+        }
+    }
 }
 
 TEST(BlockHandler, HornsBonusOnBlitz) {
