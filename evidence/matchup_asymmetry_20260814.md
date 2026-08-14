@@ -170,6 +170,34 @@ stejném pásmu). **Jejich obrana rozdíl 451 vs 86 nevysvětluje.**
 míří to na **P15** (nabídka bloku nezná cenu cíle: blok do kopce na soupeřova
 nosiče se **nenabídne nikdy**) a na **P13** (Dauntless).
 
+### ⭐⭐⭐ MECHANISMUS TĚCH 7,5 %: GUARD V ROZÍCH, jen z druhé strany
+*(uživatel 14.08.: „z koho která rasa staví klec a kdo je nosič?")*
+
+Změřeno na 3000 hrách — složení rohů klece v kolech, kdy daná strana drží míč:
+
+| | Guard v rozích | náš 2k blitz na jejich nosiče | obsazených rohů |
+|---|---|---|---|
+| skaven | **6,7 %** | **54,4 %** | 1,28 / 4 |
+| wood-elf | 5,6 % | 43,4 % | 1,13 / 4 |
+| human | 20,6 % | 19,0 % | 1,21 / 4 |
+| **ork** | **50,9 %** | **7,5 %** | 1,37 / 4 |
+| *trpaslík* | *70,6 %* | — | *1,31 / 4* |
+
+**Monotónní a téměř dokonale inverzní.** Guard v rohu znamená, že jejich obranná
+asistence **nejde zrušit značkováním** — proto se k jejich nosiči nedostaneme na
+dvě kostky.
+* **ork:** Blitzer +Guard **28,4 %** + Black Orc +Guard+Block **22,5 %**
+* **skaven:** jen Blitzer +Guard 6,7 %, a do rohů si staví **Gutter Runnery ST2
+  (36,4 %)** — nejhorší možné tělo do klece — plus Lineman +Wrestle 25,8 %
+
+⭐ **Ráno vyšlo, že Guard je důvod, proč skaven nemůže ublížit NÁM. Teď se
+ukazuje, že je to i důvod, proč MY nemůžeme ublížit orkovi. Táž dovednost,
+oba směry.**
+
+**Kdo nese:** ork **Thrower +Block 78,5 %** · skaven Thrower 48,1 % +
+**Gutter Runner 37,5 %** · wood-elf Catcher 43,2 % / Lineman 41,1 % ·
+human Thrower 74,4 % · *my Runner +Block 82,1 %*.
+
 ### Dílčí čísla, která potvrdila obě uživatelovy námitky
 * Skavenův **nejlepší kanál je 1k Wrestle v 51,1 % kol** — má ho, ale konvertuje
   nejhůř ze všech ras.
