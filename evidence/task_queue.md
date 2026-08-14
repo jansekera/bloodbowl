@@ -240,6 +240,42 @@ Platí na **P2 ⑤**, **P9c**, **T1.8** i na Fableho „idle těla dosáhnou".
 ⭐ **Obecný tvar:** *dosažitelnost není povinnost.* Zapsat jako zákaz do spec
 vedle S7.1, ne jen sem.
 
+# ⭐⭐⭐ NÁLEZ DNE, PŘESNĚJI: JEDNA AKCE, PĚT VYPNUTÝCH ÚROVNÍ
+*(uživatel 14.08.: „tady jde o několik levelů, které byly všechny vypnuté")*
+
+Není to šest nezávislých chyb. Je to **jedna akce, které je samostatně vypnutá
+každá úroveň.** Na příkladu „Slayer udeří na Black Orka":
+
+| # | úroveň | stav | položka |
+|---|---|---|---|
+| 1 | **nabídka** — počítá se Dauntless? | ⛔ ne | P13 |
+| 2 | **prior** — je ten cíl cennější? | ⛔ ne, `BLOCK 15` pro všechny | P10a / P15 |
+| 3 | **volba kostky** — ví o Wrestle? | ⛔ ne | P14 |
+| 4 | **reroll** — ví o Wrestle? | ⛔ ne | P14 |
+| 5 | **odsun** — kam ho pošleme? | ⛔ naslepo | P9 |
+
+**Akce musí projít všemi pěti a každá ji zahodí samostatně.**
+
+## ⚠️ OTEVŘENÁ METODICKÁ OTÁZKA: řetěz vs. „jedna změna najednou"
+
+**Měřit je po jedné znamená systematicky podhodnocovat každou z nich.** Opravím
+úroveň 1 → akce se dostane do nabídky → spadne na úrovni 2. Strop
+*„86 → 110 TD"*, který Fable spočítal pro Dauntless, je strop **první úrovně
+v pořád rozbitém řetězu**, ne strop toho tahu.
+
+| postup | co dá | co ztratí |
+|---|---|---|
+| **po jedné** | čistou atribuci | každá vyjde jako nula a **postupně se všechny zamítnou**, přestože dohromady fungují |
+| **všechny naráz** | skutečný potenciál | při záporném výsledku **nepůjde říct, která úroveň to pokazila** |
+
+⛔ **NEROZHODNUTO — k rozhodnutí přes víkend.** Dnešní běh na tom nic nemění.
+⭐ **Částečná odpověď už je zabudovaná:** čítače `cand_daunt` (nabídek) a
+`cand_roll` (skutečných hodů) ukážou, **na které úrovni to spadne** — ne jen
+že to nikam nevedlo. Když nabídky stoupnou a hody ne, je vinen prior (úroveň 2),
+ne Dauntless. **Tohle je levnější než měřit obojí zvlášť.**
+⇒ Možná cesta ven: **opravit celý řetěz, ale každou úroveň vybavit čítačem**,
+a atribuci dělat z čítačů místo z oddělených běhů.
+
 # ⛔ METODA: NEJDŘÍV POJISTKA MECHANISMU, TEPRVE PAK MĚŘENÍ
 *(uživatel 14.08.: „když jdeme měřit Dauntless — naučili jsme se jej nabízet
 a logovat předtím? tohle zobecnit")*

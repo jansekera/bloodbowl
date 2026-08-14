@@ -27,6 +27,14 @@ static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
     return 0;
 }
 
+thread_local long g_dauntlessRolls = 0;
+
+long takeDauntlessRollCount() {
+    long v = g_dauntlessRolls;
+    g_dauntlessRolls = 0;
+    return v;
+}
+
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
                                  const Player& att, const Player& def) {
@@ -384,6 +392,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // the equalisation now all happen on the modified pre-assist strengths, and
     // assists are added on top afterwards.
     if (att.hasSkill(SkillName::Dauntless) && defST > attST) {
+        // Uptake, ne nabídka. Čítač v macro_actions počítá, kolikrát se blok
+        // OCENIL Dauntlessem; tenhle počítá, kolikrát se opravdu HODIL. Rozdíl
+        // mezi nimi je odpověď na „nabídli jsme to, ale vzal si to search?" --
+        // prior je pro všechny bloky plochý (BLOCK 15, viz P10a), takže nabídka
+        // sama nic nezaručuje.
+        ++g_dauntlessRolls;
         int dauntlessRoll = dice.rollD6();
         bool psyched = dauntlessRoll + attST > defST;
         if (psyched) {

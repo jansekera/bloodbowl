@@ -49,6 +49,7 @@ def main():
     rows = defaultdict(dict)
     plans = defaultdict(lambda: [0, 0])
     daunt = defaultdict(int)
+    rolls = defaultdict(int)
     modes = set()
     files = sorted(glob.glob(os.path.join(OUT, "*_s*", "diag_dauntless_rows.jsonl")))
     if not files:
@@ -58,6 +59,7 @@ def main():
             r = json.loads(line)
             rows[r["matchup"]][(r["seed_idx"], r["cand_home"])] = r
             daunt[r["matchup"]] += r.get("cand_daunt", 0)
+            rolls[r["matchup"]] += r.get("cand_roll", 0)
             plans[r["matchup"]][0] += r.get("cand_plans", 0)
             plans[r["matchup"]][1] += r.get("base_plans", 0)
             modes.add(r.get("mode"))
@@ -118,8 +120,11 @@ def main():
         # POJISTKA MECHANISMU: rameno, které nic nezměnilo, se musí poznat od
         # změny, která nemá efekt. Gate analyzer tohle měl, my jsme na to málem
         # zapomněli.
-        dz = daunt[mi]
+        dz, rz = daunt[mi], rolls[mi]
         print(f"{'':10}Dauntless nabídek/hru: {dz / (2.0 * n):.2f}"
+              f"   hodů/hru: {rz / (2.0 * n):.2f}"
+              + (f"   ⚠️ NABÍDLI, ale SEARCH SI NEVZAL — prior BLOCK je plochý (P10a)"
+                 if dz and not rz else "")
               + ("   ⛔ NULA — RAMENO NIC NEZMĚNILO, měření neměří Dauntless"
                  if dz == 0 and mi not in NULL_CONTROL else
                  "   ✅ (null: očekáváno 0)" if dz == 0 else ""))

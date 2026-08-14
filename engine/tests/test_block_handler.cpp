@@ -310,7 +310,7 @@ TEST(BlockHandler, MightyBlowIsKeptForTheInjuryWhenArmourBreaksWithoutIt) {
             EXPECT_EQ(e.roll, 9) << "unspent Mighty Blow must not inflate the armour roll";
         }
     }
-    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KNOCKED_OUT);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
 }
 
 TEST(BlockHandler, MightyBlowIsSpentOnArmourOnlyWhenArmourNeedsIt) {

@@ -28,4 +28,10 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
                                  const Player& att, const Player& def);
 
+
+// Kolikrát se od posledního volání OPRAVDU hodil Dauntless -- a resetuje.
+// Protějšek k takeDauntlessOfferCount(): ta počítá nabídky, tahle odebrání.
+// Rozdíl mezi nimi říká, jestli si search nabídnutý blok vzal.
+long takeDauntlessRollCount();
+
 } // namespace bb

@@ -62,6 +62,7 @@
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
 #include "bb/macro_actions.h"
+#include "bb/block_handler.h"
 #include "bb/mcts.h"
 #include "bb/roster.h"
 #include "bb/rules_engine.h"
@@ -321,6 +322,7 @@ int main(int argc, char** argv) {
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
                 // JINÉHO než „změna nemá efekt".
                 long candDaunt = bb::takeDauntlessOfferCount();
+                long candRoll  = bb::takeDauntlessRollCount();
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
                 int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
@@ -358,13 +360,13 @@ int main(int argc, char** argv) {
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
                             "\"cand_plans\":%d,\"base_plans\":%d,"
-                            "\"cand_daunt\":%ld,\"mode\":%d}\n",
+                            "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
-                            basePlans, candDaunt, mode);
+                            basePlans, candDaunt, candRoll, mode);
                     fflush(rows);
                 }
             }
