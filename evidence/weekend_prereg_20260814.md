@@ -92,6 +92,13 @@ podmínkou**: platí, když scramble prohrajeme, neplatí, když ho vyhrajeme.
 
 **Rameno tedy zní: sražení nosiče se odmění tehdy, když scramble vyhrajeme** —
 a to je **rozpočet tří těl**: ① kdo srazí · ② kdo sebere · ③ kdo zavře cestu.
+
+⭐ **Pravidlo je bezpodmínečné; rasa soupeře o něm nerozhoduje.** Uživatel je
+řekl dvakrát a pokaždé stejně — u Longbearda proti Gutter Runnerovi jako
+součást zadání (*„a navíc jsou kolem naši"*), u Wardancera jako kontrolu.
+Rychlost soupeře neurčuje, **jestli** pravidlo platí, jen **jak těsně se ta
+trojice počítá**: proti Wardancerovi musí být třetí tělo blíž a cesta
+zavřenější, protože je na míči dřív.
 Dnešní člen se ptá jen na **našeho** nejbližšího (`nearestDist`, max +0,08)
 a nikdy na to, **kdo je blíž — my, nebo oni**; tělo zavírající cestu
 nemodeluje vůbec.
