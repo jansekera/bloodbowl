@@ -341,10 +341,15 @@ relativní**:
 
 ### Proč je to pro projekt důležité
 
-1. ⛔ **Rasově citlivá heuristika na humana NESTAČÍ.** Část (A) — cena volného
-   míče podle rychlosti, vhodnost těla do rohu — je pořád vlastnost **jednoho
-   týmu**. Human potřebuje veličinu **relativní k soupeři** (jsem tady rychlejší,
-   nebo tvrdší?). ⇒ **Human je nejtvrdší test toho, jestli část (A) stačí.**
+1. ⭐ **Část (A) mu ale nejspíš stačí — a to je důvod ho NEDĚLAT.**
+   *(Oprava mého vlastního zápisu z téhož dne: psal jsem, že (A) dává jen
+   vlastnosti jednoho týmu a humanovi to nestačí. Není to přesné.)*
+   Hlavní člen z **P10a** — *„kdo je k míči blíž a **kdo rychlejší**"* — je
+   **relativní už teď**. Human z něj dostane přesně to, co potřebuje: proti
+   trpaslíkovi vidí *„jsem tam dřív"* a je agresivní, proti skavenovi
+   *„jsou tam dřív"* a je opatrný. **Absolutní je jen druhá půlka (A)** —
+   vhodnost těla do rohu *(P16)*.
+   ⇒ **Human profituje z (A) zadarmo, bez vlastní doktríny.**
 2. ⭐ **Vysvětluje, proč šla trpasličí doktrína napsat.** Je **absolutní** —
    mlátíme vždycky, nezávisle na tom, kdo stojí naproti. Proto se dala vyjádřit
    ~60 povinnostmi. **Humanovská by musela být podmíněná** a byla by řádově
@@ -352,9 +357,25 @@ relativní**:
 3. Praktické: human nám dá **281 TD proti našim 178** — druhý nejhorší matchup
    po orkovi.
 
-⇒ **Pořadí pro část (B) tím dostává smysl i technicky:** skaven *(nejlevnější,
-absolutní plán)* → ork/wood-elf *(absolutní)* → **human až naposled**, protože
-teprve on vyžaduje podmíněný plán.
+### ⛔ ROZHODNUTÍ: human se v části (B) ZATÍM IGNORUJE
+*(uživatel 14.08.: „je to tak — nebo humany ignorujem?")*
+
+Rozhodující důvod není cena, ale **k čemu (B) vůbec je: není o vyhrávání, je
+o poctivosti měřidla.** Když soupeře zlepšíme, **naše čísla se zhorší** —
+kupujeme si důvěryhodnost benchmarku, ne výhry. A ta investice má **klesající
+výnos**:
+
+| tým | co získáme poctivostí | cena |
+|---|---|---|
+| **skaven** | **451 TD je nejzkreslenější číslo, jaké máme** | **nejnižší** |
+| ork | 86 TD — už teď hraje dost svou hru (zeď a síla) | střední |
+| wood-elf | 260 TD, plán je jednoduchý | střední |
+| **human** | podmíněný plán = dvě doktríny v jedné | **nejvyšší** |
+
+⇒ **Udělat skavena a pak se znovu podívat.** Je dost možné, že po něm bude
+vidět, jestli se ta investice vůbec vyplácí — a **human se nemusí dělat nikdy**.
+**ODLOŽENO. SPOUŠTĚČ: až doběhne skavení část (B) a vyhodnotí se, jestli se
+karta „hraje skaven skavena?" hnula.**
 
 ## ⛔ CO Z TOHO PLYNE PRO VŠECHNA NAŠE ČÍSLA
 
