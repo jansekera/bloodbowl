@@ -194,6 +194,19 @@ dvě kostky.
 ukazuje, že je to i důvod, proč MY nemůžeme ublížit orkovi. Táž dovednost,
 oba směry.**
 
+### ⚠️ A nepříjemné číslo o nás: ORK SI STAVÍ KLEC LÉPE NEŽ MY
+*(uživatel 14.08.: „to si hlídá klec lépe než my")*
+
+Obsazených rohů průměrně: **ork 1,37** · **trpaslík 1,31** · skaven 1,28 ·
+human 1,21 · wood-elf 1,13.
+
+**Máme na klec doktrínu, ~60 povinností, kontrolu K29 a celý den debat o rozích
+— a ork jich obsadí víc.** Přitom ho řídí **táž generická heuristika** jako nás.
+⇒ Naše převaha není v tom, **že** klec stavíme, ale v tom, **z čeho** ji
+stavíme (Guard 70,6 % proti jejich 50,9 %).
+⇒ Souvisí s tím, že jsme nejpomalejší (MA4): klec se nám hůř tvoří, ne hůř
+plánuje. A s nálezem *„nehrajeme s jedenácti, ale se sedmi"*.
+
 **Kdo nese:** ork **Thrower +Block 78,5 %** · skaven Thrower 48,1 % +
 **Gutter Runner 37,5 %** · wood-elf Catcher 43,2 % / Lineman 41,1 % ·
 human Thrower 74,4 % · *my Runner +Block 82,1 %*.
