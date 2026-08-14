@@ -63,6 +63,32 @@ těly** — a je to zdaleka náš nejhorší matchup:
 | human | 178 | 281 |
 | **ork** | **86** | 207 |
 
+### ⛔⛔ VADA ZADÁNÍ, NALEZENÁ PŘED SPUŠTĚNÍM (14.08. odpoledne)
+
+**Harness nemá matchup dwarf–ork:**
+```cpp
+{"dwarf","skaven"}, {"dwarf","wood-elf"}, {"dwarf","dwarf"}, {"orc","skaven"}
+```
+A Dauntless vyskočí jen při `defST > attST` (náš Slayer je ST3):
+* **dw-sk — nikdy** (skaven má max ST3)
+* **dw-we — jen proti jednomu Treemanovi ST6, a to na 50 %**
+* **orc-sk — nikdy** (null test)
+
+⇒ **Běh, jak byl nachystaný, by 14 h měřil rozdíl, který nastane jen když Slayer
+stojí vedle Treemana.** Změna míří na orky a ork-trpaslík se neměří.
+**Sedmý výskyt vzorce dne — a tentokrát v mém vlastním zadání.**
+
+⇒ **Nutná oprava před spuštěním:** přidat `{"dwarf","orc"}` jako matchup **4**
+(append, aby se neposunuly indexy) a běžet **dw-orc · dw-we · orc-sk (null)**.
+
+### ⚠️ A druhá, poctivá výhrada k síle testu
+Fable §9.5: **strop Dauntless je 86 → ~110 TD na 750 orčích her**, tedy
+~0,03 TD/hru ⇒ odhadem **+1 až 2 pp chess**. To je **na hraně nebo pod
+rozlišením** i při 3000 párech (2 pp ≈ 3k párů).
+⇒ **Očekávat NEROZHODNUTO v chess je legitimní výsledek, ne selhání.**
+Rozklad drivů a attrition per rameno tady nejsou doplněk — jsou **hlavní**
+odečet. A na krádežovém rameni dává Dauntless **nulu** (jejich nosič je ST3).
+
 ### Rameno
 `MCTSConfig::dauntlessInOffer`, **default OFF** (produkce beze změny), harness
 **mode 4**. Rameno platí pro **obě strany** — není to doktrína, kterou zkoušíme
