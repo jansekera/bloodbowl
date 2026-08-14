@@ -23,6 +23,14 @@ Nahrazuje `task_queue_20260812.md` a `task_queue_20260813.md` (oba archivní).
 | **ZAMÍTNUTO** | změřeno a rozhodnuto nedělat, uveden důvod |
 | **?** | neví se — **ověřit, než se podle toho plánuje** |
 
+⭐ **PROČ SE ZAPISUJE I TO, CO SE NEDĚLÁ** *(uživatel 14.08.)*:
+*„ať máme dohledatelné nejen proč jsme něco dělali, ale i proč jsme něco
+nedělali."* **ZAMÍTNUTO a ODLOŽENO jsou plnocenný záznam, ne absence záznamu.**
+Bez důvodu se za měsíc nedá odlišit *„změřili jsme to a nevyplatilo se"* od
+*„nikoho to nenapadlo"* — a druhé se pak dělá znovu. Proto každé **ZAMÍTNUTO**
+nese důvod a čísla, každé **ODLOŽENO** spouštěč a každé **?** větu, co by to
+rozhodlo.
+
 ⚠️ **Jediná část, která se přepisuje, je poslední oddíl „CO JE TEĎ PRVNÍ".**
 Vše ostatní jen mění stav ve sloupci. ID se **nikdy nepřečíslovávají** —
 uživatel na položky ukazuje číslem.
