@@ -118,9 +118,10 @@ struct Res { int a = 0, b = 0, none = 0, n = 0; };
 
 Res sweep(GameState (*build)(const Geom&), const ValueFunction* vf,
           const MCTSConfig& cfg, const std::vector<Geom>& geoms, int nSeeds,
-          bool handoffMode) {
+          bool handoffMode, int onlyAssists = -1) {
     Res r;
     for (const Geom& g : geoms) {
+        if (onlyAssists >= 0 && g.assists != onlyAssists) continue;
         for (int i = 0; i < nSeeds; ++i) {
             GameState gs = build(g);
             MacroMCTSPolicy policy(vf, cfg, 1000u + static_cast<uint32_t>(i));
@@ -173,6 +174,19 @@ int main(int argc, char** argv) {
            geoms.size(), nSeeds, geoms.size() * nSeeds);
 
     printf("=== 1. DAUNTLESS: Slayer mezi Black Orkem ST4 a linemanem ST3 ===\n");
+    printf("    Rozpad podle ASISTENCÍ: s pomocníky vyjdou dvě kostky i BEZ\n");
+    printf("    Dauntless, takže se blok nabídne normální cestou. Dauntless má\n");
+    printf("    přidávat právě tam, kde asistence nejsou.\n");
+    for (int as : {0, 1, 2}) {
+        char lo[40], lb[40];
+        snprintf(lo, sizeof lo, "%d asistencí, offer OFF", as);
+        snprintf(lb, sizeof lb, "%d asistencí, offer ON", as);
+        line(lo, sweep(posDauntless, vf.get(), off, geoms, nSeeds, false, as),
+             "BlackOrc", "Lineman ");
+        line(lb, sweep(posDauntless, vf.get(), on, geoms, nSeeds, false, as),
+             "BlackOrc", "Lineman ");
+    }
+    printf("  --- celkem ---\n");
     line("offer OFF", sweep(posDauntless, vf.get(), off, geoms, nSeeds, false),
          "BlackOrc", "Lineman ");
     line("offer ON", sweep(posDauntless, vf.get(), on, geoms, nSeeds, false),

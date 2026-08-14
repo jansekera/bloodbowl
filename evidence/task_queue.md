@@ -325,6 +325,28 @@ znovu spuštěn** (15:15 UTC, HEAD `1dc9ecd2`).
 nenastal proto, že situace „Longbeard nese a vedle je volný Runner" je vzácná,
 ne proto, že by ji policy odmítala.
 
+## ⛔ A DRUHÁ VADA Q1 NÁSTROJE: VIDÍ JEN VOLBU CÍLE, NE KVALITU BLOKU
+*(uživatel 14.08.: „s 1 asistencí je to na 1 kostku a s Dauntless na 2 —
+a s 0 asistencemi to taky není k zahození")*
+
+Rozpad podle asistencí (Slayer ST3 vs Black Orc ST4+Guard):
+
+| asistence | bez Dauntless | s Dauntless | volba cíle (OFF → ON) |
+|---|---|---|---|
+| **0** | ST3 v ST4 ⇒ **2 kostky PROTI nám** | srovná ⇒ **1 kostka** | 0 % → 0 % |
+| **1** | 4 v 4 ⇒ **1 kostka** | 5 v 4 ⇒ **2 kostky PRO nás** | 100 % → 100 % |
+| **2** | 5 v 4 ⇒ 2 kostky | 6 v 4 ⇒ 2 kostky *(strop)* | 76,3 % → 93,9 % |
+
+⇒ **Při jedné asistenci povyšuje Dauntless 1 kostku na 2 — a Q1 test to NEVIDÍ**,
+protože cíl je zvolený 100 % v obou ramenech. Test měřil *„přesunula se volba?"*
+a odpověděl *„ne"*; správná odpověď je *„volba ne, ale kostky ano"*.
+⇒ Při nule asistencí se z **dvou proti nám** stane **jedna** — taky zisk, jen si
+ho search nevybere, protože vedle je lineman na jednu kostku bez rizika.
+
+⛔ **Q1 test tedy Dauntless PODHODNOCUJE.** Vidí přesun mezi cíli, ne zlepšení
+téhož cíle. **Skoro celý zisk leží v Q2** — a ten měří jedině A/B na výsledek.
+⇒ **To je důvod, proč noční běh po druhé úvaze zůstal spuštěný.**
+
 ⭐⭐ **POUČENÍ, KTERÉ PLATÍ NA CELÝ Q1 NÁSTROJ:** *jedna postavená pozice je
 vzorek o velikosti jedna.* Q1 test je levný právě proto, že se dá pustit přes
 desítky geometrií — a **bez toho je horší než žádný**, protože vypadá
