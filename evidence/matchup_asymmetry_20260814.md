@@ -236,6 +236,18 @@ takže hraje **obecné nošení míče v tvaru**, ne skavení plán:
 | přihrát za klec, chytit v obklíčení | přihrávky prakticky nepoužívá (40 na 3000 her) |
 | utéct Dodgem a skórovat ve dvou kolech | veze míč pomalu a v tvaru |
 
+### ⚠️ Co všechno tím pádem měřilo proti nehrané roli
+
+* **Balík G (11.08.), attrition** *(uživatel 14.08.)*: skaven vyšel
+  **DEAD 0,14 / KO 1,82**, tedy prakticky **stejně jako wood-elf**
+  (0,15 / 1,74). Skaven hrající svůj plán se má vystavovat **víc** než elf —
+  když oba hrají tutéž opatrnou hru, vyjdou stejně.
+  ⇒ **Uživatelova předpověď o zraněních skavenů nebyla vyvrácená, jen měřená
+  proti roli, kterou soupeř nehrál.** Výměna *„~10:1 v náš prospěch"* je
+  **horní odhad** a po opravách P10a/P16/P17/P14 se má přeměřit.
+* **451 TD proti skavenovi** — viz níž.
+* **Všechny prediktory a kontroly** vážené přes čtyři soupeře.
+
 ⇒ **Naše měření proti skavenovi jsou nadhodnocená dvakrát:** jednou proto, že
 skavení nástroje jsou proti našemu rosteru neúčinné (výše), a podruhé proto,
 že je jejich AI **stejně nepoužívá**.
