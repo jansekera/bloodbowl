@@ -276,6 +276,35 @@ ne Dauntless. **Tohle je levnější než měřit obojí zvlášť.**
 ⇒ Možná cesta ven: **opravit celý řetěz, ale každou úroveň vybavit čítačem**,
 a atribuci dělat z čítačů místo z oddělených běhů.
 
+# ⭐⭐⭐ VÝSLEDKY Q1 TESTŮ (14.08., `diag_q1_decisions_20260814.cpp`)
+
+Postavené pozice, 120 opakování na rameno, plná produkční konfigurace
+(MCTS-100, vf_blend 0,15, policy načtená). **Tři jednoznačné odpovědi za
+patnáct minut** — a jedna z nich vyvrací můj vlastní zápis z téhož dne.
+
+| # | otázka | výsledek |
+|---|---|---|
+| **1** | Slayer mezi **Black Orkem ST4** a linemanem — vybere BO, když ho nabídneme? | **0 ze 112** ⛔ *(a 0 z 84 bez nabídky)* |
+| **2** | Longbeard mezi jejich **NOSIČEM** a stejným linemanem — všímá si, kdo drží míč? | **119 ze 120 = NOSIČ** ✅ |
+| **3** | náš **LONGBEARD** drží míč, vedle volný Runner — předá? | **0 ze 120** ⛔ |
+
+## Co z toho plyne
+
+* **P13 sama nestačí** — nabídka stoupla (84 → 112 zvolených bloků), ale **cíl
+  se nezměnil ani jednou**. Noční A/B by měřilo vedlejší efekt. ⇒ **Běh 14.08.
+  zastaven po 5 minutách místo po 14 hodinách.**
+* ⛔ **P15 SE ČÁSTEČNĚ VYVRACÍ.** Zapsal jsem odpoledne, že rozhodovací vrstva
+  cenu cíle nezná vůbec. **Nabídka ji nezná, ale SEARCH ANO** — přes tři členy
+  listové evaluace o nosiči si ho vybere prakticky vždycky. Sedí to na Fableho
+  závěr, že P15 z orčí mezery bere skoro nic. ⇒ **Chybí hodnota SÍLY cíle, ne
+  hodnota cíle obecně.**
+* **P5 je mrtvé na úrovni VOLBY, ne nabídky.** Situace, která ve 3000 hrách
+  nenastala, tady nastane vždy — a policy předání přesto nikdy nezvolí.
+  Unit test dokazuje, že se **nabízí**. ⇒ Zbytek řetězu.
+
+⚠️ **Výhrada:** jedna postavená pozice na scénář. Průkazné pro ni, ne pro
+všechny pozice. Než se z toho udělá doktrína, obměnit geometrii.
+
 # ⭐⭐⭐ Q1 vs Q2 — DVĚ OTÁZKY, KTERÉ SPLÝVAJÍ A NESMÍ
 *(uživatel 14.08.: „mám DTS vedle BO a LO a v A/B jej donutím v jedné z větví
 vybrat BO a ve druhé náhodně — pak ale změřím, že vybral BO vs vybral náhodně —
