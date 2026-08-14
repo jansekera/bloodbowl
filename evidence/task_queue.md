@@ -508,6 +508,42 @@ Plné drivy ≥7 kol, 195 drivů:
 
 ---
 
+# ⭐⭐⭐ PROGRAM: TRPASLIČÍ ATTRITION — ZÁKLAD HRY, ROZBITÝ NA KAŽDÉM ČLÁNKU
+*(uživatel 14.08.: „toto je základ trpasličí hry, to musíme dotáhnout")*
+
+Trpaslík nevyhrává během, vyhrává tím, že soupeře **odstraní z hřiště**.
+Všechno ostatní — klec, rohy, tempo — je podpora. Řetěz té hry má sedm článků
+a **14.08. se ukázalo, že vadný je každý**:
+
+| # | článek | co je špatně | položka | stav |
+|---|---|---|---|---|
+| **1** | **vyber cíl** | hodnota cíle = **vzácnost × role** není nikde; nabídka ji nezná, prior je plochý `BLOCK 15` | **P15 · P19** | otevřeno |
+| **2** | **získej kostky** | `Dauntless` chybí v nabídce; s 1 asistencí povyšuje 1 kostku na 2 | **P13** | ⏳ **měří se dnes v noci** |
+| **3** | **vyhraj blok** | volba kostky ani reroll neznají `Wrestle`; hráč s Block+Wrestle Wrestle nikdy nepoužije | **P14 · P17** | otevřeno |
+| **4** | **odsuň užitečně** | směr se vybírá naslepo („rovně dozadu"), nezná endzonu, náš roh ani soupeře vedle | **P9 · P9a · P9c** | P9a ✅ *(15 → 2 darovaných TD)* |
+| **5** | **prolom brnění** | `Mighty Blow` se přičítá k **oběma** hodům místo k jednomu | **T5.14** | odloženo k rosterům |
+| **6** | **faulni to správné tělo** | bere **prvního ležícího v pořadí sousedních polí**, nehodnotí nic | **P8** | otevřeno |
+| **7** | ⛔ **udrž ho mimo hřiště** | **zranění nepřetrvávají přes drive** — po TD stojí 11 čerstvých | **T5.3** | otevřeno |
+
+## ⛔ Článek 7 je NÁSOBITEL všech ostatních
+
+Dokud se po každém TD staví jedenáct čerstvých, je odstraněné tělo pryč
+**do konce drivu, ne zápasu**. ⇒ **Každá oprava článků 1–6 se měří v prostředí,
+které jejich přínos dělí.** Každý náš výsledek o bití je **dolní odhad** —
+včetně dnešního nočního běhu.
+
+⇒ **T5.3 patří na začátek programu, ne na konec.** Je to jediná položka, která
+zvýší hodnotu všech ostatních, aniž by se jich dotkla.
+
+## Proč to nikdo nenašel dřív
+
+Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
+* **kontroly** — Fable 14.08.: čistota rohů 0σ, tempo z 58 % artefakt; **bloky/kolo
+  jsou jeden ze dvou prediktorů, které kontrolu proveditelnosti PŘEŽILY (+2,8σ)**
+* **nástroje** — Q1 test vidí jen volbu cíle, ne kvalitu bloku
+* **engine** — zranění mizí s drivem, MB se počítá dvakrát, tři dovednosti chybí
+  v rozhodování
+
 # CO JE TEĎ PRVNÍ
 *(jediný oddíl, který se přepisuje — stav k 14.08.2026 odpoledne)*
 
