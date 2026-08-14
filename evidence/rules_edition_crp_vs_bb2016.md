@@ -87,6 +87,29 @@ Sprint, Claw, Mighty Blow) se mezi CRP a BB2016 **nemění**.
 
 *(Vše výše je liga, ekonomika po zápase, nebo fyzické komponenty.)*
 
+## ✅ Křížová kontrola nezávislým zdrojem (14.08.)
+
+Oficiální samostatné errata/FAQ z 5/2017 se na otevřeném webu **nepodařilo
+sehnat** — GW downloads je JS SPA bez obsahu, `thenaf.net` vrací 403, a všechny
+nalezené odkazy vedou zpět na tutéž kompilaci. Cross-check tedy proběhl proti
+komunitnímu soupisu změn *(Talk Fantasy Football, „Blood Bowl 2016 — the full
+list of changes")*.
+
+**Shoduje se s uživatelovým seznamem doslova** (Piling On volitelné + team
+reroll · Argue the Call · Weeping Dagger · Timmm-ber! pro **halflingské**
+Treemany · MVP ze tří vybraných) a **žádnou další změnu uvnitř zápasu
+nepřidal**.
+
+### ⭐ Detail, který vysvětluje shodu u Claws
+
+> *„**Claw and Grab skills returned to CRP versions**" per the errata*
+
+Posloupnost byla **CRP → rulebook 11/2016 Claw a Grab změnil → errata 5/2017
+je vrátila na verzi CRP.** Naše kompilace errata obsahuje, proto v ní Claws
+sedí na CRP slovo od slova.
+⚠️ **Kdybychom vzali holý rulebook z 11/2016, měli bychom jiný Claw** — to je
+konkrétní důvod, proč se u téhle edice nesmí pracovat s textem bez errat.
+
 ## ✅ Co se ověřilo jako BEZE ZMĚNY mezi edicemi
 
 Znění je v obou textech totožné, takže naše dosavadní audity **platí**:
