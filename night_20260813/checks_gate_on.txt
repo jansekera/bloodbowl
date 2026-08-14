@@ -1,0 +1,39 @@
+korpus: 120 her
+
+  našich kol                                    1763
+  vyřazeno (TD/poločas mezi snímky)               97
+  s míčem na konci kola                         1001
+  bez míče na konci kola                         762
+
+=== KONTROLY (splněno / posuzováno / N/A) ===
+  K29 (R1) žádný roh klece není markovaný       72.6%   n=751, 1012 N/A (57%)
+  K29⭐ plná ČISTÁ klec (4/4)                    20.4%   n=751, 1012 N/A (57%)
+    obsazených rohů průměrně (jen kola, kdy klec stojí) 2.54 / 4, z toho čistých 2.17
+    kol s míčem, kdy klec vůbec NESTOJÍ: 250
+  K9a splnil rozvrhovou podlahu                 28.4%   n=718, 1045 N/A (59%), průměr -2.66
+  K30 (R3) drahý dodge je držený                24.7%   n=8651
+  K30b levný dodge je držený (nemá cenu)        23.5%   n=3781
+    z toho drženo jen klecí/nosičem (R1 zakazuje): 237
+  K31 (R4) kolo BEZ těla bez úkolu              43.5%   n=1763
+    těl bez úkolu na kolo                      1.55 z 11
+  K33 kolo s aspoň jedním blokem                73.2%   n=1763
+
+--- E1/E2: co deska dává soupeři (ČÁST 13) ---
+  K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge  45.6%   n=1001, 762 N/A (43%)
+  K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky  71.6%   n=1763
+
+--- zámky (hypotéza 12.08.) ---
+  našich stojících v jejich TZ na kolo        1.60 z 11
+  K36 LOCKED → postup nosiče v NÁSLEDUJÍCÍM našem kole   (našich stojících v jejich TZ → Δx nosiče, 1045 degenerovaných)
+      ≤2       n=581    Δx nosiče = +2.35
+      3–5      n=130    Δx nosiče = +1.35
+      6–8      n=6      Δx nosiče = +1.83  ⚠ málo vzorků
+      9+       n=1      Δx nosiče = +0.00  ⚠ málo vzorků
+
+plán enginu (X6 / brána klece)
+  plán: NOT_CONSULTED                           60.0%
+  plán: FILL_ONLY                               18.4%
+  plán: PLAN_READY                               8.5%
+  plán: DICEY                                   11.7%
+  plán: NOT_APPLICABLE                           0.5%
+  plán: TEMPO_INSUFFICIENT                       1.0%

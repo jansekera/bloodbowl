@@ -1,0 +1,24 @@
+=== DAUNTLESS OFFER-GAP (snímky začátku našeho kola) ===
+race        hry  kolSlayer    adjST4+  nabídnuto      GAP    GAP2k    GAP/hru
+human       750       9964       1696        304     1335      624       1.78
+orc         750       9159       3401       1554     1715        0       2.29
+skaven      750      10852          0          0        0        0       0.00
+wood-elf    750      10263       1113         73      993      457       1.32
+
+=== GAP: cíle, blízkost nosiče, nečinnost Slayera ===
+human    cíle: Ogre +Block 1335×
+         cíl do 2 polí od nosiče: 104 z 253 (kde nosič existoval)
+         Slayer v tom kole vůbec neblokoval: 1159 z 1335
+orc      cíle: Black Orc +Guard+Block 1715×
+         cíl do 2 polí od nosiče: 56 z 159 (kde nosič existoval)
+         Slayer v tom kole vůbec neblokoval: 1543 z 1715
+wood-elf cíle: Treeman +Guard 993×
+         cíl do 2 polí od nosiče: 104 z 185 (kde nosič existoval)
+         Slayer v tom kole vůbec neblokoval: 848 z 993
+
+=== EVENTOVÁ KONTROLA: bloky Slayera ===
+race      bloky Slayera     z toho na ST4+
+human              4148                420
+orc                3747               1839
+skaven             5134                  0
+wood-elf           4106                127

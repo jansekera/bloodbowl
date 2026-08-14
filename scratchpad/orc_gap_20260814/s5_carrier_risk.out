@@ -1,0 +1,39 @@
+=== SOUPEŘOVA KOLA S NAŠÍM STOJÍCÍM NOSIČEM (per-race) ===
+race           n    P(nosič↓)  P(ztráta)     adj   REACH  REACH0     ESC   CCBAD  MARKED
+human       5355        0.162      0.149    0.20    4.88    2.04    4.13    2.77    1.41
+orc         4854        0.173      0.158    0.15    3.85    1.73    4.04    2.58    1.08
+skaven      6543        0.125      0.118    0.16    4.26    1.76    4.38    2.87    1.34
+wood-elf    6101        0.151      0.142    0.18    4.55    1.99    4.13    2.71    1.22
+
+=== BLZ (nejlepší kostky blitzu na nosiče) — rozdělení per-race ===
+race       n(BLZ) |      -2       1       2       3    None
+human        5355 |    0.8%   33.1%   58.5%    1.0%    6.6%
+orc          4854 |    0.0%   10.0%   68.0%    0.3%   21.7%
+skaven       6543 |    4.4%   74.7%    6.3%    0.0%   14.5%
+wood-elf     6101 |    1.3%   48.3%   38.3%    3.2%    9.0%
+
+=== P(nosič↓) PODMÍNĚNĚ BLZ a REACH (per-race) ===
+human    BLZ=-2: 0.024 (n=42) | BLZ=1: 0.098 (n=1772) | BLZ=2: 0.209 (n=3133) | BLZ=3: 0.769 (n=52) | REACH=0: 0.000 (n=356) | REACH>0: 0.174 (n=4999)
+orc      BLZ=1: 0.097 (n=487) | BLZ=2: 0.236 (n=3303) | REACH=0: 0.000 (n=1051) | REACH>0: 0.221 (n=3803)
+skaven   BLZ=-2: 0.059 (n=290) | BLZ=1: 0.124 (n=4889) | BLZ=2: 0.473 (n=412) | REACH=0: 0.000 (n=950) | REACH>0: 0.146 (n=5593)
+wood-elf BLZ=-2: 0.051 (n=79) | BLZ=1: 0.093 (n=2944) | BLZ=2: 0.227 (n=2334) | BLZ=3: 0.575 (n=193) | REACH=0: 0.000 (n=551) | REACH>0: 0.166 (n=5550)
+
+=== PER-RACE KORELACE prediktor × výsledek (Pearson, * = |r|>2/sqrt(n)) ===
+-- výsledek: carrier_down --
+                FB       FB2    MARKED      SURF       ESC     REACH    REACH0     CCBAD       adj
+human       0.050*    0.015     0.055*    0.035*   -0.162*    0.128*    0.368*    0.168*    0.320*
+orc         0.072*    0.058*    0.071*    0.032*   -0.199*    0.289*    0.450*    0.208*    0.325*
+skaven      0.073*    0.034*    0.053*    0.047*   -0.082*    0.106*    0.280*    0.137*    0.240*
+wood-elf    0.074*    0.036*    0.063*    0.020    -0.135*    0.115*    0.325*    0.145*    0.283*
+-- výsledek: ball_lost --
+                FB       FB2    MARKED      SURF       ESC     REACH    REACH0     CCBAD       adj
+human       0.046*    0.023     0.045*    0.027    -0.135*    0.123*    0.353*    0.180*    0.290*
+orc         0.084*    0.070*    0.080*    0.037*   -0.184*    0.271*    0.421*    0.212*    0.316*
+skaven      0.074*    0.035*    0.055*    0.052*   -0.062*    0.096*    0.261*    0.151*    0.229*
+wood-elf    0.072*    0.030*    0.062*    0.027*   -0.111*    0.112*    0.322*    0.158*    0.262*
+
+=== EXPOZICE: soupeřova kola s naším stojícím nosičem / hra ===
+human    7.14 kol/hru (n her=750)
+orc      6.49 kol/hru (n her=748)
+skaven   8.72 kol/hru (n her=750)
+wood-elf 8.15 kol/hru (n her=749)

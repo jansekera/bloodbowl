@@ -1,0 +1,32 @@
+=== prediktory UVNITŘ koše need0 (první 3 kola s míčem, bez posl. kola TD) ===
+
+-- need0 stihnutelné (<=2.61): n=662, TD=139 --
+   tempo   TD= 1.627 bez= 1.465 d=+0.162  +1.7sigma
+   blocks  TD= 2.014 bez= 1.802 d=+0.213  +2.8sigma
+   clean   TD= 1.819 bez= 1.818 d=+0.001  +0.0sigma
+   reach0  TD= 2.127 bez= 2.517 d=-0.390  -2.7sigma
+   idle    TD= 1.752 bez= 1.785 d=-0.033  -0.3sigma
+   fb2     TD= 0.474 bez= 0.607 d=-0.133  -2.2sigma
+
+-- need0 2.61-3.5: n=1585, TD=252 --
+   tempo   TD= 2.462 bez= 1.939 d=+0.523  +6.8sigma
+   blocks  TD= 1.915 bez= 1.371 d=+0.544  +9.6sigma
+   clean   TD= 1.907 bez= 1.835 d=+0.073  +1.1sigma
+   reach0  TD= 1.674 bez= 2.027 d=-0.353  -4.1sigma
+   idle    TD= 1.888 bez= 2.310 d=-0.422  -4.4sigma
+   fb2     TD= 0.519 bez= 0.645 d=-0.126  -2.8sigma
+
+-- need0 >3.5: n=391, TD=58 --
+   tempo   TD= 3.273 bez= 2.534 d=+0.739  +6.0sigma
+   blocks  TD= 1.773 bez= 1.283 d=+0.490  +4.3sigma
+   clean   TD= 1.684 bez= 1.586 d=+0.098  +1.0sigma
+   reach0  TD= 1.540 bez= 1.647 d=-0.107  -0.7sigma
+   idle    TD= 2.126 bez= 2.574 d=-0.448  -2.2sigma
+   fb2     TD= 0.526 bez= 0.625 d=-0.099  -0.9sigma
+
+=== kontroly po kategoriích drivů (plné přijímací, bez posl. kola TD) ===
+nespárováno: 0
+  A   n=454   tempo= 2.37 bloky= 1.89 clean= 1.72 reach0= 1.64 idle= 1.62
+  C   n=1088  tempo= 2.14 bloky= 1.40 clean= 1.52 reach0= 2.60 idle= 1.87
+  D1  n=813   tempo= 2.15 bloky= 1.34 clean= 1.57 reach0= 1.78 idle= 1.80
+  D2  n=283   tempo= 1.61 bloky= 1.58 clean= 1.63 reach0= 1.77 idle= 1.38

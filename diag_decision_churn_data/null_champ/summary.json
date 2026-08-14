@@ -1,0 +1,119 @@
+{
+ "label": "null_champ",
+ "champ": "weights_best.json",
+ "cand": "weights_best.json",
+ "config": {
+  "mcts": 100,
+  "vf_blend": 0.15,
+  "policy": "weights_policy.json",
+  "seeds": 4,
+  "base_seed": 20260730
+ },
+ "games_compared": 8,
+ "identical_games": 8,
+ "identical_games_pct": 100.0,
+ "paired_decisions": 637,
+ "churn_events": 0,
+ "churn_hazard_per_decision": {
+  "p": 0.0,
+  "ci95": [
+   -0.0,
+   0.006
+  ]
+ },
+ "expected_decisions_to_first_change": null,
+ "soft_churn_tv_matched": {
+  "n": 637,
+  "mean": 0.0,
+  "p90": 0.0
+ },
+ "champ_top1_margin": {
+  "at_divergences": null,
+  "baseline_matched": {
+   "n": 637,
+   "mean": 0.0669,
+   "median": 0.02,
+   "p90": 0.18
+  },
+  "div_share_margin_lt_002": null,
+  "baseline_share_margin_lt_002": 0.485
+ },
+ "divergence_classes": {},
+ "context_tags": {},
+ "macro_transitions": {},
+ "game_outcome_ref_vs_cand": {},
+ "per_game": [
+  {
+   "seed": 20260730,
+   "kind": "ch",
+   "trials": 73,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 73,
+   "cand_len": 73
+  },
+  {
+   "seed": 20260730,
+   "kind": "ca",
+   "trials": 87,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 87,
+   "cand_len": 87
+  },
+  {
+   "seed": 20260731,
+   "kind": "ch",
+   "trials": 92,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 92,
+   "cand_len": 92
+  },
+  {
+   "seed": 20260731,
+   "kind": "ca",
+   "trials": 65,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 65,
+   "cand_len": 65
+  },
+  {
+   "seed": 20260732,
+   "kind": "ch",
+   "trials": 75,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 75,
+   "cand_len": 75
+  },
+  {
+   "seed": 20260732,
+   "kind": "ca",
+   "trials": 72,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 72,
+   "cand_len": 72
+  },
+  {
+   "seed": 20260733,
+   "kind": "ch",
+   "trials": 98,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 98,
+   "cand_len": 98
+  },
+  {
+   "seed": 20260733,
+   "kind": "ca",
+   "trials": 75,
+   "event": 0,
+   "div_index": null,
+   "ref_len": 75,
+   "cand_len": 75
+  }
+ ]
+}

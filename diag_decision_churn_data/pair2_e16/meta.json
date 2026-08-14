@@ -1,0 +1,10 @@
+{
+ "label": "pair2_e16",
+ "champ": "weights_best.json",
+ "cand": "weights_snap_e16_99pct_+2.5.json",
+ "seeds": 24,
+ "base_seed": 20260730,
+ "mcts": 100,
+ "vf_blend": 0.15,
+ "policy": "weights_policy.json"
+}

@@ -1,0 +1,613 @@
+#include "bb/game_simulator.h"
+#include "bb/action_resolver.h"
+#include "bb/ball_handler.h"
+#include "bb/kickoff_handler.h"
+#include "bb/helpers.h"
+#include "bb/turn_handler.h"
+#include <algorithm>
+
+namespace bb {
+
+namespace {
+
+// Standard formation positions relative to LOS
+// Home: facing right (scores at x=25), LOS at x=12
+// Away: facing left (scores at x=0), LOS at x=13
+
+struct FormationPos { int8_t dx; int8_t y; };
+
+// 4 on LOS, 4 in second row, 3 in backfield = 11 players
+constexpr FormationPos HOME_FORMATION[11] = {
+    // LOS (4 players at x=12)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // Second row (4 players at x=11)
+    {-1, 4}, {-1, 6}, {-1, 8}, {-1, 10},
+    // Backfield (3 players at x=9)
+    {-3, 3}, {-3, 7}, {-3, 11},
+};
+
+constexpr FormationPos AWAY_FORMATION[11] = {
+    // LOS (4 players at x=13)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // Second row (4 players at x=14)
+    {1, 4}, {1, 6}, {1, 8}, {1, 10},
+    // Backfield (3 players at x=16)
+    {3, 3}, {3, 7}, {3, 11},
+};
+
+// Defensive formation for kicking team: 2-deep columns (P..P..P pattern)
+// 3 columns at y=4,7,10 — each 3 deep (LOS + 2 behind) — 2 sq gaps between
+// 2 deep safeties covering the gaps
+constexpr FormationPos HOME_DEFENSIVE_FORMATION[11] = {
+    // 3 on LOS (x=12, wide spread)
+    {0, 4}, {0, 7}, {0, 10},
+    // 3 column fronts (x=11, behind LOS)
+    {-1, 4}, {-1, 7}, {-1, 10},
+    // 3 column backs (x=10, behind fronts)
+    {-2, 4}, {-2, 7}, {-2, 10},
+    // 2 deep safeties (x=7, covering gaps)
+    {-5, 5}, {-5, 9},
+};
+
+constexpr FormationPos AWAY_DEFENSIVE_FORMATION[11] = {
+    // 3 on LOS (x=13, wide spread)
+    {0, 4}, {0, 7}, {0, 10},
+    // 3 column fronts (x=14, behind LOS)
+    {1, 4}, {1, 7}, {1, 10},
+    // 3 column backs (x=15, behind fronts)
+    {2, 4}, {2, 7}, {2, 10},
+    // 2 deep safeties (x=18, covering gaps)
+    {5, 5}, {5, 9},
+};
+
+// Pressure formation vs fast teams: compact, more players near LOS
+// 3 LOS + 4 contain line (dx=-1/+1) + 3 second row (dx=-2/+2) + 1 sweeper (dx=-4/+4)
+constexpr FormationPos HOME_PRESSURE_FORMATION[11] = {
+    // 3 on LOS (x=12)
+    {0, 4}, {0, 7}, {0, 10},
+    // 4 contain line (x=11, filling gaps)
+    {-1, 3}, {-1, 6}, {-1, 8}, {-1, 11},
+    // 3 second row (x=10)
+    {-2, 5}, {-2, 7}, {-2, 9},
+    // 1 sweeper with Kick (x=8)
+    {-4, 7},
+};
+
+constexpr FormationPos AWAY_PRESSURE_FORMATION[11] = {
+    // 3 on LOS (x=13)
+    {0, 4}, {0, 7}, {0, 10},
+    // 4 contain line (x=14)
+    {1, 3}, {1, 6}, {1, 8}, {1, 11},
+    // 3 second row (x=15)
+    {2, 5}, {2, 7}, {2, 9},
+    // 1 sweeper with Kick (x=17)
+    {4, 7},
+};
+
+// Deep receiver formation for receiving team: better ball pickup
+// 4 LOS + 4 second row + 2 mid backfield + 1 deep receiver (specialist in slot 10)
+constexpr FormationPos HOME_DEEP_RECEIVER_FORMATION[11] = {
+    // 4 on LOS (x=12)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // 4 second row (x=11)
+    {-1, 4}, {-1, 6}, {-1, 8}, {-1, 10},
+    // 2 mid backfield (x=9)
+    {-3, 5}, {-3, 9},
+    // 1 deep receiver (x=7, slot 10 = specialist)
+    {-5, 7},
+};
+
+constexpr FormationPos AWAY_DEEP_RECEIVER_FORMATION[11] = {
+    // 4 on LOS (x=13)
+    {0, 5}, {0, 6}, {0, 7}, {0, 8},
+    // 4 second row (x=14)
+    {1, 4}, {1, 6}, {1, 8}, {1, 10},
+    // 2 mid backfield (x=16)
+    {3, 5}, {3, 9},
+    // 1 deep receiver (x=18, slot 10 = specialist)
+    {5, 7},
+};
+
+void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
+               const FormationPos formation[11]) {
+    int baseId = (side == TeamSide::HOME) ? 1 : 12;
+    int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
+    int idx = 0;
+
+    // Fill 11 player slots from roster positionals
+    int templateIdx = 0;
+    int templateUsed = 0;
+
+    for (int i = 0; i < 11 && templateIdx < roster.positionalCount; ++i) {
+        Player& p = state.getPlayer(baseId + i);
+        p.id = baseId + i;
+        p.teamSide = side;
+        p.state = PlayerState::STANDING;
+        p.position = {
+            static_cast<int8_t>(baseLOS + formation[i].dx),
+            formation[i].y
+        };
+        p.stats = roster.positionals[templateIdx].stats;
+        p.skills = roster.positionals[templateIdx].skills;
+        p.movementRemaining = p.stats.movement;
+        p.hasMoved = false;
+        p.hasActed = false;
+        p.usedBlitz = false;
+        p.lostTacklezones = false;
+        p.proUsedThisTurn = false;
+
+        templateUsed++;
+        if (templateUsed >= roster.positionals[templateIdx].quantity ||
+            templateUsed >= (templateIdx == 0 ? 11 : roster.positionals[templateIdx].quantity)) {
+            // Move to next positional once we've used enough of current type
+            // For the first type (lineman), fill remaining slots
+            templateIdx++;
+            templateUsed = 0;
+        }
+    }
+
+    // Set team state
+    TeamState& ts = state.getTeamState(side);
+    ts.side = side;
+    ts.rerolls = 3;  // Standard starting rerolls
+    ts.hasApothecary = roster.hasApothecary;
+    ts.apothecaryUsed = false;
+}
+
+// Build a standard 11-player team: fill specialized positions first, then linemen
+// resetHalfState: true at true half boundaries (game start, half-time) -- resets the
+// turn clock and reroll allowance. false for a post-touchdown drive restart, which
+// only re-places players/ball and must NOT grant a fresh 8-turn clock or reroll pool.
+void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
+               const FormationPos formation[11], bool resetHalfState) {
+    int baseId = (side == TeamSide::HOME) ? 1 : 12;
+    int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
+
+    // First pass: assign specialized positionals (non-linemen, index > 0)
+    int slot = 0;
+    // Start with special positionals to fill key positions
+    // Blitzers in backfield/second row, catchers in backfield, thrower in back
+    // For simplicity: fill from back of formation (backfield first) with specialists
+
+    // Collect how many of each positional to place
+    struct Placement { int templateIdx; int count; };
+    Placement placements[8];
+    int nPlacements = 0;
+
+    // Specialists first (indices 1+)
+    for (int t = 1; t < roster.positionalCount; ++t) {
+        int qty = std::min((int)roster.positionals[t].quantity, 11);
+        if (qty > 0) {
+            placements[nPlacements++] = {t, qty};
+        }
+    }
+
+    // Fill from end of formation (backfield) with specialists, rest with linemen
+    int placed = 0;
+    int specSlot = 10; // start filling from backfield
+
+    // Place specialists in the "best" positions (backfield/second row)
+    for (int p = 0; p < nPlacements && specSlot >= 0; ++p) {
+        for (int q = 0; q < placements[p].count && specSlot >= 0; ++q) {
+            Player& player = state.getPlayer(baseId + specSlot);
+            player.id = baseId + specSlot;
+            player.teamSide = side;
+            player.state = PlayerState::STANDING;
+            player.position = {
+                static_cast<int8_t>(baseLOS + formation[specSlot].dx),
+                formation[specSlot].y
+            };
+            player.stats = roster.positionals[placements[p].templateIdx].stats;
+            player.skills = roster.positionals[placements[p].templateIdx].skills;
+            player.movementRemaining = player.stats.movement;
+            player.hasMoved = false;
+            player.hasActed = false;
+            player.usedBlitz = false;
+            player.lostTacklezones = false;
+            player.proUsedThisTurn = false;
+            specSlot--;
+            placed++;
+        }
+    }
+
+    // Fill remaining slots (0 to specSlot) with linemen (template index 0)
+    for (int i = 0; i <= specSlot; ++i) {
+        Player& player = state.getPlayer(baseId + i);
+        player.id = baseId + i;
+        player.teamSide = side;
+        player.state = PlayerState::STANDING;
+        player.position = {
+            static_cast<int8_t>(baseLOS + formation[i].dx),
+            formation[i].y
+        };
+        player.stats = roster.positionals[0].stats;
+        player.skills = roster.positionals[0].skills;
+        player.movementRemaining = player.stats.movement;
+        player.hasMoved = false;
+        player.hasActed = false;
+        player.usedBlitz = false;
+        player.lostTacklezones = false;
+        player.proUsedThisTurn = false;
+    }
+
+    // Set team state
+    TeamState& ts = state.getTeamState(side);
+    ts.side = side;
+    ts.score = ts.score;  // preserve score across halves/drives
+    ts.hasApothecary = roster.hasApothecary;
+    if (resetHalfState) {
+        ts.rerolls = 3;
+        ts.turnNumber = 0;
+        ts.apothecaryUsed = false;
+    }
+    ts.resetForNewTurn();
+}
+
+} // anonymous namespace
+
+namespace {
+
+// Shared by setupHalf (true half boundaries) and setupDrive (post-touchdown
+// restart): places both teams in formation and resets the ball/kickoff state.
+// isNewHalf additionally resets each team's turn clock and reroll pool --
+// must be false for setupDrive, or every touchdown grants both teams a fresh
+// 8-turn half (see project_bloodbowl_audit_findings_20260703 finding 2).
+void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
+                      TeamSide kickingTeam, bool isNewHalf) {
+    // Reset all players to off-pitch
+    for (auto& p : state.players) {
+        p.state = PlayerState::OFF_PITCH;
+        p.position = {-1, -1};
+        p.hasMoved = false;
+        p.hasActed = false;
+        p.usedBlitz = false;
+        p.lostTacklezones = false;
+        p.proUsedThisTurn = false;
+    }
+
+    // Classify receiver speed for roster-aware decisions
+    const TeamRoster& receivingRoster = (kickingTeam == TeamSide::HOME) ? away : home;
+    RosterSpeed recvSpeed = classifyRosterSpeed(receivingRoster);
+    state.receiverSpeed = recvSpeed;
+
+    // Kicking team: pressure vs fast, 2-deep columns vs slow/mixed
+    const FormationPos* homeKickForm = HOME_DEFENSIVE_FORMATION;
+    const FormationPos* awayKickForm = AWAY_DEFENSIVE_FORMATION;
+    if (recvSpeed == RosterSpeed::FAST) {
+        homeKickForm = HOME_PRESSURE_FORMATION;
+        awayKickForm = AWAY_PRESSURE_FORMATION;
+    }
+
+    // Receiving team always uses deep receiver formation
+    const auto* homeForm = (kickingTeam == TeamSide::HOME)
+        ? homeKickForm : HOME_DEEP_RECEIVER_FORMATION;
+    const auto* awayForm = (kickingTeam == TeamSide::AWAY)
+        ? awayKickForm : AWAY_DEEP_RECEIVER_FORMATION;
+
+    buildTeam(state, TeamSide::HOME, home, homeForm, isNewHalf);
+    buildTeam(state, TeamSide::AWAY, away, awayForm, isNewHalf);
+
+    // Give the kicking team's slot 10 player the Kick skill (sweeper/deep safety)
+    {
+        int kickBaseId = (kickingTeam == TeamSide::HOME) ? 1 : 12;
+        Player& safety = state.getPlayer(kickBaseId + 10);
+        if (safety.isOnPitch()) {
+            safety.skills.add(SkillName::Kick);
+        }
+    }
+
+    // Ball off pitch until kickoff
+    state.ball = BallState::offPitch();
+    state.turnoverPending = false;
+}
+
+} // anonymous namespace
+
+void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
+               TeamSide kickingTeam) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true);
+}
+
+void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
+                TeamSide kickingTeam) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false);
+}
+
+// Check if kicking team has a standing player with Kick skill
+bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
+    bool found = false;
+    state.forEachOnPitch(kickingTeam, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING && p.hasSkill(SkillName::Kick))
+            found = true;
+    });
+    return found;
+}
+
+void simpleKickoff(GameState& state, DiceRollerBase& dice) {
+    // Determine receiving team (opposite of kicking)
+    TeamSide receiving = opponent(state.kickingTeam);
+    state.activeTeam = receiving;
+
+    // Advance to the receiving team's NEXT turn (2026-07-10 fix: do not
+    // reset turnNumber here -- at a true half boundary setupHalf() already
+    // zeroed both teams' turnNumber before doKickoff() runs, so ++ still
+    // yields 1; after a post-TD kickoff mid-half, setupDrive() deliberately
+    // PRESERVES turnNumber (676bb50), and this function used to stomp that
+    // right back to 0/1, silently reviving the "every TD grants a fresh
+    // 8-turn clock" bug the 676bb50 fix was meant to close. The kicking
+    // team's own turnNumber is left untouched -- it's advanced by the
+    // normal turn-end flow, not by kickoff.
+    TeamState& recvTeam = state.getTeamState(receiving);
+    recvTeam.turnNumber++;
+    recvTeam.resetForNewTurn();
+    state.resetPlayersForNewTurn(receiving);
+
+    // Kick target: short vs fast, deep vs slow/mixed
+    int kickX;
+    if (state.receiverSpeed == RosterSpeed::FAST) {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
+    } else {
+        kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
+    }
+    int kickY = 7;
+
+    // Scatter: D6 for distance, D8 for direction
+    int dist = dice.rollD6();
+    // Kick skill: halve scatter distance (round up)
+    if (hasKickPlayer(state, state.kickingTeam)) {
+        dist = (dist + 1) / 2;  // ceil(dist/2)
+    }
+    int dir = dice.rollD8();
+    Position scatter = scatterDirection(dir);
+    int landX = kickX + scatter.x * dist;
+    int landY = kickY + scatter.y * dist;
+
+    // Clamp to pitch
+    landX = std::clamp(landX, 0, 25);
+    landY = std::clamp(landY, 0, 14);
+
+    Position landPos{static_cast<int8_t>(landX), static_cast<int8_t>(landY)};
+
+    // Check if a player is at landing position
+    Player* catcher = state.getPlayerAtPosition(landPos);
+    if (catcher && catcher->teamSide == receiving &&
+        catcher->state == PlayerState::STANDING) {
+        // Attempt catch
+        if (resolveCatch(state, catcher->id, dice, 0, nullptr)) {
+            // Ball caught
+        }
+        // If catch fails, ball bounces (handled by resolveCatch/bounce)
+    } else {
+        // Ball on ground
+        state.ball = BallState::onGround(landPos);
+    }
+
+    state.phase = GamePhase::PLAY;
+
+    // Roll weather
+    state.weather = weatherFromRoll(dice.roll2D6());
+}
+
+GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
+                        ActionSelector homePolicy, ActionSelector awayPolicy,
+                        DiceRollerBase& dice, bool useFullKickoff) {
+    GameState state;
+    GameResult result;
+
+    constexpr int MAX_ACTIONS = 5000;
+
+    auto doKickoff = [&]() {
+        if (useFullKickoff) {
+            resolveKickoff(state, dice, nullptr);
+        } else {
+            simpleKickoff(state, dice);
+        }
+    };
+
+    // First half
+    // No coin toss (yet): the opening kick is fixed. Named so the half-time
+    // branch below can derive the H2 kicker from the opening, not from
+    // whoever happened to kick the last H1 drive.
+    const TeamSide openingKickingTeam = TeamSide::AWAY;  // Home receives first
+    state.half = 1;
+    state.kickingTeam = openingKickingTeam;
+    setupHalf(state, home, away, state.kickingTeam);
+    doKickoff();
+
+    std::vector<Action> actions;
+    int totalActions = 0;
+
+    while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
+        // Handle touchdown → setup + kickoff
+        if (state.phase == GamePhase::TOUCHDOWN) {
+            // The scoring team kicks off next, not simply "whoever didn't kick last".
+            state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
+            setupDrive(state, home, away, state.kickingTeam);
+            doKickoff();
+            continue;
+        }
+
+        // Handle half time
+        if (state.phase == GamePhase::HALF_TIME) {
+            state.half = 2;
+            // The second half reverses the OPENING kickoff roles: the H1
+            // receiver kicks. Deriving this from the current kickingTeam
+            // (i.e. from the last H1 drive) handed the H2 ball back to
+            // whichever team scored last in H1.
+            state.kickingTeam = opponent(openingKickingTeam);
+            setupHalf(state, home, away, state.kickingTeam);
+            doKickoff();
+            continue;
+        }
+
+        // Get available actions
+        actions.clear();
+        getAvailableActions(state, actions);
+
+        if (actions.empty()) {
+            // No actions available — force end turn
+            Action endTurn;
+            endTurn.type = ActionType::END_TURN;
+            executeAction(state, endTurn, dice, nullptr);
+            totalActions++;
+            continue;
+        }
+
+        // Select action using appropriate policy
+        ActionSelector& policy = (state.activeTeam == TeamSide::HOME)
+                                    ? homePolicy : awayPolicy;
+        Action chosen = policy(state);
+
+        // Execute
+        executeAction(state, chosen, dice, nullptr);
+        totalActions++;
+    }
+
+    result.homeScore = state.homeTeam.score;
+    result.awayScore = state.awayTeam.score;
+    result.totalActions = totalActions;
+
+    return result;
+}
+
+// Helper: take a snapshot of the board state for replay
+static TurnLog captureTurnSnapshot(const GameState& state) {
+    TurnLog turn;
+    turn.half = state.half;
+    turn.turnNumber = state.getTeamState(state.activeTeam).turnNumber;
+    turn.activeTeam = state.activeTeam;
+    turn.homeScore = state.homeTeam.score;
+    turn.awayScore = state.awayTeam.score;
+
+    // Board (players + ball) — shared with policy-decision logging
+    BoardSnapshot board = captureBoardSnapshot(state);
+    turn.homePlayers = std::move(board.homePlayers);
+    turn.awayPlayers = std::move(board.awayPlayers);
+    turn.ballX = board.ballX;
+    turn.ballY = board.ballY;
+    turn.ballHeld = board.ballHeld;
+    turn.ballCarrierId = board.ballCarrierId;
+
+    return turn;
+}
+
+LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& away,
+                                    ActionSelector homePolicy, ActionSelector awayPolicy,
+                                    DiceRollerBase& dice, bool useFullKickoff) {
+    GameState state;
+    LoggedGameResult logged;
+
+    constexpr int MAX_ACTIONS = 5000;
+
+    auto doKickoff = [&]() {
+        if (useFullKickoff) {
+            resolveKickoff(state, dice, nullptr);
+        } else {
+            simpleKickoff(state, dice);
+        }
+    };
+
+    // First half
+    // Same fixed opening as simulateGame(); see the comment there.
+    const TeamSide openingKickingTeam = TeamSide::AWAY;
+    state.half = 1;
+    state.kickingTeam = openingKickingTeam;
+    setupHalf(state, home, away, state.kickingTeam);
+    doKickoff();
+
+    std::vector<Action> actions;
+    std::vector<GameEvent> turnEvents;
+    int totalActions = 0;
+    TeamSide lastActiveTeam = state.activeTeam;
+    int lastTurnNumber = state.getTeamState(state.activeTeam).turnNumber;
+
+    // Capture initial state features + first turn snapshot
+    {
+        StateLog log;
+        log.perspective = state.activeTeam;
+        extractFeatures(state, log.perspective, log.features);
+        logged.states.push_back(log);
+
+        logged.turnLogs.push_back(captureTurnSnapshot(state));
+    }
+
+    while (state.phase != GamePhase::GAME_OVER && totalActions < MAX_ACTIONS) {
+        if (state.phase == GamePhase::TOUCHDOWN) {
+            // Mark touchdown in current turn log
+            if (!logged.turnLogs.empty()) {
+                logged.turnLogs.back().touchdown = true;
+            }
+            // The scoring team kicks off next, not simply "whoever didn't kick last".
+            state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
+            setupDrive(state, home, away, state.kickingTeam);
+            doKickoff();
+            continue;
+        }
+
+        if (state.phase == GamePhase::HALF_TIME) {
+            state.half = 2;
+            // H2 reverses the OPENING kickoff roles, not the last H1 drive;
+            // see the comment in simulateGame().
+            state.kickingTeam = opponent(openingKickingTeam);
+            setupHalf(state, home, away, state.kickingTeam);
+            doKickoff();
+            continue;
+        }
+
+        // Check if turn changed — log features at turn boundaries
+        TeamSide curTeam = state.activeTeam;
+        int curTurn = state.getTeamState(curTeam).turnNumber;
+        if (curTeam != lastActiveTeam || curTurn != lastTurnNumber) {
+            StateLog log;
+            log.perspective = curTeam;
+            extractFeatures(state, log.perspective, log.features);
+            logged.states.push_back(log);
+
+            // Save previous turn events and start new turn log
+            logged.turnLogs.push_back(captureTurnSnapshot(state));
+            turnEvents.clear();
+
+            lastActiveTeam = curTeam;
+            lastTurnNumber = curTurn;
+        }
+
+        actions.clear();
+        getAvailableActions(state, actions);
+
+        if (actions.empty()) {
+            Action endTurn;
+            endTurn.type = ActionType::END_TURN;
+            executeAction(state, endTurn, dice, nullptr);
+            totalActions++;
+            continue;
+        }
+
+        ActionSelector& policy = (state.activeTeam == TeamSide::HOME)
+                                    ? homePolicy : awayPolicy;
+        Action chosen = policy(state);
+
+        // Execute with event capture
+        turnEvents.clear();
+        executeAction(state, chosen, dice, &turnEvents);
+
+        // Append events to current turn log
+        if (!logged.turnLogs.empty()) {
+            auto& curLog = logged.turnLogs.back();
+            for (auto& ev : turnEvents) {
+                curLog.events.push_back(ev);
+                if (ev.type == GameEvent::Type::TURNOVER) curLog.turnover = true;
+                if (ev.type == GameEvent::Type::TOUCHDOWN) curLog.touchdown = true;
+            }
+        }
+
+        totalActions++;
+    }
+
+    logged.result.homeScore = state.homeTeam.score;
+    logged.result.awayScore = state.awayTeam.score;
+    logged.result.totalActions = totalActions;
+
+    return logged;
+}
+
+} // namespace bb

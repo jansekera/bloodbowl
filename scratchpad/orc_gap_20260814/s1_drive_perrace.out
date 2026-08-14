@@ -1,0 +1,79 @@
+=== TD z headerů her (kontrola zadání) ===
+  human    hry=750 naše TD=178 jejich TD=281
+  orc      hry=750 naše TD=86 jejich TD=207
+  skaven   hry=750 naše TD=451 jejich TD=299
+  wood-elf hry=750 naše TD=260 jejich TD=421
+
+=== C DRIVY (ztráta míče): příčiny per-race — VŠECHNY drivy ===
+human    n=388 | ztraceno kolo 5.99 | vzdál. od EZ 12.81 polí
+    soupeřův blitz/blok srazil nosiče                        338 (87%)
+    neúspěšný dodge nosiče                                    23 (6%)
+    neúspěšné GFI nosiče                                      14 (4%)
+    sražen blokem v našem tahu (both down apod.)               6 (2%)
+    volný míč sebral soupeř                                    3 (1%)
+    nechycená přihrávka/handoff                                2 (1%)
+    jiné/nejasné                                               1 (0%)
+    fumble při (znovu)sebrání                                  1 (0%)
+orc      n=453 | ztraceno kolo 6.25 | vzdál. od EZ 13.39 polí
+    soupeřův blitz/blok srazil nosiče                        393 (87%)
+    neúspěšný dodge nosiče                                    28 (6%)
+    neúspěšné GFI nosiče                                       9 (2%)
+    sražen blokem v našem tahu (both down apod.)               9 (2%)
+    volný míč sebral soupeř                                    5 (1%)
+    nechycená přihrávka/handoff                                5 (1%)
+    jiné/nejasné                                               2 (0%)
+    fumble při (znovu)sebrání                                  2 (0%)
+skaven   n=259 | ztraceno kolo 5.74 | vzdál. od EZ 12.29 polí
+    soupeřův blitz/blok srazil nosiče                        208 (80%)
+    neúspěšné GFI nosiče                                      15 (6%)
+    neúspěšný dodge nosiče                                    15 (6%)
+    volný míč sebral soupeř                                    7 (3%)
+    sražen blokem v našem tahu (both down apod.)               5 (2%)
+    nechycená přihrávka/handoff                                3 (1%)
+    interception/chycení soupeřem                              2 (1%)
+    fumble při (znovu)sebrání                                  2 (1%)
+    jiné/nejasné                                               1 (0%)
+    drženo jen uvnitř tahu (event), snímkově nikdy             1 (0%)
+wood-elf n=345 | ztraceno kolo 5.86 | vzdál. od EZ 13.41 polí
+    soupeřův blitz/blok srazil nosiče                        287 (83%)
+    neúspěšný dodge nosiče                                    26 (8%)
+    neúspěšné GFI nosiče                                      16 (5%)
+    volný míč sebral soupeř                                    6 (2%)
+    sražen blokem v našem tahu (both down apod.)               5 (1%)
+    nechycená přihrávka/handoff                                3 (1%)
+    fumble při (znovu)sebrání                                  2 (1%)
+
+=== VŠECHNY přijímací drivy: 1. držení / tempo / odpor per-race ===
+opp           n  1drž.kolo   1drž.vzd    tempo    odpor   fumbly
+human      1003       2.51      20.48     2.23     4.73     0.05
+orc         926       2.25      20.92     2.03     5.20     0.07
+skaven     1036       2.44      20.45     2.74     3.82     0.06
+wood-elf   1148       2.93      20.43     2.49     4.27     0.07
+
+=== PLNÉ drivy (>=7 kol): tempo a odpor per-race per-kategorie ===
+human    [A] n= 88 tempo=2.64 odpor=3.11 1drž.kolo=1.02
+human    [C] n=304 tempo=2.11 odpor=4.95 1drž.kolo=1.04
+human    [D1] n=221 tempo=2.07 odpor=4.40 1drž.kolo=1.09
+human    [D2] n= 66 tempo=1.36 odpor=3.87 1drž.kolo=1.02
+orc      [A] n= 46 tempo=2.77 odpor=3.43 1drž.kolo=1.02
+orc      [C] n=418 tempo=2.01 odpor=5.48 1drž.kolo=1.09
+orc      [D1] n=186 tempo=1.78 odpor=5.02 1drž.kolo=1.07
+orc      [D2] n= 56 tempo=1.51 odpor=4.19 1drž.kolo=1.00
+skaven   [A] n=197 tempo=2.71 odpor=2.68 1drž.kolo=1.04
+skaven   [C] n=159 tempo=2.47 odpor=4.17 1drž.kolo=1.06
+skaven   [D1] n=200 tempo=2.42 odpor=3.53 1drž.kolo=1.06
+skaven   [D2] n= 71 tempo=1.93 odpor=3.27 1drž.kolo=1.00
+wood-elf [A] n=127 tempo=2.86 odpor=2.91 1drž.kolo=1.00
+wood-elf [C] n=215 tempo=2.18 odpor=4.65 1drž.kolo=1.07
+wood-elf [D1] n=206 tempo=2.31 odpor=3.87 1drž.kolo=1.05
+wood-elf [D2] n= 90 tempo=1.63 odpor=3.27 1drž.kolo=1.00
+
+=== C drivy: kola s míčem podle pozice nosiče per-race ===
+human    Runner 92%, Blitzer 4%, Longbeard 2%, Troll Slayer 1%
+orc      Runner 90%, Blitzer 5%, Longbeard 2%, Troll Slayer 2%
+skaven   Runner 88%, Blitzer 6%, Longbeard 4%, Troll Slayer 2%
+wood-elf Runner 90%, Blitzer 6%, Longbeard 3%, Troll Slayer 1%
+
+=== BOOTSTRAP PO HRÁCH (2000 vzorků, 95% CI) ===
+  podíl C mezi plnými drivy                  orc=0.590 (n_her=709) skaven=0.254 (n_her=627) diff CI [0.288, 0.385]
+  podíl 'blitz srazil nosiče' mezi C         orc=0.867 (n_her=446) skaven=0.796 (n_her=240) diff CI [0.013, 0.131]

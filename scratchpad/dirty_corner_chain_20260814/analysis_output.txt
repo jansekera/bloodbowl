@@ -1,0 +1,157 @@
+řádků (našich kol): 44177
+
+========================================================================
+ČÁST A — P0.1: blok → čistota rohů
+========================================================================
+
+A1 — kola s ≥1 polluterem na začátku N+1: n=3864
+  z toho: polluter blokován 2972, blok jen jinam 386, žádný blok 506
+  špinavé rohy konec N+1       hit=+0.271(n=2972) other=+0.759(n=386) none=+1.002(n=506) | hit−other -0.489 (-11.6σ) | hit−none -0.731 (-22.9σ)
+  čisté rohy konec N+1         hit=+1.411(n=2972) other=+1.083(n=386) none=+1.107(n=506) | hit−other +0.328 (+5.7σ) | hit−none +0.304 (+6.1σ)
+  Δx nosiče v N+1              hit=+1.619(n=2962) other=+1.329(n=386) none=+0.758(n=505) | hit−other +0.290 (+2.5σ) | hit−none +0.860 (+9.7σ)
+  TD v N+1                     hit=+0.000(n=2972) other=+0.000(n=386) none=+0.000(n=506) | hit−other +0.000 (+0.0σ) | hit−none +0.000 (+0.0σ)
+  polluter blokován      podíl polluterů stále špiní 7.8%, na zemi 72.8%  (n=2972)
+  neblokován             podíl polluterů stále špiní 63.8%, na zemi 3.3%  (n=892)
+
+A1 stratifikováno podle hustoty OPP3(S2) — špinavé rohy konec N+1:
+  OPP3 0–2: hit 0.144 (n=1333) vs ne 0.717 (n=360) → -0.573 (-15.5σ)
+  OPP3 3–4: hit 0.307 (n=1165) vs ne 0.968 (n=378) → -0.661 (-15.5σ)
+  OPP3 5–+: hit 0.536 (n=474) vs ne 1.143 (n=154) → -0.607 (-8.6σ)
+
+A2 — bloky v kole N → stav rohů na konci N+1 (jen kola s klecí na konci N, filled_N ≥ 1):
+  bloky_N → špinavé_N+1 (surové)                       r=+0.019    +2.2σ  n=13501
+  bloky_N → špinavé_N+1 | OPP3,REACH0,kolo             r=+0.001    +0.1σ  n=13501
+  bloky_N → čisté_N+1 (surové)                         r=-0.055    -6.4σ  n=13501
+  bloky_N → čisté_N+1 | OPP3,REACH0,kolo               r=-0.064    -7.5σ  n=13501
+  bloky_N → Δx_N+1 (surové)                            r=+0.025    +2.8σ  n=12637
+  bloky_N → Δx_N+1 | OPP3,REACH0,kolo                  r=+0.055    +6.1σ  n=12637
+
+========================================================================
+ČÁST B — P0.5: špinavý roh N → zámek → roh/tempo N+1
+========================================================================
+
+kola s klecí (filled_N ≥ 1) a stojícím nosičem: n=16545
+  zámky na konci N: průměr 1.25, z toho na špinavých rozích 0.16 (tautologická část)
+  špinavé_N → zamčení_N (surové, ~tautologie)          r=+0.413   +56.5σ  n=16545
+  špinavé_N → zamčení_N MIMO rohy                      r=+0.113   +14.5σ  n=16545
+
+B1 — osud těla ze špinavého rohu (konec N) na začátku N+1 (n=3680 těl):
+  locked     1824  49.6%
+  down       1599  43.5%
+  out          49  1.3%
+  free        208  5.7%
+  … a jako ČISTÝ roh na konci N+1 slouží 400/2906 = 13.8%
+
+B2 — špinavé rohy N → výsledky N+1 (kontrola OPP3, REACH0, kolo, filled_N):
+  špinavé_N → zamčení na začátku N+1 (surové)          r=+0.161   +20.3σ  n=15636
+  špinavé_N → zamčení_S2 | kontroly                    r=+0.079    +9.9σ  n=15636
+  špinavé_N → volná těla na začátku N+1 (surové)       r=-0.293   -37.7σ  n=15636
+  špinavé_N → volná_S2 | kontroly                      r=-0.169   -21.3σ  n=15636
+  špinavé_N → čisté rohy N+1 (surové)                  r=-0.151   -17.7σ  n=13501
+  špinavé_N → čisté rohy N+1 | kontroly                r=-0.098   -11.4σ  n=13501
+  špinavé_N → špinavé rohy N+1 (surové)                r=+0.183   +21.5σ  n=13501
+  špinavé_N → špinavé rohy N+1 | kontroly              r=+0.094   +10.9σ  n=13501
+  špinavé_N → Δx nosiče N+1 (surové)                   r=-0.087    -9.8σ  n=12637
+  špinavé_N → Δx nosiče N+1 | kontroly                 r=-0.015    -1.7σ  n=12637
+  špinavé_N → naši sražení v soupeřově kole (surové)   r=+0.106   +13.3σ  n=15636
+  špinavé_N → naši sražení v soupeřově kole | kontroly r=+0.034    +4.2σ  n=15636
+
+mezičlánek — zamčená těla na začátku N+1 → výsledek N+1:
+  zamčení_S2 → čisté rohy N+1 (surové)                 r=-0.073    -8.3σ  n=12676
+  zamčení_S2 → čisté rohy N+1 | OPP3(S2)               r=+0.006    +0.7σ  n=12676
+  zamčení_S2 → Δx nosiče N+1 (surové)                  r=-0.168   -19.0σ  n=12637
+  zamčení_S2 → Δx nosiče N+1 | OPP3(S2)                r=-0.022    -2.5σ  n=12637
+
+Δx nosiče v N+1 podle špinavých rohů na konci N (jen čtení):
+  špinavých 0   n=10480  Δx = +2.04
+  špinavých 1   n=1726   Δx = +1.57
+  špinavých 2+  n=431    Δx = +1.31
+
+------------------------------------------------------------------------
+B3 — rozpad po soupeřích: okamžitá vs odložená splatnost
+------------------------------------------------------------------------
+
+soupeř      P(ztráta|dirty=0)   P(ztráta|≥1)    Δpp      σ        n0/n1
+human                  10.5%          24.6%  +14.1  +8.5σ   2878/781
+orc                    11.2%          29.0%  +17.8  +9.6σ   2966/665
+skaven                  8.7%          17.4%   +8.7  +6.1σ   3395/787
+wood-elf               11.6%          21.7%  +10.1  +6.7σ   3364/843
+
+okamžitá splatnost s kontrolou hustoty (parciální, | OPP3,REACH0,kolo,filled):
+  human: špinavé_N → ztráta míče                       r=+0.039    +2.4σ  n=3659
+  orc: špinavé_N → ztráta míče                         r=+0.046    +2.8σ  n=3631
+  skaven: špinavé_N → ztráta míče                      r=+0.030    +1.9σ  n=4182
+  wood-elf: špinavé_N → ztráta míče                    r=+0.018    +1.2σ  n=4207
+
+odložená splatnost po soupeřích (parciální | OPP3,REACH0,kolo,filled):
+  human: špinavé_N → Δx_N+1                            r=-0.000    -0.0σ  n=2964
+  orc: špinavé_N → Δx_N+1                              r=-0.006    -0.3σ  n=2982
+  skaven: špinavé_N → Δx_N+1                           r=-0.064    -3.7σ  n=3370
+  wood-elf: špinavé_N → Δx_N+1                         r=+0.009    +0.5σ  n=3321
+
+  human: špinavé_N → zamčení_S2                        r=+0.065    +4.0σ  n=3653
+  orc: špinavé_N → zamčení_S2                          r=+0.076    +4.6σ  n=3631
+  skaven: špinavé_N → zamčení_S2                       r=+0.077    +5.0σ  n=4167
+  wood-elf: špinavé_N → zamčení_S2                     r=+0.092    +6.0σ  n=4185
+
+  human: špinavé_N → sražení naši                      r=+0.064    +3.9σ  n=3653
+  orc: špinavé_N → sražení naši                        r=+0.079    +4.8σ  n=3631
+  skaven: špinavé_N → sražení naši                     r=-0.004    -0.3σ  n=4167
+  wood-elf: špinavé_N → sražení naši                   r=+0.007    +0.5σ  n=4185
+
+  human: špinavé_N → čisté_N+1                         r=-0.120    -6.7σ  n=3157
+  orc: špinavé_N → čisté_N+1                           r=-0.094    -5.3σ  n=3203
+  skaven: špinavé_N → čisté_N+1                        r=-0.062    -3.7σ  n=3568
+  wood-elf: špinavé_N → čisté_N+1                      r=-0.114    -6.9σ  n=3573
+
+Δx_N+1 podle rasy × špinavé rohy (čtecí tabulka):
+soupeř           dirty=0       dirty=1       dirty≥2
+human        +1.91(n=2429)   +1.53(n=445)   +1.33(n=90)
+orc          +1.76(n=2550)   +1.43(n=346)   +1.10(n=86)
+skaven       +2.36(n=2767)   +1.47(n=483)   +1.17(n=120)
+wood-elf     +2.08(n=2734)   +1.81(n=452)   +1.56(n=135)
+
+========================================================================
+ČÁST C — rozpočet: co očištění rohu stojí
+========================================================================
+
+C1 — polluteři na ZAČÁTKU kola (rozhodovací bod): 5089 polluterů v 3938 kolech
+  má volného stojícího souseda (blok ZDARMA möglich): 3110/5089 = 61.1%
+  … z toho s ≥2 kostkami:                            1781/5089 = 35.0%
+  kol s ≥1 polluterem, kde jde aspoň jeden očistit zdarma: 69.2% (n=3938)
+  SKUTEČNĚ blokováno zdarma týž kolo: 2932/5089 = 57.6%; blitzem: 497/3938 kol = 12.6%
+
+  po soupeřích (podíl polluterů s volným sousedem / s ≥2k):
+    human      59.5% / 31.4%   (n=1318 polluterů)
+    orc        62.4% / 22.1%   (n=1138 polluterů)
+    skaven     59.3% / 40.8%   (n=1248 polluterů)
+    wood-elf   63.2% / 43.8%   (n=1385 polluterů)
+
+C2 — použití blitzu v kolech s klecí a ≥1 polluterem na začátku:
+  rozdělení blitzu: {'wall_fwd': 687, 'corner': 497, 'none': 2090, 'carrier_mark': 554, 'other': 110}
+
+  blitz na           n  Δx týž kolo   Δx N+1  špinavé N+1  čisté N+1  ztráta míče
+  corner           497        +1.80    +1.99        +0.28      +1.34        18.1%
+  carrier_mark     554        +1.32    +2.01        +0.25      +1.11        18.5%
+  wall_fwd         687        +2.52    +1.96        +0.22      +1.31        19.3%
+  other            110        +1.39    +2.07        +0.26      +1.30        13.6%
+  none            2090        +1.10    +1.65        +0.30      +1.20        18.8%
+
+  kontrolované srovnání corner vs wall_fwd (| opp3_S, pollS_n, kolo):
+    blitz=corner (vs wall) → Δx týž kolo               r=-0.187    -6.4σ  n=1169
+    blitz=corner (vs wall) → Δx N+1                    r=-0.027    -0.8σ  n=822
+    blitz=corner (vs wall) → špinavé N+1               r=+0.065    +1.9σ  n=910
+    blitz=corner (vs wall) → ztráta míče               r=-0.021    -0.7σ  n=1104
+
+C3 — kola s polluterem a ≥1 idle tělem (K31): n=2070
+  podíl kol s polluterem, kde vůbec je idle tělo: 2070/3938 = 52.6%
+  idle těl v těch kolech: 4434 (2.14/kolo), z toho DOSÁHNE na pollutera (MA+2): 4201 = 94.7%
+  kol, kde aspoň jedno idle tělo dosáhne: 96.2%
+
+C4 — Δx N+1 po blitzi corner/wall podle fáze (kolo v půli):
+  corner       kola 1–3: Δx_N+1 = +1.36 (n=96)
+  corner       kola 4–6: Δx_N+1 = +2.07 (n=212)
+  corner       kola 7–8: Δx_N+1 = +3.13 (n=38)
+  wall_fwd     kola 1–3: Δx_N+1 = +1.26 (n=153)
+  wall_fwd     kola 4–6: Δx_N+1 = +2.16 (n=286)
+  wall_fwd     kola 7–8: Δx_N+1 = +3.35 (n=37)

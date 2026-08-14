@@ -1,0 +1,124 @@
+{
+ "label": "pilot_e2",
+ "champ": "weights_best.json",
+ "cand": "weights_snap_e2_100pct_+2.9.json",
+ "config": {
+  "mcts": 100,
+  "vf_blend": 0.15,
+  "policy": "weights_policy.json",
+  "seeds": 3,
+  "base_seed": 20260730
+ },
+ "games_compared": 6,
+ "identical_games": 0,
+ "identical_games_pct": 0.0,
+ "paired_decisions": 26,
+ "churn_events": 6,
+ "churn_hazard_per_decision": {
+  "p": 0.2308,
+  "ci95": [
+   0.1103,
+   0.4205
+  ]
+ },
+ "expected_decisions_to_first_change": 4.3,
+ "soft_churn_tv_matched": {
+  "n": 20,
+  "mean": 0.0382,
+  "p90": 0.13
+ },
+ "champ_top1_margin": {
+  "at_divergences": {
+   "n": 6,
+   "mean": 0.0083,
+   "median": 0.01,
+   "p90": 0.03
+  },
+  "baseline_matched": {
+   "n": 20,
+   "mean": 0.043,
+   "median": 0.01,
+   "p90": 0.21
+  },
+  "div_share_margin_lt_002": 0.833,
+  "baseline_share_margin_lt_002": 0.65
+ },
+ "divergence_classes": {
+  "equal_features": 2,
+  "sub_feature": 3,
+  "safer_same_scoring": 1
+ },
+ "context_tags": {
+  "we_have_ball": 3,
+  "opp_has_ball": 3
+ },
+ "macro_transitions": {
+  "REPOSITION->REPOSITION": 3,
+  "REPOSITION->CAGE": 1,
+  "CAGE->CAGE": 1,
+  "BLITZ->BLOCK": 1
+ },
+ "game_outcome_ref_vs_cand": {
+  "D->W": 2,
+  "L->D": 1,
+  "W->D": 1,
+  "D->L": 1,
+  "D->D": 1
+ },
+ "per_game": [
+  {
+   "seed": 20260730,
+   "kind": "ch",
+   "trials": 5,
+   "event": 1,
+   "div_index": 4,
+   "ref_len": 73,
+   "cand_len": 77
+  },
+  {
+   "seed": 20260730,
+   "kind": "ca",
+   "trials": 4,
+   "event": 1,
+   "div_index": 3,
+   "ref_len": 87,
+   "cand_len": 105
+  },
+  {
+   "seed": 20260731,
+   "kind": "ch",
+   "trials": 6,
+   "event": 1,
+   "div_index": 5,
+   "ref_len": 92,
+   "cand_len": 78
+  },
+  {
+   "seed": 20260731,
+   "kind": "ca",
+   "trials": 5,
+   "event": 1,
+   "div_index": 4,
+   "ref_len": 65,
+   "cand_len": 74
+  },
+  {
+   "seed": 20260732,
+   "kind": "ch",
+   "trials": 5,
+   "event": 1,
+   "div_index": 4,
+   "ref_len": 75,
+   "cand_len": 117
+  },
+  {
+   "seed": 20260732,
+   "kind": "ca",
+   "trials": 1,
+   "event": 1,
+   "div_index": 0,
+   "ref_len": 72,
+   "cand_len": 76
+  }
+ ]
+}

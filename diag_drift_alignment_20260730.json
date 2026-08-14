@@ -1,0 +1,107 @@
+{
+ "task": "A2-2 drift vs feb-replay gradient alignment",
+ "method_replicated": "mc_shaped replay path (training_loop.py:819-821 -> trainer.py:620-645, backprop trainer.py:515-541)",
+ "step1_drift": {
+  "n_candidates": 10,
+  "dim": 4801,
+  "champion_value_norm": 8.883412368663848,
+  "mean_drift_norm": 0.2959402133018426,
+  "per_candidate_drift_norm": {
+   "weights_snap_e16_90pct_+3.7.json": 0.3508380401102653,
+   "weights_snap_e16_90pct_+3.4.json": 0.3700586758433149,
+   "weights_snap_e16_93pct_+1.6.json": 0.2118367895448721,
+   "weights_snap_e16_94pct_+2.4.json": 0.3360240350879342,
+   "weights_snap_e16_94pct_+2.3.json": 0.34038853497144955,
+   "weights_snap_e16_92pct_+2.2.json": 0.3254302936553461,
+   "weights_snap_e16_94pct_+2.2.json": 0.3547342066519947,
+   "weights_snap_e16_93pct_+2.2.json": 0.3370978871440231,
+   "weights_snap_e16_95pct_+2.2.json": 0.35277116859464025,
+   "weights_snap_e16_99pct_+2.5.json": 0.40373693373625874
+  },
+  "per_candidate_cos_to_mean_drift": {
+   "weights_snap_e16_90pct_+3.7.json": 0.9382535117935191,
+   "weights_snap_e16_90pct_+3.4.json": 0.9266958676698562,
+   "weights_snap_e16_93pct_+1.6.json": -0.31829152363186003,
+   "weights_snap_e16_94pct_+2.4.json": 0.9728913540363958,
+   "weights_snap_e16_94pct_+2.3.json": 0.9729999445474707,
+   "weights_snap_e16_92pct_+2.2.json": 0.9661786670834439,
+   "weights_snap_e16_94pct_+2.2.json": 0.9778017299357469,
+   "weights_snap_e16_93pct_+2.2.json": 0.946298889684651,
+   "weights_snap_e16_95pct_+2.2.json": 0.960883504496303,
+   "weights_snap_e16_99pct_+2.5.json": 0.9346614133684072
+  }
+ },
+ "step2_buffer": {
+  "n_total": 6286,
+  "n_feb_70f": 5000,
+  "n_fresh_73f": 1286
+ },
+ "step3_gradients": {
+  "grad_feb_norm": 0.623584332416214,
+  "grad_fresh_norm": 0.14711388864088762,
+  "mean_abs_residual_feb": 0.6453370994546931,
+  "mean_abs_residual_fresh": 0.6324597743056404,
+  "cos_grad_feb_vs_grad_fresh": 0.08347929941456864
+ },
+ "step4_alignment": {
+  "cos_meanDrift_desc_feb": 0.1737936110957626,
+  "cos_meanDrift_desc_fresh": 0.6370187276554377,
+  "random_baseline_cos_sd": 0.014432253448298278,
+  "per_candidate": {
+   "weights_snap_e16_90pct_+3.7.json": {
+    "cos_desc_feb": 0.15813556958892885,
+    "cos_desc_fresh": 0.5817017123480205
+   },
+   "weights_snap_e16_90pct_+3.4.json": {
+    "cos_desc_feb": 0.15412507397141426,
+    "cos_desc_fresh": 0.5145522714070941
+   },
+   "weights_snap_e16_93pct_+1.6.json": {
+    "cos_desc_feb": -0.06361387487550926,
+    "cos_desc_fresh": -0.30526685156401623
+   },
+   "weights_snap_e16_94pct_+2.4.json": {
+    "cos_desc_feb": 0.16053405676848323,
+    "cos_desc_fresh": 0.6634137806360856
+   },
+   "weights_snap_e16_94pct_+2.3.json": {
+    "cos_desc_feb": 0.181754178116939,
+    "cos_desc_fresh": 0.6009015420252329
+   },
+   "weights_snap_e16_92pct_+2.2.json": {
+    "cos_desc_feb": 0.155820445769843,
+    "cos_desc_fresh": 0.5702858125271992
+   },
+   "weights_snap_e16_94pct_+2.2.json": {
+    "cos_desc_feb": 0.15707004510019634,
+    "cos_desc_fresh": 0.5990453105087338
+   },
+   "weights_snap_e16_93pct_+2.2.json": {
+    "cos_desc_feb": 0.15641945254382084,
+    "cos_desc_fresh": 0.5689616127301709
+   },
+   "weights_snap_e16_95pct_+2.2.json": {
+    "cos_desc_feb": 0.17017886594078954,
+    "cos_desc_fresh": 0.6562918116049261
+   },
+   "weights_snap_e16_99pct_+2.5.json": {
+    "cos_desc_feb": 0.1988562998172713,
+    "cos_desc_fresh": 0.7591428585707275
+   }
+  }
+ },
+ "step5_bonus": {
+  "proj_len_on_desc_feb": 0.05143251833817749,
+  "proj_len_on_desc_fresh": 0.1885194581396186,
+  "pct_drift_norm_explained_feb": 17.37936110957627,
+  "pct_drift_norm_explained_fresh": 63.701872765543754,
+  "joint_lstsq": {
+   "coef_feb": 0.05764343528659277,
+   "coef_fresh": 1.2610553027829081,
+   "pct_variance_explained": 42.04431092363503
+  },
+  "drift_norm_W1_rows_70_72": 0.08251575642922607,
+  "drift_norm_W1_rows_0_69": 0.27142377632646836,
+  "note_rows70_72": "feb transitions are zero-padded -> their gradient on W1 rows 70-72 is exactly zero; drift there can only come from fresh data"
+ }
+}

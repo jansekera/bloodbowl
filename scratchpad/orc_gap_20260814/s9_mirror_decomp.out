@@ -1,0 +1,39 @@
+=== ZRCADLO: náš útok na JEJICH nosiče — plné rozdělení BLZ ===
+race          n |     -2      1      2      3  nedosáh. |     P(↓)
+human      5157 |   0.5%  62.7%  18.7%   0.3%     17.9% |    0.183
+orc        5619 |   1.2%  63.5%   7.5%   0.0%     27.8% |    0.113
+skaven     4126 |   0.0%  43.5%  52.0%   2.4%      2.1% |    0.347
+wood-elf   4374 |   0.2%  43.7%  41.5%   1.9%     12.8% |    0.266
+
+=== P(jejich nosič ↓) podle NAŠEHO BLZ (konverze, per-race) ===
+human    BLZ=1: 0.152 (n=3233) | BLZ=2: 0.451 (n=962) | BLZ=None: 0.000 (n=921)
+orc      BLZ=-2: 0.197 (n=66) | BLZ=1: 0.109 (n=3568) | BLZ=2: 0.551 (n=421) | BLZ=None: 0.000 (n=1562)
+skaven   BLZ=1: 0.183 (n=1793) | BLZ=2: 0.480 (n=2147) | BLZ=3: 0.735 (n=98) | BLZ=None: 0.000 (n=88)
+wood-elf BLZ=1: 0.285 (n=1912) | BLZ=2: 0.315 (n=1814) | BLZ=3: 0.530 (n=83) | BLZ=None: 0.002 (n=558)
+
+=== ROZKLAD: pozice vs struktura ===
+race        REACH=0    nosič ST2 dmin (prům.) kolo s adj.blok GuardCl./nosič    clona vše
+human         17.9%         7.8%         4.00          16.6%         0.45         2.16
+orc           27.8%         0.0%         5.09          10.1%         1.19         2.36
+skaven         2.1%        38.8%         2.52          28.1%         0.15         2.25
+wood-elf      12.8%        42.2%         3.36          20.9%         0.13         2.06
+
+=== BLZ>=2 podmíněně (izolace struktury) ===
+race              vše      | nosič ST2       | ST3+ a REACH>0   | ST3+, REACH>0, Guard=0
+human     19.0% (n=5157)    90.3% (n=402)         15.9% (n=3873)             17.9% (n=2324)
+orc        7.5% (n=5619)                —         10.4% (n=4057)             13.3% (n=1153)
+skaven    54.4% (n=4126)   97.0% (n=1599)         27.9% (n=2487)             28.3% (n=2128)
+wood-elf  43.4% (n=4374)   75.9% (n=1844)         20.6% (n=2416)             20.5% (n=2011)
+
+=== P15 zóna: REACH>0 a BLZ<2 (dnes se nenabízí blok, blitz jen se slabou vahou) ===
+race          podíl kol         z toho BLZ=1        z toho BLZ=-2
+human             63.2%                99.3%                 0.7%
+orc               64.7%                98.2%                 1.8%
+skaven            43.5%               100.0%                 0.0%
+wood-elf          43.9%                99.6%                 0.4%
+
+=== kdo nese, podle rasy (podíl kol; ST v závorce) ===
+human    Thrower(ST3) 74%, Lineman(ST3) 10%, Catcher(ST2) 8%, Blitzer(ST3) 7%
+orc      Thrower(ST3) 78%, Blitzer(ST3) 10%, Lineman(ST3) 5%, Blitzer ball-hunter(ST3) 5%
+skaven   Thrower(ST3) 47%, Gutter Runner(ST2) 39%, Lineman(ST3) 10%, Blitzer ball-hunter(ST3) 2%
+wood-elf Lineman(ST3) 43%, Catcher(ST2) 42%, Wardancer ball-hunter(ST3) 8%, Wardancer(ST3) 4%

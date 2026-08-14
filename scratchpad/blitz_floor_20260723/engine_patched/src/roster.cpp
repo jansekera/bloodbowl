@@ -1,0 +1,646 @@
+#include "bb/roster.h"
+#include <algorithm>
+#include <cctype>
+
+namespace bb {
+
+namespace {
+
+SkillSet makeSkills(std::initializer_list<SkillName> list) {
+    SkillSet ss;
+    for (auto s : list) ss.add(s);
+    return ss;
+}
+
+std::string toLower(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return out;
+}
+
+} // anonymous namespace
+
+// Human: Lineman 0-16, Catcher 0-4, Thrower 0-2, Blitzer 0-4, Ogre 0-1
+const TeamRoster& getHumanRoster() {
+    static const TeamRoster roster = {
+        "Human",
+        {
+            {{6, 3, 3, 8}, {}, 16},
+            {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge}), 4},
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass}), 2},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block}), 4},
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate}), 1},
+        },
+        5, 50, true
+    };
+    return roster;
+}
+
+// Orc: Lineman 0-16, Goblin 0-4, Thrower 0-2, Black Orc 0-4, Blitzer 0-4, Troll 0-1
+const TeamRoster& getOrcRoster() {
+    static const TeamRoster roster = {
+        "Orc",
+        {
+            {{5, 3, 3, 9}, {}, 16},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty}), 4},
+            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass}), 2},
+            {{4, 4, 2, 9}, {}, 4},
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block}), 4},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
+                SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
+                SkillName::ThrowTeamMate}), 1},
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Skaven: Lineman 0-16, Thrower 0-2, Gutter Runner 0-4, Blitzer 0-2, Rat Ogre 0-1
+const TeamRoster& getSkavenRoster() {
+    static const TeamRoster roster = {
+        "Skaven",
+        {
+            {{7, 3, 3, 7}, {}, 16},
+            {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass}), 2},
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge}), 4},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block}), 2},
+            {{6, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Frenzy,
+                SkillName::MightyBlow, SkillName::WildAnimal, SkillName::PrehensileTail}), 1},
+        },
+        5, 60, true
+    };
+    return roster;
+}
+
+// Dwarf: Blocker 0-16, Runner 0-2, Blitzer 0-2, Troll Slayer 0-2, Deathroller 0-1
+const TeamRoster& getDwarfRoster() {
+    static const TeamRoster roster = {
+        "Dwarf",
+        {
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 16},
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull}), 2},
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull}), 2},
+            {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy,
+                SkillName::ThickSkull, SkillName::Dauntless}), 2},
+            {{4, 7, 1, 10}, makeSkills({SkillName::Loner, SkillName::BreakTackle,
+                SkillName::DirtyPlayer, SkillName::Juggernaut, SkillName::MightyBlow,
+                SkillName::NoHands, SkillName::SecretWeapon, SkillName::StandFirm}), 1},
+        },
+        5, 40, true
+    };
+    return roster;
+}
+
+// Wood Elf: Lineman 0-16, Catcher 0-4, Thrower 0-2, Wardancer 0-2, Treeman 0-1
+const TeamRoster& getWoodElfRoster() {
+    static const TeamRoster roster = {
+        "Wood Elf",
+        {
+            {{7, 3, 4, 7}, {}, 16},
+            {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint}), 4},
+            {{7, 3, 4, 7}, makeSkills({SkillName::Pass}), 2},
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap}), 2},
+            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot,
+                SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull}), 1},
+        },
+        5, 50, true
+    };
+    return roster;
+}
+
+// Chaos: Beastman 0-16, Chaos Warrior 0-4, Minotaur 0-1
+const TeamRoster& getChaosRoster() {
+    static const TeamRoster roster = {
+        "Chaos",
+        {
+            {{6, 3, 3, 8}, makeSkills({SkillName::Horns}), 16},
+            {{5, 4, 3, 9}, {}, 4},
+            {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Horns,
+                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow}), 1},
+        },
+        3, 70, true
+    };
+    return roster;
+}
+
+// Undead: Skeleton 0-16, Zombie 0-16, Ghoul 0-4, Wight 0-2, Mummy 0-2
+const TeamRoster& getUndeadRoster() {
+    static const TeamRoster roster = {
+        "Undead",
+        {
+            {{5, 3, 2, 7}, makeSkills({SkillName::Regeneration, SkillName::ThickSkull}), 16},
+            {{4, 3, 2, 8}, makeSkills({SkillName::Regeneration}), 16},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Dodge}), 4},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Regeneration}), 2},
+            {{3, 5, 1, 9}, makeSkills({SkillName::MightyBlow, SkillName::Regeneration}), 2},
+        },
+        5, 70, false
+    };
+    return roster;
+}
+
+// Lizardmen: Skink 0-16, Saurus 0-6, Kroxigor 0-1
+const TeamRoster& getLizardmenRoster() {
+    static const TeamRoster roster = {
+        "Lizardmen",
+        {
+            {{8, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Stunty}), 16},
+            {{6, 4, 1, 9}, {}, 6},
+            {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
+                SkillName::MightyBlow, SkillName::PrehensileTail, SkillName::ThickSkull}), 1},
+        },
+        3, 60, true
+    };
+    return roster;
+}
+
+// Dark Elf: Lineman 0-16, Runner 0-2, Assassin 0-2, Blitzer 0-4, Witch Elf 0-2
+const TeamRoster& getDarkElfRoster() {
+    static const TeamRoster roster = {
+        "Dark Elf",
+        {
+            {{6, 3, 4, 8}, {}, 16},
+            {{7, 3, 4, 7}, makeSkills({SkillName::DumpOff}), 2},
+            {{6, 3, 4, 7}, makeSkills({SkillName::Stab, SkillName::Shadowing}), 2},
+            {{7, 3, 4, 8}, makeSkills({SkillName::Block}), 4},
+            {{7, 3, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Frenzy, SkillName::JumpUp}), 2},
+        },
+        5, 50, true
+    };
+    return roster;
+}
+
+// Halfling: Halfling 0-16, Treeman 0-2
+const TeamRoster& getHalflingRoster() {
+    static const TeamRoster roster = {
+        "Halfling",
+        {
+            {{5, 2, 3, 6}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty}), 16},
+            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot,
+                SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::ThrowTeamMate}), 2},
+        },
+        2, 60, true
+    };
+    return roster;
+}
+
+// Norse: Lineman 0-16, Thrower 0-2, Runner 0-2, Berserker 0-2, Ulfwerener 0-2, Yhetee 0-1
+const TeamRoster& getNorseRoster() {
+    static const TeamRoster roster = {
+        "Norse",
+        {
+            {{6, 3, 3, 7}, makeSkills({SkillName::Block}), 16},
+            {{6, 3, 3, 7}, makeSkills({SkillName::Block, SkillName::Pass}), 2},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Block, SkillName::Dauntless}), 2},
+            {{6, 3, 3, 7}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::JumpUp}), 2},
+            {{6, 4, 2, 8}, makeSkills({SkillName::Frenzy}), 2},
+            {{5, 5, 1, 8}, makeSkills({SkillName::Loner, SkillName::WildAnimal,
+                SkillName::Frenzy, SkillName::DisturbingPresence, SkillName::Claw}), 1},
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// High Elf: Lineman 0-16, Catcher 0-4, Thrower 0-2, Blitzer 0-4
+const TeamRoster& getHighElfRoster() {
+    static const TeamRoster roster = {
+        "High Elf",
+        {
+            {{6, 3, 4, 8}, {}, 16},
+            {{8, 3, 4, 7}, makeSkills({SkillName::Catch}), 4},
+            {{6, 3, 4, 8}, makeSkills({SkillName::Pass, SkillName::SureHands}), 2},
+            {{7, 3, 4, 8}, makeSkills({SkillName::Block}), 4},
+        },
+        4, 50, true
+    };
+    return roster;
+}
+
+// Vampire: Thrall 0-16, Vampire 0-4
+const TeamRoster& getVampireRoster() {
+    static const TeamRoster roster = {
+        "Vampire",
+        {
+            {{6, 3, 3, 7}, {}, 16},
+            {{6, 4, 4, 8}, makeSkills({SkillName::HypnoticGaze, SkillName::Regeneration,
+                SkillName::Bloodlust}), 4},
+        },
+        2, 70, true
+    };
+    return roster;
+}
+
+// Amazon: Linewoman 0-16, Catcher 0-2, Thrower 0-2, Blitzer 0-4
+const TeamRoster& getAmazonRoster() {
+    static const TeamRoster roster = {
+        "Amazon",
+        {
+            {{6, 3, 3, 7}, makeSkills({SkillName::Dodge}), 16},
+            {{6, 3, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Catch}), 2},
+            {{6, 3, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Pass}), 2},
+            {{6, 3, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Block}), 4},
+        },
+        4, 50, true
+    };
+    return roster;
+}
+
+// Necromantic: Zombie 0-16, Ghoul 0-2, Wight 0-2, Flesh Golem 0-2, Werewolf 0-2
+const TeamRoster& getNecromanticRoster() {
+    static const TeamRoster roster = {
+        "Necromantic",
+        {
+            {{4, 3, 2, 8}, makeSkills({SkillName::Regeneration}), 16},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Dodge}), 2},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Regeneration}), 2},
+            {{4, 4, 2, 9}, makeSkills({SkillName::StandFirm, SkillName::Regeneration,
+                SkillName::Decay}), 2},
+            {{8, 3, 3, 8}, makeSkills({SkillName::Claw, SkillName::Frenzy,
+                SkillName::Regeneration}), 2},
+        },
+        5, 70, false
+    };
+    return roster;
+}
+
+// Bretonnian: Lineman 0-16, Blocker 0-4, Blitzer 0-4
+const TeamRoster& getBretonianRoster() {
+    static const TeamRoster roster = {
+        "Bretonnian",
+        {
+            {{6, 3, 3, 7}, {}, 16},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Wrestle}), 4},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Fend, SkillName::Catch}), 4},
+        },
+        3, 60, true
+    };
+    return roster;
+}
+
+// Khemri: Skeleton 0-16, Thro-Ra 0-2, Blitz-Ra 0-2, Tomb Guardian 0-4
+const TeamRoster& getKhemriRoster() {
+    static const TeamRoster roster = {
+        "Khemri",
+        {
+            {{5, 3, 2, 7}, makeSkills({SkillName::Regeneration, SkillName::ThickSkull}), 16},
+            {{6, 3, 2, 7}, makeSkills({SkillName::Pass, SkillName::Regeneration, SkillName::SureHands}), 2},
+            {{6, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Regeneration}), 2},
+            {{3, 5, 1, 9}, makeSkills({SkillName::Decay, SkillName::Regeneration}), 4},
+        },
+        4, 70, false
+    };
+    return roster;
+}
+
+// Goblin: Goblin 0-16, Bombardier 0-1, Looney 0-1, Fanatic 0-1, Pogoer 0-1, Troll 0-2
+const TeamRoster& getGoblinRoster() {
+    static const TeamRoster roster = {
+        "Goblin",
+        {
+            {{6, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty}), 16},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Bombardier, SkillName::Dodge, SkillName::SecretWeapon,
+                SkillName::Stunty}), 1},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty}), 1},
+            {{3, 7, 3, 7}, makeSkills({SkillName::BallAndChain, SkillName::NoHands,
+                SkillName::SecretWeapon, SkillName::Stunty}), 1},
+            {{7, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Leap,
+                SkillName::VeryLongLegs, SkillName::Stunty}), 1},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
+                SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
+                SkillName::ThrowTeamMate}), 2},
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Chaos Dwarf: Hobgoblin 0-16, Blocker 0-6, Bull Centaur 0-2, Minotaur 0-1
+const TeamRoster& getChaosDwarfRoster() {
+    static const TeamRoster roster = {
+        "Chaos Dwarf",
+        {
+            {{6, 3, 3, 7}, {}, 16},
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 6},
+            {{6, 4, 2, 9}, makeSkills({SkillName::Sprint, SkillName::SureFeet, SkillName::ThickSkull}), 2},
+            {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Horns,
+                SkillName::Frenzy, SkillName::WildAnimal, SkillName::MightyBlow}), 1},
+        },
+        4, 70, true
+    };
+    return roster;
+}
+
+// Ogre: Snotling 0-16, Ogre 0-6
+const TeamRoster& getOgreRoster() {
+    static const TeamRoster roster = {
+        "Ogre",
+        {
+            {{5, 1, 3, 5}, makeSkills({SkillName::Dodge, SkillName::RightStuff,
+                SkillName::Stunty, SkillName::Titchy}), 16},
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate}), 6},
+        },
+        2, 70, true
+    };
+    return roster;
+}
+
+// Nurgle: Rotter 0-16, Pestigor 0-4, Nurgle Warrior 0-4, Beast of Nurgle 0-1
+const TeamRoster& getNurgleRoster() {
+    static const TeamRoster roster = {
+        "Nurgle",
+        {
+            {{5, 3, 3, 8}, makeSkills({SkillName::Decay, SkillName::NurglesRot}), 16},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Horns, SkillName::Regeneration,
+                SkillName::NurglesRot}), 4},
+            {{4, 4, 2, 9}, makeSkills({SkillName::FoulAppearance, SkillName::Regeneration,
+                SkillName::DisturbingPresence}), 4},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::FoulAppearance,
+                SkillName::MightyBlow, SkillName::NurglesRot, SkillName::Regeneration,
+                SkillName::Tentacles, SkillName::DisturbingPresence}), 1},
+        },
+        4, 70, false
+    };
+    return roster;
+}
+
+// Pro Elf: Lineman 0-16, Catcher 0-4, Thrower 0-2, Blitzer 0-2
+const TeamRoster& getProElfRoster() {
+    static const TeamRoster roster = {
+        "Pro Elf",
+        {
+            {{6, 3, 4, 7}, {}, 16},
+            {{8, 3, 4, 7}, makeSkills({SkillName::NervesOfSteel, SkillName::Catch}), 4},
+            {{6, 3, 4, 7}, makeSkills({SkillName::Pass}), 2},
+            {{7, 3, 4, 8}, makeSkills({SkillName::Block, SkillName::SideStep}), 2},
+        },
+        4, 50, true
+    };
+    return roster;
+}
+
+// Slann: Lineman 0-16, Catcher 0-4, Blitzer 0-4, Kroxigor 0-1
+const TeamRoster& getSlannRoster() {
+    static const TeamRoster roster = {
+        "Slann",
+        {
+            {{6, 3, 3, 8}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs}), 16},
+            {{7, 3, 4, 7}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs,
+                SkillName::DivingCatch}), 4},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Leap, SkillName::VeryLongLegs,
+                SkillName::JumpUp}), 4},
+            {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead,
+                SkillName::MightyBlow, SkillName::PrehensileTail, SkillName::ThickSkull}), 1},
+        },
+        4, 50, true
+    };
+    return roster;
+}
+
+// Underworld: UW Goblin 0-12, Skaven Lineman 0-12, Skaven Thrower 0-2, Skaven Blitzer 0-2, Troll 0-1, Warpstone Troll 0-1
+const TeamRoster& getUnderworldRoster() {
+    static const TeamRoster roster = {
+        "Underworld",
+        {
+            {{6, 2, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Dodge,
+                SkillName::RightStuff, SkillName::Stunty}), 12},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Animosity}), 12},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Pass,
+                SkillName::SureHands}), 2},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Animosity, SkillName::Block}), 2},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
+                SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
+                SkillName::ThrowTeamMate}), 1},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry,
+                SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration,
+                SkillName::ThrowTeamMate, SkillName::Tentacles}), 1},
+        },
+        6, 70, true
+    };
+    return roster;
+}
+
+// Khorne: Pit Fighter 0-16, Bloodletter 0-4, Khorne Herald 0-2, Bloodthirster 0-1
+const TeamRoster& getKhorneRoster() {
+    static const TeamRoster roster = {
+        "Khorne",
+        {
+            {{6, 3, 3, 8}, makeSkills({SkillName::Frenzy}), 16},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Horns, SkillName::Regeneration,
+                SkillName::Juggernaut}), 4},
+            {{6, 3, 3, 8}, makeSkills({SkillName::Frenzy, SkillName::Juggernaut,
+                SkillName::Horns}), 2},
+            {{6, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::Frenzy,
+                SkillName::Horns, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::WildAnimal, SkillName::Regeneration, SkillName::Claw}), 1},
+        },
+        4, 70, true
+    };
+    return roster;
+}
+
+// Chaos Pact: Marauder 0-12, DE Renegade 0-1, Goblin Renegade 0-1, Skaven Renegade 0-1, Troll 0-1, Ogre 0-1, Minotaur 0-1
+const TeamRoster& getChaosPactRoster() {
+    static const TeamRoster roster = {
+        "Chaos Pact",
+        {
+            {{6, 3, 3, 8}, {}, 12},
+            {{6, 3, 4, 8}, makeSkills({SkillName::Animosity}), 1},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Animosity, SkillName::Stunty,
+                SkillName::RightStuff}), 1},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Animosity}), 1},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::Animosity,
+                SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid,
+                SkillName::Regeneration, SkillName::ThrowTeamMate}), 1},
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::Animosity,
+                SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull,
+                SkillName::ThrowTeamMate}), 1},
+            {{5, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Animosity,
+                SkillName::Horns, SkillName::Frenzy, SkillName::WildAnimal,
+                SkillName::MightyBlow}), 1},
+        },
+        7, 70, true
+    };
+    return roster;
+}
+
+RosterSpeed classifyRosterSpeed(const TeamRoster& roster) {
+    // Build 11-player team same as buildTeam: specialists from back, linemen fill rest
+    int maSum = 0;
+    int specSlot = 10;
+
+    for (int t = 1; t < roster.positionalCount && specSlot >= 0; ++t) {
+        int qty = std::min((int)roster.positionals[t].quantity, specSlot + 1);
+        for (int q = 0; q < qty && specSlot >= 0; ++q) {
+            maSum += roster.positionals[t].stats.movement;
+            specSlot--;
+        }
+    }
+    // Fill remaining with linemen (index 0)
+    for (int i = 0; i <= specSlot; ++i) {
+        maSum += roster.positionals[0].stats.movement;
+    }
+
+    float avgMA = static_cast<float>(maSum) / 11.0f;
+    if (avgMA > 7.0f) return RosterSpeed::FAST;
+    if (avgMA <= 5.0f) return RosterSpeed::SLOW;
+    return RosterSpeed::MIXED;
+}
+
+// === Developed (TV~1200) rosters ===
+// Per-player skill variation is expressed by splitting a position into
+// separate positional templates (e.g. Blitzer +Guard vs Blitzer ball-hunter).
+// buildTeam fields specialists (index 1+) first, then fills with linemen (index 0).
+
+// Orc TV~1200: goblins removed. 4 Blitzers, 4 Black Orcs, 1 Thrower, 2 Linemen.
+const TeamRoster& getOrcRoster1200() {
+    static const TeamRoster roster = {
+        "Orc (TV1200)",
+        {
+            {{5, 3, 3, 9}, {}, 11},  // Lineman (fill)
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard}), 4},  // Black Orc +Guard
+            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Human TV~1200: 4 Blitzers, 1 Thrower, 2 Catchers, 1 Ogre, 3 Linemen.
+const TeamRoster& getHumanRoster1200() {
+    static const TeamRoster roster = {
+        "Human (TV1200)",
+        {
+            {{6, 3, 3, 8}, {}, 11},  // Lineman (fill)
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 2},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1},  // Blitzer +Mighty Blow
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block}), 2},  // Catcher +Block
+            {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow,
+                SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1},  // Ogre +Block
+        },
+        7, 50, true
+    };
+    return roster;
+}
+
+// Dwarf TV~1200: lots of Guard. 6 Longbeards, 2 Blitzers, 2 Troll Slayers, 2 Runners (no Deathroller).
+const TeamRoster& getDwarfRoster1200() {
+    static const TeamRoster roster = {
+        "Dwarf (TV1200)",
+        {
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11},  // Longbeard (fill)
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 4},  // Longbeard +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard}), 1},  // Blitzer +Guard
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::StripBall}), 1},  // Blitzer ball-hunter
+            {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
+                SkillName::Dauntless, SkillName::Guard}), 2},  // Troll Slayer +Guard
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2},  // Runner +Block
+        },
+        6, 40, true
+    };
+    return roster;
+}
+
+// Skaven TV~1200: Sure Feet on all Gutter Runners. 4 Gutter Runners, 2 Blitzers, 1 Thrower, 4 Linemen.
+const TeamRoster& getSkavenRoster1200() {
+    static const TeamRoster roster = {
+        "Skaven (TV1200)",
+        {
+            {{7, 3, 3, 7}, {}, 11},  // Lineman (fill)
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet}), 4},  // Gutter Runner +Sure Feet
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 1},  // Blitzer +Guard
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1},  // Blitzer ball-hunter
+            {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2},  // Lineman +Wrestle
+        },
+        6, 60, true
+    };
+    return roster;
+}
+
+// Wood Elf TV~1200: agile/passing. 2 Wardancers, 2 Catchers, 1 Thrower, 1 Treeman, 5 Linemen.
+const TeamRoster& getWoodElfRoster1200() {
+    static const TeamRoster roster = {
+        "Wood Elf (TV1200)",
+        {
+            {{7, 3, 4, 7}, {}, 11},  // Lineman (fill)
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::StripBall}), 1},  // Wardancer ball-hunter
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::SideStep}), 1},  // Wardancer +Side Step
+            {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
+                SkillName::Block}), 2},  // Catcher +Block
+            {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1},  // Thrower +Block
+            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1},  // Treeman +Guard
+        },
+        6, 50, true
+    };
+    return roster;
+}
+
+const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
+    if (tv >= 1200) {
+        std::string lower = toLower(name);
+        std::string normalized;
+        for (char c : lower) {
+            if (c != ' ' && c != '_' && c != '-') normalized += c;
+        }
+        if (normalized == "orc") return &getOrcRoster1200();
+        if (normalized == "human") return &getHumanRoster1200();
+        if (normalized == "dwarf") return &getDwarfRoster1200();
+        if (normalized == "skaven") return &getSkavenRoster1200();
+        if (normalized == "woodelf") return &getWoodElfRoster1200();
+    }
+    return getRosterByName(name);
+}
+
+const TeamRoster* getRosterByName(const std::string& name) {
+    std::string lower = toLower(name);
+
+    // Remove spaces/underscores for flexible matching
+    std::string normalized;
+    for (char c : lower) {
+        if (c != ' ' && c != '_' && c != '-') normalized += c;
+    }
+
+    if (normalized == "human") return &getHumanRoster();
+    if (normalized == "orc") return &getOrcRoster();
+    if (normalized == "skaven") return &getSkavenRoster();
+    if (normalized == "dwarf") return &getDwarfRoster();
+    if (normalized == "woodelf") return &getWoodElfRoster();
+    if (normalized == "chaos") return &getChaosRoster();
+    if (normalized == "undead") return &getUndeadRoster();
+    if (normalized == "lizardmen") return &getLizardmenRoster();
+    if (normalized == "darkelf") return &getDarkElfRoster();
+    if (normalized == "halfling") return &getHalflingRoster();
+    if (normalized == "norse") return &getNorseRoster();
+    if (normalized == "highelf") return &getHighElfRoster();
+    if (normalized == "vampire") return &getVampireRoster();
+    if (normalized == "amazon") return &getAmazonRoster();
+    if (normalized == "necromantic") return &getNecromanticRoster();
+    if (normalized == "bretonnian") return &getBretonianRoster();
+    if (normalized == "khemri") return &getKhemriRoster();
+    if (normalized == "goblin") return &getGoblinRoster();
+    if (normalized == "chaosdwarf") return &getChaosDwarfRoster();
+    if (normalized == "ogre") return &getOgreRoster();
+    if (normalized == "nurgle") return &getNurgleRoster();
+    if (normalized == "proelf") return &getProElfRoster();
+    if (normalized == "slann") return &getSlannRoster();
+    if (normalized == "underworld") return &getUnderworldRoster();
+    if (normalized == "khorne") return &getKhorneRoster();
+    if (normalized == "chaospact") return &getChaosPactRoster();
+
+    return nullptr;
+}
+
+} // namespace bb

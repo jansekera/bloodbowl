@@ -1,0 +1,9 @@
+test                                 r  SE(boot,hry)      σ   n kol   her
+skaven: dirty_N→Δx_N+1          -0.064        0.0150  -4.3σ    3370   739
+human:  dirty_N→ball_lost       +0.039        0.0209  +1.9σ    3659   743
+orc:    dirty_N→ball_lost       +0.046        0.0189  +2.4σ    3631   741
+skaven: dirty_N→ball_lost       +0.030        0.0189  +1.6σ    4182   748
+wood-elf: dirty_N→ball_lost     +0.018        0.0167  +1.1σ    4207   743
+VŠE: dirty_N→čisté_N+1          -0.098        0.0076 -13.0σ   13501  2942
+VŠE: dirty_N→Δx_N+1             -0.015        0.0084  -1.7σ   12637  2928
+VŠE: bloky_N→čisté_N+1          -0.064        0.0090  -7.1σ   13501  2942

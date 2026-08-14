@@ -1,0 +1,59 @@
+=== A) SJEDNOCENÁ HROZBA NA NOSIČE / SOUPEŘOVO KOLO (model) ===
+race          n  THREATnet  THREATraw P(nosič↓)emp P(ztráta)emp  naše TD
+human      5355      0.450      0.488        0.162        0.149      178
+orc        4854      0.424      0.455        0.173        0.158       86
+skaven     6543      0.400      0.441        0.125        0.118      451
+wood-elf   6101      0.413      0.512        0.151        0.142      260
+
+=== A2) KANÁL nejlepší hrozby (argmax THREAT_net), podíl kol ===
+race           síla≥2k síla≥2k+skill    1k Wrestle      1k Strip     1k prostý      do kopce     nedosáhne
+human            57.1%          0.7%          0.0%          2.5%         32.3%          0.8%          6.6%
+orc              63.2%          1.1%          0.0%          4.8%          9.3%          0.0%         21.7%
+skaven            1.2%          5.1%         51.1%          4.4%         19.2%          4.4%         14.5%
+wood-elf         38.4%          0.9%          0.0%          5.5%         45.0%          1.3%          9.0%
+
+=== A3) STRIP BALL: dosažitelný stripper / kolo — syrově vs po Sure Hands ===
+race        raw (kol %)    net (kol %)  nosič bez SureHands
+human             21.9%           3.2%                14.1%
+orc               25.5%           5.9%                13.4%
+skaven            26.4%           5.3%                22.7%
+wood-elf          47.2%           6.3%                17.1%
+
+=== A4) KALIBRACE: empirie podle pásem THREAT_net (pool všech ras) ===
+THREAT              n    P(↓)emp  P(ztráta)
+ 0.00–0.05     2908      0.000      0.000
+ 0.05–0.15      411      0.054      0.051
+ 0.25–0.35     6178      0.095      0.086
+ 0.45–1.01    13356      0.212      0.199
+
+-- P(↓)emp v pásmu THREAT_net 0.15–0.35 per-race (test 'stejná hrozba, stejná konverze') --
+  human    0.095 (n=1728)
+  orc      0.095 (n=451)
+  skaven   0.105 (n=1254)
+  wood-elf 0.090 (n=2745)
+
+=== B) EMPIRIE Z EVENTŮ: čím nosič reálně padá (face posledního bloku) ===
+race     faces sražení nosiče v soupeřově kole
+human    n= 871 | DS 52%, DD 48%
+orc      n= 848 | DD 50%, DS 50%
+skaven   n= 768 | DS 59%, DD 41%
+wood-elf n= 917 | DS 53%, DD 47%
+
+race     Wrestle použit/hru …z toho BD na nosiče   SureHands negace/hru strip uspěl/hru
+human                  0.00                  0                   0.04           0.02
+orc                    0.00                  0                   0.05           0.02
+skaven                 0.16                 49                   0.11           0.05
+wood-elf               0.00                  0                   0.21           0.05
+
+=== C) ZRCADLO: JEJICH nosič v NAŠEM kole (odkud jsou krádeže) ===
+race          n    P(nosič↓)    P(ztráta)    náš BLZ≥2     STEAL+TD/750
+human      5157        0.183        0.162        19.0%               82
+orc        5619        0.113        0.104         7.5%               31
+skaven     4126        0.347        0.317        54.4%              198
+wood-elf   4374        0.266        0.238        43.4%              102
+
+-- kdo u nich nosí (kola s jejich držením) --
+human    Thrower 74%, Lineman 10%, Catcher 8%, Blitzer 7%
+orc      Thrower 78%, Blitzer 10%, Lineman 5%, Blitzer ball-hunter 5%
+skaven   Thrower 47%, Gutter Runner 39%, Lineman 10%, Blitzer ball-hunter 2%
+wood-elf Lineman 43%, Catcher 42%, Wardancer ball-hunter 8%, Wardancer 4%

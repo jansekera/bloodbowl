@@ -47,6 +47,12 @@ WORKERS = int(os.environ.get("WORKERS", "10"))
 #   CAGE_GATE=0  produkční stav -- A/B brány 13.08. NEPROŠLO, takže korpus,
 #                který má popisovat hranou hru, ji má vypnutou
 CAGE_GATE = os.environ.get("CAGE_GATE", "1") != "0"
+#   DAUNTLESS=1  nabídka bloku oceňuje sílu, na kterou by Dauntless srovnal
+#                (P13, 14.08.). Default 0 = produkční stav. Platí pro OBĚ strany:
+#                není to naše doktrína, je to filtr, který neviděl dovednost,
+#                kterou resolver už ctí — na jedné straně by to srovnávalo dva
+#                různé enginy, ne dvě ramena.
+DAUNTLESS = os.environ.get("DAUNTLESS", "0") != "0"
 BASE_SEED = int(os.environ.get("SEED_BASE", "20260811"))
 DATA_ROOT = Path(os.environ.get(
     "DATA_ROOT", "diag_replay_mine_20260813_gate_data"))
@@ -80,6 +86,7 @@ def _game_worker(args: tuple) -> dict:
         # jediný rozdíl proti 20260811b: brána na trpasličí straně
         cage_advance=CAGE_GATE and dwarf_home,
         away_cage_advance=CAGE_GATE and not dwarf_home,
+        dauntless_in_offer=DAUNTLESS,
     )
     turns = lgr.get_turn_logs()
     rec = {

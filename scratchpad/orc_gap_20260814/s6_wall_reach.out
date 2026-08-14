@@ -1,0 +1,37 @@
+=== P(nosič↓) podle vzdálenosti: nejbližší STOJÍCÍ soupeř ===
+race                   1             2-3             4-6              7+           žádný
+human       0.415 (n= 802)    0.184 (n=2287)    0.089 (n=1112)    0.015 (n=1095)    0.000 (n=  59)
+orc         0.511 (n= 548)    0.239 (n=2011)    0.072 (n=1064)    0.002 (n=1216)    0.000 (n=  15)
+skaven      0.334 (n= 755)    0.155 (n=2520)    0.099 (n=1381)    0.029 (n=1296)    0.000 (n= 591)
+wood-elf    0.388 (n= 832)    0.175 (n=2622)    0.079 (n=1322)    0.027 (n=1216)    0.000 (n= 109)
+
+=== P(nosič↓) podle vzdálenosti: nejbližší stojící ST4+ ===
+race                   1             2-3             4-6              7+           žádný
+human       0.466 (n= 148)    0.266 (n=1004)    0.170 (n=1467)    0.052 (n=1347)    0.154 (n=1389)
+orc         0.641 (n= 217)    0.284 (n=1620)    0.127 (n=1402)    0.019 (n=1415)    0.175 (n= 200)
+skaven                 —               —               —               —    0.125 (n=6543)
+wood-elf    0.568 (n= 118)    0.257 (n=1278)    0.137 (n=2005)    0.067 (n=1747)    0.139 (n= 953)
+
+=== ROZLOŽENÍ EXPOZICE: podíl soupeřových kol s nosičem dle koše (d_all) ===
+race             1       2-3       4-6        7+     žádný         n
+human        15.0%     42.7%     20.8%     20.4%      1.1%      5355
+orc          11.3%     41.4%     21.9%     25.1%      0.3%      4854
+skaven       11.5%     38.5%     21.1%     19.8%      9.0%      6543
+wood-elf     13.6%     43.0%     21.7%     19.9%      1.8%      6101
+
+=== TOTÉŽ pro ST4+ (d_st4) ===
+race             1       2-3       4-6        7+     žádný         n
+human         2.8%     18.7%     27.4%     25.2%     25.9%      5355
+orc           4.5%     33.4%     28.9%     29.2%      4.1%      4854
+skaven        0.0%      0.0%      0.0%      0.0%    100.0%      6543
+wood-elf      1.9%     20.9%     32.9%     28.6%     15.6%      6101
+
+=== Vzdálenost nosiče od EZ podle koše d_all (orc) — kde stojíme, když nás bijí ===
+  d_all 1      n=  548  prům. vzdál. od EZ 14.1
+  d_all 2-3    n= 2011  prům. vzdál. od EZ 14.7
+  d_all 4-6    n= 1064  prům. vzdál. od EZ 17.6
+  d_all 7+     n= 1216  prům. vzdál. od EZ 20.9
+  d_all žádný  n=   15  prům. vzdál. od EZ 9.4
+
+=== BOOTSTRAP (orc, po hrách): P(down|adjacent) − P(down|d>=4) ===
+  adjacent 0.511 (n=548) | d>=4 0.035 (n=2280) | diff CI [0.434, 0.520]

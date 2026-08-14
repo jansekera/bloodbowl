@@ -1,0 +1,5 @@
+her: 3000 | her s aspoň jedním naším hand-offem: 0 (0.0 %)
+   CATCH/fail       1807   (0.602 na hru)
+   CATCH/ok         1948   (0.649 na hru)
+   PASS/fail          21   (0.007 na hru)
+   PASS/ok            19   (0.006 na hru)

@@ -1,0 +1,758 @@
+[
+ {
+  "arm": "control",
+  "all": {
+   "n": 600,
+   "W": 192,
+   "D": 216,
+   "L": 192,
+   "decisive": 384,
+   "decisive_wr": 0.5,
+   "wilson95": [
+    0.4502,
+    0.5498
+   ],
+   "z": 0.0,
+   "chess_score": 0.5,
+   "draw_rate": 0.36
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 87,
+   "D": 108,
+   "L": 105,
+   "decisive": 192,
+   "decisive_wr": 0.4531,
+   "wilson95": [
+    0.3843,
+    0.5238
+   ],
+   "z": -1.299,
+   "chess_score": 0.47,
+   "draw_rate": 0.36
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 105,
+   "D": 108,
+   "L": 87,
+   "decisive": 192,
+   "decisive_wr": 0.5469,
+   "wilson95": [
+    0.4762,
+    0.6157
+   ],
+   "z": 1.299,
+   "chess_score": 0.53,
+   "draw_rate": 0.36
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 34,
+    "D": 53,
+    "L": 33,
+    "decisive": 67,
+    "decisive_wr": 0.5075,
+    "wilson95": [
+     0.3906,
+     0.6235
+    ],
+    "z": 0.122,
+    "chess_score": 0.5042,
+    "draw_rate": 0.4417
+   },
+   "orc": {
+    "n": 120,
+    "W": 26,
+    "D": 46,
+    "L": 48,
+    "decisive": 74,
+    "decisive_wr": 0.3514,
+    "wilson95": [
+     0.2524,
+     0.465
+    ],
+    "z": -2.557,
+    "chess_score": 0.4083,
+    "draw_rate": 0.3833
+   },
+   "skaven": {
+    "n": 120,
+    "W": 49,
+    "D": 34,
+    "L": 37,
+    "decisive": 86,
+    "decisive_wr": 0.5698,
+    "wilson95": [
+     0.4644,
+     0.6692
+    ],
+    "z": 1.294,
+    "chess_score": 0.55,
+    "draw_rate": 0.2833
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 26,
+    "D": 38,
+    "L": 56,
+    "decisive": 82,
+    "decisive_wr": 0.3171,
+    "wilson95": [
+     0.2265,
+     0.424
+    ],
+    "z": -3.313,
+    "chess_score": 0.375,
+    "draw_rate": 0.3167
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 57,
+    "D": 45,
+    "L": 18,
+    "decisive": 75,
+    "decisive_wr": 0.76,
+    "wilson95": [
+     0.6522,
+     0.8425
+    ],
+    "z": 4.503,
+    "chess_score": 0.6625,
+    "draw_rate": 0.375
+   }
+  },
+  "sanity_flags": []
+ },
+ {
+  "arm": "noreset1",
+  "all": {
+   "n": 600,
+   "W": 193,
+   "D": 240,
+   "L": 167,
+   "decisive": 360,
+   "decisive_wr": 0.5361,
+   "wilson95": [
+    0.4845,
+    0.587
+   ],
+   "z": 1.37,
+   "chess_score": 0.5217,
+   "draw_rate": 0.4
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 91,
+   "D": 109,
+   "L": 100,
+   "decisive": 191,
+   "decisive_wr": 0.4764,
+   "wilson95": [
+    0.4068,
+    0.547
+   ],
+   "z": -0.651,
+   "chess_score": 0.485,
+   "draw_rate": 0.3633
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 102,
+   "D": 131,
+   "L": 67,
+   "decisive": 169,
+   "decisive_wr": 0.6036,
+   "wilson95": [
+    0.5283,
+    0.6742
+   ],
+   "z": 2.692,
+   "chess_score": 0.5583,
+   "draw_rate": 0.4367
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 40,
+    "D": 47,
+    "L": 33,
+    "decisive": 73,
+    "decisive_wr": 0.5479,
+    "wilson95": [
+     0.4342,
+     0.6569
+    ],
+    "z": 0.819,
+    "chess_score": 0.5292,
+    "draw_rate": 0.3917
+   },
+   "orc": {
+    "n": 120,
+    "W": 30,
+    "D": 57,
+    "L": 33,
+    "decisive": 63,
+    "decisive_wr": 0.4762,
+    "wilson95": [
+     0.3578,
+     0.5973
+    ],
+    "z": -0.378,
+    "chess_score": 0.4875,
+    "draw_rate": 0.475
+   },
+   "skaven": {
+    "n": 120,
+    "W": 41,
+    "D": 46,
+    "L": 33,
+    "decisive": 74,
+    "decisive_wr": 0.5541,
+    "wilson95": [
+     0.4409,
+     0.6618
+    ],
+    "z": 0.93,
+    "chess_score": 0.5333,
+    "draw_rate": 0.3833
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 21,
+    "D": 49,
+    "L": 50,
+    "decisive": 71,
+    "decisive_wr": 0.2958,
+    "wilson95": [
+     0.2023,
+     0.4102
+    ],
+    "z": -3.442,
+    "chess_score": 0.3792,
+    "draw_rate": 0.4083
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 61,
+    "D": 41,
+    "L": 18,
+    "decisive": 79,
+    "decisive_wr": 0.7722,
+    "wilson95": [
+     0.6683,
+     0.8507
+    ],
+    "z": 4.838,
+    "chess_score": 0.6792,
+    "draw_rate": 0.3417
+   }
+  },
+  "sanity_flags": []
+ },
+ {
+  "arm": "noreset2",
+  "all": {
+   "n": 600,
+   "W": 187,
+   "D": 223,
+   "L": 190,
+   "decisive": 377,
+   "decisive_wr": 0.496,
+   "wilson95": [
+    0.4458,
+    0.5463
+   ],
+   "z": -0.155,
+   "chess_score": 0.4975,
+   "draw_rate": 0.3717
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 96,
+   "D": 106,
+   "L": 98,
+   "decisive": 194,
+   "decisive_wr": 0.4948,
+   "wilson95": [
+    0.4253,
+    0.5646
+   ],
+   "z": -0.144,
+   "chess_score": 0.4967,
+   "draw_rate": 0.3533
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 91,
+   "D": 117,
+   "L": 92,
+   "decisive": 183,
+   "decisive_wr": 0.4973,
+   "wilson95": [
+    0.4256,
+    0.569
+   ],
+   "z": -0.074,
+   "chess_score": 0.4983,
+   "draw_rate": 0.39
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 32,
+    "D": 42,
+    "L": 46,
+    "decisive": 78,
+    "decisive_wr": 0.4103,
+    "wilson95": [
+     0.3078,
+     0.5211
+    ],
+    "z": -1.585,
+    "chess_score": 0.4417,
+    "draw_rate": 0.35
+   },
+   "orc": {
+    "n": 120,
+    "W": 29,
+    "D": 50,
+    "L": 41,
+    "decisive": 70,
+    "decisive_wr": 0.4143,
+    "wilson95": [
+     0.3063,
+     0.5312
+    ],
+    "z": -1.434,
+    "chess_score": 0.45,
+    "draw_rate": 0.4167
+   },
+   "skaven": {
+    "n": 120,
+    "W": 43,
+    "D": 47,
+    "L": 30,
+    "decisive": 73,
+    "decisive_wr": 0.589,
+    "wilson95": [
+     0.4745,
+     0.6947
+    ],
+    "z": 1.522,
+    "chess_score": 0.5542,
+    "draw_rate": 0.3917
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 25,
+    "D": 39,
+    "L": 56,
+    "decisive": 81,
+    "decisive_wr": 0.3086,
+    "wilson95": [
+     0.2186,
+     0.416
+    ],
+    "z": -3.444,
+    "chess_score": 0.3708,
+    "draw_rate": 0.325
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 58,
+    "D": 45,
+    "L": 17,
+    "decisive": 75,
+    "decisive_wr": 0.7733,
+    "wilson95": [
+     0.6666,
+     0.8534
+    ],
+    "z": 4.734,
+    "chess_score": 0.6708,
+    "draw_rate": 0.375
+   }
+  },
+  "sanity_flags": []
+ },
+ {
+  "arm": "noreset3",
+  "all": {
+   "n": 600,
+   "W": 178,
+   "D": 241,
+   "L": 181,
+   "decisive": 359,
+   "decisive_wr": 0.4958,
+   "wilson95": [
+    0.4444,
+    0.5473
+   ],
+   "z": -0.158,
+   "chess_score": 0.4975,
+   "draw_rate": 0.4017
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 89,
+   "D": 118,
+   "L": 93,
+   "decisive": 182,
+   "decisive_wr": 0.489,
+   "wilson95": [
+    0.4174,
+    0.5611
+   ],
+   "z": -0.296,
+   "chess_score": 0.4933,
+   "draw_rate": 0.3933
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 89,
+   "D": 123,
+   "L": 88,
+   "decisive": 177,
+   "decisive_wr": 0.5028,
+   "wilson95": [
+    0.4299,
+    0.5756
+   ],
+   "z": 0.075,
+   "chess_score": 0.5017,
+   "draw_rate": 0.41
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 42,
+    "D": 44,
+    "L": 34,
+    "decisive": 76,
+    "decisive_wr": 0.5526,
+    "wilson95": [
+     0.441,
+     0.6592
+    ],
+    "z": 0.918,
+    "chess_score": 0.5333,
+    "draw_rate": 0.3667
+   },
+   "orc": {
+    "n": 120,
+    "W": 29,
+    "D": 48,
+    "L": 43,
+    "decisive": 72,
+    "decisive_wr": 0.4028,
+    "wilson95": [
+     0.2972,
+     0.5182
+    ],
+    "z": -1.65,
+    "chess_score": 0.4417,
+    "draw_rate": 0.4
+   },
+   "skaven": {
+    "n": 120,
+    "W": 38,
+    "D": 50,
+    "L": 32,
+    "decisive": 70,
+    "decisive_wr": 0.5429,
+    "wilson95": [
+     0.427,
+     0.6543
+    ],
+    "z": 0.717,
+    "chess_score": 0.525,
+    "draw_rate": 0.4167
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 22,
+    "D": 50,
+    "L": 48,
+    "decisive": 70,
+    "decisive_wr": 0.3143,
+    "wilson95": [
+     0.2176,
+     0.4303
+    ],
+    "z": -3.108,
+    "chess_score": 0.3917,
+    "draw_rate": 0.4167
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 47,
+    "D": 49,
+    "L": 24,
+    "decisive": 71,
+    "decisive_wr": 0.662,
+    "wilson95": [
+     0.5462,
+     0.7612
+    ],
+    "z": 2.73,
+    "chess_score": 0.5958,
+    "draw_rate": 0.4083
+   }
+  },
+  "sanity_flags": []
+ },
+ {
+  "arm": "noreset4",
+  "all": {
+   "n": 600,
+   "W": 197,
+   "D": 225,
+   "L": 178,
+   "decisive": 375,
+   "decisive_wr": 0.5253,
+   "wilson95": [
+    0.4748,
+    0.5754
+   ],
+   "z": 0.981,
+   "chess_score": 0.5158,
+   "draw_rate": 0.375
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 108,
+   "D": 106,
+   "L": 86,
+   "decisive": 194,
+   "decisive_wr": 0.5567,
+   "wilson95": [
+    0.4864,
+    0.6248
+   ],
+   "z": 1.58,
+   "chess_score": 0.5367,
+   "draw_rate": 0.3533
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 89,
+   "D": 119,
+   "L": 92,
+   "decisive": 181,
+   "decisive_wr": 0.4917,
+   "wilson95": [
+    0.4198,
+    0.564
+   ],
+   "z": -0.223,
+   "chess_score": 0.495,
+   "draw_rate": 0.3967
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 39,
+    "D": 45,
+    "L": 36,
+    "decisive": 75,
+    "decisive_wr": 0.52,
+    "wilson95": [
+     0.4087,
+     0.6293
+    ],
+    "z": 0.346,
+    "chess_score": 0.5125,
+    "draw_rate": 0.375
+   },
+   "orc": {
+    "n": 120,
+    "W": 31,
+    "D": 49,
+    "L": 40,
+    "decisive": 71,
+    "decisive_wr": 0.4366,
+    "wilson95": [
+     0.3275,
+     0.5523
+    ],
+    "z": -1.068,
+    "chess_score": 0.4625,
+    "draw_rate": 0.4083
+   },
+   "skaven": {
+    "n": 120,
+    "W": 38,
+    "D": 44,
+    "L": 38,
+    "decisive": 76,
+    "decisive_wr": 0.5,
+    "wilson95": [
+     0.3903,
+     0.6097
+    ],
+    "z": 0.0,
+    "chess_score": 0.5,
+    "draw_rate": 0.3667
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 24,
+    "D": 46,
+    "L": 50,
+    "decisive": 74,
+    "decisive_wr": 0.3243,
+    "wilson95": [
+     0.2286,
+     0.4373
+    ],
+    "z": -3.022,
+    "chess_score": 0.3917,
+    "draw_rate": 0.3833
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 65,
+    "D": 41,
+    "L": 14,
+    "decisive": 79,
+    "decisive_wr": 0.8228,
+    "wilson95": [
+     0.7242,
+     0.8914
+    ],
+    "z": 5.738,
+    "chess_score": 0.7125,
+    "draw_rate": 0.3417
+   }
+  },
+  "sanity_flags": []
+ },
+ {
+  "arm": "champion",
+  "all": {
+   "n": 600,
+   "W": 196,
+   "D": 237,
+   "L": 167,
+   "decisive": 363,
+   "decisive_wr": 0.5399,
+   "wilson95": [
+    0.4885,
+    0.5905
+   ],
+   "z": 1.522,
+   "chess_score": 0.5242,
+   "draw_rate": 0.395
+  },
+  "subj_home": {
+   "n": 300,
+   "W": 99,
+   "D": 118,
+   "L": 83,
+   "decisive": 182,
+   "decisive_wr": 0.544,
+   "wilson95": [
+    0.4714,
+    0.6147
+   ],
+   "z": 1.186,
+   "chess_score": 0.5267,
+   "draw_rate": 0.3933
+  },
+  "subj_away": {
+   "n": 300,
+   "W": 97,
+   "D": 119,
+   "L": 84,
+   "decisive": 181,
+   "decisive_wr": 0.5359,
+   "wilson95": [
+    0.4633,
+    0.6071
+   ],
+   "z": 0.966,
+   "chess_score": 0.5217,
+   "draw_rate": 0.3967
+  },
+  "per_race_subj": {
+   "human": {
+    "n": 120,
+    "W": 42,
+    "D": 43,
+    "L": 35,
+    "decisive": 77,
+    "decisive_wr": 0.5455,
+    "wilson95": [
+     0.4347,
+     0.6519
+    ],
+    "z": 0.798,
+    "chess_score": 0.5292,
+    "draw_rate": 0.3583
+   },
+   "orc": {
+    "n": 120,
+    "W": 35,
+    "D": 51,
+    "L": 34,
+    "decisive": 69,
+    "decisive_wr": 0.5072,
+    "wilson95": [
+     0.3921,
+     0.6217
+    ],
+    "z": 0.12,
+    "chess_score": 0.5042,
+    "draw_rate": 0.425
+   },
+   "skaven": {
+    "n": 120,
+    "W": 38,
+    "D": 48,
+    "L": 34,
+    "decisive": 72,
+    "decisive_wr": 0.5278,
+    "wilson95": [
+     0.414,
+     0.6387
+    ],
+    "z": 0.471,
+    "chess_score": 0.5167,
+    "draw_rate": 0.4
+   },
+   "dwarf": {
+    "n": 120,
+    "W": 25,
+    "D": 53,
+    "L": 42,
+    "decisive": 67,
+    "decisive_wr": 0.3731,
+    "wilson95": [
+     0.2672,
+     0.4928
+    ],
+    "z": -2.077,
+    "chess_score": 0.4292,
+    "draw_rate": 0.4417
+   },
+   "wood-elf": {
+    "n": 120,
+    "W": 56,
+    "D": 42,
+    "L": 22,
+    "decisive": 78,
+    "decisive_wr": 0.7179,
+    "wilson95": [
+     0.6097,
+     0.8057
+    ],
+    "z": 3.85,
+    "chess_score": 0.6417,
+    "draw_rate": 0.35
+   }
+  },
+  "sanity_flags": []
+ }
+]

@@ -1,0 +1,121 @@
+korpus /home/jan/claude/bloodbowl/diag_replay_mine_20260813_big_data: 40387 vzorků (naše kolo s platným soupeřovým kolem po něm)
+vyloučeno: {'nase_kolo_TD': 976, 'konec_pulky_po_nich': 2583, 'konec_pulky_po_nas': 2845, 'souperovo_kolo_TD': 1207}
+
+== PRŮMĚRY PREDIKTORŮ (vše | podle rasy soupeře) ==
+            vše     human       orc    skaven  wood-elf
+FB         1.87      2.05      1.63      1.99      1.83
+FB2        1.03      1.15      1.20      0.83      0.93
+MARKED     1.57      1.73      1.32      1.62      1.60
+SURF       0.03      0.03      0.02      0.03      0.03
+ESC        4.18      4.13      4.04      4.38      4.13
+REACH      4.40      4.88      3.85      4.26      4.55
+REACH0     1.88      2.04      1.73      1.76      1.99
+BLZ        1.42      1.62      1.88      0.92      1.45
+CCBAD      2.74      2.77      2.58      2.87      2.71
+
+průměry výsledků:
+down       n=40387   0.594  human=0.632  orc=0.697  skaven=0.497  wood-elf=0.548
+lost       n=40387   0.060  human=0.072  orc=0.065  skaven=0.043  wood-elf=0.058
+ball_lost  n=22853   0.140  human=0.149  orc=0.158  skaven=0.118  wood-elf=0.142
+appr       n=19644   0.245  human=-0.312  orc=-1.034  skaven=2.032  wood-elf=-0.244
+
+== KORELACE prediktor x výsledek (Pearson r, hvězdička = |r| > 2/sqrt(n)) ==
+                down        lost   ball_lost        appr
+FB           0.443*      0.105*      0.065*     -0.094* 
+FB2          0.434*      0.098*      0.042*     -0.083* 
+MARKED       0.308*      0.083*      0.056*     -0.050* 
+SURF         0.002       0.009       0.035*      0.022* 
+ESC         -0.074*     -0.031*     -0.121*      0.024* 
+REACH        0.200*      0.076*      0.145*     -0.134* 
+REACH0       0.105*      0.059*      0.337*     -0.062* 
+BLZ          0.156*      0.068*      0.165*     -0.159* 
+CCBAD        0.038*      0.018*      0.170*      0.050* 
+
+== KORELACE UVNITŘ RASY (down; ball_lost) — kontrola, že to není jen rozdíl ras ==
+FB        human:0.44/0.05  orc:0.46/0.08  skaven:0.47/0.07  wood-elf:0.45/0.07
+FB2       human:0.40/0.02  orc:0.44/0.07  skaven:0.45/0.03  wood-elf:0.42/0.03
+MARKED    human:0.29/0.05  orc:0.39/0.08  skaven:0.30/0.05  wood-elf:0.31/0.06
+SURF      human:0.01/0.03  orc:0.02/0.04  skaven:-0.01/0.05  wood-elf:-0.00/0.03
+ESC       human:-0.06/-0.14  orc:-0.08/-0.18  skaven:-0.02/-0.06  wood-elf:-0.12/-0.11
+REACH     human:0.18/0.12  orc:0.18/0.27  skaven:0.26/0.10  wood-elf:0.19/0.11
+REACH0    human:0.08/0.35  orc:0.13/0.42  skaven:0.08/0.26  wood-elf:0.14/0.32
+BLZ       human:0.13/0.16  orc:0.12/0.12  skaven:0.14/0.14  wood-elf:0.15/0.22
+CCBAD     human:0.05/0.18  orc:0.10/0.21  skaven:0.01/0.15  wood-elf:0.03/0.16
+
+-- FB po koších --
+koš        n       down       lost  ball_lost
+0-0     8560      0.200      0.031      0.119
+1-2    20227      0.512      0.052      0.139
+3-4     8747      0.924      0.085      0.173
+5-6     2422      1.287      0.115      0.247
+7+       431      1.722      0.151      0.312
+
+-- FB2 po koších --
+koš        n       down       lost  ball_lost
+0-0    22134      0.326      0.039      0.130
+1-1     6397      0.724      0.075      0.177
+2-2     5618      0.843      0.073      0.134
+3-3     3047      1.044      0.091      0.200
+4+      3191      1.332      0.115      0.185
+
+-- MARKED po koších --
+koš        n       down       lost  ball_lost
+0-1    21229      0.388      0.043      0.127
+2-3    16217      0.808      0.074      0.160
+4-5     2792      0.914      0.100      0.187
+6-7      145      0.814      0.124      0.136
+8+         4      0.500      0.000      0.000
+
+-- REACH po koších --
+koš        n       down       lost  ball_lost
+0-0     2908      0.349      0.023      0.000
+1-1     1928      0.293      0.022      0.068
+2-3     4309      0.354      0.035      0.135
+4+     13708      0.580      0.056      0.182
+
+-- REACH0 po koších --
+koš        n       down       lost  ball_lost
+0-0     9455      0.419      0.034      0.016
+1-1     3282      0.434      0.036      0.118
+2-3     5004      0.530      0.053      0.210
+4+      5112      0.591      0.064      0.317
+
+-- ESC po koších --
+koš        n       down       lost  ball_lost
+0-0      928      0.774      0.085      0.360
+1-2     4383      0.533      0.046      0.191
+3-4     7598      0.462      0.048      0.118
+5+      9944      0.452      0.039      0.114
+
+-- CCBAD po koších --
+koš        n       down       lost  ball_lost
+0-1     4382      0.437      0.038      0.040
+2-2     4115      0.466      0.040      0.103
+3-3     5478      0.496      0.050      0.165
+4+      8878      0.508      0.048      0.192
+
+-- SURF po koších --
+koš        n       down       lost  ball_lost
+0-0    39467      0.594      0.059      0.138
+1-1      808      0.630      0.071      0.261
+2+       112      0.545      0.098      0.143
+
+-- BLZ (nejlepší kostky blitzu na nosiče; None = nedosáhne) --
+kostky      n     down  ball_lost
+None     2908    0.349      0.000
+-2        411    0.156      0.051
+1       10092    0.421      0.103
+2        9182    0.600      0.218
+3         260    0.869      0.558
+
+-- ball_lost podle REACH0 x BLZ --
+             BLZ ≤1d/—    BLZ 2d    BLZ 3d
+R0 = 0       0.01(6877)   0.02(2578)         —
+R0 1-2       0.12(3618)   0.20(2312)   0.26( 31)
+R0 3+        0.18(2916)   0.35(4292)   0.60(229)
+
+-- down podle MARKED x FB2 (řádky MARKED koš, sloupce FB2 koš) --
+             FB2 0-1   FB2 2-3    FB2 4+
+MRK 0-2      0.38(23674)   0.84(6652)   1.14(1643)
+MRK 3-5      0.60(4760)   1.17(1981)   1.54(1528)
+MRK 6+       0.63( 97)   1.06( 32)   1.25( 20)

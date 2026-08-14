@@ -1,0 +1,48 @@
+=== BLOKY / HRU A ROZDĚLENÍ ZVOLENÝCH FACES (per-race, per-side) ===
+race     side       hry bloky/hru |     AD     BD   PUSH     DS     DD
+human    us         750    23.18 |   4.2%  14.7%  35.5%  21.2%  24.4%
+human    them       750    21.59 |   3.9%  12.4%  36.0%  22.4%  25.3%
+orc      us         750    18.53 |   4.7%  15.8%  35.8%  20.3%  23.5%
+orc      them       750    21.88 |   2.4%  11.5%  34.5%  23.4%  28.2%
+skaven   us         750    27.61 |   3.1%  17.6%  31.0%  21.9%  26.4%
+skaven   them       750    18.08 |   6.1%  10.4%  37.5%  22.8%  23.2%
+wood-elf us         750    23.19 |   3.4%  15.0%  34.2%  22.1%  25.3%
+wood-elf them       750    19.40 |   5.2%  11.8%  36.5%  21.9%  24.6%
+
+=== KNOCKDOWNY, ARMOR, ZRANĚNÍ (per-race; oběť = side) ===
+race     oběť      KD/hru   AVroll/hru     AVbreak%    INJ/hru    CAS/hru
+human    us         11.26        14.54        29.1%       2.75       0.56
+human    them       12.36        15.09        35.3%       4.41       0.54
+orc      us         12.15        15.52        26.9%       2.89       0.47
+orc      them        9.40        11.44        24.0%       2.33       0.27
+skaven   us          9.16        11.18        25.6%       2.05       0.29
+skaven   them       17.33        20.90        44.8%       7.83       0.97
+wood-elf us          9.83        12.78        28.1%       2.47       0.42
+wood-elf them       14.13        17.75        46.8%       6.97       0.98
+
+=== STOJÍCÍ TĚLA NA ZAČÁTKU KOLA t (průměr, obě půle) ===
+race     side  | T1 T2 T3 T4 T5 T6 T7 T8
+human    us    | 10.6  9.6  8.6  7.7  6.8  6.2  5.8  5.7
+human    them  | 10.8 10.0  9.0  8.0  7.0  6.2  5.6  5.4
+orc      us    | 10.6  9.5  8.5  7.6  6.7  5.9  5.2  4.9
+orc      them  | 10.7 10.0  9.3  8.5  7.8  7.2  6.7  6.4
+skaven   us    | 10.7  9.6  8.6  7.9  7.4  7.1  6.9  7.0
+skaven   them  | 10.6  9.1  7.6  6.2  5.0  4.3  3.9  4.1
+wood-elf us    | 10.6  9.6  8.7  7.9  7.3  6.9  6.8  6.9
+wood-elf them  | 10.7  9.7  8.6  7.5  6.4  5.6  5.2  5.2
+
+=== MIMO HŘIŠTĚ (state 3) NA ZAČÁTKU KOLA t ===
+human    us    |  0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8
+human    them  |  0.1  0.2  0.4  0.5  0.8  0.9  1.1  1.2
+orc      us    |  0.0  0.1  0.2  0.3  0.5  0.6  0.7  0.7
+orc      them  |  0.0  0.1  0.2  0.3  0.5  0.6  0.7  0.7
+skaven   us    |  0.0  0.1  0.2  0.3  0.4  0.5  0.5  0.5
+skaven   them  |  0.1  0.4  0.7  1.0  1.3  1.5  1.6  1.6
+wood-elf us    |  0.0  0.1  0.3  0.4  0.5  0.6  0.6  0.6
+wood-elf them  |  0.1  0.3  0.6  0.9  1.2  1.4  1.5  1.6
+
+=== KDO SRÁŽÍ NAŠEHO NOSIČE (v soupeřově kole, per-race) ===
+human    n=973 (1.30/hru): Blitzer 33%, Ogre 30%, Lineman 20%, Thrower 12%, Catcher 6%
+orc      n=971 (1.29/hru): Black Orc 60%, Blitzer 25%, Thrower 8%, Lineman 7%
+skaven   n=836 (1.11/hru): Lineman 50%, Blitzer 22%, Gutter Runner 15%, Thrower 14%
+wood-elf n=1014 (1.35/hru): Lineman 37%, Wardancer 25%, Treeman 23%, Catcher 8%, Thrower 6%

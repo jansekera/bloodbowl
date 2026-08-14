@@ -1,0 +1,19 @@
+her: 3000
+chess teď: 0.4660   W/D/L = 661/1474/865
+marže: {-3: 7, -2: 83, -1: 775, 0: 1474, 1: 594, 2: 66, 3: 1}
+hry na-jeden-gól (remíza nebo prohra o 1): 2249 (75.0%) → hrubý strop Δchess = +0.3748
+hry, kde -1 náš TD zhorší chess: 2068 (68.9%) → případná CENA změny má stejně velký kanál: -0.3447
+
+S+1TD        Δchess=+0.3748 [+0.3670,+0.3822]  konvertováno 3000 drivů (1.00/hru)  Δchess/1 konv. drive=+0.37483×n_her… na hru +0.3748
+S_D2         Δchess=+0.0388 [+0.0340,+0.0440]  konvertováno 283 drivů (0.09/hru)  Δchess/1 konv. drive=+0.41166×n_her… na hru +0.4117
+S_D1         Δchess=+0.2503 [+0.2395,+0.2615]  konvertováno 1715 drivů (0.57/hru)  Δchess/1 konv. drive=+0.43790×n_her… na hru +0.4379
+S_C          Δchess=+0.2572 [+0.2452,+0.2692]  konvertováno 1445 drivů (0.48/hru)  Δchess/1 konv. drive=+0.53391×n_her… na hru +0.5339
+S_Cnoswing   Δchess=+0.2082 [+0.1982,+0.2177]  konvertováno 1445 drivů (0.48/hru)  Δchess/1 konv. drive=+0.43218×n_her… na hru +0.4322
+S_full       Δchess=+0.3123 [+0.3038,+0.3208]  konvertováno 2196 drivů (0.73/hru)  Δchess/1 konv. drive=+0.42668×n_her… na hru +0.4267
+S_def        Δchess=+0.1132 [+0.1055,+0.1208]  konvertováno 765 drivů (0.26/hru)  Δchess/1 konv. drive=+0.44379×n_her… na hru +0.4438
+
+po soupeřích (n=750 každý):
+  skaven    chess=0.587  na-jeden-gól=57.6%  D2/hru=0.09  C/hru=0.35
+  wood-elf  chess=0.415  na-jeden-gól=73.3%  D2/hru=0.12  C/hru=0.46
+  human     chess=0.441  na-jeden-gól=78.7%  D2/hru=0.09  C/hru=0.52
+  orc       chess=0.421  na-jeden-gól=90.3%  D2/hru=0.07  C/hru=0.60

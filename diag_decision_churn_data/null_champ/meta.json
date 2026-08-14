@@ -1,0 +1,10 @@
+{
+ "label": "null_champ",
+ "champ": "weights_best.json",
+ "cand": "weights_best.json",
+ "seeds": 4,
+ "base_seed": 20260730,
+ "mcts": 100,
+ "vf_blend": 0.15,
+ "policy": "weights_policy.json"
+}

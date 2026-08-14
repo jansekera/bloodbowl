@@ -1,0 +1,102 @@
+
+=== PŘIJÍMACÍ plné drivy, agregát přes CELÝ drive: drivů 2641, TD 452 ===
+veličina         TD   bez TD   rozdíl       σ
+tempo         2.742    2.076   +0.666   16.2σ
+k9a_marg     -1.169   -3.100   +1.931   33.1σ
+k9a_ok        0.442    0.225   +0.217   19.5σ
+blocks        1.721    1.403   +0.318   10.7σ
+clean         1.498    1.550   -0.052   -1.5σ
+dirty         0.151    0.187   -0.036   -3.3σ
+reach0        1.530    2.186   -0.656  -11.8σ
+fb2           0.347    0.519   -0.171   -7.5σ
+idle          1.575    1.779   -0.204   -4.0σ
+
+=== totéž BEZ posledního kola TD drivů: drivů 2638, TD 449 ===
+veličina         TD   bez TD   rozdíl       σ
+tempo         2.360    2.076   +0.283    5.8σ
+k9a_marg     -1.327   -3.100   +1.773   27.6σ
+k9a_ok        0.394    0.225   +0.169   14.0σ
+blocks        1.887    1.403   +0.484   13.9σ
+clean         1.731    1.550   +0.181    4.7σ
+dirty         0.178    0.187   -0.009   -0.7σ
+reach0        1.640    2.186   -0.546   -9.3σ
+fb2           0.422    0.519   -0.097   -3.5σ
+idle          1.629    1.779   -0.150   -2.6σ
+
+=== jen PRVNÍ 3 kola s míčem: drivů 2641, TD 452 ===
+veličina         TD   bez TD   rozdíl       σ
+tempo         2.308    1.916   +0.392    6.7σ
+k9a_marg     -1.170   -1.895   +0.725   11.6σ
+k9a_ok        0.406    0.274   +0.132    9.6σ
+blocks        1.918    1.460   +0.457   11.1σ
+clean         1.844    1.793   +0.051    1.1σ
+dirty         0.175    0.164   +0.011    0.7σ
+reach0        1.815    2.086   -0.271   -3.9σ
+fb2           0.491    0.633   -0.142   -4.3σ
+idle          1.863    2.225   -0.362   -5.3σ
+
+=== první 3 kola s míčem, bez posl. kola TD: drivů 2638, TD 449 ===
+veličina         TD   bez TD   rozdíl       σ
+tempo         2.308    1.916   +0.392    6.5σ
+k9a_marg     -1.170   -1.895   +0.725   11.3σ
+k9a_ok        0.405    0.274   +0.131    9.3σ
+blocks        1.927    1.460   +0.467   11.0σ
+clean         1.851    1.793   +0.058    1.3σ
+dirty         0.178    0.164   +0.013    0.9σ
+reach0        1.797    2.086   -0.289   -4.2σ
+fb2           0.506    0.633   -0.127   -3.7σ
+idle          1.877    2.225   -0.348   -4.9σ
+
+=== kontrola: VŠECHNY plné drivy (jako 13.08.), celý drive: drivů 3450, TD 637 ===
+veličina         TD   bez TD   rozdíl       σ
+tempo         2.758    2.008   +0.750   14.8σ
+k9a_marg     -1.171   -3.174   +2.003   36.1σ
+k9a_ok        0.448    0.200   +0.248   21.7σ
+blocks        1.541    1.380   +0.161    5.1σ
+clean         1.272    1.370   -0.098   -2.9σ
+dirty         0.135    0.195   -0.060   -5.9σ
+reach0        1.338    2.239   -0.901  -17.2σ
+fb2           0.303    0.490   -0.187   -8.6σ
+idle          1.386    1.539   -0.153   -3.2σ
+
+=== tempo (první 3 kola, bez posl. kola TD) vs TD, po koších need0 ===
+need0 = vzdálenost při 1. držení / zbývající kola (proveditelnost od startu)
+  need0 ≤2.61 (stihnutelné)    nTD=139   nBez=523   tempo TD=1.63 bez=1.47 Δ=+0.16 +1.7σ
+  need0 2.61–3.5               nTD=252   nBez=1333  tempo TD=2.46 bez=1.94 Δ=+0.52 +6.8σ
+  need0 >3.5 (nestihnutelné)   nTD=58    nBez=333   tempo TD=3.27 bez=2.53 Δ=+0.74 +6.0σ
+  degenerovaných (bez 1. držení / bez kol): 16
+
+=== H3: korelační matice per-drive agregátů (n=2638 drivů) ===
+          tempo  k9a_mar   k9a_ok   blocks    clean    dirty   reach0      fb2     idle
+tempo     +1.00    +0.66    +0.68    +0.15    -0.22    -0.12    +0.21    +0.05    -0.03
+k9a_ma             +1.00    +0.74    +0.28    -0.07    +0.03    +0.26    +0.11    -0.03
+k9a_ok                      +1.00    +0.25    -0.11    +0.02    +0.31    +0.10    -0.06
+blocks                               +1.00    -0.10    +0.15    -0.02    +0.02    -0.40
+clean                                         +1.00    -0.08    -0.39    -0.06    -0.16
+dirty                                                  +1.00    +0.12    +0.15    -0.12
+reach0                                                          +1.00    +0.15    +0.06
+fb2                                                                      +1.00    +0.03
+idle                                                                              +1.00
+
+bootstrap po hrách (2000×), 95% CI:
+  r(tempo,blocks) = +0.151  [+0.111,+0.190] *
+  r(tempo,clean) = -0.215  [-0.257,-0.174] *
+  r(tempo,reach0) = +0.205  [+0.159,+0.256] *
+  r(tempo,dirty) = -0.117  [-0.157,-0.080] *
+  r(clean,blocks) = -0.101  [-0.143,-0.060] *
+  r(dirty,blocks) = +0.148  [+0.106,+0.191] *
+  r(idle,blocks) = -0.400  [-0.434,-0.364] *
+  r(tempo,fb2) = +0.051  [-0.009,+0.111]
+  r(clean,reach0) = -0.390  [-0.425,-0.354] *
+
+=== per-turn (tentýž tah, kola s nosičem, bez TD kola) ===
+kol: 13285
+  r(dx, blocks) = +0.025
+  r(dx, clean) = -0.199
+  r(dx, dirty) = -0.103
+  r(dx, idle) = -0.149
+  r(dx, reach0) = +0.219  (n=13285)
+
+# SD párové delty z gate_measure_20260813 (viz report §4):
+# dw-sk: n=1500 mu=+0.0083 SD=0.5366 SE=0.0139
+# dw-we: n=1500 mu=-0.0297 SD=0.5605 SE=0.0145

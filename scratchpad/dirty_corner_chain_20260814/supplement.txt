@@ -1,0 +1,11 @@
+A1 oprava — TD v N+1 (bez selekce na platný E2): hit 0.609% (n=3119), other 0.239% (n=419), none 2.098% (n=572)
+  hit−other +0.37 pp (+1.3σ) | hit−none -1.49 pp (-2.4σ)
+A2+ bloky_N → čisté_N+1 | OPP3,REACH0,kolo,filled_N,dirty_N: r=-0.038 -4.5σ n=13501
+A2+ bloky_N → špinavé_N+1 | tytéž kontroly:                 r=+0.008 +1.0σ n=13501
+témž kolo: polluter udeřen (blok/blitz) → špinavé na konci N 0.272 (n=2830) vs neudeřen 0.806 (n=1034) → -0.533 (-20.8σ)
+  baseline P(ztráta míče v soupeřově kole) vs human: 15.1% (n=5367)
+  baseline P(ztráta míče v soupeřově kole) vs orc: 15.9% (n=4856)
+  baseline P(ztráta míče v soupeřově kole) vs skaven: 12.1% (n=6568)
+  baseline P(ztráta míče v soupeřově kole) vs wood-elf: 14.8% (n=6139)
+C2+ blitz na roh, ačkoli VŠICHNI polluteři měli volného souseda (blok zdarma šel): 226/497 = 45.5%
+C2+ blitz na roh, aspoň jeden polluter měl volného souseda: 297/497 = 59.8%

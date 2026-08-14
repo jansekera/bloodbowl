@@ -1,0 +1,10 @@
+{
+ "label": "pilot_e2",
+ "champ": "weights_best.json",
+ "cand": "weights_snap_e2_100pct_+2.9.json",
+ "seeds": 3,
+ "base_seed": 20260730,
+ "mcts": 100,
+ "vf_blend": 0.15,
+ "policy": "weights_policy.json"
+}

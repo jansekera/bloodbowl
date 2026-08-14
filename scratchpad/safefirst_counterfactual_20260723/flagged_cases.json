@@ -1,0 +1,6883 @@
+{
+ "flagged": [
+  {
+   "game": "g0000.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "away",
+   "player": 14,
+   "from": [
+    12,
+    6
+   ],
+   "to": [
+    11,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      6
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      7
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      7
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     4
+    ],
+    [
+     12,
+     10
+    ],
+    [
+     11,
+     4
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     10,
+     4
+    ],
+    [
+     10,
+     7
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     7,
+     5
+    ],
+    [
+     7,
+     9
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     11,
+     6
+    ],
+    "tz": 2,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0000.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "home",
+   "player": 8,
+   "from": [
+    16,
+    3
+   ],
+   "to": [
+    17,
+    2
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    17,
+    2
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      15,
+      2
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      4
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      2
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      17,
+      3
+     ],
+     "tz": 4,
+     "target": 8,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     5
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     17,
+     4
+    ],
+    [
+     18,
+     2
+    ],
+    [
+     18,
+     3
+    ],
+    [
+     18,
+     4
+    ],
+    [
+     18,
+     6
+    ],
+    [
+     20,
+     2
+    ],
+    [
+     19,
+     5
+    ],
+    [
+     21,
+     3
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0000.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "away",
+   "player": 12,
+   "from": [
+    10,
+    0
+   ],
+   "to": [
+    9,
+    1
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    9,
+    1
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      9,
+      1
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      1
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      0
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      1
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     3
+    ],
+    [
+     9,
+     7
+    ],
+    [
+     8,
+     2
+    ],
+    [
+     8,
+     3
+    ],
+    [
+     8,
+     0
+    ],
+    [
+     9,
+     0
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0,
+   "best_alt": {
+    "sq": [
+     10,
+     1
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0000.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "home",
+   "player": 1,
+   "from": [
+    8,
+    1
+   ],
+   "to": [
+    7,
+    2
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    7,
+    2
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      7,
+      0
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      7,
+      1
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      7,
+      2
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      1
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      2
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     8,
+     2
+    ],
+    [
+     9,
+     5
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     18,
+     2
+    ],
+    [
+     15,
+     0
+    ],
+    [
+     14,
+     1
+    ],
+    [
+     15,
+     2
+    ],
+    [
+     7,
+     3
+    ],
+    [
+     13,
+     3
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 8,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     7,
+     1
+    ],
+    "tz": 1,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "actual_scores_better: distance_win(+10),sideline_penalty_on_safe_alt(+6)"
+  },
+  {
+   "game": "g0000.json.gz",
+   "half": 2,
+   "turn": 8,
+   "team": "away",
+   "player": 12,
+   "from": [
+    8,
+    2
+   ],
+   "to": [
+    7,
+    1
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    7,
+    1
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      7,
+      1
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      8,
+      1
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      1
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      2
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      3
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     9,
+     7
+    ],
+    [
+     6,
+     2
+    ],
+    [
+     8,
+     3
+    ],
+    [
+     8,
+     0
+    ],
+    [
+     9,
+     0
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 43,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0001.json.gz",
+   "half": 1,
+   "turn": 1,
+   "team": "away",
+   "player": 14,
+   "from": [
+    9,
+    5
+   ],
+   "to": [
+    8,
+    4
+   ],
+   "tz_from": 1,
+   "tz_to": 5,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    8,
+    4
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      8,
+      4
+     ],
+     "tz": 5,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      8,
+      6
+     ],
+     "tz": 3,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      4
+     ],
+     "tz": 2,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      6
+     ],
+     "tz": 1,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      4
+     ],
+     "tz": 0,
+     "target": 1,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      5
+     ],
+     "tz": 0,
+     "target": 1,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 0,
+     "target": 1,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     8,
+     3
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     7,
+     4
+    ],
+    [
+     8,
+     5
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     7,
+     3
+    ],
+    [
+     7,
+     5
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     4,
+     5
+    ],
+    [
+     5,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     9,
+     4
+    ],
+    "tz": 2,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0001.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "away",
+   "player": 13,
+   "from": [
+    13,
+    6
+   ],
+   "to": [
+    12,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     4
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     12,
+     10
+    ],
+    [
+     11,
+     3
+    ],
+    [
+     11,
+     6
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     11,
+     11
+    ],
+    [
+     10,
+     5
+    ],
+    [
+     10,
+     7
+    ],
+    [
+     10,
+     9
+    ],
+    [
+     8,
+     7
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0001.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "home",
+   "player": 5,
+   "from": [
+    12,
+    2
+   ],
+   "to": [
+    13,
+    1
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    1
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      1
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      1
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      1
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     1
+    ],
+    [
+     13,
+     5
+    ],
+    [
+     13,
+     8
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     14,
+     2
+    ],
+    [
+     14,
+     8
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     13,
+     2
+    ],
+    [
+     16,
+     9
+    ],
+    [
+     18,
+     7
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 3,
+   "best_alt": {
+    "sq": [
+     12,
+     1
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0002.json.gz",
+   "half": 1,
+   "turn": 1,
+   "team": "away",
+   "player": 19,
+   "from": [
+    14,
+    4
+   ],
+   "to": [
+    13,
+    3
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      5
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      3
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      5
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     2
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     8,
+     4
+    ],
+    [
+     11,
+     2
+    ],
+    [
+     12,
+     3
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     9,
+     4
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     10,
+     3
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1
+  },
+  {
+   "game": "g0002.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "away",
+   "player": 18,
+   "from": [
+    19,
+    3
+   ],
+   "to": [
+    18,
+    2
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    18,
+    2
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      18,
+      2
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      19,
+      2
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      19,
+      4
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      20,
+      2
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      20,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      20,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     21,
+     7
+    ],
+    [
+     22,
+     8
+    ],
+    [
+     17,
+     3
+    ],
+    [
+     18,
+     1
+    ],
+    [
+     20,
+     8
+    ],
+    [
+     18,
+     4
+    ],
+    [
+     17,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     19,
+     2
+    ],
+    "tz": 1,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0003.json.gz",
+   "half": 1,
+   "turn": 7,
+   "team": "home",
+   "player": 5,
+   "from": [
+    13,
+    4
+   ],
+   "to": [
+    13,
+    3
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      5
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      3
+     ],
+     "tz": 3,
+     "target": 7,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     4
+    ],
+    [
+     8,
+     4
+    ],
+    [
+     5,
+     1
+    ],
+    [
+     14,
+     2
+    ],
+    [
+     25,
+     7
+    ],
+    [
+     15,
+     2
+    ],
+    [
+     17,
+     3
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     12,
+     3
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0003.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "away",
+   "player": 22,
+   "from": [
+    12,
+    8
+   ],
+   "to": [
+    11,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 4,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      8
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      7
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      8
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      9
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     4
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     10,
+     6
+    ],
+    [
+     10,
+     9
+    ],
+    [
+     7,
+     3
+    ],
+    [
+     7,
+     7
+    ],
+    [
+     11,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0004.json.gz",
+   "half": 2,
+   "turn": 3,
+   "team": "away",
+   "player": 18,
+   "from": [
+    12,
+    9
+   ],
+   "to": [
+    11,
+    9
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    9
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      9
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      10
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      9
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     4
+    ],
+    [
+     5,
+     8
+    ],
+    [
+     6,
+     8
+    ],
+    [
+     7,
+     8
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     10,
+     6
+    ],
+    [
+     10,
+     7
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     7,
+     5
+    ],
+    [
+     5,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     12,
+     10
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0005.json.gz",
+   "half": 2,
+   "turn": 3,
+   "team": "away",
+   "player": 12,
+   "from": [
+    11,
+    3
+   ],
+   "to": [
+    10,
+    4
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    10,
+    4
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      2
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      4
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      3
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     17,
+     3
+    ],
+    [
+     11,
+     4
+    ],
+    [
+     9,
+     5
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     4,
+     3
+    ],
+    [
+     10,
+     7
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     10,
+     3
+    ],
+    [
+     7,
+     9
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1
+  },
+  {
+   "game": "g0005.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "away",
+   "player": 17,
+   "from": [
+    11,
+    10
+   ],
+   "to": [
+    11,
+    11
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    11
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      9
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      10
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      9
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      11
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      9
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      11
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     3
+    ],
+    [
+     10,
+     5
+    ],
+    [
+     6,
+     8
+    ],
+    [
+     9,
+     13
+    ],
+    [
+     11,
+     12
+    ],
+    [
+     10,
+     8
+    ],
+    [
+     3,
+     10
+    ],
+    [
+     10,
+     11
+    ],
+    [
+     4,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     12,
+     10
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0006.json.gz",
+   "half": 1,
+   "turn": 2,
+   "team": "away",
+   "player": 12,
+   "from": [
+    13,
+    4
+   ],
+   "to": [
+    13,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     6
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     12,
+     5
+    ],
+    [
+     11,
+     6
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     3,
+     4
+    ],
+    [
+     9,
+     9
+    ],
+    [
+     0,
+     7
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     14,
+     4
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0006.json.gz",
+   "half": 1,
+   "turn": 3,
+   "team": "away",
+   "player": 13,
+   "from": [
+    14,
+    7
+   ],
+   "to": [
+    13,
+    6
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    6
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      13,
+      6
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      8
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      8
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      6
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      7
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      8
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     5
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     12,
+     5
+    ],
+    [
+     7,
+     2
+    ],
+    [
+     7,
+     4
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     3,
+     5
+    ],
+    [
+     9,
+     9
+    ],
+    [
+     0,
+     7
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1
+  },
+  {
+   "game": "g0006.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "away",
+   "player": 15,
+   "from": [
+    9,
+    10
+   ],
+   "to": [
+    9,
+    9
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    9,
+    9
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      8,
+      9
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      8,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      8,
+      11
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      9
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      11
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      10
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      11
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     9
+    ],
+    [
+     6,
+     2
+    ],
+    [
+     10,
+     8
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     1,
+     6
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0,
+   "best_alt": {
+    "sq": [
+     8,
+     9
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0007.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "home",
+   "player": 6,
+   "from": [
+    18,
+    4
+   ],
+   "to": [
+    17,
+    4
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    16,
+    4
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      17,
+      4
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      17,
+      5
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      18,
+      3
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      3
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      5
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     16,
+     3
+    ],
+    [
+     16,
+     5
+    ],
+    [
+     17,
+     3
+    ],
+    [
+     13,
+     3
+    ],
+    [
+     14,
+     2
+    ],
+    [
+     20,
+     8
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     14,
+     4
+    ],
+    [
+     20,
+     7
+    ],
+    [
+     21,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     17,
+     5
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0008.json.gz",
+   "half": 1,
+   "turn": 5,
+   "team": "away",
+   "player": 17,
+   "from": [
+    15,
+    8
+   ],
+   "to": [
+    14,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    14,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      14,
+      8
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      15,
+      9
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      16,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      8
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      9
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     6
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     14,
+     9
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     8,
+     9
+    ],
+    [
+     11,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     15,
+     9
+    ],
+    "tz": 1,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0008.json.gz",
+   "half": 2,
+   "turn": 8,
+   "team": "away",
+   "player": 14,
+   "from": [
+    10,
+    7
+   ],
+   "to": [
+    9,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    9,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      9,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      7
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      8
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      7
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      8
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     7
+    ],
+    [
+     8,
+     10
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     6,
+     8
+    ],
+    [
+     10,
+     8
+    ],
+    [
+     9,
+     9
+    ],
+    [
+     5,
+     7
+    ],
+    [
+     6,
+     10
+    ],
+    [
+     7,
+     9
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     9,
+     7
+    ],
+    "tz": 2,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0009.json.gz",
+   "half": 1,
+   "turn": 4,
+   "team": "away",
+   "player": 19,
+   "from": [
+    15,
+    9
+   ],
+   "to": [
+    15,
+    8
+   ],
+   "tz_from": 3,
+   "tz_to": 4,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    15,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      15,
+      8
+     ],
+     "tz": 4,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      15,
+      10
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      8
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      16,
+      10
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     8
+    ],
+    [
+     15,
+     12
+    ],
+    [
+     16,
+     7
+    ],
+    [
+     14,
+     8
+    ],
+    [
+     14,
+     9
+    ],
+    [
+     15,
+     6
+    ],
+    [
+     14,
+     11
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     13,
+     10
+    ],
+    [
+     15,
+     7
+    ],
+    [
+     10,
+     10
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 3,
+   "best_alt": {
+    "sq": [
+     16,
+     8
+    ],
+    "tz": 2,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0009.json.gz",
+   "half": 1,
+   "turn": 7,
+   "team": "away",
+   "player": 15,
+   "from": [
+    12,
+    5
+   ],
+   "to": [
+    11,
+    4
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    4
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      4
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      6
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      4
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     4
+    ],
+    [
+     10,
+     9
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     13,
+     12
+    ],
+    [
+     10,
+     4
+    ],
+    [
+     9,
+     3
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     7,
+     5
+    ],
+    [
+     7,
+     9
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1
+  },
+  {
+   "game": "g0009.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "home",
+   "player": 4,
+   "from": [
+    12,
+    3
+   ],
+   "to": [
+    13,
+    3
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     7
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     13,
+     8
+    ],
+    [
+     14,
+     4
+    ],
+    [
+     15,
+     6
+    ],
+    [
+     15,
+     3
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     16,
+     9
+    ],
+    [
+     15,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     12,
+     2
+    ],
+    "tz": 0,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0009.json.gz",
+   "half": 2,
+   "turn": 4,
+   "team": "home",
+   "player": 10,
+   "from": [
+    11,
+    2
+   ],
+   "to": [
+    12,
+    2
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 4,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    11,
+    2
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      1
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      3
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      1
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      2
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     4
+    ],
+    [
+     13,
+     3
+    ],
+    [
+     14,
+     5
+    ],
+    [
+     12,
+     3
+    ],
+    [
+     12,
+     6
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     16,
+     9
+    ],
+    [
+     13,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     10,
+     1
+    ],
+    "tz": 0,
+    "target": 2,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0009.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "home",
+   "player": 6,
+   "from": [
+    9,
+    5
+   ],
+   "to": [
+    10,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    10,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      8,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      8,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      8,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     4
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     13,
+     3
+    ],
+    [
+     11,
+     5
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     13,
+     6
+    ],
+    [
+     13,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     9,
+     6
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0011.json.gz",
+   "half": 2,
+   "turn": 2,
+   "team": "away",
+   "player": 14,
+   "from": [
+    12,
+    6
+   ],
+   "to": [
+    11,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      6
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      7
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     10
+    ],
+    [
+     12,
+     5
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     11,
+     9
+    ],
+    [
+     7,
+     7
+    ],
+    [
+     10,
+     5
+    ],
+    [
+     4,
+     3
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     12,
+     3
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     11,
+     6
+    ],
+    "tz": 2,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0013.json.gz",
+   "half": 2,
+   "turn": 6,
+   "team": "away",
+   "player": 21,
+   "from": [
+    10,
+    4
+   ],
+   "to": [
+    11,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 4,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      9,
+      4
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     9,
+     5
+    ],
+    [
+     9,
+     7
+    ],
+    [
+     10,
+     6
+    ],
+    [
+     11,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 165,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 1,
+   "turn": 4,
+   "team": "away",
+   "player": 12,
+   "from": [
+    12,
+    3
+   ],
+   "to": [
+    12,
+    4
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    4
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      2
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      3
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     4
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     9,
+     4
+    ],
+    [
+     11,
+     3
+    ],
+    [
+     11,
+     5
+    ],
+    [
+     9,
+     3
+    ],
+    [
+     10,
+     5
+    ],
+    [
+     9,
+     5
+    ],
+    [
+     10,
+     3
+    ],
+    [
+     10,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0,
+   "best_alt": {
+    "sq": [
+     13,
+     3
+    ],
+    "tz": 0,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 1,
+   "turn": 8,
+   "team": "home",
+   "player": 9,
+   "from": [
+    11,
+    5
+   ],
+   "to": [
+    12,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 4,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      4
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     12,
+     4
+    ],
+    [
+     19,
+     4
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     18,
+     4
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     20,
+     5
+    ],
+    [
+     21,
+     6
+    ],
+    [
+     22,
+     7
+    ],
+    [
+     23,
+     8
+    ],
+    [
+     18,
+     9
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     11,
+     4
+    ],
+    "tz": 1,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 1,
+   "turn": 8,
+   "team": "away",
+   "player": 14,
+   "from": [
+    11,
+    5
+   ],
+   "to": [
+    11,
+    4
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    11,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      4
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     5
+    ],
+    [
+     12,
+     2
+    ],
+    [
+     12,
+     1
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     11,
+     1
+    ],
+    [
+     11,
+     2
+    ],
+    [
+     10,
+     3
+    ],
+    [
+     10,
+     4
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 3
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 1,
+   "turn": 8,
+   "team": "away",
+   "player": 14,
+   "from": [
+    11,
+    4
+   ],
+   "to": [
+    11,
+    3
+   ],
+   "tz_from": 3,
+   "tz_to": 4,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      3
+     ],
+     "tz": 4,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      3
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     5
+    ],
+    [
+     12,
+     2
+    ],
+    [
+     12,
+     1
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     11,
+     1
+    ],
+    [
+     11,
+     2
+    ],
+    [
+     10,
+     3
+    ],
+    [
+     10,
+     4
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     12,
+     3
+    ],
+    "tz": 2,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 2,
+   "turn": 1,
+   "team": "home",
+   "player": 2,
+   "from": [
+    11,
+    6
+   ],
+   "to": [
+    12,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    13,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      5
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     17,
+     2
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     19,
+     2
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     20,
+     3
+    ],
+    [
+     21,
+     4
+    ],
+    [
+     22,
+     6
+    ],
+    [
+     23,
+     5
+    ],
+    [
+     23,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     12,
+     6
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0014.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "home",
+   "player": 11,
+   "from": [
+    10,
+    2
+   ],
+   "to": [
+    11,
+    3
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      9,
+      1
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      2
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      3
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      1
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      1
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      3
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     2
+    ],
+    [
+     12,
+     5
+    ],
+    [
+     11,
+     5
+    ],
+    [
+     12,
+     1
+    ],
+    [
+     12,
+     6
+    ],
+    [
+     12,
+     2
+    ],
+    [
+     11,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0
+  },
+  {
+   "game": "g0015.json.gz",
+   "half": 1,
+   "turn": 1,
+   "team": "home",
+   "player": 2,
+   "from": [
+    12,
+    6
+   ],
+   "to": [
+    13,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      6
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     4
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     13,
+     10
+    ],
+    [
+     14,
+     4
+    ],
+    [
+     14,
+     7
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     15,
+     4
+    ],
+    [
+     15,
+     7
+    ],
+    [
+     15,
+     10
+    ],
+    [
+     18,
+     5
+    ],
+    [
+     18,
+     9
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0015.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "home",
+   "player": 4,
+   "from": [
+    13,
+    7
+   ],
+   "to": [
+    12,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      7
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      8
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      7
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      8
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     2
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     13,
+     8
+    ],
+    [
+     18,
+     4
+    ],
+    [
+     19,
+     7
+    ],
+    [
+     15,
+     8
+    ],
+    [
+     19,
+     5
+    ],
+    [
+     13,
+     9
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     12,
+     7
+    ],
+    "tz": 2,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0016.json.gz",
+   "half": 1,
+   "turn": 3,
+   "team": "home",
+   "player": 2,
+   "from": [
+    6,
+    6
+   ],
+   "to": [
+    7,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    7,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      5,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      5,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      5,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      6,
+      5
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      6,
+      7
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      7,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      7,
+      7
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     6
+    ],
+    [
+     8,
+     5
+    ],
+    [
+     14,
+     7
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     11,
+     1
+    ],
+    [
+     14,
+     9
+    ],
+    [
+     24,
+     6
+    ],
+    [
+     18,
+     5
+    ],
+    [
+     15,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     6,
+     5
+    ],
+    "tz": 1,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0016.json.gz",
+   "half": 1,
+   "turn": 6,
+   "team": "away",
+   "player": 18,
+   "from": [
+    6,
+    7
+   ],
+   "to": [
+    5,
+    6
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    5,
+    6
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      5,
+      6
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      5,
+      7
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      5,
+      8
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      7,
+      7
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      7,
+      8
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     5,
+     5
+    ],
+    [
+     6,
+     6
+    ],
+    [
+     10,
+     3
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     15,
+     2
+    ],
+    [
+     6,
+     5
+    ],
+    [
+     7,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 3,
+   "best_alt": {
+    "sq": [
+     5,
+     7
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0016.json.gz",
+   "half": 2,
+   "turn": 2,
+   "team": "home",
+   "player": 4,
+   "from": [
+    10,
+    3
+   ],
+   "to": [
+    11,
+    2
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    11,
+    2
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      9,
+      2
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      3
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      4
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      2
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      4
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      4
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     4
+    ],
+    [
+     14,
+     6
+    ],
+    [
+     11,
+     3
+    ],
+    [
+     13,
+     3
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     12,
+     2
+    ],
+    [
+     16,
+     2
+    ],
+    [
+     15,
+     3
+    ],
+    [
+     16,
+     4
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     10,
+     2
+    ],
+    "tz": 1,
+    "target": 5,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0017.json.gz",
+   "half": 1,
+   "turn": 5,
+   "team": "home",
+   "player": 6,
+   "from": [
+    15,
+    7
+   ],
+   "to": [
+    15,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    15,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      15,
+      8
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      16,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     9
+    ],
+    [
+     16,
+     11
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     14,
+     8
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     17,
+     8
+    ],
+    [
+     13,
+     9
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     15,
+     9
+    ],
+    [
+     13,
+     8
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0
+  },
+  {
+   "game": "g0018.json.gz",
+   "half": 2,
+   "turn": 2,
+   "team": "home",
+   "player": 8,
+   "from": [
+    11,
+    9
+   ],
+   "to": [
+    12,
+    10
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    10
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      8
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      9
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      10,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      8
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      10
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      9
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      10
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     9
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     13,
+     9
+    ],
+    [
+     13,
+     6
+    ],
+    [
+     13,
+     5
+    ],
+    [
+     14,
+     6
+    ],
+    [
+     16,
+     10
+    ],
+    [
+     16,
+     8
+    ],
+    [
+     13,
+     11
+    ],
+    [
+     16,
+     6
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     11,
+     10
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0018.json.gz",
+   "half": 2,
+   "turn": 7,
+   "team": "away",
+   "player": 14,
+   "from": [
+    11,
+    3
+   ],
+   "to": [
+    10,
+    3
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    10,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      10,
+      3
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      10,
+      4
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      11,
+      2
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     9,
+     4
+    ],
+    [
+     6,
+     7
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     11,
+     4
+    ],
+    [
+     6,
+     6
+    ],
+    [
+     6,
+     4
+    ],
+    [
+     11,
+     10
+    ],
+    [
+     5,
+     6
+    ],
+    [
+     5,
+     8
+    ],
+    [
+     4,
+     9
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     11,
+     2
+    ],
+    "tz": 0,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 1,
+   "turn": 5,
+   "team": "home",
+   "player": 7,
+   "from": [
+    5,
+    5
+   ],
+   "to": [
+    5,
+    6
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    5,
+    6
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      5,
+      4
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      5,
+      6
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      6,
+      4
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      6,
+      5
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      6,
+      6
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     5,
+     7
+    ],
+    [
+     7,
+     4
+    ],
+    [
+     7,
+     5
+    ],
+    [
+     4,
+     4
+    ],
+    [
+     16,
+     0
+    ],
+    [
+     6,
+     8
+    ],
+    [
+     8,
+     2
+    ],
+    [
+     5,
+     8
+    ],
+    [
+     6,
+     3
+    ],
+    [
+     6,
+     7
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 115,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 2,
+   "turn": 2,
+   "team": "home",
+   "player": 3,
+   "from": [
+    18,
+    5
+   ],
+   "to": [
+    18,
+    6
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    18,
+    6
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      17,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      5
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      18,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      18,
+      6
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      19,
+      4
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      5
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     6
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     19,
+     7
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     19,
+     9
+    ],
+    [
+     23,
+     11
+    ],
+    [
+     22,
+     10
+    ],
+    [
+     23,
+     9
+    ],
+    [
+     20,
+     6
+    ],
+    [
+     21,
+     9
+    ],
+    [
+     21,
+     11
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     17,
+     5
+    ],
+    "tz": 0,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 2,
+   "turn": 3,
+   "team": "home",
+   "player": 7,
+   "from": [
+    17,
+    9
+   ],
+   "to": [
+    18,
+    9
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    20,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      16,
+      8
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      9
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      16,
+      10
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      8
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      10
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      18,
+      9
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      18,
+      10
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     6
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     16,
+     4
+    ],
+    [
+     19,
+     9
+    ],
+    [
+     23,
+     11
+    ],
+    [
+     22,
+     10
+    ],
+    [
+     23,
+     9
+    ],
+    [
+     20,
+     6
+    ],
+    [
+     21,
+     9
+    ],
+    [
+     21,
+     11
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 1,
+   "best_alt": {
+    "sq": [
+     18,
+     10
+    ],
+    "tz": 1,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 2,
+   "turn": 4,
+   "team": "home",
+   "player": 9,
+   "from": [
+    18,
+    7
+   ],
+   "to": [
+    19,
+    7
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 5,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    22,
+    9
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      17,
+      6
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      7
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      8
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      7
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      19,
+      8
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     6
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     16,
+     4
+    ],
+    [
+     19,
+     9
+    ],
+    [
+     23,
+     11
+    ],
+    [
+     22,
+     10
+    ],
+    [
+     23,
+     9
+    ],
+    [
+     20,
+     6
+    ],
+    [
+     21,
+     9
+    ],
+    [
+     21,
+     11
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     19,
+     8
+    ],
+    "tz": 2,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 2,
+   "turn": 4,
+   "team": "home",
+   "player": 9,
+   "from": [
+    21,
+    8
+   ],
+   "to": [
+    22,
+    9
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    22,
+    9
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      20,
+      7
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      20,
+      9
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      21,
+      7
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      22,
+      7
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      22,
+      8
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      22,
+      9
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     6
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     16,
+     4
+    ],
+    [
+     19,
+     9
+    ],
+    [
+     23,
+     11
+    ],
+    [
+     22,
+     10
+    ],
+    [
+     23,
+     9
+    ],
+    [
+     20,
+     6
+    ],
+    [
+     21,
+     9
+    ],
+    [
+     21,
+     11
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     22,
+     8
+    ],
+    "tz": 2,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0019.json.gz",
+   "half": 2,
+   "turn": 5,
+   "team": "home",
+   "player": 8,
+   "from": [
+    18,
+    7
+   ],
+   "to": [
+    19,
+    7
+   ],
+   "tz_from": 2,
+   "tz_to": 3,
+   "target_num": 5,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    19,
+    7
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      17,
+      6
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      7
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      17,
+      8
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      19,
+      7
+     ],
+     "tz": 3,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      19,
+      8
+     ],
+     "tz": 2,
+     "target": 4,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     19,
+     6
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     16,
+     4
+    ],
+    [
+     19,
+     9
+    ],
+    [
+     23,
+     11
+    ],
+    [
+     22,
+     10
+    ],
+    [
+     23,
+     9
+    ],
+    [
+     20,
+     6
+    ],
+    [
+     21,
+     9
+    ],
+    [
+     21,
+     11
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 2,
+   "best_alt": {
+    "sq": [
+     19,
+     8
+    ],
+    "tz": 2,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0021.json.gz",
+   "half": 1,
+   "turn": 4,
+   "team": "home",
+   "player": 9,
+   "from": [
+    8,
+    6
+   ],
+   "to": [
+    7,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    7,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      7,
+      5
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      9,
+      5
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     6
+    ],
+    [
+     16,
+     7
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     16,
+     6
+    ],
+    [
+     6,
+     7
+    ],
+    [
+     23,
+     5
+    ],
+    [
+     6,
+     5
+    ],
+    [
+     16,
+     4
+    ],
+    [
+     11,
+     2
+    ],
+    [
+     16,
+     3
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0021.json.gz",
+   "half": 2,
+   "turn": 3,
+   "team": "away",
+   "player": 14,
+   "from": [
+    13,
+    7
+   ],
+   "to": [
+    12,
+    6
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    6
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      8
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      6
+     ],
+     "tz": 3,
+     "target": 7,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     13,
+     5
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     14,
+     5
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     11,
+     11
+    ],
+    [
+     10,
+     5
+    ],
+    [
+     10,
+     7
+    ],
+    [
+     8,
+     5
+    ],
+    [
+     8,
+     7
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 190,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0022.json.gz",
+   "half": 1,
+   "turn": 2,
+   "team": "away",
+   "player": 16,
+   "from": [
+    13,
+    5
+   ],
+   "to": [
+    12,
+    5
+   ],
+   "tz_from": 3,
+   "tz_to": 4,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    12,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      5
+     ],
+     "tz": 4,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      4
+     ],
+     "tz": 1,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 0,
+     "target": 2,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     10,
+     4
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     12,
+     6
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     12,
+     4
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     12,
+     8
+    ],
+    [
+     11,
+     7
+    ],
+    [
+     11,
+     5
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0
+  },
+  {
+   "game": "g0022.json.gz",
+   "half": 2,
+   "turn": 3,
+   "team": "home",
+   "player": 5,
+   "from": [
+    12,
+    7
+   ],
+   "to": [
+    13,
+    8
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    8
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      11,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      11,
+      7
+     ],
+     "tz": 1,
+     "target": 5,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      12,
+      8
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      6
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      13,
+      7
+     ],
+     "tz": 0,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      8
+     ],
+     "tz": 2,
+     "target": 6,
+     "same_purpose": true
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     8
+    ],
+    [
+     18,
+     10
+    ],
+    [
+     18,
+     8
+    ],
+    [
+     14,
+     9
+    ],
+    [
+     14,
+     10
+    ],
+    [
+     16,
+     8
+    ],
+    [
+     12,
+     9
+    ],
+    [
+     17,
+     7
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 0,
+   "best_alt": {
+    "sq": [
+     13,
+     7
+    ],
+    "tz": 0,
+    "target": 4,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0023.json.gz",
+   "half": 1,
+   "turn": 3,
+   "team": "away",
+   "player": 18,
+   "from": [
+    8,
+    6
+   ],
+   "to": [
+    7,
+    7
+   ],
+   "tz_from": 1,
+   "tz_to": 6,
+   "target_num": 6,
+   "success": false,
+   "purpose": "final_step_local",
+   "goal": [
+    7,
+    7
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      7,
+      5
+     ],
+     "tz": 1,
+     "target": 1,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      7,
+      6
+     ],
+     "tz": 3,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      7,
+      7
+     ],
+     "tz": 6,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      8,
+      5
+     ],
+     "tz": 0,
+     "target": 0,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      5
+     ],
+     "tz": 0,
+     "target": 0,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      6
+     ],
+     "tz": 1,
+     "target": 1,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      9,
+      7
+     ],
+     "tz": 2,
+     "target": 2,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     6,
+     7
+    ],
+    [
+     14,
+     4
+    ],
+    [
+     13,
+     7
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     6,
+     6
+    ],
+    [
+     8,
+     7
+    ],
+    [
+     7,
+     8
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     6,
+     8
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": true,
+   "argmin_best_tz": 3,
+   "best_alt": {
+    "sq": [
+     7,
+     6
+    ],
+    "tz": 3,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  },
+  {
+   "game": "g0023.json.gz",
+   "half": 2,
+   "turn": 6,
+   "team": "away",
+   "player": 16,
+   "from": [
+    13,
+    5
+   ],
+   "to": [
+    12,
+    4
+   ],
+   "tz_from": 1,
+   "tz_to": 2,
+   "target_num": 5,
+   "success": true,
+   "purpose": "continued_to_final",
+   "goal": [
+    12,
+    3
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      4
+     ],
+     "tz": 2,
+     "target": 5,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     11,
+     3
+    ],
+    [
+     13,
+     6
+    ],
+    [
+     11,
+     8
+    ],
+    [
+     11,
+     5
+    ],
+    [
+     12,
+     7
+    ],
+    [
+     7,
+     6
+    ],
+    [
+     6,
+     6
+    ],
+    [
+     14,
+     3
+    ],
+    [
+     6,
+     5
+    ]
+   ],
+   "blocks_later": false,
+   "rational_goals": 150,
+   "replan_always_safer": false,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 2
+  },
+  {
+   "game": "g0023.json.gz",
+   "half": 2,
+   "turn": 6,
+   "team": "home",
+   "player": 4,
+   "from": [
+    13,
+    6
+   ],
+   "to": [
+    13,
+    5
+   ],
+   "tz_from": 1,
+   "tz_to": 3,
+   "target_num": 6,
+   "success": true,
+   "purpose": "final_step_local",
+   "goal": [
+    13,
+    5
+   ],
+   "is_carrier": false,
+   "cands": [
+    {
+     "sq": [
+      12,
+      6
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      5
+     ],
+     "tz": 3,
+     "target": 6,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      13,
+      7
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    },
+    {
+     "sq": [
+      14,
+      6
+     ],
+     "tz": 1,
+     "target": 4,
+     "same_purpose": true
+    },
+    {
+     "sq": [
+      14,
+      7
+     ],
+     "tz": 0,
+     "target": 3,
+     "same_purpose": false
+    }
+   ],
+   "enemies": [
+    [
+     14,
+     4
+    ],
+    [
+     13,
+     4
+    ],
+    [
+     14,
+     5
+    ]
+   ],
+   "blocks_later": true,
+   "rational_goals": 0,
+   "replan_always_safer": true,
+   "blitz_sig": true,
+   "tie_break_fixes": false,
+   "argmin_best_tz": 3,
+   "best_alt": {
+    "sq": [
+     12,
+     6
+    ],
+    "tz": 0,
+    "target": 3,
+    "same_purpose": true
+   },
+   "why": "alt_scores_better_under_own_scorer(goal-proxy)"
+  }
+ ],
+ "verdict_counts": {
+  "safer_same_purpose": 37,
+  "safer_any_only": 16,
+  "no_better": 2
+ }
+}

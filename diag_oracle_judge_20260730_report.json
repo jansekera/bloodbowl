@@ -1,0 +1,90 @@
+{
+ "n_judged": 96,
+ "n_skipped": 0,
+ "k": 48,
+ "aa_abs_dz": {
+  "n": 16,
+  "mean": 0.081,
+  "max": 0.188
+ },
+ "threshold": 0.188,
+ "pair1_e2": {
+  "n": 48,
+  "verdicts": {
+   "equivalent": 39,
+   "worse": 4,
+   "better": 5
+  },
+  "mean_dz": 0.0095,
+  "mean_dz_se": 0.0398,
+  "mean_d_turnovers": 0.1476,
+  "mean_d_terminal_vf": 0.0139,
+  "by_class": {
+   "sub_feature": {
+    "equivalent": 17,
+    "better": 1
+   },
+   "equal_features": {
+    "equivalent": 9,
+    "worse": 2,
+    "better": 2
+   },
+   "safer_same_scoring": {
+    "equivalent": 9,
+    "better": 2,
+    "worse": 2
+   },
+   "riskier_no_gain": {
+    "equivalent": 4
+   }
+  },
+  "safer_same_scoring_detail": {
+   "n": 13,
+   "mean_dz": -0.0304,
+   "mean_d_turnovers": 0.5176,
+   "mean_d_terminal_vf": -0.0364
+  }
+ },
+ "pair2_e16": {
+  "n": 48,
+  "verdicts": {
+   "worse": 7,
+   "better": 6,
+   "equivalent": 35
+  },
+  "mean_dz": 0.0065,
+  "mean_dz_se": 0.0416,
+  "mean_d_turnovers": 0.1879,
+  "mean_d_terminal_vf": -0.002,
+  "by_class": {
+   "equal_features": {
+    "worse": 1,
+    "better": 1,
+    "equivalent": 9
+   },
+   "sub_feature": {
+    "better": 1,
+    "equivalent": 15,
+    "worse": 1
+   },
+   "safer_same_scoring": {
+    "equivalent": 6,
+    "worse": 5,
+    "better": 1
+   },
+   "more_scoring": {
+    "equivalent": 1
+   },
+   "riskier_no_gain": {
+    "equivalent": 4,
+    "better": 3
+   }
+  },
+  "safer_same_scoring_detail": {
+   "n": 12,
+   "mean_dz": -0.1597,
+   "mean_d_turnovers": 0.6476,
+   "mean_d_terminal_vf": -0.1057
+  }
+ }
+}
