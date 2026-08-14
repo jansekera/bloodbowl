@@ -120,11 +120,19 @@ def main():
         # POJISTKA MECHANISMU: rameno, které nic nezměnilo, se musí poznat od
         # změny, která nemá efekt. Gate analyzer tohle měl, my jsme na to málem
         # zapomněli.
+        # ⚠️ ČTI OPATRNĚ: obě čísla počítají vyhodnocení UVNITŘ MCTS, ne skutečné
+        # tahy — search si každý tah probírá tisíce variant. A `roll` navíc míchá
+        # OBĚ ramena, protože Dauntless se při provedení hodí i v základním
+        # rameni, když už ten blok jednou vybere. ⇒ Použitelné jen jako POJISTKA
+        # MECHANISMU („je ta větev vůbec živá?"), NE jako odpověď na „vybere si
+        # search ten cíl?". Na to je potřeba test rozhodnutí nad postavenou
+        # pozicí (uživatel 14.08.).
         dz, rz = daunt[mi], rolls[mi]
-        print(f"{'':10}Dauntless nabídek/hru: {dz / (2.0 * n):.2f}"
-              f"   hodů/hru: {rz / (2.0 * n):.2f}"
-              + (f"   ⚠️ NABÍDLI, ale SEARCH SI NEVZAL — prior BLOCK je plochý (P10a)"
-                 if dz and not rz else "")
+        print(f"{'':10}[pojistka mechanismu, MCTS-interní] ocenění/hru:"
+              f" {dz / (2.0 * n):.0f}   hody Dauntless/hru: {rz / (2.0 * n):.0f}"
+              + ("   ⛔ NULA — RAMENO NIC NEZMĚNILO, měření neměří Dauntless"
+                 if dz == 0 and mi not in NULL_CONTROL else
+                 "   ✅ (null: očekáváno 0)" if dz == 0 else "")
               + ("   ⛔ NULA — RAMENO NIC NEZMĚNILO, měření neměří Dauntless"
                  if dz == 0 and mi not in NULL_CONTROL else
                  "   ✅ (null: očekáváno 0)" if dz == 0 else ""))

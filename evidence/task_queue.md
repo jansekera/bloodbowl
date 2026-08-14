@@ -276,6 +276,35 @@ ne Dauntless. **Tohle je levnější než měřit obojí zvlášť.**
 ⇒ Možná cesta ven: **opravit celý řetěz, ale každou úroveň vybavit čítačem**,
 a atribuci dělat z čítačů místo z oddělených běhů.
 
+# ⭐⭐⭐ NÁSTROJ, KTERÝ NÁM CHYBÍ: TEST ROZHODNUTÍ NAD POSTAVENOU POZICÍ
+*(uživatel 14.08.: „pokud to nevynutíš podstrčením situace — kdy má na výběr —
+a porovnáváš náhodu vs vybrání"; „dal jsem při bloku s Dauntless vědomě cíl ST4
+proti náhodně — je pro mne měřitelné")*
+
+**Neměřit výsledek zápasu, ale ROZHODNUTÍ.** Postavit pozici, kde volba
+existuje, a spočítat, co si policy vybere — proti **náhodě mezi nabídnutými
+možnostmi** jako nulové hypotéze.
+
+| problém celozápasového A/B | co s ním udělá test rozhodnutí |
+|---|---|
+| **příležitost je vzácná** *(„bloků s Dauntless na Black Orka není mnoho")* | situaci **podstrčíme**, kolik potřebujeme |
+| **pět vypnutých úrovní v řetězu** | měří **jednu** úroveň izolovaně |
+| **14 h na odpověď** | minuty |
+| **efekt pod rozlišením chess** | měří se **podíl voleb**, ne výsledek |
+
+**Vyhodnocení:** podíl zvolení cíle ST4 proti podílu, který by dala náhoda mezi
+nabídnutými cíli. 1:1 ⇒ search si toho cíle nevšímá a je jedno, co dělá zbytek.
+
+⇒ **Platí na CELOU frontu A/B, ne jen na Dauntless.** Tutéž vadu mají
+**P2+P9c** *(vybere si policy pollutera?)*, **roh vs. zeď** *(vybere si blitz
+do zdi?)* i **P10a** *(vybere sražení nosiče, když scramble vyhraje?)*.
+Všechny tři měří výsledek zápasu tam, kde je otázka o **jednom rozhodnutí**.
+
+⚠️ **Dnešní čítače tohle NENAHRAZUJÍ.** Ověřeno probem 14.08.: počítají
+vyhodnocení **uvnitř MCTS** (1829 „ocenění" a 368 hodů na hru — search si každý
+tah probírá tisíce variant), a čítač hodů navíc **míchá obě ramena**. Jako
+pojistka *„je ta větev živá?"* stačí; jako odpověď *„vybere si ten cíl?"* ne.
+
 # ⛔ METODA: NEJDŘÍV POJISTKA MECHANISMU, TEPRVE PAK MĚŘENÍ
 *(uživatel 14.08.: „když jdeme měřit Dauntless — naučili jsme se jej nabízet
 a logovat předtím? tohle zobecnit")*
