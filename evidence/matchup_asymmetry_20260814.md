@@ -131,6 +131,46 @@ kdo zavře cestu). **Oni jedno.**
 
 ---
 
+## ⭐⭐⭐ OPRAVA SMĚRU (14.08. odpoledne, po přepočtu kanálů)
+
+**Uživatelova námitka („hrušky s jablky") byla trefa a přepočet obrátil příčinu.**
+Sjednocená hrozba přes všechny kanály (síla ≥2k · Strip Ball jen proti nosiči
+bez Sure Hands · Wrestle · hrubé sražení):
+
+| | THREATnet **na nás** | P(náš nosič ↓) |
+|---|---|---|
+| human | 0,450 | 0,162 |
+| ork | 0,424 | 0,173 |
+| skaven | **0,400** | **0,125** |
+| wood-elf | 0,413 | 0,151 |
+
+⇒ **Hrozba na našeho nosiče je napříč rasami skoro stejná**, a kalibrace ukazuje,
+že **při stejné hrozbě je konverze rasově nezávislá** (P(↓) 0,090–0,105 ve
+stejném pásmu). **Jejich obrana rozdíl 451 vs 86 nevysvětluje.**
+
+### Rozdíl je v NAŠEM útoku na JEJICH nosiče
+
+| | P(srazíme jejich nosiče) | náš 2k blitz dostupný | STEAL+TD | naše TD |
+|---|---|---|---|---|
+| **skaven** | **0,347** | **54,4 %** | **198** | **451** |
+| wood-elf | 0,266 | 43,4 % | 102 | 260 |
+| human | 0,183 | 19,0 % | 82 | 178 |
+| **ork** | **0,113** | **7,5 %** | **31** | **86** |
+
+**Monotónní přes všechny čtyři rasy, v obou sloupcích.**
+⇒ Formulace se mění z *„ork nás ohrožuje víc"* na
+⭐ **„ork si svého nosiče uhlídá a skaven ne."** Jiná příčina, jiné opravy —
+míří to na **P15** (nabídka bloku nezná cenu cíle: blok do kopce na soupeřova
+nosiče se **nenabídne nikdy**) a na **P13** (Dauntless).
+
+### Dílčí čísla, která potvrdila obě uživatelovy námitky
+* Skavenův **nejlepší kanál je 1k Wrestle v 51,1 % kol** — má ho, ale konvertuje
+  nejhůř ze všech ras.
+* **Strip Ball:** syrově dosažitelný stripper ve **26,4 %** kol, **po Sure Hands
+  5,3 %** ⇒ naše Sure Hands mu ubere **~80 %**.
+* Kdo u nich nosí: skaven **Thrower 47 % / Gutter Runner 39 %** (ST3/ST2, AV7),
+  ork **Thrower 78 %** — krytý čtyřmi ST4 těly.
+
 ## ⛔⛔ NEJVĚTŠÍ VÝHRADA: SOUPEŘ NEHRAJE SVOU RASU
 *(uživatel 14.08.: „skaven se místo toho učí hrát jako elf a to ho musíme odnaučit")*
 
