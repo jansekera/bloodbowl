@@ -282,6 +282,30 @@ projektem.
 ⇒ **Část A zkusit samostatně**, protože se za ni platí prací, kterou stejně
 děláme. Část B je vlastní projekt, ne úkol.
 
+## ⭐ KARTA „HRAJE SKAVEN SKAVENA?" — co sledovat po každé rasově citlivé opravě
+*(uživatel 14.08.: „napřed navíc kouknem, jestli skaven začne hrát víc sebe")*
+
+Zapsáno **předem**, ať se to po opravě neposuzuje dojmem. Všechno jde odečíst
+z korpusů, které stejně sbíráme — **nestojí to žádný běh navíc**.
+
+| # | ukazatel | dnes | čekaný směr |
+|---|---|---|---|
+| 1 | **Gutter Runner nese míč** | 37,5 % *(Thrower 48,1 %)* | **nahoru** — míč patří tomu, kdo uteče |
+| 2 | **Gutter Runner v rohu klece** | **36,4 %** | **dolů** — má být volný, ne zazděný *(P16)* |
+| 3 | **Wrestle použit ofenzivně** | **0,16 / hru** *(49 sražení našeho nosiče na 750 her)* | **prudce nahoru** *(P17, P14)* |
+| 4 | **získané volné míče** | — | **nahoru** — jejich hra stojí na závodu k míči *(P10a)* |
+| 5 | **přihrávky** | **40 na 3000 her** = prakticky nula | **nahoru** — bez nich neexistuje hra přes klec |
+| 6 | **jejich vlastní ztráty těl** | — | **nahoru je v pořádku** — tělo je pro ně levnější než míč |
+
+⚠️ **Ukazatel 6 je past na čtení výsledku:** když začnou hrát správně, budou
+**ztrácet víc těl** a část jejich statistik se zhorší. To **není** regrese.
+A zároveň: **náš náskok proti nim klesne** — část našich 451 TD je artefakt
+toho, že svůj plán nehrají.
+
+⇒ **Tuhle kartu odečíst při KAŽDÉ z oprav P10a · P16 · P17 · P14**, ne až na
+konci. Když se nehne ani po nich, je část (A) vyvrácená a zbývá jen drahá
+část (B).
+
 ## ⛔ CO Z TOHO PLYNE PRO VŠECHNA NAŠE ČÍSLA
 
 **Průměr přes čtyři soupeře míchá dva opačné světy.** Doktrína laděná na
