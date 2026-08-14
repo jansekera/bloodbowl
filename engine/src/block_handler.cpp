@@ -97,16 +97,50 @@ static int pushCandidates(const GameState& state, Position pusherPos,
 // holds no matter who is doing the choosing, so empty candidates always win and
 // the skill heuristics only rank within them.  Only when every candidate is
 // occupied does the push go into an occupied square and chain.
+// A push may not hand the man being pushed the touchdown he is carrying the
+// ball toward.  CRP scores a carrier who ends up standing in his opponent's end
+// zone even during our own turn ("Scoring in the opponent's turn": "a player
+// holding the ball could be pushed into the End Zone by a block"), so this is a
+// gift we are free to decline by choosing another square.  It went unnoticed
+// because choosePushSquare picks on geometry alone -- straight back first -- and
+// straight back is sometimes the end zone: measured over 3000 games, eight
+// opposing carriers were walked in that way (g0289, pusher on (23,8), carrier on
+// (24,7), straight back (25,6)).  Nothing here is a trade-off; the other two
+// squares are strictly better, so the only case left alone is the one where
+// every square scores and there is no choice to decline.
+static bool pushWouldScore(const GameState& state, const Player& pushed,
+                           TeamSide blockingSide, Position dest) {
+    if (pushed.teamSide == blockingSide) return false;   // our own man scoring is a gift
+    if (!state.ball.isHeld || state.ball.carrierId != pushed.id) return false;
+    // HOME scores on x = PITCH_WIDTH-1, AWAY on x = 0 (turn_handler.cpp).
+    return dest.isInEndZone(pushed.teamSide == TeamSide::AWAY);
+}
+
 static int choosePushSquare(const GameState& state, const Position* cand, int count,
-                            Position pusherPos, bool defenderChooses, bool towardEdge) {
+                            Position pusherPos, bool defenderChooses, bool towardEdge,
+                            const Player& pushed, TeamSide blockingSide) {
     bool anyEmpty = false;
     for (int i = 0; i < count; i++) {
         if (!state.getPlayerAtPosition(cand[i])) { anyEmpty = true; break; }
     }
 
+    // Side Step gives the choice to the pushed player's own coach, who would
+    // take the touchdown, so the refusal only applies where the choice is ours.
+    bool refuseScoring = false;
+    if (!defenderChooses) {
+        for (int i = 0; i < count; i++) {
+            if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
+            if (!pushWouldScore(state, pushed, blockingSide, cand[i])) {
+                refuseScoring = true;   // a square that does not score exists
+                break;
+            }
+        }
+    }
+
     int best = -1, bestScore = 0;
     for (int i = 0; i < count; i++) {
         if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
+        if (refuseScoring && pushWouldScore(state, pushed, blockingSide, cand[i])) continue;
         int score;
         if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
         else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
@@ -166,15 +200,18 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
     }
 
     dest = cand[choosePushSquare(state, cand, count, pusherPos,
-                                 sideStep && !grab, grab && !sideStep)];
+                                 sideStep && !grab, grab && !sideStep,
+                                 pushed, blockingSide)];
 
     Player* occupant = state.getPlayerAtPosition(dest);
     if (occupant && holdsGround(*occupant, blockingSide)) {
         // The coach picks the direction, so try any other body that will not
-        // dig in before giving the push up.
+        // dig in before giving the push up.  The end-zone refusal holds here
+        // too -- dodging a Stand Firm jam is not worth conceding a touchdown.
         for (int i = 0; i < count; i++) {
             Player* other = state.getPlayerAtPosition(cand[i]);
-            if (other && !holdsGround(*other, blockingSide)) {
+            if (other && !holdsGround(*other, blockingSide) &&
+                !pushWouldScore(state, pushed, blockingSide, cand[i])) {
                 dest = cand[i];
                 occupant = other;
                 break;

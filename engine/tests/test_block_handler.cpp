@@ -114,6 +114,37 @@ TEST(BlockHandler, PushbackBasic) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
 }
 
+TEST(BlockHandler, ACarrierIsNotPushedIntoTheEndZoneHeIsAttacking) {
+    GameState gs;
+    placePlayer(gs, 1, {2, 8}, TeamSide::HOME);
+    placePlayer(gs, 12, {1, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({1, 7}, 12);
+    // g0289 mirrored. Pushing north-west off (2,8) offers (0,6), (1,6) and
+    // (0,7); two of those are the away end zone, and "straight back first"
+    // used to take (0,6) -- which CRP scores for him even on our own turn.
+    // (1,6) is the one square that declines the gift.
+    FixedDiceRoller dice({3});                  // PUSHED
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{1, 6}));
+    EXPECT_FALSE(gs.getPlayer(12).position.isInEndZone(true));
+    EXPECT_TRUE(gs.ball.isHeld);
+}
+
+TEST(BlockHandler, WhenEveryPushSquareScoresThePushHappensAnyway) {
+    GameState gs;
+    placePlayer(gs, 1, {2, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {1, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({1, 7}, 12);
+    // Straight west the three squares are (0,6), (0,7) and (0,8) -- all of them
+    // the end zone. Nothing to decline to, so the rules take their course and
+    // the guard must not deadlock or refuse to move him.
+    FixedDiceRoller dice({3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 0);
+}
+
 TEST(BlockHandler, PushOntoLooseBallBounces) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
