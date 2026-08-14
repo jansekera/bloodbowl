@@ -56,6 +56,27 @@ kanál. Po dohledání ale platí: skavenův **dovednostní** kanál je z velké
 mrtvý, takže těch 6 % skavena **nepodhodnocuje**. Přepočet přes všechny kanály
 zadán Fablemu.
 
+### ⭐ A proč jim ani Wrestle neprojde: GUARD *(uživatel 14.08.)*
+
+CRP Guard: *„The player may assist an offensive or defensive block **even if he
+is in another player's tackle zone**."* ⇒ **naše obranné asistence u nosiče
+nejdou zrušit značkováním, jejich útočné ano** — Guard nemá **ani jeden skaven**.
+
+Náš TV1200 má Guard na **šesti** hráčích, a čtyři z nich (Blitzeři + Slayeři)
+jsou doktrinálně **rohy klece**, tedy přímí sousedé nosiče.
+
+⇒ Skavení lineman ST3 na našeho Runnera ST3 se dvěma Guardy vedle:
+**3 proti 5 ⇒ dvě kostky, vybíráme MY.** A protože vybíráme, **„Both Down"
+nikdy nezvolíme** ⇒ **Wrestle se jim nespustí**. Poslední funkční kanál padá.
+
+⇒ *„Ale zkusit to musí, nic jiného nemá."* Lezou do nás do kopce a **platí za to
+těly** — a to je přesně ta attritionová bilance níž. **Nejsou slabí náhodou; my
+je do té ztráty tlačíme.**
+
+⛔ **Proti orkovi tohle NEPLATÍ:** ork má Guard taky na **šesti** hráčích
+(2 Blitzeři + **4 Black Orci ST4**). Jejich asistence tedy taky nejdou zrušit —
+a startují o stupeň výš. **Tam, kde skavena Guardem umlčíme, orka ne.**
+
 ### Osa 2 — attrition: naše dovednosti kousají do nich, jejich do nás ne
 
 * **Tackle na všech 16 Longbeardech** kouše do rosteru plného **Dodge**
