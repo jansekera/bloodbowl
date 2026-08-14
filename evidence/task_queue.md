@@ -273,19 +273,66 @@ Plné drivy ≥7 kol, 195 drivů:
 ---
 
 # CO JE TEĎ PRVNÍ
-*(jediný oddíl, který se přepisuje — stav k 14.08.2026 ráno)*
+*(jediný oddíl, který se přepisuje — stav k 14.08.2026 odpoledne)*
 
-| | co | proč |
+## ⭐ Nález dne, podle kterého se řadí zbytek
+
+**Pětkrát za jeden den se našlo totéž: rozhodovací vrstva oceňuje jinou akci,
+než jakou resolver provede.**
+
+| | filtr počítá | provede se |
 |---|---|---|
-| **1.** | **A1 anomálie** TD flag vs skóre delta | zadáno uživatelem na dnešek; 0,3 % her měří nesprávný výsledek — dokud to platí, každé A/B má šum navíc |
-| **2.** | **P5 hand-off** | povýšeno uživatelem; oprava bez A/B, ověřit na kontrolách |
-| **3.** | **P0.1 + P0.5 + P0.2** na velkém korpusu | korpus stojí hotový, nestojí strojový čas, odemyká P2 |
-| **4.** | **P1** K33/K34 na spojité | levné, opravuje metr |
-| **5.** | **P3** fázový plán trasy | bez fáze nejde odlišit chybu od záměru |
-| **6.** | **A2** vyzvednout exposure/R1 z plánovače klece | jediná cesta, jak změřit hotovou práci za zamítnutou branou |
+| P5 hand-off | cenu přihrávky (33 %) | hand-off (67 %) |
+| P9 odsun | „rovně dozadu" | volbu ze tří polí |
+| **P13** Dauntless | ST3 vs ST4 = do kopce | srovná se, 83 % |
+| **P14** Wrestle | „Both Down nás nesloží" | složí oba |
+| **P15** cena cíle | blok na nosiče = blok na linemana | nesrovnatelný výnos |
 
-**Na strojový čas víkendu** (~60 h, jedno A/B = 7 h) se vejde 5–6 A/B.
-Kandidáti v pořadí: P2 *(po P0.1)* · A2 · P6 · P7 *(zvlášť, zhorší nás)*.
+⇒ **Nejcennější stolní úkol je systematický audit** `macro_actions.cpp`,
+`block_handler.cpp` a `macro_mcts.cpp` jedinou otázkou: *počítá tenhle filtr
+cenu té akce, kterou pak opravdu provedu?* Pět nálezů za den bez hledání
+znamená, že jich tam je víc.
 
-**T1 (repertoár) a strojová část spolu nesoupeří o zdroj** — dají se nechat
-běžet vedle sebe. Uvnitř strojové části platí „jedna změna najednou".
+## Dnes v noci (připraveno, čeká na build po doběhu sběru)
+
+**P13 Dauntless**, mode 4, **3000 párů**, práh **±0,02**, povinně i rozklad
+drivů per-matchup. Předregistrace `evidence/weekend_prereg_20260814.md`,
+vyhodnocení `analyze_dauntless_20260814.py`.
+⚠️ Nejdřív ověřit **hand-off kritérium** na doběhlém korpusu — kdyby
+nefungovalo, nesmí být v baseline.
+
+## Strojový rozpočet — OPRAVENO
+
+**Jedno A/B = 14 h** (3000 párů; na 1500 by efekt pod 3 pp zmizel v šumu).
+⇒ **Víkend pojme TŘI běhy, ne pět.** Fronta na běhy 2–3: **P2+P9c** ·
+**blitz roh vs. zeď** · **P10a**. Pořadí se rozhodne v sobotu.
+
+## Stolní práce (nesoupeří o stroj, tady je úzké hrdlo)
+
+| | co | proč teď |
+|---|---|---|
+| **1.** | **audit filtr vs. resolver** *(viz výše)* | pět nálezů za den bez hledání |
+| **2.** | **P10a** cena volného míče podle toho, **kdo je blíž a kdo rychlejší** | jedna oprava spraví **naše** rozhodování **i** to, že soupeř nehraje svou rasu |
+| **3.** | **P15** práh nabídky podle ceny cíle | ST4 s míčem je dnes pro 9 z 11 těl nedotknutelný |
+| **4.** | **P14** Wrestle do výběru kostky a do rerollu | bereme „Both Down" v přesvědčení, že nás Block chrání |
+| **5.** | **P1** K33/K34 na spojité | levné, opravuje metr |
+| **6.** | **P3** fázový plán trasy | bez fáze nejde odlišit chybu od záměru |
+
+## Projekty (ne úkoly)
+
+* **T5.13 přestavba rosterů** — odloženo do doběhu víkendu. MB na co nejvíc
+  trpaslíků, TV až 1500. Skavení varianty: OTT Runner · bash Blitzer ·
+  **GR s Wrestle** · GR s Nerves of Steel.
+* **Soupeř nehraje svou rasu** — část **(A)** je levná a splývá s P10a;
+  část **(B)** je vlastní projekt a **začíná skavenem**, ne wood-elfem.
+* **T6 učení** — až po repertoáru, s úplnou procedurou jako nulovou hypotézou.
+
+## Co se dnes uzavřelo
+
+A1 anomálie *(9→0)* · P5 hand-off *(cena + kritérium + logování)* ·
+P0.1 · P0.5 · P0.6 · P0.7 · P9a *(3 případy dominance)* · T5.16 · T5.17 ·
+P9c změřeno *(61,1 % → 39,4 %)* · **P11 ZAMÍTNUTO** *(72,5 % TD už teď
+v kolech 7–8; soupeř odpoví v 0–8 %)*.
+
+⚠️ **T1 (repertoár) se dnes nehnul** — S7 boxing-in, O6, S5.3/S5.4 a chybějící
+situace zůstávají. Nesoupeří o stroj, soupeří o rozhovor.
