@@ -72,7 +72,7 @@ nice -n 19 python3 diag_drive_failure_20260811.py "$DATA" \
     > "$OUT/drives.txt" 2>&1
 
 if grep -q "K33" "$OUT/checks.txt" && \
-   grep -qE "SKÓROVALI|DOŠLA KOLA" "$OUT/drives.txt"; then
+   grep -qE "PŘIJÍMACÍ DRIVY" "$OUT/drives.txt"; then
     echo "[$(STAMP)] DONE — $OUT/checks.txt, $OUT/drives.txt" >> "$LOG"
     touch "$OUT/BIG_DONE"
 else
