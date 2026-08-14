@@ -1,3 +1,6 @@
+> ⛔ **ARCHIV.** Nahrazeno trvalou knihou `evidence/task_queue.md` (14.08.2026).
+> Neplánovat podle tohoto souboru — položky z něj jsou tam přenesené se stavem.
+
 # SLOUČENÁ FRONTA ÚKOLŮ — 12.08.2026
 
 Slučuje: audit spec (A1–A9, 12.08.) · fronta oprav (P0–P5, 12.08.) ·

@@ -1,3 +1,6 @@
+> ⛔ **ARCHIV.** Nahrazeno trvalou knihou `evidence/task_queue.md` (14.08.2026).
+> Neplánovat podle tohoto souboru — položky z něj jsou tam přenesené se stavem.
+
 # FRONTA ÚKOLŮ — 13.08.2026
 *Nahrazuje `task_queue_20260812.md`. Čti tenhle.*
 
