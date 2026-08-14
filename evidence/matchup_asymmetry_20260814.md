@@ -19,7 +19,14 @@ Naše TD / jejich TD na 750 zápasů každý *(korpus 3000 her, 14.08.)*:
 
 ---
 
-## ⭐ ZÁVĚR: nejde o sílu týmů, jde o ASYMETRII NA DVOU OSÁCH NARÁZ
+> ⚠️ **ČTI I ODDÍL „OPRAVA SMĚRU" NÍŽE.** Oddíly „Osa 1" a „Osa 2" popisují
+> **výbavu** obou stran a platí tak, jak jsou. Ale **příčinu rozdílu 451 vs 86
+> vysvětlují špatně** — přepočet přes všechny kanály ukázal, že hrozba na našeho
+> nosiče je napříč rasami skoro stejná a rozdíl leží v **našem útoku na jejich
+> nosiče**. Ta čísla „68 % vs 6 %" níž jsou pravdivá, ale měří **jejich** hrozbu,
+> ne příčinu naší neúspěšnosti. Nezahazovat, jen nečíst jako mechanismus.
+
+## ⭐ VÝBAVA OBOU STRAN: asymetrie na dvou osách naráz
 
 ### Osa 1 — odebrání míče: skavenovy nástroje jsou proti nám neutralizované
 
