@@ -302,8 +302,33 @@ patnáct minut** — a jedna z nich vyvrací můj vlastní zápis z téhož dne.
   nenastala, tady nastane vždy — a policy předání přesto nikdy nezvolí.
   Unit test dokazuje, že se **nabízí**. ⇒ Zbytek řetězu.
 
-⚠️ **Výhrada:** jedna postavená pozice na scénář. Průkazné pro ni, ne pro
-všechny pozice. Než se z toho udělá doktrína, obměnit geometrii.
+## ⛔⛔ TÁŽ VÝHRADA SE HNED VYPLNILA — SWEEP PŘES 36 GEOMETRIÍ OBRÁTIL DVA ZE TŘÍ
+
+Napsal jsem k tomu výhradu *„jedna pozice, průkazné pro ni, ne pro všechny —
+obměnit geometrii"* — a **rozhodl jsem podle toho dřív, než se obměnila.**
+`diag_q1_sweep_20260814.cpp`, 36 geometrií × 12 seedů = **432 pozic na rameno**
+*(obměna: vzdálenost nosiče, 0/1/2 asistence, kolo 3 vs 7, střed vs u lajny)*:
+
+| scénář | jedna pozice | **36 geometrií** |
+|---|---|---|
+| **Dauntless — vybere Black Orka?** | **0 %** | **76,8 % → 83,3 %** *(OFF → ON)* |
+| nosič | 99 % | **98,5 %** ✅ potvrzeno |
+| **hand-off** | **0 %** | **18,3 %** |
+
+⇒ **Ta postavená pozice byla PATOLOGICKÁ** — jedna z mála geometrií, kde lineman
+vyhraje vždy. Přes 36 geometrií je obrázek opačný: policy si Black Orka bere
+v **76,8 %** už dnes a zapnutá nabídka to zvedne na **83,3 %**, plus 29 akcí
+navíc (228 → 257).
+⇒ **Rameno chování MĚNÍ. Zabití nočního běhu 14.08. bylo předčasné a běh byl
+znovu spuštěn** (15:15 UTC, HEAD `1dc9ecd2`).
+⇒ **Hand-off taky není mrtvý** — 18,3 % napříč geometriemi. V 3000 hrách
+nenastal proto, že situace „Longbeard nese a vedle je volný Runner" je vzácná,
+ne proto, že by ji policy odmítala.
+
+⭐⭐ **POUČENÍ, KTERÉ PLATÍ NA CELÝ Q1 NÁSTROJ:** *jedna postavená pozice je
+vzorek o velikosti jedna.* Q1 test je levný právě proto, že se dá pustit přes
+desítky geometrií — a **bez toho je horší než žádný**, protože vypadá
+přesvědčivě. **Nikdy nerozhodovat podle jedné pozice.**
 
 # ⭐⭐⭐ Q1 vs Q2 — DVĚ OTÁZKY, KTERÉ SPLÝVAJÍ A NESMÍ
 *(uživatel 14.08.: „mám DTS vedle BO a LO a v A/B jej donutím v jedné z větví

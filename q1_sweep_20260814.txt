@@ -1,0 +1,13 @@
+geometrií: 36 × 12 seedů = 432 pozic na rameno
+
+=== 1. DAUNTLESS: Slayer mezi Black Orkem ST4 a linemanem ST3 ===
+  offer OFF              pozic  432 | akcí  228 | BlackOrc  175 ( 76.8 %) | Lineman    53 ( 23.2 %)
+  offer ON               pozic  432 | akcí  257 | BlackOrc  214 ( 83.3 %) | Lineman    43 ( 16.7 %)
+
+=== 2. NOSIČ: Longbeard mezi jejich NOSIČEM a linemanem ===
+  dnešní stav          pozic  432 | akcí  413 | NOSIČ     407 ( 98.5 %) | Lineman     6 (  1.5 %)
+
+=== 3. HAND-OFF: náš LONGBEARD drží míč, vedle volný Runner ===
+  dnešní stav          pozic  432 | předání   79 ( 18.3 %) | jiná akce  353
+
+⚠️ Pořád Q1: měří VOLBU, ne hodnotu.

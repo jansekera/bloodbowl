@@ -1,0 +1,3 @@
+{"matchup":4,"seed_idx":0,"cand_home":true,"race_h":"dwarf","race_a":"orc","cand":0,"base":0,"home_attr":[0,0,0,0],"away_attr":[1,0,0,0],"actions":332,"cand_plans":0,"base_plans":0,"cand_daunt":1150,"cand_roll":214,"mode":4}
+{"matchup":4,"seed_idx":0,"cand_home":false,"race_h":"dwarf","race_a":"orc","cand":1,"base":0,"home_attr":[1,1,0,0],"away_attr":[0,0,0,0],"actions":374,"cand_plans":0,"base_plans":0,"cand_daunt":1566,"cand_roll":181,"mode":4}
+{"matchup":4,"seed_idx":1,"cand_home":true,"race_h":"dwarf","race_a":"orc","cand":0,"base":0,"home_attr":[2,0,0,0],"away_attr":[0,1,0,0],"actions":302,"cand_plans":0,"base_plans":0,"cand_daunt":1812,"cand_roll":692,"mode":4}
