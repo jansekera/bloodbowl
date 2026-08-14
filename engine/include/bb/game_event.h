@@ -11,9 +11,19 @@ struct GameEvent {
         TOUCHDOWN, TURNOVER, BALL_BOUNCE, PASS, CATCH,
         PICKUP, FOUL, KICKOFF, WEATHER_CHANGE, SKILL_USED,
         KNOCKED_DOWN, ARMOR_BREAK, CASUALTY, REGENERATION,
-        EJECTED  // 2026-07-21: fouler sent off on doubles -- previously
+        EJECTED, // 2026-07-21: fouler sent off on doubles -- previously
                  // reused INJURY, ambiguous in raw event logs (see
                  // evidence/foul_success_field_bug_20260721.md)
+        HAND_OFF // 2026-08-14: a hand-off used to leave no trace of its own --
+                 // resolveHandOff calls resolveCatch and the log showed a bare
+                 // CATCH, indistinguishable from catching a bounce or a kick.
+                 // The verification run for the hand-off pricing fix therefore
+                 // reported zero hand-offs in 3000 games while the carrier
+                 // distribution had visibly moved, i.e. the instrument was
+                 // measuring a string the engine never emits.
+                 // MUST STAY LAST: bb_module.cpp maps this enum to names
+                 // positionally, so inserting anywhere else renames every
+                 // event in already-collected corpora.
     };
 
     Type type;

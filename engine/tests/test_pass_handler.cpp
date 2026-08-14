@@ -242,6 +242,31 @@ TEST(PassHandler, HandOffSuccess) {
     EXPECT_EQ(gs.ball.carrierId, 2);
 }
 
+TEST(PassHandler, HandOffLeavesATraceOfItsOwn) {
+    // A hand-off used to show up as a bare CATCH, which reads identically to
+    // catching a bounce or a kick-off -- so a corpus could not be asked whether
+    // any hand-off happened at all, and the check written for the pricing fix
+    // read zero across 3000 games while the carriers had visibly changed.
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {6, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    std::vector<GameEvent> events;
+    FixedDiceRoller dice({6});
+    resolveHandOff(gs, 1, 2, dice, &events);
+
+    int handOffs = 0;
+    for (auto& e : events) {
+        if (e.type == GameEvent::Type::HAND_OFF) {
+            handOffs++;
+            EXPECT_EQ(e.playerId, 1);
+            EXPECT_EQ(e.targetId, 2);
+        }
+    }
+    EXPECT_EQ(handOffs, 1) << "the hand-off has to be countable without guessing";
+}
+
 TEST(PassHandler, HandOffFailTurnover) {
     auto gs = makePassSetup();
     gs.homeTeam.rerolls = 0;  // No team rerolls

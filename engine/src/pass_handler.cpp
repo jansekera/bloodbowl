@@ -418,6 +418,16 @@ ActionResult resolveHandOff(GameState& state, int giverId, int receiverId,
         return ActionResult::turnovr();
     }
 
+    // A hand-off left no trace of its own in the log: this function calls
+    // resolveCatch and what came out was a bare CATCH, which reads exactly like
+    // catching a bounce or a kick-off. So the corpus could not answer "did we
+    // hand off at all" -- the check written for the pricing fix counted a
+    // HAND_OFF string the engine never emitted and duly reported zero across
+    // 3000 games. Declare the action here; the CATCH that follows carries the
+    // roll, the same shape as PASS.
+    emitEvent(events, {GameEvent::Type::HAND_OFF, giverId, receiverId,
+                       giver.position, receiver.position, 0, true});
+
     // Transfer ball to ground at receiver position
     state.ball = BallState::onGround(receiver.position);
 
