@@ -53,7 +53,45 @@ ostatní kontroly beze změny. Kdyby se hnulo chess kterýmkoli směrem o víc n
 
 ---
 
-## BĚH 1 — P10a: sražení nosiče se musí vyplatit *(nově první)*
+## BĚH 0 — P11: neskórovat dřív, než je čas *(přidáno 14.08., NEJSILNĚJŠÍ kandidát)*
+
+### Proč je to nejsilnější, co dnes máme
+*(uživatel: „kdyby Runner s míčem utekl a skóroval dříve, je to také špatně,
+protože soupeř dostane čas na re-TD"; a „ujet víc polí není špatně — ale je
+špatně skórovat dříve".)*
+
+Engine **skóruje, jakmile může**: `SCORE` má prior 100, nejvyšší ze všech
+maker; `+0,4` za „safe walk-in" a `+0,8` v posledním kole nemají podmínku na
+zbývající kola soupeře. **Zdržovací člen neexistuje.**
+
+⇒ A náš plán je **1:0**, ne 2:1 — trpaslík neskóruje v 65–82 % zápasů
+a nejčastější výsledek je 0:0. **Když už skórujeme, je ten jediný TD celý
+zápas.** Dát ho v kole 5 místo v kole 8 mění jistou výhru na minci.
+
+⚠️ **Míří to přímo na chess, ne na procesní kontrolu** — a to je přesně to,
+co otevřená otázka č. 1 od změny žádá.
+
+### Rameno
+`SCORE` a odměny za dosažitelnou endzonu dostanou podmínku na **kola zbývající
+soupeři**. Držet míč před čárou a překročit ji co nejpozději. Baseline: dnešní
+chování.
+
+### Riziko, které se musí napsat předem
+**Odložený TD může být žádný TD.** Kdo čeká, může přijít o míč a skončit 0:0
+místo 1:0. Rameno proto **nesmí** být „nikdy neskóruj dřív", ale „neskóruj
+dřív, **když míč držíš bezpečně**". Když vyjde záporně, je to poctivý výsledek
+a doktrína záporné rezervy dostane první skutečný protidůkaz od 10.08.
+
+### Metrika a práh
+* Primární: **párová delta chess na `dw-we` a `dw-sk`, 1500 párů**, prahy jako
+  u ostatních běhů (≥ +0,03 prošlo · ≤ −0,03 zamítnuto · mezi tím nerozhodnuto).
+* Doplňkově zapsat: **kolo, ve kterém padl náš TD**, a **kolik kol zbylo
+  soupeři** — před i po. Když se rozdělení nehne, rameno se nechytlo.
+* A **podíl drivů, které skončily 0:0 místo TD** — to je ta cena.
+
+---
+
+## BĚH 1 — P10a: sražení nosiče se musí vyplatit
 
 ### Proč postoupil na první místo
 Všechny tři členy, které listová evaluace o soupeřově nosiči zná, odměňují
