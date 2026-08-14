@@ -29,9 +29,15 @@ import glob, json, math, os, sys
 from collections import defaultdict
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "dauntless_ab_20260814"
-MATCHUPS = {0: "dw-sk", 1: "dw-we", 3: "orc-sk"}
-DWARF = {0, 1}
-NULL_CONTROL = {3}
+MATCHUPS = {0: "dw-sk", 1: "dw-we", 3: "orc-sk", 4: "dw-orc", 5: "dw-hu"}
+# Trpasličí matchupy, kde Dauntless VŮBEC může vyskočit (potřebuje defST > 3):
+#   dw-orc  4x Black Orc ST4  -> 83 %   (ta otázka)
+#   dw-hu   Ogre ST5          -> 67 %
+#   dw-we   Treeman ST6       -> 50 %
+DWARF = {4}      # jediný, kde je efekt nad rozlišením
+# dw-sk je DRUHÁ null kontrola: skaven má max ST3, takže Dauntless tam nevyskočí
+# ani jednou a delta musí být nula stejně jako u orc-sk.
+NULL_CONTROL = {0, 3}
 PREREG = 0.02
 
 
@@ -99,8 +105,9 @@ def main():
                  "❌ ZAMÍTNUTO" if mu <= -PREREG and sig <= -2 else
                  "— NEROZHODNUTO")
         else:
+            why = "skaven má max ST3" if mi == 0 else "ani jedna strana Dauntless nemá"
             v = ("⛔ NULL TEST SE HNUL — podezřelý harness" if abs(sig) >= 2 else
-                 "✅ null OK (ani jedna strana Dauntless nemá)")
+                 f"✅ null OK ({why})")
         print(f"{MATCHUPS.get(mi, mi):10}{n:>7}{mu:>+10.4f}{se:>9.4f}{sig:>6.1f}σ"
               f"{sum(chess_c) / len(chess_c):>12.4f}"
               f"{cas_c / (2.0 * n):>13.2f}{cas_b / (2.0 * n):>7.2f}   {v}")
@@ -114,13 +121,12 @@ def main():
     # ---- celkový verdikt proti předregistraci, ne proti dojmu ----
     dw = [verdicts[m] for m in DWARF if m in verdicts]
     print()
-    if len(dw) < 2:
-        print("⚠️  chybí trpasličí matchup — verdikt se nevyslovuje")
+    if len(dw) < 1:
+        print("⚠️  chybí dw-orc — verdikt se nevyslovuje")
     else:
         mus = [m for m, _, _ in dw]
         sigs = [s for _, s, _ in dw]
-        if all(m >= 0 for m in mus) and any(m >= PREREG and s >= 2
-                                           for m, s in zip(mus, sigs)):
+        if any(m >= PREREG and s >= 2 for m, s in zip(mus, sigs)):
             print("VERDIKT: ✅ PROŠLO podle předregistrace")
         elif any(m <= -PREREG and s <= -2 for m, s in zip(mus, sigs)):
             print("VERDIKT: ❌ ZAMÍTNUTO podle předregistrace")

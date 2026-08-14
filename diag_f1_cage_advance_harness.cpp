@@ -87,8 +87,25 @@ static const Matchup MATCHUPS[] = {
     {"dwarf", "wood-elf"},
     {"dwarf", "dwarf"},
     {"orc", "skaven"},
+    // 2026-08-14: APPENDED, never inserted -- the index is the argv matchup
+    // filter and is written into every row already on disk, so reordering this
+    // table would silently relabel past runs.
+    //
+    // dwarf-orc was missing, and it is the matchup that decides several of the
+    // questions we keep asking: we score 86 touchdowns against orcs over 750
+    // games against 451 against Skaven, and skills that key on strength (P13
+    // Dauntless equalising onto ST4) or on Block (P17 Wrestle) only ever fire
+    // here -- Skaven cap at ST3, so a Dauntless arm run on dw-sk measures
+    // nothing at all.
+    {"dwarf", "orc"},
+    // 2026-08-14: a human too, so that a dwarf A/B finally covers all four
+    // opponents. Every A/B this project has ever run -- the cage gate, bundle G,
+    // everything -- used dw-sk and dw-we only, i.e. the two FAST teams, which
+    // are exactly the matchups where our doctrine flatters itself. Orcs and
+    // humans, our two worst results, were never in an arm at all.
+    {"dwarf", "human"},
 };
-static constexpr int N_MATCHUPS = 4;
+static constexpr int N_MATCHUPS = 6;
 
 struct SideAttrition {
     int ko = 0, injured = 0, dead = 0, ejected = 0;
@@ -169,7 +186,7 @@ static FullGameOutcome playGame(const TeamRoster& home, const TeamRoster& away,
 
 static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* pol,
                              bool cageAdvanceOn, bool cageGrindOn = false,
-                             float policyBlend = 0.0f) {
+                             float policyBlend = 0.0f, bool dauntlessOn = false) {
     // Champion fairtest config (diag_policy_confirm_20260731.py): MCTS-100,
     // vf_blend 0.15, policy net loaded with blend 0 => heuristic prior
     // floors ACTIVE (expand() only computes floors when a policy is set).
@@ -182,6 +199,7 @@ static MCTSConfig makeConfig(const ValueFunction* /*vf*/, const PolicyNetwork* p
     cfg.nRollouts = 1;
     cfg.policy = pol;
     cfg.policyBlend = policyBlend;
+    cfg.dauntlessInOffer = dauntlessOn;
     cfg.cageAdvance = cageAdvanceOn;
     cfg.cageGrind = cageGrindOn;
     return cfg;
@@ -214,11 +232,13 @@ int main(int argc, char** argv) {
     // per seed. Seeds are disjoint from the other modes so runs never mix.
     uint32_t seedBase = (mode == 1) ? 37'000'000u
                       : (mode == 2) ? 51'000'000u
-                      : (mode == 3) ? 63'000'000u : SEED_BASE;
+                      : (mode == 3) ? 63'000'000u
+                      : (mode == 4) ? 79'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
          : mode == 2 ? "ERA: single arm, production config, both sides"
+         : mode == 4 ? "DAUNTLESS: block offer prices the equalised strength vs raw"
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
                      : "cage vs off");
 
@@ -233,7 +253,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    FILE* rows = fopen(mode == 1 ? "diag_f1_grind_rows.jsonl"
+    FILE* rows = fopen(mode == 4 ? "diag_dauntless_rows.jsonl"
+                     : mode == 1 ? "diag_f1_grind_rows.jsonl"
                      : mode == 2 ? "diag_era_rows.jsonl"
                      : mode == 3 ? "diag_m1_rows.jsonl"
                                  : "diag_f1_cage_advance_rows.jsonl", "a");
@@ -272,10 +293,15 @@ int main(int argc, char** argv) {
                 // LEARNED content differs (blend 0.2 vs 0.0). That isolates
                 // "does the learned policy help or hurt the dwarf" from "do
                 // the floors help". Cage/grind off, as in production.
+                // mode 4 (2026-08-14): both arms are production -- cage off,
+                // grind off -- and the ONLY difference is whether the block
+                // offer prices a Dauntless block at the strength it would
+                // equalise to. base is today's engine.
                 MCTSConfig candCfg = makeConfig(vf.get(), pol.get(),
-                                                mode != 2 && mode != 3,
+                                                mode != 2 && mode != 3 && mode != 4,
                                                 mode == 1,
-                                                mode == 3 ? 0.2f : 0.0f);
+                                                mode == 3 ? 0.2f : 0.0f,
+                                                mode == 4);
                 MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(),
                                                 mode == 1);
                 MacroMCTSPolicy homePol(vf.get(),

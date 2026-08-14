@@ -78,8 +78,30 @@ A Dauntless vyskočí jen při `defST > attST` (náš Slayer je ST3):
 stojí vedle Treemana.** Změna míří na orky a ork-trpaslík se neměří.
 **Sedmý výskyt vzorce dne — a tentokrát v mém vlastním zadání.**
 
-⇒ **Nutná oprava před spuštěním:** přidat `{"dwarf","orc"}` jako matchup **4**
-(append, aby se neposunuly indexy) a běžet **dw-orc · dw-we · orc-sk (null)**.
+⇒ **Opraveno:** `{"dwarf","orc"}` přidán jako matchup **4** a `{"dwarf","human"}`
+jako **5** (append, aby se neposunuly indexy — index se píše do každého řádku).
+
+### Které tři matchupy a proč *(vyhodnoceno před spuštěním, ne po)*
+
+Rozšíření na všech pět **zamítnuto**: expozice Dauntless podle matchupu je
+**ork 1,00 · human 0,20 · wood-elf 0,15 · skaven 0** *(4× ST4 na 83 % vs jeden
+Ogre ST5 na 67 % vs jeden Treeman ST6 na 50 %)*. Orc sám je na hraně rozlišení
+(+1–2 pp), takže human a wood-elf by po **9 h navíc** vrátily **zaručené
+nerozhodnuto** — na jejich ~0,3 pp by bylo potřeba ~40 000 párů.
+
+| matchup | role |
+|---|---|
+| **dw-orc** | **ta otázka** — 4× Black Orc ST4 |
+| **dw-sk** | **pravý null** — skaven nemá ST4, Dauntless **nemůže** vyskočit ⇒ delta MUSÍ být nula. Čistší než dw-we, kde by ten jeden Treeman občas zafungoval |
+| **orc-sk** | **A/A null** — Dauntless nemá ani jedna strana |
+
+⇒ **Dvě nezávislé nuly místo jedné, za stejných 14 h.**
+
+⚠️ **A díra, která tím vyšla najevo:** VŠECHNA A/B tohoto projektu — brána
+klece, balík G, všechno — běžela jen na **dw-sk a dw-we**, tedy proti dvěma
+**rychlým** týmům. **Ork a human, naše dvě nejhorší utkání, nebyly nikdy
+v žádném rameni.** `dw-hu` proto zůstává v tabulce harnessu pro běh, kde na
+humanovi bude záležet.
 
 ### ⚠️ A druhá, poctivá výhrada k síle testu
 Fable §9.5: **strop Dauntless je 86 → ~110 TD na 750 orčích her**, tedy
