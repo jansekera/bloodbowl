@@ -484,6 +484,67 @@ TEST(MacroActions, TheSameBadPassIsOfferedWhenTheHalfEndsWithoutIt) {
         << "the carrier cannot reach the endzone and the half ends anyway";
 }
 
+TEST(MacroActions, AnAdjacentTeamMateIsOfferedBecauseTheHandOffIsWhatHappens) {
+    // Same two agilities the routine-pass test rejects at range, but adjacent.
+    // expandPass runs HAND_OFF for a neighbour, and resolveHandOff has no throw
+    // roll -- so the offer is worth the catch alone (AG3, +1, in the clear:
+    // 3+ = 67%), not catch times a throw that never gets made (33%).
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {4, 3, 2, 9};       // AG2 Longbeard holds it
+    state.ball = BallState::carried({5, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 1;                 // no emergency to lean on
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {6, 7};                          // adjacent, one square ahead
+    p2.stats = {6, 3, 3, 8};                       // AG3 Blitzer
+    p2.movementRemaining = 6;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    bool toTheNeighbour = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::PASS_ACTION && m.targetId == 2) toTheNeighbour = true;
+    }
+    EXPECT_TRUE(toTheNeighbour)
+        << "a hand-off to an adjacent AG3 team-mate is a 3+ catch, not a throw";
+}
+
+TEST(MacroActions, TheSamePairIsStillRefusedOnceItIsAThrow) {
+    // Guards the other half: only the adjacent case was repriced. Step the very
+    // same two players apart and it is a real throw again, and a throw off AG2
+    // stays the turnover-in-waiting the range check was written to refuse.
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {4, 3, 2, 9};
+    state.ball = BallState::carried({5, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 1;
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {12, 7};                         // seven squares out
+    p2.stats = {6, 3, 3, 8};
+    p2.movementRemaining = 6;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    bool toTheDistantOne = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::PASS_ACTION && m.targetId == 2) toTheDistantOne = true;
+    }
+    EXPECT_FALSE(toTheDistantOne)
+        << "out of hand-off range the throw roll is real and AG2 still fails it";
+}
+
 TEST(MacroActions, BranchingFactorReasonable) {
     // Full game state should produce ~10-25 macros, not ~200
     GameState state;

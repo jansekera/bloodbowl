@@ -671,7 +671,26 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             auto chance = [](int t) {
                 return (7.0 - static_cast<double>(std::clamp(t, 2, 6))) / 6.0;
             };
-            const double complete = chance(throwTarget) * chance(catchTarget);
+            // expandPass() performs a HAND_OFF whenever the target is adjacent
+            // and only falls back to a throw beyond that -- but this filter
+            // priced every offer as a throw, so it was vetoing an action nobody
+            // was ever going to take. resolveHandOff (pass_handler.cpp) has no
+            // throw roll at all and catches at the same +1 the accurate-pass
+            // branch here already assumes, so at distance 1 the completion
+            // chance simply IS the catch chance.
+            //
+            // Longbeard AG2 -> Blitzer AG3 in the clear was priced
+            // 0.50 x 0.67 = 33% and thrown away; the hand-off it would have
+            // performed is 67%. The comment above concedes the same thing
+            // about "even a Runner to a Runner is 44%" -- that pair is 67% too.
+            // Under the old price no hand-off between any two dwarves we field
+            // cleared 0.5, so the macro was dead in every turn of every game,
+            // and with it the only way to get the ball off a carrier who should
+            // not be holding it (measured 2026-08-13).
+            const bool handOff = dist == 1;
+            const double complete = handOff
+                                  ? chance(catchTarget)
+                                  : chance(throwTarget) * chance(catchTarget);
 
             const int turnsLeft = 9 - myTeam.turnNumber;
             const bool emergency =
