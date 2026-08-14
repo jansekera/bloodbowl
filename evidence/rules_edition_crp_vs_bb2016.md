@@ -3,10 +3,29 @@
 **Cílová edice projektu je BB2016** (rozhodnutí uživatele, zopakované 14.08.).
 Náš stažený text `rules_crp2016.txt` je ve skutečnosti **CRP** — viz T5.16.
 
-⚠️ **Původ tohoto seznamu: od uživatele, zdrojem je AI.** Naše vlastní pravidlo
-z 07.08. zní *stáhnout text a grepovat, ne se ptát modelu* — právě takhle se ty
-dvě edice slily. **Bereme to jako seznam hypotéz k ověření**, ne jako doklad.
-Ověření vede **T5.17**.
+## ✅ ZDROJE — obě edice máme jako text (14.08.)
+
+| soubor | co to je |
+|---|---|
+| `rules_crp_lrb6.txt` | CRP / LRB6, 243 kB *(dřív matoucí název `rules_crp2016.txt`)* |
+| `rules_bb2016.txt` | **BB2016**, 107 stran / 432 kB — Rulebook 11/2016 + **Death Zone Season 1** + Bugman's Star Players |
+
+Postup byl týž jako 07.08.: `WebFetch` uloží PDF na disk i když ho neumí
+přečíst → `venv/bin/python3` + `pypdf` → grep. Zdroj PDF:
+`cdn.1j1ju.com/medias/f8/fd/4b-blood-bowl-rulebook.pdf`.
+Oba soubory jsou **mimo git** (`.gitignore`).
+
+⚠️ Seznam níž přišel od uživatele a jeho zdrojem byla AI. **Body ověřené proti
+textu jsou označené ✅ / ⛔.** Neověřené zůstávají hypotézou.
+
+### ⛔ Dva body z webových shrnutí jsou NEPRAVDIVÉ
+
+Web tvrdil, že BB2016 *„removed the '(except for Stakes)' exception from the
+Stab skill and completely removed Stakes as a skill"*. **Obojí je špatně** —
+v textu BB2016 je `Stakes (Extraordinary)` i výjimka `(except for Stakes)`
+u `Stab`, a znění je **slovo od slova totožné s CRP**.
+⇒ Přesně proto platí pravidlo *stáhnout text, ne věřit souhrnu* — ať je ten
+souhrn od AI nebo z fóra.
 
 > **Proč tenhle soubor vznikl:** uživatel tenhle přehled poslal **už dříve**
 > a nikde se nezapsal — třetí případ téhož dne (po rozhodnutí o edici a po
@@ -31,7 +50,7 @@ Sprint, Claw, Mighty Blow) se mezi CRP a BB2016 **nemění**.
 
 | # | změna | dopad na nás |
 |---|---|---|
-| **1** | **Piling On** — v CRP zdarma; v BB2016 **volitelné pravidlo** a aktivace stojí **Team Re-roll** | **Sahá.** U nás **není implementovaný vůbec** (mrtvá hodnota enumu). Až se bude dělat, musí vzniknout **verze 2016**. → **T5.15**, odloženo uživatelem |
+| **1** ✅ | **Piling On** — v CRP zdarma; v BB2016 aktivace stojí **Team Re-roll**. **OVĚŘENO v textu:** BB2016 *„**You can use a team re-roll** to re-roll the Armour roll or Injury roll"* vs CRP *„You may re-roll the Armour roll or Injury roll"* | **Sahá.** U nás **není implementovaný vůbec** (mrtvá hodnota enumu). Až se bude dělat, musí vzniknout **verze 2016**. → **T5.15**, odloženo uživatelem |
 | **2** | **Argue the Call** — kouč smí zkusit zvrátit vyloučení za faul / Secret Weapon. `1` = kouč vykázán a −1 na Brilliant Coaching · `2–5` = platí · `6` = hráč jen na střídačku (tah stále končí turnoverem) | **Sahá.** Vyloučení za faul **modelujeme** (`foul_handler.cpp:64`, dvojice → ejected, Sneaky Git tomu brání), ale odvolání nemáme. → **nová položka** |
 | **3** | **Weeping Dagger** — nová dovednost skavenních Gutter Runnerů; Badly Hurt se na **4+** mění na Miss Next Game | Sahá jen přes rostery. „Miss Next Game" je **poliga**, kterou nemodelujeme ⇒ prakticky bez efektu na jeden zápas. → k **T5.13** |
 | **4** | **Timmm-ber!** — nová dovednost **halflingských** Treemanů (+1 na postavení za každého nemarkovaného souseda). **Wood-elfí Treemani ji NEDOSTALI** | **Užitečný negativní nález:** náš wood-elfí Treeman je **správně bez ní**. Nic neměnit. |
@@ -49,6 +68,26 @@ Sprint, Claw, Mighty Blow) se mezi CRP a BB2016 **nemění**.
 * **Měřítko 28 mm → 32 mm**, deska 29 → 34 mm, nové pravítko na přihrávky
 
 *(Vše výše je liga, ekonomika po zápase, nebo fyzické komponenty.)*
+
+## ✅ Co se ověřilo jako BEZE ZMĚNY mezi edicemi
+
+Znění je v obou textech totožné, takže naše dosavadní audity **platí**:
+
+* **Mighty Blow** — *„you only modify **one** of the dice rolls"* v obou
+  ⇒ **T5.14 je chyba proti oběma edicím**, ne důsledek špatné edice.
+* **Claws** — *„any Armour roll of **8 or more after modifications**"* v obou
+  ⇒ stacking Claw+MB na brnění (7+ prorazí AV9) **zůstává**, jak si uživatel přál.
+* **Stakes**, **Stab**, **Tackle** — beze změny.
+
+## ⚠️ Nová parita, která z ověření vypadla
+
+**`Stakes` u nás dělá něco jiného, než pravidlo říká.** Obě edice shodně:
+*„may add **1 to the Armour roll** when they make a **Stab attack** against any
+player playing for a Khemri, Necromantic, Undead or Vampire team."*
+Náš engine s ním místo toho **blokuje Regeneration** (`injury.cpp:145`:
+`hasSkill(Regeneration) && !ctx.hasStakes`).
+**Neškodné** — Stakes má jediný Star Player proti nemrtvým a my nehrajeme
+ani Star Playery, ani nemrtvé *(uživatel 14.08.)*. → **T5.19**, nízká priorita.
 
 ## Co zbývá ověřit (T5.17, přeškálováno)
 
