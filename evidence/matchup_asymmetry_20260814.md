@@ -318,6 +318,44 @@ toho, že svůj plán nehrají.
 konci. Když se nehne ani po nich, je část (A) vyvrácená a zbývá jen drahá
 část (B).
 
+## ⭐⭐ HUMAN JE JEDINÝ TÝM S PODMÍNĚNÝM PLÁNEM
+*(uživatel 14.08.: „strategicky je z nich nejzajímavější human — protože proti
+trpaslíkům a orkům musí hrát AGI a proti skavenům a elfům bash")*
+
+Ostatní čtyři mají **jeden plán a hrají ho vždycky**:
+
+| tým | plán |
+|---|---|
+| trpaslík | mlátit a nedělat chyby — vždy |
+| ork | zeď a síla — vždy |
+| skaven | shodit míč, vyhrát závod k němu — vždy |
+| wood-elf | rychlost a přihrávka — vždy |
+| **human** | ⭐ **záleží na soupeři** |
+
+Human je uprostřed všeho (MA6–7, ST3, AG3, AV8), takže **nemá vlastní hru — má
+relativní**:
+* proti **trpaslíkovi a orkovi** *(pomalí, AV9, ST3–4)* je **rychlejší strana**
+  ⇒ musí hrát **AGI**: obejít, ne prorazit;
+* proti **skavenovi a wood-elfovi** *(AV7, ST2–3)* je **tvrdší strana**
+  ⇒ musí hrát **bash**: elfa nepředběhne, ale rozbije ho.
+
+### Proč je to pro projekt důležité
+
+1. ⛔ **Rasově citlivá heuristika na humana NESTAČÍ.** Část (A) — cena volného
+   míče podle rychlosti, vhodnost těla do rohu — je pořád vlastnost **jednoho
+   týmu**. Human potřebuje veličinu **relativní k soupeři** (jsem tady rychlejší,
+   nebo tvrdší?). ⇒ **Human je nejtvrdší test toho, jestli část (A) stačí.**
+2. ⭐ **Vysvětluje, proč šla trpasličí doktrína napsat.** Je **absolutní** —
+   mlátíme vždycky, nezávisle na tom, kdo stojí naproti. Proto se dala vyjádřit
+   ~60 povinnostmi. **Humanovská by musela být podmíněná** a byla by řádově
+   složitější než skavení.
+3. Praktické: human nám dá **281 TD proti našim 178** — druhý nejhorší matchup
+   po orkovi.
+
+⇒ **Pořadí pro část (B) tím dostává smysl i technicky:** skaven *(nejlevnější,
+absolutní plán)* → ork/wood-elf *(absolutní)* → **human až naposled**, protože
+teprve on vyžaduje podmíněný plán.
+
 ## ⛔ CO Z TOHO PLYNE PRO VŠECHNA NAŠE ČÍSLA
 
 **Průměr přes čtyři soupeře míchá dva opačné světy.** Doktrína laděná na
