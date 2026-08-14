@@ -137,7 +137,24 @@ prediktorů, které kontrolu proveditelnosti PŘEŽILY** (+2,8σ), takže tady j
 
 ---
 
-## FRONTA NA BĚHY 2 A 3 *(pořadí se rozhodne v sobotu, ne teď)*
+## ⛔ PRAVIDLO SEKVENCE *(uživatel 14.08.)*
+
+> *„Jsem pro měření zvlášť — samostatně Dauntless a po vyhodnocení později
+> samostatně Wrestle."*
+
+* **Žádné rameno nesmí obsahovat dvě změny naráz.** Ani tehdy, když spolu
+  věcně souvisejí (Dauntless + Wrestle tvoří balík proti Black Orkovi — měří se
+  přesto zvlášť, jinak nepůjde říct, která polovina zabrala).
+* **Sobotní běh se NEPŘEDURČUJE.** Dauntless doběhne v sobotu ráno →
+  **vyhodnotí se** → teprve pak se vybírá další. Fronta níž je zásobník
+  kandidátů, **ne plán**.
+* ⚠️ Zejména **P17 Wrestle není přislíbený na sobotu** — pořadí, které jsem
+  psal odpoledne, tímhle padá.
+
+## ZÁSOBNÍK KANDIDÁTŮ *(ne fronta, ne plán — vybírá se AŽ po vyhodnocení)*
+* **P17 Wrestle** — opravuje kanál, který skaven používá v 51 % kol, a odemyká
+  balík proti Black Orkům. ⚠️ Po opravě **klesne náš náskok proti skavenovi**,
+  protože část našich 451 TD je artefakt toho, že ho soupeř neumí použít.
 * **P2+P9c** — priorita bloku na pollutera; strop 39,4 % polluterů.
 * **blitz roh vs. zeď** — jediné, co Fable nerozhodl a observačně nejde.
 * **P10a** — sražení nosiče se musí vyplatit; rozpočet tří těl.
