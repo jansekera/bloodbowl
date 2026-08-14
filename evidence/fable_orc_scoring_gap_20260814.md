@@ -6,8 +6,9 @@ z `diag_drive_failure_20260811.py` (kategorie A/B/C/D1/D2, příčiny ztrát,
 tempo, odpor) a `diag_exposure_scan_20260812.py` (Board, REACH/REACH0/BLZ/
 CCBAD/FB2, assists s Guardem). Očekávání pre-registrována PŘED výpočtem
 (`scratchpad/orc_gap_20260814/PREREG.md`). Skripty + úplné výstupy:
-`scratchpad/orc_gap_20260814/` (s1–s7, *.out). Hraniční efekty bootstrap
-po HRÁCH. Snímek = začátek kola.
+`scratchpad/orc_gap_20260814/` (s1–s9, *.out). Hraniční efekty bootstrap
+po HRÁCH. Snímek = začátek kola. **Kapitola §9 (oprava metodiky, doplněno
+odpoledne) koriguje interpretaci §2a — čti ji spolu s §2.**
 
 Kontrola konzistence: TD z headerů = TD z drivů (naše TD = přijímací A +
 STEAL+TD): skaven 254+198=452≈451 · wood-elf 157+102=259≈260 · human
@@ -215,7 +216,7 @@ Poctivě: **obojí, zhruba půl na půl.**
 | # | očekávání | výsledek |
 |---|---|---|
 | 1 | podíl „blitz srazil" vyšší vs orc | ✓ slabě (87 vs 80 %, CI [0,01;0,13]) — hlavní rozdíl je četnost C, ne mix |
-| 2 | BLZ≥2 častěji vs orc, skaven 1k | ✓✓ 68 % vs 6 % — nejčistší mechanismus dne |
+| 2 | BLZ≥2 častěji vs orc, skaven 1k | ✓✓ 68 % vs 6 % — pozor, interpretaci koriguje §9.1 |
 | 3 | REACH0 nejistý směr | REACH0 se mezi orc/skaven neliší (1,73/1,76) — není to páka |
 | 4 | bilance stojících ≥1,5 těla T8 | ✓ rozdíl bilancí orc vs skaven 4,4 těla (−1,5 vs +2,9) |
 | 5 | naše AD vyšší vs orc, jejich DD/DS vyšší | ✓ (AD 4,7 % nejhorší; jejich AD 2,4 % nejlepší) |
@@ -223,3 +224,141 @@ Poctivě: **obojí, zhruba půl na půl.**
 | 7 | tempo nejnižší vs orc | ✓ 2,03 |
 | 8 | kontroly neplnitelné vs orc, ne opačné | ✗ obojí špatně: plníme je stejně a korelují stejným směrem (silněji) — chybí kontrola VZDÁLENOSTI |
 | 9 | primární (a) kostky + (b) attrition, ne pozdní míč | ✓ + doplněk: polovina rozdílu TD je v krádežích (198 vs 31), které jsem v prereg neměl |
+
+## 9) OPRAVA METODIKY (námitka uživatele 14.08.): hrozba přes všechny kanály
+
+**Námitka:** „BLZ≥2 porovnává hrušky s jablky — měří silový kanál, kterým
+hrozí jen ork, a ignoruje dovednostní (Wrestle, Strip Ball), kterým hrozí
+skaven." Oprávněná. Postaven model hrozby na kostku bloku přes všechny
+kanály (s8; q_down = DD+DS, +BD u útočníka s Wrestle bez Blocku
+[block_handler.cpp:494, oba k zemi BEZ brnění], q_strip = PUSH×2 u Strip
+Ballu proti nosiči bez Sure Hands [block_handler.cpp:627 negaci potvrzuje];
+dosah/kostky/asistence beze změny z exposure scanu; skilly z roster.cpp).
+THREAT_raw = bez odečtu Sure Hands, THREAT_net = s ním. Očekávání
+pre-registrována před plným během (PREREG.md, addendum 10–13). Výstupy:
+s8_threat_channels.out, s9_mirror_decomp.out.
+
+### 9.1 Původní řetěz se ROZPADL — říkám to rovnou
+
+| race | THREAT_net | THREAT_raw | P(nosič↓)emp | naše TD |
+|---|---|---|---|---|
+| human | 0,450 | 0,488 | 0,162 | 178 |
+| orc | 0,424 | 0,455 | 0,173 | 86 |
+| skaven | **0,400** | 0,441 | **0,125** | 451 |
+| wood-elf | 0,413 | 0,512 | 0,151 | 260 |
+
+Pravidlová hrozba na NAŠEHO nosiče je napříč rasami skoro stejná (skaven
+dokonce nejnižší, ale jen o 0,05) a **při stejné hrozbě je konverze rasově
+nezávislá** (pásmo THREAT 0,15–0,35: 0,090/0,095/0,105/0,090; n=451–2745).
+Realizované riziko se liší jen 1,38× (0,125→0,173) — to přes skládání
+a tempo unese kus rozdílu v C, ale ne 5,2× v TD. **Formulace „ork nás
+ohrožuje víc" byla špatné pojmenování příčiny.** Řetěz „BLZ≥2 ⇔ TD" z §2a
+tím padá jako VYSVĚTLENÍ; přežívá jen jako popis toho, kudy realizovaná
+hrozba chodí. (Vzdálenostní žebříček 0,511/0,239/0,072/0,002, attrition
+a R-DIST z §1–§5 platí dál — kontakt je drahý u všech ras.)
+
+### 9.2 Skavenova hrozba je neutralizovaná — dvěma RŮZNÝMI mechanismy
+
+* **Strip Ball (legitimní pravidlo):** stripper v dosahu nosiče syrově
+  ve 26,4 % kol (skaven; welf 47,2 %), po Sure Hands **5,3 %** (welf 6,3 %)
+  — **Sure Hands na Runnerovi bere ~80 % strip hrozby**. Empirie sedí:
+  strip uspěl 0,05/hru, Sure Hands negace 0,11/hru. Engine správně
+  (block_handler.cpp:627). ⇒ potvrzení doktríny „nosič = Runner": jeho
+  Sure Hands je tiše nejcennější skill proti třem ze čtyř ras.
+* **Wrestle (artefakt enginu, nová položka rodiny P13):** v modelu je 1k
+  Wrestle skavenův NEJLEPŠÍ kanál v 51,1 % kol (q=3/6 na kostku, bez
+  brnění, bez turnoveru). Realizace: ofenzivně 0,16 použití/hru, **49 BD
+  sražení našeho nosiče za 750 her**; faces skutečných sražení: BD 0 %,
+  DD+DS 100 %. Příčina v kódu: **rozhodovací vrstva Wrestle nezná** —
+  `scoreFace` dá Wrestlerovi za BD skóre 1 („only att falls", omyl),
+  `shouldRerollBlock` mu BD přehodí, nabídkový filtr 1k vyžaduje Block;
+  `grep Wrestle` v macro_actions/action_features/policies = **0 výskytů**.
+  Provedení skill umí (block_handler:494) — táž třída chyby jako Dauntless,
+  na straně soupeře. (Defenzivně Wrestle firuje, 0,90/hru ve skaven hrách
+  — proti NAŠIM blokům, automatika bez rozhodování; pozn.: Wrestle sráží
+  bez KNOCKED_DOWN eventu, takže s1 příčina „srazil nosiče" těch 49
+  případů nevidí — na závěrech nic nemění.)
+* **Poctivý důsledek:** část našich 451 proti skavenovi je artefakt.
+  Skaven s viděným Wrestle by měl na našeho nosiče reálný kanál v ~polovině
+  kol; model dává strop (hrozba ~orc úrovně), realita bude níž (musí projít
+  screen). Po opravě Wrestle náš náskok proti skavenovi KLESNE.
+
+### 9.3 Nosný řetěz je ZRCADLOVÝ: ork si nosiče uhlídá, skaven ne
+
+Naše kolo, jejich stojící nosič (s8 část C, s9):
+
+| race | n | P(jejich nosič↓) | náš BLZ≥2 | STEAL+TD | naše TD |
+|---|---|---|---|---|---|
+| skaven | 4126 | **0,347** | **54,4 %** | 198 | 451 |
+| wood-elf | 4374 | 0,266 | 43,4 % | 102 | 260 |
+| human | 5157 | 0,183 | 19,0 % | 82 | 178 |
+| orc | 5619 | **0,113** | **7,5 %** | 31 | 86 |
+
+**Monotónní přes všechny čtyři rasy ve všech sloupcích.** Konverze při 2k
+je všude vysoká (0,45–0,55) — když kostky máme, bereme; rozdíl je v tom,
+jak často je máme. Přijímací rameno (tempo 2,03, odpor 5,20, attrition §2b)
+běží přes tutéž veličinu — naše kostky na jejich TĚLA v koridoru. Jedna
+proměnná („kdo má sílu kolem míče"), dvě ramena; zrcadlové je strmější
+a čistší.
+
+### 9.4 Čím si ork nosiče hlídá — struktura vs pozice (s9)
+
+| složka | orc | skaven | příspěvek k rozdílu BLZ≥2 (46,9 pp) |
+|---|---|---|---|
+| **identita nosiče**: ST2 na hřišti | 0 % kol | 38,8 % kol (GR; BLZ≥2 pak 97 %) | **≈37,6 pp (~4/5)** |
+| **pozice**: REACH=0 (nedosáhneme) | 27,8 % | 2,1 % | většina zbytku |
+| dmin náš→jejich nosič | 5,09 | 2,52 | — |
+| adjacentní blok možný | 10,1 % kol | 28,1 % | — |
+| **clona**: Guard sousedé nosiče | 1,19 | 0,15 | — |
+| BLZ≥2 při ST3+ a REACH>0 | 10,4 % | 27,9 % | ≈9,6 pp |
+| … a Guard=0 | 13,3 % | 28,3 % | zbytek = nedostupné asistence |
+
+⇒ **~4/5 zrcadlového rozdílu proti skavenovi je identita nosiče** (jejich
+AI nechá nosit křehkého Guttera 39 % kol) — to není naše zásluha, to je
+jejich slabost. Ork drží Throwera ST3+Block v 78 % kol, čtvrtinu kol mimo
+náš dosah (MA5 za MA4 zdí), zbytek za Guard clonou; 1k tlak na něj
+konvertuje 0,109/kolo (Block, BD bezpečné).
+
+### 9.5 Kolik z toho vezme P13 (Dauntless) a P15 (nabídka slepá k ceně cíle)
+
+* **P13 na steal rameno: nula.** Jejich nosič je ST3 (Thrower 78 %, ST4
+  nenosí nikdy) — Dauntless proti ST3 vůbec nefiruje (podmínka defST>attST).
+  Působí jen nepřímo přes zeď (koridor/attrition přijímacího ramene).
+  **Strop 86→~110 z §3 platí beze změny i při čtení přes nový kanál.**
+* **P15 na steal rameno: skoro nic.** Zóna „REACH>0 & BLZ<2" je vs orc
+  64,7 % kol, ale z 98,2 % je to **BLZ=1 — a ty akce SE nabízejí**: blitz
+  na nosiče vždy (carrier +10 ve skóre, macro_actions.cpp:447), 1k
+  adjacentní blok taky (všichni naši mají Block). Skutečně nenabízený
+  „do kopce" blok na nosiče je 1,8 % zóny. Limit vs orc je fyzika
+  (ST3+Block nosič, Guard, dosah), ne nabídkový filtr. P15 zůstává
+  relevantní jinde (cena cíle při volbě, ne generování).
+* **Jediná oprava z této rodiny, která hýbe matchupovými poměry výrazně,
+  je Wrestle do rozhodovací vrstvy (9.2) — a ta pomůže skavenovi proti
+  nám, ne nám proti orkovi.**
+
+### 9.6 Co se mění v závěrech §5–§6
+
+Diagnóza příčiny se mění z „ork nás ohrožuje víc" na **„ork si svého
+nosiče uhlídá (Thrower, dosah, Guard) a svého soupeře nutí hrát bez
+kostek; skaven nám nosiče daruje (GR ST2, dosah 2,5)"**. Doporučení
+R-DIST, tolerance kontaktu dle BLZ a Dauntless z §5 platí (přijímací
+rameno). Nově navíc: (a) **Wrestle do rozhodovací vrstvy** — férovost
+enginu, s vědomím, že sníží naše skóre proti skavenovi; (b) steal rameno
+proti orkovi nemá levnou opravu — realistický zisk zůstává v přijímacím
+rameni (§5), odhad 150–250 TD/750 se nemění, jen jeho těžiště.
+
+### 9.7 Doplňky k „nezměřeno"
+
+* uptake nabízených 1k blitzů na jejich nosiče v MCTS (z replayů vidím
+  nabídku a výsledek, ne rozhodnutí);
+* kolik by skaven reálně vytěžil z opraveného Wrestle (chce A/B);
+* proč skavení AI nechává nosit GR 39 % kol (jejich doktrína — mimo rozsah).
+
+### 9.8 Pre-registrace (addendum 10–13) vs výsledek
+
+| # | očekávání | výsledek |
+|---|---|---|
+| 10 | THREAT_net nemonotónní s TD, ~0,40–0,50; welf nejnižší | ✓ nemonotónní; miss v detailu: nejnižší je skaven (0,400), welf 0,413 |
+| 11 | konverze při stejné hrozbě: orc ≈ model, skaven ≪ model | ✓ (pásmo 0,15–0,35 všichni 0,090–0,105; skavenův horní pás mrtvý přes nepoužitý Wrestle) |
+| 12 | Wrestle 0,1–0,2/hru ofenzivně, BD sražení ~0, strip ~0 | ✓ (0,16/hru; 49 BD z ~4900 expozic; strip 0,05/hru) |
+| 13 | zrcadlo skaven ≥2,5× orc | ✓ 3,1× (0,347 vs 0,113) |

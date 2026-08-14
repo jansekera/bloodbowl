@@ -187,6 +187,13 @@ Korpus: `diag_replay_mine_20260813_big_data`, **3000 her**, brána OFF, HEAD `e4
   volného míče funkcí toho, kdo je blíž a **kdo rychlejší**, zlepší **naše**
   rozhodování **a zároveň** naučí skavena hrát skavena. **Jedna oprava, obě
   strany**; odhadem pokryje největší půlku rozdílu.
+  ⭐ **Zdroje k skavení doktríně jsou už sebrané:**
+  `evidence/skaven_doctrine_sources_20260814.md` — a **rozsuzují starý spor**
+  („hraješ skaveny moc bash"): doktrína violence **výslovně žádá**
+  (*„be violent like a bash team while simultaneously playing like elves"*),
+  ale **ne Gutter Runnery** (*„keeping Gutter Runners … screened from attack"*).
+  A výslovně říká, že skaven **není stavěný na stalling** — což je přesně hra,
+  kterou ho dnes naše AI nechává hrát.
   **(B) skutečný plán rasy — DRAHÉ, ale u skavena MÉNĚ.** Přihrávky za klec,
   Nerves of Steel, kdy obětovat tělo. Z (A) nevypadne. **Vlastní projekt, ne
   úkol.** ⭐ **ALE: skaven je uživatelova silnější stránka než trpaslík**
