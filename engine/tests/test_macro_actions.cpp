@@ -515,6 +515,38 @@ TEST(MacroActions, AnAdjacentTeamMateIsOfferedBecauseTheHandOffIsWhatHappens) {
         << "a hand-off to an adjacent AG3 team-mate is a 3+ catch, not a throw";
 }
 
+TEST(MacroActions, AGoodCarrierIsNotOfferedAHandOffToWorseHandsAhead) {
+    // The regression the swap gate exists for. Pricing hand-offs correctly but
+    // leaving the old "is he ahead" gate in place moved the Longbeard share of
+    // carrying turns from 1-4% to 6-10% over 3000 games, because a Runner could
+    // legally give the ball to any Longbeard standing one square further up.
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {6, 3, 3, 8};      // Runner, AG3
+    state.getPlayer(1).skills.add(SkillName::SureHands);
+    state.ball = BallState::carried({5, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 1;                 // no emergency
+
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {6, 7};                          // adjacent AND one ahead
+    p2.stats = {4, 3, 2, 9};                       // Longbeard, AG2
+    p2.movementRemaining = 4;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    bool offered = false;
+    for (auto& m : macros) {
+        if (m.type == MacroType::PASS_ACTION && m.targetId == 2) offered = true;
+    }
+    EXPECT_FALSE(offered)
+        << "being one square ahead does not make a Longbeard a better pair of hands";
+}
+
 TEST(MacroActions, TheSamePairIsStillRefusedOnceItIsAThrow) {
     // Guards the other half: only the adjacent case was repriced. Step the very
     // same two players apart and it is a real throw again, and a throw off AG2

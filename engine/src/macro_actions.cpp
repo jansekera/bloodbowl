@@ -637,10 +637,38 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             if (target.id == carrier->id) return;
             if (target.state != PlayerState::STANDING) return;
             int dist = carrier->position.distanceTo(target.position);
-            // Within pass range and target is ahead
             int targetDist = distToEndzone(target.position, mySide);
             int carrierDist = distToEndzone(carrier->position, mySide);
-            if (dist > 10 || dist < 1 || targetDist >= carrierDist) return;
+            if (dist > 10 || dist < 1) return;
+
+            // "Ahead of the carrier" is the right gate for a THROW, whose point
+            // is ground. It is the wrong gate for a hand-off, whose point is
+            // getting the ball off a man who should not be holding it -- and
+            // pricing hand-offs correctly (38dcad6) without fixing the gate
+            // made things worse, not better: measured over 3000 games, the
+            // Longbeard share of carrying turns went from 1-4% up to 6-10%,
+            // because any Longbeard standing one square further forward was a
+            // legal target for a Runner. The offer answered "is he ahead" when
+            // the question is "is he a better pair of hands".
+            //
+            // So the swap has its own gate, as the fix queue specified: the
+            // criterion is "the carrier is wrong", not "the receiver is nicer".
+            // Wrong means AG2 without Sure Hands -- our Longbeards, Blockers and
+            // Slayers, who fumble a dodge half the time and have nothing to
+            // re-roll it with. Better means a genuinely safer pair of hands,
+            // not one point of anything. And the ball may not go backwards to
+            // get there.
+            const bool handOff = dist == 1;
+            auto poorHands = [](const Player& p) {
+                return p.stats.agility <= 2 && !p.hasSkill(SkillName::SureHands);
+            };
+            // For a hand-off the swap gate REPLACES the ground gate rather than
+            // joining it. Gating on "ahead" alone is what let a Runner give the
+            // ball to a Longbeard standing one square further up, and forward is
+            // the direction the damage actually ran in.
+            const bool swap = poorHands(*carrier) && !poorHands(target) &&
+                              targetDist <= carrierDist;
+            if (!handOff && targetDist >= carrierDist) return;   // throws need ground
 
             // A pass was offered to anyone with the ball, at any agility,
             // toward any team-mate ahead of him. For this side that is a
@@ -687,7 +715,6 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
             // cleared 0.5, so the macro was dead in every turn of every game,
             // and with it the only way to get the ball off a carrier who should
             // not be holding it (measured 2026-08-13).
-            const bool handOff = dist == 1;
             const double complete = handOff
                                   ? chance(catchTarget)
                                   : chance(throwTarget) * chance(catchTarget);
@@ -698,7 +725,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out) {
                 carrierDist > static_cast<int>(carrier->movementRemaining) + 2 &&
                 targetDist <= static_cast<int>(target.stats.movement) + 2;
 
-            if (complete >= 0.5 || emergency) {
+            // A hand-off must clear BOTH gates: it has to be a swap worth making
+            // and likely to arrive. The emergency clause stays common to both --
+            // the half ends without it either way.
+            const bool worthIt = handOff ? (swap && complete >= 0.5)
+                                         : (complete >= 0.5);
+            if (worthIt || emergency) {
                 out.push_back({MacroType::PASS_ACTION, carrier->id, target.id, {-1, -1}});
             }
         });
