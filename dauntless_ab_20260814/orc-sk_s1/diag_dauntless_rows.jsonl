@@ -11,3 +11,7 @@
 {"matchup":3,"seed_idx":755,"cand_home":true,"race_h":"orc","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[3,0,0,0],"actions":385,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
 {"matchup":3,"seed_idx":755,"cand_home":false,"race_h":"orc","race_a":"skaven","cand":0,"base":1,"home_attr":[0,0,0,0],"away_attr":[2,0,1,0],"actions":380,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
 {"matchup":3,"seed_idx":756,"cand_home":true,"race_h":"orc","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[1,1,0,0],"actions":520,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
+{"matchup":3,"seed_idx":756,"cand_home":false,"race_h":"orc","race_a":"skaven","cand":1,"base":1,"home_attr":[1,2,0,0],"away_attr":[1,0,0,0],"actions":507,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
+{"matchup":3,"seed_idx":757,"cand_home":true,"race_h":"orc","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[1,0,0,0],"actions":341,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
+{"matchup":3,"seed_idx":757,"cand_home":false,"race_h":"orc","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[3,1,0,0],"actions":414,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
+{"matchup":3,"seed_idx":758,"cand_home":true,"race_h":"orc","race_a":"skaven","cand":1,"base":2,"home_attr":[0,0,0,0],"away_attr":[2,0,0,0],"actions":702,"cand_plans":0,"base_plans":0,"cand_daunt":0,"cand_roll":0,"mode":4}
