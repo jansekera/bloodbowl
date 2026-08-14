@@ -131,6 +131,37 @@ kdo zavře cestu). **Oni jedno.**
 
 ---
 
+## ⛔⛔ NEJVĚTŠÍ VÝHRADA: SOUPEŘ NEHRAJE SVOU RASU
+*(uživatel 14.08.: „skaven se místo toho učí hrát jako elf a to ho musíme odnaučit")*
+
+Všechno výše popisuje, **co by skaven mohl dělat**. Náš skaven to nedělá.
+
+**Kořen je strukturální: obě strany řídí týž `MacroMCTSPolicy` s toutéž
+heuristikou.** Ta heuristika je psaná pro trpaslíka — klec, rohy, tempo,
+markování nosiče, „loose ball is bad" jako konstanta. Skaven ji dostane taky,
+takže hraje **obecné nošení míče v tvaru**, ne skavení plán:
+
+| skavení plán | co místo toho dělá naše AI |
+|---|---|
+| donutit míč spadnout, i za cenu těl | chová si těla, blituje „bezpečně" |
+| vyhrát závod k volnému míči (MA9) | hodnotí volný míč **plošně** jako špatný |
+| přihrát za klec, chytit v obklíčení | přihrávky prakticky nepoužívá (40 na 3000 her) |
+| utéct Dodgem a skórovat ve dvou kolech | veze míč pomalu a v tvaru |
+
+⇒ **Naše měření proti skavenovi jsou nadhodnocená dvakrát:** jednou proto, že
+skavení nástroje jsou proti našemu rosteru neúčinné (výše), a podruhé proto,
+že je jejich AI **stejně nepoužívá**.
+
+⇒ **Úkol:** soupeřova AI má hrát plán své rasy. Dokud ho nehraje, je „451 TD
+proti skavenovi" číslo o naší AI hrající proti sobě samé v jiném dresu.
+**Pro trénink i pro validaci doktríny je to nejzávažnější omezení, jaké máme** —
+větší než kterákoli jednotlivá pravidlová chyba, protože se týká **všech**
+naměřených čísel najednou.
+
+⚠️ Souvisí, ale není totéž, co dřívější výhrada *„soupeřova AI nehraje proti
+našim slabinám cíleně"*. Ta říkala, že nás **netrestá**. Tahle říká, že
+**nehraje ani vlastní hru**.
+
 ## ⛔ CO Z TOHO PLYNE PRO VŠECHNA NAŠE ČÍSLA
 
 **Průměr přes čtyři soupeře míchá dva opačné světy.** Doktrína laděná na

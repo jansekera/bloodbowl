@@ -151,6 +151,20 @@ Korpus: `diag_replay_mine_20260813_big_data`, **3000 her**, brána OFF, HEAD `e4
 
 # ⚠️ VÝHRADY, PODLE KTERÝCH SE NESMÍ NAVRHOVAT
 
+* ⛔⛔ **SOUPEŘ NEHRAJE SVOU RASU** *(uživatel 14.08.: „skaven se místo toho učí
+  hrát jako elf a to ho musíme odnaučit")* — **nejzávažnější omezení, jaké
+  máme**, protože se týká **všech** naměřených čísel najednou.
+  **Kořen je strukturální: obě strany řídí týž `MacroMCTSPolicy` s toutéž
+  heuristikou**, psanou pro trpaslíka (klec, rohy, tempo, „loose ball is bad"
+  jako konstanta). Skaven ji dostane taky ⇒ hraje obecné nošení míče v tvaru
+  místo svého plánu (donutit míč spadnout i za cenu těl → vyhrát závod MA9 →
+  utéct Dodgem). Přihrávky prakticky nepoužívá — **40 na 3000 her**.
+  ⇒ **„451 TD proti skavenovi" je číslo o naší AI hrající proti sobě samé
+  v jiném dresu.** Podrobně `evidence/matchup_asymmetry_20260814.md`.
+  ⚠️ **Není to totéž** co výhrada níž: ta říká, že nás soupeř netrestá; tahle
+  říká, že **nehraje ani vlastní hru**. ⇒ **ÚKOL: soupeřova AI má hrát plán své
+  rasy** — patří k **T5.13** (přestavba rosterů), protože roster bez plánu je
+  jen jiná čísla na papíře.
 * **Soupeřova AI nehraje proti našim slabinám cíleně.** Runner nevypadne ze
   hřiště ani jednou ve 120 hrách, protože si pro něj nikdo nechodí. Lidský
   soupeř by to dělal (AG3 máme jen 4 z 11).
