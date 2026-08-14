@@ -240,6 +240,31 @@ Platí na **P2 ⑤**, **P9c**, **T1.8** i na Fableho „idle těla dosáhnou".
 ⭐ **Obecný tvar:** *dosažitelnost není povinnost.* Zapsat jako zákaz do spec
 vedle S7.1, ne jen sem.
 
+# ⭐ METODA: VÝBĚR MATCHUPŮ SE DĚLÁ PODLE MECHANISMU
+*(uživatel 14.08.: „tohle jsou specifická měření a moje zobecnění na všechny rasy
+by tu nic nepřineslo")*
+
+Dvě pravidla, která vypadají protichůdně a nejsou — **jsou to dva různé kroky**:
+
+| krok | pravidlo |
+|---|---|
+| **zadání běhu** | ⭐ **Měřit jen tam, kde mechanismus MŮŽE vyskočit.** Jinak se platí hodinami stroje za zaručené „nerozhodnuto". |
+| **vyhodnocení** | ⭐ **Číst per-matchup vždycky.** Průměr přes čtyři soupeře míchá dva opačné režimy *(viz `matchup_asymmetry_20260814.md`)*. |
+
+**Postup u každého dalšího A/B:**
+1. Spočítat **expozici mechanismu per matchup** *(u Dauntless: kolik cílů je
+   silnějších než náš blokující a s jakou šancí — ork 1,00 · human 0,20 ·
+   wood-elf 0,15 · **skaven 0**)*.
+2. Vzít **matchup s nejvyšší expozicí** jako otázku.
+3. Vzít **matchup s expozicí NULA** jako pravý null — je to silnější kontrola
+   než matchup se slabou expozicí, protože tam delta **musí** být nula.
+4. Zbytek **neběžet**, a do předregistrace napsat **proč** *(kolik párů by na
+   jejich efekt bylo potřeba)*.
+
+⚠️ **Nezaměňovat s „běž vždycky totéž".** Právě to se dělalo dosud: každé A/B
+tohoto projektu jelo na `dw-sk` + `dw-we`, tedy proti dvěma **rychlým** týmům —
+a ork s humanem, naše dvě nejhorší utkání, **nebyly nikdy v žádném rameni**.
+
 # ⭐ CHYBĚJÍCÍ DIMENZE — dvě, a jsou to sourozenci
 
 Audit spec (12.08.) našel, že celá procedura popisuje jen NAŠE kolo a chybí jí
