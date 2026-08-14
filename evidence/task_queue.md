@@ -175,9 +175,14 @@ Korpus: `diag_replay_mine_20260813_big_data`, **3000 her**, brána OFF, HEAD `e4
   volného míče funkcí toho, kdo je blíž a **kdo rychlejší**, zlepší **naše**
   rozhodování **a zároveň** naučí skavena hrát skavena. **Jedna oprava, obě
   strany**; odhadem pokryje největší půlku rozdílu.
-  **(B) skutečný plán rasy — DRAHÉ.** Přihrávky za klec, Nerves of Steel, kdy
-  obětovat tělo. Z (A) nevypadne. Srovnatelné s trpasličím projektem (doktrína
-  + ~60 povinností + kontroly). **Vlastní projekt, ne úkol.**
+  **(B) skutečný plán rasy — DRAHÉ, ale u skavena MÉNĚ.** Přihrávky za klec,
+  Nerves of Steel, kdy obětovat tělo. Z (A) nevypadne. **Vlastní projekt, ne
+  úkol.** ⭐ **ALE: skaven je uživatelova silnější stránka než trpaslík**
+  *(14.08.: „na tu skavení hru jsem zvědav, tam snad pomůžu trochu líp než
+  u dwarfů")* ⇒ **u skavena levnější než u trpaslíka, ne dražší** — trpaslík
+  vyhrává NEDĚLÁNÍM chyb (samé zákazy, doktrína se rodila těžce), skaven má plán
+  ve třech krocích, který jde vyslovit. ⇒ **Část (B) začít skavenem**, ne
+  wood-elfem ani orkem: nejlevnější vstup a zároveň náš nejzkreslenější matchup.
   ⇒ **(A) zkusit samostatně**, protože se za ni platí prací, kterou stejně
   děláme.
 * **Soupeřova AI nehraje proti našim slabinám cíleně.** Runner nevypadne ze
