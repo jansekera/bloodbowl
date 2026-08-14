@@ -1,0 +1,7 @@
+rohová pole se soupeřem VEDLE (jen srovnatelné situace)
+
+  stav rohu                                n    REACH0        Δx    držíme     opp≤3
+  prázdný (soupeř vedle, my ne)         7368      0.66      0.86     72.5 %      5.04
+  špinavý (naše tělo tam stojí)         4667      0.64      0.96     80.1 %      4.87
+
+⚠️ opp≤3 je kontrola hustoty: když se ramena liší, není srovnání férové.

@@ -1,134 +1,170 @@
 # PŘEDREGISTRACE VÍKENDOVÉHO BĚHU — 14.–17.08.2026
 
-**Zapsáno PŘED spuštěním.** Účel je jediný: aby se výsledek nedal číst zpětně.
-Prahy, směry a pádové podmínky platí tak, jak stojí tady; kdo je bude chtít
-v pondělí měnit, mění je proti zapsanému textu.
+**Verze 2** (14.08. dopoledne). Přepsáno po nálezech P0.7, P9, P10a — pořadí
+běhů se proti verzi 1 změnilo a P2 spadla z první pozice na třetí.
 
-> **Proč to vůbec píšu.** A/B brány klece (13.08., 1500 párů) vyšlo neprůkazně
+**Zapsáno PŘED spuštěním.** Prahy, směry a pádové podmínky platí tak, jak stojí
+tady; kdo je bude chtít v pondělí měnit, mění je proti zapsanému textu.
+
+> **Proč to píšu.** A/B brány klece (13.08., 1500 párů) vyšlo neprůkazně
 > a strávili jsme den dohadováním, co to znamená — protože předem nebylo
-> napsané, co by znamenalo „prošlo". A visí nad tím
-> **otevřená otázka č. 1**: brána zlepšila skoro všechny procesní kontroly
-> a chess se nehnul. ⇒ **Kontroly nejsou důkaz. Rozhoduje chess.**
+> napsané, co by znamenalo „prošlo". A visí nad tím **otevřená otázka č. 1**:
+> brána zlepšila skoro všechny procesní kontroly a chess se nehnul.
+> ⇒ **Kontroly nejsou důkaz. Rozhoduje chess.**
 
 ---
 
 ## 0. ROZPOČET A POJISTKY
 
-* Kapacita: pá 18:00 → po 07:00 ≈ **61 h**. Jedno A/B (1500 párů × 3 matchupy)
-  = **7 h** (měřeno 13.08.). ⇒ vejde se 5–6 běhů včetně analýz.
-* **Šumové dno: ±5,3 pp na 400 párech** (null-test 12.08.) ⇒ SE ≈ 0,026.
-  Na 1500 párech SE ≈ 0,0134. **SE se stejně počítá ze vzorku, ne z přepočtu.**
-* Harness je **deterministický** (ověřeno bit-identicky 13.08.) ⇒ srovnání je
-  párové hra po hře, ne dvě nezávislé sady.
-* Každý běh: lockfile + marker + kontrola běžícího interpretu. Doběhová
-  podmínka **musí grepovat řetězec, který skript opravdu tiskne** — na tuhle
-  past jsme dnes narazili (`BIG_PARTIAL` u hotového korpusu).
+* Kapacita pá 18:00 → po 07:00 ≈ **61 h**; jedno A/B (1500 párů × 3 matchupy)
+  = **7 h** ⇒ 5–6 běhů včetně analýz.
+* **Šumové dno ±5,3 pp na 400 párech** ⇒ SE ≈ 0,026; na 1500 párech ≈ 0,0134.
+  SE se stejně počítá **ze vzorku**.
+* Harness je **deterministický** ⇒ srovnání párové hra po hře.
+* Doběhová podmínka **musí grepovat řetězec, který skript opravdu tiskne**.
 
 ## 0.1 CO MUSÍ BÝT HOTOVO, NEŽ BĚH ZAČNE
 
 | | | stav |
 |---|---|---|
-| P9a | zákaz odsunu nosiče do endzony, kterou útočí | ⏳ dnes |
-| P2+P9c | blok na pollutera + výběr blokujícího podle geometrie odsunu | ⏳ dnes |
-| — | ověření hand-offu na kontrolách doběhlo a nic nezhoršilo | ⏳ ~11:00 |
-| — | testy zelené, změny commitnuté a pushnuté | ⏳ |
+| **P9a rozšířené** *(tři případy dominance, viz níže)* | ⏳ dnes, build po doběhu sběru |
+| P10a | jeden člen v listové evaluaci | ⏳ dnes |
+| — | ověření hand-offu doběhlo a nic nezhoršilo | ⏳ ~11:00 |
+| — | testy zelené, commitnuto, pushnuto | ⏳ |
 
-⚠️ **Když P2+P9c do pátku 18:00 nebude hotové a otestované, běh 1 se NESPOUŠTÍ**
-a jede se rovnou běh 2. Nedodělaná změna do nočního A/B nepatří — to je
-poučení z brány klece, která se měřila s vypnutou polovinou.
+⚠️ **Nedodělaná změna do nočního A/B nepatří** — poučení z brány klece, která
+se měřila s vypnutou polovinou. Co není hotové v pátek 18:00, se přeskakuje.
 
 ---
 
-## BĚH 1 — P2+P9c: čistit roh blokem, a tím správným *(hlavní)*
+## MIMO A/B — P9a: tři případy, kde bereme striktně horší pole
 
-### Hypotéza
-Sražení hráče, který špiní roh klece, **cíleným blokem** (ne blitzem, ne víc
-bitím obecně) zvýší podíl čistých rohů a tím dojezd drivů.
+**Nepotřebuje A/B, je to dominance, ne kompromis.** Ověřuje se na kontrolách.
 
-### Mechanismus a proč čekáme, že to zabere
-* Adresný úder na pollutera: špinavé rohy v N+1 **0,27 vs 1,00** (−22,9σ,
-  n=3864), Δx nosiče **+1,62 vs +0,76** (+9,7σ) — Fable 14.08.
-* Špinavý roh nechaný přes soupeřovo kolo = **ztracené tělo**: 94,3 %
-  nedostupné na začátku N+1.
-* ⚠️ **Obecné bloky čistotu ZHORŠUJÍ** (−4,5σ) ⇒ rameno **nesmí** zvyšovat
-  celkový počet bloků, jen je přesměrovat.
+1. **Odsun nosiče do endzony, kterou útočí** — 8 darovaných TD ve 3000 hrách.
+2. **Řetěz přes naše tělo, když vedle je pole se soupeřem** — řetěz do soupeře
+   posune **dva jejich** a nás nestojí nic.
+3. **Řetěz přes náš roh klece, když vedle je řadové tělo** — roh je dražší
+   (P0.7: vyklizený roh stojí **6–9 pp** držení míče).
+
+**Pádová podmínka:** darované TD **na nulu**, rozebrané vlastní rohy dolů,
+ostatní kontroly beze změny. Kdyby se hnulo chess kterýmkoli směrem o víc než
+šum, je to podezřelé — tyhle tři případy jsou příliš vzácné na velký efekt.
+
+---
+
+## BĚH 1 — P10a: sražení nosiče se musí vyplatit *(nově první)*
+
+### Proč postoupil na první místo
+Všechny tři členy, které listová evaluace o soupeřově nosiči zná, odměňují
+**stání vedle něj** a visí na `ball.isHeld` — sražením zmizí naráz
+(−0,24 markování, −0,10 lajna, −0,12 contain). Nastoupí místo nich
+`heuristic -= 0.1  // loose ball is bad` (`macro_mcts.cpp:762`), **který
+nerozlišuje „upustili jsme ho" od „právě jsme ho soupeři vyrazili z ruky".**
+
+Bilance členů, které se mění (soupeřův nosič, 3 naše TZ, AG4):
+
+| | před sražením | po | Δ |
+|---|---|---|---|
+| uprostřed hřiště | +0,13 | −0,02 | **−0,15** |
+| u lajny (y=2) | +0,23 | −0,02 | **−0,25** |
+| může skórovat | −0,31 | −0,02 | +0,29 ✅ |
+
+⇒ **Čím blíž je soupeř skórování, tím víc heuristika blok chce; uprostřed
+hřiště se mu brání.** A S7 boxing-in = **32,4 % našich kol** je právě ten střed.
+
+**Proč před P2:** P2 staví novou doktrínu nad evaluací, která úspěch té
+doktríny hodnotí záporně. Opravit tohle je levnější a míří to **pod** ni.
 
 ### Rameno
-Kandidát: při volbě bloku dostane přednost polluter, u kterého existuje
-volné stojící tělo, z jehož pozice aspoň jedno ze tří odsunových polí
-pollutera **odklidí od rohu** a **nepřiblíží k nosiči**. Blokující se vybírá
-podle téhle geometrie, ne podle dostupnosti. Baseline: dnešní chování.
-
-### Strop účinku — poctivě, PŘEDEM
-Pravidlo se dá použít jen na **39,4 %** polluterů (P9c, 3000 her, n=5089).
-Ne na 61,1 %, jak vycházelo z Fableho hrubšího kritéria — rozdíl **21,7 pp**
-jsou případy, kdy udeřit lze, ale odsun pollutera od rohu neodklidí.
-⇒ **Nečekat velký efekt.** Kdyby vyšel velký, je to podezřelé, ne radost.
+Volný míč se přestane hodnotit jako paušálně špatný: rozlišit, komu byl vyražen
+z ruky. Baseline: dnešní chování.
 
 ### Metrika a práh *(pre-registrováno)*
-* **Primární: párová delta chess na `dw-we` a `dw-sk`, 1500 párů.**
+* Primární: **párová delta chess na `dw-we` a `dw-sk`, 1500 párů.**
 * **PROŠLO:** obě trpasličí ramena ≥ 0 a aspoň jedno **≥ +0,03 (≈ +2,2 SE)**.
 * **ZAMÍTNUTO:** kterékoli trpasličí rameno **≤ −0,03**.
-* Mezi tím: **NEROZHODNUTO** — a to se zapíše jako neúspěch, ne jako naděje.
+* Mezi tím **NEROZHODNUTO** — zapíše se jako neúspěch, ne jako naděje.
 
-### Předregistrované předpovědi kontrol *(ať se to nedá číst zpětně)*
+### Předregistrované předpovědi kontrol
 | | čekám |
 |---|---|
-| K29 čisté rohy | **nahoru** — to je mechanismus |
-| K33 bloky na kolo | **beze změny** ±2 pp; růst = rameno dělá něco jiného, než má |
-| K34 REACH0=0 | **nahoru nebo beze změny**; pokles = odsuny tlačí soupeře k nosiči ⇒ P9c nefunguje |
-| K31 idle těla | **dolů** — těla dostávají úkol |
+| bloky na nosiče | **nahoru** — to je mechanismus |
+| K33 bloky celkem | ±2 pp; velký růst = rameno bije všechno, ne nosiče |
+| DEAD/hru soupeře | nahoru nebo beze změny |
+| K9a tempo | beze změny |
+| ztráta míče soupeřem | **nahoru** |
+
+⚠️ Je to **listová evaluace**, hledání ji může přebít. Malý nebo nulový efekt
+proto **nevyvrací mechanismus**, jen říká, že search si poradil sám.
+
+---
+
+## BĚH 2 — blitz: roh, nebo zeď? *(Fable NEROZHODL)*
+
+Observačně je rozdíl nula (Δx v N+1 po fázích +1,36/+2,07/+3,13 vs
++1,26/+2,16/+3,35), ale srovnání nese **selekci** — kola, kdy engine blitzuje
+roh, nejsou náhodná. **Odpoví jen A/B.**
+
+* Rameno: blitz nemíří na roh, když polluter jde srazit **blokem zdarma**;
+  míří na zeď kupředu.
+* Opora: **45,5 %** dnešních blitzů na roh padlo v kolech, kde blok zdarma šel;
+  blitz na roh stojí **~0,7 pole** tempa (−6,4σ) a nekupuje nic měřitelného.
+* Práh: **stejný jako běh 1.**
+
+---
+
+## BĚH 3 — P2+P9c: čistit roh blokem, a tím správným *(spadlo z prvního místa)*
+
+### Pořadí povinností *(přepsáno 14.08. podle uživatele)*
+1. **Udeř na pollutera** — v **72,8 %** ho kostky složí a ležící roh nešpiní
+   (`threatens()` vrací true jen pro stojícího). Tohle je hlavní páka.
+2. **Když zůstane stát (27,2 %), pošli ho PRYČ od rohu** — jediná páka, kterou
+   tam máme, a je zadarmo. *Sražení je kostka, směr je volba; frekvencí se to
+   poměřovat nedá.*
+3. **Nikdy ne přes vlastní roh** (P0.7) · **do soupeře radši než do nás** (P9a).
+
+### Strop účinku — poctivě, PŘEDEM
+Pravidlo lze použít na **39,4 %** polluterů (P9c, n=5089) — ne na 61,1 %, jak
+vycházelo z hrubšího kritéria. **Nečekat velký efekt; kdyby vyšel, je to
+podezřelé.**
+
+### Předregistrované předpovědi kontrol
+| | čekám |
+|---|---|
+| K29 čisté rohy | **nahoru** |
+| K33 bloky | ±2 pp; růst = rameno dělá něco jiného |
+| K34 REACH0=0 | nahoru nebo beze změny; **pokles = odsuny tlačí soupeře k nosiči** |
+| K31 idle těla | dolů |
 | K9a tempo | beze změny; pokles = platíme rohy tempem |
 
-### Falzifikátor
-Když K29 stoupne a chess se nehne, je to **třetí případ** téhož vzorce
-(brána klece, balík G) a **otevřená otázka č. 1 se povyšuje nad všechnu
-další doktrinální práci.** Pak už není obhajitelné vyrábět další pravidla
-podle kontrol, o kterých nevíme, že k něčemu jsou.
+### ⛔ Zákaz, který platí nad celým během *(uživatel 14.08.)*
+*„Musí být situace nachystaná — nesmíme se hnát za jedním cílem a otevřít
+prostor jinde."* Kritérium se čte nad **současnou** deskou, ne nad tou, kam
+bychom někoho došli. **Dosažitelnost není povinnost.**
 
 ---
 
-## BĚH 2 — blitz: roh, nebo zeď? *(otázka, kterou Fable NEROZHODL)*
+## FALZIFIKÁTOR NAD CELÝM VÍKENDEM
 
-Observačně je rozdíl nula: Δx v N+1 po blitzi na roh a do zdi je po fázích
-prakticky totožný (+1,36/+2,07/+3,13 vs +1,26/+2,16/+3,35). Ale srovnání nese
-**selekci** — kola, kdy engine blitzuje roh, nejsou náhodná. **Odpoví jen A/B.**
-
-* Rameno: blitz nikdy nemíří na roh, když polluter jde srazit blokem zdarma.
-  Míří na zeď kupředu.
-* Opora: **45,5 %** dnešních blitzů na roh padlo v kolech, kde blok zdarma šel;
-  blitz na roh stojí **~0,7 pole** tempa v témž kole (−6,4σ) a nekupuje nic
-  měřitelného potom.
-* Práh: **stejný jako běh 1.**
-* ⚠️ **Běh 2 je částečně vnořený do běhu 1.** Když poběží 1 první a projde,
-  musí být 2 postavený **nad** ramenem 1, ne nad baseline — jinak se měří
-  dvakrát totéž. Když 1 neprojde, jede 2 nad baseline.
-
----
-
-## BĚH 3 — P9a samostatně *(jen když zbude čas)*
-
-Zákaz odsunu nosiče do endzony, kterou útočí. **Nepotřebuje A/B** — je to
-striktní dominance, ne kompromis, a 8 darovaných TD ve 3000 hrách je dost.
-Ověřuje se na kontrolách: darované TD musí klesnout na **0**. Sem se dává jen
-tehdy, kdy by stroj jinak stál.
-
----
+Když se kontroly zlepší a chess se nehne, je to **třetí případ** (po bráně
+klece a balíku G) a **otevřená otázka č. 1 se povyšuje nad všechnu další
+doktrinální práci.** Pak přestává být obhajitelné vyrábět pravidla podle
+kontrol, o kterých nevíme, že k něčemu jsou.
 
 ## CO SE V PONDĚLÍ ZAPÍŠE BEZ OHLEDU NA VÝSLEDEK
 
 1. Verdikt proti prahu **napsanému výše**, ne proti dojmu.
-2. Pohyb všech pěti kontrol proti předpovědi — **včetně těch, co nevyšly.**
-3. Kdyby vyšlo NEROZHODNUTO: **kolik párů by bylo potřeba** na změřený efekt,
-   a jestli se to vůbec vyplatí.
+2. Pohyb všech kontrol proti předpovědi — **včetně těch, co nevyšly.**
+3. Při NEROZHODNUTO: kolik párů by bylo potřeba, a jestli se to vyplatí.
 4. Do trvalé knihy `evidence/task_queue.md`, se stavem a commitem.
 
 ## ZNÁMÁ OMEZENÍ, KTERÁ VÝSLEDEK NESMÍ PŘEBÍT
 
 * **Soupeřova AI nehraje proti našim slabinám cíleně** ⇒ naměřená četnost chyb
   je **podlaha, ne strop**.
-* **Snímek je začátek kola** — pořadí akcí uvnitř kola může vzor zničit dřív;
-  P9c je proto **horní mez proveditelnosti**, ne záruka.
-* **44,2 % odsunových polí je obsazených** ⇒ odsun často řetězí a hýbe
-  i našimi těly. Do doktríny to zatím zapracované NENÍ.
+* **Snímek je začátek kola** ⇒ P9c je horní mez proveditelnosti, ne záruka.
+* **44,2 % odsunových polí je obsazených** ⇒ odsun často řetězí a hýbe i našimi
+  těly.
+* **Klastrovaná pozorování** u P0.7 ⇒ směr, ne σ.
 * Sdílený limit pass/hand-off (P7) dělá hbité rasy slabšími, než jsou.
