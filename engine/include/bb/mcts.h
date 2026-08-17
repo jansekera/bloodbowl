@@ -35,9 +35,14 @@ struct MCTSConfig {
     // discarded -- for a block that resolves at equal strength on a 2+. Orcs are
     // the only side we face fielding four ST4 bodies, and they are also the side
     // we score 86 touchdowns against in 750 games versus 451 against Skaven.
-    // DEFAULT OFF so production is unchanged until the A/B says otherwise, the
-    // same way cageAdvance was introduced.
-    bool dauntlessInOffer = false;
+    // 2026-08-17: ON in production. The A/B of 14.-15.08. ran 3000 pairs on
+    // dwarf-orc and passed: +4.08 pp paired delta, and +3.59 pp (~3.4 sigma)
+    // once read against the two matchups where the arm provably never fired --
+    // which is the only honest way to read it, because those nulls moved too.
+    // The Q1 sweep gives the mechanism rather than just the outcome: across 36
+    // geometries the Black Orc is chosen 76.8% -> 83.3% of the time.
+    // See evidence/weekend_result_20260817.md.
+    bool dauntlessInOffer = true;
 };
 
 struct MCTSNode {

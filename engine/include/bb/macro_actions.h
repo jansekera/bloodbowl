@@ -46,9 +46,14 @@ struct MacroExpansionResult {
 };
 
 // Generate all available macros for the current game state
-// dauntlessInOffer: price a block at the strength Dauntless would equalise to
-// (MCTSConfig::dauntlessInOffer). Defaults off so every existing caller and test
-// keeps today's behaviour; the A/B arm and, if it passes, production turn it on.
+// dauntlessInOffer: price a block at the strength Dauntless would equalise to.
+// ⚠️ This parameter default is NOT production. Production is
+// MCTSConfig::dauntlessInOffer, which has been TRUE since 17.08.2026, and every
+// engine call site passes config_.dauntlessInOffer explicitly. The false here
+// exists only so the unit tests that call this directly keep asserting the raw
+// offer; a new direct caller that omits the argument gets the non-production
+// filter, which is the same "prices a different action than the one played"
+// trap the arm was written to fix. Pass it explicitly.
 void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         bool dauntlessInOffer = false);
 

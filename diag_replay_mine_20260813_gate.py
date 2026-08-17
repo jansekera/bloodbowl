@@ -47,12 +47,15 @@ WORKERS = int(os.environ.get("WORKERS", "10"))
 #   CAGE_GATE=0  produkční stav -- A/B brány 13.08. NEPROŠLO, takže korpus,
 #                který má popisovat hranou hru, ji má vypnutou
 CAGE_GATE = os.environ.get("CAGE_GATE", "1") != "0"
-#   DAUNTLESS=1  nabídka bloku oceňuje sílu, na kterou by Dauntless srovnal
-#                (P13, 14.08.). Default 0 = produkční stav. Platí pro OBĚ strany:
-#                není to naše doktrína, je to filtr, který neviděl dovednost,
-#                kterou resolver už ctí — na jedné straně by to srovnávalo dva
-#                různé enginy, ne dvě ramena.
-DAUNTLESS = os.environ.get("DAUNTLESS", "0") != "0"
+#   DAUNTLESS=0  vypne nabídku bloku oceňující sílu, na kterou by Dauntless
+#                srovnal (P13). ⚠️ 17.08.: DEFAULT JE TEĎ 1, protože A/B prošlo
+#                a produkce to má zapnuté — korpus, který má popisovat hranou
+#                hru, ji musí mít zapnutou taky. S defaultem 0 by se od teď
+#                sbíral korpus jiného enginu, než jaký běží.
+#                Platí pro OBĚ strany: není to naše doktrína, je to filtr, který
+#                neviděl dovednost, kterou resolver už ctí — na jedné straně by
+#                to srovnávalo dva různé enginy, ne dvě ramena.
+DAUNTLESS = os.environ.get("DAUNTLESS", "1") != "0"
 BASE_SEED = int(os.environ.get("SEED_BASE", "20260811"))
 DATA_ROOT = Path(os.environ.get(
     "DATA_ROOT", "diag_replay_mine_20260813_gate_data"))

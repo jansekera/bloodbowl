@@ -1674,3 +1674,15 @@ TEST(MacroActions, PickerRankedByComputedChanceNotAgilityProxy) {
     ASSERT_NE(firstPickup, nullptr);
     EXPECT_EQ(firstPickup->playerId, 2) << "nominated the unreliable nearer body";
 }
+
+// 2026-08-17: P13 is production. This pins the default so it cannot revert in
+// silence -- the arm passed its A/B (+3.59 pp against the matchups where it
+// provably never fired), and a flag that quietly flips back would leave us
+// measuring one engine and shipping another. If you are here because this test
+// failed, the question is not "fix the test" but "why did production change".
+TEST(MacroActions, DauntlessInOfferIsOnInProduction) {
+    MCTSConfig cfg;
+    EXPECT_TRUE(cfg.dauntlessInOffer)
+        << "MCTSConfig::dauntlessInOffer is production since 2026-08-17; "
+           "see evidence/weekend_result_20260817.md";
+}

@@ -315,14 +315,26 @@ int main(int argc, char** argv) {
                 // mode 4 (2026-08-14): both arms are production -- cage off,
                 // grind off -- and the ONLY difference is whether the block
                 // offer prices a Dauntless block at the strength it would
-                // equalise to. base is today's engine.
+                // equalise to. base is the engine as it stood on 14.08.
+                //
+                // 2026-08-17: Dauntless-in-offer became production, so "leave
+                // it at the struct default" no longer means "off". Both arms
+                // now say what they want out loud. Mode 4 is kept reproducible
+                // -- its base arm is still the pre-17.08. engine -- while every
+                // other mode gets the arm ON in BOTH arms, because an A/B whose
+                // two sides are both non-production measures an engine we do
+                // not ship. That is the same defect the arm itself was written
+                // to fix, one level up.
+                const bool candDauntless = true;
+                const bool baseDauntless = (mode != 4);
                 MCTSConfig candCfg = makeConfig(vf.get(), pol.get(),
                                                 mode != 2 && mode != 3 && mode != 4,
                                                 mode == 1,
                                                 mode == 3 ? 0.2f : 0.0f,
-                                                mode == 4);
+                                                candDauntless);
                 MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(),
-                                                mode == 1);
+                                                mode == 1, false, 0.0f,
+                                                baseDauntless);
                 MacroMCTSPolicy homePol(vf.get(),
                                         candHome ? candCfg : baseCfg,
                                         seed * 2654435761u + 11u + orient);

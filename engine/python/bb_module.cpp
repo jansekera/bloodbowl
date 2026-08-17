@@ -653,7 +653,7 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("away_staged_pickup") = false,  // so the gate can run candidate-only while frozen keeps its promoted config
        py::arg("cage_advance") = false,        // 2026-08-11: F1 cage-advance planner, per side. Default off = production.
        py::arg("away_cage_advance") = false,   // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
-       py::arg("dauntless_in_offer") = false);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. Default off = production.
+       py::arg("dauntless_in_offer") = true);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. 2026-08-17: default TRUE = production, after the A/B passed (+3.59 pp vs the null arms). Corpora collected through this binding must match what production plays, or we go back to measuring one engine and shipping another.
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {
