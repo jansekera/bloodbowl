@@ -45,7 +45,7 @@ ne 3 000 na tři.
 Odhad: SD páru ~0,52 × 0,8 (CRN) / √6000 ⇒ **SE ≈ 0,55 pp**.
 
 ### Konfigurace
-* `MODE=0` *(cand = cageAdvance ON, base = produkce)*, **PAIRS=1500, SHARDS=4**
+* `MODE=0` *(cand = cageAdvance ON, base = produkce)*, **PAIRS=750, SHARDS=8**
   ⇒ **6 000 párů** na matchup `dw-we` — tam padlo původní zamítnutí.
 
 ### ⛔ NULOVÁ KONTROLA — a proč ta první verze tohohle dokumentu neplatila
@@ -83,6 +83,26 @@ nestojí.**
 u Dauntlessu ověřoval navíc, že *jiná konfigurace při stejném chování* dá nulu.
 Brána klece takový matchup nemá — proto ten per-pair test.
 
+### ✅ NÁSTROJ OVĚŘEN V OBOU SMĚRECH *(17.08. odpoledne, před spuštěním)*
+
+Nula na mrtvém rameni sama nedokazuje nic — mohla by znamenat, že CRN udělalo
+nulu ze všeho. Proto obě strany:
+
+| | rameno jednalo | párů se hnulo | leak | delta |
+|---|---|---|---|---|
+| `dw-sk`, rameno **mrtvé** | **0/40** | **0** | 0 | **+0,0000 ± 0,0000** |
+| `dw-orc`, rameno **živé** | **40/40** | 20 (50 %) | 0 | +11,25 ± 5,72 pp |
+
+⇒ `dw-sk` dával 15.08. **+2,28 pp (+2,3 SE)** při témž mrtvém rameni. **Teď je to
+exaktní nula** — a živé rameno se přesto hýbe. To je ta oprava.
+
+### ⛔ TOHLE NENÍ REPLIKACE BĚHU Z 13.08.
+Původní zamítnutí běželo na **jiném enginu**: bez P13, bez opravy hand-offu
+i bez odmítnutí darovaného TD. Dnešní běh proto odpovídá na
+**„pomáhá brána v DNEŠNÍM enginu?"**, ne na „byl tehdejší výsledek správně?".
+⇒ **Kdyby vyšlo jinak než tehdy, není to důkaz, že CRN opravilo starou chybu** —
+mohl to být kterýkoli z těch tří commitů. Obojí se musí zapsat jako možnost.
+
 ### Metrika a prahy *(pre-registrováno)*
 * **Primární:** párová delta chess na `dw-we`, 6 000 párů, **jen `n_nonzero`
   páry nesou informaci** — mean se ale bere přes VŠECHNY páry.
@@ -111,7 +131,7 @@ výsledek a patří zapsat.
 
 ### Příkaz
 ```
-MODE=0 PAIRS=1500 SHARDS=4 MATCHUPS="1:dw-we:1" \
+MODE=0 PAIRS=750 SHARDS=8 MATCHUPS="1:dw-we:1" \
   CONTROL_MODE2=1 CONTROL_PAIRS=50 OUT=gate_crn_20260817 \
   setsid nohup ./run_night_ab.sh > gate_crn_launch.log 2>&1 & disown
 ```
