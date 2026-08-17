@@ -336,17 +336,37 @@ int main(int argc, char** argv) {
                 MCTSConfig baseCfg = makeConfig(vf.get(), pol.get(),
                                                 mode == 1, false, 0.0f,
                                                 baseDauntless);
+                // ⭐ COMMON RANDOM NUMBERS (2026-08-17). All three seeds used to
+                // carry `+ orient`, so the two halves of a "pair" were two
+                // DIFFERENT games on related seeds. Measured correlation
+                // between the halves: -0.017. The pairing bought us nothing,
+                // and the cost was not academic -- on 15.08. a matchup where
+                // the arm provably never fired came out at +2.28 pp (+2.3 SE)
+                // and formally cleared the pre-registered "passed" threshold.
+                //
+                // Without `+ orient` both orientations play the SAME game with
+                // the SAME per-side search seeds, and only the arm assignment
+                // swaps. An arm that changes nothing now yields a delta of
+                // exactly zero, per pair, not on average. The seed is bound to
+                // the SIDE (11 home, 47 away) rather than to the arm, which is
+                // what makes the swap a swap.
+                //
+                // No new dependence between pairs: seeds stay disjoint across
+                // pairs. The one thing this changes about reading the output is
+                // that most pairs now return exactly 0 -- so SUMMARY reports
+                // n_nonzero, and the mean is still taken over ALL pairs,
+                // including the zeros. Dropping them would inflate the effect.
                 MacroMCTSPolicy homePol(vf.get(),
                                         candHome ? candCfg : baseCfg,
-                                        seed * 2654435761u + 11u + orient);
+                                        seed * 2654435761u + 11u);
                 MacroMCTSPolicy awayPol(vf.get(),
                                         candHome ? baseCfg : candCfg,
-                                        seed * 2654435761u + 47u + orient);
+                                        seed * 2654435761u + 47u);
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
                     [&](const GameState& s) { return homePol(s); },
                     [&](const GameState& s) { return awayPol(s); },
-                    seed * 2u + static_cast<uint32_t>(orient));
+                    seed * 2u);
 
                 // mode 4: kolikrát nabídka ocenila blok silou, na kterou by
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
@@ -424,10 +444,20 @@ int main(int argc, char** argv) {
         double mean = sum / n;
         double sd = std::sqrt(std::max(0.0, sum2 / n - mean * mean));
         double se = sd / std::sqrt(n);
+        // With common random numbers most pairs come back exactly 0, because
+        // the two arms played the identical game. n_nonzero is therefore the
+        // honest sample size of the comparison -- and a run where it is 0 has
+        // measured nothing at all, however tight its SE looks. The mean stays
+        // over ALL pairs; dividing by n_nonzero instead would inflate it.
+        int nNonzero = 0;
+        for (auto& p2 : pairs) if (p2.deltaHomeRace() != 0.0) ++nNonzero;
         int dec = candW + candL;
         double wr = dec > 0 ? static_cast<double>(candW) / dec : 0.0;
-        printf("SUMMARY matchup %d (%s vs %s), %d pairs (%d games):\n",
-               mi, mu.home, mu.away, static_cast<int>(n), 2 * static_cast<int>(n));
+        printf("SUMMARY matchup %d (%s vs %s), %d pairs (%d games), "
+               "n_nonzero %d (%.1f%%)%s:\n",
+               mi, mu.home, mu.away, static_cast<int>(n), 2 * static_cast<int>(n),
+               nNonzero, 100.0 * nNonzero / n,
+               nNonzero == 0 ? "  <= ARMS ARE IDENTICAL, NOTHING MEASURED" : "");
         printf("  cand overall: W%d D%d L%d decisiveWR=%.3f chess=%.4f | "
                "cage plans adopted %.2f/game%s\n",
                candW, candD, candL, wr,
