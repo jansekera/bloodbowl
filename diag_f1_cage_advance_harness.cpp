@@ -298,6 +298,7 @@ int main(int argc, char** argv) {
         // the harness's own noise -- that is the single most useful line on
         // Monday, and until now nothing printed it.
         long dauntTotal = 0, rollTotal = 0;
+        long handoffOfferTotal = 0;   // P21: offered vs chosen
         for (int i = 0; i < nPairs; ++i) {
             uint32_t seed = seedBase + static_cast<uint32_t>(mi) * 1'000'000u
                             + static_cast<uint32_t>(seedOffset + i);
@@ -352,6 +353,7 @@ int main(int argc, char** argv) {
                 // JINÉHO než „změna nemá efekt".
                 long candDaunt = bb::takeDauntlessOfferCount();
                 long candRoll  = bb::takeDauntlessRollCount();
+                handoffOfferTotal += bb::takeHandOffOfferCount();
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
                 int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
@@ -439,6 +441,14 @@ int main(int argc, char** argv) {
         // Did the arm fire at all? Zero is NOT "no effect" -- it is "the two
         // arms ran the same code", which makes the matchup a true null and its
         // delta a direct read of this harness's noise floor.
+        // P21: printed in every mode -- the hand-off swap is production, not an
+        // arm, and "was it ever on the menu" is the question the corpus could
+        // not answer.
+        printf("  HAND_OFF offers: %ld (%.1f/game) -- %s\n",
+               handoffOfferTotal, handoffOfferTotal / (2.0 * n),
+               handoffOfferTotal == 0
+                   ? "NEVER OFFERED => the gate is what kills it"
+                   : "offered; if none were played, the SEARCH is what kills it");
         if (mode == 4) {
             printf("  ARM Dauntless: %ld offers (%.0f/game), %ld rolls "
                    "(%.0f/game) -- %s\n",

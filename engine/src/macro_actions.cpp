@@ -132,6 +132,20 @@ long takeDauntlessOfferCount() {
     return v;
 }
 
+// 2026-08-17 (P21): the same instrument for the hand-off swap. The corpus logs
+// ZERO hand-offs in 3000 games while the situation the swap was written for
+// occurs in at least 329 of our turns and the policy takes it in 18.3 % of
+// planted positions. "Never offered" and "offered and never chosen" are
+// different defects with different fixes -- the first is the gate, the second
+// is the leaf evaluation -- and nothing could tell them apart.
+thread_local long g_handOffOffers = 0;
+
+long takeHandOffOfferCount() {
+    long v = g_handOffOffers;
+    g_handOffOffers = 0;
+    return v;
+}
+
 // Count block dice for attacker vs defender
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
                              bool isBlitz, bool dauntlessInOffer) {
@@ -769,6 +783,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             const bool worthIt = handOff ? (swap && complete >= 0.5)
                                          : (complete >= 0.5);
             if (worthIt || emergency) {
+                if (handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferCount()
                 out.push_back({MacroType::PASS_ACTION, carrier->id, target.id, {-1, -1}});
             }
         });

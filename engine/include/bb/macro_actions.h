@@ -64,6 +64,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 // per-side bookkeeping.
 long takeDauntlessOfferCount();
 
+// How many times a HAND_OFF (a PASS_ACTION macro whose target is adjacent) was
+// put on the menu, since the last call -- and resets. P21: the corpus logs zero
+// hand-offs played across 3000 games, and without this there is no way to tell
+// a gate that never offers from a search that never picks.
+long takeHandOffOfferCount();
+
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,

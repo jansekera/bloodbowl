@@ -128,7 +128,15 @@ Res sweep(GameState (*build)(const Geom&), const ValueFunction* vf,
             Action act = policy(gs);
             r.n++;
             if (handoffMode) {
-                if (act.type == ActionType::HAND_OFF || act.type == ActionType::PASS) r.a++;
+                // 2026-08-17: these two USED TO BE COUNTED TOGETHER, and the
+                // "18.3 % předání" that put the hand-off back on the live list
+                // came out of the sum. They are not the same action: a throw at
+                // AG2 is two rolls, a hand-off is one, and only the hand-off is
+                // the swap the fix was written for. Counting them apart is the
+                // whole question, because the corpus logged 914 PASS events and
+                // ZERO hand-offs across 3000 games.
+                if (act.type == ActionType::HAND_OFF) r.a++;
+                else if (act.type == ActionType::PASS) r.b++;
                 else r.none++;
             } else if (act.type == ActionType::BLOCK || act.type == ActionType::BLITZ) {
                 if (act.targetId == 12) r.a++; else if (act.targetId == 13) r.b++;
@@ -198,8 +206,10 @@ int main(int argc, char** argv) {
 
     printf("\n=== 3. HAND-OFF: náš LONGBEARD drží míč, vedle volný Runner ===\n");
     Res h = sweep(posHandoff, vf.get(), off, geoms, nSeeds, true);
-    printf("  %-22s pozic %4d | předání %4d (%5.1f %%) | jiná akce %4d\n",
-           "dnešní stav", h.n, h.a, 100.0 * h.a / h.n, h.none);
+    printf("  %-22s pozic %4d | HAND_OFF %4d (%5.1f %%) | PASS %4d (%5.1f %%)"
+           " | jiná akce %4d\n",
+           "dnešní stav", h.n, h.a, 100.0 * h.a / h.n,
+           h.b, 100.0 * h.b / h.n, h.none);
 
     printf("\n⚠️ Pořád Q1: měří VOLBU, ne hodnotu.\n");
     return 0;
