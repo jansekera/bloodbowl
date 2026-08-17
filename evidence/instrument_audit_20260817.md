@@ -167,3 +167,47 @@ jako počet bloků.
 **Přepočítat σ-tabulku na čerstvé baseline** (`corpus_baseline_20260817`,
 3 000 her, sbírá se od 17.08. 10:15, s otiskem enginu) a teprve pak
 o pořadí fronty mluvit. **3 000 her proti 120** — a poprvé s uvedeným původem.
+
+---
+
+# TŘETÍ VLNA: `diag_exposure_scan` *(vyrobil doktrínu E1/E2)*
+
+Nástroj v podstatně lepším stavu než předchozí dva: stranu čte z `home_race`,
+tiskne korpus i počet vzorků, a **sám si přiznává vlastní zkreslení**
+*(„obranné asistence u neznámé pozice útočníka ~ 0 → mírně nadsazuje jejich
+kostky")*. Přesto tři poznámky.
+
+## ① `OUT = 3` je nesprávné jméno — ale MĚŘENÍ JE SPRÁVNÉ
+
+Enum enginu má na 3 **KO**, a dál INJURED/DEAD/EJECTED/OFF_PITCH (4–7).
+Test `p["state"] == OUT` by tedy zachytil jen KO. **Ověřeno v datech:**
+exportér **hráče mimo hřiště do seznamu vůbec nedává** — vyskytují se pouze
+stavy 0/1/2 a seznam se zkracuje z 11 až na 5. Odchod ze hřiště se tedy pozná
+**nepřítomností**, a přesně tak to skript i dělá (`st_m = q["state"] if q else
+OUT`). ⇒ **jedna větev je mrtvý kód, dopad na výsledek žádný.**
+*(Zapsáno i s tím „žádný" — nález bez dopadu je pořád nález.)*
+
+## ② ⭐ HVĚZDIČKA NEMĚLA KOREKCI NA POČET SROVNÁNÍ
+
+`*` = `|r| > 2/sqrt(n)`, tedy **~2σ na každou buňku zvlášť** — a buněk je
+**36**. ⇒ **~1,8 hvězdičky se čeká i tehdy, kdyby neplatilo nic.** Z téhle
+tabulky se přitom vybrala doktrína E1/E2.
+✅ Opraveno: tiskne se počet srovnání i očekávaný počet planých hvězdiček,
+a `**` označuje buňky, které projdou korekcí na 36 srovnání.
+
+## ③ ✅ A DOKTRÍNA E1/E2 TU KOREKCI PŘEŽIJE
+
+| | down | lost | ball_lost | appr |
+|---|---|---|---|---|
+| FB2 | **0,399** | 0,096** | 0,098** | −0,070* |
+| REACH | 0,219** | 0,122** | 0,178** | −0,116** |
+| **REACH0** | 0,077* | 0,097** | **0,336**** | −0,039 |
+| BLZ | 0,164** | 0,080* | 0,205** | −0,241** |
+| SURF | 0,032 | 0,010 | −0,007 | 0,008 |
+| CCBAD | 0,005 | 0,010 | 0,165** | 0,068 |
+
+`REACH0 → ball_lost` **0,336** je nejsilnější buňka celého sloupce a projde
+korekcí s velkou rezervou. **E1/E2 stojí.** *(Korekce chyběla, ale závěr se
+nemění — a to je potřeba říct stejně jasně jako opak.)*
+⚠️ Naopak **SURF neměří nic** a **CCBAD skoro nic** — obojí bylo v tabulce
+vedle ostatních, jako by to byly rovnocenné veličiny.

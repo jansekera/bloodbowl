@@ -287,7 +287,18 @@ def main():
             line += f"  {rc}={sum(v)/len(v):.3f}" if v else ""
         print(line)
 
-    print("\n== KORELACE prediktor x výsledek (Pearson r, hvězdička = |r| > 2/sqrt(n)) ==")
+    # P25 (17.08.): hvězdička je práh ~2σ POUŽITÝ NA KAŽDOU BUŇKU ZVLÁŠŤ, a
+    # buněk je preds x outs. Při té šíři je pár hvězdiček čekaný výsledek
+    # náhody -- a přitom se z téhle tabulky vybrala doktrína E1/E2. Tiskne se
+    # proto, kolik srovnání to je a kolik hvězdiček čekat naprázdno; `**`
+    # označuje ty, které přežijí Bonferroniho korekci na ten počet.
+    _ncmp = len(preds) * len(outs)
+    _bonf = 2.807 if _ncmp <= 50 else 3.29     # ~alfa 0,05 / ncmp, oboustranně
+    print(f"\n== KORELACE prediktor x výsledek (Pearson r) ==")
+    print(f"   {_ncmp} srovnání naráz. `*` = |r| > 2/sqrt(n), tedy ~2σ NA BUŇKU"
+          f" ⇒ čekej ~{0.05 * _ncmp:.1f} hvězdičky i kdyby nic neplatilo.")
+    print(f"   `**` = přežije korekci na {_ncmp} srovnání (|r| > {_bonf:.2f}/sqrt(n))."
+          f" Doktrínu stavět jen na těch.")
     print(f"{'':8}" + "".join(f"{o:>12}" for o in outs))
     for p in preds:
         line = f"{p:<8}"
@@ -298,8 +309,9 @@ def main():
             if r_ is None:
                 line += f"{'—':>12}"
             else:
-                sig = "*" if abs(r_) > 2 / math.sqrt(n) else " "
-                line += f"{r_:>10.3f}{sig} "
+                sig = ("**" if abs(r_) > _bonf / math.sqrt(n)
+                       else "* " if abs(r_) > 2 / math.sqrt(n) else "  ")
+                line += f"{r_:>10.3f}{sig}"
         print(line)
 
     print("\n== KORELACE UVNITŘ RASY (down; ball_lost) — kontrola, že to není jen rozdíl ras ==")
