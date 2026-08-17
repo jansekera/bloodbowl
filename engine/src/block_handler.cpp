@@ -29,7 +29,7 @@ static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
 
 thread_local long g_dauntlessRolls = 0;
 
-long takeDauntlessRollCount() {
+long takeDauntlessRollEvalsInSearch() {
     long v = g_dauntlessRolls;
     g_dauntlessRolls = 0;
     return v;
@@ -392,11 +392,11 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // the equalisation now all happen on the modified pre-assist strengths, and
     // assists are added on top afterwards.
     if (att.hasSkill(SkillName::Dauntless) && defST > attST) {
-        // Uptake, ne nabídka. Čítač v macro_actions počítá, kolikrát se blok
-        // OCENIL Dauntlessem; tenhle počítá, kolikrát se opravdu HODIL. Rozdíl
-        // mezi nimi je odpověď na „nabídli jsme to, ale vzal si to search?" --
-        // prior je pro všechny bloky plochý (BLOCK 15, viz P10a), takže nabídka
-        // sama nic nezaručuje.
+        // ⛔ Tady stálo, že tohle počítá, „kolikrát se OPRAVDU hodil", a že
+        // rozdíl proti nabídce odpovídá na „vzal si to search?". Obojí je
+        // nepravda: sem se chodí i z každé simulace MCTS. 349/zápas proti
+        // 1,88 odehraným (P25, 17.08.) -- 186×. Odehrané se čtou z logu:
+        // SKILL_USED s roll == SkillName::Dauntless.
         ++g_dauntlessRolls;
         int dauntlessRoll = dice.rollD6();
         bool psyched = dauntlessRoll + attST > defST;

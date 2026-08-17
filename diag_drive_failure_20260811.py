@@ -428,7 +428,18 @@ def main():
         return r.get("subcat", r["cat"]) if r["cat"] == "D" else r["cat"]
 
     # --- hlavní tabulka ---
+    # P25 (17.08.): legenda se tiskne DO VÝSTUPU, ne jen do hlavičky skriptu.
+    # Definice byly celou dobu napsané správně -- jenže v `.py`, kdežto čte se
+    # `drives.txt`, a tam dosud stálo jen holé „A B C D1 D2". Číslo, které
+    # cestuje bez své definice, se dřív nebo později přečte jako něco jiného:
+    # „A" se čte jako „šance na skórování", i když je to podíl DRIVŮ.
     print("=== PŘIJÍMACÍ DRIVY TRPASLÍKA: A/B/C/D1/D2 ===")
+    print("  A  SKÓROVALI          — v drivu je naše TOUCHDOWN událost")
+    print("  B  MÍČ NIKDY NEZÍSKÁN — v celém drivu jsme míč ani jednou nedrželi")
+    print("  C  ZTRATILI JSME HO   — drželi jsme ho, na konci ho drží soupeř / leží volný")
+    print("  D1 POZDNÍ START       — došla kola; zbývalo_kol × 2.61 <  zbývalo_polí")
+    print("  D2 POMALÁ KLEC        — došla kola; času bylo dost a TD přesto nepadl")
+    print("  jmenovatel = PŘIJÍMACÍ DRIVY (ne zápasy, ne kola); kategorie jsou výlučné")
     hdr = "%-10s" + "%8s" * len(cats) + "%8s" % "celkem"
     print("%-10s" % "soupeř" + "".join("%8s" % c for c in cats) + "%8s" % "celkem")
     for opp in opps + ["VŠE"]:

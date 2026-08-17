@@ -122,11 +122,11 @@ static bool isFreeToAct(const Player& p) {
     return p.canAct() && !p.hasMoved;
 }
 
-// See takeDauntlessOfferCount(): incremented only on the candidate arm, since
+// See takeDauntlessOfferEvalsInSearch(): incremented only on the candidate arm, since
 // the branch that touches it is gated on dauntlessInOffer.
 thread_local long g_dauntlessOffers = 0;
 
-long takeDauntlessOfferCount() {
+long takeDauntlessOfferEvalsInSearch() {
     long v = g_dauntlessOffers;
     g_dauntlessOffers = 0;
     return v;
@@ -140,7 +140,7 @@ long takeDauntlessOfferCount() {
 // is the leaf evaluation -- and nothing could tell them apart.
 thread_local long g_handOffOffers = 0;
 
-long takeHandOffOfferCount() {
+long takeHandOffOfferEvalsInSearch() {
     long v = g_handOffOffers;
     g_handOffOffers = 0;
     return v;
@@ -783,7 +783,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             const bool worthIt = handOff ? (swap && complete >= 0.5)
                                          : (complete >= 0.5);
             if (worthIt || emergency) {
-                if (handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferCount()
+                if (handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch()
                 out.push_back({MacroType::PASS_ACTION, carrier->id, target.id, {-1, -1}});
             }
         });

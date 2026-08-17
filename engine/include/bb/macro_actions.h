@@ -57,18 +57,34 @@ struct MacroExpansionResult {
 void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         bool dauntlessInOffer = false);
 
-// How many times the block offer priced a block at the strength Dauntless would
-// equalise to, since the last call -- and resets. Diagnostics for the A/B: an
-// arm that changes nothing must be distinguishable from a change that does
-// nothing. Only ever non-zero where dauntlessInOffer is set, so it needs no
-// per-side bookkeeping.
-long takeDauntlessOfferCount();
+// ⚠️ READ THE UNIT BEFORE QUOTING EITHER OF THESE (P25, 2026-08-17).
+//
+// getAvailableMacros runs at the MCTS root AND at every expansion, so these
+// count EVALUATIONS INSIDE THE SEARCH -- roughly a hundred per decision. They
+// are NOT a count of anything that happened on the pitch, and the difference is
+// not a rounding error: takeDauntlessRollEvalsInSearch reported 349 per game
+// while the corpus logged 1.88 Dauntless rolls actually played. A factor of 186.
+//
+// They answer exactly one question, and answer it well: DID THE ARM RUN AT ALL?
+// Zero means the two arms executed the same code, which makes that matchup a
+// true null. Any other reading needs the played count instead, which comes from
+// the event log: SKILL_USED with roll == SkillName::Dauntless for the rolls,
+// HAND_OFF events for the hand-offs.
+//
+// The old names (takeDauntlessOfferCount, takeHandOffOfferCount) said "count"
+// and were duly read as "how often we did it". Hence the rename.
 
-// How many times a HAND_OFF (a PASS_ACTION macro whose target is adjacent) was
-// put on the menu, since the last call -- and resets. P21: the corpus logs zero
-// hand-offs played across 3000 games, and without this there is no way to tell
-// a gate that never offers from a search that never picks.
-long takeHandOffOfferCount();
+// Times the block offer priced a block at the strength Dauntless would equalise
+// to, per SEARCH EVALUATION, since the last call -- and resets. Only ever
+// non-zero where dauntlessInOffer is set, so it needs no per-side bookkeeping.
+long takeDauntlessOfferEvalsInSearch();
+
+// Times a HAND_OFF (a PASS_ACTION macro whose target is adjacent) was put on the
+// menu, per SEARCH EVALUATION, since the last call -- and resets. P21: the
+// corpus logs zero hand-offs PLAYED across 3000 games while this reports 10.4
+// per game offered, which is what separates "the gate never offers" from "the
+// search never picks". Played hand-offs: count HAND_OFF events.
+long takeHandOffOfferEvalsInSearch();
 
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.

@@ -423,6 +423,14 @@ def main():
             print(f"     {k}  ×{v}")
 
     print("\n=== KONTROLY (splněno / posuzováno / N/A) ===")
+    # P25 (17.08.): `n` se tiskne od 13.08., ale JEDNOTKA `n` nikde. Dvě
+    # kontroly vedle sebe mají jmenovatele lišící se 5×, a čtou se jako by byly
+    # srovnatelné: K33 je z 44 078 KOL, K30 z 207 962 PŘÍLEŽITOSTÍ K DODGI.
+    # „25,6 % drahých dodgů je držených" tedy NENÍ „ve čtvrtině kol".
+    print("  jednotka n:  K29/K29⭐ = kola s postavenou klecí  ·  K9a/K34 = kola"
+          " s míčem  ·  K30/K30b = PŘÍLEŽITOSTI K DODGI (ne kola!)")
+    print("               K31/K33/K35 = všechna naše kola  ·  N/A = predikát na"
+          " tom vzorku nedává smysl, NEPOČÍTÁ se jako splněný")
     print(C["K29"].line())
     print(C["K29full"].line())
     if cf:
@@ -451,7 +459,8 @@ def main():
     print("\nplán enginu (X6 / brána klece)")
     for k, v in st.items():
         if k.startswith("plán:"):
-            print(f"  {k:<44}{v / kol:>7.1%}")
+            # P25: procento bez jmenovatele. Byl to jediný takový řádek.
+            print(f"  {k:<44}{v / kol:>7.1%}   n={kol} (všechna naše kola)")
 
 
 if __name__ == "__main__":

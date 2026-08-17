@@ -371,9 +371,9 @@ int main(int argc, char** argv) {
                 // mode 4: kolikrát nabídka ocenila blok silou, na kterou by
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
                 // JINÉHO než „změna nemá efekt".
-                long candDaunt = bb::takeDauntlessOfferCount();
-                long candRoll  = bb::takeDauntlessRollCount();
-                handoffOfferTotal += bb::takeHandOffOfferCount();
+                long candDaunt = bb::takeDauntlessOfferEvalsInSearch();
+                long candRoll  = bb::takeDauntlessRollEvalsInSearch();
+                handoffOfferTotal += bb::takeHandOffOfferEvalsInSearch();
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
                 int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
@@ -474,7 +474,7 @@ int main(int argc, char** argv) {
         // P21: printed in every mode -- the hand-off swap is production, not an
         // arm, and "was it ever on the menu" is the question the corpus could
         // not answer.
-        printf("  HAND_OFF offers: %ld (%.1f/game) -- %s\n",
+        printf("  HAND_OFF offer evals in search: %ld (%.1f/game) -- %s\n",
                handoffOfferTotal, handoffOfferTotal / (2.0 * n),
                handoffOfferTotal == 0
                    ? "NEVER OFFERED => the gate is what kills it"
@@ -487,8 +487,10 @@ int main(int argc, char** argv) {
                    dauntTotal == 0
                        ? "NEVER FIRED => TRUE NULL: any delta below is this "
                          "harness's noise, not an effect"
-                       : "arm active (counts are search-internal evaluations, "
-                         "NOT blocks played)");
+                       : "arm active. ⚠️ SEARCH EVALUATIONS, NOT BLOCKS PLAYED "
+                         "-- measured 186x the played count. Played rolls come "
+                         "from SKILL_USED/Dauntless in the event log (1.88/game "
+                         "on the 14.08. corpus).");
         }
         // In mode 2 the two arms are the SAME configuration; only the MCTS RNG
         // seed differs. The delta is therefore a null test, not a measurement,
