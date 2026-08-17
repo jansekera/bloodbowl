@@ -585,7 +585,8 @@ Podrobně `evidence/weekend_result_20260817.md`.
 | **2.** | **P21** — spočítat **výskyt** situace „nosič ≠ Runner a vedle volný Runner" ve snímcích korpusu | rozhodne (a)/(b) **bez běhu** a odblokuje čtení celého P5 | ne |
 | **3.** | **T5.3** — zranění nepřetrvávají přes drive | ⭐ **násobitel celého attrition programu**; dokud se po TD staví 11 čerstvých, je každý náš výsledek o bití **dolní odhad** — včetně těch +4,08 pp | ne |
 | **2.5** | ⭐ **P25 — audit měřicích nástrojů** *(uživatel 17.08.: „raději ověřme, co nám v pátek ujelo")* | sedm nálezů za jediný den bez hledání; **dokud neplatí metr, je každý noční běh sázka** | ne |
-| **4.** | vybrat a spustit **noční A/B** *(kandidáti: **P17 Wrestle** · P2+P9c · blitz roh vs zeď · P10a)* | dvě okna už propadla | **ano, 14 h** |
+| ~~4.~~ | ✅ **NOC BĚŽÍ od 10:10** — brána klece s CRN, `dw-we`, 8×750 = **6 000 párů**, předregistrace `evidence/night_prereg_20260817.md`. Vedle toho ✅ **čerstvá baseline korpusu** (`run_corpus_baseline.sh`, 3 000 her) — po víkendu **nemáme žádnou použitelnou baseline** (P22), takže měna drivů je do jejího vzniku neměřitelná. | běží |
+| **5.** | vybrat a spustit **noční A/B** *(kandidáti: **P17 Wrestle** · P2+P9c · blitz roh vs zeď · P10a)* | dvě okna už propadla | **ano, 14 h** |
 
 ⛔ **Podmínka na bod 4:** noční běh **musí** obsahovat matchup s **nulovou
 expozicí** a spouštěč **musí** sourcovat `run_night_lib.sh`. Bez obojího se
