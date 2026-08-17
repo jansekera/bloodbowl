@@ -91,6 +91,36 @@ out=$( . "$LIB"; NIGHT_LOG="$TMP/pf/chain.log"
 check "zdroj novější než binárka běh ZASTAVÍ" "$out" "BLOCKED"
 grep -q "PŘELOŽIT" "$TMP/pf/chain.log" && ok "preflight řekne CO udělat" || bad "preflight neřekne co"
 
+echo "== 4b. preflight: souběžný běh =="
+
+# Vada 17.08. 09:56: `pgrep -f` sedla na SHELL, který vzor jen zmiňoval, a
+# preflight zabil první ostré spuštění. Falešný poplach tu stojí celou noc.
+mkdir -p "$TMP/conc"
+cp /bin/sleep "$TMP/conc/fakebin"                # „harness"
+touch "$TMP/conc/fakebin.cpp"; sleep 0.1; touch "$TMP/conc/fakebin"
+mkdir -p "$TMP/conc/engine/build" "$TMP/conc/engine/src" "$TMP/conc/engine/include"
+touch "$TMP/conc/engine/build/libbb_engine.so"
+: > "$TMP/conc/weights_best.json"; : > "$TMP/conc/weights_policy.json"
+mkdir -p "$TMP/conc/out"
+
+# (a) shell, který jméno binárky jen ZMIŇUJE, nesmí běh zastavit
+bash -c 'x="fakebin diag_f1_cage_advance diag_replay_mine_2026"; sleep 20' & MENTION=$!
+sleep 0.3
+out=$( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
+       night_preflight "$TMP/conc/fakebin" "$TMP/conc/out" "$TMP/conc/fakebin.cpp" \
+       >/dev/null 2>&1 && echo PASSED || echo BLOCKED )
+check "shell, co vzor jen zmiňuje, běh NEZASTAVÍ" "$out" "PASSED"
+kill $MENTION 2>/dev/null; wait $MENTION 2>/dev/null
+
+# (b) ale SKUTEČNĚ běžící binárka ho zastavit MUSÍ
+"$TMP/conc/fakebin" 25 & REAL=$!
+sleep 0.3
+out=$( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
+       night_preflight "$TMP/conc/fakebin" "$TMP/conc/out" "$TMP/conc/fakebin.cpp" \
+       >/dev/null 2>&1 && echo PASSED || echo BLOCKED )
+check "skutečně běžící binárka běh ZASTAVÍ" "$out" "BLOCKED"
+kill $REAL 2>/dev/null; wait $REAL 2>/dev/null
+
 echo "== 5. kontrola baseline =="
 
 mkdir -p "$TMP/run" "$TMP/base"

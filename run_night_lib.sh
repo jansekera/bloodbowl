@@ -149,12 +149,39 @@ night_preflight() {
         [ -f "$root/$w" ] || { night_log "PREFLIGHT ⛔ chybí $root/$w"; ok=1; }
     done
 
-    # (5) neběží už jiný sběr/harness. `pgrep -f` na vzor, který sedí i na
-    #     tenhle skript, by našel sám sebe -- proto -v $$ (viz feedback o pkill).
-    local others
-    others=$(pgrep -f 'diag_f1_cage_advance|diag_replay_mine_2026' 2>/dev/null | grep -v "^$$\$" | head -5)
+    # (5) neběží už jiný sběr/harness.
+    #
+    # ⛔ TOHLE BYLO NAPSANÉ PŘES `pgrep -f 'diag_f1_cage_advance|…'` A ZABILO
+    #    PRVNÍ OSTRÉ SPUŠTĚNÍ (17.08. 09:56). `pgrep -f` porovnává vzor s CELOU
+    #    příkazovou řádkou každého procesu, takže sedne i na shell, který ten
+    #    vzor jen zmiňuje -- na obalovací `bash -c`, na grep, na tenhle skript.
+    #    Falešný poplach v preflightu je horší než žádný: běh se NESPUSTÍ a
+    #    přijdeme o noc. (Táž rodina jako `pkill` na vzor, co sedne na sebe.)
+    #
+    # ⇒ Neptáme se na text, ptáme se na SPUŠTĚNOU BINÁRKU: `/proc/PID/exe`
+    #   ukazuje na skutečný soubor, a shell, který o něm mluví, tam nikdy není.
+    #   Sběr korpusu je python, ten se pozná podle jména skriptu v argv --
+    #   ale jen u procesů, jejichž exe je opravdu python.
+    local others="" binreal p exe
+    binreal=$(readlink -f "$bin" 2>/dev/null)
+    for p in /proc/[0-9]*; do
+        local pid=${p#/proc/}
+        [ "$pid" = "$$" ] && continue
+        exe=$(readlink "$p/exe" 2>/dev/null) || continue
+        exe=${exe% (deleted)}
+        if [ -n "$binreal" ] && [ "$exe" = "$binreal" ]; then
+            others="$others $pid(harness)"; continue
+        fi
+        case "$exe" in
+            */python3|*/python)
+                if tr '\0' ' ' < "$p/cmdline" 2>/dev/null \
+                   | grep -q 'diag_replay_mine_2026'; then
+                    others="$others $pid(sběr)"
+                fi ;;
+        esac
+    done
     if [ -n "$others" ]; then
-        night_log "PREFLIGHT ⛔ už běží jiný běh (pid: $(echo $others | tr '\n' ' '))"; ok=1
+        night_log "PREFLIGHT ⛔ už běží jiný běh:$others"; ok=1
     fi
 
     # (6) místo na disku -- korpus 3000 her je ~30 MB, ale trénink umí sežrat víc
