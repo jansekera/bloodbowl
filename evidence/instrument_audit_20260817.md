@@ -211,3 +211,49 @@ korekcí s velkou rezervou. **E1/E2 stojí.** *(Korekce chyběla, ale závěr se
 nemění — a to je potřeba říct stejně jasně jako opak.)*
 ⚠️ Naopak **SURF neměří nic** a **CCBAD skoro nic** — obojí bylo v tabulce
 vedle ostatních, jako by to byly rovnocenné veličiny.
+
+---
+
+# ČTVRTÁ VLNA: `diag_situation_scan` — **NÁSTROJ OBSTÁL**
+
+Nejlépe zdokumentovaný ze všech: hlavička si sama vypisuje **všechny
+aproximace** *(S0/S1 v korpusu nejsou · `achievable_pace` je v logu vždy 0 ⇒
+tempo se bere z MA nosiče · „poslední kolo" = turn 8 · S5 se klasifikuje jen
+podle dosahu)*. Jedna vada a jedno ověření.
+
+## ① Korpus byl ZADRÁTOVANÝ v kódu
+
+`DIRS = [tři adresáře z 11.08.]`, dohromady **280 her**, a `sys.argv` se na
+korpus **nepoužívalo**. Nástroj tedy nešlo pustit na novější data bez editace
+zdrojáku — a report žádný korpus neuváděl, takže si toho nikdo nemusel všimnout.
+✅ Opraveno: korpus z argv, výchozí zůstává starý *(reprodukovatelnost)*,
+a tiskne se korpus, otisk enginu a **jednotka jmenovatele** *(trpasličí kola)*.
+
+## ② ⭐ ROZLOŽENÍ SITUACÍ SE POTVRDILO NA 10× VĚTŠÍM VZORKU
+
+| | 280 her, 11.08. | **3 000 her, 14.08.** |
+|---|---|---|
+| **S7** *(soupeř má míč, kolo < 7)* | **32,4 %** | **33,7 %** |
+| S4 | 27,7 % | 25,1 % |
+| S5 | 15,6 % | 15,1 % |
+| S8 | 8,0 % | 9,0 % |
+| S2 | 6,8 % | 7,2 % |
+| S3 | 5,3 % | 5,8 % |
+| S10 · S9 · S6 | 1,9 · 1,1 · 0,9 % | 2,3 · 1,1 · 0,6 % |
+
+Jiný korpus, jiný engine, **10,7× víc dat** — a všechny kategorie sedí do
+~2,6 pp. **Rozložení situací je robustní.**
+
+## ⭐ A PROČ TENHLE OBSTÁL, KDYŽ σ-TABULKA NE
+
+Obojí vzniklo na malých datech z 11.08. Rozdíl je ve **jmenovateli, který
+rozhoduje**:
+
+* rozložení situací je **prostá četnost na 4 488 kolech** — velké n, žádné
+  srovnávání;
+* σ-tabulka porovnává **35 skórujících drivů** napříč **11 veličinami naráz**.
+  Rozhoduje tam **velikost kladné třídy**, ne počet kol.
+
+⇒ **„Malý korpus" sám o sobě nic neznamená.** Otázka zní, kolik případů má ta
+veličina, na které závěr stojí — a to je u obou čísel z 11.08. rozdíl 4 488
+proti 35.

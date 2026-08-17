@@ -28,9 +28,16 @@ Rozhodnutí a aproximace (vše přiznané v reportu):
 import gzip, json, glob, heapq, sys
 from collections import Counter, defaultdict
 
-DIRS = ["diag_replay_mine_20260811_data",
-        "diag_replay_mine_20260811b_data",
-        "diag_replay_mine_20260811c_data"]
+# P25 (17.08.): korpus byl ZADRÁTOVANÝ v kódu (tři adresáře z 11.08., dohromady
+# 280 her) a `sys.argv` se na něj nepoužívalo — nástroj tedy nešlo pustit na
+# novější data bez editace zdrojáku. To je samo o sobě vada měřicího aparátu:
+# číslo, které z něj vyšlo, je tím přišpendlené k jednomu starému enginu, a
+# nikdo si toho nemusí všimnout, protože report žádný korpus neuvádí.
+# Výchozí hodnota zůstává stejná, aby staré výsledky šlo reprodukovat.
+DEFAULT_DIRS = ["diag_replay_mine_20260811_data",
+                "diag_replay_mine_20260811b_data",
+                "diag_replay_mine_20260811c_data"]
+DIRS = sys.argv[1:] if len(sys.argv) > 1 else DEFAULT_DIRS
 
 STAND, PRONE, STUN, OFF = 0, 1, 2, 3
 PACE_BY_MA = {6: 3.41, 5: 2.5, 4: 1.50}   # měření R1 (pace_vs_contact)
@@ -330,7 +337,22 @@ def main():
                 noatt_cross[(tier.split()[0], act)] += 1
 
     # ---------------- výstup ----------------
+    # P25: původ čísla musí cestovat s číslem.
+    _head = ""
+    for _d in DIRS:
+        for _c in (_d.rstrip("/") + "/ENGINE_HEAD",
+                   _d.rstrip("/").rsplit("_data", 1)[0] + "/ENGINE_HEAD"):
+            try:
+                _head = open(_c).read().strip()[:8]
+                break
+            except OSError:
+                pass
+        if _head:
+            break
+    print(f"korpus: {' + '.join(DIRS)}")
+    print(f"engine korpusu: {_head or 'NEZNÁMÝ (korpus bez otisku — viz P22)'}")
     print(f"her: {len(games)} (trpaslík v každé) · trpasličích kol: {n_turns}")
+    print("jmenovatel u procent v oddílu A = TRPASLIČÍ KOLA (ne zápasy, ne drivy)")
     print(f"kol s neplatným koncovým snímkem (TD/půle/konec logu): {n_excluded_end}")
     print("\n=== A) ROZLOŽENÍ SITUACÍ (klasifikace na ZAČÁTKU kola, pace=MA nosiče) ===")
     for k in sorted(sit, key=lambda k: -sit[k]):
