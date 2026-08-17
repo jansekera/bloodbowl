@@ -650,6 +650,15 @@ aby se rozptyl skutečně redukoval — to by zlevnilo **každý** další běh.
 každý další 14hodinový běh sázka. Audit měřicího aparátu byl nejcennějším
 nálezem 13.08.; **P20 je jeho druhé kolo.**
 
+## Odložené se spouštěčem *(nesmí se ztratit — proto i tady, ne jen v tabulce)*
+
+* **P30 — cena odstranění Gutter Runnera a Black Orka, každý zvlášť** *(uživatel 17.08.)*.
+  ⏰ **Spouštěč:** přepočítaná σ-tabulka na `corpus_baseline_20260817` **+** hotové P29.
+  Teď se nepočítá, protože metr se právě přeměřuje.
+* **T5.13 přestavba rosterů** — ⏰ po doběhnutí víkendových běhů.
+* **T5.15 Piling On · T5.18 Argue the Call** — ⏰ s přestavbou rosterů.
+* **P27 `BLITZ_AND_SCORE`** — ⏰ napřed rozdělit 789 kol podle skóre; cap 0,02 při vedení je záměr.
+
 ## Projekty (ne úkoly)
 
 * **T5.13 přestavba rosterů** — MB na co nejvíc trpaslíků, TV až 1500.
