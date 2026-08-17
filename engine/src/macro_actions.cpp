@@ -308,7 +308,8 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     }
 
     // HAND_OFF_SCORE: carrier stuck/in heavy TZ, nearby teammate can score
-    if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
+    // 2026-08-17 (P4/P26): hand-off má vlastní limit na kolo, ne sdílený s pass.
+    if (iHaveBall && carrier->canAct() && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
         int carrierMaxReach = carrier->movementRemaining + 2;
         int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
@@ -370,7 +371,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     }
 
     // CHAIN_SCORE: carrier passes to relay, relay hand-offs to scorer near endzone
-    if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
+    // 2026-08-17 (P4/P26): potřebuje OBĚ akce volné -- přihrávku i hand-off.
+    // Dokud sdílely jeden příznak, byl tenhle řetěz nesplnitelný z definice:
+    // krok 1 spálil to, co potřeboval krok 2. Nabídnut 270× za 3 000 her,
+    // dokončen ani jednou.
+    if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn
+        && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
         int carrierMaxReach = carrier->movementRemaining + 2;
         bool carrierStuck = (carrierDist > carrierMaxReach);
@@ -683,8 +689,13 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         }
     }
 
-    // PASS: have ball, pass not used, teammate in range
-    if (iHaveBall && !myTeam.passUsedThisTurn && carrier->canAct()) {
+    // PASS: have ball, the relevant action not used, teammate in range
+    // 2026-08-17 (P4/P26): tohle makro se při expanzi provede jako HAND_OFF,
+    // když je cíl soused, a jako hod jinak -- takže se hlídá ten limit, který
+    // se opravdu spotřebuje. Vnější podmínka pustí dál, dokud je volný aspoň
+    // jeden z nich; rozhodne se uvnitř, až je známá vzdálenost.
+    if (iHaveBall && carrier->canAct()
+        && !(myTeam.passUsedThisTurn && myTeam.handOffUsedThisTurn)) {
         state.forEachOnPitch(mySide, [&](const Player& target) {
             if (target.id == carrier->id) return;
             if (target.state != PlayerState::STANDING) return;
@@ -711,6 +722,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // not one point of anything. And the ball may not go backwards to
             // get there.
             const bool handOff = dist == 1;
+            if (handOff ? myTeam.handOffUsedThisTurn : myTeam.passUsedThisTurn) return;
             auto poorHands = [](const Player& p) {
                 return p.stats.agility <= 2 && !p.hasSkill(SkillName::SureHands);
             };

@@ -344,8 +344,71 @@ TEST(PassHandler, NoPassActionsWhenPassUsed) {
     std::vector<Action> actions;
     getAvailableActions(gs, actions);
 
+    // The team-mate is three squares away, so no hand-off could be generated
+    // here whatever the allowances say -- this test only ever covered PASS.
+    // It used to assert HAND_OFF too and passed for that reason alone; the
+    // hand-off cases are below, with an ADJACENT team-mate.
     for (const auto& a : actions) {
         EXPECT_NE(a.type, ActionType::PASS);
+    }
+}
+
+// 2026-08-17 (P4/P26). CRP, HANDING-OFF: "The Hand-Off Action is added to the
+// list of Actions like Move, Block, Blitz and Pass. A coach may only declare
+// one Hand-Off Action per turn." Two separate declarations, two allowances.
+// They shared passUsedThisTurn until now, in both directions, which made
+// CHAIN_SCORE -- a pass followed by a hand-off -- unsatisfiable by construction:
+// step one burned exactly what step two needed. Offered 270 times across 3000
+// games, completed never.
+TEST(PassHandler, PassUsedDoesNotBlockHandOff) {
+    auto gs = makePassSetup();
+    gs.homeTeam.passUsedThisTurn = true;
+    gs.homeTeam.handOffUsedThisTurn = false;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {6, 7}, TeamSide::HOME);   // ADJACENT
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+
+    bool handOff = false;
+    for (const auto& a : actions) {
+        if (a.type == ActionType::HAND_OFF) handOff = true;
+        EXPECT_NE(a.type, ActionType::PASS);
+    }
+    EXPECT_TRUE(handOff) << "a spent pass must not consume the hand-off";
+}
+
+TEST(PassHandler, HandOffUsedBlocksHandOffButNotPass) {
+    auto gs = makePassSetup();
+    gs.homeTeam.handOffUsedThisTurn = true;
+    gs.homeTeam.passUsedThisTurn = false;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {6, 7}, TeamSide::HOME);   // adjacent: hand-off target
+    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);   // far: throw target
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+
+    bool pass = false;
+    for (const auto& a : actions) {
+        if (a.type == ActionType::PASS) pass = true;
         EXPECT_NE(a.type, ActionType::HAND_OFF);
     }
+    EXPECT_TRUE(pass) << "a spent hand-off must not consume the pass";
+}
+
+TEST(PassHandler, HandOffBurnsItsOwnAllowance) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {6, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    FixedDiceRoller dice({4});
+    resolveHandOff(gs, 1, 2, dice, nullptr);
+
+    EXPECT_TRUE(gs.homeTeam.handOffUsedThisTurn);
+    EXPECT_FALSE(gs.homeTeam.passUsedThisTurn)
+        << "handing off must leave the pass action still available";
 }

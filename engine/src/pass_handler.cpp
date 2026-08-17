@@ -404,8 +404,9 @@ ActionResult resolveHandOff(GameState& state, int giverId, int receiverId,
     Player& giver = state.getPlayer(giverId);
     Player& receiver = state.getPlayer(receiverId);
 
-    // Mark pass used
-    state.getTeamState(giver.teamSide).passUsedThisTurn = true;
+    // Mark the HAND-OFF allowance used, not the pass one (P4/P26, 2026-08-17).
+    // CRP gives the hand-off its own once-per-turn declaration.
+    state.getTeamState(giver.teamSide).handOffUsedThisTurn = true;
     giver.hasActed = true;
 
     // Must be adjacent

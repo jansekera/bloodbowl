@@ -96,7 +96,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         }
 
         // HAND_OFF: if not used this turn, has ball, each adjacent standing teammate
-        if (!team.passUsedThisTurn && state.ball.isHeld && state.ball.carrierId == p.id &&
+        // 2026-08-17: gated on its OWN allowance (P4/P26). It used to share
+        // passUsedThisTurn, which made a pass and a hand-off mutually exclusive
+        // in the same turn -- the rules make them separate declarations.
+        if (!team.handOffUsedThisTurn && state.ball.isHeld && state.ball.carrierId == p.id &&
             !p.hasSkill(SkillName::NoHands)) {
             for (auto& pos : adj) {
                 if (!pos.isOnPitch()) continue;
