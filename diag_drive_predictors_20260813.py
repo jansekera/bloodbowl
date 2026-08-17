@@ -10,17 +10,24 @@ from collections import defaultdict
 from diag_rules_checks_20260812 import (load, players, threatens, adj, STANDING,
                                         key, TACKLE, dodge_cost, DODGE_COST_THRESHOLD)
 from diag_exposure_scan_20260812 import Board, predictors
+# P25 (17.08.): atribuce TD podle STŘELCE. Oprava `14c7d035` ze 14.08. šla jen
+# do `diag_drive_failure` a tenhle sourozenec ji nedostal -- přitom právě on
+# vyrobil σ-tabulku, podle které je seřazená celá fronta úkolů.
+from diag_drive_failure_20260811 import td_scorer_side, build_id_map
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else \
     '/home/jan/claude/bloodbowl/diag_replay_mine_20260811b_data'
 rows = []
 for path in sorted(glob.glob(DATA + '/*.json.gz')):
     r = load(path)
-    nm = " ".join(p["name"] for p in r["turn_logs"][0]["home_players"][:3])
-    ours = "home" if ("Longbeard" in nm or "Troll Slayer" in nm) else "away"
+    # P25: strana se ČETLA z jmen prvních tří domácích hráčů, ačkoli je race
+    # přímo v datech. Kdyby první tři nebyli Longbeard/Slayer, skript by tiše
+    # měřil SOUPEŘE jako nás -- a nic by to neřeklo.
+    ours = "home" if r.get("home_race") == "dwarf" else "away"
     fwd = 1 if ours == "home" else -1
     endzone = 25 if fwd == 1 else 0
     logs = r["turn_logs"]
+    id_map = build_id_map(r)
     # hranice drivů
     starts = [0]
     for i in range(1, len(logs)):
@@ -33,8 +40,11 @@ for path in sorted(glob.glob(DATA + '/*.json.gz')):
         ours_turns = [i for i in range(a, b) if logs[i]["active_team"] == ours]
         if len(ours_turns) < 7:   # jen PLNÉ drivy (uživatel 13.08.)
             continue
-        scored = any(logs[i].get("touchdown") and logs[i]["active_team"] == ours
-                     for i in range(a, b))
+        # ⛔ BYLO: `logs[i]["active_team"] == ours`, tedy TD se přisuzoval tomu,
+        # kdo byl na tahu. CRP ale umožňuje TD z odsunu do endzony v kole
+        # SOUPEŘE -- 15 z 2183 TD (0,7 %). Tady se to navíc nesčítá jen jako
+        # šum: `scored` je CÍLOVÁ PROMĚNNÁ celé regrese.
+        scored = any(td_scorer_side(logs[i], id_map) == ours for i in range(a, b))
         # sesbírej kontroly přes naše kola v drivu
         acc = defaultdict(list)
         for i in ours_turns:
@@ -79,7 +89,27 @@ for path in sorted(glob.glob(DATA + '/*.json.gz')):
         if acc:
             rows.append((scored, {k: sum(v)/len(v) for k, v in acc.items() if v}))
 
-print(f"drivů: {len(rows)}, z toho se skórováním: {sum(1 for s,_ in rows if s)}\n")
+# P25 (17.08.): PŮVOD ČÍSLA MUSÍ CESTOVAT S ČÍSLEM.
+# σ-tabulka z tohohle skriptu řadí celou frontu úkolů, ale v knize stojí bez
+# korpusu, bez data a bez commitu enginu -- jako by to byla vlastnost hry.
+# Není: na `20260811b` (195 drivů) vyjde K33 0,6σ a REACH0 −1,8σ, na
+# `20260813_gate` (194 drivů, jiný engine) 4,0σ a −4,0σ. Táž velikost vzorku,
+# jiná odpověď. Bez téhle hlavičky se to nedá ani zpětně poznat.
+import os, subprocess
+_head = ""
+for _cand in (os.path.join(DATA, "..", "ENGINE_HEAD"),
+              os.path.join(os.path.dirname(DATA.rstrip("/")) or ".", "ENGINE_HEAD")):
+    try:
+        _head = open(_cand).read().strip()[:8]; break
+    except OSError:
+        pass
+print(f"korpus: {DATA}")
+print(f"her: {len(glob.glob(DATA + '/*.json.gz'))}"
+      f"   engine korpusu: {_head or 'NEZNÁMÝ (korpus bez otisku — viz P22)'}")
+print(f"filtr: jen PLNÉ drivy (>=7 našich kol) — je to VÝBĚR, ne vzorek:")
+print(f"       drive, který skončí dřív, se sem nedostane, a to koreluje s výsledkem")
+print(f"drivů: {len(rows)}, z toho se skórováním: {sum(1 for s,_ in rows if s)}")
+print(f"jednotka n u každého řádku = DRIVY, ne kola ani zápasy\n")
 keys = sorted({k for _, d in rows for k in d})
 print(f"{'veličina':<16}{'TD drivy':>11}{'bez TD':>11}{'rozdíl':>10}{'σ':>8}{'n':>7}")
 for k in keys:

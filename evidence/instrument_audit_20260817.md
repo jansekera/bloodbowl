@@ -98,3 +98,72 @@ musí to říct **jméno**, ne komentář pod ním.
   používá**. Dnes to prošlo jen díky tomu, že linker starý inode odlinkuje
   a běžící proces si ho drží (`/proc/PID/exe` → `(deleted)`). **Spoléhat se na
   to nelze.**
+
+---
+
+# ⭐⭐⭐ DRUHÁ VLNA: NÁSTROJ, KTERÝ ŘADÍ CELOU FRONTU
+*(`diag_drive_predictors_20260813.py` — vyrobil tabulku „CO PŘEDPOVÍDÁ TD")*
+
+Tahle tabulka je v knize úkolů uvedená slovy *„podle čeho se řadí zbytek"*.
+Stojí tedy na ní pořadí veškeré další práce. Audit našel **čtyři věci**.
+
+## ① Oprava atribuce TD ze 14.08. šla jen do JEDNOHO ze dvou sourozenců
+
+`14c7d035` *(„touchdown patří tomu, kdo ho dal, ne tomu, kdo byl na tahu")*
+sáhla **jen** na `diag_drive_failure`. Tenhle skript dál dělal
+`logs[i]["active_team"] == ours` — a `scored` je přitom **cílová proměnná celé
+regrese**, ne vedlejší statistika.
+✅ **Opraveno** (`td_scorer_side`).
+⚠️ **Dopad: ŽÁDNÝ** — na obou zkoušených korpusech vyjde tabulka bit po bitu
+stejně. *(Poctivý negativní výsledek: chyba byla skutečná, ale nic nepohnula.)*
+
+## ② Strana se hádala ze jmen, ačkoli je rasa přímo v datech
+
+`ours = "home" if "Longbeard" in prvních_třech_jmen else "away"`. Kdyby první
+tři domácí byli Blitzeři, skript by **tiše měřil soupeře jako nás**.
+✅ Opraveno na `home_race == "dwarf"`.
+
+## ③ ⭐ TABULKA SE NEREPRODUKUJE NA JINÉM KORPUSU TÉŽE VELIKOSTI
+
+| veličina | `20260811b` *(to, co je v knize)* | `20260813_gate` |
+|---|---|---|
+| K9a tempo | **4,2σ** | 4,0σ |
+| **bloků na kolo** | **2,7σ** | **5,6σ** |
+| **K33 (blok ano/ne)** | **0,6σ** | **4,0σ** |
+| čistota rohů K29 | **2,6σ** | 1,2σ |
+| FB2 (K35) | 2,6σ | 3,6σ |
+| **REACH0 jako počet** | **−1,8σ** | **−4,0σ** |
+| špinavé rohy | −2,2σ | −1,9σ |
+| Δx | 2,4σ | 3,7σ |
+| *počet rohů* | *−0,2σ* | *−1,5σ* |
+
+195 vs 194 drivů — **prakticky týž rozsah, a přesto se tři položky hnou
+o 2σ a víc.** Korpusy se liší i enginem, takže část toho může být skutečná
+změna. **Právě to je ale ten problém: z čísla v knize se nepozná, co z toho je
+co**, protože tam stojí bez korpusu, bez data a bez commitu.
+
+## ④ ⭐⭐ A ten rozsah je mnohem menší, než se čte
+
+Doplnil jsem tisk původu — a vyšlo najevo, že `20260811b` je **120 HER**.
+Tabulka, která řadí veškerou práci, tedy stojí na:
+
+* **120 hrách**, 195 „plných" drivech, a hlavně jen **35 drivech se skórováním**;
+* **11 veličinách porovnávaných naráz, bez jakékoli korekce** — při 35 kladných
+  případech je pár položek kolem 2,5σ přesně to, co čekáme od náhody;
+* **filtru „jen plné drivy ≥7 kol", což je VÝBĚR, ne vzorek** — drive, který
+  skončí dřív, se do tabulky nedostane, a „skončí dřív" koreluje s výsledkem.
+  *(Fable to 14.08. pojmenoval; tady je vidět, jak malý ten základ je.)*
+* engine **starší nejméně o šest commitů** než ten, co dnes běží.
+
+⇒ **Ta tabulka není zjištění o hře. Je to jeden malý vzorek jednoho starého
+enginu.** Používat ji dál jako pořadí priorit je totéž jako číst `cand_daunt`
+jako počet bloků.
+
+✅ **Opraveno v nástroji:** tiskne teď korpus, počet her, otisk enginu
+(nebo „NEZNÁMÝ"), povahu filtru a jednotku `n`.
+
+## ⇒ CO S TÍM
+
+**Přepočítat σ-tabulku na čerstvé baseline** (`corpus_baseline_20260817`,
+3 000 her, sbírá se od 17.08. 10:15, s otiskem enginu) a teprve pak
+o pořadí fronty mluvit. **3 000 her proti 120** — a poprvé s uvedeným původem.

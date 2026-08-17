@@ -498,7 +498,20 @@ učení"* (T6.2) na kontrolách, o kterých nevíme, že k něčemu jsou.
 
 # ⭐⭐⭐ CO PŘEDPOVÍDÁ TD *(podle čeho se řadí zbytek)*
 
-Plné drivy ≥7 kol, 195 drivů:
+⛔⛔ **POZASTAVENO 17.08. — TATO TABULKA NESMÍ DÁL ŘADIT FRONTU** (P25).
+Doplnil jsem do nástroje tisk původu a vyšlo najevo, na čem stojí:
+**120 her · 195 „plných" drivů · jen 35 drivů se skórováním · 11 veličin
+porovnávaných naráz bez korekce · filtr „plné drivy" je VÝBĚR, ne vzorek ·
+engine nejméně o šest commitů starší než dnešní.**
+A hlavně: **na jiném korpusu téže velikosti (`20260813_gate`, 194 drivů)
+nevychází stejně** — bloky 2,7σ → **5,6σ**, K33 0,6σ → **4,0σ**,
+REACH0 −1,8σ → **−4,0σ**. Z čísla v knize se přitom nedalo poznat ani to,
+z jakého korpusu je.
+⇒ **Přepočítat na `corpus_baseline_20260817`** (3 000 her, s otiskem enginu;
+sbírá se od 17.08.) a teprve pak o pořadí mluvit.
+*(Detail `evidence/instrument_audit_20260817.md`.)*
+
+Plné drivy ≥7 kol, 195 drivů *(korpus `20260811b`, 120 her — doplněno zpětně)*:
 
 | | σ |
 |---|---|
