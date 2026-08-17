@@ -579,7 +579,8 @@ Podrobně `evidence/weekend_result_20260817.md`.
 
 | | co | proč teď | stroj? |
 |---|---|---|---|
-| **1.** | **Zapnout P13 v produkci** (`dauntlessInOffer` → `true`) + test | verdikt prošel; dokud je `default false`, ten výsledek nikomu nic nedává | ne |
+| ~~1.~~ | ✅ **P13 ZAPNUTO V PRODUKCI** — `79382711`. Nejen `MCTSConfig`: **python binding** na `true` *(korpusy se sbírají přes něj — jinak bychom dál sbírali korpus enginu, který neběží)*, **harness** přestal spoléhat na default *(mode 4 reprodukuje přesně, ostatní režimy mají rameno v OBOU ramenech, jinak by A/B srovnávalo dva neprodukční enginy)*, **test připíchl default** proti tichému návratu. 541/541 zelených. | hotovo |
+| ~~0.~~ | ✅ **NOČNÍ APARÁT SPRAVEN A OTESTOVÁN** — `f7ecf05d`. `run_night_lib.sh` *(PID zámek · úklid dětí na EXIT/INT/TERM · číslované POKUS n · `night_preflight`: **stará binárka i starý `libbb_engine.so`** běh zastaví)* · `test_night_lib.sh` **14/14** · `run_night_ab.sh` **odmítne A/B bez nulového matchupu**. Ověřeno na reálném stromu. | hotovo |
 | **2.** | **P21** — spočítat **výskyt** situace „nosič ≠ Runner a vedle volný Runner" ve snímcích korpusu | rozhodne (a)/(b) **bez běhu** a odblokuje čtení celého P5 | ne |
 | **3.** | **T5.3** — zranění nepřetrvávají přes drive | ⭐ **násobitel celého attrition programu**; dokud se po TD staví 11 čerstvých, je každý náš výsledek o bití **dolní odhad** — včetně těch +4,08 pp | ne |
 | **4.** | vybrat a spustit **noční A/B** *(kandidáti: **P17 Wrestle** · P2+P9c · blitz roh vs zeď · P10a)* | dvě okna už propadla | **ano, 14 h** |
@@ -599,7 +600,9 @@ nespouští — právě proto vznikly P20 a P23.
 | **5.** | **P1** K33/K34 na spojité | levné, opravuje metr |
 | **6.** | **P3** fázový plán trasy | bez fáze nejde odlišit chybu od záměru |
 
-## Zadání pro Fable — **kolik našich verdiktů přežije nulové rameno**
+## Zadání pro Fable — **kolik našich verdiktů přežije nulové rameno** *(SPUŠTĚNO 17.08. ráno)*
+
+⏳ **Běží.** Výstup půjde do `evidence/fable_null_arm_audit_20260817.md`.
 
 **Otázka:** *Které z dosavadních A/B tohoto projektu by při čtení proti
 nulovému rameni dopadly jinak?* Vstup: uložená ramena (brána klece, balík G,
