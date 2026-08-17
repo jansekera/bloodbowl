@@ -255,11 +255,22 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    FILE* rows = fopen(mode == 4 ? "diag_dauntless_rows.jsonl"
-                     : mode == 1 ? "diag_f1_grind_rows.jsonl"
-                     : mode == 2 ? "diag_era_rows.jsonl"
-                     : mode == 3 ? "diag_m1_rows.jsonl"
-                                 : "diag_f1_cage_advance_rows.jsonl", "a");
+    // 2026-08-17: was "a". A run that gets killed and started again -- which is
+    // exactly what happened on 14.08. -- then APPENDED a second set of rows on
+    // top of the first, and nothing said so: the pair count still looked right
+    // to anything that de-duplicates by seed. One process owns one shard
+    // directory, so truncating is the behaviour that makes a re-launch correct
+    // by construction rather than by remembering to rm first.
+    const char* rowsName = mode == 4 ? "diag_dauntless_rows.jsonl"
+                         : mode == 1 ? "diag_f1_grind_rows.jsonl"
+                         : mode == 2 ? "diag_era_rows.jsonl"
+                         : mode == 3 ? "diag_m1_rows.jsonl"
+                                     : "diag_f1_cage_advance_rows.jsonl";
+    if (FILE* old = fopen(rowsName, "r")) {
+        fclose(old);
+        printf("note: %s existed and is being overwritten (re-launch)\n", rowsName);
+    }
+    FILE* rows = fopen(rowsName, "w");
 
     // attrition aggregation: race -> opponent-gate-on? -> sums
     struct AttrAgg {
@@ -281,6 +292,12 @@ int main(int argc, char** argv) {
         std::vector<PairResult> pairs;
         int candW = 0, candD = 0, candL = 0;
         long candPlansTotal = 0;  // "did the gate even fire" diagnostics
+        // 2026-08-17: the same question for the Dauntless arm, printed in the
+        // SUMMARY instead of having to be recovered from the rows afterwards.
+        // A matchup where the arm never fires is a TRUE NULL and its delta is
+        // the harness's own noise -- that is the single most useful line on
+        // Monday, and until now nothing printed it.
+        long dauntTotal = 0, rollTotal = 0;
         for (int i = 0; i < nPairs; ++i) {
             uint32_t seed = seedBase + static_cast<uint32_t>(mi) * 1'000'000u
                             + static_cast<uint32_t>(seedOffset + i);
@@ -326,6 +343,8 @@ int main(int argc, char** argv) {
                 int candPlans = (candHome ? homePol : awayPol).stagedPlansAdopted();
                 int basePlans = (candHome ? awayPol : homePol).stagedPlansAdopted();
                 candPlansTotal += candPlans;
+                dauntTotal += candDaunt;
+                rollTotal += candRoll;
                 int cs = candHome ? g.homeScore : g.awayScore;
                 int bs = candHome ? g.awayScore : g.homeScore;
                 double chess = cs > bs ? 1.0 : (cs < bs ? 0.0 : 0.5);
@@ -402,7 +421,23 @@ int main(int argc, char** argv) {
                candPlansTotal / (2.0 * n),
                mode == 2 ? " (cage is OFF in both arms -- 0.00 says nothing"
                            " about the gate)"
+             : mode == 4 ? " (cage is OFF in both arms -- read ARM below,"
+                           " not this)"
                          : "");
+        // Did the arm fire at all? Zero is NOT "no effect" -- it is "the two
+        // arms ran the same code", which makes the matchup a true null and its
+        // delta a direct read of this harness's noise floor.
+        if (mode == 4) {
+            printf("  ARM Dauntless: %ld offers (%.0f/game), %ld rolls "
+                   "(%.0f/game) -- %s\n",
+                   dauntTotal, dauntTotal / (2.0 * n),
+                   rollTotal, rollTotal / (2.0 * n),
+                   dauntTotal == 0
+                       ? "NEVER FIRED => TRUE NULL: any delta below is this "
+                         "harness's noise, not an effect"
+                       : "arm active (counts are search-internal evaluations, "
+                         "NOT blocks played)");
+        }
         // In mode 2 the two arms are the SAME configuration; only the MCTS RNG
         // seed differs. The delta is therefore a null test, not a measurement,
         // and printing it next to the pre-registered threshold invites reading
@@ -413,9 +448,17 @@ int main(int argc, char** argv) {
                    " this IS the noise floor]\n",
                    mu.home, mean, se, se > 0 ? mean / se : 0.0);
         } else {
-            printf("  PAIRED delta chess as %s: %+.4f +- %.4f SE (~%.1f SE) "
-                   "[pre-reg: >= +0.03 on dwarf matchups; control within 2 SE]\n",
-                   mu.home, mean, se, se > 0 ? mean / se : 0.0);
+            // The threshold used to be hardcoded at +0.03 while the weekend
+            // pre-registration said +-0.02 -- the binary and the document
+            // disagreed about what "passed" means. Say which document owns it.
+            printf("  PAIRED delta chess as %s: %+.4f +- %.4f SE (~%.1f SE)\n"
+                   "    [%s]\n",
+                   mu.home, mean, se, se > 0 ? mean / se : 0.0,
+                   mode == 4
+                       ? "pre-reg evidence/weekend_prereg_20260814.md: PASS if a "
+                         "dwarf arm >= +0.02 and neither < 0; REJECT if any <= "
+                         "-0.02; null matchups must stay within 2 SE"
+                       : "pre-reg: >= +0.03 on dwarf matchups; control within 2 SE");
         }
     }
 
@@ -426,9 +469,10 @@ int main(int argc, char** argv) {
     printf("\n=== ATTRITION / SURVIVAL (end-of-game states per race, split by "
            "which arm the OPPONENT ran%s) ===\n",
            mode == 2 ? ": SAME config, RNG seed only -- rows are a noise floor"
+         : mode == 4 ? ": Dauntless in the block offer on/off"
                      : ": cageAdvance on/off");
     printf("%-10s %-14s %6s %8s %8s %8s %8s %10s\n", "race",
-           mode == 2 ? "opp arm" : "opp gate", "games",
+           mode == 2 ? "opp arm" : mode == 4 ? "opp arm" : "opp gate", "games",
            "KO/g", "INJ/g", "DEAD/g", "EJ/g", "surv/11");
     for (auto& [race, byGate] : attrition) {
         for (auto& [gate, a] : byGate) {
@@ -436,6 +480,7 @@ int main(int argc, char** argv) {
             double inj = static_cast<double>(a.injured) / a.n;
             double dead = static_cast<double>(a.dead) / a.n;
             const char* label = mode == 2 ? (gate ? "RNG-A" : "RNG-B")
+                              : mode == 4 ? (gate ? "Dauntless ON" : "off")
                                           : (gate ? "cageAdvance ON" : "off");
             printf("%-10s %-14s %6ld %8.2f %8.2f %8.2f %8.2f %10.2f\n",
                    race.c_str(), label, a.n,
