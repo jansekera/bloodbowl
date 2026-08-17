@@ -172,8 +172,14 @@ night_preflight() {
         if [ -n "$binreal" ] && [ "$exe" = "$binreal" ]; then
             others="$others $pid(harness)"; continue
         fi
+        # ⛔ Vzor byl `*/python3|*/python` a NECHYTAL `python3.12`, protože
+        #    /proc/PID/exe ukazuje na verzovanou binárku. Zjištěno 17.08. při
+        #    kontrole zdraví běhu: preflight hlásil 0 procesů sběru, zatímco
+        #    osm workerů korpusu běželo. Guard by tedy dovolil spustit noc na
+        #    běžící sběr. Druhá chyba téhož druhu za jeden den (po `pgrep -f`)
+        #    -- vzor nad jmény je vždycky křehčí, než se zdá.
         case "$exe" in
-            */python3|*/python)
+            */python*)
                 if tr '\0' ' ' < "$p/cmdline" 2>/dev/null \
                    | grep -q 'diag_replay_mine_2026'; then
                     others="$others $pid(sběr)"

@@ -103,13 +103,22 @@ touch "$TMP/conc/engine/build/libbb_engine.so"
 : > "$TMP/conc/weights_best.json"; : > "$TMP/conc/weights_policy.json"
 mkdir -p "$TMP/conc/out"
 
-# (a) shell, který jméno binárky jen ZMIŇUJE, nesmí běh zastavit
+# (a) shell, který jméno binárky jen ZMIŇUJE, nesmí být nahlášen.
+#     ⚠️ Netvrdíme "celý preflight projde": na stroji může legitimně běžet
+#     ostrý sběr nebo A/B, a pak preflight ZASTAVIT MÁ. Testujeme přesně to,
+#     co má tenhle případ ověřit -- že se ten shell neobjeví v hlášení.
+#     (Původní verze tvrdila PASSED a procházela jen proto, že vzor
+#     `*/python3` nechytal python3.12, takže neviděla ani reálný sběr.)
 bash -c 'x="fakebin diag_f1_cage_advance diag_replay_mine_2026"; sleep 20' & MENTION=$!
 sleep 0.3
-out=$( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
-       night_preflight "$TMP/conc/fakebin" "$TMP/conc/out" "$TMP/conc/fakebin.cpp" \
-       >/dev/null 2>&1 && echo PASSED || echo BLOCKED )
-check "shell, co vzor jen zmiňuje, běh NEZASTAVÍ" "$out" "PASSED"
+: > "$TMP/conc/out/chain.log"
+( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
+  night_preflight "$TMP/conc/fakebin" "$TMP/conc/out" "$TMP/conc/fakebin.cpp" ) >/dev/null 2>&1
+if grep -q "už běží jiný běh.*$MENTION" "$TMP/conc/out/chain.log"; then
+    bad "shell, co vzor jen zmiňuje, se NEMÁ hlásit (pid $MENTION nahlášen)"
+else
+    ok "shell, co vzor jen zmiňuje, se nehlásí"
+fi
 kill $MENTION 2>/dev/null; wait $MENTION 2>/dev/null
 
 # (b) ale SKUTEČNĚ běžící binárka ho zastavit MUSÍ
@@ -120,6 +129,20 @@ out=$( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
        >/dev/null 2>&1 && echo PASSED || echo BLOCKED )
 check "skutečně běžící binárka běh ZASTAVÍ" "$out" "BLOCKED"
 kill $REAL 2>/dev/null; wait $REAL 2>/dev/null
+
+# (c) verzovaná binárka pythonu (python3.12) musí být poznaná -- vzor
+#     `*/python3` ji NECHYTAL a preflight pak souběžný sběr neviděl (17.08.)
+cat > "$TMP/conc/diag_replay_mine_2026_fake.py" <<'PYEOF'
+import time
+time.sleep(25)
+PYEOF
+python3 "$TMP/conc/diag_replay_mine_2026_fake.py" & PYRUN=$!
+sleep 0.5
+out=$( . "$LIB"; NIGHT_LOG="$TMP/conc/out/chain.log"
+       night_preflight "$TMP/conc/fakebin" "$TMP/conc/out" "$TMP/conc/fakebin.cpp" \
+       >/dev/null 2>&1 && echo PASSED || echo BLOCKED )
+check "běžící sběr pod python3.12 běh ZASTAVÍ" "$out" "BLOCKED"
+kill $PYRUN 2>/dev/null; wait $PYRUN 2>/dev/null
 
 echo "== 5. kontrola baseline =="
 
