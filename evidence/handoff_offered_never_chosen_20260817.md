@@ -1,3 +1,31 @@
+# ⛔⛔ TENTO ZÁVĚR JE CHYBNÝ — OPRAVENO TÝŽ DEN VEČER
+
+**Nadpis níž tvrdí, že se hand-off nikdy nezahraje. NEPLATÍ.** Fable 17.08.
+našel příčinu té nuly: **vada exportu logu**, ne chování enginu.
+`bb_module.cpp:325` měl stráž `typeIdx < 21`, zatímco `eventNames` má **22**
+položek ⇒ `HAND_OFF` (index 21) se zapisoval jako `"UNKNOWN"`. Commit
+`3b11d33b` přidal jméno do tabulky a **stráž nezvedl**.
+
+**Skutečnost:** v korpusu je **349 událostí `UNKNOWN` na 3 000 her** a všech 349
+jsou hand-offy; **naše strana jich zahrála 130** (109 chyceno, 51 vedlo k TD
+v témž kole). ⇒ **Hand-off žije.**
+
+⚠️ **Jak se mi to stalo:** ověřoval jsem, že se event *emituje*
+(`pass_handler.cpp:428`) a že *poziční mapa jmen sedí* (index 21 v obou) —
+obojí platí. **Stráž o řádek výš jsem nezkontroloval.** A měl jsem to přímo
+před sebou: ve vlastní tabulce typů událostí stálo `UNKNOWN 349 0,12/hru`
+a šel jsem kolem. **Ověřil jsem dvě správné věci a tu třetí ne.**
+
+✅ Stráž opravena (velikost se bere z pole, ne konstantou).
+⚠️ `corpus_baseline_20260817` se sbíral **před** opravou ⇒ i v něm je hand-off
+uložený jako `UNKNOWN`.
+
+**Co z původního textu PLATÍ dál:** trychtýř brány (329 kol ze 3 000 her),
+příčiny, proč se nabídka zahazuje, i rozdělení Q1 sweepu na `HAND_OFF`/`PASS`.
+**Neplatí závěr (c) „nabízí se, ale nevybere se".**
+
+---
+
 # P21 — HAND-OFF SE NABÍZÍ 10,4× ZA ZÁPAS A NEVYBERE SE ANI JEDNOU
 *(17.08.2026; navazuje na `evidence/weekend_result_20260817.md` §3)*
 

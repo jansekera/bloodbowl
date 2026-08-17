@@ -322,7 +322,18 @@ PYBIND11_MODULE(bb_engine, m) {
                 for (auto& ev : turn.events) {
                     py::dict ed;
                     int typeIdx = static_cast<int>(ev.type);
-                    ed["type"] = (typeIdx < 21) ? eventNames[typeIdx] : "UNKNOWN";
+                    // 2026-08-17: byla tu konstanta 21, zatímco eventNames má 22
+                    // položek -- HAND_OFF (index 21) se proto exportoval jako
+                    // "UNKNOWN". Commit 3b11d33b přidal jméno do tabulky a
+                    // nezvedl tuhle stráž, takže log tvrdil ZERO hand-offů ve
+                    // 3 000 hrách, ačkoli jich naše strana zahrála 130. Stálo
+                    // to jeden nepravdivý doktrinální závěr (P21).
+                    // Velikost se bere z pole, aby se to při dalším přidání
+                    // typu nemohlo opakovat.
+                    constexpr int kNumEventNames =
+                        static_cast<int>(sizeof(eventNames) / sizeof(eventNames[0]));
+                    ed["type"] = (typeIdx >= 0 && typeIdx < kNumEventNames)
+                                     ? eventNames[typeIdx] : "UNKNOWN";
                     ed["player_id"] = ev.playerId;
                     ed["target_id"] = ev.targetId;
                     ed["from_x"] = ev.from.x;
