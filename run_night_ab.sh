@@ -24,6 +24,16 @@
 #   Formát matchupu je `index:jméno:expozice`, kde expozice 1 = tam se rameno
 #   spustí (ta otázka), 0 = tam se spustit NEMŮŽE (null). Aspoň jedna nula.
 #
+#   ⚠️ NULA SE DĚLÁ DVĚMA ZPŮSOBY PODLE TOHO, JAK JE RAMENO VZÁCNÉ (17.08.):
+#     · rameno se opírá o dovednost nebo rasu (Dauntless, Wrestle) ⇒ existuje
+#       matchup, kde se spustit NEMŮŽE. Ten je nejlepší nula, jakou lze mít:
+#       je to zároveň kontrola implementace i podlahy aparátu.
+#     · rameno sahá na každé kolo (brána klece) ⇒ TAKOVÝ MATCHUP NEEXISTUJE
+#       a trvat na něm by znamenalo buď ho vymyslet, nebo pravidlo obejít.
+#       Použij CONTROL_MODE2=1: pustí se krátká noha v mode 2, kde mají obě
+#       ramena TOUTÉŽ konfiguraci, takže s CRN musí vyjít delta exaktně 0.
+#       Když nevyjde, hlavní výsledek se NEČTE -- nevíme, co jsme měřili.
+#
 #   Volitelně: CORPUS=1 sebere po A/B korpus 3000 her se zapnutým ramenem,
 #   BASELINE=<adresář> ho porovná — a odmítne to, když baseline běžela na jiném
 #   commitu enginu (P22: korpus 14.08. byl s baseline 6 commitů rozejitý).
@@ -40,6 +50,11 @@ OUT="$ROOT/${OUT:?nastav OUT (jméno výstupního adresáře)}"
 BIN="$ROOT/diag_f1_cage_advance"
 SRC="$ROOT/diag_f1_cage_advance_harness.cpp"
 CORPUS=${CORPUS:-0}
+# Nulová kontrola pro VŠUDYPŘÍTOMNÉ rameno: matchup s nulovou expozicí u něj
+# neexistuje, tak se nula vyrobí jinak -- mode 2 dá obě ramena TÁŽ konfigurace.
+# S CRN pak musí vyjít delty exaktně 0; cokoli jiného je vada aparátu.
+CONTROL_MODE2=${CONTROL_MODE2:-0}
+CONTROL_PAIRS=${CONTROL_PAIRS:-50}
 BASELINE=${BASELINE:-}
 
 night_init "$OUT" "ab-mode$MODE"
@@ -51,13 +66,18 @@ for spec in $MATCHUPS; do
     total=$((total+1))
     [ "${spec##*:}" = "0" ] && nulls=$((nulls+1))
 done
-if [ "$nulls" -eq 0 ]; then
-    night_log "⛔ ODMÍTÁM SPUSTIT: žádný matchup s nulovou expozicí."
+if [ "$nulls" -eq 0 ] && [ "$CONTROL_MODE2" = "0" ]; then
+    night_log "⛔ ODMÍTÁM SPUSTIT: žádná nulová kontrola."
     night_log "   Bez nuly se efekt nedá odlišit od podlahy aparátu (P20)."
-    night_log "   Přidej matchup, kde se rameno spustit NEMŮŽE, a pusť znovu."
+    night_log "   Dvě možnosti podle toho, JAK JE RAMENO VZÁCNÉ:"
+    night_log "     · rameno se opírá o dovednost/rasu (Dauntless, Wrestle) ⇒"
+    night_log "       přidej matchup, kde se spustit NEMŮŽE: 'idx:jméno:0'"
+    night_log "     · rameno sahá na každé kolo (brána klece) ⇒ takový matchup"
+    night_log "       NEEXISTUJE. Použij CONTROL_MODE2=1 — pustí se navíc krátká"
+    night_log "       noha v mode 2, kde jsou obě ramena TÁŽ konfigurace."
     exit 2
 fi
-night_log "matchupů $total, z toho nulových $nulls — OK"
+night_log "matchupů $total, z toho nulových $nulls, control_mode2=$CONTROL_MODE2 — OK"
 
 night_preflight "$BIN" "$OUT" "$SRC" || {
     night_log "⛔ preflight neprošel — nespouštím. Oprav a pusť znovu."
@@ -89,6 +109,34 @@ else
         night_log "A/B DONE ($OKS/$EXPECT)"; touch "$OUT/AB_DONE"
     else
         night_log "A/B PARTIAL: ok=$OKS fail=$FAILED"; touch "$OUT/AB_PARTIAL"; exit 1
+    fi
+fi
+
+# --- mode 2: SMOKE TEST SEEDOVÁNÍ, ne kontrola ramene ------------------------
+# ⚠️ Pod CRN je tohle TAUTOLOGIE: obě orientace hrají doslova tutéž hru, takže
+# chessCandAway = 1 - chessCandHome algebraicky a delta MUSÍ být 0, ať je na
+# rameni cokoli špatně. Chytí to jedinou věc -- hrubou chybu v seedování -- a
+# to za pár minut, takže se to vyplatí. Ale VERDIKT NA TOM NESTOJÍ.
+# Skutečná kontrola je per-pair "MOVED WITHOUT THE ARM ACTING" ze SUMMARY.
+if [ "$CONTROL_MODE2" != "0" ]; then
+    cidx=${MATCHUPS%%:*}
+    d="$OUT/control_mode2"
+    if [ -f "$d/OK" ]; then
+        night_log "kontrola mode 2 už hotová, přeskakuji"
+    else
+        mkdir -p "$d"; rm -f "$d/OK" "$d/FAIL"
+        night_log "START smoke test seedování: mode 2, $CONTROL_PAIRS párů, matchup $cidx"
+        ( cd "$d" && nice -n 19 "$BIN" "$ROOT" "$CONTROL_PAIRS" "$cidx" 2 0 > run.log 2>&1 ) \
+            && touch "$d/OK" || touch "$d/FAIL"
+    fi
+    cline=$(grep -h "NULL-TEST" "$d/run.log" 2>/dev/null | head -1)
+    night_log "  ${cline:-(kontrola nic nevrátila)}"
+    if echo "$cline" | grep -q "+0.0000 +- 0.0000"; then
+        night_log "  ✅ seedování v pořádku (nic víc to netvrdí — viz MOVED WITHOUT ARM)"
+    else
+        night_log "  ⛔ SMOKE TEST NEVYŠEL NULOVÝ. Obě ramena tam mají TOUTÉŽ konfiguraci"
+        night_log "     a přesto se liší ⇒ ROZBITÉ SEEDOVÁNÍ. Hlavní výsledek NEČÍST."
+        touch "$OUT/CONTROL_FAILED"
     fi
 fi
 

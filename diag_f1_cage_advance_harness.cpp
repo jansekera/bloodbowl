@@ -214,6 +214,15 @@ struct PairResult {
     // cand-as-homeRace chess (orientation 1) minus base-as-homeRace chess
     // (orientation 2) = chessCandHome + chessCandAway - 1.
     double deltaHomeRace() const { return chessCandHome + chessCandAway - 1.0; }
+
+    // 2026-08-17: how many times the ARM ITSELF did something in this pair --
+    // cage plans adopted for modes 0/1, Dauntless offers for mode 4. Under CRN
+    // both orientations play the identical game, so a pair where the arm never
+    // acted MUST come back at delta 0. One that does not is a leak: the flag
+    // changed the run through some path other than the feature. That check is
+    // per pair and inside the real run, which makes it far stronger than any
+    // separate control leg -- see the note on mode 2 below.
+    long armEvents = 0;
 };
 
 int main(int argc, char** argv) {
@@ -384,6 +393,15 @@ int main(int argc, char** argv) {
                 double chess = cs > bs ? 1.0 : (cs < bs ? 0.0 : 0.5);
                 if (candHome) pr.chessCandHome = chess;
                 else pr.chessCandAway = chess;
+                // Co znamená "rameno jednalo" závisí na rameni. Mode 0/1 =
+                // brána adoptovala plán; mode 4 = nabídka ocenila Dauntlessem.
+                // Mode 3 (policy blend) NEMÁ takový signál -- působí na každé
+                // rozhodnutí a nic ho nepočítá -- a mode 2 nemá rameno vůbec.
+                // Kdyby se pro ně armEvents počítalo z candPlans, vyšla by nula
+                // vždy a leak test by křičel na KAŽDÉM pohnutém páru. Proto se
+                // pro ně netiskne; falešný poplach je horší než žádný test,
+                // protože se ho lidi naučí ignorovat.
+                pr.armEvents += (mode == 4) ? candDaunt : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
                 else candD++;
@@ -449,8 +467,14 @@ int main(int argc, char** argv) {
         // honest sample size of the comparison -- and a run where it is 0 has
         // measured nothing at all, however tight its SE looks. The mean stays
         // over ALL pairs; dividing by n_nonzero instead would inflate it.
-        int nNonzero = 0;
-        for (auto& p2 : pairs) if (p2.deltaHomeRace() != 0.0) ++nNonzero;
+        int nNonzero = 0, nArmFired = 0, nLeak = 0;
+        for (auto& p2 : pairs) {
+            bool moved = p2.deltaHomeRace() != 0.0;
+            bool fired = p2.armEvents > 0;
+            if (moved) ++nNonzero;
+            if (fired) ++nArmFired;
+            if (moved && !fired) ++nLeak;   // must be 0
+        }
         int dec = candW + candL;
         double wr = dec > 0 ? static_cast<double>(candW) / dec : 0.0;
         printf("SUMMARY matchup %d (%s vs %s), %d pairs (%d games), "
@@ -458,6 +482,27 @@ int main(int argc, char** argv) {
                mi, mu.home, mu.away, static_cast<int>(n), 2 * static_cast<int>(n),
                nNonzero, 100.0 * nNonzero / n,
                nNonzero == 0 ? "  <= ARMS ARE IDENTICAL, NOTHING MEASURED" : "");
+        // ⭐ THE REAL NULL TEST, and it lives inside the run rather than beside
+        // it. A separate mode-2 leg (same config in both arms) is a TAUTOLOGY
+        // under CRN: the two orientations are literally the same game, so the
+        // delta is forced to 0 algebraically and the leg can only catch a gross
+        // seeding mistake. This cannot be waved through: it compares pairs where
+        // the arm ACTED against pairs where it did not, in the arm's own run.
+        const bool armSignalAvailable = (mode == 0 || mode == 1 || mode == 4);
+        if (armSignalAvailable) {
+            printf("  arm acted in %d/%d pairs; pairs that moved: %d; "
+                   "MOVED WITHOUT THE ARM ACTING: %d%s\n",
+                   nArmFired, static_cast<int>(n), nNonzero, nLeak,
+                   nLeak > 0
+                       ? "  <= LEAK. The flag changed the run through something"
+                         " other than the feature. DO NOT read the delta."
+                       : "  (0 = clean)");
+        } else {
+            printf("  arm-acted signal: NONE for mode %d -- this arm touches "
+                   "every decision and nothing counts it, so the per-pair leak "
+                   "test cannot run. The delta here has NO null control.\n",
+                   mode);
+        }
         printf("  cand overall: W%d D%d L%d decisiveWR=%.3f chess=%.4f | "
                "cage plans adopted %.2f/game%s\n",
                candW, candD, candL, wr,
