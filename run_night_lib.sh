@@ -97,6 +97,86 @@ night_init() {
     night_lock "$out" || exit 1
 }
 
+# --- PREFLIGHT --------------------------------------------------------------
+# ⚑ NEJNEBEZPEČNĚJŠÍ SELHÁNÍ NOČNÍHO BĚHU NENÍ PÁD — JE TO 14 HODIN NA STARÉM
+#   KÓDU. Nic to nehlásí, výsledek vypadá normálně a připíše se změně, která
+#   v binárce vůbec nebyla. 14.08. se harness přebudoval ručně (`271e9dfc`)
+#   a NIC to neověřilo; kdyby se na to zapomnělo, měřila by se noc naprázdno.
+#   Sdílená knihovna je horší než binárka: linkuje se přes rpath až za běhu,
+#   takže starý `libbb_engine.so` nepozná ani `ls -l` na binárce.
+#
+# night_preflight <binárka> <výstupní_adresář> [zdroj.cpp ...]
+# Vrací 0 jen když projde VŠECHNO. Volající má na nesplněné skončit, ne pokračovat.
+night_preflight() {
+    local bin="$1" out="$2"; shift 2
+    local root; root=$(dirname "$out")
+    local ok=0
+
+    # (1) binárka existuje a je spustitelná
+    if [ ! -x "$bin" ]; then
+        night_log "PREFLIGHT ⛔ chybí nebo není spustitelná: $bin"; ok=1
+    else
+        # (2) binárka není starší než své zdroje
+        local src
+        for src in "$@"; do
+            [ -f "$src" ] || { night_log "PREFLIGHT ⛔ chybí zdroj $src"; ok=1; continue; }
+            if [ "$src" -nt "$bin" ]; then
+                night_log "PREFLIGHT ⛔ $src je NOVĚJŠÍ než $bin ⇒ binárka je stará, PŘELOŽIT"
+                ok=1
+            fi
+        done
+    fi
+
+    # (3) engine .so není starší než engine/src a engine/include -- tohle je ta
+    #     zákeřná: linkuje se až za běhu přes rpath, na binárce není vidět
+    local so="$root/engine/build/libbb_engine.so"
+    if [ ! -f "$so" ]; then
+        night_log "PREFLIGHT ⛔ chybí $so"; ok=1
+    else
+        local newer
+        newer=$(find "$root/engine/src" "$root/engine/include" -name '*.cpp' -o -name '*.h' 2>/dev/null \
+                | while read -r f; do [ "$f" -nt "$so" ] && echo "$f"; done | head -3)
+        if [ -n "$newer" ]; then
+            night_log "PREFLIGHT ⛔ engine je novější než libbb_engine.so ⇒ běželo by se na STARÉM enginu:"
+            echo "$newer" | sed 's/^/       /' >> "$NIGHT_LOG"
+            ok=1
+        fi
+    fi
+
+    # (4) váhy, bez kterých harness stejně skončí -- ale až po startu
+    local w
+    for w in weights_best.json weights_policy.json; do
+        [ -f "$root/$w" ] || { night_log "PREFLIGHT ⛔ chybí $root/$w"; ok=1; }
+    done
+
+    # (5) neběží už jiný sběr/harness. `pgrep -f` na vzor, který sedí i na
+    #     tenhle skript, by našel sám sebe -- proto -v $$ (viz feedback o pkill).
+    local others
+    others=$(pgrep -f 'diag_f1_cage_advance|diag_replay_mine_2026' 2>/dev/null | grep -v "^$$\$" | head -5)
+    if [ -n "$others" ]; then
+        night_log "PREFLIGHT ⛔ už běží jiný běh (pid: $(echo $others | tr '\n' ' '))"; ok=1
+    fi
+
+    # (6) místo na disku -- korpus 3000 her je ~30 MB, ale trénink umí sežrat víc
+    local freemb; freemb=$(df -Pm "$root" | awk 'NR==2{print $4}')
+    if [ "${freemb:-0}" -lt 2000 ]; then
+        night_log "PREFLIGHT ⛔ volno jen ${freemb} MB (chci ≥ 2000)"; ok=1
+    fi
+
+    # (7) špinavý strom se nezakazuje, ale ZAPÍŠE SE -- jinak se výsledek připíše
+    #     commitu, na kterém neběžel
+    if [ -n "$(git -C "$root" status --porcelain -- engine/ 2>/dev/null)" ]; then
+        night_log "PREFLIGHT ⚠️ engine/ má NEZACOMMITOVANÉ změny — výsledek NEODPOVÍDÁ HEADu"
+        git -C "$root" status --porcelain -- engine/ | sed 's/^/       /' >> "$NIGHT_LOG"
+        echo dirty > "$out/ENGINE_DIRTY"
+    else
+        rm -f "$out/ENGINE_DIRTY"
+    fi
+
+    [ "$ok" -eq 0 ] && night_log "PREFLIGHT OK"
+    return $ok
+}
+
 # --- otisk commitu ----------------------------------------------------------
 # Píše se JEN commit, který sahá na engine/. Doc commity se mezi baseline
 # a měřením lišit smějí, engine ne.
