@@ -100,6 +100,19 @@ Matchup s nulovou expozicí **neexistuje** — odsunuje se v každém. Proto:
 | `arm_acted` | **≥ 0,95** | odsunuje se skoro v každém zápase |
 | mode 2 smoke test | exaktně 0 | tautologie |
 
+### ⚠️ PŘIZNÁNÍ: smoke test 12 párů běžel PO napsání předpovědí
+
+Než se spustila noc, proběhl 12párový smoke test ramene (mode 5). Ukázal:
+`arm acted 12/12` · `MOVED WITHOUT THE ARM ACTING: 0` · `cage plans adopted 0,00`
+*(brána opravdu vypnutá v obou ramenech)* · a **`n_nonzero` 83,3 %**.
+
+To je **nad** pre-registrovaným pásmem 35–65 %. ⛔ **Předpověď se NEPOSOUVÁ.**
+Dvanáct párů není důvod přepsat předpověď — a hlavně: posunout ji po pohledu na
+data je přesně ta věc, kvůli které předregistrace existuje. Když `n_nonzero`
+vyjde nad 65 %, zapíše se to jako **MIMO** a je to informace o rameni
+*(odsun přesměrujeme častěji, než jsme mysleli)*, ne selhání běhu.
+Zapsáno sem, aby bylo dohledatelné, že jsem ta data viděl.
+
 ### Pořadí čtení výsledku
 1. `MOVED WITHOUT THE ARM ACTING` = 0? Ne ⇒ konec, výsledek se nečte.
 2. `arm acted in N/M` — jak velký je skutečný vzorek?
