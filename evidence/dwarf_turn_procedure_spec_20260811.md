@@ -1715,3 +1715,157 @@ a rozdíl je právě to kritérium z 14.1:
 * **Blitz v soupeřově kole** neexistuje — celá část je o našem rozpočtu.
 * **Frenzy** mění cenu blitzu (vynucený druhý blok), ale trpaslík ho má jen na
   dvou Troll Slayerech ⇒ pro nás okrajové, pro obecné pravidlo ne.
+
+---
+
+# ČÁST 15 — POSUN KLECE (18.08.2026)
+
+> Kapitola byla rozdělaná a přerušená. V spec stálo jen **8.2 „Klec není
+> zahajovací formace"** — tedy **kdy se klec staví**. Jak se **pohybuje**,
+> žilo jen v paměti z 11.08. a v kódu, který jsme dnes zamítli.
+
+## 15.0 ⭐ KRITÉRIUM: KLEC SE NEMĚŘÍ TVAREM, ALE ROZPOČTEM TĚL
+
+Celá tahle kapitola visí na jednom měření *(3 000 her, 18.08.)*:
+
+| veličina | σ | replikuje? |
+|---|---|---|
+| **počet rohů klece** | −2,1σ | ⛔ ne |
+| **počet ČISTÝCH rohů** | **−0,2σ = nic** | ⛔ mění znaménko |
+| **počet ŠPINAVÝCH rohů** | **−6,8σ** | ✅ |
+| podíl čistých (K29) | 5,1σ | ✅ |
+
+⇒ **Postavit další roh nekupuje nic. Špinavý roh stojí.** A stojí konkrétně:
+
+| tělo, které stálo v rohu na konci kola N | ŠPINAVÝ roh | ČISTÝ roh |
+|---|---|---|
+| **nedostupné v kole N+1** | **51,2 %** | 13,5 % |
+| znovu poslouží jako čistý roh | **12,4 %** | 33,1 % |
+
+A hrajeme se **7,03 volnými těly z 11** (2,62 leží, 1,02 zamčených), tedy
+**5,5 kandidáta na 4 rohy**.
+
+⇒ **Klec je účet, ne útvar.** Každé rozhodnutí o kleci — postavit, jet, jak
+daleko, kterým směrem, kým — je **položka v rozpočtu těl**. Špinavý roh není
+„horší roh", je to **spálené tělo**: ⭐ *špinavý roh je vada obdobných důsledků
+jako žádný roh* (uživatel 18.08.), a navíc dražší.
+
+## 15.1 Rychlost: klec jede tak rychle, jak rychle se dokáže složit
+
+> *Uživatel 18.08.: „je zbytečné uvedení konstanty někam, kde by stačilo —
+> nesmí se rozpadnout, ale má jet co nejrychleji."*
+
+**Pravidlo:** krok klece = **největší krok, po kterém se v cíli složí čisté rohy
+z těl, která tam dojdou.** Cíl je **maximum**, ne strop.
+
+⛔ **Do kódu ani do kontroly nesmí konstanta „2 pole za kolo".** To je jen to,
+co ta podmínka dnes vydá na trpasličím rosteru se 7,03 volnými těly. Jiný roster,
+jiný počet ležících, jiné číslo. *(Táž chyba jako u S7.3/T1.8 — implementovat
+pravidlo, ne jeho výsledek.)*
+
+⚠️ **Přelévání ZAMÍTNUTO** *(uživatel 11.08.)*: zadní rohy se neodlepují, aby se
+staly předními. *„Neaktivací nevidím nic co získat, stále jsou to vázané rohy."*
+⇒ **tuhý posun o co nejvíc polí**, ne dvoufázové převalení.
+
+## 15.2 ⛔ SMĚR SE VYBÍRÁ — a dnes se nevybírá vůbec (P32)
+
+> *Uživatel 18.08.: „musí stavět čistou klec a kdyžtak ne vždy jen přímo rovně
+> kupředu."*
+
+Ověřeno v kódu: cíl posunu vzniká na dvou místech (`cage_advance.cpp:41`
+a v `tryAssign`) vždy jako `dest{carrier.x + dx*step, carrier.y}` — **`y` se
+nikdy nemění.** Plánovač volí jen **JAK DALEKO**, nikdy **KAM**; všechny
+zvažované cíle leží na jedné přímce vpřed.
+
+**Pravidlo:** cílem posunu smí být i pole **do strany nebo šikmo**.
+Kritérium výběru je **počet ŠPINAVÝCH rohů v cíli** *(ne počet rohů — ten
+nepředpovídá nic)*, při shodě dál vpřed.
+
+⚠️ **Táž rodina jako P9** (`choosePushSquare` = „rovně dozadu první"):
+**geometrie se nevybírá, jen se vykoná.**
+
+## 15.3 Pořadí: eskorta uklidí cestu, teprve pak jede klec
+
+Z bbtactics (souhrn 11.08.) a potvrzeno zásadou **8.5**: hráči **mimo** klec
+musí odklidit soupeře v cestě **dřív**, než se klec hne. Klec, která vyrazí do
+neuklizeného koridoru, dojede k tělu a rozpadne se na půl kroku.
+
+⭐ **A utrácí se v pořadí od volného k vzácnému:** napřed **bloky zdarma**
+(kdo už sousedí), pak **blitz** — a jen tam, kam se blokem nedosáhne
+(**ČÁST 14**). **61 % polluterů u rohu jde srazit blokem zdarma**; utratit na ně
+blitz je vyhozený rozpočet, ne špatný cíl.
+
+## 15.4 Kdo stojí v rohu
+
+**Roh není odkladiště.** Do rohu patří tělo, které tam **umí stát a nechybí
+jinde**. Změřeno: skaven staví **36,4 % rohů z Gutter Runnerů** (ST2, AV7) —
+nejhorší možné tělo: neuassistuje, neudrží pole, a je to hráč, který je jinde
+nejcennější (**P16**).
+
+⚠️ Engine dnes filtruje jen **spolehlivost aktivace** (Bone-head, Really Stupid,
+Wild Animal, Take Root, Secret Weapon, Ball & Chain) — **na vhodnost ani na cenu
+jinde se neptá.**
+
+⛔ **Klec nesmí markovat** (hierarchie R1 > R3 > R2 > R4): tělo v rohu má úkol
+držet roh, ne stát v soupeřově tackle zóně. Zamčené tělo je podle **K36**
+měřitelná ztráta tempa (Δx nosiče +2,24 při ≤2 zamčených proti +1,14 při 6–8).
+
+## 15.5 Lajna
+
+Klec u postranní čáry **ztrácí polovinu rohů**. ⇒ **vlastní klec k lajně
+netlačit; soupeřovu ano.** *(Spojuje se s T1.8: tlačit k lajně jen když
+`vzdálenost ≤ odsuny, které vyrobíme V JEDNOM KOLE`.)*
+
+## 15.6 Obrana proti klaci: nemusíš ji rozbít, stačí ji zpomalit
+
+Zpomalit soupeřovu klec na **1–2 pole za kolo** stačí — kolem **6.–8. kola**
+musí otevřít, nebo o drive přijde. To je chvíle na protiúder.
+
+⚠️ **A pozor na obrácený mechanismus:** roh soupeřovy klece, který stojí v naší
+tackle zóně, jde srazit **obyčejným blokem** — čímž **my ušetříme blitz**.
+Symetricky to platí proti nám a je to přesně důvod, proč je markovaný roh drahý.
+
+## 15.7 Co s tím, že brána klece byla zamítnuta
+
+`cage_advance` A/B 18.08., 6 000 párů s CRN: **−0,0248 ± 0,0068 (−3,7σ)** ⇒
+**brána ŠKODÍ** a v produkci zůstává vypnutá.
+
+⭐ **Ale to není verdikt o téhle kapitole.** Brána počítá `requiredPace =
+vzdálenost / zbývající kola` — **rovnoměrnou podlahu**, tedy přesně model, který
+byl 18.08. zamítnut i u K9. Vetovala postup tam, kde rovnoměrný rozvrh nedává
+smysl, tj. **ve fázi klece**. Změřila se vada rozvrhu, ne vada schopnosti:
+zapnutá brána postavila **víc klece a horší klec** (rohů 2,22 → 2,54, čistota
+79,4 → 72,6 %) — což je podle 15.0 přesně obchod špatným směrem.
+
+⇒ **Kód se nezahazuje.** Brána se vrací **až** s (a) rozvrhem po fázích
+(**T0.1**, **P3**) a (b) výběrem směru (**15.2 / P32**).
+
+## 15.8 Co je změřené a co ne
+
+| | stav |
+|---|---|
+| počet rohů 0σ · počet špinavých −6,8σ · podíl čistých 5,1σ | ✅ 3 000 her, replikuje |
+| tělo ze špinavého rohu nedostupné v 51,2 % vs 13,5 % | ✅ s kontrolní skupinou |
+| 7,03 volných těl z 11; 5,5 kandidáta na 4 rohy | ✅ |
+| směr posunu se nevybírá (`y` se nemění) | ✅ ověřeno v kódu |
+| brána škodí (−0,0248 ± 0,0068) | ✅ 6 000 párů |
+| **jaká je správná rychlost jako FUNKCE volných těl** *(dnes jen „co se složí")* | ⛔ NEZMĚŘENO |
+| **kolik stojí posun do strany na tempu** — 15.2 zvedne čistotu, ale prodlouží dráhu | ⛔ NEZMĚŘENO |
+| **jestli je pořadí „eskorta → klec" lepší než opačné** | ⛔ NEZMĚŘENO *(z bbtactics, ne z našich dat)* |
+| **kolik rohů je vlastně optimum**, když počet nepředpovídá nic | ⛔ OTEVŘENÁ OTÁZKA — možná jsou 4 rohy špatný cíl |
+
+## 15.9 Kontroly
+
+* **K29** (žádný roh není markovaný) a **K29⭐** (plná čistá klec) zůstávají,
+  ale ⚠️ **K29⭐ míří na tvar** — a tvar podle 15.0 nic nepředpovídá.
+* **NOVÁ K38 — „špinavých rohů na kolo"** jako **POČET**, ne podíl. To je
+  veličina, která jediná replikuje (**P1**: povinnost smí být ano/ne, metr si
+  musí nechat číslo).
+* **NOVÁ K39 — „tělo z rohu je příští kolo volné"**. Přímé měření 15.0:
+  dnes 51,2 % vs 13,5 % podle čistoty rohu.
+
+## 15.10 Co tahle část NEZAKRYLA
+
+* **Kdy se klec staví** — to je 8.2 a nemění se.
+* **Rozbití soupeřovy klece do detailu** — 15.6 je jen doktrína zpomalení.
+* **Hand-off a pass uvnitř klece** — vlastní kapitola, píše se před celokolem.
