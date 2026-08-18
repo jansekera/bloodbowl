@@ -1941,30 +1941,48 @@ toho, jestli ten hráč umí míč donést. ⇒ **Záloha u míče je H1 předem
 stojí, ten se stane nosičem, když se něco pokazí. Longbeard u míče je proto
 chyba i tehdy, když míč zvedne.
 
-## 16.5 ⛔ DNEŠNÍ STAV: NABÍZÍ SE, NEHRAJE SE
+## 16.5 ⛔ DNEŠNÍ STAV: NABÍZÍ SE DESETKRÁT, ZAHRAJE SE JEDNOU ZA DVACET ZÁPASŮ
+
+⚠️ **NEJDŘÍV OPRAVA ČÍSLA, KTERÉ SE TÁHNE PROJEKTEM.** První verze téhle části
+tvrdila *„0 odehraných hand-offů ve 3 000 hrách"*. **To číslo bylo staženo
+17.08.** — byla to **vada exportu logu**, ne vlastnost hry: `bb_module.cpp` měl
+stráž `typeIdx < 21` proti 22 jménům, takže `HAND_OFF` (index 21) se ukládal
+jako `UNKNOWN`. Opraveno `c943e8b8`.
 
 | | |
 |---|---|
-| `HAND_OFF` **nabídek v searchi** | **10,4 na zápas** |
-| `HAND_OFF` **odehraných ve 3 000 hrách** | **0** |
+| `HAND_OFF` nabídek v searchi | **10,4 na zápas** |
+| **naše strana ZAHRÁLA** *(3 000 her)* | **130** *(≈ 0,043 na zápas)*, z toho 109 chyceno a 51 vedlo k TD |
 | `PASS` odehraných | 0,30 na zápas |
-| `CHAIN_SCORE` odehraných | **0** |
+| `CHAIN_SCORE` odehraných | 0 |
 
-⭐ **Vada se přesunula z NABÍDKY do VOLBY** (P21). Do 14.08. se hand-off
-nenabízel; po opravě se nabízí desetkrát za zápas a **search si ho ani jednou
-nevybere**. To není doktrinální problém — je to **P5**: filtr oceňuje předání
-**cenou přihrávky (33 %)**, i když by ho resolver provedl jako hand-off (83 %),
-a práh 0,5 zahodí i Runner→Runner (44 %).
-⇒ **Kapitola je napsaná na engine, který ji zatím neumí zahrát.**
+⛔⛔ **A DRUHÁ, HORŠÍ VĚC: NÁŠ DNEŠNÍ KORPUS TU OPRAVU NEMÁ.**
+`corpus_baseline_20260817_data` se začal sbírat 17.08. v **10:15**, oprava
+exportu je z **11:59** téhož dne (ověřeno 18.08.: `c943e8b8` **není** předkem
+`5e5ab352`, na kterém korpus běžel). ⇒ **V dnešní baseline jsou hand-offy pořád
+uložené jako `UNKNOWN` a JAKÉKOLI měření hand-offu nad ní neplatí.**
+*(Ostatní dnešní měření to nezasahuje — σ-tabulka, odsuny, blitzy i rohy stojí
+na `BLOCK`/`PUSH`/pozicích, ne na `HAND_OFF`.)*
+
+⇒ **Práce na hand-offu je ZASTAVENÁ, dokud nevznikne korpus na opraveném
+exportu** *(pravidlo 18.08.: [[feedback_fix_checks_before_measuring]] — spravit
+kontroly vždy povýšit před měření)*. Tahle kapitola je **doktrína napsaná
+dopředu**, ne závěr z dat.
+
+⭐ **Co i tak platí:** nabízí se **10,4×** za zápas a zahraje se **0,043×** —
+poměr **1 : 240**. Vada tedy opravdu leží ve **VOLBĚ**, ne v nabídce (**P5**:
+filtr oceňuje předání cenou přihrávky 33 %, ačkoli by ho resolver provedl jako
+hand-off 83 %; práh 0,5 zahodí i Runner→Runner na 44 %). Závěr se nemění, jen
+přestává stát na nule.
 
 ## 16.6 Co je změřené a co ne
 
 | | stav |
 |---|---|
 | Runner 3,41 vs Longbeard 1,50 pole/kolo | ✅ |
-| hand-off 10,4 nabídek/zápas, 0 odehraných ve 3 000 hrách | ✅ |
+| hand-off 10,4 nabídek/zápas vs **130 odehraných** (0,043/zápas) | ⚠️ z korpusu **PŘED** opravou exportu; poměr 1 : 240 platí, absolutní počty se musí přeměřit |
 | pass/hand-off mají od `f5998575` vlastní povolenky | ✅ ověřeno v kódu 18.08. |
-| **jak často situace H1 vůbec nastane** *(nosič ≠ Runner a vedle volný Runner)* | ⛔ **P21, měřitelné bez běhu** — rozhoduje, jestli je P5 cenná oprava, nebo správná ale bezcenná |
+| **jak často situace H1 vůbec nastane** *(nosič ≠ Runner a vedle volný Runner)* | ⛔ **BLOKOVÁNO na novém korpusu** — dnešní baseline exportuje `HAND_OFF` jako `UNKNOWN` |
 | **cena H2 proti prostému dodge** — 17 % vs ~50 %, ale neměřeno na reálných pozicích | ⛔ NEZMĚŘENO |
 | **`CHAIN_SCORE` po opravě povolenek** — příčina pryč, účinek nezměřen (P4) | ⛔ NEZMĚŘENO |
 
