@@ -1,0 +1,19 @@
+korpus: corpus_baseline_20260817_data   příležitostí: 3733
+DOSAH = dojde k poli sousedícímu s nosičem v témž kole (horní odhad:
+        nepočítá dodge z TZ ani obsazená pole)
+
+  našich volných těl, co DOJDE (bez GFI)    3.26
+  totéž s +2 GFI (horní mez)                4.11
+  soupeřových volných, co dojde             4.02
+
+ROZLOŽENÍ našich posil v dosahu (bez GFI)
+    0      233     6.2 %
+    1      468    12.5 %
+    2      657    17.6 %
+    3      743    19.9 %
+   4+     1632    43.7 %
+
+KDO MÁ V DOSAHU VÍC (bez GFI)
+       my >     1213    32.5 %
+      shoda      502    13.4 %
+   soupeř >     2018    54.1 %

@@ -1,0 +1,13 @@
+korpus: corpus_baseline_20260817_data   her: 3000
+tělo stojící v rohu klece na konci našeho kola N → jeho stav na konci kola N+1
+
+                           ŠPINAVÝ roh     ČISTÝ roh
+těl celkem                       2484         28415
+NEDOSTUPNÉ                 1271  51.2%   3822  13.5%
+na zemi                     504  20.3%    755   2.7%
+zamčené (v TZ)              716  28.8%   2848  10.0%
+mimo hřiště                  51   2.1%    219   0.8%
+VOLNÉ                      1126  45.3%  23689  83.4%
+znovu rohem                 512  20.6%   9968  35.1%
+znovu ČISTÝM rohem          307  12.4%   9397  33.1%
+nelze dohledat               87   3.5%    904   3.2%

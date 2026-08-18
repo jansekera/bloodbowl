@@ -43,6 +43,26 @@ struct MCTSConfig {
     // geometries the Black Orc is chosen 76.8% -> 83.3% of the time.
     // See evidence/weekend_result_20260817.md.
     bool dauntlessInOffer = true;
+    // P10a (2026-08-18): raise the prior floor of a BLOCK/BLITZ whose target is
+    // the OPPONENT'S BALL CARRIER, but only when we can actually contest what
+    // falls out of him. DEFAULT OFF -- this is a night-A/B arm, not production.
+    //
+    // Why the prior and not the leaf value: the leaf eval already rewards the
+    // knockdown implicitly (the "opponent holds the ball" penalty disappears).
+    // What is missing is that BLOCK carries ONE floor for every candidate --
+    // 0.12 whether the target is the ball carrier or a lineman in the far
+    // corner -- and BLOCK emits ~2.17 candidates per node, so the carrier's
+    // block is never expanded ahead of the others. Same starvation mechanism
+    // the 07-16 ADVANCE and 07-23 BLITZ floors were written to fix.
+    //
+    // Why "only when we can contest": measured 2026-08-18 on the 3000-game
+    // corpus (evidence/carrier_block_reach_20260818.md). Knocking the carrier
+    // down does not win the ball, it makes it LOOSE -- and the opponent has
+    // more bodies in reach of that square in 54.1% of the opportunities. So the
+    // rule is not "prefer hitting the carrier", it is "hit him when at least as
+    // many of our bodies as theirs can reach what drops". That condition fires
+    // in ~46% of the 18.2% of turns where the block is available at all.
+    bool carrierBlockPrior = false;
 };
 
 struct MCTSNode {

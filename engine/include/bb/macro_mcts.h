@@ -14,6 +14,14 @@
 
 namespace bb {
 
+// P10a (2026-08-18): times the carrier-block prior floor applied, per SEARCH
+// EVALUATION, since the last call -- and resets. Same unit warning as
+// takeDauntlessOfferEvalsInSearch() in bb/macro_actions.h: this counts
+// evaluations inside the search, not events on the pitch. It exists to answer
+// one question -- DID THE ARM RUN AT ALL -- which is what the per-pair null
+// control ("MOVED WITHOUT THE ARM ACTING") needs.
+long takeCarrierBlockPriorEvalsInSearch();
+
 class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
 class CageAdvancePlanner; // bb/cage_advance.h (F1, 2026-08-03)
 

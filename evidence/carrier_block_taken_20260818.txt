@@ -1,0 +1,9 @@
+korpus: corpus_baseline_20260817_data
+  nosič bez souseda (jen blitz by dosáhl)        16832
+  příležitost (soused u nosiče)                   3733
+  … a udeřili jsme na nosiče                      3043
+  … a přesto jsme na něj udeřili (blitz)          6143
+  … udeřili jsme JINAM                             511
+  … neudeřili jsme vůbec                           179
+
+  ⇒ z příležitostí jsme na nosiče udeřili v 81.5 %

@@ -1,0 +1,16 @@
+korpus: corpus_baseline_20260817_data   jen PLNÉ drivy (>=7 našich kol)
+
+A) DRIVE podle PRŮMĚRNÉHO počtu špinavých rohů na kolo
+koš                            drivů    s TD   podíl TD
+0 (ani jeden, celý drive)       2414     528      21.9 %
+0 < prům. <= 0,25                910     166      18.2 %
+0,25 < prům. <= 0,50             442     111      25.1 %
+0,50 < prům. <= 1,00              99      17      17.2 %
+prům. > 1,00                       4       0       0.0 %
+
+B) KOLO podle PŘESNÉHO počtu špinavých rohů (podíl kol v drivu, co skončil TD)
+špinavých rohů                   kol  v TD drivu     podíl
+0                              19307        4090     21.2 %
+1                               1750         337     19.3 %
+2                                249          54     21.7 %
+3+                                11           2     18.2 %

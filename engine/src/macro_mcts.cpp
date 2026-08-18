@@ -53,6 +53,56 @@ static int greedyMacroRank(MacroType t) {
     }
 }
 
+namespace {
+
+// P10a (2026-08-18): can we contest the ball if the opponent's carrier goes
+// down on THIS square? Knocking him down does not win the ball, it makes it
+// loose -- so the question is who reaches the square it drops on.
+//
+// Measured on the 3000-game corpus (evidence/carrier_block_reach_20260818.md):
+// when a block on the carrier is available at all (18.2% of turns where the
+// opponent holds the ball), we have 3.26 free bodies in reach and they have
+// 4.02; they are ahead in 54.1%. Hence a CONDITION, not a preference.
+//
+// Reach = Chebyshev distance to the ring around the carrier, against movement
+// left (ours: what the body actually has left this turn; theirs: full MA, since
+// it is their turn next). Ignores dodges out of tackle zones and occupied
+// squares, so it is an UPPER bound on both sides -- deliberately symmetric, so
+// the comparison stays fair even though each side's number is optimistic.
+bool weCanContestTheDrop(const GameState& state, const Player& carrier,
+                         TeamSide perspective, int attackerId) {
+    auto stepsToRing = [&](const Player& p) {
+        int d = std::max(std::abs(p.position.x - carrier.position.x),
+                         std::abs(p.position.y - carrier.position.y));
+        return std::max(0, d - 1);
+    };
+    int ours = 0, theirs = 0;
+    state.forEachOnPitch(perspective, [&](const Player& p) {
+        if (p.state != PlayerState::STANDING || p.id == attackerId) return;
+        if (stepsToRing(p) <= static_cast<int>(p.movementRemaining)) ours++;
+    });
+    state.forEachOnPitch(opponent(perspective), [&](const Player& p) {
+        if (p.state != PlayerState::STANDING || p.id == carrier.id) return;
+        if (stepsToRing(p) <= static_cast<int>(p.stats.movement)) theirs++;
+    });
+    return ours >= theirs;
+}
+
+// Times the P10a floor actually applied, per SEARCH EVALUATION, since the last
+// call. Same contract and the same warning as takeDauntlessOfferEvalsInSearch()
+// in macro_actions.h: this counts evaluations inside the search, NOT things that
+// happened on the pitch. It answers one question -- DID THE ARM RUN AT ALL --
+// which is what the per-pair null control needs.
+thread_local long g_carrierBlockPriorEvals = 0;
+
+} // namespace
+
+long takeCarrierBlockPriorEvalsInSearch() {
+    long v = g_carrierBlockPriorEvals;
+    g_carrierBlockPriorEvals = 0;
+    return v;
+}
+
 // --- MacroMCTSNode ---
 
 MacroMCTSNode* MacroMCTSNode::bestChildPUCT(double C, bool maximize) const {
@@ -405,6 +455,19 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
         // macro_actions.cpp). Track how many we've floored so the secondary
         // gets half the floor -- see the PICKUP case below.
         int pickupSeen = 0;
+
+        // P10a (2026-08-18): the condition does not depend on WHICH candidate we
+        // are looking at, only on the board, so it is computed once per node.
+        // attackerId = -1 here: excluding the eventual attacker would make the
+        // answer depend on the candidate again, and the difference is one body.
+        const int oppCarrierId =
+            (config_.carrierBlockPrior && onDef && state.ball.carrierId > 0)
+                ? state.ball.carrierId : -1;
+        const bool contestable =
+            (oppCarrierId > 0) &&
+            weCanContestTheDrop(state, state.getPlayer(oppCarrierId),
+                                state.activeTeam, -1);
+
         for (int i = 0; i < n; ++i) {
             float minPrior = 0.0f;
             float maxPrior = 1.0f;
@@ -472,9 +535,26 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                     // states down to 1/8) while preserving Q-rank ordering.
                     // Defense keeps its stronger, previously-validated 0.20.
                     minPrior = onDef ? 0.20f : 0.12f;
+                    // P10a: a blitz that ends on the carrier is the only way to
+                    // reach him when nobody is adjacent yet -- 39% of the cases
+                    // where he is markable at all. Same floor, same condition.
+                    if (contestable && macros[i].targetId == oppCarrierId) {
+                        minPrior = 0.20f;
+                        ++g_carrierBlockPriorEvals;
+                    }
                     break;
                 case MacroType::BLOCK:
                     minPrior = 0.12f;
+                    // P10a: the carrier's block is worth expanding ahead of the
+                    // other ~2.17 block candidates -- but only when the drop is
+                    // contestable. 0.20 is parity with defensive BLITZ and with
+                    // PICKUP, both empirically validated; the comments on those
+                    // floors warn that overshooting flips a macro from under-
+                    // to over-selected, so this does not go higher.
+                    if (contestable && macros[i].targetId == oppCarrierId) {
+                        minPrior = 0.20f;
+                        ++g_carrierBlockPriorEvals;
+                    }
                     break;
                 case MacroType::CAGE:
                     // 2026-07-03: was 0.08 vs BLOCK's 0.12 -- but BLOCK gets
