@@ -1600,3 +1600,118 @@ BLZ 0,87); **nejtvrdší kontakt je proti orkům a lidem.**
 **Nezměřeno:** turnover v našem vlastním následujícím kole (měřena ztráta
 během jejich kola — kauzálně čistší), kauzalita, replikace na dalších dvou
 korpusech.
+
+---
+
+# ČÁST 14 — ROZPOČET BLITZU (18.08.2026)
+
+> *Uživatel 18.08.: „je ten blitz na nosiče někde v dlouhém plánu blitz akce?"*
+> Nebyl. Kapitola byla rozdělaná a přerušená — proto tahle část.
+
+## 14.0 Proč to musí být kapitola, a ne další povinnost
+
+Blitz je **jediná akce s tvrdým limitem 1× za kolo**. Všechno ostatní v téhle
+specifikaci je seznam povinností, které se dají splnit vedle sebe; blitz je
+**rozpočet** a jeho uchazeči se **vylučují**.
+
+⛔ **Dosud byl rozsypaný na dvanácti místech a měl DVA různé žebříčky:**
+
+| kde | co říká |
+|---|---|
+| **S2.10** | 1) prorvat koridor · 2) odmarkovat nosiče · 3) nejšťavnatější cíl |
+| **9.5** | 1) blitz do zdi kupředu · 2) odmarkování nosiče · 3) příležitostně GR |
+| **S7.5** | blitz na nosiče, když je šance sražení dost velká; jinak na eskortu |
+| **S8.3** | blitz na nosiče **vždy**, i za horších kostek |
+| **S5.6** | nejdřív odmarkovat pole kolem míče, pak sbírat |
+| **S6.3** | blitz na toho, kdo by míč sebral |
+| **Z10** | kolo bez blitzu je promarněný zdroj |
+
+Ty seznamy si neodporují náhodou — **každý řeší jinou situaci a žádný neříká,
+podle čeho se řadí.** Proto se nedaly sečíst a proto se šest nálezů o blitzu
+(P0.6 · P2 · P6 · P15 · K32 · P33) měřilo proti šesti různým pozadím.
+
+## 14.1 ⭐ JEDINÉ KRITÉRIUM: BLITZ SE KUPUJE DOSAH, NE NÁSILÍ
+
+**Blok je zadarmo a bez limitu — ale jen pro toho, kdo už sousedí.
+Blitz je jeden — a jeho jediná vlastnost navíc je, že tělo někam DOJDE.**
+
+⇒ **Blitz patří výhradně tam, kam se blokem nedosáhne.**
+Všechno ostatní v žebříčku je důsledek téhle jedné věty.
+
+**Doloženo, ne odvozeno** *(3 000 her, 18.08.)*:
+* **61 % polluterů** u rohu klece jde srazit **blokem zdarma** — na ně se blitz
+  utrácet nemá, a přesto **45,5 % dnešních blitzů na roh padlo v kolech, kdy
+  blok zdarma šel**. To je vyhozený rozpočet, ne špatný cíl.
+* Blitz na roh dá Δx **+1,80**, blitz do zdi **+2,52** (−6,4σ) — ne proto, že
+  je zeď cennější, ale proto, že **na zeď se jinak nedosáhne**, kdežto na roh
+  většinou ano.
+* Soupeřův nosič **nemá souseda v 5,61 kola na zápas**; blokem je nedostupný
+  úplně. Tam je blitz jediný nástroj.
+
+## 14.2 Žebříček — jeden pro útok i obranu
+
+Řadí se **shora dolů, první splnitelné patro vyhrává.** Patra jsou seřazená
+podle toho, **co v tomhle kole nejde koupit blokem**:
+
+| # | patro | podmínka | platí v |
+|---|---|---|---|
+| **B1** | **odemknout skórování** — tělo v cestě mezi nosičem a endzonou, když se dnes skóruje | S10 / S9 | S9.4 · S10 |
+| **B2** | **prorazit koridor / zeď** — `resistance` má koho a bez něj se rozvrh nesplní | postup vpřed | S2.9 · S2.11 |
+| **B3** | **odmarkovat vlastního nosiče** — nosič AG2 platí za odchod ze zóny 4+, tj. ~50 % turnover; blitz je levnější než ten hod | nosič je markovaný | 9.5 ② |
+| **B4** | **soupeřův nosič, na kterého nikdo nesousedí** — jediný nástroj, jak se k němu vůbec dostat | obrana / boxing-in | S7.5 · S8.3 |
+| **B5** | **odemknout sběr volného míče** — odmarkovat pole u míče, nebo srazit toho, kdo by ho sebral | S5 / S6 | S5.6 · S6.3 |
+| **B6** | **polluter u rohu klece, na kterého NIKDO nesousedí** | 39 % polluterů | P2 ② |
+| **B7** | zbytek — nejšťavnatější dostupný cíl | nic výše nečeká | S2.10 ③ |
+
+⚠️ **B4 povyšuje na B1 v S8** *(soupeři zbývají ≤ 2 kola)*: tam turnover stojí
+soupeře celý drive, takže se bere i za horších kostek. To je jediná výjimka
+z řazení a je to výjimka **situační**, ne cílová.
+
+## 14.3 ⛔ KDY SE BLITZ NEUTRÁCÍ
+
+`Z10` říká *„kolo bez blitzu je promarněný zdroj"*. **Platí, ale ne bezvýhradně** —
+a rozdíl je právě to kritérium z 14.1:
+
+* **NEUTRÁCET** na cíl, na který **někdo z našich už sousedí**. Blok to udělá
+  zadarmo a blitz zůstane. *(Tohle je ten nejčastější dnešní únik.)*
+* **NEUTRÁCET** na cíl, jehož sražení nic neodemyká — samotná attrition je
+  práce pro **blok**, ne pro blitz.
+* **NEUTRÁCET** nosičem. Blitz nosičem ho vystavuje a nosič má jinou práci.
+* ⚠️ **Jinak platí Z10 tvrdě:** dnes máme soupeřova nosiče v dosahu blitzu
+  **4,12 kola na zápas**, blitz na něj padne v **48,5 %** a v **25,1 %
+  (= 1,04 kola na zápas) nespadne blitz vůbec žádný.** Na nosiče přitom
+  dosáhnou **4+ naše těla v 60,4 %** těch kol ⇒ **není to otázka
+  dosažitelnosti, ale volby.**
+
+## 14.4 Co je změřené a co ne
+
+| | stav |
+|---|---|
+| nosič v dosahu blitzu 4,12/zápas · blitz na něj 48,5 % · neutracen 1,04/zápas | ✅ 3 000 her |
+| na nosiče dosáhnou 4+ těla v 60,4 % | ✅ |
+| blitz na roh +1,80 vs do zdi +2,52 (−6,4σ); 45,5 % blitzů na roh zbytečně | ✅ |
+| 61 % polluterů jde srazit blokem zdarma | ✅ |
+| **kolik z toho 1,04 „neutraceno" bylo správně** *(dosah je horní odhad — bez dodge z TZ a bez obsazených polí)* | ⛔ NEZMĚŘENO |
+| **cena patra B3 (odmarkovat nosiče) proti B2 (zeď)** — obojí je „vpřed", ale nikdy se neměřily proti sobě | ⛔ NEZMĚŘENO |
+| **jestli je 26,4 % blitzů „jinam" chyba** — polovina těch cílů stála **hned vedle nosiče** (eskorta), což může být záměr | ⛔ NEZMĚŘENO |
+
+## 14.5 Kontroly, které z toho plynou
+
+* **K10** (blitz použit) zůstává, ale je to **dolní odhad** — viz níže.
+* **K11** (blitz na tělo v cestě) → přeformulovat na **patro B2**.
+* **K32** (pořadí blitzu) byla **BLOKOVANÁ na X1**, protože *„blitz se v logu
+  nepozná od bloku"*. ⭐ **18.08. odblokována rekonstrukcí, která nový log
+  nepotřebuje:** v korpusu žádná událost `BLITZ` není, jen `BLOCK` — ale
+  **blok, u kterého ÚTOČNÍK se svým cílem na začátku kola NESOUSEDIL, je
+  blitz** (blok vyžaduje sousedství, blitz je 1/kolo). Tím se K32 dá měřit hned.
+* **NOVÁ K37 — „blitz utracen na dosažitelný cíl"**: podíl blitzů, jejichž cíl
+  **už sousedil s někým naším**. To je přímé měření úniku z 14.1 a dnes je to
+  jediné číslo, které kapitolu vymáhá.
+
+## 14.6 Co tahle část NEZAKRYLA
+
+* **Kdo blitzuje.** Žebříček řadí cíle, ne útočníky. Volba těla je jiná otázka
+  (P6: cíl blitzu se dnes vybírá podle surových kostek) a váže na **T1.8**.
+* **Blitz v soupeřově kole** neexistuje — celá část je o našem rozpočtu.
+* **Frenzy** mění cenu blitzu (vynucený druhý blok), ale trpaslík ho má jen na
+  dvou Troll Slayerech ⇒ pro nás okrajové, pro obecné pravidlo ne.
