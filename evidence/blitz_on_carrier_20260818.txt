@@ -1,0 +1,26 @@
+korpus: corpus_baseline_20260817_data   her: 3000
+dosah = dojde na pole vedle nosiče (horní odhad: bez dodge a bez obsazených polí)
+
+  kol se soupeřovým míčem                             20565     6.86 / zápas
+  nosič BEZ souseda                                   16832     5.61 / zápas
+  JMENOVATEL: nosič v dosahu blitzu                   12370     4.12 / zápas
+    ⇒ blitz jsme NEUTRATILI VŮBEC                      3109     1.04 / zápas
+    (u nosiče už někdo stojí — patří k P10a)           3733     1.24 / zápas
+    na nosiče NEDOSÁHNEME (mimo jmenovatel)            4462     1.49 / zápas
+    ⇒ blitz šel JINAM                                  3264     1.09 / zápas
+    ⇒ blitz šel NA NOSIČE                              5997     2.00 / zápas
+
+  ⇒ z kol, kde nosič JE v dosahu blitzu, jsme na něj blitzovali v 48.5 %
+
+KOLIK NAŠICH TĚL NA NOSIČE DOSÁHNE (jen kola v jmenovateli)
+    1      1551    12.5 %
+    2      1634    13.2 %
+    3      1710    13.8 %
+   4+      7475    60.4 %
+
+KDYŽ ŠEL BLITZ JINAM — jak daleko od nosiče ten cíl stál
+    1 polí      1637    50.2 %
+    2 polí       602    18.4 %
+    3 polí       415    12.7 %
+    4 polí       211     6.5 %
+   5+ polí       399    12.2 %
