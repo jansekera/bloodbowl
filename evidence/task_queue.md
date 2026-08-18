@@ -74,8 +74,8 @@ uživatel na položky ukazuje číslem.
 | T2.9 | **K36 `LOCKED`** — zamčená vlastní těla jako chybějící člen tempa | **UZAVŘENO** — `bc9cf17`; potvrzeno na 3000 hrách, monotónní: ≤2 → Δx **+2,18** (n=15314) · 3–5 → **+1,89** (n=2162) · 6–8 → **+1,06** (n=50) |
 | K9b | — | **BLOKOVÁNO** na T3.1 (`resistance` je 0, plánovač se nezeptá) |
 | K32 | blitz se v logu nepozná od bloku | **BLOKOVÁNO** na X1 |
-| T0.1 | Srovnat K9 se S2.7 — kontrola měří konstantu, povinnost přikazuje funkci odporu. Tichá chyba. | **?** — mohlo padnout v auditu 13.08., neověřeno |
-| T0.2 | Vyškrtat uzavřené: O3, O4, O5, X6 | **?** — neověřeno |
+| T0.1 | **K9 SE PŘEPÍŠE CELÉ — ROZHODNUTO uživatelem 18.08.** *(„jsem pro přepsat celé — minimálně na fáze — a ty kroky asi měřit zvlášť“)*. Ověřeno 18.08.: oprava **neproběhla**, `need = ceil(vzdálenost/zbývající kola)` (`diag_rules_checks_20260812.py:401`) je čistá geometrie bez členu odporu ⇒ rovnoměrná podlaha trestá klec za to, že jede pomalu, ačkoli **nesmí jet rychleji než 2 pole/kolo**. Nový tvar: **rozvrh po FÁZÍCH** (sólo Runner → klec → sólo výběh) a **každá fáze se měří zvlášť**, ne jedním číslem. ⚠️ Váže na **P3** (fázový plán trasy) — bez fáze v modelu nejde odlišit chybu od záměru. ⚠️ A pozor: K9a je s **20,7σ** nejsilnější prediktor dnešní σ-tabulky, takže se přepisuje kontrola, podle které je seřazená fronta; blízkost k Δx (13,9σ) navíc připouští, že měří spíš „drive šel dobře“ než „dobře jsme rozvrhli“. | **OTEVŘENO — zadáno 18.08.** |
+| T0.2 | Vyškrtat uzavřené: O3, O4, O5, X6 | **UZAVŘENO — nulová** (ověřeno 18.08.): v trvalé knize ty položky **vůbec nejsou**, žijí jen v archivu `task_queue_20260812.md`; O3 se navíc věcně vyřešilo uvnitř T1.8. Není co vyškrtávat. |
 
 # 3. TEMPO A POSTUP
 
