@@ -1,0 +1,30 @@
+korpus: corpus_baseline_20260817_data   her: 3000
+snímek = ZAČÁTEK našeho kola; vzdálenost = Chebyshev k POLI NOSIČE
+
+  našich kol                             48000
+  soupeř nemá míč (N/A)                  27435
+  soupeř má míč                          20565
+  blok na nosiče NENÍ k dispozici        16832
+  blok na nosiče JE k dispozici          3733
+  blokujících k dispozici celkem         5640
+
+  ⇒ blok na nosiče je k dispozici v 18.2 % kol, kdy soupeř drží míč (a v 7.8 % všech našich kol)
+  ⇒ průměrně 1.51 kandidáta na úder
+
+KOLIK DALŠÍCH TĚL MÁME U POLE NOSIČE (bez toho, kdo udeří)
+  do   našich stojících   z toho VOLNÝCH   soupeřových volných
+   1               0.51             0.27                  1.23
+   2               1.60             0.92                  2.26
+   3               2.63             1.69                  2.96
+
+ROZLOŽENÍ našich VOLNÝCH těl do 2 polí od nosiče
+    0 volných     1706    45.7 %
+    1 volných     1115    29.9 %
+    2 volných      558    14.9 %
+    3 volných      239     6.4 %
+   4+ volných      115     3.1 %
+
+KDO MÁ U POLE NOSIČE PŘEVAHU (volná těla do 2)
+       my >      722    19.3 %
+      shoda      686    18.4 %
+   soupeř >     2325    62.3 %
