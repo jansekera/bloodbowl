@@ -1,4 +1,5 @@
 #include "bb/block_handler.h"
+#include <cmath>
 #include "bb/helpers.h"
 #include "bb/injury.h"
 #include "bb/ball_handler.h"
@@ -29,9 +30,27 @@ static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
 
 thread_local long g_dauntlessRolls = 0;
 
+// P9/P9c arm -- see bb/block_handler.h for the measured motivation.
+thread_local bool g_pushGeometry[2] = {false, false};
+thread_local long g_pushGeometryPicks = 0;
+
 long takeDauntlessRollEvalsInSearch() {
     long v = g_dauntlessRolls;
     g_dauntlessRolls = 0;
+    return v;
+}
+
+void setPushGeometryArm(TeamSide side, bool on) {
+    g_pushGeometry[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool pushGeometryArm(TeamSide side) {
+    return g_pushGeometry[side == TeamSide::HOME ? 0 : 1];
+}
+
+long takePushGeometryEvalsInSearch() {
+    long v = g_pushGeometryPicks;
+    g_pushGeometryPicks = 0;
     return v;
 }
 
@@ -124,6 +143,50 @@ static bool pushWouldScore(const GameState& state, const Player& pushed,
     return dest.isInEndZone(pushed.teamSide == TeamSide::AWAY);
 }
 
+// P9/P9c (2026-08-18): score a push DESTINATION instead of taking the first
+// square geometry offers. The ordering is the user's, stated 2026-08-14:
+//   "priorita u špinavého rohu je odklidit protihráče PRYČ od rohu -- ne jej
+//    nechat u rohu a posunout blíž k balonu"
+// so it is a sequence, not a trade-off:
+//   (1) he stops being adjacent to a corner of OUR cage -- that was the point
+//   (2) he does not end up closer to OUR ball carrier  -- REACH0, -16.7 sigma
+//   (3) straight back                                   -- today's behaviour
+// (3) stays as the tiebreak, so with no carrier on the pitch (i.e. on defence)
+// this scores exactly like the old code and the arm is a no-op by construction.
+static int pushDestScore(const GameState& state, TeamSide blockingSide,
+                         Position dest, int straightBackScore) {
+    const Player* carrier = nullptr;
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        if (c.teamSide == blockingSide && c.isOnPitch()) carrier = &c;
+    }
+    if (!carrier) return straightBackScore;
+
+    auto cheb = [](Position a, Position b) {
+        return std::max(std::abs(a.x - b.x), std::abs(a.y - b.y));
+    };
+
+    // (1) does he still dirty a STANDING corner of our cage?
+    bool dirties = false;
+    for (int dx = -1; dx <= 1 && !dirties; dx += 2) {
+        for (int dy = -1; dy <= 1 && !dirties; dy += 2) {
+            Position corner{static_cast<int8_t>(carrier->position.x + dx),
+                            static_cast<int8_t>(carrier->position.y + dy)};
+            if (!corner.isOnPitch()) continue;
+            const Player* occ = state.getPlayerAtPosition(corner);
+            if (!occ || occ->teamSide != blockingSide ||
+                occ->state != PlayerState::STANDING) continue;
+            if (cheb(dest, corner) <= 1) dirties = true;
+        }
+    }
+
+    // (2) distance from our carrier, capped -- past 4 squares he is out of
+    // reach anyway and further shoving buys nothing worth outranking (1).
+    int dist = std::min(cheb(dest, carrier->position), 4);
+
+    return (dirties ? 0 : 10000) + 100 * dist + straightBackScore;
+}
+
 static int choosePushSquare(const GameState& state, const Position* cand, int count,
                             Position pusherPos, bool defenderChooses, bool towardEdge,
                             const Player& pushed, TeamSide blockingSide) {
@@ -152,10 +215,27 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         int score;
         if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
         else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
+        else if (pushGeometryArm(blockingSide))
+            score = pushDestScore(state, blockingSide, cand[i], count - i);  // P9/P9c
         else                   score = count - i;                       // straight back first
         if (best < 0 || score > bestScore) { best = i; bestScore = score; }
     }
-    return best < 0 ? 0 : best;
+    if (best < 0) return 0;
+
+    // Count only the pushes the arm actually REDIRECTED. A counter that ticked
+    // on every push would say "the arm ran" even where it agreed with straight
+    // back, and the per-pair null control needs the number that can be zero.
+    if (!defenderChooses && !towardEdge && pushGeometryArm(blockingSide)) {
+        int plain = -1, plainScore = 0;
+        for (int i = 0; i < count; i++) {
+            if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
+            if (refuseScoring && pushWouldScore(state, pushed, blockingSide, cand[i])) continue;
+            int sc = count - i;
+            if (plain < 0 || sc > plainScore) { plain = i; plainScore = sc; }
+        }
+        if (plain >= 0 && plain != best) ++g_pushGeometryPicks;
+    }
+    return best;
 }
 
 // Push one player a square away from `pusherPos`, chaining into whoever is in

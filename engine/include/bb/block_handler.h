@@ -47,4 +47,34 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
 // běžela na stejném kódu ⇒ pravý null.
 long takeDauntlessRollEvalsInSearch();
 
+// ---------------------------------------------------------------------------
+// P9 / P9c ARM (2026-08-18): choose the push DESTINATION, do not just take the
+// first one geometry offers.
+//
+// `choosePushSquare` scores candidates as `count - i` -- "straight back first"
+// -- so the destination square is never evaluated for anything except (a) empty
+// vs occupied, (b) refusing to walk a carrier into his own end zone, and (c)
+// the Side Step / Grab special cases. Measured on the 3000-game corpus
+// (evidence/push_choice_ceiling_20260818.md): 21.9 pushes a game, 17.3 of them
+// with a REAL choice (>=2 empty candidates), and in 1.04 a game we pushed the
+// opponent CLOSER to our own ball carrier when a farther empty square existed
+// -- 0.27 a game glued him directly adjacent. Another 0.24 a game left him
+// adjacent to a corner of our own cage when another square would have cleared
+// him. Pushing a man next to our carrier raises REACH0, which is the SECOND
+// strongest predictor of a scoring drive in the 08-18 sigma table (-16.7 sigma,
+// and it replicates on both corpus halves).
+//
+// Per SIDE, because an A/B must be able to run the arm on one team only, and
+// thread_local because self-play runs games in parallel. Default OFF on both
+// sides = today's behaviour, bit for bit.
+void setPushGeometryArm(TeamSide side, bool on);
+bool pushGeometryArm(TeamSide side);
+
+// Times the arm actually picked a DIFFERENT square than "straight back first"
+// would have, since the last call -- and resets. Same unit warning as the other
+// take*EvalsInSearch counters: this counts resolutions inside the search too,
+// not just pushes played on the pitch. It answers "did the arm run at all",
+// which is what the per-pair null control needs.
+long takePushGeometryEvalsInSearch();
+
 } // namespace bb

@@ -123,7 +123,7 @@ TEST(BlockHandler, ACarrierIsNotPushedIntoTheEndZoneHeIsAttacking) {
     // (0,7); two of those are the away end zone, and "straight back first"
     // used to take (0,6) -- which CRP scores for him even on our own turn.
     // (1,6) is the one square that declines the gift.
-    FixedDiceRoller dice({3});                  // PUSHED
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});    // PUSHED (+ zásoba na následné hody)
     BlockParams params{1, 12, false, false};
     resolveBlock(gs, params, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).position, (Position{1, 6}));
@@ -805,4 +805,81 @@ TEST(BlockHandler, DauntlessEqualisesBeforeOurOwnAssistsAreAdded) {
     }
     EXPECT_TRUE(psyched);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+// ---------------------------------------------------------------------------
+// P9 / P9c (2026-08-18): the push DESTINATION is chosen, not just taken.
+//
+// Motivation and corpus numbers live in bb/block_handler.h. These pin the two
+// defects that were actually measured, plus the two guarantees that keep the
+// arm honest: OFF reproduces "straight back first" bit for bit, and the counter
+// only ticks when the arm really redirected.
+namespace {
+struct PushArmOn {
+    explicit PushArmOn(TeamSide s) : side(s) { setPushGeometryArm(side, true); }
+    ~PushArmOn() { setPushGeometryArm(side, false); takePushGeometryEvalsInSearch(); }
+    TeamSide side;
+};
+}  // namespace
+
+TEST(PushGeometry, ArmOffKeepsStraightBackExactly) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    // Our carrier sits right behind the push line, so with the arm ON the
+    // destination would matter. OFF it must not.
+    placePlayer(gs, 2, {12, 8}, TeamSide::HOME);
+    gs.ball = BallState::carried({12, 8}, 2);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});    // PUSHED (+ zásoba na následné hody)
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}))
+        << "arm OFF must reproduce straight-back first";
+    EXPECT_EQ(takePushGeometryEvalsInSearch(), 0);
+}
+
+TEST(PushGeometry, DoesNotShoveHimNextToOurOwnCarrier) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 2, {12, 8}, TeamSide::HOME);
+    gs.ball = BallState::carried({12, 8}, 2);   // our carrier one step away
+    PushArmOn arm(TeamSide::HOME);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});    // PUSHED (+ zásoba na následné hody)
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    // Candidates pushing east off (10,7) are (12,7), (12,6) and (12,8);
+    // (12,8) is occupied by our carrier, and straight back (12,7) is adjacent
+    // to him. (12,6) is the only square that does not hand him our carrier.
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+    EXPECT_EQ(takePushGeometryEvalsInSearch(), 1)
+        << "the counter must tick exactly when the square was redirected";
+}
+
+TEST(PushGeometry, ClearsHimOffACornerOfOurCage) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    // Our carrier further away, with a STANDING corner at (13,6): straight
+    // back (12,7) keeps the pushed man adjacent to that corner -- the dirty
+    // corner the whole doctrine is about -- while (12,8) clears him.
+    placePlayer(gs, 2, {14, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({14, 7}, 2);
+    placePlayer(gs, 3, {13, 6}, TeamSide::HOME);
+    PushArmOn arm(TeamSide::HOME);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});    // PUSHED (+ zásoba na následné hody)
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    const Position dest = gs.getPlayer(12).position;
+    EXPECT_NE(dest, (Position{12, 7})) << "straight back leaves the corner dirty";
+    EXPECT_GT(std::max(std::abs(dest.x - 13), std::abs(dest.y - 6)), 1)
+        << "the pushed man must stop being adjacent to our standing corner";
+}
+
+TEST(PushGeometry, ArmIsPerSideSoAnABCanRunItOnOneTeamOnly) {
+    setPushGeometryArm(TeamSide::HOME, true);
+    EXPECT_TRUE(pushGeometryArm(TeamSide::HOME));
+    EXPECT_FALSE(pushGeometryArm(TeamSide::AWAY));
+    setPushGeometryArm(TeamSide::HOME, false);
+    EXPECT_FALSE(pushGeometryArm(TeamSide::HOME));
 }
