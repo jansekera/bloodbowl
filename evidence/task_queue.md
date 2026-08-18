@@ -680,6 +680,12 @@ nálezem 13.08.; **P20 je jeho druhé kolo.**
 
 ## Odložené se spouštěčem *(nesmí se ztratit — proto i tady, ne jen v tabulce)*
 
+* **FABLE 18.08. — VYNECHÁNO ZÁMĚRNĚ** *(uživatel: „na dnes asi pro fable nic — když už běží noc a zadání máme frontu“)*. Není to zapomenutí: den vyrobil víc nálezů, než se stihlo strávit, a Fable analýza by soutěžila o CPU s běžící nocí.
+  ⏰ **Spouštěč:** po ranním čtení noci 19.08. **Tři kandidáti, seřazení podle toho, co dnešek otevřel:**
+  1. ⭐ **„Kolik rohů klece je vlastně optimum?“** — σ-tabulka 18.08.: počet rohů **−2,1σ**, počet ČISTÝCH rohů **−0,2σ** a v půlkách mění znaménko, zatímco počet ŠPINAVÝCH je **−6,8σ**. ⇒ **Možná jsou 4 rohy špatný cíl** a celá klec se má stavět menší. Zapsáno jako otevřená otázka ve spec **15.8**.
+  2. **B3 vs B2** — odmarkovat vlastního nosiče proti prorazit zeď. Obojí je patro „vpřed“ v žebříčku blitzu (**ČÁST 14**) a **nikdy se neměřily proti sobě**.
+  3. **Je 26,4 % blitzů „jinam“ chyba?** Polovina těch cílů stála **hned vedle nosiče** (eskorta), což může být záměr, ne únik.
+
 * **P30 — cena odstranění Gutter Runnera a Black Orka, každý zvlášť** *(uživatel 17.08.)*.
   ⏰ **Spouštěč:** přepočítaná σ-tabulka na `corpus_baseline_20260817` **+** hotové P29.
   Teď se nepočítá, protože metr se právě přeměřuje.
