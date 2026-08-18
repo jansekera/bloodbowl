@@ -1,0 +1,19 @@
+korpus: corpus_baseline_20260817_data
+her: 3000   engine korpusu: NEZNÁMÝ (korpus bez otisku — viz P22)
+filtr: jen PLNÉ drivy (>=7 našich kol) — je to VÝBĚR, ne vzorek:
+       drive, který skončí dřív, se sem nedostane, a to koreluje s výsledkem
+drivů: 5044, z toho se skórováním: 827
+jednotka n u každého řádku = DRIVY, ne kola ani zápasy
+
+veličina           TD drivy     bez TD    rozdíl       σ      n
+K29_čisté             0.822      0.769    +0.054    5.1σ   3524
+K33_blok              0.760      0.773    -0.013   -2.5σ   5044
+K34_reach0            0.457      0.355    +0.102    9.3σ   3869
+K35_fb2               0.876      0.789    +0.086   11.6σ   3869
+K9a_splněno           0.437      0.211    +0.227   20.7σ   3468
+REACH0_počet          1.385      2.100    -0.715  -16.7σ   3869
+blokůdo               1.703      1.522    +0.181   10.4σ   5044
+rohů_všech            1.254      1.313    -0.059   -2.1σ   3869
+rohů_ČISTÝCH          1.133      1.140    -0.007   -0.2σ   3869
+rohů_ŠPINAVÝCH        0.121      0.173    -0.053   -6.8σ   3869
+Δx                    2.733      2.081    +0.652   13.9σ   3468

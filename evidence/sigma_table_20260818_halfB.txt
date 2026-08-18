@@ -1,0 +1,19 @@
+korpus: /tmp/claude-1000/-home-jan-claude/32725022-eaae-4914-bf2f-55382aaa930e/scratchpad/half_B
+her: 1500   engine korpusu: NEZNÁMÝ (korpus bez otisku — viz P22)
+filtr: jen PLNÉ drivy (>=7 našich kol) — je to VÝBĚR, ne vzorek:
+       drive, který skončí dřív, se sem nedostane, a to koreluje s výsledkem
+drivů: 2525, z toho se skórováním: 421
+jednotka n u každého řádku = DRIVY, ne kola ani zápasy
+
+veličina           TD drivy     bez TD    rozdíl       σ      n
+K29_čisté             0.822      0.765    +0.056    3.8σ   1771
+K33_blok              0.770      0.775    -0.005   -0.7σ   2525
+K34_reach0            0.456      0.350    +0.106    6.8σ   1943
+K35_fb2               0.877      0.792    +0.084    8.0σ   1943
+K9a_splněno           0.437      0.211    +0.226   14.7σ   1725
+REACH0_počet          1.437      2.123    -0.685  -11.1σ   1943
+blokůdo               1.707      1.535    +0.172    6.9σ   2525
+rohů_všech            1.229      1.330    -0.101   -2.6σ   1943
+rohů_ČISTÝCH          1.109      1.155    -0.047   -1.2σ   1943
+rohů_ŠPINAVÝCH        0.120      0.174    -0.054   -4.9σ   1943
+Δx                    2.707      2.031    +0.676   10.0σ   1725
