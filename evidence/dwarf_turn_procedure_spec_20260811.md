@@ -1869,3 +1869,110 @@ zapnutá brána postavila **víc klece a horší klec** (rohů 2,22 → 2,54, č
 * **Kdy se klec staví** — to je 8.2 a nemění se.
 * **Rozbití soupeřovy klece do detailu** — 15.6 je jen doktrína zpomalení.
 * **Hand-off a pass uvnitř klece** — vlastní kapitola, píše se před celokolem.
+
+---
+
+# ČÁST 16 — PŘIHRÁVKA A PŘEDÁNÍ (18.08.2026)
+
+> V celé specifikaci byla o přihrávce **jediná zmínka** — S8.4, a to ještě
+> o **soupeřově** příjemci. O naší vlastní přihrávce ani řádka, přestože
+> doktrína **rozhodnutá byla** (T1.4: *„rozhodnuto, nezapsáno"*).
+> ⚑ Píše se **před** celokolovým plánem: pass a hand-off jsou spolu s blitzem
+> **tři vzácné akce po jedné za kolo** a celokolo je právě ta kapitola, která je
+> alokuje. Plánovat je s prázdnými poličkami nejde *(uživatel 18.08.)*.
+
+## 16.0 ⭐ KRITÉRIUM: MÍČ SE NEPŘEDÁVÁ PRO POSTUP, ALE PRO VÝMĚNU NOSIČE
+
+Trpaslík nepřihrává na vzdálenost — **AG2 a žádná přihrávací dovednost**.
+Hodnota přesunu míče je proto skoro celá v tom, **KDO ho po něm nese**:
+
+| nosič | pole za kolo |
+|---|---|
+| **Runner** | **3,41** |
+| **Longbeard** | **1,50** |
+
+To je **2,3×** a je to zároveň odpověď na *„kolik kol na TD"*. ⇒ **Předání je
+nástroj tempa, ne nástroj vzdálenosti.**
+
+⭐ **Kritérium tedy zní „NOSIČ JE ŠPATNÝ", ne „příjemce je lepší"** — a to je
+přesně ta věta, kterou dnešní filtr nemá (**P5**).
+
+## 16.1 Co říká pravidlo a co říká engine
+
+* CRP dává **dvě NEZÁVISLÉ povolenky**: jednu na `PASS`, jednu na `HAND_OFF`.
+  Obojí se smí v témž kole.
+* ⚠️ **Engine je do 17.08.2026 sdílel** (`passUsedThisTurn`) ⇒ přihrávka
+  a předání byly vzájemně **výlučné** a `CHAIN_SCORE` se rozbíjel na kroku 2.
+  **Opraveno `f5998575`** *(„the hand-off has its own action allowance, and
+  always did")*. ⇒ **Doktrína níž smí kombinaci použít; do 17.08. nesměla.**
+* Riziko není souměrné: **hand-off ~83 %** *(prostý catch)*, **přihrávka AG2
+  na dálku ~33 %**. Selhání obojího je **turnover**, tedy celý drive.
+
+## 16.2 Žebříček — kdy se míč předává
+
+Shora dolů, první splnitelné patro vyhrává.
+
+| # | patro | podmínka |
+|---|---|---|
+| **H1** | **NOSIČ NEDOBĚHNE** — má míč tělo, které nestihne rozvrh *(Longbeard 1,50 pole/kolo)*, a vedle stojí tělo, které ho stihne | předání **stojícímu sousedovi**, který je potenciální nosič |
+| **H2** | **NOSIČ JE ZAMČENÝ** — markovaný nosič AG2 platí za odchod ze zóny hod 4+, tj. **~50 % turnover**; předání sousedovi stojí 17 % | soused mimo TZ |
+| **H3** | **SKÓROVÁNÍ TEĎ** — příjemce dosáhne endzony v tomhle kole a nosič ne | jen v S10 / S9 |
+| **P1** | **přihrávka** — pro trpaslíka **skoro nikdy** *(uživatel)*; jen jako skórovací akce v posledním kole půle, kdy je alternativou nula | ⚠️ AG2 ⇒ ~33 % |
+
+## 16.3 ⛔ KDY SE MÍČ NEPŘEDÁVÁ
+
+* **Nikdy pro vzdálenost.** Míč se nese, ne posílá — to je celé S2.
+* **Nikdy Longbeardovi.** Předání, po kterém nese pomalejší tělo, je záporný
+  obchod i při 83% úspěchu.
+* **Nikdy, když současný nosič rozvrh plní.** 17 % turnoveru za nic.
+* **Nikdy z klece ven.** Nosič vyměněný mimo klec zahazuje celý tvar, který si
+  klec vybudovala *(ČÁST 15: rozpočet těl)*.
+* ⚠️ **Pozor na dvě povolenky, ne na jednu.** Od 17.08. jde v jednom kole
+  přihrávka **i** předání — což je nová možnost i nová past: **dva hody na
+  turnover v jednom kole.**
+
+## 16.4 Záloha u míče musí být potenciální NOSIČ
+
+> *Uživatel: „jako pomocník vedle míče měl přijít Blitzer — ať když Runner
+> nezvedne, je on s AG3 a MA5 potenciální nosič."*
+
+Doplňuje **S0** a **O8**: záloha se dnes vybírá podle **vzdálenosti**, ne podle
+toho, jestli ten hráč umí míč donést. ⇒ **Záloha u míče je H1 předem** — kdo tam
+stojí, ten se stane nosičem, když se něco pokazí. Longbeard u míče je proto
+chyba i tehdy, když míč zvedne.
+
+## 16.5 ⛔ DNEŠNÍ STAV: NABÍZÍ SE, NEHRAJE SE
+
+| | |
+|---|---|
+| `HAND_OFF` **nabídek v searchi** | **10,4 na zápas** |
+| `HAND_OFF` **odehraných ve 3 000 hrách** | **0** |
+| `PASS` odehraných | 0,30 na zápas |
+| `CHAIN_SCORE` odehraných | **0** |
+
+⭐ **Vada se přesunula z NABÍDKY do VOLBY** (P21). Do 14.08. se hand-off
+nenabízel; po opravě se nabízí desetkrát za zápas a **search si ho ani jednou
+nevybere**. To není doktrinální problém — je to **P5**: filtr oceňuje předání
+**cenou přihrávky (33 %)**, i když by ho resolver provedl jako hand-off (83 %),
+a práh 0,5 zahodí i Runner→Runner (44 %).
+⇒ **Kapitola je napsaná na engine, který ji zatím neumí zahrát.**
+
+## 16.6 Co je změřené a co ne
+
+| | stav |
+|---|---|
+| Runner 3,41 vs Longbeard 1,50 pole/kolo | ✅ |
+| hand-off 10,4 nabídek/zápas, 0 odehraných ve 3 000 hrách | ✅ |
+| pass/hand-off mají od `f5998575` vlastní povolenky | ✅ ověřeno v kódu 18.08. |
+| **jak často situace H1 vůbec nastane** *(nosič ≠ Runner a vedle volný Runner)* | ⛔ **P21, měřitelné bez běhu** — rozhoduje, jestli je P5 cenná oprava, nebo správná ale bezcenná |
+| **cena H2 proti prostému dodge** — 17 % vs ~50 %, ale neměřeno na reálných pozicích | ⛔ NEZMĚŘENO |
+| **`CHAIN_SCORE` po opravě povolenek** — příčina pryč, účinek nezměřen (P4) | ⛔ NEZMĚŘENO |
+
+## 16.7 Kontroly
+
+* **NOVÁ K40 — „nosič je správné tělo"**: podíl kol, kdy míč nese hráč, který
+  **stihne rozvrh**. Přímé měření 16.0; dnešní ekvivalent neexistuje.
+* **NOVÁ K41 — „záloha u míče je potenciální nosič"**: dnes 22,2 % kol má
+  u míče zálohu vůbec (S5.3), ale nikdo neměří **kdo** to je.
+* **K-handoff**: nabídnuto vs zahráno. Rozdíl mezi nulou a desítkou je celý
+  obsah P5 — a kdyby se ta kontrola tiskla, P21 by se nemusela vymýšlet.
