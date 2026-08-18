@@ -16,10 +16,25 @@
 #   ⛔ PREFLIGHT PŘED 14 HODINAMI, NE PO NICH.
 #      Nejhorší selhání není pád, ale noc odběhnutá na starém `libbb_engine.so`.
 #
+#   ⛔ NOC SI MUSÍ VYTISKNOUT VLASTNÍ VÝSLEDEK  (přidáno 18.08.)
+#      Noc 17.→18.08. doběhla bezvadně -- 8/8 shardů, žádný FAIL -- a skončila
+#      BEZ VÝSLEDKU: `chain.log` končil `NIGHT DONE`, 6 000 párů leželo jako osm
+#      čísel po ±0,019, tedy osm JEDNOTLIVĚ NEPRŮKAZNÝCH výsledků, a sloučenou
+#      deltu spočítal ráno člověk. Táž rodina jako audit aparátu: SNÍMEK SE
+#      VYDÁVÁ ZA STAV -- a je to přesně krok, kde si unavené čtení vybere shard,
+#      který se hodí. ⇒ `night_summarize.py` na konci, v POŘADÍ ČTENÍ
+#      z předregistrace (① leak → ② jmenovatel → ③ n_nonzero → ④ delta).
+#      Kontrola, kterou nikdo nepřečte, se od chybějící kontroly neliší.
+#
 # POUŽITÍ
-#   MODE=4 PAIRS=750 SHARDS=4 \
+#   MODE=4 PAIRS=750 SHARDS=4 THRESHOLD=0.015 \
 #   MATCHUPS="4:dw-orc:1 0:dw-sk:0 3:orc-sk:0" \
 #   OUT=ab_wrestle_20260818 ./run_night_ab.sh
+#
+#   `THRESHOLD` je PRÁH Z PŘEDREGISTRACE (default 0,015). Zapíše se do
+#   `chain.log` PŘI STARTU a vyhodnotí se strojově -- 17.→18.08. si harness
+#   tiskl vlastní natvrdo zadané `>= +0.03`, zatímco předregistrace na tutéž
+#   noc říkala ±0,015. Dva prahy v jedné noci = otevřená branka pro doladění.
 #
 #   Formát matchupu je `index:jméno:expozice`, kde expozice 1 = tam se rameno
 #   spustí (ta otázka), 0 = tam se spustit NEMŮŽE (null). Aspoň jedna nula.
@@ -56,6 +71,11 @@ CORPUS=${CORPUS:-0}
 CONTROL_MODE2=${CONTROL_MODE2:-0}
 CONTROL_PAIRS=${CONTROL_PAIRS:-50}
 BASELINE=${BASELINE:-}
+# ⛔ PRÁH JE VSTUP BĚHU, NE KONSTANTA VE ZDROJÁKU (18.08.). Harness si tiskne
+#   vlastní natvrdo zadané `[pre-reg: >= +0.03]`, zatímco předregistrace noci
+#   17.→18.08. říkala ±0,015 — dva různé prahy v jedné noci. Práh se proto
+#   předává sem, zapisuje se do chain.log PŘI STARTU a vyhodnocuje se strojově.
+THRESHOLD=${THRESHOLD:-0.015}
 
 night_init "$OUT" "ab-mode$MODE"
 night_stamp_head "$OUT"
@@ -78,11 +98,34 @@ if [ "$nulls" -eq 0 ] && [ "$CONTROL_MODE2" = "0" ]; then
     exit 2
 fi
 night_log "matchupů $total, z toho nulových $nulls, control_mode2=$CONTROL_MODE2 — OK"
+night_log "PRÁH pre-registrován PŘED během: ±$THRESHOLD (párová delta chess)"
 
 night_preflight "$BIN" "$OUT" "$SRC" || {
     night_log "⛔ preflight neprošel — nespouštím. Oprav a pusť znovu."
     exit 3
 }
+
+# --- PREFLIGHT (2. část): UMÍ BINÁRKA TU KONTROLU VŮBEC VYTISKNOUT? ----------
+# ⚑ `night_preflight` hlídá STÁŘÍ binárky a `libbb_engine.so`. To ale neřekne
+#   nic o tom, jestli ta binárka umí `MOVED WITHOUT THE ARM ACTING` -- řádek,
+#   na kterém podle předregistrace stojí CELÝ verdikt. Kdyby ho neuměla, noc
+#   proběhne normálně, sloučení vypíše ⛔ ... až RÁNO, a 14 hodin je pryč.
+#   ⇒ Sonda na 1 páru v CÍLOVÉM režimu, dřív než se sáhne na noc. (Rodina T2.7:
+#   stará binárka tiše měří něco jiného -- tady tiše NEMĚŘÍ kontrolu.)
+if [ ! -f "$OUT/AB_DONE" ]; then
+    probe="$OUT/.probe"; rm -rf "$probe"; mkdir -p "$probe"
+    pidx=${MATCHUPS%%:*}
+    if ( cd "$probe" && "$BIN" "$ROOT" 1 "$pidx" "$MODE" 0 > run.log 2>&1 ) \
+       && grep -q "MOVED WITHOUT THE ARM ACTING" "$probe/run.log"; then
+        night_log "PREFLIGHT sonda OK — binárka tiskne per-pair kontrolu ramene"
+        rm -rf "$probe"
+    else
+        night_log "⛔ PREFLIGHT sonda: binárka NETISKNE 'MOVED WITHOUT THE ARM ACTING'"
+        night_log "   (mode $MODE, matchup $pidx). Verdikt by neměl na čem stát ⇒ NESPOUŠTÍM."
+        night_log "   Viz $probe/run.log. Přelož harness a pusť znovu."
+        exit 4
+    fi
+fi
 
 # --- A/B --------------------------------------------------------------------
 if [ -f "$OUT/AB_DONE" ]; then
@@ -140,16 +183,25 @@ if [ "$CONTROL_MODE2" != "0" ]; then
     fi
 fi
 
-# --- „spustilo se to rameno vůbec?" -----------------------------------------
-# Nejcennější řádek pondělního čtení. Harness ho od 17.08. tiskne sám; tady se
-# jen vytáhne nahoru, aby se na něj nemuselo hledat.
-night_log "--- ARM (nula = ta ramena běžela na stejném kódu) ---"
-for spec in $MATCHUPS; do
-    rest=${spec#*:}; name=${rest%%:*}
-    # Pozor na vzor: "ARM " sedí i na "both arms" v řádku o kleci. Kotvit.
-    line=$(grep -h "^  ARM " "$OUT/${name}_s"*/run.log 2>/dev/null | head -1 | sed 's/^  //')
-    night_log "  $name: ${line:-(harness nic netiskl — stará binárka?)}"
-done
+# --- VÝSLEDEK NOCI ----------------------------------------------------------
+# ⛔ TENHLE BLOK NAHRAZUJE „ARM" ŘÁDEK, KTERÝ 18.08. LHAL.
+#   Grepoval `^  ARM `, což je řádek POUZE pro mode 4 (Dauntless). V mode 0
+#   neexistuje ⇒ do chain.log se vytiskl fallback „(harness nic netiskl — stará
+#   binárka?)“ přesně nad testem, který proběhl a byl čistý 8/8. Navíc `head -1`
+#   četl jen shard 0, takže leak v shardu 5 by neprobublal.
+#
+# ⛔ A DRUHÁ, HORŠÍ VADA: noc končila `NIGHT DONE` BEZ VÝSLEDKU. 6 000 párů
+#   leželo jako osm čísel po ±0,019 -- osm JEDNOTLIVĚ NEPRŮKAZNÝCH výsledků --
+#   a sloučenou deltu musel ráno spočítat člověk. Snímek se vydával za stav.
+#   ⇒ Noc si od 18.08. tiskne vlastní výsledek, v POŘADÍ ČTENÍ z předregistrace.
+night_log "--- VÝSLEDEK (pořadí je pořadí čtení z předregistrace) ---"
+names=""
+for spec in $MATCHUPS; do rest=${spec#*:}; names="$names ${rest%%:*}"; done
+if THRESHOLD="$THRESHOLD" python3 "$ROOT/night_summarize.py" "$OUT" $names >> "$NIGHT_LOG" 2>&1; then
+    :
+else
+    night_log "⚠️ sloučení skončilo nenulově — přečti výpis výš, verdikt NEVYNÁŠEJ z jednoho shardu"
+fi
 
 # --- korpus (volitelně) -----------------------------------------------------
 if [ "$CORPUS" != "0" ]; then

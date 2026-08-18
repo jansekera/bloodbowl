@@ -163,6 +163,53 @@ out=$( . "$LIB"; NIGHT_LOG="$TMP/run/chain.log"
        night_check_baseline "$TMP/run" "$TMP/base" >/dev/null 2>&1 && echo SAME || echo DIFF )
 check "baseline BEZ otisku se odmítne (běhy před 17.08.)" "$out" "DIFF"
 
+echo "== 6. sloučení shardů (night_summarize.py, 18.08.) =="
+# Vada: noc 17.->18.08. doběhla čistě a SKONČILA BEZ VÝSLEDKU -- 6 000 párů
+# leželo jako osm jednotlivě neprůkazných čísel a součet udělal ráno člověk.
+SUM="$ROOT/night_summarize.py"
+mkshard() {  # $1=dir $2=delta $3=se $4=leak $5=n_nonzero
+    mkdir -p "$1"
+    { echo "SUMMARY matchup 1 (dwarf vs wood-elf), 750 pairs (1500 games), n_nonzero $5:"
+      echo "  arm acted in 750/750 pairs; pairs that moved: $5; MOVED WITHOUT THE ARM ACTING: $4  (0 = clean)"
+      echo "  PAIRED delta chess as dwarf: $2 +- $3 SE (~0.0 SE)"
+    } > "$1/run.log"
+}
+# 6a: dva shardy pod prahem každý zvlášť se SLOUČÍ nad práh
+D="$TMP/sum1"; mkshard "$D/m_s0" "-0.0200" "0.0190" 0 480; mkshard "$D/m_s1" "-0.0300" "0.0190" 0 480
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D" m 2>&1)
+echo "$out" | grep -q -- "-0.0250" && ok "sloučená delta ze dvou shardů" || bad "sloučená delta: $out"
+echo "$out" | grep -q "ŠKODÍ" && ok "verdikt proti prahu se vynese strojově" || bad "verdikt chybí"
+echo "$out" | grep -q "2/2 shardů záporných" && ok "znaménka shardů se počítají" || bad "znaménka chybí"
+
+# 6b: PRÁH JE VSTUP, ne konstanta -- táž data, jiný práh, jiný verdikt
+out=$(THRESHOLD=0.05 python3 "$SUM" "$D" m 2>&1)
+echo "$out" | grep -q "NEROZHODNUTO" && ok "vyšší práh dá NEROZHODNUTO (práh je vstup)" || bad "práh se neuplatnil"
+echo "$out" | grep -q "se zapisuje JAKO NEROZHODNUTO" \
+    && ok "NEROZHODNUTO si vyžádá vlastní zápis" || bad "chybí věta o zápisu NEROZHODNUTO"
+
+# 6c: LEAK V JEDINÉM SHARDU MUSÍ ZASTAVIT ČTENÍ DELTY.
+#     Původní blok grepoval `head -1`, takže leak v shardu 5 by neprobublal.
+D2="$TMP/sum2"; mkshard "$D2/m_s0" "-0.0200" "0.0190" 0 480; mkshard "$D2/m_s1" "-0.0300" "0.0190" 7 480
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D2" m 2>&1); rc=$?
+check "leak v NEPRVNÍM shardu vrátí nenulový kód" "$rc" "3"
+echo "$out" | grep -q "DELTA SE NEČTE" && ok "leak zastaví čtení delty" || bad "leak deltu nezastavil"
+echo "$out" | grep -q "m_s1" && ok "leak ukáže, KTERÝ shard" || bad "neřekne který shard"
+echo "$out" | grep -q "DELTA SLOUČENĚ" && bad "delta se vytiskla i přes leak" || ok "delta se při leaku NEVYTISKNE"
+
+# 6d: chybějící kontrola (stará binárka) se pozná a verdikt se NEVYNESE
+D3="$TMP/sum3"; mkdir -p "$D3/m_s0"
+{ echo "SUMMARY matchup 1 (dwarf vs wood-elf), 375 pairs (750 games):"
+  echo "  PAIRED delta chess as dwarf: -0.0297 +- 0.0145 SE (~-2.0 SE)"; } > "$D3/m_s0/run.log"
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D3" m 2>&1); rc=$?
+check "log bez per-pair kontroly vrátí nenulový kód" "$rc" "2"
+echo "$out" | grep -q "VERDIKT SE NEVYNÁŠÍ" && ok "stará binárka: verdikt se nevynáší" || bad "starý log prošel"
+
+# 6e: overdisperze -- shardy si neodpovídají, sloučení je podezřelé
+D4="$TMP/sum4"
+mkshard "$D4/m_s0" "+0.2000" "0.0190" 0 480; mkshard "$D4/m_s1" "-0.2000" "0.0190" 0 480
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D4" m 2>&1)
+echo "$out" | grep -q "SHARDY SI NEODPOVÍDAJÍ" && ok "overdisperze se ohlásí" || bad "overdisperze neohlášena"
+
 echo
 if [ "$FAILS" -eq 0 ]; then
     printf "\033[32mVŠECH %s KONTROL PROŠLO\033[0m\n" "$RUNS"
