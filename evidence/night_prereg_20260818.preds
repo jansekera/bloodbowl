@@ -1,0 +1,6 @@
+# Předpovědi noci 18.→19.08. (P9/P9c). Strojově kontroluje night_summarize.py.
+# Žádná předpověď o kontrolách -- běh má CORPUS=0 a spouštěč by ji odmítl.
+delta      in    0.005 0.020    # 1,28 opravené volby na zápas, mechanismus přes REACH0
+n_nonzero  in    0.35  0.65     # rameno přesměruje ~1,3 odsunu na zápas
+leak       ==    0              # jinak se delta NEČTE
+arm_acted  >=    0.95           # odsunuje se skoro v každém zápase

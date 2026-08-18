@@ -1,0 +1,10 @@
+korpus: corpus_baseline_20260817_data   her: 3000
+
+  našich odsunů                                   65789    21.93 / zápas
+  SE SKUTEČNOU VOLBOU (>=2 prázdná)               52020    17.34 / zápas
+  bez volby (0-1 prázdné pole)                    13769     4.59 / zápas
+  B) přisunuli k nosiči, ač šlo dál                3115     1.04 / zápas
+     z toho: přilepili ho PŘÍMO k nosiči            811     0.27 / zápas
+  A) nechali ho u rohu, ač šlo jinam                735     0.24 / zápas
+
+  ⇒ z odsunů se skutečnou volbou: A 1.4 % · B 6.0 %

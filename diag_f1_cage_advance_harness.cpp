@@ -244,13 +244,15 @@ int main(int argc, char** argv) {
     uint32_t seedBase = (mode == 1) ? 37'000'000u
                       : (mode == 2) ? 51'000'000u
                       : (mode == 3) ? 63'000'000u
-                      : (mode == 4) ? 79'000'000u : SEED_BASE;
+                      : (mode == 4) ? 79'000'000u
+                      : (mode == 5) ? 91'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
          : mode == 2 ? "ERA: single arm, production config, both sides"
          : mode == 4 ? "DAUNTLESS: block offer prices the equalised strength vs raw"
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
+         : mode == 5 ? "P9/P9c: cilove pole odsunu se VYBIRA (geometrie) vs 'rovne dozadu'"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -270,7 +272,8 @@ int main(int argc, char** argv) {
     // to anything that de-duplicates by seed. One process owns one shard
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
-    const char* rowsName = mode == 4 ? "diag_dauntless_rows.jsonl"
+    const char* rowsName = mode == 5 ? "diag_pushgeom_rows.jsonl"
+                         : mode == 4 ? "diag_dauntless_rows.jsonl"
                          : mode == 1 ? "diag_f1_grind_rows.jsonl"
                          : mode == 2 ? "diag_era_rows.jsonl"
                          : mode == 3 ? "diag_m1_rows.jsonl"
@@ -337,8 +340,13 @@ int main(int argc, char** argv) {
                 // to fix, one level up.
                 const bool candDauntless = true;
                 const bool baseDauntless = (mode != 4);
+                // ⛔ 18.08.: bylo `mode != 2 && mode != 3 && mode != 4`, tedy
+                // seznam VÝJIMEK -- každý nový režim by bránu klece dostal
+                // zapnutou, aniž by o to kdokoli požádal. Mode 5 (P9) by tak
+                // měřil odsun DOHROMADY s bránou, kterou jsme týž den zamítli
+                // (−0,0248 ± 0,0068). Přepsáno na seznam těch, kdo ji CHTĚJÍ.
                 MCTSConfig candCfg = makeConfig(vf.get(), pol.get(),
-                                                mode != 2 && mode != 3 && mode != 4,
+                                                mode == 0 || mode == 1,
                                                 mode == 1,
                                                 mode == 3 ? 0.2f : 0.0f,
                                                 candDauntless);
@@ -371,6 +379,16 @@ int main(int argc, char** argv) {
                 MacroMCTSPolicy awayPol(vf.get(),
                                         candHome ? baseCfg : candCfg,
                                         seed * 2654435761u + 47u);
+                // mode 5 (P9/P9c, 18.08.): rameno nesedí v MCTSConfig, ale
+                // v resolveru bloku, protože odsun řeší resolver, ne search.
+                // Nastavuje se PER STRANU, ať A/B umí jen jednu -- a shazuje se
+                // hned po hře, aby nepřeteklo do dalšího páru.
+                bb::setPushGeometryArm(bb::TeamSide::HOME,
+                                       mode == 5 && candHome);
+                bb::setPushGeometryArm(bb::TeamSide::AWAY,
+                                       mode == 5 && !candHome);
+                bb::takePushGeometryEvalsInSearch();   // vynuluj čítač na pár
+
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
                     [&](const GameState& s) { return homePol(s); },
@@ -380,6 +398,9 @@ int main(int argc, char** argv) {
                 // mode 4: kolikrát nabídka ocenila blok silou, na kterou by
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
                 // JINÉHO než „změna nemá efekt".
+                long candPush = bb::takePushGeometryEvalsInSearch();
+                bb::setPushGeometryArm(bb::TeamSide::HOME, false);
+                bb::setPushGeometryArm(bb::TeamSide::AWAY, false);
                 long candDaunt = bb::takeDauntlessOfferEvalsInSearch();
                 long candRoll  = bb::takeDauntlessRollEvalsInSearch();
                 handoffOfferTotal += bb::takeHandOffOfferEvalsInSearch();
@@ -401,7 +422,8 @@ int main(int argc, char** argv) {
                 // vždy a leak test by křičel na KAŽDÉM pohnutém páru. Proto se
                 // pro ně netiskne; falešný poplach je horší než žádný test,
                 // protože se ho lidi naučí ignorovat.
-                pr.armEvents += (mode == 4) ? candDaunt : candPlans;
+                pr.armEvents += (mode == 4) ? candDaunt
+                              : (mode == 5) ? candPush : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
                 else candD++;
@@ -488,7 +510,7 @@ int main(int argc, char** argv) {
         // delta is forced to 0 algebraically and the leg can only catch a gross
         // seeding mistake. This cannot be waved through: it compares pairs where
         // the arm ACTED against pairs where it did not, in the arm's own run.
-        const bool armSignalAvailable = (mode == 0 || mode == 1 || mode == 4);
+        const bool armSignalAvailable = (mode == 0 || mode == 1 || mode == 4 || mode == 5);
         if (armSignalAvailable) {
             printf("  arm acted in %d/%d pairs; pairs that moved: %d; "
                    "MOVED WITHOUT THE ARM ACTING: %d%s\n",
