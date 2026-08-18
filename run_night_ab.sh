@@ -76,6 +76,12 @@ BASELINE=${BASELINE:-}
 #   17.→18.08. říkala ±0,015 — dva různé prahy v jedné noci. Práh se proto
 #   předává sem, zapisuje se do chain.log PŘI STARTU a vyhodnocuje se strojově.
 THRESHOLD=${THRESHOLD:-0.015}
+# ⛔ PŘEDREGISTRACE JAKO VSTUP BĚHU, NE JAKO DOKUMENT VEDLE (18.08.).
+#   Noc 17.→18.08. měla šest předpovědí; DVĚ z nich ten běh nemohl zodpovědět
+#   (`CORPUS=0`) a nikdo to nezkontroloval PŘED spuštěním. Předá-li se sem
+#   soubor předpovědí, spouštěč to chytne za minutu místo za 14 hodin a
+#   `night_summarize.py` na konci vytiskne PŘEDPOVĚĎ vs VÝSLEDEK.
+PREREG=${PREREG:-}
 
 night_init "$OUT" "ab-mode$MODE"
 night_stamp_head "$OUT"
@@ -99,6 +105,23 @@ if [ "$nulls" -eq 0 ] && [ "$CONTROL_MODE2" = "0" ]; then
 fi
 night_log "matchupů $total, z toho nulových $nulls, control_mode2=$CONTROL_MODE2 — OK"
 night_log "PRÁH pre-registrován PŘED během: ±$THRESHOLD (párová delta chess)"
+
+# --- předpovědi: umí na ně tenhle běh vůbec odpovědět? -----------------------
+if [ -n "$PREREG" ]; then
+    if [ ! -f "$PREREG" ]; then
+        night_log "⛔ PREREG=$PREREG neexistuje — nespouštím."; exit 5
+    fi
+    night_log "předregistrace: $PREREG"
+    sed 's/^/    /' "$PREREG" >> "$NIGHT_LOG"
+    need_corpus=$(grep -c '^[[:space:]]*corpus:' "$PREREG" || true)
+    if [ "${need_corpus:-0}" -gt 0 ] && [ "$CORPUS" = "0" ]; then
+        night_log "⛔ ODMÍTÁM SPUSTIT: $need_corpus předpověď/i potřebuje korpus, ale CORPUS=0."
+        night_log "   Běh by na ně NEUMĚL ODPOVĚDĚT a zjistilo by se to až ráno — přesně to"
+        night_log "   se stalo 17.→18.08. (K9a tempo, bloky). Buď CORPUS=1, nebo je z"
+        night_log "   předregistrace vyškrtni. Předpověď, na kterou běh neodpoví, tam nepatří."
+        exit 6
+    fi
+fi
 
 night_preflight "$BIN" "$OUT" "$SRC" || {
     night_log "⛔ preflight neprošel — nespouštím. Oprav a pusť znovu."
@@ -197,7 +220,7 @@ fi
 night_log "--- VÝSLEDEK (pořadí je pořadí čtení z předregistrace) ---"
 names=""
 for spec in $MATCHUPS; do rest=${spec#*:}; names="$names ${rest%%:*}"; done
-if THRESHOLD="$THRESHOLD" python3 "$ROOT/night_summarize.py" "$OUT" $names >> "$NIGHT_LOG" 2>&1; then
+if THRESHOLD="$THRESHOLD" PREREG="$PREREG" python3 "$ROOT/night_summarize.py" "$OUT" $names >> "$NIGHT_LOG" 2>&1; then
     :
 else
     night_log "⚠️ sloučení skončilo nenulově — přečti výpis výš, verdikt NEVYNÁŠEJ z jednoho shardu"

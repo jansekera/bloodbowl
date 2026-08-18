@@ -1,0 +1,8 @@
+# Předpovědi noci 17.→18.08. přepsané do strojově čitelné podoby (zpětně, 18.08.
+# jako doklad, že by je T2.14 chytila). Zdroj: evidence/night_prereg_20260817.md
+delta      in    -0.015 0.015     # čekám kolem nuly => NEROZHODNUTO
+n_nonzero  >=    0.80             # brána sahá na skoro každé kolo s klecí
+leak       ==    0                # jinak se delta nečte
+arm_acted  >=    0.99             # poctivý jmenovatel
+corpus:K9a <     baseline         # tempo dolů -- POTŘEBUJE CORPUS=1
+corpus:blocks >  baseline         # bloky nahoru -- POTŘEBUJE CORPUS=1

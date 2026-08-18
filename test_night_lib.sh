@@ -210,6 +210,33 @@ mkshard "$D4/m_s0" "+0.2000" "0.0190" 0 480; mkshard "$D4/m_s1" "-0.2000" "0.019
 out=$(THRESHOLD=0.015 python3 "$SUM" "$D4" m 2>&1)
 echo "$out" | grep -q "SHARDY SI NEODPOVÍDAJÍ" && ok "overdisperze se ohlásí" || bad "overdisperze neohlášena"
 
+echo "== 7. předpověď vs výsledek (T2.14, 18.08.) =="
+# Vada: noc 17.->18.08. měla 6 předpovědí; DVĚ ten běh nemohl zodpovědět
+# (CORPUS=0) a nikdo to nezkontroloval PŘED startem, a nic je po doběhnutí
+# neporovnalo s výsledkem -- minutá `n_nonzero` (62,8 % vs >80 %) se málem ztratila.
+D5="$TMP/preg"; mkshard "$D5/m_s0" "-0.0250" "0.0190" 0 470
+cat > "$TMP/p.preds" <<'EOF'
+delta      in    -0.015 0.015
+n_nonzero  >=    0.80
+leak       ==    0
+EOF
+out=$(PREREG="$TMP/p.preds" THRESHOLD=0.015 python3 "$SUM" "$D5" m 2>&1)
+echo "$out" | grep -q "MIMO.*delta" && ok "falzifikovaná předpověď se označí MIMO" || bad "MIMO u delty chybí"
+echo "$out" | grep -q "MIMO.*n_nonzero" && ok "minutá n_nonzero se NEZTRATÍ" || bad "n_nonzero mimo neoznačeno"
+echo "$out" | grep -q "TREFA.*leak" && ok "splněná předpověď se označí TREFA" || bad "TREFA chybí"
+
+# 7b: předpověď, na kterou běh neumí odpovědět, se NESMÍ tvářit jako splněná
+cat > "$TMP/p2.preds" <<'EOF'
+corpus:K9a <  baseline
+EOF
+out=$(PREREG="$TMP/p2.preds" THRESHOLD=0.015 python3 "$SUM" "$D5" m 2>&1)
+echo "$out" | grep -q "NEZODPOVĚDITELNÁ" && ok "nezodpověditelná předpověď se pojmenuje" || bad "prošla tiše"
+echo "$out" | grep -q "TREFA" && bad "nezodpověditelná se tváří jako TREFA" || ok "nezodpověditelná NENÍ trefa"
+
+# 7c: bez předregistrace se nic nerozbije (zpětná kompatibilita)
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D5" m 2>&1); rc=$?
+check "bez PREREG projde beze změny" "$rc" "0"
+
 echo
 if [ "$FAILS" -eq 0 ]; then
     printf "\033[32mVŠECH %s KONTROL PROŠLO\033[0m\n" "$RUNS"

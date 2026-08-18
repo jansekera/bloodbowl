@@ -46,7 +46,7 @@ def read_shard(path):
                 delta=float(d.group(1)), se=float(d.group(2)))
 
 
-def summarize(out, name, thr):
+def summarize(out, name, thr, facts=None):
     logs = sorted(glob.glob(os.path.join(out, name + "_s*", "run.log")))
     sh = [x for x in (read_shard(p) for p in logs) if x]
     L = []
@@ -109,6 +109,11 @@ def summarize(out, name, thr):
                  % (emp, pooled,
                     "overdisperze ⚠️ SHARDY SI NEODPOVÍDAJÍ, sloučení je podezřelé"
                     if emp > 1.5 * pooled else "bez overdisperze, sloučení legitimní"))
+    if facts is not None:
+        facts.update({"delta": mean, "n_nonzero": nz / pairs if not any(x["nz"] is None for x in sh) else None,
+                      "leak": float(leak), "arm_acted": acted / of})
+        for k in [k for k, v in facts.items() if v is None]:
+            del facts[k]
     verdict = ("ŠKODÍ" if mean <= -thr else "POMÁHÁ" if mean >= thr else "NEROZHODNUTO")
     L.append("       PRÁH ±%.4f (vstup běhu, ne konstanta ve zdrojáku) ⇒ **%s**" % (thr, verdict))
     if verdict == "NEROZHODNUTO":
@@ -116,11 +121,89 @@ def summarize(out, name, thr):
     return L, 0
 
 
+
+# ============================================================================
+# PŘEDPOVĚĎ vs VÝSLEDEK                                          (18.08.2026)
+#
+# ⚑ PROČ. Předregistrace má jedinou hodnotu: donutí mít nepravdu NAHLAS.
+#   Noc 17.→18.08. měla šest předpovědí. Dvě z nich ten běh NEMOHL zodpovědět
+#   (`CORPUS=0`) a nikdo to nezkontroloval PŘED spuštěním; a nic je po doběhnutí
+#   neporovnalo s výsledkem, takže minutá předpověď `n_nonzero` (62,8 % proti
+#   čekaným >80 %) se málem ztratila -- přitom je to informace o rameni, ze které
+#   vzešlo P32. Když minutá předpověď nezanechá stopu, necháš si stejný špatný model.
+#
+# ⚑ FORMÁT souboru (PREREG=cesta), jedna předpověď na řádek:
+#     delta      in    -0.015 0.015     # co čekám a proč
+#     n_nonzero  >=    0.80
+#     leak       ==    0
+#     arm_acted  >=    0.99
+#     corpus:K9a <     baseline         # potřebuje CORPUS=1 -- jinak se běh NESPUSTÍ
+#   `#` je komentář. Metrika s předponou `corpus:` je pro spouštěč signál, že
+#   běh musí sbírat korpus; sem se dostane jen jako NEZODPOVĚDITELNÁ.
+# ============================================================================
+OPS = {
+    "==": lambda v, a: abs(v - a[0]) < 1e-9,
+    ">=": lambda v, a: v >= a[0],
+    "<=": lambda v, a: v <= a[0],
+    ">":  lambda v, a: v > a[0],
+    "<":  lambda v, a: v < a[0],
+    "in": lambda v, a: a[0] <= v <= a[1],
+}
+
+
+def parse_prereg(path):
+    out = []
+    for raw in open(path):
+        line = raw.split("#")[0].strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            out.append((parts[0] if parts else "?", None, None, raw.strip()))
+            continue
+        metric, op, args = parts[0], parts[1], parts[2:]
+        try:
+            vals = [float(a) for a in args]
+        except ValueError:
+            vals = None            # např. `corpus:K9a < baseline`
+        out.append((metric, op, vals, raw.strip()))
+    return out
+
+
+def confront(preds, facts):
+    """facts: metrika -> hodnota. Vrací (řádky, počet MIMO)."""
+    L = ["  --- PŘEDPOVĚĎ vs VÝSLEDEK (z předregistrace, zapsané PŘED během) ---"]
+    missed = 0
+    for metric, op, vals, raw in preds:
+        if metric not in facts or op not in OPS or vals is None:
+            L.append(f"    ⛔ NEZODPOVĚDITELNÁ  {raw}")
+            L.append("       ⇒ běh na tuhle předpověď neumí odpovědět. To se mělo chytit PŘED startem.")
+            missed += 1
+            continue
+        v = facts[metric]
+        ok = OPS[op](v, vals)
+        L.append(f"    {'✅ TREFA ' if ok else '❌ MIMO  '}  {metric} {op} "
+                 f"{' '.join(f'{x:g}' for x in vals)}   →  změřeno {v:+.4f}")
+        if not ok:
+            missed += 1
+            L.append("       ⚠️ MIMO se zapisuje. Je to informace o rameni, ne selhání běhu.")
+    if not preds:
+        L.append("    (předregistrace nepředána -- PREREG=cesta)")
+    return L, missed
+
 if __name__ == "__main__":
     out, thr = sys.argv[1], float(os.environ.get("THRESHOLD", "0.015"))
+    preg = os.environ.get("PREREG", "")
+    preds = parse_prereg(preg) if preg and os.path.exists(preg) else []
     rc = 0
     for name in sys.argv[2:]:
-        lines, r = summarize(out, name, thr)
+        facts = {}
+        lines, r = summarize(out, name, thr, facts)
         print("\n".join(lines))
         rc = max(rc, r)
+        if preds and r == 0:
+            cl, missed = confront(preds, facts)
+            print("\n".join(cl))
+            if missed:
+                print(f"       ⇒ {missed} předpověď/i MIMO nebo nezodpověditelná — patří do zápisu noci.")
     sys.exit(rc)
