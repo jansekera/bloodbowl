@@ -769,3 +769,42 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// K9b (2026-08-18): corridorResistance must live OUTSIDE the planner.
+//
+// Until today the number existed only when the cage gate ran. The gate is OFF
+// in production (NOT_CONSULTED in 100% of turns on the 3000-game corpus), so
+// check K9b -- which needs it -- could never run, and it was parked as
+// "BLOCKED on T3.1". T3.1 was REJECTED on 2026-08-18, which would have turned
+// that temporary blocker into a permanent one. This pins the hoisted function
+// so it cannot quietly slide back inside the planner.
+TEST(CorridorResistance, CountsOnlyStandingOpponentsInTheCorridor) {
+    GameState state = makeCageState();
+    const Player& carrier = state.getPlayer(1);
+    // The fixture's only AWAY body sits far away at {24,13} -> outside.
+    EXPECT_EQ(corridorResistance(state, carrier, TeamSide::HOME), 0);
+
+    auto place = [&](int id, Position pos, PlayerState st) {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = TeamSide::AWAY;
+        p.state = st;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        p.hasMoved = false;
+        p.hasActed = false;
+    };
+    // HOME advances with dx = +1; the carrier stands at {12,7}.
+    place(13, Position{14, 7}, PlayerState::STANDING);   // ahead 2, dy 0
+    place(14, Position{15, 9}, PlayerState::STANDING);   // ahead 3, dy 2
+    EXPECT_EQ(corridorResistance(state, carrier, TeamSide::HOME), 2);
+
+    place(15, Position{16, 7}, PlayerState::PRONE);      // prone       -> out
+    place(16, Position{18, 7}, PlayerState::STANDING);   // ahead 6 > 4 -> out
+    place(17, Position{14, 11}, PlayerState::STANDING);  // dy 4 > 2    -> out
+    place(18, Position{10, 7}, PlayerState::STANDING);   // behind us   -> out
+    EXPECT_EQ(corridorResistance(state, carrier, TeamSide::HOME), 2)
+        << "prone, too deep, too wide and behind must all be excluded";
+}

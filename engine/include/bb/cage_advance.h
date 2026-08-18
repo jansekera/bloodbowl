@@ -135,6 +135,25 @@ struct CageAdvancePlan {
     std::vector<uint8_t> diagMacroCornerGfi; // 1 = the 1-GFI corner allowance
 };
 
+// Standing opponents in the advance corridor ahead of the carrier -- i.e.
+// "how hard is the path forward". Each body there costs an extra block or an
+// arc around it, which is pace: three squares across open grass and three
+// squares through a wall are not the same demand.
+//
+// ⛔ WHY THIS IS A FREE FUNCTION (2026-08-18, K9b).
+//   Until today this was computed ONLY inside CageAdvancePlanner::plan(), so
+//   it existed only when the cage gate ran. The gate is OFF in production
+//   (`plan: NOT_CONSULTED` in 100% of turns on the 3000-game corpus), so
+//   `resistance` was always 0 and check K9b -- which needs it -- could never
+//   run. K9b was parked as "BLOCKED on T3.1"; T3.1 was REJECTED on 2026-08-18
+//   (the gate hurts, -0.0248 +- 0.0068), which turned a temporary blocker into
+//   a permanent one. Hoisting the computation out makes resistance available
+//   in EVERY turn regardless of the planner -- and the phase rewrite of K9
+//   (T0.1) needs it, because otherwise the cage-phase floor would have to be
+//   a hardcoded constant, which the user forbade on the same day.
+int corridorResistance(const GameState& state, const Player& carrier,
+                       TeamSide mySide);
+
 class CageAdvancePlanner {
 public:
     // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,

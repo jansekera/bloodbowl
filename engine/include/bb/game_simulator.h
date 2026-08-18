@@ -77,6 +77,19 @@ struct TurnLog {
     // plan.written == false means no planner ran -- the turn was pure search().
     TurnPlanRecord plan;
 
+    // Standing opponents in the corridor ahead of OUR carrier at the start of
+    // this turn -- "how hard is the path forward".
+    //
+    // ⛔ SEPARATE FROM plan.resistance ON PURPOSE (2026-08-18, K9b). The same
+    // number lives in TurnPlanRecord, but ONLY when the cage planner ran, and
+    // the gate is OFF in production (NOT_CONSULTED in 100% of turns), so that
+    // copy is always 0. Worse, the simulator re-assigns curLog.plan from the
+    // thread-local record on every action until `written` flips, so anything
+    // stamped there at snapshot time would be overwritten by zeros. This field
+    // is a property of the BOARD, not of the planner, and is filled every turn.
+    // -1 = not applicable (we do not hold the ball).
+    int8_t corridorResistance = -1;
+
     // Summary flags
     bool turnover = false;
     bool touchdown = false;

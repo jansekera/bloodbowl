@@ -56,6 +56,22 @@ int cageExposure(const GameState& state, const Player& carrier, int step) {
 
 } // anonymous namespace
 
+// See the header for why this is not a planner member any more (K9b, 08-18).
+int corridorResistance(const GameState& state, const Player& carrier,
+                       TeamSide mySide) {
+    const int dx = forwardDx(mySide);
+    int n = 0;
+    state.forEachOnPitch(opponent(mySide), [&](const Player& p) {
+        if (p.state != PlayerState::STANDING) return;
+        int ahead = (p.position.x - carrier.position.x) * dx;
+        if (ahead < 1 || ahead > CageAdvancePlanner::CORRIDOR_DEPTH) return;
+        if (std::abs(p.position.y - carrier.position.y) >
+            CageAdvancePlanner::CORRIDOR_HALF_WIDTH) return;
+        ++n;
+    });
+    return n;
+}
+
 bool CageAdvancePlanner::eligibleCornerPlayer(const Player& p) {
     // Activation-reliability nega-traits: the corner job is a formation
     // commitment -- a corner that fails its activation roll (or roots) is a
@@ -477,14 +493,10 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     plan.requiredPace = static_cast<double>(dist) / usable;
 
     // Opponent resistance in the advance corridor (constraint 1): each
-    // screen body ahead costs an extra arc/block, i.e. pace.
-    state.forEachOnPitch(opponent(mySide), [&](const Player& p) {
-        if (p.state != PlayerState::STANDING) return;
-        int ahead = (p.position.x - carrier.position.x) * dx;
-        if (ahead < 1 || ahead > CORRIDOR_DEPTH) return;
-        if (std::abs(p.position.y - carrier.position.y) > CORRIDOR_HALF_WIDTH) return;
-        plan.resistance++;
-    });
+    // screen body ahead costs an extra arc/block, i.e. pace. Hoisted out of
+    // the planner on 08-18 (K9b) so it exists even when the gate does not run
+    // -- ONE definition, used both here and by the per-turn snapshot.
+    plan.resistance = corridorResistance(state, carrier, mySide);
     int penalty = std::min(2, (plan.resistance + 1) / 2);
 
     // Role-achievable raw step: the largest step the actual corner

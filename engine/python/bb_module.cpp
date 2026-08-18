@@ -276,6 +276,8 @@ PYBIND11_MODULE(bb_engine, m) {
                     pd["exposure"] = pl.exposure;
                     t["plan"] = pd;
                 }
+                // K9b (08-18): odpor mimo plánovač -- viz game_simulator.h
+                t["corridor_resistance"] = turn.corridorResistance;
                 switch (turn.weather) {
                     case bb::Weather::SWELTERING_HEAT: t["weather"] = "sweltering_heat"; break;
                     case bb::Weather::VERY_SUNNY:      t["weather"] = "very_sunny"; break;

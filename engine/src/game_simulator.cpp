@@ -1,4 +1,5 @@
 #include "bb/game_simulator.h"
+#include "bb/cage_advance.h"
 #include "bb/action_resolver.h"
 #include "bb/ball_handler.h"
 #include "bb/kickoff_handler.h"
@@ -673,6 +674,17 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     turn.ballHeld = board.ballHeld;
     turn.ballCarrierId = board.ballCarrierId;
     turn.weather = state.weather;
+
+    // K9b (08-18): odpor v koridoru se počítá KAŽDÉ kolo, nezávisle na tom,
+    // jestli běžel plánovač klece. Jen pro naše kolo a jen když držíme míč --
+    // jinak predikát nedává smysl a zapisuje se -1 (N/A), ne nula.
+    if (state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& car = state.getPlayer(state.ball.carrierId);
+        turn.corridorResistance =
+            (car.teamSide == state.activeTeam)
+                ? static_cast<int8_t>(corridorResistance(state, car, state.activeTeam))
+                : static_cast<int8_t>(-1);
+    }
 
     return turn;
 }
