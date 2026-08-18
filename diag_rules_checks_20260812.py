@@ -136,6 +136,25 @@ class Check:
         self.n += 1
         self.ok += 1 if passed else 0
 
+    def num(self, v):
+        """Zapiš i ČÍSLO, ne jen splněno/nesplněno.  (P1, 18.08.2026)
+
+        ⛔ PROČ. σ-tabulka 18.08. na 3 000 hrách: tatáž veličina jako POČET je
+        jeden z nejsilnějších prediktorů TD, jako ano/ne je šum -- a u bloků
+        dokonce s OBRÁCENÝM znaménkem:
+
+            bloků na kolo (počet)          +10,4σ   a v půlkách korpusu replikuje
+            "padl aspoň jeden blok?"       −2,5σ   a NEreplikuje
+            REACH0 (počet)                 −16,7σ
+            "REACH0 = 0?"                   +9,3σ
+
+        Ano/ne slepí dohromady "na nosiče dosáhne jeden" a "dosáhnou čtyři",
+        což je rozdíl mezi 8,3 % a 33 % ztráty míče.  ⇒ POVINNOST smí být
+        ano/ne ("ani jeden otevřený roh" je správný cíl), ale METR si musí
+        nechat číslo.  Pravidlo a metr nemusí mít týž tvar.
+        """
+        self.vals.append(float(v))
+
     def skip(self):
         self.deg += 1
 
@@ -146,7 +165,9 @@ class Check:
         if self.deg:
             s += f", {self.deg} N/A ({self.deg / (self.n + self.deg):.0%})"
         if self.vals:
-            s += f", průměr {sum(self.vals) / len(self.vals):+.2f}"
+            # P1 (18.08.): podíl vlevo je PRAVIDLO, tohle číslo je METR.
+            # U K33/K34/K35 nese skoro všechen signál právě ono.
+            s += f", ⌀ {sum(self.vals) / len(self.vals):+.2f} ← metr"
         return s
 
 
@@ -234,10 +255,10 @@ def analyse(paths, race="dwarf"):
         "K30": Check("K30 (R3) drahý dodge je držený", "podíl soupeřů"),
         "K30cheap": Check("K30b levný dodge je držený (nemá cenu)", "podíl soupeřů"),
         "K31": Check("K31 (R4) kolo BEZ těla bez úkolu"),
-        "K33": Check("K33 kolo s aspoň jedním blokem"),
+        "K33": Check("K33 kolo s aspoň jedním blokem"),   # + P1: bloků/kolo
         # E1/E2 z ČÁSTI 13 (exposure scan, 12.08.) jako vynucované kontroly
-        "K34": Check("K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge"),
-        "K35": Check("K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky"),
+        "K34": Check("K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge"),  # + P1: REACH0 jako počet
+        "K35": Check("K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky"),   # + P1: FB2 jako počet
     }
     # K36: hypotéza z odehrané situace 12.08. — postup vykoupený kontaktem
     # zamyká vlastní těla, a zamčené tělo neumí být rohem klece příští kolo.
@@ -281,6 +302,7 @@ def analyse(paths, race="dwarf"):
             blocks = sum(1 for e in S["events"]
                          if e["type"] == "BLOCK" and any(p["id"] == e["player_id"] for p in us))
             C["K33"].hit(blocks > 0)
+            C["K33"].num(blocks)          # P1: ano/ne je u bloků šum, počet je +10,4σ
 
             # --- kolik kol vůbec mělo plán (X6 / brána klece)
             pl = S.get("plan") or {}
@@ -343,8 +365,10 @@ def analyse(paths, race="dwarf"):
             board = Board(E, ours)
             P = predictors(board)
             C["K35"].hit(P["FB2"] <= 1)
+            C["K35"].num(P["FB2"])        # P1
             if "REACH0" in P:
                 C["K34"].hit(P["REACH0"] == 0)
+                C["K34"].num(P["REACH0"]) # P1: počet je −16,7σ, práh jen +9,3σ
             else:
                 C["K34"].skip()   # bez stojícího nosiče predikát nedává smysl
 
