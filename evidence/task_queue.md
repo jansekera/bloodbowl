@@ -65,6 +65,11 @@ uživatel na položky ukazuje číslem.
 | T2.5 | N4 kalibrace proti uživateli — 20 kol, shoda ≥ 18/20, **než se agregátu uvěří** | **OTEVŘENO** |
 | T2.6 | **X2 + X3** (kostky bloku · deklarovaná makra s pořadím) — jedna oprava odemkne **Z4, Z5, Z9, Z14, S2.14, S10.3** | **OTEVŘENO** — nejlepší poměr odemčeno/cena v celém aparátu |
 | T2.7 | [14] diag binárky staticky — jinak stará binárka tiše měří jiný engine | **OTEVŘENO** |
+| **T2.10** | ⭐⭐ **`run_night_ab.sh` — ARM blok hlásí falešný poplach a čte jen 1 shard z 8.** Grepuje `^  ARM `, což je řádek **pouze pro mode 4** (`diag_f1_cage_advance_harness.cpp:528`); v mode 0 neexistuje ⇒ v noci 17.→18.08. se vytiskl fallback „(harness nic netiskl — stará binárka?)“ přesně na řádku, který předregistrace označuje za nejcennější ranní čtení — přitom test proběhl a byl **čistý 8/8**. Navíc `head -1` = jen shard 0, takže leak v shardu 5 by neprobublal. Opravit vzor na `MOVED WITHOUT THE ARM ACTING` (tiskne se v každém režimu) a **sečíst přes všechny shardy**. | **OTEVŘENO — levné, kazí ranní čtení** |
+| **T2.11** | ⭐⭐⭐ **Nic neslučuje shardy — noc nemá výsledek.** `chain.log` končí `NIGHT DONE` bez sloučené delty; 6 000 párů existuje jen jako 8× ±0,019, tj. **osm jednotlivě neprůkazných čísel**, a skutečnou odpověď musel ráno spočítat člověk. Táž rodina jako audit aparátu: **snímek se vydává za stav** — a je to přesně krok, kde si unavené čtení vybere shard, který se hodí. Chce to `night_summarize`: sloučená delta + sdružená SE + **empirická SE mezi shardy** *(kontrola overdisperze — v noci 0,0053 < 0,0068 ⇒ sloučení legitimní)* + počet záporných shardů + součet leaku + `n_nonzero`. | **OTEVŘENO** |
+| **T2.12** | ⛔ **Dva různé prahy v jedné noci.** Harness tiskne natvrdo `[pre-reg: >= +0.03 on dwarf matchups]`, předregistrace na tutéž noc říká **±0,015**. Práh se nikde **strojově nevyhodnotí** ⇒ verdikt zůstává na ranním čtení, což je otevřená branka pro dodatečné doladění. Práh má být **vstup běhu** (proměnná prostředí zapsaná do `chain.log` při startu), ne konstanta ve zdrojáku. | **OTEVŘENO** |
+| **T2.13** | **Preflight neověří, že kontrola vůbec existuje.** Hlídá mtime binárky i `libbb_engine.so` (T2.7 na úrovni enginu), ale ne to, jestli binárka umí vytisknout `MOVED WITHOUT THE ARM ACTING`. Kdyby neuměla, noc vypadá normálně a **verdikt stojí na kontrole, která neproběhla**. Oprava: sonda 1 páru v cílovém režimu, grep na ten řádek, jinak `exit`. | **OTEVŘENO** |
+| **T2.14** | **Předregistrované předpovědi se nikde nekonfrontují s výsledkem.** Noc 17.→18.08.: dvě ze šesti (K9a tempo dolů, bloky nahoru) byly **nezodpověditelné**, protože běh měl `CORPUS=0`; a minutá předpověď `n_nonzero` **62,8 % vs čekaných >80 %** je informace o rameni *(brána sahá na méně kol, než jsme mysleli)*, která by bez zápisu propadla. Buď `CORPUS=1`, nebo předpovědi na korpus z předregistrace vyškrtnout — a přidat krok „předpověď vs výsledek“ do shrnutí. | **OTEVŘENO** |
 | T2.8 | E1/E2 jako K34/K35 | **UZAVŘENO** — `bc9cf17` |
 | T2.9 | **K36 `LOCKED`** — zamčená vlastní těla jako chybějící člen tempa | **UZAVŘENO** — `bc9cf17`; potvrzeno na 3000 hrách, monotónní: ≤2 → Δx **+2,18** (n=15314) · 3–5 → **+1,89** (n=2162) · 6–8 → **+1,06** (n=50) |
 | K9b | — | **BLOKOVÁNO** na T3.1 (`resistance` je 0, plánovač se nezeptá) |
@@ -76,7 +81,7 @@ uživatel na položky ukazuje číslem.
 
 | ID | co | stav |
 |---|---|---|
-| T3.1 | Brána klece — veto jen při `achievable == 0` + cage-fill | **ZAMÍTNUTO** — 1500 párů, dw-we **−0,0297 (−2,0σ)**, dw-sk +0,008. ⚠️ Nezahazovat kód: zlepšila skoro všechny kontroly, vyměnila tempo (20,6→28,4 %) za bití (76,1→73,2 %) a čistotu rohů (79,4→72,6 %) ⇒ nula. **Chybí jí plán trasy, ne schopnost.** |
+| T3.1 | Brána klece — veto jen při `achievable == 0` + cage-fill | **ZAMÍTNUTO — PŘEMĚŘENO 18.08. A POTVRZENO** (`gate_crn_20260817/`, 6 000 párů s CRN, pre-reg `evidence/night_prereg_20260817.md`): leak `MOVED WITHOUT THE ARM ACTING` **0 v 8/8 shardech** ⇒ delta se smí číst · `arm acted` **6000/6000** · `n_nonzero` **62,8 %** *(pre-reg čekal >80 % — předpověď MIMO, práh se podle pravidla NEPOSOUVÁ)* · **delta −0,0248 ± 0,0068 SE (−3,7σ), 8/8 shardů záporných**, 95 % CI [−0,038; −0,012] ⇒ pod pre-reg prahem **−0,015 = BRÁNA ŠKODÍ**, tedy ne NEROZHODNUTO. ⛔ **Není to replikace 13.08.** — mezi tím 3 commity enginu (P13, hand-off, darované TD) ⇒ platí „v dnešním enginu škodí“, ne „tehdy jsme měli pravdu“. ⚠️ Výhrada z 13.08. platí dál: **chybí jí plán trasy, ne schopnost.** *(původní zápis 13.08.:)* 1500 párů, dw-we **−0,0297 (−2,0σ)**, dw-sk +0,008. ⚠️ Nezahazovat kód: zlepšila skoro všechny kontroly, vyměnila tempo (20,6→28,4 %) za bití (76,1→73,2 %) a čistotu rohů (79,4→72,6 %) ⇒ nula. **Chybí jí plán trasy, ne schopnost.** |
 | T3.2 | [1] Kontrola `c085331` (exposure = uživatelovo R1) — přeměřit K7 na korpusu PO opravě klece | **BLOKOVÁNO** — viz A2 |
 | A2 | ⭐ **Exposure/R1 vyzvednout z `cage_advance.cpp` do obecného pohybu** | **OTEVŘENO** *(nové 14.08.)* — ověřeno: `c085331` sahá jen do `cage_advance.cpp`, ten se instancuje výhradně při `config.cageAdvance` (`macro_mcts.cpp:907`) ⇒ **hotová práce nejde zapnout nezávisle na zamítnuté bráně.** Je to tvoje vlastní pravidlo *„BLITZ pohyb → obecný pohyb"*. |
 | T3.3 | [2] Tempo cílit na 3,14, ne 2,61 | **PŘEFORMULOVÁNO** → P3 (rovnoměrná podlaha je špatný model) |
@@ -579,46 +584,61 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
   v rozhodování
 
 # CO JE TEĎ PRVNÍ
-*(jediný oddíl, který se přepisuje — stav k 17.08.2026 ráno)*
+*(jediný oddíl, který se přepisuje — stav k 18.08.2026 ráno)*
 
-## ⭐ Nález víkendu, podle kterého se řadí zbytek
+## ⭐ Nález noci, podle kterého se řadí zbytek
 
-**Práh „PROŠLO" splnilo rameno, které se ani jednou nespustilo.**
-`dw-sk` +2,28 pp (+2,3 SE) při `cand_daunt = 0` v 6 000/6 000 her. Pár není
-tatáž hra s jedním přehozeným bitem — jsou to **dvě různé hry na spřízněných
-seedech**. ⇒ **P20.** Efekt se čte **proti nulovému rameni**, ne proti nule,
-a **každé budoucí A/B musí nulové rameno mít**.
+**Brána klece ŠKODÍ — a poprvé to stojí na kontrole, ne na víře.**
+`gate_crn_20260817/`, 6 000 párů, čteno v pre-registrovaném pořadí:
+leak `MOVED WITHOUT THE ARM ACTING` **0 v 8/8 shardech** ⇒ delta se smí číst ·
+`arm acted` **6000/6000** · `n_nonzero` **62,8 %** ·
+**delta −0,0248 ± 0,0068 SE (−3,7σ), 8/8 shardů záporných**.
+Pre-reg práh −0,015 ⇒ **ŠKODÍ**. ⇒ **T3.1 uzavřeno.**
+⛔ **Není to replikace 13.08.** (3 commity enginu mezi tím) a ⚠️ výhrada platí:
+**chybí jí plán trasy, ne schopnost** — kód se nezahazuje, vrací se přes **P3**.
 
-⚠️ Bezprostřední důsledek: **zamítnutí brány klece** (−0,0297 = −2,0σ) běželo
-**bez nulového ramene** a je třeba ho přečíst znovu touž optikou.
+⚠️ **Pre-registrovaná předpověď byla FALZIFIKOVÁNA** (čekalo se „kolem nuly“).
+To je zdravé: předregistrace poprvé zabránila tomu, aby se výsledek dočetl zpětně.
 
-*(Nález 14.08. „filtr oceňuje jinou akci, než jakou resolver provede" — P5 · P9 ·
-P13 · P14 · P15 — platí dál a systematický audit `macro_actions.cpp` /
-`block_handler.cpp` / `macro_mcts.cpp` zůstává nejcennějším stolním úkolem.)*
+## ⭐⭐ Druhý nález noci: spravili jsme SPUŠTĚNÍ noci, ne její ČTENÍ
 
-## Výsledek víkendu — jedna věta
+17.08. se opravil spouštěč a přibyl per-pair leak test — obojí v noci fungovalo.
+**Čtecí strana ale selhala na pěti místech naráz** (T2.10–T2.14). Nejhorší dvě:
 
-**P13 Dauntless PROŠLO** (dw-orc +4,08 pp; proti sdružené nule **+3,59 pp,
-~3,4σ**), **v produkci ale zapnuté není**; **měna drivů se nezměřila** (jiný
-engine v baseline, P22); **hand-off má 0 výskytů ve 3 000 hrách** (P21);
-**so + ne propadly bez běhu** — dvě 14hodinová okna.
-Podrobně `evidence/weekend_result_20260817.md`.
+* `chain.log` vytiskl **„(harness nic netiskl — stará binárka?)“** přesně na tom
+  řádku, který předregistrace označuje za nejcennější ranní čtení — a byl to
+  **falešný poplach**: test proběhl a byl čistý 8/8. Grep hledá mode-4 vzor.
+* **Nic neslučuje shardy.** Noc skončila bez výsledku; 6 000 párů leželo jako
+  osm jednotlivě neprůkazných čísel a součet musel udělat člověk ráno.
+
+⇒ *Kontrola, kterou nikdo nepřečte, a výsledek, který nikdo nespočítá,
+se od chybějící kontroly a chybějícího výsledku neliší.*
 
 ## Dnes — pořadí
 
 | | co | proč teď | stroj? |
 |---|---|---|---|
-| ~~1.~~ | ✅ **P13 ZAPNUTO V PRODUKCI** — `79382711`. Nejen `MCTSConfig`: **python binding** na `true` *(korpusy se sbírají přes něj — jinak bychom dál sbírali korpus enginu, který neběží)*, **harness** přestal spoléhat na default *(mode 4 reprodukuje přesně, ostatní režimy mají rameno v OBOU ramenech, jinak by A/B srovnávalo dva neprodukční enginy)*, **test připíchl default** proti tichému návratu. 541/541 zelených. | hotovo |
-| ~~0.~~ | ✅ **NOČNÍ APARÁT SPRAVEN A OTESTOVÁN** — `f7ecf05d`. `run_night_lib.sh` *(PID zámek · úklid dětí na EXIT/INT/TERM · číslované POKUS n · `night_preflight`: **stará binárka i starý `libbb_engine.so`** běh zastaví)* · `test_night_lib.sh` **14/14** · `run_night_ab.sh` **odmítne A/B bez nulového matchupu**. Ověřeno na reálném stromu. | hotovo |
-| **2.** | **P21** — spočítat **výskyt** situace „nosič ≠ Runner a vedle volný Runner" ve snímcích korpusu | rozhodne (a)/(b) **bez běhu** a odblokuje čtení celého P5 | ne |
-| **3.** | **T5.3** — zranění nepřetrvávají přes drive | ⭐ **násobitel celého attrition programu**; dokud se po TD staví 11 čerstvých, je každý náš výsledek o bití **dolní odhad** — včetně těch +4,08 pp | ne |
-| **2.5** | ⭐ **P25 — audit měřicích nástrojů** *(uživatel 17.08.: „raději ověřme, co nám v pátek ujelo")* | sedm nálezů za jediný den bez hledání; **dokud neplatí metr, je každý noční běh sázka** | ne |
-| ~~4.~~ | ✅ **NOC BĚŽÍ od 10:10** — brána klece s CRN, `dw-we`, 8×750 = **6 000 párů**, předregistrace `evidence/night_prereg_20260817.md`. Vedle toho ✅ **čerstvá baseline korpusu** (`run_corpus_baseline.sh`, 3 000 her) — po víkendu **nemáme žádnou použitelnou baseline** (P22), takže měna drivů je do jejího vzniku neměřitelná. | běží |
-| **5.** | vybrat a spustit **noční A/B** *(kandidáti: **P17 Wrestle** · P2+P9c · blitz roh vs zeď · P10a)* | dvě okna už propadla | **ano, 14 h** |
+| **1.** | **T2.10 + T2.11 + T2.13** — opravit ARM grep, přidat `night_summarize` (sloučená delta · sdružená SE · **empirická SE mezi shardy** · počet záporných shardů · součet leaku · `n_nonzero`), preflight sonda na existenci kontroly | **půl hodiny práce, a jinak se příští noc čte zas ručně**; bez toho je i správně změřená noc sázka na ranní pozornost | ne |
+| **2.** | **P30 — přepočet σ-tabulky** na `corpus_baseline_20260817_data` (3 000 her, COLLECT_DONE, otisk enginu 5e5ab352) | ⏰ **spouštěč splněn dnes v noci**; σ-tabulka je od 17.08. POZASTAVENÁ a **nesmí řadit frontu**, dokud se nepřepočítá | ne |
+| **3.** | **T2.12** — práh jako vstup běhu, ne konstanta ve zdrojáku | dvě různá čísla (+0,03 vs ±0,015) v jedné noci | ne |
+| **4.** | **P21** — výskyt „nosič ≠ Runner a vedle volný Runner“ ve snímcích korpusu | rozhodne (a)/(b) bez běhu a odblokuje čtení P5; teď už je na čem (nová baseline) | ne |
+| **5.** | **T5.3** — zranění nepřetrvávají přes drive | ⭐ násobitel celého attrition programu | ne |
+| **6.** | vybrat a spustit **noční A/B** *(kandidáti: P2+P9c · blitz roh vs zeď · P10a; **P17 Wrestle vyřazen** — je to parita, ne zlepšení)* | tři okna už propadla | **ano, 14 h** |
 
-⛔ **Podmínka na bod 4:** noční běh **musí** obsahovat matchup s **nulovou
-expozicí** a spouštěč **musí** sourcovat `run_night_lib.sh`. Bez obojího se
-nespouští — právě proto vznikly P20 a P23.
+⛔ **Podmínka na bod 6 se ROZŠIŘUJE.** Dosud: nulová kontrola + `run_night_lib.sh`.
+Nově navíc: **běh se nespouští, dokud neumí sám vytisknout sloučený výsledek**
+(T2.11) — jinak vyrobíme další noc, kterou nikdo nepřečte.
+⚠️ A do předregistrace patří **jen předpovědi, na které ten běh umí odpovědět**:
+noc 17.→18.08. měla `CORPUS=0`, takže dvě ze šesti byly od začátku nezodpověditelné (T2.14).
+
+## Rozpočet párů — POZOR, změna pravidla
+
+**CRN u všudypřítomného ramene skoro nepomáhá: redukce SE ~6 %**, ne slíbených
+15–25 %. Identických párů bylo **37 %** *(víc, než se čekalo)*, a přesto se SE
+skoro nehnula — ⭐ **páry, které se hnou, se hnou víc** (podmíněné SD páru 0,66
+vs nepárová 0,56). ⇒ **Rozpočet párů se NESMÍ počítat z podílu identických párů**;
+plánuje se podle šumového dna BEZ CRN (2 pp ⇒ ~5 300 párů) a CRN se bere jako bonus.
+U **vzácného** ramene platí dál, že CRN je zásadní (mrtvé rameno dá exaktní nulu).
 
 ## Stolní práce *(nesoupeří o stroj, tady je úzké hrdlo)*
 
