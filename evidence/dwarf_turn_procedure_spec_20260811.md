@@ -1819,6 +1819,60 @@ a nestojí to ani jeden blitz — jen jiné pole.
 **V 39,3 % našich kol končí nosič v kontaktu se soupeřem.** Ne během
 soupeřova kola — **na konci NAŠEHO**, kdy jsme právě rozhodli, kde bude stát.
 
+## 15.0c ⭐⭐⭐ POLE NOSIČE SE DOPOČÍTÁVÁ ZE ZAMÝŠLENÉ KLECE *(uživatel 19.08.)*
+
+> **„Podle toho, kde bude stát nosič v našem kole, přece dopočítáme vše —
+> včetně toho, aby byly rohy čisté."**
+
+Je to pravidlo o **pořadí rozhodování**, a obrací to dnešní pořadí:
+
+| | dnes | podle pravidla |
+|---|---|---|
+| 1. | nosič popojde (rovně kupředu, `cage_advance.cpp:41`) | vyber **cílové pole nosiče** |
+| 2. | klec se dopočítává k místu, kam došel | z něj plynou 4 rohy, jejich čistota i zákaz dalších sousedů |
+| 3. | čtvrtý roh se nedostaví | těla se přiřadí na rohy, které tím byly určeny |
+
+⇒ **Pole nosiče je kořen plánu, ne jeho vstup.** Cílové pole se hodnotí podle
+klece, která z něj vyjde — ne naopak. Je to táž chybějící dimenze **KAM**
+jako P9 (pole odsunu) a P35 (pole, kam blitzující dojde), jen na nejdražším
+místě: pole nosiče určuje **všechna čtyři** rohová pole naráz.
+
+### ⛔ Strop: možné v 95,6 %, plníme ve 2,7 %
+
+19 964 kol, kde nosič stojí na začátku našeho kola, ⌀ 7,49 volného stojícího
+těla mimo nosiče. Pro každé pole v dosahu nosiče se ptáme, jestli z něj vyjde
+**plná čistá klec bez dalších sousedů** a jestli na ty čtyři rohy **dosáhnou
+čtyři naše těla** (bipartitní párování):
+
+| | kol | |
+|---|---:|---:|
+| ✅ **takové pole existuje** | 19 095 | **95,6 %** |
+| ⛔ méně než 4 stojící těla — rozpočet to nedovolí | 735 | 3,7 % |
+| ⛔ žádné dosažitelné pole to nedá | 134 | **0,7 %** |
+
+A z těch 19 095 kol **nosič ve 25,7 % už na takovém poli STOJÍ** a nemusel by
+se hnout vůbec; v dalších 22,6 % je to **jedno pole**.
+
+⇒ **Pravidlo je splnitelné v 95,6 % kol a plníme ho ve 2,7 %.**
+Rozdíl **není rozpočet těl** (ten brání ve 3,7 %) ani soupeř (0,7 %) —
+je to **volba pole**.
+
+⚠️ **Strop, ne plán.** Dosah se počítá Chebyshevem z `ma` bez TZ, dodge a GFI
+(horní mez); ležící těla se nepočítají (konzervativní); neptá se, **co to stojí
+na tempu** — a tempo je K9a s 20,7σ, takže *„postav klec kdekoli, hlavně čistou"*
+je legální jen tehdy, když se pole vybírá **v rámci** postupu, ne proti němu.
+
+### ⛔ Lajna: co nejde, to nejde — a proto se tam nechodí *(uživatel 19.08.)*
+
+Roh **mimo hřiště** je 2,1 % chybějících rohů. Na postranní čáře jsou dva rohy
+geometricky nemožné ⇒ **4 rohy tam mají 0,0 %** (193 kol). ⭐ **Není to vada
+k opravě, je to stav, kterému se má vyhnout výběr pole** — a už jedno pole od
+lajny jsou všechna čtyři pole na hřišti, a přesto je to jen 1,8 %, takže i tam
+zbytek dělá volba, ne geometrie. Posiluje to **15.5** *(vlastní klec k lajně
+netlačit; soupeřovu ano)*.
+⏰ **Zaslouží samostatný rozebraný příklad k diskuzi** *(uživatel)* — zapsáno
+jako **T1.10**.
+
 ## 15.1 Rychlost: klec jede tak rychle, jak rychle se dokáže složit
 
 > *Uživatel 18.08.: „je zbytečné uvedení konstanty někam, kde by stačilo —
