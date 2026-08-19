@@ -6,32 +6,32 @@ Vstup: 52,4 % našich kol s míčem má zároveň (a) chybějící roh klece a
 zakazuje, jedno pole od prázdného rohu.  Strop 0,73 rohu/kolo.
 
 Tenhle skript strop ROZEBÍRÁ NA PŘÍČINY.  Každé ortogonální tělo v každém
-kvalifikujícím kole padne do PRÁVĚ JEDNÉ kategorie (kaskáda ①→⑤):
+kvalifikujícím kole padne do PRÁVĚ JEDNÉ kategorie (kaskáda (1)→(5)):
 
-  ①  už hrálo            — má v kole vlastní událost ⇒ rozpočet kola pryč
-  ⓪  leží/omráčeno       — nehrálo, ale nestojí (brief ji nevyjmenovává;
-                            bez ní by kaskáda ležící tělo tiše pustila do ⑤)
-  ②  markuje DRAZE       — sousedí se stojícím soupeřem, jehož únik něco
+  (1)  už hrálo            — má v kole vlastní událost ⇒ rozpočet kola pryč
+  (0)  leží/omráčeno       — nehrálo, ale nestojí (brief ji nevyjmenovává;
+                            bez ní by kaskáda ležící tělo tiše pustila do (5))
+  (2)  markuje DRAZE       — sousedí se stojícím soupeřem, jehož únik něco
                             stojí (dodge_cost ≥ 0,20) ⇒ R3 drží roh přebije
-  ③  zamčené (levné mark.) — sousedí se stojícím soupeřem, ale VŠECHNY úniky
+  (3)  zamčené (levné mark.) — sousedí se stojícím soupeřem, ale VŠECHNY úniky
                             jsou levné ⇒ R3 podle K30b roh NEpřebije, jenže
                             tělo samo stojí v TZ a krok do rohu stojí NÁŠ dodge
        ⚠️ geometrická poznámka: „markuje" a „je v TZ" je u stojícího soupeře
-       TENTÝŽ predikát (sousedství).  Čisté ③ bez ② je proto prázdná množina
+       TENTÝŽ predikát (sousedství).  Čisté (3) bez (2) je proto prázdná množina
        KONSTRUKCÍ, ne měřením — kaskáda dělí podle toho, ČÍ dodge je drahý:
-       ② = soupeřův (povinnost), ③ = jen náš (cena kroku).
-  ④  roh není k mání      — žádný prázdný roh na hřišti (obsazené soupeřem /
+       (2) = soupeřův (povinnost), (3) = jen náš (cena kroku).
+  (4)  roh není k mání      — žádný prázdný roh na hřišti (obsazené soupeřem /
                             mimo hřiště; 15.5 lajna)
-  ④b roh je, ale krok stojí hod / cesta blokovaná — volné stojící tělo,
+  (4b) roh je, ale krok stojí hod / cesta blokovaná — volné stojící tělo,
                             prázdný roh existuje, ale 2-krokový přesun vede
                             jen přes TZ nebo obsazená pole
-  ⑤  NIC TOMU NEBRÁNILO   — stojící, nehrálo, nemarkuje, není v TZ, prázdný
+  (5)  NIC TOMU NEBRÁNILO   — stojící, nehrálo, nemarkuje, není v TZ, prázdný
                             roh dosažitelný BEZ HODU; dělí se na
-                            ⑤č (dosažitelný ČISTÝ roh — jediné, co pravidlu
-                            pomáhá) a ⑤š (jen ŠPINAVÝ roh — krok je zdarma,
+                            (5)č (dosažitelný ČISTÝ roh — jediné, co pravidlu
+                            pomáhá) a (5)š (jen ŠPINAVÝ roh — krok je zdarma,
                             ale vyrobí roh −6,8σ ⇒ NENÍ zadarmo věcně).
 
-Turn-level: max. párování ⑤č-těl na čisté prázdné rohy ⇒ rohů/kolo a
+Turn-level: max. párování (5)č-těl na čisté prázdné rohy ⇒ rohů/kolo a
 rohů/zápas SKUTEČNĚ zadarmo (to je číslo pro rozhodnutí o implementaci).
 
 Cena kroku: pro každé kolo s párováním se těla PŘESUNOU do rohů v kopii
@@ -90,13 +90,13 @@ def max_matching(edges, n_bodies, n_corners):
 def main():
     paths = sorted(glob.glob(sys.argv[1]))
     st = Counter()
-    dodge_costs_step = []          # náš dodge v ③ (cena kroku, kdyby se šel)
+    dodge_costs_step = []          # náš dodge v (3) (cena kroku, kdyby se šel)
     drive_rows = []                # (game_idx, scored, {metrika: mean})
     reach_delta = Counter()
     fb2_delta = Counter()
     reach_pairs = []               # (REACH0 před, po)
-    marked_after = 0               # ⑤č tělo, které by v rohu NOVĚ markovalo
-    screen_proxy = 0               # ⑤č tělo se stojícím soupeřem do 2 polí
+    marked_after = 0               # (5č) tělo, které by v rohu NOVĚ markovalo
+    screen_proxy = 0               # (5č) tělo se stojícím soupeřem do 2 polí
     matched_total = 0
 
     for gi, path in enumerate(paths):
@@ -214,35 +214,49 @@ def main():
                 bpos = (p["x"], p["y"])
                 st["těl celkem (jmenovatel B)"] += 1
                 if p["id"] in played:
-                    st["① už hrálo"] += 1
+                    # (1)a: DOŠLO na ortogonální pole vlastním pohybem v TOMHLE
+                    # kole — poslední poziční událost hráče je MOVE končící
+                    # na bpos.  To není „rozpočet pryč": táž akce mohla za
+                    # stejnou cenu skončit V ROHU.  Vada volby CÍLOVÉHO POLE.
+                    last_pos_ev = None
+                    for e in S.get("events", []):
+                        if e["player_id"] == p["id"] and "to_x" in e:
+                            last_pos_ev = e
+                    if (last_pos_ev and last_pos_ev["type"] == "MOVE"
+                            and (last_pos_ev["to_x"], last_pos_ev["to_y"]) == bpos):
+                        st["(1a) hrálo: DOŠLO SEM pohybem (vada cílového pole)"] += 1
+                        if any(c for c in avail_clean if cheb(c, bpos) == 1):
+                            st["(1a)… a ČISTÝ prázdný roh je hned vedle cíle"] += 1
+                    else:
+                        st["(1b) hrálo jinak (blok/blitz/stálo a jednalo)"] += 1
                     continue
                 if p["state"] != STANDING:
-                    st["⓪ leží/omráčeno (a nehrálo)"] += 1
+                    st["(0) leží/omráčeno (a nehrálo)"] += 1
                     continue
                 markers = [o for o in standing_them
                            if adj(bpos, (o["x"], o["y"]))]
                 if markers:
                     if any(dodge_cost(o, p) >= DODGE_COST_THRESHOLD for o in markers):
-                        st["② markuje DRAZE (R3 platí)"] += 1
+                        st["(2) markuje DRAZE (R3 platí)"] += 1
                     else:
-                        st["③ zamčené — markuje jen LEVNĚ (K30b: roh nemá přebít)"] += 1
+                        st["(3) zamčené — markuje jen LEVNĚ (K30b: roh nemá přebít)"] += 1
                         dodge_costs_step.append(dodge_cost(p, markers[0]))
                     continue
                 if not avail:
-                    st["④ roh není k mání (obsazen soupeřem / mimo hřiště)"] += 1
+                    st["(4) roh není k mání (obsazen soupeřem / mimo hřiště)"] += 1
                     continue
                 clean_r = [c for c in avail_clean if free_reach(bpos, c)]
                 dirty_r = [c for c in avail if c not in avail_clean
                            and free_reach(bpos, c)]
                 if clean_r:
-                    st["⑤č NIC NEBRÁNILO — dosažitelný ČISTÝ roh"] += 1
+                    st["(5č) NIC NEBRÁNILO — dosažitelný ČISTÝ roh"] += 1
                     cat5_bodies.append((p, clean_r))
                     if any(cheb(bpos, (o["x"], o["y"])) <= 2 for o in standing_them):
                         screen_proxy += 1
                 elif dirty_r:
-                    st["⑤š krok zdarma, ale jen do ŠPINAVÉHO rohu (−6,8σ)"] += 1
+                    st["(5š) krok zdarma, ale jen do ŠPINAVÉHO rohu (−6,8σ)"] += 1
                 else:
-                    st["④b roh je, ale krok stojí hod / cesta blokovaná"] += 1
+                    st["(4b) roh je, ale krok stojí hod / cesta blokovaná"] += 1
 
             # ── turn-level: kolik ČISTÝCH rohů se v TOMHLE kole složí ──
             if cat5_bodies:
@@ -252,7 +266,7 @@ def main():
                          for bi, (_, cs) in enumerate(cat5_bodies)}
                 m, assign = max_matching(edges, len(cat5_bodies), len(corners))
                 st["kol s ≥1 rohem zadarmo"] += 1
-                st["⑤ rohů ZADARMO (párování)"] += m
+                st["(5) rohů ZADARMO (párování)"] += m
                 matched_total += m
 
                 # cena kroku: přesuň spárovaná těla, přepočti REACH0/FB2
@@ -292,13 +306,15 @@ def main():
     print(f"replika stropu: {st['strop (min(prázdné rohy, těla)) — replika 0,73']}"
           f" rohů = {st['strop (min(prázdné rohy, těla)) — replika 0,73']/n:.2f}/kolo\n")
 
-    cats = ["① už hrálo", "⓪ leží/omráčeno (a nehrálo)",
-            "② markuje DRAZE (R3 platí)",
-            "③ zamčené — markuje jen LEVNĚ (K30b: roh nemá přebít)",
-            "④ roh není k mání (obsazen soupeřem / mimo hřiště)",
-            "④b roh je, ale krok stojí hod / cesta blokovaná",
-            "⑤č NIC NEBRÁNILO — dosažitelný ČISTÝ roh",
-            "⑤š krok zdarma, ale jen do ŠPINAVÉHO rohu (−6,8σ)"]
+    cats = ["(1a) hrálo: DOŠLO SEM pohybem (vada cílového pole)",
+            "(1b) hrálo jinak (blok/blitz/stálo a jednalo)",
+            "(0) leží/omráčeno (a nehrálo)",
+            "(2) markuje DRAZE (R3 platí)",
+            "(3) zamčené — markuje jen LEVNĚ (K30b: roh nemá přebít)",
+            "(4) roh není k mání (obsazen soupeřem / mimo hřiště)",
+            "(4b) roh je, ale krok stojí hod / cesta blokovaná",
+            "(5č) NIC NEBRÁNILO — dosažitelný ČISTÝ roh",
+            "(5š) krok zdarma, ale jen do ŠPINAVÉHO rohu (−6,8σ)"]
     tot = 0
     print(f"ROZKLAD TĚL (jmenovatel B = {B}):")
     for c in cats:
@@ -307,17 +323,21 @@ def main():
         print(f"  {c:<58} {v:6d}  {100*v/B:5.1f} %")
     assert tot == B, f"kaskáda nepokrývá všechna těla: {tot} != {B}"
     print(f"  {'SOUČET (kontrola úplnosti kaskády)':<58} {tot:6d}  100.0 %")
+    v1a = st["(1a) hrálo: DOŠLO SEM pohybem (vada cílového pole)"]
+    v1ac = st["(1a)… a ČISTÝ prázdný roh je hned vedle cíle"]
+    print(f"  pod-množina (1a): ČISTÝ prázdný roh hned vedle zvoleného cíle: "
+          f"{v1ac} z {v1a} ({100*v1ac/max(1,v1a):.1f} %)")
     if dodge_costs_step:
-        print(f"\n  ③: ⌀ P(selhání NAŠEHO dodge při kroku do rohu) "
+        print(f"\n  (3): ⌀ P(selhání NAŠEHO dodge při kroku do rohu) "
               f"= {sum(dodge_costs_step)/len(dodge_costs_step):.2f} "
               f"(n={len(dodge_costs_step)})")
 
-    m5 = st["⑤ rohů ZADARMO (párování)"]
-    print(f"\n⑤ TURN-LEVEL (párování ⑤č-těl na čisté prázdné rohy):")
+    m5 = st["(5) rohů ZADARMO (párování)"]
+    print(f"\n(5) TURN-LEVEL (párování (5č)-těl na čisté prázdné rohy):")
     print(f"  kol s ≥1 rohem zadarmo: {st['kol s ≥1 rohem zadarmo']}"
           f"  ({100*st['kol s ≥1 rohem zadarmo']/n:.1f} % z n, "
           f"{100*st['kol s ≥1 rohem zadarmo']/Q:.1f} % z Q)")
-    print(f"  ⑤ rohů zadarmo: {m5}  =  {m5/n:.3f} rohu/kolo  =  {m5/G:.2f} rohu/zápas")
+    print(f"  (5) rohů zadarmo: {m5}  =  {m5/n:.3f} rohu/kolo  =  {m5/G:.2f} rohu/zápas")
 
     print(f"\nCENA KROKU (přepočet E1/E2 po přesunu spárovaných těl; "
           f"kol s přesunem n={matched_total and st['kol s ≥1 rohem zadarmo']}):")
@@ -329,10 +349,10 @@ def main():
     print(f"  ΔFB2, n={nf}:")
     for d in sorted(fb2_delta):
         print(f"    {d:+d}: {fb2_delta[d]:6d}  {100*fb2_delta[d]/nf:5.1f} %")
-    print(f"  ⑤č tělo, které by v rohu NOVĚ markovalo: {marked_after} "
+    print(f"  (5č) tělo, které by v rohu NOVĚ markovalo: {marked_after} "
           f"(z {matched_total}; u čistého rohu musí být 0 — kontrola definice)")
-    print(f"  ⑤č tělo se stojícím soupeřem do 2 polí (screen-proxy): "
-          f"{screen_proxy} z {st['⑤č NIC NEBRÁNILO — dosažitelný ČISTÝ roh']}")
+    print(f"  (5č) tělo se stojícím soupeřem do 2 polí (screen-proxy): "
+          f"{screen_proxy} z {st['(5č) NIC NEBRÁNILO — dosažitelný ČISTÝ roh']}")
 
     # ═════════ σ (metodika P30) ═════════
     print(f"\nσ-METODIKA P30: plné drivy (≥7 našich kol): {len(drive_rows)}, "
