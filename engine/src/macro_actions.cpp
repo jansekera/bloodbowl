@@ -147,6 +147,41 @@ thread_local long g_dauntlessOffers = 0;
 // Per side, default off, so an A/B pairs cleanly. The counter ticks only when
 // the arm actually changes which blitzer is sent, i.e. it is a null-arm test in
 // the sense of 2026-08-17: zero means both arms ran the same code.
+// --- P38 arm: the carrier's destination square is derived from the cage it
+// would produce, instead of the cage being fitted around wherever the carrier
+// happened to stop (user, 2026-08-19: "podle toho, kde bude stat nosic v nasem
+// kole, prece dopocitame vse vcetne toho, aby byly rohy ciste").
+//
+// expandAdvance picks a y-offset by counting tackle zones along the route and
+// nothing else: the four squares that will BE the cage never enter the choice.
+// Corpus 2026-08-19, 19 964 turns: a reachable square from which a full clean
+// cage can be built -- four corners, all clean, no other neighbour of the
+// carrier, and four free bodies that can actually reach those corners -- exists
+// in 95.6 % of turns, and in 25.7 % of those the carrier is already standing on
+// one. We satisfy the rule in 2.7 %. Body budget blocks it in 3.7 %, the
+// opponent in 0.7 %; the rest is the choice of square.
+//
+// ⚠️ Tempo is not for sale here. K9a (schedule floor) is the strongest
+// predictor we have (20.7 sigma), so the arm only ever ranks squares that give
+// up AT MOST ONE square of forward progress against the best available -- it
+// changes WHICH square the carrier ends on, not how far it goes.
+thread_local bool g_cageAwareAdvance[2] = {false, false};
+thread_local long g_cageAwareAdvancePicks = 0;
+
+void setCageAwareAdvanceArm(TeamSide side, bool on) {
+    g_cageAwareAdvance[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool cageAwareAdvanceArm(TeamSide side) {
+    return g_cageAwareAdvance[side == TeamSide::HOME ? 0 : 1];
+}
+
+long takeCageAwareAdvancePicksInSearch() {
+    long v = g_cageAwareAdvancePicks;
+    g_cageAwareAdvancePicks = 0;
+    return v;
+}
+
 thread_local bool g_blitzLanding[2] = {false, false};
 thread_local long g_blitzLandingRepicks = 0;
 
@@ -1204,6 +1239,7 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
     }
 
     Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(bestY)};
+
     movePlayerToward(state, macro.playerId, target, dice, result, 14);
     return result;
 }
@@ -1250,6 +1286,71 @@ int carrierStallAwareSteps(const GameState& state, const Player& carrier,
     return steps;
 }
 
+// --- P38 helpers ---------------------------------------------------------
+//
+// Score the cage a candidate carrier square would produce. The three clauses
+// of the rule (K29**, spec 15.0b) are scored as a CONJUNCTION with the corner
+// count leading, because three corners out of four are not 75 % of a cage --
+// they are an open cage. Deliberately cheap: this runs inside MCTS expansion.
+static int cageScoreForSquare(const GameState& state, const Player& carrier,
+                              Position cand) {
+    static const int DX[4] = {-1, -1, 1, 1};
+    static const int DY[4] = {-1, 1, -1, 1};
+    static const int OX[4] = {-1, 1, 0, 0};
+    static const int OY[4] = {0, 0, -1, 1};
+    const TeamSide theirs = opponent(carrier.teamSide);
+
+    // (3) no other neighbour of the carrier: the four orthogonal squares empty,
+    // and no opponent anywhere in the eight.
+    for (int i = 0; i < 4; ++i) {
+        Position o{static_cast<int8_t>(cand.x + OX[i]),
+                   static_cast<int8_t>(cand.y + OY[i])};
+        if (!o.isOnPitch()) continue;
+        const Player* p = state.getPlayerAtPosition(o);
+        if (p && p->id != carrier.id) return -1;
+    }
+
+    Position corners[4];
+    int nCorners = 0;
+    for (int i = 0; i < 4; ++i) {
+        Position c{static_cast<int8_t>(cand.x + DX[i]),
+                   static_cast<int8_t>(cand.y + DY[i])};
+        if (!c.isOnPitch()) continue;          // sideline: the corner cannot exist
+        const Player* p = state.getPlayerAtPosition(c);
+        if (p && p->teamSide == theirs) return -1;   // corner held by the opponent
+        // (2) clean: no standing opponent beside the corner square
+        bool dirty = false;
+        state.forEachOnPitch(theirs, [&](const Player& e) {
+            if (e.state == PlayerState::STANDING && e.position.distanceTo(c) <= 1) dirty = true;
+        });
+        if (dirty) return -1;
+        corners[nCorners++] = c;
+    }
+    if (nCorners < 4) return -1;               // fewer than four corners exist at all
+
+    // (1) four bodies that can actually reach those four corners. Greedy is
+    // enough for 4x N and stays cheap; a body already standing on a corner
+    // counts as its own filler.
+    bool used[32] = {false};
+    int filled = 0;
+    for (int c = 0; c < 4; ++c) {
+        int bestId = -1, bestDist = 999;
+        state.forEachOnPitch(carrier.teamSide, [&](const Player& b) {
+            if (b.id == carrier.id) return;
+            if (b.state != PlayerState::STANDING) return;
+            if (b.id >= 0 && b.id < 32 && used[b.id]) return;
+            int d = b.position.distanceTo(corners[c]);
+            if (d > b.movementRemaining) return;
+            if (d < bestDist) { bestDist = d; bestId = b.id; }
+        });
+        if (bestId < 0) break;
+        used[bestId] = true;
+        ++filled;
+    }
+    if (filled < 4) return -1;
+    return 1;   // all three clauses hold
+}
+
 static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
                                            DiceRollerBase& dice) {
     MacroExpansionResult result;
@@ -1267,6 +1368,51 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     else if (targetY > 9) targetY--;
 
     Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(targetY)};
+    // P38: the square is chosen by the cage it produces, not by arithmetic on x
+    // plus a one-square nudge toward the centre. Candidates are limited to the
+    // SAME stall-aware step budget, and to within one square of the best forward
+    // progress available inside it -- tempo (K9a, 20.7 sigma) is not for sale;
+    // what changes is which square, not how far.
+    bool armChoseSquare = false;
+    if (cageAwareAdvanceArm(state.activeTeam)) {
+        const int budget = steps;
+        int maxProgress = 0;
+        for (int ox = -budget; ox <= budget; ++ox) {
+            for (int oy = -budget; oy <= budget; ++oy) {
+                Position cand{static_cast<int8_t>(carrier.position.x + ox),
+                              static_cast<int8_t>(carrier.position.y + oy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand)) continue;
+                int prog = dx * (cand.x - carrier.position.x);
+                if (prog > maxProgress) maxProgress = prog;
+            }
+        }
+        Position best{-1, -1};
+        int bestProg = 0;
+        for (int ox = -budget; ox <= budget; ++ox) {
+            for (int oy = -budget; oy <= budget; ++oy) {
+                Position cand{static_cast<int8_t>(carrier.position.x + ox),
+                              static_cast<int8_t>(carrier.position.y + oy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand)) continue;
+                int prog = dx * (cand.x - carrier.position.x);
+                if (prog < 1 || prog < maxProgress - 1) continue;
+                // A carrier parked in a tackle zone hands over a free block on
+                // the ball -- the same guard the fallback below applies.
+                if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
+                if (cageScoreForSquare(state, carrier, cand) < 0) continue;
+                if (prog > bestProg) { bestProg = prog; best = cand; }
+            }
+        }
+        if (best.x >= 0) {
+            armChoseSquare = true;
+            if (best != target) {
+                ++g_cageAwareAdvancePicks;
+                target = best;
+            }
+        }
+    }
+
     // The walk's final square is exempt from TZ scoring on the premise that
     // the macro which chose it owns the risk (cage corners deliberately stand
     // next to defenders, probes price it). ADVANCE has no such pricing: the
@@ -1274,7 +1420,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     // the opponent a free block on the ball. Pull the target back to the
     // nearest unoccupied TZ-free square; if none exists ahead, don't advance
     // at all and let the search's other macros handle the turn.
-    while (steps > 0 &&
+    while (!armChoseSquare && steps > 0 &&
            (state.getPlayerAtPosition(target) != nullptr ||
             countTacklezones(state, target, carrier.teamSide) > 0)) {
         --steps;
@@ -1282,6 +1428,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         target.x = static_cast<int8_t>(targetX);
     }
     if (steps <= 0) return result;
+
     movePlayerToward(state, macro.playerId, target, dice, result, steps + 2);
     return result;
 }

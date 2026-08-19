@@ -245,7 +245,8 @@ int main(int argc, char** argv) {
                       : (mode == 2) ? 51'000'000u
                       : (mode == 3) ? 63'000'000u
                       : (mode == 4) ? 79'000'000u
-                      : (mode == 5) ? 91'000'000u : SEED_BASE;
+                      : (mode == 5) ? 91'000'000u
+                      : (mode == 6) ? 103'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
@@ -253,6 +254,7 @@ int main(int argc, char** argv) {
          : mode == 4 ? "DAUNTLESS: block offer prices the equalised strength vs raw"
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
          : mode == 5 ? "P9/P9c: cilove pole odsunu se VYBIRA (geometrie) vs 'rovne dozadu'"
+         : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -272,7 +274,8 @@ int main(int argc, char** argv) {
     // to anything that de-duplicates by seed. One process owns one shard
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
-    const char* rowsName = mode == 5 ? "diag_pushgeom_rows.jsonl"
+    const char* rowsName = mode == 6 ? "diag_cageadvance_rows.jsonl"
+                         : mode == 5 ? "diag_pushgeom_rows.jsonl"
                          : mode == 4 ? "diag_dauntless_rows.jsonl"
                          : mode == 1 ? "diag_f1_grind_rows.jsonl"
                          : mode == 2 ? "diag_era_rows.jsonl"
@@ -388,6 +391,14 @@ int main(int argc, char** argv) {
                 bb::setPushGeometryArm(bb::TeamSide::AWAY,
                                        mode == 5 && !candHome);
                 bb::takePushGeometryEvalsInSearch();   // vynuluj čítač na pár
+                // mode 6 (P38, 19.08.): rameno sedí v expandAdvance -- cílové
+                // pole nosiče se odvozuje z klece, která z něj vyjde. Per strana,
+                // shazuje se hned po hře, ať nepřeteče do dalšího páru.
+                bb::setCageAwareAdvanceArm(bb::TeamSide::HOME,
+                                           mode == 6 && candHome);
+                bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY,
+                                           mode == 6 && !candHome);
+                bb::takeCageAwareAdvancePicksInSearch();
 
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
@@ -399,6 +410,9 @@ int main(int argc, char** argv) {
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
                 // JINÉHO než „změna nemá efekt".
                 long candPush = bb::takePushGeometryEvalsInSearch();
+                long candCage = bb::takeCageAwareAdvancePicksInSearch();
+                bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
+                bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPushGeometryArm(bb::TeamSide::HOME, false);
                 bb::setPushGeometryArm(bb::TeamSide::AWAY, false);
                 long candDaunt = bb::takeDauntlessOfferEvalsInSearch();
@@ -423,7 +437,8 @@ int main(int argc, char** argv) {
                 // pro ně netiskne; falešný poplach je horší než žádný test,
                 // protože se ho lidi naučí ignorovat.
                 pr.armEvents += (mode == 4) ? candDaunt
-                              : (mode == 5) ? candPush : candPlans;
+                              : (mode == 5) ? candPush
+                              : (mode == 6) ? candCage : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
                 else candD++;

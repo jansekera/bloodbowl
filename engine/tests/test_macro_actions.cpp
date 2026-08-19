@@ -1807,3 +1807,101 @@ TEST(MacroExpansion, BlitzLandingArmIsPerSideAndLeavesTheOtherSideAlone) {
     setBlitzLandingArm(TeamSide::HOME, false);
     EXPECT_FALSE(blitzLandingArm(TeamSide::HOME));
 }
+
+// --- P38 (2026-08-19): the carrier's destination is derived from the cage
+//
+// expandAdvance's target was arithmetic -- x plus the stall-aware step count,
+// y nudged one square toward the centre -- and the four squares that will BE
+// the cage never entered the choice. Corpus: a reachable square giving a full
+// clean cage exists in 95.6 % of turns; we satisfy the rule in 2.7 %.
+//
+// Fixture: HOME carrier at (10,7) with two stall-aware steps. Straight ahead,
+// (12,7) has an opponent sitting ON one of its corners, so off-arm the walk is
+// pulled back to (11,7) and the cage is never built. Two rows up, (12,5) gives
+// four clean corners with four teammates in reach -- same forward progress, a
+// different file. Off-arm must keep (11,7); on-arm must take (12,5).
+namespace {
+GameState makeCageAwareAdvanceState() {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(1);
+    carrier.id = 1;
+    carrier.teamSide = TeamSide::HOME;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {10, 7};
+    carrier.stats = {6, 3, 3, 9};
+    carrier.movementRemaining = 6;
+
+    // Four bodies that can reach the corners of (12,5): (11,4) (11,6) (13,4) (13,6).
+    int ids[] = {2, 3, 4, 5};
+    int xs[] = {8, 8, 8, 9};
+    int ys[] = {3, 5, 9, 10};
+    for (int i = 0; i < 4; ++i) {
+        Player& b = state.getPlayer(ids[i]);
+        b.id = ids[i];
+        b.teamSide = TeamSide::HOME;
+        b.state = PlayerState::STANDING;
+        b.position = {static_cast<int8_t>(xs[i]), static_cast<int8_t>(ys[i])};
+        b.stats = {6, 3, 3, 9};
+        b.movementRemaining = 6;
+    }
+
+    // The opponent stands ON a corner of the straight-ahead square (12,7).
+    Player& opp = state.getPlayer(12);
+    opp.id = 12;
+    opp.teamSide = TeamSide::AWAY;
+    opp.state = PlayerState::STANDING;
+    opp.position = {13, 8};
+    opp.stats = {6, 3, 3, 8};
+    opp.movementRemaining = 6;
+
+    state.ball = BallState::carried({10, 7}, 1);
+    return state;
+}
+}  // namespace
+
+TEST(MacroExpansion, CageAwareAdvanceOffKeepsTheArithmeticSquare) {
+    GameState state = makeCageAwareAdvanceState();
+    setCageAwareAdvanceArm(TeamSide::HOME, false);
+    takeCageAwareAdvancePicksInSearch();
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+
+    EXPECT_EQ(state.getPlayer(1).position.y, 7)
+        << "off-arm the carrier must keep walking straight down its own file";
+    EXPECT_EQ(takeCageAwareAdvancePicksInSearch(), 0)
+        << "a disabled arm must be a true null: no picks, no counter";
+}
+
+TEST(MacroExpansion, CageAwareAdvanceTakesTheSquareThatYieldsTheCage) {
+    GameState state = makeCageAwareAdvanceState();
+    setCageAwareAdvanceArm(TeamSide::HOME, true);
+    takeCageAwareAdvancePicksInSearch();
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+    Position end = state.getPlayer(1).position;
+    setCageAwareAdvanceArm(TeamSide::HOME, false);
+
+    EXPECT_EQ(end.x, 12) << "the arm must not give up forward progress";
+    EXPECT_EQ(end.y, 5) << "the arm must take the file whose corners are clean";
+    EXPECT_GT(takeCageAwareAdvancePicksInSearch(), 0)
+        << "the counter has to record that the arm moved the target";
+}
+
+TEST(MacroExpansion, CageAwareAdvanceIsPerSide) {
+    setCageAwareAdvanceArm(TeamSide::AWAY, true);
+    EXPECT_TRUE(cageAwareAdvanceArm(TeamSide::AWAY));
+    EXPECT_FALSE(cageAwareAdvanceArm(TeamSide::HOME));
+    setCageAwareAdvanceArm(TeamSide::AWAY, false);
+}

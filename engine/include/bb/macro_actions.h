@@ -107,6 +107,27 @@ bool blitzLandingArm(TeamSide side);
 // over a matchup means both arms took the same decision, i.e. a true null arm.
 long takeBlitzLandingRepicksInSearch();
 
+// --- P38 arm (2026-08-19): derive the carrier's destination square from the
+// cage it would produce (user's rule, spec 15.0c).
+//
+// expandAdvance picks a y-offset by counting tackle zones on the route; the
+// four squares that will BE the cage never enter the choice. Corpus measurement
+// (19 964 turns): a reachable square giving a full clean cage -- four corners,
+// all clean, no other neighbour of the carrier, four free bodies able to reach
+// those corners -- exists in 95.6 % of turns, and in 25.7 % of those the carrier
+// already stands on one. The rule is met in 2.7 %. Body budget blocks 3.7 %,
+// the opponent 0.7 %; the rest is the choice of square.
+//
+// ⚠️ The arm only ranks squares within ONE square of the best available forward
+// progress: K9a (schedule floor) is our strongest predictor at 20.7 sigma, so
+// this changes WHICH square the carrier ends on, never how far it goes.
+void setCageAwareAdvanceArm(TeamSide side, bool on);
+bool cageAwareAdvanceArm(TeamSide side);
+
+// Times the arm actually moved the carrier's target square, per SEARCH
+// EVALUATION. Zero over a matchup means both arms took the same decision.
+long takeCageAwareAdvancePicksInSearch();
+
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
