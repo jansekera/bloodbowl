@@ -34,7 +34,14 @@ from pathlib import Path
 
 # Vše až po DATA_ROOT musí zůstat shodné s diag_replay_mine_20260811b.py,
 # jinak přestane platit párovost korpusů.
-OPPONENTS = ["skaven", "wood-elf", "orc", "human"]
+# ⭐ 19.08.: přibylo ZRCADLO (uživatel). Měřák klece je „dal drive TD do konce
+# půle", a zrcadlo je zrovna ten matchup, kde vzniká 0:0 — podpis rasy — a
+# v žádném měření konverze dosud nebylo. Seznam je nově vstup prostředí, aby
+# šlo sebrat samostatný zrcadlový korpus, aniž se přepisuje baseline.
+# ⚠️ Přidáním do DEFAULTU se mění SKLADBA příštích baselinů: dnešní
+# `corpus_baseline_20260819` má čtyři soupeře, příští bude mít pět, takže se
+# jejich souhrnné řádky (VŠE) nesmí srovnávat přímo. Per-soupeř řádky ano.
+OPPONENTS = os.environ.get("OPPONENTS", "skaven,wood-elf,orc,human,dwarf").split(",")
 W = "weights_best.json"
 POLICY_PATH = "weights_policy.json"
 TV, VF_BLEND, MCTS = 1200, 0.0, 100
