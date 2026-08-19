@@ -56,3 +56,46 @@ to by bylo kruhové: polovina kol by prošla konstrukcí. A uživatel řekl
 **„cíl je maximum, ne ten strop"**, takže referencí nemá být to, co vydáváme
 běžně, ale to, co jde vydat.
 ⇒ Tvar reference je **rozhodnutí, ne detail**, a je zapsané jako otevřené.
+
+---
+
+# ⛔ KOREKCE TÉHOŽ DNE — kapacita se nesmí číst z kol, kde se pravidlo nehraje
+
+*(uživatel 19.08.: „tady předpokládám záplavu starých čísel neaplikovatelných
+na poslední rozvrh")*
+
+Námitka sedí a **obrací závěr výše**. Tempa v kroku A jsou z korpusu, kde se
+pravidlo klece plní ve **2,7 %** kol a klec má ⌀ 1,3 rohu. Zapsat je jako
+KAPACITU znamená **povýšit dnešní neschopnost na strop**.
+
+Δx nosiče podle toho, jak dobře klec stojí *(3 000 her)*:
+
+| řez | kol | ⌀ Δx | medián | p75 |
+|---|---:|---:|---:|---:|
+| všechna kola s nosičem | 17 728 | 2,20 | 1,0 | 4,0 |
+| ≥2 rohy | 7 703 | **1,98** | 1,0 | 4,0 |
+| 4 rohy | 1 744 | 2,14 | 1,0 | 4,0 |
+| 4 rohy, všechny čisté | 1 263 | 2,30 | 2,0 | 4,0 |
+| ⭐ **CELÉ PRAVIDLO (K29⭐⭐)** | **377** | **2,55** | 3,0 | 5,0 |
+
+⇒ **Správně postavená klec je RYCHLEJŠÍ, ne pomalejší.** Monotónně:
+1,98 → 2,14 → 2,30 → **2,55**, tedy blízko výběhu (2,85).
+
+⇒ ⛔ **Závěr kroku A („rovnoměrná podlaha trestá klec") NEPLATÍ.** Podlaha
+netrestá klec, trestá **naši** klec. Fáze „klec" není pomalá fáze; pomalá je
+rozbitá klec, a to je vada, ne vlastnost.
+
+⚠️ **Korelace, ne kauzalita:** kola, kde pravidlo drží, můžou být kola, kde je
+soupeř daleko — což umožnilo obojí naráz, čistou klec i rychlý postup.
+
+## Co to dělá s T0.1
+
+* **Kapacita fáze KLEC se z tohoto korpusu spolehlivě změřit NEDÁ.** Nejlepší
+  dostupná dolní mez je **2,55** ze 377 kol, kde pravidlo drží — ne 1,93.
+* ⏰ **Přeměřit po noci P38.** Teprve korpus, který pravidlo hraje, dá kapacitu,
+  na které smí rozvrh stát. Táž podmínka jako u σ pravidla (0,0 = vyhladovělý metr).
+* **Zpětný rozvrh od 8. kola zůstává správný tvar** *(uživatel 19.08.)* —
+  mění se jen to, čím se plní: kapacitou pravidlem postavené klece, ne historií.
+* ⛔ **Percentil jako kapacita byl špatná náhrada.** S průměrem vyšlo 95,8 % kol
+  jako „nesplnitelný rozvrh", s p75 40,7 %, s p90 19,6 % — číslo řídil volený
+  percentil, ne hra. Percentil jen zakrýval to, že chybí kapacita z pravidla.
