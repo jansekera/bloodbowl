@@ -1,0 +1,21 @@
+korpus: /home/jan/claude/bloodbowl/corpus_baseline_20260819_data
+her: 3000   engine korpusu: ea6f0a51
+filtr: jen PLNÉ drivy (>=7 našich kol) — je to VÝBĚR, ne vzorek:
+       drive, který skončí dřív, se sem nedostane, a to koreluje s výsledkem
+drivů: 5031, z toho se skórováním: 835
+jednotka n u každého řádku = DRIVY, ne kola ani zápasy
+
+veličina           TD drivy     bez TD    rozdíl       σ      n
+K29_čisté             0.820      0.770    +0.050    4.8σ   3515
+K33_blok              0.761      0.774    -0.013   -2.5σ   5031
+K34_reach0            0.456      0.355    +0.102    9.2σ   3861
+K35_fb2               0.871      0.791    +0.080   10.6σ   3861
+K9a_splněno           0.437      0.210    +0.227   20.8σ   3461
+PRAVIDLO_klece        0.022      0.022    -0.000   -0.2σ   3861
+REACH0_počet          1.390      2.119    -0.729  -16.7σ   3861
+blokůdo               1.715      1.524    +0.191   11.0σ   5031
+odpor_koridoru        0.889      1.176    -0.287   -9.6σ   3463
+rohů_všech            1.261      1.302    -0.041   -1.5σ   3861
+rohů_ČISTÝCH          1.136      1.129    +0.007    0.3σ   3861
+rohů_ŠPINAVÝCH        0.124      0.173    -0.049   -6.2σ   3861
+Δx                    2.739      2.065    +0.673   14.4σ   3461

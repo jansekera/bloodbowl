@@ -74,6 +74,29 @@ for path in sorted(glob.glob(DATA + '/*.json.gz')):
             acc["rohů_ŠPINAVÝCH"].append(float(len(dirty)))
             if filled:
                 acc["K29_čisté"].append(0.0 if dirty else 1.0)
+            # ⭐ K29⭐⭐ — PRAVIDLO KLECE jako JEDNA veličina (19.08.).
+            # Tabulka dosud obsahovala jen jeho ROZLOŽENÉ kusy (počet rohů,
+            # počet čistých, počet špinavých) a ty se chovaly každý jinak.
+            # Cíl je ale KONJUNKCE: tři rohy ze čtyř nejsou 75 % klece,
+            # je to otevřená klec.
+            orth = [(car["x"] + dx, car["y"] + dy)
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))]
+            them_at = {(p["x"], p["y"]) for p in them}
+            extra = ([o for o in orth if o in occ and not occ[o]["has_ball"]]
+                     + [o for o in orth if o in them_at]
+                     + [d for d in diag if d in them_at])
+            acc["PRAVIDLO_klece"].append(
+                1.0 if (len(filled) == 4 and not dirty and not extra) else 0.0)
+
+            # ⭐ ODPOR KORIDORU (K9b, 18.08.) — poprvé v σ-tabulce. Do dneška
+            # žádný korpus tohle pole nevezl, takže veličina existovala v enginu
+            # a nikdy se neptalo, jestli něco předpovídá. -1 = nepočítalo se
+            # (nosič mimo hru), takový záznam se NEPŘIČÍTÁ, aby se sentinel
+            # nevydával za nulový odpor.
+            _cr = logs[i].get("corridor_resistance", -1)
+            if _cr is not None and _cr >= 0:
+                acc["odpor_koridoru"].append(float(_cr))
+
             P = predictors(Board(E, ours))
             if "REACH0" in P:
                 acc["K34_reach0"].append(1.0 if P["REACH0"] == 0 else 0.0)
@@ -97,8 +120,15 @@ for path in sorted(glob.glob(DATA + '/*.json.gz')):
 # jiná odpověď. Bez téhle hlavičky se to nedá ani zpětně poznat.
 import os, subprocess
 _head = ""
+# ⛔ 19.08.: obě dosavadní cesty minuly `corpus_baseline_*_data`, protože otisk
+# leží v SOUROZENCI bez přípony `_data` (`corpus_baseline_YYYYMMDD/ENGINE_HEAD`),
+# ne nad datovým adresářem. Hlavička pak tiskla „korpus bez otisku" u korpusu,
+# který otisk MÁ -- tedy přesně ta vada, kterou si tenhle skript vynucuje (P22).
+_root = DATA.rstrip("/")
+_sib = _root[:-5] if _root.endswith("_data") else _root
 for _cand in (os.path.join(DATA, "..", "ENGINE_HEAD"),
-              os.path.join(os.path.dirname(DATA.rstrip("/")) or ".", "ENGINE_HEAD")):
+              os.path.join(os.path.dirname(_root) or ".", "ENGINE_HEAD"),
+              os.path.join(_sib, "ENGINE_HEAD")):
     try:
         _head = open(_cand).read().strip()[:8]; break
     except OSError:
