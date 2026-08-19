@@ -78,6 +78,7 @@ uživatel na položky ukazuje číslem.
 | K9b | **ODPOR SE MUSÍ POČÍTAT MIMO BRÁNU — zadáno 18.08.**<br>**Co odpor je:** kolik soupeřových **stojících** těl stojí v koridoru před nosičem (`CORRIDOR_DEPTH` vpřed, `CORRIDOR_HALF_WIDTH` do stran). Každé stojí blok nebo obloučkovou cestu navíc, tedy tempo — je to to, co odlišuje „tři pole prázdným polem“ od „tří polí skrz zeď“.<br>**Kde dnes žije:** počítá se **jen uvnitř plánovače klece** (`cage_advance.cpp:479–486`); jinde se už jen přenáší (`turn_plan_record.h:36`, `bb_module.cpp:272`). V produkci je brána vypnutá ⇒ `plán: NOT_CONSULTED` ve **100 %** kol ⇒ **odpor je vždy 0** a K9b nemá z čeho měřit.<br>⛔ **Blokátor se dnes stal TRVALÝM:** K9b čekala na T3.1, ale T3.1 byla 18.08. **zamítnuta** (brána škodí) — takže věc, na kterou čeká, se už nikdy nezapne. Čekat dál znamená položku tiše pohřbít.<br>⇒ **Zadání:** vytáhnout výpočet odporu do samostatné funkce nezávislé na plánovači, aby existoval v každém našem kole bez ohledu na to, jestli brána běží. Je to pár řádků (dnes jedna `forEachOnPitch` lambda).<br>⭐ **Není to volba, je to PŘEDPOKLAD T0.1:** přepis K9 na fáze potřebuje odpor — podlaha fáze „klec“ se bez něj nedá napsat jinak než konstantou, a konstanta je 18.08. zakázaná. | **UZAVŘENO 18.08.** — `corridorResistance()` je volná funkce v `cage_advance.{h,cpp}`; plánovač volá **tutéž** (jediná definice), a `captureTurnSnapshot` ji počítá **každé naše kolo s míčem** do nového pole `TurnLog::corridorResistance` *(vlastní pole, ne `plan.resistance` — simulátor přepisuje `curLog.plan` z thread-local záznamu, takže cokoli tam orazítkované by přepsaly nuly)*; −1 = N/A, ne nula. Export do pythonu `corridor_resistance`. Ověřeno na 3 hrách: `plan: NOT_CONSULTED` ve 100 % kol a **odpor přesto naměřen** (36 kol, ⌀ 1,44, max 5). Testy **544 → 545**. |
 | K32 | blitz se v logu nepozná od bloku | **BLOKOVÁNO** na X1 |
 | **P32** | ⭐⭐⭐ **KLEC SE POSOUVÁ JEN ROVNĚ KUPŘEDU — SMĚR SE NEVOLÍ** *(uživatel 18.08.: „bod 1 nesmí škodit — musí stavět čistou klec a kdyžtak ne vždy jen přímo rovně kupředu“)*. Ověřeno v kódu 18.08.: cíl posunu vzniká na dvou místech (`cage_advance.cpp:41` v `cageExposure` a v `tryAssign`) vždy jako **`dest{carrier.x + dx*step, carrier.y}`** — **`y` se NIKDY nemění**. Plánovač tedy volí jen **JAK DALEKO**, nikdy **KAM**: všechny zvažované cíle leží na jedné přímce vpřed. Řádek 548 sice vybírá „nejméně exponovaný cíl“, ale jen mezi kroky po té přímce.<br>⭐ **To je pravděpodobný mechanismus, proč brána postavila víc klece a HORŠÍ klec** (rohů 2,22→2,54, čistota 79,4→72,6 %): když rovně vpřed nejdou rohy udržet čisté, plánovač nemá jak uhnout do strany — umí jen zkrátit krok, nebo vetovat.<br>⚠️ **Táž rodina jako P9** (`choosePushSquare` = „rovně dozadu první“, cílové pole se nehodnotí): **geometrie se nevybírá, jen se vykoná.**<br>⇒ Zadání: cílem posunu smí být i pole do strany/šikmo; kritérium výběru je **čistota rohů v cíli** (počet ŠPINAVÝCH rohů, ne počet rohů — σ-tabulka 18.08.), při shodě dál vpřed. | **OTEVŘENO — zadáno 18.08., přímý vstup pro T3.1** |
+| **P39** | ⛔⛔ **NOSIČ SE V KOLE VŮBEC NEAKTIVUJE — a je to největší ztráta tempa, jakou jsme změřili** *(19.08.)*. Zpětný rozvrh z **mechanických** stropů *(SÓLO a VÝBĚH = MA nosiče · KLEC = min(MA rohů, MA nosiče); uživatel 19.08.)* ukazuje, že rozvrh je nesplnitelný jen ve **27,6 %** kol — ne v 95,8 %, jak vycházelo z historického tempa. ⇒ **Drivy neprohráváme rozvrhem, ale nevyužitím.**<br>**Ze splnitelných kol se nosič v 37,7 % NEHNUL VŮBEC.** A z kol s Δx = 0 *(1 641, vzorek 800 her)*:<br>• **nosič NEJEDNAL VŮBEC — žádná událost: 83,8 %**<br>• z toho byl přitom **úplně volný, bez jediné soupeřovy TZ: 58,3 %**<br>• v soupeřově TZ (dodge by stál hod): 41,7 %<br>⇒ **Nosič nestojí proto, že by nemohl. Neaktivuje se.** Není to tempo, je to **chybějící akce**.<br>**Kandidáti na příčinu, NEOVĚŘENO — první krok je rozhodnout mezi nimi, ne opravovat:** ⓐ `carrierStallAwareSteps` drží pohyb **schválně** v záloze (`maxSafe = MA/2`) a jeho test bezpečí `carrierIsBlitzable` **nezná GFI** (**P37**) ⇒ považuje se za bezpečného neprávem; ⓑ makro ADVANCE se v search vůbec nevybere; ⓒ `expandAdvance` skončí na `if (steps <= 0) return result;`.<br>⚠️ **Vzorek 800 her, ne 3 000** — první věc ráno je přepočítat na celém korpusu. Doklad `evidence/cage_ma_cap_20260819.md`, skripty `diag_cage_ma_cap_20260819.py` · `diag_mech_schedule_20260819.py`. | **OTEVŘENO — ⏰⏰ PRIORITA NA RÁNO 20.08.** *(uživatel 19.08.)* |
 | **P38** | ⭐⭐⭐ **POLE NOSIČE SE DOPOČÍTÁVÁ ZE ZAMÝŠLENÉ KLECE** *(uživatel 19.08.: „podle toho, kde bude stát nosič v našem kole, přece dopočítáme vše včetně toho, aby byly rohy čisté“)*. Pravidlo o **pořadí rozhodování**: dnes nosič popojde rovně kupředu a klec se dopočítává k místu, kam došel; podle pravidla se **cílové pole nosiče vybírá podle klece, která z něj vyjde**. Pole nosiče určuje **všechna čtyři** rohová pole naráz ⇒ táž chybějící dimenze **KAM** jako P9 a P35, na nejdražším místě.<br>⛔ **STROP: možné v 95,6 %, plníme ve 2,7 %.** 19 964 kol, ⌀ 7,49 volného stojícího těla: pole, ze kterého vyjde plná čistá klec bez dalších sousedů **a na jehož rohy dosáhnou čtyři naše těla**, existuje v **19 095 kolech (95,6 %)**; rozpočet těl brání ve **3,7 %**, soupeř v **0,7 %**. A **ve 25,7 % těch kol nosič na takovém poli UŽ STOJÍ** (dalších 22,6 % = jedno pole). ⇒ Rozdíl nedělá rozpočet ani soupeř, ale **volba pole**.<br>⚠️ Strop, ne plán: dosah Chebyshevem z `ma` bez TZ/dodge/GFI (horní mez), ležící těla nepočítána, a **neptá se na cenu na tempu** (K9a 20,7σ) ⇒ pole se musí vybírat **v rámci** postupu, ne proti němu. Doklad `diag_carrier_square_plan_20260819.py`, spec **15.0c**. | ✅ **IMPLEMENTOVÁNO 19.08.** — rameno `setCageAwareAdvanceArm(side,on)`, per side, default OFF, **mode 6** v nočním harnessu. `expandAdvance` prochází pole v TÉMŽE krokovém rozpočtu a bere to, ze kterého vyjde plná čistá klec (4 rohy na hřišti · žádný obsazený soupeřem · u žádného nestojí soupeř · nosič bez dalších sousedů · čtyři volná stojící těla na ně dosáhnou). ⭐ **Tempo se neprodává:** kandidáti jsou omezeni na pole do **jednoho pole** od nejlepšího dostupného postupu (K9a 20,7σ) ⇒ mění se KTERÉ pole, ne jak daleko. Pole v TZ se vylučuje jako v původní záložní smyčce, a když rameno pole najde, smyčka se přeskočí. Čítač `takeCageAwareAdvancePicksInSearch()` tiká jen při skutečném posunu cíle. Testy **552 → 555**. ⛔ **Sonda odhalila, že mode 6 nebyl v seznamu módů, pro které se tiskne per-pair leak test** — noc by se odmítla spustit; opraveno v mode listu, ne obcházením sondy. Předregistrace `evidence/night_prereg_20260819.md`. ⏰ **Čeká na noční A/B.** |
 | **T1.10** | ⭐ **LAJNA — samostatný rozebraný příklad k diskuzi** *(uživatel 19.08.: „mimo hřiště je zajímavé, ale měli bysme se tomu vyhýbat — pokud nejde, tak nejde; toto si zaslouží samostatný příklad k diskuzi“)*. Roh mimo hřiště je 2,1 % chybějících rohů; na postranní čáře jsou dva rohy geometricky nemožné ⇒ **4 rohy 0,0 %** (193 kol), jedno pole od lajny **1,8 %**, uprostřed **13,6 %** *(⚠️ gradient je korelace, ne důkaz)*. ⭐ **Není to vada k opravě, je to stav, kterému se má vyhnout výběr pole.** Doktrína existuje (**15.5**), chybí **odehraná situace**: kdy je tlak k lajně přijatelná cena za postup a kdy ne. | **OTEVŘENO — rozhovor, nesoupeří o stroj** |
 | **P35** | ⭐⭐⭐ **BLITZ SE OCEŇUJE Z VÝCHOZÍHO POLE, ale hází se z cílového.** `getBlockDiceCount` (`macro_actions.cpp:182`) počítá **obranné asistence** kolem pole, kde blitzující STOJÍ; resolver (`action_resolver.cpp:86–118` → `block_handler.cpp:491`) je počítá až tam, kam DOJDE. Kdo blitzuje do hloučku, má na startu nula a u cíle několik.<br>⭐ **Kód tu závislost ZNÁ:** komentář `action_resolver.cpp:89–91` — *„fewer enemies next to the blitzer = fewer defender assists on the block, see getBlockDiceCount"* — proto je `pickApproachStep` TZ-aware. **Trasa ji respektuje, výběr blitzujícího ne.**<br>**Strop (27 928 blitzů, 3 000 her):** kostky se změní v **16,2 %**, a v **9,7 % (2 712) se překlopí z „vybíráme my" na „vybírá soupeř"** — nejčastěji **+1 → −2**. ⇒ **≈ 0,9 blitzu na zápas s obráceným znaménkem kostek.** ⚠️ DOLNÍ odhad: bere se nejpříznivější pole u cíle, korpus neveze Guard. ⭐ **Upřesnění z psaní testu:** `pickApproachStep` je TZ-scored, takže **když u cíle existuje čisté pole, executor po něm dojde sám** ⇒ vada kouše jen tam, kde je **každé** volné pole u cíle pokryté. Měření to nezeslabuje — strop se počítal z nejpříznivějšího pole, tedy **už za dokonalé trasy**, a 9,7 % je **zbytek PO ní**. Doklad `evidence/filter_vs_resolver_round2_20260819.md`. | ✅ **IMPLEMENTOVÁNO 19.08.** — rameno `setBlitzLandingArm(side,on)`, per side, default OFF; cílové pole se počítá **touž chůzí jako executor** (`estimateApproachFailChance` ho vrací přes `landingOut`); ošetřena **obě** místa výběru (`expandBlitz` i `expandBlitzAndScore`); čítač `takeBlitzLandingRepicksInSearch()` tiká jen při skutečné změně volby ⇒ nulový test. Testy **549 → 552**. ⏰ **Čeká na noční A/B.** |
@@ -594,93 +595,31 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
   v rozhodování
 
 # CO JE TEĎ PRVNÍ
-*(jediný oddíl, který se přepisuje — stav k 19.08.2026 ráno)*
+*(jediný oddíl, který se přepisuje — stav k 19.08.2026 večer)*
 
-## ⭐ Nález noci: P9c efekt NEDODAL — a je to EKVIVALENCE, ne slabý běh
-
-`pushgeom_20260818/`, 6 800 párů, čteno v pre-registrovaném pořadí:
-leak **0** ⇒ delta se smí číst · `arm acted` **6 799/6 800** · `n_nonzero` **57,5 %** ·
-**delta +0,0017 ± 0,0060 SE (+0,28σ)**, 4/8 shardů záporných,
-empirická SE mezi shardy 0,0064 vs sdružená 0,0060 ⇒ **bez overdisperze**.
-
-⭐ **95 % CI [−0,0100; +0,0134] je CELÉ uvnitř prahu ±0,015.** To není „nemáme sílu" —
-efekt velikosti prahu je **vyloučen v obou směrech**. ⚠️ Malý kladný efekt
-**do ~1,3 pp** ale vyloučit neumíme ⇒ **„P9c neškodí" platí, „P9c je k ničemu" ne.**
-Kód se **nezahazuje**: 1,28 prokazatelně horší volby na zápas je doložená vada.
-Druhou půlku mechanismu drží **P32** (klec se posouvá jen rovně kupředu).
-
-## ⭐⭐ Druhý nález: aparát ten rozdíl neumí vytisknout ⇒ **T2.16**
-
-`night_summarize.py:117` porovnává **jen bodový odhad** s prahem. „NEROZHODNUTO"
-proto nese **dva opačné příkazy k akci** — *přidej páry* vs *zastav*. Cena záměny
-je **další 14hodinová noc**. Podle pravidla 18.08. jde **oprava kontroly před další měření**.
-
-## ✅ Třetí nález: čtecí strana obstála na ostro
-
-Ráno se **nedopočítávalo nic ručně** — sloučená delta, SE, overdisperze, verdikt
-i PŘEDPOVĚĎ vs VÝSLEDEK přišly z `chain.log`. T2.10–T2.14 tím ověřeny v provozu.
-⭐ A předpověď, o které se čekalo, že mine, **TREFILA**: `n_nonzero` 57,5 % proti
-pásmu 35–65 %. **12párový smoke dal 83,3 % a mýlil se** ⇒ smoke o desítkách párů
-není důvod posouvat pre-registraci; dobře se udělalo, že se neposunula.
-
-## Dnes — pořadí
-
-| | co | proč teď | stroj? |
-|---|---|---|---|
-| ~~1.~~ | ✅ **NOVÝ KORPUS BĚŽÍ** — `corpus_baseline_20260819/`, spuštěn 19.08. **09:26 SELČ**, 3 000 her, WORKERS=10, engine `ea6f0a51`, `git status engine/` čistý. Konec **~14:30 SELČ**. Vzniká ze DVOU nezávislých důvodů: (1) oprava exportu `HAND_OFF` (`c943e8b8`) — ověřeno, že ji binárka má; (2) nové pole `corridor_resistance` (K9b `a69758a6` 09:37, `.so` sestaven 09:50) — ověřeno `strings` v `bb_engine…so`. | běží |
-| ~~2.~~ | ✅ **T2.16 HOTOVO 19.08.** — čtyři verdikty místo tří; noc 18.→19.08. se přečte jako **EKVIVALENCE** s příkazem *ZASTAV*, ne jako výzva k opakování. Testy 35/35 → **42/42**. ⇒ **Podmínka na noční běh je splněná** — bod 8 je odblokovaný. | hotovo |
-| ~~2b.~~ | ✅ **K29⭐⭐ PRAVIDLO KLECE HOTOVO 19.08.** *(uživatel: „optimum klece je čtyři rohy a žádní další sousedi s ballcarrierem / vše čisté samozřejmě / to je pravidlo")*. Konjunkce tří klauzulí, implementována v `diag_rules_checks_20260812.py` (`K29rule`) **dřív, než se nad novým korpusem cokoli změřilo**. Plníme ji v **2,7 %** kol; **K29⭐ hlásila 12,3 %** — nadhodnocuje 4× (chybí třetí klauzule + useknutý jmenovatel). Spec **15.0b**. | hotovo |
-| **2c.** | ⭐⭐⭐ **P34 — ROZEBRÁNO 19.08. (Fable), a je to VOLBA, ne rozpočet.** Z 20 889 ortogonálních těl: **50,2 % na to zakázané pole vlastním pohybem DOŠLO v tomtéž kole**, a **73,6 % z nich mělo čistý prázdný roh hned vedle zvoleného cíle**; dalších **20,4 % stálo celé kolo nevyužitých** s rohem dosažitelným bez hodu. **Všechny legitimní překážky dohromady 2,0 %.** ⇒ **Zadarmo úplně 0,165 rohu/kolo = 1,36/zápas** (22,6 % stropu), s přesměrováním už odehraného pohybu **0,464/kolo = 3,82/zápas = 64 % stropu**. ⭐ **Cena kroku je ZÁPORNÁ:** REACH0 se zlepší v 30,3 % kol, zhorší v 3,5 %, FB2 beze změny ve 100 %. ⚠️ **σ pravidla 0,0 — vyhladovělý metr** (korpus ho hraje ve 2,2 % kol), po implementaci přeměřit. Doklad `evidence/fable_corner_gap_20260819.md`. | **OTEVŘENO — nejlepší kandidát na noc** |
-| **3.** | **FABLE 19.08.** *(BĚŽÍ od 10:05 SELČ)* — ⛔ **kandidát (1) ODPADL**: uživatel odpověděl **PRAVIDLEM** *(4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů)*, otázka „kolik rohů je optimum" je tím zavřená bez měření. ⇒ Zbývá **(2) B3 vs B2** *(odmarkovat vlastního nosiče vs prorazit zeď — nikdy neměřeno proti sobě)* nebo **(3) je 26,4 % blitzů „jinam" chyba**. ⭐ **Nový kandidát (4), který otevřelo dnešní měření:** *co brání 4. rohu, když tělo stojí jedno pole vedle* — 52,4 % kol, strop 0,73 rohu/kolo | jedna Fable analýza denně; dnešek jí dluží den | ne (jen čtení) |
-| **4.** | **P21** — výskyt „nosič ≠ Runner a vedle volný Runner" ve snímcích korpusu | ⏰ **až na novém korpusu** — odblokuje P5 | ne |
-| **5.** | **P30 přepočet σ-tabulky** — poprvé s `corridor_resistance` jako veličinou | ⏰ spouštěč: `BASELINE_DONE` v `corpus_baseline_20260819` | ne |
-| ~~6.~~ | ⛔ **BYLO ZASTARALÉ — P33 je ZMĚŘENÁ od 18.08.** *(nosič v dosahu blitzu 4,12 kola/zápas · blitz na něj 48,5 % · neutracen 1,04/zápas)*. Do ranní tabulky 19.08. se dostala zkopírováním ze včerejšího seznamu **bez ověření stavu** — přesně vada, které má kniha bránit. Živý zbytek T1.9 je: *kolik z 1,04 „neutraceno" bylo správně* · *B3 vs B2* · *je 26,4 % „jinam" chyba* (poslední dvě jsou kandidáti pro Fable). **T0.1** platí dál, ale ⏰ čeká na nový korpus (`corridor_resistance`). | ne |
-| ~~7.~~ | ⛔ **BYLO ZASTARALÉ — T5.3 je UZAVŘENÁ od 17.08.**: zranění PŘETRVÁVAJÍ (0 návratů ze 648 casualty za 600 her), oprava je v `918fc589` z 10.08. Táž vada kopírování jako u bodu 6. | ne |
-| **8.** | vybrat a spustit **noční A/B** — ⭐⭐ **favorit je nově P38** *(pole nosiče se vybírá podle klece, která z něj vyjde: možné v 95,6 %, plníme 2,7 %)*, pod ním **P34** *(cílové pole vlastního pohybu se posuzuje proti kleci)*: strop **1,36–3,82 rohu/zápas**, cena **záporná**, legitimní překážky jen 2,0 %. Před ním **P35** *(blitz oceňovaný z výchozího pole, ≈0,9 blitzu/zápas s obráceným znaménkem kostek)* — obojí je táž chybějící dimenze **KAM**. **P32** klesá na třetí. | ✅ **T2.16 splněno, odblokováno** | **ano, 14 h** |
-
-⛔ **Podmínka na noční běh se ROZŠIŘUJE potřetí.** Dosud: nulová kontrola ·
-`run_night_lib.sh` · umí vytisknout sloučený výsledek (T2.11).
-Nově navíc: **umí odlišit ekvivalenci od nedostatku síly** (T2.16) — jinak
-vyrobíme noc, kterou sice někdo přečte, ale **přečte ji jako výzvu k opakování**.
-
-## Stolní práce *(nesoupeří o stroj, tady je úzké hrdlo)*
+## ⏰⏰ RÁNO 20.08. — POŘADÍ
 
 | | co | proč |
 |---|---|---|
-| **0.** | ⭐⭐⭐ **PRAVIDLO 18.08.: OPRAVA KONTROLY SE VŽDY POVYŠUJE PŘED MĚŘENÍ** *(uživatel)*. Neplatí jen tehdy — je to **pořadí, které platí pokaždé**. ⇒ Dnes to nese **T2.16** na 2. místo. | řadí vše pod sebou |
-| ~~1.~~ | ✅ **DRUHÉ KOLO HOTOVO 19.08.** — `evidence/filter_vs_resolver_round2_20260819.md`. Tři nálezy: **P35** *(blitz oceňovaný z výchozího pole — 9,7 % blitzů se překlopí z „vybíráme my" na „vybírá soupeř", ≈ 0,9/zápas)* · **P36** *(Dauntless chybí v žebříčku blitzujících)* · **P37** *(`carrierIsBlitzable` nezná GFI, 0,42 kola/zápas)*. ⚠️ Nedokončeno: `macro_mcts.cpp`, `scoreMoveAction`, `expandCage`/`expandReposition`; pass/hand-off vědomě vynechán (P5 čeká na korpus). | další kolo je samostatná položka |
-| **2.** | **P15** práh nabídky podle ceny cíle | ST4 s míčem je dnes pro 9 z 11 těl nedotknutelný |
-| **3.** | **P14** Wrestle do výběru kostky a do rerollu | bereme „Both Down" v přesvědčení, že nás Block chrání |
-| **4.** | **P3** fázový plán trasy | bez fáze nejde odlišit chybu od záměru |
+| **1.** | **přečíst `cageadvance_20260819/chain.log`** — noc **P38** (mode 6, 8×850 = 6 800 párů, dw-we, práh ±0,015, `CONTROL_MODE2=1`), start 19.08. **14:01 SELČ**, konec **~04:30**. Předregistrace `evidence/night_prereg_20260819.md`. ⭐ **Nic se nedopočítává ručně** — `chain.log` tiskne leak → arm acted → `n_nonzero` → sloučenou deltu s verdiktem *(nově čtyřstupňovým: ŠKODÍ · POMÁHÁ · **EKVIVALENCE** · **NEROZHODNUTO — MÁLO SÍLY**)* a PŘEDPOVĚĎ vs VÝSLEDEK. Když něco počítáš ručně, je to vada aparátu. | pre-registrovaný experiment |
+| **2.** | ⛔⛔ **P39 — NOSIČ SE NEAKTIVUJE.** *(uživatel 19.08.: „zapiš P39 do fronty jako prioritu na ráno")* Přepočítat na **celém** korpusu (dnešní čísla jsou z 800 her) a **rozhodnout mezi příčinami ⓐ/ⓑ/ⓒ, ne opravovat**. | největší změřená ztráta tempa: 37,7 % splnitelných kol bez pohybu, z toho 83,8 % nosič vůbec nejednal a 58,3 % z nich byl volný |
+| **3.** | **zrcadlový korpus** `corpus_mirror_20260819_data` (750 her dwarf–dwarf, doběhlo 19.08. odpoledne) — spočítat **konverzi drivů** (kategorie A) a podívat se na 0:0. | uživatelův měřák klece: *„TD za 8 kol"*; zrcadlo v žádném měření konverze dosud nebylo |
+| **4.** | **T0.1 dokončit** — tvar rozvrhu hotový, kapacita nově **z mechanických stropů** *(SÓLO/VÝBĚH = MA nosiče, KLEC = min(MA rohů, MA nosiče))*, takže už nečeká na korpus. Zbývá napsat novou K9 do `diag_rules_checks_20260812.py` a změřit její σ proti staré K9a (20,8σ). | ROZDĚLANÉ — nesmí zapadnout |
+| **5.** | **σ pravidla a kapacity přeměřit** na korpusu **po** P38 — dnešní 0,0σ je vyhladovělý metr (pravidlo se hraje ve 2,2 % kol). | spouštěč: noc doběhla |
 
-## Zadání pro Fable — **kolik našich verdiktů přežije nulové rameno** *(SPUŠTĚNO 17.08. ráno)*
+## Co se dnes rozhodlo *(a nemusí se znovu otvírat)*
 
-✅ **DODÁNO 17.08. 09:31 SELČ** — `evidence/fable_null_arm_audit_20260817.md` (12,8 kB).
-⛔ **Ve frontě stálo „⏳ Běží" ještě 19.08. ráno**, ačkoli výstup ležel hotový **dva dny**.
-Sám nález se neztratil (je v paměti i v produkci: CRN podle §4 běželo 18.08.,
-`n_nonzero` je povinný řádek souhrnu), ztratil se **stav ve frontě** — táž rodina
-jako „snímek se vydává za stav". ⇒ Odteď se stav Fable zadání zavírá **týž den**,
-co soubor vznikne.
+* ⛔ **Vyměňovat rychlejší těla do rohů se nevyplatí** — strop klece využíváme na 48 %, při stropu 4 na 50 %, při stropu 5 na 39 %. Mez není svazující.
+* ⛔ **P5 (volba hand-offu) — strop 0,15 kola/zápas** ⇒ navrženo zamítnout stropem jako P8 a P10a. Živá je místo toho otázka o **pozici Runnera** (0,376 kola/zápas).
+* ⛔ **„Rovnoměrná podlaha trestá klec" NEPLATÍ** — správně postavená klec jede **2,55** pole/kolo proti 1,98 u rozbité. Podlaha trestá naši klec, ne fázi.
+* ✅ **σ-tabulka přepočítána** na čerstvém korpusu, všech 11 veličin replikovalo; nová **odpor koridoru −9,6σ**.
+* ✅ **P35 · P38 implementovány** s ramenem, čítačem a testy (549 → 555).
+* ✅ **T2.16** — verdikt noci rozlišuje EKVIVALENCI od nedostatku síly.
+* ⛔ **Z17** — proti skavenům se lajně vyhýbáme **striktně** (u lajny ztrácíme míč v 20,9 % proti 10,8 % uprostřed; skaven je uprostřed nejméně nebezpečný soupeř ze všech).
 
-**Co dodal:** korelace mezi polovinami páru **−0,017** ⇒ pár byl fakticky dvě
-nezávislá měření · mrtvé rameno dá **+2,28 pp (+2,3 SE)** ⇒ práh ~2 SE překročí
-ve ~2 % běhů · §4 „tři `+ orient` pryč" ⇒ **CRN, exaktní nula u mrtvého ramene**.
+## ⚠️ Poznámka k vedení knihy
 
-**Otázka:** *Které z dosavadních A/B tohoto projektu by při čtení proti
-nulovému rameni dopadly jinak?* Vstup: uložená ramena (brána klece, balík G,
-M1, era, Dauntless) + `dauntless_ab_20260814/*_s*/diag_dauntless_rows.jsonl`,
-kde jsou **dvě nezávislé nuly na 6 000 hrách** — dosud jediné, co o podlaze
-aparátu víme napřímo.
-
-Co má vrátit: **(1)** empirickou podlahu párové delty per shard i sdruženě;
-**(2)** přepočet každého historického verdiktu proti té podlaze, jmenovitě
-**zamítnutí brány klece**; **(3)** kolik párů je doopravdy potřeba na 2 pp;
-**(4)** jestli jde pár utáhnout (sdílený herní seed, shodné MCTS seedy) tak,
-aby se rozptyl skutečně redukoval — to by zlevnilo **každý** další běh.
-
-**Proč tohle a ne attrition:** nepotřebuje stroj, a dokud neplatí metr, je
-každý další 14hodinový běh sázka. Audit měřicího aparátu byl nejcennějším
-nálezem 13.08.; **P20 je jeho druhé kolo.**
+Ranní tabulka 19.08. obsahovala **tři zastaralé položky** (P33, T5.3, P21), všechny zkopírované z předchozího dne bez ověření stavu. Než se sem něco zapíše, **ověř stav ve sloupci**, ne v paměti.
 
 ## Odložené se spouštěčem *(nesmí se ztratit — proto i tady, ne jen v tabulce)*
 
