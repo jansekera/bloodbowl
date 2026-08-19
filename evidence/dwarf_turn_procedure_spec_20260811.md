@@ -2018,6 +2018,56 @@ Rozhodne to rozpad ztrát u lajny podle příčiny — zapsáno, neměřeno.
 
 ⚠️ Celá tabulka je **korelace**: nosič u lajny může být příznak tlaku.
 
+### ⭐⭐⭐ ČÍM SE CENA LAJNY ŘÍDÍ: **MA toho, kdo na nosiče dosáhne** *(uživatel 19.08.)*
+
+Rasa je špatný hák — se čtyřmi rasami se dá proložit cokoli (n = 4). Tohle je
+na úrovni **kola**, jmenovatel ~20 000: co má nosič **kolem sebe**.
+Mezi soupeři, kteří na nosiče **dosáhnou** (Chebyshev ≤ MA+2, tedy i přes GFI),
+se bere nejvyšší MA a nejvyšší ST.
+
+| max **MA** | u lajny (0–2) | střed (3+) | násobek |
+|---:|---:|---:|---:|
+| 6 | 27,5 % | 21,0 % | ×1,31 |
+| 7 | 16,8 % | 14,7 % | ×1,15 |
+| 8 | 25,2 % | 15,6 % | ×1,62 |
+| **9** | 25,7 % | **13,6 %** | **×1,89** |
+
+| max **ST** | u lajny (0–2) | střed (3+) | násobek |
+|---:|---:|---:|---:|
+| **3** | 21,4 % | **13,4 %** | **×1,60** |
+| 4 | 31,1 % | 21,1 % | ×1,48 |
+| 5 | 29,1 % | 20,4 % | ×1,43 |
+
+⭐ **MA a ST táhnou proti sobě.** S rychlostí násobek **roste** (1,31 → 1,89)
+a střed se **zlepšuje** (21,0 → 13,6 %). Se silou **klesá** (1,60 → 1,43)
+a střed se **zhoršuje** (13,4 → 20,4 %).
+
+⇒ **Hypotéza z 15.5b je tím změřená, ne jen vyslovená:**
+**lajna převádí DOSAH na POŠKOZENÍ.** Kdo má dosah bez síly, získá u lajny
+nejvíc — uprostřed k nám dojde a neublíží, u lajny mu hřiště dodá to, co mu
+chybí. Kdo má sílu, je nebezpečný všude a lajna mu přidá nejmíň.
+
+### ⇒ Použitelný tvar pravidla, bez jména rasy
+
+**Tvrdost zákazu lajny se řídí MA nejrychlejšího soupeře, který na nosiče
+dosáhne** *(nikoli rasou, nikoli průměrným MA týmu)*:
+
+* **max MA ≥ 8 ⇒ ZÁKAZ.** Násobek 1,6–1,9 a střed je zároveň nejbezpečnější
+  dostupný stav ⇒ odklon nemá co vyvažovat.
+* **max MA ≤ 7 ⇒ KOMPROMIS** proti postupu. Násobek 1,15–1,31 a střed je
+  nebezpečný taky, takže odklon kupuje jen část.
+
+⭐ **Je to čitelné v okamžiku rozhodování** — MA soupeřů v dosahu je na desce
+vidět, na rozdíl od „proti komu hrajeme". Zapadá to přímo do **P38**: pole
+nosiče se dá vážit vzdáleností od lajny **úměrně max MA v dosahu**.
+
+⚠️ **Výhrady, které to nesmí ztratit:**
+* **MA a ST jsou přes roster provázané** (GR = MA9/ST2, Black Orc = MA5/ST4),
+  takže obě tabulky nejsou nezávislé; tenhle řez je **nerozplete úplně**.
+* **Malé buňky u lajny** (122–432 kol). MA9 drží pohodlně (12,1 pp ± 2,8 ≈ 4,3σ),
+  ale **MA6 je jen ~1,8σ** a **MA7 boří monotónnost** (×1,15) — nevyhlazovat.
+* Pořád **korelace**: nosič u lajny může být příznak tlaku, ne jeho příčina.
+
 ## 15.6 Obrana proti klaci: nemusíš ji rozbít, stačí ji zpomalit
 
 Zpomalit soupeřovu klec na **1–2 pole za kolo** stačí — kolem **6.–8. kola**
