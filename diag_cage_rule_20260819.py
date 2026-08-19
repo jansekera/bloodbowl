@@ -72,11 +72,11 @@ def run(paths, race="dwarf"):
             c2 = not dirty
             c3 = not extra_any
 
-            st["① 4 rohy"] += c1
-            st["② všechny čisté"] += c2
-            st["③ žádní další sousedi"] += c3
-            st["PRAVIDLO (①∧②∧③)"] += (c1 and c2 and c3)
-            st["dnešní K29⭐ (①∧②)"] += (c1 and c2)
+            st["(1) 4 rohy"] += c1
+            st["(2) všechny čisté"] += c2
+            st["(3) žádní další sousedi"] += c3
+            st["PRAVIDLO ((1)∧(2)∧(3))"] += (c1 and c2 and c3)
+            st["dnešní K29⭐ ((1)∧(2))"] += (c1 and c2)
             if c1 and c2 and not c3:
                 st["⛔ K29⭐ říká PLNÁ ČISTÁ, a přesto má nosič dalšího souseda"] += 1
                 if extra_them_orth or them_on_diag:
@@ -86,9 +86,9 @@ def run(paths, race="dwarf"):
 
             # co láme třetí klauzuli
             if extra_them_orth or them_on_diag:
-                st["③ lomeno SOUPEŘEM (nosič je v kontaktu)"] += 1
+                st["(3) lomeno SOUPEŘEM (nosič je v kontaktu)"] += 1
             if extra_ours and not (extra_them_orth or them_on_diag):
-                st["③ lomeno JEN NAŠÍM tělem navíc"] += 1
+                st["(3) lomeno JEN NAŠÍM tělem navíc"] += 1
             st["našich těl navíc u nosiče celkem"] += len(extra_ours)
             st["soupeřů u nosiče celkem"] += len(extra_them_orth) + len(them_on_diag)
 
@@ -111,11 +111,11 @@ def main():
     st = run(paths)
     n = st["našich kol s míčem na konci"]
     print(f"korpus: {len(paths)} her · {n} našich kol s míčem na konci kola\n")
-    order = ["① 4 rohy", "② všechny čisté", "③ žádní další sousedi",
-             "dnešní K29⭐ (①∧②)", "PRAVIDLO (①∧②∧③)",
+    order = ["(1) 4 rohy", "(2) všechny čisté", "(3) žádní další sousedi",
+             "dnešní K29⭐ ((1)∧(2))", "PRAVIDLO ((1)∧(2)∧(3))",
              "⛔ K29⭐ říká PLNÁ ČISTÁ, a přesto má nosič dalšího souseda",
-             "③ lomeno SOUPEŘEM (nosič je v kontaktu)",
-             "③ lomeno JEN NAŠÍM tělem navíc",
+             "(3) lomeno SOUPEŘEM (nosič je v kontaktu)",
+             "(3) lomeno JEN NAŠÍM tělem navíc",
              "   z toho: SOUPEŘ vedle nosiče (lehlý/omráčený ⇒ 'čisté')",
              "   z toho: jen NAŠE tělo navíc",
              "⭐ chybí roh, a naše tělo stojí ORTOGONÁLNĚ (1 pole vedle)"]

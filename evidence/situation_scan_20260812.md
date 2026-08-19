@@ -113,10 +113,10 @@ tier D je navíc prázdný, takže ani „nabídnuto, ale fyzicky neprovediteln�
 nenastává. Předregistrovaná varianta „S5 se stěhuje do generátoru akcí"
 **NENASTALA** — fronta úkolů se kvůli tomu nepřeskupuje.
 
-Skutečný obsah bývalých „43 pb": ① zastaralé měření (n=53, engine o šest
-oprav starší) — dnes je díra 11 pb; ② z toho víc než polovina = turnover
-zabil kolo před sběrem (pořadí rizika, ne S5); ③ ~třetina = dodge-only
-situace, kde neber je legitimní; ④ zbytek 2,7 % = vada volby searche.
+Skutečný obsah bývalých „43 pb": (1) zastaralé měření (n=53, engine o šest
+oprav starší) — dnes je díra 11 pb; (2) z toho víc než polovina = turnover
+zabil kolo před sběrem (pořadí rizika, ne S5); (3) ~třetina = dodge-only
+situace, kde neber je legitimní; (4) zbytek 2,7 % = vada volby searche.
 
 ---
 

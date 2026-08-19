@@ -16,10 +16,10 @@ Jediný POKUS, žádný FAIL, žádný restart. Zámek, úklid dětí i prefligh
 
 | # | co | hodnota | verdikt |
 |---|---|---|---|
-| ① | `MOVED WITHOUT THE ARM ACTING` | **0** ve všech 8 shardech | ✅ delta se **smí** číst |
-| ② | `arm acted` | **6000/6000 (100 %)** | ✅ plný jmenovatel |
-| ③ | `n_nonzero` | **3766/6000 = 62,8 %** | ⚠️ pre-reg čekal **>80 %** — předpověď MIMO; podle vlastního pravidla se **práh NEPOSOUVÁ** |
-| ④ | párová delta chess `dw-we` | **−0,0248 ± 0,0068 SE** *(−3,7σ)*, 95 % CI **[−0,038; −0,012]** | ⇒ **≤ −0,015 = BRÁNA ŠKODÍ** |
+| (1) | `MOVED WITHOUT THE ARM ACTING` | **0** ve všech 8 shardech | ✅ delta se **smí** číst |
+| (2) | `arm acted` | **6000/6000 (100 %)** | ✅ plný jmenovatel |
+| (3) | `n_nonzero` | **3766/6000 = 62,8 %** | ⚠️ pre-reg čekal **>80 %** — předpověď MIMO; podle vlastního pravidla se **práh NEPOSOUVÁ** |
+| (4) | párová delta chess `dw-we` | **−0,0248 ± 0,0068 SE** *(−3,7σ)*, 95 % CI **[−0,038; −0,012]** | ⇒ **≤ −0,015 = BRÁNA ŠKODÍ** |
 
 Shardy: −0,0120 −0,0267 −0,0413 −0,0507 −0,0160 −0,0060 −0,0273 −0,0180 —
 **8/8 záporných.** Empirická SE mezi shardy **0,0053** < sdružená **0,0068**

@@ -1657,11 +1657,11 @@ podle toho, **co v tomhle kole nejde koupit blokem**:
 |---|---|---|---|
 | **B1** | **odemknout skórování** — tělo v cestě mezi nosičem a endzonou, když se dnes skóruje | S10 / S9 | S9.4 · S10 |
 | **B2** | **prorazit koridor / zeď** — `resistance` má koho a bez něj se rozvrh nesplní | postup vpřed | S2.9 · S2.11 |
-| **B3** | **odmarkovat vlastního nosiče** — nosič AG2 platí za odchod ze zóny 4+, tj. ~50 % turnover; blitz je levnější než ten hod | nosič je markovaný | 9.5 ② |
+| **B3** | **odmarkovat vlastního nosiče** — nosič AG2 platí za odchod ze zóny 4+, tj. ~50 % turnover; blitz je levnější než ten hod | nosič je markovaný | 9.5 (2) |
 | **B4** | **soupeřův nosič, na kterého nikdo nesousedí** — jediný nástroj, jak se k němu vůbec dostat | obrana / boxing-in | S7.5 · S8.3 |
 | **B5** | **odemknout sběr volného míče** — odmarkovat pole u míče, nebo srazit toho, kdo by ho sebral | S5 / S6 | S5.6 · S6.3 |
-| **B6** | **polluter u rohu klece, na kterého NIKDO nesousedí** | 39 % polluterů | P2 ② |
-| **B7** | zbytek — nejšťavnatější dostupný cíl | nic výše nečeká | S2.10 ③ |
+| **B6** | **polluter u rohu klece, na kterého NIKDO nesousedí** | 39 % polluterů | P2 (2) |
+| **B7** | zbytek — nejšťavnatější dostupný cíl | nic výše nečeká | S2.10 (3) |
 
 ⚠️ **B4 povyšuje na B1 v S8** *(soupeři zbývají ≤ 2 kola)*: tam turnover stojí
 soupeře celý drive, takže se bere i za horších kostek. To je jediná výjimka
@@ -1767,11 +1767,11 @@ tři rohy „ze čtyř" nejsou 75 % klece, jsou to **otevřená klec**.
 
 | | klauzule | proč |
 |---|---|---|
-| **①** | **4 rohy** — všechna čtyři diagonální pole nosiče obsazená naším stojícím tělem | tři rohy = díra, kterou se dojde k nosiči bez dodge |
-| **②** | **všechny čisté** — žádný roh nesousedí se stojícím soupeřem | špinavý roh je spálené tělo (15.0) |
-| **③** | **žádní další sousedi nosiče** — čtyři ortogonální pole **prázdná**, a v žádném z osmi polí soupeř | soused je buď kontakt na nosiči, nebo naše tělo utracené za nic |
+| **(1)** | **4 rohy** — všechna čtyři diagonální pole nosiče obsazená naším stojícím tělem | tři rohy = díra, kterou se dojde k nosiči bez dodge |
+| **(2)** | **všechny čisté** — žádný roh nesousedí se stojícím soupeřem | špinavý roh je spálené tělo (15.0) |
+| **(3)** | **žádní další sousedi nosiče** — čtyři ortogonální pole **prázdná**, a v žádném z osmi polí soupeř | soused je buď kontakt na nosiči, nebo naše tělo utracené za nic |
 
-⚠️ **③ zakazuje i VLASTNÍ tělo navíc.** Není to estetika: ortogonální pole vedle
+⚠️ **(3) zakazuje i VLASTNÍ tělo navíc.** Není to estetika: ortogonální pole vedle
 nosiče je jediné, které klec **nechrání dvěma tackle zónami**, takže tělo tam
 nic nedrží — a podle 15.0 je klec **rozpočet**, ne útvar. Tělo, které tam stojí,
 chybí v rohu, kterých máme 5,5 kandidáta na 4.
@@ -1780,10 +1780,10 @@ chybí v rohu, kterých máme 5,5 kandidáta na 4.
 
 | | | |
 |---|---|---|
-| ① 4 rohy | 2 396 | **9,7 %** |
-| ② všechny čisté | 21 425 | 86,8 % |
-| ③ nosič bez dalších sousedů | 6 000 | **24,3 %** |
-| **PRAVIDLO ①∧②∧③** | **675** | **⛔ 2,7 %** |
+| (1) 4 rohy | 2 396 | **9,7 %** |
+| (2) všechny čisté | 21 425 | 86,8 % |
+| (3) nosič bez dalších sousedů | 6 000 | **24,3 %** |
+| **PRAVIDLO (1)∧(2)∧(3)** | **675** | **⛔ 2,7 %** |
 
 Rozdělení podle počtu rohů: **0 rohů v 33,1 %** kol · 1 v 24,2 % · 2 v 19,6 % ·
 3 v 13,4 % · 4 v 9,7 %.
@@ -1805,7 +1805,7 @@ Ověřeno dvěma nezávislými implementacemi na týchž 400 hrách (3,1 % obě)
 ### ⭐ Strop opravy: **0,73 rohu na kolo se dá získat překročením o JEDNO pole**
 
 V **52,4 % kol** platí zároveň: *chybí roh* **a** *naše tělo stojí ortogonálně
-u nosiče*, tedy na poli, které ③ zakazuje — **jedno pole od prázdného rohu,
+u nosiče*, tedy na poli, které (3) zakazuje — **jedno pole od prázdného rohu,
 a u nosiče už je**. Průměrně **1,01 našeho těla na kolo** stojí takto, proti
 **0,63 soupeře** u nosiče.
 

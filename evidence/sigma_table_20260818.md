@@ -49,20 +49,20 @@ K29 (5,1σ); tři nejslabší řádky jsou šum a nesmí se o ně opřít žádn
 
 ## ⭐⭐ Tři věcné změny proti 13.08.
 
-**① „Byl v kole blok?" předpovídá TD ZÁPORNĚ** (+0,6σ → −2,5σ), a hlavně:
+**(1) „Byl v kole blok?" předpovídá TD ZÁPORNĚ** (+0,6σ → −2,5σ), a hlavně:
 je to jediná z hlavních veličin, která **v půlkách nereplikuje**. Souhlasí to
 s nálezem 14.08., že *obecné* bloky zhoršují čistotu rohů (−4,5σ).
 ⇒ **„bít víc" je definitivně mrtvá rada**; platí jen „bít toho správného".
 Zároveň ⚠️ **`bloků na kolo` jako POČET je +10,4σ a replikuje** — takže to není
 „bít je špatné", ale **„blok jako ano/ne nic neměří"**. Táž vada jako u REACH0.
 
-**② Binarizace ničí signál — potvrzeno podruhé a silněji** (P1).
+**(2) Binarizace ničí signál — potvrzeno podruhé a silněji** (P1).
 REACH0 jako počet −16,7σ, tatáž věc jako ano/ne 9,3σ. Rohy jako počet −2,1σ
 (šum), čistota jako podíl 5,1σ. ⇒ **P1 (přepsat K33/K34 na spojité) povýšit** —
 už to není „levné, opravuje metr", je to **druhý nejsilnější prediktor v tabulce,
 který dnešní kontrola zahazuje**.
 
-**③ Nezáleží na tom, kolik máme ČISTÝCH rohů, ale kolik máme ŠPINAVÝCH.**
+**(3) Nezáleží na tom, kolik máme ČISTÝCH rohů, ale kolik máme ŠPINAVÝCH.**
 Počet čistých rohů: **−0,2σ = nic** (a v půlkách mění znaménko).
 Počet špinavých rohů: **−6,8σ** a replikuje.
 ⇒ Doktrína se nemá formulovat jako *„postav čtvrtý roh"*, ale jako

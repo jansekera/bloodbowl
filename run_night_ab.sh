@@ -23,7 +23,7 @@
 #      deltu spočítal ráno člověk. Táž rodina jako audit aparátu: SNÍMEK SE
 #      VYDÁVÁ ZA STAV -- a je to přesně krok, kde si unavené čtení vybere shard,
 #      který se hodí. ⇒ `night_summarize.py` na konci, v POŘADÍ ČTENÍ
-#      z předregistrace (① leak → ② jmenovatel → ③ n_nonzero → ④ delta).
+#      z předregistrace ((1) leak → (2) jmenovatel → (3) n_nonzero → (4) delta).
 #      Kontrola, kterou nikdo nepřečte, se od chybějící kontroly neliší.
 #
 # POUŽITÍ

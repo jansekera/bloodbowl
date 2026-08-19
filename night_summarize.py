@@ -17,8 +17,8 @@
 #   nad testem, který ve skutečnosti proběhl a byl čistý 8/8.
 #
 # ⚑ POŘADÍ VÝPISU JE POŘADÍ ČTENÍ Z PŘEDREGISTRACE, ne pořadí zajímavosti:
-#   ① leak → ② jmenovatel → ③ n_nonzero → ④ teprve pak delta.
-#   Když ① neprojde, delta se NEVYTISKNE. Nedá se přečíst od konce.
+#   (1) leak → (2) jmenovatel → (3) n_nonzero → (4) teprve pak delta.
+#   Když (1) neprojde, delta se NEVYTISKNE. Nedá se přečíst od konce.
 # ============================================================================
 import re, sys, glob, math, os
 
@@ -59,44 +59,44 @@ def summarize(out, name, thr, facts=None):
     pairs = sum(x["pairs"] for x in sh)
     L.append("  %s — %d shardů, %d párů" % (name, len(sh), pairs))
 
-    # ① leak — bez něj se delta nečte
+    # (1) leak — bez něj se delta nečte
     missing = [x for x in sh if x["leak"] is None]
     if missing:
-        L.append("    ① ⛔ ŘÁDEK `MOVED WITHOUT THE ARM ACTING` CHYBÍ v %d/%d shardech"
+        L.append("    (1) ⛔ ŘÁDEK `MOVED WITHOUT THE ARM ACTING` CHYBÍ v %d/%d shardech"
                  % (len(missing), len(sh)))
         L.append("       ⇒ binárka tu kontrolu neumí (stará?). VERDIKT SE NEVYNÁŠÍ.")
         return L, 2
     leak = sum(x["leak"] for x in sh)
     bad = [x["path"].split("/")[-2] for x in sh if x["leak"]]
-    L.append("    ① MOVED WITHOUT THE ARM ACTING: %d %s"
+    L.append("    (1) MOVED WITHOUT THE ARM ACTING: %d %s"
              % (leak, "(0 = čisté, delta se SMÍ číst)" if leak == 0
                 else "⛔ v " + ",".join(bad) + " — rameno změnilo běh JINUDY, DELTA SE NEČTE"))
     if leak:
         return L, 3
 
-    # ② jmenovatel
+    # (2) jmenovatel
     acted, of = sum(x["acted"] for x in sh), sum(x["of"] for x in sh)
-    L.append("    ② arm acted: %d/%d (%.1f %%)%s"
+    L.append("    (2) arm acted: %d/%d (%.1f %%)%s"
              % (acted, of, 100.0 * acted / of,
                 "" if acted == of else "  ⚠️ neúplný jmenovatel — část párů rameno neměřila"))
 
-    # ③ n_nonzero
+    # (3) n_nonzero
     if any(x["nz"] is None for x in sh):
-        L.append("    ③ n_nonzero: ⚠️ CHYBÍ v logu (harness starší než 17.08.)"
+        L.append("    (3) n_nonzero: ⚠️ CHYBÍ v logu (harness starší než 17.08.)"
                  " — nevíme, kolik párů vůbec neslo informaci")
     else:
         nz = sum(x["nz"] for x in sh)
-        L.append("    ③ n_nonzero: %d/%d (%.1f %%) — jen tyhle páry nesou informaci"
+        L.append("    (3) n_nonzero: %d/%d (%.1f %%) — jen tyhle páry nesou informaci"
                  % (nz, pairs, 100.0 * nz / pairs))
 
-    # ④ teprve teď delta
+    # (4) teprve teď delta
     n = len(sh)
     mean = sum(x["delta"] for x in sh) / n
     pooled = math.sqrt(sum(x["se"] ** 2 for x in sh)) / n
     sd = math.sqrt(sum((x["delta"] - mean) ** 2 for x in sh) / (n - 1)) if n > 1 else 0.0
     emp = sd / math.sqrt(n) if n > 1 else 0.0
     neg = sum(1 for x in sh if x["delta"] < 0)
-    L.append("    ④ DELTA SLOUČENĚ: %+.4f ± %.4f SE (%+.2f σ), 95%% CI [%+.4f; %+.4f]"
+    L.append("    (4) DELTA SLOUČENĚ: %+.4f ± %.4f SE (%+.2f σ), 95%% CI [%+.4f; %+.4f]"
              % (mean, pooled, mean / pooled if pooled else 0,
                 mean - 1.96 * pooled, mean + 1.96 * pooled))
     L.append("       shardy: " + " ".join("%+.4f" % x["delta"] for x in sh))

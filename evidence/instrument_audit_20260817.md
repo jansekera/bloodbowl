@@ -107,7 +107,7 @@ musí to říct **jméno**, ne komentář pod ním.
 Tahle tabulka je v knize úkolů uvedená slovy *„podle čeho se řadí zbytek"*.
 Stojí tedy na ní pořadí veškeré další práce. Audit našel **čtyři věci**.
 
-## ① Oprava atribuce TD ze 14.08. šla jen do JEDNOHO ze dvou sourozenců
+## (1) Oprava atribuce TD ze 14.08. šla jen do JEDNOHO ze dvou sourozenců
 
 `14c7d035` *(„touchdown patří tomu, kdo ho dal, ne tomu, kdo byl na tahu")*
 sáhla **jen** na `diag_drive_failure`. Tenhle skript dál dělal
@@ -117,13 +117,13 @@ regrese**, ne vedlejší statistika.
 ⚠️ **Dopad: ŽÁDNÝ** — na obou zkoušených korpusech vyjde tabulka bit po bitu
 stejně. *(Poctivý negativní výsledek: chyba byla skutečná, ale nic nepohnula.)*
 
-## ② Strana se hádala ze jmen, ačkoli je rasa přímo v datech
+## (2) Strana se hádala ze jmen, ačkoli je rasa přímo v datech
 
 `ours = "home" if "Longbeard" in prvních_třech_jmen else "away"`. Kdyby první
 tři domácí byli Blitzeři, skript by **tiše měřil soupeře jako nás**.
 ✅ Opraveno na `home_race == "dwarf"`.
 
-## ③ ⭐ TABULKA SE NEREPRODUKUJE NA JINÉM KORPUSU TÉŽE VELIKOSTI
+## (3) ⭐ TABULKA SE NEREPRODUKUJE NA JINÉM KORPUSU TÉŽE VELIKOSTI
 
 | veličina | `20260811b` *(to, co je v knize)* | `20260813_gate` |
 |---|---|---|
@@ -142,7 +142,7 @@ o 2σ a víc.** Korpusy se liší i enginem, takže část toho může být skut
 změna. **Právě to je ale ten problém: z čísla v knize se nepozná, co z toho je
 co**, protože tam stojí bez korpusu, bez data a bez commitu.
 
-## ④ ⭐⭐ A ten rozsah je mnohem menší, než se čte
+## (4) ⭐⭐ A ten rozsah je mnohem menší, než se čte
 
 Doplnil jsem tisk původu — a vyšlo najevo, že `20260811b` je **120 HER**.
 Tabulka, která řadí veškerou práci, tedy stojí na:
@@ -177,7 +177,7 @@ tiskne korpus i počet vzorků, a **sám si přiznává vlastní zkreslení**
 *(„obranné asistence u neznámé pozice útočníka ~ 0 → mírně nadsazuje jejich
 kostky")*. Přesto tři poznámky.
 
-## ① `OUT = 3` je nesprávné jméno — ale MĚŘENÍ JE SPRÁVNÉ
+## (1) `OUT = 3` je nesprávné jméno — ale MĚŘENÍ JE SPRÁVNÉ
 
 Enum enginu má na 3 **KO**, a dál INJURED/DEAD/EJECTED/OFF_PITCH (4–7).
 Test `p["state"] == OUT` by tedy zachytil jen KO. **Ověřeno v datech:**
@@ -187,7 +187,7 @@ stavy 0/1/2 a seznam se zkracuje z 11 až na 5. Odchod ze hřiště se tedy pozn
 OUT`). ⇒ **jedna větev je mrtvý kód, dopad na výsledek žádný.**
 *(Zapsáno i s tím „žádný" — nález bez dopadu je pořád nález.)*
 
-## ② ⭐ HVĚZDIČKA NEMĚLA KOREKCI NA POČET SROVNÁNÍ
+## (2) ⭐ HVĚZDIČKA NEMĚLA KOREKCI NA POČET SROVNÁNÍ
 
 `*` = `|r| > 2/sqrt(n)`, tedy **~2σ na každou buňku zvlášť** — a buněk je
 **36**. ⇒ **~1,8 hvězdičky se čeká i tehdy, kdyby neplatilo nic.** Z téhle
@@ -195,7 +195,7 @@ tabulky se přitom vybrala doktrína E1/E2.
 ✅ Opraveno: tiskne se počet srovnání i očekávaný počet planých hvězdiček,
 a `**` označuje buňky, které projdou korekcí na 36 srovnání.
 
-## ③ ✅ A DOKTRÍNA E1/E2 TU KOREKCI PŘEŽIJE
+## (3) ✅ A DOKTRÍNA E1/E2 TU KOREKCI PŘEŽIJE
 
 | | down | lost | ball_lost | appr |
 |---|---|---|---|---|
@@ -221,7 +221,7 @@ aproximace** *(S0/S1 v korpusu nejsou · `achievable_pace` je v logu vždy 0 ⇒
 tempo se bere z MA nosiče · „poslední kolo" = turn 8 · S5 se klasifikuje jen
 podle dosahu)*. Jedna vada a jedno ověření.
 
-## ① Korpus byl ZADRÁTOVANÝ v kódu
+## (1) Korpus byl ZADRÁTOVANÝ v kódu
 
 `DIRS = [tři adresáře z 11.08.]`, dohromady **280 her**, a `sys.argv` se na
 korpus **nepoužívalo**. Nástroj tedy nešlo pustit na novější data bez editace
@@ -229,7 +229,7 @@ zdrojáku — a report žádný korpus neuváděl, takže si toho nikdo nemusel 
 ✅ Opraveno: korpus z argv, výchozí zůstává starý *(reprodukovatelnost)*,
 a tiskne se korpus, otisk enginu a **jednotka jmenovatele** *(trpasličí kola)*.
 
-## ② ⭐ ROZLOŽENÍ SITUACÍ SE POTVRDILO NA 10× VĚTŠÍM VZORKU
+## (2) ⭐ ROZLOŽENÍ SITUACÍ SE POTVRDILO NA 10× VĚTŠÍM VZORKU
 
 | | 280 her, 11.08. | **3 000 her, 14.08.** |
 |---|---|---|

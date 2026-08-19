@@ -1,6 +1,6 @@
 # ZADÁNÍ PRO FABLE 19.08.2026 — CO BRÁNÍ ČTVRTÉMU ROHU
 
-*(kandidát ④; kandidát ① „kolik rohů je optimum" odpadl — uživatel 19.08.
+*(kandidát (4); kandidát (1) „kolik rohů je optimum" odpadl — uživatel 19.08.
 odpověděl PRAVIDLEM: „optimum klece je čtyři rohy a žádní další sousedi
 s ballcarrierem, vše čisté samozřejmě". Viz spec ČÁST 15.0b.)*
 
@@ -35,7 +35,7 @@ zařaď to tělo do právě jedné kategorie a vrať podíly **i absolutní poč
    v TZ, roh je prázdný a dostupný. **Tohle je čistá vada volby a jediná
    část stropu, která je zadarmo.**
 
-Kategorie ⑤ vrať zvlášť **jako rohů na kolo i na zápas** — to je číslo,
+Kategorie (5) vrať zvlášť **jako rohů na kolo i na zápas** — to je číslo,
 podle kterého se rozhodne, jestli se to implementuje.
 
 ## Druhá otázka: patří pravidlo do σ-tabulky?
@@ -53,7 +53,7 @@ a chybí jí ta správná.
 ## Třetí otázka: co ten krok stojí
 
 Když tělo přejde z ortogonálního pole do rohu — **co se rozpadne?**
-Zajímá nás hlavně, kolik z kategorie ⑤ zároveň drží něco jiného, co
+Zajímá nás hlavně, kolik z kategorie (5) zároveň drží něco jiného, co
 v kategoriích 2–3 nezachytíme (screen, zálohu na příští kolo, cestu).
 Stačí kvalifikovaný odhad s doklady, ne přesné číslo.
 
@@ -64,7 +64,7 @@ Stačí kvalifikovaný odhad s doklady, ne přesné číslo.
   korpus stačí. *(Čerstvý `corpus_baseline_20260819_data` doběhne ~12:20
   SELČ; ⚠️ je legitimní na něm výsledek zopakovat, ale NEČEKEJ na něj.)*
 * **Reprodukce vstupních čísel:** `diag_cage_rule_20260819.py` — pusť ho
-  a měl bys dostat pravidlo 2,7 %, ① 9,7 %, ③ 24,3 %, strop 0,73 rohu/kolo.
+  a měl bys dostat pravidlo 2,7 %, (1) 9,7 %, (3) 24,3 %, strop 0,73 rohu/kolo.
   **Když ti to nesedí, hlas to jako první věc** — je to kontrola, že čteme
   týž korpus týmž způsobem.
 * **Struktury:** helpers `players`, `adj`, `threatens`, `dodge_cost`,
