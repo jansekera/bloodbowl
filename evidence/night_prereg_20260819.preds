@@ -1,0 +1,7 @@
+# Předpovědi noci 19.→20.08. (P38 — cílové pole nosiče se odvozuje z klece).
+# Strojově kontroluje night_summarize.py. CORPUS=0, takže žádná předpověď
+# o kontrolách -- spouštěč by ji odmítl.
+delta      in    0.005 0.040   # cena kroku měřena jako ZÁPORNÁ: REACH0 lepší v 30,3 % kol, horší v 3,5 %
+n_nonzero  in    0.60  0.95    # rameno sahá na ADVANCE, tedy skoro na každé kolo s míčem
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # nosič postupuje skoro v každém zápase

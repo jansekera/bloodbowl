@@ -525,7 +525,14 @@ int main(int argc, char** argv) {
         // delta is forced to 0 algebraically and the leg can only catch a gross
         // seeding mistake. This cannot be waved through: it compares pairs where
         // the arm ACTED against pairs where it did not, in the arm's own run.
-        const bool armSignalAvailable = (mode == 0 || mode == 1 || mode == 4 || mode == 5);
+        // mode 6 (P38) patří sem stejně jako 5: čítač tiká JEN když rameno
+        // cílové pole nosiče opravdu posunulo, takže „rameno jednalo" je
+        // zodpověditelná otázka a leak test se smí spustit. Kdyby se to
+        // zapomnělo dopsat, noc by se odmítla spustit (preflight sonda hledá
+        // řádek „MOVED WITHOUT THE ARM ACTING") -- což je správné chování,
+        // ale opravuje se to TADY, ne obcházením sondy.
+        const bool armSignalAvailable =
+            (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6);
         if (armSignalAvailable) {
             printf("  arm acted in %d/%d pairs; pairs that moved: %d; "
                    "MOVED WITHOUT THE ARM ACTING: %d%s\n",
