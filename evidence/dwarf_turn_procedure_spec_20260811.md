@@ -1750,6 +1750,75 @@ daleko, kterým směrem, kým — je **položka v rozpočtu těl**. Špinavý ro
 „horší roh", je to **spálené tělo**: ⭐ *špinavý roh je vada obdobných důsledků
 jako žádný roh* (uživatel 18.08.), a navíc dražší.
 
+## 15.0b ⭐⭐⭐ PRAVIDLO KLECE *(uživatel 19.08.)* — a co z něj zbylo v kontrole
+
+> **„Optimum klece jsou ČTYŘI rohy, všechny ČISTÉ, a ŽÁDNÍ další sousedi
+> s ballcarrierem."** — *„to je pravidlo"*
+
+**Otevřená otázka z 15.8 („kolik rohů je optimum") je tím ZAVŘENÁ, a ne měřením.**
+σ-tabulka ukazovala, že *počet* rohů nepředpovídá nic (−2,1σ) a počet *čistých*
+rohů nic (−0,2σ) — a nabízelo se z toho číst *„možná jsou 4 rohy špatný cíl"*.
+Bylo to čtení metru, ne hry: **cíl je konjunkce tří klauzulí a rozložený na
+sčítance přestane existovat.** Táž rodina jako K33 *(ano/ne −2,5σ vs počet
++10,4σ)* — jenže obráceně: tady se **konjunkce nesmí rozložit**, protože
+tři rohy „ze čtyř" nejsou 75 % klece, jsou to **otevřená klec**.
+
+⇒ **Cílový stav (K29⭐⭐), všechny tři klauzule najednou:**
+
+| | klauzule | proč |
+|---|---|---|
+| **①** | **4 rohy** — všechna čtyři diagonální pole nosiče obsazená naším stojícím tělem | tři rohy = díra, kterou se dojde k nosiči bez dodge |
+| **②** | **všechny čisté** — žádný roh nesousedí se stojícím soupeřem | špinavý roh je spálené tělo (15.0) |
+| **③** | **žádní další sousedi nosiče** — čtyři ortogonální pole **prázdná**, a v žádném z osmi polí soupeř | soused je buď kontakt na nosiči, nebo naše tělo utracené za nic |
+
+⚠️ **③ zakazuje i VLASTNÍ tělo navíc.** Není to estetika: ortogonální pole vedle
+nosiče je jediné, které klec **nechrání dvěma tackle zónami**, takže tělo tam
+nic nedrží — a podle 15.0 je klec **rozpočet**, ne útvar. Tělo, které tam stojí,
+chybí v rohu, kterých máme 5,5 kandidáta na 4.
+
+### Jak často to plníme — 3 000 her, 24 692 našich kol s míčem *(19.08.)*
+
+| | | |
+|---|---|---|
+| ① 4 rohy | 2 396 | **9,7 %** |
+| ② všechny čisté | 21 425 | 86,8 % |
+| ③ nosič bez dalších sousedů | 6 000 | **24,3 %** |
+| **PRAVIDLO ①∧②∧③** | **675** | **⛔ 2,7 %** |
+
+Rozdělení podle počtu rohů: **0 rohů v 33,1 %** kol · 1 v 24,2 % · 2 v 19,6 % ·
+3 v 13,4 % · 4 v 9,7 %.
+
+### ⛔ Nález: dnešní K29⭐ nadhodnocuje **4×**, a to ze dvou nezávislých důvodů
+
+1. **Chybí jí třetí klauzule.** `len(filled) == 4 and not dirty` — o sousedech
+   nosiče neví. V **1 326 kolech (5,4 %, tj. dvě třetiny všech jejích „splněno")**
+   hlásí *plnou čistou klec*, a nosič přitom má dalšího souseda. Z toho **291 ×
+   stojí vedle nosiče SOUPEŘ** — lehlý nebo omráčený, takže rohy zůstaly formálně
+   „čisté", jenže příští kolo vstane **v kontaktu s míčem**.
+2. **Má useknutý jmenovatel.** Přeskakuje kola, kde nestojí ani jeden roh
+   *(63 % N/A)* — jenže *„klec nestojí"* je **porušení pravidla, ne prázdný
+   predikát**. Proto čte **12,3 %** tam, kde je pravda **3,1 %** *(týchž 400 her)*.
+
+⇒ **K29⭐⭐ počítá všechny tři klauzule přes VŠECHNA naše kola s míčem.**
+Ověřeno dvěma nezávislými implementacemi na týchž 400 hrách (3,1 % obě).
+
+### ⭐ Strop opravy: **0,73 rohu na kolo se dá získat překročením o JEDNO pole**
+
+V **52,4 % kol** platí zároveň: *chybí roh* **a** *naše tělo stojí ortogonálně
+u nosiče*, tedy na poli, které ③ zakazuje — **jedno pole od prázdného rohu,
+a u nosiče už je**. Průměrně **1,01 našeho těla na kolo** stojí takto, proti
+**0,63 soupeře** u nosiče.
+
+⚠️ **Je to STROP, ne plán:** neptá se, jestli to tělo už hrálo, ani jestli
+nemarkuje něco dražšího *(hierarchie R1 > R3 > R2 > R4)*. Ale řádově je to
+**víc než cokoli, co jsme letos měřili jako strop** (P10a 0,23 · P8 0,056),
+a nestojí to ani jeden blitz — jen jiné pole.
+
+### ⛔ A nejtvrdší číslo kapitoly
+
+**V 39,3 % našich kol končí nosič v kontaktu se soupeřem.** Ne během
+soupeřova kola — **na konci NAŠEHO**, kdy jsme právě rozhodli, kde bude stát.
+
 ## 15.1 Rychlost: klec jede tak rychle, jak rychle se dokáže složit
 
 > *Uživatel 18.08.: „je zbytečné uvedení konstanty někam, kde by stačilo —
@@ -1852,12 +1921,21 @@ zapnutá brána postavila **víc klece a horší klec** (rohů 2,22 → 2,54, č
 | **jaká je správná rychlost jako FUNKCE volných těl** *(dnes jen „co se složí")* | ⛔ NEZMĚŘENO |
 | **kolik stojí posun do strany na tempu** — 15.2 zvedne čistotu, ale prodlouží dráhu | ⛔ NEZMĚŘENO |
 | **jestli je pořadí „eskorta → klec" lepší než opačné** | ⛔ NEZMĚŘENO *(z bbtactics, ne z našich dat)* |
-| **kolik rohů je vlastně optimum**, když počet nepředpovídá nic | ⛔ OTEVŘENÁ OTÁZKA — možná jsou 4 rohy špatný cíl |
+| ~~kolik rohů je vlastně optimum~~ | ✅ **ZAVŘENO 19.08. PRAVIDLEM, ne měřením** — 4 rohy, všechny čisté, nosič bez dalších sousedů *(uživatel)*. Viz **15.0b**. Metr se rozložením konjunkce mýlil, ne hra. |
+| **plníme pravidlo v 2,7 % kol** (K29⭐ hlásila 12,3 %) | ✅ 3 000 her, 24 692 kol |
+| **0,73 rohu/kolo jde získat překročením o 1 pole** | ⚠️ STROP — neptá se na dostupnost těla |
+| **nosič v kontaktu na konci NAŠEHO kola v 39,3 %** | ✅ 3 000 her |
 
 ## 15.9 Kontroly
 
-* **K29** (žádný roh není markovaný) a **K29⭐** (plná čistá klec) zůstávají,
-  ale ⚠️ **K29⭐ míří na tvar** — a tvar podle 15.0 nic nepředpovídá.
+* ⭐⭐⭐ **NOVÁ K29⭐⭐ — PRAVIDLO KLECE** *(19.08., viz 15.0b)*: `4 rohy ∧ všechny
+  čisté ∧ nosič bez dalších sousedů`, přes **všechna naše kola s míčem**.
+  Implementováno v `diag_rules_checks_20260812.py` (`K29rule`) **dřív, než se
+  nad novým korpusem cokoli změřilo** — pravidlo 18.08.
+* **K29** (žádný roh není markovaný) a **K29⭐** (plná čistá klec) zůstávají
+  **jen jako historická linie**: ⚠️ **K29⭐ nadhodnocuje 4×** (chybí jí třetí
+  klauzule a má useknutý jmenovatel) a míří na tvar — a tvar podle 15.0
+  nic nepředpovídá.
 * **NOVÁ K38 — „špinavých rohů na kolo"** jako **POČET**, ne podíl. To je
   veličina, která jediná replikuje (**P1**: povinnost smí být ano/ne, metr si
   musí nechat číslo).

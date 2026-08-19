@@ -250,7 +250,13 @@ def analyse(paths, race="dwarf"):
     unknown = Counter()
     C = {
         "K29": Check("K29 (R1) žádný roh klece není markovaný"),
-        "K29full": Check("K29⭐ plná ČISTÁ klec (4/4)"),
+        "K29full": Check("K29⭐ plná ČISTÁ klec (4/4) — ⚠️ jen 2 ze 3 klauzulí"),
+        # K29⭐⭐ (uživatel 19.08.): „optimum klece jsou ČTYŘI rohy, všechny
+        # ČISTÉ, a ŽÁDNÍ další sousedi s ballcarrierem." Je to PRAVIDLO.
+        # K29⭐ umí jen první dvě klauzule ⇒ kolo, kde stojí soupeř vedle
+        # NOSIČE, u něj projde jako „plná čistá klec". Změřeno na korpusu
+        # 17.08.: K29⭐ 8,1 %, pravidlo 2,7 % — nadhodnocuje 3×.
+        "K29rule": Check("K29⭐⭐ PRAVIDLO: 4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů"),
         "K9a": Check("K9a splnil rozvrhovou podlahu", vals=[]),
         "K30": Check("K30 (R3) drahý dodge je držený", "podíl soupeřů"),
         "K30cheap": Check("K30b levný dodge je držený (nemá cenu)", "podíl soupeřů"),
@@ -410,6 +416,21 @@ def analyse(paths, race="dwarf"):
                 C["K29"].hit(not dirty)
                 C["K29full"].hit(len(filled) == 4 and not dirty)
 
+            # --- K29⭐⭐ třetí klauzule: nosič nemá ŽÁDNÉHO dalšího souseda.
+            # ⛔ Nesmí se přeskočit spolu s K29: „klec nestojí" je porušení
+            # pravidla, ne prázdný predikát (past z auditu 13.08.) — jmenovatel
+            # jsou VŠECHNA naše kola s míčem, ne jen kola s postavenou klecí.
+            orth = [(car["x"] + dx, car["y"] + dy)
+                    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))]
+            them_at = {(p["x"], p["y"]) for p in them}
+            extra = ([o for o in orth if o in occ and not occ[o]["has_ball"]]
+                     + [o for o in orth if o in them_at]
+                     + [d for d in diag if d in them_at])
+            C["K29rule"].hit(len(filled) == 4 and not dirty and not extra)
+            if extra:
+                st["K29⭐⭐ nosič má dalšího souseda"] += 1
+            st["K29⭐⭐ sousedů nosiče navíc celkem"] += len(extra)
+
             # --- K9a: rozvrhová podlaha.  `need` ze ZAČÁTKU kola: požadavek
             # na tohle kolo se nesmí počítat z toho, kam jsme došli.
             turns_left = 9 - S["turn"]
@@ -462,6 +483,7 @@ def main():
               f"{sum(cf) / len(cf):.2f} / 4, z toho čistých {sum(cc) / len(cc):.2f}")
     print(f"    kol s míčem, kdy klec vůbec NESTOJÍ: "
           f"{st['K29 kol bez jediného rohu (klec nestojí)']}")
+    print(C["K29rule"].line())
     print(C["K9a"].line())
     print(C["K30"].line())
     print(C["K30cheap"].line())
