@@ -86,6 +86,27 @@ long takeDauntlessOfferEvalsInSearch();
 // search never picks". Played hand-offs: count HAND_OFF events.
 long takeHandOffOfferEvalsInSearch();
 
+// --- P35 arm (2026-08-19): price a BLITZ block from the square the blitzer
+// LANDS on, not the one he starts from.
+//
+// getBlockDiceCount counts the DEFENDER's assists around the attacker's square.
+// A blitz moves first and blocks second (action_resolver.cpp:86-118), so
+// block_handler.cpp:491 counts them on arrival. The candidate ranking counted
+// them at home -- a blitzer in the open shows zero and can pick up several by
+// stepping next to the target. Measured on the corpus (2026-08-19, 27 928
+// reconstructed blitzes): the dice bracket changes in 16.2 %, and in 9.7 % it
+// flips from "we choose" to "the opponent chooses", most often +1 -> -2.
+//
+// Per side, default OFF. Turning it on for one side only is what makes a paired
+// A/B legible.
+void setBlitzLandingArm(TeamSide side, bool on);
+bool blitzLandingArm(TeamSide side);
+
+// Times the arm actually changed WHICH blitzer gets sent, per SEARCH EVALUATION
+// (read the unit warning above -- this is not a count of blitzes played). Zero
+// over a matchup means both arms took the same decision, i.e. a true null arm.
+long takeBlitzLandingRepicksInSearch();
+
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,

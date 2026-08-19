@@ -44,9 +44,19 @@ Druhý je **+2 → +1** (1 168×). Podhodnoceno **0,18 asistence na blitz**.
 
 ⇒ **≈ 0,9 blitzu na zápas se hází s obráceným znaménkem kostek.**
 
-⚠️ **Je to DOLNÍ odhad, ne horní**, ze tří důvodů: (1) bere se pro nás
-**nejpříznivější** volné pole u cíle, kdežto `pickApproachStep` vybírá podle
-trasy; (2) korpus neveze **Guard**, který by asistence jen přidal;
+### ⭐ Upřesnění, které vyšlo najevo až při psaní testu (19.08.)
+
+První verze unit testu **vadu nereprodukovala** — a důvod je podstatný:
+`pickApproachStep` je TZ-scored, takže **když u cíle existuje čisté pole,
+executor po něm dojde sám** a žádná asistence nevznikne.
+⇒ **Vada kouše jen tam, kde je KAŽDÉ volné pole u cíle už pokryté.**
+
+To měření **nezeslabuje, naopak ho vysvětluje**: strop se počítal z **pro nás
+nejpříznivějšího** volného pole u cíle, tedy **už za předpokladu dokonalé
+trasy** — a i tak vyšlo 9,7 %. **Je to zbytek PO chytré trase, ne místo ní.**
+
+⚠️ **Je to DOLNÍ odhad, ne horní**, ze tří důvodů: (1) bere se pro nás **nejpříznivější** volné pole u cíle,
+kdežto `pickApproachStep` optimalizuje TZ na trase, ne asistence u cíle; (2) korpus neveze **Guard**, který by asistence jen přidal;
 (3) rekonstrukce blitzu *(blok, jehož útočník s cílem na začátku kola
 nesousedil)* zahrne i blok po řetězovém odsunu, což číslo naopak nadhodnocuje —
 ale ta část je malá proti 2 424 překlopením.
@@ -101,3 +111,26 @@ na MA−3.
   se nabízí jen na sousední ležící cíl ⇒ táž vada tam **není**. Ověřeno,
   ne předpokládáno.
 * `scoreMoveAction`, `expandCage`, `expandReposition` — nekontrolovány.
+
+
+---
+
+## Oprava P35 — shipnuta 19.08.
+
+Rameno **`setBlitzLandingArm(side, on)`**, per side, **default OFF**.
+Když je zapnuté, `estimateBlitzFailChance` spočítá **cílové pole** touž chůzí,
+jakou půjde executor (`estimateApproachFailChance` ho nově vrací přes
+`landingOut`, aby odhad a provedení nemohly znovu utéct od sebe), a
+`getBlockDiceCount` počítá obranné asistence **kolem něj**.
+
+Ošetřena **obě** místa, kde se blitzující vybírá — `expandBlitz`
+i `expandBlitzAndScore`; nechat druhé by znamenalo oceňovat týž blok dvěma
+způsoby podle toho, který makro se ptá.
+
+Čítač **`takeBlitzLandingRepicksInSearch()`** tiká **jen když rameno opravdu
+změní, kdo blitz provede** ⇒ nula na matchupu = obě ramena provedla totéž,
+což je nulový test podle 17.08.
+
+Testy **549 → 552**: rameno vypnuté nechá volbu i čítač beze změny (nulovost) ·
+zapnuté odmítne blitzujícího, jehož cílové pole dává soupeři asistenci ·
+rameno je per side.

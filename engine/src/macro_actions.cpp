@@ -126,6 +126,44 @@ static bool isFreeToAct(const Player& p) {
 // the branch that touches it is gated on dauntlessInOffer.
 thread_local long g_dauntlessOffers = 0;
 
+// --- P35 arm: price the blitz block from the square the blitzer LANDS on ---
+//
+// getBlockDiceCount counts DEFENDER assists around the attacker's square. For a
+// plain BLOCK that square is where the block is thrown from, so it is right. For
+// a BLITZ it is not: action_resolver.cpp:86-118 walks the blitzer adjacent to
+// the target FIRST and block_handler.cpp:491 counts the assists there. A blitzer
+// standing in the open has zero defender assists at home and can pick up several
+// on arrival -- so the ranking that chooses WHICH blitzer to send prices a block
+// that is not the one thrown.
+//
+// The executor already knows this: the comment at action_resolver.cpp:89-91 says
+// "fewer enemies next to the blitzer = fewer defender assists on the block, see
+// getBlockDiceCount", which is why pickApproachStep is TZ-aware. The route
+// respected the dependency; the candidate ranking did not. Corpus 2026-08-19,
+// 27 928 reconstructed blitzes: the dice bracket changes in 16.2 % of them and
+// flips from "we choose" to "the opponent chooses" in 9.7 % -- most often
+// +1 -> -2, about 0.9 blitzes per game thrown with the sign reversed.
+//
+// Per side, default off, so an A/B pairs cleanly. The counter ticks only when
+// the arm actually changes which blitzer is sent, i.e. it is a null-arm test in
+// the sense of 2026-08-17: zero means both arms ran the same code.
+thread_local bool g_blitzLanding[2] = {false, false};
+thread_local long g_blitzLandingRepicks = 0;
+
+void setBlitzLandingArm(TeamSide side, bool on) {
+    g_blitzLanding[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool blitzLandingArm(TeamSide side) {
+    return g_blitzLanding[side == TeamSide::HOME ? 0 : 1];
+}
+
+long takeBlitzLandingRepicksInSearch() {
+    long v = g_blitzLandingRepicks;
+    g_blitzLandingRepicks = 0;
+    return v;
+}
+
 long takeDauntlessOfferEvalsInSearch() {
     long v = g_dauntlessOffers;
     g_dauntlessOffers = 0;
@@ -147,8 +185,13 @@ long takeHandOffOfferEvalsInSearch() {
 }
 
 // Count block dice for attacker vs defender
+// attPos: the square the attacker throws the block FROM. Defaults to where he
+// stands, which is correct for a BLOCK; a BLITZ must pass the landing square,
+// because that is where block_handler will count the defender's assists (P35).
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
-                             bool isBlitz, bool dauntlessInOffer) {
+                             bool isBlitz, bool dauntlessInOffer,
+                             Position attPos = Position{-1, -1}) {
+    if (attPos.x < 0) attPos = att.position;
     int attST = att.stats.strength;
     int defST = def.stats.strength;
     if (isBlitz && att.hasSkill(SkillName::Horns)) attST += 1;
@@ -179,7 +222,7 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
     }
     int attAssists = countAssists(state, def.position, att.teamSide,
                                   att.id, def.id, def.id);
-    int defAssists = countAssists(state, att.position, def.teamSide,
+    int defAssists = countAssists(state, attPos, def.teamSide,
                                   def.id, att.id, att.id);
     BlockDiceInfo info = getBlockDiceInfo(attST + attAssists, defST + defAssists);
     return info.attackerChooses ? info.count : -info.count;
@@ -221,8 +264,13 @@ static double estimateBlockFailChance(int diceCount, bool attackerHasBlock) {
 // calculateDodgeTarget) for each square left while standing in an enemy
 // tackle zone, plus GFI fail chance (1/6, natural 1) for each square
 // beyond movementRemaining.
+// landingOut (optional): the square the mover ends up on, i.e. the square the
+// blitz block is actually thrown from. Same walk as the executor -- handing it
+// back here is what keeps the P35 dice estimate from drifting away from the
+// route again.
 static double estimateApproachFailChance(const GameState& state, const Player& mover,
-                                          Position target) {
+                                          Position target, Position* landingOut = nullptr) {
+    if (landingOut) *landingOut = mover.position;
     if (mover.position.distanceTo(target) <= 1) return 0.0;
 
     Position cur = mover.position;
@@ -245,6 +293,7 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
         }
         moveLeft -= 1;
         cur = next;
+        if (landingOut) *landingOut = cur;
     }
     return failChance;
 }
@@ -253,12 +302,15 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).
 static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
-                                       const Player& target) {
+                                       const Player& target, bool fromLanding) {
     // Risk estimate and feature extraction keep the raw strengths: they describe
     // the block as thrown, not whether to offer it.
-    int diceCount = getBlockDiceCount(state, blitzer, target, true, false);
+    Position landing{-1, -1};
+    double approachFail = estimateApproachFailChance(state, blitzer, target.position,
+                                                     fromLanding ? &landing : nullptr);
+    int diceCount = getBlockDiceCount(state, blitzer, target, true, false,
+                                      fromLanding ? landing : Position{-1, -1});
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block));
-    double approachFail = estimateApproachFailChance(state, blitzer, target.position);
     return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
 }
 
@@ -1285,6 +1337,13 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     Action bestBlitzAction{};
     bool found = false;
     double bestFail = 2.0; // worse than any real fail chance (max 1.0)
+    // P35: with the arm on, the same ranking is also run the old way, purely so
+    // the counter can say whether the arm changed anything. Zero repicks over a
+    // matchup means the two arms executed the same decision -- the null-arm test
+    // of 2026-08-17, which is what makes a paired delta readable at all.
+    const bool landing = blitzLandingArm(state.activeTeam);
+    int plainBest = -1;
+    double plainFail = 2.0;
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
@@ -1293,15 +1352,22 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        double fail = estimateBlitzFailChance(state, blitzer, target);
+        double fail = estimateBlitzFailChance(state, blitzer, target, landing);
         if (fail < bestFail) {
             bestFail = fail;
             bestBlitzAction = a;
             found = true;
         }
+        if (landing) {
+            double pf = estimateBlitzFailChance(state, blitzer, target, false);
+            if (pf < plainFail) { plainFail = pf; plainBest = a.playerId; }
+        }
     }
 
     if (!found) return result;
+    if (landing && plainBest >= 0 && plainBest != bestBlitzAction.playerId) {
+        ++g_blitzLandingRepicks;
+    }
 
     executeAndRecord(state, bestBlitzAction, dice, result);
     return result;
@@ -1325,12 +1391,18 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
     Action bestBlitz{};
     bool foundBlitz = false;
     double bestScore = -2.0; // worse than any real -fail (min -1.0)
+    // P35 applies here too: BLITZ_AND_SCORE picks a blitzer the same way, so
+    // leaving this call site alone would price the same block two ways
+    // depending on which macro asked -- exactly the split the arm exists to close.
+    const bool landing = blitzLandingArm(state.activeTeam);
+    int plainBest = -1;
+    double plainScore = -2.0;
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ) continue;
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
-        double fail = estimateBlitzFailChance(state, blitzer, blocker);
+        double fail = estimateBlitzFailChance(state, blitzer, blocker, landing);
         bool isCarrier = (a.playerId == carrierId);
         double score = -fail + (isCarrier ? 0.0 : 0.001);
         if (score > bestScore) {
@@ -1338,9 +1410,17 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
             bestBlitz = a;
             foundBlitz = true;
         }
+        if (landing) {
+            double ps = -estimateBlitzFailChance(state, blitzer, blocker, false)
+                        + (isCarrier ? 0.0 : 0.001);
+            if (ps > plainScore) { plainScore = ps; plainBest = a.playerId; }
+        }
     }
 
     if (!foundBlitz) return result; // can't blitz, abort
+    if (landing && plainBest >= 0 && plainBest != bestBlitz.playerId) {
+        ++g_blitzLandingRepicks;
+    }
 
     // Execute the blitz
     if (executeAndRecord(state, bestBlitz, dice, result)) return result;

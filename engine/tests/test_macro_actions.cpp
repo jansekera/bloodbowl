@@ -1686,3 +1686,124 @@ TEST(MacroActions, DauntlessInOfferIsOnInProduction) {
         << "MCTSConfig::dauntlessInOffer is production since 2026-08-17; "
            "see evidence/weekend_result_20260817.md";
 }
+
+// --- P35 (2026-08-19): a BLITZ is priced from the square the blitzer LANDS on
+//
+// getBlockDiceCount counts the DEFENDER's assists around the attacker. A blitz
+// moves first and blocks second (action_resolver.cpp:86-118), so
+// block_handler.cpp:491 counts them on arrival -- but the ranking that chooses
+// WHICH blitzer to send counted them at home. A blitzer standing in the open
+// shows zero and can collect several by stepping next to the target.
+//
+// ⚠️ The first version of this fixture did NOT reproduce the bug, and the
+// reason matters: pickApproachStep is TZ-scored, so when a clean landing square
+// exists next to the target the executor already walks to it and no assist ever
+// materialises. The defect only bites where EVERY free square beside the target
+// is itself covered -- which is exactly what the corpus measurement counted
+// (it took the most favourable free landing, i.e. it already assumed a perfect
+// route, and still found the dice flipping in 9.7 % of blitzes).
+//
+// Fixture: target at (18,7), covered from (18,6) and (18,8), so every square a
+// blitzer can land on hands the defender at least one assist. The western
+// blitzer (ST4) starts clean two squares out and looks like a 2-dice block from
+// there; on arrival it is an even 1-dice block. The northern blitzer (ST5) pays
+// a GFI on approach but keeps its dice on arrival. Off-arm the west one wins on
+// paper; on-arm the north one wins in fact.
+namespace {
+GameState makeBlitzLandingState() {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& west = state.getPlayer(1);
+    west.id = 1;
+    west.teamSide = TeamSide::HOME;
+    west.state = PlayerState::STANDING;
+    west.position = {16, 7};
+    west.stats = {6, 4, 3, 8};
+    west.movementRemaining = 6;
+
+    Player& north = state.getPlayer(2);
+    north.id = 2;
+    north.teamSide = TeamSide::HOME;
+    north.state = PlayerState::STANDING;
+    north.position = {18, 3};
+    north.stats = {4, 5, 3, 8};
+    north.movementRemaining = 3;
+
+    Player& target = state.getPlayer(12);
+    target.id = 12;
+    target.teamSide = TeamSide::AWAY;
+    target.state = PlayerState::STANDING;
+    target.position = {18, 7};
+    target.stats = {6, 3, 3, 8};
+    target.movementRemaining = 6;
+
+    // Cover the target from both files so that NO free square beside it is
+    // assist-free: this is what stops pickApproachStep from routing the problem
+    // away, and it is the only shape in which the mispricing can bite.
+    int flankIds[] = {13, 14};
+    int flankYs[] = {6, 8};
+    for (int i = 0; i < 2; ++i) {
+        Player& f = state.getPlayer(flankIds[i]);
+        f.id = flankIds[i];
+        f.teamSide = TeamSide::AWAY;
+        f.state = PlayerState::STANDING;
+        f.position = {18, static_cast<int8_t>(flankYs[i])};
+        f.stats = {6, 3, 3, 8};
+        f.movementRemaining = 6;
+    }
+
+    state.ball = BallState::onGround({5, 7});
+    return state;
+}
+}  // namespace
+
+TEST(MacroExpansion, BlitzLandingArmOffKeepsTheOldChoiceAndCountsNothing) {
+    GameState state = makeBlitzLandingState();
+    setBlitzLandingArm(TeamSide::HOME, false);
+    takeBlitzLandingRepicksInSearch();  // reset
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    ASSERT_FALSE(result.actions.empty());
+    EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
+    EXPECT_EQ(result.actions[0].playerId, 1)
+        << "off-arm must keep pricing the block from the blitzer's own square";
+    EXPECT_EQ(takeBlitzLandingRepicksInSearch(), 0)
+        << "a disabled arm must be a true null: no repicks, no counter";
+}
+
+TEST(MacroExpansion, BlitzLandingArmSeesTheAssistWaitingAtTheLandingSquare) {
+    GameState state = makeBlitzLandingState();
+    setBlitzLandingArm(TeamSide::HOME, true);
+    takeBlitzLandingRepicksInSearch();  // reset
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
+    auto result = greedyExpandMacro(state, macro, dice);
+    setBlitzLandingArm(TeamSide::HOME, false);
+
+    ASSERT_FALSE(result.actions.empty());
+    EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
+    EXPECT_EQ(result.actions[0].playerId, 2)
+        << "on-arm must reject the blitzer whose landing square hands the "
+           "defender an assist";
+    EXPECT_GT(takeBlitzLandingRepicksInSearch(), 0)
+        << "the counter has to record that the arm changed the decision";
+}
+
+TEST(MacroExpansion, BlitzLandingArmIsPerSideAndLeavesTheOtherSideAlone) {
+    setBlitzLandingArm(TeamSide::HOME, true);
+    EXPECT_TRUE(blitzLandingArm(TeamSide::HOME));
+    EXPECT_FALSE(blitzLandingArm(TeamSide::AWAY));
+    setBlitzLandingArm(TeamSide::HOME, false);
+    EXPECT_FALSE(blitzLandingArm(TeamSide::HOME));
+}
