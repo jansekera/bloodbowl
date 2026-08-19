@@ -1939,6 +1939,35 @@ Klec u postranní čáry **ztrácí polovinu rohů**. ⇒ **vlastní klec k lajn
 netlačit; soupeřovu ano.** *(Spojuje se s T1.8: tlačit k lajně jen když
 `vzdálenost ≤ odsuny, které vyrobíme V JEDNOM KOLE`.)*
 
+### ⛔⛔ PROTI SKAVENŮM STRIKTNĚ *(uživatel 19.08.)*
+
+Doktrína 15.5 byla rasově slepá. Změřeno *(3 000 her, ztráta míče v soupeřově
+NÁSLEDUJÍCÍM kole podle vzdálenosti našeho nosiče od lajny na konci NAŠEHO)*:
+
+| soupeř | u lajny (0–1) | střed (4+) | násobek |
+|---|---:|---:|---:|
+| **skaven** | **20,9 %** | **10,8 %** | **×1,94** |
+| orc | 27,1 % | 14,6 % | ×1,86 |
+| human | 21,1 % | 14,3 % | ×1,48 |
+| wood-elf | 17,6 % | 12,8 % | ×1,38 |
+
+⭐ **Proč zrovna u skavenů „striktně“, a ne „raději ne“:** skaven je **uprostřed
+hřiště nejméně nebezpečný soupeř ze všech** (10,8 %) a u lajny je naráz stejně
+nebezpečný jako kdokoli jiný. ⇒ **Lajna u nich není horší varianta, lajna je
+jediné místo, kde na nás dosáhnou.** U orků je absolutní penalizace vyšší, ale
+nebezpečný je i střed — tam je to kompromis, tady zákaz.
+
+Skaven má navíc **monotónní gradient** (10,8 → 14,9 → 20,9 %), orkové ne
+(14,6 → 29,4 → 27,1 %) ⇒ skavení číslo je i konzistentnější.
+Rozdíl **10,0 pp ± 3,2 ≈ 3,1σ** (n = 163 kol u lajny).
+
+⚠️ **Korelace, ne kauzalita:** nosič u lajny může být *příznak* tlaku, ne jeho
+příčina. Neměří to, že by odklon ke středu tu ztrátu odstranil.
+
+⇒ **Z17 (nový zákaz): proti skavenům se vlastní nosič k postranní čáře
+nepřibližuje. Není to položka rozpočtu, kterou lze přeplatit postupem.**
+Doklad `diag_sideline_by_race_20260819.py`.
+
 ## 15.6 Obrana proti klaci: nemusíš ji rozbít, stačí ji zpomalit
 
 Zpomalit soupeřovu klec na **1–2 pole za kolo** stačí — kolem **6.–8. kola**
