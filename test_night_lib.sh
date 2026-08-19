@@ -187,6 +187,33 @@ echo "$out" | grep -q "NEROZHODNUTO" && ok "vyšší práh dá NEROZHODNUTO (pr�
 echo "$out" | grep -q "se zapisuje JAKO NEROZHODNUTO" \
     && ok "NEROZHODNUTO si vyžádá vlastní zápis" || bad "chybí věta o zápisu NEROZHODNUTO"
 
+# 6b': T2.16 (19.08.) -- „NEROZHODNUTO" neslo DVA OPAČNÉ PŘÍKAZY K AKCI.
+#      Noc 18.->19.08. dala CI CELÉ uvnitř prahu (ekvivalence, tj. „zastav"),
+#      a kód na to řekl totéž slovo jako na běh, který neví nic („přidej páry").
+Db="$TMP/sum1b"
+# obě delty malé a SE malá => CI se vejde dovnitř prahu ±0.015
+mkshard "$Db/m_s0" "+0.0010" "0.0040" 0 480; mkshard "$Db/m_s1" "+0.0024" "0.0040" 0 480
+out=$(THRESHOLD=0.015 python3 "$SUM" "$Db" m 2>&1)
+echo "$out" | grep -q "EKVIVALENCE" && ok "CI uvnitř prahu dá EKVIVALENCI, ne NEROZHODNUTO" \
+    || bad "CI uvnitř prahu se pořád čte jako nerozhodnuto: $out"
+echo "$out" | grep -q "PŘÍKAZ: ZASTAV" && ok "ekvivalence řekne, že přidávat páry nemá smysl" \
+    || bad "chybí příkaz k akci"
+echo "$out" | grep -q "NENÍ to nula" && ok "ekvivalence se nesmí číst jako nula" \
+    || bad "chybí výhrada, že ekvivalence není nula"
+echo "$out" | grep -q "MÁLO SÍLY" && bad "ekvivalence se hlásí i jako málo síly" \
+    || ok "ekvivalence NEhlásí zároveň málo síly"
+
+# 6b'': táž data, ale SE velká => CI přesahuje práh => druhý, OPAČNÝ příkaz
+Dc="$TMP/sum1c"
+mkshard "$Dc/m_s0" "+0.0010" "0.0400" 0 480; mkshard "$Dc/m_s1" "+0.0024" "0.0400" 0 480
+out=$(THRESHOLD=0.015 python3 "$SUM" "$Dc" m 2>&1)
+echo "$out" | grep -q "MÁLO SÍLY" && ok "CI přes práh dá NEROZHODNUTO — MÁLO SÍLY" \
+    || bad "málo síly se nerozpoznalo: $out"
+echo "$out" | grep -q "bylo potřeba" && ok "řekne, kolik párů by na rozhodnutí chybělo" \
+    || bad "chybí rozpočet párů"
+echo "$out" | grep -q "EKVIVALENCE" && bad "málo síly se hlásí jako ekvivalence" \
+    || ok "málo síly NEhlásí ekvivalenci"
+
 # 6c: LEAK V JEDINÉM SHARDU MUSÍ ZASTAVIT ČTENÍ DELTY.
 #     Původní blok grepoval `head -1`, takže leak v shardu 5 by neprobublal.
 D2="$TMP/sum2"; mkshard "$D2/m_s0" "-0.0200" "0.0190" 0 480; mkshard "$D2/m_s1" "-0.0300" "0.0190" 7 480

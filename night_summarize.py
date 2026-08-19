@@ -114,9 +114,52 @@ def summarize(out, name, thr, facts=None):
                       "leak": float(leak), "arm_acted": acted / of})
         for k in [k for k, v in facts.items() if v is None]:
             del facts[k]
-    verdict = ("ŠKODÍ" if mean <= -thr else "POMÁHÁ" if mean >= thr else "NEROZHODNUTO")
+    # ⭐ T2.16 (19.08.): VERDIKT SE NESMÍ VYNÁŠET Z BODOVÉHO ODHADU SAMOTNÉHO.
+    #
+    # ⚑ PROČ. Noc 18.->19.08. (P9c) dala +0,0017 ± 0,0060, tedy 95% CI
+    #   [-0,0100; +0,0134] proti prahu ±0,015 -- CELÉ CI leží UVNITŘ prahu.
+    #   To NENÍ „nemáme sílu": efekt velikosti prahu je vyloučen v OBOU směrech
+    #   (TOST projde). Dosavadní kód na to řekl „NEROZHODNUTO" -- tedy TOTÉŽ
+    #   SLOVO, jakým odpovídá na běh, který má SE tak velkou, že neví nic.
+    #
+    #   A ta dvě „nerozhodnuto" nesou OPAČNÉ PŘÍKAZY K AKCI:
+    #     * CI přesahuje práh  ⇒ přidej páry a běh zopakuj;
+    #     * CI uvnitř prahu    ⇒ ZASTAV, rameno předpovězený efekt nedodává.
+    #   Cena záměny je další 14hodinová noc, která nic nového nezjistí.
+    lo, hi = mean - 1.96 * pooled, mean + 1.96 * pooled
+    if mean <= -thr:
+        verdict = "ŠKODÍ"
+    elif mean >= thr:
+        verdict = "POMÁHÁ"
+    elif -thr < lo and hi < thr:
+        verdict = "EKVIVALENCE"
+    else:
+        verdict = "NEROZHODNUTO — MÁLO SÍLY"
     L.append("       PRÁH ±%.4f (vstup běhu, ne konstanta ve zdrojáku) ⇒ **%s**" % (thr, verdict))
-    if verdict == "NEROZHODNUTO":
+
+    if verdict == "EKVIVALENCE":
+        L.append("       celé 95%% CI [%+.4f; %+.4f] leží UVNITŘ prahu ⇒ efekt velikosti"
+                 " prahu je vyloučen v OBOU směrech." % (lo, hi))
+        L.append("       ⇒ PŘÍKAZ: ZASTAV. Přidávat páry nemá smysl — rameno"
+                 " předpovězený efekt NEDODÁVÁ.")
+        # ⚠️ Co tenhle běh NEVYLUČUJE, se musí říct nahlas: ekvivalence proti
+        #    prahu není nula. Bez téhle věty se z „EKVIVALENCE" čte „nula".
+        L.append("       ⚠️ NENÍ to nula: efekt až do %+.4f (mez CI) tenhle běh"
+                 " vyloučit NEUMÍ. \u201eNeškodí\u201c ANO, \u201eje k ničemu\u201c NE."
+                 % (hi if abs(hi) > abs(lo) else lo))
+    elif verdict == "NEROZHODNUTO — MÁLO SÍLY":
+        L.append("       95%% CI [%+.4f; %+.4f] PŘESAHUJE práh ⇒ tenhle běh neumí"
+                 " rozhodnout ani \u201epomáhá/škodí\u201c, ani \u201eefekt tam není\u201c." % (lo, hi))
+        # Kolik párů by chybělo, aby CI ještě padlo dovnitř prahu. Platí PŘI
+        # NEZMĚNĚNÉM bodovém odhadu -- je to rozpočtový odhad, ne předpověď.
+        room = thr - abs(mean)
+        if room > 0 and pooled > 0:
+            need = pairs * (1.96 * pooled / room) ** 2
+            L.append("       na rozhodnutí by při NEZMĚNĚNÉM odhadu bylo potřeba"
+                     " ~%d párů (dnes %d, tj. %.1f×)" % (round(need), pairs, need / pairs))
+        else:
+            L.append("       bodový odhad je na prahu nebo za ním ⇒ počet párů"
+                     " na rozhodnutí se odsud spočítat nedá")
         L.append("       ⚠️ NEROZHODNUTO se zapisuje JAKO NEROZHODNUTO, ne jako potvrzení zamítnutí.")
     return L, 0
 
