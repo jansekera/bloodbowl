@@ -1968,6 +1968,56 @@ příčina. Neměří to, že by odklon ke středu tu ztrátu odstranil.
 nepřibližuje. Není to položka rozpočtu, kterou lze přeplatit postupem.**
 Doklad `diag_sideline_by_race_20260819.py`.
 
+### ⭐⭐ UNIVERZÁLNÍ TVAR: lajna je soupeřova asistence zdarma
+
+*(19.08., zobecnění Z17 — uživatel: „nějak univerzálněji?")*
+
+Zapsat to jako pravidlo o **rase** je nejslabší možná forma: platí to jen do
+příštího rosteru. Mechanismus je rasově nezávislý a má **dvě části**:
+
+**(1) Geometrie.** Roh mimo hřiště neexistuje. Na postranní čáře jsou **dva ze
+čtyř rohů nemožné** ⇒ plná klec má **0,0 %**. To nespraví žádné tělo a žádný hod.
+
+**(2) Kryté směry.** Lajna pokrývá jednu stranu **za soupeře**. Uprostřed musí
+hlídat všechny směry úniku, u lajny polovinu — a tu polovinu mu dělá hřiště.
+⇒ **Lajna je jeho asistence zdarma, a stojí ho nula rozpočtu.**
+
+⇒ **U1 (univerzálně, každý soupeř):** vlastní klec se k postranní čáře
+netlačí; soupeřova ano. To platí bez ohledu na rasu — násobek ztráty míče
+u lajny je **×1,38 až ×1,94** proti středu u **všech čtyř** měřených soupeřů.
+
+### ⛔ Kdy je z toho ZÁKAZ, a ne kompromis
+
+**Kritérium není rasa, je to bezpečnost STŘEDU.**
+
+| soupeř | u lajny | **střed** | násobek |
+|---|---:|---:|---:|
+| **skaven** | 20,9 % | **10,8 %** | ×1,94 |
+| orc | 27,1 % | 14,6 % | ×1,86 |
+| human | 21,1 % | 14,3 % | ×1,48 |
+| wood-elf | 17,6 % | 12,8 % | ×1,38 |
+
+Násobek sám rasy **nerozliší** — ork má skoro týž jako skaven. Rozlišuje je
+**střed**:
+
+* **Střed je nejbezpečnější místo na hřišti** *(skaven, 10,8 % = nejnižší číslo
+  v tabulce)* ⇒ odklon od lajny nás dostane do nejlepšího dostupného stavu
+  a soupeř **nemá kam jinam sáhnout** ⇒ **ZÁKAZ**. Není co vyvažovat.
+* **Střed je nebezpečný taky** *(ork, 14,6 %)* ⇒ odklon kupuje jen část
+  a zbytek se platí dál ⇒ **KOMPROMIS** proti postupu.
+
+⇒ **Pravidlo:** *čím bezpečnější je proti tomuhle soupeři střed, tím tvrdší je
+zákaz lajny.* Skaven je dnes jediný, u koho je absolutní — ale **je to vlastnost
+matchupu, ne jména rasy**, a přeměří se u každého nového soupeře týmž řezem.
+
+⚠️ **Hypotéza mechanismu, NEZMĚŘENO:** proč zrovna skaven. Je rychlý, ale slabý
+(ST2–3, AV7) — uprostřed **dosáhne, a neublíží**; u lajny se dosah mění v
+poškození (odsun do davu bez hodu na armor, a nám mizí strana, kam uniknout).
+⇒ *Lajna převádí DOSAH na POŠKOZENÍ, a nejvíc získává ten, kdo má dosah bez síly.*
+Rozhodne to rozpad ztrát u lajny podle příčiny — zapsáno, neměřeno.
+
+⚠️ Celá tabulka je **korelace**: nosič u lajny může být příznak tlaku.
+
 ## 15.6 Obrana proti klaci: nemusíš ji rozbít, stačí ji zpomalit
 
 Zpomalit soupeřovu klec na **1–2 pole za kolo** stačí — kolem **6.–8. kola**
