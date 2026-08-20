@@ -1895,6 +1895,18 @@ ortogonály naopak jediné správné místo.** ⇒ Kontrola musí umět rozliši
 **nad a pod má všech 6 ve svých tackle zónách**, kdežto diagonály jen 3 ⇒
 soupeř na ně sice stoupnout může, ale **za každý další pohyb zaplatí dodge**.
 
+⭐⭐ **A dvojice není přibitá na střed** *(uživatel 20.08.: „a jestli se mohou
+pohnout zároveň víc na jednu ze stran — která je volnější — tak tam")*:
+
+* **placement** = nad a pod nosiče *(ortogonály kolmo na postup)*;
+* **směr** = k **volnější straně** *(míň soupeřů, víc prostoru)*;
+* **mez** = to, co stihnou **OBĚ** těla. ⚠️ Nedriftovat tam, kam dojde jen
+  jedno — pak se ze dvou stane jedno a zbydou **3 pole mimo naši TZ**.
+
+⇒ Je to týž tvar jako u plné klece *(„klec jede tak rychle, jak rychle se
+dokáže znovu složit")*, jen se dvěma těly — a **volnější strana je přesně ta,
+kudy se obchází zeď**.
+
 ⛔⛔ **MEZ TÉ METRIKY, ať se nepřecení:** **tackle zóna nezabrání VSTUPU** —
 zdražuje jen *odchod*. „Pole je v naší TZ" tedy **neznamená**, že tam soupeř
 nemůže stoupnout a příště blokovat.
