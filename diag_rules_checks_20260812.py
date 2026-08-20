@@ -370,8 +370,33 @@ def analyse(paths, race="dwarf"):
             if S["active_team"] != ours or i + 1 >= len(logs):
                 continue
             E = logs[i + 1]
-            if S.get("touchdown") or E["half"] != S["half"]:
-                st["vyřazeno (TD/poločas mezi snímky)"] += 1
+            # ⛔ OPRAVA 20.08.: TOUCHDOWN JE MAXIMÁLNÍ ÚSPĚCH, NE CHYBĚJÍCÍ DATA.
+            # Tenhle plošný skip vyhazoval kola s TD z CELÉHO modulu -- včetně
+            # K9a, našeho nejsilnějšího prediktoru (20,8σ). Důvod skipu je
+            # legitimní jen ZPOLA: snímek E je až PO výkopu, takže pozice těl
+            # z něj číst nejde (K29/K38 se proto přeskočí dál). Rozvrhové
+            # kontroly ale žádné E nepotřebují -- stačí jim začátek kola a fakt,
+            # že se skórovalo. A právě jim to vyhazovalo PRÁVĚ TA KOLA, VE
+            # KTERÝCH JSME USPĚLI: z 232 kol fáze VÝBĚH jich 139 skončilo TD
+            # a kontrola počítala jen 79 zbylých => 2,9 % místo ~60 %, a na tom
+            # čísle se postavila P41 jako „nejhorší fáze o řád".
+            if S.get("touchdown"):
+                carTD = next((p for p in players(S, ours) if p["has_ball"]), None)
+                turns_left_td = 9 - S["turn"]
+                if carTD is not None and turns_left_td > 0:
+                    C["K9a"].hit(True); C["K9a"].vals.append(0.0)
+                    _ph, _cap, _ = phase_floor(S, carTD, 0, 0,
+                                               players(S, ours), endzone)
+                    _kk = {"SÓLO": "K9c_solo", "KLEC": "K9c_cage",
+                           "VÝBĚH": "K9c_run"}[_ph]
+                    for _k in ("K9c_solo", "K9c_cage", "K9c_run"):
+                        (C[_k].hit(True) if _k == _kk else C[_k].skip())
+                    C[_kk].vals.append(0.0)
+                    C["K9x"].hit(False); C["K9x"].num(0)
+                st["kolo skončilo TD (rozvrh započten, pozice ne)"] += 1
+                continue
+            if E["half"] != S["half"]:
+                st["vyřazeno (poločas mezi snímky)"] += 1
                 continue
             st["našich kol"] += 1
 
