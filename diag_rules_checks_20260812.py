@@ -314,6 +314,27 @@ def analyse(paths, race="dwarf"):
         # ⭐ Hlavní číslo, kvůli kterému se to přepisuje: jak často K9a žádala
         # něco, co v tom kole nešlo. Jmenovatel jsou VŠECHNA posuzovaná kola.
         "K9x": Check("K9a žádala mechanicky NEMOŽNÉ", vals=[]),
+        # --- K38 (20.08.2026): ZÁKAZ „nosič nekončí kolo v kontaktu" ------
+        # ⭐ Uživatel 20.08.: „block na nosiče se nesmí stávat vůbec."
+        # Blok vyžaduje, aby útočník u nosiče UŽ STÁL na začátku svého kola
+        # => je to NÁŠ stav, vyrobený rozhodnutím o cílovém poli, a soupeře
+        # NESTOJÍ NIC. Blitz naproti tomu stojí jeho jedinou akci za kolo
+        # a jde ho jen ZDRAŽIT => dvě různé tvrdosti, ne dvě velikosti téhož.
+        #
+        # ⛔ POČÍTAJÍ SE JEN STOJÍCÍ SOUPEŘI. Číslo „nosič končí v kontaktu
+        # ve 39,3 %", které spec vedla jako nejtvrdší číslo kapitoly, počítalo
+        # i LEŽÍCÍ -- ti nemají tackle zónu a blokovat nemohou. Se správnou
+        # definicí je to 12,3 %, tedy zákaz je 3x levnější, než kapitola zněla.
+        #
+        # ⚠️ Ležící soupeř u nosiče NENÍ zakázaný, ale je NEPŘÍJEMNÝ (uživatel
+        # 20.08.): postaví se za 3 MA a nabízí soupeři cíl. Měří se zvlášť
+        # jako K38b -- výstraha, ne porušení.
+        # ⚠️ Ležící soupeř S JUMP UP se ale postaví ZDARMA, takže je fakticky
+        # stojící a patří do ZÁKAZU. V dnešním korpusu ji nemá žádný soupeř
+        # (Jump Up nesou jen Dark Elf, Norse a Slann), ale pravidlo se píše
+        # obecně -- jinak bychom zadrátovali výsledek platný pro čtyři rasy.
+        "K38": Check("K38 nosič NEkončí kolo u stojícího soupeře", vals=[]),
+        "K38b": Check("K38b …ani u ležícího (výstraha, ne zákaz)", vals=[]),
         "K30": Check("K30 (R3) drahý dodge je držený", "podíl soupeřů"),
         "K30cheap": Check("K30b levný dodge je držený (nemá cenu)", "podíl soupeřů"),
         "K31": Check("K31 (R4) kolo BEZ těla bez úkolu"),
@@ -457,7 +478,7 @@ def analyse(paths, race="dwarf"):
                 C["K29"].skip()
                 C["K29full"].skip()
                 C["K9a"].skip()
-                for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x"):
+                for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x", "K38", "K38b"):
                     C[_k].skip()
                 continue
             st["s míčem na konci kola"] += 1
@@ -488,6 +509,38 @@ def analyse(paths, race="dwarf"):
             if extra:
                 st["K29⭐⭐ nosič má dalšího souseda"] += 1
             st["K29⭐⭐ sousedů nosiče navíc celkem"] += len(extra)
+
+            # --- K38: zákaz „nosič nekončí kolo v kontaktu" (uživatel 20.08.)
+            if car["state"] != STANDING:
+                C["K38"].skip(); C["K38b"].skip()
+            else:
+                near = [p for p in them
+                        if max(abs(p["x"] - car["x"]), abs(p["y"] - car["y"])) <= 1]
+                # ZÁKAZ: stojící soupeř. (Ležící s Jump Up patří sem taky —
+                # postaví se ZDARMA, takže je fakticky stojící.)
+                #
+                # ⛔ JENŽE LOG DOVEDNOSTI NEEXPORTUJE. Hráč v `turn_logs` má
+                # jen id/x/y/state/has_ball/name/ma/st/ag/av -- žádné skills.
+                # Klauzule o Jump Up se proto na tomhle korpusu VYHODNOTIT
+                # NEDÁ a je tu vědomě VYNECHANÁ, ne tiše nefunkční: kdyby se
+                # psala jako `"Jump Up" in name`, nikdy by nespustila a číslo
+                # by tiše podhodnocovalo.
+                #
+                # ⚠️ DNES to nevadí: Jump Up nesou jen Dark Elf, Norse a Slann
+                # (roster.cpp), a soupeři v korpusu jsou skaven, orc, human
+                # a wood-elf. ⇒ Číslo platí. Až přibude soupeř s Jump Up,
+                # MUSÍ se do logu doplnit dovednosti, jinak K38 začne lhát.
+                hard = [p for p in near if p["state"] == STANDING]
+                soft = [p for p in near if p["state"] != STANDING]
+                C["K38"].hit(not hard)
+                C["K38"].num(len(hard))
+                # výstraha se posuzuje jen tam, kde zákaz drží — jinak by se
+                # „porušený zákaz" počítal podruhé jako výstraha
+                if hard:
+                    C["K38b"].skip()
+                else:
+                    C["K38b"].hit(not soft)
+                    C["K38b"].num(len(soft))
 
             # --- K9a: rozvrhová podlaha.  `need` ze ZAČÁTKU kola: požadavek
             # na tohle kolo se nesmí počítat z toho, kam jsme došli.
@@ -561,7 +614,7 @@ def main():
           f"{st['K29 kol bez jediného rohu (klec nestojí)']}")
     print(C["K29rule"].line())
     print(C["K9a"].line())
-    for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x"):
+    for _k in ("K38", "K38b", "K9c_solo", "K9c_cage", "K9c_run", "K9x"):
         print(C[_k].line())
     print(C["K30"].line())
     print(C["K30cheap"].line())
