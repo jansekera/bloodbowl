@@ -2375,15 +2375,38 @@ je **basher**, takže obecná basher-doktrína („basuj, jak to jde") ho posíl
 do kontaktu **hned** — kdežto jeho vlastní rasová příručka ho posílá čekat na
 převahu. **Obojí je o téže rase a říká to opak.**
 
-⛔ **CO ZŮSTÁVÁ OTEVŘENÉ — a bez toho se to nedá implementovat:**
-**v čem se měří „převaha"?** Kandidáti, žádný zatím nerozhodnutý:
-* **stojící těla** (nejlevnější, ale nepočítá kvalitu);
-* **attrition** (KO/INJ — ale ta se projeví až se zpožděním);
-* **poziční** (kolik jejich těl je za naší linií);
-* **iniciativa** (kdo si může dovolit blok zdarma).
-⚠️ **A ŽÁDNÁ KONSTANTA** ([[feedback_implement_the_rule_not_the_outcome]]):
-prahem nesmí být zadrátované „+2 těla", musí to být pravidlo, ze kterého
-trpasličí i jiný případ vypadne sám.
+## 17.4c ⭐ „PŘEVAHA" = STOJÍCÍ TĚLA *(uživatel 20.08.: „převaha = stojící těla, počítej to tak")*
+
+**Definice je rozhodnutá:** `převaha = naše stojící těla − jejich stojící těla`,
+měřeno na začátku kola. Ostatní kandidáti *(attrition · poziční · iniciativa)*
+se **zamítají**, ne odkládají: attrition se projeví se zpožděním, poziční
+a iniciativa nejsou k dispozici jako jedno číslo.
+
+⭐ **A rozhodnutí přišlo AŽ PO měření, které tou definicí náhodou už prošlo** —
+Fable 20.08. stratifikoval přesně takhle *(„převaha (my − oni, stojící)")*,
+takže test iniciativy je zpětně férový a **nemusí se opakovat**:
+
+| převaha | kontakt ≤1 | kontakt ≥2 | Δ |
+|---|---|---|---|
+| ZÁPORNÁ | +2,87 *(n=4 384)* | +2,25 *(n=4 140)* | −0,62 |
+| NULA | +2,18 *(n=797)* | +2,05 *(n=1 457)* | −0,13 |
+| KLADNÁ | +2,40 *(n=1 370)* | +1,56 *(n=2 662)* | **−0,84** |
+
+⛔ **Znaménko se v žádném pásmu nepřeklápí** ⇒ hypotéza, že *„bez převahy je
+kontakt škodlivý a s převahou prospěšný"*, **tímhle metrem NEŽIJE**.
+⭐ Ale **největší přínos kontaktu je při KLADNÉ převaze** — a to s fázovým
+modelem D1→D2 **konzistentní je**.
+
+⚠️ **Co to znamená pro implementaci:** převaha **není spouštěč, který
+překlápí znaménko**. Je to **veličina, podle které se past vyplácí víc nebo
+míň**. ⇒ D1→D2 se nesmí napsat jako `if (převaha > X) L else sloupce` —
+⭐ a to se shoduje se zákazem konstanty ([[feedback_implement_the_rule_not_the_outcome]]):
+**prahem nesmí být zadrátované „+2 těla"**. Tvar, který z měření vychází, je
+**spojitý**: čím větší převaha, tím těsnější sevření.
+
+⇒ **To rozsuzuje i Q5** *(postupné svírání vs vybrané kolo a all-in)* ve
+prospěch **postupného** — spojitá veličina spojitý tvar unese, práh ne.
+⚠️ Uživateli to ale zatím **předloženo nebylo**, takže Q5 zůstává otevřená.
 
 ⭐⭐⭐ **A TŘETÍ FÁZOVÉ PRAVIDLO OD UŽIVATELE — engine fáze NEMÁ ŽÁDNÉ.**
 Tohle je po **fázovém plánu trasy** (13.08.: sólo Runner → klec → sólo
