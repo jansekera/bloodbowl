@@ -264,6 +264,48 @@ echo "$out" | grep -q "TREFA" && bad "nezodpověditelná se tváří jako TREFA"
 out=$(THRESHOLD=0.015 python3 "$SUM" "$D5" m 2>&1); rc=$?
 check "bez PREREG projde beze změny" "$rc" "0"
 
+echo "== 8. dvoustranná vs jednostranná delta (T2.17, 20.08.) =="
+
+# Regrese na noc 19.->20.08.: +0,0827 se proti JEDNOSTRANNĚ psané
+# předregistraci 0,005-0,040 vytisklo jako MIMO, ačkoli jednostranně
+# (+0,0413) padlo dovnitř. Obě veličiny se musí dát odlišit.
+D17="$TMP/t17"; mkdir -p "$D17"
+mkshard "$D17/m_s0" "+0.0827" "0.0092" 0 500
+mkshard "$D17/m_s1" "+0.0827" "0.0092" 0 500
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D17" m 2>&1)
+echo "$out" | grep -q "DVOUSTRANNÁ" \
+  && ok "delta se označí jako dvoustranná" || bad "chybí označení dvoustrannosti: $out"
+echo "$out" | grep -q -- "jednostranný odhad +0.0413" \
+  && ok "jednostranný odhad se dopočítá (delta/2)" || bad "chybí jednostranný odhad: $out"
+echo "$out" | grep -q "dělení dvěma platí JEN" \
+  && ok "u jednostranného odhadu stojí jeho podmínka" || bad "chybí podmínka symetrie: $out"
+
+# Jádro T2.17: TÁŽ delta proti TÉMUŽ pásmu vyjde opačně podle toho,
+# kterou veličinu předregistrace předpovídá.
+# ⚠️ Pásmo je 0,005-0,045, ne 0,040 jako v ostré předregistraci P38:
+# jednostranně vyšlo +0,0413, takže proti ostrému pásmu je MIMO taky --
+# jen o 0,0013 místo o dvojnásobek. Test má ukázat ZÁMĚNU VELIČIN, ne
+# tvrdit, že se ostrá předpověď trefila.
+cat > "$TMP/p17.preds" <<'PREDS'
+delta      in    0.005 0.045
+delta_1s   in    0.005 0.045
+PREDS
+out=$(THRESHOLD=0.015 PREREG="$TMP/p17.preds" python3 "$SUM" "$D17" m 2>&1)
+echo "$out" | grep -q "MIMO.*delta in" \
+  && ok "dvoustranná delta proti jednostrannému pásmu je MIMO" || bad "delta měla být MIMO: $out"
+echo "$out" | grep -q "TREFA.*delta_1s" \
+  && ok "delta_1s proti témuž pásmu je TREFA — to je přesně ta záměna" || bad "delta_1s měla být TREFA: $out"
+
+# Drobnost z T2.16: varování a číslo si nesmí odporovat.
+D18="$TMP/t18"; mkdir -p "$D18/m_s0"
+{ echo "SUMMARY matchup 1 (dwarf vs wood-elf), 6800 pairs (13600 games), n_nonzero 4302 (63.3%):"
+  echo "  arm acted in 6799/6800 pairs; pairs that moved: 4302; MOVED WITHOUT THE ARM ACTING: 0  (0 = clean)"
+  echo "  PAIRED delta chess as dwarf: +0.0100 +- 0.0060 SE (~1.7 SE)"; } > "$D18/m_s0/run.log"
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D18" m 2>&1)
+echo "$out" | grep -q "1 párů rameno NEMĚŘILA" \
+  && ok "chybějící páry se tisknou V KUSECH, ne schované ve „100,0 %“" \
+  || bad "neúplný jmenovatel se pořád hlásí jen procentem: $out"
+
 echo
 if [ "$FAILS" -eq 0 ]; then
     printf "\033[32mVŠECH %s KONTROL PROŠLO\033[0m\n" "$RUNS"

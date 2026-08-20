@@ -76,9 +76,13 @@ def summarize(out, name, thr, facts=None):
 
     # (2) jmenovatel
     acted, of = sum(x["acted"] for x in sh), sum(x["of"] for x in sh)
+    # ⚠️ Varování a číslo si nesmí odporovat: 6799/6800 se zaokrouhlí na
+    # „100,0 %" a vedle toho stálo „neúplný jmenovatel". Chybějící páry se
+    # proto tisknou V KUSECH, ne jako procento, které je schová.
     L.append("    (2) arm acted: %d/%d (%.1f %%)%s"
              % (acted, of, 100.0 * acted / of,
-                "" if acted == of else "  ⚠️ neúplný jmenovatel — část párů rameno neměřila"))
+                "" if acted == of else
+                "  ⚠️ %d párů rameno NEMĚŘILA — neúplný jmenovatel" % (of - acted)))
 
     # (3) n_nonzero
     if any(x["nz"] is None for x in sh):
@@ -109,8 +113,33 @@ def summarize(out, name, thr, facts=None):
                  % (emp, pooled,
                     "overdisperze ⚠️ SHARDY SI NEODPOVÍDAJÍ, sloučení je podezřelé"
                     if emp > 1.5 * pooled else "bez overdisperze, sloučení legitimní"))
+    # ⭐ T2.17 (20.08.2026): DELTA JE DVOUSTRANNÁ A MUSÍ TO BÝT NAPSANÉ.
+    #
+    # ⚑ PROČ. `deltaHomeRace() = chessCandHome + chessCandAway - 1`
+    #   (diag_f1_cage_advance_harness.cpp:216). Rameno je v páru zapnuté vždy
+    #   JEDNÉ straně, takže se neměří „my s ramenem vs my bez ramene", ale
+    #   „my s ramenem vs my PROTI rameni". Když rameno pomáhá oběma stranám,
+    #   oba členy se SČÍTAJÍ.
+    #
+    #   Noc 19.->20.08. (P38): vytisklo se +0,0827 a předregistrace čekala
+    #   0,005-0,040, takže summarizer napsal ❌ MIMO -- na efektu, který
+    #   jednostranně (+0,041) padl přesně na horní hranu pásma, tedy TREFA.
+    #   Cena záměny není jen špatný štítek: „2x nad stropem" svádí vyhlásit
+    #   průlom tam, kde je efekt v očekávaném pásmu.
+    #
+    # ⚠️ Dělení dvěma platí, JEN když je efekt na obou stranách podobný. To
+    #   se odsud zkontrolovat nedá -- chce to rows (TD po rasách). Proto se
+    #   jednostranný odhad tiskne s tou podmínkou u sebe, ne jako fakt.
+    L.append("       ⚠️ tahle delta je DVOUSTRANNÁ (chessCandHome + chessCandAway − 1)")
+    L.append("          = my S RAMENEM proti nám PROTI RAMENI, ne proti nulovému rameni")
+    L.append("       ⇒ jednostranný odhad %+.4f ± %.4f SE, 95%% CI [%+.4f; %+.4f]"
+             % (mean / 2.0, pooled / 2.0,
+                (mean - 1.96 * pooled) / 2.0, (mean + 1.96 * pooled) / 2.0))
+    L.append("          ⚠️ dělení dvěma platí JEN při podobném efektu na obou"
+             " stranách — ověř z rows (TD po rasách)")
+
     if facts is not None:
-        facts.update({"delta": mean, "n_nonzero": nz / pairs if not any(x["nz"] is None for x in sh) else None,
+        facts.update({"delta": mean, "delta_1s": mean / 2.0, "n_nonzero": nz / pairs if not any(x["nz"] is None for x in sh) else None,
                       "leak": float(leak), "arm_acted": acted / of})
         for k in [k for k, v in facts.items() if v is None]:
             del facts[k]
@@ -176,7 +205,8 @@ def summarize(out, name, thr, facts=None):
 #   vzešlo P32. Když minutá předpověď nezanechá stopu, necháš si stejný špatný model.
 #
 # ⚑ FORMÁT souboru (PREREG=cesta), jedna předpověď na řádek:
-#     delta      in    -0.015 0.015     # co čekám a proč
+#     delta      in    -0.015 0.015     # DVOUSTRANNĚ, jak to tiskne harness
+#     delta_1s   in    -0.008 0.008     # totéž JEDNOSTRANNĚ (= delta/2)
 #     n_nonzero  >=    0.80
 #     leak       ==    0
 #     arm_acted  >=    0.99
