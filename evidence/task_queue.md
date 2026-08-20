@@ -645,6 +645,7 @@ vedou pod nimi, ne podle pořadí vzniku:
 
 | | co | |
 |---|---|---|
+| ⏰⏰ **P32** | klec se posouvá **jen rovně vpřed**, `y` se nikdy nemění | ⭐ **povýšeno 20.08.**: není to vada posunu, ale **chybějící polovina pravidla** ze spec 15.0b‴ *(„tvar pevný, cíl nosiče vpřed A DO BOKU“)*. ⇒ I kdyby P40 vyšlo, **klec za nosičem do boku nedojede** |
 | 🔄 **P40** | placebo mode 7 | **běží v noci** |
 | ⏰ **P41** | fáze VÝBĚH **2,9 %** | první krok je rozpad podle `turns_left`, ne oprava |
 | ⏰ **P39** | nosič se neaktivuje | P40 to možná rozhodne |
