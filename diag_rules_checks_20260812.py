@@ -117,6 +117,38 @@ def dodge_cost(target, marker):
 
 
 # ── povinná trojice ───────────────────────────────────────────────────────
+def phase_floor(S, carS, got_unused, need, ours_players, endzone):
+    """Fáze rozvrhu a její MECHANICKÝ strop.  (T0.1, 20.08.2026)
+
+    ⭐ JEDINÁ DEFINICE.  K9c v tomhle souboru i σ-tabulka
+    (`diag_drive_predictors_20260813.py`) musí volat TUTÉŽ funkci -- jinak
+    kontrola a metr měří jinou veličinu a nikdo se to nedozví.  Je to táž
+    lekce jako u `corridorResistance()` (K9b, 18.08.).
+
+    Vrací `(fáze, strop, need_fáze)`.
+
+    ⛔ ŽÁDNÁ LADĚNÁ KONSTANTA (uživatel 18.08.).  `+2` u výběhu jsou dva GFI,
+    tedy PRAVIDLO; `>= 2 rohy` je táž mez, na které stojí K29 („klec stojí").
+    Strop klece je funkce TĚL (MA nejpomalejšího rohu), ne číslo.
+    """
+    occS = {(p["x"], p["y"]): p for p in ours_players}
+    diagS = [(carS["x"] + dx, carS["y"] + dy) for dx in (-1, 1) for dy in (-1, 1)]
+    cornersS = [occS[d] for d in diagS if d in occS]
+    dist = abs(endzone - carS["x"])
+    ma = carS.get("ma", 6)
+    if dist <= ma + 2:
+        phase, cap = "VÝBĚH", ma
+    elif len(cornersS) >= 2:
+        # Posune-li se nosič o Δx, musí o Δx popojet i každý roh, jinak klec
+        # zůstane vzadu => strop je MA nejpomalejšího rohu, shora omezený
+        # nosičem (uživatel 19.08.).
+        phase, cap = "KLEC", min([c.get("ma", 6) for c in cornersS] + [ma])
+    else:
+        phase, cap = "SÓLO", ma
+    # Dlužíš svůj rovnoměrný podíl, ale NIKDY VÍC, než co fáze dovolí.
+    return phase, cap, min(need, cap)
+
+
 @dataclass
 class Check:
     """Výsledek kontroly: splněno / posuzováno / degenerovaných.
@@ -258,6 +290,30 @@ def analyse(paths, race="dwarf"):
         # 17.08.: K29⭐ 8,1 %, pravidlo 2,7 % — nadhodnocuje 3×.
         "K29rule": Check("K29⭐⭐ PRAVIDLO: 4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů"),
         "K9a": Check("K9a splnil rozvrhovou podlahu", vals=[]),
+        # --- T0.1 (20.08.2026): K9 PŘEPSANÁ PO FÁZÍCH -------------------
+        # ⛔ PROČ. K9a bere `need = ceil(vzdálenost / zbývající kola)` --
+        # ROVNOMĚRNOU podlahu, čistou geometrii bez jediného členu o tom, co
+        # je v tom kole mechanicky možné. Tím TRESTÁ KLEC za to, že jede
+        # pomalu, ačkoli klec rychleji jet NESMÍ: posune-li se nosič o Δx,
+        # musí o Δx popojet i každý roh, takže strop je MA nejpomalejšího
+        # rohu (uživatel 19.08.). Sólo běh takový strop nemá.
+        #
+        # ⭐ A ŽÁDNÁ KONSTANTA (uživatel 18.08.). Podlaha fáze „klec" se
+        # nepíše jako „2 pole na kolo" -- to je jen to, co dnešní trpasličí
+        # roster vydá (7,03 volných těl z 11). Pravidlo zní „klec jede tak
+        # rychle, jak rychle se dokáže znovu složit", strop je FUNKCE těl,
+        # a cíl je maximum, ne ten strop.
+        #
+        # Tvar: dlužíš svůj rovnoměrný podíl, ale NIKDY VÍC, než co fáze
+        # mechanicky dovolí  =>  need_fáze = min(need_rovnoměrný, strop_fáze).
+        # Každá fáze se měří ZVLÁŠŤ -- jedno číslo přes všechny tři je přesně
+        # to slepení, kvůli kterému K9a nešla přečíst.
+        "K9c_solo": Check("K9c SÓLO — podlaha fáze", vals=[]),
+        "K9c_cage": Check("K9c KLEC — podlaha fáze", vals=[]),
+        "K9c_run":  Check("K9c VÝBĚH — podlaha fáze", vals=[]),
+        # ⭐ Hlavní číslo, kvůli kterému se to přepisuje: jak často K9a žádala
+        # něco, co v tom kole nešlo. Jmenovatel jsou VŠECHNA posuzovaná kola.
+        "K9x": Check("K9a žádala mechanicky NEMOŽNÉ", vals=[]),
         "K30": Check("K30 (R3) drahý dodge je držený", "podíl soupeřů"),
         "K30cheap": Check("K30b levný dodge je držený (nemá cenu)", "podíl soupeřů"),
         "K31": Check("K31 (R4) kolo BEZ těla bez úkolu"),
@@ -401,6 +457,8 @@ def analyse(paths, race="dwarf"):
                 C["K29"].skip()
                 C["K29full"].skip()
                 C["K9a"].skip()
+                for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x"):
+                    C[_k].skip()
                 continue
             st["s míčem na konci kola"] += 1
 
@@ -448,6 +506,24 @@ def analyse(paths, race="dwarf"):
                 C["K9a"].vals.append(got - need)
                 C["K9a"].hit(got >= need)
 
+                # --- K9c: táž otázka, ale rozvržená po FÁZÍCH (T0.1) ------
+                # Fáze se klasifikuje ze ZAČÁTKU kola -- podlaha je požadavek
+                # NA to kolo, takže se nesmí odvozovat z toho, kam jsme došli
+                # (táž past, kvůli které K9a bere `need` z carS, ne z car).
+                phase, cap, need_ph = phase_floor(
+                    S, carS, got, need, players(S, ours), endzone)
+                kk = {"SÓLO": "K9c_solo", "KLEC": "K9c_cage",
+                      "VÝBĚH": "K9c_run"}[phase]
+                for _k in ("K9c_solo", "K9c_cage", "K9c_run"):
+                    if _k != kk:
+                        C[_k].skip()
+                C[kk].vals.append(got - need_ph)
+                C[kk].hit(got >= need_ph)
+                st[f"K9c fáze {phase}"] += 1
+                # ⭐ Kolikrát rovnoměrná podlaha žádala víc, než fáze umí.
+                C["K9x"].hit(cap < need)
+                C["K9x"].num(max(0, need - cap))
+
     return st, C, B, corners_filled, corners_clean, idle_per_turn, unknown
 
 
@@ -485,6 +561,8 @@ def main():
           f"{st['K29 kol bez jediného rohu (klec nestojí)']}")
     print(C["K29rule"].line())
     print(C["K9a"].line())
+    for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x"):
+        print(C[_k].line())
     print(C["K30"].line())
     print(C["K30cheap"].line())
     print(f"    z toho drženo jen klecí/nosičem (R1 zakazuje): "

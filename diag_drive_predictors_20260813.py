@@ -8,7 +8,8 @@ import sys, glob, math, gzip, json
 sys.path.insert(0, '/home/jan/claude/bloodbowl')
 from collections import defaultdict
 from diag_rules_checks_20260812 import (load, players, threatens, adj, STANDING,
-                                        key, TACKLE, dodge_cost, DODGE_COST_THRESHOLD)
+                                        key, TACKLE, dodge_cost, DODGE_COST_THRESHOLD,
+                                        phase_floor)
 from diag_exposure_scan_20260812 import Board, predictors
 # P25 (17.08.): atribuce TD podle STŘELCE. Oprava `14c7d035` ze 14.08. šla jen
 # do `diag_drive_failure` a tenhle sourozenec ji nedostal -- přitom právě on
@@ -109,6 +110,17 @@ for path in sorted(glob.glob(DATA + '/*.json.gz')):
                 got = (car["x"] - carS["x"]) * fwd
                 acc["K9a_splněno"].append(1.0 if got >= need else 0.0)
                 acc["Δx"].append(float(got))
+                # --- T0.1 (20.08.): K9 po FÁZÍCH, přes TUTÉŽ funkci, kterou
+                # volá kontrola K9c. Kdyby se logika zkopírovala, měřila by
+                # σ-tabulka jinou veličinu než kontrola a nikdo by se to
+                # nedozvěděl (táž lekce jako corridorResistance, K9b).
+                _ph, _cap, _needph = phase_floor(
+                    logs[i], carS, got, need, players(logs[i], ours), endzone)
+                acc["K9c_splněno"].append(1.0 if got >= _needph else 0.0)
+                # ⭐ Kolikrát rovnoměrná podlaha žádala mechanicky nemožné --
+                # přesně to, kvůli čemu se K9 přepisuje.
+                acc["K9a_žádala_nemožné"].append(1.0 if _cap < need else 0.0)
+                acc["K9c_rezerva"].append(float(got - _needph))
         if acc:
             rows.append((scored, {k: sum(v)/len(v) for k, v in acc.items() if v}))
 
