@@ -1867,6 +1867,37 @@ příště postaví“ je **jiné a nesplnitelné pravidlo** — a plynul by z n
 že **vlastní sražení soupeře je cena**. Sražený u rohu je pořád **lepší** než
 týž soupeř stojící.
 
+### ⭐⭐⭐ 15.0d KDY SE SKÓRUJE HNED: NEDRŽ SE NA PRAHU V DAVU *(uživatel 20.08.)*
+
+> **„když je jich tolik blízko — a zvlášť elfů — tak už nám nezbývá než TD hned."**
+
+**Doktrína záporné rezervy** *(nehnat se za TD, protože skórovat brzy vrací
+soupeři míč)* má **výjimku, kterou jsme neměli zapsanou:**
+**neplatí, když na nosiče dosáhne dost soupeřů.** Držet se na prahu má cenu,
+jen když **to držení přežijeme**.
+
+**Rozhodovací veličina existuje a je změřená: REACH0** — *kolik soupeřů
+dosáhne na nosiče **bez jediného dodge***. V σ-tabulce **−16,7σ**, tedy jeden
+z nejsilnějších prediktorů, co máme ([[project_bloodbowl_exposure_reach0_20260812]]).
+
+⇒ **Pravidlo:** *„drž se na prahu"* **jen při nízkém REACH0**. Roste-li, je
+stall **prohra na dvě kola** — bere se TD hned, **i za cenu hodů**.
+
+⭐ **A rasa soupeře to zostřuje** *(„a zvlášť elfů")*: u rychlých a agilních
+je REACH0 vysoké **i z dálky**, a **Leap navíc ruší daň tackle zón** — takže
+klec proti nim nekupuje tolik času jako proti pomalým.
+
+**Odehraný příklad 20.08.** *(6. kolo z 8, nosič 6 polí od endzony, klec
+stojí, wood-elf)*: na nosiče dosáhne **11 z 11** soupeřů, z toho **dva
+Wardanceři s Leap dva kroky daleko**. Držet dvě kola = dva blitzy plus Leap
+skrz tackle zóny. ⇒ **Bere se TD hned.**
+
+⚠️ **Cena je přiznaná, ne schovaná:** cesta je **6 kroků a 3 dodge**
+*(AG 3 ⇒ řádově 12–30 %)*. **Blitz ji zlevní** — a ⭐ **vybírá se podle toho,
+kolik dodgů ubere**, ne podle kostek: sražení Wardancera na (22,5) srazí cenu
+na **1 dodge** *(~50–65 %, s rerollem ~80 %)*. **To je čtvrté kritérium
+k žebříčku blitzu B1–B7 v ČÁSTI 14** a je měřitelné.
+
 ### ⭐⭐⭐ 15.0b‴ DEGRADOVANÁ KLEC: DVĚ TĚLA PATŘÍ NAD A POD NOSIČE *(uživatel 20.08.)*
 
 ⛔ **Tohle je 97 % kol.** Plné pravidlo klece plníme ve **2,7 %**, takže případ
