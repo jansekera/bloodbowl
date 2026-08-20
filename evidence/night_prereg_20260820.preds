@@ -1,0 +1,22 @@
+# Předpovědi noci 20.→21.08. (P40 — PLACEBO: tatáž volba pole BEZ kritéria klece).
+# Strojově kontroluje night_summarize.py. CORPUS=0, takže žádná předpověď
+# o kontrolách -- spouštěč by ji odmítl.
+#
+# ⭐ CO TENHLE BĚH ROZHODUJE. P38 dalo +0,0827 ± 0,0065 (dvoustranně) a má
+# přibalené tři změny: (A) boční volnost, (B) kritérium klece, (C) obejití
+# záložní smyčky. Placebo se od P38 liší JEDINÝM predikátem -- vypuštěným
+# cageScoreForSquare -- takže rozdíl mezi deltami je cena kritéria klece.
+#   placebo ≈ P38  ⇒ nález se jmenuje „nosič neuměl uhnout do strany", ne klec
+#   placebo < P38  ⇒ kritérium klece si část zisku zaslouží
+#
+# ⚠️ DELTA SE PÍŠE DVOUSTRANNĚ (T2.17, opraveno 20.08.): harness tiskne
+# chessCandHome + chessCandAway − 1, tedy „my s ramenem proti nám PROTI
+# rameni". Noc 19.→20.08. měla předpovědi psané jednostranně a summarizer
+# proto vytiskl MIMO na efektu, který byl jinde. Píšeme obě veličiny.
+
+delta      in    0.040 0.140   # Fable, DVOUSTRANNĚ: bod +0,090. Placebo odblokuje nosiče v 97,9 % idle kol proti 58,9 % u P38, ale kupuje víc chůze do odporu (6,7 % vs 3,5 % picků)
+delta_1s   in    0.020 0.070   # totéž jednostranně (= delta/2)
+arm_picks  >=    5000000       # smoke 12 párů: placebo 637,75/hru vs P38 290,50/hru; 5 M na 13 600 her = 368/hru, tedy nad P38 a pod smoke odhadem. ⭐ MUSÍ být VÍC než P38, jinak placebo neměří, co si myslíme
+n_nonzero  in    0.55  0.80    # P38 dalo 63,3 %; placebo sahá na víc kol, ale strop je týž (kola s míčem)
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # nosič postupuje skoro v každém zápase

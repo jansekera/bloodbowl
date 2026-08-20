@@ -1,0 +1,2 @@
+{"matchup":1,"seed_idx":850,"cand_home":true,"race_h":"dwarf","race_a":"wood-elf","cand":1,"base":1,"home_attr":[1,0,0,0],"away_attr":[1,0,0,0],"actions":522,"cand_plans":0,"base_plans":0,"cand_daunt":476,"cand_roll":72,"mode":7}
+{"matchup":1,"seed_idx":850,"cand_home":false,"race_h":"dwarf","race_a":"wood-elf","cand":0,"base":1,"home_attr":[0,1,0,0],"away_attr":[1,1,0,0],"actions":416,"cand_plans":0,"base_plans":0,"cand_daunt":109,"cand_roll":0,"mode":7}

@@ -613,10 +613,10 @@ neprohrajeme prakticky nikdy. ⇒ **Obrana je ROZHOVOR, ne strojová práce.**
 
 | # | co | proč teď | blokuje |
 |---|---|---|---|
-| **1** | **T2.17 — oprava summarizeru** *(dvoustranná vs jednostranná delta)* | ⭐ **oprava kontroly se povyšuje před měření** — jinak dnešní noc přečteme týmž zkresleným metrem jako včerejší | pre-reg noci |
-| **2** | **P40 — implementovat placebo rameno (mode 7)** | jediný funkční rozdíl je `macro_actions.cpp:1403`; Fable vypsal i ostatní místa *(setter za ř. 178, podmínka ř. 1377, harness ř. 244–249 seedy 127M, 251–257, 277, ~400–406, 440–441)* | noc |
-| **3** | **předregistrace noci, psaná DVOUSTRANNĚ** | placebo **+0,090** [+0,04; +0,14] · rozdíl placebo−P38 **0,00** [−0,04; +0,05] · **placebo musí mít VÍC picků než P38** · leak == 0 | noc |
-| **4** | **spustit noc** | 6 800 párů ≈ **14 h** ⇒ **start nejpozději ~14:00 SELČ**, jinak nedoběhne do rána | — |
+| **1** | ✅ **HOTOVO** — T2.17 oprava summarizeru *(dvoustranná vs jednostranná delta)* | ⭐ **oprava kontroly se povyšuje před měření** — jinak dnešní noc přečteme týmž zkresleným metrem jako včerejší | pre-reg noci |
+| **2** | ✅ **HOTOVO** — P40 placebo rameno (mode 7), testy 555 → 559 | jediný funkční rozdíl je `macro_actions.cpp:1403`; Fable vypsal i ostatní místa *(setter za ř. 178, podmínka ř. 1377, harness ř. 244–249 seedy 127M, 251–257, 277, ~400–406, 440–441)* | noc |
+| **3** | ✅ **HOTOVO** — `evidence/night_prereg_20260820.preds` | placebo **+0,090** [+0,04; +0,14] · rozdíl placebo−P38 **0,00** [−0,04; +0,05] · **placebo musí mít VÍC picků než P38** · leak == 0 | noc |
+| **4** | ✅ **noc SPUŠTĚNA 10:52 SELČ** — `placebo_20260820`, mode 7, 8×850 párů, práh ±0,015, `CONTROL_MODE2=1`, preflight OK | konec ~01:00–04:00 | — |
 | **5** | *(za běhu noci)* **Q6 — v čem se měří „převaha"** | rozhovor, stroj nestojí; **blokuje T1.11** | T1.11 |
 | **6** | *(za běhu noci)* **T0.1 — nová K9 po fázích** | nečeká na korpus, tvar je hotový a otestovaný | σ přeměření |
 
