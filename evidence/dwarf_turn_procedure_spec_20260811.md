@@ -2309,31 +2309,89 @@ pravidlo o geometrii lajny**, a platí obousměrně.
 násobek podle max MA toho, kdo dosáhne (6→×1,31 · 7→×1,15 · 8→×1,62 ·
 9→×1,89) ⇒ **L je nejcennější přesně proti rychlým a slabým, tedy elfům.**
 
-## 17.4 ⚠️ NEROZSOUZENÝ SPOR: držet kontakt, nebo stavět sloupce?
+## 17.4 ⭐⭐⭐ ROZHODNUTO UŽIVATELEM 20.08.: NENÍ TO VOLBA, JE TO FÁZE
 
-Rešerše 20.08. (grumbbl *„To Base, or not to Base"*, Exit 23
-*„Defense 101"*, bbtactics *„How to beat Dwarfs"*) doktrínu potvrzuje
-— *„trpaslík je jeden z mála, kdo si může dovolit basovat"*, *„obklíčíš je
-vrstvou hráčů a prakticky zastavíš míč"* — **ale přináší protiargument,
-který v naší doktríně nebyl:**
+> *„na začátku musí trpaslík začít s 2 sloupce a postupně to tlačit do L —
+> jak mu poroste převaha"* **(uživatel 20.08.)**
 
-> *„Je důležité **nezůstat v base kontaktu**, protože to soupeři obvykle
-> dovolí vyrobit díru a začít se skrz ni tlačit."*
-> Alternativa: **sloupce po dvou hráčích** napříč hřištěm — *„prvního
-> blitznou, ale na druhého nemají rychlost ani obratnost."*
+**Sloupce a L si neodporují. Je to jeden postup ve dvou fázích, a přechod
+mezi nimi řídí PŘEVAHA.**
 
-⇒ **„Obklíč a drž" a „nedrž kontakt, stav sloupce" si odporují a my
-nemáme rozsouzeno, kdy platí která.**
+| fáze | tvar | proč |
+|---|---|---|
+| **D1 — zdržuj** | **sloupce po dvou** napříč hřištěm, **kontakt NEDRŽET** | dokud nemáme převahu, kontakt soupeři dovolí vyrobit díru a protlačit se; sloupec drží i po blitzu — *„prvního blitznou, na druhého nemají rychlost ani obratnost"* |
+| **D2 — zavři past** | **půlkruh L/U proti lajně**, kontakt DRŽET | s převahou už díra nevznikne rychleji, než ji zaceláme; teď se vyplatí brát únikové pole a nutit dodge proti Tackle |
 
-**Hypotéza dělicí čáry — INICIATIVA**, týž fázový model, jaký říká
-trpasličí příručka (*opatrně, dokud nemáme početní převahu, pak
-agresivně*):
-* **nemáme převahu** ⇒ **sloupce po dvou**, kontakt nedržet;
-* **máme převahu** ⇒ **obklíčení**, past zavřít.
+⭐ **Přechod je POSTUPNÝ, ne překlopení** *(„postupně to tlačit do L")* —
+sloupce se k soupeři přitlačují a zavírají do půlkruhu, jak převaha roste.
+Není to `if (převaha) L else sloupce`.
 
-⚠️ **Je to HYPOTÉZA, ne zjištění.** Rozhodne **odehraná situace na S7**
-s uživatelem, ne měření — je to volba doktríny, ne fakt o enginu.
-⇒ Zapsáno jako otevřená položka.
+✔ **Nezávisle to potvrzuje trpasličí příručka** (Goonhammer/King_Ghidra):
+*„A good approach is often to play cautiously and hope to get a numbers
+advantage, at which point you can be more aggressive."* Tentýž fázový model,
+jiný zdroj.
+
+## 17.4b OVĚŘENÍ NA WEBU (20.08.) — dvě třetiny sedí, jedna ne
+
+*(rešerše: grumbbl „A Lean, Mean, Screening Machine" · Goonhammer „The Art of
+Game Management" a „Dwarf Team Guide" · Exit 23 „Defense 101" · bbtactics)*
+
+**✔ POTVRZENO — fáze D1 je standardní pojmenovaná formace, ne improvizace.**
+*„Two-deep columns of players are the most fundamental screen… v column
+defence se staví dvouřadé screeny napříč šířkou hřiště, **a nikdo nebasuje**."*
+⇒ „sloupce po dvou bez kontaktu" je **column defence**, věc s vlastním jménem.
+
+⭐ **A přišla GEOMETRIE, kterou jsme neměli** — a je implementovatelná:
+* **1 pole od soupeře** ⇒ nutí ho **blitzovat**, ne jen blokovat *(blok chce
+  sousedství; screen si ho schválně nedovolí)*;
+* **2 pole mezi sebou** do šířky;
+* **2 do hloubky** — a důvod je přesně ten anti-blitzový:
+  *„i když jednoho z předních blitzneš a srazíš, nebo ho i odstraníš,
+  stejně neprojdeš — kvůli obránci za ním."*
+⇒ Rozpočet: **5 obránců pokryje šířku hřiště** a udrží *„až dvojnásobek
+vlastního počtu"*.
+
+**✔ POTVRZENO — přechod do basování existuje jako uznaný krok.**
+*„Často si budeš muset vybrat kolo, kdy jdeš all-in — buď přepneš strategii
+na **basování více soupeřů**, nebo utratíš rerolly na zlomovou akci."*
+
+**⛔ NEPOTVRZENO — spouštěč „převaha" je DOKTRÍNA TRPASLÍKA, ne obecná.**
+Jediný zdroj, který spouštěč váže na početní převahu, je **trpasličí**
+příručka: *„hrát opatrně a doufat v početní převahu, a v tu chvíli můžeš být
+agresivnější."* **Obecné zdroje mluví jinak:** Exit 23 dělí screen vs basování
+podle **typu týmu** *(agility drží soupeře „na délku paže", bashers „basují
+tak často, jak to jde")*, a jeho spouštěč je **stav zápasu**: *„když prohráváš
+0:2 v poločase, opatrná obrana přestává být možnost."*
+
+⛔ **A JEDNA VĚC SI PŘÍMO ODPORUJE:** uživatel řekl *„postupně to tlačit do
+L"*, ale jediný zdroj, který o načasování mluví, říká **„vyber si kolo a jdi
+all-in"** — tedy **jednorázové překlopení, ne postupné svírání**. To není
+detail: postupné svírání znamená, že v mezifázi držíme **napůl rozbitý tvar**,
+který nedělá ani jedno pořádně.
+⇒ **Otevřená otázka na uživatele, ne na měření.**
+
+⚠️ **A tenhle rozpor je pro nás ostřejší než pro kohokoli jiného:** trpaslík
+je **basher**, takže obecná basher-doktrína („basuj, jak to jde") ho posílá
+do kontaktu **hned** — kdežto jeho vlastní rasová příručka ho posílá čekat na
+převahu. **Obojí je o téže rase a říká to opak.**
+
+⛔ **CO ZŮSTÁVÁ OTEVŘENÉ — a bez toho se to nedá implementovat:**
+**v čem se měří „převaha"?** Kandidáti, žádný zatím nerozhodnutý:
+* **stojící těla** (nejlevnější, ale nepočítá kvalitu);
+* **attrition** (KO/INJ — ale ta se projeví až se zpožděním);
+* **poziční** (kolik jejich těl je za naší linií);
+* **iniciativa** (kdo si může dovolit blok zdarma).
+⚠️ **A ŽÁDNÁ KONSTANTA** ([[feedback_implement_the_rule_not_the_outcome]]):
+prahem nesmí být zadrátované „+2 těla", musí to být pravidlo, ze kterého
+trpasličí i jiný případ vypadne sám.
+
+⭐⭐⭐ **A TŘETÍ FÁZOVÉ PRAVIDLO OD UŽIVATELE — engine fáze NEMÁ ŽÁDNÉ.**
+Tohle je po **fázovém plánu trasy** (13.08.: sólo Runner → klec → sólo
+výběh) a po **fázích útoku** už **třetí** doktrína, která je vnitřně
+fázová. **Engine přitom nemá pojem fáze nikde** — ani v útoku, ani
+v obraně. ⇒ *Bez fáze nejde odlišit chybu od záměru*
+([[project_bloodbowl_phased_route_plan_20260813]]). **To přestává být
+detail jedné kapitoly a začíná to být chybějící struktura modelu.**
 
 ## 17.5 Co past drží — a proč u nás teče
 
@@ -2364,7 +2422,8 @@ jestli ho vytlačujeme k lajně. Bez ní si o obraně nic netvrdit.
 
 ## 17.7 Co tahle část NEZAKRYLA
 
-* **17.4 je otevřená** — spor kontakt vs sloupce není rozhodnutý.
+* **17.4 je rozhodnutá** *(uživatel 20.08.)*, ale **„převaha" nemá
+  definici** — a bez ní se fázový přechod nedá implementovat ani měřit.
 * **Kdy se L zahajuje** (v kterém soupeřově kole) není nikde.
 * **Rozpočet těl pro L** — kolik ze 7,03 volných těl past spolyká, se
   nikdy nepočítalo. ⚠️ Pozor: je to **obranný** rozpočet, tedy jiná kola
