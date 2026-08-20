@@ -1892,6 +1892,25 @@ stojí, wood-elf)*: na nosiče dosáhne **11 z 11** soupeřů, z toho **dva
 Wardanceři s Leap dva kroky daleko**. Držet dvě kola = dva blitzy plus Leap
 skrz tackle zóny. ⇒ **Bere se TD hned.**
 
+⭐⭐⭐ **A PROTI ČEMU SE TA CENA VÁŽÍ** *(uživatel 20.08.: „s jedním dodge
+a jedním GFI furt lepší než čekat, až nám míč seberou")*:
+
+⛔ **Neporovnává se „TD teď" proti „TD později", ale proti „PŘIJDEME O MÍČ".**
+Alternativou k hodu **není jistota** — je to pravděpodobnost, že za dvě kola
+míč **vůbec ještě máme**.
+
+**A tu známe:** držení míče končí **ztrátou ve 48,9 %**, a **70,1 % těch ztrát
+je blitz na nosiče** ([[project_bloodbowl_possession_end_20260820]]) — tedy
+přesně to, co v téhle pozici hrozí **dvakrát**, plus Leap.
+
+⇒ **Rozhodovací tvar pravidla:**
+**ber TD, když `P(dojdu teď)` > `P(za dvě kola ještě držím míč a dojdu pak)`.**
+V odehraném příkladu: **1 dodge + 1 GFI ≈ 45–55 %, s rerollem ~70 %** proti
+dvěma kolům držení proti jedenácti dosahujícím soupeřům.
+
+⚠️ **Bez toho srovnávacího základu se pravidlo čte jako hazard** — a s ním je
+to ta lepší sázka.
+
 ⚠️ **Cena je přiznaná, ne schovaná:** cesta je **6 kroků a 3 dodge**
 *(AG 3 ⇒ řádově 12–30 %)*. **Blitz ji zlevní** — a ⭐ **vybírá se podle toho,
 kolik dodgů ubere**, ne podle kostek: sražení Wardancera na (22,5) srazí cenu
