@@ -14,11 +14,25 @@ z korpusu. **Nejsou špatné — jsou z jiného enginu.**
 ⇒ **Pořadí je proto dané a nedá se přeskládat:**
 
 ```
-  1. P45 + vstávání 4+      (oprava pravidel)
-  2. REBUILD + testy
-  3. NOVÝ KORPUS            ← bez něj jsou všechna měření dál neplatná
-  4. teprve pak ostatní změny, každá měřená proti NOVÉMU korpusu
+  1. P45 + vstávání 4+      (oprava pravidel, engine)
+  2. X3 — makra s pořadím do logu   (engine, POZOROVACÍ)
+  3. REBUILD + testy
+  4. NOVÝ KORPUS            ← už s pořadím maker
+  5. teprve pak ostatní změny, každá měřená proti NOVÉMU korpusu
 ```
+
+⚠️ **X3 musí být PŘED korpusem, ne po něm** *(uživatel 20.08. chtěl „hned po
+korpusu" — upraveno)*: `TurnLog` nemá makra vůbec, takže **X3 je změna
+enginu**. Po korpusu by se korpus musel sbírat **znovu**.
+
+⭐ **A batchovat X3 s P45 se SMÍ**, ačkoli dvě změny před jedním korpusem
+obvykle ne: **X3 je čistě pozorovací** — jen zapisuje, co se stalo, do hry
+nesahá ⇒ **nemůže zamaskovat účinek P45**.
+
+⇒ **Co X3 rozhodne:** kolik kol zahraje **CAGE PŘED ADVANCE**. `expandCage`
+kotví rohy na `carrier.position` **v okamžiku provedení**, a pořadí maker
+nikdo nevynucuje ⇒ zahraje-li se CAGE dřív, **rohy se postaví kolem starého
+pole**. To je kandidát na **65,9 % rozpadů klece**.
 
 ⚠️ **Sběr korpusu trvá hodiny** ⇒ pustit ho **hned po P45**, ne až po dalších
 opravách. Zatímco běží, jde psát kód, ne měřit.
