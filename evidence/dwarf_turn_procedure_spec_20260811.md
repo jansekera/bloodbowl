@@ -1883,6 +1883,33 @@ z nejsilnějších prediktorů, co máme ([[project_bloodbowl_exposure_reach0_20
 ⇒ **Pravidlo:** *„drž se na prahu"* **jen při nízkém REACH0**. Roste-li, je
 stall **prohra na dvě kola** — bere se TD hned, **i za cenu hodů**.
 
+⛔⛔ **OPRAVA TÉHOŽ DNE — SUROVÝ POČET NESTAČÍ** *(uživatel 20.08.: „ale
+původní situace byla zcela odlišná — proti třem lineelfům bych byl pro posun
+klece dopředu")*.
+
+Táž pozice, jen jiné složení soupeře, dá **opačnou odpověď**:
+
+| | tři Line-elfové | plná deska, 2× Wardancer s Leap |
+|---|---|---|
+| dosáhne na nosiče | 3 | **11** |
+| cesta nosiče na TD | 6 kroků / **1 dodge** | 6 kroků / **3 dodge** |
+| **verdikt** | ⭐ **POSUNOUT KLEC** — dojde na `x=23`, zbývají 2 pole, skóruje se příští kolo **v tvaru a s rezervou** | ⭐ **TD HNED** |
+
+⇒ ⛔ **REACH0 jako POČET na tohle nestačí.** Tři a jedenáct dávají **tutéž
+geometrii postupu**; rozdíl dělá **Leap a rychlost**, ne počet. Surový počet
+by řekl „drž se" i proti **třem Wardancerům**, což je přesně obráceně.
+
+⇒ **Váha existuje a je změřená:** hák z 19.08. — **dosah se převádí na
+poškození podle max MA** *(6→×1,31 · 7→×1,15 · 8→×1,62 · 9→×1,89)*
+([[project_bloodbowl_sideline_vs_skaven_20260819]]). **Táž váha patří sem**,
+plus **Leap jako samostatný přepínač** *(ruší daň tackle zón, tedy celý
+mechanismus, kterým klec kupuje čas)*.
+
+⚠️ **Poznámka k postupu, ne k pravidlu:** tenhle rozpor vznikl tím, že jsem
+**doplnil desku uprostřed diskuze** — nejdřív tři soupeři, pak jedenáct.
+Obě odpovědi jsou správné, každá pro svou desku. **Situace se nedoplňuje za
+běhu**, jinak se nedá poznat, jestli se změnil názor, nebo zadání.
+
 ⭐ **A rasa soupeře to zostřuje** *(„a zvlášť elfů")*: u rychlých a agilních
 je REACH0 vysoké **i z dálky**, a **Leap navíc ruší daň tackle zón** — takže
 klec proti nim nekupuje tolik času jako proti pomalým.
