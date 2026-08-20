@@ -1895,17 +1895,20 @@ ortogonály naopak jediné správné místo.** ⇒ Kontrola musí umět rozliši
 **nad a pod má všech 6 ve svých tackle zónách**, kdežto diagonály jen 3 ⇒
 soupeř na ně sice stoupnout může, ale **za každý další pohyb zaplatí dodge**.
 
-⭐⭐ **A dvojice není přibitá na střed** *(uživatel 20.08.: „a jestli se mohou
-pohnout zároveň víc na jednu ze stran — která je volnější — tak tam")*:
+⭐⭐ **TVAR JE PEVNÝ, POHYB NE** *(uživatel 20.08.: „dvojice je přibitá na
+střed — ale nechci zahodit pohyb vpřed a do boku na volnější stranu")*:
 
-* **placement** = nad a pod nosiče *(ortogonály kolmo na postup)*;
-* **směr** = k **volnější straně** *(míň soupeřů, víc prostoru)*;
-* **mez** = to, co stihnou **OBĚ** těla. ⚠️ Nedriftovat tam, kam dojde jen
-  jedno — pak se ze dvou stane jedno a zbydou **3 pole mimo naši TZ**.
+* **tvar** — obě těla drží **pevný odstup nad a pod nosičem**; dvojice se od
+  něj **neodpojuje** a nedriftuje sama;
+* **pohyb** — k volnější straně se posouvá **CÍL NOSIČE**, tedy **vpřed
+  a do boku**, a dvojice ho následuje **ve stejném tvaru**;
+* **volnější strana** = míň soupeřů, víc prostoru — **přesně ta, kudy se
+  obchází zeď**;
+* **mez** = to, co stihnou **OBĚ** těla. ⚠️ Nevolit cíl, kam dojde jen jedno —
+  pak se ze dvou stane jedno a zbydou **3 pole mimo naši TZ**.
 
 ⇒ Je to týž tvar jako u plné klece *(„klec jede tak rychle, jak rychle se
-dokáže znovu složit")*, jen se dvěma těly — a **volnější strana je přesně ta,
-kudy se obchází zeď**.
+dokáže znovu složit")*, jen se dvěma těly.
 
 ⛔⛔ **MEZ TÉ METRIKY, ať se nepřecení:** **tackle zóna nezabrání VSTUPU** —
 zdražuje jen *odchod*. „Pole je v naší TZ" tedy **neznamená**, že tam soupeř
