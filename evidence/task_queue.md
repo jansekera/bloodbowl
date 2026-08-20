@@ -626,6 +626,32 @@ neprohrajeme prakticky nikdy. ⇒ **Obrana je ROZHOVOR, ne strojová práce.**
 | **5** | *(za běhu noci)* **Q6 — v čem se měří „převaha"** | rozhovor, stroj nestojí; **blokuje T1.11** | T1.11 |
 | **6** | ✅ **HOTOVO** — T0.1 K9 po fázích; přepis jako kontrola neuspěl (16,3σ vs 20,8σ), ale vypadl z toho **P41: fáze VÝBĚH 2,9 %** | — | — |
 
+## ⭐⭐⭐ POLOŽKY SE ŘADÍ PODLE DVOU CÍLŮ KLECE *(uživatel 20.08.)*
+
+Spec **15.0b′**: klec má **dvě položky — dojít co nejdál · ochránit nosiče**
+([[project_bloodbowl_cage_two_goals_20260820]]). Otevřené položky se proto
+vedou pod nimi, ne podle pořadí vzniku:
+
+### 🛡️ OCHRÁNIT NOSIČE *(tady je 70 % ztrát míče)*
+
+| | co | proč sem patří |
+|---|---|---|
+| ⏰⏰ **P45** | ležící smí BLOCK + chybí hod 4+ | ⭐ *(uživatel 20.08.: „do ochránit nosiče patří i opravit darovaný jumpup ze dneška")* — **není to parity úklid, je to největší jednotlivá vada ochrany**: dokud dáváme prakticky Jump Up každému, je **každý ležící soused blokující zdarma**, a to ruší přesně to, co klec dělá |
+| ⏰⏰ **P37** | `carrierIsBlitzable` nezná GFI | blitz na nosiče = **70,1 %** ztrát, a tahle funkce rozhoduje o záloze pohybu |
+| ⏰ **P44** | follow-up je povinný | blokuje **dvojroli blitzujícího jako rohu** ⇒ rozpočet 6 ze 7 → 5 ze 7 |
+| ⏰ **P42** | zákaz „nosič nekončí v kontaktu" | kontrola **K38 stojí**, chybí rameno |
+
+### 🏃 DOJÍT CO NEJDÁL
+
+| | co | |
+|---|---|---|
+| 🔄 **P40** | placebo mode 7 | **běží v noci** |
+| ⏰ **P41** | fáze VÝBĚH **2,9 %** | první krok je rozpad podle `turns_left`, ne oprava |
+| ⏰ **P39** | nosič se neaktivuje | P40 to možná rozhodne |
+
+⚠️ **Ostatní otevřené položky** *(z 63)* se tím **nemažou ani nezamítají** —
+jen nejsou na řadě, dokud klec nedělá to, co má.
+
 ## ⏰ Co je na řadě PO noci P40
 
 1. **Q8** — nasadit P38? *(podle výsledku P40)*
