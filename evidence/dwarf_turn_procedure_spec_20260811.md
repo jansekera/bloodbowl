@@ -1841,6 +1841,32 @@ a nemohou blokovat. Přeměřeno 20.08. na 24 754 kolech: **stojící soupeř
 ⇒ **Neplníme ani jeden**, a **plnění pravidla klece je 2,7 %** proti
 splnitelným 95,6 %.
 
+### ⭐⭐⭐ 15.0b″ JEDNO PRAVIDLO MÍSTO DVOU — SOUSEDSTVÍ NA KONCI NAŠEHO KOLA *(uživatel 20.08.)*
+
+> **„my máme kolo — teď se posunujeme — nesmíme se posunout rohem vedle
+> stojícího — protože nám příští kolo přijde od něj block“**
+
+**Žádné tělo klece — nosič ani roh — nekončí pohyb vedle stojícího
+soupeře.** Sousedství na konci **našeho** kola = **blok zdarma v jejich**.
+
+⭐ Dosud to spec vedla jako **dvě nesouvisející klauzule** — „čisté rohy“
+(K29) a „nosič bez sousedů“ (K38). Je to **jedno pravidlo o dvou místech**:
+
+| tělo | kontrola | tvrdost |
+|---|---|---|
+| **nosič** | **K38** | ⛔ zákaz — cílová četnost NULA |
+| **roh** | **K29** *(„špinavý roh“)* | ⛔ týž důvod, táž tvrdost |
+
+⚠️ **Ležící soupeř se nepočítá** — ne proto, že by byl neškodný, ale proto,
+že **musí napřed zaplatit 3 MA za postavení**, takže ten blok **nedostane
+zadarmo**. *(S Jump Up ho dostane ⇒ patří do zákazu — viz P43.)*
+
+⛔ **A ČAS SE NEPOSOUVÁ DOPŘEDU.** Posuzuje se **konec našeho kola**, ne to,
+jestli klec **přežije soupeřovo**. Požadavek „roh nesmí být tam, kde se sražený
+příště postaví“ je **jiné a nesplnitelné pravidlo** — a plynul by z něj nesmysl,
+že **vlastní sražení soupeře je cena**. Sražený u rohu je pořád **lepší** než
+týž soupeř stojící.
+
 ### ⭐⭐ A ochrana má DVĚ RŮZNÉ TVRDOSTI *(uživatel 20.08.)*
 
 > **„Ten blitz na nosiče je řešitelný správnou klecí — a to také řešíme —
