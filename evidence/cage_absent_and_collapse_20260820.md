@@ -83,3 +83,56 @@ se **54 % rozejde** — a obojí **naší volbou**. ⇒ **Čistota rohů je až 
 problém v pořadí.**
 
 Skripty `diag_cage_absent_20260820.py` · `diag_cage_collapse_20260820.py`.
+
+
+---
+
+# D. HYPOTÉZA O MECHANISMU — s pojmenovaným testem, ne závěr *(20.08. večer)*
+
+Čtení kódu dává mechanismus, který **vysvětlí obě čísla naráz**. ⚠️ **Není
+potvrzený** — kontrola, která by ho potvrdila, u nás neexistuje.
+
+## Co v kódu je
+
+1. ✅ **`expandCage` míří na čtyři diagonály správně** *(`macro_actions.cpp:1466`)*
+   — engine to **umí**.
+2. ⛔ Ale kotví je na **`cp = carrier.position`**, tedy tam, kde nosič stojí
+   **v okamžiku provedení makra**.
+3. ⛔ **CAGE a ADVANCE jsou dvě samostatná makra** a **nic nevynucuje jejich
+   pořadí**.
+
+⇒ **Zahraje-li se CAGE dřív než ADVANCE, rohy se postaví kolem STARÉHO pole
+a nosič jim pak odejde.** To je přesně kategorie **(3)** — *nosič odešel
+a rohy nešly s ním*, **65,9 % rozpadů**.
+
+## A druhá půlka sedí taky
+
+Tělo blízko nosiče, které **nedostane CAGE**, spadne v `expandReposition`
+*(ř. 1040)* na:
+
+```cpp
+} else if (carrierDist <= 3) {
+    // Already near carrier — move to cage/screen position ahead of carrier
+    target = {carrier->position.x + dx * 2, carrier->position.y};
+}
+```
+
+⇒ **Jedno jediné pole, dvě vpřed, ve STEJNÉ ŘADĚ — a pro všechna těla totéž.**
+Komentář slibuje *„cage/screen position"*, kód počítá **ortogonálu**.
+Kdo na `x+2` nedosáhne, zastaví na `x+1` ve stejné řadě ⇒ **stojí ortogonálně
+vedle nosiče** = kategorie **(a)**, **49,2 %** kol bez jediného rohu.
+
+## ⛔ Proč to zůstává HYPOTÉZOU
+
+Potvrdit ji znamená vidět **pořadí zahraných maker v kole**. To je **X3
+z T2.6** — kontrola, která **nikdy nevznikla** *(v paměti vedená jako
+„nejlepší poměr odemčeno/cena v celém aparátu")*.
+
+⇒ **Test, který ji rozhodne:** zaznamenat do logu **deklarovaná makra
+s pořadím**, a pak se ptát: **kolik kol zahraje CAGE PŘED ADVANCE?**
+* hodně ⇒ hypotéza potvrzena, oprava je **vynutit pořadí** *(nebo kotvit
+  rohy na CÍLOVÉ pole nosiče, ne na současné)*;
+* málo ⇒ vada je jinde a hledá se dál.
+
+⚠️ **Nedělat opravu před tím testem.** 20.08. se třikrát ukázalo, že tvrzení
+předběhlo ověření.
