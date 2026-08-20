@@ -30,6 +30,10 @@ RE_SUM   = re.compile(r"SUMMARY matchup \d+ \([^)]*\), (\d+) pairs \(\d+ games\)
 RE_ARM   = re.compile(r"arm acted in (\d+)/(\d+) pairs; pairs that moved: (\d+); "
                       r"MOVED WITHOUT THE ARM ACTING: (\d+)")
 RE_DELTA = re.compile(r"PAIRED delta chess as \w+: ([-+][\d.]+) \+- ([\d.]+)")
+# ⭐ 20.08.: počet picků, ne jen jestli rameno jednalo. Bez něj se nedá
+# předregistrovat kontrola „placebo musí mít VÍC picků než P38" -- běh by
+# proběhl a odpověď by v něm nebyla. Starší logy ho nemají; smí chybět.
+RE_PICKS = re.compile(r"ARM PICKS TOTAL: (\d+)")
 
 
 def read_shard(path):
@@ -43,6 +47,7 @@ def read_shard(path):
                 acted=int(a.group(1)) if a else None,
                 of=int(a.group(2)) if a else None,
                 leak=int(a.group(4)) if a else None,
+                picks=int(RE_PICKS.search(t).group(1)) if RE_PICKS.search(t) else None,
                 delta=float(d.group(1)), se=float(d.group(2)))
 
 
@@ -83,6 +88,15 @@ def summarize(out, name, thr, facts=None):
              % (acted, of, 100.0 * acted / of,
                 "" if acted == of else
                 "  ⚠️ %d párů rameno NEMĚŘILA — neúplný jmenovatel" % (of - acted)))
+
+    # (2b) kolik picků — předregistrovatelná veličina, ne jen binární „jednalo"
+    if not any(x["picks"] is None for x in sh):
+        picks = sum(x["picks"] for x in sh)
+        L.append("    (2b) ARM PICKS TOTAL: %d (%.2f/hru) — kolik, ne jen jestli"
+                 % (picks, picks / (2.0 * pairs)))
+    else:
+        L.append("    (2b) ARM PICKS TOTAL: ⚠️ CHYBÍ v logu (harness starší než 20.08.)"
+                 " — předpověď o počtu picků NELZE zodpovědět")
 
     # (3) n_nonzero
     if any(x["nz"] is None for x in sh):
@@ -139,7 +153,9 @@ def summarize(out, name, thr, facts=None):
              " stranách — ověř z rows (TD po rasách)")
 
     if facts is not None:
-        facts.update({"delta": mean, "delta_1s": mean / 2.0, "n_nonzero": nz / pairs if not any(x["nz"] is None for x in sh) else None,
+        facts.update({"delta": mean, "delta_1s": mean / 2.0,
+                      "arm_picks": float(sum(x["picks"] for x in sh))
+                      if not any(x["picks"] is None for x in sh) else None, "n_nonzero": nz / pairs if not any(x["nz"] is None for x in sh) else None,
                       "leak": float(leak), "arm_acted": acted / of})
         for k in [k for k, v in facts.items() if v is None]:
             del facts[k]

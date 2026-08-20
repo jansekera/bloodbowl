@@ -302,6 +302,28 @@ D18="$TMP/t18"; mkdir -p "$D18/m_s0"
   echo "  arm acted in 6799/6800 pairs; pairs that moved: 4302; MOVED WITHOUT THE ARM ACTING: 0  (0 = clean)"
   echo "  PAIRED delta chess as dwarf: +0.0100 +- 0.0060 SE (~1.7 SE)"; } > "$D18/m_s0/run.log"
 out=$(THRESHOLD=0.015 python3 "$SUM" "$D18" m 2>&1)
+echo "$out" | grep -q "ARM PICKS TOTAL: ⚠️ CHYBÍ" \
+  && ok "chybějící počet picků se přizná, ne mlčí" || bad "chybějící picky se neohlásily: $out"
+
+# picky se sečtou přes shardy a dají se předpovídat
+D19="$TMP/t19"; mkdir -p "$D19/m_s0" "$D19/m_s1"
+for sh in 0 1; do
+  { echo "SUMMARY matchup 1 (dwarf vs wood-elf), 100 pairs (200 games), n_nonzero 60 (60.0%):"
+    echo "  ARM PICKS TOTAL: 1500 (7.50/game)"
+    echo "  arm acted in 100/100 pairs; pairs that moved: 60; MOVED WITHOUT THE ARM ACTING: 0  (0 = clean)"
+    echo "  PAIRED delta chess as dwarf: +0.0900 +- 0.0100 SE (~9.0 SE)"; } > "$D19/m_s$sh/run.log"
+done
+cat > "$TMP/p19.preds" <<'PREDS'
+arm_picks  >=  2500
+PREDS
+out=$(THRESHOLD=0.015 PREREG="$TMP/p19.preds" python3 "$SUM" "$D19" m 2>&1)
+echo "$out" | grep -q "ARM PICKS TOTAL: 3000" \
+  && ok "picky se sečtou přes shardy" || bad "picky se nesečetly: $out"
+echo "$out" | grep -q "TREFA.*arm_picks" \
+  && ok "počet picků jde předregistrovat" || bad "arm_picks nejde předpovědět: $out"
+
+# ⚠️ znovu D18 -- mezitím se $out přepsalo během t19
+out=$(THRESHOLD=0.015 python3 "$SUM" "$D18" m 2>&1)
 echo "$out" | grep -q "1 párů rameno NEMĚŘILA" \
   && ok "chybějící páry se tisknou V KUSECH, ne schované ve „100,0 %“" \
   || bad "neúplný jmenovatel se pořád hlásí jen procentem: $out"

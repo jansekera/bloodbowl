@@ -124,6 +124,32 @@ long takeBlitzLandingRepicksInSearch();
 void setCageAwareAdvanceArm(TeamSide side, bool on);
 bool cageAwareAdvanceArm(TeamSide side);
 
+// --- P40 placebo arm (2026-08-20): the SAME square search as P38, minus the
+// cage criterion.
+//
+// P38 bundles three changes at once and its +0.0827 cannot be attributed:
+// (A) lateral freedom -- the baseline computes the target arithmetically and
+// every candidate lies on one line forward; (B) the cage criterion; (C) it
+// bypasses the fallback loop that otherwise pulls `steps` down to 0, i.e. the
+// carrier does not move at all (that is literally P39).
+//
+// The placebo is identical to P38 in EVERYTHING -- same step budget, same
+// `prog >= maxProgress - 1` band, same tackle-zone filter, same bypass of the
+// fallback -- and differs ONLY by dropping cageScoreForSquare. So:
+//   placebo ~ P38  => the finding is "the carrier could not step aside", not
+//                     the cage, and P32/P9/P35 become one brief about WHERE;
+//   placebo < P38  => the cage criterion earns part of the gain.
+//
+// Corpus evidence that motivated it (fable_p38_decomposition_20260820.md):
+// over the 5 213 turns where the carrier neither moved nor acted, the placebo
+// would find a square in 97.9 % of them and P38 in only 58.9 % -- the cage
+// criterion BLOCKS the arm in two out of five idle turns.
+//
+// ⚠️ Both arms must never be on at once; setting one clears the other, so a
+// caller cannot accidentally measure their sum.
+void setPlaceboAdvanceArm(TeamSide side, bool on);
+bool placeboAdvanceArm(TeamSide side);
+
 // Times the arm actually moved the carrier's target square, per SEARCH
 // EVALUATION. Zero over a matchup means both arms took the same decision.
 long takeCageAwareAdvancePicksInSearch();

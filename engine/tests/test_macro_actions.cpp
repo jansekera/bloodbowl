@@ -1905,3 +1905,73 @@ TEST(MacroExpansion, CageAwareAdvanceIsPerSide) {
     EXPECT_FALSE(cageAwareAdvanceArm(TeamSide::HOME));
     setCageAwareAdvanceArm(TeamSide::AWAY, false);
 }
+
+// --- P40 placebo arm (2026-08-20) ---------------------------------------
+//
+// The placebo runs the SAME square search as P38 and differs only by dropping
+// the cage criterion. These tests pin the three properties the A/B depends on:
+// it is a true null when off, it is per side, and -- the one that matters --
+// the two arms cannot both be on, so a run can never measure their sum and
+// report it under either name.
+
+TEST(MacroExpansion, PlaceboAdvanceOffKeepsTheArithmeticSquare) {
+    GameState state = makeCageAwareAdvanceState();
+    setPlaceboAdvanceArm(TeamSide::HOME, false);
+    takeCageAwareAdvancePicksInSearch();
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+
+    EXPECT_EQ(state.getPlayer(1).position.y, 7)
+        << "off-arm the carrier must keep walking straight down its own file";
+    EXPECT_EQ(takeCageAwareAdvancePicksInSearch(), 0)
+        << "a disabled placebo must be a true null: no picks, no counter";
+}
+
+TEST(MacroExpansion, PlaceboAdvanceStillLeavesTheStraightFile) {
+    // The point of the placebo: lateral freedom survives without the cage
+    // criterion. It need not land on the SAME square as P38 -- that is the
+    // whole question the night answers -- but it must stop being locked to
+    // the carrier's own file, or the A/B would compare P38 against the
+    // baseline a second time instead of isolating the criterion.
+    GameState state = makeCageAwareAdvanceState();
+    setPlaceboAdvanceArm(TeamSide::HOME, true);
+    takeCageAwareAdvancePicksInSearch();
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+    Position end = state.getPlayer(1).position;
+    setPlaceboAdvanceArm(TeamSide::HOME, false);
+
+    EXPECT_EQ(end.x, 12) << "the placebo must not give up forward progress either";
+    EXPECT_GT(takeCageAwareAdvancePicksInSearch(), 0)
+        << "the counter has to record that the placebo moved the target";
+}
+
+TEST(MacroExpansion, PlaceboAdvanceIsPerSide) {
+    setPlaceboAdvanceArm(TeamSide::AWAY, true);
+    EXPECT_TRUE(placeboAdvanceArm(TeamSide::AWAY));
+    EXPECT_FALSE(placeboAdvanceArm(TeamSide::HOME));
+    setPlaceboAdvanceArm(TeamSide::AWAY, false);
+}
+
+TEST(MacroExpansion, PlaceboAndCageArmsAreMutuallyExclusive) {
+    // ⭐ The one that protects the measurement. The two arms differ by a single
+    // predicate, so if both were on the run would measure their sum and print
+    // it under whichever name the mode claims.
+    setCageAwareAdvanceArm(TeamSide::HOME, true);
+    setPlaceboAdvanceArm(TeamSide::HOME, true);
+    EXPECT_TRUE(placeboAdvanceArm(TeamSide::HOME));
+    EXPECT_FALSE(cageAwareAdvanceArm(TeamSide::HOME))
+        << "turning the placebo on must clear the cage arm";
+
+    setCageAwareAdvanceArm(TeamSide::HOME, true);
+    EXPECT_TRUE(cageAwareAdvanceArm(TeamSide::HOME));
+    EXPECT_FALSE(placeboAdvanceArm(TeamSide::HOME))
+        << "and the other way round";
+
+    setCageAwareAdvanceArm(TeamSide::HOME, false);
+    setPlaceboAdvanceArm(TeamSide::HOME, false);
+}

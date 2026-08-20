@@ -168,8 +168,29 @@ thread_local long g_dauntlessOffers = 0;
 thread_local bool g_cageAwareAdvance[2] = {false, false};
 thread_local long g_cageAwareAdvancePicks = 0;
 
+thread_local bool g_placeboAdvance[2] = {false, false};
+
 void setCageAwareAdvanceArm(TeamSide side, bool on) {
-    g_cageAwareAdvance[side == TeamSide::HOME ? 0 : 1] = on;
+    const int i = side == TeamSide::HOME ? 0 : 1;
+    g_cageAwareAdvance[i] = on;
+    // P40: the two arms differ by ONE predicate, so having both on would
+    // measure their sum and call it either name. Turning one on clears the
+    // other by construction rather than by remembering to.
+    if (on) g_placeboAdvance[i] = false;
+}
+
+// P40 placebo: same search, no cage criterion. Shares the pick counter with
+// P38 on purpose -- the counter answers "did the arm move the target square",
+// which is the same question for both, and a matchup with zero picks is a null
+// arm either way.
+void setPlaceboAdvanceArm(TeamSide side, bool on) {
+    const int i = side == TeamSide::HOME ? 0 : 1;
+    g_placeboAdvance[i] = on;
+    if (on) g_cageAwareAdvance[i] = false;
+}
+
+bool placeboAdvanceArm(TeamSide side) {
+    return g_placeboAdvance[side == TeamSide::HOME ? 0 : 1];
 }
 
 bool cageAwareAdvanceArm(TeamSide side) {
@@ -1374,7 +1395,8 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     // progress available inside it -- tempo (K9a, 20.7 sigma) is not for sale;
     // what changes is which square, not how far.
     bool armChoseSquare = false;
-    if (cageAwareAdvanceArm(state.activeTeam)) {
+    const bool placebo = placeboAdvanceArm(state.activeTeam);
+    if (cageAwareAdvanceArm(state.activeTeam) || placebo) {
         const int budget = steps;
         int maxProgress = 0;
         for (int ox = -budget; ox <= budget; ++ox) {
@@ -1400,7 +1422,8 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
                 // A carrier parked in a tackle zone hands over a free block on
                 // the ball -- the same guard the fallback below applies.
                 if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
-                if (cageScoreForSquare(state, carrier, cand) < 0) continue;
+                // ⭐ P40: THE one functional difference between the two arms.
+                if (!placebo && cageScoreForSquare(state, carrier, cand) < 0) continue;
                 if (prog > bestProg) { bestProg = prog; best = cand; }
             }
         }

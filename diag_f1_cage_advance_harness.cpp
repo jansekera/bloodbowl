@@ -246,7 +246,8 @@ int main(int argc, char** argv) {
                       : (mode == 3) ? 63'000'000u
                       : (mode == 4) ? 79'000'000u
                       : (mode == 5) ? 91'000'000u
-                      : (mode == 6) ? 103'000'000u : SEED_BASE;
+                      : (mode == 6) ? 103'000'000u
+                      : (mode == 7) ? 127'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
@@ -255,6 +256,7 @@ int main(int argc, char** argv) {
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
          : mode == 5 ? "P9/P9c: cilove pole odsunu se VYBIRA (geometrie) vs 'rovne dozadu'"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
+         : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -274,7 +276,8 @@ int main(int argc, char** argv) {
     // to anything that de-duplicates by seed. One process owns one shard
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
-    const char* rowsName = mode == 6 ? "diag_cageadvance_rows.jsonl"
+    const char* rowsName = mode == 7 ? "diag_placebo_rows.jsonl"
+                         : mode == 6 ? "diag_cageadvance_rows.jsonl"
                          : mode == 5 ? "diag_pushgeom_rows.jsonl"
                          : mode == 4 ? "diag_dauntless_rows.jsonl"
                          : mode == 1 ? "diag_f1_grind_rows.jsonl"
@@ -398,6 +401,15 @@ int main(int argc, char** argv) {
                                            mode == 6 && candHome);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY,
                                            mode == 6 && !candHome);
+                // mode 7 (P40, 20.08.): tatáž volba pole BEZ kritéria klece.
+                // Rozklad 20.08.: v 5 213 kolech, kde nosič nejednal, by
+                // placebo pole našlo v 97,9 % a P38 jen v 58,9 % => kritérium
+                // klece rameno ve 2 z 5 idle kol BLOKUJE. Tenhle běh měří,
+                // kolik z +0,0827 na tom kritériu doopravdy visí.
+                bb::setPlaceboAdvanceArm(bb::TeamSide::HOME,
+                                         mode == 7 && candHome);
+                bb::setPlaceboAdvanceArm(bb::TeamSide::AWAY,
+                                         mode == 7 && !candHome);
                 bb::takeCageAwareAdvancePicksInSearch();
 
                 FullGameOutcome g = playGame(
@@ -413,6 +425,8 @@ int main(int argc, char** argv) {
                 long candCage = bb::takeCageAwareAdvancePicksInSearch();
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
+                bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);
+                bb::setPlaceboAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPushGeometryArm(bb::TeamSide::HOME, false);
                 bb::setPushGeometryArm(bb::TeamSide::AWAY, false);
                 long candDaunt = bb::takeDauntlessOfferEvalsInSearch();
@@ -438,7 +452,7 @@ int main(int argc, char** argv) {
                 // protože se ho lidi naučí ignorovat.
                 pr.armEvents += (mode == 4) ? candDaunt
                               : (mode == 5) ? candPush
-                              : (mode == 6) ? candCage : candPlans;
+                              : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
                 else candD++;
@@ -532,8 +546,18 @@ int main(int argc, char** argv) {
         // řádek „MOVED WITHOUT THE ARM ACTING") -- což je správné chování,
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
-            (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6);
+            (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
+             mode == 7);
         if (armSignalAvailable) {
+            // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
+            // je binární, takže předregistrovaná kontrola typu „placebo musí
+            // hlásit VÍC picků než P38" se z výstupu PŘEČÍST NEDÁ -- a to je
+            // táž vada jako měřit vadnou kontrolou: běh proběhne a odpověď
+            // v něm není. Součet přes všechny páry se proto tiskne zvlášť.
+            long armPicks = 0;
+            for (auto& p2 : pairs) armPicks += p2.armEvents;
+            printf("  ARM PICKS TOTAL: %ld (%.2f/game)\n",
+                   armPicks, static_cast<double>(armPicks) / (2.0 * n));
             printf("  arm acted in %d/%d pairs; pairs that moved: %d; "
                    "MOVED WITHOUT THE ARM ACTING: %d%s\n",
                    nArmFired, static_cast<int>(n), nNonzero, nLeak,
