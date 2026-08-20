@@ -120,9 +120,26 @@ někdo náš jen v **55,5 %** (vs 76,3 % ve středu) a jeho ⌀ postup je
 **+3,56 vs +2,27**. ⇒ díra existuje a lidský soupeř s elfy by ji našel;
 v korpusu je vzácná, tak z ní nic silnějšího netvrdit.
 
-## (5) GEOMETRIE D1 Z WEBU (1 od soupeře · 2 do šířky · 2 do hloubky)
+## (5) GEOMETRIE D1 Z WEBU (1 pole od soupeře · 2 do hloubky) — FRAGMENTY EXISTUJÍ
 
-*(doplňuje se — měření běží, viz konec souboru)*
+*(skript `diag_bvc_d1_geometry_20260820.py`; „1 pole od" = mezi tělem a
+nejbližším stojícím soupeřem je přesně jedno prázdné pole — nutí blitz,
+ne blok; „kryté" = jiné naše stojící tělo 1–2 pole ZA ním, |dy| ≤ 1)*
+
+| | baseline (n=15 675) | zrcadlo (n=4 344) |
+|---|---|---|
+| těl v odstupu přesně 1 pole, celkem | 31 226 (⌀ 2,0/kolo) | 8 442 (⌀ 1,9/kolo) |
+| z nich s hloubkou za sebou | 12 154 = 38,9 % | 3 350 = 39,7 % |
+| kol s ≥2 těly v odstupu 1 | **58,4 %** | 56,4 % |
+| kol s ≥2 KRYTÝMI těly (fragment D1) | **20,9 %** (3 269) | 20,4 % (887) |
+
+⇒ Důležitá korekce nálezu (1): **vyhladovělá je čistá FORMACE D1**
+(sloupce bez kontaktu kdekoli na desce: 2,3 %), ale **fragmenty D1 po
+tělech — odstup 1 s hloubkovým krytím — korpus obsahuje v pětině kol.**
+Vznikají náhodou vedle probíhající bitky. Budoucí metr D1 se tedy má
+definovat **po tělech, ne po formaci**, jinak bude hladovět jako σ klece
+19.08. Šířkový rozestup 2 mezi sloupci jsem už neměřil (doporučené další
+měření, až bude D1 čemu měřit záměrně).
 
 ## (6) ODEHRANÁ SITUACE — g0248, 2. půle, 3. kolo, soupeř skaven
 
@@ -157,6 +174,12 @@ je kladná.
   (10,6), (9,6)… až (3,5), se dvěma GFI. Za naším kontaktním prstencem
   nestál v jeho dráze **nikdo**. O dvě kola později skaven **dal TD**
   (míč se u endzony ještě jednou vysypal, ale sebrali ho dřív než my).
+
+⚠️ Není to kuriozita jednoho záznamu — **týž mechanismus proti pomalému
+soupeři:** v `g0397.json.gz` (idx 12, 1. půle, 7. kolo, soupeř orc) držíme
+orčího Throwera +Block **třemi** těly; orc blitznul jedno z nich (srazil
+a zranil), Thrower dal jediný dodge 3+ a utekl **7 polí** podél lajny —
+za prstencem zase nikdo nestál.
 
 **Poučení jde proti oběma doktrínám naráz:** kontakt proti AG4+Dodge
 nezdrží ani s Tackle (2+), a škoda nevznikla z kontaktu samotného, ale
