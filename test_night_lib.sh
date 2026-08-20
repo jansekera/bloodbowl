@@ -328,6 +328,68 @@ echo "$out" | grep -q "1 párů rameno NEMĚŘILA" \
   && ok "chybějící páry se tisknou V KUSECH, ne schované ve „100,0 %“" \
   || bad "neúplný jmenovatel se pořád hlásí jen procentem: $out"
 
+echo "== 9. fronta úloh místo pevných shardů (T2.15, 20.08.) =="
+
+# ⭐ Co se testuje: (1) N se NEMĚNÍ, (2) offsety pokryjí rozsah beze zbytku
+# a bez překryvu -- na tom stojí CRN, (3) každý kus si vezme právě jeden
+# worker, (4) nedělitelné dělení se ODMÍTNE, ne tiše zaokrouhlí.
+Q="$TMP/q"; mkdir -p "$Q/bin"
+cat > "$Q/bin/fake" <<'FAKE'
+#!/bin/bash
+echo "off=$5 pairs=$2" >> "$QLOG"
+echo "SUMMARY matchup $3 (dwarf vs wood-elf), $2 pairs ($(( $2 * 2 )) games), n_nonzero 5 (50.0%):"
+echo "  ARM PICKS TOTAL: 100 (1.00/game)"
+echo "  arm acted in $2/$2 pairs; pairs that moved: 5; MOVED WITHOUT THE ARM ACTING: 0  (0 = clean)"
+echo "  PAIRED delta chess as dwarf: +0.0500 +- 0.0100 SE (~5.0 SE)"
+FAKE
+chmod +x "$Q/bin/fake"
+
+# vytáhneme jen tu smyčku z run_night_ab.sh, ať netaháme celý preflight
+qrun() {  # $1=SHARDS $2=PAIRS $3=CHUNKS $4=WORKERS
+    rm -rf "$Q/out"; mkdir -p "$Q/out"; : > "$Q/offs.txt"
+    ( set -u
+      SHARDS=$1; PAIRS=$2; CHUNKS=$3; WORKERS=$4
+      OUT="$Q/out"; BIN="$Q/bin/fake"; ROOT="$Q"; MODE=7
+      export QLOG="$Q/offs.txt"
+      TOTAL_PAIRS=$(( SHARDS * PAIRS ))
+      if [ $(( TOTAL_PAIRS % CHUNKS )) -ne 0 ]; then
+          echo "ODMÍTNUTO"
+      else
+          CHUNK_PAIRS=$(( TOTAL_PAIRS / CHUNKS ))
+          run_one() { local d="$OUT/$2_s$3"; mkdir -p "$d"
+              ( cd "$d" && "$BIN" "$ROOT" "$5" "$1" "$MODE" "$4" > run.log 2>&1 ); }
+          QDIR="$OUT/.queue"; mkdir -p "$QDIR"
+          worker() { local k
+              for k in $(seq 0 $((CHUNKS - 1))); do
+                  mkdir "$QDIR/m_$k" 2>/dev/null || continue
+                  run_one "$1" "m" "$k" "$(( k * CHUNK_PAIRS ))" "$CHUNK_PAIRS"
+              done; }
+          w=0; while [ "$w" -lt "$WORKERS" ]; do worker 1 & w=$((w + 1)); done
+          wait
+      fi )
+}
+
+qrun 8 850 40 8
+tot=$(awk -F'pairs=' '{s+=$2} END{print s}' "$Q/offs.txt")
+check "N se NEMĚNÍ: 40 kusů dá týchž 6800 párů" "$tot" "6800"
+uniq_off=$(cut -d' ' -f1 "$Q/offs.txt" | sort -u | wc -l)
+check "každý offset právě jednou (CRN nedotčeno)" "$uniq_off" "40"
+runs=$(wc -l < "$Q/offs.txt")
+check "žádný kus neběžel dvakrát" "$runs" "40"
+maxoff=$(cut -d= -f2 "$Q/offs.txt" | cut -d' ' -f1 | sort -n | tail -1)
+check "poslední offset sedí na konec rozsahu" "$maxoff" "6630"
+
+# nedělitelné dělení se musí ODMÍTNOUT, ne tiše zaokrouhlit
+# ⚠️ 6800 % 32 = 16 -- „SHARDS×4“ vypadá rozumně a NEDĚLÍ. Přesně ta past:
+# bez pojistky by CHUNK_PAIRS=212 a 16 párů by tiše zmizelo.
+out=$(qrun 8 850 32 8 2>&1)
+echo "$out" | grep -q "ODMÍTNUTO" \
+  && ok "nedělitelné dělení se ODMÍTNE (nestejné kusy rozbijí sdruženou SE)" \
+  || bad "nedělitelné dělení prošlo tiše: $out"
+echo "$out" | grep -q "ODMÍTNUTO" \
+  && ok "a odmítne i „rozumné“ SHARDS×4 = 32 (6800 %% 32 = 16)" \
+  || bad "32 nemělo projít: $out"
+
 echo
 if [ "$FAILS" -eq 0 ]; then
     printf "\033[32mVŠECH %s KONTROL PROŠLO\033[0m\n" "$RUNS"

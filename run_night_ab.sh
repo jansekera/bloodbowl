@@ -28,6 +28,8 @@
 #
 # POUŽITÍ
 #   MODE=4 PAIRS=750 SHARDS=4 THRESHOLD=0.015 \
+#   (volitelně CHUNKS=32 WORKERS=8 -- T2.15: táž práce nakrájená na víc
+#    kusů, worker si bere další, až dodělá. NEMĚNÍ počet párů ani sílu.)
 #   MATCHUPS="4:dw-orc:1 0:dw-sk:0 3:orc-sk:0" \
 #   OUT=ab_wrestle_20260818 ./run_night_ab.sh
 #
@@ -154,22 +156,74 @@ fi
 if [ -f "$OUT/AB_DONE" ]; then
     night_log "A/B už hotové, přeskakuji"
 else
-    night_log "START A/B mode $MODE, ${SHARDS}×${PAIRS} párů na matchup"
-    run_one() {  # $1=index  $2=jméno  $3=shard
-        local off=$(( $3 * PAIRS )) d="$OUT/$2_s$3"
+    # ⭐ T2.15 (20.08.2026): FRONTA ÚLOH MÍSTO PEVNÉHO DĚLENÍ.
+    #
+    # ⚑ PROČ. Shard dostával pevný blok seedů, jenže zápasy nejsou stejně
+    #   dlouhé => shardy se rozejdou a běh čeká na nejpomalejšího. Změřeno:
+    #   17.08. rozptyl 2,8 h, noc 19.->20.08. rovné 4 h (22:59 vs 02:53).
+    #   Polovina jader poslední hodiny stojí naprázdno a odhad konce se řídí
+    #   nejpomalejším shardem, ne průměrem.
+    #
+    # ⛔ NEMĚNÍ TO N (uživatel 20.08.: "jestli by noc zkrátit mělo za následek
+    #   spadnutí výsledku do šumu, jsem proti zkrácení noci"). Párů na matchup
+    #   zůstává SHARDS*PAIRS; mění se JEN to, na kolik kusů se ta práce
+    #   nakrájí a jak se rozdává. SE ani síla se nehnou. Ubírají se PROSTOJE.
+    #
+    # ⭐ CRN ZŮSTÁVÁ. Seed se v harnessu odvozuje z `off + index páru`, tedy
+    #   z GLOBÁLNÍHO indexu, ne z pořadí zpracování. Úloha nese svůj `off`
+    #   s sebou, takže je jedno, který worker si ji kdy vezme -- pár k páru
+    #   sedne stejně jako dřív. Kdyby se `off` počítal z pořadí, párování by
+    #   se rozbilo a nulové rameno by přestalo dávat exaktní nulu.
+    #
+    # CHUNKS = na kolik kusů krájíme (default SHARDS => chování jako dřív)
+    # WORKERS = kolik jich běží naráz (default SHARDS)
+    CHUNKS=${CHUNKS:-$SHARDS}
+    WORKERS=${WORKERS:-$SHARDS}
+    TOTAL_PAIRS=$(( SHARDS * PAIRS ))
+    if [ $(( TOTAL_PAIRS % CHUNKS )) -ne 0 ]; then
+        night_log "⛔ ODMÍTÁM: $TOTAL_PAIRS párů se nedá beze zbytku rozdělit na $CHUNKS kusů."
+        night_log "   Zbylo by $(( TOTAL_PAIRS % CHUNKS )) párů — tiše by ZMIZELY, tedy změna N."
+        night_log "   Nestejně velké kusy navíc rozbijí sdruženou SE (night_summarize váží shardy stejně)."
+        # Odmítnutí, které neporadí, se obchází místo opravy. Nabídneme dělitele.
+        cands=""
+        for c in $(seq 1 $(( TOTAL_PAIRS < 200 ? TOTAL_PAIRS : 200 ))); do
+            [ $(( TOTAL_PAIRS % c )) -eq 0 ] && [ "$c" -ge "$WORKERS" ] && cands="$cands $c"
+        done
+        night_log "   Použitelné CHUNKS (dělitelé $TOTAL_PAIRS, >= WORKERS=$WORKERS):${cands:- žádný do 200}"
+        exit 7
+    fi
+    CHUNK_PAIRS=$(( TOTAL_PAIRS / CHUNKS ))
+    night_log "START A/B mode $MODE, $TOTAL_PAIRS párů na matchup = ${CHUNKS}×${CHUNK_PAIRS}, ${WORKERS} naráz"
+
+    run_one() {  # $1=index  $2=jméno  $3=kus  $4=offset  $5=párů
+        local d="$OUT/$2_s$3"
         mkdir -p "$d"; rm -f "$d/OK" "$d/FAIL"
-        if ( cd "$d" && nice -n 19 "$BIN" "$ROOT" "$PAIRS" "$1" "$MODE" "$off" > run.log 2>&1 ); then
-            touch "$d/OK";  night_log "done $2 shard $3"
+        if ( cd "$d" && nice -n 19 "$BIN" "$ROOT" "$5" "$1" "$MODE" "$4" > run.log 2>&1 ); then
+            touch "$d/OK";  night_log "done $2 shard $3 (off $4, $5 párů)"
         else
             touch "$d/FAIL"; night_log "FAIL $2 shard $3 — viz $d/run.log"
         fi
     }
+
+    # Fronta: worker si bere DALŠÍ volný index, až dodělá. Index se přiděluje
+    # atomicky přes `mkdir` (mkdir buď uspěje, nebo ne -- žádný závod).
+    QDIR="$OUT/.queue"; rm -rf "$QDIR"; mkdir -p "$QDIR"
+    worker() {  # $1=index matchupu  $2=jméno
+        local k
+        for k in $(seq 0 $((CHUNKS - 1))); do
+            mkdir "$QDIR/$2_$k" 2>/dev/null || continue   # už si ho vzal jiný
+            run_one "$1" "$2" "$k" "$(( k * CHUNK_PAIRS ))" "$CHUNK_PAIRS"
+        done
+    }
     for spec in $MATCHUPS; do
         idx=${spec%%:*}; rest=${spec#*:}; name=${rest%%:*}
-        for s in $(seq 0 $((SHARDS - 1))); do night_run_bg run_one "$idx" "$name" "$s"; done
+        w=0; while [ "$w" -lt "$WORKERS" ]; do
+            night_run_bg worker "$idx" "$name"; w=$((w + 1))
+        done
     done
     night_wait
-    EXPECT=$(( total * SHARDS ))
+    rm -rf "$QDIR"
+    EXPECT=$(( total * CHUNKS ))
     OKS=$(find "$OUT" -name OK | wc -l); FAILED=$(find "$OUT" -name FAIL | wc -l)
     if [ "$FAILED" -eq 0 ] && [ "$OKS" -eq "$EXPECT" ]; then
         night_log "A/B DONE ($OKS/$EXPECT)"; touch "$OUT/AB_DONE"
