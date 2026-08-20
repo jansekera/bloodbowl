@@ -1814,10 +1814,50 @@ nemarkuje něco dražšího *(hierarchie R1 > R3 > R2 > R4)*. Ale řádově je t
 **víc než cokoli, co jsme letos měřili jako strop** (P10a 0,23 · P8 0,056),
 a nestojí to ani jeden blitz — jen jiné pole.
 
-### ⛔ A nejtvrdší číslo kapitoly
+### ⛔ A nejtvrdší číslo kapitoly — ⚠️ OPRAVENO 20.08.
 
-**V 39,3 % našich kol končí nosič v kontaktu se soupeřem.** Ne během
-soupeřova kola — **na konci NAŠEHO**, kdy jsme právě rozhodli, kde bude stát.
+**~~V 39,3 %~~ ve 12,3 % našich kol končí nosič v kontaktu se STOJÍCÍM
+soupeřem.** Ne během soupeřova kola — **na konci NAŠEHO**, kdy jsme právě
+rozhodli, kde bude stát.
+
+⛔ **Číslo 39,3 % počítalo i LEŽÍCÍ soupeře**, kteří nemají tackle zónu
+a nemohou blokovat. Přeměřeno 20.08. na 24 754 kolech: **stojící soupeř
+12,3 %**, jakýkoli včetně ležících **38,9 %**, naše vlastní tělo u nosiče
+**80,7 %**. ⇒ **Zákaz je 3× levnější, než kapitola dosud zněla.**
+*(Táž rodina jako K29⭐ s chybějící třetí klauzulí kvůli lehlým soupeřům.)*
+
+### ⭐⭐⭐ 15.0b′ CÍL KLECE MÁ DVĚ POLOŽKY *(uživatel 20.08.)*
+
+> **„Cílem klece — co řešíme jako první okruh — je: dojít co nejdál
+> k soupeřově TD, a chránit nosiče. Neplníme."**
+
+**Klec není jeden úkol, jsou to DVA, a měří se každý zvlášť:**
+
+| | úkol | jak stojíme |
+|---|---|---|
+| **C1** | **dojít co nejdál k soupeřově endzoně** | ⌀ Δx 1,98–2,74 pole/kolo; **max 7 kol na TD, nikdy 8**; ale **81,8 % držení neskončí ničím** |
+| **C2** | **ochránit nosiče** | ⛔ **48,9 % držení končí ztrátou**, z toho **70,1 % blitz** a **16,5 % blok** |
+
+⇒ **Neplníme ani jeden**, a **plnění pravidla klece je 2,7 %** proti
+splnitelným 95,6 %.
+
+### ⭐⭐ A ochrana má DVĚ RŮZNÉ TVRDOSTI *(uživatel 20.08.)*
+
+> **„Ten blitz na nosiče je řešitelný správnou klecí — a to také řešíme —
+> a uznáváme, že to ne vždy vyřešíme tak striktně jako block na nosiče."**
+> **„Blok na nosiče se nesmí stávat vůbec."**
+
+| | tvar pravidla | proč |
+|---|---|---|
+| **blok na nosiče** | ⛔ **ZÁKAZ — cílová četnost NULA** | blok vyžaduje, aby útočník u nosiče **už stál**; je to **náš** stav, který jsme si vyrobili rozhodnutím o cílovém poli, a soupeře nestojí nic |
+| **blitz na nosiče** | ⚠️ **řeší se klecí, a nemusí se povést** | soupeř za něj platí **svou jedinou blitz akcí za kolo**; můžeme ho jen **zdražit** |
+
+⇒ **Není to jedno pravidlo o dvou velikostech.** Zákaz na blok je splnitelný
+**volbou pole**; ochrana proti blitzu je **rozpočet těl**.
+
+**Strop zákazu:** expozice **12,3 %** našich kol → soupeř udeří v **51,4 %**
+→ ztráta míče v **47,4 %** ⇒ **3,0 % našich kol ≈ 0,74 ztráty míče na zápas**.
+Doklad `evidence/carrier_contact_20260820.md`.
 
 ## 15.0c ⭐⭐⭐ POLE NOSIČE SE DOPOČÍTÁVÁ ZE ZAMÝŠLENÉ KLECE *(uživatel 19.08.)*
 
