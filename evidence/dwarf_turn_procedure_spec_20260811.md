@@ -1895,20 +1895,30 @@ ortogonály naopak jediné správné místo.** ⇒ Kontrola musí umět rozliši
 **nad a pod má všech 6 ve svých tackle zónách**, kdežto diagonály jen 3 ⇒
 soupeř na ně sice stoupnout může, ale **za každý další pohyb zaplatí dodge**.
 
-⭐⭐ **TVAR JE PEVNÝ, POHYB NE** *(uživatel 20.08.: „dvojice je přibitá na
-střed — ale nechci zahodit pohyb vpřed a do boku na volnější stranu")*:
+⭐⭐⭐ **TVAR JE PEVNÝ, POHYB NE — A PLATÍ TO PRO CELOU KLEC**
 
-* **tvar** — obě těla drží **pevný odstup nad a pod nosičem**; dvojice se od
-  něj **neodpojuje** a nedriftuje sama;
+⚠️ **Není to pravidlo degradované klece, je to pravidlo KLECE** *(uživatel
+20.08.: „dvojice je přibitá na střed — ale nechci zahodit pohyb vpřed a do
+boku na volnější stranu“ · „pro celou klec“)*. Dvě těla jsou jen jeho
+nejchudší případ.
+
+* **tvar** — těla drží **pevný odstup vůči nosiči** *(čtyři diagonály u plné
+  klece, nad a pod u dvou)*; formace se **neodpojuje** a nedriftuje sama;
 * **pohyb** — k volnější straně se posouvá **CÍL NOSIČE**, tedy **vpřed
-  a do boku**, a dvojice ho následuje **ve stejném tvaru**;
+  A DO BOKU**, a formace ho následuje **ve stejném tvaru**;
 * **volnější strana** = míň soupeřů, víc prostoru — **přesně ta, kudy se
   obchází zeď**;
-* **mez** = to, co stihnou **OBĚ** těla. ⚠️ Nevolit cíl, kam dojde jen jedno —
-  pak se ze dvou stane jedno a zbydou **3 pole mimo naši TZ**.
+* **mez** = to, co stihnou **VŠECHNA** těla formace. ⚠️ Nevolit cíl, kam dojde
+  jen část — u dvou těl se ze dvou stane jedno a zbydou **3 pole mimo naši
+  TZ**, u plné klece se **ztratí roh**.
 
-⇒ Je to týž tvar jako u plné klece *(„klec jede tak rychle, jak rychle se
-dokáže znovu složit")*, jen se dvěma těly.
+⛔ **A přesně tohle má rozbité P32:** plánovač posouvá klec **jen rovně
+vpřed** — `dest{carrier.x + dx*step, carrier.y}` na obou místech
+(`cage_advance.cpp:41` a v `tryAssign`), **`y` se NIKDY nemění** ⇒ pohyb do
+boku na volnější stranu dnes engine neumí **ani s plnou klecí**.
+
+⇒ Je to táž věta jako *„klec jede tak rychle, jak rychle se dokáže znovu
+složit“*, jen doplněná o **KAM**.
 
 ⛔⛔ **MEZ TÉ METRIKY, ať se nepřecení:** **tackle zóna nezabrání VSTUPU** —
 zdražuje jen *odchod*. „Pole je v naší TZ" tedy **neznamená**, že tam soupeř
