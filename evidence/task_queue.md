@@ -599,64 +599,40 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
   v rozhodování
 
 # CO JE TEĎ PRVNÍ
-*(jediný oddíl, který se přepisuje — stav k 19.08.2026 večer)*
 
-## ⏰⏰ RÁNO 20.08. — POŘADÍ
+*(jediný oddíl, který se přepisuje — přepsáno 20.08.2026 ráno)*
 
-| | co | proč |
-|---|---|---|
-| **1.** | **přečíst `cageadvance_20260819/chain.log`** — noc **P38** (mode 6, 8×850 = 6 800 párů, dw-we, práh ±0,015, `CONTROL_MODE2=1`), start 19.08. **14:01 SELČ**, konec **~04:30**. Předregistrace `evidence/night_prereg_20260819.md`. ⭐ **Nic se nedopočítává ručně** — `chain.log` tiskne leak → arm acted → `n_nonzero` → sloučenou deltu s verdiktem *(nově čtyřstupňovým: ŠKODÍ · POMÁHÁ · **EKVIVALENCE** · **NEROZHODNUTO — MÁLO SÍLY**)* a PŘEDPOVĚĎ vs VÝSLEDEK. Když něco počítáš ručně, je to vada aparátu. | pre-registrovaný experiment |
-| **2.** | ⛔⛔ **P39 — NOSIČ SE NEAKTIVUJE.** *(uživatel 19.08.: „zapiš P39 do fronty jako prioritu na ráno")* Přepočítat na **celém** korpusu (dnešní čísla jsou z 800 her) a **rozhodnout mezi příčinami (a)/(b)/(c), ne opravovat**. | největší změřená ztráta tempa: 37,7 % splnitelných kol bez pohybu, z toho 83,8 % nosič vůbec nejednal a 58,3 % z nich byl volný |
-| **3.** | **zrcadlový korpus** `corpus_mirror_20260819_data` (750 her dwarf–dwarf, doběhlo 19.08. odpoledne) — spočítat **konverzi drivů** (kategorie A) a podívat se na 0:0. | uživatelův měřák klece: *„TD za 8 kol"*; zrcadlo v žádném měření konverze dosud nebylo |
-| **4.** | **T0.1 dokončit** — tvar rozvrhu hotový, kapacita nově **z mechanických stropů** *(SÓLO/VÝBĚH = MA nosiče, KLEC = min(MA rohů, MA nosiče))*, takže už nečeká na korpus. Zbývá napsat novou K9 do `diag_rules_checks_20260812.py` a změřit její σ proti staré K9a (20,8σ). | ROZDĚLANÉ — nesmí zapadnout |
-| **5.** | **σ pravidla a kapacity přeměřit** na korpusu **po** P38 — dnešní 0,0σ je vyhladovělý metr (pravidlo se hraje ve 2,2 % kol). | spouštěč: noc doběhla |
+## ⭐ PRAVIDLO DNE: STROJ ZŮSTÁVÁ NA KLECI
 
-## Co se dnes rozhodlo *(a nemusí se znovu otvírat)*
+*(uživatel 20.08.: „stroj pokračuje v práci na kleci")* — a podepřeno
+měřením `diag_where_lost_20260820.py`: **v 89,9 % nevyhraných zápasů máme
+nulu**, a *„dali jsme, ale míň"* je **11 zápasů ze 3 000**. Přestřelku
+neprohrajeme prakticky nikdy. ⇒ **Obrana je ROZHOVOR, ne strojová práce.**
 
-* ⛔ **Vyměňovat rychlejší těla do rohů se nevyplatí** — strop klece využíváme na 48 %, při stropu 4 na 50 %, při stropu 5 na 39 %. Mez není svazující.
-* ⛔ **P5 (volba hand-offu) — strop 0,15 kola/zápas** ⇒ navrženo zamítnout stropem jako P8 a P10a. Živá je místo toho otázka o **pozici Runnera** (0,376 kola/zápas).
-* ⛔ **„Rovnoměrná podlaha trestá klec" NEPLATÍ** — správně postavená klec jede **2,55** pole/kolo proti 1,98 u rozbité. Podlaha trestá naši klec, ne fázi.
-* ✅ **σ-tabulka přepočítána** na čerstvém korpusu, všech 11 veličin replikovalo; nová **odpor koridoru −9,6σ**.
-* ✅ **P35 · P38 implementovány** s ramenem, čítačem a testy (549 → 555).
-* ✅ **T2.16** — verdikt noci rozlišuje EKVIVALENCI od nedostatku síly.
-* ⛔ **Z17** — proti skavenům se lajně vyhýbáme **striktně** (u lajny ztrácíme míč v 20,9 % proti 10,8 % uprostřed; skaven je uprostřed nejméně nebezpečný soupeř ze všech).
+## Pořadí na dnešek
 
-## ⚠️ Poznámka k vedení knihy
+| # | co | proč teď | blokuje |
+|---|---|---|---|
+| **1** | **T2.17 — oprava summarizeru** *(dvoustranná vs jednostranná delta)* | ⭐ **oprava kontroly se povyšuje před měření** — jinak dnešní noc přečteme týmž zkresleným metrem jako včerejší | pre-reg noci |
+| **2** | **P40 — implementovat placebo rameno (mode 7)** | jediný funkční rozdíl je `macro_actions.cpp:1403`; Fable vypsal i ostatní místa *(setter za ř. 178, podmínka ř. 1377, harness ř. 244–249 seedy 127M, 251–257, 277, ~400–406, 440–441)* | noc |
+| **3** | **předregistrace noci, psaná DVOUSTRANNĚ** | placebo **+0,090** [+0,04; +0,14] · rozdíl placebo−P38 **0,00** [−0,04; +0,05] · **placebo musí mít VÍC picků než P38** · leak == 0 | noc |
+| **4** | **spustit noc** | 6 800 párů ≈ **14 h** ⇒ **start nejpozději ~14:00 SELČ**, jinak nedoběhne do rána | — |
+| **5** | *(za běhu noci)* **Q6 — v čem se měří „převaha"** | rozhovor, stroj nestojí; **blokuje T1.11** | T1.11 |
+| **6** | *(za běhu noci)* **T0.1 — nová K9 po fázích** | nečeká na korpus, tvar je hotový a otestovaný | σ přeměření |
 
-Ranní tabulka 19.08. obsahovala **tři zastaralé položky** (P33, T5.3, P21), všechny zkopírované z předchozího dne bez ověření stavu. Než se sem něco zapíše, **ověř stav ve sloupci**, ne v paměti.
+## ⛔ Co se dnes NEDĚLÁ a proč
 
-## Odložené se spouštěčem *(nesmí se ztratit — proto i tady, ne jen v tabulce)*
+* **Q8 — nasadit P38** → **až podle P40.** Rozklad ukázal, že zisk nenese
+  klec, a že trpaslík ramenem **obíhá jako elf** (prolomení 0,3 %).
+  Nasadili bychom „klec" a dostali obíhání.
+* **σ pravidla klece přeměřit** → čeká na korpus **po** nasazení, tedy po Q8.
+* **T1.11 obranu stavět** → blokováno **Q6**, a stroj patří kleci.
+* **P39 samostatně měřit** → **P40 to nejspíš rozhodne za nás**: rameno
+  obchází právě tu záložní smyčku, která v základu stáhne `steps` na 0.
 
-* **FABLE 18.08. — VYNECHÁNO ZÁMĚRNĚ** *(uživatel: „na dnes asi pro fable nic — když už běží noc a zadání máme frontu“)*. Není to zapomenutí: den vyrobil víc nálezů, než se stihlo strávit, a Fable analýza by soutěžila o CPU s běžící nocí.
-  ⏰ **Spouštěč:** po ranním čtení noci 19.08. **Tři kandidáti, seřazení podle toho, co dnešek otevřel:**
-  1. ⭐ **„Kolik rohů klece je vlastně optimum?“** — σ-tabulka 18.08.: počet rohů **−2,1σ**, počet ČISTÝCH rohů **−0,2σ** a v půlkách mění znaménko, zatímco počet ŠPINAVÝCH je **−6,8σ**. ⇒ **Možná jsou 4 rohy špatný cíl** a celá klec se má stavět menší. Zapsáno jako otevřená otázka ve spec **15.8**.
-  2. **B3 vs B2** — odmarkovat vlastního nosiče proti prorazit zeď. Obojí je patro „vpřed“ v žebříčku blitzu (**ČÁST 14**) a **nikdy se neměřily proti sobě**.
-  3. **Je 26,4 % blitzů „jinam“ chyba?** Polovina těch cílů stála **hned vedle nosiče** (eskorta), což může být záměr, ne únik.
+## Fronta rozhovoru
 
-* **P30 — cena odstranění Gutter Runnera a Black Orka, každý zvlášť** *(uživatel 17.08.)*.
-  ⏰ **Spouštěč:** přepočítaná σ-tabulka na `corpus_baseline_20260817` **+** hotové P29.
-  Teď se nepočítá, protože metr se právě přeměřuje.
-* **T5.13 přestavba rosterů** — ⏰ po doběhnutí víkendových běhů.
-* **T5.15 Piling On · T5.18 Argue the Call** — ⏰ s přestavbou rosterů.
-* **P27 `BLITZ_AND_SCORE`** — ⏰ napřed rozdělit 789 kol podle skóre; cap 0,02 při vedení je záměr.
-
-## Projekty (ne úkoly)
-
-* **T5.13 přestavba rosterů** — MB na co nejvíc trpaslíků, TV až 1500.
-  Skavení varianty: OTT Runner · bash Blitzer · **GR s Wrestle** · GR s Nerves of Steel.
-* **Soupeř nehraje svou rasu** — část **(A)** je levná a splývá s P10a;
-  část **(B)** je vlastní projekt a **začíná skavenem**.
-* **T6 učení** — až po repertoáru, s úplnou procedurou jako nulovou hypotézou.
-
-## Co se uzavřelo o víkendu
-
-**P13 PROŠLO** *(čeká na zapnutí)* · **P23** spouštěč *(`run_night_lib.sh`)* ·
-**P24** vyhodnocení *(práh, popisky ramen, řádek „vyskočilo to vůbec?")* ·
-**P22** otisk enginu u korpusů *(zpětně doplněn)*.
-
-⚠️ **T1 (repertoár) se nehnul** od 14.08. — S7 boxing-in, O6, S5.3/S5.4
-a chybějící situace z T1.2 čekají dál.
-
+Viz oddíl níž — **Q4–Q8 + T1.10**. Nejvíc blokuje **Q6**.
 
 ---
 
