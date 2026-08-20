@@ -142,6 +142,9 @@ def main():
             dx = lost = None
             if td_turn:
                 lost = 0
+                # postup = vzdálenost míče k naší endzoně (dolní mez; bez
+                # toho by kategorie s více TD měly postup uměle NÍZKÝ)
+                dx = (our_ez - S["ball_x"]) * oppfwd
             elif same_half:
                 their_E = R.players(E, theirs)
                 carE = next((p for p in their_E if p["has_ball"]), None)
