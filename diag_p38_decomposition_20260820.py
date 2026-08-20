@@ -205,6 +205,58 @@ def main():
                 tx = min(24, max(1, car["x"] + ez_dir * budget))
                 ty = car["y"] + (1 if car["y"] < 5 else (-1 if car["y"] > 9 else 0))
 
+                # --- odpor koridoru (replika corridorResistance, K9b) -----
+                def resistance(x, y):
+                    return sum(1 for o in opp_standing
+                               if 1 <= (o["x"] - x) * ez_dir <= 4
+                               and abs(o["y"] - y) <= 2)
+
+                # validace repliky proti exportu (z AKTUÁLNÍHO pole nosiče)
+                cr = S.get("corridor_resistance", -1)
+                if cr >= 0:
+                    c["CR: porovnáno s exportem"] += 1
+                    if cr != resistance(car["x"], car["y"]):
+                        c["CR: replika NESOUHLASÍ s exportem"] += 1
+
+                # skutečné koncové pole základu: pull-back smyčka (C++ ř. 1425)
+                bsteps, btx = budget, tx
+                while bsteps > 0 and (
+                        (btx, ty) in occupied
+                        or any(cheb(o["x"], o["y"], btx, ty) <= 1
+                               for o in opp_standing)):
+                    bsteps -= 1
+                    btx = min(24, max(1, car["x"] + ez_dir * bsteps))
+                base_final = (btx, ty) if bsteps > 0 else (car["x"], car["y"])
+
+                # rozpad OBĚHNUTÍ/PROLOMENÍ: pick ramene vs pole základu
+                res_base = resistance(tx, ty)
+                res_bfin = resistance(*base_final)
+                for tag, pk in (("P38(a)", pk_a), ("placebo", pk_pl)):
+                    if not pk or pk == (tx, ty):
+                        continue
+                    dres = resistance(pk[0], pk[1]) - res_base
+                    lateral = pk[1] != ty
+                    c[f"ZED {tag}: pick != základ"] += 1
+                    if lateral and dres < 0:
+                        c[f"ZED {tag}: OBĚHNUTÍ (strana, odpor klesá)"] += 1
+                    elif not lateral and dres >= 0:
+                        c[f"ZED {tag}: PROLOMENÍ (vpřed, odpor neklesá)"] += 1
+                    elif lateral and dres == 0:
+                        c[f"ZED {tag}: strana, odpor stejný"] += 1
+                    elif lateral:
+                        c[f"ZED {tag}: strana, odpor ROSTE"] += 1
+                    else:
+                        c[f"ZED {tag}: vpřed, odpor klesá"] += 1
+                    if dres > 0:
+                        c[f"ZED {tag}: pick má VYŠŠÍ odpor než základ"] += 1
+                    # a totéž proti SKUTEČNÉMU konci základu (po pull-backu;
+                    # když se základ nehne, je to pole nosiče)
+                    dres2 = resistance(pk[0], pk[1]) - res_bfin
+                    if dres2 < 0:
+                        c[f"ZED {tag}: odpor KLESÁ vs skutečný konec základu"] += 1
+                    elif dres2 > 0:
+                        c[f"ZED {tag}: odpor ROSTE vs skutečný konec základu"] += 1
+
                 if pk_pl:
                     c["VŠE: placebo najde pole"] += 1
                 if pk_a:
@@ -274,6 +326,19 @@ def main():
            c["IDLE v TZ"], "idle v TZ")
         pr("IDLE v TZ: P38(a) najde", c["IDLE v TZ: P38(a) najde"],
            c["IDLE v TZ"], "idle v TZ")
+        print("validace CR repliky: %d neshod z %d porovnaných"
+              % (c["CR: replika NESOUHLASÍ s exportem"], c["CR: porovnáno s exportem"]))
+        for tag in ("P38(a)", "placebo"):
+            nz = c[f"ZED {tag}: pick != základ"]
+            print("ZEĎ %s (kola, kde pick != pole základu): %d" % (tag, nz))
+            for lab in ("OBĚHNUTÍ (strana, odpor klesá)",
+                        "PROLOMENÍ (vpřed, odpor neklesá)",
+                        "strana, odpor stejný", "strana, odpor ROSTE",
+                        "vpřed, odpor klesá",
+                        "pick má VYŠŠÍ odpor než základ",
+                        "odpor KLESÁ vs skutečný konec základu",
+                        "odpor ROSTE vs skutečný konec základu"):
+                pr("  " + lab, c[f"ZED {tag}: {lab}"], nz, "picků != základ")
 
 
 if __name__ == "__main__":

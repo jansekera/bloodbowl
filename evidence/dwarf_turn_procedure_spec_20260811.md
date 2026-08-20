@@ -2255,3 +2255,118 @@ přestává stát na nule.
   u míče zálohu vůbec (S5.3), ale nikdo neměří **kdo** to je.
 * **K-handoff**: nabídnuto vs zahráno. Rozdíl mezi nulou a desítkou je celý
   obsah P5 — a kdyby se ta kontrola tiskla, P21 by se nemusela vymýšlet.
+
+---
+
+# ČÁST 17 — OBRANA „L": BOXING-IN (20.08.2026)
+
+⛔ **Proč tahle kapitola vzniká až teď.** Uživatel 20.08. mluvil o
+*„strategickém posunu zdi"*, který si vede jako **„L"**, a já odpověděl,
+že L v naší spec nemáme. **Ve spec opravdu není — ale v paměti leží od
+10.08.** Doktrína existovala deset dní a **nikdy se nedostala do
+procedury**, takže se podle ní nikdy nic neměřilo ani nekontrolovalo.
+Tahle kapitola to napravuje.
+
+⚠️ **Obranná část spec byla dosud jen S1 (rozestavení na výkop) a S8
+(zabraň skóre).** Mezi nimi zela díra přesně tam, kde trávíme většinu
+soupeřových kol — v **S7 (boxing-in)**, což je podle měření 12.08.
+**32,4 % kol** a jediné robustní číslo celého rozložení situací.
+
+## 17.1 Co L je — a co není
+
+**L není rozestavení ani screen. Je to ODEBÍRÁNÍ ÚNIKOVÝCH POLÍ.**
+
+Cílem není odebrat míč, ale **vzít soupeři pohyb** a donutit ho k boji
+nablízko, kde trpaslík s AV9, Block a Thick Skull vyhrává. Obklíčenému
+zbývají dvě špatné možnosti: **dodge** (proti našemu Tackle často selže
+⇒ pád, hod na brnění, turnover), nebo **probít se** (bloky proti AV9).
+
+⇒ **Screen je to, co se hraje PROTI nám. Boxing-in je to, co hrajeme MY.**
+Komunitní názvy: *Basing Up* · *Boxing-In* · styl *„Dwarf Meatgrinder"*.
+
+## 17.2 Tvar: půlkruh L/U proti lajně
+
+```
+[ AUT ]  SOP1  |  SOP2  |
+[ AUT ] -------|--------|-------
+[ AUT ]  TRP1  |  TRP2  |  TRP3
+[ AUT ]        |  TRP4  |
+```
+**TRP1/TRP3 diagonálně** jistí úniky do stran · **TRP2/TRP4 tlačí
+zepředu** · **lajna dělá zadní stěnu ZADARMO**.
+
+## 17.3 ⭐⭐⭐ L a U1 JSOU TÁŽ VĚC ZE DVOU STRAN
+
+**U1** (ČÁST 15.5, 19.08.): *lajna je soupeřova asistence zdarma — bere
+dva ze čtyř rohů geometricky a hlídá mu jednu stranu za nulový rozpočet*
+⇒ **vlastní klec k lajně netlačit.**
+
+**To je doslova popis L z druhé strany.** Co U1 zakazuje NÁM v útoku, to
+L vnucuje SOUPEŘI v obraně. ⇒ **Není to dvojí doktrína, je to jedno
+pravidlo o geometrii lajny**, a platí obousměrně.
+
+⭐ A dědí i **změřený hák U1**: lajna **převádí DOSAH na POŠKOZENÍ**,
+násobek podle max MA toho, kdo dosáhne (6→×1,31 · 7→×1,15 · 8→×1,62 ·
+9→×1,89) ⇒ **L je nejcennější přesně proti rychlým a slabým, tedy elfům.**
+
+## 17.4 ⚠️ NEROZSOUZENÝ SPOR: držet kontakt, nebo stavět sloupce?
+
+Rešerše 20.08. (grumbbl *„To Base, or not to Base"*, Exit 23
+*„Defense 101"*, bbtactics *„How to beat Dwarfs"*) doktrínu potvrzuje
+— *„trpaslík je jeden z mála, kdo si může dovolit basovat"*, *„obklíčíš je
+vrstvou hráčů a prakticky zastavíš míč"* — **ale přináší protiargument,
+který v naší doktríně nebyl:**
+
+> *„Je důležité **nezůstat v base kontaktu**, protože to soupeři obvykle
+> dovolí vyrobit díru a začít se skrz ni tlačit."*
+> Alternativa: **sloupce po dvou hráčích** napříč hřištěm — *„prvního
+> blitznou, ale na druhého nemají rychlost ani obratnost."*
+
+⇒ **„Obklíč a drž" a „nedrž kontakt, stav sloupce" si odporují a my
+nemáme rozsouzeno, kdy platí která.**
+
+**Hypotéza dělicí čáry — INICIATIVA**, týž fázový model, jaký říká
+trpasličí příručka (*opatrně, dokud nemáme početní převahu, pak
+agresivně*):
+* **nemáme převahu** ⇒ **sloupce po dvou**, kontakt nedržet;
+* **máme převahu** ⇒ **obklíčení**, past zavřít.
+
+⚠️ **Je to HYPOTÉZA, ne zjištění.** Rozhodne **odehraná situace na S7**
+s uživatelem, ne měření — je to volba doktríny, ne fakt o enginu.
+⇒ Zapsáno jako otevřená položka.
+
+## 17.5 Co past drží — a proč u nás teče
+
+| skill | role | máme? |
+|---|---|---|
+| **Guard** | asistence i když sám markovaný | ✔ Longbeardi ×2, Blitzeři, Slayeři |
+| **Tackle** | ruší Dodge ⇒ útěk je sebevražda | ✔ všichni Longbeardi |
+| **Stand Firm** | ⭐ **klíč k UDRŽENÍ** — obklíčený hodí push back a náš hráč se nehne ⇒ past se neotevře | ⛔ **NIKDO** (jen Deathroller, ten v sestavě není) |
+| **Mighty Blow** | až po zámku; převádí kontrolu na zranění | ⛔ **NIKDO** |
+
+⛔ **A i kdybychom Stand Firm přidali, past teče:** chain push u nás
+Stand Firmem **PROJDE** (`block_handler.cpp:122`), ač pravidla říkají
+*„neither player moves"*; a Stand Firm je u nás **vynucený** místo
+volitelného (`:62`). **To je přesně mechanismus, kterým se past otevírá.**
+
+⚠️ **A Frenzy past otevírá sám:** je to **povinný** follow-up + druhý
+blok, takže Slayera může vytáhnout z půlkruhu ven — a s AV8 stojí venku
+hůř než kdokoli. ⇒ **Frenzy jen tam, kde druhý push končí surfem nebo
+zpátky v tvaru.**
+
+## 17.6 Co se má měřit — a co se měří místo toho
+
+⛔ **Náš rozhodčí testoval obranu jako „stojí u nosiče někdo náš" → 70 %.
+To je ale úplně jiná veličina než „nemá kam".**
+
+⇒ **Chybějící metrika: počet volných polí, kam může nosič odejít** — a
+jestli ho vytlačujeme k lajně. Bez ní si o obraně nic netvrdit.
+
+## 17.7 Co tahle část NEZAKRYLA
+
+* **17.4 je otevřená** — spor kontakt vs sloupce není rozhodnutý.
+* **Kdy se L zahajuje** (v kterém soupeřově kole) není nikde.
+* **Rozpočet těl pro L** — kolik ze 7,03 volných těl past spolyká, se
+  nikdy nepočítalo. ⚠️ Pozor: je to **obranný** rozpočet, tedy jiná kola
+  než útočný (nosič 1 + rohy 4 + blitz 1 = 6 ze 7).
+* **L proti Big Guyovi** — půlkruh proti ST5 nemusí držet.
