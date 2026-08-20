@@ -499,12 +499,49 @@ def analyse(paths, race="dwarf"):
                     B["K36"].add(locked, (n1["x"] - n0["x"]) * fwd)
 
             if car is None:
-                st["bez míče na konci kola"] += 1
-                C["K29"].skip()
-                C["K29full"].skip()
-                C["K9a"].skip()
-                for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x", "K38", "K38b"):
-                    C[_k].skip()
+                # ⛔ OPRAVA 20.08. (druhá téhož dne): ZTRÁTA MÍČE JE MAXIMÁLNÍ
+                # SELHÁNÍ ROZVRHU, NE CHYBĚJÍCÍ DATA.
+                #
+                # Kola s TD se od dnešního rána odklánějí dřív, takže v téhle
+                # větvi zbyla PRÁVĚ ta, kde jsme míč ZTRATILI -- a všechna se
+                # skipovala. ⇒ Ranní oprava udělala kontrolu ASYMETRICKOU:
+                # úspěch (TD) se počítá jako splněno, neúspěch (ztráta) se
+                # vyhazuje ⇒ systematicky OPTIMISTICKÁ. To je horší než původní
+                # stav, kdy se vyhazovalo obojí.
+                #
+                # Rozvrhové kontroly proto dostanou NESPLNĚNO; poziční
+                # (K29/K38) se skipují dál -- bez nosiče je jejich predikát
+                # opravdu nedefinovaný.
+                # ⚠️ Tahle větev chytá DVĚ různé věci a nesmí se slepit:
+                #   (a) míč jsme na začátku kola MĚLI a ztratili  => selhání
+                #   (b) míč jsme neměli ani na začátku (obrana)   => predikát
+                #       nedává smysl
+                # Slepené počítadlo hlásilo 587 „ztrát" z 1469 kol, což je
+                # nesmysl -- většina byla (b).
+                carS_l = next((p for p in players(S, ours) if p["has_ball"]), None)
+                tl_l = 9 - S["turn"]
+                if carS_l is None:
+                    st["kolo BEZ míče (obrana) — predikát N/A"] += 1
+                elif tl_l <= 0:
+                    st["ztráta míče, ale rozvrh už doběhl (N/A)"] += 1
+                else:
+                    st["⛔ ZTRÁTA MÍČE (rozvrh = nesplněno)"] += 1
+                if carS_l is not None and tl_l > 0:
+                    C["K9a"].hit(False); C["K9a"].vals.append(-1.0)
+                    _ph, _cap, _ = phase_floor(S, carS_l, 0, 0,
+                                               players(S, ours), endzone)
+                    _kk = {"SÓLO": "K9c_solo", "KLEC": "K9c_cage",
+                           "VÝBĚH": "K9c_run"}[_ph]
+                    for _k in ("K9c_solo", "K9c_cage", "K9c_run"):
+                        (C[_k].hit(False) if _k == _kk else C[_k].skip())
+                    C[_kk].vals.append(-1.0)
+                    C["K9x"].skip()
+                else:
+                    C["K9a"].skip()
+                    for _k in ("K9c_solo", "K9c_cage", "K9c_run", "K9x"):
+                        C[_k].skip()
+                C["K29"].skip(); C["K29full"].skip()
+                C["K38"].skip(); C["K38b"].skip()
                 continue
             st["s míčem na konci kola"] += 1
 
@@ -610,9 +647,20 @@ def main():
     paths = sorted(p for pat in pats for p in glob.glob(pat))
     st, C, B, cf, cc, idle, unknown = analyse(paths)
     print(f"korpus: {len(paths)} her\n")
-    for k in ("našich kol", "vyřazeno (TD/poločas mezi snímky)",
-              "s míčem na konci kola", "bez míče na konci kola"):
-        print(f"  {k:<44}{st[k]:>6}")
+    # ⛔ 20.08.: TISKL SE PEVNÝ SEZNAM KLÍČŮ. Když se počítadlo přejmenuje,
+    # vytiskne se u starého názvu NULA -- a nula vypadá jako „tohle se nikdy
+    # neděje", ne jako „tohle už se nepočítá". Přesně ta rodina vady, kterou
+    # tenhle modul dnes dvakrát vyrobil. ⇒ Tiskne se, CO SE OPRAVDU POČÍTALO:
+    # nejdřív známé pořadí, pak VŠECHNO ostatní, ať se nic neschová.
+    _first = ["našich kol", "s míčem na konci kola"]
+    _rest = sorted(k for k in st
+                   if k not in _first and not k.startswith(("K9c fáze", "plán:", "K29", "K31", "K33")))
+    for k in _first + _rest:
+        if st[k]:
+            print(f"  {k:<52}{st[k]:>7}")
+    _zero = [k for k in _first + _rest if not st[k]]
+    if _zero:
+        print(f"  (nulová počítadla: {', '.join(_zero)})")
     kol = st["našich kol"] or 1
 
     if unknown:
