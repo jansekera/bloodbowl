@@ -92,6 +92,27 @@ starý engine a nová ještě nejsou.
 
 ---
 
+## 4b. ⏰⏰ T2.18 — kontroly musí umět říct, co je v jejich N/A
+
+*(uživatel 20.08.: „kdyžtak tyto kontroly pak rozšiř — ale dnes už ne — dnes
+to jen zapiš do plánu a dej tomu prioritu")*
+
+⛔ **Proč má prioritu:** klecové kontroly měly N/A **větší než měřenou
+množinu** *(27 575 proti 16 517)*, a přesně v něm ležel hlavní nález.
+**Stálo to 17 dní.**
+
+* **(a) obecně, levné:** `Check.line()` ať **sám hlásí, když `deg > n`**.
+  Jedna podmínka, chytá celou rodinu **dopředu**.
+* **(b) adresně u klece:** populace *„klec nestojí"* se má reportovat **jako
+  číslo s rozpadem příčin**, ne jako prázdno — kategorie už existují.
+
+⭐ **A druhá otázka téže rodiny:** u každé kontroly se ptát **„běží ta cesta
+vůbec?"** *(20.08. jsem na mrtvý kód mířil dvakrát)*.
+
+⚠️ **Nedělat souběžně s opravami enginu** — je to změna měřidla, a měřidlo se
+nemění uprostřed měření. Nejlépe **po novém korpusu**, aby se dalo srovnat
+staré a nové čtení téhož běhu.
+
 ## 5. Provoz — co se od zítřka mění
 
 * ⏰ **noc se spouští POZDĚ ODPOLEDNE**, po commitnutí denní práce, a
