@@ -197,3 +197,5 @@
 {"matchup":1,"seed_idx":4348,"cand_home":true,"race_h":"dwarf","race_a":"wood-elf","cand":1,"base":0,"home_attr":[0,0,0,1],"away_attr":[1,2,0,1],"actions":421,"cand_plans":0,"base_plans":0,"cand_daunt":863,"cand_roll":195,"mode":7}
 {"matchup":1,"seed_idx":4348,"cand_home":false,"race_h":"dwarf","race_a":"wood-elf","cand":0,"base":0,"home_attr":[0,0,0,2],"away_attr":[0,3,0,0],"actions":451,"cand_plans":0,"base_plans":0,"cand_daunt":1550,"cand_roll":322,"mode":7}
 {"matchup":1,"seed_idx":4349,"cand_home":true,"race_h":"dwarf","race_a":"wood-elf","cand":0,"base":1,"home_attr":[0,1,0,0],"away_attr":[2,0,0,1],"actions":442,"cand_plans":0,"base_plans":0,"cand_daunt":613,"cand_roll":68,"mode":7}
+{"matchup":1,"seed_idx":4349,"cand_home":false,"race_h":"dwarf","race_a":"wood-elf","cand":1,"base":1,"home_attr":[0,0,0,0],"away_attr":[0,2,0,0],"actions":492,"cand_plans":0,"base_plans":0,"cand_daunt":1650,"cand_roll":73,"mode":7}
+{"matchup":1,"seed_idx":4350,"cand_home":true,"race_h":"dwarf","race_a":"wood-elf","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[1,1,1,0],"actions":511,"cand_plans":0,"base_plans":0,"cand_daunt":413,"cand_roll":139,"mode":7}
