@@ -1867,6 +1867,41 @@ příště postaví“ je **jiné a nesplnitelné pravidlo** — a plynul by z n
 že **vlastní sražení soupeře je cena**. Sražený u rohu je pořád **lepší** než
 týž soupeř stojící.
 
+### ⭐⭐⭐ 15.0b‴ DEGRADOVANÁ KLEC: DVĚ TĚLA PATŘÍ NAD A POD NOSIČE *(uživatel 20.08.)*
+
+⛔ **Tohle je 97 % kol.** Plné pravidlo klece plníme ve **2,7 %**, takže případ
+„na čtyři rohy těla nejsou" je ten **normální**, a spec o něm dosud **mlčela**.
+
+> **Uživatel 20.08.: „tak jak minule — nad a pod nosiče."**
+
+Tedy **ortogonály kolmo na směr postupu**, ne diagonály.
+
+⚠️ **A neplatí na to zákaz z 15.0b′.** Klauzule *„nosič bez dalších sousedů"*
+**předpokládá čtyři těla**: se čtyřmi diagonálami je ortogonální tělo navíc
+zbytečné a stojí na poli, které klec už kontroluje. **Se dvěma těly jsou
+ortogonály naopak jediné správné místo.** ⇒ Kontrola musí umět rozlišit
+**„vybrali jsme špatně"** od **„nebylo z čeho"**.
+
+**Spočítáno** *(nosič má 8 přístupových polí; „volné" = mimo naše tackle zóny)*:
+
+| rozestavení | těl | soupeř může STOUPNOUT na | z toho **mimo naši TZ** |
+|---|---:|---:|---:|
+| **plná klec** (4 diagonály) | 4 | **4** | 0 |
+| **nad a pod** (ortogonály) | 2 | 6 | **0** |
+| dvě diagonály | 2 | 6 | 3 |
+| tři diagonály | 3 | 5 | 1 |
+
+⭐ **Proč nad a pod:** obě dvoutělové varianty nechají soupeři 6 polí, ale
+**nad a pod má všech 6 ve svých tackle zónách**, kdežto diagonály jen 3 ⇒
+soupeř na ně sice stoupnout může, ale **za každý další pohyb zaplatí dodge**.
+
+⛔⛔ **MEZ TÉ METRIKY, ať se nepřecení:** **tackle zóna nezabrání VSTUPU** —
+zdražuje jen *odchod*. „Pole je v naší TZ" tedy **neznamená**, že tam soupeř
+nemůže stoupnout a příště blokovat.
+⇒ **Proto se dvě těla plné kleci nevyrovnají:** hodnota klece je
+**OBSAZENÍ** *(4 pole soupeři fyzicky nejdou)*, ne pokrytí. Klec **půlí počet
+polí, odkud jde blokovat** — a to dvě těla neumí v žádném rozestavení.
+
 ### ⭐⭐ A ochrana má DVĚ RŮZNÉ TVRDOSTI *(uživatel 20.08.)*
 
 > **„Ten blitz na nosiče je řešitelný správnou klecí — a to také řešíme —
