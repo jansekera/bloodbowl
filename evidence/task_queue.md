@@ -1035,6 +1035,49 @@ zprovoznila**, takže se to od teď bude dít 6× častěji a je čas se podíva
 ⏰ **Oprava až po víkendu** — běží sběr, do enginu se nesahá. Jsou to dva
 řádky, ale musí být napsané per dovednost.
 
+## 📋 P56 — ZBYLÝCH OSM PRAVIDLOVÝCH VAD Z AUDITU 21.08. *(neopraveno)*
+
+⚠️ **Vzniklo proto, že tyhle nálezy žily jen v `evidence/fable_rules_parity_20260821.md`.**
+Nález, který nikdo nepřepíše do fronty, je ztracený — táž vada jako všechno
+ostatní dnes. Opraveno bylo **F1 · F2a · F2b · F3 · F4 · F5**; tady je zbytek.
+
+| # | co | ř. `rules_bb2016.txt` | náš kód | dopad |
+|---|---|---|---|---|
+| **F12** ⭐⭐ | **Leap je MRTVÝ KÓD** — `resolveLeap` je hotový a správný, ale **nemá VŮBEC ŽÁDNÉHO VOLAJÍCÍHO** *(žádný ActionType, nic v nabídce, žádné makro)* | 8270-8283 | — | ⛔ **oba wardanceři nikdy neskočili**; wood-elf bez klíčového nástroje |
+| **F6** | Pass reroll jen na **přirozenou 1** ⇒ **skill/týmový reroll se na nepřesnou přihrávku nikdy nepoužije** | 8335-8337 | `pass_handler.cpp:275-346` | deformuje pass ekonomiku |
+| **F7** | Fumble má být **modifikovaný ≤ 1**, ne přirozená 1 | 1742-1745 | tamtéž | opačný směr než F6 |
+| **F8** | Nepřesná přihrávka létá **kickoffovou šablonou D8×D6** místo rozptylu 3×1 *(vlastní Hail Mary přitom 3×1 má — kód si protiřečí)* | 735-741 | `pass_handler.cpp:363-365` | každý nepřesný pass |
+| **F11** | **Wrestle**: chybí turnover, když jde k zemi vlastní nosič | 8677-8678 | `block_handler.cpp:602` | vzácné |
+| **F9** | Throw-in: místo chycení na dopadu vždy bounce + klamp místo re-throw | 871-877 | `ball_handler.cpp:186-205` | část z 6,6 bounce/hru |
+| **F10** | Výkop bez povinného odrazu a bez touchbacku | 276-281 | `game_simulator.cpp:544-552` | ~3,5 výkopů/hru, ±1 pole, symetrické |
+| **F13** | Kickoff tabulka *(Riot jednostranný · Blitz! = šoupnutí o pole místo volného kola · Rock jen stun)* | 1284-1345 | `kickoff_handler.cpp:60-180` | ⚠️ **SPÍCÍ** — korpus běží na `simpleKickoff`, je to mrtvá cesta |
+
+### ⭐ F12 je táž třída jako vstávání
+
+**Schopnost, kterou plánovač nikdy nevyvolá.** `resolveLeap` je napsaný,
+otestovaný a pravidlově správný — a nevolá ho nic. Z logu to nejde poznat
+*(Leap nemá ani event typ)*, přesně jako vstávání před P45.
+⇒ **Wood-elf byl v každém dosavadním měření oslabený TŘETÍM způsobem** —
+vedle Treemana, který nevstával, a Take Rootu, který mu to bral.
+
+### 📌 Pozorovací, dá se batchovat kdykoli
+
+* **BLITZ deklarace se neloguje** ⇒ blitzy se dnes rekonstruují heuristicky
+  *(„pohyb + blok" — právě proto se dal spolehlivě spočítat jen jako
+  „nadbytečné nad jeden za kolo")*;
+* **asistence u faulu se nelogují** ⇒ ⛔ **skutečnou velikost F2a po opravě
+  nezměříme**;
+* **Leap nemá event typ.**
+
+### ⛔ Edice tu nerozhoduje
+
+Všech 13 nálezů je **shodně vadných proti CRP i BB2016** *(texty ověřeny
+v obou souborech)*. Žádný nestojí na volbě edice.
+⚠️ **Otevřená otázka z P45** *(dovolí BB2016 postavení za 3 MA na začátku
+LIBOVOLNÉ akce, i BLOCK?)* **tímto auditem rozhodnuta NENÍ.**
+
+⏰ **Vše až po víkendu** — běží sběr.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
