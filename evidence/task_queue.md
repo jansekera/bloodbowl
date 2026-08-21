@@ -1186,6 +1186,65 @@ nadhodnocené, nejvíc u dodge týmů.
 ⏰ **Opravit po víkendu**, spolu s P53, P54, P56. Oprava je malá — příznak
 „tenhle hod už byl přehozen" v `attemptRoll`.
 
+## 📋 T2.20 HOTOVO 21.08. — audit testů: **13/13 vad testy nechytily**, ale našel 10 NOVÝCH
+
+Výstup: **`evidence/fable_test_audit_20260821.md`** *(končí `HOTOVO`)*.
+Jmenovatel přiznaný: **plně prošlo 268 mechanických testů** + vzorky,
+**vynecháno ~229** AI/aparát.
+
+### Verdikt: hypotéza potvrzena — ale NENÍ to osud
+
+**Žádný z 13 nálezů rules-parity auditu žádný test nechytil**, a rozpadá se to
+do čtyř mechanismů:
+* **3× test vadu přímo CERTIFIKOVAL** *(`StandUpNotEnoughMA`,
+  `ResetPlayersForNewTurn`, kostky ve `FoulHandler`)*;
+* **6× chyběl test hranice** přesně tam, kde je vada;
+* **3× VAKUÓZNÍ ASERCE** — `InaccuratePassScatters` a `HailMaryPassScatters3Times`
+  tvrdí `EXPECT_GE(turnover + success, 0)`, což je **vždycky pravda**;
+  ⭐ dva z nich kryly F8;
+* **1× zelené testy MRTVÉHO KÓDU** — `resolveLeap` má **tři zelené testy
+  a žádného volajícího** *(F12)*.
+
+⭐⭐ **A to podstatné: postup „přečti pravidlo → najdi test → otestuj hranici"
+našel za jedno odpoledne 10 NOVÝCH certifikovaných rozporů (TA1-TA10),
+které pokrytí kódu nikdy nenajde.** ⇒ **Jde to hledat systematicky.**
+
+### ⛔ TÝKÁ SE KORPUSU — do balíku oprav po víkendu
+
+* **TA1 = P57** *(řetěz rerollů, už zapsáno)*.
+* ⛔ **TA2 — TAKE ROOT, dvě vady, obě ověřeny mnou v textu:**
+  1. **rozsah:** ř. **8572** *„Immediately after declaring an **Action**"* —
+     jakoukoli. Náš `big_guy_handler.cpp:87` hází **jen na `MOVE` a `BLITZ`**
+     ⇒ **Treeman si BLOK vezme bez hodu.**
+  2. **perzistence:** ř. **8575** *„his MA is considered 0 **until a drive
+     ends**, or he is Knocked Down or Placed Prone"* — ⛔ **žádný trvalý stav
+     zakořenění u nás NEEXISTUJE**, hod se zapomene.
+  ⇒ Obojí dělá elfího Treemana **silnějším, než má být**, a **interaguje
+  s dnešní opravou B2**.
+
+### 📌 LATENTNÍ *(goblin / vampire rostery — v TV1200 nikdo)* → k P49
+
+**TTM** *(5 rozporů — accurate má scatterovat 3×, fumble padá do PŮVODNÍHO
+pole a test asertuje opak, turnover bez míče, Always Hungry žere po jedné
+místo dvou, chybí −1)* · **Bombardier** *(test se JMENUJE `NeverTurnover`,
+ale ř. 7956 říká „Fumbles … ARE turnovers")* · **Hypnotic Gaze** *(fail není
+turnover; cíl 2+TZ místo Agility)* · **Ball & Chain** · **Chainsaw**
+*(chybí +3 na armour)* · **Tentacles** a **Shadowing** *(obě mají úplně jinou
+kostkovou mechaniku než ř. 8585/8455 — 2D6±ST/MA)* · **Blood Lust**.
+
+### 📌 Mrtvé a netestované
+
+* **5 mrtvých dovedností v enumu**: `PilingOn` · **`Leader`** *(= chybějící
+  reroll ekonomika!)* · `DumpOff` · `Animosity` · `PassBlock`;
+* **11 implementovaných dovedností bez jediného testu** — z toho **`Catch`,
+  `Pass` a `Fend` HRAJÍ v korpusu**, a ⭐ **F6 sedí přesně v netestovaném
+  místě skillu `Pass`**.
+
+### Úloha C → patří pod T2.18
+
+Aparát kontrol N/A **už počítá** *(deg + `st[]` důvody)*; zbývá **důvod
+v typu**, jedna **tichá cesta v K30** a **kontrakt exportu `plan.*`**.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
