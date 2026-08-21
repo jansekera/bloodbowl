@@ -1133,6 +1133,50 @@ dva audity odporovaly A Fable by byla vyčerpaná)*.
 ve všech úrovních *(low až max)* je běžný nástroj, a obě nachystaná Fable
 zadání jdou z existujícího rozpočtu.
 
+## ⛔⛔ P57 — `attemptRoll` ŘETĚZÍ TŘI REROLLY JEDNOHO HODU *(živé v korpusu 21.08.)*
+
+Našel **audit testů 21.08.**, rules-parity audit to **NEMĚL**. **Ověřeno mnou
+v `rules_bb2016.txt`, ne převzato.**
+
+**ř. 925-927:** *„**VERY IMPORTANT:** No matter how many re-rolls you have, or
+what type they are, **you may never re-roll a single dice roll more than
+once**."* *(totéž ř. 950-951)*
+**ř. 8385-8387 (Pro):** *„On a roll of 1, 2 or 3 the original result stands and
+**may not be re-rolled with a skill or team re-roll**; however you can re-roll
+the Pro roll with a Team re-roll."*
+
+⛔ **Náš `attemptRoll` (`helpers.cpp:241`) vrství skill → Pro → týmový reroll**,
+tedy **až tři rerolly téhož hodu**. A po **neúspěšné** Pro bráně *(1-3)* pustí
+týmový reroll **originálu**, což ř. 8386 zakazuje výslovně.
+
+### Rozsah: největší ze všech dnešních
+
+Týká se **každého dodge, GFI a sebrání míče** — nejčastějších hodů ve hře.
+Systematicky zvyšuje úspěšnost, a **nejvíc týmům se skill rerolly**, tedy
+zase **skavenovi a wood-elfovi** *(Dodge, Sure Feet)*.
+⚠️ **Dnešní oprava F4/F5** *(limit 1× za kolo)* **tuhle kaskádu NEŘEŠÍ** —
+je to jiná vada v téže funkci: F4/F5 omezuje, **kolikrát za kolo** smí hráč
+skill reroll použít, P57 řeší, **kolikrát po sobě smí být přehozen JEDEN hod**.
+
+### ⚠️ A test ji CERTIFIKUJE
+
+`Helpers.AttemptRollFullChain` s kostkami `{2,1,4,2,5}` prochází celou
+kaskádou *(fail → Dodge reroll fail → Pro brána prošla → Pro reroll fail →
+týmový reroll uspěl = **tři rerolly jednoho hodu**)* — a je **zelený**.
+⇒ Čtvrtý test, který dnes vadu zafixoval. Patří do **T2.20**.
+
+### ⛔⛔ ŽIVÉ V BĚŽÍCÍM KORPUSU — a NEOPRAVUJE SE
+
+**Uživatel 21.08.: „tohle zapiš, ale do aktuálního běhu už nesahej."**
+⇒ **Křížový korpus z 21.-24.08. se sbírá s TOUHLE VADOU.** Není to omyl,
+je to vědomé rozhodnutí — třetí zabití běhu za den by stálo víc, než ta vada
+zkazí, a rozpočet okna už není nafukovací.
+⚠️ **Kdo ten korpus bude číst, MUSÍ to vědět:** rerolly jsou v něm
+nadhodnocené, nejvíc u dodge týmů.
+
+⏰ **Opravit po víkendu**, spolu s P53, P54, P56. Oprava je malá — příznak
+„tenhle hod už byl přehozen" v `attemptRoll`.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
