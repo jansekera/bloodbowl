@@ -974,6 +974,42 @@ Sběr zabit **11:26** *(989 her `dwarf-dwarf`, zahozeno)*. Opraveno jen to, co
   už při odporu 3**, přičemž 5 je běžné ⇒ člen nese skoro nulovou informaci.
   `TempoSnapshot::turnsLeft` se počítá a **neexportuje**. → k **P53**.
 
+## ❓ P55 — PROPADLÁ AKCE PO BONE-HEAD / TAKE ROOT: SPOTŘEBUJE SE DEKLARACE? *(NEOVĚŘENO)*
+
+⚠️ **Tohle je otevřená otázka, ne nález.** Vznikla 21.08. při opravě B1 *(hod
+big guye jednou za akci, ne za pole)* — všiml jsem si klauzule a **nekontroloval
+jsem ji**.
+
+**BB2016 ř. 7975-7983 (Bone-head):**
+> *„…you must roll a D6 immediately after declaring an Action for the player,
+> but before taking the Action. On a roll of 1 … The player can't do anything
+> for the turn, **and the player's team loses the declared Action for the
+> turn.** (So if a Bone-head player declares a Blitz Action and rolls a 1, then
+> the team cannot declare …)"*
+
+⇒ **Propadlý blitz se podle pravidel nedá deklarovat znovu** — tým o něj pro
+to kolo přišel. **Nevím, jestli to tak u nás je.**
+`resolveAction` při zablokované akci vrací `ActionResult::ok()` *(„Action
+wasted, not turnover")*, ale `blitzUsedThisTurn` se nastavuje **až v případu
+`ActionType::BLITZ`**, tedy AŽ ZA big-guy kontrolou *(`action_resolver.cpp`)*.
+**Ověřit obojí:** spotřebuje se týmový blitz? a spotřebuje se hráčova aktivace?
+
+### Proč to není akademické
+
+**Bone-head má v TV1200 jediný hráč — humanní Ogre** `{5, 5, 2, 9}`
+*(Loner + Bone-head + Mighty Blow)*. **Take Root taky jediný — elfí Treeman.**
+Really Stupid nikdo. ⇒ Týká se to **přesně dvou sestav**, ale v obou jde
+o jejich **nejsilnější tělo**.
+
+⭐ **Kontext, kvůli kterému to teď hoří víc:** do opravy B1 se hod dělal
+**za každé pole**, takže Ogre s MA 5 měl šanci na propadlou akci
+**1 − (5/6)⁵ ≈ 60 %** místo 16,7 % — byl prakticky nepoužitelný, a proto se
+nikdy neukázalo, co se s propadlou deklarací děje dál. **Oprava tu cestu
+zprovoznila**, takže se to od teď bude dít 6× častěji a je čas se podívat.
+*(Táž rodina jako F1 a B1: vada byla němá, dokud jinou opravou neožila.)*
+
+⏰ **Až po víkendu** — běží sběr, do enginu se nesahá.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
