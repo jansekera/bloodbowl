@@ -42,3 +42,31 @@ arm_picks  >=    2500000       # ≈184/hru na 13 600 her. 19.08. tenhle údaj h
 #   trpaslíkovi (2,46σ) a nic elfovi. Fable k tomu 21.08. našla mechanismus:
 #   pole u lajny NEMŮŽE mít čtyři rohy, takže kritérium je nechtěný vynucovač
 #   U1. Ten mechanismus je na vstávání NEZÁVISLÝ ⇒ měl by řez přežít beze změny.
+
+# ============================================================================
+# ⭐ DOPLNĚNO 21.08. PŘED RESTARTEM — sedm pravidlových oprav navíc.
+#
+# Původní běh (12:17) byl ZABIT ve 11:26 UTC, 989 her zahozeno. Fable
+# rules-parity audit a nezávislý code review našly vady, které by korpus
+# znehodnotily. Opraveno: F1 omráčení (překlápělo se na ZAČÁTKU kola místo na
+# konci -- aktivace navíc, 6,2 stunů/hru) · Guard u faulu · dublet na hodu na
+# zranění · Frenzy druhý blok · limity rerollů Dodge/Sure Feet · big-guy hod
+# jednou za akci · Take Root nebrání vstávání. K tomu pět mých regresí z rána.
+#
+# ⭐⭐ RUČNÍ PŘEDPOVĚĎ UŽIVATELE (harness ji neumí, dopočítá se z rows):
+#   "Z omráčení taky pochází velká část výhod trpaslíků, která nám tím teď
+#    chybí." Trpaslíkova hra -- útok i obrana -- stojí na tom, že složený
+#    soupeř ZŮSTANE LEŽET, a vada mu to zkracovala.
+#   PŘEDPOVĚĎ: oprava F1 pomůže TRPASLÍKOVI, a nejvíc proti RYCHLÝM týmům
+#   (skaven, wood-elf), kde je poměr omráčených nejvíc v jeho neprospěch
+#   (změřeno 21.08.: proti skavenovi leží omráčený soupeř 1,72x častěji než
+#   my, proti wood-elfovi 1,49x, ale proti ORKOVI jen 0,26x -- tam vada
+#   pomáhala NÁM, takže tam se může projevit obráceně).
+#   ⛔ Vyjde-li opak, je to NÁLEZ, ne šum.
+#   ⚠️ Změřit se to na starém korpusu NEDALO: omráčení tam jako stav
+#   prakticky neexistuje (0,48 výskytu na zápas proti 6,2 skutečným stunům) --
+#   vada mazala právě to, co by se měřilo. Nový korpus to poprvé uvidí.
+#
+# ⚠️ TÍM SE POSOUVÁ I ZÁKLADNÍ ČÁRA: TD 0,740 -> 0,443 bylo měřeno na enginu
+# PŘED těmito sedmi opravami. Nová hodnota bude jiná a NENÍ s tou srovnatelná.
+# ============================================================================
