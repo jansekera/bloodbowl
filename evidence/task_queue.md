@@ -1118,11 +1118,20 @@ za každé pole, past s `avoid`)* — ⭐ **rozhodla nezávislost kontextu, ne
 ⇒ **Pouštět v páru**: `/code-review max` **a k tomu čerstvého recenzenta**,
 který o změnách neví nic než diff a texty pravidel.
 
-### ⛔ `/code-review ultra` je něco jiného
+### ⛔⛔ `/code-review ultra` — ZAMÍTNUTO 21.08., nenavrhovat znovu
 
-Multi-agentní review v cloudu, **placený zvlášť a spustit ho může JEN
-uživatel** — já ne, ani přes Bash. Nechat si ho na chvíli, kdy si dva audity
-odporují nebo kdy po změně nemá kdo přijít druhý den a opravit ji.
+Multi-agentní review v cloudu, **placený zvlášť**; spustit ho může jen
+uživatel. **Byl to MŮJ návrh a uživatel ho týž den zamítl:**
+*„jsem proti dalším platbám — když nevyužijeme ani tokeny, co máme teď."*
+⇒ ⭐ **Kritérium je jasné a platí obecně: dokud je nevyužitá kapacita, kterou
+už máme, neplatí se za další.** Fable je na **30 % spotřeby na konci týdne**,
+protože prioritu má něco jiného — ne protože by došla.
+⇒ **Nenavrhovat ultra znovu, dokud se ta situace nezmění** *(např. že by si
+dva audity odporovaly A Fable by byla vyčerpaná)*.
+
+⚠️ **Nic ostatního ve frontě žádnou platbu navíc nepotřebuje:** `/code-review`
+ve všech úrovních *(low až max)* je běžný nástroj, a obě nachystaná Fable
+zadání jdou z existujícího rozpočtu.
 
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
