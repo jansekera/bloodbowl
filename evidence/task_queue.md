@@ -954,8 +954,16 @@ Asistence u faulu vyžadují **naše těla VEDLE CÍLE**, a cíl leží **v kori
 ⇒ abychom zvýšili šanci prorazit brnění *(Black Ork AV 9 = **27,9 %**,
 změřeno)*, obklíčíme ho svými těly, která **stojí přesně v cestě, kterou
 chceme projít**. **Odstraníme jednoho zedníka a zazdíme se sami.**
-⚠️ A ta těla jsou pak **markovaná zbytkem zdi** ⇒ odchod je bude stát dodge.
-**Nejsou to jen zabraná pole, jsou to zavázaná těla na příští kolo.**
+⚠️⚠️ **A druhá cena NENÍ dodge — je to RÁNA, a přijde jistě.**
+*(uživatel 21.08., opravuje moji první formulaci: „nebude je stát dodge —
+v našem kole sem přišli a v příštím soupeřově dostanou ránu")*
+⇒ Dodge je hypotetická budoucí cena, kterou lze neplatit tím, že tělo zůstane.
+**Blok je jistý a přijde hned v následujícím soupeřově kole.**
+⭐ **A je to TÁŽ VĚC jako u vstávání** *(pravidlo uživatele z 20.08.)*: kdo si
+stoupne vedle soupeře, mění se z **„stojím ho BLITZ"** na **„dávám mu BLOK
+ZDARMA"** — tady rovnou **třem tělům naráz**, a proti zdi z orků **ST 4
+s Guardem**, tedy za pro ně příznivé kostky.
+⇒ **Čtvrtý člen je tím výrazně dražší, než jsem ho původně psal.**
 
 ### ⛔ A METR TO NEPOZNÁ — včetně toho, který jsem dnes přidal
 
