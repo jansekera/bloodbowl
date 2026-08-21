@@ -891,6 +891,37 @@ protrhnout se ven skrz dav je něco jiného než skrz ležící.
 zůstal nejlepší.** Když spadne, je to nález, ne regrese měření — a mění
 pořadí fází v doktríně.
 
+## 📋 T2.20 — AUDIT TESTŮ *(zadání nachystáno 21.08., čeká na rules-parity)*
+
+Uživatel 21.08.: *„a něco jako fable kontrola pokrytí a úplnosti testů
+v projektu by nepomohlo?"*
+
+⛔ **Ale NE jako pokrytí kódu.** Obě dnešní pravidlové vady **pokrytí měly
+a testy prošly** — a ⭐⭐⭐ **nejhorší z nich byl test sám**:
+`MoveHandler.StandUpNotEnoughMA` tvrdil *„pod 3 MA vstávání selže"*, což
+BB2016 ř. 691-693 **popírá** *(žádá hod 4+)*. Někdo napsal kód, pak test, který
+s kódem souhlasí, a od té chvíle byla vada **certifikovaná**: Treeman nevstal
+z 911 sražení ani jednou.
+⇒ **Chybějící osa je pokrytí PRAVIDEL, ne kódu.**
+
+**Tři úlohy** *(zadání `evidence/fable_brief_test_audit_20260821.md`)*:
+* **A ⭐** testy, které fixují chování **bez opory v pravidlech** — nejlevnější
+  a nejúčinnější;
+* **B** dovednosti a akce **bez jediného testu** *(precedens: `PilingOn` je
+  v enumu a v `engine/src/` se nevyskytuje vůbec, T5.15)*;
+* **C** co je v **N/A kontrol** — ⚠️ to už máme jako **T2.18**, sem patří jako
+  táž rodina.
+
+⏰ **Spustit AŽ PO rules-parity auditu** — jeho výstup je vstupem téhle úlohy
+*(u každého rozporu kódu a pravidla se ptát „a proč to nechytil test?")*.
+Souběžně by se tatáž práce zaplatila dvakrát.
+
+⭐ **Proč to vzniklo:** uživatel si všiml, že **obě dnešní pravidlové vady
+vzešly z ROZHOVORU a ani jednu nenašla kontrola** — při 572 testech, z nichž
+se **ani jeden nedotýká vstávání ani asistencí u faulu** *(ověřeno)*.
+⇒ **Kontrola ověřuje to, co nás napadlo ověřit**, a pravidlová vada je z
+definice to, co nás nenapadlo.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
