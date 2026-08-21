@@ -703,6 +703,194 @@ kvantifikovat, protože někdy chci záměrně, ať tam zavazí, a jindy ne."*
 ⇒ **Vstát vedle soupeře je DRAŽŠÍ než zůstat ležet**, a zisk to musí přebít.
 ⚠️ **Nestavět plánovač dřív, než se tohle změří.**
 
+### ⭐⭐⭐ Q3 ZODPOVĚZENO 21.08. — TŘI VĚTVE, A ROZHODUJE CENA NA MNĚ
+
+Uživatel 21.08.: *„zůstat ležet — riskuju faul — jsem dost levný, abych
+soupeři nestál za faul, a je ten, vedle koho bych se postavil, silný a např.
+i s MB, a mám riskantní dodge, na kterém bych nejspíš upadl a mohl se hned
+zranit?"*
+
+⇒ **První diskriminátor NENÍ „kam to tělo patří", ale CENA TŘÍ MOŽNOSTÍ PRO
+TOHO HRÁČE.** Rozpočet těl *(„je potřeba jinde")* je až přebíjející člen —
+musí porazit všechny tři ceny, ne je nahradit.
+
+| větev | co mě to stojí |
+|---|---|
+| **zůstat ležet** | **FAUL** — vážený tím, jestli za faul vůbec stojím |
+| **vstát a zůstat** | soused mě **udeří zadarmo**; váha = jeho ST, asistence, **Mighty Blow / Claw** |
+| **vstát a dodgnout pryč** | **selhaný dodge** = padnu a hned mi jde armour/injury |
+
+### ⛔⛔ A TÍM SE OPRAVUJE PRAVIDLO Z 20.08.
+
+Pravidlo znělo: *„ležící soused ≡ vzdálený soupeř v dosahu: obojí stojí JEDEN
+BLITZ"* — a z toho plynulo, že ležet je relativně bezpečné, protože blitz je
+jeden za kolo.
+⛔ **Platí to jen pro BLOK. Faul je OBYČEJNÁ AKCE, a ta scarcity se na něj
+nevztahuje.** Ležící tělo tedy tou úvahou chráněné NENÍ.
+
+**Změřeno (korpus 19.08., 500 her / 15 999 kol):**
+* fauly: **3 428 = 6,86 na zápas**, jsou v **21,4 %** kol — ⛔ **není to
+  okrajový jev**;
+* soupeřových ležících na desce: 2,68/kolo ⇒ **7,98 % příležitostí skončí
+  faulem**;
+* **36,3 %** faulů prorazí AV (1 244 z 3 428).
+⇒ Tělo, které proleží čtyři kola, má **~28 % šanci, že ho aspoň jednou
+faulnou**. **Ležet není pasivní bezpečí, je to expozice.**
+
+⚠️ **Měřeno na PŘEDřezovém korpusu** *(nikdo nevstával, takže ležících bylo
+2,68/kolo; po opravě je jich ~1,42)*. Méně cílů může sazbu na cíl zvednout.
+**Přeměřit na křížovém korpusu.**
+
+
+### ⭐⭐ UPŘESNĚNÍ CENY 21.08. — uživatel
+
+*„Já teď vstávám. A když nedodgnu, tak je cena toho, co bude vedle mě, až
+vstanu, a praští mě. Když dodge provedu, je cena fail dodge — moje AG —
+vždy dodge do 0 TZ."*
+
+⭐ **Cena se počítá na stavu PO POSTAVENÍ, ne na tom, jak deska vypadá teď.**
+* **vstát a zůstat** → cena = **blok od toho, kdo bude vedle mě, až budu stát**;
+* **vstát a odejít** → cena = **jediný selhaný dodge**, a to je čistá funkce
+  mého AG, protože ⭐⭐ **cíl dodge má VŽDY 0 TZ** *(tvrdé pravidlo uživatele)*
+  ⇒ žádné postihy za TZ na cílovém poli, jeden hod, a pak jsem volný.
+
+### ⇒ Tři důsledky, které z toho plynou (moje odvození, ne uživatelovo)
+
+1. ✅ **OPRAVENO uživatelem 21.08. (odpověď na Q9): NENÍ to tvrdá podmínka.**
+   *„Vždy dopočítat cenu dodge — obecně preferovat míň rizikové."*
+   ⇒ ⛔ **Větev „odejít" se NIKDY neškrtá.** Když pole s nulovým TZ není,
+   dodge se **ocení** do toho, co je, a porovná se s ostatními dvěma větvemi.
+   „Do 0 TZ" je tedy **vyjádření preference nízkého rizika v běžném případě**,
+   ne brána.
+   ⭐⭐ **Tím je celé Q3 JEDNOTNÉ: tři větve, všechny OCENĚNÉ, vyhrává nejmíň
+   riziková.** Žádný rozhodovací strom, žádné prahy — a to je přesně důvod,
+   proč to uživatel „nerozepíše striktně". ⇒ **Tvar úlohy je POROVNÁNÍ CEN,
+   a to je práce pro search, ne pro `if`.**
+2. ⭐⭐ **Rozpočet pohybu tu větev skoro zavírá sám.** Postavení stojí **3 MA**,
+   takže po něm zbývá **MA − 3**:
+   * **trpaslík MA 4 → 1 pole.** Musí to trefit **na první krok**: pole přímo
+     od souseda pryč *(vzdálenost 2 od něj = mimo jeho TZ)*, a musí být volné
+     a nekryté nikým dalším. Jsou to **tři pole z osmi**.
+   * **wood-elf MA 7-8 → 4-5 polí**, tedy skoro vždy se kam dostat.
+   ⇒ **Tatáž doktrína je pro elfa levná a pro trpaslíka na hraně** — a NENÍ to
+   rasové pravidlo, je to **rozpočet pohybu po zaplacení vstávání**.
+3. ⛔ **Pod 3 MA je ta větev dvojitý hod:** postavení na **4+**, a protože pak
+   `movementRemaining = 0`, je každý další krok **GFI**. Dodge + GFI = dva hody.
+   *(Treeman MA 2 ⇒ „vstát a odejít" je prakticky mimo hru.)*
+
+⚠️ **A pořád platí, že se to NEROZEPISUJE STRIKTNĚ** *(uživatel 21.08.)* —
+tohle je popis CENY, ne rozhodovací strom. Rozhoduje search; naším úkolem je
+dát mu ty členy vidět, ne mu předepsat výsledek.
+
+
+### ⭐⭐⭐ A KDO TAM VŮBEC LEŽÍ — uživatel 21.08.
+
+*„Nejsem nosič s míčem, abych se strachoval o budoucí blitz. A pokud jsem
+cenný, tak nemám co dělat ležící ve skrumáži."*
+
+**Dvě pravidla v jedné větě:**
+1. ⭐ **Cena se počítá proti SOUSEDOVI, ne proti dosahu.** Dosah *(U1, hák
+   lajny)* je starost **NOSIČE**. Obyčejné tělo řeší, kdo stojí vedle něj,
+   až vstane — a hotovo. ⇒ **Q8 zodpovězeno: sousedství, ne dosah.**
+2. ⭐⭐⭐ **Cenný hráč ležící ve skrumáži je chyba, která se stala DŘÍV.**
+   Není to volba při vstávání — je to vada v tom, koho jsme tam poslali.
+   ⇒ Rozhodování o vstávání se tím **zjednodušuje**: kdo tam leží, je z definice
+   levný, takže větev *„jsem dost levný, abych nestál za faul"* je **default**,
+   ne výpočet.
+
+⚠️ ⇒ **A tím se otevírá otázka O ÚROVEŇ VÝŠ, která je měřitelná:**
+**končí naši cenní hráči** *(Guard, vysoké ST, blodgeři)* **ležící ve
+skrumáži?** Když ano, je to nález o **přidělování těl**, ne o vstávání — a týká
+se to přímo klece a screenu *(rohy a výplně mají být levná těla)*.
+**Změřit na křížovém korpusu.**
+
+### ⚠️ NEKUPIT — rozhodnuto 21.08.
+
+Uživatel: *„chceme jednu změnu a tu testovat, a nedávno jsme porušili
+a spálili se."* Precedens je konkrétní: volba pole nosiče měla **tři** změny
+naráz a stálo to noc navíc (placebo) plus Fableho rozbor.
+⇒ **Bezpodmínečné vstávání se změří první.** *„Sražený vstane" jsou PRAVIDLA;
+kdy vstát a zavazet je NAŠE DOKTRÍNA na ně nasazená* — a doktrína potřebuje
+základní čáru, proti které se dá měřit.
+
+## ⏰ P50 — KICK-OFF RETURN: ZAČÁTEK DRIVU SE BĚŽÍ, NE KLECUJE *(uživatel 21.08.)*
+
+*„Pak v budoucnu máme nachystanou úpravu — kick off return — a ze začátku běž
+rychle a postav zeď — screen a ne klec."*
+
+### Číslo, které to podpírá (změřeno 21.08.)
+
+Vzdálenost nosiče k EZ podle zbývajících kol *(korpus 19.08., 2 051 kol)*:
+**20,8 → 18,0 → 16,4 → 15,2 → 14,2 → 13,2 → 11,7**
+⇒ ⭐⭐ **trpaslík ujde ⌀ 1,5 pole za kolo, a potřebuje 3,46 už od prvního kola.**
+**Nedostane se do skluzu během drivu — vychází z něj rovnou.**
+⚠️ Ze starého korpusu; po opravě vstávání to bude nejspíš horší.
+
+### ⛔⛔ PAST V METRU POŽADOVANÉHO TEMPA — NEPRŮMĚROVAT
+
+`required = dist / max(1, turnsLeft − RESERVE_TURNS)`. V posledních **dvou**
+kolech se dělitel usekne na 1, takže veličina **přestane být tempo** a stane
+se z ní **zbývající vzdálenost**:
+
+| zbývá kol | 7 | 6 | 5 | 4 | 3 | **2** | **1** |
+|---|---|---|---|---|---|---|---|
+| ⌀ required | 3,46 | 3,60 | 4,11 | 5,06 | 7,09 | **13,20** | **11,72** |
+| dělitel | 6 | 5 | 4 | 3 | 2 | **1** | **1** |
+
+⇒ Průměr přes všechna kola (**6,99**) je z velké části tohle a **čte se jako
+„potřebujeme 7 polí za kolo", přitom to znamená „zbývá 13 polí a jedno kolo"**.
+**Metr je čitelný jen po kolech a jen dokud je dělitel > 1.**
+*(Uživatel to odchytil jako „magická čísla" hned, jak je uviděl.
+⛔ Do kódu se zatím nesahá — jen se to nesmí průměrovat.)*
+
+### ⭐⭐⭐ A TÍM SE MĚNÍ STATUS P48 (SCREEN)
+
+P48 byl odložen úplně na konec s odůvodněním *„pomáhá ELFOVI, a elf už dnes
+skóruje víc"*. **To odůvodnění tímhle padá:** screen tu chce **trpaslík**,
+a na fázi, kde je nejpomalejší. ⇒ Screen **není elfí kapitola** — je to
+**nástroj rychlé fáze pro každého**, přesně jako klec je nástroj kontaktní.
+*(Táž oprava jako u U1 a u klece: pravidlo zúžené na rasu, u které se našlo.)*
+
+### Co to je za tvar
+
+**Fázová doktrína** — už **ČTVRTÁ** *(13.08. trasa · 18.08. T0.1 · 20.08.
+obrana · dnes útok od kick-offu)* — a **engine pojem fáze nemá nikde**
+*(viz [[project_bloodbowl_phase_model_missing_20260820]])*.
+⇒ Bez fáze nejde odlišit *„nepostavil klec, protože běží"* od *„nepostavil
+klec, protože ji neumí"*.
+⚠️ **Přechod rychlá → kontaktní musí řídit měřitelná veličina**, ne konstanta
+(zákaz konstanty, uživatel 20.08.). Kandidát je na to nově **`corridor_strength`**
+*(přidáno dnes)* — zeď se přestane obíhat, až má sílu, ne až má hustotu.
+
+### ✅ CO Z TOHO UŽ VE FRONTĚ JE — prověřeno 21.08. na uživatelův dotaz
+
+| co | kde | stav |
+|---|---|---|
+| obrana jako fáze (D1 sloupce → D2 L) | **T1.11** | zapsáno, v kódu NENÍ nic |
+| útočné fáze SÓLO/KLEC/VÝBĚH (podlaha) | **T0.1 / K9c** | metr hotov |
+| klec se posouvá jen rovně, směr se nevolí | **P32** | ⛔ **NENASAZENO** |
+| pole nosiče = boční volnost, +12,8σ | **P38** | ⛔ **NENASAZENO, čeká na Q8** |
+| začátek drivu se běží + screen | **P50** | nové 21.08. |
+| ⛔ **pojem FÁZE v enginu jako takový** | **NIKDE** | jen zápis v paměti |
+
+⇒ ⭐ **„Běž na max dopředu a do boku" v plánech JE — rozdělené na P32 (směr)
+a P38 (pole nosiče) — ale ANI JEDNO NENÍ ZAVEDENÉ.** Máme to změřené, ne
+nasazené; P38 čeká přesně na víkendovou fázi B.
+
+### 🔎 CHECK NA TŘETÍ FÁZI (VÝBĚH) — doplněno 21.08.
+
+**Dnešní stav: opravovat nepotřebuje.** Nález *„VÝBĚH 2,9 %"* byl 20.08.
+**stažen jako artefakt kontroly** *(`diag_rules_checks` vyhazoval kola, která
+skončila TD)*; po opravě je **VÝBĚH 69,3 % — NEJLEPŠÍ fáze, dvojnásobně**
+(SÓLO 34,8 · KLEC 34,0).
+
+⚠️⚠️ **ALE TO ČÍSLO JE Z PŘEDŘEZOVÉHO ENGINU** *(nikdo nevstával)*, a výběh je
+fáze, kterou **víc stojících obránců musí zasáhnout ze všech nejvíc** —
+protrhnout se ven skrz dav je něco jiného než skrz ležící.
+⇒ **CHECK: přeměřit podíl fází na křížovém korpusu a ověřit, že VÝBĚH
+zůstal nejlepší.** Když spadne, je to nález, ne regrese měření — a mění
+pořadí fází v doktríně.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože

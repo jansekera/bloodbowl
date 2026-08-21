@@ -72,17 +72,43 @@ lgr = bb_engine.simulate_game_logged(r, r, home_ai="macro_mcts", away_ai="macro_
                                      away_weights_path="weights_best.json",
                                      epsilon=0.0, vf_blend=0.0,
                                      policy_weights_path="weights_policy.json")
-n = sum(1 for t in lgr.get_turn_logs() for e in t["events"]
-        if e["type"] == "STAND_UP")
+turns = lgr.get_turn_logs()
+bad = []
+
+# (1) vstávání (P45) -- stará .so tenhle event NEZNÁ
+n = sum(1 for t in turns for e in t["events"] if e["type"] == "STAND_UP")
 print("STAND_UP v sondě:", n, file=sys.stderr)
-sys.exit(0 if n > 0 else 1)
+if n == 0:
+    bad.append("STAND_UP = 0 (stará binárka, nebo se plánovač nezvedá)")
+
+# (2) nová pole desky (21.08.). Klíč, který stará .so vůbec nemá, shodí
+# KeyError -- a to je taky správná odpověď, jen míň čitelná, proto .get().
+missing = [k for k in ("corridor_strength", "required_pace",
+                       "achievable_pace", "dist_to_endzone_board")
+           if k not in turns[0]]
+if missing:
+    bad.append("chybí pole v turn logu: %s" % missing)
+else:
+    # ⛔ Nestačí, že pole EXISTUJE -- musí se i PLNIT. Přesně tahle vada nás
+    # stála celý rok u plan.*: pole tam bylo, bylo v něm 0, a nula se četla
+    # jako fakt. N/A je -1, takže "živé" kolo je to s required_pace >= 0.
+    live = [t for t in turns if t["required_pace"] >= 0]
+    print("kol s živým tempem: %d / %d" % (len(live), len(turns)), file=sys.stderr)
+    if not live:
+        bad.append("required_pace je N/A ve VŠECH kolech -- metr se neplní")
+    elif not any(t["corridor_strength"] > 0 for t in live):
+        bad.append("corridor_strength je 0 ve všech živých kolech")
+
+for b in bad:
+    print("PREFLIGHT FAIL:", b, file=sys.stderr)
+sys.exit(1 if bad else 0)
 PY
 then
-    night_log "⛔ PREFLIGHT: binárka netiskne STAND_UP ⇒ běží STARÁ .so."
+    night_log "⛔ PREFLIGHT SELHAL — viz důvod výš. Nejčastěji: běží STARÁ .so."
     night_log "   Přestav (cmake --build engine/build) a spusť znovu."
     exit 4
 fi
-night_log "PREFLIGHT OK — binárka je ta opravená (tiskne STAND_UP)"
+night_log "PREFLIGHT OK — binárka tiskne STAND_UP i nové metry desky (tempo, síla koridoru)"
 night_log "ROZPOČET: 15 dvojic × $GAMES her ≈ $(( 15 * GAMES * 56 / 10 / 3600 )) h při 5,6 s/hru"
 
 # --- 15 křížů, POSTUPNĚ ----------------------------------------------------
