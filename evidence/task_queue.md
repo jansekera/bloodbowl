@@ -891,6 +891,58 @@ protrhnout se ven skrz dav je něco jiného než skrz ležící.
 zůstal nejlepší.** Když spadne, je to nález, ne regrese měření — a mění
 pořadí fází v doktríně.
 
+## ⏰ P51 — ZVEDNOUT TV NA 1500 A PŘEDĚLAT ROSTERY *(uživatel 21.08.)*
+
+⛔ **NOVÁ POLOŽKA — prověřeno, že ve frontě ANI V PAMĚTI dosud NEBYLA.**
+*(uživatel si myslel, že „to je asi v sekci předělání rosterů" — taková sekce
+neexistuje)*
+
+### Proč vzniklo: rozpočet dovedností je BLOKÁTOR DOKTRÍNY, ne ladění
+
+* **klec** chce **Guard + Tackle** na čtyřech rozích *(sestava z 07.08. je
+  postavená přesně kolem toho)*;
+* **screen** chce **Stand Firm** v první řadě *(uživatel 21.08.: „trpaslík má
+  mít jednu řadu ob jedna a Stand Firm, ať se to neprolomí")*;
+* ⛔⛔ **náš trpaslík TV1200 nemá Stand Firm ANI JEDNOU** — v celé pětici
+  sestav ho má **jediný hráč, elfí Treeman**. ⇒ **Trpasličí screen se dnes
+  zahrát NEDÁ.** *(Engine skill implementovaný má, včetně řetězového odsunu,
+  `block_handler.cpp:258` — zápis z 10.08., že chain push Stand Firmem projde,
+  je ZASTARALÝ.)*
+⇒ Po P50 *(začátek drivu se běží a staví screen)* se **dvě fáze téhož drivu
+perou o tatáž těla** a TV1200 unese jen jednu.
+
+### Uživatelův argument, a data ho potvrzují
+
+*„Trpaslíci nebudou tak hladoví po rozšíření lavičky — o to víc se vejde sem."*
+
+**Trvale mimo hru na zápas** *(300 her, dnešní engine)*:
+
+| tým | casualty | vyloučení | **trvale pryč** | zranění (INJURY) |
+|---|---|---|---|---|
+| skaven | 1,526 | 0,368 | **1,895** | 11,20 |
+| wood-elf | 1,250 | 0,408 | **1,658** | 10,18 |
+| human | 0,703 | 0,500 | **1,203** | 6,26 |
+| **trpaslík** | 0,613 | 0,463 | **1,077** | **3,21** |
+| orc | 0,378 | 0,419 | **0,797** | 3,28 |
+
+⭐ **Trpaslík ztrácí o 44 % míň hráčů než skaven a schytá 3,5× míň zranění.**
+⇒ Lavičku potřebuje nejmíň ze všech kromě orka ⇒ **přírůstek TV mu může jít
+skoro celý do dovedností.**
+
+### ⇒ Mění to Q12
+
+Q12 *(Guard vs Stand Firm — přestavět · rozdělit role · hloubka místo tuhosti)*
+**se nemusí rozhodovat kompromisem**, jen se posune na jinou TV: při 1500 můžou
+být **obě fáze hratelné naráz**. ⏳ Čeká na souhlas uživatele.
+
+### ⚠️ Dvě výhrady do zadání
+
+1. **TV se musí zvednout OBĚMA stranám**, jinak měříme sílu rozpočtu, ne
+   doktrínu — a **je to DALŠÍ ŘEZ v porovnatelnosti**, hned po tom dnešním.
+   Všechna dosavadní čísla jsou z TV1200.
+2. Ta úspora na lavičce je měřená **PO dnešní opravě vstávání**; před ní
+   byla jiná, protože sražený mizel z desky, ale nešel do zranění.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
