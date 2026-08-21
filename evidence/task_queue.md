@@ -1005,6 +1005,61 @@ KAM — P9 · P34 · P35 je jedna chybějící dimenze)*.
 ale k **volbě pole nosiče**, což je vysoká priorita. **Rozhodnout dřív, než se
 to začne stavět** — jinak se vysoká priorita omylem zakope do nízké.
 
+
+### ⭐⭐⭐ ROH SCREENU — HOTOVÁ GEOMETRIE *(uživatel 21.08., potvrzeno)*
+
+*„Když má soupeř frenzy, musím poslední roh u kraje postavit o 1 pole dál od
+kraje — a za něj druhého o 1 blíž kraji, ale ne u kraje."*
+*„Tím, že bude o 1 pole k nám, se brání sám vysurfování."*
+
+```
+              x=10   x=11   x=12
+        ╔═══════════════════════════╗   ← LAJNA
+   y=0  ║   ·      ·      ·         ║
+   y=1  ║   ·      B      ·         ║
+   y=2  ║   ·      ·      A         ║
+   y=3  ║   ·      ·      ·         ║
+   y=4  ║   ·      ·      S         ║      soupeř útočí zprava
+```
+**A** = kotva · **B** = záloha o jedno pole HLOUBĚJI (k nám) · **S** = screen
+
+### Pravidlo kotvy — obecné, ne „proti Frenzy"
+
+⭐ **Kotva stojí tolik polí od kraje, kolik má soupeř ODSUNŮ.**
+* obyčejný blokař = 1 odsun ⇒ **`y = 1`** *(z `y=1` jde push jen na `y=0`)*
+* **Frenzy = 2 odsuny** ⇒ **`y = 2`** *(`y=2 → y=1 → y=0`, pořád na hřišti;
+  z `y=1` by to bylo `y=1 → y=0 → VEN`)*
+⇒ Zobecňuje se samo na cokoli dalšího, co odsouvá. **Není to výjimka
+pro Frenzy, je to funkce počtu odsunů.**
+
+### Proč záloha, a proč o pole hlouběji
+
+Posunem kotvy na `y = 2` se otevře pruh `y = 0` a `y = 1` ⇒ `B` ho zavře
+**tackle zonou**, aniž stojí v linii. ⛔ **A NE na `y = 0`** — tam je
+nejlevnější cíl na hřišti.
+⭐⭐ **A hloubka ji brání sama** *(uživatel)*: aby soupeř `B` surfoval, musí
+stát na opačné straně než kraj, tedy na `(10,2)`, `(11,2)` nebo `(12,2)` —
+a **`(12,2)` obsazuje sama kotva `A`**, zbylá dvě leží **za linií screenu**.
+⇒ **Dvě těla držící roh si navzájem ubírají soupeřova pole** — týž princip
+jako klec: hodnota je v **OBSAZENÍ**, ne v markování.
+
+### ⚠️ Praktický dosah v TV1200
+
+**Frenzy má z pěti sestav jediná — trpaslík** *(2 Troll Slayeři)*.
+⇒ Tohle pravidlo nás váže **jen v dvojici trpaslík vs. trpaslík**; ve všech
+ostatních jsme my ta strana s Frenzy. ⭐ **A `dwarf-dwarf` je jedna z patnácti
+dvojic křížového korpusu — dosud NIKDY neměřená.**
+Engine druhý blok Frenzy i crowd surf implementovaný má *(`block_handler.cpp`
+:788, :86)*, takže to půjde změřit, ne jen napsat.
+
+### ⛔ OTEVŘENO — kolize nosiče se zálohou
+
+Nosič má stát **za screenem a dál od kraje** *(klauzule 4)* a záloha **za
+screenem a blíž ke kraji**. Obě pravidla míří do téže druhé řady a **jak se
+skládají, jsme neřešili**. ⚠️ Nosič navíc své pole vybírá podle **rozptylu**,
+ne podle screenu ⇒ může vyjít vedle zálohy, což je právě to nahuštění, kterému
+se screen vyhýbá.
+
 ### ⛔ A screen se dnes NEHRAJE ANI ELFEM — Fable 21.08.
 
 Elf místo klece screen **nehraje, hraje rozsyp**: SCREEN **12,0 %**
