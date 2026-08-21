@@ -1169,8 +1169,17 @@ týmový reroll uspěl = **tři rerolly jednoho hodu**)* — a je **zelený**.
 
 **Uživatel 21.08.: „tohle zapiš, ale do aktuálního běhu už nesahej."**
 ⇒ **Křížový korpus z 21.-24.08. se sbírá s TOUHLE VADOU.** Není to omyl,
-je to vědomé rozhodnutí — třetí zabití běhu za den by stálo víc, než ta vada
-zkazí, a rozpočet okna už není nafukovací.
+je to **vědomé rozhodnutí uživatele** a stojí na třech důvodech:
+
+1. ⭐ **Není to táž třída jako ranní vady.** Omráčení a vstávání měnily,
+   **KDO stojí na hřišti** *(třetina mužstva)*. P57 mění **úspěšnost hodů** —
+   posune čísla, ale nemění tvar hry.
+2. ⭐ **Korpus se sbírá hlavně kvůli patnácti dvojicím, z nichž deset jsme
+   nikdy neviděli.** K tomu, CO v nich vůbec je, ta vada nebrání.
+3. ⭐⭐ **Rozhodující: alternativou není lepší korpus, ale ŽÁDNÝ.** Uživatel:
+   *„nepřijde mi to zásadní pro ničení běhu — zvlášť relativně blízko před
+   breakem."* Kdyby restart selhal a nikdo tu nebyl, přijdeme o celý víkend.
+   ⇒ **Zapsaná vada se dá při čtení odečíst; chybějící data ne.**
 ⚠️ **Kdo ten korpus bude číst, MUSÍ to vědět:** rerolly jsou v něm
 nadhodnocené, nejvíc u dodge týmů.
 
