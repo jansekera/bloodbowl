@@ -1078,6 +1078,52 @@ LIBOVOLNÉ akce, i BLOCK?)* **tímto auditem rozhodnuta NENÍ.**
 
 ⏰ **Vše až po víkendu** — běží sběr.
 
+## 📋 T2.21 — SPUSTIT `/code-review max` A PŘEHODNOTIT JEHO NÁLEZY *(uživatel 21.08.)*
+
+*„Máme tedy za úkol spustit command code-review max — s tím, že pak
+přehodnotíš, co vrátil za nálezy."*
+⏰ **Pondělí nebo později** — není to urgentní, ale nemá to zapadnout.
+
+### Rozsah
+
+Dnešní zásah do enginu: **`7a228f73~1..96809734`** *(oprava vstávání · metry
+desky · sedm pravidlových oprav · pět regresí — 12 změn chování za jeden den)*.
+⚠️ **Nedávat to bez rozsahu** — jsme na `main`, takže bez argumentu by review
+bralo celou větev.
+⭐ **Proč zrovna tenhle rozsah:** dvanáct změn chování v jednom dni je přesně
+prostředí, kde se chyby schovávají v **interakcích**, ne v jednotlivých
+změnách — a dvě z dnešních vad *(F1, B1)* byly spící a probudila je jiná
+oprava.
+
+### ⭐⭐ A PAK JE PŘEHODNOTIT — to je vlastní úkol, ne formalita
+
+**Doloženo 21.08., dvakrát za jedno odpoledne:**
+* ⛔ *„Rozbil jsi Jump Up"* — **nerozbil.** BB2016 ř. 8198 dává volné vstání
+  jen tomu, kdo deklaroval **jinou akci než blok**; blok z lehu je samostatná
+  cesta s hodem AG+2, kterou engine nikdy neuměl. **Moje změna odstranila
+  NELEGÁLNÍ blok zdarma.** Kdybych nález přijal, vrátil bych vadu zpátky.
+* ⛔ *„prone Looney (roster.cpp:308)"* — ř. 308 je **Fanatic** (ST 7,
+  BallAndChain); Looney je ř. 307 (Chainsaw). Oprava věcně seděla, **jméno ne**
+  — a jméno hráče člověk instinktivně nekontroluje.
+⇒ **Agent přinese správný nález se špatným zdůvodněním, a to je horší než
+špatný nález** — projde to.
+⚠️ **Každé pravidlo si ověřit v `rules_bb2016.txt`**, ne z citace agenta.
+
+### ⚠️ Mez toho nástroje: `/code-review` běží jako FORK mého kontextu
+
+⇒ **Sdílí moje slepá místa.** 21.08. našel fork pět regresí, ale **nezávislý
+Opus s čistým kontextem našel výrazně víc** *(Take Root u vstávání, big-guy hod
+za každé pole, past s `avoid`)* — ⭐ **rozhodla nezávislost kontextu, ne
+úroveň.**
+⇒ **Pouštět v páru**: `/code-review max` **a k tomu čerstvého recenzenta**,
+který o změnách neví nic než diff a texty pravidel.
+
+### ⛔ `/code-review ultra` je něco jiného
+
+Multi-agentní review v cloudu, **placený zvlášť a spustit ho může JEN
+uživatel** — já ne, ani přes Bash. Nechat si ho na chvíli, kdy si dva audity
+odporují nebo kdy po změně nemá kdo přijít druhý den a opravit ji.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
