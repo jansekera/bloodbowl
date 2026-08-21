@@ -312,16 +312,42 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
     if (player.hasSkill(SkillName::JumpUp)) {
         // Free stand up
         player.state = PlayerState::STANDING;
+        player.hasMoved = true;   // standing up IS movement (see below)
         return ActionResult::ok();
     }
 
-    // Costs 3 MA
+    // BB2016 (rules_bb2016.txt, l. 690-695): "The only time a player can stand
+    // up is at the beginning of an Action at a cost of three squares from his
+    // movement. If the player has less than three squares of movement, he must
+    // roll 4+ to stand up - if he stands up successfully, he may not move
+    // further squares unless he Goes For It. Failure to stand successfully for
+    // any reason is not a turnover."
     if (player.movementRemaining < 3) {
-        return ActionResult::fail();
+        int roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::STAND_UP, playerId, -1,
+                          player.position, player.position, 4, roll >= 4});
+        if (roll < 4) {
+            // Action is used up, but this is explicitly NOT a turnover.
+            player.hasActed = true;
+            return ActionResult::fail();
+        }
+        player.movementRemaining = 0;   // any further step must be a GFI
+        player.state = PlayerState::STANDING;
+        player.hasMoved = true;
+        return ActionResult::ok();
     }
 
     player.movementRemaining -= 3;
     player.state = PlayerState::STANDING;
+    // Standing up is movement, so it closes the activation the same way a step
+    // does: the actor-switch close-out in executeAction() keys off hasMoved,
+    // and l. 674-676 forbids a Block Action afterwards ("you may not move when
+    // you take a Block Action"). Without this a prone player stood up for 3 MA
+    // and then blocked as a fresh, unacted activation -- strictly better than
+    // Jump Up, which at least costs an AG roll.
+    player.hasMoved = true;
+    emitEvent(events, {GameEvent::Type::STAND_UP, playerId, -1,
+                      player.position, player.position, 0, true});
     return ActionResult::ok();
 }
 

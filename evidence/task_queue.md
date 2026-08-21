@@ -664,6 +664,177 @@ jen nejsou na řadě, dokud klec nedělá to, co má.
 3. **P41** — fáze VÝBĚH 2,9 %; první krok je **rozpad podle `turns_left`**, ne oprava.
 4. **P39** — nosič se neaktivuje *(P40 to možná rozhodne za nás)*.
 
+## ✅ P45 PRAVIDLOVÁ ČÁST HOTOVA 21.08. — testy 566/566
+
+**Opraveno** (`move_handler.cpp` · `rules_engine.cpp` · `game_event.h`):
+1. **hod 4+ pod 3 MA** — dosud `fail()` ⇒ MA 2 se nepostavil NIKDY;
+   po úspěchu `movementRemaining = 0`, takže **další krok je GFI**;
+   **neúspěch NENÍ turnover** (ř. 694-695).
+2. **vstávání nastavuje `hasMoved`** — je to pohyb ⇒ uzávěrka aktivace se
+   spustí a **po vstání už nejde Block** (ř. 675).
+3. **BLOCK se nenabízí hráči, který se pohnul** — pohyb+blok **je blitz**
+   a ten je jeden za kolo *(uživatel 21.08.)*. Míří na 2 641 nadbytečných
+   případů (2,61 % kol).
+4. ⭐ **nový event `STAND_UP`** — vstávání dosud **neemitovalo nic**, takže
+   se v korpusu nedalo odlišit *„nikdo nevstává"* od *„vstávání se neloguje"*.
+   Append-only na konec enumu, staré korpusy se nepřejmenují.
+
+**Testy:** 6 nových (`StandUp.*`) + 2 přepsané legacy *(starý
+`StandUpNotEnoughMA` pinoval to špatné chování)*. Před opravou padaly 4 ze 6.
+
+⛔ **ZBÝVÁ: plánovač nikoho nepostaví.** `turn_planner.cpp` slovo `PRONE`
+neobsahuje ani jednou; vstávání je zakódované jako pohyb na vlastní pole,
+tedy nulový postup, a plánovač takovou akci nikdy nevybere.
+⇒ **Bez toho je pravidlová oprava neúčinná** — měřeno 0,4 % (1 067
+z 280 719 ležících).
+
+### ⭐⭐ Q3 — KDY VSTÁVAT VEDLE SOUPEŘE *(uživatel 21.08.: „nejtěžší na vyhodnocení")*
+
+*„Když jen vstanu vedle někoho, tak vstanu, abych dostal ránu — to chce nějak
+kvantifikovat, protože někdy chci záměrně, ať tam zavazí, a jindy ne."*
+⭐ *„A to se bavíme o pohybu — jednodušší akci."*
+
+**Dvě protichůdné položky, obě měřitelné:**
+* ⛔ **cena** — ⭐⭐⭐ vstáním se sám převedu z *„stojím soupeře BLITZ"* na
+  *„dávám mu BLOK ZDARMA"* *(pravidlo z 20.08.)*, a když mě složí, ležím
+  zpátky a zaplatil jsem 3 MA;
+* ✅ **zisk** — stojící tělo má **TZ**: zdražuje odchod o dodge, dává
+  **asistenci** našim blokům a **obsazuje pole**.
+⇒ **Vstát vedle soupeře je DRAŽŠÍ než zůstat ležet**, a zisk to musí přebít.
+⚠️ **Nestavět plánovač dřív, než se tohle změří.**
+
+## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
+
+Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
+ten to svým způsobem porušuje a neporušuje. Zatím nás toto neovlivňuje."*
+
+**Kontext:** vzniklo u opravy vstávání, kde platí *„nesmíš se hýbat, když bereš
+Block akci"* (BB2016 ř. 675). **Hypnotic Gaze je akce, která do téhle dvojice
+pohyb/blok nezapadá** — je to třetí druh akce proti sousedovi, a proto to
+pravidlo zdánlivě porušuje, aniž ho porušuje.
+
+⛔ **Znění NEDOHLEDÁNO — neodhadovat z hlavy**, ověřit proti
+`rules_bb2016.txt`. Otevřené: smí se upír před Gaze hýbat? je Gaze akce sama
+o sobě, nebo součást Move akce? co s aktivací po ní?
+
+⚠️ **Dnes nás to nijak neovlivňuje** — v sestavách TV1200 `dw-we` upír není.
+⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
+neztratilo**, ne úkol.
+
+## 🐢 P48 — SCREEN PRO ELFA *(zavedeno 21.08., ZÁMĚRNĚ NEJNIŽŠÍ PRIORITA)*
+
+**Původ:** rešerše 21.08. potvrdila, že klec je *„a staple tactic used by pretty
+much every team"*, **ale agility týmy ji na útoku často vynechávají a staví
+místo ní SCREEN** — šířka a flexibilita místo shluku; soupeř nesmí projít mezi
+elfy bez dodge rollu. Uživatel 21.08.: *„elf teoreticky může zkusit i screen
+místo klece — ale klec je univerzální pravidlo s jasným zadáním."*
+
+⛔ **Priorita je nejnižší ZÁMĚRNĚ a je to rozhodnutí uživatele 21.08.:
+screen pomáhá ELFOVI, a elf už dnes skóruje víc než trpaslík**
+*(0,55–0,67 proti 0,44–0,54 TD/hru)* ⇒ **nejmenší volný prostor na zlepšení.**
+Jde až **po kleci a nejspíš po všem ostatním.**
+
+### Definice, kterou je nutné zapsat PŘED měřením
+
+*(jinak si screen nadefinujeme tak, aby vyšel — lekce z K29 a ze σ-tabulky)*
+
+**SCREEN = řetěz našich STOJÍCÍCH těl mezi nosičem a hrozbou, bez volného
+průchodu.** Tři klauzule, opět **konjunkce**:
+1. **spojitost** — sousední členové řetězu jsou Chebyshev **≤ 3** *(při rozestupu
+   4 vznikne pole, které nemá TZ ani jednoho souseda = volný pruh;
+   při **≤ 2** je každá mezera kryta DVĚMA TZ = „těsný screen")*;
+2. **ukotvení** — oba konce končí na lajně, nebo je obcházka dražší, než má
+   soupeř MA;
+3. **separace** — každá soupeřova cesta k nosiči kříží řetěz.
+
+⭐ **Klauzuli 3 nemusíme stavět od nuly: je to ZRCADLO metriky 17.6**
+*(„kolik má nosič levných únikových polí", `diag_basing_vs_columns_20260820.py`,
+prediktivní: gradient +1,41 → +2,86)*. Screen se ptá na totéž z druhé strany —
+kolik má **soupeř** levných cest k **našemu** nosiči.
+
+### ⚠️ Dvě pasti, které se musí přiznat dopředu
+
+* **Metr bude VYHLADOVĚLÝ.** Engine pojem screenu nemá vůbec ⇒ na baseline
+  korpusu vyjde jednotky procent a σ ≈ 0, což **neznamená „neplatí"**
+  *(klec 2,7 % / 0,0σ · sloupce 2,3 %)*. Měřit se smí až s ramenem.
+* **Screen NEMÁ kanonickou geometrii.** Klec jsou čtyři pevná pole, screen je
+  RODINA tvarů ⇒ je to **měkké kritérium**, a s měkkými kritérii má projekt
+  špatnou zkušenost *(σ-tabulka konjunkci rozložila na sčítance a neviděla nic)*.
+
+### ⭐⭐ Proč to bude levnější, než to vypadá — screen ≡ D1
+
+**Sloupce po dvou (obranná fáze D1) jsou fragment screenu**: dvojice
+s mezerou je přesně zařízení proti „projít mezi". A grumbbl *„nezůstávat
+v base kontaktu"* je screenová logika, ne klecová. ⇒ **Až na P48 dojde,
+většina geometrie už bude stát z obrany** *(T1.11, spec ČÁST 17)*.
+
+### ✅ NAPĚTÍ O LAJNĚ ROZŘEŠENO 21.08. — uživatel
+
+⭐⭐⭐ **Zákaz lajny platí pro NOSIČE, ne pro FORMACI.**
+Uživatel 21.08.: *„screen u lajny mi přijde OK — ušetřím těla a zároveň si dám
+pozor na vysurfování jednoho krajního. Samotný ballcarrier za screenem
+samozřejmě stojí v klidu dál od lajny a počítá si, kde stát — podle toho, kam
+doběhne nejrozptýleněji."*
+
+⇒ **U1 se nemění, jen se upřesňuje jeho subjekt.** Lajna je soupeřova asistence
+zdarma **proti tomu, kdo u ní stojí**. Screen u ní stát SMÍ, protože pro něj je
+lajna kotva zdarma *(ušetřená těla)*; **nosič u ní stát NESMÍ**, protože pro něj
+je to hák. Klec a screen se tedy nerozhodují rasou ani doktrínou, ale **tím,
+čí tělo se k lajně tlačí**.
+
+### 🌊 Cena kotvy zdarma — SURF, a řeší se GEOMETRIÍ (klauzule 2)
+
+Krajní tělo screenu je nejlevnější cíl: **crowd push je zranění bez armour rollu.**
+⭐ **Řešení je v tvaru, ne v extra pravidle: kotva stojí na `y = 1`, ne na `y = 0`.**
+Odvozeno z geometrie odsunu *(ověřit proti enginu, P9/P9c)*:
+* mezera ke lajně zůstává **krytá vlastním TZ kotvy** ⇒ **screen se neotevře**;
+* na `y = 0` jde kotva ven **JEDNÍM** pushem; na `y = 1` **žádný jediný push ven
+  nevede** — útočník od lajny odsouvá směrem OD sebe, tedy dovnitř, a útočník
+  zevnitř dotlačí kotvu nejvýš na `y = 0`.
+⇒ **`y = 1` stojí soupeře o jedno kolo víc a nás nestojí nic.**
+
+### 🎯 NOVÁ KLAUZULE 4 — POZICE NOSIČE ZA SCREENEM
+
+Screen bez pravidla o nosiči je poloviční tvar. Nosič **není členem řetězu**;
+stojí **za ním a dál od lajny**, a své pole si **dopočítává** — táž logika jako
+pravidlo z 19.08. *(pole nosiče se dopočítává z klece, která z něj vyjde)*,
+ale s **jiným kritériem**: ne „z jakého pole vyjde klec", ale
+⭐ **„z jakého pole se pokračování nejvíc ROZPTÝLÍ".**
+
+⚠️ **„Nejrozptýleněji" se musí zapsat jako počítatelná veličina PŘED měřením.**
+Kandidát k předložení uživateli *(nepotvrzeno)*: pro každé kandidátní pole S
+vzít pole dosažitelná nosičem příští kolo a měřit **úhlový rozptyl směrů, které
+nejsou levně kryté** *(TZ / dosah blitzu)* — ne pouhý POČET polí, protože deset
+polí v jednom klínu je jedna cesta, ne deset.
+
+### ⭐⭐ PODEZŘENÍ NA ROZSAH — kritérium rozptylu nejspíš NENÍ screenové
+
+Metodická lekce U1 i klece: *když pravidlo najdu u jedné rasy/tvaru, první
+podezřelý je, že jsem ho omylem zúžil.* **Rozptyl pokračování je kandidát na
+chybějící dimenzi „KAM"** *(vzorec 19.08.: engine vybírá KDO a JESTLI, ale ne
+KAM — P9 · P34 · P35 je jedna chybějící dimenze)*.
+⛔ **Pokud generalizuje, NEPATŘÍ do P48** *(nejnižší priorita, pomáhá elfovi)*,
+ale k **volbě pole nosiče**, což je vysoká priorita. **Rozhodnout dřív, než se
+to začne stavět** — jinak se vysoká priorita omylem zakope do nízké.
+
+### ⛔ A screen se dnes NEHRAJE ANI ELFEM — Fable 21.08.
+
+Elf místo klece screen **nehraje, hraje rozsyp**: SCREEN **12,0 %**
+(510/4 258) proti trpaslíkovým **11,4 %** (661/5 779) — **stejně**.
+⇒ To, že elf klec neplní, **není volba jiné doktríny, je to ABSENCE doktríny.**
+⚠️ Metr měří náhodné formace *(přiznáno Fablem)*. ⇒ Poslední důvod, proč by
+P48 měl být výš než poslední, tím padá.
+
+### ⚠️ Původní znění napětí *(archiv)*
+
+**U1 zakazuje tlačit VLASTNÍ KLEC k lajně** *(bere dva ze čtyř rohů zadarmo)*,
+ale **elfí doktrína staví screen U LAJNY záměrně.**
+⭐ Kandidát na rozřešení: **lajna je špatná pro KLEC (ubírá rohy) a dobrá pro
+SCREEN (je to zeď, kterou nemusíš obsadit)** ⇒ přepínač klec/screen by pak
+nebyl **rasa**, ale **GEOMETRIE**, což je použitelnější. **Zadáno Fablovi
+21.08.** jako podotázka k P40 — první dílčí odpověď přijde odtamtud.
+Souvisí s **T1.10**.
+
 ## ⛔ Co se dnes NEDĚLÁ a proč
 
 * **Q8 — nasadit P38** → **až podle P40.** Rozklad ukázal, že zisk nenese

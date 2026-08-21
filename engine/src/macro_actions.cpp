@@ -402,6 +402,29 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // Always: END_TURN
     out.push_back({MacroType::END_TURN, -1, -1, {-1, -1}});
 
+    // STAND UP (2026-08-21). Prone players were invisible to this whole layer:
+    // isFreeToAct() requires STANDING, so no macro ever touched them and
+    // nobody ever got up -- 1 067 of 280 719 prone player-turns on the
+    // 3 000-game corpus (0.4 %), at EVERY MA, not just the Treeman's 2. Each
+    // knockdown therefore removed a body for the rest of the drive, for both
+    // teams. Emitted as a REPOSITION onto the player's own square; the walk in
+    // movePlayerToward now treats "prone and already there" as unfinished.
+    // Deliberately NO new MacroType: MACRO_COUNT is a positional feature-vector
+    // width, and this fix must not move it.
+    // ⚠️ UNCONDITIONAL ON PURPOSE, AND THAT IS NOT THE FINAL SHAPE. Standing up
+    // next to an enemy converts the player from "costs them a BLITZ" into
+    // "gives them a free BLOCK" (user doctrine 2026-08-20), so it is strictly
+    // more expensive than staying down; sometimes the point is to stand and
+    // dodge AWAY (a dwarf beside a Mighty Blow orc) -- and only if that body is
+    // needed elsewhere. See Q3 in evidence/task_queue.md; this is the version
+    // that makes the rule reachable, not the version that prices it.
+    state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (p.state != PlayerState::PRONE) return;
+        if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
+        if (p.hasSkill(SkillName::BallAndChain)) return;
+        out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
+    });
+
     const Player* carrier = findCarrier(state);
     bool iHaveBall = (carrier != nullptr);
     bool ballOnGround = !state.ball.isHeld && state.ball.isOnPitch();
@@ -1178,7 +1201,11 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
         if (!p.isOnPitch() || p.lostTacklezones) return false;
-        if (p.position == target) return true; // arrived
+        // A PRONE player standing on the target square has NOT arrived -- he
+        // still has to get up. Before 2026-08-21 this returned "arrived", so a
+        // REPOSITION onto one's own square was a silent no-op and the macro
+        // layer had no way to stand anybody up at all.
+        if (p.position == target && p.state != PlayerState::PRONE) return true;
 
         // Get available actions
         std::vector<Action> actions;

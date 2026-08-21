@@ -194,15 +194,33 @@ TEST(MoveHandler, StandUpCosts3MA) {
     EXPECT_EQ(gs.getPlayer(1).movementRemaining, 3); // 6 - 3
 }
 
-TEST(MoveHandler, StandUpNotEnoughMA) {
+// BB2016 (rules_bb2016.txt, l. 691-695): under 3 MA the player does NOT simply
+// fail -- he rolls 4+. This test used to pin the old, wrong behaviour (an
+// automatic fail), which meant a Treeman with MA 2 never stood up: 0 of 911
+// knockdowns over 750 games, and 0.3 % across every MA on the 3 000-game
+// corpus. Fixed 2026-08-21, see evidence/task_queue.md (P45).
+TEST(MoveHandler, StandUpUnder3MA_Rolls4Plus) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).movementRemaining = 2;
-    FixedDiceRoller dice({});
+    FixedDiceRoller dice({4});
+    auto result = resolveStandUp(gs, 1, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);  // further steps are GFI
+}
+
+TEST(MoveHandler, StandUpUnder3MA_FailsOn3AndIsNotTurnover) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).movementRemaining = 2;
+    FixedDiceRoller dice({3});
     auto result = resolveStandUp(gs, 1, dice, nullptr);
     EXPECT_FALSE(result.success);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE); // still prone
+    EXPECT_FALSE(result.turnover);   // l. 694-695, explicitly not a turnover
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
 }
 
 TEST(MoveHandler, JumpUpFreeStandUp) {

@@ -305,3 +305,116 @@ TEST(ActionResolver, BlitzApproachAvoidsTacklezonesOnEquallyCloseSteps) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// VSTÁVÁNÍ (P45, 21.08.) — BB2016 rules_bb2016.txt ř. 670-695.
+// Vstávání JE pohyb: zaplatím 3 a jdu dál; pod 3 MA hod 4+, a pak už jen GFI.
+// Vstát v TZ jde bez hodu, dodge se platí až při odchodu.
+// A po vstání NESMÍ přijít Block ("you may not move when you take a Block
+// Action", ř. 675).
+// ---------------------------------------------------------------------------
+
+TEST(StandUp, Under3MA_Rolls4PlusAndSucceeds) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);   // Treeman
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    Action action{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({4});                               // 4+ => uspěje
+    auto result = resolveAction(gs, action, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    // "he may not move further squares unless he Goes For It" => zbytek 0
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);
+}
+
+TEST(StandUp, Under3MA_FailureIsNotTurnover) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    Action action{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({3});                               // 3 => neuspěje
+    auto result = resolveAction(gs, action, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    // ř. 694-695: "Failure to stand successfully for any reason is not a turnover."
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(StandUp, Under3MA_NextStepIsGfi) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    FixedDiceRoller dice({4, 2});          // 4 = vstal, 2 = GFI (2+)
+    Action stand{ActionType::MOVE, 1, -1, {10, 7}};
+    ASSERT_TRUE(resolveAction(gs, stand, dice, nullptr).success);
+    ASSERT_EQ(gs.getPlayer(1).movementRemaining, 0);
+
+    Action step{ActionType::MOVE, 1, -1, {11, 7}};
+    auto result = resolveAction(gs, step, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_LT(gs.getPlayer(1).movementRemaining, 0);   // šel na GFI
+}
+
+TEST(StandUp, InTackleZoneNeedsNoRoll) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/6);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);          // soused v TZ
+
+    Action action{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({});                              // žádná kostka nepadne
+    auto result = resolveAction(gs, action, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 3);        // 6-3
+}
+
+TEST(StandUp, AfterStandingUpBlockIsNotOffered) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/6);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    Action stand{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({});
+    ASSERT_TRUE(resolveAction(gs, stand, dice, nullptr).success);
+
+    std::vector<Action> acts;
+    getAvailableActions(gs, acts);
+    for (const auto& a : acts) {
+        EXPECT_FALSE(a.type == ActionType::BLOCK && a.playerId == 1)
+            << "ř. 675: kdo vstal, nesmí vzít Block akci";
+    }
+}
+
+TEST(StandUp, MovedPlayerIsNotOfferedBlock) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {9, 7}, TeamSide::HOME, /*ma=*/6);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    Action step{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({});
+    ASSERT_TRUE(resolveAction(gs, step, dice, nullptr).success);
+
+    std::vector<Action> acts;
+    getAvailableActions(gs, acts);
+    for (const auto& a : acts) {
+        EXPECT_FALSE(a.type == ActionType::BLOCK && a.playerId == 1)
+            << "pohyb + blok je BLITZ, a ten je jeden za kolo";
+    }
+}

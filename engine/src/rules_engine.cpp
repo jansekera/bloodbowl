@@ -37,9 +37,14 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             out.push_back({ActionType::MOVE, p.id, -1, pos});
         }
 
-        // BLOCK: each adjacent standing enemy
+        // BLOCK: each adjacent standing enemy.
+        // Not for a player who already moved this activation: BB2016 l. 675,
+        // "you may not move when you take a Block Action" -- move+block is a
+        // BLITZ, and that is one per turn (gated below by blitzUsedThisTurn).
+        // canAct() cannot carry this: it is also used for targeting checks.
         TeamSide enemySide = opponent(side);
         for (auto& pos : adj) {
+            if (p.hasMoved) break;
             if (!pos.isOnPitch()) continue;
             const Player* enemy = state.getPlayerAtPosition(pos);
             if (enemy && enemy->teamSide == enemySide && canAct(enemy->state)) {
@@ -210,8 +215,11 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         if (p.state != PlayerState::PRONE) return;
         if (p.hasActed || p.lostTacklezones) return;
 
-        // Can stand up if JumpUp or movementRemaining >= 3
-        if (p.hasSkill(SkillName::JumpUp) || p.movementRemaining >= 3) {
+        // Anyone prone may ATTEMPT to stand: 3 MA if he has it, otherwise a
+        // 4+ roll (BB2016 l. 691-693). The old `movementRemaining >= 3` gate
+        // meant a sub-3-MA player was never even offered the action, so a
+        // Treeman (MA 2) stayed down for the rest of every drive.
+        {
             // After standing up, the player can move — generate a MOVE action
             // to their own position as a "stand up" action
             out.push_back({ActionType::MOVE, p.id, -1, p.position});

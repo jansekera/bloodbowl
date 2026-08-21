@@ -1975,3 +1975,70 @@ TEST(MacroExpansion, PlaceboAndCageArmsAreMutuallyExclusive) {
     setCageAwareAdvanceArm(TeamSide::HOME, false);
     setPlaceboAdvanceArm(TeamSide::HOME, false);
 }
+
+// P45 (2026-08-21) test helper: this file has no generic placePlayer.
+static void p45Place(GameState& gs, int id, Position pos, TeamSide side, int ma = 6) {
+    Player& p = gs.getPlayer(id);
+    p.id = id;
+    p.teamSide = side;
+    p.state = PlayerState::STANDING;
+    p.position = pos;
+    p.stats = {static_cast<int8_t>(ma), 3, 3, 8};
+    p.movementRemaining = static_cast<int8_t>(ma);
+    p.hasMoved = false;
+    p.hasActed = false;
+}
+
+// P45 (2026-08-21): the macro layer could not stand anybody up -- isFreeToAct()
+// requires STANDING, and a REPOSITION onto one's own square was a no-op.
+TEST(MacroActions, ProneePlayerIsOfferedStandUp) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    p45Place(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(gs, macros);
+    bool found = false;
+    for (const auto& m : macros) {
+        if (m.playerId == 1 && m.targetPos == (Position{10, 7})) found = true;
+    }
+    EXPECT_TRUE(found) << "ležící musí dostat nabídku vstát";
+}
+
+TEST(MacroActions, StandUpMacroActuallyStandsThePlayerUp) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    p45Place(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    Macro m{MacroType::REPOSITION, 1, -1, {10, 7}};
+    FixedDiceRoller dice({});
+    auto res = greedyExpandMacro(gs, m, dice);
+    EXPECT_FALSE(res.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 3);   // 6 - 3
+}
+
+TEST(MacroActions, TreemanUnder3MAIsOfferedAndRollsToStand) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    p45Place(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(gs, macros);
+    bool found = false;
+    for (const auto& m : macros) {
+        if (m.playerId == 1 && m.targetPos == (Position{10, 7})) found = true;
+    }
+    ASSERT_TRUE(found) << "MA 2 musí dostat nabídku taky -- je to hod 4+";
+
+    Macro m{MacroType::REPOSITION, 1, -1, {10, 7}};
+    FixedDiceRoller dice({4});
+    greedyExpandMacro(gs, m, dice);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+}

@@ -781,10 +781,20 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     weakBlitzer.id = 1;
     weakBlitzer.teamSide = TeamSide::HOME;
     weakBlitzer.state = PlayerState::STANDING;
-    weakBlitzer.position = {15, 7};
+    weakBlitzer.position = {12, 7};
     weakBlitzer.stats = {6, 1, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
+    // Retuned 2026-08-21 from x=15/16 to x=12/13. The fixture sits on a knife
+    // edge by construction, and the P45 stand-up fix moved the edge: a blitzer
+    // who fails the ~70 % roll used to lie there for the rest of the drive
+    // (nobody in the engine ever stood up), so the risky BLITZ carried a
+    // permanent body loss the search could see. Now he can get back up, the
+    // downside shrank, and the undeferred baseline stopped picking BLITZ.
+    // Moving the pair toward AWAY's endzone restores the Q gap via the same
+    // `proximity` knob this comment already describes -- the guard, not the
+    // geometry, is what the test is about.
+    //
     // Positioned far from AWAY's own endzone (x=0) -- low `proximity` in
     // simulate()'s heuristic means dropping the ball here is a much smaller
     // swing than dropping it near their scoring end, a continuous knob for
@@ -794,7 +804,7 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     strongDefender.id = 12;
     strongDefender.teamSide = TeamSide::AWAY;
     strongDefender.state = PlayerState::STANDING;
-    strongDefender.position = {16, 7};
+    strongDefender.position = {13, 7};
     strongDefender.stats = {6, 6, 3, 9};
     strongDefender.movementRemaining = 6;
 
