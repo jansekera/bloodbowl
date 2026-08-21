@@ -680,10 +680,21 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     // jinak predikát nedává smysl a zapisuje se -1 (N/A), ne nula.
     if (state.ball.isHeld && state.ball.carrierId > 0) {
         const Player& car = state.getPlayer(state.ball.carrierId);
-        turn.corridorResistance =
-            (car.teamSide == state.activeTeam)
-                ? static_cast<int8_t>(corridorResistance(state, car, state.activeTeam))
-                : static_cast<int8_t>(-1);
+        if (car.teamSide == state.activeTeam) {
+            turn.corridorResistance =
+                static_cast<int8_t>(corridorResistance(state, car, state.activeTeam));
+            turn.corridorStrength =
+                static_cast<int16_t>(corridorStrength(state, car, state.activeTeam));
+            // Tempo -- viz cage_advance.h. Razítkuje se KAŽDÉ kolo, protože
+            // plánovač, kde to dosud žilo, v produkci neběží.
+            TempoSnapshot t = tempoSnapshot(state, car, state.activeTeam);
+            turn.requiredPace = t.required;
+            turn.achievablePace = t.achievable;
+            turn.distToEndzone = t.distToEndzone;
+        } else {
+            turn.corridorResistance = -1;
+            turn.corridorStrength = -1;
+        }
     }
 
     return turn;

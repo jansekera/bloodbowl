@@ -90,6 +90,18 @@ struct TurnLog {
     // -1 = not applicable (we do not hold the ball).
     int8_t corridorResistance = -1;
 
+    // Sesterská veličina k corridorResistance (2026-08-21): SOUČET ST týchž
+    // těl. Odpor jako počet nerozlišil čtyři soupeře (1,78/1,93/1,89/1,89),
+    // přestože se v nich trpaslíkovo skórování liší 4,3x. -1 = N/A.
+    int16_t corridorStrength = -1;
+
+    // Tempo jako vlastnost desky (2026-08-21). `plan.*` je v produkci celé
+    // nula (NOT_CONSULTED ve 100 % kol), takže dosud NEEXISTOVALO měření
+    // toho, jestli vůbec stíháme dojít. -1 = N/A (nedržíme míč v našem kole).
+    float requiredPace = -1.0f;
+    float achievablePace = -1.0f;
+    int8_t distToEndzone = -1;
+
     // Summary flags
     bool turnover = false;
     bool touchdown = false;

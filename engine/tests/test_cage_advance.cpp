@@ -808,3 +808,70 @@ TEST(CorridorResistance, CountsOnlyStandingOpponentsInTheCorridor) {
     EXPECT_EQ(corridorResistance(state, carrier, TeamSide::HOME), 2)
         << "prone, too deep, too wide and behind must all be excluded";
 }
+
+// ---------------------------------------------------------------------------
+// MĚŘENÍ PŘIDANÉ 21.08. — tempo a síla koridoru jako VLASTNOSTI DESKY.
+// Důvod: plan.* je v produkci celé nula (NOT_CONSULTED ve 100 % kol), takže
+// "stíháme dojít?" a "jak silná je zeď?" nešlo z korpusu zjistit vůbec.
+// ---------------------------------------------------------------------------
+
+TEST(BoardMetrics, CorridorStrengthWeighsStrengthNotBodies) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {10, 7}; car.stats = {6, 3, 3, 8}; car.movementRemaining = 6;
+
+    // dvě slabá těla v koridoru (ST 2 + ST 2)
+    for (int i = 0; i < 2; ++i) {
+        Player& e = gs.getPlayer(12 + i);
+        e.id = 12 + i; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = {static_cast<int8_t>(12 + i), 7}; e.stats = {6, 2, 3, 7};
+    }
+    EXPECT_EQ(corridorResistance(gs, car, TeamSide::HOME), 2);
+    EXPECT_EQ(corridorStrength(gs, car, TeamSide::HOME), 4);
+
+    // tytéž dvě těla, ale silná (ST 4 + ST 4): počet STEJNÝ, síla DVOJNÁSOBNÁ
+    gs.getPlayer(12).stats = {6, 4, 3, 9};
+    gs.getPlayer(13).stats = {6, 4, 3, 9};
+    EXPECT_EQ(corridorResistance(gs, car, TeamSide::HOME), 2);
+    EXPECT_EQ(corridorStrength(gs, car, TeamSide::HOME), 8);
+}
+
+TEST(BoardMetrics, TempoSnapshotExistsWithoutThePlanner) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.turnNumber = 5;              // turnsLeft = 9-5 = 4, usable = 3
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {13, 7}; car.stats = {6, 3, 3, 8}; car.movementRemaining = 6;
+
+    TempoSnapshot t = tempoSnapshot(gs, car, TeamSide::HOME);
+    EXPECT_EQ(t.distToEndzone, 12);          // 25 - 13
+    EXPECT_EQ(t.turnsLeft, 4);
+    EXPECT_FLOAT_EQ(t.required, 12.0f / 3.0f);
+    // prázdný koridor => žádná přirážka => MA 6 + 2 GFI
+    EXPECT_FLOAT_EQ(t.achievable, 8.0f);
+}
+
+TEST(BoardMetrics, TempoAchievableDropsWithCorridorResistance) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.turnNumber = 1;
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {10, 7}; car.stats = {6, 3, 3, 8}; car.movementRemaining = 6;
+
+    float clean = tempoSnapshot(gs, car, TeamSide::HOME).achievable;
+    for (int i = 0; i < 3; ++i) {
+        Player& e = gs.getPlayer(12 + i);
+        e.id = 12 + i; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = {static_cast<int8_t>(11 + i), 7}; e.stats = {6, 3, 3, 8};
+    }
+    float blocked = tempoSnapshot(gs, car, TeamSide::HOME).achievable;
+    EXPECT_LT(blocked, clean) << "zeď musí srazit dosažitelné tempo";
+    EXPECT_FLOAT_EQ(blocked, clean - 2.0f);   // přirážka min(2, (3+1)/2) = 2
+}

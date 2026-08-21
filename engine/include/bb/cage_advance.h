@@ -154,6 +154,41 @@ struct CageAdvancePlan {
 int corridorResistance(const GameState& state, const Player& carrier,
                        TeamSide mySide);
 
+// ⛔ CO corridorResistance NEVIDÍ (2026-08-21). Je to POČET těl v koridoru,
+// takže váží skavena ST 2 stejně jako orka ST 4 s Guardem. Změřeno na 300
+// hrách: napříč čtyřmi soupeři dává 1,78 / 1,93 / 1,89 / 1,89 -- prakticky
+// totéž -- zatímco trpaslíkovo skórování se mezi krajními soupeři liší 4,3x
+// a je MONOTÓNNÍ v jejich průměrném ST i AV. Doktrína přitom zní "trpaslík
+// zeď PROLOMÍ, elf ji OBĚHNE", a prolomení je funkce SÍLY zdi, ne počtu těl.
+// Součet ST týchž těl je proto samostatná veličina, ne varianta téže.
+int corridorStrength(const GameState& state, const Player& carrier,
+                     TeamSide mySide);
+
+// Tempo jako VLASTNOST DESKY, ne plánovače.
+//
+// ⛔ PROČ ZNOVU A VEDLE `TurnPlanRecord` (2026-08-21). Táž lekce jako K9b
+// o odporu koridoru: `plan.requiredPace`/`achievablePace` se počítají jen
+// uvnitř CageAdvancePlanner::plan(), a ten je v produkci vypnutý --
+// `verdict = NOT_CONSULTED` a `adopted = false` ve 100 % kol (9 574 z 9 574
+// na korpusu 21.08., a stejně tak na korpusu 19.08. PŘED opravou vstávání).
+// Všechna pole plánu kromě `written`, `turns_left` a `dist_to_endzone` jsou
+// proto v korpusu NULA -- a nula se pak čte jako fakt.
+// ⇒ Bez tohohle se "jsme pomalí" nedá odlišit od "jsme pomalí schválně"
+//   ani od "nikam nejdeme".
+//
+// ⚠️ `achievable` je tu SCHVÁLNĚ BEZ KLECE. Plánovačova verze je největší
+// krok, pro který je proveditelné rozestavení rohů; tahle je prostý dosah
+// nosiče mínus přirážka za odpor. Jsou to dvě různé veličiny a nesmí se
+// srovnávat napřímo.
+struct TempoSnapshot {
+    float required = -1.0f;      // vzdálenost k jejich EZ / použitelná kola
+    float achievable = -1.0f;    // dosah nosiče (vč. GFI) - přirážka za odpor
+    int8_t distToEndzone = -1;
+    int8_t turnsLeft = -1;
+};
+TempoSnapshot tempoSnapshot(const GameState& state, const Player& carrier,
+                            TeamSide mySide);
+
 class CageAdvancePlanner {
 public:
     // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,

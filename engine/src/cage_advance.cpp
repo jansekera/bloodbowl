@@ -72,6 +72,44 @@ int corridorResistance(const GameState& state, const Player& carrier,
     return n;
 }
 
+int corridorStrength(const GameState& state, const Player& carrier,
+                     TeamSide mySide) {
+    const int dx = forwardDx(mySide);
+    int st = 0;
+    state.forEachOnPitch(opponent(mySide), [&](const Player& p) {
+        if (p.state != PlayerState::STANDING) return;
+        int ahead = (p.position.x - carrier.position.x) * dx;
+        if (ahead < 1 || ahead > CageAdvancePlanner::CORRIDOR_DEPTH) return;
+        if (std::abs(p.position.y - carrier.position.y) >
+            CageAdvancePlanner::CORRIDOR_HALF_WIDTH) return;
+        st += p.stats.strength;
+    });
+    return st;
+}
+
+TempoSnapshot tempoSnapshot(const GameState& state, const Player& carrier,
+                            TeamSide mySide) {
+    TempoSnapshot t;
+    const int ezX = (mySide == TeamSide::HOME) ? 25 : 0;
+    const int dist = std::abs(carrier.position.x - ezX);
+    const TeamState& my = state.getTeamState(mySide);
+    // Táž definice jako v plánovači (ř. 464): turnsLeft = 9 - turnNumber.
+    const int turnsLeft = std::clamp(9 - static_cast<int>(my.turnNumber), 0,
+                                     CageAdvancePlanner::MAX_HALF_TURNS);
+    const int usable = std::max(1, turnsLeft - CageAdvancePlanner::RESERVE_TURNS);
+
+    t.distToEndzone = static_cast<int8_t>(std::min(dist, 127));
+    t.turnsLeft = static_cast<int8_t>(turnsLeft);
+    t.required = static_cast<float>(dist) / static_cast<float>(usable);
+
+    const int resistance = corridorResistance(state, carrier, mySide);
+    const int penalty = std::min(2, (resistance + 1) / 2);
+    t.achievable = static_cast<float>(
+        static_cast<int>(carrier.movementRemaining) +
+        CageAdvancePlanner::CARRIER_GFI_MAX - penalty);
+    return t;
+}
+
 bool CageAdvancePlanner::eligibleCornerPlayer(const Player& p) {
     // Activation-reliability nega-traits: the corner job is a formation
     // commitment -- a corner that fails its activation roll (or roots) is a
