@@ -943,6 +943,52 @@ být **obě fáze hratelné naráz**. ⏳ Čeká na souhlas uživatele.
 2. Ta úspora na lavičce je měřená **PO dnešní opravě vstávání**; před ní
    byla jiná, protože sražený mizel z desky, ale nešel do zranění.
 
+## ⛔⛔ P53 — KORIDOR VIDÍ JEN SOUPEŘE, NE NÁS *(uživatel 21.08.)*
+
+*„Pozor u pokusu odstranit zedníka faulem, ať si tu cestu nezavřeme našimi
+asistenty."*
+
+### Mechanismus
+
+Asistence u faulu vyžadují **naše těla VEDLE CÍLE**, a cíl leží **v koridoru**
+⇒ abychom zvýšili šanci prorazit brnění *(Black Ork AV 9 = **27,9 %**,
+změřeno)*, obklíčíme ho svými těly, která **stojí přesně v cestě, kterou
+chceme projít**. **Odstraníme jednoho zedníka a zazdíme se sami.**
+⚠️ A ta těla jsou pak **markovaná zbytkem zdi** ⇒ odchod je bude stát dodge.
+**Nejsou to jen zabraná pole, jsou to zavázaná těla na příští kolo.**
+
+### ⛔ A METR TO NEPOZNÁ — včetně toho, který jsem dnes přidal
+
+`corridorResistance` i `corridorStrength` iterují **výhradně přes soupeře**
+*(`forEachOnPitch(opponent(mySide))`)*.
+⇒ Po povedeném faulu **síla zdi KLESNE** *(ubyl nepřítel)*, zatímco
+**skutečná průchodnost se ZHORŠÍ** *(přibyli naši)*.
+⭐ **Metr ohodnotí tah jako úspěch přesně tehdy, kdy je to prohra.**
+
+### Ocenění řetězu má tedy ČTYŘI členy, čtvrtý záporný
+
+> **(o kolik klesne síla zdi) × (cena těla) × (šance, že ho odstraním)
+> − (kolik koridoru si sami ucpeme a kolik těl si zavážeme)**
+
+### ⏰ Kdy
+
+⛔ **NE TEĎ** — korpus se sbírá a přidání pole do turn logu by znamenalo, že
+prvních pár dvojic ho nemá; to je přesně ta nesourodost, kvůli které dnes
+zahazujeme korpus z 19.08.
+⇒ **PRVNÍ VĚC PO VÍKENDU:** sesterský metr *„naše stojící těla v koridoru"*,
+toutéž geometrií *(CORRIDOR_DEPTH 4, HALF_WIDTH 2)*.
+
+### ⭐⭐⭐ A JE TO POTŘETÍ TÝŽ TVAR — proto z toho vzniklo zadání pro Fable
+
+| metr | počítá | nepočítá |
+|---|---|---|
+| `favorable_blocks` [65] | **naše** 2+ kostkové bloky | soupeřovy proti nám |
+| `corridor_resistance` | **počet** těl | jejich sílu *(→ opraveno 21.08.)* |
+| `corridor_strength` | **soupeře** v koridoru | **nás** v koridoru |
+
+⇒ **Naše metry jsou soustavně JEDNOSTRANNÉ.** Tři nezávislé nálezy za jediný
+den vypadají na **třídu vad, ne na tři náhody** ⇒ **T2.20, audit metrů.**
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
