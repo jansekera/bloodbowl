@@ -1058,6 +1058,48 @@ ale k **volbě pole nosiče**, což je vysoká priorita. **Rozhodnout dřív, ne
 to začne stavět** — jinak se vysoká priorita omylem zakope do nízké.
 
 
+
+### ⭐⭐⭐ PŘEPÍNAČ FÁZE — uživatel 21.08.
+
+> **„Klec staví brzo pomalý proti rychlému."**
+
+⇒ Není to vlastnost rasy ani soupeře, je to **VZTAH RYCHLOSTÍ**. Jedním
+pravidlem to rozliší čtyři případy: pomalý proti rychlému kleci **hned**
+*(neuteče)*, rychlý proti pomalému **běží a drží screen** *(uteče)*, zbylé dva
+jsou mezi tím podle velikosti rozdílu.
+
+**Operační přepis** *(moje formulace, ne uživatelova — ať se to nepřipíše
+špatně)*, bez konstanty a bez rasy:
+
+> **Dokáže nosič skončit kolo mimo dosah všech?**
+> **ANO ⇒ běž a drž screen. NE ⇒ stav klec.**
+
+⭐ **Umíme to spočítat už dnes:** je to zrcadlo **metriky 17.6** *(levná úniková
+pole nosiče, gradient +1,41 → +2,86)*, a rys **`carrier_blitzable` [63]**
+v hodnotové funkci už existuje.
+⇒ **Přechod fáze tedy NENÍ číslo kola ani konstanta** — sedí na uživatelův
+zákaz konstant z 20.08.
+
+⚠️ Uživatelův vlastní příklad: *„u trpaslíků preferuju sestavit klec co
+nejdříve, zvlášť proti ELFŮM a SKAVENŮM"* — tedy proti **MA 8-9**. Sedí to na
+U1, kde je hák **max MA toho, kdo na nosiče DOSÁHNE** *(6→×1,31 · 7→×1,15 ·
+8→×1,62 · 9→×1,89)*.
+
+### Odstup nosiče od screenu — Q11 ZODPOVĚZENO
+
+*„Ze začátku — kam dojde. Runner jde z hloubi pole s míčem a screen jde od
+půle. Pak asi jednu mezeru za screenem a pak on."*
+
+* **na začátku drivu odstup vzniká GEOMETRIÍ, ne pravidlem** — runner startuje
+  vzadu, screen se staví od půlky;
+* **ustálený stav: jedna mezera**, tedy nosič **dvě řady** za linií.
+
+⚠️ **Jedna mezera je slabší, než jsem u Q11 navrhoval:** kdo protrhne clonu,
+stojí na linii a k nosiči mu zbývají 2 pole — **blitz s pohybem je dojde**.
+Drží to proti protlačení, **ne proti rychlému blitzeru**.
+⭐ **A to je přesně důvod, proč pravidlo výš existuje:** proti rychlému se
+screen na odstup spolehnout nedá, tak se staví klec.
+
 ### ⭐⭐⭐ ROH SCREENU — HOTOVÁ GEOMETRIE *(uživatel 21.08., potvrzeno)*
 
 *„Když má soupeř frenzy, musím poslední roh u kraje postavit o 1 pole dál od
