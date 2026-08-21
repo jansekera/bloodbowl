@@ -1008,7 +1008,32 @@ nikdy neukázalo, co se s propadlou deklarací děje dál. **Oprava tu cestu
 zprovoznila**, takže se to od teď bude dít 6× častěji a je čas se podívat.
 *(Táž rodina jako F1 a B1: vada byla němá, dokud jinou opravou neožila.)*
 
-⏰ **Až po víkendu** — běží sběr, do enginu se nesahá.
+### ✅ ZODPOVĚZENO TÝŽ DEN — čtením kódu, běh to neohrozilo
+
+⭐ **Zmrazení se týká OPRAV, ne zjišťování.** Odpověď je **půl na půl**:
+
+* ✅ **aktivace hráče se spotřebuje správně** — Bone-head na 1 nastaví
+  `hasActed`, `hasMoved` i `lostTacklezones` *(`big_guy_handler.cpp:16-19`)*,
+  což sedí na *„the player can't do anything for the turn"*;
+* ⛔ **týmový blitz se NESPOTŘEBUJE.** `blitzUsedThisTurn = true` je na
+  `action_resolver.cpp:90`, tedy **uvnitř** case `ActionType::BLITZ` — a tam
+  se nikdy nedojde, protože big-guy kontrola se vrátí dřív.
+  ⇒ **Tým smí blitznout znovu jiným hráčem**, přesně to, co ř. 7981-7983
+  zakazuje. **Volný blitz navíc** pokaždé, když Ogrovi propadne deklarovaný
+  blitz.
+
+### ⚠️⚠️ A NEZOBECŇOVAT NA VŠECHNY BIG GUYE — texty se LIŠÍ
+
+* **Bone-head** ř. 7980-7983: *„…and the player's team **loses the declared
+  Action** for the turn."* ⇒ týmový blitz padá.
+* **Take Root** ř. 8582-8584: *„if a player fails his Take Root roll as part of
+  a Blitz Action **he may not block that turn**…"* — ⛔ **o ztrátě týmového
+  blitzu tam NENÍ NIC.**
+⇒ **Opravovat po dovednostech, ne plošně jedním `if` v big-guy kontrole.**
+*(Really Stupid, Wild Animal a Bloodlust si přečíst zvlášť — neověřeno.)*
+
+⏰ **Oprava až po víkendu** — běží sběr, do enginu se nesahá. Jsou to dva
+řádky, ale musí být napsané per dovednost.
 
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
