@@ -997,6 +997,46 @@ toutéž geometrií *(CORRIDOR_DEPTH 4, HALF_WIDTH 2)*.
 ⇒ **Naše metry jsou soustavně JEDNOSTRANNÉ.** Tři nezávislé nálezy za jediný
 den vypadají na **třídu vad, ne na tři náhody** ⇒ **T2.20, audit metrů.**
 
+## ⛔⛔ P54 — GUARD SE U FAULU NESMÍ POUŽÍT, A U NÁS SE POUŽÍVÁ
+
+**BB2016 `rules_bb2016.txt` ř. 8158-8161 (Guard):** *„A player with this skill
+assists an offensive or defensive block even if he is in another player's
+tackle zone. **This skill may not be used to assist a foul.**"*
+**ř. 1849-1851 (faul):** *„**No player from either side may assist a foul if
+they are in the tackle zone of an opposing player**, do not have their tackle
+zones, or are not standing."* — **žádná výjimka pro Guard.**
+
+⛔ **U nás:** `resolveFoul` *(`foul_handler.cpp:19-22`)* volá `countAssists`
+*(`helpers.cpp:159`)*, a ta má Guard výjimku natvrdo v sobě ⇒ **uplatní ji
+i u faulu, na obou stranách.**
+
+⚠️ **A já jsem 21.08. tvrdil, že to engine počítá správně** — ověřil jsem, ŽE
+se asistence počítají, ne JAK. Uživatel to odchytil. *(Táž chyba jako 10.08.
+u přihrávky: dodaný text je vstup, verdikt až po textu na disku — jenže tady
+jsem si text na disku neotevřel vůbec.)*
+
+### Dopad není okrajový
+
+Hráčů s **Guard** v TV1200: **trpaslík 6 · ork 6** · human 2 · elf 1 · skaven 1.
+⇒ Právě ty dvě sestavy stojí ve skrumáži a faulují nejvíc.
+⛔ **Všechna čísla o faulech z 21.08. jsou NADHODNOCENÁ** — 58,6 % (AV 7) /
+43,8 (AV 8) / 27,9 (AV 9) / 25,6 (AV 10) i souhrnných 41,5 %.
+
+### ⏰ Kdy
+
+⛔ **NE TEĎ** — běží víkendový sběr; přestavba `.so` pod běžícím korpusem je
+vada, na kterou jsme narazili 19.08. ⇒ **hned po víkendu, vedle P53.**
+
+### ⭐⭐⭐ HYPOTÉZA, KTERÁ Z TOHO PLYNE — a je větší než ta vada
+
+**Dvě pravidlové vady za jediný den, obě na TÉMŽE MÍSTĚ: u akce, která NENÍ
+blok.**
+* **vstávání** = pohyb, který není pohyb ⇒ plánovač ho nevidí *(P45)*;
+* **faul** = asistence, která není bloková ⇒ počítá se blokovou funkcí *(P54)*.
+⇒ **Kód odvozuje všechno od BLOKU, protože blok byl první, co se
+implementovalo.** To je kandidát na **TŘÍDU vad** ⇒ zadáno Fablovi jako
+rules-parity audit *(`evidence/fable_brief_rules_parity_20260821.md`)*.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože
