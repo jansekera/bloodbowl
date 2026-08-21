@@ -785,8 +785,16 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
     att.hasActed = true;
 
-    // Frenzy: if both standing and adjacent after block, mandatory 2nd block
-    if (!frenzySecondBlock && att.hasSkill(SkillName::Frenzy) &&
+    // Frenzy: if both standing and adjacent after block, mandatory 2nd block.
+    // ⛔ JEN PO PUSHED / DEFENDER STUMBLES (oprava 21.08.). BB2016 l. 8139-8141:
+    // "If a 'Pushed' or 'Defender Stumbles' result WAS CHOSEN, the player must
+    // immediately throw a second block." Dosud se druhý blok házel po každém
+    // výsledku, kde oba zůstali stát a sousedili -- tedy i po BOTH_DOWN, kdy
+    // oba mají Block a nikdo nepadne. To je blok navíc zadarmo, a v TV1200 to
+    // má jen trpaslík (2 Troll Slayeři), takže to hrálo PRO nás.
+    const bool frenzyTrigger = (chosen == BlockDiceFace::PUSHED ||
+                                chosen == BlockDiceFace::DEFENDER_STUMBLES);
+    if (!frenzySecondBlock && frenzyTrigger && att.hasSkill(SkillName::Frenzy) &&
         canAct(att.state) && canAct(def.state) &&
         att.position.distanceTo(def.position) == 1) {
         // CRP: during a Blitz the second block costs movement too — with

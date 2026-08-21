@@ -157,7 +157,8 @@ int calculateCatchTarget(const GameState& state, const Player& catcher, int modi
 }
 
 int countAssists(const GameState& state, Position targetPos, TeamSide assistingSide,
-                 int excludeId1, int excludeId2, int tzExcludeId) {
+                 int excludeId1, int excludeId2, int tzExcludeId,
+                 bool guardApplies) {
     int count = 0;
     auto adj = targetPos.getAdjacent();
     for (auto& apos : adj) {
@@ -170,7 +171,7 @@ int countAssists(const GameState& state, Position targetPos, TeamSide assistingS
 
         // Can assist if: has Guard, or not in any enemy TZ
         // CRP: "except the player being blocked" → exclude tzExcludeId from TZ check
-        if (p->hasSkill(SkillName::Guard)) {
+        if (guardApplies && p->hasSkill(SkillName::Guard)) {
             count++;
         } else {
             int enemyTZ = countTacklezones(state, p->position, assistingSide, tzExcludeId);
@@ -248,8 +249,18 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
     if (roll >= target) return true;
 
     // Skill reroll
+    // ⛔ LIMIT JEDNOU ZA KOLO (oprava 21.08.). BB2016 l. 8089-8090 (Dodge):
+    // "the player may only re-roll ONE failed Dodge roll per turn"; l. 8541
+    // (Sure Feet): "may only use the Sure Feet skill once per turn".
+    // attemptRoll žádný stav za kolo nemělo, takže obě šly neomezeně -- a
+    // nadržovalo to dodge týmům (skaven, wood-elf), které dodgují nejvíc.
+    bool* skillOncePerTurn = nullptr;
+    if (skillReroll == SkillName::Dodge)    skillOncePerTurn = &player.dodgeRerollUsedThisTurn;
+    if (skillReroll == SkillName::SureFeet) skillOncePerTurn = &player.sureFeetRerollUsedThisTurn;
     if (skillReroll != SkillName::SKILL_COUNT &&
-        player.hasSkill(skillReroll) && !skillNegatedByOpponent) {
+        player.hasSkill(skillReroll) && !skillNegatedByOpponent &&
+        !(skillOncePerTurn && *skillOncePerTurn)) {
+        if (skillOncePerTurn) *skillOncePerTurn = true;
         roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(skillReroll), roll >= target});

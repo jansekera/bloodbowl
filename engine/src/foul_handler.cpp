@@ -16,10 +16,11 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     }
 
     // Calculate foul assists
+    // guardApplies = false: BB2016 l. 8160 -- Guard nesmí asistovat FAULU.
     int friendlyAssists = countAssists(state, target.position, fouler.teamSide,
-                                        fouler.id, target.id);
+                                        fouler.id, target.id, -1, false);
     int enemyAssists = countAssists(state, fouler.position, target.teamSide,
-                                     fouler.id, target.id);
+                                     fouler.id, target.id, -1, false);
     int assistMod = friendlyAssists - enemyAssists;
 
     // DirtyPlayer bonus
@@ -31,7 +32,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     int die1 = dice.rollD6();
     int die2 = dice.rollD6();
     int armourRoll = die1 + die2 + assistMod;
-    bool isDoubles = (die1 == die2);
+    bool isDoubles = (die1 == die2);   // armour; injury se přičte níž (l. 1878)
 
     bool armourBroken = (armourRoll > target.stats.armour);
 
@@ -56,7 +57,11 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         if (target.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
         if (fouler.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
 
-        resolveInjuryRoll(state, target.id, dice, ctx, events);
+        // BB2016 l. 1878: "if the Armour AND/OR Injury roll is a doubles".
+        // Dosud se koukalo jen na armour kostky (oprava 21.08.).
+        bool injuryDoubles = false;
+        resolveInjuryRoll(state, target.id, dice, ctx, events, &injuryDoubles);
+        if (injuryDoubles) isDoubles = true;
 
         handleBallOnPlayerDown(state, target.id, dice, events);
     }

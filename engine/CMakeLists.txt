@@ -61,6 +61,7 @@ add_executable(bb_tests
     tests/test_position.cpp
     tests/test_player.cpp
     tests/test_game_state.cpp
+    tests/test_turn_handler.cpp
     tests/test_dice.cpp
     tests/test_helpers.cpp
     tests/test_injury.cpp

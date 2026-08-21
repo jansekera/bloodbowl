@@ -36,7 +36,7 @@ TEST(FoulHandler, FoulBreaksArmour) {
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
     // Armor: 5+4=9 > 8, broken. Injury: 3+3=6 → stunned
-    FixedDiceRoller dice({5, 4, 3, 3});
+    FixedDiceRoller dice({5, 4, 3, 4});  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
@@ -48,7 +48,7 @@ TEST(FoulHandler, DirtyPlayerBonus) {
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
     // Armor: 4+4+1(DP)=9 > 8, broken. Injury: 3+3=6 → stunned
-    FixedDiceRoller dice({4, 4, 3, 3});
+    FixedDiceRoller dice({4, 4, 3, 4});  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
@@ -94,7 +94,7 @@ TEST(FoulHandler, FoulOnStunnedTarget) {
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::STUNNED;
     // Valid target
-    FixedDiceRoller dice({5, 4, 3, 3}); // broken + stunned
+    FixedDiceRoller dice({5, 4, 3, 4}); // broken + stunned  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_TRUE(result.success);
 }
@@ -117,8 +117,9 @@ TEST(FoulHandler, FoulEmitsInjuryEvent) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
-    // Armor: 5+4=9 > 8, broken. Injury: 3+3=6 → stunned.
-    FixedDiceRoller dice({5, 4, 3, 3});
+    // Armor: 5+4=9 > 8, broken. Injury: 3+4=7 → stunned (dřív 3+3=6; 3,3 je
+    // nově dublet a vyloučilo by faulujícího, BB2016 l. 1878).
+    FixedDiceRoller dice({5, 4, 3, 4});  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     std::vector<GameEvent> events;
     auto result = resolveFoul(gs, 1, 12, dice, &events);
     EXPECT_TRUE(result.success);
@@ -128,9 +129,9 @@ TEST(FoulHandler, FoulEmitsInjuryEvent) {
     });
     ASSERT_NE(it, events.end());
     EXPECT_EQ(it->playerId, 12);
-    EXPECT_EQ(it->roll, 6);
+    EXPECT_EQ(it->roll, 7);
     EXPECT_EQ(it->die1, 3);
-    EXPECT_EQ(it->die2, 3);
+    EXPECT_EQ(it->die2, 4);
 
     // FOUL and ARMOR_BREAK events also carry the individual armour dice.
     auto foulEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
@@ -154,8 +155,44 @@ TEST(FoulHandler, FoulDecayDoesNotAffectTheInjuryRoll) {
     gs.getPlayer(12).skills.add(SkillName::Decay);
     // Armour: 5+4=9 > 8, broken. Injury: 3+3=6 -> Stunned, and that stands;
     // the trailing 5,4 must not be consumed as a second injury roll.
-    FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
+    FixedDiceRoller dice({5, 4, 3, 4, 5, 4});  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_TRUE(result.success);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}
+
+// BB2016 ř. 1878-1882: "if the Armour AND/OR Injury roll is a doubles (i.e.
+// two 1s, or two 2s, etc), the referee has spotted the foul, and the player
+// taking the Foul Action is sent off... In addition, his team suffers a
+// turnover." Do 21.08. se koukalo JEN na armour kostky, protože hod na
+// zranění dělá sdílená BLOKOVÁ funkce, která kostky nevracela.
+TEST(FoulHandler, DoublesOnInjuryRollEjectsAndCausesTurnover) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+
+    // armour 5+4 = 9 > AV 8 => prorazí; zranění 3+3 = DUBLET
+    FixedDiceRoller dice({5, 4, 3, 3});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED) << "dublet na zranění vylučuje";
+    EXPECT_TRUE(result.turnover) << "a tým má turnover";
+}
+
+TEST(FoulHandler, GuardDoesNotAssistAFoul) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);      // faulující
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;      // oběť
+    // náš asistent vedle oběti, ale V TZ stojícího soupeře => bez Guardu neasistuje
+    placePlayer(gs, 2, {11, 8}, TeamSide::HOME);
+    gs.getPlayer(2).skills.add(SkillName::Guard);
+    placePlayer(gs, 13, {12, 8}, TeamSide::AWAY);     // markuje našeho asistenta
+
+    // armour 4+4 = 8, AV 8 => neprorazí BEZ asistence; s Guardem by bylo 9 a prorazilo
+    FixedDiceRoller dice({4, 4});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE)
+        << "BB2016 ř. 8160: Guard se u faulu použít NESMÍ";
 }

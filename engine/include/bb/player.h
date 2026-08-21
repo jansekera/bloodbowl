@@ -31,10 +31,31 @@ struct Player {
     const char* positionName = "";
     int8_t movementRemaining = 0;
     bool hasMoved = false;
+    // BB2016 l. 703-708: "All face-down players are turned face up at the END
+    // of their team's next turn... Note that a player may not turn face up on
+    // the turn they are Stunned."  The flip therefore belongs at END of turn,
+    // and must skip anyone stunned during that very turn. Cleared for the
+    // active team in resetPlayersForNewTurn, so a player stunned during the
+    // OPPONENT's turn has it clear by the start of his own turn and flips at
+    // that turn's end -- while one stunned during his own team's turn keeps
+    // the flag through it and flips a turn later.
+    bool stunnedThisTurn = false;
     bool hasActed = false;
     bool usedBlitz = false;
     bool lostTacklezones = false;
     bool proUsedThisTurn = false;
+    // BB2016 l. 8573 a spol.: "Immediately after declaring an ACTION with this
+    // player, roll a D6" -- JEDNOU za akci, ne za každé pole. Náš vícepolový
+    // pohyb je N akcí MOVE, takže se hod dělal N-krát. Dokud ležící big guy
+    // nikdy nejednal, nevadilo to; P45 to probudilo (oprava 21.08.).
+    bool bigGuyCheckedThisTurn = false;
+    // BB2016 l. 8089-8090 (Dodge): "the player may only re-roll ONE failed
+    // Dodge roll PER TURN"; l. 8541-8542 (Sure Feet): "may only use the Sure
+    // Feet skill once per turn". attemptRoll dosud žádný stav za kolo nemělo,
+    // takže se rerollovalo neomezeně -- a nadržovalo to dodge týmům
+    // (skaven, wood-elf) proti nám (oprava 21.08.).
+    bool dodgeRerollUsedThisTurn = false;
+    bool sureFeetRerollUsedThisTurn = false;
     // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on
     // the pitch at the end of a drive. On a roll of 1 the player collapses and
     // may not be set up for the next kick-off." One drive out, then back --

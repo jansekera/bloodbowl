@@ -1776,6 +1776,14 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // the auto-pickup in move_handler.cpp would turn this dice-free macro
     // into a real gamble (item 11).
     Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
+    // Pojistka (21.08.): vstávací makro má cíl == vlastní pole hráče. Kdyby na
+    // něm ležel volný míč, `avoid` by tu JEDINOU akci vetoval, expanze by
+    // vrátila prázdno a MacroMCTSPolicy z toho udělá END_TURN -- tedy zahodí
+    // zbytek kola CELÉHO týmu. Vstáváním se na pole nevstupuje, jen se na něm
+    // hráč zvedá, takže tu žádný pickup hrozit nemůže.
+    if (macro.targetPos == state.getPlayer(macro.playerId).position) {
+        avoid = Position{-1, -1};
+    }
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
                      maxSteps, avoid);
     return result;

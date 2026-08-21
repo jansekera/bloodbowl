@@ -24,11 +24,13 @@ CasualtyResult rollCasualty(DiceRollerBase& dice) {
 }
 
 int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
-                      const InjuryContext& ctx, std::vector<GameEvent>* events) {
+                      const InjuryContext& ctx, std::vector<GameEvent>* events,
+                      bool* outDoubles) {
     Player& player = state.getPlayer(playerId);
 
     int d1 = dice.rollD6();
     int d2 = dice.rollD6();
+    if (outDoubles) *outDoubles = (d1 == d2);
     int injuryRoll = d1 + d2 + ctx.injuryModifier;
 
     // Decay does NOT touch the Injury roll (rules parity, 2026-08-10). CRP:
@@ -49,6 +51,8 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
     if (injuryRoll <= 7) {
         // Stunned
         player.state = PlayerState::STUNNED;
+        // BB2016 l. 707: may not turn face up on the turn he is Stunned.
+        player.stunnedThisTurn = true;
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
                           injuryRoll, false, d1, d2});
     } else if (injuryRoll <= 9) {
@@ -64,6 +68,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         // dwarf has this skill, so it was live and it cost us.
         if (player.hasSkill(SkillName::ThickSkull) && injuryRoll == 8) {
             player.state = PlayerState::STUNNED;
+            player.stunnedThisTurn = true;
             emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                               static_cast<int>(SkillName::ThickSkull), true});
             return injuryRoll;

@@ -922,6 +922,58 @@ se **ani jeden nedotýká vstávání ani asistencí u faulu** *(ověřeno)*.
 ⇒ **Kontrola ověřuje to, co nás napadlo ověřit**, a pravidlová vada je z
 definice to, co nás nenapadlo.
 
+## ✅ VÁRKA OPRAV 21.08. PŘED RESTARTEM — testy 577/577
+
+Sběr zabit **11:26** *(989 her `dwarf-dwarf`, zahozeno)*. Opraveno jen to, co
+**mění, co se ve hře stane** — pozorovací věci a neživé rasy odloženy.
+**Každé pravidlo ověřeno v `rules_bb2016.txt`, ne z citace agenta.**
+
+| # | co | pravidlo | proč to hoří |
+|---|---|---|---|
+| **F1** | omráčený se probíral **na začátku** kola | ř. **703-708** *(„at the END of their team's next turn")* | **aktivace navíc** každému omráčenému, 6,2 stunů/hru; ⭐ **spící vada, kterou probudilo P45** |
+| **F2a** | Guard asistoval faulu | ř. **8160** *(„may not be used to assist a foul")* | trpaslík 6 + ork 6 Guardů ⇒ **všechna čísla o faulech nadhodnocená** |
+| **F2b** | dublet se hlídal **jen na armour** | ř. **1878** *(„Armour **and/or** Injury")* | ≈**0,42 vyloučení a turnoverů/hru** navíc; faul byl levnější, než má být |
+| **F3** | Frenzy házel druhý blok **po každém** výsledku | ř. **8139-8141** *(jen po Pushed / Defender Stumbles)* | blok zdarma; v TV1200 má Frenzy **jen trpaslík** ⇒ hrálo to PRO nás |
+| **F4/F5** | Dodge a Sure Feet reroll **bez limitu** | ř. **8089-8090**, **8541-8542** *(jednou za kolo)* | nadržovalo **dodge týmům** (skaven, wood-elf) |
+| **B1** | big-guy hod **za každé pole** místo za akci | ř. **8573** *(„after declaring an ACTION")* | ⭐ **taky probudilo P45** — Ogre a Treeman rolovali Bone Head / Take Root za každý krok |
+| **B2** | Take Root bránil **vstávání** | ř. **8583-8584** *(„he can still roll to stand up if he is Prone")* | Treeman vstával s **41,7 %** místo 50 %, a jen wood-elf |
+
+**A moje dnešní regrese** *(našel je code review — všechny z commitů 21.08.)*:
+* ⛔ **blitz přicházel o svůj blok** — `hasMoved` zábrana nerozlišovala „deklaroval
+  blitz" od „jen se hnul"; nově `hasMoved && !usedBlitz`;
+* **vstávání pod 3 MA obcházelo `attemptRoll`** ⇒ nešel na něj **týmový reroll**
+  *(u Treemana s Loner dvojnásob citlivé — přesně to selhání, které měl P45 odstranit)*;
+* **Jump Up neemitoval `STAND_UP`** ⇒ volná vstání byla v logu neviditelná;
+* **BallAndChain** chyběl ve vstávací smyčce *(makro vrstva ho měla — dvě
+  vrstvy si odporovaly uvnitř jednoho commitu)*;
+* **pojistka `avoid`** — vstávací makro má cíl == vlastní pole; kdyby na něm
+  ležel volný míč, veto by udělalo z expanze prázdno a z toho **END_TURN**,
+  tedy zahození kola celého týmu.
+
+### ⚠️ NÁLEZY AGENTŮ, KTERÉ JSEM PO OVĚŘENÍ NEPŘIJAL
+
+* **„Rozbil jsi Jump Up"** — ⛔ **ne.** ř. 8198 dává volné vstání jen tomu, kdo
+  deklaroval **jinou akci než blok**, a pak platí ř. 674. Blok z lehu je
+  samostatná cesta s hodem **AG+2** (ř. 8200), kterou engine **nikdy neuměl**.
+  Moje `hasMoved` odstranilo **nelegální** blok zdarma.
+* **„prone Looney (roster.cpp:308)"** — ⛔ špatné jméno: ř. 308 je **Fanatic**
+  (ST 7, BallAndChain), Looney je ř. 307 (Chainsaw). Oprava věcně sedí.
+⭐ **Dvakrát za odpoledne přinesl agent správný nález se špatným zdůvodněním.**
+
+### 📌 ODLOŽENO — nemá vliv na korpus
+
+* **Stand-and-go** — makro umí postavit jen **na místě**; ř. 670-671 dovolují
+  utratit zbytek pohybu *(Longbeard MA 4 vstane a jde 1 pole)*. **Není to
+  porušení pravidel, je to STROP na naměřenou hodnotu P45.** ⇒ přeměřit potom.
+* **Ball & Chain** *(goblini — v TV1200 nikdo)*: ř. **7827-7830** žádá hod na
+  zranění **bez hodu na brnění** a **Stunned → KO**; my házíme i brnění
+  a Stunned necháváme. → k P49.
+* **Jump Up blok z lehu za AG+2** *(v TV1200 nikdo)* → k P49.
+* **Metry**: `achievable` počítá přirážku z **počtu**, ne ze síly *(dědí přesně
+  tu slepotu, kvůli které vznikla `corridor_strength`)*, a `penalty` **saturuje
+  už při odporu 3**, přičemž 5 je běžné ⇒ člen nese skoro nulovou informaci.
+  `TempoSnapshot::turnsLeft` se počítá a **neexportuje**. → k **P53**.
+
 ## 🐢 P49 — UPÍŘI A HYPNOTIC GAZE *(uživatel 21.08., NÍZKÁ PRIORITA)*
 
 Uživatel 21.08.: *„přidej si na nízkou prioritu upíry a skill GAZE — protože

@@ -57,14 +57,21 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
     // New turn (or new drive via kickoff): no activation is open.
     currentActivationId = -1;
     forEachPlayer(side, [](Player& p) {
-        if (p.state == PlayerState::STUNNED) {
-            p.state = PlayerState::PRONE;
-        }
+        // ⛔ STUNNED se tu UŽ NEPŘEKLÁPÍ (oprava 21.08.). BB2016 l. 703-708:
+        // face-down se otáčí na KONCI příštího kola svého týmu, ne na začátku
+        // -- překlopení tady dávalo každému omráčenému jednu aktivaci navíc.
+        // Flip je teď v resolveEndTurn(); tady se jen ČISTÍ příznak, aby hráč
+        // omráčený v SOUPEŘOVĚ kole na konci toho svého už vstal, kdežto ten,
+        // koho složili ve VLASTNÍM kole, ležel ještě jedno.
+        p.stunnedThisTurn = false;
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
         p.lostTacklezones = false;
         p.proUsedThisTurn = false;
+        p.bigGuyCheckedThisTurn = false;
+        p.dodgeRerollUsedThisTurn = false;
+        p.sureFeetRerollUsedThisTurn = false;
         p.movementRemaining = p.stats.movement;
     });
 }

@@ -34,8 +34,14 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
 // not expressible via InjuryContext::armourModifier -- so they still get
 // event-emission and skill-handling parity with the shared BLOCK/bomb/BC path.
 // Returns the injury roll.
+// outDoubles (nepovinné): true, když na hodu na ZRANĚNÍ padl dublet. BB2016
+// l. 1878: "if the Armour AND/OR Injury roll is a doubles" -> faulující je
+// vyloučen a tým má turnover. Foul handler dosud koukal jen na armour kostky,
+// protože injury se dělá touhle sdílenou BLOKOVOU funkcí, která kostky
+// nevracela -- klasický šev "faul přebírá blokovou mašinérii" (oprava 21.08.).
 int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
-                      const InjuryContext& ctx, std::vector<GameEvent>* events);
+                      const InjuryContext& ctx, std::vector<GameEvent>* events,
+                      bool* outDoubles = nullptr);
 
 void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
                       std::vector<GameEvent>* events);

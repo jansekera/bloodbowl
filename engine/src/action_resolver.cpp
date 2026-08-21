@@ -24,7 +24,29 @@ ActionResult resolveAction(GameState& state, const Action& action,
                               p.hasSkill(SkillName::WildAnimal) ||
                               p.hasSkill(SkillName::TakeRoot) ||
                               p.hasSkill(SkillName::Bloodlust);
-        if (hasBigGuySkill) {
+        // ⭐ VSTÁVÁNÍ SE NEBLOKUJE TAKE ROOTEM (oprava 21.08.). BB2016
+        // l. 8583-8584 doslova: "...he may not block that turn (HE CAN STILL
+        // ROLL TO STAND UP IF HE IS PRONE)." Bone Head ("can't do anything
+        // for the turn") a Really Stupid blokují správně -- výjimku má JEN
+        // Take Root. Bez toho vstane Treeman s p = 5/6 x 1/2 = 41,7 % místo
+        // 50 %, a je to jediné tělo pod 3 MA v pěti TV1200 sestavách.
+        const bool standUpAttempt =
+            (action.type == ActionType::MOVE &&
+             p.state == PlayerState::PRONE &&
+             action.target == p.position);
+        const bool onlyTakeRoot = p.hasSkill(SkillName::TakeRoot) &&
+                                  !p.hasSkill(SkillName::BoneHead) &&
+                                  !p.hasSkill(SkillName::ReallyStupid) &&
+                                  !p.hasSkill(SkillName::WildAnimal) &&
+                                  !p.hasSkill(SkillName::Bloodlust);
+        // ⭐ A JEN JEDNOU ZA AKTIVACI (oprava 21.08.). BB2016 l. 8573:
+        // "Immediately after declaring an ACTION". Vícepolový pohyb je u nás
+        // N akcí MOVE, takže se házelo N-krát -- Ogre a Treeman rolovali
+        // Bone Head / Take Root za každé pole. Spící vada, kterou probudilo
+        // P45 (dokud se ležící nezvedal, nikam nešel).
+        if (hasBigGuySkill && !p.bigGuyCheckedThisTurn &&
+            !(standUpAttempt && onlyTakeRoot)) {
+            p.bigGuyCheckedThisTurn = true;
             BigGuyResult bgResult = resolveBigGuyCheck(state, action.playerId,
                                                         action.type, dice, events);
             if (bgResult.actionBlocked && !bgResult.proceed) {

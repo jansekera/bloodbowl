@@ -157,6 +157,7 @@ void resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
                     if (idx == target) {
                         Player& mp = state.getPlayer(p.id);
                         mp.state = PlayerState::STUNNED;
+                        mp.stunnedThisTurn = true;
                         emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, p.id, -1,
                                           p.position, {}, 0, false});
                     }
@@ -173,6 +174,7 @@ void resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
                 int roll = dice.rollD6();
                 if (roll == 6) {
                     p.state = PlayerState::STUNNED;
+                    p.stunnedThisTurn = true;
                     emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, p.id, -1,
                                       p.position, {}, roll, false});
                 }

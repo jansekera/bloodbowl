@@ -108,7 +108,12 @@ TEST(GameState, ResetPlayersForNewTurn) {
 
     gs.resetPlayersForNewTurn(TeamSide::HOME);
 
-    EXPECT_EQ(p.state, PlayerState::PRONE);  // stunned → prone
+    // OPRAVENO 21.08.: STUNNED se v resetu UŽ NEPŘEKLÁPÍ. BB2016 l. 703-708
+    // žádá otočení face-up na KONCI příštího kola týmu, ne na začátku --
+    // tenhle test dosud fixoval to špatné chování (omráčený dostával jednu
+    // aktivaci navíc). Flip je v resolveEndTurn(), viz TurnHandler.Stunned*.
+    EXPECT_EQ(p.state, PlayerState::STUNNED);   // reset s tím nehýbe
+    EXPECT_FALSE(p.stunnedThisTurn);            // jen čistí příznak
     EXPECT_FALSE(p.hasMoved);
     EXPECT_FALSE(p.hasActed);
     EXPECT_FALSE(p.lostTacklezones);

@@ -44,7 +44,13 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // canAct() cannot carry this: it is also used for targeting checks.
         TeamSide enemySide = opponent(side);
         for (auto& pos : adj) {
-            if (p.hasMoved) break;
+            // ⚠️ VÝJIMKA PRO BLITZ (oprava 21.08.): pohyb + blok JE blitz.
+            // `expandBlitzAndScore` provede BLITZ akci, pak si dojde k cíli
+            // vlastními kroky MOVE a teprve pak hledá BLOCK -- holé
+            // `if (p.hasMoved) break` mu ten blok sebralo a blitz se
+            // spotřeboval bez rány. `usedBlitz` se nastavuje na začátku
+            // BLITZ akce, takže rozlišuje "deklaroval blitz" od "jen se hnul".
+            if (p.hasMoved && !p.usedBlitz) break;
             if (!pos.isOnPitch()) continue;
             const Player* enemy = state.getPlayerAtPosition(pos);
             if (enemy && enemy->teamSide == enemySide && canAct(enemy->state)) {
@@ -214,6 +220,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
     state.forEachOnPitch(side, [&](const Player& p) {
         if (p.state != PlayerState::PRONE) return;
         if (p.hasActed || p.lostTacklezones) return;
+        // Stejná výjimka jako v hlavní smyčce (:21) a v makro vrstvě:
+        // BallAndChain smí JEN svou akci. Bez toho si dvě vrstvy odporovaly.
+        if (p.hasSkill(SkillName::BallAndChain)) return;
 
         // Anyone prone may ATTEMPT to stand: 3 MA if he has it, otherwise a
         // 4+ roll (BB2016 l. 691-693). The old `movementRemaining >= 3` gate

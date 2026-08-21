@@ -47,7 +47,13 @@ int calculateCatchTarget(const GameState& state, const Player& catcher, int modi
 // Block helpers
 // tzExcludeId: CRP "except the player being blocked" — exclude from TZ check
 int countAssists(const GameState& state, Position targetPos, TeamSide assistingSide,
-                 int excludeId1 = -1, int excludeId2 = -1, int tzExcludeId = -1);
+                 int excludeId1 = -1, int excludeId2 = -1, int tzExcludeId = -1,
+                 // BB2016 l. 8160: Guard "may not be used to assist a FOUL",
+                 // and l. 1849-1851 lists no exception for it: "No player from
+                 // either side may assist a foul if they are in the tackle zone
+                 // of an opposing player." resolveFoul passes false. Default
+                 // true keeps every block caller unchanged.
+                 bool guardApplies = true);
 BlockDiceInfo getBlockDiceInfo(int attST, int defST);
 int getPushbackSquares(Position attackerPos, Position defenderPos, Position out[3]);
 Position scatterDirection(int d8);

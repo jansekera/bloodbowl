@@ -313,6 +313,14 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
         // Free stand up
         player.state = PlayerState::STANDING;
         player.hasMoved = true;   // standing up IS movement (see below)
+        // ⚠️ hasMoved je tu SPRÁVNĚ, ne regrese: BB2016 l. 8198 dává volné
+        // vstání jen tomu, kdo deklaroval JINOU akci než blok, a pak platí
+        // l. 674 ("a player who stands up may not take a Block Action").
+        // Blok z lehu je samostatná cesta s hodem AG+2 (l. 8200), kterou
+        // engine neumí -- chybí NABÍDKA blokové akce ležícímu, ne tenhle
+        // řádek. Před 21.08. Jump Up vstal zdarma a blokoval NELEGÁLNĚ.
+        emitEvent(events, {GameEvent::Type::STAND_UP, playerId, -1,
+                          player.position, player.position, 0, true});
         return ActionResult::ok();
     }
 
@@ -323,10 +331,17 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
     // further squares unless he Goes For It. Failure to stand successfully for
     // any reason is not a turnover."
     if (player.movementRemaining < 3) {
-        int roll = dice.rollD6();
+        // Přes attemptRoll, ne holým rollD6 (oprava 21.08.): každý jiný hod
+        // v enginu (dodge :137, GFI :161, pickup) jde přes něj a vrstvi
+        // skill reroll -> Pro -> týmový reroll s Loner bránou. Holý hod
+        // znamenal, že Treemanovi nešel použít týmový reroll -- tedy přesně
+        // to selhání, které měl P45 odstranit.
+        bool ok = attemptRoll(state, playerId, dice, /*target=*/4,
+                              SkillName::SKILL_COUNT, /*negated=*/false,
+                              /*canUseTeamReroll=*/true, events);
         emitEvent(events, {GameEvent::Type::STAND_UP, playerId, -1,
-                          player.position, player.position, 4, roll >= 4});
-        if (roll < 4) {
+                          player.position, player.position, 4, ok});
+        if (!ok) {
             // Action is used up, but this is explicitly NOT a turnover.
             player.hasActed = true;
             return ActionResult::fail();

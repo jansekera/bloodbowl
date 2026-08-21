@@ -13,6 +13,18 @@ void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTu
     // of playing the drive out. The ejection now happens where the drive
     // actually ends, in setupHalfOrDrive (game_simulator.cpp).
 
+    // BB2016 l. 703-708 (oprava 21.08.): "All face-down players are turned
+    // face up at the END of their team's next turn, even if a turnover takes
+    // place. Note that a player may not turn face up on the turn they are
+    // Stunned." Dosud se to dělalo v resetPlayersForNewTurn na ZAČÁTKU kola,
+    // takže omráčený dostal aktivaci navíc. Pozn.: "even if a turnover takes
+    // place" -- proto je to tu bezpodmínečně, ne až za kontrolou wasTurnover.
+    state.forEachPlayer(current, [](Player& p) {
+        if (p.state == PlayerState::STUNNED && !p.stunnedThisTurn) {
+            p.state = PlayerState::PRONE;
+        }
+    });
+
     // Switch active team
     state.activeTeam = opponent(current);
 
