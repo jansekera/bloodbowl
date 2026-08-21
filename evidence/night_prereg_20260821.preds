@@ -1,0 +1,44 @@
+# Předpovědi noci 21.→24.08. (VÍKEND) — dvě fáze v řetězu.
+# Strojově kontroluje night_summarize.py POUZE fázi B (A/B). CORPUS=0.
+#
+# ⭐ CO TENHLE BĚH ROZHODUJE
+# Dnešní oprava vstávání (P45) je ŘEZ: ležící se dosud postavil v 0,4 %
+# případů (1 067 z 280 719), nově v ~70 %. Na 21 hrách to dalo 3,04 -> 1,42
+# ležících těl na kolo, +20 % vlastních stojících, +65 % bloků, +59 % sražení.
+# ⇒ Všechno naměřené PŘED 21.08. je z jiného enginu.
+#
+# Fáze B je proto REPLIKACE, ne nová otázka: totéž rameno (mode 6 = volba pole
+# nosiče, boční volnost + veto polí bez klece), týž matchup dw-we, týž počet
+# párů (8 × 850 = 6 800), týž práh ±0,015 jako 19.08. **Mění se JEN engine.**
+# 19.08. dalo +0,0827 ± 0,0065 (+12,80σ), 8/8 shardů kladných.
+#
+# ⚠️ Předpovědi jsou ŠIROKÉ SCHVÁLNĚ. Nevíme, jak velký ten řez je, a úzké
+# pásmo napsané „aby to vyšlo" je horší než přiznaná nejistota.
+#
+# ⭐ SMĚR, KTERÝ OČEKÁVÁM A PROČ: na desce je víc stojících těl (obou týmů),
+# takže je těsněji ⇒ boční volnost by měla být CENNĚJŠÍ, ne míň cenná.
+# Zároveň veto polí bez klece bude blokovat ČASTĚJI (víc soupeřů = víc
+# špinavých rohů), což táhne opačně. Čistý součet neumím předpovědět.
+#
+# ⚠️ DELTA JE DVOUSTRANNÁ (T2.17): harness tiskne chessCandHome + chessCandAway
+# − 1, tedy „my S RAMENEM proti nám PROTI RAMENI". Píšeme obě veličiny.
+
+delta      in    0.020 0.160   # bod +0,08; 19.08. dalo +0,0827. ⛔ Pásmo je široké schválně -- řez je velký a neznámý. Pod 0,020 = efekt řez nepřežil.
+delta_1s   in    0.010 0.080   # totéž jednostranně (= delta/2)
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # rameno sahá na ADVANCE, tedy skoro na každý zápas
+n_nonzero  in    0.55  0.85    # 19.08. dalo 63,3 %. Víc těl = víc rozhodnutých zápasů ⇒ spíš nahoru než dolů.
+arm_picks  >=    2500000       # ≈184/hru na 13 600 her. 19.08. tenhle údaj harness netiskl (pole přibylo 20.08.); Fableho smoke odhadl P38 na ~290/hru, placebo 644/hru. Je to PODLAHA, ne odhad.
+
+# --- RUČNĚ, harness to neumí (nevymýšlím predikát, který summarizer nezná) ---
+# ⭐ ROZKLAD PO RASÁCH, dopočítá se ráno z diag_*_rows.jsonl:
+#   19.08. dalo trpaslík 0,4401 -> 0,5378 (+0,098) a wood-elf 0,5513 -> 0,6466
+#   (+0,095), tedy rasově NEUTRÁLNÍ zisk.
+#   PŘEDPOVĚĎ: neutralita VYDRŽÍ (klec je univerzální pravidlo -- uživatel
+#   20.08.), tj. |Δdwarf − Δwood-elf| < 0,04.
+#   ⛔ Kdyby se rozešly, je to nález o tom, že řez pomohl jedné rase.
+#
+# ⭐ A DRUHÁ RUČNÍ: 20.08. vyšlo, že kritérium klece je vůči placebu +0,034
+#   trpaslíkovi (2,46σ) a nic elfovi. Fable k tomu 21.08. našla mechanismus:
+#   pole u lajny NEMŮŽE mít čtyři rohy, takže kritérium je nechtěný vynucovač
+#   U1. Ten mechanismus je na vstávání NEZÁVISLÝ ⇒ měl by řez přežít beze změny.

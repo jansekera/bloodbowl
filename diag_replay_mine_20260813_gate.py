@@ -42,6 +42,11 @@ from pathlib import Path
 # `corpus_baseline_20260819` má čtyři soupeře, příští bude mít pět, takže se
 # jejich souhrnné řádky (VŠE) nesmí srovnávat přímo. Per-soupeř řádky ano.
 OPPONENTS = os.environ.get("OPPONENTS", "skaven,wood-elf,orc,human,dwarf").split(",")
+# 21.08.2026: dosud byl domácí VŽDY trpaslík, takže korpus uměl jen kříže
+# "dwarf vs X" -- pět z patnácti dvojic. HOME_RACE to otevírá, aniž se cokoli
+# mění pro dosavadní volání (default je pořád dwarf, orientace se dál střídá
+# podle idx % 2, takže každý sběr pokrývá obě strany).
+HOME_RACE = os.environ.get("HOME_RACE", "dwarf")
 W = "weights_best.json"
 POLICY_PATH = "weights_policy.json"
 TV, VF_BLEND, MCTS = 1200, 0.0, 100
@@ -84,7 +89,7 @@ def _game_worker(args: tuple) -> dict:
     import bb_engine
     opp = OPPONENTS[(idx // 2) % len(OPPONENTS)]
     dwarf_home = (idx % 2 == 0)          # obě orientace, ať se nemíchá bias
-    ra, rb = ("dwarf", opp) if dwarf_home else (opp, "dwarf")
+    ra, rb = (HOME_RACE, opp) if dwarf_home else (opp, HOME_RACE)
     hr = bb_engine.get_developed_roster(ra, TV)
     ar = bb_engine.get_developed_roster(rb, TV)
     lgr = bb_engine.simulate_game_logged(
