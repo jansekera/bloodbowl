@@ -65,7 +65,8 @@ PYBIND11_MODULE(bb_engine, m) {
         .value("HYPNOTIC_GAZE", bb::ActionType::HYPNOTIC_GAZE)
         .value("BALL_AND_CHAIN", bb::ActionType::BALL_AND_CHAIN)
         .value("MULTIPLE_BLOCK", bb::ActionType::MULTIPLE_BLOCK)
-        .value("END_TURN", bb::ActionType::END_TURN);
+        .value("END_TURN", bb::ActionType::END_TURN)
+        .value("LEAP", bb::ActionType::LEAP);
 
     py::enum_<bb::Weather>(m, "Weather")
         .value("SWELTERING_HEAT", bb::Weather::SWELTERING_HEAT)

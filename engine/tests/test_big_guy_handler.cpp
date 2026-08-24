@@ -3,6 +3,8 @@
 #include "bb/move_handler.h"
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
+#include "bb/rules_engine.h"
+#include <vector>
 
 using namespace bb;
 
@@ -501,4 +503,95 @@ TEST(BigGuyHandler, BoneHeadBlockedViaResolver) {
     EXPECT_FALSE(result.turnover);
     EXPECT_TRUE(gs.getPlayer(1).hasActed);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));  // Didn't move
+}
+
+// ============================================================================
+// F12 LEAP (24.08.2026) -- `resolveLeap` byl hotovy a mel tri zelene testy,
+// ale NEMEL ZADNEHO VOLAJICIHO: `ActionType::LEAP` neexistoval a nabidka ho
+// negenerovala, takze oba wardanceri za cely rok neskocili. Tatáž trida jako
+// P45 vstavani: resolver bez nabidky. Tyhle testy hlidaji NABIDKU, ne resolver.
+// ============================================================================
+
+TEST(RulesEngine, LeapIsActuallyOfferedToAPlayerWhoHasIt) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    int leaps = 0;
+    for (const auto& a : actions) if (a.type == ActionType::LEAP) ++leaps;
+    EXPECT_GT(leaps, 0) << "Leap se musi objevit v NABIDCE, ne jen v resolveru";
+}
+
+TEST(RulesEngine, LeapIsNotOfferedWithoutTheSkill) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) EXPECT_NE(a.type, ActionType::LEAP);
+}
+
+TEST(RulesEngine, LeapReachesTwoSquaresOverAPlayer) {
+    // l. 8271-8273: "jump to any empty square within 2 squares EVEN IF IT
+    // REQUIRES JUMPING OVER A PLAYER FROM EITHER TEAM"
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);   // stoji v ceste
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    bool over = false;
+    for (const auto& a : actions)
+        if (a.type == ActionType::LEAP && a.target == Position{12, 7}) over = true;
+    EXPECT_TRUE(over) << "pres hráče se skakat SMI";
+}
+
+TEST(RulesEngine, LeapIsOnlyOfferedOncePerTurn) {
+    // l. 8283: "A player may only use the Leap skill ONCE PER TURN."
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    gs.getPlayer(1).leapUsedThisTurn = true;
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) EXPECT_NE(a.type, ActionType::LEAP);
+}
+
+TEST(RulesEngine, LeapCostsTwoSquaresOfMovement) {
+    // l. 8273-8274: "Making a leap costs the player TWO squares of movement."
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+
+    FixedDiceRoller dice({5});   // AG4 => cil 3, hod 5 => cisty skok
+    Action a{ActionType::LEAP, 1, -1, {12, 7}};
+    auto result = resolveAction(gs, a, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 5);   // 7 - 2
+    EXPECT_TRUE(gs.getPlayer(1).leapUsedThisTurn);
 }

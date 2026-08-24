@@ -62,6 +62,8 @@ struct Player {
     // him to move out of his current square", a smi blokovat sousedy BEZ
     // follow-upu (l. 8580-8582).
     bool rooted = false;
+    // Leap, BB2016 l. 8283: "A player may only use the Leap skill ONCE PER TURN."
+    bool leapUsedThisTurn = false;
     bool dodgeRerollUsedThisTurn = false;
     bool sureFeetRerollUsedThisTurn = false;
     // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on

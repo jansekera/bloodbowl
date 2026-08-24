@@ -187,6 +187,14 @@ ActionResult resolveAction(GameState& state, const Action& action,
             return resolveBallAndChain(state, action.playerId, dice, events);
         }
 
+        case ActionType::LEAP: {
+            // F12: dosud sem nevedla zadna cesta. l. 8283 -- jednou za kolo.
+            Player& p = state.getPlayer(action.playerId);
+            if (p.leapUsedThisTurn) return ActionResult::fail();
+            p.leapUsedThisTurn = true;
+            return resolveLeap(state, action.playerId, action.target, dice, events);
+        }
+
         case ActionType::MULTIPLE_BLOCK: {
             // targetId encodes first target, target.x/y encodes second target ID
             // We use targetId for first target and target position's x as second target ID

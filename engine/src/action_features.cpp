@@ -13,7 +13,11 @@ void extractActionFeatures(const GameState& state, const Action& action, float* 
     out[0] = (action.type == ActionType::END_TURN) ? 1.0f : 0.0f;
 
     // [1] is_move
-    out[1] = (action.type == ActionType::MOVE) ? 1.0f : 0.0f;
+    // Leap je forma POHYBU (l. 8270-8273: "jump to any empty square within 2
+    // squares ... may carry on moving"), takze se ocenuje jako pohyb -- jinak
+    // by ho hodnotici vrstva nevidela vubec.
+    out[1] = (action.type == ActionType::MOVE ||
+              action.type == ActionType::LEAP) ? 1.0f : 0.0f;
 
     // [2] is_block
     out[2] = (action.type == ActionType::BLOCK) ? 1.0f : 0.0f;

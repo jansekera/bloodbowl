@@ -70,6 +70,7 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.lostTacklezones = false;
         p.proUsedThisTurn = false;
         p.bigGuyCheckedThisTurn = false;
+        p.leapUsedThisTurn = false;
         p.dodgeRerollUsedThisTurn = false;
         p.sureFeetRerollUsedThisTurn = false;
         // Take Root (l. 8573-8576): zakorenení konci, kdyz je hráč sražen

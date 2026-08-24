@@ -46,7 +46,12 @@ enum class ActionType : uint8_t {
     MOVE, BLOCK, BLITZ, PASS, HAND_OFF, FOUL,
     THROW_TEAM_MATE, BOMB_THROW, HYPNOTIC_GAZE,
     BALL_AND_CHAIN, MULTIPLE_BLOCK,
-    END_TURN, SETUP_PLAYER, END_SETUP
+    END_TURN, SETUP_PLAYER, END_SETUP,
+    // F12 (24.08.2026): Leap dosud NEBYL akci -- `resolveLeap` byl hotovy, mel
+    // tri zelene testy a NEMEL ZADNEHO VOLAJICIHO, takze oba wardanceri za cely
+    // rok neskocili. Pridano na KONEC, aby se neposunuly ciselne hodnoty
+    // ostatnich (python binding, logy).
+    LEAP
 };
 
 inline bool requiresPlayer(ActionType t) {

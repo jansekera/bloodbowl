@@ -39,6 +39,30 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             out.push_back({ActionType::MOVE, p.id, -1, pos});
         }
 
+        // LEAP -- BB2016 l. 8270-8283: "allowed to jump to any EMPTY square
+        // WITHIN 2 SQUARES even if it requires jumping over a player from
+        // either team. Making a leap costs the player TWO squares of movement.
+        // ... A player may only use the Leap skill ONCE PER TURN."
+        // ⛔ Tahle nabidka tu do 24.08.2026 nebyla, takze `resolveLeap` -- hotovy
+        // a se tremi zelenymi testy -- nemel volajiciho a nikdo nikdy neskocil.
+        // Je to tataz trida jako P45 vstavani: resolver bez nabidky.
+        if (p.hasSkill(SkillName::Leap) && !p.leapUsedThisTurn && !p.rooted) {
+            int maxGfi = p.hasSkill(SkillName::Sprint) ? 3 : 2;
+            if (p.movementRemaining - 2 >= -maxGfi) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    for (int dy = -2; dy <= 2; ++dy) {
+                        if (dx == 0 && dy == 0) continue;
+                        Position dest{static_cast<int8_t>(p.position.x + dx),
+                                      static_cast<int8_t>(p.position.y + dy)};
+                        if (!dest.isOnPitch()) continue;
+                        if (p.position.distanceTo(dest) > 2) continue;
+                        if (state.getPlayerAtPosition(dest) != nullptr) continue;
+                        out.push_back({ActionType::LEAP, p.id, -1, dest});
+                    }
+                }
+            }
+        }
+
         // BLOCK: each adjacent standing enemy.
         // Not for a player who already moved this activation: BB2016 l. 675,
         // "you may not move when you take a Block Action" -- move+block is a
