@@ -1,0 +1,65 @@
+# Předpovědi noci 24.→25.08. — REPLIKACE P38 (volba cílového pole nosiče).
+# Strojově kontroluje night_summarize.py. CORPUS=0.
+#
+# ⭐ PROČ SE TO PUŠTÍ ZNOVU
+# Víkendová fáze B tuhle otázku NEZODPOVĚDĚLA — neodehrála ani jeden pár.
+# Preflight sonda spadla na SEGFAULT (exit 139) z ABI nesouladu: harness byl
+# přeložený 20.08. proti tehdejším hlavičkám, 21.08. přibyla do struct Player
+# čtyři pole a .so se přestavěl. Hláška přitom tvrdila "binárka NETISKNE
+# MOVED WITHOUT THE ARM ACTING", což je jiný příznak. Opraveno 24.08.
+# (commit 32f93c8f): harness přeložen, preflight má nový vztah binárka↔.so,
+# sonda odlišuje PÁD od chybějícího řádku.
+#
+# ⛔⛔ ZÁKLADNÍ ČÁRA SE POSUNULA PODRUHÉ, A VÍC NEŽ 21.08.
+# 24.08. proběhlo pravidlové kolo: 20 oprav, 14 commitů, 577 → 623 testů.
+# Z toho na tenhle běh sahají nejvíc:
+#   · N8  — Both Down PŘESTAL odsouvat obránce a útočník ho už NENÁSLEDUJE
+#           (ř. 514-519). Každý Both Down proti obránci bez Blocku dosud
+#           posunul DVA hráče o pole. To je přímo geometrie, kterou P38 měří.
+#   · N1  — Dodge ztratil vymyšlený −1 (má jen reroll, ř. 8086-8092).
+#   · TA1 — jeden hod = nejvýš jeden reroll (ř. 925-927).
+#   · LOS — před zápasem se poprvé hází (ř. 304-307); volba je rasová.
+#   · TA2 — Take Root perzistuje; F12 Leap se poprvé nabízí.
+# ⇒ ⛔ TOHLE UŽ NENÍ "mění se JEN engine" ve smyslu 21.08. Je to REPLIKACE
+#   NA JINÉ HŘE, a tak se musí číst. Číslo z 19.08. (+0,0827 ± 0,0065,
+#   +12,80σ) je orientační kotva, NE cíl.
+#
+# ⚠️ Předpovědi jsou ŠIROKÉ SCHVÁLNĚ. Úzké pásmo napsané "aby to vyšlo" je
+# horší než přiznaná nejistota.
+#
+# ⭐ SMĚR, KTERÝ OČEKÁVÁM A PROČ — a je to napsané PŘED během:
+#   Rameno P38 je z velké části BOČNÍ VOLNOST (rozklad Fable 20.08.: placebo
+#   našlo pole v 97,9 % idle kol, P38 jen v 58,9 %). N8 ubral blokům schopnost
+#   posouvat těla, takže se deska po blocích MÉNĚ přerovnává a boční volnost
+#   by měla být CENNĚJŠÍ, ne míň cenná. Proti tomu: N1 sebral dodge týmům
+#   stupeň, takže wood-elf hůř uteče a víc se mlátí — a to táhne opačně.
+#   Čistý součet nepředpovídám.
+#
+# ⚠️ DELTA JE DVOUSTRANNÁ (T2.17): harness tiskne chessCandHome + chessCandAway
+# − 1, tedy "my S RAMENEM proti nám PROTI RAMENI". Píšeme obě veličiny.
+
+delta      in    0.010 0.170   # bod +0,08 podle 19.08.; pásmo ŠIRŠÍ než 21.08., protože řez je větší. Pod 0,010 = efekt tenhle řez nepřežil.
+delta_1s   in    0.005 0.085   # totéž jednostranně (= delta/2)
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # rameno sahá na ADVANCE, tedy skoro na každý zápas
+n_nonzero  in    0.50  0.85    # 19.08. dalo 63,3 %. Dolní mez povolena níž: N8 ubral rozhodnutých pozic.
+arm_picks  >=    2000000       # ≈147/hru na 13 600 her. PODLAHA, ne odhad; 21.08. jsem psal 2,5 M, ale ten běh se nespustil, takže to číslo NENÍ ověřené.
+
+# --- RUČNĚ, harness to neumí (nevymýšlím predikát, který summarizer nezná) ---
+# ⭐ (1) RASOVÁ NEUTRALITA. 19.08. dalo trpaslík +0,098 a wood-elf +0,095, tedy
+#   zisk NEZÁVISLÝ na rase — a uživatel 20.08.: "klec má pomáhat všem".
+#   PŘEDPOVĚĎ: neutralita vydrží, |Δdwarf − Δwood-elf| < 0,05.
+#   ⛔ Kdyby se rozešly, je to nález o tom, že řez pomohl jedné rase.
+#   ⚠️ Pásmo povoleno šířeji než 21.08. (0,04), protože N1 sebral dodge stupeň
+#     JEN wood-elfovi — asymetrický zásah, který se právě tady může projevit.
+#
+# ⭐ (2) VYNUCOVAČ U1. 20.08. vyšlo kritérium klece +0,034 trpaslíkovi (2,46σ)
+#   a nic elfovi; Fable našla mechanismus: pole u lajny NEMŮŽE mít čtyři rohy,
+#   takže je to nechtěný vynucovač "nestůj u lajny". Mechanismus je na dnešních
+#   opravách NEZÁVISLÝ ⇒ měl by řez přežít beze změny.
+#
+# ⭐ (3) KONTROLA INVARIANTŮ. Na první nový korpus pustit
+#   diag_state_invariants_20260824.py. 24.08. na starém korpusu 18 000 her
+#   ČISTO, ale dnešní opravy sahají skoro na všechny cesty, které pokládají
+#   tělo nebo míč MIMO vrstvu nabídky (odsun, vhazování, dopad TTM, touchback).
+#   ⛔ Tenhle běh je CORPUS=0, takže se to udělá až na dalším sběru.
