@@ -33,6 +33,21 @@ void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
 void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
                 TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr);
 
+// Pre-match coin toss -- BB2016 l. 304-307: "Flip the Blood Bowl coin or roll
+// a D6 to see which coach will choose who will set up first. The team that sets
+// up first is called the kicking team." Returns the team that kicks off to open
+// the FIRST half; the second half reverses it (l. 1016-1017).
+//
+// ⚠️ Volba vitéze losu je DOKTRINA, ne pravidlo -- pravidla jen rikaji, ze
+// vitéz volí. Merenim 24.08. (18 000 her) vyslo, ze prijmout DRUHOU pulku je
+// vyhoda (+4,9σ human, +4,7σ orc), takze "volim kop" je racionalni volba pro
+// rychle tymy; trpaslik je k tomu lhostejny (-0,4σ). Dokud to neni rozhodnuto,
+// vitéz losu PRIJIMA (naivni volba) -- symetrii to nelamé, protoze vitéz losu
+// je nahodny.
+enum class TossElection { RECEIVE, KICK };
+TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
+                                TossElection winnerElects = TossElection::RECEIVE);
+
 // Simplified kickoff: place ball with scatter, transition to PLAY
 void simpleKickoff(GameState& state, DiceRollerBase& dice);
 

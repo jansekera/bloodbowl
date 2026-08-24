@@ -476,6 +476,20 @@ void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away
 }
 
 // Check if kicking team has a standing player with Kick skill
+// BB2016 l. 304-307: los pred zapasem. Do 24.08.2026 se nehazel VUBEC --
+// `openingKickingTeam` byla konstanta AWAY, takze domaci zahajovali 1. pulku
+// a hoste 2. pulku v 18 000 z 18 000 her kriz. korpusu. Merenim vyslo, ze to
+// neni kosmetika: v zrcadlovych utkanich (stejna rasa na obou stranach, tedy
+// rozdil ma byt sum) vyhravali hoste o +4,87σ (human), +4,68σ (orc), +2,84σ
+// (skaven), +2,61σ (wood-elf). Jediny trpaslik byl imunni (-0,40σ) -- na TD
+// potrebuje ~7 kol, takze posledni drive pulky neumi promenit.
+TeamSide rollOpeningKickingTeam(DiceRollerBase& dice, TossElection winnerElects) {
+    // (1) los: D6, 1-3 vyhrava HOME, 4-6 AWAY
+    const TeamSide tossWinner = (dice.rollD6() <= 3) ? TeamSide::HOME : TeamSide::AWAY;
+    // (2) vitéz losu volí; kdo NEkope, ten prijima
+    return (winnerElects == TossElection::RECEIVE) ? opponent(tossWinner) : tossWinner;
+}
+
 bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
     bool found = false;
     state.forEachOnPitch(kickingTeam, [&](const Player& p) {
@@ -574,10 +588,10 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     };
 
     // First half
-    // No coin toss (yet): the opening kick is fixed. Named so the half-time
-    // branch below can derive the H2 kicker from the opening, not from
-    // whoever happened to kick the last H1 drive.
-    const TeamSide openingKickingTeam = TeamSide::AWAY;  // Home receives first
+    // BB2016 l. 304-307: los rozhoduje, kdo kope jako prvni. Pojmenovane, aby
+    // si vetev half-time nize odvodila kopajiciho v H2 z OTVIRACIHO losu, ne
+    // z toho, kdo nahodou kopal posledni drive H1 (l. 1016-1017).
+    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam, &dice);
@@ -717,8 +731,8 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     };
 
     // First half
-    // Same fixed opening as simulateGame(); see the comment there.
-    const TeamSide openingKickingTeam = TeamSide::AWAY;
+    // Los stejne jako v simulateGame(); viz komentar tam.
+    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam, &dice);

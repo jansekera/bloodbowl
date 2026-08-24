@@ -652,6 +652,10 @@ TEST(GameSimulator, SecondHalfKickoffReversesOpeningRoles) {
             bool anyH1Score = false;
             bool h2Seen = false;
             TeamSide h2Kicker = TeamSide::AWAY;
+            // 24.08.2026: zahajujici kopajici uz NENI konstanta (los, BB2016
+            // l. 304-307), takze si ho test musi precist, ne predpokladat.
+            bool openingSeen = false;
+            TeamSide openingKicker = TeamSide::AWAY;
 
             auto creditH1Scorer = [&](const GameState& s) {
                 int h = s.getTeamState(TeamSide::HOME).score;
@@ -662,6 +666,7 @@ TEST(GameSimulator, SecondHalfKickoffReversesOpeningRoles) {
             };
             auto policy = [&](const GameState& s) {
                 if (s.half == 1) {
+                    if (!openingSeen) { openingKicker = s.kickingTeam; openingSeen = true; }
                     creditH1Scorer(s);
                 } else if (!h2Seen) {
                     // A TD on the very last H1 action gets no PLAY policy
@@ -684,13 +689,19 @@ TEST(GameSimulator, SecondHalfKickoffReversesOpeningRoles) {
 
             if (!h2Seen) continue;  // game hit MAX_ACTIONS inside H1
             gamesReachingH2++;
-            // Post-fix invariant: H2 is kicked by the H1 receiver (HOME),
-            // no matter who kicked or scored last in H1.
-            EXPECT_EQ(h2Kicker, TeamSide::HOME)
+            // BB2016 l. 1016-1017: "At the start of the second half, the
+            // kicking team is the one that did not kick off at the start of
+            // the first half." Tedy protejsek OTVIRACIHO kopajiciho -- ne
+            // konstanta HOME, a ne ten, kdo skoroval v H1 posledni.
+            ASSERT_TRUE(openingSeen) << "seed=" << seed;
+            EXPECT_EQ(h2Kicker, opponent(openingKicker))
                 << "seed=" << seed << " logged=" << useLoggedVariant
+                << " openingKicker=" << (int)openingKicker
                 << " lastH1Scorer=" << (int)lastH1Scorer
                 << " anyH1Score=" << anyH1Score;
-            if (anyH1Score && lastH1Scorer == TeamSide::HOME) {
+            if (anyH1Score && lastH1Scorer != opponent(openingKicker)) {
+                // rozlisujici pripad: posledni skorer H1 NENI ten, kdo ma
+                // kopat v H2 -- prave tady stara vada vracela spatnou stranu
                 sawHomeScoredLastInH1 = true;
             }
             // Enough coverage for this variant once the discriminating case
@@ -1047,4 +1058,43 @@ TEST(GameSimulator, SimpleKickoffAlwaysLeavesTheBallOnThePitch) {
                 << int(t.ballX) << "," << int(t.ballY) << ")";
         }
     }
+}
+
+// ============================================================================
+// LOS PRED ZAPASEM -- BB2016 l. 304-307 (doplneno 24.08.2026)
+// Do te doby se los nehazel vubec: `openingKickingTeam` byla konstanta AWAY.
+// Merenim na krizovem korpusu (18 000 her) to vyslo jako systematicka vyhoda
+// hostu: v ZRCADLOVYCH utkanich (stejna rasa na obou stranach => rozdil ma byt
+// sum) vyhravali hoste o +4,87σ (human), +4,68σ (orc), +2,84σ (skaven),
+// +2,61σ (wood-elf). Zadny test to nehlidal, protoze zadny netvrdil, ze
+// zahajeni ma byt nahodne.
+// ============================================================================
+
+TEST(GameSimulator, CoinTossHomeWinsAndElectsToReceive) {
+    // l. 304-306: vitéz losu volí, kdo se stavi prvni = kdo kope.
+    FixedDiceRoller dice({1});   // 1-3 => los vyhrava HOME
+    EXPECT_EQ(rollOpeningKickingTeam(dice), TeamSide::AWAY);  // HOME prijima => AWAY kope
+}
+
+TEST(GameSimulator, CoinTossAwayWinsAndElectsToReceive) {
+    FixedDiceRoller dice({5});   // 4-6 => los vyhrava AWAY
+    EXPECT_EQ(rollOpeningKickingTeam(dice), TeamSide::HOME);
+}
+
+TEST(GameSimulator, CoinTossWinnerMayElectToKick) {
+    // druha strana volby: vitéz losu si smi vybrat kop (a prijmout 2. pulku)
+    FixedDiceRoller dice({1});
+    EXPECT_EQ(rollOpeningKickingTeam(dice, TossElection::KICK), TeamSide::HOME);
+    FixedDiceRoller dice2({6});
+    EXPECT_EQ(rollOpeningKickingTeam(dice2, TossElection::KICK), TeamSide::AWAY);
+}
+
+TEST(GameSimulator, CoinTossBothOpeningsOccurAcrossSeeds) {
+    // vlastni nalez: kdyz to nikdo netvrdi, konstanta projde. Tohle to tvrdi.
+    std::set<int> openings;
+    for (int seed = 1; seed <= 40; ++seed) {
+        DiceRoller dice(seed);
+        openings.insert(static_cast<int>(rollOpeningKickingTeam(dice)));
+    }
+    EXPECT_EQ(openings.size(), 2u) << "los musi dat obe strany, ne konstantu";
 }
