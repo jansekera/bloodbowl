@@ -82,13 +82,31 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         }
     }
 
-    // TakeRoot: D6, 1=fail on MOVE actions only
-    if (player.hasSkill(SkillName::TakeRoot)) {
-        if (actionType == ActionType::MOVE || actionType == ActionType::BLITZ) {
-            int roll = dice.rollD6();
-            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(SkillName::TakeRoot), roll >= 2});
-            if (roll == 1) {
+    // TakeRoot -- BB2016 l. 8572-8584 (prepsano 24.08.2026, TA2).
+    // Bylo spatne trojím zpusobem: (1) hod se hazel jen na MOVE a BLITZ, ale
+    // pravidlo rika "immediately after declaring AN ACTION", tj. i na BLOCK,
+    // PASS, HAND-OFF a FOUL -- Treeman tedy blokoval bez rizika; (2) zakorenení
+    // NEPERZISTOVALO, takze priste zase normalne chodil; (3) na 1 se blokovala
+    // KAZDA akce, ale pravidlo blok vyslovne DOVOLUJE ("may block adjacent
+    // players without following-up as part of a Block Action") a zakazuje ho
+    // jen po neuspesnem hodu v ramci BLITZE.
+    if (player.hasSkill(SkillName::TakeRoot) && !player.rooted) {
+        int roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                          static_cast<int>(SkillName::TakeRoot), roll >= 2});
+        if (roll == 1) {
+            // l. 8574-8576: MA = 0 az do konce drivu (nebo do srazeni).
+            player.rooted = true;
+            player.movementRemaining = 0;
+            // l. 8580-8583: blok sousedu smi (bez follow-upu, resi se v
+            // block_handleru); po neuspechu v ramci BLITZE blokovat NESMI.
+            // MOVE se zakorenením ztraci smysl -- MA je 0 -- a nechavame ho
+            // propadnout jako driv, at se aktivace spotrebuje spravne (P55).
+            const bool mayStillAct = (actionType == ActionType::BLOCK ||
+                                      actionType == ActionType::PASS ||
+                                      actionType == ActionType::HAND_OFF ||
+                                      actionType == ActionType::FOUL);
+            if (!mayStillAct) {
                 player.hasActed = true;
                 player.hasMoved = true;
                 result.actionBlocked = true;

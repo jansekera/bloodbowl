@@ -72,7 +72,10 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.bigGuyCheckedThisTurn = false;
         p.dodgeRerollUsedThisTurn = false;
         p.sureFeetRerollUsedThisTurn = false;
-        p.movementRemaining = p.stats.movement;
+        // Take Root (l. 8573-8576): zakorenení konci, kdyz je hráč sražen
+        // nebo polozen na zem -- do dalsiho vlastniho kola uz s nim nepocitame.
+        if (p.state != PlayerState::STANDING) p.rooted = false;
+        p.movementRemaining = p.rooted ? 0 : p.stats.movement;
     });
 }
 

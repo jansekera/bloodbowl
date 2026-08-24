@@ -54,6 +54,14 @@ struct Player {
     // Feet skill once per turn". attemptRoll dosud žádný stav za kolo nemělo,
     // takže se rerollovalo neomezeně -- a nadržovalo to dodge týmům
     // (skaven, wood-elf) proti nám (oprava 21.08.).
+    // BB2016 l. 8573-8579 (Take Root): na 1 "his MA is considered 0 UNTIL A
+    // DRIVE ENDS, or he is Knocked Down or Placed Prone". Do 24.08.2026 tenhle
+    // stav v enginu NEEXISTOVAL -- zakorenění platilo jen na tu jednu akci a
+    // priste Treeman zase normalne chodil. Zaroven zakorenený hráč "may not Go
+    // For It, be pushed back for any reason, or use any skill that would allow
+    // him to move out of his current square", a smi blokovat sousedy BEZ
+    // follow-upu (l. 8580-8582).
+    bool rooted = false;
     bool dodgeRerollUsedThisTurn = false;
     bool sureFeetRerollUsedThisTurn = false;
     // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on

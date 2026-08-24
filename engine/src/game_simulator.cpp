@@ -379,6 +379,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
         }
     }
     for (auto& p : state.players) p.playedThisDrive = false;
+    // Take Root (l. 8575): "his MA is considered 0 UNTIL A DRIVE ENDS" --
+    // tohle je ten konec drivu, at uz po TD nebo o poloćase.
+    for (auto& p : state.players) p.rooted = false;
 
     if (state.weather == Weather::SWELTERING_HEAT && dice) {
         for (auto& p : state.players) {
@@ -483,11 +486,26 @@ void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away
 // rozdil ma byt sum) vyhravali hoste o +4,87σ (human), +4,68σ (orc), +2,84σ
 // (skaven), +2,61σ (wood-elf). Jediny trpaslik byl imunni (-0,40σ) -- na TD
 // potrebuje ~7 kol, takze posledni drive pulky neumi promenit.
+TossElection defaultTossElection(const TeamRoster& roster) {
+    // Krehke a rychle soupisky volí UTOK, vsechny ostatni OBRANU -- zduvodneni
+    // je v hlavicce. Rychlost soupisky uz umime klasifikovat (⌀ MA jedenactky).
+    return (classifyRosterSpeed(roster) == RosterSpeed::FAST)
+               ? TossElection::RECEIVE : TossElection::KICK;
+}
+
 TeamSide rollOpeningKickingTeam(DiceRollerBase& dice, TossElection winnerElects) {
     // (1) los: D6, 1-3 vyhrava HOME, 4-6 AWAY
     const TeamSide tossWinner = (dice.rollD6() <= 3) ? TeamSide::HOME : TeamSide::AWAY;
     // (2) vitéz losu volí; kdo NEkope, ten prijima
     return (winnerElects == TossElection::RECEIVE) ? opponent(tossWinner) : tossWinner;
+}
+
+TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
+                                const TeamRoster& home, const TeamRoster& away) {
+    const TeamSide tossWinner = (dice.rollD6() <= 3) ? TeamSide::HOME : TeamSide::AWAY;
+    const TossElection e =
+        defaultTossElection(tossWinner == TeamSide::HOME ? home : away);
+    return (e == TossElection::RECEIVE) ? opponent(tossWinner) : tossWinner;
 }
 
 bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
@@ -591,7 +609,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     // BB2016 l. 304-307: los rozhoduje, kdo kope jako prvni. Pojmenovane, aby
     // si vetev half-time nize odvodila kopajiciho v H2 z OTVIRACIHO losu, ne
     // z toho, kdo nahodou kopal posledni drive H1 (l. 1016-1017).
-    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice);
+    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice, home, away);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam, &dice);
@@ -732,7 +750,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
 
     // First half
     // Los stejne jako v simulateGame(); viz komentar tam.
-    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice);
+    const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice, home, away);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam, &dice);

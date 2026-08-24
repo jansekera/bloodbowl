@@ -1098,3 +1098,30 @@ TEST(GameSimulator, CoinTossBothOpeningsOccurAcrossSeeds) {
     }
     EXPECT_EQ(openings.size(), 2u) << "los musi dat obe strany, ne konstantu";
 }
+
+TEST(GameSimulator, TossElectionIsRaceDependent) {
+    // bbtactics.com/kicking-receiving + merení 24.08.: krehke/rychle soupisky
+    // volí UTOK (prvni kolo, tri bloky zdarma na LOS, rychly TD), bashove
+    // a vysokoAV volí OBRANU (branit s plnym soupisem, 2-1 grind).
+    EXPECT_EQ(defaultTossElection(*getRosterByName("wood-elf")), TossElection::RECEIVE);
+    EXPECT_EQ(defaultTossElection(*getRosterByName("skaven")),   TossElection::RECEIVE);
+    EXPECT_EQ(defaultTossElection(*getRosterByName("dwarf")),    TossElection::KICK);
+    EXPECT_EQ(defaultTossElection(*getRosterByName("orc")),      TossElection::KICK);
+    EXPECT_EQ(defaultTossElection(*getRosterByName("human")),    TossElection::KICK);
+}
+
+TEST(GameSimulator, DwarfWinningTheTossElectsToDefend) {
+    // trpaslik vyhraje los => volí OBRANU => kope on
+    FixedDiceRoller dice({1});   // 1-3 => HOME vyhrava los
+    EXPECT_EQ(rollOpeningKickingTeam(dice, *getRosterByName("dwarf"),
+                                     *getRosterByName("wood-elf")),
+              TeamSide::HOME);
+}
+
+TEST(GameSimulator, WoodElfWinningTheTossElectsToAttack) {
+    // wood-elf vyhraje los => volí UTOK => kope soupeř
+    FixedDiceRoller dice({5});   // 4-6 => AWAY vyhrava los
+    EXPECT_EQ(rollOpeningKickingTeam(dice, *getRosterByName("dwarf"),
+                                     *getRosterByName("wood-elf")),
+              TeamSide::HOME);
+}

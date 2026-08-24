@@ -31,7 +31,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             if (state.getPlayerAtPosition(pos) != nullptr) continue;
 
             // Check movement remaining (including GFI)
-            int maxGfi = p.hasSkill(SkillName::Sprint) ? 3 : 2;
+            // Take Root, l. 8577-8578: zakorenený "may not Go For It" -- MA 0
+            // by mu jinak porad nechalo dva kroky pres GFI.
+            int maxGfi = p.rooted ? 0 : (p.hasSkill(SkillName::Sprint) ? 3 : 2);
             if (p.movementRemaining - 1 < -maxGfi) continue;
 
             out.push_back({ActionType::MOVE, p.id, -1, pos});

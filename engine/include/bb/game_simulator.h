@@ -44,7 +44,27 @@ void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away
 // rychle tymy; trpaslik je k tomu lhostejny (-0,4σ). Dokud to neni rozhodnuto,
 // vitéz losu PRIJIMA (naivni volba) -- symetrii to nelamé, protoze vitéz losu
 // je nahodny.
+// V nasi terminologii: RECEIVE = volim UTOK (mam mic), KICK = volim OBRANU.
 enum class TossElection { RECEIVE, KICK };
+
+// Co vitéz losu volí. Rozhodnuto 24.08.2026 podle bbtactics.com/kicking-receiving
+// a merení na krizovem korpusu, a je to RASOVE, ne globalne:
+//   * KREHKE/RYCHLE soupisky (elf, skaven, jesterky, gobliní, pulcici) volí UTOK
+//     -- prvni kolo zapasu, tri "bloky zdarma" na LOS, rychly TD (2-3 kola)
+//     a souperi se upre posledni kolo zapasu;
+//   * VSECHNY OSTATNI, a hlavne BASHOVE a vysokoAV (trpaslik, chaos dwarf, ork)
+//     volí OBRANU -- brani s kompletnim soupisem, KO nadelane souperi maji jen
+//     JEDNU sanci se vratit, a utoci se ve druhe pulce proti oslabenemu tymu
+//     (2-1 grind). Nase mereni 24.08. ukazalo, ze druha pulka je vyhoda.
+TossElection defaultTossElection(const TeamRoster& roster);
+
+// Pre-match coin toss -- BB2016 l. 304-307: "Flip the Blood Bowl coin or roll
+// a D6 to see which coach will choose who will set up first. The team that sets
+// up first is called the kicking team." Returns the team that kicks off to open
+// the FIRST half; the second half reverses it (l. 1016-1017).
+TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
+                                const TeamRoster& home, const TeamRoster& away);
+// Testovaci varianta s vynucenou volbou.
 TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
                                 TossElection winnerElects = TossElection::RECEIVE);
 

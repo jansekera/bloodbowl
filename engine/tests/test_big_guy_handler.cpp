@@ -152,15 +152,47 @@ TEST(BigGuyHandler, WildAnimalPassesMoveOnFour) {
 
 // ===== TAKE ROOT TESTS =====
 
-TEST(BigGuyHandler, TakeRootOnlyMove) {
+// ⛔ TA2 (24.08.2026): `TakeRootOnlyMove` drive CERTIFIKOVAL vadu -- prazdne
+// kostky a komentar "Block: no roll needed" tvrdily, ze Treeman blokuje BEZ
+// rizika. BB2016 l. 8572-8573: "Immediately after declaring AN ACTION with
+// this player, roll a D6" -- tedy i na BLOCK. Nahrazeno testy hranice.
+
+TEST(BigGuyHandler, TakeRootRollsOnEveryDeclaredAction) {
+    for (ActionType at : {ActionType::MOVE, ActionType::BLOCK, ActionType::BLITZ,
+                          ActionType::PASS, ActionType::HAND_OFF, ActionType::FOUL}) {
+        auto gs = makeGameState();
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+        gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+        FixedDiceRoller dice({1});           // jedina kostka: hod se MUSI spotrebovat
+        resolveBigGuyCheck(gs, 1, at, dice, nullptr);
+        EXPECT_TRUE(gs.getPlayer(1).rooted)
+            << "hod na Take Root se u akce " << static_cast<int>(at) << " vubec nehodil";
+    }
+}
+
+TEST(BigGuyHandler, TakeRootFailedBlockActionMayStillBlock) {
+    // l. 8580-8582: "The player may block adjacent players without
+    // following-up as part of a Block Action."
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::TakeRoot);
-
-    // Block: no roll needed
-    FixedDiceRoller dice({});
+    FixedDiceRoller dice({1});
     auto result = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
     EXPECT_FALSE(result.actionBlocked);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);   // l. 8574-8575: MA = 0
+}
+
+TEST(BigGuyHandler, TakeRootFailedBlitzMayNotBlock) {
+    // l. 8582-8584: "if a player fails his Take Root roll as part of a Blitz
+    // Action he may not block that turn"
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    FixedDiceRoller dice({1});
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::BLITZ, dice, nullptr);
+    EXPECT_TRUE(result.actionBlocked);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
 }
 
 TEST(BigGuyHandler, TakeRootFailMove) {
@@ -172,6 +204,47 @@ TEST(BigGuyHandler, TakeRootFailMove) {
     auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
 
     EXPECT_TRUE(result.actionBlocked);
+}
+
+TEST(BigGuyHandler, TakeRootPassesOnTwoPlus) {
+    // druha strana hranice: 2+ a hraje se normalne
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    FixedDiceRoller dice({2});
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    EXPECT_FALSE(result.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).rooted);
+}
+
+TEST(BigGuyHandler, TakeRootPersistsAcrossTurns) {
+    // l. 8574-8576: MA je 0 "until a drive ends, or he is Knocked Down or
+    // Placed Prone" -- tedy NE jen na tu jednu akci.
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    gs.getPlayer(1).stats.movement = 2;
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).rooted);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).rooted)   << "zakorenení skoncilo uz pristi kolo";
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);
+}
+
+TEST(BigGuyHandler, TakeRootEndsWhenKnockedDown) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    gs.getPlayer(1).stats.movement = 2;
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).rooted);
+
+    gs.getPlayer(1).state = PlayerState::PRONE;     // "or he is Knocked Down"
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_FALSE(gs.getPlayer(1).rooted);
 }
 
 // ===== BLOODLUST TESTS =====

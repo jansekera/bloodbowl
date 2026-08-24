@@ -256,6 +256,10 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
 // a bystander on the blocking team wants the free square a chain hands him,
 // an opponent wants to jam the push.
 static bool holdsGround(const Player& p, TeamSide blockingSide) {
+    // Take Root (l. 8578-8579) drzi pole bezpodminecne -- i vlastnimu tymu:
+    // zakorenený nesmi byt odsunut "for any reason", takze na rozdil od Stand
+    // Firm to neni volba jeho trenéra a nezalezi na tom, kdo blokuje.
+    if (p.rooted) return true;
     return p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
 }
 
@@ -341,6 +345,14 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
                             bool isBlitz, DiceRollerBase& dice,
                             Position& pushDest, std::vector<GameEvent>* events) {
+    // Take Root, l. 8578-8579: zakorenený hráč "may not Go For It, BE PUSHED
+    // BACK FOR ANY REASON, or use any skill that would allow him to move out of
+    // his current square". Zadny Juggernaut override -- pravidlo vyjimku nema.
+    if (defender.rooted) {
+        pushDest = defender.position;
+        return false; // no push
+    }
+
     // StandFirm check (Juggernaut ignores on blitz)
     if (defender.hasSkill(SkillName::StandFirm)) {
         bool juggernautOverride = isBlitz && attacker.hasSkill(SkillName::Juggernaut);
@@ -369,13 +381,19 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     Position attOldPos = att.position;
     Position defOldPos = def.position;
 
+    // Take Root, l. 8580-8582: "The player may block adjacent players WITHOUT
+    // FOLLOWING-UP as part of a Block Action." Zakorenený se tedy nikam nehne
+    // -- follow-up by ho vytahl z pole, ktere opustit nesmi (l. 8578-8579).
+    if (att.rooted) noFollowUp = true;
+
     // CRP: a block thrown as part of a Blitz costs 1 point of movement.
     // Out of normal movement the blitzer may GFI into the block (2+, 3+
     // in a blizzard, counts against the GFI limit); with no GFI left the
     // block cannot be thrown at all. This is what denies a Frenzy second
     // block after "GFI to arrive + GFI for the first block".
     if (params.isBlitz) {
-        int gfiFloor = att.hasSkill(SkillName::Sprint) ? -3 : -2;
+        // Take Root, l. 8577-8578: zakorenený nesmi GFI.
+        int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
         if (att.movementRemaining - 1 < gfiFloor) {
             // No movement and no GFI left: no block is thrown.
             att.hasActed = true;
@@ -802,7 +820,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // only via the charge in the recursive call) so the first block's
         // outcome is preserved unchanged when the second is impossible.
         if (params.isBlitz) {
-            int gfiFloor = att.hasSkill(SkillName::Sprint) ? -3 : -2;
+            // Take Root, l. 8577-8578: zakorenený nesmi GFI.
+            int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
             if (att.movementRemaining - 1 < gfiFloor) {
                 return turnover ? ActionResult::turnovr() : ActionResult::ok();
             }
