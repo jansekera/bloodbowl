@@ -125,6 +125,22 @@ ActionResult resolveBallAndChain(GameState& state, int playerId,
             // Don't move into occupied square, continue to next step
             continue;
         }
+        // ⛔⛔ INVARIANT (24.08.2026): sem se dosud propadl LEZICI nebo OMRACENY
+        // hráč v cilovem poli -- podminka vys chtela STANDING, takze se pod nim
+        // kod prosel dal a Ball & Chain hráč mu VLEZL DO POLE. Dva hráči na
+        // jednom poli nejsou odchylka od pravidel, je to ROZBITY STAV: co pak
+        // vrati getPlayerAtPosition, kolik je tam asistenci, kudy vede cesta.
+        // Dosud to bylo nedosazitelne (zadny korpusovy roster nema Ball & Chain
+        // a zadne makro tu akci neemituje), ale nedosazitelnost neni oprava.
+        //
+        // ⚠️ TOHLE NENI implementace pravidla, je to POJISTKA. BB2016
+        // l. 7822-7825: "Prone or Stunned players in an occupied square are
+        // PUSHED BACK and an Armour roll is made to see if they are injured,
+        // instead of the block being thrown at them." Odsun + hod na zbroj je
+        // soucast TA6 (odlozeno); do te doby se pole proste NEOBSADI.
+        if (occupant) {
+            continue;
+        }
 
         // Move to empty square
         Position oldPos = bcp.position;

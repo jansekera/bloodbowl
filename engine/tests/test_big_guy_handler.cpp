@@ -595,3 +595,30 @@ TEST(RulesEngine, LeapCostsTwoSquaresOfMovement) {
     EXPECT_EQ(gs.getPlayer(1).movementRemaining, 5);   // 7 - 2
     EXPECT_TRUE(gs.getPlayer(1).leapUsedThisTurn);
 }
+
+TEST(RulesEngine, ARootedPlayerIsNotOfferedAnythingThatMovesHim) {
+    // N11 (24.08.2026): zakaz GFI pro zakorenene zil JEN v nabidce MOVE.
+    // Pathfinder a resolveMoveStep o `rooted` nevedeli, takze se zakorenenemu
+    // Treemanovi nabidl BLITZ na nesousedni cil a smycka ho pres GFI POSUNULA.
+    // l. 8577-8579: "may not Go For It, be pushed back for any reason, or use
+    // any skill that would allow him to move out of his current square."
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 2, 6, 1, 10);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    gs.getPlayer(1).rooted = true;
+    gs.getPlayer(1).movementRemaining = 0;
+    placePlayer(gs, 12, {14, 7}, TeamSide::AWAY);   // ctyri pole daleko
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) {
+        EXPECT_NE(a.type, ActionType::MOVE)  << "zakorenený se nehybe";
+        EXPECT_NE(a.type, ActionType::LEAP)  << "ani skokem";
+        EXPECT_NE(a.type, ActionType::BLITZ) << "ani blitzem na vzdaleny cil";
+    }
+}

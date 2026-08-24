@@ -118,7 +118,9 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
     bool needsGfi = false;
     if (player.movementRemaining < 0) {
         // Allow up to -2 GFI squares (or -3 with Sprint)
-        int maxGfi = player.hasSkill(SkillName::Sprint) ? -3 : -2;
+        // N11: zakorenený nesmi GFI (l. 8577-8578) -- tady to chybelo, takze
+        // ho blitz smycka pres GFI protlacila i pres zakaz v nabidce.
+        int maxGfi = player.rooted ? 0 : (player.hasSkill(SkillName::Sprint) ? -3 : -2);
         if (player.movementRemaining < maxGfi) {
             player.movementRemaining++; // undo
             return ActionResult::fail();
@@ -245,7 +247,9 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     // trida jako 21.08. "oprava pravidla umi probudit spici vadu".
     int gfiSquares = 0;
     if (player.movementRemaining < 0) {
-        int maxGfi = player.hasSkill(SkillName::Sprint) ? -3 : -2;
+        // N11: zakorenený nesmi GFI (l. 8577-8578) -- tady to chybelo, takze
+        // ho blitz smycka pres GFI protlacila i pres zakaz v nabidce.
+        int maxGfi = player.rooted ? 0 : (player.hasSkill(SkillName::Sprint) ? -3 : -2);
         if (player.movementRemaining < maxGfi) {
             player.movementRemaining += 2; // undo
             return ActionResult::fail();

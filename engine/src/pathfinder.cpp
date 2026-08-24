@@ -31,7 +31,12 @@ bool canReachAdjacentTo(const GameState& state, const Player& player,
         }
     }
 
-    int maxGfi = player.hasSkill(SkillName::Sprint) ? 3 : 2;
+    // N11 (24.08.2026): Take Root, l. 8577-8579 -- zakorenený "may not Go For
+    // It, be pushed back for any reason, or use any skill that would allow him
+    // to move out of his current square". Zakaz zil jen v nabidce MOVE a v
+    // blitz-bloku; pathfinder o nem nevedel, takze zakorenenemu Treemanovi se
+    // nabidl BLITZ na nesousedni cil a smycka ho pres GFI opravdu posunula.
+    int maxGfi = player.rooted ? 0 : (player.hasSkill(SkillName::Sprint) ? 3 : 2);
     int maxRange = maxMove + maxGfi - reserveMove;
 
     if (maxRange <= 0) return false;
@@ -110,7 +115,12 @@ int getValidMoveTargets(const GameState& state, const Player& player,
     int count = 0;
     bool inTZ = countTacklezones(state, player.position, player.teamSide) > 0;
 
-    int maxGfi = player.hasSkill(SkillName::Sprint) ? 3 : 2;
+    // N11 (24.08.2026): Take Root, l. 8577-8579 -- zakorenený "may not Go For
+    // It, be pushed back for any reason, or use any skill that would allow him
+    // to move out of his current square". Zakaz zil jen v nabidce MOVE a v
+    // blitz-bloku; pathfinder o nem nevedel, takze zakorenenemu Treemanovi se
+    // nabidl BLITZ na nesousedni cil a smycka ho pres GFI opravdu posunula.
+    int maxGfi = player.rooted ? 0 : (player.hasSkill(SkillName::Sprint) ? 3 : 2);
     bool canGfi = player.movementRemaining <= 0 && player.movementRemaining > -maxGfi;
 
     auto adj = player.position.getAdjacent();

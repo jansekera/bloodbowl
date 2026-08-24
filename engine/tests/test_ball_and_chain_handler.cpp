@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "bb/ball_and_chain_handler.h"
 #include "bb/helpers.h"
+#include <vector>
 
 using namespace bb;
 
@@ -113,4 +114,26 @@ TEST(BallAndChainHandler, NeverTurnover) {
     auto result = resolveBallAndChain(gs, 1, dice, nullptr);
     EXPECT_FALSE(result.turnover);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+}
+
+TEST(BallAndChainHandler, NeverEntersASquareOccupiedByAProneOrStunnedPlayer) {
+    // ⛔⛔ INVARIANT, ne parita: podminka pro auto-blok chtela STANDING, takze
+    // LEZICI hráč v cilovem poli propadl na vetev "move to empty square"
+    // a Ball & Chain hráč mu vlezl do pole -- DVA HRACI NA JEDNOM POLI.
+    // (Pravidlovou variantu -- odsun + hod na zbroj, l. 7822-7825 -- resi TA6.)
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 4, 5, 1, 8);
+    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+
+    // vsechny kroky mirime na vychod (D8=3), tedy na leziciho hráče
+    FixedDiceRoller dice(std::vector<int>(40, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+
+    EXPECT_NE(gs.getPlayer(1).position, gs.getPlayer(12).position)
+        << "dva hráči na jednom poli je rozbity stav, ne odchylka";
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
 }
