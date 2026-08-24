@@ -48,21 +48,90 @@ TEST(PassHandler, AccuratePassCaught) {
     EXPECT_EQ(gs.ball.carrierId, 2);
 }
 
-TEST(PassHandler, InaccuratePassScatters) {
+// ⚠️ VAKUOZNI TEST NAHRAZEN (24.08.2026). Puvodni `InaccuratePassScatters`
+// asertoval `EXPECT_GE(result.turnover + result.success, 0)` -- vzdy pravda --
+// a komentar to priznaval: "This test verifies the pass completes without
+// crash." Prave pod nim lezela vada F8.
+
+TEST(PassHandler, InaccuratePassScattersThreeTimesByOneSquare) {
+    // BB2016 l. 735-737: "Roll for scatter THREE TIMES, ONE AFTER THE OTHER."
+    // Do 24.08. se sem recyklovala vykopova sablona (D8 smer x D6 vzdalenost),
+    // takze mic letel az 6 poli rovne.
     auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
     placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);   // tri kroky na vychod od cile
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // Quick Pass na (8,7), cil 3. Hod 2 => nepresna (a NENI fumble: 2+1 = 3).
+    // Tri rozptyly D8=3 (vychod) => (9,7) -> (10,7) -> (11,7). Chyt: 4 (cil 4).
+    FixedDiceRoller dice({2, 3, 3, 3, 4});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    EXPECT_EQ(gs.ball.position.x, 11);
+    EXPECT_EQ(gs.ball.position.y, 7);
+}
+
+TEST(PassHandler, FumbleCountsTheMODIFIEDResultNotJustANatural1) {
+    // F7, l. 1742-1744: "if the D6 roll for a pass is 1 OR LESS BEFORE OR AFTER
+    // MODIFICATION, then the thrower has fumbled". Se dvema tackle zonami je
+    // modifikator -2, takze hod 2 (+1 za Quick Pass) = 1 => FUMBLE.
+    // Do 24.08. se fumblovalo jen na prirozenou 1 a tohle byla jen neprecna
+    // prihravka.
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {5, 6}, TeamSide::AWAY);   // dve tackle zony na hazece
+    placePlayer(gs, 13, {5, 8}, TeamSide::AWAY);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // hod 2 => fumble; odraz od hazece D8=3 (vychod) na prazdne (6,7)
+    FixedDiceRoller dice({2, 3, 4, 4, 4});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_TRUE(result.turnover);
+    EXPECT_NE(gs.ball.carrierId, 2);   // k prijemci se to nedostalo
+}
+
+TEST(PassHandler, PassSkillRerollsAnINACCURATEPassToo) {
+    // F6, l. 8336-8337: "allowed to re-roll the D6 if he throws AN INACCURATE
+    // PASS or fumbles". Do 24.08. se rerollovalo jen na fumble.
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;          // aby to nemohl zachranit tymovy reroll
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pass);
     placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
     gs.ball = BallState::carried({5, 7}, 1);
 
-    // Quick Pass: target = 3. Roll 2 (fail, inaccurate)
-    // Scatter: D8=3(E) D6=1 → (9,7), no one there
-    // Bounce: D8=7(W) → (8,7) where player 2 is → catch roll 4 (target 4) → success
-    FixedDiceRoller dice({2, 3, 1, 7, 4});
+    // hod 2 => nepresna (cil 3); Pass reroll: 5 => presna; chyt 3 (cil 3 s +1)
+    FixedDiceRoller dice({2, 5, 3});
     auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
 
-    // Player 2 might or might not catch depending on exact scatter
-    // This test verifies the pass completes without crash
-    EXPECT_GE(result.turnover + result.success, 0);  // valid result
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    EXPECT_EQ(gs.ball.position.x, 8);   // dopadlo na CIL, ne po rozptylu
+}
+
+TEST(PassHandler, WithoutThePassSkillAnInaccuratePassIsNotRerolled) {
+    // druha strana hranice: bez Pass skillu se nepresna prihravka NErerolluje
+    // (tymovy reroll na nepresnou prihravku je volba trenéra, ne pravidlo, a
+    // chovani se tu zamerne nemeni -- viz komentar v pass_handler.cpp)
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    FixedDiceRoller dice({2, 3, 3, 3, 4});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);   // tymovy reroll se nesahl
+    EXPECT_EQ(gs.ball.position.x, 11);   // proste se rozptylila
 }
 
 TEST(PassHandler, FumbleOnNatural1) {
@@ -220,8 +289,14 @@ TEST(PassHandler, HailMaryPassScatters3Times) {
     FixedDiceRoller dice({4, 3, 1, 5, 7, 5});
     auto result = resolvePass(gs, 1, {20, 7}, dice, nullptr);
 
-    // Just verify completes
-    EXPECT_GE(result.turnover + result.success, 0);
+    // ⚠️ 24.08.2026: puvodni aserce byla `EXPECT_GE(turnover + success, 0)`,
+    // tedy vzdy pravda ("Just verify completes"). Hail Mary tri rozptyly
+    // delal spravne uz driv -- ale nikdo to netvrdil.
+    // (20,7) -> D8=3 (V) -> (21,7) -> D8=1 (S) -> (21,6) -> D8=5 (J) -> (21,7)
+    EXPECT_EQ(gs.ball.position.x, 20);   // po odrazu zpet na hráče 2
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    EXPECT_FALSE(result.turnover);
 }
 
 // ===== HAND-OFF TESTS =====

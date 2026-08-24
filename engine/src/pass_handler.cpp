@@ -136,6 +136,20 @@ int checkInterception(GameState& state, int passerId, Position target,
 
 } // anonymous namespace
 
+// BB2016 l. 735-737: "Roll for scatter THREE TIMES, ONE AFTER THE OTHER, to see
+// where the ball ends up. Note that each of the Scatter rolls is made
+// separately, so it is possible for the ball to end up back in the target
+// square." Tri nezavisle kroky o JEDNO pole, ne jeden dlouhy skok.
+static Position scatterThreeTimes(Position from, DiceRollerBase& dice) {
+    Position p = from;
+    for (int i = 0; i < 3; i++) {
+        Position step = scatterDirection(dice.rollD8());
+        p.x += step.x;
+        p.y += step.y;
+    }
+    return p;
+}
+
 ActionResult resolvePass(GameState& state, int passerId, Position target,
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& passer = state.getPlayer(passerId);
@@ -172,14 +186,8 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             return ActionResult::turnovr();
         }
 
-        // Inaccurate: 3 single scatters from target
-        Position landPos = target;
-        for (int i = 0; i < 3; i++) {
-            int d8 = dice.rollD8();
-            Position scatter = scatterDirection(d8);
-            landPos.x += scatter.x;
-            landPos.y += scatter.y;
-        }
+        // Inaccurate: 3 single scatters from target (l. 735-737)
+        Position landPos = scatterThreeTimes(target, dice);
 
         if (!landPos.isOnPitch()) {
             resolveThrowIn(state, target, landPos, dice, events);
@@ -242,16 +250,17 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         range = static_cast<PassRange>(static_cast<int>(range) - 1);
     }
 
-    int passTarget = 7 - passer.stats.agility;
-    passTarget -= passModifier(range);  // range modifier (QP=+1, SP=0, LP=-1, LB=-2)
-
-    if (passer.hasSkill(SkillName::Accurate)) passTarget -= 1;
-
+    // ⛔ F7 (24.08.2026): modifikatory se u nas syply do CILE, ne do HODU, takze
+    // "modifikovany hod" v kodu vubec neexistoval -- a prave o nem mluvi pravidlo
+    // o fumblu (l. 1742-1744: "1 or less BEFORE OR AFTER MODIFICATION"). Vedeme
+    // je proto zvlast; `passTarget` z nich vznika, ale je oriznuty na 2..6, takze
+    // se z nej soucet zpetne dopocitat NEDA.
+    int passMods = passModifier(range);  // QP=+1, SP=0, LP=-1, LB=-2
+    if (passer.hasSkill(SkillName::Accurate)) passMods += 1;
     if (!passer.hasSkill(SkillName::NervesOfSteel)) {
-        passTarget += countTacklezones(state, passer.position, passer.teamSide);
+        passMods -= countTacklezones(state, passer.position, passer.teamSide);
     }
-
-    passTarget += countDisturbingPresence(state, passer.position, passer.teamSide);
+    passMods -= countDisturbingPresence(state, passer.position, passer.teamSide);
 
     // Weather: ONLY Very Sunny penalises a throw (rules parity,
     // 2026-08-10). CRP: "Very Sunny: the blinding sunshine causes a -1
@@ -260,88 +269,68 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     // the RANGE ("only quick or short passes can be attempted") rather than
     // taxing the roll. We used to charge all three.
     if (state.weather == Weather::VERY_SUNNY) {
-        passTarget += 1;
+        passMods -= 1;
     }
 
-    passTarget = std::clamp(passTarget, 2, 6);
+    int passTarget = std::clamp(7 - passer.stats.agility - passMods, 2, 6);
 
-    // Roll with Pass skill reroll chain
+    // BB2016 l. 1742-1744 (F7): "if the D6 roll for a pass is 1 OR LESS BEFORE
+    // OR AFTER MODIFICATION, then the thrower has fumbled". Do 24.08.2026 se
+    // fumblovalo jen na PRIROZENOU 1, takze jsme fumblovali MIN, nez mame:
+    // hazec se dvema tackle zonami fumbluje uz na 3, u nas to byla jen neprecna
+    // prihravka.
+    auto isFumble = [&](int r) { return r == 1 || r + passMods <= 1; };
+
     int roll = dice.rollD6();
 
     emitEvent(events, {GameEvent::Type::PASS, passerId, -1, passer.position, target,
-                      roll, roll >= passTarget});
+                      roll, roll >= passTarget && !isFumble(roll)});
 
-    // Natural 1 = always fumble
-    if (roll == 1) {
-        // Attempt reroll (Pass skill, Pro, Team)
-        bool rerolled = false;
-        // Pass skill reroll
+    const bool fumbledFirst = isFumble(roll);
+    const bool inaccurateFirst = !fumbledFirst && roll < passTarget;
+
+    if (fumbledFirst || inaccurateFirst) {
+        // F6, l. 8336-8337: "A player with the Pass skill is allowed to re-roll
+        // the D6 if he throws AN INACCURATE PASS OR FUMBLES." Do 24.08. se
+        // rerollovalo jen na fumble, tj. na polovinu pripadu, ktere pravidlo
+        // jmenuje.
+        // ⚠️ TA1 (l. 925-927): jeden hod = nejvys jeden reroll, takze se
+        // stupne uz NERETEZI -- driv tu byla kaskada Pass -> Pro -> tymovy.
         if (passer.hasSkill(SkillName::Pass)) {
             roll = dice.rollD6();
             emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
-                              static_cast<int>(SkillName::Pass), roll >= passTarget && roll != 1});
-            if (roll != 1 && roll >= passTarget) {
-                rerolled = true;
-                // accurate pass handled below
-            } else if (roll == 1) {
-                // Still fumble after reroll
-                resolveBounce(state, passer.position, dice, 0, events);
-                return ActionResult::turnovr();
-            } else {
-                rerolled = true;
-                // inaccurate — fall through
-            }
-        }
-
-        if (!rerolled) {
-            // Try Pro
+                              static_cast<int>(SkillName::Pass),
+                              roll >= passTarget && !isFumble(roll)});
+        } else if (fumbledFirst) {
+            // Pro a tymovy reroll zustavaji jen na FUMBLE. Pravidla je dovoluji
+            // i na neprecnou prihravku, ale to uz je volba trenéra (utratit
+            // tymovy reroll za nepresny pass), ne oprava -- a menit ji tady by
+            // byl zasah do doktriny, ne do pravidel. Chovani zustava jako driv.
+            bool rerolled = false;
             if (passer.hasSkill(SkillName::Pro) && !passer.proUsedThisTurn) {
                 passer.proUsedThisTurn = true;
-                int proRoll = dice.rollD6();
-                if (proRoll >= 4) {
+                if (dice.rollD6() >= 4) {
                     roll = dice.rollD6();
-                    if (roll != 1 && roll >= passTarget) {
-                        rerolled = true;
-                    } else if (roll == 1) {
-                        resolveBounce(state, passer.position, dice, 0, events);
-                        return ActionResult::turnovr();
-                    } else {
-                        rerolled = true;
-                    }
-                }
-            }
-        }
-
-        if (!rerolled) {
-            // Try team reroll
-            TeamState& team = state.getTeamState(passer.teamSide);
-            if (team.canUseReroll()) {
-                team.rerolls--;
-                team.rerollUsedThisTurn = true;
-                if (passer.hasSkill(SkillName::Loner)) {
-                    int lonerRoll = dice.rollD6();
-                    if (lonerRoll < 4) {
-                        resolveBounce(state, passer.position, dice, 0, events);
-                        return ActionResult::turnovr();
-                    }
-                }
-                roll = dice.rollD6();
-                if (roll != 1 && roll >= passTarget) {
-                    rerolled = true;
-                } else if (roll == 1) {
-                    resolveBounce(state, passer.position, dice, 0, events);
-                    return ActionResult::turnovr();
-                } else {
                     rerolled = true;
                 }
             }
+            if (!rerolled) {
+                TeamState& team = state.getTeamState(passer.teamSide);
+                if (team.canUseReroll()) {
+                    team.rerolls--;
+                    team.rerollUsedThisTurn = true;
+                    bool lonerOk = true;
+                    if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
+                    if (lonerOk) roll = dice.rollD6();
+                }
+            }
         }
+    }
 
-        if (!rerolled) {
-            // Fumble: ball bounces from passer
-            resolveBounce(state, passer.position, dice, 0, events);
-            return ActionResult::turnovr();
-        }
+    if (isFumble(roll)) {
+        // Fumble: ball bounces from passer, turnover (l. 1744-1746)
+        resolveBounce(state, passer.position, dice, 0, events);
+        return ActionResult::turnovr();
     }
 
     bool accurate = (roll >= passTarget);
@@ -359,14 +348,11 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             }
         }
     } else {
-        // Inaccurate: scatter D8 + D6 from target
-        int scatterDir = dice.rollD8();
-        int scatterDist = dice.rollD6();
-        Position scatter = scatterDirection(scatterDir);
-        Position landPos{
-            static_cast<int8_t>(target.x + scatter.x * scatterDist),
-            static_cast<int8_t>(target.y + scatter.y * scatterDist)
-        };
+        // F8, l. 735-737: tri samostatne rozptyly po JEDNOM poli. Do 24.08.2026
+        // se sem recyklovala VYKOPOVA sablona (jeden smer D8 x vzdalenost D6),
+        // takze neprecna prihravka letela az 6 poli rovne misto trikrokove
+        // prochazky o max 3 pole, ktera se muze vratit i do ciloveho pole.
+        Position landPos = scatterThreeTimes(target, dice);
 
         if (!landPos.isOnPitch()) {
             resolveThrowIn(state, target, landPos, dice, events);
