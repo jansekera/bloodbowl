@@ -127,6 +127,27 @@ night_preflight() {
         done
     fi
 
+    # (2b) ⛔⛔ ABI: binárka nesmí být STARŠÍ NEŽ .so (24.08.2026).
+    #      Tohle je díra, na kterou umřela fáze B víkendového řetězu.
+    #      `diag_f1_cage_advance` byl přeložený 20.08. proti tehdejším hlavičkám;
+    #      21.08. přibyla do `struct Player` pole (stunnedThisTurn,
+    #      dodgeRerollUsedThisTurn, sureFeetRerollUsedThisTurn,
+    #      bigGuyCheckedThisTurn) a .so se přestavěl. Struktura změnila velikost,
+    #      stará binárka sahala na špatné offsety ⇒ SEGFAULT hned na první hře.
+    #      Kontroly (2) a (3) to NECHYTILY: zdroj harnessu se neměnil a .so bylo
+    #      čerstvé -- obě prošly. Chyběl přesně tenhle vztah mezi nimi.
+    #      ⚠️ Není vidět na binárce: linkuje se až za běhu přes rpath.
+    local so_abi="$root/engine/build/libbb_engine.so"
+    if [ -x "$bin" ] && [ -f "$so_abi" ] && [ "$so_abi" -nt "$bin" ]; then
+        night_log "PREFLIGHT ⛔ ABI: $so_abi je NOVĚJŠÍ než $bin"
+        night_log "   ⇒ harness je přeložený proti STARÝM hlavičkám. Pokud se od té"
+        night_log "     doby změnil struct Player/GameState, spadne to na SEGFAULT."
+        night_log "   Oprava: g++ -O2 -std=c++20 -Iengine/include -Iengine/third_party \\"
+        night_log "           diag_f1_cage_advance_harness.cpp -Lengine/build -lbb_engine \\"
+        night_log "           -Wl,-rpath,\$PWD/engine/build -o diag_f1_cage_advance"
+        ok=1
+    fi
+
     # (3) engine .so není starší než engine/src a engine/include -- tohle je ta
     #     zákeřná: linkuje se až za běhu přes rpath, na binárce není vidět
     local so="$root/engine/build/libbb_engine.so"

@@ -140,14 +140,30 @@ night_preflight "$BIN" "$OUT" "$SRC" || {
 if [ ! -f "$OUT/AB_DONE" ]; then
     probe="$OUT/.probe"; rm -rf "$probe"; mkdir -p "$probe"
     pidx=${MATCHUPS%%:*}
-    if ( cd "$probe" && "$BIN" "$ROOT" 1 "$pidx" "$MODE" 0 > run.log 2>&1 ) \
-       && grep -q "MOVED WITHOUT THE ARM ACTING" "$probe/run.log"; then
-        night_log "PREFLIGHT sonda OK — binárka tiskne per-pair kontrolu ramene"
+    ( cd "$probe" && "$BIN" "$ROOT" 1 "$pidx" "$MODE" 0 > run.log 2>&1 )
+    probe_rc=$?
+    # ⛔ 24.08.2026: rozlišit PÁD od CHYBĚJÍCÍHO ŘÁDKU. Do dneška obojí hlásilo
+    #   „binárka NETISKNE ...", a fáze B víkendu 22.08. na to umřela: skutečná
+    #   příčina byl SEGFAULT (rc=139) z ABI nesouladu, ne chybějící řádek.
+    #   Hláška poslala hledat vzor pro režim, zatímco šlo o starý harness.
+    if [ "$probe_rc" -ne 0 ]; then
+        night_log "⛔ PREFLIGHT sonda SPADLA (rc=$probe_rc), mode $MODE, matchup $pidx."
+        if [ "$probe_rc" -ge 128 ]; then
+            night_log "   rc >= 128 ⇒ signál $((probe_rc-128)). 139 = SEGFAULT, a to skoro"
+            night_log "   vždycky znamená ABI: harness je přeložený proti starým hlavičkám,"
+            night_log "   zatímco libbb_engine.so je novější. PŘELOŽ HARNESS."
+        fi
+        night_log "   Viz $probe/run.log. NESPOUŠTÍM."
+        exit 4
+    fi
+    if grep -q "MOVED WITHOUT THE ARM ACTING" "$probe/run.log"; then
+        night_log "PREFLIGHT sonda OK — binárka běží a tiskne per-pair kontrolu ramene"
         rm -rf "$probe"
     else
-        night_log "⛔ PREFLIGHT sonda: binárka NETISKNE 'MOVED WITHOUT THE ARM ACTING'"
-        night_log "   (mode $MODE, matchup $pidx). Verdikt by neměl na čem stát ⇒ NESPOUŠTÍM."
-        night_log "   Viz $probe/run.log. Přelož harness a pusť znovu."
+        night_log "⛔ PREFLIGHT sonda: běh prošel, ale NETISKNE 'MOVED WITHOUT THE ARM ACTING'"
+        night_log "   (mode $MODE, matchup $pidx) ⇒ tenhle režim nemá signál ramene."
+        night_log "   Verdikt by neměl na čem stát. Doplň mode $MODE do armSignalAvailable"
+        night_log "   v diag_f1_cage_advance_harness.cpp. Viz $probe/run.log. NESPOUŠTÍM."
         exit 4
     fi
 fi
