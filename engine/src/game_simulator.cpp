@@ -547,20 +547,52 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
 
     // Scatter: D6 for distance, D8 for direction
     int dist = dice.rollD6();
-    // Kick skill: halve scatter distance (round up)
+    // Kick skill, BB2016 l. 8211-8213: "you may choose to halve the number of
+    // squares that the ball scatters on kick-off, ROUNDING ANY FRACTIONS DOWN
+    // (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)". Do 24.08.2026 se zaokrouhlovalo
+    // NAHORU, takze u tri hodu ze sesti (1, 3, 5) mic uletel o pole dal, nez ma.
     if (hasKickPlayer(state, state.kickingTeam)) {
-        dist = (dist + 1) / 2;  // ceil(dist/2)
+        dist = dist / 2;  // floor -- pravidlo dava i tabulku, viz vys
     }
     int dir = dice.rollD8();
     Position scatter = scatterDirection(dir);
     int landX = kickX + scatter.x * dist;
     int landY = kickY + scatter.y * dist;
 
-    // Clamp to pitch
-    landX = std::clamp(landX, 0, 25);
-    landY = std::clamp(landY, 0, 14);
-
+    // ⛔ F10 (24.08.2026): tady se dosud mic ORIZL na hriste (`clamp`), takze
+    // vykop nikdy neodletel ven ani do vlastni poloviny -- a TOUCHBACK proto
+    // v teto ceste NEEXISTOVAL. `resolveKickoff` (plna cesta) ho ma, ale korpus
+    // bezi na teto, zjednodusene. BB2016 l. 275-283.
     Position landPos{static_cast<int8_t>(landX), static_cast<int8_t>(landY)};
+
+    // Polovina PRIJIMAJICIHO: HOME brani nizka x (LOS 12/13), AWAY vysoka.
+    auto inReceivingHalf = [&](Position p) {
+        return receiving == TeamSide::AWAY ? p.x >= 13 : p.x <= 12;
+    };
+
+    // l. 281-283: "the receiving coach is awarded a 'touchback' and must give
+    // the ball to ANY PLAYER IN HIS TEAM". Kteremu, to je VOLBA trenéra, ne
+    // pravidlo -- davame ho nejhlubsimu stojicimu hráči (prednostne se Sure
+    // Hands), tedy tomu, kdo je nejdal od LOS a nejmene ohrozeny.
+    auto awardTouchback = [&]() {
+        int losX = (state.kickingTeam == TeamSide::HOME) ? 12 : 13;
+        Player* pick = nullptr;
+        int bestScore = -1;
+        state.forEachOnPitch(receiving, [&](const Player& p) {
+            if (p.state != PlayerState::STANDING) return;
+            if (p.hasSkill(SkillName::NoHands)) return;
+            int score = std::abs(p.position.x - losX) +
+                        (p.hasSkill(SkillName::SureHands) ? 100 : 0);
+            if (score > bestScore) { bestScore = score; pick = &state.getPlayer(p.id); }
+        });
+        if (pick) {
+            state.ball = BallState::carried(pick->position, pick->id);
+        } else {
+            state.ball = BallState::onGround(Position{
+                static_cast<int8_t>(std::clamp(landX, 0, 25)),
+                static_cast<int8_t>(std::clamp(landY, 0, 14))});
+        }
+    };
 
     // Put the ball down BEFORE anyone tries to catch it. Until 2026-08-11 it
     // was placed only in the else-branch, so a kick landing on a standing
@@ -573,13 +605,32 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
     // blocks, three fouls and a casualty, played without a ball. The full
     // kickoff path (resolveKickoff) always had this right; only the simplified
     // one was wrong, and the simplified one is what the corpora run on.
-    state.ball = BallState::onGround(landPos);
+    if (!landPos.isOnPitch() || !inReceivingHalf(landPos)) {
+        // l. 280-282: "If the ball scatters or bounces off the pitch OR INTO
+        // THE KICKING TEAM'S HALF, the receiving coach is awarded a touchback."
+        awardTouchback();
+    } else {
+        state.ball = BallState::onGround(landPos);
 
-    Player* catcher = state.getPlayerAtPosition(landPos);
-    if (catcher && catcher->teamSide == receiving &&
-        catcher->state == PlayerState::STANDING) {
-        if (!resolveCatch(state, catcher->id, dice, 0, nullptr)) {
+        Player* catcher = state.getPlayerAtPosition(landPos);
+        if (catcher && catcher->teamSide == receiving &&
+            catcher->state == PlayerState::STANDING) {
+            if (!resolveCatch(state, catcher->id, dice, 0, nullptr)) {
+                resolveBounce(state, landPos, dice, 0, nullptr);
+            }
+        } else if (!catcher) {
+            // l. 277-278: "If the ball lands in an empty square it will BOUNCE
+            // ONE MORE SQUARE." Ten odraz tu dosud chybel uplne -- mic po
+            // vykopu proste lezel v poli dopadu.
             resolveBounce(state, landPos, dice, 0, nullptr);
+        }
+
+        // A odraz muze mic dostat ven nebo do kopajici poloviny -- pak je to
+        // touchback taky (tataz veta l. 280-282).
+        // ⚠️ Aproximace: nas `resolveBounce` po vyletu z hriste rovnou vhazuje
+        // z davu, takze mezistav neodpovida pravidlum; koncovy stav ano.
+        if (!state.ball.isHeld && !inReceivingHalf(state.ball.position)) {
+            awardTouchback();
         }
     }
 

@@ -228,9 +228,12 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
 
     // Scatter: D6 for distance, D8 for direction
     int dist = dice.rollD6();
-    // Kick skill: halve scatter distance (round up)
+    // Kick skill, BB2016 l. 8211-8213: "you may choose to halve the number of
+    // squares that the ball scatters on kick-off, ROUNDING ANY FRACTIONS DOWN
+    // (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)". Do 24.08.2026 se zaokrouhlovalo
+    // NAHORU, takze u tri hodu ze sesti (1, 3, 5) mic uletel o pole dal, nez ma.
     if (hasKickPlayer(state, state.kickingTeam)) {
-        dist = (dist + 1) / 2;  // ceil(dist/2)
+        dist = dist / 2;  // floor -- pravidlo dava i tabulku, viz vys
     }
     int dir = dice.rollD8();
     Position scatter = scatterDirection(dir);

@@ -1125,3 +1125,37 @@ TEST(GameSimulator, WoodElfWinningTheTossElectsToAttack) {
                                      *getRosterByName("wood-elf")),
               TeamSide::HOME);
 }
+
+// ============================================================================
+// F10 (24.08.2026) -- BB2016 l. 275-283. `simpleKickoff` je cesta, na ktere
+// bezi KORPUS, a touchback v ni neexistoval: mic se `clamp`nul na hriste.
+// ============================================================================
+
+TEST(GameSimulator, SimpleKickoffAwardsATouchbackWhenTheBallLeavesThePitch) {
+    // l. 280-282: "If the ball scatters or bounces OFF THE PITCH or into the
+    // kicking team's half, the receiving coach is awarded a 'touchback' and
+    // must give the ball to any player in his team."
+    // Do 24.08. se mic v teto ceste `clamp`nul na kraj hriste a hralo se dal.
+    GameState gs;
+    const TeamRoster& dwarf = *getRosterByName("dwarf");
+    DiceRoller setupDice(7);
+    setupHalf(gs, dwarf, dwarf, TeamSide::AWAY, &setupDice);   // AWAY kope, HOME prijima
+    gs.kickingTeam = TeamSide::AWAY;
+
+    // Kick skill sebereme, at se rozptyl nepuli (jinak by mic zustal na hristi).
+    gs.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        gs.getPlayer(p.id).skills.remove(SkillName::Kick);
+    });
+
+    // AWAY kope na kickX = 3 (HOME je pomaly roster). D6=6, D8=7 (zapad)
+    // => x = 3 - 6 = -3, tedy VEN Z HRISTE => touchback.
+    FixedDiceRoller dice({6, 7, 4, 4});
+    simpleKickoff(gs, dice);
+
+    EXPECT_TRUE(gs.ball.isHeld) << "touchback musi dat mic hráči, ne ho nechat lezet";
+    ASSERT_GE(gs.ball.carrierId, 0);
+    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME)
+        << "mic dostava PRIJIMAJICI tym";
+    EXPECT_TRUE(gs.ball.position.isOnPitch());
+    EXPECT_LE(gs.ball.position.x, 12) << "a stoji ve SVE polovine";
+}
