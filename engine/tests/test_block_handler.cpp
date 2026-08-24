@@ -72,6 +72,42 @@ TEST(BlockHandler, WrestleBothProne) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
 
+// F11 (24.08.2026): `WrestleBothProne` vys testuje NENOSICE a je spravne, ale
+// je to happy path -- vada lezela v pripadu, ktery zadny test nemel. BB2016
+// l. 8677-8678: "Use of this skill does not cause a turnover UNLESS THE ACTIVE
+// PLAYER WAS HOLDING THE BALL." Kod vracel ok() bezpodmínečně.
+
+TEST(BlockHandler, WrestleIsTurnoverWhenTheActivePlayerHeldTheBall) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Wrestle);
+    gs.ball.isHeld = true;               // blokujici (aktivni) hráč nese míč
+    gs.ball.carrierId = 1;
+    gs.ball.position = {10, 7};
+    FixedDiceRoller dice({2, 3, 4, 5, 6, 1, 2, 3});  // BD + odraz uvolneneho mice
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BlockHandler, WrestleIsNoTurnoverWhenTheDEFENDERHeldTheBall) {
+    // druha strana hranice: mic drzi nekdo z NEaktivniho tymu -> zadny turnover
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Wrestle);
+    gs.ball.isHeld = true;
+    gs.ball.carrierId = 12;
+    gs.ball.position = {11, 7};
+    FixedDiceRoller dice({2, 3, 4, 5, 6, 1, 2, 3});  // BD + odraz uvolneneho mice
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+}
+
 TEST(BlockHandler, DodgeSavesOnDS) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);

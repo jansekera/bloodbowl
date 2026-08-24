@@ -607,7 +607,18 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                               !att.hasSkill(SkillName::Block);
 
             if (defWrestle || attWrestle) {
-                // Wrestle: both prone, no armor, no turnover
+                // F11, 24.08.2026: Wrestle NENI bezpodminecne bez turnoveru.
+                // BB2016 l. 8677-8678: "Use of this skill does not cause
+                // a turnover UNLESS THE ACTIVE PLAYER WAS HOLDING THE BALL",
+                // a katalog turnoveru l. 368-372 to rika stejne: "being Placed
+                // Prone is not a turnover unless it is a player from the active
+                // team holding the ball ... e.g. skills like Diving Tackle,
+                // Piling On and Wrestle count as being Placed Prone".
+                // Cte se PRED padem, protoze handleBallOnPlayerDown mic upusti.
+                const bool activeHeldBall =
+                    state.ball.isHeld && state.ball.carrierId == att.id;
+
+                // Wrestle: both prone, no armor
                 att.state = PlayerState::PRONE;
                 def.state = PlayerState::PRONE;
                 emitEvent(events, {GameEvent::Type::SKILL_USED,
@@ -617,7 +628,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 handleBallOnPlayerDown(state, att.id, dice, events);
                 handleBallOnPlayerDown(state, def.id, dice, events);
                 att.hasActed = true;
-                return ActionResult::ok(); // Wrestle = no turnover
+                return activeHeldBall ? ActionResult::turnovr() : ActionResult::ok();
             }
 
             // No Wrestle — check Block
