@@ -1065,3 +1065,28 @@ TEST(BlockHandler, DefenderDownStillBeatsAWrestledBothDown) {
     BlockDiceFace faces[2] = {BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::BOTH_DOWN};
     EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::DEFENDER_DOWN);
 }
+
+TEST(BlockHandler, BothDownKnocksBothPlayersDownInPlaceWithNoPushOrFollowUp) {
+    // ⛔⛔ N8 (24.08.2026), nalezl Fable audit pohybu. BB2016 l. 514-519:
+    // "BOTH DOWN: **Both players are Knocked Down**, unless one or both of the
+    // players involved has the Block skill." Zadny odsun, zadny follow-up.
+    // Srovnej l. 530-533 (DEFENDER DOWN): "pushed back and then Knocked Down
+    // in the square they are moved to. The attacking player may follow up."
+    // Nas kod delal na Both Down to druhe -- posouval DVA hráče o pole.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Block);   // utocnik neplada
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);   // obrance bez Blocku
+
+    FixedDiceRoller dice({2, 3, 3, 1, 2});   // BD; zbroj 6 <= AV8; (zraneni)
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}))
+        << "obrance pada NA MISTE, neodsouva se";
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}))
+        << "a utocnik ho nenasleduje";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_FALSE(result.turnover);
+}

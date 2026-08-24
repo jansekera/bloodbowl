@@ -721,22 +721,35 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, att.id, -1,
                                   att.position, {}, 0, false});
             }
+            // ⛔⛔ N8 (24.08.2026): tady stalo `defPushed = true;` s komentarem
+            // "defender gets pushed then knocked down" -- to je ale chovani
+            // DEFENDER DOWN, ne BOTH DOWN.
+            // BB2016 l. 514-519: "BOTH DOWN: **Both players are Knocked Down**,
+            // unless one or both of the players involved has the Block skill."
+            // Zadny odsun, zadny follow-up. Srovnej l. 530-533 (Defender Down):
+            // "The defending player is **pushed back and then Knocked Down in
+            // the square they are moved to**. The attacking player may follow up."
+            // ⇒ Kazdy Both Down proti obranci bez Blocku posouval DVA hráče
+            // o pole, kam pravidla nedovoluji -- a `scoreFace` tuhle tvar ceni
+            // 8/10 pro utocnika s Blockem, takze se VOLI casto. Deformovalo to
+            // klece, screeny a vsechna dosavadni pozicni mereni.
             if (defFalls) {
-                defKnockedDown = true;
-                defPushed = true; // defender gets pushed then knocked down
+                def.state = PlayerState::PRONE;
+                emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
+                                  def.position, {}, 0, false});
+                InjuryContext defCtx;
+                if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
+                if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
+                resolveArmourAndInjury(state, def.id, dice, defCtx, events);
+                handleBallOnPlayerDown(state, def.id, dice, events);
             }
-
-            if (!defPushed) {
-                // Both have Block or only attacker falls
-                if (attKnockedDown) {
-                    InjuryContext attCtx;
-                    resolveArmourAndInjury(state, att.id, dice, attCtx, events);
-                    handleBallOnPlayerDown(state, att.id, dice, events);
-                }
-                att.hasActed = true;
-                return turnover ? ActionResult::turnovr() : ActionResult::ok();
+            if (attKnockedDown) {
+                InjuryContext attCtx;
+                resolveArmourAndInjury(state, att.id, dice, attCtx, events);
+                handleBallOnPlayerDown(state, att.id, dice, events);
             }
-            break;
+            att.hasActed = true;
+            return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
 
         case BlockDiceFace::PUSHED: {

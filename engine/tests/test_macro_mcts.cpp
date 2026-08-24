@@ -781,10 +781,20 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     weakBlitzer.id = 1;
     weakBlitzer.teamSide = TeamSide::HOME;
     weakBlitzer.state = PlayerState::STANDING;
-    weakBlitzer.position = {12, 7};
+    weakBlitzer.position = {14, 7};
     weakBlitzer.stats = {6, 1, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
+    // Retuned 2026-08-24 from x=12/13 to x=14/15. Druhe preladeni z tehoz
+    // duvodu jako to prvni: oprava pravidla posunula hranu. N8 (Both Down uz
+    // obrance NEODSUNUJE a utocnik ho NENASLEDUJE, l. 514-519) ubrala blitzu
+    // pozicni zisk, cimz se Q mezera zvetsila a strazce prestal odkladat.
+    // Posun PRYC od AWAY endzony ji vraci na hranu -- tymz `proximity` knoflikem,
+    // ktery popisuje komentar nize.
+    // ⚠️ Tenhle test JE takhle krehky ZAMERNE (testuje strazce, ne geometrii),
+    // ale znamena to, ze **kazda pravidlova oprava ho muze shodit** -- a je to
+    // signal k preladeni, ne k oslabeni aserce.
+    //
     // Retuned 2026-08-21 from x=15/16 to x=12/13. The fixture sits on a knife
     // edge by construction, and the P45 stand-up fix moved the edge: a blitzer
     // who fails the ~70 % roll used to lie there for the rest of the drive
@@ -804,7 +814,7 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     strongDefender.id = 12;
     strongDefender.teamSide = TeamSide::AWAY;
     strongDefender.state = PlayerState::STANDING;
-    strongDefender.position = {13, 7};
+    strongDefender.position = {15, 7};
     strongDefender.stats = {6, 6, 3, 9};
     strongDefender.movementRemaining = 6;
 
