@@ -248,12 +248,17 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
     int roll = dice.rollD6();
     if (roll >= target) return true;
 
-    // Skill reroll
+    // ⛔⛔ JEDEN HOD = NEJVÝŠ JEDEN REROLL (oprava TA1/P57, 24.08.2026).
+    // BB2016 l. 925-927: "VERY IMPORTANT: No matter how many re-rolls you have,
+    // or what type they are, you may never re-roll a single dice roll more than
+    // once." Do 21.08. tady byla KASKÁDA skill -> Pro -> týmový reroll, takže
+    // jeden hod dostal až TŘI opravné pokusy; nadržovalo to týmům s Dodge a
+    // Sure Feet (skaven, wood-elf). Každá větev níž proto KONČÍ návratem.
+
+    // (1) Skill reroll
     // ⛔ LIMIT JEDNOU ZA KOLO (oprava 21.08.). BB2016 l. 8089-8090 (Dodge):
     // "the player may only re-roll ONE failed Dodge roll per turn"; l. 8541
     // (Sure Feet): "may only use the Sure Feet skill once per turn".
-    // attemptRoll žádný stav za kolo nemělo, takže obě šly neomezeně -- a
-    // nadržovalo to dodge týmům (skaven, wood-elf), které dodgují nejvíc.
     bool* skillOncePerTurn = nullptr;
     if (skillReroll == SkillName::Dodge)    skillOncePerTurn = &player.dodgeRerollUsedThisTurn;
     if (skillReroll == SkillName::SureFeet) skillOncePerTurn = &player.sureFeetRerollUsedThisTurn;
@@ -264,22 +269,39 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
         roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(skillReroll), roll >= target});
-        if (roll >= target) return true;
+        return roll >= target;   // hod už byl jednou přehozen -- konec
     }
 
-    // Pro reroll
+    // (2) Pro
+    // BB2016 l. 8385-8389: před rerollem hod D6; na 4-6 se reroll provede, na
+    // 1-3 "the original result stands and may not be re-rolled with a skill or
+    // team re-roll; however you can re-roll the Pro roll with a Team re-roll."
+    // ⇒ týmový reroll tu smí přehodit BRÁNU, ne původní hod.
     if (player.hasSkill(SkillName::Pro) && !player.proUsedThisTurn) {
         player.proUsedThisTurn = true;
         int proRoll = dice.rollD6();
+        if (proRoll < 4 && canUseTeamReroll) {
+            TeamState& team = state.getTeamState(player.teamSide);
+            if (team.canUseReroll()) {
+                team.rerolls--;
+                team.rerollUsedThisTurn = true;
+                bool lonerOk = true;
+                if (player.hasSkill(SkillName::Loner)) {
+                    lonerOk = dice.rollD6() >= 4;
+                }
+                if (lonerOk) proRoll = dice.rollD6();
+            }
+        }
         if (proRoll >= 4) {
             roll = dice.rollD6();
             emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                               static_cast<int>(SkillName::Pro), roll >= target});
-            if (roll >= target) return true;
+            return roll >= target;
         }
+        return false;   // původní výsledek platí a nesmí se přehodit
     }
 
-    // Team reroll
+    // (3) Týmový reroll -- jen když hod ještě nebyl přehozen
     if (canUseTeamReroll) {
         TeamState& team = state.getTeamState(player.teamSide);
         if (team.canUseReroll()) {
@@ -295,7 +317,7 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
             }
 
             roll = dice.rollD6();
-            if (roll >= target) return true;
+            return roll >= target;
         }
     }
 

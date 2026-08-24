@@ -364,15 +364,78 @@ TEST(Helpers, AttemptRollLonerGate) {
     EXPECT_EQ(gs.homeTeam.rerolls, 0); // reroll consumed
 }
 
-TEST(Helpers, AttemptRollFullChain) {
+// ⛔ TA1 (24.08.2026): tenhle test dřív CERTIFIKOVAL vadu -- kostkami
+// {2,1,4,2,5} projel řetěz Dodge reroll -> Pro -> týmový reroll, tj. TŘI
+// rerolly JEDNOHO hodu, a asertoval EXPECT_TRUE. BB2016 l. 925-927:
+// "VERY IMPORTANT: No matter how many re-rolls you have, or what type they
+// are, you may never re-roll a single dice roll more than once."
+// Nahrazeno testy hranice -- na obou stranách.
+
+TEST(Helpers, AttemptRollOnlyOneRerollPerDiceRoll) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Dodge);
     gs.getPlayer(1).skills.add(SkillName::Pro);
     gs.homeTeam.rerolls = 1;
-    // roll 2 (fail), Dodge reroll: 1 (fail), Pro check: 4 (pass), Pro reroll: 2 (fail),
-    // team reroll: 5 (success)
+    // BB2016 l. 925-927: hod 2 (fail) -> Dodge reroll 1 (fail) a KONEC.
+    // Kostky 4/2/5 zůstanou nespotřebované -- kdyby kód pokračoval na Pro
+    // a týmový reroll, vyšlo by mu success a test spadne.
     FixedDiceRoller dice({2, 1, 4, 2, 5});
     bool ok = attemptRoll(gs, 1, dice, 4, SkillName::Dodge, false, true, nullptr);
+    EXPECT_FALSE(ok);
+    EXPECT_EQ(gs.homeTeam.rerolls, 1);              // týmový reroll se NESMÍ sáhnout
+    EXPECT_FALSE(gs.homeTeam.rerollUsedThisTurn);
+    EXPECT_FALSE(gs.getPlayer(1).proUsedThisTurn);  // ani Pro se nezkouší
+}
+
+TEST(Helpers, AttemptRollSkillRerollSucceedsStops) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Dodge);
+    gs.homeTeam.rerolls = 1;
+    // druhá strana hranice: hod 2 (fail) -> Dodge reroll 5 (success)
+    FixedDiceRoller dice({2, 5});
+    bool ok = attemptRoll(gs, 1, dice, 4, SkillName::Dodge, false, true, nullptr);
     EXPECT_TRUE(ok);
+    EXPECT_EQ(gs.homeTeam.rerolls, 1);
+}
+
+TEST(Helpers, AttemptRollTeamRerollOnlyWhenNoSkillReroll) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Dodge);
+    gs.getPlayer(1).dodgeRerollUsedThisTurn = true;  // Dodge už tohle kolo padl (l. 8089-8090)
+    gs.homeTeam.rerolls = 1;
+    // skill reroll není k dispozici => týmový reroll je PRVNÍ reroll toho hodu, a smí
+    FixedDiceRoller dice({2, 5});
+    bool ok = attemptRoll(gs, 1, dice, 4, SkillName::Dodge, false, true, nullptr);
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}
+
+TEST(Helpers, AttemptRollProGateFailStopsOriginal) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    gs.homeTeam.rerolls = 0;   // žádný týmový reroll na přehození Pro hodu
+    // BB2016 l. 8386-8389: Pro brána 1-3 => "the original result stands and may
+    // not be re-rolled with a skill or team re-roll".
+    FixedDiceRoller dice({2, 3, 5});
+    bool ok = attemptRoll(gs, 1, dice, 4, SkillName::SKILL_COUNT, false, true, nullptr);
+    EXPECT_FALSE(ok);
+    EXPECT_TRUE(gs.getPlayer(1).proUsedThisTurn);
+}
+
+TEST(Helpers, AttemptRollTeamRerollRerollsTheProRollItself) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    gs.homeTeam.rerolls = 1;
+    // l. 8388-8389: "however you can re-roll the Pro roll with a Team re-roll"
+    // hod 2 (fail) -> Pro brána 3 (fail) -> týmový reroll BRÁNY: 5 (pass)
+    // -> Pro reroll původního hodu: 4 (success)
+    FixedDiceRoller dice({2, 3, 5, 4});
+    bool ok = attemptRoll(gs, 1, dice, 4, SkillName::SKILL_COUNT, false, true, nullptr);
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
 }
