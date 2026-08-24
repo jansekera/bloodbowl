@@ -43,7 +43,11 @@ delta_1s   in    0.005 0.085   # totéž jednostranně (= delta/2)
 leak       ==    0             # jinak se delta NEČTE
 arm_acted  >=    0.95          # rameno sahá na ADVANCE, tedy skoro na každý zápas
 n_nonzero  in    0.50  0.85    # 19.08. dalo 63,3 %. Dolní mez povolena níž: N8 ubral rozhodnutých pozic.
-arm_picks  >=    2000000       # ≈147/hru na 13 600 her. PODLAHA, ne odhad; 21.08. jsem psal 2,5 M, ale ten běh se nespustil, takže to číslo NENÍ ověřené.
+arm_picks  >=    2720000       # 200/hru na 13 600 her. ⭐ PŘITVRZENO 24.08. PO LIGHT TESTU, a je to schválně jen APARÁTOVÁ podlaha:
+                               # light test (40 párů, týž engine/mode/matchup) dal 22 535 picků = 281,69/hru ⇒ ~3,83 M na ostrý běh.
+                               # Původních 2 M (≈147/hru) by prošlo, i kdyby rameno pracovalo na polovinu — taková kontrola nehlídá nic.
+                               # ⛔ PRAVIDLO: po vidění dat se smí kontrola PŘITVRDIT, ne povolit, a jen ta, která hlídá APARÁT.
+                               #    Na `delta` (hypotéza) se nesahá — light test dal +0,0125 ± 0,0819, což je na 40 párech bezcenné.
 
 # --- RUČNĚ, harness to neumí (nevymýšlím predikát, který summarizer nezná) ---
 # ⭐ (1) RASOVÁ NEUTRALITA. 19.08. dalo trpaslík +0,098 a wood-elf +0,095, tedy
