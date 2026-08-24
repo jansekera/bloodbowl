@@ -22,10 +22,15 @@ bool checkTentacles(GameState& state, int playerId, Position from,
         if (!canAct(opp->state) || opp->lostTacklezones) continue;
         if (!opp->hasSkill(SkillName::Tentacles)) continue;
 
-        // Contest: D6+moverST vs D6+tentaclesST, strictly greater to escape
-        int moverRoll = dice.rollD6();
-        int tentRoll = dice.rollD6();
-        bool escaped = (moverRoll + mover.stats.strength) > (tentRoll + opp->stats.strength);
+        // TA8 (24.08.2026) -- BB2016 l. 8588-8591: "The opposing player rolls
+        // 2D6 ADDING THEIR OWN player's ST and SUBTRACTING the Tentacles
+        // player's ST from the score. If the final result is 5 OR LESS, then
+        // the moving player is held firm." Do 24.08. se tu hral protihod
+        // D6 vs D6, tedy uplne jine rozdeleni: symetricke kolem nuly misto
+        // 2D6 s prahem 5, a s jinou citlivosti na rozdil sil.
+        int roll = dice.roll2D6();
+        int total = roll + mover.stats.strength - opp->stats.strength;
+        bool escaped = (total >= 6);
 
         emitEvent(events, {GameEvent::Type::SKILL_USED, opp->id, playerId, {}, {},
                           static_cast<int>(SkillName::Tentacles), !escaped});
@@ -54,10 +59,15 @@ void checkShadowing(GameState& state, int playerId, Position from,
         if (!canAct(opp->state) || opp->lostTacklezones) continue;
         if (!opp->hasSkill(SkillName::Shadowing)) continue;
 
-        // Roll: D6 + shadowMA - moverMA. If >= 6, follower moves to vacated square
-        int roll = dice.rollD6();
-        int total = roll + opp->stats.movement - mover.stats.movement;
-        bool follows = (total >= 6);
+        // TA9 (24.08.2026) -- BB2016 l. 8458-8464: "The opposing player rolls
+        // 2D6 ADDING THEIR OWN player's movement allowance and SUBTRACTING the
+        // Shadowing player's movement allowance. If the final result is 7 OR
+        // LESS, the player with Shadowing MAY move into the square vacated."
+        // Do 24.08. tu byl JEDEN D6 a znamenka OBRACENE (+ stinujici MA
+        // - utikajici MA >= 6), takze rychly hráč se stinovani hur ubranil.
+        int roll = dice.roll2D6();
+        int total = roll + mover.stats.movement - opp->stats.movement;
+        bool follows = (total <= 7);
 
         emitEvent(events, {GameEvent::Type::SKILL_USED, opp->id, playerId, opp->position, from,
                           static_cast<int>(SkillName::Shadowing), follows});

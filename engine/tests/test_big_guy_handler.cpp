@@ -352,75 +352,87 @@ TEST(MoveHandler, LeapIgnoresTZ) {
 
 // ===== TENTACLES TESTS =====
 
-TEST(MoveHandler, TentaclesCaught) {
+// ============================================================================
+// TA8 / TA9 (24.08.2026): oba skilly mely UPLNE JINOU kostkovou mechaniku, nez
+// pisi pravidla, a testy tu vadnou verzi certifikovaly vcetne vypoctu v
+// komentari. Prepsano na text BB2016.
+// ============================================================================
+
+TEST(MoveHandler, TentaclesCaughtOnFiveOrLess) {
+    // l. 8588-8591: "The opposing player rolls 2D6 ADDING THEIR OWN player's ST
+    // and SUBTRACTING the Tentacles player's ST. If the final result is 5 OR
+    // LESS, then the moving player is held firm."
+    // Do 24.08. se hral protihod D6 vs D6 -- jine rozdeleni i jina citlivost.
+    auto gs = makeGameState();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 3, 8);   // ST3 utika
+    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 6, 5, 1, 9);  // ST5 chapadla
+    gs.getPlayer(12).skills.add(SkillName::Tentacles);
+
+    // 2D6 = 3+4 = 7; 7 + ST3 - ST5 = 5 => 5 nebo min => CHYCEN
+    FixedDiceRoller dice({3, 4});
+    auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
+
+    EXPECT_TRUE(result.success);      // neni to turnover, jen konci pohyb
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+}
+
+TEST(MoveHandler, TentaclesEscapedOnSixOrMore) {
+    // druha strana hranice: tentyz rozdil sil, o jednicku vyssi hod
     auto gs = makeGameState();
     gs.homeTeam.rerolls = 0;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 3, 8);
     placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 6, 5, 1, 9);
     gs.getPlayer(12).skills.add(SkillName::Tentacles);
 
-    // Tentacles check: mover D6 + ST3 vs tentacles D6 + ST5
-    // Mover rolls 2 (2+3=5), tentacles rolls 1 (1+5=6), 5 < 6 → caught
-    FixedDiceRoller dice({2, 1});
-    auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
-
-    EXPECT_TRUE(result.success);  // Not a turnover, movement just ends
-    EXPECT_FALSE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));  // Stayed at original pos
-}
-
-TEST(MoveHandler, TentaclesEscape) {
-    auto gs = makeGameState();
-    gs.homeTeam.rerolls = 0;
-    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3, 8);
-    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 6, 3, 1, 9);
-    gs.getPlayer(12).skills.add(SkillName::Tentacles);
-
-    // Tentacles: mover rolls 4 (4+4=8) vs tentacles rolls 2 (2+3=5), 8 > 5 → escaped
-    // Then dodge: AG3, 1 TZ at dest? No, enemy at (10,8) is adjacent to (10,7) not (11,7).
-    // Actually from (10,7), dest (11,7): is enemy at (10,8) adjacent to (10,7)? Yes.
-    // So needsDodge=true. Dodge target = 7-3 + TZ@(11,7) = 4 + 0 = 4. Roll 5 → success
-    FixedDiceRoller dice({4, 2, 5});
+    // 2D6 = 4+4 = 8; 8 + 3 - 5 = 6 => unik. Pak dodge: AG3, cil 4, hod 5.
+    FixedDiceRoller dice({4, 4, 5});
     auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
 
     EXPECT_TRUE(result.success);
-    EXPECT_FALSE(result.turnover);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
 }
 
 // ===== SHADOWING TESTS =====
 
-TEST(MoveHandler, ShadowingFollow) {
+TEST(MoveHandler, ShadowingFollowsOnSevenOrLess) {
+    // l. 8458-8464: "The opposing player rolls 2D6 ADDING THEIR OWN player's
+    // movement allowance and SUBTRACTING the Shadowing player's movement
+    // allowance. If the final result is 7 OR LESS, the player with Shadowing
+    // may move into the square vacated." Do 24.08. tu byl JEDEN D6 a znamenka
+    // OBRACENE, takze RYCHLY hráč se stinovani branil HUR misto lip.
     auto gs = makeGameState();
     gs.homeTeam.rerolls = 0;
-    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 4, 8);  // MA6 AG4
-    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 8, 3, 3, 8);  // MA8 with Shadowing
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 4, 8);   // MA6 utika
+    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 8, 3, 3, 8);  // MA8 stinuje
     gs.getPlayer(12).skills.add(SkillName::Shadowing);
 
-    // needsDodge = true (enemy at (10,8) has TZ on (10,7))
-    // Dodge: AG4, target = 7-4 + TZ@(11,7)=0 = 3. Roll 4 → success
-    // Shadowing: D6 + MA8 - MA6 = D6+2. If >= 6 → follows. Roll 4 → 4+2=6 → follows!
-    FixedDiceRoller dice({4, 4});
+    // dodge AG4 cil 3, hod 4 => uspech.
+    // 2D6 = 4+3 = 7; 7 + MA6 - MA8 = 5 => 7 nebo min => NASLEDUJE
+    FixedDiceRoller dice({4, 4, 3});
     auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
 
     EXPECT_TRUE(result.success);
-    EXPECT_EQ(gs.getPlayer(12).position, (Position{10, 7}));  // Followed to vacated square
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{10, 7}));
 }
 
-TEST(MoveHandler, ShadowingFail) {
+TEST(MoveHandler, ShadowingFailsOnEightOrMore) {
+    // ⭐ A tady je videt, ze znamenka mela byt obracene: utikajici je RYCHLEJSI
+    // (MA8 proti MA6), takze se ma ubranit -- a s opravou se ubrani.
     auto gs = makeGameState();
     gs.homeTeam.rerolls = 0;
-    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 8, 3, 4, 8);  // MA8 AG4
-    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 6, 3, 3, 8);  // MA6 with Shadowing
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 8, 3, 4, 8);   // MA8 utika
+    placePlayer(gs, 12, {10, 8}, TeamSide::AWAY, 6, 3, 3, 8);  // MA6 stinuje
     gs.getPlayer(12).skills.add(SkillName::Shadowing);
 
-    // Dodge: AG4, target 3. Roll 4 → success
-    // Shadowing: D6 + MA6 - MA8 = D6-2. Need 6 → roll must be 8+ → impossible
-    FixedDiceRoller dice({4, 6});
+    // dodge AG4 cil 3, hod 4 => uspech.
+    // 2D6 = 4+4 = 8; 8 + MA8 - MA6 = 10 => 8 nebo vic => NENASLEDUJE
+    FixedDiceRoller dice({4, 4, 4});
     auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
 
     EXPECT_TRUE(result.success);
-    EXPECT_EQ(gs.getPlayer(12).position, (Position{10, 8}));  // Stayed put
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{10, 8}));
 }
 
 // ===== BIG GUY INTEGRATION VIA ACTION RESOLVER =====
