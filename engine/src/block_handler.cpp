@@ -530,6 +530,13 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // assists instead of his own. Both are gone: the comparison, the roll and
     // the equalisation now all happen on the modified pre-assist strengths, and
     // assists are added on top afterwards.
+    // Dauntless, BB2016 l. 8023-8033 (doslova shodne s CRP): "The skill only
+    // works when the player attempts to block an opponent who is STRONGER than
+    // himself. ... rolls a D6 and adds it to his strength. If the total is EQUAL
+    // TO OR LOWER than the opponent's Strength, the player must block using his
+    // normal Strength. If the total is GREATER, then the player counts as having
+    // a Strength EQUAL TO HIS OPPONENT'S ... calculated BEFORE any defensive or
+    // offensive assists are added but AFTER all other modifiers."
     if (att.hasSkill(SkillName::Dauntless) && defST > attST) {
         // ⛔ Tady stálo, že tohle počítá, „kolikrát se OPRAVDU hodil", a že
         // rozdíl proti nabídce odpovídá na „vzal si to search?". Obojí je
@@ -739,6 +746,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
         case BlockDiceFace::DEFENDER_STUMBLES: {
             // Dodge saves: DS → PUSHED (unless Tackle)
+            // Tackle, l. 8569-8571: "...nor may they use their Dodge skill if
+            // the player throws a block at them and uses the Tackle skill."
             if (def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle)) {
                 defPushed = true; // just a push
             } else {
@@ -816,7 +825,14 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
 
-        // StripBall: if defender has ball and not knocked down, and attacker has StripBall.
+        // Strip Ball, l. 8517-8521: "When a player with this skill blocks an
+        // opponent with the ball, applying a 'Pushed' or 'Defender Stumbles'
+        // result will cause the opposing player to DROP THE BALL IN THE SQUARE
+        // THAT THEY ARE PUSHED TO, EVEN IF the opposing player is NOT KNOCKED
+        // DOWN." Sražený nosič mic pusti i bez Strip Ballu, takze zdejsi vetev
+        // resi prave to "i kdyz nespadl". Sure Hands ho rusi (l. 8546-8548).
+        // Mic padá z def.position, coz uz JE cilove pole odsunu (odsun probehl
+        // vys v resolvePushback).
         if (!defKnockedDown && state.ball.isHeld && state.ball.carrierId == def.id &&
             att.hasSkill(SkillName::StripBall)) {
             if (def.hasSkill(SkillName::SureHands)) {

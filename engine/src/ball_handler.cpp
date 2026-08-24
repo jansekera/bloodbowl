@@ -41,6 +41,10 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
 
     int target = calculateCatchTarget(state, catcher, modifier);
     bool success = attemptRoll(state, catcherId, dice, target,
+                               // Catch, l. 7992-7995: "allowed to re-roll the D6
+                               // if he fails a catch roll. It also allows the
+                               // player to re-roll the D6 if he drops a hand-off
+                               // or fails to make an interception."
                                SkillName::Catch, false, true, events);
 
     emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},

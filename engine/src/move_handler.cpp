@@ -131,6 +131,10 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
         int target = calculateDodgeTarget(state, player, to, from);
 
         // Check if Tackle negates Dodge reroll
+        // Tackle, BB2016 l. 8566-8571: "Opposing players who are standing in
+        // any of this player's tackle zones are NOT ALLOWED TO USE THEIR DODGE
+        // SKILL if they attempt to dodge out of any of the player's tackle
+        // zones." Rusi se tim REROLL, ne modifikator -- Dodge zadny nema.
         bool tackleNegates = false;
         auto srcAdj = from.getAdjacent();
         for (auto& apos : srcAdj) {

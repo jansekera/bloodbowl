@@ -80,24 +80,49 @@ TEST(Helpers, DodgeTargetWithTZAtDest) {
     EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 4);
 }
 
-TEST(Helpers, DodgeTargetWithDodgeSkill) {
+// ⛔⛔ 24.08.2026: oba puvodni testy certifikovaly VYMYSLENY modifikator --
+// "AG3 4+, +1 dodge, -1 Dodge skill => 2+". BB2016 l. 8086-8092 dava Dodge
+// POUZE REROLL a tabulka modifikatoru (l. 597-600) zna jen "+1 za hod na dodge"
+// a "-1 za tackle zonu na CILOVEM poli". Zadny bonus za dovednost tam neni.
+
+TEST(Helpers, DodgeSkillDoesNotChangeTheTargetOnlyGivesAReroll) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    gs.getPlayer(1).skills.add(SkillName::Dodge);
+    GameState gs2;
+    placePlayer(gs2, 1, {10, 7}, TeamSide::HOME);
+    gs2.getPlayer(1).skills.add(SkillName::Dodge);
 
-    // AG3 4+, +1 dodge, -1 Dodge skill => 2+
-    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 2);
+    // AG3: 7-3 = 4, minus +1 za hod na dodge => 3+. Se skillem TOTEZ.
+    EXPECT_EQ(calculateDodgeTarget(gs,  gs.getPlayer(1),  {11, 7}, {10, 7}), 3);
+    EXPECT_EQ(calculateDodgeTarget(gs2, gs2.getPlayer(1), {11, 7}, {10, 7}), 3)
+        << "Dodge je reroll, ne modifikator";
 }
 
-TEST(Helpers, DodgeTargetDodgeNegatedByTackle) {
+TEST(Helpers, StuntyIgnoresTacklezonesOnTheDESTINATIONSquare) {
+    // l. 8530-8533: "may IGNORE ANY ENEMY TACKLE ZONES ON THE SQUARE HE IS
+    // MOVING TO". Do 24.08. to bylo plosne -1, tj. ve trech tackle zonach
+    // o dva stupne min, nez pravidlo dava.
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    gs.getPlayer(1).skills.add(SkillName::Dodge);
-    placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
-    gs.getPlayer(12).skills.add(SkillName::Tackle);
+    placePlayer(gs, 12, {12, 6}, TeamSide::AWAY);   // TZ na (11,7)
+    placePlayer(gs, 13, {12, 8}, TeamSide::AWAY);   // TZ na (11,7)
+    placePlayer(gs, 14, {12, 7}, TeamSide::AWAY);   // TZ na (11,7)
 
-    // Tackle at source negates Dodge: AG3 4+, +1 dodge => 3+
+    // bez Stunty: 3+ a tri tackle zony na cili => 6+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 6);
+
+    gs.getPlayer(1).skills.add(SkillName::Stunty);
+    // se Stunty se cilove tackle zony ignoruji uplne => zpatky na 3+
     EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
+}
+
+TEST(Helpers, TwoHeadsAndTitchyAddOneToTheDodgeRoll) {
+    // l. 8644-8646 a l. 8638-8639 -- tyhle dva PLOSNE +1 opravdu maji
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 3);
+    gs.getPlayer(1).skills.add(SkillName::TwoHeads);
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {11, 7}, {10, 7}), 2);
 }
 
 TEST(Helpers, DodgeTargetStuntyAndTwoHeads) {

@@ -53,7 +53,9 @@ Position pickApproachStep(const GameState& state, const Player& mover,
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source) {
     int ag = player.stats.agility;
-    // BreakTackle: use ST if higher
+    // Break Tackle, l. 7987-7990: "The player may use his Strength instead of
+    // his Agility when making a Dodge roll ... This skill may only be used once
+    // per turn." ⚠️ Limit "jednou za kolo" nehlidame.
     if (player.hasSkill(SkillName::BreakTackle) && player.stats.strength > ag) {
         ag = player.stats.strength;
     }
@@ -72,26 +74,30 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
     // TZ at destination
     target += countTacklezones(state, dest, player.teamSide);
 
-    // Skills that make dodging easier
-    // Dodge: -1 (negated if any opponent adjacent to source has Tackle)
-    if (player.hasSkill(SkillName::Dodge)) {
-        bool tacklePresent = false;
-        auto srcAdj = source.getAdjacent();
-        for (auto& apos : srcAdj) {
-            if (!apos.isOnPitch()) continue;
-            const Player* opp = state.getPlayerAtPosition(apos);
-            if (opp && opp->teamSide != player.teamSide &&
-                exertsTacklezone(opp->state) && !opp->lostTacklezones &&
-                opp->hasSkill(SkillName::Tackle)) {
-                tacklePresent = true;
-                break;
-            }
-        }
-        if (!tacklePresent) target -= 1;
-    }
+    // ⛔⛔ 24.08.2026: TADY BYL VYMYSLENY MODIFIKATOR. Dodge dostaval -1 na cil
+    // (tj. +1 na hod), a k tomu jeste reroll pres attemptRoll v move_handleru.
+    // BB2016 l. 8086-8092 dava Dodge POUZE REROLL: "is allowed to RE-ROLL the
+    // D6 if he fails to dodge out of any of an opposing player's tackle zones.
+    // However, the player may only re-roll one failed Dodge roll per turn."
+    // A tabulka modifikatoru dodge (l. 597-600) zna jen "+1 za hod na dodge"
+    // (ten uz je v `6 - ag`) a "-1 za kazdou tackle zonu na CILOVEM poli".
+    // Zadny bonus za dovednost Dodge tam neni.
+    // ⇒ Dodge tymy (skaven, wood-elf, human) mely kazdy dodge o stupen levnejsi,
+    // nez maji mit. Tataz strana jako TA1 (retez rerollu), taky opraveno dnes.
+    //
+    // Tackle tu proto nema co rusit: l. 8567-8571 rusi Dodge jako REROLL,
+    // a to uz dela move_handler.cpp (parametr skillNegatedByOpponent).
 
-    if (player.hasSkill(SkillName::Stunty)) target -= 1;
+    // Stunty, l. 8530-8533: "may IGNORE ANY ENEMY TACKLE ZONES ON THE SQUARE HE
+    // IS MOVING TO when he makes a Dodge roll". Neni to plosne -1, je to
+    // odecteni CELE penalizace za cil -- ve trech tackle zonach je to rozdil
+    // -1 proti -3.
+    if (player.hasSkill(SkillName::Stunty)) {
+        target -= countTacklezones(state, dest, player.teamSide);
+    }
+    // Titchy, l. 8638-8639: "may add 1 to any Dodge roll he attempts."
     if (player.hasSkill(SkillName::Titchy)) target -= 1;
+    // Two Heads, l. 8644-8646: "Add 1 to all Dodge rolls the player makes."
     if (player.hasSkill(SkillName::TwoHeads)) target -= 1;
 
     // Skills that make dodging harder (opponents at source)
@@ -101,11 +107,17 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
         const Player* opp = state.getPlayerAtPosition(apos);
         if (opp && opp->teamSide != player.teamSide &&
             exertsTacklezone(opp->state) && !opp->lostTacklezones) {
+            // Prehensile Tail, l. 8598-8601: "opposing players must subtract 1
+            // from the D6 roll if they attempt to dodge out of any of the
+            // player's tackle zones."
             if (opp->hasSkill(SkillName::PrehensileTail)) target += 1;
         }
     }
 
-    // DivingTackle: +2 from one opponent at source
+    // Diving Tackle, l. 8076-8080: "The opposing player must subtract 2 from
+    // his Dodge roll ... only ONE of the opposing players may use Diving
+    // Tackle." ⚠️ NEUPLNE: hráč s Diving Tackle se ma pritom POLOZIT NA ZEM
+    // do pole, ktere utikajici opustil (l. 8074-8075) -- to nedelame (ukol B2).
     for (auto& apos : srcAdj) {
         if (!apos.isOnPitch()) continue;
         const Player* opp = state.getPlayerAtPosition(apos);
