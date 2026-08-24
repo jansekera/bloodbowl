@@ -601,10 +601,41 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // opposing player may not use his Fend, Stand Firm or Wrestle
             // skills against the Juggernaut player's blocks." Stand Firm was
             // already handled (resolvePushback), Fend and Wrestle were not.
-            bool defWrestle = def.hasSkill(SkillName::Wrestle) &&
+            // ⛔ VOLBA, NE MECHANIKA (24.08.2026). BB2016 l. 8672-8676: "This
+            // player MAY USE Wrestle ... Both players are Placed Prone in their
+            // respective squares EVEN IF ONE OR BOTH HAVE THE BLOCK SKILL."
+            // Block tedy Wrestle NEPREBIJI -- rozhoduje trenér. Do 24.08. byla
+            // volba zadratovana, a to v OPACNYCH smerech: utocnik s Blockem
+            // Wrestle nepouzil NIKDY (`&& !att.hasSkill(Block)`), obrance
+            // naopak VZDY. Kombinace Block+Wrestle na jednom hráči tim byla
+            // v utoku mrtva -- prave ta, kvuli ktere se o Wrestle u trpaslika
+            // uvazuje (Longbeard).
+            const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
+            const bool defHasBall = state.ball.isHeld && state.ball.carrierId == def.id;
+
+            // Utocnik: bez Blocku ho Both Down slozi tak jako tak, takze Wrestle
+            // je lepsi vzdy (slozi i souperě a nikdo nehazi na zbroj). S Blockem
+            // by zustal stat, takze Wrestle stoji za to jen kdyz je co ziskat:
+            // souper ma Block (jinak by se NESTALO NIC), nebo drzi mic.
+            const bool attWantsWrestle =
+                att.hasSkill(SkillName::Wrestle) &&
+                (!att.hasSkill(SkillName::Block) ||
+                 (!attHasBall && (def.hasSkill(SkillName::Block) || defHasBall)));
+
+            // Obrance: kdyz ma Block, Both Down ho necha stat a slozi utocnika
+            // -- to je lepsi nez Wrestle, ledaze utocnik drzi mic (pak je jeho
+            // polozeni na zem turnover, l. 368-372). Bez Blocku pada tak jako
+            // tak, takze Wrestle bere jako lepsi variantu (bez hodu na zbroj).
+            const bool defWantsWrestle =
+                def.hasSkill(SkillName::Wrestle) &&
+                (!def.hasSkill(SkillName::Block) || attHasBall);
+
+            // Juggernaut na blitzu rusi Wrestle OBRANCE (rules parity 10.08.):
+            // "the opposing player may not use his Fend, Stand Firm or Wrestle
+            // skills against the Juggernaut player's blocks."
+            bool defWrestle = defWantsWrestle &&
                               !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
-            bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
-                              !att.hasSkill(SkillName::Block);
+            bool attWrestle = attWantsWrestle;
 
             if (defWrestle || attWrestle) {
                 // F11, 24.08.2026: Wrestle NENI bezpodminecne bez turnoveru.

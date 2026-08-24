@@ -919,3 +919,89 @@ TEST(PushGeometry, ArmIsPerSideSoAnABCanRunItOnOneTeamOnly) {
     setPushGeometryArm(TeamSide::HOME, false);
     EXPECT_FALSE(pushGeometryArm(TeamSide::HOME));
 }
+
+// ============================================================================
+// Block + Wrestle na JEDNOM hráči -- l. 8672-8676 "even if one or both have the
+// Block skill". Do 24.08.2026 to bylo zadratovane: utocnik s Blockem Wrestle
+// nepouzil nikdy. Kvuli teto kombinaci se o Wrestle u Longbearda uvazuje.
+// ============================================================================
+
+TEST(BlockHandler, AttackerWithBlockAndWrestleUsesWrestleAgainstABlockOpponent) {
+    // oba maji Block => Both Down by neudelal NIC. Wrestle je jediny zpusob,
+    // jak souperě polozit -- a to je ta "aktivni" varianta v utoku.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.getPlayer(12).skills.add(SkillName::Block);
+    FixedDiceRoller dice({2});   // BOTH DOWN
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);                       // nedrzi mic
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BlockHandler, AttackerWithBlockKeepsBlockAgainstANonBlockOpponent) {
+    // druha strana volby: souper Block nema, takze Both Down ho slozi I S HODEM
+    // NA ZBROJ a utocnik zustane stat. Wrestle by byl horsi -- nesmi se pouzit.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    FixedDiceRoller dice({2, 3, 3, 4, 4});   // BD + hod na zbroj souperě
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BlockHandler, AttackerWithBlockAndWrestleTakesDownTheCarrier) {
+    // souper Block nema, ale NESE MIC => slozit ho bez hodu na zbroj se vyplati
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.ball.isHeld = true; gs.ball.carrierId = 12; gs.ball.position = {11, 7};
+    FixedDiceRoller dice({2, 3, 4, 5, 6, 1, 2, 3});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);                       // mic nesl SOUPER
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.ball.isHeld);                        // mic se uvolnil
+}
+
+TEST(BlockHandler, AttackerWithTheBallDoesNotWrestleItAway) {
+    // l. 8677-8678 + F11: polozeni nosice aktivniho tymu JE turnover, takze
+    // utocnik s Blockem, ktery nese mic, Wrestle volit nesmi.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.getPlayer(12).skills.add(SkillName::Block);
+    gs.ball.isHeld = true; gs.ball.carrierId = 1; gs.ball.position = {10, 7};
+    FixedDiceRoller dice({2});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);  // Block, ne Wrestle
+}
+
+TEST(BlockHandler, DefenderWithBlockKeepsBlockUnlessTheCarrierIsBlocking) {
+    // obrance s Blockem: Both Down slozi utocnika a on zustane stat -- Wrestle
+    // by byl horsi. Do 24.08. ho pouzival VZDY.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Block);
+    gs.getPlayer(12).skills.add(SkillName::Wrestle);
+    FixedDiceRoller dice({2, 3, 3, 4, 4});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_TRUE(result.turnover);            // utocnik slozen = turnover
+}
