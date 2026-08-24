@@ -177,31 +177,82 @@ Position throwInDirection(ExitEdge edge, DiceRollerBase& dice) {
 
 } // namespace
 
+// F9 (24.08.2026) -- BB2016 l. 868-877. Dve vady v jedne funkci:
+//
+// (1) "If the ball is thrown into a square occupied by a STANDING PLAYER, that
+//     player MUST ATTEMPT TO CATCH the ball. If the ball lands in an empty
+//     square or a square occupied by a Prone or Stunned player, then it will
+//     bounce." -- u nas se odrazelo VZDY ("regardless of whether that square is
+//     occupied"), takze vhozeny mic nikdo nikdy nechytil.
+// (2) "If a throw-in results in the ball going off the pitch AGAIN, it will be
+//     THROWN IN AGAIN, centred on the last square it was in before it left the
+//     pitch." -- u nas se misto toho oriznul na kraj hriste (`clamp`), cimz
+//     vzniklo pole, kam se mic podle pravidel nikdy nedostane.
+//
+// Opakovane vhazovani se pocita ve smycce s tvrdym stropem: hriste je 26x15,
+// takze 2D6 nemuze cyklit donekonecna, ale strop chrani proti degenerovanemu
+// stavu (mic mimo, zadny hrac). Po strope se mic polozi na posledni pole
+// v hristi a odrazi se -- to uz je nase volba, ne pravidlo.
 void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExit,
                     DiceRollerBase& dice, std::vector<GameEvent>* events) {
-    ExitEdge edge = classifyExit(offPitchExit);
-    Position offset = throwInDirection(edge, dice);
-    int distance = dice.roll2D6();
+    Position origin = lastOnPitch;
+    Position exitAt = offPitchExit;
 
-    Position dest{
-        static_cast<int8_t>(lastOnPitch.x + offset.x * distance),
-        static_cast<int8_t>(lastOnPitch.y + offset.y * distance)
-    };
+    for (int attempt = 0; attempt < 8; ++attempt) {
+        ExitEdge edge = classifyExit(exitAt);
+        Position offset = throwInDirection(edge, dice);
+        int distance = dice.roll2D6();
 
-    // Clamp to pitch if off-pitch
-    if (!dest.isOnPitch()) {
-        dest.x = std::clamp(dest.x, static_cast<int8_t>(0),
-                            static_cast<int8_t>(Position::PITCH_WIDTH - 1));
-        dest.y = std::clamp(dest.y, static_cast<int8_t>(0),
-                            static_cast<int8_t>(Position::PITCH_HEIGHT - 1));
+        // Mic se posouva po JEDNOM poli, aby se dalo najit "the LAST SQUARE it
+        // was IN before it left the pitch" (l. 875-877) -- skok rovnou na
+        // cilove pole tuhle informaci zahodi a druhe vhazeni by se pak pocitalo
+        // z puvodniho mista, ne z toho, kde mic hriste opustil.
+        Position dest = origin;
+        Position lastInside = origin;
+        Position firstOutside = origin;
+        bool leftPitch = false;
+        for (int step = 0; step < distance; ++step) {
+            dest.x = static_cast<int8_t>(dest.x + offset.x);
+            dest.y = static_cast<int8_t>(dest.y + offset.y);
+            if (!dest.isOnPitch()) {
+                firstOutside = dest;
+                leftPitch = true;
+                break;
+            }
+            lastInside = dest;
+        }
+
+        emitEvent(events, {GameEvent::Type::BALL_BOUNCE, -1, -1, origin, dest,
+                          distance, !leftPitch});
+
+        if (leftPitch) {
+            // l. 875-877: letel ven znovu => vhazuje se ZNOVU, ale z POSLEDNIHO
+            // POLE V HRISTI, ne z puvodniho mista.
+            origin = lastInside;
+            exitAt = firstOutside;
+            continue;
+        }
+
+        Player* catcher = state.getPlayerAtPosition(dest);
+        if (catcher && catcher->state == PlayerState::STANDING &&
+            !catcher->hasSkill(SkillName::NoHands)) {
+            // l. 871-872: stojici hráč chytat MUSI (neni to volba).
+            // l. 878: "Throw-ins cannot be intercepted" -- chytani vhozeneho
+            // mice tedy neni intercept a plati pro obe strany stejne.
+            state.ball = BallState::onGround(dest);
+            if (resolveCatch(state, catcher->id, dice, 0, events)) return;
+            // nechytil => odrazi se z jeho pole
+            resolveBounce(state, dest, dice, 0, events);
+            return;
+        }
+
+        // l. 872-874: prazdne pole, nebo lezici/omraceny => odraz
+        resolveBounce(state, dest, dice, 0, events);
+        return;
     }
 
-    emitEvent(events, {GameEvent::Type::BALL_BOUNCE, -1, -1, lastOnPitch, dest,
-                      distance, true});
-
-    // A throw-in always ends with one standard bounce from the landing
-    // square, regardless of whether that square is occupied.
-    resolveBounce(state, dest, dice, 0, events);
+    // Strop: mic polozime na posledni pole v hristi a odrazime.
+    resolveBounce(state, origin, dice, 0, events);
 }
 
 void handleBallOnPlayerDown(GameState& state, int playerId, DiceRollerBase& dice,

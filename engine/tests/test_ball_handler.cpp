@@ -235,6 +235,57 @@ TEST(BallHandler, ThrowInCornerExit) {
     EXPECT_EQ(gs.ball.position, (Position{1, 4}));
 }
 
+// ============================================================================
+// F9 (24.08.2026): ctyri puvodni ThrowIn testy pokryvaly vyhradne drahy, kde se
+// kod s pravidly SHODOVAL (dopad na prazdne pole -> odraz). Nepokryte bylo
+// presne to, kde byla vada. BB2016 l. 871-877.
+// ============================================================================
+
+TEST(BallHandler, ThrowInIsCaughtByAStandingPlayerInTheLandingSquare) {
+    // l. 871-872: "If the ball is thrown into a square occupied by a STANDING
+    // player, that player MUST attempt to catch the ball." Do 24.08. se
+    // z pole dopadu VZDY odrazelo, takze vhozeny mic nikdo nikdy nechytil.
+    GameState gs;
+    placePlayer(gs, 1, {10, 5}, TeamSide::HOME);
+    // stejne kostky jako ThrowInSideExitStraight: dopad na (10,5), kde stoji
+    // hráč 1 => chyt AG3, cil 4, hod 5 => uspech. Zadny odraz.
+    FixedDiceRoller dice({3, 3, 2, 5});
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+    EXPECT_EQ(gs.ball.position, (Position{10, 5}));
+}
+
+TEST(BallHandler, ThrowInBouncesOffAPRONEPlayerInsteadOfBeingCaught) {
+    // druha strana hranice, l. 872-874: "If the ball lands in an empty square
+    // or a square occupied by a PRONE OR STUNNED player, then it will bounce."
+    GameState gs;
+    placePlayer(gs, 1, {10, 5}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    // dopad (10,5) na leziciho => zadny chyt, odraz D8=3 (vychod) -> (11,5)
+    FixedDiceRoller dice({3, 3, 2, 3});
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 5}));
+}
+
+TEST(BallHandler, ThrowInThatLeavesThePitchAgainIsThrownInAgain) {
+    // l. 875-877: "If a throw-in results in the ball going off the pitch AGAIN,
+    // it will be THROWN IN AGAIN, centred on the last square it was in before
+    // it left the pitch." Do 24.08. se misto toho orizlo na kraj hriste.
+    GameState gs;
+    // 1. vhazeni z (10,0) po vystupu nahoru: D6=1 => diagonala (-1,+1),
+    //    2D6 = 6+6 = 12. Mic jde po poli: (9,1)...(0,10) je posledni pole
+    //    V HRISTI, dalsi krok (-1,11) uz je ven -- vlevo.
+    // 2. vhazeni tedy z (0,10), NE z (10,0), a sablonou pro LEVY kraj:
+    //    D6=3 => rovne dovnitr (+1,0), 2D6 = 2+2 = 4 => (4,10).
+    //    Prazdne pole => odraz D8=3 (vychod) -> (5,10).
+    FixedDiceRoller dice({1, 6, 6, 3, 2, 2, 3});
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_TRUE(gs.ball.position.isOnPitch());
+    EXPECT_EQ(gs.ball.position, (Position{5, 10}));
+}
+
 TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
     GameState gs;
     placePlayer(gs, 1, {11, 5}, TeamSide::HOME);
