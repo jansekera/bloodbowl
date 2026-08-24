@@ -440,17 +440,51 @@ TEST(BlockHandler, ChainsawSuccess) {
     EXPECT_TRUE(result.success);
 }
 
-TEST(BlockHandler, ChainsawKickback) {
+// ⛔ TA7 (24.08.2026): `ChainsawKickback` certifikoval DVE vady naraz --
+// komentar sam pocital "3+3=6 <= 8 not broken" a pak asertoval PRONE
+// + turnover. BB2016 l. 8001-8006: k hodu na zbroj se PRICITA 3, a kdyz
+// zbroj neprorazi, "the attack HAS NO EFFECT".
+
+TEST(BlockHandler, ChainsawKickbackWithoutBreakingArmourHasNoEffect) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Chainsaw);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-    // Chainsaw: D6=1 → kickback on attacker. Armor: 3+3=6 ≤ 8 not broken
-    FixedDiceRoller dice({1, 3, 3});
+    // D6=1 => kickback na nositele. Zbroj: 2+2 = 4, +3 = 7 <= AV8 => neproraženo
+    FixedDiceRoller dice({1, 2, 2});
     BlockParams params{1, 12, false, false};
     auto result = resolveBlock(gs, params, dice, nullptr);
-    EXPECT_TRUE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+}
+
+TEST(BlockHandler, ChainsawKickbackThatBreaksArmourFloorsTheWielder) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    // D6=1 => kickback. Zbroj: 3+3 = 6, +3 = 9 > AV8 => proraženo.
+    // Hod na zraneni 2D6 = 1+2 = 3 => Stunned.
+    FixedDiceRoller dice({1, 3, 3, 1, 2});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_TRUE(result.turnover);      // srazeny hráč aktivniho tymu
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+}
+
+TEST(BlockHandler, ChainsawAddsThreeToTheVictimsArmourRoll) {
+    // l. 8003-8004: bez toho +3 mela pila probojnost obycejneho bloku.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    // D6=2 => zasah. Zbroj: 3+3 = 6 -- bez +3 by to AV8 NEprorazilo,
+    // s +3 je to 9 > 8 => prorazi. Zraneni 2D6 = 1+2 = 3 => Stunned.
+    FixedDiceRoller dice({2, 3, 3, 1, 2});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);     // obet je souper
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
 
 TEST(BlockHandler, FrenzyDoubleBlock) {

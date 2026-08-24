@@ -50,7 +50,16 @@ TEST(BombHandler, InaccurateTripleScatter) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING); // Not hit
 }
 
-TEST(BombHandler, Fumble) {
+// ============================================================================
+// TA4 (24.08.2026): tri z peti puvodnich testu certifikovaly vadu, a jeden se
+// tak i JMENOVAL -- `NeverTurnover`, s komentarem "Even if fumble with ball
+// carrier, never turnover". BB2016 l. 7956-7958 rika presny opak.
+// ============================================================================
+
+TEST(BombHandler, FumbleExplodesInTheThrowersOwnSquareAndIsATurnover) {
+    // l. 7967-7968: "If the bomb is fumbled it explodes IN THE BOMB THROWER'S
+    // SQUARE." Puvodne se rozptylovala D8 od hazece, takze si hazec vetsinou
+    // ublizit nemohl. A l. 7969-7970: kdo je ve stejnem poli, JDE K ZEMI.
     GameState gs;
     gs.phase = GamePhase::PLAY;
     gs.activeTeam = TeamSide::HOME;
@@ -58,54 +67,67 @@ TEST(BombHandler, Fumble) {
     gs.getPlayer(1).skills.add(SkillName::Bombardier);
     placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
 
-    // Natural 1 = fumble. Scatter from thrower (10,7): D8=1 → (11,7)
-    // No player at (11,7) → no explosion effect
-    FixedDiceRoller dice({1, 1});
+    // hod 1 => fumble; vybuch v (10,7); hazec sam = automaticky srazen,
+    // zbroj 2D6 = 2+2 = 4 <= AV8 => neproraženo, ale SRAZEN uz je.
+    FixedDiceRoller dice({1, 2, 2});
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
-    EXPECT_FALSE(result.turnover); // Never turnover
+
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE)
+        << "hazec zadnou imunitu nema -- pravidlo o ni nikde nemluvi";
+    EXPECT_TRUE(result.turnover)
+        << "l. 7956-7958: vybuch, ktery srazi hráče aktivniho tymu, JE turnover";
 }
 
-TEST(BombHandler, OffPitchFizzle) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    gs.activeTeam = TeamSide::HOME;
-    placePlayer(gs, 1, {1, 7}, TeamSide::HOME);
-    gs.getPlayer(1).skills.add(SkillName::Bombardier);
-
-    // Fumble (roll=1), scatter D8=5 → (-1,0) → (0,7) still on pitch
-    // Actually let's make it scatter off pitch: thrower at (0,7)
-    gs.getPlayer(1).position = {0, 7};
-    // Fumble, D8=5 → (-1,0) → (-1,7) off pitch → fizzle
-    FixedDiceRoller dice({1, 5});
-    auto result = resolveBombThrow(gs, 1, {5, 7}, dice, nullptr);
-    EXPECT_FALSE(result.turnover);
-}
-
-TEST(BombHandler, ThrowerImmune) {
+TEST(BombHandler, AdjacentPlayersAreOnlyKnockedDownOnFourPlus) {
+    // l. 7970-7971: "players in ADJACENT squares are Knocked Down ON A ROLL OF
+    // 4+". Puvodne se srazelo cele okoli 3x3 automaticky.
     GameState gs;
     gs.phase = GamePhase::PLAY;
     gs.activeTeam = TeamSide::HOME;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);   // soused vybuchu
 
-    // Fumble (roll=1), scatter D8=5 → (-1,0) → (9,7)
-    // Explosion at (9,7). Thrower at (10,7) is adjacent → in 3x3 but IMMUNE
-    FixedDiceRoller dice({1, 5});
-    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING); // Thrower immune
+    // hod 1 => fumble, vybuch v (10,7).
+    // Pole (10,7) je hazec: automaticky srazen, zbroj 2+2 = 4 => neproraženo.
+    // Soused (11,7): hod 3 => MENE nez 4 => nezasazen.
+    FixedDiceRoller dice({1, 2, 2, 3});
+    resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
 }
 
-TEST(BombHandler, NeverTurnover) {
+TEST(BombHandler, TheBombHitsPRONEPlayersToo) {
+    // l. 7972-7974: "Players can be hit by a bomb and treated as Knocked Down
+    // EVEN IF THEY ARE ALREADY PRONE OR STUNNED." Puvodne se preskakovali.
     GameState gs;
     gs.phase = GamePhase::PLAY;
     gs.activeTeam = TeamSide::HOME;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bombardier);
-    gs.ball = BallState::carried({10, 7}, 1);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
 
-    // Even if fumble with ball carrier, never turnover
-    // Fumble: D8=1 → (11,7). No players there.
-    FixedDiceRoller dice({1, 1});
-    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+    // fumble => vybuch v (10,7); hazec zbroj 2+2; soused hod 5 => zasazen,
+    // jeho zbroj 3+3 = 6 <= AV8 => neproraženo, ale hod na nej PADL.
+    FixedDiceRoller dice({1, 2, 2, 5, 3, 3});
+    resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);   // zustava na zemi
+}
+
+TEST(BombHandler, ABombInTheCrowdExplodesWithNoEffect) {
+    // l. 7968-7969: "If a bomb lands in the crowd, it explodes with no effect."
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {0, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+
+    // hod 2 (nepresna, cil 4 pro AG2 na kratkou), tri rozptyly na zapad
+    // z ciloveho pole (2,7) => (-1,7) = mimo hriste
+    FixedDiceRoller dice({2, 7, 7, 7});
+    auto result = resolveBombThrow(gs, 1, {2, 7}, dice, nullptr);
     EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
 }

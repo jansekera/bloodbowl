@@ -462,22 +462,36 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         emitEvent(events, {GameEvent::Type::BLOCK, att.id, def.id, att.position,
                           def.position, chainsawRoll, chainsawRoll >= 2});
 
+        // TA7 (24.08.2026) -- BB2016 l. 8001-8006: "Make an Armour roll for the
+        // player hit by the chainsaw, ADDING 3 TO THE SCORE. If the roll beats
+        // the victim's Armour value then the victim is Knocked Down and injured.
+        // If the roll FAILS to beat the victim's Armour value then the attack
+        // HAS NO EFFECT."
+        // Dve vady: (1) +3 nikde -- pila mela probojnost obycejneho bloku;
+        // (2) kickback srazil nositele a vratil turnover BEZ OHLEDU na to, jestli
+        // zbroj vubec prorazil, a test `ChainsawKickback` to certifikoval
+        // (kostky {1,3,3} => 6 <= AV8 "neproraženo", a presto PRONE + turnover).
+        InjuryContext ctx;
+        ctx.armourModifier = 3;
+
         if (chainsawRoll == 1) {
-            // Kickback on attacker
-            att.state = PlayerState::PRONE;
+            // Kickback: obeti je NOSITEL
+            bool broken = resolveArmourAndInjury(state, att.id, dice, ctx, events);
+            att.hasActed = true;
+            if (!broken) return ActionResult::ok();   // "no effect"
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, att.id, -1,
                               att.position, {}, 0, false});
-            InjuryContext ctx;
-            resolveArmourAndInjury(state, att.id, dice, ctx, events);
             handleBallOnPlayerDown(state, att.id, dice, events);
-            att.hasActed = true;
+            // Sražený hráč aktivního tymu = turnover (katalog l. 368-369).
             return ActionResult::turnovr();
         } else {
-            // Armor roll on defender
-            InjuryContext ctx;
-            resolveArmourAndInjury(state, def.id, dice, ctx, events);
-            handleBallOnPlayerDown(state, def.id, dice, events);
+            bool broken = resolveArmourAndInjury(state, def.id, dice, ctx, events);
             att.hasActed = true;
+            if (broken) {
+                emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
+                                  def.position, {}, 0, false});
+                handleBallOnPlayerDown(state, def.id, dice, events);
+            }
             return ActionResult::ok();
         }
     }

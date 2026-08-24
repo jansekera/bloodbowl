@@ -35,8 +35,11 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
 
     passTarget += countDisturbingPresence(state, thrower.position, thrower.teamSide);
 
-    if (state.weather == Weather::POURING_RAIN || state.weather == Weather::BLIZZARD ||
-        state.weather == Weather::VERY_SUNNY) {
+    // Bomba se hazi "using the rules for throwing the ball (INCLUDING WEATHER
+    // EFFECTS)" (l. 7952-7954), a u mice plati od 10.08.: postih na HOD dava
+    // JEN Very Sunny. Pouring Rain ma -1 na chytani/intercept/sber, ne na hod,
+    // a Blizzard omezuje DOSAH, ne hod. Tady se poresne dan vsechny tri.
+    if (state.weather == Weather::VERY_SUNNY) {
         passTarget += 1;
     }
 
@@ -50,11 +53,9 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     Position explosionPos = target;
 
     if (roll == 1) {
-        // Fumble: scatter 1 from thrower
-        int d8 = dice.rollD8();
-        Position scatter = scatterDirection(d8);
-        explosionPos = {static_cast<int8_t>(thrower.position.x + scatter.x),
-                        static_cast<int8_t>(thrower.position.y + scatter.y)};
+        // TA4, l. 7967-7968: "If the bomb is FUMBLED it explodes IN THE BOMB
+        // THROWER'S SQUARE." Puvodne se rozptylovala D8 od hazece.
+        explosionPos = thrower.position;
     } else if (roll < passTarget) {
         // Inaccurate: 3x scatter from target
         for (int i = 0; i < 3; i++) {
@@ -70,8 +71,15 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
         return ActionResult::ok(); // Never turnover
     }
 
-    // 2. Explosion: all standing players in 3x3 area around explosion
-    // Thrower is immune
+    // 2. TA4, l. 7969-7974: "When the bomb finally does explode ANY PLAYER IN
+    // THE SAME SQUARE IS KNOCKED DOWN, and players in ADJACENT squares are
+    // Knocked Down ON A ROLL OF 4+. Players can be hit by a bomb and treated as
+    // Knocked Down EVEN IF THEY ARE ALREADY PRONE OR STUNNED."
+    // Tri vady naraz: hazec mel vymyslenou imunitu (pravidlo zadnou nema),
+    // sousedni pole se srazela automaticky misto na 4+, a lezici a omraceni se
+    // preskakovali uplne.
+    bool activeKnockedDown = false;
+
     for (int dx = -1; dx <= 1; dx++) {
         for (int dy = -1; dy <= 1; dy++) {
             int px = explosionPos.x + dx;
@@ -81,20 +89,26 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
             Position checkPos{static_cast<int8_t>(px), static_cast<int8_t>(py)};
             Player* victim = state.getPlayerAtPosition(checkPos);
             if (!victim) continue;
-            if (victim->id == throwerId) continue; // thrower immune
-            if (victim->state != PlayerState::STANDING) continue;
+            if (!isOnPitch(victim->state)) continue;
 
-            // Knocked down + armor roll
+            const bool sameSquare = (dx == 0 && dy == 0);
+            if (!sameSquare && dice.rollD6() < 4) continue;   // sousedi na 4+
+
             victim->state = PlayerState::PRONE;
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, victim->id, throwerId,
                               victim->position, {}, 0, false});
+            if (victim->teamSide == thrower.teamSide) activeKnockedDown = true;
             InjuryContext ctx;
             resolveArmourAndInjury(state, victim->id, dice, ctx, events);
             handleBallOnPlayerDown(state, victim->id, dice, events);
         }
     }
 
-    return ActionResult::ok(); // Never turnover
+    // l. 7956-7958: "Fumbles or any bomb explosions that lead to A PLAYER ON THE
+    // ACTIVE TEAM BEING KNOCKED OVER ARE TURNOVERS." Test se puvodne jmenoval
+    // `NeverTurnover` a certifikoval presny opak. Fumble je pokryty sam od sebe:
+    // vybuchne v poli hazece, ktery je tim srazen.
+    return activeKnockedDown ? ActionResult::turnovr() : ActionResult::ok();
 }
 
 } // namespace bb
