@@ -238,14 +238,30 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     player.movementRemaining -= 2;
     player.hasMoved = true;
 
-    bool needsGfi = false;
+    // ⛔ N7 (24.08.2026): skok o dve pole muze stat DVA GFI hody, ne jeden.
+    // BB2016 l. 1701: "Roll a D6 for the player after they have moved EACH
+    // EXTRA SQUARE." Pri deficitu 2 se tedy hazi dvakrat. Dokud byl Leap mrtvy
+    // kod, nevadilo to; dnesnim zapojenim nabidky se to PROBUDILO -- tataz
+    // trida jako 21.08. "oprava pravidla umi probudit spici vadu".
+    int gfiSquares = 0;
     if (player.movementRemaining < 0) {
         int maxGfi = player.hasSkill(SkillName::Sprint) ? -3 : -2;
         if (player.movementRemaining < maxGfi) {
             player.movementRemaining += 2; // undo
             return ActionResult::fail();
         }
-        needsGfi = true;
+        gfiSquares = -player.movementRemaining;   // 1 nebo 2
+    }
+
+    // ⛔ N6 (24.08.2026): Tentacles a Shadowing platí i na SKOK, a chybely tu.
+    // BB2016 l. 8586-8587: Tentacles se pouziva, kdyz souper "attempts to DODGE
+    // OR LEAP out of any of his tackle zones" -- leap je jmenovan vyslovne.
+    // l. 8456-8458: Shadowing plati pri opusteni TZ "FOR ANY REASON".
+    // Latentni to bylo jen proto, ze Leap nemel volajiciho; dnesnim zapojenim
+    // nabidky se to probudilo.
+    if (checkTentacles(state, playerId, from, dice, events)) {
+        player.movementRemaining += 2;   // skok se nekonal
+        return ActionResult::ok();       // "held firm, his action ends" -- ne turnover
     }
 
     // Leap agility check: plain Agility roll, NO modifiers except Very Long
@@ -276,8 +292,8 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
         return ActionResult::turnovr();
     }
 
-    // GFI if needed
-    if (needsGfi) {
+    // GFI -- jeden hod za KAZDE pole nad ramec MA (l. 1701)
+    for (int g = 0; g < gfiSquares; ++g) {
         int gfiTarget = (state.weather == Weather::BLIZZARD) ? 3 : 2;
         bool gfiOk = attemptRoll(state, playerId, dice, gfiTarget,
                                   SkillName::SureFeet, false, true, events);
@@ -296,6 +312,9 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
 
     // Move player
     player.position = to;
+    // Shadowing, l. 8456-8458: plati pri opusteni TZ "FOR ANY REASON",
+    // tedy i po skoku (N6).
+    checkShadowing(state, playerId, from, dice, events);
 
     if (state.ball.isHeld && state.ball.carrierId == playerId) {
         state.ball.position = to;
