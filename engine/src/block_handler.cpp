@@ -8,8 +8,17 @@
 namespace bb {
 
 // Score a block die face from the attacker's perspective (higher = better for attacker)
+//
+// ⛔ 24.08.2026: tabulka neznala WRESTLE, a tim si sama zavirala dvere, ktere
+// jsme prave otevreli v resolveru. Utocnik s Block+Wrestle proti obranci
+// s Blockem: BOTH_DOWN se ocenoval 4 ("nestane se nic"), PUSHED 5 -- takze
+// vybirac sahl po odsunu a Wrestle se NIKDY nespustil. Presne ta situace,
+// kvuli ktere se o Wrestle u trpaslika uvazuje: PROLOMENI ZDI, kde odsun
+// nestaci a je potreba obrance SLOZIT. Tohle je zas jednou "filtr ocenuje
+// jinou akci, nez jakou resolver provede".
 static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
-                     bool defHasDodge, bool attHasTackle) {
+                     bool defHasDodge, bool attHasTackle,
+                     bool attUsesWrestle, bool defUsesWrestle) {
     switch (face) {
         case BlockDiceFace::DEFENDER_DOWN:
             return 10;
@@ -18,6 +27,16 @@ static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
         case BlockDiceFace::PUSHED:
             return 5;
         case BlockDiceFace::BOTH_DOWN:
+            // Wrestle prepisuje vsechny ctyri radky pod sebou: oba jdou na zem
+            // bez hodu na zbroj, bez ohledu na Block (l. 8674-8676).
+            if (attUsesWrestle) {
+                // Obrance SLOZEN. Neni to zadarmo -- utocnik lezi taky, takze
+                // to je min nez DEFENDER_DOWN a min nez cisty odsun s hodem na
+                // zbroj proti nekomu, kdo by stejne spadl. Vic nez PUSHED (5)
+                // to je jen tam, kde odsun problem neresi: proti Blocku.
+                return defHasBlock ? 7 : 6;
+            }
+            if (defUsesWrestle) return 1;               // obrance nas polozi taky
             if (attHasBlock && !defHasBlock) return 8;  // only def falls
             if (attHasBlock && defHasBlock) return 4;   // nothing happens
             if (!attHasBlock && defHasBlock) return 1;  // only att falls
@@ -61,12 +80,20 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     bool defBlock = def.hasSkill(SkillName::Block);
     bool defDodge = def.hasSkill(SkillName::Dodge);
     bool attTackle = att.hasSkill(SkillName::Tackle);
+    // Musi to byt TAZ podminka jako v resolveru (case BOTH_DOWN), jinak vybirac
+    // ocenuje jinou vec, nez se pak stane. Mic sem nedosahne, takze se pocita
+    // konzervativne: bez mice, tj. jak to vypada ve zdi.
+    bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
+                      (!attBlock || defBlock);
+    bool defWrestle = def.hasSkill(SkillName::Wrestle) && !defBlock;
 
     int bestIdx = 0;
-    int bestScore = scoreFace(faces[0], attBlock, defBlock, defDodge, attTackle);
+    int bestScore = scoreFace(faces[0], attBlock, defBlock, defDodge, attTackle,
+                              attWrestle, defWrestle);
 
     for (int i = 1; i < count; i++) {
-        int s = scoreFace(faces[i], attBlock, defBlock, defDodge, attTackle);
+        int s = scoreFace(faces[i], attBlock, defBlock, defDodge, attTackle,
+                          attWrestle, defWrestle);
         if (attackerChooses) {
             if (s > bestScore) { bestScore = s; bestIdx = i; }
         } else {

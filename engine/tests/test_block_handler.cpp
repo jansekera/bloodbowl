@@ -1005,3 +1005,29 @@ TEST(BlockHandler, DefenderWithBlockKeepsBlockUnlessTheCarrierIsBlocking) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
     EXPECT_TRUE(result.turnover);            // utocnik slozen = turnover
 }
+
+TEST(BlockHandler, WrestleMakesBothDownWorthMoreThanAPushAgainstABlockWall) {
+    // PROLOMENI ZDI: obrance ma Block, takze odsun ho jen posune a Both Down by
+    // bez Wrestle neudelal nic. S Wrestle je Both Down JEDINA cesta, jak ho
+    // slozit -- vybirac to musi ocenit vys nez PUSHED.
+    Player att; att.skills.add(SkillName::Block); att.skills.add(SkillName::Wrestle);
+    Player def; def.skills.add(SkillName::Block);
+    BlockDiceFace faces[2] = {BlockDiceFace::PUSHED, BlockDiceFace::BOTH_DOWN};
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::BOTH_DOWN);
+}
+
+TEST(BlockHandler, WithoutWrestleAPushStillBeatsBothDownAgainstABlockWall) {
+    // druha strana: bez Wrestle je Both Down proti Blocku mrtva kostka
+    Player att; att.skills.add(SkillName::Block);
+    Player def; def.skills.add(SkillName::Block);
+    BlockDiceFace faces[2] = {BlockDiceFace::PUSHED, BlockDiceFace::BOTH_DOWN};
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::PUSHED);
+}
+
+TEST(BlockHandler, DefenderDownStillBeatsAWrestledBothDown) {
+    // Wrestle nesmi prebit cistou vyhru -- utocnik pri nem lezi taky
+    Player att; att.skills.add(SkillName::Block); att.skills.add(SkillName::Wrestle);
+    Player def; def.skills.add(SkillName::Block);
+    BlockDiceFace faces[2] = {BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::BOTH_DOWN};
+    EXPECT_EQ(autoChooseBlockDie(faces, 2, true, att, def), BlockDiceFace::DEFENDER_DOWN);
+}
