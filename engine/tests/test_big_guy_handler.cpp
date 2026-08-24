@@ -260,32 +260,81 @@ TEST(BigGuyHandler, BloodlustPass) {
     EXPECT_FALSE(result.actionBlocked);
 }
 
-TEST(BigGuyHandler, BloodlustBiteThrall) {
+// ============================================================================
+// TA10 (24.08.2026) -- BB2016 l. 7929-7947. Puvodni testy certifikovaly, ze
+// kousnuti je AUTO-KO Thralla a ze upir bez Thralla jde do KO, a ani jedno
+// nebylo turnover. Pravidlo rika neco jineho na obou stranach.
+// ============================================================================
+
+TEST(BigGuyHandler, BloodlustBiteIsAnInjuryRollNotAnAutoKO) {
+    // l. 7939-7941: "make an INJURY ROLL on the Thrall treating any casualty
+    // roll as Badly Hurt. The injury will not cause a turnover unless the
+    // Thrall was holding the ball."
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
-    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);  // Adjacent Thrall (no Bloodlust)
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);   // Thrall
 
-    FixedDiceRoller dice({1});  // Fail → bite
+    // 1 => Blood Lust selhal; hod na zraneni 2D6 = 1+2 = 3 => jen Stunned
+    FixedDiceRoller dice({1, 1, 2});
     auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
 
-    EXPECT_FALSE(result.actionBlocked);  // Action proceeds
+    EXPECT_FALSE(result.actionBlocked);   // nakrmil se, akce pokracuje
     EXPECT_TRUE(result.proceed);
-    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::KO);  // Thrall KO'd
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::STUNNED)
+        << "kousnuti je hod na zraneni, ne automaticke KO";
 }
 
-TEST(BigGuyHandler, BloodlustNoThrall) {
+TEST(BigGuyHandler, BloodlustBiteOfTheBallCarrierIsATurnover) {
+    // tataz veta, druha strana: "unless the Thrall WAS HOLDING THE BALL"
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
-    // No adjacent Thrall
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.ball.isHeld = true; gs.ball.carrierId = 2; gs.ball.position = {11, 7};
+
+    FixedDiceRoller dice({1, 1, 2, 3, 4, 5, 6, 1, 2});
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_TRUE(result.turnover);
+}
+
+TEST(BigGuyHandler, BloodlustWithNoThrallSendsTheVampireToRESERVESAndIsATurnover) {
+    // l. 7942-7945: "Failure to bite a Thrall IS A TURNOVER and requires you to
+    // feed on a spectator -- move the Vampire to the RESERVES BOX."
+    // Puvodne z nej byl KO (tedy hráč, ktery se muze vratit hodem 4+ o poloćase)
+    // a turnover zadny.
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bloodlust);
+    // zadny soused
 
     FixedDiceRoller dice({1});
     auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
 
     EXPECT_TRUE(result.actionBlocked);
     EXPECT_FALSE(result.proceed);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH)
+        << "rezervy, ne KO -- z KO se vraci hodem 4+";
+}
+
+TEST(BigGuyHandler, BloodlustMayBiteAProneOrStunnedThrall) {
+    // l. 7938-7939: Thrall smi byt "standing, PRONE OR STUNNED".
+    // Puvodni kod chtel canAct(), tedy jen stojiciho -- lezici Thrall vedle
+    // upira se nepocital a upir sel zbytecne do rezerv.
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bloodlust);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+
+    FixedDiceRoller dice({1, 1, 2});
+    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_NE(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
 }
 
 // ===== LEAP TESTS =====

@@ -49,6 +49,11 @@ ActionResult resolveAction(GameState& state, const Action& action,
             p.bigGuyCheckedThisTurn = true;
             BigGuyResult bgResult = resolveBigGuyCheck(state, action.playerId,
                                                         action.type, dice, events);
+            if (bgResult.turnover) {
+                // TA10: Blood Lust -- upir nemel koho kousnout (l. 7942-7943),
+                // nebo kousnuty Thrall drzel mic (l. 7941-7942).
+                return ActionResult::turnovr();
+            }
             if (bgResult.actionBlocked && !bgResult.proceed) {
                 return ActionResult::ok();  // Action wasted, not turnover
             }
