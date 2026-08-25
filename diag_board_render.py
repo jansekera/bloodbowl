@@ -114,7 +114,10 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
     # ⭐ CELÉ buňky s ohraničením, i prázdné (uživatel 25.08.: „sice zabere víc
     #    prostoru, ale to je OK"). Šířka 5 dává kódům jako `DLG_` vzduch.
-    print('       ' + ''.join(f'{x:^8}' for x in range(xlo, xhi + 1)))
+    # ⛔ 25.08.: hlavička byla CENTROVANÁ (`{x:^8}`), zatímco obsah buňky je
+    #    zarovnaný DOLEVA -- číslo tak viselo o dva znaky vpravo od pole, které
+    #    popisuje, a deska se četla o SLOUPEC VEDLE. Zarovnat na začátek buňky.
+    print('       ' + ''.join(f' {x:<6} ' for x in range(xlo, xhi + 1)))
     line = '      +' + '-------+' * (xhi - xlo + 1)
     ys = sorted({y for (x, y) in cell if xlo <= x <= xhi})
     for y in range(max(0, min(ys) - 1), min(15, max(ys) + 2)):
