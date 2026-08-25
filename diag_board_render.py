@@ -17,13 +17,40 @@ KÓDY (dva znaky, velká = stojí, malá druhá = leží/omráčen, `o` = drží
 """
 import gzip, json, sys
 
-NAS = {'Longbeard': 'LB', 'Longbeard +Guard': 'LG', 'Blitzer +Guard+Tackle': 'BZ',
-       'Blitzer +Guard': 'BZ', 'Blitzer +Mighty Blow': 'BZ', 'Blitzer ball-hunter': 'BZ',
-       'Troll Slayer +Guard+Tackle': 'TS', 'Runner +Block': 'RN', 'Deathroller': 'DR'}
-JEJICH = {'Lineman': 'lm', 'Wardancer ball-hunter': 'wd', 'Wardancer +Side Step': 'wd',
-          'Catcher +Block': 'ct', 'Thrower +Block': 'th', 'Treeman +Guard': 'tr',
-          'Gutter Runner +Sure Feet': 'gr', 'Black Orc +Guard+Block': 'bo',
-          'Ogre +Block': 'og', 'Lineman +Wrestle': 'lw'}
+# ⭐ ZNAČENÍ PODLE UŽIVATELE (25.08.): RASOVÉ PÍSMENO + ROLE.
+#    D dwarf · W wood-elf · S skaven · O orc · H human
+#    role: L lineman/Longbeard · LG Longbeard+Guard · B Blitzer · T Troll Slayer
+#          R Runner · W Wardancer · C Catcher · TH Thrower · TR Treeman
+#          G Gutter Runner · BO Black Orc · OG Ogre · DR Deathroller
+ROLE = {'Longbeard': 'L', 'Longbeard +Guard': 'LG', 'Blitzer +Guard+Tackle': 'B',
+        'Blitzer +Guard': 'B', 'Blitzer +Mighty Blow': 'B', 'Blitzer ball-hunter': 'B',
+        'Troll Slayer +Guard+Tackle': 'T', 'Runner +Block': 'R', 'Deathroller': 'DR',
+        'Lineman': 'L', 'Lineman +Wrestle': 'LW', 'Wardancer ball-hunter': 'W',
+        'Wardancer +Side Step': 'W', 'Catcher +Block': 'C', 'Thrower +Block': 'TH',
+        'Treeman +Guard': 'TR', 'Treeman': 'TR', 'Gutter Runner +Sure Feet': 'G',
+        'Black Orc +Guard+Block': 'BO', 'Ogre +Block': 'OG'}
+RASA = {'dwarf': 'D', 'wood-elf': 'W', 'skaven': 'S', 'orc': 'O', 'human': 'H'}
+
+
+def kod(name, race, state, ball, acted=False):
+    """RASA+ROLE; stunned malými; ležící `_`; ODEHRANÝ `-`; míč `o`.
+
+    ⭐ DVA REŽIMY, a `-` patří jen do jednoho (uživatel 25.08.):
+      · ROZBOR KORPUSU  -- snímek je ze ZAČÁTKU kola, nikdo ještě nehrál,
+        a `hasActed` se do `turn_logs` stejně neukládá => `-` se nepoužije.
+      · ŽIVÁ HRA        -- deska se překresluje UPROSTŘED tahu po každé
+        aktivaci, aby bylo vidět, s kým už se hýbalo a nehýbalo se s ním
+        podruhé. Tam `hasActed` k dispozici JE (`Player::hasActed`).
+    ⇒ značka existuje tady, aby ji živý režim mohl použít beze změny formátu.
+    """
+    c = RASA.get(race, '?') + ROLE.get(name, '?')
+    if state == 2:                     # STUNNED -> malými
+        c = c.lower()
+    if ball:
+        return c + 'o'
+    if state == 1:
+        return c + '_'
+    return c + ('-' if acted else '')
 
 
 def our_endzone(d, we_are_home):
@@ -43,6 +70,8 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
     t = d['turn_logs'][idx]
     ours = t['home_players'] if we_home else t['away_players']
     them = t['away_players'] if we_home else t['home_players']
+    r_ours = d['home_race'] if we_home else d['away_race']
+    r_them = d['away_race'] if we_home else d['home_race']
     ez = our_endzone(d, we_home)
     cell = {}
     # ⭐ NAŠI vždy VELKÝMI, JEJICH vždy malými -- první pokus 25.08. dával
@@ -50,36 +79,42 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
     # Lineman) vypadaly jako totéž. Stav jde do TŘETÍHO znaku, ne do velikosti.
     for p in ours:
         if p['state'] in (0, 1, 2):
-            cell[(p['x'], p['y'])] = (NAS.get(p['name'], '??').upper(),
-                                      p.get('has_ball', False), p['state'])
+            cell[(p['x'], p['y'])] = kod(p['name'], r_ours, p['state'],
+                                         p.get('has_ball', False), p.get('has_acted', False))
     for p in them:
         if p['state'] in (0, 1, 2):
-            cell[(p['x'], p['y'])] = (JEJICH.get(p['name'], '??').lower(),
-                                      p.get('has_ball', False), p['state'])
+            cell[(p['x'], p['y'])] = kod(p['name'], r_them, p['state'],
+                                         p.get('has_ball', False), p.get('has_acted', False))
     print(f"{path.split('/')[-1]}  idx {idx}  půle {t['half']} kolo {t['turn']}  "
           f"hraje: {'MY' if (t.get('active_team')=='home')==we_home else 'ONI'}")
     if ez is not None:
         smer = '←' if ez == 0 else '→'
         print(f"naše endzóna x={ez} {smer} (ODVOZENO z reálného TD v téže hře, ne z domněnky)")
     print()
-    print('       ' + ''.join(f'{x:^4}' for x in range(xlo, xhi + 1)))
-    line = '      +' + '---+' * (xhi - xlo + 1)
+    # ⭐ ořez se odvodí z OBSAZENÝCH polí, ne z hádání -- a kdo zůstane venku,
+    #    ten se VYPÍŠE (25.08. jsem ořezem kolem míče vyhodil volného příjemce).
+    occx = [x for (x, y) in cell]
+    if (xlo, xhi) == (0, 25) and occx:
+        xlo, xhi = max(0, min(occx) - 1), min(25, max(occx) + 1)
+    venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
+    print('       ' + ''.join(f'{x:^5}' for x in range(xlo, xhi + 1)))
+    line = '      +' + '----+' * (xhi - xlo + 1)
     ys = sorted({y for (x, y) in cell if xlo <= x <= xhi})
     for y in range(max(0, min(ys) - 1), min(15, max(ys) + 2)):
         print(line)
         row = f' y={y:<3}|'
         for x in range(xlo, xhi + 1):
             v = cell.get((x, y))
-            if v:
-                mark = 'o' if v[1] else ('.' if v[2] != 0 else ' ')
-                row += f'{v[0]}{mark}|'
-            else:
-                row += '   |'
+            row += (f'{v:<4}|' if v else '    |')
         print(row)
     print(line)
-    print('\nVELKÁ = NAŠI · malá = JEJICH · 3. znak:  o = drží míč,  . = leží/omráčen')
-    if (xlo, xhi) != (0, 25):
-        print(f'⚠️ OŘEZ x={xlo}..{xhi} — mimo výsek MŮŽE STÁT NĚKDO DŮLEŽITÝ')
+    print(f'\nD dwarf · W wood-elf · S skaven · O orc · H human   +role')
+    print('stunned = malými · `_` = leží · `o` = drží míč')
+    print('`-` = ODEHRANÝ — jen v ŽIVÉ HŘE (překreslení uprostřed tahu).')
+    print('   V korpusu se nepoužije: snímek je ze ZAČÁTKU kola a `hasActed` se neukládá.')
+    if venku:
+        print(f'⚠️ MIMO VÝSEK x={xlo}..{xhi} stojí: ' +
+              ', '.join(f'{v}@{sq}' for sq, v in sorted(venku)))
 
 
 if __name__ == '__main__':
