@@ -80,7 +80,9 @@ harness_running() {
 say "=== ŘIDIČ VÍKENDU START (manifest $MANIFEST${DRY:+, $DRY}) ==="
 cd "$ROOT" || exit 1
 
-if harness_running; then say "⛔ už běží harness — NESPOUŠTÍM"; exit 1; fi
+# --dry-run jen ověřuje manifest a nic nespouští, takže běžící harness mu
+# nevadí -- a je to jediný režim, ve kterém se řidič smí pustit za noci.
+if [ -z "$DRY" ] && harness_running; then say "⛔ už běží harness — NESPOUŠTÍM"; exit 1; fi
 
 ok=0; failed=0; skipped=0
 while IFS='|' read -r name ref mode pairs prereg corpus; do
@@ -99,8 +101,16 @@ while IFS='|' read -r name ref mode pairs prereg corpus; do
         say "⛔ '$name' PŘESKOČEN: $OUT už existuje ⇒ běh by se tiše přeskočil (AB_DONE)"
         skipped=$((skipped+1)); continue
     fi
-    if [ ! -f "$prereg" ]; then
-        say "⛔ '$name' PŘESKOČEN: chybí předregistrace $prereg — bez ní se neměří"
+    # ⚠️ Předregistrace se ověřuje V TOM REFU, který cyklus postaví, ne
+    # v aktuálním checkoutu -- 25.08. to dry-run odhalil hned na prvním pokusu:
+    # prereg pro M1/N10 žije na větvi, řidič ji hledal na main a cyklus zahodil.
+    # `git cat-file -e` to umí bez checkoutu, takže to funguje i v --dry-run.
+    if ! git cat-file -e "$ref:$prereg" 2>/dev/null; then
+        say "⛔ '$name' PŘESKOČEN: v refu '$ref' není $prereg — bez předregistrace se neměří"
+        skipped=$((skipped+1)); continue
+    fi
+    if ! git rev-parse -q --verify "$ref^{commit}" >/dev/null; then
+        say "⛔ '$name' PŘESKOČEN: ref '$ref' neexistuje"
         skipped=$((skipped+1)); continue
     fi
 
