@@ -429,6 +429,61 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     bool iHaveBall = (carrier != nullptr);
     bool ballOnGround = !state.ball.isHeld && state.ball.isOnPitch();
 
+    // M1/N10 second half (25.08.2026): the blitzer whose activation is STILL
+    // OPEN. resolveBlock now leaves hasActed clear for a blitzer who is still
+    // on his feet (l. 347-350, "the block may be made at any point during the
+    // move"), but the general REPOSITION loop below rejects him TWICE:
+    // isFreeToAct() demands !hasMoved, and the loop returns early for anyone
+    // adjacent to a standing enemy -- which is exactly what a blitzer is once
+    // he has thrown his block. Permission without an offer is the P45 shape
+    // again (a finished resolver nobody can reach), so the retreat is emitted
+    // HERE, separately, leaving the general gates untouched.
+    //
+    // M9 measured the size on 18 000 games (24.08.): 4.09 blitzes a game end
+    // with the blitzer stuck in contact although he has MA left AND a free
+    // square to go to, and it happens to AV7 pieces (Wardancer, Catcher,
+    // Gutter Runner) 1.5x more often than to AV9.
+    //
+    // `usedBlitz` is the marker rather than hasMoved: it means "declared a
+    // blitz", so this cannot hand a second move to everyone who merely walked.
+    //
+    // ⚠️ SCOPE -- this is the RETREAT only. The user's other case, "the carrier
+    // opens his own lane with a blitz and runs through it", needs SCORE/ADVANCE
+    // to accept a mid-activation player and is a bigger change; the carrier is
+    // skipped here and keeps his own macros.
+    // ⚠️ No GFI: a retreat bought with a Go For It is a gamble, not hygiene,
+    // and M9's ceiling counted only squares reachable on real movement.
+    state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (!p.canAct() || !p.usedBlitz) return;
+        if (p.hasSkill(SkillName::BallAndChain)) return;
+        if (iHaveBall && p.id == carrier->id) return;
+        if (p.movementRemaining <= 0) return;
+        if (countTacklezones(state, p.position, mySide) == 0) return;  // not exposed
+
+        // Nearest free square that is outside EVERY enemy tackle zone. The
+        // target is geometric and the executor walks it, exactly like every
+        // other REPOSITION target here -- if the walk stalls, the blitzer ends
+        // up no worse than he already is.
+        int reach = p.movementRemaining;
+        Position best{-1, -1};
+        int bestDist = 99;
+        for (int dy = -reach; dy <= reach; ++dy) {
+            for (int dx = -reach; dx <= reach; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                Position cand{static_cast<int8_t>(p.position.x + dx),
+                              static_cast<int8_t>(p.position.y + dy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand) != nullptr) continue;
+                if (countTacklezones(state, cand, mySide) != 0) continue;
+                int d = p.position.distanceTo(cand);
+                if (d < bestDist) { bestDist = d; best = cand; }
+            }
+        }
+        if (best.x >= 0) {
+            out.push_back({MacroType::REPOSITION, p.id, -1, best});
+        }
+    });
+
     // SCORE: carrier can reach endzone with MA + 2 GFI
     if (iHaveBall && carrier->canAct()) {
         int dist = distToEndzone(carrier->position, mySide);
