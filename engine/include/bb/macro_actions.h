@@ -107,6 +107,25 @@ bool blitzLandingArm(TeamSide side);
 // over a matchup means both arms took the same decision, i.e. a true null arm.
 long takeBlitzLandingRepicksInSearch();
 
+// --- B2 arm (2026-08-25): price a block against a defender who can WRESTLE ---
+//
+// blockDieBadFraction knew only the ATTACKER's Block and returned 1/6 with it.
+// BB2016 l. 8670-8676: Wrestle places BOTH players prone "even if one or both
+// have the Block skill", so against a Wrestle defender BOTH_DOWN is bad for us
+// too and the truth is 2/6. On one die that is 16.7% against 33.3%; on two dice
+// -- which is what Guard buys -- 2.8% against 11.1%, a FOURFOLD underestimate.
+//
+// M7 measured the ceiling on the 6 000 corpus games containing a skaven:
+// 5.45 blocks a game land on a Wrestle defender, 15.1% come up Both Down, and
+// every single one of those put our own body on the ground as well.
+//
+// Per side, default OFF.
+void setWrestlePricingArm(TeamSide side, bool on);
+bool wrestlePricingArm(TeamSide side);
+// Times the arm actually changed the price -- defender has Wrestle AND the
+// attacker has Block, the only case where the two answers differ.
+long takeWrestlePricingEventsInSearch();
+
 // --- P38 arm (2026-08-19): derive the carrier's destination square from the
 // cage it would produce (user's rule, spec 15.0c).
 //

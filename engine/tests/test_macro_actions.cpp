@@ -96,6 +96,71 @@ TEST(MacroActions, AlwaysHasEndTurn) {
     EXPECT_TRUE(hasMacroType(macros, MacroType::END_TURN));
 }
 
+// --- B2 (25.08.2026): cena bloku proti obránci s WRESTLE -------------------
+//
+// Do 25.08. znal `blockDieBadFraction` jen ÚTOČNÍKŮV Block a vracel 1/6.
+// BB2016 ř. 8670-8676 ale Wrestle klade OBA hráče "even if one or both have
+// the Block skill" -- proti Wrestle jsou tedy špatné OBĚ tváře, 2/6.
+// M7 (25.08., 6 000 her): 5,45 bloku na hru míří na obránce s Wrestle, 15,1 %
+// z nich padne Both Down, a VŠECHNY položily i naše tělo.
+//
+// Funkce jsou file-local, takže se testují přes rameno a jeho čítač: tiká jen
+// tam, kde se obě odpovědi LIŠÍ -- tedy když útočník Block má.
+struct WrestlePricingArmOn {
+    explicit WrestlePricingArmOn(TeamSide s) : s_(s) { setWrestlePricingArm(s_, true); }
+    ~WrestlePricingArmOn() { setWrestlePricingArm(s_, false); }
+    TeamSide s_;
+};
+
+TEST(MacroActions, WrestlePricingArmFiresOnlyForABlockAttackerVsWrestleDefender) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);
+    state.getPlayer(12).skills.add(SkillName::Wrestle);
+    state.getPlayer(12).position = {11, 7};   // sousedí -> blitz se ocení
+
+    WrestlePricingArmOn arm(TeamSide::HOME);
+    takeWrestlePricingEventsInSearch();       // vynuluj
+    // ⚠️ Cena se počítá až při ROZVINUTÍ makra BLITZ (estimateBlitzFailChance
+    // v expandBlitz), ne při jeho vypsání -- první verze testu volala
+    // getAvailableMacros a nechytila nic (25.08.).
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+    greedyExpandMacro(state, blitz, dice);
+
+    EXPECT_GT(takeWrestlePricingEventsInSearch(), 0)
+        << "s ramenem se cena proti Wrestle obránci musí lišit";
+}
+
+TEST(MacroActions, WrestlePricingArmOffChangesNothing) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);
+    state.getPlayer(12).skills.add(SkillName::Wrestle);
+    state.getPlayer(12).position = {11, 7};
+
+    takeWrestlePricingEventsInSearch();
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+    greedyExpandMacro(state, blitz, dice);
+
+    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
+        << "nulový test: bez ramene se engine chová přesně jako do 25.08.";
+}
+
+TEST(MacroActions, WrestlePricingDoesNotFireWithoutWrestle) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);
+    state.getPlayer(12).position = {11, 7};    // obránce Wrestle NEMÁ
+
+    WrestlePricingArmOn arm(TeamSide::HOME);
+    takeWrestlePricingEventsInSearch();
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+    greedyExpandMacro(state, blitz, dice);
+
+    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
+        << "bez Wrestle na obránci se nic měnit nesmí";
+}
+
 TEST(MacroActions, EmptyInNonPlayPhase) {
     GameState state = makeMinimalState();
     state.phase = GamePhase::GAME_OVER;

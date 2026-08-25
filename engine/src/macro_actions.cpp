@@ -220,6 +220,23 @@ long takeBlitzLandingRepicksInSearch() {
     return v;
 }
 
+thread_local bool g_wrestlePricing[2] = {false, false};
+thread_local long g_wrestlePricingEvents = 0;
+
+void setWrestlePricingArm(TeamSide side, bool on) {
+    g_wrestlePricing[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool wrestlePricingArm(TeamSide side) {
+    return g_wrestlePricing[side == TeamSide::HOME ? 0 : 1];
+}
+
+long takeWrestlePricingEventsInSearch() {
+    long v = g_wrestlePricingEvents;
+    g_wrestlePricingEvents = 0;
+    return v;
+}
+
 long takeDauntlessOfferEvalsInSearch() {
     long v = g_dauntlessOffers;
     g_dauntlessOffers = 0;
@@ -291,17 +308,29 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
 // autoChooseBlockDie's scoreFace does, deliberately: this runs on every
 // macro expansion during MCTS (thousands of times per search), so it needs
 // to stay cheap, not skill-exact.
-static double blockDieBadFraction(bool attackerHasBlock) {
+// B2 (25.08.2026): `defenderCanWrestle` je druhá polovina téhle otázky a do
+// 25.08. tu nebyla. BB2016 ř. 8670-8676: Wrestle položí OBA hráče "even if one
+// or both have the Block skill" -- útočníkův Block ho tedy před BOTH_DOWN
+// NEZACHRÁNÍ a špatné jsou obě tváře kostky, ne jedna.
+// ⚠️ Wrestle je VOLBA obránce, ne mechanika. Předpokládá se, že ji použije,
+// když se mu vyplatí -- což u nositele BEZ Blocku platí vždy: padl by tak jako
+// tak, a Placed Prone navíc nemá hod na zbroj. Korpus to potvrzuje: 4 923
+// ze 4 923 Both Down proti `Lineman +Wrestle` položilo OBĚ těla.
+// ⛔ U obránce, který má Block I Wrestle, je to skutečná volba a 2/6 je pak
+// PŘÍSNÝ odhad; takového nositele ale žádná korpusová sestava nemá.
+static double blockDieBadFraction(bool attackerHasBlock, bool defenderCanWrestle) {
+    if (defenderCanWrestle) return 2.0 / 6.0;
     return attackerHasBlock ? (1.0 / 6.0) : (2.0 / 6.0);
 }
 
 // Estimated probability that the block itself goes badly for the attacker,
 // from a diceCount as returned by getBlockDiceCount (positive = attacker
 // chooses N dice, negative = defender chooses N dice).
-static double estimateBlockFailChance(int diceCount, bool attackerHasBlock) {
+static double estimateBlockFailChance(int diceCount, bool attackerHasBlock,
+                                      bool defenderCanWrestle = false) {
     int n = std::abs(diceCount);
     if (n == 0) return 1.0;
-    double bad = blockDieBadFraction(attackerHasBlock);
+    double bad = blockDieBadFraction(attackerHasBlock, defenderCanWrestle);
     if (diceCount > 0) {
         // Attacker picks the best of n dice -> fails only if ALL n are bad.
         return std::pow(bad, n);
@@ -366,7 +395,14 @@ static double estimateBlitzFailChance(const GameState& state, const Player& blit
                                                      fromLanding ? &landing : nullptr);
     int diceCount = getBlockDiceCount(state, blitzer, target, true, false,
                                       fromLanding ? landing : Position{-1, -1});
-    double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block));
+    // B2: obráncův Wrestle se do ceny promítne jen POD RAMENEM, aby šel rozdíl
+    // změřit párovým A/B. Čítač tiká jen tam, kde se cena OPRAVDU liší -- tedy
+    // když útočník Block má; bez Blocku vychází 2/6 v obou případech.
+    const bool defWrestle = target.hasSkill(SkillName::Wrestle) &&
+                            wrestlePricingArm(blitzer.teamSide);
+    if (defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestlePricingEvents;
+    double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
+                                               defWrestle);
     return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
 }
 
