@@ -97,15 +97,17 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
     if (xlo, xhi) == (0, 25) and occx:
         xlo, xhi = max(0, min(occx) - 1), min(25, max(occx) + 1)
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
-    print('       ' + ''.join(f'{x:^5}' for x in range(xlo, xhi + 1)))
-    line = '      +' + '----+' * (xhi - xlo + 1)
+    # ⭐ CELÉ buňky s ohraničením, i prázdné (uživatel 25.08.: „sice zabere víc
+    #    prostoru, ale to je OK"). Šířka 5 dává kódům jako `DLG_` vzduch.
+    print('       ' + ''.join(f'{x:^6}' for x in range(xlo, xhi + 1)))
+    line = '      +' + '-----+' * (xhi - xlo + 1)
     ys = sorted({y for (x, y) in cell if xlo <= x <= xhi})
     for y in range(max(0, min(ys) - 1), min(15, max(ys) + 2)):
         print(line)
         row = f' y={y:<3}|'
         for x in range(xlo, xhi + 1):
             v = cell.get((x, y))
-            row += (f'{v:<4}|' if v else '    |')
+            row += (f' {v:<4}|' if v else '     |')
         print(row)
     print(line)
     print(f'\nD dwarf · W wood-elf · S skaven · O orc · H human   +role')
