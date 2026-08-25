@@ -67,3 +67,6 @@ replay_archive/
 rules_crp_lrb6.txt
 rules_bb2016.txt
 .claude/worktrees/
+
+# 25.08.: nezávislý build adresář pro vývoj, když je engine/build zmrazený nocí
+engine/build_dev/
