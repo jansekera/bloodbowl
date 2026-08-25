@@ -24,14 +24,20 @@ cd "$ROOT" || exit 1
 LIGHT=${LIGHT:-0}
 if [ "$LIGHT" = "1" ]; then
     OUT_DIR=blitzlanding_lighttest_20260825
-    PAIRS=3; SHARDS=2; CHUNKS=4; CONTROL_PAIRS=5; CORPUS_ON=0
+    # korpus i v light testu, jen 12 her: 25.08. do něj přibyla KONTROLA
+    # INVARIANTŮ a nezkoušená větev v noci je totéž co žádná větev.
+    # ⚠️ 25.08.: první pokus mel PAIRS=3/SHARDS=2/CHUNKS=4 => 6 parů na 4 kusy,
+    # což hlídač správně odmítl (rc=7): zbytek by tiše ZMIZEL a změnil N.
+    # Platí i pro light test: CHUNKS musí DĚLIT celkový počet párů a být >= WORKERS.
+    PAIRS=2; SHARDS=2; CHUNKS=2; NWORKERS=2; CONTROL_PAIRS=5; CORPUS_ON=1; CORPUS_N=12
     LOG=$ROOT/lighttest_20260825.log
 else
     OUT_DIR=blitzlanding_replic_20260825
     # 4 800 párů = 40 chunků × 120. Kalibrace: mode 8 dal v light testu
     # 46,8 s/pár na JEDNOM procesu (8 párů / 6 m 14 s, prázdný stroj); při 8
     # naráz čekej 6-9 s/pár wall, tedy 8-12 h. Loňská noc (mode 6) jela 9,13 s/pár.
-    PAIRS=600; SHARDS=8; CHUNKS=40; CONTROL_PAIRS=50; CORPUS_ON=1
+    # 4 800 párů / 40 kusů = 120 na kus, 40 >= WORKERS 8 ⇒ hlídač dělitelnosti projde.
+    PAIRS=600; SHARDS=8; CHUNKS=40; NWORKERS=8; CONTROL_PAIRS=50; CORPUS_ON=1; CORPUS_N=3000
     LOG=$ROOT/night_20260825.log
 fi
 
@@ -60,8 +66,8 @@ say "    harness OK ($(date -r diag_f1_cage_advance '+%H:%M'))"
 
 say "(4) A/B: mode 8, ${SHARDS} × ${PAIRS} párů, dw-we, práh ±0,015, CORPUS=$CORPUS_ON"
 MODE=8 PAIRS="$PAIRS" SHARDS="$SHARDS" THRESHOLD=0.015 \
-CHUNKS="$CHUNKS" WORKERS=8 CONTROL_MODE2=1 CONTROL_PAIRS="$CONTROL_PAIRS" \
-CORPUS="$CORPUS_ON" \
+CHUNKS="$CHUNKS" WORKERS="$NWORKERS" CONTROL_MODE2=1 CONTROL_PAIRS="$CONTROL_PAIRS" \
+CORPUS="$CORPUS_ON" CORPUS_GAMES="$CORPUS_N" \
 MATCHUPS="1:dw-we:1" \
 PREREG="$ROOT/evidence/night_prereg_20260825.preds" \
 OUT="$OUT_DIR" \

@@ -67,6 +67,7 @@ OUT="$ROOT/${OUT:?nastav OUT (jméno výstupního adresáře)}"
 BIN="$ROOT/diag_f1_cage_advance"
 SRC="$ROOT/diag_f1_cage_advance_harness.cpp"
 CORPUS=${CORPUS:-0}
+CORPUS_GAMES=${CORPUS_GAMES:-3000}
 # Nulová kontrola pro VŠUDYPŘÍTOMNÉ rameno: matchup s nulovou expozicí u něj
 # neexistuje, tak se nula vyrobí jinak -- mode 2 dá obě ramena TÁŽ konfigurace.
 # S CRN pak musí vyjít delty exaktně 0; cokoli jiného je vada aparátu.
@@ -302,14 +303,28 @@ if [ "$CORPUS" != "0" ]; then
     if [ -f "$CORPUS_DATA/COLLECT_DONE" ]; then
         night_log "korpus už existuje, přeskakuji"
     else
-        night_log "START korpus 3000 her se zapnutým ramenem"
+        night_log "START korpus $CORPUS_GAMES her se zapnutým ramenem"
         if CAGE_GATE=0 DAUNTLESS=1 DATA_ROOT="$CORPUS_DATA" SEED_BASE=20260900 \
-                nice -n 19 python3 diag_replay_mine_20260813_gate.py collect 3000 \
+                nice -n 19 python3 diag_replay_mine_20260813_gate.py collect "$CORPUS_GAMES" \
                 > "$OUT/collect.log" 2>&1; then
             night_log "korpus HOTOV"
         else
             night_log "FAIL korpus — viz $OUT/collect.log"; exit 1
         fi
+    fi
+    # ⭐ 25.08.: KONTROLA INVARIANTŮ na PRVNÍM korpusu po pravidlovém kole.
+    # Předregistrace 24.08. si ji vyžádala a nemohla ji dostat (ten běh byl
+    # CORPUS=0). Běží PRVNÍ ze tří rozborů: rozbitý invariant není odchylka od
+    # pravidel, je to stav, se kterým se dál počítá, takže znehodnocuje i drives
+    # a checks pod ním. Nezastavuje běh -- data už jsou sebraná a je lepší je mít
+    # i s poplachem než je zahodit.
+    nice -n 19 python3 diag_state_invariants_20260824.py "$CORPUS_DATA" \
+        > "$OUT/invariants.txt" 2>&1
+    if grep -q "ŽÁDNÝ ROZBITÝ INVARIANT" "$OUT/invariants.txt"; then
+        night_log "invarianty ✅ ČISTO ($(grep -m1 '^her:' "$OUT/invariants.txt"))"
+    else
+        night_log "⛔⛔ INVARIANTY: NÁLEZ — přečti $OUT/invariants.txt PŘED čímkoli jiným"
+        head -12 "$OUT/invariants.txt" | while IFS= read -r l; do night_log "    $l"; done
     fi
     nice -n 19 python3 diag_drive_failure_20260811.py "$CORPUS_DATA" > "$OUT/drives.txt" 2>&1
     nice -n 19 python3 diag_rules_checks_20260812.py "$CORPUS_DATA/*.json.gz" > "$OUT/checks.txt" 2>&1

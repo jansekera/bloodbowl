@@ -13,7 +13,7 @@ g0040 -- "an entire second half of 108 moves, 19 blocks, three fouls and a
 casualty, played WITHOUT A BALL", protože výkop dopadl na hráče, ten ho
 neudržel, a míč zůstal mimo hřiště na (-1,-1). Našlo se to náhodou, 1 ze 120.
 """
-import gzip, json, glob, os, collections
+import gzip, json, glob, os, sys, collections
 from multiprocessing import Pool
 
 ON_PITCH = (0, 1, 2)   # STANDING, PRONE, STUNNED
@@ -73,7 +73,19 @@ def one(path):
     return bad
 
 if __name__ == '__main__':
-    files = sorted(glob.glob('crosses_20260821_data/*/g*.json.gz'))
+    # 25.08.: cesta byla NATVRDO na crosses_20260821_data. Pustit tuhle kontrolu
+    # na nový korpus by tiše zkontrolovalo STARÝ -- a vyšlo by "čisto", protože
+    # ten opravdu čistý je. To je přesně třída z 24.08.: KONTROLA HLÍDÁ JINÝ
+    # OBJEKT, NEŽ SI MYSLÍŠ (preflight hlídal jiné dvojice a fáze B umřela).
+    # Default zůstává, aby staré volání dál platilo, ale dá se předat kořen.
+    root = sys.argv[1] if len(sys.argv) > 1 else 'crosses_20260821_data'
+    pats = [os.path.join(root, '*', 'g*.json.gz'),   # crosses: podadresář na matchup
+            os.path.join(root, 'g*.json.gz')]        # collect: hry přímo v kořeni
+    files = sorted({f for pat in pats for f in glob.glob(pat)})
+    print(f"korpus: {root}")
+    if not files:
+        print(f"⛔ ŽÁDNÉ HRY v {root} — kontrola NEPROBĚHLA (a to NENÍ 'čisto')")
+        raise SystemExit(2)
     with Pool(6) as pool:
         rows = [r for r in pool.map(one, files, chunksize=50) if r is not None]
     total = collections.Counter()
