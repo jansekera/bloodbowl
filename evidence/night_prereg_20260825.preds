@@ -1,0 +1,67 @@
+# Předpovědi noci 25.→26.08. — B1/P35 (VÝBĚR BLITZUJÍCÍHO PODLE POLE, KAM DOJDE).
+# Strojově kontroluje night_summarize.py. Mode 8, dw-we, CORPUS=1.
+#
+# ⭐ CO SE MĚŘÍ
+# Výběr blitzujícího dnes oceňuje obranné asistence kolem pole, kde blitzující
+# STOJÍ; kostky se ale hází tam, KAM DOJDE (getBlockDiceCount macro_actions.cpp:182
+# proti block_handler.cpp:491). Rameno `setBlitzLandingArm` spočítá cílové pole
+# TOUŽ CHŮZÍ, jakou použije executor, takže ocenění a hod mluví o témž poli.
+#
+# ⏰ RAMENO JE HOTOVÉ OD 19.08. A ČEKALO 6 DNÍ NA MODE V HARNESSU. Noc 19.→20.08.
+# běžela mode 6 (P38), a P35 zůstala neměřená. Mode 8 přidán 25.08.
+#
+# ⛔⛔ ZÁKLADNÍ ČÁRA SE OD MĚŘENÍ STROPU POSUNULA DVAKRÁT
+# Strop (16,2 % změněných kostek, 9,7 % s překlopeným znaménkem, ≈0,9 blitzu na
+# zápas) je z 19.08., tedy PŘED opravou vstávání (21.08.) i PŘED pravidlovým
+# kolem (24.08.). N8 vzal Both Down odsun, N1 dodge stupeň, P45 postavil těla.
+# ⇒ Strop se musí PŘEPOČÍTAT na novém korpusu, ne převzít. Viz ruční položka (2).
+#
+# ⚠️ Předpovědi jsou ŠIROKÉ SCHVÁLNĚ, a pásmo delty PŘIPOUŠTÍ ZÁPOR.
+#
+# ⭐ SMĚR, KTERÝ ČEKÁM A PROČ — napsáno PŘED během:
+#   Čekám KLADNOU, ale MENŠÍ deltu než u P38. Důvod pro: ocenit blok tam, kde se
+#   doopravdy hází, je oprava informace, ne heuristiky, a strop mluví o ≈0,9
+#   blitzu na zápas s OBRÁCENÝM znaménkem kostek — to je drahá jednotka.
+#   Důvod proti, a je vážný: rameno nemění POČET blitzů, mění KOHO pošleme.
+#   Jiný blitzující může být dál, křehčí nebo potřebnější jinde, a `estimateBlitz-
+#   FailChance` tyhle náklady zná jen částečně. ⇒ ZÁPORNÁ delta JE MOŽNÁ a byla by
+#   nálezem: znamenala by, že „správná cena bloku" se platí něčím, co neúčtujeme.
+#   Nulu nečekám — čítač z light testu ukazuje 127,5 repicků na hru, takže rameno
+#   rozhodně sahá; otázka je jen, jestli k lepšímu.
+
+delta      in   -0.020 0.120   # dvoustranná (chessCandHome + chessCandAway − 1). Pod −0,020 = rameno ŠKODÍ, a to je nález, ne selhání běhu.
+delta_1s   in   -0.010 0.060   # totéž jednostranně (= delta/2)
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # light test 8/8 párů
+n_nonzero  in    0.35  0.85    # light test 50,0 % (na 8 párech); mode 6 dal 61,4 %
+arm_picks  >=    900000        # APARÁTOVÁ podlaha, ne hypotéza: light test dal 2 040 repicků
+                               # = 127,50/hru; 4 800 párů = 9 600 her ⇒ ~1,22 M očekáváno.
+                               # Podlaha 900 000 ≈ 93,75/hru ⇒ chytne rameno běžící na 3/4 výkonu.
+                               # ⛔ PRAVIDLO (24.08.): po vidění dat se APARÁTOVÁ kontrola smí
+                               #    PŘITVRDIT, nikdy povolit; na `delta` se nesahá.
+
+# --- RUČNĚ, harness to neumí ------------------------------------------------
+# ⭐ (1) ROZPAD PO RASÁCH SE DĚLÁ NA TD, NE NA CHESS PO STRANÁCH.
+#   ⛔ Chyba, do které jsem 25.08. spadl při čtení P38: rozpad dvoustranné delty
+#   na chess po stranách dal zdánlivý rasový rozchod 0,162. Byl KONFUNDOVANÝ —
+#   měřil i nerovnost matchupu (nulová noha: dwarf startuje na chess 0,33, ne 0,50).
+#   ⇒ POSTUP: pro každou rasu porovnat TD/hru TÉŽE RASY s ramenem a bez něj,
+#   párováno po seed_idx. U P38 to dalo dwarf +0,094 ± 0,008, wood-elf +0,103 ± 0,010.
+#   PŘEDPOVĚĎ: u P35 rasovou neutralitu NEČEKÁM. Trpaslík blitzuje do sevřených
+#   formací (klec, zeď), kde je „každé volné pole u cíle pokryté" — což je přesně
+#   podmínka, za které vada kouše. ⇒ čekám VĚTŠÍ zisk trpaslíkovi než wood-elfovi.
+#   ⚠️ Je to předpověď o MECHANISMU; když vyjde opačně, je vadný mechanismus, ne rasa.
+#
+# ⭐ (2) PŘEPOČÍTAT STROP NA NOVÉM KORPUSU. Čísla 16,2 % / 9,7 % / 0,9 blitzu na
+#   zápas jsou z 19.08. Na korpusu z CORPUS=1 spočítat znovu: kolik blitzů má jiný
+#   bracket kostek při ocenění z výchozího vs cílového pole, a kolik z toho překlopí
+#   znaménko. ⇒ Řekne, jestli strop pravidlové kolo přežil.
+#   ⚠️ Pole `cand_landing` je v řádcích nově (25.08.) ⇒ jde to ověřit i z A/B, ne jen z korpusu.
+#
+# ⭐ (3) KONTROLA INVARIANTŮ — TEĎ UŽ SE UDĚLÁ. Předregistrace 24.08. ji odložila,
+#   protože ten běh byl CORPUS=0. Tenhle má CORPUS=1 ⇒ pustit
+#   diag_state_invariants_20260824.py na nově sebraný korpus (glob se musí přepsat,
+#   je natvrdo na crosses_20260821_data). 25.08. na 20 hrách nového enginu ČISTO.
+#
+# ⭐ (4) M10 (k P27) a M7 (k B2) jsou taky offline nad tímtéž korpusem — zadání
+#   leží v M-ROUND. Nepatří do strojové kontroly, ale korpus na ně vzniká.
