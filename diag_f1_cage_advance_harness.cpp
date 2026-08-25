@@ -248,7 +248,8 @@ int main(int argc, char** argv) {
                       : (mode == 5) ? 91'000'000u
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
-                      : (mode == 8) ? 149'000'000u : SEED_BASE;
+                      : (mode == 8) ? 149'000'000u
+                      : (mode == 9) ? 163'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
@@ -259,6 +260,7 @@ int main(int argc, char** argv) {
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
+         : mode == 9 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -278,7 +280,8 @@ int main(int argc, char** argv) {
     // to anything that de-duplicates by seed. One process owns one shard
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
-    const char* rowsName = mode == 8 ? "diag_blitzlanding_rows.jsonl"
+    const char* rowsName = mode == 9 ? "diag_blitzcont_rows.jsonl"
+                         : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
                          : mode == 6 ? "diag_cageadvance_rows.jsonl"
                          : mode == 5 ? "diag_pushgeom_rows.jsonl"
@@ -423,6 +426,15 @@ int main(int argc, char** argv) {
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY,
                                        mode == 8 && !candHome);
                 bb::takeBlitzLandingRepicksInSearch();   // vynuluj na par
+                // mode 9 (M1/N10, 25.08.): blitz nechava aktivaci otevrenou,
+                // blitzujici dostane nabidku ustupu a follow-up je VOLBA.
+                // Vsechny tri pulky pod JEDNIM ramenem schvalne -- rozdelene
+                // by meril jejich smes (viz macro_actions.h).
+                bb::setBlitzContinuationArm(bb::TeamSide::HOME,
+                                            mode == 9 && candHome);
+                bb::setBlitzContinuationArm(bb::TeamSide::AWAY,
+                                            mode == 9 && !candHome);
+                bb::takeBlitzContinuationEventsInSearch();   // vynuluj na par
 
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
@@ -436,6 +448,9 @@ int main(int argc, char** argv) {
                 long candPush = bb::takePushGeometryEvalsInSearch();
                 long candCage = bb::takeCageAwareAdvancePicksInSearch();
                 long candLanding = bb::takeBlitzLandingRepicksInSearch();
+                long candCont = bb::takeBlitzContinuationEventsInSearch();
+                bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
+                bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
@@ -468,6 +483,7 @@ int main(int argc, char** argv) {
                 pr.armEvents += (mode == 4) ? candDaunt
                               : (mode == 5) ? candPush
                               : (mode == 8) ? candLanding
+                              : (mode == 9) ? candCont
                               : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
@@ -498,13 +514,14 @@ int main(int argc, char** argv) {
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
                             "\"cand_plans\":%d,\"base_plans\":%d,"
-                            "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,\"mode\":%d}\n",
+                            "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,\"cand_cont\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
-                            basePlans, candDaunt, candRoll, candLanding, mode);
+                            basePlans, candDaunt, candRoll, candLanding,
+                            candCont, mode);
                     fflush(rows);
                 }
             }
@@ -563,7 +580,7 @@ int main(int argc, char** argv) {
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 8);
+             mode == 7 || mode == 8 || mode == 9);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
