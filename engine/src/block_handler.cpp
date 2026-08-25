@@ -913,7 +913,19 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         handleBallOnPlayerDown(state, att.id, dice, events);
     }
 
-    att.hasActed = true;
+    // M1/N10 (25.08.2026): BB2016 l. 347-350 -- "He may make one block during
+    // the move. The block may be made AT ANY POINT during the move." A Block
+    // Action IS the activation and ends here; a Blitz is a move with a block
+    // inside it, so it stays open while the blitzer is still on his feet.
+    // Every other `hasActed = true` above is a path where the attacker went
+    // down or the action was wasted (Foul Appearance, chainsaw kickback, stab,
+    // failed GFI) -- those close the activation in a Blitz too, which is why
+    // this is the only site that changes.
+    // ⚠️ The offer side is a SEPARATE half: macro_actions.cpp:584 does not emit
+    // REPOSITION for a player adjacent to a standing opponent, i.e. exactly the
+    // player who just blocked. Reopening the activation without that gives him
+    // permission to move and nowhere to go.
+    att.hasActed = !(params.isBlitz && canAct(att.state));
 
     // Frenzy: if both standing and adjacent after block, mandatory 2nd block.
     // ⛔ JEN PO PUSHED / DEFENDER STUMBLES (oprava 21.08.). BB2016 l. 8139-8141:

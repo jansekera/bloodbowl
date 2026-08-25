@@ -689,6 +689,64 @@ TEST(BlockHandler, BlitzFrenzySecondBlockDeniedWithoutMovement) {
     EXPECT_EQ(dice.remaining(), 0u);  // no dice consumed beyond GFI + 1 block die
 }
 
+// M1/N10 (25.08.2026): BB2016 l. 347-350 -- "He may make one block during the
+// move. The block may be made AT ANY POINT during the move." resolveBlock set
+// hasActed on every path, so a blitzer could never move after his block: no
+// hit-and-run, and no "the carrier opens his own lane with a blitz and runs
+// through it". The user reported this on 22.07 and it sat for 33 days; M9
+// measured the ceiling on 24.08 (4.09 blitzes a game end stuck in contact with
+// movement left and somewhere to go, AV7 pieces 1.5x more often than AV9).
+//
+// These three pin the boundary rather than the fix: a blitz leaves the
+// activation open, a Block Action does not, and going down closes it either way.
+TEST(BlockHandler, BlitzLeavesTheActivationOpenAfterTheBlock) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({3});   // PUSHED, both stay standing
+    BlockParams params{1, 12, true, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 3);  // the block cost 1 MP
+    EXPECT_FALSE(gs.getPlayer(1).hasActed)
+        << "a blitzer with movement left must still be able to move after the block";
+}
+
+TEST(BlockHandler, BlockActionStillEndsTheActivation) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({3});   // same PUSHED, but a Block Action this time
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_TRUE(gs.getPlayer(1).hasActed)
+        << "a Block Action is the whole activation -- only a Blitz continues";
+}
+
+TEST(BlockHandler, BlitzerWhoGoesDownCannotKeepMoving) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    // BOTH_DOWN with neither player holding Block: the attacker falls, so the
+    // activation is over no matter how much movement is left on paper.
+    FixedDiceRoller dice({2, 3, 3, 3, 3});
+    BlockParams params{1, 12, true, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+}
+
 TEST(BlockHandler, BlitzBlockGfiFailKnocksAttackerDown) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
