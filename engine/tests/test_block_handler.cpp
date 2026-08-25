@@ -699,6 +699,41 @@ TEST(BlockHandler, BlitzFrenzySecondBlockDeniedWithoutMovement) {
 //
 // These three pin the boundary rather than the fix: a blitz leaves the
 // activation open, a Block Action does not, and going down closes it either way.
+// M1c/T5.29 (25.08.2026): l. 608-611 make the follow-up the coach's decision,
+// and we always took it. For a blitzer whose activation is still open that is
+// not a free square, it is a shove deeper into contact -- he lands next to the
+// very player he just pushed, and only then may he withdraw.
+TEST(BlockHandler, BlitzerWithMovementLeftDeclinesAFollowUpIntoMoreTacklezones) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({3});   // PUSHED: defender to (12,7), square (11,7) freed
+    BlockParams params{1, 12, true, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}))
+        << "following up would put him back in the pushed defender's tacklezone";
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);
+}
+
+// The mirror: a Block Action IS the whole activation, so there is nothing to
+// save the movement for and the free square is simply taken.
+TEST(BlockHandler, BlockActionStillTakesTheFreeFollowUp) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({3});
+    BlockParams params{1, 12, false, false};   // Block Action, not a Blitz
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+}
+
 TEST(BlockHandler, BlitzLeavesTheActivationOpenAfterTheBlock) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);

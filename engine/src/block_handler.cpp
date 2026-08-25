@@ -400,6 +400,41 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
                    events, 0);
 }
 
+// M1c/T5.29 (25.08.2026): FOLLOW-UP JE VOLBA, NE DŮSLEDEK.
+// BB2016 l. 608-611: "A player who has made a block IS ALLOWED to make a
+// special follow up move... The player's COACH MUST DECIDE whether to follow
+// up." Do 25.08. se následovalo vždy: `noFollowUp` defaultoval na false a žádné
+// volací místo ho nepředalo.
+//
+// ⭐ Tvar řešení je převzatý z Wrestle (24.08., d0093607): rozhodovací pravidlo
+// v resolveru, sepsané i s důvody. Plánovač by to unesl líp, ale tady je volba
+// BINÁRNÍ a LOKÁLNÍ -- follow-up je zdarma, ignoruje tackle zóny a týká se
+// jediného pole -- takže nepotřebuje vlastní vrstvu.
+//
+// ⭐ Default je NÁSLEDOVAT, a to schválně: follow-up je pohyb ZDARMA, který
+// nemusí dodgovat ("This move is free, and the player can ignore enemy tackle
+// zones"). Je to tedy obvykle výhoda, ne past -- odmítá se jen tam, kde má
+// blitzující ještě otevřenou aktivaci a uvolněné pole by ho dalo do VÍC
+// soupeřových zón než to, kde stojí. To je přesně hit-and-run (M1/N10).
+static bool wantsFollowUp(const GameState& state, const Player& att,
+                          const BlockParams& params, Position vacated) {
+    // Povinné případy -- pravidla volbu neposkytují:
+    //   Frenzy l. 8138: "must always follow up if they can"
+    //   Ball & Chain l. 7825: "must follow up if they push back another player"
+    if (att.hasSkill(SkillName::Frenzy) ||
+        att.hasSkill(SkillName::BallAndChain)) {
+        return true;
+    }
+    // Mimo blitz je blok celá aktivace: není co si šetřit, pole zdarma se bere.
+    if (!params.isBlitz) return true;
+    // Blitzující, který už nemá čím pokračovat, taky nemá co získat.
+    if (!canAct(att.state) || att.movementRemaining <= 0) return true;
+
+    const int tzStay = countTacklezones(state, att.position, att.teamSide);
+    const int tzGo   = countTacklezones(state, vacated, att.teamSide);
+    return tzGo <= tzStay;
+}
+
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           DiceRollerBase& dice, std::vector<GameEvent>* events,
                           bool frenzySecondBlock, bool noFollowUp) {
@@ -814,8 +849,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
             // StripBall: ball drops at crowd edge (already handled by crowd surf)
 
-            // Follow-up: attacker to old defender position
-            if (!noFollowUp) {
+            // Follow-up: attacker to old defender position -- but only if he
+            // wants it (l. 608-611). See wantsFollowUp above.
+            if (!noFollowUp && wantsFollowUp(state, att, params, defOldPos)) {
                 att.position = defOldPos;
                 if (state.ball.isHeld && state.ball.carrierId == att.id) {
                     state.ball.position = att.position;
@@ -874,7 +910,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // a chain that jams against one) leaves the defender where he stood, and
         // we used to walk the attacker onto him -- two players on one square.
         bool defVacated = def.position != defOldPos;
-        if (!noFollowUp && !fendPrevents && defVacated) {
+        if (!noFollowUp && !fendPrevents && defVacated &&
+            wantsFollowUp(state, att, params, defOldPos)) {
             att.position = defOldPos;
             if (state.ball.isHeld && state.ball.carrierId == att.id) {
                 state.ball.position = att.position;
