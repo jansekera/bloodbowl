@@ -91,6 +91,20 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
         smer = '←' if ez == 0 else '→'
         print(f"naše endzóna x={ez} {smer} (ODVOZENO z reálného TD v téže hře, ne z domněnky)")
     print()
+    # ⭐ TACKLE ZÓNY (uživatel žádal už dřív a nebylo to zapsané -- 25.08.):
+    #   · PRÁZDNÉ pole  -> kolik JEJICH zón na něj dosahuje (kam smím a za co)
+    #   · NAŠE tělo     -> `/n` = v kolika JEJICH zónách stojí
+    #   · JEJICH tělo   -> `/n` = kolik NAŠICH zón je na něm (je značkovaný?)
+    # Ležící ani omráčení zónu NEVYZAŘUJÍ (`exertsTacklezone`), proto jen state==0.
+    st_ours = {(p['x'], p['y']) for p in ours if p['state'] == 0}
+    st_them = {(p['x'], p['y']) for p in them if p['state'] == 0}
+    def zon(sq, kdo):
+        return sum(1 for q in kdo if max(abs(q[0]-sq[0]), abs(q[1]-sq[1])) == 1)
+    for (x, y), v in list(cell.items()):
+        n = zon((x, y), st_them if (x, y) in st_ours else st_ours)
+        if (x, y) in st_ours or (x, y) in st_them:
+            if n:
+                cell[(x, y)] = f'{v}/{n}'
     # ⭐ ořez se odvodí z OBSAZENÝCH polí, ne z hádání -- a kdo zůstane venku,
     #    ten se VYPÍŠE (25.08. jsem ořezem kolem míče vyhodil volného příjemce).
     occx = [x for (x, y) in cell]
@@ -99,19 +113,25 @@ def render(path, idx, we_home=True, xlo=0, xhi=25):
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
     # ⭐ CELÉ buňky s ohraničením, i prázdné (uživatel 25.08.: „sice zabere víc
     #    prostoru, ale to je OK"). Šířka 5 dává kódům jako `DLG_` vzduch.
-    print('       ' + ''.join(f'{x:^6}' for x in range(xlo, xhi + 1)))
-    line = '      +' + '-----+' * (xhi - xlo + 1)
+    print('       ' + ''.join(f'{x:^8}' for x in range(xlo, xhi + 1)))
+    line = '      +' + '-------+' * (xhi - xlo + 1)
     ys = sorted({y for (x, y) in cell if xlo <= x <= xhi})
     for y in range(max(0, min(ys) - 1), min(15, max(ys) + 2)):
         print(line)
         row = f' y={y:<3}|'
         for x in range(xlo, xhi + 1):
             v = cell.get((x, y))
-            row += (f' {v:<4}|' if v else '     |')
+            if v:
+                row += f' {v:<6}|'
+            else:
+                z = zon((x, y), st_them)
+                row += (f'   {z}   |' if z else '       |')
         print(row)
     print(line)
     print(f'\nD dwarf · W wood-elf · S skaven · O orc · H human   +role')
     print('stunned = malými · `_` = leží · `o` = drží míč')
+    print('ČÍSLO v prázdném poli = kolik JEJICH tackle zón na něj dosahuje')
+    print('`/n` u těla = v kolika zónách SOUPEŘE stojí (u jejich těla: kolik NAŠICH je na něm)')
     print('`-` = ODEHRANÝ — jen v ŽIVÉ HŘE (překreslení uprostřed tahu).')
     print('   V korpusu se nepoužije: snímek je ze ZAČÁTKU kola a `hasActed` se neukládá.')
     if venku:
