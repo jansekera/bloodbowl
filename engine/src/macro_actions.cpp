@@ -220,6 +220,25 @@ long takeBlitzLandingRepicksInSearch() {
     return v;
 }
 
+thread_local bool g_blitzContinuation[2] = {false, false};
+thread_local long g_blitzContinuationEvents = 0;
+
+void setBlitzContinuationArm(TeamSide side, bool on) {
+    g_blitzContinuation[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool blitzContinuationArm(TeamSide side) {
+    return g_blitzContinuation[side == TeamSide::HOME ? 0 : 1];
+}
+
+void noteBlitzContinuationEvent() { ++g_blitzContinuationEvents; }
+
+long takeBlitzContinuationEventsInSearch() {
+    long v = g_blitzContinuationEvents;
+    g_blitzContinuationEvents = 0;
+    return v;
+}
+
 long takeDauntlessOfferEvalsInSearch() {
     long v = g_dauntlessOffers;
     g_dauntlessOffers = 0;
@@ -454,6 +473,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // ⚠️ No GFI: a retreat bought with a Go For It is a gamble, not hygiene,
     // and M9's ceiling counted only squares reachable on real movement.
     state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (!blitzContinuationArm(mySide)) return;
         if (!p.canAct() || !p.usedBlitz) return;
         if (p.hasSkill(SkillName::BallAndChain)) return;
         if (iHaveBall && p.id == carrier->id) return;
@@ -480,6 +500,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             }
         }
         if (best.x >= 0) {
+            noteBlitzContinuationEvent();
             out.push_back({MacroType::REPOSITION, p.id, -1, best});
         }
     });

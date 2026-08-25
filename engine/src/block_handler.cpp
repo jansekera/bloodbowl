@@ -3,6 +3,7 @@
 #include "bb/helpers.h"
 #include "bb/injury.h"
 #include "bb/ball_handler.h"
+#include "bb/macro_actions.h"   // M1/N10 arm: blitzContinuationArm()
 #include <algorithm>
 
 namespace bb {
@@ -400,6 +401,17 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
                    events, 0);
 }
 
+// M1/N10: jediná definice toho, kdy blok aktivaci ZAVÍRÁ. Volá se ze VŠECH
+// míst, kde blok normálně končí -- 25.08. jsem nejdřív opravil jen to poslední
+// a větev s pushnutím (ř. ~875) se vrací dřív, takže test padal a vypadalo to,
+// jako by rameno nefungovalo. Dvě kopie téhož pravidla = jedna z nich zestárne.
+static void endBlockActivation(Player& att, const BlockParams& params) {
+    const bool staysOpen = blitzContinuationArm(att.teamSide) &&
+                           params.isBlitz && canAct(att.state);
+    if (staysOpen) noteBlitzContinuationEvent();
+    att.hasActed = !staysOpen;
+}
+
 // M1c/T5.29 (25.08.2026): FOLLOW-UP JE VOLBA, NE DŮSLEDEK.
 // BB2016 l. 608-611: "A player who has made a block IS ALLOWED to make a
 // special follow up move... The player's COACH MUST DECIDE whether to follow
@@ -421,6 +433,10 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
     // Povinné případy -- pravidla volbu neposkytují:
     //   Frenzy l. 8138: "must always follow up if they can"
     //   Ball & Chain l. 7825: "must follow up if they push back another player"
+    // ⚠️ Za VYPNUTÝM ramenem se chová přesně jako do 25.08.: následuje vždy.
+    // Bez toho by se nulový test nedal udělat -- větev bez ramene musí hrát
+    // starou hru beze zbytku.
+    if (!blitzContinuationArm(att.teamSide)) return true;
     if (att.hasSkill(SkillName::Frenzy) ||
         att.hasSkill(SkillName::BallAndChain)) {
         return true;
@@ -432,7 +448,11 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
 
     const int tzStay = countTacklezones(state, att.position, att.teamSide);
     const int tzGo   = countTacklezones(state, vacated, att.teamSide);
-    return tzGo <= tzStay;
+    if (tzGo > tzStay) {
+        noteBlitzContinuationEvent();
+        return false;
+    }
+    return true;
 }
 
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
@@ -863,7 +883,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                     }
                 }
             }
-            att.hasActed = true;
+            endBlockActivation(att, params);
 
             // Handle BD attacker knockdown
             if (attKnockedDown) {
@@ -962,7 +982,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // REPOSITION for a player adjacent to a standing opponent, i.e. exactly the
     // player who just blocked. Reopening the activation without that gives him
     // permission to move and nowhere to go.
-    att.hasActed = !(params.isBlitz && canAct(att.state));
+    endBlockActivation(att, params);
 
     // Frenzy: if both standing and adjacent after block, mandatory 2nd block.
     // ⛔ JEN PO PUSHED / DEFENDER STUMBLES (oprava 21.08.). BB2016 l. 8139-8141:
