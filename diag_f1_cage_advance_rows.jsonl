@@ -1,4 +1,5 @@
-{"matchup":0,"seed_idx":0,"cand_home":true,"race_h":"dwarf","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,0],"away_attr":[0,0,0,0],"actions":504}
-{"matchup":0,"seed_idx":0,"cand_home":false,"race_h":"dwarf","race_a":"skaven","cand":1,"base":0,"home_attr":[0,0,0,1],"away_attr":[2,1,0,0],"actions":432}
-{"matchup":0,"seed_idx":1,"cand_home":true,"race_h":"dwarf","race_a":"skaven","cand":0,"base":2,"home_attr":[0,0,0,0],"away_attr":[1,0,0,0],"actions":642}
-{"matchup":0,"seed_idx":1,"cand_home":false,"race_h":"dwarf","race_a":"skaven","cand":1,"base":0,"home_attr":[0,1,0,0],"away_attr":[2,0,0,0],"actions":501}
+{"matchup":0,"seed_idx":0,"cand_home":true,"race_h":"dwarf","race_a":"skaven","cand":0,"base":1,"home_attr":[0,0,0,1],"away_attr":[4,0,0,2],"actions":607,"cand_plans":5,"base_plans":0,"cand_daunt":0,"cand_roll":0,"cand_landing":0,"cand_leap":0,"mode":0}
+{"matchup":0,"seed_idx":0,"cand_home":false,"race_h":"dwarf","race_a":"skaven","cand":0,"base":0,"home_attr":[0,0,0,0],"away_attr":[2,0,0,1],"actions":493,"cand_plans":2,"base_plans":0,"cand_daunt":0,"cand_roll":0,"cand_landing":0,"cand_leap":0,"mode":0}
+{"matchup":0,"seed_idx":1,"cand_home":true,"race_h":"dwarf","race_a":"skaven","cand":0,"base":0,"home_attr":[0,0,0,0],"away_attr":[1,0,0,0],"actions":443,"cand_plans":2,"base_plans":0,"cand_daunt":0,"cand_roll":0,"cand_landing":0,"cand_leap":0,"mode":0}
+{"matchup":0,"seed_idx":1,"cand_home":false,"race_h":"dwarf","race_a":"skaven","cand":0,"base":0,"home_attr":[0,0,0,1],"away_attr":[3,0,0,0],"actions":529,"cand_plans":3,"base_plans":0,"cand_daunt":0,"cand_roll":0,"cand_landing":0,"cand_leap":0,"mode":0}
+{"matchup":0,"seed_idx":2,"cand_home":true,"race_h":"dwarf","race_a":"skaven","cand":0,"base":0,"home_attr":[1,0,0,2],"away_attr":[5,0,0,1],"actions":528,"cand_plans":3,"base_plans":0,"cand_daunt":0,"cand_roll":0,"cand_landing":0,"cand_leap":0,"mode":0}
