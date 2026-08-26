@@ -103,3 +103,6 @@ blitzlanding_*/*/
 carrier_square_*/*/
 *_replic_*/*/
 *_lighttest_*/*/
+
+# semafory běhu (0 B, říkají jen "doběhlo" — to už plyne z výsledků)
+*_DONE
