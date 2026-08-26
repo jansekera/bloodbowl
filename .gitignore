@@ -85,13 +85,21 @@ crosses_20260821_data
 # zálohy konfigurace s datem v příponě
 *.bak-*
 
-# ⭐⭐⭐ 26.08. (uživatel): BĚHOVÉ ADRESÁŘE SE DO GITU NEDÁVAJÍ VŮBEC.
-# "logy a výsledky běhů, co se stále mění a mají cenu jen těsně po dokončení
-#  a vyhodnocení = bych do gitu nedával."
-# Do gitu patří ZÁVĚR (evidence/*.md, task_queue.md, paměť), ne materiál,
-# ze kterého vznikl. Týká se checks/drives/invariants/HEAD i per-pair
-# diag_*_rows.jsonl -- dřívější vzor (ab_measure_20260811) tímto NEPLATÍ.
-blitzlanding_*/
-carrier_square_*/
-*_lighttest_*/
-*_replic_*/
+# ⭐⭐⭐ 26.08.: Z BĚHU SE COMMITUJE JEN VYHODNOCENÍ, NE MATERIÁL.
+# Uživatel dal pravidlo "výsledky běhů do gitu nedávat" a vzápětí vrátil
+# rozhodnutí mně. Dělící čára NENÍ "je to výstup běhu", ale VELIKOST × ŽIVOTNOST:
+#
+#   checks/drives/invariants/HEAD   7 kB/běh   ← DOVNITŘ. Dnes ráno vyšel
+#       nález dne ze srovnání s drives.txt starým 6 DNÍ. "Cenu jen těsně po
+#       vyhodnocení" tahle kategorie nemá -- je to jediný trvalý záznam
+#       chování enginu v čase, a HEAD/ENGINE_HEAD je provenience, bez které
+#       se zpětně nepozná, co běh vlastně měřil (viz ABI nesoulad 24.08.).
+#   per-pair shardy                 2,8 MB/běh ← VEN, cena končí vyhodnocením
+#   korpusová data                   34 MB/běh ← VEN, dtto (a žijí v ../bb-data)
+#
+# Ignorují se proto PODADRESÁŘE běhu, ne běh sám -- výsledkové soubory
+# v kořeni tím projdou.
+blitzlanding_*/*/
+carrier_square_*/*/
+*_replic_*/*/
+*_lighttest_*/*/
