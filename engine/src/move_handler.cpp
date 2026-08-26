@@ -279,9 +279,7 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     // skok take nespotrebuje: hrac se o nej nedostal pokusit.
     player.leapUsedThisTurn = true;
 
-    int target = 7 - player.stats.agility;
-    if (player.hasSkill(SkillName::VeryLongLegs)) target -= 1;
-    target = std::clamp(target, 2, 6);
+    int target = calculateLeapTarget(player);   // sdilene s ocenenim
 
     bool leapOk = attemptRoll(state, playerId, dice, target,
                                SkillName::SKILL_COUNT, false, true, events);

@@ -2042,3 +2042,99 @@ TEST(MacroActions, TreemanUnder3MAIsOfferedAndRollsToStand) {
     greedyExpandMacro(gs, m, dice);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
 }
+
+// ---------------------------------------------------------------------------
+// LEAP v makrové chůzi (26.08.2026, rameno setLeapWalkArm).
+// Wardancer s míčem stojí obklopený, endzone je vpravo. Bez skoku se musí
+// prodírat tackle zónami; se skokem má přeskočit ven.
+// ---------------------------------------------------------------------------
+namespace {
+GameState makeLeapWalkState() {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& ward = state.getPlayer(1);
+    ward.id = 1;
+    ward.teamSide = TeamSide::HOME;
+    ward.state = PlayerState::STANDING;
+    ward.position = {10, 7};
+    ward.stats = {8, 3, 4, 7};          // wardancer: MA8 AG4
+    ward.movementRemaining = 8;
+    ward.skills.add(SkillName::Leap);
+
+    // Zeď tří obránců těsně vpravo -- chůze musí kolem, skok přes.
+    const int ys[3] = {6, 7, 8};
+    for (int i = 0; i < 3; ++i) {
+        Player& d = state.getPlayer(12 + i);
+        d.id = 12 + i;
+        d.teamSide = TeamSide::AWAY;
+        d.state = PlayerState::STANDING;
+        d.position = {11, static_cast<int8_t>(ys[i])};
+        d.stats = {6, 3, 3, 8};
+        d.movementRemaining = 6;
+    }
+    state.ball = BallState::carried({10, 7}, 1);
+    return state;
+}
+}  // namespace
+
+TEST(MacroExpansion, LeapWalkArmOffIsATrueNull) {
+    GameState state = makeLeapWalkState();
+    setLeapWalkArm(TeamSide::HOME, false);
+    takeLeapWalkPicksInSearch();  // reset
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::SCORE, 1, -1, {-1, -1}};   // playerId=1 (nosič)
+    auto result = greedyExpandMacro(state, macro, dice);
+
+    for (const auto& a : result.actions)
+        EXPECT_NE(a.type, ActionType::LEAP)
+            << "vypnuté rameno nesmí skok ani navrhnout";
+    EXPECT_EQ(takeLeapWalkPicksInSearch(), 0)
+        << "vypnuté rameno musí být pravá nula -- žádný tik čítače";
+}
+
+TEST(MacroExpansion, LeapWalkArmOnJumpsOutOfTheTacklezone) {
+    GameState state = makeLeapWalkState();
+    setLeapWalkArm(TeamSide::HOME, true);
+    takeLeapWalkPicksInSearch();  // reset
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::SCORE, 1, -1, {-1, -1}};   // playerId=1 (nosič)
+    auto result = greedyExpandMacro(state, macro, dice);
+    setLeapWalkArm(TeamSide::HOME, false);
+
+    bool leaped = false;
+    for (const auto& a : result.actions)
+        if (a.type == ActionType::LEAP) leaped = true;
+    EXPECT_TRUE(leaped) << "wardancer sevřený zdí má skok použít";
+    EXPECT_GT(takeLeapWalkPicksInSearch(), 0)
+        << "čítač musí zaznamenat, že rameno změnilo volbu";
+}
+
+TEST(MacroExpansion, LeapWalkArmDoesNotJumpOnAnOpenPitch) {
+    // Admisní predikát: bez něj by greedy skóre srovnávalo akci o DVOU polích
+    // s akcí o jednom a na volném hřišti by "výhodně" skákalo tam, kam se
+    // dojde zadarmo dvěma kroky. Tichá inflace skoků, kterou by A/B naměřilo
+    // jako efekt ramene.
+    GameState state = makeLeapWalkState();
+    for (int i = 0; i < 3; ++i) state.getPlayer(12 + i).position = {2, 2};  // zeď pryč
+    setLeapWalkArm(TeamSide::HOME, true);
+    takeLeapWalkPicksInSearch();  // reset
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::SCORE, 1, -1, {-1, -1}};   // playerId=1 (nosič)
+    auto result = greedyExpandMacro(state, macro, dice);
+    setLeapWalkArm(TeamSide::HOME, false);
+
+    for (const auto& a : result.actions)
+        EXPECT_NE(a.type, ActionType::LEAP)
+            << "na volném hřišti nemá skok co nabídnout -- chůze tam dojde zadarmo";
+    EXPECT_EQ(takeLeapWalkPicksInSearch(), 0);
+}
