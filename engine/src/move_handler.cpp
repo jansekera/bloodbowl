@@ -273,6 +273,12 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     // the player. No modifiers apply to this D6 roll unless he has Very
     // Long Legs." We used to add the destination's tackle zones, which made
     // leaping into a cage far dearer than the rules intend.
+    // T5.32 (26.08.): TEDDA se skok pocita za pouzity -- po VSECH validacich
+    // a po Tentacles. Drive to delal action_resolver jeste pred validaci,
+    // takze neplatny pokus sebral skok za cele kolo. Tentacles ("held firm")
+    // skok take nespotrebuje: hrac se o nej nedostal pokusit.
+    player.leapUsedThisTurn = true;
+
     int target = 7 - player.stats.agility;
     if (player.hasSkill(SkillName::VeryLongLegs)) target -= 1;
     target = std::clamp(target, 2, 6);
@@ -280,7 +286,8 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     bool leapOk = attemptRoll(state, playerId, dice, target,
                                SkillName::SKILL_COUNT, false, true, events);
 
-    emitEvent(events, {GameEvent::Type::DODGE, playerId, -1, from, to,
+    // T5.31 (26.08.): bylo DODGE -- skok se v korpusu nedal odlisit od dodge.
+    emitEvent(events, {GameEvent::Type::LEAP, playerId, -1, from, to,
                       target, leapOk});
 
     if (!leapOk) {

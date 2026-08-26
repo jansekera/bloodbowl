@@ -30,8 +30,17 @@ struct GameEvent {
                  // up" from "standing up is not logged"; it turned out to be
                  // the former (0.4 % of 280 719 prone player-turns), but only
                  // an added event can keep that honest.
-                 // MUST STAY LAST: bb_module.cpp maps this enum to names
-                 // positionally, so append only.
+                 // positionally mapped in bb_module.cpp -- APPEND ONLY.
+                 ,
+        LEAP // 2026-08-26 (T5.31): resolveLeap emitoval DODGE, takze skok se
+             // v korpusu NEDAL odlisit od dodge -- nesel spocitat ani
+             // "kolikrat se skocilo". Pritom to nejsou tytez veci: dodge ma
+             // modifikatory a tackle zony, leap je holy Agility hod bez
+             // modifikatoru (krome Very Long Legs). Merit rameno na skok,
+             // ktery v logu vypada jako dodge, nema cenu -- proto je tohle
+             // PREREKVIZITA A/B, ne kosmetika.
+             // MUST STAY LAST: bb_module.cpp maps this enum to names
+             // positionally, so append only.
     };
 
     Type type;

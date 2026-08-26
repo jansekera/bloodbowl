@@ -2,6 +2,7 @@
 #include "bb/action_resolver.h"
 #include "bb/rules_engine.h"
 #include "bb/helpers.h"
+#include "bb/move_handler.h"
 
 using namespace bb;
 
@@ -417,4 +418,62 @@ TEST(StandUp, MovedPlayerIsNotOfferedBlock) {
         EXPECT_FALSE(a.type == ActionType::BLOCK && a.playerId == 1)
             << "pohyb + blok je BLITZ, a ten je jeden za kolo";
     }
+}
+
+// ---------------------------------------------------------------------------
+// T5.31 / T5.32 (26.08.2026) -- aparát pro Leap, PREREKVIZITA A/B ramene.
+// Testy jsou schválně napsané PŘED opravou (metodika z TA1/P57: hranice se
+// změří dřív, než se sáhne na kód), takže na dnešním kódu MUSÍ padat.
+// ---------------------------------------------------------------------------
+
+TEST(ActionResolver, InvalidLeapDoesNotConsumeTheTurnsLeap) {
+    // T5.32: action_resolver propaloval `leapUsedThisTurn` PŘED tím, než
+    // resolveLeap vůbec dostal šanci cíl zvalidovat. Z validace přitom vedou
+    // TŘI cesty k fail() (vzdálenost, obsazené pole, strop GFI) -- a každá
+    // z nich brala hráči skok na celé kolo, ačkoli se žádný skok nekonal.
+    // Latentní to bylo jen do 24.08., kdy Leap dostal nabídku (F12).
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    placePlayer(gs, 12, {12, 7}, TeamSide::AWAY);   // cíl je OBSAZENÝ
+
+    Action action{ActionType::LEAP, 1, -1, {12, 7}};
+    FixedDiceRoller dice({});
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_FALSE(result.success) << "skok na obsazené pole se nesmí povést";
+    EXPECT_FALSE(gs.getPlayer(1).leapUsedThisTurn)
+        << "neplatný pokus nesmí sebrat skok za kolo -- žádný skok se nekonal";
+}
+
+TEST(ActionResolver, LeapEmitsItsOwnEventNotDodge) {
+    // T5.31: resolveLeap emitoval GameEvent::Type::DODGE, takže v korpusu
+    // nešlo skok od dodge odlišit -- ani spočítat, kolikrát se skočilo.
+    // Přitom to nejsou tytéž věci: dodge má modifikátory a tackle zóny,
+    // leap je holý Agility hod bez modifikátorů (mimo Very Long Legs).
+    // Bez tohohle se rameno na skok nedá změřit.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+
+    std::vector<GameEvent> events;
+    FixedDiceRoller dice({5});          // AG3 => cíl 4, hod 5 => čistý skok
+    auto result = resolveLeap(gs, 1, {12, 7}, dice, &events);
+    EXPECT_TRUE(result.success);
+
+    int leaps = 0, dodges = 0;
+    for (const auto& e : events) {
+        if (e.type == GameEvent::Type::LEAP)  ++leaps;
+        if (e.type == GameEvent::Type::DODGE) ++dodges;
+    }
+    EXPECT_EQ(leaps, 1)  << "skok musí mít v logu vlastní stopu";
+    EXPECT_EQ(dodges, 0) << "a nesmí se vydávat za dodge";
 }
