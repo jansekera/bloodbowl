@@ -84,3 +84,14 @@ crosses_20260821_data
 
 # zálohy konfigurace s datem v příponě
 *.bak-*
+
+# ⭐⭐⭐ 26.08. (uživatel): BĚHOVÉ ADRESÁŘE SE DO GITU NEDÁVAJÍ VŮBEC.
+# "logy a výsledky běhů, co se stále mění a mají cenu jen těsně po dokončení
+#  a vyhodnocení = bych do gitu nedával."
+# Do gitu patří ZÁVĚR (evidence/*.md, task_queue.md, paměť), ne materiál,
+# ze kterého vznikl. Týká se checks/drives/invariants/HEAD i per-pair
+# diag_*_rows.jsonl -- dřívější vzor (ab_measure_20260811) tímto NEPLATÍ.
+blitzlanding_*/
+carrier_square_*/
+*_lighttest_*/
+*_replic_*/
