@@ -75,6 +75,12 @@ engine/build_dev/
 # repo je veřejné). Soubory zůstávají na disku a v záloze — vyřazuje se jen
 # SLEDOVÁNÍ, nemaže se nic. Výsledkové soubory běhu (checks/drives/HEAD) se
 # commitují dál, jak bylo zvykem.
-crosses_20260821/
-crosses_20260821_data/
+# bez lomítka: od 26.08. jsou to SYMLINKY na ../bb-data/ (data přesunuta ven
+# z repa, aby nemátla v pracovním adresáři; skripty s natvrdo zadanou cestou
+# fungují dál přes symlink)
+crosses_20260821
+crosses_20260821_data
 *_corpus_data/
+
+# zálohy konfigurace s datem v příponě
+*.bak-*
