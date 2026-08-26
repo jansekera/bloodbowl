@@ -106,3 +106,6 @@ carrier_square_*/*/
 
 # semafory běhu (0 B, říkají jen "doběhlo" — to už plyne z výsledků)
 *_DONE
+
+# běhy Leapu (26.08.) — týž důvod jako ostatní běhové adresáře
+leapwalk_*/
