@@ -1,0 +1,47 @@
+korpus: crosses_20260821_data   souborů: 18000
+her: 18000
+
+=== (1) V KTERÉM KOLE PADÁ TD ===
+rasa             1     2     3     4     5     6     7     8   celkem  /nástup    7-8
+dwarf            0     2    28    65   112   164   227   553     1151   0.160    68%
+human            0    98   123   172   269   355   514   708     2239   0.311    55%
+orc              0    10    33    56   102   171   279   539     1190   0.165    69%
+skaven           0   225   335   499   541   656   848   959     4063   0.564    44%
+wood-elf         0   214   368   571   660   711   988  1207     4719   0.655    47%
+
+=== (2) DOKONČITELNOST: podíl kol s `dosažitelné >= potřebné` ===
+rasa              1      2      3      4      5      6      7      8
+dwarf          100%   100%   100%   100%    90%    32%     6%    14%
+human          100%   100%   100%   100%    96%    44%     8%    16%
+orc            100%   100%   100%    99%    73%    19%     4%    11%
+skaven         100%   100%   100%   100%   100%    83%    14%    22%
+wood-elf       100%   100%   100%   100%    99%    83%    17%    27%
+
+=== (3) DOKONČITELNOST PODLE MA NOSIČE ===
+rasa          MA      kol   dokončitelné
+dwarf          4     2291          21.9%
+dwarf          5     4712          36.3%
+dwarf          6    38284          70.8%
+human          5      298          39.6%
+human          6    35549          71.0%
+human          7     3100          55.4%
+human          8     3913          66.0%
+orc            4     1354          31.7%
+orc            5    40838          60.2%
+orc            6     6230          49.3%
+skaven         7    21625          78.6%
+skaven         9    13490          80.7%
+wood-elf       2      168           6.5%
+wood-elf       7    12572          74.4%
+wood-elf       8    25011          81.9%
+
+=== (4) CENA ZTRÁTY MÍČE ===
+rasa           ztrát   ⌀vzdálenost k naší EZ   soupeř by DOŠEL
+dwarf          10102                    11.2               64%
+human           9926                    11.1               68%
+orc             8829                    10.7               63%
+skaven          8565                    12.2               72%
+wood-elf        9368                    12.3               71%
+
+⚠️ (4) je HORNÍ mez ceny: 'soupeř by došel' počítá jen vzdálenost a MA,
+   ne to, že mu v cestě stojíme. Skutečná cena je nižší.

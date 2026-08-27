@@ -106,8 +106,15 @@ static const Matchup MATCHUPS[] = {
     // are exactly the matchups where our doctrine flatters itself. Orcs and
     // humans, our two worst results, were never in an arm at all.
     {"dwarf", "human"},
+    // 2026-08-26: APPENDED (index 6) kvuli Leapu. Vsechny dosavadni matchupy
+    // maji na jedne strane trpaslika, ktery Leap NEMA -- rameno by tam v jedne
+    // ze dvou orientaci nedelalo nic a bezec by mel ctvrtinovou silu. Tady maji
+    // Leap OBE strany (2 wardanceri z 11 na kazde), takze rameno hraje v obou
+    // orientacich a par je presne "wood-elf s rukama vs. wood-elf bez rukou"
+    // na TEMZE enginu.
+    {"wood-elf", "wood-elf"},
 };
-static constexpr int N_MATCHUPS = 6;
+static constexpr int N_MATCHUPS = 7;
 
 struct SideAttrition {
     int ko = 0, injured = 0, dead = 0, ejected = 0;
@@ -249,6 +256,7 @@ int main(int argc, char** argv) {
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
                       : (mode == 8) ? 149'000'000u
+                      : (mode == 9) ? 167'000'000u
                       : (mode == 10) ? 163'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
@@ -260,6 +268,7 @@ int main(int argc, char** argv) {
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
+         : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
          : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
                      : "cage vs off");
 
@@ -281,6 +290,7 @@ int main(int argc, char** argv) {
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
     const char* rowsName = mode == 10 ? "diag_blitzcont_rows.jsonl"
+                         : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
                          : mode == 6 ? "diag_cageadvance_rows.jsonl"
@@ -426,10 +436,20 @@ int main(int argc, char** argv) {
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY,
                                        mode == 8 && !candHome);
                 bb::takeBlitzLandingRepicksInSearch();   // vynuluj na par
+                // mode 9 (LEAP, 26.08.): skok vstupuje do makrove chuze.
+                // ⚠️ Rameno JE pravidlova oprava, ne nas prospech -- Leap maji
+                // jen wardanceri, takze na dw-we by nase cisla sla DOLU a bylo
+                // by to spravne. Proto se meri na we-we (matchup 6), kde maji
+                // Leap obe strany a par je "s rukama vs. bez rukou".
+                bb::setLeapWalkArm(bb::TeamSide::HOME, mode == 9 && candHome);
+                bb::setLeapWalkArm(bb::TeamSide::AWAY, mode == 9 && !candHome);
+                bb::takeLeapWalkPicksInSearch();         // vynuluj na par
                 // mode 10 (M1/N10, 25.08.): blitz nechava aktivaci otevrenou,
                 // blitzujici dostane nabidku ustupu a follow-up je VOLBA.
                 // Vsechny tri pulky pod JEDNIM ramenem schvalne -- rozdelene
                 // by meril jejich smes (viz macro_actions.h).
+                // ⚠️ 27.08.: bylo mode 9, prectislovano na 10 -- Leap si 9 vzal
+                // driv a UZ S NIM BEZELA NOC, takze cisla nelze prohodit.
                 bb::setBlitzContinuationArm(bb::TeamSide::HOME,
                                             mode == 10 && candHome);
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY,
@@ -448,6 +468,9 @@ int main(int argc, char** argv) {
                 long candPush = bb::takePushGeometryEvalsInSearch();
                 long candCage = bb::takeCageAwareAdvancePicksInSearch();
                 long candLanding = bb::takeBlitzLandingRepicksInSearch();
+                long candLeap = bb::takeLeapWalkPicksInSearch();
+                bb::setLeapWalkArm(bb::TeamSide::HOME, false);
+                bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
                 long candCont = bb::takeBlitzContinuationEventsInSearch();
                 bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
@@ -483,6 +506,7 @@ int main(int argc, char** argv) {
                 pr.armEvents += (mode == 4) ? candDaunt
                               : (mode == 5) ? candPush
                               : (mode == 8) ? candLanding
+                              : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
                               : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
@@ -514,14 +538,15 @@ int main(int argc, char** argv) {
                             "\"base\":%d,\"home_attr\":[%d,%d,%d,%d],"
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
                             "\"cand_plans\":%d,\"base_plans\":%d,"
-                            "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,\"cand_cont\":%ld,\"mode\":%d}\n",
+                            "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,"
+                            "\"cand_leap\":%ld,\"cand_cont\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
                             basePlans, candDaunt, candRoll, candLanding,
-                            candCont, mode);
+                            candLeap, candCont, mode);
                     fflush(rows);
                 }
             }

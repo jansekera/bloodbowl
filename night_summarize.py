@@ -29,7 +29,7 @@ RE_SUM   = re.compile(r"SUMMARY matchup \d+ \([^)]*\), (\d+) pairs \(\d+ games\)
                       r"(?:, n_nonzero (\d+))?")
 RE_ARM   = re.compile(r"arm acted in (\d+)/(\d+) pairs; pairs that moved: (\d+); "
                       r"MOVED WITHOUT THE ARM ACTING: (\d+)")
-RE_DELTA = re.compile(r"PAIRED delta chess as \w+: ([-+][\d.]+) \+- ([\d.]+)")
+RE_DELTA = re.compile(r"PAIRED delta chess as [\w-]+: ([-+][\d.]+) \+- ([\d.]+)")
 # ⭐ 20.08.: počet picků, ne jen jestli rameno jednalo. Bez něj se nedá
 # předregistrovat kontrola „placebo musí mít VÍC picků než P38" -- běh by
 # proběhl a odpověď by v něm nebyla. Starší logy ho nemají; smí chybět.

@@ -1,0 +1,4 @@
+korpus: /home/jan/claude/bloodbowl/blitzlanding_replic_20260825_corpus_data
+her: 3000
+
+✅ ŽÁDNÝ ROZBITÝ INVARIANT

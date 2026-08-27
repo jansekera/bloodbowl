@@ -1,0 +1,235 @@
+Soubory 18000 | trpasličích her 4800 | přijímacích drivů 6109 | čas 65.7s (3.6 ms/hra)
+Kategorie: {'D2': 374, 'C': 2627, 'D1': 1418, 'A': 1570, 'B': 120}
+JEN PLNÉ DRIVY (start v kole 1): {'D2': 373, 'C': 2391, 'A': 1489, 'D1': 531, 'B': 16}
+
+=== 0. START DRIVU (snímek po výkopu) ===
+[A] n=1489 | míč mimo hřiště 0 (0%) | nejbližší trpaslík k míči 4.03 | nejbližší soupeř k míči 9.84 | soupeřů v naší půli 0.00 | vzdál. míče od endzone 21.84 | y míče 6.91
+    nejbližší trpaslík k míči: ≤1 67 (4%) | 2-3 511 (34%) | 4-5 601 (40%) | 6-7 310 (21%) | 8+ 0 (0%)
+[D (vše)] n=904 | míč mimo hřiště 0 (0%) | nejbližší trpaslík k míči 4.12 | nejbližší soupeř k míči 9.95 | soupeřů v naší půli 0.00 | vzdál. míče od endzone 21.95 | y míče 7.00
+    nejbližší trpaslík k míči: ≤1 53 (6%) | 2-3 289 (32%) | 4-5 341 (38%) | 6-7 221 (24%) | 8+ 0 (0%)
+[D1] n=531 | míč mimo hřiště 0 (0%) | nejbližší trpaslík k míči 5.04 | nejbližší soupeř k míči 11.02 | soupeřů v naší půli 0.00 | vzdál. míče od endzone 23.02 | y míče 7.07
+    nejbližší trpaslík k míči: ≤1 2 (0%) | 2-3 58 (11%) | 4-5 256 (48%) | 6-7 215 (40%) | 8+ 0 (0%)
+[D2] n=373 | míč mimo hřiště 0 (0%) | nejbližší trpaslík k míči 2.80 | nejbližší soupeř k míči 8.44 | soupeřů v naší půli 0.00 | vzdál. míče od endzone 20.44 | y míče 6.91
+    nejbližší trpaslík k míči: ≤1 51 (14%) | 2-3 231 (62%) | 4-5 85 (23%) | 6-7 6 (2%) | 8+ 0 (0%)
+
+=== 1. PRVNÍ DRŽENÍ — rozdělení kola (start-of-turn snímek) ===
+[A] n=1489 | k1:1428 k2:50 k3:6 k4:3 k5:1 k7:1
+    soupeř držel míč dřív než my: 17 (1%) | start drivu v kole 1.00
+[D (vše)] n=904 | k1:840 k2:52 k3:5 k4:4 k5:1 k7:1 k8:1
+    soupeř držel míč dřív než my: 13 (1%) | start drivu v kole 1.00
+[D1] n=531 | k1:492 k2:31 k3:2 k4:3 k5:1 k7:1 k8:1
+    soupeř držel míč dřív než my: 7 (1%) | start drivu v kole 1.00
+[D2] n=373 | k1:348 k2:21 k3:3 k4:1
+    soupeř držel míč dřív než my: 6 (2%) | start drivu v kole 1.00
+
+=== 1b. CO SE DĚLO V NAŠICH TAZÍCH PŘED PRVNÍM DRŽENÍM (jmenovatel = tahy) ===
+[A] tahů před 1. držením: 1569 (1.05/drive)
+    SEBRÁN v tomto tahu (normální tah sebrání)               1474 (94%)
+    sebrán a ztracen v témž tahu: přihrávka                    33 (2%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   31 (2%)
+    míč drží SOUPEŘ na startu tahu                             28 (2%)
+    žádný pokus, míč V DOSAHU MA                                3 (0%)
+[D (vše)] tahů před 1. držením: 993 (1.10/drive)
+    SEBRÁN v tomto tahu (normální tah sebrání)                892 (90%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   41 (4%)
+    sebrán a ztracen v témž tahu: přihrávka                    29 (3%)
+    míč drží SOUPEŘ na startu tahu                             29 (3%)
+    sebrán a ztracen v témž tahu: nosič spadl na DODGE          1 (0%)
+    žádný pokus, míč V DOSAHU MA                                1 (0%)
+[D1] tahů před 1. držením: 592 (1.11/drive)
+    SEBRÁN v tomto tahu (normální tah sebrání)                526 (89%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   35 (6%)
+    míč drží SOUPEŘ na startu tahu                             21 (4%)
+    sebrán a ztracen v témž tahu: přihrávka                     8 (1%)
+    sebrán a ztracen v témž tahu: nosič spadl na DODGE          1 (0%)
+    žádný pokus, míč V DOSAHU MA                                1 (0%)
+[D2] tahů před 1. držením: 401 (1.08/drive)
+    SEBRÁN v tomto tahu (normální tah sebrání)                366 (91%)
+    sebrán a ztracen v témž tahu: přihrávka                    21 (5%)
+    míč drží SOUPEŘ na startu tahu                              8 (2%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                    6 (1%)
+
+=== 1c. TOTÉŽ PO DRIVECH: klasifikace PRVNÍHO našeho tahu bez držení (jmenovatel = drivy s aspoň 1 takovým tahem) ===
+[A] drivů: 1489 z 1489
+    SEBRÁN v tomto tahu (normální tah sebrání)               1428 (96%)
+    sebrán a ztracen v témž tahu: přihrávka                    32 (2%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   28 (2%)
+    žádný pokus, míč V DOSAHU MA                                1 (0%)
+[D (vše)] drivů: 904 z 904
+    SEBRÁN v tomto tahu (normální tah sebrání)                840 (93%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   35 (4%)
+    sebrán a ztracen v témž tahu: přihrávka                    29 (3%)
+[D1] drivů: 531 z 531
+    SEBRÁN v tomto tahu (normální tah sebrání)                492 (93%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                   31 (6%)
+    sebrán a ztracen v témž tahu: přihrávka                     8 (2%)
+[D2] drivů: 373 z 373
+    SEBRÁN v tomto tahu (normální tah sebrání)                348 (93%)
+    sebrán a ztracen v témž tahu: přihrávka                    21 (6%)
+    pokus o PICKUP NEÚSPĚŠNÝ                                    4 (1%)
+
+=== 1d. ŘETĚZCE tříd tahů před 1. držením u D-drivů s 1. držením >= kolo 3 (top 15) ===
+D-drivů s 1. držením >= kolo 3: 12 z 904
+     3  pokus o PICKUP NEÚSPĚŠNÝ → pokus o PICKUP NEÚSPĚŠNÝ → SEBRÁN v tomto tahu (normální tah sebrání)
+     1  sebrán a ztracen v témž tahu: přihrávka → sebrán a ztracen v témž tahu: nosič spadl na DODGE → míč drží SOUPEŘ na startu tahu → SEBRÁN v tomto tahu (normální tah sebrání)
+     1  sebrán a ztracen v témž tahu: přihrávka → pokus o PICKUP NEÚSPĚŠNÝ
+     1  pokus o PICKUP NEÚSPĚŠNÝ → pokus o PICKUP NEÚSPĚŠNÝ → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → SEBRÁN v tomto tahu (normální tah sebrání)
+     1  sebrán a ztracen v témž tahu: přihrávka → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu
+     1  pokus o PICKUP NEÚSPĚŠNÝ → žádný pokus, míč V DOSAHU MA → pokus o PICKUP NEÚSPĚŠNÝ → SEBRÁN v tomto tahu (normální tah sebrání)
+     1  sebrán a ztracen v témž tahu: přihrávka → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → SEBRÁN v tomto tahu (normální tah sebrání)
+     1  sebrán a ztracen v témž tahu: přihrávka → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu
+     1  pokus o PICKUP NEÚSPĚŠNÝ → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu
+     1  sebrán a ztracen v témž tahu: přihrávka → míč drží SOUPEŘ na startu tahu → míč drží SOUPEŘ na startu tahu
+
+=== 2. TEMPO PO TAZÍCH (postup nosiče v jednom našem tahu; jmenovatel = naše tahy s držením) ===
+[A] tahů 6278 | průměr 3.38 | <0 111 (2%) | 0 1701 (27%) | 1 832 (13%) | 2 367 (6%) | 3 641 (10%) | 4 460 (7%) | 5 354 (6%) | 6+ 1812 (29%)
+    jen tahy s udrženým míčem do dalšího snímku: n=4848 průměr 2.78 | <0 101 (2%) | 0 1425 (29%) | 1 775 (16%) | 2 309 (6%) | 3 565 (12%) | 4 398 (8%) | 5 275 (6%) | 6+ 1000 (21%)
+[D (vše)] tahů 4712 | průměr 1.85 | <0 134 (3%) | 0 2124 (45%) | 1 804 (17%) | 2 269 (6%) | 3 339 (7%) | 4 233 (5%) | 5 194 (4%) | 6+ 615 (13%)
+    jen tahy s udrženým míčem do dalšího snímku: n=4580 průměr 1.86 | <0 133 (3%) | 0 2034 (44%) | 1 799 (17%) | 2 264 (6%) | 3 335 (7%) | 4 230 (5%) | 5 192 (4%) | 6+ 593 (13%)
+[D1] tahů 2782 | průměr 2.24 | <0 71 (3%) | 0 1172 (42%) | 1 410 (15%) | 2 154 (6%) | 3 184 (7%) | 4 171 (6%) | 5 126 (5%) | 6+ 494 (18%)
+    jen tahy s udrženým míčem do dalšího snímku: n=2704 průměr 2.26 | <0 70 (3%) | 0 1120 (41%) | 1 409 (15%) | 2 151 (6%) | 3 181 (7%) | 4 169 (6%) | 5 125 (5%) | 6+ 479 (18%)
+[D2] tahů 1930 | průměr 1.29 | <0 63 (3%) | 0 952 (49%) | 1 394 (20%) | 2 115 (6%) | 3 155 (8%) | 4 62 (3%) | 5 68 (4%) | 6+ 121 (6%)
+    jen tahy s udrženým míčem do dalšího snímku: n=1876 průměr 1.29 | <0 63 (3%) | 0 914 (49%) | 1 390 (21%) | 2 113 (6%) | 3 154 (8%) | 4 61 (3%) | 5 67 (4%) | 6+ 114 (6%)
+
+=== 2b. PRŮMĚR TEMPA ZA DRIVE — rozdělení (prahová hypotéza: 2,86 vs 2,02, nic mezi?) ===
+[A] n=1458 průměr 3.18 | <1 69 (5%) | 1-1.5 145 (10%) | 1.5-2 133 (9%) | 2-2.5 233 (16%) | 2.5-3 187 (13%) | 3-3.5 187 (13%) | 3.5-4 112 (8%) | 4+ 392 (27%)
+[D (vše)] n=897 průměr 2.09 | <1 159 (18%) | 1-1.5 189 (21%) | 1.5-2 133 (15%) | 2-2.5 151 (17%) | 2.5-3 90 (10%) | 3-3.5 58 (6%) | 3.5-4 21 (2%) | 4+ 96 (11%)
+[D1] n=528 průměr 2.55 | <1 29 (5%) | 1-1.5 82 (16%) | 1.5-2 89 (17%) | 2-2.5 115 (22%) | 2.5-3 76 (14%) | 3-3.5 41 (8%) | 3.5-4 17 (3%) | 4+ 79 (15%)
+[D2] n=369 průměr 1.43 | <1 130 (35%) | 1-1.5 107 (29%) | 1.5-2 44 (12%) | 2-2.5 36 (10%) | 2.5-3 14 (4%) | 3-3.5 17 (5%) | 3.5-4 4 (1%) | 4+ 17 (5%)
+
+=== 2c. TEMPO PODLE KOLA DRIVU (průměrný postup v našem tahu k, jen tahy s udrženým míčem) ===
+[A] k2:4.44(n1365)  k3:2.07(n1180)  k4:1.44(n929)  k5:1.84(n678)  k6:2.32(n454)  k7:5.47(n242)
+[D (vše)] k2:4.14(n794)  k3:1.75(n736)  k4:1.01(n691)  k5:0.93(n658)  k6:0.85(n573)  k7:1.52(n552)  k8:2.29(n576)
+[D1] k2:5.67(n473)  k3:2.19(n434)  k4:1.20(n413)  k5:0.95(n385)  k6:0.93(n337)  k7:1.62(n320)  k8:2.27(n342)
+[D2] k2:1.88(n321)  k3:1.12(n302)  k4:0.73(n278)  k5:0.89(n273)  k6:0.72(n236)  k7:1.38(n232)  k8:2.32(n234)
+
+=== 3. STAV NOSIČE NA STARTU TAHU vs POSTUP (jmenovatel = naše tahy s držením, bez TD tahu) ===
+[A] n=4848
+    nosič PRONE na startu: 0 (0%) | v tacklezóně (>=1): 2834 (58%) | v >=2 TZ: 1463 (30%) | MA nosiče 7.73 | Catcher 64%, Lineman 24%, Wardancer 10%
+    kroků nosiče/tah 2.27 | tahů s 0 kroky: 2383 (49%) | s 0 kroky a VOLNÝ (ne prone, 0 TZ): 681 (14%) | dodge/tah 0.21 | GFI/tah 0.03 | handoff-tahy 13% | sražen v soupeřově tahu 16%
+    volný (0 TZ, stojí)    n=2014 postup 4.02 kroků 2.96 | <0 2 (0%) | 0 378 (19%) | 1 128 (6%) | 2 169 (8%) | 3 325 (16%) | 4 202 (10%) | 5 144 (7%) | 6+ 666 (33%)
+    1 TZ, stojí            n=1371 postup 2.29 kroků 1.93 | <0 23 (2%) | 0 416 (30%) | 1 311 (23%) | 2 90 (7%) | 3 157 (11%) | 4 103 (8%) | 5 62 (5%) | 6+ 209 (15%)
+    >=2 TZ, stojí          n=1463 postup 1.52 kroků 1.65 | <0 76 (5%) | 0 631 (43%) | 1 336 (23%) | 2 50 (3%) | 3 83 (6%) | 4 93 (6%) | 5 69 (5%) | 6+ 125 (9%)
+    volný nosič podle kola: k2:4.99(n1077)  k3:2.87(n456)  k4:2.31(n238)  k5:2.87(n121)  k6:3.24(n79)  k7:6.21(n43)
+[D (vše)] n=4580
+    nosič PRONE na startu: 0 (0%) | v tacklezóně (>=1): 3052 (67%) | v >=2 TZ: 1737 (38%) | MA nosiče 7.65 | Catcher 55%, Lineman 29%, Wardancer 12%
+    kroků nosiče/tah 1.59 | tahů s 0 kroky: 2882 (63%) | s 0 kroky a VOLNÝ (ne prone, 0 TZ): 617 (13%) | dodge/tah 0.16 | GFI/tah 0.02 | handoff-tahy 9% | sražen v soupeřově tahu 16%
+    volný (0 TZ, stojí)    n=1528 postup 3.29 kroků 2.56 | <0 3 (0%) | 0 433 (28%) | 1 122 (8%) | 2 135 (9%) | 3 220 (14%) | 4 126 (8%) | 5 104 (7%) | 6+ 385 (25%)
+    1 TZ, stojí            n=1315 postup 1.55 kroků 1.35 | <0 28 (2%) | 0 574 (44%) | 1 317 (24%) | 2 96 (7%) | 3 71 (5%) | 4 60 (5%) | 5 46 (3%) | 6+ 123 (9%)
+    >=2 TZ, stojí          n=1737 postup 0.84 kroků 0.91 | <0 102 (6%) | 0 1027 (59%) | 1 360 (21%) | 2 33 (2%) | 3 44 (3%) | 4 44 (3%) | 5 42 (2%) | 6+ 85 (5%)
+    volný nosič podle kola: k2:4.63(n648)  k3:2.48(n308)  k4:1.94(n171)  k5:1.59(n136)  k6:1.67(n90)  k7:2.96(n82)  k8:3.44(n93)
+[D1] n=2704
+    nosič PRONE na startu: 0 (0%) | v tacklezóně (>=1): 1727 (64%) | v >=2 TZ: 992 (37%) | MA nosiče 7.70 | Catcher 58%, Lineman 26%, Wardancer 12%
+    kroků nosiče/tah 1.86 | tahů s 0 kroky: 1608 (59%) | s 0 kroky a VOLNÝ (ne prone, 0 TZ): 343 (13%) | dodge/tah 0.16 | GFI/tah 0.02 | handoff-tahy 11% | sražen v soupeřově tahu 15%
+    volný (0 TZ, stojí)    n= 977 postup 4.06 kroků 3.06 | <0 1 (0%) | 0 213 (22%) | 1 48 (5%) | 2 81 (8%) | 3 124 (13%) | 4 96 (10%) | 5 71 (7%) | 6+ 343 (35%)
+    1 TZ, stojí            n= 735 postup 1.75 kroků 1.56 | <0 13 (2%) | 0 306 (42%) | 1 169 (23%) | 2 53 (7%) | 3 38 (5%) | 4 44 (6%) | 5 26 (4%) | 6+ 86 (12%)
+    >=2 TZ, stojí          n= 992 postup 0.85 kroků 0.92 | <0 56 (6%) | 0 601 (61%) | 1 192 (19%) | 2 17 (2%) | 3 19 (2%) | 4 29 (3%) | 5 28 (3%) | 6+ 50 (5%)
+    volný nosič podle kola: k2:5.76(n443)  k3:2.87(n214)  k4:2.36(n109)  k5:1.58(n72)  k6:2.19(n43)  k7:3.50(n48)  k8:3.54(n48)
+[D2] n=1876
+    nosič PRONE na startu: 0 (0%) | v tacklezóně (>=1): 1325 (71%) | v >=2 TZ: 745 (40%) | MA nosiče 7.58 | Catcher 50%, Lineman 33%, Wardancer 12%
+    kroků nosiče/tah 1.19 | tahů s 0 kroky: 1274 (68%) | s 0 kroky a VOLNÝ (ne prone, 0 TZ): 274 (15%) | dodge/tah 0.16 | GFI/tah 0.02 | handoff-tahy 8% | sražen v soupeřově tahu 17%
+    volný (0 TZ, stojí)    n= 551 postup 1.91 kroků 1.69 | <0 2 (0%) | 0 220 (40%) | 1 74 (13%) | 2 54 (10%) | 3 96 (17%) | 4 30 (5%) | 5 33 (6%) | 6+ 42 (8%)
+    1 TZ, stojí            n= 580 postup 1.31 kroků 1.08 | <0 15 (3%) | 0 268 (46%) | 1 148 (26%) | 2 43 (7%) | 3 33 (6%) | 4 16 (3%) | 5 20 (3%) | 6+ 37 (6%)
+    >=2 TZ, stojí          n= 745 postup 0.82 kroků 0.91 | <0 46 (6%) | 0 426 (57%) | 1 168 (23%) | 2 16 (2%) | 3 25 (3%) | 4 15 (2%) | 5 14 (2%) | 6+ 35 (5%)
+    volný nosič podle kola: k2:2.19(n205)  k3:1.59(n94)  k4:1.21(n62)  k5:1.59(n64)  k6:1.19(n47)  k7:2.21(n34)  k8:3.33(n45)
+
+=== 3b. TAHY S 0 KROKY NOSIČE — proč? (jmenovatel = tahy s 0 kroky, míč udržen) ===
+[A] n=2383 (z 4848 tahů) | turnover DŘÍV než se nosič pohnul: 209 (9%) | nosič bez jediné události: 1196 (50%) | turnover v tahu vůbec: 435 (18%)
+    volný nosič, bez předčasného turnoveru: n=618 | mělo volné pole vpřed: 423 (68%) | mělo BEZPEČNÉ pole vpřed (0 TZ): 380 (61%) | podle kola: k2:277 k3:180 k4:97 k5:37 k6:14 k7:13
+    nosič v TZ, bez předčasného turnoveru: n=1556 | mělo volné pole vpřed: 932 (60%) | mělo BEZPEČNÉ pole vpřed: 269 (17%)
+    nosič s událostí, ale 0 kroků (n=1187): BLOCK 60%, PASS 37%, BLOCK+PUSH 1%, PUSH 1%, HAND_OFF 1%, PASS+PUSH 0%
+    volný nosič bez volného pole vpřed (n=195): všechna 3 pole vpřed obsazena NAŠIMI: 163 (84%) | mimo hřiště/okraj: 32
+[D (vše)] n=2882 (z 4580 tahů) | turnover DŘÍV než se nosič pohnul: 430 (15%) | nosič bez jediné události: 1717 (60%) | turnover v tahu vůbec: 695 (24%)
+    volný nosič, bez předčasného turnoveru: n=546 | mělo volné pole vpřed: 355 (65%) | mělo BEZPEČNÉ pole vpřed (0 TZ): 314 (58%) | podle kola: k2:163 k3:130 k4:82 k5:68 k6:42 k7:29 k8:32
+    nosič v TZ, bez předčasného turnoveru: n=1906 | mělo volné pole vpřed: 1118 (59%) | mělo BEZPEČNÉ pole vpřed: 267 (14%)
+    nosič s událostí, ale 0 kroků (n=1165): BLOCK 68%, PASS 26%, FOUL 1%, HAND_OFF 1%, PUSH 1%, BLOCK+PUSH 1%
+    volný nosič bez volného pole vpřed (n=191): všechna 3 pole vpřed obsazena NAŠIMI: 141 (74%) | mimo hřiště/okraj: 50
+[D1] n=1608 (z 2704 tahů) | turnover DŘÍV než se nosič pohnul: 267 (17%) | nosič bez jediné události: 960 (60%) | turnover v tahu vůbec: 412 (26%)
+    volný nosič, bez předčasného turnoveru: n=302 | mělo volné pole vpřed: 219 (73%) | mělo BEZPEČNÉ pole vpřed (0 TZ): 198 (66%) | podle kola: k2:81 k3:88 k4:48 k5:37 k6:17 k7:14 k8:17
+    nosič v TZ, bez předčasného turnoveru: n=1039 | mělo volné pole vpřed: 615 (59%) | mělo BEZPEČNÉ pole vpřed: 143 (14%)
+    nosič s událostí, ale 0 kroků (n=648): BLOCK 65%, PASS 30%, PUSH 1%, FOUL 1%, HAND_OFF 1%, ARMOR_BREAK+BLOCK+KNOCKED_DOWN 0%
+    volný nosič bez volného pole vpřed (n=83): všechna 3 pole vpřed obsazena NAŠIMI: 55 (66%) | mimo hřiště/okraj: 28
+[D2] n=1274 (z 1876 tahů) | turnover DŘÍV než se nosič pohnul: 163 (13%) | nosič bez jediné události: 757 (59%) | turnover v tahu vůbec: 283 (22%)
+    volný nosič, bez předčasného turnoveru: n=244 | mělo volné pole vpřed: 136 (56%) | mělo BEZPEČNÉ pole vpřed (0 TZ): 116 (48%) | podle kola: k2:82 k3:42 k4:34 k5:31 k6:25 k7:15 k8:15
+    nosič v TZ, bez předčasného turnoveru: n=867 | mělo volné pole vpřed: 503 (58%) | mělo BEZPEČNÉ pole vpřed: 124 (14%)
+    nosič s událostí, ale 0 kroků (n=517): BLOCK 73%, PASS 21%, HAND_OFF 2%, FOUL 1%, PUSH 1%, BLOCK+PUSH 1%
+    volný nosič bez volného pole vpřed (n=108): všechna 3 pole vpřed obsazena NAŠIMI: 86 (80%) | mimo hřiště/okraj: 22
+
+=== 3d. POSTUP VE STEJNÉM STAVU: volný nosič + BEZPEČNÉ pole vpřed + bez předčasného turnoveru ===
+[A] n=1462 postup 4.68 kroků 3.37 | <0 1 (0%) | 0 144 (10%) | 1 86 (6%) | 2 115 (8%) | 3 266 (18%) | 4 155 (11%) | 5 114 (8%) | 6+ 581 (40%)
+    podle kola: k2:5.40(n905)  k3:3.50(n292)  k4:2.82(n122)  k5:3.28(n71)  k6:3.83(n42)  k7:6.67(n30)
+[D (vše)] n=1030 postup 4.18 kroků 3.14 | <0 1 (0%) | 0 167 (16%) | 1 69 (7%) | 2 83 (8%) | 3 174 (17%) | 4 97 (9%) | 5 90 (9%) | 6+ 349 (34%)
+    podle kola: k2:5.08(n548)  k3:3.13(n181)  k4:2.73(n85)  k5:2.20(n70)  k6:2.10(n49)  k7:4.49(n45)  k8:5.10(n52)
+[D1] n=721 postup 4.88 kroků 3.55 | <0 0 (0%) | 0 88 (12%) | 1 29 (4%) | 2 50 (7%) | 3 101 (14%) | 4 74 (10%) | 5 63 (9%) | 6+ 316 (44%)
+    podle kola: k2:5.98(n404)  k3:3.34(n143)  k4:3.21(n58)  k5:2.05(n37)  k6:2.88(n24)  k7:5.14(n29)  k8:5.54(n26)
+[D2] n=309 postup 2.55 kroků 2.18 | <0 1 (0%) | 0 79 (26%) | 1 40 (13%) | 2 33 (11%) | 3 73 (24%) | 4 23 (7%) | 5 27 (9%) | 6+ 33 (11%)
+    podle kola: k2:2.54(n144)  k3:2.37(n38)  k4:1.70(n27)  k5:2.36(n33)  k6:1.36(n25)  k7:3.31(n16)  k8:4.65(n26)
+
+=== 3e. ROZKLAD ROZDÍLU A vs D1 v postupu na tah (tahy s udrženým míčem) ===
+A 2.78 vs D1 2.26, rozdíl 0.52 pole/tah
+    volný                    podíl tahů A 40% / D1 35% | postup A 4.15 / D1 4.24 | příspěvek: skladba stavů +0.24, chování ve stavu -0.03
+    1 TZ                     podíl tahů A 27% / D1 24% | postup A 2.40 / D1 1.98 | příspěvek: skladba stavů +0.07, chování ve stavu +0.11
+    >=2 TZ                   podíl tahů A 28% / D1 31% | postup A 1.62 / D1 1.00 | příspěvek: skladba stavů -0.04, chování ve stavu +0.19
+    turnover před nosičem    podíl tahů A  4% / D1 10% | postup A 0.00 / D1 0.00 | příspěvek: skladba stavů -0.00, chování ve stavu +0.00
+    SOUČET: skladba stavů (kde nosič stojí = soupeřův tlak + naše vystavení) +0.26 | chování ve stavu (co s tím uděláme) +0.26
+
+=== 3c. TURNOVER DŘÍV NEŽ SE NOSIČ POHNUL — podíl na VŠECH tazích s držením ===
+[A] n=4848 | 209 (4%) | nosič je první událost tahu: 27%
+[D (vše)] n=4580 | 430 (9%) | nosič je první událost tahu: 25%
+[D1] n=2704 | 267 (10%) | nosič je první událost tahu: 28%
+[D2] n=1876 | 163 (9%) | nosič je první událost tahu: 20%
+
+=== 4a. ODPOR PODLE KOLA (na startu našeho tahu; pás nosiče ±2 | nejlepší pás | všech stojících soupeřů před nosičem | stojící soupeři celkem / naši) ===
+[A]
+    k2 n=1397 pás 6.01 | min pás 1.42 | před nosičem 9.50 | stojí soupeř 9.77 / my 10.34 | TZ na nosiči 0.24
+    k3 n=1284 pás 5.37 | min pás 0.65 | před nosičem 7.89 | stojí soupeř 9.18 / my 9.89 | TZ na nosiči 1.07
+    k4 n=1118 pás 4.53 | min pás 0.33 | před nosičem 6.40 | stojí soupeř 8.85 / my 9.48 | TZ na nosiči 1.53
+    k5 n= 904 pás 3.82 | min pás 0.21 | před nosičem 5.38 | stojí soupeř 8.40 / my 9.12 | TZ na nosiči 1.67
+    k6 n= 693 pás 2.94 | min pás 0.13 | před nosičem 4.19 | stojí soupeř 8.03 / my 8.90 | TZ na nosiči 1.58
+    k7 n= 533 pás 2.12 | min pás 0.07 | před nosičem 3.09 | stojí soupeř 7.74 / my 8.44 | TZ na nosiči 1.38
+    k8 n= 349 pás 0.88 | min pás 0.01 | před nosičem 1.26 | stojí soupeř 7.72 / my 8.02 | TZ na nosiči 0.88
+[D (vše)]
+    k2 n= 819 pás 6.29 | min pás 1.42 | před nosičem 9.80 | stojí soupeř 9.99 / my 10.13 | TZ na nosiči 0.22
+    k3 n= 755 pás 6.05 | min pás 0.75 | před nosičem 8.78 | stojí soupeř 9.64 / my 9.63 | TZ na nosiči 0.89
+    k4 n= 707 pás 5.54 | min pás 0.41 | před nosičem 7.75 | stojí soupeř 9.34 / my 9.14 | TZ na nosiči 1.40
+    k5 n= 675 pás 5.15 | min pás 0.28 | před nosičem 7.10 | stojí soupeř 9.07 / my 8.68 | TZ na nosiči 1.65
+    k6 n= 593 pás 4.70 | min pás 0.20 | před nosičem 6.34 | stojí soupeř 8.79 / my 8.54 | TZ na nosiči 1.81
+    k7 n= 586 pás 4.32 | min pás 0.15 | před nosičem 5.89 | stojí soupeř 8.48 / my 8.02 | TZ na nosiči 1.83
+    k8 n= 577 pás 3.74 | min pás 0.13 | před nosičem 5.16 | stojí soupeř 8.17 / my 7.65 | TZ na nosiči 1.79
+[D1]
+    k2 n= 489 pás 6.34 | min pás 1.56 | před nosičem 9.96 | stojí soupeř 10.03 / my 10.18 | TZ na nosiči 0.06
+    k3 n= 448 pás 6.09 | min pás 0.82 | před nosičem 8.90 | stojí soupeř 9.61 / my 9.71 | TZ na nosiči 0.75
+    k4 n= 418 pás 5.63 | min pás 0.45 | před nosičem 7.91 | stojí soupeř 9.44 / my 9.18 | TZ na nosiči 1.35
+    k5 n= 397 pás 5.26 | min pás 0.28 | před nosičem 7.24 | stojí soupeř 9.17 / my 8.66 | TZ na nosiči 1.69
+    k6 n= 350 pás 4.79 | min pás 0.20 | před nosičem 6.52 | stojí soupeř 8.97 / my 8.53 | TZ na nosiči 1.89
+    k7 n= 338 pás 4.35 | min pás 0.15 | před nosičem 6.06 | stojí soupeř 8.67 / my 8.02 | TZ na nosiči 1.84
+    k8 n= 342 pás 3.67 | min pás 0.14 | před nosičem 5.15 | stojí soupeř 8.28 / my 7.58 | TZ na nosiči 1.81
+[D2]
+    k2 n= 330 pás 6.22 | min pás 1.21 | před nosičem 9.57 | stojí soupeř 9.93 / my 10.06 | TZ na nosiči 0.45
+    k3 n= 307 pás 5.97 | min pás 0.66 | před nosičem 8.62 | stojí soupeř 9.70 / my 9.51 | TZ na nosiči 1.09
+    k4 n= 289 pás 5.42 | min pás 0.35 | před nosičem 7.52 | stojí soupeř 9.19 / my 9.08 | TZ na nosiči 1.48
+    k5 n= 278 pás 4.99 | min pás 0.28 | před nosičem 6.91 | stojí soupeř 8.92 / my 8.70 | TZ na nosiči 1.61
+    k6 n= 243 pás 4.57 | min pás 0.19 | před nosičem 6.07 | stojí soupeř 8.53 / my 8.56 | TZ na nosiči 1.69
+    k7 n= 248 pás 4.29 | min pás 0.14 | před nosičem 5.67 | stojí soupeř 8.22 / my 8.02 | TZ na nosiči 1.81
+    k8 n= 235 pás 3.84 | min pás 0.11 | před nosičem 5.17 | stojí soupeř 8.02 / my 7.75 | TZ na nosiči 1.76
+
+=== 4b. A: KOLO TD a tempo včetně TD tahu ===
+TD v kole: k2:2 k3:75 k4:185 k5:226 k6:264 k7:334 k8:403
+použitých kol od 1. držení: 2:7 3:78 4:191 5:229 6:265 7:335 8:384
+tempo VČETNĚ TD tahu: průměr 3.31 | <1 0 (0%) | 1-1.5 1 (0%) | 1.5-2 48 (3%) | 2-2.5 298 (20%) | 2.5-3 363 (24%) | 3-3.5 307 (21%) | 3.5-4 99 (7%) | 4+ 373 (25%)
+
+=== 4. ODPOR V KORIDORU podle kola (průměr stojících soupeřů před nosičem, pás ±2) ===
+[A] n=1487 průměr 4.34 | <2 39 (3%) | 2-4 489 (33%) | 4-6 794 (53%) | 6-8 156 (10%) | 8+ 9 (1%)
+[D (vše)] n=901 průměr 5.20 | <2 8 (1%) | 2-4 147 (16%) | 4-6 466 (52%) | 6-8 257 (29%) | 8+ 23 (3%)
+[D1] n=530 průměr 5.24 | <2 5 (1%) | 2-4 83 (16%) | 4-6 274 (52%) | 6-8 152 (29%) | 8+ 16 (3%)
+[D2] n=371 průměr 5.15 | <2 3 (1%) | 2-4 64 (17%) | 4-6 192 (52%) | 6-8 105 (28%) | 8+ 7 (2%)
+
+=== 5. D-DRIVY: kde skončily (end_dist) a kolik chybělo ===
+[D1] n=531 konc. vzdálenost od endzone průměr 11.31 | 0 0 (0%) | 1-3 27 (5%) | 4-6 52 (10%) | 7-10 195 (37%) | 11-15 165 (31%) | 16+ 92 (17%)
+[D2] n=373 konc. vzdálenost od endzone průměr 10.68 | 0 0 (0%) | 1-3 20 (5%) | 4-6 44 (12%) | 7-10 137 (37%) | 11-15 126 (34%) | 16+ 46 (12%)
+
+=== per soupeř: A vs D 1. držení a tempo ===
+dwarf     A n=202 1.drž 1.11 tempo 2.90 | D n= 267 1.drž 1.13 tempo 1.84
+human     A n=420 1.drž 1.04 tempo 3.18 | D n= 209 1.drž 1.07 tempo 2.15
+orc       A n=360 1.drž 1.03 tempo 3.53 | D n= 236 1.drž 1.05 tempo 2.25
+skaven    A n=507 1.drž 1.07 tempo 3.03 | D n= 192 1.drž 1.16 tempo 2.18

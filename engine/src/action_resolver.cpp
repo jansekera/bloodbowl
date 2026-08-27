@@ -191,7 +191,12 @@ ActionResult resolveAction(GameState& state, const Action& action,
             // F12: dosud sem nevedla zadna cesta. l. 8283 -- jednou za kolo.
             Player& p = state.getPlayer(action.playerId);
             if (p.leapUsedThisTurn) return ActionResult::fail();
-            p.leapUsedThisTurn = true;
+            // T5.32 (26.08.): priznak se UZ NENASTAVUJE tady. Z validace
+            // v resolveLeap vedou tri cesty k fail() (vzdalenost, obsazene
+            // pole, strop GFI) a kazda z nich brala hracovi skok na cele
+            // kolo, ac se zadny skok nekonal. Propaluje se az v resolveLeap,
+            // tesne pred agility hodem -- tedy ve chvili, kdy se skok
+            // SKUTECNE pokousi.
             return resolveLeap(state, action.playerId, action.target, dice, events);
         }
 

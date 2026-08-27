@@ -1,0 +1,65 @@
+# Předpovědi noci 26.→27.08. — LEAP VSTUPUJE DO MAKROVÉ CHŮZE (rodina M).
+# Strojově kontroluje night_summarize.py. Mode 9, CORPUS=0.
+# MATCHUPS="6:we-we:1 1:dw-we:1 2:dw-dw:0"
+#
+# ⭐ CO SE MĚŘÍ
+# Skok byl do 24.08. mrtvý kód; F12 mu dal nabídku, ale plánovač ho neuměl
+# použít v chůzi. Rameno `setLeapWalkArm` ho pouští do `findMoveToward`, oceňuje
+# ve `scoreMoveAction` toutéž měnou jako krok, a `movePlayerToward` dostal guard
+# „úspěch bez pohybu" kvůli Tentacles. Tři místa, jedno rameno.
+#
+# ⛔⛔ TOHLE NENÍ MĚŘENÍ NAŠEHO PROSPĚCHU — JE TO PRAVIDLOVÁ OPRAVA
+# Uživatel 26.08.: „LEAP patří do opravy pravidel, proto jsem mu dal prioritu,
+# PŘESTOŽE nám škodí vyřešení." Leap mají v korpusu jen wardanceři (2 z 11,
+# wood-elf). Engine má dovednost umět SPRÁVNĚ; jestli nám to uškodí, je vedlejší.
+# ⇒ Měřítko je pravidlová parita, ne zisk. „Hojné využívání" wood-elfem je
+#   samostatná položka WE-LEAP v CELOTAHU, ne tahle noc.
+#
+# ⭐ PROČ we-we JAKO HLAVNÍ MATCHUP
+# Rasy se s orientací NEMĚNÍ, mění se jen to, která strana je kandidát. Na dw-we
+# by tedy rameno v jedné ze dvou orientací nedělalo NIC (dwarf Leap nemá) a běh
+# by měl čtvrtinovou sílu. Na we-we mají Leap obě strany, takže pár je přesně
+# „wood-elf s rukama vs. wood-elf bez rukou" na témž enginu.
+# Light test: we-we 125,5 picků/hru · dw-we 49,6 · dw-dw 0.
+#
+# ⛔ NULOVÝ MATCHUP dw-dw: ČEKÁ SE U NĚJ „MIMO" A JE TO SPRÁVNĚ
+# Předpovědi se vyhodnocují na KAŽDÝ matchup zvlášť. dw-dw nemá Leap ani na
+# jedné straně ⇒ arm_picks a n_nonzero u něj MUSÍ vyjít 0 a hlásit MIMO.
+# To je POTVRZENÍ nuly, ne selhání běhu. Číst se u něj má jediné: delta ≈ 0.
+#
+# ⭐ STROP ZMĚŘEN PŘED ŘÁDKOU KÓDU (diag_leap_ceiling_20260826.py, 1 000 her):
+# 6,02 příležitosti na hru proti metru M9 = 4,09 blitzů/hru; ve 40,9 % kol má
+# wardancer aspoň jedno pole vpřed, kam se chůzí nedostane. Rozdělení
+# DVOUVRCHOLOVÉ: buď nic, nebo 10+ polí. ⚠️ Horní mez, a volná — BFS ignoruje
+# tackle zóny, tedy chůzi spíš nadhodnocuje.
+#
+# ⭐ SMĚR, KTERÝ ČEKÁM A PROČ — napsáno PŘED během:
+#   Čekám KLADNOU deltu na we-we: rameno dává straně schopnost, kterou pravidla
+#   dávají a plánovač ji dosud neuměl vzít, a strop říká, že příležitostí je víc
+#   než blitzů (6,02 vs 4,09/hru).
+#   Důvod proti, a je vážný: skok je HOD. Nezdar = ležící tělo v cílovém poli,
+#   hod na brnění a TURNOVER, a wardancer má AV7. Admisní predikát sice brání
+#   skákání na volném hřišti, ale tam, kde skok povolí (hráč v TZ), se riziko
+#   hodu vyměňuje za riziko dodge — a ten by měl reroll z Dodge skillu, který
+#   wardancer MÁ. ⇒ ZÁPORNÁ delta je možná a byla by nálezem: znamenala by, že
+#   cena 6*(leapTarget-1) je podstřelená, protože neúčtuje ztrátu Dodge rerollu.
+#   Nulu nečekám — čítač ukazuje 125,5 picků/hru, rameno rozhodně sahá.
+#
+# ⚠️ NA dw-we SE NAŠE ČÍSLA MOHOU ZHORŠIT A JE TO SPRÁVNĚ. Kandidátem je tam
+#   střídavě dwarf (rameno nedělá nic) a wood-elf (rameno pomáhá soupeři).
+#   Delta chess měří výhodu KANDIDÁTA, takže kladná delta = wood-elf s Leapem
+#   je silnější. Naše TD proti němu jdou dolů. To je splněné zadání.
+
+delta      in   -0.030 0.120   # dvoustranná (chessCandHome + chessCandAway − 1). Pod −0,030 = skok ŠKODÍ; nález, ne selhání.
+delta_1s   in   -0.015 0.060   # totéž jednostranně (= delta/2)
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # light test 4/4 na obou expozičních matchupech; u dw-dw MIMO ZÁMĚRNĚ
+n_nonzero  in    0.30  0.90    # light test 50 % na 4 párech -- široké schválně; u dw-dw MIMO ZÁMĚRNĚ
+arm_picks  >=    400000        # APARÁTOVÁ podlaha, ne hypotéza. Light test: we-we 125,5/hru,
+                               # dw-we 49,6/hru. Podlaha je stavěná na SLABŠÍ z obou
+                               # (dw-we): 2 400 párů = 4 800 her × 49,6 ≈ 238 000 ... ⇒ 400 000
+                               # by dw-we NEPROŠEL. Držím ji proto na hodnotě, kterou musí
+                               # splnit HLAVNÍ matchup we-we (4 800 her × 125,5 ≈ 602 000),
+                               # a u dw-we se čeká MIMO -- viz poznámka o slabší expozici výše.
+                               # ⛔ PRAVIDLO (24.08.): po vidění dat se APARÁTOVÁ kontrola smí
+                               # opravit jen SMĚREM NAHORU a se zápisem, nikdy dolů k výsledku.

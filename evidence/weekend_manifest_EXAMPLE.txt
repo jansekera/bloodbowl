@@ -1,0 +1,20 @@
+# MANIFEST ŘIDIČE VÍKENDU — jeden cyklus na řádek
+# jmeno | git-ref | mode | paru | prereg | corpus(0/1)
+#
+# ⚠️ Píše se V PÁTEK, ne v sobotu ve 03:00. A předregistrace musí existovat
+#    DŘÍV, než cyklus poběží — řidič cyklus bez ní odmítne.
+# ⛔ Ramena z TÉŽE mechaniky (P35 × M1/N10 = obojí blitz) dají každé svou deltu,
+#    ale NE kombinaci. Chce-li se kombinace, je to TŘETÍ cyklus s vlastním ramenem.
+# ⭐ Korpus (poslední sloupec) patří AŽ ZA ROZHODNUTÍ, ne doprostřed řetězu:
+#    sbírá se s rameny VYPNUTÝMI, takže zastará, jakmile se cokoli zapne.
+#
+# ⛔⛔ SLOUPEC `paru` NEŘÍKÁ NIC O DÉLCE BĚHU (poučení 26.08.).
+#    Tempo se liší podle MATCHUPU: we-we jelo 266 s/pár na worker proti
+#    ~71 s/pár u dw-we -- elfí zápasy jsou delší a míň jich končí předčasně.
+#    Noc 26.08. se kvůli tomu musela v poledne restartovat (projekce konce
+#    vyšla na zítřek 19:49 místo dnešní 04:15).
+#    ⇒ Před zápisem cyklu OVĚŘ TEMPO TOHO matchupu, nepřebírej z jiného.
+#    ⚠️ A pozor na jednotku: "s/pár" v chain.log je AGREGÁT přes všechny
+#       workery; na jeden worker je to ×WORKERS.
+
+m1n10   | m1-n10-blitz-continuation | 9 | 4800 | evidence/night_prereg_20260827.preds | 0

@@ -1,7 +1,8 @@
-# NÁVRH ZADÁNÍ — LEAP: jak se má plánovat *(DRAFT, k domluvě 25.08. ve 14:00)*
+# ZADÁNÍ — LEAP: jak se má plánovat
 
-⛔ **NESPOUŠTĚT bez domluvy.** Uživatel 25.08.: *„zatím jej nespouštěj —
-domluvíme se dnes ve 14:00."*
+✅ **ODSOUHLASENO A SPUŠTĚNO 25.08.** Model: **Fable** *(rozhodl uživatel)*.
+Zadání je předem uzemněné v kódu, takže se v něm nerozhoduje o faktech, ale
+o NÁVRHU — jiný typ úlohy než T5.21, kde šlo o odolání prioru a jel Opus.
 
 ## Otázka, kterou to má zodpovědět
 
@@ -84,12 +85,21 @@ nepiš to z hlavy:
 - nerozšiřovat `MacroType`
 - neodhadovat dopad čísly, která nejsou změřená
 
-## Otevřené, co má rozhodnout domluva ve 14:00
+## Rozhodnuto — neřeš to znovu
 
-- **(a)** Fable, nebo Opus? *(T5.21 jel na Opus, protože šlo o odolání prioru;
-  tady jde o návrh architektury — jiný typ úlohy.)*
-- **(b)** Má návrh rovnou obsahovat i **strop změřený offline**, nebo jen jeho
-  zadání a strop si změřím sám?
-- **(c)** Patří sem i **A2 Jump Up** *(blok z lehu, ř. 8200-8204 — ležícímu se
-  BLOCK vůbec nenabízí)*? Je to táž třída „akce existuje, makro ji neemituje",
-  ale jiná dovednost.
+- **Model: Fable.** *(T5.21 jel na Opusu, protože šlo o odolání prioru; tady jde
+  o návrh architektury.)*
+- ⛔ **Strop NEMĚŘ, jen ho ZADEJ.** Na stroji běží noční A/B (P35) a rozbory nad
+  korpusem začínají až po 16:00 — nespouštěj nic, co bere CPU. Napiš **přesné
+  zadání měření**: který soubor, jaká podmínka, co se počítá.
+- ⛔ **A2 Jump Up je MIMO ROZSAH.** Je to táž třída *(„akce existuje, makro ji
+  neemituje")*, ale jiná dovednost a jiné pravidlo. Nemíchat.
+
+## Jak hlásit
+
+Výstup do `evidence/fable_leap_plan_20260825.md`, **průběžně** — po každé
+hotové části ulož. *(22.08. usekl limit metrový audit v třetině a výsledek se
+ztratil.)*
+
+Ve finální odpovědi vrať **stručně**: navrhované místo zásahu, jak se skok
+ocení, jméno ramene, a zadání na měření stropu.

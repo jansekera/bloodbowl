@@ -36,6 +36,11 @@ Position pickApproachStep(const GameState& state, const Player& mover,
 // Agility roll targets (clamped to 2-6)
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source);
+// Leap, l. 8276-8277: holy Agility hod, ZADNE modifikatory krome Very Long
+// Legs -- zadne tackle zony, zadne +1 za dodge. Sdileny mezi resolverem
+// (move_handler) a ocenenim (macro_actions), aby cena nemohla utect od
+// pravidla; tataz unifikace, jakou po item7 dostal pickApproachStep.
+int calculateLeapTarget(const Player& player);
 int calculatePickupTarget(const GameState& state, const Player& player);
 // Same roll, priced as if `player` stood on `at` -- macro generation needs
 // the target BEFORE the picker walks to the ball (tackle zones are counted
