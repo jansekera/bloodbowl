@@ -1,0 +1,187 @@
+korpus /home/jan/claude/bloodbowl/blitzlanding_replic_20260825_corpus_data: 3000 her, 48000 našich kol, 188.0 s (0.06 s/hra -> 3 000 her ≈ 3.1 min)
+kontrola rekonstrukce kandidátů vs analyze_turn_offers (kol s neshodou): žádná
+
+=== KOLA (nabídnuto 0, 0.000/kolo) ===
+    48000           našich kol
+     1189           kolo BEZ JEDINÉ naší akce (hned END_TURN)
+      624           _…z toho s míčem v ruce
+      581           _…z toho s míčem a nabídnutým ADVANCE
+      548           _…z toho v obraně
+       17           _…z toho s míčem na zemi
+
+=== SCORE (nabídnuto 903, 0.019/kolo) ===
+      820   90.8 %  dojde
+      320   35.4 %  _dist == MA+2 (vyžaduje oba GFI)
+       42    4.7 %  NEDOJDE: greedy chůze selže (no_move), BFS by došel
+       26    2.9 %  NEDOJDE: ani ideální cesta (BFS) se nevejde
+       15    1.7 %  NEDOJDE: greedy chůze selže (loop), BFS by došel
+
+=== ADVANCE (nabídnuto 18135, 0.378/kolo) ===
+     8178   45.1 %  dojde na zvolené pole
+     6342   35.0 %  VZDÁ SE: záložní smyčka stáhla steps na 0
+     6167   34.0 %  _…a přitom bylo volné TZ-free pole vpřed mimo přímku
+     2807   15.5 %  NEDOJDE: chůze selže (loop)
+      507    2.8 %  NEDOJDE: chůze selže (exhausted)
+      301    1.7 %  NEDOJDE: chůze selže (no_move)
+
+=== HAND_OFF_SCORE (nabídnuto 292, 0.006/kolo) ===
+      211   72.3 %  dojde (příjemce do endzóny)
+      114   39.0 %  _nosič po dosažení sousedství dál PŘEŠLAPUJE (kroků > 1)
+       88   30.1 %  _nosič cestou opouští TZ (dodge)
+       33   11.3 %  NEDOJDE: nosič neskončí vedle příjemce (loop)
+       19    6.5 %  NEDOJDE: příjemce -- greedy selže (no_move), BFS by došel
+        9    3.1 %  NEDOJDE: příjemce -- ani BFS
+        9    3.1 %  NEDOJDE: příjemce -- greedy selže (loop), BFS by došel
+        7    2.4 %  NEDOJDE: nosič neskončí vedle příjemce (no_move)
+        4    1.4 %  NEDOJDE: nosič neskončí vedle příjemce (exhausted)
+
+=== PASS_SCORE (nabídnuto 469, 0.010/kolo) ===
+      423   90.2 %  dojde (příjemce do endzóny)
+       21    4.5 %  NEDOJDE: příjemce -- greedy selže (loop), BFS by došel
+       17    3.6 %  NEDOJDE: příjemce -- greedy selže (no_move), BFS by došel
+        4    0.9 %  NEJDE: cíl mimo pravítko (žádná PASS akce)
+        2    0.4 %  NEDOJDE: příjemce -- ani BFS
+        2    0.4 %  NEJDE: blizzard zakazuje long pass (žádná PASS akce)
+
+=== CHAIN_SCORE (nabídnuto 218, 0.005/kolo) ===
+      160   73.4 %  dojde (střelec do endzóny)
+       29   13.3 %  NEDOJDE: relay neskončí vedle střelce (loop)
+       11    5.0 %  NEDOJDE: střelec -- greedy selže (loop), BFS by došel
+        8    3.7 %  NEDOJDE: střelec -- greedy selže (no_move), BFS by došel
+        6    2.8 %  NEDOJDE: relay neskončí vedle střelce (exhausted)
+        3    1.4 %  NEDOJDE: střelec -- ani BFS
+        1    0.5 %  NEJDE: blizzard zakazuje long pass
+
+=== PICKUP (nabídnuto 12448, 0.259/kolo) ===
+    10568   84.9 %  dojde na míč
+     1477   11.9 %  NEDOJDE: greedy selže (loop), BFS by došel
+      270    2.2 %  NEDOJDE: greedy selže (exhausted), BFS by došel
+      133    1.1 %  NEDOJDE: ani BFS se nevejde do MA+2
+
+=== CAGE (nabídnuto 19037, 0.397/kolo) ===
+    36829  193.5 %  _rohů volných
+    30581  160.6 %  _rohů dojito
+    14239   74.8 %  aspoň 1 roh obsazen
+     3647   19.2 %  _rohů nedojito: nejbližší > 4 pole
+     2590   13.6 %  _rohů nedojito: chůze selže do 4 kroků
+     2521   13.2 %  žádný volný roh, klec NENÍ hotová (rohy drží soupeř/ležící/sideline) -> expanze nic nedělá
+     1527    8.0 %  klec už hotová (4 naše rohy) -> expanze nic nedělá
+      750    3.9 %  NIKDO nedojde na žádný volný roh
+      280    1.5 %  _…protože nejbližší volný je > 4 pole (limit 4 kroků)
+
+=== BLITZ (nabídnuto 69000, 1.438/kolo) ===
+    64611   93.6 %  dosažitelný aspoň jedním blitzerem
+    47990   69.6 %  _kol s nabídkou BLITZ
+    30058   43.6 %  _remíza skóre na hraně výběru (cíl nejistý)
+     4389    6.4 %  NEJDE: žádný náš hráč nedosáhne k cíli (žádná BLITZ akce)
+     3473    5.0 %  _kol, kde top-1 cíl je nedosažitelný, ač JINÝ soupeř dosažitelný je
+     2255    3.3 %  _…cíl dál než MA6+2 od kohokoli
+        3    0.0 %  _kol, kde NIKDO nedosáhne na ŽÁDNÉHO soupeře (nezávisle na výběru cíle)
+
+=== BLITZ_AND_SCORE (nabídnuto 337, 0.007/kolo) ===
+      325   96.4 %  blitzovat může spoluhráč
+       24    7.1 %  _…ale nosič nemá cestu ani BFS (blokující stojí v ní)
+        7    2.1 %  jen nosič blitzuje, dosah po bloku stačí
+        5    1.5 %  NEDOJDE: blitzovat může jen nosič a po bloku mu nezbývá dosah
+
+=== BLOCK (nabídnuto 192146, 4.003/kolo) ===
+     6496    3.4 %  _nabídka Slayera proti silnějšímu (Dauntless vyrovnán)
+     4398    2.3 %  _…bez vyrovnání by se NENABÍDLA (hod Dauntless rozhodne)
+
+=== REPOSITION (nabídnuto 247919, 5.165/kolo) ===
+    62401   25.2 %    [útok: 2 pole před nosiče] nabídnuto
+    44884   18.1 %    [míč: k volnému poli vedle míče] nabídnuto
+    43996   17.7 %    [obrana: screen] nabídnuto
+    35778   14.4 %    [útok: 2 pole před nosiče] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+    27996   11.3 %    [útok: k nosiči (cíl = nosičovo pole)] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+    27996   11.3 %    [útok: k nosiči (cíl = nosičovo pole)] nabídnuto
+    25174   10.2 %    [míč: k volnému poli vedle míče] NEDOJDE: cíl dál než MA (bez GFI)
+    24824   10.0 %    [útok: 2 pole před nosiče] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+    23890    9.6 %    [obrana: screen] dojde
+    19910    8.0 %    [obrana: intercept lane] nabídnuto
+    19401    7.8 %    [obrana: marker (cíl = pole nosiče)] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+    19401    7.8 %    [obrana: marker (cíl = pole nosiče)] nabídnuto
+    15930    6.4 %    [míč: k volnému poli vedle míče] dojde
+    13860    5.6 %    [obrana: roh soupeřovy klece] nabídnuto
+    12902    5.2 %    [útok: 2 pole před nosiče] dojde
+    11042    4.5 %    [obrana: intercept lane] dojde
+    10212    4.1 %    [obrana: screen] NEDOJDE: cíl dál než MA (bez GFI)
+     8956    3.6 %    [obrana: safety (vlastní endzóna, y=7)] nabídnuto
+     8521    3.4 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+     8319    3.4 %    [obrana: roh soupeřovy klece] NEDOJDE: cíl dál než MA (bez GFI)
+     7363    3.0 %    [obrana: safety (vlastní endzóna, y=7)] NEDOJDE: cíl dál než MA (bez GFI)
+     7184    2.9 %    [útok: 2 pole před nosiče] NEDOJDE: chůze selže (loop) v dosahu MA
+     6961    2.8 %    [obrana: screen] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+     6904    2.8 %    [útok: 2 pole před nosiče] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+     4729    1.9 %    [obrana: screen] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+     4314    1.7 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+     4286    1.7 %    [útok: 2 pole před nosiče] cíl = vlastní pole (stůj)
+     3811    1.5 %    [obrana: endzone guard] nabídnuto
+     3618    1.5 %    [obrana: intercept lane] NEDOJDE: cíl dál než MA (bez GFI)
+     3505    1.4 %    [obrana: intercept lane] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+     2926    1.2 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+     2855    1.2 %    [útok: 2 pole před nosiče] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+     2786    1.1 %    [obrana: roh soupeřovy klece] NEDOJDE: chůze selže (loop) v dosahu MA
+     2521    1.0 %    [míč: k volnému poli vedle míče] NEDOJDE: chůze selže (loop) v dosahu MA
+     2507    1.0 %    [obrana: intercept lane] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+     2352    0.9 %    [obrana: endzone guard] NEDOJDE: cíl dál než MA (bez GFI)
+     2117    0.9 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+     1864    0.8 %    [obrana: roh soupeřovy klece] dojde
+     1839    0.7 %    [míč: už vedle (stůj)] cíl = vlastní pole (stůj)
+     1839    0.7 %    [míč: už vedle (stůj)] nabídnuto
+     1463    0.6 %    [obrana: screen] cíl = vlastní pole (stůj)
+     1435    0.6 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+     1259    0.5 %    [míč: k volnému poli vedle míče] NEDOJDE: chůze selže (exhausted) v dosahu MA
+     1258    0.5 %    [obrana: safety (vlastní endzóna, y=7)] dojde
+     1236    0.5 %    [útok: 2 pole před nosiče] NEDOJDE: cíl dál než MA (bez GFI)
+     1145    0.5 %    [obrana: endzone guard] dojde
+     1137    0.5 %    [obrana: intercept lane] cíl = vlastní pole (stůj)
+     1000    0.4 %    [útok: 2 pole před nosiče] NEDOJDE: chůze selže (exhausted) v dosahu MA
+      891    0.4 %    [obrana: roh soupeřovy klece] NEDOJDE: chůze selže (exhausted) v dosahu MA
+      886    0.4 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+      865    0.3 %    [útok: receiver u endzóny] nabídnuto
+      793    0.3 %    [útok: receiver u endzóny] NEDOJDE: cíl dál než MA (bez GFI)
+      771    0.3 %    [obrana: screen] NEDOJDE: chůze selže (loop) v dosahu MA
+      703    0.3 %    [obrana: screen] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+      698    0.3 %    [obrana: screen] NEDOJDE: chůze selže (exhausted) v dosahu MA
+      599    0.2 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+      394    0.2 %    [útok: 2 pole před nosiče] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+      338    0.1 %    [obrana: intercept lane] NEDOJDE: chůze selže (exhausted) v dosahu MA
+      269    0.1 %    [obrana: intercept lane] NEDOJDE: chůze selže (loop) v dosahu MA
+      225    0.1 %    [obrana: safety (vlastní endzóna, y=7)] cíl = vlastní pole (stůj)
+      223    0.1 %    [obrana: intercept lane] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+      184    0.1 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+      170    0.1 %    [obrana: endzone guard] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+      160    0.1 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+       99    0.0 %    [obrana: safety (vlastní endzóna, y=7)] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+       71    0.0 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+       63    0.0 %    [obrana: endzone guard] NEDOJDE: chůze selže (exhausted) v dosahu MA
+       62    0.0 %    [obrana: endzone guard] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+       55    0.0 %    [obrana: endzone guard] NEDOJDE: chůze selže (loop) v dosahu MA
+       53    0.0 %    [útok: receiver u endzóny] dojde
+       52    0.0 %    [obrana: screen] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+       47    0.0 %    [útok: 2 pole před nosiče] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+       37    0.0 %    [obrana: safety (vlastní endzóna, y=7)] _cíl obsazený v dosahu MA: skončí VEDLE cíle
+       25    0.0 %    [obrana: endzone guard] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=2)
+       25    0.0 %    [obrana: endzone guard] cíl = vlastní pole (stůj)
+       19    0.0 %    [obrana: intercept lane] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+       15    0.0 %    [obrana: intercept lane] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+       14    0.0 %    [obrana: screen] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+       12    0.0 %    [útok: receiver u endzóny] cíl je OBSAZENÉ pole (jen přiblížení, dojít nelze)
+       10    0.0 %    [útok: 2 pole před nosiče] CÍL MIMO HŘIŠTĚ
+        6    0.0 %    [obrana: marker (cíl = pole nosiče)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=6)
+        6    0.0 %    [obrana: safety (vlastní endzóna, y=7)] NEDOJDE: chůze selže (loop) v dosahu MA
+        5    0.0 %    [obrana: safety (vlastní endzóna, y=7)] NEDOJDE: chůze selže (exhausted) v dosahu MA
+        5    0.0 %    [obrana: screen] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+        5    0.0 %    [útok: 2 pole před nosiče] NEDOJDE: chůze selže (no_move) v dosahu MA
+        5    0.0 %    [útok: k nosiči (cíl = nosičovo pole)] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=6)
+        4    0.0 %    [obrana: endzone guard] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=3)
+        4    0.0 %    [obrana: intercept lane] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+        4    0.0 %    [útok: receiver u endzóny] NEDOJDE: chůze selže (exhausted) v dosahu MA
+        3    0.0 %    [útok: receiver u endzóny] NEDOJDE: chůze selže (loop) v dosahu MA
+        1    0.0 %    [obrana: endzone guard] NEDOJDE: chůze selže (no_move) v dosahu MA
+        1    0.0 %    [obrana: endzone guard] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=4)
+        1    0.0 %    [obrana: endzone guard] _cíl obsazený v dosahu MA: skončí DÁL než vedle (d=5)
+        1    0.0 %    [obrana: intercept lane] NEDOJDE: chůze selže (no_move) v dosahu MA
+        1    0.0 %    [obrana: screen] NEDOJDE: chůze selže (no_move) v dosahu MA
+

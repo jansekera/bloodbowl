@@ -12,8 +12,12 @@
 #   musí být zacommitovaná a přeložená PŘED startem; po startu se `.so` nesmí
 #   přestavět, dokud běh neskončí.
 #
-# ⭐ MODE 8 JE NOVÝ (25.08.). Rameno `setBlitzLandingArm` je hotové od 19.08.,
-#   ale harness pro něj neměl mode, takže se P35 šest dní neměřila.
+# ⭐ MODE 10 (27.08.). Rameno `setBlitzContinuationArm` je hotové od 25.08.
+#   ⚠️ PŘEČÍSLOVÁNO z 9 na 10: mode 9 si vzal Leap a UŽ S NÍM BĚŽELA NOC
+#   (26.→27.08.), takže čísla nešlo prohodit. Seed base 163'000'000 zůstal,
+#   Leap má 167'000'000 ⇒ seedy se nekříží.
+#   ⛔ Hlavička tu do 27.08. tvrdila „MODE 8 JE NOVÝ (25.08.)" — zdědilo se to
+#   ze skriptu předchozí noci. Štítek, který se nepřepíše, lže tiše.
 #
 # LIGHT=1 -> krátká zkouška celého řetězu (jiný OUT, malé N, bez korpusu).
 # ============================================================================
