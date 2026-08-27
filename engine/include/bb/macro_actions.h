@@ -163,6 +163,10 @@ bool wrestlePricingArm(TeamSide side);
 // Times the arm actually changed the price -- defender has Wrestle AND the
 // attacker has Block, the only case where the two answers differ.
 long takeWrestlePricingEventsInSearch();
+// ⭐ 27.08.: kolikrát rameno ZMĚNILO VOLBU blitzujícího (ne kolikrát se lišila
+// cena). Bez tohohle se „rameno jednalo" nedá odlišit od „rameno se dívalo" --
+// táž oprava, jakou dostalo P35.
+long takeWrestlePricingRepicksInSearch();
 
 // --- P38 arm (2026-08-19): derive the carrier's destination square from the
 // cage it would produce (user's rule, spec 15.0c).

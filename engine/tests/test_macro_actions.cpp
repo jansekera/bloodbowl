@@ -161,6 +161,50 @@ TEST(MacroActions, WrestlePricingDoesNotFireWithoutWrestle) {
         << "bez Wrestle na obránci se nic měnit nesmí";
 }
 
+TEST(MacroActions, WrestlePricingRepickTicksOnlyOnAChangedChoice) {
+    // ⭐ 27.08.: čítač REPICKŮ. `events` říká „cena se počítala jinak", což je
+    // velké číslo i u ramene, které nikdy nic nepřehodilo. Noc musí umět říct
+    // „rameno JEDNALO", a to je tenhle čítač. Vzor: P35.
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);   // náš blitzující
+    state.getPlayer(1).position = {10, 7};
+    Player& def = state.getPlayer(12);                 // obránce s Wrestle, BEZ Blocku
+    def.position = {11, 7};
+    def.skills.add(SkillName::Wrestle);
+
+    WrestlePricingArmOn arm(TeamSide::HOME);
+    takeWrestlePricingRepicksInSearch();
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+    greedyExpandMacro(state, blitz, dice);
+    EXPECT_EQ(takeWrestlePricingRepicksInSearch(), 0)
+        << "jediný kandidát => volba se změnit NEMŮŽE, i když se cena liší";
+}
+
+TEST(MacroActions, WrestlePricingIgnoresADefenderWhoWouldNotWrestle) {
+    // ⛔ 27.08.: obránce, který má Block I Wrestle, by Wrestle NEPOUŽIL --
+    // Both Down ho nechá stát a složí útočníka. Vybírač proto nesmí počítat
+    // 2/6, jinak oceňuje jinou věc, než se pak stane (táž podmínka jako
+    // block_handler.cpp, case BOTH_DOWN). Dřív tu stálo pouhé „Wrestle má".
+    // Ožilo to 27.08. s Longbeardy, kteří mají obojí.
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);
+    Player& def = state.getPlayer(12);
+    def.position = {11, 7};
+    def.skills.add(SkillName::Wrestle);
+    def.skills.add(SkillName::Block);                  // ⇒ Wrestle by nepoužil
+    // míč drží nosič, ale NE náš blitzující => výjimka `attHasBall` neplatí
+    state.ball = BallState::onGround({20, 1});
+
+    WrestlePricingArmOn arm(TeamSide::HOME);
+    takeWrestlePricingEventsInSearch();
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+    greedyExpandMacro(state, blitz, dice);
+    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
+        << "obránce s Blockem by Wrestle nepoužil => cena se měnit nesmí";
+}
+
 TEST(MacroActions, BlitzAndScoreIsNotOfferedOutOfReach) {
     // T5.35a (27.08.2026): brána nabízela BLITZ_AND_SCORE do `MA + 2 GFI + 3`.
     // Krok 2 toho makra ale nosiče DOVEDE DO ENDZÓNY, takže „skoro dojde"

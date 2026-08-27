@@ -312,6 +312,20 @@ long takeWrestlePricingEventsInSearch() {
     return v;
 }
 
+// ⭐ 27.08.: ČÍTAČ REPICKŮ -- tiká, jen když rameno ZMĚNILO VOLBU, ne když se
+// jen lišila cena. `g_wrestlePricingEvents` odpovídá na otázku „kolikrát se
+// cena počítala jinak", a to číslo vyjde velké i tehdy, když rameno nikdy nic
+// nepřehodilo -- noc by pak hlásila „rameno jednalo" o rameni, které se jen
+// dívalo. Vzor je P35 (`g_blitzLandingRepicks`), které tuhle opravu dostalo
+// z téhož důvodu.
+thread_local long g_wrestlePricingRepicks = 0;
+
+long takeWrestlePricingRepicksInSearch() {
+    long v = g_wrestlePricingRepicks;
+    g_wrestlePricingRepicks = 0;
+    return v;
+}
+
 thread_local bool g_blitzContinuation[2] = {false, false};
 thread_local long g_blitzContinuationEvents = 0;
 
@@ -481,7 +495,8 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).
 static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
-                                       const Player& target, bool fromLanding) {
+                                       const Player& target, bool fromLanding,
+                                      bool wrestleForcedOff = false) {
     // Risk estimate and feature extraction keep the raw strengths: they describe
     // the block as thrown, not whether to offer it.
     Position landing{-1, -1};
@@ -492,7 +507,25 @@ static double estimateBlitzFailChance(const GameState& state, const Player& blit
     // B2: obráncův Wrestle se do ceny promítne jen POD RAMENEM, aby šel rozdíl
     // změřit párovým A/B. Čítač tiká jen tam, kde se cena OPRAVDU liší -- tedy
     // když útočník Block má; bez Blocku vychází 2/6 v obou případech.
-    const bool defWrestle = target.hasSkill(SkillName::Wrestle) &&
+    //
+    // ⛔ 27.08.: PODMÍNKA MUSÍ BÝT TÁŽ JAKO V RESOLVERU. Do dneška tu stálo
+    //   pouhé `target.hasSkill(Wrestle)` -- tedy „Wrestle MÁ", ne „Wrestle by
+    //   POUŽIL". Dokud Block+Wrestle neměl nikdo, byl v tom rozdíl nulový;
+    //   27.08. dostaly všechny týmy dva linemany s Wrestle a u trpaslíka jsou
+    //   to Longbeardi, kteří Block MAJÍ, takže ta větev ožila.
+    //   Resolver (`block_handler.cpp`, case BOTH_DOWN) rozhoduje takto:
+    //     defWantsWrestle = Wrestle && (!Block || attHasBall)
+    //   -- obránce s Blockem by Both Down přestál VESTOJE a útočníka složil,
+    //   což je lepší než jít k zemi s ním; sáhne po Wrestle jen tehdy, když
+    //   útočník drží míč (jeho položení je turnover).
+    //   ⇒ Kdyby vybírač počítal 2/6 i tam, kde by obránce Wrestle NEPOUŽIL,
+    //     oceňuje JINOU VĚC, NEŽ SE PAK STANE -- táž vada, před kterou varuje
+    //     `autoChooseBlockDie` o dvě stě řádků výš.
+    const bool attHasBall = state.ball.isHeld &&
+                            state.ball.carrierId == blitzer.id;
+    const bool defWouldWrestle = target.hasSkill(SkillName::Wrestle) &&
+                                 (!target.hasSkill(SkillName::Block) || attHasBall);
+    const bool defWrestle = defWouldWrestle && !wrestleForcedOff &&
                             wrestlePricingArm(blitzer.teamSide);
     if (defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestlePricingEvents;
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
@@ -1760,6 +1793,11 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     const bool landing = blitzLandingArm(state.activeTeam);
     int plainBest = -1;
     double plainFail = 2.0;
+    // B2 (27.08.): týž kontrafaktuál pro Wrestle -- koho bychom vybrali, kdyby
+    // se obráncův Wrestle do ceny nepromítal.
+    const bool wrestleOn = wrestlePricingArm(state.activeTeam);
+    int noWrestleBest = -1;
+    double noWrestleFail = 2.0;
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
@@ -1778,11 +1816,18 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
             double pf = estimateBlitzFailChance(state, blitzer, target, false);
             if (pf < plainFail) { plainFail = pf; plainBest = a.playerId; }
         }
+        if (wrestleOn) {
+            double wf = estimateBlitzFailChance(state, blitzer, target, landing, true);
+            if (wf < noWrestleFail) { noWrestleFail = wf; noWrestleBest = a.playerId; }
+        }
     }
 
     if (!found) return result;
     if (landing && plainBest >= 0 && plainBest != bestBlitzAction.playerId) {
         ++g_blitzLandingRepicks;
+    }
+    if (wrestleOn && noWrestleBest >= 0 && noWrestleBest != bestBlitzAction.playerId) {
+        ++g_wrestlePricingRepicks;
     }
 
     executeAndRecord(state, bestBlitzAction, dice, result);
@@ -1813,6 +1858,10 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
     const bool landing = blitzLandingArm(state.activeTeam);
     int plainBest = -1;
     double plainScore = -2.0;
+    // B2 (27.08.): kontrafaktuál pro Wrestle, týž tvar jako u P35 o kus výš.
+    const bool wrestleOn = wrestlePricingArm(state.activeTeam);
+    int noWrestleBest = -1;
+    double noWrestleScore = -2.0;
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ) continue;
@@ -1831,11 +1880,19 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
                         + (isCarrier ? 0.0 : 0.001);
             if (ps > plainScore) { plainScore = ps; plainBest = a.playerId; }
         }
+        if (wrestleOn) {
+            double ws = -estimateBlitzFailChance(state, blitzer, blocker, landing, true)
+                        + (isCarrier ? 0.0 : 0.001);
+            if (ws > noWrestleScore) { noWrestleScore = ws; noWrestleBest = a.playerId; }
+        }
     }
 
     if (!foundBlitz) return result; // can't blitz, abort
     if (landing && plainBest >= 0 && plainBest != bestBlitz.playerId) {
         ++g_blitzLandingRepicks;
+    }
+    if (wrestleOn && noWrestleBest >= 0 && noWrestleBest != bestBlitz.playerId) {
+        ++g_wrestlePricingRepicks;
     }
 
     // Execute the blitz
