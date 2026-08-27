@@ -96,6 +96,46 @@ TEST(MacroActions, AlwaysHasEndTurn) {
     EXPECT_TRUE(hasMacroType(macros, MacroType::END_TURN));
 }
 
+TEST(MacroActions, BlitzAndScoreIsNotOfferedOutOfReach) {
+    // T5.35a (27.08.2026): brána nabízela BLITZ_AND_SCORE do `MA + 2 GFI + 3`.
+    // Krok 2 toho makra ale nosiče DOVEDE DO ENDZÓNY, takže „skoro dojde"
+    // nedává TD. Na korpusu 25.08. bylo VŠECH 944 kol, kde je tohle jediná
+    // skórující cesta, mimo dosah (průměr 10,0 pole) a TD tam padlo 0,6 %,
+    // ať nosič udělal cokoli. Test hlídá, aby se to `+3` nevrátilo.
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.movementRemaining = 6;                 // MA 6 + 2 GFI = dosah 8
+
+    Player& def = state.getPlayer(12);             // blokující mezi nosičem a EZ
+    def.state = PlayerState::STANDING;
+
+    // (1) NA HRANICI DOSAHU: x=17 => dist 8 == 6 + 2  ⇒ nabídnout SE MÁ
+    carrier.position = {17, 7};
+    state.ball = BallState::carried({17, 7}, 1);
+    def.position = {19, 7};
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::BLITZ_AND_SCORE))
+        << "na hranici dosahu se nabídnout MUSÍ -- zúžení nesmí ubrat legální tah";
+
+    // (2) O JEDNO POLE DÁL: x=16 => dist 9 > 8  ⇒ nabídnout SE NESMÍ
+    carrier.position = {16, 7};
+    state.ball = BallState::carried({16, 7}, 1);
+    def.position = {18, 7};
+    macros.clear();
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::BLITZ_AND_SCORE))
+        << "mimo dosah je to nabídka tahu, který v tom kole NELZE dokončit";
+
+    // (3) SPRINT dává třetí GFI, takže tomutéž hráči se ze stejného pole
+    //     nabídnout MÁ -- zúžení se počítá stejně jako rules_engine.cpp:36.
+    carrier.skills.add(SkillName::Sprint);
+    macros.clear();
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::BLITZ_AND_SCORE))
+        << "se Sprintem je dosah 6+3=9 a tah dokončitelný je";
+}
+
 TEST(MacroActions, EmptyInNonPlayPhase) {
     GameState state = makeMinimalState();
     state.phase = GamePhase::GAME_OVER;

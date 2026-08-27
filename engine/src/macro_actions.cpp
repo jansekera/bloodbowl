@@ -813,14 +813,35 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 
     // BLITZ_AND_SCORE: carrier can almost reach endzone, but opponent blocks path
     // Blitz the blocker out of the way, then move carrier to score
+    //
+    // ⛔ T5.35a (27.08.2026): DOSAH SE UŽ NEPŘIPOČÍTÁVÁ „S REZERVOU".
+    //   Podmínka zněla `dist <= maxReach + 3`. To `+3` je fudge ke slovu
+    //   „almost" v komentáři výše -- jenže krok 2 tohohle makra nosiče
+    //   DOVEDE DO ENDZÓNY, a „skoro" TD nedává. Změřeno na korpusu 25.08.
+    //   (3 000 her, M10): z 1 281 nabídek jich 944 padlo do kol, kde je
+    //   BLITZ_AND_SCORE jediná skórující cesta -- a ve VŠECH 944 byl nosič
+    //   dál než `MA + 2 GFI`, průměrně 10,0 pole. TD tam padlo 0,6 % a bylo
+    //   JEDNO, co nosič udělal (blitz 0/21, blok bez kroku 0/376, jen krok
+    //   4/328, nic 2/219; turnover shodně 32-38 %).
+    //   ⇒ Nabízel se tah, který v tom kole nelze dokončit -- a P27 na tom
+    //     vzorku deset dní měřilo „vadu ve volbě". Vada je v ADMISI.
+    //   ⇒ Šlo tedy jen o to, přestat měřit vlastní šum: to, co zbude, je
+    //     teprve vzorek, kde jde něco rozeznat.
+    // ⚠️ GFI se bere STEJNĚ jako v rules_engine.cpp:36 a pathfinder.cpp:39
+    //   (Sprint dává tři), aby zúžení neodmítlo nabídku, kterou hráč
+    //   SKUTEČNĚ dokáže doběhnout. Blok při blitzu stojí pole pohybu, ale
+    //   platí ho zpravidla SPOLUHRÁČ: výběr blitzujícího se od nosiče
+    //   schválně odklání (expandBlitzAndScore, tie-break `isCarrier`).
     if (iHaveBall && carrier->canAct() && !myTeam.blitzUsedThisTurn) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2;
+        int gfi = carrier->rooted ? 0
+                : (carrier->hasSkill(SkillName::Sprint) ? 3 : 2);
+        int maxReach = carrier->movementRemaining + gfi;
         int ezX = endzoneX(mySide);
         int dx = forwardDx(mySide);
 
         // Carrier can't directly score (SCORE not available) or would need to go through enemies
-        if (dist > 0 && dist <= maxReach + 3) {
+        if (dist > 0 && dist <= maxReach) {
             // Find opponent on the path between carrier and endzone
             int bestBlocker = -1;
             int bestBlockerDist = 999;

@@ -243,9 +243,15 @@ def analyze_turn_offers(mine, theirs, race, opp_race, ez, turn_no, weather, ball
         off["BLITZ"] += min(2 if (on_def and n_cand > 1) else 1, n_cand)
 
     # --- BLITZ_AND_SCORE ---
+    # ⚠️ 27.08. (T5.35a): brána se zúžila z `MA + 2 GFI + 3` na `MA + GFI`.
+    #   To `+3` nabízelo tah, který v tom kole nejde dokončit -- krok 2 makra
+    #   nosiče DOVEDE DO ENDZÓNY, takže „skoro dojde" nedává TD. Rekonstrukce
+    #   se posouvá s enginem, jinak by se čísla z korpusu rozešla s tím, co
+    #   engine skutečně nabízí (macro_actions.cpp:814).
     if i_have_ball and carrier_can_act:
         d = dist_ez(carrier)
-        if 0 < d <= carrier["ma"] + 2 + 3:
+        gfi = 3 if "Sprint" in skills(race, carrier) else 2
+        if 0 < d <= carrier["ma"] + gfi:
             best = None
             best_dist = 999
             for e in stand_theirs:
