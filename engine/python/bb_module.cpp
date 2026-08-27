@@ -289,6 +289,9 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["cage_ahead_occupied"] = turn.cageAheadOccupied;
                 t["cage_ahead_ours"] = turn.cageAheadOurs;
                 t["carrier_tz"] = turn.carrierTz;
+                t["activated"] = turn.activatedCount;
+                t["eligible_at_start"] = turn.eligibleAtStart;
+                t["moved"] = turn.movedCount;
                 t["dist_to_endzone_board"] = turn.distToEndzone;
                 switch (turn.weather) {
                     case bb::Weather::SWELTERING_HEAT: t["weather"] = "sweltering_heat"; break;

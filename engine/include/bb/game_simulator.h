@@ -151,6 +151,33 @@ struct TurnLog {
     int8_t cageAheadOurs = -1;
     int8_t carrierTz = -1;
 
+    // ⭐⭐⭐ KOLIK ZE SVÉHO KOLA JSME VŮBEC VYUŽILI (uživatel 27.08.).
+    //
+    // ⛔ PROČ TAKHLE A NE ČÍTAČEM MECHANISMU. Nabízelo se počítat jednu
+    //   konkrétní cestu -- prázdná expanze makra se v macro_mcts.cpp:1180
+    //   promění v END_TURN a zahodí zbytek kola CELÉHO týmu. Jenže takový
+    //   čítač vidí JEN TU JEDNU cestu: kdyby kolo utínalo i něco jiného,
+    //   vyšlo by malé číslo a četlo by se jako „problém to není". To je
+    //   táž past jako nula, která znamená „nikdo to nepočítá".
+    // ⇒ Uživatel to obrátil správně: měřit VÝSLEDEK, ne mechanismus --
+    //   „kolik hráčů se aktivovalo, než kolo skončilo, a je jedno, jestli
+    //   nám došly nápady nebo přišel END_TURN".
+    //
+    // ⭐ Je to zároveň chybějící JMENOVATEL k půlce nálezů z 27.08.: M11
+    //   (volný nosič stojí), P39 (nosič nejednal vůbec) a „drive se zavřel
+    //   nečinností" jsou tatáž otázka. V kole 6 hry g0010 udělal celý tým
+    //   JEDEN blok -- odsud by to bylo vidět jako 1 z 11, ne až ručním
+    //   dohledáváním.
+    //
+    // ⚠️ ČÍST S ROZVAHOU: aktivace není užitek (krok se počítá jako blitz),
+    //   proto vedle stojí `movedCount`. A nízké číslo NEMUSÍ být vada --
+    //   turnover kolo legitimně utne (viz `turnover` níže) a někdy je
+    //   správné nechat tělo stát (fronta, položka C1). Diagnostika, ne verdikt.
+    // -1 = nevyplněno.
+    int8_t activatedCount = -1;   // našich hráčů, kteří v kole jednali
+    int8_t eligibleAtStart = -1;  // našich, kteří NA ZAČÁTKU kola jednat mohli
+    int8_t movedCount = -1;       // z aktivovaných ti, kdo opravdu změnili pole
+
     // Summary flags
     bool turnover = false;
     bool touchdown = false;
