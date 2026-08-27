@@ -1,0 +1,61 @@
+# Předpovědi noci 27.→28.08. — M1/N10 (BLITZ JE POHYB S BLOKEM UVNITŘ).
+# Mode 10, dw-we, CORPUS=1. PŘIPRAVENO 25.08. — píše se PŘED během, ne před čtením.
+# ⚠️ 27.08.: PŘEČÍSLOVÁNO 9 → 10. Mode 9 si vzala noc LEAP (26.08.) a UŽ S NÍM
+#   BĚŽELA; dvě větve si sáhly na totéž číslo a git to hlásil jen jako textový
+#   konflikt. Seed base 163'000'000 zůstává (Leap má 167'000'000), takže seedy
+#   se nekříží a nic z předregistrace se tím nemění.
+#
+# ⭐ CO SE MĚŘÍ — jedno pravidlo ve třech půlkách, pod JEDNÍM ramenem:
+#   (1) blitz nechává aktivaci otevřenou      BB2016 ř. 347-350
+#   (2) blitzující dostane NABÍDKU ústupu     (bez ní je (1) povolení bez cíle)
+#   (3) follow-up je VOLBA                    BB2016 ř. 608-611
+# Rozdělit je do tří ramen by měřilo jejich směs, ne pravidlo.
+#
+# ⏰ HISTORIE: uživatel to hlásil 22.07.2026 a leželo to 33 dní, protože brzda
+# „napřed změř strop" neměla číslo úkolu. M9 (24.08., 18 000 her) strop změřil:
+# 4,09 blitzu na hru končí tělem uvízlým v kontaktu, ač má MA i kam jít;
+# AV7 kusy 27,2 % proti AV9 18,2 %.
+#
+# ⛔ ČEKEJ, ŽE TO POMŮŽE VÍC SOUPEŘI NEŽ NÁM — a to je SPRÁVNĚ.
+# Hit-and-run je nástroj rychlých křehkých kusů: wood-elfí Wardancer, human
+# Catcher, skavení Gutter Runner. Trpaslík chce v kontaktu ZŮSTAT. M9 to i změřil
+# (AV7 1,5× častěji než AV9). ⇒ ⚠️ Kdyby se to četlo jako „naše AI se zhoršila",
+# je to špatné čtení: opravujeme PRAVIDLO, ne výsledek. Táž situace jako F6/F7/F8.
+#
+# ⚠️ Pásmo delty je ŠIROKÉ a připouští zápor. Rameno nemění, KOLIK blitzů padne;
+# mění, co se s blitzujícím stane potom.
+
+delta      in   -0.030 0.150   # dvoustranná (chessCandHome + chessCandAway − 1)
+delta_1s   in   -0.015 0.075   # totéž jednostranně
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.95          # sonda 25.08.: 4/4 páry
+n_nonzero  in    0.35  0.85    # neznámo, schválně široké
+arm_picks  >=    11500000      # APARÁTOVÁ podlaha. Sonda 25.08. (4 páry, 8 her):
+                               # 14 969 událostí = 1 871,12/hru ⇒ na 4 800 párů
+                               # (9 600 her) ~17,9 M. Podlaha ≈ 1 198/hru = 64 %
+                               # sondy ⇒ chytne rameno běžící na dvě třetiny.
+                               # ⚠️ JEDNOTKA JE „ZA VYHODNOCENÍ V HLEDÁNÍ", ne za
+                               # odehraný blitz -- getAvailableMacros běží v MCTS
+                               # tisíckrát za tah. NEČÍST jako počet blitzů.
+
+# --- RUČNĚ, harness to neumí ------------------------------------------------
+# ⭐ (1) ROZPAD PO RASÁCH NA TD, NE NA CHESS PO STRANÁCH.
+#   ⛔ Chyba z 25.08.: chess po stranách je konfundovaný nerovností matchupu
+#   (nulová noha: dwarf startuje na 0,33, ne 0,50). POSTUP: TD/hru TÉŽE RASY
+#   s ramenem a bez něj, párováno po seed_idx.
+#   PŘEDPOVĚĎ: wood-elf získá VÍC než trpaslík. Je to předpověď o MECHANISMU
+#   (hit-and-run patří rychlým křehkým kusům), ne o rase.
+#
+# ⭐ (2) SPOTŘEBOVAL SE STROP Z M9? Přepočítat `diag_blitz_retreat_ceiling` na
+#   novém korpusu: kolik blitzů pořád končí v kontaktu, ač má MA i kam.
+#   Z 4,09/hru má klesnout. ⚠️ NE na nulu — ústup stojí dodge a někdy se
+#   nevyplatí; k nule by to spadlo jen kdyby plánovač ustupoval slepě.
+#
+# ⭐ (3) ODMÍTNUTÝ FOLLOW-UP: kolikrát? Pole `cand_cont` sčítá všechny tři půlky
+#   dohromady, takže samotné odmítnutí se z A/B NEVYČTE. Spočítat z korpusu
+#   (pozice blitzujícího po bloku vs uvolněné pole).
+#   ⚠️ Kdyby vyšlo ~0, znamená to, že (3) je mrtvá a delta stojí na (1)+(2).
+#
+# ⭐ (4) KONTROLA INVARIANTŮ na novém korpusu (CORPUS=1). Pozor: tahle změna
+#   pohybuje těly PO bloku, tedy přesně tam, kde se 24.08. našly „dva hráči na
+#   jednom poli". Sledovat `dva_hraci_na_poli`.

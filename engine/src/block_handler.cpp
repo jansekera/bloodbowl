@@ -3,6 +3,7 @@
 #include "bb/helpers.h"
 #include "bb/injury.h"
 #include "bb/ball_handler.h"
+#include "bb/macro_actions.h"   // M1/N10 arm: blitzContinuationArm()
 #include <algorithm>
 
 namespace bb {
@@ -398,6 +399,60 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     return pushOne(state, attacker.position, defender, sideStep, grab,
                    /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
                    events, 0);
+}
+
+// M1/N10: jediná definice toho, kdy blok aktivaci ZAVÍRÁ. Volá se ze VŠECH
+// míst, kde blok normálně končí -- 25.08. jsem nejdřív opravil jen to poslední
+// a větev s pushnutím (ř. ~875) se vrací dřív, takže test padal a vypadalo to,
+// jako by rameno nefungovalo. Dvě kopie téhož pravidla = jedna z nich zestárne.
+static void endBlockActivation(Player& att, const BlockParams& params) {
+    const bool staysOpen = blitzContinuationArm(att.teamSide) &&
+                           params.isBlitz && canAct(att.state);
+    if (staysOpen) noteBlitzContinuationEvent();
+    att.hasActed = !staysOpen;
+}
+
+// M1c/T5.29 (25.08.2026): FOLLOW-UP JE VOLBA, NE DŮSLEDEK.
+// BB2016 l. 608-611: "A player who has made a block IS ALLOWED to make a
+// special follow up move... The player's COACH MUST DECIDE whether to follow
+// up." Do 25.08. se následovalo vždy: `noFollowUp` defaultoval na false a žádné
+// volací místo ho nepředalo.
+//
+// ⭐ Tvar řešení je převzatý z Wrestle (24.08., d0093607): rozhodovací pravidlo
+// v resolveru, sepsané i s důvody. Plánovač by to unesl líp, ale tady je volba
+// BINÁRNÍ a LOKÁLNÍ -- follow-up je zdarma, ignoruje tackle zóny a týká se
+// jediného pole -- takže nepotřebuje vlastní vrstvu.
+//
+// ⭐ Default je NÁSLEDOVAT, a to schválně: follow-up je pohyb ZDARMA, který
+// nemusí dodgovat ("This move is free, and the player can ignore enemy tackle
+// zones"). Je to tedy obvykle výhoda, ne past -- odmítá se jen tam, kde má
+// blitzující ještě otevřenou aktivaci a uvolněné pole by ho dalo do VÍC
+// soupeřových zón než to, kde stojí. To je přesně hit-and-run (M1/N10).
+static bool wantsFollowUp(const GameState& state, const Player& att,
+                          const BlockParams& params, Position vacated) {
+    // Povinné případy -- pravidla volbu neposkytují:
+    //   Frenzy l. 8138: "must always follow up if they can"
+    //   Ball & Chain l. 7825: "must follow up if they push back another player"
+    // ⚠️ Za VYPNUTÝM ramenem se chová přesně jako do 25.08.: následuje vždy.
+    // Bez toho by se nulový test nedal udělat -- větev bez ramene musí hrát
+    // starou hru beze zbytku.
+    if (!blitzContinuationArm(att.teamSide)) return true;
+    if (att.hasSkill(SkillName::Frenzy) ||
+        att.hasSkill(SkillName::BallAndChain)) {
+        return true;
+    }
+    // Mimo blitz je blok celá aktivace: není co si šetřit, pole zdarma se bere.
+    if (!params.isBlitz) return true;
+    // Blitzující, který už nemá čím pokračovat, taky nemá co získat.
+    if (!canAct(att.state) || att.movementRemaining <= 0) return true;
+
+    const int tzStay = countTacklezones(state, att.position, att.teamSide);
+    const int tzGo   = countTacklezones(state, vacated, att.teamSide);
+    if (tzGo > tzStay) {
+        noteBlitzContinuationEvent();
+        return false;
+    }
+    return true;
 }
 
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
@@ -814,8 +869,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
             // StripBall: ball drops at crowd edge (already handled by crowd surf)
 
-            // Follow-up: attacker to old defender position
-            if (!noFollowUp) {
+            // Follow-up: attacker to old defender position -- but only if he
+            // wants it (l. 608-611). See wantsFollowUp above.
+            if (!noFollowUp && wantsFollowUp(state, att, params, defOldPos)) {
                 att.position = defOldPos;
                 if (state.ball.isHeld && state.ball.carrierId == att.id) {
                     state.ball.position = att.position;
@@ -827,7 +883,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                     }
                 }
             }
-            att.hasActed = true;
+            endBlockActivation(att, params);
 
             // Handle BD attacker knockdown
             if (attKnockedDown) {
@@ -874,7 +930,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // a chain that jams against one) leaves the defender where he stood, and
         // we used to walk the attacker onto him -- two players on one square.
         bool defVacated = def.position != defOldPos;
-        if (!noFollowUp && !fendPrevents && defVacated) {
+        if (!noFollowUp && !fendPrevents && defVacated &&
+            wantsFollowUp(state, att, params, defOldPos)) {
             att.position = defOldPos;
             if (state.ball.isHeld && state.ball.carrierId == att.id) {
                 state.ball.position = att.position;
@@ -913,7 +970,19 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         handleBallOnPlayerDown(state, att.id, dice, events);
     }
 
-    att.hasActed = true;
+    // M1/N10 (25.08.2026): BB2016 l. 347-350 -- "He may make one block during
+    // the move. The block may be made AT ANY POINT during the move." A Block
+    // Action IS the activation and ends here; a Blitz is a move with a block
+    // inside it, so it stays open while the blitzer is still on his feet.
+    // Every other `hasActed = true` above is a path where the attacker went
+    // down or the action was wasted (Foul Appearance, chainsaw kickback, stab,
+    // failed GFI) -- those close the activation in a Blitz too, which is why
+    // this is the only site that changes.
+    // ⚠️ The offer side is a SEPARATE half: macro_actions.cpp:584 does not emit
+    // REPOSITION for a player adjacent to a standing opponent, i.e. exactly the
+    // player who just blocked. Reopening the activation without that gives him
+    // permission to move and nowhere to go.
+    endBlockActivation(att, params);
 
     // Frenzy: if both standing and adjacent after block, mandatory 2nd block.
     // ⛔ JEN PO PUSHED / DEFENDER STUMBLES (oprava 21.08.). BB2016 l. 8139-8141:
