@@ -1,4 +1,5 @@
 #include "bb/game_simulator.h"
+#include <set>
 #include "bb/cage_advance.h"
 #include "bb/action_resolver.h"
 #include "bb/ball_handler.h"
@@ -758,6 +759,19 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     turn.ballCarrierId = board.ballCarrierId;
     turn.weather = state.weather;
 
+    // ⭐ 27.08.: jmenovatel k počtu aktivací -- kdo NA ZAČÁTKU kola jednat mohl.
+    // Bez něj je „aktivovali jsme tři" nečitelné: tři z jedenácti je jiná věc
+    // než tři ze čtyř, co zbyli na hřišti.
+    {
+        int elig = 0;
+        state.forEachOnPitch(state.activeTeam, [&](const Player& p) {
+            if (p.canAct()) ++elig;
+        });
+        turn.eligibleAtStart = static_cast<int8_t>(std::min(elig, 127));
+        turn.activatedCount = 0;
+        turn.movedCount = 0;
+    }
+
     // K9b (08-18): odpor v koridoru se počítá KAŽDÉ kolo, nezávisle na tom,
     // jestli běžel plánovač klece. Jen pro naše kolo a jen když držíme míč --
     // jinak predikát nedává smysl a zapisuje se -1 (N/A), ne nula.
@@ -921,6 +935,30 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
                 curLog.events.push_back(ev);
                 if (ev.type == GameEvent::Type::TURNOVER) curLog.turnover = true;
                 if (ev.type == GameEvent::Type::TOUCHDOWN) curLog.touchdown = true;
+            }
+            // ⭐ 27.08.: kolik našich už v tomhle kole jednalo. Počítá se ZE
+            // STAVU, ne z událostí -- aktivace, která neudělala nic viditelného
+            // (hráč se postavil a zůstal), je pořád utracená aktivace, a právě
+            // ta nás zajímá. Přepočet po každé akci; na konci kola v tom čísle
+            // zůstane finální stav, ať kolo skončilo jakkoli.
+            if (curLog.eligibleAtStart >= 0) {
+                int acted = 0;
+                state.forEachOnPitch(curLog.activeTeam, [&](const Player& p) {
+                    if (p.hasActed) ++acted;
+                });
+                curLog.activatedCount = static_cast<int8_t>(std::min(acted, 127));
+                // ...a z nich ti, kdo opravdu změnili pole. Aktivace není užitek.
+                std::set<int> movers;
+                for (auto& ev : curLog.events) {
+                    if (ev.type != GameEvent::Type::PLAYER_MOVE &&
+                        ev.type != GameEvent::Type::DODGE &&
+                        ev.type != GameEvent::Type::GFI &&
+                        ev.type != GameEvent::Type::LEAP) continue;
+                    if (ev.playerId <= 0) continue;
+                    if (state.getPlayer(ev.playerId).teamSide != curLog.activeTeam) continue;
+                    movers.insert(ev.playerId);
+                }
+                curLog.movedCount = static_cast<int8_t>(std::min<size_t>(movers.size(), 127));
             }
         }
 

@@ -510,8 +510,18 @@ const TeamRoster& getOrcRoster1200() {
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
             {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block}), 4, "Black Orc +Guard+Block"},  // Black Orc holder
             {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            // 2026-08-27 (uživatel): DVA linemani s `Wrestle` KAŽDÉMU týmu, symetricky.
+            // Do dneška ho měl JEN skaven (2/11), takže rameno B2 (cena bloku proti
+            // Wrestle) šlo měřit jen na matchupu dw-sk -- jinde by delta vyšla NULA
+            // Z DEFINICE. ⭐ Vazbu na starší korpusy to rozbíjí, ale ta je dnes
+            // rozbitá tak jako tak (T5.34, T5.35a, merge M1/N10) ⇒ nejlevnější
+            // možný okamžik: základna se láme JEDNOU, ne dvakrát.
+            // ⛔ POŘADÍ JE VÝZNAMOVÉ: sestava se plní shora do 11, takže tenhle
+            // řádek musí být POSLEDNÍ -- jinak vytlačí specialistu, ne výplňového
+            // linemana. Prvně vložený uprostřed vyhodil lidem OGRA a test to chytil.
+            {{5, 3, 3, 9}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
         },
-        6, 60, true
+        7, 60, true
     };
     return roster;
 }
@@ -529,8 +539,18 @@ const TeamRoster& getHumanRoster1200() {
             {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
             {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow,
                 SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1, "Ogre +Block"},  // Ogre +Block
+            // 2026-08-27 (uživatel): DVA linemani s `Wrestle` KAŽDÉMU týmu, symetricky.
+            // Do dneška ho měl JEN skaven (2/11), takže rameno B2 (cena bloku proti
+            // Wrestle) šlo měřit jen na matchupu dw-sk -- jinde by delta vyšla NULA
+            // Z DEFINICE. ⭐ Vazbu na starší korpusy to rozbíjí, ale ta je dnes
+            // rozbitá tak jako tak (T5.34, T5.35a, merge M1/N10) ⇒ nejlevnější
+            // možný okamžik: základna se láme JEDNOU, ne dvakrát.
+            // ⛔ POŘADÍ JE VÝZNAMOVÉ: sestava se plní shora do 11, takže tenhle
+            // řádek musí být POSLEDNÍ -- jinak vytlačí specialistu, ne výplňového
+            // linemana. Prvně vložený uprostřed vyhodil lidem OGRA a test to chytil.
+            {{6, 3, 3, 8}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
         },
-        7, 50, true
+        8, 50, true
     };
     return roster;
 }
@@ -551,8 +571,20 @@ const TeamRoster& getDwarfRoster1200() {
             {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
                 SkillName::Dauntless, SkillName::Guard, SkillName::Tackle}), 2, "Troll Slayer +Guard+Tackle"},  // cage corner
             {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},  // Runner +Block
+            // 2026-08-27 (uživatel): DVA linemani s `Wrestle` KAŽDÉMU týmu, symetricky.
+            // Do dneška ho měl JEN skaven (2/11), takže rameno B2 (cena bloku proti
+            // Wrestle) šlo měřit jen na matchupu dw-sk -- jinde by delta vyšla NULA
+            // Z DEFINICE. ⭐ Vazbu na starší korpusy to rozbíjí, ale ta je dnes
+            // rozbitá tak jako tak (T5.34, T5.35a, merge M1/N10) ⇒ nejlevnější
+            // možný okamžik: základna se láme JEDNOU, ne dvakrát.
+            // ⭐ Longbeard MÁ Block, takže tady vzniká nositel Block+Wrestle -- ZÁMĚRNĚ.
+            // Rozhodovací pravidlo pro tu kombinaci engine dostal už 24.08.
+            // (block_handler.cpp, case BOTH_DOWN) a komentář u něj říká, že se
+            // dělalo PRÁVĚ kvůli úvaze dát Wrestle Longbeardovi. Volba, ne mechanika.
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull,
+                SkillName::Wrestle}), 2, "Longbeard +Wrestle"},  // Longbeard +Wrestle
         },
-        5, 40, true
+        6, 40, true
     };
     return roster;
 }
@@ -589,8 +621,15 @@ const TeamRoster& getWoodElfRoster1200() {
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
                 SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},  // Treeman +Guard
+            // 2026-08-27 (uživatel): DVA linemani s `Wrestle` KAŽDÉMU týmu, symetricky.
+            // Do dneška ho měl JEN skaven (2/11), takže rameno B2 (cena bloku proti
+            // Wrestle) šlo měřit jen na matchupu dw-sk -- jinde by delta vyšla NULA
+            // Z DEFINICE. ⭐ Vazbu na starší korpusy to rozbíjí, ale ta je dnes
+            // rozbitá tak jako tak (T5.34, T5.35a, merge M1/N10) ⇒ nejlevnější
+            // možný okamžik: základna se láme JEDNOU, ne dvakrát.
+            {{7, 3, 4, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
         },
-        6, 50, true
+        7, 50, true
     };
     return roster;
 }
