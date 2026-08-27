@@ -33,7 +33,7 @@ if [ "$LIGHT" = "1" ]; then
     LOG=$ROOT/lighttest_20260827.log
 else
     OUT_DIR=blitzcont_replic_20260827
-    # 4 800 párů = 40 chunků × 120. Kalibrace: mode 9 dal v light testu
+    # 4 800 párů = 40 chunků × 120. Kalibrace: mode 10 dal v light testu
     # 46,8 s/pár na JEDNOM procesu (8 párů / 6 m 14 s, prázdný stroj); při 8
     # naráz čekej 6-9 s/pár wall, tedy 8-12 h. Loňská noc (mode 6) jela 9,13 s/pár.
     # 4 800 párů / 40 kusů = 120 na kus, 40 >= WORKERS 8 ⇒ hlídač dělitelnosti projde.
@@ -64,8 +64,8 @@ g++ -O2 -std=c++20 -Iengine/include -Iengine/third_party \
     || { say "⛔ BUILD HARNESS FAIL"; exit 1; }
 say "    harness OK ($(date -r diag_f1_cage_advance '+%H:%M'))"
 
-say "(4) A/B: mode 9, ${SHARDS} × ${PAIRS} párů, dw-we, práh ±0,015, CORPUS=$CORPUS_ON"
-MODE=9 PAIRS="$PAIRS" SHARDS="$SHARDS" THRESHOLD=0.015 \
+say "(4) A/B: mode 10, ${SHARDS} × ${PAIRS} párů, dw-we, práh ±0,015, CORPUS=$CORPUS_ON"
+MODE=10 PAIRS="$PAIRS" SHARDS="$SHARDS" THRESHOLD=0.015 \
 CHUNKS="$CHUNKS" WORKERS="$NWORKERS" CONTROL_MODE2=1 CONTROL_PAIRS="$CONTROL_PAIRS" \
 CORPUS="$CORPUS_ON" CORPUS_GAMES="$CORPUS_N" \
 MATCHUPS="1:dw-we:1" \

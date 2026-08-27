@@ -1,5 +1,9 @@
 # Předpovědi noci 27.→28.08. — M1/N10 (BLITZ JE POHYB S BLOKEM UVNITŘ).
-# Mode 9, dw-we, CORPUS=1. PŘIPRAVENO 25.08. — píše se PŘED během, ne před čtením.
+# Mode 10, dw-we, CORPUS=1. PŘIPRAVENO 25.08. — píše se PŘED během, ne před čtením.
+# ⚠️ 27.08.: PŘEČÍSLOVÁNO 9 → 10. Mode 9 si vzala noc LEAP (26.08.) a UŽ S NÍM
+#   BĚŽELA; dvě větve si sáhly na totéž číslo a git to hlásil jen jako textový
+#   konflikt. Seed base 163'000'000 zůstává (Leap má 167'000'000), takže seedy
+#   se nekříží a nic z předregistrace se tím nemění.
 #
 # ⭐ CO SE MĚŘÍ — jedno pravidlo ve třech půlkách, pod JEDNÍM ramenem:
 #   (1) blitz nechává aktivaci otevřenou      BB2016 ř. 347-350
