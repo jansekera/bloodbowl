@@ -1,4 +1,4 @@
-Soubory: 12 | trpasličích her: 12 | přijímacích drivů: 15 | obranných: 14 | BUG drivů (míč mimo hru): 0
+Soubory: 12 | trpasličích her: 12 | přijímacích drivů: 13 | obranných: 15 | BUG drivů (míč mimo hru): 0
 
 === PŘIJÍMACÍ DRIVY TRPASLÍKA: A/B/C/D1/D2 ===
   A  SKÓROVALI          — v drivu je naše TOUCHDOWN událost
@@ -9,42 +9,42 @@ Soubory: 12 | trpasličích her: 12 | přijímacích drivů: 15 | obranných: 14
   jmenovatel = PŘIJÍMACÍ DRIVY (ne zápasy, ne kola); kategorie jsou výlučné
 soupeř           A       B       C      D1      D2  celkem
 dwarf       0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
-human       0 (0%) 1 (33%)  0 (0%) 2 (67%)  0 (0%)       3
-orc         0 (0%)  0 (0%) 1 (33%) 2 (67%)  0 (0%)       3
-skaven      0 (0%)  0 (0%) 2 (50%) 2 (50%)  0 (0%)       4
-wood-elf    0 (0%)  0 (0%)  0 (0%) 2 (67%) 1 (33%)       3
-VŠE         0 (0%)  1 (7%) 4 (27%) 9 (60%)  1 (7%)      15
+human       0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
+orc         0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
+skaven     1 (20%) 1 (20%) 2 (40%) 1 (20%)  0 (0%)       5
+wood-elf    0 (0%)  0 (0%)  0 (0%)2 (100%)  0 (0%)       2
+VŠE         1 (8%)  1 (8%) 5 (38%) 6 (46%)  0 (0%)      13
 
 === TOTÉŽ, JEN PLNÉ DRIVY (>=7 našich kol; odpovídá půlím bez předchozího TD) ===
 dwarf       0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
-human       0 (0%)  0 (0%)  0 (0%)2 (100%)  0 (0%)       2
+human       0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
 orc         0 (0%)  0 (0%) 1 (50%) 1 (50%)  0 (0%)       2
-skaven      0 (0%)  0 (0%) 2 (50%) 2 (50%)  0 (0%)       4
-wood-elf    0 (0%)  0 (0%)  0 (0%) 1 (50%) 1 (50%)       2
-VŠE         0 (0%)  0 (0%) 4 (33%) 7 (58%)  1 (8%)      12
+skaven     1 (33%)  0 (0%) 1 (33%) 1 (33%)  0 (0%)       3
+wood-elf    0 (0%)  0 (0%)  0 (0%)2 (100%)  0 (0%)       2
+VŠE         1 (9%)  0 (0%) 4 (36%) 6 (55%)  0 (0%)      11
 
-D1 s dosaženým tempem < 2.61 (překryv 'pozdě I pomalu'): 6 z 9
-D2 dosažené tempo: 1.29 | D1 dosažené tempo: 1.49
-D1 'krátký drive už od výkopu' (n_kol×2.61 < vzdál. na výkopu): 8 z 9
-D1 fumble pickupy před 1. držením: 0.11 | zpoždění 1. držení vs start drivu (kola): 0.11
-D1 s prvním držením až v posledním tahu půle: 2 z 9
+D1 s dosaženým tempem < 2.61 (překryv 'pozdě I pomalu'): 6 z 6
+D2 dosažené tempo: — | D1 dosažené tempo: 1.63
+D1 'krátký drive už od výkopu' (n_kol×2.61 < vzdál. na výkopu): 6 z 6
+D1 fumble pickupy před 1. držením: 0.17 | zpoždění 1. držení vs start drivu (kola): 0.17
+D1 s prvním držením až v posledním tahu půle: 0 z 6
 
 === DOPLŇKY PER KATEGORIE (vše-soupeři) ===
-[B] n=1 | 1. držení: kolo —, vzdál. — polí | tempo — polí/kolo | odpor — soupeřů
-[C] n=4 | 1. držení: kolo 1.25, vzdál. 21.75 polí | tempo 2.03 polí/kolo | odpor 5.08 soupeřů
+[A] n=1 | 1. držení: kolo 1.00, vzdál. 20.00 polí | tempo 1.33 polí/kolo | odpor 4.50 soupeřů
     nosič (kola s míčem): Runner 100%
-    příčiny ztráty: soupeřův blitz/blok srazil nosiče 3×, volný míč sebral soupeř 1×
-    ztraceno v kole: 6.75 | vzdálenost od endzone při ztrátě: 10.00 polí
-[D1] n=9 | 1. držení: kolo 2.56, vzdál. 20.56 polí | tempo 1.97 polí/kolo | odpor 5.53 soupeřů
-    nosič (kola s míčem): Runner 91%, Blitzer 7%, Longbeard 2%
-[D2] n=1 | 1. držení: kolo 1.00, vzdál. 17.00 polí | tempo 1.29 polí/kolo | odpor 3.71 soupeřů
-    nosič (kola s míčem): Longbeard 86%, Runner 14%
+    první nosič: Runner 1×
+[B] n=1 | 1. držení: kolo —, vzdál. — polí | tempo — polí/kolo | odpor — soupeřů
+[C] n=5 | 1. držení: kolo 1.60, vzdál. 18.60 polí | tempo 2.59 polí/kolo | odpor 5.49 soupeřů
+    nosič (kola s míčem): Runner 89%, Longbeard 11%
+    příčiny ztráty: soupeřův blitz/blok srazil nosiče 5×
+    ztraceno v kole: 5.60 | vzdálenost od endzone při ztrátě: 8.80 polí
+[D1] n=6 | 1. držení: kolo 1.17, vzdál. 21.50 polí | tempo 1.88 polí/kolo | odpor 5.16 soupeřů
+    nosič (kola s míčem): Runner 87%, Blitzer 13%
 
-[B] z toho soupeř v drivu skóroval: 0 z 1 | soupeř míč držel: 0 z 1 | naše fumble pickupy/drive: 1.00
+[B] z toho soupeř v drivu skóroval: 1 z 1 | soupeř míč držel: 0 z 1 | naše fumble pickupy/drive: 1.00
 
 === OBRANNÉ DRIVY TRPASLÍKA (doplněk) ===
-  míč získán, bez TD                  4 (29%)
-  bez zisku míče, bez TD soupeře      4 (29%)
-  STEAL+TD                            3 (21%)
-  soupeř TD                           3 (21%)
+  míč získán, bez TD                  7 (47%)
+  bez zisku míče, bez TD soupeře      5 (33%)
+  STEAL+TD                            3 (20%)
 

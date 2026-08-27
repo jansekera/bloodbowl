@@ -667,10 +667,22 @@ int main(int argc, char** argv) {
         // seed differs. The delta is therefore a null test, not a measurement,
         // and printing it next to the pre-registered threshold invites reading
         // a gate effect that is not there. Say what it is instead.
+        //
+        // ⛔⛔ 27.08.2026: TENHLE RADEK DO DNESKA LHAL -- tvrdil "this IS the
+        //   noise floor". Neni. Overeno na kontrole noci 26.->27.08.: VSECH
+        //   50 seedu melo obe radky z TEZE HRY (shodne `actions` i zrcadlove
+        //   skore), takze `chessCandHome + chessCandAway == 1` plati Z
+        //   DEFINICE a delta je identicky 0 se SE 0. Test, ktery NEMUZE
+        //   spadnout, neni test sumu -- je to kontrola SEEDOVANI.
+        //   ⇒ Sumove dno by chtelo DVE RUZNE hry se stejnou konfiguraci;
+        //     tohle jsou dve cteni jedne hry. Dokud to tak je, cislo se smi
+        //     citovat jen jako "seedovani drzi", nikdy jako mez rozlisitelnosti.
+        //   Zadano jako uloha; nemeni se to den pred noci.
         if (mode == 2) {
-            printf("  NULL-TEST delta chess as %s: %+.4f +- %.4f SE (~%.1f SE)"
-                   " [same config both arms, RNG seed only -- expected 0;"
-                   " this IS the noise floor]\n",
+            printf("  SEED-CHECK delta chess as %s: %+.4f +- %.4f SE (~%.1f SE)"
+                   " [same config both arms, RNG seed only -- delta is 0 BY"
+                   " CONSTRUCTION (both rows are the SAME game read from both"
+                   " sides), so this is a seeding check, NOT a noise floor]\n",
                    mu.home, mean, se, se > 0 ? mean / se : 0.0);
         } else {
             // The threshold used to be hardcoded at +0.03 while the weekend

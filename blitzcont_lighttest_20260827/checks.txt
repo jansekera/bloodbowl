@@ -1,47 +1,52 @@
 korpus: 12 her
 
-  našich kol                                              178
-  s míčem na konci kola                                    92
-  K30 drženo jen klecí/nosičem (R1 zakazuje)               20
-  K36 locked celkem                                       559
+  našich kol                                              177
+  s míčem na konci kola                                    97
+  K30 drženo jen klecí/nosičem (R1 zakazuje)               23
+  K36 locked celkem                                       532
   K9a nosič se během kola změnil                            1
-  kolo BEZ míče (obrana) — predikát N/A                    83
-  kolo skončilo TD (rozvrh započten, pozice ne)             3
+  kolo BEZ míče (obrana) — predikát N/A                    80
+  kolo skončilo TD (rozvrh započten, pozice ne)             4
   vyřazeno (poločas mezi snímky)                            6
-  ⛔ ZTRÁTA MÍČE (rozvrh = nesplněno)                        3
+
+⚠️  NEZNÁMÍ HRÁČI (chybí v ROSTER_KNOWN — cena dodge je u nich odhad bez skillů):
+     ('Longbeard +Wrestle', 2, 4, 3)  ×330
+     ('Lineman +Wrestle', 3, 5, 3)  ×58
+     ('Lineman +Wrestle', 3, 6, 3)  ×56
+     ('Lineman +Wrestle', 4, 7, 3)  ×47
 
 === KONTROLY (splněno / posuzováno / N/A) ===
   jednotka n:  K29/K29⭐ = kola s postavenou klecí  ·  K9a/K34 = kola s míčem  ·  K30/K30b = PŘÍLEŽITOSTI K DODGI (ne kola!)
                K31/K33/K35 = všechna naše kola  ·  N/A = predikát na tom vzorku nedává smysl, NEPOČÍTÁ se jako splněný
-  K29 (R1) žádný roh klece není markovaný       69.1%   n=55, 123 N/A (69%)
-  K29⭐ plná ČISTÁ klec (4/4) — ⚠️ jen 2 ze 3 klauzulí  14.5%   n=55, 123 N/A (69%)
-    obsazených rohů průměrně (jen kola, kdy klec stojí) 2.29 / 4, z toho čistých 1.91
-    kol s míčem, kdy klec vůbec NESTOJÍ: 37
-  K29⭐⭐ PRAVIDLO: 4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů   2.2%   n=92
-  K9a splnil rozvrhovou podlahu                 18.1%   n=72, 109 N/A (60%), ⌀ -3.25 ← metr
-  K38 nosič NEkončí kolo u stojícího soupeře    70.7%   n=92, 86 N/A (48%), ⌀ +0.39 ← metr
-  K38b …ani u ležícího (výstraha, ne zákaz)     80.0%   n=65, 113 N/A (63%), ⌀ +0.26 ← metr
-  K9c SÓLO — podlaha fáze                       22.9%   n=35, 120 N/A (77%), ⌀ -2.20 ← metr
-  K9c KLEC — podlaha fáze                       25.0%   n=32, 123 N/A (79%), ⌀ -1.91 ← metr
-  K9c VÝBĚH — podlaha fáze                      60.0%   n=5, 150 N/A (97%), ⌀ -2.00 ← metr
-  K9a žádala mechanicky NEMOŽNÉ                 27.5%   n=69, 86 N/A (55%), ⌀ +1.25 ← metr
-  K30 (R3) drahý dodge je držený                40.4%   n=1140
-  K30b levný dodge je držený (nemá cenu)        34.6%   n=364
-    z toho drženo jen klecí/nosičem (R1 zakazuje): 20
-  K31 (R4) kolo BEZ těla bez úkolu              28.7%   n=178
-    těl bez úkolu na kolo                      2.11 z 11
-  K33 kolo s aspoň jedním blokem                86.5%   n=178, ⌀ +2.25 ← metr
+  K29 (R1) žádný roh klece není markovaný       77.9%   n=68, 109 N/A (62%)
+  K29⭐ plná ČISTÁ klec (4/4) — ⚠️ jen 2 ze 3 klauzulí  11.8%   n=68, 109 N/A (62%)
+    obsazených rohů průměrně (jen kola, kdy klec stojí) 2.01 / 4, z toho čistých 1.78
+    kol s míčem, kdy klec vůbec NESTOJÍ: 29
+  K29⭐⭐ PRAVIDLO: 4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů   4.1%   n=97
+  K9a splnil rozvrhovou podlahu                 25.4%   n=71, 109 N/A (61%), ⌀ -2.96 ← metr
+  K38 nosič NEkončí kolo u stojícího soupeře    79.4%   n=97, 80 N/A (45%), ⌀ +0.33 ← metr
+  K38b …ani u ležícího (výstraha, ne zákaz)     75.3%   n=77, 100 N/A (56%), ⌀ +0.29 ← metr
+  K9c SÓLO — podlaha fáze                       24.3%   n=37, 114 N/A (75%), ⌀ -2.14 ← metr
+  K9c KLEC — podlaha fáze                       34.6%   n=26, 125 N/A (83%), ⌀ -1.88 ← metr
+  K9c VÝBĚH — podlaha fáze                      37.5%   n=8, 143 N/A (95%), ⌀ -2.38 ← metr
+  K9a žádala mechanicky NEMOŽNÉ                 21.1%   n=71, 80 N/A (53%), ⌀ +0.89 ← metr
+  K30 (R3) drahý dodge je držený                42.3%   n=1063
+  K30b levný dodge je držený (nemá cenu)        34.7%   n=349
+    z toho drženo jen klecí/nosičem (R1 zakazuje): 23
+  K31 (R4) kolo BEZ těla bez úkolu              39.0%   n=177
+    těl bez úkolu na kolo                      1.90 z 11
+  K33 kolo s aspoň jedním blokem                90.4%   n=177, ⌀ +2.41 ← metr
 
 --- E1/E2: co deska dává soupeři (ČÁST 13) ---
-  K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge  31.5%   n=92, 86 N/A (48%), ⌀ +2.42 ← metr
-  K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky  56.2%   n=178, ⌀ +1.61 ← metr
+  K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge  32.0%   n=97, 80 N/A (45%), ⌀ +2.32 ← metr
+  K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky  58.2%   n=177, ⌀ +1.57 ← metr
 
 --- zámky (hypotéza 12.08.) ---
-  našich stojících v jejich TZ na kolo        3.14 z 11
-  K36 LOCKED → postup nosiče v NÁSLEDUJÍCÍM našem kole   (našich stojících v jejich TZ → Δx nosiče, 112 degenerovaných)
-      ≤2       n=37     Δx nosiče = +1.95
-      3–5      n=25     Δx nosiče = +2.12  ⚠ málo vzorků
-      6–8      n=4      Δx nosiče = +0.00  ⚠ málo vzorků
+  našich stojících v jejich TZ na kolo        3.01 z 11
+  K36 LOCKED → postup nosiče v NÁSLEDUJÍCÍM našem kole   (našich stojících v jejich TZ → Δx nosiče, 109 degenerovaných)
+      ≤2       n=39     Δx nosiče = +2.00
+      3–5      n=27     Δx nosiče = +1.59  ⚠ málo vzorků
+      6–8      n=2      Δx nosiče = +2.50  ⚠ málo vzorků
 
 plán enginu (X6 / brána klece)
-  plán: NOT_CONSULTED                          100.0%   n=178 (všechna naše kola)
+  plán: NOT_CONSULTED                          100.0%   n=177 (všechna naše kola)

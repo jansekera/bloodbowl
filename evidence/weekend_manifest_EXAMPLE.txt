@@ -17,4 +17,25 @@
 #    ⚠️ A pozor na jednotku: "s/pár" v chain.log je AGREGÁT přes všechny
 #       workery; na jeden worker je to ×WORKERS.
 
-m1n10   | m1-n10-blitz-continuation | 9 | 4800 | evidence/night_prereg_20260827.preds | 0
+# ⛔⛔ 27.08.: PŮVODNÍ UKÁZKOVÝ ŘÁDEK BYL ODSTRANĚN A JE TŘEBA VĚDĚT PROČ.
+#   Stálo tu:
+#     m1n10 | m1-n10-blitz-continuation | 9 | 4800 | ...20260827.preds | 0
+#   Dvě vady naráz, a obě TICHÉ:
+#   (1) `9` byl mode M1/N10 jen do 26.08. Pak si devítku vzal LEAP a UŽ S NÍ
+#       BĚŽELA NOC, takže se přečíslovalo: M1/N10 = mode 10. Řádek s devítkou
+#       by pustil CIZÍ rameno pod jménem m1n10 -- běh by proběhl, výsledek by
+#       vypadal normálně a byl by o něčem jiném.
+#   (2) `m1n10` běží v noci 27.->28.08. z mainu ⇒ do víkendu už NEPATŘÍ vůbec.
+#   ⇒ Ukázka se nechává PRÁZDNÁ schválně: řádek se opisuje, a opsaný řádek
+#     stárne rychleji, než si kdo všimne.
+#
+# TVAR ŘÁDKU (bez ostrých hodnot):
+#   jmeno | git-ref | mode | paru | prereg | corpus
+#
+# ⏰ CO ČEKÁ NA ZAŘAZENÍ (stav 27.08.):
+#   b2-wrestle-pricing -- větev připravená (main zmergován, ocenění srovnané
+#     s resolverem, čítač repicků, 643/643). ⛔ CHYBÍ `mode 11` v harnessu NA
+#     VĚTVI a předregistrace. Předregistrace se má psát AŽ Z NOVÝCH SESTAV
+#     (Wrestle dostaly 27.08. všechny týmy), tedy z korpusu noci 27.->28.08.
+#   ⭐ b2 už NENÍ vázané na matchup dw-sk -- do 27.08. mělo Wrestle jen skaven
+#     a jinde by delta vyšla NULA Z DEFINICE.

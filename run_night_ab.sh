@@ -266,10 +266,17 @@ if [ "$CONTROL_MODE2" != "0" ]; then
         ( cd "$d" && nice -n 19 "$BIN" "$ROOT" "$CONTROL_PAIRS" "$cidx" 2 0 > run.log 2>&1 ) \
             && touch "$d/OK" || touch "$d/FAIL"
     fi
-    cline=$(grep -h "NULL-TEST" "$d/run.log" 2>/dev/null | head -1)
+    # ⚠️ 27.08.: harness ten řádek přejmenoval z „NULL-TEST" na „SEED-CHECK",
+    # protože tvrdil, že je to šumové dno, a není (viz níže). Grep se musel
+    # posunout s ním -- jinak by kontrola tiše nevrátila nic a noc by si
+    # označila CONTROL_FAILED. Starý název se hledá taky, aby šly číst i logy
+    # z běhů před 27.08.
+    cline=$(grep -hE "SEED-CHECK|NULL-TEST" "$d/run.log" 2>/dev/null | head -1)
     night_log "  ${cline:-(kontrola nic nevrátila)}"
     if echo "$cline" | grep -q "+0.0000 +- 0.0000"; then
-        night_log "  ✅ seedování v pořádku (nic víc to netvrdí — viz MOVED WITHOUT ARM)"
+        night_log "  ✅ seedování drží. ⛔ A NIC VÍC: delta je tu 0 Z DEFINICE"
+        night_log "     (obě řádky jsou TÁŽ hra čtená z obou stran), takže to"
+        night_log "     NENÍ šumové dno a nesmí se tak citovat."
     else
         night_log "  ⛔ SMOKE TEST NEVYŠEL NULOVÝ. Obě ramena tam mají TOUTÉŽ konfiguraci"
         night_log "     a přesto se liší ⇒ ROZBITÉ SEEDOVÁNÍ. Hlavní výsledek NEČÍST."
