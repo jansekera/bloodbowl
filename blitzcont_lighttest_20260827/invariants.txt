@@ -1,4 +1,0 @@
-korpus: /home/jan/claude/bloodbowl/blitzcont_lighttest_20260827_corpus_data
-her: 12
-
-✅ ŽÁDNÝ ROZBITÝ INVARIANT
