@@ -51,7 +51,8 @@
 #       ramena TOUTÉŽ konfiguraci, takže s CRN musí vyjít delta exaktně 0.
 #       Když nevyjde, hlavní výsledek se NEČTE -- nevíme, co jsme měřili.
 #
-#   Volitelně: CORPUS=1 sebere po A/B korpus 3000 her se zapnutým ramenem,
+#   Volitelně: CORPUS=1 sebere po A/B korpus 3000 her v PRODUKČNÍM nastavení
+#   (ramena VYPNUTÁ -- sbírá samostatný python proces, binding je zapnout neumí),
 #   BASELINE=<adresář> ho porovná — a odmítne to, když baseline běžela na jiném
 #   commitu enginu (P22: korpus 14.08. byl s baseline 6 commitů rozejitý).
 # ============================================================================
