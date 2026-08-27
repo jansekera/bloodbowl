@@ -774,6 +774,16 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
             turn.requiredPace = t.required;
             turn.achievablePace = t.achievable;
             turn.distToEndzone = t.distToEndzone;
+            // T5.34 (27.08.): krytí nosiče se razítkuje ze STEJNÉHO důvodu --
+            // měřidlo nesmí viset na tom, jestli se rozhoduje.
+            CageSnapshot cg = cageSnapshot(state, car, state.activeTeam);
+            turn.cageCorners = cg.corners;
+            turn.cageCornersMarked = cg.cornersMarked;
+            turn.cageOrthoOccupied = cg.orthoOccupied;
+            turn.cageOrthoOurs = cg.orthoOurs;
+            turn.cageAheadOccupied = cg.aheadOccupied;
+            turn.cageAheadOurs = cg.aheadOurs;
+            turn.carrierTz = cg.carrierTz;
         } else {
             turn.corridorResistance = -1;
             turn.corridorStrength = -1;

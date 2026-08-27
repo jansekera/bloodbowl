@@ -1,0 +1,27 @@
+korpus blitzlanding_replic_20260825_corpus_data: 3000 her, 48000 našich kol
+BLITZ_AND_SCORE nabídnuto v 1281 kolech (0.427 na hru), z toho 337 i se současnou nabídkou SCORE
+
+větev ladderu           druh       hodn.     kol   podíl  blitz  blok?   TD
+---------------------------------------------------------------------------
+(6) zbývají <= 4 kola   PODLAHA     0.20     409  31.9%      8    206   28
+(1) poslední kolo       PODLAHA     0.70     371  29.0%      6     95   53
+(5) zbývají <= 2 kola   PODLAHA     0.35     342  26.7%     12    102   20
+(7) zbytek              PODLAHA     0.08     123   9.6%      3     52   12
+(4) VEDEME (stall)      STROP       0.02      30   2.3%      0     13    0
+(2) prohráváme o 2+     PODLAHA     0.50       6   0.5%      0      1    1
+---------------------------------------------------------------------------
+STROP (prior stlačen)                         30   2.3%      0
+PODLAHA (prior zvednut)                     1251  97.7%     29
+
+  blitz = blok nosiče PO jeho pohybu (jistý blitz)
+  blok? = blok nosiče BEZ pohybu -- BLOCK makro NEBO blitz ze sousední pozice, z logu nerozlišitelné (horní mez)
+
+⇒ „vada ve VOLBĚ" se smí tvrdit o 1251 kolech, ne o 1281.
+  konverze v podlahových větvích: 29/1251 = 2.32%
+
+--- DOPLNĚK: byla v tomtéž kole nabídka prosté SCORE (chůzí do EZ)? ---
+podlahové kolo                                1251
+  BEZ nabídky SCORE                            918      <= JEDINÁ skórující cesta
+  i s nabídkou SCORE (chůzí do EZ)             333
+    a TD padl                                  108      = 32,4 %  (nebrat blitz je SPRÁVNĚ)
+    a TD padl (bez SCORE)                        6      =  0,7 %  <= TADY JE VADA

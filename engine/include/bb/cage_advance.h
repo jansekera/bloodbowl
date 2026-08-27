@@ -189,6 +189,47 @@ struct TempoSnapshot {
 TempoSnapshot tempoSnapshot(const GameState& state, const Player& carrier,
                             TeamSide mySide);
 
+// KVALITA KRYTÍ NOSIČE jako vlastnost DESKY (T5.34, 2026-08-27).
+//
+// ⛔ PROČ POTŘETÍ TÝŽ TVAR. Nejdřív `corridorResistance` (K9b, 18.08.), pak
+// tempo (21.08.), teď rohy klece: `TurnPlanRecord` pole `filledCorners`,
+// `openCorners` a `exposure` MÁ, ale plní je jen `CageAdvancePlanner::plan()`,
+// a ten je v produkci vypnutý -- `verdict = NOT_CONSULTED` ve 100 % kol.
+// ⇒ V korpusu je `plan.filled_corners` TRVALE 0. To je HORŠÍ než nelogovat:
+//   kdo přečte 0, přečte „klec nemá rohy", ačkoli to znamená „nikdo to
+//   nepočítal". Nula vydávaná za měření.
+// ⇒ Uživatel 26.08.: „jak často necháme nosiče stát, bych vyhodnocoval až po
+//   posunu v tom, jak dobře jej kryjeme klecí -- a toto i musíme umět správně
+//   zalogovat a vyhodnotit." Bez tohohle se `M11` číst nedá.
+//
+// ⚠️ MĚŘIDLO NESMÍ VISET NA TOM, JESTLI SE ROZHODUJE. Vzor je T5.31 (skok
+//   dostal vlastní event, protože se schovával za `DODGE`).
+//
+// DEFINICE, které to používá -- jsou to VOLBY, ne pravidla, a proto tady stojí:
+//   * ROH = NÁŠ STOJÍCÍ hráč na diagonále nosiče. Ležící tělo roh nedrží.
+//   * ROH JE OZNAČENÝ, když sám stojí v soupeřově TZ. Doktrína (uživatel
+//     4.08., bbtactics „Cage Basics"): žádný z pětice nemá skončit v TZ --
+//     označený roh soupeř vyblokuje a klec se otevře. ⇒ „čisté rohy" =
+//     `corners - cornersMarked`.
+//   * ORTOGONÁLY MAJÍ BÝT PRÁZDNÉ (pravidlo z 11.08., „nehromadit klec"):
+//     tělo navíc je munice pro chain push NA NAŠEHO NOSIČE. Počítá se
+//     KDOKOLI, a zvlášť KOLIK Z TOHO JSME MY -- 26.08. vyšlo 149 ze 149 naši.
+//   * POLE PŘÍMO VPŘED je ortogonála ve směru postupu. Rohem klece NENÍ,
+//     a přesto v něm 26.08. stál náš hráč ve 172 ze 172 zavřených cest (M11).
+//     Proto se vede zvlášť.
+// -1 v každém poli = N/A (nedržíme míč v našem kole), ne nula.
+struct CageSnapshot {
+    int8_t corners = -1;        // naši STOJÍCÍ na 4 diagonálách
+    int8_t cornersMarked = -1;  // z nich ty, které samy stojí v soupeřově TZ
+    int8_t orthoOccupied = -1;  // 4 ortogonály obsazené KÝMKOLI
+    int8_t orthoOurs = -1;      // z toho naši
+    int8_t aheadOccupied = -1;  // 0/1 pole PŘÍMO VPŘED obsazené kýmkoli
+    int8_t aheadOurs = -1;      // 0/1 a je to náš hráč
+    int8_t carrierTz = -1;      // soupeřovy TZ na nosiči samotném
+};
+CageSnapshot cageSnapshot(const GameState& state, const Player& carrier,
+                          TeamSide mySide);
+
 class CageAdvancePlanner {
 public:
     // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,

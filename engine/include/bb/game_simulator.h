@@ -137,6 +137,20 @@ struct TurnLog {
     float achievablePace = -1.0f;
     int8_t distToEndzone = -1;
 
+    // KVALITA KRYTÍ NOSIČE (T5.34, 27.08.). Táž lekce jako u odporu koridoru
+    // a tempa: `plan.filled_corners` je v korpusu TRVALE 0, protože plánovač
+    // v produkci neběží (NOT_CONSULTED ve 100 % kol) -- a nula se pak čte
+    // jako „klec nemá rohy" místo „nikdo to nepočítal". Definice rohu,
+    // označení a ortogonál viz cage_advance.h. -1 = N/A (nedržíme míč
+    // v našem kole), ne nula.
+    int8_t cageCorners = -1;
+    int8_t cageCornersMarked = -1;
+    int8_t cageOrthoOccupied = -1;
+    int8_t cageOrthoOurs = -1;
+    int8_t cageAheadOccupied = -1;
+    int8_t cageAheadOurs = -1;
+    int8_t carrierTz = -1;
+
     // Summary flags
     bool turnover = false;
     bool touchdown = false;

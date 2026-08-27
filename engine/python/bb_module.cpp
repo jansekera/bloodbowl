@@ -282,6 +282,13 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["corridor_strength"] = turn.corridorStrength;
                 t["required_pace"] = turn.requiredPace;
                 t["achievable_pace"] = turn.achievablePace;
+                t["cage_corners"] = turn.cageCorners;
+                t["cage_corners_marked"] = turn.cageCornersMarked;
+                t["cage_ortho_occupied"] = turn.cageOrthoOccupied;
+                t["cage_ortho_ours"] = turn.cageOrthoOurs;
+                t["cage_ahead_occupied"] = turn.cageAheadOccupied;
+                t["cage_ahead_ours"] = turn.cageAheadOurs;
+                t["carrier_tz"] = turn.carrierTz;
                 t["dist_to_endzone_board"] = turn.distToEndzone;
                 switch (turn.weather) {
                     case bb::Weather::SWELTERING_HEAT: t["weather"] = "sweltering_heat"; break;

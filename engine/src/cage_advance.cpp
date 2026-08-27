@@ -110,6 +110,52 @@ TempoSnapshot tempoSnapshot(const GameState& state, const Player& carrier,
     return t;
 }
 
+CageSnapshot cageSnapshot(const GameState& state, const Player& carrier,
+                          TeamSide mySide) {
+    CageSnapshot c;
+    const int dx = forwardDx(mySide);
+    c.corners = c.cornersMarked = 0;
+    c.orthoOccupied = c.orthoOurs = 0;
+    c.aheadOccupied = c.aheadOurs = 0;
+
+    // Rohy: 4 diagonály. Roh drží jen NÁŠ STOJÍCÍ hráč -- ležící tělo klec
+    // nekryje a soupeřovo tělo tam vůbec nemá co dělat.
+    for (int sx : {-1, 1}) {
+        for (int sy : {-1, 1}) {
+            Position slot{static_cast<int8_t>(carrier.position.x + sx),
+                          static_cast<int8_t>(carrier.position.y + sy)};
+            if (!slot.isOnPitch()) continue;
+            const Player* p = state.getPlayerAtPosition(slot);
+            if (!p || p->teamSide != mySide ||
+                p->state != PlayerState::STANDING) continue;
+            ++c.corners;
+            if (countTacklezones(state, slot, mySide) > 0) ++c.cornersMarked;
+        }
+    }
+
+    // Ortogonály MAJÍ být prázdné (11.08.). Tady se počítá KDOKOLI, protože
+    // munici pro chain push dělá tělo, ne jeho dres -- a zvlášť se vede,
+    // kolik z toho jsme my, protože to je ta vada, kterou 26.08. našel M11.
+    for (auto d : {std::pair<int, int>{dx, 0}, {-dx, 0}, {0, -1}, {0, 1}}) {
+        Position slot{static_cast<int8_t>(carrier.position.x + d.first),
+                      static_cast<int8_t>(carrier.position.y + d.second)};
+        if (!slot.isOnPitch()) continue;
+        const Player* p = state.getPlayerAtPosition(slot);
+        if (!p) continue;
+        ++c.orthoOccupied;
+        const bool ours = (p->teamSide == mySide);
+        if (ours) ++c.orthoOurs;
+        if (d.first == dx && d.second == 0) {
+            c.aheadOccupied = 1;
+            c.aheadOurs = ours ? 1 : 0;
+        }
+    }
+
+    c.carrierTz = static_cast<int8_t>(
+        countTacklezones(state, carrier.position, mySide));
+    return c;
+}
+
 bool CageAdvancePlanner::eligibleCornerPlayer(const Player& p) {
     // Activation-reliability nega-traits: the corner job is a formation
     // commitment -- a corner that fails its activation roll (or roots) is a
