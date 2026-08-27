@@ -100,12 +100,50 @@ long takeHandOffOfferEvalsInSearch();
 // Per side, default OFF. Turning it on for one side only is what makes a paired
 // A/B legible.
 void setBlitzLandingArm(TeamSide side, bool on);
+// LEAP do makrove chuze (26.08.2026). Gate se ptá na stranu MOVERA, ne na
+// activeTeam -- Leap mají v korpusu jen soupeřovi wardanceři, takže per-side
+// zapnutí je jediný způsob, jak měřit "wood-elf s rukama vs. bez rukou".
+void setLeapWalkArm(TeamSide side, bool on);
+bool leapWalkArm(TeamSide side);
 bool blitzLandingArm(TeamSide side);
 
 // Times the arm actually changed WHICH blitzer gets sent, per SEARCH EVALUATION
 // (read the unit warning above -- this is not a count of blitzes played). Zero
 // over a matchup means both arms took the same decision, i.e. a true null arm.
 long takeBlitzLandingRepicksInSearch();
+// Tiká, když findMoveToward VRÁTÍ LEAP jako vítěze -- ne když ho jen připustí
+// mezi kandidáty. OFF rameno LEAP vrátit nemůže, takže každý tik je z definice
+// změněná volba. Je to počet VYHODNOCENÍ V SEARCHI, ne skoků na hřišti.
+long takeLeapWalkPicksInSearch();
+
+// --- M1/N10 arm (2026-08-25): a Blitz is a MOVE with a block inside it ---
+//
+// BB2016 l. 347-350: "He may make one block during the move. The block may be
+// made AT ANY POINT during the move." The engine ended the activation on every
+// block, so hit-and-run was impossible and a carrier could never open his own
+// lane. The user reported it on 22.07; M9 measured the ceiling on 24.08 --
+// 4.09 blitzes a game end stuck in contact with MA left and somewhere to go,
+// AV7 pieces 1.5x more often than AV9.
+//
+// ⚠️ THE ARM COVERS ALL THREE HALVES AT ONCE, deliberately. They are one rule:
+//   (1) the activation stays open after the block   (block_handler)
+//   (2) the blitzer is OFFERED a retreat            (getAvailableMacros)
+//   (3) the follow-up becomes a choice, l. 608-611  (block_handler)
+// Splitting them into separate switches would measure a mixture: (1) without
+// (2) is permission with nowhere to go, and (1)+(2) without (3) is mostly eaten
+// by the push dragging him in before he can withdraw.
+//
+// Per side, default OFF.
+void setBlitzContinuationArm(TeamSide side, bool on);
+bool blitzContinuationArm(TeamSide side);
+
+// Times the arm actually changed a decision: an activation left open, a retreat
+// offered, or a follow-up declined. Zero over a matchup means both arms played
+// the same game -- the null test. Per SEARCH EVALUATION, like the P35 counter.
+long takeBlitzContinuationEventsInSearch();
+// Internal: bump the counter from block_handler, which owns two of the three
+// halves. Not part of the harness API.
+void noteBlitzContinuationEvent();
 
 // --- B2 arm (2026-08-25): price a block against a defender who can WRESTLE ---
 //

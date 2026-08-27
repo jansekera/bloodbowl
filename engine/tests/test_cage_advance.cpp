@@ -856,6 +856,95 @@ TEST(BoardMetrics, TempoSnapshotExistsWithoutThePlanner) {
     EXPECT_FLOAT_EQ(t.achievable, 8.0f);
 }
 
+TEST(BoardMetrics, CageSnapshotExistsWithoutThePlanner) {
+    // T5.34: krytí nosiče je vlastnost DESKY. Plánovač v produkci neběží
+    // (NOT_CONSULTED ve 100 % kol), takže `plan.filled_corners` je trvale 0 --
+    // a nula se pak čte jako „klec nemá rohy" místo „nikdo to nepočítal".
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {13, 7}; car.stats = {6, 3, 3, 8};
+
+    // čtyři naše diagonály = plná klec, ortogonály prázdné
+    int id = 2;
+    for (int sx : {-1, 1}) {
+        for (int sy : {-1, 1}) {
+            Player& p = gs.getPlayer(id);
+            p.id = id; p.teamSide = TeamSide::HOME; p.state = PlayerState::STANDING;
+            p.position = {static_cast<int8_t>(13 + sx), static_cast<int8_t>(7 + sy)};
+            p.stats = {6, 3, 3, 8};
+            ++id;
+        }
+    }
+    CageSnapshot c = cageSnapshot(gs, car, TeamSide::HOME);
+    EXPECT_EQ(c.corners, 4);
+    EXPECT_EQ(c.cornersMarked, 0);
+    EXPECT_EQ(c.orthoOccupied, 0) << "plná klec má ortogonály PRÁZDNÉ (pravidlo 11.08.)";
+    EXPECT_EQ(c.aheadOccupied, 0);
+    EXPECT_EQ(c.carrierTz, 0);
+
+    // ležící roh roh NEDRŽÍ
+    gs.getPlayer(2).state = PlayerState::PRONE;
+    EXPECT_EQ(cageSnapshot(gs, car, TeamSide::HOME).corners, 3);
+}
+
+TEST(BoardMetrics, CageSnapshotSeesTheBodyDirectlyAhead) {
+    // M11 (26.08.): cestu vpřed zavírají VLASTNÍ ve 149 ze 149 případů, a pole
+    // přímo vpřed rohem klece NENÍ. Proto se vede zvlášť od ostatních ortogonál.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {13, 7}; car.stats = {6, 3, 3, 8};
+
+    Player& own = gs.getPlayer(2);           // NÁŠ hráč přímo vpřed (HOME jde na +x)
+    own.id = 2; own.teamSide = TeamSide::HOME; own.state = PlayerState::STANDING;
+    own.position = {14, 7}; own.stats = {6, 3, 3, 8};
+
+    CageSnapshot c = cageSnapshot(gs, car, TeamSide::HOME);
+    EXPECT_EQ(c.orthoOccupied, 1);
+    EXPECT_EQ(c.orthoOurs, 1);
+    EXPECT_EQ(c.aheadOccupied, 1);
+    EXPECT_EQ(c.aheadOurs, 1) << "tělo navíc PŘÍMO VPŘED je ta vada z M11";
+    EXPECT_EQ(c.corners, 0);
+
+    // týž hráč o pole vedle (ortogonála, ale ne dopředu) => ahead spadne na 0
+    own.position = {13, 8};
+    CageSnapshot c2 = cageSnapshot(gs, car, TeamSide::HOME);
+    EXPECT_EQ(c2.orthoOccupied, 1);
+    EXPECT_EQ(c2.aheadOccupied, 0);
+}
+
+TEST(BoardMetrics, CageSnapshotCountsMarkedCorners) {
+    // Označený roh není slabší roh: soupeř ho vyblokuje a klec se otevře
+    // (doktrína 4.08., bbtactics „Cage Basics"). Proto se počítá zvlášť.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    Player& car = gs.getPlayer(1);
+    car.id = 1; car.teamSide = TeamSide::HOME; car.state = PlayerState::STANDING;
+    car.position = {13, 7}; car.stats = {6, 3, 3, 8};
+
+    Player& corner = gs.getPlayer(2);
+    corner.id = 2; corner.teamSide = TeamSide::HOME;
+    corner.state = PlayerState::STANDING;
+    corner.position = {12, 6}; corner.stats = {6, 3, 3, 8};
+
+    EXPECT_EQ(cageSnapshot(gs, car, TeamSide::HOME).cornersMarked, 0);
+
+    Player& foe = gs.getPlayer(12);          // soupeř sousedící s rohem, ne s nosičem
+    foe.id = 12; foe.teamSide = TeamSide::AWAY; foe.state = PlayerState::STANDING;
+    foe.position = {11, 5}; foe.stats = {6, 3, 3, 8};
+
+    CageSnapshot c = cageSnapshot(gs, car, TeamSide::HOME);
+    EXPECT_EQ(c.corners, 1);
+    EXPECT_EQ(c.cornersMarked, 1);
+    EXPECT_EQ(c.carrierTz, 0) << "soupeř na nosiče nedosahuje";
+}
+
 TEST(BoardMetrics, TempoAchievableDropsWithCorridorResistance) {
     GameState gs;
     gs.phase = GamePhase::PLAY;

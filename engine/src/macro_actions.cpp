@@ -32,6 +32,13 @@ static const Player* findCarrier(const GameState& state) {
 
 // Score a MOVE action: lower is better.
 // Prefers: close to target, no enemy TZ, no GFI.
+// LEAP do makrove chuze (rodina M), 26.08.2026. Default OFF -- pri OFF je
+// admise bajtove identicka s dneskem, takze nulovy test je cisty.
+// ⛔ Deklarace MUSI byt nad findMoveToward, ktery citac inkrementuje;
+// ostatni ramena jsou deklarovana az u svych setteru nize a to tu neslo.
+thread_local bool g_leapWalk[2] = {false, false};
+thread_local long g_leapWalkPicks = 0;
+
 static int scoreMoveAction(const GameState& state, const Action& a,
                            Position target, int playerId) {
     const Player& p = state.getPlayer(playerId);
@@ -50,6 +57,26 @@ static int scoreMoveAction(const GameState& state, const Action& a,
     // Distance is primary (each square = 10 points)
     // TZ penalty must exceed distance savings (10 per square) to prefer going around
     int score = dist * 10;
+
+    // LEAP (26.08.2026) -- mluvi TOUTEZ menou jako MOVE, jinak se uvnitr
+    // jednoho vyberu porovnava hruska s jablkem.
+    //   6 * (leapTarget - 1) == 36 * p_fail: AG4 wardancer (cil 3+) = +12,
+    //   tedy tak drahy jako jeden hlidany krok; AG3 (cil 4+) = +18.
+    // ZADNY odchozi dodge se neuctuje (l. 8277-8278): tahle funkce dodge
+    // neoceňuje ani u MOVE (plati ho resolver), takze uspora se projevi sama.
+    // Cil hodu je BEZ modifikatoru za TZ cile (l. 8276-8277) -- destTZ se
+    // proto pricita jen k POZICNI cene mezicile, ne k obtiznosti hodu.
+    if (a.type == ActionType::LEAP) {
+        score += 6 * (calculateLeapTarget(p) - 1);
+        // Skok stoji 2 pole MA; kolik z nich je nad ramec => GFI hody.
+        int gfiRolls = std::max(0, 2 - std::max(0, static_cast<int>(p.movementRemaining)));
+        score += 8 * gfiRolls;
+        if (a.target != target) {
+            if (destTZ > 0) score += (currentlyInTZ ? 12 : 20) * destTZ;
+            if (a.target.y <= 1 || a.target.y >= 13) score += 6;
+        }
+        return score;
+    }
     // Stepping ONTO the walk's target square is never penalized for tackle
     // zones or sidelines (2026-08-04): the macro that chose the target owns
     // that risk decision (cage corners deliberately stand next to
@@ -93,8 +120,37 @@ static bool findMoveToward(const std::vector<Action>& actions, int playerId,
                            Position avoid = {-1, -1}) {
     int bestScore = 9999;
     bool found = false;
+
+    // --- LEAP admise (26.08.2026, rameno setLeapWalkArm, default OFF) ------
+    // Bez predikatu by greedy krokove skore srovnavalo akci o DVOU polich
+    // s akci o jednom a na volnem hristi by "vyhodne" skakalo tam, kam se
+    // dojde zadarmo dvema kroky. Skok ma cenu jen tam, kde neco NAHRAZUJE:
+    //   (a) hrac stoji v nepratelske TZ  -> skok nahrazuje dodge (l. 8277-8278)
+    //   (b) zadny MOVE nesnizuje vzdalenost -> je obezdeny a skok je jedina cesta
+    bool allowLeap = false;
+    if (state) {
+        const Player& mv = state->getPlayer(playerId);
+        if (leapWalkArm(mv.teamSide)) {
+            if (countTacklezones(*state, mv.position, mv.teamSide) > 0) {
+                allowLeap = true;                     // (a)
+            } else {
+                int here = mv.position.distanceTo(target);
+                bool anyProgress = false;
+                for (auto& a : actions) {
+                    if (a.type != ActionType::MOVE || a.playerId != playerId) continue;
+                    if (avoid.x >= 0 && a.target == avoid) continue;
+                    if (a.target.distanceTo(target) < here) { anyProgress = true; break; }
+                }
+                allowLeap = !anyProgress;             // (b)
+            }
+        }
+    }
+
     for (auto& a : actions) {
-        if (a.type != ActionType::MOVE || a.playerId != playerId) continue;
+        bool isLeap = (a.type == ActionType::LEAP);
+        if (isLeap && !allowLeap) continue;
+        if (!isLeap && a.type != ActionType::MOVE) continue;
+        if (a.playerId != playerId) continue;
         // Hard exclusion (item 11): a square the caller must never enter,
         // even as a mere waypoint -- landing on a loose ball's square
         // auto-triggers a real pickup roll regardless of intent.
@@ -114,6 +170,10 @@ static bool findMoveToward(const std::vector<Action>& actions, int playerId,
             found = true;
         }
     }
+    // Tika az kdyz skok VYHRAL vyber -- pouhe pripusteni mezi kandidaty by
+    // tikalo i tam, kde stejne vyhral MOVE, a citac by prestal znamenat
+    // "zmenena volba".
+    if (found && bestMove.type == ActionType::LEAP) ++g_leapWalkPicks;
     return found;
 }
 
@@ -206,12 +266,27 @@ long takeCageAwareAdvancePicksInSearch() {
 thread_local bool g_blitzLanding[2] = {false, false};
 thread_local long g_blitzLandingRepicks = 0;
 
+
 void setBlitzLandingArm(TeamSide side, bool on) {
     g_blitzLanding[side == TeamSide::HOME ? 0 : 1] = on;
 }
 
 bool blitzLandingArm(TeamSide side) {
     return g_blitzLanding[side == TeamSide::HOME ? 0 : 1];
+}
+
+void setLeapWalkArm(TeamSide side, bool on) {
+    g_leapWalk[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool leapWalkArm(TeamSide side) {
+    return g_leapWalk[side == TeamSide::HOME ? 0 : 1];
+}
+
+long takeLeapWalkPicksInSearch() {
+    long v = g_leapWalkPicks;
+    g_leapWalkPicks = 0;
+    return v;
 }
 
 long takeBlitzLandingRepicksInSearch() {
@@ -234,6 +309,25 @@ bool wrestlePricingArm(TeamSide side) {
 long takeWrestlePricingEventsInSearch() {
     long v = g_wrestlePricingEvents;
     g_wrestlePricingEvents = 0;
+    return v;
+}
+
+thread_local bool g_blitzContinuation[2] = {false, false};
+thread_local long g_blitzContinuationEvents = 0;
+
+void setBlitzContinuationArm(TeamSide side, bool on) {
+    g_blitzContinuation[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool blitzContinuationArm(TeamSide side) {
+    return g_blitzContinuation[side == TeamSide::HOME ? 0 : 1];
+}
+
+void noteBlitzContinuationEvent() { ++g_blitzContinuationEvents; }
+
+long takeBlitzContinuationEventsInSearch() {
+    long v = g_blitzContinuationEvents;
+    g_blitzContinuationEvents = 0;
     return v;
 }
 
@@ -464,6 +558,63 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     const Player* carrier = findCarrier(state);
     bool iHaveBall = (carrier != nullptr);
     bool ballOnGround = !state.ball.isHeld && state.ball.isOnPitch();
+
+    // M1/N10 second half (25.08.2026): the blitzer whose activation is STILL
+    // OPEN. resolveBlock now leaves hasActed clear for a blitzer who is still
+    // on his feet (l. 347-350, "the block may be made at any point during the
+    // move"), but the general REPOSITION loop below rejects him TWICE:
+    // isFreeToAct() demands !hasMoved, and the loop returns early for anyone
+    // adjacent to a standing enemy -- which is exactly what a blitzer is once
+    // he has thrown his block. Permission without an offer is the P45 shape
+    // again (a finished resolver nobody can reach), so the retreat is emitted
+    // HERE, separately, leaving the general gates untouched.
+    //
+    // M9 measured the size on 18 000 games (24.08.): 4.09 blitzes a game end
+    // with the blitzer stuck in contact although he has MA left AND a free
+    // square to go to, and it happens to AV7 pieces (Wardancer, Catcher,
+    // Gutter Runner) 1.5x more often than to AV9.
+    //
+    // `usedBlitz` is the marker rather than hasMoved: it means "declared a
+    // blitz", so this cannot hand a second move to everyone who merely walked.
+    //
+    // ⚠️ SCOPE -- this is the RETREAT only. The user's other case, "the carrier
+    // opens his own lane with a blitz and runs through it", needs SCORE/ADVANCE
+    // to accept a mid-activation player and is a bigger change; the carrier is
+    // skipped here and keeps his own macros.
+    // ⚠️ No GFI: a retreat bought with a Go For It is a gamble, not hygiene,
+    // and M9's ceiling counted only squares reachable on real movement.
+    state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (!blitzContinuationArm(mySide)) return;
+        if (!p.canAct() || !p.usedBlitz) return;
+        if (p.hasSkill(SkillName::BallAndChain)) return;
+        if (iHaveBall && p.id == carrier->id) return;
+        if (p.movementRemaining <= 0) return;
+        if (countTacklezones(state, p.position, mySide) == 0) return;  // not exposed
+
+        // Nearest free square that is outside EVERY enemy tackle zone. The
+        // target is geometric and the executor walks it, exactly like every
+        // other REPOSITION target here -- if the walk stalls, the blitzer ends
+        // up no worse than he already is.
+        int reach = p.movementRemaining;
+        Position best{-1, -1};
+        int bestDist = 99;
+        for (int dy = -reach; dy <= reach; ++dy) {
+            for (int dx = -reach; dx <= reach; ++dx) {
+                if (dx == 0 && dy == 0) continue;
+                Position cand{static_cast<int8_t>(p.position.x + dx),
+                              static_cast<int8_t>(p.position.y + dy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand) != nullptr) continue;
+                if (countTacklezones(state, cand, mySide) != 0) continue;
+                int d = p.position.distanceTo(cand);
+                if (d < bestDist) { bestDist = d; best = cand; }
+            }
+        }
+        if (best.x >= 0) {
+            noteBlitzContinuationEvent();
+            out.push_back({MacroType::REPOSITION, p.id, -1, best});
+        }
+    });
 
     // SCORE: carrier can reach endzone with MA + 2 GFI
     if (iHaveBall && carrier->canAct()) {
@@ -698,14 +849,35 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 
     // BLITZ_AND_SCORE: carrier can almost reach endzone, but opponent blocks path
     // Blitz the blocker out of the way, then move carrier to score
+    //
+    // ⛔ T5.35a (27.08.2026): DOSAH SE UŽ NEPŘIPOČÍTÁVÁ „S REZERVOU".
+    //   Podmínka zněla `dist <= maxReach + 3`. To `+3` je fudge ke slovu
+    //   „almost" v komentáři výše -- jenže krok 2 tohohle makra nosiče
+    //   DOVEDE DO ENDZÓNY, a „skoro" TD nedává. Změřeno na korpusu 25.08.
+    //   (3 000 her, M10): z 1 281 nabídek jich 944 padlo do kol, kde je
+    //   BLITZ_AND_SCORE jediná skórující cesta -- a ve VŠECH 944 byl nosič
+    //   dál než `MA + 2 GFI`, průměrně 10,0 pole. TD tam padlo 0,6 % a bylo
+    //   JEDNO, co nosič udělal (blitz 0/21, blok bez kroku 0/376, jen krok
+    //   4/328, nic 2/219; turnover shodně 32-38 %).
+    //   ⇒ Nabízel se tah, který v tom kole nelze dokončit -- a P27 na tom
+    //     vzorku deset dní měřilo „vadu ve volbě". Vada je v ADMISI.
+    //   ⇒ Šlo tedy jen o to, přestat měřit vlastní šum: to, co zbude, je
+    //     teprve vzorek, kde jde něco rozeznat.
+    // ⚠️ GFI se bere STEJNĚ jako v rules_engine.cpp:36 a pathfinder.cpp:39
+    //   (Sprint dává tři), aby zúžení neodmítlo nabídku, kterou hráč
+    //   SKUTEČNĚ dokáže doběhnout. Blok při blitzu stojí pole pohybu, ale
+    //   platí ho zpravidla SPOLUHRÁČ: výběr blitzujícího se od nosiče
+    //   schválně odklání (expandBlitzAndScore, tie-break `isCarrier`).
     if (iHaveBall && carrier->canAct() && !myTeam.blitzUsedThisTurn) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2;
+        int gfi = carrier->rooted ? 0
+                : (carrier->hasSkill(SkillName::Sprint) ? 3 : 2);
+        int maxReach = carrier->movementRemaining + gfi;
         int ezX = endzoneX(mySide);
         int dx = forwardDx(mySide);
 
         // Carrier can't directly score (SCORE not available) or would need to go through enemies
-        if (dist > 0 && dist <= maxReach + 3) {
+        if (dist > 0 && dist <= maxReach) {
             // Find opponent on the path between carrier and endzone
             int bestBlocker = -1;
             int bestBlockerDist = 999;
@@ -1258,7 +1430,18 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         if (moveDist >= currentDist && bestMove.target == lastPos) return false; // loop
 
         lastPos = p.position;
+        Position before = p.position;
         if (executeAndRecord(state, bestMove, dice, result)) return false;
+
+        // ⛔ GUARD "USPECH BEZ POHYBU" (26.08.2026, treti misto Leapu).
+        // resolveLeap pri chyceni Tentacles vraci ok() a hrac se NEPOHNE
+        // (move_handler.cpp; l. 8586-8587 jmenuje leap vyslovne). Blitzova
+        // smycka tenhle guard ma uz od doby, kdy ji Tentacles potkaly;
+        // makrova chuze ho nemela, protoze do ni zadna "ok-ale-stojim" akce
+        // dosud nevedla. Pripustenim LEAPu se ta cesta OTEVIRA -- bez guardu
+        // by smycka tocila naprazdno az do maxSteps (leapUsedThisTurn sice
+        // brani druhemu skoku, ale mrtve iterace zustavaji).
+        if (state.getPlayer(playerId).position == before) return false;
     }
     return false;
 }

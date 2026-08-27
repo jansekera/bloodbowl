@@ -70,6 +70,33 @@ def one(path):
             bad['vic_nosicu_najednou'] += 1
         if carriers and not held:
             bad['nosic_bez_drzeni'] += 1
+
+    # --- (5) TOUCHDOWNY SEDÍ NA KONEČNÉ SKÓRE (26.08.2026) ---
+    # Vzešlo z uživatelovy kontroly 25.08.: "když se TD na konci první půle
+    # načte v kole 9 -- zkontroluj, jak se načte TD v kole 16."
+    # ⭐ Ověřeno tehdy na 900 hrách: `touchdown` flagy sedí na výsledek 900/900,
+    # ale POSLEDNÍ SNÍMEK SKÓRE jen 882/900 (98 %). Ve 2 % her se TD v posledním
+    # kole hry nemá kde projevit -- žádné další kolo už není. Kdo počítá TD
+    # z přírůstku skóre mezi snímky, SYSTEMATICKY ZTRÁCÍ PRÁVĚ TY POSLEDNÍ,
+    # tedy to, oč u grindu jde.
+    # Kontrola je proti KONEČNÉMU skóre hry, ne proti snímkům, a je per-strana:
+    # samotný součet by neodhalil TD připsaný nesprávné straně.
+    # ⛔⛔ JEN SOUČET, NE ROZDĚLENÍ PO STRANÁCH -- a to je zjištění, ne lenost.
+    # Zkusil jsem 26.08. obojí a obě cesty k "kdo skóroval" jsou slepé:
+    #   · `active_team` je ve snímku s TD flagem UŽ PŘEPNUTÝ na soupeře
+    #     (g1273: active=away, ale míč drží hráč 8 = HOME)
+    #   · `ball_carrier_id` je v 5,5 % TD snímků -1 -- míč je po touchdownu
+    #     odebraný, takže nosič už neexistuje
+    # ⇒ Ze záznamu kola SE NEDÁ ODVODIT, KTERÁ STRANA TD DALA. Kontrola po
+    #   stranách by proto hlásila 10,3 % her jako rozbité, ačkoli engine je
+    #   v pořádku -- byla by to vada KONTROLY vydávaná za vadu enginu, přesně
+    #   to, čemu se tenhle soubor má bránit. Do fronty patří chybějící pole
+    #   (rodina T5.33 "hasActed do turn_logs").
+    # Součet naproti tomu drží: ověřeno 600/600 a 400/400 před zapsáním.
+    td_total = sum(1 for t in d['turn_logs'] if t.get('touchdown'))
+    if td_total != d.get('home_score', 0) + d.get('away_score', 0):
+        bad['TD_flagy_nesedi_na_soucet_skore'] += 1
+
     return bad
 
 if __name__ == '__main__':

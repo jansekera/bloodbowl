@@ -70,3 +70,42 @@ rules_bb2016.txt
 
 # 25.08.: nezávislý build adresář pro vývoj, když je engine/build zmrazený nocí
 engine/build_dev/
+
+# 26.08.: běhová korpusová DATA se do gitu nedávají (203 MB, 18 000 souborů,
+# repo je veřejné). Soubory zůstávají na disku a v záloze — vyřazuje se jen
+# SLEDOVÁNÍ, nemaže se nic. Výsledkové soubory běhu (checks/drives/HEAD) se
+# commitují dál, jak bylo zvykem.
+# bez lomítka: od 26.08. jsou to SYMLINKY na ../bb-data/ (data přesunuta ven
+# z repa, aby nemátla v pracovním adresáři; skripty s natvrdo zadanou cestou
+# fungují dál přes symlink)
+crosses_20260821
+crosses_20260821_data
+*_corpus_data/
+
+# zálohy konfigurace s datem v příponě
+*.bak-*
+
+# ⭐⭐⭐ 26.08.: Z BĚHU SE COMMITUJE JEN VYHODNOCENÍ, NE MATERIÁL.
+# Uživatel dal pravidlo "výsledky běhů do gitu nedávat" a vzápětí vrátil
+# rozhodnutí mně. Dělící čára NENÍ "je to výstup běhu", ale VELIKOST × ŽIVOTNOST:
+#
+#   checks/drives/invariants/HEAD   7 kB/běh   ← DOVNITŘ. Dnes ráno vyšel
+#       nález dne ze srovnání s drives.txt starým 6 DNÍ. "Cenu jen těsně po
+#       vyhodnocení" tahle kategorie nemá -- je to jediný trvalý záznam
+#       chování enginu v čase, a HEAD/ENGINE_HEAD je provenience, bez které
+#       se zpětně nepozná, co běh vlastně měřil (viz ABI nesoulad 24.08.).
+#   per-pair shardy                 2,8 MB/běh ← VEN, cena končí vyhodnocením
+#   korpusová data                   34 MB/běh ← VEN, dtto (a žijí v ../bb-data)
+#
+# Ignorují se proto PODADRESÁŘE běhu, ne běh sám -- výsledkové soubory
+# v kořeni tím projdou.
+blitzlanding_*/*/
+carrier_square_*/*/
+*_replic_*/*/
+*_lighttest_*/*/
+
+# semafory běhu (0 B, říkají jen "doběhlo" — to už plyne z výsledků)
+*_DONE
+
+# běhy Leapu (26.08.) — týž důvod jako ostatní běhové adresáře
+leapwalk_*/

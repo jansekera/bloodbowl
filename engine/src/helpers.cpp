@@ -50,6 +50,12 @@ Position pickApproachStep(const GameState& state, const Player& mover,
     return bestNext;
 }
 
+int calculateLeapTarget(const Player& player) {
+    int target = 7 - player.stats.agility;
+    if (player.hasSkill(SkillName::VeryLongLegs)) target -= 1;
+    return std::clamp(target, 2, 6);
+}
+
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source) {
     int ag = player.stats.agility;

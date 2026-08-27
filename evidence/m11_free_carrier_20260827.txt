@@ -1,0 +1,29 @@
+korpus blitzlanding_replic_20260825_corpus_data: 3000 her
+volný nosič (v žádné TZ) v 8653 tazích; z toho STÁL v 2408 (27.8%)
+
+CO BYLO V NABÍDCE — podíl tahů, kde makro bylo k dispozici
+makro                   nosič STÁL     nosič ŠEL    rozdíl
+----------------------------------------------------------
+END_TURN                   100.0%        100.0%     +0.0%
+CAGE                       100.0%        100.0%     +0.0%
+BLITZ                       99.9%        100.0%     -0.1%
+REPOSITION                  99.8%         99.7%     +0.0%
+ADVANCE                     97.7%         95.8%     +1.9%
+BLOCK                       79.0%         79.8%     -0.8%
+FOUL                        45.7%         50.7%     -5.0%
+PASS_ACTION                  3.9%          1.9%     +2.0%
+SCORE                        2.3%          4.2%     -1.9%
+PASS_SCORE                   2.2%          1.1%     +1.1%
+BLITZ_AND_SCORE              1.2%          1.7%     -0.5%
+CHAIN_SCORE                  1.1%          0.6%     +0.5%
+HAND_OFF_SCORE               0.6%          0.4%     +0.3%
+
+JAK DOBŘE BYL KRYTÝ (průměr na tah, definice = CageSnapshot/T5.34)
+veličina                          nosič STÁL     nosič ŠEL
+----------------------------------------------------------
+rohy                                    1.93          1.42
+z toho označené                         0.31          0.21
+ortogonály obsazené                     1.28          0.88
+  z toho NAŠI                           1.27          0.86
+pole PŘÍMO VPŘED obsazené               0.56          0.35
+  z toho NÁŠ hráč                       0.56          0.34

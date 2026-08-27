@@ -1,0 +1,65 @@
+Q19 — NÁKRES PRO DISKUZI PO 16:00 (27.08.2026)
+==============================================
+⭐ TOHLE NENÍ NÁKRES TOHO, ŽE JE POZDĚ. To by otázkou nehnulo (uživatel 27.08.).
+   Je to nákres MOMENTU, KDY BYLO JEŠTĚ OTEVŘENO — a co jsme v něm udělali.
+
+g0010, půle 2, KOLO 6, my = dwarf, soupeř = skaven, 0:0. Naše endzóna VLEVO,
+skórujeme VPRAVO na x=25 (nákres je oříznutý na x=8..17, mimo nikdo nestojí).
+
+CO JE NA DESCE:
+  · nosič `DRo/3` = Runner s míčem na (14,4), **11 polí od endzóny**,
+    stojí ve TŘECH tacklezónách
+  · `DR/0` na (12,6) = DRUHÝ Runner, MA 6, **VOLNÝ — v nulové tacklezóně**,
+    13 polí od endzóny
+  · zbývají 3 kola ⇒ jeho dosah je 3 × 6 = **18 polí > 13** ⇒ DOŠEL BY
+
+CO SE V TOM KOLE STALO — celý tým udělal JEDNU věc:
+      Longbeard +Guard   BLOCK   (9,6) -> (9,7)
+  Volný Runner se **nepohnul ani o pole**. Nosič taky ne — v kole 7 stojí
+  oba přesně tam, kde byli.
+
+⇒ V kole 7 už dosah nejrychlejšího volného hráče (MA 5 × 2 kola = 10) NESTAČÍ
+  na 12 polí. **Mezi kolem 6 a 7 se to zavřelo, a zavřelo se to NEČINNOSTÍ.**
+
+TEDY OTÁZKA NA DISKUZI NENÍ „proč jsme v kole 8 neblitzli", ale:
+  ⭐⭐ **Co má tým dělat v kole 6, aby v kole 8 bylo koho hledat?**
+  Uživatel to pojmenoval: *nachystat někoho blíž dřív, jako elfové* — a zařadil
+  to do CELOTAH, protože každá aktivace dnes vidí jen sebe.
+
+KONTEXT (celá 2. půle, naše kola):
+  kolo 2: nosič d=22 · volný Runner MA6 d=18, zbývá 7 kol (dosah 42)
+  kolo 4: nosič d=13 · volný Runner MA6 d=14, zbývá 5 kol (dosah 30)
+  kolo 6: nosič d=11 · volný Runner MA6 d=13, zbývá 3 kola (dosah 18)  <= JEŠTĚ OTEVŘENO
+  kolo 7: nosič d=11 · nejrychlejší volný MA5 d=12, zbývají 2 kola (dosah 10)  <= ZAVŘENO
+  kolo 8: nosič d=10, MA 6 ⇒ nedojde ani se dvěma GFI. Brána přesto nabídla BLITZ_AND_SCORE.
+  ⚠️ Nosič ušel za 7 kol 12 polí = 1,7 pole na kolo.
+
+g0010.json.gz  idx 26  půle 2 kolo 6  hraje: MY
+
+        8       9       10      11      12      13      14      15      16      17     
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=1  |       |       |       |       |       |       |       |       |       |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=2  |       |       |       |       |       |   1   | DT_   |   2   |   1   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=3  |       |       |       |       |       | DLG/1 | SB    | SLW   |   2   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=4  |       |       |       |       |       | DL/1  | DRo/3 | SL    |   2   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=5  |       |       |       |       |       | DT/0  | DL/1  | SG_   |   1   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=6  |   1   | DLG/1 |   1   | SL_   | DR/0  |       | DL/1  | SL_   |   1   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=7  |   1   | SG    |   1   |       |   1   |   1   |   2   | SLW   | DB/1  |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=8  |   1   |   1   |   1   |       |   1   | SG    |   2   |   1   |   1   |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+ y=9  |       |       |       |       |   1   |   1   |   1   |       |       |       |
+      +-------+-------+-------+-------+-------+-------+-------+-------+-------+-------+
+
+D dwarf · W wood-elf · S skaven · O orc · H human   +role
+stunned = malými · `_` = leží · `o` = drží míč
+ČÍSLO v prázdném poli = kolik JEJICH tackle zón na něj dosahuje
+`/n` = JEN u NAŠICH stojících, VŽDY (i `/0`) — v kolika jejich zónách stojí
+`-` = ODEHRANÝ — jen v ŽIVÉ HŘE (překreslení uprostřed tahu).
+   V korpusu se nepoužije: snímek je ze ZAČÁTKU kola a `hasActed` se neukládá.
