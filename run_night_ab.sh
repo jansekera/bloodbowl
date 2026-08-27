@@ -310,7 +310,14 @@ if [ "$CORPUS" != "0" ]; then
     if [ -f "$CORPUS_DATA/COLLECT_DONE" ]; then
         night_log "korpus už existuje, přeskakuji"
     else
-        night_log "START korpus $CORPUS_GAMES her se zapnutým ramenem"
+        # ⛔ 27.08.: DO DNESKA TU STÁLO „se zapnutým ramenem" A BYLA TO NEPRAVDA.
+        # Korpus sbírá SAMOSTATNÝ python proces (`diag_replay_mine_...gate.py`),
+        # ramena jsou thread-local proměnné v harnessu a binding je neumí
+        # zapnout -- `bb_module.cpp` žádné `set_*_arm` neexportuje. Sbírá se
+        # tedy PRODUKČNÍ nastavení s rameny VYPNUTÝMI, což je správně (korpus
+        # má být baseline). Fable si 27.08. z té hlášky odvodil do metodiky
+        # svého auditu, že korpus nese zapnuté P35 -- štítek zalhal dál.
+        night_log "START korpus $CORPUS_GAMES her — PRODUKČNÍ nastavení, ramena VYPNUTÁ"
         if CAGE_GATE=0 DAUNTLESS=1 DATA_ROOT="$CORPUS_DATA" SEED_BASE=20260900 \
                 nice -n 19 python3 diag_replay_mine_20260813_gate.py collect "$CORPUS_GAMES" \
                 > "$OUT/collect.log" 2>&1; then
