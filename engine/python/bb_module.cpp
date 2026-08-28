@@ -232,7 +232,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
                 "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
                 "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
-                "EJECTED", "HAND_OFF", "STAND_UP", "LEAP"
+                "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP"
                 // Positional map onto GameEvent::Type -- append only.
             };
             for (auto& turn : lgr.turnLogs) {

@@ -39,6 +39,19 @@ struct GameEvent {
              // modifikatoru (krome Very Long Legs). Merit rameno na skok,
              // ktery v logu vypada jako dodge, nema cenu -- proto je tohle
              // PREREKVIZITA A/B, ne kosmetika.
+             ,
+        FOLLOW_UP // 2026-08-28 (M1/N10 dočtení): follow-up nastavoval
+             // `att.position = defOldPos` a NEEMITOVAL NIC, takže se v korpusu
+             // nedalo odlišit "nikdo nenásleduje" od "následování se neloguje"
+             // -- táž třída jako STAND_UP před 21.08. Předregistrace noci
+             // 27.->28.08. se na počet ODMÍTNUTÝCH follow-upů ptala a odpovědět
+             // nešlo.
+             // ⭐ EMITUJE SE I KDYŽ SE FOLLOW-UP NEVEZME (`success=false`).
+             // Bez toho by v logu chyběl JMENOVATEL a "odmítnuto" by se
+             // nedalo odlišit od "nebylo co odmítnout" -- přesně ta past,
+             // do které první čtení 28.08. spadlo (dělilo všemi bloky,
+             // ačkoli obránce uvolní pole jen v 80 % blitzů).
+             // `from` = kde útočník stál, `to` = uvolněné pole obránce.
              // MUST STAY LAST: bb_module.cpp maps this enum to names
              // positionally, so append only.
     };

@@ -871,15 +871,23 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
             // Follow-up: attacker to old defender position -- but only if he
             // wants it (l. 608-611). See wantsFollowUp above.
-            if (!noFollowUp && wantsFollowUp(state, att, params, defOldPos)) {
-                att.position = defOldPos;
-                if (state.ball.isHeld && state.ball.carrierId == att.id) {
-                    state.ball.position = att.position;
-                } else if (!state.ball.isHeld && state.ball.position == att.position) {
-                    // Following up onto a loose ball attempts a pickup,
-                    // same as deliberately moving onto one.
-                    if (!resolvePickup(state, att.id, dice, events)) {
-                        turnover = true;
+            if (!noFollowUp) {
+                // 2026-08-28: FOLLOW_UP se emituje I KDYZ se nenasleduje.
+                // Bez toho v logu chybi jmenovatel -- viz game_event.h.
+                const Position attOldPos = att.position;
+                const bool wants = wantsFollowUp(state, att, params, defOldPos);
+                emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id,
+                                  attOldPos, defOldPos, 0, wants});
+                if (wants) {
+                    att.position = defOldPos;
+                    if (state.ball.isHeld && state.ball.carrierId == att.id) {
+                        state.ball.position = att.position;
+                    } else if (!state.ball.isHeld && state.ball.position == att.position) {
+                        // Following up onto a loose ball attempts a pickup,
+                        // same as deliberately moving onto one.
+                        if (!resolvePickup(state, att.id, dice, events)) {
+                            turnover = true;
+                        }
                     }
                 }
             }
@@ -930,16 +938,25 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // a chain that jams against one) leaves the defender where he stood, and
         // we used to walk the attacker onto him -- two players on one square.
         bool defVacated = def.position != defOldPos;
-        if (!noFollowUp && !fendPrevents && defVacated &&
-            wantsFollowUp(state, att, params, defOldPos)) {
-            att.position = defOldPos;
-            if (state.ball.isHeld && state.ball.carrierId == att.id) {
-                state.ball.position = att.position;
-            } else if (!state.ball.isHeld && state.ball.position == att.position) {
-                // Following up onto a loose ball attempts a pickup, same
-                // as deliberately moving onto one.
-                if (!resolvePickup(state, att.id, dice, events)) {
-                    turnover = true;
+        if (!noFollowUp && !fendPrevents && defVacated) {
+            // 2026-08-28: FOLLOW_UP se emituje I KDYZ se nenasleduje --
+            // `success` nese volbu, ne uspech hodu. Podminka nad tim je
+            // PRILEZITOST (pole se uvolnilo a nic ji nezakazuje), takze
+            // odmitnuti uz jde odlisit od "nebylo co odmitnout".
+            const Position attOldPos = att.position;
+            const bool wants = wantsFollowUp(state, att, params, defOldPos);
+            emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id,
+                              attOldPos, defOldPos, 0, wants});
+            if (wants) {
+                att.position = defOldPos;
+                if (state.ball.isHeld && state.ball.carrierId == att.id) {
+                    state.ball.position = att.position;
+                } else if (!state.ball.isHeld && state.ball.position == att.position) {
+                    // Following up onto a loose ball attempts a pickup, same
+                    // as deliberately moving onto one.
+                    if (!resolvePickup(state, att.id, dice, events)) {
+                        turnover = true;
+                    }
                 }
             }
         }

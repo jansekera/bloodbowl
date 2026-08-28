@@ -1216,3 +1216,82 @@ TEST(BlockHandler, BothDownKnocksBothPlayersDownInPlaceWithNoPushOrFollowUp) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_FALSE(result.turnover);
 }
+
+// --- FOLLOW_UP event (28.08.2026) -------------------------------------------
+//
+// Follow-up used to set `att.position = defOldPos` and emit nothing, so a
+// corpus could not tell "nobody follows up" from "following up is not logged".
+// The pre-registration of the 27.->28.08. night asked how often the follow-up
+// is REFUSED and the question was unanswerable for that reason alone -- the
+// same class as STAND_UP before 21.08.
+//
+// ⭐ The event fires on the OPPORTUNITY, not on the choice: `success` carries
+// whether the follow-up was taken. Without that the log would hold a numerator
+// with no denominator, and "refused" would be indistinguishable from "there was
+// nothing to refuse" -- which is exactly how the first reading on 28.08. went
+// wrong (it divided by every block, though a defender vacates in only 80 % of
+// blitzes).
+static int countFollowUps(const std::vector<GameEvent>& ev, bool taken) {
+    int n = 0;
+    for (const auto& e : ev) {
+        if (e.type == GameEvent::Type::FOLLOW_UP && e.success == taken) ++n;
+    }
+    return n;
+}
+
+TEST(BlockHandler, FollowUpTakenIsLogged) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED
+    BlockParams params{1, 12, true, false};    // blitz, arm OFF => always follows
+    resolveBlock(gs, params, dice, &ev);
+
+    ASSERT_EQ(countFollowUps(ev, true), 1);
+    ASSERT_EQ(countFollowUps(ev, false), 0);
+    for (const auto& e : ev) {
+        if (e.type != GameEvent::Type::FOLLOW_UP) continue;
+        EXPECT_EQ(e.playerId, 1);
+        EXPECT_EQ(e.targetId, 12);
+        EXPECT_EQ(e.from, (Position{10, 7})) << "from = where the attacker stood";
+        EXPECT_EQ(e.to, (Position{11, 7})) << "to = the square the defender left";
+    }
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+}
+
+TEST(BlockHandler, FollowUpDeclinedIsLoggedToo) {
+    BlitzContinuationArmOn arm(TeamSide::HOME);
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED: (11,7) is freed
+    BlockParams params{1, 12, true, false};
+    resolveBlock(gs, params, dice, &ev);
+
+    // The blitzer stays put -- and the log still records that he COULD have.
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+    EXPECT_EQ(countFollowUps(ev, false), 1) << "the refusal must be countable";
+    EXPECT_EQ(countFollowUps(ev, true), 0);
+}
+
+TEST(BlockHandler, NoFollowUpEventWhenTheDefenderNeverVacated) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED, but Stand Firm holds
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &ev);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(countFollowUps(ev, true) + countFollowUps(ev, false), 0)
+        << "no square was freed, so there was no opportunity to log";
+}
