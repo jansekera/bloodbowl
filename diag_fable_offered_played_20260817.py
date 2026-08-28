@@ -80,6 +80,15 @@ SKILLS = {
     ("wood-elf", "Thrower +Block"): {"Pass", "Block"},
     ("wood-elf", "Treeman +Guard"): {"Loner", "TakeRoot", "StandFirm",
                                      "MightyBlow", "ThickSkull", "Guard"},
+    # 2026-08-27 (uzivatel): DVA linemani s Wrestle KAZDEMU tymu, ne jen
+    # skavenovi -- roster.cpp:522, :551, :584, :602, :630. Bez techto radku
+    # `skills()` PADALO na KeyError a blokovalo kazdy rozbor nad nabidkami
+    # (M10, M11, audit dosahu). ⭐ Padat je tu spravne: tichy `.get(..., set())`
+    # by mlcky tvrdil, ze hrac nema ZADNY skill, coz je horsi nez pad.
+    ("dwarf", "Longbeard +Wrestle"): {"Block", "Tackle", "ThickSkull", "Wrestle"},
+    ("orc", "Lineman +Wrestle"): {"Wrestle"},
+    ("human", "Lineman +Wrestle"): {"Wrestle"},
+    ("wood-elf", "Lineman +Wrestle"): {"Wrestle"},
 }
 
 # passRangeFromOffset — přepis enums.h:204-233 (Q=0,S=1,L=2,B=3, X=None)
