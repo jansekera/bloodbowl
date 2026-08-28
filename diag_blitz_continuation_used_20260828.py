@@ -133,7 +133,13 @@ if __name__ == '__main__':
     print(f"      ZUSTAL v kontaktu             {tot['ZUSTAL']:7d}  "
           f"{P('ZUSTAL', tot['MEL_KAM']):5.1f} %   {tot['ZUSTAL']/g:.2f}/hru  <= zbyvajici strop")
     print()
-    print("  (3) FOLLOW-UP:")
+    print("  (3) FOLLOW-UP:  NECITELNE -- follow-up NEEMITUJE ZADNOU UDALOST")
+    print("      block_handler.cpp:875 nastavi att.position = defOldPos a nic")
+    print("      neemituje, takze rekonstrukce pozice z MOVE ho NEVIDI.")
+    print("      Cisla nize pocitaji jen pripady, kdy na uvolnene pole vedl")
+    print("      MOVE -- coz je jina vec. Nejde odlisit `nikdo nenasleduje`")
+    print("      od `nasledovani se neloguje`: trida STAND_UP pred 21.08.")
+    print("      => chce to EVENT, ne dalsi korpus.")
     b = tot['bloku_s_cilem']
     print(f"      bloku, kde obrance POLE UVOLNIL {b:7d}  {P('bloku_s_cilem', n):5.1f} % z blitzu")
     print(f"      vzat (stoji na poli obrance)  {tot['followup_vzat']:7d}  {P('followup_vzat', b):5.1f} %")
