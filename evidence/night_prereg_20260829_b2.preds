@@ -1,0 +1,78 @@
+# Předpovědi cyklu B2 — CENA BLOKU PROTI OBRÁNCI, KTERÝ WRESTLE POUŽIJE.
+# Strojově kontroluje night_summarize.py. Mode 11, větev `b2-wrestle-pricing`.
+# MATCHUPS="2:dw-dw:1"
+# NAPSÁNO 28.08.2026 dopoledne, PŘED během. Čísla pod ním jsou z korpusu
+# noci 27.->28.08. (nové sestavy) a ze sond na TÉŽE binárce.
+#
+# ⭐ CO SE MĚŘÍ
+# Hledání dosud oceňovalo blok proti obránci s `Wrestle` tak, jako by Wrestle
+# neměl. Pravidlo samo v enginu JE od 24.08. (`block_handler.cpp`, case
+# BOTH_DOWN); chybělo, aby s ním počítalo OCENĚNÍ v MCTS. Rameno
+# `setWrestlePricingArm` to doplňuje na jednom místě.
+#
+# ⭐⭐ TOHLE NENÍ PRAVIDLOVÁ OPRAVA — a proto se TADY zisk měřit SMÍ.
+# U Leapu a M1/N10 platilo „měřítko je parita, ne zisk", protože engine
+# pravidlo NEUMĚL. Tady ho umí a jen ho špatně ocení. ⇒ Správnější ocenění MÁ
+# vést k lepší volbě; kdyby nevedlo, je to nález o hledání, ne o pravidlech.
+#
+# ⭐⭐⭐ PROČ `dw-dw` A NE `dw-sk` NEBO `dw-we` — TŘI NEZÁVISLÁ MĚŘIDLA
+#   (1) sonda repicků 27.08.:  dw-dw 8,62/hru  ·  dw-sk 8,38/hru
+#   (2) strop z korpusu 28.08. (600 her, `diag_b2_wrestle_ceiling_20260828.py`):
+#       bloků na obránce s Wrestle —  dw-dw 17,50/hru · dw-sk 12,23 · dw-we 9,91
+#   (3) sonda na TÉŽE binárce 28.08. (12 párů):
+#       dw-dw  9,83 repicku/hru, n_nonzero 1/12
+#       dw-we  0,62 repicku/hru, n_nonzero 0/12  <= ŠESTNÁCTKRÁT MÍŇ
+#   ⇒ dw-we by byl SLEPÝ VZOREK. Mechanismus: repick chce útočníka s `Block`
+#     PROTI obránci s `Wrestle`, a trpaslík má Block skoro všude.
+#   ⭐ A dw-dw je ZRCADLO — rameno hraje v obou orientacích symetricky, týž
+#     důvod, proč Leap dostal we-we.
+#   ⛔ Do 27.08. by dw-dw dalo TVRDOU NULU (trpaslík Wrestle neměl).
+#
+# ⚠️ PÁKA JE MALÁ A VÍ SE TO PŘEDEM. Ověření vzorku 27.08.: cena se OPRAVDU
+# liší jen u ~2,4 % našich bloků (útočník musí mít Block). Proto je pásmo
+# delty úzké kolem nuly a připouští zápor.
+#
+# ⚠️ `n_nonzero` SE ČEKÁ NÍZKÉ — a je to vlastnost, ne vada. Rameno mění
+# ocenění, ne repertoár; většina párů dohraje shodně. Sonda dala 1/12, což je
+# na 12 párech skoro nic ⇒ pásmo je schválně široké. ⛔ NÍZKÉ n_nonzero
+# NEZNAMENÁ slabý běh: nulové páry snižují rozptyl, takže SE vyjde MENŠÍ než
+# u M1/N10 (tam 59,2 % neslo 0,0069).
+
+delta      in   -0.020 0.080   # dvoustranná (chessCandHome + chessCandAway − 1)
+delta_1s   in   -0.010 0.040   # totéž jednostranně
+leak       ==    0             # jinak se delta NEČTE
+arm_acted  >=    0.50          # sonda 28.08.: 8/12 párů = 0,67; bursty
+n_nonzero  in    0.03  0.35    # sonda 1/12; schválně široké
+arm_picks  >=    55000         # APARÁTOVÁ PODLAHA pro 4 800 párů = 9 600 her.
+                               # Sonda 28.08.: 236 repicků / 24 her = 9,83/hru
+                               # ⇒ očekávej ~94 000. Podlaha = 5,73/hru = 58 %
+                               # sondy ⇒ chytne rameno běžící na dvě třetiny.
+                               # ⚠️ JEDNOTKA JE REPICK, tedy SKUTEČNÁ ZMĚNA
+                               # VÝBĚRU — ne „cena se lišila". Čítač
+                               # `g_wrestlePricingRepicks` (commit 38f2d21b)
+                               # vznikl právě proto, že „cena se lišila" se
+                               # nedá odlišit od „rameno se jen dívalo".
+
+# --- RUČNĚ, harness to neumí ------------------------------------------------
+# ⭐ (1) ZRCADLO SE MUSÍ OVĚŘIT, NE PŘEDPOKLÁDAT. dw-dw je zrcadlo v sestavách,
+#   ale ne v pořadí tahů (kdo má výkop). ⇒ Rozpad delty po orientacích:
+#   `chessCandHome` a `chessCandAway` mají vyjít PODOBNĚ. Když ne, dělení
+#   dvěma NEPLATÍ a jednostranný odhad se nesmí citovat. (Postup ověřený
+#   28.08. na M1/N10: TD/hru téže rasy, párováno po `seed_idx`.)
+#
+# ⭐ (2) KOLIK REPICKŮ PŘIPADÁ NA JEDEN ZMĚNĚNÝ ZÁPAS. `arm_picks / n_nonzero`.
+#   Sonda dává 236/1 = 236, což je podezřele mnoho. Když to zůstane, znamená
+#   to, že rameno mele naprázdno: mění výběr v hledání, ale ne výsledek hry
+#   ⇒ nález o HLEDÁNÍ (odkud se ta volba stejně vrátí zpátky), ne o ceně.
+#   ⚠️ Tohle je jediné číslo, které umí odlišit „malý efekt" od „efekt se
+#   ztratí uvnitř MCTS", a z A/B samotného se nevyčte.
+#
+# ⭐ (3) DOSTAL Wrestle NĚKDO, KDO HO POUŽIJE? Ocenění je od 38f2d21b srovnané
+#   s resolverem, takže se nepočítá Wrestle, který by obránce NEPOUŽIL.
+#   Zkontrolovat z korpusu, že `Longbeard +Wrestle` (Block+Tackle+Wrestle)
+#   opravdu tvoří většinu příležitostí na dw-dw — je to jediný nositel
+#   kombinace Block+Wrestle, kterou změna sestav 27.08. vyrobila ZÁMĚRNĚ.
+#
+# ⛔ (4) NIC O DÍŘE VE ZDI. Otázka „obránce by Wrestle nepoužil, kdyby držel
+#   nosný roh" potřebuje POJEM ZDI, a ten je až v CELOTAHU. Tenhle běh na ni
+#   NEODPOVÍDÁ a nesmí se tak číst.

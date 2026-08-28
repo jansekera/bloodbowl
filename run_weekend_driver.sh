@@ -38,10 +38,23 @@
 #   ./run_weekend_driver.sh MANIFEST [--dry-run]
 #
 # MANIFEST -- jeden cyklus na řádek, sloupce oddělené `|`, `#` je komentář:
-#   jmeno | git-ref | mode | paru | prereg-cesta | corpus(0/1)
+#   jmeno | git-ref | mode | paru | prereg-cesta | corpus(0/1) | matchup
 # Například:
-#   p35    | main                      | 8 | 4800 | evidence/night_prereg_20260825.preds | 0
-#   m1n10  | m1-n10-blitz-continuation | 9 | 4800 | evidence/night_prereg_20260827.preds | 1
+#   p35    | main                      | 8 | 4800 | evidence/night_prereg_20260825.preds | 0 | 1:dw-we:1
+#   b2     | b2-wrestle-pricing        |11 | 4800 | evidence/night_prereg_20260829_b2.preds | 0 | 2:dw-dw:1
+#
+# ⛔⛔ SLOUPEC `matchup` PŘIBYL 28.08.2026 A JE TO OPRAVA TICHÉ VADY.
+#   Do té doby driver posílal do run_night_ab.sh natvrdo MATCHUPS="1:dw-we:1",
+#   a manifest o tom NIC neříkal -- žádný sloupec, žádný řádek v logu. Cyklus
+#   napsaný pro jiný matchup by tedy proběhl na dw-we, skončil rc=0 a vypadal
+#   NORMÁLNĚ.
+#   Změřeno týž den na mode 11 (B2), 12 párů na binárku:
+#     dw-dw  9,83 repicku/hru, n_nonzero 1/12
+#     dw-we  0,62 repicku/hru, n_nonzero 0/12   <= SLEPÝ VZOREK
+#   ⇒ B2 puštěné bez tohohle sloupce by dalo deltu ~0 a četlo by se jako
+#     „rameno nepomáhá". To není slabý efekt, to je jiná otázka.
+#   Chybí-li sloupec, driver cyklus ODMÍTNE. Mlčky doplněná výchozí hodnota
+#   je přesně ta vada, která se tu opravuje.
 # ============================================================================
 set -u
 ROOT=/home/jan/claude/bloodbowl
@@ -85,16 +98,31 @@ cd "$ROOT" || exit 1
 if [ -z "$DRY" ] && harness_running; then say "⛔ už běží harness — NESPOUŠTÍM"; exit 1; fi
 
 ok=0; failed=0; skipped=0
-while IFS='|' read -r name ref mode pairs prereg corpus; do
+while IFS='|' read -r name ref mode pairs prereg corpus matchup; do
     name=$(echo "$name" | xargs); [ -z "$name" ] && continue
     case "$name" in \#*) continue;; esac
     ref=$(echo "$ref" | xargs); mode=$(echo "$mode" | xargs)
     pairs=$(echo "$pairs" | xargs); prereg=$(echo "$prereg" | xargs)
     corpus=$(echo "${corpus:-0}" | xargs)
+    matchup=$(echo "${matchup:-}" | xargs)
     OUT="wknd_${name}_${STAMP}"
 
     say ""
-    say "--- CYKLUS '$name': ref=$ref mode=$mode párů=$pairs korpus=$corpus"
+    say "--- CYKLUS '$name': ref=$ref mode=$mode párů=$pairs korpus=$corpus matchup=${matchup:-CHYBÍ}"
+
+    # (d5) MATCHUP SE NEDOPLŇUJE MLČKY. Viz hlavička: do 28.08. tu byla
+    # natvrdo dw-we a manifest o tom neměl sloupec, takže cyklus napsaný pro
+    # jiný matchup doběhl rc=0 na slepém vzorku. Výchozí hodnota by tu vadu
+    # jen přemalovala.
+    if [ -z "$matchup" ]; then
+        say "⛔ '$name' PŘESKOČEN: chybí sloupec matchup (tvar 'idx:jméno:expozice', např. 2:dw-dw:1)"
+        skipped=$((skipped+1)); continue
+    fi
+    case "$matchup" in
+        *:*:*) ;;
+        *) say "⛔ '$name' PŘESKOČEN: matchup '$matchup' nemá tvar 'idx:jméno:expozice'"
+           skipped=$((skipped+1)); continue;;
+    esac
 
     # (d1) CLEAR je PODMÍNKA, ne úklid: existující OUT by běh tiše přeskočil
     if [ -e "$OUT" ]; then
@@ -144,7 +172,7 @@ while IFS='|' read -r name ref mode pairs prereg corpus; do
     MODE="$mode" PAIRS=$((pairs/8)) SHARDS=8 THRESHOLD=0.015 \
     CHUNKS=40 WORKERS=8 CONTROL_MODE2=1 CONTROL_PAIRS=50 \
     CORPUS="$corpus" CORPUS_GAMES=3000 \
-    MATCHUPS="1:dw-we:1" PREREG="$ROOT/$prereg" OUT="$OUT" \
+    MATCHUPS="$matchup" PREREG="$ROOT/$prereg" OUT="$OUT" \
         ./run_night_ab.sh >>"$LOG" 2>&1
     rc=$?
     if [ $rc -eq 0 ]; then say "✅ '$name' HOTOV (rc=0), výsledek v $OUT/chain.log"; ok=$((ok+1))
