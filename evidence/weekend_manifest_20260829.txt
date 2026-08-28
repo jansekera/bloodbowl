@@ -1,0 +1,33 @@
+# MANIFEST VÍKENDU 29.-31.08.2026 — psáno v PÁTEK 28.08. dopoledne
+# jmeno | git-ref | mode | paru | prereg | corpus(0/1) | matchup
+#
+# ⭐ SLOUPEC `matchup` JE NOVÝ (28.08.). Do dneška ho manifest neměl a driver
+#   posílal natvrdo dw-we -- viz hlavička run_weekend_driver.sh. B2 by na tom
+#   doběhlo rc=0 na slepém vzorku (0,62 repicku/hru proti 9,83 na dw-dw).
+#
+# ⏰ TEMPO OVĚŘENO PRO TENTO MATCHUP, NEPŘEVZATO (manifest to zakazuje):
+#   sonda 28.08., 12 párů, jeden proces, mode 11 na téže binárce:
+#     dw-dw 35,2 s/pár   ·   dw-we 48,8 s/pár
+#   Noc 27.->28.08. jela dw-we pod 8 workery za 70,9 s/pár/worker
+#   ⇒ přirážka za soupeření o stroj 1,45x
+#   ⇒ dw-dw pod 8 workery ~51 s/pár/worker
+#   ⇒ 4 800 párů = 4800*51/8 = 8 h 31 min + kontrola seedování ~44 min
+#   ⇒ CELKEM ~9 h 15 min. Korpus se NEBERE (viz níže) -- ušetří 4 h 19 min.
+#
+# ⭐ PROČ corpus=0: korpus se sbírá s rameny VYPNUTÝMI, a větev b2 mimo rameno
+#   produkci nemění. Nový korpus by byl kopie toho z noci 27.->28.08.
+#   ⛔ A ruční body (2)+(3) z předregistrace M1/N10 potřebují korpus se
+#     ZAPNUTÝM ramenem, což tenhle sloupec neumí ani při corpus=1.
+
+b2 | b2-wrestle-pricing | 11 | 4800 | evidence/night_prereg_20260829_b2.preds | 0 | 2:dw-dw:1
+
+# ⛔⛔ DÁL UŽ NIC — A JE TO ROZHODNUTÍ, NE MEZERA.
+#   Připravené rameno je jen jedno. Ostatní kandidáti:
+#     * LEAP (oprava admise)  -- uživatel 27.08.: celý okruh AŽ PŘÍŠTÍ TÝDEN
+#     * M12 ADVANCE/REPOSITION -- MOVE se dělá příští týden, rameno neexistuje
+#     * M13 / B3 (blitz z lehu, chain push) -- ze včerejší diskuze, nepostavené
+#     * blitz-and-score, vlastní zeď, P39 -- bez ramene
+#   ⭐ „Máme čas" a „je to připravené" NEJSOU žádost o noc
+#     (feedback_spare_time_is_not_a_reason). Druhý cyklus by musel říct, co
+#     odsouvá -- a neodsouvá nic, protože nic dalšího připravené není.
+#   ⇒ Zbytek víkendu zůstává VOLNÝ. Je to otázka na uživatele, ne na mne.
