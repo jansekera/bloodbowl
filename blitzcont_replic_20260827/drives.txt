@@ -1,0 +1,53 @@
+Soubory: 3000 | trpasličích her: 3000 | přijímacích drivů: 3707 | obranných: 3397 | BUG drivů (míč mimo hru): 0
+
+=== PŘIJÍMACÍ DRIVY TRPASLÍKA: A/B/C/D1/D2 ===
+  A  SKÓROVALI          — v drivu je naše TOUCHDOWN událost
+  B  MÍČ NIKDY NEZÍSKÁN — v celém drivu jsme míč ani jednou nedrželi
+  C  ZTRATILI JSME HO   — drželi jsme ho, na konci ho drží soupeř / leží volný
+  D1 POZDNÍ START       — došla kola; zbývalo_kol × 2.61 <  zbývalo_polí
+  D2 POMALÁ KLEC        — došla kola; času bylo dost a TD přesto nepadl
+  jmenovatel = PŘIJÍMACÍ DRIVY (ne zápasy, ne kola); kategorie jsou výlučné
+soupeř           A       B       C      D1      D2  celkem
+dwarf      18 (3%) 16 (2%)323 (48%)286 (42%) 34 (5%)     677
+human      33 (5%) 18 (3%)331 (47%)280 (40%) 42 (6%)     704
+orc         7 (1%)  9 (1%)406 (59%)244 (35%) 25 (4%)     691
+skaven    78 (10%) 41 (5%)267 (34%)326 (41%)78 (10%)     790
+wood-elf   55 (7%) 51 (6%)334 (40%)352 (42%) 53 (6%)     845
+VŠE       191 (5%)135 (4%)1661 (45%)1488 (40%)232 (6%)    3707
+
+=== TOTÉŽ, JEN PLNÉ DRIVY (>=7 našich kol; odpovídá půlím bez předchozího TD) ===
+dwarf      18 (3%)  1 (0%)300 (52%)222 (39%) 34 (6%)     575
+human      30 (5%)  0 (0%)284 (51%)196 (36%) 42 (8%)     552
+orc         7 (1%)  0 (0%)354 (63%)174 (31%) 25 (4%)     560
+skaven    65 (12%)  0 (0%)184 (35%)194 (37%)78 (15%)     521
+wood-elf  48 (10%)  1 (0%)205 (43%)175 (36%)53 (11%)     482
+VŠE       168 (6%)  2 (0%)1327 (49%)961 (36%)232 (9%)    2690
+
+D1 s dosaženým tempem < 2.61 (překryv 'pozdě I pomalu'): 1168 z 1488
+D2 dosažené tempo: 0.87 | D1 dosažené tempo: 1.59
+D1 'krátký drive už od výkopu' (n_kol×2.61 < vzdál. na výkopu): 1445 z 1488
+D1 fumble pickupy před 1. držením: 0.09 | zpoždění 1. držení vs start drivu (kola): 0.22
+D1 s prvním držením až v posledním tahu půle: 135 z 1488
+
+=== DOPLŇKY PER KATEGORIE (vše-soupeři) ===
+[A] n=191 | 1. držení: kolo 1.17, vzdál. 20.00 polí | tempo 2.77 polí/kolo | odpor 3.59 soupeřů
+    nosič (kola s míčem): Runner 94%, Blitzer 4%, Longbeard 2%, Troll Slayer 0%
+    první nosič: Runner 189×, Longbeard 2×
+[B] n=135 | 1. držení: kolo —, vzdál. — polí | tempo — polí/kolo | odpor — soupeřů
+[C] n=1661 | 1. držení: kolo 1.41, vzdál. 20.48 polí | tempo 2.10 polí/kolo | odpor 5.67 soupeřů
+    nosič (kola s míčem): Runner 90%, Blitzer 5%, Longbeard 3%, Troll Slayer 1%
+    příčiny ztráty: soupeřův blitz/blok srazil nosiče 1387×, neúspěšný dodge nosiče 108×, volný míč sebral soupeř 55×, neúspěšné GFI nosiče 37×, nechycená přihrávka/handoff 24×, sražen blokem v našem tahu (both down apod.) 24×, interception/chycení soupeřem 10×, fumble při (znovu)sebrání 9×, drženo jen uvnitř tahu (event), snímkově nikdy 5×, jiné/nejasné 1×, neúspěšná přihrávka 1×
+    ztraceno v kole: 6.16 | vzdálenost od endzone při ztrátě: 12.99 polí
+[D1] n=1488 | 1. držení: kolo 3.11, vzdál. 21.07 polí | tempo 2.07 polí/kolo | odpor 5.50 soupeřů
+    nosič (kola s míčem): Runner 86%, Blitzer 8%, Longbeard 4%, Troll Slayer 2%
+[D2] n=232 | 1. držení: kolo 1.02, vzdál. 17.04 polí | tempo 1.34 polí/kolo | odpor 4.77 soupeřů
+    nosič (kola s míčem): Runner 81%, Blitzer 9%, Longbeard 8%, Troll Slayer 3%
+
+[B] z toho soupeř v drivu skóroval: 87 z 135 | soupeř míč držel: 52 z 135 | naše fumble pickupy/drive: 1.15
+
+=== OBRANNÉ DRIVY TRPASLÍKA (doplněk) ===
+  míč získán, bez TD                  1586 (47%)
+  bez zisku míče, bez TD soupeře      1183 (35%)
+  soupeř TD                           331 (10%)
+  STEAL+TD                            297 (9%)
+

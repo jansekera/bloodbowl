@@ -1,0 +1,48 @@
+korpus: 3000 her
+
+  našich kol                                            44610
+  s míčem na konci kola                                 24399
+  K30 drženo jen klecí/nosičem (R1 zakazuje)             6014
+  K36 locked celkem                                    128609
+  K9a nosič se během kola změnil                           81
+  kolo BEZ míče (obrana) — predikát N/A                 19879
+  kolo skončilo TD (rozvrh započten, pozice ne)           463
+  vyřazeno (poločas mezi snímky)                         1738
+  ⛔ ZTRÁTA MÍČE (rozvrh = nesplněno)                      332
+
+=== KONTROLY (splněno / posuzováno / N/A) ===
+  jednotka n:  K29/K29⭐ = kola s postavenou klecí  ·  K9a/K34 = kola s míčem  ·  K30/K30b = PŘÍLEŽITOSTI K DODGI (ne kola!)
+               K31/K33/K35 = všechna naše kola  ·  N/A = predikát na tom vzorku nedává smysl, NEPOČÍTÁ se jako splněný
+  K29 (R1) žádný roh klece není markovaný       70.6%   n=17025, 27585 N/A (62%)
+  K29⭐ plná ČISTÁ klec (4/4) — ⚠️ jen 2 ze 3 klauzulí   9.4%   n=17025, 27585 N/A (62%)
+    obsazených rohů průměrně (jen kola, kdy klec stojí) 2.10 / 4, z toho čistých 1.74
+    kol s míčem, kdy klec vůbec NESTOJÍ: 7374
+  K29⭐⭐ PRAVIDLO: 4 rohy ∧ všechny čisté ∧ nosič bez dalších sousedů   2.4%   n=24399
+  K9a splnil rozvrhovou podlahu                 20.3%   n=18040, 26999 N/A (60%), ⌀ -3.40 ← metr
+  K38 nosič NEkončí kolo u stojícího soupeře    79.0%   n=24399, 20211 N/A (45%), ⌀ +0.31 ← metr
+  K38b …ani u ležícího (výstraha, ne zákaz)     74.7%   n=19284, 25326 N/A (57%), ⌀ +0.31 ← metr
+  K9c SÓLO — podlaha fáze                       26.4%   n=9634, 28285 N/A (75%), ⌀ -2.27 ← metr
+  K9c KLEC — podlaha fáze                       24.9%   n=7641, 30278 N/A (80%), ⌀ -2.17 ← metr
+  K9c VÝBĚH — podlaha fáze                      55.2%   n=765, 37154 N/A (98%), ⌀ -1.39 ← metr
+  K9a žádala mechanicky NEMOŽNÉ                 30.2%   n=17708, 20211 N/A (53%), ⌀ +1.23 ← metr
+  K30 (R3) drahý dodge je držený                37.5%   n=282044
+  K30b levný dodge je držený (nemá cenu)        34.7%   n=86265
+    z toho drženo jen klecí/nosičem (R1 zakazuje): 6014
+  K31 (R4) kolo BEZ těla bez úkolu              33.9%   n=44610
+    těl bez úkolu na kolo                      2.11 z 11
+  K33 kolo s aspoň jedním blokem                87.0%   n=44610, ⌀ +2.31 ← metr
+
+--- E1/E2: co deska dává soupeři (ČÁST 13) ---
+  K34 (E1) REACH0 = 0 — nikdo nedosáhne bez dodge  35.6%   n=24399, 20211 N/A (45%), ⌀ +2.07 ← metr
+  K35 (E2) FB2 ≤ 1 — bezplatné ≥2kostkové bloky  56.8%   n=44610, ⌀ +1.55 ← metr
+
+--- zámky (hypotéza 12.08.) ---
+  našich stojících v jejich TZ na kolo        2.88 z 11
+  K36 LOCKED → postup nosiče v NÁSLEDUJÍCÍM našem kole   (našich stojících v jejich TZ → Δx nosiče, 27341 degenerovaných)
+      ≤2       n=10653  Δx nosiče = +1.98
+      3–5      n=5779   Δx nosiče = +1.55
+      6–8      n=815    Δx nosiče = +1.18
+      9+       n=22     Δx nosiče = +0.91  ⚠ málo vzorků
+
+plán enginu (X6 / brána klece)
+  plán: NOT_CONSULTED                          100.0%   n=44610 (všechna naše kola)

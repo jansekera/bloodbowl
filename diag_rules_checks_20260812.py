@@ -76,6 +76,10 @@ TACKLE = {  # náš Tackle ruší soupeři Dodge reroll (CRP)
     ("Troll Slayer +Guard+Tackle", 2, 5, 3),
     ("Blitzer ball-hunter", 3, 6, 3),        # human/orc: Strip Ball + Tackle
     ("Blitzer ball-hunter", 3, 7, 3),        # skaven
+    # 2026-08-28: Longbeard si Wrestle PŘIBRAL, Tackle mu zůstal
+    # (roster.cpp:584 -- Block+Tackle+ThickSkull+Wrestle). Kdyby chyběl tady,
+    # cena dodge od něj by se počítala BEZ Tackle, tedy PODHODNOCENĚ.
+    ("Longbeard +Wrestle", 2, 4, 3),
 }
 # Každé jméno v korpusu musí být v ROSTER_KNOWN, jinak skript hlásí chybu.
 # Tiché přeskočení neznámého hráče je přesně ta třída vady, kvůli které se
@@ -85,7 +89,13 @@ ROSTER_KNOWN = DODGE | TACKLE | {
     ("Blitzer +Guard", 3, 7, 3), ("Blitzer +Mighty Blow", 3, 6, 3),
     ("Blitzer +Mighty Blow", 3, 7, 3), ("Lineman", 3, 5, 3),
     ("Lineman", 3, 6, 3), ("Lineman", 3, 7, 3), ("Lineman", 4, 7, 3),
-    ("Lineman +Wrestle", 3, 7, 3), ("Ogre +Block", 2, 5, 5),
+    ("Lineman +Wrestle", 3, 7, 3),
+    # 2026-08-27: Wrestle dostaly DVA linemani KAŽDÉHO týmu (roster.cpp:522,
+    # :551, :602, :630), ne jen skaven. Bez těchto řádků hlásil korpus
+    # 27.->28.08. ~146 tis. neznámých výskytů a cena dodge u nich byla odhad.
+    ("Lineman +Wrestle", 3, 5, 3), ("Lineman +Wrestle", 3, 6, 3),
+    ("Lineman +Wrestle", 4, 7, 3),
+    ("Ogre +Block", 2, 5, 5),
     ("Runner +Block", 3, 6, 3), ("Thrower +Block", 3, 5, 3),
     ("Thrower +Block", 3, 6, 3), ("Thrower +Block", 3, 7, 3),
     ("Thrower +Block", 4, 7, 3), ("Treeman +Guard", 1, 2, 6),
