@@ -63,3 +63,31 @@ stunned = malými · `_` = leží · `o` = drží míč
 `/n` = JEN u NAŠICH stojících, VŽDY (i `/0`) — v kolika jejich zónách stojí
 `-` = ODEHRANÝ — jen v ŽIVÉ HŘE (překreslení uprostřed tahu).
    V korpusu se nepoužije: snímek je ze ZAČÁTKU kola a `hasActed` se neukládá.
+
+================================================================================
+⛔⛔ HRANICE DISKUZE (uživatel 27.08.: „přijde mi, že budeme předbíhat celotah
+   v hodnocení, co se mu povedlo")
+================================================================================
+NEHODNOTÍ SE, jak dobře by tuhle situaci zvládl CELOTAH. Neexistuje ⇒ hodnotit
+ho znamená přistoupit k jeho stavbě s hotovým názorem. Platí totéž pravidlo
+jako u měření: NEVYHODNOCOVAT, CO ENGINE NEUMÍ NAPLÁNOVAT.
+
+⇒ Diskuze sbírá ZADÁNÍ, ne verdikt. Dvě poloviny, které se nemíchají:
+
+(A) DNES ŘEŠITELNÉ — existuje to a je to změřené (vada JEDNÉ aktivace):
+    · chůze se zastaví o pole dřív, protože vstup do TZ cení +20 proti +10
+      za pole vzdálenosti; cílové pole je od penalizace osvobozené,
+      PŘEDPOSLEDNÍ ne  ⇒  marker skončí u nosiče v 0,8 % případů, kdy na to
+      má pohyb (71 z 8 387)     [Fable 27.08., § 2.2]
+    · touž příčinou 26,5 % selhání u cíle „roh soupeřovy klece"
+    · ADVANCE se vzdá po přímce, i když je volno vedle (35 % nabídek,
+      z toho 97,2 % zbytečně)
+    ⇒ patří do M-ROUND, příští týden. Jedna oprava, dva symptomy.
+
+(B) PATŘÍ CELOTAHU — dnes se jen ZAPÍŠE, žádné „povedlo by se":
+    · nachystat příjemce dopředu („jako elfové") -- rozhodnutí NAPŘÍČ
+      aktivacemi a koly, žádná jednotlivá aktivace ho udělat neumí
+    · „je tohle tělo nosné" (Wrestle vs. díra ve zdi) -- fronta C1
+    ⇒ výstupem má být VĚTA, NA KTEROU BUDE CELOTAH MUSET UMĚT ODPOVĚDĚT,
+      a ta se zapíše jako zadání, ne jako očekávání.
+================================================================================

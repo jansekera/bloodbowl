@@ -1,5 +1,18 @@
 # FABLE 27.08.2026 — AUDIT NABÍDEK MAKER PROTI DOSAHU
 
+> ⛔⛔ **OPRAVA (Claude, 27.08. odpoledne) — JEDNA VĚTA V METODICE JE ŠPATNĚ.**
+> Audit na dvou místech (§1 a §6) tvrdí, že korpus 25.08. byl sebrán
+> **„s mode 8 (P35 blitz landing) zapnutým"**. **Není to pravda.** Korpus sbírá
+> SAMOSTATNÝ python proces (`diag_replay_mine_20260813_gate.py collect`);
+> ramena jsou thread-local proměnné v harnessu a **binding je neumí zapnout** —
+> `engine/python/bb_module.cpp` žádné `set_*_arm` neexportuje. Jediné, co se
+> nastavuje, je `dauntless_in_offer`, a to je **produkční nastavení**, ne rameno.
+> ⇒ Korpus nese **produkční stav s rameny VYPNUTÝMI**, jak doktrína žádá.
+> ⭐ Fable to převzal z hlášky `run_night_ab.sh` *„START korpus … se zapnutým
+> ramenem"* — **další lživý štítek**, dnes už třetí. Hláška opravena.
+> ⚠️ **Na závěry auditu to nemá vliv** *(P35 mění, KDO blitzuje, ne zda někdo
+> dosáhne)* — ale ta výhrada v §6 padá úplně.
+
 **Otázka:** BLITZ_AND_SCORE (`+3`) a LEAP (z TZ) měly dnes týž tvar vady —
 makro se nabídne do stavu, ve kterém nemůže splnit, co slibuje. Kolikrát se
 ten tvar opakuje u ostatních maker?

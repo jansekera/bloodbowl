@@ -51,7 +51,8 @@
 #       ramena TOUTÉŽ konfiguraci, takže s CRN musí vyjít delta exaktně 0.
 #       Když nevyjde, hlavní výsledek se NEČTE -- nevíme, co jsme měřili.
 #
-#   Volitelně: CORPUS=1 sebere po A/B korpus 3000 her se zapnutým ramenem,
+#   Volitelně: CORPUS=1 sebere po A/B korpus 3000 her v PRODUKČNÍM nastavení
+#   (ramena VYPNUTÁ -- sbírá samostatný python proces, binding je zapnout neumí),
 #   BASELINE=<adresář> ho porovná — a odmítne to, když baseline běžela na jiném
 #   commitu enginu (P22: korpus 14.08. byl s baseline 6 commitů rozejitý).
 # ============================================================================
@@ -266,10 +267,17 @@ if [ "$CONTROL_MODE2" != "0" ]; then
         ( cd "$d" && nice -n 19 "$BIN" "$ROOT" "$CONTROL_PAIRS" "$cidx" 2 0 > run.log 2>&1 ) \
             && touch "$d/OK" || touch "$d/FAIL"
     fi
-    cline=$(grep -h "NULL-TEST" "$d/run.log" 2>/dev/null | head -1)
+    # ⚠️ 27.08.: harness ten řádek přejmenoval z „NULL-TEST" na „SEED-CHECK",
+    # protože tvrdil, že je to šumové dno, a není (viz níže). Grep se musel
+    # posunout s ním -- jinak by kontrola tiše nevrátila nic a noc by si
+    # označila CONTROL_FAILED. Starý název se hledá taky, aby šly číst i logy
+    # z běhů před 27.08.
+    cline=$(grep -hE "SEED-CHECK|NULL-TEST" "$d/run.log" 2>/dev/null | head -1)
     night_log "  ${cline:-(kontrola nic nevrátila)}"
     if echo "$cline" | grep -q "+0.0000 +- 0.0000"; then
-        night_log "  ✅ seedování v pořádku (nic víc to netvrdí — viz MOVED WITHOUT ARM)"
+        night_log "  ✅ seedování drží. ⛔ A NIC VÍC: delta je tu 0 Z DEFINICE"
+        night_log "     (obě řádky jsou TÁŽ hra čtená z obou stran), takže to"
+        night_log "     NENÍ šumové dno a nesmí se tak citovat."
     else
         night_log "  ⛔ SMOKE TEST NEVYŠEL NULOVÝ. Obě ramena tam mají TOUTÉŽ konfiguraci"
         night_log "     a přesto se liší ⇒ ROZBITÉ SEEDOVÁNÍ. Hlavní výsledek NEČÍST."
@@ -303,7 +311,14 @@ if [ "$CORPUS" != "0" ]; then
     if [ -f "$CORPUS_DATA/COLLECT_DONE" ]; then
         night_log "korpus už existuje, přeskakuji"
     else
-        night_log "START korpus $CORPUS_GAMES her se zapnutým ramenem"
+        # ⛔ 27.08.: DO DNESKA TU STÁLO „se zapnutým ramenem" A BYLA TO NEPRAVDA.
+        # Korpus sbírá SAMOSTATNÝ python proces (`diag_replay_mine_...gate.py`),
+        # ramena jsou thread-local proměnné v harnessu a binding je neumí
+        # zapnout -- `bb_module.cpp` žádné `set_*_arm` neexportuje. Sbírá se
+        # tedy PRODUKČNÍ nastavení s rameny VYPNUTÝMI, což je správně (korpus
+        # má být baseline). Fable si 27.08. z té hlášky odvodil do metodiky
+        # svého auditu, že korpus nese zapnuté P35 -- štítek zalhal dál.
+        night_log "START korpus $CORPUS_GAMES her — PRODUKČNÍ nastavení, ramena VYPNUTÁ"
         if CAGE_GATE=0 DAUNTLESS=1 DATA_ROOT="$CORPUS_DATA" SEED_BASE=20260900 \
                 nice -n 19 python3 diag_replay_mine_20260813_gate.py collect "$CORPUS_GAMES" \
                 > "$OUT/collect.log" 2>&1; then

@@ -1,0 +1,4 @@
+korpus: /home/jan/claude/bloodbowl/blitzcont_replic_20260827_corpus_data
+her: 3000
+
+✅ ŽÁDNÝ ROZBITÝ INVARIANT
