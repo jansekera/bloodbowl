@@ -636,12 +636,15 @@ TEST(RulesEngine, ARootedPlayerIsNotOfferedAnythingThatMovesHim) {
 //                Blitz Action that turn.)"                        => SPOTREBUJE
 //   Really Stupid(r. 8398-8401) tataz veta, vcetne teze zavorky.   => SPOTREBUJE
 //   Wild Animal  (r. 8668-8669) "the Action is WASTED."            => SPOTREBUJE
-//   Take Root    (r. 8580-8583) mluvi JEN o bloku: "he may not block that
-//                turn (he can still roll to stand up if he is Prone)" --
-//                o tymove akci ANI SLOVO.                          => NESPOTREBUJE
+//   Take Root    (r. 8580-8583) mluvi JEN o bloku -- ale mlceni o tymove
+//                akci NEODVOLAVA deklaracni pravidlo.              => SPOTREBUJE
 //
-// Tyhle testy hlidaji HRANICI: tri musi zcernat opravou, ctvrty musi zustat
-// zeleny -- je to test, ze oprava NEPRETEKLA.
+// ⛔ OPRAVA TEHOZ DNE: nejdriv tu stalo, ze Take Root tymu blitz PONECHAVA,
+// podle souhrnu ve fronte. Souhrn ale zahladil vyhradu, kterou audit 24.08.
+// zaznamenal: rozhoduje l. 351-352 (a 357-358, 360-362) -- "IMPORTANT: This
+// Action may NOT BE DECLARED by more than one player per turn". Limit visi na
+// DEKLARACI, ne na dokonceni, a vsechny ctyri hody se hazi az po ni. Vety
+// u jednotlivych dovednosti deklaracni pravidlo jen OPAKUJI.
 // ============================================================================
 
 // Blitz na sousedniho soupere: kdyby kontrola prosla, byl by to jen blok.
@@ -691,8 +694,8 @@ TEST(BigGuyHandler, M2WildAnimalFailOnBlitzStillCostsTheTeamItsBlitz) {
     EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
 }
 
-// HRANICE: Take Root o tymove akci nerika nic => blitz tymu ZUSTAVA.
-TEST(BigGuyHandler, M2TakeRootFailOnBlitzDoesNotCostTheTeamItsBlitz) {
+// Take Root: MA se nuluje, ale blitz uz byl DEKLAROVAN => tym o nej prisel.
+TEST(BigGuyHandler, M2TakeRootFailOnBlitzAlsoCostsTheTeamItsBlitz) {
     auto gs = makeGameState();
     placeBlitzPair(gs);
     gs.getPlayer(1).skills.add(SkillName::TakeRoot);
@@ -703,7 +706,7 @@ TEST(BigGuyHandler, M2TakeRootFailOnBlitzDoesNotCostTheTeamItsBlitz) {
 
     EXPECT_TRUE(result.success);
     EXPECT_TRUE(gs.getPlayer(1).rooted);
-    EXPECT_FALSE(gs.homeTeam.blitzUsedThisTurn);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
 }
 
 // Tataz veta pravidel plati na KAZDOU deklarovanou akci s tymovym limitem,

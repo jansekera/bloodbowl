@@ -116,11 +116,13 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                 player.hasMoved = true;
                 result.actionBlocked = true;
                 result.proceed = false;
-                // M2 (29.08.): `wastesTeamAction` zustava FALSE zamerne.
-                // l. 8580-8583 mluvi jen o tom, ze po neuspechu v ramci BLITZE
-                // hrac nesmi blokovat -- o tymove akci ani slovo, na rozdil od
-                // Bone-head / Really Stupid / Wild Animal. Tym si tedy blitz
-                // ponechava. Hlida to test M2TakeRootFailOnBlitzDoesNotCost...
+                // M2 (29.08.): tym o deklarovanou akci PRICHAZI i tady.
+                // Nejdriv jsem sem napsal opak, protoze l. 8580-8583 mluvi jen
+                // o zakazu bloku. Rozhoduje ale l. 351-352: "IMPORTANT: This
+                // Action may NOT BE DECLARED by more than one player per turn"
+                // -- limit visi na DEKLARACI, ne na dokonceni, a Take Root se
+                // hazi az "immediately after declaring an Action".
+                result.wastesTeamAction = true;
                 return result;
             }
         }

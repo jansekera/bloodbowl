@@ -16,14 +16,26 @@ struct BigGuyResult {
     // (l. 7941-7942). Driv se turnover z teto cesty nedal vratit vubec.
     bool turnover = false;
     // M2/N13 = P55 (29.08.2026): rika, jestli propadla akce bere TYMU jeho
-    // deklarovanou akci pro tohle kolo. Nese PRAVIDLO, ne dovednost, protoze
-    // pravidla nemluvi stejne:
-    //   Bone-head (r. 7980-7983) i Really Stupid (r. 8398-8401): "the player's
-    //     team loses the declared Action for the turn (...the team cannot
-    //     declare another Blitz Action that turn)"          => true
-    //   Wild Animal (r. 8668-8669): "the Action is wasted."  => true
-    //   Take Root (r. 8580-8583) mluvi JEN o bloku a o tymove akci nerika
-    //     nic                                               => false
+    // deklarovanou akci pro tohle kolo.
+    //
+    // Odpoved je ANO pro vsechny ctyri dovednosti, a rozhoduje o tom jedno
+    // misto -- l. 351-352 u Blitze, l. 357-358 u Passe, l. 360-362 u Hand-off
+    // a Foulu: "IMPORTANT: This Action may NOT BE DECLARED by more than one
+    // player per turn." Limit visi na DEKLARACI, ne na dokonceni, a vsechny
+    // big-guy hody se hazi "immediately after declaring an Action".
+    //
+    // Vety u jednotlivych dovednosti tedy nic nezavadeji, jen to znovu rikaji,
+    // aby se "the player can't do anything for the turn" nedalo cist jako
+    // "akce se nestala":
+    //   Bone-head    l. 7980-7983  "the player's team loses the declared
+    //                              Action for the turn"
+    //   Really Stupid l. 8398-8401 tataz veta
+    //   Wild Animal  l. 8668-8669  "the Action is wasted"
+    //   Take Root    l. 8580-8583  mluvi jen o zakazu bloku -- ale mlceni
+    //                              o tymove akci NEODVOLAVA l. 351-352
+    //
+    // Priznak zustava, aby to rozhodnuti bylo videt na jednom miste a dalo se
+    // zmenit, kdyby se nasla dovednost, u ktere se akce nedeklaruje.
     bool wastesTeamAction = false;
 };
 
