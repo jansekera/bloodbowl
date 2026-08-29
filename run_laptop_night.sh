@@ -53,7 +53,10 @@ supervise() {
     local try=0
     while [ "$try" -lt "$MAX_RETRY" ]; do
         if [ -f "$OUT/AB_DONE" ]; then
-            echo "=== AB_DONE $(date '+%F %T') — hotovo po $try restartech"
+            # ⚠️ `try` je počet POKUSŮ, ne restartů: první průchod je pokus 1
+            #    a restartů bylo nula. Popisek, který tvrdí něco jiného, než co
+            #    se stalo, je přesně to, co se 27.08. našlo třikrát za den.
+            echo "=== AB_DONE $(date '+%F %T') — hotovo na $try. pokus (restartů: $((try - 1)))"
             echo "Teď sloučit:"
             echo "  PREREG=evidence/night_prereg_20260829_b2.preds THRESHOLD=0.015 \\"
             echo "  python3 night_summarize.py $OUT dw-dw dwnw"
