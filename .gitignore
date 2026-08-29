@@ -109,3 +109,6 @@ carrier_square_*/*/
 
 # běhy Leapu (26.08.) — týž důvod jako ostatní běhové adresáře
 leapwalk_*/
+
+# Stavový adresář oh-my-claudecode (nástroj, ne projekt) -- 29.08.2026
+.omc/

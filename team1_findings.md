@@ -122,7 +122,8 @@ Logovat do `epoch_metrics.csv` (přidat sloupce).
 
 1. **HOTOVO:** ANTI_REGRESSION 0.35→0.50, BM_DROP_LIMIT 0.10→0.05 (commit 2f2380f)
 2. **HOTOVO:** VF_BLEND 0.0→0.3 s dokumentovaným komentářem (commit caa99da)
-3. **TODO #1:** `carrier_can_score` 0.6→0.8 (trainer.py:22) — po skončení aktuálního --loop 8
-4. **TODO #2:** `stall_incentive` 0.5→0.0 (trainer.py:21) — po pozorování efektu #1 (3+ iterace)
+3. **HOTOVO:** `carrier_can_score` 0.6→0.8 (trainer.py, commit ee60124)
+4. **ODLOŽENO:** `stall_incentive` — byl součástí 2:1 grind mechaniky (score v 1. poločase, bash + stall).
+   Odsunuto dokud AI nedosáhne stabilního 90%+. TODO: navrhnout jako explicitní half-aware reward.
 5. **TODO #3:** GATING_MATCHES 100→200 — zvýšit spolehlivost chess gate
 6. **TODO (dlouhodobé):** Per-player features (~492), MCTS root sampling, c_puct=2.5
