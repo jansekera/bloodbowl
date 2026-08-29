@@ -622,3 +622,103 @@ TEST(RulesEngine, ARootedPlayerIsNotOfferedAnythingThatMovesHim) {
         EXPECT_NE(a.type, ActionType::BLITZ) << "ani blitzem na vzdaleny cil";
     }
 }
+
+// ============================================================================
+// M2 / N13 = P55 (29.08.2026) -- PROPADLA AKCE NESPOTREBUJE TYMOVY LIMIT.
+// `resolveAction` vraci `ok()` uz PRED switchem, kdyz big-guy kontrola akci
+// zablokuje -- jenze `blitzUsedThisTurn` se nastavuje az UVNITR `case BLITZ`.
+// Tym tedy dostane DRUHY blitz za tez kolo.
+//
+// ⚠️ OPRAVUJE SE PER DOVEDNOST, protoze pravidla nemluvi stejne:
+//   Bone-head    (r. 7980-7983) "the player's team LOSES THE DECLARED ACTION
+//                for the turn. (So if a Bone-head player declares a Blitz
+//                Action and rolls a 1, then the team cannot declare another
+//                Blitz Action that turn.)"                        => SPOTREBUJE
+//   Really Stupid(r. 8398-8401) tataz veta, vcetne teze zavorky.   => SPOTREBUJE
+//   Wild Animal  (r. 8668-8669) "the Action is WASTED."            => SPOTREBUJE
+//   Take Root    (r. 8580-8583) mluvi JEN o bloku: "he may not block that
+//                turn (he can still roll to stand up if he is Prone)" --
+//                o tymove akci ANI SLOVO.                          => NESPOTREBUJE
+//
+// Tyhle testy hlidaji HRANICI: tri musi zcernat opravou, ctvrty musi zustat
+// zeleny -- je to test, ze oprava NEPRETEKLA.
+// ============================================================================
+
+// Blitz na sousedniho soupere: kdyby kontrola prosla, byl by to jen blok.
+static void placeBlitzPair(GameState& gs) {
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::AWAY);
+}
+
+TEST(BigGuyHandler, M2BoneHeadFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // Bone-head fail
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);        // propadla akce, ne turnover
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+TEST(BigGuyHandler, M2ReallyStupidFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // bez asistence cil 4+, 1 propada
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+TEST(BigGuyHandler, M2WildAnimalFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::WildAnimal);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // pri blitzu cil 2+, prirozena 1 propada
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+// HRANICE: Take Root o tymove akci nerika nic => blitz tymu ZUSTAVA.
+TEST(BigGuyHandler, M2TakeRootFailOnBlitzDoesNotCostTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // Take Root fail => zakoreni, MA 0
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
+    EXPECT_FALSE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+// Tataz veta pravidel plati na KAZDOU deklarovanou akci s tymovym limitem,
+// ne jen na blitz -- "the team loses THE DECLARED ACTION for the turn".
+TEST(BigGuyHandler, M2BoneHeadFailOnFoulStillCostsTheTeamItsFoul) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    Action action{ActionType::FOUL, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
+}

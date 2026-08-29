@@ -21,6 +21,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: tym prichazi o deklarovanou akci
             return result;
         }
     }
@@ -56,6 +57,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: tym prichazi o deklarovanou akci
             return result;
         }
     }
@@ -80,6 +82,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: "the Action is wasted"
             return result;
         }
     }
@@ -113,6 +116,11 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                 player.hasMoved = true;
                 result.actionBlocked = true;
                 result.proceed = false;
+                // M2 (29.08.): `wastesTeamAction` zustava FALSE zamerne.
+                // l. 8580-8583 mluvi jen o tom, ze po neuspechu v ramci BLITZE
+                // hrac nesmi blokovat -- o tymove akci ani slovo, na rozdil od
+                // Bone-head / Really Stupid / Wild Animal. Tym si tedy blitz
+                // ponechava. Hlida to test M2TakeRootFailOnBlitzDoesNotCost...
                 return result;
             }
         }
