@@ -819,3 +819,65 @@ TEST(BigGuyHandler, M3GazedPlayerStillGetsHisTacklezonesBackNextTurn) {
     gs.resetPlayersForNewTurn(TeamSide::AWAY);
     EXPECT_FALSE(gs.getPlayer(awayId).lostTacklezones);
 }
+
+// ============================================================================
+// M3b (29.08.2026) -- PODMINKA NAVIC U ASISTENCE REALLY STUPID.
+// Vysla najevo az pri M3: `hasAdjacentAlly` zada `!ally->lostTacklezones`,
+// jenze pravidlo (r. 8393-8396) zada JEN tri veci:
+//   "If there are one or more players from the same team STANDING ADJACENT to
+//    the Really Stupid player's square, AND WHO AREN'T REALLY STUPID, then add
+//    2 to the D6 roll."
+// O tacklezonach ani slovo. Bone-headuv zakaz asistence je vyslovne omezeny na
+// "assist another player ON A BLOCK OR FOUL" (r. 7984-7985) -- bonus k hodu
+// Really Stupid neni ani jedno.
+//
+// ⚠️ Dokud se `lostTacklezones` cistilo kazde kolo, kousala ta podminka
+// vzacne. M3 ji nechava PRETRVAT, takze od dneska by bone-headed Ogre prestal
+// podpirat souseda na cele kolo a vic -- moje oprava tu vadu zhorsila, proto
+// se resi hned a ne "az na pravidla".
+// ============================================================================
+
+TEST(BigGuyHandler, M3bBoneHeadedAllyStillPropsUpAReallyStupidPlayer) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).skills.add(SkillName::BoneHead);
+    gs.getPlayer(2).lostTacklezones = true;      // soused uz hodil 1
+    gs.getPlayer(2).bigGuyStupefied = true;
+
+    // Stoji, sousedi, neni Really Stupid => cil je 2+, ne 4+.
+    FixedDiceRoller dice({2});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_FALSE(r.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+}
+
+// HRANICE, ktera v pravidlech JE a musi zustat: druhy Really Stupid nepomaha.
+TEST(BigGuyHandler, M3bASecondReallyStupidPlayerDoesNotPropHimUp) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).skills.add(SkillName::ReallyStupid);
+
+    FixedDiceRoller dice({2});                   // bez asistence cil 4+ => propada
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_TRUE(r.actionBlocked);
+}
+
+// A lezici soused nepomaha -- "STANDING adjacent".
+TEST(BigGuyHandler, M3bAProneAllyDoesNotPropHimUp) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+
+    FixedDiceRoller dice({2});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_TRUE(r.actionBlocked);
+}

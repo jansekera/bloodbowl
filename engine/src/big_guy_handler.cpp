@@ -46,8 +46,15 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         for (auto& pos : adj) {
             if (!pos.isOnPitch()) continue;
             const Player* ally = state.getPlayerAtPosition(pos);
+            // M3b (29.08.2026): `!ally->lostTacklezones` tu bylo NAVIC.
+            // r. 8393-8396 zada jen "players from the same team STANDING
+            // ADJACENT ... AND WHO AREN'T REALLY STUPID" -- o tacklezonach nic.
+            // Bone-headuv zakaz asistence je vyslovne jen "on a BLOCK OR FOUL"
+            // (r. 7984-7985), a bonus k hodu Really Stupid neni ani jedno.
+            // Podminka kousala vzacne, dokud se priznak cistil kazde kolo;
+            // M3 ho necha pretrvat, takze od ni bylo potreba se zbavit hned.
             if (ally && ally->teamSide == player.teamSide &&
-                canAct(ally->state) && !ally->lostTacklezones &&
+                canAct(ally->state) &&
                 !ally->hasSkill(SkillName::ReallyStupid)) {
                 hasAdjacentAlly = true;
                 break;
