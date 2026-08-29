@@ -71,6 +71,14 @@ def main():
     ap.add_argument('--out', required=True, help='výstupní adresář (ideálně na Disku)')
     ap.add_argument('--pairs', type=int, required=True, help='CELKEM párů na matchup')
     ap.add_argument('--chunks', type=int, required=True, help='na kolik STEJNÝCH kusů')
+    # ⭐ NULA SMÍ BÝT KRATŠÍ (uživatel 29.08., a fronta má precedens u Leapu:
+    #   „nulový test je LEVNÝ, stačí mu ~200 párů: jeho úkol je ukázat NULU,
+    #   ne změřit deltu"). Bez tohohle by nula běžela na plný počet a
+    #   zdvojnásobila noc, aniž by to komukoli k něčemu bylo.
+    ap.add_argument('--null-pairs', type=int, default=0,
+                    help='párů pro matchupy s expozicí 0 (0 = stejně jako --pairs)')
+    ap.add_argument('--null-chunks', type=int, default=0,
+                    help='kusů pro nulu (0 = největší dělitel --null-pairs <= --chunks)')
     ap.add_argument('--workers', type=int, default=2)
     ap.add_argument('--session-hours', type=float, default=8.0)
     ap.add_argument('--session-use', type=float, default=0.85)
@@ -81,14 +89,33 @@ def main():
     out = args.out if os.path.isabs(args.out) else os.path.join(ROOT, args.out)
     os.makedirs(out, exist_ok=True)
 
-    if args.pairs % args.chunks:
-        print('⛔ %d párů se nedá rozdělit na %d stejných kusů (zbývá %d).'
-              % (args.pairs, args.chunks, args.pairs % args.chunks))
-        print('   Nestejné kusy rozbijí sdruženou SE — night_summarize váží shardy stejně.')
-        div = [c for c in range(args.workers, 201) if args.pairs % c == 0]
-        print('   Dělitelé >= WORKERS: %s' % (' '.join(map(str, div)) or 'žádný do 200'))
+    def split(pairs, chunks, label):
+        if pairs % chunks:
+            print('⛔ %s: %d párů se nedá rozdělit na %d stejných kusů (zbývá %d).'
+                  % (label, pairs, chunks, pairs % chunks))
+            print('   Nestejné kusy rozbijí sdruženou SE — night_summarize váží shardy stejně.')
+            div = [c for c in range(1, 201) if pairs % c == 0]
+            print('   Dělitelé %d: %s' % (pairs, ' '.join(map(str, div)) or 'žádný do 200'))
+            return None
+        return pairs // chunks
+
+    chunk_pairs = split(args.pairs, args.chunks, 'expozice')
+    if chunk_pairs is None:
         return 7
-    chunk_pairs = args.pairs // args.chunks
+    # Nula: vlastní počet párů i kusů, ať se kus nezvětší proti expozici.
+    null_pairs = args.null_pairs or args.pairs
+    if args.null_chunks:
+        null_chunks = args.null_chunks
+    else:
+        cands = [c for c in range(1, args.chunks + 1) if null_pairs % c == 0]
+        null_chunks = cands[-1] if cands else 1
+    null_chunk_pairs = split(null_pairs, null_chunks, 'nula')
+    if null_chunk_pairs is None:
+        return 7
+    if null_pairs != args.pairs:
+        print('nula je kratší: %d párů v %d kusech po %d  (expozice %d v %d po %d)'
+              % (null_pairs, null_chunks, null_chunk_pairs,
+                 args.pairs, args.chunks, chunk_pairs))
 
     if not check_fingerprint(out, fingerprint(args)):
         return 8
@@ -98,16 +125,18 @@ def main():
         return 0
 
     specs = [s.split(':') for s in args.matchups.split()]
-    todo, done = [], 0
-    for idx, name, _exp in specs:
-        for k in range(args.chunks):
+    todo, done, total = [], 0, 0
+    for idx, name, exp in specs:
+        nch = args.chunks if exp != '0' else null_chunks
+        npr = chunk_pairs if exp != '0' else null_chunk_pairs
+        total += nch
+        for k in range(nch):
             d = os.path.join(out, '%s_s%d' % (name, k))
             if os.path.exists(os.path.join(d, 'OK')):
                 done += 1
             else:
-                todo.append((idx, name, k, d))
-    total = len(specs) * args.chunks
-    print('\nkusů celkem %d · hotovo %d · zbývá %d   (%d párů na kus)'
+                todo.append((idx, name, k, d, npr, nch))
+    print('\nkusů celkem %d · hotovo %d · zbývá %d   (expozice %d párů na kus)'
           % (total, done, len(todo), chunk_pairs))
     if not todo:
         open(os.path.join(out, 'AB_DONE'), 'w').close()
@@ -128,17 +157,16 @@ def main():
                 break
         t0 = time.time()
         procs = []
-        for idx, name, k, d in batch:
+        for idx, name, k, d, npr, nch in batch:
             os.makedirs(d, exist_ok=True)
             # ⛔ NIKDY nemazat existující OK -- to je právě to, co noc dělá
             #    a proč se na ni nedá navázat.
             for f in ('FAIL',):
                 p = os.path.join(d, f)
                 if os.path.exists(p): os.remove(p)
-            cmd = [BIN, ROOT, str(chunk_pairs), idx, str(args.mode),
-                   str(k * chunk_pairs)]
+            cmd = [BIN, ROOT, str(npr), idx, str(args.mode), str(k * npr)]
             print('   ▶ %s kus %d/%d  (offset %d, %d párů)'
-                  % (name, k + 1, args.chunks, k * chunk_pairs, chunk_pairs))
+                  % (name, k + 1, nch, k * npr, npr))
             if args.dry_run:
                 procs.append((None, d, name, k)); continue
             log = open(os.path.join(d, 'run.log'), 'w')
@@ -155,10 +183,11 @@ def main():
         ran += len(batch)
         todo = todo[len(batch):]
 
-    oks = sum(1 for _, _, k, d in
-              [(i, n, k, os.path.join(out, '%s_s%d' % (n, k)))
-               for i, n, _e in specs for k in range(args.chunks)]
-              if os.path.exists(os.path.join(d, 'OK')))
+    oks = 0
+    for i, n, e in specs:
+        for k in range(args.chunks if e != '0' else null_chunks):
+            if os.path.exists(os.path.join(out, '%s_s%d' % (n, k), 'OK')):
+                oks += 1
     print('\n' + '=' * 70)
     print('SEZENÍ HOTOVO: pustilo %d kusů, celkem %d/%d má OK' % (ran, oks, total))
     if oks == total:
