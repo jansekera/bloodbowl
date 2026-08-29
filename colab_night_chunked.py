@@ -231,11 +231,16 @@ def main():
         print('   PREREG=<prereg> THRESHOLD=0.015 python3 night_summarize.py \\')
         print('       %s %s' % (out, ' '.join(s[1] for s in specs)))
     else:
-        print('⏸  Zbývá %d kusů. Pusť tenhle skript znovu v novém sezení se')
+        print('⏸  Zbývá %d kusů. Pusť tenhle skript znovu v novém sezení se'
+              % (total - oks))
         print('   STEJNÝMI parametry — otisk běhu ohlídá, že engine je týž.')
         print('   ⛔ Mezi sezeními NEPŘESTAVUJ engine a nepřepínej commit.')
     print('=' * 70)
-    return 0
+    # ⭐ VLASTNÍ KÓD PRO "DOŠEL ČAS, PRÁCE ZBÝVÁ" (rc=3). Bez něj vypadá
+    #   vyčerpaný rozpočet stejně jako hotová noc (obojí rc=0), a dohližitel
+    #   v `run_laptop_night.sh` by runner OKAMŽITĚ pustil znovu -- tedy by
+    #   limit sezení obešel a rozdělení na poloviny by nefungovalo.
+    return 0 if oks == total else 3
 
 if __name__ == '__main__':
     sys.exit(main())

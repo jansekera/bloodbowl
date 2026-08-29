@@ -40,16 +40,26 @@ WORKERS=${WORKERS:-8}
 LOG="$OUT/laptop_night.log"
 PIDFILE="$OUT/laptop_night.pid"
 MAX_RETRY=${MAX_RETRY:-20}
+# ⭐ ROZDĚLENÍ NA POLOVINY: `SESSION_HOURS=11` nechá běh po ~11 h čistě
+#   skončit (rozběhlé kusy dojedou, nové se nepouštějí) a druhý den se
+#   TÝMŽ příkazem naváže. Default 999 = bez limitu, jeden dlouhý běh.
+#   ⛔ MEZI POLOVINAMI SE NESMÍ PŘESTAVĚT ENGINE ani přepnout commit --
+#     otisk běhu to odmítne, a odmítne správně: jedna noc = jedno měření.
+SESSION_HOURS=${SESSION_HOURS:-999}
 
 alive() {   # ⛔ NE `pgrep -f`: ten si namatchne sám sebe (past z 21.08.).
     [ -f "$PIDFILE" ] || return 1
     local p; p=$(cat "$PIDFILE" 2>/dev/null) || return 1
-    [ -n "$p" ] && [ -d "/proc/$p" ]
+    [ -n "$p" ] && [ -d "/proc/$p" ] || return 1
+    # ⛔ `/proc/$p` existuje i pro CIZÍ proces, kterému systém recykloval PID.
+    #   Bez téhle kontroly by běh falešně hlásil "už běží" a odmítl start.
+    #   (Táž rodina jako past `pgrep -f`, jen z druhé strany.)
+    tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -q 'run_laptop_night\|bloodbowl-night'
 }
 
 # --- vlastní smyčka: běží uvnitř systemd-inhibit, aby se stroj neuspal -------
 supervise() {
-    echo "=== START $(date '+%F %T') — mode $MODE, $PAIRS+$NULL_PAIRS párů, $CHUNKS kusů, $WORKERS workerů"
+    echo "=== START $(date '+%F %T') — mode $MODE, $PAIRS+$NULL_PAIRS párů, $CHUNKS kusů, $WORKERS workerů, limit ${SESSION_HOURS} h"
     local try=0
     while [ "$try" -lt "$MAX_RETRY" ]; do
         if [ -f "$OUT/AB_DONE" ]; then
@@ -67,7 +77,7 @@ supervise() {
         python3 -u "$ROOT/colab_night_chunked.py" \
             --mode "$MODE" --matchups "$MATCHUPS" --out "$OUT" \
             --pairs "$PAIRS" --chunks "$CHUNKS" --null-pairs "$NULL_PAIRS" \
-            --workers "$WORKERS" --session-hours 999 || {
+            --workers "$WORKERS" --session-hours "$SESSION_HOURS" || {
                 rc=$?
                 # ⛔ 8 = neshoda otisku běhu. To NENÍ pád, ze kterého se dá
                 #   zotavit opakováním -- engine se změnil a opakování by jen
@@ -75,6 +85,14 @@ supervise() {
                 if [ "$rc" = "8" ]; then
                     echo "⛔ otisk běhu nesedí (rc=8). Nepokračuji — viz výpis výš."
                     return 8
+                fi
+                if [ "$rc" = "3" ]; then
+                    # Vyčerpaný rozpočet sezení NENÍ pád. Opakovat by znamenalo
+                    # limit obejít -- což je přesně to, co uživatel nechtěl.
+                    echo "⏸  Rozpočet sezení vyčerpán $(date '+%F %T'). Zbytek"
+                    echo "   dojede příště: pusť TENTÝŽ příkaz, hotové kusy se"
+                    echo "   přeskočí. ⛔ Nepřestavuj mezitím engine."
+                    return 3
                 fi
                 echo "runner skončil rc=$rc, zkusím znovu za 30 s"
                 sleep 30
@@ -93,6 +111,11 @@ case "${1:-}" in
         #   a odpojený běh umřel na "unexpected EOF". Chytila to až ostrá
         #   zkouška; `bash -n` na hlavním skriptu je v pořádku, protože ta
         #   chyba vzniká až SLOŽENÍM řetězce za běhu.
+        # ⛔ ÚKLID PIDFILE PATŘÍ SEM: původně se mazal na řádku ZA
+        #   `bash -c`, jenže oprava přes `exec` ten shell nahradila, takže se
+        #   ten řádek nikdy neprovedl a pidfile zůstával ležet. Objevila to až
+        #   zkouška rozpočtu sezení, ne čtení.
+        trap 'rm -f "$PIDFILE"' EXIT
         supervise; exit $?;;
   --status)
         if alive; then echo "BĚŽÍ (pid $(cat "$PIDFILE"))"; else echo "neběží"; fi
@@ -120,7 +143,7 @@ fi
 
 mkdir -p "$OUT"
 
-export OUT MODE MATCHUPS PAIRS CHUNKS NULL_PAIRS WORKERS MAX_RETRY LOG PIDFILE ROOT
+export OUT MODE MATCHUPS PAIRS CHUNKS NULL_PAIRS WORKERS MAX_RETRY LOG PIDFILE ROOT SESSION_HOURS
 INHIBIT=""
 command -v systemd-inhibit >/dev/null && \
     INHIBIT="systemd-inhibit --what=sleep:idle --why=bloodbowl-night --mode=block"
