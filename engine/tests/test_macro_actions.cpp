@@ -2249,3 +2249,76 @@ TEST(MacroActions, M4RootedCarrierIsNotOfferedScoreOnGfiHeCannotUse) {
     getAvailableMacros(state, macros);
     EXPECT_FALSE(hasMacroType(macros, MacroType::SCORE));
 }
+
+// ============================================================================
+// M5 / A7 (29.08.2026) -- STAND-AND-GO STROP.
+// P45 (21.08.) udelal vstavani dosazitelnym, ale jen NA MISTE: lezicimu se
+// emituje `REPOSITION` na jeho VLASTNI pole a nic vic. r. 668-671 ale rikaji:
+// "...may do nothing before standing up AT A COST OF THREE SQUARES of his
+// movement when he next takes an Action ... The player may take ANY Action
+// other than a Block Action." Zbytek pohybu je tedy jeho.
+//
+// Dopad zmeren 24.08. (M4): vstavani 24,31 na hru, ale 98,6 % z toho nikam
+// nevede; 5,47 na hru melo kam jit a neslo. Nejostrejsi pripad pojmenovala
+// fronta: "lezici hrac u volneho mice se k nemu ten tah nikdy nedostane."
+//
+// ⭐ Executor to UZ UMI: `movePlayerToward` bere "prone a uz na cili" jako
+// nedokoncene, postavi ho a jde dal. Chybi POUZE nabidka -- tataz trida jako
+// F12 Leap, P45 vstavani a M4 Sprint.
+// ============================================================================
+
+namespace {
+// Lezici hrac s MA `ma`, volny mic `dist` poli od nej.
+GameState makeProneNearBallState(int ma, int dist) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.position = {10, 7};
+    p1.stats = {static_cast<int8_t>(ma), 3, 3, 8};
+    p1.movementRemaining = ma;
+    p1.state = PlayerState::PRONE;
+    state.ball = BallState::onGround({static_cast<int8_t>(10 + dist), 7});
+    return state;
+}
+}  // namespace
+
+TEST(MacroActions, M5PronePlayerIsOfferedPickupWithinWhatIsLeftAfterStanding) {
+    auto state = makeProneNearBallState(/*ma=*/6, /*dist=*/3);   // 6 - 3 = 3
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::PICKUP));
+}
+
+// HRANICE 1: za hranici zbytku + GFI uz ne (6-3=3, +2 GFI = 5 < 6).
+TEST(MacroActions, M5PronePlayerIsNotOfferedPickupBeyondThatBudget) {
+    auto state = makeProneNearBallState(/*ma=*/6, /*dist=*/6);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::PICKUP));
+}
+
+// HRANICE 2: stojici hrac se nesmi opravou nijak zmenit.
+TEST(MacroActions, M5StandingPlayerKeepsHisFullPickupReach) {
+    auto state = makeProneNearBallState(/*ma=*/6, /*dist=*/6);
+    state.getPlayer(1).state = PlayerState::STANDING;
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::PICKUP));
+}
+
+// HRANICE 3: kdo uz jednal, nabidku nedostane ani vlezmo.
+TEST(MacroActions, M5ProneButAlreadyActedIsNotOfferedPickup) {
+    auto state = makeProneNearBallState(/*ma=*/6, /*dist=*/3);
+    state.getPlayer(1).hasActed = true;
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::PICKUP));
+}
+
+// HRANICE 4: vstavani stoji tri pole, takze MA 3 nechava NULU -- a na volny
+// mic o jedno pole dal uz jen pres GFI, ktere hranice 1 pousti.
+TEST(MacroActions, M5ProneWithMaThreeHasNothingLeftButGfi) {
+    auto state = makeProneNearBallState(/*ma=*/3, /*dist=*/3);   // 3-3=0, +2 GFI
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::PICKUP));       // 3 > 0 + 2
+}

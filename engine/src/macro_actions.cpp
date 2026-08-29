@@ -928,12 +928,37 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         constexpr int kSecondPickerMaxGap = 25;
 
         state.forEachOnPitch(mySide, [&](const Player& p) {
-            if (!isFreeToAct(p)) return;
+            // M5/A7 (29.08.2026): lezici hrac smi vstat a UTRATIT ZBYTEK
+            // pohybu -- r. 668-671, "at a cost of THREE SQUARES of his
+            // movement ... The player may take ANY Action other than a Block
+            // Action". P45 udelal vstavani dosazitelnym, ale jen NA MISTE
+            // (REPOSITION na vlastni pole), takze lezici hrac u volneho mice
+            // se k nemu ten tah nikdy nedostal. Executor to umi uz ted:
+            // `movePlayerToward` bere "prone a uz na cili" jako nedokoncene,
+            // postavi ho a pokracuje. Chybela jen NABIDKA -- tataz trida jako
+            // F12 Leap, P45 vstavani a M4 Sprint.
+            const bool prone = (p.state == PlayerState::PRONE);
+            if (prone) {
+                if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
+            } else if (!isFreeToAct(p)) {
+                return;
+            }
             if (p.hasSkill(SkillName::BallAndChain)) return;
             if (p.hasSkill(SkillName::NoHands)) return;
 
+            // Rozpocet po vstani. Jump Up (r. 8196-8198) vstava zdarma;
+            // pod 3 MA je vstani na 4+ a `resolveStandUp` pak nuluje pohyb
+            // (move_handler.cpp:390, "any further step must be a GFI"), takze
+            // zbytek je v obou tech pripadech presne to, co zbyde.
+            int afterStand = p.movementRemaining;
+            if (prone && !p.hasSkill(SkillName::JumpUp)) {
+                afterStand = (p.movementRemaining >= 3)
+                                 ? p.movementRemaining - 3
+                                 : 0;
+            }
+
             int dist = p.position.distanceTo(state.ball.position);
-            int maxReach = p.movementRemaining + maxGfiSquares(p);
+            int maxReach = afterStand + maxGfiSquares(p);
             if (dist > maxReach) return;
 
             // Rank by the COMPUTED chance of coming up with the ball, not by
