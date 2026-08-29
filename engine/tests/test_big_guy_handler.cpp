@@ -725,3 +725,97 @@ TEST(BigGuyHandler, M2BoneHeadFailOnFoulStillCostsTheTeamItsFoul) {
     EXPECT_TRUE(result.success);
     EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
 }
+
+// ============================================================================
+// M3 / N12 (29.08.2026) -- BONE-HEAD A REALLY STUPID DOSTAVALI TACKLEZONY
+// ZPATKY ZADARMO kazde vlastni kolo. `resetPlayersForNewTurn` mazal
+// `lostTacklezones` bez ohledu na to, cim byl nastaveny.
+//
+// Bone-head, r. 7983-7986: "...until he manages to roll a 2 or better at the
+// start of a future Action or the drive ends." Really Stupid r. 8402-8405
+// totez. Stav tedy NEKONCI zacatkem kola -- konci az USPESNYM HODEM, nebo
+// koncem drivu. Hrac, ktereho trener uz znovu neaktivuje, ma TZ ztracene dal.
+//
+// ⭐ A NALEZ NAVIC, ktery ve fronte ani v auditu 24.08. neni: `lostTacklezones`
+// nese DVE RUZNE DELKY TRVANI. Hypnotic Gaze (r. 8185-8188) konci
+// "...until the START OF HIS NEXT ACTION or the drive ends" -- tedy skutecne
+// pristim kolem obeti. Jeden priznak na obe veci byl na tu delsi kratky.
+// Reseni: `lostTacklezones` zustava ucinnym priznakem (ctou ho patnactery
+// mista), a pribyva `bigGuyStupefied`, ktery drzi tu DELSI dobu a rika resetu,
+// ze tenhle hrac je ma nechat.
+//
+// Posledni test hlida GAZE -- ten se hybat NESMI.
+// ============================================================================
+
+TEST(BigGuyHandler, M3BoneHeadKeepsLostTacklezonesIntoTheNextTurn) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);   // r. 7983-7986
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);         // aktivaci ale ma
+}
+
+TEST(BigGuyHandler, M3BoneHeadGetsTacklezonesBackOnlyByPassingTheRoll) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller failRoll({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, failRoll, nullptr);
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    FixedDiceRoller passRoll({4});                  // "roll a 2 or better"
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, passRoll, nullptr);
+    EXPECT_FALSE(r.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+}
+
+TEST(BigGuyHandler, M3ReallyStupidKeepsLostTacklezonesIntoTheNextTurn) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+
+    FixedDiceRoller dice({1});                      // sam => cil 4+
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);   // r. 8402-8405
+}
+
+// Stav prezije i kolo, ve kterem hrac lezi -- pravidlo zna jen uspesny hod
+// nebo konec drivu, sraz mezi ne nepatri.
+TEST(BigGuyHandler, M3BeingKnockedDownDoesNotClearTheBoneHeadState) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);
+}
+
+// ⛔ HRANICE: Hypnotic Gaze ma KRATSI trvani a oprava se na nej NESMI rozlezt.
+// r. 8185-8188: "...until the start of his NEXT ACTION or the drive ends."
+TEST(BigGuyHandler, M3GazedPlayerStillGetsHisTacklezonesBackNextTurn) {
+    auto gs = makeGameState();
+    // ⚠️ `forEachPlayer` chodi po `squadId(side, n)`, ne po `p.teamSide` --
+    // hrac musi mit ID z te squady, jinak ho reset vubec nepotka.
+    const int awayId = GameState::squadId(TeamSide::AWAY, 0);
+    placePlayer(gs, awayId, {10, 7}, TeamSide::AWAY);
+    gs.getPlayer(awayId).lostTacklezones = true;    // obet uspesneho gaze
+    // ⭐ a ZADNY bigGuyStupefied -- gaze ho nenastavuje
+
+    gs.resetPlayersForNewTurn(TeamSide::AWAY);
+    EXPECT_FALSE(gs.getPlayer(awayId).lostTacklezones);
+}

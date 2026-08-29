@@ -15,8 +15,15 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(SkillName::BoneHead), roll >= 2});
+        if (roll >= 2) {
+            // M3: "until he manages to roll a 2 OR BETTER at the start of a
+            // future Action" (r. 7985-7986) -- uspesny hod stav ukoncuje.
+            player.bigGuyStupefied = false;
+            player.lostTacklezones = false;
+        }
         if (roll == 1) {
             player.lostTacklezones = true;
+            player.bigGuyStupefied = true;
             player.hasActed = true;
             player.hasMoved = true;
             result.actionBlocked = true;
@@ -51,8 +58,15 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(SkillName::ReallyStupid), roll >= target});
+        if (roll >= target) {
+            // M3: r. 8404-8405, "until he manages to roll a successful result
+            // for a Really Stupid roll at the start of a future Action".
+            player.bigGuyStupefied = false;
+            player.lostTacklezones = false;
+        }
         if (roll < target) {
             player.lostTacklezones = true;
+            player.bigGuyStupefied = true;
             player.hasActed = true;
             player.hasMoved = true;
             result.actionBlocked = true;
