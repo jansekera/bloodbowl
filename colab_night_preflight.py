@@ -27,7 +27,11 @@ BIN  = os.path.join(ROOT, 'diag_f1_cage_advance')
 SRC  = os.path.join(ROOT, 'diag_f1_cage_advance_harness.cpp')
 SO   = os.path.join(ROOT, 'engine', 'build', 'libbb_engine.so')
 
-MATCHUP_NAMES = ['dw-sk', 'dw-we', 'dw-dw', 'orc-sk', 'dw-orc', 'dw-hum', 'we-we']
+# ⚠️ POŘADÍ JE VÝZNAMOVÉ a musí sedět s `MATCHUPS[]` v
+# `diag_f1_cage_advance_harness.cpp` -- index se zapisuje do každého řádku na
+# disku. Doplňuje se na KONEC, nikdy doprostřed.
+MATCHUP_NAMES = ['dw-sk', 'dw-we', 'dw-dw', 'orc-sk', 'dw-orc', 'dw-hum',
+                 'we-we', 'dwnw-dwnw']   # 7 = nula pro B2 (bez Wrestle)
 
 results = []   # (stav, název, detail)
 def rec(state, name, detail=''):
@@ -240,36 +244,58 @@ def step_plan(args, par, w):
     # ⛔ OPRAVA 29.08.: práce je MATCHUPY x PÁRY, ne jen páry. Do téhle opravy
     #   skript u dvou matchupů hlásil polovinu potřebného času -- tedy říkal,
     #   ze se noc do sezení vejde, a nevešla by se.
-    nm = len(args.matchups.split())
+    specs = args.matchups.split()
+    nm = len(specs)
+    n_null = sum(1 for x in specs if x.endswith(':0'))
+    n_exp = nm - n_null
+    null_pairs = args.null_pairs or args.pairs
+    # Práce se počítá PO MATCHUPECH podle toho, kolik má který párů.
+    work = n_exp * args.pairs + n_null * null_pairs
     budget = args.session_hours * 3600 * args.session_use
-    fits = int(budget * w / par / nm) if par > 0 else 0
+    fits = int(budget * w / par) if par > 0 else 0
     rec('INFO', 'do %.1f h při využití %.0f %%' % (args.session_hours, args.session_use * 100),
-        '≈ %d párů na matchup  (%d matchupy => %d kusů práce)' % (fits, nm, fits * nm))
-    need_h = args.pairs * nm * par / w / 3600.0 if w else float('inf')
-    rec('INFO', 'cílových %d párů x %d matchupů' % (args.pairs, nm),
+        '≈ %d párů práce celkem' % fits)
+    need_h = work * par / w / 3600.0 if w else float('inf')
+    rec('INFO', 'zadání: %d expozice x %d + %d nula x %d = %d párů'
+        % (n_exp, args.pairs, n_null, null_pairs, work),
         '≈ %.1f h na %d workeru/ech' % (need_h, w))
-    if fits >= args.pairs:
+
+    if fits >= work:
         rec('OK', 'vejde se do jednoho sezení')
-        return
-    n_sessions = -(-args.pairs // max(fits, 1))
-    rec('WARN', 'na jedno sezení to nestačí', 'potřeba ≈ %d sezení' % n_sessions)
-    # ⛔ kusy musí být STEJNĚ VELKÉ a CHUNKS >= WORKERS
-    div = [c for c in range(w, 201) if args.pairs % c == 0]
-    ok = [c for c in div if args.pairs / c * nm * par / w <= budget]
-    print('       použitelné CHUNKS (dělitelé %d, >= WORKERS=%d): %s'
-          % (args.pairs, w, ' '.join(map(str, div[:20])) or 'žádný do 200'))
-    if ok:
-        c = ok[0]
-        rec('OK', 'doporučené krájení',
-            'CHUNKS=%d ⇒ %d párů na kus ≈ %.1f h na sezení'
-            % (c, args.pairs // c, args.pairs / c * nm * par / w / 3600.0))
     else:
-        rec('STOP', 'nelze nakrájet na stejně velké kusy do sezení',
-            'změň PAIRS na číslo s vhodnými děliteli')
-    print('       ⛔ Kusy MUSÍ být stejně velké — night_summarize váží shardy stejně,')
-    print('          nestejné kusy rozbijí sdruženou SE.')
-    print('       ⛔ Engine se mezi kusy NESMÍ přestavět: jedna noc = jedno měření,')
-    print('          jen roztažené přes víc sezení. Týž commit, tatáž binárka.')
+        n_sessions = -(-work // max(fits, 1))
+        rec('WARN', 'na jedno sezení to nestačí', 'potřeba ≈ %d sezení' % n_sessions)
+        print('       ⛔ Engine se mezi sezeními NESMÍ přestavět: jedna noc = jedno')
+        print('          měření, jen roztažené přes víc sezení. Týž commit, tatáž binárka.')
+
+    # ⭐ KRÁJENÍ NEMĚNÍ CELKOVÝ ČAS -- fronta workery vytíží tak jako tak.
+    #   Mění ODOLNOST: když kus umře nebo se stroj uspí, přijdeš o CELÝ kus,
+    #   protože bez `OK` se dělá znovu od začátku. Doporučujeme tedy podle
+    #   toho, jak dlouhý kus jsi ochoten ztratit, ne podle sezení.
+    div = [c for c in range(w, 401) if args.pairs % c == 0]
+    if div:
+        best, best_h = None, None
+        for c in div:
+            # ⛔ NEDĚLIT `w`: kus běží na JEDNOM workeru. `par` je s/pár/worker,
+            #   tedy už zahrnuje, že jich běží `w` naráz. Dělení navíc dalo
+            #   u 600 párů „2,7 h" místo 21,6 -- číslo, které vypadá věrohodně.
+            h = args.pairs / c * par / 3600.0
+            if h <= 3.5 and (best is None or h > best_h):
+                best, best_h = c, h
+        print('       použitelné CHUNKS (dělitelé %d, >= WORKERS=%d): %s'
+              % (args.pairs, w, ' '.join(map(str, div[:20]))))
+        if best:
+            rec('OK', 'doporučené krájení',
+                'CHUNKS=%d ⇒ %d párů na kus ≈ %.1f h  (tolik ztratíš, když kus umře)'
+                % (best, args.pairs // best, best_h))
+        else:
+            rec('WARN', 'žádný dělitel nedá kus pod 3,5 h',
+                'nejjemnější je CHUNKS=%d ⇒ %.1f h na kus'
+                % (div[-1], args.pairs / div[-1] * par / 3600.0))
+    else:
+        rec('STOP', 'žádný dělitel >= WORKERS', 'změň PAIRS na číslo s vhodnými děliteli')
+    print('       ⛔ Kusy MUSÍ být stejně velké UVNITŘ matchupu — night_summarize')
+    print('          váží shardy stejně, nestejné kusy rozbijí sdruženou SE.')
 
 def main():
     ap = argparse.ArgumentParser()
@@ -277,6 +303,12 @@ def main():
     ap.add_argument('--matchups', required=True, help='"idx:jméno:expozice ..."')
     ap.add_argument('--prereg', default='')
     ap.add_argument('--pairs', type=int, default=4800, help='cílový počet párů na matchup')
+    # ⛔ Bez tohohle počítal rozvrh KAŽDÝ matchup na plný počet párů, takže
+    #   u B2 (4800 expozice + 400 nula) hlásil 43,3 h místo 23,5 -- tedy
+    #   skoro dvojnásobek. Přeceněný odhad je méně nebezpečný než podceněný,
+    #   ale pořád je to číslo, podle kterého se rozhoduje o zabrání stroje.
+    ap.add_argument('--null-pairs', type=int, default=0,
+                    help='párů pro matchupy s expozicí 0 (0 = stejně jako --pairs)')
     ap.add_argument('--workers', type=int, default=8)
     ap.add_argument('--session-hours', type=float, default=12.0)
     ap.add_argument('--session-use', type=float, default=0.85,
