@@ -622,3 +622,262 @@ TEST(RulesEngine, ARootedPlayerIsNotOfferedAnythingThatMovesHim) {
         EXPECT_NE(a.type, ActionType::BLITZ) << "ani blitzem na vzdaleny cil";
     }
 }
+
+// ============================================================================
+// M2 / N13 = P55 (29.08.2026) -- PROPADLA AKCE NESPOTREBUJE TYMOVY LIMIT.
+// `resolveAction` vraci `ok()` uz PRED switchem, kdyz big-guy kontrola akci
+// zablokuje -- jenze `blitzUsedThisTurn` se nastavuje az UVNITR `case BLITZ`.
+// Tym tedy dostane DRUHY blitz za tez kolo.
+//
+// ⚠️ OPRAVUJE SE PER DOVEDNOST, protoze pravidla nemluvi stejne:
+//   Bone-head    (r. 7980-7983) "the player's team LOSES THE DECLARED ACTION
+//                for the turn. (So if a Bone-head player declares a Blitz
+//                Action and rolls a 1, then the team cannot declare another
+//                Blitz Action that turn.)"                        => SPOTREBUJE
+//   Really Stupid(r. 8398-8401) tataz veta, vcetne teze zavorky.   => SPOTREBUJE
+//   Wild Animal  (r. 8668-8669) "the Action is WASTED."            => SPOTREBUJE
+//   Take Root    (r. 8580-8583) mluvi JEN o bloku -- ale mlceni o tymove
+//                akci NEODVOLAVA deklaracni pravidlo.              => SPOTREBUJE
+//
+// ⛔ OPRAVA TEHOZ DNE: nejdriv tu stalo, ze Take Root tymu blitz PONECHAVA,
+// podle souhrnu ve fronte. Souhrn ale zahladil vyhradu, kterou audit 24.08.
+// zaznamenal: rozhoduje l. 351-352 (a 357-358, 360-362) -- "IMPORTANT: This
+// Action may NOT BE DECLARED by more than one player per turn". Limit visi na
+// DEKLARACI, ne na dokonceni, a vsechny ctyri hody se hazi az po ni. Vety
+// u jednotlivych dovednosti deklaracni pravidlo jen OPAKUJI.
+// ============================================================================
+
+// Blitz na sousedniho soupere: kdyby kontrola prosla, byl by to jen blok.
+static void placeBlitzPair(GameState& gs) {
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::AWAY);
+}
+
+TEST(BigGuyHandler, M2BoneHeadFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // Bone-head fail
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);        // propadla akce, ne turnover
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+TEST(BigGuyHandler, M2ReallyStupidFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // bez asistence cil 4+, 1 propada
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+TEST(BigGuyHandler, M2WildAnimalFailOnBlitzStillCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::WildAnimal);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // pri blitzu cil 2+, prirozena 1 propada
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+// Take Root: MA se nuluje, ale blitz uz byl DEKLAROVAN => tym o nej prisel.
+TEST(BigGuyHandler, M2TakeRootFailOnBlitzAlsoCostsTheTeamItsBlitz) {
+    auto gs = makeGameState();
+    placeBlitzPair(gs);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+
+    Action action{ActionType::BLITZ, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});          // Take Root fail => zakoreni, MA 0
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
+    EXPECT_TRUE(gs.homeTeam.blitzUsedThisTurn);
+}
+
+// Tataz veta pravidel plati na KAZDOU deklarovanou akci s tymovym limitem,
+// ne jen na blitz -- "the team loses THE DECLARED ACTION for the turn".
+TEST(BigGuyHandler, M2BoneHeadFailOnFoulStillCostsTheTeamItsFoul) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    Action action{ActionType::FOUL, 1, 2, {11, 7}};
+    FixedDiceRoller dice({1});
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
+}
+
+// ============================================================================
+// M3 / N12 (29.08.2026) -- BONE-HEAD A REALLY STUPID DOSTAVALI TACKLEZONY
+// ZPATKY ZADARMO kazde vlastni kolo. `resetPlayersForNewTurn` mazal
+// `lostTacklezones` bez ohledu na to, cim byl nastaveny.
+//
+// Bone-head, r. 7983-7986: "...until he manages to roll a 2 or better at the
+// start of a future Action or the drive ends." Really Stupid r. 8402-8405
+// totez. Stav tedy NEKONCI zacatkem kola -- konci az USPESNYM HODEM, nebo
+// koncem drivu. Hrac, ktereho trener uz znovu neaktivuje, ma TZ ztracene dal.
+//
+// ⭐ A NALEZ NAVIC, ktery ve fronte ani v auditu 24.08. neni: `lostTacklezones`
+// nese DVE RUZNE DELKY TRVANI. Hypnotic Gaze (r. 8185-8188) konci
+// "...until the START OF HIS NEXT ACTION or the drive ends" -- tedy skutecne
+// pristim kolem obeti. Jeden priznak na obe veci byl na tu delsi kratky.
+// Reseni: `lostTacklezones` zustava ucinnym priznakem (ctou ho patnactery
+// mista), a pribyva `bigGuyStupefied`, ktery drzi tu DELSI dobu a rika resetu,
+// ze tenhle hrac je ma nechat.
+//
+// Posledni test hlida GAZE -- ten se hybat NESMI.
+// ============================================================================
+
+TEST(BigGuyHandler, M3BoneHeadKeepsLostTacklezonesIntoTheNextTurn) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);   // r. 7983-7986
+    EXPECT_FALSE(gs.getPlayer(1).hasActed);         // aktivaci ale ma
+}
+
+TEST(BigGuyHandler, M3BoneHeadGetsTacklezonesBackOnlyByPassingTheRoll) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller failRoll({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, failRoll, nullptr);
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    FixedDiceRoller passRoll({4});                  // "roll a 2 or better"
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, passRoll, nullptr);
+    EXPECT_FALSE(r.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+}
+
+TEST(BigGuyHandler, M3ReallyStupidKeepsLostTacklezonesIntoTheNextTurn) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+
+    FixedDiceRoller dice({1});                      // sam => cil 4+
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);   // r. 8402-8405
+}
+
+// Stav prezije i kolo, ve kterem hrac lezi -- pravidlo zna jen uspesny hod
+// nebo konec drivu, sraz mezi ne nepatri.
+TEST(BigGuyHandler, M3BeingKnockedDownDoesNotClearTheBoneHeadState) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+
+    FixedDiceRoller dice({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);
+}
+
+// ⛔ HRANICE: Hypnotic Gaze ma KRATSI trvani a oprava se na nej NESMI rozlezt.
+// r. 8185-8188: "...until the start of his NEXT ACTION or the drive ends."
+TEST(BigGuyHandler, M3GazedPlayerStillGetsHisTacklezonesBackNextTurn) {
+    auto gs = makeGameState();
+    // ⚠️ `forEachPlayer` chodi po `squadId(side, n)`, ne po `p.teamSide` --
+    // hrac musi mit ID z te squady, jinak ho reset vubec nepotka.
+    const int awayId = GameState::squadId(TeamSide::AWAY, 0);
+    placePlayer(gs, awayId, {10, 7}, TeamSide::AWAY);
+    gs.getPlayer(awayId).lostTacklezones = true;    // obet uspesneho gaze
+    // ⭐ a ZADNY bigGuyStupefied -- gaze ho nenastavuje
+
+    gs.resetPlayersForNewTurn(TeamSide::AWAY);
+    EXPECT_FALSE(gs.getPlayer(awayId).lostTacklezones);
+}
+
+// ============================================================================
+// M3b (29.08.2026) -- PODMINKA NAVIC U ASISTENCE REALLY STUPID.
+// Vysla najevo az pri M3: `hasAdjacentAlly` zada `!ally->lostTacklezones`,
+// jenze pravidlo (r. 8393-8396) zada JEN tri veci:
+//   "If there are one or more players from the same team STANDING ADJACENT to
+//    the Really Stupid player's square, AND WHO AREN'T REALLY STUPID, then add
+//    2 to the D6 roll."
+// O tacklezonach ani slovo. Bone-headuv zakaz asistence je vyslovne omezeny na
+// "assist another player ON A BLOCK OR FOUL" (r. 7984-7985) -- bonus k hodu
+// Really Stupid neni ani jedno.
+//
+// ⚠️ Dokud se `lostTacklezones` cistilo kazde kolo, kousala ta podminka
+// vzacne. M3 ji nechava PRETRVAT, takze od dneska by bone-headed Ogre prestal
+// podpirat souseda na cele kolo a vic -- moje oprava tu vadu zhorsila, proto
+// se resi hned a ne "az na pravidla".
+// ============================================================================
+
+TEST(BigGuyHandler, M3bBoneHeadedAllyStillPropsUpAReallyStupidPlayer) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).skills.add(SkillName::BoneHead);
+    gs.getPlayer(2).lostTacklezones = true;      // soused uz hodil 1
+    gs.getPlayer(2).bigGuyStupefied = true;
+
+    // Stoji, sousedi, neni Really Stupid => cil je 2+, ne 4+.
+    FixedDiceRoller dice({2});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_FALSE(r.actionBlocked);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+}
+
+// HRANICE, ktera v pravidlech JE a musi zustat: druhy Really Stupid nepomaha.
+TEST(BigGuyHandler, M3bASecondReallyStupidPlayerDoesNotPropHimUp) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).skills.add(SkillName::ReallyStupid);
+
+    FixedDiceRoller dice({2});                   // bez asistence cil 4+ => propada
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_TRUE(r.actionBlocked);
+}
+
+// A lezici soused nepomaha -- "STANDING adjacent".
+TEST(BigGuyHandler, M3bAProneAllyDoesNotPropHimUp) {
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::ReallyStupid);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+
+    FixedDiceRoller dice({2});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
+
+    EXPECT_TRUE(r.actionBlocked);
+}

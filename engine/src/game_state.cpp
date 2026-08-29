@@ -67,7 +67,9 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
-        p.lostTacklezones = false;
+        // M3/N12: gaze konci pristim kolem obeti, big-guy stav az uspesnym
+        // hodem nebo koncem drivu -- viz komentar u `bigGuyStupefied`.
+        p.lostTacklezones = p.bigGuyStupefied;
         p.proUsedThisTurn = false;
         p.bigGuyCheckedThisTurn = false;
         p.leapUsedThisTurn = false;

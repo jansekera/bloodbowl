@@ -50,6 +50,11 @@ Position pickApproachStep(const GameState& state, const Player& mover,
     return bestNext;
 }
 
+int maxGfiSquares(const Player& player) {
+    if (player.rooted) return 0;                                  // r. 8577-8578
+    return player.hasSkill(SkillName::Sprint) ? 3 : 2;            // r. 8487-8490
+}
+
 int calculateLeapTarget(const Player& player) {
     int target = 7 - player.stats.agility;
     if (player.hasSkill(SkillName::VeryLongLegs)) target -= 1;

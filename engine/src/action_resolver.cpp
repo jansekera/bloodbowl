@@ -14,6 +14,29 @@
 
 namespace bb {
 
+namespace {
+
+// M2/N13 = P55 (29.08.2026): deklarovana akce, ktera propadne big-guy
+// kontrolou, MUSI tymu odecist jeho limit -- Bone-head to rika doslova
+// ("the team cannot declare another Blitz Action that turn", r. 7981-7983).
+// Dosud se `blitzUsedThisTurn` nastavovalo az uvnitr `case BLITZ`, kam se
+// pri zablokovane akci nikdy nedoslo, takze tym dostal DRUHY blitz.
+// Plati na kazdou akci s tymovym limitem, ne jen na blitz -- pravidlo mluvi
+// o "the declared Action", ne o blitzu.
+void consumeDeclaredTeamAction(GameState& state, TeamSide side, ActionType type) {
+    TeamState& team = state.getTeamState(side);
+    switch (type) {
+        case ActionType::BLITZ:           team.blitzUsedThisTurn = true;   break;
+        case ActionType::PASS:
+        case ActionType::THROW_TEAM_MATE: team.passUsedThisTurn = true;    break;
+        case ActionType::HAND_OFF:        team.handOffUsedThisTurn = true; break;
+        case ActionType::FOUL:            team.foulUsedThisTurn = true;    break;
+        default: break;   // MOVE a BLOCK zadny tymovy limit nemaji
+    }
+}
+
+}  // namespace
+
 ActionResult resolveAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events) {
     // BigGuy pre-action checks for player actions
@@ -55,6 +78,12 @@ ActionResult resolveAction(GameState& state, const Action& action,
                 return ActionResult::turnovr();
             }
             if (bgResult.actionBlocked && !bgResult.proceed) {
+                // M2: akce propadla -- pokud ji pravidlo bere i TYMU, odecist
+                // ji tady, protoze do switche (kde se limit nastavuje) se uz
+                // nedostaneme. `wastesTeamAction` nese to rozliseni.
+                if (bgResult.wastesTeamAction) {
+                    consumeDeclaredTeamAction(state, p.teamSide, action.type);
+                }
                 return ActionResult::ok();  // Action wasted, not turnover
             }
         }

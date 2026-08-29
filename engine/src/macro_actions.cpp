@@ -652,7 +652,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // SCORE: carrier can reach endzone with MA + 2 GFI
     if (iHaveBall && carrier->canAct()) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2; // +2 GFI
+        int maxReach = carrier->movementRemaining + maxGfiSquares(*carrier); // +2 GFI
         if (dist <= maxReach && dist > 0) {
             out.push_back({MacroType::SCORE, carrier->id, -1, {-1, -1}});
         }
@@ -662,7 +662,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // 2026-08-17 (P4/P26): hand-off má vlastní limit na kolo, ne sdílený s pass.
     if (iHaveBall && carrier->canAct() && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
         bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
 
@@ -677,7 +677,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (adjDist > 2) return; // carrier must reach adjacency within 1 move
 
                 int receiverDist = distToEndzone(teammate.position, mySide);
-                int receiverMaxReach = teammate.movementRemaining + 2;
+                int receiverMaxReach = teammate.movementRemaining + maxGfiSquares(teammate);
                 if (receiverDist > 0 && receiverDist <= receiverMaxReach) {
                     out.push_back({MacroType::HAND_OFF_SCORE, carrier->id, teammate.id, {-1, -1}});
                 }
@@ -688,7 +688,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // PASS_SCORE: carrier stuck, pass (longer range) to teammate who can score
     if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
         bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
 
@@ -705,7 +705,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (passDist < 2 || passDist > 10) return; // hand-off is separate; max pass ~10
 
                 int receiverDist = distToEndzone(teammate.position, mySide);
-                int receiverMaxReach = teammate.movementRemaining + 2;
+                int receiverMaxReach = teammate.movementRemaining + maxGfiSquares(teammate);
                 if (receiverDist <= 0 || receiverDist > receiverMaxReach) return;
 
                 int score = teammate.stats.agility * 5 - passDist;
@@ -729,7 +729,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn
         && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         bool carrierStuck = (carrierDist > carrierMaxReach);
 
         if (carrierStuck) {
@@ -753,7 +753,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     if (adjDist > 2) return; // relay must reach adjacency for hand-off
 
                     int scorerDist = distToEndzone(scorer.position, mySide);
-                    int scorerMaxReach = scorer.movementRemaining + 2;
+                    int scorerMaxReach = scorer.movementRemaining + maxGfiSquares(scorer);
                     if (scorerDist <= 0 || scorerDist > scorerMaxReach) return;
 
                     int score = relay.stats.agility * 3 + scorer.stats.agility * 5
@@ -779,7 +779,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // ADVANCE: carrier can move forward but can't score
     if (iHaveBall && carrier->canAct() && carrier->movementRemaining > 0) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2;
+        int maxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         if (dist > maxReach) {
             out.push_back({MacroType::ADVANCE, carrier->id, -1, {-1, -1}});
         }
@@ -904,7 +904,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     if (iHaveBall && carrier->canAct() && !myTeam.blitzUsedThisTurn) {
         int dist = distToEndzone(carrier->position, mySide);
         int gfi = carrier->rooted ? 0
-                : (carrier->hasSkill(SkillName::Sprint) ? 3 : 2);
+                : maxGfiSquares(*carrier);
         int maxReach = carrier->movementRemaining + gfi;
         int ezX = endzoneX(mySide);
         int dx = forwardDx(mySide);
@@ -997,12 +997,37 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         constexpr int kSecondPickerMaxGap = 25;
 
         state.forEachOnPitch(mySide, [&](const Player& p) {
-            if (!isFreeToAct(p)) return;
+            // M5/A7 (29.08.2026): lezici hrac smi vstat a UTRATIT ZBYTEK
+            // pohybu -- r. 668-671, "at a cost of THREE SQUARES of his
+            // movement ... The player may take ANY Action other than a Block
+            // Action". P45 udelal vstavani dosazitelnym, ale jen NA MISTE
+            // (REPOSITION na vlastni pole), takze lezici hrac u volneho mice
+            // se k nemu ten tah nikdy nedostal. Executor to umi uz ted:
+            // `movePlayerToward` bere "prone a uz na cili" jako nedokoncene,
+            // postavi ho a pokracuje. Chybela jen NABIDKA -- tataz trida jako
+            // F12 Leap, P45 vstavani a M4 Sprint.
+            const bool prone = (p.state == PlayerState::PRONE);
+            if (prone) {
+                if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
+            } else if (!isFreeToAct(p)) {
+                return;
+            }
             if (p.hasSkill(SkillName::BallAndChain)) return;
             if (p.hasSkill(SkillName::NoHands)) return;
 
+            // Rozpocet po vstani. Jump Up (r. 8196-8198) vstava zdarma;
+            // pod 3 MA je vstani na 4+ a `resolveStandUp` pak nuluje pohyb
+            // (move_handler.cpp:390, "any further step must be a GFI"), takze
+            // zbytek je v obou tech pripadech presne to, co zbyde.
+            int afterStand = p.movementRemaining;
+            if (prone && !p.hasSkill(SkillName::JumpUp)) {
+                afterStand = (p.movementRemaining >= 3)
+                                 ? p.movementRemaining - 3
+                                 : 0;
+            }
+
             int dist = p.position.distanceTo(state.ball.position);
-            int maxReach = p.movementRemaining + 2;
+            int maxReach = afterStand + maxGfiSquares(p);
             if (dist > maxReach) return;
 
             // Rank by the COMPUTED chance of coming up with the ball, not by
@@ -1046,7 +1071,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // loop above already applies before accepting the fallback.
             const Player* fallback = findNearestFreePlayer(state, state.ball.position);
             if (fallback && !fallback->hasSkill(SkillName::NoHands) &&
-                fallback->position.distanceTo(state.ball.position) <= fallback->movementRemaining + 2) {
+                fallback->position.distanceTo(state.ball.position) <= fallback->movementRemaining + maxGfiSquares(*fallback)) {
                 bestPicker = fallback;
             }
         }
@@ -1970,7 +1995,8 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     // 9-11 (e.g. MA9 Skaven Gutter Runners) walks the previously-hardcoded
     // 8 steps, stops short, and wastes the whole activation with the ball
     // still loose (project_bloodbowl_audit_findings_20260703 finding 6).
-    int maxSteps = state.getPlayer(macro.playerId).movementRemaining + 2;
+    const Player& picker = state.getPlayer(macro.playerId);
+    int maxSteps = picker.movementRemaining + maxGfiSquares(picker);
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
     if (result.turnover) return result;
 
@@ -2263,7 +2289,7 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
         const Player& p = state.getPlayer(macro.playerId);
         if (p.isOnPitch()) {
             int dist = distToEndzone(p.position, mySide);
-            int ma = p.movementRemaining + 2;
+            int ma = p.movementRemaining + maxGfiSquares(p);
             out[10] = std::min(1.0f, static_cast<float>(ma) / std::max(dist, 1));
         }
     }

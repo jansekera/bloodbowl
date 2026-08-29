@@ -218,8 +218,15 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             }
         }
 
-        // MULTIPLE_BLOCK: player has MultipleBlock, 2+ adjacent enemies, no Frenzy
-        if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Frenzy)) {
+        // MULTIPLE_BLOCK: player has MultipleBlock and 2+ adjacent enemies.
+        // ⭐ FRENZY UZ TU NENI PODMINKA (oprava 29.08.2026, nalez L6).
+        // r. 8302-8305: "...so Multiple Block can be used INSTEAD OF Frenzy,
+        // but both skills cannot be used TOGETHER." Pravidlo zakazuje
+        // KOMBINACI, ne drzeni obojiho -- `&& !p.hasSkill(Frenzy)` tedy hraci
+        // s obema dovednostmi bralo VOLBU, kterou pravidlo predpoklada.
+        // Vylouceni se resi na druhe strane: `resolveMultipleBlock` pousti oba
+        // bloky s `frenzyDisabled`, takze Frenzy uvnitr nezasahne.
+        if (p.hasSkill(SkillName::MultipleBlock)) {
             // Collect adjacent standing enemies
             int adjEnemies[8];
             int nAdj = 0;

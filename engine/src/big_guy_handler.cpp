@@ -15,12 +15,20 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(SkillName::BoneHead), roll >= 2});
+        if (roll >= 2) {
+            // M3: "until he manages to roll a 2 OR BETTER at the start of a
+            // future Action" (r. 7985-7986) -- uspesny hod stav ukoncuje.
+            player.bigGuyStupefied = false;
+            player.lostTacklezones = false;
+        }
         if (roll == 1) {
             player.lostTacklezones = true;
+            player.bigGuyStupefied = true;
             player.hasActed = true;
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: tym prichazi o deklarovanou akci
             return result;
         }
     }
@@ -38,8 +46,15 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         for (auto& pos : adj) {
             if (!pos.isOnPitch()) continue;
             const Player* ally = state.getPlayerAtPosition(pos);
+            // M3b (29.08.2026): `!ally->lostTacklezones` tu bylo NAVIC.
+            // r. 8393-8396 zada jen "players from the same team STANDING
+            // ADJACENT ... AND WHO AREN'T REALLY STUPID" -- o tacklezonach nic.
+            // Bone-headuv zakaz asistence je vyslovne jen "on a BLOCK OR FOUL"
+            // (r. 7984-7985), a bonus k hodu Really Stupid neni ani jedno.
+            // Podminka kousala vzacne, dokud se priznak cistil kazde kolo;
+            // M3 ho necha pretrvat, takze od ni bylo potreba se zbavit hned.
             if (ally && ally->teamSide == player.teamSide &&
-                canAct(ally->state) && !ally->lostTacklezones &&
+                canAct(ally->state) &&
                 !ally->hasSkill(SkillName::ReallyStupid)) {
                 hasAdjacentAlly = true;
                 break;
@@ -50,12 +65,20 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(SkillName::ReallyStupid), roll >= target});
+        if (roll >= target) {
+            // M3: r. 8404-8405, "until he manages to roll a successful result
+            // for a Really Stupid roll at the start of a future Action".
+            player.bigGuyStupefied = false;
+            player.lostTacklezones = false;
+        }
         if (roll < target) {
             player.lostTacklezones = true;
+            player.bigGuyStupefied = true;
             player.hasActed = true;
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: tym prichazi o deklarovanou akci
             return result;
         }
     }
@@ -80,6 +103,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
             player.hasMoved = true;
             result.actionBlocked = true;
             result.proceed = false;
+            result.wastesTeamAction = true;   // M2: "the Action is wasted"
             return result;
         }
     }
@@ -113,6 +137,13 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                 player.hasMoved = true;
                 result.actionBlocked = true;
                 result.proceed = false;
+                // M2 (29.08.): tym o deklarovanou akci PRICHAZI i tady.
+                // Nejdriv jsem sem napsal opak, protoze l. 8580-8583 mluvi jen
+                // o zakazu bloku. Rozhoduje ale l. 351-352: "IMPORTANT: This
+                // Action may NOT BE DECLARED by more than one player per turn"
+                // -- limit visi na DEKLARACI, ne na dokonceni, a Take Root se
+                // hazi az "immediately after declaring an Action".
+                result.wastesTeamAction = true;
                 return result;
             }
         }

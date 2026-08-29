@@ -113,8 +113,17 @@ static const Matchup MATCHUPS[] = {
     // orientacich a par je presne "wood-elf s rukama vs. wood-elf bez rukou"
     // na TEMZE enginu.
     {"wood-elf", "wood-elf"},
+    // 2026-08-29: PRIPOJENO (index 7) jako NULOVA KONTROLA pro rameno B2.
+    // Od 27.08. ma Wrestle kazdy tym, takze matchup, kde se
+    // `setWrestlePricingArm` spustit NEMUZE, prestal existovat -- a bez nuly
+    // se beh nesmi pustit (P20). `dwarf-nw` je taz sestava TV1200 bez dvou
+    // Longbeardu s Wrestle; `getDevelopedRoster` zahazuje pomlcku, takze se
+    // trefi do "dwarfnw".
+    // ⛔ PRIPOJENO, NE VLOZENO: index se zapisuje do kazdeho radku na disku,
+    // takze preskladani tehle tabulky by TISE preznacilo minule behy.
+    {"dwarf-nw", "dwarf-nw"},
 };
-static constexpr int N_MATCHUPS = 7;
+static constexpr int N_MATCHUPS = 8;
 
 struct SideAttrition {
     int ko = 0, injured = 0, dead = 0, ejected = 0;

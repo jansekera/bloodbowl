@@ -82,7 +82,14 @@ def one(path):
     return c
 
 if __name__ == '__main__':
-    files = sorted(glob.glob('crosses_20260821_data/*/g*.json.gz'))
+    # 2026-08-28: cesta byla natvrdo na korpus z 21.08. Zobecneno na argument,
+    # aby sel STROP precist parove -- tyz seed, rameno M1/N10 ZAP vs VYP.
+    # Bez toho je kazde cislo jen snimek proti pohnute bazi.
+    import sys
+    root = sys.argv[1] if len(sys.argv) > 1 else 'crosses_20260821_data'
+    files = sorted(glob.glob(f'{root}/*/g*.json.gz')) or sorted(glob.glob(f'{root}/g*.json.gz'))
+    if not files:
+        raise SystemExit(f'zadne hry v {root}')
     with Pool(6) as pool:
         rows = [r for r in pool.map(one, files, chunksize=50) if r is not None]
     tot = collections.Counter()

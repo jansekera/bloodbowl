@@ -23,6 +23,7 @@
 #include "bb/value_function.h"
 #include "bb/mcts.h"
 #include "bb/macro_mcts.h"
+#include "bb/macro_actions.h"
 
 namespace py = pybind11;
 
@@ -231,7 +232,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
                 "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
                 "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
-                "EJECTED", "HAND_OFF", "STAND_UP", "LEAP"
+                "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP"
                 // Positional map onto GameEvent::Type -- append only.
             };
             for (auto& turn : lgr.turnLogs) {
@@ -537,7 +538,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                       bool awayStagedPickup,
                                       bool cageAdvance,
                                       bool awayCageAdvance,
-                                      bool dauntlessInOffer) {
+                                      bool dauntlessInOffer,
+                                      bool blitzContinuation) {
         bb::DiceRoller dice(seed);
 
         // Home VF (training weights)
@@ -626,6 +628,23 @@ PYBIND11_MODULE(bb_engine, m) {
             }
         };
 
+        // 2026-08-28: M1/N10 -- blitz nechava aktivaci otevrenou (BB2016 l.
+        // 347-350). BOTH sides on purpose, same argument as dauntlessInOffer:
+        // it is a rule the planner did not honour, not a doctrine we are
+        // trying on our dwarves, so one-sided would compare two engines.
+        //
+        // ⭐ PROC TO NENI NASAZENI DO PRODUKCE. Default is false. The arm
+        // passed its A/B on 2026-08-28 (+0.0177 +- 0.0069, 6/6 predictions),
+        // but the pre-registration left two readings unanswerable, because a
+        // corpus is collected with the arms OFF: whether M9's ceiling (4.09
+        // blitzes/game stuck in contact) got consumed, and how often the
+        // follow-up is refused. With the arm off the second one is 0 BY
+        // CONSTRUCTION -- which would read as "that half is dead". This switch
+        // lets the corpus answer both WITHOUT deciding to ship, keeping
+        // "measure what the arm does" apart from "decide to deploy it".
+        bb::setBlitzContinuationArm(bb::TeamSide::HOME, blitzContinuation);
+        bb::setBlitzContinuationArm(bb::TeamSide::AWAY, blitzContinuation);
+
         auto logged = bb::simulateGameLogged(
             home, away,
             makePolicy(homeAI, vf.get(), policyNet.get(), policyBlend,
@@ -681,7 +700,8 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("away_staged_pickup") = false,  // so the gate can run candidate-only while frozen keeps its promoted config
        py::arg("cage_advance") = false,        // 2026-08-11: F1 cage-advance planner, per side. Default off = production.
        py::arg("away_cage_advance") = false,   // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
-       py::arg("dauntless_in_offer") = true);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. 2026-08-17: default TRUE = production, after the A/B passed (+3.59 pp vs the null arms). Corpora collected through this binding must match what production plays, or we go back to measuring one engine and shipping another.
+       py::arg("dauntless_in_offer") = true,
+       py::arg("blitz_continuation") = false);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. 2026-08-17: default TRUE = production, after the A/B passed (+3.59 pp vs the null arms). Corpora collected through this binding must match what production plays, or we go back to measuring one engine and shipping another.
 
     // --- Roster getters ---
     m.def("get_roster", [](const std::string& name) -> const bb::TeamRoster* {

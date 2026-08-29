@@ -138,6 +138,7 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.hasActed = false;
         p.usedBlitz = false;
         p.lostTacklezones = false;
+        p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.proUsedThisTurn = false;
 
         templateUsed++;
@@ -204,6 +205,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.hasActed = false;
         p.usedBlitz = false;
         p.lostTacklezones = false;
+        p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.proUsedThisTurn = false;
     }
 
@@ -405,6 +407,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
             p.hasActed = false;
             p.usedBlitz = false;
             p.lostTacklezones = false;
+        p.bigGuyStupefied = false;      // M3: "or the drive ends" 
             p.proUsedThisTurn = false;
             continue;
         }
@@ -417,6 +420,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
         p.hasActed = false;
         p.usedBlitz = false;
         p.lostTacklezones = false;
+        p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.proUsedThisTurn = false;
     }
 

@@ -2,6 +2,7 @@
 #include "bb/block_handler.h"
 #include "bb/helpers.h"
 #include "bb/macro_actions.h"   // M1/N10 arm
+#include "bb/rules_engine.h"
 
 using namespace bb;
 
@@ -1215,4 +1216,167 @@ TEST(BlockHandler, BothDownKnocksBothPlayersDownInPlaceWithNoPushOrFollowUp) {
         << "a utocnik ho nenasleduje";
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_FALSE(result.turnover);
+}
+
+// --- FOLLOW_UP event (28.08.2026) -------------------------------------------
+//
+// Follow-up used to set `att.position = defOldPos` and emit nothing, so a
+// corpus could not tell "nobody follows up" from "following up is not logged".
+// The pre-registration of the 27.->28.08. night asked how often the follow-up
+// is REFUSED and the question was unanswerable for that reason alone -- the
+// same class as STAND_UP before 21.08.
+//
+// ⭐ The event fires on the OPPORTUNITY, not on the choice: `success` carries
+// whether the follow-up was taken. Without that the log would hold a numerator
+// with no denominator, and "refused" would be indistinguishable from "there was
+// nothing to refuse" -- which is exactly how the first reading on 28.08. went
+// wrong (it divided by every block, though a defender vacates in only 80 % of
+// blitzes).
+static int countFollowUps(const std::vector<GameEvent>& ev, bool taken) {
+    int n = 0;
+    for (const auto& e : ev) {
+        if (e.type == GameEvent::Type::FOLLOW_UP && e.success == taken) ++n;
+    }
+    return n;
+}
+
+TEST(BlockHandler, FollowUpTakenIsLogged) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED
+    BlockParams params{1, 12, true, false};    // blitz, arm OFF => always follows
+    resolveBlock(gs, params, dice, &ev);
+
+    ASSERT_EQ(countFollowUps(ev, true), 1);
+    ASSERT_EQ(countFollowUps(ev, false), 0);
+    for (const auto& e : ev) {
+        if (e.type != GameEvent::Type::FOLLOW_UP) continue;
+        EXPECT_EQ(e.playerId, 1);
+        EXPECT_EQ(e.targetId, 12);
+        EXPECT_EQ(e.from, (Position{10, 7})) << "from = where the attacker stood";
+        EXPECT_EQ(e.to, (Position{11, 7})) << "to = the square the defender left";
+    }
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+}
+
+TEST(BlockHandler, FollowUpDeclinedIsLoggedToo) {
+    BlitzContinuationArmOn arm(TeamSide::HOME);
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 4;
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED: (11,7) is freed
+    BlockParams params{1, 12, true, false};
+    resolveBlock(gs, params, dice, &ev);
+
+    // The blitzer stays put -- and the log still records that he COULD have.
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+    EXPECT_EQ(countFollowUps(ev, false), 1) << "the refusal must be countable";
+    EXPECT_EQ(countFollowUps(ev, true), 0);
+}
+
+TEST(BlockHandler, NoFollowUpEventWhenTheDefenderNeverVacated) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3});                 // PUSHED, but Stand Firm holds
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, &ev);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(countFollowUps(ev, true) + countFollowUps(ev, false), 0)
+        << "no square was freed, so there was no opportunity to log";
+}
+
+// ============================================================================
+// L6 (29.08.2026) -- FRENZY + MULTIPLE BLOCK: PRAVIDLO ZAKAZUJE KOMBINACI,
+// KOD BRAL VOLBU.
+// r. 8302-8305: "The player cannot follow up either block when using this
+// skill, so Multiple Block can be used INSTEAD OF Frenzy, but both skills
+// cannot be used TOGETHER."
+// ⇒ MIT se smi obojí, POUZIT v jednom okamziku jen jedno. Duvod je mechanicky:
+// Multiple Block zakazuje follow-up, Frenzy ho vyzaduje (r. 8138).
+//
+// `rules_engine.cpp:222` mel `&& !p.hasSkill(Frenzy)`, takze hrac s obojim
+// nedostal MULTIPLE_BLOCK NIKDY -- to je odebrana volba, ne zakazana
+// kombinace. Nositel obojiho v `roster.cpp` existuje (r. 7450), jen ne mezi
+// peti korpusovymi sestavami.
+// ============================================================================
+
+TEST(BlockHandler, L6MultipleBlockIsOfferedToAPlayerWhoAlsoHasFrenzy) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+
+    bool offered = false;
+    for (const auto& a : actions) {
+        if (a.type == ActionType::MULTIPLE_BLOCK && a.playerId == 1) offered = true;
+    }
+    EXPECT_TRUE(offered);
+}
+
+// HRANICE: hrac BEZ Multiple Block ji nedostane, at ma Frenzy nebo ne.
+TEST(BlockHandler, L6MultipleBlockIsStillNotOfferedWithoutTheSkill) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) {
+        EXPECT_NE(a.type, ActionType::MULTIPLE_BLOCK);
+    }
+}
+
+// A druha pulka pravidla: kdyz uz Multiple Block bezi, Frenzy se NESMI zapnout.
+// Obranci maji Stand Firm, takze po PUSHED nikdo nikam nejde a oba zustavaji
+// stat a sousedit -- presne stav, ve kterem Frenzy povinny druhy blok hazi.
+// Musi vyjit PRESNE DVA bloky, ne tri nebo ctyri.
+TEST(BlockHandler, L6FrenzyDoesNotAddBlocksInsideAMultipleBlock) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 8, 3, 9);   // ST8, at ma 2 kostky
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);        // po PUSHED nikam
+    gs.getPlayer(13).skills.add(SkillName::StandFirm);
+
+    // 3 = PUSHED (dice.h:21). ST8 proti ST3+2 => 2 kostky pro utocnika, oba
+    // padnou na PUSHED, Stand Firm odsun zrusi => oba stoji a sousedi, tedy
+    // presne spoustec povinneho druheho bloku Frenzy. Dost kostek i pro rany,
+    // ktere se hazet NEMAJI.
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3});
+    std::vector<GameEvent> events;
+    resolveMultipleBlock(gs, 1, 12, 13, dice, &events);
+
+    int blocks = 0;
+    for (const auto& e : events) if (e.type == GameEvent::Type::BLOCK) ++blocks;
+    EXPECT_EQ(blocks, 2);
 }

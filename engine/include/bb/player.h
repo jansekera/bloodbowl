@@ -43,6 +43,15 @@ struct Player {
     bool hasActed = false;
     bool usedBlitz = false;
     bool lostTacklezones = false;
+    // M3/N12 (29.08.2026): `lostTacklezones` nese DVE ruzne delky trvani a na
+    // tu delsi byl kratky. Hypnotic Gaze (r. 8185-8188) konci "until the START
+    // OF HIS NEXT ACTION or the drive ends", takze reset na zacatku kola je
+    // spravne. Bone-head (r. 7983-7986) a Really Stupid (r. 8402-8405) ale
+    // trvaji "until he manages to ROLL A 2 OR BETTER at the start of a future
+    // Action or the drive ends" -- ty zacatek kola NEKONCI.
+    // `lostTacklezones` zustava ucinnym priznakem (cte ho patnact mist),
+    // `bigGuyStupefied` drzi tu delsi dobu a rika resetu, at ho nechá být.
+    bool bigGuyStupefied = false;
     bool proUsedThisTurn = false;
     // BB2016 l. 8573 a spol.: "Immediately after declaring an ACTION with this
     // player, roll a D6" -- JEDNOU za akci, ne za každé pole. Náš vícepolový
