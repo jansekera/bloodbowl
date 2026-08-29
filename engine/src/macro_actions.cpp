@@ -1877,7 +1877,8 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     // 9-11 (e.g. MA9 Skaven Gutter Runners) walks the previously-hardcoded
     // 8 steps, stops short, and wastes the whole activation with the ball
     // still loose (project_bloodbowl_audit_findings_20260703 finding 6).
-    int maxSteps = state.getPlayer(macro.playerId).movementRemaining + 2;
+    const Player& picker = state.getPlayer(macro.playerId);
+    int maxSteps = picker.movementRemaining + maxGfiSquares(picker);
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
     if (result.turnover) return result;
 
