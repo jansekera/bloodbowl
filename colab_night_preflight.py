@@ -219,17 +219,35 @@ def step_tempo(args, ncpu):
     rec('INFO', '%d workerů naráz' % w, '%.1f s/pár/worker' % par)
     state = 'WARN' if cont > 2.0 else 'OK'
     rec(state, 'přirážka za soupeření', '%.2fx  (server měl 1,45x na 8 workerech)' % cont)
+
+    # ⭐⭐ ROZHODUJE PROPUSTNOST, NE s/pár. Změřeno na Colabu 29.08.: solo
+    #   70,5 s/pár, dva workery 191,5 s/pár/worker => 0,0142 vs 0,0104 páru/s,
+    #   tedy DVA WORKERY JSOU O 27 % POMALEJŠÍ NEŽ JEDEN. Přirážka horší než
+    #   lineární u dvou "jader" znamená dva HYPERTHREADY jednoho fyzického
+    #   jádra -- druhý worker si nebere volné jádro, rve se o totéž.
+    thr_solo = 1.0 / solo if solo > 0 else 0.0
+    thr_par  = w / par if par > 0 else 0.0
+    rec('INFO', 'propustnost', 'solo %.4f  ·  %dx %.4f páru/s' % (thr_solo, w, thr_par))
+    if thr_par < thr_solo:
+        rec('WARN', 'VÍC WORKERŮ JE POMALEJŠÍ',
+            'jeď --workers 1 (%.0f %% rychleji celkem)' % ((thr_solo / thr_par - 1) * 100))
+        return solo, solo, 1
     return solo, par, w
 
 # --- 6. ROZVRH DO SEZENÍ ----------------------------------------------------
 def step_plan(args, par, w):
     print('\n=== 6. KOLIK SE TOHO VEJDE DO SEZENÍ ===')
+    # ⛔ OPRAVA 29.08.: práce je MATCHUPY x PÁRY, ne jen páry. Do téhle opravy
+    #   skript u dvou matchupů hlásil polovinu potřebného času -- tedy říkal,
+    #   ze se noc do sezení vejde, a nevešla by se.
+    nm = len(args.matchups.split())
     budget = args.session_hours * 3600 * args.session_use
-    fits = int(budget * w / par) if par > 0 else 0
+    fits = int(budget * w / par / nm) if par > 0 else 0
     rec('INFO', 'do %.1f h při využití %.0f %%' % (args.session_hours, args.session_use * 100),
-        '≈ %d párů na matchup' % fits)
-    need_h = args.pairs * par / w / 3600.0 if w else float('inf')
-    rec('INFO', 'cílových %d párů' % args.pairs, '≈ %.1f h na %d workerech' % (need_h, w))
+        '≈ %d párů na matchup  (%d matchupy => %d kusů práce)' % (fits, nm, fits * nm))
+    need_h = args.pairs * nm * par / w / 3600.0 if w else float('inf')
+    rec('INFO', 'cílových %d párů x %d matchupů' % (args.pairs, nm),
+        '≈ %.1f h na %d workeru/ech' % (need_h, w))
     if fits >= args.pairs:
         rec('OK', 'vejde se do jednoho sezení')
         return
@@ -237,14 +255,14 @@ def step_plan(args, par, w):
     rec('WARN', 'na jedno sezení to nestačí', 'potřeba ≈ %d sezení' % n_sessions)
     # ⛔ kusy musí být STEJNĚ VELKÉ a CHUNKS >= WORKERS
     div = [c for c in range(w, 201) if args.pairs % c == 0]
-    ok = [c for c in div if args.pairs / c * par / w <= budget]
+    ok = [c for c in div if args.pairs / c * nm * par / w <= budget]
     print('       použitelné CHUNKS (dělitelé %d, >= WORKERS=%d): %s'
           % (args.pairs, w, ' '.join(map(str, div[:20])) or 'žádný do 200'))
     if ok:
         c = ok[0]
         rec('OK', 'doporučené krájení',
-            'CHUNKS=%d ⇒ %d párů na kus ≈ %.1f h' % (c, args.pairs // c,
-                                                     args.pairs / c * par / w / 3600.0))
+            'CHUNKS=%d ⇒ %d párů na kus ≈ %.1f h na sezení'
+            % (c, args.pairs // c, args.pairs / c * nm * par / w / 3600.0))
     else:
         rec('STOP', 'nelze nakrájet na stejně velké kusy do sezení',
             'změň PAIRS na číslo s vhodnými děliteli')
