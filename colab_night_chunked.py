@@ -70,6 +70,10 @@ def main():
     ap.add_argument('--matchups', required=True, help='"idx:jméno:expozice ..."')
     ap.add_argument('--out', required=True, help='výstupní adresář (ideálně na Disku)')
     ap.add_argument('--pairs', type=int, required=True, help='CELKEM párů na matchup')
+    # ⚠️ GRANULARITA: celkový čas na počtu kusů skoro nezávisí (fronta je
+    #   vytíží), ale ODOLNOST ANO -- když kus umře nebo se stroj uspí, přijdeš
+    #   o CELÝ kus, protože bez `OK` se dělá znovu od začátku. 4800/48 = 100
+    #   párů na kus je při 8 workerech ~3 h; 4800/15 = 320 párů je ~10,5 h.
     ap.add_argument('--chunks', type=int, required=True, help='na kolik STEJNÝCH kusů')
     # ⭐ NULA SMÍ BÝT KRATŠÍ (uživatel 29.08., a fronta má precedens u Leapu:
     #   „nulový test je LEVNÝ, stačí mu ~200 párů: jeho úkol je ukázat NULU,
@@ -144,44 +148,74 @@ def main():
         return 0
 
     budget = args.session_hours * 3600 * args.session_use
-    per_chunk = None                      # změří se na prvním kusu
-    ran = 0
-    while todo:
-        # kolik jich pustit naráz: nikdy víc než workers
-        batch = todo[:args.workers]
-        if per_chunk is not None:
-            left = budget - (time.time() - started)
-            if left < per_chunk * 1.1:
-                print('\n⏹  KONEC SEZENÍ: na další kus (~%.0f min) zbývá %.0f min.'
-                      % (per_chunk / 60, max(left, 0) / 60))
-                break
-        t0 = time.time()
-        procs = []
-        for idx, name, k, d, npr, nch in batch:
-            os.makedirs(d, exist_ok=True)
-            # ⛔ NIKDY nemazat existující OK -- to je právě to, co noc dělá
-            #    a proč se na ni nedá navázat.
-            for f in ('FAIL',):
-                p = os.path.join(d, f)
-                if os.path.exists(p): os.remove(p)
-            cmd = [BIN, ROOT, str(npr), idx, str(args.mode), str(k * npr)]
-            print('   ▶ %s kus %d/%d  (offset %d, %d párů)'
-                  % (name, k + 1, nch, k * npr, npr))
-            if args.dry_run:
-                procs.append((None, d, name, k)); continue
-            log = open(os.path.join(d, 'run.log'), 'w')
-            procs.append((subprocess.Popen(cmd, cwd=d, stdout=log, stderr=log), d, name, k))
-        for p, d, name, k in procs:
-            if p is None: continue
-            rc = p.wait()
+
+    # ⭐⭐ FRONTA MÍSTO DÁVEK (29.08.2026). Do téhle opravy pouštěl runner
+    #   `workers` kusů naráz a ČEKAL NA VŠECHNY, než pustil další dávku --
+    #   tedy přesně vada, kterou shellový harness odstranil v T2.15:
+    #     "Shard dostával pevný blok seedů, jenže zápasy nejsou stejně dlouhé
+    #      => shardy se rozejdou a běh čeká na nejpomalejšího."
+    #   Navíc poslední dávka bývá poloprázdná (15 kusů na 8 workerech = 8+7).
+    #   Teď si slot bere DALŠÍ VOLNÝ KUS, jakmile dodělá.
+    #
+    # ⏰ ROZPOČET SEZENÍ: když dojde čas, PŘESTANOU SE POUŠTĚT NOVÉ kusy, ale
+    #   rozběhnuté se nechají dojet. Zabít je by znamenalo zahodit jejich práci
+    #   -- kus bez `OK` se příště dělá celý znovu.
+    per_chunk = None            # nejdelší dosud doběhlý kus (horní odhad)
+    ran, failed = 0, 0
+    running = []                # [(Popen, d, name, k, t0)]
+    stop_launching = False
+
+    def launch(item):
+        idx, name, k, d, npr, nch = item
+        os.makedirs(d, exist_ok=True)
+        # ⛔ NIKDY nemazat existující OK -- to je právě to, co noc dělá a proč
+        #    se na ni nedá navázat.
+        f = os.path.join(d, 'FAIL')
+        if os.path.exists(f): os.remove(f)
+        cmd = [BIN, ROOT, str(npr), idx, str(args.mode), str(k * npr)]
+        print('   ▶ %s kus %d/%d  (offset %d, %d párů)'
+              % (name, k + 1, nch, k * npr, npr), flush=True)
+        if args.dry_run:
+            return (None, d, name, k, time.time())
+        log = open(os.path.join(d, 'run.log'), 'w')
+        return (subprocess.Popen(cmd, cwd=d, stdout=log, stderr=log),
+                d, name, k, time.time())
+
+    while todo or running:
+        while todo and len(running) < args.workers and not stop_launching:
+            if per_chunk is not None:
+                left = budget - (time.time() - started)
+                if left < per_chunk * 1.1:
+                    print('\n⏹  KONEC SEZENÍ: na další kus (~%.0f min) zbývá %.0f min.'
+                          % (per_chunk / 60, max(left, 0) / 60), flush=True)
+                    if running:
+                        print('   %d rozběhlých kusů se nechává dojet.' % len(running))
+                    stop_launching = True
+                    break
+            running.append(launch(todo.pop(0)))
+            ran += 1
+        if args.dry_run:
+            running = []
+            continue
+        if not running:
+            break
+        time.sleep(2)
+        still = []
+        for proc, d, name, k, t0 in running:
+            rc = proc.poll()
+            if rc is None:
+                still.append((proc, d, name, k, t0)); continue
+            dt = time.time() - t0
+            per_chunk = dt if per_chunk is None else max(per_chunk, dt)
             open(os.path.join(d, 'OK' if rc == 0 else 'FAIL'), 'w').close()
-            if rc: print('   ⛔ FAIL %s kus %d (rc=%d) — viz %s/run.log' % (name, k, rc, d))
-        dt = time.time() - t0
-        if not args.dry_run and batch:
-            per_chunk = dt        # dávka trvá tolik co nejpomalejší kus v ní
-            print('   dávka %d kusů za %.1f min' % (len(batch), dt / 60))
-        ran += len(batch)
-        todo = todo[len(batch):]
+            if rc:
+                failed += 1
+                print('   ⛔ FAIL %s kus %d (rc=%d) — viz %s/run.log'
+                      % (name, k, rc, d), flush=True)
+            else:
+                print('   ✓ %s kus %d hotov za %.1f min   (zbývá %d kusů)'
+                      % (name, k + 1, dt / 60, len(todo)), flush=True)
+        running = still
 
     oks = 0
     for i, n, e in specs:
@@ -189,18 +223,24 @@ def main():
             if os.path.exists(os.path.join(out, '%s_s%d' % (n, k), 'OK')):
                 oks += 1
     print('\n' + '=' * 70)
-    print('SEZENÍ HOTOVO: pustilo %d kusů, celkem %d/%d má OK' % (ran, oks, total))
+    print('SEZENÍ HOTOVO: pustilo %d kusů (%d selhalo), celkem %d/%d má OK'
+          % (ran, failed, oks, total))
     if oks == total:
         open(os.path.join(out, 'AB_DONE'), 'w').close()
         print('✅ VŠECHNY KUSY HOTOVÉ — AB_DONE založeno. Teď sloučit:')
         print('   PREREG=<prereg> THRESHOLD=0.015 python3 night_summarize.py \\')
         print('       %s %s' % (out, ' '.join(s[1] for s in specs)))
     else:
-        print('⏸  Zbývá %d kusů. Pusť tenhle skript znovu v novém sezení se')
+        print('⏸  Zbývá %d kusů. Pusť tenhle skript znovu v novém sezení se'
+              % (total - oks))
         print('   STEJNÝMI parametry — otisk běhu ohlídá, že engine je týž.')
         print('   ⛔ Mezi sezeními NEPŘESTAVUJ engine a nepřepínej commit.')
     print('=' * 70)
-    return 0
+    # ⭐ VLASTNÍ KÓD PRO "DOŠEL ČAS, PRÁCE ZBÝVÁ" (rc=3). Bez něj vypadá
+    #   vyčerpaný rozpočet stejně jako hotová noc (obojí rc=0), a dohližitel
+    #   v `run_laptop_night.sh` by runner OKAMŽITĚ pustil znovu -- tedy by
+    #   limit sezení obešel a rozdělení na poloviny by nefungovalo.
+    return 0 if oks == total else 3
 
 if __name__ == '__main__':
     sys.exit(main())
