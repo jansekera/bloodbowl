@@ -583,7 +583,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // SCORE: carrier can reach endzone with MA + 2 GFI
     if (iHaveBall && carrier->canAct()) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2; // +2 GFI
+        int maxReach = carrier->movementRemaining + maxGfiSquares(*carrier); // +2 GFI
         if (dist <= maxReach && dist > 0) {
             out.push_back({MacroType::SCORE, carrier->id, -1, {-1, -1}});
         }
@@ -593,7 +593,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // 2026-08-17 (P4/P26): hand-off má vlastní limit na kolo, ne sdílený s pass.
     if (iHaveBall && carrier->canAct() && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
         bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
 
@@ -608,7 +608,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (adjDist > 2) return; // carrier must reach adjacency within 1 move
 
                 int receiverDist = distToEndzone(teammate.position, mySide);
-                int receiverMaxReach = teammate.movementRemaining + 2;
+                int receiverMaxReach = teammate.movementRemaining + maxGfiSquares(teammate);
                 if (receiverDist > 0 && receiverDist <= receiverMaxReach) {
                     out.push_back({MacroType::HAND_OFF_SCORE, carrier->id, teammate.id, {-1, -1}});
                 }
@@ -619,7 +619,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // PASS_SCORE: carrier stuck, pass (longer range) to teammate who can score
     if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         int carrierTZ = countTacklezones(state, carrier->position, carrier->teamSide);
         bool carrierStuck = (carrierDist > carrierMaxReach) || (carrierTZ >= 2 && carrierDist > 0);
 
@@ -636,7 +636,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (passDist < 2 || passDist > 10) return; // hand-off is separate; max pass ~10
 
                 int receiverDist = distToEndzone(teammate.position, mySide);
-                int receiverMaxReach = teammate.movementRemaining + 2;
+                int receiverMaxReach = teammate.movementRemaining + maxGfiSquares(teammate);
                 if (receiverDist <= 0 || receiverDist > receiverMaxReach) return;
 
                 int score = teammate.stats.agility * 5 - passDist;
@@ -660,7 +660,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     if (iHaveBall && carrier->canAct() && !myTeam.passUsedThisTurn
         && !myTeam.handOffUsedThisTurn) {
         int carrierDist = distToEndzone(carrier->position, mySide);
-        int carrierMaxReach = carrier->movementRemaining + 2;
+        int carrierMaxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         bool carrierStuck = (carrierDist > carrierMaxReach);
 
         if (carrierStuck) {
@@ -684,7 +684,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     if (adjDist > 2) return; // relay must reach adjacency for hand-off
 
                     int scorerDist = distToEndzone(scorer.position, mySide);
-                    int scorerMaxReach = scorer.movementRemaining + 2;
+                    int scorerMaxReach = scorer.movementRemaining + maxGfiSquares(scorer);
                     if (scorerDist <= 0 || scorerDist > scorerMaxReach) return;
 
                     int score = relay.stats.agility * 3 + scorer.stats.agility * 5
@@ -710,7 +710,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // ADVANCE: carrier can move forward but can't score
     if (iHaveBall && carrier->canAct() && carrier->movementRemaining > 0) {
         int dist = distToEndzone(carrier->position, mySide);
-        int maxReach = carrier->movementRemaining + 2;
+        int maxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
         if (dist > maxReach) {
             out.push_back({MacroType::ADVANCE, carrier->id, -1, {-1, -1}});
         }
@@ -835,7 +835,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     if (iHaveBall && carrier->canAct() && !myTeam.blitzUsedThisTurn) {
         int dist = distToEndzone(carrier->position, mySide);
         int gfi = carrier->rooted ? 0
-                : (carrier->hasSkill(SkillName::Sprint) ? 3 : 2);
+                : maxGfiSquares(*carrier);
         int maxReach = carrier->movementRemaining + gfi;
         int ezX = endzoneX(mySide);
         int dx = forwardDx(mySide);
@@ -933,7 +933,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             if (p.hasSkill(SkillName::NoHands)) return;
 
             int dist = p.position.distanceTo(state.ball.position);
-            int maxReach = p.movementRemaining + 2;
+            int maxReach = p.movementRemaining + maxGfiSquares(p);
             if (dist > maxReach) return;
 
             // Rank by the COMPUTED chance of coming up with the ball, not by
@@ -977,7 +977,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // loop above already applies before accepting the fallback.
             const Player* fallback = findNearestFreePlayer(state, state.ball.position);
             if (fallback && !fallback->hasSkill(SkillName::NoHands) &&
-                fallback->position.distanceTo(state.ball.position) <= fallback->movementRemaining + 2) {
+                fallback->position.distanceTo(state.ball.position) <= fallback->movementRemaining + maxGfiSquares(*fallback)) {
                 bestPicker = fallback;
             }
         }
@@ -2170,7 +2170,7 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
         const Player& p = state.getPlayer(macro.playerId);
         if (p.isOnPitch()) {
             int dist = distToEndzone(p.position, mySide);
-            int ma = p.movementRemaining + 2;
+            int ma = p.movementRemaining + maxGfiSquares(p);
             out[10] = std::min(1.0f, static_cast<float>(ma) / std::max(dist, 1));
         }
     }

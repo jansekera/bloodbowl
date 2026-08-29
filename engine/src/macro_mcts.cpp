@@ -782,7 +782,7 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
                 scoringBonus += 0.4;  // strong bonus — safe TD
             }
             // Can score with GFI (risky but possible)
-            else if (dist <= carrier.movementRemaining + 2) {
+            else if (dist <= carrier.movementRemaining + maxGfiSquares(carrier)) {
                 scoringBonus += 0.2;
             }
 
@@ -803,7 +803,7 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             if (turnsLeft <= 1) {
                 if (dist <= static_cast<int>(carrier.movementRemaining)) {
                     scoringBonus += 0.8;  // safe walk-in on last turn
-                } else if (dist <= carrier.movementRemaining + 2) {
+                } else if (dist <= carrier.movementRemaining + maxGfiSquares(carrier)) {
                     scoringBonus += 0.5;  // GFI needed but scoreable
                 }
             }

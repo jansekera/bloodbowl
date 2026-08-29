@@ -2178,3 +2178,74 @@ TEST(MacroExpansion, LeapWalkArmDoesNotJumpOnAnOpenPitch) {
             << "na volném hřišti nemá skok co nabídnout -- chůze tam dojde zadarmo";
     EXPECT_EQ(takeLeapWalkPicksInSearch(), 0);
 }
+
+// ============================================================================
+// M4 / N15 (29.08.2026) -- SPRINT SE V NABIDKACH NEPOCITAL.
+// Dosah se v `getAvailableMacros` pocital pausalne jako `movementRemaining + 2`
+// na ctrnacti mistech, prestoze r. 8487-8490 rikaji: "The player may attempt to
+// move up to THREE extra squares rather than the normal two when Going For It."
+// Wood-elf Catcher se Sprintem (roster.cpp:102, MA 8) tedy nedostal nabidku
+// SCORE, kterou by resolver zvladl -- trida "akce se nenabidne", tataz jako
+// F12 Leap a P45 vstavani.
+//
+// ⭐ A tataz pausalni "+2" ignorovala i ZAKORENENI. r. 8577-8578: zakorenény
+// "may not Go For It" -- dostaval tedy nabidky na dve pole, ktera nemel.
+// `rules_engine.cpp:36` obe veci resil uz od 24.08., nabidky maker ne.
+// ============================================================================
+
+namespace {
+// Nosic s danym MA presne `dist` poli od domaci endzony (x = 25).
+GameState makeSprintScoringState(int ma, int dist, bool sprint) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.position = {static_cast<int8_t>(25 - dist), 7};
+    p1.stats = {static_cast<int8_t>(ma), 2, 4, 7};
+    p1.movementRemaining = ma;
+    if (sprint) p1.skills.add(SkillName::Sprint);
+    state.ball = BallState::carried(p1.position, 1);
+    return state;
+}
+}  // namespace
+
+TEST(MacroActions, M4SprintCarrierIsOfferedScoreAtMaPlusThree) {
+    auto state = makeSprintScoringState(/*ma=*/6, /*dist=*/9, /*sprint=*/true);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::SCORE));
+}
+
+// HRANICE 1: bez Sprintu na tutez vzdalenost nabidka byt NESMI.
+TEST(MacroActions, M4CarrierWithoutSprintIsNotOfferedScoreAtMaPlusThree) {
+    auto state = makeSprintScoringState(/*ma=*/6, /*dist=*/9, /*sprint=*/false);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::SCORE));
+}
+
+// HRANICE 2: ani se Sprintem se nedosahne na MA + 4.
+TEST(MacroActions, M4SprintDoesNotReachMaPlusFour) {
+    auto state = makeSprintScoringState(/*ma=*/6, /*dist=*/10, /*sprint=*/true);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::SCORE));
+}
+
+// HRANICE 3: bez Sprintu se na MA + 2 dosahnout MA -- oprava nesmi ubrat.
+TEST(MacroActions, M4CarrierWithoutSprintStillReachesMaPlusTwo) {
+    auto state = makeSprintScoringState(/*ma=*/6, /*dist=*/8, /*sprint=*/false);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::SCORE));
+}
+
+// Zakoreneny nosic nesmi dostat nabidku na pole, na ktera nedojde: MA je 0
+// a GFI mu pravidlo zakazuje (r. 8577-8578).
+TEST(MacroActions, M4RootedCarrierIsNotOfferedScoreOnGfiHeCannotUse) {
+    auto state = makeSprintScoringState(/*ma=*/6, /*dist=*/2, /*sprint=*/false);
+    Player& p1 = state.getPlayer(1);
+    p1.rooted = true;
+    p1.movementRemaining = 0;
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::SCORE));
+}

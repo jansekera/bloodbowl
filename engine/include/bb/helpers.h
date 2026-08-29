@@ -40,6 +40,17 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
 // Legs -- zadne tackle zony, zadne +1 za dodge. Sdileny mezi resolverem
 // (move_handler) a ocenenim (macro_actions), aby cena nemohla utect od
 // pravidla; tataz unifikace, jakou po item7 dostal pickApproachStep.
+// M4/N15 (29.08.2026): kolik poli navic smi hrac ujit pres Go For It.
+// r. 8487-8490 (Sprint): "may attempt to move up to THREE extra squares rather
+// than the normal two when Going For It." r. 8577-8578 (Take Root): zakorenény
+// "may not Go For It".
+// ⭐ Existuje jako JEDNA definice zamerne: tentyz vyraz byl rozepsany na
+// ctrnacti mistech v `macro_actions.cpp` bez Sprintu i bez zakoreneni, kdezto
+// `rules_engine.cpp`, `pathfinder.cpp` a `move_handler.cpp` ho mely spravne --
+// tj. presne ten druh rozdvojeni, ktere u `endBlockActivation` (M1/N10, 25.08.)
+// zpusobilo, ze oprava sedela jen v jedne z obou kopii.
+int maxGfiSquares(const Player& player);
+
 int calculateLeapTarget(const Player& player);
 int calculatePickupTarget(const GameState& state, const Player& player);
 // Same roll, priced as if `player` stood on `at` -- macro generation needs
