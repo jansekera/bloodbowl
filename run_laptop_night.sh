@@ -28,6 +28,7 @@
 # ============================================================================
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+SELF="$ROOT/$(basename "$0")"
 
 OUT=${OUT:-$ROOT/ab_b2_20260829}
 MODE=${MODE:-11}
@@ -45,33 +46,6 @@ alive() {   # ⛔ NE `pgrep -f`: ten si namatchne sám sebe (past z 21.08.).
     local p; p=$(cat "$PIDFILE" 2>/dev/null) || return 1
     [ -n "$p" ] && [ -d "/proc/$p" ]
 }
-
-case "${1:-}" in
-  --status)
-        if alive; then echo "BĚŽÍ (pid $(cat "$PIDFILE"))"; else echo "neběží"; fi
-        if [ -d "$OUT" ]; then
-            ok=$(find "$OUT" -name OK 2>/dev/null | wc -l)
-            fail=$(find "$OUT" -name FAIL 2>/dev/null | wc -l)
-            echo "kusů hotových: $ok, selhalých: $fail"
-            [ -f "$OUT/AB_DONE" ] && echo "✅ AB_DONE — noc je celá hotová"
-        fi
-        [ -f "$LOG" ] && { echo "--- posledních 12 řádků logu:"; tail -12 "$LOG"; }
-        exit 0;;
-  --stop)
-        if alive; then
-            p=$(cat "$PIDFILE"); kill -- -"$p" 2>/dev/null || kill "$p" 2>/dev/null
-            echo "zastaveno (pid $p). Hotové kusy zůstávají, běh se dá navázat."
-        else echo "neběží"; fi
-        rm -f "$PIDFILE"; exit 0;;
-esac
-
-if alive; then
-    echo "⛔ už běží (pid $(cat "$PIDFILE")). Nespouštím podruhé — dva běhy do"
-    echo "   téhož OUT by si přepisovaly kusy. Viz --status."
-    exit 1
-fi
-
-mkdir -p "$OUT"
 
 # --- vlastní smyčka: běží uvnitř systemd-inhibit, aby se stroj neuspal -------
 supervise() {
@@ -107,15 +81,53 @@ supervise() {
     return 1
 }
 
+case "${1:-}" in
+  --_supervise)
+        # ⛔ SKRYTÝ REŽIM: skript se v odpojeném sezení volá SÁM SEBE.
+        #   Do 29.08. se sem místo toho vkládala funkce přes
+        #   `$(declare -f supervise)` do `bash -c '...'` -- jenže ta funkce
+        #   obsahuje apostrofy (`'+%F %T'`), takže uvozování skončilo uprostřed
+        #   a odpojený běh umřel na "unexpected EOF". Chytila to až ostrá
+        #   zkouška; `bash -n` na hlavním skriptu je v pořádku, protože ta
+        #   chyba vzniká až SLOŽENÍM řetězce za běhu.
+        supervise; exit $?;;
+  --status)
+        if alive; then echo "BĚŽÍ (pid $(cat "$PIDFILE"))"; else echo "neběží"; fi
+        if [ -d "$OUT" ]; then
+            ok=$(find "$OUT" -name OK 2>/dev/null | wc -l)
+            fail=$(find "$OUT" -name FAIL 2>/dev/null | wc -l)
+            echo "kusů hotových: $ok, selhalých: $fail"
+            [ -f "$OUT/AB_DONE" ] && echo "✅ AB_DONE — noc je celá hotová"
+        fi
+        [ -f "$LOG" ] && { echo "--- posledních 12 řádků logu:"; tail -12 "$LOG"; }
+        exit 0;;
+  --stop)
+        if alive; then
+            p=$(cat "$PIDFILE"); kill -- -"$p" 2>/dev/null || kill "$p" 2>/dev/null
+            echo "zastaveno (pid $p). Hotové kusy zůstávají, běh se dá navázat."
+        else echo "neběží"; fi
+        rm -f "$PIDFILE"; exit 0;;
+esac
+
+if alive; then
+    echo "⛔ už běží (pid $(cat "$PIDFILE")). Nespouštím podruhé — dva běhy do"
+    echo "   téhož OUT by si přepisovaly kusy. Viz --status."
+    exit 1
+fi
+
+mkdir -p "$OUT"
+
 export OUT MODE MATCHUPS PAIRS CHUNKS NULL_PAIRS WORKERS MAX_RETRY LOG PIDFILE ROOT
 INHIBIT=""
 command -v systemd-inhibit >/dev/null && \
     INHIBIT="systemd-inhibit --what=sleep:idle --why=bloodbowl-night --mode=block"
 
+# `exec` drží PID: zapsané číslo je zároveň PGID celé skupiny (setsid udělal
+# nové sezení), takže `--stop` může poslat signál CELÉ skupině a nezůstanou
+# viset běžící kusy.
 setsid nohup bash -c "
     echo \$\$ > '$PIDFILE'
-    $INHIBIT bash -c '$(declare -f supervise); supervise'
-    rm -f '$PIDFILE'
+    exec $INHIBIT '$SELF' --_supervise
 " >> "$LOG" 2>&1 &
 disown 2>/dev/null || true
 
