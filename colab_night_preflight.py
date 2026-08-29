@@ -118,9 +118,10 @@ def step_payload():
         f = os.path.join(ROOT, name)
         if os.path.exists(f):
             tracked = sh('git -C "%s" ls-files --error-unmatch %s' % (ROOT, name)).returncode == 0
-            rec('OK', name, '%s%s' % ('v gitu' if tracked else 'lokálně, MIMO git', ''))
+            rec('OK', name, 'v gitu' if tracked else 'je tady, ale MIMO git')
             if not tracked:
-                print('       ⚠️ je v .gitignore ⇒ do Colabu se NEDOSTANE klonem')
+                print('       ⏰ je v .gitignore ⇒ PŘÍŠTÍ sezení si ho musí nakopírovat')
+                print('          znovu (klon ho nepřinese). Teď je všechno v pořádku.')
         else:
             rec('STOP' if blocking else 'WARN', 'chybí ' + name, why)
             ok = ok and not blocking
