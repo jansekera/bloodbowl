@@ -1159,3 +1159,58 @@ TEST(GameSimulator, SimpleKickoffAwardsATouchbackWhenTheBallLeavesThePitch) {
     EXPECT_TRUE(gs.ball.position.isOnPitch());
     EXPECT_LE(gs.ball.position.x, 12) << "a stoji ve SVE polovine";
 }
+
+// ============================================================================
+// NULOVÁ KONTROLA PRO RAMENO B2 (29.08.2026, návrh uživatele).
+// `setWrestlePricingArm` opravuje cenu bloku proti obránci s Wrestle. Od
+// 27.08. má Wrestle KAŽDÝ tým, takže matchup, kde se rameno spustit NEMŮŽE,
+// přestal existovat -- a bez nuly se běh nesmí pustit (P20).
+//
+// ⛔ Proto VARIANTA, ne revert: kdyby se Wrestle odebral zpátky, běžela by
+// nula na JINÉ BINÁRCE než expozice, a nula má dokázat, že aparát V TOMHLE
+// BUILDU nevyrábí efekt z ničeho.
+// ============================================================================
+
+TEST(DevelopedRoster, DwarfNoWrestleVariantFieldsNoWrestleAtAll) {
+    const TeamRoster* r = getDevelopedRoster("dwarf-nw", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 0);
+}
+
+// A HRANICE: běžný trpaslík ho má pořád dva -- varianta se nesmí rozlézt.
+TEST(DevelopedRoster, PlainDwarfStillFieldsTwoWrestleLongbeards) {
+    const TeamRoster* r = getDevelopedRoster("dwarf", 1200);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
+}
+
+// ⭐ A JÁDRO NULY: musí to být TÁŽ SESTAVA minus jedna dovednost. Kdyby
+// vypuštěním řádku vypadl i specialista, nula by neměřila podlahu aparátu,
+// ale jiný tým. `buildTeam` sází specialisty OD ZADU a zbytek doplní prvním
+// ("fill") řádkem, takže ti dva mají zůstat obyčejnými Longbeardy.
+TEST(DevelopedRoster, DwarfNoWrestleKeepsEverySpecialistAndOnlyLosesTheSkill) {
+    const TeamRoster* plain = getDevelopedRoster("dwarf", 1200);
+    const TeamRoster* nw    = getDevelopedRoster("dwarf-nw", 1200);
+    ASSERT_NE(plain, nullptr); ASSERT_NE(nw, nullptr);
+    GameState a, b;
+    setupHalf(a, *plain, *plain);
+    setupHalf(b, *nw, *nw);
+
+    // Specialisté beze změny
+    EXPECT_EQ(countHomeSkill(b, SkillName::Guard),      countHomeSkill(a, SkillName::Guard));
+    EXPECT_EQ(countHomeSkill(b, SkillName::Frenzy),     countHomeSkill(a, SkillName::Frenzy));
+    EXPECT_EQ(countHomeSkill(b, SkillName::SureHands),  countHomeSkill(a, SkillName::SureHands));
+    EXPECT_EQ(countHomeSkill(b, SkillName::Dauntless),  countHomeSkill(a, SkillName::Dauntless));
+    // Longbeardi s Wrestle se stali obyčejnými Longbeardy => Block a Tackle
+    // zůstávají, Wrestle mizí.
+    EXPECT_EQ(countHomeSkill(b, SkillName::Block),      countHomeSkill(a, SkillName::Block));
+    EXPECT_EQ(countHomeSkill(b, SkillName::Tackle),     countHomeSkill(a, SkillName::Tackle));
+    EXPECT_EQ(countHomeSkill(b, SkillName::Wrestle), 0);
+    EXPECT_EQ(countHomeSkill(a, SkillName::Wrestle), 2);
+}

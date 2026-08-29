@@ -589,6 +589,43 @@ const TeamRoster& getDwarfRoster1200() {
     return roster;
 }
 
+// ⭐⭐ NULOVÁ KONTROLA PRO RAMENO B2 (29.08.2026, návrh uživatele).
+// `setWrestlePricingArm` opravuje cenu bloku proti obránci s Wrestle. Od
+// 27.08. má ale Wrestle KAŽDÝ tým, takže matchup, kde se rameno spustit
+// NEMŮŽE, přestal existovat -- a `run_night_ab.sh` běh bez nuly odmítá (P20).
+//
+// ⛔ PROČ VARIANTA A NE REVERT: kdyby se Wrestle odebral zpátky a nula se
+//    změřila tak, běžela by na JINÉ BINÁRCE než expozice. A přesně tomu má
+//    nula zabránit -- má dokázat, že aparát V TOMHLE BUILDU nevyrábí efekt
+//    z ničeho. Nula z jiného buildu to netvrdí. Varianta drží obě nohy
+//    v jednom běhu, na jedné binárce.
+//
+// ⭐ Harness plní jedenáctku tak, že specialisty sází OD ZADU
+//    (`buildTeam`, game_simulator.cpp:184) a zbytek doplní prvním
+//    ("fill") řádkem. Vypuštěním posledního pozičního řádku tedy ti dva
+//    Longbeardi s Wrestle prostě zůstanou obyčejnými Longbeardy -- táž
+//    sestava minus jedna dovednost, což je přesně to, co nula chce.
+//
+// ⚠️ NENÍ to TV1200: bez dvou Wrestle je hodnota týmu nižší. Pro nulu to
+//    nevadí -- od ní se nečeká srovnatelnost, jen delta NULA. ⛔ Nesmí se
+//    z ní ale číst nic o síle sestav.
+const TeamRoster& getDwarfRoster1200NoWrestle() {
+    static const TeamRoster roster = {
+        "Dwarf (TV1200, no Wrestle)",
+        {
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11, "Longbeard"},  // Longbeard (fill)
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard}), 2, "Longbeard +Guard"},
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Guard, SkillName::Tackle}), 2, "Blitzer +Guard+Tackle"},
+            {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull,
+                SkillName::Dauntless, SkillName::Guard, SkillName::Tackle}), 2, "Troll Slayer +Guard+Tackle"},
+            {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},
+            // ⛔ ZDE ŽÁDNÝ `Longbeard +Wrestle` -- v tom je celý smysl.
+        },
+        5, 40, true
+    };
+    return roster;
+}
+
 // Skaven TV~1200: Sure Feet on all Gutter Runners. 4 Gutter Runners, 2 Blitzers, 1 Thrower, 4 Linemen.
 const TeamRoster& getSkavenRoster1200() {
     static const TeamRoster roster = {
@@ -644,6 +681,9 @@ const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
         if (normalized == "orc") return &getOrcRoster1200();
         if (normalized == "human") return &getHumanRoster1200();
         if (normalized == "dwarf") return &getDwarfRoster1200();
+        // Nulová kontrola B2 -- viz komentář u getDwarfRoster1200NoWrestle().
+        // `normalized` už zahodilo pomlčku, takže "dwarf-nw" sem dorazí jako "dwarfnw".
+        if (normalized == "dwarfnw") return &getDwarfRoster1200NoWrestle();
         if (normalized == "skaven") return &getSkavenRoster1200();
         if (normalized == "woodelf") return &getWoodElfRoster1200();
     }
