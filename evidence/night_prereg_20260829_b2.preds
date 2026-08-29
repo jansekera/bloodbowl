@@ -76,3 +76,35 @@ arm_picks  >=    55000         # APARÁTOVÁ PODLAHA pro 4 800 párů = 9 600 he
 # ⛔ (4) NIC O DÍŘE VE ZDI. Otázka „obránce by Wrestle nepoužil, kdyby držel
 #   nosný roh" potřebuje POJEM ZDI, a ten je až v CELOTAHU. Tenhle běh na ni
 #   NEODPOVÍDÁ a nesmí se tak číst.
+
+# ============================================================================
+# DODATEK K PŘEDREGISTRACI — 29.08.2026, PSÁNO PŘED BĚHEM (běh nezačal)
+#
+# ZMĚNA ZADÁNÍ: přibyl NULOVÝ MATCHUP.
+#   bylo:  MATCHUPS="2:dw-dw:1"                  (bez nuly => exit 2)
+#   je:    MATCHUPS="2:dw-dw:1 7:dwnw:0"
+#
+# ⛔ PROČ: `run_night_ab.sh` běh bez nulové kontroly odmítá (P20), a od 27.08.
+#   má Wrestle KAŽDÝ tým, takže matchup, kde se rameno spustit NEMŮŽE,
+#   přestal existovat. Náhradou měl být `CONTROL_MODE2=1`, jenže harness sám
+#   o něm píše: "pod CRN je tohle TAUTOLOGIE ... VERDIKT NA TOM NESTOJÍ."
+#
+# ⭐ ŘEŠENÍ (návrh uživatele 29.08.): sestava `dwarf-nw` = táž TV1200 bez dvou
+#   Longbeardů s Wrestle, matchup index 7. VARIANTA, ne revert -- revert by
+#   postavil nulu na JINOU BINÁRKU než expozici, a nula má dokázat, že aparát
+#   V TOMHLE BUILDU nevyrábí efekt z ničeho.
+#
+# ✅ NULA JE DOLOŽENÁ MĚŘENÍM, ne předpokladem (29.08., 2 páry, mode 11):
+#     matchup 7 dwarf-nw : ARM PICKS TOTAL 0 (0,00/hru), arm acted 0/2 párů
+#     matchup 2 dw-dw    : 9,83 repicku/hru (sonda 28.08., 12 párů)
+#     kontrola, že to není mrtvý matchup: mode 10 na TÉMŽE matchupu 7 dá
+#                          7 909 picků -- takže hraje, jen B2 tam nemá o co
+#
+# ⏰ PŘEDPOVĚĎ NA NULU (píše se PŘED během): delta na matchupu 7 musí vyjít
+#   EXAKTNĚ 0,0000 a `n_nonzero` 0/N. Cokoli jiného znamená, že rameno sahá
+#   jinam, než si myslíme, a hlavní výsledek se NEČTE.
+#
+# ROZSAH: expozice 4800 párů (15 kusů po 320), nula 400 párů (10 kusů po 40).
+#   Nula je kratší schválně -- její úkol je ukázat nulu, ne změřit deltu
+#   (týž precedens jako u Leapu: "nulový test je LEVNÝ, stačí mu ~200 párů").
+# ============================================================================

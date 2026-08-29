@@ -19,7 +19,18 @@
 #   ⛔ A ruční body (2)+(3) z předregistrace M1/N10 potřebují korpus se
 #     ZAPNUTÝM ramenem, což tenhle sloupec neumí ani při corpus=1.
 
-b2 | b2-wrestle-pricing | 11 | 4800 | evidence/night_prereg_20260829_b2.preds | 0 | 2:dw-dw:1
+# ⛔ ŘÁDEK NÍŽE JE NEPLATNÝ OD 29.08. -- neměl NULOVÝ MATCHUP, takže by ho
+#   run_night_ab.sh odmítl (exit 2, P20). Ponechán, aby bylo vidět, co se změnilo.
+# b2 | b2-wrestle-pricing | 11 | 4800 | evidence/night_prereg_20260829_b2.preds | 0 | 2:dw-dw:1
+
+# 29.08.: nula je matchup 7 `dwarf-nw` (táž sestava bez dvou Wrestle Longbeardů).
+#   Doloženo měřením: mode 11 na matchupu 7 dá ARM PICKS 0, na matchupu 2 dá
+#   9,83 repicku/hru. Nula běží KRATŠÍ (400 párů) -- její úkol je ukázat nulu,
+#   ne změřit deltu.
+#   ⚠️ Tenhle manifest čte `run_weekend_driver.sh`, který má jeden sloupec
+#      `paru` na cyklus. Kratší nula se proto pouští `colab_night_chunked.py`
+#      s `--null-pairs`, ne přes tenhle driver.
+b2 | b2-wrestle-pricing | 11 | 4800 | evidence/night_prereg_20260829_b2.preds | 0 | 2:dw-dw:1 7:dwnw:0
 
 # ⛔⛔ DÁL UŽ NIC — A JE TO ROZHODNUTÍ, NE MEZERA.
 #   Připravené rameno je jen jedno. Ostatní kandidáti:
