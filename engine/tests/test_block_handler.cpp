@@ -2,6 +2,7 @@
 #include "bb/block_handler.h"
 #include "bb/helpers.h"
 #include "bb/macro_actions.h"   // M1/N10 arm
+#include "bb/rules_engine.h"
 
 using namespace bb;
 
@@ -1294,4 +1295,88 @@ TEST(BlockHandler, NoFollowUpEventWhenTheDefenderNeverVacated) {
     EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
     EXPECT_EQ(countFollowUps(ev, true) + countFollowUps(ev, false), 0)
         << "no square was freed, so there was no opportunity to log";
+}
+
+// ============================================================================
+// L6 (29.08.2026) -- FRENZY + MULTIPLE BLOCK: PRAVIDLO ZAKAZUJE KOMBINACI,
+// KOD BRAL VOLBU.
+// r. 8302-8305: "The player cannot follow up either block when using this
+// skill, so Multiple Block can be used INSTEAD OF Frenzy, but both skills
+// cannot be used TOGETHER."
+// ⇒ MIT se smi obojí, POUZIT v jednom okamziku jen jedno. Duvod je mechanicky:
+// Multiple Block zakazuje follow-up, Frenzy ho vyzaduje (r. 8138).
+//
+// `rules_engine.cpp:222` mel `&& !p.hasSkill(Frenzy)`, takze hrac s obojim
+// nedostal MULTIPLE_BLOCK NIKDY -- to je odebrana volba, ne zakazana
+// kombinace. Nositel obojiho v `roster.cpp` existuje (r. 7450), jen ne mezi
+// peti korpusovymi sestavami.
+// ============================================================================
+
+TEST(BlockHandler, L6MultipleBlockIsOfferedToAPlayerWhoAlsoHasFrenzy) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+
+    bool offered = false;
+    for (const auto& a : actions) {
+        if (a.type == ActionType::MULTIPLE_BLOCK && a.playerId == 1) offered = true;
+    }
+    EXPECT_TRUE(offered);
+}
+
+// HRANICE: hrac BEZ Multiple Block ji nedostane, at ma Frenzy nebo ne.
+TEST(BlockHandler, L6MultipleBlockIsStillNotOfferedWithoutTheSkill) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) {
+        EXPECT_NE(a.type, ActionType::MULTIPLE_BLOCK);
+    }
+}
+
+// A druha pulka pravidla: kdyz uz Multiple Block bezi, Frenzy se NESMI zapnout.
+// Obranci maji Stand Firm, takze po PUSHED nikdo nikam nejde a oba zustavaji
+// stat a sousedit -- presne stav, ve kterem Frenzy povinny druhy blok hazi.
+// Musi vyjit PRESNE DVA bloky, ne tri nebo ctyri.
+TEST(BlockHandler, L6FrenzyDoesNotAddBlocksInsideAMultipleBlock) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 8, 3, 9);   // ST8, at ma 2 kostky
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);        // po PUSHED nikam
+    gs.getPlayer(13).skills.add(SkillName::StandFirm);
+
+    // 3 = PUSHED (dice.h:21). ST8 proti ST3+2 => 2 kostky pro utocnika, oba
+    // padnou na PUSHED, Stand Firm odsun zrusi => oba stoji a sousedi, tedy
+    // presne spoustec povinneho druheho bloku Frenzy. Dost kostek i pro rany,
+    // ktere se hazet NEMAJI.
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3});
+    std::vector<GameEvent> events;
+    resolveMultipleBlock(gs, 1, 12, 13, dice, &events);
+
+    int blocks = 0;
+    for (const auto& e : events) if (e.type == GameEvent::Type::BLOCK) ++blocks;
+    EXPECT_EQ(blocks, 2);
 }

@@ -457,7 +457,8 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
 
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           DiceRollerBase& dice, std::vector<GameEvent>* events,
-                          bool frenzySecondBlock, bool noFollowUp) {
+                          bool frenzySecondBlock, bool noFollowUp,
+                          bool frenzyDisabled) {
     Player& att = state.getPlayer(params.attackerId);
     Player& def = state.getPlayer(params.targetId);
     Position attOldPos = att.position;
@@ -1010,7 +1011,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // má jen trpaslík (2 Troll Slayeři), takže to hrálo PRO nás.
     const bool frenzyTrigger = (chosen == BlockDiceFace::PUSHED ||
                                 chosen == BlockDiceFace::DEFENDER_STUMBLES);
-    if (!frenzySecondBlock && frenzyTrigger && att.hasSkill(SkillName::Frenzy) &&
+    // L6 (29.08.): uvnitr Multiple Blocku se Frenzy nezapina vubec --
+    // r. 8304-8305 "both skills cannot be used together".
+    if (!frenzySecondBlock && !frenzyDisabled && frenzyTrigger &&
+        att.hasSkill(SkillName::Frenzy) &&
         canAct(att.state) && canAct(def.state) &&
         att.position.distanceTo(def.position) == 1) {
         // CRP: during a Blitz the second block costs movement too — with
@@ -1065,7 +1069,8 @@ ActionResult resolveMultipleBlock(GameState& state, int attackerId,
             params.targetId = target1Id;
             params.isBlitz = false;
             params.hornsBonus = false;
-            ActionResult result = resolveBlock(state, params, dice, events, false, true);
+            ActionResult result = resolveBlock(state, params, dice, events, false, true,
+                                              /*frenzyDisabled=*/true);
 
             def1.stats.strength = origST;
 
@@ -1104,7 +1109,8 @@ second_block:
         params.targetId = target2Id;
         params.isBlitz = false;
         params.hornsBonus = false;
-        ActionResult result = resolveBlock(state, params, dice, events, false, true);
+        ActionResult result = resolveBlock(state, params, dice, events, false, true,
+                                              /*frenzyDisabled=*/true);
 
         def2.stats.strength = origST;
 

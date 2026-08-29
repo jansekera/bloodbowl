@@ -18,7 +18,17 @@ struct BlockParams {
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           DiceRollerBase& dice, std::vector<GameEvent>* events,
                           bool frenzySecondBlock = false,
-                          bool noFollowUp = false);
+                          bool noFollowUp = false,
+                          // L6 (29.08.2026): "both skills cannot be used
+                          // together" (r. 8304-8305). Multiple Block vypina
+                          // Frenzy na CELOU svou akci -- nestaci spolehnout se
+                          // na to, ze po odsunu nebudou sousedit: se Stand Firm
+                          // nebo Fend obranci zustanou stat vedle sebe a povinny
+                          // druhy blok by se hodil. Vlastni parametr, ne
+                          // preteceni pres `noFollowUp` -- ten se nastavuje i
+                          // pri zakoreneni (r. 469) a tam Frenzy vypinat nemame
+                          // duvod.
+                          bool frenzyDisabled = false);
 
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,
