@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Enum\GameEventType;
+
 final class GameEvent
 {
     /**
@@ -13,6 +15,12 @@ final class GameEvent
         private readonly string $description,
         private readonly array $data = [],
     ) {
+        // ⛔ VALIDACE TADY, NE AŽ V DATABÁZI. `GameEventType::from()` vyhodí
+        //    výjimku na neznámý typ, takže překlep spadne v místě, kde vznikl,
+        //    a ne o tři vrstvy dál při INSERTu -- nebo vůbec, kdyby se událost
+        //    jen zalogovala. Konstruktor bere dál `string`, aby se nemuselo
+        //    sáhnout na 86 továrních metod; typ se tím ale nestává volným.
+        GameEventType::from($type);
     }
 
     public static function playerMove(int $playerId, string $from, string $to): self
@@ -807,6 +815,7 @@ final class GameEvent
     }
 
     public function getType(): string { return $this->type; }
+    public function getTypeEnum(): GameEventType { return GameEventType::from($this->type); }
     public function getDescription(): string { return $this->description; }
     /** @return array<string, mixed> */
     public function getData(): array { return $this->data; }
