@@ -106,20 +106,13 @@ TEST(MacroActions, AlwaysHasEndTurn) {
 //
 // Funkce jsou file-local, takže se testují přes rameno a jeho čítač: tiká jen
 // tam, kde se obě odpovědi LIŠÍ -- tedy když útočník Block má.
-struct WrestlePricingArmOn {
-    explicit WrestlePricingArmOn(TeamSide s) : s_(s) { setWrestlePricingArm(s_, true); }
-    ~WrestlePricingArmOn() { setWrestlePricingArm(s_, false); }
-    TeamSide s_;
-};
-
-TEST(MacroActions, WrestlePricingArmFiresOnlyForABlockAttackerVsWrestleDefender) {
+TEST(MacroActions, WrestlePricingAppliesForABlockAttackerVsWrestleDefender) {
     GameState state = makeMinimalState();
     state.getPlayer(1).skills.add(SkillName::Block);
     state.getPlayer(12).skills.add(SkillName::Wrestle);
     state.getPlayer(12).position = {11, 7};   // sousedí -> blitz se ocení
 
-    WrestlePricingArmOn arm(TeamSide::HOME);
-    takeWrestlePricingEventsInSearch();       // vynuluj
+    takeWrestleDefenderPricedInSearch();       // vynuluj
     // ⚠️ Cena se počítá až při ROZVINUTÍ makra BLITZ (estimateBlitzFailChance
     // v expandBlitz), ne při jeho vypsání -- první verze testu volala
     // getAvailableMacros a nechytila nic (25.08.).
@@ -127,58 +120,22 @@ TEST(MacroActions, WrestlePricingArmFiresOnlyForABlockAttackerVsWrestleDefender)
     Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
     greedyExpandMacro(state, blitz, dice);
 
-    EXPECT_GT(takeWrestlePricingEventsInSearch(), 0)
-        << "s ramenem se cena proti Wrestle obránci musí lišit";
+    EXPECT_GT(takeWrestleDefenderPricedInSearch(), 0)
+        << "cena proti obránci, který Wrestle POUŽIJE, se musí lišit";
 }
 
-TEST(MacroActions, WrestlePricingArmOffChangesNothing) {
-    GameState state = makeMinimalState();
-    state.getPlayer(1).skills.add(SkillName::Block);
-    state.getPlayer(12).skills.add(SkillName::Wrestle);
-    state.getPlayer(12).position = {11, 7};
-
-    takeWrestlePricingEventsInSearch();
-    FixedDiceRoller dice(std::vector<int>(40, 4));
-    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
-    greedyExpandMacro(state, blitz, dice);
-
-    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
-        << "nulový test: bez ramene se engine chová přesně jako do 25.08.";
-}
-
-TEST(MacroActions, WrestlePricingDoesNotFireWithoutWrestle) {
+TEST(MacroActions, WrestlePricingDoesNotApplyWithoutWrestle) {
     GameState state = makeMinimalState();
     state.getPlayer(1).skills.add(SkillName::Block);
     state.getPlayer(12).position = {11, 7};    // obránce Wrestle NEMÁ
 
-    WrestlePricingArmOn arm(TeamSide::HOME);
-    takeWrestlePricingEventsInSearch();
+    takeWrestleDefenderPricedInSearch();
     FixedDiceRoller dice(std::vector<int>(40, 4));
     Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
     greedyExpandMacro(state, blitz, dice);
 
-    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
+    EXPECT_EQ(takeWrestleDefenderPricedInSearch(), 0)
         << "bez Wrestle na obránci se nic měnit nesmí";
-}
-
-TEST(MacroActions, WrestlePricingRepickTicksOnlyOnAChangedChoice) {
-    // ⭐ 27.08.: čítač REPICKŮ. `events` říká „cena se počítala jinak", což je
-    // velké číslo i u ramene, které nikdy nic nepřehodilo. Noc musí umět říct
-    // „rameno JEDNALO", a to je tenhle čítač. Vzor: P35.
-    GameState state = makeMinimalState();
-    state.getPlayer(1).skills.add(SkillName::Block);   // náš blitzující
-    state.getPlayer(1).position = {10, 7};
-    Player& def = state.getPlayer(12);                 // obránce s Wrestle, BEZ Blocku
-    def.position = {11, 7};
-    def.skills.add(SkillName::Wrestle);
-
-    WrestlePricingArmOn arm(TeamSide::HOME);
-    takeWrestlePricingRepicksInSearch();
-    FixedDiceRoller dice(std::vector<int>(40, 4));
-    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
-    greedyExpandMacro(state, blitz, dice);
-    EXPECT_EQ(takeWrestlePricingRepicksInSearch(), 0)
-        << "jediný kandidát => volba se změnit NEMŮŽE, i když se cena liší";
 }
 
 TEST(MacroActions, WrestlePricingIgnoresADefenderWhoWouldNotWrestle) {
@@ -196,12 +153,11 @@ TEST(MacroActions, WrestlePricingIgnoresADefenderWhoWouldNotWrestle) {
     // míč drží nosič, ale NE náš blitzující => výjimka `attHasBall` neplatí
     state.ball = BallState::onGround({20, 1});
 
-    WrestlePricingArmOn arm(TeamSide::HOME);
-    takeWrestlePricingEventsInSearch();
+    takeWrestleDefenderPricedInSearch();
     FixedDiceRoller dice(std::vector<int>(40, 4));
     Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
     greedyExpandMacro(state, blitz, dice);
-    EXPECT_EQ(takeWrestlePricingEventsInSearch(), 0)
+    EXPECT_EQ(takeWrestleDefenderPricedInSearch(), 0)
         << "obránce s Blockem by Wrestle nepoužil => cena se měnit nesmí";
 }
 

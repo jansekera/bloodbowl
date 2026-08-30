@@ -134,6 +134,12 @@ long takeLeapWalkPicksInSearch();
 // by the push dragging him in before he can withdraw.
 //
 // Per side, default OFF.
+// Diagnostika B2: kolikrát se v hledání ocenil blok proti obránci, který by
+// Wrestle POUŽIL, a útočník má Block -- tedy případ, kde se cena od naivní
+// liší (2/6 místo 1/6). Není to rameno, jen měřidlo; cena je od 30.08.
+// v produkci vždy.
+long takeWrestleDefenderPricedInSearch();
+
 void setBlitzContinuationArm(TeamSide side, bool on);
 bool blitzContinuationArm(TeamSide side);
 
@@ -158,15 +164,11 @@ void noteBlitzContinuationEvent();
 // every single one of those put our own body on the ground as well.
 //
 // Per side, default OFF.
-void setWrestlePricingArm(TeamSide side, bool on);
-bool wrestlePricingArm(TeamSide side);
 // Times the arm actually changed the price -- defender has Wrestle AND the
 // attacker has Block, the only case where the two answers differ.
-long takeWrestlePricingEventsInSearch();
 // ⭐ 27.08.: kolikrát rameno ZMĚNILO VOLBU blitzujícího (ne kolikrát se lišila
 // cena). Bez tohohle se „rameno jednalo" nedá odlišit od „rameno se dívalo" --
 // táž oprava, jakou dostalo P35.
-long takeWrestlePricingRepicksInSearch();
 
 // --- P38 arm (2026-08-19): derive the carrier's destination square from the
 // cage it would produce (user's rule, spec 15.0c).

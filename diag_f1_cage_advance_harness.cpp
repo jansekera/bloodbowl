@@ -467,16 +467,11 @@ int main(int argc, char** argv) {
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY,
                                             mode == 10 && !candHome);
                 bb::takeBlitzContinuationEventsInSearch();   // vynuluj na par
-                // mode 11 (B2, 25.08., merene poprve): cena bloku proti
-                // obranci s Wrestle. ⚠️ Rameno se do 27.08. nedalo merit nikde
-                // jinde nez na dw-sk -- Wrestle mel JEN skaven. Dnes ho maji
-                // dva linemani v KAZDEM tymu, takze matchup uz neomezuje.
-                bb::setWrestlePricingArm(bb::TeamSide::HOME,
-                                         mode == 11 && candHome);
-                bb::setWrestlePricingArm(bb::TeamSide::AWAY,
-                                         mode == 11 && !candHome);
-                bb::takeWrestlePricingRepicksInSearch();   // vynuluj na par
-                bb::takeWrestlePricingEventsInSearch();
+                // ⛔ mode 11 (B2) ZRUSEN 30.08.: noc 29.->30.08. dala
+                // EKVIVALENCI (delta +0,0010 +- 0,0034, cele CI uvnitr prahu),
+                // cena je od te doby v PRODUKCI vzdy a rameno padlo. Cislo 11
+                // se uz NEPOUZIJE -- rezimy se jen pripojuji, aby radky na
+                // disku nezmenily vyznam. Vysledek zustava v `ab_b2_20260829/`.
 
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
@@ -496,12 +491,7 @@ int main(int argc, char** argv) {
                 long candCont = bb::takeBlitzContinuationEventsInSearch();
                 bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
-                // ⭐ B2 hlasi REPICKY, ne „cena se lisila" -- to druhe vyjde
-                // velke i u ramene, ktere nikdy nic neprehodilo.
-                long candWrestle = bb::takeWrestlePricingRepicksInSearch();
-                bb::takeWrestlePricingEventsInSearch();
-                bb::setWrestlePricingArm(bb::TeamSide::HOME, false);
-                bb::setWrestlePricingArm(bb::TeamSide::AWAY, false);
+                long candWrestle = 0;   // mode 11 zrusen (viz vyse)
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
@@ -536,7 +526,6 @@ int main(int argc, char** argv) {
                               : (mode == 8) ? candLanding
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
-                              : (mode == 11) ? candWrestle
                               : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
@@ -634,8 +623,7 @@ int main(int argc, char** argv) {
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 8 || mode == 9 || mode == 10 ||
-             mode == 11);
+             mode == 7 || mode == 8 || mode == 9 || mode == 10);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
