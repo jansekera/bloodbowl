@@ -36,7 +36,12 @@ MATCHUPS=${MATCHUPS:-"2:dw-dw:1 7:dwnw:0"}
 PAIRS=${PAIRS:-4800}
 CHUNKS=${CHUNKS:-48}
 NULL_PAIRS=${NULL_PAIRS:-400}
-WORKERS=${WORKERS:-8}
+# ⭐ VYCHOZI 4, NE 8 (uzivatel 30.08.: „zabral 100 % procesoru -- to nepujde
+#   vzdy"). Zmereno na dw-dw: 8 workeru 0,0681 paru/s, 4 workery 0,0597 --
+#   osmy worker pridava jen +14 %, protoze jsou to 4 FYZICKA jadra + HT.
+#   Ctyri workery stoji +12 % casu (B2 ~24 h misto ~21) a nechaji stroj
+#   POUZITELNY. Osmicku nastav jen tehdy, kdyz laptop stejne nikdo nepotrebuje.
+WORKERS=${WORKERS:-4}
 LOG="$OUT/laptop_night.log"
 PIDFILE="$OUT/laptop_night.pid"
 MAX_RETRY=${MAX_RETRY:-20}

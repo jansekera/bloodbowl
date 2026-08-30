@@ -134,6 +134,12 @@ long takeLeapWalkPicksInSearch();
 // by the push dragging him in before he can withdraw.
 //
 // Per side, default OFF.
+// Diagnostika B2: kolikrát se v hledání ocenil blok proti obránci, který by
+// Wrestle POUŽIL, a útočník má Block -- tedy případ, kde se cena od naivní
+// liší (2/6 místo 1/6). Není to rameno, jen měřidlo; cena je od 30.08.
+// v produkci vždy.
+long takeWrestleDefenderPricedInSearch();
+
 void setBlitzContinuationArm(TeamSide side, bool on);
 bool blitzContinuationArm(TeamSide side);
 
@@ -144,6 +150,25 @@ long takeBlitzContinuationEventsInSearch();
 // Internal: bump the counter from block_handler, which owns two of the three
 // halves. Not part of the harness API.
 void noteBlitzContinuationEvent();
+
+// --- B2 arm (2026-08-25): price a block against a defender who can WRESTLE ---
+//
+// blockDieBadFraction knew only the ATTACKER's Block and returned 1/6 with it.
+// BB2016 l. 8670-8676: Wrestle places BOTH players prone "even if one or both
+// have the Block skill", so against a Wrestle defender BOTH_DOWN is bad for us
+// too and the truth is 2/6. On one die that is 16.7% against 33.3%; on two dice
+// -- which is what Guard buys -- 2.8% against 11.1%, a FOURFOLD underestimate.
+//
+// M7 measured the ceiling on the 6 000 corpus games containing a skaven:
+// 5.45 blocks a game land on a Wrestle defender, 15.1% come up Both Down, and
+// every single one of those put our own body on the ground as well.
+//
+// Per side, default OFF.
+// Times the arm actually changed the price -- defender has Wrestle AND the
+// attacker has Block, the only case where the two answers differ.
+// ⭐ 27.08.: kolikrát rameno ZMĚNILO VOLBU blitzujícího (ne kolikrát se lišila
+// cena). Bez tohohle se „rameno jednalo" nedá odlišit od „rameno se dívalo" --
+// táž oprava, jakou dostalo P35.
 
 // --- P38 arm (2026-08-19): derive the carrier's destination square from the
 // cage it would produce (user's rule, spec 15.0c).

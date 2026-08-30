@@ -295,6 +295,27 @@ long takeBlitzLandingRepicksInSearch() {
     return v;
 }
 
+
+// ⛔ 30.08.: čítače ramene B2 odstraněny spolu s ramenem. Poučení z nich ale
+// PLATÍ a drží se u P35 (`g_blitzLandingRepicks`): čítač musí tikat, jen když
+// se ZMĚNILA VOLBA, ne když se jen lišila cena -- jinak noc hlásí „rameno
+// jednalo" o rameni, které se jen dívalo.
+
+
+// ⭐ DIAGNOSTIKA, NE RAMENO (30.08.2026). Vypínač `setWrestlePricingArm` padl
+// spolu s nasazením ceny -- čítač zůstal. Je to týž princip jako u `T5.34`
+// (`cageSnapshot`): MĚŘIDLO NESMÍ VISET NA TOM, JESTLI SE ROZHODUJE. Bez něj
+// by na otázku „jak často vůbec oceňujeme blok proti obránci, který Wrestle
+// POUŽIJE" neuměl odpovědět nikdo -- a nula z chybějícího měřidla se od nuly
+// z chybějícího jevu nepozná.
+thread_local long g_wrestleDefenderPriced = 0;
+
+long takeWrestleDefenderPricedInSearch() {
+    long v = g_wrestleDefenderPriced;
+    g_wrestleDefenderPriced = 0;
+    return v;
+}
+
 thread_local bool g_blitzContinuation[2] = {false, false};
 thread_local long g_blitzContinuationEvents = 0;
 
@@ -385,17 +406,29 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
 // autoChooseBlockDie's scoreFace does, deliberately: this runs on every
 // macro expansion during MCTS (thousands of times per search), so it needs
 // to stay cheap, not skill-exact.
-static double blockDieBadFraction(bool attackerHasBlock) {
+// B2 (25.08.2026): `defenderCanWrestle` je druhá polovina téhle otázky a do
+// 25.08. tu nebyla. BB2016 ř. 8670-8676: Wrestle položí OBA hráče "even if one
+// or both have the Block skill" -- útočníkův Block ho tedy před BOTH_DOWN
+// NEZACHRÁNÍ a špatné jsou obě tváře kostky, ne jedna.
+// ⚠️ Wrestle je VOLBA obránce, ne mechanika. Předpokládá se, že ji použije,
+// když se mu vyplatí -- což u nositele BEZ Blocku platí vždy: padl by tak jako
+// tak, a Placed Prone navíc nemá hod na zbroj. Korpus to potvrzuje: 4 923
+// ze 4 923 Both Down proti `Lineman +Wrestle` položilo OBĚ těla.
+// ⛔ U obránce, který má Block I Wrestle, je to skutečná volba a 2/6 je pak
+// PŘÍSNÝ odhad; takového nositele ale žádná korpusová sestava nemá.
+static double blockDieBadFraction(bool attackerHasBlock, bool defenderCanWrestle) {
+    if (defenderCanWrestle) return 2.0 / 6.0;
     return attackerHasBlock ? (1.0 / 6.0) : (2.0 / 6.0);
 }
 
 // Estimated probability that the block itself goes badly for the attacker,
 // from a diceCount as returned by getBlockDiceCount (positive = attacker
 // chooses N dice, negative = defender chooses N dice).
-static double estimateBlockFailChance(int diceCount, bool attackerHasBlock) {
+static double estimateBlockFailChance(int diceCount, bool attackerHasBlock,
+                                      bool defenderCanWrestle = false) {
     int n = std::abs(diceCount);
     if (n == 0) return 1.0;
-    double bad = blockDieBadFraction(attackerHasBlock);
+    double bad = blockDieBadFraction(attackerHasBlock, defenderCanWrestle);
     if (diceCount > 0) {
         // Attacker picks the best of n dice -> fails only if ALL n are bad.
         return std::pow(bad, n);
@@ -460,7 +493,43 @@ static double estimateBlitzFailChance(const GameState& state, const Player& blit
                                                      fromLanding ? &landing : nullptr);
     int diceCount = getBlockDiceCount(state, blitzer, target, true, false,
                                       fromLanding ? landing : Position{-1, -1});
-    double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block));
+    // B2: obráncův Wrestle se do ceny promítne jen POD RAMENEM, aby šel rozdíl
+    // změřit párovým A/B. Čítač tiká jen tam, kde se cena OPRAVDU liší -- tedy
+    // když útočník Block má; bez Blocku vychází 2/6 v obou případech.
+    //
+    // ⛔ 27.08.: PODMÍNKA MUSÍ BÝT TÁŽ JAKO V RESOLVERU. Do dneška tu stálo
+    //   pouhé `target.hasSkill(Wrestle)` -- tedy „Wrestle MÁ", ne „Wrestle by
+    //   POUŽIL". Dokud Block+Wrestle neměl nikdo, byl v tom rozdíl nulový;
+    //   27.08. dostaly všechny týmy dva linemany s Wrestle a u trpaslíka jsou
+    //   to Longbeardi, kteří Block MAJÍ, takže ta větev ožila.
+    //   Resolver (`block_handler.cpp`, case BOTH_DOWN) rozhoduje takto:
+    //     defWantsWrestle = Wrestle && (!Block || attHasBall)
+    //   -- obránce s Blockem by Both Down přestál VESTOJE a útočníka složil,
+    //   což je lepší než jít k zemi s ním; sáhne po Wrestle jen tehdy, když
+    //   útočník drží míč (jeho položení je turnover).
+    //   ⇒ Kdyby vybírač počítal 2/6 i tam, kde by obránce Wrestle NEPOUŽIL,
+    //     oceňuje JINOU VĚC, NEŽ SE PAK STANE -- táž vada, před kterou varuje
+    //     `autoChooseBlockDie` o dvě stě řádků výš.
+    const bool attHasBall = state.ball.isHeld &&
+                            state.ball.carrierId == blitzer.id;
+    const bool defWouldWrestle = target.hasSkill(SkillName::Wrestle) &&
+                                 (!target.hasSkill(SkillName::Block) || attHasBall);
+    // ⭐ NASAZENO 30.08.2026 (B2). Do téhle změny cena visela na rameni
+    //   `setWrestlePricingArm`, které se v produkci nikdy nezapínalo -- engine
+    //   tedy hrál dál s cenou, o které je DOLOŽENO, že je špatná: r. 8670-8676
+    //   položí při Both Down OBA hráče, i když jeden nebo oba mají Block,
+    //   takže špatné jsou DVĚ šestiny, ne jedna (2 kostky: 11,1 %, ne 2,8 %).
+    //   Noc 29.->30.08. změřila, že oprava nic nezhorší: delta +0,0010 ± 0,0034,
+    //   celé 95% CI [-0,0057; +0,0078] uvnitř prahu ±0,015 => EKVIVALENCE.
+    // ⛔ Rameno TÍM padá. „Neškodí" není důvod nechat v kódu vypínač, který
+    //   nikdo nikdy nepřepne (uživatel 30.08.); a nechat místo toho v enginu
+    //   prokazatelně špatnou cenu by bylo implementovat VÝSLEDEK místo
+    //   PRAVIDLA -- vada, kterou projekt vede pod
+    //   `feedback_implement_the_rule_not_the_outcome`.
+    const bool defWrestle = defWouldWrestle;
+    if (defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestleDefenderPriced;
+    double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
+                                               defWrestle);
     return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
 }
 

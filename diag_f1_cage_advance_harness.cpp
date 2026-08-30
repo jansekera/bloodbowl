@@ -266,7 +266,8 @@ int main(int argc, char** argv) {
                       : (mode == 7) ? 127'000'000u
                       : (mode == 8) ? 149'000'000u
                       : (mode == 9) ? 167'000'000u
-                      : (mode == 10) ? 163'000'000u : SEED_BASE;
+                      : (mode == 10) ? 163'000'000u
+                      : (mode == 11) ? 179'000'000u : SEED_BASE;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     printf("mode=%d (%s)\n", mode,
            mode == 1 ? "GRIND A/B: cage+grind vs cage (fallback)"
@@ -279,6 +280,7 @@ int main(int argc, char** argv) {
          : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
          : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
          : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
+         : mode == 11 ? "B2: cena bloku proti obranci, ktery WRESTLE POUZIJE"
                      : "cage vs off");
 
     auto vf = loadValueFunction(root + "/weights_best.json");
@@ -298,7 +300,8 @@ int main(int argc, char** argv) {
     // to anything that de-duplicates by seed. One process owns one shard
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
-    const char* rowsName = mode == 10 ? "diag_blitzcont_rows.jsonl"
+    const char* rowsName = mode == 11 ? "diag_wrestleprice_rows.jsonl"
+                         : mode == 10 ? "diag_blitzcont_rows.jsonl"
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
@@ -464,6 +467,11 @@ int main(int argc, char** argv) {
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY,
                                             mode == 10 && !candHome);
                 bb::takeBlitzContinuationEventsInSearch();   // vynuluj na par
+                // ⛔ mode 11 (B2) ZRUSEN 30.08.: noc 29.->30.08. dala
+                // EKVIVALENCI (delta +0,0010 +- 0,0034, cele CI uvnitr prahu),
+                // cena je od te doby v PRODUKCI vzdy a rameno padlo. Cislo 11
+                // se uz NEPOUZIJE -- rezimy se jen pripojuji, aby radky na
+                // disku nezmenily vyznam. Vysledek zustava v `ab_b2_20260829/`.
 
                 FullGameOutcome g = playGame(
                     *homeRoster, *awayRoster,
@@ -483,6 +491,7 @@ int main(int argc, char** argv) {
                 long candCont = bb::takeBlitzContinuationEventsInSearch();
                 bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
+                long candWrestle = 0;   // mode 11 zrusen (viz vyse)
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);

@@ -145,7 +145,19 @@ def step_spec(args):
         rec('STOP', 'chybí nulová kontrola',
             'bez nuly se efekt nedá odlišit od podlahy aparátu (P20)')
         return False
-    rec('OK', 'nulová kontrola', '%d z %d matchupů' % (len(nulls), len(specs)))
+    # ⛔ HLÁŠKA MUSÍ ŘÍCT, ČÍM to prošlo. Do 30.08. tiskla „OK — 0 z 1 matchupů",
+    #   což je samo o sobě protimluv: nula nulových matchupů a přesto OK.
+    #   Prošlo to díky `--control-mode2`, jenže to z výpisu nešlo poznat --
+    #   a harness sám o mode 2 píše, že je to pod CRN TAUTOLOGIE a verdikt na
+    #   něm stát nesmí. Takový popisek je horší než žádný.
+    if nulls:
+        rec('OK', 'nulová kontrola', '%d z %d matchupů' % (len(nulls), len(specs)))
+    else:
+        rec('WARN', 'nulová kontrola JEN přes CONTROL_MODE2',
+            'žádný matchup s nulovou expozicí — mode 2 je pod CRN TAUTOLOGIE')
+        print('       ⚠️ Chytí jedině hrubou chybu v seedování. Verdikt na něm')
+        print('          NESTOJÍ — skutečná nula je matchup, kde se rameno')
+        print('          spustit NEMŮŽE (u B2 je to `7:dwnw:0`).')
     if args.prereg:
         p = args.prereg if os.path.isabs(args.prereg) else os.path.join(ROOT, args.prereg)
         if not os.path.exists(p):
