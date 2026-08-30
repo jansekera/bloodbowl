@@ -785,6 +785,17 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     weakBlitzer.stats = {6, 1, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
+    // Retuned 2026-08-30 (TRETI PRELADENI): volny hrac presunut z {5,3} na
+    // {13,3}. Hranu tentokrat posunula oprava M12 -- `ADVANCE` uz nerezignuje,
+    // kdyz je zavrena primka a volno vedle, takze v rolloutech SOUPERUV nosic
+    // neuvizne a riskantni BLITZ ztratil na hodnote: zaklad zacal volit
+    // REPOSITION, tedy tyz tah, ktery ma vybrat teprve STRAZCE, a test prestal
+    // rozlisovat.
+    // ⚠️ Knoflik `proximity` (x-ova poloha dvojice) tentokrat NEZABRAL -- zkouseno
+    //    x = 8, 10, 12, 17, 20, vsechny padaly. Zabralo az priblizeni VOLNEHO
+    //    hrace k deji, ktere zmensi hodnotu REPOSITION jako alternativy.
+    //    Aserce se NEOSLABILA, presunul se fixture -- jak zada komentar nize.
+    //
     // Retuned 2026-08-24 from x=12/13 to x=14/15. Druhe preladeni z tehoz
     // duvodu jako to prvni: oprava pravidla posunula hranu. N8 (Both Down uz
     // obrance NEODSUNUJE a utocnik ho NENASLEDUJE, l. 514-519) ubrala blitzu
@@ -822,7 +833,7 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     freePlayer.id = 2;
     freePlayer.teamSide = TeamSide::HOME;
     freePlayer.state = PlayerState::STANDING;
-    freePlayer.position = {5, 3};
+    freePlayer.position = {13, 3};
     freePlayer.stats = {6, 3, 3, 8};
     freePlayer.movementRemaining = 6;
 

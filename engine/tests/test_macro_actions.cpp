@@ -2420,34 +2420,39 @@ GameState makeCarrierWithBlockedLine() {
 }
 }  // namespace
 
-TEST(MacroActions, M12GaugeCountsAResignationWhenTheLineIsBlocked) {
+// ⚠️ SMYSL TĚCHTO DVOU TESTŮ SE OPRAVOU ZMĚNIL, a to je v pořádku.
+// Do opravy měřily VADU: zavřená přímka => rezignace, a volno vedle. Po
+// opravě se v té situaci nerezignuje vůbec, takže by v původním znění padaly.
+// Přeznačeny na HLÍDKU: zavřená přímka s volným bokem už rezignaci vyvolat
+// NESMÍ, a `resignedButSideFree` musí zůstat na nule. Kdyby někdo vrátil
+// hledání po přímce, tohle to chytí.
+TEST(MacroActions, M12ABlockedLineWithAFreeSideNoLongerCountsAsResignation) {
     auto state = makeCarrierWithBlockedLine();
-    takeAdvanceResignedInSearch();               // vynuluj
-    takeAdvanceResignedButSideFreeInSearch();
-
-    FixedDiceRoller dice(std::vector<int>(40, 4));
-    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
-    greedyExpandMacro(state, adv, dice);
-
-    EXPECT_EQ(takeAdvanceResignedInSearch(), 1)
-        << "přímka je zavřená => ADVANCE musí rezignovat a čítač to má vidět";
-}
-
-TEST(MacroActions, M12GaugeSeesThatASideSquareWasFree) {
-    auto state = makeCarrierWithBlockedLine();   // boky (11,6) a (11,8) jsou volné
     takeAdvanceResignedInSearch();
     takeAdvanceResignedButSideFreeInSearch();
 
-    FixedDiceRoller dice(std::vector<int>(40, 4));
+    FixedDiceRoller dice(std::vector<int>(60, 4));
     Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
     greedyExpandMacro(state, adv, dice);
 
-    EXPECT_EQ(takeAdvanceResignedButSideFreeInSearch(), 1)
-        << "volno vedle BYLO => tahle rezignace byla zbytečná";
+    EXPECT_EQ(takeAdvanceResignedInSearch(), 0)
+        << "po opravě M12 se při zavřené přímce a volném boku nerezignuje";
 }
 
-// ⛔ HRANICE: když je zavřeno i vedle, rezignace je NA MÍSTĚ a druhý čítač
-// tikat NESMÍ. Bez toho by měřidlo hlásilo „zbytečná rezignace" vždycky.
+TEST(MacroActions, M12NeedlessResignationsAreGoneFromTheGauge) {
+    auto state = makeCarrierWithBlockedLine();
+    takeAdvanceResignedInSearch();
+    takeAdvanceResignedButSideFreeInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(60, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_EQ(takeAdvanceResignedButSideFreeInSearch(), 0)
+        << "zbytečná rezignace je přesně to, co M12 odstranila -- kdyby tohle"
+           " číslo znovu ožilo, je hledání zase po přímce";
+}
+
 TEST(MacroActions, M12GaugeDoesNotClaimSideFreeWhenEverythingIsBlocked) {
     // ⚠️ Zeď se nestaví do celého dosahu -- rozpočet je až 6 polí, tedy pás
     //    13x13, a tolik těl tým nemá (11 + 2 na lavičce). První verze testu to
@@ -2472,4 +2477,75 @@ TEST(MacroActions, M12GaugeDoesNotClaimSideFreeWhenEverythingIsBlocked) {
 
     EXPECT_EQ(takeAdvanceResignedButSideFreeInSearch(), 0)
         << "zavřeno i vedle => rezignace byla nutná, čítač tikat nesmí";
+}
+
+// ============================================================================
+// M12 KROK 2 (30.08.2026) — CHOVÁNÍ, ne měřidlo.
+// Krok 1 změřil, že 90,1 % rezignací `ADVANCE` bylo zbytečných: existovalo
+// volné pole bez TZ s postupem vpřed, jen MIMO PŘÍMKU. Záložní smyčka totiž
+// mění jen `x` a `y` nechává (macro_actions.cpp), takže zavřená přímka pro ni
+// znamená „nikam nelze".
+//
+// ⛔ Tyhle dva testy jsou PÁR a musí se číst spolu: první říká, co se má
+// začít dít, druhý co se dít NESMÍ. Bez druhého by opravu splnilo i „hýbej se
+// vždycky", což by nosiče posílalo do tacklezón.
+// ============================================================================
+
+TEST(MacroActions, M12CarrierWithABlockedLineButAFreeSideMustAdvance) {
+    auto state = makeCarrierWithBlockedLine();
+    const Position before = state.getPlayer(1).position;
+
+    FixedDiceRoller dice(std::vector<int>(60, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_NE(state.getPlayer(1).position, before)
+        << "přímka zavřená, bok volný => vzdát postup není volba, je to vada";
+}
+
+// ⛔ HRANICE: když je zavřeno i vedle, nosič zůstat stát MUSÍ. Rozpočet je
+// zúžený na jedno pole, takže kandidáti jsou jen tři a dají se zazdít.
+TEST(MacroActions, M12CarrierWithEverythingBlockedMustStayPut) {
+    auto state = makeCarrierWithBlockedLine();
+    state.getPlayer(1).movementRemaining = 1;
+    Player& a = state.getPlayer(5);
+    a.id = 5; a.teamSide = TeamSide::HOME; a.state = PlayerState::STANDING;
+    a.position = {11, 6}; a.stats = {6, 3, 3, 8};
+    Player& b = state.getPlayer(6);
+    b.id = 6; b.teamSide = TeamSide::HOME; b.state = PlayerState::STANDING;
+    b.position = {11, 8}; b.stats = {6, 3, 3, 8};
+    const Position before = state.getPlayer(1).position;
+
+    FixedDiceRoller dice(std::vector<int>(60, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_EQ(state.getPlayer(1).position, before)
+        << "zavřeno i vedle => stát je správně, hýbat se za každou cenu ne";
+}
+
+// ⛔ A DRUHÁ HRANICE: pole v soupeřově tacklezóně se brát NESMÍ, i kdyby bylo
+// volné. Zaparkovaný nosič v TZ dává soupeři blok na míč zadarmo -- tuhle
+// podmínku má dnešní smyčka a oprava ji nesmí ztratit.
+TEST(MacroActions, M12CarrierDoesNotStepIntoATacklezoneToAvoidResigning) {
+    auto state = makeCarrierWithBlockedLine();
+    state.getPlayer(1).movementRemaining = 1;
+    // boky obsadíme soupeři tak, aby (11,6) i (11,8) byly v jejich TZ a volné
+    Player& e1 = state.getPlayer(12);
+    e1.position = {12, 5};  e1.state = PlayerState::STANDING;
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13; e2.teamSide = TeamSide::AWAY; e2.state = PlayerState::STANDING;
+    e2.position = {12, 9}; e2.stats = {6, 3, 3, 8};
+    const Position before = state.getPlayer(1).position;
+
+    FixedDiceRoller dice(std::vector<int>(60, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    const Position after = state.getPlayer(1).position;
+    if (after != before) {
+        EXPECT_EQ(countTacklezones(state, after, TeamSide::HOME), 0)
+            << "nosič skončil v tacklezóně => oprava ztratila podmínku, kterou"
+               " dnešní smyčka má";
+    }
 }

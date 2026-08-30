@@ -1773,6 +1773,44 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         targetX = std::clamp(carrier.position.x + dx * steps, 1, 24);
         target.x = static_cast<int8_t>(targetX);
     }
+
+    // ⭐ M12/A+C (30.08.2026): KDYŽ PŘÍMKA NEVEDE, HLEDEJ VEDLE.
+    //   Smyčka výš mění jen `x` a `y` nechává, takže zavřená přímka pro ni
+    //   znamená „nikam nelze" -- a `ADVANCE` se vzdá, i když je volno o pole
+    //   stranou. Změřeno v produkci (krok 1, 6 párů dw-dw): z 9202 rezignací
+    //   jich 8294 = 90,1 % mělo volné pole bez TZ mimo přímku. Vzdát postup,
+    //   když je kam jít, se jako záměr obhájit nedá => je to VADA.
+    //
+    // ⛔ ROZSAH JE PŘESNĚ TA VADA, NIC VÍC. Z ramene P38 se sem NEBERE ani
+    //   klecové kritérium `cageScoreForSquare` (to je okruh KLEC), ani okno
+    //   „do jednoho pole od nejlepšího postupu". Tohle je jen „nerezignuj,
+    //   když existuje volné pole vpřed" -- podmínky zůstávají tytéž, co má
+    //   smyčka: volné pole, bez soupeřovy tacklezóny, postup >= 1.
+    if (!armChoseSquare && steps <= 0) {
+        Position best{-1, -1};
+        int bestProg = 0, bestDrift = 99;
+        for (int ox = -origSteps; ox <= origSteps; ++ox) {
+            for (int oy = -origSteps; oy <= origSteps; ++oy) {
+                Position cand{static_cast<int8_t>(carrier.position.x + ox),
+                              static_cast<int8_t>(carrier.position.y + oy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand)) continue;
+                const int prog = dx * (cand.x - carrier.position.x);
+                if (prog < 1) continue;
+                if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
+                // Nejdál vpřed; při shodě to, co se nejmíň uhne od přímky --
+                // aby se z opravy nestalo „chodit do stran", když jde rovně.
+                const int drift = std::abs(oy);
+                if (prog > bestProg || (prog == bestProg && drift < bestDrift)) {
+                    bestProg = prog; bestDrift = drift; best = cand;
+                }
+            }
+        }
+        if (best.x >= 0) {
+            target = best;
+            steps = std::max(bestProg, std::abs(best.y - carrier.position.y));
+        }
+    }
     if (steps <= 0) {
         // ⭐ M12 krok 1: TADY `ADVANCE` rezignuje. Než se vrátíme, zeptáme se,
         //   jestli to bylo nutné -- prohledáme TÝŽ rozpočet ve ČTVERCI a
