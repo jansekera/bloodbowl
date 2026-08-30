@@ -225,6 +225,23 @@ thread_local long g_dauntlessOffers = 0;
 // predictor we have (20.7 sigma), so the arm only ever ranks squares that give
 // up AT MOST ONE square of forward progress against the best available -- it
 // changes WHICH square the carrier ends on, not how far it goes.
+// ⭐ M12, KROK 1 (30.08.2026): MĚŘIDLO, KTERÉ NEMĚNÍ CHOVÁNÍ.
+// Otázka zní: kolikrát `ADVANCE` rezignuje (záložní smyčka stáhne `steps` na 0)
+// a KOLIKRÁT Z TOHO existovalo volné pole bez tacklezóny s postupem >= 1
+// uvnitř rozpočtu, jen MIMO PŘÍMKU? To rozhodne, jestli je (A/C) VADA, nebo
+// taktická volba -- a rozhodne to měřením, ne úvahou.
+// ⛔ Schválně mimo rameno: měřidlo nesmí viset na tom, jestli se rozhoduje
+//    (T5.34). Tenhle čítač tiká v PRODUKCI, i když jsou všechna ramena vypnutá.
+thread_local long g_advanceResigned = 0;        // smyčka stáhla steps na 0
+thread_local long g_advanceResignedButSideFree = 0;  // ...a přitom bylo volno vedle
+
+long takeAdvanceResignedInSearch() {
+    long v = g_advanceResigned; g_advanceResigned = 0; return v;
+}
+long takeAdvanceResignedButSideFreeInSearch() {
+    long v = g_advanceResignedButSideFree; g_advanceResignedButSideFree = 0; return v;
+}
+
 thread_local bool g_cageAwareAdvance[2] = {false, false};
 thread_local long g_cageAwareAdvancePicks = 0;
 
@@ -1747,6 +1764,8 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     // the opponent a free block on the ball. Pull the target back to the
     // nearest unoccupied TZ-free square; if none exists ahead, don't advance
     // at all and let the search's other macros handle the turn.
+    const int origSteps = steps;   // M12 krok 1: rozpočet PŘED snižováním
+    bool sideFree = false;
     while (!armChoseSquare && steps > 0 &&
            (state.getPlayerAtPosition(target) != nullptr ||
             countTacklezones(state, target, carrier.teamSide) > 0)) {
@@ -1754,7 +1773,27 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         targetX = std::clamp(carrier.position.x + dx * steps, 1, 24);
         target.x = static_cast<int8_t>(targetX);
     }
-    if (steps <= 0) return result;
+    if (steps <= 0) {
+        // ⭐ M12 krok 1: TADY `ADVANCE` rezignuje. Než se vrátíme, zeptáme se,
+        //   jestli to bylo nutné -- prohledáme TÝŽ rozpočet ve ČTVERCI a
+        //   hledáme volné pole bez TZ, které vede vpřed. Je to jen čtení
+        //   stavu, nic se nemění.
+        ++g_advanceResigned;
+        const int budget0 = origSteps;
+        for (int ox = -budget0; ox <= budget0 && !sideFree; ++ox) {
+            for (int oy = -budget0; oy <= budget0; ++oy) {
+                Position cand{static_cast<int8_t>(carrier.position.x + ox),
+                              static_cast<int8_t>(carrier.position.y + oy)};
+                if (!cand.isOnPitch()) continue;
+                if (state.getPlayerAtPosition(cand)) continue;
+                if (dx * (cand.x - carrier.position.x) < 1) continue;
+                if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
+                sideFree = true; break;
+            }
+        }
+        if (sideFree) ++g_advanceResignedButSideFree;
+        return result;
+    }
 
     movePlayerToward(state, macro.playerId, target, dice, result, steps + 2);
     return result;

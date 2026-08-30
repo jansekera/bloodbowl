@@ -84,6 +84,10 @@ struct Matchup {
     const char* home;
     const char* away;
 };
+// M12 krok 1: akumulatory pres cely beh (scitaji se pres vsechny pary).
+static long g_advResigned = 0;
+static long g_advResignedSF = 0;
+
 static const Matchup MATCHUPS[] = {
     {"dwarf", "skaven"},
     {"dwarf", "wood-elf"},
@@ -492,6 +496,12 @@ int main(int argc, char** argv) {
                 bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
                 bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
                 long candWrestle = 0;   // mode 11 zrusen (viz vyse)
+                // ⭐ M12 krok 1 (30.08.): diagnostika ADVANCE, NEZAVISLA na
+                //   ramenech -- tika i s vypnutymi. Odpovida na otazku, jestli
+                //   je 2D hledani VADA nebo taktika: kolik rezignaci ADVANCE
+                //   melo volne pole bez TZ MIMO PRIMKU.
+                g_advResigned  += bb::takeAdvanceResignedInSearch();
+                g_advResignedSF += bb::takeAdvanceResignedButSideFreeInSearch();
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
@@ -632,6 +642,9 @@ int main(int argc, char** argv) {
             // v něm není. Součet přes všechny páry se proto tiskne zvlášť.
             long armPicks = 0;
             for (auto& p2 : pairs) armPicks += p2.armEvents;
+            printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
+                   g_advResigned, g_advResignedSF,
+                   g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);
             printf("  ARM PICKS TOTAL: %ld (%.2f/game)\n",
                    armPicks, static_cast<double>(armPicks) / (2.0 * n));
             printf("  arm acted in %d/%d pairs; pairs that moved: %d; "

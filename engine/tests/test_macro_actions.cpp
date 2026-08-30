@@ -2387,3 +2387,89 @@ TEST(MacroActions, M5ProneWithMaThreeHasNothingLeftButGfi) {
     getAvailableMacros(state, macros);
     EXPECT_FALSE(hasMacroType(macros, MacroType::PICKUP));       // 3 > 0 + 2
 }
+
+// ============================================================================
+// M12 KROK 1 (30.08.2026) — MĚŘIDLO NEŽ ZMĚNA.
+// Otázka: kolikrát `ADVANCE` rezignuje (záložní smyčka stáhne `steps` na 0)
+// a kolikrát z toho bylo volné pole bez TZ MIMO PŘÍMKU?
+//
+// ⛔ Tenhle test NEHLÍDÁ chování enginu, hlídá MĚŘIDLO. Kdyby čítač tikal
+// jinde, než si myslím, vyjde z něj číslo, které vypadá věrohodně a znamená
+// něco jiného -- táž vada jako slepý metr stropu M9 (28.08.) nebo
+// `plan.filled_corners`, které hlásilo nulu, protože nikdo nepočítal.
+// ============================================================================
+
+namespace {
+// Nosič na (10,7), přímka vpřed zavřená vlastními těly, boky volné.
+GameState makeCarrierWithBlockedLine() {
+    GameState state = makeMinimalState();
+    Player& c = state.getPlayer(1);
+    c.position = {10, 7};
+    c.stats = {6, 3, 3, 8};
+    c.movementRemaining = 6;
+    state.ball = BallState::carried(c.position, 1);
+    state.getPlayer(12).position = {20, 1};   // soupeř daleko, žádné TZ
+    // vlastní zeď přímo vpřed: (11..13, 7)
+    for (int i = 0; i < 3; ++i) {
+        Player& w = state.getPlayer(2 + i);
+        w.id = 2 + i; w.teamSide = TeamSide::HOME; w.state = PlayerState::STANDING;
+        w.position = {static_cast<int8_t>(11 + i), 7};
+        w.stats = {6, 3, 3, 8};
+    }
+    return state;
+}
+}  // namespace
+
+TEST(MacroActions, M12GaugeCountsAResignationWhenTheLineIsBlocked) {
+    auto state = makeCarrierWithBlockedLine();
+    takeAdvanceResignedInSearch();               // vynuluj
+    takeAdvanceResignedButSideFreeInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_EQ(takeAdvanceResignedInSearch(), 1)
+        << "přímka je zavřená => ADVANCE musí rezignovat a čítač to má vidět";
+}
+
+TEST(MacroActions, M12GaugeSeesThatASideSquareWasFree) {
+    auto state = makeCarrierWithBlockedLine();   // boky (11,6) a (11,8) jsou volné
+    takeAdvanceResignedInSearch();
+    takeAdvanceResignedButSideFreeInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_EQ(takeAdvanceResignedButSideFreeInSearch(), 1)
+        << "volno vedle BYLO => tahle rezignace byla zbytečná";
+}
+
+// ⛔ HRANICE: když je zavřeno i vedle, rezignace je NA MÍSTĚ a druhý čítač
+// tikat NESMÍ. Bez toho by měřidlo hlásilo „zbytečná rezignace" vždycky.
+TEST(MacroActions, M12GaugeDoesNotClaimSideFreeWhenEverythingIsBlocked) {
+    // ⚠️ Zeď se nestaví do celého dosahu -- rozpočet je až 6 polí, tedy pás
+    //    13x13, a tolik těl tým nemá (11 + 2 na lavičce). První verze testu to
+    //    zkusila, nechala díry a měřidlo je správně našlo; chyba byla v ZADÁNÍ
+    //    testu, ne v čítači. Rozpočet se proto zúží na JEDNO pole, kde jsou
+    //    kandidáti jen tři -- a ty zazdít lze.
+    auto state = makeCarrierWithBlockedLine();
+    state.getPlayer(1).movementRemaining = 1;
+    Player& a = state.getPlayer(5);
+    a.id = 5; a.teamSide = TeamSide::HOME; a.state = PlayerState::STANDING;
+    a.position = {11, 6}; a.stats = {6, 3, 3, 8};
+    Player& b = state.getPlayer(6);
+    b.id = 6; b.teamSide = TeamSide::HOME; b.state = PlayerState::STANDING;
+    b.position = {11, 8}; b.stats = {6, 3, 3, 8};
+
+    takeAdvanceResignedInSearch();
+    takeAdvanceResignedButSideFreeInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(40, 4));
+    Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, adv, dice);
+
+    EXPECT_EQ(takeAdvanceResignedButSideFreeInSearch(), 0)
+        << "zavřeno i vedle => rezignace byla nutná, čítač tikat nesmí";
+}

@@ -187,6 +187,14 @@ void noteBlitzContinuationEvent();
 void setCageAwareAdvanceArm(TeamSide side, bool on);
 bool cageAwareAdvanceArm(TeamSide side);
 
+// M12 krok 1 (30.08.2026): diagnostika ADVANCE, NEZÁVISLÁ na ramenech.
+//   resigned         -- kolikrát záložní smyčka stáhla `steps` na 0
+//   resignedButSideFree -- kolikrát z toho existovalo volné pole bez TZ
+//                          s postupem >= 1 uvnitř rozpočtu, MIMO přímku
+// Podíl druhého k prvnímu říká, jestli je 2D hledání VADA, nebo taktika.
+long takeAdvanceResignedInSearch();
+long takeAdvanceResignedButSideFreeInSearch();
+
 // --- P40 placebo arm (2026-08-20): the SAME square search as P38, minus the
 // cage criterion.
 //
