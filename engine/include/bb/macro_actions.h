@@ -192,6 +192,13 @@ bool cageAwareAdvanceArm(TeamSide side);
 //   resignedButSideFree -- kolikrát z toho existovalo volné pole bez TZ
 //                          s postupem >= 1 uvnitř rozpočtu, MIMO přímku
 // Podíl druhého k prvnímu říká, jestli je 2D hledání VADA, nebo taktika.
+// Q3 (30.08.2026): měřidlo ke vstávání, NEZÁVISLÉ na ramenech.
+//   offered            -- kolikrát se ležícímu nabídlo vstát
+//   offeredNextToEnemy -- kolikrát z toho stál vedle STOJÍCÍHO soupeře,
+//                         tedy v té drahé větvi („dávám mu blok zadarmo")
+long takeStandOfferedInSearch();
+long takeStandOfferedNextToEnemyInSearch();
+
 long takeAdvanceResignedInSearch();
 long takeAdvanceResignedButSideFreeInSearch();
 

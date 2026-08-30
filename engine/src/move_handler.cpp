@@ -343,6 +343,31 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     return ActionResult::ok();
 }
 
+// ⭐ Q3 (30.08.2026): PROVEDENÍ vstávání, protějšek k měřidlu NABÍDKY
+// v `macro_actions.cpp`. Nabídka je bezpodmínečná; tenhle čítač říká, co si
+// z ní hledání skutečně vzalo. ⛔ Rozdíl mezi nimi je ta odpověď na Q3:
+// když se provedení té drahé situaci samo vyhýbá, umí ji hledání ocenit
+// i bez plánovače.
+thread_local long g_stoodUp = 0;
+thread_local long g_stoodUpNextToEnemy = 0;
+
+long takeStoodUpInSearch() { long v = g_stoodUp; g_stoodUp = 0; return v; }
+long takeStoodUpNextToEnemyInSearch() {
+    long v = g_stoodUpNextToEnemy; g_stoodUpNextToEnemy = 0; return v;
+}
+
+// Zaznamená úspěšné vstání. Adjacence se čte PŘED tím, než hráč cokoli udělá.
+static void noteStandUp(const GameState& state, const Player& p) {
+    ++g_stoodUp;
+    for (const Position& adj : p.position.getAdjacent()) {
+        if (!adj.isOnPitch()) continue;
+        const Player* e = state.getPlayerAtPosition(adj);
+        if (e && e->teamSide != p.teamSide && e->state == PlayerState::STANDING) {
+            ++g_stoodUpNextToEnemy; return;
+        }
+    }
+}
+
 ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice,
                             std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
@@ -353,6 +378,7 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
 
     if (player.hasSkill(SkillName::JumpUp)) {
         // Free stand up
+        noteStandUp(state, player);
         player.state = PlayerState::STANDING;
         player.hasMoved = true;   // standing up IS movement (see below)
         // ⚠️ hasMoved je tu SPRÁVNĚ, ne regrese: BB2016 l. 8198 dává volné
@@ -389,11 +415,13 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
             return ActionResult::fail();
         }
         player.movementRemaining = 0;   // any further step must be a GFI
+        noteStandUp(state, player);
         player.state = PlayerState::STANDING;
         player.hasMoved = true;
         return ActionResult::ok();
     }
 
+    noteStandUp(state, player);
     player.movementRemaining -= 3;
     player.state = PlayerState::STANDING;
     // Standing up is movement, so it closes the activation the same way a step

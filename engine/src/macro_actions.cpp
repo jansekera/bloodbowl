@@ -232,6 +232,25 @@ thread_local long g_dauntlessOffers = 0;
 // taktická volba -- a rozhodne to měřením, ne úvahou.
 // ⛔ Schválně mimo rameno: měřidlo nesmí viset na tom, jestli se rozhoduje
 //    (T5.34). Tenhle čítač tiká v PRODUKCI, i když jsou všechna ramena vypnutá.
+// ⭐ Q3, KROK 1 (30.08.2026): MĚŘIDLO KE VSTÁVÁNÍ, které NEMĚNÍ CHOVÁNÍ.
+// Q3 je zodpovězená doktrinálně (21.08., tři větve a cena na hráči), ale
+// plánovač neexistuje -- `P45` vstávání nabízí BEZPODMÍNEČNĚ a jeho vlastní
+// komentář to přiznává. Než se začne oceňovat, je potřeba vědět, jak často
+// se vstává v té DRAHÉ situaci: vedle stojícího soupeře, kde se hráč převede
+// z „stojím ho blitz" na „dávám mu blok zadarmo".
+// ⛔ Měří se NABÍDKA i PROVEDENÍ zvlášť, a rozdíl mezi nimi je ta odpověď:
+//   nabídka je bezpodmínečná, takže když provedení tu drahou situaci samo
+//   obchází, hledání ji už umí ocenit a plánovač je méně naléhavý.
+thread_local long g_standOffered = 0;
+thread_local long g_standOfferedNextToEnemy = 0;
+
+long takeStandOfferedInSearch() {
+    long v = g_standOffered; g_standOffered = 0; return v;
+}
+long takeStandOfferedNextToEnemyInSearch() {
+    long v = g_standOfferedNextToEnemy; g_standOfferedNextToEnemy = 0; return v;
+}
+
 thread_local long g_advanceResigned = 0;        // smyčka stáhla steps na 0
 thread_local long g_advanceResignedButSideFree = 0;  // ...a přitom bylo volno vedle
 
@@ -602,6 +621,15 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         if (p.state != PlayerState::PRONE) return;
         if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
         if (p.hasSkill(SkillName::BallAndChain)) return;
+        // Q3 měřidlo: nabídnuto -- a je vedle něj STOJÍCÍ soupeř?
+        ++g_standOffered;
+        for (const Position& adj : p.position.getAdjacent()) {
+            if (!adj.isOnPitch()) continue;
+            const Player* e = state.getPlayerAtPosition(adj);
+            if (e && e->teamSide != mySide && e->state == PlayerState::STANDING) {
+                ++g_standOfferedNextToEnemy; break;
+            }
+        }
         out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
     });
 

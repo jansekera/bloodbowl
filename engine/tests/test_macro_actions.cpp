@@ -6,6 +6,8 @@
 #include "bb/dice.h"
 #include "bb/action_features.h"
 #include "bb/helpers.h"
+#include "bb/move_handler.h"      // Q3: měřidlo provedeného vstání
+#include "bb/action_resolver.h"   // Q3: resolveAction
 #include <algorithm>
 #include <set>
 
@@ -2548,4 +2550,87 @@ TEST(MacroActions, M12CarrierDoesNotStepIntoATacklezoneToAvoidResigning) {
             << "nosič skončil v tacklezóně => oprava ztratila podmínku, kterou"
                " dnešní smyčka má";
     }
+}
+
+// ============================================================================
+// Q3 KROK 1 (30.08.2026) — MĚŘIDLO KE VSTÁVÁNÍ.
+// Q3 je zodpovězená doktrinálně 21.08. (tři větve: zůstat ležet / vstát
+// a zůstat / vstát a dodgnout pryč, a rozhoduje cena NA HRÁČI), ale plánovač
+// neexistuje: `P45` vstávání nabízí bezpodmínečně.
+//
+// ⛔ Tyhle testy hlídají MĚŘIDLO, ne engine. Číslo z nespolehlivého čítače je
+// horší než žádné -- viz slepý metr stropu M9 (28.08.).
+// ============================================================================
+
+namespace {
+// Ležící hráč na (10,7); `enemyAdjacent` postaví soupeře na (11,7).
+GameState makeProneState(bool enemyAdjacent) {
+    GameState state = makeMinimalState();
+    Player& p = state.getPlayer(1);
+    p.position = {10, 7};
+    p.state = PlayerState::PRONE;
+    p.movementRemaining = 6;
+    p.hasActed = false; p.hasMoved = false;
+    state.ball = BallState::onGround({2, 2});   // míč daleko, ať neruší
+    Player& e = state.getPlayer(12);
+    e.position = enemyAdjacent ? Position{11, 7} : Position{22, 1};
+    e.state = PlayerState::STANDING;
+    return state;
+}
+}  // namespace
+
+TEST(MacroActions, Q3GaugeCountsAStandUpOfferForAPronePlayer) {
+    auto state = makeProneState(/*enemyAdjacent=*/false);
+    takeStandOfferedInSearch();
+    takeStandOfferedNextToEnemyInSearch();
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    EXPECT_EQ(takeStandOfferedInSearch(), 1) << "ležícímu se vstání nabízí";
+    EXPECT_EQ(takeStandOfferedNextToEnemyInSearch(), 0)
+        << "soupeř je daleko => drahá větev to není";
+}
+
+TEST(MacroActions, Q3GaugeSeesTheExpensiveCaseNextToAStandingEnemy) {
+    auto state = makeProneState(/*enemyAdjacent=*/true);
+    takeStandOfferedInSearch();
+    takeStandOfferedNextToEnemyInSearch();
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    EXPECT_EQ(takeStandOfferedNextToEnemyInSearch(), 1)
+        << "vstát vedle stojícího soupeře = převedu se z 'stojím ho blitz'"
+           " na 'dávám mu blok zadarmo' -- to je ta drahá větev";
+}
+
+// ⛔ HRANICE: LEŽÍCÍ soused se nepočítá. Ležící soupeř neudeří, takže vstát
+// vedle něj drahé NENÍ -- kdyby to čítač počítal, nadhodnotí drahou větev.
+TEST(MacroActions, Q3GaugeIgnoresAProneNeighbour) {
+    auto state = makeProneState(/*enemyAdjacent=*/true);
+    state.getPlayer(12).state = PlayerState::PRONE;
+    takeStandOfferedInSearch();
+    takeStandOfferedNextToEnemyInSearch();
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    EXPECT_EQ(takeStandOfferedNextToEnemyInSearch(), 0)
+        << "ležící soused neudeří => drahá větev to není";
+}
+
+TEST(MacroActions, Q3GaugeCountsTheStandUpThatActuallyHappened) {
+    auto state = makeProneState(/*enemyAdjacent=*/true);
+    takeStoodUpInSearch();
+    takeStoodUpNextToEnemyInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(20, 4));
+    Action stand{ActionType::MOVE, 1, -1, {10, 7}};   // vstání = MOVE na sebe
+    resolveAction(state, stand, dice, nullptr);
+
+    EXPECT_EQ(state.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(takeStoodUpInSearch(), 1) << "provedené vstání se musí započítat";
+    EXPECT_EQ(takeStoodUpNextToEnemyInSearch(), 1)
+        << "a to v drahé větvi, protože soupeř stojí vedle";
 }

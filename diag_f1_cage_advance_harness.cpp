@@ -62,6 +62,7 @@
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
 #include "bb/macro_actions.h"
+#include "bb/move_handler.h"   // Q3: citace provedeneho vstavani
 #include "bb/block_handler.h"
 #include "bb/mcts.h"
 #include "bb/roster.h"
@@ -87,6 +88,8 @@ struct Matchup {
 // M12 krok 1: akumulatory pres cely beh (scitaji se pres vsechny pary).
 static long g_advResigned = 0;
 static long g_advResignedSF = 0;
+static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
+static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
 static const Matchup MATCHUPS[] = {
     {"dwarf", "skaven"},
@@ -502,6 +505,14 @@ int main(int argc, char** argv) {
                 //   melo volne pole bez TZ MIMO PRIMKU.
                 g_advResigned  += bb::takeAdvanceResignedInSearch();
                 g_advResignedSF += bb::takeAdvanceResignedButSideFreeInSearch();
+                // ⭐ Q3 (30.08.): vstavani -- NABIDKA vs PROVEDENI, a v obojim
+                //   podil DRAHE vetve (vedle stojiciho soupere). Rozdil mezi
+                //   nabidkou a provedenim rika, jestli si hledani tu drahou
+                //   situaci uz sam obchazi.
+                g_standOff   += bb::takeStandOfferedInSearch();
+                g_standOffNE += bb::takeStandOfferedNextToEnemyInSearch();
+                g_stoodUp    += bb::takeStoodUpInSearch();
+                g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
@@ -642,6 +653,9 @@ int main(int argc, char** argv) {
             // v něm není. Součet přes všechny páry se proto tiskne zvlášť.
             long armPicks = 0;
             for (auto& p2 : pairs) armPicks += p2.armEvents;
+            printf("  Q3/VSTAVANI: nabidnuto %ld (drahych %ld = %.1f %%) | provedeno %ld (drahych %ld = %.1f %%)\n",
+                   g_standOff, g_standOffNE, g_standOff ? 100.0*g_standOffNE/g_standOff : 0.0,
+                   g_stoodUp,  g_stoodUpNE,  g_stoodUp  ? 100.0*g_stoodUpNE/g_stoodUp   : 0.0);
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);
