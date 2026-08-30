@@ -1,0 +1,29 @@
+# PŘEMĚŘENÍ FAULŮ NA DNEŠNÍM ENGINU — 30.08.2026
+#
+# Proč: cislo z 19.08. (6,86 faulu/zapas, ~28 % sance ze lezici telo faulnou)
+#   stalo na PREDREZOVEM korpusu, kdy NIKDO NEVSTAVAL -- lezicich bylo
+#   2,68 na kolo. Fronta si sama zapsala 'premerit na krizovem korpusu'.
+#   Q3 na tom cisle stoji: je to cena vetve 'zustat lezet'.
+#
+# Sber: 200 her, 6400 kol, 4 workery, 47 min, PRODUKCNI nastaveni
+#   (CAGE_GATE=0, ramena vypnuta), SEED_BASE=20260830, engine f6c2b18e
+#   -- tedy po pravidlovem kole, M1-M5, M12 a novych soupiskach s Wrestle.
+#
+#                        19.08.   30.08.
+#   faulu na zapas        6,86     5,49
+#   % kol s faulem        21,4     17,2
+#   % faulu prorazi AV    36,3     35,6
+#   lezicich souperu/kolo  2,68     0,80
+#   vstavani na zapas        --    31,43
+#
+# ⭐ SAZBA NA CIL VZROSTLA, ne klesla: faulu ubylo o 20 %, ale cilu o 70 %.
+#   19.08.: 6,86 / (2,68 x 32) = 8,0 % prilezitosti skonci faulem
+#   30.08.: 5,49 / (0,80 x 32) = 21,4 %
+#   => LEZET JE DNES ~2,7x NEBEZPECNEJSI. Presne varovani, ktere fronta
+#      u toho cisla nesla: 'mene cilu muze sazbu na cil zvednout'.
+#   => '~28 % za ctyri kola' se posouva NAHORU, na zhruba 60 %.
+#
+# ⚠️ NENI to trend: mezi 19.08. a dneskem se zmenily OBA vstupy i cely
+#   engine. Cti jako SNIMEK dnesniho stavu.
+#
+# ⛔ Syrova data (3,9 MB, 200 her) v gitu nejsou -- velikost x zivotnost.
