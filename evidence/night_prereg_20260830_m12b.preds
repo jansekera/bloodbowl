@@ -1,0 +1,72 @@
+# PREDREGISTRACE NOCI 30.->31.08.2026  —  M12/(B) KLECOVE KRITERIUM
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Kolik z efektu P38 visi na KLECOVEM KRITERIU samotnem?
+#
+# ⛔ PROC NE MODE 6: (A) ctvercove hledani a (C) nerezignovat jsou od
+#   `b6cadc15` (30.08.) PRODUKCE, takze "rameno vs vypnuto" by merilo jen
+#   zbytek. Navic kriterium uz postup NEBLOKUJE -- pole, ktera zamitne, dnes
+#   projdou ctvercovym zaloznim hledanim. ⇒ Nalez z 20.08. ("blokuje ve 2 z 5
+#   idle kol", 58,9 % vs 97,9 %) DNESNI ENGINE NEPOPISUJE a nesmi se citovat
+#   jako ocekavani.
+#
+# ⭐ ZADANI: mode 12 -- kandidat ma rameno S kriteriem, protistrana PLACEBO
+#   (totez hledani BEZ kriteria). Parova delta meri PRESNE to kriterium.
+#   MATCHUPS="2:dw-dw:1", CONTROL_MODE2=1
+#
+# ⛔⛔ NULA JE SLABSI NEZ U B2, A VI SE TO PREDEM.
+#   Kriterium saha do KAZDEHO kola s nosicem, takze matchup s nulovou expozici
+#   NEEXISTUJE -- nedá se udelat obdoba `dwarf-nw`. Zbyva CONTROL_MODE2,
+#   o kterem harness sam pise: "pod CRN je to TAUTOLOGIE ... VERDIKT NA TOM
+#   NESTOJI". ⇒ Aparat se obhajuje LEAKEM, ne nulou.
+#
+# PREDPOVEDI (kontrolovatelne strojove, ctou se v tomto poradi)
+leak == 0
+arm_acted >= 0.5
+n_nonzero in 0.03 0.35
+delta in -0.05 0.05
+delta_1s in -0.025 0.025
+#
+# ⏰ RUCNI CTENI, ktera harness neudela:
+#   (1) repicky na ZMENENOU HRU -- jedine cislo, ktere odlisi "maly efekt" od
+#       "efekt se rozpusti uvnitr MCTS" (poucení z B2, kde rameno menilo volbu
+#       ve 20,6 % paru a vysledek se nepohnul);
+#   (2) rasovy rozpad na TD, ne chess po stranach (chess po stranach je
+#       konfundovany nerovnosti matchupu -- P38 replikace 25.08.);
+#   (3) ⛔ PREDPOVED UZIVATELE ZAPSANA PREDEM (26.08., k slozce B):
+#       "bojim se, ze vyjde, ze je nebezpecne od vsech krom khemri v desti."
+#       => merit PER RASU a proti rychlosti soupere; souhrnna delta tu
+#       predpoved ANI NEPOTVRDI, ANI NEVYVRATI.
+#
+# ⚠️ CO TENHLE BEH NEZODPOVI: jestli by kriterium melo dostat zpet pravomoc
+#   postup ZABLOKOVAT (do 30.08. ji melo, ted uz ne). To je NAVRHOVE
+#   rozhodnuti, ne merena velicina.
+
+# ============================================================================
+# DIMENZOVANI BEHU — psano PRED behem, po light testu
+#
+# Light test (12 paru, mode 12, dw-dw): leak 0 · arm acted 12/12 ·
+#   n_nonzero 7/12 = 58,3 % · 15 837 repicku (660/hru) · 44,8 s/par solo
+#   PAIRED delta +0,2083 +- 0,0924 SE (~2,3 sigma)
+#
+# ⛔⛔ TA DELTA SE JAKO VYSLEDEK NECTE A NESMI RIDIT VELIKOST BEHU.
+#   12 paru, SE 0,09; +0,208 je 14x prah, ale na tak malem vzorku to muze byt
+#   sum stejne dobre jako obr. Dimenzovat beh podle POZOROVANEHO efektu je
+#   optional stopping. Zapsano jako NAZNAK, ne nalez.
+#
+# ⇒ VELIKOST SE ODVOZUJE Z PRAHU, ne z pozorovani:
+#   aby slo rozhodnout i EKVIVALENCI, musi cele CI padnout dovnitr +-0,015,
+#   tedy 2*SE < 0,015 => SE < 0,0075. Z light testu (SE 0,0924 pri n=12)
+#   vychazi n ~ 12 * (0,0924/0,0075)^2 ~ 1 820 => volime 2 400 paru.
+#   ⭐ Mensi beh nez u B2 (4 800) staci, protoze informativnich paru je
+#     2,8x vic: 58,3 % proti 20,6 %.
+#
+# ZADANI: --mode 12 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48
+#         --workers 4     (~10 h; 50 paru na kus ~0,84 h)
+#
+# ⚠️ NULA: `colab_night_chunked.py` CONTROL_MODE2 neumi, takze kontrola
+#   seedovani bezi SAMOSTATNE a PRED hlavnim behem (mode 2, kde maji obe
+#   ramena touz konfiguraci a delta musi vyjit exaktne 0). Preflight pred
+#   14 hodinami, ne po nich.
+# ============================================================================
