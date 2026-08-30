@@ -5,6 +5,45 @@
 
 namespace bb {
 
+// ⭐ MĚŘIDLO EXKLUZIVITY FAULU (30.08.2026, zadání uživatele).
+// Otázka: když se fauluje, KOLIK ležících těl bylo v tu chvíli na výběr?
+// Bez toho se týmová sazba faulů dosazuje jako riziko konkrétního hráče --
+// a to je průměr přes všechna ležící těla, tedy přesně to, co pravidlo
+// `OCEŇOVÁNÍ` zakazuje. Riziko pro NEBEZPEČNÉ tělo je jiné než pro čtvrtého
+// Longbearda v hromadě, a rozdíl je právě v tom, s kolika soupeří.
+//
+// ⛔ „NA VÝBĚR" ZNAMENÁ FAULOVATELNÝ, NE JEN LEŽÍCÍ. Faulovat lze jen zblízka,
+//   takže se počítají ležící soupeři, kteří SOUSEDÍ s některým naším stojícím
+//   hráčem, jenž ještě může jednat. Bez té podmínky by měřidlo míchalo VOLBU
+//   s DOSAŽITELNOSTÍ -- a přesně na tom ztroskotal offline rozbor korpusu
+//   z 30.08. (tělo uprostřed mely je obklopené, elf spadlý v poli je sám).
+thread_local long g_foulsSeen = 0;
+thread_local long g_foulAlternatives = 0;   // součet „kolik bylo na výběr"
+thread_local long g_foulsWithChoice = 0;    // z toho, kde byla víc než jedna
+
+long takeFoulsSeenInSearch() { long v = g_foulsSeen; g_foulsSeen = 0; return v; }
+long takeFoulAlternativesInSearch() {
+    long v = g_foulAlternatives; g_foulAlternatives = 0; return v;
+}
+long takeFoulsWithChoiceInSearch() {
+    long v = g_foulsWithChoice; g_foulsWithChoice = 0; return v;
+}
+
+// Kolik ležících soupeřů je právě teď faulovatelných týmem `by`.
+static int foulableTargets(const GameState& state, TeamSide by) {
+    int n = 0;
+    state.forEachOnPitch(opponent(by), [&](const Player& t) {
+        if (t.state != PlayerState::PRONE && t.state != PlayerState::STUNNED) return;
+        for (const Position& adj : t.position.getAdjacent()) {
+            if (!adj.isOnPitch()) continue;
+            const Player* f = state.getPlayerAtPosition(adj);
+            if (f && f->teamSide == by && f->state == PlayerState::STANDING &&
+                !f->hasActed) { ++n; return; }
+        }
+    });
+    return n;
+}
+
 ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& fouler = state.getPlayer(foulerId);
@@ -13,6 +52,15 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     // Target must be prone or stunned
     if (target.state != PlayerState::PRONE && target.state != PlayerState::STUNNED) {
         return ActionResult::fail();
+    }
+
+    // Měřidlo exkluzivity: čte se PŘED vyhodnocením, tedy ve stavu, ve kterém
+    // se ten faul rozhodoval.
+    {
+        const int alts = foulableTargets(state, fouler.teamSide);
+        ++g_foulsSeen;
+        g_foulAlternatives += alts;
+        if (alts > 1) ++g_foulsWithChoice;
     }
 
     // Calculate foul assists

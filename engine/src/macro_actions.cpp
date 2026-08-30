@@ -243,12 +243,21 @@ thread_local long g_dauntlessOffers = 0;
 //   obchází, hledání ji už umí ocenit a plánovač je méně naléhavý.
 thread_local long g_standOffered = 0;
 thread_local long g_standOfferedNextToEnemy = 0;
+// ⭐ 30.08. (uživatel): „vstát vedle někoho s MB je ještě horší než jen vstát
+//   vedle někoho." Jeden koš na všechny sousedy je TÁŽ chyba průměrování, jakou
+//   zakazuje pravidlo `OCEŇOVÁNÍ`: soused s Mighty Blow / Claw / Piling On
+//   nemá stejnou cenu jako obyčejný -- zvedá hod na zbroj i na zranění, takže
+//   „dostanu ránu zdarma" se u něj mění na „dostanu DRAHOU ránu zdarma".
+thread_local long g_standOfferedNextToHitter = 0;
 
 long takeStandOfferedInSearch() {
     long v = g_standOffered; g_standOffered = 0; return v;
 }
 long takeStandOfferedNextToEnemyInSearch() {
     long v = g_standOfferedNextToEnemy; g_standOfferedNextToEnemy = 0; return v;
+}
+long takeStandOfferedNextToHitterInSearch() {
+    long v = g_standOfferedNextToHitter; g_standOfferedNextToHitter = 0; return v;
 }
 
 thread_local long g_advanceResigned = 0;        // smyčka stáhla steps na 0
@@ -623,13 +632,19 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         if (p.hasSkill(SkillName::BallAndChain)) return;
         // Q3 měřidlo: nabídnuto -- a je vedle něj STOJÍCÍ soupeř?
         ++g_standOffered;
+        bool nextToEnemy = false, nextToHitter = false;
         for (const Position& adj : p.position.getAdjacent()) {
             if (!adj.isOnPitch()) continue;
             const Player* e = state.getPlayerAtPosition(adj);
-            if (e && e->teamSide != mySide && e->state == PlayerState::STANDING) {
-                ++g_standOfferedNextToEnemy; break;
+            if (!e || e->teamSide == mySide || e->state != PlayerState::STANDING) continue;
+            nextToEnemy = true;
+            if (e->hasSkill(SkillName::MightyBlow) || e->hasSkill(SkillName::Claw) ||
+                e->hasSkill(SkillName::PilingOn)) {
+                nextToHitter = true; break;   // horší případ, dál hledat netřeba
             }
         }
+        if (nextToEnemy) ++g_standOfferedNextToEnemy;
+        if (nextToHitter) ++g_standOfferedNextToHitter;
         out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
     });
 

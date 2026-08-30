@@ -8,6 +8,7 @@
 #include "bb/helpers.h"
 #include "bb/move_handler.h"      // Q3: měřidlo provedeného vstání
 #include "bb/action_resolver.h"   // Q3: resolveAction
+#include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
 #include <algorithm>
 #include <set>
 
@@ -2633,4 +2634,79 @@ TEST(MacroActions, Q3GaugeCountsTheStandUpThatActuallyHappened) {
     EXPECT_EQ(takeStoodUpInSearch(), 1) << "provedené vstání se musí započítat";
     EXPECT_EQ(takeStoodUpNextToEnemyInSearch(), 1)
         << "a to v drahé větvi, protože soupeř stojí vedle";
+}
+
+// ============================================================================
+// EXKLUZIVITA FAULU + ROZLIŠENÍ NEBEZPEČNÉHO SOUSEDA (30.08.2026)
+//
+// Obojí vzniklo z jedné uživatelovy námitky: týmová sazba se nesmí dosazovat
+// jako riziko konkrétního hráče. U faulu proto, že si soupeř VYBÍRÁ cíl podle
+// hodnoty; u vstávání proto, že soused s Mighty Blow není totéž co obyčejný.
+// ============================================================================
+
+namespace {
+// Vlastní pomocník: `placePlayer` z test_big_guy_handler.cpp sem nedosáhne.
+void putPlayer(GameState& gs, int id, Position pos, TeamSide side, PlayerState st) {
+    Player& p = gs.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = st; p.position = pos;
+    p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+    p.hasActed = false; p.hasMoved = false;
+}
+}  // namespace
+
+TEST(FoulHandler, ExclusivityGaugeCountsOnlyREACHABLEProneBodies) {
+    // ⛔ TOHLE JE TA HRANICE, NA KTERÉ ZTROSKOTAL OFFLINE ROZBOR KORPUSU:
+    //    ležící tělo, ke kterému nikdo z nás nedosáhne, NENÍ na výběr.
+    //    Bez téhle podmínky by měřidlo míchalo VOLBU s DOSAŽITELNOSTÍ.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    putPlayer(gs, 1, {10, 7}, TeamSide::HOME, PlayerState::STANDING);   // fauler
+    putPlayer(gs, 12, {11, 7}, TeamSide::AWAY, PlayerState::PRONE);     // cíl vedle
+    putPlayer(gs, 13, {22, 1}, TeamSide::AWAY, PlayerState::PRONE);     // ležící DALEKO
+
+    takeFoulsSeenInSearch(); takeFoulAlternativesInSearch();
+    takeFoulsWithChoiceInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    resolveFoul(gs, 1, 12, dice, nullptr);
+
+    EXPECT_EQ(takeFoulsSeenInSearch(), 1);
+    EXPECT_EQ(takeFoulAlternativesInSearch(), 1)
+        << "vzdálené ležící tělo na výběr NENÍ -- faulovat lze jen zblízka";
+    EXPECT_EQ(takeFoulsWithChoiceInSearch(), 0)
+        << "jediná možnost => žádná volba, exkluzivita je 1";
+}
+
+TEST(FoulHandler, ExclusivityGaugeSeesARealChoiceBetweenTwoBodies) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    putPlayer(gs, 1, {10, 7}, TeamSide::HOME, PlayerState::STANDING);
+    putPlayer(gs, 12, {11, 7}, TeamSide::AWAY, PlayerState::PRONE);
+    putPlayer(gs, 13, {11, 6}, TeamSide::AWAY, PlayerState::PRONE);  // druhý, taky vedle
+
+    takeFoulsSeenInSearch(); takeFoulAlternativesInSearch();
+    takeFoulsWithChoiceInSearch();
+
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    resolveFoul(gs, 1, 12, dice, nullptr);
+
+    EXPECT_EQ(takeFoulAlternativesInSearch(), 2) << "obě těla byla na výběr";
+    EXPECT_EQ(takeFoulsWithChoiceInSearch(), 1)
+        << "víc než jedna možnost => soupeř VYBÍRAL, a to je ta exkluzivita";
+}
+
+TEST(MacroActions, Q3GaugeSeparatesADangerousNeighbourFromAnOrdinaryOne) {
+    auto plain = makeProneState(/*enemyAdjacent=*/true);
+    takeStandOfferedNextToEnemyInSearch(); takeStandOfferedNextToHitterInSearch();
+    std::vector<Macro> m1; getAvailableMacros(plain, m1);
+    EXPECT_EQ(takeStandOfferedNextToEnemyInSearch(), 1);
+    EXPECT_EQ(takeStandOfferedNextToHitterInSearch(), 0)
+        << "obyčejný soused ještě není drahá rána";
+
+    auto mb = makeProneState(/*enemyAdjacent=*/true);
+    mb.getPlayer(12).skills.add(SkillName::MightyBlow);
+    takeStandOfferedNextToEnemyInSearch(); takeStandOfferedNextToHitterInSearch();
+    std::vector<Macro> m2; getAvailableMacros(mb, m2);
+    EXPECT_EQ(takeStandOfferedNextToHitterInSearch(), 1)
+        << "soused s Mighty Blow => rána zdarma je navíc DRAHÁ";
 }

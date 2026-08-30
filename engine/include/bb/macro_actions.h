@@ -198,6 +198,9 @@ bool cageAwareAdvanceArm(TeamSide side);
 //                         tedy v té drahé větvi („dávám mu blok zadarmo")
 long takeStandOfferedInSearch();
 long takeStandOfferedNextToEnemyInSearch();
+long takeStandOfferedNextToHitterInSearch();
+//   offeredNextToHitter -- z toho vedle souseda s Mighty Blow / Claw / Piling
+//                          On, kde ta rána zdarma je navíc DRAHÁ
 
 long takeAdvanceResignedInSearch();
 long takeAdvanceResignedButSideFreeInSearch();
