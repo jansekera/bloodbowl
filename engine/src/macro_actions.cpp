@@ -272,6 +272,14 @@ long takeAdvanceResignedButSideFreeInSearch() {
 
 thread_local bool g_cageAwareAdvance[2] = {false, false};
 thread_local long g_cageAwareAdvancePicks = 0;
+// ⭐ REPICKY KLECOVÉHO KRITÉRIA (30.08.2026) -- vlastní čítač pro (B).
+// ⛔ PROČ NESTAČÍ `g_cageAwareAdvancePicks`: tiká i PLACEBU, protože oba
+//   projdou týž blok. V běhu „rameno proti placebu" (mode 12) by tedy obě
+//   strany hlásily „rameno jednalo" a leak test i jmenovatel by ztratily
+//   smysl. Tenhle čítač tiká, JEN kdyz kritérium ZMĚNILO VOLBU oproti tomu,
+//   co by se vybralo bez něj -- táž oprava, jakou dostalo P35 (25.08.)
+//   a B2 (27.08.) z téhož důvodu.
+thread_local long g_cageCritRepicks = 0;
 
 thread_local bool g_placeboAdvance[2] = {false, false};
 
@@ -306,6 +314,10 @@ long takeCageAwareAdvancePicksInSearch() {
     long v = g_cageAwareAdvancePicks;
     g_cageAwareAdvancePicks = 0;
     return v;
+}
+
+long takeCageCritRepicksInSearch() {
+    long v = g_cageCritRepicks; g_cageCritRepicks = 0; return v;
 }
 
 thread_local bool g_blitzLanding[2] = {false, false};
@@ -1773,24 +1785,33 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
                 if (prog > maxProgress) maxProgress = prog;
             }
         }
-        Position best{-1, -1};
-        int bestProg = 0;
-        for (int ox = -budget; ox <= budget; ++ox) {
-            for (int oy = -budget; oy <= budget; ++oy) {
-                Position cand{static_cast<int8_t>(carrier.position.x + ox),
-                              static_cast<int8_t>(carrier.position.y + oy)};
-                if (!cand.isOnPitch()) continue;
-                if (state.getPlayerAtPosition(cand)) continue;
-                int prog = dx * (cand.x - carrier.position.x);
-                if (prog < 1 || prog < maxProgress - 1) continue;
-                // A carrier parked in a tackle zone hands over a free block on
-                // the ball -- the same guard the fallback below applies.
-                if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
-                // ⭐ P40: THE one functional difference between the two arms.
-                if (!placebo && cageScoreForSquare(state, carrier, cand) < 0) continue;
-                if (prog > bestProg) { bestProg = prog; best = cand; }
+        // Výběr jako funkce kritéria, aby šel spočítat KONTRAFAKTUÁL:
+        // „co bych vybral, kdyby se klec neposuzovala".
+        auto pickSquare = [&](bool useCrit) {
+            Position b{-1, -1};
+            int bp = 0;
+            for (int ox = -budget; ox <= budget; ++ox) {
+                for (int oy = -budget; oy <= budget; ++oy) {
+                    Position cand{static_cast<int8_t>(carrier.position.x + ox),
+                                  static_cast<int8_t>(carrier.position.y + oy)};
+                    if (!cand.isOnPitch()) continue;
+                    if (state.getPlayerAtPosition(cand)) continue;
+                    int prog = dx * (cand.x - carrier.position.x);
+                    if (prog < 1 || prog < maxProgress - 1) continue;
+                    // A carrier parked in a tackle zone hands over a free block
+                    // on the ball -- the same guard the fallback below applies.
+                    if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
+                    // ⭐ P40: THE one functional difference between the two arms.
+                    if (useCrit && cageScoreForSquare(state, carrier, cand) < 0) continue;
+                    if (prog > bp) { bp = prog; b = cand; }
+                }
             }
-        }
+            return b;
+        };
+        const Position best = pickSquare(/*useCrit=*/!placebo);
+        // Repick: kritérium tiká, jen kdyz volbu ZMĚNILO. Počítá se jen tam,
+        // kde kritérium skutečně běží (tedy ne u placeba).
+        if (!placebo && best != pickSquare(/*useCrit=*/false)) ++g_cageCritRepicks;
         if (best.x >= 0) {
             armChoseSquare = true;
             if (best != target) {

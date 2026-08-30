@@ -187,6 +187,12 @@ void noteBlitzContinuationEvent();
 void setCageAwareAdvanceArm(TeamSide side, bool on);
 bool cageAwareAdvanceArm(TeamSide side);
 
+// Repicky KLECOVÉHO KRITÉRIA (30.08.2026): tiká, jen když kritérium ZMĚNILO
+// volbu pole oproti výběru bez něj. ⛔ `takeCageAwareAdvancePicksInSearch`
+// se na to použít NEDÁ -- tiká i placebu, takže v běhu „rameno proti placebu"
+// by obě strany hlásily „rameno jednalo".
+long takeCageCritRepicksInSearch();
+
 // M12 krok 1 (30.08.2026): diagnostika ADVANCE, NEZÁVISLÁ na ramenech.
 //   resigned         -- kolikrát záložní smyčka stáhla `steps` na 0
 //   resignedButSideFree -- kolikrát z toho existovalo volné pole bez TZ

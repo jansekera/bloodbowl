@@ -269,6 +269,7 @@ int main(int argc, char** argv) {
                       : (mode == 3) ? 63'000'000u
                       : (mode == 4) ? 79'000'000u
                       : (mode == 5) ? 91'000'000u
+                      : (mode == 12) ? 191'000'000u
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
                       : (mode == 8) ? 149'000'000u
@@ -282,6 +283,7 @@ int main(int argc, char** argv) {
          : mode == 4 ? "DAUNTLESS: block offer prices the equalised strength vs raw"
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
          : mode == 5 ? "P9/P9c: cilove pole odsunu se VYBIRA (geometrie) vs 'rovne dozadu'"
+         : mode == 12 ? "M12/(B): KLECOVE KRITERIUM samotne -- rameno PROTI PLACEBU"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
@@ -312,6 +314,7 @@ int main(int argc, char** argv) {
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
+                         : mode == 12 ? "diag_cagecrit_rows.jsonl"
                          : mode == 6 ? "diag_cageadvance_rows.jsonl"
                          : mode == 5 ? "diag_pushgeom_rows.jsonl"
                          : mode == 4 ? "diag_dauntless_rows.jsonl"
@@ -432,19 +435,30 @@ int main(int argc, char** argv) {
                 // mode 6 (P38, 19.08.): rameno sedí v expandAdvance -- cílové
                 // pole nosiče se odvozuje z klece, která z něj vyjde. Per strana,
                 // shazuje se hned po hře, ať nepřeteče do dalšího páru.
+                // ⭐ mode 12 (30.08.): (B) SAMOTNA. Kandidat dostane rameno
+                //   S kriteriem, protistrana PLACEBO -- tedy TOTEZ hledani BEZ
+                //   kriteria. Parova delta pak meri PRESNE to kriterium, ne
+                //   smes (A)+(B), kterou by dal mode 6 proti vypnutemu.
+                //   ⛔ Mode 6 uz to izolovat NEUMI: (A) a (C) jsou od
+                //   `b6cadc15` PRODUKCE, takze "rameno vs vypnuto" meri jen
+                //   zbytek -- a navic uz kriterium NEBLOKUJE postup (zamitnuta
+                //   pole dnes projdou ctvercovym zaloznim hledanim), takze
+                //   cislo z 20.08. (58,9 % vs 97,9 %) dnesni engine nepopisuje.
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME,
-                                           mode == 6 && candHome);
+                                           (mode == 6 || mode == 12) && candHome);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY,
-                                           mode == 6 && !candHome);
+                                           (mode == 6 || mode == 12) && !candHome);
                 // mode 7 (P40, 20.08.): tatáž volba pole BEZ kritéria klece.
                 // Rozklad 20.08.: v 5 213 kolech, kde nosič nejednal, by
                 // placebo pole našlo v 97,9 % a P38 jen v 58,9 % => kritérium
                 // klece rameno ve 2 z 5 idle kol BLOKUJE. Tenhle běh měří,
                 // kolik z +0,0827 na tom kritériu doopravdy visí.
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME,
-                                         mode == 7 && candHome);
+                                         (mode == 7 && candHome) ||
+                                         (mode == 12 && !candHome));
                 bb::setPlaceboAdvanceArm(bb::TeamSide::AWAY,
-                                         mode == 7 && !candHome);
+                                         (mode == 7 && !candHome) ||
+                                         (mode == 12 && candHome));
                 bb::takeCageAwareAdvancePicksInSearch();
                 // mode 8 (B1/P35, implementovano 19.08., merene poprve):
                 // vyber blitzujiciho se oceni z pole, KAM DOJDE, ne z toho,
@@ -491,6 +505,10 @@ int main(int argc, char** argv) {
                 // JINÉHO než „změna nemá efekt".
                 long candPush = bb::takePushGeometryEvalsInSearch();
                 long candCage = bb::takeCageAwareAdvancePicksInSearch();
+                // ⛔ V mode 12 se `candCage` POUZIT NESMI -- tika i placebu,
+                //   takze by obe strany hlasily "rameno jednalo". Signalem je
+                //   REPICK kriteria: zmenilo volbu proti vyberu bez nej?
+                long candCrit = bb::takeCageCritRepicksInSearch();
                 long candLanding = bb::takeBlitzLandingRepicksInSearch();
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
@@ -547,6 +565,7 @@ int main(int argc, char** argv) {
                               : (mode == 8) ? candLanding
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
+                              : (mode == 12) ? candCrit
                               : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
                 else if (cs < bs) candL++;
@@ -644,7 +663,7 @@ int main(int argc, char** argv) {
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 8 || mode == 9 || mode == 10);
+             mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
