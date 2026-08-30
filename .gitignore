@@ -112,3 +112,7 @@ leapwalk_*/
 
 # Stavový adresář oh-my-claudecode (nástroj, ne projekt) -- 29.08.2026
 .omc/
+
+# Vystupy nocnich behu: syrove radky shardu ven, vyhodnoceni jde do evidence/
+# (feedback_no_run_artifacts_in_git, 26.08.2026)
+ab_*_2026*/

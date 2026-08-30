@@ -1,0 +1,62 @@
+# VÝSLEDEK NOCI B2, 29.->30.08.2026 -- rameno setWrestlePricingArm (mode 11)
+#
+# Beh: 88/88 kusu, 0 selhani, na 1. pokus bez restartu, 20 h 45 min.
+#   laptop, 8 workeru, vetev b2-wrestle-pricing @ 060b2cc8
+#   expozice 2:dw-dw:1  48 x 100 paru  |  nula 7:dwnw:0  40 x 10 paru
+#
+# ⛔ SYROVA DATA (3,2 MB radku shardu) V GITU NEJSOU -- pravidlo
+#   'velikost x zivotnost' (feedback_no_run_artifacts_in_git). Zustavaji
+#   v ab_b2_20260829/ na disku; sem jde jen VYHODNOCENI.
+#
+  dw-dw — 48 shardů, 4800 párů
+    (1) MOVED WITHOUT THE ARM ACTING: 0 (0 = čisté, delta se SMÍ číst)
+    (2) arm acted: 3787/4800 (78.9 %)  ⚠️ 1013 párů rameno NEMĚŘILA — neúplný jmenovatel
+    (2b) ARM PICKS TOTAL: 117759 (12.27/hru) — kolik, ne jen jestli
+    (3) n_nonzero: 987/4800 (20.6 %) — jen tyhle páry nesou informaci
+    (4) DELTA SLOUČENĚ: +0.0010 ± 0.0034 SE (+0.30 σ), 95% CI [-0.0057; +0.0078]
+       shardy: +0.0400 +0.0300 -0.0300 -0.0050 +0.0050 -0.0400 +0.0050 +0.0000 +0.0400 +0.0050 +0.0200 +0.0300 -0.0250 +0.0550 -0.0050 -0.0050 +0.0050 +0.0050 +0.0400 +0.0100 -0.0750 +0.0050 +0.0200 -0.0200 -0.0050 +0.0150 -0.0150 -0.0500 +0.0200 +0.0550 +0.0400 +0.0000 -0.0150 -0.0150 +0.0350 +0.0300 -0.0100 +0.0000 +0.0150 +0.0000 +0.0200 -0.0450 -0.0350 -0.0450 -0.0250 -0.0050 +0.0050 -0.0300
+       20/48 shardů záporných
+       empirická SE mezi shardy 0.0041 vs sdružená 0.0034 ⇒ bez overdisperze, sloučení legitimní
+       ⚠️ tahle delta je DVOUSTRANNÁ (chessCandHome + chessCandAway − 1)
+          = my S RAMENEM proti nám PROTI RAMENI, ne proti nulovému rameni
+       ⇒ jednostranný odhad +0.0005 ± 0.0017 SE, 95% CI [-0.0028; +0.0039]
+          ⚠️ dělení dvěma platí JEN při podobném efektu na obou stranách — ověř z rows (TD po rasách)
+       PRÁH ±0.0150 (vstup běhu, ne konstanta ve zdrojáku) ⇒ **EKVIVALENCE**
+       celé 95% CI [-0.0057; +0.0078] leží UVNITŘ prahu ⇒ efekt velikosti prahu je vyloučen v OBOU směrech.
+       ⇒ PŘÍKAZ: ZASTAV. Přidávat páry nemá smysl — rameno předpovězený efekt NEDODÁVÁ.
+       ⚠️ NENÍ to nula: efekt až do +0.0078 (mez CI) tenhle běh vyloučit NEUMÍ. „Neškodí“ ANO, „je k ničemu“ NE.
+  --- PŘEDPOVĚĎ vs VÝSLEDEK (z předregistrace, zapsané PŘED během) ---
+    ✅ TREFA   delta in -0.02 0.08   →  změřeno +0.0010
+    ✅ TREFA   delta_1s in -0.01 0.04   →  změřeno +0.0005
+    ✅ TREFA   leak == 0   →  změřeno +0.0000
+    ✅ TREFA   arm_acted >= 0.5   →  změřeno +0.7890
+    ✅ TREFA   n_nonzero in 0.03 0.35   →  změřeno +0.2056
+    ✅ TREFA   arm_picks >= 55000   →  změřeno +117759.0000
+  dwnw — 40 shardů, 400 párů
+    (1) MOVED WITHOUT THE ARM ACTING: 0 (0 = čisté, delta se SMÍ číst)
+    (2) arm acted: 0/400 (0.0 %)  ⚠️ 400 párů rameno NEMĚŘILA — neúplný jmenovatel
+    (2b) ARM PICKS TOTAL: 0 (0.00/hru) — kolik, ne jen jestli
+    (3) n_nonzero: 0/400 (0.0 %) — jen tyhle páry nesou informaci
+    (4) DELTA SLOUČENĚ: +0.0000 ± 0.0000 SE (+0.00 σ), 95% CI [+0.0000; +0.0000]
+       shardy: +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000 +0.0000
+       0/40 shardů záporných
+       empirická SE mezi shardy 0.0000 vs sdružená 0.0000 ⇒ bez overdisperze, sloučení legitimní
+       ⚠️ tahle delta je DVOUSTRANNÁ (chessCandHome + chessCandAway − 1)
+          = my S RAMENEM proti nám PROTI RAMENI, ne proti nulovému rameni
+       ⇒ jednostranný odhad +0.0000 ± 0.0000 SE, 95% CI [+0.0000; +0.0000]
+          ⚠️ dělení dvěma platí JEN při podobném efektu na obou stranách — ověř z rows (TD po rasách)
+       PRÁH ±0.0150 (vstup běhu, ne konstanta ve zdrojáku) ⇒ **EKVIVALENCE**
+       celé 95% CI [+0.0000; +0.0000] leží UVNITŘ prahu ⇒ efekt velikosti prahu je vyloučen v OBOU směrech.
+       ⇒ PŘÍKAZ: ZASTAV. Přidávat páry nemá smysl — rameno předpovězený efekt NEDODÁVÁ.
+       ⚠️ NENÍ to nula: efekt až do +0.0000 (mez CI) tenhle běh vyloučit NEUMÍ. „Neškodí“ ANO, „je k ničemu“ NE.
+  --- PŘEDPOVĚĎ vs VÝSLEDEK (z předregistrace, zapsané PŘED během) ---
+    ✅ TREFA   delta in -0.02 0.08   →  změřeno +0.0000
+    ✅ TREFA   delta_1s in -0.01 0.04   →  změřeno +0.0000
+    ✅ TREFA   leak == 0   →  změřeno +0.0000
+    ❌ MIMO    arm_acted >= 0.5   →  změřeno +0.0000
+       ⚠️ MIMO se zapisuje. Je to informace o rameni, ne selhání běhu.
+    ❌ MIMO    n_nonzero in 0.03 0.35   →  změřeno +0.0000
+       ⚠️ MIMO se zapisuje. Je to informace o rameni, ne selhání běhu.
+    ❌ MIMO    arm_picks >= 55000   →  změřeno +0.0000
+       ⚠️ MIMO se zapisuje. Je to informace o rameni, ne selhání běhu.
+       ⇒ 3 předpověď/i MIMO nebo nezodpověditelná — patří do zápisu noci.
