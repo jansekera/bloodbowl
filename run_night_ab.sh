@@ -319,8 +319,30 @@ if [ "$CORPUS" != "0" ]; then
         # má být baseline). Fable si 27.08. z té hlášky odvodil do metodiky
         # svého auditu, že korpus nese zapnuté P35 -- štítek zalhal dál.
         night_log "START korpus $CORPUS_GAMES her — PRODUKČNÍ nastavení, ramena VYPNUTÁ"
+        # ⛔ PYTHON PRO KORPUS SE MUSI VYBRAT, NE PREDPOKLADAT (30.08.2026).
+        #   `bb_engine` je pribindovany k VERZI, se kterou se prekladal --
+        #   tady `cpython-38`, protoze cmake nasel /usr/local/bin/python3.8.
+        #   Systemovy `python3` je ale 3.10, takze sber spadne na
+        #   `ModuleNotFoundError: No module named 'bb_engine'`. Na serveru to
+        #   fungovalo, protoze tam `python3` BYLO 3.8 -- klasicka past
+        #   "jinde to jede".
+        CORPUS_PY=${CORPUS_PY:-}
+        if [ -z "$CORPUS_PY" ]; then
+            for c in "$(grep -m1 '^PYTHON_EXECUTABLE:FILEPATH=' \
+                        "$ROOT/engine/build/CMakeCache.txt" 2>/dev/null | cut -d= -f2)" \
+                     python3; do
+                [ -x "$c" ] || command -v "$c" >/dev/null 2>&1 || continue
+                if "$c" -c "import sys; sys.path.insert(0,'$ROOT/engine/build'); import bb_engine" \
+                        >/dev/null 2>&1; then CORPUS_PY="$c"; break; fi
+            done
+        fi
+        if [ -z "$CORPUS_PY" ]; then
+            night_log "⛔ zadny python neumi naimportovat bb_engine — prelozit modul"
+            exit 1
+        fi
+        night_log "korpus pojede pres $CORPUS_PY ($("$CORPUS_PY" -V 2>&1))"
         if CAGE_GATE=0 DAUNTLESS=1 DATA_ROOT="$CORPUS_DATA" SEED_BASE=20260900 \
-                nice -n 19 python3 diag_replay_mine_20260813_gate.py collect "$CORPUS_GAMES" \
+                nice -n 19 "$CORPUS_PY" diag_replay_mine_20260813_gate.py collect "$CORPUS_GAMES" \
                 > "$OUT/collect.log" 2>&1; then
             night_log "korpus HOTOV"
         else
