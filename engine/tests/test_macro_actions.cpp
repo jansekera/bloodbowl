@@ -2793,3 +2793,101 @@ TEST(CarrierStallAware, RootedOpponentGetsNoGfiSoTheGfiBandIsSafeAgain) {
     GameState s = makeP37State({20, 7}, /*sprint=*/false, /*rooted=*/true);
     EXPECT_EQ(carrierStallAwareSteps(s, s.getPlayer(1), s.homeTeam), kReserved);
 }
+
+// ============================================================================
+// Q3 KROK A (31.08.2026): TŘETÍ MOŽNOST VSTÁVÁNÍ MUSÍ EXISTOVAT
+//
+// Uživatelova doktrína (20.08.): vstát vedle soupeře mění hráče z „stojí je
+// BLITZ" na „dává jim BLOK ZDARMA". Někdy je proto pointa vstát a ODSKOČIT.
+// Do 31.08. ta možnost v makro vrstvě NEEXISTOVALA — obecná REPOSITION smyčka
+// žádá stojícího hráče a žádného souseda, takže ležící u soupeře dostal jedinou
+// nabídku: vstát a zůstat. Rozhodovalo se mezi dvěma možnostmi ze tří.
+// ============================================================================
+namespace {
+
+// Ležící HOME hráč na {10,7} se stojícím soupeřem hned vedle.
+GameState makeProneNextToEnemyState(int ma, bool boxedIn) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.homeTeam.turnNumber = 3;
+    auto mk = [&](int id, TeamSide side, Position pos, PlayerState st, int mv) {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = st; p.position = pos;
+        p.stats = {static_cast<int8_t>(mv), 3, 3, 8};
+        p.movementRemaining = mv;
+    };
+    mk(1, TeamSide::HOME, {10, 7}, PlayerState::PRONE, ma);
+    mk(12, TeamSide::AWAY, {11, 7}, PlayerState::STANDING, 6);
+    if (boxedIn) {
+        // ⚠️ Obklíčení musí sedět na ROZPOČET, ne na oko. Při MA3 je po vstání
+        // 0 pohybu + 2 GFI, tedy dosah 2. Obsadíme všech OSM sousedních polí:
+        // tím jsou zabraná a každé pole ve vzdálenosti 2 sousedí aspoň s jedním
+        // z nich, takže leží v tacklezóně. Únik pak opravdu neexistuje.
+        // (První pokus obsadil jen prstenec ve vzdálenosti 2 a pole za ním
+        // zůstala volná -- fixtura tvrdila obklíčení, které tam nebylo.)
+        int id = 13;
+        for (const Position& q : Position{10, 7}.getAdjacent()) {
+            if (!q.isOnPitch() || s.getPlayerAtPosition(q)) continue;
+            mk(id++, TeamSide::AWAY, q, PlayerState::STANDING, 6);
+        }
+    }
+    return s;
+}
+
+int countRepositionFor(const std::vector<Macro>& ms, int playerId) {
+    int c = 0;
+    for (auto& m : ms) if (m.type == MacroType::REPOSITION && m.playerId == playerId) ++c;
+    return c;
+}
+
+} // namespace
+
+TEST(Q3StandUp, ProneNextToEnemyGetsBothStayAndEscape) {
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    // ⭐ dvě nabídky pro téhož hráče: vstát a zůstat + vstát a odejít
+    EXPECT_EQ(countRepositionFor(ms, 1), 2);
+    bool stay = false, escape = false;
+    for (auto& m : ms) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        if (m.targetPos == Position{10, 7}) stay = true;
+        else escape = true;
+    }
+    EXPECT_TRUE(stay)   << "zmizela původní nabídka vstát a zůstat";
+    EXPECT_TRUE(escape) << "nenabídlo se vstát a odejít";
+}
+
+TEST(Q3StandUp, EscapeSquareIsOutOfEveryEnemyTacklezone) {
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    for (auto& m : ms) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        if (m.targetPos == Position{10, 7}) continue;      // to je „zůstat"
+        EXPECT_EQ(countTacklezones(s, m.targetPos, TeamSide::HOME), 0)
+            << "útěkové pole je pořád v soupeřově tacklezóně";
+    }
+}
+
+TEST(Q3StandUp, ProneWithoutEnemyContactGetsOnlyTheStayOffer) {
+    // Bez kontaktu není před čím utíkat; stojícího si příští kolo převezme
+    // obecná REPOSITION smyčka.
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    s.getPlayer(12).position = {20, 7};   // soupeř daleko
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    EXPECT_EQ(countRepositionFor(ms, 1), 1);
+}
+
+TEST(Q3StandUp, BoxedInProneGetsNoEscapeOfferAndThatIsRecorded) {
+    // Když je každé dosažitelné pole pokryté, možnost NEEXISTUJE — a je to
+    // jiný nález než „možnost se nevybrala". Proto vlastní čítač.
+    takeStandEscapeImpossibleInSearch();          // vynuluj
+    GameState s = makeProneNextToEnemyState(/*ma=*/3, /*boxedIn=*/true);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    EXPECT_EQ(countRepositionFor(ms, 1), 1) << "nabídl se útěk tam, kde není kam";
+    EXPECT_GE(takeStandEscapeImpossibleInSearch(), 1);
+}

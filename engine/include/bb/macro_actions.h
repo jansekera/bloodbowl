@@ -205,6 +205,8 @@ long takeCageCritRepicksInSearch();
 long takeStandOfferedInSearch();
 long takeStandOfferedNextToEnemyInSearch();
 long takeStandOfferedNextToHitterInSearch();
+long takeStandEscapeOfferedInSearch();
+long takeStandEscapeImpossibleInSearch();
 //   offeredNextToHitter -- z toho vedle souseda s Mighty Blow / Claw / Piling
 //                          On, kde ta rána zdarma je navíc DRAHÁ
 

@@ -249,6 +249,11 @@ thread_local long g_standOfferedNextToEnemy = 0;
 //   nemá stejnou cenu jako obyčejný -- zvedá hod na zbroj i na zranění, takže
 //   „dostanu ránu zdarma" se u něj mění na „dostanu DRAHOU ránu zdarma".
 thread_local long g_standOfferedNextToHitter = 0;
+// Q3 krok A (31.08.2026): druha moznost -- VSTAT A ODEJIT. Meri se ZVLAST,
+// kolikrat se nabidla a kolikrat NESLA (zadne pole bez tacklezony v dosahu),
+// protoze "moznost neexistuje" a "moznost se nevybrala" jsou RUZNE nalezy.
+thread_local long g_standEscapeOffered = 0;
+thread_local long g_standEscapeImpossible = 0;
 
 long takeStandOfferedInSearch() {
     long v = g_standOffered; g_standOffered = 0; return v;
@@ -258,6 +263,14 @@ long takeStandOfferedNextToEnemyInSearch() {
 }
 long takeStandOfferedNextToHitterInSearch() {
     long v = g_standOfferedNextToHitter; g_standOfferedNextToHitter = 0; return v;
+}
+
+long takeStandEscapeOfferedInSearch() {
+    long v = g_standEscapeOffered; g_standEscapeOffered = 0; return v;
+}
+
+long takeStandEscapeImpossibleInSearch() {
+    long v = g_standEscapeImpossible; g_standEscapeImpossible = 0; return v;
 }
 
 thread_local long g_advanceResigned = 0;        // smyčka stáhla steps na 0
@@ -658,6 +671,45 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         if (nextToEnemy) ++g_standOfferedNextToEnemy;
         if (nextToHitter) ++g_standOfferedNextToHitter;
         out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
+
+        // ⭐ Q3 KROK A (31.08.2026): DRUHA MOZNOST -- VSTAT A ODEJIT.
+        // Uzivatelova doktrina (20.08.): vstat vedle soupere meni hrace
+        // z "stoji je BLITZ" na "dava jim BLOK ZDARMA", takze je to prisne
+        // drazsi nez zustat lezet; nekdy je pointa vstat a ODSKOCIT
+        // (trpaslik vedle orka s Mighty Blow).
+        // ⛔ Ta moznost do dneska v MAKRO vrstve NEEXISTOVALA: obecna
+        //   REPOSITION smycka zada isFreeToAct() (tedy STOJICIHO) A zadneho
+        //   souseda, takze lezici u soupere dostal jedinou nabidku -- vstat
+        //   a zustat. Rozhodovalo se tedy mezi DVEMA moznostmi ze TRI.
+        //   Tohle je verze, ktera moznost ZPRISTUPNUJE; ocenit ji je krok B.
+        // ⚠️ Nabizi se JEN vedle soupere: bez kontaktu neni pred cim utikat
+        //   a obecna smycka si stojiciho hrace prevezme sama v pristim kole.
+        if (nextToEnemy) {
+            const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
+            Position best{-1, -1};
+            int bestSteps = 99;
+            for (int dx = -budget; dx <= budget; ++dx) {
+                for (int dy = -budget; dy <= budget; ++dy) {
+                    if (dx == 0 && dy == 0) continue;
+                    Position cand{static_cast<int8_t>(p.position.x + dx),
+                                  static_cast<int8_t>(p.position.y + dy)};
+                    if (!cand.isOnPitch()) continue;
+                    if (state.getPlayerAtPosition(cand) != nullptr) continue;
+                    const int steps = p.position.distanceTo(cand);
+                    if (steps > budget) continue;
+                    // Cilem je VEN Z KONTAKTU, ne "o kus dal": pole s cizi
+                    // tacklezonou by hrace nechalo v teze situaci.
+                    if (countTacklezones(state, cand, mySide) > 0) continue;
+                    if (steps < bestSteps) { bestSteps = steps; best = cand; }
+                }
+            }
+            if (best.x >= 0) {
+                ++g_standEscapeOffered;
+                out.push_back({MacroType::REPOSITION, p.id, -1, best});
+            } else {
+                ++g_standEscapeImpossible;
+            }
+        }
     });
 
     const Player* carrier = findCarrier(state);
