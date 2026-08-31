@@ -1361,9 +1361,36 @@ Block akci"* (BB2016 ř. 675). **Hypnotic Gaze je akce, která do téhle dvojice
 pohyb/blok nezapadá** — je to třetí druh akce proti sousedovi, a proto to
 pravidlo zdánlivě porušuje, aniž ho porušuje.
 
-⛔ **Znění NEDOHLEDÁNO — neodhadovat z hlavy**, ověřit proti
-`rules_bb2016.txt`. Otevřené: smí se upír před Gaze hýbat? je Gaze akce sama
-o sobě, nebo součást Move akce? co s aktivací po ní?
+✅ **ZNĚNÍ DOHLEDÁNO 31.08.** — `rules_bb2016.txt` ř. 8180-8183:
+*„The player may use hypnotic gaze **at the end of his Move Action** on one
+opposing player who is **in an adjacent square**."* Tím padají všechny tři
+otevřené otázky:
+
+| otázka z 21.08. | odpověď BB2016 |
+|---|---|
+| smí se upír před Gaze hýbat? | **ANO** — pravidlo pohyb přímo předpokládá („at the END of his Move Action") |
+| je Gaze akce sama o sobě, nebo součást Move akce? | ⭐ **NENÍ to samostatná akce.** Je to přívěsek Move Action. ⇒ **rozpouští se tím i ta „porušuje/neporušuje" záhada z 21.08.**: gaze není třetí druh akce proti sousedovi, a pravidlo *„nesmíš se hýbat při Block akci"* (ř. 675) se ho netýká, protože to není blok |
+| co s aktivací po ní? | **BB2016 o tom NEŘÍKÁ NIC.** Žádná věta o ukončení aktivace neexistuje — je zbytečná, protože gaze je z definice na konci pohybu |
+
+⛔⛔ **A POZOR NA IMPLEMENTACI — DVA CIZORODÉ PRVKY, KTERÉ SE NABÍZEJÍ SAMY.**
+Uživatel poslal 31.08. dva texty (AI + reddit), **oba z BB2020/Third Season**,
+kde je gaze **Special Action** s vlastní deklarací, s podmínkou **Marking**
+a s větou *„their activation comes to an end"*. **Nic z toho v BB2016 není.**
+Kdyby se makro psalo podle nich, dostaneme do BB2016 enginu BB2020 mechaniku
+— a **kontrola by prošla, protože závěr (leže to nejde) sedí v obou edicích**.
+Viz [[project_bloodbowl_vampire_ai_text_refuted_20260824]].
+
+⚠️ **DŮSLEDEK PRO BUDOUCÍ MAKRO, který se snadno přehlédne:** text váže gaze
+na **Move Action**, ne na „pohyb" obecně ⇒ doslovným čtením **nejde gaze na
+konci Blitze ani Passu**. To je věcný rozdíl proti BB2020, kde je to vlastní
+akce. ⚠️ Čteno doslova; nemáme k tomu FAQ, takže při psaní makra to chce
+druhý pohled, ne převzít odsud.
+
+⭐ **Leže to nejde** — ale ne kvůli markingu (ten BB2016 nezná), nýbrž kvůli
+ř. 669-671: *„While Prone, the player … **may do nothing before standing up**
+… when he next takes an Action."* Upír tedy deklaruje Move Action, vstane
+za 3 pole, dojde a teprve na konci pohybu gazuje. Při MA6 mu na pohyb
+zbydou 3 pole.
 
 ⚠️ **Dnes nás to nijak neovlivňuje** — v sestavách TV1200 `dw-we` upír není.
 ⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
