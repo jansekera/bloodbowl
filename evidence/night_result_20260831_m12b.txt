@@ -1,0 +1,59 @@
+# VYSLEDEK NOCI 30.->31.08.2026  —  M12/(B) KLECOVE KRITERIUM
+# Beh: mode 12, dw-dw, 2400 paru, 48 kusu, 4 workery, 20:47 -> 08:15 (11,5 h)
+# Otisk: commit 9ff779f2 · harness c5303502 · engine_so 1ddac765 · 48/48 OK, 0 FAIL
+# Predregistrace: evidence/night_prereg_20260830_m12b.preds (psana PRED behem)
+
+## CTENI V PORADI Z PREDREGISTRACE
+(1) leak  MOVED WITHOUT THE ARM ACTING: 0 / 2400   => delta se SMI cist
+(2) arm acted 2400/2400 (100 %) · ARM PICKS TOTAL 3 011 301 (627,35/hru)
+(3) n_nonzero 1258/2400 = 52,4 %
+(4) DELTA (dvoustranna) +0,0242 +- 0,0086 SE  (+2,82 sigma)  CI95 [+0,0074; +0,0409]
+    jednostranne +0,0121 +- 0,0043  CI95 [+0,0037; +0,0205]
+    11/48 shardu zapornych; empiricka SE mezi shardy 0,0066 vs sdruzena 0,0086
+    => bez overdisperze, slouceni legitimni
+    TD/hru: rameno 0,2294 vs placebo 0,1998  (+0,0296 = +14,8 % relativne)
+
+## PREDPOVEDI: 4 z 5 SEDLY
+  leak == 0                    ANO (0)
+  arm_acted >= 0.5             ANO (1,00)
+  n_nonzero in 0.03 0.35       ⛔ NE — vyslo 0,524, MIMO PASMO NAHORU
+  delta in -0.05 0.05          ANO (+0,0242)
+  delta_1s in -0.025 0.025     ANO (+0,0121)
+⛔ POUCENI Z MINUTE PREDPOVEDI: pasmo n_nonzero jsem psal ze zkusenosti STARSICH
+  ramen (B2 20,6 %), ackoli LIGHT TEST TEHOZ RAMENE uz rekl 58,3 %. Predpoved
+  se ma opirat o nejblizsi dostupne pozorovani aparatu, ne o zvyk. Miss je
+  neskodny (vic paru nese informaci, nez cekano), ale je to miss.
+
+## VERDIKT
+  Prah +-0,015 (vstup behu). Delta je KLADNA a signifikantni (2,82 sigma),
+  ale CI [+0,0074; +0,0409] prah OBKROCUJE.
+  ⇒ POMAHA — smer je jisty, VELIKOST proti prahu jista NENI.
+  ⇒ Ekvivalence VYVRACENA (CI nepada dovnitr +-0,015).
+
+## RUCNI CTENI ZE ZADANI
+(1) REPICKY NA ZMENENOU HRU — 627/hru, a pohnulo se 52,4 % paru.
+    ⭐ Toto je ostry OPAK B2: tam rameno menilo volbu ve 20,6 % paru a vysledek
+    se nepohnul (efekt se rozpustil v MCTS). Tady meni volbu casto A vysledek
+    se hybe. Kriterium neni kosmetika.
+(2) RASOVY ROZPAD NA TD — ⛔ TENTO BEH NA NEJ NEODPOVIDA. Matchup je dw-dw,
+    obe strany trpaslik. Rozpad po rasach vyzaduje vicerasovy beh.
+(3) PREDPOVED UZIVATELE (26.08., "nebezpecne od vsech krom khemri v desti")
+    ⛔ TIMTO BEHEM ANI NEPOTVRZENA, ANI NEVYVRACENA — presne jak predregistrace
+    predem rekla. Potrebuje vicerasovy beh + pocasi, ne souhrnnou deltu.
+
+## KONTROLY NAVIC
+  Kontrola seedovani (mode 2, 8 paru, PRED behem): n_nonzero 0/8 — obe
+  orientace hraly touz hru, jak CRN vyzaduje. (Tautologie, verdikt na ni nestoji.)
+  Asymetrie stran (home minus away, parove): +0,0158 +- 0,0088 = 1,80 sigma
+  => v sumu ⇒ puleni dvoustranne delty na jednostrannou je obhajitelne.
+  ⚠️ 1,8 sigma neni nula; pri dalsim behu tehoz ramena stoji za druhy pohled.
+
+## ⛔ CO SE NEPOTVRDILO Z LIGHT TESTU
+  Light test (12 paru) ukazal +0,2083. Noc ukazala +0,0242 — DEVETKRAT MIN.
+  Predregistrace odmitla podle te delty dimenzovat beh a mela pravdu.
+  ⇒ Zaznam do sbirky "spatny vysledek vypada normalne": 12 paru vyrobilo
+    cislo 14x nad prahem, ktere se pri 200x vetsim vzorku scvrklo pod dvojnasobek.
+
+## OTEVRENA OTAZKA (navrhova, nezmerena)
+  Ma kriterium dostat zpet pravomoc postup ZABLOKOVAT? Do 30.08. (b6cadc15) ji
+  melo. Tenhle beh meri kriterium JAKO PREFERENCI, ne jako zakaz.
