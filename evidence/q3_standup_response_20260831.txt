@@ -1,0 +1,42 @@
+# Q3 — TRI MOZNOSTI VSTAVANI: MERIDLA (31.08.2026)
+# Sonda: mode 8, dw-we, 4 pary (8 her). ⚠️ CISLA JSOU VYHODNOCENI V HLEDANI,
+# ne odehrana kola — MCTS kazdou situaci oceni mnohokrat. Cte se PODIL, ne
+# absolutni pocet. Korpusove cislo prinese noc 31.08.
+#
+#   Q3/VSTAVANI: nabidnuto 32 048 (drahych 26 082 = 81,4 %)
+#                provedeno 38 697 (drahych 32 150 = 83,1 %)
+#   Q3/UTEK:     nabidnut 25 955 · NEBYLO KAM 127 = 0,5 %
+#   Q3/ODPOVED:  na vstale dopadlo 9 646 ran
+#                z toho BLITZEM 2 107 = 21,8 %   (zbytek = BLOK ZDARMA)
+#                srazeno 5 274 = 54,7 %
+#
+# ⭐⭐⭐ NALEZ 1: TRETI MOZNOST EXISTOVALA TEMER VZDY — jen se nenabizela.
+#   Uteci slo v 99,5 % situaci (bez uniku jen 0,5 %). Do 31.08. pritom makro
+#   vrstva nabizela lezicimu u soupere JEDINOU vec: vstat a zustat. Doktrina
+#   uzivatele z 20.08. mluvi o trech moznostech, planovac rozhodoval o dvou —
+#   a ta chybejici byla dostupna skoro pokazde.
+#   ⇒ Neni to "planovac utek zavrhl", je to "utek nikdy nedostal".
+#
+# ⭐⭐⭐ NALEZ 2: DOKTRINA VZACNOSTI POTVRZENA DATY, NE UVAHOU.
+#   Na hrace, ktery vstal vedle soupere, dopada odveta z 78,2 % jako BLOK,
+#   tedy zdroj NEOMEZENY, ktery soupere nestoji nic. Blitzem — vzacnym
+#   zdrojem 1/kolo — se plati jen 21,8 %.
+#   ⇒ Presne to uzivatel tvrdil 20.08. ("meni se z 'stoji je BLITZ' na 'dava
+#     jim BLOK ZDARMA'"). Kdyby to bylo obracene, doktrina by padla.
+#   A vic nez polovina tech ran (54,7 %) skonci srazenim ⇒ hrac je zpatky
+#   na zemi a cely nas tah byl zaplaceny za nic.
+#
+# ⚠️ VYHRADA K JMENOVATELUM (aby se to necetlo jako pomer): "nabidnuto" pocita
+#   MAKRO vrstva, "provedeno" vsechna vstani vcetne surove vrstvy
+#   (rules_engine). Provedeno > nabidnuto proto NENI chyba — od M13 (31.08.)
+#   dostava lezici hrac nabidku MOVE i v surove vrstve, takze v rolloutech
+#   vstava i mimo makro. Ta dve cisla se NESMI delit mezi sebou.
+#
+# ⏰ CO Z TOHO PLYNE PRO KROK B (ocenení):
+#   Poradi nejhorsi souperovy odpovedi je tim doloženo:
+#     vstat a zustat vedle  -> BLOK ZDARMA (neomezeny)      = nejhorsi
+#     vstat a odejit        -> BLITZ (1/kolo), jen na dosah = stredni
+#     zustat lezet          -> FAUL (1/kolo, zvlast)        = nejlevnejsi,
+#                              ale telo je mimo hru
+#   ⛔ Neimplementovat to jako "vzdy utec": zustat lezet ma vlastni cenu
+#     (chybejici telo v kleci) a ta se odsud NEZMERI.

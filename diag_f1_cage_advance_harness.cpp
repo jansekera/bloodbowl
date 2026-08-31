@@ -89,6 +89,8 @@ struct Matchup {
 static long g_advResigned = 0;
 static long g_advResignedSF = 0;
 static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
+static long g_standEsc = 0, g_standEscNo = 0;
+static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
 static const Matchup MATCHUPS[] = {
@@ -527,6 +529,11 @@ int main(int argc, char** argv) {
                 //   podil DRAHE vetve (vedle stojiciho soupere). Rozdil mezi
                 //   nabidkou a provedenim rika, jestli si hledani tu drahou
                 //   situaci uz sam obchazi.
+                g_standEsc   += bb::takeStandEscapeOfferedInSearch();
+                g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
+                g_hitStood   += bb::takeHitOnStoodUpInSearch();
+                g_hitStoodBl += bb::takeHitOnStoodUpByBlitzInSearch();
+                g_kdStood    += bb::takeKnockedOnStoodUpInSearch();
                 g_standOff   += bb::takeStandOfferedInSearch();
                 g_standOffNE += bb::takeStandOfferedNextToEnemyInSearch();
                 g_stoodUp    += bb::takeStoodUpInSearch();
@@ -675,6 +682,13 @@ int main(int argc, char** argv) {
             printf("  Q3/VSTAVANI: nabidnuto %ld (drahych %ld = %.1f %%) | provedeno %ld (drahych %ld = %.1f %%)\n",
                    g_standOff, g_standOffNE, g_standOff ? 100.0*g_standOffNE/g_standOff : 0.0,
                    g_stoodUp,  g_stoodUpNE,  g_stoodUp  ? 100.0*g_stoodUpNE/g_stoodUp   : 0.0);
+            printf("  Q3/UTEK: nabidnut %ld, NEBYLO KAM %ld (%.1f %% situaci bez uniku)\n",
+                   g_standEsc, g_standEscNo,
+                   (g_standEsc + g_standEscNo) ? 100.0*g_standEscNo/(g_standEsc+g_standEscNo) : 0.0);
+            printf("  Q3/ODPOVED: na vstale dopadlo %ld ran, z toho BLITZEM %ld (%.1f %%), srazeno %ld (%.1f %%)\n",
+                   g_hitStood, g_hitStoodBl,
+                   g_hitStood ? 100.0*g_hitStoodBl/g_hitStood : 0.0,
+                   g_kdStood, g_hitStood ? 100.0*g_kdStood/g_hitStood : 0.0);
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);

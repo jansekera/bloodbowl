@@ -87,4 +87,13 @@ bool pushGeometryArm(TeamSide side);
 // which is what the per-pair null control needs.
 long takePushGeometryEvalsInSearch();
 
+
+// Q3 krok B (31.08.2026): souperova odpoved na vstani vedle nej.
+// hit  = na hrace, ktery v predchozim kole vstal vedle soupere, dopadl blok
+// blitz= z toho placeno VZACNYM zdrojem (blitz 1/kolo), zbytek je blok ZDARMA
+// kd   = z toho skoncilo srazenim
+long takeHitOnStoodUpInSearch();
+long takeHitOnStoodUpByBlitzInSearch();
+long takeKnockedOnStoodUpInSearch();
+
 } // namespace bb

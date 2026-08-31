@@ -357,13 +357,16 @@ long takeStoodUpNextToEnemyInSearch() {
 }
 
 // Zaznamená úspěšné vstání. Adjacence se čte PŘED tím, než hráč cokoli udělá.
-static void noteStandUp(const GameState& state, const Player& p) {
+static void noteStandUp(const GameState& state, Player& p) {
     ++g_stoodUp;
+    p.stoodUpNextToEnemy = false;
     for (const Position& adj : p.position.getAdjacent()) {
         if (!adj.isOnPitch()) continue;
         const Player* e = state.getPlayerAtPosition(adj);
         if (e && e->teamSide != p.teamSide && e->state == PlayerState::STANDING) {
-            ++g_stoodUpNextToEnemy; return;
+            ++g_stoodUpNextToEnemy;
+            p.stoodUpNextToEnemy = true;   // Q3: dozit do souperovy odpovedi
+            return;
         }
     }
 }

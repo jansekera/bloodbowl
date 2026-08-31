@@ -71,6 +71,14 @@ struct Player {
     // him to move out of his current square", a smi blokovat sousedy BEZ
     // follow-upu (l. 8580-8582).
     bool rooted = false;
+    // Q3 krok B (31.08.2026): "vstal v tomhle kole VEDLE stojiciho soupere".
+    // Meridla do dneska pocitala jen NABIDKU a PROVEDENI vstani, tedy nas
+    // vlastni tah. Doktrina uzivatele (20.08.) ale tvrdi neco o SOUPEROVE
+    // ODPOVEDI -- ze takovy hrac uz nestoji blitz, ale da se srazit BLOKEM
+    // ZDARMA, a blok je NEOMEZENY zdroj. To se z nabidky precist neda.
+    // Priznak proto prezije do souperova kola a smaze se az na zacatku
+    // naseho dalsiho, takze blok v mezicase se da zaucotvat spravne vetvi.
+    bool stoodUpNextToEnemy = false;
     // Leap, BB2016 l. 8283: "A player may only use the Leap skill ONCE PER TURN."
     bool leapUsedThisTurn = false;
     bool dodgeRerollUsedThisTurn = false;

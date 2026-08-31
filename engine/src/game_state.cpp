@@ -73,6 +73,9 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.proUsedThisTurn = false;
         p.bigGuyCheckedThisTurn = false;
         p.leapUsedThisTurn = false;
+        // Q3: priznak zil pres souperovo kolo prave proto, aby se dala
+        // zmerit JEHO odpoved; ted uz je vycerpany.
+        p.stoodUpNextToEnemy = false;
         p.dodgeRerollUsedThisTurn = false;
         p.sureFeetRerollUsedThisTurn = false;
         // Take Root (l. 8573-8576): zakorenení konci, kdyz je hráč sražen

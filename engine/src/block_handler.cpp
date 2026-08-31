@@ -455,6 +455,33 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
     return true;
 }
 
+// ============================================================================
+// Q3 krok B (31.08.2026): MERIDLO SOUPEROVY ODPOVEDI NA VSTANI
+//
+// Uzivatelova doktrina (20.08.): kdo vstane vedle soupere, meni se z "stoji je
+// BLITZ" na "da se srazit BLOKEM ZDARMA" -- a blok je NEOMEZENY zdroj, kdezto
+// blitz je jeden za kolo. Doktrina tedy tvrdi neco o TOM, CO SOUPER UDELA,
+// a to se z nabidky ani z provedeni vstani precist NEDA.
+//
+// ⛔ Rozliseni blok vs blitz je cely smysl mericich: kdyby se ukazalo, ze na
+//   vstale hrace se plytva BLITZEM, doktrina by neplatila -- souper by za to
+//   platil svym vzacnym zdrojem misto toho, aby bral neco zadarmo.
+// ============================================================================
+thread_local long g_hitOnStoodUp = 0;
+thread_local long g_hitOnStoodUpByBlitz = 0;
+thread_local long g_knockedOnStoodUp = 0;
+
+long takeHitOnStoodUpInSearch() { long v = g_hitOnStoodUp; g_hitOnStoodUp = 0; return v; }
+long takeHitOnStoodUpByBlitzInSearch() { long v = g_hitOnStoodUpByBlitz; g_hitOnStoodUpByBlitz = 0; return v; }
+long takeKnockedOnStoodUpInSearch() { long v = g_knockedOnStoodUp; g_knockedOnStoodUp = 0; return v; }
+
+// Tri emitovaci mista srazeni obrance (r. ~547, ~794, ~968) volaji TOHLE, aby
+// pravidlo nebylo opsane trikrat -- dve kopie tehoz pravidla znamenaji, ze
+// jedna z nich zestarne (poucení z `endBlockActivation`, 25.08.).
+static void noteKnockdownOnStoodUp(const Player& def) {
+    if (def.stoodUpNextToEnemy) ++g_knockedOnStoodUp;
+}
+
 ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           DiceRollerBase& dice, std::vector<GameEvent>* events,
                           bool frenzySecondBlock, bool noFollowUp,
@@ -463,6 +490,13 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     Player& def = state.getPlayer(params.targetId);
     Position attOldPos = att.position;
     Position defOldPos = def.position;
+
+    // Q3: zaucotvat POKUS jeste nez se cokoli hodi. Frenzy druhy blok se
+    // nepocita znovu -- je to tataz rana, ne dalsi rozhodnuti soupere.
+    if (def.stoodUpNextToEnemy && !frenzySecondBlock) {
+        ++g_hitOnStoodUp;
+        if (params.isBlitz) ++g_hitOnStoodUpByBlitz;
+    }
 
     // Take Root, l. 8580-8582: "The player may block adjacent players WITHOUT
     // FOLLOWING-UP as part of a Block Action." Zakorenený se tedy nikam nehne
@@ -546,6 +580,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (broken) {
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
                                   def.position, {}, 0, false});
+                noteKnockdownOnStoodUp(def);   // Q3
                 handleBallOnPlayerDown(state, def.id, dice, events);
             }
             return ActionResult::ok();
@@ -793,6 +828,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 def.state = PlayerState::PRONE;
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
                                   def.position, {}, 0, false});
+                noteKnockdownOnStoodUp(def);   // Q3
                 InjuryContext defCtx;
                 if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
                 if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
@@ -967,6 +1003,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             def.state = PlayerState::PRONE;
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
                               def.position, {}, 0, false});
+            noteKnockdownOnStoodUp(def);   // Q3
 
             InjuryContext defCtx;
             // One flag, not two modifiers: resolveArmourAndInjury decides which
