@@ -2891,3 +2891,64 @@ TEST(Q3StandUp, BoxedInProneGetsNoEscapeOfferAndThatIsRecorded) {
     EXPECT_EQ(countRepositionFor(ms, 1), 1) << "nabídl se útěk tam, kde není kam";
     EXPECT_GE(takeStandEscapeImpossibleInSearch(), 1);
 }
+
+// ============================================================================
+// Q3 KROK B (31.08.2026): OCENĚNÍ TŘÍ VĚTVÍ — rameno, default OFF
+//
+// Cena větve = NEJSILNĚJŠÍ odpověď, kterou soupeř opravdu má, vážená
+// vzácností zdroje (blok neomezeně · blitz 1/kolo · faul 1/kolo).
+// ⭐ POČÍTANÁ, ne měřená (uživatel 31.08.): měření odpovídá na otázku
+// o soupeři, ne o větvi, a náš soupeř je naše vlastní AI.
+// ============================================================================
+
+TEST(Q3Pricing, ArmIsOffByDefaultSoTheOfferSetIsUnchanged) {
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    s.getPlayer(12).skills.add(SkillName::MightyBlow);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    EXPECT_EQ(countRepositionFor(ms, 1), 2) << "rameno zasáhlo, ačkoli je vypnuté";
+}
+
+TEST(Q3Pricing, ArmDropsStayNextToAMightyBlowHitterWhenEscapeIsCheaper) {
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    s.getPlayer(12).skills.add(SkillName::MightyBlow);
+    setStandUpPricingArm(TeamSide::HOME, true);
+    takeStandUpPricingRepicksInSearch();
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    setStandUpPricingArm(TeamSide::HOME, false);
+
+    // zůstává jen útěk
+    EXPECT_EQ(countRepositionFor(ms, 1), 1);
+    for (auto& m : ms)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1)
+            EXPECT_NE(m.targetPos, (Position{10, 7})) << "zůstala dražší větev";
+    EXPECT_GE(takeStandUpPricingRepicksInSearch(), 1) << "čítač netikl";
+}
+
+TEST(Q3Pricing, MarkingTheEnemyCarrierKeepsTheStayOfferEvenNextToAHitter) {
+    // ⭐ Uživatel 31.08.: „blok zdarma, když zavazím postupu ballcarriera,
+    // je relativní cena." Tělo, které značí nosiče, platí za něco.
+    GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
+    s.getPlayer(12).skills.add(SkillName::MightyBlow);
+    s.ball = BallState::carried({11, 7}, 12);   // soupeřův nosič je ten soused
+    setStandUpPricingArm(TeamSide::HOME, true);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    setStandUpPricingArm(TeamSide::HOME, false);
+    EXPECT_EQ(countRepositionFor(ms, 1), 2)
+        << "rameno rozpustilo pozici, která značí soupeřova nosiče";
+}
+
+TEST(Q3Pricing, ArmNeverDropsStayWhenThereIsNowhereToRun) {
+    // Bez náhrady se větev brát nesmí — alternativa je zůstat ležet, a to
+    // je absence nabídky, ne jiná nabídka.
+    GameState s = makeProneNextToEnemyState(/*ma=*/3, /*boxedIn=*/true);
+    for (int id = 12; id <= 20; ++id)
+        if (s.getPlayer(id).isOnPitch()) s.getPlayer(id).skills.add(SkillName::MightyBlow);
+    setStandUpPricingArm(TeamSide::HOME, true);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    setStandUpPricingArm(TeamSide::HOME, false);
+    EXPECT_EQ(countRepositionFor(ms, 1), 1) << "vzalo se vstávání tam, kde není náhrada";
+}

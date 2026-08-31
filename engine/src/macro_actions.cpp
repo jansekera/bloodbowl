@@ -255,6 +255,48 @@ thread_local long g_standOfferedNextToHitter = 0;
 thread_local long g_standEscapeOffered = 0;
 thread_local long g_standEscapeImpossible = 0;
 
+// ============================================================================
+// Q3 KROK B (31.08.2026): OCENENI TRI VETVI VSTAVANI -- rameno, default OFF.
+//
+// ⭐ DOKTRINA (uzivatel, 20.08. a znovu 30.08.): vetev se oceni NEJSILNEJSI
+//   odpovedi, kterou souper OPRAVDU MA, omezenou vzacnosti zdroje:
+//     blitz 1/kolo · faul 1/kolo (zvlastni pridel) · BLOK NEOMEZENE
+//   ⇒ poradi nejhorsi odpovedi na tri vetve vstavani:
+//     vstat a zustat vedle -> BLOK ZDARMA (neomezeny)      nejhorsi
+//     vstat a odejit       -> BLITZ (1/kolo, jen na dosah) stredni
+//     zustat lezet         -> FAUL (1/kolo, zvlast)        nejlevnejsi
+//
+// ⭐ ZMERENO 31.08. (evidence/q3_standup_response_20260831.txt), takze to
+//   NENI uvaha: na vstale hrace dopada odveta z 78,2 % jako BLOK a jen
+//   z 21,8 % jako blitz, a 54,7 % ran konci srazenim. Kdyby to bylo
+//   obracene, tohle rameno by nemelo duvod existovat.
+//
+// ⛔ RAMENO NEDELA "vzdy utec". Bere jen vetev, kterou doktrina oznacuje za
+//   PRISNE NEJHORSI a u ktere zaroven existuje nahrada: vstat a zustat vedle
+//   soupere, ktery ma MightyBlow / Claw / PilingOn (uzivatel 30.08.: "vstat
+//   vedle nekoho s MB je jeste horsi nez jen vstat vedle nekoho"), kdyz je
+//   kam utect. Bez uteku se nabidka NEBERE -- alternativa by byla zustat
+//   lezet a to je absence nabidky, ne jina nabidka.
+// ⚠️ "Zustat lezet" ma vlastni cenu (chybejici telo v kleci), kterou tahle
+//   meridla NEZMERI. Proto se rameno drzi jen tam, kde je nahrada.
+// ============================================================================
+thread_local bool g_standPricing[2] = {false, false};
+thread_local long g_standPricingRepicks = 0;
+
+void setStandUpPricingArm(TeamSide side, bool on) {
+    g_standPricing[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool standUpPricingArm(TeamSide side) {
+    return g_standPricing[side == TeamSide::HOME ? 0 : 1];
+}
+
+// Tika jen kdyz rameno OPRAVDU zmenilo nabidku (vzalo vetev "vstat a zustat").
+// Nula pres matchup = obe ramena nabidla totez => nulovy test.
+long takeStandUpPricingRepicksInSearch() {
+    long v = g_standPricingRepicks; g_standPricingRepicks = 0; return v;
+}
+
 long takeStandOfferedInSearch() {
     long v = g_standOffered; g_standOffered = 0; return v;
 }
@@ -521,6 +563,91 @@ static double estimateBlockFailChance(int diceCount, bool attackerHasBlock,
 // blitz block is actually thrown from. Same walk as the executor -- handing it
 // back here is what keeps the P35 dice estimate from drifting away from the
 // route again.
+// ============================================================================
+// Q3 KROK B (31.08.2026): NEJHORSI SOUPEROVA ODPOVED -- POCITANA, NE MERENA.
+//
+// ⭐ UZIVATEL 31.08.: "souperova nejhorsi odpoved se neda overit, dokud ji
+//   soupere nenaucime -- ale co je spatne na tom mit to spocitane matematikou?"
+//   Nic. Naopak: MERENI odpovida na otazku o SOUPEROVI, ne o vetvi.
+//   Nas souper je nase vlastni AI, takze zmerene "co udelal" je DOLNI ODHAD
+//   toho, co UDELAT SLO -- a ten se zlepsi pokazde, kdyz zesili soupere, cimz
+//   by se ocenení pod nohama hybalo. Pocitany worst case je na sile soupere
+//   NEZAVISLY a je to konzervativni mez, presne jak doktrina zada.
+//   ⇒ Meridla z q3_standup_response_20260831 tuhle funkci NEOVERUJI a nemohou;
+//     ukazuji jen, ze uz i dnesni slaby souper tu vetev trestá.
+//
+// Vzacnost zdroju (uzivatel 30.08.): blok NEOMEZENE · blitz 1/kolo ·
+// faul 1/kolo (zvlastni pridel, takze neni tak vzacny jako blitz).
+// Nasobky nize proto NEJSOU ladici parametry -- rikaji, kolikrat tutez ranu
+// souper OPRAVDU muze zopakovat.
+// ============================================================================
+namespace {
+
+// P(obrance jde k zemi) podle poctu blokovych kostek. Zaporne = vybira souper.
+double knockdownChanceFromDice(int dice) {
+    switch (dice) {
+        case -3: return 0.09;
+        case -2: return 0.14;
+        case -1: return 0.28;   // jedna kostka, vybira nas souper
+        case  1: return 0.44;   // jedna kostka
+        case  2: return 0.69;
+        default: return dice >= 3 ? 0.83 : 0.44;
+    }
+}
+
+// Nasobek za to, ze rana od TOHOHLE hrace boli vic (uzivatel 30.08.:
+// "vstat vedle nekoho s MB je jeste horsi nez jen vstat vedle nekoho").
+double hurtAmplifier(const Player& e) {
+    double amp = 1.0;
+    if (e.hasSkill(SkillName::MightyBlow)) amp += 0.35;
+    if (e.hasSkill(SkillName::Claw))       amp += 0.35;
+    if (e.hasSkill(SkillName::PilingOn))   amp += 0.25;
+    return amp;
+}
+
+// Vzacnost: blok muze souper hodit KAZDYM sousedem a nic ho to nestoji;
+// blitz jen JEDNOU za kolo, takze tuz ranu "zaplati" a nemuze ji dat jinam.
+constexpr double kBlockWeight = 1.00;
+constexpr double kBlitzWeight = 0.45;
+constexpr double kFoulWeight  = 0.30;
+
+} // namespace
+
+// Kolik nas stoji, kdyz nas hrac `p` stoji (nebo lezi) na poli `q`.
+// Vraci NEJSILNEJSI odpoved, kterou souper opravdu ma -- ne prumer, ne to,
+// co by nas soucasny souper skutecne zahral.
+static double worstReplyCost(const GameState& state, const Player& p,
+                             Position q, bool standing) {
+    const TeamSide mySide = p.teamSide;
+    double worst = 0.0;
+
+    state.forEachOnPitch(opponent(mySide), [&](const Player& e) {
+        if (e.state != PlayerState::STANDING || e.lostTacklezones) return;
+        const int d = e.position.distanceTo(q);
+
+        if (!standing) {
+            // Lezici se NEDA blokovat ani blitzovat -- da se jen FAULOVAT,
+            // a to jednou za kolo. r. 674-676 + katalog akci.
+            if (d <= 1) {
+                worst = std::max(worst, kFoulWeight * hurtAmplifier(e));
+            }
+            return;
+        }
+
+        const int dice = getBlockDiceCount(state, e, p, false, false);
+        const double dmg = knockdownChanceFromDice(dice) * hurtAmplifier(e);
+
+        if (d <= 1) {
+            // BLOK ZDARMA: neomezeny zdroj, souper za nej neplati nicim.
+            worst = std::max(worst, kBlockWeight * dmg);
+        } else if (d <= static_cast<int>(e.stats.movement) + maxGfiSquares(e)) {
+            // BLITZ: dosah vcetne GFI (P37), ale jen JEDEN za kolo.
+            worst = std::max(worst, kBlitzWeight * dmg);
+        }
+    });
+    return worst;
+}
+
 static double estimateApproachFailChance(const GameState& state, const Player& mover,
                                           Position target, Position* landingOut = nullptr) {
     if (landingOut) *landingOut = mover.position;
@@ -670,7 +797,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         }
         if (nextToEnemy) ++g_standOfferedNextToEnemy;
         if (nextToHitter) ++g_standOfferedNextToHitter;
-        out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
+
+        // Q3 krok B: nabidka "vstat a ZUSTAT" se vypousti VZDY, krome jedineho
+        // pripadu pod ramenem -- viz komentar u `setStandUpPricingArm`.
+        // Rozhodnuti se musi udelat AZ POTOM, co je znamo, jestli utek vubec
+        // existuje, jinak by rameno bralo nabidku i tam, kde nahrada neni.
+        bool offerStay = true;
 
         // ⭐ Q3 KROK A (31.08.2026): DRUHA MOZNOST -- VSTAT A ODEJIT.
         // Uzivatelova doktrina (20.08.): vstat vedle soupere meni hrace
@@ -686,8 +818,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         //   a obecna smycka si stojiciho hrace prevezme sama v pristim kole.
         if (nextToEnemy) {
             const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
+            const bool priced = standUpPricingArm(mySide);
             Position best{-1, -1};
             int bestSteps = 99;
+            double bestCost = 1e9;
             for (int dx = -budget; dx <= budget; ++dx) {
                 for (int dy = -budget; dy <= budget; ++dy) {
                     if (dx == 0 && dy == 0) continue;
@@ -700,16 +834,63 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     // Cilem je VEN Z KONTAKTU, ne "o kus dal": pole s cizi
                     // tacklezonou by hrace nechalo v teze situaci.
                     if (countTacklezones(state, cand, mySide) > 0) continue;
-                    if (steps < bestSteps) { bestSteps = steps; best = cand; }
+                    if (priced) {
+                        // ⭐ Pod ramenem se pole vybira podle NEJHORSI ODPOVEDI,
+                        //   ne podle vzdalenosti. Pole bez tacklezony jeste
+                        //   nemusi byt bezpecne -- souper na nej muze dosahnout
+                        //   BLITZEM, a to zadna vzdalenost nerekne.
+                        const double c = worstReplyCost(state, p, cand, true);
+                        if (c < bestCost || (c == bestCost && steps < bestSteps)) {
+                            bestCost = c; bestSteps = steps; best = cand;
+                        }
+                    } else if (steps < bestSteps) {
+                        bestSteps = steps; best = cand;
+                    }
                 }
             }
             if (best.x >= 0) {
                 ++g_standEscapeOffered;
                 out.push_back({MacroType::REPOSITION, p.id, -1, best});
+                // ⭐ Rameno bere nabidku "vstat a zustat" jen tehdy, kdyz je
+                //   POCITANE nejhorsi odpovedi PRISNE DRAZ nez utek. Zadna
+                //   heuristika typu "ma MB" -- MightyBlow uz sedi uvnitr
+                //   `hurtAmplifier`, a stejne tak sila, pocet asistenci
+                //   a dosah blitzu, ktere by se z priznaku vycist nedaly.
+                // ⚠️ Prah 1e-9 je jen ochrana proti rovnosti v plovouci
+                //   carce, ne ladici parametr: pri SHODNE cene se nabidka
+                //   NEBERE, protoze "zustat" ma vlastni hodnotu (telo drzi
+                //   pole v kleci), kterou tenhle vypocet nezna.
+                // ⛔⛔ CENA JE RELATIVNI, NE ABSOLUTNI (uzivatel 31.08.:
+                //   "blok zdarma, kdyz zavazim postupu ballcarriera, je
+                //   relativni cena"). `worstReplyCost` umi jen RIZIKO; neumi,
+                //   CO TO TELO NA TOM POLI DELA. Kdyz stanim znacim souperova
+                //   nosice nebo drzim roh vlastni klece, je blok zdarma cena,
+                //   kterou PLATIM ZA NECO -- a vetev se brat nesmi.
+                //   ⇒ Bez teto podminky by rameno rozpustilo prave ty pozice,
+                //     kvuli kterym se telo zvedá.
+                bool stayEarnsItsKeep = false;
+                if (state.ball.isHeld && state.ball.carrierId > 0) {
+                    const Player& bc = state.getPlayer(state.ball.carrierId);
+                    if (bc.isOnPitch()) {
+                        const int dToCarrier = p.position.distanceTo(bc.position);
+                        if (bc.teamSide != mySide && dToCarrier <= 1) {
+                            stayEarnsItsKeep = true;   // znacim souperova nosice
+                        } else if (bc.teamSide == mySide && dToCarrier <= 2) {
+                            stayEarnsItsKeep = true;   // drzim roh vlastni klece
+                        }
+                    }
+                }
+                if (priced && !stayEarnsItsKeep &&
+                    worstReplyCost(state, p, p.position, true) > bestCost + 1e-9) {
+                    offerStay = false;
+                    ++g_standPricingRepicks;
+                }
             } else {
                 ++g_standEscapeImpossible;
             }
         }
+
+        if (offerStay) out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
     });
 
     const Player* carrier = findCarrier(state);

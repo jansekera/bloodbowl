@@ -205,6 +205,9 @@ long takeCageCritRepicksInSearch();
 long takeStandOfferedInSearch();
 long takeStandOfferedNextToEnemyInSearch();
 long takeStandOfferedNextToHitterInSearch();
+void setStandUpPricingArm(TeamSide side, bool on);
+bool standUpPricingArm(TeamSide side);
+long takeStandUpPricingRepicksInSearch();
 long takeStandEscapeOfferedInSearch();
 long takeStandEscapeImpossibleInSearch();
 //   offeredNextToHitter -- z toho vedle souseda s Mighty Blow / Claw / Piling

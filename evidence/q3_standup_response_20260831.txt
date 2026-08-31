@@ -17,11 +17,16 @@
 #   a ta chybejici byla dostupna skoro pokazde.
 #   ⇒ Neni to "planovac utek zavrhl", je to "utek nikdy nedostal".
 #
-# ⭐⭐⭐ NALEZ 2: DOKTRINA VZACNOSTI POTVRZENA DATY, NE UVAHOU.
+# ⭐⭐ NALEZ 2: UZ I DNESNI SOUPER TU VETEV TRESTA.
+#   ⛔ PRERAMOVANO 31.08. po uzivatelove namitce: tohle doktrinu NEOVERUJE
+#     a nemuze. Merena odpoved popisuje SOUPERE, ne vetev -- a nas souper je
+#     nase vlastni AI, takze cislo je DOLNI ODHAD, ktery se pohne pokazde,
+#     kdyz soupere zesilime. Worst case se ma POCITAT (worstReplyCost),
+#     protoze pocitana mez je na sile soupere nezavisla.
 #   Na hrace, ktery vstal vedle soupere, dopada odveta z 78,2 % jako BLOK,
 #   tedy zdroj NEOMEZENY, ktery soupere nestoji nic. Blitzem — vzacnym
 #   zdrojem 1/kolo — se plati jen 21,8 %.
-#   ⇒ Presne to uzivatel tvrdil 20.08. ("meni se z 'stoji je BLITZ' na 'dava
+#   ⇒ Shoduje se s tim, co uzivatel tvrdil 20.08. ("meni se z 'stoji je BLITZ' na 'dava
 #     jim BLOK ZDARMA'"). Kdyby to bylo obracene, doktrina by padla.
 #   A vic nez polovina tech ran (54,7 %) skonci srazenim ⇒ hrac je zpatky
 #   na zemi a cely nas tah byl zaplaceny za nic.
