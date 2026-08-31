@@ -1,0 +1,76 @@
+# PREDREGISTRACE NOCI 31.08.->01.09.2026  —  P35 / mode 8
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Skodi oprava P35? (Blitzujici se vybira podle pole, KAM DOJDE, ne podle
+#   toho, kde stoji -- blok se tedy oceni odtud, odkud se opravdu hazi.)
+#
+# ⛔⛔ OTAZKA JE JEDNOSTRANNA A JE TO ZAMER, NE ZKRACENI VZORKU.
+#   Zmerene tempo DNES (31.08., light test 12 paru, dw-we): 62,6 s/par solo.
+#   Pri 4 workerech a kontenci 1,35 vychazi:
+#       dokazat EKVIVALENCI (cele CI dovnitr +-0,015)  ~3 600 paru ~ 21 h
+#       odpovedet "neskodi to?"                        ~1 680 paru ~ 9,8 h
+#   Do noci se vejde jen to druhe. ⇒ NEMENIM VZOREK PRO TOUZ OTAZKU
+#   (to zakazuje [[feedback_never_trade_power_for_walltime]]), MENIM OTAZKU
+#   na tu, kterou noc uveze. P35 je OPRAVA PODLE PRAVIDEL -- stejne jako cena
+#   Wrestle u B2 -- takze staci vedet, ze NESKODI; ekvivalence by chtela
+#   druhou noc a ta se muze pridat pozdeji.
+#
+# ⛔ STROP Z 19.08. SE NESMI CIST JAKO OCEKAVANI.
+#   "kostky se meni v 16,2 %, prekloni se 9,7 %" bylo merene 19.08.
+#   DNESNI ENGINE TO NEPOPISUJE: M13 (31.08.) pustila LEZICI hrace k blitzu,
+#   takze se zmenila MNOZINA UCHAZECU, ze ktere vybirac vybira.
+#   ⭐ Doklad, ze to neni teorie: repicku bylo 25.08. **127,50/hru**,
+#     dnes je jich **146,92/hru** (+15 %). Tataz trida jako P38, kde nalez
+#     "blokuje ve 2 z 5 kol" prestal platit po zmenach v produkci.
+#
+# ✅ AUDIT MERICIHO RETEZU (31.08., pred behem) -- PROSEL VE VSECH CTYRECH BODECH
+#   (1) CITAC TIKA JEN PRI ZMENENE VOLBE. Obe mista vyberu (`expandBlitz`
+#       :2015-2018, `expandBlitzAndScore` :2068-2071) spocitaji volbu I PO STARU
+#       a inkrementuji, jen kdyz vyjde JINY hrac. Tyz vzor jako mode 12.
+#   (2) CITAC JE UPLNY. Rameno nemuze zmenit TRASU bez zmeny hrace: cilove pole
+#       se pocita jen pro OCENENI (`estimateBlitzFailChance`), trasu si vybira
+#       executor (`pickApproachStep`). ⇒ "zmenil se hrac" pokryva cely ucinek.
+#   (3) IZOLACE DRZI. `getBlockDiceCount` dostane cilove pole POUZE pod ramenem;
+#       produkce dal pocita z vychoziho pole. Cena Wrestle (B2, nasazena 30.08.)
+#       sedi UVNITR funkce, kterou volaji OBE ramena stejne ⇒ odecte se.
+#   (4) SIGNAL DOJDE AZ DO VYHODNOCENI. `cand_landing` -> `armEvents` ->
+#       "arm acted" + "ARM PICKS TOTAL"; mode 8 je v `armSignalAvailable`,
+#       takze LEAK TEST SE SPUSTI.
+#
+# LIGHT TEST DNES (12 paru, dw-we, dnesni engine):
+#   leak 0 · arm acted 12/12 · n_nonzero 8/12 = 66,7 % · 3 526 repicku
+#   (146,92/hru) · PAIRED delta +0,0000 +- 0,1179
+#   ⛔ Ta delta neni vysledek a NESMI ridit velikost behu (optional stopping).
+#
+# PREDPOVEDI (ctou se v tomto poradi)
+leak == 0
+arm_acted >= 0.5
+n_nonzero in 0.35 0.90
+delta in -0.05 0.05
+delta_1s in -0.025 0.025
+#
+# ⚠️ PASMO n_nonzero JE ODVOZENO Z DNESNIHO LIGHT TESTU (66,7 %), NE ZE ZVYKU.
+#   30.08. jsem u M12 registroval 0,03-0,35 podle starsich ramen, ackoli light
+#   test tehoz ramene uz rekl 58,3 % -- a predpoved minula. Tady se opiram
+#   o nejblizsi dostupne pozorovani aparatu.
+#
+# ⏰ RUCNI CTENI, ktera harness neudela:
+#   (1) repicky na hru proti dnesnim 146,92 -- kdyby v noci vysly VYRAZNE jine,
+#       neco se mezi light testem a behem zmenilo a delta se necte;
+#   (2) rozpad po stranach (dwarf vs wood-elf). ⚠️ dw-we je NEROVNY matchup,
+#       takze rozpad je konfundovany -- cte se jako NAZNAK, ne jako nalez
+#       (poucení z replikace P38 25.08.);
+#   (3) jestli se efekt kupi u BLITZ_AND_SCORE nebo u prosteho BLITZ -- to
+#       harness netiskne, muselo by se to dopocitat z radku.
+#
+# ⛔ NULA: matchup s nulovou expozici NEEXISTUJE (blitzuje se v kazdem zapase),
+#   stejne jako u M12. Kontrola seedovani (mode 2) bezi SAMOSTATNE a PRED
+#   hlavnim behem; je to pod CRN TAUTOLOGIE a VERDIKT NA NI NESTOJI.
+#   ⇒ Aparat se obhajuje LEAKEM.
+#
+# ZADANI: --mode 8 --matchups "1:dw-we:1" --pairs 1680 --chunks 48 --workers 4
+#         (35 paru na kus ~ 49 min; 12 vln po 4 => ~9,8 h)
+#
+# ⏰ SPUSTIT AZ VECER. [[project_bloodbowl_night_launch_timing_20260820]]:
+#   noc patri na KONEC dne, protoze behem ni se nesmi prestavet .so.

@@ -1431,6 +1431,19 @@ ležící** — jen pro stojící. Nezahrnuto do M13 schválně: mění to prost
 stojících hráčů, a to je vlastní změna s vlastním ověřením
 *(uživatelovo „jedna změna najednou")*.
 
+⛔⛔ **POZOR PŘI OPRAVĚ — NEZOBECŇOVAT NA „blitz bez bloku = plýtvání"**
+*(uživatel 31.08.)*. **Deklarace blitzu má cenu i bez rány.** `Wild Animal`
+*(ř. 8666-8669)*: *„roll a D6, **adding 2 to the roll if taking a Block or Blitz
+Action**"* ⇒ Rat Ogre hází **2+ místo 4+** jen za to, že akci nazve blitzem —
+a blok házet nemusí, protože ř. 347-348 říká *„he **MAY** make one block"*.
+Zaplatí za to týmovým blitzem na kolo, a může to být výhodný obchod.
+⇒ Oprava se smí opřít **jen o rozpočet pohybu** *(kdo nemá čím zaplatit ani
+krok, ani blok, nezíská nic)*, **ne o „nehodí blok, tedy je to zbytečné"**.
+⚠️ U nás dnes latentní: `WildAnimal` má **0 hráčů** ve všech šesti hraných
+sestavách *(ověřeno 31.08. týmž způsobem jako Jump Up)*. Engine to jinak
+implementuje správně, včetně toho, že **přirozená 1 padá i s +2**
+(`big_guy_handler.cpp:93-108`, oprava ze 07.08.).
+
 ## 🐢 P48 — SCREEN PRO ELFA *(zavedeno 21.08., ZÁMĚRNĚ NEJNIŽŠÍ PRIORITA)*
 
 **Původ:** rešerše 21.08. potvrdila, že klec je *„a staple tactic used by pretty
