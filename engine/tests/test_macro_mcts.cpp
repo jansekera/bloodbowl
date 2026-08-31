@@ -715,29 +715,22 @@ TEST(MacroMCTS, RiskDeferralNoLongerNeededOnS3AfterItem14) {
     // fresh Stage-5-style re-measurement is queued separately, not required
     // to land this fix.
     //
-    // ⛔⛔ 31.08.2026, M13: TENHLE ZAVER UZ NEPLATI A NEBYL PREPSAN NA ZELENOU.
-    // S3 ma v aktivnim tymu SEST lezicich proti ctyrem stojicim. Do M13 zadny
-    // z nich nemohl deklarovat akci; ted smi MOVE i BLITZ (r. 669-676), takze
-    // se prostor tahu -- a s nim i rollouty a Q -- zmenil podstatne. Q-guard
-    // proto na S3 znovu NACHAZI, od ceho odlozit, a vraci REPOSITION.
-    //
-    // ⚠️ CO TO NEZNAMENA: ze je nova volba lepsi. Neni zmerena. Tvrzeni
-    //    "po item 14 uz neni od ceho odkladat" bylo take jen snimek hledani,
-    //    ne overeny vysledek -- a M13 ho zneplatnilo podruhe.
-    // ✅ CO TO NEOHROZUJE: PRODUKCI. `riskDeferral` je default-OFF
-    //    (mcts.h:28) a neodlozena volba na S3 je porad BLITZ -- to hlida
-    //    sesterský RiskDeferralOffMatchesBaselineOnS3, ktery NEPADL.
-    // ⇒ Test proto tvrdi jen to, co je pravda a co ma smysl hlidat:
-    //    guard se tu ZAPINA a lisi se od neodlozene volby. Jestli je to
-    //    zlepseni, rozhodne az premereni (kniha ukolu, radek M13/S3).
+    // ⭐ 31.08.2026, M13: TENHLE TEST JE TED DUKAZ, ZE VYPINAC FUNGUJE.
+    // Behem dne M13 (lezici smi deklarovat akci) prostor tahu na S3 zmenila
+    // tak, ze Q-guard zase odkladal a vracel REPOSITION -- S3 ma v aktivnim
+    // tymu SEST lezicich. Na zadost uzivatele ("zkus to rozdelit na dve mereni
+    // kazde zvlast") sedi M13 od 31.08. za `setProneActionArm`, default OFF.
+    // ⇒ S VYPNUTYM RAMENEM se S3 vraci PRESNE k puvodni volbe BLITZ.
+    //   Kdyby tenhle test zacal padat, znamena to, ze do produkce proteklo
+    //   neco, co melo zustat za vypinacem -- a to je cennejsi hlidka nez
+    //   puvodni tvrzeni o item 14.
     GameState state = makeS3State();
     PolicyNetwork zeroPolicy;
     MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
     MacroMCTSSearch search(nullptr, cfg, 42);
     Macro result = search.search(state);
-    EXPECT_NE(result.type, MacroType::BLITZ)
-        << "guard se na S3 po M13 zapina; kdyby prestal, je to zmena hledani "
-           "a patri k ni premereni, ne tichá oprava testu";
+    EXPECT_EQ(result.type, MacroType::BLITZ)
+        << "S3 se nevratil k puvodni volbe => neco proteklo mimo vypinac";
 }
 
 TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "bb/rules_engine.h"
 #include "bb/helpers.h"
+#include "bb/macro_actions.h"
 
 using namespace bb;
 
@@ -209,6 +210,15 @@ TEST(RulesEngine, NoMovementLeftNoMoveActions) {
 namespace {
 
 // Ležící HOME hráč na {10,7}, kolem samé prázdno.
+// ⚠️ M13 je od 31.08. za vypínačem (`setProneActionArm`), aby šla změřit
+// zvlášť od noci P35 — uživatel 31.08.: „zkus to rozdělit na dvě měření".
+// Fixtura ho proto zapíná; test `ProneArmOffRestoresTheOldOfferSet` níž hlídá,
+// že vypnuté rameno vrací PŘESNĚ původní stav.
+struct ProneArmOn {
+    ProneArmOn()  { setProneActionArm(TeamSide::HOME, true);  }
+    ~ProneArmOn() { setProneActionArm(TeamSide::HOME, false); }
+};
+
 GameState makeProneState(int ma, bool jumpUp = false, bool rooted = false) {
     GameState gs;
     gs.phase = GamePhase::PLAY;
@@ -230,6 +240,7 @@ bool hasMoveTo(const std::vector<Action>& as, Position dest) {
 } // namespace
 
 TEST(RulesEngineProne, ProneMa6IsOfferedRealStepsNotJustStandingUp) {
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/6);
     std::vector<Action> as;
     getAvailableActions(gs, as);
@@ -242,6 +253,7 @@ TEST(RulesEngineProne, ProneMa6IsOfferedRealStepsNotJustStandingUp) {
 }
 
 TEST(RulesEngineProne, ProneIsNeverOfferedBlockOrAnythingBelowTheStepGate) {
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/6);
     // soused, na kterého by se dalo útočit, kdyby to šlo
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
@@ -257,6 +269,7 @@ TEST(RulesEngineProne, ProneIsNeverOfferedBlockOrAnythingBelowTheStepGate) {
 }
 
 TEST(RulesEngineProne, StunnedPlayerGetsNothing) {
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/6);
     gs.getPlayer(1).state = PlayerState::STUNNED;
     std::vector<Action> as;
@@ -268,6 +281,7 @@ TEST(RulesEngineProne, StunnedPlayerGetsNothing) {
 TEST(RulesEngineProne, SubThreeMovementStillGetsAStepBecauseItIsAGfi) {
     // MA2 (treeman): vstání je hod na 4+ a pohyb se pak nuluje, ale ř. 693
     // dovoluje jít dál "unless he Goes For It" => krok se nabídnout MÁ.
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/2);
     std::vector<Action> as;
     getAvailableActions(gs, as);
@@ -277,6 +291,7 @@ TEST(RulesEngineProne, SubThreeMovementStillGetsAStepBecauseItIsAGfi) {
 TEST(RulesEngineProne, RootedProneGetsNoStepBecauseHeMayNotGoForIt) {
     // Take Root (ř. 8577-8578) bere GFI. MA3 => po vstání 0 a bez GFI
     // není čím krok zaplatit. Hlídá, že se GFI nepřičetlo paušálně.
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/3, /*jumpUp=*/false, /*rooted=*/true);
     std::vector<Action> as;
     getAvailableActions(gs, as);
@@ -286,6 +301,7 @@ TEST(RulesEngineProne, RootedProneGetsNoStepBecauseHeMayNotGoForIt) {
 
 TEST(RulesEngineProne, JumpUpStandsForFreeSoTheWholeMoveIsStillThere) {
     // ř. 8196-8198: vstání zdarma při jiné akci než blok.
+    ProneArmOn _arm;
     GameState gsPlain = makeProneState(/*ma=*/3);
     GameState gsJump  = makeProneState(/*ma=*/3, /*jumpUp=*/true);
     std::vector<Action> a1, a2;
@@ -306,6 +322,7 @@ TEST(RulesEngineProne, JumpUpStandsForFreeSoTheWholeMoveIsStillThere) {
 // ============================================================================
 
 TEST(RulesEngineProneBlitz, ProneIsOfferedBlitzOnAnAdjacentEnemy) {
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/6);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     std::vector<Action> as;
@@ -317,6 +334,7 @@ TEST(RulesEngineProneBlitz, ProneIsOfferedBlitzOnAnAdjacentEnemy) {
 TEST(RulesEngineProneBlitz, StandingPlayerReachesFurtherThanTheSameProneOne) {
     // ⭐ Tenhle test drží celý smysl kroku B: TÁŽ pozice, TÝŽ hráč, jen leh.
     // Kdyby se vstání do dosahu nezapočítalo, obě čísla by si byla rovna.
+    ProneArmOn _arm;
     GameState up = makeProneState(/*ma=*/6);
     up.getPlayer(1).state = PlayerState::STANDING;
     placePlayer(up, 12, {16, 7}, TeamSide::AWAY);
@@ -333,6 +351,7 @@ TEST(RulesEngineProneBlitz, StandingPlayerReachesFurtherThanTheSameProneOne) {
 TEST(RulesEngineProneBlitz, RootedProneNextToEnemyGetsNoBlitzBecauseTheBlockIsUnpayable) {
     // MA3 zakořeněný: po vstání 0 pohybu a bez GFI (ř. 8577-8578) není čím
     // zaplatit blok (ř. 549-550) => blitz by se utratil za nic.
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/3, /*jumpUp=*/false, /*rooted=*/true);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     std::vector<Action> as;
@@ -343,6 +362,7 @@ TEST(RulesEngineProneBlitz, RootedProneNextToEnemyGetsNoBlitzBecauseTheBlockIsUn
 TEST(RulesEngineProneBlitz, SubThreeMovementProneStillGetsAnAdjacentBlitzViaGfi) {
     // MA2 treeman bez Take Root: vstání na 4+, pohyb 0, blok přes GFI --
     // ř. 693 to výslovně dovoluje. Dřív `maxMove -= 3` dalo -1 a blitz zmizel.
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/2);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     std::vector<Action> as;
@@ -356,9 +376,23 @@ TEST(RulesEngineProneBlitz, SubThreeMovementProneReachesAnEnemyTwoSquaresAwayOnG
     // krok + blok = 2 pole (ř. 693 „unless he Goes For It").
     // Starý `maxMove -= 3` dal -1, rozpočet vyšel 0 a blitz zmizel --
     // pravidlo pod 3 MA žádný záporný rozpočet nezná.
+    ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/2);
     placePlayer(gs, 12, {12, 7}, TeamSide::AWAY);   // vzdálenost 2
     std::vector<Action> as;
     getAvailableActions(gs, as);
     EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 1);
+}
+
+
+TEST(RulesEngineProne, ProneArmOffRestoresTheOldOfferSet) {
+    // ⭐ Důkaz, že vypínač opravdu vrací stav před M13: bez ramene dostane
+    // ležící JEDINOU akci — vstát na místě ze samostatné smyčky.
+    GameState gs = makeProneState(/*ma=*/6);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::MOVE), 1);
+    EXPECT_TRUE(hasMoveTo(as, {10, 7}));
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
 }

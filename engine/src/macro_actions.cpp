@@ -280,6 +280,34 @@ thread_local long g_standEscapeImpossible = 0;
 // ⚠️ "Zustat lezet" ma vlastni cenu (chybejici telo v kleci), kterou tahle
 //   meridla NEZMERI. Proto se rameno drzi jen tam, kde je nahrada.
 // ============================================================================
+// ============================================================================
+// M13 RAMENO (31.08.2026, na zadost uzivatele: "zkus to rozdelit na dve mereni
+// kazde zvlast"). Lezici hrac smi deklarovat akci -- je to OPRAVA PRAVIDLA
+// (r. 669-676), ale zaroven VELKA zmena chovani: na stavu S3 je v aktivnim
+// tymu SEST lezicich ze ctrnacti, takze se meni cely prostor tahu.
+// ⛔ Sla by do produkce nezmerena a noc 31.08. (P35) by ji nesla s sebou --
+//   pak by se nedalo rict, co zpusobila ONA a co merene rameno. Proto vypinac.
+// ⚠️ Az se zmeri, vypinac ZMIZI a chovani se nasadi natrvdo -- stejne jako
+//   u ceny Wrestle (B2, 30.08.). Rameno je leseni, ne trvala volba.
+// ============================================================================
+thread_local bool g_proneAction[2] = {false, false};
+// Signal ramene: BLITZ deklarovany LEZICIM hracem. Do M13 to neslo vubec,
+// takze kazdy vyskyt je zmena hry, ne jen "rameno bezelo". Nula pres matchup
+// = obe ramena hrala totez => nulovy test.
+thread_local long g_proneActionPicks = 0;
+void noteProneBlitzDeclared() { ++g_proneActionPicks; }
+long takeProneActionPicksInSearch() {
+    long v = g_proneActionPicks; g_proneActionPicks = 0; return v;
+}
+
+void setProneActionArm(TeamSide side, bool on) {
+    g_proneAction[side == TeamSide::HOME ? 0 : 1] = on;
+}
+
+bool proneActionArm(TeamSide side) {
+    return g_proneAction[side == TeamSide::HOME ? 0 : 1];
+}
+
 thread_local bool g_standPricing[2] = {false, false};
 thread_local long g_standPricingRepicks = 0;
 
@@ -816,9 +844,12 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         //   Tohle je verze, ktera moznost ZPRISTUPNUJE; ocenit ji je krok B.
         // ⚠️ Nabizi se JEN vedle soupere: bez kontaktu neni pred cim utikat
         //   a obecna smycka si stojiciho hrace prevezme sama v pristim kole.
-        if (nextToEnemy) {
+        // Q3: cela vetev "vstat a odejit" (krok A) i jeji ocenení (krok B) sedi
+        // pod JEDNIM vypinacem. Nabidnout utek bez ocenení je pulka zmeny --
+        // planovac by dostal moznost navic, ale duvod, proc si ji vybrat, ne.
+        if (nextToEnemy && standUpPricingArm(mySide)) {
             const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
-            const bool priced = standUpPricingArm(mySide);
+            const bool priced = true;
             Position best{-1, -1};
             int bestSteps = 99;
             double bestCost = 1e9;
@@ -1131,6 +1162,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 // planovac nikdy nemuze vybrat.
                 // ⚠️ !hasMoved zustava: kdo se uz hnul, blitz deklarovat nemuze.
                 if (!blitzer.canDeclareAction() || blitzer.hasMoved) return;
+                if (blitzer.state == PlayerState::PRONE && !proneActionArm(mySide)) return;
                 if (blitzer.hasSkill(SkillName::BallAndChain)) return;
                 // Dosah se zkrati o vstani; pod 3 MA je vstani hod na 4+ a
                 // pohyb pak nula, takze blok plati GFI (r. 690-695).

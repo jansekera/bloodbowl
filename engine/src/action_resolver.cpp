@@ -1,4 +1,5 @@
 #include "bb/action_resolver.h"
+#include "bb/macro_actions.h"
 #include "bb/move_handler.h"
 #include "bb/block_handler.h"
 #include "bb/foul_handler.h"
@@ -126,6 +127,9 @@ ActionResult resolveAction(GameState& state, const Action& action,
 
             // If prone, stand up first
             if (player.state == PlayerState::PRONE) {
+                // M13 signal: blitz z lehu do 31.08. NESEL vubec, takze kazdy
+                // vyskyt je zmenena hra, ne jen "rameno bezelo".
+                noteProneBlitzDeclared();
                 ActionResult standResult = resolveStandUp(state, action.playerId, dice, events);
                 if (!standResult.success) return standResult;
             }

@@ -1,6 +1,7 @@
 #include "bb/rules_engine.h"
 #include "bb/helpers.h"
 #include "bb/pathfinder.h"
+#include "bb/macro_actions.h"
 
 namespace bb {
 
@@ -22,6 +23,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // Tataz trida jako Leap 24.08.: hotovy resolver bez volajiciho.
         if (!p.canDeclareAction()) return;
         const bool prone = (p.state == PlayerState::PRONE);
+        // M13 rameno (31.08.): dokud se nezmeri, chova se surova vrstva jako
+        // pred M13 -- lezici dostane jen vstani na miste ze samostatne smycky
+        // dole. Uzivatel 31.08.: "zkus to rozdelit na dve mereni kazde zvlast".
+        if (prone && !proneActionArm(side)) return;
 
         // BallAndChain players can ONLY use the BALL_AND_CHAIN action
         if (p.hasSkill(SkillName::BallAndChain)) {

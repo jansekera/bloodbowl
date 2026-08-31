@@ -274,6 +274,8 @@ int main(int argc, char** argv) {
                       : (mode == 12) ? 191'000'000u
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
+                      : (mode == 13) ? 233'000'000u
+                      : (mode == 14) ? 251'000'000u
                       : (mode == 8) ? 149'000'000u
                       : (mode == 9) ? 167'000'000u
                       : (mode == 10) ? 163'000'000u
@@ -288,6 +290,8 @@ int main(int argc, char** argv) {
          : mode == 12 ? "M12/(B): KLECOVE KRITERIUM samotne -- rameno PROTI PLACEBU"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
+         : mode == 13 ? "M13: lezici hrac smi deklarovat akci (r. 669-676)"
+         : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
          : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
          : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
          : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
@@ -314,6 +318,8 @@ int main(int argc, char** argv) {
     const char* rowsName = mode == 11 ? "diag_wrestleprice_rows.jsonl"
                          : mode == 10 ? "diag_blitzcont_rows.jsonl"
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
+                         : mode == 13 ? "diag_proneaction_rows.jsonl"
+                         : mode == 14 ? "diag_standpricing_rows.jsonl"
                          : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
                          : mode == 12 ? "diag_cagecrit_rows.jsonl"
@@ -466,6 +472,18 @@ int main(int argc, char** argv) {
                 // vyber blitzujiciho se oceni z pole, KAM DOJDE, ne z toho,
                 // kde stoji. Citac tika jen pri SKUTECNE zmene volby, takze
                 // nula pres matchup = obe ramena udelala totez => nulovy test.
+                // mode 13 (M13, 31.08.): lezici smi deklarovat akci. Signalem je
+                // BLITZ DEKLAROVANY Z LEHU -- to do M13 neslo vubec, takze
+                // kazdy vyskyt je zmenena hra.
+                bb::setProneActionArm(bb::TeamSide::HOME, mode == 13 && candHome);
+                bb::setProneActionArm(bb::TeamSide::AWAY, mode == 13 && !candHome);
+                bb::takeProneActionPicksInSearch();
+                // mode 14 (Q3, 31.08.): utekova nabidka + jeji ocenení nejhorsi
+                // souperovou odpovedi. Signalem je repick -- rameno vzalo vetev
+                // "vstat a zustat".
+                bb::setStandUpPricingArm(bb::TeamSide::HOME, mode == 14 && candHome);
+                bb::setStandUpPricingArm(bb::TeamSide::AWAY, mode == 14 && !candHome);
+                bb::takeStandUpPricingRepicksInSearch();
                 bb::setBlitzLandingArm(bb::TeamSide::HOME,
                                        mode == 8 && candHome);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY,
@@ -512,6 +530,8 @@ int main(int argc, char** argv) {
                 //   REPICK kriteria: zmenilo volbu proti vyberu bez nej?
                 long candCrit = bb::takeCageCritRepicksInSearch();
                 long candLanding = bb::takeBlitzLandingRepicksInSearch();
+                long candProne = bb::takeProneActionPicksInSearch();
+                long candPrice = bb::takeStandUpPricingRepicksInSearch();
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
@@ -540,6 +560,10 @@ int main(int argc, char** argv) {
                 g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
                 bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
                 bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
+                bb::setProneActionArm(bb::TeamSide::HOME, false);
+                bb::setProneActionArm(bb::TeamSide::AWAY, false);
+                bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
+                bb::setStandUpPricingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);
@@ -569,6 +593,8 @@ int main(int argc, char** argv) {
                 // protože se ho lidi naučí ignorovat.
                 pr.armEvents += (mode == 4) ? candDaunt
                               : (mode == 5) ? candPush
+                              : (mode == 13) ? candProne
+                              : (mode == 14) ? candPrice
                               : (mode == 8) ? candLanding
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
@@ -670,7 +696,8 @@ int main(int argc, char** argv) {
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12);
+             mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
+             mode == 13 || mode == 14);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí

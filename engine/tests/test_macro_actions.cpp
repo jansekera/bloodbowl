@@ -2844,22 +2844,26 @@ int countRepositionFor(const std::vector<Macro>& ms, int playerId) {
 } // namespace
 
 TEST(Q3StandUp, ProneNextToEnemyGetsBothStayAndEscape) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
     GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
     std::vector<Macro> ms;
     getAvailableMacros(s, ms);
-    // ⭐ dvě nabídky pro téhož hráče: vstát a zůstat + vstát a odejít
-    EXPECT_EQ(countRepositionFor(ms, 1), 2);
-    bool stay = false, escape = false;
+    // ⭐ Jádro kroku A: útěk MUSÍ být mezi nabídkami. Jestli u něj zůstane
+    // i „vstát a zůstat" rozhoduje až ocenění (krok B) — obojí sedí pod týmž
+    // vypínačem, takže se to tu netvrdí. Držení pozice u nosiče má vlastní test.
+    bool escape = false;
     for (auto& m : ms) {
         if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
-        if (m.targetPos == Position{10, 7}) stay = true;
-        else escape = true;
+        if (m.targetPos != Position{10, 7}) escape = true;
     }
-    EXPECT_TRUE(stay)   << "zmizela původní nabídka vstát a zůstat";
     EXPECT_TRUE(escape) << "nenabídlo se vstát a odejít";
+    EXPECT_GE(countRepositionFor(ms, 1), 1);
 }
 
 TEST(Q3StandUp, EscapeSquareIsOutOfEveryEnemyTacklezone) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
     GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
     std::vector<Macro> ms;
     getAvailableMacros(s, ms);
@@ -2872,6 +2876,8 @@ TEST(Q3StandUp, EscapeSquareIsOutOfEveryEnemyTacklezone) {
 }
 
 TEST(Q3StandUp, ProneWithoutEnemyContactGetsOnlyTheStayOffer) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
     // Bez kontaktu není před čím utíkat; stojícího si příští kolo převezme
     // obecná REPOSITION smyčka.
     GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
@@ -2882,6 +2888,8 @@ TEST(Q3StandUp, ProneWithoutEnemyContactGetsOnlyTheStayOffer) {
 }
 
 TEST(Q3StandUp, BoxedInProneGetsNoEscapeOfferAndThatIsRecorded) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
     // Když je každé dosažitelné pole pokryté, možnost NEEXISTUJE — a je to
     // jiný nález než „možnost se nevybrala". Proto vlastní čítač.
     takeStandEscapeImpossibleInSearch();          // vynuluj
@@ -2901,12 +2909,17 @@ TEST(Q3StandUp, BoxedInProneGetsNoEscapeOfferAndThatIsRecorded) {
 // o soupeři, ne o větvi, a náš soupeř je naše vlastní AI.
 // ============================================================================
 
-TEST(Q3Pricing, ArmIsOffByDefaultSoTheOfferSetIsUnchanged) {
+TEST(Q3Pricing, ArmOffRestoresExactlyTheOldSingleOffer) {
+    // ⭐ Vypnuté rameno musí vrátit stav před 31.08.: ležící u soupeře dostane
+    // JEDINOU nabídku — vstát a zůstat. Ani útěk, ani ocenění.
     GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
     s.getPlayer(12).skills.add(SkillName::MightyBlow);
     std::vector<Macro> ms;
     getAvailableMacros(s, ms);
-    EXPECT_EQ(countRepositionFor(ms, 1), 2) << "rameno zasáhlo, ačkoli je vypnuté";
+    EXPECT_EQ(countRepositionFor(ms, 1), 1);
+    for (auto& m : ms)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1)
+            EXPECT_EQ(m.targetPos, (Position{10, 7}));
 }
 
 TEST(Q3Pricing, ArmDropsStayNextToAMightyBlowHitterWhenEscapeIsCheaper) {
