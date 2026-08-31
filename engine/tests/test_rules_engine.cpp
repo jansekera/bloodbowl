@@ -194,3 +194,106 @@ TEST(RulesEngine, NoMovementLeftNoMoveActions) {
     int moveCount = countActionsOfType(actions, ActionType::MOVE);
     EXPECT_EQ(moveCount, 0);
 }
+
+// ============================================================================
+// M13, KROK A (31.08.2026): LEŽÍCÍ HRÁČ SMÍ DEKLAROVAT AKCI
+//
+// BB2016 ř. 669-676: „While Prone, the player ... may do nothing before
+// standing up at a cost of three squares of his movement WHEN HE NEXT TAKES AN
+// ACTION. ... The player may take any Action other than a Block Action."
+//
+// Do 31.08. vracel `getAvailableActions` ležícímu JEDINOU akci: MOVE na vlastní
+// pole (vstát a skončit). Resolver přitom vstávání před pohybem i před blitzem
+// uměl už dřív -- chyběla NABÍDKA. Krok A otevírá právě a jen MOVE.
+// ============================================================================
+namespace {
+
+// Ležící HOME hráč na {10,7}, kolem samé prázdno.
+GameState makeProneState(int ma, bool jumpUp = false, bool rooted = false) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, ma);
+    Player& p = gs.getPlayer(1);
+    p.state = PlayerState::PRONE;
+    p.rooted = rooted;
+    if (jumpUp) p.skills.add(SkillName::JumpUp);
+    return gs;
+}
+
+bool hasMoveTo(const std::vector<Action>& as, Position dest) {
+    for (auto& a : as)
+        if (a.type == ActionType::MOVE && a.target == dest) return true;
+    return false;
+}
+
+} // namespace
+
+TEST(RulesEngineProne, ProneMa6IsOfferedRealStepsNotJustStandingUp) {
+    GameState gs = makeProneState(/*ma=*/6);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+
+    // vstání na místě tu bylo i před M13 -- musí zůstat
+    EXPECT_TRUE(hasMoveTo(as, {10, 7})) << "vstání na místě se ztratilo";
+    // ⭐ jádro kroku A: po vstání (6-3=3) mu zbývá pohyb, takže smí i krok
+    EXPECT_TRUE(hasMoveTo(as, {11, 7})) << "ležící nedostal žádný skutečný krok";
+    EXPECT_EQ(countActionsOfType(as, ActionType::MOVE), 9);  // 8 sousedů + vlastní pole
+}
+
+TEST(RulesEngineProne, ProneIsNeverOfferedBlockOrAnythingBelowTheStepGate) {
+    GameState gs = makeProneState(/*ma=*/6);
+    // soused, na kterého by se dalo útočit, kdyby to šlo
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+
+    // ř. 674-676 zakazuje blok z lehu VÝSLOVNĚ
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLOCK), 0);
+    // blitz z lehu je legální, ale je to KROK B (dosah se musí zkrátit)
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
+    EXPECT_EQ(countActionsOfType(as, ActionType::FOUL), 0);
+    EXPECT_EQ(countActionsOfType(as, ActionType::HYPNOTIC_GAZE), 0);
+}
+
+TEST(RulesEngineProne, StunnedPlayerGetsNothing) {
+    GameState gs = makeProneState(/*ma=*/6);
+    gs.getPlayer(1).state = PlayerState::STUNNED;
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    // ř. 690 pouští vstání jen z Prone
+    EXPECT_EQ(countActionsOfType(as, ActionType::MOVE), 0);
+}
+
+TEST(RulesEngineProne, SubThreeMovementStillGetsAStepBecauseItIsAGfi) {
+    // MA2 (treeman): vstání je hod na 4+ a pohyb se pak nuluje, ale ř. 693
+    // dovoluje jít dál "unless he Goes For It" => krok se nabídnout MÁ.
+    GameState gs = makeProneState(/*ma=*/2);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_TRUE(hasMoveTo(as, {11, 7}));
+}
+
+TEST(RulesEngineProne, RootedProneGetsNoStepBecauseHeMayNotGoForIt) {
+    // Take Root (ř. 8577-8578) bere GFI. MA3 => po vstání 0 a bez GFI
+    // není čím krok zaplatit. Hlídá, že se GFI nepřičetlo paušálně.
+    GameState gs = makeProneState(/*ma=*/3, /*jumpUp=*/false, /*rooted=*/true);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_FALSE(hasMoveTo(as, {11, 7}));
+    EXPECT_TRUE(hasMoveTo(as, {10, 7})) << "vstát na místě smí i zakořeněný";
+}
+
+TEST(RulesEngineProne, JumpUpStandsForFreeSoTheWholeMoveIsStillThere) {
+    // ř. 8196-8198: vstání zdarma při jiné akci než blok.
+    GameState gsPlain = makeProneState(/*ma=*/3);
+    GameState gsJump  = makeProneState(/*ma=*/3, /*jumpUp=*/true);
+    std::vector<Action> a1, a2;
+    getAvailableActions(gsPlain, a1);
+    getAvailableActions(gsJump, a2);
+    // bez Jump Up: 3-3 = 0 a krok je GFI (nabídne se)
+    // s Jump Up:   zůstávají 3 pole -- taky se nabídne, ale ne z GFI
+    EXPECT_TRUE(hasMoveTo(a1, {11, 7}));
+    EXPECT_TRUE(hasMoveTo(a2, {11, 7}));
+}

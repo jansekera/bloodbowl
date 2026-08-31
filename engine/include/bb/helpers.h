@@ -51,6 +51,13 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
 // zpusobilo, ze oprava sedela jen v jedne z obou kopii.
 int maxGfiSquares(const Player& player);
 
+// Kolik pohybu hraci zbyde POTE, co vstane -- pro stojiciho je to jeho pohyb.
+// BB2016 r. 690-695: vstani stoji TRI pole; pod 3 MA je to hod na 4+ a po nem
+// "he may not move further squares unless he Goes For It" (=> nula).
+// r. 8196-8198: Jump Up vstava ZDARMA, pokud nedeklaroval Block Action.
+// Jedno misto pro pravidlo -- pouziva ho nabidka akci i vyber zvedace mice.
+int movementAfterStandUp(const Player& player);
+
 int calculateLeapTarget(const Player& player);
 int calculatePickupTarget(const GameState& state, const Player& player);
 // Same roll, priced as if `player` stood on `at` -- macro generation needs

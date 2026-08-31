@@ -50,6 +50,13 @@ Position pickApproachStep(const GameState& state, const Player& mover,
     return bestNext;
 }
 
+int movementAfterStandUp(const Player& player) {
+    const int mv = static_cast<int>(player.movementRemaining);
+    if (player.state != PlayerState::PRONE) return mv;
+    if (player.hasSkill(SkillName::JumpUp)) return mv;   // r. 8196-8198
+    return mv >= 3 ? mv - 3 : 0;                          // r. 690-695
+}
+
 int maxGfiSquares(const Player& player) {
     if (player.rooted) return 0;                                  // r. 8577-8578
     return player.hasSkill(SkillName::Sprint) ? 3 : 2;            // r. 8487-8490

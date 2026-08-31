@@ -16,10 +16,16 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
     out.push_back({ActionType::END_TURN, -1, -1, {-1, -1}});
 
     state.forEachOnPitch(side, [&](const Player& p) {
-        if (!p.canAct()) return;
+        // M13 (31.08.2026): DEKLAROVAT smi i lezici (BB2016 r. 669-676).
+        // Resolver to uz umel -- `MOVE` i `BLITZ` maji vetev "if prone, stand
+        // up first" (action_resolver.cpp:96, :127) -- chybela jen NABIDKA.
+        // Tataz trida jako Leap 24.08.: hotovy resolver bez volajiciho.
+        if (!p.canDeclareAction()) return;
+        const bool prone = (p.state == PlayerState::PRONE);
 
         // BallAndChain players can ONLY use the BALL_AND_CHAIN action
         if (p.hasSkill(SkillName::BallAndChain)) {
+            if (prone) return;   // krok A meri jen MOVE; B&C z lehu neresime
             out.push_back({ActionType::BALL_AND_CHAIN, p.id, -1, {-1, -1}});
             return; // Skip all other action types
         }
@@ -34,10 +40,30 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             // Take Root, l. 8577-8578: zakorenený "may not Go For It" -- MA 0
             // by mu jinak porad nechalo dva kroky pres GFI.
             int maxGfi = p.rooted ? 0 : (p.hasSkill(SkillName::Sprint) ? 3 : 2);
-            if (p.movementRemaining - 1 < -maxGfi) continue;
+            // Lezici plati vstani ze SVEHO pohybu (3 pole, r. 690-695) jeste
+            // nez udela prvni krok, takze rozpocet se pocita az PO nem.
+            // Pod 3 MA vstani nuluje pohyb => krok je pak nutne GFI, coz je
+            // presne to, co pravidlo dovoluje ("unless he Goes For It").
+            if (movementAfterStandUp(p) - 1 < -maxGfi) continue;
 
             out.push_back({ActionType::MOVE, p.id, -1, pos});
         }
+
+        // ⛔⛔ ZAVOR KROKU A (M13, 31.08.2026): vyse je JEDINA akce, kterou
+        // lezici v tomhle kroku dostane -- MOVE. Vsechno nize je zamerne
+        // NEDOSTUPNE, a NENI to opatrnost, je to spravnost:
+        //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
+        //                 Jump Up (r. 8200-8204, AG roll +2) je polozka A2 a
+        //                 resolver pro ni neexistuje.
+        //   BLITZ      -- legalni z lehu (blitz neni Block Action) a resolver
+        //                 to umi (action_resolver.cpp:127), ale nabidka musi
+        //                 zkratit DOSAH o vstani. To je KROK B, merena zmena.
+        //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB/MULTIPLE_BLOCK
+        //              -- vetsina je z lehu podle pravidel legalni (r. 676),
+        //                 ale jejich resolvery vetev "if prone, stand up first"
+        //                 NEMAJI. Nabidnout je ted znamena zahrat je Z LEHU,
+        //                 tedy vyrobit nelegalni tah misto opravy chybejiciho.
+        if (prone) return;
 
         // LEAP -- BB2016 l. 8270-8283: "allowed to jump to any EMPTY square
         // WITHIN 2 SQUARES even if it requires jumping over a player from

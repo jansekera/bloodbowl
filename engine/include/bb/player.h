@@ -97,6 +97,23 @@ struct Player {
         return bb::canAct(state) && !hasActed && !lostTacklezones;
     }
 
+    // M13 (31.08.2026) -- BB2016 r. 669-676: "While Prone, the player ... may
+    // do nothing before standing up at a cost of three squares of his movement
+    // WHEN HE NEXT TAKES AN ACTION. ... The player may take any Action other
+    // than a Block Action."
+    // ⇒ LEZICI HRAC SMI DEKLAROVAT AKCI. `canAct()` to zakazovalo vsem, protoze
+    // v nem splyvaji DVE ruzne otazky: "smi tenhle hrac zacit akci?" a "stoji
+    // (ma tacklezonu, jde chytit, jde asistovat, jde ho blokovat)?" -- na tu
+    // druhou se `canAct` pta na desitkach mist (pass_handler, gaze_handler,
+    // move_handler, block_handler asistence), a tam PRONE patri dal ven.
+    // Proto novy predikat misto zmeny stareho; rules_engine.cpp:70 si na to
+    // splynuti stezoval uz driv.
+    // ⛔ STUNNED ne: r. 690 pousti vstani jen z Prone.
+    bool canDeclareAction() const {
+        return (state == PlayerState::STANDING || state == PlayerState::PRONE)
+               && !hasActed && !lostTacklezones;
+    }
+
     bool canMove() const {
         return bb::canAct(state) && !lostTacklezones && movementRemaining > 0;
     }

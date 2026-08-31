@@ -1091,12 +1091,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // pod 3 MA je vstani na 4+ a `resolveStandUp` pak nuluje pohyb
             // (move_handler.cpp:390, "any further step must be a GFI"), takze
             // zbytek je v obou tech pripadech presne to, co zbyde.
-            int afterStand = p.movementRemaining;
-            if (prone && !p.hasSkill(SkillName::JumpUp)) {
-                afterStand = (p.movementRemaining >= 3)
-                                 ? p.movementRemaining - 3
-                                 : 0;
-            }
+            const int afterStand = movementAfterStandUp(p);
 
             int dist = p.position.distanceTo(state.ball.position);
             int maxReach = afterStand + maxGfiSquares(p);
