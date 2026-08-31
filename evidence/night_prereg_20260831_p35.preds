@@ -74,3 +74,41 @@ delta_1s in -0.025 0.025
 #
 # ⏰ SPUSTIT AZ VECER. [[project_bloodbowl_night_launch_timing_20260820]]:
 #   noc patri na KONEC dne, protoze behem ni se nesmi prestavet .so.
+
+# ============================================================================
+# DODATEK 31.08. 14:00 — PREDREGISTRACE PLATI, ALE ENGINE SE OD JEJIHO PSANI
+# ZMENIL. Pise se PRED behem, beh nezacal.
+#
+# ⭐ CO SE ZMENILO: na zadost uzivatele ("zkus to rozdelit na dve mereni kazde
+#   zvlast") jsou M13 i Q3 od 13:45 za VLASTNIMI vypinaci (setProneActionArm,
+#   setStandUpPricingArm), oba default OFF. Noc je tedy uz nenese.
+#
+# LIGHT TEST PROTI FINALNIMU BUILDU (12 paru, dw-we, harness 13:45):
+#   leak 0 · arm acted 12/12 · n_nonzero 5/12 = 41,7 %
+#   ARM PICKS TOTAL 2 268 = 94,50/hru
+#   PAIRED delta -0,1250 +- 0,1334 SE (~0,9 SE)
+#   Q3/UTEK: nabidnut 0  <== ⭐ DUKAZ, ZE ROZDELENI DRZI: Q3 rameno je v mode 8
+#                             vypnute, takze utekova nabidka NEVZNIKA vubec.
+#
+# ⛔ TA DELTA NENI VYSLEDEK. 12 paru, 0,9 SE. Je ZAPORNA, a prave proto ji
+#   sem pisu: kdyby noc vysla zaporne, nesmi to vypadat, ze se to "cekalo",
+#   a kdyby vysla kladne, nesmi se tenhle naznak zamlcet. Beh se podle ni
+#   NEDIMENZUJE ANI NEZASTAVUJE.
+#
+# ⚠️ REPICKY NA HRU SE HYBOU — a je to duvod, proc predregistrace zakazuje
+#   citovat strop z 19.08.:
+#       25.08. (pred M13, pred P37)   127,50/hru
+#       31.08. 11:00 (M13 v produkci) 146,92/hru
+#       31.08. 14:00 (M13 za vypinacem, P37 v produkci)  94,50/hru
+#   ⇒ P37 (carrierIsBlitzable zna GFI) posunul cislo DOLU o tretinu proti
+#     25.08. Baze se dnes hybala TRIKRAT. Absolutni cisla z noci se proto
+#     nesmi srovnat s nicim starsim -- plati JEN parova delta.
+#     [[feedback_moving_baseline_only_paired_ab]]
+#
+# ✅ PREDPOVED n_nonzero (0,35-0,90) DRZI i po zmene: 41,7 % je uvnitr.
+#   Pasmo bylo odvozeno z rannho light testu (66,7 %); dnesni build dal 41,7 %,
+#   takze pasmo bylo dost siroke prave proto, ze se opiralo o pozorovani
+#   aparatu a ne o jedno cislo.
+#
+# ZADANI ZUSTAVA: --mode 8 --matchups "1:dw-we:1" --pairs 1680 --chunks 48
+#                 --workers 4
