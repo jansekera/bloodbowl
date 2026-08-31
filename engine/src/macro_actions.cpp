@@ -1642,14 +1642,38 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
 }
 
 // Can any standing opponent reach the carrier with a blitz on their next
-// activation? Same approximation as feature f63 (carrier_blitzable,
-// feature_extractor.cpp): chebyshev(opp, carrier) <= opp MA.
+// activation?
+//
+// P37 (31.08.2026) -- BB2016 l. 347-350: "Blitz: The player may move a number
+// of squares equal to their MA. He may make one block during the move. The
+// block ... 'costs' one square of movement." So reaching a carrier at
+// chebyshev distance d costs d-1 squares to close plus 1 for the block = d.
+// The test was `d <= MA`, which is right for the movement but FORGETS GOING
+// FOR IT: l. 8487-8490 grants 2 more squares (3 with Sprint), and l. 8577-8578
+// takes them away from a rooted player. A blitz on GFI is a normal blitz.
+// ⇒ the reach is `d <= MA + maxGfiSquares(opp)`.
+//
+// Why it matters where it is read: this decides whether the carrier keeps
+// movement in reserve (carrierStallAwareSteps). Understating the opponent's
+// reach makes the carrier hold movement back in exactly the turns where the
+// blitz is already coming -- the reserve buys nothing and the exposure is paid.
+//
+// ⚠️ Feature f63 (carrier_blitzable, feature_extractor.cpp:356-362) uses the
+// OLD approximation and is deliberately left alone: it is a network input, so
+// changing it shifts the input distribution under an already-trained policy.
+// The two are no longer the same test -- see ledger row P37.
+//
+// ⚠️ Prone opponents are still skipped. Per l. 674-676 a prone player MAY
+// declare a Blitz Action (standing up costs 3 of his MA), so this understates
+// reach for them too -- but our engine cannot play that yet, so counting it
+// here would predict a blitz the opponent is unable to make. Belongs to M13.
 static bool carrierIsBlitzable(const GameState& state, const Player& carrier) {
     bool blitzable = false;
     state.forEachOnPitch(opponent(carrier.teamSide), [&](const Player& opp) {
         if (blitzable) return;
         if (opp.state != PlayerState::STANDING) return;
-        if (opp.position.distanceTo(carrier.position) <= opp.stats.movement) {
+        const int reach = static_cast<int>(opp.stats.movement) + maxGfiSquares(opp);
+        if (opp.position.distanceTo(carrier.position) <= reach) {
             blitzable = true;
         }
     });

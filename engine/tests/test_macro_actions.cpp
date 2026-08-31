@@ -2710,3 +2710,86 @@ TEST(MacroActions, Q3GaugeSeparatesADangerousNeighbourFromAnOrdinaryOne) {
     EXPECT_EQ(takeStandOfferedNextToHitterInSearch(), 1)
         << "soused s Mighty Blow => rána zdarma je navíc DRAHÁ";
 }
+
+// ============================================================================
+// P37 (31.08.2026): carrierIsBlitzable MUSÍ ZNÁT GOING FOR IT
+//
+// BB2016 ř. 347-350: blitz = pohyb do MA, blok "costs one square of movement".
+// Na cíl ve vzdálenosti d se tedy utratí d-1 na doběh + 1 na blok = d.
+// Ř. 8487-8490 přidává 2 pole GFI (3 se Sprintem), ř. 8577-8578 je bere
+// zakořeněnému. ⇒ dosah je MA + maxGfiSquares, ne MA.
+//
+// Test je postavený tak, aby ROZLIŠIL právě ten GFI pruh: soupeř stojí
+// ve vzdálenosti, která je nad MA a pod MA+GFI. Kdyby se opravilo cokoli
+// jiného (třeba +1 za blok), čísla nesednou.
+// ============================================================================
+namespace {
+
+// Nosič HOME na {13,7}: MA6, do endzóny (x=25) je 12 polí, kolo 6 => zbývají
+// 3 kola => idealSteps = (12+2)/3 = 4, ale maxSafe = MA/2 = 3.
+//   soupeř MIMO dosah  -> šetří se pohyb: 3 kroky
+//   soupeř V dosahu    -> plný sprint:    4 kroky
+// Ta dvojka 3 vs 4 je celý rozdíl, který test čte.
+GameState makeP37State(Position oppPos, bool sprint, bool rooted) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 6;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& carrier = state.getPlayer(1);
+    carrier.id = 1;
+    carrier.teamSide = TeamSide::HOME;
+    carrier.state = PlayerState::STANDING;
+    carrier.position = {13, 7};
+    carrier.stats = {6, 3, 3, 8};
+    carrier.movementRemaining = 6;
+
+    Player& opp = state.getPlayer(12);
+    opp.id = 12;
+    opp.teamSide = TeamSide::AWAY;
+    opp.state = PlayerState::STANDING;
+    opp.position = oppPos;
+    opp.stats = {6, 3, 3, 8};
+    opp.movementRemaining = 6;
+    opp.rooted = rooted;
+    if (sprint) opp.skills.add(SkillName::Sprint);
+
+    state.ball = BallState::carried({13, 7}, 1);
+    return state;
+}
+
+constexpr int kReserved = 3;   // šetří pohyb (maxSafe = MA/2)
+constexpr int kSprintOut = 4;  // utrácí naplno (idealSteps)
+
+} // namespace
+
+TEST(CarrierStallAware, OpponentBeyondMaPlusGfiStillLetsTheCarrierHoldMovementBack) {
+    // vzdálenost 9 > MA6 + GFI2 = 8 -> nedosáhne ani na GFI
+    GameState s = makeP37State({22, 7}, /*sprint=*/false, /*rooted=*/false);
+    EXPECT_EQ(carrierStallAwareSteps(s, s.getPlayer(1), s.homeTeam), kReserved);
+}
+
+TEST(CarrierStallAware, OpponentInsideTheGfiBandCountsAsBlitzable) {
+    // ⭐ jádro P37: vzdálenost 7 je NAD MA6 a POD MA6+GFI2=8.
+    // Před opravou vyšlo 3 (rezerva), a ta rezerva byla k ničemu -- blitz
+    // stejně přišel. Po opravě 4.
+    GameState s = makeP37State({20, 7}, /*sprint=*/false, /*rooted=*/false);
+    EXPECT_EQ(carrierStallAwareSteps(s, s.getPlayer(1), s.homeTeam), kSprintOut);
+}
+
+TEST(CarrierStallAware, SprintExtendsTheBlitzReachByOneMoreSquare) {
+    // Sprint dává 3 pole GFI (ř. 8487-8490) -> dosah 9, tedy i na 9 dosáhne.
+    GameState s = makeP37State({22, 7}, /*sprint=*/true, /*rooted=*/false);
+    EXPECT_EQ(carrierStallAwareSteps(s, s.getPlayer(1), s.homeTeam), kSprintOut);
+}
+
+TEST(CarrierStallAware, RootedOpponentGetsNoGfiSoTheGfiBandIsSafeAgain) {
+    // Zakořeněný nesmí GFI (ř. 8577-8578) -> dosah zpět na MA6, 7 je mimo.
+    // Tenhle test hlídá, že se nepřičetlo GFI paušálně.
+    GameState s = makeP37State({20, 7}, /*sprint=*/false, /*rooted=*/true);
+    EXPECT_EQ(carrierStallAwareSteps(s, s.getPlayer(1), s.homeTeam), kReserved);
+}
