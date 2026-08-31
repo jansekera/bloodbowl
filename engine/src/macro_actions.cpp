@@ -890,8 +890,22 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             int targetBestScore = -999;
 
             state.forEachOnPitch(mySide, [&](const Player& blitzer) {
-                if (!isFreeToAct(blitzer)) return;
+                // M13 krok C (31.08.2026): BLITZ smi i LEZICI (r. 676 --
+                // blitz neni Block Action). `isFreeToAct` zada STANDING, takze
+                // makro vrstva by lezici blitzery vynechala, zatimco surova
+                // vrstva (rules_engine, krok B) uz je nabizi. Ten nesoulad je
+                // horsi nez obe krajnosti: rollouty by ocenovaly tahy, ktere
+                // planovac nikdy nemuze vybrat.
+                // ⚠️ !hasMoved zustava: kdo se uz hnul, blitz deklarovat nemuze.
+                if (!blitzer.canDeclareAction() || blitzer.hasMoved) return;
                 if (blitzer.hasSkill(SkillName::BallAndChain)) return;
+                // Dosah se zkrati o vstani; pod 3 MA je vstani hod na 4+ a
+                // pohyb pak nula, takze blok plati GFI (r. 690-695).
+                if (blitzer.state == PlayerState::PRONE) {
+                    const int gfiB = blitzer.rooted ? 0 : maxGfiSquares(blitzer);
+                    if (movementAfterStandUp(blitzer) + gfiB
+                        < blitzer.position.distanceTo(def.position)) return;
+                }
 
                 int dice = getBlockDiceCount(state, blitzer, def, true, dauntlessInOffer);
                 int score = dice * 2;

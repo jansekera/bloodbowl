@@ -1396,6 +1396,41 @@ zbydou 3 pole.
 ⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
 neztratilo**, ne úkol.
 
+## ⏰ M13/S3 — RISK-DEFERRAL NA S3 JE ZNOVU NEZMĚŘENÝ *(31.08.2026)*
+
+**Co se stalo:** M13 pustil ležící hráče k akcím. `S3` (test_macro_mcts) má
+v aktivním týmu **6 ležících proti 4 stojícím**, takže se prostor tahů změnil
+podstatně — a `riskDeferral=true` na něm **zase odkládá** (REPOSITION místo
+BLITZ). Test `RiskDeferralNoLongerNeededOnS3AfterItem14` tvrdil opak.
+
+⭐ **Nebyl přepsán na zelenou.** Tvrdí teď jen to, co je pravda a co má smysl
+hlídat: *guard se tu zapíná a liší se od neodložené volby*.
+
+✅ **Produkce netknutá:** `riskDeferral` je default-OFF (`mcts.h:28`)
+a neodložená volba na S3 je pořád BLITZ — hlídá sesterský test, který nepadl.
+
+⛔ **Co je tím pádem NEZNÁMÉ:** jestli je odložení na S3 zlepšení. Stage-5
+čísla (turnover 32,5 → 7,0 %) byla stará už po item 14; teď jsou stará
+podruhé. ⇒ Kdyby se `riskDeferral` měl kdy zapnout, **musí se přeměřit**,
+a ne se opřít o žádný z těch dvou snímků.
+
+⚠️ **Poučení, které se opakuje:** test, který tvrdí *„po opravě X už není od
+čeho odkládat"*, je **snímek hledání**, ne pravidlo — a zestárne při první
+změně prostoru tahů. Viz [[feedback_measure_what_the_change_does]].
+
+## ⏰ P37b — BLITZ SE NABÍZÍ I TOMU, KDO UŽ NEMÁ ČÍM HODIT BLOK *(nález 31.08.)*
+
+`rules_engine.cpp`, větev „už sousedí": stojícímu se BLITZ nabídne **bez
+kontroly rozpočtu**. Blok při blitzu stojí pole pohybu (ř. 549-550), takže
+hráč s `movementRemaining <= -maxGfi` blitz deklaruje, `block_handler.cpp:480`
+ho odmítne hodit a **týmový blitz je utracen za nic**.
+
+⚠️ Vzácné (chce hráče, který se dostal na dno GFI vlastními kroky MOVE a pak
+teprve deklaruje blitz), ale **je to tatáž vada, kterou M13 opravil pro
+ležící** — jen pro stojící. Nezahrnuto do M13 schválně: mění to prostor tahů
+stojících hráčů, a to je vlastní změna s vlastním ověřením
+*(uživatelovo „jedna změna najednou")*.
+
 ## 🐢 P48 — SCREEN PRO ELFA *(zavedeno 21.08., ZÁMĚRNĚ NEJNIŽŠÍ PRIORITA)*
 
 **Původ:** rešerše 21.08. potvrdila, že klec je *„a staple tactic used by pretty

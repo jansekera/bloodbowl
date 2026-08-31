@@ -22,14 +22,13 @@ bool canReachAdjacentTo(const GameState& state, const Player& player,
                         int reserveMove) {
     if (!player.isOnPitch() || player.state == PlayerState::STUNNED) return false;
 
-    int maxMove = player.movementRemaining;
-    if (player.state == PlayerState::PRONE) {
-        if (player.hasSkill(SkillName::JumpUp)) {
-            // Free stand up
-        } else {
-            maxMove -= 3; // stand up cost
-        }
-    }
+    // M13 krok B (31.08.2026): rozpocet po vstani ma JEDNO misto
+    // (helpers.cpp, r. 690-695 + 8196-8198). Tady se drive odecitalo 3
+    // natvrdo, coz je vadne POD 3 MA: pravidlo tam nedava zaporny rozpocet,
+    // ale hod na 4+ a pak NULU ("he may not move further squares unless he
+    // Goes For It"). Treemanovi (MA2) vychazelo maxMove -1 a blitz z lehu
+    // se neanabidl ani pres GFI, ktere pravidlo vyslovne dovoluje.
+    const int maxMove = movementAfterStandUp(player);
 
     // N11 (24.08.2026): Take Root, l. 8577-8579 -- zakorenený "may not Go For
     // It, be pushed back for any reason, or use any skill that would allow him
@@ -54,10 +53,12 @@ bool canReachAdjacentTo(const GameState& state, const Player& player,
     PathNode queue[GRID_SIZE];
     int qHead = 0, qTail = 0;
 
-    int startCost = 0;
-    if (player.state == PlayerState::PRONE && !player.hasSkill(SkillName::JumpUp)) {
-        startCost = 3;
-    }
+    // ⭐⭐ M13 krok B (31.08.2026): VSTANI SE UCTOVALO DVAKRAT.
+    // `maxMove` uz vstani odecetl (vyse), a pak ho BFS ucetl jeste jednou jako
+    // pocatecni cenu 3. Lezici MA6 tak mel maxRange 3+2-1=4 a zaroven start na
+    // 3, takze mu na kroky zbyval JEDEN -- dosahl jen na souseda o dve pole.
+    // Rozpocet je pritom jeden: pohyb po vstani + GFI, minus 1 na blok.
+    const int startCost = 0;
 
     int startIdx = gridIdx(player.position.x, player.position.y);
     visited[startIdx] = true;

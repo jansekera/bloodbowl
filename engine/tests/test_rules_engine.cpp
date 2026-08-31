@@ -251,10 +251,9 @@ TEST(RulesEngineProne, ProneIsNeverOfferedBlockOrAnythingBelowTheStepGate) {
 
     // ř. 674-676 zakazuje blok z lehu VÝSLOVNĚ
     EXPECT_EQ(countActionsOfType(as, ActionType::BLOCK), 0);
-    // blitz z lehu je legální, ale je to KROK B (dosah se musí zkrátit)
-    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
     EXPECT_EQ(countActionsOfType(as, ActionType::FOUL), 0);
     EXPECT_EQ(countActionsOfType(as, ActionType::HYPNOTIC_GAZE), 0);
+    EXPECT_EQ(countActionsOfType(as, ActionType::LEAP), 0);
 }
 
 TEST(RulesEngineProne, StunnedPlayerGetsNothing) {
@@ -296,4 +295,70 @@ TEST(RulesEngineProne, JumpUpStandsForFreeSoTheWholeMoveIsStillThere) {
     // s Jump Up:   zůstávají 3 pole -- taky se nabídne, ale ne z GFI
     EXPECT_TRUE(hasMoveTo(a1, {11, 7}));
     EXPECT_TRUE(hasMoveTo(a2, {11, 7}));
+}
+
+// ============================================================================
+// M13, KROK B (31.08.2026): BLITZ Z LEHU
+//
+// Blitz NENÍ Block Action, takže spadá pod ř. 676 („may take any Action other
+// than a Block Action"). Do teď ho ležící nedostal nikdy — a právě o něj šlo
+// v uživatelově tahu z 27.08. („začal bych blitz z (14,2) na (14,3)").
+// ============================================================================
+
+TEST(RulesEngineProneBlitz, ProneIsOfferedBlitzOnAnAdjacentEnemy) {
+    GameState gs = makeProneState(/*ma=*/6);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 1);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLOCK), 0) << "blok z lehu je zakázaný";
+}
+
+TEST(RulesEngineProneBlitz, StandingPlayerReachesFurtherThanTheSameProneOne) {
+    // ⭐ Tenhle test drží celý smysl kroku B: TÁŽ pozice, TÝŽ hráč, jen leh.
+    // Kdyby se vstání do dosahu nezapočítalo, obě čísla by si byla rovna.
+    GameState up = makeProneState(/*ma=*/6);
+    up.getPlayer(1).state = PlayerState::STANDING;
+    placePlayer(up, 12, {16, 7}, TeamSide::AWAY);
+    GameState down = makeProneState(/*ma=*/6);
+    placePlayer(down, 12, {16, 7}, TeamSide::AWAY);
+    std::vector<Action> au, ad;
+    getAvailableActions(up, au);
+    getAvailableActions(down, ad);
+    EXPECT_EQ(countActionsOfType(au, ActionType::BLITZ), 1) << "stojící dosáhne";
+    EXPECT_EQ(countActionsOfType(ad, ActionType::BLITZ), 0)
+        << "ležící dosáhl stejně daleko => vstání se do dosahu nezapočítalo";
+}
+
+TEST(RulesEngineProneBlitz, RootedProneNextToEnemyGetsNoBlitzBecauseTheBlockIsUnpayable) {
+    // MA3 zakořeněný: po vstání 0 pohybu a bez GFI (ř. 8577-8578) není čím
+    // zaplatit blok (ř. 549-550) => blitz by se utratil za nic.
+    GameState gs = makeProneState(/*ma=*/3, /*jumpUp=*/false, /*rooted=*/true);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
+}
+
+TEST(RulesEngineProneBlitz, SubThreeMovementProneStillGetsAnAdjacentBlitzViaGfi) {
+    // MA2 treeman bez Take Root: vstání na 4+, pohyb 0, blok přes GFI --
+    // ř. 693 to výslovně dovoluje. Dřív `maxMove -= 3` dalo -1 a blitz zmizel.
+    GameState gs = makeProneState(/*ma=*/2);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 1);
+}
+
+TEST(RulesEngineProneBlitz, SubThreeMovementProneReachesAnEnemyTwoSquaresAwayOnGfi) {
+    // ⭐ Tenhle test drží opravu v PATHFINDERU, ne v nabídce: MA2 ležící,
+    // soupeř na 2 pole. Po vstání (hod 4+) je pohyb 0, ale GFI dovoluje
+    // krok + blok = 2 pole (ř. 693 „unless he Goes For It").
+    // Starý `maxMove -= 3` dal -1, rozpočet vyšel 0 a blitz zmizel --
+    // pravidlo pod 3 MA žádný záporný rozpočet nezná.
+    GameState gs = makeProneState(/*ma=*/2);
+    placePlayer(gs, 12, {12, 7}, TeamSide::AWAY);   // vzdálenost 2
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 1);
 }

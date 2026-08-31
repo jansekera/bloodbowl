@@ -49,21 +49,6 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             out.push_back({ActionType::MOVE, p.id, -1, pos});
         }
 
-        // ⛔⛔ ZAVOR KROKU A (M13, 31.08.2026): vyse je JEDINA akce, kterou
-        // lezici v tomhle kroku dostane -- MOVE. Vsechno nize je zamerne
-        // NEDOSTUPNE, a NENI to opatrnost, je to spravnost:
-        //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
-        //                 Jump Up (r. 8200-8204, AG roll +2) je polozka A2 a
-        //                 resolver pro ni neexistuje.
-        //   BLITZ      -- legalni z lehu (blitz neni Block Action) a resolver
-        //                 to umi (action_resolver.cpp:127), ale nabidka musi
-        //                 zkratit DOSAH o vstani. To je KROK B, merena zmena.
-        //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB/MULTIPLE_BLOCK
-        //              -- vetsina je z lehu podle pravidel legalni (r. 676),
-        //                 ale jejich resolvery vetev "if prone, stand up first"
-        //                 NEMAJI. Nabidnout je ted znamena zahrat je Z LEHU,
-        //                 tedy vyrobit nelegalni tah misto opravy chybejiciho.
-        if (prone) return;
 
         // LEAP -- BB2016 l. 8270-8283: "allowed to jump to any EMPTY square
         // WITHIN 2 SQUARES even if it requires jumping over a player from
@@ -72,7 +57,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // ⛔ Tahle nabidka tu do 24.08.2026 nebyla, takze `resolveLeap` -- hotovy
         // a se tremi zelenymi testy -- nemel volajiciho a nikdo nikdy neskocil.
         // Je to tataz trida jako P45 vstavani: resolver bez nabidky.
-        if (p.hasSkill(SkillName::Leap) && !p.leapUsedThisTurn && !p.rooted) {
+        // ⏰ Leap z lehu: rozpocet by musel odecist vstani a resolveLeap
+        //    vetev "stand up first" nema. Mimo M13.
+        if (p.hasSkill(SkillName::Leap) && !p.leapUsedThisTurn && !p.rooted && !prone) {
             int maxGfi = p.hasSkill(SkillName::Sprint) ? 3 : 2;
             if (p.movementRemaining - 2 >= -maxGfi) {
                 for (int dx = -2; dx <= 2; ++dx) {
@@ -95,7 +82,13 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // BLITZ, and that is one per turn (gated below by blitzUsedThisTurn).
         // canAct() cannot carry this: it is also used for targeting checks.
         TeamSide enemySide = opponent(side);
+        // ⛔ BLOK Z LEHU NIKDY (r. 674-676, vyslovne). Jedina vyjimka je
+        // Jump Up (r. 8200-8204: Block Action z lehu na AG roll +2) -- to je
+        // polozka A2 a resolver pro ni neexistuje, takze se nenabizi.
+        // ⚠️ Tahle straz musi byt VYSLOVNA: `p.hasMoved` je v okamziku
+        // deklarace jeste false, takze zavor nize by blok lezicimu nezabranil.
         for (auto& pos : adj) {
+            if (prone) break;
             // ⚠️ VÝJIMKA PRO BLITZ (oprava 21.08.): pohyb + blok JE blitz.
             // `expandBlitzAndScore` provede BLITZ akci, pak si dojde k cíli
             // vlastními kroky MOVE a teprve pak hledá BLOCK -- holé
@@ -111,6 +104,12 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         }
 
         // BLITZ: if not used this turn, each reachable enemy
+        // M13 krok B (31.08.2026): NABIZI SE I Z LEHU. Blitz neni Block Action,
+        // takze spada pod r. 676 "may take any Action other than a Block
+        // Action"; resolver ho umi (action_resolver.cpp:127 vstane a teprve pak
+        // se hybe) a `canReachAdjacentTo` uz dosah o vstani zkracuje.
+        // ⭐ Odsud je uzivateluv tah z 27.08. ("zacal bych blitz z (14,2)")
+        // vubec zahratelny -- do ted lezici hrac blitz NIKDY nedostal.
         if (!team.blitzUsedThisTurn && !p.usedBlitz) {
             state.forEachOnPitch(enemySide, [&](const Player& enemy) {
                 if (!canAct(enemy.state) && !isOnPitch(enemy.state)) return;
@@ -118,7 +117,17 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
 
                 // Check if already adjacent
                 if (p.position.distanceTo(enemy.position) == 1) {
-                    // Already adjacent — blitz is just a block with blitz flag
+                    // Uz sousedi: blitz je jen blok s priznakem -- ale i ten
+                    // BLOK STOJI JEDNO POLE (r. 549-550), a lezici na nej musi
+                    // mit z ceho zaplatit AZ PO vstani. Bez teto podminky by
+                    // se lezicimu s MA3 nabidl blitz, ktery po vstani (3-3=0)
+                    // hodi GFI, a zakorenenemu blitz, ktery se nehodi vubec --
+                    // v obou pripadech se utrati tymovy blitz za nic.
+                    if (prone) {
+                        const int gfi = p.rooted ? 0
+                                      : (p.hasSkill(SkillName::Sprint) ? 3 : 2);
+                        if (movementAfterStandUp(p) - 1 < -gfi) return;
+                    }
                     out.push_back({ActionType::BLITZ, p.id, enemy.id, enemy.position});
                     return;
                 }
@@ -133,6 +142,19 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                 }
             });
         }
+
+        // ⛔⛔ ZAVOR M13 (31.08.2026): lezici dostane MOVE (krok A) a BLITZ
+        // (krok B). Vsechno nize je zamerne NEDOSTUPNE, a NENI to opatrnost,
+        // je to spravnost:
+        //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
+        //                 Jump Up (r. 8200-8204, AG roll +2) je polozka A2 a
+        //                 resolver pro ni neexistuje.
+        //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB/MULTIPLE_BLOCK
+        //              -- vetsina je z lehu podle pravidel legalni (r. 676),
+        //                 ale jejich resolvery vetev "if prone, stand up first"
+        //                 NEMAJI. Nabidnout je ted znamena zahrat je Z LEHU,
+        //                 tedy vyrobit nelegalni tah misto opravy chybejiciho.
+        if (prone) return;
 
         // PASS: if not used this turn, has ball, each standing teammate within range 13
         if (!team.passUsedThisTurn && state.ball.isHeld && state.ball.carrierId == p.id &&
