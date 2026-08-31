@@ -117,3 +117,10 @@ leapwalk_*/
 # (feedback_no_run_artifacts_in_git, 26.08.2026)
 ab_*_2026*/
 q3_fouls_*_data/
+
+# 31.08.: pracovní řádky harnessu v KOŘENI repa. Harness je přepisuje při
+# každém spuštění (i při light testu), takže se pracovní strom pořád špiní
+# a `git status` přestává být užitečný. Je to MATERIÁL běhu podle téhož
+# pravidla velikost × životnost jako shardy výše — vyhodnocení jde do evidence/.
+# ⛔ Soubory se NEMAŽOU, jen se vyřazuje sledování (git rm --cached).
+/diag_*_rows.jsonl
