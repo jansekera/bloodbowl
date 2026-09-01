@@ -1826,6 +1826,24 @@ static bool executeAndRecord(GameState& state, const Action& action,
 
 // Find and execute MOVE actions for playerId toward target, up to maxSteps.
 // Uses state-aware scoring to avoid enemy tackle zones (prefers safe routes).
+// ⭐ MERIDLO MAKROVE CHUZE (01.09.2026, uzivatel: "zkontroluj poradne vsechno
+//   okolo pohybu"). `movePlayerToward` ma ctyri mista, kde se VZDA, a kazde
+//   znamena neco jineho:
+//     NENASEL  findMoveToward nevratil krok (obsazeno / mimo rozpocet)
+//     OBCHAZKA cesta by se vzdalila o vic nez JEDNO pole => makro SELZE CELE.
+//              ⛔ Podezrele: screen nebo klec vynuti dvoupolovou obchazku
+//                 a hrac se nehne vubec. Merime nez opravujeme.
+//     SMYCKA   krok zpet na predchozi pole bez priblizeni
+//     STOJI    akce vratila ok(), ale hrac se nepohnul (Tentacles)
+//     LIMIT    dosel maxSteps
+thread_local long g_mwNoStep = 0, g_mwDetour = 0, g_mwLoop = 0,
+                  g_mwStuck = 0, g_mwLimit = 0;
+void takeMoveWalkBailout(long* out5) {
+    out5[0]=g_mwNoStep; out5[1]=g_mwDetour; out5[2]=g_mwLoop;
+    out5[3]=g_mwStuck;  out5[4]=g_mwLimit;
+    g_mwNoStep=g_mwDetour=g_mwLoop=g_mwStuck=g_mwLimit=0;
+}
+
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
                               int maxSteps = 12, Position avoid = {-1, -1}) {
@@ -1845,16 +1863,19 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
 
         // Find best move toward target (with TZ avoidance)
         Action bestMove;
-        if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) return false;
+        if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) { ++g_mwNoStep; return false; }
 
         // Allow sideways moves to dodge around opponents, but don't go too far
         int currentDist = p.position.distanceTo(target);
         int moveDist = bestMove.target.distanceTo(target);
-        if (moveDist > currentDist + 1) return false; // max 1 square detour
-        if (moveDist >= currentDist && bestMove.target == lastPos) return false; // loop
+        if (moveDist > currentDist + 1) { ++g_mwDetour; return false; } // max 1 square detour
+        if (moveDist >= currentDist && bestMove.target == lastPos) { ++g_mwLoop; return false; } // loop
 
         lastPos = p.position;
         Position before = p.position;
+        // ⚠️ `p` je REFERENCE -- po akci uz ukazuje na NOVY stav. Stav pred
+        //   akci se proto musi zkopirovat, jinak je porovnani nize no-op.
+        const PlayerState beforeState = p.state;
         if (executeAndRecord(state, bestMove, dice, result)) return false;
 
         // ⛔ GUARD "USPECH BEZ POHYBU" (26.08.2026, treti misto Leapu).
@@ -1865,8 +1886,21 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         // dosud nevedla. Pripustenim LEAPu se ta cesta OTEVIRA -- bez guardu
         // by smycka tocila naprazdno az do maxSteps (leapUsedThisTurn sice
         // brani druhemu skoku, ale mrtve iterace zustavaji).
-        if (state.getPlayer(playerId).position == before) return false;
+        // ⛔⛔ VSTANI NENI "USPECH BEZ POHYBU" (01.09.2026).
+        //   Vstavaci makro je REPOSITION na VLASTNI pole: hrac vstane a pozice
+        //   se nezmeni, takze tenhle guard to vyhodnotil jako "nepohnul se"
+        //   a vratil SELHANI -- prestoze vstani probehlo. Dalsi iterace by
+        //   pritom spravne vratila uspech (`position == target && !PRONE`).
+        //   ⇒ Makro vrstva hlasila KAZDE VSTANI jako neuspech.
+        //   Vada vznikla 26.08., kdy se guard pridal kvuli Leapu/Tentacles,
+        //   a rozbila vstavani, ktere pribylo 21.08. (P45). Po M13 (31.08.)
+        //   je vstavani jeste castejsi.
+        //   ⚠️ Guard sam je spravny a zustava -- jen se stav PRONE -> STANDING
+        //     pocita jako POKROK, protoze jim je.
+        if (state.getPlayer(playerId).position == before &&
+            state.getPlayer(playerId).state == beforeState) { ++g_mwStuck; return false; }
     }
+    ++g_mwLimit;
     return false;
 }
 

@@ -32,6 +32,9 @@ long takeStandBlitzTOInSearch();
 // stoji, daleko]. Nez se zacne opravovat 9,3 % vyhozenych blitzu, musi se
 // vedet PROC -- hadani uz dvakrat neslo.
 void takeBlitzWastedBreakdown(long* out6);
+// P37b: blitz deklarovan u SOUSEDA vs ZDALEKA. Rozlisi vadu nabidky od vady chuze.
+void noteBlitzDeclaredAdjacent(bool adjacent);
+void takeBlitzDeclSplit(long* out2);
 
 ActionResult resolveAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events);

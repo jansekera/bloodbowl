@@ -100,6 +100,15 @@ thread_local long g_standBlitzTO   = 0;
 //   DALEKO   = dosel, ale neskoncil sousedici
 thread_local long g_bwNoReach = 0, g_bwMove = 0, g_bwTurnover = 0,
                   g_bwDown = 0, g_bwStuck = 0, g_bwFar = 0;
+thread_local long g_blitzDeclAdj = 0, g_blitzDeclFar = 0;
+}
+
+void noteBlitzDeclaredAdjacent(bool adjacent) {
+    if (adjacent) ++g_blitzDeclAdj; else ++g_blitzDeclFar;
+}
+void takeBlitzDeclSplit(long* out2) {
+    out2[0] = g_blitzDeclAdj; out2[1] = g_blitzDeclFar;
+    g_blitzDeclAdj = g_blitzDeclFar = 0;
 }
 
 void noteBlitzWasted(int reason) {
@@ -284,6 +293,11 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
         case ActionType::BLITZ: {
             Player& player = state.getPlayer(action.playerId);
             Player& target = state.getPlayer(action.targetId);
+            // P37b diagnostika: byl blitzujici pri DEKLARACI uz soused?
+            // Rozliseni rozhodne, kde vada je: u souseda = vada NABIDKY,
+            // u vzdaleneho = CHUZE spotrebovala rezervu, kterou reachability
+            // slibila (a to je vada pohybu, ne nabidky).
+            noteBlitzDeclaredAdjacent(player.position.distanceTo(target.position) == 1);
 
             // Mark blitz used
             state.getTeamState(player.teamSide).blitzUsedThisTurn = true;

@@ -96,6 +96,8 @@ static long g_proneBl = 0, g_standActs = 0, g_standTO = 0;
 static long g_standBl = 0, g_standNB = 0;
 static long g_bw[6] = {0,0,0,0,0,0};
 static long g_bwUnpay = 0;
+static long g_declAdj = 0, g_declFar = 0;
+static long g_mw[5] = {0,0,0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
@@ -569,6 +571,8 @@ int main(int argc, char** argv) {
                 { long bw[6]; bb::takeBlitzWastedBreakdown(bw);
                   for (int q = 0; q < 6; ++q) g_bw[q] += bw[q]; }
                 g_bwUnpay += bb::takeBlitzBlockUnpayableInSearch();
+                { long d2[2]; bb::takeBlitzDeclSplit(d2); g_declAdj += d2[0]; g_declFar += d2[1]; }
+                { long mw[5]; bb::takeMoveWalkBailout(mw); for (int q=0;q<5;++q) g_mw[q]+=mw[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
                 g_hitStood   += bb::takeHitOnStoodUpInSearch();
@@ -743,7 +747,9 @@ int main(int argc, char** argv) {
                      ? (1.0*g_proneTO/g_proneActs)/(1.0*g_standTO/g_standActs) : 0.0);
             printf("  BLITZ/PROC: nedosah %ld | pohyb %ld | TURNOVER %ld | srazen %ld | stoji %ld | daleko %ld\n",
                    g_bw[0], g_bw[1], g_bw[2], g_bw[3], g_bw[4], g_bw[5]);
-            printf("  P37b/NEZAPLATI: blitz deklarovan, rana nezaplatitelna: %ld\n", g_bwUnpay);
+            printf("  CHUZE/VZDANI: nenasel %ld | OBCHAZKA %ld | smycka %ld | stoji %ld | limit %ld\n",
+                   g_mw[0], g_mw[1], g_mw[2], g_mw[3], g_mw[4]);
+            printf("  P37b/NEZAPLATI: %ld | deklarace: u SOUSEDA %ld, ZDALEKA %ld\n", g_bwUnpay, g_declAdj, g_declFar);
             printf("  M13/BLITZ:  bez rany z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
                    g_proneNB, g_proneBl, g_proneBl ? 100.0*g_proneNB/g_proneBl : 0.0,
                    g_standNB, g_standBl, g_standBl ? 100.0*g_standNB/g_standBl : 0.0,

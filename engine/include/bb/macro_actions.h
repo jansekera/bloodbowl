@@ -204,6 +204,8 @@ long takeStandOfferedNextToEnemyInSearch();
 long takeStandOfferedNextToHitterInSearch();
 double blitzApproachRiskForTest(const GameState& state, const Player& mover,
                                 const Player& target);
+// Kde se makrova chuze vzdava: [nenasel, obchazka, smycka, stoji, limit].
+void takeMoveWalkBailout(long* out5);
 void setBlitzPathArm(TeamSide side, bool on);
 bool blitzPathArm(TeamSide side);
 void setProneActionArm(TeamSide side, bool on);
