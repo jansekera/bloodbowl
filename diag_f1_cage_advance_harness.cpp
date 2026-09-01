@@ -276,7 +276,6 @@ int main(int argc, char** argv) {
                       : (mode == 7) ? 127'000'000u
                       : (mode == 13) ? 233'000'000u
                       : (mode == 14) ? 251'000'000u
-                      : (mode == 8) ? 149'000'000u
                       : (mode == 9) ? 167'000'000u
                       : (mode == 10) ? 163'000'000u
                       : (mode == 11) ? 179'000'000u : SEED_BASE;
@@ -292,7 +291,7 @@ int main(int argc, char** argv) {
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 13 ? "M13: lezici hrac smi deklarovat akci (r. 669-676)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
-         : mode == 8 ? "B1/P35: blitzujici se vybira podle pole, KAM DOJDE"
+         : mode == 8 ? "(mode 8 ZRUSEN 01.09. -- P35 nasazeno do produkce)"
          : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
          : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
          : mode == 11 ? "B2: cena bloku proti obranci, ktery WRESTLE POUZIJE"
@@ -320,7 +319,6 @@ int main(int argc, char** argv) {
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 13 ? "diag_proneaction_rows.jsonl"
                          : mode == 14 ? "diag_standpricing_rows.jsonl"
-                         : mode == 8 ? "diag_blitzlanding_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
                          : mode == 12 ? "diag_cagecrit_rows.jsonl"
                          : mode == 6 ? "diag_cageadvance_rows.jsonl"
@@ -484,11 +482,10 @@ int main(int argc, char** argv) {
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, mode == 14 && candHome);
                 bb::setStandUpPricingArm(bb::TeamSide::AWAY, mode == 14 && !candHome);
                 bb::takeStandUpPricingRepicksInSearch();
-                bb::setBlitzLandingArm(bb::TeamSide::HOME,
-                                       mode == 8 && candHome);
-                bb::setBlitzLandingArm(bb::TeamSide::AWAY,
-                                       mode == 8 && !candHome);
-                bb::takeBlitzLandingRepicksInSearch();   // vynuluj na par
+                // ⛔ mode 8 (P35) ZRUSEN 01.09.2026 -- rameno nasazeno do
+                //   produkce po noci 31.08. (neskodi), takze uz neni co
+                //   prepinat. Cislo se NEPOUZIVA ZNOVU: mody jsou append-only,
+                //   protoze index je zapsany v radcich na disku.
                 // mode 9 (LEAP, 26.08.): skok vstupuje do makrove chuze.
                 // ⚠️ Rameno JE pravidlova oprava, ne nas prospech -- Leap maji
                 // jen wardanceri, takze na dw-we by nase cisla sla DOLU a bylo
@@ -529,7 +526,6 @@ int main(int argc, char** argv) {
                 //   takze by obe strany hlasily "rameno jednalo". Signalem je
                 //   REPICK kriteria: zmenilo volbu proti vyberu bez nej?
                 long candCrit = bb::takeCageCritRepicksInSearch();
-                long candLanding = bb::takeBlitzLandingRepicksInSearch();
                 long candProne = bb::takeProneActionPicksInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
                 long candLeap = bb::takeLeapWalkPicksInSearch();
@@ -558,8 +554,6 @@ int main(int argc, char** argv) {
                 g_standOffNE += bb::takeStandOfferedNextToEnemyInSearch();
                 g_stoodUp    += bb::takeStoodUpInSearch();
                 g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
-                bb::setBlitzLandingArm(bb::TeamSide::HOME, false);
-                bb::setBlitzLandingArm(bb::TeamSide::AWAY, false);
                 bb::setProneActionArm(bb::TeamSide::HOME, false);
                 bb::setProneActionArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
@@ -595,7 +589,6 @@ int main(int argc, char** argv) {
                               : (mode == 5) ? candPush
                               : (mode == 13) ? candProne
                               : (mode == 14) ? candPrice
-                              : (mode == 8) ? candLanding
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
                               : (mode == 12) ? candCrit
@@ -630,13 +623,18 @@ int main(int argc, char** argv) {
                             "\"away_attr\":[%d,%d,%d,%d],\"actions\":%d,"
                             "\"cand_plans\":%d,\"base_plans\":%d,"
                             "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,"
+                            "\"cand_prone\":%ld,\"cand_price\":%ld,"
                             "\"cand_leap\":%ld,\"cand_cont\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
                             g.home.ejected, g.away.ko, g.away.injured,
                             g.away.dead, g.away.ejected, g.totalActions, candPlans,
-                            basePlans, candDaunt, candRoll, candLanding,
+                            // cand_landing zustava v SCHEMATU s nulou: mode 8
+                            // je zrusen (P35 nasazeno), ale radky starych behu
+                            // to pole maji a ctecky se kvuli tomu nemaji menit.
+                            basePlans, candDaunt, candRoll, 0L,
+                            candProne, candPrice,
                             candLeap, candCont, mode);
                     fflush(rows);
                 }
@@ -696,7 +694,7 @@ int main(int argc, char** argv) {
         // ale opravuje se to TADY, ne obcházením sondy.
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 8 || mode == 9 || mode == 10 || mode == 12 ||
+             mode == 7 || mode == 9 || mode == 10 || mode == 12 ||
              mode == 13 || mode == 14);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"

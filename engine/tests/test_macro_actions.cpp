@@ -1872,10 +1872,19 @@ GameState makeBlitzLandingState() {
 }
 }  // namespace
 
-TEST(MacroExpansion, BlitzLandingArmOffKeepsTheOldChoiceAndCountsNothing) {
+// ============================================================================
+// P35 NASAZENO 01.09.2026 — rameno odebrano, ocenení z ciloveho pole je
+// PRODUKCE. Noc 31.08. (1 680 paru): jednostranne +0,0073 +- 0,0060,
+// skoda na urovni prahu -0,015 VYLOUCENA. Duvod odebrani je tyz jako u B2:
+// default-OFF rameno, ktere neskodi, je jen dalsi hotova vec, o ktere nikdo
+// nevi (T5.14 lezela 11 dni, P31 33 dni).
+//
+// Ze tri puvodnich testu ramene zbyva TENHLE — ten, ktery hlida SAMO PRAVIDLO.
+// Dva zbyle testovaly vypinac (nulovy stav a per-side izolaci), a ty se
+// zrusenim vypinace ztratily predmet.
+// ============================================================================
+TEST(MacroExpansion, BlitzerIsPricedFromTheSquareHeLandsOnNotTheOneHeStandsOn) {
     GameState state = makeBlitzLandingState();
-    setBlitzLandingArm(TeamSide::HOME, false);
-    takeBlitzLandingRepicksInSearch();  // reset
 
     DiceRoller dice(42);
     Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
@@ -1883,37 +1892,10 @@ TEST(MacroExpansion, BlitzLandingArmOffKeepsTheOldChoiceAndCountsNothing) {
 
     ASSERT_FALSE(result.actions.empty());
     EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
-    EXPECT_EQ(result.actions[0].playerId, 1)
-        << "off-arm must keep pricing the block from the blitzer's own square";
-    EXPECT_EQ(takeBlitzLandingRepicksInSearch(), 0)
-        << "a disabled arm must be a true null: no repicks, no counter";
-}
-
-TEST(MacroExpansion, BlitzLandingArmSeesTheAssistWaitingAtTheLandingSquare) {
-    GameState state = makeBlitzLandingState();
-    setBlitzLandingArm(TeamSide::HOME, true);
-    takeBlitzLandingRepicksInSearch();  // reset
-
-    DiceRoller dice(42);
-    Macro macro{MacroType::BLITZ, -1, 12, {-1, -1}};
-    auto result = greedyExpandMacro(state, macro, dice);
-    setBlitzLandingArm(TeamSide::HOME, false);
-
-    ASSERT_FALSE(result.actions.empty());
-    EXPECT_EQ(result.actions[0].type, ActionType::BLITZ);
+    // Hrac 1 ma z VLASTNIHO pole lepsi kostky, ale doskoci na pole, kde obranci
+    // ceka asistence; hrac 2 je odtud, KAM DOJDE, lepsi volba.
     EXPECT_EQ(result.actions[0].playerId, 2)
-        << "on-arm must reject the blitzer whose landing square hands the "
-           "defender an assist";
-    EXPECT_GT(takeBlitzLandingRepicksInSearch(), 0)
-        << "the counter has to record that the arm changed the decision";
-}
-
-TEST(MacroExpansion, BlitzLandingArmIsPerSideAndLeavesTheOtherSideAlone) {
-    setBlitzLandingArm(TeamSide::HOME, true);
-    EXPECT_TRUE(blitzLandingArm(TeamSide::HOME));
-    EXPECT_FALSE(blitzLandingArm(TeamSide::AWAY));
-    setBlitzLandingArm(TeamSide::HOME, false);
-    EXPECT_FALSE(blitzLandingArm(TeamSide::HOME));
+        << "vyber blitzujiciho se vratil k oceneni z vychoziho pole";
 }
 
 // --- P38 (2026-08-19): the carrier's destination is derived from the cage

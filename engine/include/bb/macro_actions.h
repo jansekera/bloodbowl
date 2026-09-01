@@ -99,18 +99,15 @@ long takeHandOffOfferEvalsInSearch();
 //
 // Per side, default OFF. Turning it on for one side only is what makes a paired
 // A/B legible.
-void setBlitzLandingArm(TeamSide side, bool on);
 // LEAP do makrove chuze (26.08.2026). Gate se ptá na stranu MOVERA, ne na
 // activeTeam -- Leap mají v korpusu jen soupeřovi wardanceři, takže per-side
 // zapnutí je jediný způsob, jak měřit "wood-elf s rukama vs. bez rukou".
 void setLeapWalkArm(TeamSide side, bool on);
 bool leapWalkArm(TeamSide side);
-bool blitzLandingArm(TeamSide side);
 
 // Times the arm actually changed WHICH blitzer gets sent, per SEARCH EVALUATION
 // (read the unit warning above -- this is not a count of blitzes played). Zero
 // over a matchup means both arms took the same decision, i.e. a true null arm.
-long takeBlitzLandingRepicksInSearch();
 // Tiká, když findMoveToward VRÁTÍ LEAP jako vítěze -- ne když ho jen připustí
 // mezi kandidáty. OFF rameno LEAP vrátit nemůže, takže každý tik je z definice
 // změněná volba. Je to počet VYHODNOCENÍ V SEARCHI, ne skoků na hřišti.

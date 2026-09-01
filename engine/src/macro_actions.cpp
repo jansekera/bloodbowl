@@ -403,17 +403,7 @@ long takeCageCritRepicksInSearch() {
     long v = g_cageCritRepicks; g_cageCritRepicks = 0; return v;
 }
 
-thread_local bool g_blitzLanding[2] = {false, false};
-thread_local long g_blitzLandingRepicks = 0;
 
-
-void setBlitzLandingArm(TeamSide side, bool on) {
-    g_blitzLanding[side == TeamSide::HOME ? 0 : 1] = on;
-}
-
-bool blitzLandingArm(TeamSide side) {
-    return g_blitzLanding[side == TeamSide::HOME ? 0 : 1];
-}
 
 void setLeapWalkArm(TeamSide side, bool on) {
     g_leapWalk[side == TeamSide::HOME ? 0 : 1] = on;
@@ -429,17 +419,13 @@ long takeLeapWalkPicksInSearch() {
     return v;
 }
 
-long takeBlitzLandingRepicksInSearch() {
-    long v = g_blitzLandingRepicks;
-    g_blitzLandingRepicks = 0;
-    return v;
-}
 
-
-// ⛔ 30.08.: čítače ramene B2 odstraněny spolu s ramenem. Poučení z nich ale
-// PLATÍ a drží se u P35 (`g_blitzLandingRepicks`): čítač musí tikat, jen když
-// se ZMĚNILA VOLBA, ne když se jen lišila cena -- jinak noc hlásí „rameno
-// jednalo" o rameni, které se jen dívalo.
+// ⛔ 30.08.: čítače ramene B2 odstraněny spolu s ramenem. 01.09. totéž pro
+// P35 (`g_blitzLandingRepicks`) -- rameno nasazeno, čítač odešel s ním.
+// Poučení z obou ale PLATÍ a drží se u `g_proneActionPicks`
+// a `g_standPricingRepicks`: čítač musí tikat, jen když se ZMĚNILA VOLBA,
+// ne když se jen lišila cena -- jinak noc hlásí „rameno jednalo" o rameni,
+// které se jen dívalo.
 
 
 // ⭐ DIAGNOSTIKA, NE RAMENO (30.08.2026). Vypínač `setWrestlePricingArm` padl
@@ -710,14 +696,14 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).
 static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
-                                       const Player& target, bool fromLanding) {
+                                       const Player& target) {
     // Risk estimate and feature extraction keep the raw strengths: they describe
     // the block as thrown, not whether to offer it.
     Position landing{-1, -1};
     double approachFail = estimateApproachFailChance(state, blitzer, target.position,
-                                                     fromLanding ? &landing : nullptr);
+                                                     &landing);
     int diceCount = getBlockDiceCount(state, blitzer, target, true, false,
-                                      fromLanding ? landing : Position{-1, -1});
+                                      landing);   // P35: VZDY z ciloveho pole
     // B2: obráncův Wrestle se do ceny promítne jen POD RAMENEM, aby šel rozdíl
     // změřit párovým A/B. Čítač tiká jen tam, kde se cena OPRAVDU liší -- tedy
     // když útočník Block má; bez Blocku vychází 2/6 v obou případech.
@@ -2254,10 +2240,10 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     // the counter can say whether the arm changed anything. Zero repicks over a
     // matchup means the two arms executed the same decision -- the null-arm test
     // of 2026-08-17, which is what makes a paired delta readable at all.
-    const bool landing = blitzLandingArm(state.activeTeam);
-    int plainBest = -1;
-    double plainFail = 2.0;
-
+    // ⭐ P35 NASAZENO 01.09.2026 (noc 31.08.: jednostranne +0,0073 +- 0,0060,
+    //   skoda na urovni prahu vyloucena). Rameno odebrano -- default-OFF
+    //   rameno, ktere neskodi, je jen dalsi hotova vec, o ktere nikdo nevi
+    //   (B2, 30.08., tyz duvod).
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
@@ -2265,22 +2251,15 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        double fail = estimateBlitzFailChance(state, blitzer, target, landing);
+        double fail = estimateBlitzFailChance(state, blitzer, target);
         if (fail < bestFail) {
             bestFail = fail;
             bestBlitzAction = a;
             found = true;
         }
-        if (landing) {
-            double pf = estimateBlitzFailChance(state, blitzer, target, false);
-            if (pf < plainFail) { plainFail = pf; plainBest = a.playerId; }
-        }
     }
 
     if (!found) return result;
-    if (landing && plainBest >= 0 && plainBest != bestBlitzAction.playerId) {
-        ++g_blitzLandingRepicks;
-    }
 
     executeAndRecord(state, bestBlitzAction, dice, result);
     return result;
@@ -2307,15 +2286,12 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
     // P35 applies here too: BLITZ_AND_SCORE picks a blitzer the same way, so
     // leaving this call site alone would price the same block two ways
     // depending on which macro asked -- exactly the split the arm exists to close.
-    const bool landing = blitzLandingArm(state.activeTeam);
-    int plainBest = -1;
-    double plainScore = -2.0;
 
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ) continue;
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
-        double fail = estimateBlitzFailChance(state, blitzer, blocker, landing);
+        double fail = estimateBlitzFailChance(state, blitzer, blocker);
         bool isCarrier = (a.playerId == carrierId);
         double score = -fail + (isCarrier ? 0.0 : 0.001);
         if (score > bestScore) {
@@ -2323,17 +2299,9 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
             bestBlitz = a;
             foundBlitz = true;
         }
-        if (landing) {
-            double ps = -estimateBlitzFailChance(state, blitzer, blocker, false)
-                        + (isCarrier ? 0.0 : 0.001);
-            if (ps > plainScore) { plainScore = ps; plainBest = a.playerId; }
-        }
     }
 
     if (!foundBlitz) return result; // can't blitz, abort
-    if (landing && plainBest >= 0 && plainBest != bestBlitz.playerId) {
-        ++g_blitzLandingRepicks;
-    }
 
     // Execute the blitz
     if (executeAndRecord(state, bestBlitz, dice, result)) return result;
