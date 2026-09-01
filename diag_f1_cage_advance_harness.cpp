@@ -98,6 +98,7 @@ static long g_bw[6] = {0,0,0,0,0,0};
 static long g_bwUnpay = 0;
 static long g_declAdj = 0, g_declFar = 0;
 static long g_mw[5] = {0,0,0,0,0};
+static long g_bp[3] = {0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
@@ -573,6 +574,7 @@ int main(int argc, char** argv) {
                 g_bwUnpay += bb::takeBlitzBlockUnpayableInSearch();
                 { long d2[2]; bb::takeBlitzDeclSplit(d2); g_declAdj += d2[0]; g_declFar += d2[1]; }
                 { long mw[5]; bb::takeMoveWalkBailout(mw); for (int q=0;q<5;++q) g_mw[q]+=mw[q]; }
+                { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
                 g_hitStood   += bb::takeHitOnStoodUpInSearch();
@@ -749,15 +751,29 @@ int main(int argc, char** argv) {
                    g_bw[0], g_bw[1], g_bw[2], g_bw[3], g_bw[4], g_bw[5]);
             printf("  CHUZE/VZDANI: nenasel %ld | OBCHAZKA %ld | smycka %ld | stoji %ld | limit %ld\n",
                    g_mw[0], g_mw[1], g_mw[2], g_mw[3], g_mw[4]);
+            printf("  P37b/CESTA: dobehu %ld | OPTIMALNICH %ld (%.1f %%) | kroku navic %ld (%.3f/dobeh)\n",
+                   g_bp[0], g_bp[1], g_bp[0] ? 100.0*g_bp[1]/g_bp[0] : 0.0,
+                   g_bp[2], g_bp[0] ? 1.0*g_bp[2]/g_bp[0] : 0.0);
             printf("  P37b/NEZAPLATI: %ld | deklarace: u SOUSEDA %ld, ZDALEKA %ld\n", g_bwUnpay, g_declAdj, g_declFar);
             printf("  M13/BLITZ:  bez rany z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
                    g_proneNB, g_proneBl, g_proneBl ? 100.0*g_proneNB/g_proneBl : 0.0,
                    g_standNB, g_standBl, g_standBl ? 100.0*g_standNB/g_standBl : 0.0,
                    (g_standBl && g_standNB && g_proneBl)
                      ? (1.0*g_proneNB/g_proneBl)/(1.0*g_standNB/g_standBl) : 0.0);
-            printf("  Q3/UTEK: nabidnut %ld, NEBYLO KAM %ld (%.1f %% situaci bez uniku)\n",
-                   g_standEsc, g_standEscNo,
-                   (g_standEsc + g_standEscNo) ? 100.0*g_standEscNo/(g_standEsc+g_standEscNo) : 0.0);
+            // ⚠️ Toto meridlo je ZAVESENE NA RAMENI Q3 (cely blok s utekem je
+            //   pod `standUpPricingArm`), takze mimo mode 14 hlasi nulu. Nula
+            //   tedy znamena "rameno vypnute", NE "nebylo kam utect" -- a to
+            //   se cetlo spatne uz 01.09. Tiskne se proto vyslovne.
+            //   ⇒ Spravne by meridlo na rameni viset nemelo (tyz princip jako
+            //     `cageSnapshot`, T5.34), ale spocitat utekove pole v KAZDEM
+            //     rolloutu i s vypnutym ramenem stoji cas. Zapsano do knihy.
+            if (g_standEsc + g_standEscNo == 0) {
+                printf("  Q3/UTEK: 0 — RAMENO VYPNUTE (meridlo visi na rameni, viz mode 14)\n");
+            } else {
+                printf("  Q3/UTEK: nabidnut %ld, NEBYLO KAM %ld (%.1f %% situaci bez uniku)\n",
+                       g_standEsc, g_standEscNo,
+                       100.0*g_standEscNo/(g_standEsc+g_standEscNo));
+            }
             printf("  Q3/ODPOVED: na vstale dopadlo %ld ran, z toho BLITZEM %ld (%.1f %%), srazeno %ld (%.1f %%)\n",
                    g_hitStood, g_hitStoodBl,
                    g_hitStood ? 100.0*g_hitStoodBl/g_hitStood : 0.0,
