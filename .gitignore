@@ -124,3 +124,7 @@ q3_fouls_*_data/
 # pravidla velikost × životnost jako shardy výše — vyhodnocení jde do evidence/.
 # ⛔ Soubory se NEMAŽOU, jen se vyřazuje sledování (git rm --cached).
 /diag_*_rows.jsonl
+
+# 01.09.: prelozeny harness. Rebuilduje se pri kazde zmene enginu, takze se
+# pracovni strom spini binarkou. Tyz duvod jako diag_*_rows.jsonl vyse.
+/diag_f1_cage_advance

@@ -96,4 +96,9 @@ long takeHitOnStoodUpInSearch();
 long takeHitOnStoodUpByBlitzInSearch();
 long takeKnockedOnStoodUpInSearch();
 
+
+// Bezici pocet hozenych ran. NEZAVISLY na `events` (ta jsou behem hledani
+// vypnuta) -- rozdil dvou odectu rekne, jestli akce ranu hodila.
+long blockThrowSeq();
+
 } // namespace bb

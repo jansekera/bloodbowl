@@ -467,6 +467,14 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
 //   vstale hrace se plytva BLITZEM, doktrina by neplatila -- souper by za to
 //   platil svym vzacnym zdrojem misto toho, aby bral neco zadarmo.
 // ============================================================================
+// ⛔ 01.09.: POCITADLO HOZENYCH RAN, NEZAVISLE NA UDALOSTECH.
+// M13 diagnostika nejdriv hledala blok v `events` -- jenze behem hledani je
+// `events == nullptr`, takze hlasila "blitz bez rany" u KAZDEHO blitzu z lehu
+// (3 909 z 5 981 na sonde). Tataz past jako u `cageSnapshot`, T5.34:
+// MERIDLO NESMI VISET NA TOM, JESTLI SE ZROVNA LOGUJE.
+thread_local long g_blocksThrown = 0;
+long blockThrowSeq() { return g_blocksThrown; }
+
 thread_local long g_hitOnStoodUp = 0;
 thread_local long g_hitOnStoodUpByBlitz = 0;
 thread_local long g_knockedOnStoodUp = 0;
@@ -549,6 +557,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // 2. Chainsaw
     if (att.hasSkill(SkillName::Chainsaw)) {
         int chainsawRoll = dice.rollD6();
+        ++g_blocksThrown;
         emitEvent(events, {GameEvent::Type::BLOCK, att.id, def.id, att.position,
                           def.position, chainsawRoll, chainsawRoll >= 2});
 
@@ -714,6 +723,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         }
     }
 
+    ++g_blocksThrown;
     emitEvent(events, {GameEvent::Type::BLOCK, att.id, def.id, att.position,
                       def.position, static_cast<int>(chosen), true});
 

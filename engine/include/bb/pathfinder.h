@@ -15,6 +15,13 @@ struct MoveTarget {
 // If yes, returns true and sets outAdjacent to the best adjacent square.
 // reserveMove: movement points to hold back from the budget (a blitz must
 // keep 1 for the block itself -- CRP: the block costs 1 MP/GFI).
+// Prvni krok po NEJKRATSI ceste na pole sousedici s `target`, s rezervou
+// jednoho pole na blok. Tacklezony rozhoduji mezi stejne dlouhymi cestami.
+// false = nikam nevede (pak se blitz nema o co pokouset).
+long takeBlitzPathPicksInSearch();
+bool nextStepTowardAdjacent(const GameState& state, const Player& player,
+                            Position target, Position& outStep);
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);

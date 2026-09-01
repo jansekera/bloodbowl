@@ -477,3 +477,56 @@ TEST(ActionResolver, LeapEmitsItsOwnEventNotDodge) {
     EXPECT_EQ(leaps, 1)  << "skok musí mít v logu vlastní stopu";
     EXPECT_EQ(dodges, 0) << "a nesmí se vydávat za dodge";
 }
+
+// ============================================================================
+// BLITZOVÁ CHŮZE — charakterizační testy (01.09.2026)
+// ⚠️ Vznikly jako testy opravy M14 (chůze po nejkratší cestě), ale PROCHÁZEJÍ
+//    I NA PŮVODNÍ hladové chůzi — v Čebyševově metrice úhyb do strany taky
+//    zkracuje vzdálenost, takže se tělo obejde samo. M14 byl proto zamítnut.
+//    Testy zůstávají: popisují, co od blitzové chůze čekáme, ať ji píše kdokoli.
+//
+// Uživatel 01.09.: „není teď spíše potřeba dořešit pohyb a pak jej předat tomu
+// blitz, aby se mu zlepšil ten poměr ve prospěch dojde a praští?"
+// `pickApproachStep` vybíral krok jen ze sousedních polí podle
+// `vzdálenost*100 + TZ`, bez znalosti cesty a bez paměti. Když bylo pole
+// směrem k cíli obsazené, uhnul stranou — a z toho pole byl nejlepší zase ten
+// původní. Chůze oscilovala, spálila pohyb a blitz padl na „nedošel".
+// ============================================================================
+TEST(ActionResolver, BlitzWalksAroundABodyInsteadOfBurningMovementOnIt) {
+    // Blitzer (10,7) -> cíl (14,7). Přímá cesta je ucpaná vlastními těly na
+    // (11,7) a (12,7); volná trasa vede o řádek níž a je stejně dlouhá.
+    // Hladový výběr sem tam poskakoval, dokud nedošel pohyb.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    placePlayer(gs, 3, {12, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {14, 7}, TeamSide::AWAY);
+
+    Action action{ActionType::BLITZ, 1, 12, {14, 7}};
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    std::vector<GameEvent> events;
+    auto result = resolveAction(gs, action, dice, &events);
+
+    EXPECT_TRUE(result.success) << "blitz neobešel vlastní tělo a padl na 'nedošel'";
+    bool blocked = false;
+    for (auto& ev : events) if (ev.type == GameEvent::Type::BLOCK) blocked = true;
+    EXPECT_TRUE(blocked) << "došel, ale ránu nehodil";
+}
+
+TEST(ActionResolver, BlitzFailsCleanlyWhenNoPathExists) {
+    // Cíl je celý obestavěný: cesta neexistuje, blitz to musí poznat a ne
+    // chodit dokola, dokud nedojde pohyb.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {2, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);   // mimo dosah MA6+GFI
+
+    Action action{ActionType::BLITZ, 1, 12, {20, 7}};
+    FixedDiceRoller dice({3, 3, 3});
+    auto result = resolveAction(gs, action, dice, nullptr);
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.turnover) << "nedosažitelný cíl není turnover";
+}

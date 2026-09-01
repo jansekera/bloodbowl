@@ -62,6 +62,7 @@
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
 #include "bb/macro_actions.h"
+#include "bb/pathfinder.h"
 #include "bb/move_handler.h"   // Q3: citace provedeneho vstavani
 #include "bb/block_handler.h"
 #include "bb/mcts.h"
@@ -90,6 +91,10 @@ static long g_advResigned = 0;
 static long g_advResignedSF = 0;
 static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
 static long g_standEsc = 0, g_standEscNo = 0;
+static long g_proneActs = 0, g_proneTO = 0, g_proneSF = 0, g_proneNB = 0;
+static long g_proneBl = 0, g_standActs = 0, g_standTO = 0;
+static long g_standBl = 0, g_standNB = 0;
+static long g_bw[6] = {0,0,0,0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
@@ -274,6 +279,7 @@ int main(int argc, char** argv) {
                       : (mode == 12) ? 191'000'000u
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
+                      : (mode == 15) ? 269'000'000u
                       : (mode == 13) ? 233'000'000u
                       : (mode == 14) ? 251'000'000u
                       : (mode == 9) ? 167'000'000u
@@ -289,6 +295,7 @@ int main(int argc, char** argv) {
          : mode == 12 ? "M12/(B): KLECOVE KRITERIUM samotne -- rameno PROTI PLACEBU"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
+         : mode == 15 ? "M14b: blitzova chuze uhyba tacklezonam i GFI"
          : mode == 13 ? "M13: lezici hrac smi deklarovat akci (r. 669-676)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
          : mode == 8 ? "(mode 8 ZRUSEN 01.09. -- P35 nasazeno do produkce)"
@@ -317,6 +324,7 @@ int main(int argc, char** argv) {
     const char* rowsName = mode == 11 ? "diag_wrestleprice_rows.jsonl"
                          : mode == 10 ? "diag_blitzcont_rows.jsonl"
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
+                         : mode == 15 ? "diag_blitzpath_rows.jsonl"
                          : mode == 13 ? "diag_proneaction_rows.jsonl"
                          : mode == 14 ? "diag_standpricing_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
@@ -473,6 +481,8 @@ int main(int argc, char** argv) {
                 // mode 13 (M13, 31.08.): lezici smi deklarovat akci. Signalem je
                 // BLITZ DEKLAROVANY Z LEHU -- to do M13 neslo vubec, takze
                 // kazdy vyskyt je zmenena hra.
+                bb::setBlitzPathArm(bb::TeamSide::HOME, mode == 15 && candHome);
+                bb::setBlitzPathArm(bb::TeamSide::AWAY, mode == 15 && !candHome);
                 bb::setProneActionArm(bb::TeamSide::HOME, mode == 13 && candHome);
                 bb::setProneActionArm(bb::TeamSide::AWAY, mode == 13 && !candHome);
                 bb::takeProneActionPicksInSearch();
@@ -527,6 +537,7 @@ int main(int argc, char** argv) {
                 //   REPICK kriteria: zmenilo volbu proti vyberu bez nej?
                 long candCrit = bb::takeCageCritRepicksInSearch();
                 long candProne = bb::takeProneActionPicksInSearch();
+                long candPath  = bb::takeBlitzPathPicksInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
@@ -545,6 +556,17 @@ int main(int argc, char** argv) {
                 //   podil DRAHE vetve (vedle stojiciho soupere). Rozdil mezi
                 //   nabidkou a provedenim rika, jestli si hledani tu drahou
                 //   situaci uz sam obchazi.
+                g_proneActs  += bb::takeProneActsInSearch();
+                g_proneTO    += bb::takeProneTurnoversInSearch();
+                g_proneSF    += bb::takeProneStandFailInSearch();
+                g_proneNB    += bb::takeProneNoBlockInSearch();
+                g_proneBl    += bb::takeProneBlitzesInSearch();
+                g_standActs  += bb::takeStandActsInSearch();
+                g_standTO    += bb::takeStandTurnoversInSearch();
+                g_standBl    += bb::takeStandBlitzesInSearch();
+                g_standNB    += bb::takeStandNoBlockInSearch();
+                { long bw[6]; bb::takeBlitzWastedBreakdown(bw);
+                  for (int q = 0; q < 6; ++q) g_bw[q] += bw[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
                 g_hitStood   += bb::takeHitOnStoodUpInSearch();
@@ -554,6 +576,8 @@ int main(int argc, char** argv) {
                 g_standOffNE += bb::takeStandOfferedNextToEnemyInSearch();
                 g_stoodUp    += bb::takeStoodUpInSearch();
                 g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
+                bb::setBlitzPathArm(bb::TeamSide::HOME, false);
+                bb::setBlitzPathArm(bb::TeamSide::AWAY, false);
                 bb::setProneActionArm(bb::TeamSide::HOME, false);
                 bb::setProneActionArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
@@ -587,6 +611,7 @@ int main(int argc, char** argv) {
                 // protože se ho lidi naučí ignorovat.
                 pr.armEvents += (mode == 4) ? candDaunt
                               : (mode == 5) ? candPush
+                              : (mode == 15) ? candPath
                               : (mode == 13) ? candProne
                               : (mode == 14) ? candPrice
                               : (mode == 9) ? candLeap
@@ -695,7 +720,7 @@ int main(int argc, char** argv) {
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
              mode == 7 || mode == 9 || mode == 10 || mode == 12 ||
-             mode == 13 || mode == 14);
+             mode == 13 || mode == 14 || mode == 15);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
@@ -707,6 +732,20 @@ int main(int argc, char** argv) {
             printf("  Q3/VSTAVANI: nabidnuto %ld (drahych %ld = %.1f %%) | provedeno %ld (drahych %ld = %.1f %%)\n",
                    g_standOff, g_standOffNE, g_standOff ? 100.0*g_standOffNE/g_standOff : 0.0,
                    g_stoodUp,  g_stoodUpNE,  g_stoodUp  ? 100.0*g_stoodUpNE/g_stoodUp   : 0.0);
+            printf("  M13/LEZICI: akci z lehu %ld (z toho BLITZ %ld) | vstani selhalo %ld\n",
+                   g_proneActs, g_proneBl, g_proneSF);
+            printf("  M13/CENA:   TURNOVER z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
+                   g_proneTO, g_proneActs, g_proneActs ? 100.0*g_proneTO/g_proneActs : 0.0,
+                   g_standTO, g_standActs, g_standActs ? 100.0*g_standTO/g_standActs : 0.0,
+                   (g_standActs && g_standTO && g_proneActs)
+                     ? (1.0*g_proneTO/g_proneActs)/(1.0*g_standTO/g_standActs) : 0.0);
+            printf("  BLITZ/PROC: nedosah %ld | pohyb %ld | TURNOVER %ld | srazen %ld | stoji %ld | daleko %ld\n",
+                   g_bw[0], g_bw[1], g_bw[2], g_bw[3], g_bw[4], g_bw[5]);
+            printf("  M13/BLITZ:  bez rany z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
+                   g_proneNB, g_proneBl, g_proneBl ? 100.0*g_proneNB/g_proneBl : 0.0,
+                   g_standNB, g_standBl, g_standBl ? 100.0*g_standNB/g_standBl : 0.0,
+                   (g_standBl && g_standNB && g_proneBl)
+                     ? (1.0*g_proneNB/g_proneBl)/(1.0*g_standNB/g_standBl) : 0.0);
             printf("  Q3/UTEK: nabidnut %ld, NEBYLO KAM %ld (%.1f %% situaci bez uniku)\n",
                    g_standEsc, g_standEscNo,
                    (g_standEsc + g_standEscNo) ? 100.0*g_standEscNo/(g_standEsc+g_standEscNo) : 0.0);

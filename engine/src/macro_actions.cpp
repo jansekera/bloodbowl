@@ -290,12 +290,29 @@ thread_local long g_standEscapeImpossible = 0;
 // ⚠️ Az se zmeri, vypinac ZMIZI a chovani se nasadi natrvdo -- stejne jako
 //   u ceny Wrestle (B2, 30.08.). Rameno je leseni, ne trvala volba.
 // ============================================================================
+// ⛔ RAMENO PRO BLITZOVOU CHUZI (M14b, 01.09.2026). Duvod, proc rameno
+//   a ne rovnou produkce: dnes uz jsem dvakrat "opravil" chuzi podle teorie
+//   a dvakrat to nedodalo, protoze jsem porovnaval ROZESLE behy (jine
+//   jmenovatele, sest paru). Parove A/B na tychz seminkach je jediny zpusob,
+//   jak poznat rozdil od sumu.
+thread_local bool g_blitzPath[2] = {false, false};
+void setBlitzPathArm(TeamSide side, bool on) {
+    g_blitzPath[side == TeamSide::HOME ? 0 : 1] = on;
+}
+bool blitzPathArm(TeamSide side) {
+    return g_blitzPath[side == TeamSide::HOME ? 0 : 1];
+}
+
 thread_local bool g_proneAction[2] = {false, false};
-// Signal ramene: BLITZ deklarovany LEZICIM hracem. Do M13 to neslo vubec,
-// takze kazdy vyskyt je zmena hry, ne jen "rameno bezelo". Nula pres matchup
-// = obe ramena hrala totez => nulovy test.
+// Signal ramene: LEZICI HRAC UDELAL NECO, CO PRED M13 NESLO -- deklaroval
+// blitz, nebo vstal a SEL JINAM (vstani NA MISTE se nepocita, to slo i pred
+// M13 samostatnou smyckou). Kazdy vyskyt je tedy zmena hry, ne "rameno bezelo".
+// ⛔ Audit 01.09.: puvodne se pocital jen blitz, a to byl NEUPLNY signal --
+//   par, kde rameno zmenilo jen pohyb, by hlasil "arm acted 0" nad pohnutou
+//   hrou a LEAK TEST BY KRICEL NA VLASTNIM RAMENI.
+// Nula pres matchup = obe ramena hrala totez => nulovy test.
 thread_local long g_proneActionPicks = 0;
-void noteProneBlitzDeclared() { ++g_proneActionPicks; }
+void noteProneActionTaken() { ++g_proneActionPicks; }
 long takeProneActionPicksInSearch() {
     long v = g_proneActionPicks; g_proneActionPicks = 0; return v;
 }
