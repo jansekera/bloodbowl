@@ -475,6 +475,19 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
 thread_local long g_blocksThrown = 0;
 long blockThrowSeq() { return g_blocksThrown; }
 
+// ⭐ P37b (01.09.2026): BLITZ DEKLAROVAN, ALE RANA JE NEZAPLATITELNA.
+//   Blok pri blitzu stoji jedno pole (r. 549-550). Nabidka to u STOJICICH
+//   hracu nekontroluje -- lezici ji od 31.08. maji, stojici ne. Hrac tedy
+//   muze blitz deklarovat, tym prijde o svuj JEDINY blitz na kolo, a rana
+//   se nehodi, protoze neni z ceho.
+//   ⛔ MERIME NEZ OPRAVUJEME: vim, ze ta cesta v kodu existuje, ale ne,
+//     jestli nastava. Rozpad `BLITZ/PROC` ji NEVIDI -- hrac u cile stoji,
+//     chuzi neprojde, a odmitnuti rany zadny citac netiklo.
+thread_local long g_blitzBlockUnpayable = 0;
+long takeBlitzBlockUnpayableInSearch() {
+    long v = g_blitzBlockUnpayable; g_blitzBlockUnpayable = 0; return v;
+}
+
 thread_local long g_hitOnStoodUp = 0;
 thread_local long g_hitOnStoodUpByBlitz = 0;
 thread_local long g_knockedOnStoodUp = 0;
@@ -521,6 +534,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
         if (att.movementRemaining - 1 < gfiFloor) {
             // No movement and no GFI left: no block is thrown.
+            ++g_blitzBlockUnpayable;   // P37b
             att.hasActed = true;
             return ActionResult::ok();
         }

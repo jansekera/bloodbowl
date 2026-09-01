@@ -100,5 +100,8 @@ long takeKnockedOnStoodUpInSearch();
 // Bezici pocet hozenych ran. NEZAVISLY na `events` (ta jsou behem hledani
 // vypnuta) -- rozdil dvou odectu rekne, jestli akce ranu hodila.
 long blockThrowSeq();
+// P37b: blitz deklarovan, ale na ranu uz nezbylo pole pohybu (r. 549-550).
+// Tym prisel o svuj jediny blitz na kolo a rana nepadla.
+long takeBlitzBlockUnpayableInSearch();
 
 } // namespace bb

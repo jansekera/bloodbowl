@@ -1439,6 +1439,21 @@ a blok házet nemusí, protože ř. 347-348 říká *„he **MAY** make one bloc
 Zaplatí za to týmovým blitzem na kolo, a může to být výhodný obchod.
 ⇒ Oprava se smí opřít **jen o rozpočet pohybu** *(kdo nemá čím zaplatit ani
 krok, ani blok, nezíská nic)*, **ne o „nehodí blok, tedy je to zbytečné"**.
+
+⭐⭐⭐ **A DRUHÝ DŮVOD, PROČ NABÍDKU NEZUŽOVAT — uživatel 01.09.:**
+*„blitz souseda a pak útěk je dobrý nápad, pro být pak zároveň užitečný
+později jinde — v celotahu."*
+`ř. 552-553`: *„The player may **carry on moving** after the effects of the
+block have been worked out if he has any squares of movement left."*
+⇒ **Blitz na souseda není jen rána, je to způsob, jak se OSVOBODIT.** Srazím
+souseda (tím zmizí jeho tacklezóna) a zbytkem pohybu odejdu tam, kde jsem
+potřeba — bez dodge, protože už mě nikdo neznačí. Hodnota té akce se tedy
+**neměří ranou, ale tím, co hráč dokáže ve zbytku tahu.**
+⛔ Oprava proto **nesmí** zakázat blitz jen proto, že hráč sousedí, ani proto,
+že mu po ráně nezbude pohyb na další krok. Smí odmítnout **jen** případ, kdy
+není z čeho zaplatit **ani ránu samotnou** — tam opravdu nevznikne nic.
+⚠️ Souvisí s `M1/N10` (blitzující smí po ráně pokračovat, opraveno 25.08.) —
+bez té opravy by tenhle vzor nešel zahrát vůbec.
 ⚠️ U nás dnes latentní: `WildAnimal` má **0 hráčů** ve všech šesti hraných
 sestavách *(ověřeno 31.08. týmž způsobem jako Jump Up)*. Engine to jinak
 implementuje správně, včetně toho, že **přirozená 1 padá i s +2**
