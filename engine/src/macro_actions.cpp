@@ -687,7 +687,16 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     Position cur = mover.position;
     // The blitz block itself costs 1 MP (CRP) -- reserve it so a
     // budget-tight approach correctly prices the trailing GFI risk.
-    int moveLeft = mover.movementRemaining - 1;
+    // ⛔⛔ M13b (01.09.2026): LEZICIMU SE MUSI ODECIST VSTANI.
+    //   Do dneska tu stalo `mover.movementRemaining - 1`, takze lezici MA6 se
+    //   ocenil, jako by mel po rezerve na blok PET poli -- ma DVE (r. 690-695,
+    //   vstani stoji tri). GFI riziko proto zacalo pricitat o TRI pole pozdeji
+    //   a lezici blitzer se jevil BEZPECNEJSI, NEZ JE.
+    //   Do 31.08. to byla spici vada (lezici blitzovat nesmel); M13 ji
+    //   probudila -- tataz trida jako Bone Head hozeny za kazde pole, kterou
+    //   probudilo P45. Bez teto opravy by noc 01.09. merila M13 PRIZNIVEJI,
+    //   nez zaslouzi, protoze planovac lezici blitzery podcenuje v riziku.
+    int moveLeft = movementAfterStandUp(mover) - 1;
     double failChance = 0.0;
 
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
@@ -712,6 +721,14 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // Combined estimate used to rank blitzer candidates for a fixed target:
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).
+// Testovaci pristup k oceneni DOBEHU. Vystaveno schvalne: bez nej by se
+// M13b (vstani se musi odecist) dalo hlidat jen neprimo pres volbu blitzujiciho,
+// a takovy test by prosel i pri spatne cene, kdyz by volba nahodou vysla stejne.
+double blitzApproachRiskForTest(const GameState& state, const Player& mover,
+                                const Player& target) {
+    return estimateApproachFailChance(state, mover, target.position);
+}
+
 static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
                                        const Player& target) {
     // Risk estimate and feature extraction keep the raw strengths: they describe

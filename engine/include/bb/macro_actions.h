@@ -202,6 +202,8 @@ long takeCageCritRepicksInSearch();
 long takeStandOfferedInSearch();
 long takeStandOfferedNextToEnemyInSearch();
 long takeStandOfferedNextToHitterInSearch();
+double blitzApproachRiskForTest(const GameState& state, const Player& mover,
+                                const Player& target);
 void setBlitzPathArm(TeamSide side, bool on);
 bool blitzPathArm(TeamSide side);
 void setProneActionArm(TeamSide side, bool on);

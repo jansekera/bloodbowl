@@ -2947,3 +2947,43 @@ TEST(Q3Pricing, ArmNeverDropsStayWhenThereIsNowhereToRun) {
     setStandUpPricingArm(TeamSide::HOME, false);
     EXPECT_EQ(countRepositionFor(ms, 1), 1) << "vzalo se vstávání tam, kde není náhrada";
 }
+
+// ============================================================================
+// M13b (01.09.2026): RIZIKO DOBĚHU MUSÍ LEŽÍCÍMU ODEČÍST VSTÁNÍ
+//
+// `estimateApproachFailChance` počítalo rozpočet z `movementRemaining`, takže
+// ležící MA6 vypadal, že má po rezervě na blok pět polí — má dvě (ř. 690-695).
+// GFI riziko proto začalo přičítat o tři pole později a ležící blitzer se jevil
+// bezpečnější, než je. Do 31.08. spící vada (ležící blitzovat nesměl), M13 ji
+// probudila — táž třída jako Bone Head házený za každé pole, který probudilo P45.
+// ============================================================================
+TEST(BlitzApproachRisk, ProneBlitzerIsPricedWithTheStandUpCostSubtracted) {
+    // Cíl je 5 polí daleko: stojící MA6 tam dojde bez GFI, ležící MA6 má po
+    // vstání 3 pole a musí GFI — a to se v ceně MUSÍ objevit.
+    auto build = [](bool prone) {
+        GameState s;
+        s.phase = GamePhase::PLAY;
+        s.activeTeam = TeamSide::HOME;
+        Player& p = s.getPlayer(1);
+        p.id = 1; p.teamSide = TeamSide::HOME;
+        p.state = prone ? PlayerState::PRONE : PlayerState::STANDING;
+        p.position = {8, 7}; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        Player& e = s.getPlayer(12);
+        e.id = 12; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = {13, 7}; e.stats = {6, 3, 3, 8}; e.movementRemaining = 6;
+        return s;
+    };
+    GameState up = build(false), down = build(true);
+    std::vector<Macro> mu, md;
+    setProneActionArm(TeamSide::HOME, true);
+    getAvailableMacros(up, mu);
+    getAvailableMacros(down, md);
+    setProneActionArm(TeamSide::HOME, false);
+
+    // ⭐ Jádro: ležící musí být oceněn jako RIZIKOVĚJŠÍ než týž hráč vestoje.
+    // Před opravou vyšly obě ceny STEJNĚ, protože vstání se neodečetlo.
+    const double riskUp   = blitzApproachRiskForTest(up,   up.getPlayer(1),   up.getPlayer(12));
+    const double riskDown = blitzApproachRiskForTest(down, down.getPlayer(1), down.getPlayer(12));
+    EXPECT_GT(riskDown, riskUp)
+        << "ležící blitzer se ocenil stejně jako stojící => vstání se neodečetlo";
+}
