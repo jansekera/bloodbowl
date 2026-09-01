@@ -214,21 +214,20 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             (action.type == ActionType::MOVE &&
              p.state == PlayerState::PRONE &&
              action.target == p.position);
-        const bool onlyTakeRoot = p.hasSkill(SkillName::TakeRoot) &&
-                                  !p.hasSkill(SkillName::BoneHead) &&
-                                  !p.hasSkill(SkillName::ReallyStupid) &&
-                                  !p.hasSkill(SkillName::WildAnimal) &&
-                                  !p.hasSkill(SkillName::Bloodlust);
         // ⭐ A JEN JEDNOU ZA AKTIVACI (oprava 21.08.). BB2016 l. 8573:
         // "Immediately after declaring an ACTION". Vícepolový pohyb je u nás
         // N akcí MOVE, takže se házelo N-krát -- Ogre a Treeman rolovali
         // Bone Head / Take Root za každé pole. Spící vada, kterou probudilo
         // P45 (dokud se ležící nezvedal, nikam nešel).
-        if (hasBigGuySkill && !p.bigGuyCheckedThisTurn &&
-            !(standUpAttempt && onlyTakeRoot)) {
+        // ⛔ N14 (01.09.2026): vyjimka `!(standUpAttempt && onlyTakeRoot)`
+        //   ZRUSENA. Prehazovala cely hod, takze zakorenení pri vstavani
+        //   NIKDY nevzniklo. Misto toho se hod hazi a `standUpInPlace` rekne
+        //   handleru, ze vstani se blokovat nesmi (r. 8583-8584).
+        if (hasBigGuySkill && !p.bigGuyCheckedThisTurn) {
             p.bigGuyCheckedThisTurn = true;
             BigGuyResult bgResult = resolveBigGuyCheck(state, action.playerId,
-                                                        action.type, dice, events);
+                                                        action.type, dice, events,
+                                                        standUpAttempt);
             if (bgResult.turnover) {
                 // TA10: Blood Lust -- upir nemel koho kousnout (l. 7942-7943),
                 // nebo kousnuty Thrall drzel mic (l. 7941-7942).

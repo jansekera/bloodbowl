@@ -530,3 +530,33 @@ TEST(ActionResolver, BlitzFailsCleanlyWhenNoPathExists) {
     EXPECT_FALSE(result.success);
     EXPECT_FALSE(result.turnover) << "nedosažitelný cíl není turnover";
 }
+
+// ============================================================================
+// N14 (01.09.2026): TAKE ROOT SE HÁZÍ I PŘI VSTÁVÁNÍ
+//
+// BB2016 ř. 8572-8584. Poslední věta rozhoduje: „(he can still roll to stand up
+// if he is Prone)" — zakořenění vstávání NEBRÁNÍ. Do dneška se to řešilo tím,
+// že se při vstávání hod NEHÁZEL VŮBEC, takže Treeman, který měl zakořenit,
+// příští kolo normálně chodil. Teď se hod hází, zakořenění platí, a vstání
+// přesto projde.
+// ============================================================================
+TEST(ActionResolver, TakeRootRollHappensOnStandUpAndRootingSticks) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    Player& t = gs.getPlayer(1);
+    t.state = PlayerState::PRONE;
+    t.skills.add(SkillName::TakeRoot);
+
+    // 1 = Take Root selže (zakoření), 4 = vstání na 4+ vyjde
+    Action action{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller dice({1, 4});
+    auto result = resolveAction(gs, action, dice, nullptr);
+
+    EXPECT_TRUE(gs.getPlayer(1).rooted)
+        << "hod na Take Root se při vstávání vůbec nehodil";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING)
+        << "zakořenění zabránilo vstání, ačkoli ř. 8583-8584 ho výslovně dovoluje";
+    EXPECT_FALSE(result.turnover);
+}

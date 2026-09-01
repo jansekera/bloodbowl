@@ -39,7 +39,14 @@ struct BigGuyResult {
     bool wastesTeamAction = false;
 };
 
+// `standUpInPlace` = deklarovana akce je pouhe VSTANI na vlastnim poli.
+// BB2016 r. 8583-8584 konci vetou "(he can still roll to stand up if he is
+// Prone)" -- zakorenení tedy vstavani NEBRANI, i kdyz kazdou jinou MOVE akci
+// zabije. Bez tohohle rozliseni se muselo vybirat mezi dvema chybami: bud
+// se hod pri vstavani NEHAZEL (a Treeman, ktery mel zakorenit, priste zase
+// chodil -- N14), nebo se hazel a zakoreneny uz nikdy nevstal.
 BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actionType,
-                                DiceRollerBase& dice, std::vector<GameEvent>* events);
+                                DiceRollerBase& dice, std::vector<GameEvent>* events,
+                                bool standUpInPlace = false);
 
 } // namespace bb

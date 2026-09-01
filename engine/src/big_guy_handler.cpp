@@ -6,7 +6,8 @@
 namespace bb {
 
 BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actionType,
-                                DiceRollerBase& dice, std::vector<GameEvent>* events) {
+                                DiceRollerBase& dice, std::vector<GameEvent>* events,
+                                bool standUpInPlace) {
     Player& player = state.getPlayer(playerId);
     BigGuyResult result;
 
@@ -128,10 +129,18 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
             // block_handleru); po neuspechu v ramci BLITZE blokovat NESMI.
             // MOVE se zakorenením ztraci smysl -- MA je 0 -- a nechavame ho
             // propadnout jako driv, at se aktivace spotrebuje spravne (P55).
+            // ⭐ N14 (01.09.2026): VSTANI ZAKORENENI NEBRANI. r. 8583-8584
+            //   konci zavorkou "(he can still roll to stand up if he is
+            //   Prone)". Do dneska se to resilo tak, ze se pri vstavani hod
+            //   NEHAZEL VUBEC (`standUpAttempt && onlyTakeRoot` v resolveru) --
+            //   jenze tim Treeman, ktery mel zakorenit, priste zase normalne
+            //   chodil. Ted se hod hazi a zakorenení PLATI; jen vstani samotne
+            //   projde, protoze to pravidlo vyslovne dovoluje.
             const bool mayStillAct = (actionType == ActionType::BLOCK ||
                                       actionType == ActionType::PASS ||
                                       actionType == ActionType::HAND_OFF ||
-                                      actionType == ActionType::FOUL);
+                                      actionType == ActionType::FOUL ||
+                                      standUpInPlace);
             if (!mayStillAct) {
                 player.hasActed = true;
                 player.hasMoved = true;
