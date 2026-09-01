@@ -136,3 +136,47 @@ delta_1s in -0.05 0.05
 # ZADANI: --mode 13 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48
 #         --workers 4     (50 paru na kus; ~11,8 h, bez limitu seance)
 # Spousteni: ./launch_m13_night.sh (kontrola seedovani + noc, noc jen pri nule)
+
+# ============================================================================
+# ⛔⛔⛔ DODATEK II — ENGINE SE TED MENI CASTO. JAK SE TOHLE MERENI SMI CIST.
+# (uzivatel 01.09.: "engine se ted mění často")
+#
+# FAKT: 01.09. mel engine SEDM zmen mezi 09:53 a 12:48 --
+#   09:53 P35 nasazeno do produkce (rameno a mode 8 odebrany)
+#   11:43 diagnostika M13 + rozpad vyhozeneho blitzu; M14b za vypinacem
+#   11:54 M13b: riziko dobehu odecita vstani
+#   12:04 N14: Take Root se hazi i pri vstavani
+#   12:10 P37b citac
+#   12:20 P37b oprava
+#   12:48 makro chuze prestala hlasit vstani jako selhani
+# Pred tim 31.08. dalsich sest. To NENI stabilni baze, je to VYVOJ.
+#
+# CO Z TOHO PLYNE — PET PRAVIDEL PRO CTENI:
+#
+# (1) ⛔ ABSOLUTNI CISLA MAJI ZIVOTNOST HODIN, NE DNU.
+#     Doklad z dneska: repicky P35 na hru 127,50 (25.08.) -> 146,92 (11:00)
+#     -> 94,50 (14:00 31.08.); tempo M13 58,5 s/par (10:25) -> 44,5 (13:00).
+#     Kazde cislo z teto noci proto plati JEN k otisku behu, ne obecne.
+#
+# (2) ⛔ SROVNANI NAPRIC NOCEMI JE MRTVE. Plati POUZE parova delta uvnitr
+#     jedne noci -- obe ramena na TEMZ .so.
+#     [[feedback_moving_baseline_only_paired_ab]]
+#
+# (3) ⭐ OTISK BEHU JE JEDINE, CO VYSLEDEK VAZE K ENGINU. `RUN_IDENTITY.json`
+#     (commit + sha256 harnessu + sha256 .so) se MUSI citovat u kazdeho zaveru.
+#     Bez nej se za tyden neda rict, co se vlastne merilo (ABI nesoulad 24.08.).
+#
+# (4) ⛔ LIGHT TEST STARSI NEZ PAR HODIN NEPOPISUJE BUILD. Dnes se to stalo
+#     dvakrat: ranni light test P35 (11:04) uz ve 14:00 neplatil, a ranni
+#     light test M13 (10:25) neplatil ve 13:00. Light test se proto opakuje
+#     PROTI FINALNIMU BUILDU, ne "protoze uz jeden mame".
+#
+# (5) ⛔ NALEZ SI NESE COMMIT, NA KTEREM BYL ZMEREN. Strop P35 z 19.08.
+#     ("blokuje ve 2 z 5 kol", "9,7 % prekloni") dnesni engine NEPOPISUJE
+#     a jeho citovani by bylo tvrzeni o stavu, ktery uz neexistuje.
+#     Tataz vada zdrzela P38 o deset dni.
+#
+# ⚠️ A JEDNA VEC, KTERA Z TOHO NEPLYNE: ze se ma prestat menit. Sedm zmen
+#   za dopoledne je zdrava rychlost, kdyz kazda ma test a kazda je zmerena.
+#   Nebezpecne neni tempo zmen, ale CTENI STARYCH CISEL JAKO PLATNYCH.
+# ============================================================================
