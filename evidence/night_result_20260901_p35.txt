@@ -1,0 +1,63 @@
+# VYSLEDEK NOCI 31.08.->01.09.2026  —  P35 / mode 8
+# Beh: mode 8, dw-we, 1 680 paru, 48 kusu, 4 workery, 15:26 -> ~03:00 (11,6 h)
+# Otisk: commit c1b6fc8d (meni jen evidence/) · harness 37c4b6cc · so ebaa628b
+#        => TOTOZNY .so jako light test ve 14:00. 48/48 OK, 0 FAIL.
+# Predregistrace: evidence/night_prereg_20260831_p35.preds + dodatek 14:00
+
+## CTENI V PORADI Z PREDREGISTRACE
+(1) leak  MOVED WITHOUT THE ARM ACTING: 0 / 1680   => delta se SMI cist
+(2) arm acted 1680/1680 (100 %) · ARM PICKS TOTAL 418 146 (124,45/hru)
+(3) n_nonzero 1005/1680 = 59,8 %
+(4) DELTA dvoustranna +0,0146 +- 0,0119 SE (+1,22 sigma) CI95 [-0,0088; +0,0380]
+    jednostranne      +0,0073 +- 0,0060 SE            CI95 [-0,0044; +0,0190]
+    20/48 shardu zapornych; empiricka SE 0,0128 vs sdruzena 0,0119 => bez overdisperze
+    TD/hru: rameno 0,4524 vs base 0,4333 (+0,0190)
+
+## PREDPOVEDI: 5 z 5 SEDLY
+  leak == 0                 ANO (0)
+  arm_acted >= 0.5          ANO (1,00)
+  n_nonzero in 0.35 0.90    ANO (0,598)
+  delta in -0.05 0.05       ANO (+0,0146)
+  delta_1s in -0.025 0.025  ANO (+0,0073)
+
+## VERDIKT PROTI REGISTROVANE OTAZCE ("SKODI TO?")
+  ⛔ Souhrn tiskne "NEROZHODNUTO", ale to je verdikt k DVOUSTRANNE otazce
+    (pomaha/skodi/ekvivalence), o ktere predregistrace PREDEM rekla, ze na ni
+    tenhle beh nema silu -- na ekvivalenci by pri zmerenem tempu bylo treba
+    ~21 h. Registrovana otazka byla JEDNOSTRANNA.
+  ⇒ Jednostranne CI95 je [-0,0044; +0,0190]. Dolni mez -0,0044 lezi VYSOKO
+    NAD prahem skody -0,015.
+  ⇒ **P35 NESKODI.** Skoda na urovni prahu je vyloucena. Smer je kladny
+    (+0,0073), ale NENI signifikantni (1,22 sigma) -- "pomaha" se tvrdit nesmi.
+
+## ⛔⛔ FALESNY POPLACH, KTERY JSEM SI VYROBIL SAM — a proc je tu zapsany
+  Ve vypisu shardu jsem "nasel" trend delty s poradim shardu: r=+0,471,
+  t=+3,62, prvni vs druha polovina 3,23 sigma. Vypadalo to na vadu aparatu.
+  ⭐ KONTROLA: tyz test na noci M12 (30.08., tyz aparat) dal r=+0,011 -- cisto.
+  ⭐ PRICINA: `night_summarize.py` tiskl shardy v ABECEDNIM poradi
+    (s0, s1, s10, s11 ... s19, s2, s20), ne ciselnem. Cetl jsem prehazene
+    poradi jako poradi seedu. Po serazeni podle skutecneho indexu (z radku)
+    vychazi r=+0,181, t=+1,24 => ZADNY TREND.
+  ⇒ Opraveno ve zdroji: souhrn tridi ciselne. Vypis, ktery svadi ke spatnemu
+    cteni, je vada vypisu, ne cteni.
+  ⇒ Zaznam do sbirky "spatny vysledek vypada normalne": 3,6 sigma z niceho,
+    a jedine, co to odhalilo, byla KONTROLA NA JINEM BEHU.
+
+## RUCNI CTENI ZE ZADANI
+(1) REPICKY NA HRU: 124,45 proti 94,50 z light testu (12 paru).
+    ⚠️ Neni to zmena enginu -- otisk behu potvrzuje TOTOZNY .so. Light test
+    na 12 parech tuhle velicinu proste neodhadne; denni rada byla
+    146,92 (M13 v produkci) / 94,50 (M13 za vypinacem) / 124,45 (noc).
+(2) ROZPAD PO STRANACH: kandidat=DOMACI chess 0,4164 · kandidat=HOST 0,5982.
+    ⛔ Tenhle rozdil NENI ucinek ramene -- je to znama asymetrie domaci/host
+    (host vyhrava, zapis 24.08.). Dvoustranna forma delty ji prave proto
+    odecita (0,4164 + 0,5982 - 1 = +0,0146). Ucinek ramene se z toho
+    rozlozit NEDA, presne jak predregistrace varovala.
+(3) BLITZ vs BLITZ_AND_SCORE: ⛔ NELZE — radky ten udaj nenesou. Registroval
+    jsem cteni, na ktere aparat nema pole. Doplnit pred pristim merenim.
+
+## DUSLEDEK
+  P35 je oprava PODLE PRAVIDEL (blok se oceni z pole, odkud se hazi) a je
+  dolozeno, ze NESKODI. ⇒ Nasadit natrvdo a rameno ODEBRAT -- stejne jako
+  cena Wrestle u B2 (30.08.), a ze stejneho duvodu: default-OFF rameno, ktere
+  neskodi, je jen dalsi hotova vec, o ktere nikdo nevi.

@@ -52,7 +52,15 @@ def read_shard(path):
 
 
 def summarize(out, name, thr, facts=None):
-    logs = sorted(glob.glob(os.path.join(out, name + "_s*", "run.log")))
+    # ⛔ 01.09.2026: SETRIDIT CISELNE, NE ABECEDNE. `sorted()` nad cestami dava
+    # poradi s0, s1, s10, s11 ... s19, s2, s20 -- a ten vypis pak KAZDY cte
+    # jako poradi shardu (tedy seedu). 31.08. jsem na nem "nasel" trend
+    # 3,6 sigma, ktery po serazeni podle skutecneho indexu klesl na 1,2 sigma
+    # a zmizel. Vypis, ktery svadi ke spatnemu cteni, je vada vypisu.
+    def _shard_no(path):
+        m = re.search(r"_s(\d+)/", path)
+        return int(m.group(1)) if m else 0
+    logs = sorted(glob.glob(os.path.join(out, name + "_s*", "run.log")), key=_shard_no)
     sh = [x for x in (read_shard(p) for p in logs) if x]
     L = []
     if not sh:
