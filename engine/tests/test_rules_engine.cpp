@@ -396,3 +396,48 @@ TEST(RulesEngineProne, ProneArmOffRestoresTheOldOfferSet) {
     EXPECT_TRUE(hasMoveTo(as, {10, 7}));
     EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
 }
+
+// ============================================================================
+// P37b (01.09.2026): NA RÁNU MUSÍ ZBÝT POLE POHYBU
+//
+// ř. 549-550: „the block … costs one square of movement." Do 01.09. měli tuhle
+// kontrolu jen ležící (M13); stojící ne, takže hráč, který už utratil pohyb
+// i GFI, blitz DEKLAROVAL, tým přišel o svůj jediný blitz na kolo a rána se
+// nehodila. Změřeno před opravou: ~9 na zápas.
+//
+// ⛔ ROZSAH JE ÚZKÝ SCHVÁLNĚ (uživatel 01.09.): ř. 552-553 dovoluje po ráně
+// pokračovat v pohybu, takže „blitz souseda a pak útěk" je legitimní vzor —
+// srazím ho, zmizí tacklezóna, odejdu bez dodge. Nabídka se proto NESMÍ zúžit
+// za to, že hráč sousedí, ani za to, že mu po ráně nezbude krok.
+// ============================================================================
+TEST(RulesEngineBlitzBudget, AdjacentBlitzIsStillOfferedWhenOnlyTheBlockIsAffordable) {
+    // Pohyb 0, ale GFI zbývá => ránu zaplatit lze. Nabídka MUSÍ zůstat:
+    // hráč sice po ráně neodejde, ale rána sama má cenu.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).movementRemaining = 0;
+
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 1)
+        << "nabídka se zúžila i tam, kde rána zaplatit jde";
+}
+
+TEST(RulesEngineBlitzBudget, AdjacentBlitzIsRefusedWhenEvenTheBlockCannotBePaid) {
+    // Pohyb i GFI vyčerpané (-2 při maxGfi 2) => rána se nehodí, tým by přišel
+    // o blitz za nic. A hráč se nemůže ani hnout, takže deklarace nekupuje nic.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).movementRemaining = -2;
+
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0)
+        << "nabídl se blitz, jehož ránu není z čeho zaplatit";
+}

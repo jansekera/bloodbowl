@@ -128,11 +128,25 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                     // se lezicimu s MA3 nabidl blitz, ktery po vstani (3-3=0)
                     // hodi GFI, a zakorenenemu blitz, ktery se nehodi vubec --
                     // v obou pripadech se utrati tymovy blitz za nic.
-                    if (prone) {
-                        const int gfi = p.rooted ? 0
-                                      : (p.hasSkill(SkillName::Sprint) ? 3 : 2);
-                        if (movementAfterStandUp(p) - 1 < -gfi) return;
-                    }
+                    // ⭐ P37b (01.09.2026): NA RANU MUSI ZBYT POLE POHYBU.
+                    //   r. 549-550: "the block ... costs one square of movement".
+                    //   Do dneska tuhle kontrolu meli jen LEZICI (M13, 31.08.);
+                    //   stojici ne, takze hrac, ktery uz utratil pohyb i GFI,
+                    //   blitz DEKLAROVAL, tym prisel o svuj jediny blitz na
+                    //   kolo a rana se nehodila (`block_handler.cpp:480`).
+                    //   ZMERENO pred opravou: 142 na 8 paru = ~9 za zapas,
+                    //   0,26 % blitzu. Mala, ale CISTA ztrata.
+                    // ⛔ ROZSAH JE ZAMERNE UZKY (uzivatel 01.09.: "blitz souseda
+                    //   a pak utek je dobry napad"). r. 552-553 dovoluje po rane
+                    //   POKRACOVAT v pohybu, takze blitz na souseda je zpusob,
+                    //   jak se OSVOBODIT -- srazim ho, zmizi tacklezona, odejdu
+                    //   bez dodge. Nabidka se proto NEZUZUJE za to, ze hrac
+                    //   sousedi, ani za to, ze mu po rane nezbude krok.
+                    //   Odmita se JEDINY pripad: neni z ceho zaplatit ani ranu.
+                    //   (Ten hrac se stejne nemuze ani hnout, takze mu deklarace
+                    //   nekoupi ani Wild Animal bonus -- viz P37b v knize.)
+                    const int gfi = p.rooted ? 0 : maxGfiSquares(p);
+                    if (movementAfterStandUp(p) - 1 < -gfi) return;
                     out.push_back({ActionType::BLITZ, p.id, enemy.id, enemy.position});
                     return;
                 }
