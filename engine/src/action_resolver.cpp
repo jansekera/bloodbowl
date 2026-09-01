@@ -101,6 +101,24 @@ thread_local long g_standBlitzTO   = 0;
 thread_local long g_bwNoReach = 0, g_bwMove = 0, g_bwTurnover = 0,
                   g_bwDown = 0, g_bwStuck = 0, g_bwFar = 0;
 thread_local long g_blitzDeclAdj = 0, g_blitzDeclFar = 0;
+// ⭐ P37b DIAGNOSTIKA (01.09.2026, pripravena za behu noci, NESPUSTENA).
+//   Nabidka rezervuje pole na ranu (`canReachAdjacentTo(..., 1)`), chuze ne
+//   (reserve=0). Pripad "dosel, ale rana neni z ceho" proto muze nastat JEN
+//   tehdy, kdyz hladova chuze jde DELSI cestou nez BFS optimum -- jinak by
+//   rezerva zbyla. Merime tedy presne to: kroky navic proti optimu.
+//   ⛔ Rano jsem P37b "opravil" v NABIDCE a nezabralo to (142 -> 140).
+//     Teprve tenhle rozdil rekne, jestli je vada v chuzi, nebo jinde.
+thread_local long g_blitzSteps = 0, g_blitzOptimal = 0, g_blitzExtra = 0;
+}
+
+void noteBlitzPathLength(int steps, int optimal) {
+    ++g_blitzSteps;
+    if (steps <= optimal) ++g_blitzOptimal;
+    else g_blitzExtra += (steps - optimal);
+}
+void takeBlitzPathStats(long* out3) {
+    out3[0]=g_blitzSteps; out3[1]=g_blitzOptimal; out3[2]=g_blitzExtra;
+    g_blitzSteps=g_blitzOptimal=g_blitzExtra=0;
 }
 
 void noteBlitzDeclaredAdjacent(bool adjacent) {

@@ -35,6 +35,9 @@ void takeBlitzWastedBreakdown(long* out6);
 // P37b: blitz deklarovan u SOUSEDA vs ZDALEKA. Rozlisi vadu nabidky od vady chuze.
 void noteBlitzDeclaredAdjacent(bool adjacent);
 void takeBlitzDeclSplit(long* out2);
+// P37b: delka hladove cesty proti BFS optimu. [pokusu, optimalnich, kroku navic]
+void noteBlitzPathLength(int steps, int optimal);
+void takeBlitzPathStats(long* out3);
 
 ActionResult resolveAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events);
