@@ -89,3 +89,50 @@ delta_1s in -0.05 0.05
 #
 # ZADANI: --mode 13 --matchups "2:dw-dw:1" --pairs 1200 --chunks 48
 #         --workers 4 --session-hours 11   (25 paru na kus; ~7,8 h)
+
+# ============================================================================
+# DODATEK 01.09. 13:05 — ENGINE SE OD PSANI PREDREGISTRACE ZMENIL PETKRAT.
+# Psano PRED behem. Beh nezacal.
+#
+# CO PRIBYLO (vse PRODUKCE, tedy v OBOU ramenech stejne => parovou deltu
+# to nekazi, ale ZEM, na ktere mereni stoji, je jina):
+#   M13b  riziko dobehu odecita lezicimu VSTANI (planovac ho pred tim
+#         podcenoval v riziku => M13 by vyslo PRIZNIVEJI, nez zaslouzi)
+#   N14   Take Root se hazi i pri vstavani (zakorenení uz nemizi)
+#   P37b  na ranu pri blitzu musi zbyt pole pohybu  ⚠️ NEZABRALO (142 -> 140),
+#         pripad tedy nevznika ve vetvi "uz sousedi" -- zustava otevrene
+#   ⭐ MAKRO CHUZE HLASILA KAZDE VSTANI JAKO SELHANI (67 479 -> 0 na 8 parech).
+#      Pojistka "uspech bez pohybu" (26.08., kvuli Tentacles) nerozlisovala
+#      vstani, pri kterem se pozice z definice nemeni.
+#      ⛔ TOHLE SE DOTYKA PRESNE TOHO, CO M13 MERI. M13 se tedy meri na enginu,
+#        kde vstavani POPRVE FUNGUJE SPRAVNE. Kdyby se vysledek jednou cetl
+#        jako srovnani s drivejskem, je to SPATNE CTENI.
+#
+# LIGHT TEST PROTI FINALNIMU BUILDU (12 paru, dw-dw, 12:51-13:00):
+#   leak 0 · arm acted 12/12 · n_nonzero 9/12 = 75,0 %
+#   ARM PICKS 11 535 = 480,62/hru
+#   Q3/UTEK 0  <= Q3 rameno vypnute, rozdeleni drzi
+#   CHUZE/VZDANI stoji 0  <= oprava vstavani drzi
+#   M13/CENA turnover z lehu 16,9 % PROTI ze stoje 2,1 %
+#   M13/BLITZ bez rany z lehu 1,4 % PROTI ze stoje 9,0 %
+#   PAIRED delta -0,1250 +- 0,1197 (~1,0 SE)
+#   ⛔ Delta je SUM a neridi nic. Zapsana proto, ze je zaporna -- uz poctvrte
+#     u M13. Kdyby noc vysla zaporne, nesmi to vypadat jako predvidani.
+#
+# ⚠️ n_nonzero 75 % je uvnitr registrovaneho pasma (0,20-0,80), ale TESNE
+#   u horni hranice. Rada napric light testy: 37,5 -> 50 -> 62,5 -> 75 %,
+#   a roste s tim, jak dnesni opravy pousteji lezici hrace ke hre. Pasmo
+#   registruju NEZMENENE -- posouvat ho po pozorovani je optional stopping.
+#
+# ZMENA DIMENZOVANI: tempo na finalnim buildu je 44,5 s/par (12 paru za 534 s),
+#   ne 58,5 jako rano -- dnesni opravy beh ZRYCHLILY, protoze chuze se prestala
+#   zbytecne vzdavat a opakovat. Pri 4 workerech to je ~17,7 s/par.
+#   ⇒ 2 400 paru = ~11,8 h, SE ~ 0,0100 (proti prahu 0,015 REZERVA).
+#   ⛔ SESSION_HOURS=11 ZRUSENO. Byl to zbytek po rannim planu na dve noci
+#     (kdyz jeste vychazelo 23 h na dw-we). Pri 11,8 h by beh UPROSTRED
+#     ZASTAVIL a vynutil druhou seanci -- tedy zmrazil engine na dalsi den.
+#     Pojistka proti dlouhe noci by zpusobila dvoudenni blokadu.
+#
+# ZADANI: --mode 13 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48
+#         --workers 4     (50 paru na kus; ~11,8 h, bez limitu seance)
+# Spousteni: ./launch_m13_night.sh (kontrola seedovani + noc, noc jen pri nule)
