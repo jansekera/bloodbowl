@@ -1420,7 +1420,29 @@ změně prostoru tahů. Viz [[feedback_measure_what_the_change_does]].
 
 ## ⏰ P37b — BLITZ SE NABÍZÍ I TOMU, KDO UŽ NEMÁ ČÍM HODIT BLOK *(nález 31.08.)*
 
-### ⛔ STAV 01.09.: ZMĚŘENO, OPRAVENO V NABÍDCE — A NEZABRALO
+### ✅ UZAVŘENO 01.09.: ZMĚŘENO, POCHOPENO, DÁL SE NEVYPLATÍ
+
+**Hladová chůze je z 97,6 % optimální** *(49 336 doběhů, 48 171 optimálních,
+1 256 kroků navíc = 0,025 na doběh)*. ⇒ Moje hypotéza, že chůze systematicky
+promrhává rezervu, byla **špatná**.
+
+**Skutečný mechanismus:** těch 64-142 případů vzniká právě ve **2,4 %
+neoptimálních doběhů, které byly zároveň těsné na rozpočet** — nabídka
+rezervu na ránu slíbí, chůze si o krok navíc sáhne, a rána není z čeho.
+Reálné, ale **mikroskopické: ~0,1 % blitzů**.
+
+⇒ **Nevyplatí se.** Jediná známá oprava je M14b (chůze po nejkratší cestě)
+a ta měřením **neprošla** — a teď je i jasné proč: *nemá co opravovat*,
+když je chůze z 97,6 % už nejkratší.
+⭐ **Dvě nezávislá měření se tím potkala**: párové A/B M14b (−0,1667 ± 0,1076)
+a podíl optimálních cest. Zamítnutí M14b tím má druhý doklad.
+
+⚠️ Oprava v nabídce z 01.09. **zůstává** — je správná sama o sobě
+*(na ránu má zbýt pole, ř. 549-550)*, jen míří jinam, než vada je.
+
+---
+
+### Původní stav (01.09. dopoledne, pro historii)
 
 **Změřeno před opravou:** 142 výskytů na 8 párů (~9 za zápas, 0,26 % blitzů).
 Živá, ale malá vada. **Po opravě v `rules_engine` (větev „už sousedí"): 140.**
