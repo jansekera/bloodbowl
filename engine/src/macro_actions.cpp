@@ -851,6 +851,9 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         // Rozhodnuti se musi udelat AZ POTOM, co je znamo, jestli utek vubec
         // existuje, jinak by rameno bralo nabidku i tam, kde nahrada neni.
         bool offerStay = true;
+        // Tika JEDNOU za hrace, i kdyz rameno zmenilo obe veci naraz --
+        // jinak by se jeden zasah pocital dvakrat a jmenovatel by lhal.
+        bool armChangedOffer = false;
 
         // ⭐ Q3 KROK A (31.08.2026): DRUHA MOZNOST -- VSTAT A ODEJIT.
         // Uzivatelova doktrina (20.08.): vstat vedle soupere meni hrace
@@ -901,6 +904,16 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             }
             if (best.x >= 0) {
                 ++g_standEscapeOffered;
+                // ⛔⛔ AUDIT 01.09.: SIGNAL BYL NEUPLNY. Citac tikal jen kdyz
+                //   rameno VZALO nabidku "zustat" -- jenze rameno dela DVE
+                //   veci a druha je, ze nabidku "odejit" vubec PRIDA (cely
+                //   tenhle blok je pod vypinacem). Par, kde rameno jen pridalo
+                //   utek a planovac si ho vybral, by hlasil "arm acted 0" nad
+                //   POHNUTOU hrou => LEAK TEST BY KRICEL NA VLASTNI RAMENO
+                //   a noc by se nesmela precist.
+                //   ⇒ Signal je "rameno ZMENILO NABIDKU", at uz jakkoli.
+                //   Tataz vada jako u M13 (31.08.) -- druhe rameno za dva dny.
+                armChangedOffer = true;
                 out.push_back({MacroType::REPOSITION, p.id, -1, best});
                 // ⭐ Rameno bere nabidku "vstat a zustat" jen tehdy, kdyz je
                 //   POCITANE nejhorsi odpovedi PRISNE DRAZ nez utek. Zadna
@@ -934,7 +947,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (priced && !stayEarnsItsKeep &&
                     worstReplyCost(state, p, p.position, true) > bestCost + 1e-9) {
                     offerStay = false;
-                    ++g_standPricingRepicks;
+                    armChangedOffer = true;
                 }
             } else {
                 ++g_standEscapeImpossible;
@@ -942,6 +955,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         }
 
         if (offerStay) out.push_back({MacroType::REPOSITION, p.id, -1, p.position});
+        if (armChangedOffer) ++g_standPricingRepicks;
     });
 
     const Player* carrier = findCarrier(state);

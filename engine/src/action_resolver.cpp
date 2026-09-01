@@ -316,6 +316,17 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             // u vzdaleneho = CHUZE spotrebovala rezervu, kterou reachability
             // slibila (a to je vada pohybu, ne nabidky).
             noteBlitzDeclaredAdjacent(player.position.distanceTo(target.position) == 1);
+            // P37b: BFS optimum SPOCITANE PRED chuzi -- porovna se s tim,
+            // kolik kroku hladova chuze opravdu udela.
+            int optimalSteps = -1;
+            {
+                Position tmp;
+                if (nextStepTowardAdjacent(state, player, target.position, tmp)) {
+                    optimalSteps = optimalPathStepsToAdjacent(state, player, target.position);
+                }
+            }
+            const Position blitzStart = player.position;
+            int walkedSteps = 0;
 
             // Mark blitz used
             state.getTeamState(player.teamSide).blitzUsedThisTurn = true;
@@ -390,6 +401,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 // no other progress guard. Treat no-progress as "can't reach",
                 // consistent with the other bail-out paths above.
                 if (player.position == beforeStep) { noteBlitzWasted(4); return ActionResult::fail(); }
+                ++walkedSteps;
             }
 
             // Now adjacent — perform block
@@ -397,6 +409,9 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 noteBlitzWasted(5);
                 return ActionResult::fail();
             }
+
+            if (optimalSteps > 0) noteBlitzPathLength(walkedSteps, optimalSteps);
+            (void)blitzStart;
 
             BlockParams params;
             params.attackerId = action.playerId;

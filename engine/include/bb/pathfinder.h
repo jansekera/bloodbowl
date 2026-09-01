@@ -19,6 +19,8 @@ struct MoveTarget {
 // jednoho pole na blok. Tacklezony rozhoduji mezi stejne dlouhymi cestami.
 // false = nikam nevede (pak se blitz nema o co pokouset).
 long takeBlitzPathPicksInSearch();
+int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
+                               Position target);
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                             Position target, Position& outStep);
 
