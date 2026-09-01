@@ -1,0 +1,91 @@
+# PREDREGISTRACE NOCI 01.->02.09.2026  —  M13 / mode 13
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Jakou CENU ma oprava M13? (Lezici hrac smi deklarovat akci -- BB2016
+#   r. 669-676: "While Prone, the player ... may do nothing before standing up
+#   at a cost of three squares of his movement WHEN HE NEXT TAKES AN ACTION.
+#   ... The player may take any Action other than a Block Action.")
+#
+# ⛔⛔ TOHLE MERENI NEROZHODUJE, JESTLI NASADIT. Uzivatel 01.09.: "je to oprava
+#   a ta se nasadi, i kdyz vypada, ze skodi proti predchozi verzi."
+#   M13 je PRAVIDLO. Nehraje se podle toho, co nam vyhovuje.
+#   ⇒ Mereni kupuje dve JINE veci:
+#     (1) ZNAT CENU -- lezici, ktery vstane a jde, MUSI hazet dodge z
+#         tacklezony, a neuspesny dodge je turnover. To je cena pravidla.
+#     (2) CHYTIT CHYBU -- kdyby byl efekt velky a zaporny, neznamena to
+#         "pravidla nam skodi", ale "neco jsme naprogramovali spatne".
+#   Proto se do behu pridala DIAGNOSTIKA, ne vetsi vzorek: kdyz je podezreni
+#   na chybu, vic logu poradi lip nez vic paru.
+#
+# ✅ AUDIT MERICIHO RETEZU (01.09., pred behem)
+#   (1) ⛔ NALEZENA A OPRAVENA VADA: signal pocital jen BLITZ z lehu, ne pohyb.
+#       Par, kde rameno zmenilo POUZE chuzi, by hlasil "arm acted 0" nad
+#       pohnutou hrou => LEAK TEST BY KRICEL NA VLASTNI RAMENO a noc by se
+#       nesmela precist. Ted se pocita "lezici udelal neco, co pred M13
+#       neslo" -- blitz, nebo vstal a SEL JINAM. Vstani NA MISTE se nepocita
+#       (to slo i pred M13 samostatnou smyckou).
+#   (2) UPLNOST: rameno nemuze zmenit nic jineho -- gatuje NABIDKU (rules_engine
+#       i macro_actions), resolver uz vstavani umel driv.
+#   (3) IZOLACE: s vypnutym ramenem se MacroMCTS/S3 vraci PRESNE na BLITZ
+#       a nabidky na jedinou (vstat na miste). Hlidaji dva testy.
+#   (4) SIGNAL DOJDE DO VYHODNOCENI: candProne -> armEvents -> arm acted
+#       + ARM PICKS + leak; mode 13 je v armSignalAvailable.
+#
+# ⛔ NULA NEEXISTUJE: lezici hraci jsou v kazdem zapase, matchup s nulovou
+#   expozici nejde postavit (stejne jako u M12 a P35). Kontrola seedovani
+#   (mode 2) bezi SAMOSTATNE a PRED behem; je to pod CRN tautologie a verdikt
+#   na ni NESTOJI. ⇒ Aparat se obhajuje LEAKEM.
+#
+# LIGHT TESTY (01.09., dnesni engine)
+#   dw-dw, 8 paru: leak 0 · arm acted 8/8 · n_nonzero 3/8 · 7 878 picku
+#                  (492,38/hru) · PAIRED delta -0,1875 +- 0,0856
+#   dw-we, 8 paru: leak 0 · arm acted 8/8 · n_nonzero 4/8 · 6 873 picku
+#                  (429,56/hru) · PAIRED delta +0,0000 +- 0,1976
+#   ⛔ OBE DELTY JSOU SUM A NERIDI NIC. Zapsany sem PREDEM prave proto, ze
+#     jedna je zaporna: kdyby noc vysla zaporne, nesmi to vypadat jako
+#     predvidani, a kdyby kladne, nesmi se ten naznak zamlcet.
+#
+# VOLBA MATCHUPU: dw-dw (matchup 2), a je to zmerene rozhodnuti:
+#   tempo M13  dw-dw 58,5 s/par  vs  dw-we 149,8 s/par  => 2,6x rychlejsi
+#   a matchup je SYMETRICKY, takze rozpad po stranach nebude konfundovany
+#   asymetrii domaci/host -- presne to cteni u P35 (dw-we) PADLO.
+#
+# DIMENZOVANI: s se NEBERE z light testu (8 paru je nespolehlivy odhad),
+#   ale ze zmerenych NOCI: M12/dw-dw s=0,42, P35/dw-we s=0,49. Konzervativne
+#   0,49 => n = (0,49/0,015)^2 ~ 1 070. Volim 1 200 s rezervou.
+#   Tempo wall pri 4 workerech ~23,3 s/par => ~7,8 h. Jedna noc staci.
+#   SESSION_HOURS=11 zustava JAKO POJISTKA, ne jako plan.
+#
+# PREDPOVEDI (ctou se v tomto poradi)
+leak == 0
+arm_acted >= 0.5
+n_nonzero in 0.20 0.80
+delta in -0.10 0.10
+delta_1s in -0.05 0.05
+#
+# ⚠️ Pasma jsou sirsi nez u P35 zamerne: light testy daly n_nonzero 37,5 %
+#   a 50 %, a jedna delta byla -0,1875. Registruju pasmo, ktere unese
+#   i skutecny zaporny efekt, protoze M13 se nasadi tak jako tak.
+#
+# ⏰ RUCNI CTENI (harness je tiskne sam, viz M13/* radky)
+#   (1) M13/CENA: turnover BLITZU z lehu proti turnoveru BLITZU ze stoje.
+#       ⛔ NECIST podil "vsech akci" -- akce z lehu je JEDNA akce s celym
+#         blitzem, stojici pohyb je N akci MOVE (past se jmenovatelem,
+#         nalezena 01.09.: davala 10,7x tam, kde srovnani neplati).
+#   (2) M13/BLITZ: vyhozeny tymovy blitz z lehu proti stoji. Light test dal
+#       2,1 % proti 9,3 % => z lehu se plytva 4x MIN, protoze nabidka pro
+#       lezici ma prisnou kontrolu rozpoctu, kterou bezny blitz nema.
+#   (3) BLITZ/PROC: rozpad podle priciny. Cekam vetsinu v TURNOVER (cena
+#       pravidla), a `nedosah` mensi nez 15 % (vada nabidky, resi se zvlast).
+#   (4) rozpad po stranach -- ted CITELNY, matchup je symetricky.
+#
+# ⚠️ CO Z NOCI NEPLATI: absolutni cisla. `.so` se 01.09. menilo mnohokrat
+#   (P35 nasazeno, diagnostika, M14b za vypinacem). Plati JEN parova delta.
+#   [[feedback_moving_baseline_only_paired_ab]]
+#
+# ⛔ M14b (mode 15, blitzova chuze) je v mode 13 VYPNUTA. Noc tedy bezi na
+#   PRODUKCNI chuzi a dnesni pokusy o jeji opravu ji nijak neovlivnuji.
+#
+# ZADANI: --mode 13 --matchups "2:dw-dw:1" --pairs 1200 --chunks 48
+#         --workers 4 --session-hours 11   (25 paru na kus; ~7,8 h)
