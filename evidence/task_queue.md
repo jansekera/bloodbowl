@@ -1420,6 +1420,40 @@ změně prostoru tahů. Viz [[feedback_measure_what_the_change_does]].
 
 ## ⏰ P37b — BLITZ SE NABÍZÍ I TOMU, KDO UŽ NEMÁ ČÍM HODIT BLOK *(nález 31.08.)*
 
+### ⛔ STAV 01.09.: ZMĚŘENO, OPRAVENO V NABÍDCE — A NEZABRALO
+
+**Změřeno před opravou:** 142 výskytů na 8 párů (~9 za zápas, 0,26 % blitzů).
+Živá, ale malá vada. **Po opravě v `rules_engine` (větev „už sousedí"): 140.**
+⇒ **Případ tam nevzniká.** Oprava zůstává (je správná sama o sobě), ale míří
+jinam, než vada je.
+
+⭐ **DIAGNÓZA Z ČETBY KÓDU — nabídka a chůze mají různý rozpočet:**
+
+| | rezerva na ránu |
+|---|---|
+| nabídka `rules_engine` | `canReachAdjacentTo(..., **reserve = 1**)` |
+| chůze `action_resolver` | `canReachAdjacentTo(..., adjPos)` — **reserve = 0** |
+
+Nabídka tedy **slíbí, že na ránu zbude pole**, ale chůze si tu rezervu
+nehlídá a jde, dokud není u cíle s nulou. ⇒ Případ může nastat **jen když
+hladová chůze jde delší cestou než BFS optimum**, které nabídku podložilo.
+
+⇒ **P37b není vada nabídky, je to důsledek nepřesné chůze.**
+
+⏰ **PŘIPRAVENO, NESPUŠTĚNO:** čítač délky hladové cesty proti BFS optimu
+*(kroky navíc)* — větev `p37b-diag` ve worktree `bb-dev-20260901`.
+⚠️ **Záměrně nepřeloženo**: překlad si bere jádra a soutěžil by s běžící nocí
+*(load vyskočil na 7,8)*. Přeložit a spustit **až po skončení běhu**.
+
+⭐ **Souvislost s M14b:** kdyby se potvrdilo, že hladová chůze je systematicky
+delší, je to **druhý doklad pro tutéž opravu**, kterou jsem 01.09. zamítl na
+základě párového měření (−0,1667 ± 0,1076, −1,5 SE při 12 párech). Zamítnutí
+stálo na 12 párech; kdyby diagnostika ukázala velký podíl neoptimálních cest,
+zaslouží si **noc, ne odhad**.
+
+---
+
+
 `rules_engine.cpp`, větev „už sousedí": stojícímu se BLITZ nabídne **bez
 kontroly rozpočtu**. Blok při blitzu stojí pole pohybu (ř. 549-550), takže
 hráč s `movementRemaining <= -maxGfi` blitz deklaruje, `block_handler.cpp:480`
