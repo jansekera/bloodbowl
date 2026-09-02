@@ -15,6 +15,37 @@ Nezapisovat řešení — zapisovat **co má hráč rozeznat**.
 
 ---
 
+## ⛔⛔ VAROVÁNÍ PŘED MĚŘENÍM — MODEL CELOTAH JEŠTĚ NEUMÍ
+
+> **Uživatel 02.09.:** *„celotah ještě model neumí — tak dej pozor, ať nepočítáš
+> něco, co model neumí."*
+
+Kdybychom měřili **rozhodnutí, která engine nedělá**, každé číslo spadne do N/A
+a bude říkat jen to, co už víme: *že to neumí*. Týž tvar jako **Leap měřený
+proti dodge** — porovnávalo se s něčím, o co se ani nesnaží.
+
+```
+⛔ NEMĚŘIT:  „schoval si plánovač blitz na správný okamžik?"
+             (mechanismus schovávání NEEXISTUJE ⇒ vždy „ne")
+⛔ NEMĚŘIT:  „zvolil dobré pořadí aktivací?"
+             (pořadí se nevolí ⇒ otázka nemá referenci)
+
+✅ MĚŘIT:    DŮSLEDKY, které dnes nastávají
+             · na jak hodnotný cíl blitz padne
+             · jak často makro selže uprostřed tahu a co se pak stane
+             · kolikrát nosiči zavazí vlastní tělo
+```
+
+⭐ **Rozdíl:** to první měří **chybějící schopnost** *(a vyjde vždy nula)*,
+to druhé měří **cenu její nepřítomnosti** *(a to je číslo, které se dá porovnat
+po nasazení)*.
+
+⚠️ Platí to i pro **předregistrace**: registrovat se smí jen čtení, které má
+dnes co vytisknout. [[feedback_registered_reading_needs_a_print_line]] ·
+[[feedback_na_bucket_is_the_finding]] · [[feedback_measure_what_the_change_does]]
+
+---
+
 ## A. UŽ DOLOŽENÉ Z NAŠÍ PRÁCE *(mají číslo nebo zdroj)*
 
 | # | situace | co má celotah rozeznat | zdroj |
