@@ -87,11 +87,18 @@ delta_1s in -0.05 0.05
 # DIMENZOVANI: tempo 56 s/par (12 paru za 11,2 min na finalnim buildu).
 #   s se bere ze ZMERENYCH NOCI, ne z light testu: M13/dw-dw dalo SE 0,0084
 #   pri 2 400 parech => s = 0,412.
-#   1 800 paru => SE ~ 0,0097 (proti prahu 0,015 rezerva), ~11,9 h.
-#   ⇒ start ~18:00, konec ~06:00. Bez limitu seance.
+#   1 800 paru => SE ~ 0,0097, ~11,9 h
+#   2 400 paru => SE ~ 0,0084, ~15,9 h   ⇐ VOLENO (uzivatel 02.09.:
+#                 "priprav na noc delsi beh 2400 paru - spusti se driv")
+#   ⇒ START ~14:00, konec ~06:00. Bez limitu seance.
+#   ⭐ Delsi beh se plati ranejsim startem, ne zkracenim vzorku -- prah
+#     +-0,015 pri SE 0,0084 znamena, ze bude mozne rozhodnout i EKVIVALENCI
+#     (cele CI se vejde dovnitr prahu), ne jen smer. To u Q3 STOJI ZA TO,
+#     protoze je to taktika: "neskodi" tu nestaci, chceme vedet, jestli
+#     POMAHA.
 #
 # ⚠️ CO Z NOCI NEPLATI: absolutni cisla. `.so` se 02.09. menilo (M13 nasazeno,
 #   rameno odebrano, citace zapojeny). Plati JEN parova delta.
 #
-# ZADANI: --mode 14 --matchups "2:dw-dw:1" --pairs 1800 --chunks 45 --workers 4
+# ZADANI: --mode 14 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48 --workers 4
 # Spousteni: ./launch_q3_night.sh  (preflight --expect -> kontrola seedovani -> noc)

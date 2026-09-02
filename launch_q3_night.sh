@@ -19,7 +19,7 @@ EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI"
 
 echo "=== (1) PREFLIGHT — tisknou se vsechna registrovana cteni? ==="
 python3 colab_night_preflight.py --mode 14 --matchups "2:dw-dw:1" \
-        --expect "$EXPECT" --pairs 1800 --workers 4 || {
+        --expect "$EXPECT" --pairs 2400 --workers 4 || {
   echo "⛔ PREFLIGHT NEPROSEL — NOC SE NESPOUSTI"; exit 1; }
 
 echo "=== (2) kontrola seedovani: mode 2, 8 paru, dw-dw ==="
@@ -31,6 +31,6 @@ if [ "${NZ:-x}" != "0" ]; then
 fi
 echo "✅ kontrola cista (n_nonzero=0)"
 
-echo "=== (3) spoustim noc: 1800 paru, 45 kusu po 40, 4 workery ==="
-OUT=$PWD/ab_q3_20260902 MODE=14 MATCHUPS="2:dw-dw:1" PAIRS=1800 \
-CHUNKS=45 NULL_PAIRS=0 WORKERS=4 ./run_laptop_night.sh
+echo "=== (3) spoustim noc: 2400 paru, 48 kusu po 50, 4 workery ==="
+OUT=$PWD/ab_q3_20260902 MODE=14 MATCHUPS="2:dw-dw:1" PAIRS=2400 \
+CHUNKS=48 NULL_PAIRS=0 WORKERS=4 ./run_laptop_night.sh
