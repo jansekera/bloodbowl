@@ -94,6 +94,7 @@ static long g_standEsc = 0, g_standEscNo = 0;
 static long g_proneActs = 0, g_proneTO = 0, g_proneSF = 0, g_proneNB = 0;
 static long g_proneBl = 0, g_standActs = 0, g_standTO = 0;
 static long g_standBl = 0, g_standNB = 0;
+static long g_proneBlTO = 0, g_standBlTO = 0;
 static long g_bw[6] = {0,0,0,0,0,0};
 static long g_bwUnpay = 0;
 static long g_declAdj = 0, g_declFar = 0;
@@ -300,7 +301,7 @@ int main(int argc, char** argv) {
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 15 ? "M14b: blitzova chuze uhyba tacklezonam i GFI"
-         : mode == 13 ? "M13: lezici hrac smi deklarovat akci (r. 669-676)"
+         : mode == 13 ? "(mode 13 ZRUSEN 02.09. -- M13 nasazeno do produkce)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
          : mode == 8 ? "(mode 8 ZRUSEN 01.09. -- P35 nasazeno do produkce)"
          : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
@@ -487,9 +488,10 @@ int main(int argc, char** argv) {
                 // kazdy vyskyt je zmenena hra.
                 bb::setBlitzPathArm(bb::TeamSide::HOME, mode == 15 && candHome);
                 bb::setBlitzPathArm(bb::TeamSide::AWAY, mode == 15 && !candHome);
-                bb::setProneActionArm(bb::TeamSide::HOME, mode == 13 && candHome);
-                bb::setProneActionArm(bb::TeamSide::AWAY, mode == 13 && !candHome);
-                bb::takeProneActionPicksInSearch();
+                // ⛔ mode 13 (M13) ZRUSEN 02.09.2026 -- rameno nasazeno do
+                //   produkce po noci 01.->02.09. (+0,0048 +- 0,0084, tedy nic).
+                //   Cislo se NEPOUZIVA ZNOVU (mody jsou append-only).
+                bb::takeProneActionPicksInSearch();   // diagnostika zustava
                 // mode 14 (Q3, 31.08.): utekova nabidka + jeji ocenení nejhorsi
                 // souperovou odpovedi. Signalem je repick -- rameno vzalo vetev
                 // "vstat a zustat".
@@ -569,6 +571,8 @@ int main(int argc, char** argv) {
                 g_standTO    += bb::takeStandTurnoversInSearch();
                 g_standBl    += bb::takeStandBlitzesInSearch();
                 g_standNB    += bb::takeStandNoBlockInSearch();
+                g_proneBlTO  += bb::takeProneBlitzTOInSearch();
+                g_standBlTO  += bb::takeStandBlitzTOInSearch();
                 { long bw[6]; bb::takeBlitzWastedBreakdown(bw);
                   for (int q = 0; q < 6; ++q) g_bw[q] += bw[q]; }
                 g_bwUnpay += bb::takeBlitzBlockUnpayableInSearch();
@@ -586,8 +590,6 @@ int main(int argc, char** argv) {
                 g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
                 bb::setBlitzPathArm(bb::TeamSide::HOME, false);
                 bb::setBlitzPathArm(bb::TeamSide::AWAY, false);
-                bb::setProneActionArm(bb::TeamSide::HOME, false);
-                bb::setProneActionArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
                 bb::setStandUpPricingArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
@@ -728,7 +730,7 @@ int main(int argc, char** argv) {
         const bool armSignalAvailable =
             (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
              mode == 7 || mode == 9 || mode == 10 || mode == 12 ||
-             mode == 13 || mode == 14 || mode == 15);
+             mode == 14 || mode == 15);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
@@ -742,7 +744,17 @@ int main(int argc, char** argv) {
                    g_stoodUp,  g_stoodUpNE,  g_stoodUp  ? 100.0*g_stoodUpNE/g_stoodUp   : 0.0);
             printf("  M13/LEZICI: akci z lehu %ld (z toho BLITZ %ld) | vstani selhalo %ld\n",
                    g_proneActs, g_proneBl, g_proneSF);
-            printf("  M13/CENA:   TURNOVER z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
+            // ⭐ POCTIVE SROVNANI: BLITZ PROTI BLITZU. Podil VSECH akci je past
+            //   se jmenovatelem (akce z lehu je JEDNA akce s celym blitzem,
+            //   stojici pohyb je N akci MOVE) -- davala 7,9x tam, kde srovnani
+            //   neplati. Citace byly 01.09. pridany do enginu a 02.09. teprve
+            //   ZAPOJENY sem; do te doby se registrovane cteni provest NEDALO.
+            printf("  M13/CENA-BLITZ: TURNOVER blitzu z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
+                   g_proneBlTO, g_proneBl, g_proneBl ? 100.0*g_proneBlTO/g_proneBl : 0.0,
+                   g_standBlTO, g_standBl, g_standBl ? 100.0*g_standBlTO/g_standBl : 0.0,
+                   (g_standBl && g_standBlTO && g_proneBl)
+                     ? (1.0*g_proneBlTO/g_proneBl)/(1.0*g_standBlTO/g_standBl) : 0.0);
+            printf("  M13/CENA(vse, ⛔NECIST jako pomer): z lehu %ld/%ld = %.1f %%  ze stoje %ld/%ld = %.1f %%  (%.2fx)\n",
                    g_proneTO, g_proneActs, g_proneActs ? 100.0*g_proneTO/g_proneActs : 0.0,
                    g_standTO, g_standActs, g_standActs ? 100.0*g_standTO/g_standActs : 0.0,
                    (g_standActs && g_standTO && g_proneActs)

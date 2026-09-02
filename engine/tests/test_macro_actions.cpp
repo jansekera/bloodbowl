@@ -2975,10 +2975,8 @@ TEST(BlitzApproachRisk, ProneBlitzerIsPricedWithTheStandUpCostSubtracted) {
     };
     GameState up = build(false), down = build(true);
     std::vector<Macro> mu, md;
-    setProneActionArm(TeamSide::HOME, true);
     getAvailableMacros(up, mu);
     getAvailableMacros(down, md);
-    setProneActionArm(TeamSide::HOME, false);
 
     // ⭐ Jádro: ležící musí být oceněn jako RIZIKOVĚJŠÍ než týž hráč vestoje.
     // Před opravou vyšly obě ceny STEJNĚ, protože vstání se neodečetlo.

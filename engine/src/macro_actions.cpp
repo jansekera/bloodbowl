@@ -280,21 +280,14 @@ thread_local long g_standEscapeImpossible = 0;
 // ⚠️ "Zustat lezet" ma vlastni cenu (chybejici telo v kleci), kterou tahle
 //   meridla NEZMERI. Proto se rameno drzi jen tam, kde je nahrada.
 // ============================================================================
-// ============================================================================
-// M13 RAMENO (31.08.2026, na zadost uzivatele: "zkus to rozdelit na dve mereni
-// kazde zvlast"). Lezici hrac smi deklarovat akci -- je to OPRAVA PRAVIDLA
-// (r. 669-676), ale zaroven VELKA zmena chovani: na stavu S3 je v aktivnim
-// tymu SEST lezicich ze ctrnacti, takze se meni cely prostor tahu.
-// ⛔ Sla by do produkce nezmerena a noc 31.08. (P35) by ji nesla s sebou --
-//   pak by se nedalo rict, co zpusobila ONA a co merene rameno. Proto vypinac.
-// ⚠️ Az se zmeri, vypinac ZMIZI a chovani se nasadi natrvdo -- stejne jako
-//   u ceny Wrestle (B2, 30.08.). Rameno je leseni, ne trvala volba.
-// ============================================================================
-// ⛔ RAMENO PRO BLITZOVOU CHUZI (M14b, 01.09.2026). Duvod, proc rameno
-//   a ne rovnou produkce: dnes uz jsem dvakrat "opravil" chuzi podle teorie
-//   a dvakrat to nedodalo, protoze jsem porovnaval ROZESLE behy (jine
-//   jmenovatele, sest paru). Parove A/B na tychz seminkach je jediny zpusob,
-//   jak poznat rozdil od sumu.
+// ⛔ RAMENO PRO BLITZOVOU CHUZI (M14b, 01.09.2026), default OFF, mode 15.
+//   ⚠️ VRACENO 02.09.: pri odebirani ramene M13 jsem mazal blok mezi dvema
+//     kotvami a tohle rameno lezelo UVNITR -- linker to chytil hned
+//     ("undefined reference to blitzPathArm"). Mazat podle kotev je levne,
+//     ale musi se overit, CO mezi nimi je.
+//   Stav: ZAMITNUTO dvema nezavislymi merenimi (parove A/B -0,1667 +- 0,1076;
+//   a hladova chuze je z 97,6 % uz optimalni, takze nema co opravovat).
+//   Zustava za vypinacem, noc si nezaslouzi.
 thread_local bool g_blitzPath[2] = {false, false};
 void setBlitzPathArm(TeamSide side, bool on) {
     g_blitzPath[side == TeamSide::HOME ? 0 : 1] = on;
@@ -303,26 +296,15 @@ bool blitzPathArm(TeamSide side) {
     return g_blitzPath[side == TeamSide::HOME ? 0 : 1];
 }
 
-thread_local bool g_proneAction[2] = {false, false};
-// Signal ramene: LEZICI HRAC UDELAL NECO, CO PRED M13 NESLO -- deklaroval
-// blitz, nebo vstal a SEL JINAM (vstani NA MISTE se nepocita, to slo i pred
-// M13 samostatnou smyckou). Kazdy vyskyt je tedy zmena hry, ne "rameno bezelo".
-// ⛔ Audit 01.09.: puvodne se pocital jen blitz, a to byl NEUPLNY signal --
-//   par, kde rameno zmenilo jen pohyb, by hlasil "arm acted 0" nad pohnutou
-//   hrou a LEAK TEST BY KRICEL NA VLASTNIM RAMENI.
-// Nula pres matchup = obe ramena hrala totez => nulovy test.
+// ⭐ M13 NASAZENO 02.09.2026 — rameno `setProneActionArm` odebrano po noci
+// 01.->02.09. (2 400 paru): +0,0048 +- 0,0084, tedy neodlisitelne od nuly.
+// Citac picku ZUSTAVA jako DIAGNOSTIKA (tyz princip jako cageSnapshot,
+// T5.34: meridlo nesmi viset na tom, jestli se rozhoduje) -- rika, jak casto
+// lezici hraci vubec jednaji, a to je udaj o desce, ne o rameni.
 thread_local long g_proneActionPicks = 0;
 void noteProneActionTaken() { ++g_proneActionPicks; }
 long takeProneActionPicksInSearch() {
     long v = g_proneActionPicks; g_proneActionPicks = 0; return v;
-}
-
-void setProneActionArm(TeamSide side, bool on) {
-    g_proneAction[side == TeamSide::HOME ? 0 : 1] = on;
-}
-
-bool proneActionArm(TeamSide side) {
-    return g_proneAction[side == TeamSide::HOME ? 0 : 1];
 }
 
 thread_local bool g_standPricing[2] = {false, false};
@@ -1196,7 +1178,6 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 // planovac nikdy nemuze vybrat.
                 // ⚠️ !hasMoved zustava: kdo se uz hnul, blitz deklarovat nemuze.
                 if (!blitzer.canDeclareAction() || blitzer.hasMoved) return;
-                if (blitzer.state == PlayerState::PRONE && !proneActionArm(mySide)) return;
                 if (blitzer.hasSkill(SkillName::BallAndChain)) return;
                 // Dosah se zkrati o vstani; pod 3 MA je vstani hod na 4+ a
                 // pohyb pak nula, takze blok plati GFI (r. 690-695).

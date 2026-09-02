@@ -208,10 +208,8 @@ double blitzApproachRiskForTest(const GameState& state, const Player& mover,
 void takeMoveWalkBailout(long* out5);
 void setBlitzPathArm(TeamSide side, bool on);
 bool blitzPathArm(TeamSide side);
-void setProneActionArm(TeamSide side, bool on);
 void noteProneActionTaken();
 long takeProneActionPicksInSearch();
-bool proneActionArm(TeamSide side);
 void setStandUpPricingArm(TeamSide side, bool on);
 bool standUpPricingArm(TeamSide side);
 long takeStandUpPricingRepicksInSearch();

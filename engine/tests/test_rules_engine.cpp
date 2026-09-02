@@ -214,10 +214,11 @@ namespace {
 // zvlášť od noci P35 — uživatel 31.08.: „zkus to rozdělit na dvě měření".
 // Fixtura ho proto zapíná; test `ProneArmOffRestoresTheOldOfferSet` níž hlídá,
 // že vypnuté rameno vrací PŘESNĚ původní stav.
-struct ProneArmOn {
-    ProneArmOn()  { setProneActionArm(TeamSide::HOME, true);  }
-    ~ProneArmOn() { setProneActionArm(TeamSide::HOME, false); }
-};
+// ⭐ 02.09.2026: rameno odebrano po zmereni (noc 2 400 paru: +0,0048 +- 0,0084).
+// Struktura zustava PRAZDNA schvalne — testy nize ji drzi v tele, takze se
+// nemusely prepisovat, a kdyby se M13 nekdy zase schovavalo za vypinac,
+// je kam sahnout. Prazdny RAII je levnejsi nez patnact editaci testu.
+struct ProneArmOn { };
 
 GameState makeProneState(int ma, bool jumpUp = false, bool rooted = false) {
     GameState gs;
@@ -385,17 +386,9 @@ TEST(RulesEngineProneBlitz, SubThreeMovementProneReachesAnEnemyTwoSquaresAwayOnG
 }
 
 
-TEST(RulesEngineProne, ProneArmOffRestoresTheOldOfferSet) {
-    // ⭐ Důkaz, že vypínač opravdu vrací stav před M13: bez ramene dostane
-    // ležící JEDINOU akci — vstát na místě ze samostatné smyčky.
-    GameState gs = makeProneState(/*ma=*/6);
-    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-    std::vector<Action> as;
-    getAvailableActions(gs, as);
-    EXPECT_EQ(countActionsOfType(as, ActionType::MOVE), 1);
-    EXPECT_TRUE(hasMoveTo(as, {10, 7}));
-    EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0);
-}
+// ⛔ TEST `ProneArmOffRestoresTheOldOfferSet` ODSTRANEN 02.09.2026 spolu
+// s ramenem: hlidal, ze VYPNUTE rameno vraci stav pred M13. Rameno uz
+// neexistuje, takze test nema predmet. Chovani samo hlidaji testy vyse.
 
 // ============================================================================
 // P37b (01.09.2026): NA RÁNU MUSÍ ZBÝT POLE POHYBU

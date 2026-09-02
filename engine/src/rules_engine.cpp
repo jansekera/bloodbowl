@@ -23,10 +23,14 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // Tataz trida jako Leap 24.08.: hotovy resolver bez volajiciho.
         if (!p.canDeclareAction()) return;
         const bool prone = (p.state == PlayerState::PRONE);
-        // M13 rameno (31.08.): dokud se nezmeri, chova se surova vrstva jako
-        // pred M13 -- lezici dostane jen vstani na miste ze samostatne smycky
-        // dole. Uzivatel 31.08.: "zkus to rozdelit na dve mereni kazde zvlast".
-        if (prone && !proneActionArm(side)) return;
+        // ⭐ M13 NASAZENO 02.09.2026. Noc 01.->02.09. (2 400 paru, dw-dw):
+        //   +0,0048 +- 0,0084 (0,57 sigma), jednostranne CI [-0,0059; +0,0107]
+        //   ⇒ oprava pravidla NIC MERITELNEHO NESTOJI. Rameno odebrano,
+        //   protoze default-OFF vypinac u dolozene neskodne pravidlove opravy
+        //   uz nema co hlidat (tyz duvod jako P35 a cena Wrestle u B2).
+        //   ⚠️ Ctyri light testy pred noci daly ZAPORNOU deltu
+        //   (-0,1875 / 0,0000 / -0,1667 / -0,1250). Byl to sum a bylo to
+        //   zapsano PREDEM jako sum. Noc to potvrdila.
 
         // BallAndChain players can ONLY use the BALL_AND_CHAIN action
         if (p.hasSkill(SkillName::BallAndChain)) {
