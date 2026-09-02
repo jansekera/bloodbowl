@@ -44,6 +44,11 @@ static inline int gridIdx(int x, int y) { return y * GRID_W + x; }
 thread_local long g_blitzPathPicks = 0;
 long takeBlitzPathPicksInSearch() { long v=g_blitzPathPicks; g_blitzPathPicks=0; return v; }
 
+// Delka NEJKRATSI cesty na pole sousedici s cilem (s rezervou na blok).
+// -1 = nikam nevede. Pouziva se jen jako MERITKO pro hladovou chuzi.
+int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
+                               Position target);
+
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                             Position target, Position& outStep) {
     const int budget = movementAfterStandUp(player) + maxGfiSquares(player);
@@ -265,4 +270,40 @@ int getValidMoveTargets(const GameState& state, const Player& player,
     return count;
 }
 
+int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
+                               Position target) {
+    // Ciste BFS po POCTU POLI (bez vahy tacklezon) -- meritkem je DELKA,
+    // ne bezpecnost. Kdyby se vazilo, porovnavalo by se s necim jinym, nez
+    // hladova chuze vubec zkousi.
+    const int budget = movementAfterStandUp(player) + maxGfiSquares(player);
+    if (budget <= 0) return -1;
+    int8_t dist[GRID_SIZE];
+    std::memset(dist, -1, sizeof(dist));
+    PathNode q[GRID_SIZE]; int h = 0, t = 0;
+    const int s0 = gridIdx(player.position.x, player.position.y);
+    dist[s0] = 0;
+    q[t++] = {player.position.x, player.position.y, 0, false};
+    int best = -1;
+    while (h < t) {
+        PathNode cur = q[h++];
+        Position cp{cur.x, cur.y};
+        if (cp != player.position && cp.distanceTo(target) == 1 &&
+            dist[gridIdx(cur.x, cur.y)] <= budget - 1) {
+            best = dist[gridIdx(cur.x, cur.y)];
+            break;                       // BFS => prvni nalezene je nejkratsi
+        }
+        if (dist[gridIdx(cur.x, cur.y)] >= budget) continue;
+        for (auto& np : cp.getAdjacent()) {
+            if (!np.isOnPitch() || np == target) continue;
+            if (state.getPlayerAtPosition(np) != nullptr) continue;
+            const int ni = gridIdx(np.x, np.y);
+            if (dist[ni] >= 0) continue;
+            dist[ni] = static_cast<int8_t>(dist[gridIdx(cur.x, cur.y)] + 1);
+            q[t++] = {np.x, np.y, dist[ni], false};
+        }
+    }
+    return best;
+}
+
 } // namespace bb
+
