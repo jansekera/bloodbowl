@@ -99,6 +99,7 @@ static long g_bw[6] = {0,0,0,0,0,0};
 static long g_bwUnpay = 0;
 static long g_declAdj = 0, g_declFar = 0;
 static long g_mw[5] = {0,0,0,0,0};
+static long g_mp[4] = {0,0,0,0};
 static long g_bp[3] = {0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
@@ -578,6 +579,7 @@ int main(int argc, char** argv) {
                 g_bwUnpay += bb::takeBlitzBlockUnpayableInSearch();
                 { long d2[2]; bb::takeBlitzDeclSplit(d2); g_declAdj += d2[0]; g_declFar += d2[1]; }
                 { long mw[5]; bb::takeMoveWalkBailout(mw); for (int q=0;q<5;++q) g_mw[q]+=mw[q]; }
+                { long mp[4]; bb::takeMoveWalkProfile(mp); for (int q=0;q<4;++q) g_mp[q]+=mp[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
@@ -761,6 +763,13 @@ int main(int argc, char** argv) {
                      ? (1.0*g_proneTO/g_proneActs)/(1.0*g_standTO/g_standActs) : 0.0);
             printf("  BLITZ/PROC: nedosah %ld | pohyb %ld | TURNOVER %ld | srazen %ld | stoji %ld | daleko %ld\n",
                    g_bw[0], g_bw[1], g_bw[2], g_bw[3], g_bw[4], g_bw[5]);
+            printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",
+                   g_mp[0], g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4],
+                   (g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])
+                     ? 100.0*(g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])/(g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4]) : 0.0,
+                   g_mw[2] ? 1.0*g_mp[1]/g_mw[2] : 0.0, g_mp[2],
+                   g_mw[2] ? 100.0*g_mp[2]/g_mw[2] : 0.0,
+                   g_mw[2] ? 1.0*g_mp[3]/g_mw[2] : 0.0);
             printf("  CHUZE/VZDANI: nenasel %ld | OBCHAZKA %ld | smycka %ld | stoji %ld | limit %ld\n",
                    g_mw[0], g_mw[1], g_mw[2], g_mw[3], g_mw[4]);
             printf("  P37b/CESTA: dobehu %ld | OPTIMALNICH %ld (%.1f %%) | kroku navic %ld (%.3f/dobeh)\n",
