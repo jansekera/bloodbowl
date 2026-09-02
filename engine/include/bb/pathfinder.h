@@ -5,11 +5,7 @@
 
 namespace bb {
 
-struct MoveTarget {
-    Position pos{};
-    bool requiresDodge = false;
-    bool isGfi = false;
-};
+// (struct MoveTarget odstranen 02.09. spolu s `getValidMoveTargets` -- byl jeho jediny uzivatel)
 
 // Can the player reach any square adjacent to target?
 // If yes, returns true and sets outAdjacent to the best adjacent square.
@@ -27,10 +23,5 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);
-
-// Get all valid single-step move targets for a player.
-// Returns the number of targets written to out (up to maxOut).
-int getValidMoveTargets(const GameState& state, const Player& player,
-                        MoveTarget* out, int maxOut);
 
 } // namespace bb

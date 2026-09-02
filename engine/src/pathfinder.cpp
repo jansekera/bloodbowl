@@ -236,39 +236,21 @@ bool canReachAdjacentTo(const GameState& state, const Player& player,
     return false;
 }
 
-int getValidMoveTargets(const GameState& state, const Player& player,
-                        MoveTarget* out, int maxOut) {
-    if (!canAct(player.state) || player.lostTacklezones) return 0;
-
-    int count = 0;
-    bool inTZ = countTacklezones(state, player.position, player.teamSide) > 0;
-
-    // N11 (24.08.2026): Take Root, l. 8577-8579 -- zakorenený "may not Go For
-    // It, be pushed back for any reason, or use any skill that would allow him
-    // to move out of his current square". Zakaz zil jen v nabidce MOVE a v
-    // blitz-bloku; pathfinder o nem nevedel, takze zakorenenemu Treemanovi se
-    // nabidl BLITZ na nesousedni cil a smycka ho pres GFI opravdu posunula.
-    int maxGfi = player.rooted ? 0 : (player.hasSkill(SkillName::Sprint) ? 3 : 2);
-    bool canGfi = player.movementRemaining <= 0 && player.movementRemaining > -maxGfi;
-
-    auto adj = player.position.getAdjacent();
-    for (auto& pos : adj) {
-        if (!pos.isOnPitch()) continue;
-        if (state.getPlayerAtPosition(pos) != nullptr) continue;
-
-        // Check if player has movement remaining (including GFI)
-        int movLeft = player.movementRemaining - 1;
-        if (movLeft < -maxGfi) continue;
-
-        bool isGfi = (movLeft < 0);
-
-        if (count < maxOut) {
-            out[count++] = {pos, inTZ, isGfi};
-        }
-    }
-
-    return count;
-}
+// ⛔⛔ `getValidMoveTargets` ODSTRANENA 02.09.2026 — MRTVY KOD, KTERY SE PRESTO
+//   UDRZOVAL. V celem repu nemela JEDINEHO volajiciho (overeno grepem pres
+//   *.cpp/*.h/*.py), a presto 24.08. dostala opravu N11 na `rooted`.
+//
+//   ⭐ DUVOD ODSTRANENI NENI UKLID, ALE DVE KOPIE TEHOZ PRAVIDLA:
+//   pocitala nabidku pohybu (rozpocet, GFI, Sprint, rooted) podruhe vedle
+//   `rules_engine.cpp`, a UZ SE ROZESLA -- zacinala na `canAct(state)`, tedy
+//   jen STANDING, takze o M13 (lezici smi deklarovat akci, 31.08.) nevedela.
+//   Kdyby ji nekdo zapojil, vratil by tim chovani pred M13.
+//   „Dve kopie tehoz pravidla znamenaji, ze jedna zestarne" -- tenhle engine
+//   to ma doloženo u `endBlockActivation` (25.08.) i u nabidky blitzu.
+//
+//   Historie je v gitu (naposledy `6e2f084c`), takze se nic neztratilo.
+//   Kdyby se pathfinderova nabidka nekdy hodila, patri do `rules_engine`,
+//   ne vedle nej.
 
 int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
                                Position target) {
