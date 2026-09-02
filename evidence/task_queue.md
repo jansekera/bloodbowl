@@ -1440,7 +1440,40 @@ případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není práz
 přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
 PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
 
-⛔ ### ⭐⭐⭐ ZPŘESNĚNO 02.09. — KRITÉRIA JSOU DVĚ, NE JEDNO, A JEDNA VĚTEV JE UŽ MÁ
+⛔ ### ⭐⭐⭐ TVAR OPRAVY 02.09. (uživatel) — „V POHYBU NEMÁ POLE SOUPEŘE SMYSL"
+
+Uživatel 02.09.: *„teď řešíme pohyb a ne blitz — tak mi 'jdi na pole obsazené
+soupeřem' nesedí."*
+
+⛔ **Moje dělení „vada vs záměr" bylo měkké a je tím vyvrácené.** Popsal jsem
+větve `target = carrier->position` / `huntTarget` / `oppCarrier->position` jako
+*„záměr — jdi k němu"*. Ale **v pohybu se na hráče stoupnout nedá**; kdo ho chce
+udeřit, dělá **blok nebo blitz**, což je jiná akce. ⇒ Nejsou to záměry, jsou to
+**špatně napsané cíle**.
+
+⭐ **PRAVIDLO, KTERÉ Z TOHO PLYNE — jedno pro všechny větve:**
+**cíl pohybu musí být pole, na kterém se dá stát.**
+
+| co větev chce | jak to říká dnes | jak to má říct |
+|---|---|---|
+| značit jejich nosiče | `target = oppCarrierPtr->position` | **prázdné pole vedle něj** |
+| jít na nebezpečného soupeře | `target = huntTarget` | **prázdné pole vedle něj** |
+| podpořit našeho nosiče | `target = carrier->position` | **prázdné pole vedle něj = ROH KLECE** |
+
+⇒ **Oprava se tím sjednocuje na jeden vzorec** — a ten je už v témž souboru:
+`macro_actions.cpp:1717` (`cageTag`) projde sousední pole, vyřadí obsazená
+a mezi zbytkem vybere podle tacklezón.
+
+⭐⭐ **A třetí řádek tabulky JE `K-CIL`:** „prázdné pole vedle nosiče" **je roh
+klece**. Doprovod, který dnes míří na nosičovo pole, by po opravě mířil rovnou
+na roh. ⇒ `W-CIL` a `K-CIL` se potkávají dřív, než jsem čekal — ale pořadí
+zůstává: **napřed cíl doprovodu, pak výběr pole pro nosiče**.
+
+⚠️ **Kritérium tacklezón se ale NESJEDNOCUJE** — je rasové vůči účelu:
+značkovač k soupeři **chce** být v jeho TZ, roh klece **nesmí**. ⇒ Společné je
+*„pole je volné"*, rozdílné je *„co s TZ"*.
+
+### ⭐⭐⭐ ZPŘESNĚNO 02.09. — KRITÉRIA JSOU DVĚ, NE JEDNO, A JEDNA VĚTEV JE UŽ MÁ
 
 Uživatel 02.09.: *„když se nikdo nemá dostat ani do TZ oponenta"*. Měl jsem
 zapsáno jen **obsazenost**. Kritéria jsou **dvě**: pole musí být (1) volné
