@@ -1,0 +1,64 @@
+# VYSLEDEK NOCI 01.->02.09.2026  —  M13 / mode 13
+# Beh: dw-dw, 2 400 paru, 48 kusu po 50, 4 workery, 13:55 -> ~02:30 (12,6 h)
+# Otisk: commit 47999ed6 · harness d2f6163a · so 88d7d092 · 48/48 OK, 0 FAIL
+# Predregistrace: evidence/night_prereg_20260901_m13.preds + dodatky I a II
+
+## CTENI V PORADI Z PREDREGISTRACE
+(1) leak  MOVED WITHOUT THE ARM ACTING: 0 / 2400   => delta se SMI cist
+(2) arm acted 2400/2400 (100 %) · ARM PICKS 2 342 345 (487,99/hru)
+(3) n_nonzero 1230/2400 = 51,2 %
+(4) DELTA dvoustranna +0,0048 +- 0,0084 SE (0,57 sigma) CI95 [-0,0117; +0,0213]
+    jednostranne      +0,0024 +- 0,0042 SE            CI95 [-0,0059; +0,0107]
+    20/48 shardu zapornych; empiricka SE 0,0080 vs sdruzena 0,0084 => bez overdisperze
+    TD/hru: rameno 0,2083 vs base 0,2042 (+0,0042)
+
+## PREDPOVEDI: 5 z 5 SEDLY
+  leak == 0 · arm_acted >= 0.5 · n_nonzero in 0.20-0.80 (0,512)
+  delta in -0.10 0.10 (+0,0048) · delta_1s in -0.05 0.05 (+0,0024)
+
+## ⭐⭐ VERDIKT: M13 NIC MERITELNEHO NESTOJI
+  Efekt je NEODLISITELNY OD NULY (0,57 sigma). Jednostranne CI [-0,0059; +0,0107]
+  vylucuje skodu horsi nez -0,0059 -- hluboko pod prahem 0,015.
+  ⇒ Oprava pravidla (r. 669-676, lezici smi deklarovat akci) je ZADARMO.
+  ⛔ Souhrn tiskne "NEROZHODNUTO", ale to je verdikt k dvoustranne otazce
+    "pomaha/skodi/ekvivalence". Registrovana otazka byla CENA, a na tu
+    beh odpovedel: cena je pod rozlisovaci schopnosti.
+
+## ⭐⭐⭐ CTYRI ZAPORNE LIGHT TESTY BYLY SUM — a bylo to zapsano PREDEM
+  -0,1875 (dw-dw 8) · 0,0000 (dw-we 8) · -0,1667 (dw-dw 6) · -0,1250 (dw-dw 12)
+  Noc: +0,0048. ⇒ Zaporny sklon se cely rozpustil.
+  Kazdy z tech ctyr byl v predregistraci zapsan jako SUM, KTERY NERIDI NIC.
+  Kdybych podle nich dimenzoval, zastavoval nebo upravoval pasma, miril bych
+  PRESNE OPACNE. Zaznam do sbirky "spatny vysledek vypada normalne".
+
+## ⛔⛔ MOJE CHYBA: REGISTROVANE CTENI (1) NEJDE PROVEST — PODRUHE ZA DVA DNY
+  Predregistrace rika: `M13/CENA` cist jako BLITZ PROTI BLITZU, ⛔ NE podil
+  vsech akci (past se jmenovatelem: akce z lehu je JEDNA akce s celym blitzem,
+  stojici pohyb je N akci MOVE).
+  Citace pro poctive srovnani jsem 01.09. do enginu PRIDAL
+  (`takeProneBlitzTOInSearch`, `takeStandBlitzTOInSearch`) -- a NEZAPOJIL
+  je do vypisu harnessu. Noc proto vytiskla PRESNE to zavadejici cislo:
+    "TURNOVER z lehu 16,5 % PROTI ze stoje 2,1 % (podil 7,92x)"  <= NECIST
+  ⇒ Tataz vada jako u P35 (01.09.: registrovano cteni BLITZ vs BLITZ_AND_SCORE,
+    na ktere aparat nemel pole). Napsal jsem to jako pouceni a HNED NATO
+    udelal znovu. ⇒ Do kontroly pred noci patri: "u KAZDEHO registrovaneho
+    cteni ukazat RADEK VYPISU, ktery ho vytiskne."
+
+## RUCNI CTENI, KTERA PROVEST SLA
+(2) M13/BLITZ: vyhozeny tymovy blitz z lehu 439/39 138 = 1,1 %
+    PROTI ze stoje 30 505/314 525 = 9,7 %  (podil 0,12x)
+    ⇒ Lezici blitz plytva OSMKRAT MIN nez stojici -- nabidka pro lezici ma
+      prisnou kontrolu rozpoctu (M13, 31.08.), kterou bezny blitz nema.
+(3) BLITZ/PROC: nedosah 2 578 | TURNOVER 27 560 | pohyb/srazen/stoji/daleko 0
+    ⇒ 91 % vyhozenych blitzu je TURNOVER PRI DOBEHU, ne "nedosel".
+(4) ROZPAD PO STRANACH -- POPRVE CITELNY (symetricky matchup):
+    kandidat DOMACI chess 0,4981 · kandidat HOST 0,5067
+    asymetrie -0,0085 +- 0,0086 = 1,00 sigma => V SUMU
+    ⇒ Puleni dvoustranne delty na jednostrannou je OBHAJITELNE.
+    ⭐ Presne to cteni u P35 (dw-we) PADLO na asymetrii domaci/host; volba
+      dw-dw byla proto spravna a zaplatila se.
+
+## DUSLEDEK
+  M13 zustava v produkci (uz tam je). Rameno `setProneActionArm` a mode 13
+  lze odebrat stejne jako u P35 -- oprava je podle pravidel a je DOLOZENO,
+  ze nic nestoji. ⏰ Az po prenosu oprav z worktree, ne pred nim.
