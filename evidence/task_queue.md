@@ -1440,7 +1440,47 @@ případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není práz
 přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
 PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
 
-⛔ ### ⭐⭐⭐ TVAR OPRAVY 02.09. (uživatel) — „V POHYBU NEMÁ POLE SOUPEŘE SMYSL"
+⛔ ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
+
+⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
+opravě větve 6.
+
+**Čeho se to týká:** větve, které cíl **počítají geometricky**, ne od hráče —
+a proto u nich „test obsazenosti" nestačí. Musí se rozhodnout **kam ustoupit**:
+
+| větev | vydáno | obsazeno | jak dnes počítá cíl |
+|---|---|---|---|
+| **5** před nosičem | 64 134 | **48,3 %** | `carrier.x + dx*2`, tatáž `y` |
+| **12** screen slot | 54 365 | 17,6 % | `screenYs[] = {3,5,7,9,11}` po `slot % 5` |
+| **8** intercept lane | 26 673 | 29,7 % | půlka mezi nosičem a naší EZ |
+| **9** safety | 9 603 | 3,0 % | pevně `{myEndzone, 7}` |
+| **11** endzone guard | 1 885 | 7,6 % | `myEndzone + dx*4`, `y` = 5 nebo 9 |
+
+**Otázky, na které nemám odpověď a hádat je nebudu:**
+
+**(1)** Když je slot obsazený, **kam se ustoupí?** Nejbližší volné pole? Jiný
+slot ze seznamu? Nebo se nabídka **vynechá** *(jako u větve 6)*? U rohu klece
+je vynechání správně — roh vedle rohu není roh. U clony to tak být nemusí:
+clona o pole vedle **pořád cloní**.
+
+**(2)** Větev 5 „před nosičem" dává `carrier.x + dx*2` — **dvě pole před
+nosičem, v jeho řadě**. ⚠️ Podle definice klece *(`K-a`…`K-c`)* tam ale **nemá
+stát nikdo**: rohy jsou diagonály a ortogonály u nosiče zůstávají prázdné.
+⇒ **Co je to za tělo a co tam dělá?** Je to clona před klecí, nebo je to
+špatně napsaný roh? **To je jádro té diskuze.**
+
+**(3)** Kolik těl patří na **rohy** a kolik do **clony**? Trpaslík má 11 těl,
+4 jsou rohy, nosič je pátý ⇒ o zbylých 6 rozhoduje právě tenhle řetěz větví.
+
+⭐ **JAK TO PROJÍT — deskou, ne tabulkou.** `diag_board_render.py`, rasa+role,
+stavy a **POVINNĚ tacklezóny** *(uživatel to chtěl dvakrát)*. Vybrat situaci,
+kde je nosič s klecí a zároveň běží clona, a ptát se **herně**: *„kam by ta
+tři těla měla jít a proč"*. Viz [[feedback_present_situations_not_just_math]].
+
+⏰ **Spouštěč:** jakmile je hotová a změřená oprava větví **6 a 10**
+*(cíle „na hráči")*. Ty jsou jednoznačné a projít se nemusí.
+
+### ⭐⭐⭐ TVAR OPRAVY 02.09. (uživatel) — „V POHYBU NEMÁ POLE SOUPEŘE SMYSL"
 
 Uživatel 02.09.: *„teď řešíme pohyb a ne blitz — tak mi 'jdi na pole obsazené
 soupeřem' nesedí."*
