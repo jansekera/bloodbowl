@@ -1396,6 +1396,41 @@ zbydou 3 pole.
 ⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
 neztratilo**, ne úkol.
 
+## ⏰ W-CIL — MAKRO POSÍLÁ HRÁČE NA OBSAZENÉ POLE *(sekce POHYB, nález 02.09.)*
+
+**Zachyceno 300 situací** *(`BB_WALKLOOP_DUMP`, doklad `evidence/walkloop_finding_20260902.md`)*:
+
+```
+cíl OBSAZENÝ jiným hráčem      284/300 = 95 %
+  z toho VLASTNÍM hráčem       267/300 = 89 %
+vzdálenost od cíle = 1         263/300 = 88 %
+zbývající pohyb                1-4 pole  (hráč MÁ čím jít)
+```
+
+**Příčina:** cíle pro `REPOSITION` se počítají **geometricky a obsazenost se
+netestuje** — `macro_actions.cpp:1689,1693,1769,1782,1792,1800`. Screen sloty
+se přidělují pořadím `screenSlot % 5` na pevná Y `{3,5,7,9,11}`; `getPlayerAtPosition`
+je v celém bloku jen dvakrát, a obojí ve větvi o volném míči.
+⇒ **Není to smůla, je to systematické.**
+
+⚠️ **CENA JE MÍRNĚJŠÍ, NEŽ TO VYPADALO.** Smyčka se spouští **na kroku 0 v 0 %**
+případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není prázdná**
+⇒ `END_TURN` z toho **nevzniká**. Cena je „hráč nedošel, kam měl", ne „tým
+přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
+PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
+
+⛔ **NEOPRAVENO 02.09. ZÁMĚRNĚ:** je to široká změna chování a ve 14:00 startuje
+noc Q3. Táž zásada jako u `P37b` 01.09. — nemíchat změnu do místa, kde se měří.
+
+⭐ **Souvisí s `C4`/`C9` v `celotah_situace.md`**: nejenže naše těla brání
+nosiči — **makro na ně přímo posílá další hráče.**
+
+⛔⛔ **A ZAPSÁNO JAKO DOKLAD:** k téhle smyčce jsem 01.-02.09. vyslovil **pět
+domněnek a všechny byly mimo** *(oscilace z Čebyševovy metriky · dvoupolová
+obcházka · tacklezóny mezi stejnými cestami · promrhaná rezerva · nedosažitelný
+cíl)*. Rozhodlo **zachycení situace**, ne úvaha nad kódem — a byl to
+uživatelův návrh. [[feedback_wrong_result_looks_normal]]
+
 ## ✅ KONTROLA PŘED NOCÍ *(02.09.2026)*
 
 ⛔⛔ **PRVNÍ VERZE TOHOHLE ŘÁDKU BYLA CHYBA A NECHÁVÁM JI ZAPSANOU.**
