@@ -1396,6 +1396,51 @@ zbydou 3 pole.
 ⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
 neztratilo**, ne úkol.
 
+## ✅ KONTROLA PŘED NOCÍ — ODŠKRTÁVÁ SE, NEČTE SE *(02.09.2026)*
+
+⛔ **Proč vznikla:** za dva dny tři různé vady měřicího aparátu — neúplný
+signál ramene *(M13, Q3)*, měřidlo závislé na logování *(blitz bez rány)*,
+registrované čtení bez řádku výpisu *(P35, M13)*. Vypadají jako tři věci,
+jsou jedna: **ověřuje se to, co bylo právě postaveno, ne celý řetěz až na
+výstup.** Ke každé jsem si napsal poučení do paměti — a **poučení se čte,
+kontrola se provádí**. Tohle je ta kontrola.
+
+```
+[ ] 1. SEZNAM ZMĚN RAMENE
+       Vypsat VŠECHNO, co rameno mění. U KAŽDÉ položky ukázat, kde tiká čítač.
+       Chybí-li u některé, signál je NEÚPLNÝ ⇒ leak test bude křičet na
+       vlastní rameno a noc se nesmí přečíst.
+
+[ ] 2. ŘETĚZ KAŽDÉHO ČTENÍ — ČTYŘI DÍLY
+       čítač v enginu → sběr v harnessu → printf → čitelný výstup
+       U KAŽDÉHO registrovaného ručního čtení napsat JMÉNO ŘÁDKU výstupu.
+       Nedá-li se napsat, čtení se dopíše NEBO vyškrtne z předregistrace.
+
+[ ] 3. MĚŘIDLA NESMÍ VISET NA ROZHODOVÁNÍ
+       Žádné měřidlo uvnitř `if (rameno)` ani závislé na `events != nullptr`.
+       (Zjištěno: „blitz bez rány" hlásil 3 909 místo 100, protože hledal
+       v událostech, které jsou během hledání vypnuté.)
+
+[ ] 4. JMENOVATELE
+       Porovnávané veličiny musí být TÁŽ JEDNOTKA. (Akce z lehu je JEDNA akce
+       s celým blitzem, stojící pohyb je N akcí MOVE ⇒ 7,9× tam, kde srovnání
+       neplatí.) Blitz proti blitzu, ne akce proti akcím.
+
+[ ] 5. LIGHT TEST PROTI FINÁLNÍMU BUILDU
+       Ne „už jeden máme". Engine se mění po hodinách.
+
+[ ] 6. OTISK BĚHU
+       RUN_IDENTITY = commit + sha256 harnessu + sha256 .so. Cituje se
+       u každého závěru.
+
+[ ] 7. RAMENA
+       V daném módu smí být zapnuté PRÁVĚ JEDNO. Ověřit z výpisu, ne z kódu.
+```
+
+⚠️ **Bod 2 je nejmladší a nejdražší:** 01.09. jsem past se jmenovatelem sám
+našel, napsal k ní čítače — a nezapojil je do výpisu. Noc 02.09. pak vytiskla
+přesně to zavádějící číslo, které jsem den předtím označil za zavádějící.
+
 ## ⏰ M13/S3 — RISK-DEFERRAL NA S3 JE ZNOVU NEZMĚŘENÝ *(31.08.2026)*
 
 **Co se stalo:** M13 pustil ležící hráče k akcím. `S3` (test_macro_mcts) má
