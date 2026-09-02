@@ -96,6 +96,77 @@ polovinu *(blitz uvolní blitzujícího)* — **C9 uvolňuje NĚKOHO JINÉHO.**
 
 ---
 
+## A3. SBĚR 02.09. — 46 SEKVENCÍ Z MĚSÍCŮ KONVERZACE *(`Q01`-`Q46`)*
+
+Uživatel 02.09.: *„ty sekvence by měly být zapsané z měsíců konverzace a bylo
+jich hodně"* — a bylo. Prošly se spec, evidence, fronta úkolů i paměť.
+**Detail každé je v `evidence/celotah_situace_sber_20260902.md`**, tady je
+jmenný seznam, aby se ve sběrném místě **žádná neztratila**.
+
+⭐ **Tvar je u všech stejný:** *akce A → umožní akci B **jiného hráče** →
+výsledek*, a u každé je napsáno **proč to druhé bez prvního nejde**.
+⇒ To je ta hranice, kvůli které vznikl `C9`: vlastnost jedné akce sem nepatří.
+
+⛔ **Prostřední sloupec (co jde měřit DNES) je v tom sběru povinný a smí být
+„NIC".** Z 46 sekvencí má **11** položek `⛔ NIC` — pořadí aktivací, fáze
+obrany, elfí obrana, rerolly, apothecary, výkop, počasí. Tam mechanismus
+v enginu **neexistuje** a číslo by vyšlo nula ⇒ **neměřit**, jinak bychom
+změřili chybějící schopnost. Viz varování nahoře.
+
+| **`Q01`** | ODMARKOVAT NOSIČE A JÍT |
+| **`Q02`** | BLITZ SE VYBÍRÁ PODLE TOHO, KOLIK DODGŮ UBERE CESTĚ NOSIČE — ne podle kostek |
+| **`Q03`** | PROŽENÍ ZDÍ JE JEDEN TAH, NE DVA |
+| **`Q04`** | DÍRA SE MĚŘÍ CENOU PRŮCHODU V DODGÍCH, ne šířkou |
+| **`Q05`** | UHNOUT VLASTNÍM TĚLEM ⇒ NOSIČ PROJDE |
+| **`Q06`** | ESKORTA UKLIDÍ CESTU, TEPRVE PAK JEDE KLEC |
+| **`Q07`** | POŘADÍ UVNITŘ TAHU: napřed volné tahy, jejichž hodnota NEZÁVISÍ na zbytku kola |
+| **`Q08`** | SELHÁNÍ SE ŘADÍ PODLE TOHO, CO PO SOBĚ ZANECHÁ |
+| **`Q09`** | STAND-AND-GO |
+| **`Q10`** | HIT-AND-RUN |
+| **`Q11`** | BLITZUJÍCÍ ZŮSTANE VOLNÝ ⇒ STANE SE ROHEM KLECE |
+| **`Q12`** | BLITZ Z LEHU + CHAIN PUSH |
+| **`Q13`** | CHAIN PUSH PRO NÁS: blok na cizí tělo posune NAŠEHO nosiče o pole blíž k endzóně |
+| **`Q14`** | WRESTLE UDĚLÁ MEZERU — a projde jí NĚKDO JINÝ |
+| **`Q15`** | NACHYSTAT PŘÍJEMCE DOPŘEDU ⇒ V POSLEDNÍM TAHU MU PŘEDAT |
+| **`Q16`** | SRAZIT PRONÁSLEDOVATELE ⇒ PRODLOUŽIT SÓLOVÝ VÝBĚH |
+| **`Q17`** | ROH, KTERÝ SÁM UDEŘÍ, PŘESTÁVÁ BÝT ROHEM |
+| **`Q18`** | VOLNÝ SOUSED SRAZÍ MARKERA ROHU ZDARMA ⇒ BLITZ ZŮSTANE NA JINOU PRÁCI |
+| **`Q19`** | IDLE TĚLO DOJDE A ASISTUJE ⇒ Z JEDNOKOSTKOVÉHO BLOKU JE DVOUKOSTKOVÝ |
+| **`Q20`** | KDYŽ NOSIČ ODEJDE, ROHY MUSÍ JÍT S NÍM — a je to otázka POŘADÍ |
+| **`Q21`** | KDYŽ SE TĚLO TAK JAKO TAK HÝBE, MÁ CÍLIT ROVNOU NA ROH |
+| **`Q22`** | „CLEAR BLOCKERS", PAK POSUN — v jednom tahu |
+| **`Q23`** | POSTAV SE TAM, KDE NĚKDO TEPRVE BUDE |
+| **`Q24`** | VACATE-FIRST: kdo překáží, jde první — a žádná noha plánu nesmí zabít pozdější nohu |
+| **`Q25`** | PŘIVEĎ ASISTENCI, PAK UDEŘ |
+| **`Q26`** | NA BIG GUYE SE NECHODÍ — ČEKÁ SE, AŽ PŘIJDE |
+| **`Q27`** | BLOK NA SOUPEŘOVA NOSIČE SE PŘIPRAVUJE, NE POPADÁ |
+| **`Q28`** | SRAZIT → FAULNOUT → ODSTRANIT |
+| **`Q29`** | FRENZY JE DVOUKROKOVÁ SEKVENCE, A DRUHÝ BLOK SE HÁZÍ Z NOVÉ POZICE |
+| **`Q30`** | PO NEÚSPĚŠNÉM BLITZU SE STÁHNOUT ZA ŠTÍT |
+| **`Q31`** | CHAIN PUSH JE ZPŮSOB, JAK POHNOUT OZNAČKOVANÝM HRÁČEM BEZ HODU — odsun není dodge |
+| **`Q32`** | ODMARKOVAT MÍČ, ZŮSTAT U NĚJ, PAK SBÍRAT |
+| **`Q33`** | VZÍT MÍČ JEN KDYŽ HO UMÍM ZAJISTIT |
+| **`Q34`** | KOLO PO TURNOVERU: MÍČ BRÁT, ne dostavovat klec |
+| **`Q35`** | „PŘEDEJ ZA SEBE A ODHOĎ PŘES ZEĎ" — pass a hand-off mají VLASTNÍ povolenky ⇒ v jednom kole jde obojí |
+| **`Q36`** | SVÍRAT POSTUPNĚ, BEZ KONTAKTU, DOKUD TRASA PŘÍJEMCE NENÍ DOST DLOUHÁ |
+| **`Q37`** | VÍC MARKERŮ ⇒ VÍC VYNUCENÝCH HODŮ ⇒ JEJICH KOLO SKONČÍ PŘEDČASNĚ |
+| **`Q38`** | ROH SOUPEŘOVY KLECE, KTERÝ STOJÍ V NAŠÍ TZ, SE SRAZÍ OBYČEJNÝM BLOKEM ⇒ BLITZ ZŮSTANE NA NOSIČE |
+| **`Q39`** | PROAKTIVNÍ REZERVNÍ BLITZER („vyprošťovač") |
+| **`Q40`** | OKNO SE ZAVÍRÁ NEČINNOSTÍ — otázka není „proč se neblitzovalo v kole 8", ale „co udělat v kole 6, aby v kole 8 bylo koho hledat" |
+| **`Q41`** | PŘEDÁ ZA SEBE → THROWER HODÍ PŘES NAŠI ZEĎ → VOLNÝ V DOSAHU TD |
+| **`Q42`** | WARDANCER SEBERE → CATCHER UŽ STOJÍ NACHYSTANÝ VEPŘEDU → HOD NEBO DOBĚH ⇒ TD V TÉMŽ TAHU |
+| **`Q43`** | L BEZ ZADNÍ STĚNY: blok stranou → dokročí do uvolněného pole → jeden dodge 2+ → 10 polí |
+| **`Q44`** | SOUPEŘ PŘIPRAVUJE ÚNIKOVÝ KORIDOR 2-3 KOLA DOPŘEDU a hledá pruhy, které jsme opustili ZA AKCÍ |
+| **`Q45`** | SOUPEŘ NÁM VYROBÍ CHAIN PUSH DO NOSIČE — NAŠIMI VLASTNÍMI TĚLY |
+| **`Q46`** | STRIP BALL SHODÍ MÍČ POUHÝM ODSUNEM — bez sražení |
+
+⚠️ **Oddíl 2 sběru (`V01`-`V70`) sem NEPATŘÍ** — to jsou **vlastnosti jedné
+akce** (kam se smí postavit roh, kdy se nesmí skórovat, prahy kostek). Jsou to
+*podmínky a ceny, se kterými sekvence počítají*, ne kandidáti na `C`.
+
+⏰ **K PROJITÍ SPOLU** — uživatel řekl, že situace projdeme, **než se začne
+pracovat na celotahu**. Tenhle seznam je podklad k tomu projití, ne plán práce.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
