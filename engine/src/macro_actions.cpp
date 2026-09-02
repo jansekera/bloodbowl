@@ -36,6 +36,14 @@ static const Player* findCarrier(const GameState& state) {
 // admise bajtove identicka s dneskem, takze nulovy test je cisty.
 // ⛔ Deklarace MUSI byt nad findMoveToward, ktery citac inkrementuje;
 // ostatni ramena jsou deklarovana az u svych setteru nize a to tu neslo.
+// ⭐⭐ W-CIL (02.09.): rozpad vydanych REPOSITION cilu PO VETVICH.
+//   thread_local stejne jako ostatni citace -- MCTS hleda paralelne.
+thread_local long g_repTot[BB_REP_BRANCHES]  = {0};
+thread_local long g_repOwn[BB_REP_BRANCHES]  = {0};   // obsazeno NASIM telem
+thread_local long g_repOpp[BB_REP_BRANCHES]  = {0};   // obsazeno SOUPEREM
+thread_local long g_repTz[BB_REP_BRANCHES]   = {0};   // volne, ale v souperove TZ
+thread_local long g_repSelf[BB_REP_BRANCHES] = {0};   // cil == vlastni pole
+
 thread_local bool g_leapWalk[2] = {false, false};
 thread_local long g_leapWalkPicks = 0;
 
@@ -114,6 +122,65 @@ static int scoreMoveAction(const GameState& state, const Action& a,
 
 // Find available MOVE action toward a target position.
 // Prefers safe routes (avoids enemy tackle zones and GFI).
+// ⭐⭐⭐ W-CIL (02.09.): prevede cil „jdi k TOMUHLE HRACI" na pole, na kterem
+//   se DA STAT.
+//
+//   PROC: v pohybu nema cil na hraci vyznam -- na hrace se stoupnout neda
+//   (nabidka dava jen prazdna pole, a `findMoveToward` vybira jen z nabidky),
+//   takze takovy cil je NEDOSAZITELNY Z KONSTRUKCE. Chuze k nemu dojde na
+//   dosah, pak uz nedokaze zmensit vzdalenost, a spusti se pojistka proti
+//   smycce. Kdo chce hrace uderit, dela blok nebo blitz -- jinou akci.
+//   Uzivatel 02.09.: „ted resime pohyb a ne blitz - tak mi 'jdi na pole
+//   obsazene souperem' nesedi."
+//
+//   ⭐ TACKLEZONY SE VZDYCKY MINIMALIZUJI -- a stalo to jedno premysleni navic.
+//     Nejdriv jsem tu mel prepinac „znackovac v souperove zone BYT CHCE".
+//     Jenze kdo stoji VEDLE soupere, je v jeho zone UZ TIM -- vsichni kandidati
+//     ji maji >= 1. Minimalizace tedy nevybira „mimo zonu", ale pole s nejmene
+//     DALSIMI soupeři navic. To chce roh klece i znackovac stejne.
+//   ⛔ Prepinac proto zrusen misto toho, aby se nosil nepouzity: dnes rano
+//     jsem mazal `getValidMoveTargets` presne za tohle (mrtva volba zestarne).
+//
+//   ⭐⭐⭐ `cornersOnly` -- uzivatel 02.09.: „roh klece musi byt PRESNE roh
+//     a musi byt presne 4 rohy a nikdo dalsi vedle nosice."
+//     ⇒ Roh je VYHRADNE DIAGONALA. Ortogonalni soused nosice neni roh, a
+//       navic tam podle te definice nema stat NIKDO. Kdyby doprovod mohl
+//       skoncit na ortogonale, oprava by aktivne vyrabela porusenou klec.
+//     Znackovac k souperi naproti tomu bere KTERYKOLI sousedni pole -- jde
+//     mu o tacklezonu, ne o tvar.
+//
+//   ⛔ Vraci {-1,-1}, kdyz zadne volne sousedni pole neni (hrac je obklopeny).
+//     Volajici pak nabidku VYNECHA -- vydat nedosazitelny cil je horsi nez
+//     nevydat zadny.
+//
+//   ⚠️ Deterministicke: poradi `getAdjacent()` je pevne a rozhoduje se jen
+//     podle cisel, zadny hod. Pod CRN musi obe ramena dostat totez.
+static Position standableNextTo(const GameState& state, Position anchor,
+                                TeamSide mySide, Position from,
+                                bool cornersOnly) {
+    Position best{-1, -1};
+    int bestScore = INT32_MIN;
+    for (auto& apos : anchor.getAdjacent()) {
+        if (!apos.isOnPitch()) continue;
+        // Roh = diagonala: obe souradnice se lisi o 1. Ortogonalni soused ma
+        // jednu shodnou, a rohem NENI (podminka K-a).
+        if (cornersOnly && (apos.x == anchor.x || apos.y == anchor.y)) continue;
+        if (state.getPlayerAtPosition(apos)) continue;   // musi byt VOLNE
+        // ⛔⛔ POZOR NA TRETI PARAMETR (chyba, kterou jsem 02.09. udelal):
+        //   `friendlySide` je strana toho, KDO TAM STOJI, a funkce pocita jeho
+        //   PROTIVNIKY. Tedy `mySide` = kolik SOUPEROVYCH tacklezon na to pole
+        //   dosahuje. Kdyz jsem predal `opponent(mySide)`, pocital jsem NASE
+        //   vlastni zony -- a roh je diagonala naseho nosice, takze ho nas
+        //   nosic pokryva VZDYCKY => vyslo presne 100 %, coz to prozradilo.
+        const int tz = countTacklezones(state, apos, mySide);
+        // Hlavni kriterium je ucel (tacklezony), druhotne blizkost k hraci,
+        // ktery tam ma dojit -- kazde pole navic je pole, ktere muze chybet.
+        const int score = -tz * 100 - apos.distanceTo(from);
+        if (score > bestScore) { bestScore = score; best = apos; }
+    }
+    return best;
+}
+
 static bool findMoveToward(const std::vector<Action>& actions, int playerId,
                            Position target, Action& bestMove,
                            const GameState* state = nullptr,
@@ -1591,6 +1658,9 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     int turnsLeft = std::max(0, 9 - myTeam.turnNumber);
     int endzoneGuardCount = 0;
     int screenSlot = 0;
+    // ⭐ W-CIL merenie 02.09.: ktera vetev cil vydala. Cislo odpovida
+    //   poradi prirazeni `target = ...` v retezu nize; 0 = zadna (nemelo by nastat).
+    int repBranch = 0;
 
     // Pre-compute defensive info
     const Player* oppCarrierPtr = nullptr;
@@ -1639,6 +1709,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // the PICKUP macro's job (item 11). Already adjacent = already
             // denying, stay put.
             if (p.position.distanceTo(state.ball.position) == 1) {
+                repBranch = 1;
                 target = p.position;
             } else {
                 Position bestAdj{-1, -1};
@@ -1653,6 +1724,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     }
                 }
                 if (bestAdj.x < 0) return;  // ball fully surrounded
+                repBranch = 2;
                 target = bestAdj;
             }
         } else if (iHaveBall) {
@@ -1675,6 +1747,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         huntTarget = opp.position;
                     }
                 });
+                repBranch = 3;
                 target = huntTarget;
                 hunterPlaced = true;
             }
@@ -1686,15 +1759,39 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 recvY = std::clamp(recvY, 2, 12);
                 int recvX = ezX - dx * 3; // 3 squares from endzone (reachable next turn)
                 recvX = std::clamp(recvX, 1, 24);
+                repBranch = 4;
                 target = {static_cast<int8_t>(recvX), static_cast<int8_t>(recvY)};
                 receiverPlaced = true;
             } else if (carrierDist <= 3) {
                 // Already near carrier — move to cage/screen position ahead of carrier
+                repBranch = 5;
                 target = {static_cast<int8_t>(carrier->position.x + dx * 2),
                           static_cast<int8_t>(carrier->position.y)};
             } else {
-                // Far from carrier — move toward carrier
-                target = carrier->position;
+                // ⭐⭐⭐ W-CIL/vetev 6 (02.09.): DRIV `target = carrier->position`.
+                //   Zmereno: 71 229 cilu, z toho 100 % obsazenych -- vzdycky
+                //   nasim vlastnim nosicem. Na hrace se v pohybu stoupnout NEDA
+                //   (nabidka dava jen prazdna pole), takze ten cil byl
+                //   nedosazitelny Z KONSTRUKCE: chuze k nemu dosla na dosah,
+                //   pak uz nezmensila vzdalenost a spustila pojistku proti
+                //   smycce. Uzivatel 02.09.: „v pohybu mi 'jdi na pole obsazene
+                //   souperem' nesedi" -- a s vlastnim nosicem je to totez.
+                //
+                //   ⭐ Spravny cil je ROH KLECE, a roh je podle uzivatele
+                //     (02.09.) VYHRADNE DIAGONALA: „roh musi byt presne roh
+                //     a nikdo dalsi vedle nosice" -- ortogonalni pole u nosice
+                //     maji zustat PRAZDNA (podminka K-c). Proto `cornersOnly`.
+                //   ⭐ A `wantEnemyTz=false`: roh v souperove tacklezone byt
+                //     nesmi.
+                repBranch = 6;
+                const Position corner = standableNextTo(
+                    state, carrier->position, mySide, p.position,
+                    /*cornersOnly=*/true);
+                // ⛔ Kdyz zadny volny cisty roh neni, nabidku VYNECHAME.
+                //   Vydat nedosazitelny cil je horsi nez nevydat zadny: stal
+                //   by hraci cely jeho pohyb a skoncil by na pojistce.
+                if (corner.x < 0) return;
+                target = corner;
             }
         } else if (onDefense) {
             // Defense: safety + marker on carrier + endzone guard + screen
@@ -1725,6 +1822,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     }
                     if (bestCorner.x != oppCarrierPtr->position.x ||
                         bestCorner.y != oppCarrierPtr->position.y) {
+                        repBranch = 7;
                         target = bestCorner;
                         cageTagPlaced = true;
                         usedCageTag = true;
@@ -1758,6 +1856,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 bool goalSide =
                     (p.position.x - oppCarrierPtr->position.x) * dxOpp >= -2;
                 if (goalSide && p.position.distanceTo(lane) <= p.stats.movement * 2) {
+                    repBranch = 8;
                     target = lane;
                     interceptPlaced = true;
                     usedIntercept = true;
@@ -1766,19 +1865,40 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             if (!usedIntercept) {
             // Strategy 1: Safety player (fast, near our endzone)
             if (!safetyPlaced && p.stats.movement >= 6) {
+                repBranch = 9;
                 target = {static_cast<int8_t>(myEndzone),
                           static_cast<int8_t>(7)};
                 safetyPlaced = true;
             }
             // Strategy 2: Pressure marker — move toward opponent carrier
             else if (!markerPlaced && oppCarrierPtr != nullptr) {
-                target = oppCarrierPtr->position;
+                // ⭐⭐⭐ W-CIL/vetev 10 (02.09.): DRIV `target = oppCarrier->position`.
+                //   Zmereno: 26 022 cilu, z toho 100 % obsazenych SOUPEREM.
+                //   Uzivatel 02.09.: „ted resime pohyb a ne blitz - tak mi
+                //   'jdi na pole obsazene souperem' nesedi." Ma pravdu doslova:
+                //   na soupere se stoupnout neda, a kdo ho chce uderit, dela
+                //   BLOK nebo BLITZ -- jinou akci. Tenhle cil tedy nevyjadroval
+                //   zamer, byl proste spatne napsany.
+                //
+                //   Znackovat znamena STAT VEDLE NEJ, tedy na volnem sousednim
+                //   poli. ⚠️ Na rozdil od rohu klece tu NENI `cornersOnly`:
+                //   znackovat jde z ortogonaly i z diagonaly stejne dobre,
+                //   tacklezona plati na vsech osm smeru.
+                repBranch = 10;
+                const Position spot = standableNextTo(
+                    state, oppCarrierPtr->position, mySide, p.position,
+                    /*cornersOnly=*/false);
+                // ⛔ Kdyz je jejich nosic uplne obklopeny, znackovat uz neni kam
+                //   -- a je to dobra zprava, ne chyba. Nabidku vynechame.
+                if (spot.x < 0) return;
+                target = spot;
                 markerPlaced = true;
             }
             // Strategy 3: Endzone guard — prevent one-turn TD
             else if (oppScoringThreatCount > 0 && endzoneGuardCount < 2) {
                 int guardX = myEndzone + forwardDx(mySide) * 4;
                 int guardY = (endzoneGuardCount == 0) ? 5 : 9;
+                repBranch = 11;
                 target = {static_cast<int8_t>(std::clamp(guardX, 1, 24)),
                           static_cast<int8_t>(guardY)};
                 endzoneGuardCount++;
@@ -1789,6 +1909,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 static const int screenYs[] = {3, 5, 7, 9, 11};
                 int screenY = screenYs[screenSlot % 5];
                 screenSlot++;
+                repBranch = 12;
                 target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
                           static_cast<int8_t>(screenY)};
             }
@@ -1797,10 +1918,33 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         } else {
             // Move forward toward center
             int dx = forwardDx(mySide);
+            repBranch = 13;
             target = {static_cast<int8_t>(p.position.x + dx * 3),
                       static_cast<int8_t>(7)}; // center Y
         }
 
+        // ⭐⭐ W-CIL MERIDLO (02.09.): u KAZDEHO vydaneho cile zaznamenej, ktera
+        //   vetev ho vydala a v jakem stavu to pole je. Bez toho by se opravovalo
+        //   poslepu -- nektere vetve mirí na obsazene pole ZAMERNE (`carrier->position`
+        //   = „jdi k nemu"), u jinych je to vada.
+        //   ⛔ Nezavisle na logovani i na jakemkoli rameni (princip T5.34).
+        if (repBranch >= 0 && repBranch < BB_REP_BRANCHES) {
+            ++g_repTot[repBranch];
+            if (target == p.position) {
+                ++g_repSelf[repBranch];
+            } else {
+                const Player* occ = state.getPlayerAtPosition(target);
+                if (occ) {
+                    if (occ->teamSide == mySide) ++g_repOwn[repBranch];
+                    else                          ++g_repOpp[repBranch];
+                } else if (countTacklezones(state, target, mySide) > 0) {
+                    // `mySide` = kolik SOUPEROVYCH zon na pole dosahuje.
+                    // ⛔ Do 02.09. tu bylo `opponent(mySide)`, tedy NASE zony:
+                    //   sloupec „volne v TZ" meril neco jineho, nez tvrdil.
+                    ++g_repTz[repBranch];
+                }
+            }
+        }
         out.push_back({MacroType::REPOSITION, p.id, -1, target});
     });
 }
@@ -1886,6 +2030,21 @@ void takeMoveWalkBailout(long* out5) {
     out5[3]=g_mwStuck;  out5[4]=g_mwLimit;
     g_mwNoStep=g_mwDetour=g_mwLoop=g_mwStuck=g_mwLimit=0;
 }
+// ⭐⭐ W-CIL (02.09.): rozpad vydanych REPOSITION cilu PO VETVICH.
+//   Proc po vetvich: nekterym vetvim je obsazenost CILE vlastni -- `target =
+//   carrier->position` znamena „jdi k nosici", ne „postav se na nej". Souhrnne
+//   cislo „X %% cilu je obsazenych" by tedy michalo VADU s ZAMEREM.
+//   ⛔ Meri se v okamziku VYDANI nabidky, ne pri chuzi: az chuze dojde, muze
+//     tam uz stat nekdo jiny, a to je jina otazka (viz walkloop_finding).
+void takeRepositionTargets(long* out5xN) {
+    for (int b = 0; b < BB_REP_BRANCHES; ++b) {
+        out5xN[b*5+0]=g_repTot[b];  out5xN[b*5+1]=g_repOwn[b];
+        out5xN[b*5+2]=g_repOpp[b];  out5xN[b*5+3]=g_repTz[b];
+        out5xN[b*5+4]=g_repSelf[b];
+        g_repTot[b]=g_repOwn[b]=g_repOpp[b]=g_repTz[b]=g_repSelf[b]=0;
+    }
+}
+
 void takeMoveWalkProfile(long* out4) {
     out4[0]=g_mwArrived; out4[1]=g_mwLoopSteps;
     out4[2]=g_mwLoopStep0; out4[3]=g_mwLoopDist;

@@ -9,6 +9,13 @@
 
 namespace bb {
 
+// ⭐ W-CIL (02.09.): pocet vetvi, ktere vydavaji REPOSITION cil (index 0 = zadna).
+#define BB_REP_BRANCHES 14
+// Rozpad vydanych cilu po vetvich: 5 cisel na vetev
+//   [0] celkem  [1] obsazeno nasim  [2] obsazeno souperem  [3] volne v souperove TZ  [4] vlastni pole
+void takeRepositionTargets(long* out5xN);
+
+
 enum class MacroType : uint8_t {
     SCORE = 0,
     ADVANCE,
