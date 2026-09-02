@@ -1,0 +1,97 @@
+# PREDREGISTRACE NOCI 02.->03.09.2026  —  Q3 / mode 14
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Pomaha OCENIT tri vetve vstavani nejhorsi souperovou odpovedi?
+#
+# ⭐⭐ NA ROZDIL OD M13 TU VYSLEDEK OPRAVDU ROZHODUJE.
+#   M13 byla oprava PRAVIDLA a nasadila se by i pri zaporne delte. Q3 je
+#   TAKTIKA -- neni to nic, co by pravidla vyzadovala. ⇒ Kdyz vyjde zaporne
+#   nebo nerozhodne, rameno se NENASAZUJE a zustane za vypinacem.
+#
+# CO RAMENO DELA (dve veci, obe pod `setStandUpPricingArm`)
+#   (a) ZPRISTUPNI UTEK. Do 31.08. makro vrstva nabizela lezicimu u soupere
+#       JEDINOU vec -- vstat na miste. Planovac tedy rozhodoval mezi DVEMA
+#       moznostmi ze tri ("zustat lezet" je jen nevybrani nabidky).
+#       Utekove pole: nejblizsi volne v dosahu po vstani, s NULOVOU souperovou
+#       tacklezonou. ⭐ Zmereno: takove pole existuje v 99,99 % situaci
+#       (light test: nabidnut 50 277, NEBYLO KAM 2).
+#   (b) OCENI TRI VETVE doktrinou nejhorsi odpovedi (uzivatel 30.08.),
+#       POCITANOU, ne merenou (uzivatel 01.09.: "co je spatne na tom mit to
+#       spocitane matematikou?"):
+#         blok  NEOMEZENE      vaha 1,00
+#         blitz 1/kolo         vaha 0,45
+#         faul  1/kolo zvlast  vaha 0,30
+#       Kostky pres `getBlockDiceCount`, MightyBlow/Claw/PilingOn pres
+#       `hurtAmplifier`, dosah blitzu VCETNE GFI (P37).
+#   ⛔ Vetev "vstat a zustat" se NEBERE, kdyz telo na tom poli neco DELA --
+#     znaci souperova nosice (d<=1) nebo drzi roh vlastni klece (d<=2).
+#     Uzivatel 31.08.: "blok zdarma, kdyz zavazim postupu ballcarriera, je
+#     relativni cena." `worstReplyCost` umi jen RIZIKO, ne UCEL.
+#
+# ✅ AUDIT MERICIHO RETEZU (01.09., 4/4 body)
+#   (1) ⛔ NALEZENA A OPRAVENA VADA: citac tikal jen kdyz rameno VZALO nabidku
+#       "zustat" -- ne kdyz PRIDALO utek. Par, kde rameno jen pridalo utek
+#       a planovac si ho vybral, by hlasil "arm acted 0" nad POHNUTOU hrou
+#       => LEAK TEST BY KRICEL NA VLASTNI RAMENO. Ted tika "rameno ZMENILO
+#       NABIDKU", at uz jakkoli, a JEDNOU za hrace.
+#       [[feedback_arm_signal_incomplete_when_arm_does_two_things]]
+#   (2) UPLNOST: rameno se cte na JEDINEM miste (macro_actions.cpp:873),
+#       `worstReplyCost` se mimo nej nevola NIKDY.
+#   (3) IZOLACE: s vypnutym ramenem 8/8 testu vcetne
+#       `ArmOffRestoresExactlyTheOldSingleOffer`.
+#   (4) SIGNAL DOJDE DO VYHODNOCENI: candPrice -> armEvents -> arm acted
+#       + ARM PICKS + leak; mode 14 je v `armSignalAvailable`.
+#
+# ⛔ NULA NEEXISTUJE: lezici hraci jsou v kazdem zapase. Kontrola seedovani
+#   (mode 2) bezi PRED behem; pod CRN je to tautologie a VERDIKT NA NI NESTOJI.
+#   ⇒ Aparat se obhajuje LEAKEM.
+#
+# LIGHT TEST PROTI FINALNIMU BUILDU (12 paru, dw-dw, 09:46-09:57)
+#   leak 0 · arm acted 12/12 · n_nonzero 8/12 = 66,7 %
+#   ARM PICKS 50 277 = 2 094,88/hru
+#   Q3/UTEK nabidnut 50 277, NEBYLO KAM 2
+#   Q3/ODPOVED 39 183 ran na vstale, BLITZEM 23,9 %, srazeno 49,1 %
+#   PAIRED delta -0,1667 +- 0,1483 (~1,1 SE)
+#   ⛔ Delta je SUM a NERIDI NIC. Zapsana proto, ze je ZAPORNA -- u M13 byly
+#     ctyri zaporne light testy a noc dala +0,0048. Kdyby Q3 vyslo zaporne,
+#     nesmi to vypadat jako predvidani; kdyby kladne, nesmi se to zamlcet.
+#
+# PREDPOVEDI (ctou se v tomto poradi)
+leak == 0
+arm_acted >= 0.5
+n_nonzero in 0.30 0.90
+delta in -0.10 0.10
+delta_1s in -0.05 0.05
+#
+# ⏰ RUCNI CTENI — U KAZDEHO JMENO RADKU VYSTUPU
+#   ⭐ Tohle je nova povinna cast (02.09.). 01.09. u P35 a 02.09. u M13 jsem
+#     registroval cteni, ktere aparat NEVYTISKL -- podruhe dokonce s citacem,
+#     ktery jsem den predtim sam pridal do enginu a nezapojil do vypisu.
+#     Preflight to ted overuje pres `--expect`.
+#     [[feedback_registered_reading_needs_a_print_line]]
+#
+#   (1) radek `Q3/UTEK`      — existuje kam utect? (nabidnut vs NEBYLO KAM)
+#       ⚠️ Toto meridlo VISI NA RAMENI (cely blok je pod vypinacem), takze
+#         mimo mode 14 hlasi nulu. V mode 14 je platne.
+#   (2) radek `Q3/ODPOVED`   — kolik ran na vstale, z toho BLITZEM, srazeno.
+#       ⭐ Podil BLITZU je test doktriny: kdyz je nizky, souper trestá
+#         NEOMEZENYM zdrojem (blok) a doktrina plati. Light test 23,9 %.
+#   (3) radek `Q3/VSTAVANI`  — nabidka vs provedeni, podil DRAHE vetve.
+#   (4) rozpad po stranach z radku — matchup je SYMETRICKY, takze je citelny
+#       (u P35 na dw-we toto cteni PADLO na asymetrii domaci/host).
+#
+# VOLBA MATCHUPU: dw-dw (matchup 2) -- symetricky (rozpad po stranach citelny)
+#   a rychlejsi nez dw-we.
+#
+# DIMENZOVANI: tempo 56 s/par (12 paru za 11,2 min na finalnim buildu).
+#   s se bere ze ZMERENYCH NOCI, ne z light testu: M13/dw-dw dalo SE 0,0084
+#   pri 2 400 parech => s = 0,412.
+#   1 800 paru => SE ~ 0,0097 (proti prahu 0,015 rezerva), ~11,9 h.
+#   ⇒ start ~18:00, konec ~06:00. Bez limitu seance.
+#
+# ⚠️ CO Z NOCI NEPLATI: absolutni cisla. `.so` se 02.09. menilo (M13 nasazeno,
+#   rameno odebrano, citace zapojeny). Plati JEN parova delta.
+#
+# ZADANI: --mode 14 --matchups "2:dw-dw:1" --pairs 1800 --chunks 45 --workers 4
+# Spousteni: ./launch_q3_night.sh  (preflight --expect -> kontrola seedovani -> noc)
