@@ -1833,10 +1833,63 @@ static bool executeAndRecord(GameState& state, const Action& action,
 //     LIMIT    dosel maxSteps
 thread_local long g_mwNoStep = 0, g_mwDetour = 0, g_mwLoop = 0,
                   g_mwStuck = 0, g_mwLimit = 0;
+// ⛔ 02.09.: `smycka 158 170` NEMA JMENOVATEL. Pocet vzdani sam o sobe nerika
+//   nic, dokud nevim, kolik chuzi naopak DOJDE -- tataz vada jako u turnoveru
+//   z lehu, kde chybela reference ze stoje.
+//   K tomu PROFIL situace, kdy se smycka spusti: kolik kroku uz hrac udelal
+//   (0 = nerozesel se vubec, 3+ = opravdu oscilace po pokroku) a jak daleko
+//   od cile stal. ⭐ ZADNA HYPOTEZA PREDEM -- 01.09. jich pet selhalo.
+thread_local long g_mwArrived = 0;
+thread_local long g_mwLoopSteps = 0, g_mwLoopStep0 = 0, g_mwLoopDist = 0;
+
+// ⭐ ZACHYCENI SITUACE, NE JEN POCTU (02.09.2026, uzivatel: „mas k te smycce
+//   i priklad ze hry?"). Citac rekne KOLIK, ne CO -- a nad cislem se neda
+//   diskutovat. Dumpuje se prvnich N pripadu: pozice vsech hracu, cil chuze,
+//   kolik kroku uz hrac udelal. Vic nez N se zahazuje, aby z toho nebyly
+//   gigabajty (v rolloutech se chuze vola miliony krat).
+// ⚠️ Zapina se promennou prostredi BB_WALKLOOP_DUMP=<soubor>, takze v beznem
+//   behu i v NOCI je to UPLNE VYPNUTE a nic to nestoji.
+thread_local int  g_wlDumpLeft = -1;      // -1 = jeste nezjisteno
+thread_local FILE* g_wlDumpFile = nullptr;
+
+static void dumpWalkLoop(const GameState& st, const Player& p,
+                         Position target, int step, int dist) {
+    if (g_wlDumpLeft < 0) {
+        const char* path = getenv("BB_WALKLOOP_DUMP");
+        if (!path) { g_wlDumpLeft = 0; return; }
+        g_wlDumpFile = fopen(path, "a");
+        g_wlDumpLeft = g_wlDumpFile ? 300 : 0;
+    }
+    if (g_wlDumpLeft <= 0 || !g_wlDumpFile) return;
+    --g_wlDumpLeft;
+    fprintf(g_wlDumpFile, "{\"mover\":%d,\"side\":%d,\"from\":[%d,%d],"
+            "\"target\":[%d,%d],\"step\":%d,\"dist\":%d,\"mv\":%d,"
+            "\"ball\":[%d,%d],\"held\":%s,\"players\":[",
+            p.id, p.teamSide == TeamSide::HOME ? 0 : 1,
+            p.position.x, p.position.y, target.x, target.y, step, dist,
+            static_cast<int>(p.movementRemaining),
+            st.ball.position.x, st.ball.position.y,
+            st.ball.isHeld ? "true" : "false");
+    bool first = true;
+    for (const Player& q : st.players) {
+        if (!q.isOnPitch()) continue;
+        fprintf(g_wlDumpFile, "%s{\"id\":%d,\"s\":%d,\"x\":%d,\"y\":%d,\"st\":%d}",
+                first ? "" : ",", q.id, q.teamSide == TeamSide::HOME ? 0 : 1,
+                q.position.x, q.position.y, static_cast<int>(q.state));
+        first = false;
+    }
+    fprintf(g_wlDumpFile, "]}\n");
+    fflush(g_wlDumpFile);
+}
 void takeMoveWalkBailout(long* out5) {
     out5[0]=g_mwNoStep; out5[1]=g_mwDetour; out5[2]=g_mwLoop;
     out5[3]=g_mwStuck;  out5[4]=g_mwLimit;
     g_mwNoStep=g_mwDetour=g_mwLoop=g_mwStuck=g_mwLimit=0;
+}
+void takeMoveWalkProfile(long* out4) {
+    out4[0]=g_mwArrived; out4[1]=g_mwLoopSteps;
+    out4[2]=g_mwLoopStep0; out4[3]=g_mwLoopDist;
+    g_mwArrived=g_mwLoopSteps=g_mwLoopStep0=g_mwLoopDist=0;
 }
 
 static bool movePlayerToward(GameState& state, int playerId, Position target,
@@ -1850,7 +1903,7 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         // still has to get up. Before 2026-08-21 this returned "arrived", so a
         // REPOSITION onto one's own square was a silent no-op and the macro
         // layer had no way to stand anybody up at all.
-        if (p.position == target && p.state != PlayerState::PRONE) return true;
+        if (p.position == target && p.state != PlayerState::PRONE) { ++g_mwArrived; return true; }
 
         // Get available actions
         std::vector<Action> actions;
@@ -1864,7 +1917,14 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         int currentDist = p.position.distanceTo(target);
         int moveDist = bestMove.target.distanceTo(target);
         if (moveDist > currentDist + 1) { ++g_mwDetour; return false; } // max 1 square detour
-        if (moveDist >= currentDist && bestMove.target == lastPos) { ++g_mwLoop; return false; } // loop
+        if (moveDist >= currentDist && bestMove.target == lastPos) {
+            ++g_mwLoop;
+            g_mwLoopSteps += step;          // kolik kroku uz hrac udelal
+            if (step == 0) ++g_mwLoopStep0; // vubec se nerozesel
+            g_mwLoopDist += currentDist;    // jak daleko od cile stal
+            dumpWalkLoop(state, p, target, step, currentDist);
+            return false;
+        } // loop
 
         lastPos = p.position;
         Position before = p.position;

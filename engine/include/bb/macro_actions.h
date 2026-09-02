@@ -206,6 +206,9 @@ double blitzApproachRiskForTest(const GameState& state, const Player& mover,
                                 const Player& target);
 // Kde se makrova chuze vzdava: [nenasel, obchazka, smycka, stoji, limit].
 void takeMoveWalkBailout(long* out5);
+// Profil chuze: [dosla, soucet kroku pri smycce, smycek na kroku 0,
+// soucet vzdalenosti pri smycce]. Bez `dosla` nema pocet vzdani jmenovatel.
+void takeMoveWalkProfile(long* out4);
 void setBlitzPathArm(TeamSide side, bool on);
 bool blitzPathArm(TeamSide side);
 void noteProneActionTaken();
