@@ -128,3 +128,4 @@ q3_fouls_*_data/
 # 01.09.: prelozeny harness. Rebuilduje se pri kazde zmene enginu, takze se
 # pracovni strom spini binarkou. Tyz duvod jako diag_*_rows.jsonl vyse.
 /diag_f1_cage_advance
+/diag_dev
