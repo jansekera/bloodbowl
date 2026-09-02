@@ -198,6 +198,37 @@ doprovod nosiče **výhradně diagonálu**.
 *(kolik rohů je obsazeno, a kdo stojí vedle nich)*, ne vlastnost jednoho cíle
 pohybu. Patří k `K-CIL`.
 
+## A5. ⭐⭐⭐ JEDNA SEKVENCE CELOTAHU UŽ V ENGINU JE — `BLITZ_AND_SCORE`
+
+Uživatel 02.09.: *„blitz and score patří do celotahu — teď je ve hrách
+prezentováno bez naplánování?"*
+
+**Ověřeno v `expandBlitzAndScore()`:** je to **dvoukrokový plán dvou různých
+hráčů**, provedený jako **jedno makro**:
+
+```
+Krok 1  vyber blitzujícího -- tie-break SCHVALNE pryc od nosice
+        („aby se nosic neriskoval, kdyz je stejne bezpecny spoluhrac")
+        -> proved blitz, odkliď blokujícího
+Krok 2  „Now move the carrier to score" -> nosic jde do endzony
+```
+
+⇒ **Naplánovaná je — ale napevno, rukou.** Hledání rozhoduje jen *„vzít, nebo
+nevzít"*. Neumí ji **složit**, **obměnit**, ani **najít podobnou** — třeba
+`Q01` *(blitz na markera ⇒ nosič odejde bez dodge)* je týž tvar a engine ji nezná.
+
+⭐⭐ **PROČ JE TO DŮLEŽITÉ: je to PŘEDLOHA, a zároveň jediná svého druhu.**
+Dokazuje, že engine **umí provést** dvoučlennou sekvenci — ⇒ to, co u celotahu
+chybí, **není provedení, ale HLEDÁNÍ**. Sedí to na naše tři patra
+*(`project_bloodbowl_three_tiers_20260824`)*: `BLITZ_AND_SCORE` je v patře 1
+„funguje samo", ale jen proto, že ten jeden plán **někdo napsal ručně**.
+
+⚠️ **A nese to s sebou i varování:** právě u téhle jediné ruční sekvence se
+ukázalo *(`T5.35a`, 27.08.)*, že se **nabízela tam, kde se dojít nedalo** —
+944 z 1 281 nabídek mělo nosiče průměrně **10 polí** od endzóny. ⇒ Ruční plán
+**nekontroluje vlastní předpoklady**; to je práce, kterou by plánovač dělal
+sám. Viz `Q19` ve frontě.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
