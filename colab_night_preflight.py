@@ -196,6 +196,29 @@ def step_probe(args):
             'mode %d chybí v armSignalAvailable ⇒ verdikt by neměl na čem stát' % args.mode)
         return None
     rec('OK', 'sonda běží a tiskne kontrolu ramene', '%.1f s na pár' % dt)
+
+    # ⛔⛔ KAŽDÉ REGISTROVANÉ ČTENÍ MUSÍ MÍT ŘÁDEK VE VÝPISU (02.09.2026).
+    #   T2.13 sem přidalo kontrolu, že se tiskne LEAK řádek -- a ta se od té
+    #   doby nikdy neopakovala, protože se SPOUŠTÍ. Tohle je její zobecnění.
+    #   ⛔ Proč: 01.09. (P35) jsem registroval čtení, na které harness neměl
+    #     pole. 02.09. (M13) jsem čítače pro registrované čtení do enginu
+    #     PŘIDAL a nezapojil do výpisu -- noc pak vytiskla přesně to zavádějící
+    #     číslo, které jsem den předtím označil za zavádějící.
+    #   Řetěz je čtyřdílný: čítač v enginu -> sběr v harnessu -> printf ->
+    #   výstup. Kontrolovat se dá jen ten poslední díl, a to stačí.
+    if args.expect:
+        chybi = [lbl for lbl in args.expect.split(',') if lbl.strip()
+                 and lbl.strip() not in log]
+        if chybi:
+            rec('STOP', 'registrované čtení se NEVYTISKNE',
+                'chybí ve výstupu: %s ⇒ noc by doběhla a odpověď by v ní nebyla'
+                % ', '.join(chybi))
+            return None
+        rec('OK', 'všechna registrovaná čtení mají řádek ve výpisu',
+            args.expect)
+    else:
+        rec('WARN', 'nezadáno --expect',
+            'předregistrace má ruční čtení? pak sem patří jména jejich řádků')
     m = re.search(r'ARM PICKS TOTAL: (\d+)', log)
     if m:
         rec('INFO', 'picků ramene', '%s (na 1 páru)' % m.group(1))
@@ -311,6 +334,10 @@ def step_plan(args, par, w):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('--expect', default='',
+                    help='cárkou oddělená jména řádků výstupu, která '
+                         'předregistrace slibuje jako ruční čtení '
+                         '(napr. "M13/CENA,M13/BLITZ,BLITZ/PROC")')
     ap.add_argument('--mode', type=int, required=True)
     ap.add_argument('--matchups', required=True, help='"idx:jméno:expozice ..."')
     ap.add_argument('--prereg', default='')

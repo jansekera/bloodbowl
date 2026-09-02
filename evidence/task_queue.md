@@ -1396,7 +1396,27 @@ zbydou 3 pole.
 ⇒ Řadí se **k P48**, tedy až za vším ostatním. Je to **poznámka, aby se to
 neztratilo**, ne úkol.
 
-## ✅ KONTROLA PŘED NOCÍ — ODŠKRTÁVÁ SE, NEČTE SE *(02.09.2026)*
+## ✅ KONTROLA PŘED NOCÍ *(02.09.2026)*
+
+⛔⛔ **PRVNÍ VERZE TOHOHLE ŘÁDKU BYLA CHYBA A NECHÁVÁM JI ZAPSANOU.**
+Napsal jsem sem sedmibodový seznam „který se odškrtává" — a uživatel hned
+upozornil, že **seznam už dávno máme, a to jako SPUSTITELNÝ SKRIPT**
+(`colab_night_preflight.py`). ⭐ `T2.13` do něj kdysi přidalo kontrolu, že se
+leak řádek opravdu vytiskne, a **ta se od té doby nikdy neopakovala — protože
+se spouští.** Markdown seznam je tedy krok ZPÁTKY: je to čtvrtý zápis o téže
+věci, a psát zápisy místo kontrol je přesně ten vzorec, který ty vady plodí.
+
+⇒ **Zobecněno a přesunuto do skriptu 02.09.:** `--expect "M13/CENA,BLITZ/PROC"`
+předá preflightu **jména řádků výstupu**, které předregistrace slibuje jako
+ruční čtení. Sonda 1 páru je vytiskne, nebo **noc se nespustí** (`STOP`).
+Bez `--expect` jen `WARN` — aby to nešlo obejít mlčením.
+
+⚠️ **Zbytek seznamu níž zůstává jako POPIS, ne jako procedura.** Co z něj jde
+zautomatizovat, patří do skriptu; co ne, patří do předregistrace.
+
+### Body, které skript zatím neumí
+
+
 
 ⛔ **Proč vznikla:** za dva dny tři různé vady měřicího aparátu — neúplný
 signál ramene *(M13, Q3)*, měřidlo závislé na logování *(blitz bez rány)*,
