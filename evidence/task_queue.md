@@ -734,6 +734,27 @@ neprohrajeme prakticky nikdy. ⇒ **Obrana je ROZHOVOR, ne strojová práce.**
 | **5** | *(za běhu noci)* **Q6 — v čem se měří „převaha"** | rozhovor, stroj nestojí; **blokuje T1.11** | T1.11 |
 | **6** | ✅ **HOTOVO** — T0.1 K9 po fázích; přepis jako kontrola neuspěl (16,3σ vs 20,8σ), ale vypadl z toho **P41: fáze VÝBĚH 2,9 %** | — | — |
 
+## ⏰ K-CIL — KAM MÁ NOSIČ DOJÍT, ABY SE DALA POSTAVIT KLEC *(uživatel 02.09.)*
+
+**Sekce KLEC. Nezačínat — klec je až po pohybu.** Zapsáno, aby se to neztratilo.
+
+Uživatel 02.09.: *„dříve jsme řešili, ať nosič dojde někam, kde kolem něj bude
+potřeba sestavit klec, ať se správně vyhodnotí vše včetně čistoty rohů — a delší
+dobu potom řešíme, že posíláme všechny na jedno stejné místo."*
+
+⭐ **Je to tentýž problém ze dvou konců, ale patří do dvou sekcí:**
+* **cíl DOPROVODU** *(pole pro čtyři rohy kolem nosiče)* — a to je vada POHYBU,
+  vedená jako `W-CIL`: cíle se nepočítají z nosiče, ale geometricky.
+* **cíl NOSIČE** *(dojít tam, kde ta čtyři pole vůbec existují a jsou čistá)* —
+  a to je **klec**, tenhle řádek.
+
+⇒ ⛔ **Pořadí je dané a nesmí se přehodit:** dokud doprovod chodí na geometrické
+body, nemá smysl vybírat nosiči pole podle čistoty rohů — postavil by se do
+dobrého místa a doprovod by mu tam stejně nepřišel. **Napřed `W-CIL`, pak tohle.**
+
+⚠️ **Souvisí:** `M11` *(nosičům stojíme v cestě my sami, 149/149 vlastními)* je
+třetí pohled na týž jev — o patro výš než `W-CIL`.
+
 ## ⭐⭐⭐ POLOŽKY SE ŘADÍ PODLE DVOU CÍLŮ KLECE *(uživatel 20.08.)*
 
 Spec **15.0b′**: klec má **dvě položky — dojít co nejdál · ochránit nosiče**
@@ -1419,7 +1440,35 @@ případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není práz
 přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
 PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
 
-⛔ **NEOPRAVENO 02.09. ZÁMĚRNĚ:** je to široká změna chování a ve 14:00 startuje
+⛔ ### ⭐⭐⭐ ZPŘESNĚNO 02.09. — KRITÉRIA JSOU DVĚ, NE JEDNO, A JEDNA VĚTEV JE UŽ MÁ
+
+Uživatel 02.09.: *„když se nikdo nemá dostat ani do TZ oponenta"*. Měl jsem
+zapsáno jen **obsazenost**. Kritéria jsou **dvě**: pole musí být (1) volné
+a (2) ne v soupeřově tacklezóně — a druhé v zápisu chybělo.
+
+⭐ **Klíčové zjištění: oprava se nemusí vymýšlet, je v témž souboru.** Větev
+`cageTag` v `macro_actions.cpp:1717-1721` to dělá **správně** — projde
+sousední pole, `isOnPitch()`, `getPlayerAtPosition()` vyřadí obsazená,
+a mezi zbytkem **minimalizuje tacklezóny**:
+
+```cpp
+if (!apos.isOnPitch()) continue;
+if (state.getPlayerAtPosition(apos)) continue;
+int friendlyTZ = countTacklezones(state, apos, opponent(mySide));
+```
+
+⛔ **Ostatních šest cílů netestuje NIC** — jsou čistě geometrické:
+`macro_actions.cpp:1689` (receiver), `1693` (kolem nosiče), `1769` (safety
+na `{myEndzone, 7}`), `1782` (endzone guard), `1792` (screen sloty
+`{3,5,7,9,11}` po `screenSlot % 5`), `1800` (`{x + dx*3, 7}`).
+⇒ Sedm hráčů dostane **týž bod 7 na ose Y**, a nikdo se neptá, kdo tam stojí.
+
+⚠️ **Ale kritérium tacklezón NENÍ pro všechny stejné** — a proto to není
+jedna funkce pro všechny větve: `cageTag` chce k soupeřovu nosiči, takže TZ
+**minimalizuje** (nulu mít nemůže); screen a reposition tam **nemají co
+dělat vůbec**. ⇒ Společné je „pole je volné", rozdílné je „co s TZ".
+
+**NEOPRAVENO 02.09. ZÁMĚRNĚ:** je to široká změna chování a ve 14:00 startuje
 noc Q3. Táž zásada jako u `P37b` 01.09. — nemíchat změnu do místa, kde se měří.
 
 ⭐ **Souvisí s `C4`/`C9` v `celotah_situace.md`**: nejenže naše těla brání
