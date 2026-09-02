@@ -131,7 +131,7 @@ game_simulator  ──jednu akci──▶  MacroMCTSPolicy::operator()
 | # | co | doklad (`soubor:řádek`) | v komentáři vysvětlené? | odhad dopadu |
 |---|---|---|---|---|
 | **W1** | **Strom sekvencí se po každé aktivaci zahazuje.** `root` je lokální, žádný reuse podstromu, žádné uložení nalezené sekvence. Engine tedy „plán celého tahu" v každé aktivaci **postaví a zahodí**, a příští aktivace ho staví znovu z jiných kostek. | `macro_mcts.cpp:177` (lokální `root`), `:282` (vrací se jen `mostVisitedChild`), `:162-164` (nová `getAvailableMacros` při každém volání) | **NE** — nikde není napsáno, že je to záměr ani že je to zjednodušení | **VELKÝ pro celotah.** Je to přesně ta chybějící vrstva: výhled existuje, ale nemá kam se uložit |
-| **W2** | **Rozpočet hledání je 100 iterací.** Při ~6-25 kandidátech v kořeni (engine sám odhaduje `n<=12` / `n>=13` jako „malý/velký obranný uzel") většina dětí nedostane ani jednu návštěvu, takže strom je prakticky **jednoplýtvý** a „sekvence" z W1 je z velké části teorie. | `run_iteration.py:31` (`MCTS_ITERATIONS = 100`, přepínatelné `BB_MCTS`), `macro_mcts.cpp:594-595` a `:604-608` (odhad `n`), `mcts.h:16` (default 100000 — v produkci se nepoužije) | částečně: komentáře u priorů mluví o „starvation of visits", tedy o tom, že rozpočet je úzký; NIKDE není, že by hloubka byla záměrně 1 | **VELKÝ** — kdyby to platilo, `W1` je akademická vada a skutečná vada je hloubka. **Rozhoduje měření `WM1`** |
+| **W2** | **Rozpočet hledání je 100 iterací.** Při ~6-25 kandidátech v kořeni (engine sám odhaduje `n<=12` / `n>=13` jako „malý/velký obranný uzel") většina dětí nedostane ani jednu návštěvu, takže strom je prakticky **jednoplýtvý** a „sekvence" z W1 je z velké části teorie. | `run_iteration.py:31` (`MCTS_ITERATIONS = 100`, přepínatelné `BB_MCTS` na `:67`), **`diag_utils.py:123`** (`mcts_iterations: int = 100` — default `run_arm`, tedy rozpočet, na kterém běží noční A/B), `macro_mcts.cpp:594-595` a `:604-608` (odhad `n`), `mcts.h:16` (default 100000 — v produkci se nepoužije) | částečně: komentáře u priorů mluví o „starvation of visits", tedy o tom, že rozpočet je úzký; NIKDE není, že by hloubka byla záměrně 1 | **VELKÝ** — kdyby to platilo, `W1` je akademická vada a skutečná vada je hloubka. **Rozhoduje měření `WM1`** |
 | **W3** | **BLITZ makro NENESE, kdo blitzuje.** Nabídka emituje `{BLITZ, playerId = -1, targetId}` — vybírá se jen CÍL. Blitzující se volí až v expandéru. | `macro_actions.cpp:1245` (`out.push_back({MacroType::BLITZ, -1, candidates[i].targetId, {-1,-1}})`), výběr v `:2329-2342` | **ANO, částečně**: `:1160-1164` komentář „Score each target (best blitzer for each)" — ale že se identita nepředává, nikde | **STŘEDNÍ-VELKÝ**: uživatelovo *„cíl blitzu se rozhoduje PRVNÍ"* je v enginu **napůl splněné** (cíl je opravdu první a samostatný), ale druhá půlka — KDO a ODKUD — se rozhoduje mimo ocenění |
 | **W4** | **Nabídka a expandér blitzu měří DVĚ RŮZNÉ VĚCI.** Nabídka: `score = dice*2 + sideline/carrier/threat bonusy`, **maximum přes blitzující**, a pak se **ořízne na top-1 (útok) / top-2 (obrana)**. Expandér: **minimum** `estimateBlitzFailChance` = blok × doběh. Cíl, který nabídka zahodila, expandér nikdy neuvidí. | nabídka `macro_actions.cpp:1190-1227` + ořez `:1241-1246`; expandér `:2329-2342`; `estimateBlitzFailChance` `:714-761` | **NE** pro rozpor; `:2332-2335` vysvětluje jen VOLBU uvnitř expandéru (item 14) | **STŘEDNÍ**: nesouhlas se projeví v ADMISI (co se nenabídne, se neocení), ne v Q — Q se počítá z reálné expanze |
 | **W5** | **Blitz se týmu odečte PŘED chůzí.** `blitzUsedThisTurn = true` na `:332` je nad smyčkou doběhu; každá z pěti cest `noteBlitzWasted(0..5)` pak vrátí `fail()` — **tým už blitz nemá**. | `action_resolver.cpp:332-333` vs. `:373,379,384,391,392,395,403,409` | **ANO, a bohatě**: `:89-102` vyjmenovává rozpad příčin a `:104-111` říká, že „P37b jsem ráno opravil v NABÍDCE a nezabralo to" ⇒ je to **známý, měřený, neuzavřený** stav | **VELKÝ pro vzácný zdroj**: engine sám změřil 9,3 % blitzů ze stoje bez rány (`:90-91`) |
@@ -191,10 +191,15 @@ Makro se ocení expanzí uvnitř hledání (`dice_`), a pak se **znovu expanduje
 maker (W16) tedy platí: **ocenil se jeden průběh, hraje se jiný.**
 
 ### R5 — dědictví, doložené jinde a stále platné
-* **Nabídka počítá dosah `MA + 2`, i pro hráče se `Sprint`** (N15 z `fable_movement_parity_20260824.md`)
-  — `macro_actions.cpp:1007, 1017, 1032, 1043, 1060, 1084`, `turn_planner.cpp:34`.
-  ⚠️ Část míst už `maxGfiSquares()` používá (`:1007`), takže **není to plošné** — chce
-  to projít, ne opsat starý nález.
+* **Dosah `MA + 2` napevno, tedy bez `Sprint` a bez `rooted`** — zbytek nálezu N15
+  z `fable_movement_parity_20260824.md`. ⭐ **V `macro_actions.cpp` je to už OPRAVENÉ**
+  (`:1007, 1017, 1032, 1043, 1060, 1084, 1134, 1274` volají `maxGfiSquares`,
+  `helpers.cpp:60-63`), ale **v ostatních vrstvách přežívá**:
+  `turn_planner.cpp:34, 39, 77` (klasifikace cíle kola a platnost staged pickupu),
+  `macro_mcts.cpp:812, 820` (hand-off bonus v listové heuristice),
+  `macro_actions.cpp:1208, 1607` (odhad SOUPEŘOVY skórující hrozby).
+  ⚠️ Tři z těch pěti míst počítají **dosah soupeře**, kde `+2` naopak SOUPEŘE
+  podceňuje — a to je jiný nález než původní N15.
 * **`cageScoreForSquare` nekontroluje `hasActed`** (W17).
 * **`carrierStallAwareSteps` nečte počet volných těl** (W20).
 

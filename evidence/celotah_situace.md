@@ -69,6 +69,33 @@ ale **dnes se na ní nedá změřit vůbec nic**, protože fázový model chybí
 sloupec nebyl, někdo by to zkusil měřit a dostal by nulu, kterou by četl jako
 nález.
 
+## A2. SEKVENCE — CO JE VLASTNĚ „SITUACE PRO CELOTAH"
+
+⛔⛔ **UPŘESNĚNO 02.09. (uživatel):** *„s těmi informacemi mi šlo o příklady jako
+blitz na toho, kdo nám markuje nosiče, a pak nosičem pohyb a TD — tvoje odpověď
+mi přijde o něčem jiném."*
+
+**Situace pro celotah je SEKVENCE, ne vlastnost jedné akce.** Má tvar:
+
+```
+akce A jednoho hráče  →  ta UMOŽNÍ akci B jiného hráče  →  výsledek
+```
+
+⇒ Nálezy typu *„plánovač oceňuje makra izolovaně"* nebo *„plán se postaví
+a zahodí"* jsou **architektura**, ne situace. Patří do auditu
+*(`fable_wholeturn_audit_20260902.md`)*, ne sem. Sem patří **konkrétní tah**,
+který jde nakreslit na desku.
+
+| # | SEKVENCE | ✅ jde měřit DNES | ⏰ až to bude umět | zdroj |
+|---|---|---|---|---|
+| **C9** | **Odmarkovat nosiče a skórovat.** Soupeř nám značí nosiče ⇒ **blitz na toho, kdo markuje** ⇒ zmizí jeho tacklezóna ⇒ **nosič vyrazí bez dodge** ⇒ TD. Blitz tu není za zranění, je to **klíč k nosičovu pohybu**. | kolikrát je nosič markovaný **a blitz jde jinam**; kolikrát nosič dodgeuje, ač šel soused srazit | podíl blitzů, po kterých se **nosič posunul dál**, a z toho TD |
+
+⛔ **C9 je vzor, jak to psát:** jmenuje **kdo**, **v jakém pořadí** a **proč to
+druhé bez toho prvního nejde**. Tím se liší od C1, který popisuje jen tu první
+polovinu *(blitz uvolní blitzujícího)* — **C9 uvolňuje NĚKOHO JINÉHO.**
+
+---
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
