@@ -167,6 +167,37 @@ akce** (kam se smí postavit roh, kdy se nesmí skórovat, prahy kostek). Jsou t
 ⏰ **K PROJITÍ SPOLU** — uživatel řekl, že situace projdeme, **než se začne
 pracovat na celotahu**. Tenhle seznam je podklad k tomu projití, ne plán práce.
 
+## A4. ⭐⭐⭐ DEFINICE KLECE — přesně, od uživatele 02.09.
+
+Uživatel 02.09.: *„roh klece musí být přesně roh a musí být přesně 4 rohy
+a nikdo další vedle nosiče — navíc rohy nesmí být vedle soupeře, ale to je
+už součást klece."*
+
+**Čtyři podmínky, a každá zakazuje něco jiného:**
+
+| # | podmínka | co zakazuje |
+|---|---|---|
+| **K-a** | roh je **přesně roh** | ⛔ **jen DIAGONÁLA.** Ortogonální soused nosiče **není roh** |
+| **K-b** | rohů je **přesně 4** | ⛔ ani tři *(díra)*, ani „pátý na pomoc" |
+| **K-c** | **nikdo další vedle nosiče** | ⛔ ortogonální pole u nosiče zůstávají **PRÁZDNÁ** |
+| **K-d** | roh **není vedle soupeře** | ⛔ *(uživatel to sám zařadil do sekce KLEC — neřešit teď)* |
+
+⭐⭐ **`K-c` je nejpřekvapivější a hned má doklad:** sběr `Q21` měří, že
+**50,2 % těl na ortogonále tam došlo vlastním pohybem** a **73,6 %** z nich
+mělo **čistý roh hned vedle cíle**. ⇒ Chodíme na pole, která podle definice
+klece mají **zůstat prázdná**, a roh vedle necháváme volný.
+
+⭐ **Dopad na `W-CIL` (pohyb) HNED:** větev „podpoř nosiče" nesmí po opravě
+mířit na libovolné volné pole vedle nosiče — musí mířit na **diagonálu**.
+Jinak by oprava aktivně vyráběla porušení `K-c`.
+⇒ Pomocná funkce `standableNextTo` dostává přepínač **jen rohy / všech osm**:
+značkovač k soupeři chce **kterékoli** sousední pole *(jde mu o tacklezónu)*,
+doprovod nosiče **výhradně diagonálu**.
+
+⛔ **`K-b` a `K-d` se teď NEŘEŠÍ** — jsou to vlastnosti klece jako celku
+*(kolik rohů je obsazeno, a kdo stojí vedle nich)*, ne vlastnost jednoho cíle
+pohybu. Patří k `K-CIL`.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
