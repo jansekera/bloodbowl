@@ -38,6 +38,21 @@ static const Player* findCarrier(const GameState& state) {
 // ostatni ramena jsou deklarovana az u svych setteru nize a to tu neslo.
 // ⭐⭐ W-CIL (02.09.): rozpad vydanych REPOSITION cilu PO VETVICH.
 //   thread_local stejne jako ostatni citace -- MCTS hleda paralelne.
+// ⭐ Q19 (02.09.): kolikrat se BLITZ_AND_SCORE vubec NABIDNE.
+//   ⚠️ Tohle je pocet V HLEDANI (getAvailableMacros bezi v kazde simulaci),
+//     takze se to NESMI cist jako „kolikrat to sla zahrat" -- je to mira
+//     toho, jak casto ta nabidka v prostoru tahu vubec je.
+thread_local long g_basOfferSearch = 0;
+
+// W-GFI (02.09.): kdyz chuze skonci na LIMITU (dosel pohyb), jak DALEKO
+//   jeste byla od cile. Kbelíky: [0] 1 pole, [1] 2 pole, [2] 3 pole,
+//   [3] 4 a vic, [4] uz na cili (nemelo by nastat).
+//   PROC: GFI kupuje 2 pole (3 se Sprintem). Kbelíky 1 a 2 jsou tedy tim,
+//   co by GFI ZACHRANILO; kbelík 4+ je mimo dosah i s nim.
+//   Bez tohoto rozpadu je „limit 181 152" cislo, ze ktereho se neda
+//   rozhodnout -- muze znamenat „staci krok" i „chybi pul hriste".
+thread_local long g_mwLimitDist[5] = {0,0,0,0,0};
+
 thread_local long g_repTot[BB_REP_BRANCHES]  = {0};
 thread_local long g_repOwn[BB_REP_BRANCHES]  = {0};   // obsazeno NASIM telem
 thread_local long g_repOpp[BB_REP_BRANCHES]  = {0};   // obsazeno SOUPEREM
@@ -1368,6 +1383,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             });
 
             if (bestBlocker > 0) {
+                ++g_basOfferSearch;
                 out.push_back({MacroType::BLITZ_AND_SCORE, carrier->id, bestBlocker, {-1, -1}});
             }
         }
@@ -2036,6 +2052,12 @@ void takeMoveWalkBailout(long* out5) {
 //   cislo „X %% cilu je obsazenych" by tedy michalo VADU s ZAMEREM.
 //   ⛔ Meri se v okamziku VYDANI nabidky, ne pri chuzi: az chuze dojde, muze
 //     tam uz stat nekdo jiny, a to je jina otazka (viz walkloop_finding).
+long takeBlitzAndScoreOffersInSearch() { long v=g_basOfferSearch; g_basOfferSearch=0; return v; }
+
+void takeMoveWalkLimitDist(long* out5) {
+    for (int q = 0; q < 5; ++q) { out5[q] = g_mwLimitDist[q]; g_mwLimitDist[q] = 0; }
+}
+
 void takeRepositionTargets(long* out5xN) {
     for (int b = 0; b < BB_REP_BRANCHES; ++b) {
         out5xN[b*5+0]=g_repTot[b];  out5xN[b*5+1]=g_repOwn[b];
@@ -2115,6 +2137,14 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
             state.getPlayer(playerId).state == beforeState) { ++g_mwStuck; return false; }
     }
     ++g_mwLimit;
+    {
+        const int miss = state.getPlayer(playerId).position.distanceTo(target);
+        if (miss <= 0)      ++g_mwLimitDist[4];
+        else if (miss == 1) ++g_mwLimitDist[0];
+        else if (miss == 2) ++g_mwLimitDist[1];
+        else if (miss == 3) ++g_mwLimitDist[2];
+        else                ++g_mwLimitDist[3];
+    }
     return false;
 }
 

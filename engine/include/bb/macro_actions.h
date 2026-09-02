@@ -15,6 +15,16 @@ namespace bb {
 //   [0] celkem  [1] obsazeno nasim  [2] obsazeno souperem  [3] volne v souperove TZ  [4] vlastni pole
 void takeRepositionTargets(long* out5xN);
 
+// ⭐ Q19: kolikrat se BLITZ_AND_SCORE nabidlo -- V HLEDANI, ne ve hre.
+long takeBlitzAndScoreOffersInSearch();
+
+// W-GFI: rozpad vzdani „dosel pohyb" podle toho, jak daleko jeste bylo k cili.
+//   [0] 1 pole  [1] 2  [2] 3  [3] 4+  [4] uz na cili
+void takeMoveWalkLimitDist(long* out5);
+// ⭐⭐ Q19: SKUTECNE tahy (greedyExpandMacro na zvolene makro, mimo hledani).
+//   [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho skoncilo TOUCHDOWNEM
+void takeBlitzAndScoreReal(long* out3);
+
 
 enum class MacroType : uint8_t {
     SCORE = 0,

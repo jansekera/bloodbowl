@@ -102,6 +102,11 @@ static long g_mw[5] = {0,0,0,0,0};
 static long g_mp[4] = {0,0,0,0};
 // ⭐⭐ W-CIL 02.09.: rozpad vydanych REPOSITION cilu po vetvich (5 cisel na vetev)
 static long g_rep[BB_REP_BRANCHES*5] = {0};
+// ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
+static long g_bas[3] = {0,0,0};
+static long g_basOff = 0;
+// W-GFI: rozpad vzdani „dosel pohyb" podle chybejici vzdalenosti
+static long g_mld[5] = {0,0,0,0,0};
 static long g_bp[3] = {0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
@@ -582,6 +587,9 @@ int main(int argc, char** argv) {
                 { long d2[2]; bb::takeBlitzDeclSplit(d2); g_declAdj += d2[0]; g_declFar += d2[1]; }
                 { long mw[5]; bb::takeMoveWalkBailout(mw); for (int q=0;q<5;++q) g_mw[q]+=mw[q]; }
                 { long mp[4]; bb::takeMoveWalkProfile(mp); for (int q=0;q<4;++q) g_mp[q]+=mp[q]; }
+                { long b3[3]; bb::takeBlitzAndScoreReal(b3); for (int q=0;q<3;++q) g_bas[q]+=b3[q]; }
+                g_basOff += bb::takeBlitzAndScoreOffersInSearch();
+                { long md[5]; bb::takeMoveWalkLimitDist(md); for (int q=0;q<5;++q) g_mld[q]+=md[q]; }
                 { long rp[BB_REP_BRANCHES*5]; bb::takeRepositionTargets(rp);
                   for (int q=0;q<BB_REP_BRANCHES*5;++q) g_rep[q]+=rp[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
@@ -777,7 +785,26 @@ int main(int argc, char** argv) {
                     "8-intercept lane", "9-safety", "10-MARKOVAT nosice [zamer]",
                     "11-endzone guard", "12-screen slot", "13-vpred do stredu" };
                 long tot=0; for (int b=0;b<BB_REP_BRANCHES;++b) tot+=g_rep[b*5+0];
-                printf("  W-CIL/CILE: vydano celkem %ld\n", tot);
+                {
+                const long tot = g_mld[0]+g_mld[1]+g_mld[2]+g_mld[3]+g_mld[4];
+                const long saveGfi = g_mld[0]+g_mld[1];          // 1-2 pole = bezny GFI
+                const long saveSprint = saveGfi + g_mld[2];      // +3. pole = Sprint
+                printf("  W-GFI/CHYBELO: vzdani na limitu %ld | 1 pole %ld (%.1f %%) | 2 pole %ld (%.1f %%) | 3 pole %ld (%.1f %%) | 4+ %ld (%.1f %%) | uz na cili %ld\n",
+                       tot,
+                       g_mld[0], tot?100.0*g_mld[0]/tot:0.0,
+                       g_mld[1], tot?100.0*g_mld[1]/tot:0.0,
+                       g_mld[2], tot?100.0*g_mld[2]/tot:0.0,
+                       g_mld[3], tot?100.0*g_mld[3]/tot:0.0,
+                       g_mld[4]);
+                printf("  W-GFI/STROP: GFI (2 pole) by zachranilo %ld (%.1f %% vzdani na limitu) | se Sprintem (3) %ld (%.1f %%)\n",
+                       saveGfi, tot?100.0*saveGfi/tot:0.0,
+                       saveSprint, tot?100.0*saveSprint/tot:0.0);
+            }
+            printf("  Q19/BLITZ-A-SKORUJ: nabidnuto v hledani %ld | SKUTECNE zahranych maker %ld, z toho BaS %ld (%.2f %%), z nich TOUCHDOWN %ld (%.1f %%)\n",
+                   g_basOff, g_bas[0], g_bas[1],
+                   g_bas[0] ? 100.0*g_bas[1]/g_bas[0] : 0.0,
+                   g_bas[2], g_bas[1] ? 100.0*g_bas[2]/g_bas[1] : 0.0);
+            printf("  W-CIL/CILE: vydano celkem %ld\n", tot);
                 for (int b=0;b<BB_REP_BRANCHES;++b) {
                     long t=g_rep[b*5+0]; if (!t) continue;
                     printf("    %-28s celkem %7ld | nase %6ld (%4.1f %%) | souper %5ld (%4.1f %%) | volne v TZ %5ld (%4.1f %%) | vlastni pole %6ld\n",

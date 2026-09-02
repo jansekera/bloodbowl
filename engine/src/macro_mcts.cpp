@@ -11,6 +11,13 @@
 
 namespace bb {
 
+// ⭐⭐ Q19 (02.09.): skutecne zahrane tahy, mimo hledani. Viz misto uziti nize.
+thread_local long g_basRealPicks = 0, g_basRealBas = 0, g_basRealTD = 0;
+void takeBlitzAndScoreReal(long* out3) {
+    out3[0]=g_basRealPicks; out3[1]=g_basRealBas; out3[2]=g_basRealTD;
+    g_basRealPicks=g_basRealBas=g_basRealTD=0;
+}
+
 static int distToEndzone(Position pos, TeamSide side) {
     int ezX = (side == TeamSide::HOME) ? 25 : 0;
     return std::abs(pos.x - ezX);
@@ -1159,7 +1166,18 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
 
     // Expand the chosen macro into a plan
     GameState planState = state.clone();
+    // ⭐⭐ Q19 (02.09.): TADY se pocita SKUTECNY tah, ne simulace.
+    //   `greedyExpandMacro` na tomhle miste rozbaluje makro, ktere hra
+    //   opravdu zahraje -- na rozdil od expandBlitzAndScore(), ktery bezi
+    //   i v kazde simulaci hledani a jehoz citac by merilo neco jineho.
+    //   Uzivatel se ptal: „bereme tu nabidku, kdyz se da skorovat?"
+    ++g_basRealPicks;
+    const bool basPick = (bestMacro.type == MacroType::BLITZ_AND_SCORE);
+    if (basPick) ++g_basRealBas;
     auto expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
+    // TD se pozna podle fáze: action_resolver nastavuje TOUCHDOWN, kdyz
+    // checkTouchdown() projde (action_resolver.cpp:509-514).
+    if (basPick && planState.phase == GamePhase::TOUCHDOWN) ++g_basRealTD;
 
     if (expansion.actions.empty() && fromStagedPlan) {
         // The planned macro no-opped against the real state (drift the
