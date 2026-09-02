@@ -8,6 +8,13 @@
 #       radku, ktera predregistrace slibuje jako rucni cteni.
 #       ⛔ Bez teto brany se 01.09. i 02.09. stalo, ze noc dobehla a
 #         registrovane cteni v ni NEBYLO (P35, M13).
+#   ⚠️ --control-mode2: nulovy MATCHUP se u Q3 koupit NEDA -- rameno se
+#       spousti pri kazdem vstavani vedle soupere, neni rasa, kde by neslo.
+#       Rozpulit 2400 paru na expozici+nulu by stalo silu (prah +-0,015 je
+#       v jedne noci jen 2,5 sigma). ⇒ Nulou je brana (2) nize, a ta je pod
+#       CRN TAUTOLOGIE: chyti hrubou chybu v seedovani, ale VERDIKT NA NI
+#       NESTOJI. Skutecnou ochranou je leak test v samotne noci
+#       ("MOVED WITHOUT THE ARM ACTING: 0").
 #   (2) KONTROLA SEEDOVANI (mode 2): pod CRN musi obe orientace hrat touz
 #       hru => n_nonzero PRESNE 0. Je to tautologie a verdikt na ni nestoji,
 #       ale hrubou chybu v seedovani chyti.
@@ -19,7 +26,8 @@ EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI"
 
 echo "=== (1) PREFLIGHT — tisknou se vsechna registrovana cteni? ==="
 python3 colab_night_preflight.py --mode 14 --matchups "2:dw-dw:1" \
-        --expect "$EXPECT" --pairs 2400 --workers 4 || {
+        --expect "$EXPECT" --pairs 2400 --workers 4 --control-mode2 \
+        --prereg evidence/night_prereg_20260902_q3.preds || {
   echo "⛔ PREFLIGHT NEPROSEL — NOC SE NESPOUSTI"; exit 1; }
 
 echo "=== (2) kontrola seedovani: mode 2, 8 paru, dw-dw ==="
