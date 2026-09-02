@@ -1440,7 +1440,58 @@ případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není práz
 přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
 PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
 
-⛔ ### ⭐⭐⭐ W-GFI — ENGINE HÁZÍ, AŽ KDYŽ MÁ CO ZTRATIT *(uživatel 02.09., doloženo v kódu)*
+⛔ ### ⏰⏰⏰ ZÍTRA 03.09. — GFI DO POHYBU *(uživatel 02.09.: „minimálně bych u pohybu přidal GFI možnost — třeba zítra — s daty od klece, ale čistě do pohybu")*
+
+⭐⭐⭐ **DOKTRÍNA TO UŽ POVOLUJE — kód implementuje jen půlku.**
+`dwarf_turn_procedure_spec_20260811.md:678-681`:
+
+> **GFI je pro průchod povolené** — výjimka z „tempo se nekupuje kostkami".
+> **Rush je legitimní přesně tehdy, když je rozdílem mezi *projít* a *zůstat
+> zaseknutý*.** Ne pro bankování, ne pro rutinní tempo.
+> ⚠️ V blizzardu to neplatí (GFI padá na 1-2).
+
+⇒ **Není to nové rozhodnutí.** Kód převzal ze dvou vět **jen tu zakazující**
+a výjimku zahodil. A dnešní měření říká, že **70 % vzdaných chůzí je právě
+„zaseknul jsem se"** *(limit 181 152 z 259 562)* — tedy přesně ten případ,
+pro který je výjimka napsaná.
+
+**ROZSAH — přesně jak uživatel řekl: „čistě do pohybu".**
+⛔ **Do `cage_advance.cpp` NESAHAT.** Klec je data, ne cíl změny.
+✅ Mění se **`expandReposition`** *(`macro_actions.cpp:2749`)*, kde je dnes
+`maxSteps = movementRemaining` bez GFI.
+
+**PODMÍNKA, ne paušál** — doktrína je v tomhle přesná:
+* ✅ GFI **jen když rozhoduje o dojití**: cíl je na `movementRemaining + 1`
+  nebo `+ 2` ⇒ bez GFI se **nedojde vůbec**
+* ⛔ **ne**, když se cíl dá dojít i bez něj *(to je „rutinní tempo")*
+* ⛔ **ne** na zásobu do dalšího kola *(to je „bankování")*
+* ⚠️ **ne v blizzardu** — tam GFI padá na 1-2
+
+**DATA OD KLECE, KTERÁ K TOMU PATŘÍ** *(a dnes se nikam netisknou)*:
+⛔ `cage_advance.cpp:461` — při plnění klece **vypadne z plánu každý, kdo by na
+svůj roh potřeboval GFI** *(`|| sa.needsGfi) continue;`)*.
+⛔ `cage_advance.cpp:791` — při posunu ten, kdo GFI potřebuje, ho **nedostane**;
+jen se mu **promine, že dojde o pole vedle** *(„walks dice-free and may stop one
+square short")*. `needsGfi` se tedy počítá a používá jako **tolerance na minutí**,
+ne jako povolení hodit.
+⇒ **Roh, který by se dal obsadit jedním GFI, se nechá prázdný.** Proti
+uživatelově definici klece *(`K-b`: rohů je přesně 4)* je to volba
+**1/6 pád na zem** vs **jistá neúplná klec** — a kód volí to druhé.
+
+⛔⛔ **`diagMacroCornerGfi` EXISTUJE A NIKDE SE NETISKNE**
+*(`cage_advance.h:135`, plní se na `:770` a `:815`)*. Plánovač si zaznamená,
+které rohy potřebovaly GFI, a to číslo **nikdy neopustí engine**.
+⇒ **Potřetí za tři dny týž tvar** — viz [[feedback_registered_reading_needs_a_print_line]].
+**První krok zítra: dát mu řádek ve výpisu.** Bez něj nevíme, o kolik rohů jde.
+
+⏰ **CO ZMĚŘIT, NEŽ SE TO ZAPNE** *(neopravovat naslepo)*:
+**(1)** z 181 152 „limit" vzdání: **kolika by stačil 1-2 kroky navíc?** = horní odhad zisku
+**(2)** kolik rohů klece padne na `needsGfi` = druhý horní odhad, z klece
+**(3)** proti tomu cena: GFI **2+**, tedy **1/6 pád**. U volného hráče to není
+turnover, ale je to **tělo na zemi na začátku soupeřova kola**.
+⇒ Teprve poměr řekne, jestli je to **vada k opravě**, nebo **rameno na noc**.
+
+### ⭐⭐⭐ W-GFI — ENGINE HÁZÍ, AŽ KDYŽ MÁ CO ZTRATIT *(uživatel 02.09., doloženo v kódu)*
 
 Uživatel 02.09.: *„když nebudeme házet kostkou, nedáme TD a nikdy nevyhrajeme
 — to je tu stále — můžeš to vyčíst z kódu snad."* ⇒ **Dá. A je to soustavné.**
