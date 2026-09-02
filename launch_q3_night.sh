@@ -20,6 +20,9 @@
 #       ale hrubou chybu v seedovani chyti.
 #   (3) az pak noc.
 # ============================================================================
+# ⚠️ --session-hours 16: laptop nema strop sezeni (to bylo COLAB). Sestnact
+#   je „start ve 14:00, stroj potrebujes rano" -- kdyz se beh do toho nevejde,
+#   chci to vedet PRED spustenim, ne rano.
 set -u
 cd /home/jenda/claude/blood-bowl
 EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI"
@@ -27,7 +30,8 @@ EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI"
 echo "=== (1) PREFLIGHT — tisknou se vsechna registrovana cteni? ==="
 python3 colab_night_preflight.py --mode 14 --matchups "2:dw-dw:1" \
         --expect "$EXPECT" --pairs 2400 --workers 4 --control-mode2 \
-        --prereg evidence/night_prereg_20260902_q3.preds || {
+        --prereg evidence/night_prereg_20260902_q3.preds \
+        --session-hours 16 || {
   echo "⛔ PREFLIGHT NEPROSEL — NOC SE NESPOUSTI"; exit 1; }
 
 echo "=== (2) kontrola seedovani: mode 2, 8 paru, dw-dw ==="

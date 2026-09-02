@@ -349,7 +349,15 @@ def main():
     ap.add_argument('--null-pairs', type=int, default=0,
                     help='párů pro matchupy s expozicí 0 (0 = stejně jako --pairs)')
     ap.add_argument('--workers', type=int, default=8)
-    ap.add_argument('--session-hours', type=float, default=12.0)
+    # ⛔⛔ 12.0 JE DELKA COLAB SEZENI, NE VLASTNOST TOHOTO STROJE.
+    #   Na laptopu ZADNY takovy strop neni -- beh skonci, az dobehne, a
+    #   `run_laptop_night.sh` ma SESSION_HOURS default 999 (= bez limitu).
+    #   ⇒ Nechat 12 znamena tisknout varovani „potreba ~2 sezeni", ktere
+    #     na laptopu NEPLATI, a to je horsi nez zadne: 02.09. jsem ho
+    #     zopakoval uzivateli jako fakt a musel ho brat zpet.
+    #   Skutecne omezeni na laptopu je HODINOVE (kdy stroj potrebujes zpet)
+    #   ⇒ predavej `--session-hours` podle toho, jinak se nepredpoklada nic.
+    ap.add_argument('--session-hours', type=float, default=999.0)
     ap.add_argument('--session-use', type=float, default=0.85,
                     help='jakou část sezení si troufneme využít')
     ap.add_argument('--tempo-pairs', type=int, default=2, help='manifest žádá 2 na segment')
