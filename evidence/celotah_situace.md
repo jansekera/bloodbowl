@@ -46,20 +46,28 @@ dnes co vytisknout. [[feedback_registered_reading_needs_a_print_line]] ·
 
 ---
 
-## A. UŽ DOLOŽENÉ Z NAŠÍ PRÁCE *(mají číslo nebo zdroj)*
+## A. UŽ DOLOŽENÉ Z NAŠÍ PRÁCE
 
-| # | situace | co má celotah rozeznat | zdroj |
+⭐ **KAŽDÁ SITUACE NESE TŘI VĚCI** *(uživatel 02.09.: „na jednu stranu chci
+zaznamenat všechny možnosti, na druhou si dát pozor, ať to neměřím, dokud to
+neumí")*. Tím se ta dvě pravidla přestanou tlouct: **sbírá se neomezeně,
+měří se jen prostřední sloupec.**
+
+| # | situace — CO MÁ HRÁČ ROZEZNAT | ✅ jde měřit DNES *(cena nepřítomnosti)* | ⏰ změří se AŽ TO BUDE UMĚT |
 |---|---|---|---|
-| C1 | **Blitz na souseda jako UVOLNĚNÍ** | Srazím souseda ⇒ zmizí jeho tacklezóna ⇒ zbytkem pohybu odejdu **bez dodge** tam, kde jsem potřeba. Hodnota se neměří ranou, ale **zbytkem tahu**. | uživatel 01.09.; ř. 552-553 |
-| C2 | **Tři možnosti vstávání** | vstát a zůstat *(blok zdarma, neomezený)* · vstát a odejít *(blitz, 1×/kolo)* · zůstat ležet *(faul, 1×/kolo)*. ⚠️ Ale **zůstat vedle nosiče je cena za něco** — riziko nesmí přebít účel. | Q3, uživatel 20.08. a 31.08. |
-| C3 | **Rozpočet blitzu** | Blitz je jediná akce s tvrdým limitem 1/kolo. Kdy si ho **schovat**? Změřeno: neutracen vůbec 25,1 % kol, ale 48,5 % padne na nosiče. | `T1.9`, spec část 14 |
-| C4 | **Nosiči zavazí VLASTNÍ hráči** | Postup nosiče blokují naše těla, ne soupeřova. 149/149 vlastními. ⇒ pořadí aktivací: **napřed uhnout, pak jít**. | `M11`, 26.08. |
-| C5 | **Nosič si nechává pohyb v záloze** | Šetřit pohyb má smysl jen dokud na něj soupeř nedosáhne blitzem — a dosah je `MA + GFI`, ne `MA`. | `P37`, 31.08. |
-| C6 | **Obrana: dva sloupce → skok do L** | Přechod mezi fázemi obrany řídí **převaha**, ne pozice. Engine fáze nemá vůbec. | uživatel 20.08., `project_bloodbowl_phase_model_missing` |
-| C7 | **Zeď: prolomit vs oběhnout** | Univerzální objekt, **rasová odpověď**: trpaslík prolomí, elf oběhne/přeskočí. | uživatel 20.08. |
-| C8 | **Klec má DVA cíle naráz** | Dojít co nejdál k TD **a** chránit nosiče. Neplníme ani jeden. | uživatel 20.08. |
+| **C1** | **Blitz na souseda jako UVOLNĚNÍ.** Srazím souseda ⇒ zmizí tacklezóna ⇒ zbytkem pohybu odejdu **bez dodge**. Hodnota není v ráně, ale ve zbytku tahu. *(ř. 552-553)* | kolik blitzů skončí **stáním na místě**, ač měl hráč pohyb i volné pole | podíl blitzů, po kterých hráč **odešel a byl jinde užitečný** |
+| **C2** | **Tři možnosti vstávání.** zůstat vedle *(blok zdarma, neomezený)* · odejít *(blitz 1×)* · zůstat ležet *(faul 1×)*. ⚠️ Vedle nosiče je zůstání **cena za něco**. | ✅ **měří se dnes** — `Q3/ODPOVED`: 23,9 % ran blitzem, zbytek blok zdarma | delta ramene Q3 *(noc 02.09.)* |
+| **C3** | **Rozpočet blitzu.** Jediná akce s limitem 1/kolo — kdy si ho **schovat**? | na jak **hodnotný cíl** blitz padne; kolikrát zůstane neutracen *(dnes 25,1 %)* | zda se blitz drží do okamžiku, kdy je nejdražší pro soupeře |
+| **C4** | **Nosiči zavazí VLASTNÍ hráči** *(149/149)*. ⇒ napřed uhnout, pak jít. | kolikrát je pole před nosičem obsazené **naším** tělem | zda pořadí aktivací tu překážku odstraní dřív |
+| **C5** | **Nosič si nechává pohyb v záloze** — má smysl jen dokud soupeř nedosáhne blitzem *(`MA + GFI`)*. | kolik kol nosič šetří pohyb, ačkoli je **v dosahu blitzu** | zda se rezerva drží jen tam, kde něco koupí |
+| **C6** | **Obrana: dva sloupce → skok do L**, přechod řídí **převaha**. Engine fáze nemá. | ⛔ **NIC** — fáze v enginu neexistuje, každé číslo by bylo N/A | podíl kol strávených ve správné fázi |
+| **C7** | **Zeď: prolomit vs oběhnout** — univerzální objekt, **rasová odpověď**. | kolikrát se u zdi zvolí průchod přes tacklezónu vs obchůzka | zda volba odpovídá rase a situaci |
+| **C8** | **Klec má DVA cíle naráz** — dojít k TD **a** chránit nosiče. | ✅ máme: tempo drivu, `cageSnapshot` rohy | zda se cíle váží proti sobě, ne střídají |
 
----
+⛔ **C6 je příklad, proč ten prostřední sloupec existuje:** je to reálná situace,
+ale **dnes se na ní nedá změřit vůbec nic**, protože fázový model chybí. Kdyby
+sloupec nebyl, někdo by to zkusil měřit a dostal by nulu, kterou by četl jako
+nález.
 
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
