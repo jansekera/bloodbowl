@@ -13,7 +13,9 @@ namespace bb {
 #define BB_REP_BRANCHES 14
 // Rozpad vydanych cilu po vetvich: 5 cisel na vetev
 //   [0] celkem  [1] obsazeno nasim  [2] obsazeno souperem  [3] volne v souperove TZ  [4] vlastni pole
-void takeRepositionTargets(long* out5xN);
+// [0] celkem [1] nase [2] souper [3] volne v souperove TZ [4] vlastni pole
+// [5] nedosahne v TOMHLE kole [6] ani s GFI [7] NEDOSAHNE ANI DO KONCE PULE
+void takeRepositionTargets(long* out8xN);
 
 // ⭐ Q19: kolikrat se BLITZ_AND_SCORE nabidlo -- V HLEDANI, ne ve hre.
 long takeBlitzAndScoreOffersInSearch();

@@ -101,7 +101,7 @@ static long g_declAdj = 0, g_declFar = 0;
 static long g_mw[5] = {0,0,0,0,0};
 static long g_mp[4] = {0,0,0,0};
 // ⭐⭐ W-CIL 02.09.: rozpad vydanych REPOSITION cilu po vetvich (5 cisel na vetev)
-static long g_rep[BB_REP_BRANCHES*5] = {0};
+static long g_rep[BB_REP_BRANCHES*8] = {0};
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -590,8 +590,8 @@ int main(int argc, char** argv) {
                 { long b3[3]; bb::takeBlitzAndScoreReal(b3); for (int q=0;q<3;++q) g_bas[q]+=b3[q]; }
                 g_basOff += bb::takeBlitzAndScoreOffersInSearch();
                 { long md[5]; bb::takeMoveWalkLimitDist(md); for (int q=0;q<5;++q) g_mld[q]+=md[q]; }
-                { long rp[BB_REP_BRANCHES*5]; bb::takeRepositionTargets(rp);
-                  for (int q=0;q<BB_REP_BRANCHES*5;++q) g_rep[q]+=rp[q]; }
+                { long rp[BB_REP_BRANCHES*8]; bb::takeRepositionTargets(rp);
+                  for (int q=0;q<BB_REP_BRANCHES*8;++q) g_rep[q]+=rp[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
@@ -806,11 +806,24 @@ int main(int argc, char** argv) {
                    g_bas[2], g_bas[1] ? 100.0*g_bas[2]/g_bas[1] : 0.0);
             printf("  W-CIL/CILE: vydano celkem %ld\n", tot);
                 for (int b=0;b<BB_REP_BRANCHES;++b) {
-                    long t=g_rep[b*5+0]; if (!t) continue;
-                    printf("    %-28s celkem %7ld | nase %6ld (%4.1f %%) | souper %5ld (%4.1f %%) | volne v TZ %5ld (%4.1f %%) | vlastni pole %6ld\n",
-                        BN[b], t, g_rep[b*5+1], 100.0*g_rep[b*5+1]/t,
-                        g_rep[b*5+2], 100.0*g_rep[b*5+2]/t,
-                        g_rep[b*5+3], 100.0*g_rep[b*5+3]/t, g_rep[b*5+4]);
+                    long t=g_rep[b*8+0]; if (!t) continue;
+                    printf("    %-28s celkem %7ld | nase %6ld (%4.1f %%) | souper %5ld (%4.1f %%) | volne v TZ %6ld (%4.1f %%) | vlastni pole %6ld\n",
+                        BN[b], t, g_rep[b*8+1], 100.0*g_rep[b*8+1]/t,
+                        g_rep[b*8+2], 100.0*g_rep[b*8+2]/t,
+                        g_rep[b*8+3], 100.0*g_rep[b*8+3]/t, g_rep[b*8+4]);
+                }
+                // W-DOSAH: kolik cilu je MIMO DOSAH uz pri vydani, po vetvich
+                long fTot=0, fgTot=0;
+                for (int b=0;b<BB_REP_BRANCHES;++b) { fTot+=g_rep[b*8+5]; fgTot+=g_rep[b*8+6]; }
+                long nvTot=0; for (int b=0;b<BB_REP_BRANCHES;++b) nvTot+=g_rep[b*8+7];
+                printf("  W-DOSAH/NABIDKA: nedojde v TOMHLE kole %ld z %ld (%.1f %%) | ani s GFI %ld (%.1f %%) | ⛔ NIKDY do konce pule %ld (%.1f %%)\n",
+                       fTot, tot, tot?100.0*fTot/tot:0.0, fgTot, tot?100.0*fgTot/tot:0.0,
+                       nvTot, tot?100.0*nvTot/tot:0.0);
+                for (int b=0;b<BB_REP_BRANCHES;++b) {
+                    long t=g_rep[b*8+0], f=g_rep[b*8+5]; if (!t || !f) continue;
+                    printf("    %-28s mimo dosah %7ld / %7ld (%5.1f %%) | i s GFI %7ld (%5.1f %%) | NIKDY (ani do konce pule) %7ld (%5.1f %%)\n",
+                        BN[b], f, t, 100.0*f/t, g_rep[b*8+6], 100.0*g_rep[b*8+6]/t,
+                        g_rep[b*8+7], 100.0*g_rep[b*8+7]/t);
                 }
             }
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",

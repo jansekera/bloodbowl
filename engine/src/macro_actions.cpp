@@ -58,6 +58,18 @@ thread_local long g_repOwn[BB_REP_BRANCHES]  = {0};   // obsazeno NASIM telem
 thread_local long g_repOpp[BB_REP_BRANCHES]  = {0};   // obsazeno SOUPEREM
 thread_local long g_repTz[BB_REP_BRANCHES]   = {0};   // volne, ale v souperove TZ
 thread_local long g_repSelf[BB_REP_BRANCHES] = {0};   // cil == vlastni pole
+// W-DOSAH (02.09.): meri se na strane NABIDKY, ne chuze -- tady vim, KTERA
+//   vetev cil vydala, a merim primo pricinu misto nasledku.
+//   Uzivatel: „kdyz ma roh MA 4 nebo 5, tak spocitas hned, jestli dojde pres
+//   hriste." Presne to se tu pocita: vzdalenost cile proti rozpoctu hrace.
+thread_local long g_repFar[BB_REP_BRANCHES]  = {0};   // dal nez movementRemaining
+thread_local long g_repFarG[BB_REP_BRANCHES] = {0};   // dal i s GFI (uplne mimo)
+thread_local long g_repMissSum[BB_REP_BRANCHES] = {0};// suma chybejicich poli (jen far)
+// ⭐⭐ Uzivatel 02.09.: „mimo dosah mas pocitat proti vzdalenosti do cile a MA
+//   s GFI na kazde kolo a pocet zbyvajicich kol." Mel pravdu -- „nedojdu TED"
+//   neni vada: GFI se obnovuje kazde kolo, takze hrac dojde priste. Vada je
+//   az cil, na ktery se neda dojit ANI DO KONCE PULE.
+thread_local long g_repNever[BB_REP_BRANCHES] = {0};
 
 thread_local bool g_leapWalk[2] = {false, false};
 thread_local long g_leapWalkPicks = 0;
@@ -1946,6 +1958,22 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         //   ⛔ Nezavisle na logovani i na jakemkoli rameni (princip T5.34).
         if (repBranch >= 0 && repBranch < BB_REP_BRANCHES) {
             ++g_repTot[repBranch];
+            // W-DOSAH: dosahne na ten cil vubec v TOMHLE kole?
+            if (target != p.position) {
+                const int need = p.position.distanceTo(target);
+                const int budget = p.movementRemaining;
+                const int gfi = p.rooted ? 0 : maxGfiSquares(p);
+                if (need > budget) {
+                    ++g_repFar[repBranch];
+                    g_repMissSum[repBranch] += (need - budget);
+                    if (need > budget + gfi) ++g_repFarG[repBranch];
+                    // Rozpocet do konce pule: tohle kolo zbytek pohybu + GFI,
+                    // kazde dalsi kolo plne MA + GFI znovu.
+                    const long lifetime = (long)budget + gfi
+                        + (long)turnsLeft * ((long)p.stats.movement + gfi);
+                    if ((long)need > lifetime) ++g_repNever[repBranch];
+                }
+            }
             if (target == p.position) {
                 ++g_repSelf[repBranch];
             } else {
@@ -2058,12 +2086,15 @@ void takeMoveWalkLimitDist(long* out5) {
     for (int q = 0; q < 5; ++q) { out5[q] = g_mwLimitDist[q]; g_mwLimitDist[q] = 0; }
 }
 
-void takeRepositionTargets(long* out5xN) {
+void takeRepositionTargets(long* out8xN) {
     for (int b = 0; b < BB_REP_BRANCHES; ++b) {
-        out5xN[b*5+0]=g_repTot[b];  out5xN[b*5+1]=g_repOwn[b];
-        out5xN[b*5+2]=g_repOpp[b];  out5xN[b*5+3]=g_repTz[b];
-        out5xN[b*5+4]=g_repSelf[b];
+        out8xN[b*8+0]=g_repTot[b];  out8xN[b*8+1]=g_repOwn[b];
+        out8xN[b*8+2]=g_repOpp[b];  out8xN[b*8+3]=g_repTz[b];
+        out8xN[b*8+4]=g_repSelf[b];
+        out8xN[b*8+5]=g_repFar[b];  out8xN[b*8+6]=g_repFarG[b];
+        out8xN[b*8+7]=g_repNever[b];
         g_repTot[b]=g_repOwn[b]=g_repOpp[b]=g_repTz[b]=g_repSelf[b]=0;
+        g_repFar[b]=g_repFarG[b]=g_repMissSum[b]=g_repNever[b]=0;
     }
 }
 
