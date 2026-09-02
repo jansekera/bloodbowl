@@ -1440,7 +1440,53 @@ případů ⇒ hráč se vždycky aspoň jednou pohnul ⇒ expanze **není práz
 přišel o kolo". *(Nebezpečná je jiná, vzácná cesta: `nenasel 870`, kde selže
 PRVNÍ krok ⇒ prázdná expanze ⇒ END_TURN — viz `W7-W9` v auditu celotahu.)*
 
-⛔ ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
+⛔ ### ⭐⭐⭐ W-GFI — ENGINE HÁZÍ, AŽ KDYŽ MÁ CO ZTRATIT *(uživatel 02.09., doloženo v kódu)*
+
+Uživatel 02.09.: *„když nebudeme házet kostkou, nedáme TD a nikdy nevyhrajeme
+— to je tu stále — můžeš to vyčíst z kódu snad."* ⇒ **Dá. A je to soustavné.**
+A dodal konkrétně: *„na pickup musíme hodit — ať s trpaslíky dojdeme, musíme
+hodit blitz a GFI třeba."*
+
+| místo | co tam doslova stojí |
+|---|---|
+| `macro_actions.cpp:2743` | REPOSITION: **„Deliberately NO +2 GFI headroom"** |
+| `cage_advance.cpp:440` | **„Deliberately dice-free and carrier-free: no GFI"** |
+| `cage_advance.cpp:618` | *„walked at **MAX dice-free pace**"* |
+| `cage_advance.cpp:627` | grind: *„**max dice-free step, no GFI**"* |
+| `cage_advance.cpp:678` | *„walk down to **any feasible dice-free step**"* |
+| ⚖️ `expandPickup` | GFI **povoleno** — tam je míč ve hře |
+
+⇒ **Pravidlo, které z toho vychází: engine hází, až když už drží míč, a nehází
+proto, aby se k němu dostal.** To je přesně obrácené než uživatelova doktrína
+[[project_bloodbowl_doing_nothing_never_wins]].
+
+⭐⭐ **ODŮVODNĚNÍ V KÓDU SI PROTIŘEČÍ SAMO SE SEBOU.** Zdůvodnění zní: *„neúspěšný
+GFI u volně se přesouvajícího hráče je **čistá ztráta**, když není ve hře míč."*
+⛔ „Čistá ztráta" platí **jen když nedojít je zadarmo**. A tentýž komentář má
+o dva řádky níž výjimku: *„…jen pro nosiče v tempové nouzi, **kde nedojití
+stejně ztrácí drive**."* ⇒ **Kód VÍ, že nedojití má cenu — přiznává ji jedinému
+hráči v jediné situaci a všem ostatním počítá nulu.**
+
+⭐ **ZMĚŘENO 02.09.** *(sonda, mode 14, dw-dw)*:
+```
+CHUZE/VZDANI:  nenasel 750 | smycka 77 660 | LIMIT 181 152
+```
+⇒ **70 % všech vzdání je „došel mi pohyb"** — a právě těm tahům je GFI zakázané.
+Trpaslík s **MA 5** má na screen slot dojít o dvě pole, která si **vzít nesmí**.
+
+⚠️ **A dvě vrstvy si neodpovídají:** `pathfinder.cpp:54` a `:260` počítají rozpočet
+**včetně `maxGfiSquares`**, ale `expandReposition` chodí **bez GFI**. Hledání cesty
+tedy s GFI počítá a provedení ho odmítne zaplatit. *(Týž tvar jako `P37b`: nabídka
+slíbí rezervu, kterou chůze nemá.)*
+
+⏰ **CO SE MÁ ZMĚŘIT, NEŽ SE COKOLI ZMĚNÍ** — ⛔ neopravovat naslepo:
+**(1)** z těch 181 152 „limit" vzdání: **kolika by stačil 1 nebo 2 kroky navíc?**
+To je horní odhad zisku a **dnes ho neznáme**.
+**(2)** proti tomu cena: GFI je **2+ na D6**, tedy **1/6 pád na zem**. U volného
+hráče to není turnover, ale je to tělo na zemi na začátku soupeřova kola.
+⇒ Teprve poměr těch dvou čísel řekne, jestli je to rameno na noc, nebo vada.
+
+### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
 opravě větve 6.
