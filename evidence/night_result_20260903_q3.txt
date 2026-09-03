@@ -1,0 +1,46 @@
+NOC Q3 — 02.→03.09.2026 — ZAMÍTNUTO, RAMENO SE NENASADÍ
+========================================================
+mode 14 · dw-dw · 2 400 párů · 48 kusů · commit a8f83ff1
+48/48 kusů, 0 selhalých. Předregistrace: evidence/night_prereg_20260902_q3.preds
+
+ČTENÍ V ZÁVAZNÉM POŘADÍ
+  (1) leak (MOVED WITHOUT THE ARM ACTING)   0            ✅ delta se smí číst
+  (2) arm acted                             2400/2400    ✅ 100 %
+      ARM PICKS TOTAL                       9 904 769    (2 063/hru)
+  (3) n_nonzero                             1319/2400    55,0 %
+  (4) DELTA sloučeně                        -0,0933 ± 0,0086 SE   (-10,86 σ)
+      jednostranně                          -0,0467 ± 0,0043 SE
+      45/48 shardů záporných, empirická SE 0,0089 vs sdružená 0,0086
+      ⇒ bez overdisperze, sloučení legitimní
+  PRÁH ±0,015  ⇒  **ŠKODÍ**
+
+  Všech 5 předregistrovaných předpovědí TREFENO ⇒ aparát fungoval,
+  výsledek je platný a není to nedopatření.
+
+REGISTROVANÁ RUČNÍ ČTENÍ (48/48 shardů)
+  Q3/VSTAVANI  nabídnuto 22 923 932 (drahých 80,7 %) | provedeno 21 894 833 (drahých 81,5 %)
+  Q3/UTEK      nabídnut 9 904 769 | NEBYLO KAM 494 = 0,0 %
+  Q3/ODPOVED   ran na vstalé 7 466 603 | BLITZEM 23,5 % | SRAŽENO 50,1 %
+
+⭐⭐ PROČ TO ŠKODÍ — VYMĚNILO 50% RIZIKO ZA 100% ZTRÁTU
+  Rameno oceňovalo vstávání vedle soupeře „nejhorší odpovědí" a raději
+  nechávalo hráče ležet nebo ustupovat.
+  ⇒ Jenže když vstalý schytá ránu, jde k zemi jen v 50,1 % (Q3/ODPOVED).
+    Zůstat ležet naproti tomu stojí CELOU aktivaci JISTĚ: ležící nedrží
+    tacklezónu, neblokuje, neasistuje, je terč faulu zadarmo a i po M13
+    platí za akci 3 pole pohybu.
+  ⇒ Vyměnilo POLOVIČNÍ pravděpodobnost pádu za JISTOTU neužitečnosti.
+
+⭐ DOKTRÍNA SE TÍM NEVYVRACÍ, UPŘESŇUJE SE
+  „Oceňuj nejhorší odpovědí soupeře" platí — ale nejhorší odpověď se musí
+  VYNÁSOBIT PRAVDĚPODOBNOSTÍ. Tady je to 0,5, a ocenili jsme ji jako jistotu.
+  (Souvisí: worst_case_valuation — vzácnost zdroje tam je, pravděpodobnost ne.)
+
+⚠️ ÚNIK NEBYL ZABLOKOVANÝ
+  Q3/UTEK „nebylo kam" = 0,0 % ⇒ rameno mělo kam ustoupit prakticky vždy.
+  Nesplnilo se to špatně — byl špatný ZÁMĚR.
+
+⚠️ OMEZENÍ MĚŘIDLA, PŘIZNANÉ
+  Řádky Q3/VSTAVANI se sčítají PŘES OBĚ RAMENA dohromady, takže z poměru
+  80,7 % nabídnuto / 81,5 % provedeno NELZE číst účinek ramene — je to
+  průměr obou stran. Kdyby se to mělo číst, musí být čítač per-rameno.
