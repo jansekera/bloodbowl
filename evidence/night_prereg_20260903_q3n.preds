@@ -70,3 +70,5 @@ delta_1s in -0.02 0.04
 #
 # ZADANI: --mode 16 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48 --workers 4
 # Spousteni: ./launch_q3n_night.sh
+
+#   Q3/ODEBRANO-ZUSTAT  MUSI byt 0 -- dukaz, ze Q3-N nedela nic navic

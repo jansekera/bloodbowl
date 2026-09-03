@@ -27,7 +27,7 @@ set -u
 cd /home/jenda/claude/blood-bowl
 # ⭐ Registrovana rucni cteni teto noci. Q3-N pridava utek, takze se musi
 #   tisknout i CENA (kolik stoji), PRICINA (ktera kostka) a obe pojistky.
-EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI,Q3/CENA,Q3/CENA-PRICINA,Q3/ZED,Q3/PRILIS-RIZIKOVE"
+EXPECT="Q3/UTEK,Q3/ODPOVED,Q3/VSTAVANI,Q3/CENA,Q3/CENA-PRICINA,Q3/ZED,Q3/PRILIS-RIZIKOVE,Q3/ODEBRANO-ZUSTAT"
 
 echo "=== (1) PREFLIGHT — tisknou se vsechna registrovana cteni? ==="
 python3 colab_night_preflight.py --mode 16 --matchups "2:dw-dw:1" \
