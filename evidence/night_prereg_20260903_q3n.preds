@@ -1,0 +1,72 @@
+# PREDREGISTRACE NOCI 03.->04.09.2026  —  Q3-N / mode 16
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Pomaha lezicimu u soupere NABIDNOUT UTEK -- tedy vstat a odejit z kontaktu?
+#
+# ⭐⭐⭐ PROC SE PTAME ZNOVU, KDYZ NOC 02.09. UZ ODPOVEDELA
+#   Nocni Q3 (mode 14) dala -0,0933 +- 0,0086 (-10,86 σ), 45/48 shardu zaporne.
+#   Rameno ale delalo DVE VECI NARAZ (uzivatel 03.09.: "Q3 porovnava hodne veci
+#   naraz - to je proti zasade jedna zmena a kontrola"):
+#     (N) PRIDALO utek do nabidky
+#     (O) ODEBRALO "vstat a zustat", kdyz ocenene skore vyslo horsi
+#   ⇒ Nevime, ktera pulka skodila. Dnes merime SAMOTNE (N).
+#
+# ⭐⭐⭐ CO SE MEZITIM OPRAVILO (a proc to neni tataz otazka)
+#   Vyhodnoceni noci naslo, ze skoda je VYSVETLITELNA, ne principialni:
+#     ⛔ utek koncil TURNOVEREM 42,83 % (zustat: 0,00 %, overeno testem
+#        StandUp.Under3MA_FailureIsNotTurnover) a 94,3-98,6 % z toho byl
+#        DODGE, ne GFI -- to vyvratilo odhad fable agenta.
+#     ⇒ (b) ocenovani ted kostky POCITA: pFail * zbyvajici aktivace >= 1
+#           => utek se vubec nenabidne
+#     ⇒ (c) ZED: telo si drzi misto, kdyz stoji v ceste hrozbe na nas mic
+#           nebo nosice (uzivatel 03.09.: "vstat a nechat se prastit je
+#           dulezite zachovat pro trpaslika ve stene")
+#   Kratky beh po opravach: turnover uteku 42,83 % -> 24,83 %.
+#
+# ⭐⭐ NA ROZDIL OD M13 TU VYSLEDEK ROZHODUJE.
+#   Q3 je TAKTIKA, ne pravidlo. Pri zaporne nebo nerozhodne delte se rameno
+#   NENASADI a zustane za vypinacem.
+#
+# ⭐ CO SE MERI: (N) SAMO. Rameno jen PRIDAVA moznost do nabidky.
+#   Nabidka "vstat a zustat" zustava vzdy. ⇒ Planovac muze utek IGNOROVAT.
+#   Racionalni planovac by tedy nemel byt HORSI nez bez ramene; zaporna delta
+#   by znamenala, ze si utek VYBIRA spatne -- coz je samo o sobe nalez, ale
+#   nalez o VYBERU, ne o nabidce.
+#
+# ⛔ CO SE DNES NEMERI: (O), tedy odebirani "zustat". To je mode 17 a prijde
+#   az po (N). T2.20 zakazuje retezit dve ramena v jedne noci.
+#
+# REGISTROVANA RUCNI CTENI (poradi leak -> arm acted -> n_nonzero -> delta)
+#   Q3/UTEK           kolikrat se utek nabidl a kolikrat nebylo kam
+#   Q3/ODPOVED        co na vstaleho dopadlo
+#   Q3/VSTAVANI       objem nabidek vstavani celkem
+#   Q3/CENA           turnover uteku PROTI turnoveru zustani
+#   Q3/CENA-PRICINA   ktera kostka ten turnover zpusobila (dodge/GFI/pickup)
+#   Q3/ZED            kolikrat pojistka (c) telo u zdi podrzela
+#   Q3/PRILIS-RIZIKOVE kolikrat ocenovani (b) utek zamitlo
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.9
+n_nonzero in 0.20 0.85
+delta in -0.03 0.06
+delta_1s in -0.02 0.04
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Rameno POUZE pridava moznost ⇒ ocekavam nulu az mirne kladno. Interval je
+#   uzsi nez u mode 14 (-0,10..0,10) prave proto, ze (O) uz nemuze skodit.
+#   ⛔ Kdyby vyslo pod -0,03, nalez NENI "utek je spatny", ale "vyber si ho
+#     bere, i kdyz nema" -- a dalsi krok je pak hledani ve VYBERU.
+#
+# DIMENZOVANI
+#   s ze ZMERENYCH noci (M13/dw-dw: SE 0,0084 pri 2 400 parech => s = 0,412).
+#   2 400 paru => SE ~ 0,0084. Pri prahu +-0,015 to staci i na EKVIVALENCI.
+#   ⚠️ Tempo se NEPREBIRA z 02.09. (61,9-67 min/chunk) -- mode 16 je JINY
+#     engine (b+c+rozdeleni ramene). Preflight ho meri na miste.
+#
+# ⚠️ CO Z NOCI NEPLATI: absolutni cisla. `.so` se 03.09. menilo. Plati JEN
+#   parova delta.
+#
+# ZADANI: --mode 16 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48 --workers 4
+# Spousteni: ./launch_q3n_night.sh

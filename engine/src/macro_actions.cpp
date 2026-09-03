@@ -277,6 +277,11 @@ thread_local long g_q3EscDodge = 0, g_q3EscGfi = 0;
 thread_local long g_q3EscTooRisky = 0;
 // Kolikrat pojistku zabrala ZED (telo drzi hrozbu, ktera mi ohrozuje mic/nosice).
 thread_local long g_q3StayWall = 0;
+// ⭐ 03.09.: rameno Q3-O ODEBIRA nabidku "zustat". `armChangedOffer` tikne
+//   jednou za hrace at rameno udela jednu vec nebo obe, takze se z nej
+//   NEDA precist, jak casto se odebiralo. Vlastni citac -- jinak by noc
+//   Q3-O merila zmenu, jejiz objem nezname.
+thread_local long g_q3StayRemoved = 0;
 thread_local long g_q3StayTried = 0, g_q3StayTurnover = 0;
 
 thread_local long g_standEscapeOffered = 0;
@@ -341,6 +346,39 @@ void setStandUpPricingArm(TeamSide side, bool on) {
     g_standPricing[side == TeamSide::HOME ? 0 : 1] = on;
 }
 
+// ⭐⭐⭐ Q3 KROK D (03.09.2026): RAMENO ROZDELENO NA DVE.
+//   Uzivatel 03.09.: „Q3 porovnava hodne veci naraz — to je proti zasade
+//   jedna zmena a kontrola." Mel pravdu a kod si to sam priznaval
+//   („rameno dela DVE veci"). Noc 02.->03.09. proto nemohla rict, ktera
+//   pulka zpusobila -0,0933.
+//
+//   Q3-N (`standUpEscapeArm`)  = jen PRIDA nabidku „vstat a odejit",
+//     vcetne ceny dodge a pojistky. Nabidka „zustat" se NIKDY neodebira.
+//   Q3-O (`standUpRemoveStayArm`) = teprve ODEBIRA „zustat", kdyz je utek
+//     levnejsi a nejde o zed. ⛔ Bez Q3-N nema smysl a sam se nezapina.
+//
+//   ⇒ Dve noci misto jedne, ale prvni z nich konecne rekne neco, co jde
+//     priradit. Puvodni `standUpPricingArm` zustava jako „obe naraz",
+//     aby sla vcerejsi noc reprodukovat.
+thread_local bool g_standUpEscapeArm[2] = {false, false};
+thread_local bool g_standUpRemoveStayArm[2] = {false, false};
+
+void setStandUpEscapeArm(TeamSide side, bool on) {
+    g_standUpEscapeArm[static_cast<int>(side)] = on;
+}
+bool standUpEscapeArm(TeamSide side) {
+    // Q3-N je zapnute i tehdy, kdyz bezi stare slepene rameno.
+    return g_standUpEscapeArm[static_cast<int>(side)] || standUpPricingArm(side);
+}
+void setStandUpRemoveStayArm(TeamSide side, bool on) {
+    g_standUpRemoveStayArm[static_cast<int>(side)] = on;
+}
+bool standUpRemoveStayArm(TeamSide side) {
+    // ⛔ Odebirani „zustat" bez nabidnuteho uteku by hrace jen uveznilo.
+    return standUpEscapeArm(side)
+        && (g_standUpRemoveStayArm[static_cast<int>(side)] || standUpPricingArm(side));
+}
+
 bool standUpPricingArm(TeamSide side) {
     return g_standPricing[side == TeamSide::HOME ? 0 : 1];
 }
@@ -362,14 +400,16 @@ long takeStandOfferedNextToHitterInSearch() {
 }
 
 // ⭐ Q3: [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
-void takeQ3StandUpCost(long* out8) {
-    out8[0]=g_q3EscTried;  out8[1]=g_q3EscTurnover;
-    out8[2]=g_q3StayTried; out8[3]=g_q3StayTurnover;
-    out8[4]=g_q3EscDodge;  out8[5]=g_q3EscGfi;
-    out8[6]=g_q3EscTooRisky;
-    out8[7]=g_q3StayWall;
+void takeQ3StandUpCost(long* out9) {
+    out9[0]=g_q3EscTried;  out9[1]=g_q3EscTurnover;
+    out9[2]=g_q3StayTried; out9[3]=g_q3StayTurnover;
+    out9[4]=g_q3EscDodge;  out9[5]=g_q3EscGfi;
+    out9[6]=g_q3EscTooRisky;
+    out9[7]=g_q3StayWall;
+    out9[8]=g_q3StayRemoved;
     g_q3EscTried=g_q3EscTurnover=g_q3StayTried=g_q3StayTurnover=0;
     g_q3EscDodge=g_q3EscGfi=g_q3EscTooRisky=g_q3StayWall=0;
+    g_q3StayRemoved=0;
 }
 
 long takeStandEscapeOfferedInSearch() {
@@ -890,7 +930,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         // Q3: cela vetev "vstat a odejit" (krok A) i jeji ocenení (krok B) sedi
         // pod JEDNIM vypinacem. Nabidnout utek bez ocenení je pulka zmeny --
         // planovac by dostal moznost navic, ale duvod, proc si ji vybrat, ne.
-        if (nextToEnemy && standUpPricingArm(mySide)) {
+        if (nextToEnemy && standUpEscapeArm(mySide)) {
             const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
             const bool priced = true;
             Position best{-1, -1};
@@ -1066,10 +1106,11 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         });
                     }
                 }
-                if (priced && !stayEarnsItsKeep &&
+                if (priced && standUpRemoveStayArm(mySide) && !stayEarnsItsKeep &&
                     worstReplyCost(state, p, p.position, true) > bestCost + 1e-9) {
                     offerStay = false;
                     armChangedOffer = true;
+                    ++g_q3StayRemoved;
                 }
             } else if (!q3TooRisky) {
                 ++g_standEscapeImpossible;

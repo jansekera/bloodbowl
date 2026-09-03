@@ -80,7 +80,40 @@
 
 using namespace bb;
 
-static constexpr uint32_t SEED_BASE = 34'000'000;  // disjoint from 30M/31M runs
+static constexpr uint32_t SEED_BASE = 34'000'000;
+
+// ⭐⭐⭐ 03.09.2026: JEDINY SEZNAM MODU SE SIGNALEM RAMENE.
+//   Tretí výskyt téže vady za tři dny: mode 16 mel rameno zapnute (Q3/UTEK
+//   nabidnut 204x), ale `armEvents` pro nej propadlo do `candPlans` = 0 =>
+//   leak test hlasil „MOVED WITHOUT THE ARM ACTING" NAD VLASTNIM RAMENEM
+//   a noc by se nesmela precist. Pritom vsechny ctyri clanky retezu
+//   (citac -> sber -> printf -> vystup) byly cele.
+//   ⇒ Vada neni v zadnem clanku, je v tom, ze pridani modu vyzaduje ZASAH
+//     NA DVOU MISTECH a druhe je tichy `else`. Proto se to tady kontroluje
+//     PRI STARTU: mod, ktery ma signal, MUSI mit i vlastni citac.
+static bool modeHasArmSignal(int mode) {
+    switch (mode) {
+        case 0: case 1: case 4: case 5: case 6: case 7:
+        case 9: case 10: case 12: case 14: case 15:
+        case 16: case 17:
+            return true;
+        default:
+            return false;   // mode 2 (bez ramene), 3 (policy blend - nic to
+                            // nepocita), 8 a 13 (zrusene)
+    }
+}
+// Mod ma cim „arm acted" naplnit: bud vlastni citac, nebo `candPlans`,
+// coz je smysluplne jen tam, kde rameno adoptuje PLAN (brana klece).
+static bool modeHasArmCounter(int mode) {
+    switch (mode) {
+        case 4: case 5: case 9: case 10: case 12: case 13:
+        case 14: case 15: case 16: case 17:   // vlastni citac
+        case 0: case 1: case 6: case 7:       // candPlans je tu ten citac
+            return true;
+        default:
+            return false;
+    }
+}  // disjoint from 30M/31M runs
 
 struct Matchup {
     const char* home;
@@ -91,7 +124,7 @@ static long g_advResigned = 0;
 static long g_advResignedSF = 0;
 static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
 static long g_standEsc = 0, g_standEscNo = 0;
-static long g_q3c[8] = {0,0,0,0,0,0,0,0};
+static long g_q3c[9] = {0,0,0,0,0,0,0,0,0};
 static long g_toc[3] = {0,0,0};     // priciny turnoveru pohybu: dodge / GFI / pickup   // Q3: utek zkusen / TURNOVER / zustat zkuseno / TURNOVER
 static long g_proneActs = 0, g_proneTO = 0, g_proneSF = 0, g_proneNB = 0;
 static long g_proneBl = 0, g_standActs = 0, g_standTO = 0;
@@ -287,6 +320,8 @@ int main(int argc, char** argv) {
                       : (mode == 12) ? 191'000'000u
                       : (mode == 6) ? 103'000'000u
                       : (mode == 7) ? 127'000'000u
+                      : (mode == 16) ? 281'000'000u
+                      : (mode == 17) ? 293'000'000u
                       : (mode == 15) ? 269'000'000u
                       : (mode == 13) ? 233'000'000u
                       : (mode == 14) ? 251'000'000u
@@ -303,6 +338,8 @@ int main(int argc, char** argv) {
          : mode == 12 ? "M12/(B): KLECOVE KRITERIUM samotne -- rameno PROTI PLACEBU"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
+         : mode == 16 ? "Q3-N: jen PRIDA nabidku vstat-a-odejit (s cenou dodge a pojistkou)"
+         : mode == 17 ? "Q3-O: nad Q3-N teprve ODEBERE nabidku vstat-a-zustat"
          : mode == 15 ? "M14b: blitzova chuze uhyba tacklezonam i GFI"
          : mode == 13 ? "(mode 13 ZRUSEN 02.09. -- M13 nasazeno do produkce)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
@@ -311,6 +348,19 @@ int main(int argc, char** argv) {
          : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
          : mode == 11 ? "B2: cena bloku proti obranci, ktery WRESTLE POUZIJE"
                      : "cage vs off");
+
+    // ⭐⭐⭐ POJISTKA PRI STARTU (03.09.2026). Spadne TEDY, ne az u cteni noci.
+    //   Kdyz ma mod rameno, ale zadny citac, leak test bude kricet na vlastni
+    //   rameno a 16 hodin stroje se zahodi. Radeji nespustit.
+    if (modeHasArmSignal(mode) && !modeHasArmCounter(mode)) {
+        fprintf(stderr,
+                "FATAL: mode %d ma signal ramene, ale zadny citac `armEvents`.\n"
+                "  => leak test by hlasil MOVED WITHOUT THE ARM ACTING nad\n"
+                "     vlastnim ramenem a beh by se nesmel precist.\n"
+                "  Doplnit vetev v `pr.armEvents += ...` a v `modeHasArmCounter`.\n",
+                mode);
+        return 2;
+    }
 
     auto vf = loadValueFunction(root + "/weights_best.json");
     auto pol = loadPolicyNetworkFromFile(root + "/weights_policy.json");
@@ -334,7 +384,7 @@ int main(int argc, char** argv) {
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 15 ? "diag_blitzpath_rows.jsonl"
                          : mode == 13 ? "diag_proneaction_rows.jsonl"
-                         : mode == 14 ? "diag_standpricing_rows.jsonl"
+                         : (mode == 14 || mode == 16 || mode == 17) ? "diag_standpricing_rows.jsonl"
                          : mode == 7 ? "diag_placebo_rows.jsonl"
                          : mode == 12 ? "diag_cagecrit_rows.jsonl"
                          : mode == 6 ? "diag_cageadvance_rows.jsonl"
@@ -500,6 +550,11 @@ int main(int argc, char** argv) {
                 // "vstat a zustat".
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, mode == 14 && candHome);
                 bb::setStandUpPricingArm(bb::TeamSide::AWAY, mode == 14 && !candHome);
+                // ⭐ Q3 rozdeleno (03.09.): 16 = jen pridat utek, 17 = pridat i odebrat
+                bb::setStandUpEscapeArm(bb::TeamSide::HOME, (mode == 16 || mode == 17) && candHome);
+                bb::setStandUpEscapeArm(bb::TeamSide::AWAY, (mode == 16 || mode == 17) && !candHome);
+                bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, mode == 17 && candHome);
+                bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, mode == 17 && !candHome);
                 bb::takeStandUpPricingRepicksInSearch();
                 // ⛔ mode 8 (P35) ZRUSEN 01.09.2026 -- rameno nasazeno do
                 //   produkce po noci 31.08. (neskodi), takze uz neni co
@@ -584,7 +639,7 @@ int main(int argc, char** argv) {
                 { long mp[4]; bb::takeMoveWalkProfile(mp); for (int q=0;q<4;++q) g_mp[q]+=mp[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
-                { long q[8]; bb::takeQ3StandUpCost(q); for (int z=0;z<8;++z) g_q3c[z]+=q[z]; }
+                { long q[9]; bb::takeQ3StandUpCost(q); for (int z=0;z<9;++z) g_q3c[z]+=q[z]; }
                 { long tc[3]; bb::takeMoveTurnoverCause(tc); for (int z=0;z<3;++z) g_toc[z]+=tc[z]; }
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
                 g_hitStood   += bb::takeHitOnStoodUpInSearch();
@@ -598,6 +653,10 @@ int main(int argc, char** argv) {
                 bb::setBlitzPathArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
                 bb::setStandUpPricingArm(bb::TeamSide::AWAY, false);
+                bb::setStandUpEscapeArm(bb::TeamSide::HOME, false);
+                bb::setStandUpEscapeArm(bb::TeamSide::AWAY, false);
+                bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, false);
+                bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);
@@ -629,7 +688,7 @@ int main(int argc, char** argv) {
                               : (mode == 5) ? candPush
                               : (mode == 15) ? candPath
                               : (mode == 13) ? candProne
-                              : (mode == 14) ? candPrice
+                              : (mode == 14 || mode == 16 || mode == 17) ? candPrice
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
                               : (mode == 12) ? candCrit
@@ -733,10 +792,7 @@ int main(int argc, char** argv) {
         // zapomnělo dopsat, noc by se odmítla spustit (preflight sonda hledá
         // řádek „MOVED WITHOUT THE ARM ACTING") -- což je správné chování,
         // ale opravuje se to TADY, ne obcházením sondy.
-        const bool armSignalAvailable =
-            (mode == 0 || mode == 1 || mode == 4 || mode == 5 || mode == 6 ||
-             mode == 7 || mode == 9 || mode == 10 || mode == 12 ||
-             mode == 14 || mode == 15);
+        const bool armSignalAvailable = modeHasArmSignal(mode);
         if (armSignalAvailable) {
             // ⭐ 20.08.: KOLIK picků, ne jen JESTLI. „arm acted in N/N pairs"
             // je binární, takže předregistrovaná kontrola typu „placebo musí
@@ -805,6 +861,9 @@ int main(int argc, char** argv) {
                    g_q3c[5], g_q3c[1] ? 100.0*g_q3c[5]/g_q3c[1] : 0.0,
                    g_q3c[1]-g_q3c[4]-g_q3c[5]);
             printf("  Q3/ZED: pojistka zabrala %ld x (telo drzi hrozbu na nas mic/nosice)\n", g_q3c[7]);
+            // ⭐ Jen mode 17 odebira; v mode 16 musi byt NULA. Kdyby nebyla,
+            //   rameno Q3-N dela vic, nez ma, a noc meri dve zmeny naraz.
+            printf("  Q3/ODEBRANO-ZUSTAT: %ld x (mode 16 MUSI byt 0)\n", g_q3c[8]);
             printf("  Q3/PRILIS-RIZIKOVE: utek nenabidnut %ld x (P_fail * zbyvajici aktivace >= 1)\n", g_q3c[6]);
             if (g_standEsc + g_standEscNo == 0) {
             printf("  Q3/UTEK: 0 — RAMENO VYPNUTE (meridlo visi na rameni, viz mode 14)\n");

@@ -215,6 +215,13 @@ void noteProneActionTaken();
 long takeProneActionPicksInSearch();
 void setStandUpPricingArm(TeamSide side, bool on);
 bool standUpPricingArm(TeamSide side);
+
+// ⭐ Q3 rozdeleno (03.09.): Q3-N jen PRIDA utek, Q3-O teprve ODEBERE „zustat".
+//   Q3-O bez Q3-N se nezapne. Stare `standUpPricingArm` = obe naraz.
+void setStandUpEscapeArm(TeamSide side, bool on);
+bool standUpEscapeArm(TeamSide side);
+void setStandUpRemoveStayArm(TeamSide side, bool on);
+bool standUpRemoveStayArm(TeamSide side);
 long takeStandUpPricingRepicksInSearch();
 long takeStandEscapeOfferedInSearch();
 
@@ -223,7 +230,7 @@ long takeStandEscapeOfferedInSearch();
 //   [4] z toho DODGE [5] z toho GFI — rozpad UVNITR uteku
 //   [6] utek NENABIDNUT, protoze P_fail*zbyvajici >= 1
 //   [7] pojistku zabrala ZED
-void takeQ3StandUpCost(long* out8);
+void takeQ3StandUpCost(long* out9);   // 9. slot: kolikrat rameno ODEBRALO "zustat" (Q3-O)
 long takeStandEscapeImpossibleInSearch();
 //   offeredNextToHitter -- z toho vedle souseda s Mighty Blow / Claw / Piling
 //                          On, kde ta rána zdarma je navíc DRAHÁ
