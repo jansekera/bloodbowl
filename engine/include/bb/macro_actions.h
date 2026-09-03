@@ -221,7 +221,8 @@ long takeStandEscapeOfferedInSearch();
 // ⭐ Q3 (03.09.): co stoji vstavani, OBE vetve.
 //   [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
 //   [4] z toho DODGE [5] z toho GFI — rozpad UVNITR uteku
-void takeQ3StandUpCost(long* out6);
+//   [6] utek NENABIDNUT, protoze P_fail*zbyvajici >= 1
+void takeQ3StandUpCost(long* out7);
 long takeStandEscapeImpossibleInSearch();
 //   offeredNextToHitter -- z toho vedle souseda s Mighty Blow / Claw / Piling
 //                          On, kde ta rána zdarma je navíc DRAHÁ

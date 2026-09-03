@@ -273,6 +273,8 @@ thread_local long g_q3EscTried = 0, g_q3EscTurnover = 0;
 //   Tady se citace ctou tesne pred chuzi a tesne po ni, takze rozdil patri
 //   vyhradne tomuhle jednomu makru.
 thread_local long g_q3EscDodge = 0, g_q3EscGfi = 0;
+// Kolikrat se utek NENABIDL, protoze by v prumeru stal vic nez jednu aktivaci.
+thread_local long g_q3EscTooRisky = 0;
 thread_local long g_q3StayTried = 0, g_q3StayTurnover = 0;
 
 thread_local long g_standEscapeOffered = 0;
@@ -358,12 +360,13 @@ long takeStandOfferedNextToHitterInSearch() {
 }
 
 // ⭐ Q3: [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
-void takeQ3StandUpCost(long* out6) {
-    out6[0]=g_q3EscTried;  out6[1]=g_q3EscTurnover;
-    out6[2]=g_q3StayTried; out6[3]=g_q3StayTurnover;
-    out6[4]=g_q3EscDodge;  out6[5]=g_q3EscGfi;
+void takeQ3StandUpCost(long* out7) {
+    out7[0]=g_q3EscTried;  out7[1]=g_q3EscTurnover;
+    out7[2]=g_q3StayTried; out7[3]=g_q3StayTurnover;
+    out7[4]=g_q3EscDodge;  out7[5]=g_q3EscGfi;
+    out7[6]=g_q3EscTooRisky;
     g_q3EscTried=g_q3EscTurnover=g_q3StayTried=g_q3StayTurnover=0;
-    g_q3EscDodge=g_q3EscGfi=0;
+    g_q3EscDodge=g_q3EscGfi=g_q3EscTooRisky=0;
 }
 
 long takeStandEscapeOfferedInSearch() {
@@ -888,6 +891,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             const int budget = movementAfterStandUp(p) + maxGfiSquares(p);
             const bool priced = true;
             Position best{-1, -1};
+            bool q3TooRisky = false;
             int bestSteps = 99;
             double bestCost = 1e9;
             for (int dx = -budget; dx <= budget; ++dx) {
@@ -916,7 +920,53 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     }
                 }
             }
+            // ⭐⭐⭐ Q3 KROK B2 (03.09.2026): CENA DODGE. Noc 02.->03.09. skoncila
+            //   -0,0933 a merenim se ukazalo PROC: utek konci TURNOVEREM ve
+            //   42,83 % (zustat v 0,00 %), a z tech turnoveru je 94,3 % DODGE.
+            //   `worstReplyCost` pritom ocenuje jen CILOVE pole -- cestu ven ne.
+            //
+            //   ⛔ Turnover se NEDA prevest do jednotek `worstReplyCost`
+            //     (pravdepodobnost srazeni x poskozeni JEDNOHO hrace), aniz by
+            //     se vymyslela „hodnota jedne aktivace". Proto se neprevadi:
+            //     pouzije se jako PODMINKA, ne jako scitanec.
+            //
+            //   ⭐ Obe strany se daji spocitat v AKTIVACICH:
+            //     ZUSTAT stoji NEJVYS JEDNU aktivaci -- hrac spadne a je na kole
+            //       mimo (a priste plati 3 pole za vstani). Mez z pravidel.
+            //     UTECT stoji P(dodge selze) x pocet spoluhracu, kteri jeste nesli
+            //       -- turnover ukonci kolo VSEM.
+            //   ⇒ Utek se smi vzit jen kdyz  P_fail * zbyvajici < 1.
+            //
+            //   ⭐ Reprodukuje to doktrinu S2.14 „bezpecne akce prvni, rizikove
+            //     posledni" (spec r. 173) — a to je duvod, proc: turnover na
+            //     zacatku kola stoji vsechny zbyvajici aktivace, na konci nic.
+            //   ⛔ Zadna ladici konstanta: P_fail z `calculateDodgeTarget`,
+            //     zbyvajici z `hasActed`, mez 1 z pravidel.
             if (best.x >= 0) {
+                const int dodgeTarget = calculateDodgeTarget(state, p, best, p.position);
+                // D6: uspech pri hodu >= target. Cil <=1 znamena jistotu,
+                // cil >=7 nemoznost -- oboji se orizne.
+                const int need = std::clamp(dodgeTarget, 1, 7);
+                const double pFail = (need - 1) / 6.0;
+
+                int remaining = 0;
+                state.forEachOnPitch(mySide, [&](const Player& mate) {
+                    if (mate.id != p.id && !mate.hasActed && mate.canAct()) ++remaining;
+                });
+
+                if (pFail * remaining >= 1.0) {
+                    // Utek by v prumeru stal vic nez jednu aktivaci ⇒ nenabizi se.
+                    ++g_q3EscTooRisky;
+                    q3TooRisky = true;
+                }
+            }
+            // ⛔⛔ 03.09.: PRVNI VERZE ZDE NASTAVILA best={-1,-1}, cimz spadla do
+            //   vetve „utek neexistuje" a zvedla `g_standEscapeImpossible`.
+            //   Radek Q3/UTEK pak hlasil „NEBYLO KAM 7136 = 96,7 % situaci bez
+            //   uniku" — a to je NEPRAVDA: uteky existovaly, jen byly prilis
+            //   rizikove. Dve ruzne veci ve stejnem citaci.
+            //   ⇒ Zamitnuti pro riziko se drzi ZVLAST (`q3TooRisky`).
+            if (best.x >= 0 && !q3TooRisky) {
                 ++g_standEscapeOffered;
                 // ⛔⛔ AUDIT 01.09.: SIGNAL BYL NEUPLNY. Citac tikal jen kdyz
                 //   rameno VZALO nabidku "zustat" -- jenze rameno dela DVE
@@ -963,7 +1013,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     offerStay = false;
                     armChangedOffer = true;
                 }
-            } else {
+            } else if (!q3TooRisky) {
                 ++g_standEscapeImpossible;
             }
         }
