@@ -44,3 +44,46 @@ REGISTROVANÁ RUČNÍ ČTENÍ (48/48 shardů)
   Řádky Q3/VSTAVANI se sčítají PŘES OBĚ RAMENA dohromady, takže z poměru
   80,7 % nabídnuto / 81,5 % provedeno NELZE číst účinek ramene — je to
   průměr obou stran. Kdyby se to mělo číst, musí být čítač per-rameno.
+
+================================================================
+⭐⭐⭐ PŘEHODNOCENO TÝŽ DEN (uživatel: „to Q3 se mi nelíbí, můžeme to přehodnotit?")
+================================================================
+⛔ MŮJ PRVNÍ ZÁVĚR BYL ŠPATNÝ. Napsal jsem, že se vyvrátila doktrína
+  „oceňuj nejhorší odpovědí soupeře". Nevyvrátila. Vyvrátila se
+  IMPLEMENTACE, která má DVĚ konkrétní, opravitelné vady.
+
+VADA 1 — ÚTĚK SE OCEŇUJE JEN Z POLOVINY (doloženo čtením kódu)
+  `worstReplyCost` počítá VÝHRADNĚ odpověď soupeře na CÍLOVÉM poli:
+  blok zdarma, blitz, faul. CESTU VEN nepočítá vůbec.
+  ⇒ Přitom `move_handler.cpp:104`: `needsDodge = countTacklezones(from) > 0`
+    — odchod z kontaktu VŽDY vyvolá DODGE. A rameno navíc plánuje s GFI
+    (`budget = movementAfterStandUp + maxGfiSquares`).
+  ⇒ Útěk může stát až TŘI HODY (dodge + 2× GFI) a každý neúspěch je
+    TURNOVER PRO CELÝ TÝM.
+
+  ⭐⭐ JÁDRO: rameno porovnávalo dvě rizika, která NEJSOU VE STEJNÝCH
+    JEDNOTKÁCH. Sražení stojí JEDNOHO hráče; neúspěšný dodge stojí
+    CELÉ KOLO VŠEM OSTATNÍM. `worstReplyCost` umí jen to první.
+
+VADA 2 — `stayEarnsItsKeep` NEZNÁ ZEĎ (uživatel 03.09.: „vstát a nechat
+  se praštit je důležité zachovat pro trpaslíka ve stěně")
+  Pojistka zná jen DVA případy, oba vázané na míč:
+     bc.teamSide != mySide && dToCarrier <= 1   -> značím jejich nosiče
+     bc.teamSide == mySide && dToCarrier <= 2   -> držím roh vlastní klece
+  ⛔ Tělo v OBRANNÉ ZDI, když je míč daleko, dostane stayEarnsItsKeep=false
+    ⇒ rameno mu zruší nabídku zůstat a pošle ho pryč ⇒ ROZPOUŠTÍ ZEĎ,
+    tedy jedinou strukturu, na které trpasličí obrana stojí.
+  ⚠️ V kódu je u té pojistky vlastní varování: „Bez této podmínky by
+    rameno rozpustilo právě ty pozice, kvůli kterým se tělo zvedá."
+    Vědělo se to — implementovaly se jen ty dva míčové případy.
+
+⛔⛔ CO SE NEMĚŘILO A MĚLO
+  Ani jeden ze 48 shardů nemá čítač „kolik útěků skončilo TURNOVEREM".
+  Ústřední riziko celého ramene se NEMĚŘILO. ⇒ Vysvětlení výše je
+  doložené kódem, ale NE daty. Bez toho čítače se Q3 měřit znovu NESMÍ.
+
+POŘADÍ OPRAV (dohodnuto s uživatelem 03.09.)
+  (a) čítač: útěků nabídnuto / vzato / z toho TURNOVER (dodge, GFI zvlášť)
+  (b) do ocenění doplnit DODGE a GFI
+  (c) do `stayEarnsItsKeep` doplnit ZEĎ (tělo v obranné linii bez ohledu na míč)
+  (d) teprve pak nová noc
