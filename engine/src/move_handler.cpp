@@ -6,6 +6,29 @@
 
 namespace bb {
 
+// ⭐⭐ Q3 (03.09.2026): PROC pohyb skoncil turnoverem.
+//   Kratky beh 03.09.: „vstat a odejit" konci turnoverem ve 42,83 %,
+//   „vstat a zustat" v 0,00 %. NEVI SE ale, ktera kostka to dela.
+//   Fable 03.09. tvrdi, ze u trpaslika hlavne GFI (Longbeard MA 4, vstani
+//   stoji 3 => zbyva JEDNO pole, takze utek skoro vzdy pretece do GFI).
+//   ⇒ Tohle to rozhodne MERENIM.
+//   ⛔ Meri se tady, ne v makru: `ActionResult` nese jen success/turnover,
+//     ne duvod. Jedine tady se prícina pozna.
+//   ⭐ Berou se VSECHNY TRI priciny z resolveMoveStep, aby jejich SOUCET
+//     musel sedet na celkovy pocet turnoveru — vestavena kontrola, ze
+//     zadna prícina neutekla. (Leap ma vlastni tri mista, Q3 se ho netyka.)
+thread_local long g_toDodge = 0, g_toGfi = 0, g_toPickup = 0;
+// Vraci prectene hodnoty zpatky — pouziva Q3, ktery cte rozpad UVNITR
+// jednoho makra a nesmi tim ochudit souhrnny radek.
+void addBackMoveTurnoverCause(const long* in3) {
+    g_toDodge += in3[0]; g_toGfi += in3[1]; g_toPickup += in3[2];
+}
+
+void takeMoveTurnoverCause(long* out3) {
+    out3[0] = g_toDodge; out3[1] = g_toGfi; out3[2] = g_toPickup;
+    g_toDodge = g_toGfi = g_toPickup = 0;
+}
+
 namespace {
 
 // Check Tentacles: adjacent enemies with Tentacles contest the move
@@ -158,6 +181,7 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
 
         if (!dodgeOk) {
             // Failed dodge: player falls at destination
+            ++g_toDodge;
             player.position = to;
             player.state = PlayerState::PRONE;
             player.hasActed = true;
@@ -182,6 +206,7 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
 
         if (!gfiOk) {
             // Failed GFI: player falls at destination
+            ++g_toGfi;
             player.position = to;
             player.state = PlayerState::PRONE;
             player.hasActed = true;
@@ -214,6 +239,7 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
         bool pickupOk = resolvePickup(state, playerId, dice, events);
         if (!pickupOk) {
             // Failed pickup — turnover
+            ++g_toPickup;
             player.hasActed = true;
             return ActionResult::turnovr();
         }

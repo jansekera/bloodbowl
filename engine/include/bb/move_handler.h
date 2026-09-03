@@ -20,4 +20,11 @@ long takeStoodUpNextToEnemyInSearch();
 ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice,
                             std::vector<GameEvent>* events);
 
+
+// ⭐ Q3 (03.09.): proc pohyb skoncil turnoverem — vsechny tri priciny
+//   z resolveMoveStep. [0] DODGE [1] GFI [2] PICKUP.
+//   Jejich soucet MUSI sedet na celkovy pocet turnoveru pohybu.
+void takeMoveTurnoverCause(long* out3);
+void addBackMoveTurnoverCause(const long* in3);
+
 } // namespace bb

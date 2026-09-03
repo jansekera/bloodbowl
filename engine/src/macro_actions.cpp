@@ -1,4 +1,5 @@
 #include "bb/macro_actions.h"
+#include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
 #include <algorithm>
@@ -252,6 +253,28 @@ thread_local long g_standOfferedNextToHitter = 0;
 // Q3 krok A (31.08.2026): druha moznost -- VSTAT A ODEJIT. Meri se ZVLAST,
 // kolikrat se nabidla a kolikrat NESLA (zadne pole bez tacklezony v dosahu),
 // protoze "moznost neexistuje" a "moznost se nevybrala" jsou RUZNE nalezy.
+// ⭐⭐ Q3 (03.09.2026): CO STOJI VSTAVANI. Noc 02.->03.09. skoncila -0,0933
+//   (-10,86 sigma). Pri prehodnoceni se ukazaly TRI vady, a zadnou z nich
+//   ta noc nemerila:
+//   (1) `worstReplyCost` ocenuje jen CILOVE pole -- dodge ani GFI ne, pritom
+//       odchod z kontaktu vzdy vyvola dodge (move_handler.cpp:104) a rameno
+//       planuje i s GFI => az tri hody, kazdy neuspech TURNOVER CELEMU TYMU.
+//   (2) `stayEarnsItsKeep` zna jen dva pripady, oba vazane na mic -- ZED v nem
+//       neni (uzivatel 03.09.: „vstat a nechat se prastit je dulezite zachovat
+//       pro trpaslika ve stene").
+//   (3) rameno dela DVE VECI NARAZ: prida moznost utect A odebere „zustat".
+//       ⇒ noc nemuze rict, ktera pulka skodila. Uzivatel 03.09.: „to je proti
+//         zasade jedna zmena a kontrola."
+//   ⭐ Meri se OBE VETVE, jinak je cislo neinterpretovatelne: „utek ma X %
+//     turnoveru" nic nerika bez „zustat ma Y %".
+thread_local long g_q3EscTried = 0, g_q3EscTurnover = 0;
+// ⭐ Rozpad turnoveru UVNITR uteku. Celkovy rozpad (POHYB/TURNOVER-PRICINA)
+//   je pres cely beh vcetne bezne chuze, takze se utekum PRIPSAT NESMI.
+//   Tady se citace ctou tesne pred chuzi a tesne po ni, takze rozdil patri
+//   vyhradne tomuhle jednomu makru.
+thread_local long g_q3EscDodge = 0, g_q3EscGfi = 0;
+thread_local long g_q3StayTried = 0, g_q3StayTurnover = 0;
+
 thread_local long g_standEscapeOffered = 0;
 thread_local long g_standEscapeImpossible = 0;
 
@@ -332,6 +355,15 @@ long takeStandOfferedNextToEnemyInSearch() {
 }
 long takeStandOfferedNextToHitterInSearch() {
     long v = g_standOfferedNextToHitter; g_standOfferedNextToHitter = 0; return v;
+}
+
+// ⭐ Q3: [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
+void takeQ3StandUpCost(long* out6) {
+    out6[0]=g_q3EscTried;  out6[1]=g_q3EscTurnover;
+    out6[2]=g_q3StayTried; out6[3]=g_q3StayTurnover;
+    out6[4]=g_q3EscDodge;  out6[5]=g_q3EscGfi;
+    g_q3EscTried=g_q3EscTurnover=g_q3StayTried=g_q3StayTurnover=0;
+    g_q3EscDodge=g_q3EscGfi=0;
 }
 
 long takeStandEscapeOfferedInSearch() {
@@ -2592,8 +2624,40 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     if (macro.targetPos == state.getPlayer(macro.playerId).position) {
         avoid = Position{-1, -1};
     }
+    // ⭐⭐ Q3 MERIDLO (03.09.): rozliseni se dela PRED chuzi -- potom uz hrac
+    //   lezici neni. „Vstat a zustat" ma cil == vlastni pole (viz vyse),
+    //   „vstat a odejit" cokoli jineho.
+    const Player& q3p = state.getPlayer(macro.playerId);
+    const bool q3WasProne = (q3p.state == PlayerState::PRONE);
+    const bool q3Leaving  = (macro.targetPos != q3p.position);
+    if (q3WasProne) { if (q3Leaving) ++g_q3EscTried; else ++g_q3StayTried; }
+
+    // ⛔⛔ 03.09.: PRVNI VERZE BYLA SPATNE. `takeMoveTurnoverCause` vraci
+    //   NAAKUMULOVANY soucet od posledniho cteni, ne prispevek tohohle makra.
+    //   Cetl jsem ho jen PO chuzi a cely soucet pripsal uteku => sectly se
+    //   turnovery z celeho behu, opakovane (DODGE 2 617 490 z 3 001 uteku).
+    //   Prozradil to sloupec „jine", ktery vysel ZAPORNY.
+    //   ⇒ Musi se cist PRED i PO a brat ROZDIL. Cteni hodnoty vraci zpatky,
+    //     aby souhrnny radek zustal netknuty.
+    long q3Before[3] = {0,0,0};
+    if (q3WasProne && q3Leaving) {
+        takeMoveTurnoverCause(q3Before);
+        addBackMoveTurnoverCause(q3Before);
+    }
+
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
                      maxSteps, avoid);
+
+    if (q3WasProne && result.turnover) {
+        if (q3Leaving) {
+            ++g_q3EscTurnover;
+            long q3After[3];
+            takeMoveTurnoverCause(q3After);
+            addBackMoveTurnoverCause(q3After);   // souhrnny radek zustava netknuty
+            g_q3EscDodge += (q3After[0] - q3Before[0]);
+            g_q3EscGfi   += (q3After[1] - q3Before[1]);
+        } else ++g_q3StayTurnover;
+    }
     return result;
 }
 

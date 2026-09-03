@@ -91,6 +91,8 @@ static long g_advResigned = 0;
 static long g_advResignedSF = 0;
 static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
 static long g_standEsc = 0, g_standEscNo = 0;
+static long g_q3c[6] = {0,0,0,0,0,0};
+static long g_toc[3] = {0,0,0};     // priciny turnoveru pohybu: dodge / GFI / pickup   // Q3: utek zkusen / TURNOVER / zustat zkuseno / TURNOVER
 static long g_proneActs = 0, g_proneTO = 0, g_proneSF = 0, g_proneNB = 0;
 static long g_proneBl = 0, g_standActs = 0, g_standTO = 0;
 static long g_standBl = 0, g_standNB = 0;
@@ -582,6 +584,8 @@ int main(int argc, char** argv) {
                 { long mp[4]; bb::takeMoveWalkProfile(mp); for (int q=0;q<4;++q) g_mp[q]+=mp[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
+                { long q[6]; bb::takeQ3StandUpCost(q); for (int z=0;z<6;++z) g_q3c[z]+=q[z]; }
+                { long tc[3]; bb::takeMoveTurnoverCause(tc); for (int z=0;z<3;++z) g_toc[z]+=tc[z]; }
                 g_standEscNo += bb::takeStandEscapeImpossibleInSearch();
                 g_hitStood   += bb::takeHitOnStoodUpInSearch();
                 g_hitStoodBl += bb::takeHitOnStoodUpByBlitzInSearch();
@@ -788,8 +792,20 @@ int main(int argc, char** argv) {
             //   ⇒ Spravne by meridlo na rameni viset nemelo (tyz princip jako
             //     `cageSnapshot`, T5.34), ale spocitat utekove pole v KAZDEM
             //     rolloutu i s vypnutym ramenem stoji cas. Zapsano do knihy.
+            // ⭐⭐ Q3/CENA musí být MIMO obě větve: 03.09. skončil uvnitř
+            //   větve „rameno vypnuté" a při zapnutém rameni se NEVYTISKL.
+            //   Zdroj i řetěz byly v pořádku — chyběl VÝSTUP.
+            printf("  POHYB/TURNOVER-PRICINA: dodge %ld | GFI %ld | pickup %ld | SOUCET %ld\n",
+                   g_toc[0], g_toc[1], g_toc[2], g_toc[0]+g_toc[1]+g_toc[2]);
+            printf("  Q3/CENA: UTEK zkusen %ld, z toho TURNOVER %ld (%.2f %%) | ZUSTAT zkuseno %ld, z toho TURNOVER %ld (%.2f %%)\n",
+                   g_q3c[0], g_q3c[1], g_q3c[0] ? 100.0*g_q3c[1]/g_q3c[0] : 0.0,
+                   g_q3c[2], g_q3c[3], g_q3c[2] ? 100.0*g_q3c[3]/g_q3c[2] : 0.0);
+            printf("  Q3/CENA-PRICINA: z %ld turnoveru uteku je DODGE %ld (%.1f %%) | GFI %ld (%.1f %%) | jine %ld\n",
+                   g_q3c[1], g_q3c[4], g_q3c[1] ? 100.0*g_q3c[4]/g_q3c[1] : 0.0,
+                   g_q3c[5], g_q3c[1] ? 100.0*g_q3c[5]/g_q3c[1] : 0.0,
+                   g_q3c[1]-g_q3c[4]-g_q3c[5]);
             if (g_standEsc + g_standEscNo == 0) {
-                printf("  Q3/UTEK: 0 — RAMENO VYPNUTE (meridlo visi na rameni, viz mode 14)\n");
+            printf("  Q3/UTEK: 0 — RAMENO VYPNUTE (meridlo visi na rameni, viz mode 14)\n");
             } else {
                 printf("  Q3/UTEK: nabidnut %ld, NEBYLO KAM %ld (%.1f %% situaci bez uniku)\n",
                        g_standEsc, g_standEscNo,
