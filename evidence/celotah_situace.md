@@ -229,6 +229,30 @@ ukázalo *(`T5.35a`, 27.08.)*, že se **nabízela tam, kde se dojít nedalo** �
 **nekontroluje vlastní předpoklady**; to je práce, kterou by plánovač dělal
 sám. Viz `Q19` ve frontě.
 
+## A6. ⭐⭐⭐ ZEĎ JE PŘEDMĚT CELOTAHU, NE JEDNÉ AKTIVACE *(uživatel 03.09.)*
+
+Uživatel 03.09.: *„zeď budeme umět až v celotahu — a i tam doufám."*
+
+**Proč:** zeď je **týmová struktura**. Jestli moje tělo drží zeď, závisí na tom,
+**kde stojí ostatní a kam se v tomhle kole pohnou**. Rozhodnutí o **jedné
+aktivaci** to vědět nemůže — neví, jestli mezeru zaplní spoluhráč, ani jestli
+se zeď zrovna staví, nebo rozpouští.
+
+⚠️ **Co je v enginu od 03.09.: POJISTKA, ne zeď.** `stayEarnsItsKeep` byla
+rozšířena tak, že tělo si drží místo, když jeho tacklezóna drží soupeře
+ohrožujícího náš míč nebo nosiče. ⇒ **Zabrání tomu, aby se zeď rozpustila tělo
+po těle** *(to Q3 dělalo)*, ale zeď **nestaví ani neudržuje**.
+⛔ Nezachytí ani tělo ve **druhé řadě**, které se soupeřem nesousedí, ale zavírá
+cestu za první řadou — a právě druhá řada je to, co ze sloupce dělá zeď
+*(spec ř. 2549-2553: „i když jednoho z předních srazíš, stejně neprojdeš")*.
+
+⭐ **Sedí to na nález z téhož dne** *(`A5`, `BLITZ_AND_SCORE`)*: u celotahu
+nechybí **provedení**, chybí **hledání**. Zeď je přesně ten případ — engine
+umí tělo postavit, neumí rozhodnout, **která těla mají tvořit linii**.
+
+⏰ **Do celotahu tedy patří:** kdo tvoří zeď · kolik řad · kdo drží druhou řadu ·
+v jakém pořadí se aktivují, aby si nezavřeli cestu *(viz `Q05`, `Q24` — vacate-first)*.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.

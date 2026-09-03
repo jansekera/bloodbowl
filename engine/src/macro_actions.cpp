@@ -275,6 +275,8 @@ thread_local long g_q3EscTried = 0, g_q3EscTurnover = 0;
 thread_local long g_q3EscDodge = 0, g_q3EscGfi = 0;
 // Kolikrat se utek NENABIDL, protoze by v prumeru stal vic nez jednu aktivaci.
 thread_local long g_q3EscTooRisky = 0;
+// Kolikrat pojistku zabrala ZED (telo drzi hrozbu, ktera mi ohrozuje mic/nosice).
+thread_local long g_q3StayWall = 0;
 thread_local long g_q3StayTried = 0, g_q3StayTurnover = 0;
 
 thread_local long g_standEscapeOffered = 0;
@@ -360,13 +362,14 @@ long takeStandOfferedNextToHitterInSearch() {
 }
 
 // ⭐ Q3: [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
-void takeQ3StandUpCost(long* out7) {
-    out7[0]=g_q3EscTried;  out7[1]=g_q3EscTurnover;
-    out7[2]=g_q3StayTried; out7[3]=g_q3StayTurnover;
-    out7[4]=g_q3EscDodge;  out7[5]=g_q3EscGfi;
-    out7[6]=g_q3EscTooRisky;
+void takeQ3StandUpCost(long* out8) {
+    out8[0]=g_q3EscTried;  out8[1]=g_q3EscTurnover;
+    out8[2]=g_q3StayTried; out8[3]=g_q3StayTurnover;
+    out8[4]=g_q3EscDodge;  out8[5]=g_q3EscGfi;
+    out8[6]=g_q3EscTooRisky;
+    out8[7]=g_q3StayWall;
     g_q3EscTried=g_q3EscTurnover=g_q3StayTried=g_q3StayTurnover=0;
-    g_q3EscDodge=g_q3EscGfi=g_q3EscTooRisky=0;
+    g_q3EscDodge=g_q3EscGfi=g_q3EscTooRisky=g_q3StayWall=0;
 }
 
 long takeStandEscapeOfferedInSearch() {
@@ -1006,6 +1009,61 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         } else if (bc.teamSide == mySide && dToCarrier <= 2) {
                             stayEarnsItsKeep = true;   // drzim roh vlastni klece
                         }
+                    }
+                }
+
+                // ⭐⭐⭐ Q3 KROK C (03.09.2026): ZEĎ. Uzivatel: „vstat a nechat se
+                //   prastit je dulezite zachovat pro trpaslika ve stene."
+                //   Obe podminky vyse jsou vazane na MIC (jeho nosic / nas roh).
+                //   Telo v obranne linii pri vzdalenem mici dostalo false a
+                //   rameno mu zrusilo nabidku zustat ⇒ ROZPOUSTELO ZED.
+                //   V kodu u te pojistky bylo vlastni varovani, ze se to stane.
+                //
+                //   ⭐ Doktrina: „L neni rozestaveni ani screen, je to ODEBIRANI
+                //     UNIKOVYCH POLI" (spec r. 2481) a S7.2 (r. 247): pocet
+                //     unikovych poli nosice musi kazde kolo klesat.
+                //   ⇒ Telo si drzi misto, kdyz jeho tacklezona lezi na nekom,
+                //     kdo OHROZUJE to, o co se hraje — ne jen na nosici.
+                //
+                //   ⚠️ TOHLE JE ZJEDNODUSENA VERZE. Fable 03.09. navrhl merit
+                //     hodnotu tela jako ZDRAZENI SOUPEROVA PRUCHODU (Dijkstra
+                //     za soupere, po jeho nejlepsim jednom blitzu). To je
+                //     spravnejsi — zachyti i druhou radu sloupce, kde je
+                //     marginalni prispevek jednoho tela nulovy — ale bezi to
+                //     v KAZDEM rolloutu. Tahle verze je O(hraci), ne O(cest).
+                //   ⛔ NEZACHYCUJE: telo ve druhe rade, ktere nesousedi s
+                //     hrozbou, ale zavira cestu ZA prvni radou. To je znamy
+                //     zbytek a patri k mereni, ne k odhadu.
+                if (!stayEarnsItsKeep) {
+                    // Kdo je hrozba, plyne z vetve rozvrhu (spec r. 95-107):
+                    //   souper drzi mic  -> jeho nosic (uz vyresen vyse)
+                    //   drzime my        -> kazdy souper s dosahem na naseho nosice
+                    //   mic volny        -> souper s dosahem na mic
+                    Position objective{-1, -1};
+                    bool haveObjective = false;
+                    if (state.ball.isHeld && state.ball.carrierId > 0) {
+                        const Player& bc = state.getPlayer(state.ball.carrierId);
+                        if (bc.isOnPitch() && bc.teamSide == mySide) {
+                            objective = bc.position; haveObjective = true;
+                        }
+                    } else if (state.ball.isOnPitch()) {
+                        objective = state.ball.position; haveObjective = true;
+                    }
+                    if (haveObjective) {
+                        state.forEachOnPitch(opponent(mySide), [&](const Player& e) {
+                            if (stayEarnsItsKeep) return;
+                            if (e.state != PlayerState::STANDING || e.lostTacklezones) return;
+                            // dosah vcetne GFI -- tyz vypocet jako u blitzu
+                            const int reach = e.movementRemaining
+                                            + (e.rooted ? 0 : maxGfiSquares(e));
+                            if (e.position.distanceTo(objective) > reach + 1) return;
+                            // Drzim ho svou tacklezonou prave ted?
+                            if (p.position.distanceTo(e.position) != 1) return;
+                            // A na unikovem poli uz bych ho nedrzel?
+                            if (best.x >= 0 && best.distanceTo(e.position) <= 1) return;
+                            stayEarnsItsKeep = true;
+                            ++g_q3StayWall;
+                        });
                     }
                 }
                 if (priced && !stayEarnsItsKeep &&
