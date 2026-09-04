@@ -553,6 +553,69 @@ TEST(MacroActions, RepositionNeverOffersTargetUnreachableByEndOfHalf) {
     }
 }
 
+// W-GFI (04.09.2026, default OFF, setRepositionGfiArm). Without the arm,
+// expandReposition NEVER lets a free player use GFI (hardcoded +0 headroom)
+// -- the walk stops one square short even when the risk is cheap. With the
+// arm on and no teammate left to lose, the price P_fail * remaining is
+// always < 1, so the GFI gets offered; a fixed-6 roll makes it succeed.
+TEST(MacroExpansion, RepositionGfiArmClosesTheGapWhenTeammatesAreFree) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.position = {10, 7};
+    p1.movementRemaining = 3;
+    p1.hasMoved = false;
+    const Position target{14, 7};  // distance 4: needs exactly 1 GFI square
+    const Macro macro{MacroType::REPOSITION, 1, -1, target};
+
+    GameState off = state.clone();
+    FixedDiceRoller diceOff(std::vector<int>(10, 6));
+    greedyExpandMacro(off, macro, diceOff);
+    EXPECT_NE(off.getPlayer(1).position, target)
+        << "arm is OFF by default -- must not reach a target 1 square beyond movement";
+
+    setRepositionGfiArm(TeamSide::HOME, true);
+    GameState on = state.clone();
+    FixedDiceRoller diceOn(std::vector<int>(10, 6));
+    greedyExpandMacro(on, macro, diceOn);
+    setRepositionGfiArm(TeamSide::HOME, false);  // reset for later tests
+    EXPECT_EQ(on.getPlayer(1).position, target)
+        << "arm ON, no teammate left to lose, GFI succeeds -- must reach it";
+}
+
+// Same gap, but ten teammates still have to act and the team reroll is
+// already spent this turn: P_fail (1/6, no reroll) * 10 > 1, so the arm
+// must stay conservative even though it is ON -- price, not a blank check.
+TEST(MacroExpansion, RepositionGfiArmStaysConservativeWhenExpensive) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.position = {10, 7};
+    p1.movementRemaining = 3;
+    p1.hasMoved = false;
+    const Position target{14, 7};
+    const Macro macro{MacroType::REPOSITION, 1, -1, target};
+
+    for (int id = 2; id <= 11; ++id) {
+        Player& mate = state.getPlayer(id);
+        mate.id = id;
+        mate.teamSide = TeamSide::HOME;
+        mate.state = PlayerState::STANDING;
+        mate.position = {static_cast<int8_t>(1 + id), 1};
+        mate.stats = {6, 3, 3, 8};
+        mate.movementRemaining = 6;
+        mate.hasMoved = false;
+        mate.hasActed = false;
+    }
+    state.homeTeam.rerolls = 1;
+    state.homeTeam.rerollUsedThisTurn = true;  // no reroll left this turn
+
+    setRepositionGfiArm(TeamSide::HOME, true);
+    FixedDiceRoller dice(std::vector<int>(10, 6));  // would succeed if tried
+    greedyExpandMacro(state, macro, dice);
+    setRepositionGfiArm(TeamSide::HOME, false);
+    EXPECT_NE(state.getPlayer(1).position, target)
+        << "ten teammates still to act, no reroll -- GFI must NOT be offered here";
+}
+
 // Rewritten 2026-08-11. A pass used to be offered to anyone with the ball,
 // at any agility, toward any team-mate ahead. For a dwarf side that is a
 // standing invitation to lose the drive: 21 turnovers on the 08-11 corpus

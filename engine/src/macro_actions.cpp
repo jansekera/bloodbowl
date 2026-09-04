@@ -463,6 +463,43 @@ void setStandUpPricingArm(TeamSide side, bool on) {
 thread_local bool g_standUpEscapeArm[2] = {false, false};
 thread_local bool g_standUpRemoveStayArm[2] = {false, false};
 
+// ⭐⭐⭐ W-GFI (04.09.2026, uzivatel: "vetsinou u GFI zisk prevysuje -- ale to
+//   je zkusenost, ne data"). Volny hrac mirici na REPOZICI (bezpecnost/
+//   screen/marker/roh) dnes GFI NIKDY nedostane -- `expandReposition` ma
+//   pevne `+0` (viz komentar u `maxSteps` vyse), zdůvodnene jako "pure
+//   downside". ⛔ To je PAUSALNI zakaz, ne pocitany -- presne tvar vady,
+//   jakou melo Q3 pred dnesnim rozdelenim.
+//   ⭐ Cena neni "telo na zemi" (to je chyba, kterou jsem rano rekl a
+//   uzivatel opravil) -- selhany GFI je VZDY turnover
+//   (move_handler.cpp:216), tedy stoji VSECHNY zbyvajici aktivace tymu.
+//   ⇒ tyz tvar jako Q3-N: nabidnout GFI jen kdyz
+//   `P_fail(potrebnych GFI) * zbyvajici aktivace < 1`.
+thread_local bool g_repositionGfiArm[2] = {false, false};
+// ⭐ "rameno jednalo" pro tenhle arm: kolikrat GFI skutecne povolilo krok
+//   navic, ktery by bez ramene nebyl. Musi se napojit i na cislo modu v
+//   harnessu (viz `modeHasArmSignal/Counter`, oprava 03.09. -- treti
+//   vyskyt tehoz tvaru za tri dny), jinak leak test krici na vlastni rameno.
+thread_local long g_repositionGfiGranted = 0;
+// ⭐ Rozpad prilezitosti: kolikrat gap>0 vubec nastal (jen kdyz je rameno
+//   zapnute -- viz volajici kod), a z toho kolikrat cena rekla "moc drahe".
+//   `granted + tooRisky` MUSI souhlasit s `opportunity` -- pozitivni kontrola,
+//   stejny tvar jako W-DOSAH BLOKOVANO/NIKDY (03.-04.09.).
+thread_local long g_repositionGfiOpportunity = 0;
+thread_local long g_repositionGfiTooRisky = 0;
+
+void setRepositionGfiArm(TeamSide side, bool on) {
+    g_repositionGfiArm[static_cast<int>(side)] = on;
+}
+bool repositionGfiArm(TeamSide side) {
+    return g_repositionGfiArm[static_cast<int>(side)];
+}
+void takeRepositionGfiStats(long* out3) {
+    out3[0] = g_repositionGfiOpportunity;
+    out3[1] = g_repositionGfiGranted;
+    out3[2] = g_repositionGfiTooRisky;
+    g_repositionGfiOpportunity = g_repositionGfiGranted = g_repositionGfiTooRisky = 0;
+}
+
 void setStandUpEscapeArm(TeamSide side, bool on) {
     g_standUpEscapeArm[static_cast<int>(side)] = on;
 }
@@ -2991,6 +3028,44 @@ static MacroExpansionResult expandFoul(GameState& state, const Macro& macro,
     return result;
 }
 
+// ⭐⭐⭐ W-GFI (04.09.2026): pravdepodobnost, ze `gfiSquares` GFI hodu za
+//   sebou VŠECHNY neuspeji -- tedy ze aktivace skonci turnoverem kvuli GFI.
+//   ⛔ NENÍ to proste `1 - (1-p)^n` -- tymovy reroll (`TeamState::canUseReroll`,
+//   team_state.h) je omezen na JEDEN ZA CELE KOLO, ne jeden na hod, a
+//   `attemptRoll` (helpers.cpp) ho automaticky spotrebuje na PRVNI hod, ktery
+//   ho potrebuje. Kdyz je pri vstupu do teto aktivace jeste volny, kryje jen
+//   TEN prvni neuspech v cestě -- druhy GFI uz jede bez nej.
+//   Odvozeni pro gfiSquares==2 s volnym rerollem:
+//     P(uspech) = s*(1-p^2) + p*s^2   [s=1-p]
+//   kde prvni clen je "1. hod hned vysel, reroll zustava pro 2." a druhy
+//   "1. hod spravil reroll, 2. uz musi projit sam".
+//   ⭐ Skill reroll (Sure Feet) se ZAMERNE NEPOCITA -- kdyby ho hrac mel,
+//   `attemptRoll` ho pouzije JAKO PRVNI a tymovy reroll zustane volny dele,
+//   takze vynechani jen NADHODNOCUJE riziko, nikdy ho nepodhodnoti.
+static double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard) {
+    if (gfiSquares <= 0) return 0.0;
+    const double p = blizzard ? (2.0 / 6.0) : (1.0 / 6.0);
+    const double s = 1.0 - p;
+    if (gfiSquares == 1) {
+        return rerollAvailable ? p * p : p;
+    }
+    // gfiSquares == 2 (volajici drzi vstup v [0,2]).
+    if (!rerollAvailable) return 1.0 - s * s;
+    const double succeed = s * (1.0 - p * p) + p * s * s;
+    return 1.0 - succeed;
+}
+
+// ⭐ Kolik spoluhracu jeste ceka na aktivaci -- tyz vypocet jako u Q3-N
+//   uteku (macro_actions.cpp, ~r. 990), tam overeny.
+static int teammatesStillToAct(const GameState& state, int excludePlayerId,
+                               TeamSide side) {
+    int remaining = 0;
+    state.forEachOnPitch(side, [&](const Player& mate) {
+        if (mate.id != excludePlayerId && !mate.hasActed && mate.canAct()) ++remaining;
+    });
+    return remaining;
+}
+
 static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
                                               DiceRollerBase& dice) {
     MacroExpansionResult result;
@@ -3007,8 +3082,37 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // macro.gfiAllowance (0-2) opts a SPECIFIC walk into real GFI rolls --
     // set only by the cage-advance planner for the ball carrier in a tempo
     // emergency, where not arriving loses the drive anyway.
+    // ⭐⭐⭐ W-GFI rameno (04.09.2026, default OFF, setRepositionGfiArm):
+    //   misto pausalniho zakazu se rozhoduje POCITANOU cenou -- tyz tvar
+    //   jako Q3-N. `gap` = kolik GFI poli by zavrelo mezeru mezi hracem a
+    //   cilem (0-2, dal GFI nepomuze -- viz `+ std::clamp(...,0,2)` nize).
+    //   ⛔ Cena NENI "telo na zemi" -- selhany GFI je VZDY turnover
+    //   (move_handler.cpp:216), tedy stoji VSECHNY zbyvajici aktivace tymu.
+    int localGfiAllowance = 0;
+    {
+        const Player& mover = state.getPlayer(macro.playerId);
+        if (repositionGfiArm(mover.teamSide) &&
+            macro.targetPos != mover.position) {
+            const int need = mover.position.distanceTo(macro.targetPos);
+            const int gap = std::clamp(need - static_cast<int>(mover.movementRemaining), 0, 2);
+            if (gap > 0) {
+                ++g_repositionGfiOpportunity;
+                const bool rerollAvailable =
+                    state.getTeamState(mover.teamSide).canUseReroll();
+                const bool blizzard = state.weather == Weather::BLIZZARD;
+                const double pFail = gfiSequenceFailProb(gap, rerollAvailable, blizzard);
+                const int remaining = teammatesStillToAct(state, mover.id, mover.teamSide);
+                if (pFail * remaining < 1.0) {
+                    localGfiAllowance = gap;
+                    ++g_repositionGfiGranted;
+                } else {
+                    ++g_repositionGfiTooRisky;
+                }
+            }
+        }
+    }
     int maxSteps = state.getPlayer(macro.playerId).movementRemaining
-                   + std::clamp(macro.gfiAllowance, 0, 2);
+                   + std::clamp(std::max(macro.gfiAllowance, localGfiAllowance), 0, 2);
     // Loose ball: never step onto its square, not even as a waypoint --
     // the auto-pickup in move_handler.cpp would turn this dice-free macro
     // into a real gamble (item 11).

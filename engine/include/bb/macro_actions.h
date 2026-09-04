@@ -250,6 +250,15 @@ bool standUpRemoveStayArm(TeamSide side);
 long takeStandUpPricingRepicksInSearch();
 long takeStandEscapeOfferedInSearch();
 
+// ⭐ W-GFI (04.09.): volnemu hraci mirici na REPOZICI (bezpecnost/screen/
+//   marker/roh, ne nosic) se GFI povoli, jen kdyz P_fail * zbyvajici
+//   aktivace < 1 -- misto pausalniho zakazu. Default OFF.
+void setRepositionGfiArm(TeamSide side, bool on);
+bool repositionGfiArm(TeamSide side);
+// [0] gap>0 nastal (prilezitost) [1] povoleno [2] zamitnuto jako prilis drahe
+// -- [1]+[2] MUSI souhlasit s [0].
+void takeRepositionGfiStats(long* out3);
+
 // ⭐ Q3 (03.09.): co stoji vstavani, OBE vetve.
 //   [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER
 //   [4] z toho DODGE [5] z toho GFI — rozpad UVNITR uteku

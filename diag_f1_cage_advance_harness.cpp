@@ -95,7 +95,7 @@ static bool modeHasArmSignal(int mode) {
     switch (mode) {
         case 0: case 1: case 4: case 5: case 6: case 7:
         case 9: case 10: case 12: case 14: case 15:
-        case 16: case 17:
+        case 16: case 17: case 18:
             return true;
         default:
             return false;   // mode 2 (bez ramene), 3 (policy blend - nic to
@@ -107,7 +107,7 @@ static bool modeHasArmSignal(int mode) {
 static bool modeHasArmCounter(int mode) {
     switch (mode) {
         case 4: case 5: case 9: case 10: case 12: case 13:
-        case 14: case 15: case 16: case 17:   // vlastni citac
+        case 14: case 15: case 16: case 17: case 18:   // vlastni citac
         case 0: case 1: case 6: case 7:       // candPlans je tu ten citac
             return true;
         default:
@@ -139,6 +139,7 @@ static long g_mp[4] = {0,0,0,0};
 static long g_rep[BB_REP_BRANCHES*8] = {0};
 static long g_repBlocked[BB_REP_BRANCHES] = {0};  // W-DOSAH invariant: zablokovano
 static long g_cageDiceyGfi[3] = {0,0,0};  // W-GFI krok 0: DICEY planu / rohy s GFI / selhavsi krok byl GFI
+static long g_repGfi[3] = {0,0,0};  // W-GFI rameno: prilezitost / povoleno / zamitnuto jako drahe
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -331,6 +332,7 @@ int main(int argc, char** argv) {
                       : (mode == 7) ? 127'000'000u
                       : (mode == 16) ? 281'000'000u
                       : (mode == 17) ? 293'000'000u
+                      : (mode == 18) ? 307'000'000u
                       : (mode == 15) ? 269'000'000u
                       : (mode == 13) ? 233'000'000u
                       : (mode == 14) ? 251'000'000u
@@ -349,6 +351,7 @@ int main(int argc, char** argv) {
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 16 ? "Q3-N: jen PRIDA nabidku vstat-a-odejit (s cenou dodge a pojistkou)"
          : mode == 17 ? "Q3-O: nad Q3-N teprve ODEBERE nabidku vstat-a-zustat"
+         : mode == 18 ? "W-GFI: volnemu hraci na reposition se GFI povoli podle P_fail*zbyvajici < 1"
          : mode == 15 ? "M14b: blitzova chuze uhyba tacklezonam i GFI"
          : mode == 13 ? "(mode 13 ZRUSEN 02.09. -- M13 nasazeno do produkce)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
@@ -564,6 +567,10 @@ int main(int argc, char** argv) {
                 bb::setStandUpEscapeArm(bb::TeamSide::AWAY, (mode == 16 || mode == 17) && !candHome);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, mode == 17 && candHome);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, mode == 17 && !candHome);
+                // ⭐ W-GFI (04.09.): rameno pro volny pohyb (bezpecnost/screen/
+                //   marker/roh), NE nosic -- viz macro_actions.cpp expandReposition.
+                bb::setRepositionGfiArm(bb::TeamSide::HOME, mode == 18 && candHome);
+                bb::setRepositionGfiArm(bb::TeamSide::AWAY, mode == 18 && !candHome);
                 bb::takeStandUpPricingRepicksInSearch();
                 // ⛔ mode 8 (P35) ZRUSEN 01.09.2026 -- rameno nasazeno do
                 //   produkce po noci 31.08. (neskodi), takze uz neni co
@@ -612,6 +619,9 @@ int main(int argc, char** argv) {
                 long candProne = bb::takeProneActionPicksInSearch();
                 long candPath  = bb::takeBlitzPathPicksInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
+                long gfiStats[3]; bb::takeRepositionGfiStats(gfiStats);
+                long candGfi = gfiStats[1];
+                for (int q = 0; q < 3; ++q) g_repGfi[q] += gfiStats[q];
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
@@ -674,6 +684,8 @@ int main(int argc, char** argv) {
                 bb::setStandUpEscapeArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, false);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, false);
+                bb::setRepositionGfiArm(bb::TeamSide::HOME, false);
+                bb::setRepositionGfiArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);
@@ -706,6 +718,7 @@ int main(int argc, char** argv) {
                               : (mode == 15) ? candPath
                               : (mode == 13) ? candProne
                               : (mode == 14 || mode == 16 || mode == 17) ? candPrice
+                              : (mode == 18) ? candGfi
                               : (mode == 9) ? candLeap
                               : (mode == 10) ? candCont
                               : (mode == 12) ? candCrit
@@ -921,6 +934,13 @@ int main(int argc, char** argv) {
             printf("  W-GFI/KLEC-DICEY: planu zamitnuto jako DICEY %ld | z toho rohu na 1-GFI %ld | selhavsi krok byl GFI %ld (%.1f %% DICEY planu)\n",
                    g_cageDiceyGfi[0], g_cageDiceyGfi[1], g_cageDiceyGfi[2],
                    g_cageDiceyGfi[0] ? 100.0*g_cageDiceyGfi[2]/g_cageDiceyGfi[0] : 0.0);
+            // ⭐⭐⭐ W-GFI rameno (04.09.2026): misto pausalniho zakazu se GFI
+            //   povoli, jen kdyz P_fail(gap, reroll, pocasi) * zbyvajici
+            //   aktivace < 1. POZITIVNI KONTROLA: [1]+[2] MUSI souhlasit s [0].
+            printf("  W-GFI/RAMENO: prilezitost (gap>0) %ld | povoleno %ld (%.1f %%) | zamitnuto jako drahe %ld (%.1f %%)%s\n",
+                   g_repGfi[0], g_repGfi[1], g_repGfi[0]?100.0*g_repGfi[1]/g_repGfi[0]:0.0,
+                   g_repGfi[2], g_repGfi[0]?100.0*g_repGfi[2]/g_repGfi[0]:0.0,
+                   (g_repGfi[1]+g_repGfi[2]==g_repGfi[0]) ? "  ✅" : "  ⛔ NESOUHLASI");
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",
                    g_mp[0], g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4],
                    (g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])
