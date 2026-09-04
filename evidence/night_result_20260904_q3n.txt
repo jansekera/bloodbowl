@@ -1,0 +1,23 @@
+  dw-dw — 48 shardů, 2400 párů
+    (1) MOVED WITHOUT THE ARM ACTING: 0 (0 = čisté, delta se SMÍ číst)
+    (2) arm acted: 2368/2400 (98.7 %)  ⚠️ 32 párů rameno NEMĚŘILA — neúplný jmenovatel
+    (2b) ARM PICKS TOTAL: 244344 (50.91/hru) — kolik, ne jen jestli
+    (3) n_nonzero: 951/2400 (39.6 %) — jen tyhle páry nesou informaci
+    (4) DELTA SLOUČENĚ: +0.0052 ± 0.0071 SE (+0.73 σ), 95% CI [-0.0087; +0.0191]
+       shardy: +0.0300 +0.0200 -0.0600 -0.0100 -0.1200 +0.0000 -0.0200 +0.0000 +0.0300 -0.0900 -0.0700 +0.0800 +0.0200 +0.0500 +0.0100 +0.0800 +0.0000 +0.0400 +0.0500 +0.0200 -0.0500 +0.0100 +0.0000 -0.0200 +0.0400 +0.0500 -0.0200 +0.0200 -0.0400 +0.0300 +0.0500 +0.0300 +0.0900 +0.0600 -0.0400 -0.0800 +0.0200 -0.0300 +0.0000 +0.0000 +0.0300 +0.0200 -0.0200 -0.0400 +0.0200 -0.0200 +0.0600 +0.0200
+       16/48 shardů záporných
+       empirická SE mezi shardy 0.0065 vs sdružená 0.0071 ⇒ bez overdisperze, sloučení legitimní
+       ⚠️ tahle delta je DVOUSTRANNÁ (chessCandHome + chessCandAway − 1)
+          = my S RAMENEM proti nám PROTI RAMENI, ne proti nulovému rameni
+       ⇒ jednostranný odhad +0.0026 ± 0.0036 SE, 95% CI [-0.0044; +0.0096]
+          ⚠️ dělení dvěma platí JEN při podobném efektu na obou stranách — ověř z rows (TD po rasách)
+       PRÁH ±0.0150 (vstup běhu, ne konstanta ve zdrojáku) ⇒ **NEROZHODNUTO — MÁLO SÍLY**
+       95% CI [-0.0087; +0.0191] PŘESAHUJE práh ⇒ tenhle běh neumí rozhodnout ani „pomáhá/škodí“, ani „efekt tam není“.
+       na rozhodnutí by při NEZMĚNĚNÉM odhadu bylo potřeba ~4864 párů (dnes 2400, tj. 2.0×)
+       ⚠️ NEROZHODNUTO se zapisuje JAKO NEROZHODNUTO, ne jako potvrzení zamítnutí.
+  --- PŘEDPOVĚĎ vs VÝSLEDEK (z předregistrace, zapsané PŘED během) ---
+    ✅ TREFA   leak == 0   →  změřeno +0.0000
+    ✅ TREFA   arm_acted >= 0.9   →  změřeno +0.9867
+    ✅ TREFA   n_nonzero in 0.2 0.85   →  změřeno +0.3962
+    ✅ TREFA   delta in -0.03 0.06   →  změřeno +0.0052
+    ✅ TREFA   delta_1s in -0.02 0.04   →  změřeno +0.0026
