@@ -159,6 +159,7 @@ změřili chybějící schopnost. Viz varování nahoře.
 | **`Q44`** | SOUPEŘ PŘIPRAVUJE ÚNIKOVÝ KORIDOR 2-3 KOLA DOPŘEDU a hledá pruhy, které jsme opustili ZA AKCÍ |
 | **`Q45`** | SOUPEŘ NÁM VYROBÍ CHAIN PUSH DO NOSIČE — NAŠIMI VLASTNÍMI TĚLY |
 | **`Q46`** | STRIP BALL SHODÍ MÍČ POUHÝM ODSUNEM — bez sražení |
+| **`Q47`** | *(04.09., uživatel — u W-GFI: „hráči se musí posouvat kupředu, ať jsou u akce nebo k míči")* VOLNÉ TĚLO BEZ CÍLE POSTUPUJE SMĚREM K DĚNÍ, NE STOJÍ — kdo dnes nemíří k akci ani k míči, zítra tam není, až bude potřeba (stejná rodina jako `Q40` „okno se zavírá nečinností"; sedí i na [[project_bloodbowl_doing_nothing_never_wins]]) |
 
 ⚠️ **Oddíl 2 sběru (`V01`-`V70`) sem NEPATŘÍ** — to jsou **vlastnosti jedné
 akce** (kam se smí postavit roh, kdy se nesmí skórovat, prahy kostek). Jsou to
