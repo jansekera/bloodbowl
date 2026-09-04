@@ -22,6 +22,16 @@ namespace bb {
 // control ("MOVED WITHOUT THE ARM ACTING") needs.
 long takeCarrierBlockPriorEvalsInSearch();
 
+// ⭐ W-GFI krok (0) (04.09.2026): kolik F1 cage-advance planu vyslo DICEY
+//   (zamitnuto jako prilis rizikove) a kolik z toho souviselo s 1-GFI
+//   povolenim na rohu. `cage_advance.cpp` zustava jen ZDROJ DAT -- toto
+//   cte uz existujici `CageAdvancePlan::diagMacroCornerGfi`, nic v cage
+//   logice se nemeni.
+//   [0] pocet planu s verdiktem DICEY
+//   [1] z toho: soucet rohu vyzadujicich 1-GFI napric temi plany
+//   [2] z toho: kolikrat byl PRAVE SELHAVSI krok rohem s 1-GFI
+void takeCageDiceyGfiStats(long* out3);
+
 class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
 class CageAdvancePlanner; // bb/cage_advance.h (F1, 2026-08-03)
 

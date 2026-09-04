@@ -138,6 +138,7 @@ static long g_mp[4] = {0,0,0,0};
 // ⭐⭐ W-CIL 02.09.: rozpad vydanych REPOSITION cilu po vetvich (5 cisel na vetev)
 static long g_rep[BB_REP_BRANCHES*8] = {0};
 static long g_repBlocked[BB_REP_BRANCHES] = {0};  // W-DOSAH invariant: zablokovano
+static long g_cageDiceyGfi[3] = {0,0,0};  // W-GFI krok 0: DICEY planu / rohy s GFI / selhavsi krok byl GFI
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -652,6 +653,7 @@ int main(int argc, char** argv) {
                   for (int q=0;q<BB_REP_BRANCHES*8;++q) g_rep[q]+=rp[q]; }
                 { long rb[BB_REP_BRANCHES]; bb::takeRepositionBlocked(rb);
                   for (int q=0;q<BB_REP_BRANCHES;++q) g_repBlocked[q]+=rb[q]; }
+                { long cg[3]; bb::takeCageDiceyGfiStats(cg); for (int q=0;q<3;++q) g_cageDiceyGfi[q]+=cg[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 { long q[9]; bb::takeQ3StandUpCost(q); for (int z=0;z<9;++z) g_q3c[z]+=q[z]; }
@@ -911,6 +913,14 @@ int main(int argc, char** argv) {
                     printf("    %-28s blokovano %7ld x\n", BN[b], g_repBlocked[b]);
                 }
             }
+            // ⭐⭐⭐ W-GFI krok (0) (04.09.2026, uzivatel 02.09.: "s daty od
+            //   klece, ale cistě do pohybu"). `diagMacroCornerGfi` existuje
+            //   od 06.08. a NIKDE se netiskl -- potreti za tri dny tvar
+            //   "citac existuje, vypis chybi". Cte se v macro_mcts.cpp
+            //   (konzument planu), cage_advance.cpp zustava jen zdroj dat.
+            printf("  W-GFI/KLEC-DICEY: planu zamitnuto jako DICEY %ld | z toho rohu na 1-GFI %ld | selhavsi krok byl GFI %ld (%.1f %% DICEY planu)\n",
+                   g_cageDiceyGfi[0], g_cageDiceyGfi[1], g_cageDiceyGfi[2],
+                   g_cageDiceyGfi[0] ? 100.0*g_cageDiceyGfi[2]/g_cageDiceyGfi[0] : 0.0);
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",
                    g_mp[0], g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4],
                    (g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])

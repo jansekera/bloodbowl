@@ -102,12 +102,34 @@ bool weCanContestTheDrop(const GameState& state, const Player& carrier,
 // which is what the per-pair null control needs.
 thread_local long g_carrierBlockPriorEvals = 0;
 
+// ⭐ W-GFI krok (0) (04.09.2026, uzivatel 02.09.: "s daty od klece, ale
+//   cistě do pohybu"). `CageAdvancePlan::diagMacroCornerGfi` existuje od
+//   06.08. (DICEY diagnostika), ale nikde se necetlo -- POTRETI za tri dny
+//   tvar "citac existuje, vypis chybi" (viz
+//   feedback_registered_reading_needs_a_print_line). Meri se TADY, v
+//   konzumentovi planu, ne v cage_advance.cpp -- ten zustava jen ZDROJ DAT.
+//   [0] kolik planu vyslo DICEY (zamitnuto jako prilis rizikove)
+//   [1] z toho: kolik ROHU v tom planu vyzadovalo 1-GFI povoleni (soucet
+//       diagMacroCornerGfi pres cely plan -- co vsechno jsme si u nej rekli)
+//   [2] z toho: kolikrat byl PRAVE TEN SELHAVSI krok (diceyLegIdx) rohem,
+//       ktery GFI vyzadoval -- odpovida "byl GFI PRICINOU zamitnuti?"
+thread_local long g_cageDiceyPlans = 0;
+thread_local long g_cageDiceyGfiCorners = 0;
+thread_local long g_cageDiceyFailedLegWasGfi = 0;
+
 } // namespace
 
 long takeCarrierBlockPriorEvalsInSearch() {
     long v = g_carrierBlockPriorEvals;
     g_carrierBlockPriorEvals = 0;
     return v;
+}
+
+void takeCageDiceyGfiStats(long* out3) {
+    out3[0] = g_cageDiceyPlans;
+    out3[1] = g_cageDiceyGfiCorners;
+    out3[2] = g_cageDiceyFailedLegWasGfi;
+    g_cageDiceyPlans = g_cageDiceyGfiCorners = g_cageDiceyFailedLegWasGfi = 0;
 }
 
 // --- MacroMCTSNode ---
@@ -1050,6 +1072,20 @@ bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
             // turn as today. Role budget: no reservations from this call
             // site yet (see bb/cage_advance.h, constraint 3).
             CageAdvancePlan plan = cagePlanner_->build(state);
+            // ⭐ W-GFI krok (0): mereni DICEY planu, ne zmena chovani. Cti
+            //   pred `if (plan.valid)`, protoze DICEY je prave ta vetev,
+            //   kde `plan.valid == false` a jinak by se cislo ztratilo.
+            if (plan.verdict == CageAdvanceVerdict::DICEY) {
+                ++g_cageDiceyPlans;
+                for (uint8_t g : plan.diagMacroCornerGfi) {
+                    if (g) ++g_cageDiceyGfiCorners;
+                }
+                if (plan.diceyLegIdx >= 0 &&
+                    static_cast<size_t>(plan.diceyLegIdx) < plan.diagMacroCornerGfi.size() &&
+                    plan.diagMacroCornerGfi[plan.diceyLegIdx]) {
+                    ++g_cageDiceyFailedLegWasGfi;
+                }
+            }
             if (plan.valid) {
                 stagedMacros_ = std::move(plan.macros);
                 stagedIndex_ = 0;
