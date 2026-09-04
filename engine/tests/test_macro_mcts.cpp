@@ -684,12 +684,33 @@ TEST(MacroMCTS, RiskDeferralOffMatchesBaselineOnS3) {
     // Baseline regression guard: riskDeferral=false must reproduce exactly
     // production's undeferred pick (BLITZ) on S3 -- the feature is fully
     // inert unless explicitly enabled.
+    // ⭐⭐⭐ 02.09.2026, W-CIL: TENHLE TEST TVRDIL `== MacroType::BLITZ`,
+    //   tedy SNIMEK HLEDANI. Snimek zestarne pri prvni zmene prostoru tahu --
+    //   a to se stalo dvakrat za dva dny (M13 31.08., W-CIL 02.09.).
+    //   ⛔ Navic je S3 podle vlastniho komentare vyse pozice, kde PET presunu
+    //     lezi v rozmezi Q_MARGIN od blitze. Prevracet skoro nerozhodnou
+    //     pozici v pevne ocekavani znamena hlidat sum.
+    //
+    //   ⇒ Test ted tvrdi to, co ma v NAZVU a v ucelu: `riskDeferral` je pri
+    //     vypnuti NECINNY, tedy hledani je DETERMINISTICKE a dva stejne
+    //     spustene behy daji touz volbu. Na tom stoji i CRN v nocnich A/B:
+    //     kdyby hledani nebylo deterministicke, parove srovnani nema smysl.
+    //   ⭐ Neni to prepsani na zelenou -- je to vymena snimku za invariant.
+    //     Uzivatel 02.09.: „ano, prepis ten test na invariant."
     GameState state = makeS3State();
     PolicyNetwork zeroPolicy;
     MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
-    MacroMCTSSearch search(nullptr, cfg, 42);
-    Macro result = search.search(state);
-    EXPECT_EQ(result.type, MacroType::BLITZ);
+
+    MacroMCTSSearch searchA(nullptr, cfg, 42);
+    const Macro a = searchA.search(state);
+    MacroMCTSSearch searchB(nullptr, cfg, 42);
+    const Macro b = searchB.search(state);
+
+    EXPECT_EQ(a.type, b.type)
+        << "vypnuty riskDeferral neni deterministicky => CRN v nocnich A/B nesedi";
+    EXPECT_EQ(a.playerId, b.playerId);
+    EXPECT_EQ(a.targetPos.x, b.targetPos.x);
+    EXPECT_EQ(a.targetPos.y, b.targetPos.y);
 }
 
 TEST(MacroMCTS, RiskDeferralNoLongerNeededOnS3AfterItem14) {
@@ -724,13 +745,38 @@ TEST(MacroMCTS, RiskDeferralNoLongerNeededOnS3AfterItem14) {
     //   Kdyby tenhle test zacal padat, znamena to, ze do produkce proteklo
     //   neco, co melo zustat za vypinacem -- a to je cennejsi hlidka nez
     //   puvodni tvrzeni o item 14.
+    // ⭐⭐⭐ 02.09.2026, W-CIL: pevne `== MacroType::BLITZ` odstraneno.
+    //   DUVOD: jako hlidka na protekly vypinac to bylo ukotvene ke SNIMKU, ne
+    //   ke vztahu -- takze zakricelo i na zmenu, ktera ZA ZADNYM vypinacem
+    //   neni. Presne to se stalo dnes: `W-CIL` je oprava vady primo v produkci
+    //   (cil pohybu musi byt pole, na kterem se da stat), zadne rameno v tom
+    //   nefiguruje, a test presto hlasil „neco proteklo mimo vypinac".
+    //   ⇒ Tenhle tvar uz jednou stal noc: [[feedback_arm_signal_incomplete...]].
+    //
+    //   ⇒ Test ted tvrdi VZTAH, ktery je jeho skutecnym obsahem a ktery
+    //     zadna produkcni zmena neposune: na S3 uz Q-guard NEMA CO ODKLADAT,
+    //     tedy ZAPNUTY a VYPNUTY davaji TOUZ volbu. Kdyz se prostor tahu
+    //     zmeni a obe strany se posunou stejne, test mlci -- spravne.
+    //     Kdyz se rozejdou, guard zase zacal zasahovat, a to VEDET CHCEME.
+    //
+    //   ⚠️ Hlidka na proteklé rameno se timhle NERUSI, jen se stehuje tam,
+    //     kam patri: leak test v samotne noci („MOVED WITHOUT THE ARM
+    //     ACTING: 0"), ktery meri rameno proti jeho vlastnimu citaci.
     GameState state = makeS3State();
     PolicyNetwork zeroPolicy;
-    MCTSConfig cfg = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
-    MacroMCTSSearch search(nullptr, cfg, 42);
-    Macro result = search.search(state);
-    EXPECT_EQ(result.type, MacroType::BLITZ)
-        << "S3 se nevratil k puvodni volbe => neco proteklo mimo vypinac";
+
+    MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    MacroMCTSSearch searchOff(nullptr, cfgOff, 42);
+    const Macro off = searchOff.search(state);
+
+    MCTSConfig cfgOn = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/true);
+    MacroMCTSSearch searchOn(nullptr, cfgOn, 42);
+    const Macro on = searchOn.search(state);
+
+    EXPECT_EQ(on.type, off.type)
+        << "Q-guard na S3 zase odklada => uz NENI necinny, a to je zmena, "
+           "kterou je treba vysvetlit (ne prepsat)";
+    EXPECT_EQ(on.playerId, off.playerId);
 }
 
 TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {
