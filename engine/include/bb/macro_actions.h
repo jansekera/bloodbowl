@@ -17,6 +17,12 @@ namespace bb {
 // [5] nedosahne v TOMHLE kole [6] ani s GFI [7] NEDOSAHNE ANI DO KONCE PULE
 void takeRepositionTargets(long* out8xN);
 
+// ⭐⭐⭐ W-DOSAH INVARIANT (04.09.2026): kolikrat byla nabidka ZABLOKOVANA,
+//   protoze cil nesel dosahnout ani do konce pule (BB_REP_BRANCHES cisel,
+//   jedno na vetev). Po opravě by [7] v `takeRepositionTargets` (NIKDY) melo
+//   souhlasit s timhle poctem -- obe se inkrementuji spolecne.
+void takeRepositionBlocked(long* outN);
+
 // ⭐ Q19: kolikrat se BLITZ_AND_SCORE nabidlo -- V HLEDANI, ne ve hre.
 long takeBlitzAndScoreOffersInSearch();
 

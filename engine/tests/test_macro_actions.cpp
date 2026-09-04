@@ -522,6 +522,37 @@ TEST(MacroActions, DefensiveRepositionInterceptRequiresGoalSide) {
     EXPECT_TRUE(hasSafety);
 }
 
+// W-DOSAH INVARIANT (04.09.2026, uzivatel 02.09.: "2 nesmi existovat"). Cil,
+// na ktery se neda dojit ani do konce pule, se nesmi nabidnout VUBEC -- bez
+// ohledu na to, jak byl vypocitan. Safety spot je PEVNA souradnice
+// {myEndzone, 7}: hrac na opacnem konci hriste v poslednim kole pule na ni
+// nedojde, ani s GFI, ani se zbylym casem (zadny uz nezbyva).
+TEST(MacroActions, RepositionNeverOffersTargetUnreachableByEndOfHalf) {
+    GameState state = makeMinimalState();
+    // AWAY carries the ball mid-field (not on the flank) -- keeps HOME's
+    // defender out of both the cage-tag and intercept-lane strategies, so
+    // generation falls through to Strategy 1 (safety, {myEndzone, 7}).
+    state.getPlayer(12).position = {12, 7};
+    state.ball = BallState::carried({12, 7}, 12);
+    // HOME defender at the far touchline, movement already spent, on the
+    // half's LAST turn: even GFI plus every remaining turn's full MA cannot
+    // cover the 24 squares back to the safety spot at {0, 7}.
+    Player& p1 = state.getPlayer(1);
+    p1.position = {24, 7};
+    p1.movementRemaining = 0;  // isFreeToAct() needs !hasMoved, so this stays false
+    state.homeTeam.turnNumber = 8;  // turnsLeft == 1
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    for (auto& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        FAIL() << "REPOSITION offered an unreachable target ("
+               << static_cast<int>(m.targetPos.x) << ","
+               << static_cast<int>(m.targetPos.y) << ")";
+    }
+}
+
 // Rewritten 2026-08-11. A pass used to be offered to anyone with the ball,
 // at any agility, toward any team-mate ahead. For a dwarf side that is a
 // standing invitation to lose the drive: 21 turnovers on the 08-11 corpus

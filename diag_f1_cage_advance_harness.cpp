@@ -137,6 +137,7 @@ static long g_mw[5] = {0,0,0,0,0};
 static long g_mp[4] = {0,0,0,0};
 // ⭐⭐ W-CIL 02.09.: rozpad vydanych REPOSITION cilu po vetvich (5 cisel na vetev)
 static long g_rep[BB_REP_BRANCHES*8] = {0};
+static long g_repBlocked[BB_REP_BRANCHES] = {0};  // W-DOSAH invariant: zablokovano
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -649,6 +650,8 @@ int main(int argc, char** argv) {
                 { long md[5]; bb::takeMoveWalkLimitDist(md); for (int q=0;q<5;++q) g_mld[q]+=md[q]; }
                 { long rp[BB_REP_BRANCHES*8]; bb::takeRepositionTargets(rp);
                   for (int q=0;q<BB_REP_BRANCHES*8;++q) g_rep[q]+=rp[q]; }
+                { long rb[BB_REP_BRANCHES]; bb::takeRepositionBlocked(rb);
+                  for (int q=0;q<BB_REP_BRANCHES;++q) g_repBlocked[q]+=rb[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 { long q[9]; bb::takeQ3StandUpCost(q); for (int z=0;z<9;++z) g_q3c[z]+=q[z]; }
@@ -844,7 +847,11 @@ int main(int argc, char** argv) {
                     "6-K NOSICI [zamer]", "7-roh klece (kontroluje)",
                     "8-intercept lane", "9-safety", "10-MARKOVAT nosice [zamer]",
                     "11-endzone guard", "12-screen slot", "13-vpred do stredu" };
-                long tot=0; for (int b=0;b<BB_REP_BRANCHES;++b) tot+=g_rep[b*5+0];
+                // ⛔ 02.09.: tady byl stride 5 misto 8 (pole se rozsirilo o
+                //   W-DOSAH sloupce, tohle secteni se zapomnelo prepocitat) --
+                //   „vydano celkem" pak nesedelo a „nedojde ... z %ld" davalo
+                //   pomery pres 100 %. Opraveno 04.09. pred dalsim merenim.
+                long tot=0; for (int b=0;b<BB_REP_BRANCHES;++b) tot+=g_rep[b*8+0];
                 {
                 const long tot = g_mld[0]+g_mld[1]+g_mld[2]+g_mld[3]+g_mld[4];
                 const long saveGfi = g_mld[0]+g_mld[1];          // 1-2 pole = bezny GFI
@@ -876,7 +883,12 @@ int main(int argc, char** argv) {
                 long fTot=0, fgTot=0;
                 for (int b=0;b<BB_REP_BRANCHES;++b) { fTot+=g_rep[b*8+5]; fgTot+=g_rep[b*8+6]; }
                 long nvTot=0; for (int b=0;b<BB_REP_BRANCHES;++b) nvTot+=g_rep[b*8+7];
-                printf("  W-DOSAH/NABIDKA: nedojde v TOMHLE kole %ld z %ld (%.1f %%) | ani s GFI %ld (%.1f %%) | ⛔ NIKDY do konce pule %ld (%.1f %%)\n",
+                // ⚠️ 04.09.: „NIKDY" uz NEZNAMENA porusenou nabidku -- od dnesni
+                //   opravy se kazdy takovy pripad BLOKUJE pred vydanim (viz
+                //   W-DOSAH/BLOKOVANO nize). Cislo tu zustava jako POZITIVNI
+                //   KONTROLA detekce (musi byt > 0, jinak je detekce mrtva),
+                //   ne jako nalez vady.
+                printf("  W-DOSAH/NABIDKA: nedojde v TOMHLE kole %ld z %ld (%.1f %%) | ani s GFI %ld (%.1f %%) | detekovano-a-BLOKOVANO %ld (%.1f %%)\n",
                        fTot, tot, tot?100.0*fTot/tot:0.0, fgTot, tot?100.0*fgTot/tot:0.0,
                        nvTot, tot?100.0*nvTot/tot:0.0);
                 for (int b=0;b<BB_REP_BRANCHES;++b) {
@@ -884,6 +896,19 @@ int main(int argc, char** argv) {
                     printf("    %-28s mimo dosah %7ld / %7ld (%5.1f %%) | i s GFI %7ld (%5.1f %%) | NIKDY (ani do konce pule) %7ld (%5.1f %%)\n",
                         BN[b], f, t, 100.0*f/t, g_rep[b*8+6], 100.0*g_rep[b*8+6]/t,
                         g_rep[b*8+7], 100.0*g_rep[b*8+7]/t);
+                }
+                // ⭐⭐⭐ W-DOSAH/BLOKOVANO (04.09.2026): INVARIANT, ne mereni --
+                //   „2 nesmi existovat" (uzivatel 02.09.). Nabidka na cil, ktery
+                //   se nedal dosahnout ani do konce pule, se ted vubec NEVYDA.
+                //   ⭐ POZITIVNI KONTROLA: tohle cislo MUSI presne souhlasit se
+                //   sloupcem NIKDY vyse (oba citace tikaji spolecne v tomtez
+                //   `if`) -- kdyby nesouhlasilo, je citac odpojeny od opravy.
+                long blkTot=0; for (int b=0;b<BB_REP_BRANCHES;++b) blkTot+=g_repBlocked[b];
+                printf("  W-DOSAH/BLOKOVANO: nabidka zamitnuta invariantem %ld x (musi = NIKDY vyse: %ld)%s\n",
+                       blkTot, nvTot, blkTot==nvTot ? "  ✅" : "  ⛔ NESOUHLASI");
+                for (int b=0;b<BB_REP_BRANCHES;++b) {
+                    if (!g_repBlocked[b]) continue;
+                    printf("    %-28s blokovano %7ld x\n", BN[b], g_repBlocked[b]);
                 }
             }
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",

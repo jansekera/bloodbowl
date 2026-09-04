@@ -71,6 +71,12 @@ thread_local long g_repMissSum[BB_REP_BRANCHES] = {0};// suma chybejicich poli (
 //   neni vada: GFI se obnovuje kazde kolo, takze hrac dojde priste. Vada je
 //   az cil, na ktery se neda dojit ANI DO KONCE PULE.
 thread_local long g_repNever[BB_REP_BRANCHES] = {0};
+// ⭐⭐⭐ W-DOSAH INVARIANT (04.09.2026, uzivatel 02.09.: „2 nesmi existovat").
+//   Kolikrat byla nabidka ZABLOKOVANA, protoze cil neslo dosahnout ani do
+//   konce pule. Zvlast pole, mimo stride-8 `g_rep*` (ten uz jednou dostal
+//   vadu z prepocitani stride pri rozsireni) -- novy citac se radeji pripoji
+//   samostatnym akcesorem, nez aby se sahalo znovu na existujici pole.
+thread_local long g_repBlocked[BB_REP_BRANCHES] = {0};
 
 thread_local bool g_leapWalk[2] = {false, false};
 thread_local long g_leapWalkPicks = 0;
@@ -2138,8 +2144,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         //   = „jdi k nemu"), u jinych je to vada.
         //   ⛔ Nezavisle na logovani i na jakemkoli rameni (princip T5.34).
         if (repBranch >= 0 && repBranch < BB_REP_BRANCHES) {
-            ++g_repTot[repBranch];
-            // W-DOSAH: dosahne na ten cil vubec v TOMHLE kole?
+            // W-DOSAH: dosahne na ten cil vubec v TOMHLE kole, a do konce pule?
             if (target != p.position) {
                 const int need = p.position.distanceTo(target);
                 const int budget = p.movementRemaining;
@@ -2152,9 +2157,25 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     // kazde dalsi kolo plne MA + GFI znovu.
                     const long lifetime = (long)budget + gfi
                         + (long)turnsLeft * ((long)p.stats.movement + gfi);
-                    if ((long)need > lifetime) ++g_repNever[repBranch];
+                    if ((long)need > lifetime) {
+                        ++g_repNever[repBranch];
+                        // ⭐⭐⭐ 04.09.: INVARIANT, ne jen mereni (uzivatel 02.09.:
+                        //   „2 nesmi existovat"). Cil nedosazitelny ani do konce
+                        //   pule se NESMI nabidnout -- vydat ho by hrace stalo
+                        //   cely jeho pohyb a skoncil by na pojistce proti smycce.
+                        //   ⛔ NEORIZAT podle movementRemaining samotneho -- to by
+                        //   zabilo kazdy vicekolovy plan (uzivatel predem
+                        //   varoval, spec zadani_20260903.md); orizava se jen
+                        //   tenhle strukturalni pripad, kdy nepomuze ani zbytek
+                        //   pule. Vetve 5, 7, 8 (a po 02.09. i 6) tohle nikdy
+                        //   nepotkaly, protoze cil pocitaji OD HRACE -- tenhle
+                        //   blok je predloha pro zbyvajici pevne souradnice.
+                        ++g_repBlocked[repBranch];
+                        return;  // nabidka se NEVYDA
+                    }
                 }
             }
+            ++g_repTot[repBranch];
             if (target == p.position) {
                 ++g_repSelf[repBranch];
             } else {
@@ -2265,6 +2286,13 @@ long takeBlitzAndScoreOffersInSearch() { long v=g_basOfferSearch; g_basOfferSear
 
 void takeMoveWalkLimitDist(long* out5) {
     for (int q = 0; q < 5; ++q) { out5[q] = g_mwLimitDist[q]; g_mwLimitDist[q] = 0; }
+}
+
+void takeRepositionBlocked(long* outN) {
+    for (int b = 0; b < BB_REP_BRANCHES; ++b) {
+        outN[b] = g_repBlocked[b];
+        g_repBlocked[b] = 0;
+    }
 }
 
 void takeRepositionTargets(long* out8xN) {
