@@ -94,19 +94,19 @@ static constexpr uint32_t SEED_BASE = 34'000'000;
 static bool modeHasArmSignal(int mode) {
     switch (mode) {
         case 0: case 1: case 4: case 5: case 6: case 7:
-        case 9: case 10: case 12: case 14: case 15:
+        case 9: case 12: case 14: case 15:
         case 16: case 17: case 18:
             return true;
         default:
             return false;   // mode 2 (bez ramene), 3 (policy blend - nic to
-                            // nepocita), 8 a 13 (zrusene)
+                            // nepocita), 8, 10 a 13 (zrusene)
     }
 }
 // Mod ma cim „arm acted" naplnit: bud vlastni citac, nebo `candPlans`,
 // coz je smysluplne jen tam, kde rameno adoptuje PLAN (brana klece).
 static bool modeHasArmCounter(int mode) {
     switch (mode) {
-        case 4: case 5: case 9: case 10: case 12: case 13:
+        case 4: case 5: case 9: case 12: case 13:
         case 14: case 15: case 16: case 17: case 18:   // vlastni citac
         case 0: case 1: case 6: case 7:       // candPlans je tu ten citac
             return true;
@@ -147,6 +147,10 @@ static long g_basOff = 0;
 static long g_mld[5] = {0,0,0,0,0};
 static long g_bp[3] = {0,0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
+// ⭐ M1/N10 po nasazeni (07.09.): uz to neni signal ramene, ale meridlo desky
+//   -- kolikrat blitz nechal aktivaci otevrenou, odmitl follow-up nebo dostal
+//   nabidku ustupu. Tika ve VSECH modech, obema stranam.
+static long g_blitzCont = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
 static const Matchup MATCHUPS[] = {
@@ -357,7 +361,7 @@ int main(int argc, char** argv) {
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
          : mode == 8 ? "(mode 8 ZRUSEN 01.09. -- P35 nasazeno do produkce)"
          : mode == 9 ? "LEAP: skok vstupuje do makrove chuze (rodina M)"
-         : mode == 10 ? "M1/N10: blitz je POHYB S BLOKEM UVNITR (l. 347-350)"
+         : mode == 10 ? "(mode 10 ZRUSEN 07.09. -- M1/N10 nasazeno do produkce)"
          : mode == 11 ? "B2: cena bloku proti obranci, ktery WRESTLE POUZIJE"
                      : "cage vs off");
 
@@ -392,7 +396,6 @@ int main(int argc, char** argv) {
     // directory, so truncating is the behaviour that makes a re-launch correct
     // by construction rather than by remembering to rm first.
     const char* rowsName = mode == 11 ? "diag_wrestleprice_rows.jsonl"
-                         : mode == 10 ? "diag_blitzcont_rows.jsonl"
                          : mode == 9 ? "diag_leapwalk_rows.jsonl"
                          : mode == 15 ? "diag_blitzpath_rows.jsonl"
                          : mode == 13 ? "diag_proneaction_rows.jsonl"
@@ -584,16 +587,15 @@ int main(int argc, char** argv) {
                 bb::setLeapWalkArm(bb::TeamSide::HOME, mode == 9 && candHome);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, mode == 9 && !candHome);
                 bb::takeLeapWalkPicksInSearch();         // vynuluj na par
-                // mode 10 (M1/N10, 25.08.): blitz nechava aktivaci otevrenou,
-                // blitzujici dostane nabidku ustupu a follow-up je VOLBA.
-                // Vsechny tri pulky pod JEDNIM ramenem schvalne -- rozdelene
-                // by meril jejich smes (viz macro_actions.h).
-                // ⚠️ 27.08.: bylo mode 9, prectislovano na 10 -- Leap si 9 vzal
-                // driv a UZ S NIM BEZELA NOC, takze cisla nelze prohodit.
-                bb::setBlitzContinuationArm(bb::TeamSide::HOME,
-                                            mode == 10 && candHome);
-                bb::setBlitzContinuationArm(bb::TeamSide::AWAY,
-                                            mode == 10 && !candHome);
+                // ⛔ mode 10 (M1/N10) ZRUSEN 07.09.2026 -- rameno nasazeno do
+                //   produkce po noci 27.->28.08. (+0,0177 +- 0,0069, >2,5
+                //   sigma), takze uz neni co prepinat. Cislo se NEPOUZIVA
+                //   ZNOVU: mody jsou append-only, protoze index je zapsany
+                //   v radcich na disku -- stejne jako 8 (P35) a 13 (M13).
+                //   Vysledek zustava v `blitzcont_replic_20260827/`.
+                // ⭐ Citac ZUSTAVA jako diagnostika: od nasazeni tika obema
+                //   stranam a rika, jak casto blitzujici vubec pokracuje.
+                //   Neni to uz signal ramene (viz `modeHasArmSignal`).
                 bb::takeBlitzContinuationEventsInSearch();   // vynuluj na par
                 // ⛔ mode 11 (B2) ZRUSEN 30.08.: noc 29.->30.08. dala
                 // EKVIVALENCI (delta +0,0010 +- 0,0034, cele CI uvnitr prahu),
@@ -625,9 +627,7 @@ int main(int argc, char** argv) {
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
-                long candCont = bb::takeBlitzContinuationEventsInSearch();
-                bb::setBlitzContinuationArm(bb::TeamSide::HOME, false);
-                bb::setBlitzContinuationArm(bb::TeamSide::AWAY, false);
+                g_blitzCont += bb::takeBlitzContinuationEventsInSearch();
                 long candWrestle = 0;   // mode 11 zrusen (viz vyse)
                 // ⭐ M12 krok 1 (30.08.): diagnostika ADVANCE, NEZAVISLA na
                 //   ramenech -- tika i s vypnutymi. Odpovida na otazku, jestli
@@ -720,7 +720,6 @@ int main(int argc, char** argv) {
                               : (mode == 14 || mode == 16 || mode == 17) ? candPrice
                               : (mode == 18) ? candGfi
                               : (mode == 9) ? candLeap
-                              : (mode == 10) ? candCont
                               : (mode == 12) ? candCrit
                               : (mode == 6 || mode == 7) ? candCage : candPlans;
                 if (cs > bs) candW++;
@@ -765,7 +764,12 @@ int main(int argc, char** argv) {
                             // to pole maji a ctecky se kvuli tomu nemaji menit.
                             basePlans, candDaunt, candRoll, 0L,
                             candProne, candPrice,
-                            candLeap, candCont, mode);
+                            // cand_cont zustava v SCHEMATU s nulou ze stejneho
+                            // duvodu jako cand_landing: mode 10 je zrusen
+                            // (M1/N10 nasazeno), ale radky starych behu to pole
+                            // maji a ctecky se kvuli tomu nemaji menit. Soucet
+                            // se od ted tiskne v souhrnu jako M1/POKRACOVANI.
+                            candLeap, 0L, mode);
                     fflush(rows);
                 }
             }
@@ -994,6 +998,9 @@ int main(int argc, char** argv) {
                    g_hitStood, g_hitStoodBl,
                    g_hitStood ? 100.0*g_hitStoodBl/g_hitStood : 0.0,
                    g_kdStood, g_hitStood ? 100.0*g_kdStood/g_hitStood : 0.0);
+            printf("  M1/POKRACOVANI: %ld udalosti (aktivace otevrena / follow-up "
+                   "odmitnut / ustup nabidnut) -- od 07.09. PRODUKCE, obe strany\n",
+                   g_blitzCont);
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);

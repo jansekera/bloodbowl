@@ -68,22 +68,13 @@ CAGE_GATE = os.environ.get("CAGE_GATE", "1") != "0"
 #                neviděl dovednost, kterou resolver už ctí — na jedné straně by
 #                to srovnávalo dva různé enginy, ne dvě ramena.
 DAUNTLESS = os.environ.get("DAUNTLESS", "1") != "0"
-#   BLITZ_CONT=1 zapne rameno M1/N10 (blitz nechává aktivaci otevřenou,
-#     BB2016 ř. 347-350) na OBOU stranách. Default 0 = produkce.
-#   ⭐ PROČ TENHLE PŘEPÍNAČ VŮBEC JE (28.08.2026). Rameno prošlo A/B v noci
-#     27.->28.08. (+0,0177 ± 0,0069, předpovědi 6/6), ale předregistrace u něj
-#     nechala DVA ruční body, které se z korpusu přečíst nedají, protože korpus
-#     se sbírá s rameny VYPNUTÝMI:
-#       (2) spotřeboval se strop z M9? (4,09 blitzu/hru končí v kontaktu, ač
-#           má tělo MA i kam jít)
-#       (3) kolikrát se follow-up ODMÍTNE?
-#     ⛔ S vypnutým ramenem vyjde (3) NULA Z KONSTRUKCE -- a předregistrace
-#     u toho varovala „kdyby vyšlo ~0, je ta půlka mrtvá". To by byl lživý
-#     závěr, ne nález.
-#   ⭐ A NENÍ TO NASAZENÍ DO PRODUKCE. Přepínač odděluje „změřit, co rameno
-#     dělá" od „rozhodnout, jestli ho nasadit" -- což je lekce z Q8, kde se
-#     „nasadit P38?" ptalo na směs tří změn.
-BLITZ_CONT = os.environ.get("BLITZ_CONT", "0") != "0"
+#   ⛔ BLITZ_CONT ZRUŠENO 07.09.2026 -- M1/N10 nasazeno do produkce (noc
+#     27.->28.08.: +0,0177 ± 0,0069, předpovědi 6/6). Engine už žádný přepínač
+#     nemá a chová se vždy tak, jak se dřív choval jen se zapnutým ramenem:
+#     blitz nechává aktivaci otevřenou (BB2016 ř. 347-350), blitzující dostane
+#     nabídku ústupu a follow-up je VOLBA. Korpus sbíraný přes tenhle skript
+#     tedy hraje totéž co produkce -- což je týž důvod, proč má DAUNTLESS
+#     default 1.
 BASE_SEED = int(os.environ.get("SEED_BASE", "20260811"))
 DATA_ROOT = Path(os.environ.get(
     "DATA_ROOT", "diag_replay_mine_20260813_gate_data"))
@@ -118,7 +109,6 @@ def _game_worker(args: tuple) -> dict:
         cage_advance=CAGE_GATE and dwarf_home,
         away_cage_advance=CAGE_GATE and not dwarf_home,
         dauntless_in_offer=DAUNTLESS,
-        blitz_continuation=BLITZ_CONT,
     )
     turns = lgr.get_turn_logs()
     rec = {

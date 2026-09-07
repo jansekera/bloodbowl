@@ -138,7 +138,9 @@ bool leapWalkArm(TeamSide side);
 // změněná volba. Je to počet VYHODNOCENÍ V SEARCHI, ne skoků na hřišti.
 long takeLeapWalkPicksInSearch();
 
-// --- M1/N10 arm (2026-08-25): a Blitz is a MOVE with a block inside it ---
+// --- M1/N10 (2026-08-25): a Blitz is a MOVE with a block inside it ---
+// ⭐ NASAZENO 07.09.2026, rameno odebrano. Noc 27.->28.08.: +0,0177 +- 0,0069
+//   (>2,5 sigma, 6/6 predpovedi). Vsechny tri pulky jsou od ted PRODUKCE.
 //
 // BB2016 l. 347-350: "He may make one block during the move. The block may be
 // made AT ANY POINT during the move." The engine ended the activation on every
@@ -147,27 +149,23 @@ long takeLeapWalkPicksInSearch();
 // 4.09 blitzes a game end stuck in contact with MA left and somewhere to go,
 // AV7 pieces 1.5x more often than AV9.
 //
-// ⚠️ THE ARM COVERS ALL THREE HALVES AT ONCE, deliberately. They are one rule:
+// ⚠️ THE ARM COVERED ALL THREE HALVES AT ONCE, deliberately. They are one rule:
 //   (1) the activation stays open after the block   (block_handler)
 //   (2) the blitzer is OFFERED a retreat            (getAvailableMacros)
 //   (3) the follow-up becomes a choice, l. 608-611  (block_handler)
 // Splitting them into separate switches would measure a mixture: (1) without
 // (2) is permission with nowhere to go, and (1)+(2) without (3) is mostly eaten
 // by the push dragging him in before he can withdraw.
-//
-// Per side, default OFF.
 // Diagnostika B2: kolikrát se v hledání ocenil blok proti obránci, který by
 // Wrestle POUŽIL, a útočník má Block -- tedy případ, kde se cena od naivní
 // liší (2/6 místo 1/6). Není to rameno, jen měřidlo; cena je od 30.08.
 // v produkci vždy.
 long takeWrestleDefenderPricedInSearch();
 
-void setBlitzContinuationArm(TeamSide side, bool on);
-bool blitzContinuationArm(TeamSide side);
-
-// Times the arm actually changed a decision: an activation left open, a retreat
-// offered, or a follow-up declined. Zero over a matchup means both arms played
-// the same game -- the null test. Per SEARCH EVALUATION, like the P35 counter.
+// Diagnostika M1/N10: kolikrat blitz nechal aktivaci otevrenou, odmitl
+// follow-up nebo dostal nabidku ustupu. Neni to rameno, jen meridlo; chovani
+// je od 07.09. v produkci vzdy (rameno padlo po noci 27.->28.08., +0,0177
+// +- 0,0069). Per SEARCH EVALUATION, jako ostatni citace tady.
 long takeBlitzContinuationEventsInSearch();
 // Internal: bump the counter from block_handler, which owns two of the three
 // halves. Not part of the harness API.

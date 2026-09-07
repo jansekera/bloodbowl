@@ -3,7 +3,7 @@
 #include "bb/helpers.h"
 #include "bb/injury.h"
 #include "bb/ball_handler.h"
-#include "bb/macro_actions.h"   // M1/N10 arm: blitzContinuationArm()
+#include "bb/macro_actions.h"   // M1/N10: noteBlitzContinuationEvent()
 #include <algorithm>
 
 namespace bb {
@@ -405,9 +405,14 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
 // míst, kde blok normálně končí -- 25.08. jsem nejdřív opravil jen to poslední
 // a větev s pushnutím (ř. ~875) se vrací dřív, takže test padal a vypadalo to,
 // jako by rameno nefungovalo. Dvě kopie téhož pravidla = jedna z nich zestárne.
+//
+// ⭐ M1/N10 NASAZENO 07.09.2026 -- rameno odebrano, otevrena aktivace je
+// PRODUKCE. Noc 27.->28.08. dala +0,0177 +- 0,0069 (>2,5 sigma, 6/6
+// predpovedi). Duvod odebrani je tyz jako u P35 (01.09.) a M13 (02.09.):
+// pravidlova oprava, o ktere je dolozeno, ze POMAHA, nema co delat za
+// default-OFF vypinacem -- to je jen dalsi hotova vec, o ktere nikdo nevi.
 static void endBlockActivation(Player& att, const BlockParams& params) {
-    const bool staysOpen = blitzContinuationArm(att.teamSide) &&
-                           params.isBlitz && canAct(att.state);
+    const bool staysOpen = params.isBlitz && canAct(att.state);
     if (staysOpen) noteBlitzContinuationEvent();
     att.hasActed = !staysOpen;
 }
@@ -433,10 +438,6 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
     // Povinné případy -- pravidla volbu neposkytují:
     //   Frenzy l. 8138: "must always follow up if they can"
     //   Ball & Chain l. 7825: "must follow up if they push back another player"
-    // ⚠️ Za VYPNUTÝM ramenem se chová přesně jako do 25.08.: následuje vždy.
-    // Bez toho by se nulový test nedal udělat -- větev bez ramene musí hrát
-    // starou hru beze zbytku.
-    if (!blitzContinuationArm(att.teamSide)) return true;
     if (att.hasSkill(SkillName::Frenzy) ||
         att.hasSkill(SkillName::BallAndChain)) {
         return true;

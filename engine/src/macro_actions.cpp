@@ -656,16 +656,15 @@ long takeWrestleDefenderPricedInSearch() {
     return v;
 }
 
-thread_local bool g_blitzContinuation[2] = {false, false};
+// ⭐ DIAGNOSTIKA, NE RAMENO (07.09.2026). Vypinac `setBlitzContinuationArm`
+// padl spolu s nasazenim M1/N10 -- citac zustal, tyz princip jako u ceny
+// Wrestle (B2, 30.08.) a u picku lezicich (M13, 02.09.): MERIDLO NESMI VISET
+// NA TOM, JESTLI SE ROZHODUJE. Tika tri veci, ktere jsou od ted vlastnost
+// desky, ne ramene: aktivace nechana otevrena, follow-up odmitnut, ustup
+// nabidnut. Bez nej by na otazku „jak casto blitzujici vubec pokracuje"
+// neumel odpovedet nikdo -- a nula z chybejiciho meridla se od nuly
+// z chybejiciho jevu nepozna.
 thread_local long g_blitzContinuationEvents = 0;
-
-void setBlitzContinuationArm(TeamSide side, bool on) {
-    g_blitzContinuation[side == TeamSide::HOME ? 0 : 1] = on;
-}
-
-bool blitzContinuationArm(TeamSide side) {
-    return g_blitzContinuation[side == TeamSide::HOME ? 0 : 1];
-}
 
 void noteBlitzContinuationEvent() { ++g_blitzContinuationEvents; }
 
@@ -1286,8 +1285,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // skipped here and keeps his own macros.
     // ⚠️ No GFI: a retreat bought with a Go For It is a gamble, not hygiene,
     // and M9's ceiling counted only squares reachable on real movement.
+    //
+    // ⭐ M1/N10 NASAZENO 07.09.2026 -- rameno odebrano, nabidka ustupu je
+    // PRODUKCE (noc 27.->28.08.: +0,0177 +- 0,0069, >2,5 sigma, 6/6 predpovedi).
     state.forEachOnPitch(mySide, [&](const Player& p) {
-        if (!blitzContinuationArm(mySide)) return;
         if (!p.canAct() || !p.usedBlitz) return;
         if (p.hasSkill(SkillName::BallAndChain)) return;
         if (iHaveBall && p.id == carrier->id) return;

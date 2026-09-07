@@ -701,42 +701,23 @@ TEST(BlockHandler, BlitzFrenzySecondBlockDeniedWithoutMovement) {
 //
 // These three pin the boundary rather than the fix: a blitz leaves the
 // activation open, a Block Action does not, and going down closes it either way.
-// M1/N10 arm is thread_local and the whole suite runs in one process, so a
-// test that switches it on must switch it off again or it leaks into every
-// test that follows. RAII rather than a trailing call: an EXPECT that fails
-// mid-test must not be able to skip the cleanup.
-struct BlitzContinuationArmOn {
-    explicit BlitzContinuationArmOn(TeamSide side) : side_(side) {
-        setBlitzContinuationArm(side_, true);
-    }
-    ~BlitzContinuationArmOn() { setBlitzContinuationArm(side_, false); }
-    TeamSide side_;
-};
-
-// The null test at unit level: with the arm OFF the engine must play exactly
-// the game it played before 25.08. -- activation closed, follow-up taken. If
-// this ever drifts, the paired A/B is measuring two different baselines and the
-// delta means nothing.
-TEST(BlockHandler, WithTheArmOffTheBlitzBehavesExactlyAsBefore) {
-    GameState gs;
-    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
-    gs.getPlayer(1).movementRemaining = 4;
-    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-
-    FixedDiceRoller dice({3});
-    BlockParams params{1, 12, true, false};
-    resolveBlock(gs, params, dice, nullptr);
-
-    EXPECT_TRUE(gs.getPlayer(1).hasActed) << "arm off: the block ends the activation";
-    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "arm off: follow-up is taken";
-}
+// ⭐ M1/N10 NASAZENO 07.09.2026 -- rameno `setBlitzContinuationArm` odebrano,
+// vsechny tri pulky jsou PRODUKCE. Noc 27.->28.08. (+0,0177 +- 0,0069, >2,5
+// sigma, 6/6 predpovedi). Duvod odebrani je tyz jako u P35 (01.09.) a M13
+// (02.09.): default-OFF vypinac u dolozene prospesne pravidlove opravy uz
+// nema co hlidat.
+//
+// S ramenem odesla i RAII pomucka `BlitzContinuationArmOn` a test
+// WithTheArmOffTheBlitzBehavesExactlyAsBefore -- ten hlidal VYPNUTY vypinac
+// (aktivace zavrena, follow-up vzdy) a se zrusenim vypinace ztratil predmet;
+// stara vetev uz neexistuje, takze nemuze zestarnout. Testy nize hlidaji SAMA
+// PRAVIDLA a plati beze zmeny.
 
 // M1c/T5.29 (25.08.2026): l. 608-611 make the follow-up the coach's decision,
 // and we always took it. For a blitzer whose activation is still open that is
 // not a free square, it is a shove deeper into contact -- he lands next to the
 // very player he just pushed, and only then may he withdraw.
 TEST(BlockHandler, BlitzerWithMovementLeftDeclinesAFollowUpIntoMoreTacklezones) {
-    BlitzContinuationArmOn arm(TeamSide::HOME);
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).movementRemaining = 4;
@@ -768,7 +749,6 @@ TEST(BlockHandler, BlockActionStillTakesTheFreeFollowUp) {
 }
 
 TEST(BlockHandler, BlitzLeavesTheActivationOpenAfterTheBlock) {
-    BlitzContinuationArmOn arm(TeamSide::HOME);
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).movementRemaining = 4;
@@ -1248,7 +1228,13 @@ TEST(BlockHandler, FollowUpTakenIsLogged) {
 
     std::vector<GameEvent> ev;
     FixedDiceRoller dice({3});                 // PUSHED
-    BlockParams params{1, 12, true, false};    // blitz, arm OFF => always follows
+    // ⭐ 07.09.: byl to BLITZ „s vypnutym ramenem => nasleduje vzdy". Rameno
+    // padlo (M1/N10 nasazeno) a blitzujici s pohybem by tuhle nabidku ted
+    // ODMITL -- coz je predmet testu o dva niz. Povinny follow-up se tedy
+    // bere tam, kde ho pravidla POVINNY nechavaji: blok jako CELA aktivace
+    // (l. 608-611 nedava co setrit). Predmet testu -- ZAPIS udalosti
+    // FOLLOW_UP vcetne from/to -- je tyz.
+    BlockParams params{1, 12, false, false};   // Block Action => always follows
     resolveBlock(gs, params, dice, &ev);
 
     ASSERT_EQ(countFollowUps(ev, true), 1);
@@ -1264,7 +1250,6 @@ TEST(BlockHandler, FollowUpTakenIsLogged) {
 }
 
 TEST(BlockHandler, FollowUpDeclinedIsLoggedToo) {
-    BlitzContinuationArmOn arm(TeamSide::HOME);
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).movementRemaining = 4;
