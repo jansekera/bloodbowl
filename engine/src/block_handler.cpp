@@ -53,6 +53,8 @@ thread_local long g_dauntlessRolls = 0;
 // P9/P9c arm -- see bb/block_handler.h for the measured motivation.
 thread_local bool g_pushGeometry[2] = {false, false};
 thread_local long g_pushGeometryPicks = 0;
+thread_local long g_pushGeometryPicksDodge = 0;   // redirected AND pushed target has Dodge
+thread_local long g_pushGeometryPicksFastMA = 0;  // redirected AND pushed target MA >= 6 (first-pass "fast mover" cutoff, not a tuned constant)
 
 long takeDauntlessRollEvalsInSearch() {
     long v = g_dauntlessRolls;
@@ -71,6 +73,17 @@ bool pushGeometryArm(TeamSide side) {
 long takePushGeometryEvalsInSearch() {
     long v = g_pushGeometryPicks;
     g_pushGeometryPicks = 0;
+    return v;
+}
+
+long takePushGeometryDodgePicksInSearch() {
+    long v = g_pushGeometryPicksDodge;
+    g_pushGeometryPicksDodge = 0;
+    return v;
+}
+long takePushGeometryFastMAPicksInSearch() {
+    long v = g_pushGeometryPicksFastMA;
+    g_pushGeometryPicksFastMA = 0;
     return v;
 }
 
@@ -261,7 +274,11 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
             int sc = count - i;
             if (plain < 0 || sc > plainScore) { plain = i; plainScore = sc; }
         }
-        if (plain >= 0 && plain != best) ++g_pushGeometryPicks;
+        if (plain >= 0 && plain != best) {
+            ++g_pushGeometryPicks;
+            if (pushed.hasSkill(SkillName::Dodge)) ++g_pushGeometryPicksDodge;
+            if (pushed.stats.movement >= 6) ++g_pushGeometryPicksFastMA;
+        }
     }
     return best;
 }

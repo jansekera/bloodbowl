@@ -86,6 +86,8 @@ bool pushGeometryArm(TeamSide side);
 // not just pushes played on the pitch. It answers "did the arm run at all",
 // which is what the per-pair null control needs.
 long takePushGeometryEvalsInSearch();
+long takePushGeometryDodgePicksInSearch();
+long takePushGeometryFastMAPicksInSearch();
 
 
 // Q3 krok B (31.08.2026): souperova odpoved na vstani vedle nej.

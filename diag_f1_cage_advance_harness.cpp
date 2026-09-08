@@ -519,6 +519,8 @@ int main(int argc, char** argv) {
                 bb::setPushGeometryArm(bb::TeamSide::AWAY,
                                        mode == 5 && !candHome);
                 bb::takePushGeometryEvalsInSearch();   // vynuluj čítač na pár
+                bb::takePushGeometryDodgePicksInSearch();   // vynuluj čítač na pár
+                bb::takePushGeometryFastMAPicksInSearch();  // vynuluj čítač na pár
                 // mode 6 (P38, 19.08.): rameno sedí v expandAdvance -- cílové
                 // pole nosiče se odvozuje z klece, která z něj vyjde. Per strana,
                 // shazuje se hned po hře, ať nepřeteče do dalšího páru.
@@ -613,6 +615,8 @@ int main(int argc, char** argv) {
                 // Dauntless srovnal. Nula = rameno nic nezměnilo, a to je něco
                 // JINÉHO než „změna nemá efekt".
                 long candPush = bb::takePushGeometryEvalsInSearch();
+                long candPushDodge = bb::takePushGeometryDodgePicksInSearch();
+                long candPushFastMA = bb::takePushGeometryFastMAPicksInSearch();
                 long candCage = bb::takeCageAwareAdvancePicksInSearch();
                 // ⛔ V mode 12 se `candCage` POUZIT NESMI -- tika i placebu,
                 //   takze by obe strany hlasily "rameno jednalo". Signalem je
@@ -753,7 +757,9 @@ int main(int argc, char** argv) {
                             "\"cand_plans\":%d,\"base_plans\":%d,"
                             "\"cand_daunt\":%ld,\"cand_roll\":%ld,\"cand_landing\":%ld,"
                             "\"cand_prone\":%ld,\"cand_price\":%ld,"
-                            "\"cand_leap\":%ld,\"cand_cont\":%ld,\"mode\":%d}\n",
+                            "\"cand_leap\":%ld,\"cand_cont\":%ld,"
+                            "\"cand_push\":%ld,\"cand_push_dodge\":%ld,"
+                            "\"cand_push_fastma\":%ld,\"mode\":%d}\n",
                             mi, seedOffset + i, candHome ? "true" : "false",
                             mu.home, mu.away,
                             cs, bs, g.home.ko, g.home.injured, g.home.dead,
@@ -769,7 +775,16 @@ int main(int argc, char** argv) {
                             // (M1/N10 nasazeno), ale radky starych behu to pole
                             // maji a ctecky se kvuli tomu nemaji menit. Soucet
                             // se od ted tiskne v souhrnu jako M1/POKRACOVANI.
-                            candLeap, 0L, mode);
+                            candLeap, 0L,
+                            // 08.09.: mode 5 reanalyza -- cand_push_dodge a
+                            // cand_push_fastma jsou NOVA pole (ne recyklovany
+                            // mrtvy slot jako cand_landing/cand_cont vyse),
+                            // protoze se maji cist SOUCASNE s cand_push, ne
+                            // misto nej. Meri agilitu odsunuteho cile jen u
+                            // presmerovanych odsunu (viz g_pushGeometryPicks*
+                            // v block_handler.cpp) -- cisty pridavek, nemeni
+                            // vyznam zadneho existujiciho pole.
+                            candPush, candPushDodge, candPushFastMA, mode);
                     fflush(rows);
                 }
             }
