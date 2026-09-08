@@ -172,7 +172,7 @@ skaven     Gutter Runner MA9 ST2 ×4          ST2 proti ST3 je DO KOPCE => kostk
 
 | ID | co | stav |
 |---|---|---|
-| **P9c** | ⭐⭐⭐ **ÚČEL BLOKU NA POLLUTERA JE ODKLIDIT HO OD ROHU** *(uživatel 14.08.: „priorita u špinavého rohu je odklidit protihráče pryč od rohu — ne jej nechat u rohu a posunout blíž k balonu")*. **Není to kompromis, je to pořadí:** odsun, po kterém polluter roh **pořád špiní**, není částečný úspěch — je to **selhání akce**, protože roh byl jediný důvod ji dělat. A když ho takový odsun navíc přiblíží k nosiči, je to **záporný obchod**.<br>⇒ Řazení cílových polí při bloku na pollutera: **(1) přestane sousedit s rohem** *(to je účel)* → **(2) nepřiblíží se k našemu nosiči** → (3) zbytek.<br>⚠️ **Váže to i výběr blokujícího, ne jen směru:** tři nabízená pole jsou dána vektorem `polluter − blokující`, takže **kdo udeří, určuje, kam se dá odsunout**. Blokující se má vybírat tak, aby pole splňující (1) vůbec existovalo.<br>⭐ **Nepotřebuje nové logování** — je to otázka na začátek kola (pozice pollutera, rohu, nosiče a kandidátů na blok), ne na průběh. Jde spočítat na **stávajícím korpusu**. <br><br>✅ **IMPLEMENTOVÁNO 18.08. A JDE NA NOC.** `choosePushSquare` teď cílové pole **skóruje**, v uživatelově pořadí: (1) přestane sousedit s rohem naší klece → (2) nepřiblíží se k našemu nosiči (REACH0) → (3) rovně dozadu jako tiebreak. **Bez našeho nosiče na hřišti skóruje přesně jako dřív ⇒ na obraně je rameno konstrukčně no-op.** Per SIDE (`setPushGeometryArm`), default OFF, čítač tiká **jen když se pole opravdu přesměrovalo**. Testy 545 → 549. **Strop spočítán PŘED během:** 21,93 odsunu na zápas, **17,34 se skutečnou volbou**, **1,04 na zápas přisunuto BLÍŽ k našemu nosiči** ač šlo dál (0,27 přímo k němu) a **0,24 ponecháno u rohu** ač šlo jinam ⇒ **~1,28 prokazatelně horší volby na zápas** (P10a 0,23 · P8 0,056, obojí zamítnuto). Předregistrace `evidence/night_prereg_20260818.md`.<br><br>⚖️ **ZMĚŘENO 18.→19.08. — EFEKT SE NEKONAL.** `pushgeom_20260818/`, 6 800 párů, leak **0**, `n_nonzero` **57,5 %**, bez overdisperze: **+0,0017 ± 0,0060 SE (+0,28σ)**, 95 % CI **[−0,0100; +0,0134]**. Předpověď 0,005–0,020 **MIMO**. CI je celé uvnitř prahu ⇒ efekt **≥ 1,5 pp vyloučen v obou směrech**; ⚠️ malý kladný efekt **do ~1,3 pp vyloučit neumíme**, takže „neškodí" ANO, „je k ničemu" NE. ⇒ **Kód se nezahazuje** (je to doložená vada volby, 1,28 horší volby na zápas), ale **sám o sobě chess neposouvá** — druhou půlku drží **P32**. |
+| **P9c** | ⭐⭐⭐ **ÚČEL BLOKU NA POLLUTERA JE ODKLIDIT HO OD ROHU** *(uživatel 14.08.: „priorita u špinavého rohu je odklidit protihráče pryč od rohu — ne jej nechat u rohu a posunout blíž k balonu")*. **Není to kompromis, je to pořadí:** odsun, po kterém polluter roh **pořád špiní**, není částečný úspěch — je to **selhání akce**, protože roh byl jediný důvod ji dělat. A když ho takový odsun navíc přiblíží k nosiči, je to **záporný obchod**.<br>⇒ Řazení cílových polí při bloku na pollutera: **(1) přestane sousedit s rohem** *(to je účel)* → **(2) nepřiblíží se k našemu nosiči** → (3) zbytek.<br>⚠️ **Váže to i výběr blokujícího, ne jen směru:** tři nabízená pole jsou dána vektorem `polluter − blokující`, takže **kdo udeří, určuje, kam se dá odsunout**. Blokující se má vybírat tak, aby pole splňující (1) vůbec existovalo.<br>⭐ **Nepotřebuje nové logování** — je to otázka na začátek kola (pozice pollutera, rohu, nosiče a kandidátů na blok), ne na průběh. Jde spočítat na **stávajícím korpusu**. <br><br>✅ **IMPLEMENTOVÁNO 18.08. A JDE NA NOC.** `choosePushSquare` teď cílové pole **skóruje**, v uživatelově pořadí: (1) přestane sousedit s rohem naší klece → (2) nepřiblíží se k našemu nosiči (REACH0) → (3) rovně dozadu jako tiebreak. **Bez našeho nosiče na hřišti skóruje přesně jako dřív ⇒ na obraně je rameno konstrukčně no-op.** Per SIDE (`setPushGeometryArm`), default OFF, čítač tiká **jen když se pole opravdu přesměrovalo**. Testy 545 → 549. **Strop spočítán PŘED během:** 21,93 odsunu na zápas, **17,34 se skutečnou volbou**, **1,04 na zápas přisunuto BLÍŽ k našemu nosiči** ač šlo dál (0,27 přímo k němu) a **0,24 ponecháno u rohu** ač šlo jinam ⇒ **~1,28 prokazatelně horší volby na zápas** (P10a 0,23 · P8 0,056, obojí zamítnuto). Předregistrace `evidence/night_prereg_20260818.md`.<br><br>⚖️ **ZMĚŘENO 18.→19.08. — EFEKT SE NEKONAL.** `pushgeom_20260818/`, 6 800 párů, leak **0**, `n_nonzero` **57,5 %**, bez overdisperze: **+0,0017 ± 0,0060 SE (+0,28σ)**, 95 % CI **[−0,0100; +0,0134]**. Předpověď 0,005–0,020 **MIMO**. CI je celé uvnitř prahu ⇒ efekt **≥ 1,5 pp vyloučen v obou směrech**; ⚠️ malý kladný efekt **do ~1,3 pp vyloučit neumíme**, takže „neškodí" ANO, „je k ničemu" NE. ⇒ **Kód se nezahazuje** (je to doložená vada volby, 1,28 horší volby na zápas), ale **sám o sobě chess neposouvá** — druhou půlku drží **P32**. |<br><br>⏰⏰ **08.09.: EXPLORATIVNÍ PŘEPOČET (nepředregistrovaný) — SKRYTÁ ASYMETRIE PODLE STRANY.** Rozdělením `pushgeom_20260818/dw-we_s*/diag_pushgeom_rows.jsonl` (13 600 řádků) podle `cand_home` a s kontrolou z `control_mode2/diag_era_rows.jsonl` (n=50, dw-we bez ramene): **efekt na trpaslíka (drží rameno on) +0,0187 ± 0,0705 (0,27σ)**, **efekt na elfa (drží rameno on) −0,0171 ± 0,0705 (0,24σ)** — každý zvlášť šum. Ale **rozdíl mezi nimi +0,0358 ± 0,0068 = 5,28σ**, protože se nejistá kontrola v rozdílu (stejně jako v součtu) odečte pryč. Součet `e_dwarf+e_elf` = +0,0017 ± 0,0068, sedí na ohlášenou noční deltu ⇒ metodika konzistentní. **HYPOTÉZA (uživatel 08.09.):** nejde o to, kdo rameno drží, ale **koho odsouvá** — když ho drží trpaslík, odsouvá agilní elfy (MA6+/Dodge) a vychází to kladně; když ho drží elf, odsouvá neagilní trpaslíky (MA4, bez Dodge) a vychází to záporně. Dává to mechanický smysl (agilní cíl si špatný odsun dokáže vykompenzovat, neagilní ne), ale **korpus to neumí ověřit** — `diag_pushgeom_rows.jsonl` loguje jen souhrn zápasu za stranu, ne AG/MA/Dodge konkrétního odsouvaného hráče. ⏰ **UŽIVATEL 08.09.: „P9c budu chtít projít."** Než další noc: doplnit logování odsouvaného hráče (AG/MA/přítomnost Dodge) do `diag_f1_cage_advance_harness.cpp`, napsat předregistraci na hypotézu "hodnota roste s agilitou cíle", pak teprve měřit — **nenasazovat z tohohle přepočtu**, je nepředregistrovaný a jednotlivé rasové odhady nejsou samy o sobě průkazné.<br><br>✅ **08.09.: LOGOVÁNÍ HOTOVO.** Doplněny `cand_push`/`cand_push_dodge`/`cand_push_fastma` (odsouvaný má Dodge / MA≥6) do `block_handler.cpp`+`.h` a `diag_f1_cage_advance_harness.cpp`. Čistě přídavné, **715/715 testů beze změny**. Kouřový test (10 párů dw-we): trpaslík drží rameno → odsouvá elfy, dodge cíl 53,6 %, MA≥6 cíl 100,0 % · elf drží rameno → odsouvá trpaslíky, dodge cíl 0,1 %, MA≥6 cíl 8,9 %. Dvě upřesnění proti zjednodušené premise: elfí Lineman/Thrower Dodge nemají (jen Catcher/Blitzer/Wardancer, proto 53,6 % ne ~100 %); trpasličí Runner má MA6 (proto 8,9 % ne 0). Necommitnuto, žádná noc neběžela — jen ověření kabeláže.<br>⛔⛔ **NOVÝ ZÁDRHEL (uživatel 08.09.): „trpaslík má stejně Tackle — ale elf má agilitu."** Trpaslík má Tackle na **9/13 pozic** (ruší soupeřův Dodge PŘI BLOKU, ne při odsunu samotném). V dw-we páru se ale drží pohromadě DVĚ věci najednou: (1) drží-li rameno trpaslík, odsouvá agilního elfa A trpaslík má Tackle; (2) drží-li rameno elf, odsouvá neagilního trpaslíka A elf Tackle většinou nemá. ⇒ **naměřená asymetrie může stejně dobře být "má odsouvající strana Tackle", ne "je cíl agilní"** — v tomhle matchupu se obě vysvětlení nedají rozlišit, protože kolinearizují s rasou stejně jako dřív agilita cíle. Nové čítače tohle nerozliší (logují jen vlastnosti ODSOUVANÉHO). ⏰ **Před předregistrací třeba buď (a) doplnit čítač na Tackle odsouvající strany, nebo (b) najít matchup, kde se agilita cíle a Tackle odsouvajícího nekryjí** (např. ork má Tackle jako trpaslík, ale jinou obrannou strukturu) — jinak předregistrovaná hypotéza testuje dvě věci najednou. |
 | **P9** | ⭐⭐⭐ **SMĚR ODSUNU SE VYBÍRÁ SLEPĚ — a je to společný kořen dvou dnešních nálezů.** CRP FAQ: *„The coach of the moving team decides all pushback directions unless the pushed player has Side Step."* Máme tedy volbu ze **tří polí** (`getPushbackSquares`) a `choosePushSquare` (`block_handler.cpp:113`) ji zahodí: `score = count - i` = **„rovně dozadu první"**, čistě geometricky. Cílové pole se **nikdy nehodnotí** — nedívá se na nosiče, na klec, na endzonu ani na tackle zóny. Heuristiky existují jen pro Side Step a Grab.<br>⇒ **Každý náš odsun je volné přemístění soupeře, a tu volbu zahazujeme.**<br>⭐ **Nejde jen o geometrii, ale o OBSAZENÍ** *(uživatel 14.08.: „je důležité kdo stojí na a — jestli náš nebo soupeř")*. Když prázdné pole není, odsun **řetězí** a druhý článek je ten, kdo tam stojí. Kód rozlišuje jen prázdné/neprázdné (`anyEmpty`) a pak jede straight-back — **komu to tělo patří, neřeší**. Žebříček cílového pole podle obsazení:<br>• **soupeř** → dobré, řetěz posune **dva jejich** ⇒ když je vedle straight-backu pole se soupeřem a straight-back řetězí přes nás, je současná volba **striktně horší** ⇒ patří k **P9a**, ne k doktríně<br>• **prázdné** → výchozí<br>• **naše řadové tělo** → malá cena<br>• **náš roh klece** → vysoká cena *(úder, který měl roh očistit, ho rozebere)*<br>• **náš nosič** → veto<br>⇒ 44,2 % odsunových polí je obsazených, takže tohle není okrajový jev.<br>**Dopad 1 (uživatel 14.08.):** při čištění rohu blokem *„může odsun nechat soupeře nejen jako stojícího souseda rohu, ale nově navíc i souseda ballcarriera"*. Bije to do **27,2 %** bloků, kde polluter zůstane stát (Fable: na zemi je 72,8 %). A míří to na `REACH0`, což je podle E1 rozdíl mezi **1,8 %** a **33 %** ztráty míče.<br>**Dopad 2:** ranní **8 darovaných TD** ve 3000 hrách má týž kořen — ověřeno na `g0289`: pusher (23,8), nosič (24,7), „rovně dozadu" = **(25,6) = endzona**. Nebyla to smůla, byla to ta konstanta. | **OTEVŘENO — VYSOKÁ PRIORITA** *(blokuje bezpečné nasazení P2)* |
 | **P10** | ⭐⭐⭐ **HODNOTA BLOKU SE NEODVOZUJE OD CÍLE — a nosič se odměňuje za MARKOVÁNÍ, ne za sražení.** *(uživatel 14.08.: „když je vedle našeho Longbearda možnost block na GR s míčem a navíc jsou kolem naši — co může být lepšího než jej blocknout?")* Odpověď: nic — a engine to neví.<br>**(1) Prior je plochý:** `greedyMacroRank` (`macro_mcts.cpp:47-48`) dává `BLITZ 20`, `BLOCK 15` — **jedna hodnota pro všechny bloky**. Blok na nosiče s Tackle a 3 kostkami má týž prior jako blok na linemana v protilehlém rohu. Kategorie „udeř na míč" v žebříčku není.<br>**(2) Tři existující členy o nosiči odměňují jen STÁNÍ VEDLE:** marking `+0,08×min(TZ,3)` (max +0,24, `:776`), sideline trap `+0,10` (`:808`), contain-vs-AG≥4 `+0,06×…` (max +0,12, `:819`). **Sražení nosiče nemá člen žádný.**<br>⚠️ **DOPOČÍTÁNO 14.08. — podezření POTVRZENO a je silnější, než vypadalo.** Všechny tři členy o nosiči visí na `ball.isHeld`, takže sražením **zmizí naráz** (−0,24 −0,10 −0,12), a místo nich naskočí `heuristic -= 0.1  // loose ball is bad` (`:762`) — ⭐ **který nerozlišuje „upustili jsme ho" od „právě jsme ho soupeři vyrazili".**<br>Bilance členů, které se mění (soupeřův nosič, 3 naše TZ, AG4):<br>• **uprostřed hřiště** (12 polí od endzony): **+0,13 → −0,02 = −0,15**<br>• **u lajny** (y=2): **+0,23 → −0,02 = −0,25**<br>• **může skórovat** (8 polí, MA9): −0,31 → −0,02 = **+0,29** ✅<br>⇒ **Čím blíž je soupeř skórování, tím víc heuristika blok chce; uprostřed hřiště se mu aktivně brání.** A S7 boxing-in = 32,4 % kol je právě ten střed.<br>⚠️ Poctivě: je to **listová evaluace**, MCTS to může přebít hledáním (sebráním míče hlouběji ve stromě). Netvrdím „AI nikdy nebije nosiče" — tvrdím, že úspěšný výsledek akce se hodnotí hůř než výchozí stav.<br>⇒ Sedí na starý nález *„trpaslík markuje a bije, nehoní"*: markovat jsme ho naučili, bít nedopsali.<br>⛔ **PODMÍNKA, BEZ KTERÉ JE OPRAVA ŠPATNĚ** *(uživatel 14.08.: „zkontroluj před blitz Wardancera na balon, že máš v záloze druhého pro pickup a třetího pro zablokování cesty k uzmutému balonu")*: **vyražený míč je zisk jen tehdy, když ho posbíráme.** Jinak jsme vyrobili volný míč uprostřed hřiště a dali ho rychlejšímu týmu — a trpaslík je v souboji o volný míč nejhorší možná rasa (MA4, AG2 u většiny těl).<br>⇒ `loose ball is bad` **není nesmysl, je to správné pravidlo se špatnou podmínkou**: platí, když scramble prohrajeme, neplatí, když ho vyhrajeme. ⇒ Rameno **nesmí** znít „bij nosiče", ale **„bij nosiče, když scramble vyhrajeme"**, a to je **rozpočet tří těl**: (1) kdo srazí · (2) kdo sebere · (3) kdo zavře cestu.<br>⭐ **Pravidlo je BEZPODMÍNEČNÉ a rasa soupeře o něm nerozhoduje.** Uživatel je řekl dvakrát a pokaždé stejně — u Longbearda proti GR jako součást zadání (*„a navíc jsou kolem naši"*), u Wardancera jako kontrolu. Rychlost soupeře neurčuje, **jestli** pravidlo platí, jen **jak těsně se ta trojice počítá**: proti Wardancerovi musí být třetí tělo blíž a cesta zavřenější, protože je na míči dřív. ⛔ *(Zapsal jsem to nejdřív jako dva protikladné případy lámající se podle rychlosti soupeře — to byl můj konstrukt, ne jeho pravidlo. Opraveno.)*<br>⇒ Dnešní člen se ptá **jen na nás** (`nearestDist` našeho nejbližšího, max +0,08) — nikdy na to, **kdo je blíž, my nebo oni**, a tělo zavírající cestu nemodeluje vůbec.<br>⭐⭐ **A musí se ptát i KDO JE RYCHLEJŠÍ** *(uživatel 14.08.)*: **cena ztráty míče není konstanta, je funkcí rychlosti soupeře k míči.** Proti skavenovi (MA9 + Dodge, a s Nerves of Steel i chycení v obklíčení) je upuštěný míč **skoro inkasovaný gól** — proto se jim vyplatí blitz na míč i za cenu ztráty těl, a proto nám dají **198 krádežových TD proti orkovým 31**. Proti orkovi (MA4–5, AG2–3) je to nepříjemnost, kterou často sebereme zpátky. ⇒ Táž jedna oprava, dva vstupy místo jednoho. Podrobně `evidence/matchup_asymmetry_20260814.md`.<br>⇒ Symetricky potvrzuje rozpočet tří těl: **my potřebujeme tři, abychom scramble vyhráli. Oni jedno.** Souvisí s [[project_bloodbowl_loose_ball_denial_doctrine_20260807]].<br>⛔ **POZOR NA ZÁMĚNU SITUACÍ** *(uživatel 14.08.)*: „nosič" a „polluter" **nejsou dva cíle v jednom kole**, jsou to cíle ve **dvou různých situacích**. Roh klece existuje jen v **našem kole s míčem** (S2–S5); soupeřův nosič jen v **obranném kole** (S7/S8). Prior na blok podle cíle proto **musí být indexovaný situací**, ne jeden plochý žebříček — jinak se opakuje táž chyba o patro výš. ⇒ P10 se dělí: **P10a** blok na soupeřova nosiče *(obrana)* · **P10b** blok na pollutera *(útok)*. **P10b NENÍ levnější cesta k P2, je to P2.** <br><br>⛔⛔ **P10a ZAMÍTNUTO JAKO NOČNÍ RAMENO 18.08. — Q1 pojistka ho zastavila.** Oprava napsána (`MCTSConfig::carrierBlockPrior`: blok/blitz na nosiče dostane prior floor 0,20 místo plochých 0,12, **jen když u pole nosiče máme aspoň tolik těl v dosahu co soupeř** — podmínka, ne preference, protože sražení nosiče míč UVOLNÍ a soupeř má v dosahu víc těl v 54,1 %). **Q1 na přeplněné desce:** podmínka funguje (nesporné pole 0,0 pp), ale **sporné pole se nehnulo taky — search si nosiče bere v 98 % už bez ramene**. **Korpus se jmenovatelem:** z **3 733** příležitostí jsme na nosiče udeřili v **81,5 %**, a bez souseda jsme na něj **6 143×** doblitzovali. ⇒ **Strop ~0,23 kola na zápas**, z toho část se udeřit nemá. Táž logika jako P8 (0,056 faulu/zápas). Kód zůstává za vypnutým flagem, testy 549/549. Doklad `evidence/p10a_q1_result_20260818.md`. ⚠️ **Neodpovězeno:** jestli je těch 81,5 % úderů dobře NAČASOVANÝCH a jestli se udeří SPRÁVNÝM tělem (P9). |
 | **P13** | ⛔⛔ **ZMĚŘENO Q1 TESTEM 14.08. — OPRAVA NABÍDKY SAMA NESTAČÍ.** Postavená pozice: náš Slayer (ST3, Dauntless+Block) mezi **Black Orkem ST4** a **linemanem ST3**, 120 opakování na rameno, `diag_q1_target_choice_20260814.cpp`.<br><br>| | bloků zvoleno | **z toho Black Orc** |<br>|---|---|---|<br>| Dauntless v nabídce **OFF** | 84 | **0** |<br>| Dauntless v nabídce **ON** | 112 | **0** |<br><br>⇒ **Search si Black Orka nevybere ani jednou, ani když je mu nabízený.** Vybere vždy linemana vedle něj. Nabídka stoupla, volba se nezměnila.<br>⚠️ Počet bloků se zvedl 84 → 112, takže ta nabídka **něco** udělala — jen ne to zamýšlené: rozhýbala prohledávání a skončila u linemana. **Noční A/B by měřilo vedlejší efekt přidané volby, ne bití Black Orků.**<br>⛔ **NOČNÍ BĚH 14.08. PROTO ZASTAVEN** po ~5 minutách, ne po 14 hodinách. *(uživatel to předpověděl: „bojím se, že to toho Black Orka nevybere a měření bude nula")*<br>⇒ **P13 zůstává správnou opravou** (filtr oceňoval jinou akci, než jaká se provede) — **ale sama o sobě nemá co změřit.** Musí jít **spolu s úrovní 2**: cena cíle v prioru (**P15 / P10a**). To je přesně ten pětiúrovňový řetěz.<br>⚠️ **Výhrada:** jedna postavená pozice, 120 vzorků na rameno. 0/112 je průkazné pro **tuhle** pozici, ne důkaz pro všechny.<br>*(původní popis nálezu níž — platí, jen nestačí)*<br>⭐ **NABÍDKA BLOKU NEPOČÍTÁ S DAUNTLESS, PROVEDENÍ ANO** *(uživatel 14.08.: „soustředili jsme se na welfy a přitom bolí proti orkům — tam je Dauntless na ST4 orky úplně super plán")*.<br>`getBlockDiceCount` (`macro_actions.cpp:126`) počítá jen `Horns`, a jen u blitzu; **Dauntless nikde**. ⇒ Troll Slayer ST3 proti Black Orkovi ST4 se ocení jako **do kopce**, `dice` vyjde záporné a filtr `if (dice >= 2 || oneDieWorthOffering)` nabídku **zahodí**. Přitom `block_handler.cpp:386` Dauntless při provedení uplatní **správně** (před asistencemi, CRP, opraveno `9f98070`).<br>⇒ **Slayerovi se blok na Black Orka nikdy nenabídne**, ačkoli by se srovnal na ST4 a s jednou asistencí by z toho byly **dvě kostky pro nás**.<br>⭐ **Dauntless je nejsilnější právě proti ST4:** d6+3 > 4 ⇒ 2+ ⇒ **83 %**; proti ST5 67 %, proti Treemanovi ST6 jen 50 %. **Ork je jediný soupeř se čtyřmi ST4 hráči** — proti wood-elfovi je jeden Treeman, proto si toho nikdo nevšiml. Souvisí s tím, že proti orkovi dáváme **86 TD na 750 zápasů** proti 451 na skavena.<br>⚠️ **Třetí výskyt téhož vzorce za den** (po ceně hand-offu a po směru odsunu): **filtr oceňuje jinou akci, než jaká by se provedla.** ⇒ Projít `macro_actions.cpp` systematicky touž otázkou.<br>*(Zadáno Fablemu 14.08. jako doplněk k analýze orků — změřit, kolik bloků to bere a jestli to vůbec souvisí se ztrátami míče.)* | ✅ **ZMĚŘENO 14.→15.08., PROŠLO** — `evidence/weekend_result_20260817.md`. **dw-orc +4,08 pp** (SE 0,80; rameno vyskočilo ~1 739×/hru) · dw-sk **+2,28 pp** · orc-sk **−1,30 pp** (kontrola uvnitř 2 SE). Práh předregistrace splněn. ⛔ **ALE obě nuly se hnuly, ačkoli tam rameno prokazatelně NEBĚŽELO** (`cand_daunt = 0` v 6 000/6 000) ⇒ poctivý efekt je **dw-orc proti sdružené nule: +3,59 pp, ~3,4σ**, ne +4,08. Fable čekal +1–2 pp. **Zbývá: zapnout v produkci** (`dauntlessInOffer` je dál `default false`). |
@@ -1803,6 +1803,187 @@ a podíl optimálních cest. Zamítnutí M14b tím má druhý doklad.
 ⚠️ Oprava v nabídce z 01.09. **zůstává** — je správná sama o sobě
 *(na ránu má zbýt pole, ř. 549-550)*, jen míří jinam, než vada je.
 
+⛔⛔ **04.09. PRIORITA ZVÝŠENA (uživatel) -- konkrétní naměřený příklad:**
+`pickApproachStep` (`helpers.cpp:33`) skóruje `vzdálenost*100 + 12*zóny_na_cíli`
+(12, když už hráč v zóně stojí). Elf13 blitz na DL10: krok (13,6) [2 zóny na
+cíli, dodge cíl 4+ = **50 % pád**] vyhrál přes (15,6) [0 zón, dodge cíl 2+ =
+**17 % pád**], protože 100:12 váha vzdálenost naprosto přebíjí. Skončilo to
+skutečným turnoverem. **Váha 12 je flat za KAŽDOU zónu, ne podle skutečné
+`calculateDodgeTarget` pravděpodobnosti** -- M14b (`nextStepTowardAdjacent`,
+`blitzPathArm`) tohle řeší lépe (cena roste s rizikem, ne jen binárně), ale
+byl **zamítnut měřením** (viz výše). Tenhle konkrétní příklad je silnější
+anekdota než ty dosavadní -- 50 % vs 17 % je citelný rozdíl, ne mikroskopický.
+`pickApproachStep` navíc krmí i BLITZ (`action_resolver.cpp` fallback), takže
+oprava má širší dopad než jen Move.
+
+⛔⛔ **ÚKOL (uživatel 04.09.): naplánovat opravu co nejdřív po zítřejší noci
+(Q3-O, 04.→05.09.)** -- stejný spouštěč jako M1/N10 výše. ⚠️ "Oprava" tu
+neznamená jen zapnout `blitzPathArm` -- ten byl zamítnut měřením a dnešní
+anekdota to samo o sobě nepřevrací.
+
+⭐⭐⭐ **05.09. OSTŘEJŠÍ DIAGNÓZA (uživatel: "proč blitz vybírá cestu přímo,
+když pohyb už umí vyhýbat se nebezpečí?"):** `pickApproachStep`
+(`helpers.cpp:33`, používá ho BLITZ) a `scoreMoveAction` (`macro_actions.cpp:84`,
+používá ho obecný MOVE/REPOSITION) mají **STEJNÉ konstanty za tacklezónu**
+(20 čerstvě / 12 už-dodguje) -- doslova okopírované, viz komentář u
+`pickApproachStep` (`helpers.h:26-28`): *"tackle zones break ties
+(scoreMoveAction's 20/12 weights)"*. ALE váha vzdálenosti se liší
+**10×** (`pickApproachStep` má `*100`, `scoreMoveAction` má `*10`), takže
+poměr, který u Move dělá TZ vyhýbání DOMINANTNÍ (20/12 > 10), je u Blitz
+desetkrát oslabený (20/12 vs 100) a vzdálenost úplně přebije riziko.
+⇒ **Vypadá to jako nezáměrná nesrovnalost** (TZ konstanty zkopírované, ale
+škála vzdálenosti ne) -- komentář TVRDÍ shodu, kód ji nedodržuje.
+⭐ **Mění to plán:** nejde o "vymyslet novou cenu" (nová věc v enginu,
+vyžadující check-in), ale spíš o **zarovnat Blitz na už fungující,
+unconditional referenci** (Move) -- blíž k "oprava s jediným řešením" než
+k novému rameni/formuli. Až přijde na řadu: ověřit, jestli sjednocení
+škály (buď `pickApproachStep` na `*10`, nebo sdílet `scoreMoveAction` přímo)
+řeší i M14b měřený problém, než se rozhoduje o zamítnutém rameni znovu.
+Engine se nesmí přestavět, dokud běží víkendová Q3-O noc.
+| OTEVŘENO, priorita zvýšena 04.09., diagnóza upřesněna 05.09. -- spouštěč
+(dokončení a přečtení víkendové noci Q3-O) SPLNĚN 06.09. (ekvivalence,
+144/144 čisté) -- smí se zkoumat/stavět
+
+⛔⛔⛔ **07.09. PROSTÉ ZAROVNÁNÍ KONSTANTY VYZKOUŠENO A VRÁCENO ZPĚT --
+NENÍ TO BEZPEČNÁ OPRAVA.** Změna `pickApproachStep` z `vzdálenost*100` na
+`vzdálenost*10` (stejně jako `scoreMoveAction`) přeložena a otestována
+PŘED commitem (uživatel 07.09.: "jestli nebyl ani krátký test, tak jej
+proveď před commitem") -- **3 testy selhaly**: `result.success == false`,
+blitz vůbec nedošel k cíli. Komentář u
+`ActionResolver.BlitzWalksAroundABodyInsteadOfBurningMovementOnIt`:
+*"Hladový výběr sem tam poskakoval, dokud nedošel pohyb"* -- to je
+zdokumentovaná OSCILAČNÍ CHYBA (viz `pathfinder.cpp` komentář u M14b:
+"Kdyz je pole smerem k cili obsazene, uhne stranou; z toho pole je pak
+nejlepsi zase to puvodni ⇒ CHUZE OSCILUJE A SPALI POHYB").
+**Příčina:** menší váha vzdálenosti sblížila skóre různých polí, a čím
+blíž skóre, tím snáz hladový výběr osciluje. Vráceno (`git checkout --`),
+715/715 testů zpátky v pořádku, nic nebylo commitnuté.
+⇒ **Naivní zarovnání konstant je vyloučené.** Skutečná cesta vede zpátky
+k **M14b** (`nextStepTowardAdjacent`, BFS) -- ten se oscilaci vyhýbá
+konstrukcí (globální hledání cesty, ne hladový lokální krok), ne náhodou.
+Jeho zamítnutí ("hladová chůze je z 97,6 % optimální", 12 párů) stojí za
+přehodnocení ve světle dnešního konkrétního důkazu, že hladový přístup
+prokazatelně selhává na reálných scénářích (nejen na 2,4 % marginálních
+případech, ale i na úplné selhání blitzu).
+
+✅⛔⛔ **08.09. M14b PŘEMĚŘENO -- ROZHODNĚ ŠKODÍ, ZŮSTÁVÁ ZAMÍTNUTO.**
+4800 párů (400× víc než lehký test z 01.09.), mode 15, dw-dw,
+`ab_m14b_20260907/`, `evidence/night_prereg_20260907_m14b.preds`.
+**DELTA −0,0170 ± 0,0062 SE (−2,72σ), 95% CI [−0,0292; −0,0048]** -- celé
+CI POD prahem −0,015 ⇒ **ŠKODÍ**, ne nerozhodnuto/ekvivalence. 32/32
+kusů čistě, arm acted 100 %, všech 5 předpovědí trefeno.
+⭐⭐⭐ **Lehký test z 01.09. měl SPRÁVNÝ SMĚR, jen málo síly** (12 párů,
+SE=0,1076) -- s pořádným vzorkem se potvrdilo, že BFS vyhýbání riziku
+(`nextStepTowardAdjacent`, K=2 za tacklezónu) stojí víc, než kolik
+zachraňuje -- pravděpodobně příliš opatrná cena vede chůzi k uhýbání i
+tam, kde by se riziko vyplatilo přijmout.
+⇒ **CELÉ VLÁKNO UZAVŘENO:** naivní zarovnání konstant vyloučeno (bug,
+oscilace, 07.09.), M14b vyloučeno (prokázaná škoda, 08.09.). `pickApproachStep`
+zůstává, jak je. | UZAVŘENO 08.09. -- obě navrhované opravy zamítnuty,
+engine se nemění
+
+⭐ **ZAŘAZENÍ (uživatel 05.09.): "jestli z toho vyjde jednoduchá oprava,
+zařaďme ji hned za sekci pohyb."** Pokud se ukáže, že jde skutečně jen o
+zarovnání konstanty (`pickApproachStep` `*100`→`*10`, žádná nová logika),
+patří to do **FRONTY A** (vada, bez noci, průběžně -- stejný tvar jako
+`M13`/`A2`/`L2` výše) a v pořadí hned za tím, co se teď dodělává v sekci
+POHYB. Pokud se ukáže, že to je složitější (např. sjednocení rozbije něco
+jinde, nebo to je ve skutečnosti nová cena, ne zarovnání), patří to zpět do
+FRONTY B (vlastní noc) podle skutečné náročnosti -- rozhoduje se to AŽ PO
+prozkoumání, ne teď.
+
+⭐ **04.09., kontrola vzorce `standUpEscapeArm`/`standUpRemoveStayArm` na
+konkrétním příkladu** (metoda viz [[feedback_find_a_situation_for_rejected_arms]]):
+WL18 (leží na 14,8) vedle DL2 (stojí na 13,7, jediný soused). Spočítáno z
+`worstReplyCost`/`calculateDodgeTarget` (`macro_actions.cpp`):
+  - **vstát a zůstat**: ST3(DL2, 0 asistencí) vs ST3(WL18, 0 asistencí --
+    obě sousední elfky jsou označené JINÝM trpaslíkem, takže nemůžou
+    asistovat) ⇒ rovnost, 1 kostka útočník volí, `knockdownChanceFromDice(1)
+    =0,44` ⇒ **cena 1,00×0,44 = 0,44**.
+  - **vstát a utéct** na bezpečné pole (mimo dosah všech trpaslíků): cena
+    cíle ~0, ale dodge na odchod z (14,8) = 2+ (1/6 pád) ⇒ brána
+    `pFail×zbývající_aktivace<1` útěk nenabídne, dokud zbývá ≥6 spoluhráčů;
+    pozdě v tahu (≤5 zbývá) se odemkne a s cenou ~0 vyhraje nad 0,44.
+  - ⇒ Vzorec sedí s doktrínou "bezpečné akce první, rizikové poslední".
+⚠️ **DL2 není reprezentativní příklad pro taktickou otázku "base ať WW21
+skóruje"** — z (13,7) je na balon (3,5) přes 10 polí, nikdy nebyl skutečnou
+hrozbou, takže `stayEarnsItsKeep`/ZED tady správně vychází false. Tohle byla
+čistě kontrola ARITMETIKY vzorce, ne test taktické hodnoty "zavazet".
+⛔ Oprava vlastní chyby: první výpočet použil ZASTARALOU desku (WL13 už dřív
+odešlo/omráčeno) a dal špatně 0,28 místo 0,44 -- opraveno v konverzaci, závěr
+(brána funguje) se nezměnil, jen čísla. | OTEVŘENO -- součást revize
+zamítnutých ramen, žádný nový nález
+
+⭐⭐ **04.09., LEPŠÍ příklad pro `stayEarnsItsKeep`/ZED** (na žádost uživatele
+"zkus najít jinou situaci třeba i s využitím agenta - at sedí", dohledáno
+subagentem): DL2/WL18 výše nikdy nespustil větev ZED (DL2 na balon nedosáhl).
+Tenhle scénář ji spustí přímo.
+
+**Korpus:** žádná logovaná data s per-situačními čísly neexistují —
+`evidence/q3_standup_response_20260831.txt` je z doby PŘED opravou ZED
+(31.08.) a nese jen souhrnné podíly nabídky/odpovědi, ne `stayEarnsItsKeep`
+ani cenu za jednotlivou situaci. Scénář je proto sestavený ručně.
+
+**Scénář:** elfové drží míč. Nosič **WW21** stojí na (5,5). Ležící
+spoluhráč **P** (wood-elf Lineman, ST3 AG4 AV7) leží na (4,5) — sousedí
+s nosičem (vzdálenost 1). Trpaslík **DL** (ST3, bez dovedností) stojí na
+(3,5), sousedí s P.
+
+- **`stayEarnsItsKeep`**: míč držíme MY, vzdálenost P→nosič = 1 ≤ 2 ⇒
+  **TRUE** hned na první větvi (`macro_actions.cpp`, `bc.teamSide==mySide
+  && dToCarrier<=2`) — nezáleží, co spočítají ceny níž, "zůstat" se
+  NEODEBÍRÁ.
+- **Vstát a zůstat**: ST3(DL) vs ST3(P), rovnost, 1 kostka útočník volí →
+  `knockdownChanceFromDice(1)=0,44` → **cena 1,00×0,44 = 0,44**.
+- **Vstát a utéct**: bezpečné pole cena ~0, dodge na odchod = 2+ (1/6 pád).
+  Brána `pFail×zbývající<1`: 0,167×5=0,83<1 ⇒ útěk se **NABÍDNE** (na
+  rozdíl od DL2 příkladu, tady prochází i risková brána).
+- ⇒ **Bez ZED** by čisté minimum rizika vzalo útěk (0<0,44) a smazalo
+  "zůstat" — P by opustil bok nosiče WW21. **Se ZED** zůstávají OBĚ
+  možnosti nabídnuté, takže o skutečné taktické hodnotě rozhoduje až plné
+  vyhledávání (MCTS), ne heuristika předem.
+
+⚠️ **Vlastní mez zjištěná subagentem**: podmínka `dToCarrier<=2` nekontroluje,
+jestli P skutečně leží MEZI DL a nosičem na cestě k němu — jen vzdálenost
+od nosiče. Tělo o pole vedle (ne v cestě) by taky prošlo jako "stojí to za
+to". Nekontrolováno dál, jen zaznamenáno jako známý zjednodušující rozdíl
+od doslovné definice "clony".
+
+⭐ **Upřesnění meze (uživatel 04.09.)**: správná logika by neměla stačit
+"vzdálenost od nosiče ≤2" — měla by znít **"uteče nosič daleko, a pak se P
+rozhodne: pokud by po jeho odchodu DL zavazil v cestě k míči/nosiči, P
+zůstane; jinak P dodgne a přesune se na správnou stranu, aby dál clonil"**.
+Tedy dvoufázové rozhodnutí (nejdřív kam jde nosič, pak jestli P drží
+skutečnou cestu k němu), ne jednorázová vzdálenostní zkratka. Kód dnes umí
+jen tu zkratku — může proto říct "zůstat" i tam, kde by správná logika
+poslala P jinam (nesouseiící tělo, které náhodou vyšlo do 2 polí od
+nosiče, ale neleží mu v cestě). ⛔ Nestavěno, jen zapsáno jako přesnější
+popis mezery pro budoucí opravu.
+
+⛔⛔ **KOREKCE (04.09.): `pickApproachStep`/`blitzPathArm` (M14b) NENÍ
+sekce Move.** Obě volací místa (`action_resolver.cpp:382`,
+`macro_actions.cpp:900`) jsou výhradně uvnitř dořešení BLITZU (přiblížení
+k cíli bloku) — žádné volání z obecné REPOSITION/Move makro vrstvy
+neexistuje. Dřívější zápis "`pickApproachStep` navíc krmí i BLITZ" byl
+obráceně — krmí JEN blitz, ne Move.
+⭐ **Důsledek pro prioritizaci (uživatel 04.09.: "z těch zamítnutých situací
+bych upřednostnil ty ze sekce move"):** po kontrole nemá sekce **POHYB
+aktuálně ŽÁDNÉ zamítnuté rameno** — `LeapWalkArm` a `CageAwareAdvanceArm`
+(A)/(C) tam patří, ale obě jsou jen ODLOŽENÉ/nezměřené (Leap odsunut
+27.08. "na příští týden", M12 split čeká na noc), ne zamítnuté. Jediné
+skutečně zamítnuté zůstávají obě v **BLITZ**: `blitzPathArm`/M14b a
+`pushGeometryArm`/P9c (ekvivalence). | OTEVŘENO -- součást revize
+zamítnutých ramen
+
+⭐ **04.09., anekdota ze zkušební partie proti enginu:** uživatel ručně vedl
+DBG9 přímou cestou přes pole v tacklezóně WW21 místo bezpečné objížďky stejné
+délky -- přesně ten scénář, který `nextStepTowardAdjacent`/`blitzPathArm`
+řeší. Skončilo to dodge, turnoverem, ztrátou celého tahu. **Není to nový
+doklad proti zamítnutí** -- je to jeden lidský tah, ne statistika, a sedí přesně
+do těch ~2,4 % neoptimálních doběhů, které měření už zachytilo. Dávám sem jen
+jako konkrétní ilustraci pro pozdější revizi zamítnutých ramen (uživatelův
+úkol "pak později projdeme znovu i ty zamítnuté raději").
+
 ---
 
 ### Původní stav (01.09. dopoledne, pro historii)
@@ -2130,8 +2311,110 @@ kolo    0      1      2     kolo    2      3      4      5      6
   8  ,0433  ,0695  ,1095      8  ,0731  ,0884  ,1203  ,0872  ,0459</pre>⇒ **Vyřadit DVA WARDANCERY sráží jejich skórování o 53-67 %, a je to konzistentní v KAŽDÉM kole.** ⇒ **Vyřadit linemany nedělá skoro nic** — řada není ani monotónní, vrchol je na **čtyřech**; šest stojících dává **nižší** TD/kolo než čtyři.<br>⇒ ⭐⭐ **Zhruba: jeden wardancer ≈ tři až čtyři linemani. A nad čtyři linemany se přebytek nepočítá vůbec.**<br>⇒ **ODPOVĚĎ NA Q16: převaha zůstává tou praktickou veličinou** *(uživatel: „lépe to vyhodnotit neumím")* — **ale NESMÍ se počítat jako POČET TĚL.** `naše − jejich` dá u „dva wardanceři dole" totéž číslo jako u „dva linemani dole", ačkoli první je poloviční tým a druhý skoro nic. **Musí být VÁŽENÁ** — a teď máme první váhy.<br>⭐ Rámec na to už je: **`P19` „hodnota cíle je VZÁCNOST × ROLE"** — tahle měření mu dodala čísla.<br>⚠️ **Poctivě: je to korelace.** Tým bez obou wardancerů je nejspíš celkově tlačený, takže část efektu může být „prohrává, proto neskóruje". Stratifikace podle kola vyhodila hlavní zkreslení a efekt drží ve všech pěti kolech, ale kauzalitu to nedokazuje.<br>⏳ **Otevřené zůstává jen JEDNO:** jestli se přechod D1→D2 má psát jako *dokončitelnost + únosnost*, nebo jako **vážená převaha**. Ty dvě varianty se teď od sebe liší míň, než vypadaly — vážená převaha je vlastně **měřitelná náhražka dokončitelnosti**. | **ČÁSTEČNĚ ZODPOVĚZENO 25.08.** — váhy změřeny, tvar pravidla otevřený |
 | **Q17** | **Napsat `P59` (horizont) rovnou jako DOPOČET?** *(25.08.)* Jednokolová funkce: kam dosáhne každé jeho stojící tělo · kde je míč · **a koho má v dosahu TD na přihrávku**. Byl by to **první kus, kde se dnešní doktrína dotkne kódu**. ⚠️ Má **dvě větve** podle toho, kdo drží míč *(u nás: cena odebrání se odečítá; u něj: čistý dosah)*. | ⏳ **NEZODPOVĚZENÁ — a uživatel 26.08. řekl JAK se k odpovědi dojde:** *„beru jako stále nezodpovězenou, s možností někam se přiblížit po více dopočtech jako je P59 — ale to je velká intuice totok."* ⇒ ⭐⭐ **Zodpoví se EMPIRICKY, ne teoreticky:** každý další dopočet je **doklad**, a až jich bude dost, ukáže se, jestli forma *„dopočet místo prahu"* platí obecně.<br>⚠️ **Uživatel sám to označil za INTUICI** — nemá se to citovat jako rozhodnutí.<br>⭐ **A materiál se už sbírá sám — 26.08. vzniklo PĚT dopočtů, aniž by se Q17 kladla:**<pre>strop Leapu        6,02 příležitosti/hru   ← nahradil odhad „skáče se dost?"<br>P40 koridor        oběhnutí 57,8 %        ← nahradil dohad o tom, co rameno dělá<br>záložní smyčka     21 % rezignací         ← nahradil domněnku „nosič prostě stojí"<br>P59 horizont       přihrávkou 44,8 %      ← nahradil špatně tvarované tempo 64 %<br>Q16 strop          obklíčení 44,3 %       ← nahradil „asi to je geometrická situace"</pre>⇒ **Ta forma se už POUŽÍVÁ, jen se o ní nerozhodlo.** ⭐ A `Q6` k tomu dodává **negativní doklad**: převaha jako **práh** selhala *(znaménko se v žádném pásmu nepřeklápí)* — tedy **jeden případ, kde práh prokazatelně nefunguje.** |
 | **Q18** | **Co s hotovými větvemi `m1-n10-blitz-continuation` a `b2-wrestle-pricing`?** *(25.08.)* Obě jsou zelené a nemergované. ⛔ **Sedí v TÉŽE funkci** `estimateBlitzFailChance` *(P35 tam taky)* ⇒ podle `T2.20` se **nesmí zřetězit** a kombinace chce vlastní běh. ⇒ pořadí nocí pro okruh BLITZ se musí rozhodnout jako celek, ne po jedné. | ✅ **ZAŘAZENO 26.08.** *(uživatel: „zařaď co nejdříve, ať nezlobí — a zkontroluj, bude ta druhá větev chtít čas na trénink?")*.<br>⭐ **ODPOVĚĎ NA TRÉNINK: NE.** `b2-wrestle-pricing` mění **tři soubory** *(`macro_actions.h/.cpp`, testy)* a **ani jeden se netýká učení** — žádná policy, žádné váhy, žádný self-play. Je to **heuristika ocenění bloku** *(Both Down proti Wrestle složí i našeho hráče s Blockem)* ⇒ **měří se A/B nocí, ne tréninkem.**<br>**Stav obou větví:**<pre>              rameno  testy  mode  prereg   ⇒ přidělený mode<br>m1-n10          ✅      ✅     ⚠️9    ✅      10 (přečíslovat)<br>b2-wrestle      ✅      ✅     ⛔     ⛔      11 (dopsat obojí)</pre>⛔⛔ **KOLIZE MÓDŮ:** `m1-n10` si vzala **mode 9**, který si 26.08. vzal i **Leap** *(a už s ním běží noc, takže Leap si 9 nechává)*. ⇒ **m1-n10 → mode 10**, včetně `armSignalAvailable`, seedu, popisu, `rowsName` a `armEvents` dispatche. **b2 → mode 11.**<br>⭐ **`b2` je ve STEJNÉ situaci, v jaké bylo `P35`:** rameno hotové, čekalo **6 dní jen na mode v harnessu**. ⇒ **Ta past se opakuje potřetí** — hotová práce stojí na chybějícím řádku v harnessu.<br>⛔ **NESMÍ SE ZŘETĚZIT:** obě sedí v `estimateBlitzFailChance`, kde je i `P35` ⇒ podle `T2.20` **každá potřebuje VLASTNÍ běh**; kombinace by byla třetí.<br>✅ **UZAVŘENO 28.08.:** `m1-n10` odběhlo jako **mode 10** v noci 27.→28.08. *(rameno POMÁHÁ, +0,0177 ± 0,0069)*, `b2` je jako **mode 11** v manifestu víkendu na `dw-dw`. ⛔ Nezřetězily se, každá má vlastní běh.
+
+⛔⛔⛔ **04.09. ZJIŠTĚNO: `m1-n10` (mode 10) SE PO KLADNÉM VÝSLEDKU NIKDY NENASADILO DO PRODUKCE.** Vyšlo najevo náhodou při hraní zkušební partie proti enginu (`bb_play_session_20260904.py`) — uživatel se ptal, proč follow-up po bloku pořád probíhá vždycky, když je to už "hotovo". Ověřeno přímo v kódu: `g_blitzContinuation[2] = {false, false}` zůstává výchozí i dnes, a **nic v `macro_mcts.cpp`/`MCTSConfig` rameno nikdy nezapíná** — ani produkční AI ho tedy nepoužívá. Naměřený kladný výsledek (+0,0177 ± 0,0069, >2,5 σ) z 28. 8. leží nevyužitý přes měsíc.
+⭐ **Stejný vzorec jako P35 a `b2` výše** (hotová práce čeká na chybějící řádek) — jen o řád déle.
+**ÚKOL (uživatel 04.09.): nasadit co nejdřív po zítřejší noci (Q3-O, 04.→05.09.).** Postup: `setBlitzContinuationArm` přepnout na `true` jako výchozí (nebo řádek úplně odstranit a nechat chování vždy zapnuté, stejným vzorem jako u P35/M13 „arm removed, nasazeno do produkce"), přeložit, `713+/713+` testů, a ověřit, že se tím nenaruší nic z rozjeté práce (W-GFI mode 18 apod.). ⛔ NEDĚLAT dřív než po přečtení noci Q3-O — engine se nesmí přestavět, dokud noc běží.
+✅ **06.09.: SPOUŠTĚČ SPLNĚN** — víkendová Q3-O noc (7200 párů) doběhla a
+je přečtená: EKVIVALENCE (−0,0009±0,0042, CI uvnitř prahu), rameno
+`standUpEscapeArm`/`standUpRemoveStayArm` zůstává vypnuté. M1/N10 nasazení
+teď smí proběhnout.
+
+✅✅✅ **UZAVŘENO 07.09. — NASAZENO DO PRODUKCE, commit `771d1ecc`.**
+Odstraněny všechny tři brány (`endBlockActivation`, `wantsFollowUp`,
+ústupová makra v `macro_actions.cpp`) a vypínač `blitzContinuationArm`
+samotný -- chování je teď nepodmíněné. Čítač `noteBlitzContinuationEvent`
+zůstává jako diagnostika. **715/715 testů** (základna 716/716 -- jeden test
+smazán, testoval neexistující výchozí chování bez ramene; jeden přepsán
+přes BLOCK místo BLITZ, aby dál testoval svůj skutečný předmět).
+**Pozitivní kontrola na živé binárce** potvrdila, že ústupová nabídka
+skutečně reaguje na `usedBlitz` (1 vs 0), ne že se jen nerozbilo nic.
+Navíc mimo zadání: zrušen mode 10 v diagnostickém harnessu (vzor P35/M13)
+a odstraněn mrtvý parametr `blitz_continuation` z Python bindingu.
+Pushnuto na `main`. | **UZAVŘENO 07.09.**
 ⏰ **Zařazení:** obě do **víkendové fronty** *(`run_weekend_driver.sh`, sloupec `git-ref` dovolí běh z větve bez mergování)*; pořadí a počty párů se rozhodnou **v pátek**. |
 | **T5.35** | ⭐⭐⭐ **BLITZ MÁ ŠPATNĚ POLOŽENOU OTÁZKU — POČÍTAT HO TAM, KDE JDE NĚCO ROZEZNAT** *(uživatel 27.08.: „v tom případě máme zase u blitz špatně položenou otázku — a toto by taky chtělo přehodnotit, ať ten blitz počítáme pro situaci, kde jde něco rozeznat")*.<br>**Doklad:** `M10` změřilo, že v **93,6 %** kol, kde je `BLITZ_AND_SCORE` jediná skórující cesta, **není v dosahu endzóny NIKDO z jedenácti** ⇒ všechny čtyři skupiny chování dávají 0–1,2 % TD a **stejný turnover 32–38 %**. Měří se tam **šum, ne rozhodnutí**.<br>⇒ **DVĚ ČÁSTI, každá jinam:**<br>&nbsp;&nbsp;**(a) ÚZKÁ, LEVNÁ, BEZ NOCI:** zúžit admisi `BLITZ_AND_SCORE` na **skutečný dosah** *(dnes `MA + 2 + 3`, u trpaslíka s MA 5 tedy až 10 polí)*. Jeden podmínkový řádek + test. Po ní se `M10` přeměří na tom, co zbude — **teprve to je vzorek, kde jde něco rozeznat.**<br>&nbsp;&nbsp;**(b) ŠIROKÁ — DO `B-ROUND`:** přeformulovat celou blitzovou otázku tak, aby se počítala jen v **rozlišitelných situacích**. Sem patří i to, že se v `P27` deset dní počítala konverze na vzorku, kde konvertovat nešlo.<br>⭐ **TŘETÍ VÝSKYT TÉHOŽ TVARU ZA JEDEN DEN:** Leap = vadná **admise** *(ne cena)*, `BLITZ_AND_SCORE` = vadná **admise** *(ne volba)*, a teď **vadně položená otázka měření**. ⇒ Do diskuze patří obecně: *kolik dalších maker se nabízí mimo svůj dosah a měří se ve slepém vzorku?* | ✅ **(a) HOTOVO 27.08.** — admise `BLITZ_AND_SCORE` zúžena na skutečný dosah; je v enginu, který jel v noci 27.→28.08. ⚠️ **Přeměření `M10` na zúženém vzorku ZBÝVÁ** — potřebuje korpus z enginu se zúženou admisí, a ten z noci 27.→28.08. ho **má**. · ⏰ **(b) do `B-ROUND`**<br><br>⛔⛔ **OPRAVA STAVU 02.09. — „korpus z noci 27.→28.08. ho MÁ" JE NEPRAVDA.** Uživatel se zeptal, jestli u `Q19` mezitím proběhla změna k lepšímu. **Zúžení admise v kódu JE** *(ověřeno dnes: `macro_actions.cpp` má `dist <= maxReach`, bez toho `+3`)*. ⛔ **Ale korpus, na kterém se to mělo přeměřit, NEEXISTUJE:** nejnovější na disku je **19.08.**, tedy osm dní PŘED opravou; korpus z 26.08. i noc 27.→28.08. byly na **serveru, který 29.08. zanikl**.<br>⇒ ⚠️ **Q19 tím mění cenovou třídu:** není to „rozhovor, nesoupeří o stroj" — **potřebuje HRY**, tedy den stroje.<br>⭐ **Levná půlka ale existuje** *(a je to přesně postup, který se osvědčil dnes u `W-CIL`)*: **měřidlo v krátké sondě** — počítat nabídky `BLITZ_AND_SCORE` a u každé, jestli nosič na endzónu vůbec dosáhne. Odpoví na *„zúžení funguje?"* za minuty. ⛔ **Neodpoví** na *„padá v zúženém vzorku TD?"* — na to hry potřeba jsou.<br>⭐⭐ **Metodicky:** tohle je **čtvrtý** zápis za jeden den, který tvrdil stav, jenž neplatí *(`b2` větev „6 commitů mimo main" · `Q19` nákres „připraven" · `Q19` korpus „má ho" · `M13/S3` test „nebyl přepsán na zelenou")*. ⇒ **Stav v zápisech stárne, nález ne.** Před prací ověřit, ne přečíst. |
 | **T1.10** | **Lajna jako samostatný rozebraný příklad** *(uživatel 19.08.)* — kdy je tlak k lajně přijatelná cena za postup. | **ČEKÁ od 19.08.** |
 | **Q19** | ⭐⭐⭐ **„BLITZNI A SKÓRUJ" SE NABÍZÍ TAM, KDE SE SKÓROVAT NEDÁ — a otázka je, co s tím** *(uživatel 27.08.: „to s tím blitz mi přijde jako kandidát na dizkuzi po 16:00 s nákresem situace")*.<br>**Co je změřeno** *(M10, korpus 25.08., 3 000 her — [[project_bloodbowl_m10_measured_20260827]])*: `BLITZ_AND_SCORE` nabídnuto v **1 281 kolech**. Kde šlo do endzóny **dojít chůzí** (333 kol), padlo TD ve **32,4 %** a nebrat blitz je tam **správně**. Zbývá **944 kol, kde je blitz jediná skórující cesta — a ve VŠECH 944 je nosič dál než `MA + 2 GFI`** *(průměr **10,0 pole**)*. TD tam padlo **6× = 0,6 %**, a **je jedno, co nosič udělal** *(blitzoval 0/21 · blokoval bez kroku 0/376 · jen se pohnul 4/328 · nic 2/219)*; **turnover je ve všech skupinách stejný (32-38 %)** ⇒ blok není nebezpečnější, je **neplodný**.<br>⛔⛔ **P27 SE TÍM PŘEFORMULOVÁVÁ: není to „vada ve VOLBĚ", je to vada v ADMISI.** Brána pouští `BLITZ_AND_SCORE`, když je nosič do `MA + 2 + 3` od endzóny — u trpaslíka s MA 5 tedy až na **vzdálenost 10**. ⇒ ⭐ **Opravuje se podmínkou dosahu, ne učením.**<br>⭐⭐ **TÝŽ TVAR JAKO LEAP TÝŽ DEN:** vadná **admise**, ne vadná cena ani volba. **Dvakrát za jedno dopoledne** ⇒ otázka do diskuze je obecnější než blitz: *kolik dalších maker se nabízí mimo svůj dosah?*<br>**Na diskuzi:** nákres konkrétní situace *(`diag_board_render.py`, tacklezóny povinně)* — kde nosič stojí, kam by musel dojít a co brána viděla. | ⏰ **DISKUZE PO 16:00 dne 27.08.** — nákres připraven |
 | **Q20** | ⏰ **ČÍM (a jestli vůbec) NAPLNIT ZBYTEK VÍKENDU 29.-31.08.?** *(28.08.)* Manifest `evidence/weekend_manifest_20260829.txt` má **jediný cyklus** — `b2` na `dw-dw`, ~9 h 15 min. Víkend unese **dva až tři**. ⛔ **Nic dalšího ale nemá rameno:** Leap je uživatelovým rozhodnutím až příští týden, `M12` (ADVANCE/REPOSITION) se staví příští týden, `M13`/`B3` ze včerejší diskuze nejsou postavené. ⇒ Druhý cyklus by znamenal **dnes odpoledne postavit rameno**, tedy předsunout práci před plán — a to je přesně to, co `feedback_spare_time_is_not_a_reason` zakazuje dělat bez rozhodnutí uživatele.<br>⭐ **Tři možnosti, mezi kterými se volí:** *(1)* nechat víkend na jediném cyklu a mít v pondělí čistý výsledek `b2`; *(2)* postavit dnes rameno pro `T5.35a`-navazující měření a dát mu druhý cyklus; *(3)* pustit `b2` s víc páry *(např. 9 600)* a koupit si za volný čas **sílu místo druhé otázky** — ⚠️ ale práh ±0,015 je u b2 nejspíš zbytečně hrubý, protože nízké `n_nonzero` dává malou SE i při 4 800. | ⛔ **ZASTARALO 02.09.** — víkend 29.-31.08. je pryč, otázka padla sama. ⭐ Zapsáno, aby se nepletlo do seznamu neprovedených diskuzí: **není to nezodpovězená otázka, je to odpadlá.** |
+
+⛔ **04.09. ZJIŠTĚNO PŘI PARTII: `choosePushSquare` nikdy nenabízí volbu trenéra.** Bez Side Step/Grab bere pevně "rovně dozadu" (nebo skóre P9c, když běží `pushGeometryArm` -- teď vypnuté); žádná větev nebere vstup od útočícího hráče, ačkoliv CRP dává volbu cílového pole útočícímu trenérovi, když je víc volných polí. Aby šlo volbu zapojit, musí `Action`/`execute_action` umět přijmout zvolené cílové pole -- zásah do rozhraní sdíleného s AI tréninkem, ne drobná oprava. **NEDĚLAT NAROZE** -- napřed představit plán (viz [[feedback_check_in_before_new_engine_work]]).
+
+⭐⭐ **05.09. UŽIVATEL NESOUHLASÍ S "MOŽNÁ ZJEDNODUŠENÍ" RÁMOVÁNÍM:** *"je to
+sice složitější na výpočet ale pro hru je to velmi velká věc — co by se
+neměla zjednodušovat."* Ruší se tím dřívější spekulace, že jde možná o
+vědomou, přijatelnou zjednodušující volbu kvůli MCTS větvení — uživatel to
+považuje za důležité navzdory výpočetní ceně, ne za okrajovou položku.
+⭐ **Souvislost s existujícím vláknem P9/P9a/P9c** (`choosePushSquare` výše
+v tomto souboru): P9 je už dnes vedený jako **VYSOKÁ PRIORITA** ("blokuje
+bezpečné nasazení P2"). P9c (skórování cíle podle rohu/nosiče) bylo
+změřeno a vyšlo **efekt se nekonal** (+0,0017±0,0060, ekvivalence) — ale to
+řešilo jen JAK VYBRAT MEZI nabídnutými poli algoritmicky, ne JESTLI vůbec
+dát tu volbu trenérovi/hráči. Dnešní nález (04.09.) je tedy nadstavba nad
+P9, ne duplicitní práce.
+
+⭐ **05.09. (uživatel: "všechny tyto totiž ovlivnují ten výběr")** —
+Side Step, Grab, Stand Firm, Juggernaut všechny mění, KDO vybírá a Z ČEHO:
+- **Side Step** — volba jde OBRÁNCI (`defenderChooses`, už v kódu)
+- **Grab** — ÚTOČNÍK smí vybrat i pole MIMO standardní tři (`block_handler.cpp:396`, už v kódu)
+- **Stand Firm** — obránce se smí rozhodnout NEODEJÍT vůbec (`holdsGround`, už v kódu)
+- **Juggernaut** — ruší Stand Firm na blitzu (`block_handler.cpp:386`, už v kódu)
+Ověřeno v aktuálním rosteru (TV1200): Grab a Juggernaut nemá NIKDO (žádný
+tým v `roster.cpp`); Stand Firm jen wood-elf Treeman; Side Step jen jeden
+Wardancer (nerozlišitelný od druhého z Pythonu -- staty identické).
+⇒ **Oprava "dej trenérovi/hráči volbu mezi prázdnými poli" musí zapadnout
+DO téhle existující kostry, ne ji nahradit** — týká se jen zbylého případu
+(žádná z těch čtyř výjimek neplatí a je víc než jedno prázdné pole), ne
+celého mechanismu push znovu od nuly.
+| OTEVŘENO -- nemá spouštěč, čeká na klid po M1/N10 a Q3-O; priorita
+potvrzena uživatelem 05.09., ne "možná zbytečné"
+
+⭐ **POŘADÍ (uživatel 05.09.): za sekci Move a za opravu cesty u blitz**
+(`pickApproachStep`/`blitzPathArm` zarovnání, viz zápis výše). Tedy: (1)
+co se teď dodělává v sekci POHYB → (2) zarovnání blitzové cesty na
+`scoreMoveAction` → (3) tahle položka (volba pole po odsunu).
+
+⭐ **05.09. ÚKOL (uživatel): po doběhnutí víkendové Q3-O noci (7200 párů,
+`ab_q3o_weekend_20260905/`) rozebrat rozhodování `standUpEscapeArm`/
+`standUpRemoveStayArm` nad KONKRÉTNÍ SITUACÍ Z REÁLNÉ HRY, ne ručně
+sestaveným scénářem.** Dnešní příklady (DL2/WL18, WW21/P/DL od subagenta)
+byly buď nereprezentativní, nebo vymyšlené — tenhle beh poprvé skutečně
+hraje s oběma rameny zapnutými (mode 17, N+O), takže jeho vlastní log má
+reálné situace, kde se AI touhle větví rozhodovala. Najít jednu (ideálně
+kde `stayEarnsItsKeep` vyšlo true i false, pro srovnání) a projít ji stejným
+způsobem jako dnešní příklady (`worstReplyCost`, dodge brána, ZED). |
+OTEVŘENO -- spouštěč (doběhnutí víkendové noci Q3-O) SPLNĚN 06.09., log v
+`ab_q3o_weekend_20260905/` je k dispozici
+
+✅⛔ **06.09. Q3-O VÍKENDOVÁ NOC UZAVŘENA — EKVIVALENCE, S DŮLEŽITOU VÝHRADOU.**
+7200 párů, mode 17 (`standUpEscapeArm`+`standUpRemoveStayArm` dohromady),
+matchup dw-dw: DELTA −0,0009 ± 0,0042 SE, 95% CI [−0,0091; +0,0073] celé
+uvnitř prahu ±0,015 ⇒ rameno se NENASAZUJE. 144/144 čistě, leak 0, všech 5
+předpovědí trefeno.
+
+⭐⭐⭐ **VÝHRADA (uživatel 06.09.): "dodge je pro elfa."** Ověřeno v rosteru —
+**trpaslík TV1200 nemá Dodge NIKDE** (celý dwarfí blok v `roster.cpp` bez
+jediného výskytu), zatímco wood-elf ho má skoro na každé roli. Bez Dodge
+žádný reroll ⇒ "vstát a utéct" je pro trpaslíka čistá pravděpodobnost z
+AG2, nejslabší možný případ té mechaniky (sedí na naměřených 38,6 % pádů
+útěku). **Celé Q3-N i Q3-O běželo výhradně na dw-dw** — testovali jsme
+mechaniku stavěnou na útěku/agilitě na rase, která ji strukturálně neumí
+dobře využít.
+⇒ **Ekvivalence u dw-dw NEZNAMENÁ ekvivalenci obecně.** Mohla by to být
+vlastnost matchupu, ne mechaniky — u agilní/Dodge rasy (wood-elf, skaven)
+by stejné rameno mohlo vyjít jinak. ⛔ Nerozhodnuto, jestli se to má
+doměřit na jiném matchupu (dw-we/we-we) — čeká na rozhodnutí uživatele,
+patří do fronty B (vlastní noc).
+| OTEVŘENO -- Q3-O jako takové UZAVŘENO pro dw-dw, otázka zobecnění na
+jiné rasy je nová, samostatná položka
+
+✅ **07.09. WE-WE SONDA (200 párů, mode 17) — POTVRZENÍ PŘEDPOKLADU, ŽÁDNÁ NOC NAVÍC.**
+Uživatelův předpoklad "dodge je pro elfa" ověřen krátkým během: aktivace
+ramene **232 picků/hru (n_nonzero 64,0 %)** u we-we proti **61,7 picků/hru
+(n_nonzero 40,6 %)** u dw-dw z víkendové noci — skoro 4× víc. Delta samotná
+zůstává nerozhodnutá (−0,0025 ± 0,0375, potřeba ~6918 párů), ale to nebylo
+cílem. **Uživatel 07.09.: "nechci na to plýtvat noc - měl jsem předpoklad a
+potvrzení krátkým během stačí."** ⇒ Uzavřeno bez další noci -- mechanismus
+je potvrzený (mění se výrazně podle rasy), přesné číslo dopadu na výhry se
+nezjišťuje. Pokud by se přesto chtělo doměřit, ~6918 párů na we-we by
+rozhodlo, ale to teď není v plánu.
