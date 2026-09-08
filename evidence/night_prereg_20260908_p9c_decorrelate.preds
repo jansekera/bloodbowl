@@ -1,0 +1,38 @@
+# PREDREGISTRACE 08.09.2026 -- P9c DEKORELACE, mode 5, matchup 8 (orc-mb vs wood-elf-agile)
+# PSANO PRED BEHEM. Beh nezacal v okamziku zapsani.
+#
+# OTAZKA
+#   Asymetrie namerena 08.09. prepoctem dw-we korpusu (5.28 sigma) je bud
+#   o agilite odsouvaneho cile (Dodge/MA), nebo o Tacklu odsouvajici strany
+#   (rusi Dodge pri DEFENDER_STUMBLES) -- v dw-we nerozlisitelne, cestuji
+#   spolu s rasou. Novy matchup 8 (ork ma Tackle 1/19, elf dostal Dodge navic)
+#   je rozdeluje.
+#
+# CO SE MERI: mode 5, pushGeometryArm, matchup index 8.
+#   Rozhodne se to RUCNIM rozdelenim podle cand_home z diag_pushgeom_rows.jsonl
+#   (stejna metoda jako 08.09. prepocet dw-we), NE vestavenou souhrnnou deltou.
+#   Standardni pole nize jsou kontrola cistoty behu, ne odpoved na otazku.
+#
+# DIMENZOVANI: PAIRS=80 (mode 5) + PAIRS=16 (mode 2 kontrola), WORKERS=4.
+#   Tempo zmereno 08.09.: ~129 s/par, jedno vlakno -> ~52 min celkem pri
+#   4 workerech, sekvencne (kontrola pak sonda). SONDA, ne rozhodna sila --
+#   uzivatel 08.09.: "ale pak jen kratsi test".
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.85
+n_nonzero in 0.35 0.80
+delta in -0.15 0.15
+delta_1s in -0.08 0.08
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Siroke a symetricke kolem nuly, protoze soucet obou orientaci muze
+#   vyjit cokoliv -- predpovida se ASYMETRIE mezi orientacemi (viz .md),
+#   ne soucet. n_nonzero siroke, protoze je to nova soupiska a presny
+#   podil presmerovanych odsunu se muze lisit od puvodnich 57.5% na dw-we.
+#
+# ROZHODNE (mimo strojovou kontrolu, viz .md): rucni split cand_home=true
+#   vs false s mode-2 p_hat, cetnosti cand_push_dodge/cand_push_fastma.
+#
+# ZADANI: mode=5, matchup=8, PAIRS=80, WORKERS=4, CHUNKS=8 (mode 5)
+#          mode=2, matchup=8, PAIRS=16, WORKERS=4, CHUNKS=4 (kontrola)

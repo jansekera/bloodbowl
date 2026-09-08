@@ -160,6 +160,7 @@ změřili chybějící schopnost. Viz varování nahoře.
 | **`Q45`** | SOUPEŘ NÁM VYROBÍ CHAIN PUSH DO NOSIČE — NAŠIMI VLASTNÍMI TĚLY |
 | **`Q46`** | STRIP BALL SHODÍ MÍČ POUHÝM ODSUNEM — bez sražení |
 | **`Q47`** | *(04.09., uživatel — u W-GFI: „hráči se musí posouvat kupředu, ať jsou u akce nebo k míči")* VOLNÉ TĚLO BEZ CÍLE POSTUPUJE SMĚREM K DĚNÍ, NE STOJÍ — kdo dnes nemíří k akci ani k míči, zítra tam není, až bude potřeba (stejná rodina jako `Q40` „okno se zavírá nečinností"; sedí i na [[project_bloodbowl_doing_nothing_never_wins]]) |
+| **`Q48`** | *(08.09., uživatel — rozbor situace u P9c: „dál od nosiče... ať jej kdyžtak praští ještě náš druhý, kdyby nespadl")* BLOK ODSUNE SOUPEŘE → POKUD ZŮSTAL STÁT (nespadl), ODSOUVAJÍCÍ NEBO JINÉ NAŠE STOJÍCÍ TĚLO NA NĚJ MŮŽE ÚTOČIT PODRUHÉ, POKUD ZŮSTAL V DOSAHU — hodnota destinace odsunu není jen geometrická (roh/nosič), ale i v tom, jestli **umožní druhou akci jiného/téhož hráče**. P9c (`pushDestScore`, nasazeno 08.09.) tohle nepočítá vůbec, řeší jen vzdálenost od rohu/nosiče. ⛔ Rozbor ukázal, že tahle úvaha váží MÍŇ, když existuje skutečná klec (riziko průniku za zeď převáží) — patří tedy do celotahu jako otázka pořadí/kombinace akcí, ne jako oprava P9c samotného. |
 
 ⚠️ **Oddíl 2 sběru (`V01`-`V70`) sem NEPATŘÍ** — to jsou **vlastnosti jedné
 akce** (kam se smí postavit roh, kdy se nesmí skórovat, prahy kostek). Jsou to

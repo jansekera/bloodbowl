@@ -31,7 +31,7 @@ SO   = os.path.join(ROOT, 'engine', 'build', 'libbb_engine.so')
 # `diag_f1_cage_advance_harness.cpp` -- index se zapisuje do každého řádku na
 # disku. Doplňuje se na KONEC, nikdy doprostřed.
 MATCHUP_NAMES = ['dw-sk', 'dw-we', 'dw-dw', 'orc-sk', 'dw-orc', 'dw-hum',
-                 'we-we', 'dwnw-dwnw']   # 7 = nula pro B2 (bez Wrestle)
+                 'we-we', 'dwnw-dwnw', 'orcmb-weagile']   # 7 = nula pro B2 (bez Wrestle); 8 = P9c dekorelace
 
 results = []   # (stav, název, detail)
 def rec(state, name, detail=''):
