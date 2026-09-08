@@ -526,6 +526,28 @@ const TeamRoster& getOrcRoster1200() {
     return roster;
 }
 
+// 08.09.2026: P9c test variant (Tackle-vs-agility decorrelation) -- copy of
+// getOrcRoster1200() with Mighty Blow added to the 11 fill Linemen, so the
+// PUSHING side can carry extra hitting power without touching Tackle.
+// Selected only via getDevelopedRoster("orc-mb", ...), NOT the shared
+// TV1200 name -- getOrcRoster1200() itself stays untouched.
+const TeamRoster& getOrcRoster1200MightyBlow() {
+    static const TeamRoster roster = {
+        "Orc (TV1200, +Mighty Blow)",
+        {
+            {{5, 3, 3, 9}, makeSkills({SkillName::MightyBlow}), 11, "Lineman +Mighty Blow"},  // Lineman (fill)
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2, "Blitzer +Guard"},  // Blitzer +Guard
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow}), 1, "Blitzer +Mighty Blow"},  // Blitzer +Mighty Blow
+            {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},  // Blitzer ball-hunter
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block}), 4, "Black Orc +Guard+Block"},  // Black Orc holder
+            {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            {{5, 3, 3, 9}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
+        },
+        7, 60, true
+    };
+    return roster;
+}
+
 // Human TV~1200: 4 Blitzers, 1 Thrower, 2 Catchers, 1 Ogre, 3 Linemen.
 const TeamRoster& getHumanRoster1200() {
     static const TeamRoster roster = {
@@ -671,6 +693,32 @@ const TeamRoster& getWoodElfRoster1200() {
     return roster;
 }
 
+// 08.09.2026: P9c test variant (Tackle-vs-agility decorrelation) -- copy of
+// getWoodElfRoster1200() with Dodge added to the 11 fill Linemen, so the
+// PUSHED-TARGET side can carry extra agility without touching Tackle.
+// Selected only via getDevelopedRoster("woodelf-agile", ...), NOT the shared
+// TV1200 name -- getWoodElfRoster1200() itself stays untouched.
+const TeamRoster& getWoodElfRoster1200Agile() {
+    static const TeamRoster roster = {
+        "Wood Elf (TV1200, +Dodge)",
+        {
+            {{7, 3, 4, 7}, makeSkills({SkillName::Dodge}), 11, "Lineman +Dodge"},  // Lineman (fill)
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::StripBall}), 1, "Wardancer ball-hunter"},  // Wardancer ball-hunter
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap,
+                SkillName::SideStep}), 1, "Wardancer +Side Step"},  // Wardancer +Side Step
+            {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint,
+                SkillName::Block}), 2, "Catcher +Block"},  // Catcher +Block
+            {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},  // Thrower +Block
+            {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm,
+                SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},  // Treeman +Guard
+            {{7, 3, 4, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},  // Lineman +Wrestle
+        },
+        7, 50, true
+    };
+    return roster;
+}
+
 const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
     if (tv >= 1200) {
         std::string lower = toLower(name);
@@ -686,6 +734,10 @@ const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
         if (normalized == "dwarfnw") return &getDwarfRoster1200NoWrestle();
         if (normalized == "skaven") return &getSkavenRoster1200();
         if (normalized == "woodelf") return &getWoodElfRoster1200();
+        // 08.09.2026 P9c test variants (Tackle-vs-agility decorrelation) --
+        // see getWoodElfRoster1200Agile()/getOrcRoster1200MightyBlow().
+        if (normalized == "woodelfagile") return &getWoodElfRoster1200Agile();
+        if (normalized == "orcmb") return &getOrcRoster1200MightyBlow();
     }
     return getRosterByName(name);
 }
