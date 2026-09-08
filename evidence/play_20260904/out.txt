@@ -1,0 +1,59 @@
+aktivni tym: TeamSide.HOME  fáze: GamePhase.PLAY  kolo H:2 A:1
+mic: (3,5)  drzeny=False  nosic=-1
+vyrez x=1..22 y=3..12 (cele hriste je x=0..25 y=0..14)
+
+     1      2      3      4      5      6      7      8      9      10     11     12     13     14     15     16     17     18     19     20     21     22     
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=3 |      |      |      |      |      |      |      |      |  1   |  1   |  1   |      |      |      |      |      |      |      |      |      |      |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=4 |      |      |      |      |DR5/0 |      |      |      |  1   |WL12- |  2   |  1   |  1   |      |      |      |      |      |  1   |  1   |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=5 |      |  1   |*MIC* |  1   |      |      |      |      |DL10/1|  1   |DL1_  |WTRG17-|  2   |      |      |      |      |      |  1   |WC19- |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=6 |      |  1   |WW21- |  1   |      |      |      |      |      |      |DTG6/2|WL15- |wl13- |      |      |      |      |      |  1   |  1   |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=7 |      |  1   |  1   |  1   |      |      |DR4/1 |  1   |  1   |      |  1   |DL3/2 |DL2/2 |  1   |      |      |      |      |      |      |      |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=8 |      |      |      |      |      |      |  1   |WW22- |  1   |      |      |DBG8/1|WL16- |WL18_ |      |      |      |      |  1   |  1   |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=9 |      |      |      |      |      |      |  1   |  1   |  1   |      |      |DTG7/1|  1   |  1   |      |      |      |      |  1   |WC20- |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=10|      |      |      |      |      |      |      |  1   |  1   |  1   |      |DL11/0|      |      |      |      |      |      |  1   |  1   |  1   |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=11|      |      |      |      |      |      |      |  1   |WL14- |  1   |      |      |DBG9_ |      |      |      |      |      |      |      |      |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+y=12|      |      |      |      |      |      |      |  1   |  1   |  1   |      |      |      |      |      |      |      |      |      |      |      |      |
+    +------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+------+
+
+D trpaslik (nas, HOME) · W wood-elf (jejich, AWAY) · +role (L/R/B/T/DR/C/W/TR) +ID
+cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje
+/n u D.. = VZDY (i /0) -- v kolika JEJICH zonach stoji
+u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · '-' uz hral · malymi = stunned
+
+--- hráči (staty) ---
+   1 TRP (11, 5) MA4 ST3 AG2 AV9 PlayerState.PRONE ceka
+   2 TRP (13, 7) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+   3 TRP (12, 7) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+   4 TRP ( 7, 7) MA6 ST3 AG3 AV8 PlayerState.STANDING ceka
+   5 TRP ( 5, 4) MA6 ST3 AG3 AV8 PlayerState.STANDING ceka
+   6 TRP (11, 6) MA5 ST3 AG2 AV8 PlayerState.STANDING ceka
+   7 TRP (12, 9) MA5 ST3 AG2 AV8 PlayerState.STANDING ceka
+   8 TRP (12, 8) MA5 ST3 AG3 AV9 PlayerState.STANDING ceka
+   9 TRP (13,11) MA5 ST3 AG3 AV9 PlayerState.PRONE ceka
+  10 TRP ( 9, 5) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+  11 TRP (12,10) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+  23 TRP (-1,-1) MA4 ST3 AG2 AV9 PlayerState.OFF_PITCH ceka
+  24 TRP (-1,-1) MA4 ST3 AG2 AV9 PlayerState.OFF_PITCH ceka
+  12 ELF (10, 4) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  13 ELF (13, 6) MA7 ST3 AG4 AV7 PlayerState.STUNNED hral
+  14 ELF ( 9,11) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  15 ELF (12, 6) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  16 ELF (13, 8) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  17 ELF (12, 5) MA2 ST6 AG1 AV10 PlayerState.STANDING hral
+  18 ELF (14, 8) MA7 ST3 AG4 AV7 PlayerState.PRONE ceka
+  19 ELF (20, 5) MA8 ST2 AG4 AV7 PlayerState.STANDING hral
+  20 ELF (20, 9) MA8 ST2 AG4 AV7 PlayerState.STANDING hral
+  21 ELF ( 3, 6) MA8 ST3 AG4 AV7 PlayerState.STANDING hral
+  22 ELF ( 8, 8) MA8 ST3 AG4 AV7 PlayerState.STANDING hral
+  25 ELF (-1,-1) MA7 ST3 AG4 AV7 PlayerState.OFF_PITCH ceka
+  26 ELF (-1,-1) MA7 ST3 AG4 AV7 PlayerState.OFF_PITCH ceka

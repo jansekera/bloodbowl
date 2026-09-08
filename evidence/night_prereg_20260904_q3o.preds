@@ -1,0 +1,68 @@
+# PREDREGISTRACE NOCI 04.->05.09.2026  —  Q3-O / mode 17
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Pomaha KOMBINACE (N+O) -- pridat utek A odebrat "zustat" -- oproti
+#   rameni zcela vypnutemu? A co to rika o tom, KDE sedela vcerejsi skoda?
+#
+# ⛔⛔⛔ TOHLE NENI PRIMA IZOLACE (O). Harness porovnava kandidata (N+O)
+#   proti soupeři BEZ ramene, ne proti soupeři s (N) samotnym. Primy A/B
+#   test (O) samotneho by vyzadoval treti variantu harnesse -- coz T2.20
+#   zakazuje delat v jedne noci s (N+O). Misto toho se (O) izoluje NEPRIMO,
+#   ODECTENIM:
+#     dnesni delta (N+O vs nic)  MINUS  vcerejsi delta (N vs nic)
+#     ≈ prispevek (O) samotneho
+#   Neni to par-A/B test (O), je to porovnani dvou nezavislych mereni.
+#   ⛔ Nepocitat to jako by to byla stejna sila dukazu jako primy test.
+#
+# CO UZ VIME (03.->04.09., mode 16, Q3-N samotne)
+#   delta +0,0052 +- 0,0071 SE (+0,73 sigma), 95% CI [-0,0087; +0,0191]
+#   ⇒ NEROZHODNUTO, ale jasne NE ZAPORNE. Vsech 5 predpovedi trefeno.
+#   Srovnani s 02.09. (mode 14, N+O DOHROMADY, tehdy jeste PRED opravami
+#   b+c): -0,0933 +- 0,0086 (-10,86 sigma), jasne zaporne.
+#   ⭐ Hypoteza: skoda z 02.09. sedela v (O), ne v (N).
+#
+# ⚠️ ALE: mezi 02.09. a dneskem se zmenilo i OCENOVANI (krok b: kostky
+#   misto merene rizika) a pridala se ZED (krok c). Takze dnesni mode 17
+#   NENI totozne s vcerejsim mode 14 -- je to OPRAVENA verze obou pulek
+#   dohromady. Kdyby dnesni (N+O) vyslo zaporne, nejde jednoznacne rict,
+#   jestli je vinny (O) samotny, nebo (O) i po opravach porad skodi jinak.
+#   ⇒ Odectenim ziskame NEPRIMY signal, ne dukaz.
+#
+# CO SE DNES MERI: mode 17 = (N) rozsireni nabidky O UNIK + (O) odebrani
+#   nabidky ZUSTAT, kdyz je pocitana cena "zustat" horsi. Q3-O VYZADUJE
+#   Q3-N (kod: standUpRemoveStayArm() vraci false, pokud neni zapnuty i
+#   standUpEscapeArm()).
+#
+# REGISTROVANA RUCNI CTENI (poradi leak -> arm acted -> n_nonzero -> delta)
+#   Q3/UTEK · Q3/ODPOVED · Q3/VSTAVANI · Q3/CENA · Q3/CENA-PRICINA ·
+#   Q3/ZED · Q3/PRILIS-RIZIKOVE · Q3/ODEBRANO-ZUSTAT
+#   ⭐ Na rozdil od vcerejska DNES Q3/ODEBRANO-ZUSTAT NESMI byt 0 --
+#     kdyby bylo, znamenalo by to, ze rameno O nikdy nezabralo a mereni
+#     je prazdne (stejna vada jako u M13/Q3 31.08.-02.09., jen obracene).
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.9
+n_nonzero in 0.20 0.85
+delta in -0.10 0.06
+delta_1s in -0.05 0.04
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Sirsi zaporny okraj (-0,10) nez u Q3-N (-0,03), protoze TOHLE je vetev,
+#   kde vcerejsi skoda pravdepodobne sedela -- a i po opravach (b)+(c) to
+#   porad muze byt zaporne. Horni okraj stejny jako u Q3-N (+0,06), protoze
+#   pridana cast (O) muze jen ODEBIRAT moznosti, ne pridavat sanci na lepsi
+#   vysledek.
+#   ⇒ Vysledek rozhoduje TAKTIKU: zaporne = (O) se nenasadi, ani po
+#     opravach; kladne/neutralni = vcerejsi skoda sedela jinde, nez jsme
+#     cekali, a je treba hledat dal.
+#
+# DIMENZOVANI: tempo ZMERENO CERSTVE preflightem (nepřebira se z Q3-N,
+#   viz T pravidlo "tempo se nepřebírá"), byt stejny engine/commit.
+#
+# ⚠️ CO Z NOCI NEPLATI: absolutni cisla. Plati JEN parova delta a NEPRIME
+#   srovnani s vcerejskym mode 16 popsane vyse.
+#
+# ZADANI: --mode 17 --matchups "2:dw-dw:1" --pairs 2400 --chunks 48 --workers 4
+# Spousteni: ./launch_q3o_night.sh

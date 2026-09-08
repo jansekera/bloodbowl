@@ -1,0 +1,53 @@
+# PREDREGISTRACE NOCI 05.->07.09.2026 (vikend)  —  Q3-O / mode 17, VELKY BEH
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Totozna otazka jako 04.09. (Q3-O): pomaha KOMBINACE (N+O) oproti rameni
+#   zcela vypnutemu? Dnesni beh je JEN VETSI VZOREK TEHOZ MERENI, ne nove
+#   mereni jineho ramene.
+#
+# PROC VETSI BEH: Q3-N (mode 16, 03.->04.09.) i Q3-O (mode 17, 04.->05.09.)
+#   obe skoncily NEROZHODNUTO pri 2400 parech:
+#     Q3-N: delta +0,0052 +- 0,0071 SE, 95% CI [-0,0087; +0,0191]
+#     Q3-O: delta +0,0063 +- 0,0072 SE, 95% CI [-0,0078; +0,0203]
+#   night_summarize.py u Q3-O spocital: na rozhodnuti by pri NEZMENENEM
+#   odhadu bylo potreba ~6199 paru (2,6x dnesnich 2400).
+#   ⭐ POUCENI 04.09. (feedback_size_nights_with_margin_not_just_enough):
+#     dimenzovat s REZERVOU, ne jen na hranici odhadu. Q3-O sam byl pripraven
+#     PRED timhle poucenim (launcher z 07:54, poucení az 14:51 tehoz dne) a
+#     zdedil stejne poddimenzovane zadani jako Q3-N -- proto se to opakuje.
+#   ⇒ Tenhle beh: 7200 paru = 3,0x puvodnich 2400, citelne nad 6199.
+#
+# ⛔⛔⛔ STALE NENI PRIMA IZOLACE (O) -- viz vcerejsi prereg
+#   (night_prereg_20260904_q3o.preds) pro plne zduvodneni. Odectenim proti
+#   Q3-N lze ziskat jen NEPRIMY odhad prispevku O, ne par-A/B dukaz.
+#
+# CO SE MERI: mode 17 = (N) rozsireni nabidky O UNIK + (O) odebrani nabidky
+#   ZUSTAT, kdyz je pocitana cena "zustat" horsi. Vyzaduje standUpEscapeArm()
+#   soucasne zapnuty (kod: standUpRemoveStayArm() vraci false bez nej).
+#
+# REGISTROVANA RUCNI CTENI (poradi leak -> arm acted -> n_nonzero -> delta)
+#   Q3/UTEK · Q3/ODPOVED · Q3/VSTAVANI · Q3/CENA · Q3/CENA-PRICINA ·
+#   Q3/ZED · Q3/PRILIS-RIZIKOVE · Q3/ODEBRANO-ZUSTAT
+#   ⭐ Q3/ODEBRANO-ZUSTAT NESMI byt 0 -- jinak rameno O nikdy nezabralo.
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+#   Proporcni predpovedi (arm_acted, n_nonzero) se pri vetsim vzorku NEMENI --
+#   jsou to podily, ne absolutni cisla.
+leak == 0
+arm_acted >= 0.9
+n_nonzero in 0.20 0.85
+delta in -0.10 0.06
+delta_1s in -0.05 0.04
+#
+# ODUVODNENI PREDPOVEDI DELTY (nezmeneno proti vcerejsku -- stejne mereni,
+#   jen vetsi vzorek, takze rozsah moznych vysledku se nemeni, jen presnost)
+#
+# DIMENZOVANI: tempo ZMERENO CERSTVE preflightem (nepřebira se z predchoziho
+#   behu, viz pravidlo "tempo se nepřebírá", byt stejny engine/commit).
+#
+# ⚠️ CO Z NOCI NEPLATI: absolutni cisla. Plati JEN parova delta a NEPRIME
+#   srovnani s mode 16 (Q3-N) popsane vyse.
+#
+# ZADANI: --mode 17 --matchups "2:dw-dw:1" --pairs 7200 --chunks 144 --workers 4
+# Spousteni: ./launch_q3o_weekend_20260905.sh

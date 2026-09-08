@@ -1,0 +1,52 @@
+# PREDREGISTRACE 07.09.2026 -- M14b / blitzPathArm, mode 15, PREMERENI
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   `nextStepTowardAdjacent` (BFS, cena = pole + K*tacklezona + K*GFI) misto
+#   hladoveho `pickApproachStep` (jen vzdalenost + TZ tiebreak) pro krok
+#   blitzujiciho k cili. Pomaha to chess delte, kdyz uz vime, ze hladovy
+#   vyber ma znamou oscilacni chybu (viz nize)?
+#
+# CO UZ VIME
+#   Lehky test 12 paru (01.09.): -0,1667 +- 0,1076 (1,5 SE) -- SUM, ne
+#   dukaz. Zamitnuto s odůvodněním "hladova chuze je z 97,6 % optimalni"
+#   (mereno jako pocet kroku navic proti BFS optimu, PRUMER pres 49 336
+#   dobehu).
+#   ⛔⛔⛔ 07.09.: PRI ZKOUSCE NAIVNIHO ZAROVNANI KONSTANT (jiny pristup,
+#   pickApproachStep vzdalenost*100->*10) selhaly 3 testy s
+#   result.success==false -- hladovy vyber OSCILUJE a UPLNE NEDOJDE K CILI,
+#   ne ze by jen sel o kousek delsi cestou. To je jina, ZAVAZNEJSI trida
+#   selhani nez "0,025 kroku navic na dobeh" prumer z 01.09. -- prumer
+#   muze skryvat vzacne ale KATASTROFICKE pripady (blitz vubec neprobehne),
+#   presne to, co BFS (M14b) resi konstrukci, ne heuristikou.
+#   ⇒ Timhle behem se merime SKUTECNY M14b (BFS), ne ten naivni pokus,
+#   ktery uz byl vracen -- ten se necommitl.
+#
+# CO SE MERI: mode 15, blitzPathArm zapnuty pro kandidatni stranu,
+#   `nextStepTowardAdjacent` misto `pickApproachStep` pro kazdy krok
+#   blitzoveho pribliseni.
+#
+# DIMENZOVANI: 4800 paru = 400x vetsi nez lehky test (12 paru), s rezervou
+#   (feedback_size_nights_with_margin_not_just_enough) -- NE podle
+#   nespolehliveho bodoveho odhadu z lehkeho testu, ktery ma SE=0,1076 a
+#   neni zaklad pro sizing. Tempo zmereno cerstve zde: 80,7 s/par/worker,
+#   4800 paru ~= 26,9 h.
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.85
+n_nonzero in 0.15 0.60
+delta in -0.10 0.08
+delta_1s in -0.05 0.04
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Siroke, protoze skutecny smer neznam s jistotou -- lehky test byl sum,
+#   ne signal. Horni okraj o neco vyssi nez u puvodni predregistrace,
+#   protoze dnesni nalez (uplne selhani blitzu u hladoveho vyberu) je
+#   zavaznejsi, nez se 01.09. cekalo -- pokud se tenhle jev deje v realnych
+#   hrach casteji, nez ukazuje 2,4% neoptimalnich dobehu, efekt muze byt
+#   vetsi. Spodni okraj ponechan siroky pro pripad, ze BFS cena (K=2 za TZ,
+#   K=1 za GFI) neni spravne kalibrovana a chuze se prilis vyhyba riziku
+#   na ukor postupu.
+#
+# ZADANI: --mode 15 --matchups "2:dw-dw:1" --pairs 4800 --chunks 32 --workers 4
