@@ -1,0 +1,50 @@
+# VYSLEDEK SONDY 08.09.2026 — M12/(B) KLECOVE KRITERIUM, MULTI-RASOVA
+# Beh: mode 12, dva matchupy (dw-we, dw-sk), 60 paru kazdy, 6 kusu, 4 workery
+# Predregistrace: evidence/night_prereg_20260908_m12b_multirace.md/.preds (psana PRED behem)
+
+## KONTEXT
+dw-dw (30.->31.08., 2400 paru): DELTA +0,0242 +- 0,0086 SE (2,82 sigma) => POMAHA.
+Predikce uzivatele 26.08.: "(B) nebezpecne od vsech krom khemri v desti" --
+klec svazuje 4 tela, proti rychle/prihravkove rase je to zatez.
+Tahle sonda testuje dva dalsi body na ose rychlosti soupere.
+
+## CTENI V PORADI Z PREDREGISTRACE
+
+### dw-we (wood-elf, rychly/agilni)
+(1) leak: 0/60 => delta se smi cist
+(2) arm acted 60/60 (100 %) — ARM PICKS TOTAL 80 307 (669,23/hru)
+(3) n_nonzero 36/60 = 60,0 %
+(4) DELTA (dvoustranna) +0,0000 +- 0,0594 SE (0,00 sigma), CI95 [-0,1164; +0,1164]
+    jednostranne +0,0000 +- 0,0297
+    1/6 shardu zapornych; bez overdisperze
+    => NEROZHODNUTO, MALO SILY. Na rozhodnuti chybi cca 60x vic paru (~3614).
+5 z 5 predpovedi TREFA.
+
+### dw-sk (skaven, nejrychlejsi/nejkrehci)
+(1) leak: 0/60 => delta se smi cist
+(2) arm acted 60/60 (100 %) — ARM PICKS TOTAL 76 600 (638,33/hru)
+(3) n_nonzero 35/60 = 58,3 %
+(4) DELTA (dvoustranna) +0,1917 +- 0,0664 SE (2,89 sigma), CI95 [+0,0615; +0,3218]
+    jednostranne +0,0958 +- 0,0332, CI95 [+0,0308; +0,1609]
+    1/6 shardu zapornych; bez overdisperze
+    => POMAHA. Prah +-0,015 cele mimo CI.
+3 z 5 predpovedi TREFA (delta a delta_1s MIMO — predregistrace cekala
+pokles/otoceni smerem k rychle rase, vyslo jeste silnejsi pomoc).
+
+## VERDIKT — TRI BODY NA OSE RYCHLOSTI SOUPERE
+  dw-dw (pomaly)         +0,0242 +- 0,0086   POMAHA (2,82 sigma)
+  dw-we (rychly/agilni)  +0,0000 +- 0,0594   NEROZHODNUTO (malo sily)
+  dw-sk (nejrychlejsi)   +0,1917 +- 0,0664   POMAHA (2,89 sigma), NEJVIC ze tri
+
+PREDIKCE UZIVATELE (26.08., "nebezpecne od vsech krom khemri v desti") SPIS
+VYVRACENA, NE POTVRZENA. Zadny pokles s rychlosti soupere videt neni --
+pokud neco, nejrychlejsi testovana rasa (skaven) dopadla nejlip ze vsech.
+dw-we zustava nerozhodnuty (ne nula), takze uplne vyvraceni to jeste neni --
+ale hypoteza "klec skodi proti rychlym rasam" nema v datech oporu.
+
+## OTEVRENE
+  dw-we by chtelo doměřit (nerozhodnuto != nula) pred konecnym souctem.
+  Pocasi (soucast puvodni predikce "khemri V DESTI") se v teto sonde
+  netestovalo vubec -- zbyva samostatna otazka.
+  Rozdeleni na TD po rasach v ramci jednoho matchupu (ne jen napric
+  matchupy) taky zbyva -- tahle sonda srovnava jen matchup-proti-matchupu.
