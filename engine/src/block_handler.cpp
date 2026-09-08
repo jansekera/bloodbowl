@@ -206,7 +206,18 @@ static int pushDestScore(const GameState& state, TeamSide blockingSide,
         return std::max(std::abs(a.x - b.x), std::abs(a.y - b.y));
     };
 
-    // (1) does he still dirty a STANDING corner of our cage?
+    // 08.09.2026 (uživatel): PRIORITA OTOČENA. "Pro nás je horší, když soupeř
+    // sousedí s nosičem -- proto nejdřív odsunout od nosiče, pak až je
+    // problém, že sousedí s rohem klece." Sousedství s nosičem je přímé
+    // ohrožení míče; špinění rohu je až druhotné, řeší se teprve když
+    // vzdálenost od nosiče už nerozhoduje (viz strop níž).
+
+    // (1) distance from our carrier, capped -- past 4 squares he is out of
+    // reach anyway and further shoving buys nothing worth outranking (2).
+    int dist = std::min(cheb(dest, carrier->position), 4);
+
+    // (2) does he still dirty a STANDING corner of our cage? -- tiebreak,
+    // used only once (1) stops discriminating (dist tied, typically capped).
     bool dirties = false;
     for (int dx = -1; dx <= 1 && !dirties; dx += 2) {
         for (int dy = -1; dy <= 1 && !dirties; dy += 2) {
@@ -220,11 +231,7 @@ static int pushDestScore(const GameState& state, TeamSide blockingSide,
         }
     }
 
-    // (2) distance from our carrier, capped -- past 4 squares he is out of
-    // reach anyway and further shoving buys nothing worth outranking (1).
-    int dist = std::min(cheb(dest, carrier->position), 4);
-
-    return (dirties ? 0 : 10000) + 100 * dist + straightBackScore;
+    return 10000 * dist + (dirties ? 0 : 100) + straightBackScore;
 }
 
 static int choosePushSquare(const GameState& state, const Position* cand, int count,

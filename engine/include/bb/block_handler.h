@@ -81,6 +81,12 @@ long takeDauntlessRollEvalsInSearch();
 // confirmed the rule matches what a human coach would actually pick.
 // The per-side toggle is gone; the picks counters stay as production
 // diagnostics (how often the rule changes the pick from straight-back).
+//
+// ⭐ Priorita otočena 08.09.2026 (uživatel, tentýž den jako nasazení): "pro
+// nás je horší, když soupeř sousedí s nosičem -- proto nejdřív odsunout od
+// nosiče, pak až je problém, že sousedí s rohem klece." `pushDestScore` teď
+// dává vzdálenosti od nosiče váhu 10000/pole (kryje celý strop 0-4), rohu
+// jen 100 jako tiebreak -- obráceně, než jak to bylo od 18.08.
 
 // Times the rule actually picked a DIFFERENT square than "straight back
 // first" would have, since the last call -- and resets. Diagnostic only now
