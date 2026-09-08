@@ -50,8 +50,15 @@ static int scoreFace(BlockDiceFace face, bool attHasBlock, bool defHasBlock,
 
 thread_local long g_dauntlessRolls = 0;
 
-// P9/P9c arm -- see bb/block_handler.h for the measured motivation.
-thread_local bool g_pushGeometry[2] = {false, false};
+// P9/P9c -- 08.09.2026 NASAZENO DO PRODUKCE, nepodmineny (uzivatel: "nastav
+// AI ať odstrkává tak, ať nesousedí s nosičem ani s klecí -- víc netřeba").
+// Statisticka delta na dw-we vysla jako ekvivalence (+0,0017 +- 0,0060), ale
+// nasazuje se jako doložená oprava vadné volby (1,28 horší volby na zápas),
+// ne jako prokázaný zisk chess -- stejný důvod jako u B2/Wrestle pricing.
+// Rozbor konkrétní situace se skutečnou klecí (diagonální tělo u nosiče)
+// potvrdil, že napsané pravidlo (roh -> nosič -> rovně dozadu) odpovídá
+// tomu, co by hráč sám zvolil. Přepínač zůstal jako diagnostika (viz níže),
+// ale sám mechanismus je teď bezpodmínečný.
 thread_local long g_pushGeometryPicks = 0;
 thread_local long g_pushGeometryPicksDodge = 0;   // redirected AND pushed target has Dodge
 thread_local long g_pushGeometryPicksFastMA = 0;  // redirected AND pushed target MA >= 6 (first-pass "fast mover" cutoff, not a tuned constant)
@@ -60,14 +67,6 @@ long takeDauntlessRollEvalsInSearch() {
     long v = g_dauntlessRolls;
     g_dauntlessRolls = 0;
     return v;
-}
-
-void setPushGeometryArm(TeamSide side, bool on) {
-    g_pushGeometry[side == TeamSide::HOME ? 0 : 1] = on;
-}
-
-bool pushGeometryArm(TeamSide side) {
-    return g_pushGeometry[side == TeamSide::HOME ? 0 : 1];
 }
 
 long takePushGeometryEvalsInSearch() {
@@ -256,17 +255,16 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         int score;
         if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
         else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
-        else if (pushGeometryArm(blockingSide))
-            score = pushDestScore(state, blockingSide, cand[i], count - i);  // P9/P9c
-        else                   score = count - i;                       // straight back first
+        else                   score = pushDestScore(state, blockingSide, cand[i], count - i);  // P9/P9c
         if (best < 0 || score > bestScore) { best = i; bestScore = score; }
     }
     if (best < 0) return 0;
 
-    // Count only the pushes the arm actually REDIRECTED. A counter that ticked
-    // on every push would say "the arm ran" even where it agreed with straight
-    // back, and the per-pair null control needs the number that can be zero.
-    if (!defenderChooses && !towardEdge && pushGeometryArm(blockingSide)) {
+    // Diagnostic only, ticks on every redirect now that the rule is
+    // unconditional -- no longer an A/B signal (see modeHasArmSignal-style
+    // note for M1/N10). Says how often the rule actually changes the pick
+    // vs. agreeing with straight-back, and against whom.
+    if (!defenderChooses && !towardEdge) {
         int plain = -1, plainScore = 0;
         for (int i = 0; i < count; i++) {
             if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;

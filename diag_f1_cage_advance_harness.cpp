@@ -191,8 +191,20 @@ static const Matchup MATCHUPS[] = {
     // ⛔ PRIPOJENO, NE VLOZENO: index se zapisuje do kazdeho radku na disku,
     // takze preskladani tehle tabulky by TISE preznacilo minule behy.
     {"dwarf-nw", "dwarf-nw"},
+    // 2026-09-08: PRIPOJENO (index 8) pro P9c dekorelaci Dodge cile vs Tackle
+    // odsouvajiciho -- viz task_queue.md, P9c 08.09. Puvodni dw-we matchup
+    // ma obe veci svazane na rase najednou (trpaslik ma Tackle 9/13 A odsouva
+    // agilniho elfa; elf nema Tackle A odsouva neagilniho trpaslika), takze
+    // asymetrie namerena 08.09. (5.28 sigma) nejde priradit jedne, nebo druhe
+    // priline. `orc-mb`/`wood-elf-agile` jsou nove varianty (roster.cpp):
+    // ork ma Tackle skoro nikde (1/19), elf dostal Dodge navic na vsechny
+    // fill Linemany a ork symetricky Mighty Blow (nesouvisi s Tackle/Dodge,
+    // jen vyrovnava silu tymu). Kdyz drzi rameno ork (cand_home=true) a
+    // odsouva agilniho elfa BEZ Tackle na sve strane, kladny efekt by
+    // ukazoval na agilitu cile; nulovy/zaporny na Tackle odsouvajiciho.
+    {"orc-mb", "wood-elf-agile"},
 };
-static constexpr int N_MATCHUPS = 8;
+static constexpr int N_MATCHUPS = 9;
 
 struct SideAttrition {
     int ko = 0, injured = 0, dead = 0, ejected = 0;
@@ -349,7 +361,7 @@ int main(int argc, char** argv) {
          : mode == 2 ? "ERA: single arm, production config, both sides"
          : mode == 4 ? "DAUNTLESS: block offer prices the equalised strength vs raw"
          : mode == 3 ? "M1: learned policy blend 0.2 vs 0.0, DWARF SIDE ONLY"
-         : mode == 5 ? "P9/P9c: cilove pole odsunu se VYBIRA (geometrie) vs 'rovne dozadu'"
+         : mode == 5 ? "(mode 5 ZRUSEN 08.09. -- P9/P9c nasazeno do produkce)"
          : mode == 12 ? "M12/(B): KLECOVE KRITERIUM samotne -- rameno PROTI PLACEBU"
          : mode == 6 ? "P38: cilove pole NOSICE se odvozuje z KLECE, ktera z nej vyjde"
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
@@ -510,14 +522,13 @@ int main(int argc, char** argv) {
                 MacroMCTSPolicy awayPol(vf.get(),
                                         candHome ? baseCfg : candCfg,
                                         seed * 2654435761u + 47u);
-                // mode 5 (P9/P9c, 18.08.): rameno nesedí v MCTSConfig, ale
-                // v resolveru bloku, protože odsun řeší resolver, ne search.
-                // Nastavuje se PER STRANU, ať A/B umí jen jednu -- a shazuje se
-                // hned po hře, aby nepřeteklo do dalšího páru.
-                bb::setPushGeometryArm(bb::TeamSide::HOME,
-                                       mode == 5 && candHome);
-                bb::setPushGeometryArm(bb::TeamSide::AWAY,
-                                       mode == 5 && !candHome);
+                // ⛔ mode 5 (P9/P9c) ZRUSEN 08.09.2026 -- rameno nasazeno do
+                //   produkce nepodmineně (dw-we delta byla ekvivalence,
+                //   +0,0017 +- 0,0060, ale nasazeno jako dolozena oprava
+                //   volby, ne jako prokazany zisk chess). Cislo 5 se uz
+                //   NEPOUZIJE -- rezimy se jen pripojuji, aby radky na disku
+                //   nezmenily vyznam. Vysledek zustava v `pushgeom_20260818/`
+                //   a `ab_p9c_decorrelate_probe_20260908/`.
                 bb::takePushGeometryEvalsInSearch();   // vynuluj čítač na pár
                 bb::takePushGeometryDodgePicksInSearch();   // vynuluj čítač na pár
                 bb::takePushGeometryFastMAPicksInSearch();  // vynuluj čítač na pár
@@ -694,8 +705,6 @@ int main(int argc, char** argv) {
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::AWAY, false);
-                bb::setPushGeometryArm(bb::TeamSide::HOME, false);
-                bb::setPushGeometryArm(bb::TeamSide::AWAY, false);
                 long candDaunt = bb::takeDauntlessOfferEvalsInSearch();
                 long candRoll  = bb::takeDauntlessRollEvalsInSearch();
                 handoffOfferTotal += bb::takeHandOffOfferEvalsInSearch();
