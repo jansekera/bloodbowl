@@ -495,6 +495,12 @@ thread_local long g_repositionGfiReached = 0, g_repositionGfiTurnover = 0;
 //   zablokovany cil), OTHER = zbytek pripadu (nemel by prakticky nastat).
 thread_local long g_repositionGfiZbytekLimit = 0, g_repositionGfiZbytekNoStep = 0,
                   g_repositionGfiZbytekOther = 0;
+// ⭐ Uzivatel 09.09.: „26 % turnover je dost -- je to GFI nebo dodge?"
+//   Rozpad prislusnosti turnoveru z granted-GFI pokusu podle prvniho
+//   priciny, ktera se lisi (takeMoveTurnoverCause pred/po, stejny vzor
+//   jako Q3 vyse).
+thread_local long g_repositionGfiTurnoverDodge = 0, g_repositionGfiTurnoverGfi = 0,
+                  g_repositionGfiTurnoverOther = 0;
 
 void setRepositionGfiArm(TeamSide side, bool on) {
     g_repositionGfiArm[static_cast<int>(side)] = on;
@@ -516,6 +522,12 @@ void takeRepositionGfiZbytekBreakdown(long* out3) {
     out3[1] = g_repositionGfiZbytekNoStep;
     out3[2] = g_repositionGfiZbytekOther;
     g_repositionGfiZbytekLimit = g_repositionGfiZbytekNoStep = g_repositionGfiZbytekOther = 0;
+}
+void takeRepositionGfiTurnoverCause(long* out3) {
+    out3[0] = g_repositionGfiTurnoverDodge;
+    out3[1] = g_repositionGfiTurnoverGfi;
+    out3[2] = g_repositionGfiTurnoverOther;
+    g_repositionGfiTurnoverDodge = g_repositionGfiTurnoverGfi = g_repositionGfiTurnoverOther = 0;
 }
 
 void setStandUpEscapeArm(TeamSide side, bool on) {
@@ -3174,12 +3186,20 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
                 : std::clamp(need - static_cast<int>(mover.movementRemaining), 0, 2);
             if (gap > 0) {
                 ++g_repositionGfiOpportunity;
-                const bool rerollAvailable =
-                    state.getTeamState(mover.teamSide).canUseReroll();
-                const bool blizzard = state.weather == Weather::BLIZZARD;
-                const double pFail = gfiSequenceFailProb(gap, rerollAvailable, blizzard);
+                // ⛔⛔⛔ 09.09.2026 (uzivatel: "riskantni dodge se ma taky
+                //   vyhodnotit a kdyztak neprovest"): PUVODNE tu stalo
+                //   `gfiSequenceFailProb(gap, ...)` -- cenilo JEN GFI. Zmereno
+                //   (`ab_wgfi_20260909_probe_v2/`): z turnoveru granted-GFI
+                //   pokusu bylo DODGE 70,9 %, GFI jen 29,1 % -- cesta k cili
+                //   casto vede pres tacklezonu a rameno tohle riziko vubec
+                //   necenilo. `pathFailProb` cini CELKOVE riziko cesty
+                //   (dodge + GFI dohromady), stejnym rozpoctem jako `need`
+                //   vyse -- takze pFail*zbyvajici < 1 ted skutecne odpovida
+                //   celkove cene, ne jen jejimu GFI kouskem.
+                const double pFail = pathFailProb(state, mover, macro.targetPos,
+                                                  probeBudget, avoid);
                 const int remaining = teammatesStillToAct(state, mover.id, mover.teamSide);
-                if (pFail * remaining < 1.0) {
+                if (pFail >= 0.0 && pFail * remaining < 1.0) {
                     localGfiAllowance = gap;
                     ++g_repositionGfiGranted;
                 } else {
@@ -3226,6 +3246,15 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     //   thread_local citace primo (bez resetu), takze normalni beh harnessu
     //   (takeMoveWalkBailout) neni nijak dotcen.
     const long mwLimitBefore = g_mwLimit, mwNoStepBefore = g_mwNoStep;
+    // ⭐ Uživatel 09.09.: „26 % turnover je dost — je to GFI nebo dodge?"
+    //   Stejny vzor jako Q3 (cist PRED i PO, brat rozdil -- viz komentar
+    //   vyse) -- BFS cesta muze projit tacklezonou (dodge), ne jen hodit
+    //   GFI za hranici MA, takze se to neda uhodnout, musi se zmerit.
+    long gfiTOBefore[3] = {0,0,0};
+    if (localGfiAllowance > 0) {
+        takeMoveTurnoverCause(gfiTOBefore);
+        addBackMoveTurnoverCause(gfiTOBefore);
+    }
 
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
                      maxSteps, avoid);
@@ -3234,7 +3263,15 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // skutecne POVOLIL (ne kdy jen mel prilezitost), zjisti se, jestli krok
     // navic dovedl hrace na cil, nebo skoncil turnoverem (GFI padlo).
     if (localGfiAllowance > 0) {
-        if (result.turnover) ++g_repositionGfiTurnover;
+        if (result.turnover) {
+            ++g_repositionGfiTurnover;
+            long gfiTOAfter[3];
+            takeMoveTurnoverCause(gfiTOAfter);
+            addBackMoveTurnoverCause(gfiTOAfter);   // souhrnny radek zustava netknuty
+            if (gfiTOAfter[0] > gfiTOBefore[0]) ++g_repositionGfiTurnoverDodge;
+            else if (gfiTOAfter[1] > gfiTOBefore[1]) ++g_repositionGfiTurnoverGfi;
+            else ++g_repositionGfiTurnoverOther;
+        }
         else if (state.getPlayer(macro.playerId).position == macro.targetPos)
             ++g_repositionGfiReached;
         else {

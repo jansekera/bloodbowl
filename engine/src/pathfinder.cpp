@@ -284,6 +284,70 @@ int pathStepsToward(const GameState& state, const Player& player,
     return steps[targetIdx];
 }
 
+// ⭐⭐⭐ 09.09.2026 (uzivatel: "riskantni dodge se ma taky vyhodnotit a
+//   kdyztak neprovest"). CELKOVA pravdepodobnost neuspechu (turnover)
+//   NEJLEVNEJSI cesty na `target` -- kombinuje VSECHNY tacklezone-dodge
+//   kroky NA CESTE a GFI kroky, ne jen GFI. Zmereno (ab_wgfi sonda):
+//   z granted-GFI turnoveru bylo DODGE 70,9 %, GFI jen 29,1 % -- W-GFI
+//   rameno cenilo jen GFI a dodge riziko na sve vlastni ceste vubec
+//   nevidelo. Nezavisle udalosti: P(fail) = 1 - prod(1-p_i) pres CELOU
+//   cestu. -1.0 = nedosazitelne v rozpoctu.
+double pathFailProb(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare) {
+    if (budget <= 0) return -1.0;
+    if (target == player.position) return 0.0;
+
+    int key[GRID_SIZE];
+    int8_t steps[GRID_SIZE];
+    int16_t parent[GRID_SIZE];
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
+                        /*preferStraight=*/true);
+    const int startIdx = gridIdx(player.position.x, player.position.y);
+    const int targetIdx = gridIdx(target.x, target.y);
+    if (key[targetIdx] >= kInfCost) return -1.0;
+
+    // Zrekonstruuj CELOU cestu (ne jen prvni krok jako nextStepToward) --
+    // parent[] jde od cile zpatky ke startu.
+    int chain[GRID_SIZE];
+    int n = 0;
+    for (int idx = targetIdx; idx != startIdx; idx = parent[idx]) {
+        if (idx < 0 || n >= GRID_SIZE) return -1.0;  // nemelo by nastat pri validnim key[]
+        chain[n++] = idx;
+    }
+
+    // Stejne konstanty jako `riskWeightedDijkstra` (rerollAvailable natvrdo
+    // false -- viz odduvodneni tamtez), aby se cenilo totez, co se pak
+    // skutecne pojede.
+    const bool rerollAvailable = false;
+    const bool blizzard = (state.weather == Weather::BLIZZARD);
+    const int freeSteps = movementAfterStandUp(player);
+    const int gfiCap = maxGfiSquares(player);
+
+    Position cur = player.position;
+    double successProb = 1.0;
+    int stepCount = 0;
+    for (int i = n - 1; i >= 0; --i) {
+        Position np{static_cast<int8_t>(chain[i] % GRID_W),
+                    static_cast<int8_t>(chain[i] / GRID_W)};
+        if (countTacklezones(state, np, player.teamSide) > 0) {
+            const int dodgeTarget = calculateDodgeTarget(state, player, np, cur);
+            const double pFail = (dodgeTarget - 1) / 6.0;
+            successProb *= (1.0 - pFail);
+        }
+        const int nStep = stepCount + 1;
+        const int gfiBefore = std::clamp(stepCount - freeSteps, 0, gfiCap);
+        const int gfiAfter  = std::clamp(nStep      - freeSteps, 0, gfiCap);
+        if (gfiAfter > gfiBefore) {
+            const double dFail = gfiSequenceFailProb(gfiAfter, rerollAvailable, blizzard)
+                               - gfiSequenceFailProb(gfiBefore, rerollAvailable, blizzard);
+            successProb *= (1.0 - dFail);
+        }
+        cur = np;
+        stepCount = nStep;
+    }
+    return 1.0 - successProb;
+}
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove) {

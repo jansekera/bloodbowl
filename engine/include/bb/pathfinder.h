@@ -43,6 +43,14 @@ bool nextStepToward(const GameState& state, const Player& player,
 int pathStepsToward(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare);
 
+// 09.09.2026: CELKOVA pravdepodobnost neuspechu (turnover) nejlevnejsi
+// cesty na `target` -- kombinuje VSECHNY tacklezone-dodge kroky na ceste
+// A GFI kroky (ne jen GFI). -1.0 = nedosazitelne v rozpoctu. Pouziva se
+// tam, kde se rozhoduje "je ta cesta dost bezpecna" (W-GFI) -- cisty GFI
+// risk podcenoval cesty, ktere vedou pres tacklezonu.
+double pathFailProb(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare);
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);

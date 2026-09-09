@@ -50,7 +50,22 @@ LIMIT, ne genuinní zablokování).
 **Kolo 3** (09.09., `gap` přepočítán z `pathStepsToward`/BFS místo
 `distanceTo`, 4 páry) — dosel na cíl **71,9 %**, turnover **28,1 %**,
 **ZBYTEK 0,0 %** — každý povolený GFI teď dojde ke kostce. Hypotéza
-plně potvrzena. **SONDA BĚŽÍ na opravené chůzi i opraveném gap.**
+plně potvrzena. Plná sonda (80 párů): mechanismus stejný (73,6/26,4/0,0 %),
+ale **win-rate se prakticky nezměnil** (−0,0031 ± 0,0200 vs −0,0031 ±
+0,0212 před opravou) — uživatel: *„26 % turnover je dost — je to GFI
+nebo dodge?"* Rozpad příčiny turnoveru (`takeMoveTurnoverCause`
+před/po, stejný vzor jako Q3): **DODGE 70,9 %, GFI jen 29,1 %** — rameno
+cenilo jen GFI riziko (`gfiSequenceFailProb`), ale BFS cesta k cíli
+často vede přes tacklezónu, kterou rameno vůbec nevidělo.
+
+**Kolo 4** (09.09., `pathFailProb` — CELKOVÉ riziko cesty, dodge i GFI
+dohromady, místo čistého GFI — nahrazuje risk gate v `expandReposition`,
+uživatel: *„riskantní dodge se má taky vyhodnotit a kdyžtak neprovést"*)
+— 8 párů: **povoleno kleslo 78,9 %→27,3 %** příležitostí (rameno teď
+správně odmítá cesty přes tacklezónu jako moc drahé), turnover z
+povolených klesl **28,3 %→15,6 %**, a mezi turnovery se otočil poměr:
+**GFI 70,1 %, DODGE jen 29,9 %** — přesně obráceně než před opravou.
+**SONDA BĚŽÍ na plně opraveném rameni (chůze + gap + celkové riziko).**
 
 ## Co se měří
 
