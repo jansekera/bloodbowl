@@ -43,10 +43,14 @@ tahle cesta tu opravu neměla), viz task_queue.md.
 **Kolo 2** (09.09., po opravě `movePlayerToward` na BFS, commit `75f9df43`,
 2 páry) — dosel na cíl 24,0 %, turnover 24,5 %, **ZBYTEK 51,5 %** (klesl
 z 63,4 %). Granted GFI teď mnohem častěji skutečně dojde ke kostce.
-Zbytek 51,5 % je nově přisouzen tomu, že `gap` počítá PŘÍMOU vzdálenost,
-ne skutečnou délku cesty kolem překážek — otevřená kalibrační otázka,
-zapsaná zvlášť, netýká se téhle sondy. **SONDA POKRAČUJE** na opravené
-chůzi.
+Zbytek 51,5 % byl přisouzen tomu, že `gap` počítá PŘÍMOU vzdálenost, ne
+skutečnou délku cesty kolem překážek — ověřeno přímo (98,5 % zbytku byl
+LIMIT, ne genuinní zablokování).
+
+**Kolo 3** (09.09., `gap` přepočítán z `pathStepsToward`/BFS místo
+`distanceTo`, 4 páry) — dosel na cíl **71,9 %**, turnover **28,1 %**,
+**ZBYTEK 0,0 %** — každý povolený GFI teď dojde ke kostce. Hypotéza
+plně potvrzena. **SONDA BĚŽÍ na opravené chůzi i opraveném gap.**
 
 ## Co se měří
 

@@ -36,6 +36,13 @@ bool nextStepToward(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare,
                     Position& outStep);
 
+// 09.09.2026 (W-GFI gap oprava): delka NEJLEVNEJSI (riziko-vazene, stejny
+// tiebreak jako `nextStepToward`) cesty PRESNE na `target` v ramci
+// `budget` kroku. -1 = nedosazitelne. MERITKO (napr. "kolik GFI poli
+// skutecne chybi"), ne krok k chuzi -- na to je `nextStepToward`.
+int pathStepsToward(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare);
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);

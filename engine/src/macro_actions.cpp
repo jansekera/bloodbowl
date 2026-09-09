@@ -3134,19 +3134,44 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // macro.gfiAllowance (0-2) opts a SPECIFIC walk into real GFI rolls --
     // set only by the cage-advance planner for the ball carrier in a tempo
     // emergency, where not arriving loses the drive anyway.
+    // Loose ball: never step onto its square, not even as a waypoint --
+    // the auto-pickup in move_handler.cpp would turn this dice-free macro
+    // into a real gamble (item 11). Spocitano DRIV nez W-GFI gap nize,
+    // protoze skutecna cesta (pathStepsToward) musi vedet o stejnem
+    // vyhybani jako pozdejsi chuze -- jinak by se meril jiny problem, nez
+    // jaky pak resi `nextStepToward`.
+    Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
     // ⭐⭐⭐ W-GFI rameno (04.09.2026, default OFF, setRepositionGfiArm):
     //   misto pausalniho zakazu se rozhoduje POCITANOU cenou -- tyz tvar
     //   jako Q3-N. `gap` = kolik GFI poli by zavrelo mezeru mezi hracem a
     //   cilem (0-2, dal GFI nepomuze -- viz `+ std::clamp(...,0,2)` nize).
     //   ⛔ Cena NENI "telo na zemi" -- selhany GFI je VZDY turnover
     //   (move_handler.cpp:216), tedy stoji VSECHNY zbyvajici aktivace tymu.
+    //
+    //   ⛔⛔⛔ 09.09.2026: `need` byla PRIMA vzdalenost (`distanceTo`), ne
+    //   skutecna cesta kolem prekazek. Mereno (`ab_wgfi_20260909_probe/`,
+    //   80 paru): 98,5 % "zbytku" (ani dosel, ani turnover) bylo LIMIT --
+    //   hrac dostal presne tolik kroku navic, kolik by stacilo vzdusnou
+    //   carou, a skutecna cesta byla delsi. `pathStepsToward` uz tu
+    //   informaci ma (stejna BFS, kterou pak pouzije `nextStepToward`) --
+    //   staci se ji zeptat MISTO distanceTo.
     int localGfiAllowance = 0;
     {
         const Player& mover = state.getPlayer(macro.playerId);
         if (repositionGfiArm(mover.teamSide) &&
             macro.targetPos != mover.position) {
-            const int need = mover.position.distanceTo(macro.targetPos);
-            const int gap = std::clamp(need - static_cast<int>(mover.movementRemaining), 0, 2);
+            // Rozpocet pro mereni: pohyb + max mozne GFI (2) -- staci na to,
+            // aby se poznalo "dosahne s GFI" od "nedosahne, ani kdyby melo
+            // vsechny 2 pole". Presahuje-li hrac Sprintem 2 (smi 3), gap se
+            // stejne klampuje na 2 nize -- teto meritce na tom nezalezi.
+            const int probeBudget = static_cast<int>(mover.movementRemaining) + 2;
+            const int need = pathStepsToward(state, mover, macro.targetPos,
+                                             probeBudget, avoid);
+            // need < 0: cil neni dosazitelny ani s max GFI -- GFI by tu byl
+            // cisty risk bez zisku (dice se hodi, i kdyz cesta nikam nevede),
+            // takze se NEPOVOLUJE vubec (gap zustava 0).
+            const int gap = (need < 0) ? 0
+                : std::clamp(need - static_cast<int>(mover.movementRemaining), 0, 2);
             if (gap > 0) {
                 ++g_repositionGfiOpportunity;
                 const bool rerollAvailable =
@@ -3165,10 +3190,6 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     }
     int maxSteps = state.getPlayer(macro.playerId).movementRemaining
                    + std::clamp(std::max(macro.gfiAllowance, localGfiAllowance), 0, 2);
-    // Loose ball: never step onto its square, not even as a waypoint --
-    // the auto-pickup in move_handler.cpp would turn this dice-free macro
-    // into a real gamble (item 11).
-    Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
     // Pojistka (21.08.): vstávací makro má cíl == vlastní pole hráče. Kdyby na
     // něm ležel volný míč, `avoid` by tu JEDINOU akci vetoval, expanze by
     // vrátila prázdno a MacroMCTSPolicy z toho udělá END_TURN -- tedy zahodí

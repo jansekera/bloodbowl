@@ -262,6 +262,28 @@ bool nextStepToward(const GameState& state, const Player& player,
     return true;
 }
 
+// 09.09.2026 (W-GFI gap oprava): delka NEJLEVNEJSI (riziko-vazene) cesty
+// PRESNE na `target`, v ramci `budget` kroku -- -1 = nedosazitelne. Na
+// rozdil od `nextStepToward` (ktery vraci jen dalsi krok) tohle vraci
+// CELKOVY POCET KROKU, protoze volajici (W-GFI: kolik GFI poli chybi) ho
+// potrebuje jako MERITKO, ne k chuzi. `preferStraight=true` shoduje se
+// s tim, jakou cestu `nextStepToward` skutecne pouzije -- jinak by se
+// merilo neco jineho, nez co pak walker udela.
+int pathStepsToward(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare) {
+    if (budget <= 0) return -1;
+    if (target == player.position) return 0;
+
+    int key[GRID_SIZE];
+    int8_t steps[GRID_SIZE];
+    int16_t parent[GRID_SIZE];
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
+                        /*preferStraight=*/true);
+    const int targetIdx = gridIdx(target.x, target.y);
+    if (key[targetIdx] >= kInfCost) return -1;
+    return steps[targetIdx];
+}
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove) {

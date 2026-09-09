@@ -7,8 +7,9 @@
 #
 # SANITY-TEST: pred opravou chuze zbytek (ani dosel, ani turnover) 63,4 %;
 #   po oprave movePlayerToward na BFS (75f9df43) zbytek klesl na 51,5 %,
-#   dosel 22,0->24,0 %, turnover 14,6->24,5 %. Rameno samo dela co ma
-#   (pozitivni kontrola povoleno+zamitnuto==prilezitost sedi).
+#   98,5 % zbytku bylo LIMIT (gap = prima vzdalenost, ne skutecna cesta).
+#   Po oprave gap na pathStepsToward/BFS: ZBYTEK 0,0 % (4 pary), dosel
+#   71,9 %, turnover 28,1 % -- kazdy povoleny GFI ted dojde ke kostce.
 #
 # CO SE MERI: mode 18, dw-dw (index 2) -- trpaslik ma nejvic "limit" vzdani
 #   ze vsech ras, nejvetsi expozice prilezitosti.
@@ -21,15 +22,17 @@
 leak == 0
 arm_acted >= 0.85
 n_nonzero in 0.10 0.60
-delta in -0.05 0.10
-delta_1s in -0.03 0.05
+delta in -0.03 0.12
+delta_1s in -0.02 0.06
 #
 # ODUVODNENI PREDPOVEDI DELTY
-#   Neutralne-pozitivni: doktrina i mereni 02.09. podporuji GFI tam, kde by
-#   jinak chuze vzdala; oprava chuze navic znamena, ze granted GFI teď
-#   castej skutecne dojde na cil (24,0 %) nez predtim (22,0 %), coz by melo
-#   spis pomoct nez uskodit. Sirsi dolni okraj pro pripad, ze cena
-#   (1/6 pad = turnover, ted castejsi 24,5 % z granted) prevazi.
+#   Uzsi a posunute vic k pozitivnimu nez v kole 2: oprava gap odstranila
+#   CELY zbytek (51,5 % -> 0,0 %) -- kazdy povoleny GFI ted bud dojde na
+#   cil (71,9 %), nebo se to pozna (28,1 % turnover), zadne GFI se
+#   neplytva na cestu, ktera stejne nikam nevedla. To by melo cistou cenu
+#   ramene priblizit tomu, co doktrina cekala. Dolni okraj zustava mirne
+#   pod nulou, protoze 28,1 % turnover z povolenych je realna cena a
+#   sonda na presne cislo nema silu.
 #
 # ROZHODNE: W-GFI/VYSLEDEK (dosel vs turnover z povolenych) CTE SE PRVNI,
 #   souhrnna delta az jako druhotna kontrola (evidence/PREREG_CHECKLIST.md).
