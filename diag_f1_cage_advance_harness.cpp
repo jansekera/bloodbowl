@@ -146,6 +146,8 @@ static long g_basOff = 0;
 // W-GFI: rozpad vzdani „dosel pohyb" podle chybejici vzdalenosti
 static long g_mld[5] = {0,0,0,0,0};
 static long g_bp[3] = {0,0,0};
+// 09.09.2026: blitzy provedene a blitzy se srazenym cilem, [arm(BFS), base(hladova)]
+static long g_blitzDone[2] = {0,0}, g_blitzTD[2] = {0,0};
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 // ⭐ M1/N10 po nasazeni (07.09.): uz to neni signal ramene, ale meridlo desky
 //   -- kolikrat blitz nechal aktivaci otevrenou, odmitl follow-up nebo dostal
@@ -680,6 +682,9 @@ int main(int argc, char** argv) {
                   for (int q=0;q<BB_REP_BRANCHES;++q) g_repBlocked[q]+=rb[q]; }
                 { long cg[3]; bb::takeCageDiceyGfiStats(cg); for (int q=0;q<3;++q) g_cageDiceyGfi[q]+=cg[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
+                { long bo[4]; bb::takeBlitzOutcome(bo);
+                  g_blitzDone[0]+=bo[0]; g_blitzTD[0]+=bo[1];
+                  g_blitzDone[1]+=bo[2]; g_blitzTD[1]+=bo[3]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 { long q[9]; bb::takeQ3StandUpCost(q); for (int z=0;z<9;++z) g_q3c[z]+=q[z]; }
                 { long tc[3]; bb::takeMoveTurnoverCause(tc); for (int z=0;z<3;++z) g_toc[z]+=tc[z]; }
@@ -982,6 +987,10 @@ int main(int argc, char** argv) {
                    g_bp[0], g_bp[1], g_bp[0] ? 100.0*g_bp[1]/g_bp[0] : 0.0,
                    g_bp[2], g_bp[0] ? 1.0*g_bp[2]/g_bp[0] : 0.0);
             printf("  P37b/NEZAPLATI: %ld | deklarace: u SOUSEDA %ld, ZDALEKA %ld\n", g_bwUnpay, g_declAdj, g_declFar);
+            printf("  M14b/VYSLEDEK BLITZU (podle politiky, ne HOME/AWAY): "
+                   "BFS provedeno %ld, cil shozen %ld (%.1f %%) | hladova provedeno %ld, cil shozen %ld (%.1f %%)\n",
+                   g_blitzDone[0], g_blitzTD[0], g_blitzDone[0]?100.0*g_blitzTD[0]/g_blitzDone[0]:0.0,
+                   g_blitzDone[1], g_blitzTD[1], g_blitzDone[1]?100.0*g_blitzTD[1]/g_blitzDone[1]:0.0);
             printf("  M13/BLITZ:  bez rany z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
                    g_proneNB, g_proneBl, g_proneBl ? 100.0*g_proneNB/g_proneBl : 0.0,
                    g_standNB, g_standBl, g_standBl ? 100.0*g_standNB/g_standBl : 0.0,

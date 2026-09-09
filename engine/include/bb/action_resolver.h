@@ -38,6 +38,10 @@ void takeBlitzDeclSplit(long* out2);
 // P37b: delka hladove cesty proti BFS optimu. [pokusu, optimalnich, kroku navic]
 void noteBlitzPathLength(int steps, int optimal);
 void takeBlitzPathStats(long* out3);
+// 09.09.2026: blitzy, ktere dosly k bloku, a kolik z nich srazilo cil --
+// rozdeleno podle POLITIKY chuze (M14b BFS vs hladova), ne HOME/AWAY.
+// [done_arm, targetDown_arm, done_base, targetDown_base]
+void takeBlitzOutcome(long* out4);
 
 ActionResult resolveAction(GameState& state, const Action& action,
                            DiceRollerBase& dice, std::vector<GameEvent>* events);

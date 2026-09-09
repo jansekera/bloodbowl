@@ -109,6 +109,13 @@ thread_local long g_blitzDeclAdj = 0, g_blitzDeclFar = 0;
 //   ⛔ Rano jsem P37b "opravil" v NABIDCE a nezabralo to (142 -> 140).
 //     Teprve tenhle rozdil rekne, jestli je vada v chuzi, nebo jinde.
 thread_local long g_blitzSteps = 0, g_blitzOptimal = 0, g_blitzExtra = 0;
+// 09.09.2026: MĚŘIT PŘÍMO TO, CO M14b MĚNÍ -- kolik blitzů se vůbec
+// odehraje (dojde na resolveBlock, ne turnover/fail při doběhu) a kolik
+// z nich srazí cíl, rozděleno podle POLITIKY chůze (BFS/M14b vs hladová),
+// ne podle HOME/AWAY -- ta se mezi orientacemi páru prohazuje, politika ne.
+// index 0 = blitzPathArm(side)==true (M14b), index 1 = hladová (baseline).
+thread_local long g_blitzDone[2] = {0, 0};
+thread_local long g_blitzTargetDown[2] = {0, 0};
 }
 
 void noteBlitzPathLength(int steps, int optimal) {
@@ -144,6 +151,17 @@ void takeBlitzWastedBreakdown(long* out6) {
     out6[0]=g_bwNoReach; out6[1]=g_bwMove; out6[2]=g_bwTurnover;
     out6[3]=g_bwDown;    out6[4]=g_bwStuck; out6[5]=g_bwFar;
     g_bwNoReach=g_bwMove=g_bwTurnover=g_bwDown=g_bwStuck=g_bwFar=0;
+}
+
+void noteBlitzOutcome(bool armSide, bool targetDown) {
+    int idx = armSide ? 0 : 1;
+    ++g_blitzDone[idx];
+    if (targetDown) ++g_blitzTargetDown[idx];
+}
+void takeBlitzOutcome(long* out4) {
+    out4[0]=g_blitzDone[0]; out4[1]=g_blitzTargetDown[0];
+    out4[2]=g_blitzDone[1]; out4[3]=g_blitzTargetDown[1];
+    g_blitzDone[0]=g_blitzDone[1]=g_blitzTargetDown[0]=g_blitzTargetDown[1]=0;
 }
 
 long takeProneActsInSearch()      { long v=g_proneActs;      g_proneActs=0;      return v; }
@@ -418,7 +436,14 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             params.targetId = action.targetId;
             params.isBlitz = true;
             params.hornsBonus = true; // Horns applies on blitz
-            return resolveBlock(state, params, dice, events);
+            ActionResult blockResult = resolveBlock(state, params, dice, events);
+            // 09.09.2026: PŘÍMÉ MĚŘENÍ TOHO, CO M14b MĚNÍ -- blitz, který
+            // dojde k bloku (na rozdíl od noteBlitzWasted výše, tenhle se
+            // "provedl"), a jestli srazil cíl (target uz nestoji). Rozdělené
+            // podle politiky chůze (BFS vs hladová), ne HOME/AWAY.
+            noteBlitzOutcome(blitzPathArm(player.teamSide),
+                             target.state != PlayerState::STANDING);
+            return blockResult;
         }
 
         case ActionType::PASS: {
