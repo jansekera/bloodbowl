@@ -109,13 +109,10 @@ thread_local long g_blitzDeclAdj = 0, g_blitzDeclFar = 0;
 //   ⛔ Rano jsem P37b "opravil" v NABIDCE a nezabralo to (142 -> 140).
 //     Teprve tenhle rozdil rekne, jestli je vada v chuzi, nebo jinde.
 thread_local long g_blitzSteps = 0, g_blitzOptimal = 0, g_blitzExtra = 0;
-// 09.09.2026: MĚŘIT PŘÍMO TO, CO M14b MĚNÍ -- kolik blitzů se vůbec
-// odehraje (dojde na resolveBlock, ne turnover/fail při doběhu) a kolik
-// z nich srazí cíl, rozděleno podle POLITIKY chůze (BFS/M14b vs hladová),
-// ne podle HOME/AWAY -- ta se mezi orientacemi páru prohazuje, politika ne.
-// index 0 = blitzPathArm(side)==true (M14b), index 1 = hladová (baseline).
-thread_local long g_blitzDone[2] = {0, 0};
-thread_local long g_blitzTargetDown[2] = {0, 0};
+// 09.09.2026, nasazeno 09.09.2026 -- diagnostika zustava, uz bez politiky
+// (BFS je jedina cesta): kolik blitzu se vubec odehraje (dojde na
+// resolveBlock, ne turnover/fail pri dobehu) a kolik z nich srazi cil.
+thread_local long g_blitzDone = 0, g_blitzTargetDown = 0;
 }
 
 void noteBlitzPathLength(int steps, int optimal) {
@@ -153,15 +150,13 @@ void takeBlitzWastedBreakdown(long* out6) {
     g_bwNoReach=g_bwMove=g_bwTurnover=g_bwDown=g_bwStuck=g_bwFar=0;
 }
 
-void noteBlitzOutcome(bool armSide, bool targetDown) {
-    int idx = armSide ? 0 : 1;
-    ++g_blitzDone[idx];
-    if (targetDown) ++g_blitzTargetDown[idx];
+void noteBlitzOutcome(bool targetDown) {
+    ++g_blitzDone;
+    if (targetDown) ++g_blitzTargetDown;
 }
-void takeBlitzOutcome(long* out4) {
-    out4[0]=g_blitzDone[0]; out4[1]=g_blitzTargetDown[0];
-    out4[2]=g_blitzDone[1]; out4[3]=g_blitzTargetDown[1];
-    g_blitzDone[0]=g_blitzDone[1]=g_blitzTargetDown[0]=g_blitzTargetDown[1]=0;
+void takeBlitzOutcome(long* out2) {
+    out2[0]=g_blitzDone; out2[1]=g_blitzTargetDown;
+    g_blitzDone=g_blitzTargetDown=0;
 }
 
 long takeProneActsInSearch()      { long v=g_proneActs;      g_proneActs=0;      return v; }
@@ -374,34 +369,35 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                 // TZ-scored picker below owns both the route and the final
                 // adjacent square (fewer enemies next to the blitzer = fewer
                 // defender assists on the block, see getBlockDiceCount).
-                // ⭐⭐ M14b (01.09.2026): CHUZE UHYBA TACKLEZONAM, i za cenu
-                //   delsi cesty. ZMERENO: 2 953 z 3 420 vyhozenych blitzu
-                //   (86 %) je TURNOVER PRI DOBEHU -- blitzujici vlezl do
-                //   tacklezony, hodil dodge a slozil se. Puvodni hladovy
-                //   `pickApproachStep` ma `vzdalenost*100 + TZ*12`, takze
-                //   za JEDNO pole priblizeni bere tretinovou sanci na ztratu
-                //   CELEHO KOLA.
+                // ⭐⭐ M14b (01.09.2026, NASAZENO DO PRODUKCE 09.09.2026):
+                //   CHUZE UHYBA TACKLEZONAM, i za cenu delsi cesty. ZMERENO:
+                //   2 953 z 3 420 vyhozenych blitzu (86 %) je TURNOVER PRI
+                //   DOBEHU -- blitzujici vlezl do tacklezony, hodil dodge
+                //   a slozil se. Puvodni hladovy `pickApproachStep` ma
+                //   `vzdalenost*100 + TZ*12`, takze za JEDNO pole priblizeni
+                //   bere tretinovou sanci na ztratu CELEHO KOLA.
                 //   ⛔ Prvni pokus (M14, lexikograficky) NEDODAL a byl vracen:
                 //     minimalizoval TZ jen mezi stejne dlouhymi cestami.
-                //     Tohle je druhy pokus a lisi se prave tim, ze delsi
-                //     bezpecnou cestu vzit UMI.
+                //   ⛔ Plocha cena (K=2 TZ, K=1 GFI) byla 08.09. zmerena
+                //     a ZAMITNUTA (-2,72 sigma) -- opravena na pravdepodob-
+                //     nostni cenu (viz pathfinder.cpp), sonda 09.09. na 80
+                //     parech vysla nerozhodnuta na win-rate (-0,0250+-0,0235,
+                //     -1,06 sigma), ale mechanismova metrika (`takeBlitzOutcome`
+                //     nize) ukazala, ze uspesnost bloku je STEJNA (~46 % obe
+                //     politiky) a BFS dokoncuje o ~2,2 % vic blitzu -- kod
+                //     dela presne to, co ma, sonda na presne cislo win-rate
+                //     dopadu jen nemela silu. Nasazeno na tomhle zaklade, ne
+                //     na rozhodne noci -- stejne zduvodneni jako P9c
+                //     (`c10caee2`): dolozena oprava mechanismu, ne cekani na
+                //     prokazany chess zisk.
+                //   Prepinac (`blitzPathArm`/`setBlitzPathArm`) odstranen --
+                //     BFS je jedina cesta, `pickApproachStep`/`canReachAdjacentTo`
+                //     uz se tu nepouzivaji.
                 Position bestNext;
-                if (blitzPathArm(player.teamSide)) {
-                    if (!nextStepTowardAdjacent(state, player, target.position, bestNext)) {
-                        noteBlitzWasted(0);
-                        return ActionResult::fail();
-                    }
-                } else {
-                    Position adjPos;
-                    if (!canReachAdjacentTo(state, player, target.position, adjPos)) {
-                        noteBlitzWasted(0);
-                        return ActionResult::fail();
-                    }
-                    bestNext = pickApproachStep(state, player, player.position,
-                                                target.position);
-                    if (bestNext.x < 0) { noteBlitzWasted(0); return ActionResult::fail(); }
+                if (!nextStepTowardAdjacent(state, player, target.position, bestNext)) {
+                    noteBlitzWasted(0);
+                    return ActionResult::fail();
                 }
-                
 
                 Position beforeStep = player.position;
                 ActionResult moveResult = resolveMoveStep(state, action.playerId,
@@ -437,12 +433,10 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             params.isBlitz = true;
             params.hornsBonus = true; // Horns applies on blitz
             ActionResult blockResult = resolveBlock(state, params, dice, events);
-            // 09.09.2026: PŘÍMÉ MĚŘENÍ TOHO, CO M14b MĚNÍ -- blitz, který
-            // dojde k bloku (na rozdíl od noteBlitzWasted výše, tenhle se
-            // "provedl"), a jestli srazil cíl (target uz nestoji). Rozdělené
-            // podle politiky chůze (BFS vs hladová), ne HOME/AWAY.
-            noteBlitzOutcome(blitzPathArm(player.teamSide),
-                             target.state != PlayerState::STANDING);
+            // Produkční diagnostika (09.09.2026): blitz, který dojde k bloku
+            // (na rozdíl od noteBlitzWasted výše, tenhle se "provedl"), a
+            // jestli srazil cíl (target uz nestoji).
+            noteBlitzOutcome(target.state != PlayerState::STANDING);
             return blockResult;
         }
 

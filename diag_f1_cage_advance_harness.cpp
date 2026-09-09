@@ -147,7 +147,7 @@ static long g_basOff = 0;
 static long g_mld[5] = {0,0,0,0,0};
 static long g_bp[3] = {0,0,0};
 // 09.09.2026: blitzy provedene a blitzy se srazenym cilem, [arm(BFS), base(hladova)]
-static long g_blitzDone[2] = {0,0}, g_blitzTD[2] = {0,0};
+static long g_blitzDone = 0, g_blitzTD = 0;
 static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 // ⭐ M1/N10 po nasazeni (07.09.): uz to neni signal ramene, ale meridlo desky
 //   -- kolikrat blitz nechal aktivaci otevrenou, odmitl follow-up nebo dostal
@@ -370,7 +370,7 @@ int main(int argc, char** argv) {
          : mode == 16 ? "Q3-N: jen PRIDA nabidku vstat-a-odejit (s cenou dodge a pojistkou)"
          : mode == 17 ? "Q3-O: nad Q3-N teprve ODEBERE nabidku vstat-a-zustat"
          : mode == 18 ? "W-GFI: volnemu hraci na reposition se GFI povoli podle P_fail*zbyvajici < 1"
-         : mode == 15 ? "M14b: blitzova chuze uhyba tacklezonam i GFI"
+         : mode == 15 ? "(mode 15 ZRUSEN 09.09. -- M14b nasazeno do produkce)"
          : mode == 13 ? "(mode 13 ZRUSEN 02.09. -- M13 nasazeno do produkce)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
          : mode == 8 ? "(mode 8 ZRUSEN 01.09. -- P35 nasazeno do produkce)"
@@ -569,8 +569,10 @@ int main(int argc, char** argv) {
                 // mode 13 (M13, 31.08.): lezici smi deklarovat akci. Signalem je
                 // BLITZ DEKLAROVANY Z LEHU -- to do M13 neslo vubec, takze
                 // kazdy vyskyt je zmenena hra.
-                bb::setBlitzPathArm(bb::TeamSide::HOME, mode == 15 && candHome);
-                bb::setBlitzPathArm(bb::TeamSide::AWAY, mode == 15 && !candHome);
+                // ⛔ mode 15 (M14b) ZRUSEN 09.09.2026 -- rameno nasazeno do
+                //   produkce nepodmineně (viz macro_actions.cpp). Cislo se
+                //   NEPOUZIVA ZNOVU (mody jsou append-only). Vysledky zustavaji
+                //   v `ab_m14b_20260907/`, `ab_m14b_20260909_probe*/`.
                 // ⛔ mode 13 (M13) ZRUSEN 02.09.2026 -- rameno nasazeno do
                 //   produkce po noci 01.->02.09. (+0,0048 +- 0,0084, tedy nic).
                 //   Cislo se NEPOUZIVA ZNOVU (mody jsou append-only).
@@ -682,9 +684,8 @@ int main(int argc, char** argv) {
                   for (int q=0;q<BB_REP_BRANCHES;++q) g_repBlocked[q]+=rb[q]; }
                 { long cg[3]; bb::takeCageDiceyGfiStats(cg); for (int q=0;q<3;++q) g_cageDiceyGfi[q]+=cg[q]; }
                 { long bp[3]; bb::takeBlitzPathStats(bp); for (int q=0;q<3;++q) g_bp[q]+=bp[q]; }
-                { long bo[4]; bb::takeBlitzOutcome(bo);
-                  g_blitzDone[0]+=bo[0]; g_blitzTD[0]+=bo[1];
-                  g_blitzDone[1]+=bo[2]; g_blitzTD[1]+=bo[3]; }
+                { long bo[2]; bb::takeBlitzOutcome(bo);
+                  g_blitzDone+=bo[0]; g_blitzTD+=bo[1]; }
                 g_standEsc   += bb::takeStandEscapeOfferedInSearch();
                 { long q[9]; bb::takeQ3StandUpCost(q); for (int z=0;z<9;++z) g_q3c[z]+=q[z]; }
                 { long tc[3]; bb::takeMoveTurnoverCause(tc); for (int z=0;z<3;++z) g_toc[z]+=tc[z]; }
@@ -696,8 +697,6 @@ int main(int argc, char** argv) {
                 g_standOffNE += bb::takeStandOfferedNextToEnemyInSearch();
                 g_stoodUp    += bb::takeStoodUpInSearch();
                 g_stoodUpNE  += bb::takeStoodUpNextToEnemyInSearch();
-                bb::setBlitzPathArm(bb::TeamSide::HOME, false);
-                bb::setBlitzPathArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpPricingArm(bb::TeamSide::HOME, false);
                 bb::setStandUpPricingArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpEscapeArm(bb::TeamSide::HOME, false);
@@ -987,10 +986,9 @@ int main(int argc, char** argv) {
                    g_bp[0], g_bp[1], g_bp[0] ? 100.0*g_bp[1]/g_bp[0] : 0.0,
                    g_bp[2], g_bp[0] ? 1.0*g_bp[2]/g_bp[0] : 0.0);
             printf("  P37b/NEZAPLATI: %ld | deklarace: u SOUSEDA %ld, ZDALEKA %ld\n", g_bwUnpay, g_declAdj, g_declFar);
-            printf("  M14b/VYSLEDEK BLITZU (podle politiky, ne HOME/AWAY): "
-                   "BFS provedeno %ld, cil shozen %ld (%.1f %%) | hladova provedeno %ld, cil shozen %ld (%.1f %%)\n",
-                   g_blitzDone[0], g_blitzTD[0], g_blitzDone[0]?100.0*g_blitzTD[0]/g_blitzDone[0]:0.0,
-                   g_blitzDone[1], g_blitzTD[1], g_blitzDone[1]?100.0*g_blitzTD[1]/g_blitzDone[1]:0.0);
+            printf("  M14b/VYSLEDEK BLITZU (produkcni diagnostika, nasazeno 09.09.): "
+                   "provedeno %ld, cil shozen %ld (%.1f %%)\n",
+                   g_blitzDone, g_blitzTD, g_blitzDone?100.0*g_blitzTD/g_blitzDone:0.0);
             printf("  M13/BLITZ:  bez rany z lehu %ld/%ld = %.1f %%  PROTI  ze stoje %ld/%ld = %.1f %%  (podil %.2fx)\n",
                    g_proneNB, g_proneBl, g_proneBl ? 100.0*g_proneNB/g_proneBl : 0.0,
                    g_standNB, g_standBl, g_standBl ? 100.0*g_standNB/g_standBl : 0.0,

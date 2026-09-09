@@ -412,21 +412,17 @@ thread_local long g_standEscapeImpossible = 0;
 // ⚠️ "Zustat lezet" ma vlastni cenu (chybejici telo v kleci), kterou tahle
 //   meridla NEZMERI. Proto se rameno drzi jen tam, kde je nahrada.
 // ============================================================================
-// ⛔ RAMENO PRO BLITZOVOU CHUZI (M14b, 01.09.2026), default OFF, mode 15.
-//   ⚠️ VRACENO 02.09.: pri odebirani ramene M13 jsem mazal blok mezi dvema
-//     kotvami a tohle rameno lezelo UVNITR -- linker to chytil hned
-//     ("undefined reference to blitzPathArm"). Mazat podle kotev je levne,
-//     ale musi se overit, CO mezi nimi je.
-//   Stav: ZAMITNUTO dvema nezavislymi merenimi (parove A/B -0,1667 +- 0,1076;
-//   a hladova chuze je z 97,6 % uz optimalni, takze nema co opravovat).
-//   Zustava za vypinacem, noc si nezaslouzi.
-thread_local bool g_blitzPath[2] = {false, false};
-void setBlitzPathArm(TeamSide side, bool on) {
-    g_blitzPath[side == TeamSide::HOME ? 0 : 1] = on;
-}
-bool blitzPathArm(TeamSide side) {
-    return g_blitzPath[side == TeamSide::HOME ? 0 : 1];
-}
+// ⛔ M14b (01.09.2026) -- NASAZENO DO PRODUKCE 09.09.2026, nepodmineny.
+//   Puvodni plocha cena (K=2 TZ, K=1 GFI) byla ZAMITNUTA dvema merenimi
+//   (parove A/B -0,1667 +- 0,1076; hladova chuze z 97,6 % uz optimalni).
+//   Opravena na pravdepodobnostni cenu (viz pathfinder.cpp, dve kola
+//   kalibrace 08.-09.09.), sonda 09.09. na 80 parech vysla na win-rate
+//   nerozhodnuta (-0,0250 +- 0,0235), ale mechanismova metrika
+//   (`takeBlitzOutcome`, action_resolver.cpp) potvrdila, ze uspesnost
+//   bloku je nezmenena (~46 % obe politiky) a BFS dokoncuje vic blitzu --
+//   kod dela to, co ma. Nasazeno na tomhle zaklade (stejne zduvodneni jako
+//   P9c, `c10caee2`), ne na prokazanem chess zisku z rozhodne noci.
+//   Prepinac (`setBlitzPathArm`/`blitzPathArm`/`g_blitzPath`) odstranen.
 
 // ⭐ M13 NASAZENO 02.09.2026 — rameno `setProneActionArm` odebrano po noci
 // 01.->02.09. (2 400 paru): +0,0048 +- 0,0084, tedy neodlisitelne od nuly.

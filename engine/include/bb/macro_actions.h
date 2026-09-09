@@ -232,8 +232,9 @@ void takeMoveWalkBailout(long* out5);
 // Profil chuze: [dosla, soucet kroku pri smycce, smycek na kroku 0,
 // soucet vzdalenosti pri smycce]. Bez `dosla` nema pocet vzdani jmenovatel.
 void takeMoveWalkProfile(long* out4);
-void setBlitzPathArm(TeamSide side, bool on);
-bool blitzPathArm(TeamSide side);
+// M14b (2026-09-01, NASAZENO 2026-09-09): prepinac odstranen, BFS cesta
+// (nextStepTowardAdjacent, pathfinder.cpp) je jedina cesta blitzujiciho.
+// Motivace a cisla viz pathfinder.cpp a evidence/task_queue.md.
 void noteProneActionTaken();
 long takeProneActionPicksInSearch();
 void setStandUpPricingArm(TeamSide side, bool on);

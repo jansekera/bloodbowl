@@ -1961,6 +1961,44 @@ podle politiky, ať jde vidět TURNOVER-při-doběhu zvlášť pro BFS a hladovo
 | OTEVŘENO — čeká na rozhodnutí uživatele (rozdělit i wasted-breakdown podle
 politiky, další sonda, rozhodná noc, nebo zpět do fronty na revizi)
 
+✅⛔ **09.09. M14b NASAZENO DO PRODUKCE, NEPODMÍNĚNĚ** (uživatel: *„já měl za
+pomáhající ale potřebuje kratší run, že to tak je opravdu v kódu — tak bych
+nasadil bez dlouhého běhu"*). Stejný tvar jako P9c (`c10caee2`): nasazeno na
+mechanismovém dokladu (úspěšnost bloku neškodí, BFS dokončí víc blitzů), ne
+na prokázaném chess zisku z rozhodné noci — ta by stála ~32 h a win-rate
+sonda beztak neměla sílu rozhodnout. `setBlitzPathArm`/`blitzPathArm`/
+`g_blitzPath` odstraněny, BFS (`nextStepTowardAdjacent`) je jediná cesta
+blitzujícího. Harness mode 15 zrušen (append-only, číslo se nepoužije
+znovu). `takeBlitzOutcome` zůstává jako produkční diagnostika (bez
+rozdělení podle politiky — je jen jedna). 713/713 testů, žádný nemusel
+zmizet (M14b nikdy neměl vlastní unit testy, jen noční harness).
+
+⛔⛔⛔ **NOVÝ NÁLEZ PŘI NASAZENÍ — `estimateApproachFailChance` (macro_actions.cpp
+~874) TEĎ MÁ STEJNÝ DRIFT, JAKÝ MĚLA OPRAVOVAT (item 7).** Ta funkce cení
+riziko blitzové nabídky (`expandBlitz`) tím, že prochází **STEJNOU cestu,
+jakou skutečně půjde executor** — dokumentovaný záměr ("Walks the SAME
+route the BLITZ executor will actually take... so the estimate can't drift
+from execution again"). Executor teď chodí přes BFS
+(`nextStepTowardAdjacent`), ale `estimateApproachFailChance` pořád volá
+`pickApproachStep` (hladový výběr) — **nabídka a provedení se rozešly**,
+přesně třída vady jako M6/Seznam B (*„plánovač oceňuje jiný pohyb, než
+resolver provede"*).
+⛔ **Neopraveno teď záměrně** — `nextStepTowardAdjacent` bere start z
+`player.position` (skutečná pozice hráče), zatímco odhad prochází
+HYPOTETICKOU pozici `cur`, která se nemění ve skutečném stavu. Oprava
+potřebuje buď přetížení s explicitním `from`, nebo přepočítat celou
+optimální cestu JEDNOU z `mover.position` a projít ji celou (BFS dá celou
+cestu zadarmo přes `parent[]`, jen se dosud nikam nevrací) — návrhové
+rozhodnutí, ne triviální náhrada volání, patří na check-in
+[[feedback_check_in_before_new_engine_work]], ne do stejného commitu jako
+nasazení.
+⏰ **Dopad, dokud se neopraví:** nabídka BLITZu podceňuje/nadceňuje riziko
+přiblížení podle staré hladové cesty, zatímco skutečně se půjde bezpečnější
+(delší) BFS cestou — ceny z `estimateApproachFailChance` (Q3 worst-reply,
+P35 dice odhad) jsou teď o něco pesimističtější, než realita bude.
+| OTEVŘENO — návrh opravy čeká na rozhodnutí, jakou formu má mít (přetížení
+vs plný BFS path replay)
+
 ⭐ **ZAŘAZENÍ (uživatel 05.09.): "jestli z toho vyjde jednoduchá oprava,
 zařaďme ji hned za sekci pohyb."** Pokud se ukáže, že jde skutečně jen o
 zarovnání konstanty (`pickApproachStep` `*100`→`*10`, žádná nová logika),
