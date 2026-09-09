@@ -1703,6 +1703,34 @@ z `distanceTo`. 713/713 testů beze změny (jen čtení existujících čítač�
 | OTEVŘENO — čeká na rozhodnutí uživatele (nasadit i tak / opravit gap na
 BFS délku cesty a přeměřit / rozhodná noc / zpět do fronty)
 
+✅⭐⭐⭐ **09.09. GAP OPRAVEN (`pathStepsToward`/BFS místo `distanceTo`,
+`0800d238`) A PŘEMĚŘENO NA 80 PÁRECH** (uživatel: *„to je na tobě — jedna
+změna — krátký run — vyhodnocení — vše bys měl zvládnout samostatně"*).
+
+**Mechanismus** (187 783 povolených, celý vzorek): dosel na cíl
+**73,6 %**, turnover **26,4 %**, zbytek **0,0 %** (27/187 783 — šum).
+Sanity na 4 párech ukázal totéž (0,0 % přesně) — potvrzeno na plné sondě.
+**Oprava drží.**
+
+**Win-rate** (druhotná kontrola): **−0,0031 ± 0,0200** — prakticky
+IDENTICKÉ číslo jako PŘED opravou gap (−0,0031 ± 0,0212). Čistě
+nerozhodnuto, bodový odhad na nule, ne u prahu.
+
+⇒ **Oprava mechanismu je jednoznačně správná** (rameno teď dělá přesně,
+co má — buď dojde, nebo se to pozná, nic se neplýtvá), ale **nezměnila
+win-rate ani o kousek** — dřív "plýtvané" pokusy se rozpadly zhruba
+napůl na úspěch a na turnover, takže se to v souhrnu vyrušilo. **Na
+rozdíl od M14b tady mechanismus NEDÁVÁ důvod nasadit bez dalších dat**:
+turnoverová cena je reálná (26,4 % z povolených, a GFI pád je VŽDY
+turnover pro celý tým, ne jen tělo na zemi) a čistý efekt na výhry
+zůstává neznámý přesně uprostřed nuly, ne nakloněný k pomáhá/škodí.
+⭐ **Doporučení:** nenasazovat nepodmíněně jako M14b/P9c — buď pustit
+rozhodnou noc (~6400 párů, aby to skutečně rozhodla), nebo nechat za
+vypínačem a vrátit do fronty. Rozdíl od M14b: tam mechanismus mířil
+jasně jedním směrem (neutrálně-pozitivně), tady míří přesně na nulu.
+| OTEVŘENO — čeká na rozhodnutí uživatele (rozhodná noc / nechat za
+vypínačem / jiné)
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
