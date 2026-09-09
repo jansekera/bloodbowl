@@ -3069,6 +3069,154 @@ TEST(BlitzApproachRisk, ProneBlitzerIsPricedWithTheStandUpCostSubtracted) {
         << "ležící blitzer se ocenil stejně jako stojící => vstání se neodečetlo";
 }
 
+// ============================================================================
+// M6/B3(a) (09.09.2026): DOVEDNOST DODGE JE REROLL — OCENĚNÍ O NĚM MUSÍ VĚDĚT
+//
+// r. 8078-8090: hráč s dovedností Dodge "is allowed to re-roll the D6 if he
+// fails to dodge out of any of an opposing player's tackle zones. However, the
+// player may only re-roll ONE failed Dodge roll per turn." Limit je NA HRÁČE,
+// ne na tým. Resolver (`move_handler`) to uměl vždycky; PLÁNOVACÍ vrstva ne —
+// oceňovala každý dodge holým `(target-1)/6`, takže skaven/elf s Dodge se
+// hlásil přesně tak rizikově jako trpaslík bez ní.
+// Tackle u opouštěného pole reroll ruší (r. 8566-8571) — a sleva s ním.
+// ============================================================================
+namespace {
+
+// HOME hráč na {8,7} běží blitzovat soupeře na {13,7}. Značkující soupeř na
+// {7,7} drží tacklezónu nad VÝCHOZÍM polem, takže cesta obsahuje právě JEDEN
+// dodge (jeho tacklezóna už na {9,7} nedosáhne) a cena je čitelná bez GFI.
+GameState makeDodgeApproachState(bool moverHasDodge, bool markerHasTackle) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    auto mk = [&](int id, TeamSide side, Position pos) -> Player& {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        return p;
+    };
+    Player& mover = mk(1, TeamSide::HOME, {8, 7});
+    if (moverHasDodge) mover.skills.add(SkillName::Dodge);
+    Player& marker = mk(11, TeamSide::AWAY, {7, 7});
+    if (markerHasTackle) marker.skills.add(SkillName::Tackle);
+    mk(12, TeamSide::AWAY, {13, 7});
+    return s;
+}
+
+} // namespace
+
+TEST(BlitzApproachRisk, DodgeSkillRerollMakesTheApproachCheaper) {
+    GameState plain = makeDodgeApproachState(/*moverHasDodge=*/false, false);
+    GameState dodgy = makeDodgeApproachState(/*moverHasDodge=*/true,  false);
+    const double rPlain = blitzApproachRiskForTest(plain, plain.getPlayer(1),
+                                                   plain.getPlayer(12));
+    const double rDodge = blitzApproachRiskForTest(dodgy, dodgy.getPlayer(1),
+                                                   dodgy.getPlayer(12));
+    // ⭐ POZITIVNÍ KONTROLA FIXTURY: kdyby cesta žádný dodge nechtěla, obě
+    //   ceny by byly nula a test by prošel i bez opravy.
+    ASSERT_GT(rPlain, 0.0) << "fixtura nevyžaduje dodge -- test neměří nic";
+    EXPECT_LT(rDodge, rPlain) << "Dodge se do ceny doběhu nepromítl";
+    // Jediný dodge na cestě ⇒ selhat musí přirozený hod I reroll: p*p.
+    EXPECT_NEAR(rDodge, rPlain * rPlain, 1e-9);
+}
+
+TEST(BlitzApproachRisk, TackleNextToTheMoverNegatesTheDodgeDiscount) {
+    GameState plain = makeDodgeApproachState(/*moverHasDodge=*/false, true);
+    GameState dodgy = makeDodgeApproachState(/*moverHasDodge=*/true,  true);
+    const double rPlain = blitzApproachRiskForTest(plain, plain.getPlayer(1),
+                                                   plain.getPlayer(12));
+    const double rDodge = blitzApproachRiskForTest(dodgy, dodgy.getPlayer(1),
+                                                   dodgy.getPlayer(12));
+    ASSERT_GT(rPlain, 0.0) << "fixtura nevyžaduje dodge -- test neměří nic";
+    // r. 8566-8571: soupeř s Tackle reroll ruší, takže sleva NESMÍ nastat.
+    EXPECT_DOUBLE_EQ(rDodge, rPlain)
+        << "Tackle u opouštěného pole slevu za Dodge nezrušil";
+}
+
+namespace {
+
+// Ležící HOME hráč u soupeře + `mates` stojících spoluhráčů, kteří ještě nešli.
+// Q3 nabídne útěk jen když P(dodge selže) * mates < 1: AG3 dává 2/6, takže při
+// čtyřech spoluhráčích je útěk bez Dodge zamítnutý (1,33) a s Dodge přípustný
+// (4/9 = 0,44).
+GameState makeQ3EscapeRiskState(bool moverHasDodge, bool enemyHasTackle, int mates) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.homeTeam.turnNumber = 3;
+    auto mk = [&](int id, TeamSide side, Position pos, PlayerState st) -> Player& {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = st; p.position = pos;
+        p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        return p;
+    };
+    Player& p = mk(1, TeamSide::HOME, {10, 7}, PlayerState::PRONE);
+    if (moverHasDodge) p.skills.add(SkillName::Dodge);
+    Player& e = mk(12, TeamSide::AWAY, {11, 7}, PlayerState::STANDING);
+    if (enemyHasTackle) e.skills.add(SkillName::Tackle);
+    for (int i = 0; i < mates; ++i) {
+        mk(2 + i, TeamSide::HOME,
+           {static_cast<int8_t>(3 + i), static_cast<int8_t>(2)},
+           PlayerState::STANDING);
+    }
+    return s;
+}
+
+bool hasEscapeOfferFor(const std::vector<Macro>& ms, int playerId, Position home) {
+    for (auto& m : ms) {
+        if (m.type != MacroType::REPOSITION || m.playerId != playerId) continue;
+        if (m.targetPos != home) return true;
+    }
+    return false;
+}
+
+} // namespace
+
+TEST(Q3Pricing, DodgeSkillRerollMakesAnOtherwiseTooRiskyEscapeAffordable) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
+    const Position home{10, 7};
+
+    long c9[9] = {0};
+    takeQ3StandUpCost(c9);                       // vynuluj čítače
+
+    GameState plain = makeQ3EscapeRiskState(/*moverHasDodge=*/false, false, 4);
+    std::vector<Macro> mp;
+    getAvailableMacros(plain, mp);
+    // ⭐ REGISTROVANÉ ČTENÍ: zamítnutí pro riziko má vlastní čítač (out[6]).
+    takeQ3StandUpCost(c9);
+    EXPECT_FALSE(hasEscapeOfferFor(mp, 1, home))
+        << "útěk se nabídl i při 2/6 * 4 spoluhráče = 1,33 aktivace";
+    EXPECT_GE(c9[6], 1) << "g_q3EscTooRisky (out[6]) neťikl";
+
+    GameState dodgy = makeQ3EscapeRiskState(/*moverHasDodge=*/true, false, 4);
+    std::vector<Macro> md;
+    getAvailableMacros(dodgy, md);
+    takeQ3StandUpCost(c9);
+    EXPECT_TRUE(hasEscapeOfferFor(md, 1, home))
+        << "Dodge (reroll, r. 8078-8090) se do ceny útěku nepromítl";
+    EXPECT_EQ(c9[6], 0) << "útěk s Dodge se pořád zamítá pro riziko";
+}
+
+TEST(Q3Pricing, TackleOnTheAdjacentEnemyKeepsTheEscapeTooRiskyDespiteDodge) {
+    setStandUpPricingArm(TeamSide::HOME, true);
+    struct Off { ~Off(){ setStandUpPricingArm(TeamSide::HOME,false);} } _off;
+    const Position home{10, 7};
+
+    long c9[9] = {0};
+    takeQ3StandUpCost(c9);
+
+    GameState s = makeQ3EscapeRiskState(/*moverHasDodge=*/true,
+                                        /*enemyHasTackle=*/true, 4);
+    std::vector<Macro> ms;
+    getAvailableMacros(s, ms);
+    takeQ3StandUpCost(c9);
+    // r. 8566-8571: Tackle ruší reroll ⇒ cena je zpátky na holých 2/6.
+    EXPECT_FALSE(hasEscapeOfferFor(ms, 1, home))
+        << "Tackle slevu za Dodge nezrušil, útěk se nabídl";
+    EXPECT_GE(c9[6], 1) << "g_q3EscTooRisky (out[6]) neťikl";
+}
+
 // --- B5 (09.09.2026): HAND_OFF_SCORE se nabízel úžeji, než ho executor umí --
 //
 // Nabídka měla natvrdo `adjDist <= 2` ("carrier must reach adjacency within 1

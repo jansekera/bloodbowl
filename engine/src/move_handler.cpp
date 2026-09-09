@@ -155,23 +155,10 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
     if (needsDodge) {
         int target = calculateDodgeTarget(state, player, to, from);
 
-        // Check if Tackle negates Dodge reroll
-        // Tackle, BB2016 l. 8566-8571: "Opposing players who are standing in
-        // any of this player's tackle zones are NOT ALLOWED TO USE THEIR DODGE
-        // SKILL if they attempt to dodge out of any of the player's tackle
-        // zones." Rusi se tim REROLL, ne modifikator -- Dodge zadny nema.
-        bool tackleNegates = false;
-        auto srcAdj = from.getAdjacent();
-        for (auto& apos : srcAdj) {
-            if (!apos.isOnPitch()) continue;
-            const Player* opp = state.getPlayerAtPosition(apos);
-            if (opp && opp->teamSide != player.teamSide &&
-                exertsTacklezone(opp->state) && !opp->lostTacklezones &&
-                opp->hasSkill(SkillName::Tackle)) {
-                tackleNegates = true;
-                break;
-            }
-        }
+        // Check if Tackle negates Dodge reroll -- JEDNA definice v `helpers.cpp`,
+        // sdilena s ocenovaci vrstvou (M6/B3(a), 09.09.2026), aby cena dodge
+        // nemohla utect od pravidla, ktere se tady opravdu resolvuje.
+        bool tackleNegates = tackleNegatesDodgeReroll(state, player, from);
 
         bool dodgeOk = attemptRoll(state, playerId, dice, target,
                                     SkillName::Dodge, tackleNegates, true, events);

@@ -36,6 +36,17 @@ Position pickApproachStep(const GameState& state, const Player& mover,
 // Agility roll targets (clamped to 2-6)
 int calculateDodgeTarget(const GameState& state, const Player& player,
                          Position dest, Position source);
+// Rusi nektery ze souperu, kteri drzi tacklezonu nad polem `from`, dovednosti
+// Tackle reroll z dovednosti Dodge?
+// Tackle, BB2016 r. 8566-8571: "Opposing players who are standing in any of this
+// player's tackle zones are NOT ALLOWED TO USE THEIR DODGE SKILL if they attempt
+// to dodge out of any of the player's tackle zones." Rusi se tim REROLL, ne
+// modifikator -- Dodge zadny nema (viz komentar v `calculateDodgeTarget`).
+// ⭐ Existuje jako JEDNA definice zamerne: tentyz vyraz mel `move_handler.cpp`
+// rozepsany inline a ocenovaci vrstva ho nemela vubec. Tataz trida rozdvojeni,
+// ktera dnes (09.09.) stala opravu L2 (commit 131a1779).
+bool tackleNegatesDodgeReroll(const GameState& state, const Player& mover,
+                              Position from);
 // Leap, l. 8276-8277: holy Agility hod, ZADNE modifikatory krome Very Long
 // Legs -- zadne tackle zony, zadne +1 za dodge. Sdileny mezi resolverem
 // (move_handler) a ocenenim (macro_actions), aby cena nemohla utect od

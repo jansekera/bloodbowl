@@ -18,6 +18,20 @@ int countTacklezones(const GameState& state, Position pos, TeamSide friendlySide
     return count;
 }
 
+bool tackleNegatesDodgeReroll(const GameState& state, const Player& mover,
+                              Position from) {
+    for (const Position& apos : from.getAdjacent()) {
+        if (!apos.isOnPitch()) continue;
+        const Player* opp = state.getPlayerAtPosition(apos);
+        if (opp && opp->teamSide != mover.teamSide &&
+            exertsTacklezone(opp->state) && !opp->lostTacklezones &&
+            opp->hasSkill(SkillName::Tackle)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int countDisturbingPresence(const GameState& state, Position pos, TeamSide friendlySide) {
     int count = 0;
     TeamSide enemySide = opponent(friendlySide);

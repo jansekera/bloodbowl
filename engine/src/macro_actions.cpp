@@ -922,6 +922,25 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     //   nez zaslouzi, protoze planovac lezici blitzery podcenuje v riziku.
     int moveLeft = movementAfterStandUp(mover) - 1;
     double failChance = 0.0;
+    // ⭐ M6/B3(a) (09.09.2026): DOVEDNOST DODGE JE REROLL, A CENA O NEM MUSI VEDET.
+    //   r. 8078-8090: "is allowed to re-roll the D6 if he fails to dodge out of
+    //   any of an opposing player's tackle zones. However, the player may only
+    //   re-roll ONE failed Dodge roll PER TURN." Limit je NA HRACE, ne na tym --
+    //   zadna kolize s akcemi ostatnich, takze se da ocenit dopredne po krocich.
+    //   Do dneska tudy prochazela hola pravdepodobnost, takze skaven/elf s Dodge
+    //   se do vyberu blitzujiciho hlasil PRESNE TAK RIZIKOVE jako trpaslik bez ni.
+    // ⛔ Neni to uzavreny vzorec, je to DOPREDNY PRUCHOD: reroll se utrati na
+    //   PRVNIM kroku, kde je pripustny (souper s Tackle ho na svem poli rusi,
+    //   r. 8566-8571), a dal uz neni k dispozici.
+    // ⚠️ A je to ZAMERNE KONZERVATIVNI ODHAD, ne presna cena. Ve skutecnosti
+    //   reroll prezije dodge, ktery vyjde uz prirozene, takze by byl porad k
+    //   dispozici i o krok dal; tenhle pruchod ho odepise na prvnim pripustnem
+    //   kroku bez ohledu na vysledek. Presna varianta je uzavreny tvar z
+    //   `task_queue.md` M6·B3(a) -- Pi(1-p_i)*(1+Sum p_i) -- ktery ale plati jen
+    //   pro NEZAVISLE kroky se stalym poctem tacklezon; tady se cesta i zony
+    //   meni krok po kroku. ⇒ Riziko se tim spis NADHODNOTI nez podhodnoti,
+    //   a to je u vyberu blitzu bezpecny smer. Nezamenovat ty dva vzorce.
+    bool rerollAvailable = mover.hasSkill(SkillName::Dodge);
 
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
         Position next = pickApproachStep(state, mover, cur, target);
@@ -930,6 +949,11 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
         if (countTacklezones(state, cur, mover.teamSide) > 0) {
             int dodgeTarget = calculateDodgeTarget(state, mover, next, cur);
             double dodgeFail = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
+            if (rerollAvailable && !tackleNegatesDodgeReroll(state, mover, cur)) {
+                // Selhat musi PRIROZENY hod I reroll.
+                dodgeFail *= dodgeFail;
+                rerollAvailable = false;   // pravo na reroll je tim vycerpane
+            }
             failChance += dodgeFail * (1.0 - failChance);
         }
         if (moveLeft <= 0) {
@@ -1154,7 +1178,19 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 // D6: uspech pri hodu >= target. Cil <=1 znamena jistotu,
                 // cil >=7 nemoznost -- oboji se orizne.
                 const int need = std::clamp(dodgeTarget, 1, 7);
-                const double pFail = (need - 1) / 6.0;
+                double pFail = (need - 1) / 6.0;
+                // ⭐ M6/B3(a) (09.09.2026): DODGE JE REROLL. r. 8078-8090 dava
+                //   hraci s dovednosti Dodge jeden reroll na NEUSPESNY dodge za
+                //   kolo (limit je na hrace, ne na tym) -- utek tady je JEDINY
+                //   dodge, takze reroll je k dispozici cely a selhat musi oba
+                //   hody. Souper s Tackle vedle vychoziho pole ho rusi
+                //   (r. 8566-8571) -- tataz podminka, jakou hodi resolver.
+                // ⛔ Bez toho se skavenovi/elfovi zapovidal utek pri teze cene
+                //   jako trpaslikovi, ackoli ho ma znatelne levnejsi.
+                if (p.hasSkill(SkillName::Dodge) &&
+                    !tackleNegatesDodgeReroll(state, p, p.position)) {
+                    pFail *= pFail;
+                }
 
                 int remaining = 0;
                 state.forEachOnPitch(mySide, [&](const Player& mate) {
