@@ -2,6 +2,7 @@
 #include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
+#include "bb/pathfinder.h"     // nextStepToward -- BFS pro movePlayerToward (09.09.2026)
 #include <algorithm>
 #include <cmath>
 
@@ -2358,7 +2359,7 @@ void takeMoveWalkProfile(long* out4) {
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
                               int maxSteps = 12, Position avoid = {-1, -1}) {
-    Position lastPos{-1, -1};  // Detect loops
+    Position lastPos{-1, -1};  // Detect loops -- jen LEAP vetev nize, BFS nebloudi z konstrukce
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
         if (!p.isOnPitch() || p.lostTacklezones) return false;
@@ -2368,28 +2369,54 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         // layer had no way to stand anybody up at all.
         if (p.position == target && p.state != PlayerState::PRONE) { ++g_mwArrived; return true; }
 
-        // Get available actions
-        std::vector<Action> actions;
-        getAvailableActions(state, actions);
-
-        // Find best move toward target (with TZ avoidance)
+        // ⭐⭐⭐ 09.09.2026 (W-GFI nalez): BFS (`nextStepToward`, M14b
+        //   zobecnene pro obecny pohyb) MISTO hladoveho findMoveToward/
+        //   scoreMoveAction -- ten se muze zaseknout/bloudit/vzdat, i kdyz
+        //   cesta existuje (presne ctyri vzdani nize -- NENASEL/OBCHAZKA/
+        //   SMYCKA/LIMIT jsou vsechny artefakty jednokrokoveho vyberu bez
+        //   pameti cesty). W-GFI sonda 09.09. to potvrdila: z GFI povoleneho
+        //   pohybu doslo na cil jen 22 %, 63 % skoncilo bloudenim (ne
+        //   turnoverem) -- presne tahle trida vady.
+        //   LEAP (`leapWalkArm`, default OFF v produkci, parkovano na
+        //   uzivatelovo rozhodnuti od 27.08.) zustava na stare ceste -- BFS
+        //   neumi skakat pres tela a prepisovat mereni parkovaneho ramene by
+        //   bylo predcasne.
         Action bestMove;
-        if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) { ++g_mwNoStep; return false; }
+        if (!leapWalkArm(p.teamSide)) {
+            if (target == p.position) {
+                // Vstavani NA MISTE (PRONE, viz komentar vyse): neni kam jit,
+                // jen se postavit. `nextStepToward` cestu nehleda (uz na cili),
+                // takze se MOVE na vlastni pole sestavi rovnou -- presne akce,
+                // kterou by z `getAvailableActions` vybral i puvodni hladovy
+                // vyber (vzdalenost 0 vyhrava skore vzdycky).
+                bestMove = Action{ActionType::MOVE, playerId, -1, target};
+            } else {
+                Position bestNext;
+                const int budget = maxSteps - step;
+                if (!nextStepToward(state, p, target, budget, avoid, bestNext)) { ++g_mwNoStep; return false; }
+                bestMove = Action{ActionType::MOVE, playerId, -1, bestNext};
+            }
+        } else {
+            std::vector<Action> actions;
+            getAvailableActions(state, actions);
+            if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) { ++g_mwNoStep; return false; }
 
-        // Allow sideways moves to dodge around opponents, but don't go too far
-        int currentDist = p.position.distanceTo(target);
-        int moveDist = bestMove.target.distanceTo(target);
-        if (moveDist > currentDist + 1) { ++g_mwDetour; return false; } // max 1 square detour
-        if (moveDist >= currentDist && bestMove.target == lastPos) {
-            ++g_mwLoop;
-            g_mwLoopSteps += step;          // kolik kroku uz hrac udelal
-            if (step == 0) ++g_mwLoopStep0; // vubec se nerozesel
-            g_mwLoopDist += currentDist;    // jak daleko od cile stal
-            dumpWalkLoop(state, p, target, step, currentDist);
-            return false;
-        } // loop
+            // Allow sideways moves to dodge around opponents, but don't go too far
+            int currentDist = p.position.distanceTo(target);
+            int moveDist = bestMove.target.distanceTo(target);
+            if (moveDist > currentDist + 1) { ++g_mwDetour; return false; } // max 1 square detour
+            if (moveDist >= currentDist && bestMove.target == lastPos) {
+                ++g_mwLoop;
+                g_mwLoopSteps += step;          // kolik kroku uz hrac udelal
+                if (step == 0) ++g_mwLoopStep0; // vubec se nerozesel
+                g_mwLoopDist += currentDist;    // jak daleko od cile stal
+                dumpWalkLoop(state, p, target, step, currentDist);
+                return false;
+            } // loop
 
-        lastPos = p.position;
+            lastPos = p.position;
+        }
+
         Position before = p.position;
         // ⚠️ `p` je REFERENCE -- po akci uz ukazuje na NOVY stav. Stav pred
         //   akci se proto musi zkopirovat, jinak je porovnani nize no-op.

@@ -51,6 +51,96 @@ long takeBlitzPathPicksInSearch() { long v=g_blitzPathPicks; g_blitzPathPicks=0;
 int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
                                Position target);
 
+static constexpr int kInfCost = 1 << 28;
+
+namespace {
+// ============================================================================
+// SDILENE BFS JADRO (M14b, 01.-09.09.2026) -- riziko-vazena Dijkstra z
+// player.position. Cena kroku = 1 pole + P(neuspech)*kRiskMultiplier za
+// tacklezonu/GFI (odvozeni a cisla viz puvodni komentar u
+// nextStepTowardAdjacent nize -- historie a zmereni se NEKOPIRUJE dvakrat).
+// Sdileno mezi `nextStepTowardAdjacent` (cil = pole vedle `target`, blokovan
+// je `target` samotny -- tam stoji souper, kterym se neprochazi) a
+// `nextStepToward` (cil = `target` samotny, blokovane pole je volitelne
+// `blockedSquare`, napr. volny mic). ⛔ DVE KOPIE TEHOZ CENOVEHO VZORCE SE
+// UZ JEDNOU ROZESLY (`endBlockActivation`, M1/N10, 25.08.) -- nekopirovat
+// znovu, jen volat.
+// `preferStraight`: pri PRESNE stejne cene upredonstni rovny krok pred
+// diagonalnim (Manhattan tiebreak, `scoreMoveAction` mel tohle uz drive --
+// `AdvanceWalksStraightAtEqualChebyshev`). Prida jen +1 jednotku klice na
+// diagonalni krok -- zanedbatelne proti kScale=100 i proti nejmensimu
+// realnemu riziku, takze to NIKDY nepretlaci skutecny rozdil v riziku/delce,
+// jen rozhodne mezi jinak identickymi cestami. Default false, aby se
+// nezmenilo uz zmerene a nasazene chovani `nextStepTowardAdjacent` (M14b).
+void riskWeightedDijkstra(const GameState& state, const Player& player,
+                          int budget, Position blockedSquare,
+                          int* key, int8_t* steps, int16_t* parent,
+                          bool preferStraight = false) {
+    constexpr double kRiskMultiplier = 4.0;
+    constexpr int kScale = 100;     // 1 pole = 100 jednotek klice
+    const int freeSteps = movementAfterStandUp(player);   // bez GFI
+    const bool rerollAvailable = false;   // viz odduvodneni u puvodni funkce
+    const bool blizzard = (state.weather == Weather::BLIZZARD);
+    bool done[GRID_SIZE];
+    for (int i = 0; i < GRID_SIZE; ++i) {
+        key[i] = kInfCost; parent[i] = -1; done[i] = false; steps[i] = 127;
+    }
+
+    const int startIdx = gridIdx(player.position.x, player.position.y);
+    key[startIdx] = 0;
+    steps[startIdx] = 0;
+
+    for (;;) {
+        int cur = -1, best = kInfCost;
+        for (int i = 0; i < GRID_SIZE; ++i)
+            if (!done[i] && key[i] < best) { best = key[i]; cur = i; }
+        if (cur < 0) break;
+        done[cur] = true;
+        Position curPos{static_cast<int8_t>(cur % GRID_W),
+                        static_cast<int8_t>(cur / GRID_W)};
+        if (steps[cur] >= budget) continue;
+
+        for (auto& np : curPos.getAdjacent()) {
+            if (!np.isOnPitch()) continue;
+            if (np == blockedSquare) continue;    // blokovane pole se neprochazi
+            if (state.getPlayerAtPosition(np) != nullptr) continue;
+            const int nIdx = gridIdx(np.x, np.y);
+            if (done[nIdx]) continue;
+            const int tz = countTacklezones(state, np, player.teamSide);
+            const int nStep = steps[cur] + 1;
+            int risk = 0;
+            if (tz > 0) {
+                // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
+                // takze P_fail sama od sebe padne do [1/6, 5/6].
+                const int dodgeTarget =
+                    calculateDodgeTarget(state, player, /*dest=*/np, /*source=*/curPos);
+                const double pFail = (dodgeTarget - 1) / 6.0;
+                risk += static_cast<int>(std::lround(pFail * kRiskMultiplier * kScale));
+            }
+            // GFI marginalne: kolik pole navic PRIDA k riziku uz naplanovane
+            // sekvence. Strop je hracuv skutecny `maxGfiSquares` (2, se
+            // Sprintem 3).
+            const int gfiCap = maxGfiSquares(player);
+            const int gfiBefore = std::clamp(steps[cur] - freeSteps, 0, gfiCap);
+            const int gfiAfter  = std::clamp(nStep      - freeSteps, 0, gfiCap);
+            if (gfiAfter > gfiBefore) {
+                const double dFail =
+                    gfiSequenceFailProb(gfiAfter,  rerollAvailable, blizzard) -
+                    gfiSequenceFailProb(gfiBefore, rerollAvailable, blizzard);
+                risk += static_cast<int>(std::lround(dFail * kRiskMultiplier * kScale));
+            }
+            const int diagBias = (preferStraight && np.x != curPos.x && np.y != curPos.y) ? 1 : 0;
+            const int nk = key[cur] + kScale + risk + diagBias;
+            if (nk < key[nIdx]) {
+                key[nIdx] = nk;
+                steps[nIdx] = static_cast<int8_t>(nStep);
+                parent[nIdx] = static_cast<int16_t>(cur);
+            }
+        }
+    }
+}
+} // namespace
+
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                             Position target, Position& outStep) {
     const int budget = movementAfterStandUp(player) + maxGfiSquares(player);
@@ -73,7 +163,6 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   ⚠️ DELKA se hlida ZVLAST (`steps <= budget`), takze zdrazeni nikdy
     //     nepovoli cestu, na kterou hrac nema pohyb -- a kdyz je tacklezona
     //     NEVYHNUTELNA, projde se, protoze levnejsi varianta neexistuje.
-    constexpr int INF = 1 << 28;
     // ⛔⛔ GFI NENI ZADARMO (nalez 01.09., druhe mereni). Prvni verze te ceny
     //   brala pole navic jako bezplatne -- jenze pole ZA HRANICI MA je Go For
     //   It a pada v sestine pripadu. Chuze proto uhnula tacklezone a misto
@@ -92,118 +181,25 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   ohrozovalo sestinou. Obchazky byly prilis caste a prilis drahe.
     //
     //   ⭐ OPRAVA: cena rizika je PRAVDEPODOBNOSTNI, ne pausalni --
-    //   cena = P(neuspech) * kRiskMultiplier v "polich".
+    //   cena = P(neuspech) * kRiskMultiplier v "polich". Vzorec (multiplikator
+    //   4.0, reroll natvrdo false, GFI marginalne) ted zije ve sdilenem jadru
+    //   `riskWeightedDijkstra` vyse -- historie kalibrace (6.0 -> 4.0, spatny
+    //   vypocet 1/3 vs 1/2) zustava zapsana tam.
     //
-    //   ⛔⛔ 08.09.2026, DRUHE KOLO: puvodni verze tehle opravy kotvila
-    //   nasobitel na 6.0 s odvolanim na "dodge na 4+ pada ve tretine
-    //   pripadu" -- to je SPATNY VYPOCET (4+ pada v POLOVINE, 1/3 odpovida
-    //   cili 3+, ne 4+). Skutecny bezny pripad (1 tacklezona, AG3, cil 4+)
-    //   by tim vysel na 300 (3 pole), draz nez stara plocha cena (200),
-    //   a mohl by chuzi udelat OPATRNEJSI, ne chytrejsi -- presny opak
-    //   zamerene opravy. ⇒ NEKOTVIT na tu spatnou hodnotu.
-    //   ⭐ Misto toho: kotva na SKUTECNY bezny pripad. Cil 4+ ma P_fail=1/2,
-    //   a chceme, aby tam cena vysla presne jako stara plocha `kTzCost=2`
-    //   (2 pole) -- proto `kRiskMultiplier = 4.0` (ne 6.0): 4*0,5 = 2.
-    //   Riziknejsi pole (cil 5+, 6+) jsou dráž, bezpecnejsi (cil 2+, 3+)
-    //   levnejsi -- ale STRED skaly sedi na puvodni, uzivatelem schvalene
-    //   cene misto na chybnem vypoctu.
-    constexpr double kRiskMultiplier = 4.0;
-    //
-    //   ⛔ Zadna vlastni kostkova matematika: dodge se pta
-    //   `calculateDodgeTarget` (helpers.cpp -- zna Dodge/Stunty/Titchy/
-    //   TwoHeads/BreakTackle i PrehensileTail/DivingTackle u zdroje) a GFI
-    //   `gfiSequenceFailProb` (macro_actions.cpp, W-GFI). Dve kopie tehoz
-    //   pravidla se rozesly uz u `endBlockActivation` (M1/N10, 25.08.).
-    //
-    //   ⚠️ GFI se NESCITA PO POLICH: tymovy reroll kryje jen PRVNI neuspesny
-    //   hod, takze dve GFI pole nestoji dvakrat tolik co jedno. Hrana proto
-    //   plati MARGINAL: P_fail(n poli) − P_fail(n−1 poli).
-    //
-    //   ⭐ MERITKO: `key[]` zustava CELOCISELNY Dijkstra (porovnani `nk <
-    //   key[]` s doublem je zbytecna past), takze se vsechno nasobi 100:
-    //   jedno pole = 100, riziko = round(P_fail * kRiskMultiplier * 100).
-    //   ⚠️ `steps[]` se timhle NEPRESKALOVAVA -- zustava CISTY POCET POLI,
-    //   protoze na nej je navazany rozpocet (`steps <= budget`).
-    constexpr int kScale = 100;     // 1 pole = 100 jednotek klice
-    const int freeSteps = movementAfterStandUp(player);   // bez GFI
-    // ⛔⛔ 08.09.2026: REROLL NATVRDO FALSE PRO OCENENI, ne skutecny stav
-    //   tymu. Puvodni verze cetla `canUseReroll()` -- to udela GFI pole
-    //   skoro zadarmo (marginal ~17 misto 100), kdyz je reroll volny, ale
-    //   nekouka, jestli ho nebude potrebovat NEKDO JINY pozdeji v kole
-    //   (na rozdil od W-GFI ramene u repozice, ktere `teammatesStillToAct`
-    //   zna a vazi). Bez tohohle vazeni je to sdileni tymoveho zdroje bez
-    //   rozmyslu. Konzervativni oprava: cenit GFI, jako by reroll nebyl,
-    //   coz je i blizsi puvodni ploche cene (p=1/6 -> 100, presne stare
-    //   `kGfiCost=1`).
-    const bool rerollAvailable = false;
-    const bool blizzard = (state.weather == Weather::BLIZZARD);
+    //   09.09.2026: zobecneno na OBECNY pohyb pres `nextStepToward` nize --
+    //   W-GFI sonda ukazala, ze `movePlayerToward` (REPOSITION/SCORE/
+    //   HAND_OFF_SCORE) mel tutez tridu vady (hladovy vyber bez pameti cesty).
     int key[GRID_SIZE];             // cena (pole + riziko)
     int8_t steps[GRID_SIZE];        // ciste pole -- na tohle se vaze rozpocet
     int16_t parent[GRID_SIZE];
-    bool done[GRID_SIZE];
-    for (int i = 0; i < GRID_SIZE; ++i) {
-        key[i] = INF; parent[i] = -1; done[i] = false; steps[i] = 127;
-    }
-
+    riskWeightedDijkstra(state, player, budget, /*blockedSquare=*/target, key, steps, parent);
     const int startIdx = gridIdx(player.position.x, player.position.y);
-    key[startIdx] = 0;
-    steps[startIdx] = 0;
-
-    for (;;) {
-        int cur = -1, best = INF;
-        for (int i = 0; i < GRID_SIZE; ++i)
-            if (!done[i] && key[i] < best) { best = key[i]; cur = i; }
-        if (cur < 0) break;
-        done[cur] = true;
-        Position curPos{static_cast<int8_t>(cur % GRID_W),
-                        static_cast<int8_t>(cur / GRID_W)};
-        if (steps[cur] >= budget) continue;
-
-        for (auto& np : curPos.getAdjacent()) {
-            if (!np.isOnPitch()) continue;
-            if (np == target) continue;                        // cil se neprochazi
-            if (state.getPlayerAtPosition(np) != nullptr) continue;
-            const int nIdx = gridIdx(np.x, np.y);
-            if (done[nIdx]) continue;
-            const int tz = countTacklezones(state, np, player.teamSide);
-            const int nStep = steps[cur] + 1;
-            int risk = 0;
-            if (tz > 0) {
-                // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
-                // takze P_fail sama od sebe padne do [1/6, 5/6].
-                const int dodgeTarget =
-                    calculateDodgeTarget(state, player, /*dest=*/np, /*source=*/curPos);
-                const double pFail = (dodgeTarget - 1) / 6.0;
-                risk += static_cast<int>(std::lround(pFail * kRiskMultiplier * kScale));
-            }
-            // GFI marginalne: kolik pole navic PRIDA k riziku uz naplanovane
-            // sekvence. Strop je hracuv skutecny `maxGfiSquares` (2, se
-            // Sprintem 3) -- `gfiSequenceFailProb` uz 08.09.2026 umi obecne
-            // N, takze se nemusi umele orezavat na 2 a cinit tim Sprintovo
-            // 3. GFI pole zdarma (byla to vada, ne zamer).
-            const int gfiCap = maxGfiSquares(player);
-            const int gfiBefore = std::clamp(steps[cur] - freeSteps, 0, gfiCap);
-            const int gfiAfter  = std::clamp(nStep      - freeSteps, 0, gfiCap);
-            if (gfiAfter > gfiBefore) {
-                const double dFail =
-                    gfiSequenceFailProb(gfiAfter,  rerollAvailable, blizzard) -
-                    gfiSequenceFailProb(gfiBefore, rerollAvailable, blizzard);
-                risk += static_cast<int>(std::lround(dFail * kRiskMultiplier * kScale));
-            }
-            const int nk = key[cur] + kScale + risk;
-            if (nk < key[nIdx]) {
-                key[nIdx] = nk;
-                steps[nIdx] = static_cast<int8_t>(nStep);
-                parent[nIdx] = static_cast<int16_t>(cur);
-            }
-        }
-    }
 
     // Cilove pole: sousedi s `target` a v rozpoctu zbyva pole na BLOK
     // (r. 549-550, "the block costs one square of movement").
-    int bestIdx = -1, bestKey = INF;
+    int bestIdx = -1, bestKey = kInfCost;
     for (int i = 0; i < GRID_SIZE; ++i) {
-        if (key[i] >= INF || i == startIdx) continue;
+        if (key[i] >= kInfCost || i == startIdx) continue;
         if (steps[i] > budget - 1) continue;
         Position p2{static_cast<int8_t>(i % GRID_W), static_cast<int8_t>(i / GRID_W)};
         if (p2.distanceTo(target) != 1) continue;
@@ -218,6 +214,51 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                        static_cast<int8_t>(idx / GRID_W)};
     const Position greedy = pickApproachStep(state, player, player.position, target);
     if (greedy != outStep) ++g_blitzPathPicks;
+    return true;
+}
+
+// Viz pathfinder.h -- 09.09.2026, zobecneni M14b pro OBECNY pohyb
+// (`movePlayerToward`, macro_actions.cpp). `budget` je EXPLICITNI parametr
+// (ne odvozeny z hrace), protoze volajici (napr. W-GFI rameno) muze chtit
+// mensi rozpocet, nez je hracovo absolutni `maxGfiSquares`.
+//
+// ⭐ NEJDE JEN O "presny cil, jinak selhat" -- nekterym volajicim (REPOSITION
+//   na geometricky, dosud neopravovany cil, viz W-CIL v task_queue.md) se
+//   dnes vydavaji cile, ktere mohou byt obsazene. Stara hladova chuze na to
+//   reagovala priblizenim NA DORAZ (dokud neco nezastavilo pokrok), pak
+//   selhala (smycka/limit). Aby BFS nahradila i tohle chovani a nejen
+//   presny-cil pripad, hleda GLOBALNE nejblizsi dosazitelne pole -- misto
+//   hadani krok po kroku, ktere osciluje.
+bool nextStepToward(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare,
+                    Position& outStep) {
+    if (budget <= 0) return false;
+    if (target == player.position) return false;   // volajici uz je na cili
+
+    int key[GRID_SIZE];
+    int8_t steps[GRID_SIZE];
+    int16_t parent[GRID_SIZE];
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
+                        /*preferStraight=*/true);
+    const int startIdx = gridIdx(player.position.x, player.position.y);
+
+    const int curDist = player.position.distanceTo(target);
+    int bestDist = curDist, bestKeyAmongTies = kInfCost, goalIdx = -1;
+    for (int i = 0; i < GRID_SIZE; ++i) {
+        if (key[i] >= kInfCost || i == startIdx) continue;
+        Position p2{static_cast<int8_t>(i % GRID_W), static_cast<int8_t>(i / GRID_W)};
+        const int d = p2.distanceTo(target);
+        if (d < bestDist || (d == bestDist && key[i] < bestKeyAmongTies)) {
+            bestDist = d; bestKeyAmongTies = key[i]; goalIdx = i;
+        }
+    }
+    if (goalIdx < 0) return false;   // nic nezlepsi vzdalenost -- opravdu zaseknuto
+
+    int idx = goalIdx;
+    while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];
+    if (parent[idx] != startIdx) return false;
+    outStep = Position{static_cast<int8_t>(idx % GRID_W),
+                       static_cast<int8_t>(idx / GRID_W)};
     return true;
 }
 

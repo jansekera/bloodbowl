@@ -1615,6 +1615,51 @@ měřit rameno se stávající chůzí jako první krok).
 | OTEVŘENO — čeká na rozhodnutí uživatele (opravit `movePlayerToward` na BFS
 teď / změřit W-GFI se stávající chůzí jako baseline nejdřív / jiné pořadí)
 
+✅⛔ **09.09. `movePlayerToward` OPRAVENA NA BFS** (uživatel: *„oprav
+movePlayerToward na BFS teď — i když to má širší dopad — stále je to
+oprava — a už máš i měřidlo jak to pak zkontrolovat"*). `nextStepToward`
+(nová funkce, `engine/src/pathfinder.cpp`) zobecňuje M14b: BFS jádro
+(`riskWeightedDijkstra`) je teď SDÍLENÉ mezi `nextStepTowardAdjacent`
+(blitz, beze změny chování) a `nextStepToward` (obecný cíl). Používá ji
+`movePlayerToward` (REPOSITION/SCORE/HAND_OFF_SCORE) místo hladového
+`findMoveToward`/`scoreMoveAction` — mimo LEAP větev (`leapWalkArm`,
+default OFF, parkováno na uživatelovo rozhodnutí od 27.08.), ta zůstává
+na staré cestě záměrně (BFS neumí skákat přes těla).
+⭐ **`nextStepToward` neselže tvrdě na obsazeném/nedosažitelném cíli** —
+hledá GLOBÁLNĚ nejbližší dosažitelné pole (stejný duch jako stará hladová
+chůze "přibliž se, i když přesně nedojdeš", ale bez jejího bloudění).
+⭐ **Tie-break `preferStraight`** (jen v `nextStepToward`, ne v blitzu):
++1 jednotka klíče (zanedbatelná proti kScale=100) za diagonální krok při
+jinak stejné ceně — opravuje `AdvanceWalksStraightAtEqualChebyshev` a
+zároveň (vedlejší efekt) STABILIZUJE volbu mezi přepočty BFS z kroku na
+krok, takže zmizelo skryté oscilování, které jsem prvně zavedl.
+⛔⛔ **DVĚ REGRESE NALEZENY A OPRAVENY PŘI KONTROLE DOPADU:**
+1. Vstávání NA MÍSTĚ (PRONE, `target==player.position`) — `nextStepToward`
+   správně odmítá "cestu nikam", ale vstávání žádnou cestu nepotřebuje, jen
+   se postavit. `movePlayerToward` teď tenhle případ řeší zvlášť (sestaví
+   MOVE na vlastní pole přímo), jinak by vstávání přestalo fungovat úplně.
+2. `AdvanceWalksStraightAtEqualChebyshev` (viz tie-break výše).
+✅ **`TurnPlannerCorridor.BackupNeverWallsOffPicker` (mined state g0008,
+2026-08-07, −10,3 SE) PROŠEL BEZ ZÁSAHU** — nejdřív selhal (BFS umí
+objet zablokovaný vchod (12,7) přes 7 polí, kde stará hladová chůze
+uvázla), ale tie-break `preferStraight` opravu vyřešil jako vedlejší
+efekt (stabilizace volby mezi přepočty). Ověřeno přeběhnutím testu
+samostatně, ne jen v celé sadě.
+✅ 713/713 testů. Sanity kontrola vlastním měřidlem (`W-GFI/VYSLEDEK`,
+2 páry, mode 18, dw-dw): zbytek (ani dosel, ani turnover) klesl **63,4 %
+→ 51,5 %**, turnover vzrostl 14,6 %→24,5 % a dosel 22,0 %→24,0 % —
+granted GFI teď mnohem častěji SKUTEČNĚ dojde ke kostce (uspěje nebo
+padne), místo aby se ztratilo bloudění. `OBCHAZKA`/`SMYCKA` čítače teď
+u ne-LEAP cesty strukturálně nemůžou tiknout (BFS z konstrukce neosciluje
+a nedělá zakázané obchvaty) — zbylo dominantně `LIMIT`.
+⭐ **NOVÝ, SAMOSTATNÝ NÁLEZ (ne walker bug, patří jinam):** zbylých 51,5 %
+"zbytek" u W-GFI teď nejspíš není chyba chůze, ale toho, že rameno počítá
+`gap` (kolik GFI polí chybí) z PŘÍMÉ vzdálenosti, ne ze skutečné délky
+cesty kolem překážek — i dokonalá BFS cesta může být delší, než rovná
+čára naznačuje. Otevřená otázka pro W-GFI kalibraci, ne pro chůzi.
+| UZAVŘENO (movePlayerToward → BFS) — W-GFI sonda (80 párů) teď může běžet
+na opravené chůzi; gap-kalibrace zůstává OTEVŘENÁ jako nová položka
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po

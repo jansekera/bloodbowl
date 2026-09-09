@@ -20,6 +20,22 @@ int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                             Position target, Position& outStep);
 
+// Zobecneni M14b pro OBECNY pohyb (09.09.2026): prvni krok po nejlevnejsi
+// (riziko-vazene) ceste co NEJBLIZ `target` -- presne na nej, pokud je to
+// v rozpoctu dosazitelne a volne, jinak na nejblizsi dosazitelne pole
+// (stejny duch jako stara hladova chuze "priblizit se, i kdyz presny cil
+// neni k mani", ale bez jejiho bloudeni -- BFS vybere jednu globalne
+// nejlepsi bunku najednou, misto aby ji hladovy vyber hadal krok po kroku
+// a osciloval). `budget` je EXPLICITNI, ne odvozeny z hrace -- volajici
+// (napr. W-GFI rameno) muze chtit mensi rozpocet, nez je hracovo absolutni
+// `maxGfiSquares`. `blockedSquare` se nikdy neprochazi, ani jako mezikrok
+// (typicky volny mic -- `avoid` u `movePlayerToward`); {-1,-1} = zadne
+// omezeni. False = zadne dosazitelne pole nezlepsi vzdalenost k cili (uz
+// na miste, nebo skutecne zaseknuto).
+bool nextStepToward(const GameState& state, const Player& player,
+                    Position target, int budget, Position blockedSquare,
+                    Position& outStep);
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);
