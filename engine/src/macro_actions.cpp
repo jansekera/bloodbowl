@@ -488,6 +488,13 @@ thread_local long g_repositionGfiTooRisky = 0;
 // skončí turnoverem (GFI padne). Bez tohohle by šlo znát jen frekvenci
 // rozhodnutí, ne jeho cenu/přínos.
 thread_local long g_repositionGfiReached = 0, g_repositionGfiTurnover = 0;
+// ⭐ ROZPAD ZBYTKU (09.09.2026) (ani dosel, ani
+//   turnover) podle toho, ktery g_mw* bucket u tehle konkretni chuze tikl:
+//   LIMIT = dosel pohyb (podporuje hypotezu "gap je prima vzdalenost, ne
+//   skutecna cesta"), NOSTEP = BFS nenasla zadne zlepseni (genuinne
+//   zablokovany cil), OTHER = zbytek pripadu (nemel by prakticky nastat).
+thread_local long g_repositionGfiZbytekLimit = 0, g_repositionGfiZbytekNoStep = 0,
+                  g_repositionGfiZbytekOther = 0;
 
 void setRepositionGfiArm(TeamSide side, bool on) {
     g_repositionGfiArm[static_cast<int>(side)] = on;
@@ -503,6 +510,12 @@ void takeRepositionGfiStats(long* out5) {
     out5[4] = g_repositionGfiTurnover;
     g_repositionGfiOpportunity = g_repositionGfiGranted = g_repositionGfiTooRisky
         = g_repositionGfiReached = g_repositionGfiTurnover = 0;
+}
+void takeRepositionGfiZbytekBreakdown(long* out3) {
+    out3[0] = g_repositionGfiZbytekLimit;
+    out3[1] = g_repositionGfiZbytekNoStep;
+    out3[2] = g_repositionGfiZbytekOther;
+    g_repositionGfiZbytekLimit = g_repositionGfiZbytekNoStep = g_repositionGfiZbytekOther = 0;
 }
 
 void setStandUpEscapeArm(TeamSide side, bool on) {
@@ -3185,6 +3198,14 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
         addBackMoveTurnoverCause(q3Before);
     }
 
+    // ⭐ POTVRZENO 09.09.2026 (4 páry, 9 911/10 061 = 98,5 % zbytku je LIMIT):
+    //   jestli ZBYTEK (ani dosel, ani turnover) je LIMIT (dosel pohyb -- gap
+    //   pocitany z prime vzdalenosti nestaci na skutecnou cestu) nebo neco
+    //   jineho (NENASEL apod. -- genuinne zablokovany cil). Ctou se holе
+    //   thread_local citace primo (bez resetu), takze normalni beh harnessu
+    //   (takeMoveWalkBailout) neni nijak dotcen.
+    const long mwLimitBefore = g_mwLimit, mwNoStepBefore = g_mwNoStep;
+
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
                      maxSteps, avoid);
 
@@ -3195,6 +3216,11 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
         if (result.turnover) ++g_repositionGfiTurnover;
         else if (state.getPlayer(macro.playerId).position == macro.targetPos)
             ++g_repositionGfiReached;
+        else {
+            if (g_mwLimit > mwLimitBefore) ++g_repositionGfiZbytekLimit;
+            else if (g_mwNoStep > mwNoStepBefore) ++g_repositionGfiZbytekNoStep;
+            else ++g_repositionGfiZbytekOther;
+        }
     }
 
     if (q3WasProne && result.turnover) {

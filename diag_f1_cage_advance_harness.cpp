@@ -140,6 +140,7 @@ static long g_rep[BB_REP_BRANCHES*8] = {0};
 static long g_repBlocked[BB_REP_BRANCHES] = {0};  // W-DOSAH invariant: zablokovano
 static long g_cageDiceyGfi[3] = {0,0,0};  // W-GFI krok 0: DICEY planu / rohy s GFI / selhavsi krok byl GFI
 static long g_repGfi[5] = {0,0,0,0,0};  // W-GFI: prilezitost/povoleno/zamitnuto/dosel-z-povolenych/turnover-z-povolenych
+static long g_repGfiZbytek[3] = {0,0,0};  // DOCASNE: zbytek podle bucketu [limit,noStep,other]
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -643,6 +644,8 @@ int main(int argc, char** argv) {
                 long gfiStats[5]; bb::takeRepositionGfiStats(gfiStats);
                 long candGfi = gfiStats[1];
                 for (int q = 0; q < 5; ++q) g_repGfi[q] += gfiStats[q];
+                { long gz[3]; bb::takeRepositionGfiZbytekBreakdown(gz);
+                  for (int q = 0; q < 3; ++q) g_repGfiZbytek[q] += gz[q]; }
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
@@ -984,6 +987,10 @@ int main(int argc, char** argv) {
                        zbytek, g_repGfi[1]?100.0*zbytek/g_repGfi[1]:0.0,
                        zbytek < 0 ? "  ⛔ ZAPORNY -- citac nesouhlasi" : "");
             }
+            // POTVRZENO (09.09.2026, 98,5 % zbytku): gap je prima vzdalenost, ne skutecna cesta.
+            //   LIMIT (dosel pohyb -- gap = prima vzdalenost, ne skutecna cesta).
+            printf("  W-GFI/ZBYTEK-PRICINA: LIMIT %ld | NENASEL %ld | JINE %ld\n",
+                   g_repGfiZbytek[0], g_repGfiZbytek[1], g_repGfiZbytek[2]);
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",
                    g_mp[0], g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4],
                    (g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])

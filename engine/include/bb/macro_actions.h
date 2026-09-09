@@ -267,6 +267,9 @@ bool repositionGfiArm(TeamSide side);
 // -- [1]+[2] MUSI souhlasit s [0].
 // [opportunity, granted, tooRisky, reached (z granted), turnover (z granted)]
 void takeRepositionGfiStats(long* out5);
+// ROZPAD ZBYTKU (09.09.2026, potvrzeno LIMIT=98,5 %) z takeRepositionGfiStats
+// (granted - reached - turnover) podle g_mw* buketu. [limit, noStep, other]
+void takeRepositionGfiZbytekBreakdown(long* out3);
 
 // ⭐ Q3 (03.09.): co stoji vstavani, OBE vetve.
 //   [0] utek zkusen [1] z toho TURNOVER [2] „vstat a zustat" zkuseno [3] z toho TURNOVER

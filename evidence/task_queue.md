@@ -1680,7 +1680,28 @@ rozhodné noci** — zbytek 49,2 % je moc velký na to, aby šlo říct "kód
 dělá přesně, co má"; navíc turnoverová cena je reálná a nezanedbatelná
 (23,3 % z GFI pokusů). Rozhodnutí (nasadit / doladit gap na skutečnou
 cestu / pustit rozhodnou noc / zpět do fronty) čeká na uživatele.
-| OTEVŘENO — čeká na rozhodnutí uživatele
+
+✅⭐⭐⭐ **09.09. PŘÍČINA ZBYTKU OVĚŘENA PŘÍMO, NE DOMNĚNKOU** (uživatel:
+*„to jsou ale tvoje interní věci co vidíš a umíš zkontrolovat sám — na to
+mne nepotřebuješ"*). Přidán rozpad zbytku podle toho, který `g_mw*`
+bucket tikl u KAŽDÉHO konkrétního granted-GFI pokusu (čte se stav před/po
+volání `movePlayerToward`, bez resetu sdílených čítačů — `engine/src/
+macro_actions.cpp`). Na 4 párech (10 061 případů zbytku):
+```
+LIMIT (dosel pohyb)     9 911  =  98,5 %
+NENASEL (fakt zablokovano)  146  =   1,5 %
+JINÉ                          4  ≈   0,0 %
+```
+⇒ **Potvrzeno: `gap` (kolik GFI polí chybí) se počítá z PŘÍMÉ vzdálenosti
+(`need = mover.position.distanceTo(macro.targetPos)`,
+`macro_actions.cpp:3100`), ne ze skutečné (BFS) délky cesty kolem
+překážek.** I dokonalá chůze zbytek nevyřeší — hráč dostane přesně tolik
+kroků navíc, kolik by stačilo VZDUŠNOU čarou, a skutečná cesta bývá delší.
+Oprava (kdyby se chtěla): `gap` počítat z BFS délky cesty
+(`nextStepToward`/`riskWeightedDijkstra` uz tohle číslo uvnitř má), ne
+z `distanceTo`. 713/713 testů beze změny (jen čtení existujících čítačů).
+| OTEVŘENO — čeká na rozhodnutí uživatele (nasadit i tak / opravit gap na
+BFS délku cesty a přeměřit / rozhodná noc / zpět do fronty)
 
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
