@@ -1,0 +1,37 @@
+# PREDREGISTRACE 09.09.2026 -- W-GFI (repositionGfiArm), mode 18, dw-dw, SONDA
+# PSANO PRED BEHEM (po oprave movePlayerToward na BFS, commit 75f9df43).
+#
+# MECHANISMUS: arm povoluje GFI volnemu presouvajicimu se hraci (screen/
+#   safety/znackovac), kdyz P_fail(gap)*zbyvajici_aktivace < 1. Merena
+#   primo pres g_repositionGfiReached/g_repositionGfiTurnover.
+#
+# SANITY-TEST: pred opravou chuze zbytek (ani dosel, ani turnover) 63,4 %;
+#   po oprave movePlayerToward na BFS (75f9df43) zbytek klesl na 51,5 %,
+#   dosel 22,0->24,0 %, turnover 14,6->24,5 %. Rameno samo dela co ma
+#   (pozitivni kontrola povoleno+zamitnuto==prilezitost sedi).
+#
+# CO SE MERI: mode 18, dw-dw (index 2) -- trpaslik ma nejvic "limit" vzdani
+#   ze vsech ras, nejvetsi expozice prilezitosti.
+#
+# DIMENZOVANI: SONDA, PAIRS=80, WORKERS=4, CHUNKS=8. Tempo zmereno cerstve
+#   09.09.: 4 pary jednovlaknove 2m23s = ~36s/par -> 80 paru na 4 workerech
+#   ~= 12 minut.
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.85
+n_nonzero in 0.10 0.60
+delta in -0.05 0.10
+delta_1s in -0.03 0.05
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Neutralne-pozitivni: doktrina i mereni 02.09. podporuji GFI tam, kde by
+#   jinak chuze vzdala; oprava chuze navic znamena, ze granted GFI teď
+#   castej skutecne dojde na cil (24,0 %) nez predtim (22,0 %), coz by melo
+#   spis pomoct nez uskodit. Sirsi dolni okraj pro pripad, ze cena
+#   (1/6 pad = turnover, ted castejsi 24,5 % z granted) prevazi.
+#
+# ROZHODNE: W-GFI/VYSLEDEK (dosel vs turnover z povolenych) CTE SE PRVNI,
+#   souhrnna delta az jako druhotna kontrola (evidence/PREREG_CHECKLIST.md).
+#
+# ZADANI: --mode 18 --matchups "2:dw-dw:1" --pairs 80 --chunks 8 --workers 4

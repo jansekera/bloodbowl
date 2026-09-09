@@ -31,14 +31,22 @@ Měří se přímo přes nové čítače `g_repositionGfiReached`/`g_repositionG
 (`engine/src/macro_actions.cpp`, commit viz níž) — **ne** souhrnná win-rate,
 ta je až druhotná kontrola.
 
-## SANITY-TEST: 2 páry, mode 18, dw-dw (`engine/src/macro_actions.cpp`,
-`takeRepositionGfiStats` rozšířena na 5 polí) — příležitost 18 265, povoleno
-10 757 (58,9 %, pozitivní kontrola granted+tooRisky==opportunity ✅), z
-povolených dosel na cíl 2 365 (22,0 %), turnover 1 567 (14,6 %), **ZBYTEK
-6 825 (63,4 %)** — ani jedno. ⛔⛔⛔ **SONDA POZASTAVENA** — zbytek dohledán
-na `movePlayerToward`/`findMoveToward` (stejná hladová chůze, kterou M14b
-opravil pro blitz, ale tahle cesta tu opravu nemá), viz task_queue.md.
-Rameno samo dělá, co má (pozitivní kontrola sedí) — problém je o vrstvu níž.
+## SANITY-TEST
+
+**Kolo 1** (2 páry, stará hladová chůze) — příležitost 18 265, povoleno
+10 757 (58,9 %, pozitivní kontrola ✅), z povolených dosel na cíl 2 365
+(22,0 %), turnover 1 567 (14,6 %), **ZBYTEK 6 825 (63,4 %)** — ani jedno.
+⛔⛔⛔ **SONDA POZASTAVENA** — zbytek dohledán na `movePlayerToward`/
+`findMoveToward` (stejná hladová chůze, kterou M14b opravil pro blitz, ale
+tahle cesta tu opravu neměla), viz task_queue.md.
+
+**Kolo 2** (09.09., po opravě `movePlayerToward` na BFS, commit `75f9df43`,
+2 páry) — dosel na cíl 24,0 %, turnover 24,5 %, **ZBYTEK 51,5 %** (klesl
+z 63,4 %). Granted GFI teď mnohem častěji skutečně dojde ke kostce.
+Zbytek 51,5 % je nově přisouzen tomu, že `gap` počítá PŘÍMOU vzdálenost,
+ne skutečnou délku cesty kolem překážek — otevřená kalibrační otázka,
+zapsaná zvlášť, netýká se téhle sondy. **SONDA POKRAČUJE** na opravené
+chůzi.
 
 ## Co se měří
 
