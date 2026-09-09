@@ -487,3 +487,48 @@ TEST(PassHandler, HandOffBurnsItsOwnAllowance) {
     EXPECT_FALSE(gs.homeTeam.passUsedThisTurn)
         << "handing off must leave the pass action still available";
 }
+
+// --- L2 (09.09.2026): Disturbing Presence platí i na INTERCEPCI -------------
+//
+// r. 8054-8057: "any player must subtract 1 from the D6 when they pass,
+// INTERCEPT or catch for each opposing player with Disturbing Presence that is
+// within three squares of them, even if the Disturbing Presence player is
+// Prone or Stunned." Engine to měl na přihrávce (`passMods`) i na chytání
+// (`calculateCatchTarget`), na intercepci ne -- ze tří sloves v jedné větě
+// chyběl jeden.
+//
+// ⭐ PÁROVÝ TEST: obě poloviny jedou na TÉŽE kostce (5). Bez DP musí 5 stačit
+//   (cíl 7-4+2 = 5), s DP nesmí (cíl 6). Kdyby se opravou jen "zhoršila
+//   intercepce", první polovina to okamžitě ukáže.
+TEST(PassHandler, DisturbingPresenceRaisesTheInterceptionTarget) {
+    auto withoutDP = makePassSetup();
+    placePlayer(withoutDP, 1, {3, 7}, TeamSide::HOME);
+    placePlayer(withoutDP, 2, {9, 7}, TeamSide::HOME);
+    placePlayer(withoutDP, 12, {6, 7}, TeamSide::AWAY, 6, 3, 4);  // AG4
+    withoutDP.ball = BallState::carried({3, 7}, 1);
+
+    FixedDiceRoller diceA({5});
+    resolvePass(withoutDP, 1, {9, 7}, diceA, nullptr);
+    ASSERT_EQ(withoutDP.ball.carrierId, 12)
+        << "kontrola: bez Disturbing Presence je cíl 5 a hod 5 intercepci "
+           "MUSÍ dát -- jinak druhá polovina testu nic nedokazuje";
+
+    auto withDP = makePassSetup();
+    placePlayer(withDP, 1, {3, 7}, TeamSide::HOME);
+    placePlayer(withDP, 2, {9, 7}, TeamSide::HOME);
+    placePlayer(withDP, 12, {6, 7}, TeamSide::AWAY, 6, 3, 4);
+    // ⭐ Nositel DP musí být SOUPEŘ INTERCEPTORA, tedy hráč HÁZEJÍCÍHO týmu
+    //   (r. 8055-8056: "for each OPPOSING player with Disturbing Presence").
+    //   Stojí 3 pole od interceptora, ale ne vedle něj -- ať přidá jen DP a
+    //   ne tacklezónu, jinak by test nerozlišil, který modifikátor zabral.
+    //   Na přihrávku ani chytání nedosáhne: obojí dělá HOME a hledá se DP
+    //   u soupeře.
+    placePlayer(withDP, 3, {6, 4}, TeamSide::HOME);
+    withDP.getPlayer(3).skills.add(SkillName::DisturbingPresence);
+    withDP.ball = BallState::carried({3, 7}, 1);
+
+    FixedDiceRoller diceB({5, 5, 4});
+    resolvePass(withDP, 1, {9, 7}, diceB, nullptr);
+    EXPECT_NE(withDP.ball.carrierId, 12)
+        << "s Disturbing Presence je cíl 6, hod 5 intercepci dát NESMÍ";
+}

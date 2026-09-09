@@ -64,6 +64,11 @@ int checkInterception(GameState& state, int passerId, Position target,
         if (!p.hasSkill(SkillName::NervesOfSteel)) {
             t += countTacklezones(state, p.position, p.teamSide);
         }
+        // L2 (09.09.2026): totéž Disturbing Presence jako v samotném hodu níž.
+        // ⛔ Musí být na OBOU místech: tenhle `t` vybírá "nejpravděpodobnějšího"
+        //   interceptora, a kdyby ho počítal jinou sazbou než hod, vybral by
+        //   podle ceny, která se pak nezahraje.
+        t += countDisturbingPresence(state, p.position, p.teamSide);
         if (state.weather == Weather::POURING_RAIN) t += 1;
         t = std::clamp(t, 2, 6);
         if (t < bestTarget || (t == bestTarget && interceptor &&
@@ -83,6 +88,21 @@ int checkInterception(GameState& state, int passerId, Position target,
         if (!interceptor->hasSkill(SkillName::NervesOfSteel)) {
             intTarget += countTacklezones(state, interceptor->position, interceptor->teamSide);
         }
+
+        // L2 (09.09.2026): Disturbing Presence platí i na INTERCEPCI.
+        // r. 8054-8057: "any player must subtract 1 from the D6 when they
+        // pass, INTERCEPT or catch for each opposing player with Disturbing
+        // Presence that is within three squares of them, even if the
+        // Disturbing Presence player is Prone or Stunned."
+        // Engine to měl na přihrávce (`pass_handler.cpp`, passMods) i na
+        // chytání (`calculateCatchTarget`, helpers.cpp:180), na intercepci ne
+        // -- ze tří sloves v jedné větě chyběl jeden.
+        // ⭐ VNĚ `NervesOfSteel`, stejně jako u chytání: NoS (r. 8316-8317,
+        //   "ignores modifiers for enemy TACKLE ZONES when he attempts to
+        //   pass, catch or intercept") ruší jen tacklezóny, a Disturbing
+        //   Presence tacklezóna není -- působí na tři pole a i z lehu.
+        intTarget += countDisturbingPresence(state, interceptor->position,
+                                             interceptor->teamSide);
 
         // Pouring Rain applies to interceptions too (rules parity,
         // 2026-08-10). CRP: "A -1 modifier applies to all catch, intercept,
