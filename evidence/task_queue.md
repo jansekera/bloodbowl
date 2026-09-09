@@ -1731,6 +1731,43 @@ jasně jedním směrem (neutrálně-pozitivně), tady míří přesně na nulu.
 | OTEVŘENO — čeká na rozhodnutí uživatele (rozhodná noc / nechat za
 vypínačem / jiné)
 
+✅⛔⛔ **09.09. CELKOVÉ RIZIKO CESTY (dodge+GFI) OPRAVENO A PŘEMĚŘENO — MECHANISMUS
+LEPŠÍ, WIN-RATE HORŠÍ.** Uživatel: *„26 % turnover je dost — je to GFI
+nebo dodge?"* Rozpad (`takeMoveTurnoverCause` před/po, stejný vzor jako
+Q3): **DODGE 70,9 %, GFI jen 29,1 %** — rameno cenilo jen GFI riziko,
+BFS cesta ale často vede přes tacklezónu, kterou vůbec nevidělo. Uživatel:
+*„riskantní dodge se má taky vyhodnotit a kdyžtak neprovést."* Nová
+`pathFailProb` (`pathfinder.cpp`) cení CELOU cestu (dodge i GFI dohromady,
+nezávislé jevy, 1−součin úspěchů) a nahrazuje čisté `gfiSequenceFailProb`
+v risk gate `expandReposition`.
+
+**Mechanismus na 80 párech (255 257 příležitostí):** povoleno kleslo
+**80,6 % → 29,3 %** (rameno teď správně odmítá cesty přes tacklezónu jako
+moc drahé), z povolených dosel na cíl **85,3 %** (dřív 73,6 %), turnover
+**14,7 %** (dřív 26,4 %), zbytek **0,0 %**. Příčina turnoveru se otočila:
+**GFI 70,3 %, DODGE jen 29,7 %** — každé jednotlivé povolené GFI je teď
+mnohem bezpečnější.
+
+⛔⛔⛔ **ALE WIN-RATE SE ZHORŠIL, NE ZLEPŠIL:** **−0,0281 ± 0,0205
+jednostranně (−1,37 σ), 95% CI [−0,0682; +0,0120] ⇒ ŠKODÍ** (přes práh
+±0,015). Předregistrovaná predikce (mírně pozitivní) **MINULA** — zapsáno
+jako MIMO, ne jako selhání běhu.
+⭐⭐⭐ **Pravděpodobné vysvětlení:** rameno teď GFI povolí 3× méně často
+(29,3 % místo 80,6 % příležitostí). Ve zbylých ~70 % případů se hráč na
+screen/safety/značku vůbec nedostane — **cena "nedoformované obrany" je
+zřejmě vyšší, než kolik ušetří bezpečnější, ale mnohem vzácnější GFI.**
+Přesná bezpečnost jednotlivé akce nestačí, když akce kvůli ní skoro
+přestane nastávat — jiná třída nálezu než u M14b (tam oprava zvýšila
+frekvenci úspěchu BEZE změny frekvence akce).
+⇒ **Žádná verze W-GFI (plochý gap, BFS gap, celkové riziko) dosud
+nepomáhá.** Kód je teď mechanismově čistý a doložený, ale samotný
+KONCEPT (dovolit GFI na reposition) může být špatný nápad, ne jen špatně
+kalibrovaný — nebo je gate (`pFail*zbývající < 1`) příliš přísný a měl
+by tolerovat víc rizika, ne míň.
+| ZAMÍTNUTO ZATÍM — rameno zůstává za vypínačem (default OFF); otevřená
+otázka je, jestli koncept vůbec stojí za další ladění, nebo se má vrátit
+do fronty jako zamítnuté (revize zamítnutých ramen)
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
