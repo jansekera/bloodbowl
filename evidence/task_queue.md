@@ -1660,6 +1660,28 @@ cesty kolem překážek — i dokonalá BFS cesta může být delší, než rovn
 | UZAVŘENO (movePlayerToward → BFS) — W-GFI sonda (80 párů) teď může běžet
 na opravené chůzi; gap-kalibrace zůstává OTEVŘENÁ jako nová položka
 
+✅ **09.09. W-GFI SONDA NA OPRAVENÉ CHŮZI DOBĚHLA (80 párů, mode 18,
+dw-dw, `ab_wgfi_20260909_probe/`).** Mechanismová metrika (přes 390 897
+granted případů, dobře podložené číslo, ne šum): **dosel na cíl 27,5 %,
+turnover 23,3 %, zbytek 49,2 %** — mírné zlepšení proti sanity-testu
+(27,5 vs 24,0 %; 23,3 vs 24,5 %), potvrzuje na velkém vzorku totéž, co
+2-párová kontrola: rameno funguje (pozitivní kontrola granted+tooRisky==
+opportunity sedí na 524 105 příležitostech), ale skoro polovina granted
+GFI stejně nedojde ani na cíl, ani na turnover — obstoji hypotéza
+"gap = přímá vzdálenost, ne skutečná cesta kolem překážek".
+⭐ **Win-rate (druhotná kontrola): -0,0031 ± 0,0212 SE (jednostranně),
+95% CI [-0,0447; +0,0385] — ČISTĚ NEROZHODNUTO, ne blízko prahu ani na
+jednu stranu** (na rozdíl od M14b, kde bodový odhad byl u prahu). Na
+rozhodnutí při nezměněném odhadu by bylo potřeba ~7229 párů (90×
+víc). Turnoverová cena (23,3 % z granted) a zisk (27,5 % dojde) se v
+souhrnu zatím navzájem přesně ruší do šumu.
+⇒ **Na rozdíl od M14b tu mechanismus NEPODPORUJE jasné nasazení bez
+rozhodné noci** — zbytek 49,2 % je moc velký na to, aby šlo říct "kód
+dělá přesně, co má"; navíc turnoverová cena je reálná a nezanedbatelná
+(23,3 % z GFI pokusů). Rozhodnutí (nasadit / doladit gap na skutečnou
+cestu / pustit rozhodnou noc / zpět do fronty) čeká na uživatele.
+| OTEVŘENO — čeká na rozhodnutí uživatele
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
