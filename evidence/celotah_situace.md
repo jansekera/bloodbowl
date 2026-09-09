@@ -255,6 +255,35 @@ umí tělo postavit, neumí rozhodnout, **která těla mají tvořit linii**.
 ⏰ **Do celotahu tedy patří:** kdo tvoří zeď · kolik řad · kdo drží druhou řadu ·
 v jakém pořadí se aktivují, aby si nezavřeli cestu *(viz `Q05`, `Q24` — vacate-first)*.
 
+## A7. ⭐⭐ TÝMOVÝ REROLL JE SDÍLENÝ ZDROJ TAHU — CENA HO NESMÍ POČÍTAT NAPEVNO *(09.09.)*
+
+Vzešlo z `M6/B3` *(cena dodge ignoruje rerolly)*. Rozbor ukázal, že „dodge se
+necení rerollem" jsou ve skutečnosti **dvě různé věci**:
+
+* **Dodge SKILL reroll** *(pravidla ř. 8078-8090: „may only re-roll one failed
+  Dodge roll per turn" — omezení je NA HRÁČE)* — žádná kolize s jinými hráči
+  ani akcemi, dá se cenit izolovaně. **Řeší se přímo, mimo celotah** — viz
+  `dodgeSequenceFailProb` v `macro_actions.cpp`.
+* **Týmový reroll** — jeden na tým na tah, sdílený napříč VŠEMI hráči a VŠEMI
+  typy hodů *(blok, GFI, dodge, přihrávka…)*. Kdyby jedna cesta v plánovači
+  začala počítat „reroll je k dispozici", potřebuje vědět, jestli ho už
+  virtuálně neutratila jiná akce ve stejném tahu — jinak se stejný reroll
+  „utratí" vícekrát napříč různými rozhodnutími.
+
+⭐ **Přesně tahle past už byla pojmenovaná u Q3 útěku** *(macro_actions.cpp
+~ř. 1140: „nedá se převést bez vymyšlené hodnoty jedné aktivace")* — a `GFI`
+už má scaffolding pro reroll (`gfiSequenceFailProb(n, rerollAvailable, ...)`),
+jen je `rerollAvailable` natvrdo `false` na všech volajících místech
+(`pathfinder.cpp:82,321`) — protože nikdo neumí odpovědět „je ten reroll ještě
+volný v tomhle bodě tahu?".
+
+⇒ **Do celotahu patří:** sledovat spotřebu týmového rerollu napříč aktivacemi
+v jednom tahu (kdo ho už virtuálně použil, kolik aktivací ještě čeká) — teprve
+pak smí kterákoliv cenová funkce *(dodge, GFI, blok)* číst `rerollAvailable`
+jako `true`. Bez toho by zapnutí `rerollAvailable=true` kdekoliv v `pathfinder.cpp`
+znamenalo, že si engine reroll „půjčuje" pokaždé znovu, jako by ho měl
+neomezeně.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
