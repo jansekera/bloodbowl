@@ -1914,6 +1914,31 @@ noc — necommitovat a neměřit dřív, než se kalibrace opraví, jinak se
 zopakuje 07.09.-08.09. vzorec (naivní pokus → oscilace/škoda). | ZNOVU
 OTEVŘENO 08.09. — dotáhnout kalibraci, pak měřit
 
+✅⛔ **09.09. TŘI BODY OPRAVENY A COMMITNUTY (`548696d3`)** — multiplikátor
+6,0→4,0 (ukotveno na cíl 4+, ne chybně na 3+), `rerollAvailable=false`
+natvrdo, `gfiSequenceFailProb` zobecněna na libovolné N. 713/713.
+
+⚠️⚠️ **09.09. SONDA (80 párů, mode 15, dw-dw, `ab_m14b_20260909_probe/`,
+`night_prereg_20260909_m14b_probe.preds`) — VŠECH 5 PŘEDPOVĚDÍ TREFENO,
+ALE SMĚR SE NEOTOČIL.** Jednostranná delta **−0,0250 ± 0,0235 SE
+(−1,06σ)**, 95% CI [−0,0711; +0,0211] — **nerozhodnuto**, ne pomáhá.
+80/80 arm acted, n_nonzero 56,2 %, leak 0, bez overdisperze (empirická SE
+0,0620 vs sdružená 0,0470).
+⭐⭐⭐ **BODOVÝ ODHAD JE STEJNĚ ZÁPORNÝ (SPÍŠ VÍC), NEŽ ZAMÍTNUTÁ PLOCHÁ
+VERZE** (08.09.: −0,0170 ± 0,0062, 2,72σ, 4800 párů). Předregistrace
+09.09. čekala neutrálně-pozitivní směr (koncept potvrzený situací ze hry
+04.09.) — **tahle sonda tu předpověď nepodporuje**, jen nemá sílu ji
+vyvrátit ani potvrdit (SE 0,0235 vs SE 0,0062 u rozhodné noci — 80 párů
+prostě nestačí). ⇒ **Oprava kalibrace možná neřeší hlavní problém** —
+buď je multiplikátor pořád špatně (i 4,0 může být moc), nebo je vadný
+samotný koncept vyhýbání riziku touhle cestou, ne jen jeho kalibrace.
+**Rozhodnutí, jestli se má pustit rozhodná noc (~4800 párů, ~32 h při
+96 s/pár/worker) nebo se má rameno vrátit do fronty na revizi, čeká na
+uživatele — nespouštět další noc bez domluvy** (kompute je úzké hrdlo,
+[[project_bloodbowl_compute_bottleneck_20260829]]).
+| OTEVŘENO — čeká na rozhodnutí uživatele (další sonda s jinou konstantou,
+rozhodná noc, nebo zpět do fronty na revizi)
+
 ⭐ **ZAŘAZENÍ (uživatel 05.09.): "jestli z toho vyjde jednoduchá oprava,
 zařaďme ji hned za sekci pohyb."** Pokud se ukáže, že jde skutečně jen o
 zarovnání konstanty (`pickApproachStep` `*100`→`*10`, žádná nová logika),

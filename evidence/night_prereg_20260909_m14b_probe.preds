@@ -1,0 +1,37 @@
+# PREDREGISTRACE 09.09.2026 -- M14b / blitzPathArm, OPRAVENA KALIBRACE, mode 15, dw-dw, SONDA
+# PSANO PRED BEHEM. Beh nezacal.
+#
+# OTAZKA
+#   Plocha cena BFS cesty (K=2 TZ, K=1 GFI) zamitnuta 08.09. (-2,72 sigma,
+#   skodi). Konkretni situace ze hry 04.09. potvrdila spravny KONCEPT, chyba
+#   byla v kalibraci. 09.09. opraveny tri veci (commit 548696d3):
+#   multiplikator rizika 6.0->4.0 (spravne ukotveno na cil 4+), reroll
+#   natvrdo false, gfiSequenceFailProb zobecnena na libovolne N.
+#   Otoci oprava znamenko (-2,72 sigma -> neutralni/pomaha)?
+#
+# CO SE MERI: mode 15, blitzPathArm zapnuty pro kandidatni stranu,
+#   nextStepTowardAdjacent (BFS, OPRAVENA pravdepodobnostni cena) misto
+#   pickApproachStep. Matchup dw-dw (index 2), stejny jako zamitnuta
+#   07.09. sonda -- primo srovnatelne.
+#
+# DIMENZOVANI: SONDA (ne rozhodna noc), vzor P9c/M12(B) sond 08.09. --
+#   PAIRS=80, WORKERS=4, CHUNKS=8. Tempo ze 07.09. (STARA kalibrace):
+#   ~80,7 s/par/worker -- zmereno ZNOVU pred spustenim teto sondy, protoze
+#   kalibracni zmena mohla ovlivnit vypocetni naročnost.
+#
+# PREDPOVEDI (cislo = predpoved, ne pozorovani)
+leak == 0
+arm_acted >= 0.85
+n_nonzero in 0.10 0.65
+delta in -0.05 0.10
+delta_1s in -0.03 0.05
+#
+# ODUVODNENI PREDPOVEDI DELTY
+#   Uzsi a posunute k pozitivnimu nez 07.09. sonda (ktera byla siroka a
+#   symetricka kolem nuly), protoze koncept byl mezitim potvrzen konkretni
+#   situaci ze hry (04.09.) a oprava cili presne na priciny zamitnuti
+#   (spatne ukotveny multiplikator, prilis levny GFI bez ohledu na pozdejsi
+#   potrebu). Dolni okraj zustava mirne pod nulou pro pripad, ze i opravena
+#   kalibrace je porad moc/malo konzervativni.
+#
+# ZADANI: --mode 15 --matchups "2:dw-dw:1" --pairs 80 --chunks 8 --workers 4
