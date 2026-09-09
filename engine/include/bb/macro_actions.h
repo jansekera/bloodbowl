@@ -63,6 +63,18 @@ struct Macro {
     // it for the ball carrier in tempo emergencies (user doctrine 2026-08-04:
     // "the carrier MUST arrive even at GFI dice cost near the end").
     int gfiAllowance = 0;
+    // 09.09.2026: true for EVERY REPOSITION macro cage_advance.cpp emits
+    // (corners AND carrier) -- that planner already makes its OWN careful
+    // GFI decision per macro (`sa.needsGfi`, tracked outside this struct in
+    // its own `macroGfi[]`, deliberately capped at ONE corner --
+    // `GfiAllowanceAtMostOneCornerRestOpen`). `gfiAllowance` alone can't
+    // signal "cage decided zero" vs "nobody decided yet", because corner
+    // macros that get NO allowance still default to gfiAllowance=0 same as
+    // an ordinary free-movement macro. W-GFI (`expandReposition`) must
+    // never layer its own grant on top of a cage-managed macro, or it
+    // breaks that invariant (found via CageAdvance unit tests failing at
+    // W-GFI's unconditional deploy).
+    bool cageManaged = false;
 };
 
 struct MacroExpansionResult {
@@ -258,11 +270,10 @@ long takeStandEscapeOfferedInSearch();
 // Domena `gfiSquares` je [0,2]; volajici si vstup clampuje.
 double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard);
 
-// ⭐ W-GFI (04.09.): volnemu hraci mirici na REPOZICI (bezpecnost/screen/
-//   marker/roh, ne nosic) se GFI povoli, jen kdyz P_fail * zbyvajici
-//   aktivace < 1 -- misto pausalniho zakazu. Default OFF.
-void setRepositionGfiArm(TeamSide side, bool on);
-bool repositionGfiArm(TeamSide side);
+// ⭐ W-GFI (04.09., NASAZENO 09.09.2026, nepodmineny): volnemu hraci
+//   mirici na REPOZICI (bezpecnost/screen/marker/roh, ne nosic) se GFI
+//   povoli, jen kdyz P_fail(cela cesta) * zbyvajici aktivace < 1 -- misto
+//   pausalniho zakazu. Prepinac odstranen, diagnostika zustava.
 // [0] gap>0 nastal (prilezitost) [1] povoleno [2] zamitnuto jako prilis drahe
 // -- [1]+[2] MUSI souhlasit s [0].
 // [opportunity, granted, tooRisky, reached (z granted), turnover (z granted)]

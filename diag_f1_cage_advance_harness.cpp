@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
          : mode == 7 ? "P40 PLACEBO: tataz volba pole BEZ kriteria klece"
          : mode == 16 ? "Q3-N: jen PRIDA nabidku vstat-a-odejit (s cenou dodge a pojistkou)"
          : mode == 17 ? "Q3-O: nad Q3-N teprve ODEBERE nabidku vstat-a-zustat"
-         : mode == 18 ? "W-GFI: volnemu hraci na reposition se GFI povoli podle P_fail*zbyvajici < 1"
+         : mode == 18 ? "(mode 18 ZRUSEN 09.09. -- W-GFI nasazeno do produkce)"
          : mode == 15 ? "(mode 15 ZRUSEN 09.09. -- M14b nasazeno do produkce)"
          : mode == 13 ? "(mode 13 ZRUSEN 02.09. -- M13 nasazeno do produkce)"
          : mode == 14 ? "Q3: oceneni tri vetvi vstavani nejhorsi odpovedi"
@@ -589,10 +589,9 @@ int main(int argc, char** argv) {
                 bb::setStandUpEscapeArm(bb::TeamSide::AWAY, (mode == 16 || mode == 17) && !candHome);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, mode == 17 && candHome);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, mode == 17 && !candHome);
-                // ⭐ W-GFI (04.09.): rameno pro volny pohyb (bezpecnost/screen/
-                //   marker/roh), NE nosic -- viz macro_actions.cpp expandReposition.
-                bb::setRepositionGfiArm(bb::TeamSide::HOME, mode == 18 && candHome);
-                bb::setRepositionGfiArm(bb::TeamSide::AWAY, mode == 18 && !candHome);
+                // ⛔ mode 18 (W-GFI) ZRUSEN 09.09.2026 -- rameno nasazeno do
+                //   produkce nepodmineně (viz macro_actions.cpp). Cislo se
+                //   NEPOUZIVA ZNOVU. Vysledky zustavaji v `ab_wgfi_20260909_probe*/`.
                 bb::takeStandUpPricingRepicksInSearch();
                 // ⛔ mode 8 (P35) ZRUSEN 01.09.2026 -- rameno nasazeno do
                 //   produkce po noci 31.08. (neskodi), takze uz neni co
@@ -709,8 +708,6 @@ int main(int argc, char** argv) {
                 bb::setStandUpEscapeArm(bb::TeamSide::AWAY, false);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::HOME, false);
                 bb::setStandUpRemoveStayArm(bb::TeamSide::AWAY, false);
-                bb::setRepositionGfiArm(bb::TeamSide::HOME, false);
-                bb::setRepositionGfiArm(bb::TeamSide::AWAY, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::HOME, false);
                 bb::setCageAwareAdvanceArm(bb::TeamSide::AWAY, false);
                 bb::setPlaceboAdvanceArm(bb::TeamSide::HOME, false);

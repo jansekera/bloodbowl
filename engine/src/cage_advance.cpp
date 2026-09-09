@@ -459,7 +459,9 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
     std::vector<Macro> macros;
     for (const auto& sa : a.slots) {
         if (sa.playerId < 0 || sa.stayPut || sa.needsGfi) continue;
-        macros.push_back({MacroType::REPOSITION, sa.playerId, -1, sa.slot});
+        Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
+        m.cageManaged = true;
+        macros.push_back(m);
     }
     if (macros.empty()) return plan;   // cage already whole, or nobody reaches
 
@@ -702,12 +704,15 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     std::vector<bool> macroGfi;
     for (const auto& sa : assign.slots) {
         if (sa.playerId < 0 || sa.stayPut) continue;
-        macros.push_back({MacroType::REPOSITION, sa.playerId, -1, sa.slot});
+        Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
+        m.cageManaged = true;
+        macros.push_back(m);
         macroGfi.push_back(sa.needsGfi);
     }
     if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
         Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
         cm.gfiAllowance = plan.carrierGfi;
+        cm.cageManaged = true;
         macros.push_back(cm);
         macroGfi.push_back(false);
     }

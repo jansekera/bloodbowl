@@ -460,18 +460,22 @@ void setStandUpPricingArm(TeamSide side, bool on) {
 thread_local bool g_standUpEscapeArm[2] = {false, false};
 thread_local bool g_standUpRemoveStayArm[2] = {false, false};
 
-// ⭐⭐⭐ W-GFI (04.09.2026, uzivatel: "vetsinou u GFI zisk prevysuje -- ale to
-//   je zkusenost, ne data"). Volny hrac mirici na REPOZICI (bezpecnost/
-//   screen/marker/roh) dnes GFI NIKDY nedostane -- `expandReposition` ma
-//   pevne `+0` (viz komentar u `maxSteps` vyse), zdůvodnene jako "pure
-//   downside". ⛔ To je PAUSALNI zakaz, ne pocitany -- presne tvar vady,
-//   jakou melo Q3 pred dnesnim rozdelenim.
-//   ⭐ Cena neni "telo na zemi" (to je chyba, kterou jsem rano rekl a
-//   uzivatel opravil) -- selhany GFI je VZDY turnover
+// ⭐⭐⭐ W-GFI (04.09.2026, NASAZENO DO PRODUKCE 09.09.2026, nepodmineny).
+//   Volny hrac miřici na REPOZICI (bezpecnost/screen/marker/roh) dřív GFI
+//   NIKDY nedostal -- pausalni zakaz, presne tvar vady jako Q3 pred
+//   rozdelenim. Nahrazeno POCITANOU cenou: GFI se povoli jen kdyz
+//   `P_fail(cela cesta) * zbyvajici aktivace < 1` (tyz tvar jako Q3-N).
+//   Cena neni "telo na zemi" -- selhany GFI je VZDY turnover
 //   (move_handler.cpp:216), tedy stoji VSECHNY zbyvajici aktivace tymu.
-//   ⇒ tyz tvar jako Q3-N: nabidnout GFI jen kdyz
-//   `P_fail(potrebnych GFI) * zbyvajici aktivace < 1`.
-thread_local bool g_repositionGfiArm[2] = {false, false};
+//   Mechanismus opraven ve trech kolech 09.09. (chuze na BFS, gap na
+//   skutecnou cestu misto prime vzdalenosti, riziko na CELOU cestu vcetne
+//   dodge pres tacklezony, ne jen GFI) -- z povolenych GFI dosel na cil
+//   85,3 %, turnover jen 14,7 % (drive 71,9/28,1, jeste drive 22,0/24,5 na
+//   rozbite chuzi). Win-rate sonda (80 paru) vysla nerozhodnuta a hlucna
+//   (viz task_queue.md, W-GFI) -- nasazeno na mechanismovem dokladu a
+//   uzivatelove doktrine (*„s GFI trpaslik dojde s micem k TD casteji nez
+//   bez -- stoji za riziko"*), stejny duvod jako M14b/P9c, ne na
+//   prokazanem chess zisku. Přepinac odstranen.
 // ⭐ "rameno jednalo" pro tenhle arm: kolikrat GFI skutecne povolilo krok
 //   navic, ktery by bez ramene nebyl. Musi se napojit i na cislo modu v
 //   harnessu (viz `modeHasArmSignal/Counter`, oprava 03.09. -- treti
@@ -502,12 +506,6 @@ thread_local long g_repositionGfiZbytekLimit = 0, g_repositionGfiZbytekNoStep = 
 thread_local long g_repositionGfiTurnoverDodge = 0, g_repositionGfiTurnoverGfi = 0,
                   g_repositionGfiTurnoverOther = 0;
 
-void setRepositionGfiArm(TeamSide side, bool on) {
-    g_repositionGfiArm[static_cast<int>(side)] = on;
-}
-bool repositionGfiArm(TeamSide side) {
-    return g_repositionGfiArm[static_cast<int>(side)];
-}
 void takeRepositionGfiStats(long* out5) {
     out5[0] = g_repositionGfiOpportunity;
     out5[1] = g_repositionGfiGranted;
@@ -3170,8 +3168,18 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     int localGfiAllowance = 0;
     {
         const Player& mover = state.getPlayer(macro.playerId);
-        if (repositionGfiArm(mover.teamSide) &&
-            macro.targetPos != mover.position) {
+        // ⛔⛔⛔ 09.09.2026 (nalezeno pri kontrole dopadu nasazeni): `macro.
+        //   gfiAllowance` NESTACI k rozliseni -- cage-advance nastavuje
+        //   gfiAllowance JEN na tom jednom rohu, ktery GFI dostane; ostatni
+        //   rohy (deliberately BEZ GFI, at zustanou "open") maji gfiAllowance
+        //   == 0 uplne stejne jako obycejne volne makro, ktere o GFI jeste
+        //   nikdo nerozhodl. W-GFI by na ne PŘIDALO vlastni GFI navrch a
+        //   rozbilo by cage-advance invariant "nejvyš JEDEN roh"
+        //   (`GfiAllowanceAtMostOneCornerRestOpen`,
+        //   `CageIsBuiltFromScratchAtCarrierDestination` to chytily hned).
+        //   ⇒ `cageManaged` je explicitni znacka "o GFI uz nekdo rozhodl",
+        //   nezavisla na tom, jestli to rozhodnuti bylo 0 nebo vic.
+        if (!macro.cageManaged && macro.targetPos != mover.position) {
             // Rozpocet pro mereni: pohyb + max mozne GFI (2) -- staci na to,
             // aby se poznalo "dosahne s GFI" od "nedosahne, ani kdyby melo
             // vsechny 2 pole". Presahuje-li hrac Sprintem 2 (smi 3), gap se
