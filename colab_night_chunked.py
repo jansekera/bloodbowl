@@ -64,12 +64,46 @@ def check_fingerprint(out, fp):
     print('   Buď se vrať na ten commit, nebo založ nový OUT a začni znovu.')
     return False
 
+# ⭐⭐⭐ ČTVRTÁ BRÁNA (09.09.2026) -- evidence/PREREG_CHECKLIST.md.
+#   M14b sonda 09.09. běžela rovnou přes tenhle skript, bez jediné kontroly,
+#   že se vůbec měří to, co se změnilo -- vyšla jen souhrnná chess/win-rate
+#   delta a mechanismus (kolik blitzů se provede, kolik srazí cíl) se přidal
+#   AŽ DODATEČNĚ, po upozornění. Paměť/checklist v hlavě tohle nezastavily,
+#   protože nic ve spouštěči je nevyžadovalo. Tahle brána je stejná rodina
+#   jako check_fingerprint výš: ODMÍTÁ SPUSTIT, nejen připomíná.
+REQUIRED_PREREG_MARKERS = ['MECHANISMUS:', 'SANITY-TEST:']
+
+def check_prereg_checklist(path):
+    if not path:
+        print('\n⛔ ODMÍTÁM POKRAČOVAT — chybí --prereg.')
+        print('   evidence/PREREG_CHECKLIST.md: bez vyplněného mechanismu a')
+        print('   sanity-testu se noc/sonda nesmí spustit -- jinak se změří')
+        print('   zase jen souhrnná win-rate delta, ne to, co se změnilo.')
+        return False
+    if not os.path.exists(path):
+        print('\n⛔ ODMÍTÁM POKRAČOVAT — --prereg %s neexistuje.' % path)
+        return False
+    text = open(path, encoding='utf-8').read()
+    missing = [m for m in REQUIRED_PREREG_MARKERS if m not in text]
+    if missing:
+        print('\n⛔ ODMÍTÁM POKRAČOVAT — %s nemá vyplněné značky: %s'
+              % (path, ', '.join(missing)))
+        print('   Postupuj podle evidence/PREREG_CHECKLIST.md (kroky 1-4),')
+        print('   pak do předregistrace přidej řádky "MECHANISMUS: ..." a')
+        print('   "SANITY-TEST: ..." a spusť znovu.')
+        return False
+    print('prereg checklist OK (%s): %s nalezeny' % (path, ', '.join(REQUIRED_PREREG_MARKERS)))
+    return True
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--mode', type=int, required=True)
     ap.add_argument('--matchups', required=True, help='"idx:jméno:expozice ..."')
     ap.add_argument('--out', required=True, help='výstupní adresář (ideálně na Disku)')
     ap.add_argument('--pairs', type=int, required=True, help='CELKEM párů na matchup')
+    ap.add_argument('--prereg', required=True,
+                    help='cesta k .md předregistraci -- MUSI mít vyplněné '
+                         'MECHANISMUS: a SANITY-TEST: (evidence/PREREG_CHECKLIST.md)')
     # ⚠️ GRANULARITA: celkový čas na počtu kusů skoro nezávisí (fronta je
     #   vytíží), ale ODOLNOST ANO -- když kus umře nebo se stroj uspí, přijdeš
     #   o CELÝ kus, protože bez `OK` se dělá znovu od začátku. 4800/48 = 100
@@ -88,6 +122,9 @@ def main():
     ap.add_argument('--session-use', type=float, default=0.85)
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
+
+    if not check_prereg_checklist(args.prereg):
+        return 9
 
     started = time.time()
     out = args.out if os.path.isabs(args.out) else os.path.join(ROOT, args.out)

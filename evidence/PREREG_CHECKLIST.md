@@ -24,6 +24,23 @@ který se stejně píše při každé sondě/noci.
    DRUHOTNÁ kontrola dopadu na výhry — nikdy se nečte jako první a nikdy
    sama o sobě neuzavírá otázku, co změna dělá.
 
+## ⭐⭐⭐ VYNUCENO STROJOVĚ (09.09.2026) — `colab_night_chunked.py` to odmítne
+
+Checklist samotný nikoho nezastaví, dokud to nekontroluje spouštěč. Proto má
+`colab_night_chunked.py` (a přes něj i `run_laptop_night.sh`, proměnná
+`PREREG`) **povinný argument `--prereg PATH`** a před spuštěním čte ten
+soubor a hledá dva doslovné řádky:
+
+```
+MECHANISMUS: <jednou větou co změna dělá, na místě kde se rozhoduje>
+SANITY-TEST: <číslo/výsledek z 1-2 párů, pro OBĚ strany srovnání>
+```
+
+Chybí-li `--prereg`, soubor, nebo kterákoli značka, skript **skončí rc=9** a
+nic nespustí — stejná rodina jako `check_fingerprint` (rc=8), ne jen hláška.
+Kroky 1–4 výš se dělají v hlavě/proze jako dřív, kroky 2 a 4 se ale musí
+propsat i do těchhle dvou řádků, jinak noc/sonda vůbec nezačne.
+
 ## Doklad, proč to nejde nechat jen na paměti (09.09.2026, M14b)
 
 Sonda `ab_m14b_20260909_probe/` byla předregistrována a přečtena JEN podle

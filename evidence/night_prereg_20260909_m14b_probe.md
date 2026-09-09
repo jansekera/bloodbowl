@@ -28,6 +28,14 @@ tři věci (commit `548696d3`):
 Tenhle běh měří, jestli oprava kalibrace **otočí znaménko** (−2,72σ →
 neutrální/pomáhá), ne jen jestli je menší v absolutní hodnotě.
 
+MECHANISMUS: BFS cesta blitzujícího mění bezpečnost PŘIBLÍŽENÍ k cíli (méně
+turnoverů při doběhu do tacklezóny) -- měří se přímo přes `takeBlitzOutcome`
+(`engine/src/action_resolver.cpp`, commit `98db65bf`): kolik blitzů dojde
+k bloku a kolik z nich srazí cíl, podle politiky chůze (BFS vs hladová).
+SANITY-TEST: 2 páry, mode 15, dw-dw -- BFS provedeno 6655, cíl shozen 3239
+(48,7 %); hladová provedeno 6649, cíl shozen 3181 (47,8 %). Obě strany
+nenulové, číslo dává smysl -- čítač funguje.
+
 ## Co se měří
 
 Mode 15, `blitzPathArm` zapnuté pro kandidátní stranu, `nextStepTowardAdjacent`

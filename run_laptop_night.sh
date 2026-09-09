@@ -33,6 +33,11 @@ SELF="$ROOT/$(basename "$0")"
 OUT=${OUT:-$ROOT/ab_b2_20260829}
 MODE=${MODE:-11}
 MATCHUPS=${MATCHUPS:-"2:dw-dw:1 7:dwnw:0"}
+# ⭐⭐⭐ POVINNÉ (09.09.2026) -- ČTVRTÁ BRÁNA, evidence/PREREG_CHECKLIST.md.
+#   Bez PREREG odmítne colab_night_chunked.py rc=9 (chybí --prereg nebo
+#   nemá vyplněné MECHANISMUS:/SANITY-TEST:). Žádný default -- prázdná
+#   proměnná má spadnout hned, ne se tise spustit na starém souboru.
+PREREG=${PREREG:-}
 PAIRS=${PAIRS:-4800}
 CHUNKS=${CHUNKS:-48}
 NULL_PAIRS=${NULL_PAIRS:-400}
@@ -82,7 +87,8 @@ supervise() {
         python3 -u "$ROOT/colab_night_chunked.py" \
             --mode "$MODE" --matchups "$MATCHUPS" --out "$OUT" \
             --pairs "$PAIRS" --chunks "$CHUNKS" --null-pairs "$NULL_PAIRS" \
-            --workers "$WORKERS" --session-hours "$SESSION_HOURS" || {
+            --workers "$WORKERS" --session-hours "$SESSION_HOURS" \
+            --prereg "$PREREG" || {
                 rc=$?
                 # ⛔ 8 = neshoda otisku běhu. To NENÍ pád, ze kterého se dá
                 #   zotavit opakováním -- engine se změnil a opakování by jen
@@ -90,6 +96,13 @@ supervise() {
                 if [ "$rc" = "8" ]; then
                     echo "⛔ otisk běhu nesedí (rc=8). Nepokračuji — viz výpis výš."
                     return 8
+                fi
+                # ⛔ 9 = PREREG_CHECKLIST.md nesplněn (chybí soubor nebo
+                #   značky MECHANISMUS:/SANITY-TEST:). Taky se neopakuje --
+                #   dopiš předregistraci, pak spusť znovu TÝMŽ příkazem.
+                if [ "$rc" = "9" ]; then
+                    echo "⛔ prereg checklist nesplněn (rc=9). Nepokračuji — viz výpis výš."
+                    return 9
                 fi
                 if [ "$rc" = "3" ]; then
                     # Vyčerpaný rozpočet sezení NENÍ pád. Opakovat by znamenalo
