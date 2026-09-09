@@ -1936,8 +1936,30 @@ samotný koncept vyhýbání riziku touhle cestou, ne jen jeho kalibrace.
 96 s/pár/worker) nebo se má rameno vrátit do fronty na revizi, čeká na
 uživatele — nespouštět další noc bez domluvy** (kompute je úzké hrdlo,
 [[project_bloodbowl_compute_bottleneck_20260829]]).
-| OTEVŘENO — čeká na rozhodnutí uživatele (další sonda s jinou konstantou,
-rozhodná noc, nebo zpět do fronty na revizi)
+
+✅ **09.09. MECHANISMOVÁ METRIKA DOPLNĚNA (`takeBlitzOutcome`,
+`98db65bf`) — přeměřeno na TÉŽE sondě** (deterministické seedy, čistě
+diagnostický přídavek ⇒ chess delta vyšla identicky, −0,0250 jednostranně,
+potvrzuje že instrumentace nic nezměnila). **Blitzy provedeno (dojde
+k bloku) a cíl shozen, podle POLITIKY chůze:**
+- BFS (M14b): 267 069 provedeno, 122 730 shozeno cíl = **45,95 %**
+- hladová (baseline): 261 394 provedeno, 120 569 shozeno cíl = **46,13 %**
+⇒ **úspěšnost bloku (dá cíl na zem, když se k němu blitz dostane) je
+STEJNÁ** (rozdíl 0,17 p.b. na >260k pozorováních — šum, ne efekt). Dává to
+smysl: M14b mění jen cestu K cíli, ne kostky bloku samotného.
+⭐ **BFS dokončí o ~2,2 % VÍC blitzů** (267 069 vs 261 394) — nepřímý
+náznak, že míň jich umře PŘI DOBĚHU, což je přesně to, co M14b má dělat.
+Nejde ale ještě rozlišit od toho, že BFS strana third možná blitz
+navrhuje/volí častěji — **rozpad `BLITZ/PROC` (nedosah/TURNOVER při doběhu)
+zatím NENÍ rozdělený podle politiky**, jen `takeBlitzOutcome` je.
+⇒ **Závěr zatím: mechanismus (bezpečnost bloku) je neutrální, ne
+poškozený. Pokud M14b přesto škodí na win-rate, příčina není "horší
+blitzy" — je to buď šum (nejpravděpodobnější, sonda na to nemá sílu), nebo
+cena bezpečné/delší cesty jinde (tempo, GFI spotřebované na uhýbání).**
+Další krok, pokud se bude pokračovat: rozdělit i `takeBlitzWastedBreakdown`
+podle politiky, ať jde vidět TURNOVER-při-doběhu zvlášť pro BFS a hladovou.
+| OTEVŘENO — čeká na rozhodnutí uživatele (rozdělit i wasted-breakdown podle
+politiky, další sonda, rozhodná noc, nebo zpět do fronty na revizi)
 
 ⭐ **ZAŘAZENÍ (uživatel 05.09.): "jestli z toho vyjde jednoduchá oprava,
 zařaďme ji hned za sekci pohyb."** Pokud se ukáže, že jde skutečně jen o
