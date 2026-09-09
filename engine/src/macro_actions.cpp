@@ -1372,8 +1372,27 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 if (teammate.hasActed) return;
                 if (teammate.hasSkill(SkillName::NoHands)) return;
 
+                // ⛔⛔ B5 (09.09.2026): DOSAH BYL NATVRDO 2 -- NABIDKA UZSI NEZ
+                //   EXECUTOR. Pravidlo r. 1679-1682: „You may move before
+                //   performing the hand-off, but once you attempt to hand-off
+                //   the ball, you may not move the player performing the
+                //   Hand-Off Action any further." ⇒ nosic smi k prijemci dojit
+                //   CELYM zbytkem pohybu, ne jednim krokem.
+                //   `expandHandOffScore` (krok 1) to uz umi -- vola
+                //   `movePlayerToward(..., carrier.movementRemaining)`, tedy
+                //   rozpocet `movementRemaining` kroku. Nabidka ale pripoustela
+                //   jen `adjDist <= 2` (= jeden krok do sousedstvi).
+                //   ⇒ Tataz trida jako M4 Sprint / P45 vstavani / F12 Leap:
+                //     „akce se nenabidne, i kdyz ji resolver umi provest."
+                //   ⭐ Mez je EXECUTORUV rozpocet, ne pravidlove maximum:
+                //     adjacency je vzdalenost 1, takze nosic musi ujit
+                //     `adjDist - 1` poli => `adjDist <= movementRemaining + 1`.
+                //     GFI se ZAMERNE nepricita -- `movePlayerToward` dostane
+                //     `movementRemaining` a pres nej nejde, takze sirsi mez by
+                //     nabizela tah, ktery executor nedokonci (tataz vada, jakou
+                //     ma BLITZ_AND_SCORE zuzeni z `maxReach + 3`, viz nize).
                 int adjDist = carrier->position.distanceTo(teammate.position);
-                if (adjDist > 2) return; // carrier must reach adjacency within 1 move
+                if (adjDist > carrier->movementRemaining + 1) return;
 
                 int receiverDist = distToEndzone(teammate.position, mySide);
                 int receiverMaxReach = teammate.movementRemaining + maxGfiSquares(teammate);
@@ -1448,8 +1467,14 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                     if (scorer.state != PlayerState::STANDING || scorer.hasActed) return;
                     if (scorer.hasSkill(SkillName::NoHands)) return;
 
+                    // B5 (09.09.2026), tataz vada jako u HAND_OFF_SCORE vyse:
+                    //   `expandChainScore` (krok 2) posila relay ke skorerovi
+                    //   pres `movePlayerToward(..., relay.movementRemaining)`,
+                    //   nabidka ale pripoustela jen `adjDist <= 2`. Chytani
+                    //   prihravky nestoji pohyb, takze `movementRemaining` je
+                    //   v okamziku nabidky totez co pri behu.
                     int adjDist = relay.position.distanceTo(scorer.position);
-                    if (adjDist > 2) return; // relay must reach adjacency for hand-off
+                    if (adjDist > relay.movementRemaining + 1) return;
 
                     int scorerDist = distToEndzone(scorer.position, mySide);
                     int scorerMaxReach = scorer.movementRemaining + maxGfiSquares(scorer);

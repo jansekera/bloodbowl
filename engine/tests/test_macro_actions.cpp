@@ -3068,3 +3068,66 @@ TEST(BlitzApproachRisk, ProneBlitzerIsPricedWithTheStandUpCostSubtracted) {
     EXPECT_GT(riskDown, riskUp)
         << "ležící blitzer se ocenil stejně jako stojící => vstání se neodečetlo";
 }
+
+// --- B5 (09.09.2026): HAND_OFF_SCORE se nabízel úžeji, než ho executor umí --
+//
+// Nabídka měla natvrdo `adjDist <= 2` ("carrier must reach adjacency within 1
+// move"), ale `expandHandOffScore` krok 1 posílá nosiče k příjemci přes
+// `movePlayerToward(..., carrier.movementRemaining)`. BB2016 ř. 1679-1682:
+// "You may move before performing the hand-off, but once you attempt to
+// hand-off the ball, you may not move the player performing the Hand-Off
+// Action any further." ⇒ nosič smí dojít celým zbytkem pohybu.
+// Třída vady "akce se nenabídne, i když ji resolver umí" -- táž jako M4
+// Sprint, P45 vstávání a F12 Leap.
+//
+// ⭐ POZITIVNÍ KONTROLA JE V TÉMŽE TESTU: druhá polovina ověřuje, že mez
+//   NEZMIZELA -- příjemce za hranicí `movementRemaining + 1` se pořád
+//   nenabízí (jinak by test prošel i při `if (false) return;`).
+namespace {
+// Nosič je zaseknutý (do endzóny je dál, než dojde), příjemce doskóruje.
+// `handDist` = Chebyshev vzdálenost nosič->příjemce.
+GameState makeHandOffState(int carrierMove, int handDist) {
+    GameState state = makeMinimalState();
+
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {17, 7};
+    carrier.movementRemaining = static_cast<uint8_t>(carrierMove);
+    state.ball = BallState::carried({17, 7}, 1);
+
+    Player& mate = state.getPlayer(2);
+    mate.id = 2;
+    mate.teamSide = TeamSide::HOME;
+    mate.state = PlayerState::STANDING;
+    mate.position = {static_cast<int8_t>(17 + handDist), 7};
+    mate.stats = {6, 3, 3, 8};
+    mate.movementRemaining = 6;
+    mate.hasMoved = false;
+    mate.hasActed = false;
+
+    // Soupeře pryč z koridoru, ať test měří jen vzdálenost, ne tacklezóny.
+    Player& enemy = state.getPlayer(12);
+    enemy.position = {4, 2};
+
+    return state;
+}
+} // anonymous namespace
+
+TEST(MacroActions, HandOffScoreIsOfferedAsFarAsTheExecutorCanWalk) {
+    // MA 3 => executor ujde 3 pole, adjacency je vzdálenost 1 => dosah 4.
+    // Do 09.09. se při `handDist == 4` nenabídlo NIC (mez byla 2).
+    GameState reachable = makeHandOffState(/*carrierMove=*/3, /*handDist=*/4);
+    std::vector<Macro> macros;
+    getAvailableMacros(reachable, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::HAND_OFF_SCORE))
+        << "příjemce ve vzdálenosti 4 je pro MA3 nosiče dosažitelný "
+           "(3 kroky + adjacency), nabídka ho přesto zamítla";
+
+    // Pozitivní kontrola meze: o pole dál už executor nedojde, takže se
+    // nabízet NESMÍ -- jinak bychom místo opravy jen mez zrušili.
+    GameState tooFar = makeHandOffState(/*carrierMove=*/3, /*handDist=*/5);
+    std::vector<Macro> macrosFar;
+    getAvailableMacros(tooFar, macrosFar);
+    EXPECT_FALSE(hasMacroType(macrosFar, MacroType::HAND_OFF_SCORE))
+        << "vzdálenost 5 je nad rozpočet MA3 nosiče, nabídka by byla "
+           "nedokončitelná (táž vada jako BLITZ_AND_SCORE `maxReach + 3`)";
+}
