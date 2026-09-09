@@ -1748,25 +1748,26 @@ moc drahé), z povolených dosel na cíl **85,3 %** (dřív 73,6 %), turnover
 **GFI 70,3 %, DODGE jen 29,7 %** — každé jednotlivé povolené GFI je teď
 mnohem bezpečnější.
 
-⛔⛔⛔ **ALE WIN-RATE SE ZHORŠIL, NE ZLEPŠIL:** **−0,0281 ± 0,0205
-jednostranně (−1,37 σ), 95% CI [−0,0682; +0,0120] ⇒ ŠKODÍ** (přes práh
-±0,015). Předregistrovaná predikce (mírně pozitivní) **MINULA** — zapsáno
-jako MIMO, ne jako selhání běhu.
-⭐⭐⭐ **Pravděpodobné vysvětlení:** rameno teď GFI povolí 3× méně často
-(29,3 % místo 80,6 % příležitostí). Ve zbylých ~70 % případů se hráč na
-screen/safety/značku vůbec nedostane — **cena "nedoformované obrany" je
-zřejmě vyšší, než kolik ušetří bezpečnější, ale mnohem vzácnější GFI.**
-Přesná bezpečnost jednotlivé akce nestačí, když akce kvůli ní skoro
-přestane nastávat — jiná třída nálezu než u M14b (tam oprava zvýšila
-frekvenci úspěchu BEZE změny frekvence akce).
-⇒ **Žádná verze W-GFI (plochý gap, BFS gap, celkové riziko) dosud
-nepomáhá.** Kód je teď mechanismově čistý a doložený, ale samotný
-KONCEPT (dovolit GFI na reposition) může být špatný nápad, ne jen špatně
-kalibrovaný — nebo je gate (`pFail*zbývající < 1`) příliš přísný a měl
-by tolerovat víc rizika, ne míň.
-| ZAMÍTNUTO ZATÍM — rameno zůstává za vypínačem (default OFF); otevřená
-otázka je, jestli koncept vůbec stojí za další ladění, nebo se má vrátit
-do fronty jako zamítnuté (revize zamítnutých ramen)
+⚠️ **WIN-RATE VYŠLA −0,0281 ± 0,0205 (−1,37 σ), přes práh ±0,015** —
+ale ⛔⛔⛔ **09.09. OPRAVA ZÁPISU: tohle NENÍ "škodí", je to hlučný a
+nesouvisející signál, který se nemá číst jako verdikt** (uživatel: *„proč
+měříš win rate, co s tím nesouvisí zase?"* — stejná chyba, kterou jsem si
+sám zapsal do `PREREG_CHECKLIST.md` po M14b, a tady jsem ji zopakoval).
+Oprava se týkala PŘESNOSTI rizikového odhadu (dojde bezpečně / spadne) —
+a to je změřené přímo a jasně (turnover z povolených 26,4 %→14,7 %,
+příčina otočená z dodge na GFI). Celá hra má navíc stovky dalších
+rozhodnutí; u ramene, které teď kromě bezpečnosti změnilo i FREKVENCI
+(80,6 %→29,3 % povolených příležitostí), je to ještě zředěnější signál
+než u M14b. Práh ±0,015 je mechanické pravidlo pro čtení čísla, ne důkaz
+škody — 80 párů na tuhle otázku nemá sílu ani na "škodí", ani na "nic".
+⭐ **Co skutečně víme:** oprava rizikového odhadu je prokazatelně správná
+(mechanismus). **Jestli koncept "povolit GFI na reposition" čistě pomáhá
+nebo škodí výhrám, ZŮSTÁVÁ NEZNÁMÉ** — tahle sonda na to neodpovídá,
+ať vyšla jakkoli. Přímější metrika by měřila DALŠÍ krok od příčiny (např.
+kolikrát se kvůli odmítnutému GFI screen/safety vůbec nepostaví), ne
+rovnou celou hru — to je ale nová práce, ne dodatečné čtení tohohle běhu.
+| OTEVŘENO — mechanismus hotový a ověřený, otázka čistého dopadu na výhry
+zůstává nezodpovězená (jiná metrika nebo rozhodná noc, ne tahle sonda)
 
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
