@@ -34,6 +34,29 @@ GAMES=${GAMES:-3000}
 OUT="$ROOT/${OUT:-corpus_baseline_20260817}"
 DATA="$ROOT/${DATA:-corpus_baseline_20260817_data}"
 
+# ⛔⛔ SBĚR POTŘEBUJE INTERPRET, PROTI KTERÉMU JE POSTAVENÝ BINDING (09.09.2026)
+#   `bb_engine` je `cpython-38` (cmake našel /usr/local/bin/python3.8, viz
+#   run_night_ab.sh:324), ale `python3` v systému je dnes **3.10** ⇒ holé
+#   `python3` skončí uvnitř workeru na `ModuleNotFoundError: bb_engine`.
+#   Sběr tím spadl 09.09. po ~0,8 s a chyba byla vidět až v `collect.log`.
+# ⭐ Pojistka schválně SPADNE PŘI STARTU, ne až u čtení výsledku — týž tvar
+#   jako `modeHasArmSignal` u nocí: nefunkční měřidlo se má ozvat dřív, než
+#   se na něj utratí stroj.
+# ⚠️ Analýzy (`diag_drive_failure`, `diag_rules_checks`) binding NEpotřebují
+#   (ověřeno grepem), ale jedou týmž interpretem, ať je běh jednolitý.
+# ⚠️ A druhá půlka: `_add_engine_to_path()` v collectoru vkládá cesty
+#   RELATIVNĚ ("engine/build", "python", r. 82-89), takže celý sběr závisí na
+#   `cwd`. Spuštění odjinud než z kořene repa by workery shodilo touž hláškou.
+#   ⇒ `cd` sem, a pojistka testuje týmž způsobem, jakým to dělá collector.
+cd "$ROOT" || exit 3
+PY=${PY:-python3.8}
+if ! PYTHONPATH="$ROOT/engine/build:${PYTHONPATH:-}" "$PY" -c 'import bb_engine' 2>/dev/null; then
+    echo "⛔ '$PY' neumí importovat bb_engine — sběr by spadl až uvnitř workeru."
+    echo "   .so:  $(ls "$ROOT"/engine/build/bb_engine*.so 2>/dev/null || echo CHYBÍ)"
+    echo "   Zkus: PY=python3.8 $0     (nebo přestav binding na jiný interpret)"
+    exit 3
+fi
+
 night_init "$OUT" "corpus-baseline"
 night_stamp_head "$OUT"
 
@@ -60,7 +83,7 @@ if [ -f "$DATA/COLLECT_DONE" ]; then
 else
     night_log "START sběr $GAMES her, produkční nastavení, žádné rameno"
     if CAGE_GATE=0 DATA_ROOT="$DATA" SEED_BASE=20261000 \
-            nice -n 19 python3 "$ROOT/diag_replay_mine_20260813_gate.py" collect "$GAMES" \
+            nice -n 19 "$PY" "$ROOT/diag_replay_mine_20260813_gate.py" collect "$GAMES" \
             > "$OUT/collect.log" 2>&1; then
         night_log "sběr HOTOV"
     else
@@ -69,9 +92,9 @@ else
 fi
 
 night_log "START rozklad drivů"
-nice -n 19 python3 "$ROOT/diag_drive_failure_20260811.py" "$DATA" > "$OUT/drives.txt" 2>&1
+nice -n 19 "$PY" "$ROOT/diag_drive_failure_20260811.py" "$DATA" > "$OUT/drives.txt" 2>&1
 night_log "START kontroly"
-nice -n 19 python3 "$ROOT/diag_rules_checks_20260812.py" "$DATA/*.json.gz" > "$OUT/checks.txt" 2>&1
+nice -n 19 "$PY" "$ROOT/diag_rules_checks_20260812.py" "$DATA/*.json.gz" > "$OUT/checks.txt" 2>&1
 
 if grep -q "PŘIJÍMACÍ DRIVY" "$OUT/drives.txt" && grep -q "K33" "$OUT/checks.txt"; then
     night_log "HOTOVO — baseline s otiskem engine $(cut -c1-8 < "$OUT/ENGINE_HEAD")"
