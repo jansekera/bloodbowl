@@ -248,6 +248,15 @@ bool standUpRemoveStayArm(TeamSide side);
 long takeStandUpPricingRepicksInSearch();
 long takeStandEscapeOfferedInSearch();
 
+// ⭐ W-GFI cena sekvence GFI hodu (04.09.2026, definice v macro_actions.cpp).
+// Pravdepodobnost, ze aktivace SKONCI turnoverem kvuli `gfiSquares` (0-2) GFI
+// hodum za sebou; tymovy reroll kryje jen PRVNI neuspech, takze to NENI
+// `1-(1-p)^n`. Vystavena ven 08.09.2026 pro `nextStepTowardAdjacent`
+// (pathfinder.cpp), aby cesta a repozice ocenovaly GFI TYMZ vzorcem --
+// dve kopie tehoz pravidla by se rozesly (viz `endBlockActivation`, M1/N10).
+// Domena `gfiSquares` je [0,2]; volajici si vstup clampuje.
+double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard);
+
 // ⭐ W-GFI (04.09.): volnemu hraci mirici na REPOZICI (bezpecnost/screen/
 //   marker/roh, ne nosic) se GFI povoli, jen kdyz P_fail * zbyvajici
 //   aktivace < 1 -- misto pausalniho zakazu. Default OFF.

@@ -3036,24 +3036,31 @@ static MacroExpansionResult expandFoul(GameState& state, const Macro& macro,
 //   `attemptRoll` (helpers.cpp) ho automaticky spotrebuje na PRVNI hod, ktery
 //   ho potrebuje. Kdyz je pri vstupu do teto aktivace jeste volny, kryje jen
 //   TEN prvni neuspech v cestě -- druhy GFI uz jede bez nej.
-//   Odvozeni pro gfiSquares==2 s volnym rerollem:
-//     P(uspech) = s*(1-p^2) + p*s^2   [s=1-p]
-//   kde prvni clen je "1. hod hned vysel, reroll zustava pro 2." a druhy
-//   "1. hod spravil reroll, 2. uz musi projit sam".
+//   Odvozeni OBECNE pro N hodu s volnym rerollem, reroll kryje jen PRVNI
+//   neuspech, at uz nastane na kterekoli pozici (08.09.2026, rozsireno
+//   z puvodniho hardcoded N<=2 kvuli Sprintu -- viz nize):
+//     P(uspech) = P(0 neuspechu) + P(prave 1 neuspech, reroll ho zachrani)
+//               = s^N + N*p*s^(N-1)*s = s^N * (1 + N*p)
+//   Prave 1 neuspech muze nastat na kterekoli z N pozici (N moznosti),
+//   ostatnich N-1 hodu musi projit napoprve (s^(N-1)) a reroll na tom
+//   jednom musi taky projit (dalsi s). Overeno zpetne na N=1 a N=2 proti
+//   puvodnim rucne odvozenym vzorcum -- shoda presna (viz test).
 //   ⭐ Skill reroll (Sure Feet) se ZAMERNE NEPOCITA -- kdyby ho hrac mel,
 //   `attemptRoll` ho pouzije JAKO PRVNI a tymovy reroll zustane volny dele,
 //   takze vynechani jen NADHODNOCUJE riziko, nikdy ho nepodhodnoti.
-static double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard) {
+//   ⛔⛔ 08.09.2026: puvodni verze mela N natvrdo jen 1 nebo 2 ("volajici drzi
+//   vstup v [0,2]"), s komentarem, ktery predpokladal, ze vic GFI poli v
+//   jedne aktivaci nenastane. M14b (pathfinder.cpp) narazil na PROTIPRIKLAD:
+//   hrac se Sprintem smi az 3 GFI pole (`maxGfiSquares`), a puvodni funkce
+//   by pro N=3 spadla do vetve pro N=2 -- tedy CENILA TRETI POLE JAKO
+//   ZDARMA. Obecny vzorec tohle opravuje bez zvlastniho pripadu.
+double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard) {
     if (gfiSquares <= 0) return 0.0;
     const double p = blizzard ? (2.0 / 6.0) : (1.0 / 6.0);
     const double s = 1.0 - p;
-    if (gfiSquares == 1) {
-        return rerollAvailable ? p * p : p;
-    }
-    // gfiSquares == 2 (volajici drzi vstup v [0,2]).
-    if (!rerollAvailable) return 1.0 - s * s;
-    const double succeed = s * (1.0 - p * p) + p * s * s;
-    return 1.0 - succeed;
+    const double sn = std::pow(s, gfiSquares);
+    if (!rerollAvailable) return 1.0 - sn;
+    return 1.0 - sn * (1.0 + gfiSquares * p);
 }
 
 // ⭐ Kolik spoluhracu jeste ceka na aktivaci -- tyz vypocet jako u Q3-N

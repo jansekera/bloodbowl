@@ -1,6 +1,8 @@
 #include "bb/pathfinder.h"
 #include "bb/helpers.h"
+#include "bb/macro_actions.h"   // gfiSequenceFailProb -- JEDNA definice ceny GFI
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 
 namespace bb {
@@ -79,9 +81,62 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   PRESUNULO, ne zmizelo. Cena kroku musi znat OBOJI.
     //   Pomer: dodge na 4+ pada ~1/3, GFI na 2+ pada 1/6 => tacklezona je
     //   zhruba dvakrat drazsi nez GFI. Odtud 2 a 1, ne z ladeni.
-    constexpr int kTzCost  = 2;     // krok do tacklezony
-    constexpr int kGfiCost = 1;     // krok za hranici MA (Go For It)
+    //
+    // ⛔⛔⛔ PAUSALNI CENA BYLA CHYBA -- ZMERENO (M14b, 08.09.2026).
+    //   Parove A/B, 4 800 dvojic dw-dw (`ab_m14b_20260907/`):
+    //   DELTA −0,0170 ± 0,0062 SE = −2,72 σ, 95% CI [−0,0292; −0,0048].
+    //   Rameno tedy neni "bez ucinku", ono SKODI -- a mechanismus je znamy:
+    //   `kTzCost` i `kGfiCost` byly PLOSNE, nezavisle na skutecnem riziku TOHO
+    //   pole. Dodge na 3+ (pada 1/6) stal presne tolik co dodge na 6+ (pada
+    //   5/6), takze chuze platila dve pole obchazky i za pole, ktere ji
+    //   ohrozovalo sestinou. Obchazky byly prilis caste a prilis drahe.
+    //
+    //   ⭐ OPRAVA: cena rizika je PRAVDEPODOBNOSTNI, ne pausalni --
+    //   cena = P(neuspech) * kRiskMultiplier v "polich".
+    //
+    //   ⛔⛔ 08.09.2026, DRUHE KOLO: puvodni verze tehle opravy kotvila
+    //   nasobitel na 6.0 s odvolanim na "dodge na 4+ pada ve tretine
+    //   pripadu" -- to je SPATNY VYPOCET (4+ pada v POLOVINE, 1/3 odpovida
+    //   cili 3+, ne 4+). Skutecny bezny pripad (1 tacklezona, AG3, cil 4+)
+    //   by tim vysel na 300 (3 pole), draz nez stara plocha cena (200),
+    //   a mohl by chuzi udelat OPATRNEJSI, ne chytrejsi -- presny opak
+    //   zamerene opravy. ⇒ NEKOTVIT na tu spatnou hodnotu.
+    //   ⭐ Misto toho: kotva na SKUTECNY bezny pripad. Cil 4+ ma P_fail=1/2,
+    //   a chceme, aby tam cena vysla presne jako stara plocha `kTzCost=2`
+    //   (2 pole) -- proto `kRiskMultiplier = 4.0` (ne 6.0): 4*0,5 = 2.
+    //   Riziknejsi pole (cil 5+, 6+) jsou dráž, bezpecnejsi (cil 2+, 3+)
+    //   levnejsi -- ale STRED skaly sedi na puvodni, uzivatelem schvalene
+    //   cene misto na chybnem vypoctu.
+    constexpr double kRiskMultiplier = 4.0;
+    //
+    //   ⛔ Zadna vlastni kostkova matematika: dodge se pta
+    //   `calculateDodgeTarget` (helpers.cpp -- zna Dodge/Stunty/Titchy/
+    //   TwoHeads/BreakTackle i PrehensileTail/DivingTackle u zdroje) a GFI
+    //   `gfiSequenceFailProb` (macro_actions.cpp, W-GFI). Dve kopie tehoz
+    //   pravidla se rozesly uz u `endBlockActivation` (M1/N10, 25.08.).
+    //
+    //   ⚠️ GFI se NESCITA PO POLICH: tymovy reroll kryje jen PRVNI neuspesny
+    //   hod, takze dve GFI pole nestoji dvakrat tolik co jedno. Hrana proto
+    //   plati MARGINAL: P_fail(n poli) − P_fail(n−1 poli).
+    //
+    //   ⭐ MERITKO: `key[]` zustava CELOCISELNY Dijkstra (porovnani `nk <
+    //   key[]` s doublem je zbytecna past), takze se vsechno nasobi 100:
+    //   jedno pole = 100, riziko = round(P_fail * kRiskMultiplier * 100).
+    //   ⚠️ `steps[]` se timhle NEPRESKALOVAVA -- zustava CISTY POCET POLI,
+    //   protoze na nej je navazany rozpocet (`steps <= budget`).
+    constexpr int kScale = 100;     // 1 pole = 100 jednotek klice
     const int freeSteps = movementAfterStandUp(player);   // bez GFI
+    // ⛔⛔ 08.09.2026: REROLL NATVRDO FALSE PRO OCENENI, ne skutecny stav
+    //   tymu. Puvodni verze cetla `canUseReroll()` -- to udela GFI pole
+    //   skoro zadarmo (marginal ~17 misto 100), kdyz je reroll volny, ale
+    //   nekouka, jestli ho nebude potrebovat NEKDO JINY pozdeji v kole
+    //   (na rozdil od W-GFI ramene u repozice, ktere `teammatesStillToAct`
+    //   zna a vazi). Bez tohohle vazeni je to sdileni tymoveho zdroje bez
+    //   rozmyslu. Konzervativni oprava: cenit GFI, jako by reroll nebyl,
+    //   coz je i blizsi puvodni ploche cene (p=1/6 -> 100, presne stare
+    //   `kGfiCost=1`).
+    const bool rerollAvailable = false;
+    const bool blizzard = (state.weather == Weather::BLIZZARD);
     int key[GRID_SIZE];             // cena (pole + riziko)
     int8_t steps[GRID_SIZE];        // ciste pole -- na tohle se vaze rozpocet
     int16_t parent[GRID_SIZE];
@@ -112,8 +167,30 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
             if (done[nIdx]) continue;
             const int tz = countTacklezones(state, np, player.teamSide);
             const int nStep = steps[cur] + 1;
-            const int nk = key[cur] + 1 + (tz > 0 ? kTzCost : 0)
-                         + (nStep > freeSteps ? kGfiCost : 0);
+            int risk = 0;
+            if (tz > 0) {
+                // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
+                // takze P_fail sama od sebe padne do [1/6, 5/6].
+                const int dodgeTarget =
+                    calculateDodgeTarget(state, player, /*dest=*/np, /*source=*/curPos);
+                const double pFail = (dodgeTarget - 1) / 6.0;
+                risk += static_cast<int>(std::lround(pFail * kRiskMultiplier * kScale));
+            }
+            // GFI marginalne: kolik pole navic PRIDA k riziku uz naplanovane
+            // sekvence. Strop je hracuv skutecny `maxGfiSquares` (2, se
+            // Sprintem 3) -- `gfiSequenceFailProb` uz 08.09.2026 umi obecne
+            // N, takze se nemusi umele orezavat na 2 a cinit tim Sprintovo
+            // 3. GFI pole zdarma (byla to vada, ne zamer).
+            const int gfiCap = maxGfiSquares(player);
+            const int gfiBefore = std::clamp(steps[cur] - freeSteps, 0, gfiCap);
+            const int gfiAfter  = std::clamp(nStep      - freeSteps, 0, gfiCap);
+            if (gfiAfter > gfiBefore) {
+                const double dFail =
+                    gfiSequenceFailProb(gfiAfter,  rerollAvailable, blizzard) -
+                    gfiSequenceFailProb(gfiBefore, rerollAvailable, blizzard);
+                risk += static_cast<int>(std::lround(dFail * kRiskMultiplier * kScale));
+            }
+            const int nk = key[cur] + kScale + risk;
             if (nk < key[nIdx]) {
                 key[nIdx] = nk;
                 steps[nIdx] = static_cast<int8_t>(nStep);
