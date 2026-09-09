@@ -31,7 +31,7 @@ Měří se přímo přes nové čítače `g_repositionGfiReached`/`g_repositionG
 (`engine/src/macro_actions.cpp`, commit viz níž) — **ne** souhrnná win-rate,
 ta je až druhotná kontrola.
 
-## SANITY-TEST
+## SANITY-TEST:
 
 **Kolo 1** (2 páry, stará hladová chůze) — příležitost 18 265, povoleno
 10 757 (58,9 %, pozitivní kontrola ✅), z povolených dosel na cíl 2 365
