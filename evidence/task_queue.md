@@ -1581,6 +1581,40 @@ To je horní odhad zisku a **dnes ho neznáme**.
 hráče to není turnover, ale je to tělo na zemi na začátku soupeřova kola.
 ⇒ Teprve poměr těch dvou čísel řekne, jestli je to rameno na noc, nebo vada.
 
+✅⛔⛔ **09.09. SANITY-TEST W-GFI RAMENE (2 páry, mode 18, dw-dw) — MECHANISMUS
+JE ROZBITÝ VYŠŠÍ VRSTVOU, NE ŠPATNOU CENOU.** Podle `evidence/PREREG_CHECKLIST.md`
+přidány čítače `g_repositionGfiReached`/`g_repositionGfiTurnover`
+(`engine/src/macro_actions.cpp`, `takeRepositionGfiStats` nyní 5 polí) —
+z případů, kdy rameno GFI **skutečně povolí** (10 757 z 18 265 příležitostí,
+58,9 %, pozitivní kontrola granted+tooRisky==opportunity ✅):
+```
+dosel na cíl  2 365 (22,0 %)
+turnover      1 567 (14,6 %)
+ZBYTEK        6 825 (63,4 %)   <- ani jedno, tisknuto podle
+                                  feedback_take_counters_are_cumulative
+```
+⛔⛔⛔ **PŘÍČINA ZBYTKU NALEZENA: `movePlayerToward`/`findMoveToward`
+(`macro_actions.cpp:2358-2431`, používá `expandReposition` i `expandScore`/
+`expandHandOffScore`) je STEJNÁ HLADOVÁ CHŮZE, kterou M14b dnes opravil pro
+BLITZ — ale tahle cesta tu opravu NEDOSTALA.** `findMoveToward` bloudí/vzdává
+se pěti způsoby, které NEnastavují `result.turnover` (`g_mwNoStep`,
+`g_mwDetour`, `g_mwLoop`, `g_mwStuck`, **`g_mwLimit`** — to je doslova TEN
+SAMÝ "limit" bucket, co W-GFI rameno vzniklo řešit), takže granted GFI
+krok se snadno **spotřebuje na bloudění, ne na přiblížení k cíli** — extra
+pole přidá `maxSteps`, ale nepomůže volbě KAM ten krok jde.
+⇒ **W-GFI sonda (80 párů) se ZATÍM NESPOUSTÍ** — měřila by rameno
+handicapované cizí vadou, ne otázku "má se GFI povolit". Nejdřív je potřeba
+rozhodnout, jestli se `movePlayerToward` přezbrojí na BFS
+(`nextStepTowardAdjacent`, stejný nástroj jako M14b) — to by opravilo
+REPOSITION/SCORE/HAND_OFF_SCORE najednou, širší dopad než jedno rameno,
+proto **check-in před stavbou**
+([[feedback_check_in_before_new_engine_work]]), ne jednořádková náhrada.
+Prereg `night_prereg_20260909_wgfi_probe.md/.preds` zůstává napsaný a platný
+pro AŽ POTÉ, co se cesta opraví (nebo pro zamítnutí, kdyby uživatel chtěl
+měřit rameno se stávající chůzí jako první krok).
+| OTEVŘENO — čeká na rozhodnutí uživatele (opravit `movePlayerToward` na BFS
+teď / změřit W-GFI se stávající chůzí jako baseline nejdřív / jiné pořadí)
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po

@@ -139,7 +139,7 @@ static long g_mp[4] = {0,0,0,0};
 static long g_rep[BB_REP_BRANCHES*8] = {0};
 static long g_repBlocked[BB_REP_BRANCHES] = {0};  // W-DOSAH invariant: zablokovano
 static long g_cageDiceyGfi[3] = {0,0,0};  // W-GFI krok 0: DICEY planu / rohy s GFI / selhavsi krok byl GFI
-static long g_repGfi[3] = {0,0,0};  // W-GFI rameno: prilezitost / povoleno / zamitnuto jako drahe
+static long g_repGfi[5] = {0,0,0,0,0};  // W-GFI: prilezitost/povoleno/zamitnuto/dosel-z-povolenych/turnover-z-povolenych
 // ⭐ Q19: [0] vsechna zvolena makra  [1] z toho BLITZ_AND_SCORE  [2] z toho TD
 static long g_bas[3] = {0,0,0};
 static long g_basOff = 0;
@@ -640,9 +640,9 @@ int main(int argc, char** argv) {
                 long candProne = bb::takeProneActionPicksInSearch();
                 long candPath  = bb::takeBlitzPathPicksInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
-                long gfiStats[3]; bb::takeRepositionGfiStats(gfiStats);
+                long gfiStats[5]; bb::takeRepositionGfiStats(gfiStats);
                 long candGfi = gfiStats[1];
-                for (int q = 0; q < 3; ++q) g_repGfi[q] += gfiStats[q];
+                for (int q = 0; q < 5; ++q) g_repGfi[q] += gfiStats[q];
                 long candLeap = bb::takeLeapWalkPicksInSearch();
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
@@ -973,6 +973,17 @@ int main(int argc, char** argv) {
                    g_repGfi[0], g_repGfi[1], g_repGfi[0]?100.0*g_repGfi[1]/g_repGfi[0]:0.0,
                    g_repGfi[2], g_repGfi[0]?100.0*g_repGfi[2]/g_repGfi[0]:0.0,
                    (g_repGfi[1]+g_repGfi[2]==g_repGfi[0]) ? "  ✅" : "  ⛔ NESOUHLASI");
+            // 09.09.2026 (PREREG_CHECKLIST): mechanismova metrika -- z POVOLENYCH
+            //   (ne prilezitosti) kolik skutecne dojde na cil vs skonci turnoverem.
+            {
+                long zbytek = g_repGfi[1] - g_repGfi[3] - g_repGfi[4];
+                printf("  W-GFI/VYSLEDEK (z povolenych, ne z prilezitosti): dosel na cil %ld (%.1f %%) | "
+                       "turnover %ld (%.1f %%) | ZBYTEK (ani jedno) %ld (%.1f %%)%s\n",
+                       g_repGfi[3], g_repGfi[1]?100.0*g_repGfi[3]/g_repGfi[1]:0.0,
+                       g_repGfi[4], g_repGfi[1]?100.0*g_repGfi[4]/g_repGfi[1]:0.0,
+                       zbytek, g_repGfi[1]?100.0*zbytek/g_repGfi[1]:0.0,
+                       zbytek < 0 ? "  ⛔ ZAPORNY -- citac nesouhlasi" : "");
+            }
             printf("  CHUZE/PROFIL: DOSLA %ld | vzdani %ld (%.1f %% pokusu) | smycka: prum. krok %.2f, na kroku 0 %ld (%.0f %%), prum. vzdalenost %.2f\n",
                    g_mp[0], g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4],
                    (g_mp[0]+g_mw[0]+g_mw[1]+g_mw[2]+g_mw[3]+g_mw[4])

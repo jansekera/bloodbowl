@@ -482,6 +482,11 @@ thread_local long g_repositionGfiGranted = 0;
 //   stejny tvar jako W-DOSAH BLOKOVANO/NIKDY (03.-04.09.).
 thread_local long g_repositionGfiOpportunity = 0;
 thread_local long g_repositionGfiTooRisky = 0;
+// 09.09.2026 (PREREG_CHECKLIST): MĚŘIT PŘÍMO TO, CO ARM DĚLÁ, ne jen "kolikrát
+// se rozhodl" -- z granted případů, kolik SKUTEČNĚ dojde na cíl a kolik
+// skončí turnoverem (GFI padne). Bez tohohle by šlo znát jen frekvenci
+// rozhodnutí, ne jeho cenu/přínos.
+thread_local long g_repositionGfiReached = 0, g_repositionGfiTurnover = 0;
 
 void setRepositionGfiArm(TeamSide side, bool on) {
     g_repositionGfiArm[static_cast<int>(side)] = on;
@@ -489,11 +494,14 @@ void setRepositionGfiArm(TeamSide side, bool on) {
 bool repositionGfiArm(TeamSide side) {
     return g_repositionGfiArm[static_cast<int>(side)];
 }
-void takeRepositionGfiStats(long* out3) {
-    out3[0] = g_repositionGfiOpportunity;
-    out3[1] = g_repositionGfiGranted;
-    out3[2] = g_repositionGfiTooRisky;
-    g_repositionGfiOpportunity = g_repositionGfiGranted = g_repositionGfiTooRisky = 0;
+void takeRepositionGfiStats(long* out5) {
+    out5[0] = g_repositionGfiOpportunity;
+    out5[1] = g_repositionGfiGranted;
+    out5[2] = g_repositionGfiTooRisky;
+    out5[3] = g_repositionGfiReached;
+    out5[4] = g_repositionGfiTurnover;
+    g_repositionGfiOpportunity = g_repositionGfiGranted = g_repositionGfiTooRisky
+        = g_repositionGfiReached = g_repositionGfiTurnover = 0;
 }
 
 void setStandUpEscapeArm(TeamSide side, bool on) {
@@ -3152,6 +3160,15 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
 
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
                      maxSteps, avoid);
+
+    // 09.09.2026: mechanismova metrika W-GFI -- jen z pripadu, kdy arm GFI
+    // skutecne POVOLIL (ne kdy jen mel prilezitost), zjisti se, jestli krok
+    // navic dovedl hrace na cil, nebo skoncil turnoverem (GFI padlo).
+    if (localGfiAllowance > 0) {
+        if (result.turnover) ++g_repositionGfiTurnover;
+        else if (state.getPlayer(macro.playerId).position == macro.targetPos)
+            ++g_repositionGfiReached;
+    }
 
     if (q3WasProne && result.turnover) {
         if (q3Leaving) {
