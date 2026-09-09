@@ -929,18 +929,34 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     //   zadna kolize s akcemi ostatnich, takze se da ocenit dopredne po krocich.
     //   Do dneska tudy prochazela hola pravdepodobnost, takze skaven/elf s Dodge
     //   se do vyberu blitzujiciho hlasil PRESNE TAK RIZIKOVE jako trpaslik bez ni.
-    // ⛔ Neni to uzavreny vzorec, je to DOPREDNY PRUCHOD: reroll se utrati na
-    //   PRVNIM kroku, kde je pripustny (souper s Tackle ho na svem poli rusi,
-    //   r. 8566-8571), a dal uz neni k dispozici.
-    // ⚠️ A je to ZAMERNE KONZERVATIVNI ODHAD, ne presna cena. Ve skutecnosti
-    //   reroll prezije dodge, ktery vyjde uz prirozene, takze by byl porad k
-    //   dispozici i o krok dal; tenhle pruchod ho odepise na prvnim pripustnem
-    //   kroku bez ohledu na vysledek. Presna varianta je uzavreny tvar z
-    //   `task_queue.md` M6·B3(a) -- Pi(1-p_i)*(1+Sum p_i) -- ktery ale plati jen
-    //   pro NEZAVISLE kroky se stalym poctem tacklezon; tady se cesta i zony
-    //   meni krok po kroku. ⇒ Riziko se tim spis NADHODNOTI nez podhodnoti,
-    //   a to je u vyberu blitzu bezpecny smer. Nezamenovat ty dva vzorce.
-    bool rerollAvailable = mover.hasSkill(SkillName::Dodge);
+    //
+    // ⛔⛔ REROLL SE UTRATI AZ ZA SELHANY HOD, NE ZA PRILEZITOST K NEMU.
+    //   Prvni verze teto opravy (09.09., pred korekci) odepsala pravo na reroll
+    //   na PRVNIM pripustnem kroku bez ohledu na vysledek. To je spatne: dodge,
+    //   ktery vyjde uz prirozene, dovednost NEspotrebuje a reroll je dal k
+    //   dispozici pro pozdejsi dodge v teze ceste. Cesta se dvema dodgi se tim
+    //   ocenovala DRAZ, nez je.
+    // ⇒ Proto DVOUSTAVOVY DOPREDNY PRUCHOD, ne jeden skalar:
+    //     R = P(vsechny dosavadni dodge vysly PRIROZENE, reroll netknuty)
+    //     S = P(vsechny dosavadni dodge vysly, ale reroll uz je pryc)
+    //   Krok s prirozenou pst. selhani `p` (q = 1-p) a pripustnosti `e`
+    //   (`e` = soused s Tackle tady reroll NErusi, r. 8566-8571 -- je to
+    //   geometricky fakt o poli, nezavisly na tom, jestli reroll jeste je):
+    //     e:  S' = R*p*q + S*q ;  R' = R*q      (z R se da selhat a rerollem se
+    //                                            zachranit -> reroll se utrati)
+    //     !e: S' = S*q         ;  R' = R*q      (dovednost se tu pouzit nesmi)
+    //   Na konci je P(cesta prosla bez dodge-selhani) = R + S.
+    // ⭐ Pro cestu, kde je `e` vsude true, se to redukuje presne na uzavreny
+    //   tvar z `task_queue.md` M6·B3(a): Pi(1-p_i) * (1 + Sum p_i). Tenhle
+    //   pruchod je jeho zobecneni -- zvlada i to, ze Tackle rusi dovednost jen
+    //   na NEKTERYCH polich cesty, coz uzavreny tvar neumi. Test to overuje.
+    // ⚠️ Hrac BEZ dovednosti jde puvodni vetvi (jeden skalar, zadny reroll),
+    //   aby se jeho cena nezmenila ani o ULP -- na te je postavena nasazena
+    //   cesta M14b. Matematicky by dvoustavovy pruchod dal totez (S zustane 0,
+    //   R = Pi q_i), takze to nejsou dva vzorce, jen dve vetve jednoho.
+    const bool hasDodge = mover.hasSkill(SkillName::Dodge);
+    double rerollLive = 1.0;   // R
+    double rerollGone = 0.0;   // S
 
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
         Position next = pickApproachStep(state, mover, cur, target);
@@ -949,12 +965,17 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
         if (countTacklezones(state, cur, mover.teamSide) > 0) {
             int dodgeTarget = calculateDodgeTarget(state, mover, next, cur);
             double dodgeFail = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
-            if (rerollAvailable && !tackleNegatesDodgeReroll(state, mover, cur)) {
-                // Selhat musi PRIROZENY hod I reroll.
-                dodgeFail *= dodgeFail;
-                rerollAvailable = false;   // pravo na reroll je tim vycerpane
+            if (!hasDodge) {
+                failChance += dodgeFail * (1.0 - failChance);
+            } else {
+                const double q = 1.0 - dodgeFail;
+                if (!tackleNegatesDodgeReroll(state, mover, cur)) {
+                    rerollGone = rerollLive * dodgeFail * q + rerollGone * q;
+                } else {
+                    rerollGone = rerollGone * q;
+                }
+                rerollLive = rerollLive * q;   // az PO S, ktere stare R potrebuje
             }
-            failChance += dodgeFail * (1.0 - failChance);
         }
         if (moveLeft <= 0) {
             failChance += (1.0 / 6.0) * (1.0 - failChance);
@@ -963,7 +984,11 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
         cur = next;
         if (landingOut) *landingOut = cur;
     }
-    return failChance;
+    // Bez dovednosti uz `failChance` nese oboji (dodge i GFI) jako driv.
+    // S dovednosti nese jen GFI a dodge cast se pripoji stejnou OR-kombinaci:
+    // prezit = P(dodge OK) * P(GFI OK).
+    if (!hasDodge) return failChance;
+    return 1.0 - (rerollLive + rerollGone) * (1.0 - failChance);
 }
 
 // Combined estimate used to rank blitzer candidates for a fixed target:

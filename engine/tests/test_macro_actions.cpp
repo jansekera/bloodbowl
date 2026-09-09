@@ -3133,6 +3133,107 @@ TEST(BlitzApproachRisk, TackleNextToTheMoverNegatesTheDodgeDiscount) {
         << "Tackle u opouštěného pole slevu za Dodge nezrušil";
 }
 
+// ---------------------------------------------------------------------------
+// ⛔⛔ KOREKCE (09.09.2026): REROLL SE UTRATÍ AŽ ZA SELHANÝ HOD.
+//
+// První verze opravy odepsala právo na reroll na PRVNÍM přípustném kroku bez
+// ohledu na výsledek. Jenže dodge, který vyjde už přirozeně, dovednost
+// NESPOTŘEBUJE — reroll zůstává pro pozdější dodge v téže cestě. Cesta se
+// DVĚMA dodgi se tím oceňovala dráž, než je. Tenhle blok tu vadu hlídá; s
+// jedním dodgem ji chytit NELZE, tam obě verze dávají totéž.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Cesta se TŘEMI dodge kroky. HOME AG3 na {8,7} běží na soupeře na {13,7},
+// mezi tím koridor značek na {9,6} a {9,8}.
+// ⚠️ Cesta NENÍ přímka: `pickApproachStep` penalizuje tacklezóny na cílovém
+//    poli, takže sama uhýbá. Skutečný průběh byl ZMĚŘEN, ne odhadnut:
+//      {8,7}->{9,7}  cíl 5+  p1 = 4/6 = 2/3
+//      {9,7}->{10,6} cíl 4+  p2 = 3/6 = 1/2
+//      {10,6}->{11,5} cíl 3+ p3 = 2/6 = 1/3
+//      {11,5}->{12,6} volné, konec (MA6 ⇒ žádné GFI)
+// Značka {9,8} sousedí s výchozími poli 1. a 2. kroku, ale NE s {10,6}
+// ⇒ když dostane Tackle, zruší dovednost jen na PRVNÍCH DVOU krocích.
+GameState makeThreeDodgeApproachState(bool moverHasDodge, bool farMarkerHasTackle) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    auto mk = [&](int id, TeamSide side, Position pos) -> Player& {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        return p;
+    };
+    Player& mover = mk(1, TeamSide::HOME, {8, 7});
+    if (moverHasDodge) mover.skills.add(SkillName::Dodge);
+    mk(11, TeamSide::AWAY, {9, 6});
+    Player& far = mk(13, TeamSide::AWAY, {9, 8});
+    if (farMarkerHasTackle) far.skills.add(SkillName::Tackle);
+    mk(12, TeamSide::AWAY, {13, 7});
+    return s;
+}
+
+} // namespace
+
+TEST(BlitzApproachRisk, DodgeRerollSurvivesADodgeThatSucceedsNaturally) {
+    GameState plain = makeThreeDodgeApproachState(/*moverHasDodge=*/false, false);
+    GameState dodgy = makeThreeDodgeApproachState(/*moverHasDodge=*/true,  false);
+    const double rPlain = blitzApproachRiskForTest(plain, plain.getPlayer(1),
+                                                   plain.getPlayer(12));
+    const double rDodge = blitzApproachRiskForTest(dodgy, dodgy.getPlayer(1),
+                                                   dodgy.getPlayer(12));
+
+    const double p1 = 2.0 / 3.0, p2 = 1.0 / 2.0, p3 = 1.0 / 3.0;
+    const double q1 = 1 - p1, q2 = 1 - p2, q3 = 1 - p3;
+
+    // ⭐ POZITIVNÍ KONTROLA FIXTURY: kdyby cesta neměla PRÁVĚ TYHLE tři dodge
+    //   kroky, měřil by test něco jiného, než o čem si myslí, že to měří.
+    //   Bez dovednosti = 1 - Π(1-p_i) = 1 - 1/9 = 8/9.
+    ASSERT_NEAR(rPlain, 1.0 - q1 * q2 * q3, 1e-12)
+        << "fixtura nemá tři očekávané dodge kroky -- test neměří, co tvrdí";
+
+    // ⭐ REDUKCE NA UZAVŘENÝ TVAR: když je reroll přípustný na VŠECH krocích,
+    //   dvoustavový průchod musí dát přesně Π(1-p_i)·(1+Σp_i) = 5/18.
+    //   (Uzavřený tvar z `task_queue.md` M6·B3(a) -- tady ověřený, ne převzatý.)
+    const double exactSurvive = q1 * q2 * q3 * (1.0 + p1 + p2 + p3);
+    EXPECT_NEAR(rDodge, 1.0 - exactSurvive, 1e-12)
+        << "dvoustavový průchod nesedí na uzavřený tvar Π(1-p_i)*(1+Σp_i)";
+    EXPECT_NEAR(rDodge, 13.0 / 18.0, 1e-12);
+
+    // ⛔ A TOHLE JE TA VADA, kvůli které blok vznikl: stará verze utratila
+    //   reroll hned na PRVNÍM přípustném kroku bez ohledu na výsledek, takže
+    //   zbylé dva dodge platily plnou cenu ⇒ (1-p1²)(1-p2)(1-p3) ⇒ 22/27.
+    const double oldWrongFail = 1.0 - (1.0 - p1 * p1) * q2 * q3;
+    EXPECT_NEAR(oldWrongFail, 22.0 / 27.0, 1e-12);
+    EXPECT_GT(std::abs(rDodge - oldWrongFail), 0.05)
+        << "cena vyšla jako u staré verze -- reroll se pořád utrácí za "
+           "příležitost místo za selhaný hod";
+    EXPECT_LT(rDodge, rPlain);
+}
+
+TEST(BlitzApproachRisk, TackleNegatesTheRerollPerSquareNotForTheWholePath) {
+    // Značka s Tackle drží tacklezónu nad výchozím polem 1. a 2. kroku, ale
+    // NE nad {10,6}. Dovednost je tedy zakázaná na prvních dvou krocích a
+    // přípustná na třetím ⇒ cena musí ležet MEZI holou cenou a plnou slevou.
+    GameState plain = makeThreeDodgeApproachState(/*moverHasDodge=*/false, true);
+    GameState dodgy = makeThreeDodgeApproachState(/*moverHasDodge=*/true,  true);
+    const double rPlain = blitzApproachRiskForTest(plain, plain.getPlayer(1),
+                                                   plain.getPlayer(12));
+    const double rDodge = blitzApproachRiskForTest(dodgy, dodgy.getPlayer(1),
+                                                   dodgy.getPlayer(12));
+
+    ASSERT_NEAR(rPlain, 8.0 / 9.0, 1e-12)
+        << "fixtura nemá tři očekávané dodge kroky -- test neměří, co tvrdí";
+
+    // R,S průchod s e = [ne, ne, ano] ⇒ přežití 4/27 ⇒ riziko 23/27.
+    EXPECT_NEAR(rDodge, 23.0 / 27.0, 1e-12)
+        << "Tackle se neuplatnil PO POLÍCH -- buď ruší moc, nebo málo";
+    // ⭐ Přísně mezi: kdyby se Tackle bral jako vlastnost celé cesty, vyšlo by
+    //   buď 8/9 (ruší všude) nebo 13/18 (neruší nikde). Ani jedno.
+    EXPECT_LT(rDodge, rPlain) << "třetí krok slevu dostat měl";
+    EXPECT_GT(rDodge, 13.0 / 18.0) << "první dva kroky slevu dostat NEMĚLY";
+}
+
 namespace {
 
 // Ležící HOME hráč u soupeře + `mates` stojících spoluhráčů, kteří ještě nešli.
