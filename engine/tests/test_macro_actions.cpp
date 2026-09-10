@@ -3713,10 +3713,26 @@ bool k5RetreatOffered(const std::vector<Macro>& macros, int playerId, Position t
 }  // namespace
 
 // ⛔⛔⛔ TOHLE JE TA FIXTURE-KONTROLA, BEZ KTERE SE TESTY NIZE NEDAJI CIST:
-//   tvrdi, CO fixture skutecne postavila, a hlavne uchovava MERENY NALEZ,
-//   kvuli kteremu ma K5 cena dva cleny.
-TEST(MacroActions, K5FixtureBuildsTheGeometryWeThinkAndPathFailProbMissesTheEscapeDodge) {
-    // AG -> cil dodge pri VYSTUPU z kontaktu (6-AG, cilove pole bez TZ).
+//   tvrdi, CO fixture skutecne postavila, a hlavne je to REGRESNI ZAMEK na
+//   opravu vystupni brany dodge (10.09.2026).
+//
+// ⭐ HISTORIE TOHOTO TESTU (drzet, jinak se z nej stane bezobsazna kontrola):
+//   Do 10.09. dopoledne se jmenoval
+//   `K5FixtureBuildsTheGeometryWeThinkAndPathFailProbMissesTheEscapeDodge`
+//   a jeho jadrem bylo `EXPECT_DOUBLE_EQ(pPath, 0.0)` -- tedy DOKUMENTACE
+//   VADY: `pathFailProb` uctovala dodge pri VSTUPU do tacklezony, takze na
+//   ustupu z kontaktu (cilove pole je z definice mimo VSECHNY tacklezony)
+//   neuctovala nic. Kvuli tomu mela cena K5 druhy, vlastni clen `pEscape`.
+//   Brana je opravena (pathfinder.cpp, oba gaty na OPOUSTENE pole,
+//   rules_bb2016.txt r. 480-486), `pEscape` je pryc a test je prepsany do
+//   POZITIVNIHO tvrzeni: `pathFailProb` SAMA musi vratit presne to, co
+//   implikuje cil resolverova hodu.
+// ⛔ NEMAZAT. Az tenhle EXPECT spadne, brana se vratila na vstupni pole
+//   a cena K5 je zpatky dekorace (0 * cokoli < 1 plati vzdy).
+TEST(MacroActions, K5PathFailProbAlonePricesTheEscapeDodge) {
+    // AG -> cil dodge pri VYSTUPU z kontaktu. Cil = 6 - AG + TZ(CILOVE pole)
+    // (`calculateDodgeTarget`, r. 503-505), a ustupove pole ma TZ = 0, takze
+    // vychazi hole 6 - AG: AG1 -> 5+, AG2 -> 4+, AG3 -> 3+, AG4 -> 2+.
     const std::pair<int,int> agToTarget[] = {{1,5},{2,4},{3,3},{4,2}};
     for (const auto& kv : agToTarget) {
         GameState s = makeCarrierRetreatState(/*mates=*/1, /*carrierAg=*/kv.first);
@@ -3743,21 +3759,49 @@ TEST(MacroActions, K5FixtureBuildsTheGeometryWeThinkAndPathFailProbMissesTheEsca
         // (c) Pocet spoluhracu, kteri jeste nesli = jmenovatel Q3 ceny.
         ASSERT_EQ(k5MatesStillToAct(s, 1), 1);
 
-        // (d) ⛔⛔ MERENY NALEZ (10.09.2026): `pathFailProb` na tomhle ustupu
-        //   vraci PRESNE 0 pro KAZDE AG, protoze uctuje dodge pri VSTUPU do
-        //   tacklezony (pathfinder.cpp:191), zatimco resolver ho hodi pri
-        //   VYSTUPU (move_handler.cpp:127). Proto ma K5 cena druhy clen.
-        //   ⇒ Kdyz tenhle EXPECT jednou spadne, `pathFailProb` byla opravena
-        //     a K5 cena se MUSI prepocitat (jinak by dvojity clen preplacel).
+        // (d) Cil hodu, ktery resolver na tomhle ustupu SKUTECNE hodi.
+        ASSERT_EQ(calculateDodgeTarget(s, c, r, c.position), kv.second)
+            << "AG " << kv.first << ": cil vystupniho dodge";
+
+        // (e) ⭐⭐⭐ JADRO TESTU: `pathFailProb` SAMA uctuje vystupni dodge,
+        //   a to PRESNE tou hodnotou, kterou implikuje cil z (d).
+        //   Jeden krok, MA5 ⇒ zadne GFI, takze cislo je cista dodge cast:
+        //     P_fail = (cil - 1)/6 ⇒ AG1 4/6 · AG2 3/6 · AG3 2/6 · AG4 1/6.
+        //   ⛔ Do 10.09. tu bylo 0,0 pro vsechna AG (vstupni brana) -- a to je
+        //     hodnota, na kterou se to vratit NESMI: ustupove pole ma podle
+        //     (b) TZ = 0, takze KAZDA nenulova cena tady je dukaz, ze brana
+        //     stoji na OPOUSTENEM poli, presne jak zada r. 480-486.
         const double pPath = pathFailProb(s, c, r, c.movementRemaining,
                                           Position{-1, -1});
-        EXPECT_DOUBLE_EQ(pPath, 0.0)
-            << "AG " << kv.first << ": pathFailProb SAMA ustup z kontaktu "
-               "neuctuje -- kdyby uz uctovala, K5 cena se preplaci dvakrat";
+        EXPECT_DOUBLE_EQ(pPath, (kv.second - 1) / 6.0)
+            << "AG " << kv.first << ": pathFailProb SAMA neoceni vystup "
+               "z kontaktu tak, jak ho hodi resolver (cil " << kv.second
+            << "+). Nula tady = brana se vratila na VSTUPNI pole a cena K5 "
+               "je zpatky dekorace";
+        EXPECT_GT(pPath, 0.0)
+            << "AG " << kv.first << ": ustup z tacklezony je zdarma -- to je "
+               "presne ta vada, kvuli ktere existoval `pEscape`";
 
-        // (e) A tohle je ten hod, ktery se SKUTECNE hodi -- druhy clen ceny.
-        EXPECT_EQ(calculateDodgeTarget(s, c, r, c.position), kv.second)
-            << "AG " << kv.first << ": cil vystupniho dodge";
+        // (f) A tentyz ustup s dovednosti Dodge (a bez souseda s Tackle):
+        //   jediny pripustny dodge ⇒ exaktni dvoustavovy pruchod da preziti
+        //   q*(1+p) = 1 - p², tedy P_fail = p². Pro AG2 to je pravé ta dvojice
+        //   0,5 -> 0,25; K5 uz to nepocita sama, pocita to `pathFailProb`.
+        // ⚠️ TOLERANCE, NE `DOUBLE_EQ`: funkce pocita `1 - (q + p*q)`, coz je
+        //   ALGEBRAICKY p², ale v jinem poradi operaci ⇒ u AG4 se to lisi
+        //   v poslednich bitech (0,027777777777777679 proti
+        //   0,027777777777777776, tedy pres 4 ULP, ktere `DOUBLE_EQ` pusti).
+        //   1e-12 je taz tolerance, jakou pouzivaji testy v test_pathfinder.cpp.
+        GameState d = makeCarrierRetreatState(/*mates=*/1, /*carrierAg=*/kv.first);
+        d.getPlayer(1).skills.add(SkillName::Dodge);
+        ASSERT_FALSE(tackleNegatesDodgeReroll(d, d.getPlayer(1),
+                                              d.getPlayer(1).position))
+            << "soused s Tackle by reroll zrusil -- fixtura by merila neco jineho";
+        const double p = (kv.second - 1) / 6.0;
+        EXPECT_NEAR(pathFailProb(d, d.getPlayer(1), r,
+                                 d.getPlayer(1).movementRemaining,
+                                 Position{-1, -1}), p * p, 1e-12)
+            << "AG " << kv.first << ": reroll z Dodge se do ceny vystupu "
+               "nedostal (ceka se p² = " << (p * p) << ")";
     }
 }
 

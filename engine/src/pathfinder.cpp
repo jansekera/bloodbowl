@@ -188,7 +188,29 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
             const int nStep = steps[cur] + 1;
             int risk = 0;
             int nLayer = curLayer;
-            if (countTacklezones(state, np, player.teamSide) > 0) {
+            // ⛔⛔⛔ OPRAVA 10.09.2026: DODGE SE HAZI PRI VYSTUPU, NE PRI VSTUPU.
+            //   Do dneska tu stalo `countTacklezones(state, np, ...)`, tedy
+            //   brana na CILOVEM poli. Pravidla (rules_bb2016.txt r. 480-486)
+            //   rikaji opak, a doslova:
+            //     „In order to LEAVE a square that is in one or more opposing
+            //      tackle zones, a player must dodge out of the square... you
+            //      must ALWAYS make a Dodge roll when you leave a tackle zone;
+            //      EVEN IF there aren't any tackle zones on the square you are
+            //      moving to."
+            //   ⇒ Brana je pole, ktere se OPOUSTI (`curPos`). Obtiznost se
+            //     naopak bere z CILE (r. 503-505: „Per opposing tackle zone on
+            //     the square that the player is dodging to +1") -- a to
+            //     `calculateDodgeTarget(dest=np, source=curPos)` uz delalo
+            //     spravne, takze se nemeni.
+            // ⭐ NALEZENO pres K5: `pathFailProb` vracela pro ustup z kontaktu
+            //   PRESNE 0,0000 pro AG 1..4, pritom resolver hazi 5+ az 2+ --
+            //   protoze ustupove pole je z definice mimo vsechny tacklezony,
+            //   takze „vstupni" brana na nem neuctovala NIC.
+            //   ⇒ Model pod-ocenoval UTEKY a pre-ocenoval PRIBLIZENI.
+            // ⚠️ Meni to nasazenou cestu M14b, ale je to PRAVIDLOVA oprava
+            //   (FRONTA A: „vady prubezne, bez ohledu na deltu"), ne taktika.
+            //   `estimateApproachFailChance` uz to melo spravne (`cur`).
+            if (countTacklezones(state, curPos, player.teamSide) > 0) {
                 // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
                 // takze P_fail sama od sebe padne do [1/6, 5/6].
                 const int dodgeTarget =
@@ -525,7 +547,9 @@ double pathFailProb(const GameState& state, const Player& player,
         const int nSq = chain[i] % GRID_SIZE;
         Position np{static_cast<int8_t>(nSq % GRID_W),
                     static_cast<int8_t>(nSq / GRID_W)};
-        if (countTacklezones(state, np, player.teamSide) > 0) {
+        // ⛔ Taz oprava jako v `riskWeightedDijkstra` vyse (r. 480-486):
+        //   brana je pole, ktere se OPOUSTI (`cur`), ne cilove (`np`).
+        if (countTacklezones(state, cur, player.teamSide) > 0) {
             const int dodgeTarget = calculateDodgeTarget(state, player, np, cur);
             const double pFail = (dodgeTarget - 1) / 6.0;
             if (!hasDodge) {

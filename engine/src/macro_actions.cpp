@@ -1534,59 +1534,56 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         if (best.x >= 0) {
             if (isCarrier) {
                 // ============================================================
-                // ⛔⛔⛔ K5 CENA MA DVA CLENY, A JE TO MERENY NALEZ, NE VOLBA.
+                // ⭐⭐⭐ K5 CENA MA JEDEN CLEN: `pathFailProb`. TENHLE ODSTAVEC
+                //   JE HISTORIE -- proc mela dva a proc uz nema.
                 //
-                // `pathFailProb` SAMA vraci pro ustup z kontaktu PRESNE 0,0000
-                //   -- zmereno sondou `K5ProbeWhatTheFixtureActuallyBuilt`
-                //   (test_macro_actions.cpp) pro AG 1,2,3,4: vsude 0,0000,
-                //   pritom resolver hodi dodge s cilem 5+ (AG1) az 2+ (AG4).
-                // ⭐ PRICINA: `riskWeightedDijkstra`/`pathFailProb` uctuji
-                //   dodge, kdyz se do tacklezony VSTUPUJE (`np`,
-                //   pathfinder.cpp:191), ale pravidla a resolver ho uctuji pri
-                //   VYSTUPU z ni (`from`, move_handler.cpp:127) -- tak to dela
-                //   i `estimateApproachFailChance` (`cur`, r. ~1030). Ustupove
-                //   pole je z DEFINICE mimo vsechny tacklezony, takze
-                //   „vstupni" model na nem neuctuje NIC.
-                // ⇒ Kdyby se cena nechala jen na `pathFailProb`, byla by to
-                //   DEKORACE: 0 * cokoli < 1 plati vzdy a nabidka by se nikdy
-                //   nezamitla. Presne ta chybejici polozka je ta, ktera stoji
-                //   mic.
-                // ⚠️ NEOPRAVUJE SE TU `pathFailProb`: je NASAZENA a ZMERENA
-                //   pod W-GFI (09.09.), takze zmena jejich cisel je samostatna
-                //   polozka, ne vedlejsi efekt K5.
-                //
-                // ⭐ Chybejici clen se necini novym vzorcem -- bere se TENTYZ,
-                //   jaky uz ma Q3 utek (r. ~1250): cil z `calculateDodgeTarget`
-                //   od hracova VLASTNIHO pole, a reroll dovednosti Dodge jako
-                //   umocneni, kdyz ho soused s Tackle nerusi. Oba cleny se
-                //   spoji jako NEZAVISLE udalosti -- tyz model, jaky
-                //   `pathFailProb` pouziva sama pro dodge a GFI.
-                // ⚠️ ZNAMY SMER DRUHE CHYBY: kdyz je ustup na VIC krok a prvni
-                //   krok dosedne DO tacklezony, uctuje se ten jeden krok
-                //   dvakrat (tady jako vystup, v `pathFailProb` jako vstup)
-                //   ⇒ cena se PREPLATI a nabidka se zamitne casteji. Smer je
-                //   konzervativni; velikost nikdo nemeril (hypoteza, ne mereni).
+                // 10.09.2026 dopoledne tu stal DRUHY clen `pEscape` (vlastni
+                //   dodge z `calculateDodgeTarget` od hracova pole, umocneny
+                //   pri Dodge bez Tackle) spojeny s `pathFailProb` jako
+                //   nezavisla udalost. Nebyl to model, byla to NAHRADA ZA
+                //   VADU: `pathFailProb` vracela pro ustup z kontaktu PRESNE
+                //   0,0000 pro AG 1..4 (zmereno sondou, test_macro_actions.cpp),
+                //   pritom resolver hazi 5+ (AG1) az 2+ (AG4). Bez druheho
+                //   clenu by cena byla DEKORACE: 0 * cokoli < 1 plati vzdy.
+                // ⭐ PRICINA vady: `riskWeightedDijkstra`/`pathFailProb`
+                //   uctovaly dodge pri VSTUPU do tacklezony, ale pravidla ho
+                //   uctuji pri VYSTUPU z ni (rules_bb2016.txt r. 480-486:
+                //   „In order to LEAVE a square that is in one or more
+                //   opposing tackle zones, a player must dodge out of the
+                //   square ... EVEN IF there aren't any tackle zones on the
+                //   square you are moving to."). Ustupove pole je z DEFINICE
+                //   mimo vsechny tacklezony, takze „vstupni" brana na nem
+                //   neuctovala NIC. Obtiznost se naopak bere z CILE
+                //   (r. 503-505) a to `calculateDodgeTarget` uz delala dobre.
+                // ⛔⛔⛔ BRANA JE OPRAVENA (10.09.2026, pathfinder.cpp -- oba
+                //   gaty prehozene na OPOUSTENE pole) A NAHRADA JE TIM PRYC.
+                //   Vynutila si to prave ta vada, na kterou sama upozornovala:
+                //   varovala, ze pri VICEKROKOVEM ustupu, jehoz prvni krok
+                //   dosedne do tacklezony, se ten krok uctuje DVAKRAT (tady
+                //   jako vystup, v `pathFailProb` jako vstup). Po oprave uz to
+                //   neni hranicni pripad, ale SYSTEMATICKY dvojity zapocet:
+                //   prvni krok `pathFailProb` uctuje dodge z hracova
+                //   VLASTNIHO pole -- presne to, co uctoval `pEscape`.
+                // ⇒ Zustava JEDEN clen a Q3-tvar zamitnuti (nize):
+                //   `pFail * teammatesStillToAct >= 1.0` ⇒ nenabizet.
+                // ⭐ Cislo je zamerne SHODNE s resolverem: pro jednokrokovy
+                //   ustup na ciste pole vrati `pathFailProb` presne
+                //   (`calculateDodgeTarget` - 1)/6, a s dovednosti Dodge bez
+                //   Tackle jeji kvadrat. Hlida to test
+                //   `K5PathFailProbAlonePricesTheEscapeDodge`, ktery je
+                //   prepsanou verzi te puvodni sondy na vadu.
                 // ============================================================
-                Position firstStep{-1, -1};
-                if (!nextStepToward(state, p, best, reach, Position{-1, -1},
-                                    firstStep)) {
-                    return;   // chuze by se nikam nedostala -- neni co nabizet
-                }
-                const int dodgeTarget =
-                    calculateDodgeTarget(state, p, firstStep, p.position);
-                double pEscape = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
-                if (p.hasSkill(SkillName::Dodge) &&
-                    !tackleNegatesDodgeReroll(state, p, p.position)) {
-                    pEscape *= pEscape;
-                }
                 // Rozpocet BEZ GFI, zadne blokovane pole (nosic mic DRZI,
                 // takze na hristi zadny volny mic k obchazeni neni).
-                const double pPath = pathFailProb(state, p, best, reach,
+                const double pFail = pathFailProb(state, p, best, reach,
                                                   Position{-1, -1});
-                // pPath < 0: cil neni dosazitelny na cisty pohyb ⇒ nedá se
-                // ocenit, tedy se ani nenabizi (GFI by z hygieny udelal hazard).
-                if (pPath < 0.0) return;
-                const double pFail = 1.0 - (1.0 - pEscape) * (1.0 - pPath);
+                // pFail < 0: cil neni dosazitelny na cisty pohyb ⇒ neda se
+                // ocenit, tedy se ani nenabizi (GFI by z hygieny udelal
+                // hazard). ⭐ Tahle podminka POHLTILA drivejsi ranou kontrolu
+                // `nextStepToward`: `pathFailProb >= 0` znamena, ze cil sam je
+                // v rozpoctu dosazitelny, a pak k nemu prvni krok existuje
+                // vzdy -- `nextStepToward` je z obou podminek ta slabsi.
+                if (pFail < 0.0) return;
 
                 const int remaining = teammatesStillToAct(state, p.id, mySide);
                 if (pFail * remaining >= 1.0) return;

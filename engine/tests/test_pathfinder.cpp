@@ -44,6 +44,13 @@ constexpr Position kNoBlock{-1, -1};
 // `tackleMarkerId`: 0 = zadny Tackle · 11 = znacka {6,1}, ktera SOUSEDI se
 // vsemi tremi opoustenymi poli {5,0},{6,0},{7,0} ⇒ rusi reroll VSUDE ·
 // 12 = znacka {8,1}, ktera sousedi jen s {7,0} ⇒ rusi ho jen na TRETIM kroku.
+// ⚠️ POZOR PRI CTENI: tenhle koridor je NA BRANE NEZAVISLY, a proto opravu
+//   vystupni brany (10.09.2026) NEPREZIL jako dukaz, ale jako shoda. Vstupni
+//   model by dodge uctoval na cilech {6,0},{7,0},{8,0} (TZ 1,2,1), vystupni
+//   ho uctuje na opoustenych {5,0},{6,0},{7,0} (TZ 1,1,2) -- v OBOU pripadech
+//   tri dodge kroky a obtiznost se v obou bere z cile, takze p1,p2,p3 jsou
+//   totozne. ⇒ Z toho, ze tenhle test prosel pred i po oprave, NEPLYNE nic
+//   o tom, ktera brana je spravna; to hlida fixtura 2 a K5 sonda.
 GameState makeThreeDodgeCorridor(bool moverHasDodge, int tackleMarkerId = 0) {
     GameState s;
     s.phase = GamePhase::PLAY;
@@ -58,33 +65,88 @@ GameState makeThreeDodgeCorridor(bool moverHasDodge, int tackleMarkerId = 0) {
 
 // ---------------------------------------------------------------------------
 // FIXTURA 2 -- ZKRATKA PROTI OBCHAZCE (pro VYBER cesty v Dijkstre).
-// HOME AG4 MA6 na {5,9}, cil {9,5} -- diagonala, Chebyshev 4, takze
-// 4-krokova cesta je JEDINA a vede {6,8},{7,7},{8,6},{9,5}. AWAY znacka na
-// {7,9} da tacklezonu PRESNE na {6,8} a na nic dalsiho z te diagonaly.
-//   zkratka  4 pole + 1 dodge na {6,8}, TZ 1, AG4 ⇒ cil 3+, p = 2/6 = 1/3
-//   obchazka 5 poli BEZ dodge:  {5,8},{6,7},{7,6},{8,6},{9,5}
-// Ceny v jednotkach klice (1 pole = 100, riziko = p*4*100, +1 za diagonalu):
+//
+// ⛔⛔ PREPOCITANA 10.09.2026 PO OPRAVE VYSTUPNI BRANY. Dodge se uctuje pri
+//   OPUSTENI pole v tacklezone (rules_bb2016.txt r. 480-486), obtiznost se
+//   bere z CILE (r. 503-505). Stara podoba fixtury (mover AG4 + druha znacka
+//   s Tackle na {4,10}) merila vstupni branu a po oprave uz nemerila, co
+//   tvrdila -- viz odduvodneni u obou zmen nize.
+//
+// HOME AG3 MA6 na {5,9}, cil {9,5} -- diagonala, Chebyshev 4, takze
+// 4-krokova cesta je JEDINA (kazdy krok musi ubrat dx i dy) a vede
+// {6,8},{7,7},{8,6},{9,5}. AWAY znacka na {7,9} da tacklezonu PRESNE na
+// {6,8} a na nic dalsiho z te diagonaly ani z obchazky.
+//   zkratka: OPUSTENI {6,8} (TZ 1) je jediny dodge; cil kroku je {7,7},
+//            ktere ma TZ 0 ⇒ cil = 6 - AG3 + 0 = 3+, p = 2/6 = 1/3.
+//            ⭐ Vlastni pole {5,9} ma TZ 0 (od {7,9} je vzdaleno 2), takze
+//              PRVNI krok je zdarma pro OBE cesty -- kdyby nebyl, obe by
+//              platily totez a rozdil by se nemeril.
+//   obchazka: 5 poli BEZ jednoho dodge: {5,8},{6,7},{7,6},{8,6},{9,5} --
+//            zadne z opoustenych poli neni v tacklezone.
+// Ceny v jednotkach klice (1 pole = 100, riziko = p*4*100, +1 za diagonalu;
+// obchazka ma 3 diagonaly, zkratka 4):
 //   zkratka  bez Dodge  400 + 133 + 4 = 537 · s Dodge  400 + 44 + 4 = 448
 //   obchazka             500 + 3 = 503
 // ⇒ bez dovednosti vyhraje OBCHAZKA (503 < 537), s dovednosti ZKRATKA
 //   (448 < 503). Prvni krok se tim lisi: {5,8} proti {6,8}.
-// `tackleMarker` = druha AWAY znacka na {4,10}, tedy SOUSED OPOUSTENEHO
-// pole {5,9}: rusi reroll na tom kroku (r. 8566-8571) a rozdil MA ZMIZET.
-// ⚠️ {4,10} je zvolene tak, aby jeji tacklezona NEsahala ani na {5,8}
-//   (obchazka), ani na {6,8} (zkratka) -- jinak by test meril zdrazeni
-//   obchazky, ne zruseni rerollu.
-GameState makeShortcutVsDetour(bool moverHasDodge, bool withTackleMarker) {
+// ⭐ AG3 (drive AG4) je JEDINA zmena cisel: pri vystupni brane je cilem kroku
+//   {7,7} s TZ 0, ne {6,8} s TZ 1, takze se o tu jednu tacklezonu musi
+//   dorovnat obratnosti. Cena 537/448/503 je tim PRESNE tataz jako drive --
+//   fixtura meri totez, jen z pravidlove spravneho duvodu.
+//
+// `markerHasTackle` = dovednost Tackle pro znacku na {7,9}. ⭐ Je to TATAZ
+//   znacka, ktera tacklezonu na {6,8} vyroba: pri vystupni brane je
+//   opoustene pole {6,8} a znacka na {7,9} je jeho SOUSED, takze reroll rusi
+//   presne na tom kroku (r. 8566-8571) a rozdil MA ZMIZET.
+// ⚠️ Drive tu byla samostatna znacka na {4,10} -- soused pole {5,9}, protoze
+//   pri vstupni brane byl gate na {6,8}, ale kontrola Tackle na {5,9}.
+//   Po oprave je oboji {6,8} a samostatna znacka uz nejde postavit: KAZDY
+//   soused pole {6,8} bud lezi na jedne z cest, nebo pridava tacklezonu na
+//   {5,9}/{5,8}/{6,7}/{7,7}, cimz by zdrazil kroky mimo mereny jev (overeno
+//   vycerpanim vsech osmi sousedu). Tackle na uz stojici znacce nemeni ANI
+//   JEDNU tacklezonu, takze cena obou cest zustava 537/448/503.
+GameState makeShortcutVsDetour(bool moverHasDodge, bool markerHasTackle) {
     GameState s;
     s.phase = GamePhase::PLAY;
     s.activeTeam = TeamSide::HOME;
-    Player& mover = mkPlayer(s, 1, TeamSide::HOME, {5, 9}, 4);
+    Player& mover = mkPlayer(s, 1, TeamSide::HOME, {5, 9}, 3);
     if (moverHasDodge) mover.skills.add(SkillName::Dodge);
-    mkPlayer(s, 11, TeamSide::AWAY, {7, 9}, 3);
-    if (withTackleMarker) {
-        Player& t = mkPlayer(s, 12, TeamSide::AWAY, {4, 10}, 3);
-        t.skills.add(SkillName::Tackle);
-    }
+    Player& marker = mkPlayer(s, 11, TeamSide::AWAY, {7, 9}, 3);
+    if (markerHasTackle) marker.skills.add(SkillName::Tackle);
     return s;
+}
+
+// ⭐⭐⭐ POZITIVNI KONTROLA FIXTURY 2 -- volat ji MUSI kazdy test, ktery na
+//   fixture stoji. Tvrdi VYSTUPNI geometrii pole po poli, tedy presne to, co
+//   se pri prepocitani 10.09. zmenilo. Bez teto kontroly by test prosel i
+//   tehdy, kdyby se brana vratila na vstupni pole a fixtura merila neco
+//   jineho (10.09. tenhle repozitar vyrobil ctyri testy, ktere prosly a
+//   nemerily nic -- vsechny ctyri odhalily prave takove kontroly fixtury).
+void assertShortcutFixtureGeometry(const GameState& s) {
+    const Player& mover = s.getPlayer(1);
+    // (a) Vlastni pole je MIMO tacklezony ⇒ prvni krok je zdarma pro OBE
+    //     cesty. Kdyby v TZ bylo, platily by dodge obe a rozdil by zmizel.
+    ASSERT_EQ(countTacklezones(s, mover.position, TeamSide::HOME), 0)
+        << "vlastni pole {5,9} je v tacklezone -- pak plati obe cesty a "
+           "fixtura nemeri rozdil";
+    // (b) Jediny dodge zkratky: OPOUSTI se {6,8} (TZ 1) do {7,7} (TZ 0).
+    ASSERT_EQ(countTacklezones(s, Position{6, 8}, TeamSide::HOME), 1)
+        << "{6,8} nema presne jednu tacklezonu -- zkratka nema svuj dodge";
+    ASSERT_EQ(countTacklezones(s, Position{7, 7}, TeamSide::HOME), 0)
+        << "{7,7} ma tacklezonu -- obtiznost dodge i pocet dodge kroku "
+           "zkratky by byly jine";
+    ASSERT_EQ(calculateDodgeTarget(s, mover, Position{7, 7}, Position{6, 8}), 3)
+        << "dodge ze {6,8} na {7,7} neni 3+ ⇒ p != 1/3 a cela cenova "
+           "aritmetika 537/448/503 nesedi";
+    // (c) Obchazka NESMI mit ani jeden dodge: zadne z jejich opoustenych poli
+    //     nesmi byt v tacklezone (posledni pole {9,5} se neopousti).
+    for (const Position sq : {Position{5, 8}, Position{6, 7}, Position{7, 6},
+                             Position{8, 6}}) {
+        ASSERT_EQ(countTacklezones(s, sq, TeamSide::HOME), 0)
+            << "obchazkove pole {" << int(sq.x) << "," << int(sq.y)
+            << "} je v tacklezone -- obchazka by dostala dodge a nesla by "
+               "srovnat se zkratkou";
+    }
 }
 
 }  // namespace
@@ -183,9 +245,11 @@ TEST(PathFailProb, TackleNextToTheLeftSquareRemovesTheDodgeDiscount) {
     // Fixtura 2 s Tackle znackou: cesta je 5 poli BEZ dodge, takze cislo je
     // 0,0 pro oba -- a ta shoda je prave to tvrzeni. Rozdil mezi hraci se
     // meri na DELCE cesty (test nize), ne na pravdepodobnosti.
-    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*withTackleMarker=*/false);
-    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*withTackleMarker=*/false);
+    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*markerHasTackle=*/false);
+    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*markerHasTackle=*/false);
     const Position target{9, 5};
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(plain));
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(dodgy));
 
     // Bez Tackle: hrac s Dodge veme ZKRATKU pres jeden dodge p = 1/3.
     // Dvoustavove s jedinym pripustnym dodgem: preziti = q*(1+p) = 8/9
@@ -200,11 +264,14 @@ TEST(PathFailProb, TackleNextToTheLeftSquareRemovesTheDodgeDiscount) {
         << "hrac bez Dodge nevzal obchazku -- fixtura nemeri, co tvrdi";
     EXPECT_NEAR(pathFailProb(plain, plain.getPlayer(1), target, 8, kNoBlock), 0.0, 1e-12);
 
-    // A TED TACKLE: znacka na {4,10} sousedi s OPOUSTENYM polem {5,9}, takze
+    // A TED TACKLE: znacka na {7,9} sousedi s OPOUSTENYM polem {6,8}, takze
     // reroll na tom kroku neplati (r. 8566-8571). Zkratka zdrazi na plnou
     // cenu a hrac s Dodge musi skoncit na TEZE obchazce jako trpaslik.
-    GameState tPlain = makeShortcutVsDetour(false, /*withTackleMarker=*/true);
-    GameState tDodgy = makeShortcutVsDetour(true,  /*withTackleMarker=*/true);
+    // ⭐ Tackle je na TEZE znacce, ktera tacklezonu vyroba ⇒ geometrie se
+    //   nezmenila ani o pole, coz kontrola fixtury nize tvrdi znovu.
+    GameState tPlain = makeShortcutVsDetour(false, /*markerHasTackle=*/true);
+    GameState tDodgy = makeShortcutVsDetour(true,  /*markerHasTackle=*/true);
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(tDodgy));
     EXPECT_EQ(pathStepsToward(tDodgy, tDodgy.getPlayer(1), target, 8, kNoBlock), 5)
         << "Tackle u opousteneho pole slevu za Dodge nezrusil";
     EXPECT_EQ(pathStepsToward(tPlain, tPlain.getPlayer(1), target, 8, kNoBlock), 5);
@@ -216,9 +283,11 @@ TEST(PathFailProb, TackleNextToTheLeftSquareRemovesTheDodgeDiscount) {
 // ===========================================================================
 
 TEST(RiskWeightedPath, DodgeSkillMakesTheShortcutWorthTakingAndChangesTheRoute) {
-    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*withTackleMarker=*/false);
-    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*withTackleMarker=*/false);
+    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*markerHasTackle=*/false);
+    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*markerHasTackle=*/false);
     const Position target{9, 5};
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(plain));
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(dodgy));
 
     Position sPlain{-1, -1}, sDodge{-1, -1};
     ASSERT_TRUE(nextStepToward(plain, plain.getPlayer(1), target, 8, kNoBlock, sPlain));
@@ -240,16 +309,27 @@ TEST(RiskWeightedPath, DodgeSkillMakesTheShortcutWorthTakingAndChangesTheRoute) 
 }
 
 TEST(RiskWeightedPath, TackleNextToTheLeftSquareSuppressesTheRouteChange) {
-    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*withTackleMarker=*/true);
-    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*withTackleMarker=*/true);
+    GameState plain = makeShortcutVsDetour(/*moverHasDodge=*/false, /*markerHasTackle=*/true);
+    GameState dodgy = makeShortcutVsDetour(/*moverHasDodge=*/true,  /*markerHasTackle=*/true);
     const Position target{9, 5};
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(plain));
+    ASSERT_NO_FATAL_FAILURE(assertShortcutFixtureGeometry(dodgy));
+    // ⭐ A pozitivni kontrola samotneho Tackle: znacka sousedi s OPOUSTENYM
+    //   polem {6,8}, takze na TOM kroku reroll rusi. Bez teto radky by test
+    //   prosel i tehdy, kdyby Tackle nesedelo u spravneho pole.
+    ASSERT_TRUE(tackleNegatesDodgeReroll(dodgy, dodgy.getPlayer(1), Position{6, 8}))
+        << "Tackle nesousedi s opoustenym polem {6,8} -- test by nemeril "
+           "zruseni rerollu, ale neco jineho";
+    ASSERT_FALSE(tackleNegatesDodgeReroll(dodgy, dodgy.getPlayer(1), Position{5, 9}))
+        << "Tackle sousedi i s vlastnim polem {5,9} -- tam ale zadny dodge "
+           "neni (TZ 0), takze by to jen zamlzilo, co se meri";
 
     Position sPlain{-1, -1}, sDodge{-1, -1};
     ASSERT_TRUE(nextStepToward(plain, plain.getPlayer(1), target, 8, kNoBlock, sPlain));
     ASSERT_TRUE(nextStepToward(dodgy, dodgy.getPlayer(1), target, 8, kNoBlock, sDodge));
 
     // ⭐ Znacka s Tackle nesmi zdrazit ani obchazku, ani zkratku -- jen zrusit
-    //   reroll na kroku z {5,9}. Overeno tim, ze bez dovednosti se nic
+    //   reroll na kroku z {6,8}. Overeno tim, ze bez dovednosti se nic
     //   nezmenilo proti fixture bez Tackle.
     ASSERT_EQ(sPlain, (Position{5, 8}))
         << "znacka s Tackle zmenila i cestu bez dovednosti -- meri se neco jineho";
@@ -302,9 +382,22 @@ TEST(RiskWeightedPath, NonDodgeMoverIsBitIdenticalAcrossTheWholePitch) {
     }
     (void)takeBlitzPathPicksInSearch();   // citac ramene se tu nesmi vlecet dal
 
-    // Konstanta ZMERENA na binarce z `f4237f57` (tedy PRED zdvojenim stavu),
-    // ne odvozena z noveho kodu -- jinak by zamek hlidal sam sebe.
-    EXPECT_EQ(acc, 10758018192652500411ull)
+    // ⭐⭐ RE-BASELINE 10.09.2026 -- ZAMERNY, NE TICHY DRIFT.
+    //   Puvodni konstanta 10758018192652500411 byla zmerena na binarce
+    //   z `f4237f57` (PRED zdvojenim stavu). Zmenila se, protoze se opravila
+    //   BRANA dodge v `riskWeightedDijkstra`/`pathFailProb`: dodge se uctuje
+    //   pri OPUSTENI pole v tacklezone, ne pri vstupu do ni
+    //   (rules_bb2016.txt r. 480-486; obtiznost z cile, r. 503-505).
+    //   To je zmena CENIKU pro VSECHNY hrace, tedy i pro tyhle bez Dodge --
+    //   pohyb konstanty je tim padem korektni a ocekavany.
+    // ⛔ UCEL ZAMKU PRESTO PLATI DAL A JE TO TENTYZ: hlida, ze do vrstvy 0
+    //   neprosakuje logika REROLLU (zdvojeny stav). Hrac bez Dodge se pres
+    //   `hasDodge` do vrstvy 1 nedostane, takze to MA byt bit za bitem
+    //   jednovrstvovy Dijkstra. Posunula se JEN cenova baze, ne to, co zamek
+    //   chrani -- kdyby reroll zacal prosakovat, spadne to znovu.
+    // ⚠️ Nova konstanta je zmerena na binarce S opravou (dva behy, shodne)
+    //   a rucne opsana, ne odvozena z kodu za behu.
+    EXPECT_EQ(acc, 4592050832043868488ull)
         << "chovani hrace BEZ dovednosti Dodge se zmenilo -- zdvojeny stav "
            "prosakuje do vrstvy 0 a nasazena cesta M14b se tise premerila";
 }
@@ -327,7 +420,17 @@ TEST(RiskWeightedPath, NonDodgeMoverIsBitIdenticalAcrossTheWholePitch) {
 
 // Sourozenec plosneho zamku vyse, ale s micem V RUKACH SOUPERE: vlastni nosic
 // neexistuje ⇒ nova preference nesmi vratit ani jeden krok jinak.
-// Konstanta ZMERENA na binarce PRED touhle zmenou (commit `734e34e7`).
+// ⭐⭐ RE-BASELINE 10.09.2026 -- ZAMERNY, tytez duvody jako u zamku vyse.
+//   Puvodni konstanta 10651955102882326157 byla zmerena na binarce z
+//   `734e34e7`. Opravou brany dodge (uctuje se pri OPUSTENI pole
+//   v tacklezone, rules_bb2016.txt r. 480-486; obtiznost z cile r. 503-505)
+//   se zmenil CENIK cesty pro vsechny hrace, takze konstanta legitimne
+//   putuje.
+// ⛔ UCEL ZAMKU JE NEDOTCENY: hlida, ze preference „odsun od NASEHO nosice"
+//   nesmi hnout vyberem pole dosednuti, kdyz vlastni nosic NEEXISTUJE (mic
+//   drzi souper). Posunula se JEN cenova baze; kdyby ta preference zacala
+//   sahat i na cizi mic, spadne to znovu.
+// ⚠️ Nova konstanta zmerena na binarce S opravou (dva behy, shodne).
 TEST(RiskWeightedPath, EnemyHeldBallDoesNotMoveTheBlitzApproach) {
     GameState s;
     s.phase = GamePhase::PLAY;
@@ -357,7 +460,7 @@ TEST(RiskWeightedPath, EnemyHeldBallDoesNotMoveTheBlitzApproach) {
     }
     (void)takeBlitzPathPicksInSearch();
 
-    EXPECT_EQ(acc, 10651955102882326157ull)
+    EXPECT_EQ(acc, 14228315721395697305ull)
         << "mic v rukach SOUPERE zmenil vyber pole dosednuti -- podminka "
            "'nosic je NAS' nedrzi a nasazena cesta M14b se tise premerila";
 }

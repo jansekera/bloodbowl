@@ -1899,6 +1899,97 @@ rovnou celou hru — to je ale nová práce, ne dodatečné čtení tohohle běh
 | OTEVŘENO — mechanismus hotový a ověřený, otázka čistého dopadu na výhry
 zůstává nezodpovězená (jiná metrika nebo rozhodná noc, ne tahle sonda)
 
+✅⭐⭐⭐ **10.09. DODGE SE HÁZÍ PŘI VÝSTUPU, NE PŘI VSTUPU — PRAVIDLOVÁ VADA
+V CENĚ CESTY, OPRAVENA.** Uživatel řekl pravidlo z hlavy a zadal ověřit ho
+proti textu ⇒ **doktrína je jeho, potvrzená písmem**; důsledky v kódu jsou
+moje inference.
+
+**Citace, o kterou to celé stojí** (`rules_bb2016.txt` ř. **480-486**):
+*„In order to **leave** a square that is in one or more opposing tackle zones,
+a player must dodge out of the square. The player only has to dodge **once**…
+Note that you must **always** make a Dodge roll when you leave a tackle zone;
+**even if there aren't any tackle zones on the square you are moving to**."*
+A obtížnost naopak z **cíle** (ř. **503-505**): *„Per opposing tackle zone on
+the square that the player is **dodging to** +1."*
+⇒ **Brána je pole, které se OPOUŠTÍ; obtížnost je z cílového pole.**
+`calculateDodgeTarget` (`helpers.cpp`) druhou polovinu dělal správně už dřív
+a **nezměnil se**; vadná byla jen brána.
+
+⛔ **Co bylo špatně:** `pathfinder.cpp` gatoval na **cílovém** poli na dvou
+místech — `riskWeightedDijkstra` (ř. 213) a `pathFailProb` (ř. 552). Oboje
+přehozeno na opouštěné pole (`curPos` / `cur`), s citací v komentáři.
+⭐ **Nalezeno přes `KLEC/K5`:** `pathFailProb` vracela pro ústup nosiče
+z kontaktu **přesně 0,0000 pro AG 1..4**, přitom resolver hází 5+ (AG1) až 2+
+(AG4) — ústupové pole je z definice **mimo všechny** tacklezóny, takže
+„vstupní" brána na něm neúčtovala nic. ⇒ Model **pod-oceňoval ÚTĚKY
+a pře-oceňoval PŘIBLÍŽENÍ**.
+
+⚠️ **MĚNÍ TO NASAZENOU CESTU M14b** (`nextStepTowardAdjacent`, změřenou
+párově na 4 800 dvojicích) — a **smí, protože je to oprava pravidla, ne
+taktika**: `FRONTA A` = *„vady průběžně, bez ohledu na deltu"*. Nasazuje se
+tedy bez měřené delty; ⏰ **co to udělá s win-rate, se NEVÍ a neměřilo se**.
+
+⛔⛔ **DŮSLEDEK: OBEZLIČKA K5 JE ODSTRANĚNA.** Commit `933093fb` přidal
+`pEscape` (vlastní člen ceny z `calculateDodgeTarget`, spojený
+s `pathFailProb` jako nezávislý jev) **jen proto, že brána byla vadná** —
+bez něj by cena byla dekorace (0 × cokoli < 1 platí vždy). Sám se přitom
+varoval, že u víckrokového ústupu, jehož první krok dosedne DO tacklezóny,
+se ten krok **účtuje dvakrát**. ⭐ **Po opravě to není hraniční případ, ale
+systematický dvojitý zápočet** (první krok `pathFailProb` účtuje právě dodge
+z hráčova vlastního pole) — a to je to, co odstranění vynutilo. Zůstává
+**jeden člen** a Q3-tvar zamítnutí `pFail * teammatesStillToAct >= 1.0`.
+Rané `nextStepToward` gate zmizelo s ním: `pathFailProb >= 0` je z obou
+podmínek ta silnější. Čísla K5 se posunula ve **prospěch nabídky** (AG3/1
+spoluhráč 0,5556 → 0,3333), ale **žádný z jeho testů verdikt nezměnil**.
+
+⭐ **Změřená pozitivní kontrola obou směrů** *(brána vrácena na cílové pole,
+přeloženo, spuštěno, pak přesně obnoveno — `diff` prázdný)*: `pathFailProb`
+spadla zpět na **0,0 pro všechna AG 1..4** a přepsaný test to nahlásil na
+všech třech tvrzeních. ⛔ **A spadl i `K5ExpensiveCarrierRetreatIsWithheldByThePrice`**
+— to je herní důkaz, že bez opravené brány **a** bez `pEscape` je cena
+skutečně dekorace: drahý ústup by se nabídl. S opravou **740/740 zeleně**.
+
+⛔ **DVA PLOŠNÉ ZÁMKY PŘEBASELINOVÁNY — záměrně, ne tichým driftem**
+*(`test_pathfinder.cpp`, FNV součet přes 390 polí)*. Cena se změnila
+**všem** hráčům, tedy i těm bez Dodge, takže konstanty legitimně putují:
+`NonDodgeMoverIsBitIdenticalAcrossTheWholePitch`
+10758018192652500411 → **4592050832043868488**;
+`EnemyHeldBallDoesNotMoveTheBlitzApproach`
+10651955102882326157 → **14228315721395697305**
+*(obě měřeny na binárce S opravou, dva shodné běhy)*.
+⭐ **ÚČEL ZÁMKŮ JE NEDOTČENÝ a je to v komentáři napsané:** první dál hlídá,
+že do vrstvy 0 **neprosakuje logika REROLLU**, druhý že preference „odsun od
+NAŠEHO nosiče" **nesahá na cizí míč**. Posunula se **jen cenová báze**.
+
+⚠️ **Fixtura `makeShortcutVsDetour` přepočítána z pravidel, ne oslabena:**
+mover AG4 → **AG3** (při výstupní bráně je cílem kroku `{7,7}` s TZ 0, ne
+`{6,8}` s TZ 1, takže se ta jedna tacklezóna musí dorovnat obratností) —
+ceny **537 / 448 / 503** zůstaly **přesně tytéž**, fixtura měří totéž
+z pravidlově správného důvodu. Značka s `Tackle` se z `{4,10}` přesunula na
+**tutéž značku `{7,9}`**, která tacklezónu vyrábí: při výstupní bráně je
+opouštěné pole `{6,8}` a `{7,9}` je jeho soused. Samostatnou značku už
+postavit **nelze** — ověřeno vyčerpáním všech osmi sousedů `{6,8}`: každý
+buď leží na jedné z cest, nebo přidá tacklezónu na pole, které by tím
+zdražilo krok mimo měřený jev.
+⭐ **Přidána sdílená kontrola fixtury** `assertShortcutFixtureGeometry`
+(vlastní pole TZ 0 · `{6,8}` TZ 1 · `{7,7}` TZ 0 · dodge 3+ · všechna
+obcházková opouštěná pole TZ 0) — volá ji **každý** test, který na fixtuře
+stojí, podle pravidla projektu *(10.09. tenhle repozitář vyrobil čtyři
+testy, které prošly a neměřily nic; všechny čtyři odhalily právě takové
+kontroly)*.
+⚠️ **Sonda K5 NEBYLA smazána, byla PŘEPSÁNA do pozitivního tvrzení**
+a přejmenována `K5FixtureBuilds…MissesTheEscapeDodge` →
+**`K5PathFailProbAlonePricesTheEscapeDodge`**: místo „vrací 0" teď tvrdí
+„vrací přesně (`calculateDodgeTarget` − 1)/6, a s Dodge bez Tackle její
+kvadrát". Historie zůstala v komentáři, aby šlo poznat, proč test existuje.
+⚠️ Koridorová fixtura `makeThreeDodgeCorridor` je **na bráně invariantní**
+(vstupní model účtuje na cílech TZ 1,2,1, výstupní na opouštěných TZ 1,1,2 —
+v obou třech dodge se stejnými `p`) ⇒ **z toho, že její testy prošly před
+i po opravě, NEPLYNE nic o tom, která brána je správná**. Napsáno do
+komentáře, aby to nikdo nečetl jako důkaz.
+| HOTOVO A NASAZENO — pravidlová oprava (`FRONTA A`), 740/740 zeleně;
+⏰ OTEVŘENO zvlášť: dopad na win-rate M14b cesty se NEZMĚŘIL
+
 ### ⏰⏰ K PROJITÍ NAD DESKOU — GEOMETRICKÉ CÍLE *(uživatel 02.09.: „zaslouží diskuzi nad situací")*
 
 ⛔ **NEOPRAVOVAT DŘÍV, NEŽ TO PROJDEME.** Uživatel to vyžádal výslovně po
