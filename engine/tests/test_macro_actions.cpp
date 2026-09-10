@@ -379,6 +379,78 @@ TEST(MacroActions, BlitzAvailable) {
     EXPECT_TRUE(hasMacroType(macros, MacroType::BLITZ));
 }
 
+// ⭐⭐⭐ KOHO BLITZOVAT V ÚTOKU: SOUSEDA NAŠEHO NOSIČE (uživatel 10.09.2026:
+//   „koho blitzovat -- je odpověď: souseda našeho nosiče, ať nosič trpaslík
+//   nemusí dodgovat.")
+// ⛔ Do 10.09. mělo `distanceTo(carrier) <= 2` prémii +2, takže soupeř dávající
+//   nosiči blok ZDARMA měl stejnou váhu jako ten o dvě pole dál. A protože se
+//   v útoku nabízí JEN JEDEN cíl (`maxBlitz = 1`), nešlo markera vůbec vybrat.
+// ⭐ Fixtura má vlastní pojistky: oba soupeři musí být blitzovatelní a jejich
+//   vzdálenosti od nosiče musí být 1 a 2, jinak test měří jinou geometrii.
+TEST(MacroActions, OffenseBlitzPicksTheOpponentMarkingOurCarrier) {
+    GameState state = makeMinimalState();
+    state.homeTeam.blitzUsedThisTurn = false;
+    // náš nosič: trpaslík AG 2 -- pro něj je dodge 4+, tedy 50% ztráta míče
+    Player& car = state.getPlayer(1);
+    car.position = {10, 7};
+    car.stats = {6, 3, 2, 8};
+    state.ball = BallState::carried({10, 7}, 1);
+    // blitzující, který má na oba cíle dosáhnout
+    Player& mine = state.getPlayer(2);
+    mine.id = 2; mine.teamSide = TeamSide::HOME;
+    mine.state = PlayerState::STANDING; mine.position = {13, 10};
+    mine.stats = {6, 3, 3, 8}; mine.movementRemaining = 6;
+    mine.hasMoved = false; mine.hasActed = false;
+    // MARKER: soused nosiče (blok zdarma)
+    Player& marker = state.getPlayer(12);
+    marker.position = {11, 7};
+    // KONKURENT: schválně tak, aby ho STARÝ vzorec preferoval.
+    // ⭐⭐ Fixtura musí izolovat JEDINÝ člen skóre, jinak neměří nic:
+    //   · oba cíle mají **stejný počet kostek** -- marker sousedí jen s naším
+    //     nosičem, ale ten je sám v jeho tacklezóně, takže NEASISTUJE;
+    //     konkurent nemá vedle sebe nikoho našeho. Obojí tedy 1 kostka.
+    //   · konkurent je **u lajny** (`y <= 2` ⇒ +3), marker je uprostřed (+0)
+    //   ⇒ STARÝ vzorec: marker 2+0+2 = 4 · konkurent 2+3+0 = 5 ⇒ vyhrává
+    //     KONKURENT. Nová prémie za sousedství (8) to musí otočit.
+    // ⛔ První verze tohohle testu tuhle izolaci NEMĚLA a prošla i se starým
+    //   vzorcem -- odhalila to až pozitivní kontrola, ne fixtura sama.
+    Player& rival = state.getPlayer(13);
+    rival.id = 13; rival.teamSide = TeamSide::AWAY;
+    rival.state = PlayerState::STANDING; rival.position = {12, 2};
+    rival.stats = {6, 3, 3, 8}; rival.movementRemaining = 6;
+    mine.position = {12, 5};
+    // ⚠️ A DOROVNAT KOSTKY: nosič markerovi ASISTUJE (být v tacklezóně
+    //   BLOKOVANÉHO cíle asistenci nebrání), takže marker má 2 kostky.
+    //   Bez stejné asistence u konkurenta by rozdíl dělaly kostky, ne ten
+    //   člen, který test měří -- a test by prošel i se starým vzorcem.
+    //   (Přesně to se stalo dvakrát, než to pozitivní kontrola odhalila.)
+    Player& helper = state.getPlayer(3);
+    helper.id = 3; helper.teamSide = TeamSide::HOME;
+    helper.state = PlayerState::STANDING; helper.position = {13, 2};
+    helper.stats = {6, 3, 3, 8}; helper.movementRemaining = 6;
+
+    // --- POJISTKY NA FIXTURU ---
+    ASSERT_EQ(marker.position.distanceTo(car.position), 1);
+    ASSERT_GT(rival.position.distanceTo(car.position), 2)
+        << "konkurent spada do pasma <=2, takze by dostal starou premii taky";
+    ASSERT_LE(rival.position.y, 2) << "konkurent nema bonus u lajny (+3)";
+    ASSERT_GT(marker.position.y, 4) << "marker ma bonus u lajny taky -- neizolovano";
+    ASSERT_EQ(calculateDodgeTarget(state, car, {9, 7}, car.position), 4)
+        << "AG2 nosic ma mit dodge na 4+ (6-AG+TZ); jinak neplati odvod vahy";
+    ASSERT_EQ(helper.position.distanceTo(rival.position), 1)
+        << "konkurent nema asistenci -- kostky se lisi a test meri neco jineho";
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    int offered = 0, targetId = -1;
+    for (const Macro& m : macros)
+        if (m.type == MacroType::BLITZ) { ++offered; targetId = m.targetId; }
+    ASSERT_EQ(offered, 1) << "v utoku se ma nabizet jediny cil (maxBlitz = 1)";
+    EXPECT_EQ(targetId, marker.id)
+        << "nabidl se jiny cil nez ten, kdo nosici dava blok ZDARMA";
+}
+
 TEST(MacroActions, BlitzNotAvailableWhenUsed) {
     GameState state = makeMinimalState();
     state.homeTeam.blitzUsedThisTurn = true;

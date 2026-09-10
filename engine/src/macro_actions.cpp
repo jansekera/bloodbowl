@@ -1646,9 +1646,40 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         score += 2;
                     }
                 } else {
-                    // OFFENSE: near carrier bonus + ball carrier bonus
-                    if (iHaveBall && def.position.distanceTo(carrier->position) <= 2) {
-                        score += 2;
+                    // ⭐⭐⭐ KOHO BLITZOVAT V ÚTOKU: SOUSEDA NAŠEHO NOSIČE
+                    //   (uživatel 10.09.2026: „koho blitzovat -- je odpověď:
+                    //   souseda našeho nosiče, ať nosič trpaslík nemusí
+                    //   dodgovat.")
+                    //
+                    // ⛔ DO 10.09. TU BYLO `distanceTo(...) <= 2` S PRÉMIÍ +2,
+                    //   tedy KATEGORIÁLNÍ CHYBA: soupeř, který nosiči dává blok
+                    //   ZDARMA, měl stejnou váhu jako ten o dvě pole dál, který
+                    //   neohrožuje nic bez vlastního blitzu.
+                    // ⭐ Rozdíl je PRAVIDLOVÝ, ne odhad: soused hází blok
+                    //   zdarma a NEOMEZENĚ (r. 674-676 hlídají jen pohyb),
+                    //   kdežto na dvě pole musí utratit svůj JEDINÝ blitz.
+                    //   Táž „dvě různé tvrdosti" jako v `P42`.
+                    // ⭐⭐ A VÝPLATA ODSTRANĚNÍ JE, ŽE NOSIČ ODEJDE BEZ DODGE:
+                    //   `calculateDodgeTarget` = `6 - AG + TZ` (helpers.cpp:104)
+                    //   ⇒ trpasličí nosič (AG 2) potřebuje **4+ i na čistém
+                    //   poli, tedy padá v 50 %**, a selhaný dodge znamená MÍČ
+                    //   NA ZEMI. Elf (AG 4) má 2+ a k tomu reroll z Dodge.
+                    //   ⇒ Hodnota tohohle pravidla je největší přesně u
+                    //   pomalých neobratných sestav, které skutečně hrajeme.
+                    // ⚠️ A v útoku se nabízí JEN JEDEN cíl (`maxBlitz = 1`
+                    //   níž), takže tohle skóre nerozhoduje o preferenci, ale
+                    //   o tom, koho vůbec LZE blitznout.
+                    // ⚠️ VÁHA (8) je moje odvození, ne uživatelova věta:
+                    //   škálou je `+10` za soupeřova nosiče v obraně, tedy
+                    //   nejcennější cíl vůbec; uvolnění vlastního nosiče je
+                    //   srovnatelné, ne cennější. Rozdělení kategorií je
+                    //   pravidlové, velikost je k přeměření.
+                    const int distToCarrier =
+                        iHaveBall ? def.position.distanceTo(carrier->position) : 99;
+                    if (distToCarrier == 1) {
+                        score += 8;   // markuje nosiče: blok ZDARMA, neomezeně
+                    } else if (distToCarrier <= 2) {
+                        score += 2;   // hrozí, ale musí na to svůj jediný blitz
                     }
                     if (state.ball.isHeld && state.ball.carrierId == def.id) {
                         score += 5;
