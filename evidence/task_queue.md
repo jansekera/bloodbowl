@@ -799,6 +799,60 @@ dobrého místa a doprovod by mu tam stejně nepřišel. **Napřed `W-CIL`, pak 
 ⚠️ **Souvisí:** `M11` *(nosičům stojíme v cestě my sami, 149/149 vlastními)* je
 třetí pohled na týž jev — o patro výš než `W-CIL`.
 
+## ⛔⛔⛔ STAV OKRUHU KLEC K 10.09.2026 — NEŽ SE SÁHNE NA COKOLIV NÍŽ, PŘEČTI TOHLE
+
+Ověřeno **v kódu**, ne z popisu *(a v okruhu POHYB se dnes ukázalo pět zastaralých
+tvrzení, takže to není formalita)*.
+
+### ⛔ `CageAdvancePlanner` V PRODUKCI NEBĚŽÍ — a půlka položek klece je proto MRTVÁ, ne živá
+
+`engine/include/bb/mcts.h:30` → **`bool cageAdvance = false;`**, a zapíná to
+**jedině** F1 harness *(`diag_f1_cage_advance_harness.cpp:306`)* a testy
+*(`test_cage_advance.cpp:61`)*. ⭐ **Dokumentuje si to i vlastní sběrač korpusu:**
+`diag_replay_mine_20260813_gate.py:4` — *„`cageAdvance` je v produkci vypnutá.
+Dokud se nezapne, **nelze spočítat K9b**."* A `run_corpus_baseline.sh` sbírá
+s `CAGE_GATE=0`, tedy **produkčně** ⇒ **korpus planner nikdy neviděl.**
+
+⇒ ⛔⛔ **Cokoliv v `cage_advance.cpp` je pro produkci nedosažitelné**, včetně:
+* **`P32`** *(„klec se posouvá jen rovně vpřed, `y` se nikdy nemění")* — je to
+  doslova `cage_advance.cpp:216`: `Position newPos{carrier.position.x + dx*step,
+  carrier.position.y}` s komentářem *„Carrier leg: `step` squares **straight
+  forward**"*, a totéž v `cageExposure` *(`:41`)*. **Vada je reálná, ale v mrtvé
+  cestě.**
+* **hotová práce `c085331`** *(exposure = uživatelovo R1)* — už dřív zapsáno
+  u `A2`/`T3.2`: *„nejde zapnout nezávisle na zamítnuté bráně"*.
+* **dnešní `Macro::cageManaged`** *(oprava interakce s W-GFI)* — byla to tedy
+  vada **viditelná v testech**, ne v produkci. Zapsáno naplno, ať se to nečte jako
+  víc, než to bylo.
+
+### ⭐⭐ A `P46` MÁ ŠPATNĚ POSTAVENOU DIAGNÓZU — TĚLA NÁSLEDUJÍ, NOSIČ NEUMÍ ZABOČIT
+
+`P46` říká *„těla klece nenásledují nosiče do boku"*. **V kódu je to naopak:**
+rohy se počítají **z `newPos`** *(`cage_advance.cpp:222-228`, `slots[4]` z
+`newPos.x ± dx`, `newPos.y ± 1`)*, takže **těla nosiče následují správně** —
+jenže **`newPos` sám nemůže změnit `y`**. ⇒ ⭐ **`P32` a `P46` mají JEDEN
+společný korn: jediný řádek `:216`.** *(Týž vzorec jako `A2`/`T4.5` a `P31`:
+jedna vada vedená dvakrát, pokaždé jinými slovy.)*
+
+### ⇒ CO Z TOHO PLYNE PRO PRÁCI *(a co se NEMÁ dělat)*
+
+⭐ **Číslo z `P46` platí a je velké:** `diag_lane_blocked_20260820.py` *(3 000
+her)* — rovně vpřed zablokováno v **61,2 %** kol s míčem, a **ve 43,7 % z nich
+je do boku VOLNO** ⇒ **26,7 % všech našich kol s míčem** by uhnutí rozhodovalo.
+⛔ **Ale doručit se to musí v ŽIVÉ cestě**, tedy:
+* **`expandAdvance`** — tam už rameno **(A) sideFree** 08.09. přistálo *(čtverec
+  místo přímky)*, takže **nosič v produkci zabočit UMÍ**;
+* **geometrické `REPOSITION` v `getAvailableMacros`** *(r. 1249, 1408, 2346)* —
+  a to je přesně **`W-CIL`**: „klec" v produkci **není klec**, jsou to
+  **geometrické sloty počítané z desky, ne z nosiče**. Sedí to na včerejší
+  prohlídku desky *(`HOME_DEFENSIVE_FORMATION` je správná, ale po výkopu se
+  neudržuje)*.
+⛔ **NEOPRAVOVAT `cage_advance.cpp:216`, dokud není rozhodnuto, jestli se brána
+klece vůbec vrací.** Bez toho je to práce do mrtvé cesty — a přesně to `T3.2`
+už jednou zablokovalo.
+⏰ **PRVNÍ OTÁZKA OKRUHU tedy není žádná z položek níž, ale: „vrací se
+`cageAdvance`, nebo se klec dodělá v živé cestě?"** Rozhodne uživatel.
+
 ## ⭐⭐⭐ POLOŽKY SE ŘADÍ PODLE DVOU CÍLŮ KLECE *(uživatel 20.08.)*
 
 Spec **15.0b′**: klec má **dvě položky — dojít co nejdál · ochránit nosiče**
