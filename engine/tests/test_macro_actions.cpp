@@ -3901,3 +3901,77 @@ TEST(MacroActions, K5LeavesTheNonCarrierBlitzerRetreatUntouched) {
            "by merilo neco jineho, nez rika jeho jmeno";
     EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 0);
 }
+
+// ============================================================================
+// ⭐⭐⭐ KLEC/K6 KROK 3 (10.09.2026) — NENABÍZET MAKRO, KTERÉ NIC NEUDĚLÁ.
+// Nabídka `ADVANCE` se ptala jen na „nemůže skórovat a má pohyb"; jestli
+// `expandAdvance` VŮBEC MÁ KAM ŠLÁPNOUT, nikoho nezajímalo. Když neměl,
+// rozbalení vrátilo prázdno a `macro_mcts.cpp` z toho udělal END_TURN, tedy
+// propadlé kolo (viz K6 v test_macro_mcts.cpp).
+// ⛔ Test je PÁR a musí se číst spolu: první říká, co se nabízet přestalo,
+// druhý že se nabídka nezúžila víc, než měla.
+// ============================================================================
+
+TEST(MacroActions, K6AdvanceIsNotOfferedWhenTheCarrierCannotStepForward) {
+    // Zazděná varianta z M12: rozpočet JEDNO pole a všechna tři pole vpřed
+    // obsazená vlastními těly.
+    auto state = makeCarrierWithBlockedLine();
+    state.getPlayer(1).movementRemaining = 1;
+    Player& a = state.getPlayer(5);
+    a.id = 5; a.teamSide = TeamSide::HOME; a.state = PlayerState::STANDING;
+    a.position = {11, 6}; a.stats = {6, 3, 3, 8};
+    Player& b = state.getPlayer(6);
+    b.id = 6; b.teamSide = TeamSide::HOME; b.state = PlayerState::STANDING;
+    b.position = {11, 8}; b.stats = {6, 3, 3, 8};
+
+    // --- SEBEKONTROLA STAVU (bod 4 zadání) ---
+    // (a) nosič vážně nemůže skórovat: 25-10 = 15 > 1 + 2 GFI.
+    const Player& c = state.getPlayer(1);
+    ASSERT_GT(25 - c.position.x, c.movementRemaining + 2)
+        << "fixture je vadný: nosič na koncovou zónu dosáhne, ADVANCE se nenabízí"
+           " z jiného důvodu";
+    // (b) `expandAdvance` tu SKUTEČNĚ rezignuje -- kdyby ne, test by měřil
+    //     nabídku v místě, kde žádná vada není.
+    takeAdvanceResignedInSearch();
+    {
+        GameState clone = state.clone();
+        FixedDiceRoller dice(std::vector<int>(40, 4));
+        Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+        auto exp = greedyExpandMacro(clone, adv, dice);
+        ASSERT_TRUE(exp.actions.empty())
+            << "fixture je vadný: ADVANCE se rozbalí do akcí, není co neoffrovat";
+        ASSERT_EQ(takeAdvanceResignedInSearch(), 1)
+            << "fixture je vadný: rezignace ADVANCE se tu nekoná";
+    }
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_FALSE(hasMacroType(macros, MacroType::ADVANCE))
+        << "nabídka a rozbalení si odporují: makro, které nic neudělá, se nabízí";
+}
+
+TEST(MacroActions, K6AdvanceIsStillOfferedWhenTheCarrierCanStepAside) {
+    // Zavřená přímka, ale boky volné: po M12 tu `ADVANCE` postup NAJDE, takže
+    // se nabízet MUSÍ. Bez tohohle by krok 3 splnilo i „nenabízej nikdy".
+    auto state = makeCarrierWithBlockedLine();
+
+    const Player& c = state.getPlayer(1);
+    ASSERT_GT(25 - c.position.x, c.movementRemaining + 2)
+        << "fixture je vadný: nosič dosáhne koncové zóny, nabízel by se SCORE";
+    takeAdvanceResignedInSearch();
+    {
+        GameState clone = state.clone();
+        FixedDiceRoller dice(std::vector<int>(60, 4));
+        Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
+        auto exp = greedyExpandMacro(clone, adv, dice);
+        ASSERT_FALSE(exp.actions.empty())
+            << "fixture je vadný: ani vedle není kam, tohle už je zazděný stav";
+        ASSERT_EQ(takeAdvanceResignedInSearch(), 0)
+            << "fixture je vadný: ADVANCE tu rezignuje, nabízet se nemá";
+    }
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    EXPECT_TRUE(hasMacroType(macros, MacroType::ADVANCE))
+        << "krok 3 zúžil nabídku víc, než měl: postup existuje a nenabízí se";
+}

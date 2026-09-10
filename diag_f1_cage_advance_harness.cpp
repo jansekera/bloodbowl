@@ -127,6 +127,15 @@ static long g_advResigned = 0;
 //     i s vypnutymi rameny: zmena je BEZPODMINECNA (jako P9c).
 // ⭐ KLEC/P9 (10.09.): ktera vetev vybrala cil nosice -- soucet = vsechna volani
 static long g_tgtLine = 0, g_tgtSquare = 0, g_tgtNone = 0, g_tgtCage = 0;
+// ⛔⛔ 10.09.2026: TYTO DVA CHYBELY -- `K5/USTUP-NOSICE` radek vypisu je v
+//   souboru od 09.09., ale akumulatory k nemu nikdo nedeklaroval, takze se
+//   harness od te doby VUBEC NEPRELOZIL (a K5 se tedy nikdy neprecetlo).
+//   Zrcadlovy pripad `feedback_arm_counter_needs_mode_wiring`: tam citac bez
+//   radku vypisu, tady radek vypisu bez citace.
+static long g_k5Elig = 0, g_k5Off = 0;
+// ⭐⭐⭐ KLEC/K6 (10.09.): ZAHRANE makro rozbalene do NICEHO -- a jak casto to
+//   znamenalo propadle kolo. Rozvrzeni slotu viz bb/macro_mcts.h.
+static long g_k6[bb::kMacroNoopSlots] = {0};
 static long g_pushTieElig = 0;
 static long g_pushTieFlip = 0;
 static long g_advResignedSF = 0;
@@ -680,6 +689,8 @@ int main(int argc, char** argv) {
                 //   ramenech -- tika i s vypnutymi. Odpovida na otazku, jestli
                 //   je 2D hledani VADA nebo taktika: kolik rezignaci ADVANCE
                 //   melo volne pole bez TZ MIMO PRIMKU.
+                { long k6[bb::kMacroNoopSlots]; bb::takeMacroNoopStats(k6);
+                  for (int q = 0; q < bb::kMacroNoopSlots; ++q) g_k6[q] += k6[q]; }
                 g_advResigned  += bb::takeAdvanceResignedInSearch();
                 g_advResignedSF += bb::takeAdvanceResignedButSideFreeInSearch();
                 // ⭐ Q3 (30.08.): vstavani -- NABIDKA vs PROVEDENI, a v obojim
@@ -1098,6 +1109,20 @@ int main(int argc, char** argv) {
               printf("  K3/KLEC-PREBILA-PRIMKU: %ld (%.1f %% primkovych cilu)"
                      "  -- stejny postup, cistsi rohy\n",
                      g_tgtCage, g_tgtLine ? 100.0*g_tgtCage/g_tgtLine : 0.0); }
+            // ⭐⭐⭐ KLEC/K6 (10.09.): prazdne rozbaleni zahraneho makra. Bez
+            //   jmenovatele (vsechna zahrana makra) se to cislo necte.
+            { const long all = g_k6[0], noop = g_k6[1];
+              printf("  K6/PRAZDNE-MAKRO: %ld z %ld zahranych maker (%.2f %%)"
+                     " -- ZACHRANENO jinym makrem %ld, PRESTO END_TURN %ld\n",
+                     noop, all, all ? 100.0*noop/all : 0.0, g_k6[2], g_k6[3]);
+              printf("  K6/PODLE-TYPU:");
+              static const char* kMt[] = {"SCORE","ADVANCE","CAGE","BLITZ","BLOCK",
+                  "PICKUP","PASS","FOUL","REPOSITION","END_TURN","BLITZ_AND_SCORE",
+                  "HAND_OFF_SCORE","PASS_SCORE","CHAIN_SCORE"};
+              for (int q = 0; q < static_cast<int>(bb::MacroType::MACRO_COUNT); ++q) {
+                  if (g_k6[4 + q]) printf(" %s=%ld", kMt[q], g_k6[4 + q]);
+              }
+              printf("%s\n", noop ? "" : "  (zadne)"); }
             printf("  B1/ODSUN-OD-NOSICE: prilezitosti %ld, z toho ZMENENA VOLBA %ld"
                    " (%.1f %%)  -- tiebreak, cena zustava primarni\n",
                    g_pushTieElig, g_pushTieFlip,

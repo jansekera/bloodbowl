@@ -32,6 +32,20 @@ long takeCarrierBlockPriorEvalsInSearch();
 //   [2] z toho: kolikrat byl PRAVE SELHAVSI krok rohem s 1-GFI
 void takeCageDiceyGfiStats(long* out3);
 
+// ⭐⭐⭐ KLEC/K6 (10.09.2026): ZAHRANE makro, ktere se rozbalilo do NICEHO.
+//   `macro_mcts.cpp` na tom miste vracel `END_TURN`, tedy propadl CELY ZBYTEK
+//   kola, ne jen aktivaci nosice. Bez jmenovatele se to cislo necte, proto se
+//   tika i pocet vsech zahranych maker.
+//   [0] vsechna zahrana makra (kazdy pick, ktery sel do rozbaleni)
+//   [1] z toho: prvni rozbaleni dalo PRAZDNO
+//   [2] z toho: zachraneno -- jine nabidnute makro uz akce dalo (K6 krok 2)
+//   [3] z toho: presto END_TURN (opravdu nebylo co delat)
+//   [4 + t] rozpad [1] podle MacroType t
+//   ⇒ INVARIANT: [1] >= [2] + [3] (rozdil = zachranil staged-plan guard vyse),
+//     a soucet [4..] == [1].
+constexpr int kMacroNoopSlots = 4 + static_cast<int>(MacroType::MACRO_COUNT);
+void takeMacroNoopStats(long* out);   // kMacroNoopSlots cisel
+
 class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
 class CageAdvancePlanner; // bb/cage_advance.h (F1, 2026-08-03)
 
@@ -90,6 +104,10 @@ public:
     int lastIterations() const { return lastIterations_; }
     double lastBestValue() const { return lastBestValue_; }
     const std::vector<MacroChildVisitInfo>& lastChildVisits() const { return lastChildVisits_; }
+    // KLEC/K6: MacroMCTSPolicy potrebuje NABIDKU se stejnym filtrem, jaky mel
+    // root hledani, kdyz zvolene makro nic nerozbalilo. Jinak by zachrana
+    // nabizela jine makro, nez hledani videlo.
+    bool dauntlessInOffer() const { return config_.dauntlessInOffer; }
 
     // Test-only: expand a fresh root for `state` and return each child's
     // (macro, prior) after floor/cap + renorm. Pure wrapper over the private

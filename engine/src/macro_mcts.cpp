@@ -18,6 +18,13 @@ void takeBlitzAndScoreReal(long* out3) {
     g_basRealPicks=g_basRealBas=g_basRealTD=0;
 }
 
+// ⭐⭐⭐ KLEC/K6 (10.09.2026): viz bb/macro_mcts.h -- rozbalilo se zahrane
+//   makro do niceho, a co to kolo stalo.
+thread_local long g_k6Noop[kMacroNoopSlots] = {0};
+void takeMacroNoopStats(long* out) {
+    for (int i = 0; i < kMacroNoopSlots; ++i) { out[i] = g_k6Noop[i]; g_k6Noop[i] = 0; }
+}
+
 static int distToEndzone(Position pos, TeamSide side) {
     int ezX = (side == TeamSide::HOME) ? 25 : 0;
     return std::abs(pos.x - ezX);
@@ -1215,6 +1222,14 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     // checkTouchdown() projde (action_resolver.cpp:509-514).
     if (basPick && planState.phase == GamePhase::TOUCHDOWN) ++g_basRealTD;
 
+    // ⭐ KLEC/K6 krok 1: MERIDLO. Tika PRED obema zachranami, takze [1] je
+    //   „prvni rozbaleni dalo prazdno", nezavisle na tom, kdo to pak spravil.
+    ++g_k6Noop[0];
+    if (expansion.actions.empty()) {
+        ++g_k6Noop[1];
+        ++g_k6Noop[4 + static_cast<int>(bestMacro.type)];
+    }
+
     if (expansion.actions.empty() && fromStagedPlan) {
         // The planned macro no-opped against the real state (drift the
         // semantic validator couldn't see). Without this, the empty-plan
@@ -1228,11 +1243,67 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
     }
 
+    // ⭐⭐⭐ KLEC/K6 krok 2 (10.09.2026): PRAZDNE ROZBALENI NESMI PROPADNOUT
+    //   KOLO. Ochrana vyse existovala jen pro staged plan; normalni pick
+    //   hledani padal do `END_TURN` nize, cimz zahodil VSECHNY zbyvajici
+    //   aktivace, ne jen aktivaci toho jednoho hrace. Kauzalni retez:
+    //   `macro_actions.cpp` nabidne ADVANCE, i kdyz `expandAdvance` nema kam
+    //   jit (rezignuje) -> tady prazdny plan -> END_TURN.
+    //
+    // ⛔ PROC TO NEMUZE ZACYKLIT: hledani je deterministicke, takze
+    //   `search_.search(state)` by nad TYMZ stavem vratilo TOTEZ makro. Proto
+    //   se tu hledani NESPOUSTI ZNOVU. Seznam kandidatu se postavi JEDNOU
+    //   dopredu (poradi = navstevy z `lastChildVisits()`, tedy vlastni
+    //   zebricek hledani, pak zbytek v poradi nabidky), zvolene makro se z
+    //   nej vyradi, kazdy kandidat se zkusi NEJVYS jednou a cyklus je obycejny
+    //   `for` nad konecnym vektorem bez rekurze. ⇒ strukturalne bez smycky.
+    if (expansion.actions.empty()) {
+        std::vector<Macro> offered;
+        getAvailableMacros(state, offered, search_.dauntlessInOffer());
+        std::vector<Macro> candidates;
+        candidates.reserve(offered.size());
+        auto admissible = [&](const Macro& m) {
+            return m.type != MacroType::END_TURN && !sameMacro(m, bestMacro);
+        };
+        auto alreadyQueued = [&](const Macro& m) {
+            for (const Macro& q : candidates) if (sameMacro(q, m)) return true;
+            return false;
+        };
+        // Zebricek hledani: nejvic navstevovane nejdriv. `lastChildVisits()`
+        // je tu VZDY z tohoto stavu -- do teto vetve se da dojit jen pres
+        // `search_.search(state)` (bud na zacatku, nebo ve staged zachrane).
+        std::vector<MacroChildVisitInfo> ranked = search_.lastChildVisits();
+        std::sort(ranked.begin(), ranked.end(),
+                  [](const MacroChildVisitInfo& a, const MacroChildVisitInfo& b) {
+                      return a.visits > b.visits;
+                  });
+        for (const auto& r : ranked) {
+            if (admissible(r.macro) && !alreadyQueued(r.macro)) candidates.push_back(r.macro);
+        }
+        // Zbytek nabidky (makra s nula navstevami hledani je nema).
+        for (const Macro& m : offered) {
+            if (admissible(m) && !alreadyQueued(m)) candidates.push_back(m);
+        }
+        for (const Macro& m : candidates) {
+            GameState trial = state.clone();
+            auto alt = greedyExpandMacro(trial, m, expansionDice_);
+            if (!alt.actions.empty()) {
+                bestMacro = m;
+                planState = std::move(trial);
+                expansion = std::move(alt);
+                ++g_k6Noop[2];
+                break;
+            }
+        }
+    }
+
     currentPlan_ = std::move(expansion.actions);
     planIndex_ = 0;
 
     if (currentPlan_.empty()) {
-        // No actions from expansion — fall back to END_TURN
+        // No actions from expansion — fall back to END_TURN. Po K6 kroku 2 se
+        // sem dojde teprve, kdyz ANI JEDNO nabidnute makro akce nedalo.
+        ++g_k6Noop[3];
         return Action{ActionType::END_TURN, -1, -1, {-1, -1}};
     }
 

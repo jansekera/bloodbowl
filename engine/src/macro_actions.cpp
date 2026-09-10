@@ -1144,6 +1144,25 @@ static const Player* findNearestFreePlayer(const GameState& state, Position targ
     return best;
 }
 
+// ⭐⭐⭐ KLEC/K6 (10.09.2026): vysledek volby cile pro `ADVANCE`. Jediny zdroj
+//   pro nabidku i pro rozbaleni -- definice a duvod u `computeAdvanceTarget`.
+struct AdvanceTargetPlan {
+    Position target{-1, -1};
+    int steps = 0;            // <= 0 => `ADVANCE` nema kam jit (rezignace)
+    int origSteps = 0;
+    bool armChoseSquare = false;
+    // Diagnostika jen jako PRIZNAKY: citace tika `expandAdvance`, ne nabidka.
+    bool armRepickedTarget = false;   // g_cageAwareAdvancePicks
+    bool armCritRepick = false;       // g_cageCritRepicks
+    bool tgtLine = false;             // g_advTgtLine
+    bool tgtCageOverrode = false;     // g_advTgtLineCage
+    bool tgtSquare = false;           // g_advTgtSquare
+    bool sideFree = false;            // g_advanceResignedButSideFree (M12)
+};
+static AdvanceTargetPlan computeAdvanceTarget(const GameState& state,
+                                             const Player& carrier);
+static bool carrierCanAdvance(const GameState& state, const Player& carrier);
+
 // --- Macro Generation ---
 
 void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
@@ -1747,10 +1766,18 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     }
 
     // ADVANCE: carrier can move forward but can't score
+    // ⭐⭐⭐ KLEC/K6 krok 3 (10.09.2026): NENABIZET MAKRO, KTERE NIC NEUDELA.
+    //   Do dneska stacilo `dist > maxReach` a `movementRemaining > 0`; jestli
+    //   `expandAdvance` vubec ma kam slapnout, se nikdo neptal. Kdyz nemel,
+    //   rozbaleni vratilo prazdno a `macro_mcts.cpp` na prazdny plan vracel
+    //   `END_TURN` -- propadlo tedy CELE ZBYTEK KOLA. Krok 2 to jisti i tak,
+    //   ale spravne je tu nabidku vubec nedavat.
+    // ⛔ Test se NEKOPIRUJE: `carrierCanAdvance` je tenka obalka nad tim TYMZ
+    //   `computeAdvanceTarget`, ktery cil pak opravdu spocita.
     if (iHaveBall && carrier->canAct() && carrier->movementRemaining > 0) {
         int dist = distToEndzone(carrier->position, mySide);
         int maxReach = carrier->movementRemaining + maxGfiSquares(*carrier);
-        if (dist > maxReach) {
+        if (dist > maxReach && carrierCanAdvance(state, *carrier)) {
             out.push_back({MacroType::ADVANCE, carrier->id, -1, {-1, -1}});
         }
     }
@@ -2987,10 +3014,18 @@ static int cageScoreForSquare(const GameState& state, const Player& carrier,
     return 1;   // all three clauses hold
 }
 
-static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
-                                           DiceRollerBase& dice) {
-    MacroExpansionResult result;
-    const Player& carrier = state.getPlayer(macro.playerId);
+// ⭐⭐⭐ KLEC/K6 krok 3 (10.09.2026): JEDEN ZDROJ CILE PRO `ADVANCE`.
+//   Nabidka v `getAvailableMacros` a rozbaleni v `expandAdvance` se musi na
+//   otazce „ma nosic kam jit?" shodnout AZ NA BIT. Proto tu neni druha kopie
+//   vzorce, ale jedna funkce, kterou volaji oba -- dve kopie jednoho vzorce
+//   uz tenhle repozitar kously dvakrat (commit `131a1779` a `pathFailProb`
+//   v `496f5a03`).
+// ⛔ FUNKCE JE CISTA: nic nemeni a NETIKA zadny citac. Citace zustavaji ve
+//   `expandAdvance`, jinak by je nabidka (volana v KAZDEM uzlu MCTS) rozredila
+//   a `P9` invariant „soucet = vsechna volani expandAdvance" by prestal platit.
+static AdvanceTargetPlan computeAdvanceTarget(const GameState& state,
+                                              const Player& carrier) {
+    AdvanceTargetPlan plan;
     int dx = forwardDx(carrier.teamSide);
     const auto& myTeam = state.getTeamState(carrier.teamSide);
 
@@ -3050,11 +3085,11 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         const Position best = pickSquare(/*useCrit=*/!placebo);
         // Repick: kritérium tiká, jen kdyz volbu ZMĚNILO. Počítá se jen tam,
         // kde kritérium skutečně běží (tedy ne u placeba).
-        if (!placebo && best != pickSquare(/*useCrit=*/false)) ++g_cageCritRepicks;
+        if (!placebo && best != pickSquare(/*useCrit=*/false)) plan.armCritRepick = true;
         if (best.x >= 0) {
             armChoseSquare = true;
             if (best != target) {
-                ++g_cageAwareAdvancePicks;
+                plan.armRepickedTarget = true;
                 target = best;
             }
         }
@@ -3078,7 +3113,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     }
     // ⭐ KLEC/P9 diagnostika: primkova smycka uspela (cil drzi a je pruchozi).
     //   Tika PRED 2D zalohou, takze `line + square + none` = vsechna volani.
-    if (!armChoseSquare && steps > 0) ++g_advTgtLine;
+    if (!armChoseSquare && steps > 0) plan.tgtLine = true;
 
     // ⭐ M12/A+C (30.08.2026): KDYŽ PŘÍMKA NEVEDE, HLEDEJ VEDLE.
     //   Smyčka výš mění jen `x` a `y` nechává, takže zavřená přímka pro ni
@@ -3181,7 +3216,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         if (adopt) {
             target = best;
             steps = std::max(bestProg, std::abs(best.y - carrier.position.y));
-            if (lineWorked) ++g_advTgtLineCage; else ++g_advTgtSquare;
+            if (lineWorked) plan.tgtCageOverrode = true; else plan.tgtSquare = true;
         }
     }
     if (steps <= 0) {
@@ -3189,8 +3224,6 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         //   jestli to bylo nutné -- prohledáme TÝŽ rozpočet ve ČTVERCI a
         //   hledáme volné pole bez TZ, které vede vpřed. Je to jen čtení
         //   stavu, nic se nemění.
-        ++g_advanceResigned;
-        ++g_advTgtNone;   // KLEC/P9: cil nedala ani primka, ani ctverec
         const int budget0 = origSteps;
         for (int ox = -budget0; ox <= budget0 && !sideFree; ++ox) {
             for (int oy = -budget0; oy <= budget0; ++oy) {
@@ -3203,11 +3236,44 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
                 sideFree = true; break;
             }
         }
-        if (sideFree) ++g_advanceResignedButSideFree;
+    }
+
+    plan.target = target;
+    plan.steps = steps;
+    plan.origSteps = origSteps;
+    plan.armChoseSquare = armChoseSquare;
+    plan.sideFree = sideFree;
+    return plan;
+}
+
+// ⭐ KLEC/K6: `canAdvance` je PRESNE „rozbaleni by dalo pohyb", cteno z tehoz
+//   vzorce, ktery ten pohyb pak spocita. Nabidka v `getAvailableMacros` se na
+//   nic jineho ptat nesmi.
+static bool carrierCanAdvance(const GameState& state, const Player& carrier) {
+    return computeAdvanceTarget(state, carrier).steps > 0;
+}
+
+static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
+                                           DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    const Player& carrier = state.getPlayer(macro.playerId);
+    const AdvanceTargetPlan plan = computeAdvanceTarget(state, carrier);
+
+    // Citace az TADY -- `computeAdvanceTarget` je cista, viz jeji hlavicka.
+    if (plan.armRepickedTarget) ++g_cageAwareAdvancePicks;
+    if (plan.armCritRepick)     ++g_cageCritRepicks;
+    if (plan.tgtLine)           ++g_advTgtLine;
+    if (plan.tgtCageOverrode)   ++g_advTgtLineCage;
+    if (plan.tgtSquare)         ++g_advTgtSquare;
+
+    if (plan.steps <= 0) {
+        ++g_advanceResigned;
+        ++g_advTgtNone;   // KLEC/P9: cil nedala ani primka, ani ctverec
+        if (plan.sideFree) ++g_advanceResignedButSideFree;
         return result;
     }
 
-    movePlayerToward(state, macro.playerId, target, dice, result, steps + 2);
+    movePlayerToward(state, macro.playerId, plan.target, dice, result, plan.steps + 2);
     return result;
 }
 

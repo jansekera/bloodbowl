@@ -1038,3 +1038,176 @@ TEST(MacroMCTSPolicy, FallbackOnInvalidPlan) {
     }
     EXPECT_TRUE(found);
 }
+
+// ============================================================================
+// ⭐⭐⭐ KLEC/K6 (10.09.2026) — PRÁZDNÉ ROZBALENÍ NESMÍ PROPADNOUT CELÉ KOLO.
+//
+// Kauzální řetěz (dohledaný, ne hypotéza):
+//   `macro_actions.cpp` nabídne makro → `greedyExpandMacro` vrátí PRÁZDNO →
+//   `macro_mcts.cpp` na prázdný plán vracel `Action{END_TURN}` ⇒ zahodily se
+//   VŠECHNY zbývající aktivace, ne jen aktivace toho jednoho hráče.
+// ⚠️ Že „propadlé kolo je ta skutečná škoda" (a ne to, že nosič stojí) je
+//   ODVOZENÍ agenta z 10.09., ne uživatelova doktrína. Změřených 57,7 % z
+//   `evidence/carrier_marked_end_20260910.md` říká jen to, že se nosič v kole
+//   vůbec neobjevil.
+//
+// ⛔ Hodnotová funkce tu NENÍ kosmetika. Bez ní hledání v ručně staveném
+//   stavu volí `END_TURN` samo (proměřeno sondou 10.09.) a test by pak
+//   netestoval nic: propadlé kolo by nebylo od legitimního „ukončit kolo"
+//   rozeznatelné. Váhy jsou proto minimální a jednosměrné:
+//   f23 „je můj tah" +1 (ukončení kola je nejhorší dítě), f17 „naše průměrné
+//   x" -1 (pohyb vpřed je horší než stát) ⇒ hledání zvolí makro, které NIC
+//   NEUDĚLÁ. Přesně ta situace, kterou K6 řeší.
+// ============================================================================
+
+namespace {
+void k6AddPlayer(GameState& s, int id, TeamSide side, int x, int y, bool acted) {
+    Player& p = s.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+    p.position = {static_cast<int8_t>(x), static_cast<int8_t>(y)};
+    p.stats = {6, 3, 3, 8};
+    p.movementRemaining = 6; p.hasMoved = false; p.hasActed = acted;
+}
+
+// Nosič dvě pole od koncové zóny, ale ZAZDĚNÝ vlastními těly ze všech osmi
+// stran ⇒ `SCORE` se nabízí (dist 2 <= dosah 8), a rozbalí se do NIČEHO.
+// `spareMover` = navíc jeden volný hráč, který užitečný pohyb MÁ.
+GameState makeK6WalledCarrier(bool spareMover) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.homeTeam.turnNumber = 3;
+    s.homeTeam.rerolls = 3;
+    s.awayTeam.rerolls = 3;
+    s.homeTeam.blitzUsedThisTurn = true;   // ať nabídku nekomplikuje BLITZ
+    s.homeTeam.passUsedThisTurn = true;
+    s.weather = Weather::NICE;
+
+    k6AddPlayer(s, 1, TeamSide::HOME, 23, 7, false);
+    s.ball = BallState::carried({23, 7}, 1);
+    int id = 2;
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            if (!dx && !dy) continue;
+            k6AddPlayer(s, id++, TeamSide::HOME, 23 + dx, 7 + dy, /*acted=*/true);
+        }
+    }
+    k6AddPlayer(s, 10, TeamSide::HOME, 10, 3, false);
+    if (spareMover) k6AddPlayer(s, 11, TeamSide::HOME, 21, 7, false);
+    k6AddPlayer(s, 12, TeamSide::AWAY, 5, 1, false);
+    return s;
+}
+
+LinearValueFunction k6StandStillVf() {
+    std::vector<float> w(NUM_FEATURES, 0.0f);
+    w[23] = 1.0f;    // f23 = je můj tah  ⇒ END_TURN je nejhorší dítě
+    w[17] = -1.0f;   // f17 = naše průměrné x ⇒ pohyb vpřed je horší než stát
+    return LinearValueFunction(w);
+}
+
+MCTSConfig k6Config() {
+    MCTSConfig cfg;
+    cfg.timeBudgetMs = 0;
+    cfg.maxIterations = 200;
+    cfg.vfBlend = 1.0f;   // bez tohohle se `k6StandStillVf` vůbec nečte
+    return cfg;
+}
+
+size_t k6ExpandCount(const GameState& state, const Macro& m) {
+    GameState clone = state.clone();
+    DiceRoller dice(4321);
+    return greedyExpandMacro(clone, m, dice).actions.size();
+}
+
+bool k6PlayerHasLegalMove(const GameState& state, int playerId) {
+    std::vector<Action> available;
+    getAvailableActions(state, available);
+    for (auto& a : available) {
+        if (a.type == ActionType::MOVE && a.playerId == playerId) return true;
+    }
+    return false;
+}
+}  // namespace
+
+TEST(MacroMCTSPolicy, K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn) {
+    GameState state = makeK6WalledCarrier(/*spareMover=*/true);
+    LinearValueFunction vf = k6StandStillVf();
+    MCTSConfig cfg = k6Config();
+
+    // --- SEBEKONTROLA STAVU (bod 4 zadání): postavil jsem, co si myslím? ---
+    // (a) nosič je zazděný: nemá ANI JEDEN legální pohyb, tedy nemůže ani
+    //     skórovat, ani postoupit -- ne proto, že by byl daleko, ale proto,
+    //     že nemá kam šlápnout.
+    ASSERT_FALSE(k6PlayerHasLegalMove(state, 1))
+        << "fixture je vadný: nosič se přece hýbat může";
+    // (b) hráč 11 pohyb MÁ -- jinak by se nedalo tvrdit, že o něco přišel.
+    ASSERT_TRUE(k6PlayerHasLegalMove(state, 11))
+        << "fixture je vadný: druhý hráč nemá co dělat, propadlé kolo nic nestojí";
+    // (c) hledání skutečně zvolí makro, které se rozbalí do NIČEHO. Bez téhle
+    //     kontroly by test prošel i tak, že hledání zvolí rovnou to funkční
+    //     makro -- a neměřil by vůbec nic (dnes se tak stalo 4x).
+    MacroMCTSSearch probe(&vf, cfg, 42);
+    Macro pick = probe.search(state);
+    ASSERT_EQ(k6ExpandCount(state, pick), 0u)
+        << "hledání nezvolilo prázdné makro (zvolilo typ "
+        << static_cast<int>(pick.type) << ") -- test by neměřil nic";
+    // (d) a existuje jiné nabídnuté makro, které akce dá.
+    std::vector<Macro> offered;
+    getAvailableMacros(state, offered, cfg.dauntlessInOffer);
+    size_t workable = 0;
+    for (auto& m : offered) {
+        if (m.type != MacroType::END_TURN && k6ExpandCount(state, m) > 0) ++workable;
+    }
+    ASSERT_GE(workable, 1u) << "fixture je vadný: zachraňovat není čím";
+
+    long drain[kMacroNoopSlots]; takeMacroNoopStats(drain);
+
+    MacroMCTSPolicy policy(&vf, cfg, 42);
+    Action action = policy(state);
+
+    EXPECT_NE(action.type, ActionType::END_TURN)
+        << "prázdné rozbalení propadlo celé kolo -- to je ta vada K6";
+    EXPECT_NE(action.playerId, 1) << "nosič se hýbat nemůže, akce nemůže být jeho";
+    EXPECT_TRUE(k6PlayerHasLegalMove(state, action.playerId))
+        << "vrácená akce patří hráči, který se hýbat nemůže";
+
+    long k6[kMacroNoopSlots]; takeMacroNoopStats(k6);
+    EXPECT_EQ(k6[0], 1) << "měřidlo: jedno zahrané makro";
+    EXPECT_EQ(k6[1], 1) << "měřidlo: a rozbalilo se do prázdna";
+    EXPECT_EQ(k6[2], 1) << "měřidlo: zachráněno jiným makrem";
+    EXPECT_EQ(k6[3], 0) << "měřidlo: kolo tedy propadnout nesmělo";
+}
+
+TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
+    // ⛔ Druhá polovina páru: oprava NESMÍ vyrábět akci tam, kde žádná není.
+    GameState state = makeK6WalledCarrier(/*spareMover=*/false);
+    LinearValueFunction vf = k6StandStillVf();
+    MCTSConfig cfg = k6Config();
+
+    // SEBEKONTROLA: ŽÁDNÉ nabídnuté makro (mimo END_TURN) nedá ani jednu akci.
+    // Tohle je ta přesná podmínka, za které END_TURN zůstává správná odpověď.
+    std::vector<Macro> offered;
+    getAvailableMacros(state, offered, cfg.dauntlessInOffer);
+    ASSERT_GE(offered.size(), 2u) << "fixture je vadný: není z čeho vybírat";
+    for (auto& m : offered) {
+        if (m.type == MacroType::END_TURN) continue;
+        ASSERT_EQ(k6ExpandCount(state, m), 0u)
+            << "fixture je vadný: makro typu " << static_cast<int>(m.type)
+            << " akce DAVA, tohle uz neni stav, kde nejde nic";
+    }
+    ASSERT_FALSE(k6PlayerHasLegalMove(state, 1));
+
+    long drain[kMacroNoopSlots]; takeMacroNoopStats(drain);
+
+    MacroMCTSPolicy policy(&vf, cfg, 42);
+    Action action = policy(state);
+
+    EXPECT_EQ(action.type, ActionType::END_TURN)
+        << "když opravdu nic nejde, kolo se ukončit MÁ -- jinak je to přeoprava";
+
+    long k6[kMacroNoopSlots]; takeMacroNoopStats(k6);
+    EXPECT_EQ(k6[1], 1) << "měřidlo: zahrané makro se rozbalilo do prázdna";
+    EXPECT_EQ(k6[2], 0) << "měřidlo: zachránit nebylo čím";
+    EXPECT_EQ(k6[3], 1) << "měřidlo: a kolo tedy skončilo právem";
+}
