@@ -350,6 +350,49 @@ váží proti tempu nosiče)* · a jak se ta investice pozná od plýtvání.
 o patro dřív: neumí ji **připravit**. A `P62` *(elfí plán — sebrat míč a týž tah
 skórovat)* je ta samá schopnost u soupeře.
 
+## A10. ⭐⭐⭐ LEAP: DVĚ ČÁSTI SEM, JEDNA DO BLITZE *(uživatel 10.09.)*
+
+Uživatel 10.09.: *„zapiš to leap k celotahu, ať to tam pak je"* a k rozdělení:
+*„vyhodnoť, jestli tuto část nepředat do sekce blitz."* ⇒ Vyhodnoceno, **sem
+patří dvě části ze tří**. Plné měření: `evidence/leap_opportunity_20260910.md`.
+
+### (A) „PŘESKOČENÍ ZDI" — sem, a je to PŘEDČASNÉ, ne vyvrácené
+
+> Uživatel: *„část leap o přeskočení zdi budeme řešit až v celotahu — kde
+> nejdříve trpaslík postaví zeď."*
+
+Změřeno 10.09. na 4 396 aktivacích Wardancera *(200 her)*: cíl **nedosažitelný
+chůzí** má jen **0,2 %** aktivací, **a v kombinaci s nosičem 0 ze 4 396**.
+⛔ **Ale to číslo neříká „přeskakovat zeď je bezcenné" — říká, že v korpusu
+skoro žádná zeď nestojí.** A to je vlastnost NAŠEHO enginu: zeď je týmová
+struktura *(`A6`)*, kterou engine neumí postavit ani udržet *(`A8`)*.
+⇒ ⭐ **`A-tvrdé` je PODMÍNĚNÉ MĚŘENÍ:** platí *„dokud zdi nestojí"*. **Až
+celotah zdi postaví, MUSÍ se to přeměřit** — teprve pak to bude odpověď.
+⚠️ Riziko toho pokusu se přeměřením nemění a je vysoké: `7−AG` ⇒ AG4 hodí 3+,
+**selže 33,3 %**, nezdar = leží **v cílovém poli** + brnění + **turnover**,
+AV7 ⇒ **13,9 % pokusů končí hodem na zranění**.
+
+### (C) „1× ZA KOLO" JE ZDROJ CELÉHO TAHU — patří k `A7`
+
+`leapUsedThisTurn` je **turnový zdroj**, přesně jako **týmový reroll**: cenová
+funkce na jedné hraně nesmí předpokládat, že je volný, protože o něj soutěží
+celý tah. ⇒ **Táž nevyřešená věc jako `A7`**, a dvouvrstvová Dijkstra
+z `3bd48fc2` ukázala i hranici: stav *„zdroj ještě mám"* se do Dijkstry přidat
+dá, ale **jen jako aproximace**, ne exaktně.
+⭐ A pravidla to prohlubují *(uživatel 10.09.: „na leap neplatí dodge reroll —
+jen team RR")*: dodge zachrání **hráčův vlastní** reroll zdarma, leap **jen
+týmový** ⇒ leap platí **sdíleným** zdrojem, dodge nikoliv.
+
+### (B) „LEAP DO KLECE NA BLITZ NOSIČE" — ⛔ SEM NEPATŘÍ, patří do BLITZE
+
+⇒ **Vyhodnoceno 10.09.: je to JEDNO TĚLO, JEDNA AKTIVACE.** Žádná koordinace:
+**soupeřova klec už stojí**, nic nestavíme *(na rozdíl od (A))*, a v korpusu
+stojí běžně ⇒ **žádná závislost na celotahu**. Veškerá mašinérie je blitzová:
+doběh `nextStepTowardAdjacent` *(M14b)* a blok.
+⛔ **Zaparkovat to sem by znamenalo pověsit ho za celou chybějící vrstvu**,
+přitom v okruhu BLITZ je to implementovatelné dnes. ⇒ **Vedeno v `task_queue.md`
+pod BLITZEM**, sem jen tento ukazatel.
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.

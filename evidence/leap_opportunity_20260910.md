@@ -125,6 +125,54 @@ pro leap, než by čistá pravděpodobnost napovídala.
 ⚠️ Jediné, co to může otočit, je **hodně tacklezón na cíli**: dodge má
 modifikátory podle TZ, leap ne. To tenhle běh nerozpadá.
 
+## ⭐⭐⭐ 4. UŽIVATELOVA KOREKCE 10.09. — „ZEĎ" NENÍ VYVRÁCENÁ, JE PŘEDČASNÁ
+
+> *„Z výsledků jsem pochopil, že část leap o přeskočení zdi budeme řešit až
+> v celotahu — kde nejdříve trpaslík postaví zeď."*
+
+⛔ **Tím se mění výklad těch 0,2 %, a k lepšímu pro Leap.** Číslo neříká
+*„přeskakovat zeď je bezcenné"* — říká, že **v korpusu skoro žádná zeď nestojí**.
+A to je vlastnost NAŠEHO enginu, ne pravidel: zeď je týmová struktura a engine ji
+neumí postavit ani udržet *(`celotah_situace.md` `A6`: „zeď budeme umět až
+v celotahu — a i tam doufám"; dnešní `A8` totéž pro udržování formace)*.
+⇒ ⭐ **`A-tvrdé` je proto PODMÍNĚNÉ MĚŘENÍ, ne verdikt:** platí *„dokud zdi
+nestojí"*. Až je celotah postaví, musí se to **přeměřit** — a teprve pak to bude
+odpověď na otázku „má přeskočení zdi cenu".
+⛔ **Nezaměňovat s částí `B` (klec):** tam žádná taková podmínka není, klec
+v korpusu stojí běžně, takže její čísla platí už dnes.
+
+## 5. „LEAP DO KLECE" Z HLEDISKA KÓDU *(zadání uživatele 10.09.)*
+
+⛔⛔ **DNES TO NEJDE VŮBEC, a ne kvůli rameni.** `pathfinder.cpp` má **nula**
+zmínek o leapu *(ověřeno grepem)* — Dijkstra zná jen normální kroky. A doběh
+blitzu jde přes ni: `action_resolver.cpp:337,397` volá `nextStepTowardAdjacent`.
+⇒ **Blitz neumí skočit, ani se zapnutým `leapWalkArm`** — to rameno sedí
+v `findMoveToward`, kterou používá `movePlayerToward` *(obecné pohybové makro)*,
+a **blitz ji nepoužívá**. „Leap do klece a blitz nosiče" tedy dnes **není
+vyjádřitelné**, ne špatně oceněné.
+
+**Dvě možné podoby, a nejsou rovnocenné:**
+
+**(i) naučit Dijkstru hranu leapu** — z pole `u` na prázdné `v` s `cheb == 2`,
+cena `2 MA + riziko AG`. ⛔ **Tři důvody, proč to je špatná cesta:**
+* změnilo by to **nasazený a změřený doběh M14b** pro každého nositele Leapu
+* leapové **selhání není dodge**: hráč leží **v cílovém poli**, hod na brnění,
+  turnover ⇒ jiný tvar škody, takže `kRiskMultiplier` na to nesedí
+* ⭐⭐ **„1× za kolo" je zdroj celého TAHU, a Dijkstra na uzel to neumí vyjádřit**
+  — je to **přesně týž tvar jako týmový reroll**, dnes zaparkovaný jako
+  `celotah_situace.md` `A7`. Dvouvrstvová Dijkstra z `3bd48fc2` ukázala, kde je
+  hranice: stav *„zdroj ještě mám"* jde přidat, ale **jen jako aproximace**.
+
+**(ii) vlastní makro `LEAP_AND_BLITZ`** — plán o dvou krocích *(doskoč vedle
+nosiče → blitzuj ho)*, tak jak to dělá `BLITZ_AND_SCORE`. ⭐ **To je správná
+podoba**, protože: nechává M14b nedotčený · „1× za kolo" se kontroluje v jednom
+místě, ne v každé hraně · a je to **sekvence**, tedy přesně to, na co makra jsou.
+⚠️ **Ale dědí to slabinu `A5`:** engine bude takovou sekvenci umět **PROVÉST**,
+ne **NAJÍT** — bude to další ručně napsaný plán, a `T5.35a` ukázalo, že ruční
+plán **nekontroluje vlastní předpoklady** *(nabízel se, kde se nedalo dojít)*.
+⇒ **Podmínka pro (ii): brána musí ověřit, že doskok je legální A že po něm
+zbývá blitz** — jinak vznikne třetí `BLITZ_AND_SCORE`.
+
 ## ⇒ ZÁVĚR: HYGIENA, NE VELKÁ VADA — A ODPOVÍDÁ TO NA ZADÁNÍ Z 25.08.
 
 Bod, na kterém verdikt stojí *(a jediný, který stát smí)*:
