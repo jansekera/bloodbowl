@@ -216,6 +216,53 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
 // nedosazitelne v obou. Pri PRESNE stejne cene vyhrava vrstva 0; hrac bez
 // dovednosti ma vrstvu 1 celou na `kInfCost`, takze mu to vzdy vrati presne
 // to, co vracel jednovrstvovy kod.
+// ============================================================================
+// ⭐ ODSUN OD NOSICE JE SOUCAST VYBERU POLE DOSEDNUTI (B-ROUND / pripad 1,
+//   10.09.2026). Uzivatel: "predřaď ten blitz s vyberem odkud, at jej odsuneš
+//   od nosiče."
+//   Zaver 25.08. ke stejne polozce: "vyber blitzu neni jen »kdo × koho«, ale
+//   »z KTEREHO POLE« -- smer odsunu je soucast rozhodnuti."
+//
+// Mechanismus: pole dosednuti `L` urcuje utocnou linii `L->T` a odstrceni jde
+// po ni dozadu, takze `L` FIXUJE MNOZINU kandidatu na odsun (rovne vzad + dva
+// sousedi, `getPushbackSquares`). `pushDestScore` (P9c, block_handler.cpp,
+// nasazeno 08.09.) uz mezi TEMI kandidaty vybira nejlepsi, jeho PRIMARNI
+// kriterium je vzdalenost cile odsunu od NASEHO nosice se stropem 4. Tady se
+// tedy `L` oceni tim, co z nej P9c NEJLEPE dokaze vytezit -- stejne kriterium,
+// jen o vrstvu vys.
+// ⚠️ Hypoteza (moje, ne merena): druhotne z toho tez padne telo blitzujiciho na
+//   uhloprícku klece (`evidence/cage_built_20260910.md`: 0 rohu ve 33,1 % kol,
+//   pritom vlastni telo sousedi s nosicem v 79,2 % -- tela jsou, jen ne na
+//   uhloprickach). Nemereno, netvrdit jako nalez.
+//
+// ⛔⛔ TOHLE JE TIEBREAK, NE NOVA OPTIMALIZACE. `nextStepTowardAdjacent` je
+//   nasazena a UZ ZMERENA cesta M14b; cena cesty zustava STRIKTNE primarni a
+//   preference rozhoduje VYHRADNE pri PRESNE stejnem `key`. Bez vlastniho
+//   nosice na hristi je funkce nula ⇒ chovani BIT ZA BITEM tehoz. Hlidaji to
+//   dva plosne zamky v `test_pathfinder.cpp` (bez mice / mic u soupere).
+static const Player* ourCarrierForPush(const GameState& state, const Player& mover) {
+    if (!state.ball.isHeld || state.ball.carrierId <= 0) return nullptr;
+    const Player& c = state.getPlayer(state.ball.carrierId);
+    if (c.teamSide != mover.teamSide || !c.isOnPitch()) return nullptr;
+    if (c.id == mover.id) return nullptr;   // nosic blitzujici sam sebe neodsouva
+    return &c;
+}
+
+// Nejlepsi dosazitelna vzdalenost odsunu od nosice, kdyz se utoci z `from` na
+// `target`. Strop 4 je STEJNY jako v `pushDestScore` -- za nim je odsunuty hrac
+// od mice tak ci tak mimo dosah a dalsi tlaceni nekupuje nic.
+static int pushAwayScore(Position from, Position target, Position carrierPos) {
+    Position cand[3];
+    const int n = getPushbackSquares(from, target, cand);
+    int best = 0;
+    for (int i = 0; i < n; ++i) {
+        const int d = std::min(std::max(std::abs(cand[i].x - carrierPos.x),
+                                        std::abs(cand[i].y - carrierPos.y)), 4);
+        if (d > best) best = d;
+    }
+    return best;
+}
+
 inline int bestLayerIdx(const int* key, int sq) {
     const int a = key[sq], b = key[GRID_SIZE + sq];
     if (a >= kInfCost && b >= kInfCost) return -1;
@@ -283,14 +330,22 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     // (r. 549-550, "the block costs one square of movement"). Obe vrstvy
     // soutezi ve TOMTEZ cyklu, takze "levnejsi z vrstev" vyjde samo -- a
     // zaroven se rozpocet hlida na KAZDE vrstve zvlast.
-    int bestIdx = -1, bestKey = kInfCost;
+    // ⭐ Pri PRESNE stejne cene rozhoduje SMER ODSUNU -- viz `pushAwayScore`
+    //   vyse. `carrier == nullptr` (nemame mic, nosic je mimo hriste, nebo je
+    //   to blitzujici sam) ⇒ vsechna `tie` jsou 0, prvni nalezene minimum tedy
+    //   vyhrava presne jako pred touhle zmenou.
+    const Player* carrier = ourCarrierForPush(state, player);
+    int bestIdx = -1, bestKey = kInfCost, bestTie = -1;
     for (int i = 0; i < kNodeCount; ++i) {
         const int sq = i % GRID_SIZE;
         if (key[i] >= kInfCost || sq == startIdx) continue;
         if (steps[i] > budget - 1) continue;
         Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
         if (p2.distanceTo(target) != 1) continue;
-        if (key[i] < bestKey) { bestKey = key[i]; bestIdx = i; }
+        const int tie = carrier ? pushAwayScore(p2, target, carrier->position) : 0;
+        if (key[i] < bestKey || (key[i] == bestKey && tie > bestTie)) {
+            bestKey = key[i]; bestIdx = i; bestTie = tie;
+        }
     }
     if (bestIdx < 0) return false;
 

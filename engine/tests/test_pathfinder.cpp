@@ -308,3 +308,152 @@ TEST(RiskWeightedPath, NonDodgeMoverIsBitIdenticalAcrossTheWholePitch) {
         << "chovani hrace BEZ dovednosti Dodge se zmenilo -- zdvojeny stav "
            "prosakuje do vrstvy 0 a nasazena cesta M14b se tise premerila";
 }
+
+// ===========================================================================
+// CAST 4 -- ODSUN OD NOSICE JAKO TIEBREAK VE VYBERU POLE DOSEDNUTI
+//          (B-ROUND / pripad 1, 10.09.2026)
+//
+// Uzivatel: "predřaď ten blitz s vyberem odkud, at jej odsuneš od nosiče."
+// Pole dosednuti urcuje UTOCNOU LINII, a odstrceni jde po ni dozadu ⇒ pole
+// fixuje MNOZINU kandidatu na odsun, mezi kterymi az potom vybira `P9c`
+// (`pushDestScore`, block_handler.cpp). Do dneska se pole dosednuti vybiralo
+// VYHRADNE podle ceny cesty a to, k cemu je pole potom dobre, nevazilo nic.
+//
+// ⛔⛔ ROZSAH JE NOSNY: `nextStepTowardAdjacent` je NASAZENA A ZMERENA cesta
+//   M14b. Nova preference smi rozhodovat VYHRADNE pri PRESNE STEJNE cene
+//   (`key`), nikdy cenu neprebijet. Test `CheaperSquareWinsEvenWhenItPushesWorse`
+//   je presne ten, ktery to hlida -- bez nej je zmena neomezena.
+// ===========================================================================
+
+// Sourozenec plosneho zamku vyse, ale s micem V RUKACH SOUPERE: vlastni nosic
+// neexistuje ⇒ nova preference nesmi vratit ani jeden krok jinak.
+// Konstanta ZMERENA na binarce PRED touhle zmenou (commit `734e34e7`).
+TEST(RiskWeightedPath, EnemyHeldBallDoesNotMoveTheBlitzApproach) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    mkPlayer(s, 1, TeamSide::HOME, {9, 7}, 3);        // BEZ dovednosti Dodge
+    mkPlayer(s, 2, TeamSide::HOME, {8, 5}, 3);
+    mkPlayer(s, 11, TeamSide::AWAY, {11, 6}, 3);
+    mkPlayer(s, 12, TeamSide::AWAY, {11, 8}, 3);
+    mkPlayer(s, 13, TeamSide::AWAY, {7, 9}, 3);
+    mkPlayer(s, 14, TeamSide::AWAY, {13, 7}, 3);
+    s.ball = BallState::carried({11, 6}, 11);         // mic nese SOUPER
+    const Player& mover = s.getPlayer(1);
+
+    // Pojistka na fixturu: mic je drzeny, ale NE nasim hracem -- jinak by tenhle
+    // zamek merily jinou vetev, nez o ktere tvrdi, ze se nesmi hnout.
+    ASSERT_TRUE(s.ball.isHeld);
+    ASSERT_EQ(s.getPlayer(s.ball.carrierId).teamSide, TeamSide::AWAY);
+
+    uint64_t acc = 1469598103934665603ull;
+    auto mix = [&acc](int64_t v) { acc = (acc ^ static_cast<uint64_t>(v)) * 1099511628211ull; };
+    for (int y = 0; y < Position::PITCH_HEIGHT; ++y) {
+        for (int x = 0; x < Position::PITCH_WIDTH; ++x) {
+            Position adj{-1, -1};
+            const Position tgt{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+            mix(nextStepTowardAdjacent(s, mover, tgt, adj) ? (adj.y * 100 + adj.x) : -1);
+        }
+    }
+    (void)takeBlitzPathPicksInSearch();
+
+    EXPECT_EQ(acc, 10651955102882326157ull)
+        << "mic v rukach SOUPERE zmenil vyber pole dosednuti -- podminka "
+           "'nosic je NAS' nedrzi a nasazena cesta M14b se tise premerila";
+}
+
+namespace {
+// ---------------------------------------------------------------------------
+// FIXTURA 4 -- PRSTENEC S DVEMA DIRAMI.
+// AWAY cil na {10,7} je obstoupen SESTI nasimi tely, volna zustavaji jen dve
+// pole dosednuti: {10,6} (na sever od cile) a {10,8} (na jih). Blitzujici
+// startuje z `from`, nas nosic stoji na {10,11}, tedy JIZNE od cile:
+//   · dosednuti na {10,8} tlaci cil na SEVER  ({10,6}/{11,6}/{9,6}) -- PRYC
+//   · dosednuti na {10,6} tlaci cil na JIH    ({10,8}/{9,8}/{11,8}) -- K NAM
+// ⭐ Prstenec je z NASICH hracu zamerne: vlastni telo netvori tacklezonu, takze
+//   obe zbyla pole maji tacklezonu PRESNE JEDNU (jen cil sam) a jsou tedy
+//   cenove na roven -- rozdil ceny by tiebreak nikdy nepustil ke slovu.
+GameState makeRingWithTwoHoles(Position from, bool withCarrier) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    mkPlayer(s, 1, TeamSide::HOME, from, 3);
+    const Position ring[6] = {{9,6},{9,7},{9,8},{11,6},{11,7},{11,8}};
+    for (int i = 0; i < 6; ++i) mkPlayer(s, 2 + i, TeamSide::HOME, ring[i], 3);
+    mkPlayer(s, 11, TeamSide::AWAY, {10, 7}, 3);
+    if (withCarrier) {
+        mkPlayer(s, 8, TeamSide::HOME, {10, 11}, 3);
+        s.ball = BallState::carried({10, 11}, 8);
+    }
+    return s;
+}
+
+// Kolik poli sousedicich s cilem je vubec volnych -- pojistka, ze fixtura
+// postavila to, co si o ni myslim (⭐ pravidlo projektu: fixtura se overuje,
+// jinak muze test projit i pri spatnem vzorci).
+int freeAdjacentCount(const GameState& s, Position target) {
+    int n = 0;
+    for (Position p : target.getAdjacent())
+        if (p.isOnPitch() && !s.getPlayerAtPosition(p)) ++n;
+    return n;
+}
+
+}  // namespace
+
+// TEST 1: pri STEJNE cene rozhodne smer odsunu.
+TEST(BlitzApproach, EqualCostPicksTheSquareThatPushesAwayFromOurCarrier) {
+    const Position kFrom{13, 7}, kTarget{10, 7};
+    GameState noBall = makeRingWithTwoHoles(kFrom, /*withCarrier=*/false);
+    GameState withBall = makeRingWithTwoHoles(kFrom, /*withCarrier=*/true);
+
+    // --- POJISTKY NA FIXTURU ---
+    ASSERT_EQ(freeAdjacentCount(noBall, kTarget), 2)
+        << "prstenec nema presne dve diry -- test meri jinou geometrii";
+    const Player& mover = noBall.getPlayer(1);
+    // Ceny na obe diry se musi ROVNAT (delka i riziko), jinak tiebreak nema co
+    // rozhodovat a test by prosel i pro spatny vzorec.
+    const int stepsN = pathStepsToward(noBall, mover, {10, 6}, 8, kTarget);
+    const int stepsS = pathStepsToward(noBall, mover, {10, 8}, 8, kTarget);
+    ASSERT_EQ(stepsN, 3);
+    ASSERT_EQ(stepsS, 3) << "cesty na obe diry nejsou stejne dlouhe";
+    ASSERT_DOUBLE_EQ(pathFailProb(noBall, mover, {10, 6}, 8, kTarget),
+                     pathFailProb(noBall, mover, {10, 8}, 8, kTarget))
+        << "riziko obou cest se lisi -- klice tedy nejsou shodne";
+
+    // Bez nosice vyhrava porad prvni nalezene minimum (severni dira {10,6},
+    // prvni krok {12,6}) -- kontrolni strana paru.
+    Position stepNoBall{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(noBall, mover, kTarget, stepNoBall));
+    EXPECT_EQ(stepNoBall, Position(12, 6));
+
+    // S nasim nosicem na JIHU se ma vzit JIZNI dira {10,8}, protoze odtud
+    // odstrceni miri na sever, PRYC od nosice.
+    Position step{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(withBall, withBall.getPlayer(1), kTarget, step));
+    EXPECT_EQ(step, Position(12, 8))
+        << "blitzujici dosedl na stranu, ze ktere tlaci cil NA nosice";
+}
+
+// TEST 2: ⛔ TENHLE TEST DRZI ROZSAH. Kdyz se ceny LISI, vyhrava LEVNEJSI pole,
+// i kdyz tlaci hur -- jinak by z tiebreaku byla nova optimalizace a nasazena
+// cesta M14b by se tise premerila.
+TEST(BlitzApproach, CheaperSquareWinsEvenWhenItPushesTowardOurCarrier) {
+    const Position kFrom{13, 7}, kTarget{10, 7};
+    GameState s = makeRingWithTwoHoles(kFrom, /*withCarrier=*/true);
+    // Jedno telo navic na {12,8} zdrazi JIZNI (lepe tlacici) cestu o pole.
+    mkPlayer(s, 9, TeamSide::HOME, {12, 8}, 3);
+
+    // --- POJISTKY NA FIXTURU ---
+    ASSERT_EQ(freeAdjacentCount(s, kTarget), 2);
+    const Player& mover = s.getPlayer(1);
+    const int stepsN = pathStepsToward(s, mover, {10, 6}, 8, kTarget);
+    const int stepsS = pathStepsToward(s, mover, {10, 8}, 8, kTarget);
+    ASSERT_EQ(stepsN, 3);
+    ASSERT_EQ(stepsS, 4)
+        << "ceny se nelisi -- test by pak nemohl dokazat, ze cena je primarni";
+
+    Position step{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(s, mover, kTarget, step));
+    EXPECT_EQ(step, Position(12, 6))
+        << "odsun prebil CENU cesty -- z tiebreaku se stala optimalizace";
+}
