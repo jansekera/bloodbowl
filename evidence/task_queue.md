@@ -880,6 +880,33 @@ a platí od teď:
    geometrické body, nemá smysl vybírat nosiči pole podle čistoty rohů —
    postavil by se do dobrého místa a doprovod by mu tam stejně nepřišel.
    Napřed `W-CIL`, pak tohle."*
+5. ⛔⛔⛔ **A NEŽ SE SÁHNE NA POSUN NEBO TVAR: KLEC NESTAVÍME.** *(uživatel
+   10.09.: „hlavní je kontrola, že stavíme správnou a čistou klec — předtím jsme
+   kontrolovali posun klece a až potom jsme zjistili, že klec nestavíme; tak
+   nemůžeme měřit její posun.")* **Změřeno týž den**, plné čtení
+   `evidence/cage_built_20260910.md`, skript `diag_cage_built_20260910.py`,
+   korpus `cf8634e8` produkčně, **7 173 kol trpaslíka se stojícím nosičem**:<br>
+   &nbsp;&nbsp;**rohy jako HISTOGRAM, ne průměr:** **0 rohů ve 33,1 %** · 1 →
+   21,6 % · 2 → 18,3 % · 3 → 12,7 % · **4 rohy jen ve 14,4 %** *(průměr 1,54 —
+   a právě ten se dřív čítal, přitom říká něco jiného než histogram)*.<br>
+   &nbsp;&nbsp;⭐ **ČISTÁ KLEC** *(4 rohy · 0 označených · nosič mimo TZ)*
+   **= 8,27 %** *(ork 12,10 %)*. **Pozitivní kontrola:** nejlepší kolo bylo
+   4/0/mimo ⇒ čítač jedničku najít umí.<br>
+   &nbsp;&nbsp;⛔⛔ **DOMINANTNÍ DÍRA NENÍ ROH, JE TO NOSIČ SÁM: v soupeřově TZ
+   v 53,1 % kol** *(ork 41,9 %)*. Sedí to na doktrínu už zapsanou v kódu
+   *(`cage_advance.cpp:35-38`, 11.08.: nosič 40 % vs rohy 11 %, „a to byl opak
+   toho, co předpověděla revize")* — dnes je to **ještě víc**.<br>
+   &nbsp;&nbsp;⭐ **Tvar se ale neztratil:** diagonály jsou obsazené **38,5 % na
+   pole** proti **17,0 %** u ortogonál ⇒ **klecový záměr existuje, chybí ho
+   DOKONČIT**, ne nasměrovat. Aspoň jedno tělo u nosiče je v **79,2 %** kol.<br>
+   &nbsp;&nbsp;⇒ ⭐⭐ **PŘEHOZENÉ POŘADÍ** *(moje odvození, ne uživatelova věta)*:
+   **první je `P42`** *(„nosič nekončí v kontaktu", `K38` stojí, chybí rameno)* —
+   je to **jedno tělo, jeho vlastní pohyb, žádná koordinace**, a je to větší díra
+   než targeting rohů. **`W-CIL` je druhý** a jeho zadání se zpřesnilo: **doplnit
+   chybějící rohy**, ne opravit směr.<br>
+   &nbsp;&nbsp;⚠️ **A past, do které jsme málem šlápli znovu:** kdyby se teď
+   opravovalo „následování těl do boku" *(P32/P46/W-CIL)*, měřilo by se to na
+   populaci, kde klec v **92 %** kol neexistuje — **táž chyba jako s posunem.**
 4. ⏰ **Strop hodnoty je změřený:** `26,7 %` našich kol s míčem *(P46,
    `diag_lane_blocked_20260820.py`)*. To je **v živé cestě dosažitelné**, na
    rozdíl od varianty (a), která by začínala nocí na bráně, jež 18.08. dala
