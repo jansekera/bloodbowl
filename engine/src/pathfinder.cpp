@@ -18,6 +18,12 @@ static constexpr int GRID_W = Position::PITCH_WIDTH;
 static constexpr int GRID_H = Position::PITCH_HEIGHT;
 static constexpr int GRID_SIZE = GRID_W * GRID_H;
 
+// M6/B3(a)-follow-up (10.09.2026): Dijkstra ma DVE VRSTVY na pole --
+// vrstva 0 = "reroll z dovednosti Dodge je jeste netknuty", vrstva 1 =
+// "reroll uz je utraceny". Uzel = (pole, vrstva). Duvod a limity viz velky
+// komentar u `riskWeightedDijkstra`.
+static constexpr int kNodeCount = 2 * GRID_SIZE;
+
 static inline int gridIdx(int x, int y) { return y * GRID_W + x; }
 
 // ============================================================================
@@ -72,6 +78,58 @@ namespace {
 // realnemu riziku, takze to NIKDY nepretlaci skutecny rozdil v riziku/delce,
 // jen rozhodne mezi jinak identickymi cestami. Default false, aby se
 // nezmenilo uz zmerene a nasazene chovani `nextStepTowardAdjacent` (M14b).
+//
+// ============================================================================
+// ⭐⭐⭐ REROLL Z DOVEDNOSTI DODGE VE VYBERU CESTY (M6/B3(a)-follow-up,
+//   10.09.2026). Do dneska tady kazdy dodge stal holou `(cil-1)/6` a o
+//   dovednosti se nevedelo -- elf s Dodge si vybiral cestu PRESNE JAKO
+//   trpaslik bez ni, ackoli ma tyz krok znatelne levnejsi (r. 8078-8090:
+//   jeden reroll selhaneho dodge NA HRACE A TAH; soused s Tackle ho na TOM
+//   poli rusi, r. 8566-8571).
+//
+// ⭐ RESENI: ZDVOJENY STAV NA UZEL. Uzel neni pole, ale (pole, vrstva):
+//     vrstva 0 = reroll jeste netknuty,  vrstva 1 = reroll uz utraceny.
+//   Prvni PRIPUSTNY dodge na ceste se oceni `p*p` (selze jen kdyz selze
+//   dvakrat) a cestu prevede do vrstvy 1; kazdy dalsi dodge uz stoji hole
+//   `p`. Dodge, ktery reroll pouzit NESMI (Tackle u opousteneho pole),
+//   stoji `p` a ve vrstve 0 ZUSTAVA -- dovednost se neutratila.
+//   ⭐ Obe vrstvy jsou samostatne relaxovatelne (cesta pres Tackle-pole
+//     dorazi jinam s netknutym rerollem nez cesta, ktera uz ho spalila), a
+//     odpoved pro pole je LEVNEJSI z jeho dvou vrstev -- `bestLayerIdx`.
+//
+// ⛔⛔ A TED TO, CO SE NESMI ZAMLCET: TOHLE JE APROXIMACE, NE EXAKTNI CENA.
+//   Exaktni tady byt NEMUZE: po pripustnem dodge je reroll zivy s pst. `q`
+//   a utraceny s pst. `p*q`, takze nasledník je ROZDELENI PRES STAVY, ne
+//   stav. Dijkstra ale potrebuje na uzel JEDEN skalar -- rozdeleni se do nej
+//   nevejde a zadne zdvojeni to nespravi.
+//   ⇒ Chyba ma ZNAMY SMER: pravidlo "prvni pripustny dodge za p², dal hole
+//     p" PODCENUJE reroll na cestach se DVEMA A VICE dodgi, protoze dodge,
+//     ktery vyjde uz prirozene, dovednost NESPOTREBUJE a reroll ma zustat k
+//     dispozici i pro ten dalsi. ⇒ riziko se PREPLACI, cesta se jevi
+//     nebezpecnejsi, nez je. Pro VYBER cesty je to bezpecny smer
+//     (konzervativni), pro cislo, ktere se vydava jako pravdepodobnost, by
+//     to bezpecne NEBYLO.
+//   ⭐⭐ EXAKTNI OSETRENI ZIJE JINDE a jsou to DVE RUZNE VECI, ktere se
+//     NESMI ZAMENOVAT: `pathFailProb` (nize v tomhle souboru) a
+//     `estimateApproachFailChance` (macro_actions.cpp) chodi po UZ ZVOLENE,
+//     plne zname ceste, takze si mohou dovolit dvoustavovy dopredny pruchod
+//     R/S (R = vsechny dodge vysly prirozene, reroll netknuty; S = vysly,
+//     ale reroll je pryc) a vraci PRESNOU pst. Tady se nepocita
+//     pravdepodobnost, ale CENA VYBERU -- jina uloha, jine reseni.
+//     ⛔ Zamena tehle dvojice uz tenhle projekt jednou stala korekci
+//       (`cf8634e8`, 09.09.: "reroll se utrati az za SELHANY hod"). Kdo sem
+//       priste sahne, at nekopiruje p² do `pathFailProb` ani R/S sem.
+//
+// ⚠️ Hrac BEZ dovednosti Dodge do vrstvy 1 NIKDY nevstoupi (prechod je za
+//   `hasDodge`), takze cely beh je BIT ZA BITEM tentyz jednovrstvovy
+//   Dijkstra jako pred touhle zmenou -- stejne poradi vybirani minima,
+//   stejne klice, stejne `parent[]`. To je nosne: `nextStepTowardAdjacent`
+//   je NASAZENA A UZ ZMERENA cesta M14b (viz cisla nize) a trpaslici se
+//   nesmi pohnout ani o jednotku klice. Hlida to vlastni test.
+// ⛔ GFI se NEDOTYKA -- `rerollAvailable=false` zustava. TYMOVY reroll je
+//   sdileny zdroj napric celym tahem, jina a nedoresena uloha; zaparkovana
+//   schvalne v `evidence/celotah_situace.md`, oddil `A7`. Neprepinat.
+// ============================================================================
 void riskWeightedDijkstra(const GameState& state, const Player& player,
                           int budget, Position blockedSquare,
                           int* key, int8_t* steps, int16_t* parent,
@@ -81,41 +139,52 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
     const int freeSteps = movementAfterStandUp(player);   // bez GFI
     const bool rerollAvailable = false;   // viz odduvodneni u puvodni funkce
     const bool blizzard = (state.weather == Weather::BLIZZARD);
-    bool done[GRID_SIZE];
-    for (int i = 0; i < GRID_SIZE; ++i) {
+    const bool hasDodge = player.hasSkill(SkillName::Dodge);
+    bool done[kNodeCount];
+    for (int i = 0; i < kNodeCount; ++i) {
         key[i] = kInfCost; parent[i] = -1; done[i] = false; steps[i] = 127;
     }
 
     const int startIdx = gridIdx(player.position.x, player.position.y);
-    key[startIdx] = 0;
+    key[startIdx] = 0;      // start je ve vrstve 0: reroll netknuty
     steps[startIdx] = 0;
 
     for (;;) {
         int cur = -1, best = kInfCost;
-        for (int i = 0; i < GRID_SIZE; ++i)
+        for (int i = 0; i < kNodeCount; ++i)
             if (!done[i] && key[i] < best) { best = key[i]; cur = i; }
         if (cur < 0) break;
         done[cur] = true;
-        Position curPos{static_cast<int8_t>(cur % GRID_W),
-                        static_cast<int8_t>(cur / GRID_W)};
+        const int curSq = cur % GRID_SIZE;
+        const int curLayer = cur / GRID_SIZE;
+        Position curPos{static_cast<int8_t>(curSq % GRID_W),
+                        static_cast<int8_t>(curSq / GRID_W)};
         if (steps[cur] >= budget) continue;
 
         for (auto& np : curPos.getAdjacent()) {
             if (!np.isOnPitch()) continue;
             if (np == blockedSquare) continue;    // blokovane pole se neprochazi
             if (state.getPlayerAtPosition(np) != nullptr) continue;
-            const int nIdx = gridIdx(np.x, np.y);
-            if (done[nIdx]) continue;
-            const int tz = countTacklezones(state, np, player.teamSide);
+            const int nSq = gridIdx(np.x, np.y);
             const int nStep = steps[cur] + 1;
             int risk = 0;
-            if (tz > 0) {
+            int nLayer = curLayer;
+            if (countTacklezones(state, np, player.teamSide) > 0) {
                 // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
                 // takze P_fail sama od sebe padne do [1/6, 5/6].
                 const int dodgeTarget =
                     calculateDodgeTarget(state, player, /*dest=*/np, /*source=*/curPos);
                 const double pFail = (dodgeTarget - 1) / 6.0;
-                risk += static_cast<int>(std::lround(pFail * kRiskMultiplier * kScale));
+                // Reroll se smi vzit jen ve vrstve 0 a jen kdyz ho soused
+                // s Tackle u OPOUSTENEHO pole nerusi (`curPos`, ne `np` --
+                // dodge se hazi pri VYSTUPU z tacklezony, r. 8566-8571).
+                double priced = pFail;
+                if (hasDodge && curLayer == 0 &&
+                    !tackleNegatesDodgeReroll(state, player, curPos)) {
+                    priced = pFail * pFail;
+                    nLayer = 1;                 // pravo se tu povazuje za utracene
+                }
+                risk += static_cast<int>(std::lround(priced * kRiskMultiplier * kScale));
             }
             // GFI marginalne: kolik pole navic PRIDA k riziku uz naplanovane
             // sekvence. Strop je hracuv skutecny `maxGfiSquares` (2, se
@@ -129,6 +198,8 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
                     gfiSequenceFailProb(gfiBefore, rerollAvailable, blizzard);
                 risk += static_cast<int>(std::lround(dFail * kRiskMultiplier * kScale));
             }
+            const int nIdx = nLayer * GRID_SIZE + nSq;
+            if (done[nIdx]) continue;
             const int diagBias = (preferStraight && np.x != curPos.x && np.y != curPos.y) ? 1 : 0;
             const int nk = key[cur] + kScale + risk + diagBias;
             if (nk < key[nIdx]) {
@@ -138,6 +209,17 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
             }
         }
     }
+}
+
+// Levnejsi z obou vrstev pole `sq` -- vraci INDEX UZLU (tedy uz s vrstvou,
+// aby na nem slo backtrackovat `parent[]`), nebo -1 kdyz je pole
+// nedosazitelne v obou. Pri PRESNE stejne cene vyhrava vrstva 0; hrac bez
+// dovednosti ma vrstvu 1 celou na `kInfCost`, takze mu to vzdy vrati presne
+// to, co vracel jednovrstvovy kod.
+inline int bestLayerIdx(const int* key, int sq) {
+    const int a = key[sq], b = key[GRID_SIZE + sq];
+    if (a >= kInfCost && b >= kInfCost) return -1;
+    return (b < a) ? (GRID_SIZE + sq) : sq;
 }
 } // namespace
 
@@ -189,19 +271,24 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   09.09.2026: zobecneno na OBECNY pohyb pres `nextStepToward` nize --
     //   W-GFI sonda ukazala, ze `movePlayerToward` (REPOSITION/SCORE/
     //   HAND_OFF_SCORE) mel tutez tridu vady (hladovy vyber bez pameti cesty).
-    int key[GRID_SIZE];             // cena (pole + riziko)
-    int8_t steps[GRID_SIZE];        // ciste pole -- na tohle se vaze rozpocet
-    int16_t parent[GRID_SIZE];
+    // ⭐ Pole jsou DVOUVRSTVOVA (reroll netknuty / utraceny) -- viz komentar
+    //   u `riskWeightedDijkstra`. Index je UZEL, ne pole; pole = `i % GRID_SIZE`.
+    int key[kNodeCount];            // cena (pole + riziko)
+    int8_t steps[kNodeCount];       // ciste pole -- na tohle se vaze rozpocet
+    int16_t parent[kNodeCount];
     riskWeightedDijkstra(state, player, budget, /*blockedSquare=*/target, key, steps, parent);
     const int startIdx = gridIdx(player.position.x, player.position.y);
 
     // Cilove pole: sousedi s `target` a v rozpoctu zbyva pole na BLOK
-    // (r. 549-550, "the block costs one square of movement").
+    // (r. 549-550, "the block costs one square of movement"). Obe vrstvy
+    // soutezi ve TOMTEZ cyklu, takze "levnejsi z vrstev" vyjde samo -- a
+    // zaroven se rozpocet hlida na KAZDE vrstve zvlast.
     int bestIdx = -1, bestKey = kInfCost;
-    for (int i = 0; i < GRID_SIZE; ++i) {
-        if (key[i] >= kInfCost || i == startIdx) continue;
+    for (int i = 0; i < kNodeCount; ++i) {
+        const int sq = i % GRID_SIZE;
+        if (key[i] >= kInfCost || sq == startIdx) continue;
         if (steps[i] > budget - 1) continue;
-        Position p2{static_cast<int8_t>(i % GRID_W), static_cast<int8_t>(i / GRID_W)};
+        Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
         if (p2.distanceTo(target) != 1) continue;
         if (key[i] < bestKey) { bestKey = key[i]; bestIdx = i; }
     }
@@ -210,8 +297,8 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     int idx = bestIdx;
     while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];
     if (parent[idx] != startIdx) return false;
-    outStep = Position{static_cast<int8_t>(idx % GRID_W),
-                       static_cast<int8_t>(idx / GRID_W)};
+    outStep = Position{static_cast<int8_t>((idx % GRID_SIZE) % GRID_W),
+                       static_cast<int8_t>((idx % GRID_SIZE) / GRID_W)};
     const Position greedy = pickApproachStep(state, player, player.position, target);
     if (greedy != outStep) ++g_blitzPathPicks;
     return true;
@@ -235,18 +322,19 @@ bool nextStepToward(const GameState& state, const Player& player,
     if (budget <= 0) return false;
     if (target == player.position) return false;   // volajici uz je na cili
 
-    int key[GRID_SIZE];
-    int8_t steps[GRID_SIZE];
-    int16_t parent[GRID_SIZE];
+    int key[kNodeCount];
+    int8_t steps[kNodeCount];
+    int16_t parent[kNodeCount];
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
                         /*preferStraight=*/true);
     const int startIdx = gridIdx(player.position.x, player.position.y);
 
     const int curDist = player.position.distanceTo(target);
     int bestDist = curDist, bestKeyAmongTies = kInfCost, goalIdx = -1;
-    for (int i = 0; i < GRID_SIZE; ++i) {
-        if (key[i] >= kInfCost || i == startIdx) continue;
-        Position p2{static_cast<int8_t>(i % GRID_W), static_cast<int8_t>(i / GRID_W)};
+    for (int i = 0; i < kNodeCount; ++i) {
+        const int sq = i % GRID_SIZE;
+        if (key[i] >= kInfCost || sq == startIdx) continue;
+        Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
         const int d = p2.distanceTo(target);
         if (d < bestDist || (d == bestDist && key[i] < bestKeyAmongTies)) {
             bestDist = d; bestKeyAmongTies = key[i]; goalIdx = i;
@@ -257,8 +345,8 @@ bool nextStepToward(const GameState& state, const Player& player,
     int idx = goalIdx;
     while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];
     if (parent[idx] != startIdx) return false;
-    outStep = Position{static_cast<int8_t>(idx % GRID_W),
-                       static_cast<int8_t>(idx / GRID_W)};
+    outStep = Position{static_cast<int8_t>((idx % GRID_SIZE) % GRID_W),
+                       static_cast<int8_t>((idx % GRID_SIZE) / GRID_W)};
     return true;
 }
 
@@ -274,13 +362,13 @@ int pathStepsToward(const GameState& state, const Player& player,
     if (budget <= 0) return -1;
     if (target == player.position) return 0;
 
-    int key[GRID_SIZE];
-    int8_t steps[GRID_SIZE];
-    int16_t parent[GRID_SIZE];
+    int key[kNodeCount];
+    int8_t steps[kNodeCount];
+    int16_t parent[kNodeCount];
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
                         /*preferStraight=*/true);
-    const int targetIdx = gridIdx(target.x, target.y);
-    if (key[targetIdx] >= kInfCost) return -1;
+    const int targetIdx = bestLayerIdx(key, gridIdx(target.x, target.y));
+    if (targetIdx < 0) return -1;
     return steps[targetIdx];
 }
 
@@ -297,21 +385,22 @@ double pathFailProb(const GameState& state, const Player& player,
     if (budget <= 0) return -1.0;
     if (target == player.position) return 0.0;
 
-    int key[GRID_SIZE];
-    int8_t steps[GRID_SIZE];
-    int16_t parent[GRID_SIZE];
+    int key[kNodeCount];
+    int8_t steps[kNodeCount];
+    int16_t parent[kNodeCount];
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
                         /*preferStraight=*/true);
     const int startIdx = gridIdx(player.position.x, player.position.y);
-    const int targetIdx = gridIdx(target.x, target.y);
-    if (key[targetIdx] >= kInfCost) return -1.0;
+    const int targetIdx = bestLayerIdx(key, gridIdx(target.x, target.y));
+    if (targetIdx < 0) return -1.0;
 
     // Zrekonstruuj CELOU cestu (ne jen prvni krok jako nextStepToward) --
-    // parent[] jde od cile zpatky ke startu.
-    int chain[GRID_SIZE];
+    // parent[] jde od cile zpatky ke startu. `chain` nese INDEXY UZLU
+    // (pole + vrstva rerollu), pole se z nich vytahuje `% GRID_SIZE`.
+    int chain[kNodeCount];
     int n = 0;
     for (int idx = targetIdx; idx != startIdx; idx = parent[idx]) {
-        if (idx < 0 || n >= GRID_SIZE) return -1.0;  // nemelo by nastat pri validnim key[]
+        if (idx < 0 || n >= kNodeCount) return -1.0;  // nemelo by nastat pri validnim key[]
         chain[n++] = idx;
     }
 
@@ -323,16 +412,50 @@ double pathFailProb(const GameState& state, const Player& player,
     const int freeSteps = movementAfterStandUp(player);
     const int gfiCap = maxGfiSquares(player);
 
+    // ⭐⭐⭐ M6/B3(a)-follow-up (10.09.2026): TADY JE OSETRENI REROLLU EXAKTNI.
+    //   Na rozdil od `riskWeightedDijkstra` vyse (ktera VYBIRA cestu a musi si
+    //   vystacit s jednim skalarem na uzel, viz jeji komentar o aproximaci)
+    //   tahle funkce chodi po UZ ZVOLENE, plne zname ceste -- takze si smi
+    //   drzet cele rozdeleni pres dva stavy, presne jako
+    //   `estimateApproachFailChance` (macro_actions.cpp):
+    //     R = P(vsechny dosavadni dodge vysly PRIROZENE, reroll netknuty)
+    //     S = P(vsechny dosavadni dodge vysly, ale reroll uz je pryc)
+    //   Krok s prirozenou pst. selhani `p` (q = 1-p) a pripustnosti `e`
+    //   (`e` = u opousteneho pole NENI soused s Tackle, r. 8566-8571):
+    //     e:  S' = R*p*q + S*q ;  R' = R*q
+    //     !e: S' = S*q         ;  R' = R*q
+    //   P(cesta prosla bez dodge-selhani) = R + S, a to se s GFI clenem
+    //   spoji touz nezavislou soucinovou kombinaci, jakou uz funkce pouziva.
+    // ⛔ NEZAMENOVAT S APROXIMACI VE VYBERU CESTY. Tohle vraci
+    //   PRAVDEPODOBNOST, na ktere se dela go/no-go rozhodnuti (W-GFI), takze
+    //   "konzervativni preplaceni" by tu byla vada, ne bezpecna strana.
+    // ⚠️ Hrac BEZ dovednosti jde PUVODNI vetvi (jeden skalar `successProb`,
+    //   tytez operace v temz poradi), aby se jeho cislo nezmenilo ani o ULP.
+    const bool hasDodge = player.hasSkill(SkillName::Dodge);
+    double rerollLive = 1.0;   // R
+    double rerollGone = 0.0;   // S
+
     Position cur = player.position;
     double successProb = 1.0;
     int stepCount = 0;
     for (int i = n - 1; i >= 0; --i) {
-        Position np{static_cast<int8_t>(chain[i] % GRID_W),
-                    static_cast<int8_t>(chain[i] / GRID_W)};
+        const int nSq = chain[i] % GRID_SIZE;
+        Position np{static_cast<int8_t>(nSq % GRID_W),
+                    static_cast<int8_t>(nSq / GRID_W)};
         if (countTacklezones(state, np, player.teamSide) > 0) {
             const int dodgeTarget = calculateDodgeTarget(state, player, np, cur);
             const double pFail = (dodgeTarget - 1) / 6.0;
-            successProb *= (1.0 - pFail);
+            if (!hasDodge) {
+                successProb *= (1.0 - pFail);
+            } else {
+                const double q = 1.0 - pFail;
+                if (!tackleNegatesDodgeReroll(state, player, cur)) {
+                    rerollGone = rerollLive * pFail * q + rerollGone * q;
+                } else {
+                    rerollGone = rerollGone * q;
+                }
+                rerollLive = rerollLive * q;   // az PO S, ktere stare R potrebuje
+            }
         }
         const int nStep = stepCount + 1;
         const int gfiBefore = std::clamp(stepCount - freeSteps, 0, gfiCap);
@@ -345,6 +468,7 @@ double pathFailProb(const GameState& state, const Player& player,
         cur = np;
         stepCount = nStep;
     }
+    if (hasDodge) successProb *= (rerollLive + rerollGone);
     return 1.0 - successProb;
 }
 
