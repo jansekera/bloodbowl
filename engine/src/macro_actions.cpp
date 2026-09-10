@@ -190,9 +190,21 @@ static int scoreMoveAction(const GameState& state, const Action& a,
 //
 //   ⚠️ Deterministicke: poradi `getAdjacent()` je pevne a rozhoduje se jen
 //     podle cisel, zadny hod. Pod CRN musi obe ramena dostat totez.
+//   ⛔⛔⛔ K4 (10.09.2026): DOSAH JE FILTR, NE TIEBREAK.
+//     Skore tu bylo `-tz * 100 - distanceTo(from)`, tedy tacklezona prevazila
+//     vzdalenost STOKRAT ⇒ vybral se roh o osm poli dal, jen aby se usetrila
+//     jedna zona. ⭐ Je to ZRCADLO vady, kterou uz M14b opravovalo v
+//     `pickApproachStep` (`vzdalenost*100 + TZ*12`, „vzdalenost prevazi
+//     STOKRAT") -- jen obracene.
+//     ⇒ ZMERENO: vetev 6 (rohy nasi klece) vydala 31 000 cilu a **58,1 % z nich
+//       bylo mimo dosah** v tomhle kole, 28,6 % i s GFI. Nejvic cilu ze vsech
+//       vetvi, a pres polovinu nedosazitelnych -- taz trida jako `T5.35a`/`B5`.
+//     ⇒ `maxDist` je proto TVRDY FILTR (Chebyshev, GFI ZAMERNE mimo -- tataz
+//       konvence jako `B5`: sirsi mez by nabizela nedokoncitelny tah).
+//       `maxDist < 0` = bez filtru (zpetne kompatibilni volani).
 static Position standableNextTo(const GameState& state, Position anchor,
                                 TeamSide mySide, Position from,
-                                bool cornersOnly) {
+                                bool cornersOnly, int maxDist = -1) {
     Position best{-1, -1};
     int bestScore = INT32_MIN;
     for (auto& apos : anchor.getAdjacent()) {
@@ -210,6 +222,7 @@ static Position standableNextTo(const GameState& state, Position anchor,
         const int tz = countTacklezones(state, apos, mySide);
         // Hlavni kriterium je ucel (tacklezony), druhotne blizkost k hraci,
         // ktery tam ma dojit -- kazde pole navic je pole, ktere muze chybet.
+        if (maxDist >= 0 && apos.distanceTo(from) > maxDist) continue;
         const int score = -tz * 100 - apos.distanceTo(from);
         if (score > bestScore) { bestScore = score; best = apos; }
     }
@@ -2201,7 +2214,8 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 repBranch = 6;
                 const Position corner = standableNextTo(
                     state, carrier->position, mySide, p.position,
-                    /*cornersOnly=*/true);
+                    /*cornersOnly=*/true,
+                    /*maxDist=*/static_cast<int>(p.movementRemaining));
                 // ⛔ Kdyz zadny volny cisty roh neni, nabidku VYNECHAME.
                 //   Vydat nedosazitelny cil je horsi nez nevydat zadny: stal
                 //   by hraci cely jeho pohyb a skoncil by na pojistce.
@@ -2300,6 +2314,14 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                 //   znackovat jde z ortogonaly i z diagonaly stejne dobre,
                 //   tacklezona plati na vsech osm smeru.
                 repBranch = 10;
+                // ⚠️ K4: `maxDist` se tu ZAMERNE NEDAVA. Zmereno, ze i tahle
+                //   vetev ma 50,0 % cilu mimo dosah (a safety 69,6 %, endzone
+                //   guard 76,9 % vc. 16,3 % NIKDY), ale u markovani/safety muze
+                //   byt vicekolovy pochod legitimni zamer, kdezto ROH KLECE ma
+                //   smysl jen kdyz stoji NA KONCI TOHOHLE tahu. Pet obrannych
+                //   testu to potvrdilo tim, ze na filtr spadly.
+                //   ⇒ Vedeno jako `K4b`, opravovat se to bude s vlastnim
+                //     dukazem, ne paskalne s rohy klece.
                 const Position spot = standableNextTo(
                     state, oppCarrierPtr->position, mySide, p.position,
                     /*cornersOnly=*/false);

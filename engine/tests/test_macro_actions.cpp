@@ -1672,6 +1672,50 @@ TEST(MacroActions, ScoreAvoidsEnemyTZ) {
 //   změny adoptovala sken při `bestProg >= steps` a nosič skončil o TŘI POLE
 //   dál (x=15 místo 12 v testu nad tímhle) -- to je jiná změna, vedená jako
 //   `K3b`. Tady se mění jen VOLBA mezi stejně daleko vedoucími poli.
+// ⭐⭐⭐ KLEC/K4 (10.09.2026): ROH KLECE SE NENABIZI MIMO DOSAH.
+//   `standableNextTo` skorovala `-tz * 100 - distanceTo(from)`, tedy tacklezona
+//   prevazila vzdalenost STOKRAT ⇒ vybral se roh o osm poli dal, jen aby se
+//   usetrila jedna zona. Je to ZRCADLO vady, kterou uz M14b opravovalo
+//   v `pickApproachStep` ("vzdalenost prevazi STOKRAT"), jen obracene.
+// ⇒ ZMERENO na 4 parech: vetev 6 (rohy nasi klece) vydala **31 000** cilu
+//   a **58,1 %** z nich bylo mimo dosah v tomhle kole ⇒ nejvic cilu ze vsech
+//   vetvi a pres polovinu nedosazitelnych (taz trida jako `T5.35a`/`B5`).
+// ⛔ ROZSAH: filtr dostala JEN tahle vetev. Markovani (50,0 % mimo dosah),
+//   safety (69,6 %) a endzone guard (76,9 %) maji tyz problem, ale u nich muze
+//   byt vicekolovy pochod zamer -- vedeno jako `K4b`. Roh klece ma smysl jen
+//   kdyz stoji NA KONCI TOHOHLE tahu, proto tady je filtr spravne.
+TEST(MacroActions, CageCornerIsNotOfferedBeyondTheMoversReach) {
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    state.ball = BallState::carried({10, 7}, 1);
+    // Doprovod: MA na dva kroky, takze na rohy nosice nedosahne.
+    Player& escort = state.getPlayer(3);
+    escort.id = 3; escort.teamSide = TeamSide::HOME;
+    escort.state = PlayerState::STANDING; escort.position = {4, 7};
+    escort.stats = {6, 3, 3, 8}; escort.movementRemaining = 2;
+    escort.hasMoved = false; escort.hasActed = false;
+    state.getPlayer(12).position = {2, 13};   // souper daleko, nic nespini
+
+    // --- POJISTKY NA FIXTURU ---
+    ASSERT_GT(escort.position.distanceTo(Position(9, 6)), escort.movementRemaining)
+        << "doprovod na roh DOSAHNE -- test by nemeril filtr";
+    ASSERT_EQ(countTacklezones(state, {9, 6}, TeamSide::HOME), 0)
+        << "roh je v TZ, takze by ho vyradilo neco jineho nez dosah";
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    for (const Macro& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != escort.id) continue;
+        const int d = escort.position.distanceTo(m.targetPos);
+        EXPECT_LE(d, static_cast<int>(escort.movementRemaining))
+            << "nabidnut cil " << int(m.targetPos.x) << "," << int(m.targetPos.y)
+            << " ve vzdalenosti " << d << " pri rozpoctu "
+            << int(escort.movementRemaining);
+    }
+}
+
 TEST(MacroExpansion, EqualProgressPrefersTheSquareWithCleanerCageCorners) {
     GameState state = makeMinimalState();
     Player& carrier = state.getPlayer(1);
