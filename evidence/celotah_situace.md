@@ -58,7 +58,7 @@ měří se jen prostřední sloupec.**
 | **C1** | **Blitz na souseda jako UVOLNĚNÍ.** Srazím souseda ⇒ zmizí tacklezóna ⇒ zbytkem pohybu odejdu **bez dodge**. Hodnota není v ráně, ale ve zbytku tahu. *(ř. 552-553)* | kolik blitzů skončí **stáním na místě**, ač měl hráč pohyb i volné pole | podíl blitzů, po kterých hráč **odešel a byl jinde užitečný** |
 | **C2** | **Tři možnosti vstávání.** zůstat vedle *(blok zdarma, neomezený)* · odejít *(⛔ OPRAVENO 08.09. — je to REPOSITION/pohyb, ne blitz; stojí jen vlastní pohyb hráče po vstání + GFI, netýká se týmového rozpočtu blitzu — ověřeno `macro_actions.cpp:1161`, `out.push_back({MacroType::REPOSITION,...})`, `usedBlitz` se nenastavuje)* · zůstat ležet *(faul 1×)*. ⚠️ Vedle nosiče je zůstání **cena za něco**. | ✅ **měří se dnes** — `Q3/ODPOVED`: 23,9 % ran blitzem, zbytek blok zdarma *(⚠️ tohle je odpověď SOUPEŘE na naši volbu, ne cena naší volby — neověřeno, jestli je i tenhle popisek přesný)* | delta ramene Q3 *(noc 02.09.)* |
 | **C3** | **Rozpočet blitzu.** Jediná akce s limitem 1/kolo — kdy si ho **schovat**? | na jak **hodnotný cíl** blitz padne; kolikrát zůstane neutracen *(dnes 25,1 %)* | zda se blitz drží do okamžiku, kdy je nejdražší pro soupeře |
-| **C4** | **Nosiči zavazí VLASTNÍ hráči** *(149/149)*. ⇒ napřed uhnout, pak jít. | kolikrát je pole před nosičem obsazené **naším** tělem | zda pořadí aktivací tu překážku odstraní dřív |
+| **C4** | **Nosiči zavazí VLASTNÍ hráči** *(149/149)*. ⇒ napřed uhnout, pak jít. | ✅ **ZMĚŘENO 10.09.:** pole před stojícím volným nosičem je obsazené **naším** tělem v **27,5 %** *(bylo 50,1 % v baseline 19.08.)*; z obsazených jsou naši **96,7 %** — viz `A8` níž | zda pořadí aktivací tu překážku odstraní dřív |
 | **C5** | **Nosič si nechává pohyb v záloze** — má smysl jen dokud soupeř nedosáhne blitzem *(`MA + GFI`)*. | kolik kol nosič šetří pohyb, ačkoli je **v dosahu blitzu** | zda se rezerva drží jen tam, kde něco koupí |
 | **C6** | **Obrana: dva sloupce → skok do L**, přechod řídí **převaha**. Engine fáze nemá. | ⛔ **NIC** — fáze v enginu neexistuje, každé číslo by bylo N/A | podíl kol strávených ve správné fázi |
 | **C7** | **Zeď: prolomit vs oběhnout** — univerzální objekt, **rasová odpověď**. | kolikrát se u zdi zvolí průchod přes tacklezónu vs obchůzka | zda volba odpovídá rase a situaci |
@@ -283,6 +283,72 @@ pak smí kterákoliv cenová funkce *(dodge, GFI, blok)* číst `rerollAvailable
 jako `true`. Bez toho by zapnutí `rerollAvailable=true` kdekoliv v `pathfinder.cpp`
 znamenalo, že si engine reroll „půjčuje" pokaždé znovu, jako by ho měl
 neomezeně.
+
+## A8. ⭐⭐⭐ PŘED NOSIČEM STOJÍ NÁŠ — ZMĚŘENO, A JE TO CELOTAH *(uživatel 10.09.)*
+
+Uživatel 10.09.: *„Před nosičem stojí náš — je část pro celotah."* ⇒ Sem, ne do
+pohybu. **Důvod je v povaze opravy, ne v tom, kde vada vzniká:** tělo před
+nosičem není chyba toho těla ani nosiče — je to **chyba pořadí**. Jediné
+rozhodnutí o jedné aktivaci to napravit nemůže; musel by ho udělat někdo, kdo
+ví, že **tohle tělo má jít z cesty DŘÍV, než se rozhodne nosič**.
+
+## Změřeno 10.09. *(`evidence/prereg_20260909_m11_remeasure.md`, 1000 her, engine `cf8634e8`)*
+
+| co je na poli PŘÍMO VPŘED u stojícího volného nosiče | 19.08. | 10.09. |
+|---|---|---|
+| **NÁŠ** hráč | 50,1 % | **27,5 %** |
+| **JEJICH** hráč | 0,5 % | 0,9 % |
+| **PRÁZDNÉ** | 49,4 % | **71,5 %** |
+
+⭐ **Ustoupilo to na polovinu** *(50,1 → 27,5 %, ~10 σ)*, ale **nezmizelo** — a to
+je přesně to, co se od pohybové opravy čekat dá: BFS `nextStepToward` umí nosiče
+**obejít** vlastní tělo, ale **nezabrání tomu, aby tam to tělo stálo**.
+
+⛔⛔ **A OPRAVA VÝKLADU, KTEROU MĚŘENÍ VYNUTILO: „149/149" nikdy neznamenala, co
+se z ní čte.** Už v baseline 19.08. mělo **49,4 %** stojících volných nosičů
+před sebou **PRÁZDNO**. Ta věta tedy nikdy neříkala *„nosič je zablokovaný,
+kdykoliv stojí"* — říkala jen, že **KDYŽ je zablokovaný, je to naše tělo**,
+a to platí dál *(96,7 %)*. ⇒ Číslo 149/149 popisovalo **podmnožinu**, ne jev.
+
+⏰ **Co z toho pro celotah zůstává:** ta **27,5 %** jsou skutečná práce pro
+pořadí aktivací *(uhnout dřív, než jde nosič)* — táž třída jako `C5`, `Q05`
+a `Q24` *(vacate-first)*. ⚠️ Ale **není to už dominantní případ**; dominantní je
+teď *„nosič stojí, ač má vpřed volno" (71,5 %)*, a to je **jiná otázka** a jiné
+patro *(volba, ne geometrie)* — nesmí se to slít do jednoho.
+
+## A9. ⭐⭐⭐ `P27` — NACHYSTAT PŘÍJEMCE DOPŘEDU, „JAKO ELFOVÉ" *(uživatel 10.09.)*
+
+Uživatel 10.09.: *„P27 teď píšeš nově — a to patří do celotahu."* ⇒ Zapsáno sem.
+Odkaz v `task_queue.md` na to ukazoval už od 27.08. *(„druhá, skutečná oprava
+patří do CELOTAH")*, ale **obsah tady nikdy nebyl** — jen ukazatel do prázdna.
+
+**Odkud to přišlo.** `P27` začalo jako *„`BLITZ_AND_SCORE` se nabízí a
+nekonvertuje"* a **dvakrát změnilo diagnózu**:
+1. ⛔ **Stall to NEVYSVĚTLUJE** *(27.08.)* — strop prioru 0,02 při vedení
+   pokrývá jen **30 z 1 281** nabídek *(2,3 %)*. Domněnka „je to záměr, doktrína
+   stall" **padla na číslech**.
+2. ⛔ **Nebyla to vada ve VOLBĚ, ale v ADMISI** — nabízelo se to tam, kde se
+   dojít nedalo *(944 kol, nosič ve VŠECH dál než `MA + 2 GFI`, průměr 10,0
+   pole; TD 0,6 % a **bylo jedno, co nosič udělal**)*. Opraveno jako `T5.35a`
+   *(`12b7137d`)*.
+
+⭐⭐⭐ **A TEPRVE ZBYTEK JE TA SKUTEČNÁ VĚC — A JE CELOTAHOVÁ.** Uživatel 27.08.
+řekl *„je to neřešitelné — pozdě"*, a měření mu dalo za pravdu tvrdě:
+v **93,6 %** těch kol **není v dosahu endzóny NIKDO z jedenácti**.
+
+⇒ ⛔ **V okamžiku, kdy se rozhoduje o skórování, je už rozhodnuto.** Není koho
+poslat — a to se nedá spravit lepší volbou v tom kole. Musí se to spravit
+**o několik kol dřív**, tím, že tam někdo **je nachystaný**. To je celotah
+v nejčistší podobě: rozhodnutí, jehož hodnota se projeví až za tři aktivace.
+
+⏰ **Co do celotahu z `P27` patří:** kdo je **určený příjemce** · kolik těl se
+smí vyčlenit dopředu místo do klece · v kterém kole se to má stát *(a jak to
+váží proti tempu nosiče)* · a jak se ta investice pozná od plýtvání.
+
+⚠️ **Souvisí, a nesmí se to slít:** `A5`/`BLITZ_AND_SCORE` říká, že engine
+**umí provést** dvoučlennou sekvenci, ale **neumí ji najít**. `P27` je totéž
+o patro dřív: neumí ji **připravit**. A `P62` *(elfí plán — sebrat míč a týž tah
+skórovat)* je ta samá schopnost u soupeře.
 
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
