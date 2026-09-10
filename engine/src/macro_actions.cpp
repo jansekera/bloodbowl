@@ -595,6 +595,21 @@ long takeAdvanceResignedButSideFreeInSearch() {
     long v = g_advanceResignedButSideFree; g_advanceResignedButSideFree = 0; return v;
 }
 
+// ⭐⭐⭐ KLEC/P9 (10.09.2026): KTERA VETEV VYBRALA CIL NOSICE?
+//   P9 ma zmereny strop „pole, ze ktereho vyjde plna cista klec a na jehoz
+//   rohy dosahnou ctyri nase tela, existuje v 95,6 % kol -- plnime 2,7 %".
+//   ⛔ Nez se do vyberu cile prida klecove kriterium, musi se vedet, KDE se
+//     ten cil vlastne bere: `armChoseSquare` je za ramenem `cageAwareAdvance`,
+//     ktere je DEFAULT OFF, takze v produkci rozhoduje bud primkova smycka,
+//     nebo 2D zaloha (M12/A+C). Opravovat vetev, ktera nebezi, je presne ta
+//     chyba, kterou dnesek uz jednou nachytal u `cage_advance.cpp`.
+thread_local long g_advTgtLine = 0;      // cil dala PRIMKOVA smycka
+thread_local long g_advTgtSquare = 0;    // cil dala 2D zaloha (M12/A+C)
+thread_local long g_advTgtNone = 0;      // ADVANCE rezignoval uplne
+long takeAdvanceTargetSourceLine()   { long v=g_advTgtLine;   g_advTgtLine=0;   return v; }
+long takeAdvanceTargetSourceSquare() { long v=g_advTgtSquare; g_advTgtSquare=0; return v; }
+long takeAdvanceTargetSourceNone()   { long v=g_advTgtNone;   g_advTgtNone=0;   return v; }
+
 thread_local bool g_cageAwareAdvance[2] = {false, false};
 thread_local long g_cageAwareAdvancePicks = 0;
 // ⭐ REPICKY KLECOVÉHO KRITÉRIA (30.08.2026) -- vlastní čítač pro (B).
@@ -2882,6 +2897,9 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         targetX = std::clamp(carrier.position.x + dx * steps, 1, 24);
         target.x = static_cast<int8_t>(targetX);
     }
+    // ⭐ KLEC/P9 diagnostika: primkova smycka uspela (cil drzi a je pruchozi).
+    //   Tika PRED 2D zalohou, takze `line + square + none` = vsechna volani.
+    if (!armChoseSquare && steps > 0) ++g_advTgtLine;
 
     // ⭐ M12/A+C (30.08.2026): KDYŽ PŘÍMKA NEVEDE, HLEDEJ VEDLE.
     //   Smyčka výš mění jen `x` a `y` nechává, takže zavřená přímka pro ni
@@ -2918,6 +2936,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         if (best.x >= 0) {
             target = best;
             steps = std::max(bestProg, std::abs(best.y - carrier.position.y));
+            ++g_advTgtSquare;
         }
     }
     if (steps <= 0) {
@@ -2926,6 +2945,7 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
         //   hledáme volné pole bez TZ, které vede vpřed. Je to jen čtení
         //   stavu, nic se nemění.
         ++g_advanceResigned;
+        ++g_advTgtNone;   // KLEC/P9: cil nedala ani primka, ani ctverec
         const int budget0 = origSteps;
         for (int ox = -budget0; ox <= budget0 && !sideFree; ++ox) {
             for (int oy = -budget0; oy <= budget0; ++oy) {

@@ -295,6 +295,12 @@ long takeStandEscapeImpossibleInSearch();
 //                          On, kde ta rána zdarma je navíc DRAHÁ
 
 long takeAdvanceResignedInSearch();
+// ⭐ KLEC/P9: která větev vybrala cíl nosiče (přímka / 2D záloha / rezignace).
+//   Bez toho nejde vědět, kam patří klecové kritérium -- `armChoseSquare` je
+//   za ramenem, které je default OFF. Součet = všechna volání expandAdvance.
+long takeAdvanceTargetSourceLine();
+long takeAdvanceTargetSourceSquare();
+long takeAdvanceTargetSourceNone();
 long takeAdvanceResignedButSideFreeInSearch();
 
 // --- P40 placebo arm (2026-08-20): the SAME square search as P38, minus the

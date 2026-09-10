@@ -125,6 +125,8 @@ static long g_advResigned = 0;
 //   ⛔ Citac BEZ radku vypisu je past, ktera se tu chytla 3x za 3 dny
 //     (feedback_arm_counter_needs_mode_wiring) -- proto se tiskne vzdy,
 //     i s vypnutymi rameny: zmena je BEZPODMINECNA (jako P9c).
+// ⭐ KLEC/P9 (10.09.): ktera vetev vybrala cil nosice -- soucet = vsechna volani
+static long g_tgtLine = 0, g_tgtSquare = 0, g_tgtNone = 0;
 static long g_pushTieElig = 0;
 static long g_pushTieFlip = 0;
 static long g_advResignedSF = 0;
@@ -646,6 +648,9 @@ int main(int argc, char** argv) {
                 long candCrit = bb::takeCageCritRepicksInSearch();
                 long candProne = bb::takeProneActionPicksInSearch();
                 long candPath  = bb::takeBlitzPathPicksInSearch();
+                g_tgtLine   += bb::takeAdvanceTargetSourceLine();
+                g_tgtSquare += bb::takeAdvanceTargetSourceSquare();
+                g_tgtNone   += bb::takeAdvanceTargetSourceNone();
                 g_pushTieElig += bb::takeBlitzPushTieEligibleInSearch();
                 g_pushTieFlip += bb::takeBlitzPushTieFlipsInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
@@ -1069,6 +1074,12 @@ int main(int argc, char** argv) {
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);
+            { const long tgtAll = g_tgtLine + g_tgtSquare + g_tgtNone;
+              printf("  P9/CIL-NOSICE: primka %ld (%.1f %%) | 2D zaloha %ld (%.1f %%) | "
+                     "rezignace %ld (%.1f %%)  [celkem %ld]\n",
+                     g_tgtLine,   tgtAll ? 100.0*g_tgtLine/tgtAll : 0.0,
+                     g_tgtSquare, tgtAll ? 100.0*g_tgtSquare/tgtAll : 0.0,
+                     g_tgtNone,   tgtAll ? 100.0*g_tgtNone/tgtAll : 0.0, tgtAll); }
             printf("  B1/ODSUN-OD-NOSICE: prilezitosti %ld, z toho ZMENENA VOLBA %ld"
                    " (%.1f %%)  -- tiebreak, cena zustava primarni\n",
                    g_pushTieElig, g_pushTieFlip,
