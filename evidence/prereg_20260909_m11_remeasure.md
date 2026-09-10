@@ -69,3 +69,65 @@ je 3.10, ale binding `bb_engine` je `cpython-38` ⇒ workery padaly na
 + pojistka, která spadne PŘI STARTU, a `cd "$ROOT"`, protože collector si
 vkládá cesty relativně)*. Noční A/B harness tím netrpěl — jede přes
 zkompilovanou binárku, ne přes binding.
+
+---
+
+# VÝSLEDEK (10.09.2026) — 1000 her, engine `cf8634e8`
+
+## SANITY-TESTY: oba prošly PŘED čtením
+
+1. ✅ měřidlo reprodukovalo baseline *(29,2 % / 0,50 na korpusu 19.08.)*
+2. ✅ `ENGINE_HEAD` = `cf8634e8` — sedí na dnešní engine
+3. ✅ **tahů na hru identicky 16,00** v obou korpusech ⇒ rozdíly nejsou
+   artefakt délky drivů
+
+## Předpovědi proti skutečnosti
+
+| # | veličina | 19.08. | 09.09. | predikce | |
+|---|---|---|---|---|---|
+| **M1** | volný nosič **STÁL** | 29,2 % | **18,7 %** | 22-27 % | ⛔ **MIMO** — klesl VÍC |
+| **M2** | u stojícího je vpřed **NÁŠ** | 50,1 % | **27,5 %** | 0,35-0,45 | ⛔ **MIMO** — klesl VÍC |
+| **M3** | z obsazených jsou **naši** | 98,9 % | **96,7 %** | > 90 % | ✅ **TREFA** |
+
+n = 3573 vs 534 stojících ⇒ M1 i M2 jsou **~10 σ+**, ne šum.
+
+⭐ **Obě „mimo" jsou mimo ve prospěch opravy** — vada ustoupila víc, než jsem
+čekal. ⚠️ Ale běh **neumí říct, čím** *(ramena (A)/(C) z 08.09. vs BFS z 09.09.
+vs cokoliv dalšího za ten měsíc)* — a netvrdí to.
+
+## ⭐⭐⭐ NÁLEZ, KTERÝ PRŮMĚRY SKRÝVALY — „149/149" NIKDY NEZNAMENALO, CO SE Z NÍ ČTE
+
+Doplněné měřidlo *(`diag_m11_denominator_20260910.py`, tiskne i ZBYTEK)*
+rozpadlo pole **přímo vpřed** u stojícího volného nosiče na tři možnosti:
+
+| co je vpřed | 19.08. | 09.09. |
+|---|---|---|
+| **NÁŠ** hráč | 50,1 % | 27,5 % |
+| **JEJICH** hráč | 0,5 % | 0,9 % |
+| **PRÁZDNÉ** | **49,4 %** | **71,5 %** |
+
+⇒ ⛔ **Už v baseline měla POLOVINA stojících volných nosičů před sebou PRÁZDNO.**
+`M11`/`C4` *(„149/149 vlastními")* tedy nikdy neříkala *„nosič je zablokovaný,
+kdykoliv stojí"* — říkala jen, že **KDYŽ je zablokovaný, je to naše tělo**.
+A to platí dál *(96,7 %)*.
+
+⇒ ⭐⭐ **Po opravě je dominantní zbytek JINÁ otázka:** v **71,5 %** případů
+nosič stojí, **ačkoliv má pole vpřed volné**. To není „vlastní zeď", to je
+buď stall doktrína *(nepřekračuj čáru dřív, než musíš — `P27`/`M10`)*, nebo
+volba MCTS. ⏰ **Tam se má `M11` posunout, ne odškrtnout.**
+
+## ⚠️ POSUN JMENOVATELE — ČÍSLO, KTERÉ SE NESMÍ ČÍST JAKO VERDIKT
+
+| | 19.08. | 09.09. |
+|---|---|---|
+| nemáme míč | 58,4 % | 61,9 % |
+| nosič **markovaný** *(v cizí TZ)* | 16,1 % | **20,3 %** |
+| nosič **volný** | 25,5 % | **17,8 %** |
+| **TD na hru** | **0,369** | **0,274** |
+
+⛔⛔ **TOHLE NENÍ NÁLEZ O M11 A NESMÍ SE TAK ČÍST.** Je to srovnání **napříč
+časem** na **pohyblivé bázi**: mezi 19.08. a 09.09. je měsíc změn na **obou**
+stranách *(P9c, M1-M5, M13, B5, L2, ramena (A)/(C), M14b, W-GFI…)* a korpus je
+jiný. Přiřadit ten pokles TD čemukoliv konkrétnímu **z tohoto běhu nelze** —
+právě na to jsou párová A/B *([[feedback_moving_baseline_only_paired_ab]])*.
+⇒ Zapsáno jako **OTÁZKA**, ne jako výsledek: *stojí za to změřit TD/hru párově?*
