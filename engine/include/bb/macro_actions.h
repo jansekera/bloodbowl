@@ -183,6 +183,16 @@ long takeBlitzContinuationEventsInSearch();
 // halves. Not part of the harness API.
 void noteBlitzContinuationEvent();
 
+// ⭐⭐ KLEC/K5 (10.09.2026): ustup NOSICE po vlastnim blitzu. Nabidka je
+//   OCENENA (Q3 mez `P_fail * zbyvajici < 1`, P_fail z `pathFailProb`), takze
+//   se meri DVOJICI: ELIGIBLE je jmenovatel (nosic blitzoval, stoji
+//   v kontaktu, ma pohyb), OFFERED z toho ty, ktere cenou presly.
+//   ⛔ Rozdil ma DVE priciny naraz (nebylo kam / prilis drahe) -- z teto
+//     dvojice se neodlisi, viz komentar u definice.
+//   Per SEARCH EVALUATION, jako ostatni citace tady.
+long takeCarrierRetreatEligibleInSearch();
+long takeCarrierRetreatOfferedInSearch();
+
 // --- B2 arm (2026-08-25): price a block against a defender who can WRESTLE ---
 //
 // blockDieBadFraction knew only the ATTACKER's Block and returned 1/6 with it.

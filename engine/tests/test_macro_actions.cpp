@@ -9,6 +9,7 @@
 #include "bb/move_handler.h"      // Q3: měřidlo provedeného vstání
 #include "bb/action_resolver.h"   // Q3: resolveAction
 #include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
+#include "bb/pathfinder.h"        // KLEC/K5: pathFailProb -- cena ústupu nosiče
 #include <algorithm>
 #include <set>
 
@@ -3551,4 +3552,251 @@ TEST(MacroActions, HandOffScoreIsOfferedAsFarAsTheExecutorCanWalk) {
     EXPECT_FALSE(hasMacroType(macrosFar, MacroType::HAND_OFF_SCORE))
         << "vzdálenost 5 je nad rozpočet MA3 nosiče, nabídka by byla "
            "nedokončitelná (táž vada jako BLITZ_AND_SCORE `maxReach + 3`)";
+}
+
+// ============================================================================
+// ⭐⭐⭐ KLEC/K5 (10.09.2026): USTUP NOSICE PO VLASTNIM BLITZU JE OCENENY.
+//
+// Zmereno (`evidence/carrier_marked_end_20260910.md`): na konci naseho kola
+// stoji nosic vedle stojiciho soupere v 24,6 % kol, a v 38,6 % z toho se tam
+// VBLOKOVAL SAM. Mechanismus ustupu (M1/N10) uz existuje, nosic byl jen
+// vynechany -- a odgatovat ho nejde: pro nosice je selhany dodge TURNOVER.
+//
+// ⛔ Tyhle testy hlidaji, ze CENA JE SKUTECNA, ne dekorace: stejna geometrie
+//   se jednou nabidne (levne) a jednou ne (draze). Bez druheho testu by
+//   „nabizi se" neodlisilo ocenenou nabidku od odgatovane.
+// ============================================================================
+
+namespace {
+// Nosic id 1 na (10,7) PO BLITZU, v kontaktu se stojicim souperem na (11,7).
+// `mates` = kolik NASICH spoluhracu jeste neslo (jmenovatel Q3 ceny).
+// `carrierAg` = obratnost nosice (rizeni ceny dodge).
+GameState makeCarrierRetreatState(int mates, int carrierAg) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.weather = Weather::NICE;
+
+    Player& c = state.getPlayer(1);
+    c.id = 1; c.teamSide = TeamSide::HOME; c.state = PlayerState::STANDING;
+    c.position = {10, 7};
+    c.stats = {6, 3, static_cast<uint8_t>(carrierAg), 8};
+    c.movementRemaining = 5;      // uz neco ubehl k blitzu
+    c.hasMoved = true;            // blitzoval
+    c.usedBlitz = true;           // ⭐ marker M1/N10: aktivace zustala otevrena
+    c.hasActed = false;
+
+    Player& e = state.getPlayer(12);
+    e.id = 12; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+    e.position = {11, 7};
+    e.stats = {6, 3, 3, 8};
+    e.movementRemaining = 6;
+
+    // Spoluhraci daleko od nosice, at nerusi geometrii ustupu -- jsou tu jen
+    // jako POCET aktivaci, ktere by turnover zabil.
+    for (int i = 0; i < mates; ++i) {
+        Player& m = state.getPlayer(2 + i);
+        m.id = 2 + i; m.teamSide = TeamSide::HOME; m.state = PlayerState::STANDING;
+        m.position = {static_cast<int8_t>(2 + i), 1};
+        m.stats = {6, 3, 3, 8};
+        m.movementRemaining = 6;
+        m.hasMoved = false; m.hasActed = false;
+    }
+
+    state.ball = BallState::carried({10, 7}, 1);
+    return state;
+}
+
+// Ustupove pole, ktere M1/N10 smycka vybere: nejblizsi volne pole mimo VSECHNY
+// souperovy tacklezony. Fixture si ho MUSI overit sama, ne predpokladat.
+Position k5RetreatSquare(const GameState& state, const Player& p) {
+    Position best{-1, -1};
+    int bestDist = 99;
+    const int reach = p.movementRemaining;
+    for (int dy = -reach; dy <= reach; ++dy) {
+        for (int dx = -reach; dx <= reach; ++dx) {
+            if (dx == 0 && dy == 0) continue;
+            Position cand{static_cast<int8_t>(p.position.x + dx),
+                          static_cast<int8_t>(p.position.y + dy)};
+            if (!cand.isOnPitch()) continue;
+            if (state.getPlayerAtPosition(cand) != nullptr) continue;
+            if (countTacklezones(state, cand, p.teamSide) != 0) continue;
+            const int d = p.position.distanceTo(cand);
+            if (d < bestDist) { bestDist = d; best = cand; }
+        }
+    }
+    return best;
+}
+}  // namespace
+
+namespace {
+// Kolik NASICH spoluhracu jeste nejde -- tataz definice jako
+// `teammatesStillToAct` (macro_actions.cpp, static). Fixture si POCET overuje
+// sama, aby „draze" a „levne" nebylo jen prani.
+int k5MatesStillToAct(const GameState& state, int excludeId) {
+    int n = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& m) {
+        if (m.id != excludeId && !m.hasActed && m.canAct()) ++n;
+    });
+    return n;
+}
+
+// Nabidnul se K5 ustup na OCEKAVANE pole?
+bool k5RetreatOffered(const std::vector<Macro>& macros, int playerId, Position target) {
+    for (const auto& m : macros) {
+        if (m.type == MacroType::REPOSITION && m.playerId == playerId &&
+            m.targetPos == target) return true;
+    }
+    return false;
+}
+}  // namespace
+
+// ⛔⛔⛔ TOHLE JE TA FIXTURE-KONTROLA, BEZ KTERE SE TESTY NIZE NEDAJI CIST:
+//   tvrdi, CO fixture skutecne postavila, a hlavne uchovava MERENY NALEZ,
+//   kvuli kteremu ma K5 cena dva cleny.
+TEST(MacroActions, K5FixtureBuildsTheGeometryWeThinkAndPathFailProbMissesTheEscapeDodge) {
+    // AG -> cil dodge pri VYSTUPU z kontaktu (6-AG, cilove pole bez TZ).
+    const std::pair<int,int> agToTarget[] = {{1,5},{2,4},{3,3},{4,2}};
+    for (const auto& kv : agToTarget) {
+        GameState s = makeCarrierRetreatState(/*mates=*/1, /*carrierAg=*/kv.first);
+        const Player& c = s.getPlayer(1);
+
+        // (a) Nosic je NOSIC a je v kontaktu -- bez toho neni co resit.
+        ASSERT_TRUE(s.ball.isHeld);
+        ASSERT_EQ(s.ball.carrierId, 1);
+        ASSERT_TRUE(c.usedBlitz) << "K5 gate je `usedBlitz`, ne hasMoved";
+        ASSERT_TRUE(c.canAct());
+        ASSERT_GT(c.movementRemaining, 0);
+        ASSERT_EQ(countTacklezones(s, c.position, c.teamSide), 1)
+            << "nosic MUSI stat v jedne souperove tacklezone, jinak K5 gate "
+               "vubec netika";
+
+        // (b) Ustupove pole je na JEDEN krok a je mimo VSECHNY tacklezony.
+        const Position r = k5RetreatSquare(s, c);
+        ASSERT_EQ(r, Position(9, 6)) << "smycka M1/N10 vybira nejblizsi volne "
+                                        "pole mimo tacklezony";
+        ASSERT_EQ(c.position.distanceTo(r), 1)
+            << "ustup je JEDEN krok -- kdyby byl dva, cena by mela clen navic";
+        ASSERT_EQ(countTacklezones(s, r, c.teamSide), 0);
+
+        // (c) Pocet spoluhracu, kteri jeste nesli = jmenovatel Q3 ceny.
+        ASSERT_EQ(k5MatesStillToAct(s, 1), 1);
+
+        // (d) ⛔⛔ MERENY NALEZ (10.09.2026): `pathFailProb` na tomhle ustupu
+        //   vraci PRESNE 0 pro KAZDE AG, protoze uctuje dodge pri VSTUPU do
+        //   tacklezony (pathfinder.cpp:191), zatimco resolver ho hodi pri
+        //   VYSTUPU (move_handler.cpp:127). Proto ma K5 cena druhy clen.
+        //   ⇒ Kdyz tenhle EXPECT jednou spadne, `pathFailProb` byla opravena
+        //     a K5 cena se MUSI prepocitat (jinak by dvojity clen preplacel).
+        const double pPath = pathFailProb(s, c, r, c.movementRemaining,
+                                          Position{-1, -1});
+        EXPECT_DOUBLE_EQ(pPath, 0.0)
+            << "AG " << kv.first << ": pathFailProb SAMA ustup z kontaktu "
+               "neuctuje -- kdyby uz uctovala, K5 cena se preplaci dvakrat";
+
+        // (e) A tohle je ten hod, ktery se SKUTECNE hodi -- druhy clen ceny.
+        EXPECT_EQ(calculateDodgeTarget(s, c, r, c.position), kv.second)
+            << "AG " << kv.first << ": cil vystupniho dodge";
+    }
+}
+
+// ⭐ TEST 1: LEVNY USTUP => NABIDNE SE. (AG3 => P_fail = 3/6... presneji
+//   cil 3+ na D6, tedy P_fail = 2/6 = 0,3333; jeden spoluhrac jeste nesel
+//   => 0,3333 * 1 = 0,3333 < 1.)
+TEST(MacroActions, K5CheapCarrierRetreatIsOffered) {
+    GameState s = makeCarrierRetreatState(/*mates=*/1, /*carrierAg=*/3);
+    const Position r = k5RetreatSquare(s, s.getPlayer(1));
+    ASSERT_EQ(k5MatesStillToAct(s, 1), 1);       // jmenovatel, overeny
+
+    takeCarrierRetreatEligibleInSearch();
+    takeCarrierRetreatOfferedInSearch();
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+
+    EXPECT_EQ(takeCarrierRetreatEligibleInSearch(), 1)
+        << "nosic po blitzu, v kontaktu, s pohybem = eligible (JMENOVATEL)";
+    EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 1)
+        << "0,3333 * 1 < 1 => cena to pousti";
+    EXPECT_TRUE(k5RetreatOffered(macros, 1, r))
+        << "nosic se ma smet stahnout z kontaktu -- 38,6 % konecnych "
+           "porusení si do nej vblokoval sam (evidence/carrier_marked_end_20260910.md)";
+}
+
+// ⭐⭐ TEST 2: TATAZ GEOMETRIE, DRAHY USTUP => NENABIDNE SE.
+//   ⛔ TOHLE JE TEST, KTERY DOKAZUJE, ZE CENA NENI DEKORACE. Bez nej by
+//     „nabizi se" neodlisilo ocenenou nabidku od odgatovane.
+TEST(MacroActions, K5ExpensiveCarrierRetreatIsWithheldByThePrice) {
+    // (a) DRAHO PRES POCET AKTIVACI: AG3, ale pet spoluhracu jeste nesle
+    //     => 0,3333 * 5 = 1,667 >= 1. Turnover by stal vic nez zustat.
+    GameState many = makeCarrierRetreatState(/*mates=*/5, /*carrierAg=*/3);
+    const Position rMany = k5RetreatSquare(many, many.getPlayer(1));
+    ASSERT_EQ(k5MatesStillToAct(many, 1), 5) << "fixture MUSI mit 5 aktivaci";
+    ASSERT_EQ(rMany, Position(9, 6)) << "geometrie je TATAZ jako v testu 1";
+
+    takeCarrierRetreatEligibleInSearch();
+    takeCarrierRetreatOfferedInSearch();
+    std::vector<Macro> macrosMany;
+    getAvailableMacros(many, macrosMany);
+
+    EXPECT_EQ(takeCarrierRetreatEligibleInSearch(), 1)
+        << "eligible tika i kdyz cena zamitne -- jinak by nula 'offered' "
+           "nebyla citelna";
+    EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 0)
+        << "0,3333 * 5 >= 1 => cena MUSI zamitnout";
+    EXPECT_FALSE(k5RetreatOffered(macrosMany, 1, rMany))
+        << "drahy ustup nesmi byt na nabidce: selhany dodge = mic na zemi";
+
+    // (b) DRAHO PRES KOSTKU: AG1 (cil 5+, P_fail 4/6 = 0,6667) a jen DVA
+    //     spoluhraci => 1,333 >= 1. Tentyz pocet aktivaci, jina kostka.
+    GameState badAg = makeCarrierRetreatState(/*mates=*/2, /*carrierAg=*/1);
+    ASSERT_EQ(k5MatesStillToAct(badAg, 1), 2);
+    ASSERT_EQ(calculateDodgeTarget(badAg, badAg.getPlayer(1), Position{9, 6},
+                                   badAg.getPlayer(1).position), 5)
+        << "AG1 dodge z kontaktu na cistou zem je 5+";
+    takeCarrierRetreatOfferedInSearch();
+    std::vector<Macro> macrosBad;
+    getAvailableMacros(badAg, macrosBad);
+    EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 0)
+        << "0,6667 * 2 >= 1 => zamitnuto kostkou, ne poctem";
+
+    // (c) ⭐ POZITIVNI KONTROLA TEHOZ POCTU: pri DVOU aktivacich a AG4
+    //     (cil 2+, P_fail 1/6) je 0,1667 * 2 = 0,333 < 1 => nabidne se.
+    //     Bez teto kontroly by (b) mohlo projit i s rozbitym citacem.
+    GameState goodAg = makeCarrierRetreatState(/*mates=*/2, /*carrierAg=*/4);
+    ASSERT_EQ(k5MatesStillToAct(goodAg, 1), 2) << "TYZ pocet aktivaci jako v (b)";
+    takeCarrierRetreatOfferedInSearch();
+    std::vector<Macro> macrosGood;
+    getAvailableMacros(goodAg, macrosGood);
+    EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 1)
+        << "tyz pocet aktivaci, lepsi kostka => cena to pousti "
+           "(dokazuje, ze rozhoduje CENA, ne fixture)";
+}
+
+// ⭐ TEST 3: REGRESNI POJISTKA -- NENOSIC se nezmenil ani o nabidku, ani
+//   o citac. M1/N10 je nasazena produkce (+0,0177 +- 0,0069) a K5 se ji
+//   nesmi dotknout.
+TEST(MacroActions, K5LeavesTheNonCarrierBlitzerRetreatUntouched) {
+    GameState s = makeCarrierRetreatState(/*mates=*/5, /*carrierAg=*/3);
+    // Tentyz hrac, tataz geometrie -- jen mic NEDRZI (lezi daleko).
+    s.ball = BallState::onGround({2, 12});
+    const Position r = k5RetreatSquare(s, s.getPlayer(1));
+    ASSERT_EQ(r, Position(9, 6));
+    ASSERT_FALSE(s.ball.isHeld);
+
+    takeCarrierRetreatEligibleInSearch();
+    takeCarrierRetreatOfferedInSearch();
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+
+    EXPECT_TRUE(k5RetreatOffered(macros, 1, r))
+        << "nenosicuv ustup je PRODUKCE od 07.09. a K5 ho nesmi zdrazit -- "
+           "PET aktivaci a AG3 by nosice zamitlo, tenhle hrac ale mic nedrzi";
+    EXPECT_EQ(takeCarrierRetreatEligibleInSearch(), 0)
+        << "K5 citac je JEN o nosici -- kdyby tikal i nenosicum, jmenovatel "
+           "by merilo neco jineho, nez rika jeho jmeno";
+    EXPECT_EQ(takeCarrierRetreatOfferedInSearch(), 0);
 }

@@ -163,6 +163,10 @@ static long g_hitStood = 0, g_hitStoodBl = 0, g_kdStood = 0;
 //   -- kolikrat blitz nechal aktivaci otevrenou, odmitl follow-up nebo dostal
 //   nabidku ustupu. Tika ve VSECH modech, obema stranam.
 static long g_blitzCont = 0;
+// ⭐ KLEC/K5 (10.09.): ustup NOSICE po vlastnim blitzu -- [eligible, offered].
+//   Jmenovatel MUSI byt videt: nula v `offered` sama neodlisi „cena zamita
+//   vsechno" od „rozbity citac". Tika ve vsech modech, obema stranam.
+static long g_k5Elig = 0, g_k5Off = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
 static const Matchup MATCHUPS[] = {
@@ -623,6 +627,10 @@ int main(int argc, char** argv) {
                 //   stranam a rika, jak casto blitzujici vubec pokracuje.
                 //   Neni to uz signal ramene (viz `modeHasArmSignal`).
                 bb::takeBlitzContinuationEventsInSearch();   // vynuluj na par
+                // KLEC/K5: tataz hygiena -- citace nosicova ustupu se nuluji
+                // na par, aby se do nej nepricetlo nic z pripravy.
+                bb::takeCarrierRetreatEligibleInSearch();
+                bb::takeCarrierRetreatOfferedInSearch();
                 // ⛔ mode 11 (B2) ZRUSEN 30.08.: noc 29.->30.08. dala
                 // EKVIVALENCI (delta +0,0010 +- 0,0034, cele CI uvnitr prahu),
                 // cena je od te doby v PRODUKCI vzdy a rameno padlo. Cislo 11
@@ -666,6 +674,8 @@ int main(int argc, char** argv) {
                 bb::setLeapWalkArm(bb::TeamSide::HOME, false);
                 bb::setLeapWalkArm(bb::TeamSide::AWAY, false);
                 g_blitzCont += bb::takeBlitzContinuationEventsInSearch();
+                g_k5Elig += bb::takeCarrierRetreatEligibleInSearch();
+                g_k5Off  += bb::takeCarrierRetreatOfferedInSearch();
                 long candWrestle = 0;   // mode 11 zrusen (viz vyse)
                 // ⭐ M12 krok 1 (30.08.): diagnostika ADVANCE, NEZAVISLA na
                 //   ramenech -- tika i s vypnutymi. Odpovida na otazku, jestli
@@ -1072,6 +1082,11 @@ int main(int argc, char** argv) {
             printf("  M1/POKRACOVANI: %ld udalosti (aktivace otevrena / follow-up "
                    "odmitnut / ustup nabidnut) -- od 07.09. PRODUKCE, obe strany\n",
                    g_blitzCont);
+            printf("  K5/USTUP-NOSICE: eligible %ld, NABIDNUTO %ld (%.1f %%)"
+                   "  -- cena Q3: P_fail(cesta) * zbyvajici < 1;"
+                   " zbytek = nebylo kam NEBO prilis drahe\n",
+                   g_k5Elig, g_k5Off,
+                   g_k5Elig ? 100.0 * g_k5Off / g_k5Elig : 0.0);
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);

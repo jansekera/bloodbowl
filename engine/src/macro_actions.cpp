@@ -32,6 +32,13 @@ static const Player* findCarrier(const GameState& state) {
     return &p;
 }
 
+// Dopredna deklarace -- definice je az u `expandReposition` (r. ~3350). KLEC/K5
+// (nabidka ustupu NOSICI, r. ~1430) potrebuje TENTYZ pocet, jakym se ceni
+// Q3 utek a W-GFI: dve kopie tehoz pravidla se rozejdou (poucení z M1/N10,
+// `endBlockActivation`).
+static int teammatesStillToAct(const GameState& state, int excludePlayerId,
+                               TeamSide side);
+
 // Score a MOVE action: lower is better.
 // Prefers: close to target, no enemy TZ, no GFI.
 // LEAP do makrove chuze (rodina M), 26.08.2026. Default OFF -- pri OFF je
@@ -732,6 +739,32 @@ long takeBlitzContinuationEventsInSearch() {
     return v;
 }
 
+// ⭐⭐ KLEC/K5 (10.09.2026): ustup NOSICE po vlastnim blitzu -- DVA citace,
+//   protoze nabidka je OCENENA a jeden citac by o pricine nuly nerekl nic.
+//   ELIGIBLE = jmenovatel: nosic blitzoval, STOJI V KONTAKTU a ma pohyb.
+//   OFFERED  = z toho ty, ktere presly cenou (Q3 mez `P_fail * zbyvajici < 1`).
+//   ⛔ Rozdil ELIGIBLE-OFFERED ma DVE priciny naraz: „nebylo kam" (zadne
+//     volne pole mimo vsechny tacklezony) a „prilis drahe". Kdo bude cist
+//     nulu OFFERED, musi je odlisit jinak (napr. K5 sondou), ne z tehle
+//     dvojice -- rika se to tady, aby se to necetlo jako jedna pricina.
+//   ⭐ Bez jmenovatele by nula OFFERED byla necitelna
+//     ([[feedback_zero_needs_a_positive_control]]), bez tisku v harnessu by
+//     citac byl past ([[feedback_arm_counter_needs_mode_wiring]]).
+thread_local long g_carrierRetreatEligible = 0;
+thread_local long g_carrierRetreatOffered  = 0;
+
+long takeCarrierRetreatEligibleInSearch() {
+    long v = g_carrierRetreatEligible;
+    g_carrierRetreatEligible = 0;
+    return v;
+}
+
+long takeCarrierRetreatOfferedInSearch() {
+    long v = g_carrierRetreatOffered;
+    g_carrierRetreatOffered = 0;
+    return v;
+}
+
 long takeDauntlessOfferEvalsInSearch() {
     long v = g_dauntlessOffers;
     g_dauntlessOffers = 0;
@@ -1400,19 +1433,72 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     //
     // ⚠️ SCOPE -- this is the RETREAT only. The user's other case, "the carrier
     // opens his own lane with a blitz and runs through it", needs SCORE/ADVANCE
-    // to accept a mid-activation player and is a bigger change; the carrier is
-    // skipped here and keeps his own macros.
+    // to accept a mid-activation player and is a bigger change; that half is
+    // still out of scope.
     // ⚠️ No GFI: a retreat bought with a Go For It is a gamble, not hygiene,
     // and M9's ceiling counted only squares reachable on real movement.
     //
     // ⭐ M1/N10 NASAZENO 07.09.2026 -- rameno odebrano, nabidka ustupu je
     // PRODUKCE (noc 27.->28.08.: +0,0177 +- 0,0069, >2,5 sigma, 6/6 predpovedi).
+    //
+    // ============================================================================
+    // ⭐⭐⭐ KLEC/K5 (10.09.2026): NOSIC UZ NENI VYNECHANY -- USTUP SE MU CENI.
+    //
+    // Zmereno dnes (`evidence/carrier_marked_end_20260910.md`): NA KONCI NASEHO
+    // KOLA stoji nosic vedle stojiciho soupere v 24,6 % kol (trpaslik), a to
+    // souperi dava BLOK NA MIC ZDARMA -- neomezene, na rozdil od blitzu (jeden
+    // za kolo). Rozpad podle udalosti: nosic se do kontaktu VBLOKOVAL SAM
+    // v 38,6 % (nejvetsi jednotliva pricina), vubec nejednal 57,7 %, nas vlastni
+    // push 2,9 %, chuze ho tam nechala 0,5 %. K5 resi tu prvni polozku.
+    //
+    // ⭐ Vynechani nosice VYSE bylo KOLATERAL, ne rozhodnuti: SCOPE komentar ho
+    //   odriznul kvuli DRUHEMU pripadu ("otevre si blitzem uličku a probehne
+    //   ji"), ktery potrebuje SCORE/ADVANCE. K5 ale ulicku NECHCE -- chce
+    //   presne tenhle ustup, tedy uz hotovy a nasazeny mechanismus.
+    //
+    // ⛔⛔ PROC SE TO NESMI JEN ODGATOVAT: obycejnemu blitzujicimu stoji
+    //   SELHANY ustup jednu AKTIVACI (spadne). Nosici stoji MIC: z tacklezony
+    //   se vzdy vychazi dodgem (v jedne je z definice) a selhany dodge polozi
+    //   mic na zem = TURNOVER. Ustup se tedy musi OCENIT, ne povolit.
+    //
+    // ⭐ Cena se bere HOTOVYM PRAVIDLEM, ne novou konstantou -- tataz mez jako
+    //   Q3 utek (r. ~1250) a W-GFI (`expandReposition`):
+    //       ZUSTAT stoji nejvys JEDNU aktivaci (mez z pravidel),
+    //       USTOUPIT stoji P_fail x pocet spoluhracu, kteri jeste nesli
+    //         (turnover ukonci kolo VSEM),
+    //   ⇒ nabidne se jen kdyz  P_fail * zbyvajici < 1.
+    //   `zbyvajici` dava `teammatesStillToAct` z `hasActed`, mez 1 z pravidel.
+    //   `P_fail` ma DVA CLENY (VYSTUPNI dodge + zbytek cesty) -- proc, a proc
+    //   `pathFailProb` sama nestaci, je zmerene a rozepsane az u vypoctu nize.
+    //   ⛔ Zadna ladici konstanta.
+    //
+    // ⚠️⚠️ TATO MEZ NOSICUV PRIPAD PODCENUJE, A JE TO ZNAMY SMER CHYBY.
+    //   Q3 mez porovnava aktivace s aktivacemi. U nosice ale selhani nestoji
+    //   jen zbyvajici aktivace -- stoji MIC (souper ho muze sebrat a odnest),
+    //   coz je vic. ⇒ Pouzita mez je PERMISIVNI: nabidne ustup i tam, kde by
+    //   ho ball-aware cena uz zamitla. Verze, ktera umi ocenit ztratu mice
+    //   (ne jen ztracene aktivace), je SAMOSTATNA polozka -- tady se schvalne
+    //   nevymysli, protoze „hodnota mice v aktivacich" je presne ten druh
+    //   prevodu, ktery Q3 komentar odmita (viz r. ~1240).
+    //   ⚠️ Uvaha o VELIKOSTI te chyby je HYPOTEZA (moje, ne merena):
+    //     smer je dany (mic > aktivace), velikost nikdo nezmeril.
+    //
+    // ⭐ Rozpocet ceny je `reach` == `movementRemaining`, tedy BEZ GFI -- tim se
+    //   „no GFI" kontrakt drzi SAM: kdyz cesta na geometricky cil nevejde do
+    //   pohybu, `pathFailProb` vrati -1 a nabidka nevznikne, takze
+    //   `expandReposition` uz nema komu GFI pridelit.
+    // ============================================================================
     state.forEachOnPitch(mySide, [&](const Player& p) {
         if (!p.canAct() || !p.usedBlitz) return;
         if (p.hasSkill(SkillName::BallAndChain)) return;
-        if (iHaveBall && p.id == carrier->id) return;
         if (p.movementRemaining <= 0) return;
         if (countTacklezones(state, p.position, mySide) == 0) return;  // not exposed
+
+        // Jmenovatel K5: nosic po blitzu, v kontaktu, s pohybem. Tika PRED
+        // hledanim pole, takze rozdil proti OFFERED nese obe priciny
+        // (nebylo kam / prilis drahe) -- viz komentar u citace.
+        const bool isCarrier = (iHaveBall && p.id == carrier->id);
+        if (isCarrier) ++g_carrierRetreatEligible;
 
         // Nearest free square that is outside EVERY enemy tackle zone. The
         // target is geometric and the executor walks it, exactly like every
@@ -1434,6 +1520,66 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             }
         }
         if (best.x >= 0) {
+            if (isCarrier) {
+                // ============================================================
+                // ⛔⛔⛔ K5 CENA MA DVA CLENY, A JE TO MERENY NALEZ, NE VOLBA.
+                //
+                // `pathFailProb` SAMA vraci pro ustup z kontaktu PRESNE 0,0000
+                //   -- zmereno sondou `K5ProbeWhatTheFixtureActuallyBuilt`
+                //   (test_macro_actions.cpp) pro AG 1,2,3,4: vsude 0,0000,
+                //   pritom resolver hodi dodge s cilem 5+ (AG1) az 2+ (AG4).
+                // ⭐ PRICINA: `riskWeightedDijkstra`/`pathFailProb` uctuji
+                //   dodge, kdyz se do tacklezony VSTUPUJE (`np`,
+                //   pathfinder.cpp:191), ale pravidla a resolver ho uctuji pri
+                //   VYSTUPU z ni (`from`, move_handler.cpp:127) -- tak to dela
+                //   i `estimateApproachFailChance` (`cur`, r. ~1030). Ustupove
+                //   pole je z DEFINICE mimo vsechny tacklezony, takze
+                //   „vstupni" model na nem neuctuje NIC.
+                // ⇒ Kdyby se cena nechala jen na `pathFailProb`, byla by to
+                //   DEKORACE: 0 * cokoli < 1 plati vzdy a nabidka by se nikdy
+                //   nezamitla. Presne ta chybejici polozka je ta, ktera stoji
+                //   mic.
+                // ⚠️ NEOPRAVUJE SE TU `pathFailProb`: je NASAZENA a ZMERENA
+                //   pod W-GFI (09.09.), takze zmena jejich cisel je samostatna
+                //   polozka, ne vedlejsi efekt K5.
+                //
+                // ⭐ Chybejici clen se necini novym vzorcem -- bere se TENTYZ,
+                //   jaky uz ma Q3 utek (r. ~1250): cil z `calculateDodgeTarget`
+                //   od hracova VLASTNIHO pole, a reroll dovednosti Dodge jako
+                //   umocneni, kdyz ho soused s Tackle nerusi. Oba cleny se
+                //   spoji jako NEZAVISLE udalosti -- tyz model, jaky
+                //   `pathFailProb` pouziva sama pro dodge a GFI.
+                // ⚠️ ZNAMY SMER DRUHE CHYBY: kdyz je ustup na VIC krok a prvni
+                //   krok dosedne DO tacklezony, uctuje se ten jeden krok
+                //   dvakrat (tady jako vystup, v `pathFailProb` jako vstup)
+                //   ⇒ cena se PREPLATI a nabidka se zamitne casteji. Smer je
+                //   konzervativni; velikost nikdo nemeril (hypoteza, ne mereni).
+                // ============================================================
+                Position firstStep{-1, -1};
+                if (!nextStepToward(state, p, best, reach, Position{-1, -1},
+                                    firstStep)) {
+                    return;   // chuze by se nikam nedostala -- neni co nabizet
+                }
+                const int dodgeTarget =
+                    calculateDodgeTarget(state, p, firstStep, p.position);
+                double pEscape = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
+                if (p.hasSkill(SkillName::Dodge) &&
+                    !tackleNegatesDodgeReroll(state, p, p.position)) {
+                    pEscape *= pEscape;
+                }
+                // Rozpocet BEZ GFI, zadne blokovane pole (nosic mic DRZI,
+                // takze na hristi zadny volny mic k obchazeni neni).
+                const double pPath = pathFailProb(state, p, best, reach,
+                                                  Position{-1, -1});
+                // pPath < 0: cil neni dosazitelny na cisty pohyb ⇒ nedá se
+                // ocenit, tedy se ani nenabizi (GFI by z hygieny udelal hazard).
+                if (pPath < 0.0) return;
+                const double pFail = 1.0 - (1.0 - pEscape) * (1.0 - pPath);
+
+                const int remaining = teammatesStillToAct(state, p.id, mySide);
+                if (pFail * remaining >= 1.0) return;
+                ++g_carrierRetreatOffered;
+            }
             noteBlitzContinuationEvent();
             out.push_back({MacroType::REPOSITION, p.id, -1, best});
         }
