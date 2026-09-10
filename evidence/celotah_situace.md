@@ -391,7 +391,29 @@ stojí běžně ⇒ **žádná závislost na celotahu**. Veškerá mašinérie j
 doběh `nextStepTowardAdjacent` *(M14b)* a blok.
 ⛔ **Zaparkovat to sem by znamenalo pověsit ho za celou chybějící vrstvu**,
 přitom v okruhu BLITZ je to implementovatelné dnes. ⇒ **Vedeno v `task_queue.md`
-pod BLITZEM**, sem jen tento ukazatel.
+pod BLITZEM jako `B8`**, sem jen tento ukazatel.
+
+### ⛔⛔⛔ A VADA, KTEROU SI MUSÍŠ PŘEČÍST, NEŽ CELOTAH SÁHNE NA LEAP
+
+*(uživatel 10.09.: „nezapomeň na ni pak u blitz a celotah u leap")*
+
+> **`macro_actions.cpp:2494` — když je `leapWalkArm` ON, `movePlayerToward`
+> použije STARÝ HLADOVÝ `findMoveToward` místo nasazeného BFS `nextStepToward`.**
+
+⇒ Rameno mění **DVĚ věci naráz**: leap jako kandidát **a** regresi obecného
+pohybu na hladový výběr. **Jakýkoli běh s ním zapnutým měří jejich SOUČET**
+a přiřkne ho jednomu jménu — táž třída jako noc `Q3`, která se proto musela
+dělit na `16`/`17`.
+
+⭐ **Rozhodnutí uživatele 10.09.: rameno se NECHÁVÁ ZAPARKOVANÉ** *(varianta „b")*,
+**neopravuje se a neruší.** Důvod, proč se neruší: je to **jediná cesta, kterou
+se `LEAP` dostane do makra** *(nabídka v `rules_engine.cpp:82` existuje, ale MCTS
+bere makra, ne holé akce)* ⇒ zrušením by LEAP spadl do **mrtvého kódu** jako
+před 24.08. *(`F12`)*.
+
+⇒ ⛔ **Až celotah zdi postaví a bude se `A-tvrdé` přeměřovat *(viz (A) výš)*,
+NESMÍ se to měřit přes `leapWalkArm`** — buď se ta dvojitost napřed opraví
+**jako samostatná změna s vlastním ověřením**, nebo měření dostane vlastní bránu.
 
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
