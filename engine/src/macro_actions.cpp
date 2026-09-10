@@ -606,6 +606,8 @@ long takeAdvanceResignedButSideFreeInSearch() {
 thread_local long g_advTgtLine = 0;      // cil dala PRIMKOVA smycka
 thread_local long g_advTgtSquare = 0;    // cil dala 2D zaloha (M12/A+C)
 thread_local long g_advTgtNone = 0;      // ADVANCE rezignoval uplne
+thread_local long g_advTgtLineCage = 0;  // K3: sken PREBIL primku (stejny postup, cistsi rohy)
+long takeAdvanceTargetCageOverrode() { long v=g_advTgtLineCage; g_advTgtLineCage=0; return v; }
 long takeAdvanceTargetSourceLine()   { long v=g_advTgtLine;   g_advTgtLine=0;   return v; }
 long takeAdvanceTargetSourceSquare() { long v=g_advTgtSquare; g_advTgtSquare=0; return v; }
 long takeAdvanceTargetSourceNone()   { long v=g_advTgtNone;   g_advTgtNone=0;   return v; }
@@ -2913,9 +2915,30 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     //   „do jednoho pole od nejlepšího postupu". Tohle je jen „nerezignuj,
     //   když existuje volné pole vpřed" -- podmínky zůstávají tytéž, co má
     //   smyčka: volné pole, bez soupeřovy tacklezóny, postup >= 1.
-    if (!armChoseSquare && steps <= 0) {
+    // ⭐⭐⭐ KLEC/K3 (10.09.2026): CÍL NOSIČE ZNÁ ZAPLNITELNOST ROHŮ.
+    //   `P9` má změřený strop: pole, ze kterého vyjde **plná čistá klec**,
+    //   existuje v **95,6 %** kol -- a plníme ho ve **2,7 %**. Rozpočet těl
+    //   brání jen ve 3,7 %, soupeř v 0,7 % ⇒ není to „nemáme koho poslat",
+    //   je to VOLBA POLE.
+    // ⭐ A `K2` změřilo, KDE se ta volba dělá: **přímková smyčka rozhoduje
+    //   v 65,7 %** volání *(9 019 volání, 4 páry)*, 2D záloha ve 21,3 %.
+    //   ⇒ Kritérium proto NESMÍ zůstat jen v záloze; ta řeší pětinu případů.
+    //   Proto se sken pouští VŽDY, ne jen `když steps <= 0`.
+    //
+    // ⛔⛔ ROZSAH: POSTUP ZŮSTÁVÁ PRIMÁRNÍ. Sken maximalizuje `prog` nad týmž
+    //   čtvercem, takže `bestProg >= steps` vždy -- postup se nemůže zkrátit.
+    //   Klec je až TIEBREAK mezi stejně daleko vedoucími poli, a `drift` až
+    //   za ní. Bez toho by z opravy bylo „chodit do stran za klec", což je
+    //   jiná změna a musela by se měřit zvlášť.
+    // ⚠️ „Zaplnitelnost" je GEOMETRICKÁ: roh se počítá, když je na hřišti,
+    //   PRÁZDNÝ a MIMO soupeřovu tacklezónu -- tedy „čistý roh" z definice
+    //   `P9`. ⛔ Dosažitelnost našimi těly se tu ZÁMĚRNĚ neřeší: v `P9` ji
+    //   měřil zvlášť ("rozpočet těl brání ve 3,7 %"), je to malá složka, a
+    //   reachability dotaz na čtyři rohy každého kandidáta by v MCTS stál
+    //   řádově víc než celý zbytek téhle funkce.
+    if (!armChoseSquare) {
         Position best{-1, -1};
-        int bestProg = 0, bestDrift = 99;
+        int bestProg = 0, bestCorners = -1, bestDrift = 99;
         for (int ox = -origSteps; ox <= origSteps; ++ox) {
             for (int oy = -origSteps; oy <= origSteps; ++oy) {
                 Position cand{static_cast<int8_t>(carrier.position.x + ox),
@@ -2925,18 +2948,63 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
                 const int prog = dx * (cand.x - carrier.position.x);
                 if (prog < 1) continue;
                 if (countTacklezones(state, cand, carrier.teamSide) > 0) continue;
-                // Nejdál vpřed; při shodě to, co se nejmíň uhne od přímky --
-                // aby se z opravy nestalo „chodit do stran", když jde rovně.
+                // Kolik ze ctyr diagonal by slo obsadit CISTYM rohem.
+                int corners = 0;
+                for (int sx : {-1, 1}) {
+                    for (int sy : {-1, 1}) {
+                        Position slot{static_cast<int8_t>(cand.x + sx),
+                                      static_cast<int8_t>(cand.y + sy)};
+                        if (!slot.isOnPitch()) continue;
+                        if (state.getPlayerAtPosition(slot)) continue;
+                        if (countTacklezones(state, slot, carrier.teamSide) > 0) continue;
+                        ++corners;
+                    }
+                }
+                // Nejdál vpřed; při shodě nejvíc čistých rohů; teprve pak to,
+                // co se nejmíň uhne od přímky.
                 const int drift = std::abs(oy);
-                if (prog > bestProg || (prog == bestProg && drift < bestDrift)) {
-                    bestProg = prog; bestDrift = drift; best = cand;
+                if (prog > bestProg ||
+                    (prog == bestProg && corners > bestCorners) ||
+                    (prog == bestProg && corners == bestCorners && drift < bestDrift)) {
+                    bestProg = prog; bestCorners = corners; bestDrift = drift; best = cand;
                 }
             }
         }
-        if (best.x >= 0) {
+        // ⛔⛔ ROZSAH -- A JE UŽŠÍ, NEŽ PRVNÍ VERZE TÉHLE ZMĚNY.
+        //   První pokus adoptoval sken, kdykoli `bestProg >= steps`. To ale
+        //   nebyl tiebreak: u testu `AdvanceTargetPulledBackFromEnemyTZ` nosič
+        //   skončil na **x=15 místo 12**, tedy o TŘI POLE DÁL, protože mimo
+        //   přímku bylo pole bez TZ. To je jiná a větší změna — „zvyšuj postup
+        //   uhnutím z přímky, i když přímka vede" — a musí se měřit zvlášť
+        //   *(vedeno jako `K3b`)*. Sem nepatří.
+        // ⇒ Rozlišují se proto DVA případy:
+        //   · přímka NEVEDE (`steps <= 0`) ⇒ chová se to jako dosud (M12/A+C):
+        //     vezmi cokoli s postupem >= 1, jinak by `ADVANCE` rezignoval.
+        //   · přímka VEDE ⇒ adoptuj **jen při STEJNÉM postupu a STRIKTNĚ
+        //     čistších rozích** než má cíl na přímce. Postup se nemůže ani
+        //     zkrátit, ani prodloužit; mění se jen VOLBA mezi stejně dobrými.
+        int lineCorners = -1;
+        if (steps > 0) {
+            lineCorners = 0;
+            for (int sx : {-1, 1}) {
+                for (int sy : {-1, 1}) {
+                    Position slot{static_cast<int8_t>(target.x + sx),
+                                  static_cast<int8_t>(target.y + sy)};
+                    if (!slot.isOnPitch()) continue;
+                    if (state.getPlayerAtPosition(slot)) continue;
+                    if (countTacklezones(state, slot, carrier.teamSide) > 0) continue;
+                    ++lineCorners;
+                }
+            }
+        }
+        const bool lineWorked = (steps > 0);
+        const bool adopt = best.x >= 0 &&
+            (lineWorked ? (bestProg == steps && bestCorners > lineCorners)
+                        : (bestProg >= 1));
+        if (adopt) {
             target = best;
             steps = std::max(bestProg, std::abs(best.y - carrier.position.y));
-            ++g_advTgtSquare;
+            if (lineWorked) ++g_advTgtLineCage; else ++g_advTgtSquare;
         }
     }
     if (steps <= 0) {

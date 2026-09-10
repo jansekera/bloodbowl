@@ -1664,6 +1664,62 @@ TEST(MacroActions, ScoreAvoidsEnemyTZ) {
     EXPECT_FALSE(result.actions.empty());
 }
 
+// ⭐⭐⭐ KLEC/K3 (10.09.2026): PŘI STEJNÉM POSTUPU VYHRÁVÁ POLE S ČISTŠÍMI ROHY.
+//   `P9`: pole, ze kterého vyjde plná čistá klec, existuje v 95,6 % kol --
+//   plníme 2,7 %. `K2` změřilo, že o cíli rozhoduje PŘÍMKOVÁ větev v 65,7 %
+//   volání, takže kritérium muselo přijít tam, ne do 2D zálohy (21,3 %).
+// ⛔ ROZSAH: postup se nesmí ani zkrátit, ani PRODLOUŽIT. První verze téhle
+//   změny adoptovala sken při `bestProg >= steps` a nosič skončil o TŘI POLE
+//   dál (x=15 místo 12 v testu nad tímhle) -- to je jiná změna, vedená jako
+//   `K3b`. Tady se mění jen VOLBA mezi stejně daleko vedoucími poli.
+TEST(MacroExpansion, EqualProgressPrefersTheSquareWithCleanerCageCorners) {
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    carrier.movementRemaining = 6;
+    state.ball = BallState::carried({10, 7}, 1);
+    state.homeTeam.turnNumber = 6;   // 3 kola do konce, dist 15 -> chce 5 kroku
+    state.getPlayer(12).position = {2, 2};   // souper daleko, nic nespini
+    // Naše dvě těla zašpiní DVA rohy cíle na přímce {15,7} (obsazený roh se
+    // nepočítá jako čistý), aniž by zavřela samotný cíl nebo cestu.
+    auto ours = [&](int id, Position at) {
+        Player& p = state.getPlayer(id);
+        p.id = id; p.teamSide = TeamSide::HOME; p.state = PlayerState::STANDING;
+        p.position = at; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+    };
+    ours(3, {14, 6});
+    ours(4, {14, 8});
+
+    // --- POJISTKY NA FIXTURU: bez nich test neměří, co tvrdí ---
+    auto cleanCorners = [&](Position at) {
+        int c = 0;
+        for (int sx : {-1, 1}) for (int sy : {-1, 1}) {
+            Position slot{static_cast<int8_t>(at.x + sx), static_cast<int8_t>(at.y + sy)};
+            if (!slot.isOnPitch()) continue;
+            if (state.getPlayerAtPosition(slot)) continue;
+            if (countTacklezones(state, slot, TeamSide::HOME) > 0) continue;
+            ++c;
+        }
+        return c;
+    };
+    ASSERT_EQ(cleanCorners({15, 7}), 2) << "cil na primce nema zaspinene dva rohy";
+    ASSERT_EQ(cleanCorners({15, 6}), 4) << "bocni pole nema ctyri ciste rohy";
+    ASSERT_EQ(countTacklezones(state, {15, 7}, TeamSide::HOME), 0)
+        << "cil na primce je v TZ -- primka by se stahla a test meri jinou vetev";
+
+    DiceRoller dice(42);
+    Macro macro{MacroType::ADVANCE, 1, -1, {-1, -1}};
+    greedyExpandMacro(state, macro, dice);
+
+    const Player& after = state.getPlayer(1);
+    EXPECT_EQ(after.position.x, 15)
+        << "postup se zmenil -- K3 smi menit jen VOLBU pri stejnem postupu";
+    EXPECT_EQ(after.position.y, 6)
+        << "nosic zustal na primce, ackoliv stejne daleko vpred bylo pole s cistsimi rohy";
+    EXPECT_EQ(countTacklezones(state, after.position, TeamSide::HOME), 0)
+        << "P42 ban: nosic nesmi skoncit v souperove tacklezone";
+}
+
 TEST(MacroExpansion, AdvanceTargetPulledBackFromEnemyTZ) {
     // Cage technical review 2026-08-06, finding 1: ADVANCE picks its target
     // arithmetically, and since the walk's final square is TZ-exempt

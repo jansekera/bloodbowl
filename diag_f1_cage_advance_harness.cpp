@@ -126,7 +126,7 @@ static long g_advResigned = 0;
 //     (feedback_arm_counter_needs_mode_wiring) -- proto se tiskne vzdy,
 //     i s vypnutymi rameny: zmena je BEZPODMINECNA (jako P9c).
 // ⭐ KLEC/P9 (10.09.): ktera vetev vybrala cil nosice -- soucet = vsechna volani
-static long g_tgtLine = 0, g_tgtSquare = 0, g_tgtNone = 0;
+static long g_tgtLine = 0, g_tgtSquare = 0, g_tgtNone = 0, g_tgtCage = 0;
 static long g_pushTieElig = 0;
 static long g_pushTieFlip = 0;
 static long g_advResignedSF = 0;
@@ -651,6 +651,7 @@ int main(int argc, char** argv) {
                 g_tgtLine   += bb::takeAdvanceTargetSourceLine();
                 g_tgtSquare += bb::takeAdvanceTargetSourceSquare();
                 g_tgtNone   += bb::takeAdvanceTargetSourceNone();
+                g_tgtCage   += bb::takeAdvanceTargetCageOverrode();
                 g_pushTieElig += bb::takeBlitzPushTieEligibleInSearch();
                 g_pushTieFlip += bb::takeBlitzPushTieFlipsInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
@@ -1079,7 +1080,10 @@ int main(int argc, char** argv) {
                      "rezignace %ld (%.1f %%)  [celkem %ld]\n",
                      g_tgtLine,   tgtAll ? 100.0*g_tgtLine/tgtAll : 0.0,
                      g_tgtSquare, tgtAll ? 100.0*g_tgtSquare/tgtAll : 0.0,
-                     g_tgtNone,   tgtAll ? 100.0*g_tgtNone/tgtAll : 0.0, tgtAll); }
+                     g_tgtNone,   tgtAll ? 100.0*g_tgtNone/tgtAll : 0.0, tgtAll);
+              printf("  K3/KLEC-PREBILA-PRIMKU: %ld (%.1f %% primkovych cilu)"
+                     "  -- stejny postup, cistsi rohy\n",
+                     g_tgtCage, g_tgtLine ? 100.0*g_tgtCage/g_tgtLine : 0.0); }
             printf("  B1/ODSUN-OD-NOSICE: prilezitosti %ld, z toho ZMENENA VOLBA %ld"
                    " (%.1f %%)  -- tiebreak, cena zustava primarni\n",
                    g_pushTieElig, g_pushTieFlip,

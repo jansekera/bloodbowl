@@ -301,6 +301,8 @@ long takeAdvanceResignedInSearch();
 long takeAdvanceTargetSourceLine();
 long takeAdvanceTargetSourceSquare();
 long takeAdvanceTargetSourceNone();
+// K3: kolikrat sken PREBIL primku (stejny postup, ale cistsi rohy klece).
+long takeAdvanceTargetCageOverrode();
 long takeAdvanceResignedButSideFreeInSearch();
 
 // --- P40 placebo arm (2026-08-20): the SAME square search as P38, minus the
