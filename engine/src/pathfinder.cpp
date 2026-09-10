@@ -52,6 +52,25 @@ static inline int gridIdx(int x, int y) { return y * GRID_W + x; }
 thread_local long g_blitzPathPicks = 0;
 long takeBlitzPathPicksInSearch() { long v=g_blitzPathPicks; g_blitzPathPicks=0; return v; }
 
+// ============================================================================
+// ⭐⭐ SIGNÁL TIEBREAKU „ODSUŇ HO OD NOSIČE" (B-ROUND/1, 10.09.2026)
+//
+// ⛔ PROČ NESTAČÍ `g_blitzPathPicks`: ten tiká na „rozhodl jsem se jinak než
+//   hladový výběr", což u těchhle picků platilo UŽ PŘEDTÍM ⇒ o tiebreaku
+//   neříká nic. Čítač, který tiká i tam, kde se volba nezměnila, hlásí
+//   „rameno jednalo" o rameni, které se jen dívalo (poučení z B2 a P35,
+//   `macro_actions.cpp:664-670`).
+// ⇒ FLIPS tiká VÝHRADNĚ tehdy, když se vítěz LIŠÍ od toho, koho by vybralo
+//   pravidlo bez tiebreaku (tj. první striktní minimum ceny).
+//
+// ⭐ A `ELIGIBLE` je JMENOVATEL, bez kterého se nula nedá přečíst
+//   ([[feedback_zero_needs_a_positive_control]]): kdyby FLIPS byly 0, teprve
+//   ELIGIBLE odliší „shody cen skoro nejsou" od „máme rozbitý čítač".
+thread_local long g_blitzPushTieEligible = 0;   // byl nosič A našlo se pole
+thread_local long g_blitzPushTieFlips = 0;      // ...a tiebreak volbu ZMĚNIL
+long takeBlitzPushTieEligibleInSearch() { long v=g_blitzPushTieEligible; g_blitzPushTieEligible=0; return v; }
+long takeBlitzPushTieFlipsInSearch()    { long v=g_blitzPushTieFlips;    g_blitzPushTieFlips=0;    return v; }
+
 // Delka NEJKRATSI cesty na pole sousedici s cilem (s rezervou na blok).
 // -1 = nikam nevede. Pouziva se jen jako MERITKO pro hladovou chuzi.
 int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
@@ -336,6 +355,10 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   vyhrava presne jako pred touhle zmenou.
     const Player* carrier = ourCarrierForPush(state, player);
     int bestIdx = -1, bestKey = kInfCost, bestTie = -1;
+    // ⭐ Co by vybralo pravidlo BEZ tiebreaku -- tedy prvni STRIKTNI minimum
+    //   ceny, presne jak to delal kod pred `a1d9b77d`. Slouzi jen cítaci:
+    //   `flips` smi tiknout jen kdyz se vitez opravdu LISI (viz r. 54-70).
+    int costOnlyIdx = -1;
     for (int i = 0; i < kNodeCount; ++i) {
         const int sq = i % GRID_SIZE;
         if (key[i] >= kInfCost || sq == startIdx) continue;
@@ -346,8 +369,13 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
         if (key[i] < bestKey || (key[i] == bestKey && tie > bestTie)) {
             bestKey = key[i]; bestIdx = i; bestTie = tie;
         }
+        if (costOnlyIdx < 0 || key[i] < key[costOnlyIdx]) costOnlyIdx = i;
     }
     if (bestIdx < 0) return false;
+    if (carrier) {
+        ++g_blitzPushTieEligible;
+        if (bestIdx != costOnlyIdx) ++g_blitzPushTieFlips;
+    }
 
     int idx = bestIdx;
     while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];

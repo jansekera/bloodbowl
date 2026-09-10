@@ -121,6 +121,12 @@ struct Matchup {
 };
 // M12 krok 1: akumulatory pres cely beh (scitaji se pres vsechny pary).
 static long g_advResigned = 0;
+// ⭐ B-ROUND/1 (10.09.2026): signal tiebreaku „odsun ho od nosice".
+//   ⛔ Citac BEZ radku vypisu je past, ktera se tu chytla 3x za 3 dny
+//     (feedback_arm_counter_needs_mode_wiring) -- proto se tiskne vzdy,
+//     i s vypnutymi rameny: zmena je BEZPODMINECNA (jako P9c).
+static long g_pushTieElig = 0;
+static long g_pushTieFlip = 0;
 static long g_advResignedSF = 0;
 static long g_standOff = 0, g_standOffNE = 0;   // Q3: nabidka / z toho drahych
 static long g_standEsc = 0, g_standEscNo = 0;
@@ -640,6 +646,8 @@ int main(int argc, char** argv) {
                 long candCrit = bb::takeCageCritRepicksInSearch();
                 long candProne = bb::takeProneActionPicksInSearch();
                 long candPath  = bb::takeBlitzPathPicksInSearch();
+                g_pushTieElig += bb::takeBlitzPushTieEligibleInSearch();
+                g_pushTieFlip += bb::takeBlitzPushTieFlipsInSearch();
                 long candPrice = bb::takeStandUpPricingRepicksInSearch();
                 long gfiStats[5]; bb::takeRepositionGfiStats(gfiStats);
                 long candGfi = gfiStats[1];
@@ -1061,6 +1069,10 @@ int main(int argc, char** argv) {
             printf("  M12/ADVANCE: rezignaci %ld, z toho VOLNO VEDLE %ld (%.1f %%)\n",
                    g_advResigned, g_advResignedSF,
                    g_advResigned ? 100.0 * g_advResignedSF / g_advResigned : 0.0);
+            printf("  B1/ODSUN-OD-NOSICE: prilezitosti %ld, z toho ZMENENA VOLBA %ld"
+                   " (%.1f %%)  -- tiebreak, cena zustava primarni\n",
+                   g_pushTieElig, g_pushTieFlip,
+                   g_pushTieElig ? 100.0 * g_pushTieFlip / g_pushTieElig : 0.0);
             printf("  ARM PICKS TOTAL: %ld (%.2f/game)\n",
                    armPicks, static_cast<double>(armPicks) / (2.0 * n));
             printf("  arm acted in %d/%d pairs; pairs that moved: %d; "

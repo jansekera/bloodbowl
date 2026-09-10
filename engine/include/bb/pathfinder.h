@@ -15,6 +15,11 @@ namespace bb {
 // jednoho pole na blok. Tacklezony rozhoduji mezi stejne dlouhymi cestami.
 // false = nikam nevede (pak se blitz nema o co pokouset).
 long takeBlitzPathPicksInSearch();
+// Signál tiebreaku „odsuň ho od nosiče" (B-ROUND/1). `Flips` tiká JEN když
+// tiebreak volbu skutečně změnil; `Eligible` je jmenovatel, bez kterého se
+// nula nedá odlišit od rozbitého čítače. Viz pathfinder.cpp r. 54-70.
+long takeBlitzPushTieEligibleInSearch();
+long takeBlitzPushTieFlipsInSearch();
 int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
                                Position target);
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,

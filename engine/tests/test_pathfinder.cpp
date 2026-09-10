@@ -434,6 +434,51 @@ TEST(BlitzApproach, EqualCostPicksTheSquareThatPushesAwayFromOurCarrier) {
         << "blitzujici dosedl na stranu, ze ktere tlaci cil NA nosice";
 }
 
+// ⭐⭐ CITAC TIEBREAKU: musi tiknout, KDYZ se volba zmenila -- a jen tehdy.
+// ⛔ Poucení z B2 a P35 (`macro_actions.cpp:664-670`): citac, ktery tika i tam,
+//   kde se volba nezmenila, hlasi „rameno jednalo" o rameni, ktere se jen
+//   divalo. Proto se tu meri OBOJI strana paru na TYCH SAMYCH fixturach:
+//   s nosicem se volba meni (flip), bez nosice se nemeni (eligible ani flip).
+// ⭐ A `Eligible` je jmenovatel: kdyby `Flips` byly nekdy 0, teprve on odlisi
+//   „shody cen nejsou" od „citac je rozbity".
+TEST(BlitzApproach, TiebreakCounterTicksOnlyWhenThePickActuallyChanged) {
+    const Position kFrom{13, 7}, kTarget{10, 7};
+
+    // (a) BEZ nosice: tiebreak se nesmi ani zapocitat do jmenovatele
+    takeBlitzPushTieEligibleInSearch();
+    takeBlitzPushTieFlipsInSearch();
+    GameState noBall = makeRingWithTwoHoles(kFrom, /*withCarrier=*/false);
+    Position s1{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(noBall, noBall.getPlayer(1), kTarget, s1));
+    EXPECT_EQ(takeBlitzPushTieEligibleInSearch(), 0)
+        << "bez naseho nosice nema co byt „eligible“";
+    EXPECT_EQ(takeBlitzPushTieFlipsInSearch(), 0);
+
+    // (b) S nosicem na jihu: volba se PROKAZATELNE meni (viz test vyse),
+    //     takze musi tiknout i jmenovatel i flip
+    GameState withBall = makeRingWithTwoHoles(kFrom, /*withCarrier=*/true);
+    Position s2{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(withBall, withBall.getPlayer(1), kTarget, s2));
+    ASSERT_EQ(s2, Position(12, 8)) << "fixtura uz nemeni volbu -- citac by merl neco jineho";
+    EXPECT_EQ(takeBlitzPushTieEligibleInSearch(), 1);
+    EXPECT_EQ(takeBlitzPushTieFlipsInSearch(), 1)
+        << "volba se zmenila, ale citac to nezaznamenal";
+
+    // (c) POZITIVNI KONTROLA JMENOVATELE: nosic je, ale volba se NEMENI
+    //     (nosic na SEVERU => vyhrava tataz severni dira jako bez nosice)
+    //     ⇒ eligible tiká, flip NE. Bez tehle strany by test prosel i pro
+    //     citac, ktery tika pri kazdem volani s nosicem.
+    GameState north = makeRingWithTwoHoles(kFrom, /*withCarrier=*/true);
+    north.getPlayer(8).position = Position{10, 3};      // nosic je hrac 8
+    north.ball = BallState::carried({10, 3}, 8);
+    Position s3{-1, -1};
+    ASSERT_TRUE(nextStepTowardAdjacent(north, north.getPlayer(1), kTarget, s3));
+    ASSERT_EQ(s3, Position(12, 6)) << "nosic na severu ma nechat vyhrat SEVERNI diru";
+    EXPECT_EQ(takeBlitzPushTieEligibleInSearch(), 1);
+    EXPECT_EQ(takeBlitzPushTieFlipsInSearch(), 0)
+        << "volba se nezmenila, a presto citac tikl -- meri pritomnost nosice, ne ucinek";
+}
+
 // TEST 2: ⛔ TENHLE TEST DRZI ROZSAH. Kdyz se ceny LISI, vyhrava LEVNEJSI pole,
 // i kdyz tlaci hur -- jinak by z tiebreaku byla nova optimalizace a nasazena
 // cesta M14b by se tise premerila.
