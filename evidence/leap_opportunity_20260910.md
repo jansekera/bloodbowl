@@ -50,7 +50,37 @@ tedy MA je na maximu a dochozích polí je nejvíc, co kdy bude. ⇒ **0,2 % je
 DOLNÍ hranice**; uprostřed tahu s menším zbytkem MA by „za zdí" bylo častější.
 ⭐ Ale `A&B = 0` platí **při plném MA**, a to je pro klecový případ silný signál.
 
-## 2. „DO KLECE NA BLITZ NOSIČE" — EXISTUJE, ALE CHŮZE JE OBVYKLE LEVNĚJŠÍ
+## ⭐⭐⭐ 1b. CENA TÉ PŘÍLEŽITOSTI — „S RIZIKEM" *(uživatel 10.09.)*
+
+Čísla z kódu, ne z hlavy: `calculateLeapTarget` *(`helpers.cpp:79-83`)* =
+`7 − AG`, clamp [2,6] ⇒ **Wardancer AG 4 hodí 3+**, tedy **selže ve 33,3 %**.
+Při nezdaru *(`resolveLeap`, `move_handler.cpp`)*: **hráč leží v CÍLOVÉM poli,
+hod na brnění a zranění, a je to TURNOVER.** Wardancer je **AV 7** ⇒ brnění
+padne na 8+ = **41,7 %**.
+
+| na jeden pokus | |
+|---|---|
+| skok **selže** | **33,3 %** ⇒ **turnover** *(konec tahu celému týmu)* |
+| ...a z toho prolomí brnění | 41,7 % ⇒ **13,9 % pokusů končí hodem na zranění** vlastního AV7 těla |
+| navíc `N7` | dvoupolový skok může stát **dva GFI hody** *(ř. 1701, D6 za KAŽDÉ pole navíc)* |
+| navíc `N6` | `Tentacles` a `Shadowing` platí i na skok *(ř. 8586-8587, 8456-8458)* |
+
+⇒ ⛔ **Spojeno s příležitostí: 0,2 % aktivací × 22 aktivací na hru ≈ jedna
+příležitost na ~20 her — a za cenu třetinového turnoveru.**
+⭐ To je v terminologii zadání z 25.08. *(bod 4: „řekne, jestli je to velká vada,
+nebo hygiena — přesně jako M9 u P31")* odpověď **HYGIENA**, ne velká vada.
+
+## 2. ⚠️ „DO KLECE NA NOSIČE" — a POZOR, TENHLE ODDÍL NENÍ ROZHODUJÍCÍ ARGUMENT
+
+⛔⛔ **UŽIVATEL 10.09.: *„to, že nesmíme porovnávat dodge a leap přímo, jsme už
+zjistili — proto jen situace, kam se dostane jen leap, s rizikem."*** A měl
+pravdu: zadání to říká **od 25.08.** *(`fable_brief_leap_20260825_DRAFT.md`,
+bod 4)* a tentýž dokument o dva odstavce výš uzavírá i to srovnání: *„neplatí se
+dodge za opuštění výchozího pole ⇒ z obklíčení je skok LEVNĚJŠÍ než dodge, a to
+je jeho hlavní hodnota."*
+⇒ ⛔ **Tabulka níž tedy znovuotevřela uzavřenou otázku** — nechávám ji jako
+záznam měření, ale **verdikt na ní nestojí.** Rozhoduje oddíl `1` + `1b`:
+*kam se dostane JEN leap, a co ten pokus stojí.*
 
 Pole u nosiče v dosahu leapu existuje ve **465 aktivacích (10,6 %)**. Protože
 `A&B = 0`, byla **vždycky nějak dochozí** ⇒ otázka není *„dostane se tam?"*, ale
@@ -95,15 +125,22 @@ pro leap, než by čistá pravděpodobnost napovídala.
 ⚠️ Jediné, co to může otočit, je **hodně tacklezón na cíli**: dodge má
 modifikátory podle TZ, leap ne. To tenhle běh nerozpadá.
 
-## ⇒ ZÁVĚR: HODNOTA NASAZENÍ JE ~0,3 AKTIVACE NA HRU
+## ⇒ ZÁVĚR: HYGIENA, NE VELKÁ VADA — A ODPOVÍDÁ TO NA ZADÁNÍ Z 25.08.
 
-Leap je **prokazatelně lepší** v `2+ dodge` a `nedosažitelné` ⇒ **61 ze 4 396
-aktivací = 1,4 %**, tedy **~0,3 aktivace na hru**. Ve 86 % případů, kdy nějaká
-příležitost u nosiče je, je chůze stejně dobrá nebo lepší.
+Bod, na kterém verdikt stojí *(a jediný, který stát smí)*:
 
-⭐ **Uživatelovo pravidlo „C — nepoužij leap" tím dostává tvrdou hranici:** leap
-se má zvážit **jen když chůze stojí ≥ 2 dodge, nebo tam nevede vůbec**. Cokoliv
-jinak je hod zaplacený za nic.
+> **Situace, kam se dostane JEN leap: 0,2 % aktivací Wardancera. V kombinaci
+> s nosičem 0 ze 4 396. A jeden pokus stojí 33,3 % turnover a 13,9 % hod na
+> zranění vlastního AV7 těla.**
+
+⇒ **~0,05 příležitosti na hru** *(jedna na ~20 her)* za třetinové riziko
+turnoveru. To je přesně to, na co se zadání z 25.08. ptalo, a odpověď je
+**hygiena** — analogie `M9` u `P31`.
+
+⭐ **Uživatelovo pravidlo „C — nepoužij leap" tím dostává tvrdou hranici, a
+UŽŠÍ, než jsem psal poprvé:** leap má smysl **jen tam, kam chůze nevede vůbec** —
+tedy v těch 0,2 %. Srovnávat ho s dodgem se nesmí *(jiný zdroj rerollu, viz oddíl
+3 a `CELOTAH/A7`)*, takže „chůze by stála 2 dodge" **není** argument pro leap.
 
 ⏰ **A co z toho plyne pro rozhodnutí o nasazení** *(rozhodne uživatel)*:
 * Nasadit rameno **tak, jak dnes je, nelze** — napřed se musí opravit, že
