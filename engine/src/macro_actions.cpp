@@ -230,6 +230,19 @@ static Position standableNextTo(const GameState& state, Position anchor,
         // Hlavni kriterium je ucel (tacklezony), druhotne blizkost k hraci,
         // ktery tam ma dojit -- kazde pole navic je pole, ktere muze chybet.
         if (maxDist >= 0 && apos.distanceTo(from) > maxDist) continue;
+        // ⛔⛔ K4c (10.09.2026): OZNACENY ROH NENI ROH -- a proto se nenabizi.
+        //   Doktrina je zapsana v `cage_advance.cpp:29-33` a cituje pravidlo
+        //   ("none of the five may end the turn in a tackle zone"): roh
+        //   v souperove tacklezone klec NEKRYJE, protoze ho souper vyblokuje
+        //   a klec se otevre.
+        //   ⇒ ZMERENO, ze to neni teoreticke: po `K4` (dosah jako filtr) stoupl
+        //     podil cilu "volne v TZ" u vetve 6 ze 7,4 % na **17,0 %**
+        //     (2 640 z 15 517) -- z mensi, blizke mnoziny kandidatu castěji
+        //     nezbyde cisty roh. Bez tohohle by `K4` vymenilo "nedosazitelne
+        //     ciste rohy" za "dosazitelne SPINAVE".
+        //   ⚠️ Plati JEN pro `cornersOnly` (roh klece). Znackovac (`false`)
+        //     v souperove zone STAT MUSI -- to je jeho ucel.
+        if (cornersOnly && tz > 0) continue;
         const int score = -tz * 100 - apos.distanceTo(from);
         if (score > bestScore) { bestScore = score; best = apos; }
     }
@@ -752,7 +765,6 @@ long takeBlitzContinuationEventsInSearch() {
 //     citac byl past ([[feedback_arm_counter_needs_mode_wiring]]).
 thread_local long g_carrierRetreatEligible = 0;
 thread_local long g_carrierRetreatOffered  = 0;
-
 long takeCarrierRetreatEligibleInSearch() {
     long v = g_carrierRetreatEligible;
     g_carrierRetreatEligible = 0;

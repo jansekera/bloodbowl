@@ -166,7 +166,6 @@ static long g_blitzCont = 0;
 // ⭐ KLEC/K5 (10.09.): ustup NOSICE po vlastnim blitzu -- [eligible, offered].
 //   Jmenovatel MUSI byt videt: nula v `offered` sama neodlisi „cena zamita
 //   vsechno" od „rozbity citac". Tika ve vsech modech, obema stranam.
-static long g_k5Elig = 0, g_k5Off = 0;
 static long g_stoodUp = 0, g_stoodUpNE = 0;     // Q3: provedeni / z toho drahych
 
 static const Matchup MATCHUPS[] = {

@@ -1685,6 +1685,63 @@ TEST(MacroActions, ScoreAvoidsEnemyTZ) {
 //   safety (69,6 %) a endzone guard (76,9 %) maji tyz problem, ale u nich muze
 //   byt vicekolovy pochod zamer -- vedeno jako `K4b`. Roh klece ma smysl jen
 //   kdyz stoji NA KONCI TOHOHLE tahu, proto tady je filtr spravne.
+// ⭐⭐⭐ KLEC/K4c (10.09.2026): OZNACENY ROH SE NENABIZI VUBEC.
+//   Doktrina (`cage_advance.cpp:29-33`, cituje pravidlo "none of the five may
+//   end the turn in a tackle zone"): roh v souperove tacklezone klec NEKRYJE,
+//   protoze ho souper vyblokuje a klec se otevre.
+// ⇒ ZMERENO, proc to bylo potreba: po `K4` (dosah jako filtr) stoupl podil
+//   cilu "volne v TZ" u vetve 6 ze 7,4 % na 17,0 % (2 640 z 15 517) -- z mensi,
+//   blizke mnoziny kandidatu castěji nezbyde cisty roh. Bez K4c by `K4`
+//   vymenilo "nedosazitelne ciste rohy" za "dosazitelne SPINAVE".
+// ⚠️ Plati JEN pro roh klece. Znackovac v souperove zone stat MUSI.
+TEST(MacroActions, DirtyCageCornerIsNotOfferedAtAll) {
+    GameState state = makeMinimalState();
+    Player& carrier = state.getPlayer(1);
+    carrier.position = {10, 7};
+    state.ball = BallState::carried({10, 7}, 1);
+    Player& escort = state.getPlayer(3);
+    escort.id = 3; escort.teamSide = TeamSide::HOME;
+    // ⚠️ MUSI byt DAL nez 3 pole od nosice, jinak se chytne vetev 5
+    //   ("uz je blizko -- jdi na pole pred nosice") a test by nemeril rohy
+    //   vubec. Prvni verze mela {8,7} = vzdalenost 2 a POZITIVNI KONTROLA to
+    //   odhalila: test prosel i bez K4c, protoze zadny roh se nenabizel.
+    escort.state = PlayerState::STANDING; escort.position = {5, 7};
+    escort.stats = {6, 3, 3, 8}; escort.movementRemaining = 6;
+    escort.hasMoved = false; escort.hasActed = false;
+    // Souper tak, aby VSECHNY ctyri diagonaly nosice lezely v jeho tacklezone,
+    // ale sam na nich nestal: dva soupeři nad a pod nosicem ob jedno pole.
+    state.getPlayer(12).position = {10, 5};
+    Player& e2 = state.getPlayer(13);
+    e2.id = 13; e2.teamSide = TeamSide::AWAY; e2.state = PlayerState::STANDING;
+    e2.position = {10, 9}; e2.stats = {6, 3, 3, 8};
+
+    // --- POJISTKY NA FIXTURU ---
+    ASSERT_GT(escort.position.distanceTo(carrier.position), 3)
+        << "doprovod je do 3 poli od nosice => vetev 5, ne rohy klece";
+    for (Position d : {Position{9,6}, Position{11,6}, Position{9,8}, Position{11,8}}) {
+        ASSERT_EQ(state.getPlayerAtPosition(d), nullptr)
+            << "roh " << int(d.x) << "," << int(d.y) << " je obsazeny -- vyradilo by ho neco jineho";
+        ASSERT_GT(countTacklezones(state, d, TeamSide::HOME), 0)
+            << "roh " << int(d.x) << "," << int(d.y) << " NENI v TZ -- test by nemeril K4c";
+        ASSERT_LE(escort.position.distanceTo(d), static_cast<int>(escort.movementRemaining))
+            << "roh je mimo dosah -- vyradil by ho uz K4, ne K4c";
+    }
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+
+    for (const Macro& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != escort.id) continue;
+        const bool isCorner = (m.targetPos.x != carrier.position.x &&
+                               m.targetPos.y != carrier.position.y &&
+                               m.targetPos.distanceTo(carrier.position) == 1);
+        if (!isCorner) continue;
+        EXPECT_EQ(countTacklezones(state, m.targetPos, TeamSide::HOME), 0)
+            << "nabidnut roh " << int(m.targetPos.x) << "," << int(m.targetPos.y)
+            << " v souperove tacklezone -- oznaceny roh klec nekryje";
+    }
+}
+
 TEST(MacroActions, CageCornerIsNotOfferedBeyondTheMoversReach) {
     GameState state = makeMinimalState();
     Player& carrier = state.getPlayer(1);
