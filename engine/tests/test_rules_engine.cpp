@@ -269,6 +269,44 @@ TEST(RulesEngineProne, ProneIsNeverOfferedBlockOrAnythingBelowTheStepGate) {
     EXPECT_EQ(countActionsOfType(as, ActionType::LEAP), 0);
 }
 
+// ⭐⭐⭐ P45 (10.09.2026): KDO UŽ VSTAL, NESMÍ DOSTAT BLOK -- a nekrylo to nic.
+//   Test výš hlídá jen blok Z LEHU. Vada z P45 je ale o krok dál: hráč se
+//   postaví (`hasMoved = true`, stav STANDING) a teprve TEĎ by mu holá nabídka
+//   dala BLOCK jako obyčejnou akci -- tedy blok za cenu vstání, ne za blitz.
+// ⛔ Pravidla to zakazují VÝSLOVNĚ, ř. 674-676: "a player who stands up may not
+//   take a Block Action, because you may not move when you take a Block Action.
+//   The player may take any Action other than a Block Action."
+// ⇒ Tím se zodpovídá i otázka, na kterou P45 od 20.08. čekalo ("stojí vstání na
+//   začátku LIBOVOLNÉ akce, nebo jen pohybové?"): libovolné KROMĚ bloku ⇒
+//   uživatelova doktrína z 20.08. (ležící soused i vzdálený soupeř stojí soupeře
+//   JEDEN BLITZ) PLATÍ, a `rules_engine.cpp` ji drží guardem
+//   `if (p.hasMoved && !p.usedBlitz) break;`.
+// ⚠️ Guard je nosný pro celou obranu klece ("soupeř sundá nejvýš jeden roh za
+//   kolo"), a přesto na něj nebyl ANI JEDEN test -- proto tenhle.
+TEST(RulesEngineProne, PlayerWhoAlreadyStoodUpIsNotOfferedABlock) {
+    ProneArmOn _arm;
+    GameState gs = makeProneState(/*ma=*/6);
+    Player& p = gs.getPlayer(1);
+    // stav PO vstání v téže aktivaci: stojí, ale pohyb už spotřeboval
+    p.state = PlayerState::STANDING;
+    p.hasMoved = true;
+    p.movementRemaining = 3;      // 6 - 3 za vstání
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+
+    EXPECT_EQ(countActionsOfType(as, ActionType::BLOCK), 0)
+        << "ř. 674-676: kdo vstal, blok už si vzít nesmí -- musel by na to blitz";
+    // pozitivní kontrola fixtury: soused TAM JE a blok by šel, kdyby hráč
+    // nebyl po pohybu -- jinak by test prošel i s prázdnou deskou
+    p.hasMoved = false;
+    std::vector<Action> as2;
+    getAvailableActions(gs, as2);
+    EXPECT_GT(countActionsOfType(as2, ActionType::BLOCK), 0)
+        << "bez `hasMoved` se blok nabídnout MUSÍ, jinak fixtura neměří nic";
+}
+
 TEST(RulesEngineProne, StunnedPlayerGetsNothing) {
     ProneArmOn _arm;
     GameState gs = makeProneState(/*ma=*/6);
