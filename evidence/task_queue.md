@@ -853,6 +853,38 @@ už jednou zablokovalo.
 ⏰ **PRVNÍ OTÁZKA OKRUHU tedy není žádná z položek níž, ale: „vrací se
 `cageAdvance`, nebo se klec dodělá v živé cestě?"** Rozhodne uživatel.
 
+### ✅⭐⭐⭐ ROZHODNUTO 10.09.2026: **„b — dodělat v živé cestě"**
+
+⚠️ **ATRIBUCE, a uživatel na ni sám upozornil** *(„vyhodnotil jsi sám — já jen
+potvrdil")*: **rozbor i doporučení jsou MOJE**, uživatel je **potvrdil**. ⇒ Není
+to doktrinální věta jako *„blitz se kupuje dosah"* nebo *„C — nepoužij leap"*;
+je to **můj úsudek s jeho souhlasem**, tedy **falsifikovatelný**. Kdyby se
+ukázalo, že `W-CIL` v živé cestě nejde postavit bez celotahu, **varianta (a) se
+smí vrátit na stůl** — bez toho, aby se to čtlo jako popření uživatelova
+rozhodnutí.
+
+⇒ **Klec se staví v `expandAdvance` + geometrických `REPOSITION` v
+`getAvailableMacros`, ne v `cage_advance.cpp`.** Důsledky, které z toho plynou
+a platí od teď:
+
+1. ⛔ **`cage_advance.cpp` je MRTVÝ KÓD** *(pro produkci)*. ⚠️ **Nemaže se**
+   *([[feedback_never_delete_only_backup]])* a **testy se nechávají** — brána se
+   může jednou vrátit a F1 harness ji používá. Ale **nová práce tam nepatří.**
+2. ⛔ **`P32` a `P46` se v `cage_advance.cpp` NEOPRAVUJÍ.** Jejich obsah *(nosič
+   umí zabočit; těla ho následují ve tvaru)* se přenáší do živé cesty:
+   *(a)* zabočení nosiče **už tam je** — rameno **(A) sideFree**, 08.09.;
+   *(b)* následování těl **je `W-CIL`**.
+3. ⭐⭐ **`W-CIL` se tím stává HLAVNÍ položkou okruhu KLEC**, ne vedlejší vadou
+   pohybu: *„cíle doprovodu se nepočítají z nosiče, ale geometricky"*. A pořadí
+   zapsané už dřív **platí a nesmí se přehodit**: *„dokud doprovod chodí na
+   geometrické body, nemá smysl vybírat nosiči pole podle čistoty rohů —
+   postavil by se do dobrého místa a doprovod by mu tam stejně nepřišel.
+   Napřed `W-CIL`, pak tohle."*
+4. ⏰ **Strop hodnoty je změřený:** `26,7 %` našich kol s míčem *(P46,
+   `diag_lane_blocked_20260820.py`)*. To je **v živé cestě dosažitelné**, na
+   rozdíl od varianty (a), která by začínala nocí na bráně, jež 18.08. dala
+   **−3,7 σ**.
+
 ## ⭐⭐⭐ POLOŽKY SE ŘADÍ PODLE DVOU CÍLŮ KLECE *(uživatel 20.08.)*
 
 Spec **15.0b′**: klec má **dvě položky — dojít co nejdál · ochránit nosiče**
