@@ -213,15 +213,40 @@ final class BigGuySkillsTest extends TestCase
         $this->assertFalse($player->hasLostTacklezones()); // Wild Animal keeps TZ
     }
 
-    public function testWildAnimalPassOnMove(): void
+    // ⛔ PREPSANO 11.09.2026. Puvodne tenhle test tvrdil, ze TROJKA PROJDE
+    //    -- zakotvoval tim vadu. `rules_bb2016.txt` r. 8668: „On a roll of
+    //    **1-3**, the Wild Animal does not move". Bez bonusu je tedy prah 4+.
+    public function testWildAnimalThreeFailsOnMove(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1, skills: [SkillName::WildAnimal])
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        // Roll 3 (>= 3, pass)
+        // SEBEKONTROLA FIXTURY: bez Block/Blitz bonusu je prah 4+, takze 3 PADA.
         $dice = new FixedDiceRoller([3]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::MOVE, [
+            'playerId' => 1, 'x' => 6, 'y' => 7,
+        ]);
+
+        $this->assertTrue($result->isSuccess());
+        $player = $result->getNewState()->getPlayer(1);
+        $this->assertTrue($player->hasActed(), 'trojka ma akci spalit (r. 8668)');
+        $this->assertEquals(5, $player->getPosition()->getX(), 'a hrac se nesmi hnout');
+        $this->assertFalse($player->hasLostTacklezones()); // Wild Animal keeps TZ
+    }
+
+    public function testWildAnimalFourPassesOnMove(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1, skills: [SkillName::WildAnimal])
+            ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
+            ->build();
+
+        // Ctyrka je prvni hodnota, ktera bez bonusu prochazi.
+        $dice = new FixedDiceRoller([4]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -232,15 +257,21 @@ final class BigGuySkillsTest extends TestCase
         $this->assertEquals(6, $result->getNewState()->getPlayer(1)->getPosition()->getX());
     }
 
-    public function testWildAnimalAutoPassBlock(): void
+    // ⛔ PREPSANO 11.09.2026. Puvodne se jmenoval `...AutoPassBlock` a tvrdil,
+    //    ze se u bloku NEHAZI VUBEC (`assertNotContains('wild_animal')`).
+    //    Pravidla (r. 8666-8669) davaji BONUS +2, ne imunitu: hazi se vzdy,
+    //    s bonusem prochazi prirozena 2+. Tataz oprava jako v C++ enginu
+    //    07.08.2026 (`engine/src/big_guy_handler.cpp:87-93`).
+    public function testWildAnimalTwoPassesOnBlockWithTheBonus(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, id: 1, skills: [SkillName::WildAnimal])
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
             ->build();
 
-        // No wild animal check, 2-dice block (ST 5 vs 3): die1=6, die2=6 (Def Down), armor 3+3=6 < 8
-        $dice = new FixedDiceRoller([6, 6, 3, 3]);
+        // hod 2 = prirozena dvojka: s +2 je to 4, tedy PROJDE (prah 2+).
+        // Pak 2-dice block (ST 5 vs 3): die1=6, die2=6 (Def Down), armor 3+3=6 < 8
+        $dice = new FixedDiceRoller([2, 6, 6, 3, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
@@ -249,19 +280,40 @@ final class BigGuySkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('wild_animal', $types);
-        $this->assertContains('block', $types);
+        $this->assertContains('block', $types, 'dvojka s bonusem projit MA');
     }
 
-    public function testWildAnimalAutoPassBlitz(): void
+    // ⭐ DRUHA PULKA PARU -- bez ni by test nahore prosel i pri auto-passu.
+    //    Prirozena 1 pada i s bonusem (1+2=3, a 1-3 je pad).
+    public function testWildAnimalOneStillFailsOnBlockDespiteTheBonus(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, id: 1, skills: [SkillName::WildAnimal])
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
             ->build();
 
-        // No wild animal check, 2-dice block (ST 5 vs 3): die1=6, die2=6 (Def Down), armor 3+3=6 < 8
-        $dice = new FixedDiceRoller([6, 6, 3, 3]);
+        $dice = new FixedDiceRoller([1, 6, 6, 3, 3]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::BLOCK, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $this->assertTrue($result->isSuccess());
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('wild_animal', $types, 'jednicka se ma ozvat');
+        $this->assertNotContains('block', $types, 'a blok se konat NESMI');
+        $this->assertTrue($result->getNewState()->getPlayer(1)->hasActed());
+    }
+
+    public function testWildAnimalTwoPassesOnBlitzWithTheBonus(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, id: 1, skills: [SkillName::WildAnimal])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->build();
+
+        $dice = new FixedDiceRoller([2, 6, 6, 3, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLITZ, [
@@ -270,7 +322,26 @@ final class BigGuySkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('wild_animal', $types);
+        $this->assertNotContains('wild_animal', $types, 'dvojka s bonusem projit MA');
+    }
+
+    public function testWildAnimalOneStillFailsOnBlitzDespiteTheBonus(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, id: 1, skills: [SkillName::WildAnimal])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->build();
+
+        $dice = new FixedDiceRoller([1, 6, 6, 3, 3]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::BLITZ, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $this->assertTrue($result->isSuccess());
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('wild_animal', $types, 'jednicka se ma ozvat i u blitzu');
     }
 
     // === Loner ===

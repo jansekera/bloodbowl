@@ -53,8 +53,39 @@ final class BlitzHandler implements ActionHandlerInterface
         if ($attackerPos->distanceTo($defenderPos) > 1) {
             // Find best adjacent square to move to
             $moveTarget = $this->findBlitzMoveTarget($state, $attacker, $defenderPos);
+
+            // ⛔⛔⛔ OPRAVA 11.09.2026: TADY SE HÁZELA VÝJIMKA
+            //   `throw new \InvalidArgumentException('Cannot reach target for blitz')`
+            //   -- a byla to VADA, ne obrana. Naměřeno 19 z 531 rozhodnutí
+            //   (3,58 %) u kouče, proti kterému hraje člověk.
+            //
+            // ⭐ PROČ JE DEKLARACE BLITZU MIMO DOSAH LEGITIMNÍ (uživatel 11.09.):
+            //   Wild Animal (`rules_bb2016.txt` r. 8666-8669) hází D6 **+2 za
+            //   Block nebo Blitz**, padá na 1-3. Vyhlásit blitz je tedy JEDINÝ
+            //   způsob, jak Rat Ogra / Minotaura rozhýbat na přirozenou **2+**
+            //   místo 4+. Hráč přitom vůbec nemusí na cíl dosáhnout -- smysl
+            //   má sama DEKLARACE. Kontrola běží PŘED tímhle handlerem
+            //   (`ActionResolver.php:130`), takže výjimka tu deklaraci zabila
+            //   až POTOM, co svou práci odvedla.
+            //
+            // ⛔ A živá hra ji NECHYTALA: `AITurnService::playTurn` nemá
+            //   `try/catch` ani jednou (`GameOrchestrator.php:122`). Spolkl ji
+            //   jen simulátor (`cli/simulate.php:157`) -- proto v korpusu
+            //   nebyla vidět. Uživatel 11.09.: „vadu opravit, ne schovat."
+            //   ⇒ Záplata do `AITurnService` se schválně NEDĚLÁ.
+            //
+            // ⇒ Když na sousední pole cíle nedosáhneme, blitz se NERUŠÍ:
+            //   hráč se posune, jak nejblíž k cíli umí, a blok se prostě
+            //   nekoná (BB2016: Blitz = pohyb + NEJVÝŠ jeden blok během něj).
+            $blockPossible = true;
             if ($moveTarget === null) {
-                throw new \InvalidArgumentException('Cannot reach target for blitz');
+                $moveTarget = $this->findClosestApproach($state, $attacker, $defenderPos);
+                $blockPossible = false;
+                if ($moveTarget === null) {
+                    // Nemá kam šlápnout vůbec. Deklarace platí (blitz je
+                    // odečtený výš), akce se vyčerpala, blok se nekoná.
+                    return ActionResult::success($state, $events);
+                }
             }
 
             // Resolve movement to adjacent square
@@ -76,6 +107,12 @@ final class BlitzHandler implements ActionHandlerInterface
 
             $state = $moveResult->getNewState();
             $events = array_merge($events, $moveResult->getEvents());
+
+            // Na cíl se nedosáhlo -- přiblížili jsme se a končíme. Hráč si
+            // NEČISTÍ `hasMoved`/`hasActed`: žádný blok už nepřijde.
+            if (!$blockPossible) {
+                return ActionResult::success($state, $events);
+            }
 
             // Reset hasMoved so block can still mark it
             $movedAttacker = $state->getPlayer($attackerId);
@@ -103,6 +140,39 @@ final class BlitzHandler implements ActionHandlerInterface
         }
 
         return ActionResult::success($blockResult->getNewState(), $events);
+    }
+
+    /**
+     * Nejbližší DOSAŽITELNÉ pole k cíli, když na sousední pole nedosáhneme.
+     *
+     * ⭐ Používá se jen pro blitz, který se nedá dokončit (viz `resolve`).
+     *   Kritérium je totéž jako u `findBlitzMoveTarget` -- nejdřív vzdálenost
+     *   k cíli, pak nejméně dodgů a GFI -- aby se „přiblížení" nechovalo jinak
+     *   než „doběhnutí" a nevznikly dvě neslučitelné definice téhož.
+     */
+    private function findClosestApproach(GameState $state, MatchPlayerDTO $attacker, Position $defenderPos): ?Position
+    {
+        $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
+
+        $bestTarget = null;
+        $bestKey = null;
+        $startDist = $attacker->getPosition()?->distanceTo($defenderPos) ?? PHP_INT_MAX;
+
+        foreach ($validMoves as $path) {
+            $dest = $path->getDestination();
+            $dist = $dest->distanceTo($defenderPos);
+            // Přiblížení musí být PŘIBLÍŽENÍ -- couvnout od cíle není blitz.
+            if ($dist >= $startDist) {
+                continue;
+            }
+            $key = [$dist, $path->getDodgeCount(), $path->getGfiCount(), $path->getTotalCost()];
+            if ($bestKey === null || $key < $bestKey) {
+                $bestKey = $key;
+                $bestTarget = $dest;
+            }
+        }
+
+        return $bestTarget;
     }
 
     /**

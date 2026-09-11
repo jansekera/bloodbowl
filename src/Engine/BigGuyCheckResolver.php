@@ -120,14 +120,36 @@ final class BigGuyCheckResolver
         ActionType $action,
         DiceRollerInterface $dice,
     ): ?array {
-        // Block and Blitz auto-pass
-        if ($action === ActionType::BLOCK || $action === ActionType::BLITZ) {
-            return null;
-        }
+        // ⛔⛔⛔ OPRAVA 11.09.2026 -- DVĚ VADY NARÁZ, OBĚ PROTI TEXTU PRAVIDEL.
+        //   `rules_bb2016.txt` r. 8666-8669: „immediately after declaring an
+        //   Action with a Wild Animal, roll a D6, **adding 2 to the roll if
+        //   taking a Block or Blitz Action**. On a roll of **1-3**, the Wild
+        //   Animal does not move ... and the Action is wasted."
+        //
+        //   (1) Block/Blitz tu měly `return null`, tedy AUTO-PASS BEZ HODU.
+        //       Pravidla dávají bonus +2, ne imunitu: s +2 projde přirozená
+        //       2+, ale přirozená 1 PADÁ. ⇒ Rat Ogre / Minotaur byl o šestinu
+        //       spolehlivější, než pravidla dovolují.
+        //   (2) Ostatní akce padaly na `<= 2`, tedy 1-2. Pravidla říkají
+        //       1-3. ⇒ Trojka procházela, ač neměla.
+        //
+        // ⚠️ TATÁŽ VADA UŽ BYLA NAJITA A OPRAVENA V C++ ENGINU 07.08.2026
+        //   (`engine/src/big_guy_handler.cpp:87-93`, vlastní komentář:
+        //   „before this the block/blitz branch skipped the roll entirely,
+        //   making a Rat Ogre / Minotaur a sixth more reliable at hitting
+        //   than the rules allow"). PHP kopie se neopravila. ⇒ Je to týž
+        //   vzorec ve dvou kopiích -- třída, která tenhle repozitář kousla
+        //   už dvakrát (`131a1779` a `pathFailProb` v `496f5a03`).
+        //
+        // ⭐ DEKLARACE BLITZU JE PROTO LEGITIMNÍ TAH, i když se na cíl
+        //   nedosáhne: je to způsob, jak Wild Animal rozhýbat na 2+ místo
+        //   4+ (uživatel 11.09.). Na tom stojí oprava v `BlitzHandler`.
+        $hitting = ($action === ActionType::BLOCK || $action === ActionType::BLITZ);
+        $target = $hitting ? 2 : 4;
 
         $roll = $dice->rollD6();
 
-        if ($roll <= 2) {
+        if ($roll < $target) {
             // Wild Animal loses action but keeps tacklezones
             $player = $player
                 ->withHasMoved(true)
