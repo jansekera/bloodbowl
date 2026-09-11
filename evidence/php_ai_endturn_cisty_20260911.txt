@@ -1,0 +1,167 @@
+=== greedy ===
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+
+KOUČ: greedy   KORPUS: 60 her, seed 20260911
+
+ROZHODNUTÍ CELKEM (jmenovatel)                  12368
+  vrátil normální akci                          11983   96.9 %
+  ⛔ END_TURN, PŘESTOŽE BYLO CO HRÁT               14    0.1 %   <- VADA
+  END_TURN právem (nabídka prázdná)               371    3.0 %
+  ZBYTEK (musí být 0)                               0
+
+KOLA: 1778 celkem, z toho 13 (0.7 %) skončilo touhle vadou
+  JAK KOLA KONČÍ (kontrola, že se do té větve vůbec chodí):
+    turnoverem                                   1381   77.7 %
+    rozhodnutím END_TURN                          372   20.9 %
+    pojistkou (>50 akcí v kole)                     0    0.0 %
+    JINAK (touchdown / poločas / konec hry)        25    1.4 %   <- tenhle koš dřív CHYBĚL
+    ZBYTEK (musí být 0)                             0
+    kol na zápas: 29.6   (celý zápas má 32 -- kontrola jmenovatele)
+
+ZTRACENÉ AKTIVACE (hráči, kteří ještě mohli jednat): celkem 80
+  průměr na jednu vadu 5.71 hráče
+     3 hráčů propadlo        1    7.1 %
+     4 hráčů propadlo        3   21.4 %
+     5 hráčů propadlo        1    7.1 %
+     6 hráčů propadlo        4   28.6 %
+     7 hráčů propadlo        4   28.6 %
+     8 hráčů propadlo        1    7.1 %
+
+⛔⛔ VÝJIMKY Z RESOLVERU (živá hra `AITurnService` je NECHYTÁ):  0 = 0.00 % rozhodnutí
+    (žádná -- kouč vyrobil jen akce, které resolver přijal)
+
+⭐ ČÍM JSOU TY TURNOVERY (akce -> poslední událost):  1426 celkem
+    move -> player_fell                               384   26.9 %
+    blitz -> player_fell                              244   17.1 %
+    move -> ball_bounce                               186   13.0 %
+    block -> armour_roll                              172   12.1 %
+    pass -> ball_bounce                               133    9.3 %
+    block -> injury_roll                               86    6.0 %
+    blitz -> armour_roll                               67    4.7 %
+    blitz -> injury_roll                               29    2.0 %
+    hand_off -> ball_bounce                            28    2.0 %
+    move -> catch                                      20    1.4 %
+    pass -> throw_in                                   12    0.8 %
+    block -> ball_bounce                               12    0.8 %
+    ... a dalších 13 druhů
+
+⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):
+    throw_team_mate     14  100.0 % vad     (nejvíc naráz 3)
+
+=== learning ===
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+
+KOUČ: learning   KORPUS: 60 her, seed 20260911
+
+ROZHODNUTÍ CELKEM (jmenovatel)                   7491
+  vrátil normální akci                           7425   99.1 %
+  ⛔ END_TURN, PŘESTOŽE BYLO CO HRÁT               39    0.5 %   <- VADA
+  END_TURN právem (nabídka prázdná)                27    0.4 %
+  ZBYTEK (musí být 0)                               0
+
+KOLA: 1793 celkem, z toho 39 (2.2 %) skončilo touhle vadou
+  JAK KOLA KONČÍ (kontrola, že se do té větve vůbec chodí):
+    turnoverem                                   1696   94.6 %
+    rozhodnutím END_TURN                           66    3.7 %
+    pojistkou (>50 akcí v kole)                     0    0.0 %
+    JINAK (touchdown / poločas / konec hry)        31    1.7 %   <- tenhle koš dřív CHYBĚL
+    ZBYTEK (musí být 0)                             0
+    kol na zápas: 29.9   (celý zápas má 32 -- kontrola jmenovatele)
+
+ZTRACENÉ AKTIVACE (hráči, kteří ještě mohli jednat): celkem 334
+  průměr na jednu vadu 8.56 hráče
+     5 hráčů propadlo        2    5.1 %
+     6 hráčů propadlo        3    7.7 %
+     7 hráčů propadlo        3    7.7 %
+     8 hráčů propadlo        7   17.9 %
+     9 hráčů propadlo       14   35.9 %
+    10 hráčů propadlo        7   17.9 %
+    11 hráčů propadlo        3    7.7 %
+
+⛔⛔ VÝJIMKY Z RESOLVERU (živá hra `AITurnService` je NECHYTÁ):  0 = 0.00 % rozhodnutí
+    (žádná -- kouč vyrobil jen akce, které resolver přijal)
+
+⭐ ČÍM JSOU TY TURNOVERY (akce -> poslední událost):  1753 celkem
+    move -> player_fell                              1109   63.3 %
+    move -> ball_bounce                               255   14.5 %
+    blitz -> player_fell                              243   13.9 %
+    blitz -> armour_roll                               40    2.3 %
+    block -> armour_roll                               23    1.3 %
+    blitz -> injury_roll                               21    1.2 %
+    move -> catch                                      18    1.0 %
+    block -> injury_roll                               12    0.7 %
+    hand_off -> ball_bounce                             9    0.5 %
+    move -> bloodlust_fail                              7    0.4 %
+    block -> ball_bounce                                5    0.3 %
+    blitz -> bloodlust_fail                             5    0.3 %
+    ... a dalších 2 druhů
+
+⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):
+    pass               28   71.8 % vad     (nejvíc naráz 1)
+    foul               22   56.4 % vad     (nejvíc naráz 5)
+    throw_team_mate      2    5.1 % vad     (nejvíc naráz 1)
+    move                1    2.6 % vad     (nejvíc naráz 10)
+
+=== random ===
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+
+KOUČ: random   KORPUS: 60 her, seed 20260911
+
+ROZHODNUTÍ CELKEM (jmenovatel)                   8155
+  vrátil normální akci                           7990   98.0 %
+  ⛔ END_TURN, PŘESTOŽE BYLO CO HRÁT                4    0.0 %   <- VADA
+  END_TURN právem (nabídka prázdná)               161    2.0 %
+  ZBYTEK (musí být 0)                               0
+
+KOLA: 1733 celkem, z toho 4 (0.2 %) skončilo touhle vadou
+  JAK KOLA KONČÍ (kontrola, že se do té větve vůbec chodí):
+    turnoverem                                   1559   90.0 %
+    rozhodnutím END_TURN                          164    9.5 %
+    pojistkou (>50 akcí v kole)                     0    0.0 %
+    JINAK (touchdown / poločas / konec hry)        10    0.6 %   <- tenhle koš dřív CHYBĚL
+    ZBYTEK (musí být 0)                             0
+    kol na zápas: 28.9   (celý zápas má 32 -- kontrola jmenovatele)
+
+ZTRACENÉ AKTIVACE (hráči, kteří ještě mohli jednat): celkem 32
+  průměr na jednu vadu 8.00 hráče
+     7 hráčů propadlo        2   50.0 %
+     8 hráčů propadlo        1   25.0 %
+    10 hráčů propadlo        1   25.0 %
+
+⛔⛔ VÝJIMKY Z RESOLVERU (živá hra `AITurnService` je NECHYTÁ):  11 = 0.13 % rozhodnutí
+    blitz: Players must be on pitch                                11
+
+⭐ ČÍM JSOU TY TURNOVERY (akce -> poslední událost):  1617 celkem
+    move -> player_fell                               944   58.4 %
+    blitz -> player_fell                              218   13.5 %
+    block -> armour_roll                              118    7.3 %
+    blitz -> armour_roll                              111    6.9 %
+    block -> injury_roll                               73    4.5 %
+    blitz -> injury_roll                               60    3.7 %
+    pass -> ball_bounce                                42    2.6 %
+    move -> ball_bounce                                23    1.4 %
+    blitz -> ball_bounce                               14    0.9 %
+    hand_off -> ball_bounce                             3    0.2 %
+    move -> bloodlust_fail                              3    0.2 %
+    pass -> catch                                       2    0.1 %
+    ... a dalších 4 druhů
+
+⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):
+    bomb_throw          3   75.0 % vad     (nejvíc naráz 1)
+    throw_team_mate      1   25.0 % vad     (nejvíc naráz 1)
+
