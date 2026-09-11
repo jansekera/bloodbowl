@@ -45,7 +45,30 @@ final class LearningAICoach implements AICoachInterface
                 $this->W2 = $data['W2'];
                 $this->b2 = $data['b2'];
             } else {
-                $this->weights = array_values(array_map('floatval', $data));
+                // ⛔⛔⛔ OPRAVA 11.09.2026: TADY SE NAČÍTAL CELÝ OBJEKT JSON.
+                //   `array_map('floatval', $data)` jelo přes KLÍČE NEJVYŠŠÍ
+                //   ÚROVNĚ (`type`, `value_weights`, `policy_weights`,
+                //   `policy_bias`, `policy_temperature`), ne přes váhy.
+                //   Výsledek: `floatval('alphazero_linear')`=0, `floatval(pole)`=1,
+                //   `floatval(pole)`=1, bias, temperature
+                //   ⇒ `$this->weights` byl **[0, 1, 1, ~0, 1]** -- PĚT čísel
+                //   místo 73 natrénovaných vah.
+                //
+                // ⛔ A NEBYLO TO VIDĚT, protože `dotProduct` bere
+                //   `min(count($a), count($b))` = min(5, 73) = 5 a zbytek
+                //   TIŠE USEKNE -- bez chyby, bez hlášky. Stav se tedy
+                //   hodnotil jako `f1 + f2 + f4` a celý trénink se zahazoval.
+                //   Tatáž třída jako `try/catch` v `cli/simulate.php:157`:
+                //   pojistka, která vadu schová před měřením.
+                //
+                // ⚠️ `array_map` nad plochým seznamem byl nejspíš správný pro
+                //   STARŠÍ formát souboru (holé pole floatů). Formát se změnil
+                //   na strukturovaný objekt a tohle místo se neaktualizovalo.
+                //   Proto se podporují OBA tvary, ne jen ten nový.
+                $raw = (isset($data['value_weights']) && is_array($data['value_weights']))
+                    ? $data['value_weights']
+                    : $data;
+                $this->weights = self::normalizeWeights(array_values(array_map('floatval', $raw)));
             }
         } else {
             $this->weights = array_fill(0, FeatureExtractor::NUM_FEATURES, 0.0);
@@ -796,6 +819,35 @@ final class LearningAICoach implements AICoachInterface
      * @param list<float> $a
      * @param list<float> $b
      */
+    /**
+     * Srovná vektor vah na `NUM_FEATURES`.
+     *
+     * ⭐ PROČ JE DOPLNĚNÍ NULAMI BEZPEČNÉ: tři příznaky, o které jde
+     *   (`70-72`, loose-ball field position), byly PŘIDÁNY NA KONEC
+     *   (`30539d65`, `NUM_FEATURES` 70 -> 73), ne vloženy doprostřed.
+     *   Indexy 0-69 tedy pořád znamenají totéž, co když se váhy trénovaly.
+     *   Doplněná nula = "tenhle příznak zatím nemá váhu", ne posun.
+     *   ⛔ Kdyby se někdy příznak vložil DOPROSTŘED, tohle by přestalo platit
+     *   a váhy by se musely přetrénovat -- doplnit nulami by je rozházelo.
+     *
+     * ⛔ Dřív to dělal `min()` v `dotProduct` potichu. Teď se to děje na
+     *   jednom místě a je to otestované.
+     *
+     * @param list<float> $w
+     * @return list<float>
+     */
+    private static function normalizeWeights(array $w): array
+    {
+        $n = FeatureExtractor::NUM_FEATURES;
+        if (count($w) < $n) {
+            return array_pad($w, $n, 0.0);
+        }
+        if (count($w) > $n) {
+            return array_slice($w, 0, $n);
+        }
+        return $w;
+    }
+
     private static function dotProduct(array $a, array $b): float
     {
         $sum = 0.0;

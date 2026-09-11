@@ -289,9 +289,12 @@ final class FeatureExtractorTest extends TestCase
         $this->assertEqualsWithDelta(1.0 / 11.0, $features[47], 0.001);
     }
 
-    public function testFeatureCountIs70(): void
+    // NUM_FEATURES je 73 od `30539d65` ("restore feature parity with the
+    // engine, 70 -> 73"): tri priznaky loose-ball field position (70-72)
+    // PHP extraktoru chybely. Test zustal na 70 a od te doby PADAL.
+    public function testFeatureCountIs73(): void
     {
-        $this->assertSame(70, FeatureExtractor::NUM_FEATURES);
+        $this->assertSame(73, FeatureExtractor::NUM_FEATURES);
     }
 
     public function testBlockSkillFraction(): void
