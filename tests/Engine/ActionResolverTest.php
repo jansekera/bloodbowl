@@ -102,7 +102,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // Roll 1 = failure, team reroll also 1 = failure
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -146,7 +146,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // GFI needs 2+, roll 1 = failure, team reroll also 1 = failure
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -194,7 +194,7 @@ final class ActionResolverTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        $dice = new FixedDiceRoller([1, 1, 3]); // fail dodge, team reroll fail, D8=3 (East) for bounce
+        $dice = new FixedDiceRoller([1, 1, 1, 1, 3]); // fail dodge, team reroll fail, PHP27 brneni 1+1 (neprorazi), D8=3 (East) for bounce
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -814,7 +814,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // Dodge needed to leave TZ, roll 1 = fail, team reroll also 1 = fail
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLITZ, [

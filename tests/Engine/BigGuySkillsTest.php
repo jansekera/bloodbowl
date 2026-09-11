@@ -384,7 +384,7 @@ final class BigGuySkillsTest extends TestCase
             ->build();
 
         // Dodge: roll 1 (fail), Loner check: 2 (< 4, reroll blocked), falls
-        $dice = new FixedDiceRoller([1, 2]);
+        $dice = new FixedDiceRoller([1, 2, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -444,7 +444,7 @@ final class BigGuySkillsTest extends TestCase
 
         // Move to (12,7) = 7 squares, 1 GFI
         // GFI: roll 1 (fail), Loner: 3 (fail), falls
-        $dice = new FixedDiceRoller([1, 3]);
+        $dice = new FixedDiceRoller([1, 3, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

@@ -588,7 +588,7 @@ final class CombatSkillsTest extends TestCase
 
         // Dodge: target 7-3+0(TZ-1)=4+ → +2(DT)=6+. Roll 5 = fail
         // Then: fallen player armor
-        $dice = new FixedDiceRoller([5, 2, 1]); // dodge=5 fail, armor die1, die2
+        $dice = new FixedDiceRoller([5, 2, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]); // dodge=5 fail, armor die1, die2
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 

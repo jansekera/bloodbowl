@@ -129,7 +129,7 @@ final class InteractiveRerollTest extends TestCase
 
         // Dodge target 3+. Roll 2=fail, Dodge skill reroll 1=fail.
         // After skill reroll, team reroll is blocked (can't double-reroll).
-        $dice = new FixedDiceRoller([2, 1]);
+        $dice = new FixedDiceRoller([2, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
 

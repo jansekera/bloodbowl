@@ -17,6 +17,7 @@ use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\Pathfinder;
+use App\Engine\InjuryResolver;
 use App\Engine\TacklezoneCalculator;
 
 final class MoveHandler implements ActionHandlerInterface
@@ -28,7 +29,48 @@ final class MoveHandler implements ActionHandlerInterface
         private readonly TacklezoneCalculator $tzCalc,
         private readonly Pathfinder $pathfinder,
         private readonly BallResolver $ballResolver,
+        private readonly ?InjuryResolver $injuryResolver = null,
     ) {
+    }
+
+
+    /**
+     * Hrac byl SRAZEN (Knocked Down) pri pohybu -- neuspesny dodge, GFI nebo leap.
+     *
+     * PRAVIDLA r. 496-500: "...then the player is Knocked Down in the square he
+     * was dodging to AND A ROLL MUST BE MADE TO SEE IF HE WAS INJURED (See Knock
+     * Downs & Injuries). If the player is Knocked Down then his team suffers a
+     * turnover and their turn ends immediately."
+     *
+     * VADA PHP27 (nalezena 11.09.2026): do te doby se tady hazelo POUZE na dodge/GFI
+     * a hrac si lehl BEZ hodu na brneni a bez zraneni -- `MoveHandler` dokonce
+     * `InjuryResolver` vubec nedostaval (`ActionResolver.php:73`). Uzivatel:
+     * "po turnover se samozrejme musi vyhodnotit brneni a tak."
+     *
+     * Poradi je stejne jako v `BlockHandler`: nejdriv zraneni, teprve pak mic.
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return array{0: \App\DTO\GameState, 1: list<\App\DTO\GameEvent>}
+     */
+    private function resolveKnockDownDuringMove(
+        \App\DTO\GameState $state,
+        \App\DTO\MatchPlayerDTO $fallenPlayer,
+        array $events,
+    ): array {
+        $wasBallCarrier = $state->getBall()->getCarrierId() === $fallenPlayer->getId();
+
+        if ($this->injuryResolver !== null) {
+            $injResult = $this->injuryResolver->resolve($fallenPlayer, $this->dice);
+            $fallenPlayer = $injResult['player'];
+            $state = $state->withPlayer($fallenPlayer);
+            $events = array_merge($events, $injResult['events']);
+        }
+
+        if ($wasBallCarrier) {
+            [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallenPlayer, $events);
+        }
+
+        return [$state, $events];
     }
 
     public function setInteractiveRerolls(bool $interactive): void
@@ -116,7 +158,10 @@ final class MoveHandler implements ActionHandlerInterface
                         ->withMovementRemaining(0);
                     $currentState = $currentState->withPlayer($fallenPlayer);
 
-                    [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $fallenPlayer, $events);
+                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni.
+                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
+                        $currentState, $fallenPlayer, $events,
+                    );
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),
@@ -293,8 +338,11 @@ final class MoveHandler implements ActionHandlerInterface
                         ->withMovementRemaining(0);
                     $currentState = $currentState->withPlayer($fallenPlayer);
 
-                    // Drop ball if carrier
-                    [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $fallenPlayer, $events);
+                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
+                    //   teprve potom mic (stejne poradi jako v `BlockHandler`).
+                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
+                        $currentState, $fallenPlayer, $events,
+                    );
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),
@@ -424,8 +472,11 @@ final class MoveHandler implements ActionHandlerInterface
                         ->withMovementRemaining(0);
                     $currentState = $currentState->withPlayer($fallenPlayer);
 
-                    // Drop ball if carrier
-                    [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $fallenPlayer, $events);
+                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
+                    //   teprve potom mic (stejne poradi jako v `BlockHandler`).
+                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
+                        $currentState, $fallenPlayer, $events,
+                    );
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),

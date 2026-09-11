@@ -54,7 +54,7 @@ final class SkillsTest extends TestCase
 
         // Dodge target: 7-3 + 0 -1(Dodge) = 3+
         // Roll 1 (fail), no Dodge reroll due to Tackle, team reroll 1 (fail)
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

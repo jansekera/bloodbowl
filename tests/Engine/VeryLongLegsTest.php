@@ -68,7 +68,7 @@ final class VeryLongLegsTest extends TestCase
         // Leap to (7,7) — TZ=1 from enemy at (6,6)
         // Without VLL: leapTarget = max(2, 7-3+1) = 5+
         // Roll = 4 → fails (4 < 5)
-        $dice = new FixedDiceRoller([4]);
+        $dice = new FixedDiceRoller([4, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7]);
 

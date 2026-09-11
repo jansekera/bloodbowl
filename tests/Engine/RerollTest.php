@@ -57,7 +57,7 @@ final class RerollTest extends TestCase
             ->build();
 
         // Dodge target 3+. Roll 1=fail, Dodge reroll 2=fail → turnover (no team reroll)
-        $dice = new FixedDiceRoller([1, 2]);
+        $dice = new FixedDiceRoller([1, 2, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -110,7 +110,7 @@ final class RerollTest extends TestCase
             ->build();
 
         // Dodge target 4+. Roll 2=fail, team reroll 3=fail → turnover
-        $dice = new FixedDiceRoller([2, 3]);
+        $dice = new FixedDiceRoller([2, 3, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -158,7 +158,7 @@ final class RerollTest extends TestCase
             ->build();
 
         // GFI needs 2+. Roll 1=fail, team reroll 1=fail → turnover
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -331,7 +331,7 @@ final class RerollTest extends TestCase
             ->build();
 
         // Dodge target 4+. Roll 2=fail → no team reroll (0 rerolls) → turnover
-        $dice = new FixedDiceRoller([2]);
+        $dice = new FixedDiceRoller([2, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -355,7 +355,7 @@ final class RerollTest extends TestCase
         // Dodge: roll 2=fail, team reroll 5=success → reroll used
         // Steps 2,3: no dodge
         // GFI: roll 1=fail → no team reroll (already used) → turnover
-        $dice = new FixedDiceRoller([2, 5, 1]);
+        $dice = new FixedDiceRoller([2, 5, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

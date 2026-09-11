@@ -70,7 +70,7 @@ final class ActionResolver
         //   mice, takze uz to neni bezzavisla trida.
         $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
 
-        $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver);
+        $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver);
         $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver);
         $this->blockHandler->setPassResolver($this->getPassResolver());
         $this->blitzHandler = new BlitzHandler($this->moveHandler, $this->blockHandler, $pathfinder);

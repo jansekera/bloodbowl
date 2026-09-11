@@ -207,7 +207,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         // Dodge: roll 1 (fail), Pro check: 3 (fail) — no reroll, turnover
-        $dice = new FixedDiceRoller([1, 3]);
+        $dice = new FixedDiceRoller([1, 3, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

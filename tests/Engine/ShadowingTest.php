@@ -110,7 +110,7 @@ final class ShadowingTest extends TestCase
             ->build();
 
         // Dodge roll 1 → fails (need 3+), armor 2+2=4 ≤ AV8
-        $dice = new FixedDiceRoller([1, 2, 2]);
+        $dice = new FixedDiceRoller([1, 2, 2, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
 

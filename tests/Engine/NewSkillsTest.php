@@ -61,7 +61,7 @@ final class NewSkillsTest extends TestCase
         // Move to (10,7) = 7 squares, 1 GFI
         // GFI: 1 (fail), Sure Feet: 1 (fail again) -> player falls (turnover)
         // No further team reroll since skill reroll was used
-        $dice = new FixedDiceRoller([1, 1]);
+        $dice = new FixedDiceRoller([1, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [
