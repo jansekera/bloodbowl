@@ -1,0 +1,129 @@
+
+=== dwarf: 1227 tahů se STOJÍCÍM nosičem ===
+  ROHY (náš stojící hráč na diagonále nosiče) -- histogram, ne průměr:
+    0 rohů     459   37.4 %  ##############
+    1 rohů     269   21.9 %  ########
+    2 rohů     232   18.9 %  #######
+    3 rohů     123   10.0 %  ####
+    4 rohů     144   11.7 %  ####
+    ZBYTEK (musí být 0)  0
+    průměr 1.37 ze 4  <- tohle jediné se dřív četlo
+  ČISTOTA:
+    0 rohů OZNAČENÝCH (v soupeřově TZ)     898   73.2 %
+    1 rohů OZNAČENÝCH (v soupeřově TZ)     214   17.4 %
+    2 rohů OZNAČENÝCH (v soupeřově TZ)      93    7.6 %
+    3 rohů OZNAČENÝCH (v soupeřově TZ)      17    1.4 %
+    4 rohů OZNAČENÝCH (v soupeřově TZ)       5    0.4 %
+    NOSIČ sám v soupeřově TZ     666   54.3 %  <- podle doktríny větší díra než roh
+  ⭐ ČISTÁ KLEC (4 rohy, 0 označených, nosič mimo TZ): 87 = 7.09 %
+  pozitivní kontrola -- nejlepší dosažené kolo: 4 rohů, 0 označených, nosič mimo TZ
+  KOLIK NAŠICH STOJÍCÍCH VŮBEC SOUSEDÍ S NOSIČEM (8 polí, ne jen rohy):
+    0     297   24.2 %
+    1     224   18.3 %
+    2     262   21.4 %
+    3     197   16.1 %
+    4     187   15.2 %
+    5      55    4.5 %
+    6       5    0.4 %
+
+=== orc: 222 tahů se STOJÍCÍM nosičem ===
+  ROHY (náš stojící hráč na diagonále nosiče) -- histogram, ne průměr:
+    0 rohů      64   28.8 %  ###########
+    1 rohů      71   32.0 %  ############
+    2 rohů      29   13.1 %  #####
+    3 rohů      30   13.5 %  #####
+    4 rohů      28   12.6 %  #####
+    ZBYTEK (musí být 0)  0
+    průměr 1.49 ze 4  <- tohle jediné se dřív četlo
+  ČISTOTA:
+    0 rohů OZNAČENÝCH (v soupeřově TZ)     179   80.6 %
+    1 rohů OZNAČENÝCH (v soupeřově TZ)      33   14.9 %
+    2 rohů OZNAČENÝCH (v soupeřově TZ)       8    3.6 %
+    3 rohů OZNAČENÝCH (v soupeřově TZ)       2    0.9 %
+    NOSIČ sám v soupeřově TZ     105   47.3 %  <- podle doktríny větší díra než roh
+  ⭐ ČISTÁ KLEC (4 rohy, 0 označených, nosič mimo TZ): 21 = 9.46 %
+  pozitivní kontrola -- nejlepší dosažené kolo: 4 rohů, 0 označených, nosič mimo TZ
+  KOLIK NAŠICH STOJÍCÍCH VŮBEC SOUSEDÍ S NOSIČEM (8 polí, ne jen rohy):
+    0      43   19.4 %
+    1      39   17.6 %
+    2      60   27.0 %
+    3      35   15.8 %
+    4      36   16.2 %
+    5       9    4.1 %
+
+=== human: 166 tahů se STOJÍCÍM nosičem ===
+  ROHY (náš stojící hráč na diagonále nosiče) -- histogram, ne průměr:
+    0 rohů      72   43.4 %  #################
+    1 rohů      37   22.3 %  ########
+    2 rohů      26   15.7 %  ######
+    3 rohů      18   10.8 %  ####
+    4 rohů      13    7.8 %  ###
+    ZBYTEK (musí být 0)  0
+    průměr 1.17 ze 4  <- tohle jediné se dřív četlo
+  ČISTOTA:
+    0 rohů OZNAČENÝCH (v soupeřově TZ)     131   78.9 %
+    1 rohů OZNAČENÝCH (v soupeřově TZ)      27   16.3 %
+    2 rohů OZNAČENÝCH (v soupeřově TZ)       7    4.2 %
+    3 rohů OZNAČENÝCH (v soupeřově TZ)       1    0.6 %
+    NOSIČ sám v soupeřově TZ      84   50.6 %  <- podle doktríny větší díra než roh
+  ⭐ ČISTÁ KLEC (4 rohy, 0 označených, nosič mimo TZ): 11 = 6.63 %
+  pozitivní kontrola -- nejlepší dosažené kolo: 4 rohů, 0 označených, nosič mimo TZ
+  KOLIK NAŠICH STOJÍCÍCH VŮBEC SOUSEDÍ S NOSIČEM (8 polí, ne jen rohy):
+    0      48   28.9 %
+    1      39   23.5 %
+    2      27   16.3 %
+    3      28   16.9 %
+    4      18   10.8 %
+    5       6    3.6 %
+
+=== wood-elf: 135 tahů se STOJÍCÍM nosičem ===
+  ROHY (náš stojící hráč na diagonále nosiče) -- histogram, ne průměr:
+    0 rohů      48   35.6 %  ##############
+    1 rohů      31   23.0 %  #########
+    2 rohů      27   20.0 %  ########
+    3 rohů      18   13.3 %  #####
+    4 rohů      11    8.1 %  ###
+    ZBYTEK (musí být 0)  0
+    průměr 1.36 ze 4  <- tohle jediné se dřív četlo
+  ČISTOTA:
+    0 rohů OZNAČENÝCH (v soupeřově TZ)      99   73.3 %
+    1 rohů OZNAČENÝCH (v soupeřově TZ)      26   19.3 %
+    2 rohů OZNAČENÝCH (v soupeřově TZ)       9    6.7 %
+    3 rohů OZNAČENÝCH (v soupeřově TZ)       1    0.7 %
+    NOSIČ sám v soupeřově TZ      85   63.0 %  <- podle doktríny větší díra než roh
+  ⭐ ČISTÁ KLEC (4 rohy, 0 označených, nosič mimo TZ): 4 = 2.96 %
+  pozitivní kontrola -- nejlepší dosažené kolo: 4 rohů, 0 označených, nosič mimo TZ
+  KOLIK NAŠICH STOJÍCÍCH VŮBEC SOUSEDÍ S NOSIČEM (8 polí, ne jen rohy):
+    0      34   25.2 %
+    1      26   19.3 %
+    2      23   17.0 %
+    3      21   15.6 %
+    4      24   17.8 %
+    5       6    4.4 %
+    7       1    0.7 %
+
+=== skaven: 120 tahů se STOJÍCÍM nosičem ===
+  ROHY (náš stojící hráč na diagonále nosiče) -- histogram, ne průměr:
+    0 rohů      47   39.2 %  ###############
+    1 rohů      33   27.5 %  ###########
+    2 rohů      17   14.2 %  #####
+    3 rohů      11    9.2 %  ###
+    4 rohů      12   10.0 %  ####
+    ZBYTEK (musí být 0)  0
+    průměr 1.23 ze 4  <- tohle jediné se dřív četlo
+  ČISTOTA:
+    0 rohů OZNAČENÝCH (v soupeřově TZ)      83   69.2 %
+    1 rohů OZNAČENÝCH (v soupeřově TZ)      30   25.0 %
+    2 rohů OZNAČENÝCH (v soupeřově TZ)       6    5.0 %
+    3 rohů OZNAČENÝCH (v soupeřově TZ)       1    0.8 %
+    NOSIČ sám v soupeřově TZ      71   59.2 %  <- podle doktríny větší díra než roh
+  ⭐ ČISTÁ KLEC (4 rohy, 0 označených, nosič mimo TZ): 7 = 5.83 %
+  pozitivní kontrola -- nejlepší dosažené kolo: 4 rohů, 0 označených, nosič mimo TZ
+  KOLIK NAŠICH STOJÍCÍCH VŮBEC SOUSEDÍ S NOSIČEM (8 polí, ne jen rohy):
+    0      34   28.3 %
+    1      26   21.7 %
+    2      27   22.5 %
+    3      14   11.7 %
+    4      12   10.0 %
+    5       6    5.0 %
+    6       1    0.8 %

@@ -1,0 +1,249 @@
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] marked: stojící soused: dostal True, čekal True
+    [OK ] marked: ležící soused nepočítá: dostal False, čekal False
+    [OK ] marked: soupeř na dva kroky: dostal False, čekal False
+    [OK ] hledač najde pole na 1 krok: dostal 1, čekal 1
+    [OK ] neighbours: 2 stojící + 1 ležící: dostal (2, 1), čekal (2, 1)
+    [OK ] hledač NEstrict prstenec ležících ignoruje: dostal 1, čekal 1
+    [OK ] hledač STRICT prstenec ležících respektuje: dostal None, čekal None
+    [OK ] hledač vrátí None při obklíčení (rozpočet 2): dostal None, čekal None
+    [OK ] hledač přes prstenec při rozpočtu 4 najde pole: dostal True, čekal True
+    [OK ] hledač při rozpočtu 0: dostal None, čekal None
+  ⇒ měřidlo umí najít jedničku i nulu, obojí na známé desce.
+
+snímků v korpusu celkem: 5472
+VYŘAZENO (a proč) — jmenovatel se nesmí ztratit tiše:
+    na začátku kola míč nedržíme (predikát N/A)           3359
+    poslední snímek hry (není konec kola)                  171
+    hranice poločasu                                       165
+    TD v kole (mezi snímky výkop)                          116
+    ---- vyřazeno 3811 + použito 1661 = 5472 (z 5472, zbytek 0)
+kontrola párování: v 1115 použitých kolech se nosič HNUL ⇒ E není kopie S (ochrana proti off-by-one)
+
+=== dwarf: 1076 spárovaných kol se stojícím nosičem na OBOU koncích ===
+  (+ 27 kol, kde jsme nosiče/míč během kola ztratili — vedeno zvlášť, není to skip)
+  nosič označen na ZAČÁTKU kola     587   54.6 %   <- tohle četl cage_built (soupeřova akce)
+  nosič označen na KONCI kola       269   25.0 %   <- ⭐ predikát P42/K38 (naše volba)
+
+  ⛔⛔ TŘI KOŠE NA KONCI KOLA (doktrína uživatele 10.09. — ležící NENÍ zdarma, stojí jeho blitz):
+    ZDARMA (≥1 stojící soused)                269   25.0 %
+    ZA BLITZ (0 stojících, ≥1 ležící)         175   16.3 %
+    BEZPEČNO (ani jeden soused)               632   58.7 %
+    ZBYTEK (musí být 0)  0
+    ⇒ EXPOZICE CELKEM (zdarma + za blitz) 444 = 41.3 %
+  kolik BLOKŮ ZDARMA to je (počet stojících sousedů nosiče):
+    1 stojících     111   10.3 %
+    2 stojících      75    7.0 %
+    3 stojících      60    5.6 %
+    4 stojících      20    1.9 %
+    5 stojících       3    0.3 %
+  koš ZDARMA: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 266/269 = 98.9 %
+  koš ZA BLITZ: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 165/175 = 94.3 %
+  pozitivní kontrola z DAT (strict hledač): největší nalezená vzdálenost 3
+
+  ROZPAD 269 kol podle MECHANISMU (musí dát dohromady 269):
+    A označen na začátku, NEHNUL se                  193   71.7 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)    193 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                126 =  65.3 %
+    B na začátku volný, VEŠEL do kontaktu             10    3.7 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      7 =  70.0 %   nebylo      3   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  8 =  80.0 %
+    C označen, hnul se, pořád označen                 66   24.5 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)     66 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                 55 =  83.3 %
+    ZBYTEK (musí být 0)  0
+
+  PODATRIBUCE týchž 269 kol Z UDÁLOSTÍ (musí dát 269):
+    c1 nosič sám BLOKOVAL (kontakt z konstrukce)      94   34.9 %
+    c1b nosič FAULOVAL                                 5    1.9 %
+    c2 soupeře k němu PŘISTRČIL náš push              10    3.7 %
+    c3 chůze ho v kontaktu NECHALA                     3    1.1 %
+    c4 nosič se v kole VŮBEC NEPROJEVIL              157   58.4 %
+    ZBYTEK (musí být 0)  0
+
+  ⭐ CELKEM: bylo kam jít 266 = 98.9 % · nebylo kam 3 = 1.1 % · zbytek 0
+  vzdálenost k nejbližšímu volnému NEoznačenému poli (histogram):
+    1 kroků     188   69.9 %
+    2 kroků      66   24.5 %
+    3 kroků      12    4.5 %
+  pozitivní kontrola z DAT: největší nalezená vzdálenost 3 ⇒ hledač nevrací jen 1
+
+=== orc: 194 spárovaných kol se stojícím nosičem na OBOU koncích ===
+  (+ 7 kol, kde jsme nosiče/míč během kola ztratili — vedeno zvlášť, není to skip)
+  nosič označen na ZAČÁTKU kola      87   44.8 %   <- tohle četl cage_built (soupeřova akce)
+  nosič označen na KONCI kola        36   18.6 %   <- ⭐ predikát P42/K38 (naše volba)
+
+  ⛔⛔ TŘI KOŠE NA KONCI KOLA (doktrína uživatele 10.09. — ležící NENÍ zdarma, stojí jeho blitz):
+    ZDARMA (≥1 stojící soused)                 36   18.6 %
+    ZA BLITZ (0 stojících, ≥1 ležící)          34   17.5 %
+    BEZPEČNO (ani jeden soused)               124   63.9 %
+    ZBYTEK (musí být 0)  0
+    ⇒ EXPOZICE CELKEM (zdarma + za blitz) 70 = 36.1 %
+  kolik BLOKŮ ZDARMA to je (počet stojících sousedů nosiče):
+    1 stojících      12    6.2 %
+    2 stojících      13    6.7 %
+    3 stojících      11    5.7 %
+  koš ZDARMA: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 36/36 = 100.0 %
+  koš ZA BLITZ: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 29/34 = 85.3 %
+  pozitivní kontrola z DAT (strict hledač): největší nalezená vzdálenost 3
+
+  ROZPAD 36 kol podle MECHANISMU (musí dát dohromady 36):
+    A označen na začátku, NEHNUL se                   25   69.4 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)     25 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                 14 =  56.0 %
+    B na začátku volný, VEŠEL do kontaktu              2    5.6 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      2 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  2 = 100.0 %
+    C označen, hnul se, pořád označen                  9   25.0 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      9 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  6 =  66.7 %
+    ZBYTEK (musí být 0)  0
+
+  PODATRIBUCE týchž 36 kol Z UDÁLOSTÍ (musí dát 36):
+    c1 nosič sám BLOKOVAL (kontakt z konstrukce)      14   38.9 %
+    c1b nosič FAULOVAL                                 1    2.8 %
+    c2 soupeře k němu PŘISTRČIL náš push               1    2.8 %
+    c4 nosič se v kole VŮBEC NEPROJEVIL               20   55.6 %
+    ZBYTEK (musí být 0)  0
+
+  ⭐ CELKEM: bylo kam jít 36 = 100.0 % · nebylo kam 0 = 0.0 % · zbytek 0
+  vzdálenost k nejbližšímu volnému NEoznačenému poli (histogram):
+    1 kroků      22   61.1 %
+    2 kroků      13   36.1 %
+    3 kroků       1    2.8 %
+  pozitivní kontrola z DAT: největší nalezená vzdálenost 3 ⇒ hledač nevrací jen 1
+
+=== human: 138 spárovaných kol se stojícím nosičem na OBOU koncích ===
+  (+ 7 kol, kde jsme nosiče/míč během kola ztratili — vedeno zvlášť, není to skip)
+  nosič označen na ZAČÁTKU kola      70   50.7 %   <- tohle četl cage_built (soupeřova akce)
+  nosič označen na KONCI kola        34   24.6 %   <- ⭐ predikát P42/K38 (naše volba)
+
+  ⛔⛔ TŘI KOŠE NA KONCI KOLA (doktrína uživatele 10.09. — ležící NENÍ zdarma, stojí jeho blitz):
+    ZDARMA (≥1 stojící soused)                 34   24.6 %
+    ZA BLITZ (0 stojících, ≥1 ležící)          21   15.2 %
+    BEZPEČNO (ani jeden soused)                83   60.1 %
+    ZBYTEK (musí být 0)  0
+    ⇒ EXPOZICE CELKEM (zdarma + za blitz) 55 = 39.9 %
+  kolik BLOKŮ ZDARMA to je (počet stojících sousedů nosiče):
+    1 stojících      18   13.0 %
+    2 stojících       5    3.6 %
+    3 stojících       6    4.3 %
+    4 stojících       4    2.9 %
+    5 stojících       1    0.7 %
+  koš ZDARMA: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 32/34 = 94.1 %
+  koš ZA BLITZ: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 21/21 = 100.0 %
+  pozitivní kontrola z DAT (strict hledač): největší nalezená vzdálenost 2
+
+  ROZPAD 34 kol podle MECHANISMU (musí dát dohromady 34):
+    A označen na začátku, NEHNUL se                   23   67.6 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)     23 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                 13 =  56.5 %
+    B na začátku volný, VEŠEL do kontaktu              5   14.7 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      4 =  80.0 %   nebylo      1   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  5 = 100.0 %
+    C označen, hnul se, pořád označen                  6   17.6 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      6 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  6 = 100.0 %
+    ZBYTEK (musí být 0)  0
+
+  PODATRIBUCE týchž 34 kol Z UDÁLOSTÍ (musí dát 34):
+    c1 nosič sám BLOKOVAL (kontakt z konstrukce)      12   35.3 %
+    c3 chůze ho v kontaktu NECHALA                     1    2.9 %
+    c4 nosič se v kole VŮBEC NEPROJEVIL               21   61.8 %
+    ZBYTEK (musí být 0)  0
+
+  ⭐ CELKEM: bylo kam jít 33 = 97.1 % · nebylo kam 1 = 2.9 % · zbytek 0
+  vzdálenost k nejbližšímu volnému NEoznačenému poli (histogram):
+    1 kroků      23   67.6 %
+    2 kroků      10   29.4 %
+  pozitivní kontrola z DAT: největší nalezená vzdálenost 2 ⇒ hledač nevrací jen 1
+
+=== skaven: 97 spárovaných kol se stojícím nosičem na OBOU koncích ===
+  (+ 5 kol, kde jsme nosiče/míč během kola ztratili — vedeno zvlášť, není to skip)
+  nosič označen na ZAČÁTKU kola      62   63.9 %   <- tohle četl cage_built (soupeřova akce)
+  nosič označen na KONCI kola        36   37.1 %   <- ⭐ predikát P42/K38 (naše volba)
+
+  ⛔⛔ TŘI KOŠE NA KONCI KOLA (doktrína uživatele 10.09. — ležící NENÍ zdarma, stojí jeho blitz):
+    ZDARMA (≥1 stojící soused)                 36   37.1 %
+    ZA BLITZ (0 stojících, ≥1 ležící)          12   12.4 %
+    BEZPEČNO (ani jeden soused)                49   50.5 %
+    ZBYTEK (musí být 0)  0
+    ⇒ EXPOZICE CELKEM (zdarma + za blitz) 48 = 49.5 %
+  kolik BLOKŮ ZDARMA to je (počet stojících sousedů nosiče):
+    1 stojících       4    4.1 %
+    2 stojících      10   10.3 %
+    3 stojících      13   13.4 %
+    4 stojících       9    9.3 %
+  koš ZDARMA: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 35/36 = 97.2 %
+  koš ZA BLITZ: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 12/12 = 100.0 %
+  pozitivní kontrola z DAT (strict hledač): největší nalezená vzdálenost 3
+
+  ROZPAD 36 kol podle MECHANISMU (musí dát dohromady 36):
+    A označen na začátku, NEHNUL se                   30   83.3 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)     30 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                 19 =  63.3 %
+    B na začátku volný, VEŠEL do kontaktu              1    2.8 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      0 =   0.0 %   nebylo      1   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  0 =   0.0 %
+    C označen, hnul se, pořád označen                  5   13.9 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      5 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  4 =  80.0 %
+    ZBYTEK (musí být 0)  0
+
+  PODATRIBUCE týchž 36 kol Z UDÁLOSTÍ (musí dát 36):
+    c1 nosič sám BLOKOVAL (kontakt z konstrukce)       7   19.4 %
+    c2 soupeře k němu PŘISTRČIL náš push               3    8.3 %
+    c4 nosič se v kole VŮBEC NEPROJEVIL               26   72.2 %
+    ZBYTEK (musí být 0)  0
+
+  ⭐ CELKEM: bylo kam jít 35 = 97.2 % · nebylo kam 1 = 2.8 % · zbytek 0
+  vzdálenost k nejbližšímu volnému NEoznačenému poli (histogram):
+    1 kroků      23   63.9 %
+    2 kroků      10   27.8 %
+    3 kroků       2    5.6 %
+  pozitivní kontrola z DAT: největší nalezená vzdálenost 3 ⇒ hledač nevrací jen 1
+
+=== wood-elf: 96 spárovaných kol se stojícím nosičem na OBOU koncích ===
+  (+ 14 kol, kde jsme nosiče/míč během kola ztratili — vedeno zvlášť, není to skip)
+  nosič označen na ZAČÁTKU kola      59   61.5 %   <- tohle četl cage_built (soupeřova akce)
+  nosič označen na KONCI kola        34   35.4 %   <- ⭐ predikát P42/K38 (naše volba)
+
+  ⛔⛔ TŘI KOŠE NA KONCI KOLA (doktrína uživatele 10.09. — ležící NENÍ zdarma, stojí jeho blitz):
+    ZDARMA (≥1 stojící soused)                 34   35.4 %
+    ZA BLITZ (0 stojících, ≥1 ležící)          13   13.5 %
+    BEZPEČNO (ani jeden soused)                49   51.0 %
+    ZBYTEK (musí být 0)  0
+    ⇒ EXPOZICE CELKEM (zdarma + za blitz) 47 = 49.0 %
+  kolik BLOKŮ ZDARMA to je (počet stojících sousedů nosiče):
+    1 stojících       8    8.3 %
+    2 stojících      13   13.5 %
+    3 stojících      10   10.4 %
+    4 stojících       3    3.1 %
+  koš ZDARMA: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 34/34 = 100.0 %
+  koš ZA BLITZ: ÚPLNĚ ČISTÉ pole (ani stojící, ani ležící) bylo k dispozici 13/13 = 100.0 %
+  pozitivní kontrola z DAT (strict hledač): největší nalezená vzdálenost 3
+
+  ROZPAD 34 kol podle MECHANISMU (musí dát dohromady 34):
+    A označen na začátku, NEHNUL se                   28   82.4 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)     28 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                 17 =  60.7 %
+    B na začátku volný, VEŠEL do kontaktu              1    2.9 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      1 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  1 = 100.0 %
+    C označen, hnul se, pořád označen                  5   14.7 %
+        z toho BYLO KAM JÍT (horní mez rozpočtu)      5 = 100.0 %   nebylo      0   (zbytek 0)
+        totéž s rozpočtem jen 1 krok                  3 =  60.0 %
+    ZBYTEK (musí být 0)  0
+
+  PODATRIBUCE týchž 34 kol Z UDÁLOSTÍ (musí dát 34):
+    c1 nosič sám BLOKOVAL (kontakt z konstrukce)       4   11.8 %
+    c3 chůze ho v kontaktu NECHALA                     2    5.9 %
+    c4 nosič se v kole VŮBEC NEPROJEVIL               28   82.4 %
+    ZBYTEK (musí být 0)  0
+
+  ⭐ CELKEM: bylo kam jít 34 = 100.0 % · nebylo kam 0 = 0.0 % · zbytek 0
+  vzdálenost k nejbližšímu volnému NEoznačenému poli (histogram):
+    1 kroků      21   61.8 %
+    2 kroků      10   29.4 %
+    3 kroků       3    8.8 %
+  pozitivní kontrola z DAT: největší nalezená vzdálenost 3 ⇒ hledač nevrací jen 1
