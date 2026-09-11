@@ -37,18 +37,13 @@ final class RandomAICoach implements AICoachInterface
             if ($type === null || $type === ActionType::END_TURN) {
                 continue;
             }
-            if (!$this->canBuild($type)) {
+            // Akce bez hrace tenhle kouc postavit neumi -- jen vyradit.
+            $playerId = (int) ($a['playerId'] ?? 0);
+            if ($playerId === 0) {
                 continue;
             }
-            // Akce bez hrace tenhle kouc postavit neumi -- taky jen vyradit.
-            if ((int) ($a['playerId'] ?? 0) === 0) {
-                continue;
-            }
-            $playableActions[] = $a;
-        }
-
-        if ($playableActions === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            // ⭐ Enum se resi JEDNOU tady, ne znovu pri stavbe.
+            $playableActions[] = [$type, $playerId];
         }
 
         // ⛔⛔ DRUHA POLOVINA TEHOZ (11.09.2026): vrchni `default => END_TURN`
@@ -59,20 +54,18 @@ final class RandomAICoach implements AICoachInterface
         //   hrubsi nez ta v builderu), takze se kolo ukoncovalo i tady.
         //   ⇒ Builder ted vraci `null` a losuje se DAL. END_TURN az kdyz
         //   zadny kandidat akci nepostavi.
-        $zbyva = $playableActions;
-        while ($zbyva !== []) {
-            $k = array_rand($zbyva);
-            $chosen = $zbyva[$k];
-            unset($zbyva[$k]);   // kazdy kandidat se zkusi NEJVYS jednou
-                                 // => smycka je konecna
-
-            $built = $this->buildFor($state, $rules, ActionType::from($chosen['type']),
-                                     (int) $chosen['playerId']);
+        // ⭐ `shuffle` + `foreach`: kazdy kandidat se zkusi NEJVYS jednou a
+        //   smycka je konecna uz z podstaty. (Drive `while` s `array_rand`
+        //   a `unset`, tedy ucetnictvi s klici kvuli nahodnemu poradi.)
+        shuffle($playableActions);
+        foreach ($playableActions as [$type, $playerId]) {
+            $built = $this->buildFor($state, $rules, $type, $playerId);
             if ($built !== null) {
                 return $built;
             }
         }
 
+        // Prazdna nabidka i "zadny kandidat nic nepostavil" konci stejne.
         return ['action' => ActionType::END_TURN, 'params' => []];
     }
 
@@ -95,28 +88,13 @@ final class RandomAICoach implements AICoachInterface
             //   ostatnim koucum a hrac kvuli tomu nejednal nikdy).
             ActionType::BALL_AND_CHAIN => ['action' => ActionType::BALL_AND_CHAIN,
                                            'params' => ['playerId' => $playerId]],
-        };
-    }
-
-    /**
-     * Umi tenhle kouc ten typ vubec postavit?
-     *
-     * ⛔ Drzi se u `match` v `decideAction` schvalne: kdyz tam pribude vetev,
-     *    musi pribyt i tady, jinak se typ nikdy nenabidne. Seznam je UZAVRENY
-     *    -- zadny `default`, ktery by tise polkl novy typ.
-     */
-    private function canBuild(ActionType $type): bool
-    {
-        return match ($type) {
-            ActionType::MOVE,
-            ActionType::BLOCK,
-            ActionType::BLITZ,
-            ActionType::PASS,
-            ActionType::HAND_OFF,
-            ActionType::FOUL,
-            ActionType::MULTIPLE_BLOCK,
-            ActionType::BALL_AND_CHAIN => true,
-            default => false,
+            // ⭐ Nepodporovany typ (TTM, bomba, gaze) vypada z losovani TOUTEZ
+            //   cestou jako builder, ktery nenasel cil -- jeden mechanismus
+            //   misto dvou. Drive to hlidal jeste druhy uzavreny seznam
+            //   `canBuild()`, ktery se musel rucne drzet v souladu s timhle
+            //   `match`; komentar si to sam priznaval. `LearningAICoach` to
+            //   tak dela odjakziva.
+            default => null,
         };
     }
 
@@ -156,7 +134,7 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
     private function buildMoveAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {

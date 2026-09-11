@@ -56,7 +56,7 @@ final class GreedyAICoach implements AICoachInterface
         //   s jedinym resenim.
         $bestScore = -1;
         $bestAction = null;
-        $firstPlayable = null;
+        $fallbackPlayerId = null;
 
         foreach ($actions as $action) {
             $type = ActionType::from($action['type']);
@@ -81,67 +81,65 @@ final class GreedyAICoach implements AICoachInterface
                 continue;
             }
 
-            // Neohodnotila se -- ale hratelna je. Drz si prvni takovou pro
-            // pripad, ze neohodnoti NIC.
-            if ($firstPlayable === null) {
-                $built = $this->buildUnscoredAction($state, $rules, $type, $playerId, $side);
-                if ($built !== null) {
-                    $firstPlayable = $built;
-                }
+            // ⭐ Jen si zapamatuj, KOHO by se zachrana tykala. Postavit ji
+            //   tady by znamenalo pustit pathfinder podruhe pro tehoz hrace
+            //   (uvnitr `scoreMove` uz bezel) -- a v 99,4 % rozhodnuti se
+            //   vysledek zahodi, protoze nakonec neco skoruje.
+            if ($fallbackPlayerId === null && $type === ActionType::MOVE) {
+                $fallbackPlayerId = $playerId;
             }
         }
 
         if ($bestAction !== null) {
             return $bestAction;
         }
-        if ($firstPlayable !== null) {
-            return $firstPlayable;
-        }
 
-        return ['action' => ActionType::END_TURN, 'params' => []];
+        return ($fallbackPlayerId !== null
+                ? $this->buildFallbackMove($state, $rules, $fallbackPlayerId, $side)
+                : null)
+            ?? ['action' => ActionType::END_TURN, 'params' => []];
     }
 
     /**
-     * Postav akci, kterou skorer odmitl ohodnotit, aby se dala zahrat aspon
-     * jako zachrana pred propadnutim kola.
+     * Postav POHYB, ktery skorer odmitl ohodnotit (skore `<= 0`), aby se dal
+     * zahrat aspon jako zachrana pred propadnutim kola.
      *
-     * ⛔ Vraci `null`, kdyz se akce postavit neda -- tim se vyradi z uvahy
-     *    misto toho, aby ukoncila kolo (tataz past jako v `RandomAICoach`,
-     *    `71f8ac17`).
+     * ⛔ Vraci `null`, kdyz hrac nema kam -- tim se vyradi z uvahy misto toho,
+     *    aby ukoncil kolo (tataz past jako v `RandomAICoach`, `71f8ac17`).
+     * ⭐ Jen MOVE: ostatni typy, ktere skorer vraci `null`, tenhle kouc
+     *    postavit neumi, a `BALL_AND_CHAIN` se sem nedostane vubec --
+     *    `scoreBallAndChain` ma navratovy typ `array` a vzdy skoruje 200.
      *
      * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildUnscoredAction(
+    private function buildFallbackMove(
         GameState $state,
         RulesEngine $rules,
-        ActionType $type,
         int $playerId,
         TeamSide $side,
     ): ?array {
-        if ($type === ActionType::MOVE) {
-            // Skorer MOVE odmitl (skore <= 0), ale slapnout se da: vezmi
-            // pole, ktere je nejdal od nasi koncove zony, tedy postup vpred.
-            $targets = $rules->getValidMoveTargets($state, $playerId);
-            if ($targets === []) {
-                return null;
+        $targets = $rules->getValidMoveTargets($state, $playerId);
+        if ($targets === []) {
+            return null;
+        }
+
+        // Nejdal k souperove koncove zone, tedy postup vpred. Jeden pruchod
+        // s `min` -- tridit cele pole kvuli jednomu prvku je zbytecne.
+        $endZoneX = ($side === TeamSide::HOME) ? 25 : 0;
+        $best = $targets[0];
+        $bestDist = abs($best['x'] - $endZoneX);
+        foreach ($targets as $t) {
+            $d = abs($t['x'] - $endZoneX);
+            if ($d < $bestDist) {
+                $bestDist = $d;
+                $best = $t;
             }
-            $endZoneX = ($side === TeamSide::HOME) ? 25 : 0;
-            usort($targets, static fn(array $a, array $b)
-                => abs($a['x'] - $endZoneX) <=> abs($b['x'] - $endZoneX));
-
-            return [
-                'action' => ActionType::MOVE,
-                'params' => ['playerId' => $playerId, 'x' => $targets[0]['x'], 'y' => $targets[0]['y']],
-            ];
         }
 
-        if ($type === ActionType::BALL_AND_CHAIN) {
-            return ['action' => ActionType::BALL_AND_CHAIN, 'params' => ['playerId' => $playerId]];
-        }
-
-        // Ostatni typy (TTM, bomba, ...) tenhle kouc postavit neumi -- vyradit,
-        // ne ukoncit kolo.
-        return null;
+        return [
+            'action' => ActionType::MOVE,
+            'params' => ['playerId' => $playerId, 'x' => $best['x'], 'y' => $best['y']],
+        ];
     }
 
     public function setupFormation(GameState $state, TeamSide $side): GameState

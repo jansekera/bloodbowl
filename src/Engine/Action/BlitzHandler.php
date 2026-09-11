@@ -52,7 +52,12 @@ final class BlitzHandler implements ActionHandlerInterface
         // If not adjacent, move to adjacent square first
         if ($attackerPos->distanceTo($defenderPos) > 1) {
             // Find best adjacent square to move to
-            $moveTarget = $this->findBlitzMoveTarget($state, $attacker, $defenderPos);
+            // ⭐ Pathfinder se pousti JEDNOU. Drive `findClosestApproach`
+            //   volala `findValidMoves` znovu nad tymz stavem a hracem --
+            //   podle mereni v tomhle souboru slo o 3,58 % rozhodnuti, takze
+            //   to nebylo teoreticke.
+            $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
+            $moveTarget = $this->findBlitzMoveTarget($validMoves, $defenderPos);
 
             // ⛔⛔⛔ OPRAVA 11.09.2026: TADY SE HÁZELA VÝJIMKA
             //   `throw new \InvalidArgumentException('Cannot reach target for blitz')`
@@ -79,7 +84,7 @@ final class BlitzHandler implements ActionHandlerInterface
             //   nekoná (BB2016: Blitz = pohyb + NEJVÝŠ jeden blok během něj).
             $blockPossible = true;
             if ($moveTarget === null) {
-                $moveTarget = $this->findClosestApproach($state, $attacker, $defenderPos);
+                $moveTarget = $this->findClosestApproach($validMoves, $attackerPos, $defenderPos);
                 $blockPossible = false;
                 if ($moveTarget === null) {
                     // Nemá kam šlápnout vůbec. Deklarace platí (blitz je
@@ -171,13 +176,11 @@ final class BlitzHandler implements ActionHandlerInterface
      *   k cíli, pak nejméně dodgů a GFI -- aby se „přiblížení" nechovalo jinak
      *   než „doběhnutí" a nevznikly dvě neslučitelné definice téhož.
      */
-    private function findClosestApproach(GameState $state, MatchPlayerDTO $attacker, Position $defenderPos): ?Position
+    private function findClosestApproach(array $validMoves, Position $from, Position $defenderPos): ?Position
     {
-        $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
-
         $bestTarget = null;
         $bestKey = null;
-        $startDist = $attacker->getPosition()?->distanceTo($defenderPos) ?? PHP_INT_MAX;
+        $startDist = $from->distanceTo($defenderPos);
 
         foreach ($validMoves as $path) {
             $dest = $path->getDestination();
@@ -199,10 +202,8 @@ final class BlitzHandler implements ActionHandlerInterface
     /**
      * Find best adjacent square to defender for a blitz move.
      */
-    private function findBlitzMoveTarget(GameState $state, MatchPlayerDTO $attacker, Position $defenderPos): ?Position
+    private function findBlitzMoveTarget(array $validMoves, Position $defenderPos): ?Position
     {
-        $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
-
         $bestTarget = null;
         $bestScore = PHP_INT_MAX;
 

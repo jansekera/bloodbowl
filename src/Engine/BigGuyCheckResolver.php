@@ -13,29 +13,22 @@ use App\Enum\SkillName;
 
 final class BigGuyCheckResolver
 {
-    private readonly InjuryResolver $injuryResolver;
-    private readonly BallResolver $ballResolver;
-
-    public function __construct(
-        ?InjuryResolver $injuryResolver = null,
-        ?BallResolver $ballResolver = null,
-    ) {
-        // ⭐ Doplneno 11.09.2026 (PHP22): Bloodlust potrebuje HOD NA ZRANENI
-        //   a ODRAZ MICE. Do te doby si tahle trida vystacila bez zavislosti,
-        //   protoze kousnuti delala jako auto-KO -- coz byla prave ta vada.
-        $this->injuryResolver = $injuryResolver ?? new InjuryResolver();
-        $this->ballResolver = $ballResolver ?? new BallResolver(
-            new RandomDiceRoller(),
-            new TacklezoneCalculator(),
-            new ScatterCalculator(),
-        );
-    }
     /**
-     * Resolve pre-action check for Big Guy negatraits.
-     * Returns null if the action can proceed, or an ActionResult if blocked.
-     *
-     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool}|null null = action proceeds
+     * ⛔ ZAVISLOSTI JSOU POVINNE (11.09.2026). Drive tu byly nullable
+     *   s nahradni konstrukci `new BallResolver(new RandomDiceRoller(), ...)`.
+     *   To do tridy protahovalo **DRUHY, NESEEDOVANY generator kostek** vedle
+     *   toho, ktery prichazi parametrem do `resolvePreActionCheck` --
+     *   a odraz mice po neuspesnem Bloodlustu by pak sel z jine kostky nez
+     *   zbytek behu. ⇒ Tiche rozbiti reprodukovatelnosti mereni, tedy presne
+     *   to, co se v tomhle projektu nesmi.
+     *   Volajici je jediny (`ActionResolver`) a obe zavislosti predava.
      */
+    public function __construct(
+        private readonly InjuryResolver $injuryResolver,
+        private readonly BallResolver $ballResolver,
+    ) {
+    }
+
     /**
      * ⛔⛔ `wastesTeamAction` (doplneno 11.09.2026 -- polozka PHP15).
      *   `rules_bb2016.txt` r. 8398-8401: „The player can't do anything for the
@@ -115,23 +108,20 @@ final class BigGuyCheckResolver
             return null;
         }
 
-        if ($roll === 1) {
-            $player = $player
-                ->withLostTacklezones(true)
-                ->withBigGuyStupefied(true)
-                ->withHasMoved(true)
-                ->withHasActed(true);
-            $state = $state->withPlayer($player);
+        // Sem se dojde jen pri hodu 1 -- vetev `>= 2` vyse vycerpala zbytek.
+        $player = $player
+            ->withLostTacklezones(true)
+            ->withBigGuyStupefied(true)
+            ->withHasMoved(true)
+            ->withHasActed(true);
+        $state = $state->withPlayer($player);
 
-            return [
-                'state' => $state,
-                'events' => [GameEvent::boneHeadFail($player->getId(), $roll)],
-                // ⭐ viz `wastesTeamAction` niz
-                'wastesTeamAction' => true,
-            ];
-        }
-
-        return null;
+        return [
+            'state' => $state,
+            'events' => [GameEvent::boneHeadFail($player->getId(), $roll)],
+            // ⭐ viz `wastesTeamAction` niz
+            'wastesTeamAction' => true,
+        ];
     }
 
     /**
@@ -379,9 +369,14 @@ final class BigGuyCheckResolver
         //   requires you to feed on a spectator -- move the Vampire to the
         //   reserves box if he was still on the pitch. **If he was holding
         //   the ball, it bounces** from the square he occupied."
-        $vampHadBall = $state->getBall()->isHeld()
-            && $state->getBall()->getCarrierId() === $player->getId();
-        $vampPos = $player->getPosition();
+        $events = [GameEvent::bloodlustFail($player->getId(), $roll)];
+
+        // ⭐ Mic se upusti TYMZ pomocnikem, jaky uz o 40 radku vys pouziva
+        //   vetev s Thrallem -- `handleBallOnPlayerDown` sam pozna, jestli
+        //   ten hrac mic vubec nese, polozi ho na jeho pole a odrazi.
+        //   ⛔ Musi to byt PRED `withPosition(null)`, jinak uz nema odkud.
+        [$state, $events] = $this->ballResolver
+            ->handleBallOnPlayerDown($state, $player, $events);
 
         $player = $player
             ->withPosition(null)
@@ -389,15 +384,6 @@ final class BigGuyCheckResolver
             ->withHasMoved(true)
             ->withHasActed(true);
         $state = $state->withPlayer($player);
-
-        $events = [GameEvent::bloodlustFail($player->getId(), $roll)];
-
-        if ($vampHadBall && $vampPos !== null) {
-            $state = $state->withBall(\App\DTO\BallState::onGround($vampPos));
-            $bounce = $this->ballResolver->resolveBounce($state, $vampPos);
-            $state = $bounce['state'];
-            $events = array_merge($events, $bounce['events']);
-        }
 
         return [
             'state' => $state,

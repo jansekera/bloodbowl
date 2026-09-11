@@ -242,6 +242,10 @@ final class LearningAICoach implements AICoachInterface
      */
     public function setWeights(array $weights): void
     {
+        // ⭐ Druha cesta, kterou se vahy dostanou dovnitr -- musi projit tymz
+        //   srovnanim delky jako nacteni ze souboru, jinak by `dotProduct`
+        //   zase tise usekaval (viz `1b26717a`).
+        $weights = self::normalizeWeights(array_values(array_map('floatval', $weights)));
         $this->modelType = 'linear';
         $this->weights = $weights;
     }
@@ -838,14 +842,12 @@ final class LearningAICoach implements AICoachInterface
      */
     private static function normalizeWeights(array $w): array
     {
-        $n = FeatureExtractor::NUM_FEATURES;
-        if (count($w) < $n) {
-            return array_pad($w, $n, 0.0);
-        }
-        if (count($w) > $n) {
-            return array_slice($w, 0, $n);
-        }
-        return $w;
+        // Jeden vyraz pokryva kratsi, delsi i presnou delku.
+        return array_slice(
+            array_pad($w, FeatureExtractor::NUM_FEATURES, 0.0),
+            0,
+            FeatureExtractor::NUM_FEATURES,
+        );
     }
 
     private static function dotProduct(array $a, array $b): float

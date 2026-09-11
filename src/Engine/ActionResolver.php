@@ -118,10 +118,7 @@ final class ActionResolver
         return $this->gameFlowResolver;
     }
 
-    /**
-     * @param array<string, mixed> $params
-     */
-    /**
+        /**
      * Odecte TYMOVY limit u akce, ktera propadla pred svym provedenim.
      *
      * ⭐ MOVE a BLOCK zadny tymovy limit nemaji -- ty se neodecitaji.
@@ -147,6 +144,9 @@ final class ActionResolver
         return $state->withTeamState($side, $team);
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
     {
         // Big Guy pre-action check for player actions

@@ -14,12 +14,26 @@ final class TacklezoneCalculator
     /**
      * Count enemy tackle zones on a given position.
      */
-    public function countTacklezones(GameState $state, Position $position, TeamSide $friendlySide): int
-    {
+    /**
+     * @param int|null $exceptPlayerId hráč, který se do počtu NEPOČÍTÁ.
+     *   ⭐ Kvůli Hypnotic Gaze: `rules_bb2016.txt` r. 8183-8185 chce „-1 for
+     *   each opposing tackle zone … **other than the victim's**". Do 11.09.
+     *   měl handler vlastní kopii téhle smyčky; výjimka patří sem, aby byl
+     *   ten průchod jen jeden.
+     */
+    public function countTacklezones(
+        GameState $state,
+        Position $position,
+        TeamSide $friendlySide,
+        ?int $exceptPlayerId = null,
+    ): int {
         $count = 0;
         $enemySide = $friendlySide->opponent();
 
         foreach ($state->getPlayersOnPitch($enemySide) as $enemy) {
+            if ($exceptPlayerId !== null && $enemy->getId() === $exceptPlayerId) {
+                continue;
+            }
             if (!$enemy->getState()->exertsTacklezone()) {
                 continue;
             }

@@ -65,19 +65,12 @@ final class HypnoticGazeHandler implements ActionHandlerInterface
         // ⭐ NASLO TO druha pulka testovaciho paru (`...SucceedsOneAbove`):
         //   test na modifikator sam o sobe prosel i se spatnym prahem,
         //   protoze tvrdil jen neuspech.
-        $tz = 0;
-        foreach ($state->getPlayersOnPitch($gazer->getTeamSide()->opponent()) as $opp) {
-            if ($opp->getId() === $targetId) {
-                continue;   // obet se nepocita
-            }
-            if (!$opp->getState()->exertsTacklezone() || $opp->hasLostTacklezones()) {
-                continue;
-            }
-            $oppPos = $opp->getPosition();
-            if ($oppPos !== null && $gazerPos->distanceTo($oppPos) === 1) {
-                $tz++;
-            }
-        }
+        $tz = $this->tzCalc->countTacklezones(
+            $state,
+            $gazerPos,
+            $gazer->getTeamSide(),
+            exceptPlayerId: $targetId,
+        );
         $target_roll = min(6, 2 + $tz);
 
         $roll = $this->dice->rollD6();

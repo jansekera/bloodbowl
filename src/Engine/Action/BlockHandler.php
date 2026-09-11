@@ -887,8 +887,10 @@ final class BlockHandler implements ActionHandlerInterface
                     //
                     // ⭐ ČTE SE PŘED PÁDEM, protože `handleBallOnPlayerDown`
                     //   míč upustí -- potom už by se nositel nepoznal.
-                    $activeHeldBall = $state->isBallHeldBy($attacker->getTeamSide())
-                        && $state->getBall()->getCarrierId() === $attacker->getId();
+                    //   (Kdyz je nositel prave utocnik, prislusnost k tymu
+                    //   z toho plyne -- druha podminka byla zbytecna.)
+                    $activeHeldBall =
+                        $state->getBall()->getCarrierId() === $attacker->getId();
 
                     $events[] = GameEvent::wrestle($attacker->getId(), $defender->getId());
                     $attacker = $attacker->withState(PlayerState::PRONE);
