@@ -96,6 +96,13 @@ final class LearningAICoach implements AICoachInterface
             if ($type === ActionType::SETUP_PLAYER || $type === ActionType::END_SETUP) {
                 continue;
             }
+            // ⏸ PHP25: schopnost "nic nedelat" uz v enginu JE, ale kouc ji
+            //   zatim NEPOUZIVA -- kdy ji ma volit, je vlastni rozhodnuti
+            //   (jinak by se tise vratila vada, kterou PHP13/PHP24 zaviraly).
+            if ($type === ActionType::STAND_PAT) {
+                continue;
+            }
+
 
             // ⛔⛔⛔ OPRAVA 11.09.2026 -- polozka PHP24 fronty, MEKCI TVAR
             //   tehoz, co `PHP13` opravil u `GreedyAICoach` (`f44270f5`).

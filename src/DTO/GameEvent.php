@@ -32,6 +32,17 @@ final class GameEvent
         ]);
     }
 
+    /**
+     * ⭐ Hrac se vedome NEAKTIVOVAL (PHP25). Neni to zadny hod ani pohyb --
+     *    jen zaznam, ze kouc tim hracem tenhle tah hybat nechtel.
+     */
+    public static function standPat(int $playerId, string $name): self
+    {
+        return new self('stand_pat', "{$name} stays put", [
+            'playerId' => $playerId,
+        ]);
+    }
+
     public static function dodgeAttempt(int $playerId, int $target, int $roll, bool $success): self
     {
         $result = $success ? 'succeeded' : 'failed';

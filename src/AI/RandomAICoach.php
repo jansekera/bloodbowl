@@ -34,7 +34,8 @@ final class RandomAICoach implements AICoachInterface
         $playableActions = [];
         foreach ($actions as $a) {
             $type = ActionType::tryFrom($a['type']);
-            if ($type === null || $type === ActionType::END_TURN) {
+            // ⏸ PHP25: STAND_PAT se zatim nelosuje -- viz komentar u Greedyho.
+            if ($type === null || $type === ActionType::END_TURN || $type === ActionType::STAND_PAT) {
                 continue;
             }
             // Akce bez hrace tenhle kouc postavit neumi -- jen vyradit.

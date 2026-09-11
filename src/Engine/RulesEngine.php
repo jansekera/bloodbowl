@@ -117,6 +117,13 @@ final class RulesEngine
                     continue;
                 }
 
+                // ⭐ PHP25: "nic nedelat" se nabizi kazdemu, kdo jeste ma co
+                //   utratit. ⛔ Ball & Chain se sem nedostane -- ten hrac MUSI
+                //   jednat (`continue` vys), takze pro nej volba nehrat neni.
+                if ($player->canAct() || $player->canMove()) {
+                    $actions[] = ['type' => ActionType::STAND_PAT->value, 'playerId' => $player->getId()];
+                }
+
                 if ($player->canMove()) {
                     // Quick check: can the player move at all? (any adjacent empty square)
                     if ($this->canPlayerMoveAnywhere($state, $player)) {

@@ -65,6 +65,13 @@ final class GreedyAICoach implements AICoachInterface
             if ($type === ActionType::END_TURN) {
                 continue;
             }
+            // ⏸ PHP25: schopnost "nic nedelat" uz v enginu JE, ale kouc ji
+            //   zatim NEPOUZIVA -- kdy ji ma volit, je vlastni rozhodnuti
+            //   (jinak by se tise vratila vada, kterou PHP13/PHP24 zaviraly).
+            if ($type === ActionType::STAND_PAT) {
+                continue;
+            }
+
             if ($type === ActionType::SETUP_PLAYER || $type === ActionType::END_SETUP) {
                 continue;
             }

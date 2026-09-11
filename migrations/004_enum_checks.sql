@@ -53,7 +53,7 @@ ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
         'pickup', 'piling_on', 'player_fell', 'player_move',
         'pro', 'push', 'really_stupid', 'regeneration',
         'reroll', 'safe_throw', 'secret_weapon', 'shadowing',
-        'sneaky_git', 'stab', 'stakes_block_regen', 'stand_up',
+        'sneaky_git', 'stab', 'stakes_block_regen', 'stand_pat', 'stand_up',
         'strip_ball', 'sweltering_heat', 'take_root', 'tentacles',
         'throw_in', 'throw_team_mate', 'touchback', 'touchdown',
         'ttm_landing', 'turnover', 'weather_change', 'wild_animal',

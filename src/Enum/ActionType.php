@@ -16,6 +16,15 @@ enum ActionType: string
     case HYPNOTIC_GAZE = 'hypnotic_gaze';
     case BALL_AND_CHAIN = 'ball_and_chain';
     case MULTIPLE_BLOCK = 'multiple_block';
+    // ⭐ NOVE 11.09.2026 (PHP25): "nic nedelat" -- hrac se VEDOME neaktivuje.
+    //   Uzivatel: klec ceka na miste a nosic udela posledni krok az v poslednim
+    //   tahu; prednim hracum klece je spravny tah ZADNY tah. Do dneska to kouc
+    //   neumel rict jinak nez koncem kola pro CELY tym.
+    // ⛔⛔ A pro big guye to znamena VIC nez uspory pohybu: kdyz se hrac
+    //   neaktivuje, NEHAZI SE mu kontrola pred akci (Bone Head / Really Stupid
+    //   / Wild Animal / Bloodlust / Take Root). Proto je STAND_PAT v
+    //   `ActionResolver::resolve` z te kontroly VYSLOVNE vyjmuty.
+    case STAND_PAT = 'stand_pat';
     case END_TURN = 'end_turn';
     case SETUP_PLAYER = 'setup_player';
     case END_SETUP = 'end_setup';

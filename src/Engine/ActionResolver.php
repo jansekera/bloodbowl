@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Engine;
 
 use App\DTO\ActionResult;
+use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
@@ -125,6 +126,33 @@ final class ActionResolver
      *   Seznam je uzavreny, stejne jako v C++ `consumeDeclaredTeamAction`
      *   (`engine/src/action_resolver.cpp:27-37`).
      */
+    /**
+     * ⭐ PHP25: hrac se vedome neaktivuje. Zadne kostky, zadna udalost na
+     *    hristi -- jen se pro tenhle tah odepise, aby kouc mohl pokracovat
+     *    dalsim hracem misto toho, aby musel ukoncit kolo celemu tymu.
+     *
+     * ⛔ Nesmi tu vzniknout turnover ani zadny hod: viz vyjimka z kontroly
+     *    pred akci v `resolve()`.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function resolveStandPat(GameState $state, array $params): ActionResult
+    {
+        $playerId = (int) ($params['playerId'] ?? 0);
+        $player = $state->getPlayer($playerId);
+        if ($player === null) {
+            throw new \InvalidArgumentException('Player not found');
+        }
+
+        $newState = $state->withPlayer(
+            $player->withHasActed(true)->withHasMoved(true),
+        );
+
+        return ActionResult::success($newState, [
+            GameEvent::standPat($playerId, $player->getName()),
+        ]);
+    }
+
     private function consumeDeclaredTeamAction(
         GameState $state,
         \App\Enum\TeamSide $side,
@@ -152,7 +180,16 @@ final class ActionResolver
         // Big Guy pre-action check for player actions
         /** @var list<\App\DTO\GameEvent> $preEvents */
         $preEvents = [];
-        if ($action->requiresPlayer() && isset($params['playerId'])) {
+        // ⛔⛔⛔ STAND_PAT SE Z KONTROLY PRED AKCI VYJIMA (PHP25, 11.09.2026).
+        //   Uzivatel: "pro big guye to navic znamena se neaktivovat -- tak
+        //   nemusi hazet po aktivaci." Kontrola pred akci je dusledek
+        //   AKTIVACE hrace; kdyz hrac zustava stat, zadna aktivace neprobehla,
+        //   takze se NEHAZI Bone Head, Really Stupid, Wild Animal, Bloodlust
+        //   ani Take Root. Kdyby se sem STAND_PAT pustil, stalo by "nic
+        //   nedelat" tolik co akce -- a big guy by se mohl omracit tim, ze
+        //   se rozhodl nehrat.
+        if ($action !== ActionType::STAND_PAT
+            && $action->requiresPlayer() && isset($params['playerId'])) {
             $player = $state->getPlayer((int) $params['playerId']);
             if ($player !== null) {
                 $checkResult = $this->bigGuyCheckResolver->resolvePreActionCheck(
@@ -214,6 +251,7 @@ final class ActionResolver
             ActionType::BALL_AND_CHAIN => $this->ballAndChainHandler->resolve($state, $params),
             ActionType::MULTIPLE_BLOCK => $this->blockHandler->resolveMultipleBlock($state, $params),
             ActionType::FOUL => $this->foulHandler->resolve($state, $params),
+            ActionType::STAND_PAT => $this->resolveStandPat($state, $params),
             ActionType::END_TURN => $this->endTurnHandler->resolve($state, $params),
             ActionType::SETUP_PLAYER => $this->setupHandler->resolve($state, $params),
             ActionType::END_SETUP => $this->setupHandler->resolveEndSetup($state),

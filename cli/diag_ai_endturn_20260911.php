@@ -46,6 +46,11 @@ function playableOffered(array $actions): int
     foreach ($actions as $a) {
         $type = ActionType::from($a['type']);
         if ($type === ActionType::END_TURN) continue;
+        // ⛔ PHP25 (11.09.): STAND_PAT je v nabidce od te doby, co engine umi
+        //   "nic nedelat" -- ale kouc ho ZATIM ignoruje, takze do mericka
+        //   nepatri. Kdyby se pocital, "nabidka nemela nic hratelneho" by uz
+        //   nenastalo NIKDY a kos "END_TURN pravem" by se tise vynuloval.
+        if ($type === ActionType::STAND_PAT) continue;
         if ($type === ActionType::SETUP_PLAYER || $type === ActionType::END_SETUP) continue;
         if (($a['playerId'] ?? null) === null) continue;
         $n++;

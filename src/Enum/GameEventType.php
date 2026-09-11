@@ -90,6 +90,7 @@ enum GameEventType: string
     case SNEAKY_GIT             = 'sneaky_git';
     case STAB                   = 'stab';
     case STAKES_BLOCK_REGEN     = 'stakes_block_regen';
+    case STAND_PAT              = 'stand_pat';
     case STAND_UP               = 'stand_up';
     case STRIP_BALL             = 'strip_ball';
     case SWELTERING_HEAT        = 'sweltering_heat';
