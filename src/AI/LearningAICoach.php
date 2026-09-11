@@ -260,7 +260,7 @@ final class LearningAICoach implements AICoachInterface
             ActionType::PASS => $this->buildPassAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::HAND_OFF => $this->buildHandOffAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::FOUL => $this->buildFoulAction($state, $rules, $playerId, $side, $baseScore),
-            ActionType::BALL_AND_CHAIN => $this->buildBallAndChainAction($baseScore),
+            ActionType::BALL_AND_CHAIN => $this->buildBallAndChainAction($baseScore, $playerId),
             ActionType::HYPNOTIC_GAZE => $this->buildHypnoticGazeAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::BOMB_THROW => $this->buildBombThrowAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::MULTIPLE_BLOCK => $this->buildMultipleBlockAction($state, $rules, $playerId, $side, $baseScore),
@@ -588,11 +588,13 @@ final class LearningAICoach implements AICoachInterface
      *
      * @return array{action: ActionType, params: array<string, mixed>, score: float}
      */
-    private function buildBallAndChainAction(float $baseScore): array
+    private function buildBallAndChainAction(float $baseScore, int $playerId): array
     {
+        // ⛔ OPRAVA 11.09.2026 -- viz `GreedyAICoach::scoreBallAndChain`.
+        //   Chybejici `playerId` => `getPlayer(0)` => 'Player not found'.
         return [
             'action' => ActionType::BALL_AND_CHAIN,
-            'params' => [],
+            'params' => ['playerId' => $playerId],
             'score' => $baseScore + 0.1,
         ];
     }

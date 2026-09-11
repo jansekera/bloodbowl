@@ -106,7 +106,7 @@ final class GreedyAICoach implements AICoachInterface
             ActionType::PASS => $this->scorePass($state, $rules, $playerId, $side),
             ActionType::HAND_OFF => $this->scoreHandOff($state, $rules, $playerId, $side),
             ActionType::FOUL => $this->scoreFoul($state, $rules, $playerId),
-            ActionType::BALL_AND_CHAIN => $this->scoreBallAndChain(),
+            ActionType::BALL_AND_CHAIN => $this->scoreBallAndChain($playerId),
             ActionType::HYPNOTIC_GAZE => $this->scoreHypnoticGaze($state, $rules, $playerId, $side),
             ActionType::BOMB_THROW => $this->scoreBombThrow($state, $rules, $playerId, $side),
             ActionType::MULTIPLE_BLOCK => $this->scoreMultipleBlock($state, $playerId, $side),
@@ -476,11 +476,19 @@ final class GreedyAICoach implements AICoachInterface
      *
      * @return array{action: ActionType, params: array<string, mixed>, score: int}
      */
-    private function scoreBallAndChain(): array
+    private function scoreBallAndChain(int $playerId): array
     {
+        // ⛔ OPRAVA 11.09.2026: `'params' => []` NEOBSAHOVALO `playerId`.
+        //   `BallAndChainHandler:36` dela `(int) $params['playerId']` =>
+        //   chybejici klic => `(int) null` = 0 => `getPlayer(0)` = null =>
+        //   `throw new InvalidArgumentException('Player not found')`.
+        //   Nebyl to okrajovy pripad: hrac s Ball & Chain se timhle NEMOHL
+        //   pohnout NIKDY -- a je to jeho JEDINA povolena akce
+        //   (`rules_engine.cpp` i `RulesEngine` nabizeji B&C hraci jen ji).
+        //   V zive hre to `AITurnService` nechytal.
         return [
             'action' => ActionType::BALL_AND_CHAIN,
-            'params' => [],
+            'params' => ['playerId' => $playerId],
             'score' => 200,
         ];
     }
