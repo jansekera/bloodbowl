@@ -66,7 +66,13 @@ final class BigGuySkillsTest extends TestCase
         $this->assertFalse($player->hasLostTacklezones());
     }
 
-    public function testBoneHeadLostTzResetOnNewTurn(): void
+    // ⛔ PREPSANO 11.09.2026 (PHP15b). Puvodne se jmenoval
+    //    `testBoneHeadLostTzResetOnNewTurn` a tvrdil, ze nove kolo ztratu
+    //    tacklezon SMAZE -- zakotvoval tim vadu.
+    //    `rules_bb2016.txt` r. 7985-7986: „The player loses his tackle zones
+    //    ... **until he manages to roll a 2 or better at the start of
+    //    a future Action or the drive ends**." Nove kolo v tom seznamu NENI.
+    public function testBoneHeadLostTzSurvivesTheTurnBoundary(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::BoneHead])
@@ -84,9 +90,33 @@ final class BigGuySkillsTest extends TestCase
         $newState = $result->getNewState();
         $this->assertTrue($newState->getPlayer(1)->hasLostTacklezones());
 
-        // Reset for new turn
+        // Nove kolo stav NERUSI -- drzi se pres `bigGuyStupefied`.
         $resetState = $newState->resetPlayersForNewTurn(TeamSide::HOME);
-        $this->assertFalse($resetState->getPlayer(1)->hasLostTacklezones());
+        $this->assertTrue($resetState->getPlayer(1)->hasLostTacklezones(),
+            'otupení ma prezit hranici kola (r. 7985-7986)');
+        $this->assertTrue($resetState->getPlayer(1)->isBigGuyStupefied());
+    }
+
+    public function testBoneHeadLostTzEndsOnASuccessfulRoll(): void
+    {
+        // ⭐ Druha pulka paru: co stav UKONCUJE, je uspesny hod 2+.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::BoneHead])
+            ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
+            ->build();
+        $state = $state->withPlayer(
+            $state->getPlayer(1)->withBigGuyStupefied(true)->withLostTacklezones(true),
+        );
+
+        $resolver = new ActionResolver(new FixedDiceRoller([2]));
+        $result = $resolver->resolve($state, ActionType::MOVE, [
+            'playerId' => 1, 'x' => 6, 'y' => 7,
+        ]);
+
+        $after = $result->getNewState()->getPlayer(1);
+        $this->assertFalse($after->isBigGuyStupefied(),
+            'dvojka stav UKONCUJE (r. 7985-7986)');
+        $this->assertFalse($after->hasLostTacklezones());
     }
 
     public function testBoneHeadLostTzDoesNotExertTacklezone(): void

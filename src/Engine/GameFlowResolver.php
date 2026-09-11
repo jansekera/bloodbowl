@@ -189,6 +189,11 @@ final class GameFlowResolver
                         ->withPosition(null)
                         ->withHasMoved(false)
                         ->withHasActed(false)
+                        // ⭐ „**or the drive ends**" (r. 7986, r. 8575) --
+                        //   konec drivu oba pretrvavajici stavy RUSI.
+                        ->withRooted(false)
+                        ->withBigGuyStupefied(false)
+                        ->withLostTacklezones(false)
                         ->withMovementRemaining($player->getStats()->getMovement()),
                 );
             }

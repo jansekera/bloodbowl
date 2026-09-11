@@ -33,6 +33,7 @@ final class MatchPlayerDTO
         private bool $lostTacklezones = false,
         private bool $proUsedThisTurn = false,
         private bool $rooted = false,
+        private bool $bigGuyStupefied = false,
         private readonly ?string $raceName = null,
         private readonly array $learnedSkills = [],
     ) {
@@ -172,6 +173,29 @@ final class MatchPlayerDTO
      */
     public function isRooted(): bool { return $this->rooted; }
 
+    /**
+     * ⛔ DOPLNENO 11.09.2026 (PHP15b): „otupení" po neuspesne kontrole
+     *   BoneHead / Really Stupid. `rules_bb2016.txt` r. 7985-7986 (BoneHead)
+     *   a r. 8401-8405 (Really Stupid): „The player loses his tackle zones
+     *   ... **until he manages to roll a 2 or better at the start of a future
+     *   Action or the drive ends**."
+     *   ⇒ Stav PRETRVAVA PRES KOLA. PHP `lostTacklezones` kazde kolo MAZALO
+     *   (`GameState::resetPlayersForNewTurn`), takze otupení vydrzelo
+     *   presne jedno kolo a pak zmizelo samo.
+     * ⚠️ C++ ma `bigGuyStupefied` a pri resetu kola dela
+     *   `lostTacklezones = bigGuyStupefied` (`game_state.cpp:71-72`),
+     *   maze az na konci drivu (`game_simulator.cpp:141,208`).
+     */
+    public function isBigGuyStupefied(): bool { return $this->bigGuyStupefied; }
+
+    public function withBigGuyStupefied(bool $stupefied): self
+    {
+        $clone = clone $this;
+        $clone->bigGuyStupefied = $stupefied;
+
+        return $clone;
+    }
+
     public function withRooted(bool $rooted): self
     {
         $clone = clone $this;
@@ -208,6 +232,7 @@ final class MatchPlayerDTO
             lostTacklezones: $this->lostTacklezones,
             proUsedThisTurn: $this->proUsedThisTurn,
             rooted: $this->rooted,
+            bigGuyStupefied: $this->bigGuyStupefied,
             raceName: $this->raceName,
         );
     }
@@ -234,6 +259,7 @@ final class MatchPlayerDTO
             'lostTacklezones' => $this->lostTacklezones,
             'proUsedThisTurn' => $this->proUsedThisTurn,
             'rooted' => $this->rooted,
+            'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
             'learnedSkills' => $this->learnedSkills,
         ];
@@ -267,6 +293,7 @@ final class MatchPlayerDTO
             lostTacklezones: (bool) ($data['lostTacklezones'] ?? false),
             proUsedThisTurn: (bool) ($data['proUsedThisTurn'] ?? false),
             rooted: (bool) ($data['rooted'] ?? false),
+            bigGuyStupefied: (bool) ($data['bigGuyStupefied'] ?? false),
             raceName: $data['raceName'] ?? null,
             learnedSkills: array_values((array) ($data['learnedSkills'] ?? [])),
         );

@@ -101,9 +101,24 @@ final class BigGuyCheckResolver
     ): ?array {
         $roll = $dice->rollD6();
 
+        if ($roll >= 2) {
+            // r. 7985-7986: „**until he manages to roll a 2 or better** at the
+            //   start of a future Action" -- uspesny hod stav UKONCUJE.
+            if ($player->isBigGuyStupefied()) {
+                $state = $state->withPlayer(
+                    $player->withBigGuyStupefied(false)->withLostTacklezones(false),
+                );
+
+                return ['state' => $state, 'events' => [], 'proceed' => true];
+            }
+
+            return null;
+        }
+
         if ($roll === 1) {
             $player = $player
                 ->withLostTacklezones(true)
+                ->withBigGuyStupefied(true)
                 ->withHasMoved(true)
                 ->withHasActed(true);
             $state = $state->withPlayer($player);
@@ -135,9 +150,20 @@ final class BigGuyCheckResolver
 
         $roll = $dice->rollD6();
 
+        if ($roll >= $threshold && $player->isBigGuyStupefied()) {
+            // r. 8403-8405: „until he manages to roll a **successful result**
+            //   for a Really Stupid roll at the start of a future Action".
+            $state = $state->withPlayer(
+                $player->withBigGuyStupefied(false)->withLostTacklezones(false),
+            );
+
+            return ['state' => $state, 'events' => [], 'proceed' => true];
+        }
+
         if ($roll < $threshold) {
             $player = $player
                 ->withLostTacklezones(true)
+                ->withBigGuyStupefied(true)
                 ->withHasMoved(true)
                 ->withHasActed(true);
             $state = $state->withPlayer($player);
