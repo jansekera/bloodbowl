@@ -87,4 +87,73 @@ final class HandOffReceiverRemovedTest extends TestCase
         $this->assertSame(2, $result->getNewState()->getBall()->getCarrierId(),
             'běžný hand-off musí míč předat');
     }
+
+    public function testProneReceiverStillGetsTheHandOffAndCannotCatch(): void
+    {
+        // ⛔⛔ TOHLE PRVNI VERZE OPRAVY DELALA SPATNE (opraveno 11.09. podruhé
+        //    po upozornění uživatele): rušila předání i pro příjemce, který
+        //    na hřišti ZŮSTAL, jen leží. To je po opravě Bloodlustu ten
+        //    ČASTÝ případ — hod na zranění dá nejčastěji Stunned.
+        //
+        // ⭐ Pravidla to rozlišují: hráč v sousedním poli JE, takže se předání
+        //    koná („it automatically hits the targeted player", r. 1687-1688).
+        //    Chytit ale nesmí — r. 857-858: „**Prone and Stunned players may
+        //    never attempt to catch the ball.**" ⇒ míč se odrazí, a když
+        //    skončí mimo náš tým, je to turnover (r. 1683-1686).
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, agility: 4, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, agility: 4, id: 2)
+            ->withBallCarried(1)
+            ->build();
+        $state = $state->withPlayer(
+            $state->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE),
+        );
+
+        // SEBEKONTROLA FIXTURY: příjemce LEŽÍ, ale JE na hřišti -- jinak by
+        // se test trefil do větve (a) a neměřil by, co má.
+        $this->assertNotNull($state->getPlayer(2)->getPosition(),
+            'fixtura je vadná: příjemce z hřiště zmizel, to je jiný případ');
+        $this->assertFalse($state->getPlayer(2)->getState()->canAct(),
+            'fixtura je vadná: příjemce stojí');
+
+        // Odraz D8 = 3 (dx +1) na (7,7), tam nikdo nestojí => míč na zemi.
+        $resolver = new ActionResolver(new FixedDiceRoller([3]));
+        $result = $resolver->resolve($state, ActionType::HAND_OFF, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $ball = $result->getNewState()->getBall();
+        $this->assertFalse($ball->isHeld(),
+            'ležící chytit nesmí -- míč se má odrazit (r. 857-858)');
+        $this->assertTrue($result->isTurnover(),
+            'míč se zastavil nechycený => turnover (r. 1683-1686)');
+    }
+
+    public function testProneReceiverBounceCaughtByTeammateIsNotATurnover(): void
+    {
+        // ⭐ Druhá půlka: turnover visí na tom, kde míč SKONČÍ, ne na tom,
+        //    že příjemce nechytil. Odraz do rukou spoluhráče kolo nekončí.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, agility: 4, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, agility: 4, id: 2)
+            ->addPlayer(TeamSide::HOME, 7, 7, agility: 4, id: 3)
+            ->withBallCarried(1)
+            ->build();
+        $state = $state->withPlayer(
+            $state->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE),
+        );
+        $state = $state->withTeamState(TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerollUsed());
+
+        // Odraz D8 = 3 na (7,7), kde STOJÍ hráč 3 => chytá (hod 6).
+        $resolver = new ActionResolver(new FixedDiceRoller([3, 6]));
+        $result = $resolver->resolve($state, ActionType::HAND_OFF, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $this->assertSame(3, $result->getNewState()->getBall()->getCarrierId(),
+            'odraz měl chytit spoluhráč');
+        $this->assertFalse($result->isTurnover(),
+            'míč zůstal našemu týmu -- kolo nekončí');
+    }
 }

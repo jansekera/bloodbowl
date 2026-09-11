@@ -116,6 +116,26 @@ final class BallResolver
             return ['state' => $state, 'events' => [], 'success' => false, 'teamRerollUsed' => false];
         }
 
+        // ⛔ DOPLNENO 11.09.2026: `rules_bb2016.txt` r. 857-858 --
+        //   „**Prone and Stunned players may never attempt to catch the
+        //   ball.**" Tahle straz tu CHYBELA: lezicimu hraci se hazel hod na
+        //   chyceni, jako by stal.
+        //   ⭐ `resolveBounce` (r. 211) tutez podminku uz mel
+        //   (`$playerAtLanding->getState()->canAct()`), takze odrazova cesta
+        //   byla spravne -- neslo o chybejici pravidlo, ale o JEDNU Z DVOU
+        //   CEST, ktera ho nemela. Ted je na jednom miste pro vsechny
+        //   volajici.
+        if (!$catcher->getState()->canAct()) {
+            $bounceResult = $this->resolveBounce($state, $pos);
+
+            return [
+                'state' => $bounceResult['state'],
+                'events' => $bounceResult['events'],
+                'success' => false,
+                'teamRerollUsed' => false,
+            ];
+        }
+
         // No Hands: cannot catch the ball
         if ($catcher->hasSkill(SkillName::NoHands)) {
             $events = [GameEvent::noHands($catcher->getId())];

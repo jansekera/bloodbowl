@@ -61,11 +61,30 @@ final class HandOffHandler implements ActionHandlerInterface
         // ⭐ PRAVIDLOVA KOTVA: `rules_bb2016.txt` r. 7935-7937 -- vampir se
         //   krmi „at the end of the declared Action, **but before actually
         //   passing, handing off, or scoring**". Kousnuti tedy PRECHAZI
-        //   hand-off zamerne. Kdyz prijemce kousnuti neprezil na hristi,
-        //   hand-off proste nema komu -- akce je vycerpana, mic zustava
-        //   podavajicimu a turnover to NENI (katalog r. 368-384 tenhle
-        //   pripad nezna).
-        if ($receiverPos === null || !$receiver->getState()->canAct()) {
+        //   hand-off zamerne.
+        //
+        // ⛔⛔ OPRAVENO 11.09. PODRUHE -- PRVNI VERZE BYLA SPATNE.
+        //   Puvodne tu stalo `|| !$receiver->getState()->canAct()`, cimz se
+        //   predani rusilo i pro prijemce, ktery na hristi ZUSTAL, jen lezi
+        //   (Stunned). To je po oprave Bloodlustu (`f382bf4c`) ten CASTY
+        //   pripad -- hod na zraneni da nejcasteji Stunned.
+        //   ⇒ MUSI SE ROZLISIT:
+        //   **(a) prijemce z hriste ZMIZEL** (KO / zraneni, `position` null):
+        //       v sousednim poli neni hrac, komu podat. r. 1676: „hand-off is
+        //       where the ball is simply handed to another player ... **in an
+        //       adjacent square**". ⇒ K predani NEDOJDE, mic zustava
+        //       podavajicimu a NEPRIJDE „to rest" -- r. 1683-1686 dava
+        //       turnover az kdyz „the ball **IS handed off and comes to
+        //       rest** without being caught". ⇒ TURNOVER TO NENI. Tohle je
+        //       vetev niz.
+        //   **(b) prijemce LEZI, ale na hristi je:** hrac v sousednim poli
+        //       JE, takze se predani KONA („it automatically hits the
+        //       targeted player", r. 1687-1688). Chytit ale nesmi --
+        //       r. 857-858: „**Prone and Stunned players may never attempt to
+        //       catch the ball.**" ⇒ mic se odrazi a kdyz skonci mimo nas tym,
+        //       je to TURNOVER. ⇒ Tahle vetev se sem NESMI chytat; resi ji
+        //       `resolveCatch`, kam byla straz z r. 857-858 doplnena.
+        if ($receiverPos === null) {
             $state = $state->withPlayer($giver->withHasActed(true)->withHasMoved(true));
 
             return ActionResult::success($state, []);
