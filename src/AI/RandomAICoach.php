@@ -17,11 +17,35 @@ final class RandomAICoach implements AICoachInterface
     {
         $actions = $rules->getAvailableActions($state);
 
-        // Filter out END_TURN - we'll use it as fallback
-        $playableActions = array_filter(
-            $actions,
-            fn(array $a) => $a['type'] !== ActionType::END_TURN->value,
-        );
+        // ⛔⛔ OPRAVA 11.09.2026 -- polozka #2 auditu "kde engine ukoncuje tah".
+        //   Puvodne se losovalo ze VSECH akci a teprve pak se typ prekladal
+        //   pres `match`, ktery mel `default => END_TURN`. Kdyz los padl na
+        //   TTM / bombu / gaze / Ball & Chain -- tedy na typ, ktery tenhle kouc
+        //   neumi postavit -- UKONCIL SE CELY TAH TYMU. Totez delal `$playerId
+        //   === 0` o par radku vys.
+        //
+        // ⭐ PRAVIDLOVA KOTVA (`rules_bb2016.txt` r. 363-367 + uzavreny
+        //   sedmicленny seznam turnoveru r. 368-384): "kouc neumi zvoleny typ"
+        //   v tom seznamu NENI. Ukoncit tah tady je vada, ne prisnost.
+        //   Tataz trida jako `greedyPolicy` v C++ (`0630f854`) a `W7`.
+        //
+        // ⇒ Nepodporovany typ se z LOSOVANI VYRADI, misto aby ukoncil kolo.
+        //   END_TURN zustava az kdyz nezbyde nic.
+        $playableActions = [];
+        foreach ($actions as $a) {
+            $type = ActionType::tryFrom($a['type']);
+            if ($type === null || $type === ActionType::END_TURN) {
+                continue;
+            }
+            if (!$this->canBuild($type)) {
+                continue;
+            }
+            // Akce bez hrace tenhle kouc postavit neumi -- taky jen vyradit.
+            if ((int) ($a['playerId'] ?? 0) === 0) {
+                continue;
+            }
+            $playableActions[] = $a;
+        }
 
         if ($playableActions === []) {
             return ['action' => ActionType::END_TURN, 'params' => []];
@@ -29,11 +53,7 @@ final class RandomAICoach implements AICoachInterface
 
         $chosen = $playableActions[array_rand($playableActions)];
         $actionType = ActionType::from($chosen['type']);
-        $playerId = (int) ($chosen['playerId'] ?? 0);
-
-        if ($playerId === 0) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
-        }
+        $playerId = (int) $chosen['playerId'];
 
         return match ($actionType) {
             ActionType::MOVE => $this->buildMoveAction($state, $rules, $playerId),
@@ -43,7 +63,34 @@ final class RandomAICoach implements AICoachInterface
             ActionType::HAND_OFF => $this->buildHandOffAction($state, $rules, $playerId),
             ActionType::FOUL => $this->buildFoulAction($state, $rules, $playerId),
             ActionType::MULTIPLE_BLOCK => $this->buildMultipleBlockAction($state, $rules, $playerId),
-            default => ['action' => ActionType::END_TURN, 'params' => []],
+            // ⭐ Ball & Chain je pro takoveho hrace JEDINA povolena akce --
+            //   vyradit ji z losovani by ho na desce umrtvilo. Parametr je
+            //   jen `playerId` (viz `dd6b229c`, kde tenhle klic chybel obema
+            //   ostatnim koucum a hrac kvuli tomu nejednal nikdy).
+            ActionType::BALL_AND_CHAIN => ['action' => ActionType::BALL_AND_CHAIN,
+                                           'params' => ['playerId' => $playerId]],
+        };
+    }
+
+    /**
+     * Umi tenhle kouc ten typ vubec postavit?
+     *
+     * ⛔ Drzi se u `match` v `decideAction` schvalne: kdyz tam pribude vetev,
+     *    musi pribyt i tady, jinak se typ nikdy nenabidne. Seznam je UZAVRENY
+     *    -- zadny `default`, ktery by tise polkl novy typ.
+     */
+    private function canBuild(ActionType $type): bool
+    {
+        return match ($type) {
+            ActionType::MOVE,
+            ActionType::BLOCK,
+            ActionType::BLITZ,
+            ActionType::PASS,
+            ActionType::HAND_OFF,
+            ActionType::FOUL,
+            ActionType::MULTIPLE_BLOCK,
+            ActionType::BALL_AND_CHAIN => true,
+            default => false,
         };
     }
 
