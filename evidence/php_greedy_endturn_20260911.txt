@@ -1,0 +1,9 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+

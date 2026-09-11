@@ -1,0 +1,15 @@
+⭐ POZITIVNÍ KONTROLA ČTEČKY (běží PŘED korpusem):
+    [OK ] PO opravě  corpus_k7_20260910_data: 171 her načteno, turn_logs u všech: True
+    [OK ] PŘED opravou corpus_m11_20260909_data: 1000 her načteno, turn_logs u všech: True
+  ⇒ čtečka vidí obě strany.
+
+                                            PO opravě   PŘED opravou    sigma
+                                              171 her       1000 her
+--------------------------------------------------------------------------------
+TD na zápas (obě strany)                        0.702          0.639     1.59
+turnoverů na kolo                               0.460          0.459     0.12
+zápasů kratších než 32 kol                      0.000          0.000     0.00
+zápasů 0:0 (nikdo neskóroval)                   0.433          0.492    -1.43
+
+kol celkem: PO 5472  PŘED 32000
+ZBYTEK zápasů (musí být 0): PO 0  PŘED 0
