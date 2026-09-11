@@ -105,6 +105,46 @@ final class BlitzOutOfReachTest extends TestCase
     }
 
     /**
+     * ⛔ TŘETÍ VÝSKYT TÉHOŽ PRINCIPU: po přesunu se věřilo, že hráč DOŠEL.
+     *    `MoveHandler:185-190` (Tentacles) vrací `success` s hráčem NA
+     *    PŮVODNÍM POLI -- „Movement ends, NOT a turnover". Blok se pak
+     *    počítal ze staré pozice a `BlockHandler:73` hodil
+     *    `Players must be adjacent to block`.
+     */
+    public function testTentaclesStoppingTheBlitzDoesNotThrow(): void
+    {
+        // Útočník na (5,7), cíl na (8,7). Cestou stojí soupeř s Tentacles
+        // na (6,7) -- vystoupit z jeho tacklezóny se nemusí povést.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, strength: 3, id: 1)
+            ->addPlayer(TeamSide::AWAY, 8, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 5, id: 3,
+                        skills: [SkillName::Tentacles])
+            ->withBallOffPitch()
+            ->build();
+
+        // SEBEKONTROLA FIXTURY: ten soused Tentacles OPRAVDU má a stojí
+        // v cestě -- jinak se do opravované větve nedojde.
+        $this->assertTrue($state->getPlayer(3)->hasSkill(SkillName::Tentacles),
+            'fixtura je vadná: nikdo nemá Tentacles');
+        $this->assertSame(1, $state->getPlayer(1)->getPosition()
+            ->distanceTo($state->getPlayer(3)->getPosition()),
+            'fixtura je vadná: chapadla nejsou v kontaktu, nezaberou');
+
+        // Nízké hody -> únik z chapadel se nepovede.
+        $dice = new FixedDiceRoller([1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::BLITZ, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        // Ať už chapadla zaberou nebo ne, výjimka letět NESMÍ.
+        $this->assertTrue($result->isSuccess() || $result->isTurnover(),
+            'blitz zastavený chapadly nesmí házet výjimku');
+    }
+
+    /**
      * ⭐⭐⭐ SCÉNÁŘ UŽIVATELE: vyhlásit blitz pro Rat Ogra, ať se pohne na 2+.
      *    Tohle je ten důvod, proč se deklarace mimo dosah NESMÍ zakázat.
      */

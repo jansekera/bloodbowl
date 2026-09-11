@@ -114,6 +114,27 @@ final class BlitzHandler implements ActionHandlerInterface
                 return ActionResult::success($state, $events);
             }
 
+            // ⛔⛔ OPRAVA 11.09.2026, TŘETÍ VÝSKYT TÉHOŽ PRINCIPU V TOMHLE
+            //   SOUBORU: tady se věřilo, že přesun DOŠEL tam, kam měl.
+            //   `MoveHandler` ale umí vrátit `success` s hráčem NA PŮVODNÍM
+            //   POLI -- `MoveHandler:185-190`, **Tentacles**: „Movement ends,
+            //   NOT a turnover". Blok se pak počítal ze staré pozice a
+            //   `BlockHandler:73` hodil `Players must be adjacent to block`.
+            //   ZMĚŘENO: 2 z 12 135 rozhodnutí (0,02 %) -- vzácné, ale
+            //   v živé hře to nikdo nechytá (`AITurnService` `try/catch` nemá).
+            //
+            // ⭐ NENÍ TO ZÁPLATA, JE TO PRAVIDLO: Blitz je pohyb + NEJVÝŠ
+            //   jeden blok BĚHEM NĚJ. Když nás chapadla zastavila dřív, než
+            //   jsme k cíli došli, blok se prostě nekoná -- stejně jako když
+            //   se na cíl nedosáhne (větev výš).
+            $afterMove = $state->getPlayer($attackerId);
+            $afterPos = $afterMove?->getPosition();
+            $freshDefenderPos = $state->getPlayer($targetId)?->getPosition();
+            if ($afterPos === null || $freshDefenderPos === null
+                || $afterPos->distanceTo($freshDefenderPos) !== 1) {
+                return ActionResult::success($state, $events);
+            }
+
             // Reset hasMoved so block can still mark it
             $movedAttacker = $state->getPlayer($attackerId);
             if ($movedAttacker !== null) {
