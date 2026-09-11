@@ -89,6 +89,35 @@ final class GameState
         return $this->players[$id] ?? null;
     }
 
+    /**
+     * Drzi mic nekdo z tohoto tymu?
+     *
+     * ⭐ SLOUCENO 11.09.2026. Tenhle predikat existoval jako
+     *   `PassResolver::ballCaughtByTeam` (spravne) a JESTE JEDNOU inline
+     *   v `HandOffHandler` (pridano tyz den pri oprave PHP11). Dve kopie
+     *   jednoho vzorce uz tenhle projekt kously trikrat -- naposledy
+     *   `pathFailProb` v enginu (`496f5a03`). Proto jedno misto hned,
+     *   ne az se rozejdou.
+     *
+     * ⛔ Na tomhle predikatu stoji bod 2 katalogu turnoveru
+     *   (`rules_bb2016.txt` r. 371-373): mic, ktery skoncil u NASEHO hrace,
+     *   kolo neukoncuje.
+     */
+    public function isBallHeldBy(TeamSide $side): bool
+    {
+        $ball = $this->getBall();
+        if (!$ball->isHeld()) {
+            return false;
+        }
+        $carrierId = $ball->getCarrierId();
+        if ($carrierId === null) {
+            return false;
+        }
+        $carrier = $this->getPlayer($carrierId);
+
+        return $carrier !== null && $carrier->getTeamSide() === $side;
+    }
+
     public function getPlayerAtPosition(Position $pos): ?MatchPlayerDTO
     {
         foreach ($this->players as $player) {

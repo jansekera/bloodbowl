@@ -870,6 +870,26 @@ final class BlockHandler implements ActionHandlerInterface
                 }
                 // Wrestle: if either has it, both go prone without armor
                 if ($attacker->hasSkill(SkillName::Wrestle) || $defender->hasSkill(SkillName::Wrestle)) {
+                    // ⛔⛔ OPRAVA 11.09.2026: Wrestle NENÍ bezpodmínečně bez
+                    //   turnoveru. `rules_bb2016.txt` r. 8677-8678:
+                    //   „Use of this skill does not cause a turnover **unless
+                    //   the active player was holding the ball**."
+                    //   A katalog turnoverů r. 368-372 to říká stejně: „being
+                    //   Placed Prone is not a turnover unless it is a player
+                    //   from the active team holding the ball … e.g. skills
+                    //   like Diving Tackle, Piling On and **Wrestle** count as
+                    //   being Placed Prone."
+                    //
+                    // ⚠️ C++ engine tohle opravil UŽ 24.08.2026 jako `F11`
+                    //   (`engine/src/block_handler.cpp:826-848`). PHP kopie
+                    //   opravu nedostala -- TŘETÍ drift téhož druhu (vedle
+                    //   Wild Animal a gaze).
+                    //
+                    // ⭐ ČTE SE PŘED PÁDEM, protože `handleBallOnPlayerDown`
+                    //   míč upustí -- potom už by se nositel nepoznal.
+                    $activeHeldBall = $state->isBallHeldBy($attacker->getTeamSide())
+                        && $state->getBall()->getCarrierId() === $attacker->getId();
+
                     $events[] = GameEvent::wrestle($attacker->getId(), $defender->getId());
                     $attacker = $attacker->withState(PlayerState::PRONE);
                     $defender = $defender->withState(PlayerState::PRONE);
@@ -879,6 +899,12 @@ final class BlockHandler implements ActionHandlerInterface
                     if ($defender !== null) {
                         [$wState, $events] = $this->ballResolver->handleBallOnPlayerDown($wState, $defender, $events);
                     }
+
+                    if ($activeHeldBall) {
+                        $events[] = GameEvent::turnover('Wrestle with the ball');
+                        return ActionResult::turnover($wState->withTurnoverPending(true), $events);
+                    }
+
                     return ActionResult::success($wState, $events);
                 }
                 if (!$attacker->hasSkill(SkillName::Block)) {

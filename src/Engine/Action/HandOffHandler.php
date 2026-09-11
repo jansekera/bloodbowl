@@ -93,12 +93,11 @@ final class HandOffHandler implements ActionHandlerInterface
         //
         // ⇒ Rozhoduje STAV MICE PO ODRAZU, ne vysledek jednoho hodu.
         if (!$catchResult['success']) {
-            $ball = $state->getBall();
-            $newCarrier = ($ball->isHeld() && $ball->getCarrierId() !== null)
-                ? $state->getPlayer($ball->getCarrierId())
-                : null;
-
-            if ($newCarrier !== null && $newCarrier->getTeamSide() === $activeSide) {
+            // ⭐ `isBallHeldBy` je TYZ predikat, jaky uz spravne pouzival
+            //   `PassResolver` (`ballCaughtByTeam`). Pri oprave 11.09. jsem ho
+            //   napsal podruhe inline -- slouceno na `GameState`, at nevzniknou
+            //   dve kopie jednoho vzorce (tahle past uz projekt kousla 3x).
+            if ($state->isBallHeldBy($activeSide)) {
                 // Odraz chytil nekdo nas => mic je porad nas, kolo bezi dal.
                 return ActionResult::success($state, $events);
             }

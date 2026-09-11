@@ -687,18 +687,10 @@ final class PassResolver
         return $raceA !== $raceB;
     }
 
+    /** ⭐ 11.09.2026: telo presunuto na `GameState::isBallHeldBy` -- mel to
+     *  i `HandOffHandler`, dve kopie jednoho vzorce. */
     private function ballCaughtByTeam(GameState $state, \App\Enum\TeamSide $side): bool
     {
-        $ball = $state->getBall();
-        if (!$ball->isHeld()) {
-            return false;
-        }
-
-        $carrierId = $ball->getCarrierId();
-        if ($carrierId === null) {
-            return false;
-        }
-        $carrier = $state->getPlayer($carrierId);
-        return $carrier !== null && $carrier->getTeamSide() === $side;
+        return $state->isBallHeldBy($side);
     }
 }
