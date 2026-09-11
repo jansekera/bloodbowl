@@ -180,8 +180,14 @@ final class RulesEngine
             }
 
             // Hand-off: ball carrier to adjacent teammate (excluding B&C)
+            // ⛔ DOPLNENO 11.09.2026 (PHP21): `isHandOffUsedThisTurn` tu
+            //   CHYBELO -- hand-off nemel zadny tymovy limit. Podavajici
+            //   dostal `hasActed`, ale PRIJEMCE ne, takze smel podat dal
+            //   => mic putoval RETEZEM pres cele hriste. BB2016 dava tymu
+            //   jednu Hand-off Action za kolo, stejne jako Blitz/Pass/Foul.
             $ball = $state->getBall();
-            if ($ball->isHeld() && $ball->getCarrierId() !== null) {
+            if (!$teamState->isHandOffUsedThisTurn()
+                && $ball->isHeld() && $ball->getCarrierId() !== null) {
                 $carrier = $state->getPlayer($ball->getCarrierId());
                 if ($carrier !== null && $carrier->getTeamSide() === $side && $carrier->canAct()
                     && !$carrier->hasSkill(SkillName::BallAndChain)) {

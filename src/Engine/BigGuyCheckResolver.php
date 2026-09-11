@@ -19,6 +19,25 @@ final class BigGuyCheckResolver
      *
      * @return array{state: GameState, events: list<GameEvent>, proceed?: bool}|null null = action proceeds
      */
+    /**
+     * ⛔⛔ `wastesTeamAction` (doplneno 11.09.2026 -- polozka PHP15).
+     *   `rules_bb2016.txt` r. 8398-8401: „The player can't do anything for the
+     *   turn, and **the player's team loses the declared Action for that turn**
+     *   (for example if a Really Stupid player declares a Blitz Action and
+     *   fails the Really Stupid roll, then **the team cannot declare another
+     *   Blitz Action that turn**)."
+     *   A u Wild Animal r. 8668-8669: „**the Action is wasted**."
+     *
+     *   PHP to nedelalo u ZADNE ze ctyr dovednosti ⇒ Big Guy, ktery sel
+     *   k zemi na blitzu, tym o blitz NEPRIPRAVIL a ten si ho zahral znovu
+     *   jinym hracem. Cista vyhoda proti pravidlum.
+     *
+     * ⚠️ C++ engine to ma jako `wastesTeamAction` (`big_guy_handler.h:39`,
+     *   nastavovane na ctyrech mistech) a odecita ho
+     *   `action_resolver.cpp:280` pres `consumeDeclaredTeamAction`, protoze
+     *   do switche, kde se limit jinak nastavuje, uz se nedostane. PHP kopie
+     *   to nemela -- CTVRTY drift teze tridy.
+     */
     public function resolvePreActionCheck(
         GameState $state,
         MatchPlayerDTO $player,
@@ -70,6 +89,8 @@ final class BigGuyCheckResolver
             return [
                 'state' => $state,
                 'events' => [GameEvent::boneHeadFail($player->getId(), $roll)],
+                // ⭐ viz `wastesTeamAction` niz
+                'wastesTeamAction' => true,
             ];
         }
 
@@ -159,6 +180,7 @@ final class BigGuyCheckResolver
             return [
                 'state' => $state,
                 'events' => [GameEvent::wildAnimalFail($player->getId(), $roll)],
+                'wastesTeamAction' => true,
             ];
         }
 
@@ -187,6 +209,7 @@ final class BigGuyCheckResolver
             return [
                 'state' => $state,
                 'events' => [GameEvent::takeRoot($player->getId(), $roll, true)],
+                'wastesTeamAction' => true,
             ];
         }
 

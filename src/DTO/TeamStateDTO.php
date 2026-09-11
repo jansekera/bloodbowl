@@ -18,6 +18,7 @@ final class TeamStateDTO
         private int $turnNumber,
         private bool $blitzUsedThisTurn,
         private bool $passUsedThisTurn,
+        private bool $handOffUsedThisTurn,
         private bool $foulUsedThisTurn,
         private bool $hasApothecary = true,
         private bool $apothecaryUsed = false,
@@ -43,6 +44,7 @@ final class TeamStateDTO
             turnNumber: 1,
             blitzUsedThisTurn: false,
             passUsedThisTurn: false,
+            handOffUsedThisTurn: false,
             foulUsedThisTurn: false,
             hasApothecary: $hasApothecary,
             apothecaryUsed: false,
@@ -59,6 +61,17 @@ final class TeamStateDTO
     public function getTurnNumber(): int { return $this->turnNumber; }
     public function isBlitzUsedThisTurn(): bool { return $this->blitzUsedThisTurn; }
     public function isPassUsedThisTurn(): bool { return $this->passUsedThisTurn; }
+
+    /**
+     * ⛔ DOPLNENO 11.09.2026 (PHP21): hand-off NEMEL VLASTNI LIMIT VUBEC.
+     *   BB2016 dava tymu jednu Hand-off Action za kolo, stejne jako jeden
+     *   Blitz, Pass a Foul. Bez toho mohl mic putovat RETEZEM -- podavajici
+     *   dostal `hasActed`, ale PRIJEMCE ne, takze smel podat dal, a tak
+     *   porad dokola pres cele hriste.
+     * ⚠️ C++ engine ma `handOffUsedThisTurn` od 17.08. (`f5998575`,
+     *   polozka P7 ve fronte). PHP kopie ho nedostala.
+     */
+    public function isHandOffUsedThisTurn(): bool { return $this->handOffUsedThisTurn; }
     public function isFoulUsedThisTurn(): bool { return $this->foulUsedThisTurn; }
     public function hasApothecary(): bool { return $this->hasApothecary; }
     public function isApothecaryUsed(): bool { return $this->apothecaryUsed; }
@@ -123,6 +136,14 @@ final class TeamStateDTO
         return $clone;
     }
 
+    public function withHandOffUsed(): self
+    {
+        $clone = clone $this;
+        $clone->handOffUsedThisTurn = true;
+
+        return $clone;
+    }
+
     public function withFoulUsed(): self
     {
         $clone = clone $this;
@@ -136,6 +157,7 @@ final class TeamStateDTO
         $clone->rerollUsedThisTurn = false;
         $clone->blitzUsedThisTurn = false;
         $clone->passUsedThisTurn = false;
+        $clone->handOffUsedThisTurn = false;
         $clone->foulUsedThisTurn = false;
         $clone->turnNumber++;
         return $clone;
@@ -157,6 +179,7 @@ final class TeamStateDTO
             'turnNumber' => $this->turnNumber,
             'blitzUsedThisTurn' => $this->blitzUsedThisTurn,
             'passUsedThisTurn' => $this->passUsedThisTurn,
+            'handOffUsedThisTurn' => $this->handOffUsedThisTurn,
             'foulUsedThisTurn' => $this->foulUsedThisTurn,
             'hasApothecary' => $this->hasApothecary,
             'apothecaryUsed' => $this->apothecaryUsed,
@@ -179,6 +202,7 @@ final class TeamStateDTO
             turnNumber: (int) $data['turnNumber'],
             blitzUsedThisTurn: (bool) ($data['blitzUsedThisTurn'] ?? false),
             passUsedThisTurn: (bool) ($data['passUsedThisTurn'] ?? false),
+            handOffUsedThisTurn: (bool) ($data['handOffUsedThisTurn'] ?? false),
             foulUsedThisTurn: (bool) ($data['foulUsedThisTurn'] ?? false),
             hasApothecary: (bool) ($data['hasApothecary'] ?? true),
             apothecaryUsed: (bool) ($data['apothecaryUsed'] ?? false),

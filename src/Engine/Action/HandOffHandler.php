@@ -64,6 +64,13 @@ final class HandOffHandler implements ActionHandlerInterface
         // Mark giver as acted
         $state = $state->withPlayer($giver->withHasActed(true)->withHasMoved(true));
 
+        // ⛔ PHP21: odecist TYMOVY limit -- jedna Hand-off Action za kolo.
+        $handOffSide = $giver->getTeamSide();
+        $state = $state->withTeamState(
+            $handOffSide,
+            $state->getTeamState($handOffSide)->withHandOffUsed(),
+        );
+
         // Move ball to receiver's position for the catch attempt
         $state = $state->withBall(BallState::onGround($receiverPos));
 
