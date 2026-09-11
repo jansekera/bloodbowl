@@ -108,7 +108,7 @@ final class BigGuyCheckResolver
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
     ): ?array {
-        $hasAdjacentAlly = $this->hasAdjacentTeammate($state, $player);
+        $hasAdjacentAlly = $this->hasReallyStupidSupport($state, $player);
         $threshold = $hasAdjacentAlly ? 2 : 4;
 
         $roll = $dice->rollD6();
@@ -303,7 +303,14 @@ final class BigGuyCheckResolver
         return null;
     }
 
-    private function hasAdjacentTeammate(GameState $state, MatchPlayerDTO $player): bool
+    /**
+     * Ma Really Stupid hrac vedle sebe souseda, ktery mu da bonus +2?
+     *
+     * ⭐ NAZEV 11.09.2026: drive `hasAdjacentTeammate`, coz LHALO -- nejde
+     *   o „libovolneho spoluhrace vedle", ale o presne kvalifikovaneho
+     *   souseda podle r. 8393-8395. Jediny volajici je Really Stupid.
+     */
+    private function hasReallyStupidSupport(GameState $state, MatchPlayerDTO $player): bool
     {
         $pos = $player->getPosition();
         if ($pos === null) {
@@ -312,6 +319,24 @@ final class BigGuyCheckResolver
 
         foreach ($state->getPlayersOnPitch($player->getTeamSide()) as $teammate) {
             if ($teammate->getId() === $player->getId()) {
+                continue;
+            }
+            // ⛔⛔ OPRAVA 11.09.2026 (PHP15c): TADY SE NEKONTROLOVALO NIC
+            //   z toho, co pravidlo zada. `rules_bb2016.txt` r. 8393-8395:
+            //   „If there are one or more players from the same team
+            //   **STANDING** adjacent to the Really Stupid player's square,
+            //   **and who aren't Really Stupid**, then add 2 to the D6 roll."
+            //   ⇒ (1) lezici a omraceny soused se NEPOCITA;
+            //     (2) soused, ktery je SAM Really Stupid, se nepocita taky --
+            //         bez toho se dva Really Stupid navzajem PODPIRAJI a oba
+            //         hazi na 2+ misto na 4+.
+            // ⚠️ C++ to ma spravne (`big_guy_handler.cpp:44-62`) a je tam
+            //   i vlastni poznamka M3b, ze `lostTacklezones` se tu naopak
+            //   kontrolovat NEMA -- pravidlo o tacklezonach nic nerika.
+            if (!$teammate->getState()->canAct()) {
+                continue;
+            }
+            if ($teammate->hasSkill(SkillName::ReallyStupid)) {
                 continue;
             }
             $teammatePos = $teammate->getPosition();
