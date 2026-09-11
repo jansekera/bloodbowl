@@ -97,12 +97,34 @@ final class LearningAICoach implements AICoachInterface
                 continue;
             }
 
+            // ⛔⛔⛔ OPRAVA 11.09.2026 -- polozka PHP24 fronty, MEKCI TVAR
+            //   tehoz, co `PHP13` opravil u `GreedyAICoach` (`f44270f5`).
+            //   END_TURN tu byl SKOROVANY KANDIDAT se skore `baseScore - 0.01`.
+            //   Nemuselo tedy selhat nic: stacilo, aby vsichni POSTAVENI
+            //   kandidati spadli pod tu hranici, a END_TURN VYHRAL SKOREM,
+            //   i kdyz bylo co hrat. `buildMoveAction` pritom zaporne skore
+            //   vraci snadno -- odecita za GFI (`gfis * 0.08`), za dodge
+            //   a za postranni caru.
+            //
+            // ⭐ ZMERENO PRED OPRAVOU (`cli/diag_ai_endturn_20260911.php`):
+            //   23 ze 7 666 rozhodnuti = **1,2 % KOL**, prumer **8,09 hrace**
+            //   propadlo. ⚠️ A je to kouc, proti kteremu hraje CLOVEK
+            //   (`ServiceProvider.php:121-127`).
+            //
+            // ⭐ PRAVIDLOVA KOTVA (`rules_bb2016.txt` r. 363-367 + uzavreny
+            //   katalog turnoveru r. 368-384): "kandidati meli nizke skore"
+            //   v tom katalogu NENI.
+            //
+            // ⇒ Oprava je TATAZ jako v C++ (`0630f854`), v `RandomAICoach`
+            //   (`b0d01ccb`) a v `GreedyAICoach` (`f44270f5`): END_TURN az
+            //   tehdy, kdyz nabidka nic jineho nema. Zadne nove skore se
+            //   nevymysli -- END_TURN se jen prestane ucastnit souteze.
+            //
+            // ⚠️ CO SE TIM ZTRACI: kouc uz nemuze kolo ukoncit DOBROVOLNE
+            //   (drive to umel prave pres tenhle kandidat). Zadny z ostatnich
+            //   tri koucu to neumi taky -- parita je tim uplna, ale je to
+            //   zmena chovani, ne jen odstraneni vady.
             if ($type === ActionType::END_TURN) {
-                $candidates[] = [
-                    'action' => ActionType::END_TURN,
-                    'params' => [],
-                    'score' => $baseScore - 0.01,
-                ];
                 continue;
             }
 
@@ -123,6 +145,7 @@ final class LearningAICoach implements AICoachInterface
             }
         }
 
+        // ⭐ END_TURN az tady: kdyz nabidka opravdu nic hratelneho nemela.
         if ($candidates === []) {
             return ['action' => ActionType::END_TURN, 'params' => []];
         }
