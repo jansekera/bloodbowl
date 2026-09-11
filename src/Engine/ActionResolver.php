@@ -119,6 +119,32 @@ final class ActionResolver
     /**
      * @param array<string, mixed> $params
      */
+    /**
+     * Odecte TYMOVY limit u akce, ktera propadla pred svym provedenim.
+     *
+     * ⭐ MOVE a BLOCK zadny tymovy limit nemaji -- ty se neodecitaji.
+     *   Seznam je uzavreny, stejne jako v C++ `consumeDeclaredTeamAction`
+     *   (`engine/src/action_resolver.cpp:27-37`).
+     */
+    private function consumeDeclaredTeamAction(
+        GameState $state,
+        \App\Enum\TeamSide $side,
+        ActionType $type,
+    ): GameState {
+        $team = $state->getTeamState($side);
+
+        $team = match ($type) {
+            ActionType::BLITZ => $team->withBlitzUsed(),
+            ActionType::PASS,
+            ActionType::THROW_TEAM_MATE => $team->withPassUsed(),
+            ActionType::HAND_OFF => $team->withHandOffUsed(),
+            ActionType::FOUL => $team->withFoulUsed(),
+            default => $team,
+        };
+
+        return $state->withTeamState($side, $team);
+    }
+
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
     {
         // Big Guy pre-action check for player actions
@@ -136,7 +162,29 @@ final class ActionResolver
                         $state = $checkResult['state'];
                         $preEvents = $checkResult['events'];
                     } else {
-                        return ActionResult::success($checkResult['state'], $checkResult['events']);
+                        $blockedState = $checkResult['state'];
+                        // ⛔ PHP15 (11.09.2026): r. 8398-8401 -- „The player
+                        //   can't do anything for the turn, and **the player's
+                        //   team loses the declared Action for that turn**
+                        //   (for example if a Really Stupid player declares
+                        //   a Blitz Action and fails the Really Stupid roll,
+                        //   then the team cannot declare another Blitz Action
+                        //   that turn)." U Wild Animal r. 8668-8669 stejne:
+                        //   „**the Action is wasted**."
+                        //   PHP to nedelalo u ZADNE ze ctyr dovednosti ⇒ Big
+                        //   Guy, ktery sel k zemi na blitzu, tym o blitz
+                        //   NEPRIPRAVIL a ten si ho zahral znovu jinym hracem.
+                        //   Odecita se TADY, protoze do `match` niz (kde se
+                        //   tymovy limit jinak nastavuje) uz se nedostaneme.
+                        // ⚠️ C++ to ma jako `wastesTeamAction`
+                        //   (`action_resolver.cpp:276-283`); PHP kopie ne.
+                        if (!empty($checkResult['wastesTeamAction'])) {
+                            $blockedState = $this->consumeDeclaredTeamAction(
+                                $blockedState, $player->getTeamSide(), $action,
+                            );
+                        }
+
+                        return ActionResult::success($blockedState, $checkResult['events']);
                     }
                 }
             }

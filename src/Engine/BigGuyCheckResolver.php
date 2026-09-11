@@ -123,6 +123,7 @@ final class BigGuyCheckResolver
             return [
                 'state' => $state,
                 'events' => [GameEvent::reallyStupidFail($player->getId(), $roll, $hasAdjacentAlly)],
+                'wastesTeamAction' => true,
             ];
         }
 
