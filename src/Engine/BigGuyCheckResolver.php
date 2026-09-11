@@ -13,6 +13,23 @@ use App\Enum\SkillName;
 
 final class BigGuyCheckResolver
 {
+    private readonly InjuryResolver $injuryResolver;
+    private readonly BallResolver $ballResolver;
+
+    public function __construct(
+        ?InjuryResolver $injuryResolver = null,
+        ?BallResolver $ballResolver = null,
+    ) {
+        // ⭐ Doplneno 11.09.2026 (PHP22): Bloodlust potrebuje HOD NA ZRANENI
+        //   a ODRAZ MICE. Do te doby si tahle trida vystacila bez zavislosti,
+        //   protoze kousnuti delala jako auto-KO -- coz byla prave ta vada.
+        $this->injuryResolver = $injuryResolver ?? new InjuryResolver();
+        $this->ballResolver = $ballResolver ?? new BallResolver(
+            new RandomDiceRoller(),
+            new TacklezoneCalculator(),
+            new ScatterCalculator(),
+        );
+    }
     /**
      * Resolve pre-action check for Big Guy negatraits.
      * Returns null if the action can proceed, or an ActionResult if blocked.
@@ -283,32 +300,63 @@ final class BigGuyCheckResolver
         $thrall = $this->findAdjacentThrall($state, $player);
 
         if ($thrall !== null) {
-            // Bite Thrall: Thrall goes to KO box, Vampire proceeds with action
-            $thrall = $thrall->withPosition(null)->withState(PlayerState::KO);
-            $state = $state->withPlayer($thrall);
+            // ⛔⛔ OPRAVA 11.09.2026 (PHP22): drive to bylo AUTO-KO Thralla.
+            //   r. 7939-7941: „choose one to bite and **make an Injury roll
+            //   on the Thrall treating any casualty roll as Badly Hurt**.
+            //   The injury **will not cause a turnover unless the Thrall was
+            //   holding the ball**."
+            //   ⇒ Je to hod na zraneni (bez hodu na zbroj), ne automaticke KO,
+            //   a z kousnuti se NEUMIRA.
+            // ⚠️ C++ to prepsal 24.08. jako `TA10`
+            //   (`engine/src/big_guy_handler.cpp:161-215`); PHP kopie ne.
+            //
+            // ⭐ Cte se PRED hodem -- zraneni s micem pohne.
+            $thrallHadBall = $state->getBall()->isHeld()
+                && $state->getBall()->getCarrierId() === $thrall->getId();
 
-            // Emit bite event but return null — action proceeds
-            // We need to return a special result that modifies state but allows action to continue
-            // Since BigGuyCheckResolver returns null for "proceed", we must update state via the player
-            // Trick: we return null and rely on the state being updated... but that doesn't work
-            // because state is passed by value. We need to return state modifications.
-            // Solution: return the events and state, but mark it as "proceed" in a different way.
+            $inj = $this->injuryResolver->resolveInjuryOnly($thrall, $dice);
+            $bitten = $inj['player'];
+            if ($bitten->getState() === PlayerState::DEAD) {
+                // „treating any casualty roll as Badly Hurt" -- z kousnuti
+                // se neumira.
+                $bitten = $bitten->withState(PlayerState::INJURED);
+            }
+            $state = $state->withPlayer($bitten);
 
-            // Actually, looking at the caller: ActionResolver checks if checkResult !== null to block.
-            // For Bloodlust bite, we want to modify state AND allow the action to continue.
-            // Best approach: return state+events with a special 'proceed' flag.
-            // But the current interface is ?array — null means proceed, array means blocked.
+            $events = array_merge(
+                [GameEvent::bloodlustBite($player->getId(), $thrall->getId(), $roll)],
+                $inj['events'],
+            );
 
-            // Simplest solution: use a different return format that the caller can detect.
-            // Let's return with a 'proceed' key set to true.
+            if ($thrallHadBall) {
+                [$state, $events] = $this->ballResolver
+                    ->handleBallOnPlayerDown($state, $bitten, $events);
+
+                return [
+                    'state' => $state,
+                    'events' => $events,
+                    'turnover' => true,
+                ];
+            }
+
+            // Nakrmil se, akce pokracuje.
             return [
                 'state' => $state,
-                'events' => [GameEvent::bloodlustBite($player->getId(), $thrall->getId(), $roll)],
+                'events' => $events,
                 'proceed' => true,
             ];
         }
 
-        // No Thrall: Vampire loses action and is moved to reserves
+        // ⛔⛔ OPRAVA 11.09.2026 (PHP22): drive se upir jen presunul do rezerv
+        //   a turnover zadny.
+        //   r. 7942-7947: „**Failure to bite a Thrall is a turnover** and
+        //   requires you to feed on a spectator -- move the Vampire to the
+        //   reserves box if he was still on the pitch. **If he was holding
+        //   the ball, it bounces** from the square he occupied."
+        $vampHadBall = $state->getBall()->isHeld()
+            && $state->getBall()->getCarrierId() === $player->getId();
+        $vampPos = $player->getPosition();
+
         $player = $player
             ->withPosition(null)
             ->withState(PlayerState::OFF_PITCH)
@@ -316,9 +364,19 @@ final class BigGuyCheckResolver
             ->withHasActed(true);
         $state = $state->withPlayer($player);
 
+        $events = [GameEvent::bloodlustFail($player->getId(), $roll)];
+
+        if ($vampHadBall && $vampPos !== null) {
+            $state = $state->withBall(\App\DTO\BallState::onGround($vampPos));
+            $bounce = $this->ballResolver->resolveBounce($state, $vampPos);
+            $state = $bounce['state'];
+            $events = array_merge($events, $bounce['events']);
+        }
+
         return [
             'state' => $state,
-            'events' => [GameEvent::bloodlustFail($player->getId(), $roll)],
+            'events' => $events,
+            'turnover' => true,
         ];
     }
 
@@ -341,7 +399,12 @@ final class BigGuyCheckResolver
                 continue;
             }
             $teammatePos = $teammate->getPosition();
-            if ($teammatePos !== null && $pos->distanceTo($teammatePos) === 1 && $teammate->getState() === PlayerState::STANDING) {
+            // ⛔ OPRAVA 11.09.2026 (PHP22): drive se zadalo `=== STANDING`.
+            //   r. 7938-7939: „If he is standing adjacent to one or more
+            //   Thrall team-mates (**standing, prone or stunned**)" -- lezici
+            //   i omraceny Thrall se kousnout DA.
+            if ($teammatePos !== null && $pos->distanceTo($teammatePos) === 1
+                && $teammate->getState()->isOnPitch()) {
                 return $teammate;
             }
         }

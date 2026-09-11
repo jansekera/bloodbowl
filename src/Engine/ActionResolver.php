@@ -65,7 +65,9 @@ final class ActionResolver
         $this->passResolver = $passResolver;
         $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver);
         $this->gameFlowResolver = $gameFlowResolver ?? new GameFlowResolver($dice);
-        $this->bigGuyCheckResolver = new BigGuyCheckResolver();
+        // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
+        //   mice, takze uz to neni bezzavisla trida.
+        $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
 
         $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver);
         $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver);
@@ -157,6 +159,16 @@ final class ActionResolver
                     $state, $player, $action, $this->dice,
                 );
                 if ($checkResult !== null) {
+                    // ⛔ PHP22: kontrola pred akci umi skoncit i TURNOVEREM --
+                    //   Bloodlust, kdyz upir nema koho kousnout (r. 7942-7943),
+                    //   nebo kdyz kousnuty Thrall drzel mic (r. 7941-7942).
+                    //   Do 11.09. tahle vetev neexistovala a kolo beželo dal.
+                    if (!empty($checkResult['turnover'])) {
+                        return ActionResult::turnover(
+                            $checkResult['state']->withTurnoverPending(true),
+                            $checkResult['events'],
+                        );
+                    }
                     if (!empty($checkResult['proceed'])) {
                         // Bloodlust bite: state modified but action continues
                         $state = $checkResult['state'];
