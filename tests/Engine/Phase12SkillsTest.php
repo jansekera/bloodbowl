@@ -361,24 +361,53 @@ final class Phase12SkillsTest extends TestCase
         $this->assertEquals(5, $pos->getX());
     }
 
-    public function testTakeRootDoesNotAffectBlock(): void
+    // ⛔ PREPSANO 11.09.2026 (PHP15d). Puvodne se jmenoval
+    //    `testTakeRootDoesNotAffectBlock` a tvrdil `assertNotContains
+    //    ('take_root')`, tedy ze se u bloku NEHAZI VUBEC -- zakotvoval tim
+    //    vadu. `rules_bb2016.txt` r. 8573: „**Immediately after declaring an
+    //    Action** with this player, roll a D6." Tedy i u bloku.
+    //    Co u bloku PLATI je r. 8581-8582: „The player **may block adjacent
+    //    players** without following-up as part of a Block Action" -- tedy
+    //    zakorenení bloku nebrani. To uz je jina vec nez „nehazi se".
+    public function testTakeRootRollsOnBlockButRootingDoesNotStopIt(): void
     {
-        // TakeRoot player can block normally (no Take Root check)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::TakeRoot], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, armour: 10, id: 2)
             ->withBallOffPitch()
             ->build();
 
-        // Block: roll 3 = PUSHED, armor holds (no armor roll for push only)
-        $dice = new FixedDiceRoller([3]);
+        // Take Root: 1 = zakoreni. Pak block: 3 = PUSHED.
+        $dice = new FixedDiceRoller([1, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertTrue($result->isSuccess());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('take_root', $types);
+        $this->assertContains('take_root', $types, 'hod se hazi i u bloku (r. 8573)');
+        $this->assertContains('block', $types, 'zakorenení bloku nebrani (r. 8581-8582)');
+        $this->assertTrue($result->getNewState()->getPlayer(1)->isRooted(),
+            'zakorenení ma pretrvat (r. 8575-8576)');
+    }
+
+    public function testTakeRootPassedOnBlockLeavesThePlayerFree(): void
+    {
+        // ⭐ Druha pulka paru: na 2+ se nezakoreni.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::TakeRoot], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 10, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([2, 3]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertFalse($result->getNewState()->getPlayer(1)->isRooted(),
+            'dvojka zakorenit NESMI (r. 8574)');
     }
 
     // ========== STEP 6: Hail Mary Pass, Dump-Off ==========

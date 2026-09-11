@@ -32,6 +32,7 @@ final class MatchPlayerDTO
         private bool $usedBlitz,
         private bool $lostTacklezones = false,
         private bool $proUsedThisTurn = false,
+        private bool $rooted = false,
         private readonly ?string $raceName = null,
         private readonly array $learnedSkills = [],
     ) {
@@ -161,6 +162,24 @@ final class MatchPlayerDTO
         return $clone;
     }
 
+    /**
+     * ⛔ DOPLNENO 11.09.2026 (PHP15 b/d): „zakorenení" po neuspesnem hodu
+     *   Take Root. `rules_bb2016.txt` r. 8575-8576: „his MA is considered 0
+     *   **until a drive ends, or he is Knocked Down or Placed Prone**."
+     *   ⇒ Je to STAV, KTERY PRETRVAVA PRES KOLA. PHP ho nedrzelo vubec,
+     *   takze Treeman priste zase normalne chodil.
+     * ⚠️ C++ ma `player.rooted` (`big_guy_handler.cpp:121`).
+     */
+    public function isRooted(): bool { return $this->rooted; }
+
+    public function withRooted(bool $rooted): self
+    {
+        $clone = clone $this;
+        $clone->rooted = $rooted;
+
+        return $clone;
+    }
+
     public function withProUsedThisTurn(bool $used): self
     {
         $clone = clone $this;
@@ -188,6 +207,7 @@ final class MatchPlayerDTO
             usedBlitz: $this->usedBlitz,
             lostTacklezones: $this->lostTacklezones,
             proUsedThisTurn: $this->proUsedThisTurn,
+            rooted: $this->rooted,
             raceName: $this->raceName,
         );
     }
@@ -213,6 +233,7 @@ final class MatchPlayerDTO
             'movementRemaining' => $this->movementRemaining,
             'lostTacklezones' => $this->lostTacklezones,
             'proUsedThisTurn' => $this->proUsedThisTurn,
+            'rooted' => $this->rooted,
             'raceName' => $this->raceName,
             'learnedSkills' => $this->learnedSkills,
         ];
@@ -245,6 +266,7 @@ final class MatchPlayerDTO
             usedBlitz: (bool) ($data['usedBlitz'] ?? false),
             lostTacklezones: (bool) ($data['lostTacklezones'] ?? false),
             proUsedThisTurn: (bool) ($data['proUsedThisTurn'] ?? false),
+            rooted: (bool) ($data['rooted'] ?? false),
             raceName: $data['raceName'] ?? null,
             learnedSkills: array_values((array) ($data['learnedSkills'] ?? [])),
         );

@@ -56,8 +56,13 @@ final class BigGuyCheckResolver
             return $this->resolveWildAnimal($state, $player, $action, $dice);
         }
 
-        if ($player->hasSkill(SkillName::TakeRoot) && $action === ActionType::MOVE) {
-            return $this->resolveTakeRoot($state, $player, $dice);
+        // ⛔ OPRAVA 11.09.2026 (PHP15d): hod se hazel JEN NA `MOVE`.
+        //   `rules_bb2016.txt` r. 8573: „**Immediately after declaring an
+        //   Action** with this player, roll a D6." Tedy i na BLOCK, BLITZ,
+        //   PASS, HAND-OFF a FOUL -- Treeman doted blokoval bez rizika.
+        //   A hazi se jen dokud nezakorenil (pak uz je stav dany).
+        if ($player->hasSkill(SkillName::TakeRoot) && !$player->isRooted()) {
+            return $this->resolveTakeRoot($state, $player, $action, $dice);
         }
 
         if ($player->hasSkill(SkillName::Bloodlust)) {
@@ -197,24 +202,65 @@ final class BigGuyCheckResolver
     private function resolveTakeRoot(
         GameState $state,
         MatchPlayerDTO $player,
+        ActionType $action,
         DiceRollerInterface $dice,
     ): ?array {
         $roll = $dice->rollD6();
 
-        if ($roll === 1) {
-            $player = $player
-                ->withHasMoved(true)
-                ->withHasActed(true);
-            $state = $state->withPlayer($player);
+        if ($roll !== 1) {
+            return null;   // r. 8574: „On a 2 or more ... Action as normal"
+        }
 
+        // ⛔⛔ PREPSANO 11.09.2026 (PHP15 b/d) podle `rules_bb2016.txt`
+        //   r. 8572-8584. Puvodni PHP verze byla spatne TREMI zpusoby --
+        //   presne tymiz, ktere C++ engine opravil 24.08. jako `TA2`
+        //   (`engine/src/big_guy_handler.cpp:112-158`):
+        //   (1) hod se hazel jen na MOVE (opraveno v dispatchi vys);
+        //   (2) zakorenení NEPERZISTOVALO, takze priste zase normalne chodil;
+        //   (3) na 1 se blokovala KAZDA akce -- pravidlo ale blok vyslovne
+        //       DOVOLUJE.
+        //
+        // r. 8575-8576: „his MA is considered 0 **until a drive ends, or he is
+        //   Knocked Down or Placed Prone**" ⇒ stav pretrvava pres kola.
+        $player = $player
+            ->withRooted(true)
+            ->withMovementRemaining(0);
+
+        // r. 8581-8584: „The player **may block adjacent players** without
+        //   following-up as part of a Block Action **however if a player
+        //   fails his Take Root roll as part of a Blitz Action he may not
+        //   block that turn** (he can still roll to stand up if he is Prone)."
+        //   ⇒ BLOCK, PASS, HAND-OFF a FOUL zakorenení nebrani; BLITZ ano,
+        //   protoze ten je pohyb + blok.
+        $mayStillAct = in_array($action, [
+            ActionType::BLOCK,
+            ActionType::PASS,
+            ActionType::HAND_OFF,
+            ActionType::FOUL,
+        ], true);
+
+        $state = $state->withPlayer($player);
+        $events = [GameEvent::takeRoot($player->getId(), $roll, true)];
+
+        if ($mayStillAct) {
+            // Zakorenil, ale akci smi dokoncit -- jen se nehne.
             return [
                 'state' => $state,
-                'events' => [GameEvent::takeRoot($player->getId(), $roll, true)],
-                'wastesTeamAction' => true,
+                'events' => $events,
+                'proceed' => true,
             ];
         }
 
-        return null;
+        $state = $state->withPlayer(
+            $player->withHasMoved(true)->withHasActed(true),
+        );
+
+        return [
+            'state' => $state,
+            'events' => $events,
+            // M2 / r. 351-352: limit visi na DEKLARACI, ne na dokonceni.
+            'wastesTeamAction' => true,
+        ];
     }
 
     /**
