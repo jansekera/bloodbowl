@@ -27,8 +27,36 @@ final class GreedyAICoach implements AICoachInterface
         $side = $state->getActiveTeam();
         $actions = $rules->getAvailableActions($state);
 
+        // ⛔⛔⛔ OPRAVA 11.09.2026 -- polozka #1 auditu "kde engine ukoncuje tah".
+        //   `$bestAction` startoval na END_TURN, takze END_TURN vyhraval
+        //   VYCHOZI HODNOTOU: stacilo, aby `scoreAction` vratil `null` pro
+        //   vsechny nabidnute akce, a ukoncilo se kolo CELEHO TYMU.
+        //   A `null` vraci snadno -- `scoreMove` zahazuje tah se skore `<= 0`
+        //   a pro `throw_team_mate` rameno vubec neni.
+        //
+        // ⭐ ZMERENO PRED OPRAVOU (60 her, 12 135 rozhodnuti,
+        //   `cli/diag_ai_endturn_20260911.php`): 0,6 % rozhodnuti, ale
+        //   **3,7 % KOL**, prumer **7,19 hrace** propadlo, maximum **11**,
+        //   tedy cely tym. Rozpad podle toho, co skorer videl a zahodil:
+        //   `move` 66,7 %, `throw_team_mate` 33,3 %.
+        //
+        // ⭐ PRAVIDLOVA KOTVA (`rules_bb2016.txt` r. 363-367 + uzavreny
+        //   sedmicленny katalog turnoveru r. 368-384): "skorer nic neohodnotil"
+        //   v tom katalogu NENI. Ukoncit tah tady je vada, ne prisnost.
+        //
+        // ⇒ Oprava je TATAZ jako v C++ enginu (`0630f854`, `greedyPolicy`) a
+        //   v `RandomAICoach` (`b0d01ccb`): kdyz nic neskorovalo, vrat PRVNI
+        //   HRATELNOU akci z nabidky; END_TURN az kdyz nabidka nic nema.
+        //   Zadne nove skore se tu nevymysli -- je to zamerne nejslabsi mozna
+        //   oprava, ktera jen prestane zahazovat kolo.
+        //
+        // ⚠️ Co se tim NEMENI: prah `$bestScore <= 0` ve `scoreMove` ani
+        //   chybejici rameno pro `throw_team_mate`. Obojí je vlastni polozka
+        //   (viz fronta), protoze zmena prahu uz je NOVA HEURISTIKA, ne oprava
+        //   s jedinym resenim.
         $bestScore = -1;
-        $bestAction = ['action' => ActionType::END_TURN, 'params' => []];
+        $bestAction = null;
+        $firstPlayable = null;
 
         foreach ($actions as $action) {
             $type = ActionType::from($action['type']);
@@ -45,13 +73,75 @@ final class GreedyAICoach implements AICoachInterface
             }
 
             $scored = $this->scoreAction($state, $rules, $type, $playerId, $side);
-            if ($scored !== null && $scored['score'] > $bestScore) {
-                $bestScore = $scored['score'];
-                $bestAction = ['action' => $scored['action'], 'params' => $scored['params']];
+            if ($scored !== null) {
+                if ($scored['score'] > $bestScore) {
+                    $bestScore = $scored['score'];
+                    $bestAction = ['action' => $scored['action'], 'params' => $scored['params']];
+                }
+                continue;
+            }
+
+            // Neohodnotila se -- ale hratelna je. Drz si prvni takovou pro
+            // pripad, ze neohodnoti NIC.
+            if ($firstPlayable === null) {
+                $built = $this->buildUnscoredAction($state, $rules, $type, $playerId, $side);
+                if ($built !== null) {
+                    $firstPlayable = $built;
+                }
             }
         }
 
-        return $bestAction;
+        if ($bestAction !== null) {
+            return $bestAction;
+        }
+        if ($firstPlayable !== null) {
+            return $firstPlayable;
+        }
+
+        return ['action' => ActionType::END_TURN, 'params' => []];
+    }
+
+    /**
+     * Postav akci, kterou skorer odmitl ohodnotit, aby se dala zahrat aspon
+     * jako zachrana pred propadnutim kola.
+     *
+     * ⛔ Vraci `null`, kdyz se akce postavit neda -- tim se vyradi z uvahy
+     *    misto toho, aby ukoncila kolo (tataz past jako v `RandomAICoach`,
+     *    `71f8ac17`).
+     *
+     * @return array{action: ActionType, params: array<string, mixed>}|null
+     */
+    private function buildUnscoredAction(
+        GameState $state,
+        RulesEngine $rules,
+        ActionType $type,
+        int $playerId,
+        TeamSide $side,
+    ): ?array {
+        if ($type === ActionType::MOVE) {
+            // Skorer MOVE odmitl (skore <= 0), ale slapnout se da: vezmi
+            // pole, ktere je nejdal od nasi koncove zony, tedy postup vpred.
+            $targets = $rules->getValidMoveTargets($state, $playerId);
+            if ($targets === []) {
+                return null;
+            }
+            $endZoneX = ($side === TeamSide::HOME) ? 25 : 0;
+            usort($targets, static fn(array $a, array $b)
+                => abs($a['x'] - $endZoneX) <=> abs($b['x'] - $endZoneX));
+
+            return [
+                'action' => ActionType::MOVE,
+                'params' => ['playerId' => $playerId, 'x' => $targets[0]['x'], 'y' => $targets[0]['y']],
+            ];
+        }
+
+        if ($type === ActionType::BALL_AND_CHAIN) {
+            return ['action' => ActionType::BALL_AND_CHAIN, 'params' => ['playerId' => $playerId]];
+        }
+
+        // Ostatni typy (TTM, bomba, ...) tenhle kouc postavit neumi -- vyradit,
+        // ne ukoncit kolo.
+        return null;
     }
 
     public function setupFormation(GameState $state, TeamSide $side): GameState
