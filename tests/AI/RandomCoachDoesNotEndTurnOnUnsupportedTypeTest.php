@@ -57,6 +57,47 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
         }
     }
 
+    public function testBuilderThatCannotFindATargetDoesNotEndTheTurn(): void
+    {
+        // ⛔ DRUHÁ POLOVINA TÉHOŽ PRINCIPU: vrchní `default => END_TURN` nebyl
+        //    jediný výskyt -- KAŽDÝ `build*Action` vracel END_TURN, když nenašel
+        //    cíl (13 míst). Vada té třídy žije tam, kde je podmínka NABÍDKY
+        //    hrubší než podmínka BUILDERU.
+        //
+        // ⚠️ ZMĚŘENO 11.09.: na 2 026 rozhodnutích v 15 hrách ta větev
+        //    NESEPNULA ANI JEDNOU -- byla LATENTNÍ, ne aktivní. Tenhle test
+        //    ji tedy vyvolává schválně postaveným stavem, ne běžnou hrou:
+        //    BLITZ se nabízí každému, kdo `canAct()` (`RulesEngine:153-157`),
+        //    ale `buildBlitzAction` potřebuje aspoň jednoho soupeře na hřišti.
+        //    Bez soupeřů je tedy BLITZ v nabídce a builder nemá koho vzít.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1)
+            ->withBallOffPitch()
+            ->build();
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA FIXTURY: ten rozpor tam OPRAVDU je.
+        $types = [];
+        foreach ($rules->getAvailableActions($state) as $a) {
+            if (($a['playerId'] ?? null) === 1) { $types[] = $a['type']; }
+        }
+        $this->assertContains(ActionType::BLITZ->value, $types,
+            'fixtura je vadná: BLITZ se nenabízí, vada se nemůže projevit');
+        $this->assertSame([], $state->getPlayersOnPitch(TeamSide::AWAY),
+            'fixtura je vadná: soupeř na hřišti je, builder by cíl našel');
+        $this->assertContains(ActionType::MOVE->value, $types,
+            'fixtura je vadná: není čím BLITZ nahradit');
+
+        // Losuje se, takže jeden pokus nic nedokazuje.
+        $ai = new RandomAICoach();
+        for ($i = 0; $i < 300; $i++) {
+            $decision = $ai->decideAction($state, $rules);
+            $this->assertNotSame(ActionType::END_TURN, $decision['action'],
+                'builder nenašel cíl a ukončil celé kolo (pokus ' . $i . ')');
+        }
+    }
+
     public function testStillEndsTheTurnWhenNothingIsPlayable(): void
     {
         // ⛔ Druhá půlka páru: oprava NESMÍ vyrábět akci tam, kde žádná není.

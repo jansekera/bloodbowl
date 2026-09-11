@@ -51,10 +51,36 @@ final class RandomAICoach implements AICoachInterface
             return ['action' => ActionType::END_TURN, 'params' => []];
         }
 
-        $chosen = $playableActions[array_rand($playableActions)];
-        $actionType = ActionType::from($chosen['type']);
-        $playerId = (int) $chosen['playerId'];
+        // ⛔⛔ DRUHA POLOVINA TEHOZ (11.09.2026): vrchni `default => END_TURN`
+        //   nebyl jediny vyskyt. KAZDY `build*Action` vracel END_TURN, kdyz
+        //   nenasel cil (14 mist) -- `getValidMoveTargets` prazdne, zadny
+        //   soused k bloku, zadny soupeř na desce, neni komu prihrat...
+        //   Nabidka pritom takovou akci nabidnout MUZE (jeji podminka je
+        //   hrubsi nez ta v builderu), takze se kolo ukoncovalo i tady.
+        //   ⇒ Builder ted vraci `null` a losuje se DAL. END_TURN az kdyz
+        //   zadny kandidat akci nepostavi.
+        $zbyva = $playableActions;
+        while ($zbyva !== []) {
+            $k = array_rand($zbyva);
+            $chosen = $zbyva[$k];
+            unset($zbyva[$k]);   // kazdy kandidat se zkusi NEJVYS jednou
+                                 // => smycka je konecna
 
+            $built = $this->buildFor($state, $rules, ActionType::from($chosen['type']),
+                                     (int) $chosen['playerId']);
+            if ($built !== null) {
+                return $built;
+            }
+        }
+
+        return ['action' => ActionType::END_TURN, 'params' => []];
+    }
+
+    /**
+     * @return array{action: ActionType, params: array<string, mixed>}|null
+     */
+    private function buildFor(GameState $state, RulesEngine $rules, ActionType $actionType, int $playerId): ?array
+    {
         return match ($actionType) {
             ActionType::MOVE => $this->buildMoveAction($state, $rules, $playerId),
             ActionType::BLOCK => $this->buildBlockAction($state, $rules, $playerId),
@@ -132,11 +158,11 @@ final class RandomAICoach implements AICoachInterface
     /**
      * @return array{action: ActionType, params: array<string, mixed>}
      */
-    private function buildMoveAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildMoveAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $targets = $rules->getValidMoveTargets($state, $playerId);
         if ($targets === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $targets[array_rand($targets)];
@@ -152,18 +178,18 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildBlockAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildBlockAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $targets = $rules->getBlockTargets($state, $player);
         if ($targets === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $targets[array_rand($targets)];
@@ -178,20 +204,20 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildBlitzAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildBlitzAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         // Find enemies on pitch to blitz
         $side = $player->getTeamSide();
         $enemies = $state->getPlayersOnPitch($side->opponent());
         if ($enemies === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $enemies[array_rand($enemies)];
@@ -206,18 +232,18 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildPassAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildPassAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $targets = $rules->getPassTargets($state, $player);
         if ($targets === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $targets[array_rand($targets)];
@@ -233,18 +259,18 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildHandOffAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildHandOffAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $targets = $rules->getHandOffTargets($state, $player);
         if ($targets === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $targets[array_rand($targets)];
@@ -259,18 +285,18 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildMultipleBlockAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildMultipleBlockAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $targets = $rules->getBlockTargets($state, $player);
         if (count($targets) < 2) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         // Pick 2 random targets
@@ -286,18 +312,18 @@ final class RandomAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>}
+     * @return array{action: ActionType, params: array<string, mixed>}|null
      */
-    private function buildFoulAction(GameState $state, RulesEngine $rules, int $playerId): array
+    private function buildFoulAction(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $targets = $rules->getFoulTargets($state, $player);
         if ($targets === []) {
-            return ['action' => ActionType::END_TURN, 'params' => []];
+            return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
         $target = $targets[array_rand($targets)];
