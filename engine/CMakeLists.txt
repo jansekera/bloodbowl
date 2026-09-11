@@ -89,6 +89,7 @@ add_executable(bb_tests
     tests/test_turn_planner.cpp
     tests/test_cage_advance.cpp
     tests/test_pathfinder.cpp
+    tests/test_policies.cpp
 )
 target_link_libraries(bb_tests PRIVATE bb_engine GTest::gtest_main)
 

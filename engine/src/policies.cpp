@@ -113,8 +113,34 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
         return moves[r];
     }
 
-    // Fallback: end turn or random
-    return actions[0];
+    // ⛔⛔⛔ OPRAVA 10.09.2026: `return actions[0]` BYL `END_TURN`, VZDYCKY.
+    //   `rules_engine.cpp:17` vklada `END_TURN` jako **PRVNI** prvek nabidky
+    //   ("END_TURN is always available") a nic to nepreradi ⇒ tenhle "fallback"
+    //   nekoncil tah nekdy, ale KDYKOLI nesepnulo rameno MOVE/BLOCK/BLITZ.
+    //   `greedyPolicy` jina ramena nema (FOUL, PASS, HAND_OFF, LEAP, TTM zadne),
+    //   takze staci telo obklopene LEZICIMI soupeři: zadne volne pole (⇒ bez
+    //   MOVE), zadny stojici soupeř (⇒ bez BLOCK) -- a legalni je pritom FOUL.
+    //   Produkcni cesta: `macro_mcts.cpp:1327`.
+    //
+    // ⭐ PRAVIDLOVA KOTVA (rules_bb2016.txt r. 363-367): „Normally, a turn only
+    //   ends when all of the players in the team have performed an Action.
+    //   However, certain events cause the turn to end... These events are
+    //   called turnovers" -- a nasleduje UZAVRENY sedmiclenny seznam
+    //   (r. 368-384). „Politika nenasla rameno" v nem NENI. ⇒ Ukoncit tah tady
+    //   je VADA, ne prisnost.
+    //
+    // ⚠️ TATAZ TRIDA JAKO `W7` (`evidence/fable_wholeturn_audit_20260902.md:139`,
+    //   „PRAZDNA EXPANZE ZAHODI CELY ZBYTEK KOLA"), jen o vrstvu niz -- a `W7`
+    //   je zmerene: 1 189 nasich kol (2,5 %) bez jedine nasi akce
+    //   (`fable_offer_reach_audit_20260827.md:46`).
+    //
+    // ⇒ Vrat PRVNI NE-`END_TURN` akci; `END_TURN` teprve kdyz nabidka nema nic
+    //   jineho. Zadne skore se tu nevymysli: je to zamerne nejslabsi mozna
+    //   oprava, ktera jen prestane zahazovat kolo.
+    for (const Action& a : actions) {
+        if (a.type != ActionType::END_TURN) return a;
+    }
+    return actions[0];   // v nabidce opravdu nic jineho neni
 }
 
 Action learningPolicy(const GameState& state, DiceRollerBase& dice,
