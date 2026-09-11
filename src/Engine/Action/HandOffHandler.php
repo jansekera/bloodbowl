@@ -39,8 +39,36 @@ final class HandOffHandler implements ActionHandlerInterface
         $giverPos = $giver->getPosition();
         $receiverPos = $receiver->getPosition();
 
-        if ($giverPos === null || $receiverPos === null) {
+        if ($giverPos === null) {
             throw new \InvalidArgumentException('Players must be on pitch');
+        }
+
+        // ⛔⛔ OPRAVA 11.09.2026 (PHP17): PRIJEMCE UZ NA HRISTI BYT NEMUSI.
+        //   Nabidka ho vybirala pres `getHandOffTargets`, ktere vraci jen
+        //   hrace NA HRISTI -- jenze mezi nabidkou a provedenim bezi
+        //   KONTROLA PRED AKCI (`ActionResolver:130`). A **Bloodlust** v ni
+        //   kousne Thralla: hod na zraneni muze dat KO nebo zraneni, a to
+        //   `InjuryResolver:205,211,215` nastavi `position = null`.
+        //   Kdyz je tim Thrallem prave prijemce hand-offu, handler ho uz
+        //   nenajde a hazel `Players must be on pitch`.
+        //   ZMERENO: 1 z 12 135 rozhodnuti -- vzacne, ale v zive hre to
+        //   `AITurnService` nechyta (`try/catch` tam neni ani jednou).
+        //
+        // ⭐ TRETI VYSKYT TRIDY (C) „etapa veri, ze predchozi uspela"
+        //   (vedle `BlitzHandler` 3x). Tady navic PRES DVE VRSTVY: nabidka
+        //   -> kontrola pred akci -> handler.
+        //
+        // ⭐ PRAVIDLOVA KOTVA: `rules_bb2016.txt` r. 7935-7937 -- vampir se
+        //   krmi „at the end of the declared Action, **but before actually
+        //   passing, handing off, or scoring**". Kousnuti tedy PRECHAZI
+        //   hand-off zamerne. Kdyz prijemce kousnuti neprezil na hristi,
+        //   hand-off proste nema komu -- akce je vycerpana, mic zustava
+        //   podavajicimu a turnover to NENI (katalog r. 368-384 tenhle
+        //   pripad nezna).
+        if ($receiverPos === null || !$receiver->getState()->canAct()) {
+            $state = $state->withPlayer($giver->withHasActed(true)->withHasMoved(true));
+
+            return ActionResult::success($state, []);
         }
 
         if ($giverPos->distanceTo($receiverPos) !== 1) {
