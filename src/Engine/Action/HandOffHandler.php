@@ -78,7 +78,31 @@ final class HandOffHandler implements ActionHandlerInterface
             $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
         }
 
+        // ⛔⛔ OPRAVA 11.09.2026: TURNOVER SE VYHLASOVAL PRILIS BRZY.
+        //   `rules_bb2016.txt` r. 371-373 (bod 2 uzavreneho katalogu):
+        //   „A passed ball, or hand-off, is not caught by any member of the
+        //   moving team **before the ball comes to rest**."
+        //   A bod 3 k tomu vyslovne dodava: „failing a catch roll, as opposed
+        //   to a pick up, **is by itself never a turnover**." (r. 376-378)
+        //
+        //   `resolveCatch` pri neuspechu mic ODRAZI (`BallResolver:177-180`)
+        //   a ten odraz muze skoncit V RUKOU SPOLUHRACE -- `resolveBounce`
+        //   na to ma vlastni vetev. Presto se tu vracel turnover, protoze
+        //   `success => false` znamena jen "TENHLE hrac nechytil", ne "mic
+        //   je pryc". Tym tak prisel o kolo i ve chvili, kdy mic udrzel.
+        //
+        // ⇒ Rozhoduje STAV MICE PO ODRAZU, ne vysledek jednoho hodu.
         if (!$catchResult['success']) {
+            $ball = $state->getBall();
+            $newCarrier = ($ball->isHeld() && $ball->getCarrierId() !== null)
+                ? $state->getPlayer($ball->getCarrierId())
+                : null;
+
+            if ($newCarrier !== null && $newCarrier->getTeamSide() === $activeSide) {
+                // Odraz chytil nekdo nas => mic je porad nas, kolo bezi dal.
+                return ActionResult::success($state, $events);
+            }
+
             $events[] = GameEvent::turnover('Failed hand-off');
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }

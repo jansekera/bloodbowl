@@ -188,6 +188,20 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $state = $state->withPlayer($projectile);
             $events = array_merge($events, $injResult['events']);
 
+            // ⛔ OPRAVA 11.09.2026: turnover se vyhlasoval BEZ OHLEDU na to,
+            //   jestli hozeny hrac mic mel -- pritom `$hadBall` je o par
+            //   radku vys a pouziva se.
+            //   `rules_bb2016.txt` r. 368-370 (bod 1): „being injured by the
+            //   crowd ... **is not a turnover unless it is a player from the
+            //   active team holding the ball**."
+            //   A bod 6 (r. 381-384) mluvi taky jen o hraci **S MICEM**:
+            //   „A player **with the ball** is thrown ... and fails to land
+            //   successfully."
+            // ⇒ Hozeny hrac bez mice, ktery skonci u davu, kolo nekonci.
+            if (!$hadBall) {
+                return ActionResult::success($state, $events);
+            }
+
             $events[] = GameEvent::turnover('Thrown player off pitch');
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }

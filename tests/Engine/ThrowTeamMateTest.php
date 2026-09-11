@@ -190,7 +190,44 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
         ]);
 
-        $this->assertTrue($result->isTurnover());
+        // ⛔ PREPSANO 11.09.2026. Puvodne se tu tvrdil TURNOVER -- a byla to
+        //   vada, kterou test zakotvoval. Fixtura ma `withBallOffPitch()`,
+        //   takze hozeny hrac MIC NEMA.
+        //   `rules_bb2016.txt` r. 368-370 (bod 1): „being injured by the crowd
+        //   ... **is not a turnover unless it is a player from the active team
+        //   holding the ball**." A bod 6 (r. 381-384) mluvi taky jen o hraci
+        //   **s micem**.
+        $this->assertFalse($result->isTurnover(),
+            'hozeny hrac BEZ mice u davu kolo nekonci (r. 368-370)');
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('crowd_surf', $types, 'k davu se dostat MEL');
+    }
+
+    /**
+     * ⭐ DRUHA PULKA PARU: s micem to turnover JE (bod 6, r. 381-384).
+     *    Bez tohohle by test vys prosel i s "nikdy neni turnover".
+     */
+    public function testOffPitchCrowdSurfWithTheBallIsATurnover(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 1, 0, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 2, 0, skills: [SkillName::RightStuff], id: 2)
+            ->withBallCarried(2)
+            ->build();
+
+        // SEBEKONTROLA FIXTURY: hozeny hrac mic OPRAVDU ma.
+        $this->assertTrue($state->getBall()->isHeld());
+        $this->assertSame(2, $state->getBall()->getCarrierId(),
+            'fixtura je vadna: mic nenese hozeny hrac, par nic nemeri');
+
+        $dice = new FixedDiceRoller([2, 1, 3, 3]);
+        $resolver = new ActionResolver($dice);
+        $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
+        ]);
+
+        $this->assertTrue($result->isTurnover(),
+            'hozeny hrac S MICEM u davu kolo koncí (bod 6)');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
     }
