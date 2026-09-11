@@ -109,19 +109,30 @@ final class RulesEngine
             $teamState = $state->getTeamState($side);
 
             foreach ($state->getTeamPlayers($side) as $player) {
+                // ⭐ PHP25: "nic nedelat" se nabizi KAZDEMU, kdo jeste ma co
+                //   utratit -- vcetne Ball & Chain.
+                // ⛔ OPRAVA 11.09.2026: nejdriv jsem B&C hrace vyradil s tim,
+                //   ze "musi jednat". Uzivatel to opravil a pravidla mu davaji
+                //   za pravdu: r. 414-427 rikaji *"may perform one Action"* a
+                //   *"until all of the players have performed an Action, OR THE
+                //   COACH DOES NOT WANT to perform an Action with any more
+                //   players"* -- aktivace je dobrovolna pro kazdeho hrace.
+                //   Zaznam u Ball & Chain (r. 7809-7810) omezuje jen to, JAKOU
+                //   akci hrac smi vzit (*"can only take Move Actions"*), ne
+                //   jestli ji vzit MUSI.
+                // ⭐ A je to casto nejlepsi tah: neaktivovany Fanatic drzi
+                //   misto, dava asistence a ma zonu zachycenі, ale koule se
+                //   neroztoci -- takze nemuze vrazit do vlastnich hracu.
+                if ($player->canAct() || $player->canMove()) {
+                    $actions[] = ['type' => ActionType::STAND_PAT->value, 'playerId' => $player->getId()];
+                }
+
                 // Ball & Chain players can ONLY use BALL_AND_CHAIN action
                 if ($player->hasSkill(SkillName::BallAndChain)) {
                     if ($player->canAct()) {
                         $actions[] = ['type' => ActionType::BALL_AND_CHAIN->value, 'playerId' => $player->getId()];
                     }
                     continue;
-                }
-
-                // ⭐ PHP25: "nic nedelat" se nabizi kazdemu, kdo jeste ma co
-                //   utratit. ⛔ Ball & Chain se sem nedostane -- ten hrac MUSI
-                //   jednat (`continue` vys), takze pro nej volba nehrat neni.
-                if ($player->canAct() || $player->canMove()) {
-                    $actions[] = ['type' => ActionType::STAND_PAT->value, 'playerId' => $player->getId()];
                 }
 
                 if ($player->canMove()) {

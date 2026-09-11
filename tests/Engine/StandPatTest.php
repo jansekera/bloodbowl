@@ -103,10 +103,19 @@ final class StandPatTest extends TestCase
             'volba nehrát se nabízí i hráči, který už jednal');
     }
 
-    public function testBallAndChainPlayerHasNoChoiceButToAct(): void
+    public function testBallAndChainPlayerMayAlsoBeLeftAlone(): void
     {
-        // ⛔ Ball & Chain hráč MUSÍ jednat -- pravidla mu volbu nedávají,
-        //    takže mu ji nesmí dát ani tahle nová akce.
+        // ⛔ OPRAVENO 11.09.2026 UŽIVATELEM. První verze tvrdila opak — že
+        //    Ball & Chain hráč jednat MUSÍ. Pravidla to nikde neříkají:
+        //    r. 414-427: „Each player in a team **may** perform one Action per
+        //    turn … until all of the players have performed an Action, **or the
+        //    coach does not want to perform an Action with any more players**."
+        //    ⇒ Aktivace je dobrovolná pro KAŽDÉHO hráče.
+        //    Záznam Ball & Chain (r. 7809-7810) omezuje jen to, JAKOU akci smí
+        //    vzít („can only take Move Actions"), ne jestli ji vzít musí.
+        // ⭐ A uživatel dodal i proč to je strategicky důležité: neaktivovaný
+        //    Fanatic drží místo, dává asistence a má zónu zachycení, ale koule
+        //    se neroztočí — takže nemůže vrazit do vlastních hráčů.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, movement: 3, id: 1,
                         skills: [SkillName::BallAndChain])
@@ -118,7 +127,15 @@ final class StandPatTest extends TestCase
 
         $this->assertContains(ActionType::BALL_AND_CHAIN->value, $types,
             'fixtura je vadná: B&C hráči se nenabízí ani jeho vlastní akce');
-        $this->assertNotContains(ActionType::STAND_PAT->value, $types,
-            'Ball & Chain hráč dostal volbu nehrát, kterou podle pravidel nemá');
+        $this->assertContains(ActionType::STAND_PAT->value, $types,
+            'Ball & Chain hráč nedostal volbu nehrát, kterou podle pravidel má');
+
+        // A když ji vezme, nesmí se roztočit koule ani padnout kostka.
+        $dice = new FixedDiceRoller([]);
+        $result = (new ActionResolver($dice))->resolve(
+            $state, ActionType::STAND_PAT, ['playerId' => 1],
+        );
+        $this->assertSame(0, $dice->getRollCount(), 'koule se roztočila, ač hráč nehrál');
+        $this->assertFalse($result->isTurnover());
     }
 }

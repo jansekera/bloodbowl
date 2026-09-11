@@ -48,10 +48,18 @@ final class BallAndChainActionTest extends TestCase
             fn(array $a) => ($a['playerId'] ?? null) === 1,
         ));
         $this->assertNotSame([], $offered, 'fixtura je vadná: hráč nemá co hrát');
-        foreach ($offered as $a) {
-            $this->assertSame(ActionType::BALL_AND_CHAIN->value, $a['type'],
-                'fixtura je vadná: nabízí se i něco jiného než B&C');
-        }
+        // ⚠️ UPRAVENO 11.09.2026 (PHP25): od zavedení volby „nic nedělat" je
+        //    v nabídce i `stand_pat` — a to je správně, pravidla r. 414-427
+        //    nechávají aktivaci dobrovolnou i pro Ball & Chain. Fixtura tedy
+        //    hlídá, že se NENABÍZÍ nic TŘETÍHO (žádný blok, pohyb, blitz),
+        //    a že B&C v nabídce je.
+        $offeredTypes = array_column($offered, 'type');
+        $this->assertContains(ActionType::BALL_AND_CHAIN->value, $offeredTypes,
+            'fixtura je vadná: B&C akce se nenabízí');
+        $this->assertSame([], array_values(array_diff($offeredTypes, [
+            ActionType::BALL_AND_CHAIN->value,
+            ActionType::STAND_PAT->value,
+        ])), 'fixtura je vadná: nabízí se i něco jiného než B&C a volba nehrát');
 
         $decision = (new GreedyAICoach())->decideAction($state, $rules);
 
