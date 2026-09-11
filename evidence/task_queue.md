@@ -2944,3 +2944,56 @@ potvrzení krátkým během stačí."** ⇒ Uzavřeno bez další noci -- mechan
 je potvrzený (mění se výrazně podle rasy), přesné číslo dopadu na výhry se
 nezjišťuje. Pokud by se přesto chtělo doměřit, ~6918 párů na we-we by
 rozhodlo, ale to teď není v plánu.
+
+---
+
+# 8. PHP WEBOVÁ HRA — PARITA S PRAVIDLY A S ENGINEM
+
+> **Proč vlastní oddíl (11.09.2026).** PHP je **druhá implementace týchž
+> pravidel** a je to **to, co hraje člověk** (`ServiceProvider.php:121-127`).
+> Dosud neměla ve frontě místo, takže její nálezy neměly kam padat.
+>
+> ⭐⭐⭐ **VŠECHNY ZDEJŠÍ POLOŽKY VZEŠLY Z JEDNÉ UŽIVATELOVY VĚTY** *(11.09.)*:
+> *„blitz mimo dosah je potřeba nechat pro možnost vyhlásit blitz pro ratogra
+> at se pohne na 2 plus"* — plus jeho pravidla *„vadu opravit ne schovat"* a
+> ⭐ *„ke každé nalezené nesrovnalosti hledej, kde by ještě mohla být vada
+> stejného principu."* To poslední je **metoda, ne poznámka**: z jedné vady
+> vypadlo dvanáct.
+>
+> ⛔ **TŘI PRINCIPY, KTERÉ SE TU OPAKUJÍ** — hledat podle NICH, ne podle jmen:
+> **(A) PHP je zastaralá kopie C++** *(C++ opraveno, PHP ne — Wild Animal,
+> gaze)*; **(B) tichá záplata schová vadu před měřením** *(`try/catch`,
+> `min(count)`, `default =>`)*; **(C) etapa věří, že předchozí uspěla**
+> *(blitz 3×)*.
+>
+> ⚠️ **SEDM STÁVAJÍCÍCH TESTŮ TYTO VADY ZAKOTVOVALO.** Byly přepsány podle
+> textu pravidel, ne obejity. Zelená sada tedy sama o sobě nic nezaručovala.
+
+| ID | co | stav |
+|---|---|---|
+| **PHP1** | **Wild Animal: Block/Blitz měl AUTO-PASS BEZ HODU.** `rules_bb2016.txt` r. 8666-8669 dává **+2, ne imunitu** — s bonusem prochází přirozená **2+**, ale přirozená **1 PADÁ**. ⇒ Rat Ogre / Minotaur byl o **šestinu** spolehlivější, než pravidla dovolují. ⚠️ **C++ tutéž vadu opravil 07.08.** (`big_guy_handler.cpp:87-93`), PHP kopie ne. | **UZAVŘENO 11.09.** — `80852863`, pozitivní kontrola: se starým kódem padá 5 testů |
+| **PHP2** | **Wild Animal: ostatní akce padaly na 1-2**, pravidla říkají **1-3** (r. 8668). Trojka procházela, ač neměla. | **UZAVŘENO 11.09.** — `80852863` |
+| **PHP3** | ⛔⛔ **Blitz mimo dosah házel `InvalidArgumentException`** (`BlitzHandler:57`). **ZMĚŘENO: 10,26 % všech rozhodnutí.** A živá cesta ho **NECHYTÁ** — `AITurnService::playTurn` nemá `try/catch` ani jednou. Spolkl ho jen simulátor (`cli/simulate.php:157`) ⇒ v korpusu nebyl vidět. ⭐ **Deklarace mimo dosah je LEGITIMNÍ TAH** (uživatel): je to jediný způsob, jak Wild Animal rozhýbat na 2+. | **UZAVŘENO 11.09.** — `80852863`; po opravě **0,03 %** |
+| **PHP4** | **Ball & Chain: akce se stavěla bez `playerId`** (`'params' => []`) ⇒ `getPlayer(0)` = null ⇒ `throw 'Player not found'`. B&C je pro takového hráče **JEDINÁ povolená akce**, takže **nejednal NIKDY** — pro ty hráče 100 %, ne 7 z 8 922. | **UZAVŘENO 11.09.** — `dd6b229c` |
+| **PHP5** | **`RandomAICoach`: `default => END_TURN`** — los na TTM / bombu / gaze / B&C ukončil celý tah týmu. Katalog turnoverů (r. 368-384) „kouč neumí typ" nezná. | **UZAVŘENO 11.09.** — `b0d01ccb` |
+| **PHP6** | **Totéž ještě 13× uvnitř `build*Action`** — builder bez cíle vracel END_TURN. ⚠️ **ZMĚŘENO PŘED TVRZENÍM: na 2 026 rozhodnutích NESEPNULO ANI JEDNOU** ⇒ latentní past, **ne aktivní vada**. | **UZAVŘENO 11.09.** — `71f8ac17`, vedeno jako latentní |
+| **PHP7** | ⛔⛔⛔ **Váhy se načítaly z KLÍČŮ objektu JSON, ne z vah.** `array_map('floatval', $data)` nad `{type, value_weights, policy_weights, policy_bias, policy_temperature}` ⇒ `$this->weights` byl **[0, 1, 1, ~0, 1]** — **5 čísel místo 73**. A `dotProduct` bere `min(count($a), count($b))` ⇒ zbytek **tiše usekne**, bez chyby. Stav se hodnotil jako `f1+f2+f4`, **celý trénink se zahazoval**. ⭐ `testFeatureCountIs70` **nebyl zastaralý test, byl to UKAZATEL téhle vady** a padal od července. | **UZAVŘENO 11.09.** — `1b26717a` |
+| **PHP8** | **Blitz: po přesunu se neověřovalo, že hráč DOŠEL.** `MoveHandler:185-190` (**Tentacles**) vrací `success` s hráčem na původním poli („Movement ends, NOT a turnover") ⇒ blok ze staré pozice ⇒ `Players must be adjacent to block`. 2 z 12 135. Vidět to nebylo, dokud se neopravilo PHP3. | **UZAVŘENO 11.09.** — `4d09069f` |
+| **PHP9** | **Neúspěšný gaze vyhlašoval TURNOVER.** r. 8188-8189: *„If the roll fails, then the hypnotic gaze **has no effect**."* Katalog turnoverů gaze **nezná**. ⚠️ C++ to má správně a **výslovně okomentované** (`gaze_handler.cpp:21,44`). | **UZAVŘENO 11.09.** — `8460a2ff` |
+| **PHP10** | **Gaze: oběť se počítala do modifikátoru.** r. 8183-8185: *„for each opposing tackle zone … **other than the victim's**"*. Gaze vyžaduje sousedství ⇒ oběť přispívala **vždycky**, práh byl systematicky o 1 vyšší. ⭐ **Našla to druhá půlka testovacího páru** — test na modifikátor sám prošel i se špatným prahem, protože tvrdil jen neúspěch. | **UZAVŘENO 11.09.** — `8460a2ff` |
+| **PHP11** | **Hand-off: turnover se vyhlašoval příliš brzy.** r. 371-373: *„not caught by any member of the moving team **before the ball comes to rest**"* + r. 376-378: *„failing a catch roll … **is by itself never a turnover**"*. `resolveCatch` míč po neúspěchu **odrazí** a odraz může skončit **u spoluhráče** — tým přesto přišel o kolo. | **UZAVŘENO 11.09.** — `a77941d8` |
+| **PHP12** | **TTM: turnover i u hráče BEZ míče.** r. 368-370: *„injured by the crowd … **is not a turnover unless it is a player … holding the ball**"*; bod 6 mluví taky jen o hráči **s míčem**. `$hadBall` byl o pár řádků výš a nepoužil se. | **UZAVŘENO 11.09.** — `a77941d8` |
+| **PHP13** | ⛔ **AUDIT #1 SÁM NENÍ OPRAVENÝ.** `GreedyAICoach::decideAction` má `$bestScore = -1` a `$bestAction = END_TURN` jako **výchozí hodnotu**; `scoreMove` navíc zahazuje tah se skóre `<= 0` a pro `throw_team_mate` **rameno vůbec není**. **ZMĚŘENO (60 her, 12 135 rozhodnutí): 0,6 % rozhodnutí, ale 3,7 % KOL**, průměr **7,19 hráče** propadlo, max **11 = celý tým**. Rozpad příčin: `move` 66,7 %, `throw_team_mate` 33,3 %. ⚠️ **Není to oprava s jediným řešením** — je volba mezi „vrátit první hratelnou akci" (jako C++ `0630f854`) a „snížit práh skóre". | **OTEVŘENO — PRVNÍ NA ŘADĚ** |
+| **PHP14** | **Prohlídka turnoverů je HOTOVÁ ZE 7 z 30 míst.** Zbývá **23**: `PassResolver` **8**, `BlockHandler` **6**, `MoveHandler` **5**, `RerollHandler` **4**. ⚠️ Ze sedmi prohlédnutých byly **tři vadné (43 %)** ⇒ čekat další. Postup: každé místo proti uzavřenému katalogu r. 368-384. | **OTEVŘENO — VYSOKÁ**, levné a vysoká výtěžnost |
+| **PHP15** | **Big-guy vrstva je za C++ o čtyři věci** *(tentýž drift jako PHP1/PHP9)*: **(a)** `wastesTeamAction` chybí u **všech čtyř** dovedností — pravidla říkají *„the player's team **loses the declared Action** for that turn"* (r. 8398-8401); **(b)** perzistence stavu (`bigGuyStupefied`, `rooted`) — dnes se stav nedrží, takže příště hráč zase normálně chodí; **(c)** Really Stupid: soused musí **STÁT** a **nesmí být sám Really Stupid** (r. 8393-8395) — `hasAdjacentTeammate` nekontroluje **ani jedno**, takže se dva Really Stupid navzájem podpírají; **(d)** celý **přepis Take Root** z 24.08. (hod na **každou** deklarovanou akci, ne jen MOVE; zakořenění **přetrvává**; blok/pass/hand-off/foul jsou **dovolené**; vstávání zakořenění nebrání). | **OTEVŘENO — VYSOKÁ** |
+| **PHP16** | **`policy_weights` se vůbec nečtou.** `weights.json` má `value_weights` = **70 NUL** (netrénované) a `policy_weights` = **85 hodnot, 82 nenulových**. Trénink v tom souboru **je**, ale v hlavě, kterou PHP nepoužívá. ⇒ I po opravě PHP7 hodnotí `evaluateState` **vždy 0**. **Není to oprava, je to rozhodnutí** — buď číst policy hlavu, nebo přetrénovat value hlavu, nebo uznat, že AI má jet na heuristikách. | **OTEVŘENO — ČEKÁ NA ROZHODNUTÍ UŽIVATELE** |
+| **PHP17** | **`hand_off: Players must be on pitch`** — 1 výskyt z 12 135, neprošetřeno. Třída (C): etapa věří, že předchozí uspěla. | **OTEVŘENO — NÍZKÁ** |
+| **PHP18** | **Turnoverem končí 70-95 % kol** *(greedy 77,0 % · random 88,0 % · learning 94,8 %)* proti C++ **0,46 na kolo**. ⚠️ Ta tři čísla **NEJSOU srovnatelná mezi sebou** — každý kouč běžel proti jinému stavu kódu. Rozpad příčin (greedy): `move->player_fell` 27,3 %, `blitz->player_fell` 17,8 %, `move->ball_bounce` 13,7 % *(spadlé zvednutí míče)*, `block->armour_roll` 11,3 %. ⚠️ To, že je vysoký i u **random**, mluví spíš proti „slabý kouč". **PHP14 a PHP15 to můžou z velké části vysvětlit** — proto se měří AŽ PO NICH. | **OTEVŘENO — BLOKOVÁNO PHP14 + PHP15** |
+| **PHP19** | ⛔ **`AITurnService::playTurn` nemá `try/catch` ani jednou** (`grep -c` = 0), volán z `GameOrchestrator.php:122`. Jakákoli výjimka z resolveru letí do živé hry. ⭐ **Uživatel 11.09.: „vadu opravit ne schovat"** ⇒ záplata se **SCHVÁLNĚ NEDĚLÁ**, je to týž princip, který tu vadu měsíc schovával v simulátoru. Vedeno jako **STAV K VĚDOMÍ**, ne jako úkol. | **ZAMÍTNUTO jako úkol** — rozhodnutí uživatele 11.09. |
+
+⭐ **MĚŘIDLO:** `cli/diag_ai_endturn_20260911.php` (všichni tři kouči, jedno
+měřidlo, měří **zvenčí** bez sahání do produkce). Samo si našlo **dvě vlastní
+vady**: chybějící jmenovatel *(kola ukončená TD a poločasem propadala —
+14,7 kola na zápas místo 32)* a **záporný zbytek −4** *(konce se účtovaly
+jinde než kola)*. ⇒ **Zbytek se tiskne vždycky; záporný zbytek prozradí
+chybu hned.**
