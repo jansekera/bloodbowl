@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\AI;
 
 use App\DTO\GameState;
+use App\DTO\MatchPlayerDTO;
 use App\Engine\RulesEngine;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
@@ -65,6 +66,17 @@ final class LearningAICoach implements AICoachInterface
     /** A jde pro nej hrac, ktery ho udrzi -- runner nebo thrower. */
     private const PICKUP_SPECIALIST_BONUS = 1.0;
     /**
+     * ⛔⛔ NEUSPESNE ZVEDNUTI JE TURNOVER. Merenim 12.09. vyslo, ze kouc pro
+     * mic jde v 56 z 56 pripadu -- rozhodovani je v poradku. Mic presto lezi
+     * volne v 71 kolech z 245, protoze se zvednuti NEDARI: je to hod na
+     * obratnost a u AG 2 vychazi na 33 %.
+     * ⇒ Cena selhani se musi zapocitat stejne jako u dodge: pokuta podle
+     * SANCE TOHO, KDO zvedá. Tim se mezi dvema kandidaty vybere ten lepsi.
+     */
+    private const PICKUP_FAIL_WEIGHT = 4.0;
+
+    private readonly \App\Engine\BallResolver $ballResolver;
+    /**
      * ⛔⛔ RIZIKO SE MUSI OCENOVAT PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026).
      * Uzivatel: "proc trpaslik dela dodge? to nema delat -- je to trpaslik."
      * Do ted tu bylo `dodges * 0.15 + gfis * 0.08`, tedy PAUSAL: dodge za 33 %
@@ -115,6 +127,12 @@ final class LearningAICoach implements AICoachInterface
     public function __construct(?string $weightsFile = null, float $epsilon = 0.0)
     {
         $this->epsilon = $epsilon;
+        // ⛔ Jen kvuli `getPickupTarget()` -- kostkou se tady nikdy nehazi.
+        $this->ballResolver = new \App\Engine\BallResolver(
+            new \App\Engine\RandomDiceRoller(),
+            new \App\Engine\TacklezoneCalculator(),
+            new \App\Engine\ScatterCalculator(),
+        );
 
         if ($weightsFile !== null && file_exists($weightsFile)) {
             $json = file_get_contents($weightsFile);
@@ -225,6 +243,26 @@ final class LearningAICoach implements AICoachInterface
         }
 
         return $min === PHP_INT_MAX ? 0 : max(0, $min);
+    }
+
+    /**
+     * Sance (0-1), ze TENHLE hrac zvedne mic na danem poli.
+     *
+     * ⭐ Prah se NEPOCITA znovu -- bere se `BallResolver::getPickupTarget()`,
+     *    tedy tataz funkce, kterou pak pouzije engine. Hrac se pro vypocet
+     *    postavi na pole s micem, aby sedely zony zachyceni.
+     * ⭐ Sure Hands dava opakovani hodu, takze sance je 1-(1-p)^2.
+     */
+    private function pickupChance(GameState $state, MatchPlayerDTO $player, Position $ballPos): float
+    {
+        $naMici = $player->withPosition($ballPos);
+        $prah = $this->ballResolver->getPickupTarget($state, $naMici);
+        $p = max(0.0, min(1.0, (7 - $prah) / 6));
+        if ($player->hasSkill(SkillName::SureHands)) {
+            $p = 1 - (1 - $p) ** 2;
+        }
+
+        return $p;
     }
 
     /** Nosic vlastniho tymu, nebo `null`. */
@@ -591,6 +629,10 @@ final class LearningAICoach implements AICoachInterface
                             break;
                         }
                     }
+                    // ⛔ Cena selhani: neuspesne zvednuti = turnover.
+                    $sanceZvednuti = $this->pickupChance($state, $player, $ballPos);
+                    $score -= (1 - $sanceZvednuti) * self::PICKUP_FAIL_WEIGHT;
+
                     if (!$uMiceStojiSouper) {
                         $score += self::PICKUP_UNCONTESTED_BONUS;
 

@@ -306,4 +306,35 @@ final class CageFormationTest extends TestCase
             sprintf('kouč zaujal roh (%d,%d), který má soupeře vedle sebe',
                 $decision['params']['x'], $decision['params']['y']));
     }
+
+    public function testBallIsPickedUpByTheBetterAgilityPlayer(): void
+    {
+        // ⛔⛔ Měřením 12.09. vyšlo, že kouč pro míč jde v 56 z 56 případů --
+        //    rozhodování bylo v pořádku. Míč přesto ležel volně v 71 kolech
+        //    z 245, protože se zvednutí NEDAŘILO: je to hod na obratnost
+        //    a u AG 2 vychází na 33 %. Cena selhání je přitom turnover.
+        //    ⇒ Mezi dvěma kandidáty musí jít ten, kdo má lepší šanci.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 11, 7, movement: 6, agility: 2, id: 1)
+            ->addPlayer(TeamSide::HOME, 15, 7, movement: 6, agility: 4, id: 2)
+            ->addPlayer(TeamSide::AWAY, 24, 1, id: 3)
+            ->withBallOnGround(13, 7)
+            ->build();
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA: na míč dosáhnou OBA, jinak by volba nic neznamenala.
+        foreach ([1, 2] as $id) {
+            $cile = array_filter($rules->getValidMoveTargets($state, $id),
+                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7);
+            $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} na míč nedosáhne");
+        }
+
+        $decision = (new LearningAICoach())->decideAction($state, $rules);
+
+        $this->assertSame(2, $decision['params']['playerId'],
+            'pro míč šel hráč s AG 2 (33 %) místo hráče s AG 4 (67 %)');
+        $this->assertSame(13, $decision['params']['x']);
+        $this->assertSame(7, $decision['params']['y']);
+    }
 }
