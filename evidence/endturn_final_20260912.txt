@@ -1,0 +1,52 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+
+KOUČ: learning   KORPUS: 30 her, seed 20260911
+
+ROZHODNUTÍ CELKEM (jmenovatel)                   9769
+  vrátil normální akci                           9432   96.6 %
+  ⛔ END_TURN, PŘESTOŽE BYLO CO HRÁT                3    0.0 %   <- VADA
+  END_TURN právem (nabídka prázdná)               334    3.4 %
+  ZBYTEK (musí být 0)                               0
+
+KOLA: 887 celkem, z toho 3 (0.3 %) skončilo touhle vadou
+  JAK KOLA KONČÍ (kontrola, že se do té větve vůbec chodí):
+    turnoverem                                    550   62.0 %
+    rozhodnutím END_TURN                          324   36.5 %
+    pojistkou (>50 akcí v kole)                     0    0.0 %
+    JINAK (touchdown / poločas / konec hry)        13    1.5 %   <- tenhle koš dřív CHYBĚL
+    ZBYTEK (musí být 0)                             0
+    kol na zápas: 29.6   (celý zápas má 32 -- kontrola jmenovatele)
+
+ZTRACENÉ AKTIVACE (hráči, kteří ještě mohli jednat): celkem 17
+  průměr na jednu vadu 5.67 hráče
+     4 hráčů propadlo        2   66.7 %
+     9 hráčů propadlo        1   33.3 %
+
+⛔⛔ VÝJIMKY Z RESOLVERU (živá hra `AITurnService` je NECHYTÁ):  1 = 0.01 % rozhodnutí
+    blitz: Players must be on pitch                                 1
+
+⭐ ČÍM JSOU TY TURNOVERY (akce -> poslední událost):  564 celkem
+    block -> armour_roll                              162   28.7 %
+    blitz -> armour_roll                              123   21.8 %
+    block -> injury_roll                               75   13.3 %
+    move -> armour_roll                                62   11.0 %
+    move -> ball_bounce                                34    6.0 %
+    blitz -> injury_roll                               21    3.7 %
+    hand_off -> ball_bounce                            20    3.5 %
+    move -> injury_roll                                19    3.4 %
+    move -> bloodlust_fail                             11    2.0 %
+    pass -> throw_in                                    8    1.4 %
+    block -> ball_bounce                                5    0.9 %
+    blitz -> bloodlust_fail                             4    0.7 %
+    ... a dalších 9 druhů
+
+⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):
+    stand_pat           3  100.0 % vad     (nejvíc naráz 9)
+    throw_team_mate      3  100.0 % vad     (nejvíc naráz 2)

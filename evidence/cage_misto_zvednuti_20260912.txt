@@ -7,3 +7,25 @@ POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
     [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"cisty":2,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":2}
   ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.
 
+KOUČ: learning   KORPUS: 6 her, seed 20260912, rostery: dev
+
+KOLA CELKEM (jmenovatel)                    185
+  bez nosiče                                136
+     z toho míč drží SOUPEŘ                  53   (normální stav, ne vada)
+     ⛔ z toho míč VOLNÝ na hřišti            71   (nikdo ho nezvedl)
+        ⛔⛔ a NĚKDO na něj dosáhl             56   <- rozhodnutí kouče, ne vzdálenost
+        jen daleko (nikdo nedosáhl)          15
+
+⭐ CO KOUČ ZVOLIL JAKO PRVNÍ, KDYŽ MĚL MÍČ V DOSAHU (56 kol):
+    ✅ přece jen šel pro míč                56
+    ZBYTEK (musí být 0)                     0
+     míč mimo hru (po TD / před výkopem)     12
+  nosič bez klece na startu                  43
+  ⚠️ nosič u lajny (rohy nejsou 4)             2   <- NEPOČÍTÁ SE ZA ÚSPĚCH
+  ⭐ klec na startu (4 naše rohy)              4
+  ZBYTEK (musí být 0)                         0
+
+Z KOL, KTERÁ ZAČALA S KLECÍ (4):
+  ✅ všechny čtyři rohy ČISTÉ                 0     0.0 %
+  ⛔ aspoň jeden roh není čistý               4   100.0 %
+  posun nosiče: průměr 6.67 pole, maximum 8

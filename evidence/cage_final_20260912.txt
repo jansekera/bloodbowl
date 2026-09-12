@@ -1,0 +1,33 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí přečíst ČISTOU klec (4 čisté rohy): {"cisty":4,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] rozliší roh vzatý soupeřem od prázdného: {"cisty":2,"spinavy":0,"souper":1,"prazdny":1,"na_hristi":4}
+    [OK ] najde ŠPINAVÝ roh (náš hráč, ale soupeř vedle): {"cisty":3,"spinavy":1,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"cisty":2,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":2}
+  ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.
+
+KOUČ: learning   KORPUS: 10 her, seed 20260912, rostery: dev
+
+KOLA CELKEM (jmenovatel)                    303
+  bez nosiče                                219
+     z toho míč drží SOUPEŘ                  93   (normální stav, ne vada)
+     ⛔ z toho míč VOLNÝ na hřišti           104   (nikdo ho nezvedl)
+        ⛔⛔ a NĚKDO na něj dosáhl             82   <- rozhodnutí kouče, ne vzdálenost
+        jen daleko (nikdo nedosáhl)          22
+
+⭐ CO KOUČ ZVOLIL JAKO PRVNÍ, KDYŽ MĚL MÍČ V DOSAHU (82 kol):
+    ✅ přece jen šel pro míč                71
+    move (jinam)                          8
+    move (blíž k míči)                3
+    ZBYTEK (musí být 0)                     0
+     míč mimo hru (po TD / před výkopem)     22
+  nosič bez klece na startu                  72
+  ⚠️ nosič u lajny (rohy nejsou 4)             1   <- NEPOČÍTÁ SE ZA ÚSPĚCH
+  ⭐ klec na startu (4 naše rohy)             11
+  ZBYTEK (musí být 0)                         0
+
+Z KOL, KTERÁ ZAČALA S KLECÍ (11):
+  ✅ všechny čtyři rohy ČISTÉ                 1     9.1 %
+  ⛔ aspoň jeden roh není čistý              10    90.9 %
+  posun nosiče: průměr 6.00 pole, maximum 7
