@@ -80,8 +80,12 @@ final class CagePlaybookTest extends TestCase
             ->addPlayer(TeamSide::HOME, 4, 10, movement: 6, id: 3)
             ->addPlayer(TeamSide::HOME, 3, 6, movement: 6, id: 4)
             ->addPlayer(TeamSide::HOME, 3, 8, movement: 6, id: 5)
-            ->addPlayer(TeamSide::AWAY, 20, 5, id: 6)
-            ->addPlayer(TeamSide::AWAY, 20, 9, id: 7)
+            // ⭐ Soupeři musí být V DOSAHU, jinak podle uživatele (12.09.)
+            //    má přednost běh s míčem: "když jsou soupeři daleko, má přednost
+            //    běh s míčem kupředu co nejrychleji". Klec se staví proti
+            //    hrozbě, ne do prázdna.
+            ->addPlayer(TeamSide::AWAY, 12, 5, movement: 6, id: 6)
+            ->addPlayer(TeamSide::AWAY, 12, 9, movement: 6, id: 7)
             ->withBallCarried(1)
             ->build();
 
@@ -103,8 +107,10 @@ final class CagePlaybookTest extends TestCase
             ->addPlayer(TeamSide::HOME, 8, 6, movement: 6, id: 3)
             ->addPlayer(TeamSide::HOME, 6, 8, movement: 6, id: 4)
             ->addPlayer(TeamSide::HOME, 8, 8, movement: 6, id: 5)
-            ->addPlayer(TeamSide::AWAY, 20, 5, id: 6)
-            ->addPlayer(TeamSide::AWAY, 20, 9, id: 7)
+            // ⭐ Jeden soupeř ve středu: je v dosahu (klec tedy drží pohromadě),
+            //    ale po stranách zůstává čistý prostor, kam se dá posunout --
+            //    uživatel 12.09.: "posun kupředu a i do boku".
+            ->addPlayer(TeamSide::AWAY, 13, 7, movement: 6, id: 6)
             ->withBallCarried(1)
             ->build();
 

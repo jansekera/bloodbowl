@@ -872,7 +872,13 @@ final class LearningAICoach implements AICoachInterface
                 //   pred zonu az ve chvili, kdy uz nezbyva kolo na TD.
                 $vyrazitSam = $this->musiVyrazitSam($state, $side, $player);
 
-                if ($currentPos !== null && !$vyrazitSam) {
+                // ⭐⭐ UZIVATEL 12.09.: "kdyz jsou souperi daleko, ma prednost
+                //   beh s micem kupredu co nejrychleji -- cil je dosahnout
+                //   s micem TD ... cokoliv nam pomuze se posunout BEZ OHROZENI,
+                //   se hodi." ⇒ Kdyz na cilove pole nedosahne ani nejblizsi
+                //   stojici souper (jeho MA + 2 GFI), neni pred cim klec drzet.
+                if ($currentPos !== null && !$vyrazitSam
+                    && !$this->souperNedosahne($state, $side, new Position($target['x'], $target['y']))) {
                     $rohovi = $this->cornerPlayers($state, $side, $currentPos, $playerId);
                     // ⛔⛔ NAPRED SESTAVIT, PAK HNOUT (uzivatel 12.09.).
                     //   Kdyz klec JESTE nestoji, nosic nema kam spechat:
