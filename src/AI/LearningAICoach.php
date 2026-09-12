@@ -563,6 +563,37 @@ final class LearningAICoach implements AICoachInterface
         TeamSide $side,
         float $baseScore,
     ): ?array {
+        // ⛔⛔ NOSIC NEBLOKUJE A NEBLITZUJE (uzivatel 12.09.: "nosic nesmi
+        //   blitzovat ani jit vedle soupere -- na blitz mame mit lepsi
+        //   kandidaty a asistenty"). Blok i blitz ho postavi k souperi,
+        //   riskuji jeho srazeni s micem a jeste utrati tymovy blitz,
+        //   ktery ma udelat nekdo s asistenci.
+        //   Naměřeno v `CagePlaybookTest`: nosic blitzoval uprostred
+        //   sestavovani klece.
+        $ball = $state->getBall();
+        $jeNosic = $ball->isHeld() && $ball->getCarrierId() === $playerId;
+        if ($jeNosic && in_array($type, [
+            ActionType::BLOCK, ActionType::BLITZ, ActionType::MULTIPLE_BLOCK,
+            ActionType::FOUL,
+        ], true)) {
+            return null;
+        }
+
+        // ⛔⛔ A UVNITR STOJICI KLECE SE MIC NEPREDAVA. `CagePlaybookTest`
+        //   ukazal, ze kouc klec poctive postavil a pak ji jednim `hand_off`
+        //   rozbil: nosicem se stal rohovy hrac a rohy jsou kolem nej jinde.
+        //   Mimo klec prihravka smysl ma, proto se zakazuje jen tehdy,
+        //   kdyz klec opravdu stoji.
+        if ($jeNosic && in_array($type, [
+            ActionType::HAND_OFF, ActionType::PASS, ActionType::THROW_TEAM_MATE,
+        ], true)) {
+            $mojePos = $state->getPlayer($playerId)?->getPosition();
+            if ($mojePos !== null
+                && count($this->cornerPlayers($state, $side, $mojePos, $playerId)) >= self::CAGE_MIN_CORNERS) {
+                return null;
+            }
+        }
+
         return match ($type) {
             ActionType::MOVE => $this->buildMoveAction($state, $rules, $playerId, $side),
             ActionType::BLOCK => $this->buildBlockAction($state, $rules, $playerId, $side, $baseScore),
@@ -776,6 +807,30 @@ final class LearningAICoach implements AICoachInterface
 
                 if ($currentPos !== null) {
                     $rohovi = $this->cornerPlayers($state, $side, $currentPos, $playerId);
+                    // ⛔⛔ NAPRED SESTAVIT, PAK HNOUT (uzivatel 12.09.).
+                    //   Kdyz klec JESTE nestoji, nosic nema kam spechat:
+                    //   `CagePlaybookTest` ukazal, ze vyrazil o SEST poli
+                    //   a posadka pak skladala klec kolem mista, kam dobehl.
+                    //   Bez klece je tedy strop JEDNO pole, s kleci strop
+                    //   nejpomalejsiho z ni.
+                    if (count($rohovi) < self::CAGE_MIN_CORNERS) {
+                        // ⛔ Cekat ma smysl jen tehdy, kdyz MA KDO prijit.
+                        //   Nosic bez spoluhracu na hristi neni klec, kterou
+                        //   by bylo mozne sestavit -- ten at bezi.
+                        $posadka = 0;
+                        foreach ($state->getPlayersOnPitch($side) as $spolu) {
+                            if ($spolu->getId() !== $playerId) {
+                                $posadka++;
+                            }
+                        }
+                        if ($posadka >= self::CAGE_MIN_CORNERS) {
+                            $krok = max(abs($target['x'] - $currentPos->getX()),
+                                        abs($target['y'] - $currentPos->getY()));
+                            if ($krok > 1) {
+                                $score -= ($krok - 1) * self::CAGE_OUTRUN_PENALTY;
+                            }
+                        }
+                    }
                     if (count($rohovi) >= self::CAGE_MIN_CORNERS) {
                         // ⭐ UPRESNENO UZIVATELEM 12.09.: "max pohyb klece podle
                         //   NEJMENSIHO MA ze vsech peti." Klec se posouva cela,

@@ -92,4 +92,34 @@ final class CagePlaybookTest extends TestCase
         $this->assertSame(4, $this->cisteRohy($po),
             'na prázdné vlastní polovině se klec nesestavila ani za celé kolo');
     }
+
+    public function testCageMovesAsAWholeInTheSecondTurn(): void
+    {
+        // ⭐⭐ Druhá půlka zadání: "ve druhém kole s ní pohnout kupředu".
+        //    Klec už stojí; po odehrání kola musí stát ZASE CELÁ a jinde.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 7, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 6, movement: 6, id: 2)
+            ->addPlayer(TeamSide::HOME, 8, 6, movement: 6, id: 3)
+            ->addPlayer(TeamSide::HOME, 6, 8, movement: 6, id: 4)
+            ->addPlayer(TeamSide::HOME, 8, 8, movement: 6, id: 5)
+            ->addPlayer(TeamSide::AWAY, 20, 5, id: 6)
+            ->addPlayer(TeamSide::AWAY, 20, 9, id: 7)
+            ->withBallCarried(1)
+            ->build();
+
+        $this->assertSame(4, $this->cisteRohy($state), 'fixtura: klec má stát už na začátku');
+        $pred = $state->getPlayer(1)->getPosition();
+
+        $po = $this->odehrajKolo($state);
+
+        $this->assertSame(4, $this->cisteRohy($po),
+            'klec se při posunu rozpadla -- nezůstaly čtyři čisté rohy');
+
+        $ball = $po->getBall();
+        $nosic = $ball->getCarrierId() !== null ? $po->getPlayer($ball->getCarrierId()) : null;
+        $this->assertNotNull($nosic?->getPosition());
+        $this->assertGreaterThanOrEqual(1, $nosic->getPosition()->distanceTo($pred),
+            'klec stojí, ale vůbec se nehnula');
+    }
 }
