@@ -214,7 +214,7 @@ for ($g = 0; $g < $games; $g++) {
 
     $total = 0; $turnActions = 0; $klic = null; $start = null;
 
-    $uzavri = static function (?array $start, GameState $state) use (&$st, &$posun, &$spinavost): void {
+    $uzavri = static function (?array $start, GameState $state) use (&$st, &$posun, &$spinavost, &$klecCela, &$klecCelaAPosun): void {
         if ($start === null) { return; }
         $st['kola']++;
         if ($start['typ'] !== 'klec') { $st[$start['typ']]++; return; }
