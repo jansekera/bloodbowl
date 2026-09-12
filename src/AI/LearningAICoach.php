@@ -44,6 +44,17 @@ final class LearningAICoach implements AICoachInterface
      * a sem se nedostane).
      */
     private const CARRIER_NEXT_TO_ENEMY_PENALTY = 5.0;
+    /**
+     * ⭐⭐ Uzivatel 12.09.: "pokud je mic na zemi a nejsou kolem souperi --
+     * musi runner nebo thrower k mici a zvednout = nejen v prvnim kole,
+     * NEJ PRIORITA."
+     * ⇒ Volny mic bez soupere v okoli je nejlepsi vec, ktera se da udelat:
+     * nikdo o nej nesoupeu a tym z nej ma cely zbytek tahu. Bonus je proto
+     * vyssi nez cokoli krome touchdownu.
+     */
+    private const PICKUP_UNCONTESTED_BONUS = 4.0;
+    /** A jde pro nej hrac, ktery ho udrzi -- runner nebo thrower. */
+    private const PICKUP_SPECIALIST_BONUS = 1.0;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -524,6 +535,34 @@ final class LearningAICoach implements AICoachInterface
                 $ballPos = $ball->getPosition();
                 if ($ballPos !== null && $target['x'] === $ballPos->getX() && $target['y'] === $ballPos->getY()) {
                     $score = 5.0 - $riskPenalty;
+
+                    // ⭐⭐ NEJVYSSI PRIORITA: mic lezi volne a NIKDO SOUPERUV
+                    //   u nej nestoji. Pak se pro nej jde vzdycky, ne jen
+                    //   v prvnim kole -- nikdo o nej nesouperi a tym z nej ma
+                    //   cely zbytek tahu.
+                    $uMiceStojiSouper = false;
+                    foreach ($state->getPlayersOnPitch($side->opponent()) as $nepritel) {
+                        if ($nepritel->getState() !== PlayerState::STANDING) {
+                            continue;
+                        }
+                        $np = $nepritel->getPosition();
+                        if ($np !== null && $np->distanceTo($ballPos) <= 1) {
+                            $uMiceStojiSouper = true;
+                            break;
+                        }
+                    }
+                    if (!$uMiceStojiSouper) {
+                        $score += self::PICKUP_UNCONTESTED_BONUS;
+
+                        // ⭐ A jde pro nej ten, kdo ho udrzi: runner nebo
+                        //   thrower (nebo kdokoli se Sure Hands).
+                        $pojmenovani = strtolower($player->getPositionalName());
+                        if ($player->hasSkill(SkillName::SureHands)
+                            || str_contains($pojmenovani, 'runner')
+                            || str_contains($pojmenovani, 'thrower')) {
+                            $score += self::PICKUP_SPECIALIST_BONUS;
+                        }
+                    }
                     if ($score > $bestScore) {
                         $bestScore = $score;
                         $bestTarget = $target;

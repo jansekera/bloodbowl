@@ -197,4 +197,39 @@ final class CageFormationTest extends TestCase
         $this->assertSame(13, $decision['params']['x'], 'nešel pro míč');
         $this->assertSame(8, $decision['params']['y'], 'nešel pro míč');
     }
+
+    public function testUncontestedBallIsPickedUpByTheSpecialist(): void
+    {
+        // ⭐⭐ Uživatel 12.09.: „pokud je míč na zemi a nejsou kolem soupeři —
+        //    musí runner nebo thrower k míči a zvednout = nejen v prvním kole,
+        //    nej priorita." A důvod dodal taky: *„dokud neneseme míč, nemůžeme
+        //    dát TD."*
+        //    Oba hráči na míč dosáhnou stejně; jeden má Sure Hands, tedy je to
+        //    ten, kdo míč udrží. (Positional name builder nastavit neumí,
+        //    proto se tu testuje ta větev přes dovednost.)
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 11, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 15, 7, movement: 6, id: 2,
+                        skills: [\App\Enum\SkillName::SureHands])
+            ->addPlayer(TeamSide::AWAY, 24, 1, id: 3)
+            ->withBallOnGround(13, 7)
+            ->build();
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA: na míč dosáhnou OBA, jinak by volba nic neznamenala.
+        foreach ([1, 2] as $id) {
+            $cile = array_filter($rules->getValidMoveTargets($state, $id),
+                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7);
+            $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} na míč nedosáhne");
+        }
+
+        $decision = (new LearningAICoach())->decideAction($state, $rules);
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $this->assertSame(2, $decision['params']['playerId'],
+            'pro nekrytý míč šel někdo jiný než specialista');
+        $this->assertSame(13, $decision['params']['x']);
+        $this->assertSame(7, $decision['params']['y']);
+    }
 }
