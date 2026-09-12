@@ -173,4 +173,28 @@ final class CageFormationTest extends TestCase
             sprintf('nosič skončil na (%d,%d), tedy vedle soupeře',
                 $decision['params']['x'], $decision['params']['y']));
     }
+
+    public function testPickingUpTheBallBeatsAnyRiskFreeMove(): void
+    {
+        // ⭐ Uživatel 12.09.: „dej prioritu tahu zvednutí míče před ostatními
+        //    pohyby bez rizika." Míč leží volně; hráč 2 na něj dosáhne, a
+        //    zároveň by mohl bez rizika zaujmout roh u spoluhráče. Zvednutí
+        //    musí vyhrát — bez míče není co vozit v kleci.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 12, 7, movement: 6, id: 2)
+            ->addPlayer(TeamSide::AWAY, 24, 1, id: 3)
+            ->withBallOnGround(13, 8)
+            ->build();
+        $state = $state->withPlayer(
+            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+        );
+
+        $rules = new RulesEngine();
+        $decision = (new LearningAICoach())->decideAction($state, $rules);
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $this->assertSame(13, $decision['params']['x'], 'nešel pro míč');
+        $this->assertSame(8, $decision['params']['y'], 'nešel pro míč');
+    }
 }

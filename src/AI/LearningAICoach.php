@@ -15,8 +15,13 @@ final class LearningAICoach implements AICoachInterface
 {
     /** ⭐ PHP33: obsazeny ROH klece. */
     private const CAGE_CORNER_BONUS = 1.5;
-    /** Hrana klece -- lepsi nez nic, ale nesmi prebit roh. */
-    private const CAGE_EDGE_BONUS = 0.2;
+    /**
+     * ⭐ PRITAZLIVOST KLECE: hrac, ktery na roh v tomhle kole nedosahne, ma
+     * mit duvod se k nemu PRIBLIZIT. Bez toho ho tam netahne nic -- bonus
+     * dostaval jen za pole, ktere rohem UZ JE, takze posadka klece stala.
+     * Klesa se vzdalenosti a nikdy neprebije samotny roh.
+     */
+    private const CAGE_APPROACH_BONUS = 1.0;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
@@ -623,10 +628,21 @@ final class LearningAICoach implements AICoachInterface
                     $pos = new Position($target['x'], $target['y']);
                     if (self::isCageCorner($carrierPos, $pos)) {
                         $score += self::CAGE_CORNER_BONUS;
-                    } elseif ($carrierPos->distanceTo($pos) === 1) {
-                        // Hrana je porad lepsi nez nic (telo mezi soupere
-                        // a nosice), ale nesmi konkurovat rohu.
-                        $score += self::CAGE_EDGE_BONUS;
+                    } else {
+                        // ⭐ Cim bliz k nejblizsimu rohu, tim lip -- aby se
+                        //   posadka klece scházela i pres vic kol. Na roh
+                        //   (vzdalenost 0) se sem uz nedojde, ten ma vetev vys.
+                        $doRohu = PHP_INT_MAX;
+                        foreach ([[-1, -1], [1, -1], [-1, 1], [1, 1]] as [$dx, $dy]) {
+                            $roh = new Position($carrierPos->getX() + $dx, $carrierPos->getY() + $dy);
+                            if (!$roh->isOnPitch()) {
+                                continue;
+                            }
+                            $doRohu = min($doRohu, $roh->distanceTo($pos));
+                        }
+                        if ($doRohu !== PHP_INT_MAX) {
+                            $score += self::CAGE_APPROACH_BONUS / (1 + $doRohu);
+                        }
                     }
                 }
             }
