@@ -198,7 +198,10 @@ final class Phase12SkillsTest extends TestCase
 
     public function testKickMinimumOne(): void
     {
-        // D6=1, with Kick: ceil(1/2) = 1
+        // ⛔ PREPSANO 12.09.2026 (PHP32): tenhle test ZAKOTVOVAL VADU --
+        //    tvrdil `ceil(1/2) = 1`. Pravidla r. 8205-8213 rikaji opak:
+        //    "halve the number of squares ... ROUNDING ANY FRACTIONS DOWN
+        //    (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)." Hod 1 tedy dava 0.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::AWAY, 15, 7, skills: [SkillName::Kick], id: 1)
             ->addPlayer(TeamSide::HOME, 5, 7, id: 2)
@@ -206,7 +209,7 @@ final class Phase12SkillsTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // D8=1, D6=1 → Kick: ceil(1/2)=1
+        // D8=1, D6=1 → Kick: intdiv(1,2) = 0 (r. 8213: "1 = 0")
         // Kickoff table: 4+4=8 (Changing Weather), weather: 3+4 (Nice)
         // Ball bounce: D8=1
         $dice = new FixedDiceRoller([1, 1, 4, 4, 3, 4, 1]);
@@ -225,7 +228,54 @@ final class Phase12SkillsTest extends TestCase
             }
         }
         $this->assertNotNull($kickEvent);
-        $this->assertEquals(1, $kickEvent->getData()['reducedDistance']);
+        $this->assertEquals(0, $kickEvent->getData()['reducedDistance'],
+            'r. 8213 rika "1 = 0" -- zaokrouhluje se DOLU');
+    }
+
+    public function testKickInWideZoneDoesNotCount(): void
+    {
+        // ⭐ r. 8207-8210: "The player may not be set up in either wide zone
+        //    or on the line of scrimmage." Do 12.09. stacilo byt kdekoli
+        //    na hristi a stat -- kopalo se pak presneji, nez pravidla dovoluji.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 15, 1, skills: [SkillName::Kick], id: 1)  // y=1 => siroky pas
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 2)
+            ->withPhase(GamePhase::SETUP)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([1, 1, 4, 4, 3, 4, 1, 1, 1]);
+        $scatterCalc = new ScatterCalculator();
+        $kickoffResolver = new KickoffResolver($dice, $scatterCalc,
+            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc));
+
+        $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
+
+        $typy = array_map(static fn($e) => $e->getType(), $result['events']);
+        $this->assertNotContains('kick_skill', $typy,
+            'hrac s Kick stal v sirokem pasu, dovednost se pouzit nesmela');
+    }
+
+    public function testKickOnLineOfScrimmageDoesNotCount(): void
+    {
+        // ⭐ Druha polovina teze podminky: lajna. Pro AWAY je to x=13.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 13, 7, skills: [SkillName::Kick], id: 1)
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 2)
+            ->withPhase(GamePhase::SETUP)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([1, 1, 4, 4, 3, 4, 1, 1, 1]);
+        $scatterCalc = new ScatterCalculator();
+        $kickoffResolver = new KickoffResolver($dice, $scatterCalc,
+            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc));
+
+        $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
+
+        $typy = array_map(static fn($e) => $e->getType(), $result['events']);
+        $this->assertNotContains('kick_skill', $typy,
+            'hrac s Kick stal na lajne, dovednost se pouzit nesmela');
     }
 
     public function testLeaderPlusOneReroll(): void

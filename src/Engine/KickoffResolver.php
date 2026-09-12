@@ -38,9 +38,19 @@ final class KickoffResolver
         // Kick skill: halve scatter distance (round up)
         $events = [];
         $kickingTeamSide = $state->getKickingTeam() ?? TeamSide::AWAY;
+        // ⛔⛔ OPRAVA 12.09.2026 (PHP32) -- Kick byl spatne DVEMA zpusoby.
+        //   `rules_bb2016.txt` r. 8205-8213:
+        //   (1) ZAOKROUHLOVANI: "halve the number of squares that the ball
+        //       scatters on kick-off, ROUNDING ANY FRACTIONS DOWN (i.e.,
+        //       1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)." Puvodne tu bylo `ceil`,
+        //       tedy nahoru -- z hodu 1 vychazelo 1 misto 0 a z 5 tri misto dvou.
+        //   (2) KDE SMI HRAC STAT: "the player must be set up on the pitch
+        //       when his team kicks off. The player MAY NOT BE SET UP IN
+        //       EITHER WIDE ZONE OR ON THE LINE OF SCRIMMAGE." Puvodne stacilo
+        //       byt kdekoli na hristi a stat.
         if ($this->hasKickPlayer($state, $kickingTeamSide)) {
             $originalD6 = $d6;
-            $d6 = (int) ceil($d6 / 2);
+            $d6 = intdiv($d6, 2);
             $events[] = GameEvent::kickSkill(0, $originalD6, $d6);
         }
 
@@ -591,9 +601,21 @@ final class KickoffResolver
     private function hasKickPlayer(GameState $state, TeamSide $side): bool
     {
         foreach ($state->getPlayersOnPitch($side) as $player) {
-            if ($player->hasSkill(SkillName::Kick) && $player->getState() === PlayerState::STANDING) {
-                return true;
+            if (!$player->hasSkill(SkillName::Kick) || $player->getState() !== PlayerState::STANDING) {
+                continue;
             }
+
+            // r. 8207-8210: ani v sirokem pasu, ani na lajne.
+            $pos = $player->getPosition();
+            if ($pos === null || $pos->isInWideZone()) {
+                continue;
+            }
+            $losX = $side === TeamSide::HOME ? 12 : 13;
+            if ($pos->getX() === $losX) {
+                continue;
+            }
+
+            return true;
         }
         return false;
     }
