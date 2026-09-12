@@ -97,7 +97,10 @@ final class CageFormationTest extends TestCase
             ->addPlayer(TeamSide::HOME, 9, 8, movement: 6, id: 3)
             ->addPlayer(TeamSide::HOME, 11, 6, movement: 6, id: 4)
             ->addPlayer(TeamSide::HOME, 11, 8, movement: 6, id: 5)
-            ->addPlayer(TeamSide::AWAY, 24, 1, id: 6)
+            // ⭐ Soupeř musí být V DOSAHU (MA 6 + 2 GFI = 8 polí), jinak by
+            //    podle rozhodnutí uživatele z 12.09. platila přednost běhu
+            //    s míčem a strop klece by se vůbec neuplatnil.
+            ->addPlayer(TeamSide::AWAY, 16, 7, movement: 6, id: 6)
             ->withBallCarried(1)
             ->build();
         // Rohy už jednaly ⇒ rozhoduje se jen o nosiči.
