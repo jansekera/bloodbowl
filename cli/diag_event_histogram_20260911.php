@@ -27,10 +27,16 @@ use App\Engine\{ActionResolver, FixedDiceRoller, RandomDiceRoller, RulesEngine};
 use App\Enum\{ActionType, GameEventType, GamePhase, TeamSide};
 
 require_once __DIR__ . '/race_rosters.php';
+require_once __DIR__ . '/developed_rosters.php';
 
 $coachName = (string) ($argv[1] ?? 'learning');
 $games     = (int) ($argv[2] ?? 30);
 $seed      = (int) ($argv[3] ?? 20260911);
+// ⭐ 12.09.: ROSTERY JSOU TEĎ VOLBA. Základní (`base`) nemají naučené
+//   dovednosti vůbec, takže se v nich `Kick` a spol. NEMOHOU objevit --
+//   první běh histogramu je jel na nich a hlásil `kick_skill` jako nulu.
+//   Rozvinuté (`dev`, TV~1500) mají Kick u 13 ras z 26.
+$rosterMode = (string) ($argv[4] ?? 'dev');
 
 $makeCoach = static function () use ($coachName): AICoachInterface {
     return match ($coachName) {
@@ -87,7 +93,9 @@ for ($g = 0; $g < $games; $g++) {
     $homeAi = $makeCoach();
     $awayAi = $makeCoach();
 
-    $players = getRaceRoster(TeamSide::HOME, $homeRace) + getRaceRoster(TeamSide::AWAY, $awayRace);
+    $players = $rosterMode === 'base'
+        ? getRaceRoster(TeamSide::HOME, $homeRace) + getRaceRoster(TeamSide::AWAY, $awayRace)
+        : getDevelopedRaceRoster(TeamSide::HOME, $homeRace) + getDevelopedRaceRoster(TeamSide::AWAY, $awayRace);
     $state = GameState::create(
         matchId: 1,
         homeTeam: \App\DTO\TeamStateDTO::create(1, 'H', $homeRace, TeamSide::HOME, 3),
@@ -200,7 +208,7 @@ for ($g = 0; $g < $games; $g++) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-echo "KOUČ: {$coachName}   KORPUS: {$games} her, seed {$seed}\n\n";
+echo "KOUČ: {$coachName}   KORPUS: {$games} her, seed {$seed}, rostery: {$rosterMode}\n\n";
 printf("JMENOVATELÉ: %d her · %d kol · %d rozhodnutí · %d událostí · %d výjimek\n\n",
     $celkem['hry'], $celkem['kola'], $celkem['rozhodnuti'], $celkem['udalosti'], $vyjimky);
 

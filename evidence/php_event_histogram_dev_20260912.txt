@@ -1,0 +1,7 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí najít armour_roll po pádu: dodge, player_fell, turnover, armour_roll
+    [OK ] umí říct „nenastalo": touchdown v tomhle výsledku není
+  ⇒ měřidlo umí najít jedničku i nulu.
+
