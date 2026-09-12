@@ -329,15 +329,27 @@ final class LearningAICoach implements AICoachInterface
     private function souperNedosahne(GameState $state, TeamSide $side, Position $cil): bool
     {
         foreach ($state->getPlayersOnPitch($side->opponent()) as $souper) {
-            if ($souper->getState() !== PlayerState::STANDING) {
-                continue;
-            }
             $sp = $souper->getPosition();
             if ($sp === null) {
                 continue;
             }
-            $dosah = $souper->getStats()->getMovement() + 2;   // MA + dva GFI
-            if ($sp->distanceTo($cil) <= $dosah) {
+
+            // ⛔⛔ LEZICI SOUPER NENI MIMO HRU (uzivatel 12.09.: "u mereni
+            //   vzdalenosti nezapomen na nejblizsi lezici a i na nejblizsi
+            //   lezici s Jump Up"). Do ted se preskakoval kazdy, kdo nestal --
+            //   a pritom:
+            //     * PRONE se postavi za 3 pole pohybu a zbytkem dojde,
+            //     * PRONE s JUMP UP se postavi ZADARMO, takze ma plny dosah,
+            //     * STUNNED tenhle tah jednat nemuze, ten se opravdu nepocita.
+            $ma = $souper->getStats()->getMovement();
+            $dosah = match (true) {
+                $souper->getState() === PlayerState::STANDING => $ma + 2,
+                $souper->getState() === PlayerState::PRONE
+                    && $souper->hasSkill(SkillName::JumpUp) => $ma + 2,
+                $souper->getState() === PlayerState::PRONE => max(0, $ma - 3) + 2,
+                default => -1,   // STUNNED a spol. -- letos nikam nejde
+            };
+            if ($dosah >= 0 && $sp->distanceTo($cil) <= $dosah) {
                 return false;
             }
         }

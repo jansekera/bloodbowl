@@ -156,4 +156,43 @@ final class CagePlaybookTest extends TestCase
             $this->assertTrue(true, 'nosič se tenhle tah nehýbal, klec drží');
         }
     }
+
+    public function testProneOpponentStillCounts(): void
+    {
+        // ⛔⛔ Uživatel 12.09.: „u měření vzdálenosti nezapomeň na nejbližší
+        //    ležící a i na nejbližší ležící s Jump Up."
+        //    Ležící soupeř není mimo hru: postaví se za tři pole pohybu
+        //    a zbytkem dojde; s Jump Up se postaví ZADARMO, takže má plný dosah.
+        $ref = new \ReflectionMethod(LearningAICoach::class, 'souperNedosahne');
+        $ai = new LearningAICoach();
+        $cil = new \App\ValueObject\Position(10, 7);
+
+        // Ležící MA 6 sedm polí daleko: (6-3)+2 = 5 ⇒ NEDOSÁHNE.
+        $daleko = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 17, 7, movement: 6, id: 2)
+            ->withBallCarried(1)->build();
+        $daleko = $daleko->withPlayer($daleko->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $this->assertTrue($ref->invoke($ai, $daleko, TeamSide::HOME, $cil),
+            'ležící soupeř sedm polí daleko nemá dosáhnout');
+
+        // Týž ležící PĚT polí daleko ⇒ DOSÁHNE.
+        $blizko = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 15, 7, movement: 6, id: 2)
+            ->withBallCarried(1)->build();
+        $blizko = $blizko->withPlayer($blizko->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $this->assertFalse($ref->invoke($ai, $blizko, TeamSide::HOME, $cil),
+            'ležící soupeř pět polí daleko se postaví a dojde -- musí se počítat');
+
+        // ⭐ A tentýž vzdálený ležící s JUMP UP: postaví se zadarmo ⇒ 6+2 = 8 ⇒ DOSÁHNE.
+        $jumpUp = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 17, 7, movement: 6, id: 2,
+                        skills: [\App\Enum\SkillName::JumpUp])
+            ->withBallCarried(1)->build();
+        $jumpUp = $jumpUp->withPlayer($jumpUp->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $this->assertFalse($ref->invoke($ai, $jumpUp, TeamSide::HOME, $cil),
+            'ležící s Jump Up se postaví zadarmo, takže má plný dosah');
+    }
 }
