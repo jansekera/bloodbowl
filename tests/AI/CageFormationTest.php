@@ -280,4 +280,30 @@ final class CageFormationTest extends TestCase
             sprintf('pohyb trpaslíka (%d %%, skóre %.2f) není horší než elfův (%d %%, skóre %.2f) -- riziko se pořád oceňuje paušálem',
                 $sance[1], $skore[1], $sance[3], $skore[3]));
     }
+
+    public function testCleanCornerBeatsDirtyOne(): void
+    {
+        // ⚠️ Uživatel 12.09.: „špinavý roh — soused se soupeřem."
+        //    Měřením vyšlo, že ani jedno z 13 kol, která začala s klecí,
+        //    neskončilo se čtyřmi ČISTÝMI rohy — kouč mezi rohy nerozlišoval.
+        //    Nosič na (10,7); roh (11,6) má vedle sebe soupeře na (12,5),
+        //    roh (9,8) je čistý. Pomocník stojí stejně daleko od obou.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 12, movement: 6, id: 2)
+            ->addPlayer(TeamSide::AWAY, 12, 5, id: 3)
+            ->withBallCarried(1)
+            ->build();
+        $state = $state->withPlayer(
+            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+        );
+
+        $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $vzdalenostOdSoupere = max(abs($decision['params']['x'] - 12), abs($decision['params']['y'] - 5));
+        $this->assertGreaterThan(1, $vzdalenostOdSoupere,
+            sprintf('kouč zaujal roh (%d,%d), který má soupeře vedle sebe',
+                $decision['params']['x'], $decision['params']['y']));
+    }
 }

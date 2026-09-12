@@ -22,6 +22,15 @@ final class LearningAICoach implements AICoachInterface
      * Klesa se vzdalenosti a nikdy neprebije samotny roh.
      */
     private const CAGE_APPROACH_BONUS = 1.0;
+    /**
+     * ⚠️ SPINAVY ROH (uzivatel 12.09.: "spinavy roh -- soused se souperem"):
+     * roh, na kterem sice stojime, ale ma vedle sebe stojiciho soupere.
+     * Merenim 12.09. vyslo, ze ZADNE z 13 kol, ktera zacala s kleci,
+     * neskoncilo se ctyrmi CISTYMI rohy -- kouc totiz mezi rohy nerozlisoval.
+     * ⇒ Cisty roh se preferuje pred spinavym, ale spinavy je porad lepsi
+     * nez zadny: pokuta je mensi nez bonus za roh.
+     */
+    private const CAGE_DIRTY_CORNER_PENALTY = 0.8;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
@@ -698,6 +707,18 @@ final class LearningAICoach implements AICoachInterface
                     $pos = new Position($target['x'], $target['y']);
                     if (self::isCageCorner($carrierPos, $pos)) {
                         $score += self::CAGE_CORNER_BONUS;
+                        // ⚠️ Roh se souperem vedle je spinavy -- drzi se hur
+                        //   a souper na nej dosahne bez blitzu.
+                        foreach ($state->getPlayersOnPitch($side->opponent()) as $nepritel) {
+                            if ($nepritel->getState() !== PlayerState::STANDING) {
+                                continue;
+                            }
+                            $np = $nepritel->getPosition();
+                            if ($np !== null && $np->distanceTo($pos) === 1) {
+                                $score -= self::CAGE_DIRTY_CORNER_PENALTY;
+                                break;
+                            }
+                        }
                     } else {
                         // ⭐ Cim bliz k nejblizsimu rohu, tim lip -- aby se
                         //   posadka klece scházela i pres vic kol. Na roh

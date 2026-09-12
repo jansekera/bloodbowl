@@ -164,6 +164,8 @@ $st = [
     'bez_nosice'      => 0,   // rozpad nize -- viz tri kose pod tim
     'mic_u_soupere'   => 0,   // ⭐ NORMALNI STAV: mic drzi druhy tym
     'mic_volny'       => 0,   // ⛔ lezi na hristi a nikdo ho nezvedl
+    'volny_dosazitelny'   => 0,   // ⭐ a NEKDO z aktivniho tymu na nej dosahne
+    'volny_nedosazitelny' => 0,   // jen daleko -- to neni vada kouce
     'mic_mimo_hru'    => 0,   // po TD / pred vykopem
     'nosic_bez_klece' => 0,   // start: méně než 4 naše rohy
     'u_lajny'         => 0,   // start: na hřišti nejsou 4 rohy
@@ -173,6 +175,10 @@ $st = [
 ];
 $posun = [];      // o kolik se nosič posunul v kolech s klecí
 $spinavost = ['prazdny' => 0, 'souper' => 0, 'spinavy' => 0];
+// ⭐ CO KOUC ZVOLIL MISTO ZVEDNUTI, kdyz mic lezel volne a NEKDO na nej dosahl.
+//   Meri se PRICINA, ne nasledek: zajima nas prvni akce toho kola.
+$mistoZvednuti = [];
+$zvednulPrece = 0;
 
 for ($g = 0; $g < $games; $g++) {
     $homeRace = $races[mt_rand(0, count($races) - 1)];
@@ -250,6 +256,24 @@ for ($g = 0; $g < $games; $g++) {
                     $st['mic_u_soupere']++;
                 } elseif ($ball->isOnPitch()) {
                     $st['mic_volny']++;
+                    // ⭐ ROZLISIT VADU OD VZDALENOSTI: dosahne na mic vubec
+                    //   nekdo z aktivniho tymu? Kdyz ano a stejne se nezvedl,
+                    //   je to rozhodnuti kouce. Kdyz ne, je to jen daleko.
+                    $micPos = $ball->getPosition();
+                    $dosah = false;
+                    if ($micPos !== null) {
+                        foreach ($state->getPlayersOnPitch($side) as $hrac) {
+                            if (!$hrac->canMove()) { continue; }
+                            foreach ($rules->getValidMoveTargets($state, $hrac->getId()) as $t) {
+                                if ($t['x'] === $micPos->getX() && $t['y'] === $micPos->getY()) {
+                                    $dosah = true; break 2;
+                                }
+                            }
+                        }
+                    }
+                    $st[$dosah ? 'volny_dosazitelny' : 'volny_nedosazitelny']++;
+                    $sledujVolbu = $dosah;
+                    $micNaPoli = $micPos;
                 } else {
                     $st['mic_mimo_hru']++;
                 }
@@ -266,6 +290,28 @@ for ($g = 0; $g < $games; $g++) {
 
         $decision = $ai->decideAction($state, $rules);
         $total++; $turnActions++;
+        if (!empty($sledujVolbu)) {
+            $sledujVolbu = false;
+            $kl = $decision['action']->value;
+            if ($decision['action'] === ActionType::MOVE && $micNaPoli !== null
+                && ($decision['params']['x'] ?? -1) === $micNaPoli->getX()
+                && ($decision['params']['y'] ?? -1) === $micNaPoli->getY()) {
+                $zvednulPrece++;
+            } else {
+                if ($kl === 'move') {
+                    // Kam tedy sel? Bliz k mici, nebo jinam?
+                    $hrac = $state->getPlayer((int) ($decision['params']['playerId'] ?? 0));
+                    $puv = $hrac?->getPosition();
+                    if ($puv !== null && $micNaPoli !== null) {
+                        $pred = $puv->distanceTo($micNaPoli);
+                        $po = max(abs(($decision['params']['x'] ?? 0) - $micNaPoli->getX()),
+                                  abs(($decision['params']['y'] ?? 0) - $micNaPoli->getY()));
+                        $kl = $po < $pred ? 'move (blíž k míči)' : 'move (jinam)';
+                    }
+                }
+                $mistoZvednuti[$kl] = ($mistoZvednuti[$kl] ?? 0) + 1;
+            }
+        }
         if ($turnActions > 50) { $decision = ['action' => ActionType::END_TURN, 'params' => []]; }
         try { $result = $resolver->resolve($state, $decision['action'], $decision['params']); }
         catch (\Exception $e) { $result = $resolver->resolve($state, ActionType::END_TURN, []); }
@@ -285,6 +331,16 @@ printf("KOLA CELKEM (jmenovatel)                 %6d\n", $st['kola']);
 printf("  bez nosiče                             %6d\n", $st['bez_nosice']);
 printf("     z toho míč drží SOUPEŘ              %6d   (normální stav, ne vada)\n", $st['mic_u_soupere']);
 printf("     ⛔ z toho míč VOLNÝ na hřišti        %6d   (nikdo ho nezvedl)\n", $st['mic_volny']);
+printf("        ⛔⛔ a NĚKDO na něj dosáhl         %6d   <- rozhodnutí kouče, ne vzdálenost\n", $st['volny_dosazitelny']);
+printf("        jen daleko (nikdo nedosáhl)      %6d\n", $st['volny_nedosazitelny']);
+if ($st['volny_dosazitelny'] > 0) {
+    printf("\n⭐ CO KOUČ ZVOLIL JAKO PRVNÍ, KDYŽ MĚL MÍČ V DOSAHU (%d kol):\n", $st['volny_dosazitelny']);
+    printf("    ✅ přece jen šel pro míč            %6d\n", $zvednulPrece);
+    arsort($mistoZvednuti);
+    foreach ($mistoZvednuti as $co => $n) { printf("    %-32s %6d\n", $co, $n); }
+    $sou = $zvednulPrece + array_sum($mistoZvednuti);
+    printf("    ZBYTEK (musí být 0)                %6d\n", $st['volny_dosazitelny'] - $sou);
+}
 printf("     míč mimo hru (po TD / před výkopem) %6d\n", $st['mic_mimo_hru']);
 printf("  nosič bez klece na startu              %6d\n", $st['nosic_bez_klece']);
 printf("  ⚠️ nosič u lajny (rohy nejsou 4)        %6d   <- NEPOČÍTÁ SE ZA ÚSPĚCH\n", $st['u_lajny']);

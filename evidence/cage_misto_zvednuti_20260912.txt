@@ -1,0 +1,9 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí přečíst ČISTOU klec (4 čisté rohy): {"cisty":4,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] rozliší roh vzatý soupeřem od prázdného: {"cisty":2,"spinavy":0,"souper":1,"prazdny":1,"na_hristi":4}
+    [OK ] najde ŠPINAVÝ roh (náš hráč, ale soupeř vedle): {"cisty":3,"spinavy":1,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"cisty":2,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":2}
+  ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.
+
