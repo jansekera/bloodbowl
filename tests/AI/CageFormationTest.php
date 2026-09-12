@@ -144,4 +144,33 @@ final class CageFormationTest extends TestCase
         $this->assertGreaterThan(1, $krok,
             'bez klece nemá co nosiče brzdit — pokuta se pouští i tam, kde nemá');
     }
+
+    public function testCarrierNeverStepsNextToAnOpponent(): void
+    {
+        // ⛔⛔ Uživatel 12.09.: „a postavit nosiče vedle soupeře nesmíme už vůbec."
+        //    Nosič má před sebou soupeře na (12,7). Postup vpřed k němu je
+        //    bodově lákavý (blíž ke koncové zóně), ale skončit v jeho zóně
+        //    zachycení znamená blok, sražení a ztrátu míče.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::AWAY, 12, 7, id: 2)
+            ->withBallCarried(1)
+            ->build();
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA: pole vedle soupeře jsou vůbec dosažitelná.
+        $vedle = array_filter($rules->getValidMoveTargets($state, 1),
+            static fn(array $t) => max(abs($t['x'] - 12), abs($t['y'] - 7)) === 1);
+        $this->assertNotSame([], $vedle,
+            'fixtura je vadná: vedle soupeře se nedá stoupnout, zákaz by nic neznamenal');
+
+        $decision = (new LearningAICoach())->decideAction($state, $rules);
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $odstup = max(abs($decision['params']['x'] - 12), abs($decision['params']['y'] - 7));
+        $this->assertGreaterThan(1, $odstup,
+            sprintf('nosič skončil na (%d,%d), tedy vedle soupeře',
+                $decision['params']['x'], $decision['params']['y']));
+    }
 }

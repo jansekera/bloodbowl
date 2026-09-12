@@ -30,6 +30,15 @@ final class LearningAICoach implements AICoachInterface
      */
     private const CAGE_GFI_REACH = 2;
     private const CAGE_GFI_PENALTY = 0.25;
+    /**
+     * ⛔⛔ Uzivatel 12.09.: "a postavit nosice vedle soupere nesmime uz vubec."
+     * Nosic, ktery skonci v zone zachyceni soupere, muze byt blokovan,
+     * sražen a o mic pripraven -- a klec kolem nej uz nic nezachrani.
+     * Pokuta je zamerne VETSI nez cokoli, co se za pohyb da ziskat, takze
+     * takove pole prohraje se vsim krome touchdownu (ten ma vlastni vetev
+     * a sem se nedostane).
+     */
+    private const CARRIER_NEXT_TO_ENEMY_PENALTY = 5.0;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -557,6 +566,21 @@ final class LearningAICoach implements AICoachInterface
                 //   ⇒ Pokuta roste se vzdalenosti, ale POUZE kdyz klec vubec
                 //   existuje (aspon dva rohy). Bez klece se nosic pohybuje
                 //   jako driv.
+                // ⛔⛔ NOSIC NESMI SKONCIT VEDLE SOUPERE (uzivatel 12.09.).
+                //   Pocitaji se jen STOJICI souperi -- lezici zonu zachyceni
+                //   nemaji, takze vedle nich je to bezpecne.
+                $cil = new Position($target['x'], $target['y']);
+                foreach ($state->getPlayersOnPitch($side->opponent()) as $nepritel) {
+                    if ($nepritel->getState() !== PlayerState::STANDING) {
+                        continue;
+                    }
+                    $np = $nepritel->getPosition();
+                    if ($np !== null && $np->distanceTo($cil) === 1) {
+                        $score -= self::CARRIER_NEXT_TO_ENEMY_PENALTY;
+                        break;
+                    }
+                }
+
                 if ($currentPos !== null) {
                     $rohovi = $this->cornerPlayers($state, $side, $currentPos, $playerId);
                     if (count($rohovi) >= self::CAGE_MIN_CORNERS) {

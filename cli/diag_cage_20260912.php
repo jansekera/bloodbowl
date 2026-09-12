@@ -44,8 +44,15 @@ function rohy(Position $p): array
 }
 
 /**
- * Stav klece kolem nosiče: kolik rohů je NAŠICH, kolik soupeřových,
- * kolik prázdných a kolik jich vůbec leží na hřišti.
+ * Stav klece kolem nosiče -- ČTYŘI TŘÍDY, podle upřesnění uživatele 12.09.:
+ *   `prazdny`  ⛔⛔ na rohu NIKDO nestojí -- "prázdný roh je větší průšvih"
+ *   `souper`   ⛔ roh obsadil soupeř
+ *   `spinavy`  ⚠️ náš hráč tam stojí, ALE má vedle sebe soupeře
+ *              (uživatel: "špinavý roh = soused se soupeřem")
+ *   `cisty`    ✅ náš hráč a v okolí žádný stojící soupeř
+ *
+ * ⭐ Počítají se jen STOJÍCÍ soupeři -- ležící nemají zónu zachycení,
+ *   takže roh nešpiní.
  */
 function stavKlece(GameState $state, MatchPlayerDTO $carrier): array
 {
@@ -54,22 +61,34 @@ function stavKlece(GameState $state, MatchPlayerDTO $carrier): array
         return ['nase' => 0, 'souper' => 0, 'prazdne' => 0, 'na_hristi' => 0];
     }
     $side = $carrier->getTeamSide();
-    $r = ['nase' => 0, 'souper' => 0, 'prazdne' => 0, 'na_hristi' => 0];
+    $r = ['cisty' => 0, 'spinavy' => 0, 'souper' => 0, 'prazdny' => 0, 'na_hristi' => 0];
     foreach (rohy($pos) as $roh) {
         if (!$roh->isOnPitch()) {
             continue;
         }
         $r['na_hristi']++;
-        $obsazeno = null;
+
+        $nas = null;
         foreach ($state->getPlayersOnPitch($side) as $p) {
-            if ($p->getPosition()?->equals($roh)) { $obsazeno = 'nase'; break; }
+            if ($p->getPosition()?->equals($roh)) { $nas = $p; break; }
         }
-        if ($obsazeno === null) {
+        if ($nas === null) {
+            $obsazenSouperem = false;
             foreach ($state->getPlayersOnPitch($side->opponent()) as $p) {
-                if ($p->getPosition()?->equals($roh)) { $obsazeno = 'souper'; break; }
+                if ($p->getPosition()?->equals($roh)) { $obsazenSouperem = true; break; }
             }
+            $r[$obsazenSouperem ? 'souper' : 'prazdny']++;
+            continue;
         }
-        $r[$obsazeno ?? 'prazdne']++;
+
+        // Nas hrac na rohu stoji -- ma vedle sebe STOJICIHO soupere?
+        $spinavy = false;
+        foreach ($state->getPlayersOnPitch($side->opponent()) as $p) {
+            if ($p->getState() !== \App\Enum\PlayerState::STANDING) { continue; }
+            $sp = $p->getPosition();
+            if ($sp !== null && $sp->distanceTo($roh) === 1) { $spinavy = true; break; }
+        }
+        $r[$spinavy ? 'spinavy' : 'cisty']++;
     }
 
     return $r;
@@ -100,7 +119,7 @@ $cista = (new \App\Tests\Engine\GameStateBuilder())
     ->addPlayer(TeamSide::AWAY, 24, 1, id: 6)
     ->withBallCarried(1)->build();
 $s1 = stavKlece($cista, $cista->getPlayer(1));
-$ok('umí přečíst ČISTOU klec (4 naše rohy)', $s1['nase'] === 4, json_encode($s1));
+$ok('umí přečíst ČISTOU klec (4 čisté rohy)', $s1['cisty'] === 4, json_encode($s1));
 
 $spinava = (new \App\Tests\Engine\GameStateBuilder())
     ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
@@ -109,8 +128,20 @@ $spinava = (new \App\Tests\Engine\GameStateBuilder())
     ->addPlayer(TeamSide::AWAY, 24, 1, id: 6)
     ->withBallCarried(1)->build();
 $s2 = stavKlece($spinava, $spinava->getPlayer(1));
-$ok('umí najít ŠPINAVÝ roh (soupeř + prázdno)',
-    $s2['nase'] === 2 && $s2['souper'] === 1 && $s2['prazdne'] === 1, json_encode($s2));
+$ok('rozliší roh vzatý soupeřem od prázdného',
+    $s2['souper'] === 1 && $s2['prazdny'] === 1, json_encode($s2));
+
+// ⭐ A TOHLE JE TA DEFINICE, NA KTEROU UŽIVATEL 12.09. TRVAL:
+//   roh drží náš hráč, ale stojí vedle něj soupeř => ŠPINAVÝ.
+$oblicena = (new \App\Tests\Engine\GameStateBuilder())
+    ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
+    ->addPlayer(TeamSide::HOME, 9, 6, id: 2)->addPlayer(TeamSide::HOME, 11, 6, id: 3)
+    ->addPlayer(TeamSide::HOME, 9, 8, id: 4)->addPlayer(TeamSide::HOME, 11, 8, id: 5)
+    ->addPlayer(TeamSide::AWAY, 8, 5, id: 6)      // soused rohu (9,6)
+    ->withBallCarried(1)->build();
+$s2b = stavKlece($oblicena, $oblicena->getPlayer(1));
+$ok('najde ŠPINAVÝ roh (náš hráč, ale soupeř vedle)',
+    $s2b['spinavy'] === 1 && $s2b['cisty'] === 3, json_encode($s2b));
 
 $uKraje = (new \App\Tests\Engine\GameStateBuilder())
     ->addPlayer(TeamSide::HOME, 10, 0, id: 1)
@@ -119,7 +150,7 @@ $uKraje = (new \App\Tests\Engine\GameStateBuilder())
     ->withBallCarried(1)->build();
 $s3 = stavKlece($uKraje, $uKraje->getPlayer(1));
 $ok('u lajny vidí, že rohy na hřišti jsou jen DVA', $s3['na_hristi'] === 2, json_encode($s3));
-echo "  ⇒ měřidlo umí najít čistou klec, špinavý roh i případ u lajny.\n\n";
+echo "  ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.\n\n";
 
 // ─── KORPUS ──────────────────────────────────────────────────────────────────
 mt_srand($seed);
@@ -134,7 +165,7 @@ $st = [
     'klec_spinava'    => 0,   // na konci chybí aspoň jeden
 ];
 $posun = [];      // o kolik se nosič posunul v kolech s klecí
-$spinavost = ['prazdne' => 0, 'souper' => 0];
+$spinavost = ['prazdny' => 0, 'souper' => 0, 'spinavy' => 0];
 
 for ($g = 0; $g < $games; $g++) {
     $homeRace = $races[mt_rand(0, count($races) - 1)];
@@ -170,12 +201,13 @@ for ($g = 0; $g < $games; $g++) {
         $c = nosic($state, $start['side']);
         if ($c === null) { $st['klec_spinava']++; return; }
         $konec = stavKlece($state, $c);
-        if ($konec['nase'] === 4) {
+        if ($konec['cisty'] === 4) {
             $st['klec_prezila']++;
         } else {
             $st['klec_spinava']++;
-            $spinavost['prazdne'] += $konec['prazdne'];
+            $spinavost['prazdny'] += $konec['prazdny'];
             $spinavost['souper']  += $konec['souper'];
+            $spinavost['spinavy'] += $konec['spinavy'];
         }
         $posun[] = $c->getPosition() !== null && $start['pos'] !== null
             ? max(abs($c->getPosition()->getX() - $start['pos']->getX()),
@@ -206,7 +238,9 @@ for ($g = 0; $g < $games; $g++) {
                 $start = ['typ' => 'bez_nosice', 'side' => $side, 'pos' => null];
             } else {
                 $k = stavKlece($state, $c);
-                $typ = $k['na_hristi'] < 4 ? 'u_lajny' : ($k['nase'] === 4 ? 'klec' : 'nosic_bez_klece');
+                $typ = $k['na_hristi'] < 4
+                ? 'u_lajny'
+                : (($k['cisty'] + $k['spinavy']) === 4 ? 'klec' : 'nosic_bez_klece');
                 $start = ['typ' => $typ, 'side' => $side, 'pos' => $c->getPosition()];
             }
             $klic = $novyKlic; $turnActions = 0;
@@ -239,9 +273,9 @@ printf("  ZBYTEK (musí být 0)                    %6d\n\n", $zbytek);
 
 if ($st['klec_na_startu'] > 0) {
     printf("Z KOL, KTERÁ ZAČALA S KLECÍ (%d):\n", $st['klec_na_startu']);
-    printf("  ✅ klec přežila kolo                   %6d   %5.1f %%\n",
+    printf("  ✅ všechny čtyři rohy ČISTÉ            %6d   %5.1f %%\n",
         $st['klec_prezila'], 100 * $st['klec_prezila'] / $st['klec_na_startu']);
-    printf("  ⛔ rohy po kole ŠPINAVÉ                %6d   %5.1f %%\n",
+    printf("  ⛔ aspoň jeden roh není čistý          %6d   %5.1f %%\n",
         $st['klec_spinava'], 100 * $st['klec_spinava'] / $st['klec_na_startu']);
     printf("     z toho prázdných rohů %d, obsazených soupeřem %d\n",
         $spinavost['prazdne'], $spinavost['souper']);
