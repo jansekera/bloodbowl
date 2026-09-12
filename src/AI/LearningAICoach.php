@@ -21,6 +21,15 @@ final class LearningAICoach implements AICoachInterface
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
     private const CAGE_OUTRUN_PENALTY = 0.9;
+    /**
+     * ⭐ Uzivatel 12.09.: "kdyz je jen jeden z peti MA 4 a ostatni MA 5, tak
+     * je jeho pohyb POSLEDNI s GFI -- riziko na konec."
+     * ⇒ Nejpomalejsi hrac klec NEZASTAVI: dozene ji pres GFI. Takove pole
+     * navic tedy neni zakazane, jen RIZIKOVE -- mensi pokuta, a diky
+     * `RISK_FREE_BONUS` se takovy tah zahraje az na konci kola.
+     */
+    private const CAGE_GFI_REACH = 2;
+    private const CAGE_GFI_PENALTY = 0.25;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -560,8 +569,12 @@ final class LearningAICoach implements AICoachInterface
                         $limit = $this->slowestRemaining($rohovi);
                         $krok = max(abs($target['x'] - $currentPos->getX()),
                                     abs($target['y'] - $currentPos->getY()));
-                        if ($krok > $limit) {
+                        if ($krok > $limit + self::CAGE_GFI_REACH) {
+                            // Tam uz nejpomalejsi nedojde ani na GFI.
                             $score -= ($krok - $limit) * self::CAGE_OUTRUN_PENALTY;
+                        } elseif ($krok > $limit) {
+                            // Dojde, ale pres GFI => riziko, ne zakaz.
+                            $score -= ($krok - $limit) * self::CAGE_GFI_PENALTY;
                         }
                     }
                 }

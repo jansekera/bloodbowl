@@ -119,8 +119,11 @@ final class CageFormationTest extends TestCase
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $krok = max(abs($decision['params']['x'] - 10), abs($decision['params']['y'] - 7));
-        $this->assertLessThanOrEqual(2, $krok,
-            sprintf('nosič skočil o %d pole, ale nejpomalejší roh ujde jen 2', $krok));
+        // ⭐ Upřesněno uživatelem 12.09.: nejpomalejší klec nezastaví — dožene
+        //    ji přes GFI, jen se aktivuje poslední, protože to je riziko.
+        //    Strop je tedy MA nejpomalejšího + 2 pole na GFI.
+        $this->assertLessThanOrEqual(4, $krok,
+            sprintf('nosič skočil o %d pole; nejpomalejší roh ujde 2 a s GFI 4', $krok));
     }
 
     public function testCarrierWithoutACageStillSprints(): void
