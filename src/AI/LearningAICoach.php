@@ -289,6 +289,62 @@ final class LearningAICoach implements AICoachInterface
         return $p;
     }
 
+    /**
+     * ⭐⭐ ROZPUSTIT KLEC A VYRAZIT SAM -- uzivatel 12.09.:
+     *   "klec rozpustit ve chvili, kdy dopocitam, ze cela klec do TD zony
+     *    nedojde, ale nosic sam by dosel ... vyrazit na cestu bez cele klece
+     *    v kole PREDTIM, nez to bude pro nosice natesno s dobehnutim."
+     *
+     * ⇒ Pocita se, kolik kol nosic sam potrebuje (`vzdalenost / MA`, nahoru)
+     *   a kolik kol zbyva. Vyrazi se, kdyz uz je na to **jen tak tak** --
+     *   tedy o kolo DRIV, nez by mu zbyvalo presne tolik kol, kolik cesta trva.
+     */
+    private function musiVyrazitSam(GameState $state, TeamSide $side, MatchPlayerDTO $nosic): bool
+    {
+        $pos = $nosic->getPosition();
+        if ($pos === null) {
+            return false;
+        }
+        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $vzdalenost = abs($pos->getX() - $endZoneX);
+        $ma = max(1, $nosic->getStats()->getMovement());
+        $kolNaCestu = (int) ceil($vzdalenost / $ma);
+        $zbyvaKol = max(0, 9 - $state->getTeamState($side)->getTurnNumber());
+
+        // ⭐ Ta "jedna kolo rezervy" je jadro uzivatelova zaveru: nevyrazi se
+        //   az kdyz to presne vyjde, ale uz o kolo driv.
+        return $zbyvaKol <= $kolNaCestu + 1;
+    }
+
+    /**
+     * ⭐ Uzivatel 12.09.: "pokud jsme proti pomalemu souperi, muze nosic na
+     *   nasi puli bezet sam rychleji kupredu bez klece -- DOKUD SE K NEMU
+     *   SOUPER NEDOSTANE."
+     *
+     * ⇒ Dosah soupere = jeho MA + 2 pole na GFI. Kdyz na cilove pole
+     *   nedosahne ani ten nejblizsi stojici, klec neni potreba a nosic muze
+     *   bezet naplno. Pomaly souper (trpaslik MA 4) tim nechava vic prostoru
+     *   nez rychly (elf MA 8) -- presne jak uzivatel rika.
+     */
+    private function souperNedosahne(GameState $state, TeamSide $side, Position $cil): bool
+    {
+        foreach ($state->getPlayersOnPitch($side->opponent()) as $souper) {
+            if ($souper->getState() !== PlayerState::STANDING) {
+                continue;
+            }
+            $sp = $souper->getPosition();
+            if ($sp === null) {
+                continue;
+            }
+            $dosah = $souper->getStats()->getMovement() + 2;   // MA + dva GFI
+            if ($sp->distanceTo($cil) <= $dosah) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** Nosic vlastniho tymu, nebo `null`. */
     private function ownCarrierPosition(GameState $state, TeamSide $side): ?Position
     {
@@ -811,7 +867,12 @@ final class LearningAICoach implements AICoachInterface
                     }
                 }
 
-                if ($currentPos !== null) {
+                // ⭐⭐ Kdyz uz je na dobehnuti natesno, klec se ROZPOUSTI:
+                //   zadny strop, nosic bezi sam. Jinak by cela klec dojela
+                //   pred zonu az ve chvili, kdy uz nezbyva kolo na TD.
+                $vyrazitSam = $this->musiVyrazitSam($state, $side, $player);
+
+                if ($currentPos !== null && !$vyrazitSam) {
                     $rohovi = $this->cornerPlayers($state, $side, $currentPos, $playerId);
                     // ⛔⛔ NAPRED SESTAVIT, PAK HNOUT (uzivatel 12.09.).
                     //   Kdyz klec JESTE nestoji, nosic nema kam spechat:
