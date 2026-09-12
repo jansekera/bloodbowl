@@ -444,6 +444,30 @@ od beznadějného hodu** — ale nenahradí ji tím, aby místo toho stavěl př
 
 ---
 
+## A12. ⭐⭐ PRORÁŽET PŘED KLECÍ, AŤ MÁ KAM *(uživatel 12.09., odloženo sem)*
+
+**Doslova:** *„a ostatní hráči mají prorážet kupředu, ať je tam pak místo
+na posun klece."*
+
+⇒ Klec má pět hráčů; **zbylých šest má jít napřed a uvolnit cestu**, aby
+formace měla kam postoupit. Není to clona *(ta je zvlášť — bránit soupeři
+cestu ke kleci)*, je to **otevírání prostoru před klecí**.
+
+⛔ **Proč to nejde udělat v akci:** hráč, který prorazí, tím sám o sobě nic
+nezíská — cenu má **až v tom, že o kolo později projede klec**. Jeho tah se
+tedy nedá ocenit z jeho vlastního výsledku, což je přesně definice celotahu.
+A platí to i obráceně: prorážet má smysl **jen tam, kudy klec opravdu
+pojede**, takže obojí musí vzniknout v jednom plánu.
+
+⭐ **Souvisí:** `A11` *(míč mezi víc nepřáteli — přivést víc svých)*,
+`P48 SCREEN PRO ELFA`, a `PHP36` v enginové frontě *(clona)*.
+
+**Co změřit, až na to dojde:** kolik kol klec **nemá kam** postoupit
+*(všechna pole vpřed obsazená nebo ohrožená)* — bez toho se nepozná,
+jestli proražení něco koupí.
+
+---
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
