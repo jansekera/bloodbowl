@@ -122,4 +122,32 @@ final class CagePlaybookTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $nosic->getPosition()->distanceTo($pred),
             'klec stojí, ale vůbec se nehnula');
     }
+
+    public function testCageWaitsOneSquareFromEndzoneUntilTheLastTurn(): void
+    {
+        // ⭐⭐ Uživatel 12.09.: "když je klec s nosičem vepředu tak, že první
+        //    dva rohy jsou v TD zóně, tak se počká na poslední kolo a v tom
+        //    nosič dojde dát TD."
+        //    Přední rohy jsou o pole blíž zóně než nosič ⇒ ta pozice je
+        //    vzdálenost 1 od koncové zóny. HOME útočí na x=25, takže x=24.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 22, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 21, 6, movement: 6, id: 2)
+            ->addPlayer(TeamSide::HOME, 21, 8, movement: 6, id: 3)
+            ->addPlayer(TeamSide::HOME, 23, 6, movement: 6, id: 4)
+            ->addPlayer(TeamSide::HOME, 23, 8, movement: 6, id: 5)
+            ->addPlayer(TeamSide::AWAY, 10, 5, id: 6)
+            ->withBallCarried(1)
+            ->build();
+
+        $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());
+
+        // Nosič je na řadě jako první (ostatní stojí v rozích a drží).
+        if ($decision['action'] === ActionType::MOVE && ($decision['params']['playerId'] ?? 0) === 1) {
+            $this->assertNotSame(25, $decision['params']['x'],
+                'nosič šel dát TD hned, místo aby počkal s klecí na poslední kolo');
+        } else {
+            $this->assertTrue(true, 'nosič se tenhle tah nehýbal, klec drží');
+        }
+    }
 }

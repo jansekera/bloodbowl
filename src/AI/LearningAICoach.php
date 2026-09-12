@@ -736,8 +736,14 @@ final class LearningAICoach implements AICoachInterface
             // Carrier movement strategy
             if ($isCarrier) {
                 if ($this->shouldStall($state, $side)) {
-                    // When stalling: prefer 2-5 squares from endzone, central Y positions
-                    if ($distToEndZone >= 2 && $distToEndZone <= 5) {
+                    // ⭐⭐ UZIVATEL 12.09.: "kdyz je klec s nosicem vepredu tak,
+                    //   ze PRVNI DVA ROHY JSOU V TD ZONE, tak se pocka na
+                    //   posledni kolo a v tom nosic dojde dat TD."
+                    //   Predni rohy jsou o jedno pole blize zone nez nosic,
+                    //   takze ta pozice je `distToEndZone === 1`. Tam se ceka.
+                    if ($distToEndZone === 1) {
+                        $score += 2.5;
+                    } elseif ($distToEndZone >= 2 && $distToEndZone <= 5) {
                         $score += 1.5;
                     }
                     // Centrality bonus (Y=7 is center of 0-14 pitch)
