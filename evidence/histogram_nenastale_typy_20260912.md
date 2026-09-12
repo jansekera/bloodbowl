@@ -64,3 +64,42 @@ Skupina (D) se nemá probírat po jednom hádáním. **Levný rozhodovací krok:
 s VYNUCENÝMI rostery** *(Goblin vs. Halfling, Bretonnian vs. Khorne, Vampire vs. Dark Elf…)*
 místo losování z 26 ras. Tím se z „možná je to vzácné" stane **čitelná nula nebo jednička**
 u každé položky naráz — a teprve to, co zůstane nulové i tam, je nález.
+
+---
+
+# DOŘEŠENO HNED: `take_root` a `touchback` *(uživatel 12.09.)*
+
+## ✅ `take_root` — ENGINE JE V POŘÁDKU, byla to smůla korpusu
+
+**Přímý test:** hráč s Take Root, kostka vynucená na 1, akce MOVE ⇒ událost
+`take_root` **se vyrobila**. Cesta tedy funguje *(a od `PHP15d` se hází i na
+BLOCK, BLITZ, PASS, HAND-OFF a FOUL, ne jen na MOVE)*.
+
+⇒ **Nula v korpusu je vzorkování, ne vada:** Take Root má v rosterech **jediná
+rasa — Halfling** *(Treeman ×2)*, a ta vyjde při losu 2 ras z 26 průměrně
+**2,3× za 30 zápasů**.
+
+⛔ **ALE VYŠEL TÍM NAJEVO JINÝ NÁLEZ — CHYBĚJÍCÍ TREEMAN U WOOD ELFŮ.**
+Náš roster Wood Elf má jen Wardancer, Catcher, Thrower a Lineman. **Treeman
+tam není**, přestože ho ten tým podle pravidel má *(0-1, Loner, Mighty Blow,
+Stand Firm, Take Root, Thick Skull, Throw Team-Mate)*. ⇒ Proto je Take Root
+v korpusu vzácný víc, než by měl být. **Patří do změn rosterů.**
+
+## ⛔ `touchback` — ENGINE HO NEUMÍ POTKAT, A PŘÍČINA JE KONSTANTA
+
+**Přímý test:** 200 výkopů na `x=6` ⇒ **0 touchbacků**; 200 výkopů na `x=19`
+⇒ **200 touchbacků**. Cesta v kódu tedy funguje dokonale — rozhoduje jen to,
+kam se kope.
+
+**A kope se pořád na totéž pole.** `KickoffResolver::getDefaultKickTarget()`
+vrací natvrdo **(6,7)** nebo **(19,7)** — přesný střed přijímací poloviny —
+a `SetupHandler:112` jinou možnost nenabízí.
+
+⇒ Ze středu poloviny je rozptyl **nejvýš 6 polí**, takže míč **nemůže opustit
+hřiště** *(y zůstane v 1-13)* a půlicí čáru trefí leda přesně na hraně.
+**Touchback je tím strukturálně nedosažitelný.**
+
+⚠️ **Není to vada v události ani v pravidle, je to CHYBĚJÍCÍ VOLBA:** podle
+pravidel volí kopající kouč, **kam** kopne *(hluboko, nakrátko, k lajně)*, a
+touchback je cena za špatný odhad. Engine tu volbu nemá vůbec — ani pro člověka,
+ani pro AI. ⇒ **Nová věc, ne oprava** — patří k rozhodnutí uživatele.
