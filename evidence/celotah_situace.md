@@ -415,6 +415,35 @@ před 24.08. *(`F12`)*.
 NESMÍ se to měřit přes `leapWalkArm`** — buď se ta dvojitost napřed opraví
 **jako samostatná změna s vlastním ověřením**, nebo měření dostane vlastní bránu.
 
+## A11. ⭐⭐⭐ MÍČ MEZI VÍC NEPŘÁTELI — NEZVEDAT, PŘIVÉST VÍC SVÝCH *(uživatel 12.09.)*
+
+**Doslova:** *„když je míč v sousedství více nepřátel, je i po odsunutí blitzem
+jednoho z nich možná zvednutí stále nebezpečné — pak je třeba jen postoupit
+k míči více našimi a ne pokoušet se o nepravděpodobné zvednutí."*
+
+⛔ **Proč to nejde rozhodnout po jednom hráči.** Zvednutí má práh `7 − AG − 1 +
+počet cizích zón zachycení`. Každý soused míče přidá **+1**. Blitz odsune
+JEDNOHO — a to je jediný blitz, který tým za kolo má *(`isOncePerTurn`)*.
+⇒ Při dvou a víc sousedech zůstane práh vysoký **i po blitzu**, takže tah,
+který vypadá jako příprava, je ve skutečnosti utracený zdroj za nic.
+
+⭐ **Správná odpověď je tahová, ne akční:** *„letos ne"* — přivést k míči víc
+svých, obsadit okolí, a zvedat **až příští kolo**, kdy soupeřovy zóny ubyly
+nebo je náš hráč kryje. To je přesně rozhodnutí, které jednotlivá akce
+neumí učinit, protože jeho cena i výnos leží **mimo ni**.
+
+⚠️ **Dnešní kouč to neumí a nemá kde:** rozhoduje hráč po hráči, každou akci
+oceňuje zvlášť a nemá kam zapsat záměr *„tohle kolo míč nezvedáme"*.
+Dnešní oprava `c72b46cd` *(zvednutí se oceňuje podle šance)* ho jen **odradí
+od beznadějného hodu** — ale nenahradí ji tím, aby místo toho stavěl převahu.
+
+**Co bude potřeba změřit, až na to dojde:**
+1. Podíl kol, kdy míč leží u **dvou a více** soupeřů *(tam tahle situace nastává)*.
+2. Kolik z těch kol dnes končí **neúspěšným zvednutím** = turnover.
+3. A protiotázka: jak často soupeř míč mezitím **sebere sám**, když čekáme.
+
+---
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
