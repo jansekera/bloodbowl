@@ -394,7 +394,17 @@ final class BallResolver
             return [$state, $events];
         }
 
-        $pos = $fallenPlayer->getPosition();
+        // ⛔⛔⛔ OPRAVA 12.09.2026 (PHP34): TADY MIC MIZEL ZE HRY.
+        //   Kdyz srazeny nosic nemel pozici -- protoze ho prave odstranilo
+        //   zraneni, KO nebo crowd surf -- nastavil se `offPitch` a NIC ho
+        //   nevratilo. Zbytek pule se pak hral BEZ MICE: nikdo ho nemohl
+        //   zvednout a skorovat uz neslo.
+        // ⭐ ZMERENO PRED OPRAVOU (`cli/diag_cage_20260912.php`, 10 her):
+        //   16 kol z 317 (5 %) zacalo v HRATELNE fazi s micem `offPitch`.
+        // ⭐ MIC PRITOM VI, KDE BYL: `BallState::carried()` nese pozici.
+        //   Odskakuje se tedy z pole, ktere hrac zabiral -- a kdyz to pole
+        //   lezi mimo hriste, `resolveBounce` z nej udela throw-in.
+        $pos = $fallenPlayer->getPosition() ?? $state->getBall()->getPosition();
         if ($pos === null) {
             return [$state->withBall(BallState::offPitch()), $events];
         }
