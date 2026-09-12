@@ -41,6 +41,14 @@ final class LearningAICoach implements AICoachInterface
      * tlumi: jeho ukol je klec, ne zavod do koncove zony.
      */
     private const ADVANCE_DAMP_WITH_CAGE = 0.3;
+    /**
+     * ⭐⭐ Uzivatel 12.09.: "kolem rohu nesmi byt sousedi souperi" a "muze se
+     * posunout i do boku, nejen ciste dopredu."
+     * ⇒ NOSIC si nevybira jen pole pro sebe, ale MISTO PRO CELOU KLEC:
+     * ocenuje se kazdy roh ciloveho pole, ktery je volny (nebo nas) a nema
+     * vedle sebe stojiciho soupere. Ctyri ciste rohy tedy daji +1,0.
+     */
+    private const CARRIER_CLEAN_CORNER_BONUS = 0.25;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
@@ -716,6 +724,34 @@ final class LearningAICoach implements AICoachInterface
                 //   ⇒ Pokuta roste se vzdalenosti, ale POUZE kdyz klec vubec
                 //   existuje (aspon dva rohy). Bez klece se nosic pohybuje
                 //   jako driv.
+                // ⭐⭐ MISTO PRO CELOU KLEC, ne jen pro nosice: kolik rohu
+                //   ciloveho pole by bylo CISTYCH (volne nebo nase pole bez
+                //   stojiciho soupere v sousedstvi)?
+                $cilKlec = new Position($target['x'], $target['y']);
+                foreach ([[-1, -1], [1, -1], [-1, 1], [1, 1]] as [$dx, $dy]) {
+                    $roh = new Position($cilKlec->getX() + $dx, $cilKlec->getY() + $dy);
+                    if (!$roh->isOnPitch()) {
+                        continue;
+                    }
+                    $volny = true;
+                    foreach ($state->getPlayersOnPitch($side->opponent()) as $nepr) {
+                        $npp = $nepr->getPosition();
+                        if ($npp === null) {
+                            continue;
+                        }
+                        // roh obsazeny souperem, nebo souper stojici vedle nej
+                        if ($npp->equals($roh)
+                            || ($nepr->getState() === PlayerState::STANDING
+                                && $npp->distanceTo($roh) === 1)) {
+                            $volny = false;
+                            break;
+                        }
+                    }
+                    if ($volny) {
+                        $score += self::CARRIER_CLEAN_CORNER_BONUS;
+                    }
+                }
+
                 // ⛔⛔ NOSIC NESMI SKONCIT VEDLE SOUPERE (uzivatel 12.09.).
                 //   Pocitaji se jen STOJICI souperi -- lezici zonu zachyceni
                 //   nemaji, takze vedle nich je to bezpecne.

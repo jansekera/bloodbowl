@@ -337,4 +337,34 @@ final class CageFormationTest extends TestCase
         $this->assertSame(13, $decision['params']['x']);
         $this->assertSame(7, $decision['params']['y']);
     }
+
+    public function testCarrierPicksSpaceWhereTheCageCanBeClean(): void
+    {
+        // ⭐⭐ Uživatel 12.09.: „kolem rohů nesmí být sousedi soupeři" a
+        //    „může se posunout i do boku, nejen čistě dopředu."
+        //    ⇒ Nosič si nevybírá pole pro sebe, ale MÍSTO PRO CELOU KLEC.
+        //    Vpravo je soupeř, takže rohy tamtoho směru by byly špinavé;
+        //    do boku je čisto. Nosič tedy nemá jít rovně k soupeři.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::AWAY, 14, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 14, 8, id: 3)
+            ->addPlayer(TeamSide::AWAY, 14, 6, id: 4)
+            ->withBallCarried(1)
+            ->build();
+
+        $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        // Žádný z rohů cílového pole nesmí mít soupeře v sousedství.
+        foreach ([[-1, -1], [1, -1], [-1, 1], [1, 1]] as [$dx, $dy]) {
+            $rx = $decision['params']['x'] + $dx;
+            $ry = $decision['params']['y'] + $dy;
+            foreach ([[14, 6], [14, 7], [14, 8]] as [$sx, $sy]) {
+                $this->assertGreaterThan(1, max(abs($rx - $sx), abs($ry - $sy)),
+                    sprintf('roh (%d,%d) cílového pole (%d,%d) má soupeře vedle sebe',
+                        $rx, $ry, $decision['params']['x'], $decision['params']['y']));
+            }
+        }
+    }
 }

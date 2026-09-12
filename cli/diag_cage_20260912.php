@@ -182,6 +182,10 @@ $zvednulPrece = 0;
 // ⭐ A KDYZ nesel: JAKOU SANCI to zvednuti melo? Bez toho se neda rict,
 //   jestli kouc spravne odmitl beznadejny hod, nebo jestli je pokuta prisna.
 $sanceKdyzNesel = [];
+// ⭐⭐ CÍL UŽIVATELE 12.09.: "sestavit klec a pak s celou posun kupředu."
+//   Měří se tedy PŘESNĚ TO: zůstala klec celá (4 naše rohy) a posunula se?
+$klecCela = 0;      // 4 naše rohy i na konci kola -- bez ohledu na špínu
+$klecCelaAPosun = 0; // a k tomu postup vpřed
 
 for ($g = 0; $g < $games; $g++) {
     $homeRace = $races[mt_rand(0, count($races) - 1)];
@@ -218,6 +222,20 @@ for ($g = 0; $g < $games; $g++) {
         $c = nosic($state, $start['side']);
         if ($c === null) { $st['klec_spinava']++; return; }
         $konec = stavKlece($state, $c);
+        // ⭐ OPRAVENO 12.09. podle uzivatele: "kolem rohu nesmi byt sousedi
+        //   souperi" => klec je cela jen kdyz jsou vsechny ctyri rohy CISTE.
+        $cela = $konec['cisty'] === 4;
+        $vpred = false;
+        $kpos = $c->getPosition();
+        if ($cela) {
+            $klecCela++;
+            // ⭐ A taky: "muze se posunout i do boku, nejen ciste dopredu."
+            //   Staci tedy, ze se cela klec HNULA -- smer se nehlida.
+            if ($kpos !== null && $start['pos'] !== null) {
+                $vpred = $kpos->distanceTo($start['pos']) >= 1;
+            }
+            if ($vpred) { $klecCelaAPosun++; }
+        }
         if ($konec['cisty'] === 4) {
             $st['klec_prezila']++;
         } else {
@@ -374,6 +392,10 @@ if ($st['klec_na_startu'] > 0) {
     printf("Z KOL, KTERÁ ZAČALA S KLECÍ (%d):\n", $st['klec_na_startu']);
     printf("  ✅ všechny čtyři rohy ČISTÉ            %6d   %5.1f %%\n",
         $st['klec_prezila'], 100 * $st['klec_prezila'] / $st['klec_na_startu']);
+    printf("  ⭐⭐ KLEC ZŮSTALA CELÁ A ČISTÁ          %6d   %5.1f %%\n",
+        $klecCela, 100 * $klecCela / $st['klec_na_startu']);
+    printf("  ⭐⭐ ... A POSUNULA SE (i do boku)      %6d   %5.1f %%   <- CÍL\n",
+        $klecCelaAPosun, 100 * $klecCelaAPosun / $st['klec_na_startu']);
     printf("  ⛔ aspoň jeden roh není čistý          %6d   %5.1f %%\n",
         $st['klec_spinava'], 100 * $st['klec_spinava'] / $st['klec_na_startu']);
         // ⛔ ROZPAD SPINAVOSTI podle uzivatelova poradi zavaznosti:
