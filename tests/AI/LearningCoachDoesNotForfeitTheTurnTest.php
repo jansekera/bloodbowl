@@ -36,16 +36,19 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
         // ⭐ JAK SE TEN STAV VYROBÍ: `buildMoveAction` dává za pohyb
         //    `advancement * 0.1` a ODEČÍTÁ za riziko (`gfis * 0.08`) a za
         //    postranní čáru (y=0 → -0.2, y=1 → -0.05). Hráč HOME útočí na
-        //    x=25 a UŽ V KONCOVÉ ZÓNĚ STOJÍ, v rohu, s MA=1 a se spoluhráčem
+        //    x=25 a UŽ V KONCOVÉ ZÓNĚ STOJÍ, v rohu, s **MA=0** a se spoluhráčem
         //    na (25,1). Každý dosažitelný cíl je tedy buď couvnutí
-        //    (advancement < 0), nebo krok po koncové čáře přes GFI ⇒ nejlepší
-        //    vyjde na **-0,08**, kdežto END_TURN má **-0,01**.
+        //    (advancement < 0), nebo krok po koncové čáře — a VŽDY přes GFI,
+        //    protože MA je 0. ⭐ To je podstatné od 12.09.: bezrizikový tah
+        //    dostává bonus `RISK_FREE_BONUS`, takže s MA=1 by pole bez hodu
+        //    skórovalo nad END_TURN a vada by se neprojevila. S MA=0 potřebuje
+        //    hod každý cíl, bonus nedostane žádný, a nejlepší vyjde záporně.
         //    ⇒ Bez opravy vyhraje END_TURN, i když je co hrát.
         //    Míč mimo hřiště (žádné zvednutí), blitz vyčerpaný a soupeř na
         //    druhém konci hřiště (žádný blok) ⇒ v nabídce nezbude nic než
         //    MOVE. Spoluhráč už jednal, takže vlastní nabídku nemá.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 25, 0, movement: 1, id: 1)
+            ->addPlayer(TeamSide::HOME, 25, 0, movement: 0, id: 1)
             ->addPlayer(TeamSide::HOME, 25, 1, movement: 6, id: 3)
             ->addPlayer(TeamSide::AWAY, 0, 7, id: 2)
             ->withBallOffPitch()

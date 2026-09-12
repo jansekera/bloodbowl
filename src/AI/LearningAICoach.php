@@ -23,6 +23,13 @@ final class LearningAICoach implements AICoachInterface
     private const CAGE_OUTRUN_PENALTY = 0.9;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
+    /**
+     * ⭐ PORADI AKTIVACI: NEJDRIV BEZ RIZIKA (uzivatel 12.09.).
+     * Bonus dostane tah, ktery nepotrebuje ANI JEDEN hod -- zadny dodge,
+     * zadne GFI. Tim se bezpecne aktivace udelaji DRIV a rizikove zbydou
+     * na konec kola, kdy uz turnover stoji min.
+     */
+    private const RISK_FREE_BONUS = 0.4;
 
     private string $modelType = 'linear';
     /** @var list<float> */
@@ -178,7 +185,8 @@ final class LearningAICoach implements AICoachInterface
                     $candidates[] = [
                         'action' => ActionType::STAND_PAT,
                         'params' => ['playerId' => (int) $playerId],
-                        'score' => $baseScore + self::CAGE_HOLD_BONUS,
+                        // Zustat stat nestoji ani jeden hod => patri mezi bezrizikove.
+                        'score' => $baseScore + self::CAGE_HOLD_BONUS + self::RISK_FREE_BONUS,
                     ];
                 }
                 continue;
@@ -538,6 +546,14 @@ final class LearningAICoach implements AICoachInterface
                         $score += self::CAGE_EDGE_BONUS;
                     }
                 }
+            }
+
+            // ⭐ PORADI AKTIVACI -- NEJDRIV BEZ RIZIKA (uzivatel 12.09.).
+            //   Turnover na konci kola stoji min nez na zacatku: co uz je
+            //   odehrane, to se neztrati. Bezpecne tahy tedy patri DOPREDU.
+            //   Pocita se cil BEZ jedineho hodu -- ani dodge, ani GFI.
+            if ($target['dodges'] === 0 && $target['gfis'] === 0) {
+                $score += self::RISK_FREE_BONUS;
             }
 
             if ($score > $bestScore) {
