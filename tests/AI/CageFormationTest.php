@@ -85,14 +85,15 @@ final class CageFormationTest extends TestCase
         $this->assertSame(ActionType::STAND_PAT, $decision['action']);
     }
 
-    public function testCarrierWithACageAdvancesOnlyOneSquare(): void
+    public function testCarrierIsCappedByTheSlowestCageMember(): void
     {
-        // ⭐ PHP33 (B): nosič má kolem sebe klec a MA 6. Bez pravidla by
-        //    vyrazil o šest polí a klec by zůstala stát — tvar by se rozpadl.
-        //    Rohy ho doženou jen tehdy, když udělá JEDEN krok.
+        // ⭐ PHP33 (B), upřesněno uživatelem 12.09.: *„max pohyb klece podle
+        //    nejmenšího MA ze všech pěti."* Klec se posouvá celá, takže dál,
+        //    než ujde nejpomalejší z ní, jít nemůže — jinak zůstane roh prázdný.
+        //    Tady má jeden roh MA 2, ostatní 6 ⇒ strop jsou DVĚ pole.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)   // nosič
-            ->addPlayer(TeamSide::HOME, 9, 6, movement: 6, id: 2)    // rohy
+            ->addPlayer(TeamSide::HOME, 9, 6, movement: 2, id: 2)    // ⭐ nejpomalejší roh
             ->addPlayer(TeamSide::HOME, 9, 8, movement: 6, id: 3)
             ->addPlayer(TeamSide::HOME, 11, 6, movement: 6, id: 4)
             ->addPlayer(TeamSide::HOME, 11, 8, movement: 6, id: 5)
@@ -110,16 +111,16 @@ final class CageFormationTest extends TestCase
 
         // SEBEKONTROLA: nosič se OPRAVDU může dostat dál než o jedno pole.
         $daleko = array_filter($rules->getValidMoveTargets($state, 1),
-            static fn(array $t) => max(abs($t['x'] - 10), abs($t['y'] - 7)) > 1);
+            static fn(array $t) => max(abs($t['x'] - 10), abs($t['y'] - 7)) > 2);
         $this->assertNotSame([], $daleko,
-            'fixtura je vadná: nosič nemá kam dál, omezení by nic neznamenalo');
+            'fixtura je vadná: nosič se dál než o dvě pole nedostane, strop by nic neznamenal');
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $krok = max(abs($decision['params']['x'] - 10), abs($decision['params']['y'] - 7));
-        $this->assertSame(1, $krok,
-            sprintf('nosič skočil o %d pole a utekl vlastní kleci', $krok));
+        $this->assertLessThanOrEqual(2, $krok,
+            sprintf('nosič skočil o %d pole, ale nejpomalejší roh ujde jen 2', $krok));
     }
 
     public function testCarrierWithoutACageStillSprints(): void

@@ -131,6 +131,39 @@ final class LearningAICoach implements AICoachInterface
         return $n;
     }
 
+    /**
+     * ⭐ PHP33: hraci vlastniho tymu stojici v ROZICH kolem daneho pole.
+     */
+    private function cornerPlayers(GameState $state, TeamSide $side, Position $center, int $exceptId): array
+    {
+        $out = [];
+        foreach ($state->getPlayersOnPitch($side) as $p) {
+            if ($p->getId() === $exceptId) {
+                continue;
+            }
+            $pos = $p->getPosition();
+            if ($pos !== null && self::isCageCorner($center, $pos)) {
+                $out[] = $p;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Kolik poli ujde NEJPOMALEJSI z klece. Uzivatel 12.09.: "max pohyb
+     * klece podle nejmensiho MA ze vsech peti."
+     */
+    private function slowestRemaining(array $players): int
+    {
+        $min = PHP_INT_MAX;
+        foreach ($players as $p) {
+            $min = min($min, $p->getMovementRemaining());
+        }
+
+        return $min === PHP_INT_MAX ? 0 : max(0, $min);
+    }
+
     /** Nosic vlastniho tymu, nebo `null`. */
     private function ownCarrierPosition(GameState $state, TeamSide $side): ?Position
     {
@@ -516,12 +549,19 @@ final class LearningAICoach implements AICoachInterface
                 //   existuje (aspon dva rohy). Bez klece se nosic pohybuje
                 //   jako driv.
                 if ($currentPos !== null) {
-                    $rohy = $this->cornersHeldAround($state, $side, $currentPos, $playerId);
-                    if ($rohy >= self::CAGE_MIN_CORNERS) {
+                    $rohovi = $this->cornerPlayers($state, $side, $currentPos, $playerId);
+                    if (count($rohovi) >= self::CAGE_MIN_CORNERS) {
+                        // ⭐ UPRESNENO UZIVATELEM 12.09.: "max pohyb klece podle
+                        //   NEJMENSIHO MA ze vsech peti." Klec se posouva cela,
+                        //   takze dal, nez ujde nejpomalejsi z ni, jit nemuze --
+                        //   jinak nekdo zustane vzadu a roh zustane prazdny.
+                        //   Do ted tu byl natvrdo jeden krok, coz nejpomalejsiho
+                        //   hrace ignorovalo a klec zbytecne brzdilo.
+                        $limit = $this->slowestRemaining($rohovi);
                         $krok = max(abs($target['x'] - $currentPos->getX()),
                                     abs($target['y'] - $currentPos->getY()));
-                        if ($krok > 1) {
-                            $score -= ($krok - 1) * self::CAGE_OUTRUN_PENALTY;
+                        if ($krok > $limit) {
+                            $score -= ($krok - $limit) * self::CAGE_OUTRUN_PENALTY;
                         }
                     }
                 }
