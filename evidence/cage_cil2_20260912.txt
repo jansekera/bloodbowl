@@ -1,0 +1,41 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí přečíst ČISTOU klec (4 čisté rohy): {"cisty":4,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] rozliší roh vzatý soupeřem od prázdného: {"cisty":2,"spinavy":0,"souper":1,"prazdny":1,"na_hristi":4}
+    [OK ] najde ŠPINAVÝ roh (náš hráč, ale soupeř vedle): {"cisty":3,"spinavy":1,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"cisty":2,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":2}
+  ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.
+
+PHP Warning:  Undefined variable $klecCela in /home/jenda/claude/blood-bowl/cli/diag_cage_20260912.php on line 231
+PHP Warning:  Undefined variable $klecCelaAPosun in /home/jenda/claude/blood-bowl/cli/diag_cage_20260912.php on line 237
+KOUČ: learning   KORPUS: 10 her, seed 20260912, rostery: dev
+
+KOLA CELKEM (jmenovatel)                    305
+  bez nosiče                                208
+     z toho míč drží SOUPEŘ                 106   (normální stav, ne vada)
+     ⛔ z toho míč VOLNÝ na hřišti           102   (nikdo ho nezvedl)
+        ⛔⛔ a NĚKDO na něj dosáhl             74   <- rozhodnutí kouče, ne vzdálenost
+        jen daleko (nikdo nedosáhl)          28
+
+⭐ CO KOUČ ZVOLIL JAKO PRVNÍ, KDYŽ MĚL MÍČ V DOSAHU (74 kol):
+    ✅ přece jen šel pro míč                63
+    move (jinam)                          8
+    move (blíž k míči)                3
+    ⭐ nejlepší šance na zvednutí v těch kolech: 17, 17, 17, 17, 17, 17, 17, 33, 33, 33, 50 %  (medián 17 %)
+    ZBYTEK (musí být 0)                     0
+     míč mimo hru (po TD / před výkopem)      0
+  nosič bez klece na startu                  81
+  ⚠️ nosič u lajny (rohy nejsou 4)             4   <- NEPOČÍTÁ SE ZA ÚSPĚCH
+  ⭐ klec na startu (4 naše rohy)             12
+  ZBYTEK (musí být 0)                         0
+
+Z KOL, KTERÁ ZAČALA S KLECÍ (12):
+  ✅ všechny čtyři rohy ČISTÉ                 1     8.3 %
+  ⭐⭐ KLEC ZŮSTALA CELÁ A ČISTÁ               0     0.0 %
+  ⭐⭐ ... A POSUNULA SE (i do boku)           0     0.0 %   <- CÍL
+  ⛔ aspoň jeden roh není čistý              11    91.7 %
+     ⛔⛔⛔ rohů VZATÝCH SOUPEŘEM 0   (blok, neomezeně)
+     ⛔⛔ PRÁZDNÝCH rohů 21   (stojí je blitz -- jeden za kolo)
+     ⚠️ našich rohů se soupeřem vedle 0
+  posun nosiče: průměr 5.50 pole, maximum 7

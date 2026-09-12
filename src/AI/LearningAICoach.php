@@ -48,7 +48,14 @@ final class LearningAICoach implements AICoachInterface
      * ocenuje se kazdy roh ciloveho pole, ktery je volny (nebo nas) a nema
      * vedle sebe stojiciho soupere. Ctyri ciste rohy tedy daji +1,0.
      */
-    private const CARRIER_CLEAN_CORNER_BONUS = 0.25;
+    private const CARRIER_CLEAN_CORNER_BONUS = 0.6;
+    /**
+     * ⛔⛔ Uzivatel 12.09.: cista klec "je nutna -- jinak o mic prijdeme."
+     * ⇒ Neni to preference, je to PODMINKA: spinavy roh znamena, ze souper
+     * srazi rohoveho hrace a je u nosice. Proto je pokuta za roh se souperem
+     * vedle tezka, ne kosmeticka.
+     */
+    private const CAGE_DIRTY_HARD_PENALTY = 2.0;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
@@ -811,7 +818,7 @@ final class LearningAICoach implements AICoachInterface
                             }
                             $np = $nepritel->getPosition();
                             if ($np !== null && $np->distanceTo($pos) === 1) {
-                                $score -= self::CAGE_DIRTY_CORNER_PENALTY;
+                                $score -= self::CAGE_DIRTY_HARD_PENALTY;
                                 break;
                             }
                         }
