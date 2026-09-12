@@ -22,7 +22,7 @@ final class LearningAICoach implements AICoachInterface
      * dostaval jen za pole, ktere rohem UZ JE, takze posadka klece stala.
      * Klesa se vzdalenosti a nikdy neprebije samotny roh.
      */
-    private const CAGE_APPROACH_BONUS = 1.0;
+    private const CAGE_APPROACH_BONUS = 2.0;
     /**
      * ⚠️ SPINAVY ROH (uzivatel 12.09.: "spinavy roh -- soused se souperem"):
      * roh, na kterem sice stojime, ale ma vedle sebe stojiciho soupere.
@@ -32,6 +32,15 @@ final class LearningAICoach implements AICoachInterface
      * nez zadny: pokuta je mensi nez bonus za roh.
      */
     private const CAGE_DIRTY_CORNER_PENALTY = 0.8;
+    /**
+     * ⛔ MERENI 12.09.: klec se sejde jen v 7 kolech z 317 (2,2 %), pritom
+     * nosic sam existuje v 82 kolech. Duvod: hrac bez mice dostava
+     * `advancement * 0.1` za postup vpred -- za sest poli tedy az 0,6, coz
+     * prebije priblizeni ke kleci. Posadka misto skladani klece BEZI DOPREDU.
+     * ⇒ Kdyz mic drzi NAS tym, obecny postup vpred se pro hrace bez mice
+     * tlumi: jeho ukol je klec, ne zavod do koncove zony.
+     */
+    private const ADVANCE_DAMP_WITH_CAGE = 0.3;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
     /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
@@ -658,7 +667,16 @@ final class LearningAICoach implements AICoachInterface
             if ($currentPos !== null) {
                 $currentDist = abs($currentPos->getX() - $endZoneX);
                 $advancement = $currentDist - $distToEndZone;
-                $score = $advancement * 0.1 - $riskPenalty;
+                $postup = $advancement * 0.1;
+                // ⛔ Hrac bez mice, kdyz mic drzi NAS tym: tlumit zavod dopredu,
+                //   jinak prebije skladani klece (mereni 12.09., viz konstanta).
+                if (!$isCarrier && $ball->isHeld() && $ball->getCarrierId() !== null) {
+                    $nosic = $state->getPlayer($ball->getCarrierId());
+                    if ($nosic !== null && $nosic->getTeamSide() === $side) {
+                        $postup *= self::ADVANCE_DAMP_WITH_CAGE;
+                    }
+                }
+                $score = $postup - $riskPenalty;
             }
 
             // Defensive positioning: penalize moving to sideline
