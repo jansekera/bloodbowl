@@ -232,4 +232,52 @@ final class CageFormationTest extends TestCase
         $this->assertSame(13, $decision['params']['x']);
         $this->assertSame(7, $decision['params']['y']);
     }
+
+    public function testRiskIsPricedByWhoTakesIt(): void
+    {
+        // ⛔⛔ Uživatel 12.09.: „proč trpaslík dělá dodge? to nemá dělat — je to
+        //    trpaslík", a dodal: „má ho zastavit, že je dodge hodně nebezpečný
+        //    pro něj."
+        //    Do 12.09. stál dodge paušálních 0,15 bez ohledu na to, kdo ho dělá:
+        //    trpaslík s AG 2 (šance 33 %) platil stejně jako elf s AG 4 (67 %).
+        //    Nabídka přitom `successChance` nese a AG v ní už je.
+        //
+        //    Fixtura: dva naši hráči ve stejné situaci — každý má vedle sebe
+        //    soupeře, takže oba musí dodgovat. Liší se JEN agilitou.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 3, movement: 6, agility: 2, id: 1)   // trpaslík
+            ->addPlayer(TeamSide::AWAY, 6, 3, id: 2)
+            ->addPlayer(TeamSide::HOME, 5, 11, movement: 6, agility: 4, id: 3)  // elf
+            ->addPlayer(TeamSide::AWAY, 6, 11, id: 4)
+            ->withBallOffPitch()
+            ->build();
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA: oba opravdu musí dodgovat, a šance se liší.
+        $sance = [];
+        foreach ([1, 3] as $id) {
+            $cile = $rules->getValidMoveTargets($state, $id);
+            $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} nemá kam");
+            $sance[$id] = max(array_column($cile, 'successChance'));
+        }
+        $this->assertLessThan($sance[3], $sance[1],
+            'fixtura je vadná: trpaslík nemá horší šanci než elf, není co rozlišovat');
+
+        // ⭐ Porovnávají se POHYBY, ne celé rozhodnutí: v téhle pozici je
+        //    k dispozici i blok a ten by měření přebil. Měří se tedy přesně
+        //    to, co se změnilo — cena rizika v ohodnocení pohybu.
+        $ai = new LearningAICoach();
+        $build = new \ReflectionMethod(LearningAICoach::class, 'buildScoredAction');
+        $skore = [];
+        foreach ([1, 3] as $id) {
+            $b = $build->invoke($ai, $state, $rules, ActionType::MOVE, $id, TeamSide::HOME, 0.0);
+            $this->assertNotNull($b, "fixtura je vadná: hráč {$id} nemá postavený pohyb");
+            $skore[$id] = $b['score'];
+        }
+
+        $this->assertLessThan($skore[3], $skore[1],
+            sprintf('pohyb trpaslíka (%d %%, skóre %.2f) není horší než elfův (%d %%, skóre %.2f) -- riziko se pořád oceňuje paušálem',
+                $sance[1], $skore[1], $sance[3], $skore[3]));
+    }
 }

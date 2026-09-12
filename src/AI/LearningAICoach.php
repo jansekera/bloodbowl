@@ -55,6 +55,26 @@ final class LearningAICoach implements AICoachInterface
     private const PICKUP_UNCONTESTED_BONUS = 4.0;
     /** A jde pro nej hrac, ktery ho udrzi -- runner nebo thrower. */
     private const PICKUP_SPECIALIST_BONUS = 1.0;
+    /**
+     * ⛔⛔ RIZIKO SE MUSI OCENOVAT PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026).
+     * Uzivatel: "proc trpaslik dela dodge? to nema delat -- je to trpaslik."
+     * Do ted tu bylo `dodges * 0.15 + gfis * 0.08`, tedy PAUSAL: dodge za 33 %
+     * (AG 2, trpaslik) stal stejne jako dodge za 83 % (AG 4, elf).
+     * ⭐ Nabidka pritom nese `successChance` a ta AG uz zohlednuje
+     * (AG 2 => 33, AG 3 => 50, AG 4 => 67). Staci ji cist.
+     */
+    private const RISK_WEIGHT = 1.5;
+    /** ⛔ U NOSICE je cena selhani jina: turnover a ztrata mice. */
+    private const RISK_WEIGHT_CARRIER = 5.0;
+    /**
+     * ⛔⛔ TVRDA HRANICE (uzivatel 12.09.): "ma ho zastavit, ze je dodge hodne
+     * nebezpecny pro nej." Pod touhle sanci uz nejde o vahani, ale o to, ze
+     * takovy tah se proste NEHRAJE -- pro trpaslika s AG 2 je dodge 33 %,
+     * tedy dve ze tri kol konci turnoverem.
+     */
+    private const RISK_REFUSE_BELOW = 50;
+    private const RISK_REFUSE_PENALTY = 2.0;
+    private const RISK_REFUSE_PENALTY_CARRIER = 4.0;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -514,7 +534,18 @@ final class LearningAICoach implements AICoachInterface
 
         foreach ($targets as $target) {
             $score = 0.0;
-            $riskPenalty = $target['dodges'] * 0.15 + $target['gfis'] * 0.08;
+            // ⛔ Riziko podle SKUTECNE sance, ne podle poctu hodu -- viz
+            //   konstanty vys. Bez `successChance` se spadne na 100 %,
+            //   tedy na "bez rizika", coz je bezpecny vychozi stav.
+            $sance = max(0, min(100, (int) ($target['successChance'] ?? 100)));
+            $riskPenalty = (1 - $sance / 100)
+                * ($isCarrier ? self::RISK_WEIGHT_CARRIER : self::RISK_WEIGHT);
+            if ($sance < self::RISK_REFUSE_BELOW) {
+                // Pod hranici uz to neni vahani, ale zakaz.
+                $riskPenalty += $isCarrier
+                    ? self::RISK_REFUSE_PENALTY_CARRIER
+                    : self::RISK_REFUSE_PENALTY;
+            }
 
             // Touchdown: carrier reaching endzone
             if ($isCarrier) {
