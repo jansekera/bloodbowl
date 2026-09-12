@@ -112,10 +112,24 @@ for ($g = 0; $g < $games; $g++) {
                 if (count($state->getPlayersOnPitch($side)) < 11) {
                     $state = $ai->setupFormation($state, $side);
                 }
-                $state = $resolver->resolve($state, ActionType::END_SETUP, [])->getNewState();
+                $setupRes = $resolver->resolve($state, ActionType::END_SETUP, []);
+                $state = $setupRes->getNewState();
+                foreach ($setupRes->getEvents() as $ev) {
+                    $t = $ev->getType();
+                    $podleTypu[$t] = ($podleTypu[$t] ?? 0) + 1;
+                    $podleAkce['end_setup'][$t] = ($podleAkce['end_setup'][$t] ?? 0) + 1;
+                    $celkem['udalosti']++;
+                }
                 $total++;
             } elseif ($state->getPhase() === GamePhase::HALF_TIME) {
-                $state = $gameFlow->resolveHalfTime($state)['state'];
+                $ht = $gameFlow->resolveHalfTime($state);
+                $state = $ht['state'];
+                foreach ($ht['events'] ?? [] as $ev) {
+                    $t = $ev->getType();
+                    $podleTypu[$t] = ($podleTypu[$t] ?? 0) + 1;
+                    $podleAkce['game_flow'][$t] = ($podleAkce['game_flow'][$t] ?? 0) + 1;
+                    $celkem['udalosti']++;
+                }
                 $total++;
             } else {
                 break;
@@ -143,6 +157,16 @@ for ($g = 0; $g < $games; $g++) {
             $result = $resolver->resolve($state, ActionType::END_TURN, []);
         }
 
+        // Spolecny zapis udalosti do obou kosu.
+        $zapis = static function (array $events, string $akce) use (&$podleTypu, &$podleAkce, &$celkem): void {
+            foreach ($events as $ev) {
+                $t = $ev->getType();
+                $podleTypu[$t] = ($podleTypu[$t] ?? 0) + 1;
+                $podleAkce[$akce][$t] = ($podleAkce[$akce][$t] ?? 0) + 1;
+                $celkem['udalosti']++;
+            }
+        };
+
         $akce = $decision['action']->value;
         foreach ($result->getEvents() as $ev) {
             $t = $ev->getType();
@@ -156,10 +180,19 @@ for ($g = 0; $g < $games; $g++) {
             $state = $resolver->resolve($state, ActionType::END_TURN, [])->getNewState();
             $turnActions = 0;
         }
+        // ⛔⛔ OPRAVA 12.09.: prvni beh hlasil `touchdown`, `kickoff`, `half_time`
+        //   i `game_over` jako NULOVE -- a byla to vada MERIDLA, ne enginu:
+        //   udalosti z `GameFlowResolver` se vubec nesbiraly, protoze se sem
+        //   nechodi pres `resolve()`. Presne ta past, o ktere plati pravidlo
+        //   "nula se necte bez pozitivni kontroly".
         $sc = $gameFlow->checkTouchdown($state);
         if ($sc !== null) {
-            $state = $gameFlow->resolveTouchdown($state, $sc)['state'];
-            $state = $gameFlow->resolvePostTouchdown($state)['state'];
+            $td = $gameFlow->resolveTouchdown($state, $sc);
+            $state = $td['state'];
+            $zapis($td['events'] ?? [], 'game_flow');
+            $post = $gameFlow->resolvePostTouchdown($state);
+            $state = $post['state'];
+            $zapis($post['events'] ?? [], 'game_flow');
             $turnActions = 0;
         }
         if ($decision['action'] === ActionType::END_TURN) { $turnActions = 0; }
