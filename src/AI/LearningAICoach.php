@@ -19,6 +19,10 @@ final class LearningAICoach implements AICoachInterface
     private const CAGE_EDGE_BONUS = 0.2;
     /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
     private const CAGE_HOLD_BONUS = 1.8;
+    /** ⛔ Nosic NESMI utect vlastni kleci -- pokuta za kazde pole navic. */
+    private const CAGE_OUTRUN_PENALTY = 0.9;
+    /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
+    private const CAGE_MIN_CORNERS = 2;
 
     private string $modelType = 'linear';
     /** @var list<float> */
@@ -96,6 +100,28 @@ final class LearningAICoach implements AICoachInterface
     {
         return abs($carrierPos->getX() - $pos->getX()) === 1
             && abs($carrierPos->getY() - $pos->getY()) === 1;
+    }
+
+    /**
+     * Kolik SPOLUHRACU stoji v rozích klece kolem daneho pole.
+     *
+     * ⭐ PHP33 (B): pouziva se dvakrat -- kolem soucasne pozice nosice
+     *   (mam vubec klec?) a kolem ciloveho pole (udrzel by se tvar?).
+     */
+    private function cornersHeldAround(GameState $state, TeamSide $side, Position $center, int $exceptId): int
+    {
+        $n = 0;
+        foreach ($state->getPlayersOnPitch($side) as $p) {
+            if ($p->getId() === $exceptId) {
+                continue;
+            }
+            $pos = $p->getPosition();
+            if ($pos !== null && self::isCageCorner($center, $pos)) {
+                $n++;
+            }
+        }
+
+        return $n;
     }
 
     /** Nosic vlastniho tymu, nebo `null`. */
@@ -465,6 +491,31 @@ final class LearningAICoach implements AICoachInterface
                 } else {
                     // Normal: move closer to endzone
                     $score += (26 - $distToEndZone) * 0.05;
+                }
+
+                // ⛔⛔ PHP33 (B) -- POHYB CELE KLECE, NE UTEK NOSICE.
+                //   Uzivatel 12.09.: "pohyb cele klece je jako mala cast pred
+                //   celotahem." Kouc rozhoduje HRAC PO HRACI a nema kde drzet
+                //   zamer na cele kolo, takze plan formace se sem napsat neda.
+                //   Da se ale zaridit to podstatne: NOSIC NESMI KLECI UTECT.
+                //
+                //   Rohy klece jsou vzdy diagonala od nosice, takze kdyz se
+                //   nosic posune o JEDNO pole, kazdy roh ho dozene taky jednim
+                //   krokem a tvar zustane. Pri dvou a vice polich uz ne --
+                //   klec zustane vzadu a nosic stoji sam.
+                //
+                //   ⇒ Pokuta roste se vzdalenosti, ale POUZE kdyz klec vubec
+                //   existuje (aspon dva rohy). Bez klece se nosic pohybuje
+                //   jako driv.
+                if ($currentPos !== null) {
+                    $rohy = $this->cornersHeldAround($state, $side, $currentPos, $playerId);
+                    if ($rohy >= self::CAGE_MIN_CORNERS) {
+                        $krok = max(abs($target['x'] - $currentPos->getX()),
+                                    abs($target['y'] - $currentPos->getY()));
+                        if ($krok > 1) {
+                            $score -= ($krok - 1) * self::CAGE_OUTRUN_PENALTY;
+                        }
+                    }
                 }
             }
 

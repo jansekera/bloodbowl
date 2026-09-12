@@ -84,4 +84,60 @@ final class CageFormationTest extends TestCase
 
         $this->assertSame(ActionType::STAND_PAT, $decision['action']);
     }
+
+    public function testCarrierWithACageAdvancesOnlyOneSquare(): void
+    {
+        // ⭐ PHP33 (B): nosič má kolem sebe klec a MA 6. Bez pravidla by
+        //    vyrazil o šest polí a klec by zůstala stát — tvar by se rozpadl.
+        //    Rohy ho doženou jen tehdy, když udělá JEDEN krok.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)   // nosič
+            ->addPlayer(TeamSide::HOME, 9, 6, movement: 6, id: 2)    // rohy
+            ->addPlayer(TeamSide::HOME, 9, 8, movement: 6, id: 3)
+            ->addPlayer(TeamSide::HOME, 11, 6, movement: 6, id: 4)
+            ->addPlayer(TeamSide::HOME, 11, 8, movement: 6, id: 5)
+            ->addPlayer(TeamSide::AWAY, 24, 1, id: 6)
+            ->withBallCarried(1)
+            ->build();
+        // Rohy už jednaly ⇒ rozhoduje se jen o nosiči.
+        foreach ([2, 3, 4, 5] as $id) {
+            $state = $state->withPlayer(
+                $state->getPlayer($id)->withHasActed(true)->withHasMoved(true),
+            );
+        }
+
+        $rules = new RulesEngine();
+
+        // SEBEKONTROLA: nosič se OPRAVDU může dostat dál než o jedno pole.
+        $daleko = array_filter($rules->getValidMoveTargets($state, 1),
+            static fn(array $t) => max(abs($t['x'] - 10), abs($t['y'] - 7)) > 1);
+        $this->assertNotSame([], $daleko,
+            'fixtura je vadná: nosič nemá kam dál, omezení by nic neznamenalo');
+
+        $decision = (new LearningAICoach())->decideAction($state, $rules);
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $krok = max(abs($decision['params']['x'] - 10), abs($decision['params']['y'] - 7));
+        $this->assertSame(1, $krok,
+            sprintf('nosič skočil o %d pole a utekl vlastní kleci', $krok));
+    }
+
+    public function testCarrierWithoutACageStillSprints(): void
+    {
+        // ⭐ POZITIVNÍ KONTROLA OBRÁCENĚ: pokuta se smí projevit JEN tehdy,
+        //    když klec existuje. Bez rohů se nosič pohybuje jako dřív —
+        //    jinak bych zpomalil hru všude, ne jen v kleci.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 6, id: 1)
+            ->addPlayer(TeamSide::AWAY, 24, 1, id: 6)
+            ->withBallCarried(1)
+            ->build();
+
+        $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());
+
+        $this->assertSame(ActionType::MOVE, $decision['action']);
+        $krok = max(abs($decision['params']['x'] - 10), abs($decision['params']['y'] - 7));
+        $this->assertGreaterThan(1, $krok,
+            'bez klece nemá co nosiče brzdit — pokuta se pouští i tam, kde nemá');
+    }
 }
