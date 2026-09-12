@@ -329,13 +329,19 @@ final class LearningAICoach implements AICoachInterface
             $positions = [
                 new Position(12, 6), new Position(12, 7), new Position(12, 8),
                 new Position(8, 4), new Position(8, 6), new Position(8, 8), new Position(8, 10),
-                new Position(4, 3), new Position(4, 5), new Position(4, 9), new Position(4, 11),
+                // ⭐ ČTYŘI VZADU JSOU POSÁDKA KLECE (uživatel 12.09.: "na to máš
+                //   mít při rozestavení 4 další hráče vzadu"). Dřív stáli
+                //   rozházení po šířce (y 3, 5, 9, 11) a k nosiči uprostřed
+                //   se sbíhali půl kola. Teď stojí u středu, aby klec vznikla
+                //   hned, jakmile nosič zvedne míč a vyrazí.
+                new Position(4, 5), new Position(4, 6), new Position(4, 8), new Position(4, 9),
             ];
         } else {
             $positions = [
                 new Position(13, 6), new Position(13, 7), new Position(13, 8),
                 new Position(17, 4), new Position(17, 6), new Position(17, 8), new Position(17, 10),
-                new Position(21, 3), new Position(21, 5), new Position(21, 9), new Position(21, 11),
+                // ⭐ Totéž pro AWAY -- čtyři vzadu u středu jako posádka klece.
+                new Position(21, 5), new Position(21, 6), new Position(21, 8), new Position(21, 9),
             ];
         }
 
