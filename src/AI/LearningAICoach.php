@@ -13,6 +13,13 @@ use App\ValueObject\Position;
 
 final class LearningAICoach implements AICoachInterface
 {
+    /** ⭐ PHP33: obsazeny ROH klece. */
+    private const CAGE_CORNER_BONUS = 1.5;
+    /** Hrana klece -- lepsi nez nic, ale nesmi prebit roh. */
+    private const CAGE_EDGE_BONUS = 0.2;
+    /** ⭐ Uz stojim v rohu => DRZ POZICI. Musi prebit presun na jiny roh. */
+    private const CAGE_HOLD_BONUS = 1.8;
+
     private string $modelType = 'linear';
     /** @var list<float> */
     private array $weights = [];
@@ -75,6 +82,37 @@ final class LearningAICoach implements AICoachInterface
         }
     }
 
+    /**
+     * ⭐ KLEC (PHP33, zadani uzivatele 12.09.2026): klec je nosic + CTYRI
+     *    DIAGONALNI ROHY. Ortogonalni soused je k nicemu -- souper na nosice
+     *    dosahne stejne a jeste si to pole sam zabere.
+     *
+     * ⚠️ Uzivatel k tomu dodal: "jeste je varianta, kdy je nosic u kraje
+     *    a jsou jen dva rohy -- ale to je nebezpecne." Dvourohá klec je tedy
+     *    NOUZE, ne cil; tahle metoda o ni nic netvrdi, jen rika, jestli
+     *    dane pole JE roh.
+     */
+    private static function isCageCorner(Position $carrierPos, Position $pos): bool
+    {
+        return abs($carrierPos->getX() - $pos->getX()) === 1
+            && abs($carrierPos->getY() - $pos->getY()) === 1;
+    }
+
+    /** Nosic vlastniho tymu, nebo `null`. */
+    private function ownCarrierPosition(GameState $state, TeamSide $side): ?Position
+    {
+        $ball = $state->getBall();
+        if (!$ball->isHeld() || $ball->getCarrierId() === null) {
+            return null;
+        }
+        $carrier = $state->getPlayer($ball->getCarrierId());
+        if ($carrier === null || $carrier->getTeamSide() !== $side) {
+            return null;
+        }
+
+        return $carrier->getPosition();
+    }
+
     public function decideAction(GameState $state, RulesEngine $rules): array
     {
         $side = $state->getActiveTeam();
@@ -100,6 +138,23 @@ final class LearningAICoach implements AICoachInterface
             //   zatim NEPOUZIVA -- kdy ji ma volit, je vlastni rozhodnuti
             //   (jinak by se tise vratila vada, kterou PHP13/PHP24 zaviraly).
             if ($type === ActionType::STAND_PAT) {
+                // ⭐ PHP25 ODBLOKOVAN 12.09. (uzivatel: "odblokuj PHP25") --
+                //   a prvni pouziti je prave klec: hrac, ktery UZ STOJI
+                //   v rohu klece, nema kam chodit. Do ted se musel hnout,
+                //   protoze END_TURN smi az kdyz nabidka nic nema (PHP13/24),
+                //   a tim se klec kazde kolo rozsypala.
+                // ⛔ Zadna jina situace sem zatim nepatri; "kdy jeste nechat
+                //   hrace stat" je porad otevrena otazka (PHP20/PHP25).
+                $carrierPos = $this->ownCarrierPosition($state, $side);
+                $mujPos = $playerId !== null ? ($state->getPlayer((int) $playerId)?->getPosition()) : null;
+                if ($carrierPos !== null && $mujPos !== null
+                    && self::isCageCorner($carrierPos, $mujPos)) {
+                    $candidates[] = [
+                        'action' => ActionType::STAND_PAT,
+                        'params' => ['playerId' => (int) $playerId],
+                        'score' => $baseScore + self::CAGE_HOLD_BONUS,
+                    ];
+                }
                 continue;
             }
 
@@ -413,14 +468,23 @@ final class LearningAICoach implements AICoachInterface
                 }
             }
 
-            // Cage formation: move adjacent to own ball carrier
+            // ⭐ KLEC (PHP33) -- ROH ANO, HRANA SKORO NE.
+            //   Do 12.09.2026 tu stalo `distanceTo($pos) === 1`, tedy +1.0 za
+            //   JAKEKOLI sousedni pole. Z toho vznika HVEZDA kolem nosice,
+            //   ne klec: ortogonalni soused nosice nechrani -- souper na nej
+            //   dosahne stejne, a jeste tim pole zabere sam sobe.
+            //   Uzivatel 12.09.: klec = nosic + ctyri DIAGONALNI rohy.
             if (!$isCarrier && $ball->isHeld() && $ball->getCarrierId() !== null) {
                 $carrier = $state->getPlayer($ball->getCarrierId());
                 if ($carrier !== null && $carrier->getTeamSide() === $side && $carrier->getPosition() !== null) {
                     $carrierPos = $carrier->getPosition();
                     $pos = new Position($target['x'], $target['y']);
-                    if ($carrierPos->distanceTo($pos) === 1) {
-                        $score += 1.0;
+                    if (self::isCageCorner($carrierPos, $pos)) {
+                        $score += self::CAGE_CORNER_BONUS;
+                    } elseif ($carrierPos->distanceTo($pos) === 1) {
+                        // Hrana je porad lepsi nez nic (telo mezi soupere
+                        // a nosice), ale nesmi konkurovat rohu.
+                        $score += self::CAGE_EDGE_BONUS;
                     }
                 }
             }
