@@ -179,11 +179,15 @@ $spinavost = ['prazdny' => 0, 'souper' => 0, 'spinavy' => 0];
 //   Meri se PRICINA, ne nasledek: zajima nas prvni akce toho kola.
 $mistoZvednuti = [];
 $zvednulPrece = 0;
+// ⭐ A KDYZ nesel: JAKOU SANCI to zvednuti melo? Bez toho se neda rict,
+//   jestli kouc spravne odmitl beznadejny hod, nebo jestli je pokuta prisna.
+$sanceKdyzNesel = [];
 
 for ($g = 0; $g < $games; $g++) {
     $homeRace = $races[mt_rand(0, count($races) - 1)];
     $awayRace = $races[mt_rand(0, count($races) - 1)];
     $dice = new RandomDiceRoller(); $rules = new RulesEngine();
+    $bal = new \App\Engine\BallResolver($dice, new \App\Engine\TacklezoneCalculator(), new \App\Engine\ScatterCalculator());
     $mk = static fn(): AICoachInterface => match ($coachName) {
         'greedy' => new GreedyAICoach(),
         'learning' => new LearningAICoach(__DIR__ . '/../weights.json', 0.0),
@@ -310,6 +314,19 @@ for ($g = 0; $g < $games; $g++) {
                     }
                 }
                 $mistoZvednuti[$kl] = ($mistoZvednuti[$kl] ?? 0) + 1;
+                // Nejlepsi sance na zvednuti mezi tema, kdo na mic dosahli.
+                $nej = 0;
+                foreach ($state->getPlayersOnPitch($side) as $kandidat) {
+                    if (!$kandidat->canMove() || $micNaPoli === null) { continue; }
+                    $dosahne = false;
+                    foreach ($rules->getValidMoveTargets($state, $kandidat->getId()) as $t) {
+                        if ($t['x'] === $micNaPoli->getX() && $t['y'] === $micNaPoli->getY()) { $dosahne = true; break; }
+                    }
+                    if (!$dosahne) { continue; }
+                    $prah = $bal->getPickupTarget($state, $kandidat->withPosition($micNaPoli));
+                    $nej = max($nej, (int) round(max(0, min(6, 7 - $prah)) / 6 * 100));
+                }
+                $sanceKdyzNesel[] = $nej;
             }
         }
         if ($turnActions > 50) { $decision = ['action' => ActionType::END_TURN, 'params' => []]; }
@@ -338,6 +355,11 @@ if ($st['volny_dosazitelny'] > 0) {
     printf("    ✅ přece jen šel pro míč            %6d\n", $zvednulPrece);
     arsort($mistoZvednuti);
     foreach ($mistoZvednuti as $co => $n) { printf("    %-32s %6d\n", $co, $n); }
+    if ($sanceKdyzNesel !== []) {
+        sort($sanceKdyzNesel);
+        printf("    ⭐ nejlepší šance na zvednutí v těch kolech: %s %%  (medián %d %%)\n",
+            implode(', ', $sanceKdyzNesel), $sanceKdyzNesel[intdiv(count($sanceKdyzNesel), 2)]);
+    }
     $sou = $zvednulPrece + array_sum($mistoZvednuti);
     printf("    ZBYTEK (musí být 0)                %6d\n", $st['volny_dosazitelny'] - $sou);
 }
@@ -354,7 +376,13 @@ if ($st['klec_na_startu'] > 0) {
         $st['klec_prezila'], 100 * $st['klec_prezila'] / $st['klec_na_startu']);
     printf("  ⛔ aspoň jeden roh není čistý          %6d   %5.1f %%\n",
         $st['klec_spinava'], 100 * $st['klec_spinava'] / $st['klec_na_startu']);
-        if ($posun !== []) {
+        // ⛔ ROZPAD SPINAVOSTI podle uzivatelova poradi zavaznosti:
+    //   souperuv roh je nejhorsi (blok, neomezene), pak prazdny (stoji blitz),
+    //   pak nas hrac se souperem vedle.
+    printf("     ⛔⛔⛔ rohů VZATÝCH SOUPEŘEM %d   (blok, neomezeně)\n", $spinavost['souper']);
+    printf("     ⛔⛔ PRÁZDNÝCH rohů %d   (stojí je blitz -- jeden za kolo)\n", $spinavost['prazdny']);
+    printf("     ⚠️ našich rohů se soupeřem vedle %d\n", $spinavost['spinavy']);
+    if ($posun !== []) {
         printf("  posun nosiče: průměr %.2f pole, maximum %d\n",
             array_sum($posun) / count($posun), max($posun));
     }
