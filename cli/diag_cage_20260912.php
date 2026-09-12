@@ -161,7 +161,10 @@ mt_srand($seed);
 $races = array_keys(RACE_ROSTERS);
 $st = [
     'kola'            => 0,
-    'bez_nosice'      => 0,
+    'bez_nosice'      => 0,   // rozpad nize -- viz tri kose pod tim
+    'mic_u_soupere'   => 0,   // ⭐ NORMALNI STAV: mic drzi druhy tym
+    'mic_volny'       => 0,   // ⛔ lezi na hristi a nikdo ho nezvedl
+    'mic_mimo_hru'    => 0,   // po TD / pred vykopem
     'nosic_bez_klece' => 0,   // start: méně než 4 naše rohy
     'u_lajny'         => 0,   // start: na hřišti nejsou 4 rohy
     'klec_na_startu'  => 0,
@@ -239,6 +242,17 @@ for ($g = 0; $g < $games; $g++) {
             $uzavri($start, $state);
             $c = nosic($state, $side);
             if ($c === null) {
+                // ⭐ 12.09.: "bez nosice" byl slepy kos -- vetsina z nej je
+                //   uplne normalni stav, kdy mic proste drzi DRUHY tym.
+                //   Bez tohohle rozpadu vypadalo 22 z 30 kol jako problem.
+                $ball = $state->getBall();
+                if ($ball->isHeld()) {
+                    $st['mic_u_soupere']++;
+                } elseif ($ball->isOnPitch()) {
+                    $st['mic_volny']++;
+                } else {
+                    $st['mic_mimo_hru']++;
+                }
                 $start = ['typ' => 'bez_nosice', 'side' => $side, 'pos' => null];
             } else {
                 $k = stavKlece($state, $c);
@@ -269,6 +283,9 @@ for ($g = 0; $g < $games; $g++) {
 printf("KOUČ: %s   KORPUS: %d her, seed %d, rostery: %s\n\n", $coachName, $games, $seed, $rosterMode);
 printf("KOLA CELKEM (jmenovatel)                 %6d\n", $st['kola']);
 printf("  bez nosiče                             %6d\n", $st['bez_nosice']);
+printf("     z toho míč drží SOUPEŘ              %6d   (normální stav, ne vada)\n", $st['mic_u_soupere']);
+printf("     ⛔ z toho míč VOLNÝ na hřišti        %6d   (nikdo ho nezvedl)\n", $st['mic_volny']);
+printf("     míč mimo hru (po TD / před výkopem) %6d\n", $st['mic_mimo_hru']);
 printf("  nosič bez klece na startu              %6d\n", $st['nosic_bez_klece']);
 printf("  ⚠️ nosič u lajny (rohy nejsou 4)        %6d   <- NEPOČÍTÁ SE ZA ÚSPĚCH\n", $st['u_lajny']);
 printf("  ⭐ klec na startu (4 naše rohy)         %6d\n", $st['klec_na_startu']);
@@ -281,9 +298,7 @@ if ($st['klec_na_startu'] > 0) {
         $st['klec_prezila'], 100 * $st['klec_prezila'] / $st['klec_na_startu']);
     printf("  ⛔ aspoň jeden roh není čistý          %6d   %5.1f %%\n",
         $st['klec_spinava'], 100 * $st['klec_spinava'] / $st['klec_na_startu']);
-    printf("     z toho prázdných rohů %d, obsazených soupeřem %d\n",
-        $spinavost['prazdne'], $spinavost['souper']);
-    if ($posun !== []) {
+        if ($posun !== []) {
         printf("  posun nosiče: průměr %.2f pole, maximum %d\n",
             array_sum($posun) / count($posun), max($posun));
     }

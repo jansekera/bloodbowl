@@ -1,0 +1,22 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí přečíst ČISTOU klec (4 naše rohy): {"nase":4,"souper":0,"prazdne":0,"na_hristi":4}
+    [OK ] umí najít ŠPINAVÝ roh (soupeř + prázdno): {"nase":2,"souper":1,"prazdne":1,"na_hristi":4}
+    [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"nase":2,"souper":0,"prazdne":0,"na_hristi":2}
+  ⇒ měřidlo umí najít čistou klec, špinavý roh i případ u lajny.
+
+KOUČ: learning   KORPUS: 12 her, seed 20260912, rostery: dev
+
+KOLA CELKEM (jmenovatel)                    367
+  bez nosiče                                255
+  nosič bez klece na startu                  77
+  ⚠️ nosič u lajny (rohy nejsou 4)             3   <- NEPOČÍTÁ SE ZA ÚSPĚCH
+  ⭐ klec na startu (4 naše rohy)             32
+  ZBYTEK (musí být 0)                         0
+
+Z KOL, KTERÁ ZAČALA S KLECÍ (32):
+  ✅ klec přežila kolo                       10    31.2 %
+  ⛔ rohy po kole ŠPINAVÉ                    22    68.8 %
+     z toho prázdných rohů 25, obsazených soupeřem 8
+  posun nosiče: průměr 5.00 pole, maximum 16

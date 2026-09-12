@@ -5,3 +5,206 @@ POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
     [OK ] umí říct „nenastalo": touchdown v tomhle výsledku není
   ⇒ měřidlo umí najít jedničku i nulu.
 
+KOUČ: learning   KORPUS: 30 her, seed 20260911, rostery: dev
+
+JMENOVATELÉ: 30 her · 901 kol · 3849 rozhodnutí · 27112 událostí · 0 výjimek
+
+TYPY UDÁLOSTÍ, KTERÉ NASTALY (50):
+    player_move                 18069   4694.47 na 1000 rozhodnutí
+    gfi                          3133   813.98 na 1000 rozhodnutí
+    dodge                         983   255.39 na 1000 rozhodnutí
+    turnover                      869   225.77 na 1000 rozhodnutí
+    player_fell                   810   210.44 na 1000 rozhodnutí
+    armour_roll                   810   210.44 na 1000 rozhodnutí
+    injury_roll                   298    77.42 na 1000 rozhodnutí
+    reroll                        277    71.97 na 1000 rozhodnutí
+    ball_bounce                   271    70.41 na 1000 rozhodnutí
+    pickup                        266    69.11 na 1000 rozhodnutí
+    stand_up                      256    66.51 na 1000 rozhodnutí
+    block                         194    50.40 na 1000 rozhodnutí
+    push                          125    32.48 na 1000 rozhodnutí
+    follow_up                     125    32.48 na 1000 rozhodnutí
+    catch                          83    21.56 na 1000 rozhodnutí
+    kickoff                        60    15.59 na 1000 rozhodnutí
+    kickoff_table                  60    15.59 na 1000 rozhodnutí
+    touchdown                      37     9.61 na 1000 rozhodnutí
+    ko_recovery                    36     9.35 na 1000 rozhodnutí
+    half_time                      30     7.79 na 1000 rozhodnutí
+    end_turn                       29     7.53 na 1000 rozhodnutí
+    hand_off                       28     7.27 na 1000 rozhodnutí
+    kick_skill                     22     5.72 na 1000 rozhodnutí
+    pass                           22     5.72 na 1000 rozhodnutí
+    loner                          20     5.20 na 1000 rozhodnutí
+    chain_push                     18     4.68 na 1000 rozhodnutí
+    wild_animal                    18     4.68 na 1000 rozhodnutí
+    really_stupid                  16     4.16 na 1000 rozhodnutí
+    throw_in                       16     4.16 na 1000 rozhodnutí
+    bone_head                      16     4.16 na 1000 rozhodnutí
+    leap                           16     4.16 na 1000 rozhodnutí
+    foul                           13     3.38 na 1000 rozhodnutí
+    bloodlust_fail                 12     3.12 na 1000 rozhodnutí
+    tentacles                      12     3.12 na 1000 rozhodnutí
+    weather_change                 12     3.12 na 1000 rozhodnutí
+    regeneration                   11     2.86 na 1000 rozhodnutí
+    frenzy                          7     1.82 na 1000 rozhodnutí
+    diving_tackle                   6     1.56 na 1000 rozhodnutí
+    interception                    4     1.04 na 1000 rozhodnutí
+    apothecary                      4     1.04 na 1000 rozhodnutí
+    wrestle                         4     1.04 na 1000 rozhodnutí
+    foul_appearance                 3     0.78 na 1000 rozhodnutí
+    bloodlust_bite                  2     0.52 na 1000 rozhodnutí
+    animosity                       2     0.52 na 1000 rozhodnutí
+    sweltering_heat                 2     0.52 na 1000 rozhodnutí
+    fend                            1     0.26 na 1000 rozhodnutí
+    juggernaut                      1     0.26 na 1000 rozhodnutí
+    dump_off                        1     0.26 na 1000 rozhodnutí
+    game_over                       1     0.26 na 1000 rozhodnutí
+    crowd_surf                      1     0.26 na 1000 rozhodnutí
+
+⛔ TYPY, KTERÉ NENASTALY ANI JEDNOU (32 z 82):
+    always_hungry
+    ball_and_chain_block
+    ball_and_chain_move
+    bomb_explosion
+    bomb_landing
+    bomb_throw
+    chainsaw
+    chainsaw_kickback
+    diving_catch
+    ejection
+    hail_mary_pass
+    hypnotic_gaze
+    kick_off_return
+    leader
+    multiple_block
+    no_hands
+    nurgles_rot
+    pass_block
+    piling_on
+    pro
+    safe_throw
+    secret_weapon
+    shadowing
+    sneaky_git
+    stab
+    stakes_block_regen
+    stand_pat
+    strip_ball
+    take_root
+    throw_team_mate
+    touchback
+    ttm_landing
+
+   ⚠️ Každý řádek je otázka, ne nález: buď to korpus nedosáhl (vzácná
+      dovednost, žádný roster ji nemá), nebo tu cestu engine NEUMÍ.
+      Rozhoduje se to čtením, ne odhadem.
+
+ROZPAD PODLE AKCE (co která akce vůbec vyrábí):
+  blitz  (2429 událostí)
+      player_move                 1059
+      dodge                        208
+      gfi                          170
+      player_fell                  169
+      armour_roll                  169
+      turnover                     133
+      block                        130
+      follow_up                     87
+      push                          86
+      injury_roll                   54
+      reroll                        42
+      ball_bounce                   41
+      chain_push                    17
+      catch                         15
+      loner                          8
+      really_stupid                  6
+      wild_animal                    5
+      tentacles                      4
+      bone_head                      4
+      bloodlust_fail                 3
+      apothecary                     3
+      frenzy                         3
+      wrestle                        2
+      diving_tackle                  2
+      leap                           2
+      foul_appearance                1
+      bloodlust_bite                 1
+      juggernaut                     1
+      dump_off                       1
+      pass                           1
+      throw_in                       1
+      crowd_surf                     1
+  block  (267 událostí)
+      block                         64
+      push                          39
+      follow_up                     38
+      player_fell                   36
+      armour_roll                   36
+      turnover                      17
+      injury_roll                   16
+      ball_bounce                    6
+      frenzy                         4
+      foul_appearance                2
+      wrestle                        2
+      catch                          2
+      fend                           1
+      apothecary                     1
+      stand_up                       1
+      chain_push                     1
+      really_stupid                  1
+  end_setup  (224 událostí)
+      kickoff                       60
+      kickoff_table                 60
+      ball_bounce                   60
+      kick_skill                    22
+      weather_change                12
+      catch                          8
+      sweltering_heat                2
+  end_turn  (29 událostí)
+      end_turn                      29
+  foul  (19 událostí)
+      foul                          13
+      injury_roll                    6
+  game_flow  (104 událostí)
+      touchdown                     37
+      ko_recovery                   36
+      half_time                     30
+      game_over                      1
+  hand_off  (79 událostí)
+      catch                         32
+      hand_off                      28
+      ball_bounce                    9
+      turnover                       6
+      reroll                         2
+      animosity                      2
+  move  (23889 událostí)
+      player_move                17010
+      gfi                         2963
+      dodge                        775
+      turnover                     695
+      player_fell                  605
+      armour_roll                  605
+      pickup                       266
+      stand_up                     255
+      reroll                       230
+      injury_roll                  222
+      ball_bounce                  142
+      catch                         24
+      leap                          14
+      wild_animal                   13
+      loner                         12
+      bone_head                     12
+      regeneration                  11
+      really_stupid                  9
+      bloodlust_fail                 9
+      tentacles                      8
+      throw_in                       4
+      diving_tackle                  4
+      bloodlust_bite                 1
+  pass  (72 událostí)
+      pass                          21
+      turnover                      18
+      ball_bounce                   13
+      throw_in                      11
+      interception                   4
+      reroll                         3
+      catch                          2
