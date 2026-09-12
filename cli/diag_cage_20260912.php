@@ -45,8 +45,12 @@ function rohy(Position $p): array
 
 /**
  * Stav klece kolem nosiče -- ČTYŘI TŘÍDY, podle upřesnění uživatele 12.09.:
- *   `prazdny`  ⛔⛔ na rohu NIKDO nestojí -- "prázdný roh je větší průšvih"
- *   `souper`   ⛔ roh obsadil soupeř
+ *   `souper`   ⛔⛔⛔ roh obsadil soupeř -- UŽ STOJÍ VEDLE MÍČE.
+ *              Uživatel 12.09.: "soupeř stojící vedle míče je nejhorší --
+ *              block vs blitz." ⇒ Odtud může nosiče BLOKOVAT, a blok je
+ *              neomezený. Na prázdný roh se teprve musí dostat, a na to
+ *              potřebuje BLITZ, který má jen JEDEN za kolo.
+ *   `prazdny`  ⛔⛔ na rohu nikdo nestojí -- díra, ale stojí je blitz
  *   `spinavy`  ⚠️ náš hráč tam stojí, ALE má vedle sebe soupeře
  *              (uživatel: "špinavý roh = soused se soupeřem")
  *   `cisty`    ✅ náš hráč a v okolí žádný stojící soupeř
