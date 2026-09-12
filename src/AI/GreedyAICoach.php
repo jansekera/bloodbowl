@@ -212,6 +212,27 @@ final class GreedyAICoach implements AICoachInterface
     /**
      * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
      */
+    /**
+     * Cena rizika v mericich jednotkach `scoreMove` (0-1000).
+     *
+     * ⭐ `successChance` z nabidky uz agilitu zohlednuje: AG 2 => 33,
+     *    AG 3 => 50, AG 4 => 67. Pod 50 % se pripocitava tvrda privazka --
+     *    uzivatel 12.09.: "ma ho zastavit, ze je dodge hodne nebezpecny pro nej."
+     *
+     * @param array<string, mixed> $target
+     */
+    private static function riskPenalty(array $target, bool $isCarrier): float
+    {
+        $sance = max(0, min(100, (int) ($target['successChance'] ?? 100)));
+        $vaha = $isCarrier ? 500.0 : 150.0;
+        $pokuta = (1 - $sance / 100) * $vaha;
+        if ($sance < 50) {
+            $pokuta += $isCarrier ? 400.0 : 200.0;
+        }
+
+        return $pokuta;
+    }
+
     private function scoreMove(
         GameState $state,
         RulesEngine $rules,
@@ -241,7 +262,10 @@ final class GreedyAICoach implements AICoachInterface
 
             // Score touchdown: ball carrier reaching end zone
             if ($isCarrier && $pos->isInEndZone($side !== TeamSide::HOME)) {
-                $riskPenalty = $target['dodges'] * 30 + $target['gfis'] * 15;
+                // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
+                //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
+                //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
+                $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
                 $score = 1000 - $riskPenalty;
                 if ($bestTarget === null || $score > $bestScore) {
                     $bestTarget = $target;
@@ -254,7 +278,10 @@ final class GreedyAICoach implements AICoachInterface
             if (!$ball->isHeld() && $ball->isOnPitch()) {
                 $ballPos = $ball->getPosition();
                 if ($ballPos !== null && $pos->equals($ballPos)) {
-                    $riskPenalty = $target['dodges'] * 30 + $target['gfis'] * 15;
+                    // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
+                    //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
+                    //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
+                    $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
                     $score = 400 - $riskPenalty;
                     if ($bestTarget === null || $score > $bestScore) {
                         $bestTarget = $target;
@@ -264,14 +291,37 @@ final class GreedyAICoach implements AICoachInterface
                 }
             }
 
-            // Cage formation: move adjacent to own ball carrier
+            // ⭐ KLEC -- ROH ANO, HRANA NE (12.09.2026, tataz oprava jako
+            //   v `LearningAICoach`). Do ted stacila JAKAKOLI sousednost
+            //   s nosicem, z cehoz vznikla hvezda, ne klec. Klec je nosic
+            //   + ctyri DIAGONALNI rohy.
             if (!$isCarrier && $ball->isHeld() && $ball->getCarrierId() !== null) {
                 $carrier = $state->getPlayer($ball->getCarrierId());
                 if ($carrier !== null && $carrier->getTeamSide() === $side) {
                     $carrierPos = $carrier->getPosition();
-                    if ($carrierPos !== null && $pos->distanceTo($carrierPos) === 1) {
-                        $riskPenalty = $target['dodges'] * 30 + $target['gfis'] * 15;
+                    if ($carrierPos !== null
+                        && abs($carrierPos->getX() - $pos->getX()) === 1
+                        && abs($carrierPos->getY() - $pos->getY()) === 1) {
+                        // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
+                        //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
+                        //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
+                        $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
                         $score = 200 - $riskPenalty;
+                    }
+                }
+            }
+
+            // ⛔⛔ NOSIC NESMI SKONCIT VEDLE SOUPERE (uzivatel 12.09.) --
+            //   odtud ho souper BLOKUJE, a blok je neomezeny.
+            if ($isCarrier) {
+                foreach ($state->getPlayersOnPitch($side->opponent()) as $nepritel) {
+                    if ($nepritel->getState() !== PlayerState::STANDING) {
+                        continue;
+                    }
+                    $np = $nepritel->getPosition();
+                    if ($np !== null && $np->distanceTo($pos) === 1) {
+                        $score -= 500;
+                        break;
                     }
                 }
             }
@@ -283,7 +333,10 @@ final class GreedyAICoach implements AICoachInterface
                 $currentDist = abs($currentPos->getX() - $endZoneX);
                 $advancement = $currentDist - $distToEndZone;
                 if ($advancement > 0) {
-                    $riskPenalty = $target['dodges'] * 30 + $target['gfis'] * 15;
+                    // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
+                    //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
+                    //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
+                    $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
                     $score = max($score, 50 + $advancement * 10 - $riskPenalty);
                 }
             }
