@@ -50,6 +50,19 @@ final class LearningAICoach implements AICoachInterface
      */
     private const CARRIER_CLEAN_CORNER_BONUS = 0.6;
     /**
+     * ⭐⭐ BLOK SE VYBIRA PODLE KOSTEK, NE PAUSALEM (uzivatel 12.09.:
+     * "na blitz mame mit lepsi kandidaty a asistenty").
+     * Do ted mel kazdy blok `+0,05` bez ohledu na to, jestli se hazi tremi
+     * kostkami ve svuj prospech, nebo jednou, nebo dokonce dvema PROTI.
+     * Asistence pritom uz engine pocita -- `StrengthCalculator`.
+     *
+     * Poradi hodnot je poradi realne vyhodnosti:
+     *   3 kostky pro mne  >  2 pro mne  >  1  >>  2 proti  >  3 proti
+     */
+    private const BLOCK_DICE_VALUE = [
+        '3+' => 1.2, '2+' => 0.7, '1' => 0.1, '2-' => -1.5, '3-' => -3.0,
+    ];
+    /**
      * ⛔⛔ Uzivatel 12.09.: cista klec "je nutna -- jinak o mic prijdeme."
      * ⇒ Neni to preference, je to PODMINKA: spinavy roh znamena, ze souper
      * srazi rohoveho hrace a je u nosice. Proto je pokuta za roh se souperem
@@ -1024,8 +1037,27 @@ final class LearningAICoach implements AICoachInterface
         $bestTarget = $targets[0];
         $ball = $state->getBall();
 
+        $strCalc = new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
+        $mojePos = $player->getPosition();
+
         foreach ($targets as $target) {
-            $score = $baseScore + 0.05;
+            $score = $baseScore;
+
+            // ⭐ Kolik kostek a pro koho -- vcetne ASISTENCI, ktere
+            //   `calculateEffectiveStrength` uz zapocitava.
+            $cilPos = $target->getPosition();
+            if ($mojePos !== null && $cilPos !== null) {
+                $mojeSila = $strCalc->calculateEffectiveStrength($state, $player, $cilPos);
+                $jehoSila = $strCalc->calculateEffectiveStrength($state, $target, $mojePos);
+                $kostky = $strCalc->getBlockDiceInfo($mojeSila, $jehoSila);
+                $klic = ($kostky['attackerChooses'] ? '' : '-') === '-'
+                    ? $kostky['count'] . '-'
+                    : $kostky['count'] . ($kostky['count'] > 1 ? '+' : '');
+                $score += self::BLOCK_DICE_VALUE[$klic] ?? 0.0;
+            } else {
+                $score += 0.05;
+            }
+
             if ($ball->isHeld() && $ball->getCarrierId() === $target->getId()) {
                 $score += 0.5;
             }
