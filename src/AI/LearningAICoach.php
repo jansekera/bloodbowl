@@ -120,6 +120,15 @@ final class LearningAICoach implements AICoachInterface
      * SANCE TOHO, KDO zvedá. Tim se mezi dvema kandidaty vybere ten lepsi.
      */
     private const PICKUP_FAIL_WEIGHT = 4.0;
+    /**
+     * ⛔⛔ NEDOCHYCENA PRIHRAVKA JE TURNOVER -- stejne jako neuspesne zvednuti.
+     * ZMERENO 13.09.: `pass` mel 57,9 % turnoveru na akci, kdezto `move` 7,8 %.
+     * Po prvni oprave se prestalo hazet do prazdna, ale porad se nepocitalo,
+     * jestli to prijemce CHYTI.
+     * ⭐ `BallResolver::getCatchTarget()` uz zna vsechno: agilitu, ZONY
+     * ZACHYCENI kolem prijemce, Extra Arms, Nerves of Steel i Diving Catch.
+     */
+    private const CATCH_FAIL_WEIGHT = 4.0;
 
     private readonly \App\Engine\BallResolver $ballResolver;
     /**
@@ -449,6 +458,24 @@ final class LearningAICoach implements AICoachInterface
         }
 
         return $nej;
+    }
+
+    /**
+     * Sance (0-1), ze TENHLE hrac chyti mic na svem poli.
+     *
+     * ⭐ Prah se nepocita znovu -- bere se `BallResolver::getCatchTarget()`,
+     *   tedy tataz funkce, kterou pak pouzije engine.
+     * @param int $modifikator +1 za presnou prihravku, 0 za predani z ruky
+     */
+    private function catchChance(GameState $state, MatchPlayerDTO $prijemce, int $modifikator = 0): float
+    {
+        $prah = $this->ballResolver->getCatchTarget($state, $prijemce, $modifikator);
+        $p = max(0.0, min(1.0, (7 - $prah) / 6));
+        if ($prijemce->hasSkill(SkillName::Catch)) {
+            $p = 1 - (1 - $p) ** 2;   // Catch dava opakovani hodu
+        }
+
+        return $p;
     }
 
     /** Nosic vlastniho tymu, nebo `null`. */
@@ -1341,7 +1368,11 @@ final class LearningAICoach implements AICoachInterface
             $ziskPole = abs(($player->getPosition()?->getX() ?? $target['x']) - $endZoneX)
                 - abs($target['x'] - $endZoneX);
 
-            $score = $baseScore - $rangePenalty + $ziskPole * 0.1;
+            // ⛔ Sance, ze to prijemce CHYTI -- vcetne zon zachyceni kolem nej.
+            //   +1 je modifikator za PRESNOU prihravku.
+            $sanceChyceni = $this->catchChance($state, $prijemce, 1);
+            $score = $baseScore - $rangePenalty + $ziskPole * 0.1
+                - (1 - $sanceChyceni) * self::CATCH_FAIL_WEIGHT;
 
             if ($score > $bestScore) {
                 $bestScore = $score;
@@ -1401,12 +1432,15 @@ final class LearningAICoach implements AICoachInterface
                 continue;
             }
 
-            // Sance na chyceni: prah je `7 - AG` (bez modifikatoru),
-            //   takze AG 4 => 67 %, AG 3 => 50 %, AG 2 => 33 %.
-            $sance = max(0.0, min(1.0, (7 - (7 - $ag)) / 6));
+            // ⭐ OPRAVENO 13.09.: puvodni vzorec pocital JEN z agility
+            //   a ignoroval ZONY ZACHYCENI kolem prijemce -- pritom predat mic
+            //   hraci, ktery ma vedle sebe dva soupere, je uplne jina sance.
+            //   `getCatchTarget()` zna oboji, plus Extra Arms a spol.
+            $sance = $this->catchChance($state, $kandidat, 0);
             $ziskPole = $mojeVzdalenost - abs($pos->getX() - $endZoneX);
 
-            $score = $baseScore + $sance + $ziskPole * 0.1;
+            $score = $baseScore + $ziskPole * 0.1
+                - (1 - $sance) * self::CATCH_FAIL_WEIGHT;
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $kandidat;
