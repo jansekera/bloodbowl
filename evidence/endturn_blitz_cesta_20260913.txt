@@ -1,0 +1,66 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] playableOffered najde MOVE: dostal 1, čekal 1
+    [OK ] playableOffered na samotném END_TURN: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje setup: dostal 0, čekal 0
+    [OK ] playableOffered ignoruje akci bez playerId: dostal 0, čekal 0
+  ⇒ měřidlo umí najít jedničku i nulu.
+
+KOUČ: learning   KORPUS: 10 her, seed 20260911
+
+ROZHODNUTÍ CELKEM (jmenovatel)                   2994
+  vrátil normální akci                           2915   97.4 %
+  ⛔ END_TURN, PŘESTOŽE BYLO CO HRÁT                0    0.0 %   <- VADA
+  END_TURN právem (nabídka prázdná)                79    2.6 %
+  ZBYTEK (musí být 0)                               0
+
+KOLA: 296 celkem, z toho 0 (0.0 %) skončilo touhle vadou
+  JAK KOLA KONČÍ (kontrola, že se do té větve vůbec chodí):
+    turnoverem                                    215   72.6 %
+    rozhodnutím END_TURN                           77   26.0 %
+    pojistkou (>50 akcí v kole)                     0    0.0 %
+    JINAK (touchdown / poločas / konec hry)         4    1.4 %   <- tenhle koš dřív CHYBĚL
+    ZBYTEK (musí být 0)                             0
+    kol na zápas: 29.6   (celý zápas má 32 -- kontrola jmenovatele)
+
+ZTRACENÉ AKTIVACE (hráči, kteří ještě mohli jednat): celkem 0
+
+⛔⛔ VÝJIMKY Z RESOLVERU (živá hra `AITurnService` je NECHYTÁ):  0 = 0.00 % rozhodnutí
+    (žádná -- kouč vyrobil jen akce, které resolver přijal)
+
+⭐ ČÍM JSOU TY TURNOVERY (akce -> poslední událost):  223 celkem
+    move -> armour_roll                                76   34.1 %
+    block -> armour_roll                               47   21.1 %
+    move -> injury_roll                                37   16.6 %
+    move -> ball_bounce                                17    7.6 %
+    pass -> ball_bounce                                11    4.9 %
+    block -> injury_roll                                8    3.6 %
+    blitz -> armour_roll                                6    2.7 %
+    block -> bloodlust_fail                             6    2.7 %
+    move -> bloodlust_fail                              5    2.2 %
+    hand_off -> ball_bounce                             3    1.3 %
+    blitz -> injury_roll                                3    1.3 %
+    move -> catch                                       2    0.9 %
+    ... a dalších 2 druhů
+
+⭐ TURNOVERY NA AKCI (kolikrat se akce zahrala -> kolikrat z ni vzesel turnover):
+    move               1748 zahrano     137 turnoveru     7.8 %
+    block               550 zahrano      61 turnoveru    11.1 %
+    stand_pat           422 zahrano       0 turnoveru     0.0 %
+    blitz               111 zahrano      10 turnoveru     9.0 %
+    end_turn             79 zahrano       0 turnoveru     0.0 %
+    foul                 51 zahrano       0 turnoveru     0.0 %
+    pass                 19 zahrano      11 turnoveru    57.9 %
+    hand_off             12 zahrano       3 turnoveru    25.0 %
+    hypnotic_gaze         2 zahrano       1 turnoveru    50.0 %
+    CELKEM             2994              223              7.4 %
+
+⭐ KOLIK KOSTEK MĚLY ZAHRANÉ BLOKY A BLITZE (přivádíme asistenty?):
+    2 PRO         332    50.2 %
+    3 PRO         242    36.6 %
+    1 PRO          87    13.2 %
+    CELKEM        661
+
+⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):
+    (žádná vada nenastala -- není co rozpadat)

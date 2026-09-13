@@ -518,10 +518,15 @@ final class GreedyAICoach implements AICoachInterface
 
             // Prefer shorter passes (more accurate)
             $rangePenalty = match ($target['range']) {
-                'quick' => 0,
-                'short' => 10,
-                'long' => 30,
-                'bomb' => 60,
+                // ⛔ OPRAVA 13.09. (simplify/reuse): klice byly 'quick'/'short'/
+                //   'long'/'bomb', ale engine vraci 'quick_pass'/'short_pass'/
+                //   'long_pass'/'long_bomb' -- `match` tedy NIKDY nesedl
+                //   a vsechny dosahy mely tutez cenu. V `LearningAICoach` se
+                //   to opravilo rano, tady to zustalo.
+                'quick_pass' => 0,
+                'short_pass' => 10,
+                'long_pass' => 30,
+                'long_bomb' => 60,
                 default => 20,
             };
             $score -= $rangePenalty;
@@ -768,10 +773,11 @@ final class GreedyAICoach implements AICoachInterface
 
             // Prefer shorter range for accuracy
             $rangePenalty = match ($target['range']) {
-                'quick' => 0,
-                'short' => 10,
-                'long' => 25,
-                'bomb' => 50,
+                // ⛔ Tataz oprava klicu jako vys.
+                'quick_pass' => 0,
+                'short_pass' => 10,
+                'long_pass' => 25,
+                'long_bomb' => 50,
                 default => 15,
             };
 

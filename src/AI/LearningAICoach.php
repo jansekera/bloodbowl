@@ -23,16 +23,7 @@ final class LearningAICoach implements AICoachInterface
      * Klesa se vzdalenosti a nikdy neprebije samotny roh.
      */
     private const CAGE_APPROACH_BONUS = 2.0;
-    /**
-     * ⚠️ SPINAVY ROH (uzivatel 12.09.: "spinavy roh -- soused se souperem"):
-     * roh, na kterem sice stojime, ale ma vedle sebe stojiciho soupere.
-     * Merenim 12.09. vyslo, ze ZADNE z 13 kol, ktera zacala s kleci,
-     * neskoncilo se ctyrmi CISTYMI rohy -- kouc totiz mezi rohy nerozlisoval.
-     * ⇒ Cisty roh se preferuje pred spinavym, ale spinavy je porad lepsi
-     * nez zadny: pokuta je mensi nez bonus za roh.
-     */
-    private const CAGE_DIRTY_CORNER_PENALTY = 0.8;
-    /**
+        /**
      * ⛔ MERENI 12.09.: klec se sejde jen v 7 kolech z 317 (2,2 %), pritom
      * nosic sam existuje v 82 kolech. Duvod: hrac bez mice dostava
      * `advancement * 0.1` za postup vpred -- za sest poli tedy az 0,6, coz
@@ -131,6 +122,7 @@ final class LearningAICoach implements AICoachInterface
     private const CATCH_FAIL_WEIGHT = 4.0;
 
     private readonly \App\Engine\BallResolver $ballResolver;
+    private readonly \App\Engine\StrengthCalculator $strCalc;
     /**
      * ⛔⛔ RIZIKO SE MUSI OCENOVAT PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026).
      * Uzivatel: "proc trpaslik dela dodge? to nema delat -- je to trpaslik."
@@ -183,6 +175,7 @@ final class LearningAICoach implements AICoachInterface
     {
         $this->epsilon = $epsilon;
         // ⛔ Jen kvuli `getPickupTarget()` -- kostkou se tady nikdy nehazi.
+        $this->strCalc = new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
         $this->ballResolver = new \App\Engine\BallResolver(
             new \App\Engine\RandomDiceRoller(),
             new \App\Engine\TacklezoneCalculator(),
@@ -245,27 +238,6 @@ final class LearningAICoach implements AICoachInterface
             && abs($carrierPos->getY() - $pos->getY()) === 1;
     }
 
-    /**
-     * Kolik SPOLUHRACU stoji v rozích klece kolem daneho pole.
-     *
-     * ⭐ PHP33 (B): pouziva se dvakrat -- kolem soucasne pozice nosice
-     *   (mam vubec klec?) a kolem ciloveho pole (udrzel by se tvar?).
-     */
-    private function cornersHeldAround(GameState $state, TeamSide $side, Position $center, int $exceptId): int
-    {
-        $n = 0;
-        foreach ($state->getPlayersOnPitch($side) as $p) {
-            if ($p->getId() === $exceptId) {
-                continue;
-            }
-            $pos = $p->getPosition();
-            if ($pos !== null && self::isCageCorner($center, $pos)) {
-                $n++;
-            }
-        }
-
-        return $n;
-    }
 
     /**
      * ⭐ PHP33: hraci vlastniho tymu stojici v ROZICH kolem daneho pole.
@@ -394,9 +366,9 @@ final class LearningAICoach implements AICoachInterface
      *    to resili u dodge a nebezpecne odmitnout -- stejne v akci block
      *    i blitz").
      *
-     * Vraci bonus/pokutu podle poctu kostek VCETNE ASISTENCI, nebo `null`,
-     * kdyz je blok NEBEZPECNY -- tedy kdyz kostky vybira SOUPER. Takovy blok
-     * se nehraje vubec, at uz jako blok nebo jako blitz.
+     * Vraci ocenení podle poctu kostek VCETNE ASISTENCI: kladne, kdyz kostky
+     * vybira utocnik, zaporne, kdyz je vybira souper. ⛔ Uz NEVRACI `null` --
+     * to zahazovalo i bloky na silnejsiho NOSICE, kde se to presto vyplati.
      */
     private function oceneniBloku(GameState $state, MatchPlayerDTO $utocnik, MatchPlayerDTO $obrance): float
     {
@@ -406,12 +378,11 @@ final class LearningAICoach implements AICoachInterface
             return 0.05;
         }
 
-        static $strCalc = null;
-        $strCalc ??= new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
-
-        $kostky = $strCalc->getBlockDiceInfo(
-            $strCalc->calculateEffectiveStrength($state, $utocnik, $op),
-            $strCalc->calculateEffectiveStrength($state, $obrance, $up),
+        // ⭐ Bezstavovy pomocnik patri do konstruktoru, ne do `static`
+        //   promenne uvnitr metody (nalez /simplify).
+        $kostky = $this->strCalc->getBlockDiceInfo(
+            $this->strCalc->calculateEffectiveStrength($state, $utocnik, $op),
+            $this->strCalc->calculateEffectiveStrength($state, $obrance, $up),
         );
 
         // ⛔ KOSTKY PROTI NAM: tezka pokuta, ale UZ NE `null`.
@@ -1246,14 +1217,11 @@ final class LearningAICoach implements AICoachInterface
             }
         }
 
-        // ⛔⛔ OPRAVA 13.09. (review): kdyz se NEOHODNOTIL ANI JEDEN cil
-        //   (vsechny odmitnuty pro presilu), `$bestScore` zustal
-        //   `-PHP_FLOAT_MAX` a presto se vracel `$targets[0]` -- tedy prave
-        //   ten blok, ktery se mel odmitnout. S `epsilon > 0` se pak i zahral.
-        if ($bestScore === -PHP_FLOAT_MAX) {
-            return null;
-        }
-
+        // ⭐ Pojistka z rana uz tu NENI potreba: `oceneniBloku` od opravy
+        //   "blok na nosice" vraci vzdycky `float` (nebezpecny blok dostane
+        //   zapornou hodnotu misto `null`), takze smycka skore vzdy nastavi.
+        //   V `buildBlitzAction` tataz pojistka ZUSTAVA -- tam se `continue`
+        //   dela pro lezici cile a pro nedosazitelne.
         return [
             'action' => ActionType::BLOCK,
             'params' => ['playerId' => $playerId, 'targetId' => $bestTarget->getId()],
@@ -1294,7 +1262,7 @@ final class LearningAICoach implements AICoachInterface
             }
 
             // ⛔ Blitz je TYZ blok, jen s rozbehem -- oceni se stejne,
-            //   a nebezpecny se taky preskoci. Navic je blitz JEDEN ZA KOLO,
+            //   a nevyhodny dostane zapornou hodnotu. Navic je blitz JEDEN ZA KOLO,
             //   takze ho utratit za spatne kostky je drazsi nez u bloku.
             $ocena = $this->oceneniBloku($state, $player, $enemy);
 
