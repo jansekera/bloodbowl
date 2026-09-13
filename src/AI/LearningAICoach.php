@@ -427,6 +427,21 @@ final class LearningAICoach implements AICoachInterface
                         // Zustat stat nestoji ani jeden hod => patri mezi bezrizikove.
                         'score' => $baseScore + self::CAGE_HOLD_BONUS + self::RISK_FREE_BONUS,
                     ];
+                } else {
+                    // ⛔⛔ ZACHRANA PROTI NAVRATU VADY PHP13/PHP24 (13.09.).
+                    //   Od te doby, co kouc nektere akce ODMITA (nosic nebojuje,
+                    //   blok proti presile, hod pod 50 %), muze se stat, ze se
+                    //   hraci nepostavi ZADNY kandidat -- a kolo pak skoncilo
+                    //   END_TURN, ackoli bylo co hrat. Merenim 13.09.: 70 kol
+                    //   z 291 (24,1 %), pritom rano to byla 3 kola.
+                    //   ⇒ Takovy hrac ma ZUSTAT STAT, ne ukoncit kolo celemu
+                    //   tymu. Skore je zamerne pod nulou, takze vyhraje jedine
+                    //   tehdy, kdyz opravdu nic jineho neni.
+                    $candidates[] = [
+                        'action' => ActionType::STAND_PAT,
+                        'params' => ['playerId' => (int) $playerId],
+                        'score' => $baseScore - 0.5,
+                    ];
                 }
                 continue;
             }
