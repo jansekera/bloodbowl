@@ -140,6 +140,10 @@ $stat = [
     'vyjimky'          => 0,   // ⛔ kouč vyrobil akci, kterou resolver odmítl
 ];
 $vyjimkyPodle = [];   // a JAKOU -- v živé aplikaci to NIKDO nechytá
+// ⭐ KOLIK KOSTEK MA BLOK, KTERY KOUC OPRAVDU ZAHRAJE (13.09.)
+//   Uzivatel: "turnover 55 % pri nasem bloku znamena, ze neprivadime
+//   asistenty?" -- tohle je to cislo, ktere na to odpovi.
+$kostkyBloku = [];
 $hist = [];   // kolik hráčů propadlo, histogram
 $typy = [];   // ⭐ PŘÍČINA: co bylo v nabídce, když vada sepnula
 $typyMax = [];// a kolik nejvíc
@@ -247,6 +251,21 @@ for ($g = 0; $g < $games; $g++) {
             }
         } else {
             $stat['akce']++;
+            if (in_array($decision['action'], [ActionType::BLOCK, ActionType::BLITZ], true)) {
+                $utocnik = $state->getPlayer((int) ($decision['params']['playerId'] ?? 0));
+                $obrance = $state->getPlayer((int) ($decision['params']['targetId'] ?? 0));
+                $up = $utocnik?->getPosition(); $op = $obrance?->getPosition();
+                if ($up !== null && $op !== null) {
+                    static $sc = null;
+                    $sc ??= new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
+                    $ds = $sc->getBlockDiceInfo(
+                        $sc->calculateEffectiveStrength($state, $utocnik, $op),
+                        $sc->calculateEffectiveStrength($state, $obrance, $up),
+                    );
+                    $kl = $ds['count'] . ($ds['attackerChooses'] ? ' PRO' : ' PROTI');
+                    $kostkyBloku[$kl] = ($kostkyBloku[$kl] ?? 0) + 1;
+                }
+            }
         }
 
         $pojistka = false;
@@ -352,6 +371,16 @@ foreach ($turnoverPricina as $kl => $v) {
 }
 if ($vyps > 12) {
     printf("    ... a dalších %d druhů\n", count($turnoverPricina) - 12);
+}
+
+if ($kostkyBloku !== []) {
+    echo "\n⭐ KOLIK KOSTEK MĚLY ZAHRANÉ BLOKY A BLITZE (přivádíme asistenty?):\n";
+    $celkemB = array_sum($kostkyBloku);
+    arsort($kostkyBloku);
+    foreach ($kostkyBloku as $kl => $n) {
+        printf("    %-10s %6d   %5.1f %%\n", $kl, $n, 100 * $n / $celkemB);
+    }
+    printf("    CELKEM     %6d\n", $celkemB);
 }
 
 echo "\n⭐ PŘÍČINA — CO SKÓRER VIDĚL A ZAHODIL (v kolika z těch vad se typ vyskytl):\n";

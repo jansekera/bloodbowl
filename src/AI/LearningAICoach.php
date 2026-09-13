@@ -50,6 +50,15 @@ final class LearningAICoach implements AICoachInterface
      */
     private const CARRIER_CLEAN_CORNER_BONUS = 0.6;
     /**
+     * ⭐⭐ PRIVEST ASISTENTA (uzivatel 13.09.: "a privezt asistenta by mel uz
+     * umet taky -- ale neprivadej rohy klece nebo nosice").
+     * Hrac, ktery si stoupne k souperi, ktereho uz nekdo nas oznackoval,
+     * pridava asistenci a tim posouva kostky ve prospech toho druheho.
+     * ⛔ Nesmi to delat nosic (ten k souperi vubec nesmi) ani hrac drzici roh
+     * klece (ten ma vlastni ukol).
+     */
+    private const ASSIST_BONUS = 1.2;   // musi prebit i plny sprint vpred (0,6 + 0,4)
+    /**
      * ⭐⭐ BLOK SE VYBIRA PODLE KOSTEK, NE PAUSALEM (uzivatel 12.09.:
      * "na blitz mame mit lepsi kandidaty a asistenty").
      * Do ted mel kazdy blok `+0,05` bez ohledu na to, jestli se hazi tremi
@@ -368,6 +377,45 @@ final class LearningAICoach implements AICoachInterface
         }
 
         return true;
+    }
+
+    /**
+     * ⭐⭐ OCENIT BLOK PRED AKCI -- stejne jako dodge (uzivatel 13.09.:
+     *   "nas block by mel byt schopen ohodnoceni pred akci stejne jako jsme
+     *    to resili u dodge a nebezpecne odmitnout -- stejne v akci block
+     *    i blitz").
+     *
+     * Vraci bonus/pokutu podle poctu kostek VCETNE ASISTENCI, nebo `null`,
+     * kdyz je blok NEBEZPECNY -- tedy kdyz kostky vybira SOUPER. Takovy blok
+     * se nehraje vubec, at uz jako blok nebo jako blitz.
+     */
+    private function oceneniBloku(GameState $state, MatchPlayerDTO $utocnik, MatchPlayerDTO $obrance): ?float
+    {
+        $up = $utocnik->getPosition();
+        $op = $obrance->getPosition();
+        if ($up === null || $op === null) {
+            return 0.05;
+        }
+
+        static $strCalc = null;
+        $strCalc ??= new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
+
+        $kostky = $strCalc->getBlockDiceInfo(
+            $strCalc->calculateEffectiveStrength($state, $utocnik, $op),
+            $strCalc->calculateEffectiveStrength($state, $obrance, $up),
+        );
+
+        // ⛔ TVRDE ODMITNUTI: kostky vybira souper => vlastni pad je
+        //   pravdepodobnejsi nez jeho. Tataz logika jako "dodge pod 50 %".
+        if (!$kostky['attackerChooses']) {
+            return null;
+        }
+
+        return match ($kostky['count']) {
+            3 => self::BLOCK_DICE_VALUE['3+'],
+            2 => self::BLOCK_DICE_VALUE['2+'],
+            default => self::BLOCK_DICE_VALUE['1'],
+        };
     }
 
     /** Nosic vlastniho tymu, nebo `null`. */
@@ -965,6 +1013,42 @@ final class LearningAICoach implements AICoachInterface
                 }
             }
 
+            // ⭐⭐ PRIVEST ASISTENCI: stoupnout si k souperi, ktereho uz nekdo
+            //   nas ma vedle sebe. Tim se druhemu hraci zlepsi kostky.
+            //   ⛔ Nosic sem nesmi (resi se vys) a hrac, ktery UZ DRZI roh
+            //   klece, se taky neodvolava -- ma vlastni ukol.
+            if (!$isCarrier) {
+                $cilA = new Position($target['x'], $target['y']);
+                $drziRoh = false;
+                $carrierPosA = $this->ownCarrierPosition($state, $side);
+                if ($carrierPosA !== null && $currentPos !== null) {
+                    $drziRoh = self::isCageCorner($carrierPosA, $currentPos);
+                }
+                if (!$drziRoh) {
+                    foreach ($state->getPlayersOnPitch($side->opponent()) as $souperA) {
+                        if ($souperA->getState() !== PlayerState::STANDING) {
+                            continue;
+                        }
+                        $spA = $souperA->getPosition();
+                        if ($spA === null || $spA->distanceTo($cilA) !== 1) {
+                            continue;
+                        }
+                        // Ma uz nekdo nas toho soupere vedle sebe?
+                        foreach ($state->getPlayersOnPitch($side) as $spolu) {
+                            if ($spolu->getId() === $playerId
+                                || $spolu->getState() !== PlayerState::STANDING) {
+                                continue;
+                            }
+                            $pp = $spolu->getPosition();
+                            if ($pp !== null && $pp->distanceTo($spA) === 1) {
+                                $score += self::ASSIST_BONUS;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+
             // ⭐ KLEC (PHP33) -- ROH ANO, HRANA SKORO NE.
             //   Do 12.09.2026 tu stalo `distanceTo($pos) === 1`, tedy +1.0 za
             //   JAKEKOLI sousedni pole. Z toho vznika HVEZDA kolem nosice,
@@ -1052,26 +1136,13 @@ final class LearningAICoach implements AICoachInterface
         $bestTarget = $targets[0];
         $ball = $state->getBall();
 
-        $strCalc = new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
-        $mojePos = $player->getPosition();
-
         foreach ($targets as $target) {
-            $score = $baseScore;
-
-            // ⭐ Kolik kostek a pro koho -- vcetne ASISTENCI, ktere
-            //   `calculateEffectiveStrength` uz zapocitava.
-            $cilPos = $target->getPosition();
-            if ($mojePos !== null && $cilPos !== null) {
-                $mojeSila = $strCalc->calculateEffectiveStrength($state, $player, $cilPos);
-                $jehoSila = $strCalc->calculateEffectiveStrength($state, $target, $mojePos);
-                $kostky = $strCalc->getBlockDiceInfo($mojeSila, $jehoSila);
-                $klic = ($kostky['attackerChooses'] ? '' : '-') === '-'
-                    ? $kostky['count'] . '-'
-                    : $kostky['count'] . ($kostky['count'] > 1 ? '+' : '');
-                $score += self::BLOCK_DICE_VALUE[$klic] ?? 0.0;
-            } else {
-                $score += 0.05;
+            // ⛔ Nebezpecny blok (kostky vybira souper) se PRESKAKUJE uplne.
+            $ocena = $this->oceneniBloku($state, $player, $target);
+            if ($ocena === null) {
+                continue;
             }
+            $score = $baseScore + $ocena;
 
             if ($ball->isHeld() && $ball->getCarrierId() === $target->getId()) {
                 $score += 0.5;
@@ -1121,7 +1192,14 @@ final class LearningAICoach implements AICoachInterface
         $bestTarget = $enemies[0];
 
         foreach ($enemies as $enemy) {
-            $score = $baseScore + 0.03;
+            // ⛔ Blitz je TYZ blok, jen s rozbehem -- oceni se stejne,
+            //   a nebezpecny se taky preskoci. Navic je blitz JEDEN ZA KOLO,
+            //   takze ho utratit za spatne kostky je drazsi nez u bloku.
+            $ocena = $this->oceneniBloku($state, $player, $enemy);
+            if ($ocena === null) {
+                continue;
+            }
+            $score = $baseScore + $ocena;
             if ($ball->isHeld() && $ball->getCarrierId() === $enemy->getId()) {
                 $score += 0.8;
             }
