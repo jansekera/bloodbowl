@@ -63,3 +63,30 @@ role neřeší — až se na to sáhne, musí platit tohle, ne „kdo je blíž"
 ⭐ **A vychází to i časově:** Longbeard má MA 4, potřeba je ~2,8 pole za kolo
 *(19 polí od výkopu, minus kolo na sestavení a kolo na doběhnutí)*. Rezerva
 ~1,2 pole na kolo, tedy klec smí za půli dvakrát stát a TD pořád stihne.
+
+## 📊 ZMĚŘENO 13.09.2026 — SEKCE SPLNĚNA *(8 zápasů, dev rostery)*
+
+```
+klec na startu kola                     75 kol
+  ⭐⭐ CÍL: celá, čistá, posunutá        47    62,7 %
+  kolo skončilo touchdownem (neměří se) 12
+  aspoň jeden roh není čistý            16    21,3 %
+       rohů vzatých soupeřem             0
+       prázdných rohů                   16
+       našich se soupeřem vedle          1
+  posun nosiče: průměr 4,56 pole, maximum 7
+```
+
+⭐ **Rozpočet vychází s rezervou:** potřeba **2,8 pole na kolo**
+*(19 polí od výkopu, minus kolo na sestavení a kolo na doběhnutí)*,
+naměřeno **4,56**. A není to jen papír — **12 kol skončilo touchdownem**.
+
+⭐ **Cesta sem** *(vše za 12.-13.09.)*: klec vznikala v **2,2 %** kol →
+po tlumení běhu vpřed **5,2 %** → po zbytku oprav **25,3 %**.
+Cíl se nedal číst vůbec, dokud se neopravil rozbitý čítač *(`071b9f83`)*,
+a posun nešel číst, dokud se z něj nevyňala kola s touchdownem.
+
+⛔ **JEDINÁ ZBÝVAJÍCÍ PŘÍČINA NEÚSPĚCHU JE PRÁZDNÝ ROH** *(16 ze 17)*.
+Soupeř roh nevzal ani jednou. Klec se tedy nerozpadá tím, že by ji někdo
+rozebral — **někdo z posádky nedojde**. ⇒ To je úloha pro **clonu** (`PHP36`)
+a **prorážení vpřed** (`celotah A12`), obojí uživatelem odloženo.

@@ -172,6 +172,10 @@ $st = [
     'klec_na_startu'  => 0,
     'klec_prezila'    => 0,   // a na konci kola zase 4 naše
     'klec_spinava'    => 0,   // na konci chybí aspoň jeden
+    // ⛔ OPRAVA 13.09.: kolo, ve kterém padl TOUCHDOWN, se meritem posunu
+    //   cist NESMI -- po TD se tym prestavi na vykop a pozice skoci.
+    //   Puvodne to delalo "posun nosice: maximum 19 poli", coz nikdo neujde.
+    'klec_konec_td'   => 0,
 ];
 $posun = [];      // o kolik se nosič posunul v kolech s klecí
 $spinavost = ['prazdny' => 0, 'souper' => 0, 'spinavy' => 0];
@@ -219,6 +223,15 @@ for ($g = 0; $g < $games; $g++) {
         $st['kola']++;
         if ($start['typ'] !== 'klec') { $st[$start['typ']]++; return; }
         $st['klec_na_startu']++;
+
+        // ⛔ TD behem kola => drive skoncil, pozice po nem nejsou srovnatelne.
+        $skoreTed = $state->getTeamState($start['side'])->getScore()
+            + $state->getTeamState($start['side']->opponent())->getScore();
+        if (isset($start['skore']) && $skoreTed !== $start['skore']) {
+            $st['klec_konec_td']++;
+            return;
+        }
+
         $c = nosic($state, $start['side']);
         if ($c === null) { $st['klec_spinava']++; return; }
         $konec = stavKlece($state, $c);
@@ -299,13 +312,19 @@ for ($g = 0; $g < $games; $g++) {
                 } else {
                     $st['mic_mimo_hru']++;
                 }
-                $start = ['typ' => 'bez_nosice', 'side' => $side, 'pos' => null];
+                $start = ['typ' => 'bez_nosice', 'side' => $side, 'pos' => null, 'skore' => 0];
             } else {
                 $k = stavKlece($state, $c);
                 $typ = $k['na_hristi'] < 4
                 ? 'u_lajny'
                 : (($k['cisty'] + $k['spinavy']) === 4 ? 'klec' : 'nosic_bez_klece');
-                $start = ['typ' => $typ, 'side' => $side, 'pos' => $c->getPosition()];
+                $start = [
+                    'typ' => $typ, 'side' => $side, 'pos' => $c->getPosition(),
+                    // Snimek skore: kdyz se do konce kola zmeni, padl TD
+                    // a stav po nem uz je z jineho drive.
+                    'skore' => $state->getTeamState($side)->getScore()
+                        + $state->getTeamState($side->opponent())->getScore(),
+                ];
             }
             $klic = $novyKlic; $turnActions = 0;
         }
@@ -396,6 +415,7 @@ if ($st['klec_na_startu'] > 0) {
         $klecCela, 100 * $klecCela / $st['klec_na_startu']);
     printf("  ⭐⭐ ... A POSUNULA SE (i do boku)      %6d   %5.1f %%   <- CÍL\n",
         $klecCelaAPosun, 100 * $klecCelaAPosun / $st['klec_na_startu']);
+    printf("  ⚠️ kolo skončilo TOUCHDOWNEM (neměří se) %5d\n", $st['klec_konec_td']);
     printf("  ⛔ aspoň jeden roh není čistý          %6d   %5.1f %%\n",
         $st['klec_spinava'], 100 * $st['klec_spinava'] / $st['klec_na_startu']);
         // ⛔ ROZPAD SPINAVOSTI podle uzivatelova poradi zavaznosti:
