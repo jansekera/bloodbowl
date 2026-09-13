@@ -392,8 +392,20 @@ final class LearningAICoach implements AICoachInterface
         //   Ted se pokuta jen zapocita a bonus za nosice (+0,5 blok / +0,8
         //   blitz) ji muze prebit, kdyz to stoji za to.
         if (!$kostky['attackerChooses']) {
-            return match ($kostky['count']) {
-                3 => self::BLOCK_DICE_VALUE['3-'],
+            // ⛔⛔ OPRAVA 13.09. (simplify): SLIBENA VYJIMKA NEFUNGOVALA.
+            //   Komentar tvrdil, ze pokutu "muze prebit bonus za nosice"
+            //   (+0,5 blok / +0,8 blitz) -- jenze -3,0 neprebije +0,8 NIKDY,
+            //   takze blok na silnejsiho nosice zustal fakticky zakazany,
+            //   presne to, co se melo opravit.
+            // ⇒ Ted se rozhoduje EXPLICITNE, ne velikosti cisla: kdyz je
+            //   cilem NOSIC, pokuta se zmirni tak, aby blok zustal ve hre
+            //   jako nouzova moznost; jinak plati plna.
+            $cilJeNosic = $state->getBall()->isHeld()
+                && $state->getBall()->getCarrierId() === $obrance->getId();
+
+            return match (true) {
+                $cilJeNosic => self::BLOCK_DICE_VALUE['1'] - 0.4,
+                $kostky['count'] === 3 => self::BLOCK_DICE_VALUE['3-'],
                 default => self::BLOCK_DICE_VALUE['2-'],
             };
         }
@@ -866,8 +878,25 @@ final class LearningAICoach implements AICoachInterface
                             break;
                         }
                     }
-                    // ⛔ Cena selhani: neuspesne zvednuti = turnover.
+                    // ⛔⛔ OPRAVA 13.09. (simplify): TADY BYLY DVA ROZPORY.
+                    //   (a) "prah 50 %" u zvedani NEDELAL NIC: zaklad 5,0
+                    //       + bonus 4,0 za nekryty mic proti pokute nejvyse
+                    //       4,0 znamena, ze i pri sanci 10 % vyslo skore
+                    //       kladne -- zvednuti neslo odmitnout NIKDY.
+                    //   (b) RIZIKA SE NEKOMBINOVALA: cesta k mici a hod na
+                    //       zvednuti se odecitaly jako dve nezavisle pokuty,
+                    //       prestoze turnover nastane, kdyz selze KTERAKOLI
+                    //       z nich: 60 % x 60 % = 36 %, tedy 64 % turnover.
                     $sanceZvednuti = $this->pickupChance($state, $player, $ballPos);
+                    $sanceCestyKMici = max(0, min(100, (int) ($target['successChance'] ?? 100))) / 100;
+                    $sanceCelkem = $sanceCestyKMici * $sanceZvednuti;
+
+                    // ⛔ Tvrde odmitnuti pod prahem -- stejne jako u dodge.
+                    //   `riskPenalty` uz je v `$score` zapocitany za cestu,
+                    //   proto se tu odecita jen zbytek za samotny hod.
+                    if ($sanceCelkem < self::RISK_REFUSE_BELOW / 100) {
+                        continue;
+                    }
                     $score -= (1 - $sanceZvednuti) * self::PICKUP_FAIL_WEIGHT;
 
                     if (!$uMiceStojiSouper) {
