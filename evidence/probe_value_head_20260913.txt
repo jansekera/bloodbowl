@@ -1,0 +1,17 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] váhy kouče B se opravdu načetly: A = 0.0000, B = -1.0450
+    [OK ] čítač umí najít rozdíl: 27 ze 40 při epsilon = 1
+  ⇒ měřidlo umí rozlišit načtené váhy i rozdílné rozhodnutí.
+
+KORPUS: 3 her, seed 20260913
+
+ROZHODNUTÍ CELKEM          1262
+  shodná                   1262
+  ⭐ ROZDÍLNÁ                  0    0.00 %
+  ZBYTEK (musí být 0)         0
+
+⇒ PŘEDPOVĚĎ POTVRZENA: natrénovaná value hlava nezmění ANI JEDNO rozhodnutí.
+   Trénink ani oprava loaderu nemá co ovlivnit, dokud skórer hodnotí
+   jen SOUČASNÝ stav (`baseScore` se v argmaxu vykrátí).
