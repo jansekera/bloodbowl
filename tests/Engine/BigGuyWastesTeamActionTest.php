@@ -110,4 +110,33 @@ final class BigGuyWastesTeamActionTest extends TestCase
         $this->assertFalse($team->isPassUsedThisTurn(), 'MOVE nesmí brát pass');
         $this->assertFalse($team->isFoulUsedThisTurn(), 'MOVE nesmí brát foul');
     }
+
+    public function testFailedBoneHeadBombThrowCostsTheTeamItsPass(): void
+    {
+        // ⛔ PHP23: `BOMB_THROW` sdílí pass slot (`BombThrowHandler` ho odečítá
+        //    přes `withPassUsed()`), ale v `consumeDeclaredTeamAction` chyběl.
+        //    Big Guy, který propadne na DEKLAROVANÉM bomb throwu, tedy tým
+        //    o pass slot nepřipravil. Táž třída jako PHP15, jen o akci vedle.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
+                        skills: [SkillName::BoneHead, SkillName::Bombardier])
+            ->addPlayer(TeamSide::AWAY, 10, 7, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        $this->assertFalse($state->getTeamState(TeamSide::HOME)->isPassUsedThisTurn(),
+            'fixtura je vadná: pass je vyčerpaný už předem');
+
+        // Bone Head na 1 ⇒ hráč propadne a akce se má utratit.
+        $dice = new FixedDiceRoller([1, 1, 1, 1, 1, 1]);
+        $result = (new ActionResolver($dice))->resolve(
+            $state, ActionType::BOMB_THROW,
+            ['playerId' => 1, 'targetX' => 10, 'targetY' => 7],
+        );
+
+        $this->assertTrue(
+            $result->getNewState()->getTeamState(TeamSide::HOME)->isPassUsedThisTurn(),
+            'Big Guy propadl na deklarovaném bomb throwu a tým o pass slot nepřišel',
+        );
+    }
 }

@@ -162,7 +162,12 @@ final class ActionResolver
 
         $team = match ($type) {
             ActionType::BLITZ => $team->withBlitzUsed(),
+            // ⛔ PHP23: `BOMB_THROW` sdili pass slot -- `BombThrowHandler` ho
+            //   odecita pres `withPassUsed()` -- ale TADY chybel, takze Big Guy,
+            //   ktery propadne na DEKLAROVANEM bomb throwu, tym o pass slot
+            //   nepripravil. Tataz trida jako `PHP15`, jen o akci vedle.
             ActionType::PASS,
+            ActionType::BOMB_THROW,
             ActionType::THROW_TEAM_MATE => $team->withPassUsed(),
             ActionType::HAND_OFF => $team->withHandOffUsed(),
             ActionType::FOUL => $team->withFoulUsed(),
