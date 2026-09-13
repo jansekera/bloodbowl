@@ -418,6 +418,39 @@ final class LearningAICoach implements AICoachInterface
         };
     }
 
+    /**
+     * Sance (0-1), ze hrac DOJDE vedle daneho soupere -- tedy nejlepsi
+     * `successChance` mezi policky, ze kterych se da blitzovat.
+     * `null` = nedojde vubec.
+     *
+     * ⭐ Pouziva tutez cestu jako pohyb (`getValidMoveTargets`), takze se
+     *   riziko oceni STEJNE jako u dodge a GFI -- viz `RISK_WEIGHT`.
+     */
+    private function sanceDojitK(GameState $state, RulesEngine $rules, int $playerId, MatchPlayerDTO $cil): ?float
+    {
+        $cp = $cil->getPosition();
+        $mujPos = $state->getPlayer($playerId)?->getPosition();
+        if ($cp === null || $mujPos === null) {
+            return null;
+        }
+
+        // Uz vedle nej stojim => zadna cesta, zadne riziko.
+        if ($mujPos->distanceTo($cp) === 1) {
+            return 1.0;
+        }
+
+        $nej = null;
+        foreach ($rules->getValidMoveTargets($state, $playerId) as $t) {
+            if (max(abs($t['x'] - $cp->getX()), abs($t['y'] - $cp->getY())) !== 1) {
+                continue;
+            }
+            $sance = max(0, min(100, (int) ($t['successChance'] ?? 100))) / 100;
+            $nej = $nej === null ? $sance : max($nej, $sance);
+        }
+
+        return $nej;
+    }
+
     /** Nosic vlastniho tymu, nebo `null`. */
     private function ownCarrierPosition(GameState $state, TeamSide $side): ?Position
     {
@@ -741,7 +774,7 @@ final class LearningAICoach implements AICoachInterface
         return match ($type) {
             ActionType::MOVE => $this->buildMoveAction($state, $rules, $playerId, $side),
             ActionType::BLOCK => $this->buildBlockAction($state, $rules, $playerId, $side, $baseScore),
-            ActionType::BLITZ => $this->buildBlitzAction($state, $playerId, $side, $baseScore),
+            ActionType::BLITZ => $this->buildBlitzAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::PASS => $this->buildPassAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::HAND_OFF => $this->buildHandOffAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::FOUL => $this->buildFoulAction($state, $rules, $playerId, $side, $baseScore),
@@ -1175,7 +1208,7 @@ final class LearningAICoach implements AICoachInterface
     /**
      * @return array{action: ActionType, params: array<string, mixed>, score: float}|null
      */
-    private function buildBlitzAction(GameState $state, int $playerId, TeamSide $side, float $baseScore): ?array
+    private function buildBlitzAction(GameState $state, RulesEngine $rules, int $playerId, TeamSide $side, float $baseScore): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null) {
@@ -1199,7 +1232,23 @@ final class LearningAICoach implements AICoachInterface
             if ($ocena === null) {
                 continue;
             }
-            $score = $baseScore + $ocena;
+
+            // ⛔⛔ RIZIKO CESTY K CILI (13.09.2026). Blitz je blok S ROZBEHEM,
+            //   jenze `buildBlitzAction` vybira SOUPERE, ne policko -- o ceste
+            //   k nemu tedy nevedel nic. Kouc si vybral krasny trikostkovy
+            //   blitz pres tri zony zachyceni a cestou spadl.
+            // ⭐ ZMERENO: `blitz` mel 32,0 % turnoveru na akci, kdezto `block`
+            //   jen 8,8 % -- ctyrikrat vic, a rozdil je prave ta cesta.
+            $sanceCesty = $this->sanceDojitK($state, $rules, $playerId, $enemy);
+            if ($sanceCesty === null) {
+                continue;   // nedojde vubec
+            }
+            $riziko = (1 - $sanceCesty) * self::RISK_WEIGHT;
+            if ($sanceCesty < 0.5) {
+                $riziko += self::RISK_REFUSE_PENALTY;
+            }
+
+            $score = $baseScore + $ocena - $riziko;
             if ($ball->isHeld() && $ball->getCarrierId() === $enemy->getId()) {
                 $score += 0.8;
             }
