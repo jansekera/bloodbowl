@@ -1251,20 +1251,57 @@ final class LearningAICoach implements AICoachInterface
         $bestScore = -PHP_FLOAT_MAX;
         $bestTarget = $targets[0];
 
+        // ⛔⛔⛔ OPRAVA 13.09.2026: TADY SE HAZELO DO PRAZDNA.
+        //   `getPassTargets` vraci VSECHNA pole v dosahu -- v beznem stavu
+        //   kolem 359 poli -- a kouc z nich vybiral JEN podle vzdalenosti.
+        //   Vetsina z nich je prazdna, takze prihravka nikoho nenasla
+        //   a nedochycena prihravka je TURNOVER.
+        // ⭐ ZMERENO PRED OPRAVOU: `pass` = 21 zahrani, 21 turnoveru, tedy
+        //   100,0 % (`evidence/endturn_turnover_na_akci_20260913.txt`).
+        // ⚠️ A druha vada v teze metode: klice vzdalenosti byly 'short'/'long',
+        //   zatimco engine vraci 'short_pass'/'long_pass' -- `match` tedy
+        //   NIKDY nesedl a vsechny cile mely tutez pokutu.
+        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $naslo = false;
+
         foreach ($targets as $target) {
+            // Stoji na tom poli NAS hrac, ktery muze chytat?
+            $prijemce = null;
+            foreach ($state->getPlayersOnPitch($side) as $spolu) {
+                $pp = $spolu->getPosition();
+                if ($pp !== null && $pp->getX() === $target['x'] && $pp->getY() === $target['y']
+                    && $spolu->getId() !== $playerId
+                    && $spolu->getState() === PlayerState::STANDING) {
+                    $prijemce = $spolu;
+                    break;
+                }
+            }
+            if ($prijemce === null) {
+                continue;   // ⛔ do prazdna se nehazi
+            }
+            $naslo = true;
+
             $rangePenalty = match ($target['range']) {
-                'quick' => 0.0,
-                'short' => 0.02,
-                'long' => 0.05,
-                'bomb' => 0.1,
-                default => 0.03,
+                'quick_pass' => 0.0,
+                'short_pass' => 0.2,
+                'long_pass'  => 0.6,
+                default      => 1.0,   // long bomb a cokoli neznameho
             };
-            $score = $baseScore - $rangePenalty;
+
+            // Prihravka ma smysl, kdyz prijemce je BLIZ koncove zone nez hazec.
+            $ziskPole = abs(($player->getPosition()?->getX() ?? $target['x']) - $endZoneX)
+                - abs($target['x'] - $endZoneX);
+
+            $score = $baseScore - $rangePenalty + $ziskPole * 0.1;
 
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $bestTarget = $target;
             }
+        }
+
+        if (!$naslo) {
+            return null;   // nikdo k nahrani => prihravka se nenabizi
         }
 
         return [
@@ -1289,12 +1326,52 @@ final class LearningAICoach implements AICoachInterface
             return null;
         }
 
-        $target = $targets[0];
+        // ⛔⛔ OPRAVA 13.09.2026: TADY SE NEVYBIRALO VUBEC -- bral se
+        //   `$targets[0]`, tedy prvni v seznamu. Uzivatel: "hand off zalezi
+        //   na AG prijemce -- nepredavat min agilnim, dokud neni nouze."
+        //   Chycene predani je hod na obratnost prijemce; predat mic hraci
+        //   s AG 2 znamena ~33% sanci, ze mic spadne -- a to je TURNOVER.
+        //   ⭐ ZMERENO PRED OPRAVOU: `hand_off` 4 zahrani, 2 turnovery (50 %).
+        $mojeAG = $player->getStats()->getAgility();
+        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $mojeVzdalenost = $player->getPosition() !== null
+            ? abs($player->getPosition()->getX() - $endZoneX)
+            : 0;
+
+        $best = null;
+        $bestScore = -PHP_FLOAT_MAX;
+        foreach ($targets as $kandidat) {
+            $ag = $kandidat->getStats()->getAgility();
+            $pos = $kandidat->getPosition();
+            if ($pos === null) {
+                continue;
+            }
+
+            // ⛔ Min agilnimu se nepredava, dokud neni nouze.
+            if ($ag < $mojeAG) {
+                continue;
+            }
+
+            // Sance na chyceni: prah je `7 - AG` (bez modifikatoru),
+            //   takze AG 4 => 67 %, AG 3 => 50 %, AG 2 => 33 %.
+            $sance = max(0.0, min(1.0, (7 - (7 - $ag)) / 6));
+            $ziskPole = $mojeVzdalenost - abs($pos->getX() - $endZoneX);
+
+            $score = $baseScore + $sance + $ziskPole * 0.1;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $kandidat;
+            }
+        }
+
+        if ($best === null) {
+            return null;   // vsichni sousedi jsou min agilni => nepredavat
+        }
 
         return [
             'action' => ActionType::HAND_OFF,
-            'params' => ['playerId' => $playerId, 'targetId' => $target->getId()],
-            'score' => $baseScore + 0.01,
+            'params' => ['playerId' => $playerId, 'targetId' => $best->getId()],
+            'score' => $bestScore,
         ];
     }
 
