@@ -398,7 +398,7 @@ final class LearningAICoach implements AICoachInterface
      * kdyz je blok NEBEZPECNY -- tedy kdyz kostky vybira SOUPER. Takovy blok
      * se nehraje vubec, at uz jako blok nebo jako blitz.
      */
-    private function oceneniBloku(GameState $state, MatchPlayerDTO $utocnik, MatchPlayerDTO $obrance): ?float
+    private function oceneniBloku(GameState $state, MatchPlayerDTO $utocnik, MatchPlayerDTO $obrance): float
     {
         $up = $utocnik->getPosition();
         $op = $obrance->getPosition();
@@ -414,10 +414,17 @@ final class LearningAICoach implements AICoachInterface
             $strCalc->calculateEffectiveStrength($state, $obrance, $up),
         );
 
-        // ⛔ TVRDE ODMITNUTI: kostky vybira souper => vlastni pad je
-        //   pravdepodobnejsi nez jeho. Tataz logika jako "dodge pod 50 %".
+        // ⛔ KOSTKY PROTI NAM: tezka pokuta, ale UZ NE `null`.
+        //   ⭐ OPRAVA 13.09. (review): tvrde odmitnuti bezelo PRED bonusem za
+        //   nosice, takze silnejsiho NOSICE neslo nikdy blokovat -- a proti
+        //   silnejsimu tymu je to jedina cesta, jak se dostat k mici.
+        //   Ted se pokuta jen zapocita a bonus za nosice (+0,5 blok / +0,8
+        //   blitz) ji muze prebit, kdyz to stoji za to.
         if (!$kostky['attackerChooses']) {
-            return null;
+            return match ($kostky['count']) {
+                3 => self::BLOCK_DICE_VALUE['3-'],
+                default => self::BLOCK_DICE_VALUE['2-'],
+            };
         }
 
         return match ($kostky['count']) {
@@ -1101,8 +1108,27 @@ final class LearningAICoach implements AICoachInterface
                             }
                             $pp = $spolu->getPosition();
                             if ($pp !== null && $pp->distanceTo($spA) === 1) {
-                                $score += self::ASSIST_BONUS;
-                                break 2;
+                                // ⛔ OPRAVA 13.09. (review): asistence se
+                                //   NEZAPOCITA, kdyz asistujici stoji v zone
+                                //   JINEHO soupere (bez Guard). Bonus se tedy
+                                //   platil i za vtazeni do dvojiteho oznaceni
+                                //   za nula kostek navic.
+                                $jinySouperVedle = false;
+                                foreach ($state->getPlayersOnPitch($side->opponent()) as $jiny) {
+                                    if ($jiny->getId() === $souperA->getId()
+                                        || $jiny->getState() !== PlayerState::STANDING) {
+                                        continue;
+                                    }
+                                    $jp = $jiny->getPosition();
+                                    if ($jp !== null && $jp->distanceTo($cilA) === 1) {
+                                        $jinySouperVedle = true;
+                                        break;
+                                    }
+                                }
+                                if (!$jinySouperVedle) {
+                                    $score += self::ASSIST_BONUS;
+                                    break 2;
+                                }
                             }
                         }
                     }
@@ -1197,12 +1223,7 @@ final class LearningAICoach implements AICoachInterface
         $ball = $state->getBall();
 
         foreach ($targets as $target) {
-            // ⛔ Nebezpecny blok (kostky vybira souper) se PRESKAKUJE uplne.
-            $ocena = $this->oceneniBloku($state, $player, $target);
-            if ($ocena === null) {
-                continue;
-            }
-            $score = $baseScore + $ocena;
+            $score = $baseScore + $this->oceneniBloku($state, $player, $target);
 
             if ($ball->isHeld() && $ball->getCarrierId() === $target->getId()) {
                 $score += 0.5;
@@ -1276,9 +1297,6 @@ final class LearningAICoach implements AICoachInterface
             //   a nebezpecny se taky preskoci. Navic je blitz JEDEN ZA KOLO,
             //   takze ho utratit za spatne kostky je drazsi nez u bloku.
             $ocena = $this->oceneniBloku($state, $player, $enemy);
-            if ($ocena === null) {
-                continue;
-            }
 
             // ⛔⛔ RIZIKO CESTY K CILI (13.09.2026). Blitz je blok S ROZBEHEM,
             //   jenze `buildBlitzAction` vybira SOUPERE, ne policko -- o ceste
