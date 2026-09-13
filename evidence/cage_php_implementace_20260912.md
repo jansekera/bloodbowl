@@ -47,3 +47,19 @@ na vlastní polovině, **zelené**.
   běh pustí jen dokud klec ještě nestojí, nebo se drží přednost stavění klece.
 - **`PHP36` — clona ze zbylých šesti hráčů** *(„budou bránit soupeři cestu
   ke kleci")*: nezačato.
+
+## ⛔ KDO PATŘÍ DO ROHŮ — DOKTRÍNA, KTEROU JSEM 13.09. POPŘEL
+
+Navrhl jsem *„do rohů nedávat nejpomalejšího hráče"*. **Uživatel to odmítl:**
+*„tohle jsme už zkoušeli — rychlejší mají jiné úkoly — do rohů patří longbeard."*
+
+⭐ A stojí to v záznamech **od 07.08.2026**: `cage_corner_doctrine_20260807.md`
+r. 30 — *„CÍLOVÝ STAV: klasická klec s Longbeardy na rozích, jak ji hrají lidé."*
+
+⇒ **Rohy = pomalí, ale odolní** *(Block, Tackle, Thick Skull)*. Rychlí hráči
+mají clonu, blitz a příjem. ⛔ Kouč dnes rohy obsazuje **podle vzdálenosti**,
+role neřeší — až se na to sáhne, musí platit tohle, ne „kdo je blíž".
+
+⭐ **A vychází to i časově:** Longbeard má MA 4, potřeba je ~2,8 pole za kolo
+*(19 polí od výkopu, minus kolo na sestavení a kolo na doběhnutí)*. Rezerva
+~1,2 pole na kolo, tedy klec smí za půli dvakrát stát a TD pořád stihne.
