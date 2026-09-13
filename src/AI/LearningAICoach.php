@@ -435,7 +435,7 @@ final class LearningAICoach implements AICoachInterface
      * ⭐ Pouziva tutez cestu jako pohyb (`getValidMoveTargets`), takze se
      *   riziko oceni STEJNE jako u dodge a GFI -- viz `RISK_WEIGHT`.
      */
-    private function sanceDojitK(GameState $state, RulesEngine $rules, int $playerId, MatchPlayerDTO $cil): ?float
+    private function sanceDojitK(GameState $state, RulesEngine $rules, int $playerId, MatchPlayerDTO $cil, ?array $cile = null): ?float
     {
         $cp = $cil->getPosition();
         $mujPos = $state->getPlayer($playerId)?->getPosition();
@@ -449,7 +449,7 @@ final class LearningAICoach implements AICoachInterface
         }
 
         $nej = null;
-        foreach ($rules->getValidMoveTargets($state, $playerId) as $t) {
+        foreach ($cile ?? $rules->getValidMoveTargets($state, $playerId) as $t) {
             if (max(abs($t['x'] - $cp->getX()), abs($t['y'] - $cp->getY())) !== 1) {
                 continue;
             }
@@ -1225,6 +1225,14 @@ final class LearningAICoach implements AICoachInterface
             }
         }
 
+        // ⛔⛔ OPRAVA 13.09. (review): kdyz se NEOHODNOTIL ANI JEDEN cil
+        //   (vsechny odmitnuty pro presilu), `$bestScore` zustal
+        //   `-PHP_FLOAT_MAX` a presto se vracel `$targets[0]` -- tedy prave
+        //   ten blok, ktery se mel odmitnout. S `epsilon > 0` se pak i zahral.
+        if ($bestScore === -PHP_FLOAT_MAX) {
+            return null;
+        }
+
         return [
             'action' => ActionType::BLOCK,
             'params' => ['playerId' => $playerId, 'targetId' => $bestTarget->getId()],
@@ -1250,8 +1258,20 @@ final class LearningAICoach implements AICoachInterface
         $ball = $state->getBall();
         $bestScore = -PHP_FLOAT_MAX;
         $bestTarget = $enemies[0];
+        // ⭐ VYKON (review): pathfinder je pro daneho hrace a stav TOTOZNY pro
+        //   vsechny cile -- volal se ale pro kazdeho soupere zvlast (zmereno
+        //   ~10x prepocet, 122 ms proti 12,8 ms). Spocita se JEDNOU.
+        $moznaPole = $rules->getValidMoveTargets($state, $playerId);
 
         foreach ($enemies as $enemy) {
+            // ⛔ OPRAVA 13.09. (review): lezici a omracene cile se preskakuji.
+            //   `oceneniBloku` je ohodnotilo jako "1 kostka, vybiram ja",
+            //   takze blizky omraceny souper byl atraktivnejsi nez vzdaleny
+            //   stojici -- a jednorazovy blitz se utratil za NELEGALNI blok.
+            if ($enemy->getState() !== PlayerState::STANDING) {
+                continue;
+            }
+
             // ⛔ Blitz je TYZ blok, jen s rozbehem -- oceni se stejne,
             //   a nebezpecny se taky preskoci. Navic je blitz JEDEN ZA KOLO,
             //   takze ho utratit za spatne kostky je drazsi nez u bloku.
@@ -1266,7 +1286,7 @@ final class LearningAICoach implements AICoachInterface
             //   blitz pres tri zony zachyceni a cestou spadl.
             // ⭐ ZMERENO: `blitz` mel 32,0 % turnoveru na akci, kdezto `block`
             //   jen 8,8 % -- ctyrikrat vic, a rozdil je prave ta cesta.
-            $sanceCesty = $this->sanceDojitK($state, $rules, $playerId, $enemy);
+            $sanceCesty = $this->sanceDojitK($state, $rules, $playerId, $enemy, $moznaPole);
             if ($sanceCesty === null) {
                 continue;   // nedojde vubec
             }
@@ -1300,6 +1320,14 @@ final class LearningAICoach implements AICoachInterface
                 $bestScore = $score;
                 $bestTarget = $enemy;
             }
+        }
+
+        // ⛔⛔ OPRAVA 13.09. (review): totez co u bloku -- bez ohodnoceni
+        //   se vracel `$enemies[0]`, tedy klidne nedosazitelny souper.
+        //   `BlitzHandler` uz na nedosazitelnou deklaraci nehazi vyjimku
+        //   (oprava PHP3), takze se jednorazovy blitz utratil za prochazku.
+        if ($bestScore === -PHP_FLOAT_MAX) {
+            return null;
         }
 
         return [
@@ -1436,7 +1464,12 @@ final class LearningAICoach implements AICoachInterface
             //   a ignoroval ZONY ZACHYCENI kolem prijemce -- pritom predat mic
             //   hraci, ktery ma vedle sebe dva soupere, je uplne jina sance.
             //   `getCatchTarget()` zna oboji, plus Extra Arms a spol.
-            $sance = $this->catchChance($state, $kandidat, 0);
+            // ⛔ OPRAVA 13.09. (review): `HandOffHandler:127` chyta
+            //   s modifikatorem +1, kouc pocital s 0 -- u volneho AG 3 tedy
+            //   50 % misto skutecnych 67 %, coz pri vaze 4.0 delalo falesnou
+            //   pokutu -0,67 a dobra predani se zamitala. Odtud "hand_off:
+            //   0 zahrani" v mereni 13.09.
+            $sance = $this->catchChance($state, $kandidat, 1);
             $ziskPole = $mojeVzdalenost - abs($pos->getX() - $endZoneX);
 
             $score = $baseScore + $ziskPole * 0.1
