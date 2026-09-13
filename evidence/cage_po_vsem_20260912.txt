@@ -1,0 +1,39 @@
+PHP Warning:  Module "curl" is already loaded in Unknown on line 0
+PHP Warning:  Module "mongodb" is already loaded in Unknown on line 0
+POZITIVNÍ KONTROLA MĚŘIDLA (běží PŘED korpusem):
+    [OK ] umí přečíst ČISTOU klec (4 čisté rohy): {"cisty":4,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] rozliší roh vzatý soupeřem od prázdného: {"cisty":2,"spinavy":0,"souper":1,"prazdny":1,"na_hristi":4}
+    [OK ] najde ŠPINAVÝ roh (náš hráč, ale soupeř vedle): {"cisty":3,"spinavy":1,"souper":0,"prazdny":0,"na_hristi":4}
+    [OK ] u lajny vidí, že rohy na hřišti jsou jen DVA: {"cisty":2,"spinavy":0,"souper":0,"prazdny":0,"na_hristi":2}
+  ⇒ měřidlo rozliší čistý, špinavý, soupeřův i prázdný roh a případ u lajny.
+
+KOUČ: learning   KORPUS: 8 her, seed 20260912, rostery: dev
+
+KOLA CELKEM (jmenovatel)                    245
+  bez nosiče                                151
+     z toho míč drží SOUPEŘ                 102   (normální stav, ne vada)
+     ⛔ z toho míč VOLNÝ na hřišti            49   (nikdo ho nezvedl)
+        ⛔⛔ a NĚKDO na něj dosáhl             45   <- rozhodnutí kouče, ne vzdálenost
+        jen daleko (nikdo nedosáhl)           4
+
+⭐ CO KOUČ ZVOLIL JAKO PRVNÍ, KDYŽ MĚL MÍČ V DOSAHU (45 kol):
+    ✅ přece jen šel pro míč                40
+    move (blíž k míči)                3
+    move (jinam)                          2
+    ⭐ nejlepší šance na zvednutí v těch kolech: 17, 17, 17, 33, 50 %  (medián 17 %)
+    ZBYTEK (musí být 0)                     0
+     míč mimo hru (po TD / před výkopem)      0
+  nosič bez klece na startu                  32
+  ⚠️ nosič u lajny (rohy nejsou 4)             0   <- NEPOČÍTÁ SE ZA ÚSPĚCH
+  ⭐ klec na startu (4 naše rohy)             62
+  ZBYTEK (musí být 0)                         0
+
+Z KOL, KTERÁ ZAČALA S KLECÍ (62):
+  ✅ všechny čtyři rohy ČISTÉ                47    75.8 %
+  ⭐⭐ KLEC ZŮSTALA CELÁ A ČISTÁ              47    75.8 %
+  ⭐⭐ ... A POSUNULA SE (i do boku)          47    75.8 %   <- CÍL
+  ⛔ aspoň jeden roh není čistý              15    24.2 %
+     ⛔⛔⛔ rohů VZATÝCH SOUPEŘEM 1   (blok, neomezeně)
+     ⛔⛔ PRÁZDNÝCH rohů 6   (stojí je blitz -- jeden za kolo)
+     ⚠️ našich rohů se soupeřem vedle 0
+  posun nosiče: průměr 5.67 pole, maximum 19
