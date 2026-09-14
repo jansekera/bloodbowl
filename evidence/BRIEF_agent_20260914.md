@@ -10,7 +10,7 @@
 | **2 — PHP39 zbytek** | ⏳ **ČÁSTEČNĚ, a je to nález** — viz níž |
 | **3 — sladit frontu** | ✅ **HOTOVO** *(`93f8776c`)* |
 | **4 — změřit dodge** | ⏰ nezačato |
-| **5 — Mighty Blow** | ⏰ nezačato |
+| **5 — Mighty Blow** | ✅ **HOTOVO** — viz níž |
 | **6 — balík G** | ⏰ nezačato |
 
 ## ÚKOL 1 — čísla
@@ -25,6 +25,45 @@
 ⚠️ **Měření rychlosti NENÍ párové A/B** — engine **nemá seed**, takže oba běhy
 odehrály jiné zápasy. **Směr jistý, číslo měkké.**
 ⇒ ⭐ **Seed je předpoklad každého poctivého měření výkonu. Chybí.**
+
+## ✅ ÚKOL 5 — MIGHTY BLOW: dva nálezy, jeden živý a jeden spící
+
+**Pravidlo doslova** *(`rules_bb2016.txt` ř. 8291-8297)*:
+> *„Add 1 to **any Armour or Injury roll**… Note that you only modify **one** of
+> the dice rolls… **Mighty Blow cannot be used with the Stab or Chainsaw
+> skills.**"*
+
+### ⛔ ŽIVÝ NÁLEZ: MB se vždycky utratí za BRNĚNÍ, volba chybí
+Všech osm volání je `injuryResolver->resolve($obr, $dice, $mightyBlow, **0**, …)`
+⇒ modifikátor jde **vždy na brnění a nikdy na zranění**.
+Pravidla dávají **volbu**. Není to nelegální — je to **trvale zahozená půlka
+skillu**: když se brnění prolomí i bez MB, bonus **propadne**, místo aby šel
+na zranění.
+⚠️ **A je to živé** — viz „kdo MB má" níž.
+⏰ **Změřit:** jak často se brnění prolomí tak, že MB nebyl potřeba *(= kolikrát
+propadl)*.
+
+### ⏸ SPÍCÍ NÁLEZ: MB se přidává i u Stab a Chainsaw, což pravidla ZAKAZUJÍ
+`BlockHandler.php:615, 633, 729, 802` jsou **všechno cesty Chainsaw a Stab**
+a předávají `$mightyBlow` do resolveru.
+✅ **Normální blok MB má správně** *(`:990`, `:1002` u Piling On)*.
+⛔ **Ale dnes to nesepne: Stab ani Chainsaw nemá v žádném rosteru NIKDO**
+*(ověřeno `roster.cpp`)*. ⇒ Je to **latentní vada** — patří na korektnostní
+seznam **P4**, opravit **dřív, než někomu Stab/Chainsaw přibude**.
+
+### ⛔⛔ OPRAVA MÉHO DŘÍVĚJŠÍHO TVRZENÍ
+Napsal jsem *„Mighty Blow nemá v TV1200 nikdo"*. **Platí to jen o trpaslíkovi**
+a já to zobecnil na celou pětku. **MB v měřené pětce JE:**
+| roster | kdo |
+|---|---|
+| wood elf | **1× Treeman** |
+| lidé | **1× Ogre**, 1× Blitzer |
+| orci | 1× Blitzer |
+| ⭐ **orci, varianta** | **`getOrcRoster1200MightyBlow`: 11× lineman + blitzer** |
+
+⭐ **Uživatel 14.09. navrhl „napřed to někomu přidej" — a ten nástroj už
+existuje**: `getOrcRoster1200MightyBlow` je roster nasycený MB právě proto,
+aby šel účinek měřit. Jednotlivý Treeman nebo Ogre je na měření málo.
 
 ## ⛔⛔ ÚKOL 2 — NÁLEZ: zbytek PHP39 není čistý refaktor
 
