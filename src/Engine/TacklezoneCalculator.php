@@ -185,9 +185,17 @@ final class TacklezoneCalculator
         //   ⇒ Zustava jen re-roll. Tackle tim znovu znamena to, co ma:
         //   rusi Dodgi jedinou vyhodu, misto aby mu nechaval tichy bonus.
 
-        // Stunty: -1 dodge target (easier dodge)
+        // ⛔⛔ OPRAVA 14.09.2026 -- STUNTY MA ZONY IGNOROVAT, NE ODECITAT 1.
+        //   `rules_bb2016.txt` r. 8525-8533: hrac se Stunty "may IGNORE ANY
+        //   enemy tackle zones ON THE SQUARE HE IS MOVING TO when he makes
+        //   a Dodge roll (i.e., they always end up with a +1 Dodge roll
+        //   modifier)".
+        //   ⇒ Neni to dalsi `-1`, je to VYNULOVANI penalizace za zony.
+        //   Pri PRAVE JEDNE zone vyjde obojí stejne -- proto to tak dlouho
+        //   nikdo nevidel -- ale pri trech uz ne: pravidla davaji porad
+        //   (7-AG)-1, engine daval (7-AG)-1+3-1.
         if ($player->hasSkill(SkillName::Stunty)) {
-            $target--;
+            $target -= $tzAtDest;
         }
 
         // Titchy: -1 dodge target (easier dodge, stacks with Stunty)

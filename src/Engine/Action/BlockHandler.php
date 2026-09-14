@@ -612,7 +612,10 @@ final class BlockHandler implements ActionHandlerInterface
                 return [$state, $events, false];
             }
             // Chainsaw hit on defender
-            $mightyBlow = $attacker->hasSkill(SkillName::MightyBlow) ? 1 : 0;
+            // ⛔ OPRAVA 14.09.2026: MIGHTY BLOW SE SE STAB A CHAINSAW POUZIT NESMI.
+            //   `rules_bb2016.txt` r. 8291-8297: "Mighty Blow cannot be used
+            //   with the Stab or Chainsaw skills." Tohle je prave ta cesta.
+            $mightyBlow = 0;
             $hasClaw = $attacker->hasSkill(SkillName::Claw);
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
@@ -630,7 +633,10 @@ final class BlockHandler implements ActionHandlerInterface
         // Stab: bypass block dice
         if ($attacker->hasSkill(SkillName::Stab)) {
             $events[] = GameEvent::stab($attacker->getId(), $defender->getId());
-            $mightyBlow = $attacker->hasSkill(SkillName::MightyBlow) ? 1 : 0;
+            // ⛔ OPRAVA 14.09.2026: MIGHTY BLOW SE SE STAB A CHAINSAW POUZIT NESMI.
+            //   `rules_bb2016.txt` r. 8291-8297: "Mighty Blow cannot be used
+            //   with the Stab or Chainsaw skills." Tohle je prave ta cesta.
+            $mightyBlow = 0;
             $hasClaw = $attacker->hasSkill(SkillName::Claw);
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
@@ -726,7 +732,9 @@ final class BlockHandler implements ActionHandlerInterface
 
         $defenderPos = $defender->getPosition();
         $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-        $mightyBlow = $attacker->hasSkill(SkillName::MightyBlow) ? 1 : 0;
+        // ⛔ OPRAVA 14.09.2026: Mighty Blow se se Stab a Chainsaw pouzit nesmi
+        //   (`rules_bb2016.txt` r. 8291-8297).
+        $mightyBlow = 0;
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
@@ -799,7 +807,9 @@ final class BlockHandler implements ActionHandlerInterface
         // Normal chainsaw attack on defender: armor roll (2D6)
         $defenderPos = $defender->getPosition();
         $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-        $mightyBlow = $attacker->hasSkill(SkillName::MightyBlow) ? 1 : 0;
+        // ⛔ OPRAVA 14.09.2026: Mighty Blow se se Stab a Chainsaw pouzit nesmi
+        //   (`rules_bb2016.txt` r. 8291-8297).
+        $mightyBlow = 0;
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
@@ -983,6 +993,9 @@ final class BlockHandler implements ActionHandlerInterface
             $currentState = $currentState->withPlayer($defender);
 
             // Armor/injury roll
+            // ⭐ NORMALNI BLOK -- tady Mighty Blow PLATI. `rules_bb2016.txt`
+            //   r. 8291-8293: "when an opponent is Knocked Down by this
+            //   player DURING A BLOCK". Zakaz se tyka jen Stab a Chainsaw.
             $mightyBlow = $attacker->hasSkill(SkillName::MightyBlow) ? 1 : 0;
             $hasClaw = $attacker->hasSkill(SkillName::Claw);
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
