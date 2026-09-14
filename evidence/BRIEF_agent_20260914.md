@@ -109,6 +109,48 @@ stav **UZAVŘENO s commitem**.
 
 ---
 
+## ÚKOL 4 — ZMĚŘIT DVĚ POTVRZENÉ NESROVNALOSTI V DODGI *(neopravovat!)*
+
+`TacklezoneCalculator::calculateDodgeTarget()` se rozchází s `rules_bb2016.txt`
+ve **dvou** bodech. **Obojí je potvrzené proti textu pravidel 14.09.**
+⛔ **Úkolem NENÍ to opravit** — oprava mění chování kouče i trénink.
+**Úkolem je změřit, jestli to vůbec sepne**, a napsat čísla.
+
+**(A) Chybí bonus `+1` za dodge na ÚPLNĚ VOLNÉ pole.**
+Pravidla: cíl = `(7−AG) − 1 + TZ`. Engine: `(7−AG) + max(0, TZ−1)`.
+⇒ Liší se **jen při `TZ == 0`**: pravidla `2+`, engine `3+` *(pro AG4)*.
+**Změř:** jaký podíl skutečně provedených dodgů má na cílovém poli **nula**
+soupeřových TZ. *(Bez toho je to vada na papíře.)*
+
+**(B) Skill `Dodge` je modelovaný jako `−1` k cíli, pravidla dávají RE-ROLL.**
+Text: *„is allowed to **re-roll the D6** if he fails to dodge… may only re-roll
+**one** failed Dodge roll **per turn**"* *(`rules_bb2016.txt`, ř. 8086-8092)*.
+⇒ Není to jiná velikost, ale **jiný druh věci**: re-roll se za kolo spotřebuje,
+`−1` platí pořád. Engine dělá elfa **slabším na prvním úniku** a **silnějším na
+každém dalším v témže kole**.
+**Změř:** kolik dodgů za kolo dělá jeden hráč s `Dodge` *(rozdělení 1, 2, 3+)* —
+to řekne, jak velký je ten rozdíl v provozu.
+
+⚠️ **Souvislost, kvůli které to není hygiena:** šance nosiče na útěk je **jádro
+kritéria pro obranné L**, které se teď navrhuje. Dokud tohle nesedí, staví se
+doktrína na špatných číslech.
+
+## ÚKOL 5 — ZKONTROLOVAT MIGHTY BLOW PROTI PRAVIDLŮM *(jen čtení)*
+
+Fronta má pravidlo: **balík E (roster revize) musí projít korektnostní seznam
+DŘÍV, než někomu skill přidá** — jinak se trénuje na nesprávném pravidle.
+⇒ Uživatel 14.09. rozhodl, že **u změny TV dostanou trpaslíci Stand Firm
+a Mighty Blow**. Dnes je **nemá nikdo z měřené pětky**, takže případná vada
+**není vidět**.
+
+* **Stand Firm** — zkontrolován 14.09., vypadá správně *(`holdsGround()`,
+  i uprostřed řetězu, správně jako VOLBA)*. ⭐ Starý nález *„chain push
+  Stand Firmem projde"* **už neplatí**.
+* **Mighty Blow** — ⛔ **NEZKONTROLOVÁN.** Projdi `BlockHandler.php:615, 633,
+  729, 802` a porovnej s `rules_bb2016.txt`: platí `+1` na **brnění NEBO na
+  zranění** *(ne na obojí v témže bloku)*, a **nepoužije se při crowd surfu**
+  *(tam hází dav)*. Napiš, co sedí a co ne. **Neopravovat bez zadání.**
+
 ## ⛔ ČEHO SE NEDOTÝKAT
 
 * **PHP38** *(turnoverová brána + vrstvy)* — mění chování, chce vlastní měření
