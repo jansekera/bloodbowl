@@ -792,14 +792,23 @@ Turnoverová brána `score -= pT * cenaTurnoveru()` + vrstvy NORMAL/NOUZE/POSLED
 **Mění chování** ⇒ vlastní měření. Konstanty odmítnutí jsou **dočasně zpět**
 v původních hodnotách, v kódu je u nich napsáno proč.
 
-## 4. ⛔ DVĚ POTVRZENÉ NESROVNALOSTI V DODGI — změřit, NEOPRAVOVAT
+## 4. ✅ DVĚ NESROVNALOSTI V DODGI — OPRAVENO 14.09. *(`8ee89d24`)*
 `TacklezoneCalculator::calculateDodgeTarget()` proti `rules_bb2016.txt`:
 * **(A)** chybí bonus `+1` za dodge **na úplně volné pole** *(pravidla `2+`,
   engine `3+`)*;
 * **(B)** skill `Dodge` je modelovaný jako `−1` k cíli, pravidla dávají
   **re-roll jednou za kolo** *(ř. 8086-8092)* — **jiný druh věci**, ne jiná
   velikost.
-⚠️ **Není to hygiena:** šance nosiče na útěk je **jádro kritéria pro obranné L**.
+⇒ ✅ **Opraveno oboje** *(uživatel: „jdi na dodge opravu")*. **Sedm testů spadlo
+a všechny zapisovaly staré chování** — u každého je v komentáři odvození
+z pravidel, ne jen nová číslice.
+⭐ **TŘETÍ nález v téže funkci, NEOPRAVENO:** `Stunty` má podle pravidel TZ na
+cílovém poli **ignorovat**, engine ho má jako `-1`. Při jedné zóně vyjde obojí
+stejně, při třech ne. ⛔ **Nesepne** — Stunty nemá v žádném rosteru nikdo.
+Patří na **P4**.
+⚠️ **Není to hygiena:** šance nosiče na útěk je **jádro kritéria pro obranné L** —
+a po opravě engine konečně počítá totéž co pravidla, ze kterých se to kritérium
+odvozovalo.
 
 ## 4b. ⛔⛔⛔ BALÍK G JE HOTOVÝ V C++, ALE PRACUJE SE V PHP *(14.09.)*
 

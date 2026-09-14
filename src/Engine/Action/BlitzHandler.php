@@ -39,13 +39,35 @@ final class BlitzHandler implements ActionHandlerInterface
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
 
-        if ($attackerPos === null || $defenderPos === null) {
-            throw new \InvalidArgumentException('Players must be on pitch');
-        }
-
         // Mark blitz used for this turn
         $teamState = $state->getTeamState($attacker->getTeamSide());
         $state = $state->withTeamState($attacker->getTeamSide(), $teamState->withBlitzUsed());
+
+        // ⛔⛔ OPRAVA 14.09.2026 (PHP29): CIL UZ NA HRISTI BYT NEMUSI.
+        //   Tataz trida jako uzavreny PHP17 u hand-offu: nabidka vybira cile
+        //   NA HRISTI, ale mezi nabidkou a provedenim bezi KONTROLA PRED AKCI
+        //   (`ActionResolver:130`), ktera hrace z hriste sundat muze --
+        //   napr. Bloodlust kousne Thralla a `InjuryResolver` mu nastavi
+        //   `position = null`. Handler ho pak nenajde a hazel
+        //   'Players must be on pitch'.
+        //   ZMERENO: 1 vyskyt ze 7 582 rozhodnuti -- vzacne, ale v zive hre
+        //   to `AITurnService` nechyta (`try/catch` tam neni).
+        //
+        // ⭐ CO SE MA STAT: blitz je POHYB + BLOK. Kdyz cil zmizel, neni koho
+        //   blokovat -- ale hrac akci UZ DEKLAROVAL. Proto se oznaci za
+        //   'jednal' a vraci se uspech BEZ bloku. ⛔ TURNOVER TO NENI:
+        //   turnover je vyjmenovany vysledek (pad, ztrata mice), ne
+        //   "nebylo co udelat".
+        // ⚠️ JEDINY MISTO, KDE JSEM ROZHODOVAL: `withBlitzUsed()` je nove
+        //   PRED touhle strazi, takze blitz se POCITA ZA SPOTREBOVANY.
+        //   Duvod: hrac blitz DEKLAROVAL, a pravidla davaji jeden na kolo za
+        //   deklaraci, ne za uspech. Kdyby se mel vracet, patri sem opacne
+        //   poradi -- je to jednorádková zmena.
+        if ($attackerPos === null || $defenderPos === null) {
+            $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(true));
+
+            return ActionResult::success($state, []);
+        }
 
         $events = [];
 
