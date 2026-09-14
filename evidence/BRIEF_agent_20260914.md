@@ -151,6 +151,42 @@ a Mighty Blow**. Dnes je **nemá nikdo z měřené pětky**, takže případná 
   zranění** *(ne na obojí v témže bloku)*, a **nepoužije se při crowd surfu**
   *(tam hází dav)*. Napiš, co sedí a co ne. **Neopravovat bez zadání.**
 
+## ÚKOL 6 — OVĚŘIT, ŽE BALÍK G JE OPRAVDU DOTAŽENÝ *(čtení + měření)*
+
+**Proč:** změna TV *(balík E)* je v pořadí **„až po G"**, a G je odškrtnuté
+**v zápisu z 10.08., starém přes měsíc**. ⛔ **Odškrtnutí v zápisu není doklad.**
+Živá fronta `evidence/task_queue.md` balíky A–G vůbec nevede.
+
+**G = „návrat mrtvol":** rezervy · persistence zranění **uvnitř zápasu**
+· soupiska **> 11**. Tedy všechno, co musí **přežít konec drivu**.
+
+**Co se tvrdí, že je hotové** *(commity z 10.08.)*:
+| položka | commit |
+|---|---|
+| Sweltering Heat | `4bd66a4` |
+| surf: Stunned → **rezervy**, ne KO *(bez zvláštního stavu, `OFF_PITCH`)* | `4bd66a4` |
+| tabulka trvalých následků **D68** + apothecary + Regeneration do rezerv | `1e2f646`, `6211a58` |
+
+**Hotovo znamená — u KAŽDÉ položky doklad z kódu A z běhu:**
+1. **V kódu:** najdi místo, které to dělá, a napiš soubor a řádek.
+   ⛔ Nestačí, že konstanta nebo enum existuje — **musí to někdo volat**
+   *(přesně tohle 13.09. selhalo u `CoachHeuristics`: 295 řádků, nula volajících)*.
+2. ⭐⭐ **POZITIVNÍ KONTROLA MĚŘENÍM.** Před opravou bylo naměřeno
+   **`DEAD/hru = 0,00` ve všech 3 200 hrách** a *„rozdíl v přeživších na konci
+   zápasu 0,2 hráče"*. ⇒ **Změř to znovu** *(stačí ~20 zápasů na pozadí)*:
+   * `DEAD / hru` — **musí být > 0**, jinak smrt pořád nenastává;
+   * kolik hráčů je na konci zápasu **v rezervách** *(`OFF_PITCH`)*;
+   * jestli se **KO hráči vracejí** mezi drivy;
+   * kolik těl stojí na hřišti na začátku 2. půle *(soupiska > 11 má smysl,
+     jen když se z rezerv doplňuje)*.
+   ⛔ **Když vyjde nula, je to nález, ne chyba měření** — ale ke každé nule
+   napiš, čím jsi ověřil, že by měřidlo jedničku našlo.
+3. **Napiš verdikt po položkách:** hotovo / napsané ale nezapojené / chybí.
+
+⚠️ Souvisí: paměť `project_bloodbowl_casualties_dont_persist_20260807` —
+tam je původní nález, že zranění nepřežijí drive.
+⛔ **Neopravovat.** Úkolem je zjistit stav, ne ho měnit.
+
 ## ⛔ ČEHO SE NEDOTÝKAT
 
 * **PHP38** *(turnoverová brána + vrstvy)* — mění chování, chce vlastní měření
