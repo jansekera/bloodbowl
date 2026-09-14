@@ -109,7 +109,8 @@ final class SetupHandler implements ActionHandlerInterface
         $kickingTeam = $state->getKickingTeam() ?? TeamSide::AWAY;
         $receivingTeam = $kickingTeam->opponent();
 
-        $kickTarget = $this->kickoffResolver->getDefaultKickTarget($receivingTeam);
+        // ⭐ PHP31: cil kopu se uz vybira, ne bere natvrdo -- viz `chooseKickTarget`.
+        $kickTarget = $this->kickoffResolver->chooseKickTarget($state, $receivingTeam);
         $kickoffResult = $this->kickoffResolver->resolveKickoff($state, $kickTarget);
 
         $newState = $kickoffResult['state']

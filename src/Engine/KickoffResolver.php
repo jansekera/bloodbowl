@@ -623,10 +623,85 @@ final class KickoffResolver
     /**
      * Get default kick target position (center of receiving half).
      */
+    /**
+     * ⛔ PUVODNI NATVRDO ZADANY CIL. Necha se, protoze na nej ukazuji testy,
+     *   ale `chooseKickTarget()` uz vraci totez OD VYPOCTU (viz tam).
+     */
     public function getDefaultKickTarget(TeamSide $receivingTeam): Position
     {
         return $receivingTeam === TeamSide::HOME
             ? new Position(6, 7)
             : new Position(19, 7);
+    }
+
+    /**
+     * ⭐⭐⭐ PHP31 (14.09.2026): KAM SE KOPE.
+     *
+     * ⛔ Do dneska se kopalo na JEDNO natvrdo zadane pole bez ohledu na
+     *   cokoli. Ukazalo se, ze to pole je nahodou spravne -- ale nikde
+     *   nezduvodnene, a Kick se pri vyberu nepouzival vubec.
+     *
+     * ## (1) TVRDA PODMINKA: ZADNY TOUCHBACK
+     * `rules_bb2016.txt` r. 280-282: "If the ball scatters or bounces off
+     * the pitch **or into the kicking team's half**, the receiving coach is
+     * awarded a 'touchback'". ⇒ Cil musi byt od okraje hriste i od pulici
+     * cary dal, nez kam az muze mic odskakat.
+     *
+     * Rozptyl je D6 poli, se skillem `Kick` polovina zaokrouhlena dolu,
+     * tedy nejvys 3 (r. 8211-8213). ⇒ **Bezpecne pasmo:**
+     *   bez Kick (<=6): x je JEDINE pole (6 resp. 19), y 6..8
+     *   s Kick  (<=3): x 3..9 (resp. 16..22), y 3..11  => 63 poli
+     * ⭐ Bez Kicku tedy zadna volba neexistuje. **Kick tu volbu teprve
+     *   otevira** -- a o to presne slo v zadani.
+     *
+     * ## (2) VOLBA UVNITR PASMA: HLUBOKO, NEBO KRATKO
+     * Doktrina (bbtactics.com/kick): **hluboko proti POMALYM tymum**, ktere
+     * stavi klec -- ztizi jim to sebrani mice a donuti je stavet klec hloub
+     * nebo riskovat prihravku. **Kratko k lajne proti RYCHLYM prihravkovym
+     * tymum** -- donuti je na vic hodu, nez dostanou mic dozadu k throwerovi,
+     * a kdyz zvednuti nevyjde, nasi pomali hraci jsou bliz.
+     *
+     * ⚠️ PRAH JE HERNI ROZHODNUTI, NE MERENI. Prumerne MA rosteru:
+     *   trpaslik 4,38 | ork 5,00 || clovek 6,33 | wood elf 6,95 | skaven 7,40
+     * Nejvetsi mezera je mezi orkem a clovekem, proto 6,0. **Zmenit se smi
+     * jedinym cislem nize.**
+     */
+    private const RYCHLY_TYM_MA = 6.0;
+
+    public function chooseKickTarget(GameState $state, TeamSide $receivingTeam): Position
+    {
+        $kickingTeam = $receivingTeam->opponent();
+        $rozptyl = $this->hasKickPlayer($state, $kickingTeam) ? 3 : 6;
+
+        // Pulka prijimajiciho tymu. HOME brani x 0..12, AWAY x 13..25.
+        [$lo, $hi] = $receivingTeam === TeamSide::HOME ? [0, 12] : [13, 25];
+
+        $xOd = $lo + $rozptyl;
+        $xDo = $hi - $rozptyl;
+        $y = intdiv(Position::PITCH_HEIGHT - 1, 2);
+
+        if ($xOd > $xDo) {
+            // Nemuze nastat pri dnesnich rozmerech, ale kdyby se hriste
+            // zmensilo, je lepsi vratit stred nez zaporne pasmo.
+            return $this->getDefaultKickTarget($receivingTeam);
+        }
+
+        // Rychlost prijimajiciho tymu rozhoduje hloubku.
+        $hraci = $state->getPlayersOnPitch($receivingTeam);
+        $prumerneMa = $hraci === []
+            ? 0.0
+            : array_sum(array_map(static fn($p) => $p->getStats()->getMovement(), $hraci)) / count($hraci);
+
+        $rychly = $prumerneMa >= self::RYCHLY_TYM_MA;
+
+        // "Hluboko" = k JEJICH koncove zone, "kratko" = k lajne.
+        // HOME brani x 0..12, takze jeho koncova zona je x=0 => hluboko je MALE x.
+        if ($receivingTeam === TeamSide::HOME) {
+            $x = $rychly ? $xDo : $xOd;
+        } else {
+            $x = $rychly ? $xOd : $xDo;
+        }
+
+        return new Position($x, $y);
     }
 }
