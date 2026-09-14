@@ -129,3 +129,8 @@ q3_fouls_*_data/
 # pracovni strom spini binarkou. Tyz duvod jako diag_*_rows.jsonl vyse.
 /diag_f1_cage_advance
 /diag_dev
+
+# Behove artefakty (14.09.2026) -- velke a kratkozive, do gitu nepatri.
+# Pravidlo: velikost x zivotnost. Vysledky se prenasi pres evidence/*.md.
+/corpus_*/
+/tempo_measure_*/

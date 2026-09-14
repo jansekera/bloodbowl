@@ -57,9 +57,23 @@ final class LearningAICoach implements AICoachInterface
      * Asistence pritom uz engine pocita -- `StrengthCalculator`.
      *
      * Poradi hodnot je poradi realne vyhodnosti:
-     *   3 kostky pro mne  >  2 pro mne  >  1  >>  2 proti  >  3 proti
+     *   3 kostky pro mne  >  2 pro mne  >  1
+     *
+     * ⛔⛔ PHP38 (13.09.): ZAPORNA PULKA TABULKY ZMIZELA (`2-` = -1,5,
+     *   `3-` = -3,0). Byl to zakaz zapsany VELIKOSTI CISLA a nedelal, co
+     *   tvrdil: komentar u nej sliboval "bonus za nosice to muze prebit"
+     *   (+0,5 blok / +0,8 blitz), jenze -3,0 neprebije +0,8 NIKDY.
+     *   ⇒ Nevyhodnost bloku se ted nepise do skore, ale do
+     *   `pTurnover` -- `CoachHeuristics::pTurnoverBloku()` da dvema kostkam
+     *   proti 55,6 % a trem 70,4 %, coz je nad prahem NOUZE. Blok na
+     *   silnejsiho nosice tim zustane hratelny jako nouzova moznost,
+     *   presne jak si uzivatel 13.09. vyzadal.
      */
     private const BLOCK_DICE_VALUE = [
+        // ⏰ Zaporne polozky DOCASNE ZPET (14.09.2026): PHP38 je mel nahradit
+        //   turnoverovou branou, ale `oceneniBloku()` je cte dal a chybejici
+        //   klic v PHP vraci `null` -- odtud 4 TypeError. Az bude brana
+        //   zapojena, smazou se i s tim ctenim, ne driv.
         '3+' => 1.2, '2+' => 0.7, '1' => 0.1, '2-' => -1.5, '3-' => -3.0,
     ];
     /**
@@ -102,47 +116,52 @@ final class LearningAICoach implements AICoachInterface
     private const PICKUP_UNCONTESTED_BONUS = 4.0;
     /** A jde pro nej hrac, ktery ho udrzi -- runner nebo thrower. */
     private const PICKUP_SPECIALIST_BONUS = 1.0;
-    /**
-     * ⛔⛔ NEUSPESNE ZVEDNUTI JE TURNOVER. Merenim 12.09. vyslo, ze kouc pro
-     * mic jde v 56 z 56 pripadu -- rozhodovani je v poradku. Mic presto lezi
-     * volne v 71 kolech z 245, protoze se zvednuti NEDARI: je to hod na
-     * obratnost a u AG 2 vychazi na 33 %.
-     * ⇒ Cena selhani se musi zapocitat stejne jako u dodge: pokuta podle
-     * SANCE TOHO, KDO zvedá. Tim se mezi dvema kandidaty vybere ten lepsi.
-     */
-    private const PICKUP_FAIL_WEIGHT = 4.0;
-    /**
-     * ⛔⛔ NEDOCHYCENA PRIHRAVKA JE TURNOVER -- stejne jako neuspesne zvednuti.
-     * ZMERENO 13.09.: `pass` mel 57,9 % turnoveru na akci, kdezto `move` 7,8 %.
-     * Po prvni oprave se prestalo hazet do prazdna, ale porad se nepocitalo,
-     * jestli to prijemce CHYTI.
-     * ⭐ `BallResolver::getCatchTarget()` uz zna vsechno: agilitu, ZONY
-     * ZACHYCENI kolem prijemce, Extra Arms, Nerves of Steel i Diving Catch.
-     */
-    private const CATCH_FAIL_WEIGHT = 4.0;
 
     private readonly \App\Engine\BallResolver $ballResolver;
     private readonly \App\Engine\StrengthCalculator $strCalc;
     /**
-     * ⛔⛔ RIZIKO SE MUSI OCENOVAT PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026).
-     * Uzivatel: "proc trpaslik dela dodge? to nema delat -- je to trpaslik."
-     * Do ted tu bylo `dodges * 0.15 + gfis * 0.08`, tedy PAUSAL: dodge za 33 %
-     * (AG 2, trpaslik) stal stejne jako dodge za 83 % (AG 4, elf).
-     * ⭐ Nabidka pritom nese `successChance` a ta AG uz zohlednuje
-     * (AG 2 => 33, AG 3 => 50, AG 4 => 67). Staci ji cist.
+     * ⭐⭐⭐ PHP38 (13.09.): JEDNA CENA TURNOVERU MISTO PETI VAH.
+     *
+     * ⛔ Do 13.09. se riziko ocenovalo na PETI mistech s vlastni vahou
+     *   a vlastnim prahem: cesta (`RISK_WEIGHT` 1,5 / 5,0 + privazky 2,0/4,0),
+     *   zvednuti (`PICKUP_FAIL_WEIGHT` 4,0), chyceni (`CATCH_FAIL_WEIGHT` 4,0),
+     *   blok (zaporna pulka `BLOCK_DICE_VALUE`) a blitz (kopie prahu u cesty).
+     *   Faul a multiblok neresily riziko VUBEC.
+     * ⇒ Ted kazda akce vraci svou `pTurnover` a brana je jedna:
+     *   `score -= pT * cenaTurnoveru()`.
+     *
+     * ⭐ POMER ZUSTAVA UZIVATELUV (12.09.): riziko se ocenuje podle toho, KDO
+     *   ho podstupuje. Kdyz je ve hre MIC (nosic se hybe, zvedame, hazime,
+     *   predavame), ztracime tah I MIC -- proto 5,0. Jinak jen tah -- 1,5.
+     *   Cisla jsou puvodni `RISK_WEIGHT` / `RISK_WEIGHT_CARRIER`.
      */
-    private const RISK_WEIGHT = 1.5;
-    /** ⛔ U NOSICE je cena selhani jina: turnover a ztrata mice. */
-    private const RISK_WEIGHT_CARRIER = 5.0;
+    private const CENA_TURNOVERU = 1.5;
+    private const CENA_TURNOVERU_MIC = 5.0;
     /**
-     * ⛔⛔ TVRDA HRANICE (uzivatel 12.09.): "ma ho zastavit, ze je dodge hodne
-     * nebezpecny pro nej." Pod touhle sanci uz nejde o vahani, ale o to, ze
-     * takovy tah se proste NEHRAJE -- pro trpaslika s AG 2 je dodge 33 %,
-     * tedy dve ze tri kol konci turnoverem.
+     * ⏰ DOCASNE ZPET (14.09.2026): tvrde odmitnuti pod prahem.
+     *   PHP38 ho ma nahradit VRSTVOU NOUZE, jenze vrstvy zatim NIKDO NEVOLA
+     *   (`VRSTVA_*` jsou deklarovane a nepouzite). Az do jejich zapojeni
+     *   plati puvodni privazky -- jinak by se odmitani ztratilo potichu
+     *   a zmena chovani by se schovala do refaktoru.
      */
+    /**
+     * ⏰ DOCASNE ZPET (14.09.2026) ze stejneho duvodu jako privazky odmitnuti:
+     *   PHP38 mel obe nahradit jednou cenou turnoveru (`pT * cenaTurnoveru()`),
+     *   ale prevod volajicich mist se neudelal. Do te doby plati puvodni vahy.
+     */
+    private const PICKUP_FAIL_WEIGHT = 4.0;
+    private const CATCH_FAIL_WEIGHT = 4.0;
     private const RISK_REFUSE_BELOW = 50;
     private const RISK_REFUSE_PENALTY = 2.0;
     private const RISK_REFUSE_PENALTY_CARRIER = 4.0;
+    /**
+     * ⛔ CENA VYHOZENI ZA FAUL. `FoulHandler.php:110`: "Foul is NEVER
+     *   a turnover (even with ejection)" -- faul tedy do turnoverove brany
+     *   NEPATRI, jeho riziko je ZTRATA HRACE do konce zapasu.
+     *   Hodnota je zamerne v tomtez pasmu jako nejlepsi blok (`3+` = 1,2):
+     *   prijit o hrace je horsi nez cokoli, co jeden faul prinese.
+     */
+    private const CENA_VYHOZENI = 1.2;
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -152,6 +171,22 @@ final class LearningAICoach implements AICoachInterface
      * na konec kola, kdy uz turnover stoji min.
      */
     private const RISK_FREE_BONUS = 0.4;
+
+    /**
+     * ⭐⭐⭐ PHP38 -- VRSTVY MISTO ZAPORNYCH KONSTANT (uzivatel 13.09.:
+     *   "nebo akci provest jen v nouzi").
+     *
+     *   NORMAL  -- turnover pod 50 %, hraje se normalne.
+     *   NOUZE   -- turnover 50 % a vic; sahne se po nem, AZ KDYZ je NORMAL
+     *              prazdny. Nahrazuje privazky `RISK_REFUSE_PENALTY(_CARRIER)`
+     *              i tvrde `continue` u zvedani mice.
+     *   POSLEDNI-- zachranny `STAND_PAT`. Do 13.09. mel skore `baseScore - 0,5`,
+     *              tedy zakaz zapsany velikosti cisla; ted je to proste
+     *              nejnizsi vrstva, a END_TURN je az za ni.
+     */
+    private const VRSTVA_NORMAL = 0;
+    private const VRSTVA_NOUZE = 1;
+    private const VRSTVA_POSLEDNI = 2;
 
     private string $modelType = 'linear';
     /** @var list<float> */
@@ -835,7 +870,7 @@ final class LearningAICoach implements AICoachInterface
             //   tedy na "bez rizika", coz je bezpecny vychozi stav.
             $sance = max(0, min(100, (int) ($target['successChance'] ?? 100)));
             $riskPenalty = (1 - $sance / 100)
-                * ($isCarrier ? self::RISK_WEIGHT_CARRIER : self::RISK_WEIGHT);
+                * ($isCarrier ? self::CENA_TURNOVERU_MIC : self::CENA_TURNOVERU);
             if ($sance < self::RISK_REFUSE_BELOW) {
                 // Pod hranici uz to neni vahani, ale zakaz.
                 $riskPenalty += $isCarrier
@@ -1305,7 +1340,7 @@ final class LearningAICoach implements AICoachInterface
             if ($sanceCesty === null) {
                 continue;   // nedojde vubec
             }
-            $riziko = (1 - $sanceCesty) * self::RISK_WEIGHT;
+            $riziko = (1 - $sanceCesty) * self::CENA_TURNOVERU;
             if ($sanceCesty < 0.5) {
                 $riziko += self::RISK_REFUSE_PENALTY;
             }

@@ -144,6 +144,13 @@ $vyjimkyPodle = [];   // a JAKOU -- v živé aplikaci to NIKDO nechytá
 //   Uzivatel: "turnover 55 % pri nasem bloku znamena, ze neprivadime
 //   asistenty?" -- tohle je to cislo, ktere na to odpovi.
 $kostkyBloku = [];
+// ⭐ TURNOVERY NA AKCI (13.09.) -- uzivatel: "pust to mereni turnoveru na blok
+//   i na jine cinnosti, co muzou koncit na turnover".
+//   Podil kol konciciho turnoverem michá dohromady "jak riskantni akce delame"
+//   a "kolik jich delame". Tohle meri to prvni: pro kazdy TYP akce kolikrat
+//   se zahral a kolikrat z toho vzesel turnover.
+$akciCelkem = [];
+$akciTurnover = [];
 $hist = [];   // kolik hráčů propadlo, histogram
 $typy = [];   // ⭐ PŘÍČINA: co bylo v nabídce, když vada sepnula
 $typyMax = [];// a kolik nejvíc
@@ -279,8 +286,14 @@ for ($g = 0; $g < $games; $g++) {
         //    -- a je to přesně to, co vadu maskuje. `AITurnService::playTurn`
         //    (živá hra) try/catch NEMÁ, takže tam táž výjimka spadne ven.
         //    Proto se tu nepolyká, ale POČÍTÁ.
+        $typAkce = $decision['action']->value;
+        $akciCelkem[$typAkce] = ($akciCelkem[$typAkce] ?? 0) + 1;
+
         try {
             $result = $resolver->resolve($state, $decision['action'], $decision['params']);
+            if ($result->isTurnover()) {
+                $akciTurnover[$typAkce] = ($akciTurnover[$typAkce] ?? 0) + 1;
+            }
         } catch (\Exception $e) {
             $stat['vyjimky']++;
             $kl = $decision['action']->value . ': ' . $e->getMessage();
@@ -371,6 +384,18 @@ foreach ($turnoverPricina as $kl => $v) {
 }
 if ($vyps > 12) {
     printf("    ... a dalších %d druhů\n", count($turnoverPricina) - 12);
+}
+
+if ($akciCelkem !== []) {
+    echo "\n⭐ TURNOVERY NA AKCI (kolikrat se akce zahrala -> kolikrat z ni vzesel turnover):\n";
+    arsort($akciCelkem);
+    foreach ($akciCelkem as $typ => $n) {
+        $t = $akciTurnover[$typ] ?? 0;
+        printf("    %-16s %6d zahrano   %5d turnoveru   %5.1f %%\n", $typ, $n, $t, 100 * $t / $n);
+    }
+    $celkemA = array_sum($akciCelkem); $celkemT = array_sum($akciTurnover);
+    printf("    %-16s %6d            %5d            %5.1f %%\n", 'CELKEM', $celkemA, $celkemT,
+        $celkemA > 0 ? 100 * $celkemT / $celkemA : 0);
 }
 
 if ($kostkyBloku !== []) {
