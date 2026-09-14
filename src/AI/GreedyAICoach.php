@@ -252,10 +252,8 @@ final class GreedyAICoach implements AICoachInterface
     ): ?array {
         // ⛔⛔ NOSIC NEBLOKUJE A NEBLITZUJE -- tataz oprava jako v
         //   `LearningAICoach` (uzivatel 12.09.).
-        $ballG = $state->getBall();
-        if ($ballG->isHeld() && $ballG->getCarrierId() === $playerId
-            && in_array($type, [ActionType::BLOCK, ActionType::BLITZ,
-                                ActionType::MULTIPLE_BLOCK, ActionType::FOUL], true)) {
+        if (CoachHeuristics::jeNosic($state, $playerId)
+            && CoachHeuristics::nosicNebojuje($type)) {
             return null;
         }
 

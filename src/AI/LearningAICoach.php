@@ -871,12 +871,8 @@ final class LearningAICoach implements AICoachInterface
         //   ktery ma udelat nekdo s asistenci.
         //   Naměřeno v `CagePlaybookTest`: nosic blitzoval uprostred
         //   sestavovani klece.
-        $ball = $state->getBall();
-        $jeNosic = $ball->isHeld() && $ball->getCarrierId() === $playerId;
-        if ($jeNosic && in_array($type, [
-            ActionType::BLOCK, ActionType::BLITZ, ActionType::MULTIPLE_BLOCK,
-            ActionType::FOUL,
-        ], true)) {
+        $jeNosic = CoachHeuristics::jeNosic($state, $playerId);
+        if ($jeNosic && CoachHeuristics::nosicNebojuje($type)) {
             return null;
         }
 
