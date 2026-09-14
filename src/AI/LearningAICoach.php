@@ -343,7 +343,7 @@ final class LearningAICoach implements AICoachInterface
         if ($pos === null) {
             return false;
         }
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $vzdalenost = abs($pos->getX() - $endZoneX);
         $ma = max(1, $nosic->getStats()->getMovement());
         $kolNaCestu = (int) ceil($vzdalenost / $ma);
@@ -856,8 +856,8 @@ final class LearningAICoach implements AICoachInterface
         // Quick heuristic scoring without full feature extraction per target
         // Use the endzone direction and ball-related logic
         $ball = $state->getBall();
-        $isCarrier = $ball->isHeld() && $ball->getCarrierId() === $playerId;
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $isCarrier = CoachHeuristics::jeNosic($state, $playerId);
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $currentPos = $player->getPosition();
 
         $bestScore = -PHP_FLOAT_MAX;
@@ -1415,7 +1415,7 @@ final class LearningAICoach implements AICoachInterface
         // ⚠️ A druha vada v teze metode: klice vzdalenosti byly 'short'/'long',
         //   zatimco engine vraci 'short_pass'/'long_pass' -- `match` tedy
         //   NIKDY nesedl a vsechny cile mely tutez pokutu.
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $naslo = false;
 
         foreach ($targets as $target) {
@@ -1491,7 +1491,7 @@ final class LearningAICoach implements AICoachInterface
         //   s AG 2 znamena ~33% sanci, ze mic spadne -- a to je TURNOVER.
         //   ⭐ ZMERENO PRED OPRAVOU: `hand_off` 4 zahrani, 2 turnovery (50 %).
         $mojeAG = $player->getStats()->getAgility();
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $mojeVzdalenost = $player->getPosition() !== null
             ? abs($player->getPosition()->getX() - $endZoneX)
             : 0;

@@ -132,7 +132,7 @@ final class GreedyAICoach implements AICoachInterface
 
         // Nejdal k souperove koncove zone, tedy postup vpred. Jeden pruchod
         // s `min` -- tridit cele pole kvuli jednomu prvku je zbytecne.
-        $endZoneX = ($side === TeamSide::HOME) ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $best = $targets[0];
         $bestDist = abs($best['x'] - $endZoneX);
         foreach ($targets as $t) {
@@ -259,8 +259,8 @@ final class GreedyAICoach implements AICoachInterface
         }
 
         $ball = $state->getBall();
-        $isCarrier = $ball->isHeld() && $ball->getCarrierId() === $playerId;
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $isCarrier = CoachHeuristics::jeNosic($state, $playerId);
+        $endZoneX = CoachHeuristics::endZoneX($side);
 
         $bestTarget = null;
         $bestScore = -1;
@@ -501,7 +501,7 @@ final class GreedyAICoach implements AICoachInterface
             return null;
         }
 
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $bestScore = -1;
         $bestTarget = null;
 
@@ -567,7 +567,7 @@ final class GreedyAICoach implements AICoachInterface
             return null;
         }
 
-        $endZoneX = $side === TeamSide::HOME ? 25 : 0;
+        $endZoneX = CoachHeuristics::endZoneX($side);
         $bestScore = -1;
         $bestTargetId = null;
 
