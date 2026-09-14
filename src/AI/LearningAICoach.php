@@ -118,6 +118,7 @@ final class LearningAICoach implements AICoachInterface
     private const PICKUP_SPECIALIST_BONUS = 1.0;
 
     private readonly \App\Engine\BallResolver $ballResolver;
+    private readonly \App\Engine\PassResolver $passResolver;
     private readonly \App\Engine\StrengthCalculator $strCalc;
     /**
      * ⭐⭐⭐ PHP38 (13.09.): JEDNA CENA TURNOVERU MISTO PETI VAH.
@@ -252,6 +253,13 @@ final class LearningAICoach implements AICoachInterface
             new \App\Engine\RandomDiceRoller(),
             new \App\Engine\TacklezoneCalculator(),
             new \App\Engine\ScatterCalculator(),
+        );
+        // ⭐ PHP37: jen kvuli `getAccuracyTarget()` -- kostkou se tady nehazi.
+        $this->passResolver = new \App\Engine\PassResolver(
+            new \App\Engine\RandomDiceRoller(),
+            new \App\Engine\TacklezoneCalculator(),
+            new \App\Engine\ScatterCalculator(),
+            $this->ballResolver,
         );
 
         if ($weightsFile !== null && file_exists($weightsFile)) {
@@ -1517,8 +1525,27 @@ final class LearningAICoach implements AICoachInterface
             // ⛔ Sance, ze to prijemce CHYTI -- vcetne zon zachyceni kolem nej.
             //   +1 je modifikator za PRESNOU prihravku.
             $sanceChyceni = $this->catchChance($state, $prijemce, 1);
+
+            // ⛔⛔ PHP37 (14.09.2026): DO DNESKA SE POCITALO, ZE HOD VZDY VYJDE.
+            //   Ocenoval se jen CHYT, takze dlouha bomba od trpaslika s AG 2
+            //   vypadala stejne bezpecne jako quick pass od elfa -- lisila je
+            //   jen plocha pokuta za dosah.
+            //   ⭐ Engine pritom cil hodu UZ UMI: `PassResolver::getAccuracyTarget()`
+            //   zapocita AG, zony zachyceni NA HAZECI, dosah, pocasi,
+            //   Disturbing Presence, Accurate i Nerves of Steel.
+            //   ⇒ Sance se NASOBI, ne odecitaji zvlast: prihravka dojde jen
+            //   kdyz vyjde hod A ZAROVEN chyt. Tyz princip, ktery se 13.09.
+            //   opravoval u zvednuti mice ("rizika se nekombinovala").
+            $dosah = CoachHeuristics::dosahPrihravky($target['range']);
+            $sanceHodu = 1.0;
+            if ($dosah !== null) {
+                $cil = $this->passResolver->getAccuracyTarget($state, $player, $dosah);
+                $sanceHodu = max(0.0, (7 - $cil) / 6.0);
+            }
+
+            $sanceCelkem = $sanceHodu * $sanceChyceni;
             $score = $baseScore - $rangePenalty + $ziskPole * 0.1
-                - (1 - $sanceChyceni) * self::CATCH_FAIL_WEIGHT;
+                - (1 - $sanceCelkem) * self::CATCH_FAIL_WEIGHT;
 
             if ($score > $bestScore) {
                 $bestScore = $score;

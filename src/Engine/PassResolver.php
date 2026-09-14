@@ -320,10 +320,17 @@ final class PassResolver
             $target++;
         }
 
-        // Pass skill: -1 to target
-        if ($thrower->hasSkill(SkillName::Pass)) {
-            $target--;
-        }
+        // ⛔⛔ ODEBRANO 14.09.2026 -- SKILL `Pass` SE POCITAL DVAKRAT.
+        //   `rules_bb2016.txt` r. 8335-8337: "A player with the Pass skill is
+        //   allowed to RE-ROLL the D6 if he throws an inaccurate pass or
+        //   fumbles." Je to opakovani hodu, NE modifikator.
+        //   Ten re-roll engine UZ MA a ma ho spravne -- `PassResolver:127`.
+        //   Zdejsi `-1` byla druha porce tehoz skillu.
+        //   ⭐ TRETI VYSKYT TEHOZ VZORCE ZA JEDEN DEN (po `Dodge` a po
+        //   dvojici u Mighty Blow): skill, ktery dava RE-ROLL, byl zapsany
+        //   jako modifikator, a opakovani hodu se pridalo pozdeji vedle nej.
+        //   ⚠️ Provereny i ostatni: `Catch` a `Sure Hands` maji jen re-roll
+        //   (spravne), `Accurate` je modifikator a tim i ma byt.
 
         // Accurate: -1 to target
         if ($thrower->hasSkill(SkillName::Accurate)) {
