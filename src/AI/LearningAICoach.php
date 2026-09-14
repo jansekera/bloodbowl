@@ -306,8 +306,10 @@ final class LearningAICoach implements AICoachInterface
      */
     private static function isCageCorner(Position $carrierPos, Position $pos): bool
     {
-        return abs($carrierPos->getX() - $pos->getX()) === 1
-            && abs($carrierPos->getY() - $pos->getY()) === 1;
+        // ⭐ PHP39: logika je JEDNOU, v `CoachHeuristics`. Jmeno tady zustava,
+        //   protoze na nej ukazuji ctyri mista v kodu klece, ktery se prave
+        //   meni -- prejmenovani by se michalo do rozdelane prace.
+        return CoachHeuristics::jeRohKlece($carrierPos, $pos);
     }
 
 

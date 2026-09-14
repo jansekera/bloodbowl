@@ -365,8 +365,7 @@ final class GreedyAICoach implements AICoachInterface
                 if ($carrier !== null && $carrier->getTeamSide() === $side) {
                     $carrierPos = $carrier->getPosition();
                     if ($carrierPos !== null
-                        && abs($carrierPos->getX() - $pos->getX()) === 1
-                        && abs($carrierPos->getY() - $pos->getY()) === 1) {
+                        && CoachHeuristics::jeRohKlece($carrierPos, $pos)) {
                         // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
                         //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
                         //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
