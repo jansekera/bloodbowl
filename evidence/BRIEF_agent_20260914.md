@@ -1,5 +1,57 @@
 # ZADÁNÍ PRO AGENTA — 14.09.2026 večer
 
+---
+
+# ✅ STAV PO BĚHU AGENTA *(14.09. večer)*
+
+| úkol | stav |
+|---|---|
+| **1 — PHP40 cache** | ✅ **HOTOVO** *(`3256e95e`, `84b49dc2`)* |
+| **2 — PHP39 zbytek** | ⏳ **ČÁSTEČNĚ, a je to nález** — viz níž |
+| **3 — sladit frontu** | ✅ **HOTOVO** *(`93f8776c`)* |
+| **4 — změřit dodge** | ⏰ nezačato |
+| **5 — Mighty Blow** | ⏰ nezačato |
+| **6 — balík G** | ⏰ nezačato |
+
+## ÚKOL 1 — čísla
+
+| co | výsledek |
+|---|---|
+| sebekontrola Learning | **10 zápasů, 0 rozdílů** |
+| sebekontrola Greedy | **3 zápasy, 0 rozdílů** |
+| ⭐ **pozitivní kontrola** *(oba kouči)* | klíč rozbit ⇒ **hláška spadla** |
+| rychlost, 3 zápasy | **203,5 s → 116,6 s = −42,7 %** |
+
+⚠️ **Měření rychlosti NENÍ párové A/B** — engine **nemá seed**, takže oba běhy
+odehrály jiné zápasy. **Směr jistý, číslo měkké.**
+⇒ ⭐ **Seed je předpoklad každého poctivého měření výkonu. Chybí.**
+
+## ⛔⛔ ÚKOL 2 — NÁLEZ: zbytek PHP39 není čistý refaktor
+
+**Zapojeno** *(opravdu bez změny chování)*: `jeRohKlece` *(`08f06849`)* ·
+`nosicNebojuje` *(`f18f0572`)*. Dřív už `endZoneX`, `jeNosic`.
+
+**Nezapojeno, protože by to ZMĚNILO CHOVÁNÍ:**
+| metoda | rozdíl |
+|---|---|
+| `zonyZachyceni` | engine **odečítá hráče, kteří zónu ZTRATILI** — kouči si to nehlídali |
+| `jeVedleSoupere` | dědí totéž |
+| `znackujici` | dědí totéž |
+| `pVyhozeniZaFaul` | kouči riziko vyhození **vůbec nepočítají** ⇒ **nová úvaha** |
+
+⇒ **Patří k PHP38**, kde se chování mění vědomě a měří se. **Zadání znělo
+„zapoj ty, které nemění chování" — a tyhle čtyři to nesplňují.**
+
+## ⚠️ CO SE PŘI TOM POKAZILO
+
+První pokus o smazání `isCageCorner` použil **regulární výraz** a snědl
+**o 297 řádků víc**, než měl ⇒ **37 chyb v testech**. Vráceno přes
+`git checkout`, uděláno znovu **přesnými náhradami s kontrolou `count == 1`**.
+⛔ **Regex na mazání bloků kódu už ne.**
+
+---
+
+
 ⚠️ **Tenhle soubor je zadání, ne zápis.** Až se práce udělá, přepiš u každé
 položky stav a nechej soubor v repu.
 
