@@ -17,13 +17,69 @@ final class GreedyAICoach implements AICoachInterface
 {
     private readonly StrengthCalculator $strCalc;
 
+    /**
+     * ⭐⭐ PHP40 (14.09.2026): CACHE POHYBOVYCH POLI NA JEDNO ROZHODNUTI.
+     *   Tataz vec jako v `LearningAICoach` -- `getValidMoveTargets()` se pro
+     *   tehoz hrace a tyz stav volal v jednom `decideAction()` vickrat.
+     *
+     * ⛔⛔ UZIVATEL 14.09.: "cache je vzdy ta, na kterou se musi davat pozor --
+     *   kdyz neco nefunguje, je prvni ke kontrole."
+     * ⇒ Platnost je proto UMYSLNE uzka: zije jen po dobu jednoho
+     *   `decideAction()` a na jeho zacatku se ZAHAZUJE. Uvnitr jednoho
+     *   rozhodnuti se deska nemeni -- kouc nic neprovadi, jen ocenuje nabidku.
+     *
+     * @var array<int, list<array<string, mixed>>>
+     */
+    private array $poleCache = [];
+
+    /** ⭐ `BB_CACHE_SELFCHECK=1` = kazde cteni se dopocita znovu a porovna. */
+    private readonly bool $kontrolaCache;
+
+    /** ⭐ `BB_CACHE_OFF=1` = chovej se, jako by cache nebyla (jen pro mereni). */
+    private readonly bool $cacheVypnuta;
+
     public function __construct()
     {
         $this->strCalc = new StrengthCalculator();
+        $this->kontrolaCache = getenv('BB_CACHE_SELFCHECK') === '1';
+        $this->cacheVypnuta = getenv('BB_CACHE_OFF') === '1';
+    }
+
+    /**
+     * Pohybova pole hrace v aktualnim rozhodnuti. Viz `$poleCache`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function moznaPole(GameState $state, RulesEngine $rules, int $playerId): array
+    {
+        if ($this->cacheVypnuta) {
+            return $rules->getValidMoveTargets($state, $playerId);
+        }
+
+        if (!isset($this->poleCache[$playerId])) {
+            $this->poleCache[$playerId] = $rules->getValidMoveTargets($state, $playerId);
+
+            return $this->poleCache[$playerId];
+        }
+
+        if ($this->kontrolaCache) {
+            $cerstve = $rules->getValidMoveTargets($state, $playerId);
+            if ($cerstve !== $this->poleCache[$playerId]) {
+                throw new \RuntimeException(
+                    "CACHE POHYBU VRACI JINOU ODPOVED NEZ VYPOCET (hrac {$playerId}). "
+                    . 'Klic cache nepokryva vsechno, co odpoved meni.'
+                );
+            }
+        }
+
+        return $this->poleCache[$playerId];
     }
 
     public function decideAction(GameState $state, RulesEngine $rules): array
     {
+        // ⛔ Cache plati JEN pro tohle jedno rozhodnuti (viz `$poleCache`).
+        $this->poleCache = [];
+
         $side = $state->getActiveTeam();
         $actions = $rules->getAvailableActions($state);
 
@@ -125,7 +181,7 @@ final class GreedyAICoach implements AICoachInterface
         int $playerId,
         TeamSide $side,
     ): ?array {
-        $targets = $rules->getValidMoveTargets($state, $playerId);
+        $targets = $this->moznaPole($state, $rules, $playerId);
         if ($targets === []) {
             return null;
         }
@@ -248,7 +304,7 @@ final class GreedyAICoach implements AICoachInterface
         int $playerId,
         TeamSide $side,
     ): ?array {
-        $targets = $rules->getValidMoveTargets($state, $playerId);
+        $targets = $this->moznaPole($state, $rules, $playerId);
         if ($targets === []) {
             return null;
         }
