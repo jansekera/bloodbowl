@@ -188,6 +188,40 @@ final class LearningAICoach implements AICoachInterface
     private const VRSTVA_NOUZE = 1;
     private const VRSTVA_POSLEDNI = 2;
 
+    /**
+     * ⭐⭐ PHP40 (14.09.2026): CACHE POHYBOVYCH POLI NA JEDNO ROZHODNUTI.
+     *
+     * ⛔ DOLOZENY DUVOD: `getValidMoveTargets()` se pro TEHOZ hrace a TYZ stav
+     *   volal v ramci jednoho `decideAction()` vickrat -- zvlast v
+     *   `buildMoveAction`, zvlast v `buildBlitzAction`, zvlast v `sanceDojitK`.
+     *   Jeden zapas `learning` vs `greedy` stoji ~46 s a pathfinding je v nem
+     *   nejdrazsi polozka.
+     *
+     * ⛔⛔ UZIVATEL 14.09.: "cache je vzdy ta, na kterou se musi davat pozor --
+     *   kdyz neco nefunguje, je prvni ke kontrole."
+     * ⇒ Proto je platnost cache uzka: **zije jen po dobu jednoho
+     *   `decideAction()`** a na jeho zacatku se ZAHAZUJE. Uvnitr jednoho
+     *   rozhodnuti se stav nemeni -- kouc nic neprovadi, jen ocenuje nabidku.
+     *   Cache tedy nemuze prezit zmenu desky, protoze zadna nenastane.
+     * ⇒ A klic je `playerId`, protoze v ramci jednoho rozhodnuti je stav
+     *   jedina dalsi promenna a ta je konstantni.
+     *
+     * @var array<int, list<array<string, mixed>>>
+     */
+    private array $poleCache = [];
+
+    /**
+     * ⭐ SEBEKONTROLA CACHE. Kdyz je zapnuta, kazde cteni se DOPOCITA ZNOVU
+     *   bez cache a vysledky se porovnaji; pri rozdilu se hodi vyjimka.
+     *   ⇒ Je to pozitivni kontrola k tvrzeni "0 zmenenych rozhodnuti":
+     *     bez ni je prazdny seznam rozdilu bezcenny.
+     *   Zapina se `BB_CACHE_SELFCHECK=1`; v provozu je vypnuta (stoji dvojnasobek).
+     */
+    private readonly bool $kontrolaCache;
+
+    /** ⭐ `BB_CACHE_OFF=1` = chovej se, jako by cache nebyla (jen pro mereni). */
+    private readonly bool $cacheVypnuta;
+
     private string $modelType = 'linear';
     /** @var list<float> */
     private array $weights = [];
@@ -209,6 +243,9 @@ final class LearningAICoach implements AICoachInterface
     public function __construct(?string $weightsFile = null, float $epsilon = 0.0)
     {
         $this->epsilon = $epsilon;
+        $this->kontrolaCache = getenv('BB_CACHE_SELFCHECK') === '1';
+        // ⭐ Vypinac pro MERENI zrychleni -- aby se nemusel komentovat kod.
+        $this->cacheVypnuta = getenv('BB_CACHE_OFF') === '1';
         // ⛔ Jen kvuli `getPickupTarget()` -- kostkou se tady nikdy nehazi.
         $this->strCalc = new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
         $this->ballResolver = new \App\Engine\BallResolver(
@@ -474,7 +511,7 @@ final class LearningAICoach implements AICoachInterface
         }
 
         $nej = null;
-        foreach ($cile ?? $rules->getValidMoveTargets($state, $playerId) as $t) {
+        foreach ($cile ?? $this->moznaPole($state, $rules, $playerId) as $t) {
             if (max(abs($t['x'] - $cp->getX()), abs($t['y'] - $cp->getY())) !== 1) {
                 continue;
             }
@@ -518,8 +555,41 @@ final class LearningAICoach implements AICoachInterface
         return $carrier->getPosition();
     }
 
+
+    /**
+     * Pohybova pole hrace v aktualnim rozhodnuti. Viz `$poleCache`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function moznaPole(GameState $state, RulesEngine $rules, int $playerId): array
+    {
+        if ($this->cacheVypnuta) {
+            return $rules->getValidMoveTargets($state, $playerId);
+        }
+
+        if (!isset($this->poleCache[$playerId])) {
+            $this->poleCache[$playerId] = $rules->getValidMoveTargets($state, $playerId);
+
+            return $this->poleCache[$playerId];
+        }
+
+        if ($this->kontrolaCache) {
+            $cerstve = $rules->getValidMoveTargets($state, $playerId);
+            if ($cerstve !== $this->poleCache[$playerId]) {
+                throw new \RuntimeException(
+                    "CACHE POHYBU VRACI JINOU ODPOVED NEZ VYPOCET (hrac {$playerId}). "
+                    . 'Klic cache nepokryva vsechno, co odpoved meni.'
+                );
+            }
+        }
+
+        return $this->poleCache[$playerId];
+    }
+
     public function decideAction(GameState $state, RulesEngine $rules): array
     {
+        // ⛔ Cache plati JEN pro tohle jedno rozhodnuti (viz `$poleCache`).
+        $this->poleCache = [];
         $side = $state->getActiveTeam();
         $actions = $rules->getAvailableActions($state);
 
@@ -843,7 +913,7 @@ final class LearningAICoach implements AICoachInterface
      */
     private function buildMoveAction(GameState $state, RulesEngine $rules, int $playerId, TeamSide $side): ?array
     {
-        $targets = $rules->getValidMoveTargets($state, $playerId);
+        $targets = $this->moznaPole($state, $rules, $playerId);
         if ($targets === []) {
             return null;
         }
@@ -1314,7 +1384,7 @@ final class LearningAICoach implements AICoachInterface
         // ⭐ VYKON (review): pathfinder je pro daneho hrace a stav TOTOZNY pro
         //   vsechny cile -- volal se ale pro kazdeho soupere zvlast (zmereno
         //   ~10x prepocet, 122 ms proti 12,8 ms). Spocita se JEDNOU.
-        $moznaPole = $rules->getValidMoveTargets($state, $playerId);
+        $moznaPole = $this->moznaPole($state, $rules, $playerId);
 
         foreach ($enemies as $enemy) {
             // ⛔ OPRAVA 13.09. (review): lezici a omracene cile se preskakuji.
