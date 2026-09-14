@@ -801,6 +801,17 @@ v původních hodnotách, v kódu je u nich napsáno proč.
   velikost.
 ⚠️ **Není to hygiena:** šance nosiče na útěk je **jádro kritéria pro obranné L**.
 
+## 4b. ⛔⛔⛔ BALÍK G JE HOTOVÝ V C++, ALE PRACUJE SE V PHP *(14.09.)*
+
+Commity `4bd66a4`, `1e2f646`, `6211a58` mění **jen `engine/*.cpp`**. Práce
+PHP16–PHP40 i `cli/simulate.php` běží v `src/Engine/*.php` a **most mezi nimi
+není žádný**. ⇒ V PHP chybí: rezervy · tabulka D68 · lavička · návrat KO mezi
+drivy; Sweltering Heat má jiný, starý mechanismus.
+**Změřeno:** `DEAD/hru = 0,00` *(a `DEAD` se v `src/` nikdy nepřiřazuje, takže
+je to nutnost, ne vzorek)*; pozitivní kontrola: 27 INJURED, 47 KO.
+⇒ ⛔ **Brána před balíkem E (změna TV) NENÍ splněná.**
+⭐ Poučení: u každého nálezu se ptát **„ve kterém enginu?"**
+
 ## 5. Pak podle dřívějšího pořadí
 **PHP28** *(TTM rameno)* · **PHP29** *(blitz on pitch)* · **PHP37** *(pass)* ·
 **PHP31** *(kam se kope)* · **PHP36** *(clona)* · **PHP20**, **PHP18**.

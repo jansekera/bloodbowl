@@ -9,9 +9,9 @@
 | **1 — PHP40 cache** | ✅ **HOTOVO** *(`3256e95e`, `84b49dc2`)* |
 | **2 — PHP39 zbytek** | ⏳ **ČÁSTEČNĚ, a je to nález** — viz níž |
 | **3 — sladit frontu** | ✅ **HOTOVO** *(`93f8776c`)* |
-| **4 — změřit dodge** | ⏰ nezačato |
+| **4 — dodge** | ✅ **OPRAVENO** *(`8ee89d24`)* — uživatel to povýšil z měření na opravu |
 | **5 — Mighty Blow** | ✅ **HOTOVO** — viz níž |
-| **6 — balík G** | ⏰ nezačato |
+| **6 — balík G** | ✅ **HOTOVO** — ⛔⛔ a je to velký nález, viz níž |
 
 ## ÚKOL 1 — čísla
 
@@ -25,6 +25,28 @@
 ⚠️ **Měření rychlosti NENÍ párové A/B** — engine **nemá seed**, takže oba běhy
 odehrály jiné zápasy. **Směr jistý, číslo měkké.**
 ⇒ ⭐ **Seed je předpoklad každého poctivého měření výkonu. Chybí.**
+
+## ⛔⛔⛔ ÚKOL 6 — BALÍK G JE HOTOVÝ V JINÉM ENGINU, NEŽ VE KTERÉM PRACUJEME
+
+Tři commity, kterými je G odškrtnuté, mění **výhradně `engine/*.cpp`** (C++).
+Jenže `php cli/simulate.php` i celá práce PHP16–PHP40 běží na **samostatné
+implementaci v `src/Engine/*.php`**, a **most mezi nimi neexistuje**
+*(v `src/` ani `cli/` není FFI, `exec`, `shell_exec` ani `.so` — ověřeno)*.
+
+| položka | stav v PHP |
+|---|---|
+| Sweltering Heat | **jiný, starý mechanismus** *(`KickoffResolver.php:445-469`)* |
+| surf: Stunned → rezervy | **chybí** |
+| tabulka D68 | **chybí zcela** — 10+ dá plošně `INJURED` |
+| soupiska > 11 | **neexistuje** — roster vrací 11, žádná lavička |
+| návrat KO | **jen o poločase**, ne mezi drivy |
+
+**Měření (20 zápasů):** `DEAD/hru = 0,00` · rezervy na konci `0,00` ·
+⭐ **pozitivní kontrola:** týž počítač našel **27 INJURED a 47 KO**, takže
+jedničku umí najít. A nula u `DEAD` je **strukturálně nutná** — `PlayerState::DEAD`
+se v celém `src/` nikdy nepřiřazuje *(ověřeno i mnou, ne převzato)*.
+
+⇒ ⛔ **Brána před změnou TV není splněná.**
 
 ## ✅ ÚKOL 5 — MIGHTY BLOW: dva nálezy, jeden živý a jeden spící
 
