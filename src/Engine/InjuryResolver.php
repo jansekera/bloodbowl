@@ -15,6 +15,24 @@ final class InjuryResolver
      *
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
+    /**
+     * ⭐⭐ `$mightyBlow`: OPRAVA 14.09.2026 -- MB je VOLBA, ne pevny bonus.
+     *
+     * `rules_bb2016.txt` r. 8291-8297: "Add 1 to ANY Armour OR Injury roll…
+     * Note that you only modify ONE of the dice rolls, so if you decide to
+     * use Mighty Blow to modify the Armour roll, you may not modify the
+     * Injury roll as well."
+     *
+     * ⛔ Do dneska se MB predaval jako `armourModifier` a `injuryModifier`
+     *   byl vzdy 0 ⇒ **utratil se vzdy za brneni**. Kdyz se brneni prolomilo
+     *   i bez nej, bonus PROPADL. To neni nelegalni, ale je to trvale
+     *   zahozena pulka skillu.
+     * ⇒ Ted: nejdriv se posoudi, jestli by brneni prolomil hod SAM. Kdyz ano,
+     *   MB jde na ZRANENI; kdyz ne, pouzije se na brneni.
+     * ⚠️ PREDPOKLAD, ktery pravidla nerozhoduji: volba se dela PO hodu na
+     *   brneni. Text neuvadi okamzik rozhodnuti; takhle to hraje vetsina
+     *   implementaci a je to pro majitele skillu optimalni.
+     */
     public function resolve(
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
@@ -23,13 +41,23 @@ final class InjuryResolver
         bool $hasClaw = false,
         bool $hasStakes = false,
         bool $hasNurglesRot = false,
+        bool $mightyBlow = false,
     ): array {
         $events = [];
 
         // Armor roll: 2D6 > AV = armor broken
         $armourRoll = $dice->roll2D6();
-        $modifiedRoll = $armourRoll + $armourModifier;
         $armourValue = $player->getStats()->getArmour();
+
+        // Prolomil by hod brneni i BEZ Mighty Blow?
+        $bezMB = ($hasClaw && $armourRoll >= 8) || (($armourRoll + $armourModifier) > $armourValue);
+        if ($mightyBlow && !$bezMB) {
+            $armourModifier++;          // MB se utrati na brneni
+        } elseif ($mightyBlow) {
+            $injuryModifier++;          // brneni padlo samo => MB jde na zraneni
+        }
+
+        $modifiedRoll = $armourRoll + $armourModifier;
         // Claw: armor broken on 8+ regardless of AV
         $armourBroken = ($hasClaw && $armourRoll >= 8) || ($modifiedRoll > $armourValue);
 
