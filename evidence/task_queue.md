@@ -742,36 +742,73 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
-⏰ **Přepsáno 11.09.2026 pozdě večer.** Uživatel: *„opravy přednostně, podle
-čísel zdola nahoru"* a *„zapiš co chybí dodělat"*.
+⏰ **Přepsáno 14.09.2026 večer agentem.** Předchozí znění bylo z **11.09.**
+a vedlo histogram událostí, PHP28, PHP29, PHP20, PHP18 — **neodpovídalo
+skutečnosti**, protože 12.–14.09. se pracovalo na klecích, bloku/blitzu
+a pak na PHP38/39/40.
 
-## 1. Histogram typů událostí — PRÁVĚ SE DĚLÁ
+⛔ **Připomínka k téhle knize:** přepisuje se **jedině tenhle oddíl**.
+ID se **nikdy** nepřečíslovávají.
 
-**Proč:** dnešní vady nepřišly ze čtení pravidel, ale z měření a z uživatelových
-vět. Uživatel se zeptal, *„proč pořád nacházíme nesoulad"*. ⇒ Chybí **detektor
-celých chybějících tříd**: histogram typů událostí nad korpusem plus **seznam
-typů, které nenastaly ANI JEDNOU**. `PHP27` by z něj vypadl sám — kategorie
-`armour_roll` na cestě `move` tam **vůbec nebyla**.
-**Soubor:** `cli/diag_event_histogram_20260911.php`.
-⛔ **Pozitivní kontrola je povinná:** měřidlo musí umět ukázat, že typ, o kterém
-víme, že nastává, opravdu nastává — jinak je prázdný koš bezcenný.
+## 0. ⛔ NEJDŘÍV: 13.09. SKONČILO SEZENÍ UPROSTŘED REFAKTORU — OPRAVENO 14.09.
 
-## 2. PHP28 — `throw_team_mate` rameno v `LearningAICoach`
-Zbytková vada z doměření PHP24: **2 ze 7 582 rozhodnutí, 19 ztracených aktivací**.
-`buildScoredAction` nemá pro TTM větev ⇒ `default => null` ⇒ prázdní kandidáti
-⇒ konec kola. Táž třída jako PHP13.
+Pracovní strom měl **28 chyb v testech**. Nové patro *(`CoachHeuristics`,
+`CENA_TURNOVERU`, vrstvy `VRSTVA_*`)* bylo **napsané a nezapojené**, a staré
+konstanty už **smazané**, ačkoli se na ně dál volalo.
+⇒ `2dde2a76` vrátilo zelenou **bez jediné změny chování**.
+⭐ **Poučení do knihy: nejdřív zapojit, pak mazat.**
 
-## 3. PHP29 — `blitz: Players must be on pitch`
-1 výskyt v živé hře. Táž rodina jako uzavřený PHP17 *(hand-off)*: mezi nabídkou
-a provedením hráč zmizí ze hřiště. `BlitzHandler.php:43`.
+## 1. PHP40 — ✅ UZAVŘENO 14.09.
+Cache pohybových polí **na jedno rozhodnutí**, v obou koučích
+*(`3256e95e` Learning, `84b49dc2` Greedy)*.
+* **Správnost:** sebekontrola `BB_CACHE_SELFCHECK=1` — **10 zápasů, 0 rozdílů**
+  *(Learning)*, **3 zápasy, 0 rozdílů** *(Greedy)*.
+* ⭐ **Pozitivní kontrola u obou:** klíč dočasně rozbit ⇒ **hláška spadla**.
+  Bez ní by „0 rozdílů" nic neznamenalo.
+* **Rychlost:** 3 zápasy **203,5 s → 116,6 s = −42,7 %**.
+  ⚠️ **Není to párové A/B** — engine nemá seed, oba běhy odehrály jiné zápasy.
+  **Směr je jistý, číslo měkké.** ⇒ **Seed je předpoklad každého poctivého
+  měření výkonu a zatím chybí.**
 
-## 4. PHP20 — práh `<= 0` ve skóreru *(čeká na rozhodnutí uživatele)*
-Nejdřív změřit, jak často a co vybírá záchranná větev, teprve pak sahat na práh —
-změna prahu je **nová heuristika**, ne oprava.
+## 2. PHP39 — ⏳ ROZPRACOVÁNO, a zbytek NENÍ čistý refaktor
+Zapojeno do **obou** koučů *(bez změny chování)*: `endZoneX`, `jeNosic`
+*(`24a40d7f`)* · `jeRohKlece` *(`08f06849`)* · `nosicNebojuje` *(`f18f0572`)*.
 
-## 5. PHP18 — 96,2 % kol končí turnoverem *(ODBLOKOVÁNO)*
-Blokovaly ho PHP14 a PHP15, obojí je hotové. Proti C++ 0,46 turnoveru na kolo.
-⚠️ Čísla tří koučů **nejsou srovnatelná mezi sebou**.
+⛔⛔ **A tady je nález: zbylé čtyři metody NEJSOU behaviorálně neutrální.**
+| metoda | proč se nedá jen „zapojit" |
+|---|---|
+| `zonyZachyceni` | engine **odečítá hráče, kteří zónu ZTRATILI** *(`hasLostTacklezones`)*; kouči si to ve svých smyčkách nehlídali ⇒ **jiné číslo** |
+| `jeVedleSoupere` | staví na `zonyZachyceni` ⇒ dědí tentýž rozdíl |
+| `znackujici` | `getMarkingPlayers()` ⇒ tentýž rozdíl |
+| `pVyhozeniZaFaul` | kouči dnes riziko vyhození **vůbec nepočítají** ⇒ zapojení = **nová úvaha**, ne přesun |
+
+⇒ **Patří to k PHP38** *(kde se chování mění vědomě a měří se)*, ne do
+úklidu. **Agent je proto nezapojil.**
+⚠️ `dosahPrihravky` zůstává nezapojená schválně — ceny `'short_pass' => 10`
+jsou **herní rozhodnutí uživatele** *(až s PHP37)*.
+
+## 3. PHP38 — ⏸ ČEKÁ NA UŽIVATELE
+Turnoverová brána `score -= pT * cenaTurnoveru()` + vrstvy NORMAL/NOUZE/POSLEDNÍ.
+**Mění chování** ⇒ vlastní měření. Konstanty odmítnutí jsou **dočasně zpět**
+v původních hodnotách, v kódu je u nich napsáno proč.
+
+## 4. ⛔ DVĚ POTVRZENÉ NESROVNALOSTI V DODGI — změřit, NEOPRAVOVAT
+`TacklezoneCalculator::calculateDodgeTarget()` proti `rules_bb2016.txt`:
+* **(A)** chybí bonus `+1` za dodge **na úplně volné pole** *(pravidla `2+`,
+  engine `3+`)*;
+* **(B)** skill `Dodge` je modelovaný jako `−1` k cíli, pravidla dávají
+  **re-roll jednou za kolo** *(ř. 8086-8092)* — **jiný druh věci**, ne jiná
+  velikost.
+⚠️ **Není to hygiena:** šance nosiče na útěk je **jádro kritéria pro obranné L**.
+
+## 5. Pak podle dřívějšího pořadí
+**PHP28** *(TTM rameno)* · **PHP29** *(blitz on pitch)* · **PHP37** *(pass)* ·
+**PHP31** *(kam se kope)* · **PHP36** *(clona)* · **PHP20**, **PHP18**.
+
+## 6. OBRANA — ⛔ nevymýšlet
+Kouč nemá nic. 14.09. se sešla doktrína *(L = boxing-in, cíl „zmlátit
+a vysurfovat", přechod ze 2 sloupců **skokem**)*, ale spouštěč není potvrzený
+a **Mighty Blow v TV1200 nemá nikdo**. Viz `evidence/BRIEF_agent_20260914.md`.
 
 ---
 
@@ -993,7 +1030,7 @@ rozhodlo, ale to teď není v plánu.
 | **PHP37** | ⭐ **PŘIHRÁVKA DOSTANE VLASTNÍ SEKCI** *(uživatel 13.09.: „pass má mít později celou svoji sekci pro opravy")*. Dnešní oprava *(házet jen tam, kde někdo stojí)* je **první a nejhrubější** — sekce má pokrýt: **kdo** má házet *(AG, Sure Hands, Pass skill)*, **kam** *(příjemce blíž zóně, mimo zóny zachycení)*, **kdy** *(pass je jeden za kolo, stejně jako blitz)*, **intercepce** *(dnes se do rozhodování nepočítá vůbec)* a **dosah** *(quick/short/long/bomb má různé prahy)*. | ⏰ **OTEVŘENO** |
 | **PHP38** | ⭐⭐⭐ **JEDNO PRAVIDLO PRO VŠECHNY AKCE** *(uživatel 13.09.: „všechny akce si musí hlídat, ať mají turnover šanci pod 50 % — nebo akci provést jen v nouzi")*. Dnes to platí **roztroušeně a nestejně**: dodge má tvrdou hranici pod 50 %, blok odmítá přesilu, blitz i cestu, zvednutí a chycení mají váhu `4,0`, ale **foul, gaze, bomb throw a Ball & Chain nemají nic**. ⇒ Sjednotit do **jednoho místa**: každá akce umí říct svou pravděpodobnost turnoveru, a nad 50 % se nehraje. ⛔ **A „nouze" se musí definovat**, ne odhadovat — poslední kolo půle, jinak ztrácíme míč, nebo prohráváme a je to poslední šance. | ⏰ **OTEVŘENO — VYSOKÁ** *(čeká na review/simplify, které to má sjednotit)* <br>⭐⭐⭐ **NÁVRH ŘEŠENÍ Z `/simplify` (13.09.) — TŘI ZÁSAHY O PATRO VÝŠ:**<br>**(1)** kandidát nese vedle `score` i **`pTurnover`**; každá `build*Action` přestane počítat pokutu a vrátí pravděpodobnost *(podklady existují: `successChance`, `pickupChance`, `catchChance`, `getBlockDiceInfo`)*. Skládá se `1 - Π(1-pᵢ)`, takže **cesta a zvednutí se poprvé spojí do jednoho čísla**. Jedna brána: `score -= pT * cenaTurnoveru()`, a vrstva **NORMAL / NOUZE** podle prahu 50 %.<br>**(2)** **role se určí JEDNOU před smyčkou** *(nosič / roh klece / podpora)* místo **sedmi `if ($isCarrier)`** uvnitř; `buildMoveAction` má 375 řádků a role se testuje na každý z ~30 cílů.<br>**(3)** **zákaz se vyjádří vyřazením z nabídky nebo vrstvou NOUZE**, ne velikostí konstanty.<br>⛔⛔ **TŘI DOLOŽENÉ ROZPORY V TOM, CO DNES KÓD TVRDÍ:** **(a)** práh 50 % u zvedání míče **nedělá nic** *(`5,0 + 4,0 - 2,68 = 6,3` i při šanci 33 %, takže zvednutí nelze odmítnout ani na 10 %)*; **(b)** **rizika se nekombinují** *(cesta 60 % + zvednutí 60 % je ve skutečnosti 64 % turnover, a to číslo nikde nevzniká)*; **(c)** *„bonus za nosiče může přebít kostky proti"* **neplatí** *(`-3,0` nikdy nepřebije `+0,8`)*.<br>⇒ Zmizí tím **pět konstant**, obě rolové kopie prahu i záchranný `STAND_PAT -0,5`, a **faul s multiple blockem** *(dnes bez rizika úplně)* přestanou být šestým zvláštním případem. |
 | **PHP39** | ⛔ **DVA KOUČI, DVĚ KOPIE TÝCHŽ PRAVIDEL** *(nález `/simplify`, 13.09.)*. `LearningAICoach` a `GreedyAICoach` mají **duplicitně** psané: riziko podle `successChance`, klec jen na diagonály, nosič nesmí vedle soupeře, nosič nebojuje, ocenění bloku kostkami, `endZoneX` *(7× v codebase)*. Komentáře v Greedym to samy přiznávají *(„tataz oprava jako v LearningAICoach")*.<br>⭐ **A už to jednou selhalo:** oprava klíčů dosahu přihrávky proběhla ráno jen v Learningu a v Greedym zůstaly rozbité *(opraveno 13.09.)*. ⇒ Vytáhnout do `src/AI/CoachHeuristics.php`, jinak každá další oprava poběží dvakrát a jeden z koučů ji pokaždé nedostane.<br>⭐ **A hlavně: kouč si počítá sám to, co engine umí** — `TacklezoneCalculator::countTacklezones()` *(má i `exceptPlayerId`!)*, `getMarkingPlayers()`, `StrengthCalculator::countAssists()`, `GameState::getPlayerAtPosition()`, `Position::distanceTo()`, enum `PassRange`. | ⏰ **OTEVŘENO** |
-| **PHP40** | ⚡ **PATHFINDING SE POČÍTÁ DVAKRÁT PRO TÉHOŽ HRÁČE** *(změřeno `/simplify`, 13.09.)*. `getValidMoveTargets` volá zvlášť `buildMoveAction` a zvlášť `buildBlitzAction` nad **týmž stavem a týmž hráčem** — je to čistá funkce. Jedno volání **26,5 ms**, dohromady **91 % času rozhodnutí** *(dnes 250-320 ms)*.<br>⇒ **Cache na jedno rozhodnutí** *(pole vynulované na začátku `decideAction`, ⛔ ne přes `spl_object_id` — recykluje se)*: **321 → 173 ms = −46 %**, a **0 změněných rozhodnutí ze 100**. Ověřeno párově nad identickou sadou stavů, střídaným pořadím, s pozitivní kontrolou srovnávače.<br>⭐ **VYVRÁCENÁ HYPOTÉZA:** tvrdil jsem, že za zpomalením jsou trojité smyčky přes hráče. Agent je zmemoizoval *(~2 M volání pryč)* — **rozdíl byl v šumu**. Ukončí se hned na první podmínce vzdálenosti.<br>⏰ **Za tím další hrdlo:** `Pathfinder.php:86` volá uvnitř BFS `getPlayerAtPosition` *(lineární průchod 22 hráčů)* a `countTacklezones` *(`array_filter` přes všechny)* — ~80 000 iterací na volání; a `:127` kopíruje celé pole `steps` do každého uzlu *(kvadraticky)*. | ⏰ **OTEVŘENO — AŽ PO PHP38/39** *(executor právě přepisuje tentýž soubor)* |
+| **PHP40** | ✅ **UZAVŘENO 14.09.** *(`3256e95e` Learning, `84b49dc2` Greedy; 10 zápasů 0 rozdílů, pozitivní kontrola spadla, −42,7 % času)* — ⚡ **PATHFINDING SE POČÍTÁ DVAKRÁT PRO TÉHOŽ HRÁČE** *(změřeno `/simplify`, 13.09.)*. `getValidMoveTargets` volá zvlášť `buildMoveAction` a zvlášť `buildBlitzAction` nad **týmž stavem a týmž hráčem** — je to čistá funkce. Jedno volání **26,5 ms**, dohromady **91 % času rozhodnutí** *(dnes 250-320 ms)*.<br>⇒ **Cache na jedno rozhodnutí** *(pole vynulované na začátku `decideAction`, ⛔ ne přes `spl_object_id` — recykluje se)*: **321 → 173 ms = −46 %**, a **0 změněných rozhodnutí ze 100**. Ověřeno párově nad identickou sadou stavů, střídaným pořadím, s pozitivní kontrolou srovnávače.<br>⭐ **VYVRÁCENÁ HYPOTÉZA:** tvrdil jsem, že za zpomalením jsou trojité smyčky přes hráče. Agent je zmemoizoval *(~2 M volání pryč)* — **rozdíl byl v šumu**. Ukončí se hned na první podmínce vzdálenosti.<br>⏰ **Za tím další hrdlo:** `Pathfinder.php:86` volá uvnitř BFS `getPlayerAtPosition` *(lineární průchod 22 hráčů)* a `countTacklezones` *(`array_filter` přes všechny)* — ~80 000 iterací na volání; a `:127` kopíruje celé pole `steps` do každého uzlu *(kvadraticky)*. | ⏰ **OTEVŘENO — AŽ PO PHP38/39** *(executor právě přepisuje tentýž soubor)* |
 
 ⭐ **MĚŘIDLO:** `cli/diag_ai_endturn_20260911.php` (všichni tři kouči, jedno
 měřidlo, měří **zvenčí** bez sahání do produkce). Samo si našlo **dvě vlastní
