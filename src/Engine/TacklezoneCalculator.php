@@ -130,8 +130,16 @@ final class TacklezoneCalculator
 
         $tzAtDest = $this->countTacklezones($state, $destination, $player->getTeamSide());
 
-        // Base: 7 - AG, modifier: +1 per TZ at destination (first TZ is "free" with basic dodge)
-        $target = 7 - $agility + max(0, $tzAtDest - 1);
+        // ⛔⛔ OPRAVA 14.09.2026 -- CHYBEL BONUS ZA DODGE NA VOLNE POLE.
+        //   `rules_bb2016.txt` r. 503-505: k hodu se pricita "+1 Making a Dodge
+        //   roll" a odecita "-1 per opposing tackle zone on the square that the
+        //   player is dodging to". Cil je tedy `(7-AG) - 1 + TZ`.
+        //   Puvodni zapis `(7-AG) + max(0, TZ-1)` delal tyz bonus jako "prvni
+        //   TZ zadarmo" -- coz je TOTEZ pro TZ >= 1, ale pro TZ == 0 o jedno
+        //   HORSI: pravidla davaji AG4 cil `2+`, engine daval `3+`.
+        //   ⇒ Lisi se JEN utek na uplne volne pole, a to je prave ten pripad,
+        //   ktery rozhoduje, jestli nosic unikne z obklicení.
+        $target = 7 - $agility - 1 + $tzAtDest;
 
         // Prehensile Tail: +1 for each enemy with the skill at the source position
         if ($source !== null) {
@@ -165,10 +173,17 @@ final class TacklezoneCalculator
             }
         }
 
-        // Dodge skill gives +1 bonus (effectively -1 to target)
-        if ($player->hasSkill(SkillName::Dodge)) {
-            $target--;
-        }
+        // ⛔⛔ ODEBRANO 14.09.2026 -- SKILL `Dodge` SE POCITAL DVAKRAT.
+        //   Pravidla (`rules_bb2016.txt` r. 8086-8092) davaji Dodgi
+        //   RE-ROLL, ne modifikator: "is allowed to re-roll the D6 if he
+        //   fails to dodge... may only re-roll ONE failed Dodge roll PER TURN".
+        //   Ten re-roll engine UZ MA a ma ho spravne -- `MoveHandler.php:250`,
+        //   vcetne zruseni sousednim `Tackle`. Zdejsi `-1` k cili byla tedy
+        //   DRUHA porce tehoz skillu: hrac s Dodge dostaval lehci hod A JESTE
+        //   opakovani. A skutecny hod bere cil odsud (`$step->getDodgeTarget()`),
+        //   takze to nebyl jen odhad v pathfinderu.
+        //   ⇒ Zustava jen re-roll. Tackle tim znovu znamena to, co ma:
+        //   rusi Dodgi jedinou vyhodu, misto aby mu nechaval tichy bonus.
 
         // Stunty: -1 dodge target (easier dodge)
         if ($player->hasSkill(SkillName::Stunty)) {

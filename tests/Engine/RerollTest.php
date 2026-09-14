@@ -109,8 +109,11 @@ final class RerollTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 5, 4)
             ->build();
 
-        // Dodge target 4+. Roll 2=fail, team reroll 3=fail → turnover
-        $dice = new FixedDiceRoller([2, 3, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
+        // ⛔ OPRAVENO 14.09.2026. Cil je nove 3+ (souper na (5,4) NESOUSEDI
+        //   s cilovym polem (5,6) => nulova TZ; pravidla: AG3 4+ a "+1 za dodge").
+        //   Hod 3 by tedy uz PROSEL, takze team re-roll musi hodit 2, aby scenar
+        //   "oba hody selzou => turnover" porad platil.
+        $dice = new FixedDiceRoller([2, 2, 1, 1 /* PHP27: hod na brneni po padu */]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

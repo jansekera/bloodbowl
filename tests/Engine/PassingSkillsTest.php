@@ -253,14 +253,20 @@ final class PassingSkillsTest extends TestCase
 
     public function testTwoHeadsPlusDodgeStack(): void
     {
-        // AG3, TwoHeads + Dodge in 1 TZ: 7-3-1(TwoHeads)-1(Dodge) = 2+
+        // ⛔ OPRAVENO 14.09.2026. Puvodni vypocet zapocital Dodge jako `-1`
+        //   k cili -- to bylo DVOJI zapocteni (re-roll uz je v MoveHandleru).
+        //   Podle pravidel: AG3 => 4+, "+1 Making a Dodge roll", "-1 za TZ na
+        //   cilovem poli" (tady 1), TwoHeads -1 => cil 3+.
+        //   ⭐ Hod 2 tedy SELZE a teprve pak se uplatni re-roll od skillu Dodge,
+        //   ktery druhou kostkou (5) projde. Test tim nove overuje PRAVIDLO
+        //   (re-roll), ne jen scitani modifikatoru.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, skills: [SkillName::TwoHeads, SkillName::Dodge], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([2]);
+        $dice = new FixedDiceRoller([2, 5]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::MOVE, [

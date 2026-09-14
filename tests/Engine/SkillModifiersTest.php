@@ -89,10 +89,17 @@ final class SkillModifiersTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 5, 6, id: 2)
             ->build();
 
-        // Normal dodge: 7 - 3 = 4+
-        // Dodge: -1, Stunty: -1 = 2+
+        // ⛔ OPRAVENO 14.09.2026. Ocekavani 2 stalo na DVOJIM zapocteni Dodge
+        //   (cil -1 A JESTE re-roll). Podle pravidel: AG3 => 4+, "+1 Making
+        //   a Dodge roll", "-1 za kazdou souperovu TZ na cilovem poli" (tady 1)
+        //   => 4 - 1 + 1 = 4, a Stunty -1 => 3. Skill Dodge se v cili neprojevi.
+        // ⚠️ POZOR, SHODA NAHODOU: Stunty ma podle pravidel TZ na cilovem poli
+        //   IGNOROVAT ("may ignore any enemy tackle zones on the square he is
+        //   moving to"), ne odecitat 1. Pri PRAVE JEDNE zone vyjde obojí stejne,
+        //   pri trech uz ne. Engine to ma jako `-1` => samostatny nalez, zatim
+        //   NEOPRAVENO (Stunty nema v zadnem rosteru nikdo, takze to nesepne).
         $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
-        $this->assertEquals(2, $target);
+        $this->assertEquals(3, $target);
     }
 
     public function testStuntyInjuryModifier(): void

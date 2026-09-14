@@ -40,7 +40,12 @@ final class InteractiveRerollTest extends TestCase
         $this->assertNotNull($pending);
         $this->assertEquals('dodge', $pending->getRollType());
         $this->assertEquals(1, $pending->getPlayerId());
-        $this->assertEquals(4, $pending->getTarget());
+        // ⛔ OPRAVENO 14.09.2026: cil je 3+, jak rika i komentar vys.
+        //   Souper stoji na (5,4), cilove pole je (5,6) -- NENI sousedni,
+        //   takze TZ na cilovem poli je NULA. Pravidla: AG3 => 4+, "+1 Making
+        //   a Dodge roll", zadna TZ => 3+. Ocekavani 4 zapisovalo stary engine,
+        //   kteremu u nulove TZ ten bonus chybel.
+        $this->assertEquals(3, $pending->getTarget());
         $this->assertEquals(2, $pending->getRoll());
         $this->assertFalse($pending->isProAvailable()); // no Pro skill
         $this->assertTrue($pending->isTeamRerollAvailable());
@@ -274,7 +279,8 @@ final class InteractiveRerollTest extends TestCase
         $this->assertNotNull($restoredPending);
         $this->assertEquals('dodge', $restoredPending->getRollType());
         $this->assertEquals(1, $restoredPending->getPlayerId());
-        $this->assertEquals(4, $restoredPending->getTarget());
+        // ⛔ OPRAVENO 14.09.2026 -- tentyz duvod jako vys (nulova TZ => 3+).
+        $this->assertEquals(3, $restoredPending->getTarget());
     }
 
     // === Validation ===

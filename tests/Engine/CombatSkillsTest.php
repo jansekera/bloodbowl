@@ -586,9 +586,11 @@ final class CombatSkillsTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // Dodge: target 7-3+0(TZ-1)=4+ → +2(DT)=6+. Roll 5 = fail
-        // Then: fallen player armor
-        $dice = new FixedDiceRoller([5, 2, 1, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]); // dodge=5 fail, armor die1, die2
+        // ⛔ OPRAVENO 14.09.2026. Cilove pole (4,5) NESOUSEDI se souperem na
+        //   (6,5) => nulova TZ. Pravidla: AG3 4+, "+1 za dodge" => 3+,
+        //   Diving Tackle "+2 k hodu" => 5+. Hod 5 by tedy nove PROSEL,
+        //   proto se hazi 4 -- scenar "DT srazi dodge do neuspechu" plati dal.
+        $dice = new FixedDiceRoller([4, 2, 1, 1, 1 /* PHP27: hod na brneni po padu */]); // dodge=4 fail
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 

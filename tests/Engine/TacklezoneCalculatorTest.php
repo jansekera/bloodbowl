@@ -170,7 +170,12 @@ final class TacklezoneCalculatorTest extends TestCase
         $player = $state->getPlayer(1);
         $this->assertNotNull($player);
         $target = $this->calc->calculateDodgeTarget($state, $player, new Position(6, 5));
-        // 7 - 3 + max(0, 1-1) - 1 (Dodge) = 3, clamped to 3
-        $this->assertSame(3, $target);
+        // ⛔ OPRAVENO 14.09.2026. Puvodni ocekavani 3 zapisovalo DVOJI zapocteni
+        //   skillu Dodge: cil se snizoval o 1 A JESTE se pri neuspechu hazelo
+        //   znovu (`MoveHandler.php:250`). Pravidla davaji jen re-roll.
+        //   Podle pravidel: AG3 => tabulka 4+, "+1 Making a Dodge roll",
+        //   "-1 per opposing tackle zone on the square dodging to" (tady 1).
+        //   => 4 - 1 + 1 = 4. Skill Dodge se v cili neprojevi vubec.
+        $this->assertSame(4, $target);
     }
 }
