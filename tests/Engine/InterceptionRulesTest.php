@@ -110,6 +110,30 @@ final class InterceptionRulesTest extends TestCase
         $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
     }
 
+    public function testZachycujeTenSNejvyssiSanciNePrvniNaDraze(): void
+    {
+        // r. 1771-1773: "only one player can attempt an interception" -- a vybira
+        // ho souperuv kouc. Uzivatel 15.09.: zachycuje ten s NEJVYSSI SANCI.
+        // Prvni na draze (6,5) ma AG1 = cil 6+, druhy (8,5) AG4 = cil 5+.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 5, agility: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 6, 5, agility: 1, id: 10)
+            ->addPlayer(TeamSide::AWAY, 8, 5, agility: 4, id: 11)
+            ->withBallCarried(1)
+            ->build();
+
+        // Hod 5: zachycujici AG4 (5+) USPEJE; prvni na draze (6+) by neuspel.
+        $result = (new ActionResolver(new FixedDiceRoller([5, 6, 6])))->resolve($state, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 10, 'targetY' => 5,
+        ]);
+
+        $zachyceni = array_values(array_filter($result->getEvents(), static fn($e) => $e->getType() === 'interception'));
+        $this->assertCount(1, $zachyceni, 'pokus o intercepci je jen jeden');
+        $this->assertSame(11, $zachyceni[0]->getData()['playerId']);
+        $this->assertSame(11, $result->getNewState()->getBall()->getCarrierId());
+    }
+
     public function testHracBezZonyNezachycuje(): void
     {
         $state = (new GameStateBuilder())

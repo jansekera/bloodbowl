@@ -475,19 +475,33 @@ final class PassResolver
         $passPath = $this->getPassPath($from, $to);
         $enemySide = $thrower->getTeamSide()->opponent();
 
+        // ⭐ ZMENENO 15.09.2026: "only one player can attempt an interception,
+        //   no matter how many are eligible" a vybira ho SOUPERUV KOUC
+        //   (r. 1771-1773). Engine bral PRVNIHO NA DRAZE. Uzivatel: zachycuje
+        //   ten s NEJVYSSI SANCI (nejnizsi cil); pri shode prvni na draze.
+        $player = null;
+        $target = PHP_INT_MAX;
         foreach ($passPath as $pathPos) {
-            $player = $state->getPlayerAtPosition($pathPos);
-            if ($player === null || $player->getTeamSide() !== $enemySide || $player->getState() !== PlayerState::STANDING) {
+            $kandidat = $state->getPlayerAtPosition($pathPos);
+            if ($kandidat === null || $kandidat->getTeamSide() !== $enemySide || $kandidat->getState() !== PlayerState::STANDING) {
                 continue;
             }
             // ⛔ OPRAVENO 15.09.2026: zachycovat smi jen hrac, ktery MA ZONU
             //   ZACHYCENI (r. 1764 "have a tackle zone"). Stat nestaci --
             //   napr. po Hypnotic Gaze hrac stoji, ale zonu nema.
-            if ($player->hasLostTacklezones()) {
+            if ($kandidat->hasLostTacklezones()) {
                 continue;
             }
+            $cilKandidata = $this->getInterceptionTarget($state, $kandidat);
+            if ($cilKandidata < $target) {
+                $player = $kandidat;
+                $target = $cilKandidata;
+            }
+        }
 
-            $target = $this->getInterceptionTarget($state, $player);
+        if ($player !== null) {
+            $pathPos = $player->getPosition();
+            assert($pathPos !== null);
             $roll = $this->dice->rollD6();
             $success = $roll >= $target;
 
