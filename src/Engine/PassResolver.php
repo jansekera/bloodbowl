@@ -390,6 +390,46 @@ final class PassResolver
     }
 
     /**
+     * Cil hodu na intercepci: 7 - AG + 2 (pokus) + zony + DP + dest - skilly, 2-6.
+     *
+     * ⛔⛔ OPRAVENO 15.09.2026 -- do dneska tu bylo jen `7 - AG + 2` a Very Long Legs.
+     *   `rules_bb2016.txt`:
+     *     r. 1800-1802  -1 za kazdou souperovu zonu na zachycujicim
+     *     r. 8315-8317  ... kterou Nerves of Steel ignoruje
+     *     r. 8050-8058  -1 za kazdeho souperova Disturbing Presence do 3 poli
+     *     r. 1488       Pouring Rain -1
+     *     r. 8104-8106  Extra Arms +1 k hodu
+     *     r. 8655-8657  Very Long Legs +1 k hodu
+     *   Pravidla pisou modifikatory k HODU; tady se pricitaji k CILI s opacnym
+     *   znamenkem. Prirozena 1 selze a 6 uspeje (r. 1777-1779) = orez na 2-6.
+     *   ⭐ Verejne kvuli kouci (PHP37) -- ten intercepci dosud nepocita vubec.
+     */
+    public function getInterceptionTarget(GameState $state, MatchPlayerDTO $interceptor): int
+    {
+        $target = 7 - $interceptor->getStats()->getAgility() + 2;
+        $pos = $interceptor->getPosition();
+
+        if ($pos !== null) {
+            if (!$interceptor->hasSkill(SkillName::NervesOfSteel)) {
+                $target += $this->tzCalc->countTacklezones($state, $pos, $interceptor->getTeamSide());
+            }
+            $target += $this->tzCalc->countDisturbingPresence($state, $pos, $interceptor->getTeamSide());
+        }
+
+        if ($state->getWeather() === Weather::POURING_RAIN) {
+            $target++;
+        }
+        if ($interceptor->hasSkill(SkillName::ExtraArms)) {
+            $target--;
+        }
+        if ($interceptor->hasSkill(SkillName::VeryLongLegs)) {
+            $target--;
+        }
+
+        return max(2, min(6, $target));
+    }
+
+    /**
      * Check for interceptions along the pass path.
      * First eligible enemy standing in the path can attempt intercept (AG-2 roll).
      *
@@ -405,14 +445,14 @@ final class PassResolver
             if ($player === null || $player->getTeamSide() !== $enemySide || $player->getState() !== PlayerState::STANDING) {
                 continue;
             }
-
-            // Interception attempt: AG roll with -2 modifier
-            $ag = $player->getStats()->getAgility();
-            $target = max(2, min(6, 7 - $ag + 2));
-            // Very Long Legs: -1 to interception target
-            if ($player->hasSkill(SkillName::VeryLongLegs)) {
-                $target = max(2, $target - 1);
+            // ⛔ OPRAVENO 15.09.2026: zachycovat smi jen hrac, ktery MA ZONU
+            //   ZACHYCENI (r. 1764 "have a tackle zone"). Stat nestaci --
+            //   napr. po Hypnotic Gaze hrac stoji, ale zonu nema.
+            if ($player->hasLostTacklezones()) {
+                continue;
             }
+
+            $target = $this->getInterceptionTarget($state, $player);
             $roll = $this->dice->rollD6();
             $success = $roll >= $target;
 
