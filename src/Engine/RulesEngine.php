@@ -627,6 +627,9 @@ final class RulesEngine
         if ($range === null) {
             return ['Target is out of pass range'];
         }
+        if (!$range->povolenaZaPocasi($state->getWeather())) {
+            return ['Blizzard: only quick or short passes can be attempted'];
+        }
 
         return [];
     }
@@ -709,7 +712,8 @@ final class RulesEngine
             for ($y = 0; $y < Position::PITCH_HEIGHT; $y++) {
                 $targetPos = new Position($x, $y);
                 $range = PassRange::fromDistance($pos->distanceTo($targetPos));
-                if ($range !== null && !$pos->equals($targetPos)) {
+                if ($range !== null && !$pos->equals($targetPos)
+                    && $range->povolenaZaPocasi($state->getWeather())) {
                     $targets[] = [
                         'x' => $x,
                         'y' => $y,

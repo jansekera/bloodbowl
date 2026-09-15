@@ -65,11 +65,14 @@ final class PassResolver
         $isHailMary = false;
 
         if ($range === null) {
-            if ($thrower->hasSkill(SkillName::HailMaryPass)) {
+            // r. 8170-8171: Hail Mary Pass "may not be used in a blizzard".
+            if ($thrower->hasSkill(SkillName::HailMaryPass) && $state->getWeather() !== Weather::BLIZZARD) {
                 $isHailMary = true;
             } else {
                 throw new \InvalidArgumentException('Target is out of range');
             }
+        } elseif (!$range->povolenaZaPocasi($state->getWeather())) {
+            throw new \InvalidArgumentException('Blizzard: only quick or short passes can be attempted');
         }
 
         // Strong Arm: reduce effective range by one band (not for HMP)
