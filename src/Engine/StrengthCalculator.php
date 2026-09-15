@@ -97,7 +97,10 @@ final class StrengthCalculator
      */
     public function getBlockDiceInfo(int $attackerStrength, int $defenderStrength): array
     {
-        if ($attackerStrength >= 2 * $defenderStrength) {
+        // ⛔⛔ OPRAVENO 15.09.2026 -- tady bylo `>=`. `rules_bb2016.txt` r. 567-568
+        //   a tabulka r. 1731: "MORE THAN TWICE AS STRONG, three dice".
+        //   Presne dvojnasobek (casto s asistencemi: 3+3 proti 3) = 2 kostky.
+        if ($attackerStrength > 2 * $defenderStrength) {
             return ['count' => 3, 'attackerChooses' => true];
         }
         if ($attackerStrength > $defenderStrength) {
@@ -106,7 +109,7 @@ final class StrengthCalculator
         if ($attackerStrength === $defenderStrength) {
             return ['count' => 1, 'attackerChooses' => true];
         }
-        if ($defenderStrength >= 2 * $attackerStrength) {
+        if ($defenderStrength > 2 * $attackerStrength) {
             return ['count' => 3, 'attackerChooses' => false];
         }
 

@@ -139,9 +139,19 @@ final class StrengthCalculatorTest extends TestCase
         $this->assertTrue($info['attackerChooses']);
     }
 
-    public function testBlockDiceAttackerDoubleStrength(): void
+    // ⛔⛔ OPRAVENO 15.09.2026 -- testy kodovaly "dvojnasobek = 3 kostky".
+    //   `rules_bb2016.txt` r. 567-568 a tabulka r. 1731: "MORE THAN TWICE AS
+    //   STRONG, three dice". Presne dvojnasobek (6 proti 3) = jen "stronger" = 2.
+    public function testBlockDiceAttackerPresneDvojnasobekJsouDve(): void
     {
         $info = $this->calc->getBlockDiceInfo(6, 3);
+        $this->assertSame(2, $info['count']);
+        $this->assertTrue($info['attackerChooses']);
+    }
+
+    public function testBlockDiceAttackerViceNezDvojnasobekJsouTri(): void
+    {
+        $info = $this->calc->getBlockDiceInfo(7, 3);
         $this->assertSame(3, $info['count']);
         $this->assertTrue($info['attackerChooses']);
     }
@@ -153,9 +163,16 @@ final class StrengthCalculatorTest extends TestCase
         $this->assertFalse($info['attackerChooses']);
     }
 
-    public function testBlockDiceDefenderDoubleStrength(): void
+    public function testBlockDiceDefenderPresneDvojnasobekJsouDve(): void
     {
         $info = $this->calc->getBlockDiceInfo(3, 6);
+        $this->assertSame(2, $info['count']);
+        $this->assertFalse($info['attackerChooses']);
+    }
+
+    public function testBlockDiceDefenderViceNezDvojnasobekJsouTri(): void
+    {
+        $info = $this->calc->getBlockDiceInfo(3, 7);
         $this->assertSame(3, $info['count']);
         $this->assertFalse($info['attackerChooses']);
     }
