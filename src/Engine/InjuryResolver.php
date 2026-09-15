@@ -221,20 +221,15 @@ final class InjuryResolver
             $player = $player->withState(PlayerState::STUNNED);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
         } elseif ($modified <= 9) {
-            // Thick Skull: on KO result, roll D6; on 4+ → stunned instead
-            if ($player->hasSkill(SkillName::ThickSkull)) {
-                $thickSkullRoll = $dice->rollD6();
-                if ($thickSkullRoll >= 4) {
-                    $player = $player->withState(PlayerState::STUNNED);
-                    $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
-                    $events[] = GameEvent::rerollUsed($player->getId(), 'Thick Skull');
-                    $events[] = GameEvent::injuryRoll($player->getId(), $thickSkullRoll, 0, 'stunned');
-                } else {
-                    $player = $player->withState(PlayerState::KO)->withPosition(null);
-                    $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
-                    $events[] = GameEvent::rerollUsed($player->getId(), 'Thick Skull');
-                    $events[] = GameEvent::injuryRoll($player->getId(), $thickSkullRoll, 0, 'ko');
-                }
+            // ⛔⛔ OPRAVENO 15.09.2026 -- Thick Skull tu byl podle JINE EDICE
+            //   (pri KO hod D6, na 4+ omracen). `rules_bb2016.txt` r. 8595-8598:
+            //   "treats a roll of 8 on the Injury table, after any modifiers have
+            //   been applied, as a Stunned result rather than a KO'd result."
+            //   ⇒ Modifikovana 8 = Stunned, 9 = KO, zadna kostka navic.
+            //   C++ engine to ma spravne (`engine/src/injury.cpp:69`).
+            if ($modified === 8 && $player->hasSkill(SkillName::ThickSkull)) {
+                $player = $player->withState(PlayerState::STUNNED);
+                $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
             } else {
                 $player = $player->withState(PlayerState::KO)->withPosition(null);
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');

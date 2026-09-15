@@ -189,17 +189,20 @@ final class NewSkillsTest extends TestCase
 
         $injuryResolver = new InjuryResolver();
 
-        // Armor broken (2D6 > 8), then injury=KO (roll 8 or 9)
+        // ⛔⛔ OPRAVENO 15.09.2026 -- test kodoval Thick Skull z JINE EDICE
+        //   (pri KO hod D6, 4+ = omracen). `rules_bb2016.txt` r. 8595-8598:
+        //   "treats a roll of 8 on the Injury table, after any modifiers have
+        //   been applied, as a Stunned result rather than a KO'd result."
+        //   Zadna kostka navic. Tak to ma i C++ engine (`injury.cpp:69`).
         // Armor: 5+4=9 > 8 (broken)
-        // Injury: 4+4=8 (KO range)
-        // Thick Skull: roll 4 (>= 4, converts to stunned)
-        $dice = new FixedDiceRoller([5, 4, 4, 4, 4]);
+        // Injury: 4+4=8 -> Thick Skull = Stunned
+        $dice = new FixedDiceRoller([5, 4, 4, 4]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::STUNNED, $result['player']->getState());
     }
 
-    public function testThickSkullFailsToConvert(): void
+    public function testThickSkullNaDevitceZustavaKo(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
             id: 1, playerId: 1, name: 'Test', number: 1,
@@ -213,9 +216,8 @@ final class NewSkillsTest extends TestCase
         $injuryResolver = new InjuryResolver();
 
         // Armor: 5+4=9 > 8 (broken)
-        // Injury: 4+4=8 (KO)
-        // Thick Skull: roll 3 (< 4, stays KO)
-        $dice = new FixedDiceRoller([5, 4, 4, 4, 3]);
+        // Injury: 4+5=9 -> KO; Thick Skull plati JEN na 8 (r. 8596)
+        $dice = new FixedDiceRoller([5, 4, 4, 5]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::KO, $result['player']->getState());
