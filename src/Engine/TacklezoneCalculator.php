@@ -102,9 +102,10 @@ final class TacklezoneCalculator
             if (!$enemy->hasSkill(SkillName::DisturbingPresence)) {
                 continue;
             }
-            if (!$enemy->getState()->canAct()) {
-                continue;
-            }
+            // ⛔ OPRAVENO 15.09.2026 -- tady byl `canAct()`, tedy jen STANDING.
+            //   r. 8057-8058: "even if the Disturbing Presence player is Prone or
+            //   Stunned". `getPlayersOnPitch()` uz vraci STANDING/PRONE/STUNNED,
+            //   KO a zranene ne -- a to je presne mnozina, ktera se ma pocitat.
             $enemyPos = $enemy->getPosition();
             if ($enemyPos !== null && $position->distanceTo($enemyPos) <= 3) {
                 $count++;
