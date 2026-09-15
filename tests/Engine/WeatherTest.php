@@ -225,6 +225,25 @@ final class WeatherTest extends TestCase
         $this->assertEquals(4, $target);
     }
 
+    // ⭐ PRIDANO 15.09.2026: Big Hand ignoruje pri zvedani i Pouring Rain
+    //   (r. 7835-7839: "ignores modifier(s) for enemy tackle zones or Pouring
+    //   Rain weather when he attempts to pick up the ball").
+    public function testPickupBigHandIgnoresPouringRain(): void
+    {
+        $dice = new FixedDiceRoller([]);
+        $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
+
+        $state = (new GameStateBuilder())
+            ->withWeather(Weather::POURING_RAIN)
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 3, skills: [\App\Enum\SkillName::BigHand])
+            ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
+            ->withBallOnGround(5, 7)
+            ->build();
+
+        // 7 - 3 - 1 = 3 -- dest se u Big Hand nepocita
+        $this->assertEquals(3, $ballResolver->getPickupTarget($state, $state->getPlayer(1)));
+    }
+
     // ⛔ OPRAVENO 15.09.2026: Blizzard zvedani NEOVLIVNUJE (r. 1490-1494).
     public function testPickupUnchangedInBlizzard(): void
     {

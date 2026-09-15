@@ -283,7 +283,11 @@ final class BallResolver
         }
 
         $ag = $player->getStats()->getAgility();
-        $tz = ($player->hasSkill(SkillName::NervesOfSteel) || $player->hasSkill(SkillName::BigHand))
+        // ⛔⛔ OPRAVENO 15.09.2026 -- Nerves of Steel tu byl navic.
+        //   `rules_bb2016.txt` r. 8315-8317: NoS ignoruje zony jen "when he
+        //   attempts to pass, catch or intercept" -- zvedani v tom vyctu neni.
+        //   Pri zvedani zony ignoruje JEN Big Hand (r. 7835-7839).
+        $tz = $player->hasSkill(SkillName::BigHand)
             ? 0
             : $this->tzCalc->countTacklezones($state, $pos, $player->getTeamSide());
 
@@ -297,7 +301,9 @@ final class BallResolver
         // Weather modifier: +1 for Pouring Rain
         // ⛔ OPRAVENO 15.09.2026 -- Blizzard sem nepatri (r. 1490-1494: jen GFI
         //   a omezeni dosahu prihravky, zadny modifikator k chytani ani zvedani).
-        if ($state->getWeather() === Weather::POURING_RAIN) {
+        // ⛔ A Big Hand ignoruje pri zvedani i dest (r. 7837-7839: "ignores
+        //   modifier(s) for enemy tackle zones OR POURING RAIN weather").
+        if ($state->getWeather() === Weather::POURING_RAIN && !$player->hasSkill(SkillName::BigHand)) {
             $target++;
         }
 

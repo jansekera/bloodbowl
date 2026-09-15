@@ -149,7 +149,11 @@ final class NewSkillsTest extends TestCase
         $this->assertEquals(4, $target);
     }
 
-    public function testNervesOfSteelIgnoresTzForPickup(): void
+    // ⛔⛔ OPRAVENO 15.09.2026 -- test tvrdil VADU ENGINU, ne pravidla.
+    //   `rules_bb2016.txt` r. 8315-8317: "The player ignores modifiers for enemy
+    //   tackle zones when he attempts to PASS, CATCH OR INTERCEPT." Zvedani
+    //   v tom vyctu NENI -- zony pri zvedani ignoruje Big Hand, ne Nerves of Steel.
+    public function testNervesOfSteelDoesNotIgnoreTzForPickup(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, agility: 3, id: 1, skills: [SkillName::NervesOfSteel])
@@ -166,9 +170,8 @@ final class NewSkillsTest extends TestCase
 
         $target = $ballResolver->getPickupTarget($state, $state->getPlayer(1));
 
-        // Without NervesOfSteel: 7 - 3 - 1 + 2 = 5
-        // With NervesOfSteel: 7 - 3 - 1 + 0 = 3
-        $this->assertEquals(3, $target);
+        // 7 - 3 - 1 + 2 (dve souperovy zony) = 5 -- Nerves of Steel na zvedani nepusobi
+        $this->assertEquals(5, $target);
     }
 
     // --- Thick Skull ---

@@ -177,9 +177,11 @@ final class SkillModifiersTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 5, 6, id: 2) // enemy TZ
             ->build();
 
-        // Catch target should still include TZ penalty (BigHand doesn't help)
-        // We just verify the skill exists but doesn't affect catch differently
-        $this->assertTrue($state->getPlayer(1)->hasSkill(SkillName::BigHand));
+        // ⛔ OPRAVENO 15.09.2026: test drive overoval jen, ze hrac skill MA --
+        //   nemohl spadnout. Big Hand podle r. 7835-7839 plati JEN pro zvedani.
+        $ballResolver = new BallResolver(new FixedDiceRoller([]), $tzCalc, new \App\Engine\ScatterCalculator());
+        // 7 - 3 + 1 (souperova zona) = 5 -- u chytani se zona pocita dal
+        $this->assertSame(5, $ballResolver->getCatchTarget($state, $state->getPlayer(1)));
     }
 
     // === Pro ===
