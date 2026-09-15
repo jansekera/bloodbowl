@@ -35,7 +35,7 @@ final class WeatherTest extends TestCase
 
     public function testChangingWeatherRollsNewWeather(): void
     {
-        $dice = new FixedDiceRoller([4, 4, 1, 1]); // kt roll=8, weather roll=2 -> Sweltering Heat
+        $dice = new FixedDiceRoller([3, 4, 1, 1]); // kt roll=7, weather roll=2 -> Sweltering Heat
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
 
@@ -51,7 +51,7 @@ final class WeatherTest extends TestCase
 
     public function testChangingWeatherToBlizzard(): void
     {
-        $dice = new FixedDiceRoller([4, 4, 6, 6]); // kt roll=8, weather roll=12 -> Blizzard
+        $dice = new FixedDiceRoller([3, 4, 6, 6]); // kt roll=7, weather roll=12 -> Blizzard
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
 
@@ -67,7 +67,7 @@ final class WeatherTest extends TestCase
 
     public function testChangingWeatherGeneratesEvents(): void
     {
-        $dice = new FixedDiceRoller([4, 4, 3, 3]); // kt=8, weather=6 -> Nice
+        $dice = new FixedDiceRoller([3, 4, 3, 3]); // kt=7, weather=6 -> Nice
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
 

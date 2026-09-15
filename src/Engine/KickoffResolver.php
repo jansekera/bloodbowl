@@ -262,7 +262,7 @@ final class KickoffResolver
     }
 
     /**
-     * Brilliant Coaching (7): Random extra reroll for one team.
+     * Brilliant Coaching (8): Random extra reroll for one team.
      * Same mechanic as Cheering Fans.
      * @return array{state: GameState, events: list<GameEvent>}
      */
@@ -290,7 +290,7 @@ final class KickoffResolver
     }
 
     /**
-     * Changing Weather (8): Roll 2D6 for new weather.
+     * Changing Weather (7): Roll 2D6 for new weather.
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolveChangingWeather(GameState $state, int $roll): array

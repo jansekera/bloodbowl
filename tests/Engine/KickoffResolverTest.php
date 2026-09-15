@@ -31,14 +31,14 @@ final class KickoffResolverTest extends TestCase
     {
         // Home receives, kick target at (6,7)
         // Scatter: D8=1 (North), D6=2 -> (6,5)
-        // Kickoff table: 4+4=8 (Changing Weather, no-op)
+        // Kickoff table: 3+4=7 (Changing Weather, no-op)
         // Player at (6,5) catches: roll 4, AG3 target=4+
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, agility: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([1, 2, 4, 4, 3, 3, 4]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2), catch roll
+        $dice = new FixedDiceRoller([1, 2, 3, 4, 3, 3, 4]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2), catch roll
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
@@ -54,14 +54,14 @@ final class KickoffResolverTest extends TestCase
     public function testKickoffLandsEmptySquareBounces(): void
     {
         // Scatter: D8=3 (East), D6=1 -> (7,7) - no player
-        // Kickoff table: 4+4=8 (Changing Weather)
+        // Kickoff table: 3+4=7 (Changing Weather)
         // Bounce: D8=5 (South) -> (7,8)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([3, 1, 4, 4, 3, 3, 5]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2), bounce D8
+        $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 5]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2), bounce D8
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
@@ -76,13 +76,13 @@ final class KickoffResolverTest extends TestCase
     public function testKickoffScattersOutOfReceivingHalfTouchback(): void
     {
         // Scatter: D8=3 (East), D6=5 -> (15,7) not in home half -> touchback
-        // Kickoff table: 4+4=8 (Changing Weather)
+        // Kickoff table: 3+4=7 (Changing Weather)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, agility: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([3, 5, 4, 4, 3, 3]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2)
+        $dice = new FixedDiceRoller([3, 5, 3, 4, 3, 3]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2)
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoff($state, new Position(10, 7));
@@ -125,13 +125,13 @@ final class KickoffResolverTest extends TestCase
     public function testKickoffScattersOffPitchTouchback(): void
     {
         // Scatter: D8=7 (West), D6=5 -> off pitch
-        // Kickoff table: 4+4=8 (Changing Weather)
+        // Kickoff table: 3+4=7 (Changing Weather)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, agility: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([7, 5, 4, 4, 3, 3]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2)
+        $dice = new FixedDiceRoller([7, 5, 3, 4, 3, 3]); // D8, D6(scatter), D6(kt1), D6(kt2), D6(weather1), D6(weather2)
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoff($state, new Position(2, 7));
@@ -286,8 +286,8 @@ final class KickoffResolverTest extends TestCase
 
         $initialRerolls = $state->getAwayTeam()->getRerolls();
 
-        // 3+4=7 = Brilliant Coaching, then home=2, away=5
-        $dice = new FixedDiceRoller([3, 4, 2, 5]);
+        // 4+4=8 = Brilliant Coaching (r. 1321; do 15.09. prohozeno se 7), then home=2, away=5
+        $dice = new FixedDiceRoller([4, 4, 2, 5]);
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
@@ -302,8 +302,8 @@ final class KickoffResolverTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
             ->build();
 
-        // 4+4=8 = Changing Weather, then weather roll 6+6=12 = Blizzard
-        $dice = new FixedDiceRoller([4, 4, 6, 6]);
+        // 3+4=7 = Changing Weather (r. 1316; do 15.09. prohozeno s 8), then weather roll 6+6=12 = Blizzard
+        $dice = new FixedDiceRoller([3, 4, 6, 6]);
         $resolver = $this->createResolver($dice);
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
@@ -483,7 +483,7 @@ final class KickoffResolverTest extends TestCase
 
     public function testKickoffEventFromValue(): void
     {
-        $this->assertEquals(KickoffEvent::ChangingWeather, KickoffEvent::from(8));
+        $this->assertEquals(KickoffEvent::ChangingWeather, KickoffEvent::from(7));
         $this->assertEquals(KickoffEvent::Blitz, KickoffEvent::from(10));
     }
 

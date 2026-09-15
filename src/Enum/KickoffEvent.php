@@ -11,8 +11,12 @@ enum KickoffEvent: int
     case PerfectDefence = 4;
     case HighKick = 5;
     case Cheering = 6;
-    case BrilliantCoaching = 7;
-    case ChangingWeather = 8;
+    // ⛔⛔ OPRAVENO 15.09.2026 -- 7 a 8 byly prohozene.
+    //   `rules_bb2016.txt` r. 1316: "7 Changing Weather", r. 1321: "8 Brilliant
+    //   Coaching". Na 2D6 je 7 nejcastejsi (6/36), 8 ma 5/36.
+    //   ⚠️ C++ engine ma tutez vadu (`engine/include/bb/enums.h:255-256`).
+    case ChangingWeather = 7;
+    case BrilliantCoaching = 8;
     case QuickSnap = 9;
     case Blitz = 10;
     case ThrowARock = 11;
