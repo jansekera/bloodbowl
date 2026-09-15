@@ -294,8 +294,10 @@ final class BallResolver
             $target--;
         }
 
-        // Weather modifier: +1 for Pouring Rain and Blizzard
-        if (in_array($state->getWeather(), [Weather::POURING_RAIN, Weather::BLIZZARD], true)) {
+        // Weather modifier: +1 for Pouring Rain
+        // ⛔ OPRAVENO 15.09.2026 -- Blizzard sem nepatri (r. 1490-1494: jen GFI
+        //   a omezeni dosahu prihravky, zadny modifikator k chytani ani zvedani).
+        if ($state->getWeather() === Weather::POURING_RAIN) {
             $target++;
         }
 
@@ -332,8 +334,10 @@ final class BallResolver
         // Disturbing Presence: +1 per DP enemy within 3 squares
         $target += $this->tzCalc->countDisturbingPresence($state, $pos, $catcher->getTeamSide());
 
-        // Weather modifier: +1 for Pouring Rain and Blizzard
-        if (in_array($state->getWeather(), [Weather::POURING_RAIN, Weather::BLIZZARD], true)) {
+        // Weather modifier: +1 for Pouring Rain
+        // ⛔ OPRAVENO 15.09.2026 -- Blizzard sem nepatri (r. 1490-1494: jen GFI
+        //   a omezeni dosahu prihravky, zadny modifikator k chytani ani zvedani).
+        if ($state->getWeather() === Weather::POURING_RAIN) {
             $target++;
         }
 

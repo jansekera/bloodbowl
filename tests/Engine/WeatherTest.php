@@ -124,7 +124,11 @@ final class WeatherTest extends TestCase
         $this->assertEquals(5, $target);
     }
 
-    public function testPassAccuracyPlusOneInPouringRain(): void
+    // ⛔⛔ OPRAVENO 15.09.2026 -- tyhle dva testy tvrdily VADU ENGINU, ne pravidla.
+    //   `rules_bb2016.txt` r. 1482-1494: -1 k PRIHRAVCE dava jen Very Sunny.
+    //   Pouring Rain dava -1 k chytani, zvedani a intercepci. Blizzard zadny
+    //   modifikator nema -- jen povoli pouze quick a short prihravky.
+    public function testPassAccuracyUnchangedInPouringRain(): void
     {
         $dice = new FixedDiceRoller([]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
@@ -139,11 +143,11 @@ final class WeatherTest extends TestCase
         $player = $state->getPlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
-        // 7 - 3 + 0 - 0(short pass) + 1(weather) = 5
-        $this->assertEquals(5, $target);
+        // 7 - 3 + 0 - 0(short pass) = 4 -- dest nema vliv na prihravku
+        $this->assertEquals(4, $target);
     }
 
-    public function testPassAccuracyPlusOneInBlizzard(): void
+    public function testPassAccuracyUnchangedInBlizzard(): void
     {
         $dice = new FixedDiceRoller([]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
@@ -158,8 +162,8 @@ final class WeatherTest extends TestCase
         $player = $state->getPlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
-        // 7 - 3 + 0 - 0(short pass) + 1(weather) = 5
-        $this->assertEquals(5, $target);
+        // 7 - 3 + 0 - 0(short pass) = 4 -- Blizzard omezuje DOSAH, ne presnost
+        $this->assertEquals(4, $target);
     }
 
     // --- Pickup Weather Modifier Tests ---
@@ -221,7 +225,8 @@ final class WeatherTest extends TestCase
         $this->assertEquals(4, $target);
     }
 
-    public function testPickupPlusOneInBlizzard(): void
+    // ⛔ OPRAVENO 15.09.2026: Blizzard zvedani NEOVLIVNUJE (r. 1490-1494).
+    public function testPickupUnchangedInBlizzard(): void
     {
         $dice = new FixedDiceRoller([]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
@@ -236,8 +241,8 @@ final class WeatherTest extends TestCase
         $player = $state->getPlayer(1);
         $target = $ballResolver->getPickupTarget($state, $player);
 
-        // 7 - 3 - 1 + 0 + 1(weather) = 4
-        $this->assertEquals(4, $target);
+        // 7 - 3 - 1 + 0 = 3
+        $this->assertEquals(3, $target);
     }
 
     // --- Catch Weather Modifier Tests ---
@@ -278,7 +283,8 @@ final class WeatherTest extends TestCase
         $this->assertEquals(5, $target);
     }
 
-    public function testCatchPlusOneInBlizzard(): void
+    // ⛔ OPRAVENO 15.09.2026: Blizzard chytani NEOVLIVNUJE (r. 1490-1494).
+    public function testCatchUnchangedInBlizzard(): void
     {
         $dice = new FixedDiceRoller([]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
@@ -292,8 +298,8 @@ final class WeatherTest extends TestCase
         $player = $state->getPlayer(1);
         $target = $ballResolver->getCatchTarget($state, $player);
 
-        // 7 - 3 + 0 - 0 + 1(weather) = 5
-        $this->assertEquals(5, $target);
+        // 7 - 3 + 0 - 0 = 4
+        $this->assertEquals(4, $target);
     }
 
     // --- GFI Weather Modifier Tests ---

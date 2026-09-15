@@ -315,8 +315,12 @@ final class PassResolver
             $target += $this->tzCalc->countDisturbingPresence($state, $pos, $thrower->getTeamSide());
         }
 
-        // Weather modifier: +1 for Very Sunny, Pouring Rain, Blizzard
-        if (in_array($state->getWeather(), [Weather::VERY_SUNNY, Weather::POURING_RAIN, Weather::BLIZZARD], true)) {
+        // Weather modifier: +1 for Very Sunny
+        // ⛔⛔ OPRAVENO 15.09.2026 -- do dneska tu byl i Pouring Rain a Blizzard.
+        //   `rules_bb2016.txt` r. 1482-1494: -1 k PRIHRAVCE dava JEN Very Sunny.
+        //   Pouring Rain patri k chytani, zvedani a intercepci; Blizzard nema
+        //   modifikator vubec, jen povoluje pouze quick a short prihravky.
+        if ($state->getWeather() === Weather::VERY_SUNNY) {
             $target++;
         }
 
