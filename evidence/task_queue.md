@@ -779,6 +779,43 @@ Teď volá `PassResolver::getAccuracyTarget()` a **šance se násobí**
 ⏰ **Zbývá:** **intercepce** *(kouč ji nepočítá vůbec, `PassResolver` ji řeší)*
 · **kdo** má házet · **kam** mimo zóny zachycení příjemce · **kdy**.
 
+## ✅ 15.09.2026 — PRAVIDLA KOLEM PŘIHRÁVKY A POČASÍ *(9 commitů, 1086 testů)*
+Při přípravě intercepce pro kouče (PHP37) se engine porovnal s `rules_bb2016.txt`:
+* `8cf8e316` počasí: déšť/vánice už nepenalizují přihrávku, vánice ani chytání a zvedání
+* `4c0e5240` zvedání: Nerves of Steel tam nepatří; Big Hand ignoruje i déšť
+* `534c9e40` intercepce: zóny, déšť, DP, Extra Arms, NoS, podmínka zóny;
+  ⭐ nové veřejné `PassResolver::getInterceptionTarget()` pro kouče
+* `faef31f3` Safe Throw = AG hod házeče; Very Long Legs ho vypíná
+* `e81bb57d` fumble = „1 nebo méně PO modifikaci"; Safe Throw míč udrží
+* `9c60e468` Disturbing Presence působí i ležící a omráčený
+* `d852dcd6` vánice: jen quick/short, Hail Mary vůbec
+* `354a7dda` ⛔ **tabulka počasí** byla 2-3/4-5/6-8/9-10/11-12 *(Nice 16/36 místo 30/36)*
+* `d674d080` ⛔ **tabulka výkopu**: 7 a 8 prohozené
+⭐ **Vzorec dne:** testy psané podle implementace **kódovaly vadu** — v 7 z 9 commitů
+se musely přepsat podle textu pravidel. ⇒ U pravidlového testu zdroj = **řádek pravidel**.
+⚠️ **Měření před 354a7dda a po něm nejsou párově srovnatelná** *(frekvence počasí a výkopu)*.
+
+### ⭐ NÁLEZ K PHP37: KOUČ SKORO NEPŘIHRÁVÁ
+Párové A/B *(30 her, seed 20260911, dev rostery)*: `9988be61` = 2 přihrávky / 1 předání,
+HEAD = 3 / 4 ⇒ **~0,1 přihrávky na zápas už od 12.09. odpoledne**, žádná regrese.
+Evidence `php_event_histogram_*_20260912.txt` (22 přihrávek) je ze STARŠÍHO kódu
+a podle `endturn_turnover_na_akci_20260913.txt` šly tehdy všechny do prázdna.
+⇒ Intercepce v ocenění kouče změní málo rozhodnutí; engine ale hraje i webová hra.
+
+### ⏰ OTEVŘENÉ Z TÉHOŽ AUDITU
+* **KDO zachycuje** — pravidla: soupeřův kouč vybere jednoho (r. 1771); engine: první
+  na dráze. ⛔ Není jediné řešení ⇒ **k rozhodnutí uživatele**.
+* **Dráha intercepce** — pravidla: pravítko + „blíž než" podmínky (r. 1763-1769);
+  engine: Bresenham. Aproximace.
+* **Diving Catch** — r. 8061-8069 vs engine `-1 v zóně`.
+* **Bomba a Throw Team-Mate** — `$fumble = $roll === 1` (`BombThrowHandler:79`,
+  `ThrowTeamMateHandler:140`), vlastní výpočet cíle.
+* **Hail Mary za dosahem** — `RulesEngine::validatePass` odmítne `range === null`
+  ještě před resolverem *(souvisí s PHP23, odloženo uživatelem)*.
+* ⛔ **C++ ENGINE: tabulka výkopu 7/8 prohozená** (`engine/include/bb/enums.h:255-256`).
+  Tabulka počasí je tam správně.
+* Zbytek PHP37: **kouč** má volat `getInterceptionTarget()` *(kdo · kam · kdy)*.
+
 ## ⏸ ČEKÁ NA UŽIVATELE
 * **PHP38** — turnoverová brána + vrstvy. **Mění chování** ⇒ vlastní měření.
   Konstanty odmítnutí jsou dočasně zpět v původních hodnotách.
