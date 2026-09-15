@@ -742,93 +742,67 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
-⏰ **Přepsáno 14.09.2026 večer agentem.** Předchozí znění bylo z **11.09.**
-a vedlo histogram událostí, PHP28, PHP29, PHP20, PHP18 — **neodpovídalo
-skutečnosti**, protože 12.–14.09. se pracovalo na klecích, bloku/blitzu
-a pak na PHP38/39/40.
-
-⛔ **Připomínka k téhle knize:** přepisuje se **jedině tenhle oddíl**.
+⏰ **Přepsáno 14.09.2026 pozdě večer.** Přepisuje se **jedině tenhle oddíl**;
 ID se **nikdy** nepřečíslovávají.
 
-## 0. ⛔ NEJDŘÍV: 13.09. SKONČILO SEZENÍ UPROSTŘED REFAKTORU — OPRAVENO 14.09.
+## ✅ UZAVŘENO 14.09.
+| | co | commit |
+|---|---|---|
+| **PHP29** | blitz nepadne, když cíl mezitím zmizel z hřiště | `6ba51b95` |
+| **PHP31** | kam se kope — výběr místo jednoho natvrdo zadaného pole | `0262fef9` |
+| **PHP40** | cache pohybových polí na jedno rozhodnutí, oba kouči | `3256e95e`, `84b49dc2` |
 
-Pracovní strom měl **28 chyb v testech**. Nové patro *(`CoachHeuristics`,
-`CENA_TURNOVERU`, vrstvy `VRSTVA_*`)* bylo **napsané a nezapojené**, a staré
-konstanty už **smazané**, ačkoli se na ně dál volalo.
-⇒ `2dde2a76` vrátilo zelenou **bez jediné změny chování**.
-⭐ **Poučení do knihy: nejdřív zapojit, pak mazat.**
+⭐ **PHP31 nález:** bez skillu `Kick` existuje **jediné** bezpečné pole, takže
+tam nebylo co vybírat — **Kick tu volbu teprve otevírá** *(63 polí)*. Uvnitř
+pásma rozhoduje rychlost přijímajícího týmu *(hluboko proti pomalým, krátko
+proti rychlým)*; práh `RYCHLY_TYM_MA = 6.0` je **uživatelovo číslo**.
 
-## 1. PHP40 — ✅ UZAVŘENO 14.09.
-Cache pohybových polí **na jedno rozhodnutí**, v obou koučích
-*(`3256e95e` Learning, `84b49dc2` Greedy)*.
-* **Správnost:** sebekontrola `BB_CACHE_SELFCHECK=1` — **10 zápasů, 0 rozdílů**
-  *(Learning)*, **3 zápasy, 0 rozdílů** *(Greedy)*.
-* ⭐ **Pozitivní kontrola u obou:** klíč dočasně rozbit ⇒ **hláška spadla**.
-  Bez ní by „0 rozdílů" nic neznamenalo.
-* **Rychlost:** 3 zápasy **203,5 s → 116,6 s = −42,7 %**.
-  ⚠️ **Není to párové A/B** — engine nemá seed, oba běhy odehrály jiné zápasy.
-  **Směr je jistý, číslo měkké.** ⇒ **Seed je předpoklad každého poctivého
-  měření výkonu a zatím chybí.**
+## ⛔⛔ PĚT PRAVIDLOVÝCH VAD OPRAVENO — A JE V TOM VZOREC
+| vada | commit | sepne dnes? |
+|---|---|---|
+| dodge: chyběl bonus `+1` na volné pole | `8ee89d24` | ✅ |
+| **`Dodge` počítán dvakrát** — `−1` k cíli **i** re-roll | `8ee89d24` | ✅ |
+| `Stunty` má zóny **ignorovat**, ne odečítat 1 | `93043345` | ⛔ nemá nikdo |
+| Mighty Blow u **Stab/Chainsaw**, pravidla to zakazují | `93043345` | ⛔ nemá nikdo |
+| **Mighty Blow je VOLBA** brnění *nebo* zranění, ne pevně brnění | `dea6d70c` | ✅ |
+| **`Pass` počítán dvakrát** — `−1` k cíli **i** re-roll | `afc015c3` | ✅ |
 
-## 2. PHP39 — ⏳ ROZPRACOVÁNO, a zbytek NENÍ čistý refaktor
-Zapojeno do **obou** koučů *(bez změny chování)*: `endZoneX`, `jeNosic`
-*(`24a40d7f`)* · `jeRohKlece` *(`08f06849`)* · `nosicNebojuje` *(`f18f0572`)*.
+⭐⭐⭐ **VZOREC: skill, který dává RE-ROLL, byl zapsaný jako MODIFIKÁTOR — a
+opakování hodu se přidalo později VEDLE něj.** Třikrát za den *(Dodge, Pass,
+a obdobně Mighty Blow)*. ⇒ **Prověřeno i zbylé:** `Catch` a `Sure Hands` mají
+jen re-roll *(správně)*, `Accurate` je modifikátor a tím i má být. **Hotovo.**
 
-⛔⛔ **A tady je nález: zbylé čtyři metody NEJSOU behaviorálně neutrální.**
-| metoda | proč se nedá jen „zapojit" |
-|---|---|
-| `zonyZachyceni` | engine **odečítá hráče, kteří zónu ZTRATILI** *(`hasLostTacklezones`)*; kouči si to ve svých smyčkách nehlídali ⇒ **jiné číslo** |
-| `jeVedleSoupere` | staví na `zonyZachyceni` ⇒ dědí tentýž rozdíl |
-| `znackujici` | `getMarkingPlayers()` ⇒ tentýž rozdíl |
-| `pVyhozeniZaFaul` | kouči dnes riziko vyhození **vůbec nepočítají** ⇒ zapojení = **nová úvaha**, ne přesun |
+## ⏳ PHP37 — SEKCE PASS, PRVNÍ KROK HOTOV *(`afc015c3`)*
+Kouč do včerejška počítal, že **hod vždy vyjde** — oceňoval jen chycení.
+Teď volá `PassResolver::getAccuracyTarget()` a **šance se násobí**
+*(hod × chyt)*. Žádné nové číslo.
+⏰ **Zbývá:** **intercepce** *(kouč ji nepočítá vůbec, `PassResolver` ji řeší)*
+· **kdo** má házet · **kam** mimo zóny zachycení příjemce · **kdy**.
 
-⇒ **Patří to k PHP38** *(kde se chování mění vědomě a měří se)*, ne do
-úklidu. **Agent je proto nezapojil.**
-⚠️ `dosahPrihravky` zůstává nezapojená schválně — ceny `'short_pass' => 10`
-jsou **herní rozhodnutí uživatele** *(až s PHP37)*.
+## ⏸ ČEKÁ NA UŽIVATELE
+* **PHP38** — turnoverová brána + vrstvy. **Mění chování** ⇒ vlastní měření.
+  Konstanty odmítnutí jsou dočasně zpět v původních hodnotách.
+* **PHP28** — rameno `throw_team_mate`. ⛔ **Není to oprava, ale doktrína:**
+  engine chce `targetId`, `targetX`, `targetY`, tedy **koho hodit a kam**.
+* **OBRANA** — kouč nemá nic. 14.09. se sešla doktrína *(L = boxing-in, cíl
+  „zmlátit a vysurfovat", přechod ze 2 sloupců **skokem**)*, ale **spouštěč
+  není potvrzený**.
 
-## 3. PHP38 — ⏸ ČEKÁ NA UŽIVATELE
-Turnoverová brána `score -= pT * cenaTurnoveru()` + vrstvy NORMAL/NOUZE/POSLEDNÍ.
-**Mění chování** ⇒ vlastní měření. Konstanty odmítnutí jsou **dočasně zpět**
-v původních hodnotách, v kódu je u nich napsáno proč.
+## ⛔⛔⛔ A JEDNA VĚC, KTERÁ MĚNÍ POŘADÍ — DVA ENGINY
+Balík G *(rezervy, D68, lavička, návrat KO)* je hotový **v C++ enginu**,
+ale pracuje se v **PHP**, a most mezi nimi **není žádný**.
+⇒ **Brána před balíkem E (změna TV) NENÍ splněná.**
+⇒ Rozhodnutí *„u změny TV dostanou trpaslíci Stand Firm a Mighty Blow"* platí,
+ale je **za tímhle**.
+⭐ Měřicí skript: `cli/diag_package_g_20260914.php`.
 
-## 4. ✅ DVĚ NESROVNALOSTI V DODGI — OPRAVENO 14.09. *(`8ee89d24`)*
-`TacklezoneCalculator::calculateDodgeTarget()` proti `rules_bb2016.txt`:
-* **(A)** chybí bonus `+1` za dodge **na úplně volné pole** *(pravidla `2+`,
-  engine `3+`)*;
-* **(B)** skill `Dodge` je modelovaný jako `−1` k cíli, pravidla dávají
-  **re-roll jednou za kolo** *(ř. 8086-8092)* — **jiný druh věci**, ne jiná
-  velikost.
-⇒ ✅ **Opraveno oboje** *(uživatel: „jdi na dodge opravu")*. **Sedm testů spadlo
-a všechny zapisovaly staré chování** — u každého je v komentáři odvození
-z pravidel, ne jen nová číslice.
-⭐ **TŘETÍ nález v téže funkci, NEOPRAVENO:** `Stunty` má podle pravidel TZ na
-cílovém poli **ignorovat**, engine ho má jako `-1`. Při jedné zóně vyjde obojí
-stejně, při třech ne. ⛔ **Nesepne** — Stunty nemá v žádném rosteru nikdo.
-Patří na **P4**.
-⚠️ **Není to hygiena:** šance nosiče na útěk je **jádro kritéria pro obranné L** —
-a po opravě engine konečně počítá totéž co pravidla, ze kterých se to kritérium
-odvozovalo.
-
-## 4b. ⛔⛔⛔ BALÍK G JE HOTOVÝ V C++, ALE PRACUJE SE V PHP *(14.09.)*
-
-Commity `4bd66a4`, `1e2f646`, `6211a58` mění **jen `engine/*.cpp`**. Práce
-PHP16–PHP40 i `cli/simulate.php` běží v `src/Engine/*.php` a **most mezi nimi
-není žádný**. ⇒ V PHP chybí: rezervy · tabulka D68 · lavička · návrat KO mezi
-drivy; Sweltering Heat má jiný, starý mechanismus.
-**Změřeno:** `DEAD/hru = 0,00` *(a `DEAD` se v `src/` nikdy nepřiřazuje, takže
-je to nutnost, ne vzorek)*; pozitivní kontrola: 27 INJURED, 47 KO.
-⇒ ⛔ **Brána před balíkem E (změna TV) NENÍ splněná.**
-⭐ Poučení: u každého nálezu se ptát **„ve kterém enginu?"**
-
-## 5. Pak podle dřívějšího pořadí
-**PHP28** *(TTM rameno)* · **PHP29** *(blitz on pitch)* · **PHP37** *(pass)* ·
-**PHP31** *(kam se kope)* · **PHP36** *(clona)* · **PHP20**, **PHP18**.
-
-## 6. OBRANA — ⛔ nevymýšlet
-Kouč nemá nic. 14.09. se sešla doktrína *(L = boxing-in, cíl „zmlátit
-a vysurfovat", přechod ze 2 sloupců **skokem**)*, ale spouštěč není potvrzený
-a **Mighty Blow v TV1200 nemá nikdo**. Viz `evidence/BRIEF_agent_20260914.md`.
+## ⭐ TŘI VĚCI, KTERÉ SE PŘI TOM UKÁZALY O POSTUPU
+1. **Engine nemá seed** ⇒ žádné měření výkonu není párové A/B. Chybí to.
+2. **Zápas stojí ~46 s** *(cache to zkrátila o −43 %)* ⇒ „krátké měření" je
+   nanejvýš 5 zápasů; víc na pozadí.
+3. ⛔ **Hromadná náhrada bez kontroly kontextu selhala dvakrát za den** —
+   regex snědl o 297 řádků víc, a náhrada u Mighty Blow trefila pět míst
+   místo čtyř *(páté byl normální blok, kde MB platit má)*. **Po jednom.**
 
 ---
 
