@@ -115,79 +115,6 @@ final class BlockRerollTest extends TestCase
         $this->assertSame(2, $homeTeam->getRerolls());
     }
 
-    // ========== Brawler Skill ==========
-
-    public function testBrawlerRerollsBothDownDie(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Brawler], id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
-
-        // Roll 2 = BD, brawler reroll → 6 = DD, armor
-        $dice = new FixedDiceRoller([2, 6, 3, 3]);
-        $resolver = new ActionResolver($dice);
-        $resolver->setInteractiveBlocks(true);
-
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-        $pending = $result->getNewState()->getPendingBlock();
-        $this->assertTrue($pending->isBrawlerAvailable());
-        $this->assertSame(BlockDiceFace::BOTH_DOWN, $pending->getFaces()[0]);
-
-        // Use Brawler
-        $rerollResult = $resolver->resolve($result->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'brawler']);
-        $pending = $rerollResult->getNewState()->getPendingBlock();
-        $this->assertNotNull($pending);
-        $this->assertSame(BlockDiceFace::DEFENDER_DOWN, $pending->getFaces()[0]);
-        $this->assertFalse($pending->isBrawlerAvailable());
-
-        // Brawler events
-        $types = array_map(fn($e) => $e->getType(), $rerollResult->getEvents());
-        $this->assertContains('reroll', $types);
-    }
-
-    public function testBrawlerNotAvailableWithoutBothDown(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Brawler], id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
-
-        // Roll 1 = AD (not Both Down)
-        $dice = new FixedDiceRoller([1]);
-        $resolver = new ActionResolver($dice);
-        $resolver->setInteractiveBlocks(true);
-
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-        $pending = $result->getNewState()->getPendingBlock();
-        // Brawler is technically available (player has skill), but no BD in roll
-        $this->assertTrue($pending->isBrawlerAvailable());
-
-        // Trying to use Brawler without BD should fail
-        $this->expectException(\InvalidArgumentException::class);
-        $resolver->resolve($result->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'brawler']);
-    }
-
-    public function testBrawlerAutoResolvesForAI(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, skills: [SkillName::Brawler], id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
-            ->build();
-
-        // Roll 2 = BD, brawler reroll → 6 = DD, armor
-        $dice = new FixedDiceRoller([2, 6, 3, 3]);
-        $resolver = new ActionResolver($dice);
-        // Not interactive → auto-resolves
-
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-
-        // Should be fully resolved
-        $this->assertNull($result->getNewState()->getPendingBlock());
-        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('reroll', $types);
-    }
-
     // ========== Pro Reroll on Block ==========
 
     public function testProRerollOnBlock(): void
@@ -323,7 +250,6 @@ final class BlockRerollTest extends TestCase
             attackerChooses: true,
             isBlitz: false,
             isFrenzy: false,
-            brawlerAvailable: true,
             proAvailable: false,
             teamRerollAvailable: true,
         );
@@ -337,7 +263,6 @@ final class BlockRerollTest extends TestCase
         $this->assertSame(BlockDiceFace::BOTH_DOWN, $restored->getFaces()[0]);
         $this->assertSame(BlockDiceFace::PUSHED, $restored->getFaces()[1]);
         $this->assertTrue($restored->isAttackerChooses());
-        $this->assertTrue($restored->isBrawlerAvailable());
         $this->assertFalse($restored->isProAvailable());
         $this->assertTrue($restored->isTeamRerollAvailable());
     }
@@ -356,7 +281,6 @@ final class BlockRerollTest extends TestCase
             attackerChooses: true,
             isBlitz: false,
             isFrenzy: false,
-            brawlerAvailable: false,
             proAvailable: false,
             teamRerollAvailable: false,
         );

@@ -52,7 +52,6 @@ export interface PendingBlock {
     attackerChooses: boolean;
     isBlitz: boolean;
     isFrenzy: boolean;
-    brawlerAvailable: boolean;
     proAvailable: boolean;
     teamRerollAvailable: boolean;
     rerollUsed: boolean;

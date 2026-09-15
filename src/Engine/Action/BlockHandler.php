@@ -159,7 +159,6 @@ final class BlockHandler implements ActionHandlerInterface
             attackerChooses: $attackerChooses,
             isBlitz: $isBlitz,
             isFrenzy: false,
-            brawlerAvailable: $attacker->hasSkill(SkillName::Brawler),
             proAvailable: $attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn(),
             teamRerollAvailable: $state->getTeamState($activeSide)->canUseReroll(),
         );
@@ -251,7 +250,6 @@ final class BlockHandler implements ActionHandlerInterface
                     attackerChooses: $diceInfo2['attackerChooses'],
                     isBlitz: $isBlitz,
                     isFrenzy: true,
-                    brawlerAvailable: $frenzyAttacker->hasSkill(SkillName::Brawler),
                     proAvailable: $frenzyAttacker->hasSkill(SkillName::Pro) && !$frenzyAttacker->isProUsedThisTurn(),
                     teamRerollAvailable: $frenzyState->getTeamState($activeSide)->canUseReroll(),
                 );
@@ -278,7 +276,7 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
-     * Reroll block dice: Brawler (free, Both Down only), Pro (4+, one die), or Team Reroll (all dice).
+     * Reroll block dice: Pro (4+, one die) or Team Reroll (all dice).
      *
      * @param array<string, mixed> $params
      */
@@ -301,27 +299,6 @@ final class BlockHandler implements ActionHandlerInterface
         $faces = $pending->getFaces();
 
         switch ($type) {
-            case 'brawler':
-                if (!$pending->isBrawlerAvailable()) {
-                    throw new \InvalidArgumentException('Brawler not available');
-                }
-                // Brawler: free reroll of ONE die showing Both Down
-                $bdIdx = -1;
-                foreach ($faces as $idx => $f) {
-                    if ($f === BlockDiceFace::BOTH_DOWN) {
-                        $bdIdx = $idx;
-                        break;
-                    }
-                }
-                if ($bdIdx === -1) {
-                    throw new \InvalidArgumentException('Brawler requires Both Down in roll');
-                }
-                $events[] = GameEvent::rerollUsed($attacker->getId(), 'Brawler');
-                $faces[$bdIdx] = $this->rollBlockDie();
-                $pending = $pending->withBrawlerUsed()->withFaces(array_values($faces));
-                $state = $state->withPendingBlock($pending);
-                return ActionResult::success($state, $events);
-
             case 'pro':
                 if (!$pending->isProAvailable()) {
                     throw new \InvalidArgumentException('Pro not available');
@@ -403,23 +380,9 @@ final class BlockHandler implements ActionHandlerInterface
         /** @var list<GameEvent> $accumulatedEvents */
         $accumulatedEvents = [];
 
-        // Try Brawler first if Both Down is best choice
+        // ⛔ 15.09.2026: tady byl nejdriv pokus o Brawler -- skill z BB2020, v BB2016
+        //   neexistuje (`evidence/audit_pravidla_20260915.md`). Odstranen na pokyn uzivatele.
         $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
-        if ($bestFace === BlockDiceFace::BOTH_DOWN && $pending->isBrawlerAvailable()) {
-            $result = $this->resolveBlockReroll($state, ['type' => 'brawler']);
-            $accumulatedEvents = array_merge($accumulatedEvents, $result->getEvents());
-            $state = $result->getNewState();
-            $pending = $state->getPendingBlock();
-            if ($pending === null) {
-                return $result;
-            }
-            $attacker = $state->getPlayer($pending->getAttackerId());
-            $defender = $state->getPlayer($pending->getDefenderId());
-            if ($attacker === null || $defender === null) {
-                return $result;
-            }
-            $bestFace = $this->autoChooseBlockDie($pending->getFaces(), $pending->isAttackerChooses(), $attacker, $defender);
-        }
 
         // Try Pro if result is bad
         $bestScore = $this->scoreBlockFace($bestFace, $attacker, $defender);

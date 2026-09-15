@@ -28,7 +28,7 @@ quick/short · tabulka počasí · tabulka výkopu 7/8 · Thick Skull · Pass/Do
 | Blood Lust | 7934-7938: krmí se NA KONCI akce | `BigGuyCheckResolver.php:304-316` hned při deklaraci | stejná | `BloodlustTest.php:48,93` | jistá |
 | Bombardier | 7950-7972: nespotřebuje Pass akci; fumble exploduje u házeče; sousedé 4+ i ležící; turnover; chycení/intercepce | `Action/BombThrowHandler.php` spotřebuje Pass (:56-58), fumble odletí (:87-90), 3×3 automaticky jen stojící (:130-158), nikdy turnover (:111), fumble jen přirozená 1 (:79) | skoro dle pravidel | `BombThrowTest.php:22,86,118,140` | jistá |
 | Bone-head *(+ Hypnotic Gaze, Really Stupid)* | 7983-7985: nechytá, nezachycuje, nepřihrává, neasistuje | `BallResolver.php:108-145` chytá; `StrengthCalculator.php:42-58` asistuje | asistence OK | – | jistá |
-| **Brawler** | **v BB2016 NEEXISTUJE** (BB2020) | `Action/BlockHandler.php:162,254,304-322,406-410` přehoz Both Down | neimpl. | `BlockRerollTest.php:120-171` | jistá |
+| ✅ **Brawler** — **ODSTRANĚN 15.09.** | **v BB2016 NEEXISTUJE** (BB2020) | `Action/BlockHandler.php:162,254,304-322,406-410` přehoz Both Down | neimpl. | `BlockRerollTest.php:120-171` | jistá |
 | Break Tackle | 7988-7991: ST místo AG, 1× za kolo | `TacklezoneCalculator.php:128-130` vždy ST (i nižší), bez limitu | limit chybí | – | jistá |
 | Chainsaw | 8002-8016: +3 ke zbroji (zásah, kickback, pád držitele, faul), 1× za kolo | `Action/BlockHandler.php:780-842` +3 chybí; v Multiple Block 2× (:599-632); kickback bez turnoveru | +3 OK | `ChainsawTest.php:105` | jistá |
 | Claw | 8021-8022: zbroj 8+ **po modifikacích**, jen při bloku | `InjuryResolver.php:52,59` bez modifikátorů; předává se do Stab/Chainsaw | dle pravidel | – | jistá |

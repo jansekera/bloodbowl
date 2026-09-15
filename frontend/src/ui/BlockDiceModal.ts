@@ -31,12 +31,8 @@ export class BlockDiceModal {
         this.onReroll = onReroll;
 
         const chooserLabel = pending.attackerChooses ? attackerName : defenderName;
-        const hasBothDown = pending.faces.some(f => f === 'both_down');
 
         let rerollButtons = '';
-        if (pending.brawlerAvailable && hasBothDown) {
-            rerollButtons += '<button class="block-dice-modal__reroll block-dice-modal__reroll--brawler" data-type="brawler" title="Reroll the Both Down die">Brawler</button>';
-        }
         if (pending.proAvailable) {
             rerollButtons += '<button class="block-dice-modal__reroll block-dice-modal__reroll--pro" data-type="pro" title="Pro: 4+ to reroll worst die">Pro</button>';
         }

@@ -99,7 +99,7 @@ final class RulesEngine
         if ($state->getPendingBlock() !== null) {
             $actions[] = ['type' => ActionType::CHOOSE_BLOCK_DIE->value];
             $pending = $state->getPendingBlock();
-            if ($pending->isBrawlerAvailable() || $pending->isProAvailable() || $pending->isTeamRerollAvailable()) {
+            if ($pending->isProAvailable() || $pending->isTeamRerollAvailable()) {
                 $actions[] = ['type' => ActionType::REROLL_BLOCK->value];
             }
             return $actions;

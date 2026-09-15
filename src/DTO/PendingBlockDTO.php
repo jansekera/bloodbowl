@@ -17,7 +17,6 @@ final class PendingBlockDTO
         private readonly bool $attackerChooses,
         private readonly bool $isBlitz,
         private readonly bool $isFrenzy,
-        private readonly bool $brawlerAvailable,
         private readonly bool $proAvailable,
         private readonly bool $teamRerollAvailable,
         private readonly bool $rerollUsed = false,
@@ -31,7 +30,6 @@ final class PendingBlockDTO
     public function isAttackerChooses(): bool { return $this->attackerChooses; }
     public function isBlitz(): bool { return $this->isBlitz; }
     public function isFrenzy(): bool { return $this->isFrenzy; }
-    public function isBrawlerAvailable(): bool { return $this->brawlerAvailable; }
     public function isProAvailable(): bool { return $this->proAvailable; }
     public function isTeamRerollAvailable(): bool { return $this->teamRerollAvailable; }
     public function isRerollUsed(): bool { return $this->rerollUsed; }
@@ -42,7 +40,7 @@ final class PendingBlockDTO
         return new self(
             $this->attackerId, $this->defenderId, $faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            $this->brawlerAvailable, $this->proAvailable, $this->teamRerollAvailable,
+            $this->proAvailable, $this->teamRerollAvailable,
             $this->rerollUsed,
         );
     }
@@ -52,17 +50,7 @@ final class PendingBlockDTO
         return new self(
             $this->attackerId, $this->defenderId, $this->faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            false, false, false, true,
-        );
-    }
-
-    public function withBrawlerUsed(): self
-    {
-        return new self(
-            $this->attackerId, $this->defenderId, $this->faces,
-            $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            false, $this->proAvailable, $this->teamRerollAvailable,
-            $this->rerollUsed,
+            false, false, true,
         );
     }
 
@@ -71,7 +59,7 @@ final class PendingBlockDTO
         return new self(
             $this->attackerId, $this->defenderId, $this->faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            $this->brawlerAvailable, false, $this->teamRerollAvailable,
+            false, $this->teamRerollAvailable,
             $this->rerollUsed,
         );
     }
@@ -81,7 +69,7 @@ final class PendingBlockDTO
         return new self(
             $this->attackerId, $this->defenderId, $this->faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            $this->brawlerAvailable, $this->proAvailable, false,
+            $this->proAvailable, false,
             true,
         );
     }
@@ -98,7 +86,6 @@ final class PendingBlockDTO
             'attackerChooses' => $this->attackerChooses,
             'isBlitz' => $this->isBlitz,
             'isFrenzy' => $this->isFrenzy,
-            'brawlerAvailable' => $this->brawlerAvailable,
             'proAvailable' => $this->proAvailable,
             'teamRerollAvailable' => $this->teamRerollAvailable,
             'rerollUsed' => $this->rerollUsed,
@@ -117,7 +104,6 @@ final class PendingBlockDTO
             attackerChooses: (bool) $data['attackerChooses'],
             isBlitz: (bool) ($data['isBlitz'] ?? false),
             isFrenzy: (bool) ($data['isFrenzy'] ?? false),
-            brawlerAvailable: (bool) ($data['brawlerAvailable'] ?? false),
             proAvailable: (bool) ($data['proAvailable'] ?? false),
             teamRerollAvailable: (bool) ($data['teamRerollAvailable'] ?? false),
             rerollUsed: (bool) ($data['rerollUsed'] ?? false),

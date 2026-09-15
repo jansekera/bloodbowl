@@ -75,7 +75,6 @@ export const SKILL_DESCRIPTIONS: Record<string, string> = {
     'Titchy': '+1 dodge, opponents easier to dodge away from',
     'Stakes': 'Blocks Regeneration when causing a casualty',
     'Multiple Block': 'Block 2 adjacent opponents (each at +2 ST, no follow-up)',
-    'Brawler': 'Once per turn, reroll all block dice when Both Down appears',
 };
 
 /**
