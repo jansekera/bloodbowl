@@ -110,9 +110,10 @@ final class PassResolver
 
         // Accuracy roll with reroll support
         $accuracyTarget = $this->getAccuracyTarget($state, $thrower, $range);
+        $passModifier = $this->getPassRollModifier($state, $thrower, $range);
         $roll = $this->dice->rollD6();
         $accurate = $roll !== 1 && $roll >= $accuracyTarget;
-        $fumble = $roll === 1;
+        $fumble = $this->jeFumble($roll, $passModifier);
 
         $events = array_merge($animosityEvents, $passBlockEvents, $interceptResult['events']);
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
@@ -128,7 +129,7 @@ final class PassResolver
                 $skillRerollUsed = true;
                 $roll = $this->dice->rollD6();
                 $accurate = $roll !== 1 && $roll >= $accuracyTarget;
-                $fumble = $roll === 1;
+                $fumble = $this->jeFumble($roll, $passModifier);
                 $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                 $events[] = GameEvent::rerollUsed($playerId, 'Pass');
                 $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
@@ -140,7 +141,7 @@ final class PassResolver
                 if ($proRoll >= 4) {
                     $roll = $this->dice->rollD6();
                     $accurate = $roll !== 1 && $roll >= $accuracyTarget;
-                    $fumble = $roll === 1;
+                    $fumble = $this->jeFumble($roll, $passModifier);
                     $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                     $events[] = GameEvent::proReroll($playerId, $proRoll, true, $roll);
                     $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
@@ -161,12 +162,21 @@ final class PassResolver
                 if (!$lonerBlocked) {
                     $roll = $this->dice->rollD6();
                     $accurate = $roll !== 1 && $roll >= $accuracyTarget;
-                    $fumble = $roll === 1;
+                    $fumble = $this->jeFumble($roll, $passModifier);
                     $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                     $events[] = GameEvent::rerollUsed($playerId, 'Team Reroll');
                     $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
                 }
             }
+        }
+
+        // ⭐ PRIDANO 15.09.2026 -- Safe Throw (r. 8440-8443): "if this player
+        //   fumbles a pass on any roll other than a natural 1 then he manages to
+        //   keep hold of the ball instead of suffering a fumble and the team
+        //   does not suffer a turnover." Pred opravou fumble jinak nez 1 neexistoval.
+        if ($fumble && $roll !== 1 && $thrower->hasSkill(SkillName::SafeThrow)) {
+            $events[] = GameEvent::safeThrow($playerId, $roll, true);
+            return ActionResult::success($state, $events);
         }
 
         // Handle fumble
@@ -302,17 +312,30 @@ final class PassResolver
     public function getAccuracyTarget(GameState $state, MatchPlayerDTO $thrower, PassRange $range): int
     {
         $ag = $thrower->getStats()->getAgility();
+
+        return max(2, min(6, 7 - $ag - $this->getPassRollModifier($state, $thrower, $range)));
+    }
+
+    /**
+     * Soucet modifikatoru K HODU na prihravku (kladny = pomaha).
+     *
+     * ⭐ ROZDELENO 15.09.2026 z `getAccuracyTarget()`: cil hodu staci na
+     *   "presne / nepresne", ale FUMBLE podle pravidel nezavisi na cili --
+     *   r. 1740-1745: "if the D6 roll for a pass is 1 or less before OR AFTER
+     *   MODIFICATION". Na to je potreba modifikator samotny.
+     */
+    public function getPassRollModifier(GameState $state, MatchPlayerDTO $thrower, PassRange $range): int
+    {
         $pos = $thrower->getPosition();
         $tz = 0;
         if ($pos !== null && !$thrower->hasSkill(SkillName::NervesOfSteel)) {
             $tz = $this->tzCalc->countTacklezones($state, $pos, $thrower->getTeamSide());
         }
 
-        $target = 7 - $ag + $tz - $range->modifier();
-
+        $modifier = $range->modifier() - $tz;
         // Disturbing Presence: +1 per DP enemy within 3 squares
         if ($pos !== null) {
-            $target += $this->tzCalc->countDisturbingPresence($state, $pos, $thrower->getTeamSide());
+            $modifier -= $this->tzCalc->countDisturbingPresence($state, $pos, $thrower->getTeamSide());
         }
 
         // Weather modifier: +1 for Very Sunny
@@ -321,7 +344,7 @@ final class PassResolver
         //   Pouring Rain patri k chytani, zvedani a intercepci; Blizzard nema
         //   modifikator vubec, jen povoluje pouze quick a short prihravky.
         if ($state->getWeather() === Weather::VERY_SUNNY) {
-            $target++;
+            $modifier--;
         }
 
         // ⛔⛔ ODEBRANO 14.09.2026 -- SKILL `Pass` SE POCITAL DVAKRAT.
@@ -338,10 +361,19 @@ final class PassResolver
 
         // Accurate: -1 to target
         if ($thrower->hasSkill(SkillName::Accurate)) {
-            $target--;
+            $modifier++;
         }
 
-        return max(2, min(6, $target));
+        return $modifier;
+    }
+
+    /**
+     * ⛔⛔ OPRAVENO 15.09.2026 -- fumble byl jen prirozena 1.
+     *   r. 1740-1745: "1 or less before or after modification".
+     */
+    private function jeFumble(int $roll, int $modifier): bool
+    {
+        return $roll === 1 || $roll + $modifier <= 1;
     }
 
     /**
@@ -571,12 +603,19 @@ final class PassResolver
         }
 
         $accuracyTarget = $this->getAccuracyTarget($state, $thrower, $range);
+        $passModifier = $this->getPassRollModifier($state, $thrower, $range);
         $roll = $this->dice->rollD6();
         $accurate = $roll !== 1 && $roll >= $accuracyTarget;
-        $fumble = $roll === 1;
+        $fumble = $this->jeFumble($roll, $passModifier);
 
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
         $events[] = GameEvent::passAttempt($thrower->getId(), (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
+
+        // Safe Throw plati i pro dump-off -- je to prihravka (r. 8440-8443).
+        if ($fumble && $roll !== 1 && $thrower->hasSkill(SkillName::SafeThrow)) {
+            $events[] = GameEvent::safeThrow($thrower->getId(), $roll, true);
+            return ['state' => $state, 'events' => $events];
+        }
 
         if ($fumble) {
             // Ball bounces from thrower
