@@ -18,34 +18,36 @@ final class WeatherTest extends TestCase
         $this->assertEquals('Blizzard', Weather::BLIZZARD->label());
     }
 
-    public function testFromRollSwelteringHeat(): void
+    // ⛔⛔ OPRAVENO 15.09.2026 -- testy kodovaly VADNOU tabulku enginu
+    //   (2-3 / 4-5 / 6-8 / 9-10 / 11-12). `rules_bb2016.txt` r. 1476-1494
+    //   (standardni tabulka, prvni ze dvou sloupcu; druha je zimni):
+    //   2 Sweltering Heat · 3 Very Sunny · 4-10 Nice · 11 Pouring Rain · 12 Blizzard.
+    //   Tak to ma i C++ engine (`engine/include/bb/enums.h:240`).
+
+    public function testFromRollSwelteringHeatJenDva(): void
     {
         $this->assertEquals(Weather::SWELTERING_HEAT, Weather::fromRoll(2));
-        $this->assertEquals(Weather::SWELTERING_HEAT, Weather::fromRoll(3));
     }
 
-    public function testFromRollVerySunny(): void
+    public function testFromRollVerySunnyJenTri(): void
     {
-        $this->assertEquals(Weather::VERY_SUNNY, Weather::fromRoll(4));
-        $this->assertEquals(Weather::VERY_SUNNY, Weather::fromRoll(5));
+        $this->assertEquals(Weather::VERY_SUNNY, Weather::fromRoll(3));
     }
 
-    public function testFromRollNice(): void
+    public function testFromRollNiceCtyriAzDeset(): void
     {
-        $this->assertEquals(Weather::NICE, Weather::fromRoll(6));
-        $this->assertEquals(Weather::NICE, Weather::fromRoll(7));
-        $this->assertEquals(Weather::NICE, Weather::fromRoll(8));
+        foreach (range(4, 10) as $hod) {
+            $this->assertEquals(Weather::NICE, Weather::fromRoll($hod), "hod {$hod}");
+        }
     }
 
-    public function testFromRollPouringRain(): void
+    public function testFromRollPouringRainJenJedenact(): void
     {
-        $this->assertEquals(Weather::POURING_RAIN, Weather::fromRoll(9));
-        $this->assertEquals(Weather::POURING_RAIN, Weather::fromRoll(10));
+        $this->assertEquals(Weather::POURING_RAIN, Weather::fromRoll(11));
     }
 
-    public function testFromRollBlizzard(): void
+    public function testFromRollBlizzardJenDvanact(): void
     {
-        $this->assertEquals(Weather::BLIZZARD, Weather::fromRoll(11));
         $this->assertEquals(Weather::BLIZZARD, Weather::fromRoll(12));
     }
 }

@@ -25,15 +25,20 @@ enum Weather: string
 
     /**
      * Map 2D6 roll to weather.
-     * 2-3: Sweltering Heat, 4-5: Very Sunny, 6-8: Nice, 9-10: Pouring Rain, 11-12: Blizzard
+     *
+     * ⛔⛔ OPRAVENO 15.09.2026 -- tady bylo 2-3 / 4-5 / 6-8 / 9-10 / 11-12, takze
+     *   pekne pocasi padalo v 16 z 36 hodu misto 30 a vanice 3x casteji.
+     *   `rules_bb2016.txt` r. 1476-1494 (standardni tabulka):
+     *   2 Sweltering Heat · 3 Very Sunny · 4-10 Nice · 11 Pouring Rain · 12 Blizzard.
+     *   Shodne s C++ enginem (`engine/include/bb/enums.h:240`).
      */
     public static function fromRoll(int $roll): self
     {
         return match (true) {
-            $roll <= 3 => self::SWELTERING_HEAT,
-            $roll <= 5 => self::VERY_SUNNY,
-            $roll <= 8 => self::NICE,
-            $roll <= 10 => self::POURING_RAIN,
+            $roll <= 2 => self::SWELTERING_HEAT,
+            $roll === 3 => self::VERY_SUNNY,
+            $roll <= 10 => self::NICE,
+            $roll === 11 => self::POURING_RAIN,
             default => self::BLIZZARD,
         };
     }
