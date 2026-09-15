@@ -95,10 +95,13 @@ final class PassingSkillsTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
+        // ⛔ OPRAVENO 15.09.2026 -- Safe Throw NENI prehozeni hodu zachycujiciho.
+        //   r. 8434-8440: "the Safe Throw player may make an UNMODIFIED AGILITY
+        //   ROLL. If this is successful then the interception is cancelled out."
         // Interception roll 5 (succeeds for AG4 target 5+)
-        // Safe Throw reroll 3 (fails to intercept, target 5+) → interception nullified
+        // Safe Throw: AG3 hazece = 4+, roll 4 = uspech -> intercepce zrusena
         // Accuracy roll 4, catch roll 4
-        $dice = new FixedDiceRoller([5, 3, 4, 4]);
+        $dice = new FixedDiceRoller([5, 4, 4, 4]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [
@@ -123,8 +126,10 @@ final class PassingSkillsTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        // Interception roll 6 (succeeds), SafeThrow reroll 6 (also succeeds → still intercepted)
-        $dice = new FixedDiceRoller([6, 6]);
+        // Interception roll 6 (succeeds), Safe Throw: AG3 hazece = 4+, roll 3 = neuspech
+        // ⛔ OPRAVENO 15.09.2026: drive tu byla 6 jako "prehozeni zachycujiciho".
+        //   Podle pravidel by 6 na AG hod hazece intercepci ZRUSILA.
+        $dice = new FixedDiceRoller([6, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [
@@ -138,6 +143,50 @@ final class PassingSkillsTest extends TestCase
         $this->assertContains('safe_throw', $types);
         // Ball should be with the interceptor
         $this->assertEquals(3, $result->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testSafeThrowNeniPrehozeniHoduZachycujiciho(): void
+    {
+        // Rozlisujici pripad: hazec AG3 (Safe Throw 4+), zachycujici AG4 (5+).
+        // Roll 4: podle pravidel USPECH (4 >= 4+ hazece) -> zruseno.
+        //         podle stare logiky "prehozeni" 4 < 5 -> taky zruseno.
+        // Roll 5: podle pravidel USPECH -> zruseno.
+        //         podle stare logiky 5 >= 5 -> intercepce by PLATILA.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, skills: [SkillName::SafeThrow], id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 5, agility: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 5, agility: 4, id: 3)
+            ->withBallCarried(1)
+            ->build();
+
+        $result = (new ActionResolver(new FixedDiceRoller([5, 5, 4, 4])))->resolve($state, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 10, 'targetY' => 5,
+        ]);
+
+        $this->assertFalse($result->isTurnover(), 'AG hod hazece 5 na 4+ intercepci rusi');
+        $this->assertSame(2, $result->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testVeryLongLegsVypinaSafeThrow(): void
+    {
+        // r. 8657-8659: "the Safe Throw skill may not be used to affect any
+        // Interception rolls made by this player."
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, skills: [SkillName::SafeThrow], id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 5, agility: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 5, agility: 4, skills: [SkillName::VeryLongLegs], id: 3)
+            ->withBallCarried(1)
+            ->build();
+
+        // VLL: 5+ -> 4+, roll 6 = zachyceno; Safe Throw se hazet NESMI
+        $result = (new ActionResolver(new FixedDiceRoller([6, 6])))->resolve($state, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 10, 'targetY' => 5,
+        ]);
+
+        $typy = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertNotContains('safe_throw', $typy);
+        $this->assertTrue($result->isTurnover());
+        $this->assertSame(3, $result->getNewState()->getBall()->getCarrierId());
     }
 
     // ========== STEP 2: Two Heads, Extra Arms, No Hands ==========

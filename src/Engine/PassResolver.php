@@ -458,13 +458,21 @@ final class PassResolver
 
             $events = [GameEvent::interception($player->getId(), $target, $roll, $success)];
 
-            if ($success && $thrower->hasSkill(SkillName::SafeThrow)) {
-                // Safe Throw: force interception reroll
-                $reroll = $this->dice->rollD6();
-                $saved = $reroll < $target;
-                $events[] = GameEvent::safeThrow($thrower->getId(), $reroll, $saved);
+            // ⛔⛔ OPRAVENO 15.09.2026 -- Safe Throw NENI prehozeni hodu zachycujiciho.
+            //   r. 8434-8440: "the Safe Throw player may make an UNMODIFIED
+            //   AGILITY ROLL. If this is successful then the interception is
+            //   cancelled out and the passing sequence continues as normal."
+            //   ⇒ Hazi HAZEC na svou AG, bez modifikatoru.
+            //   r. 8657-8659: proti zachycujicimu s Very Long Legs se Safe Throw
+            //   pouzit NESMI.
+            if ($success && $thrower->hasSkill(SkillName::SafeThrow)
+                && !$player->hasSkill(SkillName::VeryLongLegs)) {
+                $cilSafeThrow = max(2, min(6, 7 - $thrower->getStats()->getAgility()));
+                $hod = $this->dice->rollD6();
+                $saved = $hod >= $cilSafeThrow;
+                $events[] = GameEvent::safeThrow($thrower->getId(), $hod, $saved);
                 if ($saved) {
-                    $success = false; // interception nullified
+                    $success = false; // interception cancelled
                 }
             }
 
