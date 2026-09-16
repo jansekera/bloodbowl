@@ -127,7 +127,14 @@ final class InjuryResolver
     }
 
     /**
-     * Resolve crowd surf injury (no armor roll, straight to injury with +1).
+     * Resolve crowd surf injury (bez hodu na brneni, rovnou zraneni, BEZ modifikatoru).
+     *
+     * ⛔⛔ OPRAVENO 16.09.2026 -- tady bylo `+1`. `rules_bb2016.txt` r. 651-654:
+     *   "A player pushed off the pitch, even if Knocked Down, is beaten up only by the
+     *   crowd and receives one roll on the Injury Table. THE CROWD DOES NOT HAVE ANY
+     *   INJURY MODIFYING SKILLS." ⇒ zadny modifikator, ani +1.
+     * ⏰ ZBYVA: r. 655-658 -- pri vysledku "Stunned" patri hrac do REZERV
+     *   (a zustava tam do touchdownu nebo konce polocasu). Engine stav "rezervy" nema.
      *
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
@@ -135,7 +142,7 @@ final class InjuryResolver
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
     ): array {
-        return $this->resolveInjury($player, $dice, 1, []);
+        return $this->resolveInjury($player, $dice, 0, []);
     }
 
     /**

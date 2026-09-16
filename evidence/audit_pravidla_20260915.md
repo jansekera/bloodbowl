@@ -91,7 +91,7 @@ Neimplementováno: Nurgle's Rot (jen log). Monstrous Mouth, Swoop, Timmm-ber!, W
 | co | pravidla | PHP | C++ | testy s vadou | jistota |
 |---|---|---|---|---|---|
 | ✅⭐ **Kostky bloku** | 567-568, 1731: **více než** dvojnásobek | `StrengthCalculator.php:100,109` `>=` → **opraveno `8623a6b5`** | OK | `StrengthCalculatorTest.php` přepsán | jistá |
-| Dav (crowd) | 650-657: bez modifikátorů; Stunned → Reserves | `InjuryResolver.php:138` +1; Stunned zůstane s pozicí null | OK | `InjuryResolverTest.php:114,127,138` | jistá |
+| ✅⭐ **Dav (crowd)** — **+1 ODSTRANĚNO 16.09.** *(Reserves zbývá)* | 650-657: bez modifikátorů; Stunned → Reserves | `InjuryResolver.php:138` +1; Stunned zůstane s pozicí null | OK | `InjuryResolverTest.php:114,127,138` | jistá |
 | Lékárník | 1202-1208: KO → Stunned/Reserves; znovu Casualty tabulka | `InjuryResolver.php:148-194` přehazuje 2D6 zranění; na KO nejde | KO chybí | `ApothecaryTest.php:21` | jistá |
 | Casualty D68 | 2405-2430 | v PHP není (jen INJURED) | impl. | – | jistá |
 | Throw-in | 872: šablona, 2D6 polí | `BallResolver.php:250-251` D8 × D6 | OK | – | jistá |

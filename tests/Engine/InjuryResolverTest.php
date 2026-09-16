@@ -111,10 +111,14 @@ final class InjuryResolverTest extends TestCase
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());
     }
 
+    // ⛔⛔ OPRAVENO 16.09.2026 -- dav NEMA zadny modifikator.
+    //   `rules_bb2016.txt` r. 652-654: "A player pushed off the pitch ... receives one
+    //   roll on the Injury Table. THE CROWD DOES NOT HAVE ANY INJURY MODIFYING SKILLS."
+    //   Engine posilal `injuryModifier: 1`.
     public function testCrowdSurfSkipsArmour(): void
     {
         $player = $this->makePlayer(armour: 10); // High AV doesn't matter
-        // Injury: 3+3=6 +1(crowd) = 7, stunned
+        // Injury: 3+3=6, bez modifikatoru => stunned
         $dice = new FixedDiceRoller([3, 3]);
 
         $result = $this->resolver->resolveCrowdSurf($player, $dice);
@@ -127,8 +131,8 @@ final class InjuryResolverTest extends TestCase
     public function testCrowdSurfCanCauseKO(): void
     {
         $player = $this->makePlayer(armour: 10);
-        // Injury: 4+3=7 +1(crowd) = 8, KO
-        $dice = new FixedDiceRoller([4, 3]);
+        // Injury: 4+4=8 => KO (bez modifikatoru; 7 by uz byl jen stunned)
+        $dice = new FixedDiceRoller([4, 4]);
 
         $result = $this->resolver->resolveCrowdSurf($player, $dice);
 
@@ -138,11 +142,26 @@ final class InjuryResolverTest extends TestCase
     public function testCrowdSurfCanCauseCasualty(): void
     {
         $player = $this->makePlayer(armour: 10);
-        // Injury: 5+4=9 +1(crowd) = 10, casualty
-        $dice = new FixedDiceRoller([5, 4]);
+        // Injury: 5+5=10 => casualty (bez modifikatoru; 9 by byl KO)
+        $dice = new FixedDiceRoller([5, 5]);
 
         $result = $this->resolver->resolveCrowdSurf($player, $dice);
 
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());
+    }
+
+    // ⭐ ROZLISUJICI PRIPADY -- tady se pozna, jestli se pricita +1:
+    //   hod 7: bez modifikatoru stunned, s +1 uz KO
+    //   hod 9: bez modifikatoru KO, s +1 uz casualty
+    public function testCrowdSurfHod7JeStunnedNeKo(): void
+    {
+        $result = $this->resolver->resolveCrowdSurf($this->makePlayer(armour: 10), new FixedDiceRoller([4, 3]));
+        $this->assertSame(PlayerState::STUNNED, $result['player']->getState());
+    }
+
+    public function testCrowdSurfHod9JeKoNeCasualty(): void
+    {
+        $result = $this->resolver->resolveCrowdSurf($this->makePlayer(armour: 10), new FixedDiceRoller([5, 4]));
+        $this->assertSame(PlayerState::KO, $result['player']->getState());
     }
 }
