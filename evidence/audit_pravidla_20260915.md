@@ -98,7 +98,7 @@ Neimplementováno: Nurgle's Rot (jen log). Monstrous Mouth, Swoop, Timmm-ber!, W
 | Nepřesná přihrávka | 735, 272: 3× rozptyl po 1 poli | `PassResolver.php:249` (+ Dump-Off :661) 1 směr × min(3, D6) | OK | `PassResolverTest.php:87` | jistá |
 | Faul | 1845-1849 asistence; 1878 dublet zbroj **nebo** zranění; 384 vyloučení = turnover | `Action/FoulHandler.php:65` +1 navíc, bez asistencí, jen dublet zbroje, bez turnoveru (:111) | OK | `FoulTest.php:17,49,106,135` | jistá |
 | ✅⭐ **KO recovery** — **OPRAVENO 16.09.** | 1009: i po touchdownu | `GameFlowResolver.php:82-121` jen v poločase | OK | – | jistá |
-| Přehozy v poločase / Leader | 942: obnovit; 8261 | neobnoví se | pevně 3 | – | jistá |
+| ✅ **Přehozy v poločase** — **OPRAVENO 16.09.** *(`f58eecb1`; Leader zbývá)* | 942: obnovit; 8261 | neobnoví se | pevně 3 | – | jistá |
 | Výkop 2 Get the Ref | 1275: +1 úplatek | `KickoffResolver.php:137` nic | stejná | – | jistá |
 | Výkop 3 Riot | 1286-1296 | `KickoffResolver.php:152-173` jen přijímající, bez D6 | stejná | `KickoffResolverTest.php:163,181` | jistá |
 | Výkop 5 High Kick | 1302-1307: hráč mimo zónu | `KickoffResolver.php:69` před položením míče (:82), bez zón | časování OK | – | pravděpodobná |
