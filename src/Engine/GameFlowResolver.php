@@ -191,6 +191,14 @@ final class GameFlowResolver
         $awayTeam = $state->getAwayTeam()->withTurnNumber(1);
         $state = $state->withHomeTeam($homeTeam)->withAwayTeam($awayTeam);
 
+        // ⭐ DOPLNENO 16.09.2026: tymove prehozy se o polocase vraci na vychozi pocet
+        //   (`rules_bb2016.txt` r. 941-943: "At half time ... their team re-rolls are
+        //   restored to their starting level"). Engine je neobnovoval vubec.
+        foreach ([TeamSide::HOME, TeamSide::AWAY] as $strana) {
+            $tym = $state->getTeamState($strana);
+            $state = $state->withTeamState($strana, $tym->withRerolls($tym->getRerollsStart()));
+        }
+
         // Leader: +1 reroll per team (max 1) if they have a Leader player
         $state = $this->applyLeaderBonus($state, $events);
 

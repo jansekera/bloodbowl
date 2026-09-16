@@ -22,7 +22,11 @@ final class TeamStateDTO
         private bool $foulUsedThisTurn,
         private bool $hasApothecary = true,
         private bool $apothecaryUsed = false,
+        // ⭐ 16.09.2026: vychozi pocet prehozu -- o polocase se na nej vraci
+        //   (`rules_bb2016.txt` r. 941-943). `null` = doplni se z `rerolls`.
+        private ?int $rerollsStart = null,
     ) {
+        $this->rerollsStart ??= $this->rerolls;
     }
 
     public static function create(
@@ -48,6 +52,7 @@ final class TeamStateDTO
             foulUsedThisTurn: false,
             hasApothecary: $hasApothecary,
             apothecaryUsed: false,
+            rerollsStart: $rerolls,
         );
     }
 
@@ -57,6 +62,8 @@ final class TeamStateDTO
     public function getSide(): TeamSide { return $this->side; }
     public function getScore(): int { return $this->score; }
     public function getRerolls(): int { return $this->rerolls; }
+    /** Vychozi pocet tymovych prehozu -- na nej se vraci o polocase (r. 941-943). */
+    public function getRerollsStart(): int { return $this->rerollsStart ?? $this->rerolls; }
     public function isRerollUsedThisTurn(): bool { return $this->rerollUsedThisTurn; }
     public function getTurnNumber(): int { return $this->turnNumber; }
     public function isBlitzUsedThisTurn(): bool { return $this->blitzUsedThisTurn; }
@@ -175,6 +182,7 @@ final class TeamStateDTO
             'side' => $this->side->value,
             'score' => $this->score,
             'rerolls' => $this->rerolls,
+            'rerollsStart' => $this->getRerollsStart(),
             'rerollUsedThisTurn' => $this->rerollUsedThisTurn,
             'turnNumber' => $this->turnNumber,
             'blitzUsedThisTurn' => $this->blitzUsedThisTurn,
@@ -206,6 +214,7 @@ final class TeamStateDTO
             foulUsedThisTurn: (bool) ($data['foulUsedThisTurn'] ?? false),
             hasApothecary: (bool) ($data['hasApothecary'] ?? true),
             apothecaryUsed: (bool) ($data['apothecaryUsed'] ?? false),
+            rerollsStart: isset($data['rerollsStart']) ? (int) $data['rerollsStart'] : null,
         );
     }
 }
