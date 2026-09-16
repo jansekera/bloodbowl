@@ -103,6 +103,10 @@ final class GameFlowResolver
         $swEvents = [];
         $state = $this->ejectSecretWeapons($state, $swEvents);
 
+        // ⛔ DOPLNENO 16.09.2026: hody na navrat KO hracu patri i sem (r. 1007-1012),
+        //   engine je delal jen o polocase.
+        $state = $this->hodyNaNavratKo($state, $swEvents);
+
         // Reset for new kickoff - scoring team kicks
         $state = $this->resetPlayersForSetup($state);
         $state = $state
@@ -122,6 +126,37 @@ final class GameFlowResolver
     }
 
     /**
+     * Hody na navrat KO hracu: 1 D6 za kazdeho KO hrace, na 4+ jde do rezerv.
+     *
+     * ⭐ 16.09.2026: `rules_bb2016.txt` r. 1007-1012 -- "After a touchdown has been
+     *   scored, AND at the start of the second half ... each coach should roll one D6
+     *   for each KO'd player ... On a roll of 4, 5 or 6 the player is fit enough to
+     *   return to play." ⇒ NEJEN o polocase, ale i po KAZDEM touchdownu.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function hodyNaNavratKo(GameState $state, array &$events): GameState
+    {
+        foreach ($state->getPlayers() as $player) {
+            if ($player->getState() !== PlayerState::KO) {
+                continue;
+            }
+            $roll = $this->dice->rollD6();
+            $success = $roll >= 4;
+            $events[] = GameEvent::koRecovery($player->getId(), $roll, $success);
+
+            if ($success) {
+                // Hrac se vraci do rezerv (OFF_PITCH, pripraven k rozestaveni)
+                $state = $state->withPlayer(
+                    $player->withState(PlayerState::OFF_PITCH)->withPosition(null),
+                );
+            }
+        }
+
+        return $state;
+    }
+
+    /**
      * Resolve half-time: KO recovery, reset, swap sides.
      * @return array{state: GameState, events: list<GameEvent>}
      */
@@ -132,21 +167,7 @@ final class GameFlowResolver
         // Secret Weapon: eject players at end of drive
         $state = $this->ejectSecretWeapons($state, $events);
 
-        // KO recovery rolls for both teams
-        foreach ($state->getPlayers() as $player) {
-            if ($player->getState() === PlayerState::KO) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= 4;
-                $events[] = GameEvent::koRecovery($player->getId(), $roll, $success);
-
-                if ($success) {
-                    // Player returns to reserves (OFF_PITCH, ready for setup)
-                    $state = $state->withPlayer(
-                        $player->withState(PlayerState::OFF_PITCH)->withPosition(null),
-                    );
-                }
-            }
-        }
+        $state = $this->hodyNaNavratKo($state, $events);
 
         // Reset all players for new setup
         $state = $this->resetPlayersForSetup($state);
