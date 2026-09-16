@@ -96,7 +96,7 @@ Neimplementováno: Nurgle's Rot (jen log). Monstrous Mouth, Swoop, Timmm-ber!, W
 | Casualty D68 | 2405-2430 | v PHP není (jen INJURED) | impl. | – | jistá |
 | Throw-in | 872: šablona, 2D6 polí | `BallResolver.php:250-251` D8 × D6 | OK | – | jistá |
 | Nepřesná přihrávka | 735, 272: 3× rozptyl po 1 poli | `PassResolver.php:249` (+ Dump-Off :661) 1 směr × min(3, D6) | OK | `PassResolverTest.php:87` | jistá |
-| Faul | 1845-1849 asistence; 1878 dublet zbroj **nebo** zranění; 384 vyloučení = turnover | `Action/FoulHandler.php:65` +1 navíc, bez asistencí, jen dublet zbroje, bez turnoveru (:111) | OK | `FoulTest.php:17,49,106,135` | jistá |
+| ✅⭐ **Faul** — **OPRAVENO 16.09.** *(asistence, paušální +1 pryč, turnover)*; ⏰ zbývá dublet na ZRANĚNÍ a volba u Dirty Player | 1845-1849 asistence; 1878 dublet zbroj **nebo** zranění; 384 vyloučení = turnover | `Action/FoulHandler.php:65` +1 navíc, bez asistencí, jen dublet zbroje, bez turnoveru (:111) | OK | `FoulTest.php:17,49,106,135` | jistá |
 | ✅⭐ **KO recovery** — **OPRAVENO 16.09.** | 1009: i po touchdownu | `GameFlowResolver.php:82-121` jen v poločase | OK | – | jistá |
 | ✅ **Přehozy v poločase** — **OPRAVENO 16.09.** *(`f58eecb1`; Leader zbývá)* | 942: obnovit; 8261 | neobnoví se | pevně 3 | – | jistá |
 | Výkop 2 Get the Ref | 1275: +1 úplatek | `KickoffResolver.php:137` nic | stejná | – | jistá |

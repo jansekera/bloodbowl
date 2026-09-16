@@ -13,6 +13,7 @@ use App\Enum\SkillName;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
+use App\Engine\StrengthCalculator;
 
 final class FoulHandler implements ActionHandlerInterface
 {
@@ -20,6 +21,7 @@ final class FoulHandler implements ActionHandlerInterface
         private readonly DiceRollerInterface $dice,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
+        private readonly StrengthCalculator $strengthCalculator = new StrengthCalculator(),
     ) {
     }
 
@@ -62,17 +64,26 @@ final class FoulHandler implements ActionHandlerInterface
         // Roll 2xD6 individually for doubles detection
         $die1 = $this->dice->rollD6();
         $die2 = $this->dice->rollD6();
-        $total = $die1 + $die2 + 1; // +1 prone bonus
+        // ⛔⛔ OPRAVENO 16.09.2026 -- tady byl pausalni `+1` ("prone bonus"), ktery
+        //   `rules_bb2016.txt` nezna. Modifikatorem hodu na brneni jsou ASISTENCE
+        //   (r. 1843-1850): +1 za kazdeho spoluhrace vedle OBETI, -1 za kazdeho soupere
+        //   vedle FAULUJICIHO; nesmi stat v zone soupere, musi mit zony a stat.
+        //   Guard se u faulu pouzit nesmi (r. 8161).
+        $asistence = $this->strengthCalculator->countFoulAssists($state, $attacker, $defender);
+        $modifier = $asistence;
 
         // Dirty Player: +1 to foul armor roll
+        // ⏰ r. 8045-8049 dava VOLBU zbroj NEBO zraneni -- zatim vzdy zbroj (samostatna polozka).
         if ($attacker->hasSkill(SkillName::DirtyPlayer)) {
-            $total++;
+            $modifier++;
         }
+
+        $total = $die1 + $die2 + $modifier;
 
         $armourValue = $defender->getStats()->getArmour();
         $armourBroken = $total > $armourValue;
 
-        $events[] = GameEvent::foulAttempt($attackerId, $targetId, $die1, $die2, $armourValue, $armourBroken);
+        $events[] = GameEvent::foulAttempt($attackerId, $targetId, $die1, $die2, $armourValue, $armourBroken, $modifier);
 
         // Handle armor broken -> injury roll (no Mighty Blow for fouls)
         if ($armourBroken) {
@@ -85,7 +96,9 @@ final class FoulHandler implements ActionHandlerInterface
         }
 
         // Check for ejection (doubles) — Sneaky Git avoids ejection
+        $vyloucen = false;
         if ($die1 === $die2 && !$attacker->hasSkill(SkillName::SneakyGit)) {
+            $vyloucen = true;
             $events[] = GameEvent::playerEjected($attackerId);
 
             // Get fresh attacker from state
@@ -107,7 +120,13 @@ final class FoulHandler implements ActionHandlerInterface
             }
         }
 
-        // Foul is NEVER a turnover (even with ejection)
+        // ⛔ OPRAVENO 16.09.2026 -- vylouceni faulujiciho JE turnover.
+        //   r. 1879-1881: "the player taking the Foul Action is sent off ... In addition,
+        //   his team suffers a turnover and their turn ends immediately."
+        if ($vyloucen) {
+            return ActionResult::turnover($state->withTurnoverPending(true), $events);
+        }
+
         return ActionResult::success($state, $events);
     }
 }

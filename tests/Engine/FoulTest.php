@@ -74,7 +74,9 @@ final class FoulTest extends TestCase
 
     public function testFoulDoublesCausesEjection(): void
     {
-        // Armor: die1=3 + die2=3 + 1 = 7, AV=8 → not broken. But doubles!
+        // ⛔ UPRAVENO 16.09.2026: zadny "prone bonus" (r. 1843-1850) a vylouceni
+        //   JE turnover (r. 1879-1881).
+        // Armor: 3+3 = 6, AV=8 → neprolomeno. Ale dublet!
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
             ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
@@ -87,7 +89,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($result->isTurnover());
 
         // Attacker should be ejected
         $attacker = $result->getNewState()->getPlayer(1);
@@ -105,7 +107,7 @@ final class FoulTest extends TestCase
 
     public function testFoulDoublesWithArmorBreak(): void
     {
-        // Armor: die1=5 + die2=5 + 1 = 11 > 8 → broken, AND doubles → ejection
+        // Armor: 5+5 = 10 > 8 → broken, AND doubles → ejection (a turnover)
         // Injury: 4+4 = 8 → KO
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
@@ -119,7 +121,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($result->isTurnover());
 
         // Defender KO'd
         $defender = $result->getNewState()->getPlayer(2);
@@ -132,7 +134,9 @@ final class FoulTest extends TestCase
         $this->assertEquals(PlayerState::EJECTED, $attacker->getState());
     }
 
-    public function testFoulDoesNotCauseTurnover(): void
+    // ⛔ PREPSANO 16.09.2026: faul neni turnover JEN kdyz nepadne dublet.
+    //   Pri dubletu je (r. 1879-1881) -- to hlida `FoulRulesTest`.
+    public function testFoulBezDubletuNeniTurnover(): void
     {
         // Even with ejection, foul is NOT a turnover
         $state = (new GameStateBuilder())
@@ -140,7 +144,7 @@ final class FoulTest extends TestCase
             ->addPronePlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([2, 2]); // doubles → ejection, armor holds (5 ≤ 8)
+        $dice = new FixedDiceRoller([2, 3]); // bez dubletu, zbroj drzi (5 <= 8)
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::FOUL, [
@@ -289,7 +293,7 @@ final class FoulTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        // Armor: die1=2 + die2=2 + 1 = 5 ≤ 8 → holds. Doubles → ejection.
+        // Armor: 2+2 = 4 <= 8 → drzi. Dublet → vylouceni (a turnover).
         // Ball bounce: D8=1 (north)
         $dice = new FixedDiceRoller([2, 2, 1]);
         $resolver = new ActionResolver($dice);
@@ -298,7 +302,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $this->assertTrue($result->isSuccess());
+        $this->assertTrue($result->isTurnover());
 
         // Attacker ejected
         $attacker = $result->getNewState()->getPlayer(1);

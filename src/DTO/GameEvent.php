@@ -129,6 +129,7 @@ final class GameEvent
             'playerId' => $playerId,
             'roll' => $roll,
             'modifier' => $modifier,
+            'modifier' => $modifier,
             'armourValue' => $armourValue,
             'broken' => $broken,
         ]);
@@ -275,10 +276,14 @@ final class GameEvent
         int $die2,
         int $armourValue,
         bool $armourBroken,
+        int $modifier = 0,
     ): self {
-        $total = $die1 + $die2 + 1;
+        // ⛔ OPRAVENO 16.09.2026 -- bylo tu natvrdo `+1` ("prone bonus"), ktery pravidla
+        //   neznaji. Modifikator je cisty pocet asistenci (r. 1843-1850).
+        $total = $die1 + $die2 + $modifier;
+        $modStr = $modifier === 0 ? '' : ($modifier > 0 ? "+{$modifier}" : (string) $modifier);
         $result = $armourBroken ? 'broken' : 'held';
-        return new self('foul', "Foul: {$total} (dice {$die1}+{$die2}+1) vs AV{$armourValue} - armour {$result}", [
+        return new self('foul', "Foul: {$total} (dice {$die1}+{$die2}{$modStr}) vs AV{$armourValue} - armour {$result}", [
             'attackerId' => $attackerId,
             'targetId' => $targetId,
             'die1' => $die1,

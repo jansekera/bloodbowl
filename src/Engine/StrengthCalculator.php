@@ -6,6 +6,7 @@ namespace App\Engine;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\Enum\SkillName;
+use App\Enum\TeamSide;
 use App\ValueObject\Position;
 
 final class StrengthCalculator
@@ -61,6 +62,62 @@ final class StrengthCalculator
         }
 
         return $assists;
+    }
+
+    /**
+     * Cisty pocet asistenci u FAULU: utocne minus obranne.
+     *
+     * ⭐ 16.09.2026 podle `rules_bb2016.txt` r. 1843-1853:
+     *   "Other players that are adjacent to the victim must assist the player making the
+     *    foul, and each extra player adds 1 to the Armour roll. Defending players adjacent
+     *    to the fouler must also give assists ... -1 per assist. No player from either side
+     *    may assist a foul if they are in the tackle zone of an opposing player, do not have
+     *    their tackle zones, or are not standing."
+     * ⛔ Guard se u faulu pouzit NESMI (r. 8161) -- na rozdil od bloku.
+     *   Vyjimka ze zon: u utocne asistence sama OBET, u obranne sam FAULUJICI --
+     *   jinak by obranna asistence nemohla vzniknout nikdy.
+     */
+    public function countFoulAssists(GameState $state, MatchPlayerDTO $fouler, MatchPlayerDTO $victim): int
+    {
+        $foulerPos = $fouler->getPosition();
+        $victimPos = $victim->getPosition();
+        if ($foulerPos === null || $victimPos === null) {
+            return 0;
+        }
+
+        $utocne = $this->spocitejPomocniky($state, $fouler->getTeamSide(), $victimPos, $fouler->getId(), $victim->getId());
+        $obranne = $this->spocitejPomocniky($state, $victim->getTeamSide(), $foulerPos, $victim->getId(), $fouler->getId());
+
+        return $utocne - $obranne;
+    }
+
+    /**
+     * Stojici hraci dane strany sousedici s `$cil`, kteri maji zony a nestoji v zone
+     * soupere (krome `$vyjimkaId`). `$kromeId` se preskoci uplne.
+     */
+    private function spocitejPomocniky(
+        GameState $state,
+        TeamSide $strana,
+        Position $cil,
+        int $kromeId,
+        int $vyjimkaId,
+    ): int {
+        $pocet = 0;
+        foreach ($state->getPlayersOnPitch($strana) as $hrac) {
+            if ($hrac->getId() === $kromeId || !$hrac->getState()->canAct() || $hrac->hasLostTacklezones()) {
+                continue;
+            }
+            $pos = $hrac->getPosition();
+            if ($pos === null || $pos->distanceTo($cil) !== 1) {
+                continue;
+            }
+            if ($this->isInTackleZoneExcluding($state, $hrac, $vyjimkaId)) {
+                continue;
+            }
+            $pocet++;
+        }
+
+        return $pocet;
     }
 
     /**

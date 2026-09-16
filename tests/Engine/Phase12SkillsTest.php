@@ -150,10 +150,12 @@ final class Phase12SkillsTest extends TestCase
     public function testDirtyPlayerBonusFoulArmor(): void
     {
         // Dirty Player: +1 to foul armor roll
-        // Die1=4, Die2=2, total = 4+2+1(prone)+1(DP) = 8 vs AV7 → broken
+        // ⛔ UPRAVENO 16.09.2026: pausalni "+1 prone" zrusen (r. 1843-1850).
+        //   4+2+1(DP) = 7 vs AV6 → prolomeno; BEZ Dirty Player by 6 vs 6 neprolomilo,
+        //   takze test skutecne meri ten skill.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::DirtyPlayer], id: 1)
-            ->addPronePlayer(TeamSide::AWAY, 6, 5, armour: 7, id: 2)
+            ->addPronePlayer(TeamSide::AWAY, 6, 5, armour: 6, id: 2)
             ->withBallOffPitch()
             ->build();
 
