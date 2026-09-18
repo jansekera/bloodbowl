@@ -276,7 +276,15 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
-     * Reroll block dice: Pro (4+, one die) or Team Reroll (all dice).
+     * Reroll block dice: Pro (4+) or Team Reroll -- oboji prehodi VSECHNY kostky.
+     *
+     * ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 919-924 -- "a re-roll allows
+     *   you to re-roll all the dice that produced any one result [...] a three
+     *   dice block, in which case all three dice would be rolled again"; Pro je
+     *   prehoz "any one dice roll" (r. 8381-8382), r. 982 "use my Pro skill to
+     *   re-roll that block". Pro driv prehodil jen nejhorsi kostku. Kostka se
+     *   prehazuje nejvys jednou (r. 926) => po Pro uz tymovy prehoz jen na
+     *   neuspesny HOD PRO (r. 8385-8387), po tymovem uz Pro ne.
      *
      * @param array<string, mixed> $params
      */
@@ -307,22 +315,11 @@ final class BlockHandler implements ActionHandlerInterface
                 $attacker = $attacker->withProUsedThisTurn(true);
                 $state = $state->withPlayer($attacker);
                 if ($proRoll >= 4) {
-                    // Reroll worst die
-                    $worstIdx = 0;
-                    $worstScore = PHP_INT_MAX;
-                    foreach ($faces as $idx => $f) {
-                        $s = $this->scoreBlockFace($f, $attacker, $defender);
-                        if ($s < $worstScore) {
-                            $worstScore = $s;
-                            $worstIdx = $idx;
-                        }
-                    }
-                    $faces[$worstIdx] = $this->rollBlockDie();
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
-                    $pending = $pending->withProUsed()->withFaces(array_values($faces));
+                    $pending = $pending->withRerollUsed()->withFaces($this->rollBlockDice(count($faces)));
                 } else {
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, false, null);
-                    $pending = $pending->withProUsed();
+                    $pending = $pending->withProFailed();
                 }
                 $state = $state->withPendingBlock($pending);
                 return ActionResult::success($state, $events);
@@ -345,11 +342,16 @@ final class BlockHandler implements ActionHandlerInterface
                 );
                 if (!$lonerBlocked) {
                     $events[] = GameEvent::rerollUsed($attacker->getId(), 'Team Reroll');
-                    $newFaces = [];
-                    for ($i = 0; $i < count($faces); $i++) {
-                        $newFaces[] = $this->rollBlockDie();
+                    // po neuspesnem Pro se prehazuje HOD PRO (r. 8385-8387)
+                    $proAllowed = true;
+                    if ($pending->isProFailed()) {
+                        $proRoll = $this->dice->rollD6();
+                        $proAllowed = $proRoll >= 4;
+                        $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, $proAllowed, null);
                     }
-                    $pending = $pending->withTeamRerollUsed()->withFaces($newFaces);
+                    $pending = $proAllowed
+                        ? $pending->withTeamRerollUsed()->withFaces($this->rollBlockDice(count($faces)))
+                        : $pending->withTeamRerollUsed();
                 } else {
                     $pending = $pending->withTeamRerollUsed();
                 }
@@ -649,17 +651,8 @@ final class BlockHandler implements ActionHandlerInterface
                 $attacker = $attacker->withProUsedThisTurn(true);
                 $state = $state->withPlayer($attacker);
                 if ($proRoll >= 4) {
-                    $worstIdx = 0;
-                    $worstScore = PHP_INT_MAX;
-                    foreach ($faces as $idx => $f) {
-                        $s = $this->scoreBlockFace($f, $attacker, $defender);
-                        if ($s < $worstScore) {
-                            $worstScore = $s;
-                            $worstIdx = $idx;
-                        }
-                    }
-                    $faces[$worstIdx] = $this->rollBlockDie();
-                    $faces = array_values($faces);
+                    // ⛔ OPRAVA 18.09.2026: Pro prehodi VSECHNY kostky bloku (r. 919-924, 982)
+                    $faces = $this->rollBlockDice(count($faces));
                     $chosenFace = $this->autoChooseBlockDie($faces, $attackerChooses, $attacker, $defender);
                     $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, true, null);
                 } else {
@@ -1360,6 +1353,16 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         return $best;
+    }
+
+    /** @return list<BlockDiceFace> */
+    private function rollBlockDice(int $count): array
+    {
+        $faces = [];
+        for ($i = 0; $i < $count; $i++) {
+            $faces[] = $this->rollBlockDie();
+        }
+        return $faces;
     }
 
     private function rollBlockDie(): BlockDiceFace

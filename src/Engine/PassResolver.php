@@ -138,23 +138,28 @@ final class PassResolver
                 $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
             }
 
-            // Pro reroll (after skill reroll, before team reroll)
-            if (!$accurate && $thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
-                $proRoll = $this->dice->rollD6();
-                if ($proRoll >= 4) {
+            // ⛔ OPRAVA 18.09.2026 (`rules_bb2016.txt` r. 8381-8387, 926): Pro jen
+            //   na neprehozenou kostku, zapsat pouziti, po Pro tymovy prehoz jen hodu Pro.
+            $proUsed = false;
+            if (!$accurate && !$skillRerollUsed && $thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
+                $proUsed = true;
+                $thrower = $thrower->withProUsedThisTurn(true);
+                $state = $state->withPlayer($thrower);
+                $pro = ProCheck::roll($this->dice, $thrower, $state->getTeamState($activeSide)->canUseReroll(), $events);
+                if ($pro['teamRerollUsed']) {
+                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
+                }
+                if ($pro['allowed']) {
                     $roll = $this->dice->rollD6();
                     $accurate = $roll !== 1 && $roll >= $accuracyTarget;
                     $fumble = $this->jeFumble($roll, $passModifier);
                     $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
-                    $events[] = GameEvent::proReroll($playerId, $proRoll, true, $roll);
                     $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
-                } else {
-                    $events[] = GameEvent::proReroll($playerId, $proRoll, false, null);
                 }
             }
 
-            // Team reroll (only if no skill reroll was used)
-            if (!$accurate && !$skillRerollUsed && $state->getTeamState($activeSide)->canUseReroll()) {
+            // Team reroll (only if no skill reroll and no Pro was used)
+            if (!$accurate && !$skillRerollUsed && !$proUsed && $state->getTeamState($activeSide)->canUseReroll()) {
                 $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
                 $lonerBlocked = false;
                 if ($thrower->hasSkill(SkillName::Loner)) {

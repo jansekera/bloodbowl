@@ -58,22 +58,25 @@ final class BallResolver
             $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
         }
 
-        // Pro reroll (after skill reroll, before team reroll)
-        if (!$success && $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn()) {
-            $proRoll = $this->dice->rollD6();
-            // Note: caller must track proUsedThisTurn on state
-            if ($proRoll >= 4) {
+        // ⛔ OPRAVA 18.09.2026 (`rules_bb2016.txt` r. 8381-8387, 926): Pro jen
+        //   na kostku, kterou jeste nic neprehodilo; pouziti se ZAPISE (1x za kolo);
+        //   po Pro uz tymovy prehoz kostky ne -- jen hodu Pro (`ProCheck`).
+        $proUsed = false;
+        if (!$success && !$skillRerollUsed && $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn()) {
+            $proUsed = true;
+            $player = $player->withProUsedThisTurn(true);
+            $state = $state->withPlayer($player);
+            $pro = ProCheck::roll($this->dice, $player, $teamRerollAvailable, $events);
+            $teamRerollUsed = $pro['teamRerollUsed'];
+            if ($pro['allowed']) {
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $target;
-                $events[] = GameEvent::proReroll($player->getId(), $proRoll, true, $roll);
                 $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
-            } else {
-                $events[] = GameEvent::proReroll($player->getId(), $proRoll, false, null);
             }
         }
 
-        // Team reroll (only if no skill reroll was used)
-        if (!$success && !$skillRerollUsed && $teamRerollAvailable) {
+        // Team reroll (only if no skill reroll and no Pro was used)
+        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
             $teamRerollUsed = true;
             $lonerBlocked = false;
             if ($player->hasSkill(SkillName::Loner)) {
@@ -160,21 +163,23 @@ final class BallResolver
             $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
         }
 
-        // Pro reroll (after skill reroll, before team reroll)
-        if (!$success && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
-            $proRoll = $this->dice->rollD6();
-            if ($proRoll >= 4) {
+        // ⛔ OPRAVA 18.09.2026: tataz pravidla Pro jako u zvedani (r. 8381-8387, 926).
+        $proUsed = false;
+        if (!$success && !$skillRerollUsed && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
+            $proUsed = true;
+            $catcher = $catcher->withProUsedThisTurn(true);
+            $state = $state->withPlayer($catcher);
+            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
+            $teamRerollUsed = $pro['teamRerollUsed'];
+            if ($pro['allowed']) {
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $target;
-                $events[] = GameEvent::proReroll($catcher->getId(), $proRoll, true, $roll);
                 $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            } else {
-                $events[] = GameEvent::proReroll($catcher->getId(), $proRoll, false, null);
             }
         }
 
-        // Team reroll (only if no skill reroll was used)
-        if (!$success && !$skillRerollUsed && $teamRerollAvailable) {
+        // Team reroll (only if no skill reroll and no Pro was used)
+        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
             $teamRerollUsed = true;
             $lonerBlocked = false;
             if ($catcher->hasSkill(SkillName::Loner)) {

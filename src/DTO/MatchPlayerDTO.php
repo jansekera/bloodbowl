@@ -36,6 +36,8 @@ final class MatchPlayerDTO
         private bool $bigGuyStupefied = false,
         private readonly ?string $raceName = null,
         private readonly array $learnedSkills = [],
+        // ⭐ 18.09.2026: `rules_bb2016.txt` r. 8540-8541 -- Sure Feet 1x za kolo
+        private bool $sureFeetUsedThisTurn = false,
     ) {
     }
 
@@ -93,6 +95,7 @@ final class MatchPlayerDTO
     public function hasUsedBlitz(): bool { return $this->usedBlitz; }
     public function hasLostTacklezones(): bool { return $this->lostTacklezones; }
     public function isProUsedThisTurn(): bool { return $this->proUsedThisTurn; }
+    public function isSureFeetUsedThisTurn(): bool { return $this->sureFeetUsedThisTurn; }
     public function getRaceName(): ?string { return $this->raceName; }
     /** @return list<string> */
     public function getLearnedSkills(): array { return $this->learnedSkills; }
@@ -211,6 +214,13 @@ final class MatchPlayerDTO
         return $clone;
     }
 
+    public function withSureFeetUsedThisTurn(bool $used): self
+    {
+        $clone = clone $this;
+        $clone->sureFeetUsedThisTurn = $used;
+        return $clone;
+    }
+
     /** @param list<SkillName> $skills */
     public function withSkills(array $skills): self
     {
@@ -234,6 +244,7 @@ final class MatchPlayerDTO
             rooted: $this->rooted,
             bigGuyStupefied: $this->bigGuyStupefied,
             raceName: $this->raceName,
+            sureFeetUsedThisTurn: $this->sureFeetUsedThisTurn,
         );
     }
 
@@ -258,6 +269,7 @@ final class MatchPlayerDTO
             'movementRemaining' => $this->movementRemaining,
             'lostTacklezones' => $this->lostTacklezones,
             'proUsedThisTurn' => $this->proUsedThisTurn,
+            'sureFeetUsedThisTurn' => $this->sureFeetUsedThisTurn,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -296,6 +308,7 @@ final class MatchPlayerDTO
             bigGuyStupefied: (bool) ($data['bigGuyStupefied'] ?? false),
             raceName: $data['raceName'] ?? null,
             learnedSkills: array_values((array) ($data['learnedSkills'] ?? [])),
+            sureFeetUsedThisTurn: (bool) ($data['sureFeetUsedThisTurn'] ?? false),
         );
     }
 }

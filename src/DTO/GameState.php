@@ -258,34 +258,42 @@ final class GameState
     {
         $clone = clone $this;
         foreach ($clone->players as $id => $player) {
-            if ($player->getTeamSide() === $side) {
-                // ⛔⛔ OPRAVA 11.09.2026 (PHP15b + PHP15d): tenhle reset
-                //   MAZAL DVA STAVY, ktere pravidla nechavaji pretrvat.
-                //   (1) `lostTacklezones` z BoneHead / Really Stupid --
-                //       r. 7985-7986: „until he manages to roll a 2 or better
-                //       at the start of a future Action **or the drive ends**".
-                //       Otupení tedy vydrzelo presne jedno kolo a zmizelo samo.
-                //       ⇒ Drzi se v `bigGuyStupefied` a odtud se kazde kolo
-                //       ZNOVU NASAZUJE (tataz konstrukce jako C++
-                //       `game_state.cpp:71-72`).
-                //   (2) `movementRemaining` u ZAKORENENEHO hrace -- r. 8575:
-                //       „his MA is considered 0 until a drive ends". Bez teto
-                //       vyjimky by se Treeman po jednom kole zase rozesel.
-                //       ⛔ Tuhle druhou vadu jsem si sem PRIVEDL SAM dnesni
-                //       opravou Take Root; nasla ji az kontrola tohohle mista.
-                $clone->players[$id] = $player
-                    ->withHasMoved(false)
-                    ->withHasActed(false)
-                    ->withMovementRemaining(
-                        $player->isRooted() ? 0 : $player->getStats()->getMovement(),
-                    )
-                    ->withLostTacklezones($player->isBigGuyStupefied())
-                    ->withProUsedThisTurn(false);
+            // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
+            //   turn" plati pro KAZDE kolo, i souperovo (Pro jde pouzit i mimo
+            //   vlastni kolo, napr. pri chytani). Nuloval se jen tym na tahu, takze
+            //   Pro pouzity ve vlastnim kole blokoval hrace i cele nasledujici
+            //   souperovo kolo.
+            if ($player->getTeamSide() !== $side) {
+                $clone->players[$id] = $player->withProUsedThisTurn(false);
+                continue;
+            }
+            // ⛔⛔ OPRAVA 11.09.2026 (PHP15b + PHP15d): tenhle reset
+            //   MAZAL DVA STAVY, ktere pravidla nechavaji pretrvat.
+            //   (1) `lostTacklezones` z BoneHead / Really Stupid --
+            //       r. 7985-7986: „until he manages to roll a 2 or better
+            //       at the start of a future Action **or the drive ends**".
+            //       Otupení tedy vydrzelo presne jedno kolo a zmizelo samo.
+            //       ⇒ Drzi se v `bigGuyStupefied` a odtud se kazde kolo
+            //       ZNOVU NASAZUJE (tataz konstrukce jako C++
+            //       `game_state.cpp:71-72`).
+            //   (2) `movementRemaining` u ZAKORENENEHO hrace -- r. 8575:
+            //       „his MA is considered 0 until a drive ends". Bez teto
+            //       vyjimky by se Treeman po jednom kole zase rozesel.
+            //       ⛔ Tuhle druhou vadu jsem si sem PRIVEDL SAM dnesni
+            //       opravou Take Root; nasla ji az kontrola tohohle mista.
+            $clone->players[$id] = $player
+                ->withHasMoved(false)
+                ->withHasActed(false)
+                ->withMovementRemaining(
+                    $player->isRooted() ? 0 : $player->getStats()->getMovement(),
+                )
+                ->withLostTacklezones($player->isBigGuyStupefied())
+                ->withProUsedThisTurn(false)
+                ->withSureFeetUsedThisTurn(false);
 
-                // Recover stunned players
-                if ($player->getState() === \App\Enum\PlayerState::STUNNED) {
-                    $clone->players[$id] = $clone->players[$id]->withState(\App\Enum\PlayerState::PRONE);
-                }
+            // Recover stunned players
+            if ($player->getState() === \App\Enum\PlayerState::STUNNED) {
+                $clone->players[$id] = $clone->players[$id]->withState(\App\Enum\PlayerState::PRONE);
             }
         }
         return $clone;
