@@ -16,7 +16,7 @@ declare(strict_types=1);
  * ⛔ JMENOVATEL SE NESMÍ ZTRATIT: tiskne se počet her, kol, rozhodnutí
  *   i událostí, a u rozpadu podle akcí i ZBYTEK.
  *
- * Použití: php cli/diag_event_histogram_20260911.php [kouc] [her] [seed]
+ * Použití: php cli/diag_event_histogram_20260911.php [kouc] [her] [seed] [base|dev] [rasa_domaci] [rasa_hoste]
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -37,6 +37,9 @@ $seed      = (int) ($argv[3] ?? 20260911);
 //   první běh histogramu je jel na nich a hlásil `kick_skill` jako nulu.
 //   Rozvinuté (`dev`, TV~1500) mají Kick u 13 ras z 26.
 $rosterMode = (string) ($argv[4] ?? 'dev');
+// 18.09.: pevne rasy (napr. elfove proti elfum, kde se prihrava) -- bez nich los
+$fixHome = $argv[5] ?? null;
+$fixAway = $argv[6] ?? $fixHome;
 
 $makeCoach = static function () use ($coachName): AICoachInterface {
     return match ($coachName) {
@@ -83,10 +86,11 @@ $celkem      = ['hry' => 0, 'kola' => 0, 'rozhodnuti' => 0, 'udalosti' => 0];
 $podleTypu   = [];   // typ události -> kolikrát
 $podleAkce   = [];   // akce -> typ události -> kolikrát
 $vyjimky     = 0;
+$vysledkyPrihravek = []; // 18.09.: pass podle vysledku -- pozitivni kontrola, ze nepresna cesta bezi
 
 for ($g = 0; $g < $games; $g++) {
-    $homeRace = $races[mt_rand(0, count($races) - 1)];
-    $awayRace = $races[mt_rand(0, count($races) - 1)];
+    $homeRace = $fixHome ?? $races[mt_rand(0, count($races) - 1)];
+    $awayRace = $fixAway ?? $races[mt_rand(0, count($races) - 1)];
 
     $dice = new RandomDiceRoller();
     $rules = new RulesEngine();
@@ -181,6 +185,10 @@ for ($g = 0; $g < $games; $g++) {
             $podleTypu[$t] = ($podleTypu[$t] ?? 0) + 1;
             $podleAkce[$akce][$t] = ($podleAkce[$akce][$t] ?? 0) + 1;
             $celkem['udalosti']++;
+            if ($t === 'pass' || $t === 'hail_mary_pass') {
+                $r = (string) ($ev->getData()['result'] ?? '?');
+                $vysledkyPrihravek[$r] = ($vysledkyPrihravek[$r] ?? 0) + 1;
+            }
         }
 
         $state = $result->getNewState();
@@ -237,3 +245,8 @@ foreach ($podleAkce as $akce => $typy) {
     printf("  %s  (%d událostí)\n", $akce, $sum);
     foreach ($typy as $t => $n) { printf("      %-24s %7d\n", $t, $n); }
 }
+
+echo "\nPRIHRAVKY PODLE VYSLEDKU (pass + hail_mary_pass): ";
+ksort($vysledkyPrihravek);
+foreach ($vysledkyPrihravek as $r => $n) { echo "{$r}={$n} "; }
+echo "· celkem " . array_sum($vysledkyPrihravek) . "\n";

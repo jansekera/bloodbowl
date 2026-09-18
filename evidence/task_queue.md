@@ -825,6 +825,13 @@ a podle `endturn_turnover_na_akci_20260913.txt` šly tehdy všechny do prázdna.
   „zmlátit a vysurfovat", přechod ze 2 sloupců **skokem**)*, ale **spouštěč
   není potvrzený**.
 
+## ⭐⭐ ZAŘAZENÍ ZMĚNY TV A PŘIDÁNÍ SKILLŮ — UŽIVATEL 18.09.
+*„sekce úprava TV a přidání skillů by měla být asi nejpozději za sekcí přihrávka"*
+⇒ **Balík E (T5.13 / T5.13c) dostává místo: NEJPOZDĚJI hned za sekcí PŘIHRÁVKA**, tedy před CELOTAHEM.
+Pořadí sekcí: pravidla → pohyb → klec → blitz → **přihrávka → úprava TV + skilly** → celotah.
+⚠️ Brána níž *(balík G jen v C++)* tím nezmizela — před E se musí buď G dostat do PHP, nebo
+to uživatel výslovně uvolnit. ⏰ **Otázka na uživatele otevřená.**
+
 ## ⛔⛔⛔ A JEDNA VĚC, KTERÁ MĚNÍ POŘADÍ — DVA ENGINY
 Balík G *(rezervy, D68, lavička, návrat KO)* je hotový **v C++ enginu**,
 ale pracuje se v **PHP**, a most mezi nimi **není žádný**.
