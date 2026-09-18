@@ -31,7 +31,7 @@ final class ScatterCalculator
     }
 
     /**
-     * Scatter D8 direction × D6 distance (for kickoff scatter / inaccurate pass).
+     * Scatter D8 direction × D6 distance -- jen vykop a throw-in (r. 271-273); nepresna prihravka se rozptyluje 3× po jednom poli.
      */
     public function scatterWithDistance(Position $from, int $d8Direction, int $d6Distance): Position
     {

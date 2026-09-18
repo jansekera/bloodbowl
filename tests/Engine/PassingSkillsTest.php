@@ -393,10 +393,10 @@ final class PassingSkillsTest extends TestCase
             ->build();
 
         // Accuracy: 2 (inaccurate, target 4+), team reroll: 2 (still inaccurate)
-        // Scatter: D8=5 (South), D6=1 → from (10,5): (10,6) empty
+        // Scatter 3x (r. 735): J (10,6), V (11,6), Z (10,6) empty
         // DC player at (10,7) is adjacent → moves to (10,6), catch attempt
         // Catch roll: 4 (AG3, target 4+)
-        $dice = new FixedDiceRoller([2, 2, 5, 1, 4]);
+        $dice = new FixedDiceRoller([2, 2, 5, 3, 7, 4]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state2, ActionType::PASS, [
@@ -441,10 +441,10 @@ final class PassingSkillsTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        // Accuracy: 2 (inaccurate), team reroll: 2, scatter D8=5, D6=1 → (10,6) empty
+        // Accuracy: 2 (inaccurate), team reroll: 2, scatter J, V, Z → (10,6) empty
         // DC player at (15,5) is too far → no diving catch, bounce
         // Bounce D8=1
-        $dice = new FixedDiceRoller([2, 2, 5, 1, 1]);
+        $dice = new FixedDiceRoller([2, 2, 5, 3, 7, 1]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [

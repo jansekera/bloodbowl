@@ -93,9 +93,9 @@ final class PassResolverTest extends TestCase
             ->build();
 
         // Accuracy: 3+, roll 2 = inaccurate, team reroll 2 = still inaccurate
-        // Scatter: D8=3 (East), D6=1 (capped at 3) -> (8,5)
-        // No player at (8,5) -> ball bounces: D8=5 (South) -> (8,6)
-        $dice = new FixedDiceRoller([2, 2, 3, 1, 5]);
+        // Scatter 3x po jednom poli (r. 735): V (8,5), J (8,6), Z (7,6)
+        // No player at (7,6) -> ball bounces: D8=5 (South) -> (7,7)
+        $dice = new FixedDiceRoller([2, 2, 3, 5, 7, 5]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [
@@ -118,9 +118,9 @@ final class PassResolverTest extends TestCase
             ->build();
 
         // Accuracy: 3+, roll 2 = inaccurate, team reroll 2 = still inaccurate
-        // Scatter: D8=3 (East), D6=1 -> (8,5) where player 3 is
+        // Scatter 3x (r. 735): V (8,5), S (8,4), J (8,5) -- chytat se smi jen na KONCI, kde je hrac 3
         // Player 3 catch: 4+ (no modifier for inaccurate), roll 5 = success
-        $dice = new FixedDiceRoller([2, 2, 3, 1, 5]);
+        $dice = new FixedDiceRoller([2, 2, 3, 1, 5, 5]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [

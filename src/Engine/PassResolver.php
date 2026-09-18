@@ -245,14 +245,12 @@ final class PassResolver
         }
 
         // Inaccurate pass - scatter from target
-        $d8 = $this->dice->rollD8();
-        $scatterDist = min(3, $this->dice->rollD6()); // max 3 scatter distance
-        $landingPos = $this->scatterCalc->scatterWithDistance($target, $d8, $scatterDist);
+        [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
 
         if (!$landingPos->isOnPitch()) {
             // Scattered off pitch
-            $state = $state->withBall(BallState::onGround($target));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $target);
+            $state = $state->withBall(BallState::onGround($lastOnPitch));
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
@@ -563,15 +561,11 @@ final class PassResolver
         $events[] = GameEvent::passAttempt($thrower->getId(), (string) $from, (string) $target, 'hail_mary', 2, $roll, 'inaccurate');
 
         // Always inaccurate: scatter 3 times from target
-        $landingPos = $target;
-        for ($i = 0; $i < 3; $i++) {
-            $d8 = $this->dice->rollD8();
-            $landingPos = $this->scatterCalc->scatterOnce($landingPos, $d8);
-        }
+        [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
 
         if (!$landingPos->isOnPitch()) {
-            $state = $state->withBall(BallState::onGround($target));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $target);
+            $state = $state->withBall(BallState::onGround($lastOnPitch));
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
@@ -657,13 +651,11 @@ final class PassResolver
         }
 
         // Inaccurate
-        $d8 = $this->dice->rollD8();
-        $scatterDist = min(3, $this->dice->rollD6());
-        $landingPos = $this->scatterCalc->scatterWithDistance($target, $d8, $scatterDist);
+        [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
 
         if (!$landingPos->isOnPitch()) {
-            $state = $state->withBall(BallState::onGround($target));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $target);
+            $state = $state->withBall(BallState::onGround($lastOnPitch));
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
             $events = array_merge($events, $throwInResult['events']);
             return ['state' => $throwInResult['state'], 'events' => $events];
         }
@@ -679,6 +671,27 @@ final class PassResolver
         $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
         $events = array_merge($events, $bounceResult['events']);
         return ['state' => $bounceResult['state'], 'events' => $events];
+    }
+
+    /**
+     * Nepresna prihravka: trikrat rozptyl po jednom poli (rules_bb2016 r. 735-740, 271-273).
+     * Jakmile mic opusti hriste, dalsi rozptyly se nehazi -- jde „immediately" do throw-inu
+     * od posledniho pole na hristi (r. 868-871).
+     *
+     * @return array{Position, Position} [kam mic doletel, posledni pole na hristi]
+     */
+    private function scatterMissedPass(Position $target): array
+    {
+        $pos = $target;
+        for ($i = 0; $i < 3; $i++) {
+            $next = $this->scatterCalc->scatterOnce($pos, $this->dice->rollD8());
+            if (!$next->isOnPitch()) {
+                return [$next, $pos];
+            }
+            $pos = $next;
+        }
+
+        return [$pos, $pos];
     }
 
     /**
