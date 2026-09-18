@@ -323,7 +323,12 @@ final class InteractiveRerollTest extends TestCase
             ->build();
 
         // Dodge fails
-        $dice = new FixedDiceRoller([2, /* pro check: */ 2, /* team reroll: */ 5]);
+        // ⛔ PREPSANO 18.09.2026: test kodoval vadu -- tymovy prehoz po neuspesnem
+        //   Pro prehazoval UHYB. `rules_bb2016.txt` r. 8385-8387: "On a roll of 1,
+        //   2 or 3 the original result stands and may not be re-rolled with a
+        //   skill or team re-roll; however you can re-roll the Pro roll with a
+        //   Team re-roll." => tymovy prehoz jde na HOD PRO, pak teprve uhyb.
+        $dice = new FixedDiceRoller([2, /* pro check: */ 2, /* team reroll of Pro roll: */ 5, /* dodge reroll: */ 5]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
 
@@ -344,7 +349,7 @@ final class InteractiveRerollTest extends TestCase
         $this->assertFalse($pending2->isProAvailable());
         $this->assertTrue($pending2->isTeamRerollAvailable());
 
-        // Accept team reroll → roll 5 = success (3+)
+        // Accept team reroll → Pro roll 5 (smi), dodge reroll 5 = success (3+)
         $result3 = $resolver->resolve($result2->getNewState(), ActionType::RESOLVE_REROLL, [
             'choice' => 'team_reroll',
         ]);

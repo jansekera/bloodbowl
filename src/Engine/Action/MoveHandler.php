@@ -16,6 +16,7 @@ use App\ValueObject\Position;
 use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
+use App\Engine\ProCheck;
 use App\Engine\Pathfinder;
 use App\Engine\InjuryResolver;
 use App\Engine\TacklezoneCalculator;
@@ -269,7 +270,8 @@ final class MoveHandler implements ActionHandlerInterface
 
                     if (!$success) {
                         // Check for interactive reroll opportunity
-                        $proAvail = $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
+                        // ⛔ 18.09.2026: r. 926 -- po Dodge prehozu uz ani Pro
+                        $proAvail = !$skillRerollUsed && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
                         $teamRerollAvail = !$skillRerollUsed && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
 
                         if ($this->interactiveRerolls && ($proAvail || $teamRerollAvail)) {
@@ -289,23 +291,34 @@ final class MoveHandler implements ActionHandlerInterface
                         }
                     }
 
-                    // Non-interactive: Pro reroll (after skill reroll, before team reroll)
-                    if (!$success && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
-                        $proRoll = $this->dice->rollD6();
+                    // ⛔ OPRAVA 18.09.2026 (`rules_bb2016.txt` r. 8381-8387, 926): Pro jen
+                    //   na neprehozenou kostku; po Pro tymovy prehoz jen hodu Pro (`ProCheck`).
+                    $proUsed = false;
+                    if (!$success && !$skillRerollUsed && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
+                        $proUsed = true;
                         $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
                         $currentState = $currentState->withPlayer($currentPlayer);
-                        if ($proRoll >= 4) {
+                        $pro = ProCheck::roll(
+                            $this->dice, $currentPlayer,
+                            !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll(),
+                            $events,
+                        );
+                        if ($pro['teamRerollUsed']) {
+                            $teamRerollUsed = true;
+                            $currentState = $currentState->withTeamState(
+                                $activeSide,
+                                $currentState->getTeamState($activeSide)->withRerollUsed(),
+                            );
+                        }
+                        if ($pro['allowed']) {
                             $roll = $this->dice->rollD6();
                             $success = $roll >= $target;
-                            $events[] = GameEvent::proReroll($playerId, $proRoll, true, $roll);
                             $events[] = GameEvent::dodgeAttempt($playerId, $target, $roll, $success);
-                        } else {
-                            $events[] = GameEvent::proReroll($playerId, $proRoll, false, null);
                         }
                     }
 
-                    // Non-interactive: Try team reroll (only if no skill reroll was used)
-                    if (!$success && !$skillRerollUsed && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
+                    // Non-interactive: Try team reroll (only if no skill reroll and no Pro was used)
+                    if (!$success && !$skillRerollUsed && !$proUsed && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
                         $teamRerollUsed = true;
                         $currentState = $currentState->withTeamState(
                             $activeSide,
@@ -392,9 +405,13 @@ final class MoveHandler implements ActionHandlerInterface
                 $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
 
                 // Sure Feet: reroll failed GFI
+                // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8540-8541 -- "A player may
+                //   only use the Sure Feet skill once per turn." Limit chybel.
                 $skillRerollUsedGfi = false;
-                if (!$success && $currentPlayer->hasSkill(SkillName::SureFeet)) {
+                if (!$success && $currentPlayer->hasSkill(SkillName::SureFeet) && !$currentPlayer->isSureFeetUsedThisTurn()) {
                     $skillRerollUsedGfi = true;
+                    $currentPlayer = $currentPlayer->withSureFeetUsedThisTurn(true);
+                    $currentState = $currentState->withPlayer($currentPlayer);
                     $roll = $this->dice->rollD6();
                     $success = $roll >= $gfiThreshold;
                     $events[] = GameEvent::rerollUsed($playerId, 'Sure Feet');
@@ -403,7 +420,8 @@ final class MoveHandler implements ActionHandlerInterface
 
                 if (!$success) {
                     // Check for interactive reroll opportunity
-                    $proAvailGfi = $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
+                    // ⛔ 18.09.2026: r. 926 -- po Sure Feet prehozu uz ani Pro
+                    $proAvailGfi = !$skillRerollUsedGfi && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn();
                     $teamRerollAvailGfi = !$skillRerollUsedGfi && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
 
                     if ($this->interactiveRerolls && ($proAvailGfi || $teamRerollAvailGfi)) {
@@ -423,23 +441,33 @@ final class MoveHandler implements ActionHandlerInterface
                     }
                 }
 
-                // Non-interactive: Pro reroll (after skill reroll, before team reroll)
-                if (!$success && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
-                    $proRoll = $this->dice->rollD6();
+                // ⛔ OPRAVA 18.09.2026: tataz pravidla Pro jako u uhybu (r. 8381-8387, 926).
+                $proUsedGfi = false;
+                if (!$success && !$skillRerollUsedGfi && $currentPlayer->hasSkill(SkillName::Pro) && !$currentPlayer->isProUsedThisTurn()) {
+                    $proUsedGfi = true;
                     $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
                     $currentState = $currentState->withPlayer($currentPlayer);
-                    if ($proRoll >= 4) {
+                    $pro = ProCheck::roll(
+                        $this->dice, $currentPlayer,
+                        !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll(),
+                        $events,
+                    );
+                    if ($pro['teamRerollUsed']) {
+                        $teamRerollUsed = true;
+                        $currentState = $currentState->withTeamState(
+                            $activeSide,
+                            $currentState->getTeamState($activeSide)->withRerollUsed(),
+                        );
+                    }
+                    if ($pro['allowed']) {
                         $roll = $this->dice->rollD6();
                         $success = $roll >= $gfiThreshold;
-                        $events[] = GameEvent::proReroll($playerId, $proRoll, true, $roll);
                         $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
-                    } else {
-                        $events[] = GameEvent::proReroll($playerId, $proRoll, false, null);
                     }
                 }
 
-                // Non-interactive: Try team reroll (only if no skill reroll was used)
-                if (!$success && !$skillRerollUsedGfi && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
+                // Non-interactive: Try team reroll (only if no skill reroll and no Pro was used)
+                if (!$success && !$skillRerollUsedGfi && !$proUsedGfi && !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll()) {
                     $teamRerollUsed = true;
                     $currentState = $currentState->withTeamState(
                         $activeSide,

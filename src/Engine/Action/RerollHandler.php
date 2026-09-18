@@ -33,6 +33,19 @@ final class RerollHandler
         }
 
         $choice = (string) ($params['choice'] ?? 'decline');
+
+        // ⛔ OPRAVA 18.09.2026 (review): volba klienta se musi kryt s nabidkou.
+        //   Driv sel 'pro' projit i bez skillu, podruhe v tomtez kole a po
+        //   neuspesnem hodu Pro (`rules_bb2016.txt` r. 8381, 8385-8386, 926);
+        //   'team_reroll' i bez nabidnuteho tymoveho prehozu. Stejne jako
+        //   `BlockHandler::resolveBlockReroll`.
+        if ($choice === 'pro' && !$pending->isProAvailable()) {
+            throw new \InvalidArgumentException('Pro not available');
+        }
+        if ($choice === 'team_reroll' && !$pending->isTeamRerollAvailable()) {
+            throw new \InvalidArgumentException('Team reroll not available');
+        }
+
         $state = $state->withPendingReroll(null);
 
         return match ($choice) {
@@ -82,28 +95,35 @@ final class RerollHandler
         if ($proRoll < 4) {
             $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, false, null);
 
+            // r. 8385-8387: puvodni vysledek plati; tymovy prehoz uz jen na hod Pro
             if ($pending->isTeamRerollAvailable()) {
-                $newPending = $pending->withProUsed();
-                return ActionResult::success($state->withPendingReroll($newPending), $events);
+                return ActionResult::success($state->withPendingReroll($pending->withProFailed()), $events);
             }
 
             return $this->applyFailure($state, $pending, $events);
         }
 
-        // Pro check succeeded — reroll the die
+        $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, true, null);
+
+        // ⛔ OPRAVA 18.09.2026: po prehozu kostky Pro se uz tymovy prehoz
+        //   NENABIZI -- r. 926: "you may never re-roll a single dice roll more
+        //   than once." Driv se nabidl a kostka sla prehodit podruhe.
+        return $this->rerollDie($state, $pending, $events);
+    }
+
+    /**
+     * Prehodi puvodni kostku (jedinkrat) a vyhodnoti vysledek.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function rerollDie(GameState $state, PendingRerollDTO $pending, array $events): ActionResult
+    {
         $newRoll = $this->dice->rollD6();
         $success = $newRoll >= $pending->getTarget();
-        $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, true, $newRoll);
         $events[] = $this->makeRollEvent($pending, $newRoll, $success);
 
         if ($success) {
             return $this->applySuccess($state, $pending, $events);
-        }
-
-        // Rerolled die also failed — offer team reroll if available
-        if ($pending->isTeamRerollAvailable()) {
-            $newPending = $pending->withProUsed()->withRoll($newRoll);
-            return ActionResult::success($state->withPendingReroll($newPending), $events);
         }
 
         return $this->applyFailure($state, $pending, $events);
@@ -131,16 +151,19 @@ final class RerollHandler
             $events[] = GameEvent::lonerCheck($pending->getPlayerId(), $lonerRoll, true);
         }
 
-        $newRoll = $this->dice->rollD6();
-        $success = $newRoll >= $pending->getTarget();
         $events[] = GameEvent::rerollUsed($pending->getPlayerId(), 'Team Reroll');
-        $events[] = $this->makeRollEvent($pending, $newRoll, $success);
 
-        if ($success) {
-            return $this->applySuccess($state, $pending, $events);
+        // ⛔ OPRAVA 18.09.2026: po neuspesnem Pro prehazuje tymovy prehoz HOD
+        //   PRO, ne puvodni kostku (`rules_bb2016.txt` r. 8385-8387).
+        if ($pending->isProFailed()) {
+            $proRoll = $this->dice->rollD6();
+            $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, $proRoll >= 4, null);
+            if ($proRoll < 4) {
+                return $this->applyFailure($state, $pending, $events);
+            }
         }
 
-        return $this->applyFailure($state, $pending, $events);
+        return $this->rerollDie($state, $pending, $events);
     }
 
     /**

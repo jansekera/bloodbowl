@@ -17,6 +17,9 @@ final class PendingRerollDTO
         private readonly bool $teamRerollAvailable,
         private readonly int $targetX,
         private readonly int $targetY,
+        // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
+        //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
+        private readonly bool $proFailed = false,
     ) {
     }
 
@@ -28,20 +31,14 @@ final class PendingRerollDTO
     public function isTeamRerollAvailable(): bool { return $this->teamRerollAvailable; }
     public function getTargetX(): int { return $this->targetX; }
     public function getTargetY(): int { return $this->targetY; }
+    public function isProFailed(): bool { return $this->proFailed; }
 
-    public function withProUsed(): self
+    public function withProFailed(): self
     {
         return new self(
             $this->rollType, $this->playerId, $this->target, $this->roll,
             false, $this->teamRerollAvailable, $this->targetX, $this->targetY,
-        );
-    }
-
-    public function withRoll(int $roll): self
-    {
-        return new self(
-            $this->rollType, $this->playerId, $this->target, $roll,
-            $this->proAvailable, $this->teamRerollAvailable, $this->targetX, $this->targetY,
+            true,
         );
     }
 
@@ -59,6 +56,7 @@ final class PendingRerollDTO
             'teamRerollAvailable' => $this->teamRerollAvailable,
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
+            'proFailed' => $this->proFailed,
         ];
     }
 
@@ -76,6 +74,7 @@ final class PendingRerollDTO
             teamRerollAvailable: (bool) ($data['teamRerollAvailable'] ?? false),
             targetX: (int) ($data['targetX'] ?? 0),
             targetY: (int) ($data['targetY'] ?? 0),
+            proFailed: (bool) ($data['proFailed'] ?? false),
         );
     }
 }

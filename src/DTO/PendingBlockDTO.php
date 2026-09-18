@@ -20,6 +20,9 @@ final class PendingBlockDTO
         private readonly bool $proAvailable,
         private readonly bool $teamRerollAvailable,
         private readonly bool $rerollUsed = false,
+        // ⭐ 18.09.2026: hod Pro padl 1-3 => kostky plati a tymovy prehoz smi
+        //   prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
+        private readonly bool $proFailed = false,
     ) {
     }
 
@@ -33,6 +36,7 @@ final class PendingBlockDTO
     public function isProAvailable(): bool { return $this->proAvailable; }
     public function isTeamRerollAvailable(): bool { return $this->teamRerollAvailable; }
     public function isRerollUsed(): bool { return $this->rerollUsed; }
+    public function isProFailed(): bool { return $this->proFailed; }
 
     /** @param list<BlockDiceFace> $faces */
     public function withFaces(array $faces): self
@@ -41,7 +45,7 @@ final class PendingBlockDTO
             $this->attackerId, $this->defenderId, $faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
             $this->proAvailable, $this->teamRerollAvailable,
-            $this->rerollUsed,
+            $this->rerollUsed, $this->proFailed,
         );
     }
 
@@ -54,24 +58,23 @@ final class PendingBlockDTO
         );
     }
 
-    public function withProUsed(): self
+    public function withProFailed(): self
     {
         return new self(
             $this->attackerId, $this->defenderId, $this->faces,
             $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
             false, $this->teamRerollAvailable,
-            $this->rerollUsed,
+            $this->rerollUsed, true,
         );
     }
 
+    /**
+     * ⛔ OPRAVA 18.09.2026: po tymovem prehozu uz ani Pro (r. 926: kostka se
+     *   prehazuje nejvys jednou). Driv `proAvailable` zustal.
+     */
     public function withTeamRerollUsed(): self
     {
-        return new self(
-            $this->attackerId, $this->defenderId, $this->faces,
-            $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            $this->proAvailable, false,
-            true,
-        );
+        return $this->withRerollUsed();
     }
 
     /**
@@ -89,6 +92,7 @@ final class PendingBlockDTO
             'proAvailable' => $this->proAvailable,
             'teamRerollAvailable' => $this->teamRerollAvailable,
             'rerollUsed' => $this->rerollUsed,
+            'proFailed' => $this->proFailed,
         ];
     }
 
@@ -107,6 +111,7 @@ final class PendingBlockDTO
             proAvailable: (bool) ($data['proAvailable'] ?? false),
             teamRerollAvailable: (bool) ($data['teamRerollAvailable'] ?? false),
             rerollUsed: (bool) ($data['rerollUsed'] ?? false),
+            proFailed: (bool) ($data['proFailed'] ?? false),
         );
     }
 }
