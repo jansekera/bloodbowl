@@ -33,6 +33,19 @@ final class RerollHandler
         }
 
         $choice = (string) ($params['choice'] ?? 'decline');
+
+        // ⛔ OPRAVA 18.09.2026 (review): volba klienta se musi kryt s nabidkou.
+        //   Driv sel 'pro' projit i bez skillu, podruhe v tomtez kole a po
+        //   neuspesnem hodu Pro (`rules_bb2016.txt` r. 8381, 8385-8386, 926);
+        //   'team_reroll' i bez nabidnuteho tymoveho prehozu. Stejne jako
+        //   `BlockHandler::resolveBlockReroll`.
+        if ($choice === 'pro' && !$pending->isProAvailable()) {
+            throw new \InvalidArgumentException('Pro not available');
+        }
+        if ($choice === 'team_reroll' && !$pending->isTeamRerollAvailable()) {
+            throw new \InvalidArgumentException('Team reroll not available');
+        }
+
         $state = $state->withPendingReroll(null);
 
         return match ($choice) {

@@ -584,6 +584,10 @@ final class PassResolver
                 );
                 $events = array_merge($events, $catchResult['events']);
                 $state = $catchResult['state'];
+                // ⛔ OPRAVA 18.09.2026 (review): pouzity tymovy prehoz se tu nezapisoval
+                if ($catchResult['teamRerollUsed']) {
+                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
+                }
             } else {
                 $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
                 $events = array_merge($events, $bounceResult['events']);

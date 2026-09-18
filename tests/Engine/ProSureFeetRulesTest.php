@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Engine;
 
 use App\DTO\GameState;
+use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingBlockDTO;
+use App\DTO\PendingRerollDTO;
 use App\DTO\TeamStateDTO;
 use App\Engine\ActionResolver;
 use App\Engine\BallResolver;
@@ -385,5 +388,139 @@ final class ProSureFeetRulesTest extends TestCase
 
         $noveKolo = $r->getNewState()->resetPlayersForNewTurn(TeamSide::HOME);
         $this->assertFalse($noveKolo->getPlayer(1)->isSureFeetUsedThisTurn());
+    }
+
+    // ================= Review 18.09.: interaktivni volba musi byt nabidnuta =================
+
+    private function uhybState(array $skills, int $rerolls = 3): GameState
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: $skills, id: 1)
+            ->addPlayer(TeamSide::AWAY, 5, 4, id: 2)
+            ->build();
+        return $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls($rerolls));
+    }
+
+    public function testInteraktivneProPodruhePoNeuspesnemHoduProNeprojde(): void
+    {
+        // uhyb 2 (cil 3+), Pro 3 (plati puvodni). Klient posle 'pro' znovu:
+        // s vadou Pro 5 a uhyb 6 = uspech (r. 8381 1x za kolo, r. 926).
+        $resolver = new ActionResolver(new FixedDiceRoller([2, 3, 5, 6]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
+        $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
+        $this->assertFalse($r2->getNewState()->getPendingReroll()->isProAvailable(), 'fixtura: Pro uz neni nabidnut');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
+    }
+
+    public function testInteraktivneProBezSkilluNeprojde(): void
+    {
+        $resolver = new ActionResolver(new FixedDiceRoller([2, 5, 6]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($this->uhybState([]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
+        $this->assertFalse($r->getNewState()->getPendingReroll()->isProAvailable(), 'fixtura: hrac nema Pro');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
+    }
+
+    public function testInteraktivneTymovyPrehozNenabidnutyNeprojde(): void
+    {
+        $resolver = new ActionResolver(new FixedDiceRoller([2, 6]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($this->uhybState([SkillName::Pro], rerolls: 0), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
+        $this->assertFalse($r->getNewState()->getPendingReroll()->isTeamRerollAvailable(), 'fixtura: zadny tymovy prehoz');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+    }
+
+    public function testInteraktivneUhybPoNeuspesnemProTymovyPrehozHoduProNeuspesny(): void
+    {
+        // uhyb 2, Pro 2, tymovy prehoz HODU PRO 3 => puvodni plati, turnover.
+        // (Kdyby tymovy prehoz sel na uhyb, 3 by na cil 3+ stacila.)
+        $resolver = new ActionResolver(new FixedDiceRoller([2, 2, 3, 1, 1]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
+        $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
+        $r3 = $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+
+        $this->assertTrue($r3->isTurnover());
+        $this->assertSame([2, 3], array_column($this->proUdalosti(array_merge($r2->getEvents(), $r3->getEvents())), 'proRoll'));
+    }
+
+    public function testInteraktivneGfiPoNeuspesnemProTymovyPrehozPrehazujeHodPro(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 3, 7, movement: 6, skills: [SkillName::Pro], id: 1)
+            ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
+            ->build();
+        // GFI 1, Pro 3, tymovy prehoz hodu Pro 4 => smi, GFI prehoz 2 = uspech
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 3, 4, 2]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 10, 'y' => 7]);
+        $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
+        $this->assertTrue($r2->getNewState()->getPendingReroll()->isProFailed());
+        $r3 = $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+
+        $this->assertTrue($r3->isSuccess());
+        $this->assertSame(10, $r3->getNewState()->getPlayer(1)->getPosition()->getX());
+    }
+
+    // ================= Review 18.09.: Hail Mary musi zapsat tymovy prehoz =================
+
+    public function testHailMaryChytaniTymovyPrehozHoduProSeZapise(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 1, 5, agility: 3, skills: [SkillName::HailMaryPass], id: 1)
+            ->addPlayer(TeamSide::HOME, 20, 4, agility: 3, skills: [SkillName::Pro], id: 2)
+            ->withBallCarried(1)
+            ->build();
+
+        // hod 4 (ne fumble); rozptyl S, J, S => (20,4); chytani 1, Pro 2,
+        // tymovy prehoz hodu Pro 5, chytani 6
+        $dice = new FixedDiceRoller([4, 1, 5, 1, 1, 2, 5, 6]);
+        $r = (new ActionResolver($dice))->resolve($state, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 20, 'targetY' => 5,
+        ]);
+
+        $this->assertSame(2, $r->getNewState()->getBall()->getCarrierId(), 'fixtura: chyceno po tymovem prehozu hodu Pro');
+        $this->assertTrue($r->getNewState()->getHomeTeam()->isRerollUsedThisTurn(), 'r. 8387 + 932: tymovy prehoz se spotrebuje');
+    }
+
+    // ================= Review 18.09.: Loner u tymoveho prehozu hodu Pro =================
+
+    public function testLonerNeuspechTymovyPrehozHoduProPropadne(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::Pro, SkillName::Loner], id: 1)
+            ->addPlayer(TeamSide::AWAY, 5, 6, id: 2)
+            ->build();
+
+        // uhyb 1, Pro 3, Loner 3 (neuspech) => prehoz propadne, puvodni plati
+        $r = (new ActionResolver(new FixedDiceRoller([1, 3, 3, 1, 1])))->resolve($state, ActionType::MOVE, [
+            'playerId' => 1, 'x' => 5, 'y' => 8,
+        ]);
+
+        $this->assertTrue($r->isTurnover());
+        $this->assertCount(1, $this->proUdalosti($r->getEvents()));
+        $this->assertTrue($r->getNewState()->getHomeTeam()->isRerollUsedThisTurn());
+    }
+
+    // ================= Serializace novych priznaku =================
+
+    public function testSerializaceNovychPriznaku(): void
+    {
+        $s = (new GameStateBuilder())->addPlayer(TeamSide::HOME, 5, 7, id: 1)->build();
+        $p = $s->getPlayer(1)->withSureFeetUsedThisTurn(true);
+        $this->assertTrue(MatchPlayerDTO::fromArray($p->toArray())->isSureFeetUsedThisTurn());
+
+        $rr = (new PendingRerollDTO('dodge', 1, 3, 2, true, true, 5, 6))->withProFailed();
+        $this->assertTrue(PendingRerollDTO::fromArray($rr->toArray())->isProFailed());
+
+        $pb = (new PendingBlockDTO(1, 2, [BlockDiceFace::PUSHED], true, false, false, true, true))->withProFailed();
+        $this->assertTrue(PendingBlockDTO::fromArray($pb->toArray())->isProFailed());
     }
 }
