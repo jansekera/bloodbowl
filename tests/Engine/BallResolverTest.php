@@ -237,8 +237,9 @@ final class BallResolverTest extends TestCase
             ->build();
 
         // D8=7 (West) -> off pitch
-        // Throw-in: D8=3 (East), D6=3 -> lands at (3, 7) on pitch
-        $dice = new FixedDiceRoller([7, 3, 3]);
+        // Throw-in (r. 868-871): sablona 3 = kolmo (V), 2D6 = 1+2 -> (3,7) na hristi,
+        // (hrac 1 na vychozim poli drahu neovlivni); (3,7) prazdne -> odskok 3 (V) -> (4,7)
+        $dice = new FixedDiceRoller([7, 3, 1, 2, 3]);
         $ballPos = $state->getBall()->getPosition();
         $this->assertNotNull($ballPos);
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
@@ -246,7 +247,7 @@ final class BallResolverTest extends TestCase
         $ballPos = $result['state']->getBall()->getPosition();
         $this->assertNotNull($ballPos);
         $this->assertTrue($ballPos->isOnPitch());
-        $this->assertEquals(3, $ballPos->getX());
+        $this->assertEquals(4, $ballPos->getX());
     }
 
     public function testThrowInLandsOnPitch(): void
@@ -256,16 +257,16 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(0, 7)
             ->build();
 
-        // D8=3 (East), D6=4 -> lands at (4, 7)
-        $dice = new FixedDiceRoller([3, 4]);
+        // sablona 4 = kolmo (V), 2D6 = 2+2 -> (4,7) prazdne -> odskok 1 (S) -> (4,6)
+        $dice = new FixedDiceRoller([4, 2, 2, 1]);
         $ballPos = $state->getBall()->getPosition();
         $this->assertNotNull($ballPos);
-        $result = $this->resolver($dice)->resolveThrowIn($state, $ballPos);
+        $result = $this->resolver($dice)->resolveThrowIn($state, $ballPos, new \App\ValueObject\Position(-1, 7));
 
         $ballPos = $result['state']->getBall()->getPosition();
         $this->assertNotNull($ballPos);
         $this->assertEquals(4, $ballPos->getX());
-        $this->assertEquals(7, $ballPos->getY());
+        $this->assertEquals(6, $ballPos->getY());
     }
 
     public function testPickupTargetCalculation(): void

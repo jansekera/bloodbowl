@@ -66,7 +66,8 @@ final class CombatSkillsTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        $dice = new FixedDiceRoller([2, 3]); // BD, bounce D8=3 (East)
+        // BD, odskok 3 (V) na lezici obrance (6,5) -> odskakuje dal (r. 893-898): 5 (J) -> (6,6)
+        $dice = new FixedDiceRoller([2, 3, 5]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 

@@ -8,6 +8,7 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\Weather;
 use App\ValueObject\Position;
@@ -221,7 +222,7 @@ final class BallResolver
 
         // Off pitch? Throw-in
         if (!$landingPos->isOnPitch()) {
-            $throwInResult = $this->resolveThrowIn($state, $from);
+            $throwInResult = $this->resolveThrowIn($state, $from, $landingPos, $depth);
             $events = array_merge($events, $throwInResult['events']);
             return ['state' => $throwInResult['state'], 'events' => $events];
         }
@@ -235,41 +236,74 @@ final class BallResolver
             return ['state' => $catchResult['state'], 'events' => $events];
         }
 
+        // Lezici nebo omraceny hrac: mic odskakuje dal (r. 893-898)
+        if ($playerAtLanding !== null) {
+            $bounceResult = $this->resolveBounce($state, $landingPos, $depth + 1);
+            return ['state' => $bounceResult['state'], 'events' => array_merge($events, $bounceResult['events'])];
+        }
+
         // Empty square: ball lands on ground
         $state = $state->withBall(BallState::onGround($landingPos));
         return ['state' => $state, 'events' => $events];
     }
 
     /**
-     * Throw-in from sideline when ball goes off pitch.
+     * Throw-in -- rules_bb2016 r. 868-878.
+     *  - sablona Throw-in (`ScatterCalculator::throwInOffset`) od posledniho pole na hristi,
+     *    vzdalenost 2D6; mic se posouva po jednom poli, aby bylo znat posledni pole pred vyletem;
+     *  - stojici hrac na cilovem poli MUSI chytat, prazdne pole nebo lezici/omraceny = odskok;
+     *  - kdyz mic vyleti znovu, vhazuje se znovu „centred on the last square it was in".
+     * Strop 8 vhozeni (jako C++): pak se mic polozi na posledni pole v hristi a odskoci --
+     * to je nase pojistka, ne pravidlo.
+     *
+     * @param Position $offPitchExit pole za hranou, kam mic vyletel (urcuje stranu sablony)
      * @return array{state: GameState, events: list<GameEvent>}
      */
-    public function resolveThrowIn(GameState $state, Position $lastOnPitch): array
+    public function resolveThrowIn(GameState $state, Position $lastOnPitch, Position $offPitchExit, int $depth = 0): array
     {
-        for ($attempt = 0; $attempt < 3; $attempt++) {
-            $direction = $this->dice->rollD8();
-            $distance = $this->dice->rollD6();
-            $landingPos = $this->scatterCalc->scatterWithDistance($lastOnPitch, $direction, $distance);
+        $events = [];
+        $origin = $lastOnPitch;
+        $exitAt = $offPitchExit;
 
-            $events = [GameEvent::throwIn((string) $lastOnPitch, (string) $landingPos, $direction, $distance)];
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $templateRoll = $this->dice->rollD6();
+            [$dx, $dy] = $this->scatterCalc->throwInOffset($origin, $exitAt, $templateRoll);
+            $distance = $this->dice->roll2D6();
 
-            if ($landingPos->isOnPitch()) {
-                $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-                if ($playerAtLanding !== null && $playerAtLanding->getState()->canAct()) {
-                    $state = $state->withBall(BallState::onGround($landingPos));
-                    $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, 0);
-                    $events = array_merge($events, $catchResult['events']);
-                    return ['state' => $catchResult['state'], 'events' => $events];
+            $dest = $origin;
+            $lastInside = $origin;
+            $leftPitch = false;
+            for ($step = 0; $step < $distance; $step++) {
+                $dest = new Position($dest->getX() + $dx, $dest->getY() + $dy);
+                if (!$dest->isOnPitch()) {
+                    $leftPitch = true;
+                    break;
                 }
-
-                $state = $state->withBall(BallState::onGround($landingPos));
-                return ['state' => $state, 'events' => $events];
+                $lastInside = $dest;
             }
+
+            $events[] = GameEvent::throwIn((string) $origin, (string) $dest, $templateRoll, $distance);
+
+            if ($leftPitch) {
+                $origin = $lastInside;
+                $exitAt = $dest;
+                continue;
+            }
+
+            $state = $state->withBall(BallState::onGround($dest));
+            $playerAtLanding = $state->getPlayerAtPosition($dest);
+            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
+                $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth);
+                return ['state' => $catchResult['state'], 'events' => array_merge($events, $catchResult['events'])];
+            }
+
+            $bounceResult = $this->resolveBounce($state, $dest, $depth + 1);
+            return ['state' => $bounceResult['state'], 'events' => array_merge($events, $bounceResult['events'])];
         }
 
-        // After 3 failed throw-in attempts, place ball at last known position
-        $state = $state->withBall(BallState::onGround($lastOnPitch));
-        return ['state' => $state, 'events' => [GameEvent::throwIn((string) $lastOnPitch, (string) $lastOnPitch, 0, 0)]];
+        $state = $state->withBall(BallState::onGround($origin));
+        $bounceResult = $this->resolveBounce($state, $origin, $depth + 1);
+        return ['state' => $bounceResult['state'], 'events' => array_merge($events, $bounceResult['events'])];
     }
 
     /**

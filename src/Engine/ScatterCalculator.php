@@ -43,6 +43,48 @@ final class ScatterCalculator
     }
 
     /**
+     * Sablona Throw-in (rules_bb2016 r. 868-871; tvar sablony LRB6, shodne s C++ `ball_handler.cpp:129`).
+     * U strany hod D6: 1-2 diagonala, 3-4 kolmo zpet do hriste, 5-6 druha diagonala.
+     * V rohu D3 (= (D6+1)/2): podel jedne hrany, diagonala do hriste, podel druhe hrany.
+     * Strana se urci z pole, kam mic vyletel; kdyz je to pole na hristi (volajici ho nezna),
+     * z hrany, u ktere lezi posledni pole na hristi.
+     *
+     * @return array{int, int} [dx, dy]
+     */
+    public function throwInOffset(Position $lastOnPitch, Position $offPitchExit, int $d6): array
+    {
+        $ref = $offPitchExit->isOnPitch() ? $lastOnPitch : $offPitchExit;
+        $maxX = Position::PITCH_WIDTH - 1;
+        $maxY = Position::PITCH_HEIGHT - 1;
+        $left = $offPitchExit->isOnPitch() ? $ref->getX() <= 0 : $ref->getX() < 0;
+        $right = $offPitchExit->isOnPitch() ? $ref->getX() >= $maxX : $ref->getX() > $maxX;
+        $top = $offPitchExit->isOnPitch() ? $ref->getY() <= 0 : $ref->getY() < 0;
+        $bottom = $offPitchExit->isOnPitch() ? $ref->getY() >= $maxY : $ref->getY() > $maxY;
+
+        // do hriste: +1 od leve/horni hrany, -1 od prave/dolni
+        $inX = $left ? 1 : ($right ? -1 : 0);
+        $inY = $top ? 1 : ($bottom ? -1 : 0);
+
+        if ($inX !== 0 && $inY !== 0) {
+            $d3 = intdiv($d6 + 1, 2);
+            return match ($d3) {
+                1 => [$inX, 0],
+                2 => [$inX, $inY],
+                default => [0, $inY],
+            };
+        }
+
+        if ($inY !== 0) {
+            // horni / dolni hrana: diagonaly vlevo a vpravo
+            return $d6 <= 2 ? [-1, $inY] : ($d6 <= 4 ? [0, $inY] : [1, $inY]);
+        }
+
+        // leva / prava hrana (a nouzove, kdyz hrana nejde urcit, kolmo od leve)
+        $inX = $inX === 0 ? 1 : $inX;
+        return $d6 <= 2 ? [$inX, -1] : ($d6 <= 4 ? [$inX, 0] : [$inX, 1]);
+    }
+
+    /**
      * @return array{int, int} [dx, dy]
      */
     public function getDirectionOffset(int $d8Direction): array

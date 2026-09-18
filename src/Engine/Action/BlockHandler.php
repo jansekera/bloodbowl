@@ -1186,13 +1186,16 @@ final class BlockHandler implements ActionHandlerInterface
             // Crowd surf - pushed off pitch or no valid square
             $events[] = GameEvent::crowdSurf($defender->getId());
 
-            // Ball drops at original position if carried
-            if ($state->getBall()->getCarrierId() === $defender->getId()) {
-                $state = $state->withBall(BallState::onGround($defenderOriginalPos));
-            }
+            $hadBall = $state->getBall()->getCarrierId() === $defender->getId();
 
             $defender = $defender->withPosition(null);
             $state = $state->withPlayer($defender);
+
+            // r. 659-663: nosice zbije dav a mic vhodi zpet -- „centred on the last square
+            // the player was in before he was pushed off the pitch". Driv mic jen lezel na tom poli.
+            if ($hadBall) {
+                [$state, $events] = $this->throwInFromCrowd($state, $defenderOriginalPos, $attackerPos, $events);
+            }
 
             // Crowd injury (skip armor, straight to injury with +1)
             $injResult = $this->injuryResolver->resolveCrowdSurf($defender, $this->dice);
@@ -1202,6 +1205,25 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         return [$state, $events];
+    }
+
+    /**
+     * Nosic vytlaceny do davu: dav vhazuje mic od jeho posledniho pole (r. 659-663).
+     * Strana sablony = pole za nim ve smeru odstrceni (jako C++ `pushOffPitchExit`).
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function throwInFromCrowd(GameState $state, Position $lastSquare, Position $pusherPos, array $events): array
+    {
+        $exit = new Position(
+            $lastSquare->getX() + ($lastSquare->getX() <=> $pusherPos->getX()),
+            $lastSquare->getY() + ($lastSquare->getY() <=> $pusherPos->getY()),
+        );
+        $state = $state->withBall(BallState::onGround($lastSquare));
+        $throwIn = $this->ballResolver->resolveThrowIn($state, $lastSquare, $exit);
+
+        return [$throwIn['state'], array_merge($events, $throwIn['events'])];
     }
 
     /**
@@ -1277,12 +1299,14 @@ final class BlockHandler implements ActionHandlerInterface
             $events[] = GameEvent::chainPush($chainTarget->getId(), (string) $chainTargetPos, 'off-pitch');
             $events[] = GameEvent::crowdSurf($chainTarget->getId());
 
-            if ($state->getBall()->getCarrierId() === $chainTarget->getId()) {
-                $state = $state->withBall(BallState::onGround($chainTargetPos));
-            }
+            $hadBall = $state->getBall()->getCarrierId() === $chainTarget->getId();
 
             $chainTarget = $chainTarget->withPosition(null);
             $state = $state->withPlayer($chainTarget);
+
+            if ($hadBall) {
+                [$state, $events] = $this->throwInFromCrowd($state, $chainTargetPos, $pusherOriginalPos, $events);
+            }
 
             $injResult = $this->injuryResolver->resolveCrowdSurf($chainTarget, $this->dice);
             $chainTarget = $injResult['player'];

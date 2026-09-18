@@ -76,9 +76,9 @@ final class MissedPassScatterTest extends TestCase
             ->build();
 
         // rozptyl S (7,0), S (7,-1) mimo -> treti rozptyl se NEHAZI;
-        // throw-in od (7,0): smer 5, vzdalenost 3 -> (7,3), hrac 3 chyta 6
+        // throw-in od (7,0): sablona 3 = kolmo (J), 2D6 = 1+2 -> (7,3), hrac 3 chyta 6
         // (stara verze: S × min(3,1) = (7,0), zadny throw-in)
-        $dice = new FixedDiceRoller([2, 2, 1, 1, 5, 3, 6]);
+        $dice = new FixedDiceRoller([2, 2, 1, 1, 3, 1, 2, 6]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::PASS, [
             'playerId' => 1, 'targetX' => 7, 'targetY' => 1,
         ]);
@@ -99,9 +99,9 @@ final class MissedPassScatterTest extends TestCase
             ->build();
 
         // hod 4 (ne fumble); rozptyl S (20,0), S (20,-1) mimo -> dal se nehazi;
-        // throw-in od (20,0): 5, 3 -> (20,3), hrac 3 chyta 6
+        // throw-in od (20,0): sablona 3 = kolmo (J), 2D6 = 1+2 -> (20,3), hrac 3 chyta 6
         // (stara verze: treti rozptyl 5 vrati mic na (20,0), zadny throw-in)
-        $dice = new FixedDiceRoller([4, 1, 1, 5, 3, 6]);
+        $dice = new FixedDiceRoller([4, 1, 1, 3, 1, 2, 6]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::PASS, [
             'playerId' => 1, 'targetX' => 20, 'targetY' => 1,
         ]);

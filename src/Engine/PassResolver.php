@@ -250,7 +250,7 @@ final class PassResolver
         if (!$landingPos->isOnPitch()) {
             // Scattered off pitch
             $state = $state->withBall(BallState::onGround($lastOnPitch));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
@@ -565,7 +565,7 @@ final class PassResolver
 
         if (!$landingPos->isOnPitch()) {
             $state = $state->withBall(BallState::onGround($lastOnPitch));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
@@ -655,7 +655,7 @@ final class PassResolver
 
         if (!$landingPos->isOnPitch()) {
             $state = $state->withBall(BallState::onGround($lastOnPitch));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch);
+            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
             $events = array_merge($events, $throwInResult['events']);
             return ['state' => $throwInResult['state'], 'events' => $events];
         }
