@@ -86,6 +86,7 @@ final class FoulHandler implements ActionHandlerInterface
         $events[] = GameEvent::foulAttempt($attackerId, $targetId, $die1, $die2, $armourValue, $armourBroken, $modifier);
 
         // Handle armor broken -> injury roll (no Mighty Blow for fouls)
+        $dubletNaZraneni = false;
         if ($armourBroken) {
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
@@ -93,11 +94,16 @@ final class FoulHandler implements ActionHandlerInterface
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
+            $dubletNaZraneni = $injResult['dice'][0] === $injResult['dice'][1];
         }
 
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 1877-1878 -- "if the Armour
+        //   **and/or Injury** roll is a doubles (i.e., two 1s, or two 2s, etc),
+        //   the referee has spotted the foul". Do ted se dublet cetl JEN na
+        //   brneni, protoze `resolveInjury` vracel pouhy soucet 2D6.
         // Check for ejection (doubles) — Sneaky Git avoids ejection
         $vyloucen = false;
-        if ($die1 === $die2 && !$attacker->hasSkill(SkillName::SneakyGit)) {
+        if (($die1 === $die2 || $dubletNaZraneni) && !$attacker->hasSkill(SkillName::SneakyGit)) {
             $vyloucen = true;
             $events[] = GameEvent::playerEjected($attackerId);
 

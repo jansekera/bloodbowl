@@ -9,6 +9,7 @@ use App\Engine\FixedDiceRoller;
 use App\Engine\RulesEngine;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
+use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use PHPUnit\Framework\TestCase;
 
@@ -134,6 +135,69 @@ final class FoulTest extends TestCase
         $this->assertEquals(PlayerState::EJECTED, $attacker->getState());
     }
 
+    public function testDubletNaZRANENIvylouciFaulujiciho(): void
+    {
+        // ⭐ 21.09.2026: `rules_bb2016.txt` r. 1877-1878: "if the Armour
+        //   **and/or Injury** roll is a doubles (i.e., two 1s, or two 2s, etc),
+        //   the referee has spotted the foul, and the player taking the Foul
+        //   Action is sent off". Do ted se dublet cetl JEN na brneni --
+        //   `resolveInjury` vracel pouhy soucet 2D6 a jednotlive kostky zahodil.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        // Brneni 6+4 = 10 > 8, NENI dublet. Zraneni 3+3 = 6 = DUBLET (a stunned).
+        $dice = new FixedDiceRoller([6, 4, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $attacker = $result->getNewState()->getPlayer(1);
+        $this->assertNotNull($attacker);
+        $this->assertSame(PlayerState::EJECTED, $attacker->getState(), 'r. 1877-1878: dublet na zraneni take vylucuje');
+        $this->assertTrue($result->isTurnover(), 'vylouceni faulujiciho je turnover (r. 1879-1881)');
+    }
+
+    public function testBezDubletuNaBrneniANiNaZraneniSeNevylucuje(): void
+    {
+        // Pozitivni kontrola k testu vyse: tataz fixtura, jen zraneni 3+4 misto 3+3.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        $dice = new FixedDiceRoller([6, 4, 3, 4]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $attacker = $result->getNewState()->getPlayer(1);
+        $this->assertNotNull($attacker);
+        $this->assertNotSame(PlayerState::EJECTED, $attacker->getState(), 'bez dubletu se nevylucuje');
+        $this->assertFalse($result->isTurnover());
+    }
+
+    public function testDubletNaZraneniSeSneakyGitemNevylucuje(): void
+    {
+        // r. 8523-8525: Sneaky Git -- "is never sent off for committing a foul
+        //   unless he rolls doubles for the Armour roll" ... u nas plati, ze
+        //   Sneaky Git vylouceni odvraci; test hlida, ze se to nezmenilo.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::SneakyGit], id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        $dice = new FixedDiceRoller([6, 4, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $attacker = $result->getNewState()->getPlayer(1);
+        $this->assertNotNull($attacker);
+        $this->assertNotSame(PlayerState::EJECTED, $attacker->getState());
+    }
+
     // ⛔ PREPSANO 16.09.2026: faul neni turnover JEN kdyz nepadne dublet.
     //   Pri dubletu je (r. 1879-1881) -- to hlida `FoulRulesTest`.
     public function testFoulBezDubletuNeniTurnover(): void
@@ -227,8 +291,11 @@ final class FoulTest extends TestCase
         $this->assertNotNull($defender);
         $state = $state->withPlayer($defender->withState(PlayerState::STUNNED));
 
-        // Armor: 5+4+1 = 10 > 8 → broken. Injury: 3+3 = 6 → stunned
-        $dice = new FixedDiceRoller([5, 4, 3, 3]);
+        // Armor: 5+4 = 9 > 8 → broken. Injury: 3+4 = 7 → stunned.
+        // ⛔ 21.09.2026: puvodne tu bylo zraneni 3+3, tedy DUBLET -- od opravy
+        //   r. 1877-1878 to znamena vylouceni a turnover, coz s predmetem
+        //   tohohle testu ("i omraceneho jde faulovat") nema nic spolecneho.
+        $dice = new FixedDiceRoller([5, 4, 3, 4]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::FOUL, [

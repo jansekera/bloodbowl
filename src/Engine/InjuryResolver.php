@@ -116,6 +116,9 @@ final class InjuryResolver
      *
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
+    /**
+     * @return array{player: MatchPlayerDTO, events: list<GameEvent>, dice: array{int, int}}
+     */
     public function resolveInjuryOnly(
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
@@ -201,8 +204,16 @@ final class InjuryResolver
     }
 
     /**
+     * ⭐ 21.09.2026: vraci i JEDNOTLIVE KOSTKY (`dice`). Faul potrebuje poznat
+     *   dublet i na hodu na zraneni -- `rules_bb2016.txt` r. 1877-1878:
+     *   "if the Armour **and/or Injury** roll is a doubles ... the player taking
+     *   the Foul Action is sent off". Do ted tahle metoda vracela jen soucet
+     *   `roll2D6()` a kostky zahodila, takze dublet na zraneni nesel precist.
+     *   ⚠️ Spotreba kostek je stejna (`roll2D6()` je vsude `rollD6()+rollD6()`),
+     *   takze fixtury testu zustavaji platne.
+     *
      * @param list<GameEvent> $events
-     * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
+     * @return array{player: MatchPlayerDTO, events: list<GameEvent>, dice: array{int, int}}
      */
     private function resolveInjury(
         MatchPlayerDTO $player,
@@ -212,11 +223,21 @@ final class InjuryResolver
         bool $hasStakes = false,
         bool $hasNurglesRot = false,
     ): array {
-        $roll = $dice->roll2D6();
+        $die1 = $dice->rollD6();
+        $die2 = $dice->rollD6();
+        $roll = $die1 + $die2;
         // Decay: roll injury twice, take worse (higher) result
         if ($player->hasSkill(SkillName::Decay)) {
-            $roll2 = $dice->roll2D6();
-            $roll = max($roll, $roll2);
+            $decayDie1 = $dice->rollD6();
+            $decayDie2 = $dice->rollD6();
+            $roll2 = $decayDie1 + $decayDie2;
+            if ($roll2 > $roll) {
+                // Plati horsi hod, a tedy i JEHO kostky (dublet se cte z toho,
+                // ktery se pouzil).
+                $roll = $roll2;
+                $die1 = $decayDie1;
+                $die2 = $decayDie2;
+            }
         }
         // Stunty: +1 to injury roll (more vulnerable)
         if ($player->hasSkill(SkillName::Stunty)) {
@@ -265,6 +286,6 @@ final class InjuryResolver
             }
         }
 
-        return ['player' => $player, 'events' => $events];
+        return ['player' => $player, 'events' => $events, 'dice' => [$die1, $die2]];
     }
 }
