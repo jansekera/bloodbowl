@@ -12,6 +12,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/dice_factory.php';
 
 use App\AI\AICoachInterface;
 use App\AI\GreedyAICoach;
@@ -57,7 +58,7 @@ $gamesRun = 0;
 for ($g = 0; $g < $numMatches; $g++) {
     $homeAi = createAI($homeAiType);
     $awayAi = createAI($awayAiType);
-    $dice = new RandomDiceRoller();
+    $dice = bbDice($g);
     $rules = new RulesEngine();
 
     $homePlayers = getRaceRoster(TeamSide::HOME, 'Human');

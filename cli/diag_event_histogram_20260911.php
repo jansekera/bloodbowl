@@ -26,6 +26,7 @@ use App\DTO\GameState;
 use App\Engine\{ActionResolver, FixedDiceRoller, RandomDiceRoller, RulesEngine};
 use App\Enum\{ActionType, GameEventType, GamePhase, TeamSide};
 
+require_once __DIR__ . '/dice_factory.php';
 require_once __DIR__ . '/race_rosters.php';
 require_once __DIR__ . '/developed_rosters.php';
 
@@ -92,7 +93,7 @@ for ($g = 0; $g < $games; $g++) {
     $homeRace = $fixHome ?? $races[mt_rand(0, count($races) - 1)];
     $awayRace = $fixAway ?? $races[mt_rand(0, count($races) - 1)];
 
-    $dice = new RandomDiceRoller();
+    $dice = bbDice($g);
     $rules = new RulesEngine();
     $homeAi = $makeCoach();
     $awayAi = $makeCoach();

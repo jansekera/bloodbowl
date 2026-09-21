@@ -36,6 +36,7 @@ use App\DTO\GameState;
 use App\Engine\{ActionResolver, FixedDiceRoller, RandomDiceRoller, RulesEngine};
 use App\Enum\{ActionType, GamePhase, SkillName, TeamSide};
 
+require_once __DIR__ . '/dice_factory.php';
 require_once __DIR__ . '/race_rosters.php';
 require_once __DIR__ . '/developed_rosters.php';
 
@@ -96,7 +97,7 @@ for ($g = 0; $g < $games; $g++) {
     $homeRace = $fixHome ?? $races[mt_rand(0, count($races) - 1)];
     $awayRace = $fixAway ?? $races[mt_rand(0, count($races) - 1)];
 
-    $dice   = new RandomDiceRoller();
+    $dice   = bbDice($g);
     $rules  = new RulesEngine();
     $homeAi = $makeCoach();
     $awayAi = $makeCoach();
@@ -213,7 +214,7 @@ for ($g = 0; $g < $games; $g++) {
     }
 }
 
-echo "BĚH: {$stat['hry']} her, {$stat['kola']} kol, výjimek: {$vyjimky}\n";
+echo "BĚH: {$stat['hry']} her, {$stat['kola']} kol, výjimek: {$vyjimky}  |  " . bbDicePopis() . "\n";
 echo "  hodu_na_uhyb              {$stat['hodu_na_uhyb']}   (vcetne prehozenych)\n";
 echo "  uhybu                     {$stat['uhybu']}   (pokusu, bez prehozu)\n";
 echo "  neuspesnych_uhybu         {$stat['neuspesnych_uhybu']}\n";
