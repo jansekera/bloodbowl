@@ -188,11 +188,14 @@ final class BallResolverTest extends TestCase
 
     public function testBounceOntoPlayerWhoFailsCatchBounceAgain(): void
     {
-        $state = (new GameStateBuilder())
+        // ⛔ 21.09.2026: fixtura dostala `bezPrehozu()`. Od zapojeni tymoveho
+        //   prehozu u chytani po odskoku (r. 929-933) by jinak tym prehoz
+        //   pouzil a test by meril neco jineho, nez ma.
+        $state = $this->bezPrehozu((new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
             ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, id: 2)
             ->withBallOnGround(10, 7)
-            ->build();
+            ->build());
 
         // D8=3 (East) -> lands on player 2 at (11,7)
         // catch roll 2 = fail (need 4+)
@@ -217,6 +220,13 @@ final class BallResolverTest extends TestCase
     // r. 1263: "players may use the Catch or Pro skill to try to re-roll the
     // catch roll" (kdyz mic dopadne).
     // r. 925-926: "you may never re-roll a single dice roll more than once."
+
+    /** Fixtura bez tymovych prehozu -- kdyz se meri jen to, co dela odskok. */
+    private function bezPrehozu(\App\DTO\GameState $s): \App\DTO\GameState
+    {
+        return $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(0))
+            ->withTeamState(TeamSide::AWAY, $s->getTeamState(TeamSide::AWAY)->withRerolls(0));
+    }
 
     /** @param list<\App\DTO\GameEvent> $events @return list<string> */
     private function typy(array $events): array
@@ -249,11 +259,12 @@ final class BallResolverTest extends TestCase
     {
         // Pozitivni kontrola k testu vyse: kdyz hod Pro nevyjde (1-3), plati
         // puvodni neuspech a mic odskakuje dal.
-        $state = (new GameStateBuilder())
+        // bez tymovych prehozu, at je videt jen to, co dela neuspesny hod Pro
+        $state = $this->bezPrehozu((new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
             ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Pro], id: 2)
             ->withBallOnGround(10, 7)
-            ->build();
+            ->build());
 
         // D8=3 -> hrac 2; chyceni 2 = neuspech; hod Pro 3 = nesmi; odskok D8=3 na (12,7).
         $dice = new FixedDiceRoller([3, 2, 3, 3]);
@@ -304,6 +315,74 @@ final class BallResolverTest extends TestCase
 
         $this->assertFalse($result['state']->getBall()->isHeld(), 'po prehozu z Catch uz Pro na tutez kostku nesmi');
         $this->assertNotContains('pro', $this->typy($result['events']));
+    }
+
+    // ===== Tymovy prehoz u chytani po odskoku (21.09.2026) =====
+    //
+    // r. 929-933: "A coach may use a team re-roll to re-roll any dice roll
+    // (other than Armour, Injury or Casualty rolls) made by a player in their
+    // own team and who is still on the pitch **during their own turn**."
+    // r. 8387 (Pro): "you can re-roll the Pro roll with a Team re-roll."
+    // r. 1263: u mice, ktery DOPADA po vykopu, tymovy prehoz na chytani nejde
+    //   (to resi `resolveCatch` s `teamRerollAvailable = false`).
+
+    public function testTymovyPrehozZachraniChytaniPoOdskokuVeVlastnimKole(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> mic na hrace 2; chyceni 2 = neuspech; tymovy prehoz: chyceni 5 = uspech.
+        $dice = new FixedDiceRoller([3, 2, 5]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 929-933: tymovy prehoz plati i na chytani po odskoku');
+        $this->assertSame(2, $result['state']->getTeamState(TeamSide::HOME)->getRerolls(), 'prehoz se ma odecist');
+        $this->assertContains('reroll', $this->typy($result['events']));
+    }
+
+    public function testVSouperovemKoleSeTymovyPrehozNepouzije(): void
+    {
+        // Pozitivni kontrola: tataz fixtura, jen je na tahu souper.
+        $state = (new GameStateBuilder())
+            ->withActiveTeam(TeamSide::AWAY)
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> hrac 2; chyceni 2 = neuspech; bez prehozu odskok D8=3 na (12,7).
+        $dice = new FixedDiceRoller([3, 2, 3]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertFalse($result['state']->getBall()->isHeld(), 'mimo vlastni kolo se tymovy prehoz pouzit nesmi');
+        $this->assertSame(3, $result['state']->getTeamState(TeamSide::HOME)->getRerolls(), 'prehoz se nesmi odecist');
+    }
+
+    public function testTymovyPrehozPrehodiNEUSPESNYHodPro(): void
+    {
+        // r. 8387: kdyz hod Pro nevyjde, tymovy prehoz jde na HOD PRO, ne na kostku.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Pro], id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> hrac 2; chyceni 2 neuspech; hod Pro 2 = nesmi;
+        // tymovy prehoz hodu Pro: 5 = smi; prehozene chyceni 5 = uspech.
+        $dice = new FixedDiceRoller([3, 2, 2, 5, 5]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 8387: tymovy prehoz smi prehodit hod Pro');
+        $this->assertSame(2, $result['state']->getTeamState(TeamSide::HOME)->getRerolls());
     }
 
     public function testBounceToEmptySquare(): void

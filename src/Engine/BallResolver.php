@@ -8,6 +8,7 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\Enum\GamePhase;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\Weather;
@@ -433,17 +434,50 @@ final class BallResolver
         //   Pro skill to try to re-roll the catch roll".
         //   ⛔ Po prehozu z Catch uz Pro neprichazi (r. 925-926: tataz kostka
         //   se neprehazuje dvakrat).
-        //   ⏰ Tymovy prehoz HODU PRO (r. 8387) tady zapojeny NENI -- musel by
-        //   se sem dostat tym na tahu a kontrola, ze je vlastni kolo; zapsano
-        //   v auditu jako samostatny nalez.
+        //
+        // ⭐ DOPLNENO 21.09.2026: tymovy prehoz. r. 929-933: "A coach may use a
+        //   team re-roll to re-roll any dice roll ... made by a player in their
+        //   own team and who is still on the pitch **during their own turn**."
+        //   ⇒ podminky: vlastni hrac, vlastni kolo, faze hry a volny prehoz.
+        //   ⛔ U mice DOPADAJICIHO po vykopu tymovy prehoz nejde (r. 1263) --
+        //   ten se resi v `resolveCatch()`, kam `teamRerollAvailable` posila
+        //   volajici a `KickoffResolver` ho necha na `false`.
+        $side = $catcher->getTeamSide();
+        $teamRerollAvailable = $state->getPhase() === GamePhase::PLAY
+            && $state->getActiveTeam() === $side
+            && $state->getTeamState($side)->canUseReroll();
+
+        $proUsed = false;
         if (!$success && !$skillRerollUsed
             && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
+            $proUsed = true;
             $catcher = $catcher->withProUsedThisTurn(true);
             $state = $state->withPlayer($catcher);
-            $pro = ProCheck::roll($this->dice, $catcher, false, $events);
+            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
+            if ($pro['teamRerollUsed']) {
+                $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+                $teamRerollAvailable = false;
+            }
             if ($pro['allowed']) {
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $target;
+                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
+            }
+        }
+
+        // Tymovy prehoz samotneho chytani (jen kdyz se neprehazovalo skillem ani Pro)
+        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
+            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+            $lonerBlocked = false;
+            if ($catcher->hasSkill(SkillName::Loner)) {
+                $lonerRoll = $this->dice->rollD6();
+                $lonerBlocked = $lonerRoll < 4;
+                $events[] = GameEvent::lonerCheck($catcher->getId(), $lonerRoll, !$lonerBlocked);
+            }
+            if (!$lonerBlocked) {
+                $roll = $this->dice->rollD6();
+                $success = $roll >= $target;
+                $events[] = GameEvent::rerollUsed($catcher->getId(), 'Team Reroll');
                 $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
             }
         }
