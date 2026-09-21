@@ -1332,3 +1332,50 @@ TEST(BlockHandler, L6FrenzyDoesNotAddBlocksInsideAMultipleBlock) {
     for (const auto& e : events) if (e.type == GameEvent::Type::BLOCK) ++blocks;
     EXPECT_EQ(blocks, 2);
 }
+
+// ⭐⭐ 21.09.2026: `rules_bb2016.txt` r. 8385-8387 (Pro):
+//   "On a roll of 1, 2 or 3 the original result stands and **may not be
+//   re-rolled with a skill or team re-roll**; however you can re-roll the
+//   Pro roll with a Team re-roll."
+// ⇒ Kdyz hod Pro nevyjde, tymovy prehoz smi prehodit HOD PRO, ne kostky bloku.
+//   Do 21.09. C++ po neuspesnem Pro prehodil rovnou kostky bloku.
+TEST(BlockHandler, TymovyPrehozPoNeuspesnemProJdeNaHODPRO) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getTeamState(TeamSide::HOME).rerolls = 2;
+
+    // 1 = ATTACKER_DOWN (spatny vysledek), hod Pro 2 = nesmi,
+    // tymovy prehoz HODU PRO: 3 = zase nesmi => plati puvodni ATTACKER_DOWN.
+    // Pak hod na brneni utocnika 3+3.
+    // S vadou by se trojkou prehodila KOSTKA BLOKU (3 = PUSHED) a utocnik by stal.
+    FixedDiceRoller dice({1, 2, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE)
+        << "r. 8386: po neuspesnem Pro plati puvodni vysledek";
+    EXPECT_EQ(gs.getTeamState(TeamSide::HOME).rerolls, 1)
+        << "tymovy prehoz se spotreboval na prehozeni HODU PRO";
+}
+
+TEST(BlockHandler, TymovyPrehozHODUPROmuzeUspet) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getTeamState(TeamSide::HOME).rerolls = 2;
+
+    // 1 = ATTACKER_DOWN, hod Pro 2 = nesmi, tymovy prehoz hodu Pro: 5 = smi,
+    // nova kostka bloku 6 = DEFENDER_DOWN, brneni obrance 3+3.
+    FixedDiceRoller dice({1, 2, 5, 6, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE) << "prehozeny blok srazil obrance";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getTeamState(TeamSide::HOME).rerolls, 1);
+}

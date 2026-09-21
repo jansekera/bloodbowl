@@ -719,9 +719,35 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         bool rerolled = false;
 
         // Pro reroll
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8385-8387 -- "On a roll of
+        //   1, 2 or 3 the original result stands and **may not be re-rolled with
+        //   a skill or team re-roll**; however you can re-roll the Pro roll with
+        //   a Team re-roll."
+        //   Do ted po neuspesnem hodu Pro propadl kod nize do tymoveho prehozu
+        //   a prehodil KOSTKY BLOKU -- tedy presne to, co pravidla zakazuji.
+        //   PHP vrstva to ma spravne (`ProCheck`), odtud ten rozdil.
+        bool proAttempted = false;
         if (!rerolled && att.hasSkill(SkillName::Pro) && !att.proUsedThisTurn) {
             att.proUsedThisTurn = true;
+            proAttempted = true;
             int proRoll = dice.rollD6();
+
+            // Tymovy prehoz smi prehodit jen HOD PRO, ne kostky.
+            if (proRoll < 4) {
+                TeamState& team = state.getTeamState(att.teamSide);
+                if (team.canUseReroll()) {
+                    team.rerolls--;
+                    team.rerollUsedThisTurn = true;
+
+                    bool canReroll = true;
+                    if (att.hasSkill(SkillName::Loner)) {
+                        int lonerRoll = dice.rollD6();
+                        if (lonerRoll < 4) canReroll = false;
+                    }
+                    if (canReroll) proRoll = dice.rollD6();
+                }
+            }
+
             if (proRoll >= 4) {
                 for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                 chosen = autoChooseBlockDie(faces, diceInfo.count,
@@ -734,8 +760,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             }
         }
 
-        // Team reroll
-        if (!rerolled && shouldRerollBlock(chosen, att)) {
+        // Team reroll -- jen kdyz se Pro vubec nezkouselo (r. 8386: po neuspesnem
+        //   Pro uz kostky prehodit nelze ani tymovym prehozem)
+        if (!rerolled && !proAttempted && shouldRerollBlock(chosen, att)) {
             TeamState& team = state.getTeamState(att.teamSide);
             if (team.canUseReroll()) {
                 team.rerolls--;
