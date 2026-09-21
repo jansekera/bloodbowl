@@ -66,17 +66,20 @@ final class ThrowTeamMateTest extends TestCase
         $this->assertSame(11, $landed->getPosition()->getX());
     }
 
-    public function testFumbleScattersFromThrower(): void
+    public function testFumbleNechaHraceNaJehoPoli(): void
     {
-        // Fumble (roll=1): scatter 1 from thrower
+        // ⛔ PREJMENOVANO 21.09.2026 (bylo `testFumbleScattersFromThrower`):
+        //   r. 8613 rika, ze fumblovany hrac zustava na svem PUVODNIM poli,
+        //   nerozptyluje se od hazece. Test sam mereni nezmenil -- kontroluje
+        //   jen, ze akce probehne a vyda udalosti.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->withBallOffPitch()
             ->build();
 
-        // Fumble roll=1, scatter D8=3 (East)→(6,5), landing: 7-3=4+, roll=1=fail, armor
-        $dice = new FixedDiceRoller([1, 3, 1, 2, 1]); // fumble, scatter, landing fail, armor die1, die2
+        // Fumble roll=1 => hrac zustava na (6,5); landing: 7-3=4+, roll=1=fail, armor
+        $dice = new FixedDiceRoller([1, 1, 2, 1]); // fumble, pristani (neuspech), brneni d1, d2
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -245,6 +248,113 @@ final class ThrowTeamMateTest extends TestCase
             'hozeny hrac S MICEM u davu kolo koncí (bod 6)');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
+    }
+
+    // ===== Tri nalezy z radku TTM (21.09.2026) =====
+    // r. 8606-8610: "The pass is worked out exactly the same as the player with
+    //   Throw Team-Mate passing a ball, except the player **must subtract 1 from
+    //   the D6 roll** when he passes the player, fumbles are not automatically
+    //   turnovers, and **Long Pass or Long Bomb range passes are not possible**."
+    // r. 8613: "**A fumbled team-mate will land in the square he originally
+    //   occupied.**"
+
+    public function testHodNaPresnostMaMinusJedna(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // (5,7) -> (11,7) je 6 poli = SHORT pass (modifikator 0), AG3, bez zon:
+        // cil byl 4+, s -1 je 5+. Hod 4 tedy PRED opravou vysel jako "accurate",
+        // po oprave je "inaccurate".
+        // ⚠️ Quick pass (do 3 poli) ma +1, ktery tu -1 vyrusi -- proto short.
+        $dice = new FixedDiceRoller([4, 3, 3, 3, 6]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 11, 'targetY' => 7,
+        ]);
+
+        $vysledek = null;
+        foreach ($result->getEvents() as $e) {
+            if ($e->getType() === 'throw_team_mate') { $vysledek = $e->getData()['result'] ?? null; }
+        }
+        $this->assertSame('inaccurate', $vysledek, 'r. 8608: -1 k hodu na presnost');
+    }
+
+    public function testModifikovanaJednickaJeFumble(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // Short pass (6 poli), hod 2 a modifikator -1 => 1 => fumble
+        // (r. 1742-1745 plati i pro TTM, protoze "the pass is worked out
+        // exactly the same"). Pak pristani na puvodnim poli (6 = uspech).
+        $dice = new FixedDiceRoller([2, 6]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 11, 'targetY' => 7,
+        ]);
+
+        $vysledek = null;
+        foreach ($result->getEvents() as $e) {
+            if ($e->getType() === 'throw_team_mate') { $vysledek = $e->getData()['result'] ?? null; }
+        }
+        $this->assertSame('fumble', $vysledek);
+    }
+
+    public function testFumblovanyHracZustaneNaSvemPuvodnimPoli(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // Fumble (prirozena 1). r. 8613: hrac zustava na svem PUVODNIM poli (6,7).
+        // Pred opravou se rozptyloval o jedno pole od hazece.
+        // Pak uz jen hod na pristani (6 = uspech).
+        $dice = new FixedDiceRoller([1, 6]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
+        ]);
+
+        $hozeny = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($hozeny);
+        $this->assertSame(6, $hozeny->getPosition()?->getX(), 'r. 8613: fumble = zustava na svem poli');
+        $this->assertSame(7, $hozeny->getPosition()?->getY());
+    }
+
+    public function testNaLongPassSeHazetNESMI(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // (5,7) -> (13,7) je 8 poli = Long Pass. r. 8609-8610: nejde.
+        $this->expectException(\InvalidArgumentException::class);
+        (new ActionResolver(new FixedDiceRoller([4, 4])))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 13, 'targetY' => 7,
+        ]);
+    }
+
+    public function testShortPassProjde(): void
+    {
+        // Pozitivni kontrola k testu vyse: 6 poli = Short Pass, ten povoleny je.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        $result = (new ActionResolver(new FixedDiceRoller([5, 3, 3, 3, 6])))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 11, 'targetY' => 7,
+        ]);
+        $this->assertTrue($result->isSuccess());
     }
 
     public function testPresnyHodSeResiJakoNEPRESNY_TRIKRAT_rozptyl(): void

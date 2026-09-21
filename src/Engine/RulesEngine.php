@@ -818,6 +818,12 @@ final class RulesEngine
         if ($range === null) {
             return ['Target landing position is out of range'];
         }
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8609-8610 -- u TTM
+        //   "Long Pass or Long Bomb range passes are not possible".
+        //   Nabidka nesmi takovy hod vubec obsahovat.
+        if ($range === PassRange::LONG_PASS || $range === PassRange::LONG_BOMB) {
+            return ['Throw Team-Mate: only quick or short pass range'];
+        }
 
         return [];
     }

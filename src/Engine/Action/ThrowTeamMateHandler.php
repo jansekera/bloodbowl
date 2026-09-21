@@ -129,15 +129,28 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Target is out of range');
         }
 
-        // Accuracy roll: 7 - AG + TZ + range modifier (always fumble on 1)
+        // ⛔ OPRAVA 21.09.2026 (1/3): `rules_bb2016.txt` r. 8609-8610 --
+        //   "**Long Pass or Long Bomb range passes are not possible**."
+        if ($range === PassRange::LONG_PASS || $range === PassRange::LONG_BOMB) {
+            throw new \InvalidArgumentException('Throw Team-Mate: only quick or short pass range (r. 8609-8610)');
+        }
+
+        // ⛔ OPRAVA 21.09.2026 (2/3): r. 8607-8608 -- "The pass is worked out
+        //   exactly the same as the player with Throw Team-Mate passing a ball,
+        //   **except the player must subtract 1 from the D6 roll** when he
+        //   passes the player." Ta -1 tady chybela.
+        //   A protoze se hod resi "exactly the same", plati i r. 1742-1745:
+        //   fumble je pri hodu 1 **nebo pri modifikovanem vysledku <= 1**.
         $ag = $thrower->getStats()->getAgility();
         $tz = $thrower->hasSkill(SkillName::NervesOfSteel)
             ? 0
             : $this->tzCalc->countTacklezones($state, $throwerPos, $thrower->getTeamSide());
-        $accuracyTarget = max(2, min(6, 7 - $ag + $tz - $range->modifier()));
+
+        $modifikator = $range->modifier() - $tz - 1;
+        $accuracyTarget = max(2, min(6, 7 - $ag - $modifikator));
 
         $roll = $this->dice->rollD6();
-        $fumble = $roll === 1;
+        $fumble = $roll === 1 || ($roll + $modifikator) <= 1;
         $accurate = !$fumble && $roll >= $accuracyTarget;
 
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
@@ -147,10 +160,12 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         $projectileHadBall = $state->getBall()->getCarrierId() === $targetId;
 
         if ($fumble) {
-            // Scatter 1 square from thrower
-            $direction = $this->dice->rollD8();
-            $scatterPos = $this->scatterCalc->scatterOnce($throwerPos, $direction);
-            return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $throwerPos);
+            // ⛔ OPRAVA 21.09.2026 (3/3): r. 8613 -- "**A fumbled team-mate will
+            //   land in the square he originally occupied.**" Do ted se
+            //   rozptyloval o jedno pole od hazece.
+            $puvodni = $projectile->getPosition() ?? $throwerPos;
+
+            return $this->resolveLanding($state, $projectile, $puvodni, $projectileHadBall, $events, $puvodni);
         }
 
         // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8609-8611 -- "In addition,
