@@ -411,13 +411,42 @@ final class BallResolver
         $target = $this->getCatchTarget($state, $catcher);
         $roll = $this->dice->rollD6();
         $success = $roll >= $target;
+        $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
 
+        // ⛔ OPRAVA 21.09.2026 (1/2): prehoz z Catch se tu delal POTICHU --
+        //   vydala se jen jedna udalost `catch` s uz prehozenym vysledkem,
+        //   takze prvni pokus ani pouziti skillu nebylo v zaznamu videt
+        //   (a zadny histogram je nemohl spocitat).
+        $skillRerollUsed = false;
         if (!$success && $catcher->hasSkill(SkillName::Catch)) {
+            $skillRerollUsed = true;
             $roll = $this->dice->rollD6();
             $success = $roll >= $target;
+            $events[] = GameEvent::rerollUsed($catcher->getId(), 'Catch');
+            $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
         }
 
-        $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
+        // ⛔ OPRAVA 21.09.2026 (2/2): `rules_bb2016.txt` r. 8381 -- Pro smi
+        //   prehodit "any one dice roll he has made other than Armour, Injury
+        //   or Casualty", tedy i chytani po odskoku a po vhazeni; r. 1263 to
+        //   rika u dopadajiciho mice vyslovne: "players may use the Catch or
+        //   Pro skill to try to re-roll the catch roll".
+        //   ⛔ Po prehozu z Catch uz Pro neprichazi (r. 925-926: tataz kostka
+        //   se neprehazuje dvakrat).
+        //   ⏰ Tymovy prehoz HODU PRO (r. 8387) tady zapojeny NENI -- musel by
+        //   se sem dostat tym na tahu a kontrola, ze je vlastni kolo; zapsano
+        //   v auditu jako samostatny nalez.
+        if (!$success && !$skillRerollUsed
+            && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
+            $catcher = $catcher->withProUsedThisTurn(true);
+            $state = $state->withPlayer($catcher);
+            $pro = ProCheck::roll($this->dice, $catcher, false, $events);
+            if ($pro['allowed']) {
+                $roll = $this->dice->rollD6();
+                $success = $roll >= $target;
+                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
+            }
+        }
 
         if ($success) {
             $state = $state->withBall(BallState::carried($pos, $catcher->getId()));

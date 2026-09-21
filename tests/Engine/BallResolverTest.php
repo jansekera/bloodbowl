@@ -209,6 +209,103 @@ final class BallResolverTest extends TestCase
         $this->assertEquals(7, $ballPos->getY());
     }
 
+    // ================= Pro a Catch u chytani po odskoku (21.09.2026) =================
+    //
+    // `rules_bb2016.txt` r. 8381: "Once per turn, a Pro is allowed to re-roll any
+    // one dice roll he has made other than Armour, Injury or Casualty" -- tedy
+    // i hod na chyceni mice po odskoku.
+    // r. 1263: "players may use the Catch or Pro skill to try to re-roll the
+    // catch roll" (kdyz mic dopadne).
+    // r. 925-926: "you may never re-roll a single dice roll more than once."
+
+    /** @param list<\App\DTO\GameEvent> $events @return list<string> */
+    private function typy(array $events): array
+    {
+        return array_map(static fn($e) => $e->getType(), $events);
+    }
+
+    public function testProPrehodiNeuspesneChytaniPoOdskoku(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Pro], id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 (vychod) -> mic na hrace 2; chyceni 2 = neuspech (treba 4+);
+        // hod Pro 5 = smi prehodit; prehozene chyceni 5 = uspech.
+        $dice = new FixedDiceRoller([3, 2, 5, 5]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 8381: Pro smi prehodit i chytani po odskoku');
+        $this->assertSame(2, $result['state']->getBall()->getCarrierId());
+        $this->assertContains('pro', $this->typy($result['events']), 'hod Pro ma byt videt v udalostech');
+        $this->assertTrue($result['state']->getPlayer(2)?->isProUsedThisTurn(), 'Pro se zapise jako pouzity');
+    }
+
+    public function testNeuspesnyHodProNechaPuvodniVysledek(): void
+    {
+        // Pozitivni kontrola k testu vyse: kdyz hod Pro nevyjde (1-3), plati
+        // puvodni neuspech a mic odskakuje dal.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Pro], id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> hrac 2; chyceni 2 = neuspech; hod Pro 3 = nesmi; odskok D8=3 na (12,7).
+        $dice = new FixedDiceRoller([3, 2, 3, 3]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertFalse($result['state']->getBall()->isHeld(), 'neuspesny hod Pro puvodni vysledek nemeni');
+        $this->assertSame(12, $result['state']->getBall()->getPosition()?->getX());
+    }
+
+    public function testPrehozZCatchJeVidetVUdalostech(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Catch], id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> hrac 2; chyceni 2 = neuspech; prehoz z Catch 5 = uspech.
+        $dice = new FixedDiceRoller([3, 2, 5]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertTrue($result['state']->getBall()->isHeld());
+        $typy = $this->typy($result['events']);
+        $this->assertContains('reroll', $typy, 'prehoz z Catch musi vydat udalost');
+        $this->assertSame(2, count(array_filter($typy, static fn($t) => $t === 'catch')),
+            'videt maji byt OBA pokusy o chyceni, ne jen ten druhy');
+    }
+
+    public function testPoPrehozuZCatchUzPronePrichazi(): void
+    {
+        // r. 925-926: tataz kostka se neprehazuje dvakrat.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 7, agility: 3, skills: [SkillName::Catch, SkillName::Pro], id: 2)
+            ->withBallOnGround(10, 7)
+            ->build();
+
+        // D8=3 -> hrac 2; chyceni 2 neuspech; prehoz z Catch 2 taky neuspech;
+        // s vadou by ted prislo Pro (5) a chyceni 5 = uspech. Spravne: odskok D8=3.
+        $dice = new FixedDiceRoller([3, 2, 2, 5, 5]);
+        $ballPos = $state->getBall()->getPosition();
+        $this->assertNotNull($ballPos);
+        $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
+
+        $this->assertFalse($result['state']->getBall()->isHeld(), 'po prehozu z Catch uz Pro na tutez kostku nesmi');
+        $this->assertNotContains('pro', $this->typy($result['events']));
+    }
+
     public function testBounceToEmptySquare(): void
     {
         $state = (new GameStateBuilder())
