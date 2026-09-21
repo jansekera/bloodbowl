@@ -292,7 +292,9 @@ final class GameState
                 ->withSureFeetUsedThisTurn(false)
                 // ⭐ 21.09.2026: r. 960-962 -- Dodge je "once per turn", tedy
                 //   za VLASTNI kolo (uhyba se jen ve svem kole).
-                ->withDodgeUsedThisTurn(false);
+                ->withDodgeUsedThisTurn(false)
+                // ⭐ 21.09.2026: r. 7991 -- Break Tackle "may only be used once per turn"
+                ->withBreakTackleUsedThisTurn(false);
 
             // Recover stunned players
             if ($player->getState() === \App\Enum\PlayerState::STUNNED) {

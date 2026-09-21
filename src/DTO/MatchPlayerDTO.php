@@ -41,6 +41,8 @@ final class MatchPlayerDTO
         // ⭐ 21.09.2026: `rules_bb2016.txt` r. 960-962 a 8089-8090 -- Dodge prehodi
         //   jen JEDEN neuspesny uhyb za kolo
         private bool $dodgeUsedThisTurn = false,
+        // ⭐ 21.09.2026: `rules_bb2016.txt` r. 7988-7991 -- Break Tackle 1x za kolo
+        private bool $breakTackleUsedThisTurn = false,
     ) {
     }
 
@@ -100,6 +102,7 @@ final class MatchPlayerDTO
     public function isProUsedThisTurn(): bool { return $this->proUsedThisTurn; }
     public function isSureFeetUsedThisTurn(): bool { return $this->sureFeetUsedThisTurn; }
     public function isDodgeUsedThisTurn(): bool { return $this->dodgeUsedThisTurn; }
+    public function isBreakTackleUsedThisTurn(): bool { return $this->breakTackleUsedThisTurn; }
     public function getRaceName(): ?string { return $this->raceName; }
     /** @return list<string> */
     public function getLearnedSkills(): array { return $this->learnedSkills; }
@@ -232,6 +235,13 @@ final class MatchPlayerDTO
         return $clone;
     }
 
+    public function withBreakTackleUsedThisTurn(bool $used): self
+    {
+        $clone = clone $this;
+        $clone->breakTackleUsedThisTurn = $used;
+        return $clone;
+    }
+
     /** @param list<SkillName> $skills */
     public function withSkills(array $skills): self
     {
@@ -257,6 +267,7 @@ final class MatchPlayerDTO
             raceName: $this->raceName,
             sureFeetUsedThisTurn: $this->sureFeetUsedThisTurn,
             dodgeUsedThisTurn: $this->dodgeUsedThisTurn,
+            breakTackleUsedThisTurn: $this->breakTackleUsedThisTurn,
         );
     }
 
@@ -283,6 +294,7 @@ final class MatchPlayerDTO
             'proUsedThisTurn' => $this->proUsedThisTurn,
             'sureFeetUsedThisTurn' => $this->sureFeetUsedThisTurn,
             'dodgeUsedThisTurn' => $this->dodgeUsedThisTurn,
+            'breakTackleUsedThisTurn' => $this->breakTackleUsedThisTurn,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -323,6 +335,7 @@ final class MatchPlayerDTO
             learnedSkills: array_values((array) ($data['learnedSkills'] ?? [])),
             sureFeetUsedThisTurn: (bool) ($data['sureFeetUsedThisTurn'] ?? false),
             dodgeUsedThisTurn: (bool) ($data['dodgeUsedThisTurn'] ?? false),
+            breakTackleUsedThisTurn: (bool) ($data['breakTackleUsedThisTurn'] ?? false),
         );
     }
 }

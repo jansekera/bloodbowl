@@ -72,16 +72,29 @@ final class FoulHandler implements ActionHandlerInterface
         $asistence = $this->strengthCalculator->countFoulAssists($state, $attacker, $defender);
         $modifier = $asistence;
 
-        // Dirty Player: +1 to foul armor roll
-        // ⏰ r. 8045-8049 dava VOLBU zbroj NEBO zraneni -- zatim vzdy zbroj (samostatna polozka).
-        if ($attacker->hasSkill(SkillName::DirtyPlayer)) {
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8045-8049 -- "Add 1 to any
+        //   Armour roll **or** Injury roll made by a player with this skill when
+        //   they make a Foul ... Note that you may **only modify one** of the
+        //   dice rolls." Do ted se +1 davalo VZDY na brneni, i kdyz brneni
+        //   prorazilo samo -- tim se bonus zahodil.
+        //   ⭐ Doktrina uzivatele "vol nejlepsi vysledek" (15.09.): bonus jde na
+        //   brneni jen tehdy, kdyz o nem rozhodne; jinak si ho schovame na
+        //   zraneni. Rozhodnout se smi az po hodu na brneni -- pravidla nerikaji,
+        //   ze se volba hlasi predem.
+        $armourValue = $defender->getStats()->getArmour();
+        $maDirtyPlayer = $attacker->hasSkill(SkillName::DirtyPlayer);
+
+        $bezBonusu = $die1 + $die2 + $modifier;
+        $bonusNaBrneni = $maDirtyPlayer && $bezBonusu <= $armourValue && ($bezBonusu + 1) > $armourValue;
+        if ($bonusNaBrneni) {
             $modifier++;
         }
 
         $total = $die1 + $die2 + $modifier;
-
-        $armourValue = $defender->getStats()->getArmour();
         $armourBroken = $total > $armourValue;
+
+        // Kdyz se bonus na brneni nepouzil a hod na zraneni bude, patri tam.
+        $bonusNaZraneni = ($maDirtyPlayer && !$bonusNaBrneni) ? 1 : 0;
 
         $events[] = GameEvent::foulAttempt($attackerId, $targetId, $die1, $die2, $armourValue, $armourBroken, $modifier);
 
@@ -90,7 +103,7 @@ final class FoulHandler implements ActionHandlerInterface
         if ($armourBroken) {
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-            $injResult = $this->injuryResolver->resolveInjuryOnly($defender, $this->dice, 0, $hasStakes, $hasNurglesRot);
+            $injResult = $this->injuryResolver->resolveInjuryOnly($defender, $this->dice, $bonusNaZraneni, $hasStakes, $hasNurglesRot);
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);

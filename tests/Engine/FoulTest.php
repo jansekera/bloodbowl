@@ -135,6 +135,71 @@ final class FoulTest extends TestCase
         $this->assertEquals(PlayerState::EJECTED, $attacker->getState());
     }
 
+    public function testDirtyPlayerSiSchovaBonusNaZRANENI_kdyzBrneniProjdeSamo(): void
+    {
+        // ⭐ 21.09.2026: `rules_bb2016.txt` r. 8045-8049: "Add 1 to any Armour
+        //   roll **or** Injury roll ... Note that you may only modify one of the
+        //   dice rolls, so if you decide to use Dirty Player to modify the
+        //   Armour roll, you may not modify the Injury roll as well."
+        //   Do ted se +1 davalo VZDY na brneni. Kdyz brneni prorazi i bez nej,
+        //   je to zahozeny bonus -- podle doktriny "vol nejlepsi vysledek"
+        //   patri na zraneni.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::DirtyPlayer], id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        // Brneni 5+4 = 9 > 8 prorazi i BEZ bonusu => +1 patri na zraneni.
+        // Zraneni 3+4 = 7; s bonusem 8 = KO, bez nej 7 = omraceni.
+        $dice = new FixedDiceRoller([5, 4, 3, 4]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $obet = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($obet);
+        $this->assertSame(PlayerState::KO, $obet->getState(), 'r. 8045-8049: nevyuzity bonus patri na zraneni');
+    }
+
+    public function testDirtyPlayerDaBonusNaBRNENI_kdyzJenTakProrazi(): void
+    {
+        // Pozitivni kontrola: kdyz brneni bez bonusu NEprorazi, bonus patri tam
+        // -- a pak uz NESMI byt i na zraneni.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::DirtyPlayer], id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        // Brneni 5+3 = 8, coz NENI > 8; s bonusem 9 > 8 => prorazi.
+        // Zraneni 3+4 = 7 = omraceni; kdyby se bonus pouzil dvakrat, bylo by 8 = KO.
+        $dice = new FixedDiceRoller([5, 3, 3, 4]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $obet = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($obet);
+        $this->assertSame(PlayerState::STUNNED, $obet->getState(), 'bonus se smi uplatnit jen jednou');
+    }
+
+    public function testBezDirtyPlayeraZadnyBonusNikde(): void
+    {
+        // Druha pozitivni kontrola: tataz fixtura bez skillu.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
+            ->build();
+
+        $dice = new FixedDiceRoller([5, 3, 3, 4]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
+            'playerId' => 1, 'targetId' => 2,
+        ]);
+
+        $obet = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($obet);
+        $this->assertSame(PlayerState::PRONE, $obet->getState(), 'brneni 8 neni > 8, takze zadne zraneni');
+    }
+
     public function testDubletNaZRANENIvylouciFaulujiciho(): void
     {
         // ⭐ 21.09.2026: `rules_bb2016.txt` r. 1877-1878: "if the Armour

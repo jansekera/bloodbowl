@@ -240,8 +240,22 @@ final class MoveHandler implements ActionHandlerInterface
 
             // Dodge roll
             if ($step->requiresDodge()) {
+                // ⛔ OPRAVA 21.09.2026 (`rules_bb2016.txt` r. 7988-7991): Break
+                //   Tackle je 1x za kolo, takze cil uhybu uz nelze brat
+                //   predpocitany z cesty -- ta se pocita pred prvnim krokem,
+                //   kdy je skill jeste k dispozici. Pocita se znovu ze
+                //   SOUCASNEHO stavu hrace.
+                $breakTackleTed = $this->tzCalc->breakTackleAvailable($currentPlayer);
+                $target = $from !== null
+                    ? $this->tzCalc->calculateDodgeTarget($currentState, $currentPlayer, $to, $from)
+                    : $step->getDodgeTarget();
+
+                if ($breakTackleTed) {
+                    $currentPlayer = $currentPlayer->withBreakTackleUsedThisTurn(true);
+                    $currentState = $currentState->withPlayer($currentPlayer);
+                }
+
                 $roll = $this->dice->rollD6();
-                $target = $step->getDodgeTarget();
                 $success = $roll >= $target;
                 $events[] = GameEvent::dodgeAttempt($playerId, $target, $roll, $success);
 

@@ -124,10 +124,17 @@ final class TacklezoneCalculator
      */
     public function calculateDodgeTarget(GameState $state, MatchPlayerDTO $player, Position $destination, ?Position $source = null): int
     {
-        // Break Tackle: use ST instead of AG for dodge
-        $agility = $player->hasSkill(SkillName::BreakTackle)
-            ? $player->getStats()->getStrength()
-            : $player->getStats()->getAgility();
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 7988-7991 -- "The player
+        //   **may** use his Strength instead of his Agility when making a Dodge
+        //   roll. ... This skill may only be used **once per turn**."
+        //   Do ted se sila brala VZDY (i kdyz byla nizsi nez obratnost) a bez
+        //   jakehokoli limitu.
+        //   ⭐ "May" + doktrina "vol nejlepsi vysledek" ⇒ sila se pouzije jen
+        //   tehdy, kdyz je VYSSI nez obratnost.
+        $agility = $player->getStats()->getAgility();
+        if ($this->breakTackleAvailable($player)) {
+            $agility = $player->getStats()->getStrength();
+        }
 
         $tzAtDest = $this->countTacklezones($state, $destination, $player->getTeamSide());
 
@@ -226,5 +233,17 @@ final class TacklezoneCalculator
 
         // Clamp to 2-6 range
         return max(2, min(6, $target));
+    }
+
+    /**
+     * Smi si hrac na TENHLE uhyb vzit silu misto obratnosti?
+     * r. 7988-7991: jen kdyz ma skill, jeste ho v tomhle kole nepouzil
+     * a sila je opravdu vyssi nez obratnost ("may" = volba).
+     */
+    public function breakTackleAvailable(MatchPlayerDTO $player): bool
+    {
+        return $player->hasSkill(SkillName::BreakTackle)
+            && !$player->isBreakTackleUsedThisTurn()
+            && $player->getStats()->getStrength() > $player->getStats()->getAgility();
     }
 }
