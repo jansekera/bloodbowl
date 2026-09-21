@@ -247,8 +247,11 @@ final class MoveHandler implements ActionHandlerInterface
 
                 if (!$success) {
                     // Try Dodge skill reroll (negated by adjacent enemy with Tackle)
+                    // ⛔ OPRAVA 21.09.2026 (`rules_bb2016.txt` r. 960-962, 8089-8090):
+                    //   "the player may only re-roll one failed Dodge roll per turn".
+                    //   Do ted slo Dodgem zachranit kazdy uhyb v tahu.
                     $skillRerollUsed = false;
-                    if ($currentPlayer->hasSkill(SkillName::Dodge)) {
+                    if ($currentPlayer->hasSkill(SkillName::Dodge) && !$currentPlayer->isDodgeUsedThisTurn()) {
                         $tackleNegatesDodge = false;
                         if ($from !== null) {
                             foreach ($this->tzCalc->getMarkingPlayers($currentState, $from, $currentPlayer->getTeamSide()) as $marker) {
@@ -261,6 +264,8 @@ final class MoveHandler implements ActionHandlerInterface
 
                         if (!$tackleNegatesDodge) {
                             $skillRerollUsed = true;
+                            $currentPlayer = $currentPlayer->withDodgeUsedThisTurn(true);
+                            $currentState = $currentState->withPlayer($currentPlayer);
                             $roll = $this->dice->rollD6();
                             $success = $roll >= $target;
                             $events[] = GameEvent::rerollUsed($playerId, 'Dodge');
