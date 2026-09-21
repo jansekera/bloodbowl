@@ -153,14 +153,38 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $throwerPos);
         }
 
-        if ($accurate) {
-            return $this->resolveLanding($state, $projectile, $landingTarget, $projectileHadBall, $events, $throwerPos);
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8609-8611 -- "In addition,
+        //   **accurate passes are treated instead as inaccurate passes thus
+        //   scattering the player three times** as players are heavier and
+        //   harder to pass than a ball."
+        //   Do ted: presny hod polozil hrace PRESNE na cil (zadny rozptyl)
+        //   a nepresny rozptyloval jen JEDNOU.
+        //   ⇒ Presny i nepresny konci stejne: tri rozptyly po jednom poli,
+        //   stejne jako u nepresne prihravky (`PassResolver::scatterMissedPass`).
+        [$scatterPos, $lastOnPitch] = $this->scatterThrownPlayer($landingTarget);
+
+        return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $lastOnPitch);
+    }
+
+    /**
+     * Tri rozptyly po jednom poli (r. 8610-8611). Jakmile hozeny hrac opusti
+     * hriste, dalsi rozptyly se uz nehazi -- dopada k davu a pripadny mic se
+     * vhazuje od posledniho pole na hristi (r. 8614-8616 + 659-663).
+     *
+     * @return array{Position, Position} [kam dolet, posledni pole na hristi]
+     */
+    private function scatterThrownPlayer(Position $target): array
+    {
+        $pos = $target;
+        for ($i = 0; $i < 3; $i++) {
+            $next = $this->scatterCalc->scatterOnce($pos, $this->dice->rollD8());
+            if (!$next->isOnPitch()) {
+                return [$next, $pos];
+            }
+            $pos = $next;
         }
 
-        // Inaccurate: scatter from target
-        $direction = $this->dice->rollD8();
-        $scatterPos = $this->scatterCalc->scatterOnce($landingTarget, $direction);
-        return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $landingTarget);
+        return [$pos, $pos];
     }
 
     /**

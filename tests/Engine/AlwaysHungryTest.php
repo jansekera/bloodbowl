@@ -24,8 +24,10 @@ final class AlwaysHungryTest extends TestCase
 
         // Always Hungry roll = 2 → passes
         // Accuracy roll = 5 → accurate (AG default is 3, short range)
+        // ⛔ 21.09.2026: i presny hod se resi jako nepresny (r. 8609-8611),
+        //   takze pribyly TRI rozptyly (D8=3 vychod).
         // Landing roll = 5 → lands safely
-        $dice = new FixedDiceRoller([2, 5, 5]);
+        $dice = new FixedDiceRoller([2, 5, 3, 3, 3, 5]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1,
@@ -88,9 +90,9 @@ final class AlwaysHungryTest extends TestCase
 
         // Always Hungry roll = 1 → fails
         // Team reroll: new roll = 3 → passes
-        // Accuracy roll = 5 → accurate
+        // Accuracy roll = 5 → accurate, pak 3x rozptyl (r. 8609-8611)
         // Landing roll = 5 → lands
-        $dice = new FixedDiceRoller([1, 3, 5, 5]);
+        $dice = new FixedDiceRoller([1, 3, 5, 3, 3, 3, 5]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1,
@@ -194,8 +196,8 @@ final class AlwaysHungryTest extends TestCase
             ->build();
 
         // Roll = 6 → safe
-        // Accuracy = 5, landing = 5
-        $dice = new FixedDiceRoller([6, 5, 5]);
+        // Accuracy = 5, pak 3x rozptyl (r. 8609-8611), landing = 5
+        $dice = new FixedDiceRoller([6, 5, 3, 3, 3, 5]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1,

@@ -81,7 +81,8 @@ Chybí v enumu: Fan Favourite, Filthy Rich, Kick Team-Mate. Sedí: Block, Foul A
 | Sneaky Git | 8484-8486: vyloučen jen když zbroj prorazí | `Action/FoulHandler.php:88` nikdy | stejná | – | jistá |
 | No Hands | 8319: nezachycuje | `PassResolver::checkInterceptions` pustí | OK | – | jistá |
 | Pass Block | 8355: dodge, legální cíl, i proti Dump-Off | `PassResolver.php:713+` bez dodge, rovně, jen 1, ne u Dump-Off | neimpl. | `PassBlockTest.php:15,140` | jistá |
-| ⭐ **NOVĚ 21.09.: TTM nepřesný hod rozptyluje JEN 1×** *(r. 8610-8611: „scattering the player **three times**"; `ThrowTeamMateHandler.php:162` volá `scatterOnce` jednou)* — nezařazeno, čeká na rozhodnutí pořadí | | | | |
+| ✅ **TTM: rozptyl 3× — OPRAVENO 21.09.** | 8609-8611: „**accurate passes are treated instead as inaccurate passes thus scattering the player three times**" | `ThrowTeamMateHandler::scatterThrownPlayer()` — přesný i nepřesný hod = 3 rozptyly po 1 poli, po výletu ze hřiště se další nehází | – | `ThrowTeamMateTest.php` (+3 testy; 6 starých přepsáno) | jistá |
+| ⏰ **Zbytek řádku TTM níž je pořád otevřený**: chybí **−1** k hodu na přesnost, **Long/Long Bomb se nemá nabízet**, a **fumble má hráče položit na jeho PŮVODNÍ pole** (r. 8613), ne rozptýlit od házeče | | | | |
 | Throw Team-Mate | 8607-8617: −1, jen quick/short, přesný = 3× rozptyl, fumble na místě, přistání na hráče = sražení | `Action/ThrowTeamMateHandler.php:137` bez −1; `RulesEngine.php:818` dlouhé; `:156,161,151,210-215` | OK | `ThrowTeamMateTest.php:16,41,65,153` | jistá |
 | Right Stuff | 8429-8431: může jednat později; s míčem turnover | `ThrowTeamMateHandler.php:218` hasActed; `:235-254` bez turnoveru | OK | – | jistá |
 | Secret Weapon | 8454: vyloučen i mimo hřiště | `GameFlowResolver.php:212` jen `isOnPitch` | OK | – | pravděpodobná |

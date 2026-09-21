@@ -24,7 +24,11 @@ final class ThrowTeamMateTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([4, 4]); // accuracy, landing
+        // ⛔ PREPSANO 21.09.2026 (r. 8609-8611): i PRESNY hod se resi jako
+        //   nepresny, tedy tri rozptyly. Drive tu bylo `[4, 4]` a ocekavalo se
+        //   pristani presne na (8,5) -- to bylo zakotveni vady.
+        //   Rozptyly D8=3 (vychod) x3 z (8,5) => (11,5).
+        $dice = new FixedDiceRoller([4, 3, 3, 3, 4]); // presnost, 3x rozptyl, pristani
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -33,7 +37,7 @@ final class ThrowTeamMateTest extends TestCase
         $this->assertFalse($result->isTurnover());
         $newState = $result->getNewState();
         $landed = $newState->getPlayer(2);
-        $this->assertSame(8, $landed->getPosition()->getX());
+        $this->assertSame(11, $landed->getPosition()->getX());
         $this->assertSame(5, $landed->getPosition()->getY());
         $this->assertSame(PlayerState::STANDING, $landed->getState());
     }
@@ -48,9 +52,9 @@ final class ThrowTeamMateTest extends TestCase
             ->build();
 
         // Accuracy: 7-3-1=3+. Roll 2=inaccurate.
-        // Scatter D8=3 (East), landing at (9,5).
-        // Landing: 7-3=4+. Roll 4=success.
-        $dice = new FixedDiceRoller([2, 3, 4]); // accuracy, scatter D8, landing
+        // ⛔ PREPSANO 21.09.2026 (r. 8610-8611): rozptyl je TRIKRAT, ne jednou.
+        // 3x D8=3 (vychod) z (8,5) => (11,5). Landing: 7-3=4+. Roll 4=success.
+        $dice = new FixedDiceRoller([2, 3, 3, 3, 4]); // presnost, 3x rozptyl, pristani
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -58,8 +62,8 @@ final class ThrowTeamMateTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         $landed = $result->getNewState()->getPlayer(2);
-        // Scattered East from (8,5) → (9,5)
-        $this->assertSame(9, $landed->getPosition()->getX());
+        // Tri pole na vychod od (8,5) → (11,5)
+        $this->assertSame(11, $landed->getPosition()->getX());
     }
 
     public function testFumbleScattersFromThrower(): void
@@ -94,8 +98,9 @@ final class ThrowTeamMateTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // Accurate roll=5, landing: 7-3=4+, roll=2=fail, armor 3+3=6 not > 8
-        $dice = new FixedDiceRoller([5, 2, 3, 3]); // accuracy, landing, armor die1, die2
+        // Accurate roll=5 (ale r. 8609-8611: i tak 3x rozptyl), 3x D8=3 => (11,5),
+        // landing: 7-3=4+, roll=2=fail, armor 3+3=6 not > 8
+        $dice = new FixedDiceRoller([5, 3, 3, 3, 2, 3, 3]); // presnost, 3x rozptyl, pristani, brneni
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -117,8 +122,9 @@ final class ThrowTeamMateTest extends TestCase
             ->withBallCarried(2)
             ->build();
 
-        // Accurate roll=4, landing 4+, roll=4
-        $dice = new FixedDiceRoller([4, 4]); // accuracy, landing
+        // Accurate roll=4 (r. 8609-8611: i presny = 3x rozptyl), 3x D8=3 => (11,5),
+        // landing 4+, roll=4
+        $dice = new FixedDiceRoller([4, 3, 3, 3, 4]); // presnost, 3x rozptyl, pristani
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -139,8 +145,9 @@ final class ThrowTeamMateTest extends TestCase
             ->withBallCarried(2)
             ->build();
 
-        // Accurate roll=4, landing fail roll=1, armor 2+2=4 not > 8, bounce D8=3
-        $dice = new FixedDiceRoller([4, 1, 2, 2, 3]); // accuracy, landing, armor, armor, bounce
+        // Accurate roll=4 (i tak 3x rozptyl D8=3 => (11,5)), landing fail roll=1,
+        // armor 2+2=4 not > 8, bounce D8=3
+        $dice = new FixedDiceRoller([4, 3, 3, 3, 1, 2, 2, 3]); // presnost, 3x rozptyl, pristani, brneni, odskok
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
@@ -156,20 +163,25 @@ final class ThrowTeamMateTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
-            ->addPlayer(TeamSide::AWAY, 8, 5, id: 3) // occupying landing target
+            ->addPlayer(TeamSide::AWAY, 7, 5, id: 3) // stoji na poli, kam hrac dorozptyluje
             ->withBallOffPitch()
             ->build();
 
-        // Accurate roll=4 → lands on (8,5) occupied → scatter D8=3 (East) → (9,5)
-        // Landing: 7-3+1(TZ from player3 at 8,5)=5+, roll=5
-        $dice = new FixedDiceRoller([4, 3, 5]); // accuracy, scatter from occupied, landing
+        // ⛔ PREPSANO 21.09.2026: hod se ted vzdy rozptyluje 3x (r. 8609-8611).
+        //   Aby test poradi dal meril to sve -- pristani na OBSAZENE pole --
+        //   jsou rozptyly voleny tak, aby hrac skoncil zpatky na (8,5):
+        //   D8=3 (vychod) na (9,5), D8=7 (zapad) zpet na (8,5), D8=3 na (9,5)? ne --
+        //   volime 3 (vychod) -> (9,5), 7 (zapad) -> (8,5), 7 (zapad) -> (7,5)
+        //   a cilem je obsazene pole (7,5), kde stoji hrac 3.
+        // Pak rozptyl z obsazeneho pole D8=3 (vychod) -> (8,5), pristani 5.
+        $dice = new FixedDiceRoller([4, 3, 7, 7, 3, 5]); // presnost, 3x rozptyl, rozptyl z obsazeneho, pristani
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
         ]);
 
         $landed = $result->getNewState()->getPlayer(2);
-        $this->assertSame(9, $landed->getPosition()->getX());
+        $this->assertSame(8, $landed->getPosition()->getX(), 'z obsazeneho (7,5) rozptyl na vychod');
     }
 
     public function testOffPitchCrowdSurf(): void
@@ -233,6 +245,72 @@ final class ThrowTeamMateTest extends TestCase
             'hozeny hrac S MICEM u davu kolo koncí (bod 6)');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
+    }
+
+    public function testPresnyHodSeResiJakoNEPRESNY_TRIKRAT_rozptyl(): void
+    {
+        // ⭐ 21.09.2026: `rules_bb2016.txt` r. 8609-8611: "In addition, **accurate
+        //   passes are treated instead as inaccurate passes thus scattering the
+        //   player three times** as players are heavier and harder to pass than
+        //   a ball." Do ted presny hod polozil hrace PRESNE na cil (0 rozptylu)
+        //   a nepresny rozptyloval jen 1x.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // presnost 6 = presny hod; 3x rozptyl D8=3 (vychod) z (8,7) => (11,7);
+        // pristani 6 = uspech.
+        $dice = new FixedDiceRoller([6, 3, 3, 3, 6]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
+        ]);
+
+        $hozeny = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($hozeny);
+        $this->assertSame(11, $hozeny->getPosition()?->getX(), 'tri pole na vychod od ciloveho pole');
+        $this->assertSame(7, $hozeny->getPosition()?->getY());
+    }
+
+    public function testNepresnyHodRozptylujeTakyTrikrat(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // presnost 2 = nepresny; 3x rozptyl D8=3 => (11,7); pristani 6.
+        $dice = new FixedDiceRoller([2, 3, 3, 3, 6]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
+        ]);
+
+        $hozeny = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($hozeny);
+        $this->assertSame(11, $hozeny->getPosition()?->getX());
+    }
+
+    public function testRozptylSeZastaviHnedJakHracOpustiHriste(): void
+    {
+        // Pozitivni kontrola: kdyz hrac vyleti ze hriste uz pri prvnim rozptylu,
+        // dalsi dva se nehazi (jinak by se kostky rozjely o dve dal).
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 1, 0, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 2, 0, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // presnost 2; rozptyl D8=1 (sever) z (4,0) => (4,-1) mimo hriste;
+        // pak uz jen zraneni od davu 3+3.
+        $dice = new FixedDiceRoller([2, 1, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
+        ]);
+
+        $typy = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('crowd_surf', $typy, 'po vyletu se dalsi rozptyly nehazi');
     }
 
     public function testHozenyNosicVDavuVratiMicVhazenim(): void
