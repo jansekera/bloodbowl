@@ -150,17 +150,17 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             // Scatter 1 square from thrower
             $direction = $this->dice->rollD8();
             $scatterPos = $this->scatterCalc->scatterOnce($throwerPos, $direction);
-            return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events);
+            return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $throwerPos);
         }
 
         if ($accurate) {
-            return $this->resolveLanding($state, $projectile, $landingTarget, $projectileHadBall, $events);
+            return $this->resolveLanding($state, $projectile, $landingTarget, $projectileHadBall, $events, $throwerPos);
         }
 
         // Inaccurate: scatter from target
         $direction = $this->dice->rollD8();
         $scatterPos = $this->scatterCalc->scatterOnce($landingTarget, $direction);
-        return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events);
+        return $this->resolveLanding($state, $projectile, $scatterPos, $projectileHadBall, $events, $landingTarget);
     }
 
     /**
@@ -172,6 +172,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         Position $landingPos,
         bool $hadBall,
         array $events,
+        ?Position $scatterOrigin = null,
     ): ActionResult {
         // Off pitch → crowd surf
         if (!$landingPos->isOnPitch()) {
@@ -179,8 +180,24 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $projectile = $projectile->withPosition(null);
             $state = $state->withPlayer($projectile);
 
+            // ⛔ OPRAVA 21.09.2026 (`rules_bb2016.txt` r. 8614-8616 + 659-663):
+            //   hozeny hrac u davu je „beaten up by the crowd **in the same
+            //   manner as a player who has been pushed off the pitch**", a
+            //   u vytlaceneho NOSICE plati: „the fans ... throw the ball back
+            //   into play! The throw-in is centred on the last square the
+            //   player was in before he was pushed off the pitch."
+            //   Do ted tady mic ZMIZEL (`BallState::offPitch()`).
+            $throwInFrom = $scatterOrigin;
             if ($hadBall) {
-                $state = $state->withBall(BallState::offPitch());
+                if ($throwInFrom !== null && $throwInFrom->isOnPitch()) {
+                    $state = $state->withBall(BallState::onGround($throwInFrom));
+                    $throwIn = $this->ballResolver->resolveThrowIn($state, $throwInFrom, $landingPos);
+                    $state = $throwIn['state'];
+                    $events = array_merge($events, $throwIn['events']);
+                } else {
+                    // Bez znameho posledniho ctverce nemam odkud vhazovat.
+                    $state = $state->withBall(BallState::offPitch());
+                }
             }
 
             $injResult = $this->injuryResolver->resolveCrowdSurf($projectile, $this->dice);
@@ -211,7 +228,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         if ($occupant !== null && $occupant->getId() !== $projectile->getId()) {
             $direction = $this->dice->rollD8();
             $newPos = $this->scatterCalc->scatterOnce($landingPos, $direction);
-            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events);
+            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos);
         }
 
         // Place player at landing position

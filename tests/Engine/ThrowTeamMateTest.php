@@ -220,7 +220,10 @@ final class ThrowTeamMateTest extends TestCase
         $this->assertSame(2, $state->getBall()->getCarrierId(),
             'fixtura je vadna: mic nenese hozeny hrac, par nic nemeri');
 
-        $dice = new FixedDiceRoller([2, 1, 3, 3]);
+        // 21.09.: kostek je vic, protoze po opravě nasleduje VHAZENI
+        //   (sablona D6 + 2D6 poli + pripadny odskok) -- viz
+        //   `testHozenyNosicVDavuVratiMicVhazenim`.
+        $dice = new FixedDiceRoller([2, 1, 3, 3, 4, 2, 2, 5, 5, 5, 5, 5]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
@@ -230,6 +233,41 @@ final class ThrowTeamMateTest extends TestCase
             'hozeny hrac S MICEM u davu kolo koncí (bod 6)');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
+    }
+
+    public function testHozenyNosicVDavuVratiMicVhazenim(): void
+    {
+        // ⭐ 21.09.2026: `rules_bb2016.txt` r. 8614-8616 -- hozeny hrac, ktery
+        //   odletí ze hriste, „is beaten up by the crowd **in the same manner as
+        //   a player who has been pushed off the pitch**". A r. 659-663 pro
+        //   vytlaceneho nosice: „the fans ... are more than happy to throw the
+        //   ball back into play! The throw-in is centred on the last square the
+        //   player was in before he was pushed off the pitch."
+        //   Do ted mic proste ZMIZEL (`BallState::offPitch()`).
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 1, 0, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 2, 0, skills: [SkillName::RightStuff], id: 2)
+            ->withBallCarried(2)
+            ->build();
+
+        // SEBEKONTROLA FIXTURY: hozeny hrac mic opravdu nese.
+        $this->assertSame(2, $state->getBall()->getCarrierId(), 'fixtura je vadna: mic nenese hozeny hrac');
+
+        // nepresny hod 2, rozptyl D8=1 (na sever) => (4,-1) mimo hriste;
+        // zraneni 3+3; pak vhazeni: sablona D6 a 2D6 poli, pripadny odskok.
+        $dice = new FixedDiceRoller([2, 1, 3, 3, 4, 2, 2, 5, 5, 5, 5, 5]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
+        ]);
+
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('crowd_surf', $types, 'fixtura: hrac se mel dostat k davu');
+        $this->assertContains('throw_in', $types, 'r. 659-663: fanousci hazi mic zpatky do hry');
+
+        $ball = $result->getNewState()->getBall();
+        $this->assertTrue($ball->isOnPitch(), 'mic nesmi zmizet ze hry');
+        $this->assertNotNull($ball->getPosition());
+        $this->assertTrue($result->isTurnover(), 'nosic u davu = turnover (bod 6) -- to plati dal');
     }
 
     public function testValidationTargetWithoutRightStuff(): void
