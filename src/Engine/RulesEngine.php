@@ -15,6 +15,15 @@ use App\ValueObject\Position;
 
 final class RulesEngine
 {
+    /**
+     * ⭐ BALIK G 24.09.2026: kolik hracu smi stat na hristi.
+     * Soupiska ma az `RosterValidator::MAX_PLAYERS` = 16, na hriste jich
+     * smi 11 -- r. 308-309. Zbytek ceka v rezervach (lavicka).
+     * ⚠️ Pravidla znaji vyjimky (napr. karta "GASSY ERUPTION", r. 4723,
+     * ktera dovoli 11 prekrocit) -- ty v enginu nejsou, takze strop je tvrdy.
+     */
+    public const MAX_PLAYERS_ON_PITCH = 11;
+
     private readonly TacklezoneCalculator $tzCalc;
     private readonly Pathfinder $pathfinder;
 
@@ -425,6 +434,19 @@ final class RulesEngine
         $occupant = $state->getPlayerAtPosition($position);
         if ($occupant !== null && $occupant->getId() !== $playerId) {
             $errors[] = 'Position already occupied by another player';
+        }
+
+        // ⭐ BALIK G 24.09.2026 -- soupiska smi mit az 16 hracu
+        //   (`RosterValidator::MAX_PLAYERS`), ale na hriste jich smi jen 11:
+        //   r. 308-309 "Each coach must set up 11 players, or if they can't
+        //   field 11 then as many players as they have in Reserves".
+        //   Zbytek zustava v rezervach = LAVICKA.
+        //   ⚠️ Hrac, ktery uz na hristi STOJI, se smi prestavet -- tim se
+        //   pocet nezvysi, takze strop se na nej nevztahuje.
+        if (!$player->getState()->isOnPitch()
+            && count($state->getPlayersOnPitch($side)) >= self::MAX_PLAYERS_ON_PITCH) {
+            $errors[] = 'Cannot set up more than ' . self::MAX_PLAYERS_ON_PITCH
+                . ' players on the pitch (rest stay in Reserves)';
         }
 
         return $errors;
@@ -867,8 +889,29 @@ final class RulesEngine
         $side = $state->getActiveTeam();
         $playersOnPitch = $state->getPlayersOnPitch($side);
 
-        if (count($playersOnPitch) < 11) {
-            $errors[] = 'Need at least 11 players on the pitch (have ' . count($playersOnPitch) . ')';
+        // ⛔⛔ OPRAVENO 24.09.2026 (balik G) -- tady bylo natvrdo `< 11`, zatimco
+        //   `SetupHandler::resolveEndSetup` uz pocital `min(11, dostupni)`. Tym,
+        //   ktery po zranenich jedenact hracu NEMA, tak neprosel validaci a
+        //   rozestaveni neslo ukoncit. Pravidlo r. 308-309 pocita s obema pripady:
+        //   "must set up 11 players, or if they can't field 11 then as many
+        //   players as they have in Reserves".
+        $availablePlayers = 0;
+        foreach ($state->getTeamPlayers($side) as $p) {
+            if ($p->getState() === PlayerState::OFF_PITCH || $p->getState()->isOnPitch()) {
+                $availablePlayers++;
+            }
+        }
+        $required = min(self::MAX_PLAYERS_ON_PITCH, $availablePlayers);
+
+        if (count($playersOnPitch) < $required) {
+            $errors[] = "Need at least {$required} players on the pitch (have "
+                . count($playersOnPitch) . ')';
+        }
+
+        // ⭐ A horni mez, ktera do ted chybela uplne.
+        if (count($playersOnPitch) > self::MAX_PLAYERS_ON_PITCH) {
+            $errors[] = 'Cannot have more than ' . self::MAX_PLAYERS_ON_PITCH
+                . ' players on the pitch (have ' . count($playersOnPitch) . ')';
         }
 
         // Check LOS

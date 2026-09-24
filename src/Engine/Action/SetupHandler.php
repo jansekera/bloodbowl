@@ -7,6 +7,7 @@ namespace App\Engine\Action;
 use App\DTO\ActionResult;
 use App\DTO\GameState;
 use App\Enum\GamePhase;
+use App\Engine\RulesEngine;
 use App\Enum\PlayerState;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
@@ -51,6 +52,17 @@ final class SetupHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Position already occupied');
         }
 
+        // ⭐ BALIK G 24.09.2026 -- strop 11 na hristi (r. 308-309); zbytek
+        //   soupisky (az 16) ceka v rezervach. Prestaveni hrace, ktery uz
+        //   na hristi stoji, pocet nezvysuje, takze se na nej strop nevztahuje.
+        if (!$player->getState()->isOnPitch()
+            && count($state->getPlayersOnPitch($side)) >= RulesEngine::MAX_PLAYERS_ON_PITCH) {
+            throw new \InvalidArgumentException(
+                'Cannot set up more than ' . RulesEngine::MAX_PLAYERS_ON_PITCH
+                . ' players on the pitch (rest stay in Reserves)'
+            );
+        }
+
         $placed = $player->withPosition($position);
         if ($placed->getState() === PlayerState::OFF_PITCH) {
             $placed = $placed->withState(PlayerState::STANDING);
@@ -72,11 +84,19 @@ final class SetupHandler implements ActionHandlerInterface
                 $availablePlayers++;
             }
         }
-        $required = min(11, $availablePlayers);
+        $required = min(RulesEngine::MAX_PLAYERS_ON_PITCH, $availablePlayers);
 
         if (count($playersOnPitch) < $required) {
             throw new \InvalidArgumentException(
                 "Need at least {$required} players on pitch (have " . count($playersOnPitch) . ')'
+            );
+        }
+
+        // ⭐ BALIK G 24.09.2026 -- horni mez, ktera tu do ted chybela.
+        if (count($playersOnPitch) > RulesEngine::MAX_PLAYERS_ON_PITCH) {
+            throw new \InvalidArgumentException(
+                'Cannot have more than ' . RulesEngine::MAX_PLAYERS_ON_PITCH
+                . ' players on pitch (have ' . count($playersOnPitch) . ')'
             );
         }
 

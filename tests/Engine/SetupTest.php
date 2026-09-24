@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Tests\Engine;
 
 use App\Engine\ActionResolver;
+use App\Engine\RulesEngine;
 use App\Engine\FixedDiceRoller;
 use App\Enum\ActionType;
 use App\Enum\GamePhase;
@@ -213,5 +214,242 @@ final class SetupTest extends TestCase
         $this->assertSame(10, $pos->getX());
         $this->assertSame(3, $pos->getY());
         $this->assertSame(PlayerState::STANDING, $player->getState());
+    }
+
+    // ============================================================
+    // ⭐ BALIK G 24.09.2026 -- soupiska az 16 hracu, na hristi jen 11.
+    //   r. 308-309: "Each coach must set up 11 players, or if they can't
+    //   field 11 then as many players as they have in Reserves."
+    // ============================================================
+
+    /**
+     * ⛔ Dvanacty hrac na hriste nesmi. Zbytek soupisky ceka v rezervach.
+     */
+    public function testCannotSetUpTwelfthPlayer(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 1, id: $i + 1);
+        }
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 12);
+
+        $state = $builder->build();
+        $this->assertCount(11, $state->getPlayersOnPitch(TeamSide::HOME));
+
+        $resolver = new ActionResolver(new FixedDiceRoller([]));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/more than 11 players/');
+        $resolver->resolve($state, ActionType::SETUP_PLAYER, [
+            'playerId' => 12, 'x' => 8, 'y' => 7,
+        ]);
+    }
+
+    /**
+     * ⭐⭐⭐ POZITIVNI KONTROLA k testu vyse: pri DESETI na hristi se
+     * jedenacty postavit MUSI. Bez tohohle by "vyhozena vyjimka" mohla
+     * znamenat i to, ze rozestavovani nefunguje vubec.
+     */
+    public function testEleventhPlayerStillGetsSetUp(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+
+        for ($i = 0; $i < 10; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 1, id: $i + 1);
+        }
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 11);
+
+        $state = $builder->build();
+        $resolver = new ActionResolver(new FixedDiceRoller([]));
+
+        $result = $resolver->resolve($state, ActionType::SETUP_PLAYER, [
+            'playerId' => 11, 'x' => 8, 'y' => 7,
+        ]);
+
+        $this->assertCount(11, $result->getNewState()->getPlayersOnPitch(TeamSide::HOME));
+        $this->assertSame(
+            PlayerState::STANDING,
+            $result->getNewState()->getPlayer(11)?->getState(),
+        );
+    }
+
+    /**
+     * ⭐ Strop se NEVZTAHUJE na prestaveni hrace, ktery uz na hristi stoji --
+     * pocet se tim nezvysi.
+     */
+    public function testRepositioningIsAllowedAtEleven(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 1, id: $i + 1);
+        }
+
+        $state = $builder->build();
+        $resolver = new ActionResolver(new FixedDiceRoller([]));
+
+        $result = $resolver->resolve($state, ActionType::SETUP_PLAYER, [
+            'playerId' => 1, 'x' => 9, 'y' => 13,
+        ]);
+
+        $this->assertCount(11, $result->getNewState()->getPlayersOnPitch(TeamSide::HOME));
+        $pos = $result->getNewState()->getPlayer(1)?->getPosition();
+        $this->assertNotNull($pos);
+        $this->assertSame(9, $pos->getX());
+        $this->assertSame(13, $pos->getY());
+    }
+
+    /**
+     * ⛔ Ukonceni rozestaveni s dvanacti na hristi se musi odmitnout.
+     * (Stav se da vyrobit jen obchvatem validace, proto se stavi primo.)
+     */
+    public function testEndSetupRejectsTwelveOnPitch(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+
+        for ($i = 0; $i < 3; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 12, 5 + $i, id: $i + 1);
+        }
+        for ($i = 0; $i < 9; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 3, id: $i + 4);
+        }
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addOffPitchPlayer(TeamSide::AWAY, id: 100 + $i);
+        }
+
+        $state = $builder->build();
+        $this->assertCount(12, $state->getPlayersOnPitch(TeamSide::HOME));
+
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 4, 4, 3, 3, 6]));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/more than 11 players/');
+        $resolver->resolve($state, ActionType::END_SETUP, []);
+    }
+
+    /**
+     * ⭐⭐ DRUHA VADA, nalezena pri tehle oprave: `RulesEngine::validateEndSetup`
+     * mel natvrdo `< 11`, zatimco handler uz pocital `min(11, dostupni)`.
+     * Tym, ktery po zranenich jedenact hracu NEMA, tak neslo rozestavet.
+     * Pravidlo r. 308-309 s tim vyslovne pocita.
+     */
+    public function testEndSetupAllowsFewerWhenTeamCannotFieldEleven(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+
+        // Cela soupiska je devet hracu -- jedenact proste nema kde vzit.
+        for ($i = 0; $i < 3; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 12, 5 + $i, id: $i + 1);
+        }
+        for ($i = 0; $i < 6; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 3, id: $i + 4);
+        }
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addOffPitchPlayer(TeamSide::AWAY, id: 100 + $i);
+        }
+
+        $state = $builder->build();
+        $this->assertCount(9, $state->getPlayersOnPitch(TeamSide::HOME));
+
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 4, 4, 3, 3, 6]));
+        $result = $resolver->resolve($state, ActionType::END_SETUP, []);
+
+        $this->assertSame(GamePhase::PLAY, $result->getNewState()->getPhase());
+        $this->assertCount(9, $result->getNewState()->getPlayersOnPitch(TeamSide::HOME));
+    }
+
+    // ------------------------------------------------------------
+    // ⚠️ 24.09.2026 -- tyhle testy jdou PRIMO na `RulesEngine::validate`.
+    //   Duvod: `ActionResolver` vola handler rovnou, takze testy vyse
+    //   validacni vrstvu MIJEJI. Na zive ceste ji ale vola
+    //   `GameOrchestrator:50`, tedy webova hra -- a tam vada byla.
+    //   (Zjisteno tim, ze test "min. pocet" prosel i s vadnym kodem.)
+    // ------------------------------------------------------------
+
+    public function testValidateRejectsTwelfthPlayerOnPitch(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 1, id: $i + 1);
+        }
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 12);
+
+        $errors = (new RulesEngine())->validate($builder->build(), ActionType::SETUP_PLAYER, [
+            'playerId' => 12, 'x' => 8, 'y' => 7,
+        ]);
+
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('more than 11 players', implode(' | ', $errors));
+    }
+
+    /** ⭐⭐⭐ POZITIVNI KONTROLA: pri desiti musi validace jedenacteho PUSTIT. */
+    public function testValidateAllowsEleventhPlayerOnPitch(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        for ($i = 0; $i < 10; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 1, id: $i + 1);
+        }
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 11);
+
+        $errors = (new RulesEngine())->validate($builder->build(), ActionType::SETUP_PLAYER, [
+            'playerId' => 11, 'x' => 8, 'y' => 7,
+        ]);
+
+        $this->assertSame([], $errors);
+    }
+
+    public function testValidateEndSetupRejectsTwelveOnPitch(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        for ($i = 0; $i < 3; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 12, 5 + $i, id: $i + 1);
+        }
+        for ($i = 0; $i < 9; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 3, id: $i + 4);
+        }
+
+        $errors = (new RulesEngine())->validate($builder->build(), ActionType::END_SETUP, []);
+
+        $this->assertStringContainsString('more than 11 players', implode(' | ', $errors));
+    }
+
+    /**
+     * ⭐⭐ DRUHA VADA: validace mela minimum natvrdo `< 11`, zatimco handler
+     * uz pocital `min(11, dostupni)`. Tym po zranenich tak neprosel validaci
+     * a rozestaveni neslo ukoncit. Pravidlo r. 308-309 oba pripady rozlisuje.
+     */
+    public function testValidateEndSetupAllowsFewerWhenTeamCannotFieldEleven(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        // Cela soupiska devet hracu, vsichni na hristi.
+        for ($i = 0; $i < 3; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 12, 5 + $i, id: $i + 1);
+        }
+        for ($i = 0; $i < 6; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 3, id: $i + 4);
+        }
+
+        $errors = (new RulesEngine())->validate($builder->build(), ActionType::END_SETUP, []);
+
+        $this->assertSame([], $errors, 'Deviticlenny tym musi rozestaveni ukoncit: ' . implode(' | ', $errors));
     }
 }
