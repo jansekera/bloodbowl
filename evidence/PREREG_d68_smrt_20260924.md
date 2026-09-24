@@ -87,3 +87,47 @@ Thick Skull na osmičce nahoru).
 ⭐ **Levná kontrola, až na to přijde řada:** diag už **loguje každý surf na STDERR** i s výsledkem
 hodu na zranění (`SURF hrac=… zraneni=…`). Stačí běh pustit se zachycením STDERR a **sečíst
 přímo výsledky hodů** — měří se tím příčina, ne následek, a nepotřebuje to víc her.
+
+---
+
+# ✅ DRUHÉ, NEZÁVISLÉ POTVRZENÍ — 20 her, 24.09. večer
+
+Kouřový běh po dokončení balíku G *(bod 4/4)*, tedy **jiné kostky, jiný běh**:
+
+| | naměřeno | očekáváno |
+|---|---|---|
+| casualty *(30 INJURED + 6 DEAD)* | 36 | — |
+| **DEAD** | **6 = 16,67 %** | **16,67 %** |
+
+⇒ ⭐ **Přesně na hodnotě.** Tabulka následků D68 je tím ověřená dvakrát nezávisle
+*(21,6 % při n = 74 a 16,67 % při n = 36)*.
+
+## ⏰⏰ ZATO SURF SE PŘITVRDIL — otevřená otázka je teď silnější
+
+| běh | surf → rezervy | pozn. |
+|---|---|---|
+| **PŘED** změnou D68 | 23/32 = **71,9 %** | sedí na teoretických **72,2 %** |
+| **PO**, běh 1 *(40 her)* | 16/30 = 53,3 % | |
+| **PO**, běh 2 *(20 her)* | 7/11 = 63,6 % | |
+| **PO, sloučeno** | **23/41 = 56,1 %** | **−2,3 σ proti teorii** |
+
+⭐ **Sloučit ty dva běhy po změně SE SMÍ** — je v nich **týž kód**, takže to není
+pohyblivá báze *(viz [[feedback_moving_baseline_only_paired_ab]])*.
+
+⚠️ **Jako rozdíl proti základně to významné NENÍ** *(dvouvýběrový test: 1,4 σ)*.
+**Proti teoretické hodnotě 72,2 % ale ano** — a už ze dvou nezávislých vzorků
+týmž směrem.
+
+⛔ **Mechanismus NEODHADOVAT.** Větev Stunned se změnou nedotkla a Regeneration
+funguje dál, takže vysvětlení nevychází — a právě proto se to má **změřit**.
+
+⭐⭐ **DALŠÍ KROK, a má přednost:** `php cli/diag_package_g_20260914.php --matches=40 2>surf.err`
+a sečíst řádky `SURF hrac=… zraneni=…` podle výsledku hodu. Tím se měří **příčina
+na vrstvě, kde se rozhoduje** *(jaký výsledek padl na tabulce zranění)*, ne následek
+*(kde hráč skončil)*. **Nepotřebuje to víc her než jeden běh.**
+
+## ⛔ POZOR NA VOLÁNÍ MĚŘIDLA
+
+Diag bere **`--matches=N`**, ne poziční argument. `php … 5` a `php … 2` obojí pustí
+**výchozích 20 her** a tiše — 24.09. jsem si tím zabil běh vlastním `timeout 180`
+v domnění, že pouštím pět her.
