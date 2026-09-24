@@ -52,6 +52,14 @@ final class SetupHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Position already occupied');
         }
 
+        // ⭐ BALIK G 24.09.2026 -- Sweltering Heat (r. 1477-1481): kdo zkolaboval
+        //   na konci minuleho drivu, NESMI byt rozestaven pri tomhle vykopu.
+        if ($player->isOutNextSetup()) {
+            throw new \InvalidArgumentException(
+                'Player collapsed from Sweltering Heat and may not be set up for this kick-off'
+            );
+        }
+
         // ⭐ BALIK G 24.09.2026 -- strop 11 na hristi (r. 308-309); zbytek
         //   soupisky (az 16) ceka v rezervach. Prestaveni hrace, ktery uz
         //   na hristi stoji, pocet nezvysuje, takze se na nej strop nevztahuje.
@@ -80,6 +88,12 @@ final class SetupHandler implements ActionHandlerInterface
         // Count total available players (off-pitch + on-pitch)
         $availablePlayers = 0;
         foreach ($state->getTeamPlayers($side) as $p) {
+            // ⭐ Zkolabovany z Sweltering Heat se nepocita mezi dostupne --
+            //   jinak by se od nej cekalo, ze se postavi, a rozestaveni by neslo
+            //   ukoncit (`min(11, dostupni)` by vyslo prilis vysoko).
+            if ($p->isOutNextSetup()) {
+                continue;
+            }
             if ($p->getState() === PlayerState::OFF_PITCH || $p->getState()->isOnPitch()) {
                 $availablePlayers++;
             }
@@ -125,6 +139,16 @@ final class SetupHandler implements ActionHandlerInterface
             $state = $this->autoSetupTeam($state, $opponent);
         }
 
+        // ⭐ BALIK G 24.09.2026 -- SPOTREBA priznaku. C++ ho maze pri sestavovani
+        //   dostupnych (`takeAvailability`, `game_simulator.cpp:213-218`), takze
+        //   zkolabovany vynecha PRESNE JEDNO rozestaveni. Tady je to tentyz
+        //   okamzik: obe strany uz stoji, priznak splnil ucel.
+        foreach ($state->getPlayers() as $p) {
+            if ($p->isOutNextSetup()) {
+                $state = $state->withPlayer($p->withOutNextSetup(false));
+            }
+        }
+
         // Both teams set up - proceed to kickoff
         $kickingTeam = $state->getKickingTeam() ?? TeamSide::AWAY;
         $receivingTeam = $kickingTeam->opponent();
@@ -166,7 +190,8 @@ final class SetupHandler implements ActionHandlerInterface
     {
         $offPitchPlayers = [];
         foreach ($state->getTeamPlayers($side) as $player) {
-            if ($player->getState() === PlayerState::OFF_PITCH) {
+            // ⭐ Sweltering Heat: zkolabovany tenhle vykop vynechava.
+            if ($player->getState() === PlayerState::OFF_PITCH && !$player->isOutNextSetup()) {
                 $offPitchPlayers[] = $player;
             }
         }

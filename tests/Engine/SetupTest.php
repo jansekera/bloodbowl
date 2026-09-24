@@ -452,4 +452,78 @@ final class SetupTest extends TestCase
 
         $this->assertSame([], $errors, 'Deviticlenny tym musi rozestaveni ukoncit: ' . implode(' | ', $errors));
     }
+
+    // ------------------------------------------------------------
+    // ⭐ BALIK G 24.09.2026, 4/4 -- Sweltering Heat: priznak `outNextSetup`
+    //   (r. 1477-1481 "may not be set up for the next kick-off").
+    // ------------------------------------------------------------
+
+    public function testCollapsedPlayerCannotBeSetUp(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 1);
+        $state = $builder->build();
+        $state = $state->withPlayer($state->getPlayer(1)->withOutNextSetup(true));
+
+        $errors = (new RulesEngine())->validate($state, ActionType::SETUP_PLAYER, [
+            'playerId' => 1, 'x' => 6, 'y' => 7,
+        ]);
+
+        $this->assertStringContainsString('Sweltering Heat', implode(' | ', $errors));
+    }
+
+    /** ⭐⭐⭐ POZITIVNI KONTROLA: tentyz hrac BEZ priznaku projit musi. */
+    public function testSamePlayerWithoutFlagCanBeSetUp(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        $builder->addOffPitchPlayer(TeamSide::HOME, id: 1);
+
+        $errors = (new RulesEngine())->validate($builder->build(), ActionType::SETUP_PLAYER, [
+            'playerId' => 1, 'x' => 6, 'y' => 7,
+        ]);
+
+        $this->assertSame([], $errors);
+    }
+
+    /**
+     * ⭐ Priznak vydrzi PRESNE JEDNO rozestaveni: automaticke rozestaveni
+     * zkolabovaneho vynecha a zaroven mu priznak spotrebuje, takze priste
+     * uz nastoupi.
+     */
+    public function testCollapsedPlayerIsSkippedAndFlagIsConsumed(): void
+    {
+        $builder = new GameStateBuilder();
+        $builder->withPhase(GamePhase::SETUP);
+        $builder->withActiveTeam(TeamSide::HOME);
+        for ($i = 0; $i < 3; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 12, 5 + $i, id: $i + 1);
+        }
+        for ($i = 0; $i < 8; $i++) {
+            $builder->addPlayer(TeamSide::HOME, 6, $i + 3, id: $i + 4);
+        }
+        // Away ma DVANACT v rezervach, jeden z nich zkolaboval.
+        for ($i = 0; $i < 12; $i++) {
+            $builder->addOffPitchPlayer(TeamSide::AWAY, id: 100 + $i);
+        }
+
+        $state = $builder->build();
+        $state = $state->withPlayer($state->getPlayer(100)->withOutNextSetup(true));
+
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 4, 4, 3, 3, 6]));
+        $newState = $resolver->resolve($state, ActionType::END_SETUP, [])->getNewState();
+
+        // Zkolabovany zustal v rezervach...
+        $this->assertSame(PlayerState::OFF_PITCH, $newState->getPlayer(100)->getState());
+        // ...ale jedenact ostatnich stoji, takze rozestaveni probehlo.
+        $this->assertCount(11, $newState->getPlayersOnPitch(TeamSide::AWAY));
+        // ...a priznak je spotrebovany, takze priste uz nastoupi.
+        $this->assertFalse(
+            $newState->getPlayer(100)->isOutNextSetup(),
+            'Priznak musi vydrzet presne jedno rozestaveni',
+        );
+    }
 }

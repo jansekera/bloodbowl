@@ -436,6 +436,12 @@ final class RulesEngine
             $errors[] = 'Position already occupied by another player';
         }
 
+        // ⭐ BALIK G 24.09.2026 -- Sweltering Heat (r. 1477-1481): kdo zkolaboval,
+        //   nesmi byt rozestaven pri tomhle vykopu.
+        if ($player->isOutNextSetup()) {
+            $errors[] = 'Player collapsed from Sweltering Heat and may not be set up for this kick-off';
+        }
+
         // ⭐ BALIK G 24.09.2026 -- soupiska smi mit az 16 hracu
         //   (`RosterValidator::MAX_PLAYERS`), ale na hriste jich smi jen 11:
         //   r. 308-309 "Each coach must set up 11 players, or if they can't
@@ -897,6 +903,9 @@ final class RulesEngine
         //   players as they have in Reserves".
         $availablePlayers = 0;
         foreach ($state->getTeamPlayers($side) as $p) {
+            if ($p->isOutNextSetup()) {
+                continue;
+            }
             if ($p->getState() === PlayerState::OFF_PITCH || $p->getState()->isOnPitch()) {
                 $availablePlayers++;
             }

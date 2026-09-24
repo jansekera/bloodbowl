@@ -10,6 +10,7 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\Enum\GamePhase;
 use App\Enum\PlayerState;
+use App\Enum\Weather;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
@@ -105,6 +106,9 @@ final class GameFlowResolver
 
         // ⛔ DOPLNENO 16.09.2026: hody na navrat KO hracu patri i sem (r. 1007-1012),
         //   engine je delal jen o polocase.
+        // ⚠️ Poradi: heat se hazi, DOKUD hraci jeste stoji na hristi -- po
+        //   `resetPlayersForSetup` uz je hriste prazdne a hazelo by se za nikoho.
+        $state = $this->hodyNaSwelteringHeat($state, $swEvents);
         $state = $this->hodyNaNavratKo($state, $swEvents);
 
         // Reset for new kickoff - scoring team kicks
@@ -123,6 +127,45 @@ final class GameFlowResolver
         // The scoring team will be the kicking team for the next kickoff.
 
         return ['state' => $state, 'events' => $swEvents];
+    }
+
+    /**
+     * ⭐ BALIK G 24.09.2026 -- SWELTERING HEAT, `rules_bb2016.txt` r. 1477-1481:
+     *   "It's so hot and humid that some players collapse from heat exhaustion.
+     *   Roll a D6 for each player on the pitch AT THE END OF A DRIVE. On a roll
+     *   of 1 the player collapses and MAY NOT BE SET UP for the next kick-off."
+     *
+     * ⛔ Do 24.09. to `KickoffResolver` delal PRI VYKOPU a jinak: jeden D6 na tym,
+     *   nahodne vybrana obet, a poslal ji do KO. Nesedelo ani kdy, ani za koho,
+     *   ani kam -- KO ma navratovy hod (4+), heat exhaustion zadny nema.
+     *
+     * ⭐ Hazi se za KAZDEHO hrace NA HRISTI, tedy i za lezici a omracene --
+     *   pravidlo rika "each player on the pitch", ne "each standing player".
+     *
+     * Vzor: C++ `engine/src/game_simulator.cpp:389-393`.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function hodyNaSwelteringHeat(GameState $state, array &$events): GameState
+    {
+        if ($state->getWeather() !== Weather::SWELTERING_HEAT) {
+            return $state;
+        }
+
+        foreach ($state->getPlayers() as $player) {
+            if (!$player->getState()->isOnPitch()) {
+                continue;
+            }
+            if ($this->dice->rollD6() !== 1) {
+                continue;
+            }
+
+            $state = $state->withPlayer($player->withOutNextSetup(true));
+            $teamName = $state->getTeamState($player->getTeamSide())->getName();
+            $events[] = GameEvent::swelteringHeat($player->getId(), $player->getName(), $teamName);
+        }
+
+        return $state;
     }
 
     /**
@@ -167,6 +210,8 @@ final class GameFlowResolver
         // Secret Weapon: eject players at end of drive
         $state = $this->ejectSecretWeapons($state, $events);
 
+        // ⭐ Polocas je take konec drivu, takze heat patri i sem (viz vyse).
+        $state = $this->hodyNaSwelteringHeat($state, $events);
         $state = $this->hodyNaNavratKo($state, $events);
 
         // Reset all players for new setup

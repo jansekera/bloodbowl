@@ -7,6 +7,7 @@ namespace App\Tests\Engine;
 use App\Engine\Action\MoveHandler;
 use App\Engine\BallResolver;
 use App\Engine\FixedDiceRoller;
+use App\Engine\GameFlowResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\Pathfinder;
 use App\Engine\PassResolver;
@@ -419,7 +420,17 @@ final class WeatherTest extends TestCase
 
     // --- Sweltering Heat Tests ---
 
-    public function testSwelteringHeatRemovesPlayerAtKickoff(): void
+    /**
+     * ⛔⛔ PREPSANO 24.09.2026 (balik G, 4/4). Puvodne se tenhle test jmenoval
+     *   `testSwelteringHeatRemovesPlayerAtKickoff` a tvrdil, ze se heat resi
+     *   PRI VYKOPU a posila hrace do KO. Obojí bylo proti pravidlu -- r. 1477-1481
+     *   rika "Roll a D6 for each player on the pitch AT THE END OF A DRIVE. On a
+     *   roll of 1 the player collapses and MAY NOT BE SET UP for the next
+     *   kick-off." Test tedy kodifikoval vadu; ted meri pravidlo.
+     *
+     * ⭐ Pri vykopu uz se heat neresi VUBEC -- to overuje test nize.
+     */
+    public function testSwelteringHeatDoesNothingAtKickoff(): void
     {
         $state = (new GameStateBuilder())
             ->withWeather(Weather::SWELTERING_HEAT)
@@ -429,24 +440,30 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 15, 7, id: 4)
             ->build();
 
-        // Scatter: D8=1, D6=1 -> (6,4) in home half
-        // Sweltering heat: D6=1 (home index 0 -> player 1), D6=1 (away index 0 -> player 3)
-        // Kickoff table: 1+4=5 (High Kick)
-        // Catch roll: 6 (success)
-        $dice = new FixedDiceRoller([1, 1, 1, 1, 1, 4, 6]);
+        // Scatter D8=1, D6=1; kickoff table 1+4=5 (High Kick); catch 6.
+        // ⭐ Zadne kostky na heat se uz neodebiraji.
+        $dice = new FixedDiceRoller([1, 1, 1, 4, 6]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
 
         $result = $resolver->resolveKickoff($state, new Position(6, 5));
 
-        // Player 1 should be KO'd
-        $p1 = $result['state']->getPlayer(1);
-        $this->assertEquals(PlayerState::KO, $p1->getState());
+        foreach ([1, 2, 3, 4] as $id) {
+            $this->assertSame(
+                PlayerState::STANDING,
+                $result['state']->getPlayer($id)->getState(),
+                "Hrac {$id} nesmi pri vykopu nikam zmizet",
+            );
+            $this->assertFalse(
+                $result['state']->getPlayer($id)->isOutNextSetup(),
+                "Hraci {$id} se nesmi pri vykopu nastavit priznak heat",
+            );
+        }
 
-        // Player 3 should be KO'd
-        $p3 = $result['state']->getPlayer(3);
-        $this->assertEquals(PlayerState::KO, $p3->getState());
+        $swelter = array_filter($result['events'], fn($e) => $e->getType() === 'sweltering_heat');
+        $this->assertSame([], $swelter, 'Pri vykopu nesmi padnout zadna udalost heat');
     }
+
 
     public function testNormalWeatherDoesNotRemovePlayers(): void
     {
@@ -470,33 +487,75 @@ final class WeatherTest extends TestCase
         $this->assertEquals(PlayerState::STANDING, $result['state']->getPlayer(2)->getState());
     }
 
-    public function testSwelteringHeatEventContainsPlayerName(): void
+    /**
+     * ⭐ BALIK G 24.09.2026 -- heat na KONCI DRIVU: D6 za KAZDEHO hrace na hristi,
+     *   na 1 hrac kolabuje a dostane priznak `outNextSetup`.
+     *   ⛔ NENI to KO -- KO ma navratovy hod 4+, heat exhaustion zadny nema.
+     */
+    public function testSwelteringHeatRollsForEveryPlayerAtEndOfDrive(): void
     {
         $state = (new GameStateBuilder())
             ->withWeather(Weather::SWELTERING_HEAT)
             ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 15, 5, id: 3)
+            ->addPlayer(TeamSide::AWAY, 15, 7, id: 4)
+            ->build();
+
+        // Ctyri hraci na hristi => ctyri D6. Jen prvnimu padne 1.
+        $dice = new FixedDiceRoller([1, 5, 5, 5]);
+        $events = [];
+        $flow = new GameFlowResolver($dice);
+        $newState = $this->callHeat($flow, $state, $events);
+
+        $this->assertTrue($newState->getPlayer(1)->isOutNextSetup(), 'Hodil 1 => kolabuje');
+        $this->assertSame(PlayerState::STANDING, $newState->getPlayer(1)->getState(),
+            'Kolaps NENI KO -- stav se nemeni, meni se priznak');
+
+        foreach ([2, 3, 4] as $id) {
+            $this->assertFalse($newState->getPlayer($id)->isOutNextSetup(),
+                "Hrac {$id} hodil 5, nesmi kolabovat");
+        }
+
+        $this->assertCount(1, array_filter($events, fn($e) => $e->getType() === 'sweltering_heat'));
+    }
+
+    /**
+     * ⭐⭐⭐ POZITIVNI KONTROLA: za jineho pocasi se nehazi vubec.
+     * Bez ni by "nikdo nezkolaboval" mohlo znamenat i to, ze se metoda nevola.
+     */
+    public function testNoHeatRollsInNiceWeather(): void
+    {
+        $state = (new GameStateBuilder())
+            ->withWeather(Weather::NICE)
+            ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 5, id: 2)
             ->build();
 
-        // Scatter: D8=1, D6=1
-        // Sweltering heat: D6=1 (home index 0 -> player 1), D6=1 (away index 0 -> player 2)
-        // Kickoff table: 1+4=5 (High Kick) - but player 1 is now KO'd, so no one to move
-        // Ball at (6,4) empty square, bounce D8=3 -> (7,4)
-        $dice = new FixedDiceRoller([1, 1, 1, 1, 1, 4, 3]);
-        $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        // Samé jednicky: kdyby se hazelo, zkolabovali by oba.
+        $dice = new FixedDiceRoller([1, 1, 1, 1]);
+        $events = [];
+        $newState = $this->callHeat(new GameFlowResolver($dice), $state, $events);
 
-        $result = $resolver->resolveKickoff($state, new Position(6, 5));
-
-        $swelterEvents = array_filter(
-            $result['events'],
-            fn($e) => $e->getType() === 'sweltering_heat',
-        );
-        $this->assertNotEmpty($swelterEvents);
-
-        $firstEvent = array_values($swelterEvents)[0];
-        $this->assertStringContainsString('Player 1', $firstEvent->getDescription());
+        $this->assertFalse($newState->getPlayer(1)->isOutNextSetup());
+        $this->assertFalse($newState->getPlayer(2)->isOutNextSetup());
+        $this->assertSame([], $events);
     }
+
+    /**
+     * Metoda je privatni (je to krok konce drivu, ne verejna akce), takze
+     * se vola pres reflexi -- jinak by test musel projit celym touchdownem
+     * a meril by pet veci najednou.
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     */
+    private function callHeat(GameFlowResolver $flow, $state, array &$events)
+    {
+        $m = new \ReflectionMethod($flow, 'hodyNaSwelteringHeat');
+        $m->setAccessible(true);
+        return $m->invokeArgs($flow, [$state, &$events]);
+    }
+
 
     // --- GameState Weather Serialization ---
 

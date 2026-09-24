@@ -43,6 +43,11 @@ final class MatchPlayerDTO
         private bool $dodgeUsedThisTurn = false,
         // ⭐ 21.09.2026: `rules_bb2016.txt` r. 7988-7991 -- Break Tackle 1x za kolo
         private bool $breakTackleUsedThisTurn = false,
+        // ⭐ BALIK G 24.09.2026: `rules_bb2016.txt` r. 1477-1481 (Sweltering Heat)
+        //   -- "On a roll of 1 the player collapses and MAY NOT BE SET UP for the
+        //   next kick-off." Neni to KO: KO ma navratovy hod, tohle ne. Priznak se
+        //   SPOTREBUJE pri nejblizsim rozestaveni, takze vypadne presne jedno.
+        private bool $outNextSetup = false,
     ) {
     }
 
@@ -103,6 +108,21 @@ final class MatchPlayerDTO
     public function isSureFeetUsedThisTurn(): bool { return $this->sureFeetUsedThisTurn; }
     public function isDodgeUsedThisTurn(): bool { return $this->dodgeUsedThisTurn; }
     public function isBreakTackleUsedThisTurn(): bool { return $this->breakTackleUsedThisTurn; }
+
+    /**
+     * ⭐ Sweltering Heat (r. 1477-1481): hrac zkolaboval a NESMI byt
+     * rozestaven pri nejblizsim vykopu. Vzor: C++ `outNextSetup`
+     * (`engine/src/game_simulator.cpp:213-218, 389-393`).
+     */
+    public function isOutNextSetup(): bool { return $this->outNextSetup; }
+
+    public function withOutNextSetup(bool $out): self
+    {
+        $clone = clone $this;
+        $clone->outNextSetup = $out;
+
+        return $clone;
+    }
     public function getRaceName(): ?string { return $this->raceName; }
     /** @return list<string> */
     public function getLearnedSkills(): array { return $this->learnedSkills; }
@@ -268,6 +288,7 @@ final class MatchPlayerDTO
             sureFeetUsedThisTurn: $this->sureFeetUsedThisTurn,
             dodgeUsedThisTurn: $this->dodgeUsedThisTurn,
             breakTackleUsedThisTurn: $this->breakTackleUsedThisTurn,
+            outNextSetup: $this->outNextSetup,
         );
     }
 
@@ -295,6 +316,7 @@ final class MatchPlayerDTO
             'sureFeetUsedThisTurn' => $this->sureFeetUsedThisTurn,
             'dodgeUsedThisTurn' => $this->dodgeUsedThisTurn,
             'breakTackleUsedThisTurn' => $this->breakTackleUsedThisTurn,
+            'outNextSetup' => $this->outNextSetup,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -336,6 +358,7 @@ final class MatchPlayerDTO
             sureFeetUsedThisTurn: (bool) ($data['sureFeetUsedThisTurn'] ?? false),
             dodgeUsedThisTurn: (bool) ($data['dodgeUsedThisTurn'] ?? false),
             breakTackleUsedThisTurn: (bool) ($data['breakTackleUsedThisTurn'] ?? false),
+            outNextSetup: (bool) ($data['outNextSetup'] ?? false),
         );
     }
 }

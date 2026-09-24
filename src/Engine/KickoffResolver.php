@@ -58,12 +58,12 @@ final class KickoffResolver
 
         $events[] = GameEvent::kickoff((string) $kickTarget, (string) $landingPos);
 
-        // Sweltering Heat: KO a random player from each team
-        if ($state->getWeather() === Weather::SWELTERING_HEAT) {
-            $swelterResult = $this->resolveSwelteringHeat($state);
-            $state = $swelterResult['state'];
-            $events = array_merge($events, $swelterResult['events']);
-        }
+        // ⛔⛔ ODSTRANENO 24.09.2026 (balik G, 4/4): Sweltering Heat se resil TADY,
+        //   tedy pri VYKOPU, a delal neco jineho nez pravidlo. Spravne patri na
+        //   KONEC DRIVU -- `GameFlowResolver::hodyNaSwelteringHeat`.
+        //   r. 1477-1481: "Roll a D6 for each player on the pitch AT THE END OF
+        //   A DRIVE. On a roll of 1 the player collapses and may not be set up
+        //   for the next kick-off."
 
         // Roll 2D6 kickoff table
         $kickoffTableResult = $this->resolveKickoffTable($state, $receivingTeam);
@@ -442,35 +442,6 @@ final class KickoffResolver
      * Sweltering Heat: KO a random standing player from each team.
      * @return array{state: GameState, events: list<GameEvent>}
      */
-    private function resolveSwelteringHeat(GameState $state): array
-    {
-        $events = [];
-
-        foreach ([TeamSide::HOME, TeamSide::AWAY] as $side) {
-            $players = $state->getPlayersOnPitch($side);
-            $standing = array_values(array_filter(
-                $players,
-                fn($p) => $p->getState() === PlayerState::STANDING,
-            ));
-
-            if (empty($standing)) {
-                continue;
-            }
-
-            $index = ($this->dice->rollD6() - 1) % count($standing);
-            $victim = $standing[$index];
-
-            $state = $state->withPlayer(
-                $victim->withState(PlayerState::KO)->withPosition(null),
-            );
-
-            $teamName = $state->getTeamState($side)->getName();
-            $events[] = GameEvent::swelteringHeat($victim->getId(), $victim->getName(), $teamName);
-        }
-
-        return ['state' => $state, 'events' => $events];
-    }
-
     /**
      * Handle touchback: ball given to any receiving team player on pitch.
      * Picks the player closest to center of own half.
