@@ -698,7 +698,8 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // Roll 3 = PUSHED, pushed off pitch
-        // Crowd injury: 3+3=6 +1=7 - stunned
+        // ⛔ Komentar tu drive rikal "3+3=6 +1=7", ale modifikator `+1` byl 16.09.2026
+        //   odstranen (dav nema zadne skilly upravujici zraneni) ⇒ 3+3=6, bez modifikatoru.
         $dice = new FixedDiceRoller([3, 3, 3]);
         $resolver = new ActionResolver($dice);
 
@@ -713,6 +714,56 @@ final class ActionResolverTest extends TestCase
 
         $eventTypes = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $eventTypes);
+    }
+
+    // ⭐ BALIK G, 24.09.2026 -- CELA CESTA, ne jen resolver: blok => vytlaceni z hriste
+    //   => hod na zraneni => "Stunned" => REZERVY. `rules_bb2016.txt` r. 655-658.
+    //   Duvod, proc to ma vlastni test: v bezne hre je surf vzacny (0,2/zapas pri 5 hrach)
+    //   a Stunned na nem jeste vzacnejsi ⇒ na nahodu se cekat neda, situace se vyrobi.
+    public function testBlockCrowdSurfStunnedJdeDoRezerv(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 24, 5, strength: 3, id: 1)
+            ->addPlayer(TeamSide::AWAY, 25, 5, strength: 3, id: 2)
+            ->build();
+
+        // kostka bloku 3 = PUSHED; zraneni 3+3=6 bez modifikatoru => Stunned
+        $resolver = new ActionResolver(new FixedDiceRoller([3, 3, 3]));
+
+        $result = $resolver->resolve($state, ActionType::BLOCK, [
+            'playerId' => 1,
+            'targetId' => 2,
+        ]);
+
+        $defender = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($defender);
+        $this->assertSame(PlayerState::OFF_PITCH, $defender->getState(), 'Stunned po surfu = rezervy');
+        $this->assertNull($defender->getPosition());
+
+        $eventTypes = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('crowd_surf', $eventTypes);
+    }
+
+    // ⭐ ROZLISUJICI PROTEJSEK: tataz scena, jine kostky. Casualty NESMI skoncit v rezervach.
+    //   Bez tohohle testu by "vse konci v OFF_PITCH" prosla jako uspech.
+    public function testBlockCrowdSurfCasualtyKonciJakoInjured(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 24, 5, strength: 3, id: 1)
+            ->addPlayer(TeamSide::AWAY, 25, 5, strength: 3, id: 2)
+            ->build();
+
+        // kostka bloku 3 = PUSHED; zraneni 6+6=12 => casualty
+        $resolver = new ActionResolver(new FixedDiceRoller([3, 6, 6]));
+
+        $result = $resolver->resolve($state, ActionType::BLOCK, [
+            'playerId' => 1,
+            'targetId' => 2,
+        ]);
+
+        $defender = $result->getNewState()->getPlayer(2);
+        $this->assertNotNull($defender);
+        $this->assertSame(PlayerState::INJURED, $defender->getState());
     }
 
     public function testBlockInvalidNotAdjacent(): void

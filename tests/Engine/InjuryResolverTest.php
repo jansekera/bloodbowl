@@ -124,7 +124,9 @@ final class InjuryResolverTest extends TestCase
         $result = $this->resolver->resolveCrowdSurf($player, $dice);
 
         // No armour roll event, just injury
-        $this->assertSame(PlayerState::STUNNED, $result['player']->getState());
+        // ⛔ ZMENENO 24.09.2026: "Stunned" po vyhozeni z hriste znamena REZERVY,
+        //   ne omraceni na hristi -- `rules_bb2016.txt` r. 655-658.
+        $this->assertSame(PlayerState::OFF_PITCH, $result['player']->getState());
         $this->assertCount(1, $result['events']); // only injury roll
     }
 
@@ -153,15 +155,48 @@ final class InjuryResolverTest extends TestCase
     // ⭐ ROZLISUJICI PRIPADY -- tady se pozna, jestli se pricita +1:
     //   hod 7: bez modifikatoru stunned, s +1 uz KO
     //   hod 9: bez modifikatoru KO, s +1 uz casualty
-    public function testCrowdSurfHod7JeStunnedNeKo(): void
+    // ⛔ ZMENENO 24.09.2026: hod 7 je na tabulce zraneni porad "Stunned", ale po
+    //   vyhozeni z hriste to znamena REZERVY. Rozlisovaci sila testu zustava:
+    //   s chybnym `+1` by z toho byl KO, takze OFF_PITCH vs KO tu vadu pozna dal.
+    public function testCrowdSurfHod7JdeDoRezervNeKo(): void
     {
         $result = $this->resolver->resolveCrowdSurf($this->makePlayer(armour: 10), new FixedDiceRoller([4, 3]));
-        $this->assertSame(PlayerState::STUNNED, $result['player']->getState());
+        $this->assertSame(PlayerState::OFF_PITCH, $result['player']->getState());
     }
 
     public function testCrowdSurfHod9JeKoNeCasualty(): void
     {
         $result = $this->resolver->resolveCrowdSurf($this->makePlayer(armour: 10), new FixedDiceRoller([5, 4]));
         $this->assertSame(PlayerState::KO, $result['player']->getState());
+    }
+
+    // ⭐ BALIK G, 24.09.2026 -- `rules_bb2016.txt` r. 655-658: "If a 'Stunned' result
+    //   is rolled on the Injury table the player should be placed in the Reserves box
+    //   of the Dugout, and must remain there until a touchdown is scored or the half ends."
+    //   Stav rezerv je `OFF_PITCH` -- hraci v nem cekaji na rozestaveni pri dalsim drivu.
+    public function testCrowdSurfStunnedJdeDoRezervABezPozice(): void
+    {
+        $player = $this->makePlayer(armour: 10);
+        $this->assertNotNull($player->getPosition(), 'kontrola vychoziho stavu: hrac na hristi pozici MA');
+
+        // 3+3=6 => na tabulce zraneni "Stunned"
+        $result = $this->resolver->resolveCrowdSurf($player, new FixedDiceRoller([3, 3]));
+
+        $this->assertSame(PlayerState::OFF_PITCH, $result['player']->getState());
+        $this->assertNull($result['player']->getPosition(), 'v rezervach hrac na hristi nestoji');
+    }
+
+    // ⭐ POZITIVNI KONTROLA k testu vyse: tytez kostky, ale BEZNE zraneni (ne surf)
+    //   musi dat STUNNED NA HRISTI, vcetne pozice. Bez tohohle testu by se nepoznalo,
+    //   jestli se "stunned => rezervy" neaplikuje omylem vsude.
+    public function testBezneZraneniStunnedZustavaNaHristi(): void
+    {
+        $player = $this->makePlayer(armour: 10);
+
+        // 3+3=6 na zraneni; brneni prorazime samostatne (10+10 > AV10)
+        $result = $this->resolver->resolve($player, new FixedDiceRoller([5, 6, 3, 3]));
+
+        $this->assertSame(PlayerState::STUNNED, $result['player']->getState());
+        $this->assertNotNull($result['player']->getPosition(), 'omraceny hrac lezi NA HRISTI');
     }
 }

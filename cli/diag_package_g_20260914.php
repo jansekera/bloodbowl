@@ -45,6 +45,8 @@ function createAI(string $type): AICoachInterface
     };
 }
 
+$totalSurfs = 0;
+$totalSurfStunnedToReserves = 0;
 $totalDead = 0;
 $totalReservesAtEnd = 0;
 $totalOnPitchStartOfHalf2 = 0;
@@ -153,7 +155,48 @@ for ($g = 0; $g < $numMatches; $g++) {
         }
 
         $prevActiveTeam = $activeTeam;
+
+        // ⭐ BALIK G 24.09.2026 -- meri se TO, CO ZMENA DELA: samotna udalost,
+        //   ne koncovy stav. Hrac poslany surfem do rezerv se pri dalsim drivu
+        //   zase rozestavi, takze radek "Reservy na konci zapasu" tuhle zmenu NEVIDI.
+        //   `$totalSurfs` je pozitivni kontrola: bez nej by nula ve druhem citaci
+        //   neslo odlisit od "zadny surf se nekonal".
+        $surfedNow = [];
+        $injuryAfterSurf = [];
+        foreach ($result->getEvents() as $ev) {
+            if ($ev->getType() === 'crowd_surf') {
+                $totalSurfs++;
+                $pid = $ev->getData()['playerId'] ?? null;
+                if ($pid !== null) {
+                    $surfedNow[] = $pid;
+                }
+            }
+            // ⭐ 24.09.2026 -- bez tohohle se nepozna, JESTLI vubec padlo "stunned".
+            //   Nula v citaci rezerv by pak mohla znamenat oboji: spravne KO,
+            //   nebo nesepnutou opravu. Cteni musi mit vlastni radek.
+            if ($ev->getType() === 'injury_roll' && $surfedNow !== []) {
+                $d = $ev->getData();
+                $injuryAfterSurf[$d['playerId'] ?? -1] = ($d['result'] ?? '?')
+                    . ' (hod ' . ($d['roll'] ?? '?') . '+' . ($d['modifier'] ?? '?') . ')';
+            }
+        }
+
         $state = $result->getNewState();
+
+        foreach ($surfedNow as $pid) {
+            $stateAfter = $state->getPlayer($pid)?->getState();
+            $posAfter = $state->getPlayer($pid)?->getPosition();
+            if ($stateAfter === PlayerState::OFF_PITCH) {
+                $totalSurfStunnedToReserves++;
+            }
+            fwrite(STDERR, sprintf(
+                "   SURF hrac=%d zraneni=%s -> stav=%s pozice=%s\n",
+                $pid,
+                $injuryAfterSurf[$pid] ?? 'NEZAZNAMENANO',
+                $stateAfter?->value ?? 'null',
+                $posAfter === null ? 'null' : 'na hristi',
+            ));
+        }
 
         if ($result->isTurnover() || $decision['action'] === ActionType::END_TURN) {
             if ($decision['action'] !== ActionType::END_TURN) {
@@ -227,5 +270,10 @@ printf("INJURED na konci / hru:   %.3f (celkem %d)\n", $totalInjuredAtEnd / max(
 printf("KO na konci / hru:        %.3f (celkem %d)\n", $totalKoAtEnd / max(1,$gamesRun), $totalKoAtEnd);
 printf("Standing/Prone/Stunned na konci / hru: %.3f (celkem %d)\n", $totalStandingAtEnd / max(1,$gamesRun), $totalStandingAtEnd);
 printf("Hraci na hristi na zacatku 2. pulky (soucet obou tymu) / hru: %.3f\n", $totalOnPitchStartOfHalf2 / max(1,$gamesRun));
+printf("SURFY celkem: %d (%.3f/hru)  -- pozitivni kontrola, ze se situace vubec dela\n",
+    $totalSurfs, $totalSurfs / max(1,$gamesRun));
+printf("z toho po surfu rovnou do REZERV (OFF_PITCH): %d (%.1f%% surfu)\n",
+    $totalSurfStunnedToReserves,
+    $totalSurfs > 0 ? 100.0 * $totalSurfStunnedToReserves / $totalSurfs : 0.0);
 printf("KO pozorovano celkem (unikatni hraci-zapasy): %d, z toho vratilo se do OFF_PITCH do konce zapasu: %d (%.1f%%)\n",
     $totalKoObserved, $totalKoReturnEvents, $totalKoObserved > 0 ? 100.0 * $totalKoReturnEvents / $totalKoObserved : 0.0);

@@ -136,8 +136,15 @@ final class InjuryResolver
      *   "A player pushed off the pitch, even if Knocked Down, is beaten up only by the
      *   crowd and receives one roll on the Injury Table. THE CROWD DOES NOT HAVE ANY
      *   INJURY MODIFYING SKILLS." ⇒ zadny modifikator, ani +1.
-     * ⏰ ZBYVA: r. 655-658 -- pri vysledku "Stunned" patri hrac do REZERV
-     *   (a zustava tam do touchdownu nebo konce polocasu). Engine stav "rezervy" nema.
+     * ⛔⛔ DOPLNENO 24.09.2026 (balik G) -- `rules_bb2016.txt` r. 655-658:
+     *   "If a 'Stunned' result is rolled on the Injury table the player should be
+     *   placed in the Reserves box of the Dugout, and must remain there until a
+     *   touchdown is scored or the half ends."
+     *   ⇒ Stunned po vyhozeni z hriste NENI omraceni NA HRISTI -- hrac jde do rezerv.
+     *   ⭐ Stav "rezervy" engine MA: `PlayerState::OFF_PITCH`. Pouziva ho uz navrat
+     *   z KO (`GameFlowResolver:149`) i Regeneration nize -- hraci v nem cekaji na
+     *   rozestaveni pri dalsim drivu, tedy presne "do touchdownu nebo konce polocasu".
+     *   ⛔ Starsi komentar tvrdil, ze ten stav neexistuje. Neplatilo to.
      *
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
@@ -145,7 +152,15 @@ final class InjuryResolver
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
     ): array {
-        return $this->resolveInjury($player, $dice, 0, []);
+        $result = $this->resolveInjury($player, $dice, 0, []);
+
+        if ($result['player']->getState() === PlayerState::STUNNED) {
+            $result['player'] = $result['player']
+                ->withState(PlayerState::OFF_PITCH)
+                ->withPosition(null);
+        }
+
+        return $result;
     }
 
     /**
