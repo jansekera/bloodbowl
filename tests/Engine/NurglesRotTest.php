@@ -29,7 +29,7 @@ final class NurglesRotTest extends TestCase
         $injuryResolver = new InjuryResolver();
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty)
-        $dice = new FixedDiceRoller([5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice, hasNurglesRot: true);
 
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());
@@ -51,7 +51,7 @@ final class NurglesRotTest extends TestCase
         $injuryResolver = new InjuryResolver();
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty)
-        $dice = new FixedDiceRoller([5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice, hasNurglesRot: false);
 
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());

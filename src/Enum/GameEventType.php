@@ -37,6 +37,7 @@ enum GameEventType: string
     case BOMB_LANDING           = 'bomb_landing';
     case BOMB_THROW             = 'bomb_throw';
     case BONE_HEAD              = 'bone_head';
+    case CASUALTY               = 'casualty';
     case CATCH                  = 'catch';
     case CHAIN_PUSH             = 'chain_push';
     case CHAINSAW               = 'chainsaw';

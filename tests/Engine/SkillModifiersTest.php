@@ -136,7 +136,7 @@ final class SkillModifiersTest extends TestCase
         $injuryResolver = new InjuryResolver();
         // Armor: 4+4=8 > 7 (broken)
         // Injury: 5+4=9 (normally KO) + Stunty +1 = 10 → casualty
-        $dice = new FixedDiceRoller([4, 4, 5, 4]);
+        $dice = new FixedDiceRoller([4, 4, 5, 4, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::INJURED, $result['player']->getState());

@@ -5,6 +5,7 @@ namespace App\Engine;
 
 use App\DTO\GameEvent;
 use App\DTO\MatchPlayerDTO;
+use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 
@@ -230,6 +231,41 @@ final class InjuryResolver
      * @param list<GameEvent> $events
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>, dice: array{int, int}}
      */
+    /**
+     * Tabulka nasledku (D68) -- `rules_bb2016.txt` r. 2405-2423.
+     *
+     * ⭐ Je to D68: **D6 da desitky, D8 jednotky**, tedy 48 poli.
+     *   11-38 Badly Hurt (24/48 = 50 %) · 41-48 Miss Next Game (8/48) ·
+     *   51-52 Niggling · 53-54 -1 MA · 55-56 -1 AV · 57 -1 AG · 58 -1 ST ·
+     *   61-68 DEAD (8/48 = kazda sesta casualty).
+     *
+     * ⛔⛔ DOPLNENO 24.09.2026 (balik G) -- do ted byl kazdy hod 10+ na zraneni
+     *   plose `INJURED`, takze **smrt nemohla nastat vubec**. Vzor je C++ engine
+     *   (`engine/src/injury.cpp:11`, balik G z 10.08.2026).
+     *
+     * @return array{result: CasualtyResult, tens: int, units: int}
+     */
+    public function rollCasualty(DiceRollerInterface $dice): array
+    {
+        $tens = $dice->rollD6();
+        $units = $dice->rollD8();
+
+        $result = match (true) {
+            $tens <= 3 => CasualtyResult::BADLY_HURT,
+            $tens === 4 => CasualtyResult::MISS_NEXT_GAME,
+            $tens === 6 => CasualtyResult::DEAD,
+            default => match ($units) {          // tens === 5
+                1, 2 => CasualtyResult::NIGGLING,
+                3, 4 => CasualtyResult::MA_LOSS,
+                5, 6 => CasualtyResult::AV_LOSS,
+                7 => CasualtyResult::AG_LOSS,
+                default => CasualtyResult::ST_LOSS,
+            },
+        };
+
+        return ['result' => $result, 'tens' => $tens, 'units' => $units];
+    }
+
     private function resolveInjury(
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,
@@ -278,8 +314,23 @@ final class InjuryResolver
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
             }
         } else {
-            $player = $player->withState(PlayerState::INJURED)->withPosition(null);
+            // ⛔⛔ ZMENENO 24.09.2026 (balik G): do ted tu byl plose `INJURED`,
+            //   takze DEAD nemohl nastat vubec. Ted se hazi na tabulce nasledku.
+            //   ⚠️ V JEDNOM ZAPASE je mezi BADLY_HURT, MISS_NEXT_GAME, NIGGLING
+            //   a ztratami vlastnosti rozdil nulovy -- hrac je venku tak jako tak.
+            //   Lisi se az v LIZE. Vysledek se proto ZAZNAMENAVA do udalosti,
+            //   i kdyz ho zatim nic necte.
+            $cas = $this->rollCasualty($dice);
+            $player = $player
+                ->withState($cas['result'] === CasualtyResult::DEAD ? PlayerState::DEAD : PlayerState::INJURED)
+                ->withPosition(null);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'casualty');
+            $events[] = GameEvent::casualty(
+                $player->getId(),
+                $cas['tens'],
+                $cas['units'],
+                $cas['result']->value,
+            );
 
             // Nurgle's Rot: flavor event when attacker has the skill
             if ($hasNurglesRot) {

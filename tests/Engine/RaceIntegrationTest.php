@@ -109,7 +109,7 @@ final class RaceIntegrationTest extends TestCase
         // Armor: 6+4=10 > 9 (broken)
         // Injury: 6+5=11 (casualty)
         // Regen: 4 (>= 4, success)
-        $dice = new FixedDiceRoller([6, 4, 6, 5, 4]);
+        $dice = new FixedDiceRoller([6, 4, 6, 5, 1, 1, 4]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::OFF_PITCH, $result['player']->getState());

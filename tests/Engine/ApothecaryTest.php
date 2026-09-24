@@ -32,7 +32,7 @@ final class ApothecaryTest extends TestCase
         // Armor: 5+4=9 > 7 (broken)
         // Injury: 5+5=10 (casualty)
         // Apothecary re-roll: 3+3=6 (stunned, better!)
-        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 3, 3]);
+        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 1, 1, 3, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
@@ -67,7 +67,7 @@ final class ApothecaryTest extends TestCase
         // Injury: 5+5=10 (casualty)
         // Apothecary re-roll: 6+5=11 (casualty again, worse or same)
         // Keep original (casualty)
-        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 6, 5]);
+        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 1, 1, 6, 5, 1, 1]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
@@ -118,7 +118,7 @@ final class ApothecaryTest extends TestCase
         // Armor: 5+4=9 > 7 (broken)
         // Injury: 5+5=10 (casualty)
         // No apothecary (already used)
-        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5]);
+        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 1, 1]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
@@ -140,7 +140,7 @@ final class ApothecaryTest extends TestCase
         // Armor: 5+4=9 > 7 (broken)
         // Injury: 5+5=10 (casualty)
         // Apothecary re-roll: 4+4=8 (KO, better than casualty)
-        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 4, 4]);
+        $dice = new FixedDiceRoller([6, 6, 5, 4, 5, 5, 1, 1, 4, 4]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [

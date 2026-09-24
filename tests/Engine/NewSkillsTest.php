@@ -239,7 +239,7 @@ final class NewSkillsTest extends TestCase
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty, > 9)
         // Thick Skull doesn't activate for casualty
-        $dice = new FixedDiceRoller([5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::INJURED, $result['player']->getState());

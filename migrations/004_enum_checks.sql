@@ -40,7 +40,7 @@ ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
         'always_hungry', 'animosity', 'apothecary', 'armour_roll',
         'ball_and_chain_block', 'ball_and_chain_move', 'ball_bounce', 'block',
         'bloodlust_bite', 'bloodlust_fail', 'bomb_explosion', 'bomb_landing',
-        'bomb_throw', 'bone_head', 'catch', 'chain_push',
+        'bomb_throw', 'bone_head', 'casualty', 'catch', 'chain_push',
         'chainsaw', 'chainsaw_kickback', 'crowd_surf', 'diving_catch',
         'diving_tackle', 'dodge', 'dump_off', 'ejection',
         'end_turn', 'fend', 'follow_up', 'foul',

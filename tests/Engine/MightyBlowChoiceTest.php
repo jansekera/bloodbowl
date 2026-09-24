@@ -48,8 +48,11 @@ final class MightyBlowChoiceTest extends TestCase
 
         // Brneni: 5+5 = 10 > AV 9 => padne i BEZ Mighty Blow.
         // Zraneni: 4+5 = 9 => bez bonusu KO (8-9), s bonusem 10 => ZRANENI.
-        $bezMB = $res->resolve($this->obranceAV9(), new FixedDiceRoller([5, 5, 4, 5, 6]), 0, 0, false, false, false, false);
-        $sMB   = $res->resolve($this->obranceAV9(), new FixedDiceRoller([5, 5, 4, 5, 6]), 0, 0, false, false, false, true);
+        // ⭐ +[1, 1] = hod na tabulce nasledku (D68) => 11 = Badly Hurt.
+        //   ⛔ Puvodni posloupnost koncila nepouzitou sestkou; od 24.09.2026 ji cte
+        //   tabulka nasledku jako DESITKY a 6x je DEAD. Proto je nahrazena, ne doplnena.
+        $bezMB = $res->resolve($this->obranceAV9(), new FixedDiceRoller([5, 5, 4, 5, 1, 1]), 0, 0, false, false, false, false);
+        $sMB   = $res->resolve($this->obranceAV9(), new FixedDiceRoller([5, 5, 4, 5, 1, 1]), 0, 0, false, false, false, true);
 
         $this->assertSame(PlayerState::KO, $bezMB['player']->getState(), 'bez MB ma vyjit KO');
         $this->assertSame(

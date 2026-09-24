@@ -754,7 +754,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // kostka bloku 3 = PUSHED; zraneni 6+6=12 => casualty
-        $resolver = new ActionResolver(new FixedDiceRoller([3, 6, 6]));
+        $resolver = new ActionResolver(new FixedDiceRoller([3, 6, 6, 1, 1]));
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
             'playerId' => 1,

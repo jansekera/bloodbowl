@@ -5,6 +5,7 @@ namespace App\Tests\Engine;
 
 use App\Engine\FixedDiceRoller;
 use App\Engine\InjuryResolver;
+use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
 use App\Enum\TeamSide;
 use App\ValueObject\PlayerStats;
@@ -79,7 +80,7 @@ final class InjuryResolverTest extends TestCase
         $player = $this->makePlayer(armour: 7);
         // Armour: 5+4=9 > AV7, breaks
         // Injury: 5+5=10, casualty (10+)
-        $dice = new FixedDiceRoller([5, 4, 5, 5]);
+        $dice = new FixedDiceRoller([5, 4, 5, 5, 1, 1]);
 
         $result = $this->resolver->resolve($player, $dice);
 
@@ -104,7 +105,7 @@ final class InjuryResolverTest extends TestCase
         $player = $this->makePlayer(armour: 7);
         // Armour: 5+4=9 > AV7, breaks
         // Injury: 5+4=9, with +1 = 10, casualty instead of KO
-        $dice = new FixedDiceRoller([5, 4, 5, 4]);
+        $dice = new FixedDiceRoller([5, 4, 5, 4, 1, 1]);
 
         $result = $this->resolver->resolve($player, $dice, injuryModifier: 1);
 
@@ -145,7 +146,7 @@ final class InjuryResolverTest extends TestCase
     {
         $player = $this->makePlayer(armour: 10);
         // Injury: 5+5=10 => casualty (bez modifikatoru; 9 by byl KO)
-        $dice = new FixedDiceRoller([5, 5]);
+        $dice = new FixedDiceRoller([5, 5, 1, 1]);
 
         $result = $this->resolver->resolveCrowdSurf($player, $dice);
 
@@ -168,6 +169,95 @@ final class InjuryResolverTest extends TestCase
     {
         $result = $this->resolver->resolveCrowdSurf($this->makePlayer(armour: 10), new FixedDiceRoller([5, 4]));
         $this->assertSame(PlayerState::KO, $result['player']->getState());
+    }
+
+    // ════════ TABULKA NASLEDKU (D68) -- balik G, 24.09.2026 ════════
+
+    /**
+     * ⭐ CELA TABULKA NARAZ: projde se vsech 48 kombinaci (D6 desitky x D8 jednotky)
+     *   a spocita se rozlozeni. Tim se overi tabulka jako CELEK, ne par bodu --
+     *   posunuta hranice se pozna okamzite, protoze zmeni pocty.
+     *   `rules_bb2016.txt` r. 2405-2423.
+     */
+    public function testTabulkaNasledkuMaRozlozeniPodlePravidel(): void
+    {
+        $counts = [];
+        foreach (range(1, 6) as $tens) {
+            foreach (range(1, 8) as $units) {
+                $cas = $this->resolver->rollCasualty(new FixedDiceRoller([$tens, $units]));
+                $key = $cas['result']->value;
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        }
+
+        $this->assertSame(48, array_sum($counts), 'D68 ma 48 poli, ne 68');
+        $this->assertSame(24, $counts['badly_hurt'] ?? 0, '11-38 = polovina vsech nasledku');
+        $this->assertSame(8, $counts['miss_next_game'] ?? 0, '41-48');
+        $this->assertSame(2, $counts['niggling'] ?? 0, '51-52');
+        $this->assertSame(2, $counts['ma_loss'] ?? 0, '53-54');
+        $this->assertSame(2, $counts['av_loss'] ?? 0, '55-56');
+        $this->assertSame(1, $counts['ag_loss'] ?? 0, '57');
+        $this->assertSame(1, $counts['st_loss'] ?? 0, '58');
+        $this->assertSame(8, $counts['dead'] ?? 0, '61-68 = kazda sesta casualty');
+    }
+
+    /** Hranice, na kterych se pozna posun o jedno pole. */
+    public function testTabulkaNasledkuHranice(): void
+    {
+        $cases = [
+            [1, 1, CasualtyResult::BADLY_HURT],
+            [3, 8, CasualtyResult::BADLY_HURT],     // posledni BH
+            [4, 1, CasualtyResult::MISS_NEXT_GAME], // prvni MNG
+            [4, 8, CasualtyResult::MISS_NEXT_GAME],
+            [5, 2, CasualtyResult::NIGGLING],
+            [5, 3, CasualtyResult::MA_LOSS],
+            [5, 5, CasualtyResult::AV_LOSS],
+            [5, 7, CasualtyResult::AG_LOSS],
+            [5, 8, CasualtyResult::ST_LOSS],
+            [6, 1, CasualtyResult::DEAD],           // prvni DEAD
+        ];
+
+        foreach ($cases as [$tens, $units, $expected]) {
+            $cas = $this->resolver->rollCasualty(new FixedDiceRoller([$tens, $units]));
+            $this->assertSame($expected, $cas['result'], "D68 {$tens}{$units}");
+        }
+    }
+
+    /**
+     * ⛔ Do 24.09.2026 byl kazdy hod 10+ plose INJURED, takze DEAD nemohl nastat
+     *   VUBEC -- meridlo hlasilo "DEAD/hru: 0.0000" napric tisici her.
+     */
+    public function testHod61DavaSkutecneMrtvehoHrace(): void
+    {
+        // brneni 6+6=12 > AV8, zraneni 6+6=12 => casualty, nasledek 6+1 = 61 => DEAD
+        $result = $this->resolver->resolve($this->makePlayer(armour: 8), new FixedDiceRoller([6, 6, 6, 6, 6, 1]));
+
+        $this->assertSame(PlayerState::DEAD, $result['player']->getState());
+        $this->assertNull($result['player']->getPosition());
+    }
+
+    /** POZITIVNI KONTROLA k testu vyse: tataz cesta, jiny nasledek => hrac NEumira. */
+    public function testHod11DavaZraneniNeSmrt(): void
+    {
+        $result = $this->resolver->resolve($this->makePlayer(armour: 8), new FixedDiceRoller([6, 6, 6, 6, 1, 1]));
+
+        $this->assertSame(PlayerState::INJURED, $result['player']->getState());
+    }
+
+    /** Vysledek se musi dat DOHLEDAT -- v lize se podle nej rozhoduje po zapase. */
+    public function testUdalostNasledkuNeseKostkyIVysledek(): void
+    {
+        $result = $this->resolver->resolve($this->makePlayer(armour: 8), new FixedDiceRoller([6, 6, 6, 6, 5, 7]));
+
+        $casEvents = array_values(array_filter(
+            $result['events'],
+            fn ($e) => $e->getType() === 'casualty',
+        ));
+
+        $this->assertCount(1, $casEvents);
+        $this->assertSame(5, $casEvents[0]->getData()['tens']);
+        $this->assertSame(7, $casEvents[0]->getData()['units']);
+        $this->assertSame('ag_loss', $casEvents[0]->getData()['result']);
     }
 
     // ⭐ BALIK G, 24.09.2026 -- `rules_bb2016.txt` r. 655-658: "If a 'Stunned' result

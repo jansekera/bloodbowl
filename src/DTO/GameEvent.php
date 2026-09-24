@@ -114,6 +114,21 @@ final class GameEvent
         ]);
     }
 
+    /**
+     * Vysledek hodu na tabulce nasledku (D68) -- `rules_bb2016.txt` r. 2405-2423.
+     * `tens`/`units` jsou v datech kvuli dohledatelnosti: bez nich nejde zpetne
+     * overit, ze rozlozeni sedi na tabulku.
+     */
+    public static function casualty(int $playerId, int $tens, int $units, string $result): self
+    {
+        return new self('casualty', "Casualty: {$result} (D68 {$tens}{$units})", [
+            'playerId' => $playerId,
+            'tens' => $tens,
+            'units' => $units,
+            'result' => $result,
+        ]);
+    }
+
     public static function crowdSurf(int $playerId): self
     {
         return new self('crowd_surf', "Player surfed into the crowd!", [

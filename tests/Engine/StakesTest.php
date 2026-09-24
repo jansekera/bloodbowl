@@ -30,7 +30,7 @@ final class StakesTest extends TestCase
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty)
         // No regen roll because Stakes blocks it
-        $dice = new FixedDiceRoller([5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice, hasStakes: true);
 
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());
@@ -54,7 +54,7 @@ final class StakesTest extends TestCase
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty)
         // Regen: 4 (>= 4, success)
-        $dice = new FixedDiceRoller([5, 4, 6, 5, 4]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1, 4]);
         $result = $injuryResolver->resolve($player, $dice, hasStakes: false);
 
         $this->assertSame(PlayerState::OFF_PITCH, $result['player']->getState());
@@ -78,7 +78,7 @@ final class StakesTest extends TestCase
         // Armor: 5+4=9 > 8 (broken)
         // Injury: 6+5=11 (casualty)
         // No regen skill, stakes irrelevant
-        $dice = new FixedDiceRoller([5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([5, 4, 6, 5, 1, 1]);
         $result = $injuryResolver->resolve($player, $dice, hasStakes: true);
 
         $this->assertSame(PlayerState::INJURED, $result['player']->getState());
@@ -105,7 +105,7 @@ final class StakesTest extends TestCase
         // Armor roll 2D6: [5,4]=9 > 7 → broken
         // Injury roll 2D6: [6,5]=11 → casualty
         // Stakes blocks regen → no regen roll needed
-        $dice = new FixedDiceRoller([6, 6, 5, 4, 6, 5]);
+        $dice = new FixedDiceRoller([6, 6, 5, 4, 6, 5, 1, 1]);
         $resolver = new \App\Engine\ActionResolver($dice);
         $result = $resolver->resolve($state, \App\Enum\ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 

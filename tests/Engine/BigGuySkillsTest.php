@@ -490,7 +490,7 @@ final class BigGuySkillsTest extends TestCase
         // Armor: 6+5=11 > 9 (broken)
         // Injury: 6+5=11 (casualty)
         // Regen: 4 (>= 4, success)
-        $dice = new FixedDiceRoller([6, 5, 6, 5, 4]);
+        $dice = new FixedDiceRoller([6, 5, 6, 5, 1, 1, 4]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::OFF_PITCH, $result['player']->getState());
@@ -513,7 +513,7 @@ final class BigGuySkillsTest extends TestCase
         // Armor: 6+5=11 > 9 (broken)
         // Injury: 6+5=11 (casualty)
         // Regen: 3 (< 4, fail)
-        $dice = new FixedDiceRoller([6, 5, 6, 5, 3]);
+        $dice = new FixedDiceRoller([6, 5, 6, 5, 1, 1, 3]);
         $result = $injuryResolver->resolve($player, $dice);
 
         $this->assertEquals(PlayerState::INJURED, $result['player']->getState());
