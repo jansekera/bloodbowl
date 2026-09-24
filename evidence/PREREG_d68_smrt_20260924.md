@@ -131,3 +131,67 @@ na vrstvě, kde se rozhoduje** *(jaký výsledek padl na tabulce zranění)*, ne
 Diag bere **`--matches=N`**, ne poziční argument. `php … 5` a `php … 2` obojí pustí
 **výchozích 20 her** a tiše — 24.09. jsem si tím zabil běh vlastním `timeout 180`
 v domnění, že pouštím pět her.
+
+---
+
+# ✅✅ SURF — UZAVŘENO 24.09. VEČER, VADA NEEXISTUJE
+
+Změřeno **přímo na příčině**: běh 40 her se zachyceným STDERR, kde diag u každého
+surfu tiskne i výsledek hodu na zranění. **26 surfů:**
+
+| hod | výsledek | kam hráč šel |
+|---|---|---|
+| 3 ×3 · 4 ×1 · 5 ×2 · 6 ×4 · 7 ×8 | **stunned** | **18× rezervy (OFF_PITCH)** |
+| **8** ×4 · **9** ×1 | **ko** | 5× KO box |
+| **10** ×1 · 11 ×2 | **casualty** | 2× injured, 1× **dead** |
+
+⭐ **Převod „omráčen → rezervy" sedí 18 z 18.** Kontrolní dotaz *„existuje omráčený,
+který nešel do rezerv?"* vrací **prázdno**. Oprava z bodu 1/4 funguje bez výjimky.
+
+## ⛔⛔⛔ PODEZŘENÍ BYLO MOJE CHYBA, NE VADA ENGINU
+
+Očekávaných **72,2 %** jsem vyrobil tím, že jsem si v `InjuryResolver.php` přečetl
+komentář citující *„a roll of 8 … as a Stunned result rather than a KO'd result"*
+jako obecné pravidlo. ⛔ **Je to text dovednosti THICK SKULL, tedy VÝJIMKA.**
+Obecně platí **≤ 7 = omráčen ⇒ 21/36 = 58,3 %**.
+
+Proti správné hodnotě: **18/26 = 69,2 % = +1,13 σ** ⇒ ✅ sedí.
+A dřívější „základna" 71,9 % byla **odlehlý vzorek**, ne norma.
+
+⚠️ **Konzistentní odchylka od nesprávné báze vypadá k nerozeznání od nálezu** —
+zapsáno jako [[feedback_expected_value_needs_its_own_check]].
+
+## ⭐ HRANICE 9 a 10 — na dotaz uživatele
+
+Uživatel si všiml, že v prvním výpisu **chyběly hody 9 a 10**, tedy přesně obě
+hranice prahů *(≤7 omráčen · 8-9 KO · ≥10 casualty)* — místo, kde by se schovala
+chyba o jedničku.
+
+✅ **Obě jsou pokryté testy, a ty rozlišují** *(ověřeno negativní kontrolou)*:
+
+| posun prahu | co spadne |
+|---|---|
+| `<= 7` → `<= 8` | `testArmourBrokenKO`, `testCrowdSurfCanCauseKO` |
+| `<= 9` → `<= 10` | `testArmourBrokenCasualty`, `testInjuryModifierUpgradesSeverity`, `testCrowdSurfCanCauseCasualty` |
+
+✅ **A v úplném běhu nakonec padly obě** — 9 → KO, 10 → casualty. Nebyla to mezera
+v ověření, jen vzorkování.
+
+# ⏰ CO SLEDOVAT PŘÍŠTĚ: podíl smrtí je 2,0 σ nad očekáváním
+
+| běh | casualty | DEAD | podíl |
+|---|---|---|---|
+| 1 *(40 her)* | 74 | 16 | 21,6 % |
+| 2 *(20 her)* | 36 | 6 | 16,7 % |
+| 3 *(40 her)* | 75 | 19 | 25,3 % |
+| **sloučeno** | **185** | **41** | **22,2 %** vs 16,67 % ⇒ **+2,0 σ** |
+
+⚠️ **NEPROHLAŠUJI ZA NÁLEZ**, a záměrně:
+* **pro:** očekávaná hodnota **je** ověřená — test `CELA TABULKA NARAZ` projde všech
+  48 kombinací D6×D8, takže posunutá hranice by se poznala hned;
+* **proti:** dvě σ nastanou u jednoho z dvaceti měření samy; a tohle je **jedno
+  měření**, ne tři nezávislá potvrzení — slučuji běhy téhož kódu.
+
+⇒ ⏰ **Při dalším měření je to první číslo ke čtení.** Drží-li se nad 20 % i na
+větším n, pak teprve hledat příčinu *(a začít tím, jestli se DEAD nepřiřazuje i jinde
+než z tabulky)*.
