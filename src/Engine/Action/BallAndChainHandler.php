@@ -16,15 +16,19 @@ use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\ScatterCalculator;
+use App\Engine\StrengthCalculator;
 
 final class BallAndChainHandler implements ActionHandlerInterface
 {
+    private readonly StrengthCalculator $strCalc;
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly ScatterCalculator $scatterCalc,
     ) {
+        $this->strCalc = new StrengthCalculator();
     }
 
     /**
@@ -76,18 +80,25 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, (string) $newPos, $direction);
                 $events[] = GameEvent::ballAndChainBlock($playerId, $occupant->getId());
 
-                // Move to the square first
-                $player = $player->withPosition($newPos);
-                $state = $state->withPlayer($player);
-
-                // Resolve 1-die block (using B&C player's ST vs occupant's ST)
-                [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events);
+                // B&C zustava na svem poli a blokuje odtud (r. 7840-7842); lezici
+                //   nebo omraceny v ceste se misto bloku odtlaci a hazi na brneni (r. 7843-7845).
+                if ($occupant->getState()->canAct()) {
+                    [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events);
+                } else {
+                    [$state, $events] = $this->odtlacitLeziciho($state, $player, $occupant, $events);
+                }
 
                 // If player was knocked down during auto-block, stop movement
                 $player = $state->getPlayer($playerId);
                 if ($player === null || $player->getState() !== PlayerState::STANDING) {
                     $srazenPriBloku = true;
                     break;
+                }
+
+                // Povinny follow-up (r. 7845-7847): uvolnilo-li se pole, B&C postoupi.
+                if ($state->getPlayerAtPosition($newPos) === null) {
+                    $player = $player->withPosition($newPos);
+                    $state = $state->withPlayer($player);
                 }
             } else {
                 // Move to empty square
@@ -120,8 +131,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
     /**
      * Natoceni sablony pro dalsi krok -- rozhodnuti uzivatele 25.09.: k nejblizsimu
-     * stojicimu SOUPERI a vyhnout se NASIM stojicim. Kazde natoceni ma tri mozna
-     * pole (po 1/3); skore = stojici soupere - 2 x stojici nasi - dav.
+     * stojicimu SOUPERI a vyhnout se VSEM NASIM (i lezicim). Kazde natoceni ma tri
+     * mozna pole (po 1/3); skore = stojici soupere - 2 x nasi - dav.
      * Pri shode rozhodne blizkost rovneho pole k nejblizsimu stojicimu souperi.
      *
      * @return array{int, int}
@@ -145,8 +156,10 @@ final class BallAndChainHandler implements ActionHandlerInterface
                     continue;
                 }
                 $kdo = $state->getPlayerAtPosition($pole);
-                if ($kdo !== null && $kdo->getState() === PlayerState::STANDING) {
-                    $skore += $kdo->getTeamSide() === $bnc->getTeamSide() ? -2.0 : 1.0;
+                if ($kdo !== null && $kdo->getTeamSide() === $bnc->getTeamSide()) {
+                    $skore -= 2.0; // i lezici a omraceny nas (uzivatel 25.09.)
+                } elseif ($kdo !== null && $kdo->getState() === PlayerState::STANDING) {
+                    $skore += 1.0;
                 }
             }
             $rovne = new Position($odkud->getX() + $smer[0], $odkud->getY() + $smer[1]);
@@ -211,19 +224,26 @@ final class BallAndChainHandler implements ActionHandlerInterface
             return [$state, $events, $bncPlayer];
         }
 
-        // 1-die block
-        $roll = $this->dice->rollD6();
-        $face = match ($roll) {
-            1 => BlockDiceFace::ATTACKER_DOWN,
-            2 => BlockDiceFace::BOTH_DOWN,
-            3, 4 => BlockDiceFace::PUSHED,
-            5 => BlockDiceFace::DEFENDER_STUMBLES,
-            default => BlockDiceFace::DEFENDER_DOWN,
-        };
+        // Blok podle beznych pravidel (r. 7840-7842): kostky podle sily vc. asistenci.
+        $attStr = $this->strCalc->calculateEffectiveStrength($state, $bncPlayer, $targetPos);
+        $defStr = $this->strCalc->calculateEffectiveStrength($state, $target, $bncPos);
+        $info = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
+        $faces = [];
+        for ($i = 0; $i < $info['count']; $i++) {
+            $faces[] = match ($this->dice->rollD6()) {
+                1 => BlockDiceFace::ATTACKER_DOWN,
+                2 => BlockDiceFace::BOTH_DOWN,
+                3, 4 => BlockDiceFace::PUSHED,
+                5 => BlockDiceFace::DEFENDER_STUMBLES,
+                default => BlockDiceFace::DEFENDER_DOWN,
+            };
+        }
+        assert($faces !== []); // getBlockDiceInfo vraci vzdy 1-3 kostky
+        $face = $this->vyberStranu($faces, $target->getTeamSide() === $bncPlayer->getTeamSide(), $info['attackerChooses']);
 
-        $faceValues = [$face->value];
         $events[] = GameEvent::blockAttempt(
-            $bncPlayer->getId(), $target->getId(), 1, true, $faceValues, $face->value,
+            $bncPlayer->getId(), $target->getId(), $info['count'], $info['attackerChooses'],
+            array_map(static fn(BlockDiceFace $f) => $f->value, $faces), $face->value,
         );
 
         // Simplified block resolution for auto-block
@@ -297,6 +317,50 @@ final class BallAndChainHandler implements ActionHandlerInterface
         }
 
         return [$state, $events, $bncPlayer];
+    }
+
+    /**
+     * Volba strany kostky. Proti VLASTNIMU hraci voli nas kouc za obe strany a bere,
+     * co mu nejmene ublizi (rozhodnuti uzivatele 25.09.); proti souperi voli silnejsi
+     * -- nejlepsi pro B&C, nebo nejhorsi, kdyz voli souper.
+     *
+     * @param non-empty-list<BlockDiceFace> $faces
+     */
+    private function vyberStranu(array $faces, bool $vlastni, bool $attackerChooses): BlockDiceFace
+    {
+        $poradi = $vlastni
+            ? [BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::BOTH_DOWN, BlockDiceFace::ATTACKER_DOWN, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW]
+            : [BlockDiceFace::POW, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::PUSHED, BlockDiceFace::BOTH_DOWN, BlockDiceFace::ATTACKER_DOWN];
+        if (!$vlastni && !$attackerChooses) {
+            $poradi = array_reverse($poradi);
+        }
+        foreach ($poradi as $f) {
+            if (in_array($f, $faces, true)) {
+                return $f;
+            }
+        }
+
+        return $faces[0];
+    }
+
+    /**
+     * Lezici nebo omraceny v ceste B&C: misto bloku odtlaceni a hod na brneni
+     * (`rules_bb2016.txt` r. 7843-7845). Omraceny zustava omraceny.
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function odtlacitLeziciho(GameState $state, MatchPlayerDTO $bnc, MatchPlayerDTO $obet, array $events): array
+    {
+        [$state, $events] = $this->resolvePush($state, $bnc, $obet, $events);
+        $obet = $state->requirePlayer($obet->getId());
+        if ($obet->getPosition() === null) {
+            return [$state, $events]; // vytlacen do davu -- tam uz se hazelo
+        }
+        $injResult = $this->injuryResolver->resolve($obet, $this->dice);
+        $events = array_merge($events, $injResult['events']);
+
+        return [$state->withPlayer($injResult['player']), $events];
     }
 
     /**

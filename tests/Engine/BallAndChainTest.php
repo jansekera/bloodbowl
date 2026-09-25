@@ -46,25 +46,60 @@ final class BallAndChainTest extends TestCase
     /**
      * Auto-block when B&C moves into occupied square.
      */
-    public function testAutoBlockOnOccupiedSquare(): void
+    /** Blokuje ze SVEHO pole a po odtlaceni povinne postoupi (r. 7840-7847). */
+    public function testAutoBlockFromOwnSquareThenFollowUp(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1, skills: [SkillName::BallAndChain])
-            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // enemy at (6,7)
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, id: 1, skills: [SkillName::BallAndChain])
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
             ->build();
 
-        // D8=3 (East) → moves to (6,7) where player 2 is → auto-block
-        // Block die: 6 → DEFENDER_DOWN
-        // Armor: 4+4=8 vs AV8, not broken
-        // D8=3 (East) → second move step (player pushed away or not)
-        $dice = new FixedDiceRoller([3, 6, 4, 4, 3]);
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        // D6 3 => rovne na (6,7); ST 3 proti 3 = 1 kostka: 6 = Defender Down; brneni 4+4
+        $result = (new ActionResolver(new FixedDiceRoller([3, 6, 4, 4])))->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('ball_and_chain_block', $types);
-        $this->assertContains('block', $types);
+        $bnc = $result->getNewState()->requirePlayer(1)->requirePosition();
+        $obet = $result->getNewState()->requirePlayer(2)->requirePosition();
+        $this->assertSame([6, 7], [$bnc->getX(), $bnc->getY()], 'follow-up na uvolnene pole');
+        $this->assertSame([7, 7], [$obet->getX(), $obet->getY()], 'odtlacen od pole B&C, ne z tehoz pole');
+    }
+
+    /** Silny B&C hazi kostky podle sily (r. 7840-7842): ST 7 proti 3 = 3 kostky, voli utocnik. */
+    public function testBlockUsesStrengthDice(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, id: 1, skills: [SkillName::BallAndChain])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // D6 3; tri kostky 1, 1, 6 => B&C vybere Defender Down; brneni 4+4
+        $result = (new ActionResolver(new FixedDiceRoller([3, 1, 1, 6, 4, 4])))->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(1)->getState(), 's jednou kostkou (1) by lezel');
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
+    }
+
+    /** Lezici v ceste: odtlacit + brneni misto bloku (r. 7843-7845), pak follow-up. */
+    public function testProneOccupantIsPushedAndArmourRolled(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, id: 1, skills: [SkillName::BallAndChain])
+            ->addPronePlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 9, 7, id: 3) // stojici souper v +x => natoceni +x
+            ->withBallOffPitch()
+            ->build();
+
+        // D6 3 => rovne na (6,7) s lezicim; brneni 6+6 prolomeno; zraneni 3+3 => stunned
+        $result = (new ActionResolver(new FixedDiceRoller([3, 6, 6, 3, 3])))->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertNotContains('block', $types, 'na lezici se neblokuje');
+        $obet = $result->getNewState()->requirePlayer(2);
+        $this->assertSame(PlayerState::STUNNED, $obet->getState());
+        $this->assertSame([7, 7], [$obet->requirePosition()->getX(), $obet->requirePosition()->getY()]);
     }
 
     /**
