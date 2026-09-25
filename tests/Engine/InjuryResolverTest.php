@@ -314,7 +314,7 @@ final class InjuryResolverTest extends TestCase
     public function testChainsawHolderNoBonusOnUnmodifiedArmour(): void
     {
         $player = $this->makePlayer(armour: 8, skills: [SkillName::Chainsaw]);
-        $result = $this->resolver->resolve($player, new FixedDiceRoller([3, 3]), unmodifiedArmour: true);
+        $result = $this->resolver->resolve($player, new FixedDiceRoller([3, 3]), chainsawHolderBonus: false);
 
         $this->assertSame(PlayerState::STANDING, $result['player']->getState());
     }

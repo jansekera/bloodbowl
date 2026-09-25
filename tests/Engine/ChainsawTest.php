@@ -237,4 +237,39 @@ final class ChainsawTest extends TestCase
         $this->assertTrue($result->isTurnover());
         $this->assertSame(PlayerState::STUNNED, $result->getNewState()->requirePlayer(1)->getState());
     }
+
+    /** Pila do nositele pily: +3, ne +6 -- obet je srazena az PO hodu (r. 8002-8003, 8009-8011). */
+    public function testChainsawHitOnChainsawHolderIsPlusThreeNotSix(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Chainsaw], armour: 9, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // 5 = zasah; brneni 2+4 = 6, +3 = 9 <= AV9 drzi (s +6 by bylo 12 = prolomeno)
+        $dice = new FixedDiceRoller([5, 2, 4]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
+    }
+
+    /** Stab v Multiple Block hazi "unmodified" -- bez +3 za pilu obeti, stejne jako Stab v bloku. */
+    public function testStabInMultipleBlockIgnoresVictimChainsaw(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::MultipleBlock, SkillName::Stab], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Chainsaw], armour: 8, id: 2)
+            ->addPlayer(TeamSide::AWAY, 5, 6, armour: 8, id: 3)
+            ->withBallOffPitch()
+            ->build();
+
+        // brneni cile 2: 3+3 = 6 <= 8 drzi (s +3 by bylo 9 = prolomeno); cil 3: 3+3 drzi
+        $dice = new FixedDiceRoller([3, 3, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::MULTIPLE_BLOCK, [
+            'playerId' => 1, 'targetId' => 2, 'targetId2' => 3,
+        ]);
+
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
+    }
 }

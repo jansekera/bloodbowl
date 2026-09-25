@@ -590,7 +590,7 @@ final class BlockHandler implements ActionHandlerInterface
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
             $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+            $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, chainsawHolderBonus: false);
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
@@ -611,7 +611,7 @@ final class BlockHandler implements ActionHandlerInterface
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
             $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, chainsawHolderBonus: false);
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
@@ -699,7 +699,7 @@ final class BlockHandler implements ActionHandlerInterface
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-        $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, unmodifiedArmour: true);
+        $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, chainsawHolderBonus: false);
         $defender = $injResult['player'];
         $state = $state->withPlayer($defender);
         $events = array_merge($events, $injResult['events']);
@@ -778,7 +778,7 @@ final class BlockHandler implements ActionHandlerInterface
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-        $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+        $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, chainsawHolderBonus: false);
         $defender = $injResult['player'];
         $state = $state->withPlayer($defender);
         $events = array_merge($events, $injResult['events']);

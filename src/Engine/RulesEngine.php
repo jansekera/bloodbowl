@@ -1196,7 +1196,8 @@ final class RulesEngine
         if ($player->getTeamSide() !== $state->getActiveTeam()) {
             return ['Can only stand pat with players from the active team'];
         }
-        if (!$player->canAct()) {
+        // Stejna podminka jako nabidka v `getAvailableActions` -- i lezici hrac smi zustat lezet.
+        if (!$player->canAct() && !$player->canMove()) {
             return ['Player cannot act'];
         }
         return [];

@@ -153,4 +153,19 @@ final class StandPatTest extends TestCase
             'hrac soupere se neaktivuje za nas');
         $this->assertNotSame([], $engine->validate($state, ActionType::STAND_PAT, []));
     }
+
+    /** STAND_PAT se nabizi i LEZICIMU (`canMove`) -- validace ho nesmi odmitnout. */
+    public function testRulesEngineValidatesStandPatForPronePlayer(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 10, 5, id: 2)
+            ->build();
+        $engine = new \App\Engine\RulesEngine();
+
+        $nabidnuto = array_filter($engine->getAvailableActions($state),
+            fn(array $a) => $a['type'] === ActionType::STAND_PAT->value && ($a['playerId'] ?? null) === 1);
+        $this->assertNotSame([], $nabidnuto, 'fixtura: lezicimu se STAND_PAT nabizi');
+        $this->assertSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 1]));
+    }
 }

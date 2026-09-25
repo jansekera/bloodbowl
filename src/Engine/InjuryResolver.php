@@ -45,13 +45,14 @@ final class InjuryResolver
         bool $hasStakes = false,
         bool $hasNurglesRot = false,
         bool $mightyBlow = false,
-        bool $unmodifiedArmour = false,
+        bool $chainsawHolderBonus = true,
     ): array {
         $events = [];
 
         // Nositel pily srazeny z jakehokoli duvodu => souper +3 k brneni
-        //   (`rules_bb2016.txt` r. 8009-8011). Stab hazi "unmodified" (r. Stab) => bez nej.
-        if (!$unmodifiedArmour && $player->hasSkill(SkillName::Chainsaw)) {
+        //   (`rules_bb2016.txt` r. 8009-8011). NE u hodu, ktery o srazeni teprve
+        //   rozhoduje: Stab ("unmodified") a zasah pilou (ma vlastnich +3).
+        if ($chainsawHolderBonus && $player->hasSkill(SkillName::Chainsaw)) {
             $armourModifier += 3;
         }
 
