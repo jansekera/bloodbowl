@@ -1090,5 +1090,5 @@ Inventura 25.09.: všech 19 skillů goblinů, upírů a trpaslíků (Stand Firm,
 | **E2** | Chainsaw | **zpětný ráz, který srazí nositele = turnover** (r. 366-368); test tvrdil opak | **UZAVŘENO** `0003267e` |
 | **E3** | Chainsaw | **nesmí s Frenzy ani Multiple Block** (r. 8014-8015) — `BlockHandler:~564` ji v Multiple Block dnes používá | **OTEVŘENO** |
 | **E4** | Chainsaw | **faul pilou: +3 k brnění a hod na zpětný ráz** (r. 8006-8008) — `FoulHandler` Chainsaw nezná | **OTEVŘENO** |
-| **E5** | Chainsaw | **nositel pily sražen z jakéhokoli důvodu ⇒ soupeř +3 k brnění**; **blokující, který se sám srazí o nositele pily ⇒ +3** (r. 8009-8013) — nikde v kódu | **OTEVŘENO** |
+| **E5** | Chainsaw | **nositel pily sražen z jakéhokoli důvodu ⇒ soupeř +3 k brnění**; **blokující, který se sám srazí o nositele pily ⇒ +3** (r. 8009-8013) — nikde v kódu | **UZAVŘENO** `9e02a834` — ⏰ výklad: zásah pilou do nositele pily = +6 (dva doslovné bonusy), ptát se uživatele |
 | **E6** | ostatní | Bombardier · Ball & Chain · Secret Weapon · No Hands · Leap · Very Long Legs · Right Stuff · Stunty · Always Hungry · Really Stupid · Regeneration · Loner · Hypnotic Gaze · Bloodlust · Stand Firm · Mighty Blow — **zatím neporovnáno** (TTM a Break Tackle hotové 21.09.) | **OTEVŘENO** |
