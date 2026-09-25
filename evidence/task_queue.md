@@ -1076,3 +1076,19 @@ vady**: chybějící jmenovatel *(kola ukončená TD a poločasem propadala —
 14,7 kola na zápas místo 32)* a **záporný zbytek −4** *(konce se účtovaly
 jinde než kola)*. ⇒ **Zbytek se tiskne vždycky; záporný zbytek prozradí
 chybu hned.**
+
+# 9. BALÍK E — AUDIT PRAVIDEL SKILLŮ PŘED PŘIDÁNÍM DO ROSTERŮ *(zavedeno 25.09.2026)*
+
+Postup od uživatele (21.09.): **pravidlo → přidat do rosteru → ověřit použití.**
+Inventura 25.09.: všech 19 skillů goblinů, upírů a trpaslíků (Stand Firm, MB) engine zná
+(`SkillName`), soupisky `Goblin` a `Vampire` už jsou v `cli/race_rosters.php`.
+⇒ Práce je **porovnat `rules_bb2016.txt` s kódem skill po skillu.**
+
+| ID | skill | co | stav |
+|---|---|---|---|
+| **E1** | Chainsaw | **+3 k brnění** zasaženého (i nositele při zpětném rázu), r. 8002-8003 | **UZAVŘENO** `0003267e` |
+| **E2** | Chainsaw | **zpětný ráz, který srazí nositele = turnover** (r. 366-368); test tvrdil opak | **UZAVŘENO** `0003267e` |
+| **E3** | Chainsaw | **nesmí s Frenzy ani Multiple Block** (r. 8014-8015) — `BlockHandler:~564` ji v Multiple Block dnes používá | **OTEVŘENO** |
+| **E4** | Chainsaw | **faul pilou: +3 k brnění a hod na zpětný ráz** (r. 8006-8008) — `FoulHandler` Chainsaw nezná | **OTEVŘENO** |
+| **E5** | Chainsaw | **nositel pily sražen z jakéhokoli důvodu ⇒ soupeř +3 k brnění**; **blokující, který se sám srazí o nositele pily ⇒ +3** (r. 8009-8013) — nikde v kódu | **OTEVŘENO** |
+| **E6** | ostatní | Bombardier · Ball & Chain · Secret Weapon · No Hands · Leap · Very Long Legs · Right Stuff · Stunty · Always Hungry · Really Stupid · Regeneration · Loner · Hypnotic Gaze · Bloodlust · Stand Firm · Mighty Blow — **zatím neporovnáno** (TTM a Break Tackle hotové 21.09.) | **OTEVŘENO** |
