@@ -272,4 +272,47 @@ final class ChainsawTest extends TestCase
 
         $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
     }
+
+    private function faulPilou(int $armourAttacker = 8): \App\DTO\GameState
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw], armour: $armourAttacker, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 8, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        return $s->withPlayer($s->requirePlayer(2)->withState(PlayerState::PRONE));
+    }
+
+    /** Faul pilou: +3 k brneni (r. 8006-8007). Pila 5 = bez razu; 2+4 = 6, +3 = 9 > AV8; zraneni 2+4 = stunned. */
+    public function testChainsawFoulAddsThreeToArmour(): void
+    {
+        $dice = new FixedDiceRoller([5, 2, 4, 2, 4]);
+        $result = (new ActionResolver($dice))->resolve($this->faulPilou(), ActionType::FOUL, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($result->isTurnover());
+    }
+
+    /** Faul pilou: na 1 zpetny raz (r. 8007-8008) -- obet netknuta, nositel 3+3 (+3) = 9 > AV8 => lezi => turnover. */
+    public function testChainsawFoulKickbackHitsWielderInstead(): void
+    {
+        $dice = new FixedDiceRoller([1, 3, 3, 2, 4]);
+        $result = (new ActionResolver($dice))->resolve($this->faulPilou(), ActionType::FOUL, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState(), 'obet se faulu nedockala');
+        $this->assertFalse($result->getNewState()->requirePlayer(1)->getState()->canAct());
+        $this->assertTrue($result->isTurnover());
+    }
+
+    /** Zpetny raz, ktery brneni neprorazi: 2+3 (+3) = 8 = AV8 drzi => bez ucinku, bez turnoveru, bez vylouceni. */
+    public function testChainsawFoulKickbackArmourHolds(): void
+    {
+        $dice = new FixedDiceRoller([1, 2, 3]);
+        $result = (new ActionResolver($dice))->resolve($this->faulPilou(), ActionType::FOUL, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($result->isTurnover());
+    }
 }

@@ -61,6 +61,25 @@ final class FoulHandler implements ActionHandlerInterface
 
         $events = [];
 
+        // Faul pilou (`rules_bb2016.txt` r. 8006-8008): nejdriv hod na zpetny raz;
+        //   na 1 pila zasahne NOSITELE (+3 za vlastni pilu prida resolver) a obet
+        //   zustane netknuta. Jinak faul s +3 k brneni.
+        $maPilu = $attacker->hasSkill(SkillName::Chainsaw);
+        if ($maPilu) {
+            $events[] = GameEvent::chainsaw($attackerId, $targetId);
+            if ($this->dice->rollD6() === 1) {
+                $events[] = GameEvent::chainsawKickback($attackerId);
+                $injResult = $this->injuryResolver->resolve($state->requirePlayer($attackerId), $this->dice);
+                $state = $state->withPlayer($injResult['player']);
+                $events = array_merge($events, $injResult['events']);
+                if (!$injResult['player']->getState()->canAct()) {
+                    [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $injResult['player'], $events);
+                    return ActionResult::turnover($state, $events);
+                }
+                return ActionResult::success($state, $events);
+            }
+        }
+
         // Roll 2xD6 individually for doubles detection
         $die1 = $this->dice->rollD6();
         $die2 = $this->dice->rollD6();
@@ -70,7 +89,7 @@ final class FoulHandler implements ActionHandlerInterface
         //   vedle FAULUJICIHO; nesmi stat v zone soupere, musi mit zony a stat.
         //   Guard se u faulu pouzit nesmi (r. 8161).
         $asistence = $this->strengthCalculator->countFoulAssists($state, $attacker, $defender);
-        $modifier = $asistence;
+        $modifier = $asistence + ($maPilu ? InjuryResolver::CHAINSAW_ARMOUR_BONUS : 0);
 
         // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8045-8049 -- "Add 1 to any
         //   Armour roll **or** Injury roll made by a player with this skill when
