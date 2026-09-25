@@ -77,8 +77,8 @@ final class BigGuyCheckResolver
             return $this->resolveTakeRoot($state, $player, $action, $dice);
         }
 
-        if ($player->hasSkill(SkillName::Bloodlust)) {
-            return $this->resolveBloodlust($state, $player, $dice);
+        if ($player->hasSkill(SkillName::Bloodlust) && !$player->isBloodlustHungry()) {
+            return $this->resolveBloodlust($state, $player, $action, $dice);
         }
 
         return null;
@@ -299,99 +299,71 @@ final class BigGuyCheckResolver
     }
 
     /**
-     * Bloodlust: Roll D6, need 2+. On fail: bite adjacent Thrall or lose action.
+     * Blood Lust (`rules_bb2016.txt` r. 7922-7947): D6 hned po ohlaseni akce; na 1 je
+     * upir HLADOVY -- akci dokonci (ohlaseny BLOCK smi zmenit na Move) a nakrmi se az
+     * na jejim KONCI (viz `nakrmitUpira`, vola ActionResolver po akci).
+     * Politika pro zmenu Block -> Move: kdyz uz vedle stoji Thrall, blokuje; jinak se
+     * blok neprovede a upir zustava neaktivovany, aby mohl dobehnout k Thrallovi.
      *
-     * @return array{state: GameState, events: list<GameEvent>}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed: bool}|null
      */
     private function resolveBloodlust(
         GameState $state,
         MatchPlayerDTO $player,
+        ActionType $action,
         DiceRollerInterface $dice,
     ): ?array {
         $roll = $dice->rollD6();
-
         if ($roll >= 2) {
             return null; // Pass — action proceeds normally
         }
 
-        // Failed: look for adjacent Thrall (non-Vampire teammate)
-        $thrall = $this->findAdjacentThrall($state, $player);
+        $state = $state->withPlayer($player->withBloodlustHungry(true));
+        $events = [GameEvent::bloodlustHungry($player->getId(), $roll)];
+        $blokBezThralla = $action === ActionType::BLOCK && $this->findAdjacentThrall($state, $player) === null;
 
+        return ['state' => $state, 'events' => $events, 'proceed' => !$blokBezThralla];
+    }
+
+    /**
+     * Krmeni hladoveho upira na konci akce -- pred prihravkou, predanim i TD.
+     * Thrall vedle (stoji, lezi, omracen): hod na zraneni, CAS = Badly Hurt, turnover jen
+     * kdyz Thrall drzel mic. Bez Thralla: upir do rezerv, mic odskoci z jeho pole, TURNOVER.
+     *
+     * @return array{state: GameState, events: list<GameEvent>, turnover: bool}
+     */
+    public function nakrmitUpira(GameState $state, MatchPlayerDTO $vampire, DiceRollerInterface $dice): array
+    {
+        $vampire = $vampire->withBloodlustHungry(false);
+        $state = $state->withPlayer($vampire);
+        if ($vampire->getPosition() === null) {
+            return ['state' => $state, 'events' => [], 'turnover' => false];
+        }
+
+        $thrall = $this->findAdjacentThrall($state, $vampire);
         if ($thrall !== null) {
-            // ⛔⛔ OPRAVA 11.09.2026 (PHP22): drive to bylo AUTO-KO Thralla.
-            //   r. 7939-7941: „choose one to bite and **make an Injury roll
-            //   on the Thrall treating any casualty roll as Badly Hurt**.
-            //   The injury **will not cause a turnover unless the Thrall was
-            //   holding the ball**."
-            //   ⇒ Je to hod na zraneni (bez hodu na zbroj), ne automaticke KO,
-            //   a z kousnuti se NEUMIRA.
-            // ⚠️ C++ to prepsal 24.08. jako `TA10`
-            //   (`engine/src/big_guy_handler.cpp:161-215`); PHP kopie ne.
-            //
-            // ⭐ Cte se PRED hodem -- zraneni s micem pohne.
-            $thrallHadBall = $state->getBall()->isHeld()
-                && $state->getBall()->getCarrierId() === $thrall->getId();
-
+            $thrallHadBall = $state->getBall()->isHeld() && $state->getBall()->getCarrierId() === $thrall->getId();
             $inj = $this->injuryResolver->resolveInjuryOnly($thrall, $dice);
             $bitten = $inj['player'];
             if ($bitten->getState() === PlayerState::DEAD) {
-                // „treating any casualty roll as Badly Hurt" -- z kousnuti
-                // se neumira.
-                $bitten = $bitten->withState(PlayerState::INJURED);
+                $bitten = $bitten->withState(PlayerState::INJURED); // "treating any casualty roll as Badly Hurt"
             }
             $state = $state->withPlayer($bitten);
-
-            $events = array_merge(
-                [GameEvent::bloodlustBite($player->getId(), $thrall->getId(), $roll)],
-                $inj['events'],
-            );
-
+            $events = array_merge([GameEvent::bloodlustBite($vampire->getId(), $thrall->getId(), 1)], $inj['events']);
             if ($thrallHadBall) {
-                [$state, $events] = $this->ballResolver
-                    ->handleBallOnPlayerDown($state, $bitten, $events);
-
-                return [
-                    'state' => $state,
-                    'events' => $events,
-                    'turnover' => true,
-                ];
+                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $bitten, $events);
             }
 
-            // Nakrmil se, akce pokracuje.
-            return [
-                'state' => $state,
-                'events' => $events,
-                'proceed' => true,
-            ];
+            return ['state' => $state, 'events' => $events, 'turnover' => $thrallHadBall];
         }
 
-        // ⛔⛔ OPRAVA 11.09.2026 (PHP22): drive se upir jen presunul do rezerv
-        //   a turnover zadny.
-        //   r. 7942-7947: „**Failure to bite a Thrall is a turnover** and
-        //   requires you to feed on a spectator -- move the Vampire to the
-        //   reserves box if he was still on the pitch. **If he was holding
-        //   the ball, it bounces** from the square he occupied."
-        $events = [GameEvent::bloodlustFail($player->getId(), $roll)];
+        $events = [GameEvent::bloodlustFail($vampire->getId(), 1)];
+        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $vampire, $events);
+        $state = $state->withPlayer(
+            $vampire->withPosition(null)->withState(PlayerState::OFF_PITCH)->withHasMoved(true)->withHasActed(true),
+        );
 
-        // ⭐ Mic se upusti TYMZ pomocnikem, jaky uz o 40 radku vys pouziva
-        //   vetev s Thrallem -- `handleBallOnPlayerDown` sam pozna, jestli
-        //   ten hrac mic vubec nese, polozi ho na jeho pole a odrazi.
-        //   ⛔ Musi to byt PRED `withPosition(null)`, jinak uz nema odkud.
-        [$state, $events] = $this->ballResolver
-            ->handleBallOnPlayerDown($state, $player, $events);
-
-        $player = $player
-            ->withPosition(null)
-            ->withState(PlayerState::OFF_PITCH)
-            ->withHasMoved(true)
-            ->withHasActed(true);
-        $state = $state->withPlayer($player);
-
-        return [
-            'state' => $state,
-            'events' => $events,
-            'turnover' => true,
-        ];
+        return ['state' => $state, 'events' => $events, 'turnover' => true];
     }
 
     /**

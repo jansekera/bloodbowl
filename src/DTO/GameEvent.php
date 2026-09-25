@@ -707,6 +707,15 @@ final class GameEvent
         ]);
     }
 
+    /** Blood Lust hozeno 1 -- upir se musi nakrmit na konci akce. */
+    public static function bloodlustHungry(int $vampireId, int $roll): self
+    {
+        return new self('bloodlust_hungry', "Bloodlust! Vampire must feed at the end of his action (rolled {$roll})", [
+            'vampireId' => $vampireId,
+            'roll' => $roll,
+        ]);
+    }
+
     public static function bloodlustBite(int $vampireId, int $thrallId, int $roll): self
     {
         return new self('bloodlust_bite', "Bloodlust! Vampire bites a Thrall (rolled {$roll})", [

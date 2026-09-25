@@ -56,13 +56,13 @@ final class BloodlustTest extends TestCase
         //   HOD NA ZRANENI (r. 7939-7941: „make an Injury roll on the Thrall
         //   treating any casualty roll as Badly Hurt"), takze se hazi 2 kostky
         //   navic. Drive tu stacila jedna a test spadl na „no more rolls".
-        // Bloodlust: 1 (fail) → kousnuti → zraneni 2+2=4 (Stunned) → move
+        // Bloodlust: 1 => hladovy; tah na (5,8) VEDLE Thralla; na KONCI akce kousnuti: zraneni 2+2 (r. 7934-7941)
         $dice = new FixedDiceRoller([1, 2, 2]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, [
             'playerId' => 1,
-            'x' => 4,
-            'y' => 7,
+            'x' => 5,
+            'y' => 8,
         ]);
 
         $this->assertTrue($result->isSuccess());
@@ -82,7 +82,7 @@ final class BloodlustTest extends TestCase
 
         // Vampire still moved
         $vampirePos = $newState->requirePlayer(1)->requirePosition();
-        $this->assertEquals(4, $vampirePos->getX());
+        $this->assertEquals(5, $vampirePos->getX());
     }
 
     /**
@@ -160,7 +160,7 @@ final class BloodlustTest extends TestCase
         // Bloodlust: 1 (fail) → zraneni Thralla 6+6=12 (casualty, ale
         //   „treating any casualty roll as Badly Hurt" => INJURED, ne DEAD)
         //   → block: 6 → DEFENDER_DOWN → armor 4+4=8 vs AV8, neprorazi
-        $dice = new FixedDiceRoller([1, 6, 6, 6, 4, 4]);
+        $dice = new FixedDiceRoller([1, 6, 6, 4, 4, 6, 6, 1, 1]); // Bloodlust 1; blok 2 kostky (asistence Thralla) 6,6; brneni 4+4; NA KONCI kousnuti 6+6 = CAS + D68 1,1
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, [
             'playerId' => 1,
@@ -203,7 +203,7 @@ final class BloodlustTest extends TestCase
         $dice = new FixedDiceRoller([1, 2, 2]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, [
-            'playerId' => 1, 'x' => 4, 'y' => 7,
+            'playerId' => 1, 'x' => 5, 'y' => 8,
         ]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
@@ -262,5 +262,57 @@ final class BloodlustTest extends TestCase
             'mic se ma odrazit, ne odejit s upirem');
         $this->assertTrue($after->getBall()->isOnPitch(),
             'mic zustava na hristi');
+    }
+
+    /** Krmi se az NA KONCI akce (r. 7934-7936): upir bez Thralla na zacatku dobehne k nemu a nakrmi se. */
+    public function testHungryVampireRunsToThrallAndFeedsAtEnd(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bloodlust])
+            ->addPlayer(TeamSide::HOME, 9, 7, id: 2) // Thrall -- na zacatku NENI vedle
+            ->withBallOffPitch()
+            ->build();
+
+        // Bloodlust 1; tah na (8,7) vedle Thralla; kousnuti 2+2
+        $r = (new ActionResolver(new FixedDiceRoller([1, 2, 2])))->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 8, 'y' => 7]);
+
+        $types = array_map(fn($e) => $e->getType(), $r->getEvents());
+        $this->assertContains('bloodlust_bite', $types);
+        $this->assertFalse($r->isTurnover());
+        $this->assertFalse($r->getNewState()->requirePlayer(1)->isBloodlustHungry());
+    }
+
+    /** ... a kdo od Thralla ODEJDE, nakrmit se nema kde: rezervy + turnover. */
+    public function testHungryVampireMovingAwayFromThrallFails(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bloodlust])
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 2) // Thrall vedle na ZACATKU
+            ->withBallOffPitch()
+            ->build();
+
+        $r = (new ActionResolver(new FixedDiceRoller([1])))->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 2, 'y' => 7]);
+
+        $this->assertTrue($r->isTurnover());
+        $this->assertSame(PlayerState::OFF_PITCH, $r->getNewState()->requirePlayer(1)->getState());
+    }
+
+    /** Ohlaseny BLOCK bez Thralla vedle: blok se neprovede, upir smi misto nej tahnout (r. 7927-7928). */
+    public function testHungryBlockWithoutThrallBecomesMoveOption(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bloodlust])
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 3)
+            ->addPlayer(TeamSide::HOME, 5, 10, id: 2) // Thrall o kus dal
+            ->withBallOffPitch()
+            ->build();
+
+        $r = (new ActionResolver(new FixedDiceRoller([1])))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 3]);
+
+        $types = array_map(fn($e) => $e->getType(), $r->getEvents());
+        $this->assertNotContains('block', $types);
+        $upir = $r->getNewState()->requirePlayer(1);
+        $this->assertTrue($upir->isBloodlustHungry());
+        $this->assertFalse($upir->hasActed(), 'muze jeste tahnout k Thrallovi');
     }
 }

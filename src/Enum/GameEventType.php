@@ -33,6 +33,7 @@ enum GameEventType: string
     case BALL_BOUNCE            = 'ball_bounce';
     case BLOCK                  = 'block';
     case BLOODLUST_BITE         = 'bloodlust_bite';
+    case BLOODLUST_HUNGRY       = 'bloodlust_hungry';
     case BLOODLUST_FAIL         = 'bloodlust_fail';
     case BOMB_EXPLOSION         = 'bomb_explosion';
     case BOMB_LANDING           = 'bomb_landing';

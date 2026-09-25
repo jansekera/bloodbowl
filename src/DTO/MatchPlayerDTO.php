@@ -49,6 +49,7 @@ final class MatchPlayerDTO
         //   SPOTREBUJE pri nejblizsim rozestaveni, takze vypadne presne jedno.
         private bool $outNextSetup = false,
         private bool $playedThisDrive = false,
+        private bool $bloodlustHungry = false,
     ) {
     }
 
@@ -136,6 +137,17 @@ final class MatchPlayerDTO
      * HRAL, i kdyz uz na hristi neni. Nastavuje se pri vykopu, maze pri resetu.
      */
     public function isPlayedThisDrive(): bool { return $this->playedThisDrive; }
+
+    /** Blood Lust hozeno 1: na konci akce se musi nakrmit (`rules_bb2016.txt` r. 7925-7947). */
+    public function isBloodlustHungry(): bool { return $this->bloodlustHungry; }
+
+    public function withBloodlustHungry(bool $hungry): self
+    {
+        $clone = clone $this;
+        $clone->bloodlustHungry = $hungry;
+
+        return $clone;
+    }
 
     public function withPlayedThisDrive(bool $played): self
     {
@@ -343,6 +355,7 @@ final class MatchPlayerDTO
             breakTackleUsedThisTurn: $this->breakTackleUsedThisTurn,
             outNextSetup: $this->outNextSetup,
             playedThisDrive: $this->playedThisDrive,
+            bloodlustHungry: $this->bloodlustHungry,
         );
     }
 
@@ -372,6 +385,7 @@ final class MatchPlayerDTO
             'breakTackleUsedThisTurn' => $this->breakTackleUsedThisTurn,
             'outNextSetup' => $this->outNextSetup,
             'playedThisDrive' => $this->playedThisDrive,
+            'bloodlustHungry' => $this->bloodlustHungry,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -415,6 +429,7 @@ final class MatchPlayerDTO
             breakTackleUsedThisTurn: (bool) ($data['breakTackleUsedThisTurn'] ?? false),
             outNextSetup: (bool) ($data['outNextSetup'] ?? false),
             playedThisDrive: (bool) ($data['playedThisDrive'] ?? false),
+            bloodlustHungry: (bool) ($data['bloodlustHungry'] ?? false),
         );
     }
 }

@@ -251,6 +251,20 @@ final class ActionResolver
             }
         }
 
+        // Blood Lust: pred PRIHRAVKOU a PREDANIM se hladovy upir krmi hned
+        //   ("before actually passing, handing off", r. 7935-7936).
+        if (($action === ActionType::PASS || $action === ActionType::HAND_OFF) && isset($params['playerId'])) {
+            $hladovy = $state->getPlayer((int) $params['playerId']);
+            if ($hladovy !== null && $hladovy->isBloodlustHungry()) {
+                $krmeni = $this->bigGuyCheckResolver->nakrmitUpira($state, $hladovy, $this->dice);
+                $state = $krmeni['state'];
+                $preEvents = array_merge($preEvents, $krmeni['events']);
+                if ($krmeni['turnover']) {
+                    return ActionResult::turnover($state->withTurnoverPending(true), $preEvents);
+                }
+            }
+        }
+
         $result = match ($action) {
             ActionType::MOVE => $this->moveHandler->resolve($state, $params),
             ActionType::BLOCK => $this->blockHandler->resolve($state, $params),
@@ -306,6 +320,23 @@ final class ActionResolver
                     break;
                 }
                 $result = ActionResult::success($autoResult->getNewState(), $mergedEvents);
+            }
+        }
+
+        // Blood Lust: hladovy upir se krmi na KONCI akce -- pred prihravkou, predanim
+        //   i TD (TD se vyhodnocuje az po akci). `rules_bb2016.txt` r. 7934-7947.
+        $novy = $result->getNewState();
+        if ($novy->getPendingBlock() === null && $novy->getPendingReroll() === null) {
+            foreach ($novy->getPlayers() as $upir) {
+                if (!$upir->isBloodlustHungry()
+                    || !($upir->hasActed() || $upir->hasMoved() || $action === ActionType::END_TURN)) {
+                    continue;
+                }
+                $krmeni = $this->bigGuyCheckResolver->nakrmitUpira($result->getNewState(), $upir, $this->dice);
+                $udalosti = array_merge($result->getEvents(), $krmeni['events']);
+                $result = ($result->isTurnover() || $krmeni['turnover'])
+                    ? ActionResult::turnover($krmeni['state'], $udalosti)
+                    : ActionResult::success($krmeni['state'], $udalosti);
             }
         }
 
