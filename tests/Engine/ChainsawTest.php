@@ -63,7 +63,7 @@ final class ChainsawTest extends TestCase
         $this->assertSame(PlayerState::STANDING, $defender->getState());
     }
 
-    public function testChainsawNeverCausesTurnover(): void
+    public function testChainsawHitNeverCausesTurnover(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw], id: 1)
@@ -117,7 +117,8 @@ final class ChainsawTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $this->assertFalse($result->isTurnover()); // Chainsaw never causes turnover
+        // Srazeny nositel pily = turnover (`rules_bb2016.txt` r. 366-368).
+        $this->assertTrue($result->isTurnover());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('chainsaw', $types);
         $this->assertContains('chainsaw_kickback', $types);
@@ -186,5 +187,37 @@ final class ChainsawTest extends TestCase
         $attacker = $result->getNewState()->getPlayer(1);
         $this->assertTrue($attacker->hasActed());
         $this->assertTrue($attacker->hasMoved());
+    }
+
+    /** +3 k brneni: 3+4 = 7 by AV9 neprorazilo, 7+3 = 10 ano (`rules_bb2016.txt` r. 8002-8003). */
+    public function testChainsawAddsThreeToVictimArmour(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 9, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([5, 3, 4, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertFalse($result->isTurnover());
+    }
+
+    /** Zpetny raz: 3+3 = 6 by AV8 neprorazilo, 6+3 = 9 ano => nositel lezi => turnover. */
+    public function testChainsawKickbackAddsThreeToWielderArmourAndTurnsOver(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw], armour: 8, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 9, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([1, 3, 3, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertTrue($result->isTurnover());
     }
 }

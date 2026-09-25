@@ -23,6 +23,9 @@ use App\Engine\TacklezoneCalculator;
 
 final class BlockHandler implements ActionHandlerInterface
 {
+    /** Chainsaw: +3 k hodu na brneni zasazeneho (`rules_bb2016.txt` r. 8002-8003). */
+    private const CHAINSAW_ARMOUR_BONUS = 3;
+
     private ?PassResolver $passResolver = null;
 
     public function __construct(
@@ -108,7 +111,8 @@ final class BlockHandler implements ActionHandlerInterface
             }
         }
 
-        // Chainsaw: auto armor roll, kickback on double-1, never turnover
+        // Chainsaw: D6 misto kostek bloku; 1 = zpetny raz. `rules_bb2016.txt` r. 7996-8017:
+        //   brneni zasazeneho +3; srazi-li zpetny raz nositele, je to turnover (r. 366-368).
         if ($attacker->hasSkill(SkillName::Chainsaw)) {
             return $this->resolveChainsaw($state, $attacker, $defender, $events);
         }
@@ -560,13 +564,14 @@ final class BlockHandler implements ActionHandlerInterface
             }
         }
 
-        // Chainsaw: auto armor roll, kickback on double-1, never turnover
+        // Chainsaw: D6 misto kostek bloku; 1 = zpetny raz. `rules_bb2016.txt` r. 7996-8017:
+        //   brneni zasazeneho +3; srazi-li zpetny raz nositele, je to turnover (r. 366-368).
         if ($attacker->hasSkill(SkillName::Chainsaw)) {
             $events[] = GameEvent::chainsaw($attacker->getId(), $defender->getId());
             $chainsawRoll = $this->dice->rollD6();
             if ($chainsawRoll === 1) {
                 $events[] = GameEvent::chainsawKickback($attacker->getId());
-                $injResult = $this->injuryResolver->resolve($attacker, $this->dice);
+                $injResult = $this->injuryResolver->resolve($attacker, $this->dice, self::CHAINSAW_ARMOUR_BONUS);
                 $attacker = $injResult['player'];
                 $state = $state->withPlayer($attacker);
                 $events = array_merge($events, $injResult['events']);
@@ -585,7 +590,7 @@ final class BlockHandler implements ActionHandlerInterface
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
             $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+            $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
             $defender = $injResult['player'];
             $state = $state->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
@@ -740,7 +745,7 @@ final class BlockHandler implements ActionHandlerInterface
         if ($chainsawRoll === 1) {
             // Kickback: armor roll on attacker
             $events[] = GameEvent::chainsawKickback($attacker->getId());
-            $injResult = $this->injuryResolver->resolve($attacker, $this->dice);
+            $injResult = $this->injuryResolver->resolve($attacker, $this->dice, self::CHAINSAW_ARMOUR_BONUS);
             $attacker = $injResult['player'];
             $state = $state->withPlayer($attacker);
             $events = array_merge($events, $injResult['events']);
@@ -757,6 +762,10 @@ final class BlockHandler implements ActionHandlerInterface
                     $freshAttacker->withHasActed(true)->withHasMoved(true),
                 );
             }
+            // Srazeny hrac tymu na tahu = turnover (`rules_bb2016.txt` r. 366-368).
+            if ($attacker->getState() !== PlayerState::STANDING) {
+                return ActionResult::turnover($state, $events);
+            }
             return ActionResult::success($state, $events);
         }
 
@@ -769,7 +778,7 @@ final class BlockHandler implements ActionHandlerInterface
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-        $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+        $injResult = $this->injuryResolver->resolve($defender, $this->dice, self::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
         $defender = $injResult['player'];
         $state = $state->withPlayer($defender);
         $events = array_merge($events, $injResult['events']);
