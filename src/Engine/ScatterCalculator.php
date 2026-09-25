@@ -85,6 +85,22 @@ final class ScatterCalculator
     }
 
     /**
+     * Sablona Throw-in natocena smerem `$smer` ([dx, dy], jeden ze ctyr: podel hriste
+     * nebo k lajne). D6: 1-2 jedna diagonala, 3-4 rovne, 5-6 druha diagonala --
+     * stejny tvar jako u vhazovani. Pouziva Ball & Chain (`rules_bb2016.txt` r. 7829-7833).
+     *
+     * @param array{int, int} $smer
+     * @return array{int, int} [dx, dy]
+     */
+    public function templateOffset(array $smer, int $d6): array
+    {
+        [$dx, $dy] = $smer;
+        $bok = $d6 <= 2 ? -1 : ($d6 <= 4 ? 0 : 1);
+
+        return $dx !== 0 ? [$dx, $bok] : [$bok, $dy];
+    }
+
+    /**
      * @return array{int, int} [dx, dy]
      */
     public function getDirectionOffset(int $d8Direction): array

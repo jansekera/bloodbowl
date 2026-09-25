@@ -43,6 +43,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
         }
 
         $events = [];
+        $srazenPriBloku = false;
         $ma = $player->getStats()->getMovement();
 
         for ($step = 0; $step < $ma; $step++) {
@@ -51,25 +52,20 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 break; // Player was KO'd off pitch
             }
 
-            // Roll D8 for scatter direction
-            $direction = $this->dice->rollD8();
-            $newPos = $this->scatterCalc->scatterOnce($currentPos, $direction);
+            // Sablona vhazovani natocena podle volby kouce + D6 (`rules_bb2016.txt`
+            //   r. 7829-7833); volba viz `zvolNatoceni`.
+            $smer = $this->zvolNatoceni($state, $player, $currentPos);
+            $direction = $this->dice->rollD6();
+            [$dx, $dy] = $this->scatterCalc->templateOffset($smer, $direction);
+            $newPos = new Position($currentPos->getX() + $dx, $currentPos->getY() + $dy);
 
-            // Off pitch: player is KO'd
+            // Mimo hriste: dav ho zbije jako vytlaceneho (r. 7835-7837) -- hod na
+            //   zraneni, ne automaticke KO; turnover to neni (r. 369-370).
             if (!$newPos->isOnPitch()) {
                 $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, 'off-pitch', $direction);
-
-                // Drop ball if carried
-                if ($state->getBall()->getCarrierId() === $playerId) {
-                    $state = $state->withBall(BallState::onGround($currentPos));
-                    $bounceResult = $this->ballResolver->resolveBounce($state, $currentPos);
-                    $events = array_merge($events, $bounceResult['events']);
-                    $state = $bounceResult['state'];
-                }
-
-                $player = $player->withPosition(null)->withState(PlayerState::KO);
-                $state = $state->withPlayer($player);
                 $events[] = GameEvent::crowdSurf($playerId);
+                [$state, $events] = $this->zranitBnc($state, $player, $events, true);
+                $player = $state->getPlayer($playerId);
                 break;
             }
 
@@ -90,6 +86,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 // If player was knocked down during auto-block, stop movement
                 $player = $state->getPlayer($playerId);
                 if ($player === null || $player->getState() !== PlayerState::STANDING) {
+                    $srazenPriBloku = true;
                     break;
                 }
             } else {
@@ -114,7 +111,85 @@ final class BallAndChainHandler implements ActionHandlerInterface
             $state = $state->withPlayer($player->withHasActed(true)->withHasMoved(true));
         }
 
-        return ActionResult::success($state, $events);
+        // Srazeny pri bloku = hrac tymu na tahu Knocked Down = turnover (r. 368);
+        //   dav turnover neni (r. 369-370).
+        return $srazenPriBloku
+            ? ActionResult::turnover($state, $events)
+            : ActionResult::success($state, $events);
+    }
+
+    /**
+     * Natoceni sablony pro dalsi krok -- rozhodnuti uzivatele 25.09.: k nejblizsimu
+     * stojicimu SOUPERI a vyhnout se NASIM stojicim. Kazde natoceni ma tri mozna
+     * pole (po 1/3); skore = stojici soupere - 2 x stojici nasi - dav.
+     * Pri shode rozhodne blizkost rovneho pole k nejblizsimu stojicimu souperi.
+     *
+     * @return array{int, int}
+     */
+    private function zvolNatoceni(GameState $state, MatchPlayerDTO $bnc, Position $odkud): array
+    {
+        $souperi = array_values(array_filter(
+            $state->getPlayersOnPitch($bnc->getTeamSide()->opponent()),
+            static fn(MatchPlayerDTO $p) => $p->getState() === PlayerState::STANDING,
+        ));
+
+        $nejlepsi = [1, 0];
+        $nejlepsiSkore = null;
+        foreach ([[1, 0], [-1, 0], [0, 1], [0, -1]] as $smer) {
+            $skore = 0.0;
+            foreach ([1, 3, 5] as $d6) {
+                [$dx, $dy] = $this->scatterCalc->templateOffset($smer, $d6);
+                $pole = new Position($odkud->getX() + $dx, $odkud->getY() + $dy);
+                if (!$pole->isOnPitch()) {
+                    $skore -= 1.0;
+                    continue;
+                }
+                $kdo = $state->getPlayerAtPosition($pole);
+                if ($kdo !== null && $kdo->getState() === PlayerState::STANDING) {
+                    $skore += $kdo->getTeamSide() === $bnc->getTeamSide() ? -2.0 : 1.0;
+                }
+            }
+            $rovne = new Position($odkud->getX() + $smer[0], $odkud->getY() + $smer[1]);
+            $vzdalenost = PHP_INT_MAX;
+            foreach ($souperi as $souper) {
+                $vzdalenost = min($vzdalenost, $rovne->distanceTo($souper->requirePosition()));
+            }
+            // Blizkost je jen rozhodovani shody -- mensi nez rozdil jednoho hrace.
+            $skore -= $vzdalenost === PHP_INT_MAX ? 0.0 : $vzdalenost / 100.0;
+
+            if ($nejlepsiSkore === null || $skore > $nejlepsiSkore) {
+                $nejlepsiSkore = $skore;
+                $nejlepsi = $smer;
+            }
+        }
+
+        return $nejlepsi;
+    }
+
+    /**
+     * Sraženy nebo vyleteny Ball & Chain: rovnou hod na ZRANENI, bez brneni;
+     * Stunned se pocita jako KO (`rules_bb2016.txt` r. 7848-7850).
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function zranitBnc(GameState $state, MatchPlayerDTO $bnc, array $events, bool $dav): array
+    {
+        $vysledek = $dav
+            ? $this->injuryResolver->resolveCrowdSurf($bnc, $this->dice)
+            : $this->injuryResolver->resolveInjuryOnly($bnc->withState(PlayerState::PRONE), $this->dice);
+        $hrac = $vysledek['player'];
+        $events = array_merge($events, $vysledek['events']);
+
+        // Stunned = KO; u davu resolveCrowdSurf z Stunned udela rezervy -- u B&C taky KO.
+        if ($hrac->getState() === PlayerState::STUNNED || ($dav && $hrac->getState() === PlayerState::OFF_PITCH)) {
+            $hrac = $hrac->withState(PlayerState::KO)->withPosition(null);
+        }
+        if ($dav) {
+            $hrac = $hrac->withPosition(null);
+        }
+
+        return [$state->withPlayer($hrac), $events];
     }
 
     /**
@@ -156,28 +231,16 @@ final class BallAndChainHandler implements ActionHandlerInterface
             case BlockDiceFace::ATTACKER_DOWN:
                 // B&C player knocked down
                 $events[] = GameEvent::playerFell($bncPlayer->getId());
-                $bncPlayer = $bncPlayer->withState(PlayerState::PRONE);
-                $state = $state->withPlayer($bncPlayer);
-
-                $injResult = $this->injuryResolver->resolve($bncPlayer, $this->dice);
-                $bncPlayer = $injResult['player'];
-                $state = $state->withPlayer($bncPlayer);
-                $events = array_merge($events, $injResult['events']);
-
-                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $bncPlayer, $events);
+                [$state, $events] = $this->zranitBnc($state, $bncPlayer, $events, false);
+                $bncPlayer = $state->requirePlayer($bncPlayer->getId());
                 break;
 
             case BlockDiceFace::BOTH_DOWN:
                 // Both go down unless they have Block
                 if (!$bncPlayer->hasSkill(SkillName::Block)) {
                     $events[] = GameEvent::playerFell($bncPlayer->getId());
-                    $bncPlayer = $bncPlayer->withState(PlayerState::PRONE);
-                    $state = $state->withPlayer($bncPlayer);
-                    $injResult = $this->injuryResolver->resolve($bncPlayer, $this->dice);
-                    $bncPlayer = $injResult['player'];
-                    $state = $state->withPlayer($bncPlayer);
-                    $events = array_merge($events, $injResult['events']);
-                    [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $bncPlayer, $events);
+                    [$state, $events] = $this->zranitBnc($state, $bncPlayer, $events, false);
+                    $bncPlayer = $state->requirePlayer($bncPlayer->getId());
                 }
                 if (!$target->hasSkill(SkillName::Block)) {
                     $events[] = GameEvent::playerFell($target->getId());
