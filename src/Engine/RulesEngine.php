@@ -198,13 +198,14 @@ final class RulesEngine
                         $actions[] = ['type' => ActionType::PASS->value, 'playerId' => $carrier->getId()];
                     }
                 }
+            }
 
-                // Bomb throw: player with Bombardier (shares pass slot)
-                foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canAct() && $player->hasSkill(SkillName::Bombardier)
-                        && !$player->hasSkill(SkillName::BallAndChain)) {
-                        $actions[] = ['type' => ActionType::BOMB_THROW->value, 'playerId' => $player->getId()];
-                    }
+            // Bomb throw: NESDILI akci Pass (`rules_bb2016.txt` r. 7950-7951) a hrac
+            //   se pred hodem nesmi hnout (r. 7953-7954).
+            foreach ($state->getTeamPlayers($side) as $player) {
+                if ($player->canAct() && !$player->hasMoved() && $player->hasSkill(SkillName::Bombardier)
+                    && !$player->hasSkill(SkillName::BallAndChain)) {
+                    $actions[] = ['type' => ActionType::BOMB_THROW->value, 'playerId' => $player->getId()];
                 }
             }
 
@@ -1154,9 +1155,10 @@ final class RulesEngine
             return ['Player must have Bombardier skill'];
         }
 
-        $teamState = $state->getTeamState($player->getTeamSide());
-        if ($teamState->isPassUsedThisTurn()) {
-            return ['Pass/bomb already used this turn'];
+        // Bomba NESDILI tymovou akci Pass ("does not use the team's Pass Action"),
+        //   ale hrac se pred hodem nesmi hnout ani zvednout (`rules_bb2016.txt` r. 7949-7955).
+        if ($player->hasMoved()) {
+            return ['Bombardier may not move before throwing a bomb'];
         }
 
         $from = $player->getPosition();

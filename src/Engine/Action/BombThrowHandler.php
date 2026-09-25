@@ -11,22 +11,29 @@ use App\DTO\MatchPlayerDTO;
 use App\Enum\PassRange;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
+use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
+use App\Engine\PassResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 
 final class BombThrowHandler implements ActionHandlerInterface
 {
+    private readonly PassResolver $passResolver;
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
-        private readonly TacklezoneCalculator $tzCalc,
+        TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
     ) {
+        // Bomba se hazi "using the rules for throwing the ball" (r. Bombardier) --
+        //   presnost, modifikatory a fumble bereme z prihravky.
+        $this->passResolver = new PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver);
     }
 
     /**
@@ -52,113 +59,101 @@ final class BombThrowHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Thrower must be on pitch');
         }
 
-        // Mark pass used (shares slot with pass)
+        // ⛔ OPRAVA 25.09.2026 (balik E, E10) podle `rules_bb2016.txt` r. 7948-7975:
+        //   bomba NESPOTREBUJE tymovou akci Pass; presnost a fumble jako u prihravky;
+        //   fumble vybuchne v poli HAZECE; v cilovem poli srazi vzdy, vedle na 4+;
+        //   zasahne i hazece a i lezici/omracene; turnover = fumble nebo srazeny
+        //   hrac tymu na tahu. Chytani a zachyceni bomby engine nehraje -- to
+        //   odpovida legalni volbe "declined" (bomba pak vybuchne).
         $activeSide = $thrower->getTeamSide();
-        $teamState = $state->getTeamState($activeSide);
-        $state = $state->withTeamState($activeSide, $teamState->withPassUsed());
-
-        // Mark thrower as acted
         $state = $state->withPlayer($thrower->withHasActed(true)->withHasMoved(true));
 
         $events = [];
 
-        // Calculate accuracy (same formula as TTM/pass)
         $distance = $throwerPos->distanceTo($targetPos);
         $range = PassRange::fromDistance($distance);
         if ($range === null) {
             throw new \InvalidArgumentException('Target is out of range');
         }
-
-        $ag = $thrower->getStats()->getAgility();
-        $tz = $thrower->hasSkill(SkillName::NervesOfSteel)
-            ? 0
-            : $this->tzCalc->countTacklezones($state, $throwerPos, $thrower->getTeamSide());
-        $accuracyTarget = max(2, min(6, 7 - $ag + $tz - $range->modifier()));
-
+        $accuracyTarget = $this->passResolver->getAccuracyTarget($state, $thrower, $range);
+        $modifier = $this->passResolver->getPassRollModifier($state, $thrower, $range);
         $roll = $this->dice->rollD6();
-        $fumble = $roll === 1;
+        $fumble = $roll === 1 || $roll + $modifier <= 1;
         $accurate = !$fumble && $roll >= $accuracyTarget;
-
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
         $events[] = GameEvent::bombThrow($throwerId, $roll, $resultStr);
 
         if ($fumble) {
-            // Scatter 1 square from thrower
-            $direction = $this->dice->rollD8();
-            $landingPos = $this->scatterCalc->scatterOnce($throwerPos, $direction);
+            $landingPos = $throwerPos;
         } elseif ($accurate) {
             $landingPos = $targetPos;
         } else {
-            // Inaccurate: scatter 3 times from target
+            // Nepresne: tri rozptyly od cile, jako u prihravky
             $landingPos = $targetPos;
             for ($i = 0; $i < 3; $i++) {
-                $direction = $this->dice->rollD8();
-                $landingPos = $this->scatterCalc->scatterOnce($landingPos, $direction);
+                $landingPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());
             }
         }
 
-        // If landing is off-pitch, bomb fizzles — no effect
+        // Do davu: vybuchne bez ucinku
         if (!$landingPos->isOnPitch()) {
             return ActionResult::success($state, $events);
         }
 
         $events[] = GameEvent::bombLanding((string) $landingPos);
+        [$state, $events, $srazenNas] = $this->resolveExplosion($state, $landingPos, $activeSide, $events);
 
-        // Explosion: all players in 3x3 area around landing square get knocked down + armor roll
-        [$state, $events] = $this->resolveExplosion($state, $landingPos, $throwerId, $events);
-
-        // Bomb never causes turnover
-        return ActionResult::success($state, $events);
+        return ($fumble || $srazenNas)
+            ? ActionResult::turnover($state, $events)
+            : ActionResult::success($state, $events);
     }
 
     /**
+     * V cilovem poli srazi vzdy, v sousednich na 4+; plati i pro hazece a pro
+     * lezici a omracene ("treated as Knocked Down even if already Prone or
+     * Stunned"). Vraci i to, jestli padl hrac tymu na tahu (= turnover).
+     *
      * @param list<GameEvent> $events
-     * @return array{0: GameState, 1: list<GameEvent>}
+     * @return array{0: GameState, 1: list<GameEvent>, 2: bool}
      */
     private function resolveExplosion(
         GameState $state,
         Position $center,
-        int $throwerId,
+        TeamSide $activeSide,
         array $events,
     ): array {
+        $srazenNas = false;
         for ($dx = -1; $dx <= 1; $dx++) {
             for ($dy = -1; $dy <= 1; $dy++) {
                 $pos = new Position($center->getX() + $dx, $center->getY() + $dy);
                 if (!$pos->isOnPitch()) {
                     continue;
                 }
-
                 $player = $state->getPlayerAtPosition($pos);
                 if ($player === null) {
                     continue;
                 }
-
-                // Thrower is not affected by own bomb
-                if ($player->getId() === $throwerId) {
-                    continue;
-                }
-
-                // Only standing players are knocked down
-                if ($player->getState() !== PlayerState::STANDING) {
+                $vCentru = $dx === 0 && $dy === 0;
+                if (!$vCentru && $this->dice->rollD6() < 4) {
                     continue;
                 }
 
                 $events[] = GameEvent::bombExplosion($player->getId());
-
-                // Knocked down + armor roll
-                $player = $player->withState(PlayerState::PRONE);
+                if ($player->getTeamSide() === $activeSide) {
+                    $srazenNas = true;
+                }
+                $player = $player->withState(
+                    $player->getState() === PlayerState::STUNNED ? PlayerState::STUNNED : PlayerState::PRONE,
+                );
                 $state = $state->withPlayer($player);
-
                 $injResult = $this->injuryResolver->resolve($player, $this->dice);
                 $player = $injResult['player'];
                 $state = $state->withPlayer($player);
                 $events = array_merge($events, $injResult['events']);
-
-                // Ball drops if carrier
                 [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $player, $events);
             }
         }
 
-        return [$state, $events];
+        return [$state, $events, $srazenNas];
     }
 }
