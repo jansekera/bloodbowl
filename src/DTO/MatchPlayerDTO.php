@@ -48,6 +48,7 @@ final class MatchPlayerDTO
         //   next kick-off." Neni to KO: KO ma navratovy hod, tohle ne. Priznak se
         //   SPOTREBUJE pri nejblizsim rozestaveni, takze vypadne presne jedno.
         private bool $outNextSetup = false,
+        private bool $playedThisDrive = false,
     ) {
     }
 
@@ -126,6 +127,20 @@ final class MatchPlayerDTO
     {
         $clone = clone $this;
         $clone->outNextSetup = $out;
+
+        return $clone;
+    }
+
+    /**
+     * ⭐ Secret Weapon (r. 8451-8454): po drivu se vylucuje kazdy, kdo v nem
+     * HRAL, i kdyz uz na hristi neni. Nastavuje se pri vykopu, maze pri resetu.
+     */
+    public function isPlayedThisDrive(): bool { return $this->playedThisDrive; }
+
+    public function withPlayedThisDrive(bool $played): self
+    {
+        $clone = clone $this;
+        $clone->playedThisDrive = $played;
 
         return $clone;
     }
@@ -304,6 +319,7 @@ final class MatchPlayerDTO
             dodgeUsedThisTurn: $this->dodgeUsedThisTurn,
             breakTackleUsedThisTurn: $this->breakTackleUsedThisTurn,
             outNextSetup: $this->outNextSetup,
+            playedThisDrive: $this->playedThisDrive,
         );
     }
 
@@ -332,6 +348,7 @@ final class MatchPlayerDTO
             'dodgeUsedThisTurn' => $this->dodgeUsedThisTurn,
             'breakTackleUsedThisTurn' => $this->breakTackleUsedThisTurn,
             'outNextSetup' => $this->outNextSetup,
+            'playedThisDrive' => $this->playedThisDrive,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -374,6 +391,7 @@ final class MatchPlayerDTO
             dodgeUsedThisTurn: (bool) ($data['dodgeUsedThisTurn'] ?? false),
             breakTackleUsedThisTurn: (bool) ($data['breakTackleUsedThisTurn'] ?? false),
             outNextSetup: (bool) ($data['outNextSetup'] ?? false),
+            playedThisDrive: (bool) ($data['playedThisDrive'] ?? false),
         );
     }
 }

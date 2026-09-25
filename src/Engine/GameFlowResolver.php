@@ -256,6 +256,11 @@ final class GameFlowResolver
     public function resetPlayersForSetup(GameState $state): GameState
     {
         foreach ($state->getPlayers() as $player) {
+            // Novy drive: "hral v drivu" plati jen pro ten, ktery prave skoncil.
+            if ($player->isPlayedThisDrive()) {
+                $player = $player->withPlayedThisDrive(false);
+                $state = $state->withPlayer($player);
+            }
             if ($player->getState()->isOnPitch()) {
                 $state = $state->withPlayer(
                     $player
@@ -277,13 +282,19 @@ final class GameFlowResolver
     }
 
     /**
-     * Eject all Secret Weapon players from the pitch.
+     * Secret Weapon: po drivu jde pryc kazdy, kdo v nem HRAL -- "regardless of
+     * whether the player is still on the pitch or not" (`rules_bb2016.txt`
+     * r. 8451-8454). Tedy i z KO a z rezerv (vytlaceni do davu); zraneni
+     * a mrtvi zustavaji zraneni.
      * @param list<GameEvent> $events
      */
     private function ejectSecretWeapons(GameState $state, array &$events): GameState
     {
         foreach ($state->getPlayers() as $player) {
-            if ($player->hasSkill(SkillName::SecretWeapon) && $player->getState()->isOnPitch()) {
+            $stav = $player->getState();
+            $hral = $stav->isOnPitch() || $player->isPlayedThisDrive();
+            $jesteVeHre = $stav->isOnPitch() || $stav === PlayerState::KO || $stav === PlayerState::OFF_PITCH;
+            if ($player->hasSkill(SkillName::SecretWeapon) && $hral && $jesteVeHre) {
                 $events[] = GameEvent::secretWeaponEjection($player->getId());
                 $state = $state->withPlayer(
                     $player->withState(PlayerState::EJECTED)->withPosition(null),

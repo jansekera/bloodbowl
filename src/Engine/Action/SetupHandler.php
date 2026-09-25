@@ -149,6 +149,13 @@ final class SetupHandler implements ActionHandlerInterface
             }
         }
 
+        // ⭐ Secret Weapon (r. 8451-8454): kdo stoji na hristi pri vykopu, v drivu HRAL.
+        foreach ($state->getPlayers() as $p) {
+            if ($p->getState()->isOnPitch()) {
+                $state = $state->withPlayer($p->withPlayedThisDrive(true));
+            }
+        }
+
         // Both teams set up - proceed to kickoff
         $kickingTeam = $state->getKickingTeam() ?? TeamSide::AWAY;
         $receivingTeam = $kickingTeam->opponent();
