@@ -11,6 +11,9 @@ use App\Enum\SkillName;
 
 final class InjuryResolver
 {
+    /** Chainsaw: +3 k hodu na brneni (`rules_bb2016.txt` r. 8002-8003, 8009-8011). */
+    public const CHAINSAW_ARMOUR_BONUS = 3;
+
     /**
      * Resolve armor roll and potentially injury for a knocked-down player.
      *
@@ -53,7 +56,7 @@ final class InjuryResolver
         //   (`rules_bb2016.txt` r. 8009-8011). NE u hodu, ktery o srazeni teprve
         //   rozhoduje: Stab ("unmodified") a zasah pilou (ma vlastnich +3).
         if ($chainsawHolderBonus && $player->hasSkill(SkillName::Chainsaw)) {
-            $armourModifier += 3;
+            $armourModifier += self::CHAINSAW_ARMOUR_BONUS;
         }
 
         // Armor roll: 2D6 > AV = armor broken

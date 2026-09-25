@@ -148,6 +148,15 @@ final class MatchPlayerDTO
         return ($this->state === PlayerState::STANDING || $this->state === PlayerState::PRONE) && !$this->hasMoved;
     }
 
+    /**
+     * STAND_PAT (PHP25): hrac se vedome neaktivuje. Smi kazdy, kdo by mohl jednat
+     * nebo se hnout -- i lezici smi zustat lezet.
+     */
+    public function canStandPat(): bool
+    {
+        return $this->canAct() || $this->canMove();
+    }
+
     // --- Mutation methods (used by engine) ---
 
     public function withState(PlayerState $state): self

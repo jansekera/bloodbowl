@@ -133,7 +133,7 @@ final class RulesEngine
                 // ⭐ A je to casto nejlepsi tah: neaktivovany Fanatic drzi
                 //   misto, dava asistence a ma zonu zachycenі, ale koule se
                 //   neroztoci -- takze nemuze vrazit do vlastnich hracu.
-                if ($player->canAct() || $player->canMove()) {
+                if ($player->canStandPat()) {
                     $actions[] = ['type' => ActionType::STAND_PAT->value, 'playerId' => $player->getId()];
                 }
 
@@ -507,7 +507,7 @@ final class RulesEngine
             return ['Target is not on the pitch'];
         }
         // Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541).
-        if ($target->getState() !== PlayerState::STANDING) {
+        if (!$target->getState()->canAct()) {
             return ['Can only block a standing player'];
         }
 
@@ -574,7 +574,7 @@ final class RulesEngine
             return ['Target is not on the pitch'];
         }
         // Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541).
-        if ($target->getState() !== PlayerState::STANDING) {
+        if (!$target->getState()->canAct()) {
             return ['Can only block a standing player'];
         }
 
@@ -1196,8 +1196,7 @@ final class RulesEngine
         if ($player->getTeamSide() !== $state->getActiveTeam()) {
             return ['Can only stand pat with players from the active team'];
         }
-        // Stejna podminka jako nabidka v `getAvailableActions` -- i lezici hrac smi zustat lezet.
-        if (!$player->canAct() && !$player->canMove()) {
+        if (!$player->canStandPat()) {
             return ['Player cannot act'];
         }
         return [];
