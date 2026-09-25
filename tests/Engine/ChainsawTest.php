@@ -315,4 +315,50 @@ final class ChainsawTest extends TestCase
         $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
         $this->assertFalse($result->isTurnover());
     }
+
+    /** Pila nejde s Multiple Block (r. 8014-8015): nenabizi se a validace ji odmitne. */
+    public function testChainsawCannotUseMultipleBlock(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw, SkillName::MultipleBlock], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
+            ->addPlayer(TeamSide::AWAY, 5, 6, id: 3)
+            ->withBallOffPitch()
+            ->build();
+        $rules = new \App\Engine\RulesEngine();
+
+        $mb = array_filter($rules->getAvailableActions($s), fn(array $a) => $a['type'] === ActionType::MULTIPLE_BLOCK->value);
+        $this->assertSame([], $mb);
+        $this->assertNotSame([], $rules->validate($s, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3]));
+    }
+
+    /** Pozitivni kontrola: tentyz hrac BEZ pily Multiple Block nabidnuty ma. */
+    public function testMultipleBlockOfferedWithoutChainsaw(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::MultipleBlock], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
+            ->addPlayer(TeamSide::AWAY, 5, 6, id: 3)
+            ->withBallOffPitch()
+            ->build();
+
+        $mb = array_filter((new \App\Engine\RulesEngine())->getAvailableActions($s), fn(array $a) => $a['type'] === ActionType::MULTIPLE_BLOCK->value);
+        $this->assertNotSame([], $mb);
+    }
+
+    /** Pila s Frenzy: jediny utok (r. 8014-8015). Dalsi kostka by FixedDiceRoller vycerpala. */
+    public function testChainsawWithFrenzyAttacksOnce(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Chainsaw, SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, armour: 8, id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // 5 = zasah; 2+2 = 4, +3 = 7 <= 8 drzi
+        $result = (new ActionResolver(new FixedDiceRoller([5, 2, 2])))->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $pily = array_filter($result->getEvents(), fn($e) => $e->getType() === 'chainsaw');
+        $this->assertCount(1, $pily);
+    }
 }

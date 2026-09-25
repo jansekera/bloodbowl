@@ -164,7 +164,8 @@ final class RulesEngine
                         $actions[] = ['type' => ActionType::BLOCK->value, 'playerId' => $player->getId()];
                     }
                     // Multiple Block: player with skill and 2+ adjacent enemies
-                    if ($player->hasSkill(SkillName::MultipleBlock) && count($targets) >= 2) {
+                    // Pila nejde s Multiple Block (`rules_bb2016.txt` r. 8014-8015).
+                    if ($player->hasSkill(SkillName::MultipleBlock) && !$player->hasSkill(SkillName::Chainsaw) && count($targets) >= 2) {
                         $actions[] = ['type' => ActionType::MULTIPLE_BLOCK->value, 'playerId' => $player->getId()];
                     }
                 }
@@ -1299,6 +1300,9 @@ final class RulesEngine
 
         if (!$player->hasSkill(SkillName::MultipleBlock)) {
             return ['Player must have Multiple Block skill'];
+        }
+        if ($player->hasSkill(SkillName::Chainsaw)) {
+            return ['Chainsaw cannot be used with Multiple Block'];
         }
 
         $playerPos = $player->getPosition();

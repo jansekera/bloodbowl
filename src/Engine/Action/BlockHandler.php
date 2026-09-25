@@ -561,41 +561,8 @@ final class BlockHandler implements ActionHandlerInterface
             }
         }
 
-        // Chainsaw: D6 misto kostek bloku; 1 = zpetny raz. `rules_bb2016.txt` r. 7996-8017:
-        //   brneni zasazeneho +3; srazi-li zpetny raz nositele, je to turnover (r. 366-368).
-        if ($attacker->hasSkill(SkillName::Chainsaw)) {
-            $events[] = GameEvent::chainsaw($attacker->getId(), $defender->getId());
-            $chainsawRoll = $this->dice->rollD6();
-            if ($chainsawRoll === 1) {
-                $events[] = GameEvent::chainsawKickback($attacker->getId());
-                $injResult = $this->injuryResolver->resolve($attacker, $this->dice); // +3 za vlastni pilu prida resolver
-                $attacker = $injResult['player'];
-                $state = $state->withPlayer($attacker);
-                $events = array_merge($events, $injResult['events']);
-                if ($attacker->getState() !== PlayerState::STANDING) {
-                    [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $attacker, $events);
-                    return [$state, $events, true];
-                }
-                return [$state, $events, false];
-            }
-            // Chainsaw hit on defender
-            // ⛔ OPRAVA 14.09.2026: MIGHTY BLOW SE SE STAB A CHAINSAW POUZIT NESMI.
-            //   `rules_bb2016.txt` r. 8291-8297: "Mighty Blow cannot be used
-            //   with the Stab or Chainsaw skills." Tohle je prave ta cesta.
-            $mightyBlow = 0;
-            $hasClaw = $attacker->hasSkill(SkillName::Claw);
-            $hasStakes = $attacker->hasSkill(SkillName::Stakes);
-            $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-            $wasBallCarrier = $state->getBall()->getCarrierId() === $defender->getId();
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, InjuryResolver::CHAINSAW_ARMOUR_BONUS, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, chainsawHolderBonus: false);
-            $defender = $injResult['player'];
-            $state = $state->withPlayer($defender);
-            $events = array_merge($events, $injResult['events']);
-            if ($wasBallCarrier && $defender->getState() !== PlayerState::STANDING) {
-                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $defender, $events);
-            }
-            return [$state, $events, false];
-        }
+        // Pila se v Multiple Block nepouziva (`rules_bb2016.txt` r. 8014-8015) --
+        //   `RulesEngine` tuhle akci nositeli pily nenabidne ani nepovoli.
 
         // Stab: bypass block dice
         if ($attacker->hasSkill(SkillName::Stab)) {
