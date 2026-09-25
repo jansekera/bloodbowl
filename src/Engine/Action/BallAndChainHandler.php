@@ -382,8 +382,9 @@ final class BallAndChainHandler implements ActionHandlerInterface
             return [$state, $events];
         }
 
-        // Stand Firm prevents push
-        if ($target->hasSkill(SkillName::StandFirm)) {
+        // Kdo drzi pole (zakoreneny; stojici Stand Firm soupere), se neodtlaci.
+        //   Lezici Stand Firm nepouzije (r. 1824-1825) -- B&C ho odtlaci.
+        if ($target->holdsGround($pusher->getTeamSide())) {
             return [$state, $events];
         }
 

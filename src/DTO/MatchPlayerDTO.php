@@ -178,7 +178,30 @@ final class MatchPlayerDTO
     {
         $clone = clone $this;
         $clone->state = $state;
+        // Zakoreneni konci, jakmile hrac nestoji -- sraženy, polozeny i odneseny
+        //   (`rules_bb2016.txt` r. 8575-8576). Vzor: C++ `game_state.cpp:83`.
+        if ($state !== PlayerState::STANDING) {
+            $clone->rooted = false;
+        }
         return $clone;
+    }
+
+    /**
+     * Drzi pole proti odtlaceni? Vzor: C++ `block_handler.cpp:308` `holdsGround`.
+     * - zakoreneny vzdy a proti komukoli ("may not be pushed back for any reason",
+     *   r. 8578-8579) -- neni to volba jeho trenera;
+     * - Stand Firm jen STOJICI (r. 1824-1825: vlezu funguji jen Extraordinary
+     *   skilly) a jen proti souperi -- vlastni trener volne pole rad bere.
+     */
+    public function holdsGround(TeamSide $blockingSide): bool
+    {
+        if ($this->rooted) {
+            return true;
+        }
+
+        return $this->state === PlayerState::STANDING
+            && $this->hasSkill(SkillName::StandFirm)
+            && $this->teamSide !== $blockingSide;
     }
 
     public function withPosition(?Position $position): self

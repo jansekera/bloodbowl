@@ -13,6 +13,7 @@ use App\DTO\PendingBlockDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
+use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
@@ -878,8 +879,9 @@ final class BlockHandler implements ActionHandlerInterface
 
         // Stand Firm prevents pushback (but not knockdown)
         // Juggernaut on blitz ignores Stand Firm
-        if ($defenderPushed && $defender->hasSkill(SkillName::StandFirm)
-            && !($isBlitz && $attacker->hasSkill(SkillName::Juggernaut))
+        // Zakoreneny se neodtlaci nikdy, ani Juggernautem (r. 8578-8579 "for any reason").
+        if ($defenderPushed && ($defender->isRooted() || ($defender->hasSkill(SkillName::StandFirm)
+            && !($isBlitz && $attacker->hasSkill(SkillName::Juggernaut))))
         ) {
             $defenderPushed = false;
         }
@@ -1040,10 +1042,10 @@ final class BlockHandler implements ActionHandlerInterface
             $occupant = $state->getPlayerAtPosition($pos);
             if ($occupant === null) {
                 $emptySquares[] = $pos;
-            } elseif (!$occupant->hasSkill(SkillName::StandFirm)) {
+            } elseif (!$occupant->holdsGround($attacker->getTeamSide())) {
                 $occupiedSquares[] = ['pos' => $pos, 'player' => $occupant];
             }
-            // Stand Firm occupants are not valid push targets — skip
+            // Kdo drzi pole (zakoreneny, stojici Stand Firm soupere), neni cil odtlaceni
         }
 
         // Find valid push square
@@ -1111,7 +1113,7 @@ final class BlockHandler implements ActionHandlerInterface
         if ($pushTo !== null && $chainPushTarget !== null) {
             // Chain push: resolve chain first, then push defender into vacated square
                 [$state, $events] = $this->resolveChainPush(
-                    $state, $defender, $chainPushTarget, $pushTo, $defenderOriginalPos, $events,
+                    $state, $defender, $chainPushTarget, $pushTo, $defenderOriginalPos, $attacker->getTeamSide(), $events,
                 );
                 // Now the square should be vacated — push defender there
                 $events[] = GameEvent::playerPushed($defender->getId(), (string) $defenderOriginalPos, (string) $pushTo);
@@ -1209,6 +1211,7 @@ final class BlockHandler implements ActionHandlerInterface
         MatchPlayerDTO $chainTarget,
         Position $chainTargetPos,
         Position $pusherOriginalPos,
+        TeamSide $blockingSide,
         array $events,
     ): array {
         // Calculate push direction for chain target (same vector as pusher → target)
@@ -1229,10 +1232,10 @@ final class BlockHandler implements ActionHandlerInterface
             $occupant = $state->getPlayerAtPosition($pos);
             if ($occupant === null) {
                 $emptySquares[] = $pos;
-            } elseif (!$occupant->hasSkill(SkillName::StandFirm)) {
+            } elseif (!$occupant->holdsGround($blockingSide)) {
                 $chainableSquares[] = ['pos' => $pos, 'player' => $occupant];
             }
-            // Stand Firm occupants skipped — can't push into them
+            // Kdo drzi pole, do toho se odtlacit neda
         }
 
         if ($offPitchAvailable) {
@@ -1248,7 +1251,7 @@ final class BlockHandler implements ActionHandlerInterface
         if ($chainPushTo !== null && $nextChainTarget !== null) {
             // Recursive chain: push next occupant first
             [$state, $events] = $this->resolveChainPush(
-                $state, $chainTarget, $nextChainTarget, $chainPushTo, $chainTargetPos, $events,
+                $state, $chainTarget, $nextChainTarget, $chainPushTo, $chainTargetPos, $blockingSide, $events,
             );
         }
 
