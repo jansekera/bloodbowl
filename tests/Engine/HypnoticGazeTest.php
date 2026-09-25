@@ -18,7 +18,7 @@ final class HypnoticGazeTest extends TestCase
     public function testSuccessfulGazeLosesTacklezones(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // target
             ->withBallOffPitch()
             ->build();
@@ -51,7 +51,7 @@ final class HypnoticGazeTest extends TestCase
     public function testFailedGazeIsNotATurnover(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // target
             ->addPlayer(TeamSide::AWAY, 5, 6, id: 3) // enemy creating TZ on gazer
             ->addPlayer(TeamSide::AWAY, 5, 8, id: 4) // enemy creating TZ on gazer
@@ -59,7 +59,7 @@ final class HypnoticGazeTest extends TestCase
             ->build();
 
         // Sousedi 3 a 4 delaji 2 TZ; OBET (2) se nepocita (r. 8183-8185)
-        // => prah 2+2 = 4+. Hod 3 tedy NEUSPEJE.
+        // => Agility roll AG4: 7-4+2 = 5+. Hod 3 tedy NEUSPEJE.
         $dice = new FixedDiceRoller([3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::HYPNOTIC_GAZE, [
@@ -82,15 +82,15 @@ final class HypnoticGazeTest extends TestCase
     public function testGazeTZModifier(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // target
             ->addPlayer(TeamSide::AWAY, 4, 7, id: 3) // enemy TZ +1
             ->withBallOffPitch()
             ->build();
 
-        // Soused 3 dela 1 TZ; OBET (2) se nepocita => prah 2+1 = 3+.
-        // Hod 2 tedy NEUSPEJE.
-        $dice = new FixedDiceRoller([2]);
+        // Soused 3 dela 1 TZ; OBET (2) se nepocita => AG4: 7-4+1 = 4+.
+        // Hod 3 tedy NEUSPEJE.
+        $dice = new FixedDiceRoller([3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::HYPNOTIC_GAZE, [
             'playerId' => 1,
@@ -107,17 +107,17 @@ final class HypnoticGazeTest extends TestCase
 
     public function testGazeTZModifierSucceedsOneAbove(): void
     {
-        // ⭐ Druha pulka paru k modifikatoru: pri 1 TZ je prah 3+, takze
-        //    TROJKA uspet MA. Bez tohohle by test vys prosel i s prahem,
+        // ⭐ Druha pulka paru k modifikatoru: pri 1 TZ je prah 4+ (AG4), takze
+        //    CTYRKA uspet MA. Bez tohohle by test vys prosel i s prahem,
         //    ktery neprojde nikdy.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->addPlayer(TeamSide::AWAY, 4, 7, id: 3)
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([3]);
+        $dice = new FixedDiceRoller([4]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::HYPNOTIC_GAZE, [
             'playerId' => 1,
@@ -135,14 +135,12 @@ final class HypnoticGazeTest extends TestCase
     public function testGazeNoTZSucceedsOn2(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // target (doesn't count as TZ for gaze)
             ->withBallOffPitch()
             ->build();
 
-        // No enemy TZ on gazer (target is adjacent but the TZ calc counts opponent TZs)
-        // Wait — player 2 is AWAY and gazer is HOME, so player 2 IS an enemy in gazer's TZ
-        // Need 2+1=3+ because of the target itself creating a TZ
+        // Obet se do modifikatoru nepocita (r. 8183-8185) => AG4 bez zon: 3+
         // Roll: 3 (>= 3, success)
         $dice = new FixedDiceRoller([3]);
         $resolver = new ActionResolver($dice);
@@ -161,7 +159,7 @@ final class HypnoticGazeTest extends TestCase
     public function testGazerMarkedAsActed(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::HypnoticGaze])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, agility: 4, skills: [SkillName::HypnoticGaze])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -175,5 +173,37 @@ final class HypnoticGazeTest extends TestCase
 
         $gazer = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($gazer->hasActed());
+    }
+
+    /** Je to Agility roll (r. 8182): AG2 bez zon potrebuje 5+ -- hod 4 neuspeje (drive fixni 2+). */
+    public function testGazeTargetDependsOnAgility(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, agility: 2, skills: [SkillName::HypnoticGaze], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->build();
+
+        $result = (new ActionResolver(new FixedDiceRoller([4])))->resolve($state, ActionType::HYPNOTIC_GAZE, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertFalse($result->getNewState()->requirePlayer(2)->hasLostTacklezones());
+    }
+
+    /** Efekt plati "until the start of his next action" (r. 8187-8188): akci se zony vraci, neaktivace ne. */
+    public function testGazeEffectEndsAtVictimsNextAction(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 10, 7, id: 1)
+            ->addPlayer(TeamSide::HOME, 20, 7, id: 2)
+            ->withActiveTeam(TeamSide::AWAY)
+            ->withBallOffPitch()
+            ->build();
+        $state = $state->withPlayer($state->requirePlayer(1)->withLostTacklezones(true));
+        $resolver = new ActionResolver(new FixedDiceRoller([]));
+
+        $stoji = $resolver->resolve($state, ActionType::STAND_PAT, ['playerId' => 1]);
+        $this->assertTrue($stoji->getNewState()->requirePlayer(1)->hasLostTacklezones(), 'neaktivace akci neni');
+
+        $pohyb = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 11, 'y' => 7]);
+        $this->assertFalse($pohyb->getNewState()->requirePlayer(1)->hasLostTacklezones());
     }
 }

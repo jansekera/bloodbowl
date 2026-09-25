@@ -71,7 +71,9 @@ final class HypnoticGazeHandler implements ActionHandlerInterface
             $gazer->getTeamSide(),
             exceptPlayerId: $targetId,
         );
-        $target_roll = min(6, 2 + $tz);
+        // ⛔ OPRAVA 25.09.2026 (balik E): je to "Agility roll" (r. 8182) -- cil
+        //   7 - AG + zony, 2..6. Drive `2 + tz` = jako by kazdy mel AG 5.
+        $target_roll = max(2, min(6, 7 - $gazer->getStats()->getAgility() + $tz));
 
         $roll = $this->dice->rollD6();
         $success = $roll >= $target_roll;

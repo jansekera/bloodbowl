@@ -196,6 +196,13 @@ final class ActionResolver
         if ($action !== ActionType::STAND_PAT
             && $action->requiresPlayer() && isset($params['playerId'])) {
             $player = $state->getPlayer((int) $params['playerId']);
+            // Ztracene zony (Hypnotic Gaze, Bone Head, Really Stupid) plati "until the
+            //   start of his next action" (`rules_bb2016.txt` r. 8187-8188) -- zacatkem
+            //   akce se vraci; kontrola pred akci je pripadne vezme znovu.
+            if ($player !== null && $player->hasLostTacklezones()) {
+                $player = $player->withLostTacklezones(false);
+                $state = $state->withPlayer($player);
+            }
             if ($player !== null) {
                 $checkResult = $this->bigGuyCheckResolver->resolvePreActionCheck(
                     $state, $player, $action, $this->dice,
