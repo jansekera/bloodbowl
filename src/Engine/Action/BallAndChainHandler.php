@@ -27,6 +27,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly ScatterCalculator $scatterCalc,
+        private readonly BlockHandler $blockHandler,
     ) {
         $this->strCalc = new StrengthCalculator();
     }
@@ -364,7 +365,10 @@ final class BallAndChainHandler implements ActionHandlerInterface
     }
 
     /**
-     * Simple push: find empty adjacent square away from B&C player.
+     * Odtlaceni od B&C = bezne odtlaceni (`rules_bb2016.txt` r. 7840-7847):
+     * retez, dav, Grab i Side Step resi `BlockHandler::resolvePushback`.
+     * Kdo drzi pole (zakoreneny; stojici Stand Firm soupere), se neodtlaci;
+     * lezici Stand Firm nepouzije (r. 1824-1825).
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>}
@@ -375,74 +379,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
         MatchPlayerDTO $target,
         array $events,
     ): array {
-        $pusherPos = $pusher->getPosition();
         $targetPos = $target->getPosition();
-
-        if ($pusherPos === null || $targetPos === null) {
+        if ($pusher->getPosition() === null || $targetPos === null || $target->holdsGround($pusher->getTeamSide())) {
             return [$state, $events];
         }
 
-        // Kdo drzi pole (zakoreneny; stojici Stand Firm soupere), se neodtlaci.
-        //   Lezici Stand Firm nepouzije (r. 1824-1825) -- B&C ho odtlaci.
-        if ($target->holdsGround($pusher->getTeamSide())) {
-            return [$state, $events];
-        }
-
-        $dx = $targetPos->getX() - $pusherPos->getX();
-        $dy = $targetPos->getY() - $pusherPos->getY();
-        $ndx = $dx === 0 ? 0 : ($dx > 0 ? 1 : -1);
-        $ndy = $dy === 0 ? 0 : ($dy > 0 ? 1 : -1);
-
-        // Try direct, then diagonals
-        $candidates = [
-            new Position($targetPos->getX() + $ndx, $targetPos->getY() + $ndy),
-        ];
-        if ($ndx === 0) {
-            $candidates[] = new Position($targetPos->getX() - 1, $targetPos->getY() + $ndy);
-            $candidates[] = new Position($targetPos->getX() + 1, $targetPos->getY() + $ndy);
-        } elseif ($ndy === 0) {
-            $candidates[] = new Position($targetPos->getX() + $ndx, $targetPos->getY() - 1);
-            $candidates[] = new Position($targetPos->getX() + $ndx, $targetPos->getY() + 1);
-        } else {
-            $candidates[] = new Position($targetPos->getX() + $ndx, $targetPos->getY());
-            $candidates[] = new Position($targetPos->getX(), $targetPos->getY() + $ndy);
-        }
-
-        $pushTo = null;
-        foreach ($candidates as $pos) {
-            if (!$pos->isOnPitch()) {
-                // Crowd surf
-                $events[] = GameEvent::playerPushed($target->getId(), (string) $targetPos, 'off-pitch');
-                $events[] = GameEvent::crowdSurf($target->getId());
-
-                if ($state->getBall()->getCarrierId() === $target->getId()) {
-                    $state = $state->withBall(BallState::onGround($targetPos));
-                }
-
-                $target = $target->withPosition(null);
-                $state = $state->withPlayer($target);
-                $injResult = $this->injuryResolver->resolveCrowdSurf($target, $this->dice);
-                $target = $injResult['player'];
-                $state = $state->withPlayer($target);
-                $events = array_merge($events, $injResult['events']);
-                return [$state, $events];
-            }
-            if ($state->getPlayerAtPosition($pos) === null) {
-                $pushTo = $pos;
-                break;
-            }
-        }
-
-        if ($pushTo !== null) {
-            $events[] = GameEvent::playerPushed($target->getId(), (string) $targetPos, (string) $pushTo);
-            $target = $target->withPosition($pushTo);
-            $state = $state->withPlayer($target);
-
-            if ($state->getBall()->getCarrierId() === $target->getId()) {
-                $state = $state->withBall(BallState::carried($pushTo, $target->getId()));
-            }
-        }
-
-        return [$state, $events];
+        return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events);
     }
 }

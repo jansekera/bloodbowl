@@ -63,7 +63,9 @@ final class BallAndChainTest extends TestCase
         $bnc = $result->getNewState()->requirePlayer(1)->requirePosition();
         $obet = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertSame([6, 7], [$bnc->getX(), $bnc->getY()], 'follow-up na uvolnene pole');
-        $this->assertSame([7, 7], [$obet->getX(), $obet->getY()], 'odtlacen od pole B&C, ne z tehoz pole');
+        // odtlacen od B&C na jedno z trojice poli za nim (volbu dela spolecne `resolvePushback`)
+        $this->assertSame(7, $obet->getX(), 'odtlacen od pole B&C, ne z tehoz pole');
+        $this->assertLessThanOrEqual(1, abs($obet->getY() - 7));
     }
 
     /** Silny B&C hazi kostky podle sily (r. 7840-7842): ST 7 proti 3 = 3 kostky, voli utocnik. */
@@ -99,7 +101,8 @@ final class BallAndChainTest extends TestCase
         $this->assertNotContains('block', $types, 'na lezici se neblokuje');
         $obet = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $obet->getState());
-        $this->assertSame([7, 7], [$obet->requirePosition()->getX(), $obet->requirePosition()->getY()]);
+        $this->assertSame(7, $obet->requirePosition()->getX());
+        $this->assertLessThanOrEqual(1, abs($obet->requirePosition()->getY() - 7));
     }
 
     /**

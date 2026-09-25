@@ -79,7 +79,7 @@ final class ActionResolver
         $this->ttmHandler = new ThrowTeamMateHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
         $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
         $this->hypnoticGazeHandler = new HypnoticGazeHandler($dice, $this->tzCalc);
-        $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc);
+        $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc, $this->blockHandler);
         $this->rerollHandler = new RerollHandler($dice, $this->ballResolver);
         $this->setupHandler = new SetupHandler($kickoffResolver);
         $this->endTurnHandler = new EndTurnHandler();

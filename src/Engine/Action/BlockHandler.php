@@ -1012,11 +1012,13 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * Resolve pushback: move defender one square away from attacker.
      * If all push squares are occupied or off-pitch, chain push occurs.
+     * Verejne i pro Ball & Chain -- jeho odtlaceni jsou bezna odtlaceni
+     * (`rules_bb2016.txt` r. 7840-7847), vc. retezu, Grab a Side Step.
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>}
      */
-    private function resolvePushback(
+    public function resolvePushback(
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
