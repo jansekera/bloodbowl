@@ -47,6 +47,8 @@ final class BigGuyCheckResolver
      *   `action_resolver.cpp:280` pres `consumeDeclaredTeamAction`, protoze
      *   do switche, kde se limit jinak nastavuje, uz se nedostane. PHP kopie
      *   to nemela -- CTVRTY drift teze tridy.
+     *
+     * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool}|null
      */
     public function resolvePreActionCheck(
         GameState $state,

@@ -33,6 +33,8 @@ final class InjuryResolver
      * ⚠️ PREDPOKLAD, ktery pravidla nerozhoduji: volba se dela PO hodu na
      *   brneni. Text neuvadi okamzik rozhodnuti; takhle to hraje vetsina
      *   implementaci a je to pro majitele skillu optimalni.
+     *
+     * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
      */
     public function resolve(
         MatchPlayerDTO $player,
@@ -122,9 +124,6 @@ final class InjuryResolver
     /**
      * Resolve injury only (no armor roll). Used by foul when armor is already broken.
      *
-     * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
-     */
-    /**
      * @return array{player: MatchPlayerDTO, events: list<GameEvent>, dice: array{int, int}}
      */
     public function resolveInjuryOnly(
@@ -273,6 +272,10 @@ final class InjuryResolver
         return ['result' => $result, 'tens' => $tens, 'units' => $units];
     }
 
+    /**
+     * @param list<GameEvent> $events
+     * @return array{player: MatchPlayerDTO, events: list<GameEvent>, dice: array{int, int}}
+     */
     private function resolveInjury(
         MatchPlayerDTO $player,
         DiceRollerInterface $dice,

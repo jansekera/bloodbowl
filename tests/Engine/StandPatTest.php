@@ -138,4 +138,19 @@ final class StandPatTest extends TestCase
         $this->assertSame(0, $dice->getRollCount(), 'koule se roztočila, ač hráč nehrál');
         $this->assertFalse($result->isTurnover());
     }
+
+    /** `RulesEngine` STAND_PAT sam nabizi -- validace na nem nesmi spadnout (UnhandledMatchError). */
+    public function testRulesEngineValidatesStandPat(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 10, 5, id: 2)
+            ->build();
+        $engine = new \App\Engine\RulesEngine();
+
+        $this->assertSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 1]));
+        $this->assertNotSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 2]),
+            'hrac soupere se neaktivuje za nas');
+        $this->assertNotSame([], $engine->validate($state, ActionType::STAND_PAT, []));
+    }
 }

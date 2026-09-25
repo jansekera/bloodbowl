@@ -144,7 +144,6 @@ final class GameEvent
             'playerId' => $playerId,
             'roll' => $roll,
             'modifier' => $modifier,
-            'modifier' => $modifier,
             'armourValue' => $armourValue,
             'broken' => $broken,
         ]);

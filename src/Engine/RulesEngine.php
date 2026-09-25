@@ -84,6 +84,7 @@ final class RulesEngine
             ActionType::HYPNOTIC_GAZE => $this->validateHypnoticGaze($state, $params),
             ActionType::BALL_AND_CHAIN => $this->validateBallAndChain($state, $params),
             ActionType::MULTIPLE_BLOCK => $this->validateMultipleBlock($state, $params),
+            ActionType::STAND_PAT => $this->validateStandPat($state, $params),
             ActionType::END_TURN => [],
             ActionType::SETUP_PLAYER => $this->validateSetupPlayer($state, $params),
             ActionType::END_SETUP => $this->validateEndSetup($state),
@@ -1164,6 +1165,32 @@ final class RulesEngine
             return ['Target is out of range'];
         }
 
+        return [];
+    }
+
+    /**
+     * STAND_PAT: hrac tymu na tahu se vedome neaktivuje (PHP25). Nabizi ho
+     * `getAvailableActions`, takze validace ho musi znat.
+     *
+     * @param array<string, mixed> $params
+     * @return list<string>
+     */
+    private function validateStandPat(GameState $state, array $params): array
+    {
+        if (!isset($params['playerId'])) {
+            return ['playerId is required'];
+        }
+        $playerId = (int) $params['playerId'];
+        $player = $state->getPlayer($playerId);
+        if ($player === null) {
+            return ["Player {$playerId} not found"];
+        }
+        if ($player->getTeamSide() !== $state->getActiveTeam()) {
+            return ['Can only stand pat with players from the active team'];
+        }
+        if (!$player->canAct()) {
+            return ['Player cannot act'];
+        }
         return [];
     }
 

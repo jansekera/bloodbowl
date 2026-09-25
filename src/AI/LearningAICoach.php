@@ -162,7 +162,7 @@ final class LearningAICoach implements AICoachInterface
      *   Hodnota je zamerne v tomtez pasmu jako nejlepsi blok (`3+` = 1,2):
      *   prijit o hrace je horsi nez cokoli, co jeden faul prinese.
      */
-    private const CENA_VYHOZENI = 1.2;
+    //   ⏰ Hodnota `CENA_VYHOZENI = 1.2` ceka na zapojeni (zadne volajici misto; PHPStan 25.09.).
     /** Od kolika obsazenych rohu se to uz pocita za klec, kterou ma cenu drzet. */
     private const CAGE_MIN_CORNERS = 2;
     /**
@@ -185,9 +185,7 @@ final class LearningAICoach implements AICoachInterface
      *              tedy zakaz zapsany velikosti cisla; ted je to proste
      *              nejnizsi vrstva, a END_TURN je az za ni.
      */
-    private const VRSTVA_NORMAL = 0;
-    private const VRSTVA_NOUZE = 1;
-    private const VRSTVA_POSLEDNI = 2;
+    //   ⏰ PHP38 vrstvy (nezapojene, PHPStan 25.09.): VRSTVA_NORMAL = 0, VRSTVA_NOUZE = 1, VRSTVA_POSLEDNI = 2.
 
     /**
      * ⭐⭐ PHP40 (14.09.2026): CACHE POHYBOVYCH POLI NA JEDNO ROZHODNUTI.
@@ -248,7 +246,7 @@ final class LearningAICoach implements AICoachInterface
         // ⭐ Vypinac pro MERENI zrychleni -- aby se nemusel komentovat kod.
         $this->cacheVypnuta = getenv('BB_CACHE_OFF') === '1';
         // ⛔ Jen kvuli `getPickupTarget()` -- kostkou se tady nikdy nehazi.
-        $this->strCalc = new \App\Engine\StrengthCalculator(new \App\Engine\TacklezoneCalculator());
+        $this->strCalc = new \App\Engine\StrengthCalculator();
         $this->ballResolver = new \App\Engine\BallResolver(
             new \App\Engine\RandomDiceRoller(),
             new \App\Engine\TacklezoneCalculator(),
@@ -323,6 +321,8 @@ final class LearningAICoach implements AICoachInterface
 
     /**
      * ⭐ PHP33: hraci vlastniho tymu stojici v ROZICH kolem daneho pole.
+     *
+     * @return list<MatchPlayerDTO>
      */
     private function cornerPlayers(GameState $state, TeamSide $side, Position $center, int $exceptId): array
     {
@@ -343,6 +343,8 @@ final class LearningAICoach implements AICoachInterface
     /**
      * Kolik poli ujde NEJPOMALEJSI z klece. Uzivatel 12.09.: "max pohyb
      * klece podle nejmensiho MA ze vsech peti."
+     *
+     * @param list<MatchPlayerDTO> $players
      */
     private function slowestRemaining(array $players): int
     {
@@ -506,6 +508,8 @@ final class LearningAICoach implements AICoachInterface
      *
      * ⭐ Pouziva tutez cestu jako pohyb (`getValidMoveTargets`), takze se
      *   riziko oceni STEJNE jako u dodge a GFI -- viz `RISK_WEIGHT`.
+     *
+     * @param list<array<string, mixed>>|null $cile
      */
     private function sanceDojitK(GameState $state, RulesEngine $rules, int $playerId, MatchPlayerDTO $cil, ?array $cile = null): ?float
     {
@@ -837,7 +841,7 @@ final class LearningAICoach implements AICoachInterface
         // ⭐ Druha cesta, kterou se vahy dostanou dovnitr -- musi projit tymz
         //   srovnanim delky jako nacteni ze souboru, jinak by `dotProduct`
         //   zase tise usekaval (viz `1b26717a`).
-        $weights = self::normalizeWeights(array_values(array_map('floatval', $weights)));
+        $weights = self::normalizeWeights(array_map('floatval', $weights));
         $this->modelType = 'linear';
         $this->weights = $weights;
     }
@@ -1907,6 +1911,10 @@ final class LearningAICoach implements AICoachInterface
         );
     }
 
+    /**
+     * @param array<int, float> $a
+     * @param array<int, float> $b
+     */
     private static function dotProduct(array $a, array $b): float
     {
         $sum = 0.0;

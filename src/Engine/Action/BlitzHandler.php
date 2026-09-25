@@ -197,6 +197,8 @@ final class BlitzHandler implements ActionHandlerInterface
      *   Kritérium je totéž jako u `findBlitzMoveTarget` -- nejdřív vzdálenost
      *   k cíli, pak nejméně dodgů a GFI -- aby se „přiblížení" nechovalo jinak
      *   než „doběhnutí" a nevznikly dvě neslučitelné definice téhož.
+     *
+     * @param array<string, \App\DTO\MovePath> $validMoves
      */
     private function findClosestApproach(array $validMoves, Position $from, Position $defenderPos): ?Position
     {
@@ -223,6 +225,8 @@ final class BlitzHandler implements ActionHandlerInterface
 
     /**
      * Find best adjacent square to defender for a blitz move.
+     *
+     * @param array<string, \App\DTO\MovePath> $validMoves
      */
     private function findBlitzMoveTarget(array $validMoves, Position $defenderPos): ?Position
     {

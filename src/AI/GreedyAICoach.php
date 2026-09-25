@@ -241,7 +241,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreAction(
         GameState $state,
@@ -273,7 +273,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     /**
      * Cena rizika v mericich jednotkach `scoreMove` (0-1000).
@@ -296,6 +296,7 @@ final class GreedyAICoach implements AICoachInterface
         return $pokuta;
     }
 
+    /** @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null */
     private function scoreMove(
         GameState $state,
         RulesEngine $rules,
@@ -328,7 +329,7 @@ final class GreedyAICoach implements AICoachInterface
                 // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
                 //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
                 //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
-                $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
+                $riskPenalty = self::riskPenalty($target, $isCarrier);
                 $score = 1000 - $riskPenalty;
                 if ($bestTarget === null || $score > $bestScore) {
                     $bestTarget = $target;
@@ -344,7 +345,7 @@ final class GreedyAICoach implements AICoachInterface
                     // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
                     //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
                     //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
-                    $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
+                    $riskPenalty = self::riskPenalty($target, $isCarrier);
                     $score = 400 - $riskPenalty;
                     if ($bestTarget === null || $score > $bestScore) {
                         $bestTarget = $target;
@@ -367,7 +368,7 @@ final class GreedyAICoach implements AICoachInterface
                         // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
                         //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
                         //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
-                        $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
+                        $riskPenalty = self::riskPenalty($target, $isCarrier);
                         $score = 200 - $riskPenalty;
                     }
                 }
@@ -398,7 +399,7 @@ final class GreedyAICoach implements AICoachInterface
                     // ⛔ RIZIKO PODLE TOHO, KDO HO PODSTUPUJE (12.09.2026) -- tataz
                     //   oprava jako v `LearningAICoach`. Pausal `dodges * 30`
                     //   stal stejne trpaslika s AG 2 (sance 33 %) i elfa s AG 4 (67 %).
-                    $riskPenalty = self::riskPenalty($target, $isCarrier ?? false);
+                    $riskPenalty = self::riskPenalty($target, $isCarrier);
                     $score = max($score, 50 + $advancement * 10 - $riskPenalty);
                 }
             }
@@ -421,7 +422,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreBlock(
         GameState $state,
@@ -480,7 +481,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreBlitz(
         GameState $state,
@@ -536,7 +537,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scorePass(
         GameState $state,
@@ -602,7 +603,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreHandOff(
         GameState $state,
@@ -651,7 +652,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreFoul(
         GameState $state,
@@ -689,7 +690,7 @@ final class GreedyAICoach implements AICoachInterface
     /**
      * Ball & Chain is the only action B&C players can take — always use it.
      *
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}
      */
     private function scoreBallAndChain(int $playerId): array
     {
@@ -709,7 +710,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreHypnoticGaze(
         GameState $state,
@@ -773,7 +774,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreBombThrow(
         GameState $state,
@@ -854,7 +855,7 @@ final class GreedyAICoach implements AICoachInterface
     }
 
     /**
-     * @return array{action: ActionType, params: array<string, mixed>, score: int}|null
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
     private function scoreMultipleBlock(
         GameState $state,
