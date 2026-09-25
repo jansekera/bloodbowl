@@ -37,7 +37,7 @@ ALTER TABLE skills ADD CONSTRAINT skills_category_check
 ALTER TABLE match_events DROP CONSTRAINT IF EXISTS match_events_event_type_check;
 ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
     CHECK (event_type IN (
-        'always_hungry', 'animosity', 'apothecary', 'armour_roll',
+        'always_hungry', 'always_hungry_eat', 'animosity', 'apothecary', 'armour_roll',
         'ball_and_chain_block', 'ball_and_chain_move', 'ball_bounce', 'block',
         'bloodlust_bite', 'bloodlust_fail', 'bomb_explosion', 'bomb_landing',
         'bomb_throw', 'bone_head', 'casualty', 'catch', 'chain_push',

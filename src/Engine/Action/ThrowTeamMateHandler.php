@@ -102,22 +102,31 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $events[] = GameEvent::alwaysHungry($thrower->getId(), $targetId, $hungryRoll, $eaten);
 
             if ($eaten) {
-                // Projectile is removed (Injured)
-                $projectile = $projectile->withState(PlayerState::INJURED)->withPosition(null);
-                $state = $state->withPlayer($projectile);
+                // `rules_bb2016.txt` r. 7786-7795: na 1 se ho POKUSI sezrat a hazi se
+                //   znovu. Druha 1 = snezen: MRTVY bez lekarnika a Regeneration, mic se
+                //   rozptyli jednou z JEHO pole. 2-6 = vysmekne se a hod je fumble.
+                //   Turnover, kdyz mel mic (r. 382-384); jinak jako kazdy fumble.
+                $druhyHod = $this->dice->rollD6();
+                $snezen = $druhyHod === 1;
+                $events[] = GameEvent::alwaysHungryEat($thrower->getId(), $targetId, $druhyHod, $snezen);
+                $projectilePos = $projectile->getPosition();
+                $meMic = $state->getBall()->getCarrierId() === $targetId;
 
-                // Drop ball if carried
-                if ($state->getBall()->getCarrierId() === $targetId) {
-                    $throwerPos = $thrower->getPosition();
-                    if ($throwerPos !== null) {
-                        $state = $state->withBall(BallState::onGround($throwerPos));
-                        $bounceResult = $this->ballResolver->resolveBounce($state, $throwerPos);
-                        $events = array_merge($events, $bounceResult['events']);
-                        $state = $bounceResult['state'];
-                    }
+                if (!$snezen) {
+                    // Fumble: hozeny dopada na pole, kde stal (r. 8613).
+                    $puvodni = $projectilePos ?? $throwerPos;
+                    return $this->resolveLanding($state, $projectile, $puvodni, $meMic, $events, $puvodni);
                 }
 
-                // Not a turnover — action just fails
+                $state = $state->withPlayer($projectile->withState(PlayerState::DEAD)->withPosition(null));
+                if ($meMic && $projectilePos !== null) {
+                    $state = $state->withBall(BallState::onGround($projectilePos));
+                    $bounceResult = $this->ballResolver->resolveBounce($state, $projectilePos);
+                    $events = array_merge($events, $bounceResult['events']);
+
+                    return ActionResult::turnover($bounceResult['state'], $events);
+                }
+
                 return ActionResult::success($state, $events);
             }
         }

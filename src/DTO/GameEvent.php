@@ -779,6 +779,18 @@ final class GameEvent
         ]);
     }
 
+    /** Always Hungry, druhy hod: 1 = snezen, 2-6 = vysmekl se (r. 7788-7794). */
+    public static function alwaysHungryEat(int $throwerId, int $targetId, int $roll, bool $scoffed): self
+    {
+        $result = $scoffed ? 'scoffed' : 'squirmed free';
+        return new self('always_hungry_eat', "Always Hungry: {$result} (rolled {$roll})", [
+            'throwerId' => $throwerId,
+            'targetId' => $targetId,
+            'roll' => $roll,
+            'scoffed' => $scoffed,
+        ]);
+    }
+
     public static function alwaysHungry(int $throwerId, int $targetId, int $roll, bool $eaten): self
     {
         $result = $eaten ? 'eaten' : 'safe';

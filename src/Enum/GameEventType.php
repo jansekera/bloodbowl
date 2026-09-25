@@ -24,6 +24,7 @@ namespace App\Enum;
 enum GameEventType: string
 {
     case ALWAYS_HUNGRY          = 'always_hungry';
+    case ALWAYS_HUNGRY_EAT      = 'always_hungry_eat';
     case ANIMOSITY              = 'animosity';
     case APOTHECARY             = 'apothecary';
     case ARMOUR_ROLL            = 'armour_roll';
