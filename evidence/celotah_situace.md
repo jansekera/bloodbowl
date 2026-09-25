@@ -468,6 +468,28 @@ jestli proražení něco koupí.
 
 ---
 
+## A13. ⭐⭐ UVOLNIT CESTU PRO BALL & CHAIN *(uživatel 25.09.)*
+
+Uživatel 25.09.: *„zapiš uvolnit cestu pro ball n chain jako další úkol do celotahu“*.
+
+**Situace:** Fanatic s Ball & Chain se pohybuje náhodně. Kouč před každým polem jen natočí
+šablonu vhazování (nahoru, dolů, k jedné z lajn) a D6 vybere jeden ze tří směrů
+(`rules_bb2016.txt` r. 7829-7839). Do koho narazí, toho **blokuje, přítele i nepřítele**
+(r. 7840-7842); ležící nebo omráčené odtlačí a hází na brnění.
+⇒ **Naši hráči v jeho okolí jsou v ohrožení** a zároveň mu **berou cestu k soupeři**.
+
+**Proč celotah, ne jedna aktivace:** pořadí aktivací rozhoduje. Nejdřív odsunout vlastní
+hráče z pásu, kam Fanatic může dojít (bloky, pohyby, uhnutí), **pak** Fanatic. Kdo jde
+opačně, riskuje, že Fanatic sestřelí vlastní klec nebo nosiče.
+
+**Vazba na engine (balík E, 25.09.):** natočení šablony se volí **k nejbližšímu stojícímu
+soupeři, s vyhnutím se našim stojícím** (rozhodnutí uživatele). Tahle volba řeší jen
+jeden krok; **uvolnit cestu dopředu** je úkol pro celý tah.
+
+**Souvisí:** `A7` *(pořadí aktivací)*, oddíl B *„Pořadí aktivací"*.
+
+---
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
