@@ -495,6 +495,10 @@ final class PassResolver
             if ($kandidat->hasLostTacklezones()) {
                 continue;
             }
+            // No Hands "is unable to ... intercept" (`rules_bb2016.txt` r. 8318-8320).
+            if ($kandidat->hasSkill(SkillName::NoHands)) {
+                continue;
+            }
             $cilKandidata = $this->getInterceptionTarget($state, $kandidat);
             if ($cilKandidata < $target) {
                 $player = $kandidat;
