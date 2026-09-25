@@ -49,6 +49,7 @@ final class InjuryResolver
         bool $hasNurglesRot = false,
         bool $mightyBlow = false,
         bool $chainsawHolderBonus = true,
+        bool $regenerace = true,
     ): array {
         $events = [];
 
@@ -87,7 +88,34 @@ final class InjuryResolver
             return ['player' => $player, 'events' => $events];
         }
 
-        return $this->resolveInjury($player, $dice, $injuryModifier, $events, $hasStakes, $hasNurglesRot);
+        return $this->resolveInjury($player, $dice, $injuryModifier, $events, $hasStakes, $hasNurglesRot, $regenerace);
+    }
+
+    /**
+     * Regeneration (`rules_bb2016.txt` r. 8433-8440): po zraneni -- a az PO
+     * pripadnem lekarnikovi -- D6, na 4+ do rezerv. Hazi se JEDNOU, neprehazuje se.
+     * Stakes Regeneration zakazou.
+     *
+     * @param list<GameEvent> $events
+     * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
+     */
+    public function resolveRegeneration(MatchPlayerDTO $player, DiceRollerInterface $dice, bool $hasStakes, array $events): array
+    {
+        if ($player->getState() !== PlayerState::INJURED || !$player->hasSkill(SkillName::Regeneration)) {
+            return ['player' => $player, 'events' => $events];
+        }
+        if ($hasStakes) {
+            $events[] = GameEvent::stakesBlockRegen(0, $player->getId());
+            return ['player' => $player, 'events' => $events];
+        }
+        $regenRoll = $dice->rollD6();
+        $uspech = $regenRoll >= 4;
+        if ($uspech) {
+            $player = $player->withState(PlayerState::OFF_PITCH);
+        }
+        $events[] = GameEvent::regeneration($player->getId(), $regenRoll, $uspech);
+
+        return ['player' => $player, 'events' => $events];
     }
 
     /**
@@ -189,7 +217,8 @@ final class InjuryResolver
         array $events,
     ): array {
         // Re-roll injury
-        $rerollResult = $this->resolveInjury($player, $dice, $originalModifier, []);
+        // Lekarnik prehazuje ZRANENI, ne Regeneration -- ta prijde az po nem, jednou.
+        $rerollResult = $this->resolveInjury($player, $dice, $originalModifier, [], regenerace: false);
         $rerolledState = $rerollResult['player']->getState();
 
         // Take the better result (stunned > KO > injured)
@@ -287,6 +316,7 @@ final class InjuryResolver
         array $events,
         bool $hasStakes = false,
         bool $hasNurglesRot = false,
+        bool $regenerace = true,
     ): array {
         $die1 = $dice->rollD6();
         $die2 = $dice->rollD6();
@@ -351,18 +381,8 @@ final class InjuryResolver
                 $events[] = GameEvent::nurglesRot(0, $player->getId());
             }
 
-            // Regeneration: after casualty, roll D6; on 4+ player goes to reserves
-            // Stakes: blocks Regeneration entirely
-            if ($player->hasSkill(SkillName::Regeneration) && !$hasStakes) {
-                $regenRoll = $dice->rollD6();
-                if ($regenRoll >= 4) {
-                    $player = $player->withState(PlayerState::OFF_PITCH);
-                    $events[] = GameEvent::regeneration($player->getId(), $regenRoll, true);
-                } else {
-                    $events[] = GameEvent::regeneration($player->getId(), $regenRoll, false);
-                }
-            } elseif ($player->hasSkill(SkillName::Regeneration) && $hasStakes) {
-                $events[] = GameEvent::stakesBlockRegen(0, $player->getId());
+            if ($regenerace) {
+                ['player' => $player, 'events' => $events] = $this->resolveRegeneration($player, $dice, $hasStakes, $events);
             }
         }
 

@@ -931,7 +931,7 @@ final class BlockHandler implements ActionHandlerInterface
             $hasClaw = $attacker->hasSkill(SkillName::Claw);
             $hasStakes = $attacker->hasSkill(SkillName::Stakes);
             $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+            $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, regenerace: false);
             $defender = $injResult['player'];
             $currentState = $currentState->withPlayer($defender);
             $events = array_merge($events, $injResult['events']);
@@ -943,7 +943,7 @@ final class BlockHandler implements ActionHandlerInterface
                 && $freshAttackerForPO->getState() === PlayerState::STANDING
             ) {
                 // Reroll armor/injury
-                $poInjResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+                $poInjResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, regenerace: false);
                 $defender = $poInjResult['player'];
                 $currentState = $currentState->withPlayer($defender);
                 $events = array_merge($events, $poInjResult['events']);
@@ -963,6 +963,11 @@ final class BlockHandler implements ActionHandlerInterface
                 $currentState = $currentState->withPlayer($defender);
                 $events = $apoResult['events'];
             }
+            // Regeneration az PO lekarnikovi, jednou (r. 8434-8436)
+            $regen = $this->injuryResolver->resolveRegeneration($defender, $this->dice, $hasStakes, $events);
+            $defender = $regen['player'];
+            $currentState = $currentState->withPlayer($defender);
+            $events = $regen['events'];
 
             // Drop ball if carrier
             [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $defender, $events);
@@ -982,6 +987,7 @@ final class BlockHandler implements ActionHandlerInterface
                     $freshAttacker,
                     $this->dice,
                     $defender->hasSkill(SkillName::Chainsaw) ? InjuryResolver::CHAINSAW_ARMOUR_BONUS : 0,
+                    regenerace: false,
                 );
                 $freshAttacker = $injResult['player'];
                 $currentState = $currentState->withPlayer($freshAttacker);
@@ -996,6 +1002,11 @@ final class BlockHandler implements ActionHandlerInterface
                     $currentState = $currentState->withPlayer($freshAttacker);
                     $events = $apoResult['events'];
                 }
+                // Regeneration az PO lekarnikovi, jednou (r. 8434-8436)
+                $regen = $this->injuryResolver->resolveRegeneration($freshAttacker, $this->dice, false, $events);
+                $freshAttacker = $regen['player'];
+                $currentState = $currentState->withPlayer($freshAttacker);
+                $events = $regen['events'];
 
                 // Drop ball if carrier
                 [$currentState, $events] = $this->ballResolver->handleBallOnPlayerDown($currentState, $freshAttacker, $events);
