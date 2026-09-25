@@ -40,7 +40,7 @@ final class WrestleTurnoverTest extends TestCase
         $state = $this->wrestleState(attackerCarriesBall: false);
 
         // SEBEKONTROLA FIXTURY: obránce Wrestle MÁ a útočník míč NEMÁ.
-        $this->assertTrue($state->getPlayer(2)->hasSkill(SkillName::Wrestle),
+        $this->assertTrue($state->requirePlayer(2)->hasSkill(SkillName::Wrestle),
             'fixtura je vadná: nikdo nemá Wrestle, větev se nespustí');
         $this->assertFalse($state->getBall()->isHeld(),
             'fixtura je vadná: míč někdo drží, tohle není ten případ');
@@ -56,8 +56,8 @@ final class WrestleTurnoverTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wrestle', $types,
             'Wrestle se nespustil -- test neměří, co má');
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
 
         $this->assertFalse($result->isTurnover(),
             'Placed Prone bez míče turnover NENÍ (r. 8677-8678)');

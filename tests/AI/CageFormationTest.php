@@ -34,7 +34,7 @@ final class CageFormationTest extends TestCase
 
         // Nosič už jednal ⇒ rozhoduje se jen o pomocníkovi.
         return $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
     }
 
@@ -106,7 +106,7 @@ final class CageFormationTest extends TestCase
         // Rohy už jednaly ⇒ rozhoduje se jen o nosiči.
         foreach ([2, 3, 4, 5] as $id) {
             $state = $state->withPlayer(
-                $state->getPlayer($id)->withHasActed(true)->withHasMoved(true),
+                $state->requirePlayer($id)->withHasActed(true)->withHasMoved(true),
             );
         }
 
@@ -190,7 +190,7 @@ final class CageFormationTest extends TestCase
             ->withBallOnGround(13, 8)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
 
         $rules = new RulesEngine();
@@ -261,8 +261,11 @@ final class CageFormationTest extends TestCase
         $sance = [];
         foreach ([1, 3] as $id) {
             $cile = $rules->getValidMoveTargets($state, $id);
-            $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} nemá kam");
-            $sance[$id] = max(array_column($cile, 'successChance'));
+            $sanceCest = array_column($cile, 'successChance');
+            if ($sanceCest === []) {
+                $this->fail("fixtura je vadná: hráč {$id} nemá kam");
+            }
+            $sance[$id] = max($sanceCest);
         }
         $this->assertLessThan($sance[3], $sance[1],
             'fixtura je vadná: trpaslík nemá horší šanci než elf, není co rozlišovat');
@@ -298,7 +301,7 @@ final class CageFormationTest extends TestCase
             ->withBallCarried(1)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
 
         $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());

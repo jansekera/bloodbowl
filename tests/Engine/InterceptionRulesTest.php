@@ -48,7 +48,7 @@ final class InterceptionRulesTest extends TestCase
             ->build();
 
         // AG4 = 3+, -2 za pokus = 5+
-        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testKazdaSouperovaZonaNaZachycujicimPridavaJedna(): void
@@ -58,7 +58,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::HOME, 7, 4, id: 1)
             ->build();
 
-        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testNervesOfSteelZonyIgnoruje(): void
@@ -68,7 +68,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::HOME, 7, 4, id: 1)
             ->build();
 
-        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testDestPridavaJedna(): void
@@ -78,7 +78,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 7, 5, agility: 4, id: 10)
             ->build();
 
-        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testDisturbingPresenceDoTriPoliPridavaJedna(): void
@@ -88,7 +88,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::HOME, 7, 8, skills: [SkillName::DisturbingPresence], id: 1)
             ->build();
 
-        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(6, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testExtraArmsUbiraJedna(): void
@@ -98,7 +98,7 @@ final class InterceptionRulesTest extends TestCase
             ->build();
 
         // AG3 = 4+, -2 = 6+, Extra Arms +1 k hodu = 5+
-        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testVeryLongLegsUbiraJedna(): void
@@ -107,7 +107,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 7, 5, agility: 3, skills: [SkillName::VeryLongLegs], id: 10)
             ->build();
 
-        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->getPlayer(10)));
+        $this->assertSame(5, $this->resolver()->getInterceptionTarget($s, $s->requirePlayer(10)));
     }
 
     public function testZachycujeTenSNejvyssiSanciNePrvniNaDraze(): void
@@ -142,7 +142,7 @@ final class InterceptionRulesTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 7, 5, agility: 6, id: 10)
             ->withBallCarried(1)
             ->build();
-        $state = $state->withPlayer($state->getPlayer(10)->withLostTacklezones(true));
+        $state = $state->withPlayer($state->requirePlayer(10)->withLostTacklezones(true));
 
         // Kdyby zachycoval, prvni kostka (6) by byla jeho intercepce.
         // Bez nej: presnost 6 = presne, chyt 6 = chyceno.

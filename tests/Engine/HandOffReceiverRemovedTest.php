@@ -42,7 +42,7 @@ final class HandOffReceiverRemovedTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: hand-off na hráče 2 se OPRAVDU nabízí --
         // jinak by se do opravované větve nedošlo.
-        $targets = $rules->getHandOffTargets($state, $state->getPlayer(1));
+        $targets = $rules->getHandOffTargets($state, $state->requirePlayer(1));
         $this->assertCount(1, $targets, 'fixtura je vadná: cílů není právě jeden');
         $this->assertSame(2, $targets[0]->getId());
 
@@ -56,7 +56,7 @@ final class HandOffReceiverRemovedTest extends TestCase
         ]);
 
         // SEBEKONTROLA VÝSLEDKU: příjemce OPRAVDU zmizel z hřiště.
-        $this->assertNull($result->getNewState()->getPlayer(2)->getPosition(),
+        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition(),
             'Thrall na hřišti zůstal — test neměří, co má');
 
         // Dřív tady letěla výjimka.
@@ -106,14 +106,14 @@ final class HandOffReceiverRemovedTest extends TestCase
             ->withBallCarried(1)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE),
+            $state->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE),
         );
 
         // SEBEKONTROLA FIXTURY: příjemce LEŽÍ, ale JE na hřišti -- jinak by
         // se test trefil do větve (a) a neměřil by, co má.
-        $this->assertNotNull($state->getPlayer(2)->getPosition(),
+        $this->assertNotNull($state->requirePlayer(2)->getPosition(),
             'fixtura je vadná: příjemce z hřiště zmizel, to je jiný případ');
-        $this->assertFalse($state->getPlayer(2)->getState()->canAct(),
+        $this->assertFalse($state->requirePlayer(2)->getState()->canAct(),
             'fixtura je vadná: příjemce stojí');
 
         // Odraz D8 = 3 (dx +1) na (7,7), tam nikdo nestojí => míč na zemi.
@@ -140,7 +140,7 @@ final class HandOffReceiverRemovedTest extends TestCase
             ->withBallCarried(1)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE),
+            $state->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE),
         );
         $state = $state->withTeamState(TeamSide::HOME,
             $state->getTeamState(TeamSide::HOME)->withRerollUsed());

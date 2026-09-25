@@ -53,8 +53,7 @@ final class InteractiveRerollTest extends TestCase
         $this->assertEquals(6, $pending->getTargetY());
 
         // Player should still be at original position
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(5, $player->getPosition()?->getX());
         $this->assertEquals(5, $player->getPosition()?->getY());
     }
@@ -87,8 +86,7 @@ final class InteractiveRerollTest extends TestCase
         $this->assertNull($result2->getNewState()->getPendingReroll());
 
         // Player should be at target position
-        $player = $result2->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result2->getNewState()->requirePlayer(1);
         $this->assertEquals(5, $player->getPosition()?->getX());
         $this->assertEquals(6, $player->getPosition()?->getY());
 

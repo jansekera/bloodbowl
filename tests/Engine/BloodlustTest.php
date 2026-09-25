@@ -36,8 +36,7 @@ final class BloodlustTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $newState = $result->getNewState();
-        $pos = $newState->getPlayer(1)->getPosition();
-        $this->assertNotNull($pos);
+        $pos = $newState->requirePlayer(1)->requirePosition();
         $this->assertEquals(4, $pos->getX());
         $this->assertEquals(7, $pos->getY());
     }
@@ -75,15 +74,14 @@ final class BloodlustTest extends TestCase
         //   z auto-KO. Hod na zraneni 2+2=4 dava STUNNED, tedy hrace, ktery
         //   NA HRISTI ZUSTAVA. Presne v tom je ta oprava: kousnuti neposila
         //   Thralla pryc, jen ho zrani.
-        $thrall = $newState->getPlayer(2);
+        $thrall = $newState->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $thrall->getState(),
             'hod 2+2=4 je Stunned (r. 7939-7941)');
         $this->assertNotNull($thrall->getPosition(),
             'omraceny Thrall zustava na hristi');
 
         // Vampire still moved
-        $vampirePos = $newState->getPlayer(1)->getPosition();
-        $this->assertNotNull($vampirePos);
+        $vampirePos = $newState->requirePlayer(1)->requirePosition();
         $this->assertEquals(4, $vampirePos->getX());
     }
 
@@ -116,7 +114,7 @@ final class BloodlustTest extends TestCase
         $this->assertContains('bloodlust_fail', $types);
 
         $newState = $result->getNewState();
-        $vampire = $newState->getPlayer(1);
+        $vampire = $newState->requirePlayer(1);
         $this->assertEquals(PlayerState::OFF_PITCH, $vampire->getState());
         $this->assertNull($vampire->getPosition());
     }
@@ -174,7 +172,7 @@ final class BloodlustTest extends TestCase
         $this->assertContains('block', $types);
 
         // Thrall dostal hod na zraneni -- a z kousnuti se NEUMIRA.
-        $thrall = $result->getNewState()->getPlayer(2);
+        $thrall = $result->getNewState()->requirePlayer(2);
         $this->assertNotSame(PlayerState::DEAD, $thrall->getState(),
             'z kousnuti se neumira (r. 7940-7941)');
         $this->assertNotSame(PlayerState::STANDING, $thrall->getState(),
@@ -195,11 +193,11 @@ final class BloodlustTest extends TestCase
             ->withBallOffPitch()
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(2)->withState(PlayerState::PRONE),
+            $state->requirePlayer(2)->withState(PlayerState::PRONE),
         );
 
         // SEBEKONTROLA: Thrall OPRAVDU lezi -- jinak by test nemeril vyjimku.
-        $this->assertSame(PlayerState::PRONE, $state->getPlayer(2)->getState(),
+        $this->assertSame(PlayerState::PRONE, $state->requirePlayer(2)->getState(),
             'fixtura je vadna: Thrall stoji');
 
         $dice = new FixedDiceRoller([1, 2, 2]);
@@ -258,7 +256,7 @@ final class BloodlustTest extends TestCase
 
         $after = $result->getNewState();
         $this->assertTrue($result->isTurnover());
-        $this->assertSame(PlayerState::OFF_PITCH, $after->getPlayer(1)->getState(),
+        $this->assertSame(PlayerState::OFF_PITCH, $after->requirePlayer(1)->getState(),
             'upir jde do rezerv');
         $this->assertFalse($after->getBall()->isHeld(),
             'mic se ma odrazit, ne odejit s upirem');

@@ -173,8 +173,7 @@ final class FullGameFlowTest extends TestCase
         $this->assertEquals(GamePhase::SETUP, $postResult['state']->getPhase());
 
         // Players should be off pitch
-        $player1 = $postResult['state']->getPlayer(1);
-        $this->assertNotNull($player1);
+        $player1 = $postResult['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::OFF_PITCH, $player1->getState());
     }
 

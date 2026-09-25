@@ -55,7 +55,7 @@ final class BigGuyWastesTeamActionTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('really_stupid', $types,
             'Really Stupid se neozval -- test neměří, co má');
-        $this->assertTrue($after->getPlayer(1)->hasActed());
+        $this->assertTrue($after->requirePlayer(1)->hasActed());
 
         $this->assertTrue($after->getTeamState(TeamSide::HOME)->isBlitzUsedThisTurn(),
             'tým měl o deklarovaný blitz přijít (r. 8398-8401)');
@@ -79,8 +79,8 @@ final class BigGuyWastesTeamActionTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertFalse($result->getNewState()->getPlayer(1)->hasActed()
-            && $result->getNewState()->getPlayer(1)->getPosition()->getX() === 5,
+        $this->assertFalse($result->getNewState()->requirePlayer(1)->hasActed()
+            && $result->getNewState()->requirePlayer(1)->requirePosition()->getX() === 5,
             'hráč měl projít kontrolou a jednat, ne zůstat stát');
     }
 

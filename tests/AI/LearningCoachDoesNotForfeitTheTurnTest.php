@@ -54,7 +54,7 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
             ->withBallOffPitch()
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(3)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(3)->withHasActed(true)->withHasMoved(true),
         );
         $state = $state->withTeamState(TeamSide::HOME,
             $state->getTeamState(TeamSide::HOME)->withBlitzUsed());
@@ -115,7 +115,7 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
             ->withBallOffPitch()
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
 
         $rules = new RulesEngine();

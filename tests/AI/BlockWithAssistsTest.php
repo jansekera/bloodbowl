@@ -36,7 +36,7 @@ final class BlockWithAssistsTest extends TestCase
         // SEBEKONTROLA: blok se nabízí OBĚMA, jinak by volba nic neznamenala.
         $blokujici = [];
         foreach ($rules->getAvailableActions($state) as $a) {
-            if ($a['type'] === ActionType::BLOCK->value) {
+            if ($a['type'] === ActionType::BLOCK->value && isset($a['playerId'])) {
                 $blokujici[] = $a['playerId'];
             }
         }
@@ -68,7 +68,7 @@ final class BlockWithAssistsTest extends TestCase
             ->build();
         // #1 už jednal ⇒ rozhoduje se o #3.
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
 
         $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());

@@ -115,7 +115,7 @@ final class CagePlaybookTest extends TestCase
             ->build();
 
         $this->assertSame(4, $this->cisteRohy($state), 'fixtura: klec má stát už na začátku');
-        $pred = $state->getPlayer(1)->getPosition();
+        $pred = $state->requirePlayer(1)->requirePosition();
 
         $po = $this->odehrajKolo($state);
 
@@ -125,7 +125,7 @@ final class CagePlaybookTest extends TestCase
         $ball = $po->getBall();
         $nosic = $ball->getCarrierId() !== null ? $po->getPlayer($ball->getCarrierId()) : null;
         $this->assertNotNull($nosic?->getPosition());
-        $this->assertGreaterThanOrEqual(1, $nosic->getPosition()->distanceTo($pred),
+        $this->assertGreaterThanOrEqual(1, $nosic->requirePosition()->distanceTo($pred),
             'klec stojí, ale vůbec se nehnula');
     }
 
@@ -153,7 +153,7 @@ final class CagePlaybookTest extends TestCase
             $this->assertNotSame(25, $decision['params']['x'],
                 'nosič šel dát TD hned, místo aby počkal s klecí na poslední kolo');
         } else {
-            $this->assertTrue(true, 'nosič se tenhle tah nehýbal, klec drží');
+            $this->addToAssertionCount(1); // nosič se tenhle tah nehýbal, klec drží
         }
     }
 
@@ -172,7 +172,7 @@ final class CagePlaybookTest extends TestCase
             ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
             ->addPlayer(TeamSide::AWAY, 17, 7, movement: 6, id: 2)
             ->withBallCarried(1)->build();
-        $daleko = $daleko->withPlayer($daleko->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $daleko = $daleko->withPlayer($daleko->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE));
         $this->assertTrue($ref->invoke($ai, $daleko, TeamSide::HOME, $cil),
             'ležící soupeř sedm polí daleko nemá dosáhnout');
 
@@ -181,7 +181,7 @@ final class CagePlaybookTest extends TestCase
             ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
             ->addPlayer(TeamSide::AWAY, 15, 7, movement: 6, id: 2)
             ->withBallCarried(1)->build();
-        $blizko = $blizko->withPlayer($blizko->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $blizko = $blizko->withPlayer($blizko->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE));
         $this->assertFalse($ref->invoke($ai, $blizko, TeamSide::HOME, $cil),
             'ležící soupeř pět polí daleko se postaví a dojde -- musí se počítat');
 
@@ -191,7 +191,7 @@ final class CagePlaybookTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 17, 7, movement: 6, id: 2,
                         skills: [\App\Enum\SkillName::JumpUp])
             ->withBallCarried(1)->build();
-        $jumpUp = $jumpUp->withPlayer($jumpUp->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+        $jumpUp = $jumpUp->withPlayer($jumpUp->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE));
         $this->assertFalse($ref->invoke($ai, $jumpUp, TeamSide::HOME, $cil),
             'ležící s Jump Up se postaví zadarmo, takže má plný dosah');
     }

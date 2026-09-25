@@ -42,15 +42,21 @@ final class FoulRulesTest extends TestCase
         }
         $s = $b->build();
 
-        return $s->withPlayer($s->getPlayer(2)->withState(PlayerState::PRONE));
+        return $s->withPlayer($s->requirePlayer(2)->withState(PlayerState::PRONE));
     }
 
-    private function faul(\App\DTO\GameState $s, array $kostky)
+    /**
+     * @param list<int> $kostky
+     */
+    private function faul(\App\DTO\GameState $s, array $kostky): \App\DTO\ActionResult
     {
         return (new ActionResolver(new FixedDiceRoller($kostky)))
             ->resolve($s, ActionType::FOUL, ['playerId' => 1, 'targetId' => 2]);
     }
 
+    /**
+     * @param list<\App\DTO\GameEvent> $events
+     */
     private function zbrojProlomena(array $events): bool
     {
         foreach ($events as $e) {

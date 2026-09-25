@@ -67,8 +67,7 @@ final class KickoffResolverTest extends TestCase
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
 
         $this->assertFalse($result['state']->getBall()->isHeld());
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(7, $ballPos->getX());
         $this->assertEquals(8, $ballPos->getY());
     }
@@ -231,10 +230,8 @@ final class KickoffResolverTest extends TestCase
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
         // Player 1 should be moved to ball position (8,7)
-        $player1 = $result['state']->getPlayer(1);
-        $this->assertNotNull($player1);
-        $pos = $player1->getPosition();
-        $this->assertNotNull($pos);
+        $player1 = $result['state']->requirePlayer(1);
+        $pos = $player1->requirePosition();
         $this->assertEquals(8, $pos->getX());
         $this->assertEquals(7, $pos->getY());
     }
@@ -326,18 +323,15 @@ final class KickoffResolverTest extends TestCase
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
-        $p1 = $result['state']->getPlayer(1);
-        $this->assertNotNull($p1);
-        $this->assertEquals(7, $p1->getPosition()->getX());
+        $p1 = $result['state']->requirePlayer(1);
+        $this->assertEquals(7, $p1->requirePosition()->getX());
 
-        $p2 = $result['state']->getPlayer(2);
-        $this->assertNotNull($p2);
-        $this->assertEquals(11, $p2->getPosition()->getX());
+        $p2 = $result['state']->requirePlayer(2);
+        $this->assertEquals(11, $p2->requirePosition()->getX());
 
         // Away player should not move
-        $p3 = $result['state']->getPlayer(3);
-        $this->assertNotNull($p3);
-        $this->assertEquals(15, $p3->getPosition()->getX());
+        $p3 = $result['state']->requirePlayer(3);
+        $this->assertEquals(15, $p3->requirePosition()->getX());
     }
 
     public function testKickoffTableQuickSnapDoesNotMoveIntoOccupied(): void
@@ -356,10 +350,9 @@ final class KickoffResolverTest extends TestCase
 
         // Player 2 moves first (getPlayersOnPitch order), player 1 can then move
         // But since we iterate the snapshot, player 1 sees (7,5) as occupied
-        $p1 = $result['state']->getPlayer(1);
-        $this->assertNotNull($p1);
+        $p1 = $result['state']->requirePlayer(1);
         // Player 1 couldn't move because (7,5) was occupied in the snapshot
-        $this->assertEquals(6, $p1->getPosition()->getX());
+        $this->assertEquals(6, $p1->requirePosition()->getX());
     }
 
     public function testKickoffTableBlitzMovesKickingTeam(): void
@@ -378,14 +371,12 @@ final class KickoffResolverTest extends TestCase
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
         // Away (kicking) moves -x (toward home half)
-        $p2 = $result['state']->getPlayer(2);
-        $this->assertNotNull($p2);
-        $this->assertEquals(14, $p2->getPosition()->getX());
+        $p2 = $result['state']->requirePlayer(2);
+        $this->assertEquals(14, $p2->requirePosition()->getX());
 
         // Home (receiving) doesn't move
-        $p1 = $result['state']->getPlayer(1);
-        $this->assertNotNull($p1);
-        $this->assertEquals(12, $p1->getPosition()->getX());
+        $p1 = $result['state']->requirePlayer(1);
+        $this->assertEquals(12, $p1->requirePosition()->getX());
     }
 
     public function testKickoffTableThrowARockStunsPlayers(): void
@@ -405,14 +396,14 @@ final class KickoffResolverTest extends TestCase
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
-        $p1 = $result['state']->getPlayer(1);
+        $p1 = $result['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::STUNNED, $p1->getState());
 
-        $p4 = $result['state']->getPlayer(4);
+        $p4 = $result['state']->requirePlayer(4);
         $this->assertEquals(PlayerState::STUNNED, $p4->getState());
 
         // Other players unaffected
-        $p2 = $result['state']->getPlayer(2);
+        $p2 = $result['state']->requirePlayer(2);
         $this->assertEquals(PlayerState::STANDING, $p2->getState());
     }
 
@@ -433,16 +424,16 @@ final class KickoffResolverTest extends TestCase
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
-        $p1 = $result['state']->getPlayer(1);
+        $p1 = $result['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::STUNNED, $p1->getState());
 
-        $p2 = $result['state']->getPlayer(2);
+        $p2 = $result['state']->requirePlayer(2);
         $this->assertEquals(PlayerState::STANDING, $p2->getState());
 
-        $p3 = $result['state']->getPlayer(3);
+        $p3 = $result['state']->requirePlayer(3);
         $this->assertEquals(PlayerState::STANDING, $p3->getState());
 
-        $p4 = $result['state']->getPlayer(4);
+        $p4 = $result['state']->requirePlayer(4);
         $this->assertEquals(PlayerState::STUNNED, $p4->getState());
     }
 
@@ -460,8 +451,8 @@ final class KickoffResolverTest extends TestCase
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
-        $this->assertEquals(PlayerState::STANDING, $result['state']->getPlayer(1)->getState());
-        $this->assertEquals(PlayerState::STANDING, $result['state']->getPlayer(2)->getState());
+        $this->assertEquals(PlayerState::STANDING, $result['state']->requirePlayer(1)->getState());
+        $this->assertEquals(PlayerState::STANDING, $result['state']->requirePlayer(2)->getState());
         $this->assertStringContains('no one is hurt', $result['events'][0]->getDescription());
     }
 

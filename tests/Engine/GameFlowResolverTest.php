@@ -101,8 +101,7 @@ final class GameFlowResolverTest extends TestCase
         $this->assertFalse($result['state']->getBall()->isOnPitch());
 
         // Players should be off pitch
-        $player1 = $result['state']->getPlayer(1);
-        $this->assertNotNull($player1);
+        $player1 = $result['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::OFF_PITCH, $player1->getState());
     }
 
@@ -113,8 +112,7 @@ final class GameFlowResolverTest extends TestCase
             ->build();
 
         // Set a player to KO state
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withState(PlayerState::KO)->withPosition(null));
 
         // Roll 4 = KO recovery success
@@ -124,8 +122,7 @@ final class GameFlowResolverTest extends TestCase
         $this->assertEquals(GamePhase::SETUP, $result['state']->getPhase());
         $this->assertEquals(2, $result['state']->getHalf());
 
-        $recovered = $result['state']->getPlayer(1);
-        $this->assertNotNull($recovered);
+        $recovered = $result['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::OFF_PITCH, $recovered->getState());
     }
 
@@ -135,16 +132,14 @@ final class GameFlowResolverTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withState(PlayerState::KO)->withPosition(null));
 
         // Roll 3 = KO recovery fail
         $resolver = new GameFlowResolver(new FixedDiceRoller([3]));
         $result = $resolver->resolveHalfTime($state);
 
-        $koPlayer = $result['state']->getPlayer(1);
-        $this->assertNotNull($koPlayer);
+        $koPlayer = $result['state']->requirePlayer(1);
         $this->assertEquals(PlayerState::KO, $koPlayer->getState());
     }
 

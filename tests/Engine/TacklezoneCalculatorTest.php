@@ -81,8 +81,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $this->assertTrue($this->calc->isInTacklezone($state, $player));
     }
 
@@ -93,8 +92,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 10, 10)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $this->assertFalse($this->calc->isInTacklezone($state, $player));
     }
 
@@ -123,8 +121,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 6) // adjacent to destination (6,5)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $destination = new Position(6, 5);
         $target = $this->calc->calculateDodgeTarget($state, $player, $destination);
         $this->assertSame(4, $target); // 7 - 3 + max(0, 1-1) = 4
@@ -137,8 +134,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, agility: 6, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $target = $this->calc->calculateDodgeTarget($state, $player, new Position(6, 5));
         $this->assertSame(2, $target);
     }
@@ -153,8 +149,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 7, 5)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $target = $this->calc->calculateDodgeTarget($state, $player, new Position(6, 5));
         $this->assertSame(6, $target);
     }
@@ -167,8 +162,7 @@ final class TacklezoneCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 6) // adjacent to dest
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $target = $this->calc->calculateDodgeTarget($state, $player, new Position(6, 5));
         // ⛔ OPRAVENO 14.09.2026. Puvodni ocekavani 3 zapisovalo DVOJI zapocteni
         //   skillu Dodge: cil se snizoval o 1 A JESTE se pri neuspechu hazelo

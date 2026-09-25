@@ -33,7 +33,7 @@ final class KickTargetChoiceTest extends TestCase
     /**
      * @param list<int> $ma  pohyb hracu prijimajiciho tymu
      */
-    private function stav(bool $kopajiciMaKick, array $ma, TeamSide $prijima)
+    private function stav(bool $kopajiciMaKick, array $ma, TeamSide $prijima): \App\DTO\GameState
     {
         $b = (new GameStateBuilder())->withActiveTeam($prijima);
         $kopajici = $prijima->opponent();

@@ -30,6 +30,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class BreakTackleRulesTest extends TestCase
 {
+    /**
+     * @param list<SkillName> $skills
+     */
     private function stav(int $strength, int $agility, array $skills = [SkillName::BreakTackle]): GameState
     {
         $s = (new GameStateBuilder())
@@ -43,13 +46,16 @@ final class BreakTackleRulesTest extends TestCase
 
     private function hrac(GameState $s, int $id): MatchPlayerDTO
     {
-        $p = $s->getPlayer($id);
-        $this->assertNotNull($p, "hrac {$id} musi byt ve stavu");
+        $p = $s->requirePlayer($id);
 
         return $p;
     }
 
-    /** @param list<\App\DTO\GameEvent> $events @return list<int> */
+    /** @param list<\App\DTO\GameEvent> $events @return list<int>
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return list<int>
+     */
     private function cileUhybu(array $events): array
     {
         $out = [];

@@ -109,7 +109,7 @@ final class StakesTest extends TestCase
         $resolver = new \App\Engine\ActionResolver($dice);
         $result = $resolver->resolve($state, \App\Enum\ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::INJURED, $defender->getState());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('stakes_block_regen', $types);

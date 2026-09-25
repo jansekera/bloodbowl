@@ -43,6 +43,6 @@ final class BallStateTest extends TestCase
         $this->assertTrue($restored->isHeld());
         $this->assertSame(3, $restored->getCarrierId());
         $this->assertSame(10, $restored->getPosition()?->getX());
-        $this->assertSame(7, $restored->getPosition()->getY());
+        $this->assertSame(7, $restored->requirePosition()->getY());
     }
 }

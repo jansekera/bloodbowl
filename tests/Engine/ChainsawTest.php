@@ -35,7 +35,7 @@ final class ChainsawTest extends TestCase
         $this->assertContains('injury_roll', $types);
         $this->assertNotContains('block', $types);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $defender->getState());
     }
 
@@ -59,7 +59,7 @@ final class ChainsawTest extends TestCase
         $this->assertContains('armour_roll', $types);
         $this->assertNotContains('injury_roll', $types);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
     }
 
@@ -96,10 +96,10 @@ final class ChainsawTest extends TestCase
         $this->assertNotContains('follow_up', $types);
 
         // Defender still at original position
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertNotNull($defender->getPosition());
-        $this->assertEquals(6, $defender->getPosition()->getX());
-        $this->assertEquals(5, $defender->getPosition()->getY());
+        $this->assertEquals(6, $defender->requirePosition()->getX());
+        $this->assertEquals(5, $defender->requirePosition()->getY());
     }
 
     public function testChainsawKickbackOnRoll1(): void
@@ -124,11 +124,11 @@ final class ChainsawTest extends TestCase
         $this->assertContains('chainsaw_kickback', $types);
 
         // Attacker is injured
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::STUNNED, $attacker->getState());
 
         // Defender untouched
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
     }
 
@@ -147,7 +147,7 @@ final class ChainsawTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertFalse($result->isTurnover());
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::STANDING, $attacker->getState());
     }
 
@@ -167,7 +167,7 @@ final class ChainsawTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         $newState = $result->getNewState();
-        $this->assertSame(PlayerState::KO, $newState->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::KO, $newState->requirePlayer(2)->getState());
         $this->assertFalse($newState->getBall()->isHeld());
     }
 
@@ -184,7 +184,7 @@ final class ChainsawTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($attacker->hasActed());
         $this->assertTrue($attacker->hasMoved());
     }
@@ -201,7 +201,7 @@ final class ChainsawTest extends TestCase
         $dice = new FixedDiceRoller([5, 3, 4, 3, 3]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
         $this->assertFalse($result->isTurnover());
     }
 
@@ -217,7 +217,7 @@ final class ChainsawTest extends TestCase
         $dice = new FixedDiceRoller([1, 3, 3, 3, 3]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(1)->getState());
         $this->assertTrue($result->isTurnover());
     }
 
@@ -235,6 +235,6 @@ final class ChainsawTest extends TestCase
         $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertTrue($result->isTurnover());
-        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->requirePlayer(1)->getState());
     }
 }

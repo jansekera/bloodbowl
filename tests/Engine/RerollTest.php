@@ -36,8 +36,7 @@ final class RerollTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(5, $player->getPosition()?->getX());
         $this->assertEquals(6, $player->getPosition()?->getY());
 
@@ -121,8 +120,7 @@ final class RerollTest extends TestCase
         ]);
 
         $this->assertTrue($result->isTurnover());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::PRONE, $player->getState());
 
         // Team rerolls decremented even though it failed
@@ -381,8 +379,7 @@ final class RerollTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 2=fail (target 3+), team reroll 4=success
         $dice = new FixedDiceRoller([2, 4]);
@@ -402,8 +399,7 @@ final class RerollTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Catch target 4+. Roll 3=fail, team reroll 5=success
         $dice = new FixedDiceRoller([3, 5]);

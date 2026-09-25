@@ -37,13 +37,13 @@ final class BlitzOutOfReachTest extends TestCase
         // SEBEKONTROLA FIXTURY: na cíl se OPRAVDU nedá dosáhnout. Bez tohohle
         // tvrzení by test prošel i nad stavem, kde blitz normálně vyjde --
         // a neměřil by nic.
-        $att = $state->getPlayer(1);
-        $def = $state->getPlayer(2);
+        $att = $state->requirePlayer(1);
+        $def = $state->requirePlayer(2);
         $this->assertNotNull($att->getPosition());
         $this->assertNotNull($def->getPosition());
         $this->assertGreaterThan(
             $att->getStats()->getMovement() + 2,          // +2 = maximum GFI
-            $att->getPosition()->distanceTo($def->getPosition()) - 1,
+            $att->requirePosition()->distanceTo($def->requirePosition()) - 1,
             'fixtura je vadná: cíl je v dosahu, do opravované větve se nedojde',
         );
 
@@ -59,11 +59,11 @@ final class BlitzOutOfReachTest extends TestCase
         $this->assertFalse($result->isTurnover());
 
         // A hráč se má PŘIBLÍŽIT, ne stát -- v tom je celý smysl deklarace.
-        $after = $result->getNewState()->getPlayer(1);
+        $after = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($after->getPosition());
         $this->assertLessThan(
-            $att->getPosition()->distanceTo($def->getPosition()),
-            $after->getPosition()->distanceTo($def->getPosition()),
+            $att->requirePosition()->distanceTo($def->requirePosition()),
+            $after->requirePosition()->distanceTo($def->requirePosition()),
             'hráč se k cíli nepřiblížil',
         );
 
@@ -99,9 +99,9 @@ final class BlitzOutOfReachTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(5, $result->getNewState()->getPlayer(1)->getPosition()->getX(),
+        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
             'nemá se kam hnout, tak se hnout nemá');
-        $this->assertSame(7, $result->getNewState()->getPlayer(1)->getPosition()->getY());
+        $this->assertSame(7, $result->getNewState()->requirePlayer(1)->requirePosition()->getY());
     }
 
     /**
@@ -125,10 +125,10 @@ final class BlitzOutOfReachTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: ten soused Tentacles OPRAVDU má a stojí
         // v cestě -- jinak se do opravované větve nedojde.
-        $this->assertTrue($state->getPlayer(3)->hasSkill(SkillName::Tentacles),
+        $this->assertTrue($state->requirePlayer(3)->hasSkill(SkillName::Tentacles),
             'fixtura je vadná: nikdo nemá Tentacles');
-        $this->assertSame(1, $state->getPlayer(1)->getPosition()
-            ->distanceTo($state->getPlayer(3)->getPosition()),
+        $this->assertSame(1, $state->requirePlayer(1)->requirePosition()
+            ->distanceTo($state->requirePlayer(3)->requirePosition()),
             'fixtura je vadná: chapadla nejsou v kontaktu, nezaberou');
 
         // Nízké hody -> únik z chapadel se nepovede.
@@ -158,11 +158,11 @@ final class BlitzOutOfReachTest extends TestCase
             ->build();
 
         // SEBEKONTROLA: cíl je mimo dosah (MA6 + 2 GFI = 8 < 15-1).
-        $att = $state->getPlayer(1);
-        $def = $state->getPlayer(2);
+        $att = $state->requirePlayer(1);
+        $def = $state->requirePlayer(2);
         $this->assertGreaterThan(
             $att->getStats()->getMovement() + 2,
-            $att->getPosition()->distanceTo($def->getPosition()) - 1,
+            $att->requirePosition()->distanceTo($def->requirePosition()) - 1,
             'fixtura je vadná: cíl je v dosahu',
         );
 
@@ -176,10 +176,10 @@ final class BlitzOutOfReachTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $after = $result->getNewState()->getPlayer(1);
+        $after = $result->getNewState()->requirePlayer(1);
         $this->assertLessThan(
-            $att->getPosition()->distanceTo($def->getPosition()),
-            $after->getPosition()->distanceTo($def->getPosition()),
+            $att->requirePosition()->distanceTo($def->requirePosition()),
+            $after->requirePosition()->distanceTo($def->requirePosition()),
             'Rat Ogre se na dvojce pohnout MĚL -- kvůli tomu se blitz vyhlašuje',
         );
     }
@@ -206,7 +206,7 @@ final class BlitzOutOfReachTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wild_animal', $types);
-        $this->assertSame(5, $result->getNewState()->getPlayer(1)->getPosition()->getX(),
+        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
             'na jedničce se hráč hnout NESMÍ');
     }
 }

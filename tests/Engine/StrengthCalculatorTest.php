@@ -25,8 +25,7 @@ final class StrengthCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $eff = $this->calc->calculateEffectiveStrength($state, $player, new Position(6, 5));
         $this->assertSame(3, $eff);
     }
@@ -39,13 +38,11 @@ final class StrengthCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
             ->build();
 
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(1, $assists);
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $eff = $this->calc->calculateEffectiveStrength($state, $player, new Position(6, 5));
         $this->assertSame(4, $eff);
     }
@@ -59,8 +56,7 @@ final class StrengthCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
             ->build();
 
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(2, $assists);
     }
@@ -75,8 +71,7 @@ final class StrengthCalculatorTest extends TestCase
             ->build();
 
         // Player 3 is in TZ of enemy 4, so cannot assist
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(0, $assists);
     }
@@ -91,8 +86,7 @@ final class StrengthCalculatorTest extends TestCase
             ->build();
 
         // Player 3 has Guard, so TZ doesn't block the assist
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(1, $assists);
     }
@@ -105,8 +99,7 @@ final class StrengthCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
             ->build();
 
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(0, $assists);
     }
@@ -119,8 +112,7 @@ final class StrengthCalculatorTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, id: 2)
             ->build();
 
-        $blocker = $state->getPlayer(1);
-        $this->assertNotNull($blocker);
+        $blocker = $state->requirePlayer(1);
         $assists = $this->calc->countAssists($state, $blocker, new Position(6, 5));
         $this->assertSame(0, $assists);
     }

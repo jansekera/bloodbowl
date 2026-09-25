@@ -111,7 +111,7 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
             ->build();
         // MOVE se nabízí podle `canMove()` (tj. `hasMoved`), ostatní podle
         // `canAct()` (tj. `hasActed`) -- musí se nastavit OBOJÍ.
-        $state = $state->withPlayer($state->getPlayer(1)->withHasActed(true)->withHasMoved(true));
+        $state = $state->withPlayer($state->requirePlayer(1)->withHasActed(true)->withHasMoved(true));
 
         $rules = new RulesEngine();
         $offered = $rules->getAvailableActions($state);

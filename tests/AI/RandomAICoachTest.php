@@ -41,8 +41,7 @@ final class RandomAICoachTest extends TestCase
         $builder->addPlayer(TeamSide::AWAY, 20, 10, id: 2);
         $state = $builder->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withHasMoved(true)->withHasActed(true));
 
         $decision = $this->ai->decideAction($state, $this->rules);
@@ -121,8 +120,7 @@ final class RandomAICoachTest extends TestCase
 
         $losCount = 0;
         foreach ($newState->getPlayersOnPitch(TeamSide::HOME) as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             if ($pos->getX() === 12) {
                 $losCount++;
             }
@@ -145,8 +143,7 @@ final class RandomAICoachTest extends TestCase
         $topWide = 0;
         $bottomWide = 0;
         foreach ($newState->getPlayersOnPitch(TeamSide::AWAY) as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             $y = $pos->getY();
             if ($y < 4) {
                 $topWide++;
@@ -172,8 +169,7 @@ final class RandomAICoachTest extends TestCase
         $newState = $this->ai->setupFormation($state, TeamSide::HOME);
 
         foreach ($newState->getPlayersOnPitch(TeamSide::HOME) as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             $this->assertLessThanOrEqual(12, $pos->getX(), 'Home players must be on left half');
         }
     }

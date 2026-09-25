@@ -29,7 +29,7 @@ final class KoRecoveryAfterTouchdownTest extends TestCase
             ->addPlayer(TeamSide::HOME, 6, 5, id: 3)
             ->build();
 
-        return $s->withPlayer($s->getPlayer(3)->withState(PlayerState::KO)->withPosition(null));
+        return $s->withPlayer($s->requirePlayer(3)->withState(PlayerState::KO)->withPosition(null));
     }
 
     public function testPoTouchdownuSeHaziNaNavratKoHracu(): void
@@ -38,14 +38,14 @@ final class KoRecoveryAfterTouchdownTest extends TestCase
 
         $typy = array_map(static fn($e) => $e->getType(), $r['events']);
         $this->assertContains('ko_recovery', $typy, 'po touchdownu se hazi na navrat KO hracu');
-        $this->assertSame(PlayerState::OFF_PITCH, $r['state']->getPlayer(3)->getState(), 'hod 5 = vraci se do rezerv');
+        $this->assertSame(PlayerState::OFF_PITCH, $r['state']->requirePlayer(3)->getState(), 'hod 5 = vraci se do rezerv');
     }
 
     public function testHodTriHraceNevraci(): void
     {
         $r = (new GameFlowResolver(new FixedDiceRoller([3])))->resolvePostTouchdown($this->stavSKo());
 
-        $this->assertSame(PlayerState::KO, $r['state']->getPlayer(3)->getState(), 'hod 3 = zustava v KO');
+        $this->assertSame(PlayerState::KO, $r['state']->requirePlayer(3)->getState(), 'hod 3 = zustava v KO');
     }
 
     public function testPozitivniKontrolaPolocasHaziDal(): void
@@ -55,6 +55,6 @@ final class KoRecoveryAfterTouchdownTest extends TestCase
 
         $typy = array_map(static fn($e) => $e->getType(), $r['events']);
         $this->assertContains('ko_recovery', $typy);
-        $this->assertSame(PlayerState::OFF_PITCH, $r['state']->getPlayer(3)->getState());
+        $this->assertSame(PlayerState::OFF_PITCH, $r['state']->requirePlayer(3)->getState());
     }
 }

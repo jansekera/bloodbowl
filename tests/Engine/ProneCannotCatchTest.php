@@ -31,6 +31,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class ProneCannotCatchTest extends TestCase
 {
+    /**
+     * @param list<int> $rolls
+     */
     private function ballResolver(array $rolls): BallResolver
     {
         $tz = new TacklezoneCalculator();
@@ -46,19 +49,19 @@ final class ProneCannotCatchTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withState(PlayerState::PRONE),
+            $state->requirePlayer(1)->withState(PlayerState::PRONE),
         );
         $state = $state->withBall(BallState::onGround(new Position(5, 7)));
 
         // SEBEKONTROLA: hráč leží, a s AG6 by jinak chytal skoro jistě --
         // takže když nechytí, je to tím pravidlem, ne hodem.
-        $this->assertSame(PlayerState::PRONE, $state->getPlayer(1)->getState());
-        $this->assertSame(6, $state->getPlayer(1)->getStats()->getAgility());
+        $this->assertSame(PlayerState::PRONE, $state->requirePlayer(1)->getState());
+        $this->assertSame(6, $state->requirePlayer(1)->getStats()->getAgility());
 
         // Jediná kostka = směr odrazu. Kdyby se házelo na chycení, spotřebuje
         // se na něj a test spadne na „no more rolls" -- to je tu taky tvrzení.
         $resolver = $this->ballResolver([3]);
-        $result = $resolver->resolveCatch($state, $state->getPlayer(1));
+        $result = $resolver->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertFalse($result['success'], 'ležící chytit NESMÍ (r. 857-858)');
         $this->assertFalse($result['state']->getBall()->isHeld(),
@@ -73,12 +76,12 @@ final class ProneCannotCatchTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withState(PlayerState::STUNNED),
+            $state->requirePlayer(1)->withState(PlayerState::STUNNED),
         );
         $state = $state->withBall(BallState::onGround(new Position(5, 7)));
 
         $resolver = $this->ballResolver([3]);
-        $result = $resolver->resolveCatch($state, $state->getPlayer(1));
+        $result = $resolver->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertFalse($result['success'], 'omráčený chytit NESMÍ (r. 857-858)');
     }
@@ -92,11 +95,11 @@ final class ProneCannotCatchTest extends TestCase
             ->build();
         $state = $state->withBall(BallState::onGround(new Position(5, 7)));
 
-        $this->assertTrue($state->getPlayer(1)->getState()->canAct(),
+        $this->assertTrue($state->requirePlayer(1)->getState()->canAct(),
             'fixtura je vadná: hráč nestojí');
 
         $resolver = $this->ballResolver([6]);
-        $result = $resolver->resolveCatch($state, $state->getPlayer(1));
+        $result = $resolver->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertTrue($result['success'], 'stojící hráč chytat MÁ');
         $this->assertSame(1, $result['state']->getBall()->getCarrierId());
@@ -111,7 +114,7 @@ final class ProneCannotCatchTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withState(PlayerState::PRONE),
+            $state->requirePlayer(1)->withState(PlayerState::PRONE),
         );
 
         // Odraz z (4,7) směrem 3 (dx +1) => na (5,7), kde LEŽÍ hráč 1.
@@ -134,7 +137,7 @@ final class ProneCannotCatchTest extends TestCase
             ->withBallCarried(1)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(2)->withState(PlayerState::PRONE),
+            $state->requirePlayer(2)->withState(PlayerState::PRONE),
         );
         $state = $state->withTeamState(TeamSide::HOME,
             $state->getTeamState(TeamSide::HOME)->withRerollUsed());

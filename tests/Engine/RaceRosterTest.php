@@ -24,6 +24,9 @@ final class RaceRosterTest extends TestCase
         $this->assertCount(11, $players, "Race {$race} should produce exactly 11 players");
     }
 
+    /**
+     * @return list<array{string}>
+     */
     public static function raceProvider(): array
     {
         return [

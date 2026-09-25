@@ -47,8 +47,8 @@ final class BombThrowTest extends TestCase
 
         // Both players should be prone
         $newState = $result->getNewState();
-        $this->assertEquals(PlayerState::PRONE, $newState->getPlayer(2)->getState());
-        $this->assertEquals(PlayerState::PRONE, $newState->getPlayer(3)->getState());
+        $this->assertEquals(PlayerState::PRONE, $newState->requirePlayer(2)->getState());
+        $this->assertEquals(PlayerState::PRONE, $newState->requirePlayer(3)->getState());
     }
 
     /**
@@ -109,7 +109,7 @@ final class BombThrowTest extends TestCase
 
         // Player 2 should be knocked down
         $newState = $result->getNewState();
-        $this->assertEquals(PlayerState::PRONE, $newState->getPlayer(2)->getState());
+        $this->assertEquals(PlayerState::PRONE, $newState->requirePlayer(2)->getState());
     }
 
     /**
@@ -155,7 +155,7 @@ final class BombThrowTest extends TestCase
         ]);
 
         $newState = $result->getNewState();
-        $this->assertEquals(PlayerState::STANDING, $newState->getPlayer(1)->getState());
+        $this->assertEquals(PlayerState::STANDING, $newState->requirePlayer(1)->getState());
     }
 
     /**
@@ -181,6 +181,6 @@ final class BombThrowTest extends TestCase
         ]);
 
         $newState = $result->getNewState();
-        $this->assertEquals(PlayerState::KO, $newState->getPlayer(2)->getState());
+        $this->assertEquals(PlayerState::KO, $newState->requirePlayer(2)->getState());
     }
 }

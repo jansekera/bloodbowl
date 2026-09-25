@@ -36,9 +36,9 @@ final class ThrowTeamMateTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         $newState = $result->getNewState();
-        $landed = $newState->getPlayer(2);
-        $this->assertSame(11, $landed->getPosition()->getX());
-        $this->assertSame(5, $landed->getPosition()->getY());
+        $landed = $newState->requirePlayer(2);
+        $this->assertSame(11, $landed->requirePosition()->getX());
+        $this->assertSame(5, $landed->requirePosition()->getY());
         $this->assertSame(PlayerState::STANDING, $landed->getState());
     }
 
@@ -61,9 +61,9 @@ final class ThrowTeamMateTest extends TestCase
         ]);
 
         $this->assertFalse($result->isTurnover());
-        $landed = $result->getNewState()->getPlayer(2);
+        $landed = $result->getNewState()->requirePlayer(2);
         // Tri pole na vychod od (8,5) → (11,5)
-        $this->assertSame(11, $landed->getPosition()->getX());
+        $this->assertSame(11, $landed->requirePosition()->getX());
     }
 
     public function testFumbleNechaHraceNaJehoPoli(): void
@@ -109,7 +109,7 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
         ]);
 
-        $landed = $result->getNewState()->getPlayer(2);
+        $landed = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $landed->getState());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
@@ -183,8 +183,8 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
         ]);
 
-        $landed = $result->getNewState()->getPlayer(2);
-        $this->assertSame(8, $landed->getPosition()->getX(), 'z obsazeneho (7,5) rozptyl na vychod');
+        $landed = $result->getNewState()->requirePlayer(2);
+        $this->assertSame(8, $landed->requirePosition()->getX(), 'z obsazeneho (7,5) rozptyl na vychod');
     }
 
     public function testOffPitchCrowdSurf(): void
@@ -321,10 +321,9 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
         ]);
 
-        $hozeny = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($hozeny);
+        $hozeny = $result->getNewState()->requirePlayer(2);
         $this->assertSame(6, $hozeny->getPosition()?->getX(), 'r. 8613: fumble = zustava na svem poli');
-        $this->assertSame(7, $hozeny->getPosition()?->getY());
+        $this->assertSame(7, $hozeny->requirePosition()->getY());
     }
 
     public function testNaLongPassSeHazetNESMI(): void
@@ -377,10 +376,9 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
         ]);
 
-        $hozeny = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($hozeny);
+        $hozeny = $result->getNewState()->requirePlayer(2);
         $this->assertSame(11, $hozeny->getPosition()?->getX(), 'tri pole na vychod od ciloveho pole');
-        $this->assertSame(7, $hozeny->getPosition()?->getY());
+        $this->assertSame(7, $hozeny->requirePosition()->getY());
     }
 
     public function testNepresnyHodRozptylujeTakyTrikrat(): void
@@ -397,8 +395,7 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 7,
         ]);
 
-        $hozeny = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($hozeny);
+        $hozeny = $result->getNewState()->requirePlayer(2);
         $this->assertSame(11, $hozeny->getPosition()?->getX());
     }
 

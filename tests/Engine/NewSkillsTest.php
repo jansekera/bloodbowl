@@ -42,7 +42,7 @@ final class NewSkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $pos = $result->getNewState()->getPlayer(1)->getPosition();
+        $pos = $result->getNewState()->requirePlayer(1)->requirePosition();
         $this->assertEquals(10, $pos->getX());
 
         // Verify Sure Feet reroll event
@@ -120,7 +120,8 @@ final class NewSkillsTest extends TestCase
         );
 
         $range = \App\Enum\PassRange::fromDistance(3); // quick pass, modifier +1
-        $target = $passResolver->getAccuracyTarget($state, $state->getPlayer(1), $range);
+        $this->assertNotNull($range);
+        $target = $passResolver->getAccuracyTarget($state, $state->requirePlayer(1), $range);
 
         // Without NervesOfSteel: 7 - 3 + 2(TZ) - 1(quick) = 5
         // With NervesOfSteel: 7 - 3 + 0 - 1(quick) = 3
@@ -142,7 +143,7 @@ final class NewSkillsTest extends TestCase
             new ScatterCalculator(),
         );
 
-        $target = $ballResolver->getCatchTarget($state, $state->getPlayer(1));
+        $target = $ballResolver->getCatchTarget($state, $state->requirePlayer(1));
 
         // Without NervesOfSteel: 7 - 3 + 2 = 6
         // With NervesOfSteel: 7 - 3 + 0 = 4
@@ -168,7 +169,7 @@ final class NewSkillsTest extends TestCase
             new ScatterCalculator(),
         );
 
-        $target = $ballResolver->getPickupTarget($state, $state->getPlayer(1));
+        $target = $ballResolver->getPickupTarget($state, $state->requirePlayer(1));
 
         // 7 - 3 - 1 + 2 (dve souperovy zony) = 5 -- Nerves of Steel na zvedani nepusobi
         $this->assertEquals(5, $target);

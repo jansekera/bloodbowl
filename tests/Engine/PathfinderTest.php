@@ -24,8 +24,7 @@ final class PathfinderTest extends TestCase
             ->build();
 
         // Set player as already moved
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $player = $player->withHasMoved(true);
         $state = $state->withPlayer($player);
 
@@ -39,8 +38,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         // Should include all 8 adjacent squares (among many others)
@@ -61,8 +59,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5) // occupied
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         $this->assertArrayNotHasKey('6,5', $moves);
@@ -75,8 +72,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 6, 5) // friendly occupied
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         $this->assertArrayNotHasKey('6,5', $moves);
@@ -88,8 +84,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 2, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         // Within MA=2, plus 2 GFI squares
@@ -107,8 +102,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 2, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         // Distance 2 (within MA) - no GFI
@@ -134,8 +128,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 5, 4) // adjacent enemy
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         // Moving away from the enemy should require a dodge
@@ -150,8 +143,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         foreach ($moves as $path) {
@@ -165,8 +157,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $path = $this->pathfinder->findPathTo($state, $player, new Position(7, 5));
         $this->assertNotNull($path);
@@ -180,8 +171,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, movement: 1, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $path = $this->pathfinder->findPathTo($state, $player, new Position(20, 10));
         $this->assertNull($path);
@@ -193,8 +183,7 @@ final class PathfinderTest extends TestCase
             ->addPlayer(TeamSide::HOME, 0, 0, movement: 6, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         // Corner position - (0,0) only has 3 adjacent but player can reach more via GFI
@@ -214,8 +203,7 @@ final class PathfinderTest extends TestCase
             ->addPronePlayer(TeamSide::HOME, 5, 5, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         $this->assertNotEmpty($moves);
@@ -233,8 +221,7 @@ final class PathfinderTest extends TestCase
             ->addPronePlayer(TeamSide::HOME, 5, 5, movement: 2, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
         $this->assertEmpty($moves);

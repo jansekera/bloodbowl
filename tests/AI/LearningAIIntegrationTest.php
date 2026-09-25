@@ -131,10 +131,9 @@ final class LearningAIIntegrationTest extends TestCase
         ]);
 
         $this->assertNotNull($result);
-        $player = $result->getPlayer(1);
-        $this->assertNotNull($player);
-        $this->assertSame(11, $player->getPosition()->getX());
-        $this->assertSame(7, $player->getPosition()->getY());
+        $player = $result->requirePlayer(1);
+        $this->assertSame(11, $player->requirePosition()->getX());
+        $this->assertSame(7, $player->requirePosition()->getY());
     }
 
     public function testActionSimulatorBlockReturnsState(): void
@@ -156,7 +155,7 @@ final class LearningAIIntegrationTest extends TestCase
 
         // May succeed or fail based on dice, but should not throw
         // If result is null, that's also acceptable (exception caught)
-        $this->assertTrue($result !== null || true, 'Block simulation should not crash');
+        $this->addToAssertionCount(1); // Block simulation should not crash -- dosli jsme sem bez vyjimky
     }
 
     public function testTrainedWeightsScoreDifferently(): void

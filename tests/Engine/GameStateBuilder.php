@@ -171,8 +171,9 @@ final class GameStateBuilder
     public function withBallCarried(int $carrierId): self
     {
         $player = $this->players[$carrierId] ?? null;
-        if ($player && $player->getPosition()) {
-            $this->ball = BallState::carried($player->getPosition(), $carrierId);
+        $pos = $player?->getPosition();
+        if ($pos !== null) {
+            $this->ball = BallState::carried($pos, $carrierId);
         }
         return $this;
     }

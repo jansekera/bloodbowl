@@ -47,7 +47,11 @@ final class ProSureFeetRulesTest extends TestCase
         return $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(0));
     }
 
-    /** @param list<\App\DTO\GameEvent> $events @return list<array<string, mixed>> */
+    /** @param list<\App\DTO\GameEvent> $events @return list<array<string, mixed>>
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return list<array<string, mixed>>
+     */
     private function proUdalosti(array $events): array
     {
         $out = [];
@@ -75,7 +79,7 @@ final class ProSureFeetRulesTest extends TestCase
         ]);
 
         $this->assertTrue($r->getNewState()->getBall()->isHeld(), 'fixtura: Pro prehoz zvedani probehl');
-        $this->assertTrue($r->getNewState()->getPlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
+        $this->assertTrue($r->getNewState()->requirePlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
     }
 
     public function testProPriChytaniSeZapiseJakoPouzity(): void
@@ -87,10 +91,10 @@ final class ProSureFeetRulesTest extends TestCase
         $dice = new FixedDiceRoller([1, 4, 6]); // chytani 1, Pro 4, prehoz 6
         $ball = new BallResolver($dice, new TacklezoneCalculator(), new ScatterCalculator());
 
-        $r = $ball->resolveCatch($state, $state->getPlayer(1));
+        $r = $ball->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertTrue($r['success'], 'fixtura: Pro prehoz chytani probehl');
-        $this->assertTrue($r['state']->getPlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
+        $this->assertTrue($r['state']->requirePlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
     }
 
     public function testProPriPrihravceSeZapiseJakoPouzity(): void
@@ -106,7 +110,7 @@ final class ProSureFeetRulesTest extends TestCase
             ->resolve($state, ActionType::PASS, ['playerId' => 1, 'targetX' => 9, 'targetY' => 5]);
 
         $this->assertCount(1, $this->proUdalosti($r->getEvents()), 'fixtura: Pro se pouzil');
-        $this->assertTrue($r->getNewState()->getPlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
+        $this->assertTrue($r->getNewState()->requirePlayer(1)->isProUsedThisTurn(), 'r. 8381: Pro 1x za kolo');
     }
 
     // ================= Pro: kostka nejvys 1x prehozena (po skill prehozu uz ne) =================
@@ -137,7 +141,7 @@ final class ProSureFeetRulesTest extends TestCase
         $dice = new FixedDiceRoller([1, 1, 4, 6, 4, 4, 4]);
         $ball = new BallResolver($dice, new TacklezoneCalculator(), new ScatterCalculator());
 
-        $r = $ball->resolveCatch($state, $state->getPlayer(1));
+        $r = $ball->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertSame([], $this->proUdalosti($r['events']), 'r. 926: kostka nejvys 1x prehozena');
         $this->assertFalse($r['success']);
@@ -255,7 +259,7 @@ final class ProSureFeetRulesTest extends TestCase
         ]);
 
         $this->assertTrue($r->isSuccess());
-        $this->assertSame(8, $r->getNewState()->getPlayer(1)->getPosition()->getY());
+        $this->assertSame(8, $r->getNewState()->requirePlayer(1)->requirePosition()->getY());
     }
 
     public function testInteraktivnePoUspesnemProNeniNabidnutTymovyPrehoz(): void
@@ -283,11 +287,11 @@ final class ProSureFeetRulesTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::Pro], id: 1)
             ->build();
-        $state = $state->withPlayer($state->getPlayer(1)->withProUsedThisTurn(true));
+        $state = $state->withPlayer($state->requirePlayer(1)->withProUsedThisTurn(true));
 
         $souperovo = $state->resetPlayersForNewTurn(TeamSide::AWAY);
 
-        $this->assertFalse($souperovo->getPlayer(1)->isProUsedThisTurn(), 'r. 8381: "once per turn" = kazde kolo');
+        $this->assertFalse($souperovo->requirePlayer(1)->isProUsedThisTurn(), 'r. 8381: "once per turn" = kazde kolo');
     }
 
     // ================= Pro na bloku: prehazuji se VSECHNY kostky =================
@@ -311,7 +315,7 @@ final class ProSureFeetRulesTest extends TestCase
 
         $this->assertSame(
             [BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::DEFENDER_DOWN],
-            $r2->getNewState()->getPendingBlock()->getFaces(),
+            $r2->getNewState()->requirePendingBlock()->getFaces(),
             'r. 919-924: prehoz bloku = vsechny kostky',
         );
     }
@@ -324,7 +328,7 @@ final class ProSureFeetRulesTest extends TestCase
 
         $r2 = $resolver->resolve($r->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'pro']);
 
-        $this->assertFalse($r2->getNewState()->getPendingBlock()->isTeamRerollAvailable(), 'r. 926');
+        $this->assertFalse($r2->getNewState()->requirePendingBlock()->isTeamRerollAvailable(), 'r. 926');
     }
 
     public function testBlokPoTymovemPrehozuNeniPro(): void
@@ -335,7 +339,7 @@ final class ProSureFeetRulesTest extends TestCase
 
         $r2 = $resolver->resolve($r->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'team']);
 
-        $this->assertFalse($r2->getNewState()->getPendingBlock()->isProAvailable(), 'r. 926');
+        $this->assertFalse($r2->getNewState()->requirePendingBlock()->isProAvailable(), 'r. 926');
     }
 
     public function testBlokPoNeuspesnemProTymovyPrehozPrehazujeHodPro(): void
@@ -346,11 +350,11 @@ final class ProSureFeetRulesTest extends TestCase
         $resolver->setInteractiveBlocks(true);
         $r = $resolver->resolve($this->blokState(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'pro']);
-        $this->assertTrue($r2->getNewState()->getPendingBlock()->isTeamRerollAvailable(), 'r. 8387: hod Pro jde prehodit');
+        $this->assertTrue($r2->getNewState()->requirePendingBlock()->isTeamRerollAvailable(), 'r. 8387: hod Pro jde prehodit');
 
         $r3 = $resolver->resolve($r2->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'team']);
 
-        $pending = $r3->getNewState()->getPendingBlock();
+        $pending = $r3->getNewState()->requirePendingBlock();
         $this->assertSame([BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::DEFENDER_DOWN], $pending->getFaces());
         $this->assertFalse($pending->isTeamRerollAvailable());
         $this->assertFalse($pending->isProAvailable());
@@ -384,14 +388,17 @@ final class ProSureFeetRulesTest extends TestCase
             'playerId' => 1, 'x' => 10, 'y' => 7,
         ]);
         $this->assertTrue($r->isSuccess(), 'fixtura: Sure Feet zachranil GFI');
-        $this->assertTrue($r->getNewState()->getPlayer(1)->isSureFeetUsedThisTurn());
+        $this->assertTrue($r->getNewState()->requirePlayer(1)->isSureFeetUsedThisTurn());
 
         $noveKolo = $r->getNewState()->resetPlayersForNewTurn(TeamSide::HOME);
-        $this->assertFalse($noveKolo->getPlayer(1)->isSureFeetUsedThisTurn());
+        $this->assertFalse($noveKolo->requirePlayer(1)->isSureFeetUsedThisTurn());
     }
 
     // ================= Review 18.09.: interaktivni volba musi byt nabidnuta =================
 
+    /**
+     * @param list<SkillName> $skills
+     */
     private function uhybState(array $skills, int $rerolls = 3): GameState
     {
         $s = (new GameStateBuilder())
@@ -409,7 +416,7 @@ final class ProSureFeetRulesTest extends TestCase
         $resolver->setInteractiveRerolls(true);
         $r = $resolver->resolve($this->uhybState([SkillName::Pro]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
-        $this->assertFalse($r2->getNewState()->getPendingReroll()->isProAvailable(), 'fixtura: Pro uz neni nabidnut');
+        $this->assertFalse($r2->getNewState()->requirePendingReroll()->isProAvailable(), 'fixtura: Pro uz neni nabidnut');
 
         $this->expectException(\InvalidArgumentException::class);
         $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
@@ -420,7 +427,7 @@ final class ProSureFeetRulesTest extends TestCase
         $resolver = new ActionResolver(new FixedDiceRoller([2, 5, 6]));
         $resolver->setInteractiveRerolls(true);
         $r = $resolver->resolve($this->uhybState([]), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
-        $this->assertFalse($r->getNewState()->getPendingReroll()->isProAvailable(), 'fixtura: hrac nema Pro');
+        $this->assertFalse($r->getNewState()->requirePendingReroll()->isProAvailable(), 'fixtura: hrac nema Pro');
 
         $this->expectException(\InvalidArgumentException::class);
         $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
@@ -431,7 +438,7 @@ final class ProSureFeetRulesTest extends TestCase
         $resolver = new ActionResolver(new FixedDiceRoller([2, 6]));
         $resolver->setInteractiveRerolls(true);
         $r = $resolver->resolve($this->uhybState([SkillName::Pro], rerolls: 0), ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 6]);
-        $this->assertFalse($r->getNewState()->getPendingReroll()->isTeamRerollAvailable(), 'fixtura: zadny tymovy prehoz');
+        $this->assertFalse($r->getNewState()->requirePendingReroll()->isTeamRerollAvailable(), 'fixtura: zadny tymovy prehoz');
 
         $this->expectException(\InvalidArgumentException::class);
         $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
@@ -462,11 +469,11 @@ final class ProSureFeetRulesTest extends TestCase
         $resolver->setInteractiveRerolls(true);
         $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 10, 'y' => 7]);
         $r2 = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'pro']);
-        $this->assertTrue($r2->getNewState()->getPendingReroll()->isProFailed());
+        $this->assertTrue($r2->getNewState()->requirePendingReroll()->isProFailed());
         $r3 = $resolver->resolve($r2->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
 
         $this->assertTrue($r3->isSuccess());
-        $this->assertSame(10, $r3->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(10, $r3->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     // ================= Review 18.09.: Hail Mary musi zapsat tymovy prehoz =================
@@ -514,7 +521,7 @@ final class ProSureFeetRulesTest extends TestCase
     public function testSerializaceNovychPriznaku(): void
     {
         $s = (new GameStateBuilder())->addPlayer(TeamSide::HOME, 5, 7, id: 1)->build();
-        $p = $s->getPlayer(1)->withSureFeetUsedThisTurn(true);
+        $p = $s->requirePlayer(1)->withSureFeetUsedThisTurn(true);
         $this->assertTrue(MatchPlayerDTO::fromArray($p->toArray())->isSureFeetUsedThisTurn());
 
         $rr = (new PendingRerollDTO('dodge', 1, 3, 2, true, true, 5, 6))->withProFailed();

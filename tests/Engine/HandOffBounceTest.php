@@ -44,7 +44,7 @@ final class HandOffBounceTest extends TestCase
         // tam, kam odraz míří -- jinak test neměří, co má.
         $this->assertSame(1, $state->getBall()->getCarrierId(),
             'fixtura je vadná: míč nenese podávající');
-        $this->assertSame(7, $state->getPlayer(3)->getPosition()->getX(),
+        $this->assertSame(7, $state->requirePlayer(3)->requirePosition()->getX(),
             'fixtura je vadná: spoluhráč nestojí na poli odrazu');
 
         // chycení příjemcem: 1 (neúspěch; reroll je vyčerpaný, viz výš),

@@ -34,9 +34,9 @@ final class ShadowingTest extends TestCase
         $this->assertContains('shadowing', $types);
 
         // Shadower moved to vacated square (5,5)
-        $shadower = $result->getNewState()->getPlayer(2);
-        $this->assertEquals(5, $shadower->getPosition()->getX());
-        $this->assertEquals(5, $shadower->getPosition()->getY());
+        $shadower = $result->getNewState()->requirePlayer(2);
+        $this->assertEquals(5, $shadower->requirePosition()->getX());
+        $this->assertEquals(5, $shadower->requirePosition()->getY());
     }
 
     public function testShadowingFailsOnLowRoll(): void
@@ -57,9 +57,9 @@ final class ShadowingTest extends TestCase
         $this->assertContains('shadowing', $types);
 
         // Shadower stays at original position
-        $shadower = $result->getNewState()->getPlayer(2);
-        $this->assertEquals(6, $shadower->getPosition()->getX());
-        $this->assertEquals(5, $shadower->getPosition()->getY());
+        $shadower = $result->getNewState()->requirePlayer(2);
+        $this->assertEquals(6, $shadower->requirePosition()->getX());
+        $this->assertEquals(5, $shadower->requirePosition()->getY());
     }
 
     public function testShadowingHigherMAHelps(): void
@@ -76,9 +76,9 @@ final class ShadowingTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
 
-        $shadower = $result->getNewState()->getPlayer(2);
-        $this->assertEquals(5, $shadower->getPosition()->getX());
-        $this->assertEquals(5, $shadower->getPosition()->getY());
+        $shadower = $result->getNewState()->requirePlayer(2);
+        $this->assertEquals(5, $shadower->requirePosition()->getX());
+        $this->assertEquals(5, $shadower->requirePosition()->getY());
     }
 
     public function testShadowingLowerMAMakesItHarder(): void
@@ -95,9 +95,9 @@ final class ShadowingTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
 
-        $shadower = $result->getNewState()->getPlayer(2);
-        $this->assertEquals(6, $shadower->getPosition()->getX());
-        $this->assertEquals(5, $shadower->getPosition()->getY());
+        $shadower = $result->getNewState()->requirePlayer(2);
+        $this->assertEquals(6, $shadower->requirePosition()->getX());
+        $this->assertEquals(5, $shadower->requirePosition()->getY());
     }
 
     public function testShadowingDoesNotTriggerOnFailedDodge(): void

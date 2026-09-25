@@ -29,7 +29,7 @@ final class SkillNameTest extends TestCase
 
     public function testTryFromInvalid(): void
     {
-        $this->assertNull(SkillName::tryFrom('Nonexistent'));
+        $this->assertNull(SkillName::tryFrom($this->neplatnyNazev()));
     }
 
     public function testAllCasesExist(): void
@@ -44,5 +44,11 @@ final class SkillNameTest extends TestCase
         $this->assertContains('Sure Feet', $names);
         $this->assertContains('Nerves of Steel', $names);
         $this->assertContains('Pro', $names);
+    }
+
+    /** Nazev jako `string`, ne literal -- jinak PHPStan vysledek `tryFrom` spocita predem. */
+    private function neplatnyNazev(): string
+    {
+        return 'Nonexistent';
     }
 }

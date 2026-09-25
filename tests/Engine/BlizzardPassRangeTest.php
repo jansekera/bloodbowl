@@ -19,7 +19,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class BlizzardPassRangeTest extends TestCase
 {
-    private function stav(Weather $pocasi)
+    private function stav(Weather $pocasi): \App\DTO\GameState
     {
         return (new GameStateBuilder())
             ->withWeather($pocasi)
@@ -34,9 +34,9 @@ final class BlizzardPassRangeTest extends TestCase
     private function dosahy(Weather $pocasi): array
     {
         $s = $this->stav($pocasi);
-        $r = array_unique(array_column((new RulesEngine())->getPassTargets($s, $s->getPlayer(1)), 'range'));
+        $r = array_unique(array_column((new RulesEngine())->getPassTargets($s, $s->requirePlayer(1)), 'range'));
         sort($r);
-        return array_values($r);
+        return $r;
     }
 
     public function testVeVaniciNabizeJenQuickAShort(): void

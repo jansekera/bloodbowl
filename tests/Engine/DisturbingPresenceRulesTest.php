@@ -28,7 +28,7 @@ final class DisturbingPresenceRulesTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 5 + $vzdalenost, 5, skills: [SkillName::DisturbingPresence], id: 2)
             ->build();
-        $s = $s->withPlayer($s->getPlayer(2)->withState($stav));
+        $s = $s->withPlayer($s->requirePlayer(2)->withState($stav));
 
         return (new TacklezoneCalculator())->countDisturbingPresence($s, new Position(5, 5), TeamSide::HOME);
     }

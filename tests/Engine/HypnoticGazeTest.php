@@ -38,7 +38,7 @@ final class HypnoticGazeTest extends TestCase
         $this->assertContains('hypnotic_gaze', $types);
 
         $newState = $result->getNewState();
-        $this->assertTrue($newState->getPlayer(2)->hasLostTacklezones());
+        $this->assertTrue($newState->requirePlayer(2)->hasLostTacklezones());
     }
 
     /**
@@ -73,7 +73,7 @@ final class HypnoticGazeTest extends TestCase
         $this->assertContains('hypnotic_gaze', $types, 'hod se ma ozvat');
         $this->assertNotContains('turnover', $types);
         // Akce se presto VYCERPA -- gaze se dela na konci Move Action.
-        $this->assertTrue($result->getNewState()->getPlayer(1)->hasActed());
+        $this->assertTrue($result->getNewState()->requirePlayer(1)->hasActed());
     }
 
     /**
@@ -101,7 +101,7 @@ final class HypnoticGazeTest extends TestCase
         // dvojka NEUSPEJE -- cil si tacklezony ponecha. (Drive se tu tvrdil
         // turnover; ten sem nikdy nepatril, viz test vys.)
         $this->assertFalse($result->isTurnover());
-        $this->assertFalse($result->getNewState()->getPlayer(2)->hasLostTacklezones(),
+        $this->assertFalse($result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
             'gaze neuspel, cil tacklezony ztratit nesmi');
     }
 
@@ -125,7 +125,7 @@ final class HypnoticGazeTest extends TestCase
         ]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertTrue($result->getNewState()->getPlayer(2)->hasLostTacklezones(),
+        $this->assertTrue($result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
             'trojka pri prahu 3+ uspet MA');
     }
 
@@ -173,7 +173,7 @@ final class HypnoticGazeTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $gazer = $result->getNewState()->getPlayer(1);
+        $gazer = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($gazer->hasActed());
     }
 }

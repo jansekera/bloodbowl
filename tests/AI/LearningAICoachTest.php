@@ -29,7 +29,6 @@ final class LearningAICoachTest extends TestCase
         $decision = $ai->decideAction($state, $rules);
 
         $this->assertInstanceOf(ActionType::class, $decision['action']);
-        $this->assertIsArray($decision['params']);
     }
 
     public function testHighScoreDiffWeightPrefersTouchdown(): void
@@ -153,7 +152,7 @@ final class LearningAICoachTest extends TestCase
             $this->assertSame(2, $decision['params']['targetId'], 'Should blitz sideline target');
         } else {
             // If it chose block instead (adjacent target), that's also valid
-            $this->assertTrue(true);
+            $this->addToAssertionCount(1);
         }
     }
 

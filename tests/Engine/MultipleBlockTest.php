@@ -49,11 +49,11 @@ final class MultipleBlockTest extends TestCase
 
         // Both defenders should be prone
         $newState = $result->getNewState();
-        $this->assertSame(PlayerState::PRONE, $newState->getPlayer(2)->getState());
-        $this->assertSame(PlayerState::PRONE, $newState->getPlayer(3)->getState());
+        $this->assertSame(PlayerState::PRONE, $newState->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $newState->requirePlayer(3)->getState());
 
         // Attacker should be standing and have acted
-        $attacker = $newState->getPlayer(1);
+        $attacker = $newState->requirePlayer(1);
         $this->assertSame(PlayerState::STANDING, $attacker->getState());
         $this->assertTrue($attacker->hasActed());
     }
@@ -128,9 +128,9 @@ final class MultipleBlockTest extends TestCase
         $this->assertFalse($result->isTurnover());
 
         // Attacker should NOT have moved (no follow-up)
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertSame(5, $attacker->getPosition()->getX());
-        $this->assertSame(5, $attacker->getPosition()->getY());
+        $attacker = $result->getNewState()->requirePlayer(1);
+        $this->assertSame(5, $attacker->requirePosition()->getX());
+        $this->assertSame(5, $attacker->requirePosition()->getY());
 
         // No follow-up events
         $followUpEvents = array_filter(
@@ -186,7 +186,7 @@ final class MultipleBlockTest extends TestCase
         $this->assertCount(1, $blockEvents);
 
         // Attacker should be prone
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
     }
 
     /**

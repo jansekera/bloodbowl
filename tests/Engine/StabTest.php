@@ -34,7 +34,7 @@ final class StabTest extends TestCase
         $this->assertContains('injury_roll', $types);
         $this->assertNotContains('block', $types);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $defender->getState());
     }
 
@@ -57,7 +57,7 @@ final class StabTest extends TestCase
         $this->assertContains('armour_roll', $types);
         $this->assertNotContains('injury_roll', $types);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
         $this->assertNotNull($defender->getPosition());
     }
@@ -106,9 +106,9 @@ final class StabTest extends TestCase
         $this->assertNotContains('follow_up', $types);
 
         // Defender stays at same position
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertEquals(6, $defender->getPosition()->getX());
-        $this->assertEquals(5, $defender->getPosition()->getY());
+        $defender = $result->getNewState()->requirePlayer(2);
+        $this->assertEquals(6, $defender->requirePosition()->getX());
+        $this->assertEquals(5, $defender->requirePosition()->getY());
     }
 
     public function testStabBallDropOnInjury(): void
@@ -150,7 +150,7 @@ final class StabTest extends TestCase
         $this->assertNotContains('block', $types);
 
         // Defender untouched
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
     }
 
@@ -166,7 +166,7 @@ final class StabTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($attacker->hasActed());
     }
 }

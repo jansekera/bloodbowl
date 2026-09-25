@@ -94,7 +94,7 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
         // MOVE se nabízí podle `canMove()` (`hasMoved`), ostatní podle
         // `canAct()` (`hasActed`) -- musí se nastavit OBOJÍ.
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
 
         $rules = new RulesEngine();

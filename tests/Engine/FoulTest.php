@@ -42,8 +42,7 @@ final class FoulTest extends TestCase
         $this->assertTrue($foulEvent->getData()['armourBroken']);
 
         // Defender should be stunned from injury
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::STUNNED, $defender->getState());
     }
 
@@ -68,8 +67,7 @@ final class FoulTest extends TestCase
         $this->assertFalse($foulEvent->getData()['armourBroken']);
 
         // Defender stays prone (no injury)
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::PRONE, $defender->getState());
     }
 
@@ -125,13 +123,11 @@ final class FoulTest extends TestCase
         $this->assertTrue($result->isTurnover());
 
         // Defender KO'd
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::KO, $defender->getState());
 
         // Attacker ejected
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::EJECTED, $attacker->getState());
     }
 
@@ -156,8 +152,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $obet = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($obet);
+        $obet = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::KO, $obet->getState(), 'r. 8045-8049: nevyuzity bonus patri na zraneni');
     }
 
@@ -177,8 +172,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $obet = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($obet);
+        $obet = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $obet->getState(), 'bonus se smi uplatnit jen jednou');
     }
 
@@ -195,8 +189,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $obet = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($obet);
+        $obet = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $obet->getState(), 'brneni 8 neni > 8, takze zadne zraneni');
     }
 
@@ -218,8 +211,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::EJECTED, $attacker->getState(), 'r. 1877-1878: dublet na zraneni take vylucuje');
         $this->assertTrue($result->isTurnover(), 'vylouceni faulujiciho je turnover (r. 1879-1881)');
     }
@@ -237,8 +229,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotSame(PlayerState::EJECTED, $attacker->getState(), 'bez dubletu se nevylucuje');
         $this->assertFalse($result->isTurnover());
     }
@@ -258,8 +249,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotSame(PlayerState::EJECTED, $attacker->getState());
     }
 
@@ -352,8 +342,7 @@ final class FoulTest extends TestCase
             ->build();
 
         // Make defender stunned
-        $defender = $state->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $state->requirePlayer(2);
         $state = $state->withPlayer($defender->withState(PlayerState::STUNNED));
 
         // Armor: 5+4 = 9 > 8 → broken. Injury: 3+4 = 7 → stunned.
@@ -380,8 +369,7 @@ final class FoulTest extends TestCase
             ->build();
 
         $rules = new RulesEngine();
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $targets = $rules->getFoulTargets($state, $player);
 
         $this->assertCount(1, $targets);
@@ -437,8 +425,7 @@ final class FoulTest extends TestCase
         $this->assertTrue($result->isTurnover());
 
         // Attacker ejected
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::EJECTED, $attacker->getState());
 
         // Ball should not be held by ejected player
@@ -460,8 +447,7 @@ final class FoulTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($attacker->hasActed());
         $this->assertTrue($attacker->hasMoved());
     }

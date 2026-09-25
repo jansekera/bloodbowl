@@ -38,8 +38,7 @@ final class SkillsTest extends TestCase
         $this->assertFalse($result->isTurnover());
 
         // Defender should be PRONE (Tackle negates Dodge protection)
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
 
@@ -130,8 +129,7 @@ final class SkillsTest extends TestCase
         $this->assertFalse($result->isTurnover());
 
         // Defender should be knocked down from second block
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
 
         // Should have frenzy event
@@ -191,8 +189,7 @@ final class SkillsTest extends TestCase
 
         $this->assertTrue($result->isTurnover());
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::PRONE, $attacker->getState());
     }
 
@@ -218,18 +215,16 @@ final class SkillsTest extends TestCase
         $this->assertTrue($result->isSuccess());
 
         // Defender stays at original position
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(6, $defender->getPosition()->getX());
-        $this->assertSame(5, $defender->getPosition()->getY());
+        $this->assertSame(6, $defender->requirePosition()->getX());
+        $this->assertSame(5, $defender->requirePosition()->getY());
 
         // Attacker stays at original position (no follow-up)
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($attacker->getPosition());
-        $this->assertSame(5, $attacker->getPosition()->getX());
+        $this->assertSame(5, $attacker->requirePosition()->getX());
 
         // No push event
         $pushEvents = array_filter($result->getEvents(), fn($e) => $e->getType() === 'push');
@@ -257,17 +252,15 @@ final class SkillsTest extends TestCase
         $this->assertTrue($result->isSuccess());
 
         // Defender knocked down at original position
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(6, $defender->getPosition()->getX());
+        $this->assertSame(6, $defender->requirePosition()->getX());
 
         // Attacker stays at (5,5) - no follow-up
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($attacker->getPosition());
-        $this->assertSame(5, $attacker->getPosition()->getX());
+        $this->assertSame(5, $attacker->requirePosition()->getX());
     }
 
     public function testStandFirmWithFrenzy(): void
@@ -298,11 +291,10 @@ final class SkillsTest extends TestCase
         $this->assertCount(1, $frenzyEvents);
 
         // Defender knocked down at (6,5) from second block
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(6, $defender->getPosition()->getX());
+        $this->assertSame(6, $defender->requirePosition()->getX());
     }
 
     // === Strip Ball ===
@@ -361,10 +353,9 @@ final class SkillsTest extends TestCase
         $this->assertCount(0, $stripEvents);
 
         // Defender pushed normally
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(7, $defender->getPosition()->getX());
+        $this->assertSame(7, $defender->requirePosition()->getX());
     }
 
     // === Side Step ===
@@ -394,12 +385,11 @@ final class SkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertNotNull($defender->getPosition());
         // Should be at (7,6) - safest square
-        $this->assertSame(7, $defender->getPosition()->getX());
-        $this->assertSame(6, $defender->getPosition()->getY());
+        $this->assertSame(7, $defender->requirePosition()->getX());
+        $this->assertSame(6, $defender->requirePosition()->getY());
     }
 
     public function testWithoutSideStepPicksSmartSquare(): void
@@ -420,11 +410,10 @@ final class SkillsTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertNotNull($defender->getPosition());
         // Smart push: (7,4) and (7,5) both have 1 TZ from player 3; (7,4) is closer to sideline
-        $this->assertSame(7, $defender->getPosition()->getX());
-        $this->assertSame(4, $defender->getPosition()->getY());
+        $this->assertSame(7, $defender->requirePosition()->getX());
+        $this->assertSame(4, $defender->requirePosition()->getY());
     }
 }

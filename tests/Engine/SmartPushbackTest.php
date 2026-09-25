@@ -42,7 +42,7 @@ final class SmartPushbackTest extends TestCase
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
-        $this->assertNull($result->getNewState()->getPlayer(2)->getPosition());
+        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition());
     }
 
     /**
@@ -69,8 +69,7 @@ final class SmartPushbackTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $newState = $result->getNewState();
-        $defPos = $newState->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $newState->requirePlayer(2)->requirePosition();
         // (11,7) has 2 TZs (from player 3 and 4), (11,6) has 2 TZs (from player 3 and 4), (11,8) has 1 TZ (from player 3)
         // Between (11,7) and (11,6) both have 2 TZs → tiebreak by sideline distance
         // (11,7) is min(7, 14-7)=7 from sideline, (11,6) is min(6, 14-6)=6 from sideline
@@ -99,8 +98,7 @@ final class SmartPushbackTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertEquals(11, $defPos->getX());
         $this->assertEquals(2, $defPos->getY());
     }
@@ -150,8 +148,7 @@ final class SmartPushbackTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         // SideStep defender picks FEWEST TZs.
         // All three squares (11,7), (11,6), (11,8) have 1 TZ each from player 3.
         // Equal TZs → SideStep picks first in sort order (no sideline tiebreak in SideStep path).
@@ -177,8 +174,7 @@ final class SmartPushbackTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         // Grab picks most TZs for defender. All 3 squares have 1 TZ from player 3.
         // Grab has no sideline tiebreak, just picks first in TZ order.
         $this->assertEquals(11, $defPos->getX());
@@ -206,8 +202,7 @@ final class SmartPushbackTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('crowd_surf', $types);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertEquals(14, $defPos->getX());
         // No TZs at any square → tiebreak by sideline
         // (14,7)=min(7,7)=7, (14,6)=min(6,8)=6, (14,8)=min(8,6)=6

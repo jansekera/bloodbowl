@@ -73,8 +73,7 @@ final class RulesEngineTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $player = $player->withHasMoved(true);
         $state = $state->withPlayer($player);
 
@@ -189,8 +188,7 @@ final class RulesEngineTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $player = $player->withHasMoved(true);
         $state = $state->withPlayer($player);
 
@@ -285,8 +283,7 @@ final class RulesEngineTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withHasActed(true));
 
         $errors = $this->rules->validate($state, ActionType::BLOCK, [
@@ -358,8 +355,7 @@ final class RulesEngineTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 8, 5, id: 3) // not adjacent
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $targets = $this->rules->getBlockTargets($state, $player);
 

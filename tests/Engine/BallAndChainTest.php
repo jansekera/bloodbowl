@@ -34,8 +34,7 @@ final class BallAndChainTest extends TestCase
         $this->assertFalse($result->isTurnover());
 
         $newState = $result->getNewState();
-        $pos = $newState->getPlayer(1)->getPosition();
-        $this->assertNotNull($pos);
+        $pos = $newState->requirePlayer(1)->requirePosition();
         $this->assertEquals(8, $pos->getX());
         $this->assertEquals(7, $pos->getY());
 
@@ -88,7 +87,7 @@ final class BallAndChainTest extends TestCase
         $this->assertContains('crowd_surf', $types);
 
         $newState = $result->getNewState();
-        $player = $newState->getPlayer(1);
+        $player = $newState->requirePlayer(1);
         $this->assertEquals(PlayerState::KO, $player->getState());
         $this->assertNull($player->getPosition());
     }
@@ -153,7 +152,7 @@ final class BallAndChainTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
 
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed());
         $this->assertTrue($player->hasMoved());
     }

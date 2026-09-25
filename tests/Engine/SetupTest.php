@@ -22,8 +22,7 @@ final class SetupTest extends TestCase
         $builder->addOffPitchPlayer(TeamSide::HOME, id: 1);
 
         $state = $builder->build();
-        $original = $state->getPlayer(1);
-        $this->assertNotNull($original);
+        $original = $state->requirePlayer(1);
         $this->assertSame(PlayerState::OFF_PITCH, $original->getState());
 
         $resolver = new ActionResolver(new FixedDiceRoller([]));
@@ -33,10 +32,8 @@ final class SetupTest extends TestCase
             'y' => 7,
         ]);
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
-        $pos = $player->getPosition();
-        $this->assertNotNull($pos);
+        $player = $result->getNewState()->requirePlayer(1);
+        $pos = $player->requirePosition();
         $this->assertSame(PlayerState::STANDING, $player->getState());
         $this->assertSame(5, $pos->getX());
         $this->assertSame(7, $pos->getY());
@@ -103,8 +100,7 @@ final class SetupTest extends TestCase
 
         $losCount = 0;
         foreach ($newState->getPlayersOnPitch(TeamSide::AWAY) as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             if ($pos->getX() === 13) {
                 $losCount++;
             }
@@ -139,8 +135,7 @@ final class SetupTest extends TestCase
         $topWide = 0;
         $bottomWide = 0;
         foreach ($newState->getPlayersOnPitch(TeamSide::AWAY) as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             $y = $pos->getY();
             if ($y < 4) {
                 $topWide++;
@@ -182,8 +177,7 @@ final class SetupTest extends TestCase
 
         $losCount = 0;
         foreach ($homeOnPitch as $player) {
-            $pos = $player->getPosition();
-            $this->assertNotNull($pos);
+            $pos = $player->requirePosition();
             if ($pos->getX() === 12) {
                 $losCount++;
             }
@@ -207,10 +201,8 @@ final class SetupTest extends TestCase
             'y' => 3,
         ]);
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
-        $pos = $player->getPosition();
-        $this->assertNotNull($pos);
+        $player = $result->getNewState()->requirePlayer(1);
+        $pos = $player->requirePosition();
         $this->assertSame(10, $pos->getX());
         $this->assertSame(3, $pos->getY());
         $this->assertSame(PlayerState::STANDING, $player->getState());
@@ -465,7 +457,7 @@ final class SetupTest extends TestCase
         $builder->withActiveTeam(TeamSide::HOME);
         $builder->addOffPitchPlayer(TeamSide::HOME, id: 1);
         $state = $builder->build();
-        $state = $state->withPlayer($state->getPlayer(1)->withOutNextSetup(true));
+        $state = $state->withPlayer($state->requirePlayer(1)->withOutNextSetup(true));
 
         $errors = (new RulesEngine())->validate($state, ActionType::SETUP_PLAYER, [
             'playerId' => 1, 'x' => 6, 'y' => 7,
@@ -511,18 +503,18 @@ final class SetupTest extends TestCase
         }
 
         $state = $builder->build();
-        $state = $state->withPlayer($state->getPlayer(100)->withOutNextSetup(true));
+        $state = $state->withPlayer($state->requirePlayer(100)->withOutNextSetup(true));
 
         $resolver = new ActionResolver(new FixedDiceRoller([1, 1, 4, 4, 3, 3, 6]));
         $newState = $resolver->resolve($state, ActionType::END_SETUP, [])->getNewState();
 
         // Zkolabovany zustal v rezervach...
-        $this->assertSame(PlayerState::OFF_PITCH, $newState->getPlayer(100)->getState());
+        $this->assertSame(PlayerState::OFF_PITCH, $newState->requirePlayer(100)->getState());
         // ...ale jedenact ostatnich stoji, takze rozestaveni probehlo.
         $this->assertCount(11, $newState->getPlayersOnPitch(TeamSide::AWAY));
         // ...a priznak je spotrebovany, takze priste uz nastoupi.
         $this->assertFalse(
-            $newState->getPlayer(100)->isOutNextSetup(),
+            $newState->requirePlayer(100)->isOutNextSetup(),
             'Priznak musi vydrzet presne jedno rozestaveni',
         );
     }

@@ -39,7 +39,7 @@ final class TakeRootPersistenceTest extends TestCase
         $state = $this->treeman();
 
         // SEBEKONTROLA: zatím zakořeněný není.
-        $this->assertFalse($state->getPlayer(1)->isRooted(),
+        $this->assertFalse($state->requirePlayer(1)->isRooted(),
             'fixtura je vadná: hráč už je zakořeněný');
 
         $resolver = new ActionResolver(new FixedDiceRoller([1]));
@@ -47,13 +47,13 @@ final class TakeRootPersistenceTest extends TestCase
             'playerId' => 1, 'x' => 6, 'y' => 7,
         ]);
 
-        $after = $result->getNewState()->getPlayer(1);
+        $after = $result->getNewState()->requirePlayer(1);
 
         $this->assertTrue($after->isRooted(),
             'zakořenění má přetrvat (r. 8575-8576)');
         $this->assertSame(0, $after->getMovementRemaining(),
             'MA je od té chvíle 0');
-        $this->assertSame(5, $after->getPosition()->getX(),
+        $this->assertSame(5, $after->requirePosition()->getX(),
             'zakořeněný se hnout nesmí');
     }
 
@@ -62,7 +62,7 @@ final class TakeRootPersistenceTest extends TestCase
         // ⭐ Bez tohohle by „přetrvává" znamenalo jen „zapsalo se to" --
         //    test ověřuje, že se stav i ČTE: hod se podruhé nehází.
         $state = $this->treeman();
-        $state = $state->withPlayer($state->getPlayer(1)->withRooted(true));
+        $state = $state->withPlayer($state->requirePlayer(1)->withRooted(true));
 
         // Prázdná kostka: kdyby se hodilo, test spadne na „no more rolls".
         $resolver = new ActionResolver(new FixedDiceRoller([]));
@@ -109,7 +109,7 @@ final class TakeRootPersistenceTest extends TestCase
             ->withBallOffPitch()
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(2)->withState(\App\Enum\PlayerState::PRONE),
+            $state->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE),
         );
 
         $resolver = new ActionResolver(new FixedDiceRoller([1, 3, 3, 3, 3]));

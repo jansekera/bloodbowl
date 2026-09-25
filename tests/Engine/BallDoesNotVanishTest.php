@@ -35,7 +35,7 @@ final class BallDoesNotVanishTest extends TestCase
         $this->assertSame(1, $state->getBall()->getCarrierId());
 
         // Nosiče odstraní zranění: přijde o pozici i o stav na hřišti.
-        $zraneny = $state->getPlayer(1)
+        $zraneny = $state->requirePlayer(1)
             ->withState(PlayerState::INJURED)
             ->withPosition(null);
         $state = $state->withPlayer($zraneny);
@@ -59,7 +59,7 @@ final class BallDoesNotVanishTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 3, id: 2)
             ->withBallCarried(1)
             ->build();
-        $fallen = $state->getPlayer(1)->withState(PlayerState::PRONE);
+        $fallen = $state->requirePlayer(1)->withState(PlayerState::PRONE);
         $state = $state->withPlayer($fallen);
 
         $scatter = new ScatterCalculator();

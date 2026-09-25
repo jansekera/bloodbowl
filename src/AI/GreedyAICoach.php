@@ -504,6 +504,11 @@ final class GreedyAICoach implements AICoachInterface
             if ($enemyPos === null) {
                 continue;
             }
+            // Lezici ani omraceny se blokovat nesmi (`rules_bb2016.txt` r. 540-541);
+            //   `LearningAICoach` je vynechava taky.
+            if ($enemy->getState() !== PlayerState::STANDING) {
+                continue;
+            }
 
             $score = 100;
 

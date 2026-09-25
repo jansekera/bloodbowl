@@ -89,7 +89,7 @@ final class RaceIntegrationTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wild_animal', $types);
         // Player should still be at original position
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed());
     }
 
@@ -135,8 +135,8 @@ final class RaceIntegrationTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertEquals(5, $result->getNewState()->getPlayer(1)->getPosition()->getX());
-        $this->assertEquals(4, $result->getNewState()->getPlayer(1)->getPosition()->getY());
+        $this->assertEquals(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
+        $this->assertEquals(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getY());
     }
 
     public function testUndeadWightBlockRegenBothDown(): void
@@ -159,10 +159,10 @@ final class RaceIntegrationTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         // Attacker should still be standing (Block skill saves from Both Down)
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $attacker->getState());
         // Defender should be prone (knocked down)
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::PRONE, $defender->getState());
     }
 }

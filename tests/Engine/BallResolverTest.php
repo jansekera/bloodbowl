@@ -36,8 +36,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 3 = success
         $dice = new FixedDiceRoller([3]);
@@ -56,8 +55,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 2 = fail, then D8=3 (East) for bounce
         $dice = new FixedDiceRoller([2, 3]);
@@ -66,8 +64,7 @@ final class BallResolverTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertFalse($result['state']->getBall()->isHeld());
         // Ball bounced East to (11, 7)
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(11, $ballPos->getX());
         $this->assertEquals(7, $ballPos->getY());
     }
@@ -80,8 +77,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // First roll 2 = fail, Sure Hands reroll 4 = success
         $dice = new FixedDiceRoller([2, 4]);
@@ -100,8 +96,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 3 = fail (need 4+), then D8=1 bounce N
         $dice = new FixedDiceRoller([3, 1]);
@@ -118,8 +113,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $dice = new FixedDiceRoller([3]);
         $result = $this->resolver($dice)->resolveCatch($state, $player, modifier: 1);
@@ -136,16 +130,14 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 3 = fail, D8=5 bounce S
         $dice = new FixedDiceRoller([3, 5]);
         $result = $this->resolver($dice)->resolveCatch($state, $player);
 
         $this->assertFalse($result['success']);
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(10, $ballPos->getX());
         $this->assertEquals(8, $ballPos->getY());
     }
@@ -158,8 +150,7 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(10, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         // Roll 3 = fail, Catch reroll 5 = success
         $dice = new FixedDiceRoller([3, 5]);
@@ -178,8 +169,7 @@ final class BallResolverTest extends TestCase
 
         // D8=3 (East), ball lands on player 2 at (11,7), catch roll 5 = success (need 4+)
         $dice = new FixedDiceRoller([3, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertTrue($result['state']->getBall()->isHeld());
@@ -201,13 +191,11 @@ final class BallResolverTest extends TestCase
         // catch roll 2 = fail (need 4+)
         // bounce again: D8=3 (East) -> lands at (12,7), empty square
         $dice = new FixedDiceRoller([3, 2, 3]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertFalse($result['state']->getBall()->isHeld());
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(12, $ballPos->getX());
         $this->assertEquals(7, $ballPos->getY());
     }
@@ -228,7 +216,11 @@ final class BallResolverTest extends TestCase
             ->withTeamState(TeamSide::AWAY, $s->getTeamState(TeamSide::AWAY)->withRerolls(0));
     }
 
-    /** @param list<\App\DTO\GameEvent> $events @return list<string> */
+    /** @param list<\App\DTO\GameEvent> $events @return list<string>
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return list<string>
+     */
     private function typy(array $events): array
     {
         return array_map(static fn($e) => $e->getType(), $events);
@@ -245,8 +237,7 @@ final class BallResolverTest extends TestCase
         // D8=3 (vychod) -> mic na hrace 2; chyceni 2 = neuspech (treba 4+);
         // hod Pro 5 = smi prehodit; prehozene chyceni 5 = uspech.
         $dice = new FixedDiceRoller([3, 2, 5, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 8381: Pro smi prehodit i chytani po odskoku');
@@ -268,8 +259,7 @@ final class BallResolverTest extends TestCase
 
         // D8=3 -> hrac 2; chyceni 2 = neuspech; hod Pro 3 = nesmi; odskok D8=3 na (12,7).
         $dice = new FixedDiceRoller([3, 2, 3, 3]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertFalse($result['state']->getBall()->isHeld(), 'neuspesny hod Pro puvodni vysledek nemeni');
@@ -286,8 +276,7 @@ final class BallResolverTest extends TestCase
 
         // D8=3 -> hrac 2; chyceni 2 = neuspech; prehoz z Catch 5 = uspech.
         $dice = new FixedDiceRoller([3, 2, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertTrue($result['state']->getBall()->isHeld());
@@ -309,8 +298,7 @@ final class BallResolverTest extends TestCase
         // D8=3 -> hrac 2; chyceni 2 neuspech; prehoz z Catch 2 taky neuspech;
         // s vadou by ted prislo Pro (5) a chyceni 5 = uspech. Spravne: odskok D8=3.
         $dice = new FixedDiceRoller([3, 2, 2, 5, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertFalse($result['state']->getBall()->isHeld(), 'po prehozu z Catch uz Pro na tutez kostku nesmi');
@@ -336,8 +324,7 @@ final class BallResolverTest extends TestCase
 
         // D8=3 -> mic na hrace 2; chyceni 2 = neuspech; tymovy prehoz: chyceni 5 = uspech.
         $dice = new FixedDiceRoller([3, 2, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 929-933: tymovy prehoz plati i na chytani po odskoku');
@@ -357,8 +344,7 @@ final class BallResolverTest extends TestCase
 
         // D8=3 -> hrac 2; chyceni 2 = neuspech; bez prehozu odskok D8=3 na (12,7).
         $dice = new FixedDiceRoller([3, 2, 3]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertFalse($result['state']->getBall()->isHeld(), 'mimo vlastni kolo se tymovy prehoz pouzit nesmi');
@@ -377,8 +363,7 @@ final class BallResolverTest extends TestCase
         // D8=3 -> hrac 2; chyceni 2 neuspech; hod Pro 2 = nesmi;
         // tymovy prehoz hodu Pro: 5 = smi; prehozene chyceni 5 = uspech.
         $dice = new FixedDiceRoller([3, 2, 2, 5, 5]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertTrue($result['state']->getBall()->isHeld(), 'r. 8387: tymovy prehoz smi prehodit hod Pro');
@@ -394,13 +379,11 @@ final class BallResolverTest extends TestCase
 
         // D8=1 (North) -> ball lands at (10,6), empty
         $dice = new FixedDiceRoller([1]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
         $this->assertFalse($result['state']->getBall()->isHeld());
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(10, $ballPos->getX());
         $this->assertEquals(6, $ballPos->getY());
     }
@@ -416,12 +399,10 @@ final class BallResolverTest extends TestCase
         // Throw-in (r. 868-871): sablona 3 = kolmo (V), 2D6 = 1+2 -> (3,7) na hristi,
         // (hrac 1 na vychozim poli drahu neovlivni); (3,7) prazdne -> odskok 3 (V) -> (4,7)
         $dice = new FixedDiceRoller([7, 3, 1, 2, 3]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertTrue($ballPos->isOnPitch());
         $this->assertEquals(4, $ballPos->getX());
     }
@@ -435,12 +416,10 @@ final class BallResolverTest extends TestCase
 
         // sablona 4 = kolmo (V), 2D6 = 2+2 -> (4,7) prazdne -> odskok 1 (S) -> (4,6)
         $dice = new FixedDiceRoller([4, 2, 2, 1]);
-        $ballPos = $state->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveThrowIn($state, $ballPos, new \App\ValueObject\Position(-1, 7));
 
-        $ballPos = $result['state']->getBall()->getPosition();
-        $this->assertNotNull($ballPos);
+        $ballPos = $result['state']->getBall()->requirePosition();
         $this->assertEquals(4, $ballPos->getX());
         $this->assertEquals(6, $ballPos->getY());
     }
@@ -451,8 +430,7 @@ final class BallResolverTest extends TestCase
             ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, id: 1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $dice = new FixedDiceRoller([]);
         $resolver = $this->resolver($dice);
@@ -468,8 +446,7 @@ final class BallResolverTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 11, 7, id: 10)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $dice = new FixedDiceRoller([]);
         $resolver = $this->resolver($dice);

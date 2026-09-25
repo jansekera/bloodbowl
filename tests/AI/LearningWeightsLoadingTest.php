@@ -20,6 +20,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class LearningWeightsLoadingTest extends TestCase
 {
+    /**
+     * @param array<int|string, mixed> $data
+     */
     private function writeWeights(array $data): string
     {
         $path = sys_get_temp_dir() . '/bb_weights_' . uniqid() . '.json';

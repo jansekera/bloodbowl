@@ -32,11 +32,11 @@ final class FoulAppearanceTest extends TestCase
         $this->assertNotContains('block', $types);
 
         // Attacker marked as acted
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($attacker->hasActed());
 
         // Defender untouched
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
     }
 

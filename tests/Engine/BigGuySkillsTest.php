@@ -36,7 +36,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess()); // not a turnover, just lost action
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasMoved());
         $this->assertTrue($player->hasActed());
         $this->assertTrue($player->hasLostTacklezones());
@@ -61,8 +61,8 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertEquals(6, $player->getPosition()->getX());
+        $player = $result->getNewState()->requirePlayer(1);
+        $this->assertEquals(6, $player->requirePosition()->getX());
         $this->assertFalse($player->hasLostTacklezones());
     }
 
@@ -88,13 +88,13 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $newState = $result->getNewState();
-        $this->assertTrue($newState->getPlayer(1)->hasLostTacklezones());
+        $this->assertTrue($newState->requirePlayer(1)->hasLostTacklezones());
 
         // Nove kolo stav NERUSI -- drzi se pres `bigGuyStupefied`.
         $resetState = $newState->resetPlayersForNewTurn(TeamSide::HOME);
-        $this->assertTrue($resetState->getPlayer(1)->hasLostTacklezones(),
+        $this->assertTrue($resetState->requirePlayer(1)->hasLostTacklezones(),
             'otupení ma prezit hranici kola (r. 7985-7986)');
-        $this->assertTrue($resetState->getPlayer(1)->isBigGuyStupefied());
+        $this->assertTrue($resetState->requirePlayer(1)->isBigGuyStupefied());
     }
 
     public function testBoneHeadLostTzEndsOnASuccessfulRoll(): void
@@ -105,7 +105,7 @@ final class BigGuySkillsTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
         $state = $state->withPlayer(
-            $state->getPlayer(1)->withBigGuyStupefied(true)->withLostTacklezones(true),
+            $state->requirePlayer(1)->withBigGuyStupefied(true)->withLostTacklezones(true),
         );
 
         $resolver = new ActionResolver(new FixedDiceRoller([2]));
@@ -113,7 +113,7 @@ final class BigGuySkillsTest extends TestCase
             'playerId' => 1, 'x' => 6, 'y' => 7,
         ]);
 
-        $after = $result->getNewState()->getPlayer(1);
+        $after = $result->getNewState()->requirePlayer(1);
         $this->assertFalse($after->isBigGuyStupefied(),
             'dvojka stav UKONCUJE (r. 7985-7986)');
         $this->assertFalse($after->hasLostTacklezones());
@@ -127,11 +127,11 @@ final class BigGuySkillsTest extends TestCase
             ->build();
 
         // Manually set lostTacklezones
-        $player = $state->getPlayer(1)->withLostTacklezones(true);
+        $player = $state->requirePlayer(1)->withLostTacklezones(true);
         $state = $state->withPlayer($player);
 
         $tzCalc = new TacklezoneCalculator();
-        $tz = $tzCalc->countTacklezones($state, $state->getPlayer(2)->getPosition(), TeamSide::AWAY);
+        $tz = $tzCalc->countTacklezones($state, $state->requirePlayer(2)->requirePosition(), TeamSide::AWAY);
         $this->assertEquals(0, $tz); // Bone-headed player doesn't exert TZ
     }
 
@@ -154,7 +154,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed());
         $this->assertTrue($player->hasLostTacklezones());
     }
@@ -175,8 +175,8 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertEquals(6, $player->getPosition()->getX());
+        $player = $result->getNewState()->requirePlayer(1);
+        $this->assertEquals(6, $player->requirePosition()->getX());
     }
 
     public function testReallyStupidFailWithAlly(): void
@@ -196,7 +196,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed());
     }
 
@@ -217,7 +217,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertEquals(6, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertEquals(6, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     // === Wild Animal ===
@@ -238,7 +238,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed());
         $this->assertFalse($player->hasLostTacklezones()); // Wild Animal keeps TZ
     }
@@ -262,9 +262,9 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->hasActed(), 'trojka ma akci spalit (r. 8668)');
-        $this->assertEquals(5, $player->getPosition()->getX(), 'a hrac se nesmi hnout');
+        $this->assertEquals(5, $player->requirePosition()->getX(), 'a hrac se nesmi hnout');
         $this->assertFalse($player->hasLostTacklezones()); // Wild Animal keeps TZ
     }
 
@@ -284,7 +284,7 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertEquals(6, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertEquals(6, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     // ⛔ PREPSANO 11.09.2026. Puvodne se jmenoval `...AutoPassBlock` a tvrdil,
@@ -333,7 +333,7 @@ final class BigGuySkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wild_animal', $types, 'jednicka se ma ozvat');
         $this->assertNotContains('block', $types, 'a blok se konat NESMI');
-        $this->assertTrue($result->getNewState()->getPlayer(1)->hasActed());
+        $this->assertTrue($result->getNewState()->requirePlayer(1)->hasActed());
     }
 
     public function testWildAnimalTwoPassesOnBlitzWithTheBonus(): void

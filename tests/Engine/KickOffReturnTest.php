@@ -17,15 +17,6 @@ use PHPUnit\Framework\TestCase;
 
 final class KickOffReturnTest extends TestCase
 {
-    private function createKickoffResolver(array $rolls): KickoffResolver
-    {
-        $dice = new FixedDiceRoller($rolls);
-        $scatterCalc = new ScatterCalculator();
-        $tzCalc = new TacklezoneCalculator();
-        $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        return new KickoffResolver($dice, $scatterCalc, $ballResolver);
-    }
-
     public function testKickOffReturnMovesTowardBall(): void
     {
         // KOR player at (3,7), ball lands at (6,7) — player should move 3 squares toward ball
@@ -56,9 +47,9 @@ final class KickOffReturnTest extends TestCase
         $this->assertContains('kick_off_return', $types);
 
         // Player 1 should have moved closer to (6,7)
-        $player = $result['state']->getPlayer(1);
+        $player = $result['state']->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
-        $this->assertLessThanOrEqual(3, abs($player->getPosition()->getX() - 3));
+        $this->assertLessThanOrEqual(3, abs($player->requirePosition()->getX() - 3));
     }
 
     public function testNoKickOffReturnPlayerNoMovement(): void
@@ -115,7 +106,7 @@ final class KickOffReturnTest extends TestCase
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
 
         // Player should move at most 1 square toward (6,8)
-        $player = $result['state']->getPlayer(1);
+        $player = $result['state']->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
     }
 
@@ -142,10 +133,10 @@ final class KickOffReturnTest extends TestCase
         $result = $resolver->resolveKickoff($state, new Position(10, 7));
 
         // Player moved from (1,7) toward (11,7), max 3 steps → (4,7)
-        $player = $result['state']->getPlayer(1);
+        $player = $result['state']->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
-        $this->assertEquals(4, $player->getPosition()->getX());
-        $this->assertEquals(7, $player->getPosition()->getY());
+        $this->assertEquals(4, $player->requirePosition()->getX());
+        $this->assertEquals(7, $player->requirePosition()->getY());
     }
 
     public function testKickOffReturnClosestPlayerMoves(): void
@@ -172,10 +163,10 @@ final class KickOffReturnTest extends TestCase
         $result = $resolver->resolveKickoff($state, new Position(10, 7));
 
         // Player 2 (closer at 8,7) should have moved, player 1 (3,7) should not
-        $player1 = $result['state']->getPlayer(1);
-        $player2 = $result['state']->getPlayer(2);
-        $this->assertEquals(3, $player1->getPosition()->getX()); // unchanged
-        $this->assertEquals(11, $player2->getPosition()->getX()); // moved 3 squares: 8→11
+        $player1 = $result['state']->requirePlayer(1);
+        $player2 = $result['state']->requirePlayer(2);
+        $this->assertEquals(3, $player1->requirePosition()->getX()); // unchanged
+        $this->assertEquals(11, $player2->requirePosition()->getX()); // moved 3 squares: 8→11
     }
 
     public function testTouchbackNoKickOffReturn(): void

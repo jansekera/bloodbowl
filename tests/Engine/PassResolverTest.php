@@ -234,8 +234,7 @@ final class PassResolverTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
 
         $resolver = new \App\Engine\PassResolver(
             new FixedDiceRoller([]),

@@ -33,11 +33,10 @@ final class ActionResolverTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
 
-        $movedPlayer = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($movedPlayer);
+        $movedPlayer = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($movedPlayer->getPosition());
-        $this->assertSame(6, $movedPlayer->getPosition()->getX());
-        $this->assertSame(5, $movedPlayer->getPosition()->getY());
+        $this->assertSame(6, $movedPlayer->requirePosition()->getX());
+        $this->assertSame(5, $movedPlayer->requirePosition()->getY());
         $this->assertTrue($movedPlayer->hasMoved());
     }
 
@@ -57,10 +56,9 @@ final class ActionResolverTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
-        $this->assertSame(8, $player->getPosition()->getX());
+        $this->assertSame(8, $player->requirePosition()->getX());
     }
 
     public function testSuccessfulDodge(): void
@@ -114,8 +112,7 @@ final class ActionResolverTest extends TestCase
         $this->assertFalse($result->isSuccess());
         $this->assertTrue($result->isTurnover());
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::PRONE, $player->getState());
     }
 
@@ -158,8 +155,7 @@ final class ActionResolverTest extends TestCase
         $this->assertFalse($result->isSuccess());
         $this->assertTrue($result->isTurnover());
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::PRONE, $player->getState());
     }
 
@@ -183,7 +179,7 @@ final class ActionResolverTest extends TestCase
         $this->assertTrue($ball->isHeld());
         $this->assertSame(1, $ball->getCarrierId());
         $this->assertNotNull($ball->getPosition());
-        $this->assertSame(7, $ball->getPosition()->getX());
+        $this->assertSame(7, $ball->requirePosition()->getX());
     }
 
     public function testBallDropsOnFailedDodge(): void
@@ -234,8 +230,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // Mark home player as moved
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $movedPlayer = $player->withHasMoved(true)->withMovementRemaining(0);
         $state = $state->withPlayer($movedPlayer);
 
@@ -245,8 +240,7 @@ final class ActionResolverTest extends TestCase
         $result = $resolver->resolve($state, ActionType::END_TURN, []);
 
         // Away player should be reset for the new turn
-        $awayPlayer = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($awayPlayer);
+        $awayPlayer = $result->getNewState()->requirePlayer(2);
         $this->assertFalse($awayPlayer->hasMoved());
         $this->assertSame(5, $awayPlayer->getMovementRemaining());
     }
@@ -267,11 +261,10 @@ final class ActionResolverTest extends TestCase
             'y' => 7,
         ]);
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
-        $this->assertSame(10, $player->getPosition()->getX());
-        $this->assertSame(7, $player->getPosition()->getY());
+        $this->assertSame(10, $player->requirePosition()->getX());
+        $this->assertSame(7, $player->requirePosition()->getY());
     }
 
     public function testSetupPlayerRejectsWrongSide(): void
@@ -342,8 +335,7 @@ final class ActionResolverTest extends TestCase
             ->build();
 
         // Make away player stunned
-        $player = $state->getPlayer(2);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(2);
         $stunned = $player->withState(PlayerState::STUNNED);
         $state = $state->withPlayer($stunned);
 
@@ -353,8 +345,7 @@ final class ActionResolverTest extends TestCase
         $result = $resolver->resolve($state, ActionType::END_TURN, []);
 
         // Stunned player should become prone
-        $player = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $player->getState());
     }
 
@@ -380,8 +371,7 @@ final class ActionResolverTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
 
@@ -403,13 +393,12 @@ final class ActionResolverTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState());
         // Defender pushed to (7,4) - smart push picks closest to sideline
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(7, $defender->getPosition()->getX());
-        $this->assertSame(4, $defender->getPosition()->getY());
+        $this->assertSame(7, $defender->requirePosition()->getX());
+        $this->assertSame(4, $defender->requirePosition()->getY());
     }
 
     public function testBlockAttackerFollowsUp(): void
@@ -429,11 +418,10 @@ final class ActionResolverTest extends TestCase
         ]);
 
         // Attacker should follow up to defender's old position (6,5)
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($attacker->getPosition());
-        $this->assertSame(6, $attacker->getPosition()->getX());
-        $this->assertSame(5, $attacker->getPosition()->getY());
+        $this->assertSame(6, $attacker->requirePosition()->getX());
+        $this->assertSame(5, $attacker->requirePosition()->getY());
     }
 
     public function testBlockAttackerDownCausesTurnover(): void
@@ -456,8 +444,7 @@ final class ActionResolverTest extends TestCase
         $this->assertFalse($result->isSuccess());
         $this->assertTrue($result->isTurnover());
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::PRONE, $attacker->getState());
     }
 
@@ -481,10 +468,8 @@ final class ActionResolverTest extends TestCase
 
         $this->assertTrue($result->isTurnover()); // attacker went down
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($attacker);
-        $this->assertNotNull($defender);
+        $attacker = $result->getNewState()->requirePlayer(1);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $attacker->getState());
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
@@ -508,10 +493,8 @@ final class ActionResolverTest extends TestCase
 
         $this->assertFalse($result->isTurnover()); // attacker has Block, stays up
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($attacker);
-        $this->assertNotNull($defender);
+        $attacker = $result->getNewState()->requirePlayer(1);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $attacker->getState());
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
@@ -534,11 +517,10 @@ final class ActionResolverTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STANDING, $defender->getState()); // Dodge prevents knockdown
         $this->assertNotNull($defender->getPosition());
-        $this->assertSame(7, $defender->getPosition()->getX()); // pushed
+        $this->assertSame(7, $defender->requirePosition()->getX()); // pushed
     }
 
     public function testBlockDefenderStumblesWithoutDodge(): void
@@ -558,8 +540,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
 
@@ -584,8 +565,7 @@ final class ActionResolverTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
 
@@ -609,8 +589,7 @@ final class ActionResolverTest extends TestCase
 
         $this->assertTrue($result->isTurnover());
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertSame(PlayerState::PRONE, $attacker->getState());
     }
 
@@ -632,8 +611,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $defender->getState());
 
         // Check events contain armour and injury rolls
@@ -660,8 +638,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::STUNNED, $defender->getState());
     }
 
@@ -761,8 +738,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
-        $this->assertNotNull($defender);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::INJURED, $defender->getState());
     }
 
@@ -799,8 +775,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $attacker = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($attacker);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($attacker->hasActed());
     }
 
@@ -1022,8 +997,7 @@ final class ActionResolverTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $giver = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($giver);
+        $giver = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($giver->hasActed());
     }
 }

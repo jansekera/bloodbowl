@@ -64,7 +64,11 @@ final class DodgeOncePerTurnTest extends TestCase
         return $n;
     }
 
-    /** @param list<\App\DTO\GameEvent> $events @return list<bool> */
+    /** @param list<\App\DTO\GameEvent> $events @return list<bool>
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return list<bool>
+     */
     private function vysledkyUhybu(array $events): array
     {
         $out = [];
@@ -77,8 +81,7 @@ final class DodgeOncePerTurnTest extends TestCase
 
     private function hrac(GameState $s, int $id): MatchPlayerDTO
     {
-        $p = $s->getPlayer($id);
-        $this->assertNotNull($p, "hrac {$id} musi byt ve stavu");
+        $p = $s->requirePlayer($id);
 
         return $p;
     }

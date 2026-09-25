@@ -61,7 +61,7 @@ final class KnockDownDuringMoveTest extends TestCase
         $this->assertContains('armour_roll', $types,
             'hráč byl sražen, ale nehodilo se mu na brnění (r. 496-500)');
         $this->assertTrue($result->isTurnover());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
         $this->assertSame(3, $dice->getRollCount(),
             'čekal jsem dodge (1 hod) + brnění (2 hody)');
     }

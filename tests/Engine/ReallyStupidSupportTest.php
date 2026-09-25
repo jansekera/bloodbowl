@@ -53,13 +53,13 @@ final class ReallyStupidSupportTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        $this->assertTrue($state->getPlayer(3)->getState()->canAct(),
+        $this->assertTrue($state->requirePlayer(3)->getState()->canAct(),
             'fixtura je vadná: soused nestojí');
 
         $result = $this->move($state);
 
         // Cíl pohybu je (5,8) -- úspěch se pozná tím, že tam hráč stojí.
-        $this->assertSame(8, $result->getNewState()->getPlayer(1)->getPosition()->getY(),
+        $this->assertSame(8, $result->getNewState()->requirePlayer(1)->requirePosition()->getY(),
             'trojka s bonusem (práh 2+) projít MĚLA — hráč se měl pohnout');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('really_stupid', $types,
@@ -72,9 +72,9 @@ final class ReallyStupidSupportTest extends TestCase
             ->addPlayer(TeamSide::HOME, 6, 7, id: 3)
             ->withBallOffPitch()
             ->build();
-        $state = $state->withPlayer($state->getPlayer(3)->withState(PlayerState::PRONE));
+        $state = $state->withPlayer($state->requirePlayer(3)->withState(PlayerState::PRONE));
 
-        $this->assertFalse($state->getPlayer(3)->getState()->canAct(),
+        $this->assertFalse($state->requirePlayer(3)->getState()->canAct(),
             'fixtura je vadná: soused pořád stojí');
 
         $result = $this->move($state);
@@ -93,9 +93,9 @@ final class ReallyStupidSupportTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        $this->assertTrue($state->getPlayer(3)->hasSkill(SkillName::ReallyStupid),
+        $this->assertTrue($state->requirePlayer(3)->hasSkill(SkillName::ReallyStupid),
             'fixtura je vadná: soused není Really Stupid');
-        $this->assertTrue($state->getPlayer(3)->getState()->canAct(),
+        $this->assertTrue($state->requirePlayer(3)->getState()->canAct(),
             'fixtura je vadná: soused nestojí, padlo by to z jiného důvodu');
 
         $result = $this->move($state);

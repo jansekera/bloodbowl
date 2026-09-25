@@ -60,6 +60,7 @@ final class EventDispatcherTest extends TestCase
         $event->value = 42;
         $dispatcher->dispatch($event);
 
+        $this->assertSame($event, $received);
         $this->assertSame(42, $received->value);
     }
 
@@ -67,6 +68,6 @@ final class EventDispatcherTest extends TestCase
     {
         $dispatcher = new EventDispatcher();
         $dispatcher->dispatch(new \stdClass());
-        $this->assertTrue(true);
+        $this->addToAssertionCount(1); // dispatch bez posluchacu nespadl
     }
 }

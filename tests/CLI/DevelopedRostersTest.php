@@ -143,6 +143,9 @@ final class DevelopedRostersTest extends TestCase
 
         // Verify IDs are offset for away
         $ids = array_keys($players);
+        if ($ids === []) {
+            $this->fail('soupiska je prázdná');
+        }
         $this->assertEquals(12, min($ids));
     }
 

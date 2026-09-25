@@ -29,7 +29,7 @@ final class TitchyTest extends TestCase
 
         $target = $this->calc->calculateDodgeTarget(
             $state,
-            $state->getPlayer(1),
+            $state->requirePlayer(1),
             new Position(6, 5), // destination with 1 TZ from enemy at (6,6)
             new Position(5, 5), // source
         );
@@ -49,7 +49,7 @@ final class TitchyTest extends TestCase
 
         $target = $this->calc->calculateDodgeTarget(
             $state,
-            $state->getPlayer(1),
+            $state->requirePlayer(1),
             new Position(6, 5),
             new Position(5, 5),
         );
@@ -70,7 +70,7 @@ final class TitchyTest extends TestCase
 
         $target = $this->calc->calculateDodgeTarget(
             $state,
-            $state->getPlayer(1),
+            $state->requirePlayer(1),
             new Position(6, 5), // destination with 1 TZ from Titchy enemy
             new Position(5, 5),
         );
@@ -91,7 +91,7 @@ final class TitchyTest extends TestCase
 
         $target = $this->calc->calculateDodgeTarget(
             $state,
-            $state->getPlayer(1),
+            $state->requirePlayer(1),
             new Position(6, 5), // both enemies adjacent
             new Position(5, 5),
         );
@@ -110,7 +110,7 @@ final class TitchyTest extends TestCase
 
         $target = $this->calc->calculateDodgeTarget(
             $state,
-            $state->getPlayer(1),
+            $state->requirePlayer(1),
             new Position(6, 5),
             new Position(5, 5),
         );

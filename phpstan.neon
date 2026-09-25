@@ -1,5 +1,9 @@
 parameters:
     level: 8
+    # Testy natahuji funkce soupisek z cli/ pres require_once -- PHPStan je musi znat.
+    bootstrapFiles:
+        - cli/race_rosters.php
+        - cli/developed_rosters.php
     paths:
         - src
         - tests

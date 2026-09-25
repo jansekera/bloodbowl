@@ -30,7 +30,7 @@ final class LeapTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(7, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(7, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('leap', $types);
@@ -51,7 +51,7 @@ final class LeapTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5]);
 
         $this->assertTrue($result->isTurnover());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
     }
 
     public function testLeapIgnoresTacklezones(): void
@@ -90,7 +90,7 @@ final class LeapTest extends TestCase
             ->build();
 
         $pathfinder = new Pathfinder();
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // Can reach (7,5) via leap over (6,5). But (9,5) requires going through (8,5).
         // With one leap, can reach (7,5). Then from (7,5), need to go around (8,5).
@@ -108,7 +108,7 @@ final class LeapTest extends TestCase
             ->build();
 
         $pathfinder = new Pathfinder();
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // Can leap to (7,5) costing 2 MA, then move 2 more squares
         $this->assertArrayHasKey('7,5', $moves);
@@ -132,6 +132,6 @@ final class LeapTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(7, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(7, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 }

@@ -33,7 +33,11 @@ final class ThrowInTest extends TestCase
         return new BallResolver($dice, new TacklezoneCalculator(), new ScatterCalculator());
     }
 
-    /** @param list<GameEvent> $events @return list<GameEvent> */
+    /** @param list<GameEvent> $events @return list<GameEvent>
+     *
+     * @param list<\App\DTO\GameEvent> $events
+     * @return list<\App\DTO\GameEvent>
+     */
     private function throwIns(array $events): array
     {
         return array_values(array_filter($events, fn($e) => $e->getType() === 'throw_in'));
@@ -47,7 +51,7 @@ final class ThrowInTest extends TestCase
         $dice = new FixedDiceRoller([3, 2, 3, 5]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7));
 
-        $this->assertEquals(new Position(5, 8), $result['state']->getBall()->getPosition());
+        $this->assertEquals(new Position(5, 8), $result['state']->getBall()->requirePosition());
         $this->assertSame('(5,7)', $this->throwIns($result['events'])[0]->getData()['to']);
         $this->assertFalse($dice->hasRemainingRolls());
     }
@@ -75,7 +79,7 @@ final class ThrowInTest extends TestCase
         $dice = new FixedDiceRoller([3, 1, 2, 3]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 0), new Position(-1, -1));
 
-        $this->assertEquals(new Position(4, 3), $result['state']->getBall()->getPosition());
+        $this->assertEquals(new Position(4, 3), $result['state']->getBall()->requirePosition());
         $this->assertFalse($dice->hasRemainingRolls());
     }
 
@@ -85,13 +89,13 @@ final class ThrowInTest extends TestCase
             ->addPlayer(TeamSide::HOME, 4, 7, id: 1)
             ->withBallOnGround(0, 7)
             ->build();
-        $state = $state->withPlayer($state->getPlayer(1)->withState(PlayerState::PRONE));
+        $state = $state->withPlayer($state->requirePlayer(1)->withState(PlayerState::PRONE));
 
         // sablona 4 = kolmo, 2D6 = 2+2 -> (4,7) lezici hrac -> odskok 3 -> (5,7)
         $dice = new FixedDiceRoller([4, 2, 2, 3]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7));
 
-        $this->assertEquals(new Position(5, 7), $result['state']->getBall()->getPosition());
+        $this->assertEquals(new Position(5, 7), $result['state']->getBall()->requirePosition());
         $this->assertNull($result['state']->getBall()->getCarrierId());
         $this->assertFalse($dice->hasRemainingRolls());
     }
@@ -108,7 +112,7 @@ final class ThrowInTest extends TestCase
         $throwIns = $this->throwIns($result['events']);
         $this->assertCount(2, $throwIns);
         $this->assertSame('(0,10)', $throwIns[1]->getData()['from']);
-        $this->assertEquals(new Position(3, 10), $result['state']->getBall()->getPosition());
+        $this->assertEquals(new Position(3, 10), $result['state']->getBall()->requirePosition());
         $this->assertFalse($dice->hasRemainingRolls());
     }
 
@@ -128,7 +132,7 @@ final class ThrowInTest extends TestCase
         $throwIns = $this->throwIns($result->getEvents());
         $this->assertCount(1, $throwIns, 'r. 659-663: dav mic vhazuje zpet');
         $this->assertSame('(25,5)', $throwIns[0]->getData()['from']);
-        $this->assertEquals(new Position(22, 6), $result->getNewState()->getBall()->getPosition());
+        $this->assertEquals(new Position(22, 6), $result->getNewState()->getBall()->requirePosition());
         $this->assertFalse($dice->hasRemainingRolls());
     }
 
@@ -139,13 +143,13 @@ final class ThrowInTest extends TestCase
             ->addPlayer(TeamSide::HOME, 11, 7, id: 1)
             ->withBallOnGround(10, 7)
             ->build();
-        $state = $state->withPlayer($state->getPlayer(1)->withState(PlayerState::STUNNED));
+        $state = $state->withPlayer($state->requirePlayer(1)->withState(PlayerState::STUNNED));
 
         // odskok 3 (V) na omraceneho (11,7) -> odskok 5 (J) -> (11,8)
         $dice = new FixedDiceRoller([3, 5]);
         $result = $this->resolver($dice)->resolveBounce($state, new Position(10, 7));
 
-        $this->assertEquals(new Position(11, 8), $result['state']->getBall()->getPosition());
+        $this->assertEquals(new Position(11, 8), $result['state']->getBall()->requirePosition());
         $this->assertFalse($dice->hasRemainingRolls());
     }
 }

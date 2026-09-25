@@ -43,7 +43,7 @@ final class Phase12SkillsTest extends TestCase
         // No ejection despite doubles
         $this->assertNotContains('ejection', $types);
         // Attacker still on pitch
-        $this->assertNotNull($result->getNewState()->getPlayer(1)->getPosition());
+        $this->assertNotNull($result->getNewState()->requirePlayer(1)->getPosition());
     }
 
     public function testFendPreventsFollowUp(): void
@@ -63,7 +63,7 @@ final class Phase12SkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         // Attacker should still be at (5,5) — no follow-up
-        $attPos = $result->getNewState()->getPlayer(1)->getPosition();
+        $attPos = $result->getNewState()->requirePlayer(1)->requirePosition();
         $this->assertEquals(5, $attPos->getX());
         $this->assertEquals(5, $attPos->getY());
         // Fend event
@@ -89,7 +89,7 @@ final class Phase12SkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         // Attacker should be at (6,5) — follow-up happened
-        $attPos = $result->getNewState()->getPlayer(1)->getPosition();
+        $attPos = $result->getNewState()->requirePlayer(1)->requirePosition();
         $this->assertEquals(6, $attPos->getX());
         // No fend event (Fend doesn't trigger on knockdown)
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
@@ -120,9 +120,9 @@ final class Phase12SkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('piling_on', $types);
         // Attacker should be prone from Piling On
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
         // Defender stunned from PO reroll
-        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->requirePlayer(2)->getState());
     }
 
     public function testPilingOnAttackerGoesProne(): void
@@ -144,7 +144,7 @@ final class Phase12SkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         // Attacker is prone from Piling On even though armor held
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
     }
 
     public function testDirtyPlayerBonusFoulArmor(): void
@@ -167,7 +167,7 @@ final class Phase12SkillsTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         // Defender should be injured (armor broken from DP bonus)
-        $defState = $result->getNewState()->getPlayer(2)->getState();
+        $defState = $result->getNewState()->requirePlayer(2)->getState();
         $this->assertContains($defState, [PlayerState::STUNNED, PlayerState::KO, PlayerState::INJURED]);
     }
 
@@ -363,7 +363,7 @@ final class Phase12SkillsTest extends TestCase
         $result = $gfr->resolvePostTouchdown($state);
 
         // Secret weapon player should be ejected
-        $sw = $result['state']->getPlayer(1);
+        $sw = $result['state']->requirePlayer(1);
         $this->assertSame(PlayerState::EJECTED, $sw->getState());
         $types = array_map(fn($e) => $e->getType(), $result['events']);
         $this->assertContains('secret_weapon', $types);
@@ -386,7 +386,7 @@ final class Phase12SkillsTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertSame(PlayerState::STANDING, $result->getNewState()->getPlayer(1)->getState());
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(1)->getState());
     }
 
     public function testTakeRootFailCantMove(): void
@@ -409,7 +409,7 @@ final class Phase12SkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('take_root', $types);
         // Player didn't move
-        $pos = $result->getNewState()->getPlayer(1)->getPosition();
+        $pos = $result->getNewState()->requirePlayer(1)->requirePosition();
         $this->assertEquals(5, $pos->getX());
     }
 
@@ -439,7 +439,7 @@ final class Phase12SkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('take_root', $types, 'hod se hazi i u bloku (r. 8573)');
         $this->assertContains('block', $types, 'zakorenení bloku nebrani (r. 8581-8582)');
-        $this->assertTrue($result->getNewState()->getPlayer(1)->isRooted(),
+        $this->assertTrue($result->getNewState()->requirePlayer(1)->isRooted(),
             'zakorenení ma pretrvat (r. 8575-8576)');
     }
 
@@ -458,7 +458,7 @@ final class Phase12SkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertFalse($result->getNewState()->getPlayer(1)->isRooted(),
+        $this->assertFalse($result->getNewState()->requirePlayer(1)->isRooted(),
             'dvojka zakorenit NESMI (r. 8574)');
     }
 

@@ -36,7 +36,7 @@ final class StandPatTest extends TestCase
             ->build();
 
         // SEBEKONTROLA: hráč na začátku opravdu ještě může jednat.
-        $this->assertTrue($state->getPlayer(1)->canAct(),
+        $this->assertTrue($state->requirePlayer(1)->canAct(),
             'fixtura je vadná: hráč už jednal, volba nehrát nemá co ušetřit');
 
         // ⛔ KOSTKA BEZ JEDINÉHO HODU: kdyby se sáhlo na kontrolu před akcí,
@@ -50,7 +50,7 @@ final class StandPatTest extends TestCase
             'neaktivovaný hráč házel -- to je přesně to, co se nesmí');
         $this->assertFalse($result->isTurnover());
 
-        $after = $result->getNewState()->getPlayer(1);
+        $after = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($after->hasActed(), 'hráč zůstal aktivovatelný');
         $this->assertTrue($after->hasMoved(), 'hráč zůstal pohyblivý');
 
@@ -97,7 +97,7 @@ final class StandPatTest extends TestCase
         $this->assertCount(1, $offered($state), 'volba nehrát se vůbec nenabídla');
 
         $done = $state->withPlayer(
-            $state->getPlayer(1)->withHasActed(true)->withHasMoved(true),
+            $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
         $this->assertSame([], $offered($done),
             'volba nehrát se nabízí i hráči, který už jednal');

@@ -85,9 +85,8 @@ final class GameStateTest extends TestCase
         $state = new GameState(1, 1, GamePhase::PLAY, TeamSide::HOME, $home, $away, [1 => $movedPlayer], BallState::offPitch(), false, null);
 
         $resetState = $state->resetPlayersForNewTurn(TeamSide::HOME);
-        $resetPlayer = $resetState->getPlayer(1);
+        $resetPlayer = $resetState->requirePlayer(1);
 
-        $this->assertNotNull($resetPlayer);
         $this->assertFalse($resetPlayer->hasMoved());
         $this->assertFalse($resetPlayer->hasActed());
         $this->assertSame(6, $resetPlayer->getMovementRemaining());
@@ -103,9 +102,8 @@ final class GameStateTest extends TestCase
         $state = new GameState(1, 1, GamePhase::PLAY, TeamSide::HOME, $home, $away, [1 => $stunnedPlayer], BallState::offPitch(), false, null);
 
         $resetState = $state->resetPlayersForNewTurn(TeamSide::HOME);
-        $resetPlayer = $resetState->getPlayer(1);
+        $resetPlayer = $resetState->requirePlayer(1);
 
-        $this->assertNotNull($resetPlayer);
         $this->assertSame(PlayerState::PRONE, $resetPlayer->getState());
     }
 

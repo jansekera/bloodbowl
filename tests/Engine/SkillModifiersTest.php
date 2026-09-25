@@ -33,7 +33,7 @@ final class SkillModifiersTest extends TestCase
 
         // Normal dodge from TZ: 7 - 3 = 4+
         // With Prehensile Tail at source: +1 = 5+
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(5, $target);
     }
 
@@ -48,7 +48,7 @@ final class SkillModifiersTest extends TestCase
 
         // Normal: 7 - 3 + 1 (2 TZ at dest, -1 for "free") = 5+
         // +2 Prehensile Tails at source = 7+ → clamped to 6+
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(6, $target);
     }
 
@@ -61,7 +61,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         // Without source position, no Prehensile Tail
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7));
         $this->assertEquals(4, $target);
     }
 
@@ -77,7 +77,7 @@ final class SkillModifiersTest extends TestCase
 
         // Normal dodge: 7 - 3 = 4+
         // Stunty: -1 = 3+
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(3, $target);
     }
 
@@ -98,7 +98,7 @@ final class SkillModifiersTest extends TestCase
         //   moving to"), ne odecitat 1. Pri PRAVE JEDNE zone vyjde obojí stejne,
         //   pri trech uz ne. Engine to ma jako `-1` => samostatny nalez, zatim
         //   NEOPRAVENO (Stunty nema v zadnem rosteru nikdo, takze to nesepne).
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(3, $target);
     }
 
@@ -181,7 +181,7 @@ final class SkillModifiersTest extends TestCase
         //   nemohl spadnout. Big Hand podle r. 7835-7839 plati JEN pro zvedani.
         $ballResolver = new BallResolver(new FixedDiceRoller([]), $tzCalc, new \App\Engine\ScatterCalculator());
         // 7 - 3 + 1 (souperova zona) = 5 -- u chytani se zona pocita dal
-        $this->assertSame(5, $ballResolver->getCatchTarget($state, $state->getPlayer(1)));
+        $this->assertSame(5, $ballResolver->getCatchTarget($state, $state->requirePlayer(1)));
     }
 
     // === Pro ===
@@ -244,7 +244,7 @@ final class SkillModifiersTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertTrue($player->isProUsedThisTurn());
     }
 
@@ -255,12 +255,12 @@ final class SkillModifiersTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1)->withProUsedThisTurn(true);
+        $player = $state->requirePlayer(1)->withProUsedThisTurn(true);
         $state = $state->withPlayer($player);
-        $this->assertTrue($state->getPlayer(1)->isProUsedThisTurn());
+        $this->assertTrue($state->requirePlayer(1)->isProUsedThisTurn());
 
         $resetState = $state->resetPlayersForNewTurn(TeamSide::HOME);
-        $this->assertFalse($resetState->getPlayer(1)->isProUsedThisTurn());
+        $this->assertFalse($resetState->requirePlayer(1)->isProUsedThisTurn());
     }
 
     public function testProDoesNotOverrideSkillReroll(): void
@@ -281,7 +281,7 @@ final class SkillModifiersTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertFalse($result->getNewState()->getPlayer(1)->isProUsedThisTurn());
+        $this->assertFalse($result->getNewState()->requirePlayer(1)->isProUsedThisTurn());
     }
 
     public function testProOnPickup(): void
@@ -317,7 +317,7 @@ final class SkillModifiersTest extends TestCase
 
         // With Jump Up, standing costs 0 MA, so all 4 MA available for movement
         $pathfinder = new Pathfinder(new TacklezoneCalculator());
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // Should reach x=9 (4 squares right) + 2 GFI
         $this->assertArrayHasKey('11,7', $moves);
@@ -332,7 +332,7 @@ final class SkillModifiersTest extends TestCase
 
         // Jump Up allows blocking from prone
         $rules = new RulesEngine(new TacklezoneCalculator(), new Pathfinder(new TacklezoneCalculator()));
-        $targets = $rules->getBlockTargets($state, $state->getPlayer(1));
+        $targets = $rules->getBlockTargets($state, $state->requirePlayer(1));
 
         $this->assertNotEmpty($targets);
         $this->assertEquals(2, $targets[0]->getId());
@@ -346,7 +346,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         $rules = new RulesEngine(new TacklezoneCalculator(), new Pathfinder(new TacklezoneCalculator()));
-        $targets = $rules->getBlockTargets($state, $state->getPlayer(1));
+        $targets = $rules->getBlockTargets($state, $state->requirePlayer(1));
 
         $this->assertEmpty($targets);
     }
@@ -372,7 +372,7 @@ final class SkillModifiersTest extends TestCase
         $this->assertContains('block', $types);
 
         // Attacker should be standing after block
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $attacker->getState());
     }
 
@@ -386,7 +386,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         $pathfinder = new Pathfinder(new TacklezoneCalculator());
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // MA 6 + Sprint 3 GFI = 9 squares max
         $this->assertArrayHasKey('14,7', $moves); // 9 squares right
@@ -401,7 +401,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         $pathfinder = new Pathfinder(new TacklezoneCalculator());
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // MA 6 + 2 GFI = 8 squares max
         $this->assertArrayHasKey('13,7', $moves);
@@ -416,7 +416,7 @@ final class SkillModifiersTest extends TestCase
             ->build();
 
         $pathfinder = new Pathfinder(new TacklezoneCalculator());
-        $moves = $pathfinder->findValidMoves($state, $state->getPlayer(1));
+        $moves = $pathfinder->findValidMoves($state, $state->requirePlayer(1));
 
         // 9 squares right = 3 GFIs
         $path = $moves['14,7'];
@@ -435,7 +435,7 @@ final class SkillModifiersTest extends TestCase
 
         // Normal: 7 - 1 (AG) = 6+
         // Break Tackle: 7 - 5 (ST) = 2+
-        $target = $tzCalc->calculateDodgeTarget($state, $state->getPlayer(1), new Position(6, 7), new Position(5, 7));
+        $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(2, $target);
     }
 

@@ -75,7 +75,7 @@ final class AlwaysHungryTest extends TestCase
         $this->assertNotContains('throw_team_mate', $types);
 
         // Projectile is removed (Injured)
-        $projectile = $result->getNewState()->getPlayer(2);
+        $projectile = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::INJURED, $projectile->getState());
         $this->assertNull($projectile->getPosition());
     }
@@ -106,7 +106,7 @@ final class AlwaysHungryTest extends TestCase
         $this->assertContains('throw_team_mate', $types);
 
         // Projectile survived
-        $projectile = $result->getNewState()->getPlayer(2);
+        $projectile = $result->getNewState()->requirePlayer(2);
         $this->assertNotSame(PlayerState::INJURED, $projectile->getState());
     }
 
@@ -130,7 +130,7 @@ final class AlwaysHungryTest extends TestCase
         ]);
 
         $this->assertFalse($result->isTurnover());
-        $projectile = $result->getNewState()->getPlayer(2);
+        $projectile = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::INJURED, $projectile->getState());
     }
 
@@ -182,7 +182,7 @@ final class AlwaysHungryTest extends TestCase
         $this->assertContains('loner', $types);
         $this->assertContains('always_hungry', $types);
 
-        $projectile = $result->getNewState()->getPlayer(2);
+        $projectile = $result->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::INJURED, $projectile->getState());
     }
 

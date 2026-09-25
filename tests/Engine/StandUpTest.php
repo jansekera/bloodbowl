@@ -30,8 +30,7 @@ final class StandUpTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $player->getState());
         $this->assertTrue($player->hasMoved());
         $this->assertEquals(3, $player->getMovementRemaining()); // 6 - 3 = 3
@@ -60,8 +59,7 @@ final class StandUpTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $player->getState());
         $this->assertEquals(8, $player->getPosition()?->getX());
         $this->assertEquals(7, $player->getPosition()?->getY());
@@ -119,8 +117,7 @@ final class StandUpTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $player->getState());
         $this->assertEquals(0, $player->getMovementRemaining());
 
@@ -151,8 +148,7 @@ final class StandUpTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
 
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::PRONE, $player->getState()); // Still prone
         $this->assertTrue($player->hasMoved()); // Action done
         $this->assertTrue($player->hasActed()); // Can't do anything else
@@ -237,8 +233,7 @@ final class StandUpTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(8, $player->getPosition()?->getX());
     }
 
@@ -273,8 +268,7 @@ final class StandUpTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $player = $result->getNewState()->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(11, $player->getPosition()?->getX());
 
         // No stand_up events

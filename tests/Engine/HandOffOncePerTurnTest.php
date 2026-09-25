@@ -53,7 +53,7 @@ final class HandOffOncePerTurnTest extends TestCase
         // nejednal -- bez toho by druhý hand-off nešel z jiného důvodu.
         $this->assertSame(2, $after->getBall()->getCarrierId(),
             'míč nepřešel, test neměří limit');
-        $this->assertFalse($after->getPlayer(2)->hasActed(),
+        $this->assertFalse($after->requirePlayer(2)->hasActed(),
             'příjemce už jednal -- druhý hand-off by nešel i bez limitu');
 
         $types = array_column($rules->getAvailableActions($after), 'type');

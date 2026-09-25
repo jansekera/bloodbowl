@@ -84,6 +84,22 @@ final class GameState
         return $this->players;
     }
 
+    /** Hrac, ktery ve stavu byt MUSI -- jinak je to chyba volajiciho, ne stav hry. */
+    public function requirePlayer(int $id): MatchPlayerDTO
+    {
+        return $this->getPlayer($id) ?? throw new \LogicException("Player {$id} is not in the game state");
+    }
+
+    public function requirePendingReroll(): PendingRerollDTO
+    {
+        return $this->pendingReroll ?? throw new \LogicException('No pending reroll');
+    }
+
+    public function requirePendingBlock(): PendingBlockDTO
+    {
+        return $this->pendingBlock ?? throw new \LogicException('No pending block');
+    }
+
     public function getPlayer(int $id): ?MatchPlayerDTO
     {
         return $this->players[$id] ?? null;

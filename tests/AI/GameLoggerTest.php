@@ -23,7 +23,7 @@ final class GameLoggerTest extends TestCase
     protected function tearDown(): void
     {
         // Clean up
-        $files = glob($this->tmpDir . '/*');
+        $files = glob($this->tmpDir . '/*') ?: [];
         foreach ($files as $file) {
             unlink($file);
         }
@@ -43,6 +43,7 @@ final class GameLoggerTest extends TestCase
         $logger->close();
 
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertIsArray($lines);
         $this->assertCount(1, $lines);
 
         $record = json_decode($lines[0], true);
@@ -67,6 +68,7 @@ final class GameLoggerTest extends TestCase
         $logger->close();
 
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertIsArray($lines);
         $record = json_decode($lines[0], true);
 
         $this->assertSame('result', $record['type']);
@@ -88,6 +90,7 @@ final class GameLoggerTest extends TestCase
         $logger->close();
 
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertIsArray($lines);
         $record = json_decode($lines[0], true);
 
         $this->assertCount(FeatureExtractor::NUM_FEATURES, $record['features']);
@@ -108,6 +111,7 @@ final class GameLoggerTest extends TestCase
         $logger->close();
 
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $this->assertIsArray($lines);
         $this->assertCount(3, $lines);
     }
 }

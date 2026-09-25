@@ -33,7 +33,7 @@ final class BlitzSurfingTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         // Attacker should end at Y=1 (any X) for surf angle, not at Y=0
-        $attacker = $result->getNewState()->getPlayer(1);
+        $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($attacker->getPosition());
         // After follow-up, attacker moves to defender's old position (10,0)
         // So we check events for the move destination before the block

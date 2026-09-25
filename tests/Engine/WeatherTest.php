@@ -99,7 +99,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
         // 7 - 3 + 0 - 0(short pass modifier) = 4
@@ -118,7 +118,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
         // 7 - 3 + 0 - 0(short pass) + 1(weather) = 5
@@ -141,7 +141,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
         // 7 - 3 + 0 - 0(short pass) = 4 -- dest nema vliv na prihravku
@@ -160,7 +160,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $passResolver->getAccuracyTarget($state, $player, PassRange::SHORT_PASS);
 
         // 7 - 3 + 0 - 0(short pass) = 4 -- Blizzard omezuje DOSAH, ne presnost
@@ -181,7 +181,7 @@ final class WeatherTest extends TestCase
             ->withBallOnGround(5, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getPickupTarget($state, $player);
 
         // 7 - 3 - 1 + 0 = 3
@@ -200,7 +200,7 @@ final class WeatherTest extends TestCase
             ->withBallOnGround(5, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getPickupTarget($state, $player);
 
         // 7 - 3 - 1 + 0 = 3 (no change for Very Sunny)
@@ -219,7 +219,7 @@ final class WeatherTest extends TestCase
             ->withBallOnGround(5, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getPickupTarget($state, $player);
 
         // 7 - 3 - 1 + 0 + 1(weather) = 4
@@ -242,7 +242,7 @@ final class WeatherTest extends TestCase
             ->build();
 
         // 7 - 3 - 1 = 3 -- dest se u Big Hand nepocita
-        $this->assertEquals(3, $ballResolver->getPickupTarget($state, $state->getPlayer(1)));
+        $this->assertEquals(3, $ballResolver->getPickupTarget($state, $state->requirePlayer(1)));
     }
 
     // ⛔ OPRAVENO 15.09.2026: Blizzard zvedani NEOVLIVNUJE (r. 1490-1494).
@@ -258,7 +258,7 @@ final class WeatherTest extends TestCase
             ->withBallOnGround(5, 7)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getPickupTarget($state, $player);
 
         // 7 - 3 - 1 + 0 = 3
@@ -278,7 +278,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getCatchTarget($state, $player);
 
         // 7 - 3 + 0 - 0 = 4
@@ -296,7 +296,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getCatchTarget($state, $player);
 
         // 7 - 3 + 0 - 0 + 1(weather) = 5
@@ -315,7 +315,7 @@ final class WeatherTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->build();
 
-        $player = $state->getPlayer(1);
+        $player = $state->requirePlayer(1);
         $target = $ballResolver->getCatchTarget($state, $player);
 
         // 7 - 3 + 0 - 0 = 4
@@ -451,11 +451,11 @@ final class WeatherTest extends TestCase
         foreach ([1, 2, 3, 4] as $id) {
             $this->assertSame(
                 PlayerState::STANDING,
-                $result['state']->getPlayer($id)->getState(),
+                $result['state']->requirePlayer($id)->getState(),
                 "Hrac {$id} nesmi pri vykopu nikam zmizet",
             );
             $this->assertFalse(
-                $result['state']->getPlayer($id)->isOutNextSetup(),
+                $result['state']->requirePlayer($id)->isOutNextSetup(),
                 "Hraci {$id} se nesmi pri vykopu nastavit priznak heat",
             );
         }
@@ -483,8 +483,8 @@ final class WeatherTest extends TestCase
 
         $result = $resolver->resolveKickoff($state, new Position(6, 5));
 
-        $this->assertEquals(PlayerState::STANDING, $result['state']->getPlayer(1)->getState());
-        $this->assertEquals(PlayerState::STANDING, $result['state']->getPlayer(2)->getState());
+        $this->assertEquals(PlayerState::STANDING, $result['state']->requirePlayer(1)->getState());
+        $this->assertEquals(PlayerState::STANDING, $result['state']->requirePlayer(2)->getState());
     }
 
     /**
@@ -508,12 +508,12 @@ final class WeatherTest extends TestCase
         $flow = new GameFlowResolver($dice);
         $newState = $this->callHeat($flow, $state, $events);
 
-        $this->assertTrue($newState->getPlayer(1)->isOutNextSetup(), 'Hodil 1 => kolabuje');
-        $this->assertSame(PlayerState::STANDING, $newState->getPlayer(1)->getState(),
+        $this->assertTrue($newState->requirePlayer(1)->isOutNextSetup(), 'Hodil 1 => kolabuje');
+        $this->assertSame(PlayerState::STANDING, $newState->requirePlayer(1)->getState(),
             'Kolaps NENI KO -- stav se nemeni, meni se priznak');
 
         foreach ([2, 3, 4] as $id) {
-            $this->assertFalse($newState->getPlayer($id)->isOutNextSetup(),
+            $this->assertFalse($newState->requirePlayer($id)->isOutNextSetup(),
                 "Hrac {$id} hodil 5, nesmi kolabovat");
         }
 
@@ -537,8 +537,8 @@ final class WeatherTest extends TestCase
         $events = [];
         $newState = $this->callHeat(new GameFlowResolver($dice), $state, $events);
 
-        $this->assertFalse($newState->getPlayer(1)->isOutNextSetup());
-        $this->assertFalse($newState->getPlayer(2)->isOutNextSetup());
+        $this->assertFalse($newState->requirePlayer(1)->isOutNextSetup());
+        $this->assertFalse($newState->requirePlayer(2)->isOutNextSetup());
         $this->assertSame([], $events);
     }
 
@@ -548,8 +548,10 @@ final class WeatherTest extends TestCase
      * a meril by pet veci najednou.
      *
      * @param list<\App\DTO\GameEvent> $events
+     *
+     * @param list<\App\DTO\GameEvent> $events
      */
-    private function callHeat(GameFlowResolver $flow, $state, array &$events)
+    private function callHeat(GameFlowResolver $flow, \App\DTO\GameState $state, array &$events): mixed
     {
         $m = new \ReflectionMethod($flow, 'hodyNaSwelteringHeat');
         $m->setAccessible(true);

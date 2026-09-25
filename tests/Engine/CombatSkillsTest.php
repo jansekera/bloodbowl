@@ -30,8 +30,8 @@ final class CombatSkillsTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         $newState = $result->getNewState();
-        $this->assertSame(PlayerState::PRONE, $newState->getPlayer(1)->getState());
-        $this->assertSame(PlayerState::PRONE, $newState->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $newState->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $newState->requirePlayer(2)->getState());
 
         // Check wrestle event, no armor events
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
@@ -53,8 +53,8 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
     }
 
     public function testWrestleBallCarrierCausesBounce(): void
@@ -89,8 +89,8 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(1)->getState());
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
     }
 
     public function testNoWrestleNormalBothDown(): void
@@ -193,20 +193,22 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $newState = $result->getNewState();
-        $this->assertSame(PlayerState::KO, $newState->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::KO, $newState->requirePlayer(2)->getState());
     }
 
     // ========== STEP 3: Grab ==========
 
     public function testGrabChoosesWorstSquareForDefender(): void
     {
-        // Grab: attacker picks square with most enemy TZs for defender
-        // Home player at 5,5. Away defender at 6,5. Push squares: 7,5 (straight), 7,4 and 7,6
-        // Place a home player at 8,4 so 7,4 has a TZ from home for the away defender
+        // Grab: utocnik vybere pole, kde bude obrance v NEJVICE nasich zonach.
+        // Obrance 6,5. Hraci 3 (8,3) a 4 (8,4) davaji na 7,4 DVE zony, na 7,5 jen
+        // jednu, 7,6 zadnou; ostatni volna pole kolem obrance maji nejvys jednu
+        // (od utocnika). => jednoznacne nejhorsi je 7,4 -- a NENI to prime odtlaceni (7,5).
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Grab], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2)
-            ->addPlayer(TeamSide::HOME, 8, 4, id: 3) // creates TZ at 7,4 and 7,5
+            ->addPlayer(TeamSide::HOME, 8, 3, id: 3)
+            ->addPlayer(TeamSide::HOME, 8, 4, id: 4)
             ->withBallOffPitch()
             ->build();
 
@@ -214,10 +216,8 @@ final class CombatSkillsTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $newState = $result->getNewState();
-        $defPos = $newState->getPlayer(2)->getPosition();
-        // 7,5 and 7,4 both have TZ from player 3. Grab picks the one with most TZs.
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
+        $this->assertSame([7, 4], [$defPos->getX(), $defPos->getY()]);
     }
 
     public function testGrabPrefersCrowdSurf(): void
@@ -277,7 +277,7 @@ final class CombatSkillsTest extends TestCase
 
         // Defender stays at original position
         $newState = $result->getNewState();
-        $defPos = $newState->getPlayer(2)->getPosition();
+        $defPos = $newState->requirePlayer(2)->requirePosition();
         $this->assertSame(6, $defPos->getX());
         $this->assertSame(5, $defPos->getY());
     }
@@ -295,7 +295,7 @@ final class CombatSkillsTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         // Smart push: (7,4) is closer to sideline than (7,5) or (7,6)
         $this->assertSame(7, $defPos->getX());
         $this->assertSame(4, $defPos->getY());
@@ -319,7 +319,7 @@ final class CombatSkillsTest extends TestCase
         // Movement ends but NOT a turnover
         $this->assertFalse($result->isTurnover());
         // Player stays at start (didn't move)
-        $this->assertSame(5, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('tentacles', $types);
@@ -339,7 +339,7 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(4, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     public function testTentaclesTiesMoverLoses(): void
@@ -357,7 +357,7 @@ final class CombatSkillsTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         // Player stays at 5,5 (caught)
-        $this->assertSame(5, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     public function testTentaclesStrengthMatters(): void
@@ -374,7 +374,7 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(5, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     public function testNoTentaclesNormalDodge(): void
@@ -391,7 +391,7 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(4, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('tentacles', $types);
@@ -416,7 +416,7 @@ final class CombatSkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('juggernaut', $types);
         // Defender pushed, not knocked down
-        $this->assertSame(PlayerState::STANDING, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
     }
 
     public function testJuggernautNormalBlockNoEffect(): void
@@ -472,7 +472,7 @@ final class CombatSkillsTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         // Defender pushed (standing, but at new position)
-        $this->assertSame(PlayerState::STANDING, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('juggernaut', $types);
     }
@@ -613,9 +613,9 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(4, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
         // DT player is now prone
-        $this->assertSame(PlayerState::PRONE, $result->getNewState()->getPlayer(2)->getState());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('diving_tackle', $types);
@@ -656,7 +656,7 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(4, $result->getNewState()->getPlayer(1)->getPosition()->getX());
+        $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
     public function testPathfinderIncludesDTInDodgeCount(): void
@@ -753,7 +753,7 @@ final class CombatSkillsTest extends TestCase
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
-        $this->assertNull($result->getNewState()->getPlayer(2)->getPosition());
+        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition());
     }
 
     // ========== Juggernaut vs Stand Firm ==========
@@ -774,8 +774,7 @@ final class CombatSkillsTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         // Defender should be pushed despite Stand Firm
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertNotSame(6, $defPos->getX());
     }
 
@@ -794,7 +793,7 @@ final class CombatSkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         // Stand Firm holds — defender stays
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertSame(6, $defPos->getX());
         $this->assertSame(5, $defPos->getY());
     }

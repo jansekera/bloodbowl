@@ -103,8 +103,7 @@ final class GreedyAICoachTest extends TestCase
         $builder->addPlayer(TeamSide::AWAY, 20, 10, id: 2);
         $state = $builder->build();
 
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withHasMoved(true)->withHasActed(true));
 
         $decision = $this->ai->decideAction($state, $this->rules);
@@ -154,16 +153,15 @@ final class GreedyAICoachTest extends TestCase
         $state = $builder->build();
 
         // Mark player as already moved/acted so block/move aren't prioritized
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withHasMoved(true));
 
         $decision = $this->ai->decideAction($state, $this->rules);
 
         // Should choose foul targeting the weaker armour player
-        if ($decision['action'] === ActionType::FOUL) {
-            $this->assertSame(3, $decision['params']['targetId']);
-        }
+        // (lezici cile se blokovat ani blitzovat nesmi -- `rules_bb2016.txt` r. 540-541)
+        $this->assertSame(ActionType::FOUL, $decision['action']);
+        $this->assertSame(3, $decision['params']['targetId']);
     }
 
     public function testBallAndChainPlayerUsesBallAndChainAction(): void
@@ -198,8 +196,7 @@ final class GreedyAICoachTest extends TestCase
         $state = $builder->build();
 
         // Mark player as already moved so gaze is prioritized
-        $player = $state->getPlayer(1);
-        $this->assertNotNull($player);
+        $player = $state->requirePlayer(1);
         $state = $state->withPlayer($player->withHasMoved(true));
 
         $decision = $this->ai->decideAction($state, $this->rules);

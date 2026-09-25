@@ -40,7 +40,7 @@ final class ApothecaryTest extends TestCase
         ]);
 
         // Defender should be stunned (apothecary saved from casualty)
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::STUNNED, $defender->getState());
 
         // Apothecary should be used
@@ -74,7 +74,7 @@ final class ApothecaryTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::INJURED, $defender->getState());
         $this->assertTrue($result->getNewState()->getAwayTeam()->isApothecaryUsed());
     }
@@ -97,7 +97,7 @@ final class ApothecaryTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::KO, $defender->getState());
         // Apothecary NOT used
         $this->assertFalse($result->getNewState()->getAwayTeam()->isApothecaryUsed());
@@ -125,7 +125,7 @@ final class ApothecaryTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::INJURED, $defender->getState());
     }
 
@@ -147,7 +147,7 @@ final class ApothecaryTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $defender = $result->getNewState()->getPlayer(2);
+        $defender = $result->getNewState()->requirePlayer(2);
         $this->assertEquals(PlayerState::KO, $defender->getState());
         $this->assertTrue($result->getNewState()->getAwayTeam()->isApothecaryUsed());
     }

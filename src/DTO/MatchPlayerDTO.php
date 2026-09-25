@@ -99,6 +99,12 @@ final class MatchPlayerDTO
     public function getTeamSide(): TeamSide { return $this->teamSide; }
     public function getState(): PlayerState { return $this->state; }
     public function getPosition(): ?Position { return $this->position; }
+
+    /** Pozice hrace, ktery na hristi byt MUSI. */
+    public function requirePosition(): Position
+    {
+        return $this->position ?? throw new \LogicException("Player {$this->getId()} is not on the pitch");
+    }
     public function hasMoved(): bool { return $this->hasMoved; }
     public function hasActed(): bool { return $this->hasActed; }
     public function getMovementRemaining(): int { return $this->movementRemaining; }

@@ -37,7 +37,7 @@ final class PassSkillNotDoubleCountedTest extends TestCase
     }
 
     /** @param list<SkillName> $skills */
-    private function hazec(array $skills, int $ag)
+    private function hazec(array $skills, int $ag): \App\DTO\GameState
     {
         return (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 10, 7, agility: $ag, skills: $skills, id: 1)
@@ -51,8 +51,8 @@ final class PassSkillNotDoubleCountedTest extends TestCase
         $bez = $this->hazec([], 3);
         $s = $this->hazec([SkillName::Pass], 3);
 
-        $cilBez = $r->getAccuracyTarget($bez, $bez->getPlayer(1), PassRange::SHORT_PASS);
-        $cilS = $r->getAccuracyTarget($s, $s->getPlayer(1), PassRange::SHORT_PASS);
+        $cilBez = $r->getAccuracyTarget($bez, $bez->requirePlayer(1), PassRange::SHORT_PASS);
+        $cilS = $r->getAccuracyTarget($s, $s->requirePlayer(1), PassRange::SHORT_PASS);
 
         $this->assertSame(
             $cilBez,
@@ -71,8 +71,8 @@ final class PassSkillNotDoubleCountedTest extends TestCase
         $s = $this->hazec([SkillName::Accurate], 3);
 
         $this->assertSame(
-            $r->getAccuracyTarget($bez, $bez->getPlayer(1), PassRange::SHORT_PASS) - 1,
-            $r->getAccuracyTarget($s, $s->getPlayer(1), PassRange::SHORT_PASS),
+            $r->getAccuracyTarget($bez, $bez->requirePlayer(1), PassRange::SHORT_PASS) - 1,
+            $r->getAccuracyTarget($s, $s->requirePlayer(1), PassRange::SHORT_PASS),
             'Accurate modifikator je a ma cil snizit o 1',
         );
     }
@@ -84,8 +84,8 @@ final class PassSkillNotDoubleCountedTest extends TestCase
         $ag2 = $this->hazec([], 2);
         $ag4 = $this->hazec([], 4);
 
-        $bomba = $r->getAccuracyTarget($ag2, $ag2->getPlayer(1), PassRange::LONG_BOMB);
-        $quick = $r->getAccuracyTarget($ag4, $ag4->getPlayer(1), PassRange::QUICK_PASS);
+        $bomba = $r->getAccuracyTarget($ag2, $ag2->requirePlayer(1), PassRange::LONG_BOMB);
+        $quick = $r->getAccuracyTarget($ag4, $ag4->requirePlayer(1), PassRange::QUICK_PASS);
 
         $this->assertGreaterThan(
             $quick,

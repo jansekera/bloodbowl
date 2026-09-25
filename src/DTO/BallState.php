@@ -30,6 +30,13 @@ final class BallState
     }
 
     public function getPosition(): ?Position { return $this->position; }
+
+    /** Pozice mice, ktery na hristi byt MUSI. */
+    public function requirePosition(): Position
+    {
+        return $this->getPosition() ?? throw new \LogicException('Ball is not on the pitch');
+    }
+
     public function isHeld(): bool { return $this->isHeld; }
     public function getCarrierId(): ?int { return $this->carrierId; }
 

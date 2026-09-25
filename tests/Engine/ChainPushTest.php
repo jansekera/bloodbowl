@@ -52,13 +52,11 @@ final class ChainPushTest extends TestCase
 
         $newState = $result->getNewState();
         // Defender pushed to (12,7), chain-pushed player 3 moved to (13,7)
-        $defPos = $newState->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $newState->requirePlayer(2)->requirePosition();
         $this->assertEquals(12, $defPos->getX());
         $this->assertEquals(7, $defPos->getY());
 
-        $chainedPos = $newState->getPlayer(3)->getPosition();
-        $this->assertNotNull($chainedPos);
+        $chainedPos = $newState->requirePlayer(3)->requirePosition();
         $this->assertEquals(13, $chainedPos->getX());
         $this->assertEquals(7, $chainedPos->getY());
     }
@@ -116,7 +114,7 @@ final class ChainPushTest extends TestCase
 
         $newState = $result->getNewState();
         // Player 6 pushed off pitch
-        $this->assertNull($newState->getPlayer(6)->getPosition());
+        $this->assertNull($newState->requirePlayer(6)->getPosition());
     }
 
     /**
@@ -145,9 +143,9 @@ final class ChainPushTest extends TestCase
         $this->assertNotContains('chain_push', $types);
 
         $newState = $result->getNewState();
-        $this->assertNull($newState->getPlayer(2)->getPosition());
+        $this->assertNull($newState->requirePlayer(2)->getPosition());
         // All Stand Firm players unmoved
-        $this->assertEquals(7, $newState->getPlayer(3)->getPosition()->getX());
+        $this->assertEquals(7, $newState->requirePlayer(3)->requirePosition()->getX());
     }
 
     /**
@@ -177,11 +175,10 @@ final class ChainPushTest extends TestCase
 
         $newState = $result->getNewState();
         // Defender pushed to (7,6), player 4 chain-pushed away
-        $defPos = $newState->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $newState->requirePlayer(2)->requirePosition();
         // Stand Firm player unmoved
-        $this->assertEquals(7, $newState->getPlayer(3)->getPosition()->getX());
-        $this->assertEquals(7, $newState->getPlayer(3)->getPosition()->getY());
+        $this->assertEquals(7, $newState->requirePlayer(3)->requirePosition()->getX());
+        $this->assertEquals(7, $newState->requirePlayer(3)->requirePosition()->getY());
     }
 
     /**
@@ -239,8 +236,7 @@ final class ChainPushTest extends TestCase
         $this->assertNotContains('crowd_surf', $types);
 
         // Defender should be at one of (12,7), (12,6), (12,8)
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertEquals(12, $defPos->getX());
     }
 
@@ -266,8 +262,7 @@ final class ChainPushTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('chain_push', $types);
 
-        $defPos = $result->getNewState()->getPlayer(2)->getPosition();
-        $this->assertNotNull($defPos);
+        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertEquals(12, $defPos->getX());
         $this->assertEquals(8, $defPos->getY());
     }
@@ -326,8 +321,8 @@ final class ChainPushTest extends TestCase
 
         $newState = $result->getNewState();
         // Defender at (7,7), player 3 at (8,7), player 4 at (9,7)
-        $this->assertEquals(7, $newState->getPlayer(2)->getPosition()->getX());
-        $this->assertEquals(8, $newState->getPlayer(3)->getPosition()->getX());
-        $this->assertEquals(9, $newState->getPlayer(4)->getPosition()->getX());
+        $this->assertEquals(7, $newState->requirePlayer(2)->requirePosition()->getX());
+        $this->assertEquals(8, $newState->requirePlayer(3)->requirePosition()->getX());
+        $this->assertEquals(9, $newState->requirePlayer(4)->requirePosition()->getX());
     }
 }

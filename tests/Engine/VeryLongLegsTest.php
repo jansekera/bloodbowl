@@ -43,10 +43,10 @@ final class VeryLongLegsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('leap', $types);
 
-        $player = $result->getNewState()->getPlayer(1);
+        $player = $result->getNewState()->requirePlayer(1);
         $this->assertNotNull($player->getPosition());
-        $this->assertEquals(7, $player->getPosition()->getX());
-        $this->assertEquals(7, $player->getPosition()->getY());
+        $this->assertEquals(7, $player->requirePosition()->getX());
+        $this->assertEquals(7, $player->requirePosition()->getY());
     }
 
     public function testLeapWithoutVeryLongLegsHigherTarget(): void

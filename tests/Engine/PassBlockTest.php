@@ -38,12 +38,12 @@ final class PassBlockTest extends TestCase
         $this->assertContains('pass_block', $types);
 
         // PB player should have moved closer to (7,5)
-        $pbPlayer = $result->getNewState()->getPlayer(10);
+        $pbPlayer = $result->getNewState()->requirePlayer(10);
         $this->assertNotNull($pbPlayer->getPosition());
         // Original pos (8,3), target (7,5), should move diag toward target
         $this->assertLessThan(
             abs(8 - 7) + abs(3 - 5), // original distance
-            abs($pbPlayer->getPosition()->getX() - 7) + abs($pbPlayer->getPosition()->getY() - 5)
+            abs($pbPlayer->requirePosition()->getX() - 7) + abs($pbPlayer->requirePosition()->getY() - 5)
         );
     }
 
@@ -71,9 +71,9 @@ final class PassBlockTest extends TestCase
         $this->assertNotContains('pass_block', $types);
 
         // PB player unchanged
-        $pbPlayer = $result->getNewState()->getPlayer(10);
-        $this->assertEquals(20, $pbPlayer->getPosition()->getX());
-        $this->assertEquals(12, $pbPlayer->getPosition()->getY());
+        $pbPlayer = $result->getNewState()->requirePlayer(10);
+        $this->assertEquals(20, $pbPlayer->requirePosition()->getX());
+        $this->assertEquals(12, $pbPlayer->requirePosition()->getY());
     }
 
     public function testPassBlockMovesUpToThreeSquares(): void
@@ -102,8 +102,8 @@ final class PassBlockTest extends TestCase
         $this->assertContains('pass_block', $types);
 
         // PB moved at most 3 squares from (5,3) toward (7,10)
-        $pbPlayer = $result->getNewState()->getPlayer(10);
-        $originalDist = max(abs(5 - $pbPlayer->getPosition()->getX()), abs(3 - $pbPlayer->getPosition()->getY()));
+        $pbPlayer = $result->getNewState()->requirePlayer(10);
+        $originalDist = max(abs(5 - $pbPlayer->requirePosition()->getX()), abs(3 - $pbPlayer->requirePosition()->getY()));
         $this->assertLessThanOrEqual(3, $originalDist);
     }
 
@@ -132,9 +132,9 @@ final class PassBlockTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('pass_block', $types);
 
-        $pbPlayer = $result->getNewState()->getPlayer(10);
-        $this->assertEquals(8, $pbPlayer->getPosition()->getX());
-        $this->assertEquals(5, $pbPlayer->getPosition()->getY());
+        $pbPlayer = $result->getNewState()->requirePlayer(10);
+        $this->assertEquals(8, $pbPlayer->requirePosition()->getX());
+        $this->assertEquals(5, $pbPlayer->requirePosition()->getY());
     }
 
     public function testOnlyOnePassBlockPlayerMoves(): void
@@ -167,10 +167,10 @@ final class PassBlockTest extends TestCase
         $this->assertCount(1, $passBlockEvents);
 
         // Player 10 moved, player 11 didn't
-        $pb10 = $result->getNewState()->getPlayer(10);
-        $pb11 = $result->getNewState()->getPlayer(11);
-        $this->assertNotEquals(7, $pb10->getPosition()->getX()); // moved
-        $this->assertEquals(7, $pb11->getPosition()->getX());    // unchanged
+        $pb10 = $result->getNewState()->requirePlayer(10);
+        $pb11 = $result->getNewState()->requirePlayer(11);
+        $this->assertNotEquals(7, $pb10->requirePosition()->getX()); // moved
+        $this->assertEquals(7, $pb11->requirePosition()->getX());    // unchanged
     }
 
     public function testPassBlockWithinThreeOfThrowerQualifies(): void

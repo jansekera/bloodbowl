@@ -60,7 +60,7 @@ final class BlockRerollTest extends TestCase
         $choiceResult = $resolver->resolve($result->getNewState(), ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
 
         $this->assertNull($choiceResult->getNewState()->getPendingBlock());
-        $defender = $choiceResult->getNewState()->getPlayer(2);
+        $defender = $choiceResult->getNewState()->requirePlayer(2);
         $this->assertSame(PlayerState::PRONE, $defender->getState());
     }
 
@@ -77,7 +77,7 @@ final class BlockRerollTest extends TestCase
         $resolver->setInteractiveBlocks(true);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-        $pending = $result->getNewState()->getPendingBlock();
+        $pending = $result->getNewState()->requirePendingBlock();
         $this->assertSame(BlockDiceFace::ATTACKER_DOWN, $pending->getFaces()[0]);
 
         $choiceResult = $resolver->resolve($result->getNewState(), ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
@@ -99,8 +99,8 @@ final class BlockRerollTest extends TestCase
         $resolver->setInteractiveBlocks(true);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-        $this->assertSame(BlockDiceFace::ATTACKER_DOWN, $result->getNewState()->getPendingBlock()->getFaces()[0]);
-        $this->assertTrue($result->getNewState()->getPendingBlock()->isTeamRerollAvailable());
+        $this->assertSame(BlockDiceFace::ATTACKER_DOWN, $result->getNewState()->requirePendingBlock()->getFaces()[0]);
+        $this->assertTrue($result->getNewState()->requirePendingBlock()->isTeamRerollAvailable());
 
         // Use team reroll
         $rerollResult = $resolver->resolve($result->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'team']);
@@ -130,7 +130,7 @@ final class BlockRerollTest extends TestCase
         $resolver->setInteractiveBlocks(true);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-        $this->assertTrue($result->getNewState()->getPendingBlock()->isProAvailable());
+        $this->assertTrue($result->getNewState()->requirePendingBlock()->isProAvailable());
 
         $rerollResult = $resolver->resolve($result->getNewState(), ActionType::REROLL_BLOCK, ['type' => 'pro']);
         $pending = $rerollResult->getNewState()->getPendingBlock();
@@ -290,8 +290,8 @@ final class BlockRerollTest extends TestCase
         $restored = \App\DTO\GameState::fromArray($arr);
 
         $this->assertNotNull($restored->getPendingBlock());
-        $this->assertSame(1, $restored->getPendingBlock()->getAttackerId());
-        $this->assertSame(BlockDiceFace::DEFENDER_DOWN, $restored->getPendingBlock()->getFaces()[0]);
+        $this->assertSame(1, $restored->requirePendingBlock()->getAttackerId());
+        $this->assertSame(BlockDiceFace::DEFENDER_DOWN, $restored->requirePendingBlock()->getFaces()[0]);
     }
 
     // ========== Loner + Team Reroll ==========

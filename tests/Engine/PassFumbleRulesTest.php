@@ -41,6 +41,9 @@ final class PassFumbleRulesTest extends TestCase
         return $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(0));
     }
 
+    /**
+     * @param list<\App\DTO\GameEvent> $events
+     */
     private function prvniVysledekHodu(array $events): ?string
     {
         foreach ($events as $e) {

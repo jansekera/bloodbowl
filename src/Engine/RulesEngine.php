@@ -506,6 +506,10 @@ final class RulesEngine
         if (!$target->getState()->isOnPitch()) {
             return ['Target is not on the pitch'];
         }
+        // Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541).
+        if ($target->getState() !== PlayerState::STANDING) {
+            return ['Can only block a standing player'];
+        }
 
         $playerPos = $player->getPosition();
         $targetPos = $target->getPosition();
@@ -568,6 +572,10 @@ final class RulesEngine
 
         if (!$target->getState()->isOnPitch()) {
             return ['Target is not on the pitch'];
+        }
+        // Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541).
+        if ($target->getState() !== PlayerState::STANDING) {
+            return ['Can only block a standing player'];
         }
 
         return $errors;
