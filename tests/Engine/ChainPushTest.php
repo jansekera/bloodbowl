@@ -57,8 +57,9 @@ final class ChainPushTest extends TestCase
         $this->assertEquals(7, $defPos->getY());
 
         $chainedPos = $newState->requirePlayer(3)->requirePosition();
+        // smer sekundarniho odtlaceni voli tym na tahu -- kterekoli ze tri poli (r. 648-649)
         $this->assertEquals(13, $chainedPos->getX());
-        $this->assertEquals(7, $chainedPos->getY());
+        $this->assertLessThanOrEqual(1, abs($chainedPos->getY() - 7));
     }
 
     /**
@@ -184,7 +185,7 @@ final class ChainPushTest extends TestCase
     /**
      * Ball bounces when chain-pushed carrier moves.
      */
-    public function testChainPushBallBounce(): void
+    public function testChainPushedCarrierKeepsBall(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1) // attacker
@@ -196,18 +197,18 @@ final class ChainPushTest extends TestCase
             ->build();
 
         // 1 die: roll 3 → PUSHED → chain push
-        // Ball bounce: D8 direction = 3 (East)
-        $dice = new FixedDiceRoller([3, 3]);
+        // Odtlaceny nosic mic DRZI -- neni sraženy (r. 635-653); jen Strip Ball blokujiciho ho vyrazi
+        $dice = new FixedDiceRoller([3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('chain_push', $types);
-        $this->assertContains('ball_bounce', $types);
+        $this->assertNotContains('ball_bounce', $types);
 
-        // Ball should no longer be carried by player 3
+        // Mic zustava u hrace 3 i po odtlaceni
         $ball = $result->getNewState()->getBall();
-        $this->assertNotEquals(3, $ball->getCarrierId());
+        $this->assertEquals(3, $ball->getCarrierId());
     }
 
     /**
@@ -324,5 +325,32 @@ final class ChainPushTest extends TestCase
         $this->assertEquals(7, $newState->requirePlayer(2)->requirePosition()->getX());
         $this->assertEquals(8, $newState->requirePlayer(3)->requirePosition()->getX());
         $this->assertEquals(9, $newState->requirePlayer(4)->requirePosition()->getX());
+    }
+
+    /**
+     * Side Step plati i v RETEZU (FAQ: "The coach of the moving team decides all pushback
+     * directions unless the pushed player has the Side Step skill"). Hrac 3 v retezu ma
+     * jedine pole bez nasich zon -- diagonalu (13,6); tym na tahu by jinak vybral pole se zonou.
+     */
+    public function testSideStepAppliesToSecondaryPush(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 11, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 12, 7, skills: [SkillName::SideStep], id: 3)
+            ->addPlayer(TeamSide::AWAY, 12, 6, id: 4)
+            ->addPlayer(TeamSide::AWAY, 12, 8, id: 5)
+            ->addPlayer(TeamSide::HOME, 14, 8, id: 6) // zona na (13,7) i (13,8); (13,6) bez zony
+            ->withBallOffPitch()
+            ->build();
+        // krajni dva drzi pole (zakoreneni) -- retez pujde jen pres hrace 3
+        $s = $s->withPlayer($s->requirePlayer(4)->withRooted(true));
+        $s = $s->withPlayer($s->requirePlayer(5)->withRooted(true));
+
+        // 1 kostka: 3 = Pushed
+        $r = (new ActionResolver(new FixedDiceRoller([3])))->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $pos = $r->getNewState()->requirePlayer(3)->requirePosition();
+        $this->assertSame([13, 6], [$pos->getX(), $pos->getY()]);
     }
 }

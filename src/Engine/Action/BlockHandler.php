@@ -1010,10 +1010,9 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
-     * Resolve pushback: move defender one square away from attacker.
-     * If all push squares are occupied or off-pitch, chain push occurs.
-     * Verejne i pro Ball & Chain -- jeho odtlaceni jsou bezna odtlaceni
-     * (`rules_bb2016.txt` r. 7840-7847), vc. retezu, Grab a Side Step.
+     * Odtlaceni po bloku -- jedine misto pro vsechna odtlaceni vc. retezu
+     * (`rules_bb2016.txt` r. 635-653). Verejne i pro Ball & Chain, jehoz
+     * odtlaceni jsou bezna odtlaceni (r. 7840-7847).
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>}
@@ -1030,13 +1029,35 @@ final class BlockHandler implements ActionHandlerInterface
             return [$state, $events];
         }
 
-        $pushSquares = $this->getPushbackSquares($attackerPos, $defenderOriginalPos);
+        return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events);
+    }
 
-        // Categorize push squares: empty, occupied (chain-pushable), off-pitch
+    /**
+     * Jadro odtlaceni. Sekundarni odtlaceni v retezu je "treated exactly like
+     * a normal push back as if the second player had been blocked by the first"
+     * (r. 644-646), proto se vola rekurzivne tataz funkce.
+     * - pole: volne na hristi > dav (vybira tym na tahu) > obsazene = retez (r. 639-651)
+     * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ);
+     * - Grab a Strip Ball patri blokujicimu, plati jen u PRVNIHO odtlaceni
+     *   (`$utocnik` je pak null); Grab nesmi zrusit Side Step v retezu (FAQ).
+     * - nosic odtlaceny v retezu mic DRZI (neni sraženy).
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function odtlacit(
+        GameState $state,
+        Position $odkud,
+        MatchPlayerDTO $kdo,
+        Position $kde,
+        TeamSide $blockingSide,
+        ?MatchPlayerDTO $utocnik,
+        array $events,
+    ): array {
         $emptySquares = [];
-        $occupiedSquares = []; // on-pitch, occupied, chain-pushable (no Stand Firm)
+        $occupiedSquares = [];
         $offPitchAvailable = false;
-        foreach ($pushSquares as $pos) {
+        foreach ($this->getPushbackSquares($odkud, $kde) as $pos) {
             if (!$pos->isOnPitch()) {
                 $offPitchAvailable = true;
                 continue;
@@ -1044,139 +1065,95 @@ final class BlockHandler implements ActionHandlerInterface
             $occupant = $state->getPlayerAtPosition($pos);
             if ($occupant === null) {
                 $emptySquares[] = $pos;
-            } elseif (!$occupant->holdsGround($attacker->getTeamSide())) {
+            } elseif (!$occupant->holdsGround($blockingSide)) {
                 $occupiedSquares[] = ['pos' => $pos, 'player' => $occupant];
             }
             // Kdo drzi pole (zakoreneny, stojici Stand Firm soupere), neni cil odtlaceni
         }
 
-        // Find valid push square
+        $zonySoupere = fn(Position $p): int => $this->tzCalc->countTacklezones($state, $p, $kdo->getTeamSide());
         $pushTo = null;
         $chainPushTarget = null;
-        if ($attacker->hasSkill(SkillName::Grab) && !$attacker->hasSkill(SkillName::Frenzy) && !$offPitchAvailable) {
-            // Grab: optional skill — attacker chooses NOT to use it when crowd surf is available
-            // When used: attacker chooses worst square for defender (most enemy TZs)
+        $grab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
+        if ($grab && !$offPitchAvailable) {
+            // Grab: utocnik voli nejhorsi volne pole (nejvic zon); pri moznem davu ho nepouzije
             if ($emptySquares !== []) {
-                usort($emptySquares, function (Position $a, Position $b) use ($state, $defender) {
-                    $tzA = $this->tzCalc->countTacklezones($state, $a, $defender->getTeamSide());
-                    $tzB = $this->tzCalc->countTacklezones($state, $b, $defender->getTeamSide());
-                    return $tzB <=> $tzA; // most TZ first
-                });
+                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($b) <=> $zonySoupere($a));
                 $pushTo = $emptySquares[0];
             } elseif ($occupiedSquares !== []) {
-                // Chain push fallback: pick first chain-pushable square
                 $pushTo = $occupiedSquares[0]['pos'];
                 $chainPushTarget = $occupiedSquares[0]['player'];
             }
-            // else: no valid squares = crowd surf (pushTo stays null)
-        } elseif ($defender->hasSkill(SkillName::SideStep)) {
-            // Side Step: defender chooses safest push square (fewest enemy TZs)
+        } elseif ($kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct()) {
+            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi pole (nejmin zon)
             if ($emptySquares !== []) {
-                usort($emptySquares, function (Position $a, Position $b) use ($state, $defender) {
-                    $tzA = $this->tzCalc->countTacklezones($state, $a, $defender->getTeamSide());
-                    $tzB = $this->tzCalc->countTacklezones($state, $b, $defender->getTeamSide());
-                    return $tzA <=> $tzB;
-                });
+                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
                 $pushTo = $emptySquares[0];
             } elseif ($occupiedSquares !== []) {
-                // Chain push fallback: defender picks safest occupied square
-                usort($occupiedSquares, function (array $a, array $b) use ($state, $defender) {
-                    $tzA = $this->tzCalc->countTacklezones($state, $a['pos'], $defender->getTeamSide());
-                    $tzB = $this->tzCalc->countTacklezones($state, $b['pos'], $defender->getTeamSide());
-                    return $tzA <=> $tzB;
-                });
+                usort($occupiedSquares, fn(array $a, array $b) => $zonySoupere($a['pos']) <=> $zonySoupere($b['pos']));
                 $pushTo = $occupiedSquares[0]['pos'];
                 $chainPushTarget = $occupiedSquares[0]['player'];
             }
-        } else {
-            // Normal: attacker chooses best push (crowd surf > most enemy TZs > sideline)
-            if ($offPitchAvailable) {
-                // Crowd surf preferred — pushTo stays null
-            } elseif ($emptySquares !== []) {
-                usort($emptySquares, function (Position $a, Position $b) use ($state, $defender) {
-                    $tzA = $this->tzCalc->countTacklezones($state, $a, $defender->getTeamSide());
-                    $tzB = $this->tzCalc->countTacklezones($state, $b, $defender->getTeamSide());
-                    if ($tzA !== $tzB) {
-                        return $tzB <=> $tzA; // most TZs first (worst for defender)
-                    }
-                    $sideA = min($a->getY(), 14 - $a->getY());
-                    $sideB = min($b->getY(), 14 - $b->getY());
-                    return $sideA <=> $sideB; // closer to sideline first
-                });
-                $pushTo = $emptySquares[0];
-            } elseif ($occupiedSquares !== []) {
-                // Chain push: all on-pitch empty squares taken, pick first chain-pushable
-                $pushTo = $occupiedSquares[0]['pos'];
-                $chainPushTarget = $occupiedSquares[0]['player'];
-            }
-            // else: no valid targets → crowd surf
+        } elseif ($offPitchAvailable) {
+            // Tym na tahu: dav ma prednost -- pushTo zustava null
+        } elseif ($emptySquares !== []) {
+            // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
+            usort($emptySquares, function (Position $a, Position $b) use ($zonySoupere) {
+                $tzA = $zonySoupere($a);
+                $tzB = $zonySoupere($b);
+                if ($tzA !== $tzB) {
+                    return $tzB <=> $tzA;
+                }
+                return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
+            });
+            $pushTo = $emptySquares[0];
+        } elseif ($occupiedSquares !== []) {
+            $pushTo = $occupiedSquares[0]['pos'];
+            $chainPushTarget = $occupiedSquares[0]['player'];
         }
 
+        // Retez: nejdriv uvolnit pole tatazi funkci
         if ($pushTo !== null && $chainPushTarget !== null) {
-            // Chain push: resolve chain first, then push defender into vacated square
-                [$state, $events] = $this->resolveChainPush(
-                    $state, $defender, $chainPushTarget, $pushTo, $defenderOriginalPos, $attacker->getTeamSide(), $events,
-                );
-                // Now the square should be vacated — push defender there
-                $events[] = GameEvent::playerPushed($defender->getId(), (string) $defenderOriginalPos, (string) $pushTo);
-                $defender = $defender->withPosition($pushTo);
-                $state = $state->withPlayer($defender);
-
-                // Handle ball for pushed player
-                if ($state->getBall()->getCarrierId() === $defender->getId()) {
-                    if ($attacker->hasSkill(SkillName::StripBall)) {
-                        $events[] = GameEvent::ballStripped($defender->getId());
-                        $state = $state->withBall(BallState::onGround($pushTo));
-                        $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
-                        $events = array_merge($events, $bounceResult['events']);
-                        $state = $bounceResult['state'];
-                    } else {
-                        $state = $state->withBall(BallState::carried($pushTo, $defender->getId()));
-                    }
-                }
-
-                return [$state, $events];
+            [$state, $events] = $this->odtlacit($state, $kde, $chainPushTarget, $pushTo, $blockingSide, null, $events);
         }
 
-        if ($pushTo !== null) {
-            // Normal push
-            $events[] = GameEvent::playerPushed($defender->getId(), (string) $defenderOriginalPos, (string) $pushTo);
-            $defender = $defender->withPosition($pushTo);
-            $state = $state->withPlayer($defender);
-
-            // Handle ball for pushed player
-            if ($state->getBall()->getCarrierId() === $defender->getId()) {
-                if ($attacker->hasSkill(SkillName::StripBall)) {
-                    // Strip Ball: ball drops at push destination and bounces
-                    $events[] = GameEvent::ballStripped($defender->getId());
-                    $state = $state->withBall(BallState::onGround($pushTo));
-                    $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
-                    $events = array_merge($events, $bounceResult['events']);
-                    $state = $bounceResult['state'];
-                } else {
-                    $state = $state->withBall(BallState::carried($pushTo, $defender->getId()));
-                }
+        if ($pushTo === null) {
+            // Dav (r. 650-663): zraneni bez brneni, nosice vhazuje dav od jeho posledniho pole
+            $events[] = $utocnik !== null
+                ? GameEvent::crowdSurf($kdo->getId())
+                : GameEvent::chainPush($kdo->getId(), (string) $kde, 'off-pitch');
+            if ($utocnik === null) {
+                $events[] = GameEvent::crowdSurf($kdo->getId());
             }
-        } else {
-            // Crowd surf - pushed off pitch or no valid square
-            $events[] = GameEvent::crowdSurf($defender->getId());
-
-            $hadBall = $state->getBall()->getCarrierId() === $defender->getId();
-
-            $defender = $defender->withPosition(null);
-            $state = $state->withPlayer($defender);
-
-            // r. 659-663: nosice zbije dav a mic vhodi zpet -- „centred on the last square
-            // the player was in before he was pushed off the pitch". Driv mic jen lezel na tom poli.
+            $hadBall = $state->getBall()->getCarrierId() === $kdo->getId();
+            $kdo = $kdo->withPosition(null);
+            $state = $state->withPlayer($kdo);
             if ($hadBall) {
-                [$state, $events] = $this->throwInFromCrowd($state, $defenderOriginalPos, $attackerPos, $events);
+                [$state, $events] = $this->throwInFromCrowd($state, $kde, $odkud, $events);
             }
-
-            // Crowd injury (skip armor, straight to injury with +1)
-            $injResult = $this->injuryResolver->resolveCrowdSurf($defender, $this->dice);
-            $defender = $injResult['player'];
-            $state = $state->withPlayer($defender);
+            $injResult = $this->injuryResolver->resolveCrowdSurf($kdo, $this->dice);
             $events = array_merge($events, $injResult['events']);
+
+            return [$state->withPlayer($injResult['player']), $events];
+        }
+
+        $events[] = $utocnik !== null
+            ? GameEvent::playerPushed($kdo->getId(), (string) $kde, (string) $pushTo)
+            : GameEvent::chainPush($kdo->getId(), (string) $kde, (string) $pushTo);
+        $kdo = $kdo->withPosition($pushTo);
+        $state = $state->withPlayer($kdo);
+
+        // Odtlaceny nosic mic drzi -- jen Strip Ball blokujiciho mu ho vyrazi
+        if ($state->getBall()->getCarrierId() === $kdo->getId()) {
+            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall)) {
+                $events[] = GameEvent::ballStripped($kdo->getId());
+                $state = $state->withBall(BallState::onGround($pushTo));
+                $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
+                $events = array_merge($events, $bounceResult['events']);
+                $state = $bounceResult['state'];
+            } else {
+                $state = $state->withBall(BallState::carried($pushTo, $kdo->getId()));
+            }
         }
 
         return [$state, $events];
@@ -1199,98 +1176,6 @@ final class BlockHandler implements ActionHandlerInterface
         $throwIn = $this->ballResolver->resolveThrowIn($state, $lastSquare, $exit);
 
         return [$throwIn['state'], array_merge($events, $throwIn['events'])];
-    }
-
-    /**
-     * Resolve a chain push: push the occupant out of the way recursively.
-     *
-     * @param list<GameEvent> $events
-     * @return array{0: GameState, 1: list<GameEvent>}
-     */
-    private function resolveChainPush(
-        GameState $state,
-        MatchPlayerDTO $pusher,
-        MatchPlayerDTO $chainTarget,
-        Position $chainTargetPos,
-        Position $pusherOriginalPos,
-        TeamSide $blockingSide,
-        array $events,
-    ): array {
-        // Calculate push direction for chain target (same vector as pusher → target)
-        $chainPushSquares = $this->getPushbackSquares($pusherOriginalPos, $chainTargetPos);
-
-        // Categorize chain push squares
-        $chainPushTo = null;
-        $nextChainTarget = null;
-        $offPitchAvailable = false;
-        $emptySquares = [];
-        $chainableSquares = [];
-
-        foreach ($chainPushSquares as $pos) {
-            if (!$pos->isOnPitch()) {
-                $offPitchAvailable = true;
-                continue;
-            }
-            $occupant = $state->getPlayerAtPosition($pos);
-            if ($occupant === null) {
-                $emptySquares[] = $pos;
-            } elseif (!$occupant->holdsGround($blockingSide)) {
-                $chainableSquares[] = ['pos' => $pos, 'player' => $occupant];
-            }
-            // Kdo drzi pole, do toho se odtlacit neda
-        }
-
-        if ($offPitchAvailable) {
-            // Crowd surf for chain target — pushTo stays null
-        } elseif ($emptySquares !== []) {
-            $chainPushTo = $emptySquares[0];
-        } elseif ($chainableSquares !== []) {
-            // Recursive chain push
-            $chainPushTo = $chainableSquares[0]['pos'];
-            $nextChainTarget = $chainableSquares[0]['player'];
-        }
-
-        if ($chainPushTo !== null && $nextChainTarget !== null) {
-            // Recursive chain: push next occupant first
-            [$state, $events] = $this->resolveChainPush(
-                $state, $chainTarget, $nextChainTarget, $chainPushTo, $chainTargetPos, $blockingSide, $events,
-            );
-        }
-
-        if ($chainPushTo !== null) {
-            // Chain push to empty (or now-vacated) square
-            $events[] = GameEvent::chainPush($chainTarget->getId(), (string) $chainTargetPos, (string) $chainPushTo);
-            $chainTarget = $chainTarget->withPosition($chainPushTo);
-            $state = $state->withPlayer($chainTarget);
-
-            // Handle ball for chain-pushed player
-            if ($state->getBall()->getCarrierId() === $chainTarget->getId()) {
-                $state = $state->withBall(BallState::onGround($chainPushTo));
-                $bounceResult = $this->ballResolver->resolveBounce($state, $chainPushTo);
-                $events = array_merge($events, $bounceResult['events']);
-                $state = $bounceResult['state'];
-            }
-        } else {
-            // Chain push off pitch — crowd surf
-            $events[] = GameEvent::chainPush($chainTarget->getId(), (string) $chainTargetPos, 'off-pitch');
-            $events[] = GameEvent::crowdSurf($chainTarget->getId());
-
-            $hadBall = $state->getBall()->getCarrierId() === $chainTarget->getId();
-
-            $chainTarget = $chainTarget->withPosition(null);
-            $state = $state->withPlayer($chainTarget);
-
-            if ($hadBall) {
-                [$state, $events] = $this->throwInFromCrowd($state, $chainTargetPos, $pusherOriginalPos, $events);
-            }
-
-            $injResult = $this->injuryResolver->resolveCrowdSurf($chainTarget, $this->dice);
-            $chainTarget = $injResult['player'];
-            $state = $state->withPlayer($chainTarget);
-            $events = array_merge($events, $injResult['events']);
-        }
-
-        return [$state, $events];
     }
 
     /**
