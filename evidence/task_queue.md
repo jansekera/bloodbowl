@@ -1096,4 +1096,10 @@ Inventura 25.09.: všech 19 skillů goblinů, upírů a trpaslíků (Stand Firm,
 | **E9** | Always Hungry | **dva hody** (2. jednička = mrtvý bez lékárníka/Regen., míč z pole oběti; 2–6 = fumble), r. 7782-7795 — engine sežral hned, INJURED, míč z pole házeče | **UZAVŘENO** `ced20b99` |
 | **E10** | Bombardier | **7 rozporů** (akce Pass, fumble v poli házeče, sousedé 4+, házeč není imunní, ležící/omráčení, turnover, přesnost z PassResolver) + zákaz pohybu před hodem, r. 7948-7975 | **UZAVŘENO** `d9910a96` |
 | **E11** | Bombardier | **chytání a zachycení bomby** (chytající ji musí hned hodit dál) — engine nehraje; dnes = vždy „declined“, což je legální volba | **OTEVŘENO** (nízká priorita) |
+| **E12** | Ball & Chain | **směr pohybu**: pravidla = šablona vhazování natočená **podle volby kouče** (nahoru/dolů/k lajně) + D6 ⇒ 3 směry; engine = D8, 8 směrů bez volby (`BallAndChainHandler:55`), r. 7829-7833 | **ČEKÁ NA UŽIVATELE** — nová volba v enginu (kam natočit šablonu) |
+| **E13** | Ball & Chain | **mimo hřiště = dav jako po vytlačení** (hod na zranění); engine dá rovnou KO (`:58-70`), r. 7835-7837 | **OTEVŘENO** |
+| **E14** | Ball & Chain | **blok podle běžných pravidel** (kostky podle síly a asistencí); engine vždy 1 kostka (`:139`), r. 7840-7842 | **OTEVŘENO** |
+| **E15** | Ball & Chain | **ležící/omráčený v cestě: odtlačit + hod na brnění místo bloku**; **povinné follow-up**; engine blokuje každého, r. 7843-7847 | **OTEVŘENO** |
+| **E16** | Ball & Chain | **sražený B&C: rovnou hod na zranění bez brnění; Stunned = KO**; engine hází na brnění (`:162, :176`), r. 7848-7850 | **OTEVŘENO** |
+| **E17** | Ball & Chain | GFI „if you wish“ tímtéž postupem — engine nehraje (nehrát je legální volba) | **OTEVŘENO** (nízká priorita) |
 | **E6** | ostatní | ~~Bombardier~~ (E10) · Ball & Chain · ~~Secret Weapon~~ (E7) · ~~No Hands~~ (E8) · Leap · Very Long Legs · Right Stuff · Stunty · ~~Always Hungry~~ (E9) · Really Stupid · Regeneration · Loner · Hypnotic Gaze · Bloodlust · Stand Firm · Mighty Blow — **zatím neporovnáno** (TTM a Break Tackle hotové 21.09.) | **OTEVŘENO** |
