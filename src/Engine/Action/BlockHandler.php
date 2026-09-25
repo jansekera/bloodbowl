@@ -571,7 +571,7 @@ final class BlockHandler implements ActionHandlerInterface
             $chainsawRoll = $this->dice->rollD6();
             if ($chainsawRoll === 1) {
                 $events[] = GameEvent::chainsawKickback($attacker->getId());
-                $injResult = $this->injuryResolver->resolve($attacker, $this->dice, self::CHAINSAW_ARMOUR_BONUS);
+                $injResult = $this->injuryResolver->resolve($attacker, $this->dice); // +3 za vlastni pilu prida resolver
                 $attacker = $injResult['player'];
                 $state = $state->withPlayer($attacker);
                 $events = array_merge($events, $injResult['events']);
@@ -699,7 +699,7 @@ final class BlockHandler implements ActionHandlerInterface
         $hasClaw = $attacker->hasSkill(SkillName::Claw);
         $hasStakes = $attacker->hasSkill(SkillName::Stakes);
         $hasNurglesRot = $attacker->hasSkill(SkillName::NurglesRot);
-        $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow);
+        $injResult = $this->injuryResolver->resolve($defender, $this->dice, 0, 0, $hasClaw, $hasStakes, $hasNurglesRot, (bool) $mightyBlow, unmodifiedArmour: true);
         $defender = $injResult['player'];
         $state = $state->withPlayer($defender);
         $events = array_merge($events, $injResult['events']);
@@ -745,7 +745,7 @@ final class BlockHandler implements ActionHandlerInterface
         if ($chainsawRoll === 1) {
             // Kickback: armor roll on attacker
             $events[] = GameEvent::chainsawKickback($attacker->getId());
-            $injResult = $this->injuryResolver->resolve($attacker, $this->dice, self::CHAINSAW_ARMOUR_BONUS);
+            $injResult = $this->injuryResolver->resolve($attacker, $this->dice); // +3 za vlastni pilu prida resolver
             $attacker = $injResult['player'];
             $state = $state->withPlayer($attacker);
             $events = array_merge($events, $injResult['events']);
@@ -1010,8 +1010,13 @@ final class BlockHandler implements ActionHandlerInterface
                 $freshAttacker = $freshAttacker->withState(PlayerState::PRONE);
                 $currentState = $currentState->withPlayer($freshAttacker);
 
-                // Armor/injury roll for attacker
-                $injResult = $this->injuryResolver->resolve($freshAttacker, $this->dice);
+                // Armor/injury roll for attacker; kdo se srazi o nositele pily, ma +3
+                //   (`rules_bb2016.txt` r. 8011-8013)
+                $injResult = $this->injuryResolver->resolve(
+                    $freshAttacker,
+                    $this->dice,
+                    $defender->hasSkill(SkillName::Chainsaw) ? self::CHAINSAW_ARMOUR_BONUS : 0,
+                );
                 $freshAttacker = $injResult['player'];
                 $currentState = $currentState->withPlayer($freshAttacker);
                 $events = array_merge($events, $injResult['events']);

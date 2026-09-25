@@ -220,4 +220,21 @@ final class ChainsawTest extends TestCase
         $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->getPlayer(1)->getState());
         $this->assertTrue($result->isTurnover());
     }
+
+    /** Kdo se srazi o nositele pily, ma +3: Attacker Down, 3+3 = 6 by AV8 neprorazilo, 9 ano (r. 8011-8013). */
+    public function testAttackerFallingOnChainsawHolderArmourPlusThree(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, armour: 8, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, skills: [SkillName::Chainsaw], id: 2)
+            ->withBallOffPitch()
+            ->build();
+
+        // 1 = ATTACKER_DOWN; brneni utocnika 3+3 (+3) = 9 > 8; zraneni 3+3 = 6 => stunned
+        $dice = new FixedDiceRoller([1, 3, 3, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertTrue($result->isTurnover());
+        $this->assertSame(PlayerState::STUNNED, $result->getNewState()->getPlayer(1)->getState());
+    }
 }

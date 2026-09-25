@@ -7,6 +7,7 @@ use App\Engine\FixedDiceRoller;
 use App\Engine\InjuryResolver;
 use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
+use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\PlayerStats;
 use App\ValueObject\Position;
@@ -22,7 +23,8 @@ final class InjuryResolverTest extends TestCase
         $this->resolver = new InjuryResolver();
     }
 
-    private function makePlayer(int $armour = 8, int $id = 1): MatchPlayerDTO
+    /** @param list<SkillName> $skills */
+    private function makePlayer(int $armour = 8, int $id = 1, array $skills = []): MatchPlayerDTO
     {
         return MatchPlayerDTO::create(
             id: $id,
@@ -31,7 +33,7 @@ final class InjuryResolverTest extends TestCase
             number: $id,
             positionalName: 'Lineman',
             stats: new PlayerStats(6, 3, 3, $armour),
-            skills: [],
+            skills: $skills,
             teamSide: TeamSide::HOME,
             position: new Position(5, 5),
         );
@@ -288,5 +290,32 @@ final class InjuryResolverTest extends TestCase
 
         $this->assertSame(PlayerState::STUNNED, $result['player']->getState());
         $this->assertNotNull($result['player']->getPosition(), 'omraceny hrac lezi NA HRISTI');
+    }
+
+    /** Nositel pily srazeny => +3 k brneni: 3+3 = 6 by AV8 neprorazilo, 9 ano (`rules_bb2016.txt` r. 8009-8011). */
+    public function testChainsawHolderArmourPlusThree(): void
+    {
+        $player = $this->makePlayer(armour: 8, skills: [SkillName::Chainsaw]);
+        $result = $this->resolver->resolve($player, new FixedDiceRoller([3, 3, 3, 3]));
+
+        $this->assertNotSame(PlayerState::STANDING, $result['player']->getState());
+    }
+
+    /** Hranice: 2+3 = 5, +3 = 8 = AV8 => brneni drzi. */
+    public function testChainsawHolderArmourPlusThreeBoundaryHolds(): void
+    {
+        $player = $this->makePlayer(armour: 8, skills: [SkillName::Chainsaw]);
+        $result = $this->resolver->resolve($player, new FixedDiceRoller([2, 3]));
+
+        $this->assertSame(PlayerState::STANDING, $result['player']->getState());
+    }
+
+    /** Stab hazi "unmodified" brneni => bonus za pilu obeti se nepricita. */
+    public function testChainsawHolderNoBonusOnUnmodifiedArmour(): void
+    {
+        $player = $this->makePlayer(armour: 8, skills: [SkillName::Chainsaw]);
+        $result = $this->resolver->resolve($player, new FixedDiceRoller([3, 3]), unmodifiedArmour: true);
+
+        $this->assertSame(PlayerState::STANDING, $result['player']->getState());
     }
 }
