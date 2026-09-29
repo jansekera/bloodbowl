@@ -58,6 +58,12 @@ public:
     int currentActivationId = -1;
     TeamSide kickingTeam = TeamSide::AWAY;
     Weather weather = Weather::NICE;
+    // Transient: true while the kick-off is being resolved (kick, landing,
+    // catch and bounces). BB2016 l. 1261-1263: "A team re-roll may not be used
+    // for any catch roll when the ball lands"; l. 929-933: team re-rolls only
+    // "during their own turn" -- and the kick-off is nobody's turn. Set by
+    // KickoffScope, never by hand.
+    bool kickoffInProgress = false;
     RosterSpeed receiverSpeed = RosterSpeed::MIXED;
 
     GameState();
@@ -107,6 +113,17 @@ public:
 
     // Trivial copy for MCTS branching
     GameState clone() const { return *this; }
+};
+
+
+// RAII: marks GameState::kickoffInProgress for the lifetime of a kick-off
+// resolution, so every early return (touchback, ...) clears it again.
+struct KickoffScope {
+    GameState& state;
+    explicit KickoffScope(GameState& s) : state(s) { state.kickoffInProgress = true; }
+    ~KickoffScope() { state.kickoffInProgress = false; }
+    KickoffScope(const KickoffScope&) = delete;
+    KickoffScope& operator=(const KickoffScope&) = delete;
 };
 
 } // namespace bb

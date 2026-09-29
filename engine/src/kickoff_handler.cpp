@@ -200,6 +200,7 @@ bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
 } // anonymous namespace
 
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    KickoffScope kickoffScope(state);
     TeamSide receiving = opponent(state.kickingTeam);
     state.activeTeam = receiving;
 

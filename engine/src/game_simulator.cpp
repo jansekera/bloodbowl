@@ -523,6 +523,7 @@ bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
 }
 
 void simpleKickoff(GameState& state, DiceRollerBase& dice) {
+    KickoffScope kickoffScope(state);
     // Determine receiving team (opposite of kicking)
     TeamSide receiving = opponent(state.kickingTeam);
     state.activeTeam = receiving;

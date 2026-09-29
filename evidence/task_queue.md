@@ -1126,7 +1126,7 @@ Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.0
 
 | ID | co | původ | stav |
 |---|---|---|---|
-| **P64** | PORT do C++: týmový přehoz při chytání jen hráči týmu NA TAHU a ne u míče z výkopu (`resolveCatch`/`attemptRoll` dostane `canUseTeamReroll` podle kola; r. 929-933, 1263) | commit a7603e8f | OTEVŘENO |
+| **P64** | PORT do C++: týmový přehoz při chytání jen hráči týmu NA TAHU a ne u míče z výkopu (`resolveCatch`/`attemptRoll` dostane `canUseTeamReroll` podle kola; r. 929-933, 1263) | commit a7603e8f | **UZAVŘENO 29.09.** — `resolveCatch`: týmový přehoz jen `catcher.teamSide == activeTeam` a ne při `kickoffInProgress` (`KickoffScope` v obou cestách výkopu); 3 testy + pozitivní kontrola (bez opravy 2 padají); 751 testů, 6 her bez chyby |
 | **P65** | PORT do C++: obranná asistence u faulu — výjimka „sám faulující“ ze zón (`foul_handler.cpp:70` `tzExcludeId=fouler.id`; r. 1843-1850) | commit d0c6e1d7 | OTEVŘENO |
 | **P66** | PORT do C++: počasí jen na začátku zápasu + Changing Weather, ne při každém výkopu (`kickoff_handler.cpp:278-281`; N2) | commit d674d080 (nález N2) | OTEVŘENO |
 | **P67** | PORT do C++: nepřesná přihrávka / Hail Mary — rozptyl se po opuštění hřiště zastaví, vhazování od posledního pole na hřišti (`pass_handler.cpp:161-170, 210-214, 374-378`) | commit cd2f72fe | OTEVŘENO |

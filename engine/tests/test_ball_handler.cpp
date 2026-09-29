@@ -297,3 +297,42 @@ TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
     EXPECT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, 1);
 }
+
+// --- P64 (port PHP a7603e8f): team re-roll on a catch only in own turn,
+// never on a kick-off landing. BB2016 l. 929-933 and l. 1261-1263.
+static GameState catchFixture(TeamSide active) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = active;
+    gs.homeTeam.rerolls = 2;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.ball = BallState::onGround({10, 7});
+    return gs;
+}
+
+TEST(BallHandler, CatchTeamRerollInOwnTurn) {
+    // Positive control: without it the two tests below would pass for any
+    // reason that stops a re-roll (e.g. no re-rolls in the fixture at all).
+    GameState gs = catchFixture(TeamSide::HOME);
+    FixedDiceRoller dice({2, 5});   // AG3 catch target 3: 2 fails, re-roll 5
+    EXPECT_TRUE(resolveCatch(gs, 1, dice, 0, nullptr));
+    EXPECT_EQ(gs.homeTeam.rerolls, 1);
+}
+
+TEST(BallHandler, CatchNoTeamRerollInOpponentTurn) {
+    GameState gs = catchFixture(TeamSide::AWAY);
+    FixedDiceRoller dice({2, 5});
+    EXPECT_FALSE(resolveCatch(gs, 1, dice, 0, nullptr));
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+}
+
+TEST(BallHandler, CatchNoTeamRerollDuringKickoff) {
+    GameState gs = catchFixture(TeamSide::HOME);
+    {
+        KickoffScope scope(gs);
+        FixedDiceRoller dice({2, 5});
+        EXPECT_FALSE(resolveCatch(gs, 1, dice, 0, nullptr));
+    }
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_FALSE(gs.kickoffInProgress);   // scope cleared the flag
+}
