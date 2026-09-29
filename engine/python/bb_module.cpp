@@ -426,6 +426,12 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::DiceRollerBase& base = dice;
         bb::simpleKickoff(state, base);
     });
+    // P66 (29.09.2026): výkop už počasí nehází -- hra řízená z Pythonu ho
+    // musí hodit sama, jednou před prvním výkopem (BB2016 l. 2571-2573).
+    m.def("roll_match_weather", [](bb::GameState& state, bb::DiceRoller& dice) {
+        bb::DiceRollerBase& base = dice;
+        bb::rollMatchWeather(state, base);
+    });
 
     m.def("extract_features", [](const bb::GameState& state, bb::TeamSide perspective) {
         float features[bb::NUM_FEATURES];
