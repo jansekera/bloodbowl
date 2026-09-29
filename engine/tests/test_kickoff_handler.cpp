@@ -196,3 +196,44 @@ TEST(KickoffHandler, MultipleKickoffsInGame) {
     // Just verify game completes
     EXPECT_GT(result.totalActions, 0);
 }
+
+// --- P66 (29.09.2026): weather is rolled ONCE per match (BB2016 l. 2551,
+// 2571-2573) and only Changing Weather changes it. Until then both kick-off
+// paths re-rolled it before every drive.
+TEST(KickoffHandler, KickoffKeepsMatchWeatherUnlessChangingWeather) {
+    // Many seeds, so that the kick-off table hits Changing Weather in some of
+    // them: those may change the weather, all others must keep it.
+    int kept = 0, changedByEvent = 0;
+    for (uint64_t seed = 1; seed <= 200; ++seed) {
+        auto gs = makeKickoffState();
+        gs.weather = Weather::BLIZZARD;
+        DiceRoller dice(seed);
+        std::vector<GameEvent> events;
+        resolveKickoff(gs, dice, &events);
+        bool changing = false;
+        for (const auto& e : events)
+            if (e.type == GameEvent::Type::WEATHER_CHANGE) changing = true;
+        if (changing) { ++changedByEvent; continue; }
+        EXPECT_EQ(gs.weather, Weather::BLIZZARD) << "seed " << seed;
+        ++kept;
+    }
+    EXPECT_GT(kept, 150);          // most kick-offs are not Changing Weather
+    EXPECT_GT(changedByEvent, 0);  // and the exception really was exercised
+}
+
+TEST(KickoffHandler, SimpleKickoffKeepsMatchWeather) {
+    for (uint64_t seed = 1; seed <= 50; ++seed) {
+        auto gs = makeKickoffState();
+        gs.weather = Weather::POURING_RAIN;
+        DiceRoller dice(seed);
+        simpleKickoff(gs, dice);
+        EXPECT_EQ(gs.weather, Weather::POURING_RAIN) << "seed " << seed;
+    }
+}
+
+TEST(KickoffHandler, RollMatchWeatherUsesTheWeatherTable) {
+    GameState gs;
+    FixedDiceRoller dice({6, 6});      // 12 = Blizzard
+    rollMatchWeather(gs, dice);
+    EXPECT_EQ(gs.weather, Weather::BLIZZARD);
+}

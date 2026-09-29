@@ -276,10 +276,8 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     KickoffEvent koEvent = kickoffEventFromRoll(std::clamp(kickoffRoll, 2, 12));
     resolveKickoffEvent(state, koEvent, receiving, dice, events);
 
-    // Roll weather (if not changed by CHANGING_WEATHER)
-    if (koEvent != KickoffEvent::CHANGING_WEATHER) {
-        state.weather = weatherFromRoll(dice.roll2D6());
-    }
+    // Počasí se po výkopu NEHÁZÍ (P66, 29.09.2026): platí počasí zápasu
+    // (rollMatchWeather, l. 2571-2573) a mění ho jen CHANGING_WEATHER výš.
 
     // Kick-Off Return: closest KOR player moves up to 3 sq toward ball
     if (!touchback) {

@@ -522,6 +522,13 @@ bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
     return found;
 }
 
+// BB2016 l. 2547-2573, Pre-Match Sequence 1: "One coach rolls on the Weather
+// table to see what the weather will be like for the match." Mění ho pak jen
+// výsledek Changing Weather na tabulce výkopu (l. 1316-1320).
+void rollMatchWeather(GameState& state, DiceRollerBase& dice) {
+    state.weather = weatherFromRoll(dice.roll2D6());
+}
+
 void simpleKickoff(GameState& state, DiceRollerBase& dice) {
     KickoffScope kickoffScope(state);
     // Determine receiving team (opposite of kicking)
@@ -641,9 +648,10 @@ void simpleKickoff(GameState& state, DiceRollerBase& dice) {
     }
 
     state.phase = GamePhase::PLAY;
-
-    // Roll weather
-    state.weather = weatherFromRoll(dice.roll2D6());
+    // Počasí se tu už NEHÁZÍ (P66, 29.09.2026): BB2016 l. 2551, 2571-2573 --
+    // hází se JEDNOU v předzápasové sekvenci ("to see what the weather will be
+    // like for the match"), viz rollMatchWeather(). Do 29.09. se házelo při
+    // každém výkopu, takže každý drive měl nezávislé počasí.
 }
 
 GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
@@ -666,6 +674,7 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
     // BB2016 l. 304-307: los rozhoduje, kdo kope jako prvni. Pojmenovane, aby
     // si vetev half-time nize odvodila kopajiciho v H2 z OTVIRACIHO losu, ne
     // z toho, kdo nahodou kopal posledni drive H1 (l. 1016-1017).
+    rollMatchWeather(state, dice);   // l. 2551: 1. krok předzápasové sekvence
     const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice, home, away);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
@@ -830,6 +839,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
 
     // First half
     // Los stejne jako v simulateGame(); viz komentar tam.
+    rollMatchWeather(state, dice);   // l. 2551: 1. krok předzápasové sekvence
     const TeamSide openingKickingTeam = rollOpeningKickingTeam(dice, home, away);
     state.half = 1;
     state.kickingTeam = openingKickingTeam;

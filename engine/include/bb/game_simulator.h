@@ -70,6 +70,8 @@ TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
 
 // Simplified kickoff: place ball with scatter, transition to PLAY
 void simpleKickoff(GameState& state, DiceRollerBase& dice);
+// Pre-match weather roll (BB2016 l. 2551, 2571-2573); called once per match.
+void rollMatchWeather(GameState& state, DiceRollerBase& dice);
 
 // Action selector: given a game state, return an action to execute
 using ActionSelector = std::function<Action(const GameState&)>;
