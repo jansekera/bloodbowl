@@ -1119,7 +1119,10 @@ Inventura 25.09.: všech 19 skillů goblinů, upírů a trpaslíků (Stand Firm,
 ### ⏰ PARITA PHP × C++ — nálezy auditu 29.09. (E29) — **P64–P88**
 
 Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.08. — SHODNÉ 32 · CHYBÍ 22 · NEMÁ SMYSL 2; C++ commity bez PRAVIDLA: 6 chybí v PHP.
-⭐ **P64–P67 mění měření v C++** (všech 5 TV1200 sestav) — nejdřív tyhle. Pořadí = podle dopadu na měření.
+⏰⏰ **POŘADÍ PRÁCE — rozhodl uživatel 29.09.:** *„nejdřív P64–P67 — pak opravit i ostatní nálezy — zatím nic neopravuj“*.
+1. **P64–P67** (mění měření v C++, všech 5 TV1200 sestav) — **PRVNÍ**.
+2. **pak všechny ostatní P68–P88** (včetně P81 = E28 pohyb po bloku v Blitzu do PHP, dřív „priorita č. 1“).
+⛔ **Stav 29.09.: nic se neopravuje** — jen zapsáno; oprava začne až na pokyn.
 
 | ID | co | původ | stav |
 |---|---|---|---|
