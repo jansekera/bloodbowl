@@ -1151,4 +1151,5 @@ Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.0
 | **P86** | PORT do PHP: ležící smí ohlásit Blitz (r. 676) | commit 38e4fd85 | OTEVŘENO |
 | **P87** | PRAVIDLA (PHP i C++): Stunty na zranění — modifikovaná 7 = KO a 9 = Badly Hurt místo +1 k hodu (r. 8534-8536) | nález N3 | OTEVŘENO |
 | **P88** | KONTROLA (PHP × C++): lékárník — C++ přehazuje CASUALTY tabulku, PHP hod na zranění; ověřit proti BB2016 a sjednotit | nález N1 | OTEVŘENO |
+| **P89** | PRAVIDLA (C++): přihrávka / Hail Mary, míč vyletí z hřiště ⇒ `resolvePass` vrací turnover **vždy**; ř. 881-891: turnover až když míč „finally comes to rest“ a NEchytí ho hráč tahajícího týmu — i po vhození („thrown back into an empty square, and as long as it was caught by a player from the moving team then the turnover would be avoided“). Nález 29.09. při P67; ověřit i PHP. Fumble (ř. 379-380) turnover zůstává vždy | nález 29.09. (P67) | OTEVŘENO |
 
