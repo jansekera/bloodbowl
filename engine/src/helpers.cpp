@@ -287,6 +287,11 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,
                  std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
+    // Týmový přehoz jen hráči týmu na tahu a nikdy během výkopu (P64;
+    // BB2016 l. 929-933 "during their own turn", l. 1261-1263) -- platí pro
+    // všechny hody, nejen pro chytání, takže tu, ne u volajících.
+    canUseTeamReroll = canUseTeamReroll && player.teamSide == state.activeTeam &&
+                       !state.kickoffInProgress;
 
     // Initial roll
     int roll = dice.rollD6();

@@ -261,6 +261,21 @@ def test_logged_game_result_structure():
     assert len(states) >= 2  # At least initial + 1 turn boundary
 
 
+def test_roll_match_weather_is_rolled_once_and_kept_by_kickoff():
+    """P66: weather is rolled once per match; simple_kickoff must not change it."""
+    seen = set()
+    for seed in range(1, 60):
+        gs = bb_engine.GameState()
+        bb_engine.setup_half(gs, bb_engine.get_human_roster(), bb_engine.get_human_roster())
+        dice = bb_engine.DiceRoller(seed)
+        bb_engine.roll_match_weather(gs, dice)
+        before = gs.weather
+        seen.add(before)
+        bb_engine.simple_kickoff(gs, dice)
+        assert gs.weather == before
+    assert len(seen) > 1   # the roll really varies (not stuck on Nice)
+
+
 if __name__ == "__main__":
     tests = [
         test_enums,
@@ -296,17 +311,3 @@ if __name__ == "__main__":
     if failed > 0:
         exit(1)
 
-
-def test_roll_match_weather_is_rolled_once_and_kept_by_kickoff():
-    """P66: weather is rolled once per match; simple_kickoff must not change it."""
-    seen = set()
-    for seed in range(1, 60):
-        gs = bb_engine.GameState()
-        bb_engine.setup_half(gs, bb_engine.get_human_roster(), bb_engine.get_human_roster())
-        dice = bb_engine.DiceRoller(seed)
-        bb_engine.roll_match_weather(gs, dice)
-        before = gs.weather
-        seen.add(before)
-        bb_engine.simple_kickoff(gs, dice)
-        assert gs.weather == before
-    assert len(seen) > 1   # the roll really varies (not stuck on Nice)

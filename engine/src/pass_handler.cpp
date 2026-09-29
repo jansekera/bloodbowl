@@ -162,33 +162,22 @@ int checkInterception(GameState& state, int passerId, Position target,
 // square." Tri nezavisle kroky o JEDNO pole, ne jeden dlouhy skok.
 //
 // P67 (port PHP cd2f72fe, 29.09.2026): jakmile míč opustí hřiště, DÁL SE
-// NEROZPTYLUJE -- vhazuje se hned (l. 866-869: "When a ball scatters ... off
-// the pitch it is immediately thrown back in ... using the last square the
-// ball crossed before going off as a starting point"). Do 29.09. se hodily
-// všechny tři kroky i přes aut, takže míč, který vyletěl a "vrátil se",
-// zůstal na hřišti, a vhazování začínalo z CÍLE přihrávky.
-struct PassScatter {
-    Position land;          // kde míč skončil (mimo hřiště = pole za autem)
-    Position lastOnPitch;   // poslední pole na hřišti, odkud se vhazuje
-    bool offPitch = false;
-};
-
-static PassScatter scatterThreeTimes(Position from, DiceRollerBase& dice) {
-    PassScatter r{from, from, false};
+// NEROZPTYLUJE a hned se vhazuje z posledního pole na hřišti (l. 866-869).
+// Vrací true, když míč vyletěl a byl vhozen; jinak je `land` místo dopadu.
+static bool scatterOrThrowIn(GameState& state, Position target, DiceRollerBase& dice,
+                             std::vector<GameEvent>* events, Position& land) {
+    land = target;
     for (int i = 0; i < 3; i++) {
+        const Position prev = land;
         Position step = scatterDirection(dice.rollD8());
-        Position next{static_cast<int8_t>(r.land.x + step.x),
-                      static_cast<int8_t>(r.land.y + step.y)};
-        if (!next.isOnPitch()) {
-            r.lastOnPitch = r.land;
-            r.land = next;
-            r.offPitch = true;
-            return r;
+        land = {static_cast<int8_t>(land.x + step.x),
+                static_cast<int8_t>(land.y + step.y)};
+        if (!land.isOnPitch()) {
+            resolveThrowIn(state, prev, land, dice, events);
+            return true;
         }
-        r.land = next;
     }
-    r.lastOnPitch = r.land;
-    return r;
+    return false;
 }
 
 ActionResult resolvePass(GameState& state, int passerId, Position target,
@@ -228,11 +217,8 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         }
 
         // Inaccurate: 3 single scatters from target (l. 735-737)
-        const PassScatter sc = scatterThreeTimes(target, dice);
-        const Position landPos = sc.land;
-
-        if (sc.offPitch) {
-            resolveThrowIn(state, sc.lastOnPitch, landPos, dice, events);
+        Position landPos;
+        if (scatterOrThrowIn(state, target, dice, events, landPos)) {
             return ActionResult::turnovr();
         }
 
@@ -394,11 +380,8 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         // se sem recyklovala VYKOPOVA sablona (jeden smer D8 x vzdalenost D6),
         // takze neprecna prihravka letela az 6 poli rovne misto trikrokove
         // prochazky o max 3 pole, ktera se muze vratit i do ciloveho pole.
-        const PassScatter sc = scatterThreeTimes(target, dice);
-        const Position landPos = sc.land;
-
-        if (sc.offPitch) {
-            resolveThrowIn(state, sc.lastOnPitch, landPos, dice, events);
+        Position landPos;
+        if (scatterOrThrowIn(state, target, dice, events, landPos)) {
             return ActionResult::turnovr();
         }
 

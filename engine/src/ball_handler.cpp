@@ -40,19 +40,13 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
     }
 
     int target = calculateCatchTarget(state, catcher, modifier);
-    // Team re-roll (P64, port of PHP a7603e8f): only a player of the team
-    // whose turn it is (l. 929-933 "during their own turn"), and never on a
-    // kick-off landing (l. 1261-1263). Until 2026-09-29 it was always allowed,
-    // so a receiver re-rolled kick-off catches and a bounce onto a player in
-    // the opponent's turn burned a re-roll that does not exist.
-    const bool teamRerollAllowed =
-        !state.kickoffInProgress && catcher.teamSide == state.activeTeam;
+    // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
     bool success = attemptRoll(state, catcherId, dice, target,
                                // Catch, l. 7992-7995: "allowed to re-roll the D6
                                // if he fails a catch roll. It also allows the
                                // player to re-roll the D6 if he drops a hand-off
                                // or fails to make an interception."
-                               SkillName::Catch, false, teamRerollAllowed, events);
+                               SkillName::Catch, false, true, events);
 
     emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
                       target, success});
