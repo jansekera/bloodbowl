@@ -67,8 +67,13 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     // guardApplies = false: BB2016 l. 8160 -- Guard nesmí asistovat FAULU.
     int friendlyAssists = countAssists(state, target.position, fouler.teamSide,
                                         fouler.id, target.id, -1, false);
+    // tzExcludeId = fouler.id (P65, port PHP d0c6e1d7): a defender next to the
+    // fouler always stands in the FOULER's tackle zone, so without excluding
+    // him no defensive assist could ever arise (l. 1847-1850: "Defending
+    // players adjacent to the fouler must also give assists"). Mirrors the
+    // block rule, where the player being blocked does not cancel assists.
     int enemyAssists = countAssists(state, fouler.position, target.teamSide,
-                                     fouler.id, target.id, -1, false);
+                                     fouler.id, target.id, fouler.id, false);
     int assistMod = friendlyAssists - enemyAssists;
 
     // DirtyPlayer bonus

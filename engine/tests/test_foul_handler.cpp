@@ -196,3 +196,33 @@ TEST(FoulHandler, GuardDoesNotAssistAFoul) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE)
         << "BB2016 ř. 8160: Guard se u faulu použít NESMÍ";
 }
+
+// --- P65 (port PHP d0c6e1d7): a defender next to the FOULER gives -1, even
+// though he stands in the fouler's own tackle zone (BB2016 l. 1847-1850).
+TEST(FoulHandler, DefensiveAssistNextToFoulerCounts) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);      // fouler
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;      // victim
+    placePlayer(gs, 13, {9, 7}, TeamSide::AWAY);      // defender next to the fouler
+    // armour 5+4 = 9 > AV8 would break; the defensive assist makes it 8 => holds
+    FixedDiceRoller dice({5, 4});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE)
+        << "obranna asistence vedle faulujiciho ma dat -1 (r. 1847-1850)";
+}
+
+TEST(FoulHandler, DefensiveAssistCancelledByAnotherMarker) {
+    // Control: the same defender, but ALSO in the zone of a second home
+    // player -- he may not assist, so the armour breaks. Shows that the
+    // exclusion is only the fouler himself, not "any tackle zone".
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    placePlayer(gs, 13, {9, 7}, TeamSide::AWAY);
+    placePlayer(gs, 3, {8, 7}, TeamSide::HOME);       // marks the defender
+    FixedDiceRoller dice({5, 4, 3, 4});               // 9 breaks; injury 7 => stunned
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}
