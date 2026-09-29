@@ -1113,5 +1113,39 @@ Inventura 25.09.: všech 19 skillů goblinů, upírů a trpaslíků (Stand Firm,
 | **E26** | Regeneration | pořadí: pravidla **lékárník, pak Regeneration** (r. 8436-8439); engine opačně (`InjuryResolver:354`) — ve prospěch majitele | **UZAVŘENO** `966a871c` — navíc: lékárník házel Regeneration podruhé |
 | **E27** | Apothecary × Regeneration (AI) | lékárník se volí **naslepo před** Regeneration ⇒ na hráče s Regeneration (50 %) se vyplatí méně; AI ho dnes použije na **každé** CAS | **OTEVŘENO** — volba pro AI (šetřit lékárníka na Thrally) |
 | **E28** | Blood Lust × Blitz | Pravidla (r. 7934-7936): krmí se NA KONCI akce, výjimka jen přihrávka/předání/TD ⇒ u Blitzu **nelze nakrmit před blokem**, ale **po bloku smí dojít k Thrallovi** (Blitz povoluje pohyb po bloku, zbývá-li MA) a nakrmit se tam. Engine: Blitz po bloku KONČÍ (pohyb po bloku v Blitzu chybí obecně) ⇒ krmí se na místě bloku. | **⏰⏰⏰ PRIORITA Č. 1 (uživatel 25.09.)** — C++ to má od 07.09. (`771d1ecc`, „blitz nechá aktivaci otevřenou“, změřeno +0,0177 > 2,5 σ); **PHP `BlitzHandler` ne** ⇒ převést do PHP, pak krmení upíra po bloku |
-| **E29** | PARITA PHP × C++ | **pravidelný audit každé pondělí** (uživatel 25.09.) + u každé pravidlové opravy řádek „převést do druhého enginu“. Balík E 25.09. opravoval jen PHP ⇒ **E1–E28 projít, co chybí v C++** | **OTEVŘENO** — první audit po 28.09. |
+| **E29** | PARITA PHP × C++ | **pravidelný audit každé pondělí** (uživatel 25.09.) + u každé pravidlové opravy řádek „převést do druhého enginu“. Balík E 25.09. opravoval jen PHP ⇒ **E1–E28 projít, co chybí v C++** | **1. AUDIT HOTOV 29.09.** (`evidence/parity_audit_20260929.md`, Opus — Fable není v předplatném) ⇒ **P64–P88**; ⏰ další audit **po 05.10.** |
 | **E6** | ostatní | ~~Bombardier~~ (E10) · Ball & Chain · ~~Secret Weapon~~ (E7) · ~~No Hands~~ (E8) · Leap · Very Long Legs · Right Stuff · Stunty · ~~Always Hungry~~ (E9) · Really Stupid · ~~Regeneration~~ (E26) · Loner · ~~Hypnotic Gaze~~ (E21–E24) · ~~Bloodlust~~ (E25) · Stand Firm · Mighty Blow — **zatím neporovnáno** (TTM a Break Tackle hotové 21.09.) | **OTEVŘENO** |
+
+### ⏰ PARITA PHP × C++ — nálezy auditu 29.09. (E29) — **P64–P88**
+
+Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.08. — SHODNÉ 32 · CHYBÍ 22 · NEMÁ SMYSL 2; C++ commity bez PRAVIDLA: 6 chybí v PHP.
+⭐ **P64–P67 mění měření v C++** (všech 5 TV1200 sestav) — nejdřív tyhle. Pořadí = podle dopadu na měření.
+
+| ID | co | původ | stav |
+|---|---|---|---|
+| **P64** | PORT do C++: týmový přehoz při chytání jen hráči týmu NA TAHU a ne u míče z výkopu (`resolveCatch`/`attemptRoll` dostane `canUseTeamReroll` podle kola; r. 929-933, 1263) | commit a7603e8f | OTEVŘENO |
+| **P65** | PORT do C++: obranná asistence u faulu — výjimka „sám faulující“ ze zón (`foul_handler.cpp:70` `tzExcludeId=fouler.id`; r. 1843-1850) | commit d0c6e1d7 | OTEVŘENO |
+| **P66** | PORT do C++: počasí jen na začátku zápasu + Changing Weather, ne při každém výkopu (`kickoff_handler.cpp:278-281`; N2) | commit d674d080 (nález N2) | OTEVŘENO |
+| **P67** | PORT do C++: nepřesná přihrávka / Hail Mary — rozptyl se po opuštění hřiště zastaví, vhazování od posledního pole na hřišti (`pass_handler.cpp:161-170, 210-214, 374-378`) | commit cd2f72fe | OTEVŘENO |
+| **P68** | PORT do C++: `holdsGround` — Stand Firm jen STOJÍCÍ; `rooted=false` hned při sražení/položení, ne až na začátku kola (E19, E20b) | commit 3cec72e2 | OTEVŘENO |
+| **P69** | PORT do C++: tabulka výkopu 7 = Changing Weather, 8 = Brilliant Coaching (`enums.h:252-253`) | commit d674d080 | OTEVŘENO |
+| **P70** | PORT do C++: Pro — nulovat `proUsedThisTurn` oběma týmům každé kolo; přihrávka: po neúspěšném Pro týmový přehoz jen na hod Pro (`pass_handler.cpp:329-347`) | commit 84f7dc46 | OTEVŘENO |
+| **P71** | PORT do C++: Blood Lust — hladový upír akci dokončí, krmí se na konci (před přihrávkou/předáním/TD), Block→Move | commit 9e980cac | OTEVŘENO |
+| **P72** | PORT do C++: Ball & Chain (TA6) — šablona vhazování, dav, zranění bez brnění, turnover, blok podle síly, ležící odtlačit + brnění, follow-up | commit e373bf23, 04e4946c | OTEVŘENO |
+| **P73** | PORT do C++: Bombardier — fumble při modifikovaném ≤1; zasažený omráčený zůstává omráčený | commit d9910a96 | OTEVŘENO |
+| **P74** | PORT do C++: Always Hungry — sežraný nosič míče = turnover | commit ced20b99 | OTEVŘENO |
+| **P75** | PORT do C++: Chainsaw — nenabízet Multiple Block, faul pilou (zpětný ráz + +3), +3 proti sraženému nositeli pily | commit fa2422ad, 78bf7601, 9e02a834 | OTEVŘENO |
+| **P76** | PORT do C++: TTM — fumble při modifikovaném ≤1; rozptyl se zastaví mimo hřiště; hozený nosič v davu = vhazování od posledního pole | commit 01bdfd77, 1657a19e, ec3feb2c | OTEVŘENO |
+| **P77** | PORT do C++: Dirty Player jako volba brnění/zranění; Break Tackle 1× za kolo | commit 6a6537ef | OTEVŘENO |
+| **P78** | PORT do C++: Safe Throw — nemodifikovaný AG hod házeče proti intercepci; při fumblu jinak než přirozenou 1 míč zůstává | commit faef31f3, e81bb57d | OTEVŘENO |
+| **P79** | PORT do C++: Hypnotic Gaze — zóny se vrací začátkem AKCE oběti, ne začátkem kola | commit 60ba5961 | OTEVŘENO |
+| **P80** | PORT do C++: `resolveCatch` — ležící/omráčený nechytá (stráž přímo ve funkci, hand-off) | commit 2f930279 | OTEVŘENO |
+| **P81** | PORT do PHP: follow-up jako VOLBA + pohyb po bloku v Blitzu (E28) | commit 771d1ecc | OTEVŘENO |
+| **P82** | PORT do PHP: blok v Blitzu stojí 1 pole pohybu (případně GFI), r. 549-550 | commit 366fda3e | OTEVŘENO |
+| **P83** | PORT do PHP: zakořeněný nesmí GFI ani follow-up (pathfinder `$maxRange` bez GFI při `rooted`; r. 8577-8582) | commit 6e2f084c | OTEVŘENO |
+| **P84** | PORT do PHP: Leap — cíl bez modifikátorů (jen VLL), přehoz Pro/týmový, GFI za skok do deficitu, Tentacles/Shadowing i na Leap | commit 018b230e (nález N4) | OTEVŘENO |
+| **P85** | PORT do PHP: Tentacles 2D6+ST rozdíl ≤5, Shadowing 2D6+MA rozdíl ≤7 | commit f17802d1 | OTEVŘENO |
+| **P86** | PORT do PHP: ležící smí ohlásit Blitz (r. 676) | commit 38e4fd85 | OTEVŘENO |
+| **P87** | PRAVIDLA (PHP i C++): Stunty na zranění — modifikovaná 7 = KO a 9 = Badly Hurt místo +1 k hodu (r. 8534-8536) | nález N3 | OTEVŘENO |
+| **P88** | KONTROLA (PHP × C++): lékárník — C++ přehazuje CASUALTY tabulku, PHP hod na zranění; ověřit proti BB2016 a sjednotit | nález N1 | OTEVŘENO |
+
