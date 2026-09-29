@@ -532,3 +532,28 @@ TEST(PassHandler, DisturbingPresenceRaisesTheInterceptionTarget) {
     EXPECT_NE(withDP.ball.carrierId, 12)
         << "s Disturbing Presence je cíl 6, hod 5 intercepci dát NESMÍ";
 }
+
+// --- P67 (port PHP cd2f72fe, 29.09.2026): once the scattering ball leaves the
+// pitch it scatters no further -- it is thrown in at once from the LAST square
+// on the pitch (BB2016 l. 866-869). Before, all three steps were rolled even
+// past the sideline and the throw-in started from the pass TARGET.
+TEST(PassHandler, InaccuratePassStopsScatteringAtTheSideline) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 2, {20, 2}, TeamSide::HOME);
+    gs.ball = BallState::carried({3, 7}, 1);
+
+    // HMP 4 (inaccurate) · D8=1 (N): (20,0) -> (20,-1), OFF -- no more scatter
+    // throw-in from (20,0), top edge: D6=3 -> S, 2D6 = 1+1 = 2 -> (20,2)
+    // player 2 stands there and must catch: 6 succeeds
+    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
+
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    EXPECT_EQ(gs.ball.position, (Position{20, 2}));
+    // Turnover se tu netestuje: větev "míč mimo hřiště" vrací turnover i dřív
+    // a P67 ji nemění (měří se jen, KAM míč dopadne).
+    (void)result;
+}
