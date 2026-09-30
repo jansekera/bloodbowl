@@ -131,3 +131,44 @@ TEST(BombHandler, ABombInTheCrowdExplodesWithNoEffect) {
     EXPECT_FALSE(result.turnover);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
 }
+
+// P73 (30.09.2026), port PHP d9910a96.
+// (a) Bomba se hazi "using the rules for throwing the ball" (r. 7952-7954)
+//     a fumble je "1 OR LESS BEFORE OR AFTER MODIFICATION" (r. 1742-1744).
+//     C++ fumbloval jen na prirozene 1.
+TEST(BombHandler, P73FumbleCountsTheModifiedRoll) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);          // AG3
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {11, 6}, TeamSide::AWAY);          // dve tackle zony
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+
+    // quick +1, zony -2 => modifikace -1; hod 2 => 1 = FUMBLE, vybuchne
+    // v poli hazece. Pak: brneni hazece 3+3, sousedi 1 a 1 (minou).
+    FixedDiceRoller dice({2, 3, 3, 1, 1, 1, 1, 1, 1});
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE)
+        << "hod 2 se dvema zonami se bral jako neprecny, ne jako fumble";
+}
+
+// (b) "treated as Knocked Down even if they are already Prone or Stunned"
+//     (r. 7973-7974): srazenemu se hazi brneni, ale OMRACENY neni
+//     otoceny licem nahoru -- zustava omraceny, pokud ho zraneni nezhorsi.
+TEST(BombHandler, P73AStunnedPlayerHitByTheBombStaysStunned) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::STUNNED;
+
+    FixedDiceRoller dice({5, 3, 3});                        // presne; brneni 6 neprorazi
+    resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}

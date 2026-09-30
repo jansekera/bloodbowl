@@ -43,16 +43,22 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
         passTarget += 1;
     }
 
+    // P73 (30.09.2026): fumble je "1 OR LESS BEFORE OR AFTER MODIFICATION"
+    // (r. 1742-1744), jako u mice (pass_handler.cpp). Soucet modifikaci se
+    // da spocitat PRED orezem na 2..6 -- potom uz ne. Vzor PHP d9910a96.
+    const int bombMods = (7 - thrower.stats.agility) - passTarget;
+    auto isFumble = [&](int r) { return r == 1 || r + bombMods <= 1; };
+
     passTarget = std::clamp(passTarget, 2, 6);
 
     int roll = dice.rollD6();
     emitEvent(events, {GameEvent::Type::PASS, throwerId, -1, thrower.position, target,
-                      roll, roll >= passTarget && roll != 1});
+                      roll, roll >= passTarget && !isFumble(roll)});
 
     // Determine explosion position
     Position explosionPos = target;
 
-    if (roll == 1) {
+    if (isFumble(roll)) {
         // TA4, l. 7967-7968: "If the bomb is FUMBLED it explodes IN THE BOMB
         // THROWER'S SQUARE." Puvodne se rozptylovala D8 od hazece.
         explosionPos = thrower.position;
@@ -94,7 +100,9 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
             const bool sameSquare = (dx == 0 && dy == 0);
             if (!sameSquare && dice.rollD6() < 4) continue;   // sousedi na 4+
 
-            victim->setState(PlayerState::PRONE);
+            // P73: omraceny zustava omraceny ("treated as Knocked Down even
+            // if already Prone or Stunned" = hod na brneni, ne otoceni).
+            if (victim->state != PlayerState::STUNNED) victim->setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, victim->id, throwerId,
                               victim->position, {}, 0, false});
             if (victim->teamSide == thrower.teamSide) activeKnockedDown = true;
