@@ -194,3 +194,22 @@ TEST(TTMHandler, ThrownCarrierOffThePitchIsATurnover) {
     auto result = resolveThrowTeamMate(gs, 1, 2, {1, 7}, dice, nullptr);
     EXPECT_TRUE(result.turnover);
 }
+
+// P74 (30.09.2026), port PHP ced20b99. r. 382-384: turnover, kdyz "a player
+// with the ball is thrown ... and fails to land successfully (INCLUDING
+// BEING EATEN ...)". Bez mice turnover neni (test vyse to hlida).
+TEST(TTMHandler, P74EatingTheBallCarrierIsATurnover) {
+    auto gs = ttmSetup();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 4, 5, 1, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    gs.getPlayer(1).skills.add(SkillName::AlwaysHungry);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    gs.ball = BallState::carried({11, 7}, 2);
+
+    FixedDiceRoller dice({1, 1, 3, 3, 3, 3});               // sezran; mic odskoci
+    auto result = resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    ASSERT_EQ(gs.getPlayer(2).state, PlayerState::DEAD);
+    EXPECT_TRUE(result.turnover) << "sezrany nosic mice neni turnover";
+}

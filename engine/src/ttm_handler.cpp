@@ -45,7 +45,9 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
                 }
                 projectile.setState(PlayerState::DEAD);
                 projectile.position = {-1, -1};
-                return ActionResult::ok();
+                // P74 (30.09.2026), r. 382-384: sezrany NOSIC MICE je turnover
+                // ("including being eaten"); bez mice ne. Vzor PHP ced20b99.
+                return projectileHadBall ? ActionResult::turnovr() : ActionResult::ok();
             }
             // Vykroutil se => akce se automaticky bere jako FUMBLE.
             forcedFumble = true;

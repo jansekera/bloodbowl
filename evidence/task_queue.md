@@ -1136,7 +1136,7 @@ Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.0
 | **P71** | PORT do C++: Blood Lust — hladový upír akci dokončí, krmí se na konci (před přihrávkou/předáním/TD), Block→Move | commit 9e980cac | OTEVŘENO |
 | **P72** | PORT do C++: Ball & Chain (TA6) — šablona vhazování, dav, zranění bez brnění, turnover, blok podle síly, ležící odtlačit + brnění, follow-up | commit e373bf23, 04e4946c | OTEVŘENO |
 | **P73** | PORT do C++: Bombardier — fumble při modifikovaném ≤1; zasažený omráčený zůstává omráčený | commit d9910a96 | **UZAVŘENO 30.09.** — fumble = přirozená 1 nebo modifikovaný ≤1 (součet modifikací spočtený před ořezem 2..6); zasažený omráčený zůstává omráčený. 2 testy, bez opravy oba padají; 765 testů, 6 her goblin×orc bez chyby |
-| **P74** | PORT do C++: Always Hungry — sežraný nosič míče = turnover | commit ced20b99 | OTEVŘENO |
+| **P74** | PORT do C++: Always Hungry — sežraný nosič míče = turnover | commit ced20b99 | **UZAVŘENO 30.09.** — sežraný nosič míče = turnover (bez míče ne, existující test to dál hlídá). 1 test, bez opravy padá; 766 testů, 6 her goblin×ogre bez chyby |
 | **P75** | PORT do C++: Chainsaw — nenabízet Multiple Block, faul pilou (zpětný ráz + +3), +3 proti sraženému nositeli pily | commit fa2422ad, 78bf7601, 9e02a834 | OTEVŘENO |
 | **P76** | PORT do C++: TTM — fumble při modifikovaném ≤1; rozptyl se zastaví mimo hřiště; hozený nosič v davu = vhazování od posledního pole | commit 01bdfd77, 1657a19e, ec3feb2c | OTEVŘENO |
 | **P77** | PORT do C++: Dirty Player jako volba brnění/zranění; Break Tackle 1× za kolo | commit 6a6537ef | OTEVŘENO |
