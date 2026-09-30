@@ -1147,7 +1147,7 @@ Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.0
 | **P82** | PORT do PHP: blok v Blitzu stojí 1 pole pohybu (případně GFI), r. 549-550 | commit 366fda3e | OTEVŘENO |
 | **P83** | PORT do PHP: zakořeněný nesmí GFI ani follow-up (pathfinder `$maxRange` bez GFI při `rooted`; r. 8577-8582) | commit 6e2f084c | OTEVŘENO |
 | **P84** | PORT do PHP: Leap — cíl bez modifikátorů (jen VLL), přehoz Pro/týmový, GFI za skok do deficitu, Tentacles/Shadowing i na Leap | commit 018b230e (nález N4) | OTEVŘENO |
-| **P85** | PORT do PHP: Tentacles 2D6+ST rozdíl ≤5, Shadowing 2D6+MA rozdíl ≤7 | commit f17802d1 | OTEVŘENO |
+| **P85** | PORT do PHP: Tentacles 2D6+ST rozdíl ≤5, Shadowing 2D6+MA rozdíl ≤7 | commit f17802d1 | **UZAVŘENO 30.09.** — Tentacles 2D6+ST−ST ≤5 a jen JEDEN chapadlář (nejsilnější; PHP zkoušel každý); Shadowing 2D6+MA uhýbajícího−MA stínícího ≤7 (PHP měl 1 kostku a obrácené znaménko). Staré testy kódovaly D6 proti D6 ⇒ přepsány; kostky zvoleny tak, aby **každý** test starou mechaniku rozlišil (napoprvé 5 z 8 procházelo i bez opravy). 8 testů, bez opravy všech 8 padá; 1246 testů, PHPStan 0 |
 | **P86** | PORT do PHP: ležící smí ohlásit Blitz (r. 676) | commit 38e4fd85 | OTEVŘENO |
 | **P87** | PRAVIDLA (PHP i C++): Stunty na zranění — modifikovaná 7 = KO a 9 = Badly Hurt místo +1 k hodu (r. 8534-8536) | nález N3 | OTEVŘENO |
 | **P88** | KONTROLA (PHP × C++): lékárník — C++ přehazuje CASUALTY tabulku, PHP hod na zranění; ověřit proti BB2016 a sjednotit | nález N1 | OTEVŘENO |

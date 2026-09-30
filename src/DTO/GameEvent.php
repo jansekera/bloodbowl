@@ -507,7 +507,8 @@ final class GameEvent
     public static function tentacles(int $moverId, int $tentaclesPlayerId, int $moverRoll, int $tentRoll, bool $escaped): self
     {
         $result = $escaped ? 'escaped' : 'caught';
-        return new self('tentacles', "Tentacles: {$result} (mover {$moverRoll}, tentacles {$tentRoll})", [
+        // moverRoll = 2D6, tentRoll = vysledek po ST (P85; drzi se na 5 a min)
+        return new self('tentacles', "Tentacles: {$result} (2D6 {$moverRoll}, result {$tentRoll})", [
             'moverId' => $moverId,
             'tentaclesPlayerId' => $tentaclesPlayerId,
             'moverRoll' => $moverRoll,

@@ -13,91 +13,55 @@ use PHPUnit\Framework\TestCase;
 
 final class ShadowingTest extends TestCase
 {
-    public function testShadowingFollowsOnHighRoll(): void
+    // ⛔ P85 (30.09.2026): testy nize driv kodovaly JEDNU kostku s obracenym
+    //   znamenkem. Pravidlo (`rules_bb2016.txt` r. 8458-8464): 2D6 + MA
+    //   uhybajiciho - MA stinoveho, 7 a min = nasleduje.
+
+    private function shadowState(int $moverMa, int $shadowMa): \App\DTO\GameState
     {
-        // Mover at (5,5) dodges to (5,4), shadower at (6,5) with equal MA
-        // Shadower needs roll + MA - MA >= 6, so roll >= 6
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, movement: 6, skills: [SkillName::Shadowing], id: 2)
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, movement: $moverMa, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, movement: $shadowMa, skills: [SkillName::Shadowing], id: 2)
             ->withBallOffPitch()
             ->build();
+    }
 
-        // Dodge target = 3+ (1 TZ from shadower leaving), roll 4 → success
-        // Shadowing: roll 6 + 6 - 6 = 6 ≥ 6 → follows
-        $dice = new FixedDiceRoller([4, 6]);
-        $resolver = new ActionResolver($dice);
+    /**
+     * @param list<int> $dice
+     * @return array{int, int}
+     */
+    private function shadowerAfter(\App\DTO\GameState $state, array $dice): array
+    {
+        $resolver = new ActionResolver(new FixedDiceRoller($dice));
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
-
         $this->assertFalse($result->isTurnover());
-        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('shadowing', $types);
-
-        // Shadower moved to vacated square (5,5)
-        $shadower = $result->getNewState()->requirePlayer(2);
-        $this->assertEquals(5, $shadower->requirePosition()->getX());
-        $this->assertEquals(5, $shadower->requirePosition()->getY());
+        $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
+        return [$pos->getX(), $pos->getY()];
     }
 
-    public function testShadowingFailsOnLowRoll(): void
+    public function testShadowingFollowsOnSevenOrLess(): void
     {
-        // Same setup, but roll 5 → 5 + 6 - 6 = 5 < 6 → fails
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, movement: 6, skills: [SkillName::Shadowing], id: 2)
-            ->withBallOffPitch()
-            ->build();
-
-        $dice = new FixedDiceRoller([4, 5]); // dodge success, shadowing fails
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
-
-        $this->assertFalse($result->isTurnover());
-        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('shadowing', $types);
-
-        // Shadower stays at original position
-        $shadower = $result->getNewState()->requirePlayer(2);
-        $this->assertEquals(6, $shadower->requirePosition()->getX());
-        $this->assertEquals(5, $shadower->requirePosition()->getY());
+        // uhyb 4 · 3+4 = 7, MA6-MA6 => 7 => nasleduje na uvolnene pole
+        $this->assertSame([5, 5], $this->shadowerAfter($this->shadowState(6, 6), [4, 3, 4]));
     }
 
-    public function testShadowingHigherMAHelps(): void
+    public function testShadowingFailsOnEight(): void
     {
-        // Shadower MA 7, mover MA 5 → need roll + 7 - 5 >= 6 → roll >= 4
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 5, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, movement: 7, skills: [SkillName::Shadowing], id: 2)
-            ->withBallOffPitch()
-            ->build();
-
-        // Dodge roll 4 → success, shadowing roll 4 + 7 - 5 = 6 ≥ 6 → follows
-        $dice = new FixedDiceRoller([4, 4]);
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
-
-        $shadower = $result->getNewState()->requirePlayer(2);
-        $this->assertEquals(5, $shadower->requirePosition()->getX());
-        $this->assertEquals(5, $shadower->requirePosition()->getY());
+        // uhyb 4 · 6+2 = 8 => nenasleduje. Stara: 6 + 6 - 6 = 6 >= 6 => nasledoval.
+        $this->assertSame([6, 5], $this->shadowerAfter($this->shadowState(6, 6), [4, 6, 2]));
     }
 
-    public function testShadowingLowerMAMakesItHarder(): void
+    public function testAFasterMoverIsStillFollowedOnALowRoll(): void
     {
-        // Shadower MA 5, mover MA 7 → need roll + 5 - 7 >= 6 → roll >= 8 (impossible on D6)
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 7, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, movement: 5, skills: [SkillName::Shadowing], id: 2)
-            ->withBallOffPitch()
-            ->build();
+        // MA7 proti MA5: 2+3 = 5, +7-5 = 7 => nasleduje. Stara mechanika
+        // (1 kostka + MA stinoveho - MA uhybajiciho >= 6) tu nenasledovala nikdy.
+        $this->assertSame([5, 5], $this->shadowerAfter($this->shadowState(7, 5), [4, 2, 3]));
+    }
 
-        // Dodge roll 4 → success, shadowing roll 6 + 5 - 7 = 4 < 6 → fails
-        $dice = new FixedDiceRoller([4, 6]);
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 5, 'y' => 4]);
-
-        $shadower = $result->getNewState()->requirePlayer(2);
-        $this->assertEquals(6, $shadower->requirePosition()->getX());
-        $this->assertEquals(5, $shadower->requirePosition()->getY());
+    public function testAFasterShadowerMissesOnAHighRoll(): void
+    {
+        // MA5 proti MA7: 5+5 = 10, +5-7 = 8 => nenasleduje. Stara: 5+7-5 = 7 >= 6 => nasledoval.
+        $this->assertSame([6, 5], $this->shadowerAfter($this->shadowState(5, 7), [4, 5, 5]));
     }
 
     public function testShadowingDoesNotTriggerOnFailedDodge(): void

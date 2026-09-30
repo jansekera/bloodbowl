@@ -220,15 +220,25 @@ final class MoveHandler implements ActionHandlerInterface
             }
 
             // Tentacles check before dodge
+            // ⛔ P85 (30.09.2026), vzor C++ f17802d1 (`rules_bb2016.txt` r. 8588-8595):
+            //   "The opposing player rolls 2D6 adding their own player's ST and
+            //   subtracting the Tentacles player's ST ... 5 or less = held firm"
+            //   a "only ONE of the opposing players may attempt to grab him".
+            //   PHP hazel D6 proti D6 a zkousel to KAZDY chapadlar zvlast.
+            //   Z vic chapadlaru zkousi ten nejsilnejsi (nejlepsi sance pro soupere).
             if ($step->requiresDodge() && $from !== null) {
+                $grabber = null;
                 foreach ($this->tzCalc->getMarkingPlayers($currentState, $from, $currentPlayer->getTeamSide()) as $marker) {
-                    if (!$marker->hasSkill(SkillName::Tentacles)) {
-                        continue;
+                    if ($marker->hasSkill(SkillName::Tentacles)
+                        && ($grabber === null || $marker->getStats()->getStrength() > $grabber->getStats()->getStrength())) {
+                        $grabber = $marker;
                     }
-                    $moverRoll = $this->dice->rollD6();
-                    $tentRoll = $this->dice->rollD6();
-                    $escaped = ($moverRoll + $currentPlayer->getStats()->getStrength()) > ($tentRoll + $marker->getStats()->getStrength());
-                    $events[] = GameEvent::tentacles($playerId, $marker->getId(), $moverRoll, $tentRoll, $escaped);
+                }
+                if ($grabber !== null) {
+                    $roll = $this->dice->rollD6() + $this->dice->rollD6();
+                    $total = $roll + $currentPlayer->getStats()->getStrength() - $grabber->getStats()->getStrength();
+                    $escaped = $total > 5;
+                    $events[] = GameEvent::tentacles($playerId, $grabber->getId(), $roll, $total, $escaped);
                     if (!$escaped) {
                         // Movement ends, NOT a turnover
                         $currentPlayer = $currentPlayer->withHasMoved(true);
@@ -402,10 +412,15 @@ final class MoveHandler implements ActionHandlerInterface
                         if (!$marker->hasSkill(SkillName::Shadowing)) {
                             continue;
                         }
-                        $shadowRoll = $this->dice->rollD6();
+                        // ⛔ P85 (30.09.2026), vzor C++ f17802d1 (`rules_bb2016.txt`
+                        //   r. 8458-8464): "rolls 2D6 adding their own player's MA and
+                        //   subtracting the Shadowing player's MA ... 7 or less" = nasleduje.
+                        //   PHP hazel jednu kostku s OBRACENYM znamenkem -- rychlejsi
+                        //   hrac se branil HUR.
+                        $shadowRoll = $this->dice->rollD6() + $this->dice->rollD6();
                         $shadowMA = $marker->getStats()->getMovement();
                         $moverMA = $currentPlayer->getStats()->getMovement();
-                        $followed = ($shadowRoll + $shadowMA - $moverMA) >= 6;
+                        $followed = ($shadowRoll + $moverMA - $shadowMA) <= 7;
                         $events[] = GameEvent::shadowing($marker->getId(), $currentPlayer->getId(), $shadowRoll, $followed);
                         if ($followed) {
                             $marker = $marker->withPosition($from);

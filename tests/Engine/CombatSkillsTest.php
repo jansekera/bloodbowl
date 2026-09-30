@@ -303,38 +303,41 @@ final class CombatSkillsTest extends TestCase
 
     // ========== STEP 4: Tentacles ==========
 
-    public function testTentaclesBlocksMovement(): void
+    // ⛔ P85 (30.09.2026): testy nize driv kodovaly D6 proti D6. Pravidlo
+    //   (`rules_bb2016.txt` r. 8588-8595): 2D6 + ST uhybajiciho - ST chapadlare,
+    //   5 a min = drzen. Hranicni testy z obou stran prahu.
+
+    public function testTentaclesHoldsOnFiveOrLess(): void
     {
-        // Tentacles blocks dodging away: mover 2+ST3=5, tent 4+ST3=7 → caught
+        // 4+1 = 5, ST3-ST3 => 5 => drzen (stara mechanika: mover 4 > tent 1 => unikl)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Tentacles], id: 2)
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([2, 4]); // mover=2, tent=4
+        $dice = new FixedDiceRoller([4, 1]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         // Movement ends but NOT a turnover
         $this->assertFalse($result->isTurnover());
-        // Player stays at start (didn't move)
         $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('tentacles', $types);
     }
 
-    public function testTentaclesEscapeThenDodge(): void
+    public function testTentaclesEscapesOnSixThenDodges(): void
     {
-        // Escape tentacles (5+ST3=8 > 2+ST3=5), then dodge
+        // 3+3 = 6 => vytrhne se, pak uhyb 4
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Tentacles], id: 2)
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([5, 2, 4]); // tent mover=5, tent=2 (escape), dodge=4 (pass)
+        $dice = new FixedDiceRoller([3, 3, 4]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
@@ -342,39 +345,41 @@ final class CombatSkillsTest extends TestCase
         $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
     }
 
-    public function testTentaclesTiesMoverLoses(): void
+    public function testTentaclesStrengthGapCountsForTheMover(): void
     {
-        // Tie: 3+ST3=6 vs 3+ST3=6 → mover loses (not strictly greater)
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Tentacles], id: 2)
-            ->withBallOffPitch()
-            ->build();
-
-        $dice = new FixedDiceRoller([3, 3]); // tie
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
-
-        $this->assertFalse($result->isTurnover());
-        // Player stays at 5,5 (caught)
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
-    }
-
-    public function testTentaclesStrengthMatters(): void
-    {
-        // ST4 mover vs ST3 tentacles: 2+4=6 vs 4+3=7 → caught
+        // ST4 proti ST3: 2+3 = 5, +4-3 = 6 => vytrhne se (pri rovne ST by byl drzen)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 4, id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Tentacles], id: 2)
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([2, 4]); // 2+4=6 vs 4+3=7 → caught
+        $dice = new FixedDiceRoller([2, 3, 4]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
+        $this->assertSame(4, $result->getNewState()->requirePlayer(1)->requirePosition()->getX());
+    }
+
+    public function testOnlyOneTentaclesPlayerMayTry(): void
+    {
+        // "only one of the opposing players may attempt to grab him" (r. 8593-8595)
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, skills: [SkillName::Tentacles], id: 2)
+            ->addPlayer(TeamSide::AWAY, 6, 6, skills: [SkillName::Tentacles], id: 3)
+            ->withBallOffPitch()
+            ->build();
+
+        // nova: 5+2 = 7 => vytrhne se, jeden pokus, uhyb 6.
+        // stara: 1. chapadlar 5 vs 2 unikl, 2. chapadlar 6 vs 6 => dva pokusy.
+        $dice = new FixedDiceRoller([5, 2, 6, 6, 6, 6]);
+        $resolver = new ActionResolver($dice);
+        $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5]);
+
+        $tentacleEvents = array_filter($result->getEvents(), fn($e) => $e->getType() === 'tentacles');
+        $this->assertCount(1, $tentacleEvents);
     }
 
     public function testNoTentaclesNormalDodge(): void
