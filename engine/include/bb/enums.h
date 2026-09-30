@@ -252,8 +252,10 @@ enum class KickoffEvent : uint8_t {
     PERFECT_DEFENCE = 4,
     HIGH_KICK = 5,
     CHEERING = 6,
-    BRILLIANT_COACHING = 7,
-    CHANGING_WEATHER = 8,
+    // P69 (30.09.2026), r. 1316-1321: 7 = Changing Weather, 8 = Brilliant
+    // Coaching. Do dneska prohozene (PHP opraveno v d674d080).
+    CHANGING_WEATHER = 7,
+    BRILLIANT_COACHING = 8,
     QUICK_SNAP = 9,
     BLITZ = 10,
     THROW_A_ROCK = 11,

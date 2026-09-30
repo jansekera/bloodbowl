@@ -110,6 +110,9 @@ TEST(Weather, FromRoll) {
 
 TEST(KickoffEvent, FromRoll) {
     EXPECT_EQ(kickoffEventFromRoll(2), KickoffEvent::GET_THE_REF);
-    EXPECT_EQ(kickoffEventFromRoll(7), KickoffEvent::BRILLIANT_COACHING);
+    // P69 (30.09.2026), r. 1316-1321: 7 = Changing Weather, 8 = Brilliant
+    // Coaching. Test tu driv hlidal prohozene poradi.
+    EXPECT_EQ(kickoffEventFromRoll(7), KickoffEvent::CHANGING_WEATHER);
+    EXPECT_EQ(kickoffEventFromRoll(8), KickoffEvent::BRILLIANT_COACHING);
     EXPECT_EQ(kickoffEventFromRoll(12), KickoffEvent::PITCH_INVASION);
 }
