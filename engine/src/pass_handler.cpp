@@ -133,10 +133,14 @@ int checkInterception(GameState& state, int passerId, Position target,
         // Long Legs blocks it (rules parity, 2026-08-10). CRP Very Long
         // Legs: "the Safe Throw skill may not be used to affect any
         // Interception rolls made by this player."
+        // P78 (30.09.2026), port PHP faef31f3: Safe Throw je NEMODIFIKOVANY hod
+        // na Obratnost HAZECE ("may make an unmodified Agility roll"), ne
+        // prehoz kostky zachycujiciho proti jeho cili.
         if (success && passer.hasSkill(SkillName::SafeThrow) &&
             !interceptor->hasSkill(SkillName::VeryLongLegs)) {
-            int reroll = dice.rollD6();
-            if (reroll < intTarget) {
+            const int safeTarget = std::clamp(7 - passer.stats.agility, 2, 6);
+            const int safeRoll = dice.rollD6();
+            if (safeRoll != 1 && (safeRoll == 6 || safeRoll >= safeTarget)) {
                 success = false;
                 emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
                                   static_cast<int>(SkillName::SafeThrow), true});
@@ -314,7 +318,14 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     emitEvent(events, {GameEvent::Type::PASS, passerId, -1, passer.position, target,
                       roll, roll >= passTarget && !isFumble(roll)});
 
-    const bool fumbledFirst = isFumble(roll);
+    // P78 (PHP e81bb57d): Safe Throw -- fumble jinak nez prirozenou 1 hazec
+    // "manages to keep hold of the ball ... and the team does not suffer a
+    // turnover". Takovy fumble nehrozi turnoverem, takze se za nej neplati
+    // prehozem (doktrina: Pro/tymovy prehoz jen na fumble).
+    auto safeThrowKeeps = [&](int r) {
+        return passer.hasSkill(SkillName::SafeThrow) && r != 1 && isFumble(r);
+    };
+    const bool fumbledFirst = isFumble(roll) && !safeThrowKeeps(roll);
     const bool inaccurateFirst = !fumbledFirst && roll < passTarget;
 
     if (fumbledFirst || inaccurateFirst) {
@@ -362,6 +373,15 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                 }
             }
         }
+    }
+
+    if (safeThrowKeeps(roll)) {
+        // P78: mic zustava hazeci, prihravka se neuskutecni, turnover neni.
+        // (Mic uz byl "uvolnen" na zacatku resolvePass -- vraci se do ruky.)
+        state.ball = BallState::carried(passer.position, passerId);
+        emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
+                          static_cast<int>(SkillName::SafeThrow), true});
+        return ActionResult::ok();
     }
 
     if (isFumble(roll)) {

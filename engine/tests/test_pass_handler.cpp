@@ -176,10 +176,12 @@ TEST(PassHandler, SafeThrowBlocksInterception) {
 
     gs.ball = BallState::carried({3, 7}, 1);
 
-    // Interception: roll 5 (success), SafeThrow reroll: roll 3 (< 5, fails interception)
+    // Interception: roll 5 (success). Safe Throw = NEMODIFIKOVANY hod na
+    // Obratnost HAZECE (r. Safe Throw): AG3 = 4+, hod 5 projde => zruseno.
+    // (P78: test driv kodoval prehoz kostky zachycujiciho proti jeho cili 5.)
     // Pass continues: target = 7-3-0(SP for dist 6) = 4, roll 5 → accurate
     // Catch: target 4-1=3, roll 4 → success
-    FixedDiceRoller dice({5, 3, 5, 4});
+    FixedDiceRoller dice({5, 5, 5, 4});
     auto result = resolvePass(gs, 1, {9, 7}, dice, nullptr);
 
     EXPECT_FALSE(result.turnover);
@@ -577,4 +579,56 @@ TEST(PassHandler, P70AfterAFailedProTheTeamRerollGoesToTheProRoll) {
 
     EXPECT_TRUE(result.turnover) << "tymovy prehoz prehodil prihravku misto hodu Pro";
     EXPECT_EQ(gs.homeTeam.rerolls, 2);
+}
+
+// P78 (30.09.2026), port PHP faef31f3, e81bb57d. Safe Throw: "the Safe Throw
+// player may make an UNMODIFIED AGILITY ROLL. If this is successful then the
+// interception is cancelled out" a "if this player fumbles a pass on any roll
+// OTHER THAN A NATURAL 1 then he manages to keep hold of the ball ... and the
+// team does not suffer a turnover".
+TEST(PassHandler, P78SafeThrowIsTheThrowersAgilityRollNotTheInterceptorsReroll) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);              // AG3 => 4+
+    gs.getPlayer(1).skills.add(SkillName::SafeThrow);
+    placePlayer(gs, 2, {9, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {6, 7}, TeamSide::AWAY, 6, 3, 4);    // chyta na 5+
+    gs.ball = BallState::carried({3, 7}, 1);
+
+    // intercept 5 · Safe Throw 3 < 4 => intercepce PLATI. Stara mechanika
+    // (3 < cil zachycujiciho 5) by ji zrusila.
+    FixedDiceRoller dice({5, 3, 5, 4});
+    auto result = resolvePass(gs, 1, {9, 7}, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.ball.carrierId, 12);
+}
+
+TEST(PassHandler, P78SafeThrowKeepsTheBallOnAModifiedFumble) {
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::SafeThrow);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {4, 6}, TeamSide::AWAY);             // dve zony na hazeci
+    placePlayer(gs, 13, {4, 8}, TeamSide::AWAY);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // quick +1, zony -2 => hod 2 je modifikovana 1 = fumble, ale ne prirozena
+    FixedDiceRoller dice({2, 3, 3, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}
+
+TEST(PassHandler, P78SafeThrowDoesNotSaveANaturalOne) {
+    // Hlidaci test: prirozena 1 je fumble i se Safe Throw.
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::SafeThrow);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+    FixedDiceRoller dice({1, 3, 3, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
 }
