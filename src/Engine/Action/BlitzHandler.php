@@ -79,7 +79,13 @@ final class BlitzHandler implements ActionHandlerInterface
             //   podle mereni v tomhle souboru slo o 3,58 % rozhodnuti, takze
             //   to nebylo teoreticke.
             $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
-            $moveTarget = $this->findBlitzMoveTarget($validMoves, $defenderPos);
+            // P82 (30.09.2026): rana stoji pole (`BlockHandler::payBlitzBlock`),
+            //   takze cil blitzu je jen pole, odkud na ni jeste zbyde -- normalni
+            //   pohyb, nebo aspon jedno GFI.
+            $gfiCap = $attacker->hasSkill(SkillName::Sprint) ? 3 : 2;
+            $maxCost = $attacker->getMovementRemaining() + $gfiCap - 1;
+            $payable = array_filter($validMoves, fn($p) => $p->getTotalCost() <= $maxCost);
+            $moveTarget = $this->findBlitzMoveTarget($payable, $defenderPos);
 
             // ⛔⛔⛔ OPRAVA 11.09.2026: TADY SE HÁZELA VÝJIMKA
             //   `throw new \InvalidArgumentException('Cannot reach target for blitz')`
@@ -106,7 +112,10 @@ final class BlitzHandler implements ActionHandlerInterface
             //   nekoná (BB2016: Blitz = pohyb + NEJVÝŠ jeden blok během něj).
             $blockPossible = true;
             if ($moveTarget === null) {
-                $moveTarget = $this->findClosestApproach($validMoves, $attackerPos, $defenderPos);
+                // P82: rana nebude, takze GFI by bylo ciste riziko -- priblizit
+                //   se jen normalnim pohybem.
+                $noGfi = array_filter($validMoves, fn($p) => $p->getGfiCount() === 0);
+                $moveTarget = $this->findClosestApproach($noGfi, $attackerPos, $defenderPos);
                 $blockPossible = false;
                 if ($moveTarget === null) {
                     // Nemá kam šlápnout vůbec. Deklarace platí (blitz je

@@ -35,6 +35,88 @@ final class BlockHandler implements ActionHandlerInterface
     ) {
     }
 
+    /**
+     * P82 (30.09.2026), port C++ 366fda3e / `block_handler.cpp:553-582`.
+     * `rules_bb2016.txt` r. 546-552: rana v blitzu „costs one square of
+     * movement". Bez normalniho pohybu se na ni GFI (2+, ve vanici 3+,
+     * pocita se do limitu GFI; zakoreneny GFI nesmi, r. 8577-8578); bez GFI
+     * se rana nehodi. Neuspesne GFI = pad ve VLASTNIM poli pred ranou, turnover.
+     * Prehozy jako `attemptRoll` v C++: Sure Feet (1x za kolo), jinak Pro,
+     * jinak tymovy (Loner). ⚠️ Interaktivni volbu prehozu tu clovek zatim nema.
+     *
+     * @param list<GameEvent> $events
+     * @return array{state: GameState, outcome: 'paid'|'unpayable'|'fell'}
+     */
+    private function payBlitzBlock(GameState $state, MatchPlayerDTO $attacker, array &$events): array
+    {
+        $gfiFloor = $attacker->isRooted() ? 0 : ($attacker->hasSkill(SkillName::Sprint) ? -3 : -2);
+        $remaining = $attacker->getMovementRemaining() - 1;
+        if ($remaining < $gfiFloor) {
+            $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(true));
+            return ['state' => $state, 'outcome' => 'unpayable'];
+        }
+        $attacker = $attacker->withMovementRemaining($remaining);
+        $state = $state->withPlayer($attacker);
+        if ($remaining >= 0) {
+            return ['state' => $state, 'outcome' => 'paid'];
+        }
+
+        $id = $attacker->getId();
+        $side = $attacker->getTeamSide();
+        $threshold = $state->getWeather() === \App\Enum\Weather::BLIZZARD ? 3 : 2;
+        $roll = $this->dice->rollD6();
+        $ok = $roll >= $threshold;
+        $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
+
+        if (!$ok && $attacker->hasSkill(SkillName::SureFeet) && !$attacker->isSureFeetUsedThisTurn()) {
+            $attacker = $attacker->withSureFeetUsedThisTurn(true);
+            $roll = $this->dice->rollD6();
+            $ok = $roll >= $threshold;
+            $events[] = GameEvent::rerollUsed($id, 'Sure Feet');
+            $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
+        } elseif (!$ok && $attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn()) {
+            $attacker = $attacker->withProUsedThisTurn(true);
+            $pro = \App\Engine\ProCheck::roll($this->dice, $attacker, $state->getTeamState($side)->canUseReroll(), $events);
+            if ($pro['teamRerollUsed']) {
+                $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+            }
+            if ($pro['allowed']) {
+                $roll = $this->dice->rollD6();
+                $ok = $roll >= $threshold;
+                $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
+            }
+        } elseif (!$ok && $state->getTeamState($side)->canUseReroll()) {
+            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+            $lonerOk = true;
+            if ($attacker->hasSkill(SkillName::Loner)) {
+                $lonerRoll = $this->dice->rollD6();
+                $lonerOk = $lonerRoll >= 4;
+                $events[] = GameEvent::lonerCheck($id, $lonerRoll, $lonerOk);
+            }
+            if ($lonerOk) {
+                $roll = $this->dice->rollD6();
+                $ok = $roll >= $threshold;
+                $events[] = GameEvent::rerollUsed($id, 'Team Reroll');
+                $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
+            }
+        }
+
+        if ($ok) {
+            return ['state' => $state->withPlayer($attacker), 'outcome' => 'paid'];
+        }
+
+        $events[] = GameEvent::playerFell($id);
+        $events[] = GameEvent::turnover('Failed Going For It');
+        $fallen = $attacker->withState(PlayerState::PRONE)->withHasActed(true)->withHasMoved(true);
+        $injResult = $this->injuryResolver->resolve($fallen, $this->dice);
+        $fallen = $injResult['player'];
+        $state = $state->withPlayer($fallen);
+        $events = array_merge($events, $injResult['events']);
+        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallen, $events);
+
+        return ['state' => $state, 'outcome' => 'fell'];
+    }
+
     public function setPassResolver(PassResolver $passResolver): void
     {
         $this->passResolver = $passResolver;
@@ -73,6 +155,19 @@ final class BlockHandler implements ActionHandlerInterface
 
         if ($attackerPos->distanceTo($defenderPos) !== 1) {
             throw new \InvalidArgumentException('Players must be adjacent to block');
+        }
+
+        // P82: rana v blitzu stoji pole pohybu (pripadne GFI).
+        if (!empty($params['isBlitz'])) {
+            $paid = $this->payBlitzBlock($state, $attacker, $events);
+            $state = $paid['state'];
+            if ($paid['outcome'] === 'fell') {
+                return ActionResult::turnover($state->withTurnoverPending(true), $events);
+            }
+            if ($paid['outcome'] === 'unpayable') {
+                return ActionResult::success($state, $events);
+            }
+            $attacker = $state->requirePlayer($attackerId);
         }
 
         // Dump-Off: defender with ball can quick pass before block
@@ -232,11 +327,23 @@ final class BlockHandler implements ActionHandlerInterface
                 && $frenzyAttacker->getPosition()->distanceTo($frenzyDefender->getPosition()) === 1
             ) {
                 $frenzyEvents = $result->getEvents();
+                // P82: i druha rana Frenzy v blitzu stoji pole (C++ `block_handler.cpp:557`).
+                if ($isBlitz) {
+                    $paid = $this->payBlitzBlock($frenzyState, $frenzyAttacker, $frenzyEvents);
+                    if ($paid['outcome'] === 'fell') {
+                        return ActionResult::turnover($paid['state']->withTurnoverPending(true), $frenzyEvents);
+                    }
+                    if ($paid['outcome'] === 'unpayable') {
+                        return ActionResult::success($paid['state'], $frenzyEvents);
+                    }
+                    $frenzyState = $paid['state'];
+                    $frenzyAttacker = $frenzyState->requirePlayer($pending->getAttackerId());
+                }
                 $frenzyEvents[] = GameEvent::frenzyBlock($pending->getAttackerId(), $pending->getDefenderId());
 
                 // Recalculate strengths at new positions
                 $attStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyAttacker, $frenzyDefender->getPosition());
-                $defStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyDefender, $frenzyAttacker->getPosition());
+                $defStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyDefender, $frenzyAttacker->requirePosition());
                 $diceInfo2 = $this->strCalc->getBlockDiceInfo($attStr2, $defStr2);
 
                 $faces2 = [];
