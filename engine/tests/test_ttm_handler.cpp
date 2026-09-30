@@ -213,3 +213,64 @@ TEST(TTMHandler, P74EatingTheBallCarrierIsATurnover) {
     ASSERT_EQ(gs.getPlayer(2).state, PlayerState::DEAD);
     EXPECT_TRUE(result.turnover) << "sezrany nosic mice neni turnover";
 }
+
+// ============================================================================
+// P76 (30.09.2026) -- port PHP 01bdfd77, 1657a19e, ec3feb2c.
+// ============================================================================
+
+static void ttmPair(GameState& gs, Position thrower, Position projectile) {
+    placePlayer(gs, 1, thrower, TeamSide::HOME, 4, 5, 3, 9);   // AG3
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, projectile, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+}
+
+TEST(TTMHandler, P76FumbleCountsTheModifiedRoll) {
+    // Fumble je "1 or less before or after modification" (r. 1742-1744).
+    // Short 0, TTM -1 => hod 2 je 1 = fumble => pristane na PUVODNIM poli.
+    auto gs = ttmSetup();
+    ttmPair(gs, {10, 7}, {11, 7});
+    FixedDiceRoller dice({2, 6, 6, 6, 6, 6, 6});
+    resolveThrowTeamMate(gs, 1, 2, {15, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{11, 7}))
+        << "hod 2 s -1 se bral jako neprecny, ne jako fumble";
+}
+
+TEST(TTMHandler, P76ScatterStopsOnceThePlayerLeavesThePitch) {
+    // "If the thrown player scatters off the pitch, he is beaten up by the
+    // crowd" (r. 8615-8617) -- dalsi rozptyl ho uz nevrati.
+    auto gs = ttmSetup();
+    ttmPair(gs, {10, 1}, {11, 1});
+    // presny · 1. rozptyl N = ven · (dalsi dva by ho vratily: S, S) · dav 3+3
+    FixedDiceRoller dice({6, 1, 5, 5, 3, 3, 3, 3, 3, 3});
+    resolveThrowTeamMate(gs, 1, 2, {15, 0}, dice, nullptr);
+    EXPECT_FALSE(gs.getPlayer(2).isOnPitch()) << "po vyletu z hriste se vratil";
+}
+
+TEST(TTMHandler, P76ThrownCarrierInTheCrowdMeansAThrowInFromHisLastSquare) {
+    // Mic "is immediately thrown back in ... using the last square the ball
+    // crossed before going off" (r. 866-871). C++ ho odrazel z pole (-1,-1).
+    auto gs = ttmSetup();
+    ttmPair(gs, {10, 1}, {11, 1});
+    gs.ball = BallState::carried({11, 1}, 2);
+    // presny · N ven z (15,0) · vhazovani: smer 3 = S, vzdalenost 2+2 =>
+    // (15,4) · odraz D8 5 = S => (15,5) · dav 3+3
+    FixedDiceRoller dice({6, 1, 3, 2, 2, 5, 3, 3, 3, 3, 3});
+    auto result = resolveThrowTeamMate(gs, 1, 2, {15, 0}, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{15, 5}));
+}
+
+TEST(TTMHandler, P76AStunnedPlayerLandedOnStaysStunned) {
+    // Stejny princip jako u bomby (P73): "knocked down ... (even if already
+    // prone or stunned)" (r. 8617-8619) = hod na brneni, ne otoceni licem nahoru.
+    auto gs = ttmSetup();
+    ttmPair(gs, {10, 7}, {11, 7});
+    placePlayer(gs, 12, {15, 6}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::STUNNED;
+    // presny · E, W, N => (15,6) obsazeno · brneni 3+3 · o pole dal S => (15,7) · pristani 6
+    FixedDiceRoller dice({6, 3, 7, 1, 3, 3, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6});
+    resolveThrowTeamMate(gs, 1, 2, {15, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}

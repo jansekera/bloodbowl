@@ -80,6 +80,11 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     // passes the player". Ten postih tu nebyl vubec.
     passTarget += 1;
 
+    // P76 (30.09.2026): fumble je "1 OR LESS BEFORE OR AFTER MODIFICATION"
+    // (r. 1742-1744). Soucet modifikaci se da spocitat jen PRED orezem 2..6.
+    // Vzor PHP 01bdfd77 a bomby (P73).
+    const int ttmMods = (7 - thrower.stats.agility) - passTarget;
+
     passTarget = std::clamp(passTarget, 2, 6);
 
     // Kdyz se spoluhrac vykroutil (l. 7792-7794), je akce "automatically treated
@@ -87,12 +92,13 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool fumble = forcedFumble;
     if (!forcedFumble) {
         int roll = dice.rollD6();
-        fumble = (roll == 1);
+        fumble = (roll == 1 || roll + ttmMods <= 1);
         emitEvent(events, {GameEvent::Type::PASS, throwerId, projectileId, thrower.position,
                           target, roll, !fumble});
     }
 
     Position landPos;
+    Position lastOnPitch = target;
     if (fumble) {
         // l. 8613-8614: "A fumbled team-mate will land in THE SQUARE HE
         // ORIGINALLY OCCUPIED." Puvodne se rozptyloval od HAZECE.
@@ -104,11 +110,16 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         // and harder to pass than a ball." Nepresny hod scatteruje tri krat
         // stejne (l. 735-737) => obe vetve jsou totozne a "presny" dopad
         // neexistuje. Puvodne: presny = presne na cil, nepresny = JEDEN rozptyl.
+        // P76 (PHP 1657a19e): kdo vyleti z hriste, konci v davu (r. 8615-8617)
+        // -- dalsi rozptyl ho uz nevrati. `lastOnPitch` je pole, odkud se
+        // pripadne vhazuje mic (r. 866-871).
         landPos = target;
         for (int i = 0; i < 3; ++i) {
+            lastOnPitch = landPos;
             Position step = scatterDirection(dice.rollD8());
             landPos.x = static_cast<int8_t>(landPos.x + step.x);
             landPos.y = static_cast<int8_t>(landPos.y + step.y);
+            if (!landPos.isOnPitch()) break;
         }
     }
 
@@ -121,7 +132,13 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         // pushed off the pitch."
         // l. 8430-8431: "A failed landing roll or LANDING IN THE CROWD DOES NOT
         // CAUSE A TURNOVER, UNLESS HE WAS HOLDING THE BALL."
-        if (projectileHadBall) handleBallOnPlayerDown(state, projectileId, dice, events);
+        // P76 (PHP ec3feb2c): mic se VHAZUJE z posledniho pole na hristi
+        // (r. 866-871). Driv se odrazel z pole (-1,-1), kam uz byl hrac
+        // odlozeny.
+        if (projectileHadBall) {
+            state.ball = BallState::onGround(lastOnPitch);
+            resolveThrowIn(state, lastOnPitch, landPos, dice, events);
+        }
         resolveCrowdSurf(state, projectileId, dice, events);
         return projectileHadBall ? ActionResult::turnovr() : ActionResult::ok();
     };
@@ -136,7 +153,8 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool landedOnSomeone = false;
     if (Player* under = state.getPlayerAtPosition(landPos)) {
         landedOnSomeone = true;
-        under->setState(PlayerState::PRONE);
+        // P76: omraceny zustava omraceny (hod na brneni, ne otoceni) -- jako bomba.
+        if (under->state != PlayerState::STUNNED) under->setState(PlayerState::PRONE);
         emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, under->id, projectileId,
                           under->position, {}, 0, false});
         InjuryContext uctx;
