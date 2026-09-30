@@ -297,7 +297,8 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // s obema dovednostmi bralo VOLBU, kterou pravidlo predpoklada.
         // Vylouceni se resi na druhe strane: `resolveMultipleBlock` pousti oba
         // bloky s `frenzyDisabled`, takze Frenzy uvnitr nezasahne.
-        if (p.hasSkill(SkillName::MultipleBlock)) {
+        // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
+        if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Chainsaw)) {
             // Collect adjacent standing enemies
             int adjEnemies[8];
             int nAdj = 0;

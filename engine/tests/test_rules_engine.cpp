@@ -472,3 +472,20 @@ TEST(RulesEngineBlitzBudget, AdjacentBlitzIsRefusedWhenEvenTheBlockCannotBePaid)
     EXPECT_EQ(countActionsOfType(as, ActionType::BLITZ), 0)
         << "nabídl se blitz, jehož ránu není z čeho zaplatit";
 }
+
+// P75 (30.09.2026), port PHP fa2422ad. Chainsaw "may only be used once per
+// turn (i.e. cannot be used with Frenzy or MULTIPLE BLOCK)" (r. 8014-8015).
+TEST(RulesEngine, P75ChainsawHolderIsNotOfferedMultipleBlock) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {11, 6}, TeamSide::AWAY);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    EXPECT_EQ(countActionsOfType(as, ActionType::MULTIPLE_BLOCK), 0);
+    EXPECT_GT(countActionsOfType(as, ActionType::BLOCK), 0) << "obycejny blok (pilou) ano";
+}

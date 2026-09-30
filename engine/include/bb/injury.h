@@ -20,6 +20,13 @@ struct InjuryContext {
     bool hasStakes = false;   // blocks Regeneration
     bool hasDecay = false;    // roll injury twice, take worse
     bool hasNurglesRot = false;
+    // P75 (30.09.2026), Chainsaw r. 7996-8018: +3 k brneni, kdyz obet zasahla
+    // pila, kdyz je obet NOSITEL pily sraženy "for any reason", nebo kdyz se
+    // obet srazila o nositele pily. Priznak misto `armourModifier += 3`, aby
+    // se +3 nesecetlo dvakrat (pila do nositele pily). Vzor PHP 9e02a834.
+    bool chainsaw = false;
+    // Stab hazi brneni "unmodified" -- +3 za pilu se na nej nevztahuje.
+    bool unmodifiedArmour = false;
 };
 
 // Returns true if armor was broken

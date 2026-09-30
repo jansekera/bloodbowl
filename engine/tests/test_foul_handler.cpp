@@ -226,3 +226,41 @@ TEST(FoulHandler, DefensiveAssistCancelledByAnotherMarker) {
     resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
+
+// P75 (30.09.2026), port PHP 78bf7601. r. 8006-8008: "A player armed with a
+// chainsaw may take a Foul Action, and adds 3 to the Armour roll, but must
+// roll for kick back as described above."
+TEST(FoulHandler, P75ChainsawFoulAddsThreeToArmour) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+
+    // zpetny raz 3 (ne) · brneni 3+4 = 7 (+3 = 10 > 8) · zraneni 2+3 = omracen
+    FixedDiceRoller dice({3, 3, 4, 2, 3, 3, 3});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED) << "faul pilou bez +3";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+}
+
+TEST(FoulHandler, P75ChainsawFoulKickbackHitsTheFouler) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+
+    // zpetny raz 1 · brneni NOSITELE 3+4 = 7 (+3 = 10 > 8) · zraneni 2+3
+    FixedDiceRoller dice({1, 3, 4, 2, 3, 3, 3});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE) << "obet ma zustat netknuta";
+    EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
+}

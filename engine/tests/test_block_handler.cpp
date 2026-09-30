@@ -1452,3 +1452,81 @@ TEST(BlockHandler, P68ProneRootedPlayerStillHoldsGround) {
 
     EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
 }
+
+// ============================================================================
+// P75 (30.09.2026) -- port PHP fa2422ad, 78bf7601, 9e02a834. Chainsaw,
+// r. 7996-8018: "if a player holding a chainsaw is Knocked Down FOR ANY
+// REASON, the opposing coach is allowed to add 3 to his Armour roll" a "if an
+// opponent knocks himself over when blocking the chainsaw player then add 3
+// to his Armour roll". +3 se nesmi secist dvakrat (pila do nositele pily).
+// ============================================================================
+
+TEST(BlockHandler, P75KnockedDownChainsawHolderGivesPlusThreeArmour) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 8);
+    gs.getPlayer(12).skills.add(SkillName::Chainsaw);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    // POW; brneni 3+3 = 6 (+3 = 9 > AV8); zraneni 3+3 = omracen
+    FixedDiceRoller dice({6, 3, 3, 3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED) << "+3 za pilu chybi";
+}
+
+TEST(BlockHandler, P75AttackerWhoFallsOnTheChainsawGetsPlusThreeToo) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Chainsaw);
+    gs.homeTeam.rerolls = 0;
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({1, 3, 3, 3, 3, 3, 3, 3, 3});      // ATTACKER DOWN
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+}
+
+TEST(BlockHandler, P75StabStaysUnmodifiedAgainstAChainsawHolder) {
+    // Hlidaci test: Stab hazi brneni "unmodified", +3 za pilu se nepridava.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Stab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 8);
+    gs.getPlayer(12).skills.add(SkillName::Chainsaw);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
+
+TEST(BlockHandler, P75ChainsawIntoAChainsawHolderIsPlusThreeNotSix) {
+    // Hlidaci test: pila do nositele pily = +3 jednou.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 9);
+    gs.getPlayer(12).skills.add(SkillName::Chainsaw);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({4, 3, 3, 3, 3, 3, 3});            // zasah; 6+3 = 9, ne > AV9
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}

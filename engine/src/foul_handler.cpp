@@ -63,6 +63,28 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         if (alts > 1) ++g_foulsWithChoice;
     }
 
+    // P75 (30.09.2026), port PHP 78bf7601, r. 8006-8008: faul pilou -- nejdriv
+    // hod na zpetny raz. Na 1 pila zasahne NOSITELE (+3 prida resolver, protoze
+    // ma pilu) a obet zustane netknuta; jinak faul s +3 k brneni.
+    const bool chainsawFoul = fouler.hasSkill(SkillName::Chainsaw);
+    if (chainsawFoul) {
+        const int kick = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::SKILL_USED, fouler.id, target.id, {}, {},
+                          static_cast<int>(SkillName::Chainsaw), kick >= 2});
+        if (kick == 1) {
+            fouler.hasActed = true;
+            state.getTeamState(fouler.teamSide).foulUsedThisTurn = true;
+            InjuryContext kickCtx;
+            if (!resolveArmourAndInjury(state, fouler.id, dice, kickCtx, events)) {
+                return ActionResult::ok();   // "no effect"
+            }
+            emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, fouler.id, -1,
+                              fouler.position, {}, 0, false});
+            handleBallOnPlayerDown(state, fouler.id, dice, events);
+            return ActionResult::turnovr();
+        }
+    }
+
     // Calculate foul assists
     // guardApplies = false: BB2016 l. 8160 -- Guard nesmí asistovat FAULU.
     int friendlyAssists = countAssists(state, target.position, fouler.teamSide,
@@ -75,6 +97,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     int enemyAssists = countAssists(state, fouler.position, target.teamSide,
                                      fouler.id, target.id, fouler.id, false);
     int assistMod = friendlyAssists - enemyAssists;
+    if (chainsawFoul) assistMod += 3;   // P75: faul pilou +3 k brneni
 
     // DirtyPlayer bonus
     if (fouler.hasSkill(SkillName::DirtyPlayer)) {

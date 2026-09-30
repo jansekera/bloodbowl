@@ -611,7 +611,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // zbroj vubec prorazil, a test `ChainsawKickback` to certifikoval
         // (kostky {1,3,3} => 6 <= AV8 "neproraženo", a presto PRONE + turnover).
         InjuryContext ctx;
-        ctx.armourModifier = 3;
+        ctx.chainsaw = true;   // +3 (P75: pres priznak, at se nesecte s nositelem)
 
         if (chainsawRoll == 1) {
             // Kickback: obeti je NOSITEL
@@ -641,6 +641,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         emitEvent(events, {GameEvent::Type::BLOCK, att.id, def.id, att.position,
                           def.position, 0, true});
         InjuryContext ctx;
+        ctx.unmodifiedArmour = true;   // Stab: "unmodified Armour roll" (P75: bez +3 za pilu)
         if (att.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
         resolveArmourAndInjury(state, def.id, dice, ctx, events);
         handleBallOnPlayerDown(state, def.id, dice, events);
@@ -914,6 +915,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             }
             if (attKnockedDown) {
                 InjuryContext attCtx;
+                attCtx.chainsaw = def.hasSkill(SkillName::Chainsaw);   // P75: srazil se o nositele pily
                 resolveArmourAndInjury(state, att.id, dice, attCtx, events);
                 handleBallOnPlayerDown(state, att.id, dice, events);
             }
@@ -949,6 +951,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // Handle attacker knocked down (from AD)
     if (attKnockedDown && chosen == BlockDiceFace::ATTACKER_DOWN) {
         InjuryContext attCtx;
+        attCtx.chainsaw = def.hasSkill(SkillName::Chainsaw);   // P75: srazil se o nositele pily
         resolveArmourAndInjury(state, att.id, dice, attCtx, events);
         handleBallOnPlayerDown(state, att.id, dice, events);
         att.hasActed = true;
@@ -1010,6 +1013,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // Handle BD attacker knockdown
             if (attKnockedDown) {
                 InjuryContext attCtx;
+                attCtx.chainsaw = def.hasSkill(SkillName::Chainsaw);   // P75: srazil se o nositele pily
                 resolveArmourAndInjury(state, att.id, dice, attCtx, events);
                 handleBallOnPlayerDown(state, att.id, dice, events);
             }
@@ -1098,6 +1102,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // Handle BD attacker knockdown (if both down and attacker falls)
     if (attKnockedDown && chosen == BlockDiceFace::BOTH_DOWN) {
         InjuryContext attCtx;
+        attCtx.chainsaw = def.hasSkill(SkillName::Chainsaw);   // P75: srazil se o nositele pily
         resolveArmourAndInjury(state, att.id, dice, attCtx, events);
         handleBallOnPlayerDown(state, att.id, dice, events);
     }
@@ -1157,6 +1162,8 @@ ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,
                                   DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& att = state.getPlayer(attackerId);
+    // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
+    if (att.hasSkill(SkillName::Chainsaw)) return ActionResult::fail();
 
     // Resolve first block (defender gets +2 ST, no follow-up)
     {

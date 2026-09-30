@@ -182,6 +182,10 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
     int aD1 = dice.rollD6();
     int aD2 = dice.rollD6();
     int base = aD1 + aD2 + ctx.armourModifier;
+    // P75: +3 za pilu -- jednou, at uz zasahla pila, nebo je obet jeji nositel.
+    if (!ctx.unmodifiedArmour && (ctx.chainsaw || player.hasSkill(SkillName::Chainsaw))) {
+        base += 3;
+    }
 
     // Claw: armor broken on 8+ regardless of AV, after modifications.
     auto breaksArmour = [&](int roll) {
