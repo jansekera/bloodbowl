@@ -901,8 +901,10 @@ final class BlockHandler implements ActionHandlerInterface
         // Follow-up: attacker moves to defender's old position
         // Fend: prevents follow-up when defender is not knocked down
         // Multiple Block: no follow-up allowed
-        if ($noFollowUp) {
-            // Skip follow-up entirely for Multiple Block
+        // ⛔ P83 (30.09.2026): zakoreneny blokuje „without following-up"
+        //   (`rules_bb2016.txt` r. 8580-8581). Vzor C++ `block_handler.cpp:548`.
+        if ($noFollowUp || $attacker->isRooted()) {
+            // Skip follow-up entirely for Multiple Block / rooted attacker
         } elseif ($defenderPushed && !($defender->hasSkill(SkillName::Fend) && !$defenderDown)) {
             $events[] = GameEvent::followUp($attacker->getId(), (string) $attackerPos, (string) $defenderPos);
             $attacker = $attacker->withPosition($defenderPos);

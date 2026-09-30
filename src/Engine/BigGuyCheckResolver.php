@@ -267,12 +267,17 @@ final class BigGuyCheckResolver
         //   block that turn** (he can still roll to stand up if he is Prone)."
         //   ⇒ BLOCK, PASS, HAND-OFF a FOUL zakorenení nebrani; BLITZ ano,
         //   protoze ten je pohyb + blok.
+        // ⛔ 30.09.2026 (port C++ N14 z 01.09.): LEZICI smi po neuspechu VSTAT
+        //   -- zavorka r. 8583-8584 „(he can still roll to stand up if he is
+        //   Prone)". MA je 0, takze vstava hodem 4+ (r. 690-695) a dal se
+        //   nehne (pathfinder zakorenenemu nic nenabidne, P83). Dosud se akce
+        //   rovnou ukoncila a vstavat se vubec nehazelo.
         $mayStillAct = in_array($action, [
             ActionType::BLOCK,
             ActionType::PASS,
             ActionType::HAND_OFF,
             ActionType::FOUL,
-        ], true);
+        ], true) || ($action === ActionType::MOVE && $player->getState() === PlayerState::PRONE);
 
         $state = $state->withPlayer($player);
         $events = [GameEvent::takeRoot($player->getId(), $roll, true)];

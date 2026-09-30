@@ -34,6 +34,13 @@ final class Pathfinder
         if ($pos === null || !$player->canMove()) {
             return [];
         }
+        // ⛔ P83 (30.09.2026), port C++ 6e2f084c. `rules_bb2016.txt` r. 8575-8580:
+        //   zakoreneny ma MA 0 a „may not Go For It ... or use any skill that
+        //   would allow him to move out of his current square" (ani Leap).
+        //   Vstani na miste resi `MoveHandler::resolveStandUp`, ne pathfinder.
+        if ($player->isRooted()) {
+            return [];
+        }
 
         $ma = $player->getMovementRemaining();
 

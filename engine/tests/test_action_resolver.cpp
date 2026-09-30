@@ -560,3 +560,37 @@ TEST(ActionResolver, TakeRootRollHappensOnStandUpAndRootingSticks) {
         << "zakořenění zabránilo vstání, ačkoli ř. 8583-8584 ho výslovně dovoluje";
     EXPECT_FALSE(result.turnover);
 }
+
+// 30.09.2026 (kontrola na zadost uzivatele): CELA cesta zakoreneni VLEZE.
+// r. 8572-8584: hod "immediately after declaring an Action" -- i lezici;
+// zavorka "(he can still roll to stand up if he is Prone)" s tim pocita.
+// Koreny trvaji "until a drive ends, or he is Knocked Down or Placed Prone";
+// nevydarene vstani neni ani jedno.
+TEST(ActionResolver, RootedWhileProneFailsToStandAndStaysRootedIntoTheNextTurn) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, /*ma=*/2);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    gs.homeTeam.rerolls = 0;
+
+    // 1 = zakoreni · 3 = vstani na 4+ nevyjde
+    Action action{ActionType::MOVE, 1, -1, {10, 7}};
+    FixedDiceRoller first({1, 3});
+    auto r1 = resolveAction(gs, action, first, nullptr);
+    EXPECT_FALSE(r1.turnover) << "nevydarene vstani neni turnover (r. 694-695)";
+    ASSERT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    ASSERT_TRUE(gs.getPlayer(1).rooted);
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).rooted) << "koreny zmizely se zacatkem kola";
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);
+
+    // Dalsi kolo: Take Root se znovu NEHAZI (uz je zakoreneny), rovnou vstani 4+.
+    FixedDiceRoller second({4});
+    auto r2 = resolveAction(gs, action, second, nullptr);
+    EXPECT_FALSE(r2.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_TRUE(gs.getPlayer(1).rooted);
+}
