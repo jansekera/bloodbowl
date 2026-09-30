@@ -4014,3 +4014,39 @@ TEST(MacroActions, P93AStupefiedBoneHeadRollsAgainAndWalks) {
     EXPECT_FALSE(state.getPlayer(1).lostTacklezones) << "uspesny hod mu zony nevratil";
     EXPECT_EQ(state.getPlayer(1).position, (Position{8, 7})) << "makro skoncilo pred prvnim krokem";
 }
+
+// ============================================================================
+// Uzivatel 30.09.2026: "wardancer blitzne a neda follow, at nemusi pak davat
+// dodge, a vrati se schovat za svoje linemany". Ustup po blitzu se dosud
+// nabizel JEN vystavenemu (v tackle zone). Kdo po rane v zone nestoji --
+// typicky proto, ze nenasledoval -- nedostal nic, a zustal stat na ocich.
+// Ted: pole mimo zony, dosazitelne bez GFI, na ktere dosahne NEJMIN soupera
+// (nejhorsi odpoved soupere), pri shode vedle vic vlastnich hracu, pak nejblizsi.
+// ============================================================================
+TEST(MacroActions, UnexposedBlitzerIsOfferedCoverAwayFromEnemyReach) {
+    GameState state = makeMinimalState();
+    Player& w = state.getPlayer(1);                 // "wardancer" po blitzu
+    w.position = {10, 7};
+    w.usedBlitz = true;
+    w.hasMoved = true;
+    w.movementRemaining = 4;
+    Player& d = state.getPlayer(12);                // srazeny obrance -- zadna zona
+    d.position = {12, 7};
+    d.state = PlayerState::PRONE;
+    Player& e = state.getPlayer(13);                // rychly souper v dalce
+    e.id = 13; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+    e.position = {16, 7}; e.stats = {6, 3, 3, 8}; e.movementRemaining = 6;
+    state.ball = BallState::carried({16, 7}, 13);
+    ASSERT_EQ(countTacklezones(state, w.position, TeamSide::HOME), 0) << "fixtura: blitzujici je v zone";
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* cover = nullptr;
+    for (const auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) cover = &m;
+    ASSERT_NE(cover, nullptr) << "nevystavenemu blitzujicimu se nenabidl ustup do kryti";
+    EXPECT_EQ(countTacklezones(state, cover->targetPos, TeamSide::HOME), 0);
+    // x = 6: souper z (16,7) na nej s MA 6 + 2 GFI nedosahne; lezici z (12,7)
+    // ano (MA 6 - 3 za vstani + 2 = 5). x = 7 uz ohrozuji oba.
+    EXPECT_EQ(cover->targetPos.x, 6) << "vybral pole, na ktere dosahne vic soupera";
+}

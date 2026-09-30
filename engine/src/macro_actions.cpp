@@ -4,6 +4,7 @@
 #include "bb/helpers.h"
 #include "bb/pathfinder.h"     // nextStepToward -- BFS pro movePlayerToward (09.09.2026)
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 
 namespace bb {
@@ -313,6 +314,32 @@ static bool findMoveToward(const std::vector<Action>& actions, int playerId,
 }
 
 // Check if a player is standing, on pitch, free to act
+// Kryti po blitzu (30.09.2026): kolik soupera muze pristi kolo dojit na pole
+// sousedici se `sq` -- MA (lezici -3 za vstani, Jump Up ne) + GFI. Geometricky,
+// bez tel v ceste: je to MEZ nejhorsi odpovedi, ne predpoved. Omraceni v pristim
+// kole nejednaji.
+static int enemiesThatReachNextTurn(const GameState& state, Position sq, TeamSide mySide) {
+    int n = 0;
+    state.forEachOnPitch(opponent(mySide), [&](const Player& e) {
+        if (e.state != PlayerState::STANDING && e.state != PlayerState::PRONE) return;
+        int ma = e.rooted ? 0 : e.stats.movement;
+        if (e.state == PlayerState::PRONE && !e.hasSkill(SkillName::JumpUp)) ma -= 3;
+        const int reach = std::max(0, ma) + maxGfiSquares(e);
+        if (e.position.distanceTo(sq) - 1 <= reach) ++n;
+    });
+    return n;
+}
+
+static int standingMatesAround(const GameState& state, Position sq, TeamSide mySide, int selfId) {
+    int n = 0;
+    for (const Position& a : sq.getAdjacent()) {
+        if (!a.isOnPitch()) continue;
+        const Player* m = state.getPlayerAtPosition(a);
+        if (m && m->id != selfId && m->teamSide == mySide && m->state == PlayerState::STANDING) ++n;
+    }
+    return n;
+}
+
 static bool isFreeToAct(const Player& p) {
     return p.canAct() && !p.hasMoved;
 }
@@ -1529,7 +1556,40 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         if (!p.canAct() || !p.usedBlitz) return;
         if (p.hasSkill(SkillName::BallAndChain)) return;
         if (p.movementRemaining <= 0) return;
-        if (countTacklezones(state, p.position, mySide) == 0) return;  // not exposed
+        if (countTacklezones(state, p.position, mySide) == 0) {
+            // ⭐ KRYTI (uzivatel 30.09.2026): "wardancer blitzne a neda follow,
+            //   at nemusi pak davat dodge, a vrati se schovat za svoje
+            //   linemany." Nevystaveny blitzujici dosud nedostal NIC (obecna
+            //   smycka REPOSITION ho vyradi pres hasMoved). Nabidne se pole
+            //   mimo zony, dosazitelne bez GFI, na ktere dosahne NEJMIN
+            //   soupera (doktrina: ocenuj nejhorsi odpovedi soupere); pri
+            //   shode vedle vic vlastnich stojicich, pak nejblizsi. Jen kdyz
+            //   je lepsi nez zustat stat.
+            const auto key = [&](Position sq) {
+                return std::make_tuple(enemiesThatReachNextTurn(state, sq, mySide),
+                                       -standingMatesAround(state, sq, mySide, p.id),
+                                       p.position.distanceTo(sq));
+            };
+            const int reach = p.movementRemaining;
+            Position cover{-1, -1};
+            auto bestKey = key(p.position);
+            for (int dy = -reach; dy <= reach; ++dy) {
+                for (int dx = -reach; dx <= reach; ++dx) {
+                    Position cand{static_cast<int8_t>(p.position.x + dx),
+                                  static_cast<int8_t>(p.position.y + dy)};
+                    if (cand == p.position || !cand.isOnPitch()) continue;
+                    if (state.getPlayerAtPosition(cand) != nullptr) continue;
+                    if (countTacklezones(state, cand, mySide) != 0) continue;
+                    const auto k = key(cand);
+                    if (k < bestKey) { bestKey = k; cover = cand; }
+                }
+            }
+            if (cover.x >= 0) {
+                noteBlitzContinuationEvent();
+                out.push_back({MacroType::REPOSITION, p.id, -1, cover});
+            }
+            return;
+        }
 
         // Jmenovatel K5: nosic po blitzu, v kontaktu, s pohybem. Tika PRED
         // hledanim pole, takze rozdil proti OFFERED nese obe priciny
