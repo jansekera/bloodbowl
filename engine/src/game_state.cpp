@@ -77,6 +77,7 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         // zmerit JEHO odpoved; ted uz je vycerpany.
         p.stoodUpNextToEnemy = false;
         p.dodgeRerollUsedThisTurn = false;
+        p.breakTackleUsedThisTurn = false;   // P77
         p.sureFeetRerollUsedThisTurn = false;
         // Take Root (l. 8573-8576): zakorenení konci sražením nebo položením --
         // to ted resi `Player::setState` HNED (P68, 30.09.2026). Tady se uz

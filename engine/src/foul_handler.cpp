@@ -99,16 +99,24 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     int assistMod = friendlyAssists - enemyAssists;
     if (chainsawFoul) assistMod += 3;   // P75: faul pilou +3 k brneni
 
-    // DirtyPlayer bonus
-    if (fouler.hasSkill(SkillName::DirtyPlayer)) {
-        assistMod += 1;
-    }
 
     // Roll two D6 individually (need to check for doubles)
     int die1 = dice.rollD6();
     int die2 = dice.rollD6();
     int armourRoll = die1 + die2 + assistMod;
     bool isDoubles = (die1 == die2);   // armour; injury se přičte níž (l. 1878)
+
+    // P77 (30.09.2026), port PHP 6a6537ef. Dirty Player, r. 8080-8085: +1 k
+    // brneni NEBO ke zraneni, ne k obojimu. Na brneni jen tehdy, kdyz o nem
+    // rozhodne; jinak zustane na zraneni (tyz vzor jako Mighty Blow v injury.cpp).
+    // C++ ho daval vzdy na brneni.
+    const bool dirtyPlayer = fouler.hasSkill(SkillName::DirtyPlayer);
+    bool dirtyOnInjury = false;
+    if (dirtyPlayer) {
+        const int av = target.stats.armour;
+        if (armourRoll <= av && armourRoll + 1 > av) armourRoll += 1;
+        else dirtyOnInjury = true;
+    }
 
     bool armourBroken = (armourRoll > target.stats.armour);
 
@@ -130,6 +138,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         // project_bloodbowl_why_not_beating_frozen_20260723, item 3.6).
         InjuryContext ctx;
         ctx.armourModifier = 0; // already applied to armor roll
+        if (dirtyOnInjury) ctx.injuryModifier += 1;   // P77: Dirty Player na zraneni
         if (target.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
         if (fouler.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
 

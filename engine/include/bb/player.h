@@ -82,6 +82,10 @@ struct Player {
     // Leap, BB2016 l. 8283: "A player may only use the Leap skill ONCE PER TURN."
     bool leapUsedThisTurn = false;
     bool dodgeRerollUsedThisTurn = false;
+    // Break Tackle, r. 7987-7991: "may only be used ONCE PER TURN" (P77,
+    // 30.09.2026, vzor PHP 6a6537ef). Nastavi se pri prvnim uhybu, ve kterem
+    // se Sila opravdu pouzila misto Obratnosti.
+    bool breakTackleUsedThisTurn = false;
     bool sureFeetRerollUsedThisTurn = false;
     // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on
     // the pitch at the end of a drive. On a roll of 1 the player collapses and

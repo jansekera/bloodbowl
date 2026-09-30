@@ -87,8 +87,9 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
     int ag = player.stats.agility;
     // Break Tackle, l. 7987-7990: "The player may use his Strength instead of
     // his Agility when making a Dodge roll ... This skill may only be used once
-    // per turn." ⚠️ Limit "jednou za kolo" nehlidame.
-    if (player.hasSkill(SkillName::BreakTackle) && player.stats.strength > ag) {
+    // per turn." Limit hlida `breakTackleUsedThisTurn` (P77, 30.09.2026).
+    if (player.hasSkill(SkillName::BreakTackle) && !player.breakTackleUsedThisTurn &&
+        player.stats.strength > ag) {
         ag = player.stats.strength;
     }
 

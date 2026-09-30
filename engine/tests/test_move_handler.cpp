@@ -244,3 +244,19 @@ TEST(MoveHandler, MoveBallCarrierUpdatesBallPos) {
     EXPECT_TRUE(result.success);
     EXPECT_EQ(gs.ball.position, (Position{11, 7}));
 }
+
+// P77 (30.09.2026), port PHP 6a6537ef. Break Tackle, r. 7987-7991: "may only
+// be used once per turn" -- C++ ho pouzival na kazdy uhyb.
+TEST(MoveHandler, P77BreakTackleIsSpentOnTheFirstDodge) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 2, 8);   // ST4 AG2
+    gs.getPlayer(1).skills.add(SkillName::BreakTackle);
+    placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
+    // se Silou: 7 - 4 - 1 = 2+; hod 2 projde
+    FixedDiceRoller dice({2});
+    auto result = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
+    ASSERT_TRUE(result.success);
+    EXPECT_TRUE(gs.getPlayer(1).breakTackleUsedThisTurn);
+    // dalsi uhyb uz s Obratnosti: 7 - 2 - 1 = 4+
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {12, 7}, {11, 7}), 4);
+}

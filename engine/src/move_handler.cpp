@@ -154,6 +154,12 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
     // Perform dodge roll if needed
     if (needsDodge) {
         int target = calculateDodgeTarget(state, player, to, from);
+        // P77: Break Tackle "may only be used once per turn" -- tenhle uhyb ho
+        // spotrebuje, pokud v nem Sila opravdu nahradila Obratnost.
+        if (player.hasSkill(SkillName::BreakTackle) && !player.breakTackleUsedThisTurn &&
+            player.stats.strength > player.stats.agility) {
+            player.breakTackleUsedThisTurn = true;
+        }
 
         // Check if Tackle negates Dodge reroll -- JEDNA definice v `helpers.cpp`,
         // sdilena s ocenovaci vrstvou (M6/B3(a), 09.09.2026), aby cena dodge

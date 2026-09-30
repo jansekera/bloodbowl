@@ -264,3 +264,33 @@ TEST(FoulHandler, P75ChainsawFoulKickbackHitsTheFouler) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE) << "obet ma zustat netknuta";
     EXPECT_TRUE(gs.homeTeam.foulUsedThisTurn);
 }
+
+// P77 (30.09.2026), port PHP 6a6537ef. Dirty Player, r. 8080-8085: "Add 1 to
+// any Armour roll OR Injury roll ... you may only modify one of the dice
+// rolls". C++ daval +1 vzdy na brneni, na zraneni nikdy.
+TEST(FoulHandler, P77DirtyPlayerGoesToInjuryWhenArmourBreaksWithoutIt) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::DirtyPlayer);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    // brneni 5+4 = 9 > 8 i bez bonusu · zraneni 3+4 = 7, +1 = 8 = KO
+    FixedDiceRoller dice({5, 4, 3, 4, 3, 3});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO) << "+1 nesel na zraneni";
+}
+
+TEST(FoulHandler, P77DirtyPlayerStillBreaksArmourWhenThatIsWhatItTakes) {
+    // Hlidaci test: kdyz +1 rozhodne o brneni, jde na brneni.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::DirtyPlayer);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    // brneni 3+5 = 8, +1 = 9 > 8 · zraneni 2+3 = 5 = omracen
+    FixedDiceRoller dice({3, 5, 2, 3, 3, 3});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+}
