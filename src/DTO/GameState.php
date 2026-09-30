@@ -30,6 +30,10 @@ final class GameState
         private Weather $weather = Weather::NICE,
         private ?PendingBlockDTO $pendingBlock = null,
         private ?PendingRerollDTO $pendingReroll = null,
+        // P81 (30.09.2026): hrac, ktery po rane v blitzu smi jeste dojit
+        //   (`rules_bb2016.txt` r. 551-552). Propadne, jakmile jedna jiny hrac
+        //   nebo skonci kolo -- viz `ActionResolver::resolve`.
+        private ?int $blitzContinuationPlayerId = null,
     ) {
     }
 
@@ -225,6 +229,15 @@ final class GameState
             : $this->withAwayTeam($team);
     }
 
+    public function getBlitzContinuationPlayerId(): ?int { return $this->blitzContinuationPlayerId; }
+
+    public function withBlitzContinuation(?int $playerId): self
+    {
+        $clone = clone $this;
+        $clone->blitzContinuationPlayerId = $playerId;
+        return $clone;
+    }
+
     public function withTurnoverPending(bool $pending): self
     {
         $clone = clone $this;
@@ -273,6 +286,7 @@ final class GameState
     public function resetPlayersForNewTurn(TeamSide $side): self
     {
         $clone = clone $this;
+        $clone->blitzContinuationPlayerId = null;   // P81: pokracovani konci s kolem
         foreach ($clone->players as $id => $player) {
             // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
             //   turn" plati pro KAZDE kolo, i souperovo (Pro jde pouzit i mimo
@@ -345,6 +359,7 @@ final class GameState
             'weather' => $this->weather->value,
             'pendingBlock' => $this->pendingBlock?->toArray(),
             'pendingReroll' => $this->pendingReroll?->toArray(),
+            'blitzContinuationPlayerId' => $this->blitzContinuationPlayerId,
         ];
     }
 
@@ -374,6 +389,7 @@ final class GameState
             weather: Weather::from((string) ($data['weather'] ?? 'nice')),
             pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
+            blitzContinuationPlayerId: isset($data['blitzContinuationPlayerId']) ? (int) $data['blitzContinuationPlayerId'] : null,
         );
     }
 }

@@ -372,9 +372,22 @@ final class BlockHandler implements ActionHandlerInterface
         $finalState = $result->getNewState();
         $updatedAttacker = $finalState->getPlayer($pending->getAttackerId());
         if ($updatedAttacker !== null) {
+            // ⛔ P81 (30.09.2026), port C++ 771d1ecc: po rane v BLITZU smi
+            //   stojici utocnik dojit zbytkem pohybu (`rules_bb2016.txt`
+            //   r. 551-552) -- vcetne GFI, ktere mu zbyly; zakoreneny ne.
+            //   Aktivace zustava otevrena: `hasMoved=false` pusti MOVE,
+            //   `hasActed=true` zakaze cokoli jineho.
+            $gfiFloor = $updatedAttacker->hasSkill(SkillName::Sprint) ? -3 : -2;
+            $mayContinue = $isBlitz && !$result->isTurnover()
+                && $updatedAttacker->getState() === PlayerState::STANDING
+                && !$updatedAttacker->isRooted()
+                && $updatedAttacker->getMovementRemaining() > $gfiFloor;
             $finalState = $finalState->withPlayer(
-                $updatedAttacker->withHasActed(true)->withHasMoved(true),
+                $updatedAttacker->withHasActed(true)->withHasMoved(!$mayContinue),
             );
+            if ($mayContinue) {
+                $finalState = $finalState->withBlitzContinuation($updatedAttacker->getId());
+            }
         }
 
         if ($result->isTurnover()) {

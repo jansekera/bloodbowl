@@ -182,6 +182,26 @@ final class ActionResolver
      */
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
     {
+        // ⛔ P81 (30.09.2026): pokracovani blitzu po rane. Je to TAZ akce (Blitz),
+        //   takze se neopakuje kontrola pred akci; a propadne, jakmile jedna jiny
+        //   hrac nebo tym ukonci kolo -- aktivace musi byt dokoncena, nez zacne
+        //   dalsi. Akce, ktere jen dohravaji odlozenou volbu, ho nerusi.
+        $continuationId = $state->getBlitzContinuationPlayerId();
+        $isContinuation = false;
+        if ($continuationId !== null) {
+            $actorId = isset($params['playerId']) ? (int) $params['playerId'] : null;
+            if ($action === ActionType::MOVE && $actorId === $continuationId) {
+                $isContinuation = true;
+                $state = $state->withBlitzContinuation(null);
+            } elseif ($action === ActionType::END_TURN || ($action->requiresPlayer() && $actorId !== $continuationId)) {
+                $blitzer = $state->getPlayer($continuationId);
+                if ($blitzer !== null) {
+                    $state = $state->withPlayer($blitzer->withHasMoved(true));
+                }
+                $state = $state->withBlitzContinuation(null);
+            }
+        }
+
         // Big Guy pre-action check for player actions
         /** @var list<\App\DTO\GameEvent> $preEvents */
         $preEvents = [];
@@ -193,7 +213,7 @@ final class ActionResolver
         //   ani Take Root. Kdyby se sem STAND_PAT pustil, stalo by "nic
         //   nedelat" tolik co akce -- a big guy by se mohl omracit tim, ze
         //   se rozhodl nehrat.
-        if ($action !== ActionType::STAND_PAT
+        if ($action !== ActionType::STAND_PAT && !$isContinuation
             && $action->requiresPlayer() && isset($params['playerId'])) {
             $player = $state->getPlayer((int) $params['playerId']);
             // Ztracene zony (Hypnotic Gaze, Bone Head, Really Stupid) plati "until the
