@@ -34,6 +34,12 @@ ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,
                                   DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P72 (30.09.2026): odtlaceni mimo bezny blok (Ball & Chain). Stejne jako
+// odsun v bloku: retez, Side Step, kdo drzi pole se nehne; kdo vyleti do davu,
+// dostane crowd surf (nosic -> vhazovani). Vraci true = skoncil v davu.
+bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
+                  DiceRollerBase& dice, std::vector<GameEvent>* events);
+
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
                                  const Player& att, const Player& def);

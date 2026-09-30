@@ -15,125 +15,131 @@ static void placePlayer(GameState& gs, int id, Position pos, TeamSide side,
     p.movementRemaining = ma;
 }
 
-// scatterDirection: 1=N(0,-1), 2=NE(1,-1), 3=E(1,0), 4=SE(1,1),
-//                   5=S(0,1), 6=SW(-1,1), 7=W(-1,0), 8=NW(-1,-1)
+// ============================================================================
+// P72 (30.09.2026) -- port PHP e373bf23 + 04e4946c; rozhodnuti uzivatele 25.09.
+// (znovu 30.09.: "vzdy k souperi a pozor na svoje i lezici"). BB2016
+// r. 7820-7850:
+//  - smer kazdeho kroku = sablona vhazovani (natoceni voli kouc) + D6;
+//    natoceni: k nejblizsimu STOJICIMU souperi, vyhnout se VSEM nasim;
+//  - obsazene pole: blok podle beznych pravidel (sila + asistence), povinny
+//    follow-up; lezici/omraceny = odtlacit + hod na brneni;
+//  - mimo hriste: dav (hod na zraneni, ne automaticke KO), turnover NENI;
+//  - sraženy B&C: rovnou hod na zraneni bez brneni, Stunned = KO; sraženy
+//    pri BLOKU je hrac tymu na tahu => turnover (r. 368).
+// Stare testy kodovaly D8, auto-KO v davu a "nikdy turnover".
+// Sablona: D6 1-2 = vlevo od smeru, 3-4 = rovne, 5-6 = vpravo.
+// ============================================================================
 
-TEST(BallAndChainHandler, RandomMovement) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {12, 7}, TeamSide::HOME, 4, 7, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-
-    // MA=4, 4 moves. D8: 3,3,3,3 → each E(+1,0) → should end at (16,7)
-    FixedDiceRoller dice({3, 3, 3, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_TRUE(result.success);
-    EXPECT_FALSE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(1).position, (Position{16, 7}));
+static void makeBnC(GameState& gs, int id, Position pos, int ma, int st) {
+    placePlayer(gs, id, pos, TeamSide::HOME, ma, st, 1, 8);
+    gs.getPlayer(id).skills.add(SkillName::BallAndChain);
+    gs.getPlayer(id).skills.add(SkillName::NoHands);
 }
 
-TEST(BallAndChainHandler, OffPitchKO) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {24, 7}, TeamSide::HOME, 4, 7, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-
-    // D8=3 → E(+1,0) → (25,7). D8=3 → E(+1,0) → (26,7) off pitch → KO
-    FixedDiceRoller dice({3, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_FALSE(result.turnover); // Never turnover
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
-}
-
-TEST(BallAndChainHandler, AutoBlockOccupied) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {12, 7}, TeamSide::HOME, 2, 7, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY); // Standing enemy
-
-    // MA=2. Step 1: D8=3 → E(+1,0) → (13,7) occupied → auto-block
-    // rollBlockDie uses rollD6: 6 → DD. Defender knocked down. Armor: 3+3=6
-    // Step 2: D8=3 → E(+1,0) → (13,7) occupied by prone player, not standing → skip
-    FixedDiceRoller dice({3, 6, 3, 3, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_FALSE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
-}
-
-TEST(BallAndChainHandler, BCDownStops) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {12, 7}, TeamSide::HOME, 4, 3, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
-    gs.getPlayer(12).skills.add(SkillName::Block);
-
-    // Step 1: D8=3 → E(+1,0) → (13,7) occupied + standing → auto-block
-    // rollBlockDie: D6=1 → AD. B&C player down. Armor: 3+3=6
-    // B&C stops immediately.
-    FixedDiceRoller dice({3, 1, 3, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_FALSE(result.turnover); // Never turnover
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
-}
-
-TEST(BallAndChainHandler, NoHandsBounce) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {12, 7}, TeamSide::HOME, 2, 7, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-    gs.ball = BallState::onGround({13, 7});
-
-    // Step 1: D8=3 → E(+1,0) → (13,7) empty → move there. Ball on ground → bounce
-    // Ball bounce: D8=3 → E(+1,0) → (14,7)
-    // Step 2: D8=3 → E(+1,0) → (14,7) — ball on ground there → bounce again
-    // Ball bounce: D8=3 → E(+1,0) → (15,7)
-    FixedDiceRoller dice({3, 3, 3, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_FALSE(result.turnover);
-    EXPECT_FALSE(gs.ball.isHeld); // NoHands, can't pick up
-}
-
-TEST(BallAndChainHandler, NeverTurnover) {
-    GameState gs;
-    gs.phase = GamePhase::PLAY;
-    placePlayer(gs, 1, {0, 7}, TeamSide::HOME, 2, 3, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
-    gs.getPlayer(1).skills.add(SkillName::NoHands);
-    gs.ball = BallState::carried({0, 7}, 1);
-
-    // D8=7 → W(-1,0) → (-1,7) off pitch → KO
-    // Ball dropped before going off: bounce D8=3 → E(+1,0) → (1,7)
-    FixedDiceRoller dice({7, 3});
-    auto result = resolveBallAndChain(gs, 1, dice, nullptr);
-    EXPECT_FALSE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
-}
-
-TEST(BallAndChainHandler, NeverEntersASquareOccupiedByAProneOrStunnedPlayer) {
-    // ⛔⛔ INVARIANT, ne parita: podminka pro auto-blok chtela STANDING, takze
-    // LEZICI hráč v cilovem poli propadl na vetev "move to empty square"
-    // a Ball & Chain hráč mu vlezl do pole -- DVA HRACI NA JEDNOM POLI.
-    // (Pravidlovou variantu -- odsun + hod na zbroj, l. 7822-7825 -- resi TA6.)
+static GameState bncState() {
     GameState gs;
     gs.phase = GamePhase::PLAY;
     gs.activeTeam = TeamSide::HOME;
-    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 4, 5, 1, 8);
-    gs.getPlayer(1).skills.add(SkillName::BallAndChain);
+    return gs;
+}
+
+TEST(BallAndChainHandler, P72WalksTheTemplateTowardTheNearestStandingOpponent) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 2, 7);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 3});                   // rovne, rovne
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{12, 7}));
+}
+
+TEST(BallAndChainHandler, P72TurnsAwayFromOwnPlayersEvenProneOnes) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);
+    for (int id : {2, 3, 4}) {
+        placePlayer(gs, id, {11, 6 + (id - 2)}, TeamSide::HOME);
+        gs.getPlayer(id).state = PlayerState::PRONE;
+    }
+    FixedDiceRoller dice({3});
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{9, 7})) << "natocil se na vlastni lezici";
+}
+
+TEST(BallAndChainHandler, P72TheCrowdIsAnInjuryRollNotAnAutomaticKO) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {0, 7}, 1, 3);
+    for (int id : {2, 3, 4, 5, 6}) placePlayer(gs, id, {0, 0}, TeamSide::HOME);
+    gs.getPlayer(2).position = {1, 6};
+    gs.getPlayer(3).position = {1, 7};
+    gs.getPlayer(4).position = {1, 8};
+    gs.getPlayer(5).position = {0, 6};
+    gs.getPlayer(6).position = {0, 8};
+    // jen smer -x (tri pole v davu) je lepsi nez vlastni hraci
+    FixedDiceRoller dice({3, 5, 5, 6, 6, 6, 6});    // rovne = dav; zraneni 10 = casualty
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_FALSE(r.turnover) << "dav turnover neni (r. 369-370)";
+    EXPECT_NE(gs.getPlayer(1).state, PlayerState::KO) << "dav hodil automaticke KO";
+    EXPECT_FALSE(gs.getPlayer(1).isOnPitch());
+}
+
+TEST(BallAndChainHandler, P72KnockedDownInABlockIsAnInjuryRollStunnedIsKOAndATurnover) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 3);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 1, 3, 3});             // rovne => blok; AD; zraneni 6 = Stunned
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_TRUE(r.turnover) << "sraženy pri bloku = turnover (r. 368)";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO) << "Stunned se u B&C pocita jako KO";
+}
+
+TEST(BallAndChainHandler, P72BlocksWithStrengthDiceAndMustFollowUp) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);                  // ST7 proti ST3 = 3 kostky
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 1, 1, 6, 1, 1, 1, 1}); // rovne; AD AD DD => DD; brneni 1+1
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING) << "hazela se jedna kostka";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "povinny follow-up";
+}
+
+TEST(BallAndChainHandler, P72AProneOrStunnedPlayerInTheWayIsPushedAndArmourRolled) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 5);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
-
-    // vsechny kroky mirime na vychod (D8=3), tedy na leziciho hráče
-    FixedDiceRoller dice(std::vector<int>(40, 3));
+    placePlayer(gs, 13, {20, 7}, TeamSide::AWAY);   // nejblizsi STOJICI
+    FixedDiceRoller dice({3, 1, 1, 1, 1});          // rovne; brneni 1+1
     resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_NE(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
 
-    EXPECT_NE(gs.getPlayer(1).position, gs.getPlayer(12).position)
-        << "dva hráči na jednom poli je rozbity stav, ne odchylka";
-    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+TEST(BallAndChainHandler, NeverEntersASquareStillOccupied) {
+    // ⛔ INVARIANT: dva hraci na jednom poli jsou rozbity stav.
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 4, 5);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    placePlayer(gs, 13, {20, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice(std::vector<int>(80, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    for (int a : {1, 12, 13})
+        for (int b : {1, 12, 13})
+            if (a < b && gs.getPlayer(a).isOnPitch() && gs.getPlayer(b).isOnPitch())
+                EXPECT_NE(gs.getPlayer(a).position, gs.getPlayer(b).position) << a << " a " << b;
+}
+
+TEST(BallAndChainHandler, NoHandsBounce) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({11, 7});
+    FixedDiceRoller dice({3, 3, 3, 3});             // rovne na mic; odraz D8 3 = E
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);                   // No Hands
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
 }

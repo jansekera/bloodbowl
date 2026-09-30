@@ -426,6 +426,29 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
                    events, 0);
 }
 
+bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
+                  DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    if (holdsGround(pushed, pusher.teamSide)) return false;
+    Position dest;
+    const bool surf = pushOne(state, pusher.position, pushed,
+                              pushed.hasSkill(SkillName::SideStep), /*grab=*/false,
+                              /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
+                              events, 0);
+    if (!surf) return false;
+    // Tataz vetev jako crowd surf v resolveBlock: nosic -> vhazovani od
+    // posledniho pole, jinak mic z jeho pole.
+    const Position lastPos = pushed.position;
+    if (state.ball.isHeld && state.ball.carrierId == pushed.id) {
+        state.ball = BallState::onGround(lastPos);
+        resolveThrowIn(state, lastPos, pushOffPitchExit(pusher.position, lastPos), dice, events);
+    } else {
+        handleBallOnPlayerDown(state, pushed.id, dice, events);
+    }
+    pushed.position = {-1, -1};
+    resolveCrowdSurf(state, pushed.id, dice, events);
+    return true;
+}
+
 // M1/N10: jediná definice toho, kdy blok aktivaci ZAVÍRÁ. Volá se ze VŠECH
 // míst, kde blok normálně končí -- 25.08. jsem nejdřív opravil jen to poslední
 // a větev s pushnutím (ř. ~875) se vrací dřív, takže test padal a vypadalo to,
