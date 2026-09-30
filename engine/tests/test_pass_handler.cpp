@@ -632,3 +632,21 @@ TEST(PassHandler, P78SafeThrowDoesNotSaveANaturalOne) {
     auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
     EXPECT_TRUE(result.turnover);
 }
+
+// P80 (30.09.2026), port PHP 2f930279. r. 857-858: "Prone and Stunned players
+// may never attempt to catch the ball." Predani lezicimu se KONA (je v
+// sousednim poli), ale nechyta -- mic odskoci. Straz je primo v resolveCatch.
+TEST(PassHandler, P80AStunnedReceiverOfAHandOffDoesNotCatch) {
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {6, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::STUNNED;
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // stara cesta: chytani 6 = chyceno omracenym · nova: odraz D8 3 = E => (7,7)
+    FixedDiceRoller dice({6, 3, 3, 3});
+    auto result = resolveHandOff(gs, 1, 2, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_FALSE(gs.ball.isHeld && gs.ball.carrierId == 2) << "omraceny chytil";
+}

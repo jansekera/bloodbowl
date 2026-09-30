@@ -33,6 +33,15 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
                   int modifier, std::vector<GameEvent>* events) {
     Player& catcher = state.getPlayer(catcherId);
 
+    // P80 (30.09.2026), port PHP 2f930279. r. 857-858: "Prone and Stunned
+    // players may never attempt to catch the ball." Ostatni volajici to hlidaji
+    // sami; predani ne (prijemce muze mezi nabidkou a provedenim ulehnout).
+    if (catcher.state != PlayerState::STANDING) {
+        emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
+                          0, false});
+        return false;
+    }
+
     if (catcher.hasSkill(SkillName::NoHands)) {
         emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
                           0, false});
