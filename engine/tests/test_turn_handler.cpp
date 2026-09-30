@@ -59,3 +59,20 @@ TEST(TurnHandler, StunnedFlipsEvenOnTurnover) {
     resolveEndTurn(gs, nullptr, /*wasTurnover=*/true);
     EXPECT_EQ(p.state, PlayerState::PRONE) << "ř. 705: even if a turnover takes place";
 }
+
+// P70 (30.09.2026), port PHP 84f7dc46. Pro "Once per turn" (r. 8381) plati
+// KAZDE kolo, i souperovo -- Pro jde pouzit i mimo vlastni tah (chytani
+// odskoku). C++ nuloval priznak jen tymu, ktery kolo zacina.
+TEST(TurnHandler, P70ProIsAvailableAgainInTheOpponentsTurn) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    Player& p = gs.getPlayer(1);
+    p.id = 1; p.teamSide = TeamSide::HOME;
+    p.state = PlayerState::STANDING;
+    p.proUsedThisTurn = true;           // pouzil Pro ve svem kole
+
+    resolveEndTurn(gs, nullptr, /*wasTurnover=*/false);
+    ASSERT_EQ(gs.activeTeam, TeamSide::AWAY);
+    EXPECT_FALSE(p.proUsedThisTurn) << "v souperove kole Pro nema";
+}

@@ -35,6 +35,11 @@ void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTu
     // Reset players for new turn
     state.resetPlayersForNewTurn(state.activeTeam);
     newTeam.resetForNewTurn();
+    // P70 (30.09.2026): Pro "Once per turn" (r. 8381) je za KAZDE kolo, i
+    // souperovo -- Pro jde pouzit i mimo vlastni tah (chytani, odskok).
+    // resetPlayersForNewTurn nuluje jen tym na tahu. Vzor PHP 84f7dc46.
+    state.forEachPlayer(opponent(state.activeTeam),
+                        [](Player& p) { p.proUsedThisTurn = false; });
 
     // Clear turnover flag
     state.turnoverPending = false;

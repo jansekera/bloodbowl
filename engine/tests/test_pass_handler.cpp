@@ -557,3 +557,24 @@ TEST(PassHandler, InaccuratePassStopsScatteringAtTheSideline) {
     // a P67 ji nemění (měří se jen, KAM míč dopadne).
     (void)result;
 }
+
+// P70 (30.09.2026), port PHP 84f7dc46, r. 8385-8387: po neuspesnem hodu Pro
+// "the original result stands and may not be re-rolled with a skill or team
+// re-roll; however you can re-roll the Pro roll with a Team re-roll."
+// C++ dal tymovy prehoz na HOD PRIHRAVKY (vzor bloku a attemptRoll to maji dobre).
+TEST(PassHandler, P70AfterAFailedProTheTeamRerollGoesToTheProRoll) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);       // AG3, quick pass = 3+
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // 1 = fumble · 2 = Pro neprosel · tymovy prehoz: 3 = Pro znovu neprosel
+    // ⇒ fumble plati. Stara cesta by 3 vzala jako prehozenou prihravku (3+ =
+    // presna) a 6 jako chytani.
+    FixedDiceRoller dice({1, 2, 3, 6, 3, 3, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_TRUE(result.turnover) << "tymovy prehoz prehodil prihravku misto hodu Pro";
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+}

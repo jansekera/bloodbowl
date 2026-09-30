@@ -334,15 +334,24 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             // i na neprecnou prihravku, ale to uz je volba trenéra (utratit
             // tymovy reroll za nepresny pass), ne oprava -- a menit ji tady by
             // byl zasah do doktriny, ne do pravidel. Chovani zustava jako driv.
-            bool rerolled = false;
+            // P70 (30.09.2026), r. 8385-8387: po neuspesnem hodu Pro plati
+            // puvodni vysledek a tymovy prehoz smi prehodit jen HOD PRO.
+            // Vzor attemptRoll (helpers.cpp) a bloku; PHP 84f7dc46.
             if (passer.hasSkill(SkillName::Pro) && !passer.proUsedThisTurn) {
                 passer.proUsedThisTurn = true;
-                if (dice.rollD6() >= 4) {
-                    roll = dice.rollD6();
-                    rerolled = true;
+                int proRoll = dice.rollD6();
+                if (proRoll < 4) {
+                    TeamState& team = state.getTeamState(passer.teamSide);
+                    if (team.canUseReroll()) {
+                        team.rerolls--;
+                        team.rerollUsedThisTurn = true;
+                        bool lonerOk = true;
+                        if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
+                        if (lonerOk) proRoll = dice.rollD6();
+                    }
                 }
-            }
-            if (!rerolled) {
+                if (proRoll >= 4) roll = dice.rollD6();
+            } else {
                 TeamState& team = state.getTeamState(passer.teamSide);
                 if (team.canUseReroll()) {
                     team.rerolls--;
