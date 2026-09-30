@@ -40,7 +40,7 @@ struct GameEvent {
              // ktery v logu vypada jako dodge, nema cenu -- proto je tohle
              // PREREKVIZITA A/B, ne kosmetika.
              ,
-        FOLLOW_UP // 2026-08-28 (M1/N10 dočtení): follow-up nastavoval
+        FOLLOW_UP, // 2026-08-28 (M1/N10 dočtení): follow-up nastavoval
              // `att.position = defOldPos` a NEEMITOVAL NIC, takže se v korpusu
              // nedalo odlišit "nikdo nenásleduje" od "následování se neloguje"
              // -- táž třída jako STAND_UP před 21.08. Předregistrace noci
@@ -52,8 +52,12 @@ struct GameEvent {
              // do které první čtení 28.08. spadlo (dělilo všemi bloky,
              // ačkoli obránce uvolní pole jen v 80 % blitzů).
              // `from` = kde útočník stál, `to` = uvolněné pole obránce.
+        BLOODLUST_FEED // P71 (30.09.2026): hladovy upir se krmi na konci akce.
              // MUST STAY LAST: bb_module.cpp maps this enum to names
              // positionally, so append only.
+             // `playerId` = upir, `targetId` = kousnuty Thrall (-1 = zadny),
+             // `success` = nakrmil se (false = rezervy + turnover). Bez teto
+             // udalosti krmeni v logu nebylo videt vubec.
     };
 
     Type type;

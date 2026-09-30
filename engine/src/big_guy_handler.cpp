@@ -161,73 +161,77 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     // TA10 (24.08.2026) -- BB2016 l. 7929-7947. Puvodni kod delal z kousnuti
     // AUTO-KO Thralla a z upira bez Thralla take KO, a ani jedno nebylo
     // turnover. Pravidlo rika neco jineho na obou stranach.
-    if (player.hasSkill(SkillName::Bloodlust)) {
+    if (player.hasSkill(SkillName::Bloodlust) && !player.bloodlustHungry) {
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(SkillName::Bloodlust), roll >= 2});
         if (roll == 1) {
-            // l. 7938-7939: Thrall smi byt "standing, PRONE OR STUNNED" --
-            // puvodni kod chtel canAct(), tedy jen stojiciho.
-            int thrallId = -1;
-            for (const Position& pos : player.position.getAdjacent()) {
-                if (!pos.isOnPitch()) continue;
-                const Player* ally = state.getPlayerAtPosition(pos);
-                if (ally && ally->teamSide == player.teamSide &&
-                    isOnPitch(ally->state) && !ally->hasSkill(SkillName::Bloodlust)) {
-                    thrallId = ally->id;
-                    break;
-                }
-            }
-
-            if (thrallId >= 0) {
-                // l. 7939-7941: "make an INJURY ROLL on the Thrall treating any
-                // casualty roll as BADLY HURT" -- tedy hod na zraneni, ne KO,
-                // a bez hodu na zbroj. "The injury will not cause a turnover
-                // UNLESS THE THRALL WAS HOLDING THE BALL."
-                const bool thrallHadBall =
-                    state.ball.isHeld && state.ball.carrierId == thrallId;
-
-                InjuryContext ctx{};
-                resolveInjuryRoll(state, thrallId, dice, ctx, events);
-
-                Player& thrall = state.getPlayer(thrallId);
-                if (thrall.state == PlayerState::DEAD) {
-                    // "treating any casualty roll as Badly Hurt" -- z kousnuti
-                    // se neumira.
-                    thrall.setState(PlayerState::INJURED);
-                }
-                if (thrallHadBall) {
-                    handleBallOnPlayerDown(state, thrallId, dice, events);
-                    result.actionBlocked = true;
-                    result.proceed = false;
-                    result.turnover = true;
-                    return result;
-                }
-                // Nakrmil se, akce pokracuje.
-                result.actionBlocked = false;
-                result.proceed = true;
-            } else {
-                // l. 7942-7947: "Failure to bite a Thrall IS A TURNOVER and
-                // requires you to feed on a spectator -- move the Vampire to
-                // the RESERVES BOX. If he was holding the ball, IT BOUNCES from
-                // the square he occupied." Puvodne se z upira delalo KO (tedy
-                // hráč, ktery se muze vratit hodem 4+) a turnover zadny.
-                const bool vampHadBall =
-                    state.ball.isHeld && state.ball.carrierId == playerId;
-                if (vampHadBall) {
-                    handleBallOnPlayerDown(state, playerId, dice, events);
-                }
-                player.setState(PlayerState::OFF_PITCH);   // reserves
-                player.position = {-1, -1};
+            // ⛔ P71 (30.09.2026), vzor PHP 9e980cac. r. 7929-7936: upir akci
+            //   DOKONCI a krmi se az na jejim konci ("at the end of the action,
+            //   before actually passing, handing off or scoring"). C++ kousal
+            //   hned pri ohlaseni a bez Thralla sel do rezerv, aniz se pohnul.
+            //   r. 7932-7933: ohlaseny BLOCK smi zmenit na MOVE. Politika: kdyz
+            //   vedle stoji Thrall, blokuje; jinak se rana nehodi a upir zustava
+            //   NEAKTIVOVANY, aby mohl dojit k Thrallovi (priorita uzivatele 30.09.).
+            player.bloodlustHungry = true;
+            if (actionType == ActionType::BLOCK && adjacentThrall(state, player) < 0) {
                 result.actionBlocked = true;
                 result.proceed = false;
-                result.turnover = true;
             }
             return result;
         }
     }
 
     return result;
+}
+
+int adjacentThrall(const GameState& state, const Player& vampire) {
+    // l. 7938-7939: Thrall smi byt "standing, PRONE OR STUNNED".
+    for (const Position& pos : vampire.position.getAdjacent()) {
+        if (!pos.isOnPitch()) continue;
+        const Player* ally = state.getPlayerAtPosition(pos);
+        if (ally && ally->teamSide == vampire.teamSide && isOnPitch(ally->state) &&
+            !ally->hasSkill(SkillName::Bloodlust)) {
+            return ally->id;
+        }
+    }
+    return -1;
+}
+
+bool feedBloodlust(GameState& state, int vampireId, DiceRollerBase& dice,
+                   std::vector<GameEvent>* events) {
+    Player& vampire = state.getPlayer(vampireId);
+    vampire.bloodlustHungry = false;
+    if (!vampire.isOnPitch()) return false;
+
+    const int thrallId = adjacentThrall(state, vampire);
+    emitEvent(events, {GameEvent::Type::BLOODLUST_FEED, vampireId, thrallId,
+                      vampire.position, {}, 0, thrallId >= 0});
+    if (thrallId >= 0) {
+        // l. 7939-7941: "make an INJURY ROLL on the Thrall treating any
+        // casualty roll as BADLY HURT" -- bez hodu na zbroj. "The injury will
+        // not cause a turnover UNLESS THE THRALL WAS HOLDING THE BALL."
+        const bool thrallHadBall = state.ball.isHeld && state.ball.carrierId == thrallId;
+        InjuryContext ctx{};
+        resolveInjuryRoll(state, thrallId, dice, ctx, events);
+        Player& thrall = state.getPlayer(thrallId);
+        if (thrall.state == PlayerState::DEAD) thrall.setState(PlayerState::INJURED);
+        if (thrallHadBall) {
+            handleBallOnPlayerDown(state, thrallId, dice, events);
+            return true;
+        }
+        return false;
+    }
+
+    // l. 7942-7947: "Failure to bite a Thrall IS A TURNOVER ... move the
+    // Vampire to the RESERVES BOX. If he was holding the ball, IT BOUNCES from
+    // the square he occupied."
+    if (state.ball.isHeld && state.ball.carrierId == vampireId) {
+        handleBallOnPlayerDown(state, vampireId, dice, events);
+    }
+    vampire.setState(PlayerState::OFF_PITCH);   // reserves
+    vampire.position = {-1, -1};
+    return true;
 }
 
 } // namespace bb

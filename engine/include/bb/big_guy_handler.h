@@ -49,4 +49,14 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                                 DiceRollerBase& dice, std::vector<GameEvent>* events,
                                 bool standUpInPlace = false);
 
+// P71 (30.09.2026): nakrmeni HLADOVEHO upira na konci jeho akce (r. 7934-7947).
+// Thrall vedle (stoji, lezi, omracen): hod na zraneni, CAS = Badly Hurt,
+// turnover jen kdyz Thrall drzel mic. Bez Thralla: upir do rezerv, mic odskoci
+// z jeho pole, TURNOVER. Vraci true = turnover. Hladoveho upira odznaci.
+bool feedBloodlust(GameState& state, int vampireId, DiceRollerBase& dice,
+                   std::vector<GameEvent>* events);
+
+// Id Thralla vedle upira (tymovy spoluhrac bez Blood Lust na hristi), nebo -1.
+int adjacentThrall(const GameState& state, const Player& vampire);
+
 } // namespace bb

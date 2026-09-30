@@ -509,16 +509,49 @@ ActionResult executeAction(GameState& state, const Action& action,
     // When a DIFFERENT player starts acting, the previous player's activation is
     // over: if they had moved, mark them as having acted. Continuous multi-step
     // moves and move->pass/foul/score sequences by the SAME player are untouched.
+    // P71 (30.09.2026): hladovy upir se krmi na KONCI SVE AKTIVACE (r. 7934-7947).
+    // Neuspech (bez Thralla, nebo Thrall s micem) je turnover a dalsi akce se uz
+    // nekona.
+    auto feedEndsTurn = [&](int vampId) {
+        if (!feedBloodlust(state, vampId, dice, events)) return false;
+        state.turnoverPending = true;
+        resolveEndTurn(state, events, /*wasTurnover=*/true);
+        return true;
+    };
+
     if (requiresPlayer(action.type) && action.playerId > 0) {
         if (state.currentActivationId > 0 &&
             state.currentActivationId != action.playerId) {
             Player& prev = state.getPlayer(state.currentActivationId);
             if (prev.hasMoved) prev.hasActed = true;
+            if (prev.bloodlustHungry && feedEndsTurn(prev.id)) return ActionResult::turnovr();
         }
         state.currentActivationId = action.playerId;
+    } else if (action.type == ActionType::END_TURN && state.currentActivationId > 0 &&
+               state.getPlayer(state.currentActivationId).bloodlustHungry) {
+        feedBloodlust(state, state.currentActivationId, dice, events);   // kolo konci tak jako tak
+    }
+
+    // "before actually passing, handing off" (r. 7935-7936)
+    if ((action.type == ActionType::PASS || action.type == ActionType::HAND_OFF) &&
+        action.playerId > 0 && state.getPlayer(action.playerId).bloodlustHungry &&
+        feedEndsTurn(action.playerId)) {
+        return ActionResult::turnovr();
     }
 
     ActionResult result = resolveAction(state, action, dice, events);
+
+    // Konec akce hladoveho upira: akce skoncila (hasActed), nebo by skoroval --
+    // "before ... scoring" (r. 7936), tedy PRED kontrolou TD nize.
+    if (requiresPlayer(action.type) && action.playerId > 0 && !result.turnover) {
+        const Player& actor = state.getPlayer(action.playerId);
+        const bool wouldScore = state.ball.isHeld && state.ball.carrierId == actor.id &&
+                                checkTouchdown(state);
+        if (actor.bloodlustHungry && actor.isOnPitch() && (actor.hasActed || wouldScore) &&
+            feedBloodlust(state, actor.id, dice, events)) {
+            result = ActionResult::turnovr();
+        }
+    }
 
     // Auto end turn on turnover
     if (result.turnover) {

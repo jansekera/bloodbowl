@@ -86,6 +86,11 @@ struct Player {
     // 30.09.2026, vzor PHP 6a6537ef). Nastavi se pri prvnim uhybu, ve kterem
     // se Sila opravdu pouzila misto Obratnosti.
     bool breakTackleUsedThisTurn = false;
+    // P71 (30.09.2026), Blood Lust r. 7922-7947, vzor PHP 9e980cac: na 1 je
+    // upir HLADOVY -- akci dokonci a nakrmi se az na jejim KONCI (pred
+    // prihravkou, predanim a TD). Krmeni resi `feedBloodlust`, volane z
+    // `executeAction` na konci aktivace.
+    bool bloodlustHungry = false;
     bool sureFeetRerollUsedThisTurn = false;
     // Sweltering Heat (package G, 2026-08-10): "Roll a D6 for each player on
     // the pitch at the end of a drive. On a roll of 1 the player collapses and

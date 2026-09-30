@@ -4050,3 +4050,30 @@ TEST(MacroActions, UnexposedBlitzerIsOfferedCoverAwayFromEnemyReach) {
     // ano (MA 6 - 3 za vstani + 2 = 5). x = 7 uz ohrozuji oba.
     EXPECT_EQ(cover->targetPos.x, 6) << "vybral pole, na ktere dosahne vic soupera";
 }
+
+// P71 (30.09.2026), uzivatel: "blood lust -- priorita je dostat se vedle tralla".
+TEST(MacroActions, P71AHungryVampireIsOfferedOnlyTheWalkToAThrall) {
+    GameState state = makeMinimalState();
+    Player& v = state.getPlayer(1);
+    v.skills.add(SkillName::Bloodlust);
+    v.bloodlustHungry = true;
+    v.hasMoved = true;
+    v.movementRemaining = 4;
+    state.currentActivationId = 1;
+    Player& t = state.getPlayer(2);                 // Thrall o 5 poli dal
+    t.id = 2; t.teamSide = TeamSide::HOME; t.state = PlayerState::STANDING;
+    t.position = {10, 2}; t.stats = {6, 3, 3, 8}; t.movementRemaining = 6;
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    int others = 0;
+    const Macro* walk = nullptr;
+    for (const auto& m : macros) {
+        if (m.type == MacroType::END_TURN) continue;
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) walk = &m; else ++others;
+    }
+    ASSERT_NE(walk, nullptr) << "hladovy upir nedostal cestu k Thrallovi";
+    EXPECT_EQ(others, 0) << "hladovy upir bez Thralla ma mit JEN cestu k nemu";
+    EXPECT_EQ(walk->targetPos.distanceTo(t.position), 1);
+    EXPECT_EQ(walk->gfiAllowance, 0) << "4 pole na MA 4 nepotrebuji GFI";
+}

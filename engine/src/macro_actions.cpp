@@ -1,4 +1,5 @@
 #include "bb/macro_actions.h"
+#include "bb/big_guy_handler.h"
 #include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
@@ -1209,6 +1210,35 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 
     // Always: END_TURN
     out.push_back({MacroType::END_TURN, -1, -1, {-1, -1}});
+
+    // ⭐ P71 (30.09.2026), uzivatel: "blood lust -- priorita je dostat se vedle
+    //   tralla". Hladovy upir s otevrenou aktivaci, ktery vedle Thralla nestoji,
+    //   dostane JEDINE: dojit na nejblizsi volne pole vedle Thralla (i za GFI).
+    //   Kdyby jednal kdokoli jiny, aktivace upira konci a bez Thralla je to
+    //   rezervy + turnover (r. 7942-7945).
+    if (state.currentActivationId > 0) {
+        const Player& v = state.getPlayer(state.currentActivationId);
+        if (v.teamSide == mySide && v.bloodlustHungry && v.isOnPitch() &&
+            !v.hasActed && adjacentThrall(state, v) < 0) {
+            const int reach = std::max(0, static_cast<int>(v.movementRemaining)) + maxGfiSquares(v);
+            Position best{-1, -1};
+            int bestDist = 99;
+            state.forEachOnPitch(mySide, [&](const Player& t) {
+                if (t.id == v.id || t.hasSkill(SkillName::Bloodlust)) return;
+                for (const Position& sq : t.position.getAdjacent()) {
+                    if (!sq.isOnPitch() || state.getPlayerAtPosition(sq) != nullptr) continue;
+                    const int d = v.position.distanceTo(sq);
+                    if (d <= reach && d < bestDist) { bestDist = d; best = sq; }
+                }
+            });
+            if (best.x >= 0) {
+                Macro m{MacroType::REPOSITION, v.id, -1, best};
+                m.gfiAllowance = std::min(2, std::max(0, bestDist - std::max(0, static_cast<int>(v.movementRemaining))));
+                out.push_back(m);
+                return;
+            }
+        }
+    }
 
     // STAND UP (2026-08-21). Prone players were invisible to this whole layer:
     // isFreeToAct() requires STANDING, so no macro ever touched them and
@@ -2671,10 +2701,17 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 static bool executeAndRecord(GameState& state, const Action& action,
                              DiceRollerBase& dice, MacroExpansionResult& result) {
     result.actions.push_back(action);
+    const bool wasHungry = action.playerId > 0 && state.getPlayer(action.playerId).bloodlustHungry;
     ActionResult ar = executeAction(state, action, dice, nullptr);
     if (ar.turnover) {
         result.turnover = true;
         return true;
+    }
+    // P71: upir prave vyhladovel a Thralla vedle nema -- makro konci, aby
+    // dalsi rozhodnuti (jedina nabidka: k Thrallovi) prislo driv, nez dojde jinam.
+    if (action.playerId > 0 && !wasHungry) {
+        const Player& v = state.getPlayer(action.playerId);
+        if (v.bloodlustHungry && v.isOnPitch() && adjacentThrall(state, v) < 0) return true;
     }
     return false;
 }

@@ -284,6 +284,16 @@ TEST(BigGuyHandler, BloodlustPass) {
 // nebylo turnover. Pravidlo rika neco jineho na obou stranach.
 // ============================================================================
 
+// P71 (30.09.2026): hod 1 upira jen HLADOVI (akci dokonci); kousnuti je az
+// `feedBloodlust` na konci akce. Pravidla kousnuti (TA10) hlidaji tytez testy.
+static void makeHungry(GameState& gs, int id) {
+    FixedDiceRoller one({1});
+    auto r = resolveBigGuyCheck(gs, id, ActionType::MOVE, one, nullptr);
+    ASSERT_FALSE(r.actionBlocked) << "hladovy upir akci DOKONCI";
+    ASSERT_FALSE(r.turnover) << "pri ohlaseni se jeste nekouse";
+    ASSERT_TRUE(gs.getPlayer(id).bloodlustHungry);
+}
+
 TEST(BigGuyHandler, BloodlustBiteIsAnInjuryRollNotAnAutoKO) {
     // l. 7939-7941: "make an INJURY ROLL on the Thrall treating any casualty
     // roll as Badly Hurt. The injury will not cause a turnover unless the
@@ -292,16 +302,13 @@ TEST(BigGuyHandler, BloodlustBiteIsAnInjuryRollNotAnAutoKO) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
     placePlayer(gs, 2, {11, 7}, TeamSide::HOME);   // Thrall
+    makeHungry(gs, 1);
 
-    // 1 => Blood Lust selhal; hod na zraneni 2D6 = 1+2 = 3 => jen Stunned
-    FixedDiceRoller dice({1, 1, 2});
-    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
-
-    EXPECT_FALSE(result.actionBlocked);   // nakrmil se, akce pokracuje
-    EXPECT_TRUE(result.proceed);
-    EXPECT_FALSE(result.turnover);
+    FixedDiceRoller dice({1, 2});                   // zraneni 1+2 = 3 => jen Stunned
+    EXPECT_FALSE(feedBloodlust(gs, 1, dice, nullptr));
     EXPECT_EQ(gs.getPlayer(2).state, PlayerState::STUNNED)
         << "kousnuti je hod na zraneni, ne automaticke KO";
+    EXPECT_FALSE(gs.getPlayer(1).bloodlustHungry);
 }
 
 TEST(BigGuyHandler, BloodlustBiteOfTheBallCarrierIsATurnover) {
@@ -311,48 +318,108 @@ TEST(BigGuyHandler, BloodlustBiteOfTheBallCarrierIsATurnover) {
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
     placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
     gs.ball.isHeld = true; gs.ball.carrierId = 2; gs.ball.position = {11, 7};
+    makeHungry(gs, 1);
 
-    FixedDiceRoller dice({1, 1, 2, 3, 4, 5, 6, 1, 2});
-    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
-
-    EXPECT_TRUE(result.turnover);
+    FixedDiceRoller dice({1, 2, 3, 4, 5, 6, 1, 2});
+    EXPECT_TRUE(feedBloodlust(gs, 1, dice, nullptr));
 }
 
 TEST(BigGuyHandler, BloodlustWithNoThrallSendsTheVampireToRESERVESAndIsATurnover) {
     // l. 7942-7945: "Failure to bite a Thrall IS A TURNOVER and requires you to
     // feed on a spectator -- move the Vampire to the RESERVES BOX."
-    // Puvodne z nej byl KO (tedy hráč, ktery se muze vratit hodem 4+ o poloćase)
-    // a turnover zadny.
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
-    // zadny soused
+    makeHungry(gs, 1);                               // zadny soused
 
-    FixedDiceRoller dice({1});
-    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
-
-    EXPECT_TRUE(result.actionBlocked);
-    EXPECT_FALSE(result.proceed);
-    EXPECT_TRUE(result.turnover);
+    FixedDiceRoller dice({});
+    EXPECT_TRUE(feedBloodlust(gs, 1, dice, nullptr));
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH)
         << "rezervy, ne KO -- z KO se vraci hodem 4+";
 }
 
 TEST(BigGuyHandler, BloodlustMayBiteAProneOrStunnedThrall) {
     // l. 7938-7939: Thrall smi byt "standing, PRONE OR STUNNED".
-    // Puvodni kod chtel canAct(), tedy jen stojiciho -- lezici Thrall vedle
-    // upira se nepocital a upir sel zbytecne do rezerv.
     auto gs = makeGameState();
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Bloodlust);
     placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
     gs.getPlayer(2).state = PlayerState::PRONE;
+    makeHungry(gs, 1);
 
-    FixedDiceRoller dice({1, 1, 2});
-    auto result = resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
-
-    EXPECT_FALSE(result.turnover);
+    FixedDiceRoller dice({1, 2});
+    EXPECT_FALSE(feedBloodlust(gs, 1, dice, nullptr));
     EXPECT_NE(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+}
+
+// ============================================================================
+// P71 (30.09.2026) -- KDY se krmi. r. 7929-7936: "the Vampire ... may continue
+// with the declared Action ... at the END OF THE ACTION, before actually
+// passing, handing off or scoring, the Vampire must feed". Vzor PHP 9e980cac.
+// ============================================================================
+static GameState vampState() {
+    auto gs = makeGameState();
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);    // upir MA6
+    gs.getPlayer(1).skills.add(SkillName::Bloodlust);
+    placePlayer(gs, 2, {13, 7}, TeamSide::HOME);    // Thrall
+    placePlayer(gs, 3, {3, 3}, TeamSide::HOME);     // jiny hrac
+    return gs;
+}
+
+TEST(BigGuyHandler, P71AHungryVampireFinishesHisMoveAndFeedsWhenTheNextPlayerActs) {
+    auto gs = vampState();
+    FixedDiceRoller d1({1});                        // hladovy
+    auto r1 = executeAction(gs, {ActionType::MOVE, 1, -1, {11, 7}}, d1, nullptr);
+    EXPECT_FALSE(r1.turnover);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "hladovy upir se nepohnul";
+    FixedDiceRoller d2({});
+    executeAction(gs, {ActionType::MOVE, 1, -1, {12, 7}}, d2, nullptr);   // doslo k Thrallovi
+    ASSERT_TRUE(gs.getPlayer(1).bloodlustHungry) << "krmil se uprostred sve akce";
+
+    FixedDiceRoller d3({1, 2});                     // kousnuti: zraneni 3 = Stunned
+    auto r3 = executeAction(gs, {ActionType::MOVE, 3, -1, {4, 3}}, d3, nullptr);
+    EXPECT_FALSE(r3.turnover);
+    EXPECT_FALSE(gs.getPlayer(1).bloodlustHungry);
+    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(3).position, (Position{4, 3})) << "dalsi hrac uz nejednal";
+}
+
+TEST(BigGuyHandler, P71AHungryVampireWithoutAThrallIsATurnoverWhenTheNextPlayerActs) {
+    auto gs = vampState();
+    FixedDiceRoller d1({1});
+    executeAction(gs, {ActionType::MOVE, 1, -1, {9, 7}}, d1, nullptr);    // od Thralla
+    FixedDiceRoller d2({});
+    auto r = executeAction(gs, {ActionType::MOVE, 3, -1, {4, 3}}, d2, nullptr);
+    EXPECT_TRUE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+    EXPECT_EQ(gs.getPlayer(3).position, (Position{3, 3})) << "po turnoveru jednal dalsi hrac";
+}
+
+TEST(BigGuyHandler, P71AHungryVampireFeedsBeforeTheHandOff) {
+    auto gs = vampState();
+    gs.getPlayer(2).position = {20, 7};             // Thrall daleko
+    placePlayer(gs, 4, {11, 7}, TeamSide::HOME);    // prijemce -- je to taky Thrall!
+    gs.ball = BallState::carried({10, 7}, 1);
+    FixedDiceRoller d1({1, 1, 2, 6, 6});            // hladovy; kousne prijemce (3 = Stunned)
+    executeAction(gs, {ActionType::MOVE, 1, -1, {10, 7}}, d1, nullptr);
+    FixedDiceRoller d2({1, 2, 6, 6});
+    auto r = executeAction(gs, {ActionType::HAND_OFF, 1, 4, {11, 7}}, d2, nullptr);
+    (void)r;
+    EXPECT_FALSE(gs.getPlayer(1).bloodlustHungry) << "pred predanim se nekrmil";
+    EXPECT_EQ(gs.getPlayer(4).state, PlayerState::STUNNED) << "kousnuti ma prijit PRED predanim";
+}
+
+TEST(BigGuyHandler, P71ADeclaredBlockWithNoThrallBesideIsNotThrownSoHeCanWalk) {
+    auto gs = vampState();
+    placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
+    FixedDiceRoller d1({1});
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {9, 7}}, d1, nullptr);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_TRUE(gs.getPlayer(1).bloodlustHungry);
+    EXPECT_FALSE(gs.getPlayer(1).hasActed) << "Block -> Move: aktivace zustava otevrena";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "rana se hodila";
 }
 
 // ===== LEAP TESTS =====
