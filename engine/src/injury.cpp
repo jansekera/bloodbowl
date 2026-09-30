@@ -50,7 +50,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
 
     if (injuryRoll <= 7) {
         // Stunned
-        player.state = PlayerState::STUNNED;
+        player.setState(PlayerState::STUNNED);
         // BB2016 l. 707: may not turn face up on the turn he is Stunned.
         player.stunnedThisTurn = true;
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
@@ -67,13 +67,13 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         // rules -- KO on 12.5% of injury rolls instead of 11.1% -- and every
         // dwarf has this skill, so it was live and it cost us.
         if (player.hasSkill(SkillName::ThickSkull) && injuryRoll == 8) {
-            player.state = PlayerState::STUNNED;
+            player.setState(PlayerState::STUNNED);
             player.stunnedThisTurn = true;
             emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                               static_cast<int>(SkillName::ThickSkull), true});
             return injuryRoll;
         }
-        player.state = PlayerState::KO;
+        player.setState(PlayerState::KO);
         player.position = {-1, -1};
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, {}, {},
                           injuryRoll, false, d1, d2});
@@ -137,7 +137,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
             // was the original Casualty roll) the Apothecary has managed to
             // patch him up ... the player may be moved into the Reserves box."
             if (cas == CasualtyResult::BADLY_HURT) {
-                player.state = PlayerState::OFF_PITCH;   // Reserves
+                player.setState(PlayerState::OFF_PITCH);   // Reserves
                 player.position = {-1, -1};
                 return injuryRoll;
             }
@@ -152,7 +152,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
             emitEvent(events, {GameEvent::Type::REGENERATION, playerId, -1, {}, {},
                               regenRoll, regenRoll >= 4});
             if (regenRoll >= 4) {
-                player.state = PlayerState::OFF_PITCH;   // Reserves
+                player.setState(PlayerState::OFF_PITCH);   // Reserves
                 player.position = {-1, -1};
                 return injuryRoll;
             }
@@ -248,7 +248,7 @@ void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
     // scored or the half ends." We used to convert it to a KO, which is
     // harsher: a KO must then roll 4+ to come back at all.
     if (isOnPitch(player.state)) {
-        player.state = PlayerState::OFF_PITCH;   // Reserves
+        player.setState(PlayerState::OFF_PITCH);   // Reserves
         player.position = {-1, -1};
     }
 }

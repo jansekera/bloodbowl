@@ -99,6 +99,16 @@ struct Player {
 
     bool hasSkill(SkillName s) const { return skills.has(s); }
 
+    // P68 (30.09.2026), vzor PHP `MatchPlayerDTO::withState`: kazda zmena
+    // stavu jde tudy. Zakorenení konci, "when he is Knocked Down or Placed
+    // Prone" (r. 8574-8576) -- tedy PRECHODEM do nestojiciho stavu, hned.
+    // ⛔ Ne podle toho, ze hrac nestoji: lezici se muze zakorenit sam
+    // (ohlasi akci, hodi 1) a to zakorenení trva, dokud ho nikdo nesrazi.
+    void setState(PlayerState s) {
+        state = s;
+        if (s != PlayerState::STANDING) rooted = false;
+    }
+
     bool isOnPitch() const { return bb::isOnPitch(state); }
 
     bool canAct() const {

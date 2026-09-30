@@ -244,9 +244,25 @@ TEST(BigGuyHandler, TakeRootEndsWhenKnockedDown) {
     resolveBigGuyCheck(gs, 1, ActionType::MOVE, dice, nullptr);
     ASSERT_TRUE(gs.getPlayer(1).rooted);
 
-    gs.getPlayer(1).state = PlayerState::PRONE;     // "or he is Knocked Down"
+    gs.getPlayer(1).setState(PlayerState::PRONE);   // "or he is Knocked Down"
+    EXPECT_FALSE(gs.getPlayer(1).rooted) << "koreny maji skoncit hned pri srazeni (P68)";
     gs.resetPlayersForNewTurn(TeamSide::HOME);
     EXPECT_FALSE(gs.getPlayer(1).rooted);
+}
+
+TEST(BigGuyHandler, P68RootedWhileProneStaysRootedIntoTheNextTurn) {
+    // Lezici Treeman ohlasi akci, hodi 1 (zakorenen VLEZE) a nevstane.
+    // Nikdo ho nesrazil ani nepolozil => koreny trvaji (r. 8574-8576).
+    // Reset na zacatku kola je dosud mazal kazdemu, kdo nestal.
+    auto gs = makeGameState();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::TakeRoot);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).rooted = true;
+
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    EXPECT_TRUE(gs.getPlayer(1).rooted) << "reset kola smazal koreny lezicimu";
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 0);
 }
 
 // ===== BLOODLUST TESTS =====

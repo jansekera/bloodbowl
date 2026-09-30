@@ -170,7 +170,7 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
             // Failed dodge: player falls at destination
             ++g_toDodge;
             player.position = to;
-            player.state = PlayerState::PRONE;
+            player.setState(PlayerState::PRONE);
             player.hasActed = true;
 
             InjuryContext ctx;
@@ -195,7 +195,7 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
             // Failed GFI: player falls at destination
             ++g_toGfi;
             player.position = to;
-            player.state = PlayerState::PRONE;
+            player.setState(PlayerState::PRONE);
             player.hasActed = true;
 
             InjuryContext ctx;
@@ -304,7 +304,7 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
     if (!leapOk) {
         // Failed leap: player prone at destination, armor+injury, turnover
         player.position = to;
-        player.state = PlayerState::PRONE;
+        player.setState(PlayerState::PRONE);
         player.hasActed = true;
 
         InjuryContext ctx;
@@ -321,7 +321,7 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
                                   SkillName::SureFeet, false, true, events);
         if (!gfiOk) {
             player.position = to;
-            player.state = PlayerState::PRONE;
+            player.setState(PlayerState::PRONE);
             player.hasActed = true;
 
             InjuryContext ctx;

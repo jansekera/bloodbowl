@@ -94,7 +94,7 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
             const bool sameSquare = (dx == 0 && dy == 0);
             if (!sameSquare && dice.rollD6() < 4) continue;   // sousedi na 4+
 
-            victim->state = PlayerState::PRONE;
+            victim->setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, victim->id, throwerId,
                               victim->position, {}, 0, false});
             if (victim->teamSide == thrower.teamSide) activeKnockedDown = true;

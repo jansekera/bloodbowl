@@ -1379,3 +1379,76 @@ TEST(BlockHandler, TymovyPrehozHODUPROmuzeUspet) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_EQ(gs.getTeamState(TeamSide::HOME).rerolls, 1);
 }
+
+// ============================================================================
+// P68 (30.09.2026) -- port PHP 3cec72e2 (E19, E20b).
+// E19, r. 8574-8576: zakorenení konci, "when he is Knocked Down or Placed
+//   Prone" -- HNED, ne az na zacatku jeho dalsiho kola. Do te doby drzel
+//   srazeny Treeman v souperove kole pole i v retezovem odtlaceni.
+// E20b, r. 1824-1825: "Only Extraordinary skills work when a player is Prone
+//   or Stunned" -- lezici Stand Firm retez nezastavi.
+// ============================================================================
+
+TEST(BlockHandler, P68KnockedDownRootedPlayerStopsBeingRootedAtOnce) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 2, 3, 1, 10);
+    gs.getPlayer(12).skills.add(SkillName::TakeRoot);
+    gs.getPlayer(12).rooted = true;
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    // DEFENDER DOWN na vsech kostkach; brneni 1+1 neprorazi
+    FixedDiceRoller dice({6, 6, 6, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    ASSERT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.getPlayer(12).rooted) << "srazeny zakorenený drzi koreny dal";
+}
+
+TEST(BlockHandler, P68ProneStandFirmDoesNotJamTheChain) {
+    // Tyz rozestav jako ChainIntoStandFirmMovesNobody, jen ti tri se Stand
+    // Firm LEZI. Retez je ma odtlacit, takze obrance odejde ze svého pole.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    for (int id : {13, 14, 15}) {
+        placePlayer(gs, id, {12, 7 + (id - 14)}, TeamSide::AWAY);
+        gs.getPlayer(id).skills.add(SkillName::StandFirm);
+        gs.getPlayer(id).state = PlayerState::PRONE;
+    }
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_NE(gs.getPlayer(12).position, (Position{11, 7}))
+        << "lezici Stand Firm retez zastavil";
+}
+
+TEST(BlockHandler, P68ProneRootedPlayerStillHoldsGround) {
+    // Pozitivni kontrola opacnym smerem: zakorenení NENI Stand Firm. Kdo se
+    // zakorenil vleze, drzi pole i vleze ("for any reason", r. 8578-8579).
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    for (int id : {13, 14, 15}) {
+        placePlayer(gs, id, {12, 7 + (id - 14)}, TeamSide::AWAY);
+        gs.getPlayer(id).state = PlayerState::PRONE;
+        gs.getPlayer(id).rooted = true;
+    }
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}

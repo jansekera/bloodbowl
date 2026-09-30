@@ -78,9 +78,9 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.stoodUpNextToEnemy = false;
         p.dodgeRerollUsedThisTurn = false;
         p.sureFeetRerollUsedThisTurn = false;
-        // Take Root (l. 8573-8576): zakorenení konci, kdyz je hráč sražen
-        // nebo polozen na zem -- do dalsiho vlastniho kola uz s nim nepocitame.
-        if (p.state != PlayerState::STANDING) p.rooted = false;
+        // Take Root (l. 8573-8576): zakorenení konci sražením nebo položením --
+        // to ted resi `Player::setState` HNED (P68, 30.09.2026). Tady se uz
+        // nemaze: lezici, ktery se zakorenil sam a nevstal, koreny drzi dal.
         p.movementRemaining = p.rooted ? 0 : p.stats.movement;
     });
 }

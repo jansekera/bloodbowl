@@ -194,7 +194,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                 if (thrall.state == PlayerState::DEAD) {
                     // "treating any casualty roll as Badly Hurt" -- z kousnuti
                     // se neumira.
-                    thrall.state = PlayerState::INJURED;
+                    thrall.setState(PlayerState::INJURED);
                 }
                 if (thrallHadBall) {
                     handleBallOnPlayerDown(state, thrallId, dice, events);
@@ -217,7 +217,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
                 if (vampHadBall) {
                     handleBallOnPlayerDown(state, playerId, dice, events);
                 }
-                player.state = PlayerState::OFF_PITCH;   // reserves
+                player.setState(PlayerState::OFF_PITCH);   // reserves
                 player.position = {-1, -1};
                 result.actionBlocked = true;
                 result.proceed = false;

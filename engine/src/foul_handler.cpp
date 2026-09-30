@@ -122,7 +122,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     // Doubles: fouler ejected (SneakyGit prevents)
     if (isDoubles) {
         if (!fouler.hasSkill(SkillName::SneakyGit)) {
-            fouler.state = PlayerState::EJECTED;
+            fouler.setState(PlayerState::EJECTED);
             fouler.position = {-1, -1};
             handleBallOnPlayerDown(state, fouler.id, dice, events);
             emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},

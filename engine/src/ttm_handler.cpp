@@ -43,7 +43,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
                     state.ball = BallState::onGround(origin);
                     resolveBounce(state, origin, dice, 0, events);
                 }
-                projectile.state = PlayerState::DEAD;
+                projectile.setState(PlayerState::DEAD);
                 projectile.position = {-1, -1};
                 return ActionResult::ok();
             }
@@ -134,7 +134,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool landedOnSomeone = false;
     if (Player* under = state.getPlayerAtPosition(landPos)) {
         landedOnSomeone = true;
-        under->state = PlayerState::PRONE;
+        under->setState(PlayerState::PRONE);
         emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, under->id, projectileId,
                           under->position, {}, 0, false});
         InjuryContext uctx;
@@ -172,7 +172,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
 
     if (landedOnFeet) return ActionResult::ok();
 
-    projectile.state = PlayerState::PRONE;
+    projectile.setState(PlayerState::PRONE);
     emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, projectileId, -1, landPos, {}, 0, false});
     InjuryContext ctx;
     resolveArmourAndInjury(state, projectileId, dice, ctx, events);

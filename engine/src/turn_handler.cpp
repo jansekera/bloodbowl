@@ -21,7 +21,7 @@ void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTu
     // place" -- proto je to tu bezpodmínečně, ne až za kontrolou wasTurnover.
     state.forEachPlayer(current, [](Player& p) {
         if (p.state == PlayerState::STUNNED && !p.stunnedThisTurn) {
-            p.state = PlayerState::PRONE;
+            p.state = PlayerState::PRONE;   // otoceni licem nahoru neni "Placed Prone" -- zamerne ne setState (P68)
         }
     });
 

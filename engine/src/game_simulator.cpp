@@ -377,7 +377,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // depend on that staying true.
     for (auto& p : state.players) {
         if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive) {
-            p.state = PlayerState::EJECTED;
+            p.setState(PlayerState::EJECTED);
             p.position = {-1, -1};
         }
     }
@@ -395,7 +395,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     for (auto& p : state.players) {
         // KO recovery happens BEFORE anyone is set up, per the rules above.
         if (p.state == PlayerState::KO && dice) {
-            if (dice->rollD6() >= 4) p.state = PlayerState::OFF_PITCH;
+            if (dice->rollD6() >= 4) p.setState(PlayerState::OFF_PITCH);
         }
         // Out for the rest of the match: casualties, deaths, sendings-off,
         // and any KO that failed its recovery roll. Keep the state, keep them
@@ -414,7 +414,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
         // NB: outNextSetup (heat) is deliberately NOT cleared here --
         // buildTeam reads it to hold the player out of THIS set-up and
         // clears it there, so he sits out exactly one drive.
-        p.state = PlayerState::OFF_PITCH;   // = in Reserves, available
+        p.setState(PlayerState::OFF_PITCH);   // = in Reserves, available
         p.position = {-1, -1};
         p.hasMoved = false;
         p.hasActed = false;

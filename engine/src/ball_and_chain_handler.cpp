@@ -24,7 +24,7 @@ bool resolveAutoBlock(GameState& state, int bcPlayerId, int targetId,
 
     switch (face) {
         case BlockDiceFace::ATTACKER_DOWN: {
-            bcp.state = PlayerState::PRONE;
+            bcp.setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, bcPlayerId, -1,
                               bcp.position, {}, 0, false});
             InjuryContext ctx;
@@ -39,7 +39,7 @@ bool resolveAutoBlock(GameState& state, int bcPlayerId, int targetId,
             bool defFalls = !target.hasSkill(SkillName::Block);
 
             if (bcFalls) {
-                bcp.state = PlayerState::PRONE;
+                bcp.setState(PlayerState::PRONE);
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, bcPlayerId, -1,
                                   bcp.position, {}, 0, false});
                 InjuryContext ctx;
@@ -47,7 +47,7 @@ bool resolveAutoBlock(GameState& state, int bcPlayerId, int targetId,
                 handleBallOnPlayerDown(state, bcPlayerId, dice, events);
             }
             if (defFalls) {
-                target.state = PlayerState::PRONE;
+                target.setState(PlayerState::PRONE);
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, targetId, -1,
                                   target.position, {}, 0, false});
                 InjuryContext ctx;
@@ -69,7 +69,7 @@ bool resolveAutoBlock(GameState& state, int bcPlayerId, int targetId,
                 return false;
             }
             // Knocked down
-            target.state = PlayerState::PRONE;
+            target.setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, targetId, -1,
                               target.position, {}, 0, false});
             InjuryContext ctx;
@@ -79,7 +79,7 @@ bool resolveAutoBlock(GameState& state, int bcPlayerId, int targetId,
         }
 
         case BlockDiceFace::DEFENDER_DOWN: {
-            target.state = PlayerState::PRONE;
+            target.setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, targetId, -1,
                               target.position, {}, 0, false});
             InjuryContext ctx;
@@ -110,7 +110,7 @@ ActionResult resolveBallAndChain(GameState& state, int playerId,
         // Off-pitch: player KO, drop ball, stop. NOT turnover
         if (!target.isOnPitch()) {
             handleBallOnPlayerDown(state, playerId, dice, events);
-            bcp.state = PlayerState::KO;
+            bcp.setState(PlayerState::KO);
             bcp.position = {-1, -1};
             return ActionResult::ok(); // Never turnover
         }

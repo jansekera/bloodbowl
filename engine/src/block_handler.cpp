@@ -310,7 +310,10 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
     // zakorenený nesmi byt odsunut "for any reason", takze na rozdil od Stand
     // Firm to neni volba jeho trenéra a nezalezi na tom, kdo blokuje.
     if (p.rooted) return true;
-    return p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
+    // Stand Firm jen STOJICI: "Only Extraordinary skills work when a player is
+    // Prone or Stunned" (r. 1824-1825). P68 (30.09.2026), vzor PHP 3cec72e2.
+    return p.state == PlayerState::STANDING
+        && p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
 }
 
 static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
@@ -570,7 +573,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                               att.position, gfiTarget, gfiOk});
             if (!gfiOk) {
                 // Falls before the block is thrown
-                att.state = PlayerState::PRONE;
+                att.setState(PlayerState::PRONE);
                 att.hasActed = true;
                 InjuryContext ctx;
                 resolveArmourAndInjury(state, att.id, dice, ctx, events);
@@ -800,7 +803,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
     switch (chosen) {
         case BlockDiceFace::ATTACKER_DOWN: {
-            att.state = PlayerState::PRONE;
+            att.setState(PlayerState::PRONE);
             attKnockedDown = true;
             turnover = true;
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, att.id, -1,
@@ -863,8 +866,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                     state.ball.isHeld && state.ball.carrierId == att.id;
 
                 // Wrestle: both prone, no armor
-                att.state = PlayerState::PRONE;
-                def.state = PlayerState::PRONE;
+                att.setState(PlayerState::PRONE);
+                def.setState(PlayerState::PRONE);
                 emitEvent(events, {GameEvent::Type::SKILL_USED,
                                   defWrestle ? def.id : att.id, -1, {}, {},
                                   static_cast<int>(SkillName::Wrestle), true});
@@ -880,7 +883,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             bool defFalls = !def.hasSkill(SkillName::Block);
 
             if (attFalls) {
-                att.state = PlayerState::PRONE;
+                att.setState(PlayerState::PRONE);
                 attKnockedDown = true;
                 turnover = true;
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, att.id, -1,
@@ -899,7 +902,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // 8/10 pro utocnika s Blockem, takze se VOLI casto. Deformovalo to
             // klece, screeny a vsechna dosavadni pozicni mereni.
             if (defFalls) {
-                def.state = PlayerState::PRONE;
+                def.setState(PlayerState::PRONE);
                 emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
                                   def.position, {}, 0, false});
                 noteKnockdownOnStoodUp(def);   // Q3
@@ -1074,7 +1077,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
         // Knockdown
         if (defKnockedDown) {
-            def.state = PlayerState::PRONE;
+            def.setState(PlayerState::PRONE);
             emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, def.id, -1,
                               def.position, {}, 0, false});
             noteKnockdownOnStoodUp(def);   // Q3
