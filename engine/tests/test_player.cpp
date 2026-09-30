@@ -78,10 +78,11 @@ TEST(Player, CanAct) {
     p.hasActed = true;
     EXPECT_FALSE(p.canAct());
 
-    // Lost tacklezones
+    // Lost tacklezones -- P93 (30.09.2026): akci ohlasit SMI, zony mu vrati
+    // zacatek akce (r. 8185-8188, 7983-7986). Test driv hlidal opak.
     p.hasActed = false;
     p.lostTacklezones = true;
-    EXPECT_FALSE(p.canAct());
+    EXPECT_TRUE(p.canAct());
 
     // Prone
     p.lostTacklezones = false;

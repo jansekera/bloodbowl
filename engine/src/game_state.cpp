@@ -69,7 +69,9 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.usedBlitz = false;
         // M3/N12: gaze konci pristim kolem obeti, big-guy stav az uspesnym
         // hodem nebo koncem drivu -- viz komentar u `bigGuyStupefied`.
-        p.lostTacklezones = p.bigGuyStupefied;
+        // P79/P93 (30.09.2026): ztracene zony se tu UZ NEVRACI -- gaze ani
+        // Bone-head/Really Stupid nekonci zacatkem kola, ale zacatkem AKCE
+        // (`Player::regainTacklezonesAtActionStart`) nebo koncem drivu.
         p.proUsedThisTurn = false;
         p.bigGuyCheckedThisTurn = false;
         p.leapUsedThisTurn = false;

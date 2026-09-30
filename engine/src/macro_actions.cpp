@@ -1201,7 +1201,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // that makes the rule reachable, not the version that prices it.
     state.forEachOnPitch(mySide, [&](const Player& p) {
         if (p.state != PlayerState::PRONE) return;
-        if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
+        if (p.hasActed || p.hasMoved) return;   // P93: zony akci nebrani
         if (p.hasSkill(SkillName::BallAndChain)) return;
         // Q3 měřidlo: nabídnuto -- a je vedle něj STOJÍCÍ soupeř?
         ++g_standOffered;
@@ -2057,7 +2057,7 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
             // F12 Leap, P45 vstavani a M4 Sprint.
             const bool prone = (p.state == PlayerState::PRONE);
             if (prone) {
-                if (p.hasActed || p.hasMoved || p.lostTacklezones) return;
+                if (p.hasActed || p.hasMoved) return;   // P93: zony akci nebrani
             } else if (!isFreeToAct(p)) {
                 return;
             }
@@ -3905,6 +3905,11 @@ static MacroExpansionResult expandChainScore(GameState& state, const Macro& macr
 
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
                                        DiceRollerBase& dice) {
+    // P79/P93: makro je ohlaseni akce. Executory nize (movePlayerToward, plany
+    // s nosicem) koncí, jakmile hrac nema zony -- tim hlidaji NEUSPECH kontroly
+    // big guye behem makra. Hrac, kteremu zony chybi uz z minula, by se k hodu
+    // jinak nikdy nedostal.
+    if (macro.playerId > 0) state.getPlayer(macro.playerId).regainTacklezonesAtActionStart();
     switch (macro.type) {
         case MacroType::SCORE:       return expandScore(state, macro, dice);
         case MacroType::ADVANCE:     return expandAdvance(state, macro, dice);

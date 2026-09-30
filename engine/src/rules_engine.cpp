@@ -324,7 +324,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
     // Also allow standing up prone players
     state.forEachOnPitch(side, [&](const Player& p) {
         if (p.state != PlayerState::PRONE) return;
-        if (p.hasActed || p.lostTacklezones) return;
+        if (p.hasActed) return;   // P93: ztracene zony vstani nebrani
         // Stejná výjimka jako v hlavní smyčce (:21) a v makro vrstvě:
         // BallAndChain smí JEN svou akci. Bez toho si dvě vrstvy odporovaly.
         if (p.hasSkill(SkillName::BallAndChain)) return;

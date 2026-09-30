@@ -239,6 +239,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
     // BigGuy pre-action checks for player actions
     if (requiresPlayer(action.type) && action.playerId > 0) {
         Player& p = state.getPlayer(action.playerId);
+        p.regainTacklezonesAtActionStart();   // P79/P93: pred kontrolou big guye
         bool hasBigGuySkill = p.hasSkill(SkillName::BoneHead) ||
                               p.hasSkill(SkillName::ReallyStupid) ||
                               p.hasSkill(SkillName::WildAnimal) ||

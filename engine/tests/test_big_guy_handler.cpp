@@ -821,9 +821,11 @@ TEST(BigGuyHandler, M3BeingKnockedDownDoesNotClearTheBoneHeadState) {
     EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);
 }
 
-// ⛔ HRANICE: Hypnotic Gaze ma KRATSI trvani a oprava se na nej NESMI rozlezt.
-// r. 8185-8188: "...until the start of his NEXT ACTION or the drive ends."
-TEST(BigGuyHandler, M3GazedPlayerStillGetsHisTacklezonesBackNextTurn) {
+// ⛔ P79 (30.09.2026, port PHP 60ba5961): tenhle test dřív hlídal OPAK pravidla
+// -- že gaze skončí resetem kola. r. 8185-8188: "...until the start of his NEXT
+// ACTION or the drive ends." Začátek kola to není: oběť, která v kole
+// neaktivuje, je bez zón dál. Zóny vrací až začátek její akce (test níž).
+TEST(BigGuyHandler, P79GazedPlayerKeepsNoTacklezonesThroughTheTurnReset) {
     auto gs = makeGameState();
     // ⚠️ `forEachPlayer` chodi po `squadId(side, n)`, ne po `p.teamSide` --
     // hrac musi mit ID z te squady, jinak ho reset vubec nepotka.
@@ -833,7 +835,58 @@ TEST(BigGuyHandler, M3GazedPlayerStillGetsHisTacklezonesBackNextTurn) {
     // ⭐ a ZADNY bigGuyStupefied -- gaze ho nenastavuje
 
     gs.resetPlayersForNewTurn(TeamSide::AWAY);
-    EXPECT_FALSE(gs.getPlayer(awayId).lostTacklezones);
+    EXPECT_TRUE(gs.getPlayer(awayId).lostTacklezones);
+}
+
+TEST(BigGuyHandler, P79GazedPlayerGetsHisTacklezonesBackAtTheStartOfHisAction) {
+    auto gs = makeGameState();
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).lostTacklezones = true;          // obet gaze
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    ASSERT_TRUE(gs.getPlayer(1).lostTacklezones);
+
+    Action step{ActionType::MOVE, 1, -1, {11, 7}};
+    FixedDiceRoller dice({});
+    auto r = resolveAction(gs, step, dice, nullptr);
+    EXPECT_TRUE(r.success);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+}
+
+// P93 (30.09.2026): po neuspesnem Bone-head v minulem kole dostane hrac nabidku
+// akce -- r. 7983-7986 "at the start of a FUTURE ACTION".
+TEST(BigGuyHandler, P93StupefiedBoneHeadIsOfferedAnActionNextTurn) {
+    auto gs = makeGameState();
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+    FixedDiceRoller fail({1});
+    resolveBigGuyCheck(gs, 1, ActionType::MOVE, fail, nullptr);
+    gs.resetPlayersForNewTurn(TeamSide::HOME);
+    std::vector<Action> as;
+    getAvailableActions(gs, as);
+    int mine = 0;
+    for (const auto& a : as) if (a.playerId == 1) ++mine;
+    EXPECT_GT(mine, 0) << "hrac po neuspesnem Bone-head nedostal zadnou akci";
+}
+
+// P93: a kdyz akci ohlasi a hodi znovu 1, je bez zon a bez akce dal.
+TEST(BigGuyHandler, P93StupefiedBoneHeadFailingAgainStaysStupefied) {
+    auto gs = makeGameState();
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+    gs.getPlayer(1).lostTacklezones = true;
+    gs.getPlayer(1).bigGuyStupefied = true;
+    Action step{ActionType::MOVE, 1, -1, {11, 7}};
+    FixedDiceRoller dice({1});
+    resolveAction(gs, step, dice, nullptr);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
 }
 
 // ============================================================================

@@ -115,8 +115,14 @@ struct Player {
 
     bool isOnPitch() const { return bb::isOnPitch(state); }
 
+    // P93 (30.09.2026): "smi zacit akci" -- BEZ ohledu na ztracene zony.
+    // Gaze, Bone-head i Really Stupid trvaji "until the START of his next /
+    // a future ACTION" (r. 8185-8188, 7983-7986, 8402-8405), takze akci
+    // ohlasit smi; zony mu vrati `regainTacklezonesAtActionStart` a kontrola
+    // pred akci je pripadne vezme znovu. Vzor PHP (`ActionResolver.php:202`).
+    // Zda hrac MA zony, se pta primo na `lostTacklezones`.
     bool canAct() const {
-        return bb::canAct(state) && !hasActed && !lostTacklezones;
+        return bb::canAct(state) && !hasActed;
     }
 
     // M13 (31.08.2026) -- BB2016 r. 669-676: "While Prone, the player ... may
@@ -133,7 +139,16 @@ struct Player {
     // ⛔ STUNNED ne: r. 690 pousti vstani jen z Prone.
     bool canDeclareAction() const {
         return (state == PlayerState::STANDING || state == PlayerState::PRONE)
-               && !hasActed && !lostTacklezones;
+               && !hasActed;   // P93: ztracene zony akci nebrani (viz canAct)
+    }
+
+    // P79/P93 (30.09.2026): zacatek AKCE vraci ztracene zony -- gaze konci
+    // "until the start of his next Action" (r. 8185-8188), Bone-head a Really
+    // Stupid se hazi znovu "at the start of a future Action" a pri neuspechu
+    // je vezmou zpet. Plati jen pro cerstvou aktivaci (hrac jeste nic
+    // neudelal), ne pro dalsi krok vicepoloveho pohybu.
+    void regainTacklezonesAtActionStart() {
+        if (!hasMoved && !hasActed) lostTacklezones = false;
     }
 
     bool canMove() const {

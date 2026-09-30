@@ -116,7 +116,9 @@ TEST(GameState, ResetPlayersForNewTurn) {
     EXPECT_FALSE(p.stunnedThisTurn);            // jen čistí příznak
     EXPECT_FALSE(p.hasMoved);
     EXPECT_FALSE(p.hasActed);
-    EXPECT_FALSE(p.lostTacklezones);
+    // P79/P93 (30.09.2026): ztracene zony reset kola NEVRACI -- konci zacatkem
+    // AKCE nebo koncem drivu (r. 8185-8188). Test driv hlidal opak.
+    EXPECT_TRUE(p.lostTacklezones);
     EXPECT_FALSE(p.proUsedThisTurn);
     EXPECT_EQ(p.movementRemaining, 6);
 }

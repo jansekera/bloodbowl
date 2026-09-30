@@ -3975,3 +3975,42 @@ TEST(MacroActions, K6AdvanceIsStillOfferedWhenTheCarrierCanStepAside) {
     EXPECT_TRUE(hasMacroType(macros, MacroType::ADVANCE))
         << "krok 3 zúžil nabídku víc, než měl: postup existuje a nenabízí se";
 }
+
+// ============================================================================
+// P93 (30.09.2026, uzivatel: „ano“). Bone-head / Really Stupid po neuspechu:
+// ztracene zony trvaji "until he manages to roll a 2 or better AT THE START OF
+// A FUTURE ACTION" (r. 7983-7986, 8402-8405) -- akci tedy ohlasit SMI a hodi
+// znovu. Makro vrstva mu dosud nenabidla nic (canAct() chtel zony) a kdyz uz,
+// provadeni skoncilo pred prvnim krokem (movePlayerToward kontroluje zony).
+// ============================================================================
+
+static GameState stupefiedBoneHeadState() {
+    GameState state = makeMinimalState();
+    Player& p = state.getPlayer(1);
+    p.skills.add(SkillName::BoneHead);
+    p.lostTacklezones = true;        // stav po neuspechu v minulem kole
+    p.bigGuyStupefied = true;
+    state.ball = BallState::carried({20, 7}, 12);
+    return state;
+}
+
+TEST(MacroActions, P93AStupefiedBoneHeadIsOfferedAMacro) {
+    GameState state = stupefiedBoneHeadState();
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    int mine = 0;
+    for (const auto& m : macros) if (m.playerId == 1) ++mine;
+    EXPECT_GT(mine, 0) << "hrac po neuspesnem Bone-head nedostal zadne makro";
+}
+
+TEST(MacroActions, P93AStupefiedBoneHeadRollsAgainAndWalks) {
+    GameState state = stupefiedBoneHeadState();
+    Macro m;
+    m.type = MacroType::REPOSITION;
+    m.playerId = 1;
+    m.targetPos = {8, 7};
+    FixedDiceRoller dice({4, 4, 4, 4, 4, 4, 4, 4});   // Bone-head 4 = prosel
+    greedyExpandMacro(state, m, dice);
+    EXPECT_FALSE(state.getPlayer(1).lostTacklezones) << "uspesny hod mu zony nevratil";
+    EXPECT_EQ(state.getPlayer(1).position, (Position{8, 7})) << "makro skoncilo pred prvnim krokem";
+}
