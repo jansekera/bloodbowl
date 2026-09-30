@@ -605,3 +605,25 @@ TEST(BlitzApproach, CheaperSquareWinsEvenWhenItPushesTowardOurCarrier) {
     EXPECT_EQ(step, Position(12, 6))
         << "odsun prebil CENU cesty -- z tiebreaku se stala optimalizace";
 }
+
+// ---------------------------------------------------------------------------
+// P77-review (30.09.2026): Break Tackle je 1x za kolo, takze v ceste se dvema
+// uhyby plati Sila jen pro PRVNI. `pathFailProb` ho dosud pocital na oba.
+// Koridor: start (10,7) v zonach (10,6)+(10,8); kazde prostredni pole je
+// v zone, cil (12,7) ne => kazda cesta ma presne dva uhyby.
+//   1. uhyb se Silou 4: 7-4-1 + 1 zona = 3+  => P(uspech) 4/6
+//   2. uhyb uz s AG2:   7-2-1 + 0 zon  = 4+  => P(uspech) 3/6
+//   P(neuspech) = 1 - 12/36 = 2/3. S chybou (oba se Silou) 1 - 20/36 = 0,444.
+// ---------------------------------------------------------------------------
+TEST(Pathfinder, P77BreakTackleIsPricedOnTheFirstDodgeOnly) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    Player& p = mkPlayer(gs, 1, TeamSide::HOME, {10, 7}, 2);
+    p.stats.strength = 4;
+    p.skills.add(SkillName::BreakTackle);
+    mkPlayer(gs, 12, TeamSide::AWAY, {10, 6}, 3);
+    mkPlayer(gs, 13, TeamSide::AWAY, {10, 8}, 3);
+
+    const double pf = pathFailProb(gs, gs.getPlayer(1), {12, 7}, 2, kNoBlock);
+    EXPECT_NEAR(pf, 2.0 / 3.0, 1e-9);
+}

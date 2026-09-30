@@ -543,6 +543,9 @@ double pathFailProb(const GameState& state, const Player& player,
     Position cur = player.position;
     double successProb = 1.0;
     int stepCount = 0;
+    // review P77: Break Tackle je 1x za kolo -- Sila plati jen pro PRVNI uhyb
+    // na ceste, kde ji opravdu pouzije (tyz stav, jaky nastavi move_handler).
+    Player walker = player;
     for (int i = n - 1; i >= 0; --i) {
         const int nSq = chain[i] % GRID_SIZE;
         Position np{static_cast<int8_t>(nSq % GRID_W),
@@ -550,7 +553,11 @@ double pathFailProb(const GameState& state, const Player& player,
         // ⛔ Taz oprava jako v `riskWeightedDijkstra` vyse (r. 480-486):
         //   brana je pole, ktere se OPOUSTI (`cur`), ne cilove (`np`).
         if (countTacklezones(state, cur, player.teamSide) > 0) {
-            const int dodgeTarget = calculateDodgeTarget(state, player, np, cur);
+            const int dodgeTarget = calculateDodgeTarget(state, walker, np, cur);
+            if (walker.hasSkill(SkillName::BreakTackle) && !walker.breakTackleUsedThisTurn &&
+                walker.stats.strength > walker.stats.agility) {
+                walker.breakTackleUsedThisTurn = true;
+            }
             const double pFail = (dodgeTarget - 1) / 6.0;
             if (!hasDodge) {
                 successProb *= (1.0 - pFail);

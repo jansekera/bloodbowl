@@ -164,6 +164,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         // "and then the player being thrown will scatter one more square",
         // dokud neskonci v prazdnem poli nebo mimo hriste
         do {
+            lastOnPitch = landPos;   // review P76: vhazuje se z pole, odkud vyletel
             Position step = scatterDirection(dice.rollD8());
             landPos.x = static_cast<int8_t>(landPos.x + step.x);
             landPos.y = static_cast<int8_t>(landPos.y + step.y);

@@ -326,7 +326,9 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         return passer.hasSkill(SkillName::SafeThrow) && r != 1 && isFumble(r);
     };
     const bool fumbledFirst = isFumble(roll) && !safeThrowKeeps(roll);
-    const bool inaccurateFirst = !fumbledFirst && roll < passTarget;
+    // review P78: fumble zachraneny Safe Throw neni "neprecna prihravka" --
+    // jinak by ho prehodil Pass a novy hod mohl byt skutecny fumble.
+    const bool inaccurateFirst = !isFumble(roll) && roll < passTarget;
 
     if (fumbledFirst || inaccurateFirst) {
         // F6, l. 8336-8337: "A player with the Pass skill is allowed to re-roll

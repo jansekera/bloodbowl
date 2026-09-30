@@ -274,3 +274,19 @@ TEST(TTMHandler, P76AStunnedPlayerLandedOnStaysStunned) {
     resolveThrowTeamMate(gs, 1, 2, {15, 7}, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
+
+// P76-review (30.09.2026): hozeny nosic dopadne na hrace a DODATECNY rozptyl
+// ho vynese z hriste => vhazuje se z pole, na kterem dopadl, ne z pole pred nim.
+TEST(TTMHandler, P76ThrowInAfterTheExtraScatterStartsFromTheLandedOnSquare) {
+    auto gs = ttmSetup();
+    ttmPair(gs, {10, 1}, {11, 1});
+    gs.ball = BallState::carried({11, 1}, 2);
+    placePlayer(gs, 12, {15, 0}, TeamSide::AWAY);
+    // presny · E, W, N => (15,0) obsazeno · brneni 3+3 · o pole dal N => ven
+    // · vhazovani z (15,0): smer 3 = S, 2+2 => (15,4) · odraz 5 = S => (15,5)
+    // · dav 3+3. S vadou by vhazovani slo z (15,1) => (15,5) a odraz na (15,6).
+    FixedDiceRoller dice({6, 3, 7, 1, 3, 3, 1, 3, 2, 2, 5, 3, 3, 3, 3, 3, 3});
+    resolveThrowTeamMate(gs, 1, 2, {15, 1}, dice, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{15, 5}));
+}

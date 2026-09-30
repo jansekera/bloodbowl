@@ -650,3 +650,23 @@ TEST(PassHandler, P80AStunnedReceiverOfAHandOffDoesNotCatch) {
     EXPECT_TRUE(result.turnover);
     EXPECT_FALSE(gs.ball.isHeld && gs.ball.carrierId == 2) << "omraceny chytil";
 }
+
+// P78-review (30.09.2026): modifikovany fumble, ktery Safe Throw zachrani,
+// je zaroven pod cilem prihravky -- a Pass ho pak prehazoval jako neprecny.
+// Novy hod mohl byt prirozena 1 = skutecny fumble a turnover.
+TEST(PassHandler, P78SafeThrowKeptFumbleIsNotRerolledWithPass) {
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::SafeThrow);
+    gs.getPlayer(1).skills.add(SkillName::Pass);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {4, 6}, TeamSide::AWAY);
+    placePlayer(gs, 13, {4, 8}, TeamSide::AWAY);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    FixedDiceRoller dice({2, 1, 3, 3, 3});   // 2 = zachraneny fumble; 1 by byl prehoz
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+    EXPECT_FALSE(result.turnover) << "Pass prehodil zachraneny fumble";
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}

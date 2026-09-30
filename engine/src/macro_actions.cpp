@@ -1033,12 +1033,18 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     double rerollLive = 1.0;   // R
     double rerollGone = 0.0;   // S
 
+    Player walker = mover;   // review P77: nese spotrebovany Break Tackle
     for (int guard = 0; guard < 20 && cur.distanceTo(target) > 1; ++guard) {
         Position next = pickApproachStep(state, mover, cur, target);
         if (next.x < 0) return 1.0;  // executor would fail the blitz outright
 
         if (countTacklezones(state, cur, mover.teamSide) > 0) {
-            int dodgeTarget = calculateDodgeTarget(state, mover, next, cur);
+            int dodgeTarget = calculateDodgeTarget(state, walker, next, cur);
+            // review P77: Break Tackle jen na prvni uhyb, kde se Sila pouzije.
+            if (walker.hasSkill(SkillName::BreakTackle) && !walker.breakTackleUsedThisTurn &&
+                walker.stats.strength > walker.stats.agility) {
+                walker.breakTackleUsedThisTurn = true;
+            }
             double dodgeFail = std::clamp((dodgeTarget - 1) / 6.0, 0.0, 5.0 / 6.0);
             if (!hasDodge) {
                 failChance += dodgeFail * (1.0 - failChance);
