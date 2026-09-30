@@ -10,7 +10,9 @@ const DICE_DISPLAY: Record<string, { label: string; css: string; title: string }
 
 export class BlockDiceModal {
     private container: HTMLElement;
-    private onChoose: ((faceIndex: number) => void) | null = null;
+    // P81 krok 3 (30.09.2026): follow-up je volba utocnika (BB2016 r. 608-611);
+    // posila se spolu s kostkou. Frenzy nasleduje povinne -- to hlida engine.
+    private onChoose: ((faceIndex: number, followUp: boolean) => void) | null = null;
     private onReroll: ((type: string) => void) | null = null;
 
     constructor(container: HTMLElement) {
@@ -24,7 +26,7 @@ export class BlockDiceModal {
         pending: PendingBlock,
         attackerName: string,
         defenderName: string,
-        onChoose: (faceIndex: number) => void,
+        onChoose: (faceIndex: number, followUp: boolean) => void,
         onReroll: (type: string) => void,
     ): void {
         this.onChoose = onChoose;
@@ -53,6 +55,7 @@ export class BlockDiceModal {
                 <div class="block-dice-modal__title">Block Dice${frenzyLabel}</div>
                 <div class="block-dice-modal__info">${this.escape(chooserLabel)} chooses</div>
                 <div class="block-dice-modal__dice">${diceHtml}</div>
+                <label class="block-dice-modal__followup"><input type="checkbox" class="block-dice-modal__followup-input" checked> Follow up if the defender is pushed</label>
                 ${rerollButtons ? `<div class="block-dice-modal__rerolls">${rerollButtons}</div>` : ''}
             </div>
         `;
@@ -63,8 +66,11 @@ export class BlockDiceModal {
         this.container.querySelectorAll('.block-dice-modal__die').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt((btn as HTMLElement).dataset.index ?? '0', 10);
+                const followUpInput = this.container.querySelector<HTMLInputElement>('.block-dice-modal__followup-input');
+                const followUp = followUpInput?.checked ?? true;
+                const onChoose = this.onChoose;
                 this.hide();
-                this.onChoose?.(idx);
+                onChoose?.(idx, followUp);
             });
         });
 

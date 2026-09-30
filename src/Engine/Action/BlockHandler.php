@@ -117,6 +117,38 @@ final class BlockHandler implements ActionHandlerInterface
         return ['state' => $state, 'outcome' => 'fell'];
     }
 
+    /**
+     * P81 krok 3 (30.09.2026), port C++ `wantsFollowUp` (`block_handler.cpp:461`).
+     * `rules_bb2016.txt` r. 608-611: follow-up je volba utocnika; povinny jen pro
+     * Frenzy (r. 8138: „must always follow up if they can").
+     * Clovek volbu posila (`$choice`); AI: mimo blitz pole zdarma bere, bez
+     * zbytku pohybu taky; v blitzu se zbytkem pohybu nenasleduje na pole
+     * s vic tackle zonami, nez kde stoji -- chce jeste odejit.
+     */
+    private function wantsFollowUp(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        Position $attackerPos,
+        Position $vacated,
+        bool $isBlitz,
+        ?bool $choice,
+    ): bool {
+        if ($attacker->hasSkill(SkillName::Frenzy)) {
+            return true;
+        }
+        if ($choice !== null) {
+            return $choice;
+        }
+        if (!$isBlitz || $attacker->getMovementRemaining() <= 0) {
+            return true;
+        }
+        $side = $attacker->getTeamSide();
+        $tzStay = $this->tzCalc->countTacklezones($state, $attackerPos, $side, $attacker->getId());
+        $tzGo = $this->tzCalc->countTacklezones($state, $vacated, $side, $attacker->getId());
+
+        return $tzGo <= $tzStay;
+    }
+
     public function setPassResolver(PassResolver $passResolver): void
     {
         $this->passResolver = $passResolver;
@@ -312,7 +344,10 @@ final class BlockHandler implements ActionHandlerInterface
         $state = $state->withPendingBlock(null);
 
         $isBlitz = $pending->isBlitz();
-        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz);
+        // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
+        //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
+        $followUpChoice = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
+        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice);
 
         // Frenzy: mandatory second block if both still standing and adjacent
         if (!$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
@@ -904,6 +939,7 @@ final class BlockHandler implements ActionHandlerInterface
         array $events,
         bool $isBlitz = false,
         bool $noFollowUp = false,
+        ?bool $followUpChoice = null,
     ): ActionResult {
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
@@ -1025,7 +1061,8 @@ final class BlockHandler implements ActionHandlerInterface
         //   (`rules_bb2016.txt` r. 8580-8581). Vzor C++ `block_handler.cpp:548`.
         if ($noFollowUp || $attacker->isRooted()) {
             // Skip follow-up entirely for Multiple Block / rooted attacker
-        } elseif ($defenderPushed && !($defender->hasSkill(SkillName::Fend) && !$defenderDown)) {
+        } elseif ($defenderPushed && !($defender->hasSkill(SkillName::Fend) && !$defenderDown)
+            && $this->wantsFollowUp($currentState, $attacker, $attackerPos, $defenderPos, $isBlitz, $followUpChoice)) {
             $events[] = GameEvent::followUp($attacker->getId(), (string) $attackerPos, (string) $defenderPos);
             $attacker = $attacker->withPosition($defenderPos);
             $currentState = $currentState->withPlayer($attacker);

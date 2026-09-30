@@ -1832,6 +1832,17 @@ a:hover {
     margin-bottom: 1rem;
 }
 
+/* P81 krok 3 (30.09.2026): follow-up je volba utocnika */
+.block-dice-modal__followup {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
 .block-dice-modal__die {
     width: 56px;
     height: 56px;

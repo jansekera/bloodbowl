@@ -201,10 +201,10 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
         pending,
         attackerName,
         defenderName,
-        async (faceIndex: number) => {
+        async (faceIndex: number, followUp: boolean) => {
             isProcessing = true;
             try {
-                const result = await api.submitAction(matchId, 'choose_block_die', { faceIndex });
+                const result = await api.submitAction(matchId, 'choose_block_die', { faceIndex, followUp });
                 await handleActionResult(result);
                 clearAllTargets();
                 actionPanel.setSelectedMode(null);
