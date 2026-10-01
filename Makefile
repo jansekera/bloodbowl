@@ -5,7 +5,7 @@
 
 JOBS ?= 6
 
-.PHONY: check check-php check-front check-cpp
+.PHONY: check check-php check-front check-cpp check-lint
 
 check: check-php check-front check-cpp
 	@echo "== check: vše zelené"
@@ -17,6 +17,10 @@ check-php:
 check-front:
 	npx tsc --noEmit -p .
 	npx vitest run
+
+check-lint:
+	vendor/bin/php-cs-fixer fix --dry-run --diff
+	npx eslint frontend/src
 
 check-cpp:
 	$(MAKE) -C engine/build -j$(JOBS) bb_tests mcts_cli bb_engine_py
