@@ -212,12 +212,9 @@ final class TeamService
      *
      * @return array{normal: list<array{id: int, name: string, category: string}>, double: list<array{id: int, name: string, category: string}>, can_advance: bool}
      */
-    public function getAvailableSkillsForPlayer(int $playerId): array
+    public function getAvailableSkillsForPlayer(int $playerId, int $coachId): array
     {
-        $player = $this->playerRepository->findById($playerId);
-        if ($player === null) {
-            throw new NotFoundException('Player not found');
-        }
+        $player = $this->findOwnPlayer($playerId, $coachId);
 
         $sppService = $this->sppService ?? new SPPService();
         $skillRepo = $this->skillRepository ?? new SkillRepository();
@@ -252,12 +249,9 @@ final class TeamService
     /**
      * Advance a player by learning a new skill.
      */
-    public function advancePlayer(int $playerId, int $skillId): Player
+    public function advancePlayer(int $playerId, int $skillId, int $coachId): Player
     {
-        $player = $this->playerRepository->findById($playerId);
-        if ($player === null) {
-            throw new NotFoundException('Player not found');
-        }
+        $player = $this->findOwnPlayer($playerId, $coachId);
 
         $sppService = $this->sppService ?? new SPPService();
         $skillRepo = $this->skillRepository ?? new SkillRepository();
@@ -315,5 +309,21 @@ final class TeamService
         $this->playerRepository->updateSPP($playerId, $player->getSpp(), $newLevel);
 
         return $this->playerRepository->findById($playerId) ?? $player;
+    }
+
+    /**
+     * Player of a team owned by $coachId. A foreign player looks like a missing one (404), so the
+     * API does not reveal that it exists. P112(c), security review 01.10.2026: level-up and its
+     * skill offer only checked that someone was logged in, not whose player it was.
+     */
+    private function findOwnPlayer(int $playerId, int $coachId): Player
+    {
+        $player = $this->playerRepository->findById($playerId);
+        $team = $player === null ? null : $this->teamRepository->findById($player->getTeamId());
+        if ($player === null || $team === null || $team->getCoachId() !== $coachId) {
+            throw new NotFoundException('Player not found');
+        }
+
+        return $player;
     }
 }

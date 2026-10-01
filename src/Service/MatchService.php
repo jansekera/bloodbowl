@@ -16,7 +16,9 @@ use App\Engine\StrengthCalculator;
 use App\Enum\ActionType;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
+use App\Enum\TeamStatus;
 use App\Enum\Weather;
+use App\Exception\ForbiddenException;
 use App\Exception\NotFoundException;
 use App\Exception\ValidationException;
 use App\Repository\MatchEventRepository;
@@ -67,6 +69,19 @@ final class MatchService
         $awayTeam = $this->teamRepo->findByIdWithPlayers($awayTeamId);
         if ($awayTeam === null) {
             throw new NotFoundException('Away team not found');
+        }
+
+        // P112(b), security review 01.10.2026: týmy se nekontrolovaly ⇒ šlo hrát s cizí soupiskou a SPP
+        // se pak zapsaly cizím hráčům. Domácí tým patří zakladateli, hostující hostujícímu kouči — a bez
+        // něj (hot-seat, proti AI) taky zakladateli. Cizí tým se tváří jako neexistující.
+        if ($homeTeam->getCoachId() !== $coachId) {
+            throw new NotFoundException('Home team not found');
+        }
+        if ($awayTeam->getCoachId() !== ($awayCoachId ?? $coachId)) {
+            throw new NotFoundException('Away team not found');
+        }
+        if ($homeTeam->getStatus() !== TeamStatus::ACTIVE || $awayTeam->getStatus() !== TeamStatus::ACTIVE) {
+            throw new ValidationException(['A retired team cannot play']);
         }
 
         if (count($homeTeam->getActivePlayers()) < 11) {
@@ -219,9 +234,10 @@ final class MatchService
      *
      * @param array<string, mixed> $params
      */
-    public function submitAction(int $matchId, ActionType $action, array $params): ActionResult
+    public function submitAction(int $matchId, ActionType $action, array $params, int $coachId): ActionResult
     {
         $state = $this->getGameState($matchId);
+        $this->assertMayAct($matchId, $state, $coachId);
 
         // Enable game logging for AI matches (for learning from human play)
         if ($this->logDir !== null && $state->getAiTeam() !== null) {
@@ -256,6 +272,26 @@ final class MatchService
             $result['isTurnover'],
             $allEvents,
         );
+    }
+
+    /**
+     * P112(a), security review 01.10.2026: táhnout smí jen účastník zápasu; tah dřív poslal kdokoli
+     * přihlášený za kteroukoli stranu. Zápas dvou koučů: každý jen za stranu, která je na tahu.
+     * Zápas jednoho člověka (hot-seat, proti AI — hostující kouč chybí nebo je týž) zůstává jako dřív.
+     */
+    private function assertMayAct(int $matchId, GameState $state, int $coachId): void
+    {
+        $row = $this->matchRepo->findById($matchId) ?? throw new NotFoundException('Match not found');
+        $home = (int) $row['home_coach_id'];
+        $away = $row['away_coach_id'] === null ? $home : (int) $row['away_coach_id'];
+
+        if ($coachId !== $home && $coachId !== $away) {
+            throw new ForbiddenException('Not a participant of this match');
+        }
+        $onTurn = $state->getActiveTeam() === TeamSide::HOME ? $home : $away;
+        if ($coachId !== $onTurn) {
+            throw new ForbiddenException('Not your turn');
+        }
     }
 
     /**

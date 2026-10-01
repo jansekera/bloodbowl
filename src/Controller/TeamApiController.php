@@ -148,10 +148,10 @@ final class TeamApiController
 
     public function getAvailableSkills(int $playerId): void
     {
-        $this->authService->requireAuth();
+        $coach = $this->authService->requireAuth();
 
         try {
-            $result = $this->teamService->getAvailableSkillsForPlayer($playerId);
+            $result = $this->teamService->getAvailableSkillsForPlayer($playerId, $coach->getId());
             $this->json([
                 'data' => $result,
                 '_links' => [
@@ -166,12 +166,12 @@ final class TeamApiController
 
     public function advancePlayer(int $playerId): void
     {
-        $this->authService->requireAuth();
+        $coach = $this->authService->requireAuth();
         $body = $this->getJsonBody();
         $skillId = (int) ($body['skill_id'] ?? 0);
 
         try {
-            $player = $this->teamService->advancePlayer($playerId, $skillId);
+            $player = $this->teamService->advancePlayer($playerId, $skillId, $coach->getId());
             $this->json([
                 'data' => $player->toArray(),
                 '_links' => [

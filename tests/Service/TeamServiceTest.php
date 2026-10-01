@@ -253,6 +253,59 @@ final class TeamServiceTest extends TestCase
         $this->assertSame(3, $p3->getNumber());
     }
 
+    /**
+     * P112(c) — security review 01.10.2026: level-up šel přidělit i cizímu hráči a nabídka
+     * dovedností cizího hráče šla číst (kontroloval se jen přihlášený uživatel, ne vlastník týmu).
+     * Cizí hráč se tváří jako neexistující (404), aby se neprozradilo, že existuje.
+     */
+    private function hireOwnLineman(): int
+    {
+        $team = $this->service->createTeam($this->coachId, $this->raceId, 'STest_Owner');
+        $race = $this->raceRepository->findByIdWithPositionals($this->raceId);
+        $this->assertNotNull($race);
+        $linemanId = null;
+        foreach ($race->getPositionals() as $pos) {
+            if ($pos->getName() === 'Lineman') {
+                $linemanId = $pos->getId();
+                break;
+            }
+        }
+        $this->assertNotNull($linemanId);
+
+        return $this->service->hirePlayer($team->getId(), $linemanId, 'Owned')->getId();
+    }
+
+    private function otherCoachId(): int
+    {
+        return (new CoachRepository($this->pdo))
+            ->save('SVCOther', 'other@svctest.bb', password_hash('pw', PASSWORD_DEFAULT))
+            ->getId();
+    }
+
+    public function testOwnerSeesAvailableSkillsOfOwnPlayer(): void
+    {
+        $playerId = $this->hireOwnLineman();
+
+        $offer = $this->service->getAvailableSkillsForPlayer($playerId, $this->coachId);
+        $this->assertFalse($offer['can_advance']); // nově najatý hráč nemá SPP — ale vlastník nabídku vidí
+    }
+
+    public function testOtherCoachCannotReadAvailableSkillsOfForeignPlayer(): void
+    {
+        $playerId = $this->hireOwnLineman();
+
+        $this->expectException(NotFoundException::class);
+        $this->service->getAvailableSkillsForPlayer($playerId, $this->otherCoachId());
+    }
+
+    public function testOtherCoachCannotAdvanceForeignPlayer(): void
+    {
+        $playerId = $this->hireOwnLineman();
+
+        $this->expectException(NotFoundException::class);
+        $this->service->advancePlayer($playerId, 1, $this->otherCoachId());
+    }
+
     protected function tearDown(): void
     {
         $this->pdo->exec("DELETE FROM teams WHERE name LIKE 'STest_%'");

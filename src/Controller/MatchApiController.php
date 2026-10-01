@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Enum\ActionType;
+use App\Exception\ForbiddenException;
 use App\Exception\NotFoundException;
 use App\Exception\ValidationException;
 use App\Service\AuthService;
@@ -40,6 +41,8 @@ final class MatchApiController
                     'actions' => ['href' => "/api/v1/matches/{$gameState->getMatchId()}/actions", 'method' => 'POST'],
                 ],
             ], 201);
+        } catch (ForbiddenException $e) {
+            $this->json(['error' => $e->getMessage()], 403);
         } catch (ValidationException $e) {
             $this->json(['errors' => $e->getErrors()], 422);
         } catch (NotFoundException $e) {
@@ -67,7 +70,7 @@ final class MatchApiController
 
     public function submitAction(int $matchId): void
     {
-        $this->authService->requireAuth();
+        $coach = $this->authService->requireAuth();
         $body = $this->getJsonBody();
 
         $actionType = ActionType::tryFrom((string) ($body['action'] ?? ''));
@@ -80,7 +83,7 @@ final class MatchApiController
         $params = (array) ($body['params'] ?? []);
 
         try {
-            $result = $this->matchService->submitAction($matchId, $actionType, $params);
+            $result = $this->matchService->submitAction($matchId, $actionType, $params, $coach->getId());
 
             $this->json([
                 'data' => $result->toArray(),
