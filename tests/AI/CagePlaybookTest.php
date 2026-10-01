@@ -6,7 +6,7 @@ namespace App\Tests\AI;
 
 use App\AI\LearningAICoach;
 use App\DTO\GameState;
-use App\Engine\{ActionResolver, RandomDiceRoller, RulesEngine};
+use App\Engine\{ActionResolver, RulesEngine, SeededDiceRoller};
 use App\Enum\{ActionType, TeamSide};
 use App\Tests\Engine\GameStateBuilder;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +25,7 @@ final class CagePlaybookTest extends TestCase
     {
         $rules = new RulesEngine();
         $ai = new LearningAICoach();
-        $resolver = new ActionResolver(new RandomDiceRoller());
+        $resolver = new ActionResolver(new SeededDiceRoller(20261001));
 
         for ($i = 0; $i < 40; $i++) {
             $rozhodnuti = $ai->decideAction($state, $rules);

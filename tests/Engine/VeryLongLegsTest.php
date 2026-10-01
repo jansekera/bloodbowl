@@ -92,11 +92,7 @@ final class VeryLongLegsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::PASS, ['playerId' => 1, 'targetX' => 8, 'targetY' => 5]);
 
         $this->assertTrue($result->isTurnover());
-        foreach ($result->getEvents() as $event) {
-            if ($event->getType() === 'interception') {
-                $this->assertTrue($event->getData()['success']);
-            }
-        }
+        $this->assertTrue($this->interception($result)->getData()['success']);
     }
 
     public function testInterceptionWithoutVeryLongLegsHigherTarget(): void
@@ -115,12 +111,7 @@ final class VeryLongLegsTest extends TestCase
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::PASS, ['playerId' => 1, 'targetX' => 8, 'targetY' => 5]);
 
-        foreach ($result->getEvents() as $event) {
-            if ($event->getType() === 'interception') {
-                $this->assertFalse($event->getData()['success']);
-                break;
-            }
-        }
+        $this->assertFalse($this->interception($result)->getData()['success']);
     }
 
     public function testVeryLongLegsLeapNoTZClampedAt2(): void
@@ -147,5 +138,13 @@ final class VeryLongLegsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7]);
 
         $this->assertFalse($result->isTurnover());
+    }
+
+    /** P100: dřív se tvrzení o intercepci přeskočilo, když událost vůbec nevznikla. */
+    private function interception(\App\DTO\ActionResult $result): \App\DTO\GameEvent
+    {
+        $found = array_values(array_filter($result->getEvents(), fn($e) => $e->getType() === 'interception'));
+        $this->assertCount(1, $found, 'pokus o intercepci se musí odehrát');
+        return $found[0];
     }
 }

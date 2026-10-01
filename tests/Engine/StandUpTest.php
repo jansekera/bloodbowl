@@ -95,10 +95,9 @@ final class StandUpTest extends TestCase
         // With only 3 MA (no GFI), can reach x=8
         // Verify x=9 requires GFI
         $gfiTargets = array_filter($targets, fn($t) => $t['x'] === 9 && $t['y'] === 7);
-        if ($gfiTargets !== []) {
-            $gfiTarget = array_values($gfiTargets)[0];
-            $this->assertGreaterThan(0, $gfiTarget['gfis']);
-        }
+        // P100: když pole chybělo, neověřilo se nic.
+        $this->assertNotSame([], $gfiTargets, 'x=9 má být dosažitelné s GFI');
+        $this->assertGreaterThan(0, array_values($gfiTargets)[0]['gfis']);
     }
 
     public function testPronePlayerLowMAStandUpRollSuccess(): void

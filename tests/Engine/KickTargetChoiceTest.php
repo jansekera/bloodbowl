@@ -6,7 +6,7 @@ namespace App\Tests\Engine;
 
 use App\Engine\BallResolver;
 use App\Engine\KickoffResolver;
-use App\Engine\RandomDiceRoller;
+use App\Engine\SeededDiceRoller;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 use App\Enum\SkillName;
@@ -25,7 +25,7 @@ final class KickTargetChoiceTest extends TestCase
     private function resolver(): KickoffResolver
     {
         $tz = new TacklezoneCalculator();
-        $dice = new RandomDiceRoller();
+        $dice = new SeededDiceRoller(20261001);
 
         return new KickoffResolver($dice, new ScatterCalculator(), new BallResolver($dice, $tz, new ScatterCalculator()));
     }

@@ -244,7 +244,9 @@ final class GreedyAICoachTest extends TestCase
 
         $decision = $this->ai->decideAction($state, $this->rules);
 
-        // Should choose BOMB_THROW (high value with 3 enemies) or MOVE
+        // Should choose BOMB_THROW (high value with 3 enemies) or MOVE.
+        // P100: dřív se při jiném rozhodnutí neověřilo nic — teď musí být jedno z těch dvou.
+        $this->assertContains($decision['action'], [ActionType::BOMB_THROW, ActionType::MOVE]);
         if ($decision['action'] === ActionType::BOMB_THROW) {
             $this->assertSame(1, $decision['params']['playerId']);
             $this->assertArrayHasKey('targetX', $decision['params']);

@@ -11,7 +11,7 @@ use App\DTO\GameState;
 use App\DTO\TeamStateDTO;
 use App\Engine\ActionResolver;
 use App\Engine\FixedDiceRoller;
-use App\Engine\RandomDiceRoller;
+use App\Engine\SeededDiceRoller;
 use App\Engine\RulesEngine;
 use App\Enum\ActionType;
 use App\Enum\GamePhase;
@@ -35,7 +35,7 @@ final class LearningAIIntegrationTest extends TestCase
         $state = $ai->setupFormation($state, TeamSide::AWAY);
 
         // Simulate a few turns
-        $dice = new RandomDiceRoller();
+        $dice = new SeededDiceRoller(20261001);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::END_SETUP, []);
         $state = $result->getNewState();
@@ -74,8 +74,9 @@ final class LearningAIIntegrationTest extends TestCase
         $ai = new LearningAICoach(null, 0.0);
         // Set random weights
         $weights = [];
+        $rng = new \Random\Randomizer(new \Random\Engine\PcgOneseq128XslRr64(20261001)); // P100: pevné semínko — dřív mt_rand bez semínka
         for ($i = 0; $i < FeatureExtractor::NUM_FEATURES; $i++) {
-            $weights[] = (mt_rand(-100, 100)) / 100.0;
+            $weights[] = $rng->getInt(-100, 100) / 100.0;
         }
         $ai->setWeights($weights);
 
@@ -84,7 +85,7 @@ final class LearningAIIntegrationTest extends TestCase
         $state = $ai->setupFormation($state, TeamSide::HOME);
         $state = $ai->setupFormation($state, TeamSide::AWAY);
 
-        $dice = new RandomDiceRoller();
+        $dice = new SeededDiceRoller(20261001);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::END_SETUP, []);
         $state = $result->getNewState();

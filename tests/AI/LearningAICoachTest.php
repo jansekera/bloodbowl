@@ -149,11 +149,10 @@ final class LearningAICoachTest extends TestCase
         $decision = $ai->decideAction($state, $rules);
 
         // Should prefer blitzing the sideline target
+        // P100: dřív se přijalo jakékoli jiné rozhodnutí (i konec tahu) — platné jsou jen blitz na kraj, nebo blok.
+        $this->assertContains($decision['action'], [ActionType::BLITZ, ActionType::BLOCK]);
         if ($decision['action'] === ActionType::BLITZ) {
             $this->assertSame(2, $decision['params']['targetId'], 'Should blitz sideline target');
-        } else {
-            // If it chose block instead (adjacent target), that's also valid
-            $this->addToAssertionCount(1);
         }
     }
 

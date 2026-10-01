@@ -186,9 +186,13 @@ final class KnockDownDuringMoveTest extends TestCase
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         if (!in_array('leap', $types, true)) {
-            $this->markTestSkipped('fixtura leap nespustila -- neměří se tím nic');
+            // P100: dřív markTestSkipped — rozbitá fixtura se tvářila jako přeskočený test, ne jako chyba.
+            $this->fail('fixtura leap nespustila -- neměří se tím nic');
         }
-        $this->assertContains('armour_roll', $types,
-            'hráč spadl při leapu, ale nehodilo se mu na brnění');
+        $this->assertContains(
+            'armour_roll',
+            $types,
+            'hráč spadl při leapu, ale nehodilo se mu na brnění',
+        );
     }
 }
