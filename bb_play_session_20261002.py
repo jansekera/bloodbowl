@@ -117,6 +117,8 @@ def board(state):
             code += "o"
         elif p.state == bb.PlayerState.PRONE:
             code += "_"
+        elif p.used_blitz:
+            code += "B"   # uživatel 02.10.: kdo v tomto tahu blitzoval, má B místo -
         elif p.has_acted or p.has_moved:
             code += "-"
         # ⭐ 02.10.2026 (uživatel: „DR5 a všichni pohnutí mají mít za sebou -"):
@@ -192,7 +194,7 @@ def board(state):
     lines.append("D trpaslik (nas, HOME) · W wood-elf (jejich, AWAY) · +role (L/R/B/T/DR/C/W/TR) +ID")
     lines.append("cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje")
     lines.append("/n u D.. = VZDY (i /0) -- v kolika JEJICH zonach stoji")
-    lines.append("u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · '-' uz hral · malymi = stunned")
+    lines.append("u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned")
     lines.append("")
     lines.append("--- hráči (staty) ---")
     for p in sorted(players, key=lambda q: (q.team_side != bb.TeamSide.HOME, q.id)):
