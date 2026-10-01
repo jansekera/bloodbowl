@@ -19,6 +19,31 @@ Po zelené: **commit + push bez ptaní**.
 | měsíčně / větší změna webu | security review (jako P98), aktualizace závislostí |
 | ⛔ ne pravidelně | měření síly AI jako „regresní test“ — jen párově na konkrétní otázku |
 
+## Zásady (převzato z Brasty, uživatel 01.10.)
+
+- **DRY, KISS, SSOT, SoC.** Jedno pravidlo na jednom místě; když ho opravuješ na třech místech, je to nález.
+- **Žádné fallbacky kvůli zpětné kompatibilitě.** Starý kód po dokončení náhrady hned pryč, i s jeho testy.
+- **Postupně, úkol po úkolu** — žádný úkol nepřeskakovat, hotový hned zapsat do knihy.
+- Před opravou vady hledat **příčinu**, ne obcházet následek.
+- **Testy:**
+  - test hlídá **požadavek**, ne tvar implementace — test psaný na míru kódu je zelený i u rozbité funkce;
+  - **autor testu a jeho reviewer = oddělené průchody**, nikdy neschvalovat vlastní test v témže kontextu;
+  - test číst proti **zadání / řádku pravidel**, ne proti diffu;
+  - přednost má **jeden test na místě, kudy prochází všechno** (chokepoint), před stejnými testy pro každý případ;
+  - test, který **nemůže spadnout** (always-true assert, chyby jen vypsané), je horší než žádný — viz P100.
+
+## Vrstvy PHP (hlídá `tests/Architecture/LayerDependenciesTest.php`, P102)
+
+Tři pravidla z Brasty (Domain Protection, Repository Pattern, No Direct DB Access) přeložená na BB:
+
+| vrstva | smí záviset na | proč |
+|---|---|---|
+| `Engine/` (pravidla hry) | `DTO`, `Enum`, `ValueObject`, `Engine` | pravidla se testují bez databáze a webu; jsou jádro, ne doplněk |
+| `DTO/`, `Entity/`, `ValueObject/`, `Enum/` | jen sebe navzájem (+ `Exception`) | datové typy nevědí o pravidlech ani o úložišti |
+| `AI/` | `Engine`, `DTO`, `Enum`, `ValueObject` (+ `Event`) | kouč rozhoduje nad stavem hry, ne nad databází |
+| `Controller/` | `Service`, `Repository`, `Exception`, `Enum`, `Http` | HTTP vrstva; pravidla hry jen přes `Service` |
+| **databáze (`PDO`, `Database`)** | **jen `Repository/`** (a `Database.php`) | No Direct DB Access |
+
 ## Dva enginy — ⛔ most mezi nimi není
 
 | | kde | k čemu |
