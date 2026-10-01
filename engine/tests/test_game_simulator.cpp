@@ -1214,3 +1214,42 @@ TEST(DevelopedRoster, DwarfNoWrestleKeepsEverySpecialistAndOnlyLosesTheSkill) {
     EXPECT_EQ(countHomeSkill(b, SkillName::Wrestle), 0);
     EXPECT_EQ(countHomeSkill(a, SkillName::Wrestle), 2);
 }
+
+// 02.10.2026, uživatel: každý tým dostane Kick-Off Return (pravidla ř. 8249–8256)
+// pro JEDNOHO hráče — throwera; trpaslíci thrower nemají, takže Runner.
+TEST(GameSimulator, OneKickOffReturnPlayerPerTeamOnTheThrowerOrDwarfRunner) {
+    const char* developed[] = {"human", "orc", "orc-mb", "skaven", "dwarf", "dwarf-nw",
+                               "wood-elf", "wood-elf-agile"};
+    const char* base[] = {"human", "orc", "skaven", "dwarf", "wood-elf"};
+    std::vector<const TeamRoster*> rosters;
+    for (const char* n : developed) rosters.push_back(getDevelopedRoster(n, 1200));
+    for (const char* n : base) rosters.push_back(getRosterByName(n));
+
+    for (const TeamRoster* r : rosters) {
+        ASSERT_NE(r, nullptr);
+        GameState state;
+        setupHalf(state, *r, *r, TeamSide::AWAY, nullptr);
+        bool rosterHasThrower = false;
+        for (int t = 0; t < r->positionalCount; ++t)
+            rosterHasThrower |= r->positionals[t].skills.has(SkillName::Pass);
+        const bool dwarf = std::string(r->name).rfind("Dwarf", 0) == 0;
+        EXPECT_EQ(rosterHasThrower, !dwarf) << r->name;
+
+        for (TeamSide side : {TeamSide::HOME, TeamSide::AWAY}) {
+            int count = 0;
+            for (int i = 0; i < GameState::SQUAD_SIZE; ++i) {
+                const Player& p = state.getPlayer(GameState::squadId(side, i));
+                if (!p.skills.has(SkillName::KickOffReturn)) continue;
+                ++count;
+                EXPECT_EQ(p.state, PlayerState::STANDING) << r->name << ": KOR hráč má hrát";
+                if (dwarf) {
+                    EXPECT_TRUE(p.skills.has(SkillName::SureHands)) << r->name << " " << p.positionName;
+                    EXPECT_EQ(p.stats.movement, 6) << r->name << ": Runner má MA6";
+                } else {
+                    EXPECT_TRUE(p.skills.has(SkillName::Pass)) << r->name << " " << p.positionName;
+                }
+            }
+            EXPECT_EQ(count, 1) << r->name;
+        }
+    }
+}

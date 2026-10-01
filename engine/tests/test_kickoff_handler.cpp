@@ -253,6 +253,13 @@ namespace {
 // (7 = Changing Weather dle ř. 1316-1321, viz P69), počasí 2D6 = 3+4. Míč dopadne kolem (3,7).
 std::vector<int> kickDice() { return {1, 1, 3, 4, 3, 4, 3, 3, 3, 3, 3, 3}; }
 
+// Sestava od 02.10. dává KOR throwerovi; testy si určují samy, kdo ho má.
+GameState korFixture() {
+    auto gs = makeKickoffState();
+    for (auto& p : gs.players) p.skills.remove(SkillName::KickOffReturn);
+    return gs;
+}
+
 int placeKor(GameState& gs, Position at) {
     // první domácí hráč na hřišti dostane KOR a postaví se na zadané (volné) pole
     for (auto& p : gs.players) {
@@ -274,7 +281,7 @@ int indexOf(const std::vector<GameEvent>& ev, GameEvent::Type t, int roll = -1) 
 }  // namespace
 
 TEST(KickOffReturn, MovesUpToThreeSquaresBeforeTheKickoffTable) {
-    auto gs = makeKickoffState();
+    auto gs = korFixture();
     ASSERT_EQ(gs.getPlayerAtPosition({8, 2}), nullptr);
     const int id = placeKor(gs, {8, 2});
     ASSERT_GE(id, 0);
@@ -291,7 +298,7 @@ TEST(KickOffReturn, MovesUpToThreeSquaresBeforeTheKickoffTable) {
 }
 
 TEST(KickOffReturn, NotFromTheLineOfScrimmage) {
-    auto gs = makeKickoffState();
+    auto gs = korFixture();
     // HOME LoS je sloupec x=12; najdeme tam domácího hráče
     int id = -1;
     for (auto& p : gs.players)
@@ -305,7 +312,7 @@ TEST(KickOffReturn, NotFromTheLineOfScrimmage) {
 }
 
 TEST(KickOffReturn, NotFromAnOpposingTacklezone) {
-    auto gs = makeKickoffState();
+    auto gs = korFixture();
     ASSERT_EQ(gs.getPlayerAtPosition({8, 2}), nullptr);
     ASSERT_EQ(gs.getPlayerAtPosition({9, 2}), nullptr);
     const int id = placeKor(gs, {8, 2});
@@ -317,7 +324,7 @@ TEST(KickOffReturn, NotFromAnOpposingTacklezone) {
 }
 
 TEST(KickOffReturn, OnlyOnePlayerPerKickoff) {
-    auto gs = makeKickoffState();
+    auto gs = korFixture();
     ASSERT_EQ(gs.getPlayerAtPosition({8, 2}), nullptr);
     ASSERT_EQ(gs.getPlayerAtPosition({8, 12}), nullptr);
     const int a = placeKor(gs, {8, 2});

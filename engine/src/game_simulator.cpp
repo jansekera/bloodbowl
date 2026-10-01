@@ -192,6 +192,15 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         }
     }
 
+    // --- 1b. Kick-Off Return for ONE player (user 02.10.2026, rules l. 8249-8256):
+    // the thrower; a roster without one (Dwarf) gives it to its Sure Hands Runner.
+    int korSlot = -1;
+    for (SkillName key : {SkillName::Pass, SkillName::SureHands}) {
+        for (int i = 0; i < SQUAD && korSlot < 0; ++i)
+            if (roster.positionals[templateOf[i]].skills.has(key)) korSlot = i;
+        if (korSlot >= 0) break;
+    }
+
     // --- 2. Identity for every squad member, starters and bench alike ---
     for (int i = 0; i < SQUAD; ++i) {
         Player& p = state.getPlayer(GameState::squadId(side, i));
@@ -200,6 +209,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.teamSide = side;
         p.stats = tpl.stats;
         p.skills = tpl.skills;
+        if (i == korSlot) p.skills.add(SkillName::KickOffReturn);
         p.positionName = tpl.name;
         p.movementRemaining = p.stats.movement;
         p.hasMoved = false;

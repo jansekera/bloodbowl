@@ -6,6 +6,7 @@ namespace App\Tests\CLI;
 
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../../cli/developed_rosters.php';
@@ -148,6 +149,35 @@ final class DevelopedRostersTest extends TestCase
             $this->fail('soupiska je prázdná');
         }
         $this->assertEquals(12, min($ids));
+    }
+
+    /**
+     * 02.10.2026, uživatel: každý hraný tým má Kick-Off Return (pravidla ř. 8249–8256)
+     * u JEDNOHO hráče — u throwera; trpaslíci thrower nemají, takže u Runnera.
+     */
+    #[DataProvider('playedRacesProvider')]
+    public function testExactlyOneKickOffReturnPlayerOnTheThrowerOrDwarfRunner(string $race, string $positional): void
+    {
+        foreach ([getRaceRoster(TeamSide::AWAY, $race), getDevelopedRaceRoster(TeamSide::HOME, $race)] as $players) {
+            $kor = array_values(array_filter(
+                $players,
+                static fn($p) => in_array(SkillName::KickOffReturn, $p->getSkills(), true),
+            ));
+            $this->assertCount(1, $kor, "{$race}: právě jeden hráč s Kick-Off Return");
+            $this->assertSame($positional, $kor[0]->getPositionalName());
+        }
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function playedRacesProvider(): array
+    {
+        return [
+            'Human' => ['Human', 'Thrower'],
+            'Orc' => ['Orc', 'Thrower'],
+            'Skaven' => ['Skaven', 'Thrower'],
+            'Dwarf' => ['Dwarf', 'Runner'],
+            'Wood Elf' => ['Wood Elf', 'Thrower'],
+        ];
     }
 
     /**

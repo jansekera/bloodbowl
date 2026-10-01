@@ -209,5 +209,17 @@ function getRaceRoster(TeamSide $side, string $race): array
         }
     }
 
+    // Kick-Off Return pro JEDNOHO hráče (uživatel 02.10.2026, pravidla ř. 8249–8256):
+    // thrower; tým bez throwera (Dwarf) ho dá Runnerovi. Stejně jako C++ buildTeam.
+    foreach (['Thrower', 'Runner'] as $korPositional) {
+        foreach ($players as $id => $player) {
+            if ($player->getPositionalName() === $korPositional) {
+                $players[$id] = $player->withSkills([...$player->getSkills(), SkillName::KickOffReturn]);
+
+                return $players;
+            }
+        }
+    }
+
     return $players;
 }
