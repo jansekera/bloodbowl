@@ -3,9 +3,9 @@
 ## Než řekneš „hotovo“
 
 ```bash
-make check          # formát PHP + ESLint · PHPStan + PHPUnit · tsc + vitest · C++ bb_tests (+ přestaví mcts_cli a bb_engine_py)
+make check          # formát PHP + ESLint · PHPStan + PHPUnit · tsc + vitest · C++ bb_tests (+ přestaví mcts_cli a bb_engine_py) · 6 her greedy
 ```
-Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`.
+Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`, `check-smoke`.
 Po zelené: **commit + push bez ptaní**.
 
 ## Pravidelně — spouští se RUČNĚ (uživatel 01.10.: „naplánování neřeš — mělo by se spustit např. každé pondělí, pak spustíme ručně“)

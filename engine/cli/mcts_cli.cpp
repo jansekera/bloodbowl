@@ -2,6 +2,7 @@
 #include "bb/policies.h"
 #include "bb/roster.h"
 #include "bb/value_function.h"
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -25,10 +26,13 @@ struct Options {
     bool verbose = false;
 };
 
+// OPRAVENO 01.10.2026 — tady byl tichý návrat na Humany: překlep v názvu soupisky v nočním skriptu by
+// změřil jiný tým a nikdo by to nepoznal (výpis ukáže jen „Human“). Neznámé jméno = chyba a konec.
 const TeamRoster& getRoster(const std::string& name) {
     const TeamRoster* r = getRosterByName(name);
     if (r) return *r;
-    return getHumanRoster();  // default
+    std::cerr << "Neznámá soupiska: \"" << name << "\" (viz --help)\n";
+    std::exit(1);
 }
 
 void printUsage() {
