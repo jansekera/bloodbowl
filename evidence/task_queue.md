@@ -744,6 +744,11 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 ⏰ **Přepsáno 01.10.2026.** Přepisuje se **jedině tenhle oddíl**; ID se **nikdy** nepřečíslovávají.
 
+## ⭐⭐⭐⭐ UPŘESNĚNO 01.10. VEČER — uživatel: *„jde mi o to přidat hodně kontrol sem do bb — včetně později bezpečnosti — teď je bezpečnost na bb ne tolik potřeba, protože je to jen na localhostu“*
+**Nové pořadí:** 1) **pravidla a kontroly z Brasty** (zásady do `CLAUDE.md` · **P102** testy architektury · **P100** testy, které nemohou spadnout · **P104** mutační · **P109** pokrytí · **P101** čas · **P106** integrace + práva · **P111** souběh · **P99** vstup · **P110** CI)
+→ 2) **bezpečnost později** (P113, P114, P116, P107, P108, P103) → 3) simplify P68–P97 → 4) pravidlové P84… · P118/P119 drobnosti mezi tím.
+✅ Už hotovo: P105, P98, P112, P115, P117 · ⚠️ P99 částečně.
+
 ## ⭐⭐⭐ POŘADÍ OD 01.10. — uživatel: *„dej do popředí priorit nálezy z projektu turniket“*
 **1. P98–P111 (nálezy z `~/nest-lab-vada`)** — v tomhle pořadí, protože jedno staví na druhém:
 | krok | položky | proč tady |
@@ -1197,4 +1202,6 @@ Zdroj: `evidence/parity_audit_20260929.md`. Souhrn: 56 commitů PRAVIDLA od 24.0
 | **P115** | **globální obsluha výjimek** v `index.php`: log + obecná 500 (JSON pro `/api`), nepřihlášený ⇒ 401 / přesměrování na `/login` (dnes 500), uživateli jen zprávy `ValidationException`/`NotFoundException` (dnes i text PDO) — souvisí s **P99** | P98 security review 01.10. (`evidence/security_review_20261001.md`) nález 9 | **UZAVŘENO 01.10.** `fe0477eb` — `App\Http\ErrorResponse` (401 API / 302 na /login, 403, 404, 422, jinak obecná 500, text do logu), `display_errors` 0, `MatchPageController` už neukazuje cizí výjimky. Naživo 8 dotazů: dřív vše 500 |
 | **P116** | `composer update twig/twig` na ≥ 3.27 (dnes 3.23.0: 1 critical + 4 high; nedosažitelné, statické šablony) | P98 security review 01.10. (`evidence/security_review_20261001.md`) nález 10 | **OTEVŘENO** — priorita s P98–P111 |
 | **P117** | MĚŘENÍ (C++ CLI): **`mcts_cli` při neznámé soupisce tiše hrál za Humany** (exit 0) — překlep v nočním skriptu by změřil jiný tým; výpis ukáže jen „Human“. Nalezeno při pozitivní kontrole kouře v `make check`. Týž princip prověřen: Python modul bere objekty `TeamRoster`, skripty jen výchozí hodnoty argparse | nález 01.10. | **UZAVŘENO 01.10.** `bce94c1c` — neznámé jméno ⇒ chyba + exit 1; `wood-elf` dál funguje (normalizace pomlček) |
+| **P118** | PROSTŘEDÍ: **`venv` je na tomto stroji nefunkční** — vytvořen na jiném stroji (`/home/jan/claude/bloodbowl`, Python 3.12), zdejší `/usr/bin/python3` je 3.10 ⇒ balíčky ve `venv/lib/python3.12` se nenačítají, `pip` míří na neexistující cestu. Funkční je **`/usr/local/bin/python3.8`** (jen on načte `bb_engine.cpython-38`, má numpy i pytest 8.3.5). ⚠️ Noční skripty volají `./venv/bin/python` ⇒ tady by modul enginu nenačetly | nález 01.10. (uživatel: „doinstaluj pytest“) | **OTEVŘENO** — rozhodnout: nový venv na 3.8, nebo skripty na `python3.8` |
+| **P119** | UI (PHP šablony): **`css/styles.css` relativní cestou** ⇒ na stránkách `/teams/…` a `/matches/…` 404 a stránka bez stylů (e2e 01.10.: 9× 404) | e2e smoke 01.10. | **OTEVŘENO** — absolutní `/css/styles.css` |
 
