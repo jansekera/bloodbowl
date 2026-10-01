@@ -5,7 +5,7 @@
 ```bash
 make check          # formát PHP + ESLint · PHPStan + PHPUnit · tsc + vitest · C++ bb_tests (+ přestaví mcts_cli a bb_engine_py) · 6 her greedy
 ```
-Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`, `check-smoke`.
+Musí skončit **„== check: vše zelené“** (~1,5 min). Delší `make check-all` (+ Python testy a e2e v prohlížeči, ~4 min) před dávkou commitů a jednou denně. Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`, `check-smoke`.
 Po zelené: **commit + push bez ptaní**.
 
 ## Pravidelně — spouští se RUČNĚ (uživatel 01.10.: „naplánování neřeš — mělo by se spustit např. každé pondělí, pak spustíme ručně“)
@@ -31,6 +31,11 @@ Po zelené: **commit + push bez ptaní**.
 - ⛔ `make bb_engine` **nepřestaví** Python modul — cíl je `bb_engine_py`, jinak měření běží na starém kódu
   a výsledek vypadá jako „žádná změna“ (`make check-cpp` ho staví).
 - ⛔ PHP: `seed` **neřídí kostky** (`random_int()` ignoruje `mt_srand`) ⇒ A/B napříč běhy PHP není párové.
+
+## Python prostředí
+
+- **`venv` na Pythonu 3.8** (engine se sestavuje jako `bb_engine.cpython-38`): `/usr/local/bin/python3.8 -m venv venv && venv/bin/python -m pip install -r requirements-py38.txt`.
+- `venv` **není v gitu** (P118 — dřív byl, z jiného stroje a na Pythonu 3.12, tady se nenačítal). Stará záloha: `venv.py312-jiny-stroj-20261001/`.
 
 ## Pravidla hry
 
@@ -65,7 +70,6 @@ Po zelené: **commit + push bez ptaní**.
 
 ## Známé mezery (01.10.2026)
 
-- `python/tests` se nespouští — ve `venv` chybí pytest.
 - PHPUnit hlásí 3 *PHPUnit Deprecations*.
 - Testy architektury, mutační testy, bezpečnostní brány a CI zatím nejsou — kniha **P98–P116**.
 - Lint: `vendor/bin/php-cs-fixer fix` opraví formát PHP; commity jen s formátem patří do `.git-blame-ignore-revs`.

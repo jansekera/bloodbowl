@@ -134,3 +134,7 @@ q3_fouls_*_data/
 # Pravidlo: velikost x zivotnost. Vysledky se prenasi pres evidence/*.md.
 /corpus_*/
 /tempo_measure_*/
+
+# Python prostředí se nezakládá v gitu (P118): viz requirements-py38.txt
+venv/
+venv.*/
