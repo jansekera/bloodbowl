@@ -46,8 +46,12 @@ async function hireEleven(page, teamId, uniq) {
   const log = (...a) => console.log(...a);
   const shot = async (name) => page.screenshot({ path: `/tmp/e2e_${name}.png`, fullPage: true });
 
-  page.on('console', msg => { if (msg.type() === 'error') log('[console.error]', msg.text()); });
-  page.on('pageerror', err => log('[pageerror]', err.message));
+  // P100 (01.10.2026): test dřív chyby jen vypsal a skončil úspěchem — prošel i se stránkami bez stylů (404)
+  // a i když zápas vůbec nevznikl. Teď je každý z těchto problémů selháním.
+  const problems = [];
+  page.on('console', msg => { if (msg.type() === 'error') problems.push(`console.error: ${msg.text()}`); });
+  page.on('pageerror', err => problems.push(`pageerror: ${err.message}`));
+  page.on('response', resp => { if (resp.status() >= 400) problems.push(`HTTP ${resp.status()} ${new URL(resp.url()).pathname}`); });
 
   const uniq = Date.now();
 
@@ -62,7 +66,8 @@ async function hireEleven(page, teamId, uniq) {
 
     await page.goto(`${BASE}/teams/create`);
     await page.fill('input[name="name"]', `Home ${uniq}`);
-    (await page.$$('input[name="race_id"]'))[0] && await (await page.$$('input[name="race_id"]'))[0].check();
+    // Rasa se vybírá klepnutím na kartu (label) — samotný radio input je stylem skrytý, jako pro uživatele.
+    await page.locator('label.race-option').nth(0).click();
     await page.click('button[type="submit"]');
     await page.waitForLoadState('networkidle');
     const team1Id = page.url().match(/teams\/(\d+)/)[1];
@@ -70,7 +75,8 @@ async function hireEleven(page, teamId, uniq) {
 
     await page.goto(`${BASE}/teams/create`);
     await page.fill('input[name="name"]', `Away ${uniq}`);
-    (await page.$$('input[name="race_id"]'))[1] && await (await page.$$('input[name="race_id"]'))[1].check();
+    // Rasa se vybírá klepnutím na kartu (label) — samotný radio input je stylem skrytý, jako pro uživatele.
+    await page.locator('label.race-option').nth(1).click();
     await page.click('button[type="submit"]');
     await page.waitForLoadState('networkidle');
     const team2Id = page.url().match(/teams\/(\d+)/)[1];
@@ -93,16 +99,23 @@ async function hireEleven(page, teamId, uniq) {
     log('after match create:', page.url());
     await shot('12_after_match_create');
     if (!/\/matches\/\d+/.test(page.url())) {
-      log('MATCH CREATE FAILED, body:', (await page.textContent('body')).slice(0, 500));
+      problems.push('match was not created: ' + (await page.textContent('body')).slice(0, 300));
     } else {
       log('match page loaded, checking for canvas/pitch...');
       const canvas = await page.$('canvas');
       log('canvas present:', !!canvas);
+      if (!canvas) problems.push('match page has no canvas');
       await page.waitForTimeout(1000);
       await shot('13_match_page_loaded');
     }
 
     await browser.close();
+    if (problems.length > 0) {
+      console.error(`SMOKE TEST FAILED — ${problems.length} problem(s):`);
+      for (const p of [...new Set(problems)]) console.error('  ' + p);
+      process.exit(1);
+    }
+    log('SMOKE TEST OK');
   } catch (e) {
     console.error('SMOKE TEST FAILED:', e.message);
     await shot('99_error');
