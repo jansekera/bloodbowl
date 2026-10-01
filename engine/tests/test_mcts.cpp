@@ -88,7 +88,7 @@ TEST(MCTS, SearchReturnsValidAction) {
     GameState state = makePlayState();
 
     MCTSConfig config;
-    config.timeBudgetMs = 50;
+    config.timeBudgetMs = 600000;  // P100: dřív 50 ms — výsledek závisel na rychlosti stroje; teď rozhoduje jen maxIterations (0 by tu znamenalo stop po 64 iteracích)
     config.maxIterations = 100;
 
     MCTSSearch search(nullptr, config, 42);
@@ -119,7 +119,7 @@ TEST(MCTS, SearchWithValueFunction) {
     LinearValueFunction vf(weights);
 
     MCTSConfig config;
-    config.timeBudgetMs = 50;
+    config.timeBudgetMs = 600000;  // P100: dřív 50 ms — výsledek závisel na rychlosti stroje; teď rozhoduje jen maxIterations (0 by tu znamenalo stop po 64 iteracích)
     config.maxIterations = 200;
 
     MCTSSearch search(&vf, config, 42);
@@ -198,7 +198,7 @@ TEST(MCTS, TrivialScoringPosition) {
     LinearValueFunction vf(weights);
 
     MCTSConfig config;
-    config.timeBudgetMs = 200;
+    config.timeBudgetMs = 600000;  // P100: dřív 200 ms — výsledek závisel na rychlosti stroje; teď rozhoduje jen maxIterations (0 by tu znamenalo stop po 64 iteracích)
     config.maxIterations = 1000;
 
     MCTSSearch search(&vf, config, 42);
@@ -217,7 +217,7 @@ TEST(MCTS, ExpandCreatesChildren) {
     getAvailableActions(state, actions);
 
     MCTSConfig config;
-    config.timeBudgetMs = 50;
+    config.timeBudgetMs = 600000;  // P100: dřív 50 ms — výsledek závisel na rychlosti stroje; teď rozhoduje jen maxIterations (0 by tu znamenalo stop po 64 iteracích)
     config.maxIterations = 5;
 
     MCTSSearch search(nullptr, config, 42);

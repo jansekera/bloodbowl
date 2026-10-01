@@ -989,16 +989,13 @@ TEST(MacroMCTSPolicy, DecisionLogging) {
     policy(state);
 
     const auto& decisions = policy.decisions();
-    EXPECT_GE(decisions.size(), 1u);
-
-    if (!decisions.empty()) {
-        const auto& dec = decisions[0];
-        EXPECT_GT(dec.visits.size(), 0u);
-        // Visit fractions of top-K should sum to a large portion (but <1.0 if >topK children)
-        float sum = 0;
-        for (auto& v : dec.visits) sum += v.visitFraction;
-        EXPECT_NEAR(sum, 1.0f, 0.3f);
-    }
+    ASSERT_GE(decisions.size(), 1u);   // P100: dřív EXPECT + if — při prázdném logu se zbytek přeskočil
+    const auto& dec = decisions[0];
+    EXPECT_GT(dec.visits.size(), 0u);
+    // Visit fractions of top-K should sum to a large portion (but <1.0 if >topK children)
+    float sum = 0;
+    for (auto& v : dec.visits) sum += v.visitFraction;
+    EXPECT_NEAR(sum, 1.0f, 0.3f);
 }
 
 TEST(MacroMCTSPolicy, FallbackOnInvalidPlan) {

@@ -3162,12 +3162,15 @@ TEST(Q3StandUp, EscapeSquareIsOutOfEveryEnemyTacklezone) {
     GameState s = makeProneNextToEnemyState(/*ma=*/6, /*boxedIn=*/false);
     std::vector<Macro> ms;
     getAvailableMacros(s, ms);
+    int checked = 0;   // P100: bez nabídnutého útěku by test neověřil nic
     for (auto& m : ms) {
         if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
         if (m.targetPos == Position{10, 7}) continue;      // to je „zůstat"
+        ++checked;
         EXPECT_EQ(countTacklezones(s, m.targetPos, TeamSide::HOME), 0)
             << "útěkové pole je pořád v soupeřově tacklezóně";
     }
+    EXPECT_GT(checked, 0) << "nenabídlo se žádné útěkové pole";
 }
 
 TEST(Q3StandUp, ProneWithoutEnemyContactGetsOnlyTheStayOffer) {

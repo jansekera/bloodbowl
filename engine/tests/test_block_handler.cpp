@@ -343,11 +343,15 @@ TEST(BlockHandler, MightyBlowIsKeptForTheInjuryWhenArmourBreaksWithoutIt) {
     BlockParams params{1, 12, false, false};
     resolveBlock(gs, params, dice, &events);
 
+    // P100: dřív se tvrzení o brnění přeskočilo, když událost nevznikla.
+    int armourBreaks = 0;
     for (auto& e : events) {
         if (e.type == GameEvent::Type::ARMOR_BREAK) {
+            ++armourBreaks;
             EXPECT_EQ(e.roll, 9) << "unspent Mighty Blow must not inflate the armour roll";
         }
     }
+    EXPECT_EQ(armourBreaks, 1);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::KO);
 }
 
@@ -364,15 +368,21 @@ TEST(BlockHandler, MightyBlowIsSpentOnArmourOnlyWhenArmourNeedsIt) {
     BlockParams params{1, 12, false, false};
     resolveBlock(gs, params, dice, &events);
 
+    // P100: dřív všechna tvrzení jen uvnitř smyčky — bez událostí test neověřil nic.
+    int armourBreaks = 0, injuries = 0;
     for (auto& e : events) {
         if (e.type == GameEvent::Type::ARMOR_BREAK) {
+            ++armourBreaks;
             EXPECT_EQ(e.roll, 9) << "the +1 is what took 8 past AV8";
             EXPECT_TRUE(e.success);
         }
         if (e.type == GameEvent::Type::INJURY) {
+            ++injuries;
             EXPECT_EQ(e.roll, 8) << "Mighty Blow was already spent on the armour";
         }
     }
+    EXPECT_EQ(armourBreaks, 1);
+    EXPECT_EQ(injuries, 1);
 }
 
 TEST(BlockHandler, HornsBonusOnBlitz) {

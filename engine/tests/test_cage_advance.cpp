@@ -722,9 +722,9 @@ TEST(CageAdvance, ExposureNeverStallsTheAdvance) {
     }
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
-    if (plan.valid) {
-        EXPECT_GE(plan.step, 1) << "a fully marked corridor must not freeze the cage";
-    }
+    // P100: dřív `if (plan.valid)` — neplatný plán (právě to zamrznutí) test pustil.
+    ASSERT_TRUE(plan.valid) << "a fully marked corridor must not freeze the cage";
+    EXPECT_GE(plan.step, 1) << "a fully marked corridor must not freeze the cage";
 }
 
 // 2026-08-05 (user, binding): "fallback to search is unacceptable -- the
@@ -738,18 +738,17 @@ TEST(CageAdvance, ExposureNeverStallsTheAdvance) {
 // Here the corners are too far away to reform at any forward step, so the
 // advance cannot run -- but two of them can still reach the slots around the
 // carrier where he stands. The plan must be that fill, not nothing.
-TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
+// P120 (uživatel 01.10.2026: „přední rohy soupeř není klec“): stojí-li soupeři na předních rozích
+// klece, klec tam není a doplňovat ji nemá smysl. Planner nesmí vrátit fill — a nevrací (proto
+// původní fixtura se zdí na x=13 nikdy fill nedala a `if` v testu to tiše přešel).
+TEST(CageAdvance, NoFillWhenOpponentsStandOnTheFrontCorners) {
     GameState state = makeCageState();
-    // Strip the cage: corners parked far behind, out of reach of any
-    // destination slot but within reach of the carrier's own diagonals.
     state.getPlayer(2).position = {11, 6};
     state.getPlayer(3).position = {11, 8};
     state.getPlayer(4).position = {10, 5};
     state.getPlayer(5).position = {10, 9};
-    // A wall right in front: every forward step is contested, so the advance
-    // arithmetic gives up.
     int id = 13;
-    for (int y = 5; y <= 9; ++y) {
+    for (int y = 5; y <= 9; ++y) {   // wall ON the front corners (13,6) and (13,8)
         Player& m = state.getPlayer(id);
         m.id = id; m.teamSide = TeamSide::AWAY;
         m.state = PlayerState::STANDING;
@@ -760,13 +759,45 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
     }
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
-    if (plan.valid && plan.verdict == CageAdvanceVerdict::FILL_ONLY) {
-        EXPECT_EQ(plan.step, 0) << "fill never moves the carrier";
-        EXPECT_EQ(plan.carrierGfi, 0) << "fill never buys dice";
-        EXPECT_FALSE(plan.macros.empty());
-        for (const auto& m : plan.macros) {
-            EXPECT_NE(m.playerId, 1) << "the carrier must not be in a fill plan";
-        }
+    EXPECT_NE(plan.verdict, CageAdvanceVerdict::FILL_ONLY) << "soupeř na předních rozích = není klec";
+    for (const auto& m : plan.macros) {
+        EXPECT_NE(m.playerId, 1) << "nosič sám nevybíhá (advance -> fill -> nikdy sólo běh)";
+    }
+}
+
+TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
+    GameState state = makeCageState();
+    // Strip the cage: corners parked far behind, out of reach of any
+    // destination slot but within reach of the carrier's own diagonals.
+    state.getPlayer(2).position = {11, 6};
+    state.getPlayer(3).position = {11, 8};
+    state.getPlayer(4).position = {10, 5};
+    state.getPlayer(5).position = {10, 9};
+    // A wall right in front: every forward step is contested, so the advance
+    // arithmetic gives up.
+    // P120 (01.10.2026): zeď stála na x=13 — přímo na předních rozích klece (13,6) a (13,8), takže
+    // doplnit nebylo co a plán byl neplatný; `if` to tiše přešel, test nic neověřoval. Na x=14 jsou
+    // přední rohy volné (jen v soupeřových zónách) a nastane přesně ten fill, o kterém test mluví.
+    int id = 13;
+    for (int y = 5; y <= 9; ++y) {
+        Player& m = state.getPlayer(id);
+        m.id = id; m.teamSide = TeamSide::AWAY;
+        m.state = PlayerState::STANDING;
+        m.position = {14, static_cast<int8_t>(y)};
+        m.stats = {6, 3, 3, 8};
+        m.movementRemaining = 6;
+        ++id;
+    }
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    // P100: dřív se při jiném verdiktu (právě tom, který test hlídá) neověřilo nic.
+    ASSERT_TRUE(plan.valid) << "the plan must be that fill, not nothing";
+    ASSERT_EQ(plan.verdict, CageAdvanceVerdict::FILL_ONLY);
+    EXPECT_EQ(plan.step, 0) << "fill never moves the carrier";
+    EXPECT_EQ(plan.carrierGfi, 0) << "fill never buys dice";
+    EXPECT_FALSE(plan.macros.empty());
+    for (const auto& m : plan.macros) {
+        EXPECT_NE(m.playerId, 1) << "the carrier must not be in a fill plan";
     }
 }
 

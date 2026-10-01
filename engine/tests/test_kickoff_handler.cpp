@@ -50,8 +50,10 @@ TEST(KickoffHandler, CheeringFansWinnerGetsReroll) {
     DiceRoller dice(123);
     resolveKickoff(gs, dice, nullptr);
 
-    // At least verify rerolls are >= initial (could increase from cheering/coaching)
-    EXPECT_GE(gs.homeTeam.rerolls + gs.awayTeam.rerolls, 0);
+    // At least verify rerolls are >= initial (could increase from cheering/coaching).
+    // P100: dřív EXPECT_GE(součet, 0) — vždy pravda; počáteční hodnoty se uložily a nepoužily.
+    EXPECT_GE(gs.homeTeam.rerolls, homeRerolls);
+    EXPECT_GE(gs.awayTeam.rerolls, awayRerolls);
 }
 
 TEST(KickoffHandler, ChangingWeatherChanges) {

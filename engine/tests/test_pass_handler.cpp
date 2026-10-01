@@ -1,3 +1,4 @@
+#include <optional>
 #include <gtest/gtest.h>
 #include "bb/pass_handler.h"
 #include "bb/ball_handler.h"
@@ -246,20 +247,33 @@ TEST(PassHandler, DisturbingPresenceAddsPenalty) {
     auto gs = makePassSetup();
     placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
     placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
-    // Enemy with DisturbingPresence within 3 squares of passer
-    placePlayer(gs, 12, {7, 7}, TeamSide::AWAY);
+    // Enemy with DisturbingPresence within 3 squares of passer — off the passing lane
+    // (P100: na (7,7) stál v dráze přihrávky, takže první kostka šla na pokus o zachycení).
+    placePlayer(gs, 12, {6, 9}, TeamSide::AWAY);
     gs.getPlayer(12).skills.add(SkillName::DisturbingPresence);
     gs.ball = BallState::carried({5, 7}, 1);
 
     // QP target = 7-3-1(QP)+1(DP) = 4
     // Roll 3 → fail (inaccurate), scatter: D8=1(N),D6=1 → (8,6)
     // No one there, bounce: D8=5(S) → (8,7) where player 2 is → catch roll 6 → success
-    FixedDiceRoller dice({3, 1, 1, 5, 6});
-    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+    // P100: dřív EXPECT_GE(turnover + success, 0) — součet dvou boolů je vždy ≥ 0, test neověřil nic.
+    // Teď: s DP hod 3 nestačí (cíl 4), bez DP týž hod stačí (cíl 3) — pozitivní kontrola v témže testu.
+    auto passAccurate = [](GameState g) {
+        std::vector<GameEvent> events;
+        FixedDiceRoller dice({3, 1, 1, 5, 6, 1, 1, 6, 6, 6});
+        resolvePass(g, 1, {8, 7}, dice, &events);
+        for (const auto& e : events)
+            if (e.type == GameEvent::Type::PASS) return std::optional<bool>(e.success);
+        return std::optional<bool>();
+    };
+    const auto withDp = passAccurate(gs);
+    ASSERT_TRUE(withDp.has_value()) << "pass event missing";
+    EXPECT_FALSE(*withDp) << "Disturbing Presence must turn a roll of 3 into a miss (target 4)";
 
-    // The pass was inaccurate due to DP
-    // Just verify it doesn't crash and returns valid result
-    EXPECT_GE(result.turnover + result.success, 0);
+    gs.getPlayer(12).skills = {};
+    const auto withoutDp = passAccurate(gs);
+    ASSERT_TRUE(withoutDp.has_value());
+    EXPECT_TRUE(*withoutDp) << "without DP the same roll of 3 hits (target 3)";
 }
 
 TEST(PassHandler, WeatherModifier) {
