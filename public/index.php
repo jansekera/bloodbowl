@@ -12,6 +12,9 @@ use App\Controller\MatchApiController;
 use App\Controller\MatchPageController;
 use App\Controller\TeamApiController;
 use App\Controller\TeamPageController;
+use App\Exception\NotFoundException;
+use App\Http\ErrorResponse;
+use App\Http\RouteIds;
 
 $container = new Container();
 ServiceProvider::register($container);
@@ -23,6 +26,19 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $apiPath = null;
 if (preg_match('#^/api/v1(/.*)?$#', $uri, $m)) {
     $apiPath = '/api' . ($m[1] ?? '');
+}
+
+// P115 (security review 01.10.2026): jedno místo pro chyby — nepřihlášený 401 / přesměrování, známé
+// výjimky se svým kódem, cokoli jiného obecná 500 bez textu výjimky (ten jde jen do logu).
+ini_set('display_errors', '0');
+$isApi = $apiPath !== null;
+set_exception_handler(static function (\Throwable $e) use ($isApi): void {
+    ErrorResponse::from($e, $isApi)->send($e);
+});
+
+// P99: ID mimo rozsah sloupce `integer` nemůže existovat — 404 dřív, než dojde do databáze (dřív 500).
+if (RouteIds::outOfRange($uri)) {
+    throw new NotFoundException('Not found');
 }
 
 // CORS for API

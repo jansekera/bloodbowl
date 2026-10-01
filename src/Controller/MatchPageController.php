@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Exception\NotFoundException;
+use App\Exception\ValidationException;
 use App\Repository\MatchRepository;
 use App\Repository\TeamRepository;
 use App\Service\AuthService;
@@ -43,7 +45,8 @@ final class MatchPageController
         try {
             $gameState = $this->matchService->createMatch($homeTeamId, $awayTeamId, $coach->getId(), vsAi: $vsAi);
             header("Location: /matches/{$gameState->getMatchId()}");
-        } catch (\Exception $e) {
+        } catch (ValidationException|NotFoundException $e) {
+            // P115: jen tyhle mají zprávu pro uživatele; cokoli jiného (i PDO) dojde do globální obsluhy jako obecná 500.
             $teams = $this->teamRepo->findByCoachId($coach->getId());
             echo $this->twig->render('matches/new.html.twig', [
                 'coach' => $coach,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Exception\AuthenticationRequiredException;
 use App\Entity\Coach;
 use App\Repository\CoachRepository;
 
@@ -67,7 +68,7 @@ final class AuthService
     {
         $coach = $this->getCurrentCoach();
         if ($coach === null) {
-            throw new \RuntimeException('Authentication required');
+            throw new AuthenticationRequiredException();
         }
 
         return $coach;
