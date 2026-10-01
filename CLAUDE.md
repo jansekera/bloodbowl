@@ -8,6 +8,17 @@ make check          # formát PHP + ESLint · PHPStan + PHPUnit · tsc + vitest 
 Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`.
 Po zelené: **commit + push bez ptaní**.
 
+## Pravidelně — spouští se RUČNĚ (uživatel 01.10.: „naplánování neřeš — mělo by se spustit např. každé pondělí, pak spustíme ručně“)
+
+| kdy | co |
+|---|---|
+| před každým commitem | `make check` |
+| po dávce oprav (~5–10 commitů) | `/code-review` + `/simplify`; refaktor ⇒ stejné zápasy se stejným semínkem před/po; pravidlová oprava ⇒ řádek „převést do druhého enginu“ |
+| **každé pondělí** | **audit parity PHP × C++** (`evidence/fable_brief_rules_parity_20260821.md`) · `php composer.phar audit` + `npm audit --omit=dev` · (po P108) gitleaks + Semgrep |
+| v noci, volná kapacita | mutační testy (po P104) |
+| měsíčně / větší změna webu | security review (jako P98), aktualizace závislostí |
+| ⛔ ne pravidelně | měření síly AI jako „regresní test“ — jen párově na konkrétní otázku |
+
 ## Dva enginy — ⛔ most mezi nimi není
 
 | | kde | k čemu |
