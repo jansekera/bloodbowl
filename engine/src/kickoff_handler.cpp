@@ -199,6 +199,45 @@ bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
 
 } // anonymous namespace
 
+// Kick-Off Return, BB2016 ř. 8249-8256. OPRAVENO 01.10.2026 (P122): pohyb byl až PO výkopové tabulce
+// a bez kontroly lajny a tacklezón. Pravidlo: hráč přijímajícího týmu, který NENÍ na lajně (LoS) ani
+// v soupeřově tacklezóně, se po rozptylu míče a PŘED hodem na tabulku posune až o 3 pole; jen jeden
+// hráč na výkop; ne při touchbacku; nesmí přejít do soupeřovy poloviny. AI: použije ho hráč nejblíž míči.
+static void resolveKickOffReturn(GameState& state, TeamSide receiving, Position ballPos,
+                                 std::vector<GameEvent>* events) {
+    const int losX = (receiving == TeamSide::HOME) ? 12 : 13;
+    auto inOwnHalf = [&](Position q) { return receiving == TeamSide::HOME ? q.x <= 12 : q.x >= 13; };
+
+    int bestId = -1;
+    int bestDist = 999;
+    state.forEachOnPitch(receiving, [&](const Player& p) {
+        if (p.state != PlayerState::STANDING || !p.hasSkill(SkillName::KickOffReturn)) return;
+        if (p.position.x == losX) return;                                   // na lajně ne
+        if (countTacklezones(state, p.position, receiving) > 0) return;     // v soupeřově zóně ne
+        const int d = p.position.distanceTo(ballPos);
+        if (d < bestDist) { bestDist = d; bestId = p.id; }
+    });
+    if (bestId < 0) return;
+
+    Player& p = state.getPlayer(bestId);
+    const Position from = p.position;
+    for (int step = 0; step < 3; ++step) {
+        Position best = p.position;
+        int bestD = p.position.distanceTo(ballPos);
+        for (const Position& q : p.position.getAdjacent()) {
+            if (!q.isOnPitch() || !inOwnHalf(q) || state.getPlayerAtPosition(q) != nullptr) continue;
+            const int d = q.distanceTo(ballPos);
+            if (d < bestD) { bestD = d; best = q; }
+        }
+        if (best == p.position) break;
+        p.position = best;
+    }
+    if (p.position != from) {
+        emitEvent(events, {GameEvent::Type::SKILL_USED, bestId, -1, from, p.position,
+                           static_cast<int>(SkillName::KickOffReturn), true});
+    }
+}
+
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     KickoffScope kickoffScope(state);
     TeamSide receiving = opponent(state.kickingTeam);
@@ -271,6 +310,9 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     // Kickoff event
     emitEvent(events, {GameEvent::Type::KICKOFF, -1, -1, {}, landPos, 0, true});
 
+    // Kick-Off Return PŘED výkopovou tabulkou (P122, viz resolveKickOffReturn).
+    if (!touchback) resolveKickOffReturn(state, receiving, landPos, events);
+
     // Roll 2D6 for kickoff table
     int kickoffRoll = dice.roll2D6();
     KickoffEvent koEvent = kickoffEventFromRoll(std::clamp(kickoffRoll, 2, 12));
@@ -278,34 +320,6 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
 
     // Počasí se po výkopu NEHÁZÍ (P66, 29.09.2026): platí počasí zápasu
     // (rollMatchWeather, l. 2571-2573) a mění ho jen CHANGING_WEATHER výš.
-
-    // Kick-Off Return: closest KOR player moves up to 3 sq toward ball
-    if (!touchback) {
-        state.forEachOnPitch(receiving, [&](const Player& p) {
-            if (p.state != PlayerState::STANDING) return;
-            if (!p.hasSkill(SkillName::KickOffReturn)) return;
-
-            int closestDist = 999;
-            int closestKorId = -1;
-            // Just find the closest KOR player
-            state.forEachOnPitch(receiving, [&](const Player& kp) {
-                if (!kp.hasSkill(SkillName::KickOffReturn)) return;
-                if (kp.state != PlayerState::STANDING) return;
-                int d = kp.position.distanceTo(state.ball.position);
-                if (d < closestDist) {
-                    closestDist = d;
-                    closestKorId = kp.id;
-                }
-            });
-
-            if (closestKorId == p.id) {
-                // Move up to 3 squares toward ball
-                for (int step = 0; step < 3; step++) {
-                    movePlayerToward(state, p.id, state.ball.position);
-                }
-            }
-        });
-    }
 
     // Catch/bounce at landing position (if not touchback and ball on ground)
     if (!touchback && !state.ball.isHeld) {
