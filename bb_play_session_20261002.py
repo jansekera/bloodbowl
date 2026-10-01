@@ -117,8 +117,10 @@ def board(state):
             code += "o"
         elif p.state == bb.PlayerState.PRONE:
             code += "_"
-        elif p.has_acted:
+        elif p.has_acted or p.has_moved:
             code += "-"
+        # ⭐ 02.10.2026 (uživatel: „DR5 a všichni pohnutí mají mít za sebou -"):
+        #   '-' dostane i ten, kdo se už pohnul a aktivaci má ještě otevřenou.
         # ⭐ 04.09.2026: NENI TO VADA -- overeno primo v kodu, oprava puvodni
         #   spatne domenky. `p.has_acted` se NASTAVUJE AZ pri "activation
         #   close-out at the actor-switch boundary" (action_resolver.cpp
@@ -194,7 +196,7 @@ def board(state):
     lines.append("--- hráči (staty) ---")
     for p in sorted(players, key=lambda q: (q.team_side != bb.TeamSide.HOME, q.id)):
         strana = "TRP" if p.team_side == bb.TeamSide.HOME else "ELF"
-        acted = "hral" if p.has_acted else "ceka"
+        acted = "hral" if (p.has_acted or p.has_moved) else "ceka"
         lines.append(
             f"  {p.id:2d} {strana} ({p.position.x:2d},{p.position.y:2d}) "
             f"MA{p.stats.movement} ST{p.stats.strength} AG{p.stats.agility} AV{p.stats.armour} "
