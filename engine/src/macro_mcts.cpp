@@ -2,6 +2,7 @@
 #include "bb/turn_plan_record.h"
 #include "bb/turn_planner.h"
 #include "bb/cage_advance.h"
+#include "bb/one_cage.h"
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
 #include <algorithm>
@@ -56,7 +57,6 @@ static int greedyMacroRank(MacroType t) {
         case MacroType::PASS_SCORE:       return 88;
         case MacroType::CHAIN_SCORE:      return 86;
         case MacroType::ADVANCE:          return 50;
-        case MacroType::CAGE:             return 45;
         case MacroType::PICKUP:           return 40;
         case MacroType::BLITZ:            return 20;
         case MacroType::BLOCK:            return 15;
@@ -109,20 +109,6 @@ bool weCanContestTheDrop(const GameState& state, const Player& carrier,
 // which is what the per-pair null control needs.
 thread_local long g_carrierBlockPriorEvals = 0;
 
-// ⭐ W-GFI krok (0) (04.09.2026, uzivatel 02.09.: "s daty od klece, ale
-//   cistě do pohybu"). `CageAdvancePlan::diagMacroCornerGfi` existuje od
-//   06.08. (DICEY diagnostika), ale nikde se necetlo -- POTRETI za tri dny
-//   tvar "citac existuje, vypis chybi" (viz
-//   feedback_registered_reading_needs_a_print_line). Meri se TADY, v
-//   konzumentovi planu, ne v cage_advance.cpp -- ten zustava jen ZDROJ DAT.
-//   [0] kolik planu vyslo DICEY (zamitnuto jako prilis rizikove)
-//   [1] z toho: kolik ROHU v tom planu vyzadovalo 1-GFI povoleni (soucet
-//       diagMacroCornerGfi pres cely plan -- co vsechno jsme si u nej rekli)
-//   [2] z toho: kolikrat byl PRAVE TEN SELHAVSI krok (diceyLegIdx) rohem,
-//       ktery GFI vyzadoval -- odpovida "byl GFI PRICINOU zamitnuti?"
-thread_local long g_cageDiceyPlans = 0;
-thread_local long g_cageDiceyGfiCorners = 0;
-thread_local long g_cageDiceyFailedLegWasGfi = 0;
 
 } // namespace
 
@@ -132,12 +118,6 @@ long takeCarrierBlockPriorEvalsInSearch() {
     return v;
 }
 
-void takeCageDiceyGfiStats(long* out3) {
-    out3[0] = g_cageDiceyPlans;
-    out3[1] = g_cageDiceyGfiCorners;
-    out3[2] = g_cageDiceyFailedLegWasGfi;
-    g_cageDiceyPlans = g_cageDiceyGfiCorners = g_cageDiceyFailedLegWasGfi = 0;
-}
 
 // --- MacroMCTSNode ---
 
@@ -592,21 +572,6 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                         ++g_carrierBlockPriorEvals;
                     }
                     break;
-                case MacroType::CAGE:
-                    // 2026-07-03: was 0.08 vs BLOCK's 0.12 -- but BLOCK gets
-                    // one candidate PER favorable attacker/defender pair
-                    // (~2.17 on average) while CAGE only ever emits one
-                    // candidate, so the floors alone gave BLOCK-type macros
-                    // ~3.3x the total prior mass. Outcome-level mining
-                    // (97 games, drive-level Fisher exact p=0.036) found
-                    // CAGE leads to more TDs and fewer lost balls than BLOCK
-                    // from comparable situations, including in the exact
-                    // "carrier already marked" states BLOCK is supposed to
-                    // protect best -- i.e. CAGE was being starved by prior
-                    // structure, not correctly deprioritized by merit.
-                    // Raised to per-candidate parity with BLOCK.
-                    minPrior = 0.12f;
-                    break;
                 case MacroType::PICKUP:
                     minPrior = 0.20f;
                     if (scoreDiff < 0) minPrior = 0.30f;
@@ -1016,108 +981,12 @@ ReplayOutcome MacroMCTSSearch::replayToNode(GameState& state, MacroMCTSNode* nod
 // --- MacroMCTSPolicy ---
 
 MacroMCTSPolicy::MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uint32_t seed)
-    : search_(vf, config, seed), expansionDice_(seed + 12345) {
-    if (config.stagedPickupPlanner) {
-        stagedPlanner_ = std::make_unique<StagedTurnPlanner>(vf, config, seed + 777);
-    }
-    if (config.cageAdvance) {
-        cagePlanner_ = std::make_unique<CageAdvancePlanner>(vf, config, seed + 888);
-    }
-}
+    : search_(vf, config, seed), expansionDice_(seed + 12345),
+      cage_(std::make_unique<CageController>(vf, config, seed + 888)) {}
 
 MacroMCTSPolicy::~MacroMCTSPolicy() = default;
 
-bool MacroMCTSPolicy::nextStagedMacro(const GameState& state, Macro& out) {
-    if (state.phase != GamePhase::PLAY) return false;
-
-    // Team-turn boundary: any change of team/turn/half resets planner state
-    // (this also covers a mid-plan turnover -- the turn simply ends).
-    const TeamState& ts = state.getTeamState(state.activeTeam);
-    if (stagedPlanTeam_ != state.activeTeam || stagedPlanTurn_ != ts.turnNumber ||
-        stagedPlanHalf_ != state.half) {
-        stagedMacros_.clear();
-        stagedIndex_ = 0;
-        stagedCageFillFrom_ = SIZE_MAX;
-        stagedPlanBuilt_ = false;
-        stagedPlanTeam_ = state.activeTeam;
-        stagedPlanTurn_ = ts.turnNumber;
-        stagedPlanHalf_ = state.half;
-    }
-
-    // At most one build per team-turn: once the plan is exhausted or
-    // abandoned, the rest of the turn belongs to per-macro search().
-    if (!stagedPlanBuilt_) {
-        stagedPlanBuilt_ = true;
-        TurnGoal goal = classifyTurnGoal(state);
-        {   // the goal is recorded even when no planner handles it -- "search
-            // took the whole turn" is itself the answer we keep failing to have
-            TurnPlanRecord& rec = currentTurnPlanRecord();
-            rec.written = true;
-            rec.goal = static_cast<uint8_t>(goal);
-        }
-        if (stagedPlanner_ && goal == TurnGoal::PICKUP_BALL) {
-            StagedPlan plan = stagedPlanner_->build(state);
-            if (plan.valid) {
-                stagedMacros_ = std::move(plan.safeMacros);
-                stagedMacros_.push_back(plan.pickupMacro);
-                // Item13 step 2: cage-fill macros ride behind the pickup and
-                // are only valid while our side holds the ball.
-                stagedCageFillFrom_ = plan.cageFillMacros.empty()
-                                          ? SIZE_MAX
-                                          : stagedMacros_.size();
-                for (const auto& m : plan.cageFillMacros) {
-                    stagedMacros_.push_back(m);
-                }
-                stagedIndex_ = 0;
-                stagedPlansAdopted_++;
-                currentTurnPlanRecord().adopted = true;
-            }
-        } else if (cagePlanner_ && goal == TurnGoal::ADVANCE_BALL) {
-            // F1 cage advance: shift the whole cage 1-2 squares (corners
-            // first, carrier last). TEMPO_INSUFFICIENT / DICEY verdicts
-            // leave the plan invalid -- no blind push, search() keeps the
-            // turn as today. Role budget: no reservations from this call
-            // site yet (see bb/cage_advance.h, constraint 3).
-            CageAdvancePlan plan = cagePlanner_->build(state);
-            // ⭐ W-GFI krok (0): mereni DICEY planu, ne zmena chovani. Cti
-            //   pred `if (plan.valid)`, protoze DICEY je prave ta vetev,
-            //   kde `plan.valid == false` a jinak by se cislo ztratilo.
-            if (plan.verdict == CageAdvanceVerdict::DICEY) {
-                ++g_cageDiceyPlans;
-                for (uint8_t g : plan.diagMacroCornerGfi) {
-                    if (g) ++g_cageDiceyGfiCorners;
-                }
-                if (plan.diceyLegIdx >= 0 &&
-                    static_cast<size_t>(plan.diceyLegIdx) < plan.diagMacroCornerGfi.size() &&
-                    plan.diagMacroCornerGfi[plan.diceyLegIdx]) {
-                    ++g_cageDiceyFailedLegWasGfi;
-                }
-            }
-            if (plan.valid) {
-                stagedMacros_ = std::move(plan.macros);
-                stagedIndex_ = 0;
-                stagedPlansAdopted_++;
-                currentTurnPlanRecord().adopted = true;
-            }
-        }
-    }
-
-    if (stagedIndex_ >= stagedMacros_.size()) return false;
-
-    const Macro& next = stagedMacros_[stagedIndex_];
-    bool requireHeldBall = (stagedIndex_ >= stagedCageFillFrom_);
-    if (stagedMacroStillValid(state, next, requireHeldBall)) {
-        out = next;
-        stagedIndex_++;
-        return true;
-    }
-
-    // Deviation (anything the plan didn't model): abandon the remainder and
-    // fall back to the existing search() re-planning for the rest of the turn.
-    stagedMacros_.clear();
-    stagedIndex_ = 0;
-    return false;
-}
+int MacroMCTSPolicy::cagePlansAdopted() const { return cage_->plansAdopted(); }
 
 void MacroMCTSPolicy::setLogDecisions(bool log, int topK) {
     logDecisions_ = log;
@@ -1146,9 +1015,8 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
 
     // Record the turn's goal even when no planner is configured -- "search
     // took the whole turn" is itself the fact we kept failing to have. This
-    // sits OUTSIDE the planner branch on purpose: cageAdvance and
-    // stagedPickupPlanner are both default off in production, so without this
-    // the log would be empty exactly where the behaviour is.
+    // sits OUTSIDE the cage branch on purpose: a turn the cage does not plan
+    // must still say what its goal was.
     {
         const TeamState& ts = state.getTeamState(state.activeTeam);
         TurnPlanRecord& rec = currentTurnPlanRecord();
@@ -1166,11 +1034,9 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         }
     }
 
-    // Item 13 (config-gated, default off): an active staged plan supplies
-    // the next macro directly; otherwise search as today.
+    // P126: tah klece navrhuje CageController; jinak (a po odchylce) search().
     Macro bestMacro;
-    bool fromStagedPlan = (stagedPlanner_ || cagePlanner_) &&
-                          nextStagedMacro(state, bestMacro);
+    bool fromStagedPlan = cage_->next(state, bestMacro);
     if (!fromStagedPlan) {
         bestMacro = search_.search(state);
     }
@@ -1236,8 +1102,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         // fallthrough below would return END_TURN and forfeit the turn's
         // remaining activations. Treat as a deviation instead: abandon the
         // staged plan and re-plan with the normal search.
-        stagedMacros_.clear();
-        stagedIndex_ = 0;
+        cage_->abandonTurn();
         bestMacro = search_.search(state);
         planState = state.clone();
         expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);

@@ -486,7 +486,9 @@ TEST(MacroActions, FoulNotAvailableWhenUsed) {
     EXPECT_FALSE(hasMacroType(macros, MacroType::FOUL));
 }
 
-TEST(MacroActions, CageAvailableWithCarrierAndFreePlayer) {
+// P126 (02.10.2026): klec je jedna a řídí ji CageController mimo search;
+// MCTS makro CAGE nabízet nesmí (dřív tenhle test hlídal opak).
+TEST(MacroActions, CageIsNeverOfferedToSearch) {
     GameState state = makeMinimalState();
     state.getPlayer(1).position = {10, 7};
     state.ball = BallState::carried({10, 7}, 1);
@@ -505,7 +507,7 @@ TEST(MacroActions, CageAvailableWithCarrierAndFreePlayer) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
-    EXPECT_TRUE(hasMacroType(macros, MacroType::CAGE));
+    EXPECT_FALSE(hasMacroType(macros, MacroType::CAGE));
 }
 
 TEST(MacroActions, RepositionForFreePlayer) {

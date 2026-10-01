@@ -58,7 +58,6 @@ MCTSConfig cageConfig(bool enable = true) {
     MCTSConfig cfg;
     cfg.maxIterations = 60;
     cfg.timeBudgetMs = 0;
-    cfg.cageAdvance = enable;
     return cfg;
 }
 
@@ -84,11 +83,6 @@ bool actionIsAvailable(const GameState& state, const Action& a) {
 // =============================================================
 // Gate + trigger
 // =============================================================
-
-TEST(CageAdvance, ConfigDefaultIsOff) {
-    MCTSConfig cfg;
-    EXPECT_FALSE(cfg.cageAdvance);
-}
 
 TEST(CageAdvance, NotApplicableWhenTooFewBodiesForACage) {
     GameState state = makeCageState();
@@ -612,60 +606,6 @@ TEST(CageAdvance, ReservedPlayersAreNeverDrafted) {
 // =============================================================
 // MacroMCTSPolicy integration (config-gated, default off)
 // =============================================================
-
-TEST(CageAdvancePolicy, CornersActBeforeCarrierWhenEnabled) {
-    GameState state = makeCageState();
-    MacroMCTSPolicy policy(nullptr, cageConfig(true), 42);
-    DiceRoller dice(123);
-
-    std::vector<int> actingOrder;
-    for (int step = 0; step < 80; ++step) {
-        if (state.phase != GamePhase::PLAY || state.activeTeam != TeamSide::HOME) break;
-        Action a = policy(state);
-        ASSERT_TRUE(actionIsAvailable(state, a)) << "step " << step;
-        if (a.playerId > 0 &&
-            (actingOrder.empty() || actingOrder.back() != a.playerId)) {
-            actingOrder.push_back(a.playerId);
-        }
-        executeAction(state, a, dice, nullptr);
-        if (a.type == ActionType::END_TURN) break;
-    }
-
-    auto carrierIt = std::find(actingOrder.begin(), actingOrder.end(), 1);
-    ASSERT_NE(carrierIt, actingOrder.end()) << "carrier never activated";
-    EXPECT_NE(carrierIt, actingOrder.begin())
-        << "carrier acted first -- corners were not sequenced before the ball";
-    // The staged plan's carrier leg landed (>= plan target x=14). After the
-    // plan completes, the rest of the turn belongs to production search(),
-    // which may legitimately spend the carrier's leftover movement on a
-    // further ADVANCE -- so assert at-least, not exact (open question for
-    // the A/B harness, see evidence report).
-    EXPECT_GE(state.getPlayer(1).position.x, 14);
-    EXPECT_EQ(state.getPlayer(1).position.y, 7);
-    // Diagnostics counter the A/B harness reports ("did the gate fire?").
-    EXPECT_EQ(policy.stagedPlansAdopted(), 1);
-}
-
-TEST(CageAdvancePolicy, DisabledGateMatchesSearchPath) {
-    // Gate off vs gate on-but-inert (no cage built -> NOT_APPLICABLE) must
-    // both go through plain search(): first action identical at equal seed.
-    GameState noCage = makeCageState();
-    noCage.getPlayer(2).state = PlayerState::OFF_PITCH;
-    noCage.getPlayer(3).state = PlayerState::OFF_PITCH;
-    noCage.getPlayer(4).state = PlayerState::OFF_PITCH;
-    noCage.getPlayer(5).state = PlayerState::OFF_PITCH;
-
-    MacroMCTSPolicy off(nullptr, cageConfig(false), 42);
-    MacroMCTSPolicy onButInert(nullptr, cageConfig(true), 42);
-
-    GameState s1 = noCage.clone();
-    GameState s2 = noCage.clone();
-    Action a1 = off(s1);
-    Action a2 = onButInert(s2);
-    EXPECT_EQ(a1.type, a2.type);
-    EXPECT_EQ(a1.playerId, a2.playerId);
-    EXPECT_EQ(a1.target, a2.target);
-}
 
 // 2026-08-11: the planner had no notion of tackle zones -- corner slots were
 // picked purely geometrically -- so the cage happily parked itself inside

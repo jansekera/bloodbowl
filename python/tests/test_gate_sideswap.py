@@ -226,60 +226,6 @@ class TestGatePolicyBlend:
         assert call['away_policy_blend'] == 0.0
 
 
-class TestStagedPickup:
-    """Item 13 wiring (2026-08-05): 12. prvek _gate_game je dvojice
-    (cand_staged, frozen_staged); 10. prvek _benchmark_game je cand_staged.
-    Default = plánovač vypnutý na obou stranách (dnešní chování)."""
-
-    def test_gate_12tuple_cand_home(self, fake_engine):
-        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
-                    (0.2, '', 0.0), (True, False)))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is True        # HOME = kandidát
-        assert call['away_staged_pickup'] is False  # AWAY = frozen bez plánovače
-
-    def test_gate_12tuple_cand_away(self, fake_engine):
-        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
-                    (0.2, '', 0.0), (True, False)))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is False       # HOME = frozen
-        assert call['away_staged_pickup'] is True   # AWAY = kandidát
-
-    def test_gate_12tuple_frozen_promoted_with_planner(self, fake_engine):
-        """Šampion promotnutý s plánovačem (meta staged_pickup=true) s ním
-        hraje i ve frozen slotu — fairness vzor policy_blend."""
-        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', True,
-                    (0.2, 'BESTPOL', 0.2), (True, True)))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is True
-        assert call['away_staged_pickup'] is True
-
-    def test_gate_11tuple_default_off_both_sides(self, fake_engine):
-        _gate_game((1, 0, 'GATE', 'FROZEN', 100, 0.0, 1200, False, 'POL', False,
-                    (0.2, '', 0.0)))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is False
-        assert call['away_staged_pickup'] is False
-
-    def test_benchmark_10tuple_cand_home(self, fake_engine):
-        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', False, 0.2, True))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is True
-        assert call['away_staged_pickup'] is False  # random strana nikdy
-
-    def test_benchmark_10tuple_cand_away(self, fake_engine):
-        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True, 0.2, True))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is False
-        assert call['away_staged_pickup'] is True
-
-    def test_benchmark_9tuple_default_off(self, fake_engine):
-        _benchmark_game((5, 1, 'GATE', 100, 0.0, 1200, 'POL', True, 0.2))
-        call = fake_engine.calls[-1]
-        assert call['staged_pickup'] is False
-        assert call['away_staged_pickup'] is False
-
-
 class TestScheduleBalance:
     """The production schedules assign orientation i % 2 and matchup
     races[i%5] vs races[(i+1)%5]; gcd(2,5)=1 -> period 10, so every
@@ -307,31 +253,32 @@ class TestScheduleBalance:
 
 
 class TestRaceGuardEcho:
-    """13th tuple element (echo_race, 2026-08-06): worker echoes race_idx so
+    """12th tuple element (echo_race, 2026-08-06; do 02.10.2026 13th, než
+    zmizel staged_pickup): worker echoes race_idx so
     the caller can attribute races skip-proof (never from result order)."""
 
-    def test_13tuple_echoes_race_idx_cand_home(self, fake_engine):
+    def test_12tuple_echoes_race_idx_cand_home(self, fake_engine):
         res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
-                          False, 'POL', False, (0.2, '', 0.0), (True, False),
+                          False, 'POL', False, (0.2, '', 0.0),
                           True))
         assert res == (7, 3, 0, 3)
 
-    def test_13tuple_echoes_race_idx_cand_away(self, fake_engine):
+    def test_12tuple_echoes_race_idx_cand_away(self, fake_engine):
         res = _gate_game((123, 7, 'GATE', 'FROZEN', 100, 0.0, 1200,
-                          False, 'POL', True, (0.2, '', 0.0), (True, False),
+                          False, 'POL', True, (0.2, '', 0.0),
                           True))
         # home 7 - away 3, cand AWAY -> (3, 7); race_idx 7 % 5 = 2
         assert res == (3, 7, 1, 2)
 
-    def test_13tuple_false_keeps_3tuple(self, fake_engine):
+    def test_12tuple_false_keeps_3tuple(self, fake_engine):
         res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
-                          False, 'POL', False, (0.2, '', 0.0), (True, False),
+                          False, 'POL', False, (0.2, '', 0.0),
                           False))
         assert res == (7, 3, 0)
 
-    def test_12tuple_unchanged(self, fake_engine):
+    def test_11tuple_unchanged(self, fake_engine):
         res = _gate_game((123, 3, 'GATE', 'FROZEN', 100, 0.0, 1200,
-                          False, 'POL', False, (0.2, '', 0.0), (True, False)))
+                          False, 'POL', False, (0.2, '', 0.0)))
         assert res == (7, 3, 0)
 
     def test_race_attribution_formula(self):

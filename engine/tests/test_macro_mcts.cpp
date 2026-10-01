@@ -983,6 +983,13 @@ TEST(MacroMCTSPolicy, DecisionLogging) {
     config.timeBudgetMs = 0;
     config.maxIterations = 50;
 
+    // Loguje se jen rozhodnutí search(); míč u soupeře, aby tah neplánovala klec (P126).
+    for (const auto& p : state.players) {
+        if (p.teamSide == TeamSide::AWAY && p.isOnPitch()) {
+            state.ball = BallState::carried(p.position, p.id);
+            break;
+        }
+    }
     MacroMCTSPolicy policy(nullptr, config, 42);
     policy.setLogDecisions(true, 10);
 

@@ -30,7 +30,6 @@ long takeCarrierBlockPriorEvalsInSearch();
 //   [0] pocet planu s verdiktem DICEY
 //   [1] z toho: soucet rohu vyzadujicich 1-GFI napric temi plany
 //   [2] z toho: kolikrat byl PRAVE SELHAVSI krok rohem s 1-GFI
-void takeCageDiceyGfiStats(long* out3);
 
 // ⭐⭐⭐ KLEC/K6 (10.09.2026): ZAHRANE makro, ktere se rozbalilo do NICEHO.
 //   `macro_mcts.cpp` na tom miste vracel `END_TURN`, tedy propadl CELY ZBYTEK
@@ -46,8 +45,7 @@ void takeCageDiceyGfiStats(long* out3);
 constexpr int kMacroNoopSlots = 4 + static_cast<int>(MacroType::MACRO_COUNT);
 void takeMacroNoopStats(long* out);   // kMacroNoopSlots cisel
 
-class StagedTurnPlanner;  // bb/turn_planner.h (item 13)
-class CageAdvancePlanner; // bb/cage_advance.h (F1, 2026-08-03)
+class CageController;     // bb/one_cage.h (P126, jedna klec)
 
 struct MacroMCTSNode {
     Macro macro;
@@ -152,38 +150,13 @@ class MacroMCTSPolicy {
     bool logDecisions_ = false;
     int topK_ = 20;
 
-    // Item 13 staged safe-then-PICKUP planner (config_.stagedPickupPlanner,
-    // default off). When a turn's goal is PICKUP_BALL, the planner supplies
-    // the whole turn's macro sequence up front (safe backups first, PICKUP
-    // branch last); any deviation falls back to per-macro search() for the
-    // rest of the turn -- the existing re-planning path, unchanged.
-    std::unique_ptr<StagedTurnPlanner> stagedPlanner_;
-    // F1 cage advance (config_.cageAdvance, default off): when a turn's goal
-    // is ADVANCE_BALL and a cage stands around the carrier, this planner may
-    // supply the whole cage-shift macro sequence (corners first, carrier
-    // last) through the same staged-plan machinery. Mutually exclusive with
-    // the pickup plan by goal (PICKUP_BALL vs ADVANCE_BALL).
-    std::unique_ptr<CageAdvancePlanner> cagePlanner_;
-    std::vector<Macro> stagedMacros_;
-    size_t stagedIndex_ = 0;
-    // Index of the first cage-fill macro (item13 step 2) in stagedMacros_;
-    // macros from here on are validated with requireHeldBall (a failed
-    // pickup drops the stage). SIZE_MAX = plan has no cage-fill stage.
-    size_t stagedCageFillFrom_ = SIZE_MAX;
-    bool stagedPlanBuilt_ = false;  // at most one plan build per team-turn
-    int stagedPlansAdopted_ = 0;    // diagnostics: valid plans taken (game total)
-    int stagedPlanTurn_ = -1;
-    int stagedPlanHalf_ = -1;
-    TeamSide stagedPlanTeam_ = TeamSide::HOME;
-
-    // Next staged macro if an active plan covers this state (validates the
-    // macro against the current state; on deviation clears the plan and
-    // reports none so the caller re-enters search()).
-    bool nextStagedMacro(const GameState& state, Macro& out);
+    // P126 jedna klec (bb/one_cage.h): když tah patří kleci, další makro
+    // navrhne ona; jinak a po každé odchylce rozhoduje search().
+    std::unique_ptr<CageController> cage_;
 
 public:
     MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
-    ~MacroMCTSPolicy();  // out-of-line: unique_ptr over fwd-declared planner
+    ~MacroMCTSPolicy();  // out-of-line: unique_ptr nad dopředu deklarovanou klecí
 
     Action operator()(const GameState& state);
 
@@ -193,10 +166,8 @@ public:
 
     int lastIterations() const { return search_.lastIterations(); }
     double lastBestValue() const { return search_.lastBestValue(); }
-    // Diagnostics: how many staged plans (item13 pickup or F1 cage advance)
-    // this policy adopted over its lifetime -- harnesses report "did the
-    // gated feature even fire" alongside outcome deltas.
-    int stagedPlansAdopted() const { return stagedPlansAdopted_; }
+    // Kolik plánů klece (po fázích tahu) hráč za život převzal.
+    int cagePlansAdopted() const;
 };
 
 } // namespace bb

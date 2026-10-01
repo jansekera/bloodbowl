@@ -40,6 +40,7 @@ add_library(bb_engine SHARED
     src/turn_planner.cpp
     src/turn_plan_record.cpp
     src/cage_advance.cpp
+    src/one_cage.cpp
     src/board_snapshot.cpp
 )
 target_include_directories(bb_engine PUBLIC include third_party)
@@ -88,6 +89,7 @@ add_executable(bb_tests
     tests/test_macro_mcts.cpp
     tests/test_turn_planner.cpp
     tests/test_cage_advance.cpp
+    tests/test_one_cage.cpp
     tests/test_pathfinder.cpp
     tests/test_policies.cpp
 )

@@ -541,10 +541,6 @@ PYBIND11_MODULE(bb_engine, m) {
                                       bool riskDeferral,
                                       const std::string& awayPolicyWeightsPath,
                                       float awayPolicyBlend,
-                                      bool stagedPickup,
-                                      bool awayStagedPickup,
-                                      bool cageAdvance,
-                                      bool awayCageAdvance,
                                       bool dauntlessInOffer) {
         bb::DiceRoller dice(seed);
 
@@ -581,8 +577,6 @@ PYBIND11_MODULE(bb_engine, m) {
                               bb::ValueFunction* vfPtr,
                               bb::PolicyNetwork* polPtr,
                               float polBlend,
-                              bool stagedPlanner,
-                              bool cageOn,
                               std::shared_ptr<bb::MCTSPolicy>& mctsOut,
                               std::shared_ptr<bb::MacroMCTSPolicy>& macroMctsOut) -> bb::ActionSelector {
             if (ai == "greedy") {
@@ -598,11 +592,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 cfg.nRollouts = nRollouts;
                 cfg.leafLookahead = leafLookahead;
                 cfg.riskDeferral = riskDeferral;
-                cfg.stagedPickupPlanner = stagedPlanner;
-                cfg.cageAdvance = cageOn;
-                // 2026-08-14: applies to BOTH sides on purpose. Unlike the cage
-                // planner this is not a doctrine we are trying on our dwarves --
-                // it is the block offer refusing to see a skill the resolver
+                // 2026-08-14: applies to BOTH sides on purpose -- it is the block offer refusing to see a skill the resolver
                 // already honours, so leaving it on one side would compare two
                 // different engines rather than two arms.
                 cfg.dauntlessInOffer = dauntlessInOffer;
@@ -642,11 +632,11 @@ PYBIND11_MODULE(bb_engine, m) {
         auto logged = bb::simulateGameLogged(
             home, away,
             makePolicy(homeAI, vf.get(), policyNet.get(), policyBlend,
-                       stagedPickup, cageAdvance, homeMcts, homeMacroMcts),
+                       homeMcts, homeMacroMcts),
             makePolicy(awayAI, awayVf.get(),
                        awayPolicyNet ? awayPolicyNet.get() : policyNet.get(),
                        awayPolicyBlend < 0.0f ? policyBlend : awayPolicyBlend,
-                       awayStagedPickup, awayCageAdvance, awayMcts, awayMacroMcts),
+                       awayMcts, awayMacroMcts),
             dice);
 
         // Copy policy decisions from MCTS policies
@@ -690,10 +680,7 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("risk_deferral") = false,
        py::arg("away_policy_weights_path") = "",
        py::arg("away_policy_blend") = -1.0f,  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
-       py::arg("staged_pickup") = false,       // 2026-08-05 (item 13): staged safe-then-PICKUP whole-turn planner, per side
-       py::arg("away_staged_pickup") = false,  // so the gate can run candidate-only while frozen keeps its promoted config
-       py::arg("cage_advance") = false,        // 2026-08-11: F1 cage-advance planner, per side. Default off = production.
-       py::arg("away_cage_advance") = false,   // Exposed so the verdict distribution can be read at all -- with it off the planner is never consulted.
+       // staged_pickup / cage_advance zrušeny 02.10.2026 (P126): klec je jedna a vždy zapnutá.
        py::arg("dauntless_in_offer") = true);  // 2026-08-14: price a block at the strength Dauntless would equalise to. BOTH sides. 2026-08-17: default TRUE = production, after the A/B passed (+3.59 pp vs the null arms). Corpora collected through this binding must match what production plays, or we go back to measuring one engine and shipping another.
     // ⛔ `blitz_continuation` ZRUSEN 07.09.2026 -- M1/N10 nasazeno do produkce
     //    (noc 27.->28.08.: +0,0177 +- 0,0069). Neni co prepinat.

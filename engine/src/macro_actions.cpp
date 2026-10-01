@@ -1,4 +1,5 @@
 #include "bb/macro_actions.h"
+#include "bb/one_cage.h"
 #include "bb/big_guy_handler.h"
 #include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
@@ -1878,18 +1879,9 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         }
     }
 
-    // CAGE: have ball and at least one free teammate
-    if (iHaveBall) {
-        bool hasFreePlayer = false;
-        state.forEachOnPitch(mySide, [&](const Player& p) {
-            if (p.id != carrier->id && isFreeToAct(p) && !p.hasSkill(SkillName::BallAndChain)) {
-                hasFreePlayer = true;
-            }
-        });
-        if (hasFreePlayer) {
-            out.push_back({MacroType::CAGE, carrier->id, -1, {-1, -1}});
-        }
-    }
+    // CAGE se už nenabízí (P126, 02.10.2026): klec řídí CageController
+    // (bb/one_cage.h) mimo search. Hodnota v MacroType zůstává kvůli
+    // indexům naučených vah policy.
 
     // BLITZ: not used this turn, at least one standing enemy
     // Defense-aware: prioritizes ball carrier and scoring threats
@@ -3380,44 +3372,6 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     return result;
 }
 
-static MacroExpansionResult expandCage(GameState& state, const Macro& macro,
-                                        DiceRollerBase& dice) {
-    MacroExpansionResult result;
-    const Player& carrier = state.getPlayer(macro.playerId);
-    Position cp = carrier.position;
-
-    // 4 diagonal cage positions
-    Position cagePositions[4] = {
-        {static_cast<int8_t>(cp.x + 1), static_cast<int8_t>(cp.y + 1)},
-        {static_cast<int8_t>(cp.x + 1), static_cast<int8_t>(cp.y - 1)},
-        {static_cast<int8_t>(cp.x - 1), static_cast<int8_t>(cp.y + 1)},
-        {static_cast<int8_t>(cp.x - 1), static_cast<int8_t>(cp.y - 1)},
-    };
-
-    for (auto& cagePos : cagePositions) {
-        if (!cagePos.isOnPitch()) continue;
-
-        // Already occupied?
-        const Player* occupant = state.getPlayerAtPosition(cagePos);
-        if (occupant) {
-            // If it's our standing player, that's fine
-            if (occupant->teamSide == state.activeTeam &&
-                occupant->state == PlayerState::STANDING) continue;
-            // Otherwise skip this position
-            continue;
-        }
-
-        // Find nearest free player (not carrier)
-        const Player* mover = findNearestFreePlayer(state, cagePos, carrier.id);
-        if (!mover) continue;
-
-        // Move them there (max 4 steps)
-        movePlayerToward(state, mover->id, cagePos, dice, result, 4);
-        if (result.turnover) return result;
-    }
-    return result;
-}
-
 static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
                                          DiceRollerBase& dice) {
     MacroExpansionResult result;
@@ -3583,6 +3537,16 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     // burn the carrier's entire remaining movement on a naked dash, or the
     // team never gets a decision window to form a cage around them.
     const Player& p = state.getPlayer(macro.playerId);
+    // P126 (jedna klec, fáze 1, uživatel 02.10.2026): nosič po zvednutí jde CO
+    // NEJDÁL dopředu, bez hodu a ne vedle soupeře -- rohy se postaví kolem něj
+    // potom (CageController). Brzda níže je pro zvednutí bez klece.
+    if (macro.cageManaged && state.ball.isHeld && state.ball.carrierId == macro.playerId &&
+        p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
+        const int budget = p.movementRemaining;
+        const Position dest = farthestSafeForward(state, p, budget);
+        if (dest != p.position) movePlayerToward(state, macro.playerId, dest, dice, result, budget);
+        return result;
+    }
     if (state.ball.isHeld && state.ball.carrierId == macro.playerId &&
         p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
         const auto& myTeam = state.getTeamState(p.teamSide);
@@ -4010,7 +3974,6 @@ MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
     switch (macro.type) {
         case MacroType::SCORE:       return expandScore(state, macro, dice);
         case MacroType::ADVANCE:     return expandAdvance(state, macro, dice);
-        case MacroType::CAGE:        return expandCage(state, macro, dice);
         case MacroType::BLITZ:       return expandBlitz(state, macro, dice);
         case MacroType::BLOCK:       return expandBlock(state, macro, dice);
         case MacroType::PICKUP:      return expandPickup(state, macro, dice);
@@ -4140,8 +4103,6 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
             int steps = std::max(1, p.movementRemaining / 2);
             out[14] = std::min(1.0f, steps / 6.0f);
         }
-    } else if (macro.type == MacroType::CAGE) {
-        out[14] = 0.5f; // good positional improvement
     } else if (macro.type == MacroType::REPOSITION) {
         out[14] = 0.3f;
     }

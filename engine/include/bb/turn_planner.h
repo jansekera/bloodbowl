@@ -2,33 +2,14 @@
 
 #include "bb/game_state.h"
 #include "bb/macro_actions.h"
-#include "bb/macro_mcts.h"
-#include "bb/cage_advance.h"
-#include "bb/mcts.h"
-#include "bb/dice.h"
-#include <vector>
 #include <cstdint>
 
 namespace bb {
 
-// Queue item 13 MVP (2026-07-31): simplified whole-turn planner, staged
-// safe-then-PICKUP. Confirmed scope (user, 2026-07-28, see
-// project_bloodbowl_item13_wholeturn_pickup_planner_20260728): ONE turn, no
-// multi-turn lookahead. Every dice-free (safe) macro is sequenced FIRST --
-// concretely the "bring backup near the loose ball" behavior item 11's
-// REPOSITION targeting already generates -- then exactly ONE stochastic
-// branch point: the PICKUP attempt, with two modeled outcomes:
-//   success -> the plan continues under the ADVANCE goal (expandPickup
-//              already advances the fresh carrier with the stall-aware
-//              throttle -- no separate post-branch machinery in the MVP);
-//   failure -> the plan stops; the projected state is evaluated with a
-//              fixed penalty (same spirit as greedyLookaheadBonus's -0.10
-//              observed-turnover term), no bounce/recovery dice tree.
-// Plan value = P(success)*V(success) + P(fail)*V(fail), both V(...) via the
-// EXISTING static simulate() leaf heuristic (MacroMCTSSearch::evaluateLeaf)
-// on projected states -- no new value function, no MCTS for the safe stage.
-// BLITZ / LOS-block / FOUL stages and any multi-turn chaining are explicit
-// LATER extensions, deliberately absent here.
+// Cíl tahu a kontrola, jestli makro z plánu ještě sedí na desku. Používá je
+// jedna klec (bb/one_cage.h, P126). Celotahový plánovač zvednutí míče
+// (item 13, StagedTurnPlanner) tu býval do 02.10.2026 -- nahradila ho fáze 1
+// klece (zvednout, co nejdál dopředu, rohy kolem).
 
 // Turn goal, staged by drive phase -- mirrors what simulate()'s
 // turnsLeft/idealDist pacing encodes implicitly (macro_mcts.cpp, offensive
@@ -42,36 +23,6 @@ enum class TurnGoal : uint8_t {
 
 TurnGoal classifyTurnGoal(const GameState& state);
 
-struct StagedPlan {
-    TurnGoal goal = TurnGoal::NONE;
-    // MVP builds plans only for PICKUP_BALL; other goals return valid=false
-    // and the caller keeps using per-macro search() as today.
-    bool valid = false;
-
-    std::vector<Macro> safeMacros;  // deterministic stage, executed in order
-    Macro pickupMacro{};            // the single stochastic branch point
-
-    // Step 2 (2026-08-07): cage-fill stage AFTER the pickup -- dice-free
-    // REPOSITIONs of still-unmoved teammates onto the diagonal corner slots
-    // around the carrier's PROJECTED post-pickup position (slot assignment
-    // reuses CageAdvancePlanner::tryAssign; probes reuse SAFE_PTO). Choreo-
-    // graphy (user 2026-08-05): passive guard keeps their activation for
-    // this stage; goal "pick up the ball AND build a cage around it in ONE
-    // turn". These macros are only valid while OUR side holds the ball --
-    // a failed pickup invalidates the stage (search fallback, as today).
-    std::vector<Macro> cageFillMacros;
-
-    // 2-branch value model (all values in the planning side's perspective)
-    double pSuccess = 0.0;      // P(pickup macro ends with us holding the ball)
-    double valueSuccess = 0.0;  // mean leaf eval over success samples
-    double valueFail = 0.0;     // mean leaf eval over fail samples + FAIL_PENALTY
-    double planValue = 0.0;     // pSuccess*valueSuccess + (1-pSuccess)*valueFail
-
-    // Diagnostics: safe macros whose REPOSITION target is adjacent to the
-    // loose ball -- the item 11 "backup before the pickup roll" closure metric.
-    int backupCount = 0;
-};
-
 // Semantic re-validation of a planned macro against the CURRENT state --
 // deliberately not "regenerate getAvailableMacros and compare": REPOSITION
 // targets are recomputed each generation pass (nearest free ball-adjacent
@@ -83,74 +34,5 @@ struct StagedPlan {
 // player's own side (fail pickup -> whole stage invalid -> search fallback).
 bool stagedMacroStillValid(const GameState& state, const Macro& m,
                            bool requireHeldBall = false);
-
-class StagedTurnPlanner {
-public:
-    // Safe-stage gate: same thresholds item 10's Q-guard validated
-    // (RISK_DEFER_SAFE_PTO / probe K, macro_mcts.cpp) -- a macro is "safe"
-    // only if a Monte-Carlo probe of its expansion is dice-free in practice.
-    static constexpr double SAFE_PTO = 0.02;
-    static constexpr int PROBE_K = 48;
-    // Branch sampling for pSuccess / V(success) / V(fail).
-    static constexpr int BRANCH_K = 64;
-    // Safe-stage cap (user design constraint, 2026-07-31): send ONE, at most
-    // TWO players as backups to the loose ball -- committing more strips the
-    // rest of the pitch (and an uncapped stage degenerated into a whole-team
-    // column converging on the ball, observed on mined state g0000).
-    // Candidate ordering below picks WHICH two: arrivals-this-turn first,
-    // then nearest player to the ball.
-    static constexpr int MAX_SAFE_BACKUPS = 2;
-    // Support gate (user directive 2026-08-03, "neplytvat -- kdyz uz tam
-    // nekdo je"): the staged plan only engages when the ball is genuinely
-    // unsupported. Validation over 12 mined states x 200 paired replays
-    // split cleanly on the miner's own support metric (standing teammates
-    // within Chebyshev SUPPORT_RADIUS of the ball, excluding the picker):
-    // support <= 4 -> paired value deltas neutral-to-positive (+4.0/+6.6 SE
-    // wins), support >= 5 -> mostly significant losses (worst -13.7 SE,
-    // g0005) because forced backup ordering wastes activations the
-    // production search already spends better when help is plentiful.
-    static constexpr int SUPPORT_RADIUS = 6;
-    static constexpr int MAX_PICKUP_SUPPORT = 4;
-    // Fixed fail-branch penalty, same spirit and magnitude as
-    // greedyLookaheadBonus's observed-turnover term (macro_mcts.cpp).
-    static constexpr double FAIL_PENALTY = -0.10;
-    // pSuccess adoption floor (validation finding 2026-08-07): the plan used
-    // to adopt its best pickup regardless of pSuccess -- on mined states
-    // g0003/g0008 it forced a 6+ pickup into elf tackle zones (0.109) and a
-    // physically walled-off approach (0.000) while plain search secured the
-    // ball 83-88% of the time (-5.8 / -10.3 SE). Measured pSuccess is
-    // bimodal (healthy >= 0.8, sick <= 0.11); 0.25 keeps even a marked AG2
-    // dwarf pickup (5+ = 0.33) plannable and vetoes hopeless rolls, which
-    // fall back to search() (it can blitz the marker off the ball first).
-    static constexpr double MIN_PICKUP_SUCCESS = 0.25;
-
-    StagedTurnPlanner(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
-
-    // Build a staged plan for `state`. Returns valid=false unless the goal
-    // is PICKUP_BALL and a PICKUP macro exists.
-    StagedPlan build(const GameState& state);
-
-private:
-    MCTSConfig config_;
-    MacroMCTSSearch evaler_;  // leaf eval only (evaluateLeaf)
-    DiceRoller dice_;
-    // Slot-assignment reuse for the cage-fill stage (tryAssign +
-    // eligibleCornerPlayer) -- no second corner assigner.
-    CageAdvancePlanner cageHelper_;
-
-    struct BranchStats {
-        double pSuccess = 0.0;
-        double valueSuccess = 0.0;
-        double valueFail = 0.0;
-    };
-    // Probe pTO/no-op-ness of a macro on `state` (item 10's probe pattern).
-    struct ProbeStats {
-        double pto = 0.0;
-        double meanActions = 0.0;
-    };
-    ProbeStats probeMacro(const GameState& state, const Macro& m);
-    BranchStats sampleBranch(const GameState& projected, const Macro& pickup,
-                             TeamSide perspective);
-};
 
 } // namespace bb
