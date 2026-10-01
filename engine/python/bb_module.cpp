@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include "bb/block_handler.h"
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/numpy.h>
@@ -407,6 +408,13 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::getAvailableActions(state, actions);
         return actions;
     });
+
+    // Živá partie s člověkem (02.10.2026): kouč volí pole odtlačení a follow-up.
+    m.def("set_manual_push", [](int x, int y) {
+        bb::setManualPushChoice(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
+    });
+    m.def("set_manual_follow_up", [](bool follow) { bb::setManualFollowUp(follow); });
+    m.def("clear_manual_block_choices", []() { bb::clearManualBlockChoices(); });
 
     m.def("execute_action", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;

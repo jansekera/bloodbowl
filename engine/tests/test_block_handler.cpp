@@ -1540,3 +1540,43 @@ TEST(BlockHandler, P75ChainsawIntoAChainsawHolderIsPlusThreeNotSix) {
 
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
 }
+
+// Živá partie 02.10.2026: pole odtlačení a follow-up volí útočící kouč
+// (BB2016 l. 608-611). Diagonální blok z (12,8) na (13,7), pole (14,7) obsazené:
+// kandidáti (14,6) rovně a (13,6) bokem.
+static GameState manualPushBoard() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {12, 8}, TeamSide::HOME);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {14, 7}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(BlockHandlerManual, WithoutAChoiceTheEnginePushesStraightBack) {   // pozitivní kontrola
+    GameState gs = manualPushBoard();
+    clearManualBlockChoices();
+    FixedDiceRoller dice({3});   // Pushed
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{14, 6}));
+}
+
+TEST(BlockHandlerManual, CoachPicksThePushSquareAndDeclinesTheFollowUp) {
+    GameState gs = manualPushBoard();
+    setManualPushChoice({13, 6});
+    setManualFollowUp(false);
+    FixedDiceRoller dice({3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{13, 6}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{12, 8})) << "bez follow-upu";
+}
+
+TEST(BlockHandlerManual, AChoiceTheRulesForbidIsIgnored) {
+    GameState gs = manualPushBoard();
+    setManualPushChoice({14, 7});   // obsazené, zatímco jiná pole jsou volná
+    FixedDiceRoller dice({3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{14, 6}));
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{14, 7}));
+    clearManualBlockChoices();
+}

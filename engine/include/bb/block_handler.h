@@ -118,4 +118,11 @@ long blockThrowSeq();
 // Tym prisel o svuj jediny blitz na kolo a rana nepadla.
 long takeBlitzBlockUnpayableInSearch();
 
+// Ruční volba útočícího kouče pro živou partii s člověkem (02.10.2026):
+// jednorázová, platí pro nejbližší odtlačení / follow-up. Volbu, kterou
+// pravidla nedovolí, engine ignoruje a rozhodne sám.
+void setManualPushChoice(Position p);
+void setManualFollowUp(bool follow);
+void clearManualBlockChoices();
+
 } // namespace bb

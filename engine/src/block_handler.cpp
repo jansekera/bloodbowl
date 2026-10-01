@@ -234,6 +234,21 @@ static int pushDestScore(const GameState& state, TeamSide blockingSide,
     return 10000 * dist + (dirties ? 0 : 100) + straightBackScore;
 }
 
+// Ruční volba kouče (živá partie s člověkem, 02.10.2026). Pravidla dávají
+// výběr pole odtlačení i follow-up útočícímu kouči (l. 608-611); AI je volí
+// pravidly níž, člověk je chce volit sám. Jednorázové: platí pro nejbližší
+// odtlačení / follow-up a pak se smažou. Volba, kterou pravidla nedovolí (pole
+// není mezi kandidáty, nebo je obsazené, zatímco jiné je volné; povinný
+// follow-up u Frenzy), se ignoruje a rozhodne pravidlo.
+namespace {
+thread_local Position g_manualPush{-1, -1};
+thread_local int g_manualFollowUp = -1;   // -1 = nezvoleno, 0 = ne, 1 = ano
+}  // namespace
+
+void setManualPushChoice(Position p) { g_manualPush = p; }
+void setManualFollowUp(bool follow) { g_manualFollowUp = follow ? 1 : 0; }
+void clearManualBlockChoices() { g_manualPush = {-1, -1}; g_manualFollowUp = -1; }
+
 static int choosePushSquare(const GameState& state, const Position* cand, int count,
                             Position pusherPos, bool defenderChooses, bool towardEdge,
                             const Player& pushed, TeamSide blockingSide) {
@@ -252,6 +267,14 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
                 refuseScoring = true;   // a square that does not score exists
                 break;
             }
+        }
+    }
+
+    if (!defenderChooses && g_manualPush.isOnPitch()) {
+        const Position want = g_manualPush;
+        g_manualPush = {-1, -1};
+        for (int i = 0; i < count; i++) {
+            if (cand[i] == want && !(anyEmpty && state.getPlayerAtPosition(cand[i]))) return i;
         }
     }
 
@@ -489,6 +512,11 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
     if (att.hasSkill(SkillName::Frenzy) ||
         att.hasSkill(SkillName::BallAndChain)) {
         return true;
+    }
+    if (g_manualFollowUp >= 0) {   // kouč rozhodl sám (živá partie)
+        const bool f = g_manualFollowUp == 1;
+        g_manualFollowUp = -1;
+        return f;
     }
     // Mimo blitz je blok celá aktivace: není co si šetřit, pole zdarma se bere.
     if (!params.isBlitz) return true;
