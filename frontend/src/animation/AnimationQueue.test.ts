@@ -40,11 +40,7 @@ describe('AnimationQueue', () => {
         ];
 
         // Mock requestAnimationFrame to run synchronously
-        let rafCallback: FrameRequestCallback | null = null;
-        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-            rafCallback = cb;
-            return 1;
-        });
+        vi.stubGlobal('requestAnimationFrame', () => 1);
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
         const promise = queue.playEvents(events);
@@ -73,7 +69,7 @@ describe('AnimationQueue', () => {
             },
         ];
 
-        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => 1);
+        vi.stubGlobal('requestAnimationFrame', () => 1);
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
         const promise = queue.playEvents(events);
@@ -165,7 +161,7 @@ describe('New event animations (Phase 12)', () => {
             },
         ];
 
-        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => 1);
+        vi.stubGlobal('requestAnimationFrame', () => 1);
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
         const promise = queue.playEvents(events);
@@ -193,7 +189,7 @@ describe('New event animations (Phase 12)', () => {
             },
         ];
 
-        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => 1);
+        vi.stubGlobal('requestAnimationFrame', () => 1);
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
         const promise = queue.playEvents(events);
@@ -220,7 +216,7 @@ describe('New event animations (Phase 12)', () => {
             },
         ];
 
-        vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => 1);
+        vi.stubGlobal('requestAnimationFrame', () => 1);
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
         const promise = queue.playEvents(events);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSummaryData, type MatchSummaryData } from './MatchSummary';
+import { buildSummaryData } from './MatchSummary';
 import type { GameState } from '../api/types';
 
 function makeGameState(homeScore: number, awayScore: number): GameState {

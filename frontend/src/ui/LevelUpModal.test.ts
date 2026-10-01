@@ -3,7 +3,9 @@ import { LevelUpModal } from './LevelUpModal';
 import type { AvailableSkills } from '../api/types';
 
 /** Minimal DOM mock for LevelUpModal */
-function createMockContainer(): HTMLElement {
+type MockContainer = HTMLElement & { __getListeners: () => Array<{ selector: string; handler: () => void }> };
+
+function createMockContainer(): MockContainer {
     let html = '';
     const listeners: Array<{ selector: string; handler: () => void }> = [];
 
@@ -50,7 +52,7 @@ function createMockContainer(): HTMLElement {
         },
         // Expose internal listeners for test triggering
         __getListeners: () => listeners,
-    } as unknown as HTMLElement & { __getListeners: () => typeof listeners };
+    } as unknown as MockContainer;
 }
 
 function makeSkills(): AvailableSkills {
@@ -128,8 +130,8 @@ describe('LevelUpModal', () => {
         modal.show('Player 1', makeSkills(), onSelect, onSkip);
 
         // Simulate clicking "Block" (id=1)
-        const listeners = (container as any).__getListeners();
-        const blockListener = listeners.find((l: any) => l.selector === 'skill-1');
+        const listeners = (container as MockContainer).__getListeners();
+        const blockListener = listeners.find((l) => l.selector === 'skill-1');
         expect(blockListener).toBeDefined();
         blockListener!.handler();
 
@@ -142,8 +144,8 @@ describe('LevelUpModal', () => {
 
         modal.show('Player 1', makeSkills(), onSelect, onSkip);
 
-        const listeners = (container as any).__getListeners();
-        const blockListener = listeners.find((l: any) => l.selector === 'skill-1');
+        const listeners = (container as MockContainer).__getListeners();
+        const blockListener = listeners.find((l) => l.selector === 'skill-1');
         blockListener!.handler();
 
         expect(container.style.display).toBe('none');
@@ -156,8 +158,8 @@ describe('LevelUpModal', () => {
 
         modal.show('Player 1', makeSkills(), onSelect, onSkip);
 
-        const listeners = (container as any).__getListeners();
-        const skipListener = listeners.find((l: any) => l.selector === 'skip');
+        const listeners = (container as MockContainer).__getListeners();
+        const skipListener = listeners.find((l) => l.selector === 'skip');
         expect(skipListener).toBeDefined();
         skipListener!.handler();
 

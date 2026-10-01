@@ -7,7 +7,7 @@ JOBS ?= 6
 
 .PHONY: check check-php check-front check-cpp check-lint
 
-check: check-php check-front check-cpp
+check: check-lint check-php check-front check-cpp
 	@echo "== check: vše zelené"
 
 check-php:

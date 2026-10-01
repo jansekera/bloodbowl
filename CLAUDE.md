@@ -3,9 +3,9 @@
 ## Než řekneš „hotovo“
 
 ```bash
-make check          # PHPStan + PHPUnit · tsc + vitest · C++ bb_tests (+ přestaví mcts_cli a bb_engine_py)
+make check          # formát PHP + ESLint · PHPStan + PHPUnit · tsc + vitest · C++ bb_tests (+ přestaví mcts_cli a bb_engine_py)
 ```
-Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-php`, `check-front`, `check-cpp`.
+Musí skončit **„== check: vše zelené“** (~1,5 min). Jednotlivě `make check-lint`, `check-php`, `check-front`, `check-cpp`.
 Po zelené: **commit + push bez ptaní**.
 
 ## Dva enginy — ⛔ most mezi nimi není
@@ -56,4 +56,5 @@ Po zelené: **commit + push bez ptaní**.
 
 - `python/tests` se nespouští — ve `venv` chybí pytest.
 - PHPUnit hlásí 3 *PHPUnit Deprecations*.
-- Lint/formát, testy architektury, mutační testy, bezpečnostní brány a CI zatím nejsou — kniha **P98–P111**.
+- Testy architektury, mutační testy, bezpečnostní brány a CI zatím nejsou — kniha **P98–P116**.
+- Lint: `vendor/bin/php-cs-fixer fix` opraví formát PHP; commity jen s formátem patří do `.git-blame-ignore-revs`.

@@ -53,6 +53,7 @@ reservesPanel.setOnFormation(async (formation: string) => {
         stateManager.setGameState(result.state);
         gameLog.addEvents(result.events);
     } catch (err) {
+        console.error(err);
         toast.error('Formation setup failed');
     } finally {
         isProcessing = false;
@@ -209,6 +210,7 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
                 clearAllTargets();
                 actionPanel.setSelectedMode(null);
             } catch (err) {
+                console.error(err);
                 toast.error('Block choice failed');
             } finally {
                 isProcessing = false;
@@ -220,6 +222,7 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
                 const result = await api.submitAction(matchId, 'reroll_block', { type });
                 await handleActionResult(result);
             } catch (err) {
+                console.error(err);
                 toast.error('Reroll failed');
             } finally {
                 isProcessing = false;
@@ -246,6 +249,7 @@ function showRerollModal(state: import('./api/types').GameState): void {
                 clearAllTargets();
                 actionPanel.setSelectedMode(null);
             } catch (err) {
+                console.error(err);
                 toast.error('Reroll failed');
             } finally {
                 isProcessing = false;
@@ -636,6 +640,7 @@ async function submitMove(playerId: number, x: number, y: number): Promise<void>
         await handleActionResult(result);
         clearAllTargets();
     } catch (err) {
+        console.error(err);
         toast.error('Move failed');
     } finally {
         isProcessing = false;
@@ -650,6 +655,7 @@ async function submitBlock(playerId: number, targetId: number, action: string): 
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Block failed');
     } finally {
         isProcessing = false;
@@ -664,6 +670,7 @@ async function submitMultipleBlock(playerId: number, targetId: number, targetId2
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Multiple Block failed');
     } finally {
         isProcessing = false;
@@ -678,6 +685,7 @@ async function submitPass(playerId: number, targetX: number, targetY: number): P
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Pass failed');
     } finally {
         isProcessing = false;
@@ -692,6 +700,7 @@ async function submitHandOff(playerId: number, targetId: number): Promise<void> 
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Hand-off failed');
     } finally {
         isProcessing = false;
@@ -706,6 +715,7 @@ async function submitFoul(playerId: number, targetId: number): Promise<void> {
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Foul failed');
     } finally {
         isProcessing = false;
@@ -726,6 +736,7 @@ async function submitSetupPlayer(playerId: number, x: number, y: number): Promis
         setupSelectedPlayerId = null;
         reservesPanel.setSelectedPlayer(null);
     } catch (err) {
+        console.error(err);
         toast.error('Setup failed');
     } finally {
         isProcessing = false;
@@ -763,6 +774,7 @@ async function handlePanelAction(action: string): Promise<void> {
         clearAllTargets();
         actionPanel.setSelectedMode(null);
     } catch (err) {
+        console.error(err);
         toast.error('Action failed');
     } finally {
         isProcessing = false;
@@ -838,6 +850,7 @@ async function initReplay(): Promise<void> {
             gameLog.addEvents([event]);
         });
     } catch (err) {
+        console.error(err);
         toast.error('Failed to load replay');
     }
 }
@@ -902,6 +915,7 @@ async function init(): Promise<void> {
             checkLevelUps();
         }
     } catch (err) {
+        console.error(err);
         toast.error('Failed to load match state');
     }
 }
