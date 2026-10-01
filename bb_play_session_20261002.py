@@ -170,19 +170,20 @@ def board(state):
     #   maji 7 (6 obsah + '|') -- sloupce se s kazdym dalsim polem rozjizdely
     #   o 1 znak, presne vada popsana v feedback_board_render_format.md
     #   ("hlavicka zarovnana na zacatek bunky, ne centrovana"). Sirka MUSI
-    #   sedet se sirkou bunky (7 = 6 obsah + 1 oddelovac).
-    lines.append("     " + "".join(f"{x:<6} " for x in range(xlo, xhi + 1)))
-    hline = "    +" + "------+" * (xhi - xlo + 1)
+    #   sedet se sirkou bunky. 02.10.2026: 9 = 8 obsah + 1 oddelovac -- kod
+    #   s pomlckou ("DL10-/0", "DTG6-/0") ma 7 znaku a sest uz nestacilo.
+    lines.append("     " + "".join(f"{x:<8} " for x in range(xlo, xhi + 1)))
+    hline = "    +" + "--------+" * (xhi - xlo + 1)
     for y in range(ylo, yhi + 1):
         lines.append(hline)
         row = f"y={y:<2}|"
         for x in range(xlo, xhi + 1):
             v = cell.get((x, y))
             if v:
-                row += f"{v:<6}|"
+                row += f"{v:<8}|"
             else:
                 z = zon((x, y), st_away)
-                row += (f"  {z}   |" if z else "      |")
+                row += (f"  {z}     |" if z else "        |")
         lines.append(row)
     lines.append(hline)
     if venku:
