@@ -742,8 +742,25 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
-⏰ **Přepsáno 14.09.2026 pozdě večer.** Přepisuje se **jedině tenhle oddíl**;
-ID se **nikdy** nepřečíslovávají.
+⏰ **Přepsáno 01.10.2026.** Přepisuje se **jedině tenhle oddíl**; ID se **nikdy** nepřečíslovávají.
+
+## ⭐⭐⭐ POŘADÍ OD 01.10. — uživatel: *„dej do popředí priorit nálezy z projektu turniket“*
+**1. P98–P111 (nálezy z `~/nest-lab-vada`)** — v tomhle pořadí, protože jedno staví na druhém:
+| krok | položky | proč tady |
+|---|---|---|
+| a | **P105** jeden příkaz `check` + `CLAUDE.md` v repu | základ: kam se další kontroly zapojí |
+| b | **P98** security review webové aplikace · **P107** každá cesta API říká, kdo ji smí volat · **P99** špatný vstup přes HTTP ≠ 500 | bezpečnost a vstup — nálezy, ne refaktor |
+| c | **P108** automatické bezpečnostní brány (gitleaks, audit, Semgrep **ověřený sondou**) · **P103** konfigurace fail-fast (`config.php`: `postgres` + prázdné heslo) | |
+| d | **P100** testy, které nemohou spadnout · **P104** mutační testy · **P109** práh pokrytí | kvalita testů — mutace ukážou, co pokrytí schová |
+| e | **P102** testy architektury · **P101** čas a zóna · **P106** integrace s Postgres + práva · **P111** souběh tahů | |
+| f | **P110** CI (GitHub Actions) | až je co pouštět |
+
+**2. Simplify dávky P68–P97** — nálezy uložené v `evidence/simplify_nalezy_20261001.md`, NIC ZATÍM NEAPLIKOVÁNO.
+**3. Pravidlové P84, P86–P92, P94, P96** (pořadí knihy).
+
+---
+
+## Starší obsah oddílu *(14.09.)*
 
 ## ✅ UZAVŘENO 14.09.
 | | co | commit |
