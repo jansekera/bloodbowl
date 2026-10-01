@@ -117,6 +117,8 @@ def board(state):
             code += "o"
         elif p.state == bb.PlayerState.PRONE:
             code += "_"
+        elif p.team_side != state.active_team:
+            pass   # '-'/'B' jen u týmu na tahu (soupeřovy značky z minulého tahu matou)
         elif p.used_blitz:
             code += "B"   # uživatel 02.10.: kdo v tomto tahu blitzoval, má B místo -
         elif p.has_acted or p.has_moved:
@@ -223,6 +225,8 @@ def event_str(e):
     if t in ("ARMOR_BREAK", "INJURY", "CASUALTY"):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
         return f"{t} hráč {e['target'] if e['target'] > 0 else e['player']}: {e['roll']}{dice}"
+    if t == "FOLLOW_UP":
+        return f"follow-up {who}: {'ano' if e['success'] else 'ne'}"
     if t == "MOVE":
         return f"krok {who} na {e['to']}"
     return f"{t} {who} cíl {e['target']} hod {e['roll']}"
