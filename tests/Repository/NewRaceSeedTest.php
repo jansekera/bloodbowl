@@ -121,9 +121,15 @@ final class NewRaceSeedTest extends TestCase
         $mummy = null;
         $ghoul = null;
         foreach ($undead->getPositionals() as $pos) {
-            if ($pos->getName() === 'Wight') $wight = $pos;
-            if ($pos->getName() === 'Mummy') $mummy = $pos;
-            if ($pos->getName() === 'Ghoul') $ghoul = $pos;
+            if ($pos->getName() === 'Wight') {
+                $wight = $pos;
+            }
+            if ($pos->getName() === 'Mummy') {
+                $mummy = $pos;
+            }
+            if ($pos->getName() === 'Ghoul') {
+                $ghoul = $pos;
+            }
         }
 
         // Wight: 6/3/3/8, Block+Regen
@@ -193,9 +199,15 @@ final class NewRaceSeedTest extends TestCase
         $saurus = null;
         $kroxigor = null;
         foreach ($lizardmen->getPositionals() as $pos) {
-            if ($pos->getName() === 'Skink') $skink = $pos;
-            if ($pos->getName() === 'Saurus') $saurus = $pos;
-            if ($pos->getName() === 'Kroxigor') $kroxigor = $pos;
+            if ($pos->getName() === 'Skink') {
+                $skink = $pos;
+            }
+            if ($pos->getName() === 'Saurus') {
+                $saurus = $pos;
+            }
+            if ($pos->getName() === 'Kroxigor') {
+                $kroxigor = $pos;
+            }
         }
 
         // Skink: 8/2/3/7, Dodge+Stunty
@@ -266,9 +278,15 @@ final class NewRaceSeedTest extends TestCase
         $assassin = null;
         $witchElf = null;
         foreach ($darkElf->getPositionals() as $pos) {
-            if ($pos->getName() === 'Runner') $runner = $pos;
-            if ($pos->getName() === 'Assassin') $assassin = $pos;
-            if ($pos->getName() === 'Witch Elf') $witchElf = $pos;
+            if ($pos->getName() === 'Runner') {
+                $runner = $pos;
+            }
+            if ($pos->getName() === 'Assassin') {
+                $assassin = $pos;
+            }
+            if ($pos->getName() === 'Witch Elf') {
+                $witchElf = $pos;
+            }
         }
 
         // Runner: 7/3/4/7, Dump-Off

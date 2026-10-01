@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -29,25 +30,38 @@ final class StandPatTest extends TestCase
     public function testStandPatCostsNoRollEvenForAReallyStupidBigGuy(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::ReallyStupid])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::ReallyStupid],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 3, id: 2)
             ->withBallOffPitch()
             ->build();
 
         // SEBEKONTROLA: hráč na začátku opravdu ještě může jednat.
-        $this->assertTrue($state->requirePlayer(1)->canAct(),
-            'fixtura je vadná: hráč už jednal, volba nehrát nemá co ušetřit');
+        $this->assertTrue(
+            $state->requirePlayer(1)->canAct(),
+            'fixtura je vadná: hráč už jednal, volba nehrát nemá co ušetřit',
+        );
 
         // ⛔ KOSTKA BEZ JEDINÉHO HODU: kdyby se sáhlo na kontrolu před akcí,
         //    `FixedDiceRoller` vyhodí výjimku a test spadne.
         $dice = new FixedDiceRoller([]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::STAND_PAT, ['playerId' => 1],
+            $state,
+            ActionType::STAND_PAT,
+            ['playerId' => 1],
         );
 
-        $this->assertSame(0, $dice->getRollCount(),
-            'neaktivovaný hráč házel -- to je přesně to, co se nesmí');
+        $this->assertSame(
+            0,
+            $dice->getRollCount(),
+            'neaktivovaný hráč házel -- to je přesně to, co se nesmí',
+        );
         $this->assertFalse($result->isTurnover());
 
         $after = $result->getNewState()->requirePlayer(1);
@@ -65,19 +79,30 @@ final class StandPatTest extends TestCase
         //    tentýž stav, jen místo „nic nedělat" opravdový pohyb ⇒ Really
         //    Stupid se hází.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::ReallyStupid])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::ReallyStupid],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 3, id: 2)
             ->withBallOffPitch()
             ->build();
 
         $dice = new FixedDiceRoller([6, 6, 6, 6, 6, 6]);
         (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 6, 'y' => 7],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 6, 'y' => 7],
         );
 
-        $this->assertGreaterThan(0, $dice->getRollCount(),
-            'měřidlo je vadné: ani skutečná akce big guye nevyvolala hod');
+        $this->assertGreaterThan(
+            0,
+            $dice->getRollCount(),
+            'měřidlo je vadné: ani skutečná akce big guye nevyvolala hod',
+        );
     }
 
     public function testStandPatIsOfferedOnlyWhileThePlayerCanStillDoSomething(): void
@@ -99,8 +124,11 @@ final class StandPatTest extends TestCase
         $done = $state->withPlayer(
             $state->requirePlayer(1)->withHasActed(true)->withHasMoved(true),
         );
-        $this->assertSame([], $offered($done),
-            'volba nehrát se nabízí i hráči, který už jednal');
+        $this->assertSame(
+            [],
+            $offered($done),
+            'volba nehrát se nabízí i hráči, který už jednal',
+        );
     }
 
     public function testBallAndChainPlayerMayAlsoBeLeftAlone(): void
@@ -117,23 +145,37 @@ final class StandPatTest extends TestCase
         //    Fanatic drží místo, dává asistence a má zónu zachycení, ale koule
         //    se neroztočí — takže nemůže vrazit do vlastních hráčů.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 3, id: 1,
-                        skills: [SkillName::BallAndChain])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 3,
+                id: 1,
+                skills: [SkillName::BallAndChain],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 3, id: 2)
             ->withBallOffPitch()
             ->build();
 
         $types = array_column((new RulesEngine())->getAvailableActions($state), 'type');
 
-        $this->assertContains(ActionType::BALL_AND_CHAIN->value, $types,
-            'fixtura je vadná: B&C hráči se nenabízí ani jeho vlastní akce');
-        $this->assertContains(ActionType::STAND_PAT->value, $types,
-            'Ball & Chain hráč nedostal volbu nehrát, kterou podle pravidel má');
+        $this->assertContains(
+            ActionType::BALL_AND_CHAIN->value,
+            $types,
+            'fixtura je vadná: B&C hráči se nenabízí ani jeho vlastní akce',
+        );
+        $this->assertContains(
+            ActionType::STAND_PAT->value,
+            $types,
+            'Ball & Chain hráč nedostal volbu nehrát, kterou podle pravidel má',
+        );
 
         // A když ji vezme, nesmí se roztočit koule ani padnout kostka.
         $dice = new FixedDiceRoller([]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::STAND_PAT, ['playerId' => 1],
+            $state,
+            ActionType::STAND_PAT,
+            ['playerId' => 1],
         );
         $this->assertSame(0, $dice->getRollCount(), 'koule se roztočila, ač hráč nehrál');
         $this->assertFalse($result->isTurnover());
@@ -149,8 +191,11 @@ final class StandPatTest extends TestCase
         $engine = new \App\Engine\RulesEngine();
 
         $this->assertSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 1]));
-        $this->assertNotSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 2]),
-            'hrac soupere se neaktivuje za nas');
+        $this->assertNotSame(
+            [],
+            $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 2]),
+            'hrac soupere se neaktivuje za nas',
+        );
         $this->assertNotSame([], $engine->validate($state, ActionType::STAND_PAT, []));
     }
 
@@ -163,8 +208,10 @@ final class StandPatTest extends TestCase
             ->build();
         $engine = new \App\Engine\RulesEngine();
 
-        $nabidnuto = array_filter($engine->getAvailableActions($state),
-            fn(array $a) => $a['type'] === ActionType::STAND_PAT->value && ($a['playerId'] ?? null) === 1);
+        $nabidnuto = array_filter(
+            $engine->getAvailableActions($state),
+            fn(array $a) => $a['type'] === ActionType::STAND_PAT->value && ($a['playerId'] ?? null) === 1,
+        );
         $this->assertNotSame([], $nabidnuto, 'fixtura: lezicimu se STAND_PAT nabizi');
         $this->assertSame([], $engine->validate($state, ActionType::STAND_PAT, ['playerId' => 1]));
     }

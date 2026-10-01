@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -67,8 +68,10 @@ final class HypnoticGazeTest extends TestCase
             'targetId' => 2,
         ]);
 
-        $this->assertFalse($result->isTurnover(),
-            'neuspesny gaze neni turnover -- r. 8188-8189 a katalog r. 368-384');
+        $this->assertFalse(
+            $result->isTurnover(),
+            'neuspesny gaze neni turnover -- r. 8188-8189 a katalog r. 368-384',
+        );
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('hypnotic_gaze', $types, 'hod se ma ozvat');
         $this->assertNotContains('turnover', $types);
@@ -101,8 +104,10 @@ final class HypnoticGazeTest extends TestCase
         // dvojka NEUSPEJE -- cil si tacklezony ponecha. (Drive se tu tvrdil
         // turnover; ten sem nikdy nepatril, viz test vys.)
         $this->assertFalse($result->isTurnover());
-        $this->assertFalse($result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
-            'gaze neuspel, cil tacklezony ztratit nesmi');
+        $this->assertFalse(
+            $result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
+            'gaze neuspel, cil tacklezony ztratit nesmi',
+        );
     }
 
     public function testGazeTZModifierSucceedsOneAbove(): void
@@ -125,8 +130,10 @@ final class HypnoticGazeTest extends TestCase
         ]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertTrue($result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
-            'trojka pri prahu 3+ uspet MA');
+        $this->assertTrue(
+            $result->getNewState()->requirePlayer(2)->hasLostTacklezones(),
+            'trojka pri prahu 3+ uspet MA',
+        );
     }
 
     /**

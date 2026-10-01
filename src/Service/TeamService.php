@@ -27,8 +27,7 @@ final class TeamService
         private readonly RosterValidator $rosterValidator,
         private readonly ?SkillRepository $skillRepository = null,
         private readonly ?SPPService $sppService = null,
-    ) {
-    }
+    ) {}
 
     public function createTeam(int $coachId, int $raceId, string $name): Team
     {

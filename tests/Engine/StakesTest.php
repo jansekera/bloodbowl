@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -18,7 +19,10 @@ final class StakesTest extends TestCase
     public function testStakesBlocksRegeneration(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Wight', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Wight',
+            number: 1,
             positionalName: 'Wight',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [SkillName::Regeneration],
@@ -42,7 +46,10 @@ final class StakesTest extends TestCase
     public function testWithoutStakesRegenerationWorks(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Wight', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Wight',
+            number: 1,
             positionalName: 'Wight',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [SkillName::Regeneration],
@@ -66,7 +73,10 @@ final class StakesTest extends TestCase
     public function testStakesNoEffectWithoutRegeneration(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Lineman', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Lineman',
+            number: 1,
             positionalName: 'Lineman',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [],

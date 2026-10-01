@@ -11,8 +11,7 @@ final class PlayerStats
         private readonly int $strength,
         private readonly int $agility,
         private readonly int $armour,
-    ) {
-    }
+    ) {}
 
     public function getMovement(): int
     {

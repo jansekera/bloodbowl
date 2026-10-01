@@ -24,7 +24,7 @@ final class TeamRepository
              FROM teams t
              JOIN races r ON t.race_id = r.id
              JOIN coaches c ON t.coach_id = c.id
-             WHERE t.id = :id'
+             WHERE t.id = :id',
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -56,7 +56,7 @@ final class TeamRepository
              JOIN races r ON t.race_id = r.id
              JOIN coaches c ON t.coach_id = c.id
              WHERE t.coach_id = :coach_id AND t.status = \'active\'
-             ORDER BY t.name'
+             ORDER BY t.name',
         );
         $stmt->execute(['coach_id' => $coachId]);
 
@@ -74,7 +74,7 @@ final class TeamRepository
              JOIN races r ON t.race_id = r.id
              JOIN coaches c ON t.coach_id = c.id
              WHERE t.status = \'active\'
-             ORDER BY t.name'
+             ORDER BY t.name',
         );
         $stmt->execute();
 
@@ -89,7 +89,7 @@ final class TeamRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO teams (coach_id, race_id, name, treasury)
              VALUES (:coach_id, :race_id, :name, :treasury)
-             RETURNING *'
+             RETURNING *',
         );
         $stmt->execute($data);
 
@@ -102,7 +102,7 @@ final class TeamRepository
     public function updateTreasury(int $id, int $treasury): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE teams SET treasury = :treasury, updated_at = CURRENT_TIMESTAMP WHERE id = :id'
+            'UPDATE teams SET treasury = :treasury, updated_at = CURRENT_TIMESTAMP WHERE id = :id',
         );
         $stmt->execute(['id' => $id, 'treasury' => $treasury]);
 
@@ -112,7 +112,7 @@ final class TeamRepository
     public function updateRerolls(int $id, int $rerolls): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE teams SET rerolls = :rerolls, updated_at = CURRENT_TIMESTAMP WHERE id = :id'
+            'UPDATE teams SET rerolls = :rerolls, updated_at = CURRENT_TIMESTAMP WHERE id = :id',
         );
         $stmt->execute(['id' => $id, 'rerolls' => $rerolls]);
 
@@ -122,7 +122,7 @@ final class TeamRepository
     public function updateApothecary(int $id, bool $hasApothecary): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE teams SET has_apothecary = :has_apothecary, updated_at = CURRENT_TIMESTAMP WHERE id = :id'
+            'UPDATE teams SET has_apothecary = :has_apothecary, updated_at = CURRENT_TIMESTAMP WHERE id = :id',
         );
         $stmt->execute(['id' => $id, 'has_apothecary' => $hasApothecary ? 't' : 'f']);
 
@@ -132,7 +132,7 @@ final class TeamRepository
     public function updateStatus(int $id, string $status): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE teams SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :id'
+            'UPDATE teams SET status = :status, updated_at = CURRENT_TIMESTAMP WHERE id = :id',
         );
         $stmt->execute(['id' => $id, 'status' => $status]);
 

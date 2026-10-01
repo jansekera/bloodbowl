@@ -24,7 +24,7 @@ final class PlayerRepository
             'SELECT p.*, pt.name AS positional_name
              FROM players p
              JOIN positional_templates pt ON p.positional_template_id = pt.id
-             WHERE p.id = :id'
+             WHERE p.id = :id',
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -47,7 +47,7 @@ final class PlayerRepository
              FROM players p
              JOIN positional_templates pt ON p.positional_template_id = pt.id
              WHERE p.team_id = :team_id
-             ORDER BY p.number'
+             ORDER BY p.number',
         );
         $stmt->execute(['team_id' => $teamId]);
 
@@ -68,7 +68,7 @@ final class PlayerRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO players (team_id, positional_template_id, name, number, ma, st, ag, av)
              VALUES (:team_id, :positional_template_id, :name, :number, :ma, :st, :ag, :av)
-             RETURNING *'
+             RETURNING *',
         );
         $stmt->execute($data);
 
@@ -86,7 +86,7 @@ final class PlayerRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO player_skills (player_id, skill_id, is_starting)
              VALUES (:player_id, :skill_id, TRUE)
-             ON CONFLICT (player_id, skill_id) DO NOTHING'
+             ON CONFLICT (player_id, skill_id) DO NOTHING',
         );
 
         foreach ($skillIds as $skillId) {
@@ -102,7 +102,7 @@ final class PlayerRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO player_skills (player_id, skill_id, is_starting)
              VALUES (:player_id, :skill_id, FALSE)
-             ON CONFLICT (player_id, skill_id) DO NOTHING'
+             ON CONFLICT (player_id, skill_id) DO NOTHING',
         );
         $stmt->execute([
             'player_id' => $playerId,
@@ -114,7 +114,7 @@ final class PlayerRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT COUNT(*) FROM player_skills
-             WHERE player_id = :player_id AND is_starting = FALSE'
+             WHERE player_id = :player_id AND is_starting = FALSE',
         );
         $stmt->execute(['player_id' => $playerId]);
 
@@ -132,7 +132,7 @@ final class PlayerRepository
     public function updateSPP(int $id, int $spp, int $level): bool
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE players SET spp = :spp, level = :level WHERE id = :id'
+            'UPDATE players SET spp = :spp, level = :level WHERE id = :id',
         );
         $stmt->execute(['id' => $id, 'spp' => $spp, 'level' => $level]);
 
@@ -150,7 +150,7 @@ final class PlayerRepository
     public function getNextNumber(int $teamId): int
     {
         $stmt = $this->pdo->prepare(
-            'SELECT COALESCE(MAX(number), 0) + 1 FROM players WHERE team_id = :team_id'
+            'SELECT COALESCE(MAX(number), 0) + 1 FROM players WHERE team_id = :team_id',
         );
         $stmt->execute(['team_id' => $teamId]);
 
@@ -163,7 +163,7 @@ final class PlayerRepository
             'SELECT COUNT(*) FROM players
              WHERE team_id = :team_id
              AND positional_template_id = :template_id
-             AND status = \'active\''
+             AND status = \'active\'',
         );
         $stmt->execute([
             'team_id' => $teamId,
@@ -176,7 +176,7 @@ final class PlayerRepository
     public function countActive(int $teamId): int
     {
         $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM players WHERE team_id = :team_id AND status = \'active\''
+            'SELECT COUNT(*) FROM players WHERE team_id = :team_id AND status = \'active\'',
         );
         $stmt->execute(['team_id' => $teamId]);
 
@@ -192,7 +192,7 @@ final class PlayerRepository
             'SELECT s.* FROM skills s
              JOIN player_skills ps ON s.id = ps.skill_id
              WHERE ps.player_id = :player_id
-             ORDER BY s.name'
+             ORDER BY s.name',
         );
         $stmt->execute(['player_id' => $playerId]);
 
@@ -208,7 +208,7 @@ final class PlayerRepository
             'SELECT s.name FROM skills s
              JOIN player_skills ps ON s.id = ps.skill_id
              WHERE ps.player_id = :player_id AND ps.is_starting = FALSE
-             ORDER BY s.name'
+             ORDER BY s.name',
         );
         $stmt->execute(['player_id' => $playerId]);
 

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controller;
@@ -15,8 +16,7 @@ final class MatchApiController
     public function __construct(
         private readonly AuthService $authService,
         private readonly MatchService $matchService,
-    ) {
-    }
+    ) {}
 
     public function create(): void
     {

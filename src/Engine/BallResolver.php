@@ -22,8 +22,7 @@ final class BallResolver
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
-    ) {
-    }
+    ) {}
 
     /**
      * Attempt to pick up ball when player moves onto ball square.

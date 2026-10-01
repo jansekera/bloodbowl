@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -64,8 +65,10 @@ final class ProneCannotCatchTest extends TestCase
         $result = $resolver->resolveCatch($state, $state->requirePlayer(1));
 
         $this->assertFalse($result['success'], 'ležící chytit NESMÍ (r. 857-858)');
-        $this->assertFalse($result['state']->getBall()->isHeld(),
-            'míč se má odrazit, ne zůstat v rukou');
+        $this->assertFalse(
+            $result['state']->getBall()->isHeld(),
+            'míč se má odrazit, ne zůstat v rukou',
+        );
     }
 
     public function testStunnedIsRefusedToo(): void
@@ -95,8 +98,10 @@ final class ProneCannotCatchTest extends TestCase
             ->build();
         $state = $state->withBall(BallState::onGround(new Position(5, 7)));
 
-        $this->assertTrue($state->requirePlayer(1)->getState()->canAct(),
-            'fixtura je vadná: hráč nestojí');
+        $this->assertTrue(
+            $state->requirePlayer(1)->getState()->canAct(),
+            'fixtura je vadná: hráč nestojí',
+        );
 
         $resolver = $this->ballResolver([6]);
         $result = $resolver->resolveCatch($state, $state->requirePlayer(1));
@@ -122,8 +127,10 @@ final class ProneCannotCatchTest extends TestCase
         $result = $resolver->resolveBounce($state, new Position(4, 7));
 
         $ball = $result['state']->getBall();
-        $this->assertFalse($ball->isHeld(),
-            'odraz na ležícího ho do rukou dát nesmí (r. 857-858)');
+        $this->assertFalse(
+            $ball->isHeld(),
+            'odraz na ležícího ho do rukou dát nesmí (r. 857-858)',
+        );
     }
 
     public function testPassToProneReceiverIsNotCaught(): void
@@ -139,15 +146,20 @@ final class ProneCannotCatchTest extends TestCase
         $state = $state->withPlayer(
             $state->requirePlayer(2)->withState(PlayerState::PRONE),
         );
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerollUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerollUsed(),
+        );
 
         $resolver = new ActionResolver(new FixedDiceRoller([6, 6, 3, 3, 3, 3]));
         $result = $resolver->resolve($state, ActionType::PASS, [
             'playerId' => 1, 'targetX' => 8, 'targetY' => 7,
         ]);
 
-        $this->assertNotSame(2, $result->getNewState()->getBall()->getCarrierId(),
-            'ležící příjemce míč chytit nesmí (r. 857-858)');
+        $this->assertNotSame(
+            2,
+            $result->getNewState()->getBall()->getCarrierId(),
+            'ležící příjemce míč chytit nesmí (r. 857-858)',
+        );
     }
 }

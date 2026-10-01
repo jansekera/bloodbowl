@@ -25,8 +25,7 @@ final class Player
         private readonly string $createdAt,
         private readonly ?string $positionalName = null,
         private readonly array $skills = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -212,8 +213,10 @@ final class ThrowTeamMateTest extends TestCase
         //   ... **is not a turnover unless it is a player from the active team
         //   holding the ball**." A bod 6 (r. 381-384) mluvi taky jen o hraci
         //   **s micem**.
-        $this->assertFalse($result->isTurnover(),
-            'hozeny hrac BEZ mice u davu kolo nekonci (r. 368-370)');
+        $this->assertFalse(
+            $result->isTurnover(),
+            'hozeny hrac BEZ mice u davu kolo nekonci (r. 368-370)',
+        );
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types, 'k davu se dostat MEL');
     }
@@ -232,8 +235,11 @@ final class ThrowTeamMateTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: hozeny hrac mic OPRAVDU ma.
         $this->assertTrue($state->getBall()->isHeld());
-        $this->assertSame(2, $state->getBall()->getCarrierId(),
-            'fixtura je vadna: mic nenese hozeny hrac, par nic nemeri');
+        $this->assertSame(
+            2,
+            $state->getBall()->getCarrierId(),
+            'fixtura je vadna: mic nenese hozeny hrac, par nic nemeri',
+        );
 
         // 21.09.: kostek je vic, protoze po opravě nasleduje VHAZENI
         //   (sablona D6 + 2D6 poli + pripadny odskok) -- viz
@@ -244,8 +250,10 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 4, 'targetY' => 0,
         ]);
 
-        $this->assertTrue($result->isTurnover(),
-            'hozeny hrac S MICEM u davu kolo koncí (bod 6)');
+        $this->assertTrue(
+            $result->isTurnover(),
+            'hozeny hrac S MICEM u davu kolo koncí (bod 6)',
+        );
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('crowd_surf', $types);
     }
@@ -277,7 +285,9 @@ final class ThrowTeamMateTest extends TestCase
 
         $vysledek = null;
         foreach ($result->getEvents() as $e) {
-            if ($e->getType() === 'throw_team_mate') { $vysledek = $e->getData()['result'] ?? null; }
+            if ($e->getType() === 'throw_team_mate') {
+                $vysledek = $e->getData()['result'] ?? null;
+            }
         }
         $this->assertSame('inaccurate', $vysledek, 'r. 8608: -1 k hodu na presnost');
     }
@@ -300,7 +310,9 @@ final class ThrowTeamMateTest extends TestCase
 
         $vysledek = null;
         foreach ($result->getEvents() as $e) {
-            if ($e->getType() === 'throw_team_mate') { $vysledek = $e->getData()['result'] ?? null; }
+            if ($e->getType() === 'throw_team_mate') {
+                $vysledek = $e->getData()['result'] ?? null;
+            }
         }
         $this->assertSame('fumble', $vysledek);
     }

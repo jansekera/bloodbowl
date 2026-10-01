@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -43,7 +44,7 @@ final class PassBlockTest extends TestCase
         // Original pos (8,3), target (7,5), should move diag toward target
         $this->assertLessThan(
             abs(8 - 7) + abs(3 - 5), // original distance
-            abs($pbPlayer->requirePosition()->getX() - 7) + abs($pbPlayer->requirePosition()->getY() - 5)
+            abs($pbPlayer->requirePosition()->getX() - 7) + abs($pbPlayer->requirePosition()->getY() - 5),
         );
     }
 
@@ -161,7 +162,7 @@ final class PassBlockTest extends TestCase
 
         $passBlockEvents = array_filter(
             $result->getEvents(),
-            fn($e) => $e->getType() === 'pass_block'
+            fn($e) => $e->getType() === 'pass_block',
         );
         // Only 1 PB player moves per pass
         $this->assertCount(1, $passBlockEvents);

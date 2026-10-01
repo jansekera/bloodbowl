@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -99,8 +100,11 @@ final class BlitzOutOfReachTest extends TestCase
 
         $this->assertTrue($result->isSuccess());
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
-            'nemá se kam hnout, tak se hnout nemá');
+        $this->assertSame(
+            5,
+            $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
+            'nemá se kam hnout, tak se hnout nemá',
+        );
         $this->assertSame(7, $result->getNewState()->requirePlayer(1)->requirePosition()->getY());
     }
 
@@ -118,18 +122,29 @@ final class BlitzOutOfReachTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 8, 7, id: 2)
-            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 5, id: 3,
-                        skills: [SkillName::Tentacles])
+            ->addPlayer(
+                TeamSide::AWAY,
+                6,
+                7,
+                strength: 5,
+                id: 3,
+                skills: [SkillName::Tentacles],
+            )
             ->withBallOffPitch()
             ->build();
 
         // SEBEKONTROLA FIXTURY: ten soused Tentacles OPRAVDU má a stojí
         // v cestě -- jinak se do opravované větve nedojde.
-        $this->assertTrue($state->requirePlayer(3)->hasSkill(SkillName::Tentacles),
-            'fixtura je vadná: nikdo nemá Tentacles');
-        $this->assertSame(1, $state->requirePlayer(1)->requirePosition()
+        $this->assertTrue(
+            $state->requirePlayer(3)->hasSkill(SkillName::Tentacles),
+            'fixtura je vadná: nikdo nemá Tentacles',
+        );
+        $this->assertSame(
+            1,
+            $state->requirePlayer(1)->requirePosition()
             ->distanceTo($state->requirePlayer(3)->requirePosition()),
-            'fixtura je vadná: chapadla nejsou v kontaktu, nezaberou');
+            'fixtura je vadná: chapadla nejsou v kontaktu, nezaberou',
+        );
 
         // Nízké hody -> únik z chapadel se nepovede.
         $dice = new FixedDiceRoller([1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6]);
@@ -140,8 +155,10 @@ final class BlitzOutOfReachTest extends TestCase
         ]);
 
         // Ať už chapadla zaberou nebo ne, výjimka letět NESMÍ.
-        $this->assertTrue($result->isSuccess() || $result->isTurnover(),
-            'blitz zastavený chapadly nesmí házet výjimku');
+        $this->assertTrue(
+            $result->isSuccess() || $result->isTurnover(),
+            'blitz zastavený chapadly nesmí házet výjimku',
+        );
     }
 
     /**
@@ -151,8 +168,15 @@ final class BlitzOutOfReachTest extends TestCase
     public function testWildAnimalMovesOnTwoWhenBlitzIsDeclaredOutOfReach(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, strength: 5, id: 1,
-                        skills: [SkillName::WildAnimal])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                strength: 5,
+                id: 1,
+                skills: [SkillName::WildAnimal],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -190,8 +214,15 @@ final class BlitzOutOfReachTest extends TestCase
         //    (1+2=3, a 1-3 je pád) -- jinak by to byl auto-pass, tedy ta
         //    vada, kterou C++ engine opravil 07.08.2026.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, strength: 5, id: 1,
-                        skills: [SkillName::WildAnimal])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                strength: 5,
+                id: 1,
+                skills: [SkillName::WildAnimal],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -206,7 +237,10 @@ final class BlitzOutOfReachTest extends TestCase
         $this->assertTrue($result->isSuccess());
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wild_animal', $types);
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
-            'na jedničce se hráč hnout NESMÍ');
+        $this->assertSame(
+            5,
+            $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
+            'na jedničce se hráč hnout NESMÍ',
+        );
     }
 }

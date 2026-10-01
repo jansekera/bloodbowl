@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -20,24 +21,56 @@ final class PendingRerollDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-    ) {
-    }
+    ) {}
 
-    public function getRollType(): string { return $this->rollType; }
-    public function getPlayerId(): int { return $this->playerId; }
-    public function getTarget(): int { return $this->target; }
-    public function getRoll(): int { return $this->roll; }
-    public function isProAvailable(): bool { return $this->proAvailable; }
-    public function isTeamRerollAvailable(): bool { return $this->teamRerollAvailable; }
-    public function getTargetX(): int { return $this->targetX; }
-    public function getTargetY(): int { return $this->targetY; }
-    public function isProFailed(): bool { return $this->proFailed; }
+    public function getRollType(): string
+    {
+        return $this->rollType;
+    }
+    public function getPlayerId(): int
+    {
+        return $this->playerId;
+    }
+    public function getTarget(): int
+    {
+        return $this->target;
+    }
+    public function getRoll(): int
+    {
+        return $this->roll;
+    }
+    public function isProAvailable(): bool
+    {
+        return $this->proAvailable;
+    }
+    public function isTeamRerollAvailable(): bool
+    {
+        return $this->teamRerollAvailable;
+    }
+    public function getTargetX(): int
+    {
+        return $this->targetX;
+    }
+    public function getTargetY(): int
+    {
+        return $this->targetY;
+    }
+    public function isProFailed(): bool
+    {
+        return $this->proFailed;
+    }
 
     public function withProFailed(): self
     {
         return new self(
-            $this->rollType, $this->playerId, $this->target, $this->roll,
-            false, $this->teamRerollAvailable, $this->targetX, $this->targetY,
+            $this->rollType,
+            $this->playerId,
+            $this->target,
+            $this->roll,
+            false,
+            $this->teamRerollAvailable,
+            $this->targetX,
+            $this->targetY,
             true,
         );
     }

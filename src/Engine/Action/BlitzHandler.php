@@ -18,8 +18,7 @@ final class BlitzHandler implements ActionHandlerInterface
         private readonly MoveHandler $moveHandler,
         private readonly BlockHandler $blockHandler,
         private readonly Pathfinder $pathfinder,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params

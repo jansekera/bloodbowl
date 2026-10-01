@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -39,8 +40,10 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 0, 7, id: 2)
             ->withBallOffPitch()
             ->build();
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withBlitzUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withBlitzUsed(),
+        );
 
         $rules = new RulesEngine();
         $ai = new GreedyAICoach();
@@ -48,11 +51,17 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
         // --- SEBEKONTROLA FIXTURY: postavil jsem opravdu ten stav? ---
         // (a) je co hrát -- nabídka MOVE dává.
         $types = array_column($rules->getAvailableActions($state), 'type');
-        $this->assertContains(ActionType::MOVE->value, $types,
-            'fixtura je vadná: nabídka nemá MOVE, hrát není co');
+        $this->assertContains(
+            ActionType::MOVE->value,
+            $types,
+            'fixtura je vadná: nabídka nemá MOVE, hrát není co',
+        );
         // (b) a hráč má kam šlápnout.
-        $this->assertNotSame([], $rules->getValidMoveTargets($state, 1),
-            'fixtura je vadná: hráč nemá kam, vada se nemůže projevit');
+        $this->assertNotSame(
+            [],
+            $rules->getValidMoveTargets($state, 1),
+            'fixtura je vadná: hráč nemá kam, vada se nemůže projevit',
+        );
         // (c) ⭐ KLÍČOVÉ: skórer NEOHODNOTÍ ANI JEDNU nabídnutou akci.
         //     Bez tohohle tvrzení test projde i nad stavem, kde skórer něco
         //     najde -- a neměří pak vůbec nic. (Přesně tak vypadala první
@@ -76,8 +85,11 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
 
         $decision = $ai->decideAction($state, $rules);
 
-        $this->assertNotSame(ActionType::END_TURN, $decision['action'],
-            'skórer neohodnotil nic, ale hrát bylo co -- kolo končit nesmí');
+        $this->assertNotSame(
+            ActionType::END_TURN,
+            $decision['action'],
+            'skórer neohodnotil nic, ale hrát bylo co -- kolo končit nesmí',
+        );
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $this->assertSame(1, $decision['params']['playerId']);
     }
@@ -98,10 +110,15 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
         );
 
         $rules = new RulesEngine();
-        $playable = array_filter($rules->getAvailableActions($state),
-            fn(array $a) => $a['type'] !== ActionType::END_TURN->value);
-        $this->assertSame([], $playable,
-            'fixtura je vadná: pořád je co hrát, tohle není ten případ');
+        $playable = array_filter(
+            $rules->getAvailableActions($state),
+            fn(array $a) => $a['type'] !== ActionType::END_TURN->value,
+        );
+        $this->assertSame(
+            [],
+            $playable,
+            'fixtura je vadná: pořád je co hrát, tohle není ten případ',
+        );
 
         $decision = (new GreedyAICoach())->decideAction($state, $rules);
 
@@ -113,8 +130,14 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
         // Ball & Chain je pro takového hráče jediná povolená akce; skórer ji
         // ohodnotí, ale i kdyby ne, záchranná větev ji umí postavit.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 3, id: 1,
-                        skills: [\App\Enum\SkillName::BallAndChain])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 3,
+                id: 1,
+                skills: [\App\Enum\SkillName::BallAndChain],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();

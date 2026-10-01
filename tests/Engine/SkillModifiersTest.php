@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -105,7 +106,10 @@ final class SkillModifiersTest extends TestCase
     public function testStuntyInjuryModifier(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Goblin', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Goblin',
+            number: 1,
             positionalName: 'Goblin',
             stats: new PlayerStats(6, 2, 3, 7),
             skills: [SkillName::Stunty],
@@ -125,7 +129,10 @@ final class SkillModifiersTest extends TestCase
     public function testStuntyInjuryMakesCasualtyEasier(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Goblin', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Goblin',
+            number: 1,
             positionalName: 'Goblin',
             stats: new PlayerStats(6, 2, 3, 7),
             skills: [SkillName::Stunty],

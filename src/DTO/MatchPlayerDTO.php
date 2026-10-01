@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -50,8 +51,7 @@ final class MatchPlayerDTO
         private bool $outNextSetup = false,
         private bool $playedThisDrive = false,
         private bool $bloodlustHungry = false,
-    ) {
-    }
+    ) {}
 
     /**
      * @param list<SkillName> $skills
@@ -90,39 +90,99 @@ final class MatchPlayerDTO
         );
     }
 
-    public function getId(): int { return $this->id; }
-    public function getPlayerId(): int { return $this->playerId; }
-    public function getName(): string { return $this->name; }
-    public function getNumber(): int { return $this->number; }
-    public function getPositionalName(): string { return $this->positionalName; }
-    public function getStats(): PlayerStats { return $this->stats; }
+    public function getId(): int
+    {
+        return $this->id;
+    }
+    public function getPlayerId(): int
+    {
+        return $this->playerId;
+    }
+    public function getName(): string
+    {
+        return $this->name;
+    }
+    public function getNumber(): int
+    {
+        return $this->number;
+    }
+    public function getPositionalName(): string
+    {
+        return $this->positionalName;
+    }
+    public function getStats(): PlayerStats
+    {
+        return $this->stats;
+    }
     /** @return list<SkillName> */
-    public function getSkills(): array { return $this->skills; }
-    public function getTeamSide(): TeamSide { return $this->teamSide; }
-    public function getState(): PlayerState { return $this->state; }
-    public function getPosition(): ?Position { return $this->position; }
+    public function getSkills(): array
+    {
+        return $this->skills;
+    }
+    public function getTeamSide(): TeamSide
+    {
+        return $this->teamSide;
+    }
+    public function getState(): PlayerState
+    {
+        return $this->state;
+    }
+    public function getPosition(): ?Position
+    {
+        return $this->position;
+    }
 
     /** Pozice hrace, ktery na hristi byt MUSI. */
     public function requirePosition(): Position
     {
         return $this->position ?? throw new \LogicException("Player {$this->getId()} is not on the pitch");
     }
-    public function hasMoved(): bool { return $this->hasMoved; }
-    public function hasActed(): bool { return $this->hasActed; }
-    public function getMovementRemaining(): int { return $this->movementRemaining; }
-    public function hasUsedBlitz(): bool { return $this->usedBlitz; }
-    public function hasLostTacklezones(): bool { return $this->lostTacklezones; }
-    public function isProUsedThisTurn(): bool { return $this->proUsedThisTurn; }
-    public function isSureFeetUsedThisTurn(): bool { return $this->sureFeetUsedThisTurn; }
-    public function isDodgeUsedThisTurn(): bool { return $this->dodgeUsedThisTurn; }
-    public function isBreakTackleUsedThisTurn(): bool { return $this->breakTackleUsedThisTurn; }
+    public function hasMoved(): bool
+    {
+        return $this->hasMoved;
+    }
+    public function hasActed(): bool
+    {
+        return $this->hasActed;
+    }
+    public function getMovementRemaining(): int
+    {
+        return $this->movementRemaining;
+    }
+    public function hasUsedBlitz(): bool
+    {
+        return $this->usedBlitz;
+    }
+    public function hasLostTacklezones(): bool
+    {
+        return $this->lostTacklezones;
+    }
+    public function isProUsedThisTurn(): bool
+    {
+        return $this->proUsedThisTurn;
+    }
+    public function isSureFeetUsedThisTurn(): bool
+    {
+        return $this->sureFeetUsedThisTurn;
+    }
+    public function isDodgeUsedThisTurn(): bool
+    {
+        return $this->dodgeUsedThisTurn;
+    }
+    public function isBreakTackleUsedThisTurn(): bool
+    {
+        return $this->breakTackleUsedThisTurn;
+    }
 
     /**
      * ⭐ Sweltering Heat (r. 1477-1481): hrac zkolaboval a NESMI byt
      * rozestaven pri nejblizsim vykopu. Vzor: C++ `outNextSetup`
      * (`engine/src/game_simulator.cpp:213-218, 389-393`).
      */
-    public function isOutNextSetup(): bool { return $this->outNextSetup; }
+    public function isOutNextSetup(): bool
+    {
+        return $this->outNextSetup;
+    }
 
     public function withOutNextSetup(bool $out): self
     {
@@ -136,10 +196,16 @@ final class MatchPlayerDTO
      * ⭐ Secret Weapon (r. 8451-8454): po drivu se vylucuje kazdy, kdo v nem
      * HRAL, i kdyz uz na hristi neni. Nastavuje se pri vykopu, maze pri resetu.
      */
-    public function isPlayedThisDrive(): bool { return $this->playedThisDrive; }
+    public function isPlayedThisDrive(): bool
+    {
+        return $this->playedThisDrive;
+    }
 
     /** Blood Lust hozeno 1: na konci akce se musi nakrmit (`rules_bb2016.txt` r. 7925-7947). */
-    public function isBloodlustHungry(): bool { return $this->bloodlustHungry; }
+    public function isBloodlustHungry(): bool
+    {
+        return $this->bloodlustHungry;
+    }
 
     public function withBloodlustHungry(bool $hungry): self
     {
@@ -156,9 +222,15 @@ final class MatchPlayerDTO
 
         return $clone;
     }
-    public function getRaceName(): ?string { return $this->raceName; }
+    public function getRaceName(): ?string
+    {
+        return $this->raceName;
+    }
     /** @return list<string> */
-    public function getLearnedSkills(): array { return $this->learnedSkills; }
+    public function getLearnedSkills(): array
+    {
+        return $this->learnedSkills;
+    }
 
     public function hasSkill(SkillName $skillName): bool
     {
@@ -266,7 +338,10 @@ final class MatchPlayerDTO
      *   takze Treeman priste zase normalne chodil.
      * ⚠️ C++ ma `player.rooted` (`big_guy_handler.cpp:121`).
      */
-    public function isRooted(): bool { return $this->rooted; }
+    public function isRooted(): bool
+    {
+        return $this->rooted;
+    }
 
     /**
      * ⛔ DOPLNENO 11.09.2026 (PHP15b): „otupení" po neuspesne kontrole
@@ -281,7 +356,10 @@ final class MatchPlayerDTO
      *   `lostTacklezones = bigGuyStupefied` (`game_state.cpp:71-72`),
      *   maze az na konci drivu (`game_simulator.cpp:141,208`).
      */
-    public function isBigGuyStupefied(): bool { return $this->bigGuyStupefied; }
+    public function isBigGuyStupefied(): bool
+    {
+        return $this->bigGuyStupefied;
+    }
 
     public function withBigGuyStupefied(bool $stupefied): self
     {

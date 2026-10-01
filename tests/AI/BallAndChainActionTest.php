@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -29,8 +30,14 @@ final class BallAndChainActionTest extends TestCase
     private function stateWithFanatic(): \App\DTO\GameState
     {
         return (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 3, id: 1,
-                        skills: [SkillName::BallAndChain])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 3,
+                id: 1,
+                skills: [SkillName::BallAndChain],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -54,8 +61,11 @@ final class BallAndChainActionTest extends TestCase
         //    hlídá, že se NENABÍZÍ nic TŘETÍHO (žádný blok, pohyb, blitz),
         //    a že B&C v nabídce je.
         $offeredTypes = array_column($offered, 'type');
-        $this->assertContains(ActionType::BALL_AND_CHAIN->value, $offeredTypes,
-            'fixtura je vadná: B&C akce se nenabízí');
+        $this->assertContains(
+            ActionType::BALL_AND_CHAIN->value,
+            $offeredTypes,
+            'fixtura je vadná: B&C akce se nenabízí',
+        );
         $this->assertSame([], array_values(array_diff($offeredTypes, [
             ActionType::BALL_AND_CHAIN->value,
             ActionType::STAND_PAT->value,
@@ -64,8 +74,11 @@ final class BallAndChainActionTest extends TestCase
         $decision = (new GreedyAICoach())->decideAction($state, $rules);
 
         $this->assertSame(ActionType::BALL_AND_CHAIN, $decision['action']);
-        $this->assertArrayHasKey('playerId', $decision['params'],
-            'bez playerId spadne handler na "Player not found"');
+        $this->assertArrayHasKey(
+            'playerId',
+            $decision['params'],
+            'bez playerId spadne handler na "Player not found"',
+        );
         $this->assertSame(1, $decision['params']['playerId']);
     }
 
@@ -94,7 +107,9 @@ final class BallAndChainActionTest extends TestCase
 
         $result = $resolver->resolve($state, $decision['action'], $decision['params']);
 
-        $this->assertTrue($result->isSuccess(),
-            'akce Ball & Chain musí projít resolverem, ne spadnout na výjimku');
+        $this->assertTrue(
+            $result->isSuccess(),
+            'akce Ball & Chain musí projít resolverem, ne spadnout na výjimku',
+        );
     }
 }

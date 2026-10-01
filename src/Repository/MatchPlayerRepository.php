@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Repository;
@@ -24,7 +25,7 @@ final class MatchPlayerRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO match_players (match_id, player_id, team_side, name, number, positional_name, ma, st, ag, av, skills)
              VALUES (:match_id, :player_id, :team_side, :name, :number, :positional_name, :ma, :st, :ag, :av, :skills)
-             RETURNING *'
+             RETURNING *',
         );
         $stmt->execute($data);
 
@@ -38,7 +39,7 @@ final class MatchPlayerRepository
     public function findByMatchId(int $matchId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM match_players WHERE match_id = :match_id ORDER BY team_side, number'
+            'SELECT * FROM match_players WHERE match_id = :match_id ORDER BY team_side, number',
         );
         $stmt->execute(['match_id' => $matchId]);
 

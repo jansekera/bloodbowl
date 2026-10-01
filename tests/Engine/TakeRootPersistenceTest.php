@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -27,8 +28,14 @@ final class TakeRootPersistenceTest extends TestCase
     private function treeman(): \App\DTO\GameState
     {
         return (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1,
-                        skills: [SkillName::TakeRoot])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 2,
+                id: 1,
+                skills: [SkillName::TakeRoot],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -39,8 +46,10 @@ final class TakeRootPersistenceTest extends TestCase
         $state = $this->treeman();
 
         // SEBEKONTROLA: zatím zakořeněný není.
-        $this->assertFalse($state->requirePlayer(1)->isRooted(),
-            'fixtura je vadná: hráč už je zakořeněný');
+        $this->assertFalse(
+            $state->requirePlayer(1)->isRooted(),
+            'fixtura je vadná: hráč už je zakořeněný',
+        );
 
         $resolver = new ActionResolver(new FixedDiceRoller([1]));
         $result = $resolver->resolve($state, ActionType::MOVE, [
@@ -49,12 +58,20 @@ final class TakeRootPersistenceTest extends TestCase
 
         $after = $result->getNewState()->requirePlayer(1);
 
-        $this->assertTrue($after->isRooted(),
-            'zakořenění má přetrvat (r. 8575-8576)');
-        $this->assertSame(0, $after->getMovementRemaining(),
-            'MA je od té chvíle 0');
-        $this->assertSame(5, $after->requirePosition()->getX(),
-            'zakořeněný se hnout nesmí');
+        $this->assertTrue(
+            $after->isRooted(),
+            'zakořenění má přetrvat (r. 8575-8576)',
+        );
+        $this->assertSame(
+            0,
+            $after->getMovementRemaining(),
+            'MA je od té chvíle 0',
+        );
+        $this->assertSame(
+            5,
+            $after->requirePosition()->getX(),
+            'zakořeněný se hnout nesmí',
+        );
     }
 
     public function testAlreadyRootedPlayerDoesNotRollAgain(): void
@@ -65,8 +82,14 @@ final class TakeRootPersistenceTest extends TestCase
         //    fixtura měla kořeny a MA 2, což pravidla vylučují (r. 8575-8580).
         //    Ověřuje se teď přes BLOK, který zakořeněný smí (r. 8580-8581).
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1,
-                        skills: [SkillName::TakeRoot])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 2,
+                id: 1,
+                skills: [SkillName::TakeRoot],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -82,8 +105,11 @@ final class TakeRootPersistenceTest extends TestCase
         ]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('take_root', $types,
-            'zakořeněný hráč už hod neopakuje');
+        $this->assertNotContains(
+            'take_root',
+            $types,
+            'zakořeněný hráč už hod neopakuje',
+        );
     }
 
     public function testRootingOnBlitzStopsTheAction(): void
@@ -99,8 +125,11 @@ final class TakeRootPersistenceTest extends TestCase
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('take_root', $types);
-        $this->assertNotContains('block', $types,
-            'po zakořenění v blitzu se blokovat NESMÍ');
+        $this->assertNotContains(
+            'block',
+            $types,
+            'po zakořenění v blitzu se blokovat NESMÍ',
+        );
         // A tým o deklarovaný blitz přijde (r. 351-352: limit visí na
         // DEKLARACI, ne na dokončení).
         $this->assertTrue(
@@ -114,8 +143,14 @@ final class TakeRootPersistenceTest extends TestCase
         // r. 8581-8582 dovoluje blok; FOUL, PASS a HAND-OFF pohyb taky
         // nepotřebují, takže je zakořenění neblokuje.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 2, id: 1,
-                        skills: [SkillName::TakeRoot])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 2,
+                id: 1,
+                skills: [SkillName::TakeRoot],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -130,8 +165,11 @@ final class TakeRootPersistenceTest extends TestCase
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('take_root', $types, 'hod se hází i u faulu');
-        $this->assertContains('foul', $types,
-            'zakořenění faulu nebrání -- pohyb k němu netřeba');
+        $this->assertContains(
+            'foul',
+            $types,
+            'zakořenění faulu nebrání -- pohyb k němu netřeba',
+        );
     }
 
     /**
@@ -156,8 +194,11 @@ final class TakeRootPersistenceTest extends TestCase
         $after = $result->getNewState()->requirePlayer(1);
         $this->assertFalse($result->isTurnover());
         $this->assertTrue($after->isRooted(), 'hod na Take Root se pri vstavani nehodil');
-        $this->assertSame(\App\Enum\PlayerState::STANDING, $after->getState(),
-            'zakoreneni zabranilo vstani, ackoli r. 8583-8584 ho vyslovne dovoluje');
+        $this->assertSame(
+            \App\Enum\PlayerState::STANDING,
+            $after->getState(),
+            'zakoreneni zabranilo vstani, ackoli r. 8583-8584 ho vyslovne dovoluje',
+        );
     }
 
     /**
@@ -181,8 +222,15 @@ final class TakeRootPersistenceTest extends TestCase
     public function testRootedAttackerDoesNotFollowUp(): void
     {
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 2, strength: 6, id: 1,
-                        skills: [SkillName::TakeRoot])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 2,
+                strength: 6,
+                id: 1,
+                skills: [SkillName::TakeRoot],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -192,7 +240,10 @@ final class TakeRootPersistenceTest extends TestCase
         $resolver = new ActionResolver(new FixedDiceRoller([3, 3, 3, 3, 3, 3]));
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
-            'zakoreneny sel follow-upem za odtlacenym');
+        $this->assertSame(
+            5,
+            $result->getNewState()->requirePlayer(1)->requirePosition()->getX(),
+            'zakoreneny sel follow-upem za odtlacenym',
+        );
     }
 }

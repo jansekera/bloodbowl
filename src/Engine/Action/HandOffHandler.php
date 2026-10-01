@@ -18,8 +18,7 @@ final class HandOffHandler implements ActionHandlerInterface
     public function __construct(
         private readonly BallResolver $ballResolver,
         private readonly DiceRollerInterface $dice,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params

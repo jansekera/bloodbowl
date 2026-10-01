@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -37,15 +38,23 @@ final class HandOffBounceTest extends TestCase
         //    HOME 3 týmové rerolly, takže neúspěšné chycení se PŘEHODÍ a druhá
         //    kostka se spotřebuje na reroll, ne na odraz. (Přesně tak to
         //    poprvé spadlo.)
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerollUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerollUsed(),
+        );
 
         // SEBEKONTROLA FIXTURY: míč nese podávající a spoluhráč stojí přesně
         // tam, kam odraz míří -- jinak test neměří, co má.
-        $this->assertSame(1, $state->getBall()->getCarrierId(),
-            'fixtura je vadná: míč nenese podávající');
-        $this->assertSame(7, $state->requirePlayer(3)->requirePosition()->getX(),
-            'fixtura je vadná: spoluhráč nestojí na poli odrazu');
+        $this->assertSame(
+            1,
+            $state->getBall()->getCarrierId(),
+            'fixtura je vadná: míč nenese podávající',
+        );
+        $this->assertSame(
+            7,
+            $state->requirePlayer(3)->requirePosition()->getX(),
+            'fixtura je vadná: spoluhráč nestojí na poli odrazu',
+        );
 
         // chycení příjemcem: 1 (neúspěch; reroll je vyčerpaný, viz výš),
         // odraz D8 = 3 (na (7,7)), chycení spoluhráčem: 6 (úspěch)
@@ -59,11 +68,16 @@ final class HandOffBounceTest extends TestCase
         $ball = $result->getNewState()->getBall();
         // SEBEKONTROLA VÝSLEDKU: odraz opravdu skončil u spoluhráče.
         $this->assertTrue($ball->isHeld(), 'míč měl skončit v rukou, ne na zemi');
-        $this->assertSame(3, $ball->getCarrierId(),
-            'míč měl chytit spoluhráč na poli odrazu');
+        $this->assertSame(
+            3,
+            $ball->getCarrierId(),
+            'míč měl chytit spoluhráč na poli odrazu',
+        );
 
-        $this->assertFalse($result->isTurnover(),
-            'míč zůstal našemu týmu -- kolo končit nemá (r. 371-373, 376-378)');
+        $this->assertFalse(
+            $result->isTurnover(),
+            'míč zůstal našemu týmu -- kolo končit nemá (r. 371-373, 376-378)',
+        );
     }
 
     public function testBallComingToRestOnTheGroundIsStillATurnover(): void
@@ -75,11 +89,15 @@ final class HandOffBounceTest extends TestCase
             ->addPlayer(TeamSide::HOME, 6, 7, agility: 3, id: 2)
             ->withBallCarried(1)
             ->build();
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerollUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerollUsed(),
+        );
 
-        $this->assertNull($state->getPlayerAtPosition(new \App\ValueObject\Position(7, 7)),
-            'fixtura je vadná: na poli odrazu někdo stojí, míč by se chytil');
+        $this->assertNull(
+            $state->getPlayerAtPosition(new \App\ValueObject\Position(7, 7)),
+            'fixtura je vadná: na poli odrazu někdo stojí, míč by se chytil',
+        );
 
         $dice = new FixedDiceRoller([1, 3, 6]);
         $resolver = new ActionResolver($dice);
@@ -88,8 +106,10 @@ final class HandOffBounceTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $this->assertFalse($result->getNewState()->getBall()->isHeld(),
-            'míč měl skončit na zemi');
+        $this->assertFalse(
+            $result->getNewState()->getBall()->isHeld(),
+            'míč měl skončit na zemi',
+        );
         $this->assertTrue($result->isTurnover(),
             'míč se zastavil nechycený -- to turnover JE (bod 2)');
     }

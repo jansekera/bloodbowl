@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -46,13 +47,19 @@ final class CageFormationTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: hráč se opravdu MŮŽE hnout, takže „zůstal stát"
         // je rozhodnutí, ne nedostatek možností.
-        $this->assertNotSame([], $rules->getValidMoveTargets($state, 2),
-            'fixtura je vadná: hráč nemá kam, držení pozice by nic neznamenalo');
+        $this->assertNotSame(
+            [],
+            $rules->getValidMoveTargets($state, 2),
+            'fixtura je vadná: hráč nemá kam, držení pozice by nic neznamenalo',
+        );
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
-        $this->assertSame(ActionType::STAND_PAT, $decision['action'],
-            'hráč stál v rohu klece a přesto se hnul — klec se tím rozsype');
+        $this->assertSame(
+            ActionType::STAND_PAT,
+            $decision['action'],
+            'hráč stál v rohu klece a přesto se hnul — klec se tím rozsype',
+        );
         $this->assertSame(2, $decision['params']['playerId']);
     }
 
@@ -68,9 +75,14 @@ final class CageFormationTest extends TestCase
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $dx = abs($decision['params']['x'] - 10);
         $dy = abs($decision['params']['y'] - 7);
-        $this->assertTrue($dx === 1 && $dy === 1,
-            sprintf('kouč šel na (%d,%d) — to je hrana nebo mimo klec, ne roh',
-                $decision['params']['x'], $decision['params']['y']));
+        $this->assertTrue(
+            $dx === 1 && $dy === 1,
+            sprintf(
+                'kouč šel na (%d,%d) — to je hrana nebo mimo klec, ne roh',
+                $decision['params']['x'],
+                $decision['params']['y'],
+            ),
+        );
     }
 
     public function testHoldingBeatsShufflingToAnotherCorner(): void
@@ -113,10 +125,15 @@ final class CageFormationTest extends TestCase
         $rules = new RulesEngine();
 
         // SEBEKONTROLA: nosič se OPRAVDU může dostat dál než o jedno pole.
-        $daleko = array_filter($rules->getValidMoveTargets($state, 1),
-            static fn(array $t) => max(abs($t['x'] - 10), abs($t['y'] - 7)) > 2);
-        $this->assertNotSame([], $daleko,
-            'fixtura je vadná: nosič se dál než o dvě pole nedostane, strop by nic neznamenal');
+        $daleko = array_filter(
+            $rules->getValidMoveTargets($state, 1),
+            static fn(array $t) => max(abs($t['x'] - 10), abs($t['y'] - 7)) > 2,
+        );
+        $this->assertNotSame(
+            [],
+            $daleko,
+            'fixtura je vadná: nosič se dál než o dvě pole nedostane, strop by nic neznamenal',
+        );
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
@@ -125,8 +142,11 @@ final class CageFormationTest extends TestCase
         // ⭐ Upřesněno uživatelem 12.09.: nejpomalejší klec nezastaví — dožene
         //    ji přes GFI, jen se aktivuje poslední, protože to je riziko.
         //    Strop je tedy MA nejpomalejšího + 2 pole na GFI.
-        $this->assertLessThanOrEqual(4, $krok,
-            sprintf('nosič skočil o %d pole; nejpomalejší roh ujde 2 a s GFI 4', $krok));
+        $this->assertLessThanOrEqual(
+            4,
+            $krok,
+            sprintf('nosič skočil o %d pole; nejpomalejší roh ujde 2 a s GFI 4', $krok),
+        );
     }
 
     public function testCarrierWithoutACageStillSprints(): void
@@ -144,8 +164,11 @@ final class CageFormationTest extends TestCase
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $krok = max(abs($decision['params']['x'] - 10), abs($decision['params']['y'] - 7));
-        $this->assertGreaterThan(1, $krok,
-            'bez klece nemá co nosiče brzdit — pokuta se pouští i tam, kde nemá');
+        $this->assertGreaterThan(
+            1,
+            $krok,
+            'bez klece nemá co nosiče brzdit — pokuta se pouští i tam, kde nemá',
+        );
     }
 
     public function testCarrierNeverStepsNextToAnOpponent(): void
@@ -163,18 +186,29 @@ final class CageFormationTest extends TestCase
         $rules = new RulesEngine();
 
         // SEBEKONTROLA: pole vedle soupeře jsou vůbec dosažitelná.
-        $vedle = array_filter($rules->getValidMoveTargets($state, 1),
-            static fn(array $t) => max(abs($t['x'] - 12), abs($t['y'] - 7)) === 1);
-        $this->assertNotSame([], $vedle,
-            'fixtura je vadná: vedle soupeře se nedá stoupnout, zákaz by nic neznamenal');
+        $vedle = array_filter(
+            $rules->getValidMoveTargets($state, 1),
+            static fn(array $t) => max(abs($t['x'] - 12), abs($t['y'] - 7)) === 1,
+        );
+        $this->assertNotSame(
+            [],
+            $vedle,
+            'fixtura je vadná: vedle soupeře se nedá stoupnout, zákaz by nic neznamenal',
+        );
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $odstup = max(abs($decision['params']['x'] - 12), abs($decision['params']['y'] - 7));
-        $this->assertGreaterThan(1, $odstup,
-            sprintf('nosič skončil na (%d,%d), tedy vedle soupeře',
-                $decision['params']['x'], $decision['params']['y']));
+        $this->assertGreaterThan(
+            1,
+            $odstup,
+            sprintf(
+                'nosič skončil na (%d,%d), tedy vedle soupeře',
+                $decision['params']['x'],
+                $decision['params']['y'],
+            ),
+        );
     }
 
     public function testPickingUpTheBallBeatsAnyRiskFreeMove(): void
@@ -212,8 +246,14 @@ final class CageFormationTest extends TestCase
         //    proto se tu testuje ta větev přes dovednost.)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 11, 7, movement: 6, id: 1)
-            ->addPlayer(TeamSide::HOME, 15, 7, movement: 6, id: 2,
-                        skills: [\App\Enum\SkillName::SureHands])
+            ->addPlayer(
+                TeamSide::HOME,
+                15,
+                7,
+                movement: 6,
+                id: 2,
+                skills: [\App\Enum\SkillName::SureHands],
+            )
             ->addPlayer(TeamSide::AWAY, 24, 1, id: 3)
             ->withBallOnGround(13, 7)
             ->build();
@@ -222,16 +262,21 @@ final class CageFormationTest extends TestCase
 
         // SEBEKONTROLA: na míč dosáhnou OBA, jinak by volba nic neznamenala.
         foreach ([1, 2] as $id) {
-            $cile = array_filter($rules->getValidMoveTargets($state, $id),
-                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7);
+            $cile = array_filter(
+                $rules->getValidMoveTargets($state, $id),
+                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7,
+            );
             $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} na míč nedosáhne");
         }
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
-        $this->assertSame(2, $decision['params']['playerId'],
-            'pro nekrytý míč šel někdo jiný než specialista');
+        $this->assertSame(
+            2,
+            $decision['params']['playerId'],
+            'pro nekrytý míč šel někdo jiný než specialista',
+        );
         $this->assertSame(13, $decision['params']['x']);
         $this->assertSame(7, $decision['params']['y']);
     }
@@ -267,8 +312,11 @@ final class CageFormationTest extends TestCase
             }
             $sance[$id] = max($sanceCest);
         }
-        $this->assertLessThan($sance[3], $sance[1],
-            'fixtura je vadná: trpaslík nemá horší šanci než elf, není co rozlišovat');
+        $this->assertLessThan(
+            $sance[3],
+            $sance[1],
+            'fixtura je vadná: trpaslík nemá horší šanci než elf, není co rozlišovat',
+        );
 
         // ⭐ Porovnávají se POHYBY, ne celé rozhodnutí: v téhle pozici je
         //    k dispozici i blok a ten by měření přebil. Měří se tedy přesně
@@ -282,9 +330,17 @@ final class CageFormationTest extends TestCase
             $skore[$id] = $b['score'];
         }
 
-        $this->assertLessThan($skore[3], $skore[1],
-            sprintf('pohyb trpaslíka (%d %%, skóre %.2f) není horší než elfův (%d %%, skóre %.2f) -- riziko se pořád oceňuje paušálem',
-                $sance[1], $skore[1], $sance[3], $skore[3]));
+        $this->assertLessThan(
+            $skore[3],
+            $skore[1],
+            sprintf(
+                'pohyb trpaslíka (%d %%, skóre %.2f) není horší než elfův (%d %%, skóre %.2f) -- riziko se pořád oceňuje paušálem',
+                $sance[1],
+                $skore[1],
+                $sance[3],
+                $skore[3],
+            ),
+        );
     }
 
     public function testCleanCornerBeatsDirtyOne(): void
@@ -308,9 +364,15 @@ final class CageFormationTest extends TestCase
 
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $vzdalenostOdSoupere = max(abs($decision['params']['x'] - 12), abs($decision['params']['y'] - 5));
-        $this->assertGreaterThan(1, $vzdalenostOdSoupere,
-            sprintf('kouč zaujal roh (%d,%d), který má soupeře vedle sebe',
-                $decision['params']['x'], $decision['params']['y']));
+        $this->assertGreaterThan(
+            1,
+            $vzdalenostOdSoupere,
+            sprintf(
+                'kouč zaujal roh (%d,%d), který má soupeře vedle sebe',
+                $decision['params']['x'],
+                $decision['params']['y'],
+            ),
+        );
     }
 
     public function testBallIsPickedUpByTheBetterAgilityPlayer(): void
@@ -331,15 +393,20 @@ final class CageFormationTest extends TestCase
 
         // SEBEKONTROLA: na míč dosáhnou OBA, jinak by volba nic neznamenala.
         foreach ([1, 2] as $id) {
-            $cile = array_filter($rules->getValidMoveTargets($state, $id),
-                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7);
+            $cile = array_filter(
+                $rules->getValidMoveTargets($state, $id),
+                static fn(array $t) => $t['x'] === 13 && $t['y'] === 7,
+            );
             $this->assertNotSame([], $cile, "fixtura je vadná: hráč {$id} na míč nedosáhne");
         }
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
-        $this->assertSame(2, $decision['params']['playerId'],
-            'pro míč šel hráč s AG 2 (33 %) místo hráče s AG 4 (67 %)');
+        $this->assertSame(
+            2,
+            $decision['params']['playerId'],
+            'pro míč šel hráč s AG 2 (33 %) místo hráče s AG 4 (67 %)',
+        );
         $this->assertSame(13, $decision['params']['x']);
         $this->assertSame(7, $decision['params']['y']);
     }
@@ -367,9 +434,12 @@ final class CageFormationTest extends TestCase
             $rx = $decision['params']['x'] + $dx;
             $ry = $decision['params']['y'] + $dy;
             foreach ([[14, 6], [14, 7], [14, 8]] as [$sx, $sy]) {
-                $this->assertGreaterThan(1, max(abs($rx - $sx), abs($ry - $sy)),
+                $this->assertGreaterThan(
+                    1,
+                    max(abs($rx - $sx), abs($ry - $sy)),
                     sprintf('roh (%d,%d) cílového pole (%d,%d) má soupeře vedle sebe',
-                        $rx, $ry, $decision['params']['x'], $decision['params']['y']));
+                        $rx, $ry, $decision['params']['x'], $decision['params']['y']),
+                );
             }
         }
     }

@@ -27,8 +27,12 @@ final class EventDispatcherTest extends TestCase
         $dispatcher = new EventDispatcher();
         $count = 0;
 
-        $dispatcher->subscribe(\stdClass::class, function () use (&$count) { $count++; });
-        $dispatcher->subscribe(\stdClass::class, function () use (&$count) { $count++; });
+        $dispatcher->subscribe(\stdClass::class, function () use (&$count) {
+            $count++;
+        });
+        $dispatcher->subscribe(\stdClass::class, function () use (&$count) {
+            $count++;
+        });
 
         $dispatcher->dispatch(new \stdClass());
         $this->assertSame(2, $count);

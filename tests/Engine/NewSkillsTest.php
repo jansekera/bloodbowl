@@ -180,7 +180,10 @@ final class NewSkillsTest extends TestCase
     public function testThickSkullConvertsKoToStunned(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Test', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Test',
+            number: 1,
             positionalName: 'Lineman',
             stats: new \App\ValueObject\PlayerStats(6, 3, 3, 8),
             skills: [SkillName::ThickSkull],
@@ -206,7 +209,10 @@ final class NewSkillsTest extends TestCase
     public function testThickSkullNaDevitceZustavaKo(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Test', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Test',
+            number: 1,
             positionalName: 'Lineman',
             stats: new \App\ValueObject\PlayerStats(6, 3, 3, 8),
             skills: [SkillName::ThickSkull],
@@ -227,7 +233,10 @@ final class NewSkillsTest extends TestCase
     public function testThickSkullDoesNotApplyToCasualty(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Test', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Test',
+            number: 1,
             positionalName: 'Lineman',
             stats: new \App\ValueObject\PlayerStats(6, 3, 3, 8),
             skills: [SkillName::ThickSkull],
@@ -249,7 +258,10 @@ final class NewSkillsTest extends TestCase
     public function testThickSkullDoesNotApplyToStunned(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Test', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Test',
+            number: 1,
             positionalName: 'Lineman',
             stats: new \App\ValueObject\PlayerStats(6, 3, 3, 8),
             skills: [SkillName::ThickSkull],

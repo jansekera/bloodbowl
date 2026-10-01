@@ -11,6 +11,5 @@ final class GameEventOccurred
     public function __construct(
         public readonly int $matchId,
         public readonly GameEvent $gameEvent,
-    ) {
-    }
+    ) {}
 }

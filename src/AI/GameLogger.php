@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\AI;
@@ -11,9 +12,7 @@ final class GameLogger
     /** @var resource|null */
     private $handle = null;
 
-    public function __construct(private readonly string $outputPath)
-    {
-    }
+    public function __construct(private readonly string $outputPath) {}
 
     /**
      * Log a decision point: state features from a given perspective.

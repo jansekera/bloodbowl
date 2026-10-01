@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -56,8 +57,10 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
         $state = $state->withPlayer(
             $state->requirePlayer(3)->withHasActed(true)->withHasMoved(true),
         );
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withBlitzUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withBlitzUsed(),
+        );
 
         $rules = new RulesEngine();
         $ai = new LearningAICoach();
@@ -65,11 +68,17 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
         // --- SEBEKONTROLA FIXTURY: postavil jsem opravdu ten stav? ---
         // (a) je co hrát — nabídka MOVE dává.
         $types = array_column($rules->getAvailableActions($state), 'type');
-        $this->assertContains(ActionType::MOVE->value, $types,
-            'fixtura je vadná: nabídka nemá MOVE, hrát není co');
+        $this->assertContains(
+            ActionType::MOVE->value,
+            $types,
+            'fixtura je vadná: nabídka nemá MOVE, hrát není co',
+        );
         // (b) a hráč má kam šlápnout.
-        $this->assertNotSame([], $rules->getValidMoveTargets($state, 1),
-            'fixtura je vadná: hráč nemá kam, vada se nemůže projevit');
+        $this->assertNotSame(
+            [],
+            $rules->getValidMoveTargets($state, 1),
+            'fixtura je vadná: hráč nemá kam, vada se nemůže projevit',
+        );
         // (c) ⭐ KLÍČOVÉ TVRZENÍ: každý postavený kandidát má skóre POD
         //     hranicí END_TURN. Bez tohohle test projde i nad stavem, kde
         //     něco skóruje výš — a neměří pak vůbec nic.
@@ -90,17 +99,25 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
                 continue;
             }
             $seenCandidate = true;
-            $this->assertLessThan($endTurnScore, $built['score'],
+            $this->assertLessThan(
+                $endTurnScore,
+                $built['score'],
                 'fixtura je vadná: ' . $t->value . ' skóruje nad END_TURN ('
-                . $built['score'] . ' >= ' . $endTurnScore . '), vada se nemůže projevit');
+                . $built['score'] . ' >= ' . $endTurnScore . '), vada se nemůže projevit',
+            );
         }
-        $this->assertTrue($seenCandidate,
-            'fixtura je vadná: nepostavil se ANI JEDEN kandidát — to je vada PHP13, ne PHP24');
+        $this->assertTrue(
+            $seenCandidate,
+            'fixtura je vadná: nepostavil se ANI JEDEN kandidát — to je vada PHP13, ne PHP24',
+        );
 
         $decision = $ai->decideAction($state, $rules);
 
-        $this->assertNotSame(ActionType::END_TURN, $decision['action'],
-            'všichni kandidáti byli pod hranicí END_TURN, ale hrát bylo co -- kolo končit nesmí');
+        $this->assertNotSame(
+            ActionType::END_TURN,
+            $decision['action'],
+            'všichni kandidáti byli pod hranicí END_TURN, ale hrát bylo co -- kolo končit nesmí',
+        );
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $this->assertSame(1, $decision['params']['playerId']);
     }
@@ -119,10 +136,15 @@ final class LearningCoachDoesNotForfeitTheTurnTest extends TestCase
         );
 
         $rules = new RulesEngine();
-        $playable = array_filter($rules->getAvailableActions($state),
-            fn(array $a) => $a['type'] !== ActionType::END_TURN->value);
-        $this->assertSame([], $playable,
-            'fixtura je vadná: pořád je co hrát, tohle není ten případ');
+        $playable = array_filter(
+            $rules->getAvailableActions($state),
+            fn(array $a) => $a['type'] !== ActionType::END_TURN->value,
+        );
+        $this->assertSame(
+            [],
+            $playable,
+            'fixtura je vadná: pořád je co hrát, tohle není ten případ',
+        );
 
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 

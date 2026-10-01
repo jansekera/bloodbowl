@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -230,8 +231,11 @@ final class Phase12SkillsTest extends TestCase
             }
         }
         $this->assertNotNull($kickEvent);
-        $this->assertEquals(0, $kickEvent->getData()['reducedDistance'],
-            'r. 8213 rika "1 = 0" -- zaokrouhluje se DOLU');
+        $this->assertEquals(
+            0,
+            $kickEvent->getData()['reducedDistance'],
+            'r. 8213 rika "1 = 0" -- zaokrouhluje se DOLU',
+        );
     }
 
     public function testKickInWideZoneDoesNotCount(): void
@@ -248,14 +252,20 @@ final class Phase12SkillsTest extends TestCase
 
         $dice = new FixedDiceRoller([1, 1, 4, 4, 3, 4, 1, 1, 1]);
         $scatterCalc = new ScatterCalculator();
-        $kickoffResolver = new KickoffResolver($dice, $scatterCalc,
-            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc));
+        $kickoffResolver = new KickoffResolver(
+            $dice,
+            $scatterCalc,
+            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc),
+        );
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
 
         $typy = array_map(static fn($e) => $e->getType(), $result['events']);
-        $this->assertNotContains('kick_skill', $typy,
-            'hrac s Kick stal v sirokem pasu, dovednost se pouzit nesmela');
+        $this->assertNotContains(
+            'kick_skill',
+            $typy,
+            'hrac s Kick stal v sirokem pasu, dovednost se pouzit nesmela',
+        );
     }
 
     public function testKickOnLineOfScrimmageDoesNotCount(): void
@@ -270,14 +280,20 @@ final class Phase12SkillsTest extends TestCase
 
         $dice = new FixedDiceRoller([1, 1, 4, 4, 3, 4, 1, 1, 1]);
         $scatterCalc = new ScatterCalculator();
-        $kickoffResolver = new KickoffResolver($dice, $scatterCalc,
-            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc));
+        $kickoffResolver = new KickoffResolver(
+            $dice,
+            $scatterCalc,
+            new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc),
+        );
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
 
         $typy = array_map(static fn($e) => $e->getType(), $result['events']);
-        $this->assertNotContains('kick_skill', $typy,
-            'hrac s Kick stal na lajne, dovednost se pouzit nesmela');
+        $this->assertNotContains(
+            'kick_skill',
+            $typy,
+            'hrac s Kick stal na lajne, dovednost se pouzit nesmela',
+        );
     }
 
     public function testLeaderPlusOneReroll(): void
@@ -439,8 +455,10 @@ final class Phase12SkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('take_root', $types, 'hod se hazi i u bloku (r. 8573)');
         $this->assertContains('block', $types, 'zakorenení bloku nebrani (r. 8581-8582)');
-        $this->assertTrue($result->getNewState()->requirePlayer(1)->isRooted(),
-            'zakorenení ma pretrvat (r. 8575-8576)');
+        $this->assertTrue(
+            $result->getNewState()->requirePlayer(1)->isRooted(),
+            'zakorenení ma pretrvat (r. 8575-8576)',
+        );
     }
 
     public function testTakeRootPassedOnBlockLeavesThePlayerFree(): void
@@ -458,8 +476,10 @@ final class Phase12SkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertFalse($result->getNewState()->requirePlayer(1)->isRooted(),
-            'dvojka zakorenit NESMI (r. 8574)');
+        $this->assertFalse(
+            $result->getNewState()->requirePlayer(1)->isRooted(),
+            'dvojka zakorenit NESMI (r. 8574)',
+        );
     }
 
     // ========== STEP 6: Hail Mary Pass, Dump-Off ==========

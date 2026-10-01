@@ -22,8 +22,7 @@ final class PassResolver
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params {playerId, targetX, targetY}
@@ -286,7 +285,8 @@ final class PassResolver
                     $state = $state->withPlayer($divingCatcher);
                     $isFriendly = $divingCatcher->getTeamSide() === $activeSide;
                     $catchResult = $this->ballResolver->resolveCatch(
-                        $state, $divingCatcher,
+                        $state,
+                        $divingCatcher,
                         teamRerollAvailable: $isFriendly && $catchTeamReroll,
                     );
                     $events = array_merge($events, $catchResult['events']);
@@ -583,7 +583,8 @@ final class PassResolver
             if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
                 $isFriendly = $playerAtLanding->getTeamSide() === $activeSide;
                 $catchResult = $this->ballResolver->resolveCatch(
-                    $state, $playerAtLanding,
+                    $state,
+                    $playerAtLanding,
                     teamRerollAvailable: $isFriendly && $state->getTeamState($activeSide)->canUseReroll(),
                 );
                 $events = array_merge($events, $catchResult['events']);

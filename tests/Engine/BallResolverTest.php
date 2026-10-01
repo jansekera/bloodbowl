@@ -282,8 +282,11 @@ final class BallResolverTest extends TestCase
         $this->assertTrue($result['state']->getBall()->isHeld());
         $typy = $this->typy($result['events']);
         $this->assertContains('reroll', $typy, 'prehoz z Catch musi vydat udalost');
-        $this->assertSame(2, count(array_filter($typy, static fn($t) => $t === 'catch')),
-            'videt maji byt OBA pokusy o chyceni, ne jen ten druhy');
+        $this->assertSame(
+            2,
+            count(array_filter($typy, static fn($t) => $t === 'catch')),
+            'videt maji byt OBA pokusy o chyceni, ne jen ten druhy',
+        );
     }
 
     public function testPoPrehozuZCatchUzPronePrichazi(): void

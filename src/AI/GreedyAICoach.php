@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\AI;
@@ -67,7 +68,7 @@ final class GreedyAICoach implements AICoachInterface
             if ($cerstve !== $this->poleCache[$playerId]) {
                 throw new \RuntimeException(
                     "CACHE POHYBU VRACI JINOU ODPOVED NEZ VYPOCET (hrac {$playerId}). "
-                    . 'Klic cache nepokryva vsechno, co odpoved meni.'
+                    . 'Klic cache nepokryva vsechno, co odpoved meni.',
                 );
             }
         }

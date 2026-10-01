@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine;
@@ -46,7 +47,7 @@ final class FixedDiceRoller implements DiceRollerInterface
     {
         if ($this->index >= count($this->rolls)) {
             throw new \RuntimeException(
-                "FixedDiceRoller: no more rolls available (used {$this->index} rolls)"
+                "FixedDiceRoller: no more rolls available (used {$this->index} rolls)",
             );
         }
 

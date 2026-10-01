@@ -12,8 +12,7 @@ final class ApiController
     public function __construct(
         private readonly RaceRepository $raceRepository,
         private readonly SkillRepository $skillRepository,
-    ) {
-    }
+    ) {}
 
     public function getRaces(): void
     {

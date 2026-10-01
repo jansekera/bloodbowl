@@ -22,8 +22,7 @@ final class FoulHandler implements ActionHandlerInterface
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly StrengthCalculator $strengthCalculator = new StrengthCalculator(),
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params

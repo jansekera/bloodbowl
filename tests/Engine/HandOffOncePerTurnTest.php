@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -38,8 +39,11 @@ final class HandOffOncePerTurnTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: hand-off se PŘED akcí nabízí.
         $before = array_column($rules->getAvailableActions($state), 'type');
-        $this->assertContains(ActionType::HAND_OFF->value, $before,
-            'fixtura je vadná: hand-off se nenabízí ani napoprvé');
+        $this->assertContains(
+            ActionType::HAND_OFF->value,
+            $before,
+            'fixtura je vadná: hand-off se nenabízí ani napoprvé',
+        );
 
         // Chycení: 6 (úspěch)
         $resolver = new ActionResolver(new FixedDiceRoller([6]));
@@ -51,14 +55,22 @@ final class HandOffOncePerTurnTest extends TestCase
 
         // SEBEKONTROLA VÝSLEDKU: míč OPRAVDU přešel na hráče 2, který ještě
         // nejednal -- bez toho by druhý hand-off nešel z jiného důvodu.
-        $this->assertSame(2, $after->getBall()->getCarrierId(),
-            'míč nepřešel, test neměří limit');
-        $this->assertFalse($after->requirePlayer(2)->hasActed(),
-            'příjemce už jednal -- druhý hand-off by nešel i bez limitu');
+        $this->assertSame(
+            2,
+            $after->getBall()->getCarrierId(),
+            'míč nepřešel, test neměří limit',
+        );
+        $this->assertFalse(
+            $after->requirePlayer(2)->hasActed(),
+            'příjemce už jednal -- druhý hand-off by nešel i bez limitu',
+        );
 
         $types = array_column($rules->getAvailableActions($after), 'type');
-        $this->assertNotContains(ActionType::HAND_OFF->value, $types,
-            'druhý hand-off v témž kole -- míč by putoval řetězem');
+        $this->assertNotContains(
+            ActionType::HAND_OFF->value,
+            $types,
+            'druhý hand-off v témž kole -- míč by putoval řetězem',
+        );
     }
 
     public function testHandOffIsOfferedAgainInTheNextTurn(): void
@@ -69,19 +81,27 @@ final class HandOffOncePerTurnTest extends TestCase
             ->addPlayer(TeamSide::HOME, 6, 7, agility: 4, id: 2)
             ->withBallCarried(1)
             ->build();
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withHandOffUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withHandOffUsed(),
+        );
 
         $rules = new RulesEngine();
-        $this->assertNotContains(ActionType::HAND_OFF->value,
+        $this->assertNotContains(
+            ActionType::HAND_OFF->value,
             array_column($rules->getAvailableActions($state), 'type'),
-            'fixtura je vadná: limit není nastavený');
+            'fixtura je vadná: limit není nastavený',
+        );
 
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->resetForNewTurn());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->resetForNewTurn(),
+        );
 
-        $this->assertContains(ActionType::HAND_OFF->value,
+        $this->assertContains(
+            ActionType::HAND_OFF->value,
             array_column($rules->getAvailableActions($state), 'type'),
-            'nové kolo musí hand-off zase dovolit');
+            'nové kolo musí hand-off zase dovolit',
+        );
     }
 }

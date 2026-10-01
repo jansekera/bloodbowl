@@ -12,8 +12,7 @@ final class Position
     public function __construct(
         private readonly int $x,
         private readonly int $y,
-    ) {
-    }
+    ) {}
 
     public function getX(): int
     {

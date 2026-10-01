@@ -68,7 +68,7 @@ final class RaceRepository
     public function findPositionalTemplateById(int $id): ?PositionalTemplate
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM positional_templates WHERE id = :id'
+            'SELECT * FROM positional_templates WHERE id = :id',
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -90,7 +90,7 @@ final class RaceRepository
     private function getPositionalsForRace(int $raceId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM positional_templates WHERE race_id = :race_id ORDER BY cost, name'
+            'SELECT * FROM positional_templates WHERE race_id = :race_id ORDER BY cost, name',
         );
         $stmt->execute(['race_id' => $raceId]);
         $templates = array_map(PositionalTemplate::fromRow(...), $stmt->fetchAll());

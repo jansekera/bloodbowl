@@ -15,9 +15,7 @@ final class RosterValidator
     private const ASSISTANT_COACH_COST = 10000;
     private const CHEERLEADER_COST = 10000;
 
-    public function __construct(private readonly PlayerRepository $playerRepository)
-    {
-    }
+    public function __construct(private readonly PlayerRepository $playerRepository) {}
 
     /**
      * @return list<string>

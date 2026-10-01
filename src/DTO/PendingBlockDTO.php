@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -23,48 +24,95 @@ final class PendingBlockDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => kostky plati a tymovy prehoz smi
         //   prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-    ) {
-    }
+    ) {}
 
-    public function getAttackerId(): int { return $this->attackerId; }
-    public function getDefenderId(): int { return $this->defenderId; }
+    public function getAttackerId(): int
+    {
+        return $this->attackerId;
+    }
+    public function getDefenderId(): int
+    {
+        return $this->defenderId;
+    }
     /** @return list<BlockDiceFace> */
-    public function getFaces(): array { return $this->faces; }
-    public function isAttackerChooses(): bool { return $this->attackerChooses; }
-    public function isBlitz(): bool { return $this->isBlitz; }
-    public function isFrenzy(): bool { return $this->isFrenzy; }
-    public function isProAvailable(): bool { return $this->proAvailable; }
-    public function isTeamRerollAvailable(): bool { return $this->teamRerollAvailable; }
-    public function isRerollUsed(): bool { return $this->rerollUsed; }
-    public function isProFailed(): bool { return $this->proFailed; }
+    public function getFaces(): array
+    {
+        return $this->faces;
+    }
+    public function isAttackerChooses(): bool
+    {
+        return $this->attackerChooses;
+    }
+    public function isBlitz(): bool
+    {
+        return $this->isBlitz;
+    }
+    public function isFrenzy(): bool
+    {
+        return $this->isFrenzy;
+    }
+    public function isProAvailable(): bool
+    {
+        return $this->proAvailable;
+    }
+    public function isTeamRerollAvailable(): bool
+    {
+        return $this->teamRerollAvailable;
+    }
+    public function isRerollUsed(): bool
+    {
+        return $this->rerollUsed;
+    }
+    public function isProFailed(): bool
+    {
+        return $this->proFailed;
+    }
 
     /** @param list<BlockDiceFace> $faces */
     public function withFaces(array $faces): self
     {
         return new self(
-            $this->attackerId, $this->defenderId, $faces,
-            $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            $this->proAvailable, $this->teamRerollAvailable,
-            $this->rerollUsed, $this->proFailed,
+            $this->attackerId,
+            $this->defenderId,
+            $faces,
+            $this->attackerChooses,
+            $this->isBlitz,
+            $this->isFrenzy,
+            $this->proAvailable,
+            $this->teamRerollAvailable,
+            $this->rerollUsed,
+            $this->proFailed,
         );
     }
 
     public function withRerollUsed(): self
     {
         return new self(
-            $this->attackerId, $this->defenderId, $this->faces,
-            $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            false, false, true,
+            $this->attackerId,
+            $this->defenderId,
+            $this->faces,
+            $this->attackerChooses,
+            $this->isBlitz,
+            $this->isFrenzy,
+            false,
+            false,
+            true,
         );
     }
 
     public function withProFailed(): self
     {
         return new self(
-            $this->attackerId, $this->defenderId, $this->faces,
-            $this->attackerChooses, $this->isBlitz, $this->isFrenzy,
-            false, $this->teamRerollAvailable,
-            $this->rerollUsed, true,
+            $this->attackerId,
+            $this->defenderId,
+            $this->faces,
+            $this->attackerChooses,
+            $this->isBlitz,
+            $this->isFrenzy,
+            false,
+            $this->teamRerollAvailable,
+            $this->rerollUsed,
+            true,
         );
     }
 

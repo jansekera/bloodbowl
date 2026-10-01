@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -39,8 +40,10 @@ final class KnockDownDuringMoveTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        return $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerolls(0));
+        return $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerolls(0),
+        );
     }
 
     public function testFailedDodgeRollsForArmour(): void
@@ -48,22 +51,33 @@ final class KnockDownDuringMoveTest extends TestCase
         $state = $this->stateWithDodgeRequired();
 
         // SEBEKONTROLA FIXTURY: bez dodge by se vada nemohla projevit.
-        $this->assertNotSame([], (new \App\Engine\RulesEngine())->getValidMoveTargets($state, 1),
-            'fixtura je vadná: hráč nemá kam');
+        $this->assertNotSame(
+            [],
+            (new \App\Engine\RulesEngine())->getValidMoveTargets($state, 1),
+            'fixtura je vadná: hráč nemá kam',
+        );
 
         // 1 = neúspěšný dodge, pak 1+1 = hod na brnění (2D6 = 2, neprorazí AV8).
         $dice = new FixedDiceRoller([1, 1, 1]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 6],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 4, 'y' => 6],
         );
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('armour_roll', $types,
-            'hráč byl sražen, ale nehodilo se mu na brnění (r. 496-500)');
+        $this->assertContains(
+            'armour_roll',
+            $types,
+            'hráč byl sražen, ale nehodilo se mu na brnění (r. 496-500)',
+        );
         $this->assertTrue($result->isTurnover());
         $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
-        $this->assertSame(3, $dice->getRollCount(),
-            'čekal jsem dodge (1 hod) + brnění (2 hody)');
+        $this->assertSame(
+            3,
+            $dice->getRollCount(),
+            'čekal jsem dodge (1 hod) + brnění (2 hody)',
+        );
     }
 
     public function testBrokenArmourAlsoRollsForInjury(): void
@@ -75,13 +89,18 @@ final class KnockDownDuringMoveTest extends TestCase
         // 1 = neúspěšný dodge · 6+6 = brnění 12 > AV8, prorazí · 1+1 = zranění.
         $dice = new FixedDiceRoller([1, 6, 6, 1, 1]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 6],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 4, 'y' => 6],
         );
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('armour_roll', $types);
-        $this->assertContains('injury_roll', $types,
-            'brnění prasklo, ale na zranění se nehodilo');
+        $this->assertContains(
+            'injury_roll',
+            $types,
+            'brnění prasklo, ale na zranění se nehodilo',
+        );
     }
 
     public function testSuccessfulDodgeRollsNothingExtra(): void
@@ -92,12 +111,17 @@ final class KnockDownDuringMoveTest extends TestCase
 
         $dice = new FixedDiceRoller([6, 6, 6, 6]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 6],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 4, 'y' => 6],
         );
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('armour_roll', $types,
-            'hráč dodge zvládl a přesto se hodilo na brnění');
+        $this->assertNotContains(
+            'armour_roll',
+            $types,
+            'hráč dodge zvládl a přesto se hodilo na brnění',
+        );
         $this->assertFalse($result->isTurnover());
     }
 
@@ -110,37 +134,54 @@ final class KnockDownDuringMoveTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 20, 3, id: 2)
             ->withBallOffPitch()
             ->build();
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerolls(0));
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerolls(0),
+        );
 
         // MA=1: první pole zadarmo, druhé přes GFI ⇒ 1 = pád.
         $dice = new FixedDiceRoller([1, 1, 1]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 7, 'y' => 7],
         );
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('gfi', $types, 'fixtura je vadná: k GFI vůbec nedošlo');
-        $this->assertContains('armour_roll', $types,
-            'hráč spadl při GFI, ale nehodilo se mu na brnění');
+        $this->assertContains(
+            'armour_roll',
+            $types,
+            'hráč spadl při GFI, ale nehodilo se mu na brnění',
+        );
     }
 
     public function testFailedLeapAlsoRollsForArmour(): void
     {
         // ⭐ A třetí místo: leap.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::Leap])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::Leap],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->addPlayer(TeamSide::AWAY, 6, 8, id: 3)
             ->withBallOffPitch()
             ->build();
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerolls(0));
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerolls(0),
+        );
 
         $dice = new FixedDiceRoller([1, 1, 1, 1, 1]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7, 'leap' => true],
+            $state,
+            ActionType::MOVE,
+            ['playerId' => 1, 'x' => 7, 'y' => 7, 'leap' => true],
         );
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());

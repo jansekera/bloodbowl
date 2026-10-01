@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -34,8 +35,7 @@ final class GameState
         //   (`rules_bb2016.txt` r. 551-552). Propadne, jakmile jedna jiny hrac
         //   nebo skonci kolo -- viz `ActionResolver::resolve`.
         private ?int $blitzContinuationPlayerId = null,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<int, MatchPlayerDTO> $players
@@ -61,19 +61,58 @@ final class GameState
         );
     }
 
-    public function getMatchId(): int { return $this->matchId; }
-    public function getHalf(): int { return $this->half; }
-    public function getPhase(): GamePhase { return $this->phase; }
-    public function getActiveTeam(): TeamSide { return $this->activeTeam; }
-    public function getHomeTeam(): TeamStateDTO { return $this->homeTeam; }
-    public function getAwayTeam(): TeamStateDTO { return $this->awayTeam; }
-    public function getBall(): BallState { return $this->ball; }
-    public function isTurnoverPending(): bool { return $this->turnoverPending; }
-    public function getKickingTeam(): ?TeamSide { return $this->kickingTeam; }
-    public function getAiTeam(): ?TeamSide { return $this->aiTeam; }
-    public function getWeather(): Weather { return $this->weather; }
-    public function getPendingBlock(): ?PendingBlockDTO { return $this->pendingBlock; }
-    public function getPendingReroll(): ?PendingRerollDTO { return $this->pendingReroll; }
+    public function getMatchId(): int
+    {
+        return $this->matchId;
+    }
+    public function getHalf(): int
+    {
+        return $this->half;
+    }
+    public function getPhase(): GamePhase
+    {
+        return $this->phase;
+    }
+    public function getActiveTeam(): TeamSide
+    {
+        return $this->activeTeam;
+    }
+    public function getHomeTeam(): TeamStateDTO
+    {
+        return $this->homeTeam;
+    }
+    public function getAwayTeam(): TeamStateDTO
+    {
+        return $this->awayTeam;
+    }
+    public function getBall(): BallState
+    {
+        return $this->ball;
+    }
+    public function isTurnoverPending(): bool
+    {
+        return $this->turnoverPending;
+    }
+    public function getKickingTeam(): ?TeamSide
+    {
+        return $this->kickingTeam;
+    }
+    public function getAiTeam(): ?TeamSide
+    {
+        return $this->aiTeam;
+    }
+    public function getWeather(): Weather
+    {
+        return $this->weather;
+    }
+    public function getPendingBlock(): ?PendingBlockDTO
+    {
+        return $this->pendingBlock;
+    }
+    public function getPendingReroll(): ?PendingRerollDTO
+    {
+        return $this->pendingReroll;
+    }
 
     public function getTeamState(TeamSide $side): TeamStateDTO
     {
@@ -229,7 +268,10 @@ final class GameState
             : $this->withAwayTeam($team);
     }
 
-    public function getBlitzContinuationPlayerId(): ?int { return $this->blitzContinuationPlayerId; }
+    public function getBlitzContinuationPlayerId(): ?int
+    {
+        return $this->blitzContinuationPlayerId;
+    }
 
     public function withBlitzContinuation(?int $playerId): self
     {

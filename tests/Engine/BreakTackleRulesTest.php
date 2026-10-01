@@ -60,7 +60,9 @@ final class BreakTackleRulesTest extends TestCase
     {
         $out = [];
         foreach ($events as $e) {
-            if ($e->getType() === 'dodge') { $out[] = (int) $e->getData()['target']; }
+            if ($e->getType() === 'dodge') {
+                $out[] = (int) $e->getData()['target'];
+            }
         }
 
         return $out;
@@ -87,8 +89,10 @@ final class BreakTackleRulesTest extends TestCase
 
         $this->assertSame([3], $this->cileUhybu($r->getEvents()), 'nizsi sila se brat nesmi');
         $this->assertTrue($r->isSuccess());
-        $this->assertFalse($this->hrac($r->getNewState(), 1)->isBreakTackleUsedThisTurn(),
-            'kdyz se sila nepouzila, skill se nespotreboval');
+        $this->assertFalse(
+            $this->hrac($r->getNewState(), 1)->isBreakTackleUsedThisTurn(),
+            'kdyz se sila nepouzila, skill se nespotreboval',
+        );
     }
 
     public function testPouzitiSeZapiseAObnoviSeNaZacatkuKola(): void

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -11,8 +12,7 @@ final class BallState
         private readonly ?Position $position,
         private readonly bool $isHeld,
         private readonly ?int $carrierId,
-    ) {
-    }
+    ) {}
 
     public static function onGround(Position $position): self
     {
@@ -29,7 +29,10 @@ final class BallState
         return new self(null, false, null);
     }
 
-    public function getPosition(): ?Position { return $this->position; }
+    public function getPosition(): ?Position
+    {
+        return $this->position;
+    }
 
     /** Pozice mice, ktery na hristi byt MUSI. */
     public function requirePosition(): Position
@@ -37,8 +40,14 @@ final class BallState
         return $this->getPosition() ?? throw new \LogicException('Ball is not on the pitch');
     }
 
-    public function isHeld(): bool { return $this->isHeld; }
-    public function getCarrierId(): ?int { return $this->carrierId; }
+    public function isHeld(): bool
+    {
+        return $this->isHeld;
+    }
+    public function getCarrierId(): ?int
+    {
+        return $this->carrierId;
+    }
 
     public function isOnPitch(): bool
     {

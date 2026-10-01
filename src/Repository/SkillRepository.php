@@ -83,7 +83,7 @@ final class SkillRepository
             'SELECT s.* FROM skills s
              JOIN positional_template_skills pts ON s.id = pts.skill_id
              WHERE pts.positional_template_id = :template_id
-             ORDER BY s.name'
+             ORDER BY s.name',
         );
         $stmt->execute(['template_id' => $templateId]);
 

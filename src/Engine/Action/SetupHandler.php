@@ -17,8 +17,7 @@ final class SetupHandler implements ActionHandlerInterface
 {
     public function __construct(
         private readonly KickoffResolver $kickoffResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * Resolve setup player action.
@@ -56,7 +55,7 @@ final class SetupHandler implements ActionHandlerInterface
         //   na konci minuleho drivu, NESMI byt rozestaven pri tomhle vykopu.
         if ($player->isOutNextSetup()) {
             throw new \InvalidArgumentException(
-                'Player collapsed from Sweltering Heat and may not be set up for this kick-off'
+                'Player collapsed from Sweltering Heat and may not be set up for this kick-off',
             );
         }
 
@@ -67,7 +66,7 @@ final class SetupHandler implements ActionHandlerInterface
             && count($state->getPlayersOnPitch($side)) >= RulesEngine::MAX_PLAYERS_ON_PITCH) {
             throw new \InvalidArgumentException(
                 'Cannot set up more than ' . RulesEngine::MAX_PLAYERS_ON_PITCH
-                . ' players on the pitch (rest stay in Reserves)'
+                . ' players on the pitch (rest stay in Reserves)',
             );
         }
 
@@ -102,7 +101,7 @@ final class SetupHandler implements ActionHandlerInterface
 
         if (count($playersOnPitch) < $required) {
             throw new \InvalidArgumentException(
-                "Need at least {$required} players on pitch (have " . count($playersOnPitch) . ')'
+                "Need at least {$required} players on pitch (have " . count($playersOnPitch) . ')',
             );
         }
 
@@ -110,7 +109,7 @@ final class SetupHandler implements ActionHandlerInterface
         if (count($playersOnPitch) > RulesEngine::MAX_PLAYERS_ON_PITCH) {
             throw new \InvalidArgumentException(
                 'Cannot have more than ' . RulesEngine::MAX_PLAYERS_ON_PITCH
-                . ' players on pitch (have ' . count($playersOnPitch) . ')'
+                . ' players on pitch (have ' . count($playersOnPitch) . ')',
             );
         }
 
@@ -127,7 +126,7 @@ final class SetupHandler implements ActionHandlerInterface
         $losRequired = min(3, count($playersOnPitch));
         if ($losCount < $losRequired) {
             throw new \InvalidArgumentException(
-                "Need at least {$losRequired} players on Line of Scrimmage (have {$losCount})"
+                "Need at least {$losRequired} players on Line of Scrimmage (have {$losCount})",
             );
         }
 

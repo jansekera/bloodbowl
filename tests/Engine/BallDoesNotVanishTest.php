@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -47,8 +48,10 @@ final class BallDoesNotVanishTest extends TestCase
         [$novy, $events] = $resolver->handleBallOnPlayerDown($state, $zraneny, []);
 
         $this->assertFalse($novy->getBall()->isHeld(), 'míč nemá koho držet');
-        $this->assertTrue($novy->getBall()->isOnPitch(),
-            'míč zmizel ze hry -- zbytek půle by se hrál bez něj');
+        $this->assertTrue(
+            $novy->getBall()->isOnPitch(),
+            'míč zmizel ze hry -- zbytek půle by se hrál bez něj',
+        );
     }
 
     public function testBallStillDropsNormallyWhenCarrierStaysOnThePitch(): void

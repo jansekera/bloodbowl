@@ -40,8 +40,13 @@ final class KickTargetChoiceTest extends TestCase
 
         // Kopajici tym: jeden hrac, volitelne s Kick. Musi stat MIMO siroky
         // pas (y 4..10) a MIMO lajnu (x 12 pro HOME, 13 pro AWAY).
-        $b->addPlayer($kopajici, $kopajici === TeamSide::HOME ? 10 : 15, 7,
-            skills: $kopajiciMaKick ? [SkillName::Kick] : [], id: 1);
+        $b->addPlayer(
+            $kopajici,
+            $kopajici === TeamSide::HOME ? 10 : 15,
+            7,
+            skills: $kopajiciMaKick ? [SkillName::Kick] : [],
+            id: 1,
+        );
 
         $i = 100;
         foreach ($ma as $m) {

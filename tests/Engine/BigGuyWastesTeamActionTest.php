@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -32,16 +33,24 @@ final class BigGuyWastesTeamActionTest extends TestCase
         // Hráč 1 je Really Stupid a NEMÁ vedle sebe spoluhráče ⇒ práh 4+.
         // Hráč 3 je běžný a stojí daleko, aby mohl blitzovat potom.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::ReallyStupid])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::ReallyStupid],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->addPlayer(TeamSide::HOME, 15, 3, movement: 6, id: 3)
             ->withBallOffPitch()
             ->build();
 
         // SEBEKONTROLA FIXTURY: blitz je na začátku k dispozici.
-        $this->assertFalse($state->getTeamState(TeamSide::HOME)->isBlitzUsedThisTurn(),
-            'fixtura je vadná: blitz je vyčerpaný už předem');
+        $this->assertFalse(
+            $state->getTeamState(TeamSide::HOME)->isBlitzUsedThisTurn(),
+            'fixtura je vadná: blitz je vyčerpaný už předem',
+        );
 
         // Hod 1 ⇒ pod prahem 4+, kontrola NEUSPĚJE.
         $resolver = new ActionResolver(new FixedDiceRoller([1]));
@@ -53,12 +62,17 @@ final class BigGuyWastesTeamActionTest extends TestCase
 
         // SEBEKONTROLA VÝSLEDKU: kontrola opravdu selhala.
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('really_stupid', $types,
-            'Really Stupid se neozval -- test neměří, co má');
+        $this->assertContains(
+            'really_stupid',
+            $types,
+            'Really Stupid se neozval -- test neměří, co má',
+        );
         $this->assertTrue($after->requirePlayer(1)->hasActed());
 
-        $this->assertTrue($after->getTeamState(TeamSide::HOME)->isBlitzUsedThisTurn(),
-            'tým měl o deklarovaný blitz přijít (r. 8398-8401)');
+        $this->assertTrue(
+            $after->getTeamState(TeamSide::HOME)->isBlitzUsedThisTurn(),
+            'tým měl o deklarovaný blitz přijít (r. 8398-8401)',
+        );
     }
 
     public function testSuccessfulCheckDoesNotWasteAnythingExtra(): void
@@ -66,8 +80,14 @@ final class BigGuyWastesTeamActionTest extends TestCase
         // ⛔ Druhá polovina páru: při ÚSPĚCHU se nic navíc nespotřebuje --
         //    blitz se odečte normální cestou v handleru, ne tady.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::ReallyStupid])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::ReallyStupid],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -79,9 +99,11 @@ final class BigGuyWastesTeamActionTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertFalse($result->getNewState()->requirePlayer(1)->hasActed()
+        $this->assertFalse(
+            $result->getNewState()->requirePlayer(1)->hasActed()
             && $result->getNewState()->requirePlayer(1)->requirePosition()->getX() === 5,
-            'hráč měl projít kontrolou a jednat, ne zůstat stát');
+            'hráč měl projít kontrolou a jednat, ne zůstat stát',
+        );
     }
 
     public function testFailedWildAnimalMoveCostsNoTeamAction(): void
@@ -90,8 +112,14 @@ final class BigGuyWastesTeamActionTest extends TestCase
         //    Bez tohohle by `consumeDeclaredTeamAction` mohl tiše brát blitz
         //    i za pohyb.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::WildAnimal])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::WildAnimal],
+            )
             ->addPlayer(TeamSide::AWAY, 20, 7, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -118,19 +146,28 @@ final class BigGuyWastesTeamActionTest extends TestCase
         //    Big Guy, který propadne na DEKLAROVANÉM bomb throwu, tedy tým
         //    o pass slot nepřipravil. Táž třída jako PHP15, jen o akci vedle.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::BoneHead, SkillName::Bombardier])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::BoneHead, SkillName::Bombardier],
+            )
             ->addPlayer(TeamSide::AWAY, 10, 7, id: 2)
             ->withBallOffPitch()
             ->build();
 
-        $this->assertFalse($state->getTeamState(TeamSide::HOME)->isPassUsedThisTurn(),
-            'fixtura je vadná: pass je vyčerpaný už předem');
+        $this->assertFalse(
+            $state->getTeamState(TeamSide::HOME)->isPassUsedThisTurn(),
+            'fixtura je vadná: pass je vyčerpaný už předem',
+        );
 
         // Bone Head na 1 ⇒ hráč propadne a akce se má utratit.
         $dice = new FixedDiceRoller([1, 1, 1, 1, 1, 1]);
         $result = (new ActionResolver($dice))->resolve(
-            $state, ActionType::BOMB_THROW,
+            $state,
+            ActionType::BOMB_THROW,
             ['playerId' => 1, 'targetX' => 10, 'targetY' => 7],
         );
 

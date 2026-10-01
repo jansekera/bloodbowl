@@ -29,8 +29,7 @@ final class Team
         private readonly ?string $raceName = null,
         private readonly ?string $coachName = null,
         private readonly array $players = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

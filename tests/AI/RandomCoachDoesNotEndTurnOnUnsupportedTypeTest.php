@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -28,8 +29,14 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
         // Hráč 1 má Hypnotic Gaze (typ, který kouč postavit NEUMÍ);
         // hráč 3 je běžný a MŮŽE se hýbat.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, movement: 6, id: 1,
-                        skills: [SkillName::HypnoticGaze])
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                7,
+                movement: 6,
+                id: 1,
+                skills: [SkillName::HypnoticGaze],
+            )
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->addPlayer(TeamSide::HOME, 10, 3, movement: 6, id: 3)
             ->withBallOffPitch()
@@ -41,19 +48,28 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
         // SEBEKONTROLA FIXTURY: nepodporovaný typ je OPRAVDU v nabídce --
         // jinak se do opravované větve nedá dojít a test neměří nic.
         $types = array_column($offered, 'type');
-        $this->assertContains(ActionType::HYPNOTIC_GAZE->value, $types,
-            'fixtura je vadná: gaze se nenabízí, vada se nemůže projevit');
+        $this->assertContains(
+            ActionType::HYPNOTIC_GAZE->value,
+            $types,
+            'fixtura je vadná: gaze se nenabízí, vada se nemůže projevit',
+        );
         // A je co hrát místo něj.
-        $this->assertContains(ActionType::MOVE->value, $types,
-            'fixtura je vadná: není čím gaze nahradit');
+        $this->assertContains(
+            ActionType::MOVE->value,
+            $types,
+            'fixtura je vadná: není čím gaze nahradit',
+        );
 
         // Losuje se, tak se to zkusí mnohokrát: dřív stačilo, aby los padl
         // na gaze, a kolo skončilo. Teď nesmí skončit ANI JEDNOU.
         $ai = new RandomAICoach();
         for ($i = 0; $i < 300; $i++) {
             $decision = $ai->decideAction($state, $rules);
-            $this->assertNotSame(ActionType::END_TURN, $decision['action'],
-                'kouč ukončil kolo, přestože bylo co hrát (pokus ' . $i . ')');
+            $this->assertNotSame(
+                ActionType::END_TURN,
+                $decision['action'],
+                'kouč ukončil kolo, přestože bylo co hrát (pokus ' . $i . ')',
+            );
         }
     }
 
@@ -80,21 +96,35 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
         // SEBEKONTROLA FIXTURY: ten rozpor tam OPRAVDU je.
         $types = [];
         foreach ($rules->getAvailableActions($state) as $a) {
-            if (($a['playerId'] ?? null) === 1) { $types[] = $a['type']; }
+            if (($a['playerId'] ?? null) === 1) {
+                $types[] = $a['type'];
+            }
         }
-        $this->assertContains(ActionType::BLITZ->value, $types,
-            'fixtura je vadná: BLITZ se nenabízí, vada se nemůže projevit');
-        $this->assertSame([], $state->getPlayersOnPitch(TeamSide::AWAY),
-            'fixtura je vadná: soupeř na hřišti je, builder by cíl našel');
-        $this->assertContains(ActionType::MOVE->value, $types,
-            'fixtura je vadná: není čím BLITZ nahradit');
+        $this->assertContains(
+            ActionType::BLITZ->value,
+            $types,
+            'fixtura je vadná: BLITZ se nenabízí, vada se nemůže projevit',
+        );
+        $this->assertSame(
+            [],
+            $state->getPlayersOnPitch(TeamSide::AWAY),
+            'fixtura je vadná: soupeř na hřišti je, builder by cíl našel',
+        );
+        $this->assertContains(
+            ActionType::MOVE->value,
+            $types,
+            'fixtura je vadná: není čím BLITZ nahradit',
+        );
 
         // Losuje se, takže jeden pokus nic nedokazuje.
         $ai = new RandomAICoach();
         for ($i = 0; $i < 300; $i++) {
             $decision = $ai->decideAction($state, $rules);
-            $this->assertNotSame(ActionType::END_TURN, $decision['action'],
-                'builder nenašel cíl a ukončil celé kolo (pokus ' . $i . ')');
+            $this->assertNotSame(
+                ActionType::END_TURN,
+                $decision['action'],
+                'builder nenašel cíl a ukončil celé kolo (pokus ' . $i . ')',
+            );
         }
     }
 
@@ -115,10 +145,15 @@ final class RandomCoachDoesNotEndTurnOnUnsupportedTypeTest extends TestCase
 
         $rules = new RulesEngine();
         $offered = $rules->getAvailableActions($state);
-        $playable = array_filter($offered,
-            fn(array $a) => $a['type'] !== ActionType::END_TURN->value);
-        $this->assertSame([], $playable,
-            'fixtura je vadná: pořád je co hrát, tohle není ten případ');
+        $playable = array_filter(
+            $offered,
+            fn(array $a) => $a['type'] !== ActionType::END_TURN->value,
+        );
+        $this->assertSame(
+            [],
+            $playable,
+            'fixtura je vadná: pořád je co hrát, tohle není ten případ',
+        );
 
         $decision = (new RandomAICoach())->decideAction($state, $rules);
         $this->assertSame(ActionType::END_TURN, $decision['action']);

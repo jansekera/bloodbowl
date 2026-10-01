@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Repository;
@@ -24,7 +25,7 @@ final class MatchRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO matches (home_team_id, away_team_id, home_coach_id, away_coach_id)
              VALUES (:home_team_id, :away_team_id, :home_coach_id, :away_coach_id)
-             RETURNING *'
+             RETURNING *',
         );
         $stmt->execute($data);
 
@@ -49,7 +50,7 @@ final class MatchRepository
              JOIN races ar ON at.race_id = ar.id
              JOIN coaches hc ON m.home_coach_id = hc.id
              LEFT JOIN coaches ac ON m.away_coach_id = ac.id
-             WHERE m.id = :id'
+             WHERE m.id = :id',
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -69,7 +70,7 @@ final class MatchRepository
              JOIN teams ht ON m.home_team_id = ht.id
              JOIN teams at ON m.away_team_id = at.id
              WHERE m.home_coach_id = :coach_id OR m.away_coach_id = :coach_id
-             ORDER BY m.created_at DESC'
+             ORDER BY m.created_at DESC',
         );
         $stmt->execute(['coach_id' => $coachId]);
 
@@ -80,7 +81,7 @@ final class MatchRepository
     {
         $stmt = $this->pdo->prepare(
             'UPDATE matches SET game_state = :game_state, updated_at = CURRENT_TIMESTAMP
-             WHERE id = :id'
+             WHERE id = :id',
         );
         $stmt->execute(['id' => $matchId, 'game_state' => $gameStateJson]);
     }
@@ -105,7 +106,7 @@ final class MatchRepository
         $stmt = $this->pdo->prepare(
             'UPDATE matches SET home_score = :home_score, away_score = :away_score,
                     updated_at = CURRENT_TIMESTAMP
-             WHERE id = :id'
+             WHERE id = :id',
         );
         $stmt->execute([
             'id' => $matchId,

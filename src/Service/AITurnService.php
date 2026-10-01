@@ -20,8 +20,7 @@ final class AITurnService
     public function __construct(
         private readonly AICoachInterface $aiCoach,
         private readonly RulesEngine $rulesEngine,
-    ) {
-    }
+    ) {}
 
     public function setGameLogger(GameLogger $logger): void
     {

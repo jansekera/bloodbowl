@@ -23,8 +23,7 @@ final class PositionalTemplate
         private readonly array $startingSkills = [],
         private readonly array $normalAccess = [],
         private readonly array $doubleAccess = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

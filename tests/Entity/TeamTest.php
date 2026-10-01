@@ -85,19 +85,40 @@ final class TeamTest extends TestCase
         $team = Team::fromRow($this->createTeamRow());
 
         $active = new Player(
-            id: 1, teamId: 1, positionalTemplateId: 1, name: 'Active',
-            number: 1, stats: new PlayerStats(6, 3, 3, 8), spp: 0, level: 1,
-            status: PlayerStatus::ACTIVE, createdAt: '2025-01-01',
+            id: 1,
+            teamId: 1,
+            positionalTemplateId: 1,
+            name: 'Active',
+            number: 1,
+            stats: new PlayerStats(6, 3, 3, 8),
+            spp: 0,
+            level: 1,
+            status: PlayerStatus::ACTIVE,
+            createdAt: '2025-01-01',
         );
         $dead = new Player(
-            id: 2, teamId: 1, positionalTemplateId: 1, name: 'Dead',
-            number: 2, stats: new PlayerStats(6, 3, 3, 8), spp: 0, level: 1,
-            status: PlayerStatus::DEAD, createdAt: '2025-01-01',
+            id: 2,
+            teamId: 1,
+            positionalTemplateId: 1,
+            name: 'Dead',
+            number: 2,
+            stats: new PlayerStats(6, 3, 3, 8),
+            spp: 0,
+            level: 1,
+            status: PlayerStatus::DEAD,
+            createdAt: '2025-01-01',
         );
         $retired = new Player(
-            id: 3, teamId: 1, positionalTemplateId: 1, name: 'Retired',
-            number: 3, stats: new PlayerStats(6, 3, 3, 8), spp: 0, level: 1,
-            status: PlayerStatus::RETIRED, createdAt: '2025-01-01',
+            id: 3,
+            teamId: 1,
+            positionalTemplateId: 1,
+            name: 'Retired',
+            number: 3,
+            stats: new PlayerStats(6, 3, 3, 8),
+            spp: 0,
+            level: 1,
+            status: PlayerStatus::RETIRED,
+            createdAt: '2025-01-01',
         );
 
         $teamWithPlayers = $team->withPlayers([$active, $dead, $retired]);

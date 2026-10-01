@@ -20,8 +20,7 @@ final class KickoffResolver
         private readonly DiceRollerInterface $dice,
         private readonly ScatterCalculator $scatterCalc,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * Resolve the full kickoff sequence.

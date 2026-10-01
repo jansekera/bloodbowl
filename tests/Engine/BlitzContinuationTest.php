@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -80,8 +81,10 @@ final class BlitzContinuationTest extends TestCase
         $after = $this->blitzPow($this->state());
         $r = (new ActionResolver(new FixedDiceRoller([])))
             ->resolve($after, ActionType::MOVE, ['playerId' => 3, 'x' => 2, 'y' => 1]);
-        $this->assertEmpty($this->movesOf($r->getNewState(), 1),
-            'blitzujici smi pokracovat i po aktivaci jineho hrace');
+        $this->assertEmpty(
+            $this->movesOf($r->getNewState(), 1),
+            'blitzujici smi pokracovat i po aktivaci jineho hrace',
+        );
     }
 
     public function testTheContinuationIsTheSameActionSoNoSecondBoneHeadRoll(): void

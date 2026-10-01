@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine\Action;
@@ -19,8 +20,7 @@ final class RerollHandler
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params

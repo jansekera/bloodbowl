@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -174,8 +175,10 @@ final class BallAndChainTest extends TestCase
         // D6 3 => rovne do (6,7) na soupere; blok 1 = Attacker Down; zraneni 4+4 = 8 => KO
         $result = (new ActionResolver(new FixedDiceRoller([3, 1, 4, 4])))->resolve($state, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
 
-        $brneniBnc = array_filter($result->getEvents(),
-            fn($e) => $e->getType() === 'armour_roll' && ($e->getData()['playerId'] ?? null) === 1);
+        $brneniBnc = array_filter(
+            $result->getEvents(),
+            fn($e) => $e->getType() === 'armour_roll' && ($e->getData()['playerId'] ?? null) === 1,
+        );
         $this->assertSame([], $brneniBnc, 'u B&C se na brneni nehazi');
         $this->assertSame(PlayerState::KO, $result->getNewState()->requirePlayer(1)->getState());
         $this->assertTrue($result->isTurnover());

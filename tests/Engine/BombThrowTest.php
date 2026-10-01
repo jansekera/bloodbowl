@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -13,7 +14,6 @@ use PHPUnit\Framework\TestCase;
 
 final class BombThrowTest extends TestCase
 {
-
     /**
      * Inaccurate bomb scatters 3 times from target.
      */

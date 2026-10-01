@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\AI;
@@ -23,7 +24,7 @@ final class LearningAICoach implements AICoachInterface
      * Klesa se vzdalenosti a nikdy neprebije samotny roh.
      */
     private const CAGE_APPROACH_BONUS = 2.0;
-        /**
+    /**
      * ⛔ MERENI 12.09.: klec se sejde jen v 7 kolech z 317 (2,2 %), pritom
      * nosic sam existuje v 82 kolech. Duvod: hrac bez mice dostava
      * `advancement * 0.1` za postup vpred -- za sest poli tedy az 0,6, coz
@@ -592,7 +593,7 @@ final class LearningAICoach implements AICoachInterface
             if ($cerstve !== $this->poleCache[$playerId]) {
                 throw new \RuntimeException(
                     "CACHE POHYBU VRACI JINOU ODPOVED NEZ VYPOCET (hrac {$playerId}). "
-                    . 'Klic cache nepokryva vsechno, co odpoved meni.'
+                    . 'Klic cache nepokryva vsechno, co odpoved meni.',
                 );
             }
         }
@@ -1167,8 +1168,10 @@ final class LearningAICoach implements AICoachInterface
                             }
                         }
                         if ($posadka >= self::CAGE_MIN_CORNERS) {
-                            $krok = max(abs($target['x'] - $currentPos->getX()),
-                                        abs($target['y'] - $currentPos->getY()));
+                            $krok = max(
+                                abs($target['x'] - $currentPos->getX()),
+                                abs($target['y'] - $currentPos->getY()),
+                            );
                             if ($krok > 1) {
                                 $score -= ($krok - 1) * self::CAGE_OUTRUN_PENALTY;
                             }
@@ -1182,8 +1185,10 @@ final class LearningAICoach implements AICoachInterface
                         //   Do ted tu byl natvrdo jeden krok, coz nejpomalejsiho
                         //   hrace ignorovalo a klec zbytecne brzdilo.
                         $limit = $this->slowestRemaining($rohovi);
-                        $krok = max(abs($target['x'] - $currentPos->getX()),
-                                    abs($target['y'] - $currentPos->getY()));
+                        $krok = max(
+                            abs($target['x'] - $currentPos->getX()),
+                            abs($target['y'] - $currentPos->getY()),
+                        );
                         if ($krok > $limit + self::CAGE_GFI_REACH) {
                             // Tam uz nejpomalejsi nedojde ani na GFI.
                             $score -= ($krok - $limit) * self::CAGE_OUTRUN_PENALTY;

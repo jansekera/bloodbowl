@@ -19,8 +19,7 @@ final class GameFlowResolver
 {
     public function __construct(
         private readonly DiceRollerInterface $dice,
-    ) {
-    }
+    ) {}
 
     /**
      * Check if a touchdown has occurred.

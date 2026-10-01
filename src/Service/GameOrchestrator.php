@@ -24,8 +24,7 @@ final class GameOrchestrator
         private readonly RulesEngine $rulesEngine,
         private readonly DiceRollerInterface $dice,
         private readonly AICoachInterface $aiCoach,
-    ) {
-    }
+    ) {}
 
     public function setGameLogger(GameLogger $logger): void
     {

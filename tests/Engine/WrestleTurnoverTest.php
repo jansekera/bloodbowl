@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -28,8 +29,14 @@ final class WrestleTurnoverTest extends TestCase
     {
         $b = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 3, id: 1)
-            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2,
-                        skills: [SkillName::Wrestle]);
+            ->addPlayer(
+                TeamSide::AWAY,
+                6,
+                7,
+                strength: 3,
+                id: 2,
+                skills: [SkillName::Wrestle],
+            );
         $b = $attackerCarriesBall ? $b->withBallCarried(1) : $b->withBallOffPitch();
 
         return $b->build();
@@ -40,10 +47,14 @@ final class WrestleTurnoverTest extends TestCase
         $state = $this->wrestleState(attackerCarriesBall: false);
 
         // SEBEKONTROLA FIXTURY: obránce Wrestle MÁ a útočník míč NEMÁ.
-        $this->assertTrue($state->requirePlayer(2)->hasSkill(SkillName::Wrestle),
-            'fixtura je vadná: nikdo nemá Wrestle, větev se nespustí');
-        $this->assertFalse($state->getBall()->isHeld(),
-            'fixtura je vadná: míč někdo drží, tohle není ten případ');
+        $this->assertTrue(
+            $state->requirePlayer(2)->hasSkill(SkillName::Wrestle),
+            'fixtura je vadná: nikdo nemá Wrestle, větev se nespustí',
+        );
+        $this->assertFalse(
+            $state->getBall()->isHeld(),
+            'fixtura je vadná: míč někdo drží, tohle není ten případ',
+        );
 
         // Both Down (die = 2), rovná síla => 1 kostka, útočník vybírá
         $dice = new FixedDiceRoller([2]);
@@ -54,13 +65,18 @@ final class WrestleTurnoverTest extends TestCase
 
         // SEBEKONTROLA VÝSLEDKU: Wrestle se OPRAVDU spustil.
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('wrestle', $types,
-            'Wrestle se nespustil -- test neměří, co má');
+        $this->assertContains(
+            'wrestle',
+            $types,
+            'Wrestle se nespustil -- test neměří, co má',
+        );
         $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
         $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(2)->getState());
 
-        $this->assertFalse($result->isTurnover(),
-            'Placed Prone bez míče turnover NENÍ (r. 8677-8678)');
+        $this->assertFalse(
+            $result->isTurnover(),
+            'Placed Prone bez míče turnover NENÍ (r. 8677-8678)',
+        );
     }
 
     public function testWrestleWhileHoldingTheBallIsATurnover(): void
@@ -68,8 +84,11 @@ final class WrestleTurnoverTest extends TestCase
         // ⭐ Druhá půlka páru -- a právě tahle vada tam byla.
         $state = $this->wrestleState(attackerCarriesBall: true);
 
-        $this->assertSame(1, $state->getBall()->getCarrierId(),
-            'fixtura je vadná: míč nenese aktivní hráč, pár nic neměří');
+        $this->assertSame(
+            1,
+            $state->getBall()->getCarrierId(),
+            'fixtura je vadná: míč nenese aktivní hráč, pár nic neměří',
+        );
 
         $dice = new FixedDiceRoller([2, 4, 4, 4, 4]);
         $resolver = new ActionResolver($dice);
@@ -80,7 +99,9 @@ final class WrestleTurnoverTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('wrestle', $types, 'Wrestle se nespustil');
 
-        $this->assertTrue($result->isTurnover(),
-            'aktivní hráč s míčem jde na zem -- to turnover JE (r. 8677-8678)');
+        $this->assertTrue(
+            $result->isTurnover(),
+            'aktivní hráč s míčem jde na zem -- to turnover JE (r. 8677-8678)',
+        );
     }
 }

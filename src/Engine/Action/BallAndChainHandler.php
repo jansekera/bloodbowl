@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine\Action;
@@ -243,8 +244,12 @@ final class BallAndChainHandler implements ActionHandlerInterface
         $face = $this->vyberStranu($faces, $target->getTeamSide() === $bncPlayer->getTeamSide(), $info['attackerChooses']);
 
         $events[] = GameEvent::blockAttempt(
-            $bncPlayer->getId(), $target->getId(), $info['count'], $info['attackerChooses'],
-            array_map(static fn(BlockDiceFace $f) => $f->value, $faces), $face->value,
+            $bncPlayer->getId(),
+            $target->getId(),
+            $info['count'],
+            $info['attackerChooses'],
+            array_map(static fn(BlockDiceFace $f) => $f->value, $faces),
+            $face->value,
         );
 
         // Simplified block resolution for auto-block

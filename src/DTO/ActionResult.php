@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -13,8 +14,7 @@ final class ActionResult
         private readonly bool $success,
         private readonly bool $turnover,
         private readonly array $events,
-    ) {
-    }
+    ) {}
 
     /**
      * @param list<GameEvent> $events
@@ -40,11 +40,23 @@ final class ActionResult
         return new self($state, false, false, $events);
     }
 
-    public function getNewState(): GameState { return $this->newState; }
-    public function isSuccess(): bool { return $this->success; }
-    public function isTurnover(): bool { return $this->turnover; }
+    public function getNewState(): GameState
+    {
+        return $this->newState;
+    }
+    public function isSuccess(): bool
+    {
+        return $this->success;
+    }
+    public function isTurnover(): bool
+    {
+        return $this->turnover;
+    }
     /** @return list<GameEvent> */
-    public function getEvents(): array { return $this->events; }
+    public function getEvents(): array
+    {
+        return $this->events;
+    }
 
     /**
      * @return array<string, mixed>

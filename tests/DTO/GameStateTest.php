@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\DTO;
@@ -44,8 +45,14 @@ final class GameStateTest extends TestCase
     public function testGetPlayerAtPosition(): void
     {
         $player = MatchPlayerDTO::create(
-            1, 1, 'Test', 1, 'Lineman',
-            new PlayerStats(6, 3, 3, 8), [], TeamSide::HOME,
+            1,
+            1,
+            'Test',
+            1,
+            'Lineman',
+            new PlayerStats(6, 3, 3, 8),
+            [],
+            TeamSide::HOME,
             new Position(5, 5),
         );
 

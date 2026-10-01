@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -47,8 +48,11 @@ final class FollowUpChoiceTest extends TestCase
         $resolver->setInteractiveBlocks(true);
         $pending = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
         $this->assertNotNull($pending->getNewState()->getPendingBlock(), 'fixtura: blok neceka na volbu');
-        return $resolver->resolve($pending->getNewState(), ActionType::CHOOSE_BLOCK_DIE,
-            ['faceIndex' => 0, 'followUp' => $followUp])->getNewState();
+        return $resolver->resolve(
+            $pending->getNewState(),
+            ActionType::CHOOSE_BLOCK_DIE,
+            ['faceIndex' => 0, 'followUp' => $followUp],
+        )->getNewState();
     }
 
     public function testTheCoachMayDeclineTheFollowUp(): void
@@ -84,8 +88,11 @@ final class FollowUpChoiceTest extends TestCase
         $resolver = new ActionResolver(new FixedDiceRoller([3, 3, 3, 3]));
         $r = $resolver->resolve($this->crowded(), ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
         $this->assertFalse($r->isTurnover());
-        $this->assertSame(5, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(),
-            'AI v blitzu nasledovala na pole se dvema zonami');
+        $this->assertSame(
+            5,
+            $r->getNewState()->requirePlayer(1)->requirePosition()->getX(),
+            'AI v blitzu nasledovala na pole se dvema zonami',
+        );
     }
 
     public function testOutsideABlitzTheAiStillFollowsUp(): void

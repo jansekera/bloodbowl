@@ -357,13 +357,13 @@ $posStmt = $pdo->prepare(
     'INSERT INTO positional_templates (race_id, name, max_count, cost, ma, st, ag, av, normal_access, double_access)
      VALUES (:race_id, :name, :max_count, :cost, :ma, :st, :ag, :av, :normal_access, :double_access)
      ON CONFLICT (race_id, name) DO NOTHING
-     RETURNING id'
+     RETURNING id',
 );
 
 $posSkillStmt = $pdo->prepare(
     'INSERT INTO positional_template_skills (positional_template_id, skill_id)
      VALUES (:template_id, :skill_id)
-     ON CONFLICT (positional_template_id, skill_id) DO NOTHING'
+     ON CONFLICT (positional_template_id, skill_id) DO NOTHING',
 );
 
 $posCount = 0;

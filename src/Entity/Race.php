@@ -15,8 +15,7 @@ final class Race
         private readonly int $rerollCost,
         private readonly bool $hasApothecary,
         private readonly array $positionals = [],
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

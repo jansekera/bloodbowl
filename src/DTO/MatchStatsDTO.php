@@ -13,15 +13,32 @@ final class MatchStatsDTO
         private int $interceptions = 0,
         private int $casualties = 0,
         private bool $mvp = false,
-    ) {
-    }
+    ) {}
 
-    public function getPlayerId(): int { return $this->playerId; }
-    public function getTouchdowns(): int { return $this->touchdowns; }
-    public function getCompletions(): int { return $this->completions; }
-    public function getInterceptions(): int { return $this->interceptions; }
-    public function getCasualties(): int { return $this->casualties; }
-    public function isMvp(): bool { return $this->mvp; }
+    public function getPlayerId(): int
+    {
+        return $this->playerId;
+    }
+    public function getTouchdowns(): int
+    {
+        return $this->touchdowns;
+    }
+    public function getCompletions(): int
+    {
+        return $this->completions;
+    }
+    public function getInterceptions(): int
+    {
+        return $this->interceptions;
+    }
+    public function getCasualties(): int
+    {
+        return $this->casualties;
+    }
+    public function isMvp(): bool
+    {
+        return $this->mvp;
+    }
 
     public function withTouchdown(): self
     {

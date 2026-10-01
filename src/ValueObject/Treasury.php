@@ -30,7 +30,7 @@ final class Treasury
     {
         if (!$this->canAfford($amount)) {
             throw new InsufficientFundsException(
-                "Cannot spend {$amount}g, only {$this->gold}g available"
+                "Cannot spend {$amount}g, only {$this->gold}g available",
             );
         }
 

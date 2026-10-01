@@ -13,8 +13,7 @@ final class Skill
         private readonly string $name,
         private readonly SkillCategory $category,
         private readonly string $description,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

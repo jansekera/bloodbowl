@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine\Action;
@@ -16,8 +17,7 @@ final class HypnoticGazeHandler implements ActionHandlerInterface
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params {playerId, targetId}

@@ -32,8 +32,7 @@ final class BlockHandler implements ActionHandlerInterface
         private readonly TacklezoneCalculator $tzCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * P82 (30.09.2026), port C++ 366fda3e / `block_handler.cpp:553-582`.
@@ -335,9 +334,12 @@ final class BlockHandler implements ActionHandlerInterface
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
         $events = [];
         $events[] = GameEvent::blockAttempt(
-            $pending->getAttackerId(), $pending->getDefenderId(),
-            count($faces), $pending->isAttackerChooses(),
-            $faceValues, $chosenFace->value,
+            $pending->getAttackerId(),
+            $pending->getDefenderId(),
+            count($faces),
+            $pending->isAttackerChooses(),
+            $faceValues,
+            $chosenFace->value,
         );
 
         // Clear pending block
@@ -618,7 +620,10 @@ final class BlockHandler implements ActionHandlerInterface
 
         // === Block 1: target defender1 ===
         [$state, $events, $attackerDown] = $this->resolveSingleMultipleBlock(
-            $state, $attacker, $defender1, $events,
+            $state,
+            $attacker,
+            $defender1,
+            $events,
         );
 
         // If attacker went down on first block, turnover, no second block
@@ -642,7 +647,10 @@ final class BlockHandler implements ActionHandlerInterface
             && $attacker->getPosition() !== null
         ) {
             [$state, $events, $attackerDown2] = $this->resolveSingleMultipleBlock(
-                $state, $attacker, $defender2, $events,
+                $state,
+                $attacker,
+                $defender2,
+                $events,
             );
 
             if ($attackerDown2) {
@@ -788,7 +796,12 @@ final class BlockHandler implements ActionHandlerInterface
 
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
         $events[] = GameEvent::blockAttempt(
-            $attacker->getId(), $defender->getId(), $diceCount, $attackerChooses, $faceValues, $chosenFace->value,
+            $attacker->getId(),
+            $defender->getId(),
+            $diceCount,
+            $attackerChooses,
+            $faceValues,
+            $chosenFace->value,
         );
 
         // Apply block result with noFollowUp = true
@@ -985,8 +998,8 @@ final class BlockHandler implements ActionHandlerInterface
                     //   míč upustí -- potom už by se nositel nepoznal.
                     //   (Kdyz je nositel prave utocnik, prislusnost k tymu
                     //   z toho plyne -- druha podminka byla zbytecna.)
-                    $activeHeldBall =
-                        $state->getBall()->getCarrierId() === $attacker->getId();
+                    $activeHeldBall
+                        = $state->getBall()->getCarrierId() === $attacker->getId();
 
                     $events[] = GameEvent::wrestle($attacker->getId(), $defender->getId());
                     $attacker = $attacker->withState(PlayerState::PRONE);
@@ -1045,7 +1058,11 @@ final class BlockHandler implements ActionHandlerInterface
         // Handle pushback first
         if ($defenderPushed) {
             [$currentState, $events] = $this->resolvePushback(
-                $currentState, $attacker, $defender, $defenderPos, $events,
+                $currentState,
+                $attacker,
+                $defender,
+                $defenderPos,
+                $events,
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
@@ -1456,7 +1473,9 @@ final class BlockHandler implements ActionHandlerInterface
         }
 
         // Attacker wants highest score, defender wants lowest
-        usort($scored, fn(array $a, array $b) => $attackerChooses
+        usort(
+            $scored,
+            fn(array $a, array $b) => $attackerChooses
             ? $b[1] <=> $a[1]
             : $a[1] <=> $b[1],
         );

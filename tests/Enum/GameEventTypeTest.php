@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Tests\Enum;
@@ -44,19 +45,28 @@ final class GameEventTypeTest extends TestCase
 
     public function testEveryFactoryTypeIsInTheEnum(): void
     {
-        $missing = array_diff($this->typesUsedByFactories(),
-                              array_column(GameEventType::cases(), 'value'));
-        self::assertSame([], array_values($missing),
-            'GameEvent vyrábí typ, který enum nezná — doplň ho do GameEventType.');
+        $missing = array_diff(
+            $this->typesUsedByFactories(),
+            array_column(GameEventType::cases(), 'value'),
+        );
+        self::assertSame(
+            [],
+            array_values($missing),
+            'GameEvent vyrábí typ, který enum nezná — doplň ho do GameEventType.',
+        );
     }
 
     public function testEnumAndMigrationCheckAgree(): void
     {
         $enum = array_column(GameEventType::cases(), 'value');
         $sql  = $this->typesInMigration();
-        sort($enum); sort($sql);
-        self::assertSame($enum, $sql,
-            'CHECK v migraci 004 se rozešel s GameEventType — INSERT by v provozu spadl.');
+        sort($enum);
+        sort($sql);
+        self::assertSame(
+            $enum,
+            $sql,
+            'CHECK v migraci 004 se rozešel s GameEventType — INSERT by v provozu spadl.',
+        );
     }
 
     public function testAnUnknownTypeIsRejectedWhereItIsCreated(): void
@@ -82,7 +92,8 @@ final class GameEventTypeTest extends TestCase
         preg_match_all("/'([A-Za-z]+)'/", $seg, $m);
         $sqlVals  = array_values(array_unique($m[1]));
         $enumVals = array_column(SkillCategory::cases(), 'value');
-        sort($sqlVals); sort($enumVals);
+        sort($sqlVals);
+        sort($enumVals);
         self::assertSame($enumVals, $sqlVals);
     }
 }

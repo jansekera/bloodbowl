@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\AI;
@@ -88,7 +89,7 @@ final class RandomAICoach implements AICoachInterface
             //   jen `playerId` (viz `dd6b229c`, kde tenhle klic chybel obema
             //   ostatnim koucum a hrac kvuli tomu nejednal nikdy).
             ActionType::BALL_AND_CHAIN => ['action' => ActionType::BALL_AND_CHAIN,
-                                           'params' => ['playerId' => $playerId]],
+                'params' => ['playerId' => $playerId]],
             // ⭐ Nepodporovany typ (TTM, bomba, gaze) vypada z losovani TOUTEZ
             //   cestou jako builder, ktery nenasel cil -- jeden mechanismus
             //   misto dvou. Drive to hlidal jeste druhy uzavreny seznam

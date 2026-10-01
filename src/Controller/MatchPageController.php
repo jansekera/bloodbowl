@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controller;
@@ -17,8 +18,7 @@ final class MatchPageController
         private readonly TeamRepository $teamRepo,
         private readonly MatchRepository $matchRepo,
         private readonly Environment $twig,
-    ) {
-    }
+    ) {}
 
     public function newMatch(): void
     {

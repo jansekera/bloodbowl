@@ -11,8 +11,7 @@ final class GameLogListener
 {
     public function __construct(
         private readonly MatchEventRepository $matchEventRepo,
-    ) {
-    }
+    ) {}
 
     public function __invoke(GameEventOccurred $event): void
     {

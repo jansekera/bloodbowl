@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -253,7 +254,7 @@ final class InjuryResolverTest extends TestCase
 
         $casEvents = array_values(array_filter(
             $result['events'],
-            fn ($e) => $e->getType() === 'casualty',
+            fn($e) => $e->getType() === 'casualty',
         ));
 
         $this->assertCount(1, $casEvents);

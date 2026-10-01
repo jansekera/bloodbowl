@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -56,18 +57,51 @@ final class TeamStateDTO
         );
     }
 
-    public function getTeamId(): int { return $this->teamId; }
-    public function getName(): string { return $this->name; }
-    public function getRaceName(): string { return $this->raceName; }
-    public function getSide(): TeamSide { return $this->side; }
-    public function getScore(): int { return $this->score; }
-    public function getRerolls(): int { return $this->rerolls; }
+    public function getTeamId(): int
+    {
+        return $this->teamId;
+    }
+    public function getName(): string
+    {
+        return $this->name;
+    }
+    public function getRaceName(): string
+    {
+        return $this->raceName;
+    }
+    public function getSide(): TeamSide
+    {
+        return $this->side;
+    }
+    public function getScore(): int
+    {
+        return $this->score;
+    }
+    public function getRerolls(): int
+    {
+        return $this->rerolls;
+    }
     /** Vychozi pocet tymovych prehozu -- na nej se vraci o polocase (r. 941-943). */
-    public function getRerollsStart(): int { return $this->rerollsStart ?? $this->rerolls; }
-    public function isRerollUsedThisTurn(): bool { return $this->rerollUsedThisTurn; }
-    public function getTurnNumber(): int { return $this->turnNumber; }
-    public function isBlitzUsedThisTurn(): bool { return $this->blitzUsedThisTurn; }
-    public function isPassUsedThisTurn(): bool { return $this->passUsedThisTurn; }
+    public function getRerollsStart(): int
+    {
+        return $this->rerollsStart ?? $this->rerolls;
+    }
+    public function isRerollUsedThisTurn(): bool
+    {
+        return $this->rerollUsedThisTurn;
+    }
+    public function getTurnNumber(): int
+    {
+        return $this->turnNumber;
+    }
+    public function isBlitzUsedThisTurn(): bool
+    {
+        return $this->blitzUsedThisTurn;
+    }
+    public function isPassUsedThisTurn(): bool
+    {
+        return $this->passUsedThisTurn;
+    }
 
     /**
      * ⛔ DOPLNENO 11.09.2026 (PHP21): hand-off NEMEL VLASTNI LIMIT VUBEC.
@@ -78,10 +112,22 @@ final class TeamStateDTO
      * ⚠️ C++ engine ma `handOffUsedThisTurn` od 17.08. (`f5998575`,
      *   polozka P7 ve fronte). PHP kopie ho nedostala.
      */
-    public function isHandOffUsedThisTurn(): bool { return $this->handOffUsedThisTurn; }
-    public function isFoulUsedThisTurn(): bool { return $this->foulUsedThisTurn; }
-    public function hasApothecary(): bool { return $this->hasApothecary; }
-    public function isApothecaryUsed(): bool { return $this->apothecaryUsed; }
+    public function isHandOffUsedThisTurn(): bool
+    {
+        return $this->handOffUsedThisTurn;
+    }
+    public function isFoulUsedThisTurn(): bool
+    {
+        return $this->foulUsedThisTurn;
+    }
+    public function hasApothecary(): bool
+    {
+        return $this->hasApothecary;
+    }
+    public function isApothecaryUsed(): bool
+    {
+        return $this->apothecaryUsed;
+    }
 
     public function canUseApothecary(): bool
     {

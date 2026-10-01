@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -32,8 +33,11 @@ final class BlitzBlockCostTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(5, $result->getNewState()->requirePlayer(1)->getMovementRemaining(),
-            'rana v blitzu nestrhla pole pohybu');
+        $this->assertSame(
+            5,
+            $result->getNewState()->requirePlayer(1)->getMovementRemaining(),
+            'rana v blitzu nestrhla pole pohybu',
+        );
     }
 
     public function testWithNoMovementLeftTheBlockNeedsAGfiAndAFailFallsBeforeIt(): void
@@ -52,8 +56,11 @@ final class BlitzBlockCostTest extends TestCase
 
         $this->assertTrue($result->isTurnover(), 'neuspesne GFI na ranu neni turnover');
         $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
-        $this->assertSame(6, $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
-            'rana se hodila, ackoli blitzujici padl na GFI');
+        $this->assertSame(
+            6,
+            $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
+            'rana se hodila, ackoli blitzujici padl na GFI',
+        );
         // Samotny pad by vysel i bez opravy (kostka 1 = ATTACKER DOWN) -- rozlisi
         // to az udalosti: hazelo se GFI a rana se NEHODILA.
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
@@ -98,8 +105,11 @@ final class BlitzBlockCostTest extends TestCase
 
         $this->assertFalse($result->isTurnover());
         $this->assertSame(-1, $result->getNewState()->requirePlayer(1)->getMovementRemaining());
-        $this->assertSame(7, $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
-            'rana se nehodila');
+        $this->assertSame(
+            7,
+            $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
+            'rana se nehodila',
+        );
     }
 
     public function testAnApproachThatWouldLeaveNothingForTheBlockIsNotChosenAsTheBlitzSquare(): void
@@ -117,8 +127,11 @@ final class BlitzBlockCostTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertFalse($result->isTurnover());
-        $this->assertSame(6, $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
-            'rana se hodila bez zaplaceni');
+        $this->assertSame(
+            6,
+            $result->getNewState()->requirePlayer(2)->requirePosition()->getX(),
+            'rana se hodila bez zaplaceni',
+        );
         // Kdyz rana nebude, je GFI ciste riziko: priblizeni jde jen normalnim pohybem.
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('gfi', $types, 'dosel na GFI, ackoli ranu stejne nezaplati');

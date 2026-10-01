@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine;
@@ -119,7 +120,7 @@ final class ActionResolver
         return $this->gameFlowResolver;
     }
 
-        /**
+    /**
      * Odecte TYMOVY limit u akce, ktera propadla pred svym provedenim.
      *
      * ⭐ MOVE a BLOCK zadny tymovy limit nemaji -- ty se neodecitaji.
@@ -225,7 +226,10 @@ final class ActionResolver
             }
             if ($player !== null) {
                 $checkResult = $this->bigGuyCheckResolver->resolvePreActionCheck(
-                    $state, $player, $action, $this->dice,
+                    $state,
+                    $player,
+                    $action,
+                    $this->dice,
                 );
                 if ($checkResult !== null) {
                     // ⛔ PHP22: kontrola pred akci umi skoncit i TURNOVEREM --
@@ -261,7 +265,9 @@ final class ActionResolver
                         //   (`action_resolver.cpp:276-283`); PHP kopie ne.
                         if (!empty($checkResult['wastesTeamAction'])) {
                             $blockedState = $this->consumeDeclaredTeamAction(
-                                $blockedState, $player->getTeamSide(), $action,
+                                $blockedState,
+                                $player->getTeamSide(),
+                                $action,
                             );
                         }
 

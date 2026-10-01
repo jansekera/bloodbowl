@@ -14,8 +14,7 @@ final class PageController
         private readonly AuthService $authService,
         private readonly RaceRepository $raceRepository,
         private readonly Environment $twig,
-    ) {
-    }
+    ) {}
 
     public function dashboard(): void
     {

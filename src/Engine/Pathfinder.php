@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine;
@@ -103,7 +104,7 @@ final class Pathfinder
                 $leavingTz = $this->tzCalc->countTacklezones(
                     $state,
                     $currentPos,
-                    $player->getTeamSide()
+                    $player->getTeamSide(),
                 ) > 0;
 
                 // Don't count leaving from start position unless player is actually in TZ

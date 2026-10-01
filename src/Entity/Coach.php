@@ -12,8 +12,7 @@ final class Coach
         private readonly string $email,
         private readonly string $passwordHash,
         private readonly string $createdAt,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $row

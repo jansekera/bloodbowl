@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -866,11 +867,23 @@ final class GameEvent
         ]);
     }
 
-    public function getType(): string { return $this->type; }
-    public function getTypeEnum(): GameEventType { return GameEventType::from($this->type); }
-    public function getDescription(): string { return $this->description; }
+    public function getType(): string
+    {
+        return $this->type;
+    }
+    public function getTypeEnum(): GameEventType
+    {
+        return GameEventType::from($this->type);
+    }
+    public function getDescription(): string
+    {
+        return $this->description;
+    }
     /** @return array<string, mixed> */
-    public function getData(): array { return $this->data; }
+    public function getData(): array
+    {
+        return $this->data;
+    }
 
     /**
      * @return array<string, mixed>

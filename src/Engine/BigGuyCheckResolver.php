@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine;
@@ -26,8 +27,7 @@ final class BigGuyCheckResolver
     public function __construct(
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * ⛔⛔ `wastesTeamAction` (doplneno 11.09.2026 -- polozka PHP15).

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -46,9 +47,17 @@ final class RaceIntegrationTest extends TestCase
         // Minotaur (5/5/2/8, Wild Animal, Frenzy, Horns, MB, etc.)
         // Wild Animal auto-passes on block. ST5 vs ST3 → 2 dice
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 5, strength: 5, agility: 2, armour: 8,
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                5,
+                movement: 5,
+                strength: 5,
+                agility: 2,
+                armour: 8,
                 skills: [SkillName::WildAnimal, SkillName::Frenzy, SkillName::MightyBlow, SkillName::Horns, SkillName::Loner],
-                id: 1)
+                id: 1,
+            )
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, armour: 8, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -72,9 +81,17 @@ final class RaceIntegrationTest extends TestCase
     {
         // Minotaur fails Wild Animal check on move action
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 5, strength: 5, agility: 2, armour: 8,
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                5,
+                movement: 5,
+                strength: 5,
+                agility: 2,
+                armour: 8,
                 skills: [SkillName::WildAnimal, SkillName::Loner],
-                id: 1)
+                id: 1,
+            )
             ->addPlayer(TeamSide::AWAY, 20, 5, id: 2)
             ->withBallOffPitch()
             ->build();
@@ -97,7 +114,10 @@ final class RaceIntegrationTest extends TestCase
     {
         // Mummy (3/5/1/9, MB, Regeneration) suffers casualty → regen saves
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Mummy', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Mummy',
+            number: 1,
             positionalName: 'Mummy',
             stats: new PlayerStats(3, 5, 1, 9),
             skills: [SkillName::MightyBlow, SkillName::Regeneration],
@@ -122,8 +142,17 @@ final class RaceIntegrationTest extends TestCase
         // Skink (8/2/3/7, Dodge, Stunty) dodges from tackle zone
         // AG3 + Stunty(-1) + 1TZ = 7-3+1-1 = 4+. With Dodge skill reroll available.
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 8, strength: 2, agility: 3, armour: 7,
-                skills: [SkillName::Dodge, SkillName::Stunty], id: 1)
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                5,
+                movement: 8,
+                strength: 2,
+                agility: 3,
+                armour: 7,
+                skills: [SkillName::Dodge, SkillName::Stunty],
+                id: 1,
+            )
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2) // provides 1 TZ
             ->withBallOffPitch()
             ->build();
@@ -144,8 +173,17 @@ final class RaceIntegrationTest extends TestCase
         // Wight (6/3/3/8, Block, Regeneration) blocks ST3 target → 1 die
         // Rolls BOTH_DOWN → Block skill converts to push
         $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, movement: 6, strength: 3, agility: 3, armour: 8,
-                skills: [SkillName::Block, SkillName::Regeneration], id: 1)
+            ->addPlayer(
+                TeamSide::HOME,
+                5,
+                5,
+                movement: 6,
+                strength: 3,
+                agility: 3,
+                armour: 8,
+                skills: [SkillName::Block, SkillName::Regeneration],
+                id: 1,
+            )
             ->addPlayer(TeamSide::AWAY, 6, 5, strength: 3, armour: 8, id: 2)
             ->withBallOffPitch()
             ->build();

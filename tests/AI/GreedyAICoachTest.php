@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -169,7 +170,12 @@ final class GreedyAICoachTest extends TestCase
         // B&C player is the ONLY home player; B&C is their only available action
         $builder = new GameStateBuilder();
         $builder->addPlayer(
-            TeamSide::HOME, 10, 7, movement: 6, strength: 4, id: 1,
+            TeamSide::HOME,
+            10,
+            7,
+            movement: 6,
+            strength: 4,
+            id: 1,
             skills: [SkillName::BallAndChain],
         );
         $builder->addPlayer(TeamSide::AWAY, 15, 7, id: 2);
@@ -185,7 +191,12 @@ final class GreedyAICoachTest extends TestCase
         // Vampire with HypnoticGaze adjacent to an enemy
         $builder = new GameStateBuilder();
         $builder->addPlayer(
-            TeamSide::HOME, 10, 7, strength: 4, agility: 4, id: 1,
+            TeamSide::HOME,
+            10,
+            7,
+            strength: 4,
+            agility: 4,
+            id: 1,
             skills: [SkillName::HypnoticGaze],
         );
         $builder->addPlayer(TeamSide::AWAY, 11, 7, id: 2);
@@ -214,7 +225,11 @@ final class GreedyAICoachTest extends TestCase
         // Bombardier with a cluster of enemies in range
         $builder = new GameStateBuilder();
         $builder->addPlayer(
-            TeamSide::HOME, 5, 7, agility: 3, id: 1,
+            TeamSide::HOME,
+            5,
+            7,
+            agility: 3,
+            id: 1,
             skills: [SkillName::Bombardier],
         );
         // Cluster of enemies nearby

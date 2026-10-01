@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\CLI;
@@ -33,7 +34,7 @@ final class DevelopedRostersTest extends TestCase
             $this->assertGreaterThanOrEqual(
                 count($basePlayer->getSkills()),
                 count($devPlayer->getSkills()),
-                "Developed {$race} player {$basePlayer->getPositionalName()} should have >= base skills"
+                "Developed {$race} player {$basePlayer->getPositionalName()} should have >= base skills",
             );
         }
     }
@@ -43,7 +44,7 @@ final class DevelopedRostersTest extends TestCase
         $players = getDevelopedRaceRoster(TeamSide::HOME, 'Human');
         $blitzers = array_filter(
             $players,
-            fn($p) => $p->getPositionalName() === 'Blitzer'
+            fn($p) => $p->getPositionalName() === 'Blitzer',
         );
         $this->assertCount(4, $blitzers);
 
@@ -53,7 +54,7 @@ final class DevelopedRostersTest extends TestCase
             // Each has one extra: Guard, MightyBlow, or Tackle
             $extraSkills = array_diff(
                 array_map(fn($s) => $s->value, $blitzer->getSkills()),
-                [SkillName::Block->value]
+                [SkillName::Block->value],
             );
             $this->assertCount(1, $extraSkills);
             $extra = SkillName::from(array_values($extraSkills)[0]);
@@ -66,7 +67,7 @@ final class DevelopedRostersTest extends TestCase
         $players = getDevelopedRaceRoster(TeamSide::HOME, 'Wood Elf');
         $wardancers = array_filter(
             $players,
-            fn($p) => $p->getPositionalName() === 'Wardancer'
+            fn($p) => $p->getPositionalName() === 'Wardancer',
         );
         $this->assertCount(2, $wardancers);
 
@@ -86,7 +87,7 @@ final class DevelopedRostersTest extends TestCase
         $players = getDevelopedRaceRoster(TeamSide::HOME, 'Orc');
         $blackOrcs = array_filter(
             $players,
-            fn($p) => $p->getPositionalName() === 'Black Orc'
+            fn($p) => $p->getPositionalName() === 'Black Orc',
         );
         $this->assertCount(4, $blackOrcs);
 
@@ -100,7 +101,7 @@ final class DevelopedRostersTest extends TestCase
         $players = getDevelopedRaceRoster(TeamSide::HOME, 'Lizardmen');
         $sauruses = array_filter(
             $players,
-            fn($p) => $p->getPositionalName() === 'Saurus'
+            fn($p) => $p->getPositionalName() === 'Saurus',
         );
         $this->assertCount(6, $sauruses);
 
@@ -114,7 +115,7 @@ final class DevelopedRostersTest extends TestCase
         $players = getDevelopedRaceRoster(TeamSide::HOME, 'Chaos');
         $warriors = array_filter(
             $players,
-            fn($p) => $p->getPositionalName() === 'Chaos Warrior'
+            fn($p) => $p->getPositionalName() === 'Chaos Warrior',
         );
         $this->assertCount(4, $warriors);
 
@@ -129,7 +130,7 @@ final class DevelopedRostersTest extends TestCase
         // Verify base roster wasn't mutated
         $blitzers = array_filter(
             $basePlayers,
-            fn($p) => $p->getPositionalName() === 'Blitzer'
+            fn($p) => $p->getPositionalName() === 'Blitzer',
         );
         foreach ($blitzers as $b) {
             $this->assertCount(1, $b->getSkills(), 'Base blitzer should still have only Block');

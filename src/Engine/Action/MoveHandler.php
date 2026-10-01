@@ -31,8 +31,7 @@ final class MoveHandler implements ActionHandlerInterface
         private readonly Pathfinder $pathfinder,
         private readonly BallResolver $ballResolver,
         private readonly ?InjuryResolver $injuryResolver = null,
-    ) {
-    }
+    ) {}
 
 
     /**
@@ -161,7 +160,9 @@ final class MoveHandler implements ActionHandlerInterface
 
                     // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni.
                     [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState, $fallenPlayer, $events,
+                        $currentState,
+                        $fallenPlayer,
+                        $events,
                     );
 
                     return ActionResult::turnover(
@@ -328,7 +329,8 @@ final class MoveHandler implements ActionHandlerInterface
                         $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
                         $currentState = $currentState->withPlayer($currentPlayer);
                         $pro = ProCheck::roll(
-                            $this->dice, $currentPlayer,
+                            $this->dice,
+                            $currentPlayer,
                             !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll(),
                             $events,
                         );
@@ -383,7 +385,9 @@ final class MoveHandler implements ActionHandlerInterface
                     // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
                     //   teprve potom mic (stejne poradi jako v `BlockHandler`).
                     [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState, $fallenPlayer, $events,
+                        $currentState,
+                        $fallenPlayer,
+                        $events,
                     );
 
                     return ActionResult::turnover(
@@ -482,7 +486,8 @@ final class MoveHandler implements ActionHandlerInterface
                     $currentPlayer = $currentPlayer->withProUsedThisTurn(true);
                     $currentState = $currentState->withPlayer($currentPlayer);
                     $pro = ProCheck::roll(
-                        $this->dice, $currentPlayer,
+                        $this->dice,
+                        $currentPlayer,
                         !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll(),
                         $events,
                     );
@@ -537,7 +542,9 @@ final class MoveHandler implements ActionHandlerInterface
                     // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
                     //   teprve potom mic (stejne poradi jako v `BlockHandler`).
                     [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState, $fallenPlayer, $events,
+                        $currentState,
+                        $fallenPlayer,
+                        $events,
                     );
 
                     return ActionResult::turnover(

@@ -51,7 +51,7 @@ final class CoachRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO coaches (name, email, password_hash)
              VALUES (:name, :email, :password_hash)
-             RETURNING *'
+             RETURNING *',
         );
         $stmt->execute([
             'name' => $name,

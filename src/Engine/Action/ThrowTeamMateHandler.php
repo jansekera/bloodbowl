@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Engine\Action;
@@ -26,8 +27,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         private readonly ScatterCalculator $scatterCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $params {playerId, targetId, targetX, targetY}

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -48,8 +49,11 @@ final class LearningWeightsLoadingTest extends TestCase
         unlink($path);
 
         // ⛔ Tohle je ta vada: dřív vyšla délka 5.
-        $this->assertCount(FeatureExtractor::NUM_FEATURES, $w,
-            'vektor vah musí mít tolik prvků, kolik je příznaků');
+        $this->assertCount(
+            FeatureExtractor::NUM_FEATURES,
+            $w,
+            'vektor vah musí mít tolik prvků, kolik je příznaků',
+        );
         $this->assertSame(0.25, $w[0], 'první váha se má vzít z value_weights');
         $this->assertSame(-0.5, $w[69], 'a poslední natrénovaná taky');
     }

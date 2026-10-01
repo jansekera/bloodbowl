@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -16,15 +17,29 @@ final class MovePath
         private readonly int $totalCost,
         private readonly int $dodgeCount,
         private readonly int $gfiCount,
-    ) {
-    }
+    ) {}
 
-    public function getDestination(): Position { return $this->destination; }
+    public function getDestination(): Position
+    {
+        return $this->destination;
+    }
     /** @return list<MoveStep> */
-    public function getSteps(): array { return $this->steps; }
-    public function getTotalCost(): int { return $this->totalCost; }
-    public function getDodgeCount(): int { return $this->dodgeCount; }
-    public function getGfiCount(): int { return $this->gfiCount; }
+    public function getSteps(): array
+    {
+        return $this->steps;
+    }
+    public function getTotalCost(): int
+    {
+        return $this->totalCost;
+    }
+    public function getDodgeCount(): int
+    {
+        return $this->dodgeCount;
+    }
+    public function getGfiCount(): int
+    {
+        return $this->gfiCount;
+    }
 
     public function requiresRolls(): bool
     {

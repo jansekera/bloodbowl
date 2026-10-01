@@ -22,7 +22,9 @@ final class SeededDiceRollerTest extends TestCase
     private function serie(DiceRollerInterface $d, int $n = 60): array
     {
         $out = [];
-        for ($i = 0; $i < $n; $i++) { $out[] = $d->rollD6(); }
+        for ($i = 0; $i < $n; $i++) {
+            $out[] = $d->rollD6();
+        }
 
         return $out;
     }
@@ -73,7 +75,9 @@ final class SeededDiceRollerTest extends TestCase
     public function testRozsahyHodu(): void
     {
         $d = new SeededDiceRoller(20260921);
-        $d6 = []; $d8 = []; $dd = [];
+        $d6 = [];
+        $d8 = [];
+        $dd = [];
         for ($i = 0; $i < 3000; $i++) {
             $d6[] = $d->rollD6();
             $d8[] = $d->rollD8();

@@ -58,7 +58,9 @@ final class DodgeOncePerTurnTest extends TestCase
     {
         $n = 0;
         foreach ($events as $e) {
-            if ($e->getType() === 'reroll' && ($e->getData()['source'] ?? '') === 'Dodge') { $n++; }
+            if ($e->getType() === 'reroll' && ($e->getData()['source'] ?? '') === 'Dodge') {
+                $n++;
+            }
         }
 
         return $n;
@@ -73,7 +75,9 @@ final class DodgeOncePerTurnTest extends TestCase
     {
         $out = [];
         foreach ($events as $e) {
-            if ($e->getType() === 'dodge') { $out[] = (bool) ($e->getData()['success'] ?? false); }
+            if ($e->getType() === 'dodge') {
+                $out[] = (bool) ($e->getData()['success'] ?? false);
+            }
         }
 
         return $out;

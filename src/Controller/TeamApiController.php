@@ -16,8 +16,7 @@ final class TeamApiController
         private readonly AuthService $authService,
         private readonly TeamService $teamService,
         private readonly TeamRepository $teamRepository,
-    ) {
-    }
+    ) {}
 
     public function list(): void
     {

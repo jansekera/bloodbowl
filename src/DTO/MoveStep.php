@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\DTO;
@@ -14,15 +15,32 @@ final class MoveStep
         private readonly int $dodgeTarget,
         private readonly bool $isGfi,
         private readonly bool $isLeap = false,
-    ) {
-    }
+    ) {}
 
-    public function getPosition(): Position { return $this->position; }
-    public function getMovementCost(): int { return $this->movementCost; }
-    public function requiresDodge(): bool { return $this->requiresDodge; }
-    public function getDodgeTarget(): int { return $this->dodgeTarget; }
-    public function isGfi(): bool { return $this->isGfi; }
-    public function isLeap(): bool { return $this->isLeap; }
+    public function getPosition(): Position
+    {
+        return $this->position;
+    }
+    public function getMovementCost(): int
+    {
+        return $this->movementCost;
+    }
+    public function requiresDodge(): bool
+    {
+        return $this->requiresDodge;
+    }
+    public function getDodgeTarget(): int
+    {
+        return $this->dodgeTarget;
+    }
+    public function isGfi(): bool
+    {
+        return $this->isGfi;
+    }
+    public function isLeap(): bool
+    {
+        return $this->isLeap;
+    }
 
     /**
      * @return array<string, mixed>

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -39,7 +40,7 @@ final class BlitzSurfingTest extends TestCase
         // So we check events for the move destination before the block
         $moveEvents = array_values(array_filter(
             $result->getEvents(),
-            fn($e) => $e->getType() === 'player_move'
+            fn($e) => $e->getType() === 'player_move',
         ));
         // Last move event is to the adjacent-to-defender square
         $lastMove = end($moveEvents);
@@ -67,7 +68,7 @@ final class BlitzSurfingTest extends TestCase
         $this->assertFalse($result->isTurnover());
         $moveEvents = array_values(array_filter(
             $result->getEvents(),
-            fn($e) => $e->getType() === 'player_move'
+            fn($e) => $e->getType() === 'player_move',
         ));
         $lastMove = end($moveEvents);
         $this->assertNotFalse($lastMove);
@@ -102,7 +103,7 @@ final class BlitzSurfingTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertTrue(
             in_array('stab', $types) || in_array('block', $types),
-            'Expected either stab or block event'
+            'Expected either stab or block event',
         );
     }
 

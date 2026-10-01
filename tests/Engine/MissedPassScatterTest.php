@@ -61,8 +61,11 @@ final class MissedPassScatterTest extends TestCase
             'playerId' => 1, 'targetX' => 7, 'targetY' => 5,
         ]);
 
-        $this->assertSame(2, $result->getNewState()->getBall()->getCarrierId(),
-            'hrac na poli, pres ktere mic jen proletel, chytat nesmi (r. 739-741)');
+        $this->assertSame(
+            2,
+            $result->getNewState()->getBall()->getCarrierId(),
+            'hrac na poli, pres ktere mic jen proletel, chytat nesmi (r. 739-741)',
+        );
         $this->assertFalse($dice->hasRemainingRolls());
     }
 

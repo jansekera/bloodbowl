@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -92,8 +93,10 @@ final class BigGuySkillsTest extends TestCase
 
         // Nove kolo stav NERUSI -- drzi se pres `bigGuyStupefied`.
         $resetState = $newState->resetPlayersForNewTurn(TeamSide::HOME);
-        $this->assertTrue($resetState->requirePlayer(1)->hasLostTacklezones(),
-            'otupení ma prezit hranici kola (r. 7985-7986)');
+        $this->assertTrue(
+            $resetState->requirePlayer(1)->hasLostTacklezones(),
+            'otupení ma prezit hranici kola (r. 7985-7986)',
+        );
         $this->assertTrue($resetState->requirePlayer(1)->isBigGuyStupefied());
     }
 
@@ -114,8 +117,10 @@ final class BigGuySkillsTest extends TestCase
         ]);
 
         $after = $result->getNewState()->requirePlayer(1);
-        $this->assertFalse($after->isBigGuyStupefied(),
-            'dvojka stav UKONCUJE (r. 7985-7986)');
+        $this->assertFalse(
+            $after->isBigGuyStupefied(),
+            'dvojka stav UKONCUJE (r. 7985-7986)',
+        );
         $this->assertFalse($after->hasLostTacklezones());
     }
 
@@ -478,7 +483,10 @@ final class BigGuySkillsTest extends TestCase
     public function testRegenerationSuccess(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Troll', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Troll',
+            number: 1,
             positionalName: 'Troll',
             stats: new \App\ValueObject\PlayerStats(4, 5, 1, 9),
             skills: [SkillName::Regeneration],
@@ -501,7 +509,10 @@ final class BigGuySkillsTest extends TestCase
     public function testRegenerationFailure(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Troll', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Troll',
+            number: 1,
             positionalName: 'Troll',
             stats: new \App\ValueObject\PlayerStats(4, 5, 1, 9),
             skills: [SkillName::Regeneration],
@@ -522,7 +533,10 @@ final class BigGuySkillsTest extends TestCase
     public function testRegenerationNotOnStunned(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Troll', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Troll',
+            number: 1,
             positionalName: 'Troll',
             stats: new \App\ValueObject\PlayerStats(4, 5, 1, 9),
             skills: [SkillName::Regeneration],
@@ -543,7 +557,10 @@ final class BigGuySkillsTest extends TestCase
     public function testRegenerationNotOnKO(): void
     {
         $player = \App\DTO\MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Troll', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Troll',
+            number: 1,
             positionalName: 'Troll',
             stats: new \App\ValueObject\PlayerStats(4, 5, 1, 9),
             skills: [SkillName::Regeneration],

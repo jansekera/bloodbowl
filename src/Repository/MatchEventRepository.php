@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Repository;
@@ -20,14 +21,14 @@ final class MatchEventRepository
     {
         // Get next sequence number
         $stmt = $this->pdo->prepare(
-            'SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM match_events WHERE match_id = :match_id'
+            'SELECT COALESCE(MAX(sequence_number), 0) + 1 FROM match_events WHERE match_id = :match_id',
         );
         $stmt->execute(['match_id' => $matchId]);
         $sequence = (int) $stmt->fetchColumn();
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO match_events (match_id, sequence_number, event_type, description, event_data)
-             VALUES (:match_id, :sequence_number, :event_type, :description, :event_data)'
+             VALUES (:match_id, :sequence_number, :event_type, :description, :event_data)',
         );
         $stmt->execute([
             'match_id' => $matchId,
@@ -57,7 +58,7 @@ final class MatchEventRepository
             'SELECT * FROM match_events
              WHERE match_id = :match_id
              ORDER BY sequence_number DESC
-             LIMIT :limit OFFSET :offset'
+             LIMIT :limit OFFSET :offset',
         );
         $stmt->bindValue('match_id', $matchId, PDO::PARAM_INT);
         $stmt->bindValue('limit', $limit, PDO::PARAM_INT);
@@ -75,7 +76,7 @@ final class MatchEventRepository
         $stmt = $this->pdo->prepare(
             'SELECT * FROM match_events
              WHERE match_id = :match_id
-             ORDER BY sequence_number ASC'
+             ORDER BY sequence_number ASC',
         );
         $stmt->execute(['match_id' => $matchId]);
 
@@ -96,7 +97,7 @@ final class MatchEventRepository
     public function getEventCount(int $matchId): int
     {
         $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM match_events WHERE match_id = :match_id'
+            'SELECT COUNT(*) FROM match_events WHERE match_id = :match_id',
         );
         $stmt->execute(['match_id' => $matchId]);
 

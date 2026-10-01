@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -18,7 +19,10 @@ final class NurglesRotTest extends TestCase
     public function testNurglesRotEventOnCasualty(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Lineman', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Lineman',
+            number: 1,
             positionalName: 'Lineman',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [],
@@ -40,7 +44,10 @@ final class NurglesRotTest extends TestCase
     public function testNoNurglesRotEventWithoutSkill(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Lineman', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Lineman',
+            number: 1,
             positionalName: 'Lineman',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [],
@@ -62,7 +69,10 @@ final class NurglesRotTest extends TestCase
     public function testNurglesRotNotOnNonCasualty(): void
     {
         $player = MatchPlayerDTO::create(
-            id: 1, playerId: 1, name: 'Lineman', number: 1,
+            id: 1,
+            playerId: 1,
+            name: 'Lineman',
+            number: 1,
             positionalName: 'Lineman',
             stats: new PlayerStats(6, 3, 3, 8),
             skills: [],

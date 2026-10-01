@@ -20,8 +20,7 @@ final class TeamPageController
         private readonly TeamRepository $teamRepository,
         private readonly RaceRepository $raceRepository,
         private readonly Environment $twig,
-    ) {
-    }
+    ) {}
 
     public function list(): void
     {
@@ -107,7 +106,7 @@ final class TeamPageController
         try {
             $this->teamService->hirePlayer($teamId, $templateId, $playerName);
             header("Location: /teams/{$teamId}");
-        } catch (ValidationException | NotFoundException $e) {
+        } catch (ValidationException|NotFoundException $e) {
             $errorMsg = $e instanceof ValidationException
                 ? implode(', ', $e->getErrors())
                 : $e->getMessage();

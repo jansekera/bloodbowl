@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -75,10 +76,15 @@ final class BloodlustTest extends TestCase
         //   NA HRISTI ZUSTAVA. Presne v tom je ta oprava: kousnuti neposila
         //   Thralla pryc, jen ho zrani.
         $thrall = $newState->requirePlayer(2);
-        $this->assertSame(PlayerState::STUNNED, $thrall->getState(),
-            'hod 2+2=4 je Stunned (r. 7939-7941)');
-        $this->assertNotNull($thrall->getPosition(),
-            'omraceny Thrall zustava na hristi');
+        $this->assertSame(
+            PlayerState::STUNNED,
+            $thrall->getState(),
+            'hod 2+2=4 je Stunned (r. 7939-7941)',
+        );
+        $this->assertNotNull(
+            $thrall->getPosition(),
+            'omraceny Thrall zustava na hristi',
+        );
 
         // Vampire still moved
         $vampirePos = $newState->requirePlayer(1)->requirePosition();
@@ -108,8 +114,10 @@ final class BloodlustTest extends TestCase
         // ⛔ PREPSANO 11.09.2026 (PHP22): drive se tu tvrdil `isSuccess()`
         //   -- tedy ZADNY turnover. r. 7942-7943: „**Failure to bite a Thrall
         //   is a turnover** and requires you to feed on a spectator."
-        $this->assertTrue($result->isTurnover(),
-            'upir bez Thralla = turnover (r. 7942-7943)');
+        $this->assertTrue(
+            $result->isTurnover(),
+            'upir bez Thralla = turnover (r. 7942-7943)',
+        );
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertContains('bloodlust_fail', $types);
 
@@ -173,10 +181,16 @@ final class BloodlustTest extends TestCase
 
         // Thrall dostal hod na zraneni -- a z kousnuti se NEUMIRA.
         $thrall = $result->getNewState()->requirePlayer(2);
-        $this->assertNotSame(PlayerState::DEAD, $thrall->getState(),
-            'z kousnuti se neumira (r. 7940-7941)');
-        $this->assertNotSame(PlayerState::STANDING, $thrall->getState(),
-            'kousnuti neco udelat MELO');
+        $this->assertNotSame(
+            PlayerState::DEAD,
+            $thrall->getState(),
+            'z kousnuti se neumira (r. 7940-7941)',
+        );
+        $this->assertNotSame(
+            PlayerState::STANDING,
+            $thrall->getState(),
+            'kousnuti neco udelat MELO',
+        );
     }
 
     /**
@@ -197,8 +211,11 @@ final class BloodlustTest extends TestCase
         );
 
         // SEBEKONTROLA: Thrall OPRAVDU lezi -- jinak by test nemeril vyjimku.
-        $this->assertSame(PlayerState::PRONE, $state->requirePlayer(2)->getState(),
-            'fixtura je vadna: Thrall stoji');
+        $this->assertSame(
+            PlayerState::PRONE,
+            $state->requirePlayer(2)->getState(),
+            'fixtura je vadna: Thrall stoji',
+        );
 
         $dice = new FixedDiceRoller([1, 2, 2]);
         $resolver = new ActionResolver($dice);
@@ -207,10 +224,15 @@ final class BloodlustTest extends TestCase
         ]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('bloodlust_bite', $types,
-            'lezici Thrall se kousnout DA (r. 7938-7939)');
-        $this->assertFalse($result->isTurnover(),
-            'Thrall bez mice turnover nedela (r. 7941-7942)');
+        $this->assertContains(
+            'bloodlust_bite',
+            $types,
+            'lezici Thrall se kousnout DA (r. 7938-7939)',
+        );
+        $this->assertFalse(
+            $result->isTurnover(),
+            'Thrall bez mice turnover nedela (r. 7941-7942)',
+        );
     }
 
     public function testBitingTheBallCarryingThrallIsATurnover(): void
@@ -223,8 +245,11 @@ final class BloodlustTest extends TestCase
             ->withBallCarried(2)
             ->build();
 
-        $this->assertSame(2, $state->getBall()->getCarrierId(),
-            'fixtura je vadna: mic nenese Thrall');
+        $this->assertSame(
+            2,
+            $state->getBall()->getCarrierId(),
+            'fixtura je vadna: mic nenese Thrall',
+        );
 
         $dice = new FixedDiceRoller([1, 2, 2, 3]);
         $resolver = new ActionResolver($dice);
@@ -232,8 +257,10 @@ final class BloodlustTest extends TestCase
             'playerId' => 1, 'x' => 4, 'y' => 7,
         ]);
 
-        $this->assertTrue($result->isTurnover(),
-            'kousnuty Thrall drzel mic => turnover (r. 7941-7942)');
+        $this->assertTrue(
+            $result->isTurnover(),
+            'kousnuty Thrall drzel mic => turnover (r. 7941-7942)',
+        );
     }
 
     public function testVampireWithoutThrallDropsTheBall(): void
@@ -245,8 +272,11 @@ final class BloodlustTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        $this->assertSame(1, $state->getBall()->getCarrierId(),
-            'fixtura je vadna: mic nenese upir');
+        $this->assertSame(
+            1,
+            $state->getBall()->getCarrierId(),
+            'fixtura je vadna: mic nenese upir',
+        );
 
         $dice = new FixedDiceRoller([1, 3]);
         $resolver = new ActionResolver($dice);
@@ -256,12 +286,19 @@ final class BloodlustTest extends TestCase
 
         $after = $result->getNewState();
         $this->assertTrue($result->isTurnover());
-        $this->assertSame(PlayerState::OFF_PITCH, $after->requirePlayer(1)->getState(),
-            'upir jde do rezerv');
-        $this->assertFalse($after->getBall()->isHeld(),
-            'mic se ma odrazit, ne odejit s upirem');
-        $this->assertTrue($after->getBall()->isOnPitch(),
-            'mic zustava na hristi');
+        $this->assertSame(
+            PlayerState::OFF_PITCH,
+            $after->requirePlayer(1)->getState(),
+            'upir jde do rezerv',
+        );
+        $this->assertFalse(
+            $after->getBall()->isHeld(),
+            'mic se ma odrazit, ne odejit s upirem',
+        );
+        $this->assertTrue(
+            $after->getBall()->isOnPitch(),
+            'mic zustava na hristi',
+        );
     }
 
     /** Krmi se az NA KONCI akce (r. 7934-7936): upir bez Thralla na zacatku dobehne k nemu a nakrmi se. */

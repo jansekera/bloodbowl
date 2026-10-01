@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\AI;
@@ -9,9 +10,7 @@ use App\Enum\ActionType;
 
 final class ActionSimulator
 {
-    public function __construct(private readonly ActionResolver $resolver)
-    {
-    }
+    public function __construct(private readonly ActionResolver $resolver) {}
 
     /**
      * Simulate an action and return the resulting GameState (or null on failure).

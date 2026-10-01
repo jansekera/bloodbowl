@@ -509,12 +509,17 @@ final class WeatherTest extends TestCase
         $newState = $this->callHeat($flow, $state, $events);
 
         $this->assertTrue($newState->requirePlayer(1)->isOutNextSetup(), 'Hodil 1 => kolabuje');
-        $this->assertSame(PlayerState::STANDING, $newState->requirePlayer(1)->getState(),
-            'Kolaps NENI KO -- stav se nemeni, meni se priznak');
+        $this->assertSame(
+            PlayerState::STANDING,
+            $newState->requirePlayer(1)->getState(),
+            'Kolaps NENI KO -- stav se nemeni, meni se priznak',
+        );
 
         foreach ([2, 3, 4] as $id) {
-            $this->assertFalse($newState->requirePlayer($id)->isOutNextSetup(),
-                "Hrac {$id} hodil 5, nesmi kolabovat");
+            $this->assertFalse(
+                $newState->requirePlayer($id)->isOutNextSetup(),
+                "Hrac {$id} hodil 5, nesmi kolabovat",
+            );
         }
 
         $this->assertCount(1, array_filter($events, fn($e) => $e->getType() === 'sweltering_heat'));

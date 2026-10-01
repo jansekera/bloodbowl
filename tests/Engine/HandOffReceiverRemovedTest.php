@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\Engine;
@@ -56,17 +57,26 @@ final class HandOffReceiverRemovedTest extends TestCase
         ]);
 
         // SEBEKONTROLA VÝSLEDKU: příjemce OPRAVDU zmizel z hřiště.
-        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition(),
-            'Thrall na hřišti zůstal — test neměří, co má');
+        $this->assertNull(
+            $result->getNewState()->requirePlayer(2)->getPosition(),
+            'Thrall na hřišti zůstal — test neměří, co má',
+        );
 
         // Dřív tady letěla výjimka.
-        $this->assertTrue($result->isSuccess(),
-            'zmizelý příjemce nesmí házet výjimku');
-        $this->assertFalse($result->isTurnover(),
-            'katalog turnoverů (r. 368-384) tenhle případ nezná');
+        $this->assertTrue(
+            $result->isSuccess(),
+            'zmizelý příjemce nesmí házet výjimku',
+        );
+        $this->assertFalse(
+            $result->isTurnover(),
+            'katalog turnoverů (r. 368-384) tenhle případ nezná',
+        );
         // Míč zůstává podávajícímu.
-        $this->assertSame(1, $result->getNewState()->getBall()->getCarrierId(),
-            'míč nemá komu přejít, zůstává vampírovi');
+        $this->assertSame(
+            1,
+            $result->getNewState()->getBall()->getCarrierId(),
+            'míč nemá komu přejít, zůstává vampírovi',
+        );
     }
 
     public function testNormalHandOffStillWorks(): void
@@ -84,8 +94,11 @@ final class HandOffReceiverRemovedTest extends TestCase
         ]);
 
         $this->assertTrue($result->isSuccess());
-        $this->assertSame(2, $result->getNewState()->getBall()->getCarrierId(),
-            'běžný hand-off musí míč předat');
+        $this->assertSame(
+            2,
+            $result->getNewState()->getBall()->getCarrierId(),
+            'běžný hand-off musí míč předat',
+        );
     }
 
     public function testProneReceiverStillGetsTheHandOffAndCannotCatch(): void
@@ -111,10 +124,14 @@ final class HandOffReceiverRemovedTest extends TestCase
 
         // SEBEKONTROLA FIXTURY: příjemce LEŽÍ, ale JE na hřišti -- jinak by
         // se test trefil do větve (a) a neměřil by, co má.
-        $this->assertNotNull($state->requirePlayer(2)->getPosition(),
-            'fixtura je vadná: příjemce z hřiště zmizel, to je jiný případ');
-        $this->assertFalse($state->requirePlayer(2)->getState()->canAct(),
-            'fixtura je vadná: příjemce stojí');
+        $this->assertNotNull(
+            $state->requirePlayer(2)->getPosition(),
+            'fixtura je vadná: příjemce z hřiště zmizel, to je jiný případ',
+        );
+        $this->assertFalse(
+            $state->requirePlayer(2)->getState()->canAct(),
+            'fixtura je vadná: příjemce stojí',
+        );
 
         // Odraz D8 = 3 (dx +1) na (7,7), tam nikdo nestojí => míč na zemi.
         $resolver = new ActionResolver(new FixedDiceRoller([3]));
@@ -123,10 +140,14 @@ final class HandOffReceiverRemovedTest extends TestCase
         ]);
 
         $ball = $result->getNewState()->getBall();
-        $this->assertFalse($ball->isHeld(),
-            'ležící chytit nesmí -- míč se má odrazit (r. 857-858)');
-        $this->assertTrue($result->isTurnover(),
-            'míč se zastavil nechycený => turnover (r. 1683-1686)');
+        $this->assertFalse(
+            $ball->isHeld(),
+            'ležící chytit nesmí -- míč se má odrazit (r. 857-858)',
+        );
+        $this->assertTrue(
+            $result->isTurnover(),
+            'míč se zastavil nechycený => turnover (r. 1683-1686)',
+        );
     }
 
     public function testProneReceiverBounceCaughtByTeammateIsNotATurnover(): void
@@ -142,8 +163,10 @@ final class HandOffReceiverRemovedTest extends TestCase
         $state = $state->withPlayer(
             $state->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE),
         );
-        $state = $state->withTeamState(TeamSide::HOME,
-            $state->getTeamState(TeamSide::HOME)->withRerollUsed());
+        $state = $state->withTeamState(
+            TeamSide::HOME,
+            $state->getTeamState(TeamSide::HOME)->withRerollUsed(),
+        );
 
         // Odraz D8 = 3 na (7,7), kde STOJÍ hráč 3 => chytá (hod 6).
         $resolver = new ActionResolver(new FixedDiceRoller([3, 6]));
@@ -151,8 +174,11 @@ final class HandOffReceiverRemovedTest extends TestCase
             'playerId' => 1, 'targetId' => 2,
         ]);
 
-        $this->assertSame(3, $result->getNewState()->getBall()->getCarrierId(),
-            'odraz měl chytit spoluhráč');
+        $this->assertSame(
+            3,
+            $result->getNewState()->getBall()->getCarrierId(),
+            'odraz měl chytit spoluhráč',
+        );
         $this->assertFalse($result->isTurnover(),
             'míč zůstal našemu týmu -- kolo nekončí');
     }

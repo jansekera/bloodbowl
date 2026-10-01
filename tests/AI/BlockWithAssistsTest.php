@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Tests\AI;
@@ -46,8 +47,11 @@ final class BlockWithAssistsTest extends TestCase
         $decision = (new LearningAICoach())->decideAction($state, $rules);
 
         if ($decision['action'] === ActionType::BLOCK) {
-            $this->assertNotSame(1, $decision['params']['playerId'],
-                'kouč blokoval slabším hráčem proti ST 4, ačkoli vedle měl blok s asistencí');
+            $this->assertNotSame(
+                1,
+                $decision['params']['playerId'],
+                'kouč blokoval slabším hráčem proti ST 4, ačkoli vedle měl blok s asistencí',
+            );
         } else {
             // Blok se nezvolil vůbec -- taky správně, ten špatný se hrát nemá.
             $this->assertNotSame(ActionType::BLOCK, $decision['action']);
@@ -76,8 +80,14 @@ final class BlockWithAssistsTest extends TestCase
         $this->assertSame(ActionType::MOVE, $decision['action']);
         $this->assertSame(3, $decision['params']['playerId']);
         $vzdalenostOdSoupere = max(abs($decision['params']['x'] - 6), abs($decision['params']['y'] - 7));
-        $this->assertSame(1, $vzdalenostOdSoupere,
-            sprintf('hráč šel na (%d,%d) místo aby přivedl asistenci k soupeři na (6,7)',
-                $decision['params']['x'], $decision['params']['y']));
+        $this->assertSame(
+            1,
+            $vzdalenostOdSoupere,
+            sprintf(
+                'hráč šel na (%d,%d) místo aby přivedl asistenci k soupeři na (6,7)',
+                $decision['params']['x'],
+                $decision['params']['y'],
+            ),
+        );
     }
 }
