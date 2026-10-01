@@ -125,7 +125,10 @@ final class ReallyStupidSupportTest extends TestCase
         $result = $this->move($state);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('really_stupid', $types,
-            'Really Stupid soused bonus dávat NESMÍ — dva se nepodpírají');
+        $this->assertContains(
+            'really_stupid',
+            $types,
+            'Really Stupid soused bonus dávat NESMÍ — dva se nepodpírají',
+        );
     }
 }

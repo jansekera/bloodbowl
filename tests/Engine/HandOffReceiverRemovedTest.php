@@ -179,7 +179,9 @@ final class HandOffReceiverRemovedTest extends TestCase
             $result->getNewState()->getBall()->getCarrierId(),
             'odraz měl chytit spoluhráč',
         );
-        $this->assertFalse($result->isTurnover(),
-            'míč zůstal našemu týmu -- kolo nekončí');
+        $this->assertFalse(
+            $result->isTurnover(),
+            'míč zůstal našemu týmu -- kolo nekončí',
+        );
     }
 }

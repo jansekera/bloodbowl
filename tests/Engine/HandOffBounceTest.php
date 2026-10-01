@@ -110,7 +110,9 @@ final class HandOffBounceTest extends TestCase
             $result->getNewState()->getBall()->isHeld(),
             'míč měl skončit na zemi',
         );
-        $this->assertTrue($result->isTurnover(),
-            'míč se zastavil nechycený -- to turnover JE (bod 2)');
+        $this->assertTrue(
+            $result->isTurnover(),
+            'míč se zastavil nechycený -- to turnover JE (bod 2)',
+        );
     }
 }
