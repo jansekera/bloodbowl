@@ -159,7 +159,7 @@ def board(state):
     #   do necitelneho zmatku. Vcetne mice, kdyby lezel mimo hrace.
     occx = [x for (x, y) in cell] + [state.ball.position.x]
     occy = [y for (x, y) in cell] + [state.ball.position.y]
-    xlo, xhi = max(0, min(occx) - 2), min(25, max(occx) + 2)
+    xlo, xhi = max(0, min(occx)), min(25, max(occx))   # uživatel 02.10.: bez okraje navíc, hřiště je široké
     ylo, yhi = max(0, min(occy) - 1), min(14, max(occy) + 1)
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
 
