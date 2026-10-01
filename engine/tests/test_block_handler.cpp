@@ -3,6 +3,7 @@
 #include "bb/helpers.h"
 #include "bb/macro_actions.h"   // M1/N10 arm
 #include "bb/rules_engine.h"
+#include "bb/action_resolver.h"
 
 using namespace bb;
 
@@ -1578,5 +1579,39 @@ TEST(BlockHandlerManual, AChoiceTheRulesForbidIsIgnored) {
     resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).position, (Position{14, 6}));
     EXPECT_EQ(gs.getPlayer(13).position, (Position{14, 7}));
+    clearManualBlockChoices();
+}
+
+// Blitz: kouč volí i pole, ODKUD se blokuje. DBG9 (11,10) na WW21 (13,10),
+// WL14 na (14,10); z (12,11) je odtlačení na (14,9) rovně nebo (13,9) bokem.
+static GameState manualBlitzBoard() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 9, {11, 10}, TeamSide::HOME, 5);
+    placePlayer(gs, 21, {13, 10}, TeamSide::AWAY);
+    placePlayer(gs, 14, {14, 10}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(BlockHandlerManual, CoachPicksTheBlitzSquareAndThePush) {
+    GameState gs = manualBlitzBoard();
+    setManualBlitzSquare({12, 11});
+    setManualPushChoice({13, 9});
+    setManualFollowUp(true);
+    FixedDiceRoller dice(std::vector<int>(20, 3));   // Pushed, žádné jiné hody
+    executeAction(gs, Action{ActionType::BLITZ, 9, 21, {13, 10}}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(21).position, (Position{13, 9}));
+    EXPECT_EQ(gs.getPlayer(9).position, (Position{13, 10})) << "z (12,11) follow-up na uvolněné pole";
+    clearManualBlockChoices();
+}
+
+TEST(BlockHandlerManual, WithoutABlitzSquareTheEngineChoosesItsOwn) {   // pozitivní kontrola
+    GameState gs = manualBlitzBoard();
+    clearManualBlockChoices();
+    setManualFollowUp(false);
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    executeAction(gs, Action{ActionType::BLITZ, 9, 21, {13, 10}}, dice, nullptr);
+    EXPECT_NE(gs.getPlayer(9).position, (Position{12, 11})) << "engine by z (12,11) neblokoval";
     clearManualBlockChoices();
 }

@@ -13,6 +13,10 @@ Příkazy:
   do <HOME|AWAY> <index>   -- provede akci podle čísla z 'actions'
   push <x> <y>             -- příští odtlačení na toto pole (volba kouče; jinak engine)
   follow <0|1>             -- příští follow-up ano/ne (volba kouče; jinak engine)
+  blitzfrom <x> <y>        -- příští blitz blokuje z tohoto pole (volba kouče; jinak engine)
+
+Každý příkaz měnící stav se zapisuje do prikazy.log; po restartu serveru se
+log přehraje (stejné semínko ⇒ stejné kostky ⇒ stejná partie).
   quit                     -- ukončí server
 """
 import os
@@ -199,6 +203,26 @@ def board(state):
     return "\n".join(lines)
 
 
+BLOCK_FACES = ["Attacker Down (lebka)", "Both Down", "Pushed", "Defender Stumbles", "Defender Down (POW)"]
+
+
+def event_str(e):
+    """Jeden řádek: co se stalo a co padlo na kostkách."""
+    t = e["type"]
+    who = f"hráč {e['player']}"
+    if t == "BLOCK":
+        face = BLOCK_FACES[e["roll"]] if 0 <= e["roll"] < len(BLOCK_FACES) else e["roll"]
+        return f"BLOK {who} na {e['target']}: zvolená kostka = {face}"
+    if t in ("DODGE", "GFI", "PICKUP", "CATCH", "PASS", "STAND_UP", "LEAP"):
+        return f"{t} {who}: hod {e['roll']} -> {'OK' if e['success'] else 'NEPROŠEL'}"
+    if t in ("ARMOR_BREAK", "INJURY", "CASUALTY"):
+        dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
+        return f"{t} hráč {e['target'] if e['target'] > 0 else e['player']}: {e['roll']}{dice}"
+    if t == "MOVE":
+        return f"krok {who} na {e['to']}"
+    return f"{t} {who} cíl {e['target']} hod {e['roll']}"
+
+
 def action_str(a):
     return f"{a.type} hrac={a.player_id} cil_hrac={a.target_id} cil_pole=({a.target.x},{a.target.y})"
 
@@ -210,13 +234,25 @@ def main():
         f.write("=== NOVA HRA ZALOZENA (trpaslici HOME vs wood-elf AWAY) ===\n")
         f.write(board(state) + "\n")
 
+    LOG = os.path.join(DIR, "prikazy.log")
+    replay = []
+    if os.path.exists(LOG):
+        with open(LOG) as f:
+            replay = [l.strip() for l in f if l.strip()]
+
     while True:
-        if not os.path.exists(CMD):
+        if replay:
+            line = replay.pop(0)
+        elif not os.path.exists(CMD):
             time.sleep(0.3)
             continue
-        with open(CMD) as f:
-            line = f.read().strip()
-        os.remove(CMD)
+        else:
+            with open(CMD) as f:
+                line = f.read().strip()
+            os.remove(CMD)
+            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions"):
+                with open(LOG, "a") as f:
+                    f.write(line + "\n")
         parts = line.split()
         if not parts:
             continue
@@ -246,15 +282,20 @@ def main():
             elif cmd == "push" and len(parts) == 3:
                 bb.set_manual_push(int(parts[1]), int(parts[2]))
                 result_lines.append(f"příští odtlačení: ({parts[1]},{parts[2]})")
+            elif cmd == "blitzfrom" and len(parts) == 3:
+                bb.set_manual_blitz_square(int(parts[1]), int(parts[2]))
+                result_lines.append(f"příští blitz blokuje z: ({parts[1]},{parts[2]})")
             elif cmd == "follow" and len(parts) == 2:
                 bb.set_manual_follow_up(parts[1] == "1")
                 result_lines.append(f"příští follow-up: {'ano' if parts[1] == '1' else 'ne'}")
             elif cmd == "do" and len(parts) == 2:
                 idx = int(parts[1])
                 a = last_actions[idx]
-                r = bb.execute_action(state, a, dice)
+                r, events = bb.execute_action_logged(state, a, dice)
                 bb.clear_manual_block_choices()   # volba platí jen pro tuto akci
                 result_lines.append(f"provedeno: {action_str(a)}")
+                for e in events:
+                    result_lines.append("   " + event_str(e))
                 result_lines.append(f"vysledek: turnover={r.turnover}")
                 result_lines.append(board(state))
             else:

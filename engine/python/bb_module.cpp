@@ -414,11 +414,44 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::setManualPushChoice(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
     });
     m.def("set_manual_follow_up", [](bool follow) { bb::setManualFollowUp(follow); });
+    m.def("set_manual_blitz_square", [](int x, int y) {
+        bb::setManualBlitzSquare(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
+    });
     m.def("clear_manual_block_choices", []() { bb::clearManualBlockChoices(); });
 
     m.def("execute_action", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
         return bb::executeAction(state, action, base, nullptr);
+    });
+
+    // Živá partie (02.10.2026): totéž jako execute_action, navíc události s hody,
+    // ať hráč vidí, co padlo. Jména podle GameEvent::Type (pořadí jako get_turn_logs).
+    m.def("execute_action_logged", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
+        static const char* names[] = {
+            "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
+            "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
+            "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
+            "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
+            "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
+            "BLOODLUST_FEED"};
+        std::vector<bb::GameEvent> events;
+        bb::DiceRollerBase& base = dice;
+        bb::ActionResult r = bb::executeAction(state, action, base, &events);
+        py::list ev;
+        for (const auto& e : events) {
+            py::dict d;
+            const size_t t = static_cast<size_t>(e.type);
+            d["type"] = t < sizeof(names) / sizeof(names[0]) ? names[t] : "?";
+            d["player"] = e.playerId;
+            d["target"] = e.targetId;
+            d["roll"] = e.roll;
+            d["success"] = e.success;
+            d["die1"] = e.die1;
+            d["die2"] = e.die2;
+            d["to"] = py::make_tuple(e.to.x, e.to.y);
+            ev.append(d);
+        }
+        return py::make_tuple(r, ev);
     });
 
     // KO recovery (package G) needs a dice source; the Python binding keeps

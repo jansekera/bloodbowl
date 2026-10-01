@@ -364,6 +364,42 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             // scoreMoveAction's 20/12 split; both are < 100 so a TZ-laden
             // square is still taken when it's the only one making progress
             // (a blitz through an unavoidable TZ wall must not fail outright).
+            // Jeden krok blitzujícího; false = blitz končí s výsledkem `out`.
+            auto walkStep = [&](Position next, ActionResult& out) {
+                Position beforeStep = player.position;
+                ActionResult moveResult = resolveMoveStep(state, action.playerId,
+                                                           next, dice, events);
+                if (moveResult.turnover) { noteBlitzWasted(2); out = moveResult; return false; }
+                if (!moveResult.success) { noteBlitzWasted(1); out = moveResult; return false; }
+
+                // Check if player is still standing (might have been knocked down)
+                if (player.state != PlayerState::STANDING) { noteBlitzWasted(3); out = ActionResult::turnovr(); return false; }
+
+                // A step that reports success without actually moving the player
+                // (e.g. caught by Tentacles: resolveMoveStep returns ok() but the
+                // player stays at `from`, see move_handler.cpp's checkTentacles)
+                // would otherwise retry the identical step forever — this loop has
+                // no other progress guard. Treat no-progress as "can't reach",
+                // consistent with the other bail-out paths above.
+                if (player.position == beforeStep) { noteBlitzWasted(4); out = ActionResult::fail(); return false; }
+                ++walkedSteps;
+                return true;
+            };
+
+            // Živá partie s člověkem (02.10.2026): kouč zvolil pole, ODKUD blokovat.
+            // Jen volné pole vedle cíle; nedosažitelné ⇒ cestu volí engine níž.
+            const Position wantSquare = takeManualBlitzSquare();
+            if (wantSquare.isOnPitch() && wantSquare.distanceTo(target.position) == 1 &&
+                !state.getPlayerAtPosition(wantSquare)) {
+                while (player.position != wantSquare) {
+                    Position next;
+                    const int budget = player.movementRemaining + maxGfiSquares(player);
+                    if (!nextStepToward(state, player, wantSquare, budget, Position{-1, -1}, next)) break;
+                    ActionResult stepOut;
+                    if (!walkStep(next, stepOut)) return stepOut;
+                }
+            }
+
             while (player.position.distanceTo(target.position) > 1) {
                 // Reachability gate only: canReachAdjacentTo's adjPos (BFS by
                 // pure movement cost, TZ-blind) is deliberately ignored — the
@@ -400,23 +436,8 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
                     return ActionResult::fail();
                 }
 
-                Position beforeStep = player.position;
-                ActionResult moveResult = resolveMoveStep(state, action.playerId,
-                                                           bestNext, dice, events);
-                if (moveResult.turnover) { noteBlitzWasted(2); return moveResult; }
-                if (!moveResult.success) { noteBlitzWasted(1); return moveResult; }
-
-                // Check if player is still standing (might have been knocked down)
-                if (player.state != PlayerState::STANDING) { noteBlitzWasted(3); return ActionResult::turnovr(); }
-
-                // A step that reports success without actually moving the player
-                // (e.g. caught by Tentacles: resolveMoveStep returns ok() but the
-                // player stays at `from`, see move_handler.cpp's checkTentacles)
-                // would otherwise retry the identical step forever — this loop has
-                // no other progress guard. Treat no-progress as "can't reach",
-                // consistent with the other bail-out paths above.
-                if (player.position == beforeStep) { noteBlitzWasted(4); return ActionResult::fail(); }
-                ++walkedSteps;
+                ActionResult stepOut;
+                if (!walkStep(bestNext, stepOut)) return stepOut;
             }
 
             // Now adjacent — perform block

@@ -243,11 +243,22 @@ static int pushDestScore(const GameState& state, TeamSide blockingSide,
 namespace {
 thread_local Position g_manualPush{-1, -1};
 thread_local int g_manualFollowUp = -1;   // -1 = nezvoleno, 0 = ne, 1 = ano
+thread_local Position g_manualBlitzSquare{-1, -1};
 }  // namespace
 
 void setManualPushChoice(Position p) { g_manualPush = p; }
 void setManualFollowUp(bool follow) { g_manualFollowUp = follow ? 1 : 0; }
-void clearManualBlockChoices() { g_manualPush = {-1, -1}; g_manualFollowUp = -1; }
+void setManualBlitzSquare(Position p) { g_manualBlitzSquare = p; }
+Position takeManualBlitzSquare() {
+    const Position p = g_manualBlitzSquare;
+    g_manualBlitzSquare = {-1, -1};
+    return p;
+}
+void clearManualBlockChoices() {
+    g_manualPush = {-1, -1};
+    g_manualFollowUp = -1;
+    g_manualBlitzSquare = {-1, -1};
+}
 
 static int choosePushSquare(const GameState& state, const Position* cand, int count,
                             Position pusherPos, bool defenderChooses, bool towardEdge,

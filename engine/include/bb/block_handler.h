@@ -123,6 +123,9 @@ long takeBlitzBlockUnpayableInSearch();
 // pravidla nedovolí, engine ignoruje a rozhodne sám.
 void setManualPushChoice(Position p);
 void setManualFollowUp(bool follow);
+// Pole, ze kterého blitzující blokuje (musí sousedit s cílem a být volné).
+void setManualBlitzSquare(Position p);
+Position takeManualBlitzSquare();   // přečte a smaže
 void clearManualBlockChoices();
 
 } // namespace bb
