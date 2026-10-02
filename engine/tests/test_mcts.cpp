@@ -133,21 +133,19 @@ TEST(MCTS, TimeBudgetRespected) {
 
     MCTSConfig config;
     config.timeBudgetMs = 100;
-    config.maxIterations = 1000000;  // very high cap
+    config.maxIterations = 2000;  // cap, který časový rozpočet musí předběhnout
 
-    // CPU time, not wall time: under machine load the process gets
-    // descheduled and wall time balloons even though the internal budget
-    // check works. CPU time never exceeds what the search itself consumed,
-    // and a broken budget check still fails (loop would burn CPU up to
-    // maxIterations).
-    std::clock_t cpuStart = std::clock();
-
+    // P100 (b): dřív `EXPECT_LT(cpuMs, budget * 3)` — i CPU čas se pod zátěží (živá partie
+    // na stejném stroji) natáhl a test padl (497 ms proti 300 ms) bez vady v kódu. Teď se
+    // netvrdí žádný čas: stačí, že hledání skončilo DŘÍV než strop iterací, tedy ho zastavil
+    // časový rozpočet. Pomalejší stroj dělá míň iterací, takže test je zátěží jen jistější;
+    // rozbitá kontrola rozpočtu doběhne až na strop a padne.
     MCTSSearch search(nullptr, config, 42);
     search.search(state);
 
-    double cpuMs = 1000.0 * static_cast<double>(std::clock() - cpuStart) / CLOCKS_PER_SEC;
-
-    EXPECT_LT(cpuMs, config.timeBudgetMs * 3);
+    EXPECT_GT(search.lastIterations(), 0);
+    EXPECT_LT(search.lastIterations(), config.maxIterations)
+        << "časový rozpočet hledání nezastavil";
 }
 
 TEST(MCTS, SingleActionNoSearch) {
