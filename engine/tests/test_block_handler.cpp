@@ -1554,7 +1554,16 @@ static GameState manualPushBoard() {
     return gs;
 }
 
-TEST(BlockHandlerManual, WithoutAChoiceTheEnginePushesStraightBack) {   // pozitivní kontrola
+// P100 (c): volby kouče jsou `thread_local` globály. Dřív je čistil jen konec těla testu
+// (a jen u některých testů) — test, který skončil dřív (ASSERT, výjimka), nechal zvolené
+// pole odtlačení viset a rozbil další test. Teď se čistí před každým testem i po něm.
+class BlockHandlerManual : public ::testing::Test {
+protected:
+    void SetUp() override { clearManualBlockChoices(); }
+    void TearDown() override { clearManualBlockChoices(); }
+};
+
+TEST_F(BlockHandlerManual, WithoutAChoiceTheEnginePushesStraightBack) {   // pozitivní kontrola
     GameState gs = manualPushBoard();
     clearManualBlockChoices();
     FixedDiceRoller dice({3});   // Pushed
@@ -1562,7 +1571,7 @@ TEST(BlockHandlerManual, WithoutAChoiceTheEnginePushesStraightBack) {   // pozit
     EXPECT_EQ(gs.getPlayer(12).position, (Position{14, 6}));
 }
 
-TEST(BlockHandlerManual, CoachPicksThePushSquareAndDeclinesTheFollowUp) {
+TEST_F(BlockHandlerManual, CoachPicksThePushSquareAndDeclinesTheFollowUp) {
     GameState gs = manualPushBoard();
     setManualPushChoice({13, 6});
     setManualFollowUp(false);
@@ -1572,7 +1581,7 @@ TEST(BlockHandlerManual, CoachPicksThePushSquareAndDeclinesTheFollowUp) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{12, 8})) << "bez follow-upu";
 }
 
-TEST(BlockHandlerManual, AChoiceTheRulesForbidIsIgnored) {
+TEST_F(BlockHandlerManual, AChoiceTheRulesForbidIsIgnored) {
     GameState gs = manualPushBoard();
     setManualPushChoice({14, 7});   // obsazené, zatímco jiná pole jsou volná
     FixedDiceRoller dice({3});
@@ -1594,7 +1603,7 @@ static GameState manualBlitzBoard() {
     return gs;
 }
 
-TEST(BlockHandlerManual, CoachPicksTheBlitzSquareAndThePush) {
+TEST_F(BlockHandlerManual, CoachPicksTheBlitzSquareAndThePush) {
     GameState gs = manualBlitzBoard();
     setManualBlitzSquare({12, 11});
     setManualPushChoice({13, 9});
@@ -1606,7 +1615,7 @@ TEST(BlockHandlerManual, CoachPicksTheBlitzSquareAndThePush) {
     clearManualBlockChoices();
 }
 
-TEST(BlockHandlerManual, WithoutABlitzSquareTheEngineChoosesItsOwn) {   // pozitivní kontrola
+TEST_F(BlockHandlerManual, WithoutABlitzSquareTheEngineChoosesItsOwn) {   // pozitivní kontrola
     GameState gs = manualBlitzBoard();
     clearManualBlockChoices();
     setManualFollowUp(false);
