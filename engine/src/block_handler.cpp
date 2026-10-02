@@ -854,8 +854,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     }
 
     ++g_blocksThrown;
+    // 02.10.2026 (uživatel: „zkus do logu doplnit všechny kostky hodu"): die1 nese VŠECHNY hozené
+    // kostky (po případném přehozu), zakódované po 3 bitech jako (face+1); die2 = jejich počet.
+    int packedFaces = 0;
+    for (int i = 0; i < diceInfo.count; i++) packedFaces |= (static_cast<int>(faces[i]) + 1) << (3 * i);
     emitEvent(events, {GameEvent::Type::BLOCK, att.id, def.id, att.position,
-                      def.position, static_cast<int>(chosen), true});
+                      def.position, static_cast<int>(chosen), true, packedFaces, diceInfo.count});
 
     // 5. Apply block result
     bool defPushed = false;

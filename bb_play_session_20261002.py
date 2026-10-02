@@ -222,7 +222,10 @@ def event_str(e):
     who = f"hráč {e['player']}"
     if t == "BLOCK":
         face = BLOCK_FACES[e["roll"]] if 0 <= e["roll"] < len(BLOCK_FACES) else e["roll"]
-        return f"BLOK {who} na {e['target']}: zvolená kostka = {face}"
+        # die1 = všechny hozené kostky po 3 bitech (face+1), die2 = počet (block_handler.cpp, 02.10.)
+        vse = [BLOCK_FACES[((e["die1"] >> (3 * i)) & 7) - 1] for i in range(e["die2"])] if e["die2"] else []
+        hozeno = f" · hozeno {e['die2']}: " + ", ".join(vse) if vse else ""
+        return f"BLOK {who} na {e['target']}: zvolená kostka = {face}{hozeno}"
     if t in ("DODGE", "GFI", "PICKUP", "CATCH", "PASS", "STAND_UP", "LEAP"):
         # engine v `roll` posílá CÍLOVÉ číslo hodu (move_handler.cpp: `target`), ne padlou kostku
         return f"{t} {who}: potřeba {e['roll']}+ -> {'OK' if e['success'] else 'NEPROŠEL'}"
