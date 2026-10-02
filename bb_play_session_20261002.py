@@ -176,7 +176,9 @@ def board(state):
     #   ("hlavicka zarovnana na zacatek bunky, ne centrovana"). Sirka MUSI
     #   sedet se sirkou bunky. 02.10.2026: 9 = 8 obsah + 1 oddelovac -- kod
     #   s pomlckou ("DL10-/0", "DTG6-/0") ma 7 znaku a sest uz nestacilo.
-    lines.append("     " + "".join(f"{x:<8} " for x in range(xlo, xhi + 1)))
+    # uživatel 02.10.: „nevidím nahoře čísla x" ⇒ řádek začíná „x=" a opakuje se i pod mřížkou
+    xhdr = "x=   " + "".join(f"{x:<8} " for x in range(xlo, xhi + 1))
+    lines.append(xhdr)
     hline = "    +" + "--------+" * (xhi - xlo + 1)
     for y in range(ylo, yhi + 1):
         lines.append(hline)
@@ -190,6 +192,7 @@ def board(state):
                 row += (f"  {z}     |" if z else "        |")
         lines.append(row)
     lines.append(hline)
+    lines.append(xhdr)
     if venku:
         lines.append(f"⚠️ MIMO VYREZ stoji: " + ", ".join(f"{v}@{sq}" for sq, v in sorted(venku)))
     lines.append("")
