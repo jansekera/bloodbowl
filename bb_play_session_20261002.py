@@ -221,7 +221,8 @@ def event_str(e):
         face = BLOCK_FACES[e["roll"]] if 0 <= e["roll"] < len(BLOCK_FACES) else e["roll"]
         return f"BLOK {who} na {e['target']}: zvolená kostka = {face}"
     if t in ("DODGE", "GFI", "PICKUP", "CATCH", "PASS", "STAND_UP", "LEAP"):
-        return f"{t} {who}: hod {e['roll']} -> {'OK' if e['success'] else 'NEPROŠEL'}"
+        # engine v `roll` posílá CÍLOVÉ číslo hodu (move_handler.cpp: `target`), ne padlou kostku
+        return f"{t} {who}: potřeba {e['roll']}+ -> {'OK' if e['success'] else 'NEPROŠEL'}"
     if t in ("ARMOR_BREAK", "INJURY", "CASUALTY"):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
         return f"{t} hráč {e['target'] if e['target'] > 0 else e['player']}: {e['roll']}{dice}"
