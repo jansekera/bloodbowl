@@ -497,7 +497,6 @@ void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away
     setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false, dice);
 }
 
-// Check if kicking team has a standing player with Kick skill
 // BB2016 l. 304-307: los pred zapasem. Do 24.08.2026 se nehazel VUBEC --
 // `openingKickingTeam` byla konstanta AWAY, takze domaci zahajovali 1. pulku
 // a hoste 2. pulku v 18 000 z 18 000 her kriz. korpusu. Merenim vyslo, ze to
@@ -527,15 +526,6 @@ TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
     return (e == TossElection::RECEIVE) ? opponent(tossWinner) : tossWinner;
 }
 
-bool hasKickPlayer(const GameState& state, TeamSide kickingTeam) {
-    bool found = false;
-    state.forEachOnPitch(kickingTeam, [&](const Player& p) {
-        if (p.state == PlayerState::STANDING && p.hasSkill(SkillName::Kick))
-            found = true;
-    });
-    return found;
-}
-
 // BB2016 l. 2547-2573, Pre-Match Sequence 1: "One coach rolls on the Weather
 // table to see what the weather will be like for the match." Mění ho pak jen
 // výsledek Changing Weather na tabulce výkopu (l. 1316-1320).
@@ -543,146 +533,15 @@ void rollMatchWeather(GameState& state, DiceRollerBase& dice) {
     state.weather = weatherFromRoll(dice.roll2D6());
 }
 
-void simpleKickoff(GameState& state, DiceRollerBase& dice) {
-    KickoffScope kickoffScope(state);
-    // Determine receiving team (opposite of kicking)
-    TeamSide receiving = opponent(state.kickingTeam);
-    state.activeTeam = receiving;
-
-    // Advance to the receiving team's NEXT turn (2026-07-10 fix: do not
-    // reset turnNumber here -- at a true half boundary setupHalf() already
-    // zeroed both teams' turnNumber before doKickoff() runs, so ++ still
-    // yields 1; after a post-TD kickoff mid-half, setupDrive() deliberately
-    // PRESERVES turnNumber (676bb50), and this function used to stomp that
-    // right back to 0/1, silently reviving the "every TD grants a fresh
-    // 8-turn clock" bug the 676bb50 fix was meant to close. The kicking
-    // team's own turnNumber is left untouched -- it's advanced by the
-    // normal turn-end flow, not by kickoff.
-    TeamState& recvTeam = state.getTeamState(receiving);
-    recvTeam.turnNumber++;
-    recvTeam.resetForNewTurn();
-    state.resetPlayersForNewTurn(receiving);
-
-    // Kick target: short vs fast, deep vs slow/mixed
-    int kickX;
-    if (state.receiverSpeed == RosterSpeed::FAST) {
-        kickX = (state.kickingTeam == TeamSide::HOME) ? 18 : 7;
-    } else {
-        kickX = (state.kickingTeam == TeamSide::HOME) ? 22 : 3;
-    }
-    int kickY = 7;
-
-    // Scatter: D6 for distance, D8 for direction
-    int dist = dice.rollD6();
-    // Kick skill, BB2016 l. 8211-8213: "you may choose to halve the number of
-    // squares that the ball scatters on kick-off, ROUNDING ANY FRACTIONS DOWN
-    // (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)". Do 24.08.2026 se zaokrouhlovalo
-    // NAHORU, takze u tri hodu ze sesti (1, 3, 5) mic uletel o pole dal, nez ma.
-    if (hasKickPlayer(state, state.kickingTeam)) {
-        dist = dist / 2;  // floor -- pravidlo dava i tabulku, viz vys
-    }
-    int dir = dice.rollD8();
-    Position scatter = scatterDirection(dir);
-    int landX = kickX + scatter.x * dist;
-    int landY = kickY + scatter.y * dist;
-
-    // ⛔ F10 (24.08.2026): tady se dosud mic ORIZL na hriste (`clamp`), takze
-    // vykop nikdy neodletel ven ani do vlastni poloviny -- a TOUCHBACK proto
-    // v teto ceste NEEXISTOVAL. `resolveKickoff` (plna cesta) ho ma, ale korpus
-    // bezi na teto, zjednodusene. BB2016 l. 275-283.
-    Position landPos{static_cast<int8_t>(landX), static_cast<int8_t>(landY)};
-
-    // Polovina PRIJIMAJICIHO: HOME brani nizka x (LOS 12/13), AWAY vysoka.
-    auto inReceivingHalf = [&](Position p) {
-        return receiving == TeamSide::AWAY ? p.x >= 13 : p.x <= 12;
-    };
-
-    // l. 281-283: "the receiving coach is awarded a 'touchback' and must give
-    // the ball to ANY PLAYER IN HIS TEAM". Kteremu, to je VOLBA trenéra, ne
-    // pravidlo -- davame ho nejhlubsimu stojicimu hráči (prednostne se Sure
-    // Hands), tedy tomu, kdo je nejdal od LOS a nejmene ohrozeny.
-    auto awardTouchback = [&]() {
-        int losX = (state.kickingTeam == TeamSide::HOME) ? 12 : 13;
-        Player* pick = nullptr;
-        int bestScore = -1;
-        state.forEachOnPitch(receiving, [&](const Player& p) {
-            if (p.state != PlayerState::STANDING) return;
-            if (p.hasSkill(SkillName::NoHands)) return;
-            int score = std::abs(p.position.x - losX) +
-                        (p.hasSkill(SkillName::SureHands) ? 100 : 0);
-            if (score > bestScore) { bestScore = score; pick = &state.getPlayer(p.id); }
-        });
-        if (pick) {
-            state.ball = BallState::carried(pick->position, pick->id);
-        } else {
-            state.ball = BallState::onGround(Position{
-                static_cast<int8_t>(std::clamp(landX, 0, 25)),
-                static_cast<int8_t>(std::clamp(landY, 0, 14))});
-        }
-    };
-
-    // Put the ball down BEFORE anyone tries to catch it. Until 2026-08-11 it
-    // was placed only in the else-branch, so a kick landing on a standing
-    // receiver who then dropped it left the ball where setupHalf had put it:
-    // off the pitch, at (-1,-1). resolveCatch does nothing with the ball when
-    // it fails -- the comment here claimed it bounced, and it does not -- so
-    // the drive carried on with no ball anywhere.
-    //
-    // Seen once in 120 games (g0040): an entire second half of 108 moves, 19
-    // blocks, three fouls and a casualty, played without a ball. The full
-    // kickoff path (resolveKickoff) always had this right; only the simplified
-    // one was wrong, and the simplified one is what the corpora run on.
-    if (!landPos.isOnPitch() || !inReceivingHalf(landPos)) {
-        // l. 280-282: "If the ball scatters or bounces off the pitch OR INTO
-        // THE KICKING TEAM'S HALF, the receiving coach is awarded a touchback."
-        awardTouchback();
-    } else {
-        state.ball = BallState::onGround(landPos);
-
-        Player* catcher = state.getPlayerAtPosition(landPos);
-        if (catcher && catcher->teamSide == receiving &&
-            catcher->state == PlayerState::STANDING) {
-            if (!resolveCatch(state, catcher->id, dice, 0, nullptr)) {
-                resolveBounce(state, landPos, dice, 0, nullptr);
-            }
-        } else if (!catcher) {
-            // l. 277-278: "If the ball lands in an empty square it will BOUNCE
-            // ONE MORE SQUARE." Ten odraz tu dosud chybel uplne -- mic po
-            // vykopu proste lezel v poli dopadu.
-            resolveBounce(state, landPos, dice, 0, nullptr);
-        }
-
-        // A odraz muze mic dostat ven nebo do kopajici poloviny -- pak je to
-        // touchback taky (tataz veta l. 280-282).
-        // ⚠️ Aproximace: nas `resolveBounce` po vyletu z hriste rovnou vhazuje
-        // z davu, takze mezistav neodpovida pravidlum; koncovy stav ano.
-        if (!state.ball.isHeld && !inReceivingHalf(state.ball.position)) {
-            awardTouchback();
-        }
-    }
-
-    state.phase = GamePhase::PLAY;
-    // Počasí se tu už NEHÁZÍ (P66, 29.09.2026): BB2016 l. 2551, 2571-2573 --
-    // hází se JEDNOU v předzápasové sekvenci ("to see what the weather will be
-    // like for the match"), viz rollMatchWeather(). Do 29.09. se házelo při
-    // každém výkopu, takže každý drive měl nezávislé počasí.
-}
-
 GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
                         ActionSelector homePolicy, ActionSelector awayPolicy,
-                        DiceRollerBase& dice, bool useFullKickoff) {
+                        DiceRollerBase& dice) {
     GameState state;
     GameResult result;
 
     constexpr int MAX_ACTIONS = 5000;
 
-    auto doKickoff = [&]() {
-        if (useFullKickoff) {
-            resolveKickoff(state, dice, nullptr);
-        } else {
-            simpleKickoff(state, dice);
-        }
-    };
+    auto doKickoff = [&]() { resolveKickoff(state, dice, nullptr); };
 
     // First half
     // BB2016 l. 304-307: los rozhoduje, kdo kope jako prvni. Pojmenovane, aby
@@ -786,6 +645,7 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
     turn.ballHeld = board.ballHeld;
     turn.ballCarrierId = board.ballCarrierId;
     turn.weather = state.weather;
+    turn.kickoffBallInAir = state.kickoffBallInAir;
 
     // ⭐ 27.08.: jmenovatel k počtu aktivací -- kdo NA ZAČÁTKU kola jednat mohl.
     // Bez něj je „aktivovali jsme tři" nečitelné: tři z jedenácti je jiná věc
@@ -837,19 +697,13 @@ static TurnLog captureTurnSnapshot(const GameState& state) {
 
 LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& away,
                                     ActionSelector homePolicy, ActionSelector awayPolicy,
-                                    DiceRollerBase& dice, bool useFullKickoff) {
+                                    DiceRollerBase& dice) {
     GameState state;
     LoggedGameResult logged;
 
     constexpr int MAX_ACTIONS = 5000;
 
-    auto doKickoff = [&]() {
-        if (useFullKickoff) {
-            resolveKickoff(state, dice, nullptr);
-        } else {
-            simpleKickoff(state, dice);
-        }
-    };
+    auto doKickoff = [&]() { resolveKickoff(state, dice, nullptr); };
 
     // First half
     // Los stejne jako v simulateGame(); viz komentar tam.

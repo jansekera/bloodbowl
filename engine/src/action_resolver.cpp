@@ -12,10 +12,18 @@
 #include "bb/bomb_handler.h"
 #include "bb/gaze_handler.h"
 #include "bb/ball_and_chain_handler.h"
+#include "bb/kickoff_handler.h"
 
 namespace bb {
 
 namespace {
+
+// Konec kola. Skončilo-li bonusové kolo Blitz! (výkopová tabulka 10, ř. 1334-1341), míč teprve
+// teď dopadne (pořadí výkopu ř. 1242-1248) — `resolveEndTurn` už předal tah přijímajícím.
+void endTurn(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events, bool wasTurnover) {
+    resolveEndTurn(state, events, wasTurnover);
+    if (state.kickoffBallInAir) resolveKickoffLanding(state, dice, events);
+}
 
 // M2/N13 = P55 (29.08.2026): deklarovana akce, ktera propadne big-guy
 // kontrolou, MUSI tymu odecist jeho limit -- Bone-head to rika doslova
@@ -512,7 +520,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
         }
 
         case ActionType::END_TURN: {
-            resolveEndTurn(state, events);
+            endTurn(state, dice, events, /*wasTurnover=*/false);
             return ActionResult::ok();
         }
 
@@ -536,7 +544,7 @@ ActionResult executeAction(GameState& state, const Action& action,
     auto feedEndsTurn = [&](int vampId) {
         if (!feedBloodlust(state, vampId, dice, events)) return false;
         state.turnoverPending = true;
-        resolveEndTurn(state, events, /*wasTurnover=*/true);
+        endTurn(state, dice, events, /*wasTurnover=*/true);
         return true;
     };
 
@@ -577,7 +585,7 @@ ActionResult executeAction(GameState& state, const Action& action,
     // Auto end turn on turnover
     if (result.turnover) {
         state.turnoverPending = true;
-        resolveEndTurn(state, events, /*wasTurnover=*/true);
+        endTurn(state, dice, events, /*wasTurnover=*/true);
     }
 
     // Check touchdown

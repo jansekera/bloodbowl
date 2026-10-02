@@ -13,6 +13,7 @@
 #include "bb/rules_engine.h"
 #include "bb/action_resolver.h"
 #include "bb/game_simulator.h"
+#include "bb/kickoff_handler.h"
 #include "bb/roster.h"
 #include "bb/dice.h"
 #include "bb/feature_extractor.h"
@@ -464,9 +465,12 @@ PYBIND11_MODULE(bb_engine, m) {
           },
           py::arg("state"), py::arg("home"), py::arg("away"),
           py::arg("kicking_team") = bb::TeamSide::AWAY);
+    // Jméno zůstalo kvůli skriptům; od 02.10.2026 je to JEDINÝ výkop enginu (resolveKickoff:
+    // tabulka, Kick-Off Return, touchback). Po Blitz! je na tahu KOPAJÍCÍ tým a míč letí
+    // (state.ball mimo hřiště); dopadne po jeho END_TURN v execute_action.
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
-        bb::simpleKickoff(state, base);
+        bb::resolveKickoff(state, base, nullptr);
     });
     // P66 (29.09.2026): výkop už počasí nehází -- hra řízená z Pythonu ho
     // musí hodit sama, jednou před prvním výkopem (BB2016 l. 2571-2573).

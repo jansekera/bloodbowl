@@ -64,6 +64,13 @@ public:
     // "during their own turn" -- and the kick-off is nobody's turn. Set by
     // KickoffScope, never by hand.
     bool kickoffInProgress = false;
+    // Blitz! (výkopová tabulka 10, BB2016 ř. 1334-1341): kopající tým hraje bonusové kolo, zatímco
+    // míč ještě letí (pořadí ř. 1242-1248: dopad až po vyřešení tabulky). Od hodu na tabulku do
+    // konce bonusového kola je `kickoffBallInAir` true, míč je mimo hřiště a místo dopadu leží
+    // v `kickoffLanding` (může být i mimo hřiště ⇒ touchback). Konec kola (`resolveEndTurn`)
+    // předá tah přijímajícím a `executeAction` pak zavolá `resolveKickoffLanding`.
+    bool kickoffBallInAir = false;
+    Position kickoffLanding{-1, -1};
     RosterSpeed receiverSpeed = RosterSpeed::MIXED;
 
     GameState();

@@ -262,8 +262,14 @@ def test_logged_game_result_structure():
 
 
 def test_roll_match_weather_is_rolled_once_and_kept_by_kickoff():
-    """P66: weather is rolled once per match; simple_kickoff must not change it."""
+    """P66: weather is rolled once per match; the kickoff keeps it.
+
+    Od 02.10.2026 je simple_kickoff plný výkop s tabulkou, a ta smí počasí změnit (Changing
+    Weather, 2D6 = 7, tedy 6/36 výkopů). Přesně to hlídá C++ test
+    KickoffHandler.KickoffKeepsMatchWeatherUnlessChangingWeather; tady jen, že se počasí
+    nepřehazuje při každém výkopu (dřív P66 = vždy nový hod)."""
     seen = set()
+    kept = 0
     for seed in range(1, 60):
         gs = bb_engine.GameState()
         bb_engine.setup_half(gs, bb_engine.get_human_roster(), bb_engine.get_human_roster())
@@ -272,7 +278,8 @@ def test_roll_match_weather_is_rolled_once_and_kept_by_kickoff():
         before = gs.weather
         seen.add(before)
         bb_engine.simple_kickoff(gs, dice)
-        assert gs.weather == before
+        kept += gs.weather == before
+    assert kept >= 40      # ~5/6 výkopů počasí nemění
     assert len(seen) > 1   # the roll really varies (not stuck on Nice)
 
 
