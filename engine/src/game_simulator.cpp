@@ -582,6 +582,14 @@ GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
         if (state.phase == GamePhase::TOUCHDOWN) {
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
+            // Přijímajícímu nezbylo kolo ⇒ výkop se nekoná a poločas končí BEZ nové sestavy: návrat
+            // z KO a Sweltering Heat se hází jen před výkopem, který se koná (ř. 1007-1012), tedy až
+            // v setupHalf. OPRAVENO 02.10. (#6) — dřív setupDrive házel návrat z KO, výkop pak nebyl
+            // a setupHalf házel znovu ⇒ KO hráč měl mezi poločasy dva hody.
+            if (!receivingTeamHasATurnLeft(state)) {
+                state.phase = (state.half >= 2) ? GamePhase::GAME_OVER : GamePhase::HALF_TIME;
+                continue;
+            }
             setupDrive(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;
@@ -760,6 +768,14 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
             }
             // The scoring team kicks off next, not simply "whoever didn't kick last".
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
+            // Přijímajícímu nezbylo kolo ⇒ výkop se nekoná a poločas končí BEZ nové sestavy: návrat
+            // z KO a Sweltering Heat se hází jen před výkopem, který se koná (ř. 1007-1012), tedy až
+            // v setupHalf. OPRAVENO 02.10. (#6) — dřív setupDrive házel návrat z KO, výkop pak nebyl
+            // a setupHalf házel znovu ⇒ KO hráč měl mezi poločasy dva hody.
+            if (!receivingTeamHasATurnLeft(state)) {
+                state.phase = (state.half >= 2) ? GamePhase::GAME_OVER : GamePhase::HALF_TIME;
+                continue;
+            }
             setupDrive(state, home, away, state.kickingTeam, &dice);
             doKickoff();
             continue;

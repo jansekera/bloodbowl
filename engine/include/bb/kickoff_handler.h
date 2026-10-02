@@ -14,6 +14,11 @@ namespace bb {
 // ve vzduchu (`GameState::kickoffBallInAir`); dopad pak dodělá `resolveKickoffLanding`.
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// Koná se výkop? Ř. 1033-1035: „Play stops when both coaches have had eight turns each“ ⇒ přijímající
+// (soupeř `state.kickingTeam`) musí mít ještě kolo. Volat PŘED `setupDrive`: návrat z KO a Sweltering
+// Heat se hází jen před výkopem, který se koná (ř. 1007-1012).
+bool receivingTeamHasATurnLeft(const GameState& state);
+
 // Dopad míče po bonusovém kole Blitz!. Volá `executeAction`, jakmile kolo skončí (END_TURN nebo
 // turnover); předtím `resolveEndTurn` předal tah přijímajícím.
 void resolveKickoffLanding(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events);

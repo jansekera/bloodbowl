@@ -333,6 +333,10 @@ void finishKickoff(GameState& state, Position landing, DiceRollerBase& dice,
 
 } // anonymous namespace
 
+bool receivingTeamHasATurnLeft(const GameState& state) {
+    return state.getTeamState(opponent(state.kickingTeam)).turnNumber < 8;
+}
+
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     KickoffScope kickoffScope(state);
     const TeamSide receiving = opponent(state.kickingTeam);
@@ -348,13 +352,14 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     // 8-turn clock" bug the 676bb50 fix was meant to close. The kicking
     // team's own turnNumber is left untouched -- it's advanced by the
     // normal turn-end flow, not by kickoff.
+    const bool hasATurnLeft = receivingTeamHasATurnLeft(state);
     TeamState& recvTeam = state.getTeamState(receiving);
     recvTeam.turnNumber++;
 
     // ř. 1033-1035: „Play stops when both coaches have had eight turns each.“ Přijímajícímu nezbylo
     // kolo ⇒ výkop se nekoná, poločas končí (smyčka hry to pozná z checkHalfOver). OPRAVENO 02.10. —
     // dřív se kopalo i házelo na tabulku (Blitz!, kámen, invaze) a teprve pak poločas skončil.
-    if (recvTeam.turnNumber > 8) {
+    if (!hasATurnLeft) {
         state.phase = GamePhase::PLAY;
         return;
     }

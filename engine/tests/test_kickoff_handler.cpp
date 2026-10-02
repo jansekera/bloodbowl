@@ -1007,3 +1007,56 @@ TEST(KickoffHandler, NoKickoffWithoutATurnLeftInARealGame) {
     }
     ASSERT_GE(lastTurnTds, 1) << "fixtura: žádný TD v posledním kole poločasu";
 }
+
+// #6 (uživatel 02.10.: „KO mezi poločasy má házet jednou“). Ř. 1007-1012: „After a touchdown has
+// been scored, and at the start of the second half, play is restarted … Before the kick-off however
+// each coach should roll one D6 for each KO'd player“. TD v posledním kole přijímajícího ⇒ výkop se
+// nekoná (ř. 1033-1035), další výkop je až na začátku 2. poločasu ⇒ každý KO hráč hází mezi TD a
+// výkopem 2. poločasu PRÁVĚ JEDNOU. Měří se všechny kostky mimo výkop od TD do výkopu 2. poločasu
+// (setupDrive / setupHalf nehází nic jiného než návrat z KO a Sweltering Heat ⇒ hry s horkem se
+// přeskakují). Počet KO hráčů se čte při první takové kostce (ještě před prvním návratem).
+TEST(KickoffHandler, KoPlayerRollsOnceToRecoverBetweenHalvesAfterALastTurnTouchdown) {
+    struct WatchDice : DiceRollerBase {
+        DiceRoller inner;
+        const GameState* st = nullptr;
+        int windowRolls = 0, koAtWindow = -1;
+        bool heat = false;
+        explicit WatchDice(uint32_t seed) : inner(seed) {}
+        void check() {
+            if (!st || st->kickoffInProgress) return;
+            if (st->phase != GamePhase::TOUCHDOWN && st->phase != GamePhase::HALF_TIME) return;
+            if (koAtWindow < 0) {
+                koAtWindow = 0;
+                for (const auto& p : st->players) koAtWindow += p.state == PlayerState::KO;
+            }
+            heat = heat || st->weather == Weather::SWELTERING_HEAT;
+            ++windowRolls;
+        }
+        int rollD6() override { check(); return inner.rollD6(); }
+        int rollD8() override { check(); return inner.rollD8(); }
+    };
+    int checked = 0;
+    for (uint32_t seed = 1; seed <= 400 && checked < 2; ++seed) {
+        WatchDice dice(seed);
+        int lastHalf = 0, lastActiveTurn = 0, lastOppTurn = 0, lastScore = 0;
+        auto observe = [&](const GameState& s) {
+            dice.st = &s;
+            const int score = s.homeTeam.score + s.awayTeam.score;
+            if (lastHalf == 1 && s.half == 2 && lastActiveTurn == 8 && lastOppTurn == 8 &&
+                score > lastScore && !dice.heat && dice.koAtWindow > 0) {
+                EXPECT_EQ(dice.windowRolls, dice.koAtWindow)
+                    << "seed " << seed << ": " << dice.koAtWindow << " KO hráčů, ale "
+                    << dice.windowRolls << " hodů na návrat mezi TD a výkopem 2. poločasu";
+                ++checked;
+            }
+            if (s.half == 1) { dice.windowRolls = 0; dice.koAtWindow = -1; dice.heat = false; }
+            lastHalf = s.half;
+            lastActiveTurn = s.getTeamState(s.activeTeam).turnNumber;
+            lastOppTurn = s.getTeamState(opponent(s.activeTeam)).turnNumber;
+            lastScore = score;
+            return greedyPolicy(s, dice);
+        };
+        simulateGame(getHumanRoster(), getOrcRoster(), observe, observe, dice);
+    }
+    ASSERT_GE(checked, 1) << "fixtura: žádný TD v posledním kole 1. poločasu s KO hráčem";
+}

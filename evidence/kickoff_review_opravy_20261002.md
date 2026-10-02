@@ -51,3 +51,9 @@ PHP engine: **převést do druhého enginu** (#2, #4, N1).
 - `engine/python/test_bb_engine.py` (python3.8): 17 passed · `python/tests` (venv): 202 passed · `diag_first_possession.py selftest`: ALL PASS.
 - Kouř `mcts_cli --home=greedy --away=greedy --games=6 --home-roster=wood-elf --away-roster=orc`: 6 her doběhlo (4:0:2, ⌀ 2,17 : 1,33).
 - Nemergováno, nepushnuto (worktree `worktree-agent-ac466507256f9769d`).
+
+## Rozhodnutí uživatele 02.10.: #3, #6, #7
+
+| # | rozhodnutí | test | pozitivní kontrola | commit |
+|---|---|---|---|---|
+| 6 | „KO mezi poločasy má házet jednou“: po TD, kdy přijímající nemá kolo, se `setupDrive` nevolá (výkop se nekoná ⇒ žádný návrat z KO ani Sweltering Heat); poločas/hra končí rovnou, házet se bude až v `setupHalf` (ř. 1007-1012). Sdílený predikát `receivingTeamHasATurnLeft` (kickoff_handler.h) používá i `resolveKickoff` | `KickoffHandler.KoPlayerRollsOnceToRecoverBetweenHalvesAfterALastTurnTouchdown` (simulateGame, greedy, human × orc; kostky mimo výkop od TD do výkopu 2. poločasu = počet KO hráčů; hry s horkem vynechány) | ✅ spadl před opravou: seed 6 — 3 KO, 6 hodů; seed 34 — 2 KO, 3 hody (pozn.: první verze testu prošla, protože počítala jen `half == 1`, a `simulateGame` přepne `half = 2` před `setupHalf` ⇒ hody v `setupHalf` neviděla; opraveno před commitem) | viz git log |
