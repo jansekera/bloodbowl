@@ -507,6 +507,8 @@ naplánovat: OTTD je **sekvence přes celý tah**, ne vlastnost jedné akce.
 ⇒ Dosah = pohyb sběrače + přihrávka + pohyb příjemce/předání. Celotah musí umět spočítat, **jestli OTTD vůbec existuje**,
 a když ne, hrát opatrně (02.10.: elfové blokovali, jeden blitz, nic víc).
 
+**Obrana proti OTTD** *(uživatel 02.10.: „obranný setup trpaslíkům proti OTTD je taky jiný než aktuální — teď neřešíme“)*: rozestavení kopajícího týmu po TD v posledním kole má hlídat **hloubku a příjemce přihrávek**, ne běžnou výkopovou formaci. Odloženo.
+
 **Opačná strana téže věci — STALLING:** nosič, který může skórovat, **čeká do posledního kola poločasu**,
 aby soupeři nezbyl čas na odpověď (uživatel za trpaslíky 02.10.). Patří sem i P128 (AI s trpaslíky TD do 8 kol vůbec nedá).
 
