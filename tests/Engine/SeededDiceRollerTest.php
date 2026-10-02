@@ -49,12 +49,22 @@ final class SeededDiceRollerTest extends TestCase
 
     public function testGlobalniMtSrandNaVysledekNemaVliv(): void
     {
-        mt_srand(1);
-        $a = $this->serie(new SeededDiceRoller(999));
-        mt_srand(2);
-        $b = $this->serie(new SeededDiceRoller(999));
+        try {
+            mt_srand(1);
+            $a = $this->serie(new SeededDiceRoller(999));
+            mt_srand(2);
+            $b = $this->serie(new SeededDiceRoller(999));
+        } finally {
+            // P100 (c): globální MT generátor (`array_rand` v kouči) by jinak zůstal
+            // nastavený na semínko 2 pro všechny testy po tomhle.
+            mt_srand();
+        }
 
         $this->assertSame($a, $b, 'roller nesmí viset na globálním stavu');
+        $po = mt_rand();
+        mt_srand(2);
+        $this->assertNotSame(mt_rand(), $po, 'test nesmí nechat globální semínko MT na hodnotě 2');
+        mt_srand();
     }
 
     public function testDvaRollerySeNavzajemNeruzi(): void
