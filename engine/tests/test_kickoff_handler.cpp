@@ -763,3 +763,17 @@ TEST(KickoffTable, KickingTeamScoringOnTheBlitzLandingMovesItsOwnTurnMarker) {
     EXPECT_EQ(gs.awayTeam.turnNumber, 1) << "skórující (kopající) tým posouvá značku";
     EXPECT_EQ(gs.homeTeam.turnNumber, 0) << "přijímající své první kolo ještě neodehrál";
 }
+
+// Položka 5. Nová sestava (po TD i o poločase) začíná bez míče ve vzduchu: zbytek bonusového kola
+// Blitz! (např. poločas skončil dřív, než míč dopadl) nesmí přežít do dalšího výkopu.
+TEST(KickoffHandler, SetupClearsABallStillInTheAirFromBlitz) {
+    for (bool newHalf : {false, true}) {
+        auto gs = kickFixture();
+        gs.kickoffBallInAir = true;
+        gs.kickoffLanding = {5, 5};
+        if (newHalf) setupHalf(gs, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
+        else setupDrive(gs, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
+        EXPECT_FALSE(gs.kickoffBallInAir) << (newHalf ? "setupHalf" : "setupDrive");
+        EXPECT_EQ(gs.kickoffLanding, (Position{-1, -1})) << (newHalf ? "setupHalf" : "setupDrive");
+    }
+}

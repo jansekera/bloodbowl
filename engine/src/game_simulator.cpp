@@ -483,6 +483,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // Ball off pitch until kickoff
     state.ball = BallState::offPitch();
     state.turnoverPending = false;
+    // Nová sestava = žádný míč ve vzduchu z minulého výkopu (Blitz!). OPRAVENO 02.10. (review #5).
+    state.kickoffBallInAir = false;
+    state.kickoffLanding = {-1, -1};
 }
 
 } // anonymous namespace
