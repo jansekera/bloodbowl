@@ -114,9 +114,13 @@ def board(state):
         if p.state == bb.PlayerState.STUNNED:
             code = code.lower()
         if state.ball.is_held and state.ball.carrier_id == p.id:
-            code += "o"
-        elif p.state == bb.PlayerState.PRONE:
+            code += "o"   # a pokračuje se: nosič, který už táhl, má mít i '-'/'B'
+        if p.state == bb.PlayerState.PRONE:
             code += "_"
+        elif p.team_side != state.active_team:
+            pass   # '-'/'B' jen u týmu na tahu (soupeřovy značky z minulého tahu matou)
+        elif p.used_blitz:
+            code += "B"   # uživatel 02.10.: kdo v tomto tahu blitzoval, má B místo -
         elif p.has_acted or p.has_moved:
             code += "-"
         # ⭐ 02.10.2026 (uživatel: „DR5 a všichni pohnutí mají mít za sebou -"):
@@ -155,7 +159,7 @@ def board(state):
     #   do necitelneho zmatku. Vcetne mice, kdyby lezel mimo hrace.
     occx = [x for (x, y) in cell] + [state.ball.position.x]
     occy = [y for (x, y) in cell] + [state.ball.position.y]
-    xlo, xhi = max(0, min(occx) - 2), min(25, max(occx) + 2)
+    xlo, xhi = max(0, min(occx)), min(25, max(occx))   # uživatel 02.10.: bez okraje navíc, hřiště je široké
     ylo, yhi = max(0, min(occy) - 1), min(14, max(occy) + 1)
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
 
@@ -170,28 +174,32 @@ def board(state):
     #   maji 7 (6 obsah + '|') -- sloupce se s kazdym dalsim polem rozjizdely
     #   o 1 znak, presne vada popsana v feedback_board_render_format.md
     #   ("hlavicka zarovnana na zacatek bunky, ne centrovana"). Sirka MUSI
-    #   sedet se sirkou bunky (7 = 6 obsah + 1 oddelovac).
-    lines.append("     " + "".join(f"{x:<6} " for x in range(xlo, xhi + 1)))
-    hline = "    +" + "------+" * (xhi - xlo + 1)
+    #   sedet se sirkou bunky. 02.10.2026: 9 = 8 obsah + 1 oddelovac -- kod
+    #   s pomlckou ("DL10-/0", "DTG6-/0") ma 7 znaku a sest uz nestacilo.
+    # uživatel 02.10.: „nevidím nahoře čísla x" ⇒ řádek začíná „x=" a opakuje se i pod mřížkou
+    xhdr = "x=   " + "".join(f"{x:<8} " for x in range(xlo, xhi + 1))
+    lines.append(xhdr)
+    hline = "    +" + "--------+" * (xhi - xlo + 1)
     for y in range(ylo, yhi + 1):
         lines.append(hline)
         row = f"y={y:<2}|"
         for x in range(xlo, xhi + 1):
             v = cell.get((x, y))
             if v:
-                row += f"{v:<6}|"
+                row += f"{v:<8}|"
             else:
                 z = zon((x, y), st_away)
-                row += (f"  {z}   |" if z else "      |")
+                row += (f"  {z}     |" if z else "        |")
         lines.append(row)
     lines.append(hline)
+    lines.append(xhdr)
     if venku:
         lines.append(f"⚠️ MIMO VYREZ stoji: " + ", ".join(f"{v}@{sq}" for sq, v in sorted(venku)))
     lines.append("")
     lines.append("D trpaslik (nas, HOME) · W wood-elf (jejich, AWAY) · +role (L/R/B/T/DR/C/W/TR) +ID")
     lines.append("cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje")
     lines.append("/n u D.. = VZDY (i /0) -- v kolika JEJICH zonach stoji")
-    lines.append("u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · '-' uz hral · malymi = stunned")
+    lines.append("u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned")
     lines.append("")
     lines.append("--- hráči (staty) ---")
     for p in sorted(players, key=lambda q: (q.team_side != bb.TeamSide.HOME, q.id)):
@@ -214,12 +222,18 @@ def event_str(e):
     who = f"hráč {e['player']}"
     if t == "BLOCK":
         face = BLOCK_FACES[e["roll"]] if 0 <= e["roll"] < len(BLOCK_FACES) else e["roll"]
-        return f"BLOK {who} na {e['target']}: zvolená kostka = {face}"
+        # die1 = všechny hozené kostky po 3 bitech (face+1), die2 = počet (block_handler.cpp, 02.10.)
+        vse = [BLOCK_FACES[((e["die1"] >> (3 * i)) & 7) - 1] for i in range(e["die2"])] if e["die2"] else []
+        hozeno = f" · hozeno {e['die2']}: " + ", ".join(vse) if vse else ""
+        return f"BLOK {who} na {e['target']}: zvolená kostka = {face}{hozeno}"
     if t in ("DODGE", "GFI", "PICKUP", "CATCH", "PASS", "STAND_UP", "LEAP"):
-        return f"{t} {who}: hod {e['roll']} -> {'OK' if e['success'] else 'NEPROŠEL'}"
+        # engine v `roll` posílá CÍLOVÉ číslo hodu (move_handler.cpp: `target`), ne padlou kostku
+        return f"{t} {who}: potřeba {e['roll']}+ -> {'OK' if e['success'] else 'NEPROŠEL'}"
     if t in ("ARMOR_BREAK", "INJURY", "CASUALTY"):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
         return f"{t} hráč {e['target'] if e['target'] > 0 else e['player']}: {e['roll']}{dice}"
+    if t == "FOLLOW_UP":
+        return f"follow-up {who}: {'ano' if e['success'] else 'ne'}"
     if t == "MOVE":
         return f"krok {who} na {e['to']}"
     return f"{t} {who} cíl {e['target']} hod {e['roll']}"

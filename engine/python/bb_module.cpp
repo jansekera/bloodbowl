@@ -117,6 +117,7 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("stats", &bb::Player::stats)
         .def_readwrite("movement_remaining", &bb::Player::movementRemaining)
         .def_readwrite("has_moved", &bb::Player::hasMoved)
+        .def_readwrite("used_blitz", &bb::Player::usedBlitz)
         .def_readwrite("has_acted", &bb::Player::hasActed)
         .def("has_skill", &bb::Player::hasSkill)
         .def("is_on_pitch", &bb::Player::isOnPitch)
