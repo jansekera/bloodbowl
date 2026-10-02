@@ -336,11 +336,13 @@ void finishKickoff(GameState& state, Position landing, DiceRollerBase& dice,
     state.activeTeam = receiving;
     landBall(state, receiving, landing, dice, events);
     // Po Blitz! může míč chytit kopající hráč v koncové zóně přijímajících ⇒ TD kopajících mimo
-    // jejich kolo. Přijímající své kolo nezačal (resolveKickoff mu ho už připsal) ⇒ vrátit; značku
-    // skórujících posune `executeAction` (ř. 997-1004, „Scoring in the opponent's turn“).
-    // OPRAVENO 02.10. (review #4) — dřív kolo propadlo přijímajícímu.
-    if (checkTouchdown(state) && state.getPlayer(state.ball.carrierId).teamSide == state.kickingTeam)
+    // jejich kolo: značku posouvají oni (ř. 997-1004, „Scoring in the opponent's turn“) a přijímající
+    // své kolo nezačal (resolveKickoff mu ho už připsal) ⇒ vrátit. Skóre a fázi TD řeší `executeAction`.
+    // OPRAVENO 02.10. (review #4) — dřív kolo propadlo přijímajícímu a kopající značku neposunul.
+    if (checkTouchdown(state) && state.getPlayer(state.ball.carrierId).teamSide == state.kickingTeam) {
+        state.getTeamState(state.kickingTeam).turnNumber++;
         state.getTeamState(receiving).turnNumber--;
+    }
     state.getTeamState(receiving).resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
     state.phase = GamePhase::PLAY;

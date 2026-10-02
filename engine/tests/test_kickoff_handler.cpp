@@ -765,6 +765,49 @@ TEST(KickoffTable, KickingTeamScoringOnTheBlitzLandingMovesItsOwnTurnMarker) {
     EXPECT_EQ(gs.homeTeam.turnNumber, 0) << "přijímající své první kolo ještě neodehrál";
 }
 
+// Druhé review 02.10., V1. ř. 997-1004 posouvá značku jen tomu, kdo skóruje V SOUPEŘOVĚ kole. Tým,
+// který udělal turnover a pak skóroval (nezvednutý míč odskočil spoluhráči v zóně), skóroval ve
+// SVÉM kole: značka se mu nehýbe a soupeř, jehož kolo turnover jen ohlásil, ho nezačal ⇒ o něj
+// nepřijde. Dřív se rozhodovalo podle `activeTeam` PO turnoveru: skórující dostal kolo navíc
+// a soupeř jedno ztratil.
+TEST(KickoffTable, TeamScoringAfterItsOwnTurnoverKeepsBothTurnMarkers) {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::AWAY;                // AWAY ve 4. kole, HOME má 4 odehraná
+    gs.homeTeam.turnNumber = 4;
+    gs.awayTeam.turnNumber = 4;
+    gs.awayTeam.rerolls = 0;
+    Player& lifter = playerAt(gs, {18, 5});
+    Player& catcher = playerAt(gs, {18, 9});
+    for (Player* p : {&lifter, &catcher}) {
+        p->skills.remove(SkillName::SureHands);
+        p->skills.remove(SkillName::Pro);
+    }
+    lifter.position = {1, 7};
+    catcher.position = {0, 8};                     // v koncové zóně domácích
+    gs.ball = BallState::onGround({0, 7});
+
+    FixedDiceRoller dice({1, 5, 6});               // zvednutí 1 ⇒ turnover; odraz 5 = J ⇒ (0,8); chytá 6
+    executeAction(gs, Action{ActionType::MOVE, lifter.id, -1, {0, 7}}, dice, nullptr);
+    ASSERT_EQ(gs.phase, GamePhase::TOUCHDOWN);
+    ASSERT_EQ(gs.ball.carrierId, catcher.id);
+    ASSERT_EQ(gs.awayTeam.score, 1);
+    EXPECT_EQ(gs.awayTeam.turnNumber, 4) << "skóroval ve svém kole ⇒ značka se nehýbe";
+    EXPECT_EQ(gs.homeTeam.turnNumber, 4) << "HOME své 5. kolo nezačal";
+
+    // Následující výkop (jako simulateGame): kope skórující AWAY, HOME začíná své 5. kolo.
+    gs.kickingTeam = TeamSide::AWAY;
+    setupDrive(gs, getHumanRoster(), getHumanRoster(), gs.kickingTeam);
+    for (auto& p : gs.players) {                   // jako kickFixture(false): bez Kick a Kick-Off Return
+        p.skills.remove(SkillName::Kick);
+        p.skills.remove(SkillName::KickOffReturn);
+    }
+    FixedDiceRoller kick({6, 7, 1, 1});            // 3 - 6 = -3 ⇒ touchback; Get the Ref
+    resolveKickoff(gs, kick, nullptr);
+    EXPECT_EQ(gs.homeTeam.turnNumber, 5) << "přijímající hraje své 5. kolo, žádné nepropadlo";
+    EXPECT_EQ(gs.awayTeam.turnNumber, 4) << "AWAY má po svém 4. kole další řádné kolo 5.";
+}
+
 // Položka 5. Nová sestava (po TD i o poločase) začíná bez míče ve vzduchu: zbytek bonusového kola
 // Blitz! (např. poločas skončil dřív, než míč dopadl) nesmí přežít do dalšího výkopu.
 TEST(KickoffHandler, SetupClearsABallStillInTheAirFromBlitz) {

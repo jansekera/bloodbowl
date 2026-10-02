@@ -541,6 +541,11 @@ ActionResult executeAction(GameState& state, const Action& action,
     // P71 (30.09.2026): hladovy upir se krmi na KONCI SVE AKTIVACE (r. 7934-7947).
     // Neuspech (bez Thralla, nebo Thrall s micem) je turnover a dalsi akce se uz
     // nekona.
+    // Kdo hraje kolo, v němž akce začala — turnover níž přepne `activeTeam` dřív, než se kontroluje TD.
+    const TeamSide mover = state.activeTeam;
+    // Bonusové kolo Blitz!: TD může vzniknout jen dopadem míče a značky kol řeší `finishKickoff`.
+    const bool blitzBonusTurn = state.kickoffBallInAir;
+
     auto feedEndsTurn = [&](int vampId) {
         if (!feedBloodlust(state, vampId, dice, events)) return false;
         state.turnoverPending = true;
@@ -594,9 +599,19 @@ ActionResult executeAction(GameState& state, const Action& action,
         state.getTeamState(scoringSide).score++;
         // ř. 997-1004 „Scoring in the opponent's turn“: „…scores a touchdown immediately, but must
         // move their Turn marker one space along the Turn track“. OPRAVENO 02.10. — značka se
-        // neposouvala (nosič zatlačený do zóny, kopající chytil při dopadu po Blitz!). Turnover
-        // výš už předal tah skórujícím a připsal jim kolo, takže tam tahle větev nenastane.
-        if (scoringSide != state.activeTeam) state.getTeamState(scoringSide).turnNumber++;
+        // neposouvala (nosič zatlačený do zóny). Rozhoduje, čí kolo akce běžela (`mover`), ne
+        // `activeTeam` po turnoveru. OPRAVENO 02.10. (druhé review V1) — tým, který po svém
+        // turnoveru skóroval (míč odskočil spoluhráči v zóně), dostal kolo navíc a soupeř jedno ztratil.
+        if (!blitzBonusTurn) {
+            const bool turnoverPassedTheTurn = state.activeTeam != mover;
+            if (scoringSide != mover && !turnoverPassedTheTurn) {
+                state.getTeamState(scoringSide).turnNumber++;     // soupeřovo kolo, bez turnoveru
+            } else if (scoringSide == mover && turnoverPassedTheTurn) {
+                // Skóroval ve svém kole; `resolveEndTurn` už soupeři připsal kolo, které nezačne.
+                state.getTeamState(state.activeTeam).turnNumber--;
+            }
+            // Soupeř skóroval po turnoveru: `resolveEndTurn` mu kolo už připsal = posunutá značka.
+        }
         state.phase = GamePhase::TOUCHDOWN;
         emitEvent(events, {GameEvent::Type::TOUCHDOWN, state.ball.carrierId, -1,
                           state.ball.position, {}, 0, true});

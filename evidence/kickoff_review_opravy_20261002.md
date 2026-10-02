@@ -72,3 +72,9 @@ PHP engine: **převést do druhého enginu** (#2, #4, N1).
 - `engine/python/test_bb_engine.py` (python3.8): **18 passed** · `python/tests` (venv): **202 passed**.
 - Kouř `mcts_cli --home=greedy --away=greedy --games=6 --home-roster=wood-elf --away-roster=orc`: 6 her doběhlo (3:0:3, ⌀ 2,00 : 1,17). Navíc 3 hry `macro_mcts` (30 iterací) × greedy přes Python doběhly (2:0, 1:0, 1:0).
 - Nemergováno, nepushnuto.
+
+## Druhé review 02.10.: V1, S1
+
+| # | položka | test | pozitivní kontrola | commit |
+|---|---|---|---|---|
+| V1 | (HIGH) Značka kol po TD se rozhodovala podle `activeTeam` až PO turnoveru: tým, který udělal turnover a pak skóroval ve SVÉM kole (nezvednutý míč odskočil spoluhráči v soupeřově zóně), dostal kolo navíc a soupeř jedno ztratil (ř. 997-1004 posouvá značku jen při TD v soupeřově kole). `executeAction` si teď pamatuje `mover` (kdo hrál kolo, v němž akce začala): TD soupeře bez turnoveru ⇒ +1 skórujícím (N1); TD `mover` po vlastním turnoveru ⇒ soupeři se vrací kolo, které mu `resolveEndTurn` připsal a které nezačne; TD soupeře po turnoveru ⇒ beze změny (kolo mu připsal turnover = posunutá značka). Bonusové kolo Blitz! se tu nepočítá: TD při dopadu řeší celé `finishKickoff` (kopajícím +1 i přijímajícím −1 na jednom místě) | `KickoffTable.TeamScoringAfterItsOwnTurnoverKeepsBothTurnMarkers` (AWAY ve 4. kole: zvednutí 1 ⇒ turnover, odraz J ⇒ (0,8), spoluhráč chytá ⇒ TD; pak `setupDrive` + `resolveKickoff` touchback, Get the Ref) | ✅ spadl před opravou: po TD away 5 / home 5 místo 4 / 4; po výkopu home 6 / away 5 místo 5 / 4. N1 a #4 zelené před i po | (V1) |
