@@ -163,16 +163,15 @@ final class CagePlaybookTest extends TestCase
 
         $decision = (new LearningAICoach())->decideAction($state, new RulesEngine());
 
-        // Nosič je na řadě jako první (ostatní stojí v rozích a drží).
-        if ($decision['action'] === ActionType::MOVE && ($decision['params']['playerId'] ?? 0) === 1) {
-            $this->assertNotSame(
-                25,
-                $decision['params']['x'],
-                'nosič šel dát TD hned, místo aby počkal s klecí na poslední kolo',
-            );
-        } else {
-            $this->addToAssertionCount(1); // nosič se tenhle tah nehýbal, klec drží
-        }
+        // P100: dřív `if (MOVE nosiče) assert … else addToAssertionCount` -- při jakémkoli
+        // jiném rozhodnutí (i konec tahu, i TD) test prošel a nic neověřil.
+        $this->assertSame(ActionType::MOVE, $decision['action'], 'fixtura: nosič se má hýbat');
+        $this->assertSame(1, $decision['params']['playerId'] ?? null, 'fixtura: hýbe se nosič');
+        $this->assertNotSame(
+            25,
+            $decision['params']['x'],
+            'nosič šel dát TD hned, místo aby počkal s klecí na poslední kolo',
+        );
     }
 
     public function testProneOpponentStillCounts(): void
