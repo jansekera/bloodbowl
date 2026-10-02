@@ -92,6 +92,12 @@ BlockDiceInfo getBlockDiceInfo(int attST, int defST);
 int getPushbackSquares(Position attackerPos, Position defenderPos, Position out[3]);
 Position scatterDirection(int d8);
 
+// Pole volného míče, ke kterému má AI táhnout: míč ležící na hřišti, nebo — v bonusovém kole Blitz!
+// (ř. 1334-1341) — místo dopadu výkopu, které oba trenéři znají, protože rozptyl je před tabulkou
+// (ř. 1242-1248). Dopad mimo hřiště / do kopající poloviny (touchback) ani držený míč pole nemá
+// ⇒ {-1,-1}. ⛔ Míč ve vzduchu nikdo nezvedne: na pole dopadu se smí postavit (při dopadu chytá).
+Position looseBallSquare(const GameState& state);
+
 // Reroll chain: skill → Pro → team reroll (with Loner gate)
 // skillReroll = SKILL_COUNT means no skill reroll available
 bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,

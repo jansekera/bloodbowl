@@ -140,6 +140,10 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("ball", &bb::GameState::ball)
         .def_readwrite("weather", &bb::GameState::weather)
         .def_readwrite("kicking_team", &bb::GameState::kickingTeam)
+        // Blitz! (ř. 1334-1341): míč ve vzduchu a známé místo dopadu (rozptyl je před tabulkou,
+        // ř. 1242-1248). Uživatel 02.10. (#3): AI o něm má vědět i z Pythonu.
+        .def_readwrite("kickoff_ball_in_air", &bb::GameState::kickoffBallInAir)
+        .def_readwrite("kickoff_landing", &bb::GameState::kickoffLanding)
         .def("get_player", [](bb::GameState& gs, int id) -> bb::Player& {
             return gs.getPlayer(id);
         }, py::return_value_policy::reference_internal)

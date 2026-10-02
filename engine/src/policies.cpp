@@ -1,5 +1,6 @@
 #include "bb/policies.h"
 #include "bb/action_resolver.h"
+#include "bb/helpers.h"
 #include <algorithm>
 
 namespace bb {
@@ -53,9 +54,10 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
         }
     }
 
-    // Priority 2: Move a player to the ball (if ball is on ground)
-    if (!state.ball.isHeld && state.ball.isOnPitch()) {
-        Position ballPos = state.ball.position;
+    // Priority 2: Move a player to the ball (if ball is on ground). Při Blitz! k místu dopadu
+    // (looseBallSquare, uživatel 02.10. #3) — dřív AI míč ve vzduchu neviděla. Stoupnout si na pole
+    // dopadu je legální: míč nezvedne, při dopadu ho chytá (ř. 278-279).
+    if (const Position ballPos = looseBallSquare(state); ballPos.isOnPitch()) {
 
         // Direct pickup: move to the ball square
         for (auto& a : actions) {

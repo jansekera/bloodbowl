@@ -7,6 +7,7 @@
 #include "bb/action_resolver.h"
 #include "bb/rules_engine.h"
 #include "bb/turn_handler.h"
+#include "bb/macro_actions.h"
 #include <stdexcept>
 
 using namespace bb;
@@ -1130,4 +1131,77 @@ TEST(KickOffReturn, PrefersAnEquallyGoodSquareOutsideTacklezones) {
     const Position end = korEnd(ev, {16, 3});
     EXPECT_EQ(end.distanceTo({13, 7}), 1);
     EXPECT_EQ(countTacklezones(gs, end, TeamSide::AWAY), 0) << "skončil na (" << int(end.x) << "," << int(end.y) << ")";
+}
+
+// #3 (uživatel 02.10.: „při blitz ví kam dopadne míč“). Pořadí ř. 1242-1248: rozptyl je PŘED
+// výkopovou tabulkou ⇒ při Blitz! (ř. 1334-1341) oba trenéři vědí, kam míč dopadne. AI kopajících
+// to dřív nevěděla: míč „mimo hřiště“ = žádný míč, greedy blitzoval/chodil náhodně a makra posílala
+// hráče do obrany k vlastní zóně. Míč ve vzduchu nikdo nezvedne — dopadne až po konci kola.
+// Fixtura: Blitz! s dopadem nad (3,7) (Kick, D6 1 ⇒ 0 polí), hosté (kopající) na tahu.
+namespace {
+GameState blitzOverThreeSeven() {
+    auto gs = kickFixture();
+    FixedDiceRoller dice(onThree(4, 6, {}));
+    resolveKickoff(gs, dice, nullptr);
+    return gs;
+}
+int nearestKicker(const GameState& gs, Position to) {
+    int best = 99;
+    gs.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
+        if (p.state == PlayerState::STANDING) best = std::min(best, p.position.distanceTo(to));
+    });
+    return best;
+}
+}  // namespace
+
+TEST(KickoffBlitzLanding, LooseBallSquareIsTheLandingWhileTheBallIsInTheAir) {
+    auto gs = blitzOverThreeSeven();
+    ASSERT_TRUE(gs.kickoffBallInAir);
+    ASSERT_EQ(gs.kickoffLanding, (Position{3, 7}));
+    EXPECT_EQ(looseBallSquare(gs), (Position{3, 7}));
+    gs.kickoffLanding = {-2, 7};                       // výkop do autu = touchback, místo dopadu nehraje roli
+    EXPECT_FALSE(looseBallSquare(gs).isOnPitch());
+}
+
+// Greedy hraje bonusové kolo s kostkami (uhýbání může skončit turnoverem, takže DOSAŽENÁ vzdálenost
+// závisí na kostkách) ⇒ test hlídá ZÁMĚR: každý krok, který greedy během letu míče zvolí, přibližuje
+// svého hráče k místu dopadu (aspoň 90 % kroků: nejlepší dostupný krok občas jen udrží vzdálenost,
+// když ostatní hráči už nemají pohyb); 10 semínek. Dřív greedy blitzoval / chodil náhodně
+// (pozitivní kontrola na starém kódu: 50 ze 109 kroků blíž; nový: 45 ze 46).
+TEST(KickoffBlitzLanding, GreedyBonusTurnMovesTowardTheLandingSquare) {
+    int moves = 0, closer = 0;
+    std::string trace;
+    for (uint32_t seed = 1; seed <= 10; ++seed) {
+        auto gs = blitzOverThreeSeven();
+        const Position landing = gs.kickoffLanding;
+        const int before = nearestKicker(gs, landing);
+        DiceRoller dice(seed);
+        int closest = before;
+        for (int i = 0; i < 60 && gs.kickoffBallInAir; ++i) {
+            const Action a = greedyPolicy(gs, dice);
+            if (a.type == ActionType::END_TURN) break;
+            if (a.type == ActionType::MOVE) {
+                ++moves;
+                closer += a.target.distanceTo(landing) < gs.getPlayer(a.playerId).position.distanceTo(landing);
+            }
+            executeAction(gs, a, dice, nullptr);
+            if (gs.kickoffBallInAir) closest = std::min(closest, nearestKicker(gs, landing));
+        }
+        trace += " " + std::to_string(before) + "->" + std::to_string(closest);
+    }
+    ASSERT_GT(moves, 0);
+    EXPECT_GE(closer * 10, moves * 9) << "kroky k místu dopadu " << closer << " z " << moves
+                             << "; nejbližší kopající (začátek->nejblíž):" << trace;
+}
+
+TEST(KickoffBlitzLanding, MacrosOfferSquaresAroundTheLandingButNoPickup) {
+    auto gs = blitzOverThreeSeven();
+    std::vector<Macro> macros;
+    getAvailableMacros(gs, macros);
+    bool aroundLanding = false;
+    for (const Macro& m : macros) {
+        EXPECT_NE(m.type, MacroType::PICKUP) << "míč ve vzduchu nikdo nezvedne";
+        if (m.type == MacroType::REPOSITION && m.targetPos.distanceTo(gs.kickoffLanding) == 1) aroundLanding = true;
+    }
+    EXPECT_TRUE(aroundLanding) << "žádné makro nevede hráče k místu dopadu";
 }
