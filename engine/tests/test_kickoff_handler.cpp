@@ -743,3 +743,23 @@ TEST(KickoffTable, NiceGustDoesNotBringAKickBackOverTheLineOfScrimmage) {
     ASSERT_TRUE(gs.ball.isHeld);
     EXPECT_NE(gs.ball.carrierId, los) << "touchback dostane nejhlubší hráč, ne ten na LoS pod poryvem";
 }
+
+// Položka 4. ř. 997-1004 „Scoring in the opponent's turn“: „If one of your players is holding the
+// ball in the opposing team's End Zone at any point during your opponent's turn then your team
+// scores a touchdown immediately, but MUST MOVE THEIR TURN MARKER one space along the Turn track“.
+// Po Blitz! chytí kopající hráč v koncové zóně přijímajících míč, který teprve dopadá: skóruje
+// kopající ⇒ značku posouvá ON. Přijímající své kolo nezačal (míč dopadl před ním), takže o něj
+// nepřijde. Dřív: přijímajícímu kolo propadlo a kopající značku neposunul.
+TEST(KickoffTable, KickingTeamScoringOnTheBlitzLandingMovesItsOwnTurnMarker) {
+    auto gs = kickFixture(/*withKick=*/false);
+    FixedDiceRoller dice({3, 7, 4, 6, 6});         // (3,7) - 3 = (0,7); Blitz!; chytá na 6
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.kickoffBallInAir);
+    Player& runner = playerAt(gs, {18, 5});
+    runner.position = {0, 7};                      // doběhl v bonusovém kole pod míč
+    executeAction(gs, endTurn(), dice, nullptr);
+    ASSERT_EQ(gs.phase, GamePhase::TOUCHDOWN);
+    ASSERT_EQ(gs.awayTeam.score, 1);
+    EXPECT_EQ(gs.awayTeam.turnNumber, 1) << "skórující (kopající) tým posouvá značku";
+    EXPECT_EQ(gs.homeTeam.turnNumber, 0) << "přijímající své první kolo ještě neodehrál";
+}

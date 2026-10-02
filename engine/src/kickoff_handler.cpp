@@ -2,6 +2,7 @@
 #include "bb/ball_handler.h"
 #include "bb/helpers.h"
 #include "bb/injury.h"
+#include "bb/turn_handler.h"
 #include <algorithm>
 #include <cmath>
 
@@ -314,6 +315,14 @@ void finishKickoff(GameState& state, Position landing, DiceRollerBase& dice,
     const TeamSide receiving = opponent(state.kickingTeam);
     state.activeTeam = receiving;
     landBall(state, receiving, landing, dice, events);
+    // Po Blitz! může míč chytit kopající hráč v koncové zóně přijímajících ⇒ TD kopajících mimo
+    // jejich kolo. ř. 997-1004: skórující „must move their Turn marker one space along the Turn
+    // track“; přijímající své kolo nezačal (resolveKickoff mu ho už připsal) ⇒ vrátit. OPRAVENO
+    // 02.10. (review #4) — dřív kolo propadlo přijímajícímu a kopající značku neposunul.
+    if (checkTouchdown(state) && state.getPlayer(state.ball.carrierId).teamSide == state.kickingTeam) {
+        state.getTeamState(state.kickingTeam).turnNumber++;
+        state.getTeamState(receiving).turnNumber--;
+    }
     state.getTeamState(receiving).resetForNewTurn();
     state.resetPlayersForNewTurn(receiving);
     state.phase = GamePhase::PLAY;

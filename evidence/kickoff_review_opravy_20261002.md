@@ -9,7 +9,8 @@ rozbitém kódu, mutace vrácena).
 | # | položka | test | pozitivní kontrola | commit |
 |---|---|---|---|---|
 | 1 | TurnLog: Blitz! po TD se slil do záznamu kola s TD | `KickoffTurnLog.BlitzAfterATouchdownGetsItsOwnTurnLog` | ✅ spadl před opravou (seed 11 a 20: Blitz! po TD bez vlastního záznamu) | 369157cf |
-| 2 | Poryv „Nice“ vracel míč zpoza autu / LoS (FAQ ř. 9315-9317) | `KickoffTable.NiceGustDoesNotBringAKickOffThePitchBackIn`, `…BackOverTheLineOfScrimmage` | ✅ oba spadly před opravou (míč na (1,7) nedržen; chytil hráč na LoS) | (tento commit) |
+| 2 | Poryv „Nice“ vracel míč zpoza autu / LoS (FAQ ř. 9315-9317) | `KickoffTable.NiceGustDoesNotBringAKickOffThePitchBackIn`, `…BackOverTheLineOfScrimmage` | ✅ oba spadly před opravou (míč na (1,7) nedržen; chytil hráč na LoS) | 634b5632 |
+| 4 | TD kopajících při dopadu po Blitz!: značku posouvá skórující, přijímajícímu kolo nepropadá (ř. 997-1004) | `KickoffTable.KickingTeamScoringOnTheBlitzLandingMovesItsOwnTurnMarker` | ✅ spadl před opravou (kopající 0 místo 1, přijímající 1 místo 0) | (tento commit) |
 
 ## Nechává se na rozhodnutí uživatele (neimplementováno)
 
