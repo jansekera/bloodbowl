@@ -114,8 +114,8 @@ def board(state):
         if p.state == bb.PlayerState.STUNNED:
             code = code.lower()
         if state.ball.is_held and state.ball.carrier_id == p.id:
-            code += "o"
-        elif p.state == bb.PlayerState.PRONE:
+            code += "o"   # a pokračuje se: nosič, který už táhl, má mít i '-'/'B'
+        if p.state == bb.PlayerState.PRONE:
             code += "_"
         elif p.team_side != state.active_team:
             pass   # '-'/'B' jen u týmu na tahu (soupeřovy značky z minulého tahu matou)
