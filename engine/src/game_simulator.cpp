@@ -719,6 +719,7 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
     int totalActions = 0;
     TeamSide lastActiveTeam = state.activeTeam;
     int lastTurnNumber = state.getTeamState(state.activeTeam).turnNumber;
+    bool lastBallInAir = state.kickoffBallInAir;
 
     // Capture initial state features + first turn snapshot
     {
@@ -774,7 +775,12 @@ LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& aw
         // Check if turn changed — log features at turn boundaries
         TeamSide curTeam = state.activeTeam;
         int curTurn = state.getTeamState(curTeam).turnNumber;
-        if (curTeam != lastActiveTeam || curTurn != lastTurnNumber) {
+        // Bonusové kolo Blitz! (ř. 1334-1341) je nové kolo, i když se tým ani číslo kola nemění:
+        // po TD kope skórující tým a výkop jeho `turnNumber` nehýbe. OPRAVENO 02.10. — Blitz! po TD
+        // se slil do záznamu kola, ve kterém padl TD.
+        const bool blitzStarts = state.kickoffBallInAir && !lastBallInAir;
+        lastBallInAir = state.kickoffBallInAir;
+        if (curTeam != lastActiveTeam || curTurn != lastTurnNumber || blitzStarts) {
             StateLog log;
             log.perspective = curTeam;
             extractFeatures(state, log.perspective, log.features);

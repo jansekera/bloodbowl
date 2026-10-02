@@ -677,3 +677,43 @@ TEST(KickOffReturn, MovesInARealGame) {
     ASSERT_EQ(games, 20) << "každá sestava má právě jednoho nositele KOR (P125)";
     EXPECT_GE(moved, 10) << "KOR se ve hře použil jen " << moved << "× z " << games;
 }
+
+// ===========================================================================
+// REVIEW VÝKOPU (02.10.2026) — evidence/kickoff_review_opravy_20261002.md
+// ===========================================================================
+
+// Položka 1. Bonusové kolo Blitz! (ř. 1334-1341) je samostatné kolo kopajícího týmu. Po TD kope
+// skórující tým a jeho `turnNumber` se výkopem nemění ⇒ hranice záznamu kol podle (tým, číslo kola)
+// ho slila s kolem, ve kterém padl TD. Hledá se hra, kde po TD padl Blitz! (politika ho vidí jako
+// tah s `kickoffBallInAir` a nenulovým skóre), a pro každé takové kolo musí v záznamu být vlastní
+// řádek s `kickoffBallInAir`.
+TEST(KickoffTurnLog, BlitzAfterATouchdownGetsItsOwnTurnLog) {
+    struct Key { int half, home, away; };
+    int checked = 0;
+    for (uint32_t seed = 1; seed <= 300 && checked < 2; ++seed) {
+        DiceRoller dice(seed);
+        std::vector<Key> blitzTurns;
+        auto observe = [&](const GameState& s) {
+            if (s.kickoffBallInAir && s.homeTeam.score + s.awayTeam.score > 0) {
+                const Key k{s.half, s.homeTeam.score, s.awayTeam.score};
+                bool known = false;
+                for (const auto& b : blitzTurns)
+                    known |= b.half == k.half && b.home == k.home && b.away == k.away;
+                if (!known) blitzTurns.push_back(k);
+            }
+            return greedyPolicy(s, dice);
+        };
+        const LoggedGameResult lg =
+            simulateGameLogged(getHumanRoster(), getOrcRoster(), observe, observe, dice);
+        for (const auto& b : blitzTurns) {
+            bool logged = false;
+            for (const auto& t : lg.turnLogs)
+                logged |= t.kickoffBallInAir && t.half == b.half && t.homeScore == b.home &&
+                          t.awayScore == b.away;
+            EXPECT_TRUE(logged) << "seed " << seed << ": Blitz! po TD (" << b.home << ":" << b.away
+                                << ", poločas " << b.half << ") nemá vlastní záznam kola";
+            ++checked;
+        }
+    }
+    ASSERT_GE(checked, 1) << "fixtura: v hledaných hrách nepadl Blitz! po TD";
+}
