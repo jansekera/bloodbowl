@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AnimationQueue } from './AnimationQueue';
 import type { GameEvent } from '../api/types';
 import { createAnimationState, createDelayAnimation, createMoveAnimation } from './animations';
@@ -14,6 +14,10 @@ describe('AnimationQueue', () => {
             (pos) => ({ px: pos.x * 32 + 56, py: pos.y * 32 + 56 }),
         );
     });
+
+    // P100 (c): dřív se `vi.unstubAllGlobals()` volalo na konci těla testu — když padl `expect`,
+    // zůstal podvržený requestAnimationFrame i v dalších testech.
+    afterEach(() => vi.unstubAllGlobals());
 
     it('should start with isAnimating false', () => {
         expect(queue.isAnimating).toBe(false);
@@ -51,8 +55,6 @@ describe('AnimationQueue', () => {
         await promise;
 
         expect(queue.isAnimating).toBe(false);
-
-        vi.unstubAllGlobals();
     });
 
     it('should skip all animations', async () => {
@@ -79,8 +81,6 @@ describe('AnimationQueue', () => {
         expect(queue.isAnimating).toBe(false);
         expect(queue.state.playerOverrides.size).toBe(0);
         expect(queue.state.shakePlayer).toBeNull();
-
-        vi.unstubAllGlobals();
     });
 
     it('should resolve for non-animated events', async () => {
@@ -152,6 +152,10 @@ describe('New event animations (Phase 12)', () => {
         );
     });
 
+    // P100 (c): dřív se `vi.unstubAllGlobals()` volalo na konci těla testu — když padl `expect`,
+    // zůstal podvržený requestAnimationFrame i v dalších testech.
+    afterEach(() => vi.unstubAllGlobals());
+
     it('should produce shake animations for wrestle events', async () => {
         const events: GameEvent[] = [
             {
@@ -172,7 +176,6 @@ describe('New event animations (Phase 12)', () => {
         await promise;
 
         expect(queue.isAnimating).toBe(false);
-        vi.unstubAllGlobals();
     });
 
     it('should produce shake animations for big guy failure events', async () => {
@@ -199,7 +202,6 @@ describe('New event animations (Phase 12)', () => {
         await promise;
 
         expect(queue.isAnimating).toBe(false);
-        vi.unstubAllGlobals();
     });
 
     it('should produce delay for dump_off and hail_mary_pass events', async () => {
@@ -226,6 +228,5 @@ describe('New event animations (Phase 12)', () => {
         await promise;
 
         expect(queue.isAnimating).toBe(false);
-        vi.unstubAllGlobals();
     });
 });
