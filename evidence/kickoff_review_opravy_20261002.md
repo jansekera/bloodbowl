@@ -44,3 +44,10 @@ PHP engine: **převést do druhého enginu** (#2, #4, N1).
 - **#3** AI neví o `kickoffLanding` během Blitz! (bonusové kolo hraje bez znalosti místa dopadu).
 - **#6** Návrat z KO / Sweltering Heat se hází i před výkopem, který se nekoná (přijímající nemá kolo).
 - **#7** Kick-Off Return se pohybuje přes tacklezóny bez uhýbání.
+
+## Ověření (po posledním commitu)
+
+- `bb_tests`: **839 passed** (před review 821; +18 testů).
+- `engine/python/test_bb_engine.py` (python3.8): 17 passed · `python/tests` (venv): 202 passed · `diag_first_possession.py selftest`: ALL PASS.
+- Kouř `mcts_cli --home=greedy --away=greedy --games=6 --home-roster=wood-elf --away-roster=orc`: 6 her doběhlo (4:0:2, ⌀ 2,17 : 1,33).
+- Nemergováno, nepushnuto (worktree `worktree-agent-ac466507256f9769d`).
