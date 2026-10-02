@@ -777,3 +777,25 @@ TEST(KickoffHandler, SetupClearsABallStillInTheAirFromBlitz) {
         EXPECT_EQ(gs.kickoffLanding, (Position{-1, -1})) << (newHalf ? "setupHalf" : "setupDrive");
     }
 }
+
+// Položka 8. ř. 703-708: „All face-down players are turned face up at the end of their team's next
+// turn … a player may not turn face up on the turn they are Stunned.“ Pitch Invasion (všechny D6 = 6)
+// omráčí oba týmy MIMO kolo: přijímající vstanou na konci svého prvního kola, kopající na konci
+// svého prvního kola — ne dřív (konec kola přijímajících) a ne později.
+TEST(KickoffTable, PitchInvasionStunnedPlayersOfBothTeamsTurnFaceUpAfterTheirOwnNextTurn) {
+    auto gs = kickFixture();
+    const int recv = playerAt(gs, {7, 7}).id;
+    const int kick = playerAt(gs, {18, 5}).id;
+    FixedDiceRoller dice(onThree(6, 6, std::vector<int>(40, 6)));
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_EQ(gs.getPlayer(recv).state, PlayerState::STUNNED);
+    ASSERT_EQ(gs.getPlayer(kick).state, PlayerState::STUNNED);
+    EXPECT_TRUE(gs.getPlayer(kick).stunnedThisTurn) << "omráčen teď — stejně jako po hodu na zranění";
+
+    executeAction(gs, endTurn(), dice, nullptr);   // konec 1. kola přijímajících
+    EXPECT_EQ(gs.getPlayer(recv).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(kick).state, PlayerState::STUNNED) << "kopající ještě své kolo neměl";
+
+    executeAction(gs, endTurn(), dice, nullptr);   // konec 1. kola kopajících
+    EXPECT_EQ(gs.getPlayer(kick).state, PlayerState::PRONE);
+}

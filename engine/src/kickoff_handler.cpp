@@ -241,6 +241,7 @@ void resolvePitchInvasion(GameState& state, DiceRollerBase& dice, std::vector<Ga
             p.position = {-1, -1};
         } else {
             p.setState(PlayerState::STUNNED);
+            p.stunnedThisTurn = true;   // jako injury.cpp (ř. 707); review #8 — dřív chyběl
         }
     }
 }
