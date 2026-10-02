@@ -270,7 +270,10 @@ bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
             state.weather = weatherFromRoll(weatherRoll);
             emitEvent(events, {GameEvent::Type::WEATHER_CHANGE, -1, -1, {}, {}, weatherRoll, true});
             // ř. 1318-1320: „Nice“ ⇒ poryv rozptýlí míč před dopadem o jedno pole. OPRAVENO 02.10. (P91).
-            if (state.weather == Weather::NICE) {
+            // Jen míč, který ještě míří na hřiště do přijímající poloviny: FAQ ř. 9315-9317 „any event
+            // that causes the ball to go out of bounds or over the line of scrimmage during a kick-off
+            // results in a touchback“. OPRAVENO 02.10. (review #2) — poryv vracel míč zpoza autu/LoS.
+            if (state.weather == Weather::NICE && landing.isOnPitch() && inHalfOf(receiving, landing)) {
                 const Position off = scatterDirection(dice.rollD8());
                 landing = {static_cast<int8_t>(landing.x + off.x), static_cast<int8_t>(landing.y + off.y)};
             }

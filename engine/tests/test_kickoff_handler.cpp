@@ -717,3 +717,29 @@ TEST(KickoffTurnLog, BlitzAfterATouchdownGetsItsOwnTurnLog) {
     }
     ASSERT_GE(checked, 1) << "fixtura: v hledaných hrách nepadl Blitz! po TD";
 }
+
+// Položka 2. FAQ ř. 9315-9317: „any event that causes the ball to go out of bounds or over the line
+// of scrimmage during a kick-off results in a touchback.“ Poryv „Nice“ (ř. 1318-1320) míč, který už
+// je mimo hřiště, nevrací zpět. Bez Kick: (3,7) - 4 = (-1,7) ⇒ mimo; tabulka 3+4, počasí 3+4 = Nice;
+// dřív poryv D8 3 vrátil míč na (0,7) a ten se odrazil (D8 3) na (1,7) — touchback zmizel.
+TEST(KickoffTable, NiceGustDoesNotBringAKickOffThePitchBackIn) {
+    auto gs = kickFixture(/*withKick=*/false);
+    FixedDiceRoller dice({4, 7, 3, 4, 3, 4, 3, 3, 3});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_EQ(gs.weather, Weather::NICE);
+    ASSERT_TRUE(gs.ball.isHeld) << "míč mimo hřiště = touchback, poryv ho nevrací";
+    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME);
+}
+
+// Táž věta FAQ, „over the line of scrimmage“: krátký kop (7,7) + 6 na východ = (13,7), kopající
+// polovina; poryv na západ by ho vrátil na (12,7) k domácímu na LoS.
+TEST(KickoffTable, NiceGustDoesNotBringAKickBackOverTheLineOfScrimmage) {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.receiverSpeed = RosterSpeed::FAST;
+    const int los = playerAt(gs, {12, 7}).id;
+    FixedDiceRoller dice({6, 3, 3, 4, 3, 4, 7, 6, 6});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_EQ(gs.weather, Weather::NICE);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_NE(gs.ball.carrierId, los) << "touchback dostane nejhlubší hráč, ne ten na LoS pod poryvem";
+}
