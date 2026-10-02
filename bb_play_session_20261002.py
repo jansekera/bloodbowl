@@ -36,8 +36,10 @@ ENDZONE_AWAY_X = 25  # wood-elf (AWAY) brani vyssi x
 
 
 def new_game(seed=20261002):
+    global ROSTERS
     dwarf = bb.get_developed_roster("dwarf", 1200)
     elf = bb.get_developed_roster("wood-elf", 1200)
+    ROSTERS = (dwarf, elf)
     state = bb.GameState()
     bb.setup_half(state, dwarf, elf, bb.TeamSide.AWAY)  # AWAY kope, HOME prijima
     dice = bb.DiceRoller(seed)
@@ -266,7 +268,7 @@ def main():
             with open(CMD) as f:
                 line = f.read().strip()
             os.remove(CMD)
-            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions"):
+            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
         parts = line.split()
@@ -295,6 +297,13 @@ def main():
                     p = state.get_player(a.player_id)
                     if p.team_side == side:
                         result_lines.append(f"  [{i}] {action_str(a)}")
+            elif cmd == "vykop" and len(parts) == 2:
+                # po TD: rozestavení (KO hází na návrat) + výkop; parts[1] = kdo KOPE (HOME|AWAY)
+                kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
+                bb.setup_drive(state, ROSTERS[0], ROSTERS[1], kick, dice)
+                bb.simple_kickoff(state, dice)
+                result_lines.append(f"rozestavení + výkop, kope {kick}")
+                result_lines.append(board(state))
             elif cmd == "push" and len(parts) == 3:
                 bb.set_manual_push(int(parts[1]), int(parts[2]))
                 result_lines.append(f"příští odtlačení: ({parts[1]},{parts[2]})")

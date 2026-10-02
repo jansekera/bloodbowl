@@ -465,6 +465,15 @@ PYBIND11_MODULE(bb_engine, m) {
           },
           py::arg("state"), py::arg("home"), py::arg("away"),
           py::arg("kicking_team") = bb::TeamSide::AWAY);
+    // 02.10.2026 (živá partie): rozestavení po touchdownu uvnitř poločasu (KO hráči hází na návrat).
+    m.def("setup_drive",
+          [](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
+             bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
+              bb::DiceRollerBase& base = dice;
+              state.kickingTeam = kickingTeam;   // simpleKickoff bere přijímající = opponent(state.kickingTeam)
+              bb::setupDrive(state, home, away, kickingTeam, &base);
+          },
+          py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
         bb::simpleKickoff(state, base);
