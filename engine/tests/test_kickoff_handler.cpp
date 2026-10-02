@@ -1271,6 +1271,28 @@ TEST(KickoffBlitzLanding, GreedyKeepsTheKickerWhoReachedTheLandingSquareOnIt) {
     EXPECT_GT(reached, 0) << "fixtura: hráč měl pole dopadu dosáhnout";
 }
 
+// Druhé review 02.10. (nízká). Míč ve vzduchu při Blitz! nemá nikdo ⇒ BLITZ makra nesmí kopající
+// hrát jako obranu proti nosiči (dřív `onDef = !iHaveBall && !ballOnGround`), ale stejně jako u míče
+// ležícího na místě dopadu — týž výklad volného míče (`looseBallSquare`) jako REPOSITION.
+TEST(KickoffBlitzLanding, BlitzMacrosTreatTheBallInTheAirLikeALooseBallOnTheLanding) {
+    auto inAir = blitzOverThreeSeven();
+    ASSERT_TRUE(inAir.kickoffBallInAir);
+    auto onGround = inAir;
+    onGround.kickoffBallInAir = false;
+    onGround.ball = BallState::onGround(inAir.kickoffLanding);
+    auto blitzes = [](const GameState& gs) {
+        std::vector<Macro> macros;
+        getAvailableMacros(gs, macros);
+        std::vector<std::pair<int, int>> out;
+        for (const Macro& m : macros)
+            if (m.type == MacroType::BLITZ) out.emplace_back(m.playerId, m.targetId);
+        return out;
+    };
+    const auto expected = blitzes(onGround);
+    ASSERT_FALSE(expected.empty()) << "fixtura: kopající mají koho blitzovat";
+    EXPECT_EQ(blitzes(inAir), expected);
+}
+
 TEST(KickoffBlitzLanding, MacrosOfferSquaresAroundTheLandingButNoPickup) {
     auto gs = blitzOverThreeSeven();
     std::vector<Macro> macros;

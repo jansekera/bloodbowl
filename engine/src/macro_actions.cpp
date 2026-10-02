@@ -1886,7 +1886,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // BLITZ: not used this turn, at least one standing enemy
     // Defense-aware: prioritizes ball carrier and scoring threats
     if (!myTeam.blitzUsedThisTurn) {
-        bool onDef = !iHaveBall && !ballOnGround; // opponent has ball
+        // Soupeř má míč. Volný míč = na zemi, nebo při Blitz! místo dopadu (`looseBallSquare`, jako
+        // REPOSITION níž). OPRAVENO 02.10. (druhé review) — dřív `!ballOnGround`, takže kopající v
+        // bonusovém kole blitzovali jako obrana proti nosiči, kterého nikdo nemá.
+        bool onDef = !iHaveBall && !looseBallSquare(state).isOnPitch();
         int oppCarrierId = (state.ball.isHeld && state.ball.carrierId > 0)
                             ? state.ball.carrierId : -1;
 
