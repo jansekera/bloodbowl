@@ -490,6 +490,26 @@ jeden krok; **uvolnit cestu dopředu** je úkol pro celý tah.
 
 ---
 
+## A14. ⭐⭐⭐ OTTD — TOUCHDOWN V JEDNOM TAHU *(uživatel 02.10., živá partie)*
+
+> *„OTTD za elfy se naučíš až v celotahu — jestli tam ještě není, tak jej tam přidej, ať se nezapomene."*
+
+**Situace z partie 02.10.:** trpaslíci skórovali úmyslně až v **H:8** (*„budeš muset zkusit OTTD"*).
+Po výkopu měli elfové jediný tah A:8, míč volně na (22,6), 22 polí od zóny x=0. AI to neumí ani
+naplánovat: OTTD je **sekvence přes celý tah**, ne vlastnost jedné akce.
+
+**Stavebnice OTTD (pořadí je podstata):**
+1. **příjemci napřed** — kdo bude chytat, musí doběhnout DŘÍV, než se hází (a nesmí už potřebovat pohyb po chycení ⇒ chytá jen hráč, který dál
+   **nemusí běžet**, nebo míč dostane přes **předání** od hráče, který ještě netáhl);
+2. **sběr** míče (Sure Hands/AG) → **přihrávka** (dálka: quick/short/long/long bomb ≤ 13 polí) → **předání** (hand-off) dalšímu, kdo **ještě netáhl**;
+3. GFI, Sprint, Leap, Throw Team-Mate jako prodloužení dosahu;
+4. ⛔ jeden Pass a jeden Hand-off za tah ⇒ řetěz má **nejvýš 2 přenosy míče**.
+⇒ Dosah = pohyb sběrače + přihrávka + pohyb příjemce/předání. Celotah musí umět spočítat, **jestli OTTD vůbec existuje**,
+a když ne, hrát opatrně (02.10.: elfové blokovali, jeden blitz, nic víc).
+
+**Opačná strana téže věci — STALLING:** nosič, který může skórovat, **čeká do posledního kola poločasu**,
+aby soupeři nezbyl čas na odpověď (uživatel za trpaslíky 02.10.). Patří sem i P128 (AI s trpaslíky TD do 8 kol vůbec nedá).
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
