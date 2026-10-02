@@ -244,11 +244,17 @@ namespace {
 thread_local Position g_manualPush{-1, -1};
 thread_local int g_manualFollowUp = -1;   // -1 = nezvoleno, 0 = ne, 1 = ano
 thread_local Position g_manualBlitzSquare{-1, -1};
+// 02.10.2026 živá partie: volby kouče — kterou z hozených kostek vzít (jen když vybírá útočník,
+// spotřebuje se na jednom bloku) a zda útočník NEPOUŽIJE Tackle (ř. 8569-8571: „…and uses the Tackle skill“).
+thread_local int g_manualFace = -1;
+thread_local bool g_manualNoTackle = false;
 }  // namespace
 
 void setManualPushChoice(Position p) { g_manualPush = p; }
 void setManualFollowUp(bool follow) { g_manualFollowUp = follow ? 1 : 0; }
 void setManualBlitzSquare(Position p) { g_manualBlitzSquare = p; }
+void setManualBlockFace(int face) { g_manualFace = face; }
+void setManualNoTackle(bool noTackle) { g_manualNoTackle = noTackle; }
 Position takeManualBlitzSquare() {
     const Position p = g_manualBlitzSquare;
     g_manualBlitzSquare = {-1, -1};
@@ -258,6 +264,8 @@ void clearManualBlockChoices() {
     g_manualPush = {-1, -1};
     g_manualFollowUp = -1;
     g_manualBlitzSquare = {-1, -1};
+    g_manualFace = -1;
+    g_manualNoTackle = false;
 }
 
 static int choosePushSquare(const GameState& state, const Position* cand, int count,
@@ -853,6 +861,11 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         }
     }
 
+    if (g_manualFace >= 0 && diceInfo.attackerChooses) {   // kouč vybral kostku (jen z hozených)
+        for (int i = 0; i < diceInfo.count; i++)
+            if (static_cast<int>(faces[i]) == g_manualFace) { chosen = faces[i]; break; }
+        g_manualFace = -1;
+    }
     ++g_blocksThrown;
     // 02.10.2026 (uživatel: „zkus do logu doplnit všechny kostky hodu"): die1 nese VŠECHNY hozené
     // kostky (po případném přehozu), zakódované po 3 bitech jako (face+1); die2 = jejich počet.
@@ -998,7 +1011,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // Dodge saves: DS → PUSHED (unless Tackle)
             // Tackle, l. 8569-8571: "...nor may they use their Dodge skill if
             // the player throws a block at them and uses the Tackle skill."
-            if (def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle)) {
+            if (def.hasSkill(SkillName::Dodge) && !(att.hasSkill(SkillName::Tackle) && !g_manualNoTackle)) {
                 defPushed = true; // just a push
             } else {
                 defPushed = true;

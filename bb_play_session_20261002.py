@@ -285,7 +285,7 @@ def main():
             with open(CMD) as f:
                 line = f.read().strip()
             os.remove(CMD)
-            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop"):
+            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
         parts = line.split()
@@ -321,6 +321,20 @@ def main():
                 bb.simple_kickoff(state, dice)
                 result_lines.append(f"rozestavení + výkop, kope {kick}")
                 result_lines.append(board(state))
+            elif cmd == "polocas" and len(parts) == 2:
+                # začátek 2. poločasu: parts[1] = kdo KOPE (HOME|AWAY)
+                kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
+                bb.setup_second_half(state, ROSTERS[0], ROSTERS[1], kick, dice)
+                bb.simple_kickoff(state, dice)
+                result_lines.append(f"2. poločas: rozestavení + výkop, kope {kick}")
+                result_lines.append(board(state))
+            elif cmd == "kostka" and len(parts) == 2:
+                # volba kouče: kterou z hozených kostek vzít (0 lebka,1 Both Down,2 Pushed,3 Stumbles,4 POW)
+                bb.set_manual_block_face(int(parts[1]))
+                result_lines.append(f"příští blok: kostka {BLOCK_FACES[int(parts[1])]}")
+            elif cmd == "beztackle":
+                bb.set_manual_no_tackle(True)
+                result_lines.append("příští blok: útočník NEPOUŽIJE Tackle")
             elif cmd == "push" and len(parts) == 3:
                 bb.set_manual_push(int(parts[1]), int(parts[2]))
                 result_lines.append(f"příští odtlačení: ({parts[1]},{parts[2]})")

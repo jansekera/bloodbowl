@@ -125,6 +125,8 @@ void setManualPushChoice(Position p);
 void setManualFollowUp(bool follow);
 // Pole, ze kterého blitzující blokuje (musí sousedit s cílem a být volné).
 void setManualBlitzSquare(Position p);
+void setManualBlockFace(int face);      // index do BlockDiceFace; -1 = engine
+void setManualNoTackle(bool noTackle);
 Position takeManualBlitzSquare();   // přečte a smaže
 void clearManualBlockChoices();
 

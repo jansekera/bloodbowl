@@ -418,6 +418,8 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_manual_blitz_square", [](int x, int y) {
         bb::setManualBlitzSquare(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
     });
+    m.def("set_manual_block_face", [](int face) { bb::setManualBlockFace(face); });
+    m.def("set_manual_no_tackle", [](bool v) { bb::setManualNoTackle(v); });
     m.def("clear_manual_block_choices", []() { bb::clearManualBlockChoices(); });
 
     m.def("execute_action", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
@@ -472,6 +474,17 @@ PYBIND11_MODULE(bb_engine, m) {
               bb::DiceRollerBase& base = dice;
               state.kickingTeam = kickingTeam;   // simpleKickoff bere přijímající = opponent(state.kickingTeam)
               bb::setupDrive(state, home, away, kickingTeam, &base);
+          },
+          py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
+    // 02.10.2026 (živá partie): začátek 2. poločasu jako v simulateGame (half=2, kopou přijímající z 1. poločasu,
+    // KO hráči hází na návrat — proto s kostkami, na rozdíl od setup_half).
+    m.def("setup_second_half",
+          [](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
+             bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
+              bb::DiceRollerBase& base = dice;
+              state.half = 2;
+              state.kickingTeam = kickingTeam;
+              bb::setupHalf(state, home, away, kickingTeam, &base);
           },
           py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
