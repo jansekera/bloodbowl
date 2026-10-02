@@ -15,7 +15,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     if (player.hasSkill(SkillName::BoneHead)) {
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::BoneHead), roll >= 2});
+                          static_cast<int>(SkillName::BoneHead), roll >= 2, roll});
         if (roll >= 2) {
             // M3: "until he manages to roll a 2 OR BETTER at the start of a
             // future Action" (r. 7985-7986) -- uspesny hod stav ukoncuje.
@@ -65,7 +65,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int target = hasAdjacentAlly ? 2 : 4;
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::ReallyStupid), roll >= target});
+                          static_cast<int>(SkillName::ReallyStupid), roll >= target, roll});
         if (roll >= target) {
             // M3: r. 8404-8405, "until he manages to roll a successful result
             // for a Really Stupid roll at the start of a future Action".
@@ -97,7 +97,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         int target = hitting ? 2 : 4;
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::WildAnimal), roll >= target});
+                          static_cast<int>(SkillName::WildAnimal), roll >= target, roll});
         if (roll < target) {
             // WildAnimal keeps tacklezones (unlike BoneHead/ReallyStupid)
             player.hasActed = true;
@@ -120,7 +120,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     if (player.hasSkill(SkillName::TakeRoot) && !player.rooted) {
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::TakeRoot), roll >= 2});
+                          static_cast<int>(SkillName::TakeRoot), roll >= 2, roll});
         if (roll == 1) {
             // l. 8574-8576: MA = 0 az do konce drivu (nebo do srazeni).
             player.rooted = true;
@@ -164,7 +164,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     if (player.hasSkill(SkillName::Bloodlust) && !player.bloodlustHungry) {
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::Bloodlust), roll >= 2});
+                          static_cast<int>(SkillName::Bloodlust), roll >= 2, roll});
         if (roll == 1) {
             // ⛔ P71 (30.09.2026), vzor PHP 9e980cac. r. 7929-7936: upir akci
             //   DOKONCI a krmi se az na jejim konci ("at the end of the action,

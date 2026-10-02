@@ -215,6 +215,18 @@ def board(state):
     return "\n".join(lines)
 
 
+def _skill_names():
+    # pořadí z engine/include/bb/enums.h (enum class SkillName) — jediný zdroj
+    import re
+    txt = open(os.path.join(os.path.dirname(__file__), "engine", "include", "bb", "enums.h")).read()
+    body = txt[txt.index("enum class SkillName"):]
+    body = body[body.index("{") + 1: body.index("};")]
+    body = re.sub(r"//[^\n]*", "", body)
+    return [n.split("=")[0].strip() for n in body.split(",") if n.strip()]
+
+
+SKILL_NAMES = _skill_names()
+
 BLOCK_FACES = ["Attacker Down (lebka)", "Both Down", "Pushed", "Defender Stumbles", "Defender Down (POW)"]
 
 
@@ -238,6 +250,11 @@ def event_str(e):
         return f"follow-up {who}: {'ano' if e['success'] else 'ne'}"
     if t == "MOVE":
         return f"krok {who} na {e['to']}"
+    if t in ("SKILL", "SKILL_USED"):
+        # roll = číslo skillu (enum SkillName), die1 = hozená kostka (big_guy_handler, 02.10.)
+        jm = SKILL_NAMES[e["roll"]] if 0 <= e["roll"] < len(SKILL_NAMES) else e["roll"]
+        hod = f" hod {e['die1']}" if e["die1"] else ""
+        return f"SKILL {jm} {who}:{hod} -> {'OK' if e['success'] else 'NEPROŠEL'}"
     return f"{t} {who} cíl {e['target']} hod {e['roll']}"
 
 
