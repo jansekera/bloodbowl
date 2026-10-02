@@ -108,19 +108,34 @@ void resolveKickOffReturn(GameState& state, TeamSide receiving, Position ballPos
     });
     if (bestId < 0) return;
 
+    // Pohyb během výkopu bez uhýbání (uživatel 02.10., review #7): z pole v soupeřově tacklezóně se
+    // NEODCHÁZÍ (vstoupit smí, pak stojí) a ze stejně dobrých cílů má přednost pole mimo tacklezóny.
+    // OPRAVENO 02.10. — dřív šel nenasytně k míči přes jakákoli pole, i z tacklezóny do tacklezóny.
+    // Prohledání do šířky (nejvýš 3 kroky): cíl = nejblíž míči, pak mimo TZ, pak méně kroků.
     Player& p = state.getPlayer(bestId);
     const Position from = p.position;
+    auto inTz = [&](Position q) { return countTacklezones(state, q, receiving) > 0; };
+    bool seen[Position::PITCH_WIDTH][Position::PITCH_HEIGHT] = {};
+    seen[from.x][from.y] = true;
+    std::vector<Position> frontier{from};
+    Position best = from;
+    auto key = [&](Position q) { return q.distanceTo(ballPos) * 2 + (inTz(q) ? 1 : 0); };
+    int bestKey = key(from);
     for (int step = 0; step < 3; ++step) {
-        Position best = p.position;
-        int bestD = p.position.distanceTo(ballPos);
-        for (const Position& q : p.position.getAdjacent()) {
-            if (!q.isOnPitch() || !inHalfOf(receiving, q) || state.getPlayerAtPosition(q) != nullptr) continue;
-            const int d = q.distanceTo(ballPos);
-            if (d < bestD) { bestD = d; best = q; }
+        std::vector<Position> next;
+        for (const Position& at : frontier) {
+            if (at != from && inTz(at)) continue;                 // z tacklezóny dál nejde
+            for (const Position& q : at.getAdjacent()) {
+                if (!q.isOnPitch() || !inHalfOf(receiving, q) || seen[q.x][q.y] ||
+                    state.getPlayerAtPosition(q) != nullptr) continue;
+                seen[q.x][q.y] = true;
+                next.push_back(q);
+                if (const int k = key(q); k < bestKey) { bestKey = k; best = q; }
+            }
         }
-        if (best == p.position) break;
-        p.position = best;
+        frontier = std::move(next);
     }
+    p.position = best;
     if (p.position != from) {
         emitEvent(events, {GameEvent::Type::SKILL_USED, bestId, -1, from, p.position,
                            static_cast<int>(SkillName::KickOffReturn), true});

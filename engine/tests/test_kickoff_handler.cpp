@@ -1060,3 +1060,74 @@ TEST(KickoffHandler, KoPlayerRollsOnceToRecoverBetweenHalvesAfterALastTurnTouchd
     }
     ASSERT_GE(checked, 1) << "fixtura: žádný TD v posledním kole 1. poločasu s KO hráčem";
 }
+
+// #7 (uživatel 02.10.): Kick-Off Return (ř. 8249-8256) je pohyb během výkopu, kdy se neuhýbá ⇒
+// hráč z pole v soupeřově tacklezóně NEODCHÁZÍ (vstoupit smí, pak stojí) a cestou dává přednost
+// polím mimo tacklezóny („člověk by nešel zbytečně přes pole s dodge“). Dřív šel nenasytně
+// k míči přes jakákoli pole. Fixtura: HOME kope, AWAY přijímá (LoS x=13), na hřišti jen hráči,
+// které test postaví; kop bez Kick: (18,7) + D6 5 × D8 7 (západ) = (13,7) — dopad na LoS přijímajících.
+namespace {
+GameState korLosFixture() {
+    GameState gs;
+    gs.kickingTeam = TeamSide::HOME;
+    setupHalf(gs, getHumanRoster(), getHumanRoster());
+    gs.receiverSpeed = RosterSpeed::FAST;   // kop na (18,7)
+    for (auto& p : gs.players) {
+        p.skills.remove(SkillName::KickOffReturn);
+        p.skills.remove(SkillName::Kick);
+        if (p.isOnPitch()) { p.setState(PlayerState::OFF_PITCH); p.position = {-1, -1}; }
+    }
+    return gs;
+}
+int putOn(GameState& gs, TeamSide side, Position at) {
+    for (auto& p : gs.players)
+        if (p.teamSide == side && !p.isOnPitch() && p.state == PlayerState::OFF_PITCH) {
+            p.setState(PlayerState::STANDING);
+            p.position = at;
+            return p.id;
+        }
+    return -1;
+}
+// D6 5, D8 7 ⇒ dopad (13,7); tabulka 1+1 (Get the Ref, bez účinku); odraz D8 1 (sever) a rezerva.
+std::vector<int> korLosDice() { return {5, 7, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3}; }
+Position korEnd(const std::vector<GameEvent>& ev, Position from) {
+    const int i = indexOf(ev, GameEvent::Type::SKILL_USED, static_cast<int>(SkillName::KickOffReturn));
+    return i < 0 ? from : ev[i].to;
+}
+}  // namespace
+
+TEST(KickOffReturn, StopsOnTheFirstSquareInAnOpposingTacklezone) {
+    auto gs = korLosFixture();
+    for (int y : {5, 7}) putOn(gs, TeamSide::HOME, {12, static_cast<int8_t>(y)});   // TZ (13,4..8)
+    const int kor = putOn(gs, TeamSide::AWAY, {14, 4});
+    gs.getPlayer(kor).skills.add(SkillName::KickOffReturn);
+    // Řada y=5 je kromě (13,5) v tacklezóně zatarasená vlastními hráči ⇒ na vzdálenost 2 od míče
+    // se dostane jen přes (13,5); obchvat (16,4)-(17,5)-(16,6) končí na vzdálenosti 3.
+    for (int x : {14, 15, 16}) putOn(gs, TeamSide::AWAY, {static_cast<int8_t>(x), 5});
+    ASSERT_GT(countTacklezones(gs, {13, 5}, TeamSide::AWAY), 0);
+    ASSERT_EQ(countTacklezones(gs, {14, 4}, TeamSide::AWAY), 0);
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice(korLosDice());
+    resolveKickoff(gs, dice, &ev);
+    ASSERT_EQ(ev.front().to, (Position{13, 7})) << "fixtura: dopad na LoS přijímajících";
+    EXPECT_EQ(korEnd(ev, {14, 4}), (Position{13, 5}))
+        << "vstoupil do tacklezóny na (13,5) ⇒ tam stojí; odejít z ní by znamenalo uhýbat";
+}
+
+TEST(KickOffReturn, PrefersAnEquallyGoodSquareOutsideTacklezones) {
+    auto gs = korLosFixture();
+    for (int y : {5, 7}) putOn(gs, TeamSide::HOME, {12, static_cast<int8_t>(y)});   // TZ (13,4..8)
+    const int kor = putOn(gs, TeamSide::AWAY, {16, 3});
+    gs.getPlayer(kor).skills.add(SkillName::KickOffReturn);
+    // Na 3 pole se k míči (13,7) dostane nejblíž na vzdálenost 1: (13,6) v tacklezóně, nebo (14,6)
+    // mimo ni — stejně daleko i stejně dlouhou cestou. Má zvolit pole bez tacklezóny.
+    ASSERT_GT(countTacklezones(gs, {13, 6}, TeamSide::AWAY), 0);
+    ASSERT_EQ(countTacklezones(gs, {14, 6}, TeamSide::AWAY), 0);
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice(korLosDice());
+    resolveKickoff(gs, dice, &ev);
+    ASSERT_EQ(ev.front().to, (Position{13, 7})) << "fixtura: dopad na LoS přijímajících";
+    const Position end = korEnd(ev, {16, 3});
+    EXPECT_EQ(end.distanceTo({13, 7}), 1);
+    EXPECT_EQ(countTacklezones(gs, end, TeamSide::AWAY), 0) << "skončil na (" << int(end.x) << "," << int(end.y) << ")";
+}
