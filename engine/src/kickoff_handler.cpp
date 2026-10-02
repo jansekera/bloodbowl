@@ -41,7 +41,8 @@ int randomIndex(DiceRollerBase& dice, int n) {
 // (přednostně se Sure Hands), tedy tomu, kdo je nejdál od LoS a nejméně ohrožený. No Hands míč
 // nést nesmí (ř. 8318-8320). Převzato ze `simpleKickoff` — plná cesta dřív dávala míč nejbližšímu
 // k místu dopadu, i hráči bez rukou.
-void awardTouchback(GameState& state, TeamSide receiving) {
+void awardTouchback(GameState& state, TeamSide receiving, DiceRollerBase& dice,
+                    std::vector<GameEvent>* events) {
     const int kickLos = losXOf(opponent(receiving));
     Player* pick = nullptr;
     int bestScore = -1;
@@ -53,8 +54,11 @@ void awardTouchback(GameState& state, TeamSide receiving) {
     if (pick) {
         state.ball = BallState::carried(pick->position, pick->id);
     } else {
-        // Nikdo stojící s rukama: míč na zem doprostřed přijímající poloviny (krajní případ).
-        state.ball = BallState::onGround(Position{static_cast<int8_t>(receiving == TeamSide::HOME ? 6 : 19), 7});
+        // Nikdo stojící s rukama: míč na zem doprostřed přijímající poloviny (krajní případ). Leží-li
+        // tam hráč, míč se odrazí (ř. 857-858). OPRAVENO 02.10. (review #9) — zůstal ležet pod ním.
+        const Position mid{static_cast<int8_t>(receiving == TeamSide::HOME ? 6 : 19), 7};
+        state.ball = BallState::onGround(mid);
+        if (state.getPlayerAtPosition(mid)) resolveBounce(state, mid, dice, 0, events);
     }
 }
 
@@ -69,7 +73,7 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
     bool bounced = false;
     for (int guard = 0; guard < 200; ++guard) {   // jen pojistka proti nekonečnému řetězu
         if (!at.isOnPitch() || !inHalfOf(receiving, at)) {
-            awardTouchback(state, receiving);
+            awardTouchback(state, receiving, dice, events);
             return;
         }
         Player* p = state.getPlayerAtPosition(at);

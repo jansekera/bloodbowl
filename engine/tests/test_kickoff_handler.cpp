@@ -799,3 +799,18 @@ TEST(KickoffTable, PitchInvasionStunnedPlayersOfBothTeamsTurnFaceUpAfterTheirOwn
     executeAction(gs, endTurn(), dice, nullptr);   // konec 1. kola kopajících
     EXPECT_EQ(gs.getPlayer(kick).state, PlayerState::PRONE);
 }
+
+// Položka 9. Touchback, když přijímající nemá nikoho stojícího s rukama: míč jde na zem doprostřed
+// jejich poloviny (6,7). Leží-li tam hráč, míč pod ním zůstat nesmí (ř. 857-858: ležící nechytá ⇒
+// odraz). Dřív zůstal míč ležet pod ním.
+TEST(KickoffLanding, TouchbackFallbackSquareOccupiedByAPronePlayerBounces) {
+    auto gs = kickFixture(/*withKick=*/false);
+    playerAt(gs, {7, 7}).position = {6, 7};
+    for (auto& p : gs.players)
+        if (p.teamSide == TeamSide::HOME && p.isOnPitch()) p.state = PlayerState::PRONE;
+    FixedDiceRoller dice({6, 7, 1, 1, 1});         // (3,7) - 6 ⇒ mimo hřiště ⇒ touchback; odraz na sever
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.getPlayerAtPosition(gs.ball.position), nullptr) << "míč nesmí ležet pod hráčem";
+    EXPECT_EQ(gs.ball.position, (Position{6, 6}));
+}
