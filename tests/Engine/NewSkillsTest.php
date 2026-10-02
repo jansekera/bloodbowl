@@ -94,6 +94,8 @@ final class NewSkillsTest extends TestCase
             $result->getEvents(),
             fn($e) => $e->getType() === 'reroll',
         );
+        // P100: dřív se smyčka nad nulou událostí tiše přeskočila; reroll tu MUSÍ nastat.
+        $this->assertNotEmpty($rerollEvents, 'fixtura: dodge měl selhat a přijít reroll');
         foreach ($rerollEvents as $e) {
             $this->assertEquals('Team Reroll', $e->getData()['source']);
         }
