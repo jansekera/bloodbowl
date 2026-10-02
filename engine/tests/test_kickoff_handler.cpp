@@ -1237,6 +1237,40 @@ TEST(KickoffBlitzLanding, GreedyBonusTurnMovesTowardTheLandingSquare) {
                              << "; nejbližší kopající (začátek->nejblíž):" << trace;
 }
 
+// Druhé review 02.10., S1. Kopající, který při Blitz! došel na pole dopadu, tam má zůstat: při dopadu
+// chytá (ř. 278-279). Dřív ho priorita „k míči“ posílala z pole dopadu (sousední pole je taky
+// „vzdálenost 1“) a zpátky — pálil MA i GFI (sonda: 7 kroků (5,2)↔(4,1) na 5 semínkách).
+TEST(KickoffBlitzLanding, GreedyKeepsTheKickerWhoReachedTheLandingSquareOnIt) {
+    int reached = 0;
+    for (uint32_t seed = 1; seed <= 10; ++seed) {
+        auto gs = blitzOverThreeSeven();
+        const Position landing = gs.kickoffLanding;
+        Player& runner = playerAt(gs, {18, 5});
+        runner.position = {5, 7};                  // dvě pole od (3,7), mimo tacklezóny
+        const int runnerId = runner.id;
+        DiceRoller dice(seed);
+        std::vector<GameEvent> ev;
+        bool onLanding = false;
+        for (int i = 0; i < 80 && gs.kickoffBallInAir; ++i) {
+            const Action a = greedyPolicy(gs, dice);
+            if (a.type == ActionType::END_TURN) break;
+            if (onLanding) {
+                EXPECT_FALSE(a.type == ActionType::MOVE && a.playerId == runnerId)
+                    << "seed " << seed << ": odchází z pole dopadu na (" << int(a.target.x) << ","
+                    << int(a.target.y) << ")";
+            }
+            const size_t evBefore = ev.size();
+            executeAction(gs, a, dice, &ev);
+            for (size_t k = evBefore; k < ev.size(); ++k)
+                if (onLanding && ev[k].type == GameEvent::Type::GFI && ev[k].playerId == runnerId)
+                    ADD_FAILURE() << "seed " << seed << ": GFI hráče, který už stál na poli dopadu";
+            if (gs.kickoffBallInAir && gs.getPlayer(runnerId).position == landing) onLanding = true;
+        }
+        reached += onLanding;
+    }
+    EXPECT_GT(reached, 0) << "fixtura: hráč měl pole dopadu dosáhnout";
+}
+
 TEST(KickoffBlitzLanding, MacrosOfferSquaresAroundTheLandingButNoPickup) {
     auto gs = blitzOverThreeSeven();
     std::vector<Macro> macros;

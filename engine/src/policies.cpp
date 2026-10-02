@@ -54,6 +54,14 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
         }
     }
 
+    // Při Blitz! hráč, který už stojí na poli dopadu, zůstává: při dopadu chytá (ř. 278-279).
+    // OPRAVENO 02.10. (druhé review S1) — „k míči“ ho posílala na sousední pole (taky vzdálenost 1)
+    // a zpátky, pálil MA i GFI.
+    int keepOnLandingId = -1;
+    if (state.kickoffBallInAir)
+        if (const Player* p = state.getPlayerAtPosition(looseBallSquare(state)); p && p->teamSide == mySide)
+            keepOnLandingId = p->id;
+
     // Priority 2: Move a player to the ball (if ball is on ground). Při Blitz! k místu dopadu
     // (looseBallSquare, uživatel 02.10. #3) — dřív AI míč ve vzduchu neviděla. Stoupnout si na pole
     // dopadu je legální: míč nezvedne, při dopadu ho chytá (ř. 278-279).
@@ -72,7 +80,7 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
         int bestDist = 999;
         bool found = false;
         for (auto& a : actions) {
-            if (a.type == ActionType::MOVE) {
+            if (a.type == ActionType::MOVE && a.playerId != keepOnLandingId) {
                 int dist = a.target.distanceTo(ballPos);
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -105,7 +113,7 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
     // Priority 5: Move actions (non-carrier)
     std::vector<Action> moves;
     for (auto& a : actions) {
-        if (a.type == ActionType::MOVE) moves.push_back(a);
+        if (a.type == ActionType::MOVE && a.playerId != keepOnLandingId) moves.push_back(a);
     }
     if (!moves.empty()) {
         int r = 0;
