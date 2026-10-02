@@ -594,3 +594,25 @@ TEST(ActionResolver, RootedWhileProneFailsToStandAndStaysRootedIntoTheNextTurn) 
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_TRUE(gs.getPlayer(1).rooted);
 }
+
+// ř. 997-1004 „Scoring in the opponent's turn“: nosič zatlačený do koncové zóny během soupeřova
+// kola skóruje, „but must move their Turn marker one space along the Turn track“. Týž princip jako
+// review výkopu #4 (TD kopajících při dopadu po Blitz!), tady v běžném kole.
+TEST(ActionResolver, TouchdownInTheOpponentsTurnMovesTheScorersTurnMarker) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.turnNumber = 3;
+    gs.awayTeam.turnNumber = 3;
+    placePlayer(gs, 1, {2, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {1, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({1, 7}, 12);
+
+    Action block{ActionType::BLOCK, 1, 12, {1, 7}};
+    FixedDiceRoller dice({3, 3, 3, 3, 3});   // 1 kostka: 3 = Pushed ⇒ (0,7), koncová zóna domácích
+    executeAction(gs, block, dice, nullptr);
+    ASSERT_EQ(gs.phase, GamePhase::TOUCHDOWN);
+    ASSERT_EQ(gs.awayTeam.score, 1);
+    EXPECT_EQ(gs.awayTeam.turnNumber, 4) << "skórující v soupeřově kole posouvá svou značku";
+    EXPECT_EQ(gs.homeTeam.turnNumber, 3);
+}

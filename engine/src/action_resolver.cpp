@@ -592,6 +592,11 @@ ActionResult executeAction(GameState& state, const Action& action,
     if (checkTouchdown(state)) {
         TeamSide scoringSide = state.getPlayer(state.ball.carrierId).teamSide;
         state.getTeamState(scoringSide).score++;
+        // ř. 997-1004 „Scoring in the opponent's turn“: „…scores a touchdown immediately, but must
+        // move their Turn marker one space along the Turn track“. OPRAVENO 02.10. — značka se
+        // neposouvala (nosič zatlačený do zóny, kopající chytil při dopadu po Blitz!). Turnover
+        // výš už předal tah skórujícím a připsal jim kolo, takže tam tahle větev nenastane.
+        if (scoringSide != state.activeTeam) state.getTeamState(scoringSide).turnNumber++;
         state.phase = GamePhase::TOUCHDOWN;
         emitEvent(events, {GameEvent::Type::TOUCHDOWN, state.ball.carrierId, -1,
                           state.ball.position, {}, 0, true});
