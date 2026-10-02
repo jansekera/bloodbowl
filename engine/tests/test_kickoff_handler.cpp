@@ -814,3 +814,196 @@ TEST(KickoffLanding, TouchbackFallbackSquareOccupiedByAPronePlayerBounces) {
     EXPECT_EQ(gs.getPlayerAtPosition(gs.ball.position), nullptr) << "míč nesmí ležet pod hráčem";
     EXPECT_EQ(gs.ball.position, (Position{6, 6}));
 }
+
+// ===========================================================================
+// Pokrytí pravidel výkopu, která dosud žádný test nehlídal (review 02.10.2026). Každý test má
+// pozitivní kontrolu — mutaci kódu, na které spadne (evidence/kickoff_review_opravy_20261002.md).
+// ===========================================================================
+
+// ř. 280-283: „If the ball scatters or BOUNCES off the pitch … touchback“. (3,7) - 3 = (0,7), prázdné
+// ⇒ odraz na západ mimo hřiště ⇒ touchback (žádné vhazování z davu, žádná další kostka).
+TEST(KickoffLanding, BounceOffThePitchIsATouchback) {
+    auto gs = kickFixture(/*withKick=*/false);
+    FixedDiceRoller dice({3, 7, 1, 1, 7});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld) << "odraz z hřiště = touchback";
+    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+// FAQ ř. 9312-9314: „If a player fails to catch a ball from a kick-off, and the ball bounces over the
+// line of scrimmage, is it a touchback? A. Yes“. Krátký kop (7,7) + 5 na východ = (12,7) na hráče
+// na LoS; chytání 1 ⇒ odraz na východ (13,7) = kopající polovina.
+TEST(KickoffLanding, FailedCatchBouncingOverTheLineOfScrimmageIsATouchback) {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.receiverSpeed = RosterSpeed::FAST;
+    const int los = playerAt(gs, {12, 7}).id;
+    FixedDiceRoller dice({5, 3, 1, 1, 1, 3});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld) << "odraz přes LoS po nechyceném míči = touchback";
+    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME);
+    EXPECT_NE(gs.ball.carrierId, los);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+namespace {
+// Blitz! s míčem nad (3,7) (Kick, D6 1 ⇒ 0 polí). Volný hostující hráč (18,5) se postaví vedle
+// domácího (11,4) — jeho akce v bonusovém kole pak začíná uhýbáním z tacklezóny.
+struct BlitzDodge {
+    GameState gs;
+    int runner = -1;
+};
+BlitzDodge blitzWithADodgeAhead(FixedDiceRoller& dice) {
+    BlitzDodge b{kickFixture(), -1};
+    resolveKickoff(b.gs, dice, nullptr);
+    Player& r = playerAt(b.gs, {18, 5});
+    r.skills.remove(SkillName::Dodge);
+    r.skills.remove(SkillName::SureFeet);
+    r.position = {12, 3};
+    b.runner = r.id;
+    return b;
+}
+Action moveTo(int id, Position to) { return Action{ActionType::MOVE, id, -1, to}; }
+}  // namespace
+
+// ř. 1339-1341: „If any player suffers a turnover then the bonus turn ends.“ + pořadí ř. 1242-1248:
+// teprve pak míč dopadne. Uhýbání 1, bez přehozů ⇒ turnover; brnění 1+1; dopad (3,7) ⇒ odraz (4,7).
+TEST(KickoffTable, TurnoverEndsTheBlitzBonusTurnAndTheBallLands) {
+    FixedDiceRoller dice(onThree(4, 6, {1, 1, 1, 3}));
+    auto b = blitzWithADodgeAhead(dice);
+    b.gs.awayTeam.rerolls = 0;
+    executeAction(b.gs, moveTo(b.runner, {13, 2}), dice, nullptr);
+    EXPECT_EQ(b.gs.getPlayer(b.runner).state, PlayerState::PRONE);
+    EXPECT_EQ(b.gs.activeTeam, TeamSide::HOME) << "turnover ukončil bonusové kolo";
+    EXPECT_FALSE(b.gs.kickoffBallInAir);
+    EXPECT_EQ(b.gs.ball.position, (Position{4, 7})) << "míč dopadl a odrazil se";
+    EXPECT_EQ(b.gs.homeTeam.turnNumber, 1);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+// ř. 1338-1339: „The kicking team may use team re-rolls during a Blitz.“ Uhýbání 1, přehoz 6.
+TEST(KickoffTable, KickingTeamMayUseATeamRerollDuringTheBlitz) {
+    FixedDiceRoller dice(onThree(4, 6, {1, 6}));
+    auto b = blitzWithADodgeAhead(dice);
+    b.gs.awayTeam.rerolls = 1;
+    executeAction(b.gs, moveTo(b.runner, {13, 2}), dice, nullptr);
+    EXPECT_EQ(b.gs.getPlayer(b.runner).position, (Position{13, 2}));
+    EXPECT_EQ(b.gs.getPlayer(b.runner).state, PlayerState::STANDING);
+    EXPECT_EQ(b.gs.awayTeam.rerolls, 0) << "týmový přehoz použit";
+    EXPECT_EQ(b.gs.activeTeam, TeamSide::AWAY) << "bonusové kolo pokračuje";
+    EXPECT_TRUE(b.gs.kickoffBallInAir);
+}
+
+// ř. 703-708: omráčený se otočí „at the end of their team's NEXT turn … may not turn face up on the
+// turn they are Stunned“. Kopající omráčený v bonusovém kole (uhýbání 1, brnění 6+6, zranění 1+1)
+// leží přes konec bonusového kola i kola přijímajících a otočí se na konci svého prvního řádného kola.
+TEST(KickoffTable, KickingPlayerStunnedInTheBlitzTurnsFaceUpAfterHisNextNormalTurn) {
+    FixedDiceRoller dice(onThree(4, 6, {1, 6, 6, 1, 1, 3}));
+    auto b = blitzWithADodgeAhead(dice);
+    b.gs.awayTeam.rerolls = 0;
+    executeAction(b.gs, moveTo(b.runner, {13, 2}), dice, nullptr);
+    ASSERT_EQ(b.gs.activeTeam, TeamSide::HOME);
+    EXPECT_EQ(b.gs.getPlayer(b.runner).state, PlayerState::STUNNED) << "konec bonusového kola";
+    executeAction(b.gs, endTurn(), dice, nullptr);
+    EXPECT_EQ(b.gs.getPlayer(b.runner).state, PlayerState::STUNNED) << "konec kola přijímajících";
+    executeAction(b.gs, endTurn(), dice, nullptr);
+    EXPECT_EQ(b.gs.getPlayer(b.runner).state, PlayerState::PRONE) << "konec 1. řádného kola kopajících";
+}
+
+// ř. 1291-1296: „On a 4-6, both team's turn markers are moved back one space.“
+TEST(KickoffTable, RiotMidHalfOnFourToSixMovesBothMarkersBack) {
+    auto gs = kickFixture();
+    gs.homeTeam.turnNumber = 3;
+    gs.awayTeam.turnNumber = 4;
+    FixedDiceRoller dice(onThree(1, 2, {5, 3}));   // D6 = 5 ⇒ zpět
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.homeTeam.turnNumber, 3);          // výkop ho posune na 4. kolo, Riot zpět na 3.
+    EXPECT_EQ(gs.awayTeam.turnNumber, 3);
+}
+
+// ř. 1345-1347: „The fans of the team that rolls higher are the ones that threw the rock. In the case
+// of a tie a rock is thrown at each team!“ D6 3 : 3 ⇒ kámen na oba; výběr 1+1 ⇒ první hráč; zranění
+// 1+1 = Stunned.
+TEST(KickoffTable, ThrowARockTieHitsBothTeams) {
+    auto gs = kickFixture();
+    const int away = firstOnPitch(gs, TeamSide::AWAY).id;
+    const int home = firstOnPitch(gs, TeamSide::HOME).id;
+    FixedDiceRoller dice(onThree(5, 6, {3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3}));
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(away).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(home).state, PlayerState::STUNNED);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+namespace {
+std::vector<Position> homePositions(const GameState& gs) {
+    std::vector<Position> v;
+    gs.forEachOnPitch(TeamSide::HOME, [&](const Player& p) { v.push_back(p.position); });
+    return v;
+}
+}  // namespace
+
+// ř. 1305-1308: High Kick jen „as long as the square is unoccupied“. (3,7) + 4 = (7,7), kde stojí
+// hloubkový hráč ⇒ nikdo se nepřesouvá, chytá ten, kdo tam stojí.
+TEST(KickoffTable, HighKickDoesNothingWhenTheLandingSquareIsOccupied) {
+    auto gs = kickFixture(/*withKick=*/false);
+    const int deep = playerAt(gs, {7, 7}).id;
+    const auto before = homePositions(gs);
+    FixedDiceRoller dice({4, 3, 2, 3, 6});
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(homePositions(gs), before);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, deep);
+}
+
+// High Kick: hráč se staví „into the square where the ball will land“ — míč mířící mimo hřiště
+// (touchback) žádné takové pole nemá ⇒ nikdo se nehýbe.
+TEST(KickoffTable, HighKickDoesNothingWhenTheKickIsATouchback) {
+    auto gs = kickFixture(/*withKick=*/false);
+    const auto before = homePositions(gs);
+    FixedDiceRoller dice({6, 7, 2, 3});
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(homePositions(gs), before);
+    ASSERT_TRUE(gs.ball.isHeld) << "touchback";
+}
+
+// ř. 1033-1035: „Play stops when both coaches have had eight turns each.“ Na úrovni simulateGame:
+// když TD padne, až přijímající nemá kolo, výkop se nekoná — během výkopu, kdy přijímající nemá
+// kolo, se nesmí hodit žádná kostka. Pozorováno kostkou, která vidí stav hry (politika dostává
+// referenci na skutečný stav). Pozitivní kontrola: alespoň jedna hra s TD v posledním kole.
+TEST(KickoffHandler, NoKickoffWithoutATurnLeftInARealGame) {
+    struct WatchDice : DiceRollerBase {
+        DiceRoller inner;
+        const GameState* st = nullptr;
+        int illegal = 0;
+        explicit WatchDice(uint32_t seed) : inner(seed) {}
+        void check() {
+            if (st && st->kickoffInProgress &&
+                st->getTeamState(opponent(st->kickingTeam)).turnNumber > 8) ++illegal;
+        }
+        int rollD6() override { check(); return inner.rollD6(); }
+        int rollD8() override { check(); return inner.rollD8(); }
+    };
+    int lastTurnTds = 0;
+    for (uint32_t seed = 1; seed <= 200 && lastTurnTds < 1; ++seed) {
+        WatchDice dice(seed);
+        int lastHalf = 0, lastActiveTurn = 0, lastOppTurn = 0, lastScore = 0;
+        auto lastTurnTd = [&](int scoreNow) {
+            return lastActiveTurn == 8 && lastOppTurn == 8 && scoreNow > lastScore;
+        };
+        auto observe = [&](const GameState& s) {
+            dice.st = &s;
+            const int score = s.homeTeam.score + s.awayTeam.score;
+            if (lastHalf == 1 && s.half == 2 && lastTurnTd(score)) ++lastTurnTds;
+            lastHalf = s.half;
+            lastActiveTurn = s.getTeamState(s.activeTeam).turnNumber;
+            lastOppTurn = s.getTeamState(opponent(s.activeTeam)).turnNumber;
+            lastScore = score;
+            return greedyPolicy(s, dice);
+        };
+        const GameResult r = simulateGame(getHumanRoster(), getOrcRoster(), observe, observe, dice);
+        if (lastHalf == 2 && lastTurnTd(r.homeScore + r.awayScore)) ++lastTurnTds;
+        EXPECT_EQ(dice.illegal, 0) << "seed " << seed << ": výkop házel, ač přijímající nemá kolo";
+    }
+    ASSERT_GE(lastTurnTds, 1) << "fixtura: žádný TD v posledním kole poločasu";
+}

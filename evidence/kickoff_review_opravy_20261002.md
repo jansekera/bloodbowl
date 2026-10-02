@@ -15,9 +15,26 @@ rozbitém kódu, mutace vrácena).
 | 5 | `setupHalfOrDrive` nečistil `kickoffBallInAir` / `kickoffLanding` | `KickoffHandler.SetupClearsABallStillInTheAirFromBlitz` | ✅ spadl před opravou (setupDrive i setupHalf) | 51e3c133 |
 | 8 | Pitch Invasion: `stunnedThisTurn` jako injury.cpp:55. Chování se nemění (kopajícím příznak čistí začátek jejich kola, přijímajícím `finishKickoff`) | `KickoffTable.PitchInvasionStunnedPlayersOfBothTeamsTurnFaceUpAfterTheirOwnNextTurn` | ✅ před opravou spadl jen řádek s příznakem; behaviorální část zelená před i po (= beze změny chování). Mutace: bez resetu přijímajících po dopadu ⇒ spadly ř. 796-797; otáčení všech omráčených na konci každého kola ⇒ spadl ř. 797 | dff3b4d0 |
 | 9 | Touchback bez způsobilého hráče: míč na pevné (6,7)/(19,7) i pod ležícího ⇒ teď odraz (`resolveBounce`) | `KickoffLanding.TouchbackFallbackSquareOccupiedByAPronePlayerBounces` | ✅ spadl před opravou (míč pod ležícím na (6,7)) | cf63f57e |
-| 10a | diag nástroje volaly odstraněný `simpleKickoff` ⇒ `resolveKickoff(state, dice, nullptr)` | překlad `g++ -std=c++20 -Iengine/include -Iengine/third_party … -lbb_engine` | `diag_blitz_approach_20260807` se přeloží. `diag_f1_adoption_probe` a `diag_f1_cage_advance_harness` dál nejdou přeložit, ale **z jiného důvodu**: `MCTSConfig::cageGrind/cageAdvance`, `takeCageDiceyGfiStats`, `stagedPlansAdopted` odstranil P126 (4ac90bb5, CageController místo plánovače F1) — měří plánovač, který už neexistuje; výkopové chyby v nich nezbyly | (tento commit) |
-| 10b | `diag_first_possession.py`: přijímající = aktivní tým prvního záznamu jízdy, i když je to bonusové kolo Blitz! kopajících | `_selftest` (nový případ s Blitz!) | ✅ selftest spadl před opravou (`recv` = away místo home). `get_turn_logs` nově vrací `kickoff_ball_in_air` | (tento commit) |
-| 10c | `test_bb_engine.py` počasí: volné `kept >= 40` z 59 ⇒ deterministicky: dvojče `DiceRoller` předpoví hod tabulky; mimo 7 se počasí nesmí změnit nikdy, se 7 aspoň jednou ano | `test_roll_match_weather_is_rolled_once_and_kept_by_kickoff` | ✅ mutace (nový hod počasí po každém výkopu, stará vada P66) ⇒ spadl („seed 4: tabulka 12, počasí se změnilo“); vráceno | (tento commit) |
+| 10a | diag nástroje volaly odstraněný `simpleKickoff` ⇒ `resolveKickoff(state, dice, nullptr)` | překlad `g++ -std=c++20 -Iengine/include -Iengine/third_party … -lbb_engine` | `diag_blitz_approach_20260807` se přeloží. `diag_f1_adoption_probe` a `diag_f1_cage_advance_harness` dál nejdou přeložit, ale **z jiného důvodu**: `MCTSConfig::cageGrind/cageAdvance`, `takeCageDiceyGfiStats`, `stagedPlansAdopted` odstranil P126 (4ac90bb5, CageController místo plánovače F1) — měří plánovač, který už neexistuje; výkopové chyby v nich nezbyly | 6ba3ed4b |
+| 10b | `diag_first_possession.py`: přijímající = aktivní tým prvního záznamu jízdy, i když je to bonusové kolo Blitz! kopajících | `_selftest` (nový případ s Blitz!) | ✅ selftest spadl před opravou (`recv` = away místo home). `get_turn_logs` nově vrací `kickoff_ball_in_air` | 6ba3ed4b |
+| 10c | `test_bb_engine.py` počasí: volné `kept >= 40` z 59 ⇒ deterministicky: dvojče `DiceRoller` předpoví hod tabulky; mimo 7 se počasí nesmí změnit nikdy, se 7 aspoň jednou ano | `test_roll_match_weather_is_rolled_once_and_kept_by_kickoff` | ✅ mutace (nový hod počasí po každém výkopu, stará vada P66) ⇒ spadl („seed 4: tabulka 12, počasí se změnilo“); vráceno | 6ba3ed4b |
+
+## Pokrytí dosud netestovaných pravidel (vše prošlo hned — žádná nová vada; pozitivní kontrola mutací)
+
+| pravidlo | test | mutace, na které test spadl |
+|---|---|---|
+| touchback při odrazu z hřiště (ř. 280-283) | `KickoffLanding.BounceOffThePitchIsATouchback` | M1: touchback jen u prvního dopadu, ne u odrazu |
+| nechycený míč odražený přes LoS (FAQ ř. 9312-9314) | `KickoffLanding.FailedCatchBouncingOverTheLineOfScrimmageIsATouchback` | M1 |
+| turnover ukončí Blitz! a míč dopadne (ř. 1339-1341) | `KickoffTable.TurnoverEndsTheBlitzBonusTurnAndTheBallLands` | M2: dopad jen po END_TURN, ne po turnoveru |
+| týmový přehoz v Blitz! (ř. 1338-1339) | `KickoffTable.KickingTeamMayUseATeamRerollDuringTheBlitz` | M3: přehoz zakázán, je-li míč ve vzduchu |
+| kopající omráčený v Blitz! vstane po svém příštím řádném kole (ř. 703-708) | `KickoffTable.KickingPlayerStunnedInTheBlitzTurnsFaceUpAfterHisNextNormalTurn` | M4: hod na zranění bez `stunnedThisTurn` |
+| Riot D6 4-6 zpět (ř. 1291-1296) | `KickoffTable.RiotMidHalfOnFourToSixMovesBothMarkersBack` | M5: D6 vždy vpřed |
+| Throw a Rock remíza ⇒ oba (ř. 1345-1347) | `KickoffTable.ThrowARockTieHitsBothTeams` | M6: remíza jen jeden tým |
+| High Kick: obsazené pole / touchback (ř. 1302-1308) | `KickoffTable.HighKickDoesNothingWhenTheLandingSquareIsOccupied`, `…WhenTheKickIsATouchback` | M7: bez podmínky pole/polovina |
+| „žádné kolo“ v `simulateGame` (ř. 1033-1035) | `KickoffHandler.NoKickoffWithoutATurnLeftInARealGame` | M8: bez strážce `turnNumber > 8` ⇒ kostky výkopu (seed 6, 34) |
+| **Quick Snap do soupeřovy poloviny** (ř. 1331-1333) | — **netestovatelné bez změny AI** | Do soupeřovy poloviny se dá vkročit jen z LoS (x=12/13), a hráče na LoS volba AI drží na místě (`resolveQuickSnap`). Kód polovinu nefiltruje, ale volba AI ji nikdy nevyužije ⇒ **rozhodnutí uživatele** (volba AI, ne vada pravidla) |
+
+Mutace M1–M8: `/tmp/…/scratchpad/mut.py` (mimo repo), každá po běhu vrácena.
 
 **Pozn. k N1:** TD po turnoveru (např. míč odražený k soupeři v zóně) už dřív dával +1 kolo skórujícím — turnover předá tah a připíše kolo dřív, než se kontroluje TD. Výsledek odpovídá pravidlu; větev `scoringSide != activeTeam` tam nenastane.
 PHP engine: **převést do druhého enginu** (#2, #4, N1).
