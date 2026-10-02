@@ -265,21 +265,29 @@ def test_roll_match_weather_is_rolled_once_and_kept_by_kickoff():
     """P66: weather is rolled once per match; the kickoff keeps it.
 
     Od 02.10.2026 je simple_kickoff plný výkop s tabulkou, a ta smí počasí změnit (Changing
-    Weather, 2D6 = 7, tedy 6/36 výkopů). Přesně to hlídá C++ test
-    KickoffHandler.KickoffKeepsMatchWeatherUnlessChangingWeather; tady jen, že se počasí
-    nepřehazuje při každém výkopu (dřív P66 = vždy nový hod)."""
+    Weather, 2D6 = 7). Deterministicky (review výkopu #10, 02.10.): dvojče DiceRoller se stejným
+    semínkem předpoví hody výkopu (počasí 2D6, vzdálenost D6, směr D8, tabulka 2D6) — mimo
+    tabulku 7 se počasí NESMÍ změnit nikdy; s tabulkou 7 se aspoň jednou změní (pozitivní kontrola,
+    že dvojče hody opravdu sleduje)."""
     seen = set()
-    kept = 0
+    changing = changed = 0
     for seed in range(1, 60):
         gs = bb_engine.GameState()
         bb_engine.setup_half(gs, bb_engine.get_human_roster(), bb_engine.get_human_roster())
         dice = bb_engine.DiceRoller(seed)
+        twin = bb_engine.DiceRoller(seed)
         bb_engine.roll_match_weather(gs, dice)
         before = gs.weather
         seen.add(before)
+        twin.roll_2d6(); twin.roll_d6(); twin.roll_d8()
+        table = twin.roll_2d6()
         bb_engine.simple_kickoff(gs, dice)
-        kept += gs.weather == before
-    assert kept >= 40      # ~5/6 výkopů počasí nemění
+        if table == 7:
+            changing += 1
+            changed += gs.weather != before
+        else:
+            assert gs.weather == before, f"seed {seed}: tabulka {table}, počasí se změnilo"
+    assert changing >= 1 and changed >= 1, (changing, changed)
     assert len(seen) > 1   # the roll really varies (not stuck on Nice)
 
 

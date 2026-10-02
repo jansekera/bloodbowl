@@ -59,6 +59,7 @@
 
 #include "bb/game_state.h"
 #include "bb/game_simulator.h"
+#include "bb/kickoff_handler.h"
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
 #include "bb/macro_actions.h"
@@ -256,7 +257,7 @@ static FullGameOutcome playGame(const TeamRoster& home, const TeamRoster& away,
     state.half = 1;
     state.kickingTeam = openingKickingTeam;
     setupHalf(state, home, away, state.kickingTeam);
-    simpleKickoff(state, dice);
+    resolveKickoff(state, dice, nullptr);
 
     std::vector<Action> actions;
     int totalActions = 0;
@@ -264,14 +265,14 @@ static FullGameOutcome playGame(const TeamRoster& home, const TeamRoster& away,
         if (state.phase == GamePhase::TOUCHDOWN) {
             state.kickingTeam = state.getPlayer(state.ball.carrierId).teamSide;
             setupDrive(state, home, away, state.kickingTeam);
-            simpleKickoff(state, dice);
+            resolveKickoff(state, dice, nullptr);
             continue;
         }
         if (state.phase == GamePhase::HALF_TIME) {
             state.half = 2;
             state.kickingTeam = opponent(openingKickingTeam);
             setupHalf(state, home, away, state.kickingTeam);
-            simpleKickoff(state, dice);
+            resolveKickoff(state, dice, nullptr);
             continue;
         }
         actions.clear();

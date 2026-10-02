@@ -251,6 +251,8 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["ball_carrier_id"] = turn.ballCarrierId;
                 t["turnover"] = turn.turnover;
                 t["touchdown"] = turn.touchdown;
+                // Blitz! (výkopová tabulka 10): kolo kopajícího týmu, míč ještě ve vzduchu.
+                t["kickoff_ball_in_air"] = turn.kickoffBallInAir;
 
                 // What the turn planner decided (bb/turn_plan_record.h).
                 // plan_written == false means no planner ran at all -- the

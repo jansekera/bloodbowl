@@ -13,9 +13,10 @@ first-possession bias" -- only per-drive metrics can.
 WHAT IT MEASURES (all derived read-only from get_turn_logs(), no engine change):
   - drive segmentation: a drive starts at snapshot 0, after any touchdown-
     flagged snapshot, and at each half change; the RECEIVER of a drive is the
-    active_team of its first snapshot (simpleKickoff sets activeTeam=receiving
-    and bumps its turnNumber, so the first post-kickoff snapshot is always the
-    receiver's turn). This works pre- and post-H2-kickoff-fix and would keep
+    active_team of its first snapshot, unless that snapshot is a Blitz! bonus
+    turn (kickoff_ball_in_air; since 02.10.2026 the full kick-off table runs
+    in every game) -- then the active team is the KICKER and the receiver is
+    the other side. This works pre- and post-H2-kickoff-fix and would keep
     working under any future coin toss: nothing about the schedule is assumed,
     everything is observed.
   - schedule audit: who actually receives drive 1, the H2 opening, and each
@@ -88,7 +89,8 @@ def summarize_drives(turns: list, hs: int, as_: int, swap: bool) -> dict:
     """Reduce get_turn_logs() output to a compact per-drive record.
 
     Drive starts: snapshot 0; any snapshot following a touchdown-flagged one;
-    any half change. Receiver = active_team of the drive's first snapshot.
+    any half change. Receiver = active_team of the drive's first snapshot
+    (the other side when that snapshot is a Blitz! bonus turn).
     Scorer of a drive = the side whose score increases between the drive's
     first snapshot and the NEXT drive's first snapshot (or the final result
     for the last drive) -- snapshot scores are captured at turn start, so the
@@ -109,7 +111,11 @@ def summarize_drives(turns: list, hs: int, as_: int, swap: bool) -> dict:
     for d, s in enumerate(starts):
         e = (starts[d + 1] - 1) if d + 1 < len(starts) else n - 1
         seg = turns[s:e + 1]
+        # Blitz! (kick-off table 10): the drive opens with the KICKER's bonus
+        # turn while the ball is still in the air -- receiver is the other side.
         recv = seg[0]["active_team"]
+        if seg[0].get("kickoff_ball_in_air"):
+            recv = "away" if recv == "home" else "home"
         before = (seg[0]["home_score"], seg[0]["away_score"])
         if d + 1 < len(starts):
             nxt = turns[starts[d + 1]]
@@ -497,9 +503,9 @@ def run(label: str, n: int) -> None:
 
 def _selftest() -> None:
     """Pure-python check of summarize_drives on a synthetic turn-log stream."""
-    def snap(half, team, hsc, asc, td=False):
+    def snap(half, team, hsc, asc, td=False, blitz=False):
         return {"half": half, "active_team": team, "home_score": hsc,
-                "away_score": asc, "touchdown": td}
+                "away_score": asc, "touchdown": td, "kickoff_ball_in_air": blitz}
     # H1: home receives, scores on its 2nd turn; away receives next, half
     # ends scoreless; H2: away receives, kicker (home) counter-scores.
     turns = [
@@ -525,6 +531,17 @@ def _selftest() -> None:
     cells = game_cells(g)
     assert cells["home_recv_td"] == 1 and cells["home_kick_td"] == 1
     assert cells["away_recv_n"] == 3 and cells["home_recv_n"] == 1
+    # Blitz! (02.10.2026): the first snapshot of a drive is the KICKER's bonus turn
+    # (ball still in the air) -- the receiver is the other side.
+    blitz = [
+        snap(1, "away", 0, 0, blitz=True),  # away kicks, Blitz! bonus turn
+        snap(1, "home", 0, 0, td=True),     # home receives, scores
+        snap(1, "home", 1, 0, blitz=True),  # home kicks, Blitz! again
+        snap(1, "away", 1, 0),
+    ]
+    gz = summarize_drives(blitz, 1, 0, swap=False)
+    assert [d["recv"] for d in gz["drives"]] == ["home", "away"], gz
+    assert gz["drives"][0]["end"] == "td_recv" and gz["drives"][0]["recv_turns"] == 1
     # anomaly: score jumps without touchdown flag
     bad = [snap(1, "home", 0, 0), snap(1, "away", 0, 0)]
     gb = summarize_drives(bad, 1, 0, swap=False)
