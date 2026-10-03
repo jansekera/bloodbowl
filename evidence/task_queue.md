@@ -742,9 +742,20 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 # CO JE TEĎ PRVNÍ
 
-⏰ **Přepsáno 01.10.2026.** Přepisuje se **jedině tenhle oddíl**; ID se **nikdy** nepřečíslovávají.
+⏰ **Přepsáno 03.10.2026.** Přepisuje se **jedině tenhle oddíl**; ID se **nikdy** nepřečíslovávají.
 
-## ⭐⭐⭐⭐ UPŘESNĚNO 01.10. VEČER — uživatel: *„jde mi o to přidat hodně kontrol sem do bb — včetně později bezpečnosti — teď je bezpečnost na bb ne tolik potřeba, protože je to jen na localhostu“*
+## ⭐⭐⭐⭐⭐ PRIORITA OD 03.10. — uživatel: *„prioritu dej novým úkolům po dokončení zápasu“*
+Živá partie 02.–03.10. dohrána (2:0). **Napřed úkoly z partie, teprve pak pořadí z 01.10. níž** (kontroly Brasty → bezpečnost → simplify → pravidlové).
+| krok | položky | pozn. |
+|---|---|---|
+| 1 | **sloučit větev výkopu** (`worktree-agent-ac466507256f9769d`) **+ větev P100** (`worktree-agent-ab9e76619c4f0a8b2`) do `main`, `make check-all` | ⇒ **nová báze měření**; log partie se přehrává jen na enginu `4e142640` |
+| 2 | **P130 část A** — týmový reroll jako volba kouče + původní hod ve výpisu | část B (Pro × tým) čeká na krok „úprava TV + skilly“ |
+| 3 | **P145** — vhazování z autu proti pravidlům, opravy výpisu událostí | pravidla, ne AI |
+| 4 | **P128** — podíl poločasů, kdy AI za trpaslíky dá TD do 8 kol | hlavní cíl: naučit AI skórovat za trpaslíky; až na nové bázi |
+| 5 | **P131–P144** — nálezy pro AI z partie (většina začíná měřením) + celotah A15 | pořadí uvnitř zatím neurčeno |
+| 6 | starší dluhy z 02.10.: P127 klec v PHP · převod výkopu do PHP · P123 · P124 · párové A/B jedné klece · proč F1/T3.1 dřív škodil | |
+
+## ⭐⭐⭐⭐ (AŽ PO ÚKOLECH Z PARTIE) UPŘESNĚNO 01.10. VEČER — uživatel: *„jde mi o to přidat hodně kontrol sem do bb — včetně později bezpečnosti — teď je bezpečnost na bb ne tolik potřeba, protože je to jen na localhostu“*
 **Nové pořadí:** 1) **pravidla a kontroly z Brasty** (zásady do `CLAUDE.md` · **P102** testy architektury · **P100** testy, které nemohou spadnout · **P104** mutační · **P109** pokrytí · **P101** čas · **P106** integrace + práva · **P111** souběh · **P99** vstup · **P110** CI)
 → 2) **bezpečnost později** (P113, P114, P116, P107, P108, P103) → 3) simplify P68–P97 → 4) pravidlové P84… · P118/P119 drobnosti mezi tím.
 ✅ Už hotovo: P105, P98, P112, P115, P117 · ⚠️ P99 částečně.
