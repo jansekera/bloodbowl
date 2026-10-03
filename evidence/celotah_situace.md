@@ -512,6 +512,20 @@ a když ne, hrát opatrně (02.10.: elfové blokovali, jeden blitz, nic víc).
 **Opačná strana téže věci — STALLING:** nosič, který může skórovat, **čeká do posledního kola poločasu**,
 aby soupeři nezbyl čas na odpověď (uživatel za trpaslíky 02.10.). Patří sem i P128 (AI s trpaslíky TD do 8 kol vůbec nedá).
 
+## A15. ⭐⭐⭐ ŽIVÁ PARTIE 02.–03.10. — CO Z NÍ PATŘÍ DO CELOTAHU *(uživatel, trpaslíci 2:0 proti mně za wood-elfy)*
+
+Úplný výpis partie: `evidence/play_20261002/partie_vypis.md`. Úkoly v knize: **P132–P144**. Do celotahu z nich patří to, co je **pořadí a rozdělení zdrojů přes celý tah**, ne vlastnost jedné akce:
+
+1. **Cíl blitzu se volí první a podle toho, co tahu přinese** (P133, P134): v obraně na soupeře, který nejvíc vyčnívá — odsun udělá místo pro linii (*„zvolil bych blitz na 8, ať můžeš pak postavit obranu na x 14 a 15“*); blitz se neutrácí tam, kde stačí blok (*„proč blitz na 8, když ti stačí block?“*).
+2. **Asistent táhne dřív než blokující** (P136, P140): z kontaktu se neodchází, dokud se nezkusí blok s přivedenou asistencí (*„25 mohl blokovat 3, kdyby mu přišla asistence“*); strom bez Block chce asistenta na 3 kostky.
+3. **Pořadí podle rizika a rerollu** (P141, A7): bezpečné napřed · ležící, který pak asistuje, vstává první (*„2 vstává — to jsem měl udělat první“*) · Loner blokuje poslední (*„protože asi nebude využívat rerol“*) · riziko, které na konci tahu nic nestojí, se vždy zkusí (vstání na 4+ není turnover, P142).
+4. **Izolovaný soupeř = dvě akce za sebou** (P135): blitz s asistencemi, pak faul na ležícího, a teprve potom ústup ostatních.
+5. **Klec postupuje přeskupením rolí** (P143): *„5 byl přední roh klece a teď je zadní roh — netáhnul, ale je na místě, kde jej chci“* ⇒ plán tahu hledá nejmíň pohybů, které klec posunou, ne posun všech rohů.
+6. **Týmový reroll se nešetří sám** (P144, A7): poslední reroll šel v H:7 na GFI do klece, na dvě lebky u nosiče nezbyl ⇒ v A:8 ztráta míče.
+7. **Kraj hřiště** (P131): nosič na krajní řadě = stačí Pushed; proti Frenzy ani o pole vedle.
+
+---
+
 ## B. OTÁZKY, KTERÉ Z TOHO PLYNOU *(k projití spolu)*
 
 * **Pořadí aktivací.** C4 ukazuje, že záleží — kdo jde první? Dnes se bere, co přijde *(ověřuje audit 02.09.)*.
