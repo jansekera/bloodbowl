@@ -1969,11 +1969,14 @@ TEST(MacroActions, RepositionLooseBallAlreadyAdjacentStaysPut) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
+    int repositions = 0;  // P100: bez nabídky REPOSITION se dřív netvrdilo nic
     for (auto& m : macros) {
         if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        ++repositions;
         EXPECT_EQ(m.targetPos, (Position{12, 7}))
             << "already-denying player sent on a pointless walk";
     }
+    EXPECT_GE(repositions, 1) << "hráč u míče má dostat aspoň nabídku zůstat";
 }
 
 // Item 11, waypoint variant: retargeting alone is not enough -- when the only
@@ -2836,18 +2839,18 @@ TEST(MacroActions, M12CarrierDoesNotStepIntoATacklezoneToAvoidResigning) {
     Player& e2 = state.getPlayer(13);
     e2.id = 13; e2.teamSide = TeamSide::AWAY; e2.state = PlayerState::STANDING;
     e2.position = {12, 9}; e2.stats = {6, 3, 3, 8};
-    const Position before = state.getPlayer(1).position;
 
     FixedDiceRoller dice(std::vector<int>(60, 4));
     Macro adv{MacroType::ADVANCE, 1, -1, {-1, -1}};
     greedyExpandMacro(state, adv, dice);
 
+    // P100: dřív `if (after != before) EXPECT…` — kdyby nosič zůstal stát, netvrdilo se nic.
+    // Teď se kontroluje KONEČNÉ pole vždy (stát na místě je taky přípustný výsledek, ale
+    // jen když výchozí pole není v TZ).
     const Position after = state.getPlayer(1).position;
-    if (after != before) {
-        EXPECT_EQ(countTacklezones(state, after, TeamSide::HOME), 0)
-            << "nosič skončil v tacklezóně => oprava ztratila podmínku, kterou"
-               " dnešní smyčka má";
-    }
+    EXPECT_EQ(countTacklezones(state, after, TeamSide::HOME), 0)
+        << "nosič skončil v tacklezóně => oprava ztratila podmínku, kterou"
+           " dnešní smyčka má";
 }
 
 // ============================================================================

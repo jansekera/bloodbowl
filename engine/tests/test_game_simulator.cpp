@@ -965,6 +965,8 @@ TEST(GameSimulator, NoTurnNineIsEverPlayed) {
             worst = std::max(worst, t.turnNumber);
         }
     }
+    // P100: dřív při prázdném `turnLogs` zůstalo worst=0 a EXPECT_LE prošlo bez ověření nečeho.
+    EXPECT_GE(worst, 8) << "hry se musely odehrát do osmého kola, jinak se devátému nedá přijít na stopu";
     EXPECT_LE(worst, 8) << "a half is eight turns; turn " << worst << " was played";
 }
 
@@ -983,6 +985,7 @@ TEST(GameSimulator, KickoffAlwaysLeavesTheBallOnThePitch) {
     ASSERT_NE(dwarf, nullptr);
     ASSERT_NE(skaven, nullptr);
 
+    int loggedTurns = 0;  // P100: prázdný `turnLogs` by nechal všech 120 her bez jediného tvrzení
     for (uint32_t seed = 5200; seed < 5320; ++seed) {
         DiceRoller dice(seed);
         LoggedGameResult lgr = simulateGameLogged(
@@ -995,12 +998,14 @@ TEST(GameSimulator, KickoffAlwaysLeavesTheBallOnThePitch) {
                 EXPECT_TRUE(!t.ballHeld && t.ballX < 0) << "Blitz!: míč ještě letí";
                 continue;
             }
+            ++loggedTurns;
             ASSERT_TRUE(t.ballHeld || (t.ballX >= 0 && t.ballY >= 0))
                 << "seed " << seed << ": half " << t.half << " turn "
                 << t.turnNumber << " played with the ball at ("
                 << int(t.ballX) << "," << int(t.ballY) << ")";
         }
     }
+    EXPECT_GT(loggedTurns, 0) << "žádné kolo se nezalogovalo, test neměřil nic";
 }
 
 // ============================================================================

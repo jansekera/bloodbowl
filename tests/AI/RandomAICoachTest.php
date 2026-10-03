@@ -169,6 +169,8 @@ final class RandomAICoachTest extends TestCase
         $state = $builder->build();
         $newState = $this->ai->setupFormation($state, TeamSide::HOME);
 
+        // P100: dřív smyčka nad prázdným hřištěm prošla bez tvrzení.
+        $this->assertCount(11, $newState->getPlayersOnPitch(TeamSide::HOME));
         foreach ($newState->getPlayersOnPitch(TeamSide::HOME) as $player) {
             $pos = $player->requirePosition();
             $this->assertLessThanOrEqual(12, $pos->getX(), 'Home players must be on left half');

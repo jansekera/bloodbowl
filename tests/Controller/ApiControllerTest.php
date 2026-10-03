@@ -60,6 +60,8 @@ final class ApiControllerTest extends TestCase
     {
         $data = $this->captureJson(fn() => $this->controller->getRaces());
 
+        // P100: dřív smyčka nad prázdným seznamem ras prošla bez tvrzení.
+        $this->assertNotEmpty($data['data']);
         foreach ($data['data'] as $race) {
             $this->assertArrayHasKey('positionals', $race);
             $this->assertNotEmpty($race['positionals'], "Race {$race['name']} should have positionals");

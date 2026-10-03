@@ -67,6 +67,7 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
         //     najde -- a neměří pak vůbec nic. (Přesně tak vypadala první
         //     verze tohohle testu: prošla i s odstraněnou opravou.)
         $ref = new \ReflectionMethod(GreedyAICoach::class, 'scoreAction');
+        $ohodnoceno = 0;
         foreach ($rules->getAvailableActions($state) as $offered) {
             $t = ActionType::from($offered['type']);
             if ($t === ActionType::END_TURN) {
@@ -76,12 +77,15 @@ final class GreedyCoachDoesNotForfeitTheTurnTest extends TestCase
             if ($pid === null) {
                 continue;
             }
+            $ohodnoceno++;
             $this->assertNull(
                 $ref->invoke($ai, $state, $rules, $t, (int) $pid, TeamSide::HOME),
                 'fixtura je vadná: skórer ohodnotil ' . $t->value
                 . ', do opravované větve se nedojde',
             );
         }
+        // P100: dřív smyčka nad nulou nabídek (jen END_TURN) prošla bez jediného tvrzení.
+        $this->assertGreaterThan(0, $ohodnoceno, 'fixtura je vadná: nenabídla se žádná akce kromě END_TURN');
 
         $decision = $ai->decideAction($state, $rules);
 

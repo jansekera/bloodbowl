@@ -30,6 +30,8 @@ final class DevelopedRostersTest extends TestCase
         $basePlayers = getRaceRoster(TeamSide::HOME, $race);
         $devPlayers = getDevelopedRaceRoster(TeamSide::HOME, $race);
 
+        // P100: dřív smyčka nad prázdnou soupiskou prošla bez tvrzení.
+        $this->assertNotEmpty($basePlayers);
         foreach ($basePlayers as $id => $basePlayer) {
             $devPlayer = $devPlayers[$id];
             $this->assertGreaterThanOrEqual(
@@ -133,6 +135,8 @@ final class DevelopedRostersTest extends TestCase
             $basePlayers,
             fn($p) => $p->getPositionalName() === 'Blitzer',
         );
+        // P100: dřív smyčka nad nulou blitzerů prošla bez tvrzení.
+        $this->assertCount(4, $blitzers);
         foreach ($blitzers as $b) {
             $this->assertCount(1, $b->getSkills(), 'Base blitzer should still have only Block');
         }

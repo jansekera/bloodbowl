@@ -147,6 +147,8 @@ final class PathfinderTest extends TestCase
         $player = $state->requirePlayer(1);
         $moves = $this->pathfinder->findValidMoves($state, $player);
 
+        // P100: dřív smyčka nad prázdným výsledkem prošla bez jediného tvrzení.
+        $this->assertNotEmpty($moves);
         foreach ($moves as $path) {
             $this->assertSame(0, $path->getDodgeCount());
         }
