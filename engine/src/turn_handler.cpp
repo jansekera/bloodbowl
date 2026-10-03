@@ -28,6 +28,19 @@ void resolveEndTurn(GameState& state, std::vector<GameEvent>* events, bool wasTu
     // Switch active team
     state.activeTeam = opponent(current);
 
+    // Konec bonusového kola Blitz! (výkopová tabulka 10, ř. 1334-1341): bonusové kolo značky kol
+    // nehýbe a přijímající mají číslo kola už z výkopu. Jejich kolo začne až dopadem míče
+    // (`resolveKickoffLanding`, volá ho `executeAction`), který jim kolo i resetuje.
+    if (state.kickoffBallInAir) {
+        state.forEachPlayer(current, [](Player& p) { p.proUsedThisTurn = false; });
+        state.turnoverPending = false;
+        if (wasTurnover) {
+            emitEvent(events, {GameEvent::Type::TURNOVER, -1, -1, {}, {},
+                              state.getTeamState(state.activeTeam).turnNumber, true});
+        }
+        return;
+    }
+
     // Increment turn number for the new active team
     TeamState& newTeam = state.getTeamState(state.activeTeam);
     newTeam.turnNumber++;

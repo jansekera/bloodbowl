@@ -12,10 +12,18 @@
 #include "bb/bomb_handler.h"
 #include "bb/gaze_handler.h"
 #include "bb/ball_and_chain_handler.h"
+#include "bb/kickoff_handler.h"
 
 namespace bb {
 
 namespace {
+
+// Konec kola. Skončilo-li bonusové kolo Blitz! (výkopová tabulka 10, ř. 1334-1341), míč teprve
+// teď dopadne (pořadí výkopu ř. 1242-1248) — `resolveEndTurn` už předal tah přijímajícím.
+void endTurn(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events, bool wasTurnover) {
+    resolveEndTurn(state, events, wasTurnover);
+    if (state.kickoffBallInAir) resolveKickoffLanding(state, dice, events);
+}
 
 // M2/N13 = P55 (29.08.2026): deklarovana akce, ktera propadne big-guy
 // kontrolou, MUSI tymu odecist jeho limit -- Bone-head to rika doslova
@@ -512,7 +520,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
         }
 
         case ActionType::END_TURN: {
-            resolveEndTurn(state, events);
+            endTurn(state, dice, events, /*wasTurnover=*/false);
             return ActionResult::ok();
         }
 
@@ -533,10 +541,15 @@ ActionResult executeAction(GameState& state, const Action& action,
     // P71 (30.09.2026): hladovy upir se krmi na KONCI SVE AKTIVACE (r. 7934-7947).
     // Neuspech (bez Thralla, nebo Thrall s micem) je turnover a dalsi akce se uz
     // nekona.
+    // Kdo hraje kolo, v němž akce začala — turnover níž přepne `activeTeam` dřív, než se kontroluje TD.
+    const TeamSide mover = state.activeTeam;
+    // Bonusové kolo Blitz!: TD může vzniknout jen dopadem míče a značky kol řeší `finishKickoff`.
+    const bool blitzBonusTurn = state.kickoffBallInAir;
+
     auto feedEndsTurn = [&](int vampId) {
         if (!feedBloodlust(state, vampId, dice, events)) return false;
         state.turnoverPending = true;
-        resolveEndTurn(state, events, /*wasTurnover=*/true);
+        endTurn(state, dice, events, /*wasTurnover=*/true);
         return true;
     };
 
@@ -577,13 +590,28 @@ ActionResult executeAction(GameState& state, const Action& action,
     // Auto end turn on turnover
     if (result.turnover) {
         state.turnoverPending = true;
-        resolveEndTurn(state, events, /*wasTurnover=*/true);
+        endTurn(state, dice, events, /*wasTurnover=*/true);
     }
 
     // Check touchdown
     if (checkTouchdown(state)) {
         TeamSide scoringSide = state.getPlayer(state.ball.carrierId).teamSide;
         state.getTeamState(scoringSide).score++;
+        // ř. 997-1004 „Scoring in the opponent's turn“: „…scores a touchdown immediately, but must
+        // move their Turn marker one space along the Turn track“. OPRAVENO 02.10. — značka se
+        // neposouvala (nosič zatlačený do zóny). Rozhoduje, čí kolo akce běžela (`mover`), ne
+        // `activeTeam` po turnoveru. OPRAVENO 02.10. (druhé review V1) — tým, který po svém
+        // turnoveru skóroval (míč odskočil spoluhráči v zóně), dostal kolo navíc a soupeř jedno ztratil.
+        if (!blitzBonusTurn) {
+            const bool turnoverPassedTheTurn = state.activeTeam != mover;
+            if (scoringSide != mover && !turnoverPassedTheTurn) {
+                state.getTeamState(scoringSide).turnNumber++;     // soupeřovo kolo, bez turnoveru
+            } else if (scoringSide == mover && turnoverPassedTheTurn) {
+                // Skóroval ve svém kole; `resolveEndTurn` už soupeři připsal kolo, které nezačne.
+                state.getTeamState(state.activeTeam).turnNumber--;
+            }
+            // Soupeř skóroval po turnoveru: `resolveEndTurn` mu kolo už připsal = posunutá značka.
+        }
         state.phase = GamePhase::TOUCHDOWN;
         emitEvent(events, {GameEvent::Type::TOUCHDOWN, state.ball.carrierId, -1,
                           state.ball.position, {}, 0, true});

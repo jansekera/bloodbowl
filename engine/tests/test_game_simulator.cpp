@@ -74,31 +74,6 @@ TEST(GameSimulator, SetupHomeFacingRight) {
     EXPECT_TRUE(foundAwayLOS);
 }
 
-TEST(GameSimulator, SimpleKickoffPlacesBallOnPitch) {
-    GameState state;
-    state.kickingTeam = TeamSide::AWAY;
-    setupHalf(state, getHumanRoster(), getHumanRoster());
-
-    DiceRoller dice(42);
-    simpleKickoff(state, dice);
-
-    EXPECT_EQ(state.phase, GamePhase::PLAY);
-    // Ball should be on pitch (either held or on ground)
-    EXPECT_TRUE(state.ball.isOnPitch() || state.ball.isHeld);
-}
-
-TEST(GameSimulator, SimpleKickoffSetsActiveTeam) {
-    GameState state;
-    state.kickingTeam = TeamSide::AWAY;
-    setupHalf(state, getHumanRoster(), getHumanRoster());
-
-    DiceRoller dice(42);
-    simpleKickoff(state, dice);
-
-    // Receiving team (HOME) should be active
-    EXPECT_EQ(state.activeTeam, TeamSide::HOME);
-}
-
 TEST(GameSimulator, RandomVsRandomCompletes) {
     DiceRoller dice(42);
     auto homePolicy = [&dice](const GameState& s) { return randomPolicy(s, dice); };
@@ -273,30 +248,25 @@ TEST(GameSimulator, KickSkillOnDeepSafety) {
 }
 
 TEST(GameSimulator, KickSkillHalvesScatter) {
-    // With Kick skill, D6 scatter should be halved (ceil):
-    // D6=1→1, D6=2→1, D6=3→2, D6=4→2, D6=5→3, D6=6→3
-    // Max scatter is 3, so from x=3, worst case is x=3-3=0 (still on pitch)
-    // Without Kick: max scatter 6, from x=3 could land at x=-3 (clamped to 0)
+    // Kick, BB2016 ř. 8211-8213: „you may choose to halve the number of squares that the ball
+    // scatters on kick-off, rounding any fractions down (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)“.
+    // AWAY kope na (3,7); D6 = 5 → 2 pole na západ = (1,7), prázdné ⇒ odraz na východ (2,7).
+    // Bez půlení by míč uletěl na x = -2 (touchback).
     GameState state;
     state.kickingTeam = TeamSide::AWAY;
     setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
+    for (auto& p : state.players) p.skills.remove(SkillName::KickOffReturn);   // nikdo se nehne
 
-    // Verify kicking team has Kick skill
     bool hasKick = false;
     state.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
         if (p.hasSkill(SkillName::Kick)) hasKick = true;
     });
     ASSERT_TRUE(hasKick);
 
-    // Run 50 kickoffs, verify ball never scatters more than 3 from target
-    for (int seed = 0; seed < 50; seed++) {
-        GameState s2 = state;  // copy
-        DiceRoller dice(seed);
-        simpleKickoff(s2, dice);
-        // Ball should be on pitch
-        EXPECT_TRUE(s2.ball.isOnPitch() || s2.ball.isHeld)
-            << "Ball off pitch with seed=" << seed;
-    }
+    FixedDiceRoller dice({5, 7, 1, 1, 3});       // vzdálenost, směr, tabulka Get the Ref, odraz
+    resolveKickoff(state, dice, nullptr);
+    EXPECT_FALSE(state.ball.isHeld);
+    EXPECT_EQ(state.ball.position, (Position{2, 7}));
 }
 
 TEST(GameSimulator, DefensiveFormationNoOverlaps) {
@@ -312,23 +282,6 @@ TEST(GameSimulator, DefensiveFormationNoOverlaps) {
         positions.insert(pos);
     }
     EXPECT_EQ(positions.size(), 22u);
-}
-
-TEST(GameSimulator, DeepKickTargetInReceivingHalf) {
-    // Test that deep kick (x=22 when HOME kicks, x=3 when AWAY kicks)
-    // still lands in receiving half after scatter
-    for (int seed = 0; seed < 20; seed++) {
-        GameState state;
-        state.kickingTeam = TeamSide::AWAY;
-        setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
-
-        DiceRoller dice(seed);
-        simpleKickoff(state, dice);
-
-        // Ball should be on pitch
-        EXPECT_TRUE(state.ball.isOnPitch() || state.ball.isHeld)
-            << "Ball off pitch with seed=" << seed;
-    }
 }
 
 TEST(GameSimulator, BackwardCompatDefault) {
@@ -493,15 +446,12 @@ TEST(GameSimulator, ShortKickVsFastTeam) {
 
     EXPECT_EQ(state.receiverSpeed, RosterSpeed::FAST);
 
-    // Run simpleKickoff with fixed dice to verify short kick
-    // The kick target x should be 7 (AWAY kicks vs FAST)
-    // We can't directly check kickX, but we can verify ball lands closer to LOS
-    // Use deterministic dice: D6=1 (min scatter), D8=1 (north)
-    // With Kick skill: scatter = ceil(1/2) = 1, direction north → kickX=7, kickY=7+1=8
-    DiceRoller dice(0);
-    // We need to control exact rolls; let's just verify ball is on pitch
-    simpleKickoff(state, dice);
-    EXPECT_TRUE(state.ball.isOnPitch() || state.ball.isHeld);
+    // Krátký kop na (7,7): D6 = 1 se Kick = 0 polí; tam stojí hloubkový hráč a chytá (D6 = 6).
+    for (auto& p : state.players) p.skills.remove(SkillName::KickOffReturn);
+    FixedDiceRoller dice({1, 1, 1, 1, 6});
+    resolveKickoff(state, dice, nullptr);
+    EXPECT_TRUE(state.ball.isHeld);
+    EXPECT_EQ(state.ball.position, (Position{7, 7}));
 }
 
 TEST(GameSimulator, DeepKickVsSlowTeam) {
@@ -513,10 +463,11 @@ TEST(GameSimulator, DeepKickVsSlowTeam) {
 
     EXPECT_EQ(state.receiverSpeed, RosterSpeed::SLOW);
 
-    // Verify ball lands on pitch after kickoff
-    DiceRoller dice(42);
-    simpleKickoff(state, dice);
-    EXPECT_TRUE(state.ball.isOnPitch() || state.ball.isHeld);
+    // Hluboký kop na (3,7): D6 = 1 se Kick = 0 polí; prázdné pole ⇒ odraz na východ (4,7).
+    for (auto& p : state.players) p.skills.remove(SkillName::KickOffReturn);
+    FixedDiceRoller dice({1, 1, 1, 1, 3});
+    resolveKickoff(state, dice, nullptr);
+    EXPECT_EQ(state.ball.position, (Position{4, 7}));
 }
 
 TEST(GameSimulator, PressureFormationNoOverlaps) {
@@ -581,7 +532,7 @@ TEST(GameSimulator, SetupDrivePreservesTurnClockAndRerolls) {
 // what setupDrive had just preserved and silently reviving the "every TD grants
 // a fresh 8-turn clock" bug. These tests drive the real sequence.
 TEST(GameSimulator, PostTouchdownKickoffPreservesTurnClock) {
-    for (bool useFullKickoff : {false, true}) {
+    {
         GameState state;
         setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
 
@@ -592,38 +543,26 @@ TEST(GameSimulator, PostTouchdownKickoffPreservesTurnClock) {
 
         setupDrive(state, getHumanRoster(), getHumanRoster(), TeamSide::HOME);
         DiceRoller dice(7);
-        if (useFullKickoff) {
-            resolveKickoff(state, dice, nullptr);
-        } else {
-            simpleKickoff(state, dice);
-        }
+        resolveKickoff(state, dice, nullptr);
 
         // The kicking team's clock is untouched; the receiving team advances to
         // its next turn -- NOT back to turn 1.
-        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 5)
-            << "useFullKickoff=" << useFullKickoff;
-        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 5)
-            << "useFullKickoff=" << useFullKickoff;
+        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 5);
+        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 5);
     }
 }
 
 TEST(GameSimulator, HalfBoundaryKickoffStillStartsAtTurnOne) {
     // The same ++ must still yield turn 1 at a true half boundary, where
     // setupHalf has already zeroed both clocks before the kickoff runs.
-    for (bool useFullKickoff : {false, true}) {
+    {
         GameState state;
         setupHalf(state, getHumanRoster(), getHumanRoster(), TeamSide::AWAY);
         DiceRoller dice(7);
-        if (useFullKickoff) {
-            resolveKickoff(state, dice, nullptr);
-        } else {
-            simpleKickoff(state, dice);
-        }
+        resolveKickoff(state, dice, nullptr);
 
-        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 1)
-            << "useFullKickoff=" << useFullKickoff;
-        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 0)
-            << "useFullKickoff=" << useFullKickoff;
+        EXPECT_EQ(state.getTeamState(TeamSide::HOME).turnNumber, 1);
+        EXPECT_EQ(state.getTeamState(TeamSide::AWAY).turnNumber, 0);
     }
 }
 
@@ -1021,7 +960,7 @@ TEST(GameSimulator, NoTurnNineIsEverPlayed) {
             *dwarf, *skaven,
             [&dice](const GameState& s) { return randomPolicy(s, dice); },
             [&dice](const GameState& s) { return randomPolicy(s, dice); },
-            dice, /*useFullKickoff=*/true);
+            dice);
         for (const auto& t : lgr.turnLogs) {
             worst = std::max(worst, t.turnNumber);
         }
@@ -1036,9 +975,9 @@ TEST(GameSimulator, NoTurnNineIsEverPlayed) {
 // Seen once in 120 corpus games (g0040): a whole second half of 108 moves, 19
 // blocks and a casualty, played with no ball on the field.
 //
-// This is the path the corpora actually run: neither the python binding nor
-// the diagnostic harnesses ask for the full kickoff.
-TEST(GameSimulator, SimpleKickoffAlwaysLeavesTheBallOnThePitch) {
+// Od 02.10.2026 je výkop jen jeden (resolveKickoff). Výjimka: bonusové kolo Blitz! začíná
+// s míčem ve vzduchu (ř. 1334-1341, dopad až po něm) — to TurnLog značí `kickoffBallInAir`.
+TEST(GameSimulator, KickoffAlwaysLeavesTheBallOnThePitch) {
     const TeamRoster* dwarf = getDevelopedRoster("dwarf", 1200);
     const TeamRoster* skaven = getDevelopedRoster("skaven", 1200);
     ASSERT_NE(dwarf, nullptr);
@@ -1052,6 +991,10 @@ TEST(GameSimulator, SimpleKickoffAlwaysLeavesTheBallOnThePitch) {
             [&dice](const GameState& s) { return randomPolicy(s, dice); },
             dice);
         for (const auto& t : lgr.turnLogs) {
+            if (t.kickoffBallInAir) {
+                EXPECT_TRUE(!t.ballHeld && t.ballX < 0) << "Blitz!: míč ještě letí";
+                continue;
+            }
             ASSERT_TRUE(t.ballHeld || (t.ballX >= 0 && t.ballY >= 0))
                 << "seed " << seed << ": half " << t.half << " turn "
                 << t.turnNumber << " played with the ball at ("
@@ -1124,40 +1067,6 @@ TEST(GameSimulator, WoodElfWinningTheTossElectsToAttack) {
     EXPECT_EQ(rollOpeningKickingTeam(dice, *getRosterByName("dwarf"),
                                      *getRosterByName("wood-elf")),
               TeamSide::HOME);
-}
-
-// ============================================================================
-// F10 (24.08.2026) -- BB2016 l. 275-283. `simpleKickoff` je cesta, na ktere
-// bezi KORPUS, a touchback v ni neexistoval: mic se `clamp`nul na hriste.
-// ============================================================================
-
-TEST(GameSimulator, SimpleKickoffAwardsATouchbackWhenTheBallLeavesThePitch) {
-    // l. 280-282: "If the ball scatters or bounces OFF THE PITCH or into the
-    // kicking team's half, the receiving coach is awarded a 'touchback' and
-    // must give the ball to any player in his team."
-    // Do 24.08. se mic v teto ceste `clamp`nul na kraj hriste a hralo se dal.
-    GameState gs;
-    const TeamRoster& dwarf = *getRosterByName("dwarf");
-    DiceRoller setupDice(7);
-    setupHalf(gs, dwarf, dwarf, TeamSide::AWAY, &setupDice);   // AWAY kope, HOME prijima
-    gs.kickingTeam = TeamSide::AWAY;
-
-    // Kick skill sebereme, at se rozptyl nepuli (jinak by mic zustal na hristi).
-    gs.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) {
-        gs.getPlayer(p.id).skills.remove(SkillName::Kick);
-    });
-
-    // AWAY kope na kickX = 3 (HOME je pomaly roster). D6=6, D8=7 (zapad)
-    // => x = 3 - 6 = -3, tedy VEN Z HRISTE => touchback.
-    FixedDiceRoller dice({6, 7, 4, 4});
-    simpleKickoff(gs, dice);
-
-    EXPECT_TRUE(gs.ball.isHeld) << "touchback musi dat mic hráči, ne ho nechat lezet";
-    ASSERT_GE(gs.ball.carrierId, 0);
-    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME)
-        << "mic dostava PRIJIMAJICI tym";
-    EXPECT_TRUE(gs.ball.position.isOnPitch());
-    EXPECT_LE(gs.ball.position.x, 12) << "a stoji ve SVE polovine";
 }
 
 // ============================================================================

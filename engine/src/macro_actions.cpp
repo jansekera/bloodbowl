@@ -1886,7 +1886,10 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // BLITZ: not used this turn, at least one standing enemy
     // Defense-aware: prioritizes ball carrier and scoring threats
     if (!myTeam.blitzUsedThisTurn) {
-        bool onDef = !iHaveBall && !ballOnGround; // opponent has ball
+        // Soupeř má míč. Volný míč = na zemi, nebo při Blitz! místo dopadu (`looseBallSquare`, jako
+        // REPOSITION níž). OPRAVENO 02.10. (druhé review) — dřív `!ballOnGround`, takže kopající v
+        // bonusovém kole blitzovali jako obrana proti nosiči, kterého nikdo nemá.
+        bool onDef = !iHaveBall && !looseBallSquare(state).isOnPitch();
         int oppCarrierId = (state.ball.isHeld && state.ball.carrierId > 0)
                             ? state.ball.carrierId : -1;
 
@@ -2346,7 +2349,11 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     // REPOSITION: free (no adjacent enemies) standing player
     // Smart targeting: carrier protection, safety player, defensive screen
     int myEndzone = endzoneX(opponent(mySide));  // our own endzone to defend
-    bool onDefense = !iHaveBall && !ballOnGround;
+    // Volný míč pro obklíčení: na zemi, nebo při Blitz! místo dopadu (uživatel 02.10. #3 — dřív
+    // kopající v bonusovém kole bránili, jako by míč nebyl). PICKUP výš zůstává jen pro míč na zemi.
+    const Position loosePos = looseBallSquare(state);
+    const bool ballLoose = loosePos.isOnPitch();
+    bool onDefense = !iHaveBall && !ballLoose;
     bool receiverPlaced = false;
     bool hunterPlaced = false;
     bool cageTagPlaced = false;
@@ -2399,20 +2406,20 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
 
         Position target;
 
-        if (ballOnGround) {
+        if (ballLoose) {
             // Loose ball: surround it -- stand ADJACENT, never on the ball's
             // own square. Any move landing there auto-triggers a real pickup
             // roll (move_handler.cpp), which would make this the one
             // REPOSITION that secretly gambles; an actual pickup attempt is
             // the PICKUP macro's job (item 11). Already adjacent = already
             // denying, stay put.
-            if (p.position.distanceTo(state.ball.position) == 1) {
+            if (p.position.distanceTo(loosePos) == 1) {
                 repBranch = 1;
                 target = p.position;
             } else {
                 Position bestAdj{-1, -1};
                 int bestDist = 999;
-                for (auto& apos : state.ball.position.getAdjacent()) {
+                for (auto& apos : loosePos.getAdjacent()) {
                     if (!apos.isOnPitch()) continue;
                     if (state.getPlayerAtPosition(apos) != nullptr) continue;
                     int d = p.position.distanceTo(apos);

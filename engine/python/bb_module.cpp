@@ -13,6 +13,7 @@
 #include "bb/rules_engine.h"
 #include "bb/action_resolver.h"
 #include "bb/game_simulator.h"
+#include "bb/kickoff_handler.h"
 #include "bb/roster.h"
 #include "bb/dice.h"
 #include "bb/feature_extractor.h"
@@ -140,6 +141,10 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("ball", &bb::GameState::ball)
         .def_readwrite("weather", &bb::GameState::weather)
         .def_readwrite("kicking_team", &bb::GameState::kickingTeam)
+        // Blitz! (ř. 1334-1341): míč ve vzduchu a známé místo dopadu (rozptyl je před tabulkou,
+        // ř. 1242-1248). Uživatel 02.10. (#3): AI o něm má vědět i z Pythonu.
+        .def_readwrite("kickoff_ball_in_air", &bb::GameState::kickoffBallInAir)
+        .def_readwrite("kickoff_landing", &bb::GameState::kickoffLanding)
         .def("get_player", [](bb::GameState& gs, int id) -> bb::Player& {
             return gs.getPlayer(id);
         }, py::return_value_policy::reference_internal)
@@ -251,6 +256,8 @@ PYBIND11_MODULE(bb_engine, m) {
                 t["ball_carrier_id"] = turn.ballCarrierId;
                 t["turnover"] = turn.turnover;
                 t["touchdown"] = turn.touchdown;
+                // Blitz! (výkopová tabulka 10): kolo kopajícího týmu, míč ještě ve vzduchu.
+                t["kickoff_ball_in_air"] = turn.kickoffBallInAir;
 
                 // What the turn planner decided (bb/turn_plan_record.h).
                 // plan_written == false means no planner ran at all -- the
@@ -487,9 +494,12 @@ PYBIND11_MODULE(bb_engine, m) {
               bb::setupHalf(state, home, away, kickingTeam, &base);
           },
           py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
+    // Jméno zůstalo kvůli skriptům; od 02.10.2026 je to JEDINÝ výkop enginu (resolveKickoff:
+    // tabulka, Kick-Off Return, touchback). Po Blitz! je na tahu KOPAJÍCÍ tým a míč letí
+    // (state.ball mimo hřiště); dopadne po jeho END_TURN v execute_action.
     m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
-        bb::simpleKickoff(state, base);
+        bb::resolveKickoff(state, base, nullptr);
     });
     // P66 (29.09.2026): výkop už počasí nehází -- hra řízená z Pythonu ho
     // musí hodit sama, jednou před prvním výkopem (BB2016 l. 2571-2573).

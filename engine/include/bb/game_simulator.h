@@ -68,19 +68,16 @@ TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
 TeamSide rollOpeningKickingTeam(DiceRollerBase& dice,
                                 TossElection winnerElects = TossElection::RECEIVE);
 
-// Simplified kickoff: place ball with scatter, transition to PLAY
-void simpleKickoff(GameState& state, DiceRollerBase& dice);
 // Pre-match weather roll (BB2016 l. 2551, 2571-2573); called once per match.
 void rollMatchWeather(GameState& state, DiceRollerBase& dice);
 
 // Action selector: given a game state, return an action to execute
 using ActionSelector = std::function<Action(const GameState&)>;
 
-// Run a complete game with action selectors for each team
-// useFullKickoff: if true, use resolveKickoff() with full kickoff events
+// Run a complete game with action selectors for each team (výkop: resolveKickoff, jediná cesta)
 GameResult simulateGame(const TeamRoster& home, const TeamRoster& away,
                         ActionSelector homePolicy, ActionSelector awayPolicy,
-                        DiceRollerBase& dice, bool useFullKickoff = false);
+                        DiceRollerBase& dice);
 
 // Logged game result with features for training
 struct StateLog {
@@ -106,6 +103,8 @@ struct TurnLog {
     // Weather at the start of the turn (can change mid-game via the
     // kickoff table's Changing Weather result)
     Weather weather = Weather::NICE;
+    // Bonusové kolo Blitz! (výkopová tabulka 10): míč je na začátku kola ve vzduchu, ne na hřišti.
+    bool kickoffBallInAir = false;
 
     // Events that happened during this turn
     std::vector<GameEvent> events;
@@ -194,6 +193,6 @@ struct LoggedGameResult {
 
 LoggedGameResult simulateGameLogged(const TeamRoster& home, const TeamRoster& away,
                                     ActionSelector homePolicy, ActionSelector awayPolicy,
-                                    DiceRollerBase& dice, bool useFullKickoff = false);
+                                    DiceRollerBase& dice);
 
 } // namespace bb

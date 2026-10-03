@@ -1,3 +1,5 @@
 # Commity jen s formátem — git blame je přeskočí (git config blame.ignoreRevsFile .git-blame-ignore-revs)
 # 2026-10-01  formát PHP podle PER-CS, 01.10.2026
 d0945ff306d2fc71a9f837affe2399b415ce90db
+# 2026-10-02  formát PHP testů (check-lint padal na 54f6bc94)
+2541a1c90b3562fa3a312d02ae6b36b15dbc9fc8

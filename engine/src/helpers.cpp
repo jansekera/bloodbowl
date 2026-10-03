@@ -274,6 +274,15 @@ int getPushbackSquares(Position attackerPos, Position defenderPos, Position out[
     return count;
 }
 
+Position looseBallSquare(const GameState& state) {
+    if (!state.ball.isHeld && state.ball.isOnPitch()) return state.ball.position;
+    if (state.kickoffBallInAir && state.kickoffLanding.isOnPitch()) {
+        const bool homeReceives = state.kickingTeam == TeamSide::AWAY;
+        if (homeReceives == (state.kickoffLanding.x <= 12)) return state.kickoffLanding;
+    }
+    return {-1, -1};
+}
+
 Position scatterDirection(int d8) {
     // Clockwise from North: 1=N, 2=NE, 3=E, 4=SE, 5=S, 6=SW, 7=W, 8=NW
     static const int8_t offsets[8][2] = {

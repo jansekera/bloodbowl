@@ -28,6 +28,7 @@
 
 #include "bb/game_state.h"
 #include "bb/game_simulator.h"
+#include "bb/kickoff_handler.h"
 #include "bb/action_resolver.h"
 #include "bb/macro_mcts.h"
 #include "bb/mcts.h"
@@ -596,7 +597,7 @@ int main(int argc, char** argv) {
         state.half = 1;
         state.kickingTeam = openingKickingTeam;
         setupHalf(state, *homeRoster, *awayRoster, state.kickingTeam);
-        simpleKickoff(state, dice);
+        resolveKickoff(state, dice, nullptr);
 
         int lastHalf = -1, lastTurn = -1;
         TeamSide lastTeam = TeamSide::HOME;
@@ -614,7 +615,7 @@ int main(int argc, char** argv) {
                 drive.half = state.half;
                 state.kickingTeam = scorer;
                 setupDrive(state, *homeRoster, *awayRoster, state.kickingTeam);
-                simpleKickoff(state, dice);
+                resolveKickoff(state, dice, nullptr);
                 continue;
             }
             if (state.phase == GamePhase::HALF_TIME) {
@@ -624,7 +625,7 @@ int main(int argc, char** argv) {
                 state.half = 2;
                 state.kickingTeam = opponent(openingKickingTeam);
                 setupHalf(state, *homeRoster, *awayRoster, state.kickingTeam);
-                simpleKickoff(state, dice);
+                resolveKickoff(state, dice, nullptr);
                 continue;
             }
             actions.clear();

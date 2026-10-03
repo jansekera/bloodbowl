@@ -839,14 +839,16 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
                 heuristic -= 0.4;
             }
         }
-    } else if (!state.ball.isHeld && state.ball.isOnPitch()) {
-        heuristic -= 0.1;  // loose ball is bad
+    } else if (const Position loose = looseBallSquare(state); loose.isOnPitch()) {
+        // Míč ve vzduchu při Blitz! (uživatel 02.10. #3): jen blízkost k místu dopadu, bez
+        // postihu za volný míč — ten patří až míči, který opravdu leží.
+        if (!state.kickoffBallInAir) heuristic -= 0.1;  // loose ball is bad
 
         // Bonus for having a player near the loose ball (quick pickup potential)
         int nearestDist = 999;
         state.forEachOnPitch(perspective, [&](const Player& p) {
             if (p.state != PlayerState::STANDING) return;
-            int d = p.position.distanceTo(state.ball.position);
+            int d = p.position.distanceTo(loose);
             if (d < nearestDist) nearestDist = d;
         });
         if (nearestDist <= 2) heuristic += 0.08;

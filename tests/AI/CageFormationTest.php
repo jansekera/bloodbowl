@@ -437,8 +437,13 @@ final class CageFormationTest extends TestCase
                 $this->assertGreaterThan(
                     1,
                     max(abs($rx - $sx), abs($ry - $sy)),
-                    sprintf('roh (%d,%d) cílového pole (%d,%d) má soupeře vedle sebe',
-                        $rx, $ry, $decision['params']['x'], $decision['params']['y']),
+                    sprintf(
+                        'roh (%d,%d) cílového pole (%d,%d) má soupeře vedle sebe',
+                        $rx,
+                        $ry,
+                        $decision['params']['x'],
+                        $decision['params']['y'],
+                    ),
                 );
             }
         }
