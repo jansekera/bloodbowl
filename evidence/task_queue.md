@@ -746,6 +746,11 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 
 ## ⭐⭐⭐⭐⭐ PRIORITA OD 03.10. — uživatel: *„prioritu dej novým úkolům po dokončení zápasu“*
 Živá partie 02.–03.10. dohrána (2:0). **Napřed úkoly z partie, teprve pak pořadí z 01.10. níž** (kontroly Brasty → bezpečnost → simplify → pravidlové).
+**⭐⭐⭐⭐⭐⭐ POŘADÍ UPŘESNĚNO 03.10. odpoledne — uživatel:** *„nachystej toto jako nej prioritu, ale zatím s tím nezačínej — pak bude tedy nejvyšší priorita to nachystat a druhá to vyzkoušet na naší hře a pak ostatní úkoly“*
+1. **NACHYSTAT režim „AI plánuje tah → Claude vyhodnotí → návrh opravy AI“** (P146; schváleno „1 ano“): vazba `ai_choose_action` s vlastní kostkou politiky · příkaz partie „tah AI“ nanečisto · nástroj „kontrola tahu“ · nález + návrh opravy (opravu AI před implementací představit). ⛔ **NEZAČÍNAT, dokud uživatel neřekne.**
+2. **VYZKOUŠET na naší hře** (partie 02.–03.10.; ⚠️ její log se přehrává jen na enginu `4e142640`, dnešní `main` má jiný výkop ⇒ buď build starého stavu s novou vazbou, nebo pozice přenést jinak — vyřešit při přípravě).
+3. **Ostatní úkoly** — tabulka níž od kroku 2 (P130 A, P145, P128, P131–P144, dluhy), pak pořadí z 01.10.
+
 | krok | položky | pozn. |
 |---|---|---|
 | 1 ✅ 03.10. | **sloučit větev výkopu** (`worktree-agent-ac466507256f9769d`) **+ větev P100** (`worktree-agent-ab9e76619c4f0a8b2`) do `main`, `make check-all` | ✅ sloučeno `37d404cd` + `8c45effc`, `make check-all` zelené (PHP 1301, C++ 848, Python 202, front, e2e, 6 her) ⇒ **nová báze měření**; log partie se přehrává jen na enginu `4e142640` |
