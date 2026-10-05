@@ -14,6 +14,11 @@ Příkazy:
   push <x> <y>             -- příští odtlačení na toto pole (volba kouče; jinak engine)
   follow <0|1>             -- příští follow-up ano/ne (volba kouče; jinak engine)
   blitzfrom <x> <y>        -- příští blitz blokuje z tohoto pole (volba kouče; jinak engine)
+  tahai [greedy|macro] [semínko] [iterace]
+                           -- P146: jak by tah odehrála AI — NANEČISTO (kopie stavu, vlastní kostky),
+                              výpis akcí + deska po tahu + kontrola tahu; stav partie se nemění
+  kontrola [posledni]      -- P146: kontrola rozehraného tahu týmu na tahu (nosič, kraj, kontakt, …);
+                              `posledni` = poslední DOKONČENÝ tah (i ten, který skončil turnoverem)
 
 Každý příkaz měnící stav se zapisuje do prikazy.log; po restartu serveru se
 log přehraje (stejné semínko ⇒ stejné kostky ⇒ stejná partie).
@@ -25,6 +30,7 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "engine", "build"))
 import bb_engine as bb  # noqa: E402
+import bb_kontrola_tahu as kt  # noqa: E402
 
 DIR = os.path.join(os.path.dirname(__file__), "evidence", "play_20261002")
 os.makedirs(DIR, exist_ok=True)
@@ -275,7 +281,22 @@ def main():
         with open(LOG) as f:
             replay = [l.strip() for l in f if l.strip()]
 
+    # P146: začátek rozehraného tahu a jeho akce (pro příkaz `kontrola`)
+    tah_klic, tah_start, tah_kroky = None, None, []
+    posledni_tah = None   # (start, konec, strana, kroky) posledního dokončeného tahu
+
     while True:
+        # skóre v klíči: po TD a výkopu začíná nový drive, i když se číslo kola nezmění
+        klic = (state.active_team, state.home_team.turn_number, state.away_team.turn_number, state.half,
+                state.home_team.score, state.away_team.score)
+        # tahem se rozumí jen fáze PLAY: rozestavení a výkop po TD / o poločase (`vykop`, `polocas`)
+        # nesmí přepsat tah, ve kterém padl TD (druhé review 05.10., S2)
+        if klic != tah_klic:
+            if tah_start is not None and tah_start.phase == bb.GamePhase.PLAY:
+                # konec tahu = stav hned po akci, která ho ukončila (i TD — deska před rozestavením)
+                posledni_tah = (tah_start, state.clone(), tah_start.active_team, tah_kroky)
+            tah_klic, tah_kroky = klic, []
+            tah_start = state.clone() if state.phase == bb.GamePhase.PLAY else None
         if replay:
             line = replay.pop(0)
         elif not os.path.exists(CMD):
@@ -349,11 +370,44 @@ def main():
                 a = last_actions[idx]
                 r, events = bb.execute_action_logged(state, a, dice)
                 bb.clear_manual_block_choices()   # volba platí jen pro tuto akci
+                tah_kroky.append({"action": a, "turnover": r.turnover})
                 result_lines.append(f"provedeno: {action_str(a)}")
                 for e in events:
                     result_lines.append("   " + event_str(e))
                 result_lines.append(f"vysledek: turnover={r.turnover}")
                 result_lines.append(board(state))
+            elif cmd == "tahai":
+                # tahai [greedy|macro] [semínko] [iterace] — první číslo bez jména AI = semínko
+                args = parts[1:]
+                ai = "macro_mcts"
+                if args and args[0] in ("greedy", "macro"):
+                    ai = "greedy" if args.pop(0) == "greedy" else "macro_mcts"
+                sd = int(args[0]) if len(args) > 0 else 1
+                it = int(args[1]) if len(args) > 1 else 50
+                kroky, po, hotovo = kt.plan_tahu(state, ai=ai, seed=sd, mcts_iterations=it)
+                result_lines.append(f"=== TAH AI NANEČISTO ({ai}, semínko {sd}, {it} iterací) — partie se nemění ===")
+                if not hotovo:
+                    result_lines.append("⚠️ plán narazil na limit akcí, tah NENÍ dokončený")
+                for k in kroky:
+                    result_lines.append("  " + kt.popis_kroku(k))
+                    for e in k["events"]:
+                        result_lines.append("     " + event_str(e))
+                result_lines.append(board(po))
+                result_lines.append("--- kontrola tahu ---")
+                result_lines += kt.kontrola_tahu(state, po, state.active_team, kroky)
+            elif cmd == "kontrola" and len(parts) > 1 and parts[1] == "posledni":
+                if posledni_tah is None:
+                    result_lines.append("zatím žádný dokončený tah")
+                else:
+                    st0, st1, strana, kr = posledni_tah
+                    result_lines.append(f"--- kontrola posledního dokončeného tahu ({strana}) ---")
+                    result_lines += kt.kontrola_tahu(st0, st1, strana, kr)
+            elif cmd == "kontrola":
+                result_lines.append(f"--- kontrola rozehraného tahu ({state.active_team}) ---")
+                if tah_start is None:
+                    result_lines.append("teď neběží žádný tah (TD / rozestavení) — zkus `kontrola posledni`")
+                else:
+                    result_lines += kt.kontrola_tahu(tah_start, state, state.active_team, tah_kroky)
             else:
                 result_lines.append(f"neznamy prikaz: {line}")
         except Exception as e:

@@ -130,4 +130,26 @@ void setManualNoTackle(bool noTackle);
 Position takeManualBlitzSquare();   // přečte a smaže
 void clearManualBlockChoices();
 
+// P146 (05.10.2026): AI plánuje tah nanečisto, zatímco kouč může mít volbu nachystanou pro svou
+// příští akci. Plán ji nesmí spotřebovat ani smazat (živá partie by se rozešla s přehráním logu).
+struct ManualBlockChoices {
+    Position push{-1, -1};
+    int followUp = -1;
+    Position blitzSquare{-1, -1};
+    int face = -1;
+    bool noTackle = false;
+};
+ManualBlockChoices saveManualBlockChoices();
+void restoreManualBlockChoices(const ManualBlockChoices& c);
+
+// Po dobu života: volby kouče odložené stranou (AI je nevidí), na konci vrácené — i při výjimce.
+class ManualBlockChoicesSetAside {
+    ManualBlockChoices saved_;
+public:
+    ManualBlockChoicesSetAside() : saved_(saveManualBlockChoices()) { clearManualBlockChoices(); }
+    ~ManualBlockChoicesSetAside() { restoreManualBlockChoices(saved_); }
+    ManualBlockChoicesSetAside(const ManualBlockChoicesSetAside&) = delete;
+    ManualBlockChoicesSetAside& operator=(const ManualBlockChoicesSetAside&) = delete;
+};
+
 } // namespace bb

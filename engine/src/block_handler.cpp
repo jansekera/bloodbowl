@@ -260,12 +260,18 @@ Position takeManualBlitzSquare() {
     g_manualBlitzSquare = {-1, -1};
     return p;
 }
+ManualBlockChoices saveManualBlockChoices() {
+    return {g_manualPush, g_manualFollowUp, g_manualBlitzSquare, g_manualFace, g_manualNoTackle};
+}
+void restoreManualBlockChoices(const ManualBlockChoices& c) {
+    g_manualPush = c.push;
+    g_manualFollowUp = c.followUp;
+    g_manualBlitzSquare = c.blitzSquare;
+    g_manualFace = c.face;
+    g_manualNoTackle = c.noTackle;
+}
 void clearManualBlockChoices() {
-    g_manualPush = {-1, -1};
-    g_manualFollowUp = -1;
-    g_manualBlitzSquare = {-1, -1};
-    g_manualFace = -1;
-    g_manualNoTackle = false;
+    restoreManualBlockChoices(ManualBlockChoices{});   // výchozí = „nezvoleno“, jen ve struct
 }
 
 static int choosePushSquare(const GameState& state, const Position* cand, int count,

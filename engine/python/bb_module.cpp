@@ -120,6 +120,13 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("used_blitz", &bb::Player::usedBlitz)
         .def_readwrite("has_acted", &bb::Player::hasActed)
         .def("has_skill", &bb::Player::hasSkill)
+        // SkillName v Pythonu není (výčet má desítky hodnot); číslo = pořadí v enums.h,
+        // jména si Python čte přímo z enums.h (P146 kontrola tahu: Frenzy, Guard).
+        .def("has_skill_index", [](const bb::Player& p, int k) {
+            if (k < 0 || k >= static_cast<int>(bb::SkillName::SKILL_COUNT))
+                throw py::index_error("číslo skillu mimo rozsah: " + std::to_string(k));
+            return p.hasSkill(static_cast<bb::SkillName>(k));
+        })
         .def("is_on_pitch", &bb::Player::isOnPitch)
         .def("can_act", &bb::Player::canAct);
 
@@ -128,7 +135,12 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("side", &bb::TeamState::side)
         .def_readwrite("score", &bb::TeamState::score)
         .def_readwrite("rerolls", &bb::TeamState::rerolls)
-        .def_readwrite("turn_number", &bb::TeamState::turnNumber);
+        .def_readwrite("turn_number", &bb::TeamState::turnNumber)
+        // P146 kontrola tahu: nevyužitý blitz / faul (ř. 429-430 Blitz a Pass, ř. 359-361 Hand-off a Foul: jednou za tah)
+        .def_readwrite("blitz_used_this_turn", &bb::TeamState::blitzUsedThisTurn)
+        .def_readwrite("pass_used_this_turn", &bb::TeamState::passUsedThisTurn)
+        .def_readwrite("hand_off_used_this_turn", &bb::TeamState::handOffUsedThisTurn)
+        .def_readwrite("foul_used_this_turn", &bb::TeamState::foulUsedThisTurn);
 
     // --- GameState ---
     py::class_<bb::GameState>(m, "GameState")
@@ -436,7 +448,8 @@ PYBIND11_MODULE(bb_engine, m) {
 
     // Živá partie (02.10.2026): totéž jako execute_action, navíc události s hody,
     // ať hráč vidí, co padlo. Jména podle GameEvent::Type (pořadí jako get_turn_logs).
-    m.def("execute_action_logged", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
+    // Události jako seznam slovníků — sdílí execute_action_logged a ai_plan_turn.
+    auto eventsToList = [](const std::vector<bb::GameEvent>& events) {
         static const char* names[] = {
             "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
             "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
@@ -444,9 +457,6 @@ PYBIND11_MODULE(bb_engine, m) {
             "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
             "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
             "BLOODLUST_FEED"};
-        std::vector<bb::GameEvent> events;
-        bb::DiceRollerBase& base = dice;
-        bb::ActionResult r = bb::executeAction(state, action, base, &events);
         py::list ev;
         for (const auto& e : events) {
             py::dict d;
@@ -461,8 +471,106 @@ PYBIND11_MODULE(bb_engine, m) {
             d["to"] = py::make_tuple(e.to.x, e.to.y);
             ev.append(d);
         }
-        return py::make_tuple(r, ev);
+        return ev;
+    };
+
+    m.def("execute_action_logged", [eventsToList](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
+        std::vector<bb::GameEvent> events;
+        bb::DiceRollerBase& base = dice;
+        bb::ActionResult r = bb::executeAction(state, action, base, &events);
+        return py::make_tuple(r, eventsToList(events));
     });
+
+    // P146 (05.10.2026): „AI plánuje tah“ — jak by AI odehrála celý tah týmu, který je na tahu.
+    // Běží NANEČISTO na kopii stavu a s VLASTNÍMI kostkami (politika i hody), takže se nedotkne
+    // proudu kostek živé partie. AI je nastavená jako vyhodnocovací cesta simulate_game (výš):
+    // explorationC 1.0, bez Dirichletova šumu, politika z vah, když ji soubor obsahuje (zapíná
+    // heuristické priory v macro_mcts.cpp i při policyBlend 0), vfBlend / riskDeferral jako parametry.
+    // ⚠️ Druhá kopie téže konfigurace (první je makePolicy v simulate_game) — sjednotit = kniha P147.
+    // Ruční volby kouče se po dobu plánu odloží stranou a pak vrátí (ManualBlockChoicesSetAside).
+    struct TurnPlanner {
+        bb::DiceRoller policyDice;
+        std::unique_ptr<bb::ValueFunction> vf;
+        std::unique_ptr<bb::PolicyNetwork> policyNet;
+        std::unique_ptr<bb::MacroMCTSPolicy> macro;
+        bb::ActionSelector pick;
+        TurnPlanner(const std::string& ai, uint32_t seed, const std::string& weightsPath, int mctsIterations,
+                    float vfBlend, float policyBlend, bool riskDeferral)
+            : policyDice(seed) {
+            if (!weightsPath.empty()) {
+                vf = bb::loadValueFunction(weightsPath);
+                if (!vf) throw std::invalid_argument("váhy se nepodařilo načíst: " + weightsPath);
+                policyNet = bb::loadPolicyNetworkFromFile(weightsPath);
+            }
+            if (ai == "greedy") {
+                pick = [this](const bb::GameState& s) { return bb::greedyPolicy(s, policyDice); };
+            } else if (ai == "macro_mcts") {
+                if (mctsIterations <= 0) throw std::invalid_argument("macro_mcts potřebuje mcts_iterations > 0");
+                bb::MCTSConfig cfg;
+                cfg.maxIterations = mctsIterations;
+                cfg.timeBudgetMs = 0;
+                cfg.explorationC = 1.0;
+                cfg.dirichletAlpha = 0.0f;
+                cfg.vfBlend = vfBlend;
+                cfg.riskDeferral = riskDeferral;
+                if (policyNet) {
+                    cfg.policy = policyNet.get();
+                    cfg.policyBlend = policyBlend;
+                }
+                macro = std::make_unique<bb::MacroMCTSPolicy>(vf.get(), cfg, seed);
+                pick = [this](const bb::GameState& s) { return (*macro)(s); };
+            } else {
+                throw std::invalid_argument("ai musí být greedy nebo macro_mcts, ne: " + ai);
+            }
+        }
+        // `pick` drží `this` ⇒ objekt se nesmí kopírovat ani přesouvat
+        TurnPlanner(const TurnPlanner&) = delete;
+        TurnPlanner(TurnPlanner&&) = delete;
+    };
+
+    m.def("ai_choose_action", [](const bb::GameState& state, const std::string& ai, uint32_t seed,
+                                 const std::string& weightsPath, int mctsIterations,
+                                 float vfBlend, float policyBlend, bool riskDeferral) {
+        bb::ManualBlockChoicesSetAside asideChoices;
+        TurnPlanner planner(ai, seed, weightsPath, mctsIterations, vfBlend, policyBlend, riskDeferral);
+        return planner.pick(state);
+    }, py::arg("state"), py::arg("ai") = "macro_mcts", py::arg("seed") = 1,
+       py::arg("weights_path") = "", py::arg("mcts_iterations") = 50,
+       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = false);
+
+    // Vrací (kroky, stav_po_tahu, dokončeno). dokončeno = False, když došlo `max_actions`
+    // dřív, než tah skončil (END_TURN / turnover / konec fáze).
+    m.def("ai_plan_turn", [eventsToList](const bb::GameState& start, const std::string& ai, uint32_t seed,
+                                         const std::string& weightsPath, int mctsIterations, int maxActions,
+                                         float vfBlend, float policyBlend, bool riskDeferral) {
+        bb::ManualBlockChoicesSetAside asideChoices;
+        TurnPlanner planner(ai, seed, weightsPath, mctsIterations, vfBlend, policyBlend, riskDeferral);
+        bb::DiceRoller rollDice(seed ^ 0x5bd1e995u);   // hody nanečisto, nezávislé na kostkách politiky
+        bb::GameState s = start.clone();
+        const bb::TeamSide side = s.activeTeam;
+        const int turn = s.getTeamState(side).turnNumber;
+        auto tahBezi = [&] {
+            return s.phase == bb::GamePhase::PLAY && s.activeTeam == side && s.getTeamState(side).turnNumber == turn;
+        };
+        if (!tahBezi()) throw std::invalid_argument("tah AI jde plánovat jen ve fázi PLAY (po TD napřed výkop)");
+        py::list steps;
+        bool hotovo = false;
+        for (int n = 0; n < maxActions && tahBezi(); ++n) {
+            const bb::Action a = planner.pick(s);   // v PLAY nabídka vždy obsahuje END_TURN
+            std::vector<bb::GameEvent> events;
+            const bb::ActionResult r = bb::executeAction(s, a, rollDice, &events);
+            py::dict step;
+            step["action"] = a;
+            step["events"] = eventsToList(events);
+            step["turnover"] = r.turnover;
+            steps.append(step);
+            if (a.type == bb::ActionType::END_TURN || r.turnover) { hotovo = true; break; }
+        }
+        if (!tahBezi()) hotovo = true;
+        return py::make_tuple(steps, s, hotovo);
+    }, py::arg("state"), py::arg("ai") = "macro_mcts", py::arg("seed") = 1,
+       py::arg("weights_path") = "", py::arg("mcts_iterations") = 50, py::arg("max_actions") = 200,
+       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = false);
 
     // KO recovery (package G) needs a dice source; the Python binding keeps
     // its old 4-argument shape and passes nullptr, which simply means KO'd
