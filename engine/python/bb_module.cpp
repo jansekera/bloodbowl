@@ -529,6 +529,9 @@ PYBIND11_MODULE(bb_engine, m) {
     };
 
     // P149: strop na úhyb 4+ a horší v makrech BLITZ / REPOSITION — vypínač jen pro měření před / po.
+    // P149 bod 2: hodnota nevyužité aktivace v listovém odhadu (0 = vypnuto, jen pro měření).
+    m.def("set_activation_value", [](double v) { bb::setActivationValue(v); });
+    m.def("activation_value", []() { return bb::activationValue(); });
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);
@@ -597,6 +600,9 @@ PYBIND11_MODULE(bb_engine, m) {
                     children.append(cd);
                 }
                 md["children"] = children;
+                // listový odhad stavu PŘED makrem (z pohledu týmu na tahu) — s "leaf" kroku níž
+                // dává zisk makra v jednotkách, ve kterých hledání rozhoduje (P149 bod 2)
+                md["leaf_before"] = planner.macro->evaluateLeaf(s, side);
                 step["macro"] = md;
             }
             std::vector<bb::GameEvent> events;
@@ -604,6 +610,7 @@ PYBIND11_MODULE(bb_engine, m) {
             step["action"] = a;
             step["events"] = eventsToList(events);
             step["turnover"] = r.turnover;
+            if (planner.macro) step["leaf"] = planner.macro->evaluateLeaf(s, side);   // odhad PO akci
             steps.append(step);
             if (a.type == bb::ActionType::END_TURN || r.turnover) { hotovo = true; break; }
         }

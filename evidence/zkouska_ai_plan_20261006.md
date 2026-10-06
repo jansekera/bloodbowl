@@ -222,6 +222,37 @@ Zbylé úhyby na 4+ a horší u trpaslíků: PICKUP 13 (mimo schválený rozsah)
 - Cena konečné verze: plán tahu na pozicích z partie 184 → 392 s (kopie stavu a hledání na každý krok doběhu blitzu) ⇒ kniha P157 (f).
 
 
+## Oprava P149 bod 2: cena turnoveru v hledání (06.10. noc)
+
+Schváleno uživatelem („2 hned po bodu 1“, „pokračuj bodem 2“). Listový odhad hledání přičítá straně na tahu hodnotu každé aktivace,
+kterou v tomto tahu ještě má; turnover i END_TURN o ni přijdou tím, že tah skončí. Zapnuto ve výchozím stavu.
+
+**Hodnota jedné aktivace je změřená, ne zvolená:** průměrný zisk listového odhadu na jedno úspěšné makro mimo zvednutí míče,
+vlastní hry AI, 3 dvojice ras (dwarf × wood-elf, human × orc, skaven × dwarf), n = 1 632 ⇒ **+0,024**
+(REPOSITION +0,014, BLOCK +0,023, BLITZ +0,065, ADVANCE +0,039; zvednutí míče +0,271 se nepočítá). Makro zakončené turnoverem: průměr −0,048.
+
+**Párově na pozicích z partie** (strop na úhyb zapnutý v obou ramenech):
+
+| | iterací | plánů | turnover | před turnoverem hrálo | aktivováno | konec tahu s ≥ 5 nehrajícími | první rána jako kolikátá aktivace | TD |
+|---|---|---|---|---|---|---|---|---|
+| trpaslíci, bez ceny | 50 | 160 | 16 % | 3,4 | 48 % | 30 z 96 | 2,2 | 39 |
+| trpaslíci, s cenou | 50 | 160 | 12 % | 3,6 | 52 % | 18 ze 101 | 2,3 | 39 |
+| elfové, bez ceny | 50 | 160 | 26 % | 3,7 | 70 % | 4 ze 119 | 2,5 | 0 |
+| elfové, s cenou | 50 | 160 | 28 % | 4,0 | 70 % | 2 ze 116 | 2,6 | 0 |
+| trpaslíci, bez ceny | 200 | 48 | 21 % | 3,6 | 51 % | 4 z 26 | 2,2 | 12 |
+| trpaslíci, s cenou | 200 | 48 | 12 % | 5,5 | 58 % | 4 ze 30 | 2,5 | 12 |
+| elfové, bez ceny | 200 | 48 | 31 % | 3,7 | 69 % | 1 ze 33 | 2,5 | 0 |
+| elfové, s cenou | 200 | 48 | 29 % | 4,1 | 71 % | 0 ze 34 | 2,4 | 0 |
+
+**Celé první poločasy na `main`** (40 + 40, nepárové, strop zapnutý v obou): turnover trpaslíci 33 → 29 %, elfové 47 → 47 %; TD trpaslíci 17 → 18, elfové 9 → 10.
+
+- Účinek je malý: u trpaslíků ubylo předčasných konců tahu (30 → 18) a turnoverů (16 → 12 %), u elfů se nezměnilo nic měřitelného.
+- **Pořadí „bezpečné napřed, riskantní nakonec“ cena nezařídila** — první rána padá pořád jako 2.–3. aktivace. Důvod: hledání porovnává stav po JEDNOM makru.
+  Blitz (zisk +0,065) i po odečtení ceny rizika vychází líp než bezpečný přesun (+0,014), a že jde zahrát obojí v lepším pořadí, vidí až hledání do hloubky 2,
+  na kterou 50 ani 200 iterací při 8–10 dětech kořene nestačí. Pořadí je práce pro odklad riskantních akcí (kniha P159) nebo plán celého tahu.
+- Vedlejší nález: test `K6StillEndsTheTurnWhenNothingCanBeDone` stojí na hodnotové funkci, která dává listu skoro přesně strop odhadu 1,0; s cenou se rozdíl mezi dětmi ztratil
+  a hledání zvolilo END_TURN rovnou (správná akce, jiná cesta). Test běží bez ceny, důvod je v něm zapsaný.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

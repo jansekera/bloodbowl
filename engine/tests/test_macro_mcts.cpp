@@ -1185,6 +1185,16 @@ TEST(MacroMCTSPolicy, K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn) {
 
 TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
     // ⛔ Druhá polovina páru: oprava NESMÍ vyrábět akci tam, kde žádná není.
+    // P149 bod 2 (06.10.2026): tenhle přípravek stojí na hodnotové funkci, která dává listu
+    // skoro přesně 1,0 (strop odhadu). Hodnota nevyužitých aktivací ho dorazí na strop, rozdíl
+    // mezi dětmi zmizí (Q 0,4871 vs 0,4870) a hledání zvolí END_TURN rovnou — správná akce,
+    // ale měřidla K6 níž by hlídala cestu, kterou hra nešla. Test míří na ZÁCHRANU K6,
+    // ne na listový odhad ⇒ běží bez té hodnoty.
+    struct NoActivationValue {
+        double saved = activationValue();
+        NoActivationValue() { setActivationValue(0.0); }
+        ~NoActivationValue() { setActivationValue(saved); }
+    } noActivationValue;
     GameState state = makeK6WalledCarrier(/*spareMover=*/false);
     LinearValueFunction vf = k6StandStillVf();
     MCTSConfig cfg = k6Config();
@@ -1214,4 +1224,72 @@ TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
     EXPECT_EQ(k6[1], 1) << "měřidlo: zahrané makro se rozbalilo do prázdna";
     EXPECT_EQ(k6[2], 0) << "měřidlo: zachránit nebylo čím";
     EXPECT_EQ(k6[3], 1) << "měřidlo: a kolo tedy skončilo právem";
+}
+
+// ---------------------------------------------------------------------------
+// P149 bod 2 (06.10.2026): cena turnoveru v hledání. Listový odhad přičítá hledající
+// straně hodnotu každé aktivace, kterou v tomto tahu ještě má; turnover i END_TURN
+// o ni přijdou tím, že tah skončí.
+// ---------------------------------------------------------------------------
+namespace {
+struct ActivationValueGuard {   // vrátí výchozí hodnotu i po neúspěšném testu
+    double saved = activationValue();
+    ~ActivationValueGuard() { setActivationValue(saved); }
+};
+}  // namespace
+
+TEST(TurnoverCost, LeafCreditsEveryActivationStillAvailable) {
+    ActivationValueGuard guard;
+    MCTSConfig config;
+    config.timeBudgetMs = 0;
+    config.maxIterations = 10;
+    MacroMCTSSearch search(nullptr, config, 42);
+
+    GameState state = makePlayState();
+    const TeamSide me = state.activeTeam;
+    const int avail = activationsStillAvailable(state, me);
+    ASSERT_GE(avail, 3);
+
+    setActivationValue(0.0);
+    const double plain = search.evaluateLeaf(state, me);
+    setActivationValue(0.024);
+    const double credited = search.evaluateLeaf(state, me);
+    EXPECT_NEAR(credited - plain, 0.024 * avail, 1e-9);
+
+    // hráč, který už hrál, se nepočítá
+    GameState oneActed = state.clone();
+    bool marked = false;
+    oneActed.forEachOnPitch(me, [&](const Player& p) {
+        if (!marked && !p.hasActed && !p.hasMoved && p.canAct()) {
+            oneActed.getPlayer(p.id).hasActed = true;
+            marked = true;
+        }
+    });
+    ASSERT_TRUE(marked);
+    EXPECT_NEAR(credited - search.evaluateLeaf(oneActed, me), 0.024, 1e-9);
+}
+
+TEST(TurnoverCost, NothingIsCreditedOnceTheTurnIsOver) {
+    ActivationValueGuard guard;
+    MCTSConfig config;
+    config.timeBudgetMs = 0;
+    config.maxIterations = 10;
+    MacroMCTSSearch search(nullptr, config, 42);
+
+    GameState state = makePlayState();
+    const TeamSide me = state.activeTeam;
+    // týž stav, ale na tahu je soupeř (po END_TURN nebo po turnoveru): naše nevyužité
+    // aktivace propadly, soupeřovy se z našeho pohledu nepřičítají ani neodečítají
+    GameState over = state.clone();
+    over.activeTeam = opponent(me);
+
+    setActivationValue(0.0);
+    const double plain = search.evaluateLeaf(over, me);
+    setActivationValue(0.024);
+    EXPECT_NEAR(search.evaluateLeaf(over, me), plain, 1e-9);
+}
+
+TEST(TurnoverCost, DefaultIsTheMeasuredValueAndItIsOn) {
+    // „Hotovo“ = zapnuto ve výchozím stavu (06.10.: odklad rizika byl napsaný a vypnutý).
+    EXPECT_NEAR(activationValue(), 0.024, 1e-12);
 }

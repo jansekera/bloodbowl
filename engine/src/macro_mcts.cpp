@@ -728,6 +728,25 @@ double MacroMCTSSearch::greedyLookaheadBonus(const GameState& leafState, TeamSid
     return std::clamp(progress, -0.10, 0.20) * 0.5;      // bounded, modest weight
 }
 
+// ⭐⭐⭐ P149 bod 2 (06.10.2026, uživatel: „2 hned po bodu 1“): CENA TURNOVERU V HLEDÁNÍ.
+//   Listový odhad neviděl, že po turnoveru (i po END_TURN) přijde tým o aktivace všech, kdo
+//   ještě nehráli: „skončit tah“ vycházelo HŮŘ než riskantní blitz (elfové -0,497 proti
+//   -0,379), takže neúspěch nic nestál a riskantní makro bylo prvním rozhodnutím tahu
+//   v 87 ze 174 případů (evidence/zkouska_ai_plan_20261006.md, „Příčiny“ A).
+//   ⇒ Stav, kde je hledající strana ještě na tahu, dostane za každého hráče, který ještě může
+//   začít aktivaci, hodnotu jedné aktivace. Turnover i END_TURN o ni přijdou samy tím, že tah
+//   skončí. Riskantní akce tak musí vynést o p × (zbývající aktivace) × hodnota víc než
+//   bezpečná — a tím se sama odsouvá na konec tahu, kde už není co ztratit.
+//   Hodnota NENÍ ladicí konstanta: průměrný zisk listového odhadu na jedno ÚSPĚŠNÉ makro
+//   mimo zvednutí míče, změřeno 06.10. ve vlastních hrách AI (3 dvojice ras, n = 1 632):
+//   +0,024 (REPOSITION +0,014, BLOCK +0,023, BLITZ +0,065; zvednutí +0,271 se nepočítá —
+//   není to „další běžná aktivace“). Při změně listového odhadu přeměřit (kniha P149).
+//   Jen pro tah hledající strany: v tahu soupeře se nepřičítá nic (jako dosud).
+constexpr double kActivationValueMeasured = 0.024;
+thread_local double g_activationValue = kActivationValueMeasured;
+void setActivationValue(double v) { g_activationValue = v; }
+double activationValue() { return g_activationValue; }
+
 double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
     // Heuristic baseline — always computed (provides signal even with zero VF)
     const TeamState& my = state.getTeamState(perspective);
@@ -939,7 +958,12 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
         leaf = heuristic;
     }
 
-    return std::clamp(leaf + scoringBonus, -1.0, 1.0);
+    double unspent = 0.0;   // P149 bod 2: aktivace, které hledající strana v tomto tahu ještě má
+    if (state.phase == GamePhase::PLAY && state.activeTeam == perspective) {
+        unspent = g_activationValue * activationsStillAvailable(state, perspective);
+    }
+
+    return std::clamp(leaf + scoringBonus + unspent, -1.0, 1.0);
 }
 
 void MacroMCTSSearch::backpropagate(MacroMCTSNode* node, double value) {

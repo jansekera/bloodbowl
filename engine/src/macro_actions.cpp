@@ -64,17 +64,23 @@ void takeDodgeCapStops(long* out2) {
     for (int i = 0; i < 2; ++i) { out2[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
 }
 
+// Kolik hráčů strany v tomto tahu ještě může začít aktivaci (stojící i ležící, kdo ještě
+// nehrál ani se nepohnul). Jedno místo pro strop na úhyb i pro cenu turnoveru v hledání.
+int activationsStillAvailable(const GameState& state, TeamSide side, int excludePlayerId) {
+    int n = 0;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id != excludePlayerId && !p.hasActed && !p.hasMoved && p.canAct()) ++n;
+    });
+    return n;
+}
+
 // Cíl hodu, od kterého se úhyb nehraje (4), nebo 0 = strop se na tuhle aktivaci nevztahuje.
 static int dodgeCapFor(const GameState& state, const Player& mover, bool aboutTheBall) {
     if (!g_dodgeCapEnabled) return 0;
-    // Poslední aktivace = nikdo další už hrát nebude. ⛔ Ne přes `teammatesStillToAct`: hráč,
+    // Poslední aktivace = nikdo další už hrát nebude (activationsStillAvailable). ⛔ Ne přes `teammatesStillToAct`: hráč,
     // který se právě přesunul, má `hasActed` ještě false (uzavře mu ho až první akce dalšího
     // hráče, action_resolver.cpp), takže by výjimka po přesunu spoluhráče nenastala (review H2).
-    int stillToAct = 0;
-    state.forEachOnPitch(mover.teamSide, [&](const Player& mate) {
-        if (mate.id != mover.id && !mate.hasActed && !mate.hasMoved && mate.canAct()) ++stillToAct;
-    });
-    if (stillToAct == 0) return 0;
+    if (activationsStillAvailable(state, mover.teamSide, mover.id) == 0) return 0;
     if (aboutTheBall && state.getTeamState(mover.teamSide).turnNumber >= 8) return 0;
     return kDodgeCapTarget;
 }

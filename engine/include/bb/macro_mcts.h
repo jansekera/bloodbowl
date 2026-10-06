@@ -45,6 +45,11 @@ long takeCarrierBlockPriorEvalsInSearch();
 constexpr int kMacroNoopSlots = 4 + static_cast<int>(MacroType::MACRO_COUNT);
 void takeMacroNoopStats(long* out);   // kMacroNoopSlots cisel
 
+// P149 bod 2 (06.10.2026): hodnota jedné nevyužité aktivace v listovém odhadu hledání
+// (cena turnoveru). Výchozí = změřených 0,024; 0 = vypnuto — jen pro měření před / po.
+void setActivationValue(double v);
+double activationValue();
+
 class CageController;     // bb/one_cage.h (P126, jedna klec)
 
 struct MacroMCTSNode {
@@ -181,6 +186,10 @@ public:
     double lastBestValue() const { return search_.lastBestValue(); }
     // P149: poslední rozhodnutí o makru a kolik jich už bylo (roste jen při novém rozhodnutí,
     // ne když se přehrává další akce téhož plánu).
+    // Ohodnocení stavu tímtéž listovým odhadem, jaký používá hledání (diagnostika P149 bod 2).
+    double evaluateLeaf(const GameState& state, TeamSide perspective) {
+        return search_.evaluateLeaf(state, perspective);
+    }
     const MacroDecisionInfo& lastDecision() const { return lastDecision_; }
     int decisionCount() const { return decisionCount_; }
     // Kolik plánů klece (po fázích tahu) hráč za život převzal.
