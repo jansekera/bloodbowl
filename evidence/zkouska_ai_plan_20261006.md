@@ -118,6 +118,46 @@ Plány, které AI ukončila sama (bez turnoveru a bez TD):
 - Blitz (P134/P135): Claude ho nechal ležet ve 44 % tahů, AI skoro nikdy — ale 245 z 576 elfích úhybů AI padlo právě při blitzu (N1).
 - Faul: AI fauluje, člověk v partii ani jednou; 16 turnoverů AI přišlo z faulu.
 
+## Příčiny (06.10. večer) — diagnostika „proč tohle makro“
+
+Do `MacroMCTSPolicy` přibyl záznam posledního rozhodnutí (`lastDecision()`: makro, kdo rozhodl — klec / hledání / záchrana K6 /
+nouzové greedy, děti kořene s návštěvami, priorem a Q); vazba `ai_plan_turn` ho přikládá ke kroku plánu jako klíč `macro`.
+Kontrola, že diagnostika nemění hru: stejná semínka ⇒ stejné turnovery (trpaslíci 97, elfové 178).
+
+### A. Odkud jsou úhyby na 4+ a horší (P149)
+
+| makro (rozhodlo hledání) | elfové | trpaslíci |
+|---|---|---|
+| BLITZ | 104 | 50 |
+| REPOSITION (+ záchrana K6) | 82 + 9 | 41 + 7 |
+| PICKUP | 3 | 11 |
+| BLITZ_AND_SCORE | 0 | 8 |
+
+- Jsou to úhyby **do** zón: elfové BLITZ do 3 zón 69×, do 2 zón 35×; REPOSITION do 3 zón 63×, do 4 zón 14×. Trpaslíci BLITZ do 1 zóny 35×.
+- Turnovery podle makra: elfové BLITZ 39 %, REPOSITION 31 + 6 %, BLOCK 10 %; trpaslíci BLITZ 29 %, REPOSITION 23 + 5 %, BLOCK 21 %.
+- Riskantní makro je **prvním rozhodnutím tahu** v 87 ze 174 případů (elfové) a ve 32 z 93 (trpaslíci).
+- Jak ho hledání vidělo (50 iterací, průměrně 8–10 dětí kořene):
+
+| | Q vybraného riskantního | Q nejlepšího jiného | Q END_TURN |
+|---|---|---|---|
+| trpaslíci (n = 93) | +0,475 | +0,481 | +0,402 |
+| elfové (n = 174) | −0,379 | −0,377 | −0,497 |
+
+- Vybrané makro mělo méně než polovinu návštěv ve 254 z 267 případů; dítě s vyšším Q existovalo ve 154.
+- ⇒ Dvě příčiny: (1) nabídka BLITZ a REPOSITION obsahuje cesty přes úhyby do 2–4 zón bez stropu rizika;
+  (2) hledání neúspěch nepočítá jako ztrátu — „skončit tah“ hodnotí hůř než riskantní akci, protože ztracené aktivace zbytku týmu v ohodnocení nejsou,
+  a při 50 iteracích se děti liší o tisíciny, takže rozhoduje prior.
+
+### B. Proč tah končí s nepohnutými hráči (P150)
+
+- Dobrovolných konců tahu u trpaslíků 148, z toho 73 s pěti a více neaktivovanými hráči (39× s devíti). U elfů 9 ze 132.
+- Kdo rozhoduje (počet rozhodnutí ve 20 plánech): tahy 1, 3, 26 — klec 88 / 100 / 100; tahy 5, 7, 9, 28 — klec 0, vše hledání.
+- Tah 5 s `BB_CAGE_DEBUG=1`: `[cage DICEY] leg 0/4 player=8 gfi=0 pto=0.938 ceil=0.020 target=(20,7)` — plánovač klece plán zahodil
+  (první roh by měl 94 % na turnover; cíl je 7 polí před nosičem). Tahy 9 a 28: plánovač odmítl beze stopy ve výpisu.
+- Po odmítnutí žádný náhradní postup není. Hledání pak typicky zahraje `ADVANCE nosič > END_TURN` (tah 5), `END_TURN` (tah 9), `BLITZ > END_TURN` (tah 28).
+- END_TURN vyhrává těsně: Q +0,671 proti +0,660 u nejlepšího jiného (lepší v 51 z 66), ač v nabídce byl REPOSITION (60 z 66), BLOCK (26), BLITZ (25).
+- ⇒ Otevřené: proč plánovač míří rohem na (20,7) a proč v tazích 9 a 28 mlčí. Teprve pak návrh (menší krok klece, přeskupení rohů podle P143).
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

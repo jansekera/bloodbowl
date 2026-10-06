@@ -72,6 +72,16 @@ struct MacroChildVisitInfo {
     Macro macro;
     int visits;
     float prior = 0.0f;  // post-renorm root prior (diagnostics/tests)
+    double q = 0.0;      // průměrná hodnota dítěte z pohledu hledající strany (diagnostika P149)
+};
+
+// P149 (06.10.2026): PROČ padla akce — které makro ji vyvolalo a kdo o něm rozhodl.
+// Jen diagnostika (vazba ai_plan_turn ji přikládá ke kroku plánu), hru neovlivňuje.
+struct MacroDecisionInfo {
+    enum class Source : uint8_t { CAGE, SEARCH, RESCUE, GREEDY_FALLBACK };
+    Macro macro;                 // makro, které se rozbalilo do plánu (po případné záchraně K6)
+    Source source = Source::SEARCH;
+    std::vector<MacroChildVisitInfo> children;   // děti kořene hledání; prázdné u makra klece
 };
 
 // Outcome of an open-loop replay toward a target node: `reached` is the
@@ -154,6 +164,9 @@ class MacroMCTSPolicy {
     // navrhne ona; jinak a po každé odchylce rozhoduje search().
     std::unique_ptr<CageController> cage_;
 
+    MacroDecisionInfo lastDecision_;
+    int decisionCount_ = 0;
+
 public:
     MacroMCTSPolicy(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
     ~MacroMCTSPolicy();  // out-of-line: unique_ptr nad dopředu deklarovanou klecí
@@ -166,6 +179,10 @@ public:
 
     int lastIterations() const { return search_.lastIterations(); }
     double lastBestValue() const { return search_.lastBestValue(); }
+    // P149: poslední rozhodnutí o makru a kolik jich už bylo (roste jen při novém rozhodnutí,
+    // ne když se přehrává další akce téhož plánu).
+    const MacroDecisionInfo& lastDecision() const { return lastDecision_; }
+    int decisionCount() const { return decisionCount_; }
     // Kolik plánů klece (po fázích tahu) hráč za život převzal.
     int cagePlansAdopted() const;
 };

@@ -555,11 +555,45 @@ PYBIND11_MODULE(bb_engine, m) {
         if (!tahBezi()) throw std::invalid_argument("tah AI jde plánovat jen ve fázi PLAY (po TD napřed výkop)");
         py::list steps;
         bool hotovo = false;
+        // P149: ke kroku, kterým začíná nové makro, přiložit, PROČ se hraje (makro, kdo rozhodl,
+        // jak hledání ocenilo nabídku). Jen macro_mcts; u greedy klíč "macro" chybí.
+        static const char* macroNames[] = {
+            "SCORE", "ADVANCE", "CAGE", "BLITZ", "BLOCK", "PICKUP", "PASS_ACTION", "FOUL", "REPOSITION",
+            "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE", "PASS_SCORE", "CHAIN_SCORE"};
+        static_assert(sizeof(macroNames) / sizeof(macroNames[0]) == static_cast<size_t>(bb::MacroType::MACRO_COUNT),
+                      "macroNames musí krýt celý výčet MacroType");
+        static const char* sourceNames[] = {"cage", "search", "rescue", "greedy_fallback"};
+        auto macroDict = [](const bb::Macro& m) {
+            py::dict d;
+            d["type"] = macroNames[static_cast<size_t>(m.type)];
+            d["player"] = m.playerId;
+            d["target"] = m.targetId;
+            d["target_pos"] = py::make_tuple(m.targetPos.x, m.targetPos.y);
+            d["gfi_allowance"] = m.gfiAllowance;
+            return d;
+        };
+        int decisionsSeen = 0;
         for (int n = 0; n < maxActions && tahBezi(); ++n) {
             const bb::Action a = planner.pick(s);   // v PLAY nabídka vždy obsahuje END_TURN
+            py::dict step;
+            if (planner.macro && planner.macro->decisionCount() != decisionsSeen) {
+                decisionsSeen = planner.macro->decisionCount();
+                const bb::MacroDecisionInfo& dec = planner.macro->lastDecision();
+                py::dict md = macroDict(dec.macro);
+                md["source"] = sourceNames[static_cast<size_t>(dec.source)];
+                py::list children;
+                for (const auto& c : dec.children) {
+                    py::dict cd = macroDict(c.macro);
+                    cd["visits"] = c.visits;
+                    cd["prior"] = c.prior;
+                    cd["q"] = c.q;
+                    children.append(cd);
+                }
+                md["children"] = children;
+                step["macro"] = md;
+            }
             std::vector<bb::GameEvent> events;
             const bb::ActionResult r = bb::executeAction(s, a, rollDice, &events);
-            py::dict step;
             step["action"] = a;
             step["events"] = eventsToList(events);
             step["turnover"] = r.turnover;

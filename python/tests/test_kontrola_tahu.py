@@ -363,3 +363,44 @@ def test_plan_je_deterministicky_a_zavisi_na_seminku():
                 for k in kt.plan_tahu(s, ai="macro_mcts", seed=sd)[0]]
     assert podpis(5) == podpis(5)
     assert any(podpis(5) != podpis(sd) for sd in (3, 4, 6, 8))
+
+
+# --- P149: ke kroku plánu je přiloženo, PROČ se hraje (makro, kdo rozhodl, jak ho hledání ocenilo) ---
+
+MAKRA = {"SCORE", "ADVANCE", "CAGE", "BLITZ", "BLOCK", "PICKUP", "PASS_ACTION", "FOUL", "REPOSITION",
+         "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE", "PASS_SCORE", "CHAIN_SCORE"}
+
+
+def test_plan_rika_proc_macro_mcts_ano_greedy_ne():
+    s, _ = nova_partie()
+    kroky = kt.plan_tahu(s, ai="macro_mcts", seed=5)[0]
+    assert "macro" in kroky[0], "první krok tahu vždy začíná novým rozhodnutím"
+    rozhodnuti = [k["macro"] for k in kroky if "macro" in k]
+    assert all(m["type"] in MAKRA and m["source"] in ("cage", "search", "rescue", "greedy_fallback")
+               for m in rozhodnuti)
+    # krok, kterým AI tah sama končí, nese rozhodnutí END_TURN (hráče makra nehlídáme: BLITZ a BLOCK
+    # ho v makru nemají, útočníka vybírá až rozbalení)
+    if kroky[-1]["action"].type == bb.ActionType.END_TURN and "macro" in kroky[-1]:
+        assert kroky[-1]["macro"]["type"] == "END_TURN"
+    assert all("macro" not in k for k in kt.plan_tahu(s, ai="greedy", seed=5)[0])
+
+
+def test_plan_rozhodnuti_hledani_ma_deti_s_navstevami_klec_ne():
+    s, _ = nova_partie()
+    videno, s_detmi = set(), 0
+    for sd in range(1, 6):
+        for k in kt.plan_tahu(s, ai="macro_mcts", seed=sd)[0]:
+            m = k.get("macro")
+            if m is None:
+                continue
+            videno.add(m["source"])
+            if m["source"] == "cage":
+                assert m["children"] == []
+            if m["source"] == "search" and m["children"]:   # jediné makro v nabídce ⇒ hledání neběží, dětí není
+                s_detmi += 1
+                assert len(m["children"]) >= 2
+                assert sum(c["visits"] for c in m["children"]) <= 50   # výchozích 50 iterací
+                assert all(c["visits"] > 0 and -1.5 <= c["q"] <= 1.5 for c in m["children"])
+    # pozitivní kontrola: test viděl oba zdroje i hledání s dětmi, jinak by větve výš nic nehlídaly
+    assert {"cage", "search"} <= videno
+    assert s_detmi > 0

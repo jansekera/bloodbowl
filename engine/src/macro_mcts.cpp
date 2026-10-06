@@ -291,7 +291,8 @@ Macro MacroMCTSSearch::search(const GameState& state) {
     lastChildVisits_.clear();
     for (auto& child : root.children) {
         if (child.visits > 0) {
-            lastChildVisits_.push_back({child.macro, child.visits, child.prior});
+            lastChildVisits_.push_back({child.macro, child.visits, child.prior,
+                                        child.totalValue / child.visits});
         }
     }
 
@@ -1042,6 +1043,8 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     if (!fromStagedPlan) {
         bestMacro = search_.search(state);
     }
+    MacroDecisionInfo::Source source =
+        fromStagedPlan ? MacroDecisionInfo::Source::CAGE : MacroDecisionInfo::Source::SEARCH;
 
     // Log decision if enabled (search-only: a staged-plan macro has no fresh
     // visit distribution -- lastChildVisits() would be stale)
@@ -1106,6 +1109,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         // staged plan and re-plan with the normal search.
         cage_->abandonTurn();
         bestMacro = search_.search(state);
+        source = MacroDecisionInfo::Source::SEARCH;
         planState = state.clone();
         expansion = greedyExpandMacro(planState, bestMacro, expansionDice_);
     }
@@ -1159,6 +1163,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
                 planState = std::move(trial);
                 expansion = std::move(alt);
                 ++g_k6Noop[2];
+                source = MacroDecisionInfo::Source::RESCUE;
                 break;
             }
         }
@@ -1166,6 +1171,12 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
 
     currentPlan_ = std::move(expansion.actions);
     planIndex_ = 0;
+
+    lastDecision_.macro = bestMacro;
+    lastDecision_.source = source;
+    lastDecision_.children = (source == MacroDecisionInfo::Source::CAGE)
+        ? std::vector<MacroChildVisitInfo>{} : search_.lastChildVisits();
+    ++decisionCount_;
 
     if (currentPlan_.empty()) {
         // No actions from expansion — fall back to END_TURN. Po K6 kroku 2 se
@@ -1191,6 +1202,7 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     planIndex_ = 0;
 
     // Fallback: greedy policy
+    lastDecision_.source = MacroDecisionInfo::Source::GREEDY_FALLBACK;
     return greedyPolicy(state, expansionDice_);
 }
 
