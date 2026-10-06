@@ -935,3 +935,45 @@ TEST(BoardMetrics, TempoAchievableDropsWithCorridorResistance) {
     EXPECT_LT(blocked, clean) << "zeď musí srazit dosažitelné tempo";
     EXPECT_FLOAT_EQ(blocked, clean - 2.0f);   // přirážka min(2, (3+1)/2) = 2
 }
+
+// P154/K2 (06.10.2026): když nejdelší krok nevyjde bez hodu, klec udělá kratší — nezahodí se
+// celý plán. Soupeři na (14,5) a (14,9): krok 4 by vedl rohy přes jejich zóny (úhyb), krok 2
+// postaví klec kolem (14,7) bez jediného hodu a nosič nestojí v ničí zóně.
+TEST(CageAdvance, TakesAShorterStepWhenTheLongestNeedsDice) {
+    GameState state = makeCageState();
+    for (int id : {13, 14}) {
+        Player& m = state.getPlayer(id);
+        m.id = id; m.teamSide = TeamSide::AWAY;
+        m.state = PlayerState::STANDING;
+        m.position = {14, static_cast<int8_t>(id == 13 ? 5 : 9)};
+        m.stats = {6, 3, 3, 8};
+        m.movementRemaining = 6;
+    }
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+    ASSERT_EQ(plan.verdict, CageAdvanceVerdict::PLAN_READY) << "postup, ne jen dostavění na místě";
+    // pozitivní kontrola: delší krok se opravdu zkoušel a neprošel (dřív = konec, žádný plán)
+    EXPECT_GT(plan.shortenedFromStep, plan.step);
+    EXPECT_GE(plan.step, 1);
+
+    // odehrát plán se skutečnými kostkami: žádný hod se nesmí pokazit, protože žádný není
+    struct Ones : DiceRollerBase {
+        int rollD6() override { return 1; }
+        int rollD8() override { return 1; }
+    } ones;
+    for (const Macro& m : plan.macros) {
+        auto r = greedyExpandMacro(state, m, ones);
+        EXPECT_FALSE(r.turnover) << "makro klece hodilo kostkou (hráč " << m.playerId << ")";
+    }
+    const Player& carrier = state.getPlayer(1);
+    EXPECT_EQ(carrier.position.x, 12 + plan.step) << "nosič postoupil o krok plánu";
+    EXPECT_EQ(countTacklezones(state, carrier.position, TeamSide::HOME), 0) << "nosič nesmí stát v zóně";
+    int corners = 0;
+    for (int dx : {-1, 1}) for (int dy : {-1, 1}) {
+        const Player* p = state.getPlayerAtPosition({static_cast<int8_t>(carrier.position.x + dx),
+                                                     static_cast<int8_t>(carrier.position.y + dy)});
+        if (p && p->teamSide == TeamSide::HOME && p->state == PlayerState::STANDING) ++corners;
+    }
+    EXPECT_EQ(corners, 4) << "klec má po tahu všechny čtyři rohy";
+}

@@ -9,6 +9,7 @@
 #include "bb/roster.h"
 #include "bb/macro_mcts.h"
 #include "bb/action_resolver.h"
+#include "bb/turn_planner.h"   // classifyTurnGoal (P154)
 #include <algorithm>
 #include <cstdlib>
 
@@ -315,4 +316,86 @@ TEST(OneCagePolicy, ProductionPlayerMovesTheCageCornersBeforeCarrier) {
     EXPECT_NE(it, order.begin()) << "nosič jednal první";
     EXPECT_GT(b.s.getPlayer(1).position.x, 12);
     EXPECT_GE(policy.cagePlansAdopted(), 1);
+}
+
+// --- P154 (06.10.2026): klec nesmí zůstat stát jen proto, že je nosič „v dosahu TD“ -------
+
+namespace {
+// Nosič (MA6) 8 polí od zóny = dosah jen se dvěma GFI ⇒ tah je SCORE_BALL, ale bez hodu
+// nosič nedojde. Klec stojí kolem něj, soupeř daleko.
+Board scoringRangeBoard(int turn) {
+    Board b(turn);
+    b.put(1, TeamSide::HOME, {17, 7}, 6);
+    b.put(2, TeamSide::HOME, {16, 6});
+    b.put(3, TeamSide::HOME, {16, 8});
+    b.put(4, TeamSide::HOME, {18, 6});
+    b.put(5, TeamSide::HOME, {18, 8});
+    b.put(14, TeamSide::AWAY, {3, 1});
+    b.s.ball = BallState::carried({17, 7}, 1);
+    return b;
+}
+}  // namespace
+
+TEST(OneCageScoringRange, CageKeepsAdvancingWhenTheCarrierCannotWalkInWithoutDice) {
+    Board b = scoringRangeBoard(4);
+    ASSERT_EQ(classifyTurnGoal(b.s), TurnGoal::SCORE_BALL) << "předpoklad testu: tah je označený jako skórovací";
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    std::vector<int> order;
+    while (cc.next(b.s, m)) {
+        order.push_back(m.playerId);
+        play(b.s, m);
+    }
+    ASSERT_FALSE(order.empty()) << "řadič klece tah nepřenechal hledání";
+    EXPECT_EQ(order.back(), 1) << "nosič poslední";
+    EXPECT_GT(b.s.getPlayer(1).position.x, 17) << "klec postoupila";
+    EXPECT_LT(b.s.getPlayer(1).position.x, 25) << "a neskórovala přes GFI";
+}
+
+TEST(OneCageScoringRange, LastTurnOfTheHalfIsLeftToTheSearch) {
+    Board b = scoringRangeBoard(8);          // poslední kolo: skórovat se musí zkusit
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    EXPECT_FALSE(cc.next(b.s, m));
+}
+
+TEST(OneCageScoringRange, CarrierWhoWalksInWithoutDiceIsLeftToTheSearch) {
+    Board b = scoringRangeBoard(4);
+    b.s.getPlayer(1).position = {20, 7};     // 5 polí, MA6 ⇒ dojde bez hodu
+    b.s.ball = BallState::carried({20, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    EXPECT_FALSE(cc.next(b.s, m));
+}
+
+// Hledání chce tah ukončit, nosič už popošel a rohy zůstaly stát ⇒ řadič je dotáhne.
+TEST(OneCageBeforeEndTurn, CornersFollowACarrierWhoAlreadyMoved) {
+    Board b(3);
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(2, TeamSide::HOME, {9, 6});
+    b.put(3, TeamSide::HOME, {9, 8});
+    b.put(4, TeamSide::HOME, {11, 6});
+    b.put(5, TeamSide::HOME, {11, 8});
+    b.put(14, TeamSide::AWAY, {24, 13});
+    b.s.ball = BallState::carried({12, 7}, 1);
+    b.s.getPlayer(1).hasMoved = true;        // nosič odešel o dvě pole z klece kolem (10,7)
+    b.s.getPlayer(1).movementRemaining = 4;
+
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_TRUE(cc.beforeEndTurn(b.s, m));
+    int moves = 0;
+    do {
+        EXPECT_NE(m.playerId, 1) << "nosič se podruhé nehýbe";
+        play(b.s, m);
+        ++moves;
+    } while (cc.next(b.s, m));
+    EXPECT_GE(moves, 2);
+    int corners = 0;
+    for (int dx : {-1, 1}) for (int dy : {-1, 1}) {
+        const Player* p = b.s.getPlayerAtPosition({static_cast<int8_t>(12 + dx), static_cast<int8_t>(7 + dy)});
+        if (p && p->teamSide == TeamSide::HOME) ++corners;
+    }
+    EXPECT_EQ(corners, 4) << "rohy stojí kolem nosiče";
+    EXPECT_FALSE(cc.beforeEndTurn(b.s, m)) << "jen jednou za tah";
 }

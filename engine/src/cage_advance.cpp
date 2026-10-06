@@ -481,8 +481,9 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
 // runs and chooses to crawl from one that bails out with TEMPO_INSUFFICIENT
 // and hands the turn to search(). Those two want opposite fixes.
 CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
-                                          const std::vector<int>& reservedPlayerIds) {
-    CageAdvancePlan plan = buildImpl(state, reservedPlayerIds);
+                                          const std::vector<int>& reservedPlayerIds,
+                                          bool evenInScoringRange) {
+    CageAdvancePlan plan = buildImpl(state, reservedPlayerIds, evenInScoringRange);
     if (!plan.valid) {
         CageAdvancePlan fill = buildFillOnly(state, reservedPlayerIds);
         if (fill.valid) {
@@ -518,12 +519,18 @@ CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
 }
 
 CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
-                                          const std::vector<int>& reservedPlayerIds) {
+                                          const std::vector<int>& reservedPlayerIds,
+                                          bool evenInScoringRange) {
 
     CageAdvancePlan plan;
 
     // --- Trigger: our held ball, ADVANCE goal, movable carrier, cage built.
-    if (classifyTurnGoal(state) != TurnGoal::ADVANCE_BALL) return plan;
+    // P154/K3 (06.10.2026): `evenInScoringRange` = klec smí postoupit i v tahu označeném
+    // SCORE_BALL (nosič do MA + 2 od TD). Volá se jen tehdy, když hledání v takovém tahu
+    // neskórovalo a chce tah ukončit (CageController::beforeEndTurn).
+    const TurnGoal goal = classifyTurnGoal(state);
+    if (goal != TurnGoal::ADVANCE_BALL &&
+        !(evenInScoringRange && goal == TurnGoal::SCORE_BALL)) return plan;
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     if (!carrier.canAct() || carrier.hasMoved || carrier.hasActed) return plan;
 
@@ -689,144 +696,179 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         }
         assign = std::move(a);
     }
-    plan.step = finalStep;
-    plan.filledCorners = assign.filled;
-    plan.openCorners = assign.open;
-    plan.gfiCorners = assign.gfi;
+    // ⭐ P154/K2 (06.10.2026): KDYŽ NEJDELŠÍ KROK NEVYJDE BEZ HODU, ZKUSIT KRATŠÍ.
+    //   Dosud: jeden roh nedošel bez hodu (DICEY) ⇒ zahodil se CELÝ plán a klec nešla nikam;
+    //   hledání pak pohnulo nosičem samotným a tah ukončilo (partie 02.10., tahy 5 a 7:
+    //   krok 6, roh s 94 % / 85 % na turnover; uživatel v téže pozici postoupil o 2 pole
+    //   se čtyřmi rohy). V celých hrách 30 ze 155 tahů s míčem (kniha P154).
+    //   Teď: stejná kontrola „bez hodu“ pro krok finalStep, finalStep-1, … 1; bere se první,
+    //   který projde. Když neprojde žádný, vrací se verdikt prvního pokusu (diagnostika).
+    auto legsAreSafe = [&](CageAdvancePlan& plan, int step, const AssignmentResult& assign) -> bool {
+        plan.step = step;
+        plan.filledCorners = assign.filled;
+        plan.openCorners = assign.open;
+        plan.gfiCorners = assign.gfi;
 
-    // --- Macros. Base order: front movers, back movers, carrier last
-    // (risk-last -- the screen forms before the carrier commits, and a GFI
-    // carrier leg stays at the very end). Execution order is then
-    // SITUATIONAL (user doctrine 2026-08-04): whoever stands on another
-    // mover's target square goes first, so pile-ups untangle front-first
-    // instead of deadlocking the walk.
-    std::vector<Macro> macros;
-    std::vector<bool> macroGfi;
-    for (const auto& sa : assign.slots) {
-        if (sa.playerId < 0 || sa.stayPut) continue;
-        Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
-        m.cageManaged = true;
-        macros.push_back(m);
-        macroGfi.push_back(sa.needsGfi);
-    }
-    if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
-        Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
-        cm.gfiAllowance = plan.carrierGfi;
-        cm.cageManaged = true;
-        macros.push_back(cm);
-        macroGfi.push_back(false);
-    }
-    // Dependency sort (stable): repeatedly pick the first not-yet-placed
-    // macro whose target square is not the CURRENT position of another
-    // unplaced mover. A cycle (mutual swaps) falls back to base order.
-    {
-        std::vector<Macro> ordered;
-        std::vector<bool> orderedGfi;
-        std::vector<size_t> left(macros.size());
-        for (size_t i = 0; i < left.size(); ++i) left[i] = i;
-        while (!left.empty()) {
-            size_t pickAt = 0;
-            bool found = false;
-            for (size_t li = 0; li < left.size() && !found; ++li) {
-                const Macro& cand = macros[left[li]];
-                bool blocked = false;
-                for (size_t lj = 0; lj < left.size(); ++lj) {
-                    if (lj == li) continue;
-                    const Player& other = state.getPlayer(macros[left[lj]].playerId);
-                    if (other.position == cand.targetPos) { blocked = true; break; }
+        // --- Macros. Base order: front movers, back movers, carrier last
+        // (risk-last -- the screen forms before the carrier commits, and a GFI
+        // carrier leg stays at the very end). Execution order is then
+        // SITUATIONAL (user doctrine 2026-08-04): whoever stands on another
+        // mover's target square goes first, so pile-ups untangle front-first
+        // instead of deadlocking the walk.
+        std::vector<Macro> macros;
+        std::vector<bool> macroGfi;
+        for (const auto& sa : assign.slots) {
+            if (sa.playerId < 0 || sa.stayPut) continue;
+            Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
+            m.cageManaged = true;
+            macros.push_back(m);
+            macroGfi.push_back(sa.needsGfi);
+        }
+        if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
+            Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
+            cm.gfiAllowance = plan.carrierGfi;
+            cm.cageManaged = true;
+            macros.push_back(cm);
+            macroGfi.push_back(false);
+        }
+        // Dependency sort (stable): repeatedly pick the first not-yet-placed
+        // macro whose target square is not the CURRENT position of another
+        // unplaced mover. A cycle (mutual swaps) falls back to base order.
+        {
+            std::vector<Macro> ordered;
+            std::vector<bool> orderedGfi;
+            std::vector<size_t> left(macros.size());
+            for (size_t i = 0; i < left.size(); ++i) left[i] = i;
+            while (!left.empty()) {
+                size_t pickAt = 0;
+                bool found = false;
+                for (size_t li = 0; li < left.size() && !found; ++li) {
+                    const Macro& cand = macros[left[li]];
+                    bool blocked = false;
+                    for (size_t lj = 0; lj < left.size(); ++lj) {
+                        if (lj == li) continue;
+                        const Player& other = state.getPlayer(macros[left[lj]].playerId);
+                        if (other.position == cand.targetPos) { blocked = true; break; }
+                    }
+                    if (!blocked) { pickAt = li; found = true; }
                 }
-                if (!blocked) { pickAt = li; found = true; }
+                if (!found) pickAt = 0;  // cycle: fall back to base order
+                ordered.push_back(macros[left[pickAt]]);
+                orderedGfi.push_back(macroGfi[left[pickAt]]);
+                left.erase(left.begin() + pickAt);
             }
-            if (!found) pickAt = 0;  // cycle: fall back to base order
-            ordered.push_back(macros[left[pickAt]]);
-            orderedGfi.push_back(macroGfi[left[pickAt]]);
-            left.erase(left.begin() + pickAt);
+            macros = std::move(ordered);
+            macroGfi = std::move(orderedGfi);
         }
-        macros = std::move(ordered);
-        macroGfi = std::move(orderedGfi);
-    }
 
-    // Probe each macro on the EVOLVING projection (item13 pattern) -- step
-    // k's safety only means anything given steps 1..k-1 -- then execute it
-    // there to advance the occupancy picture.
-    GameState projected = state.clone();
-    for (size_t i = 0; i < macros.size(); ++i) {
-        const Macro& m = macros[i];
-        // The carrier's GFI leg is an ACCEPTED dice risk (tempo emergency):
-        // it gets the relaxed ceiling, everything else stays dice-free.
-        double ceiling = SAFE_PTO;
-        if (m.gfiAllowance == 1) ceiling = SAFE_PTO_GFI1;
-        else if (m.gfiAllowance >= 2) ceiling = SAFE_PTO_GFI2;
-        auto pr = probeMacro(projected, m);
-        if (pr.pto > ceiling || pr.meanActions < 0.5) {
-            if (getenv("BB_CAGE_DEBUG")) {
-                fprintf(stderr, "[cage DICEY] leg %zu/%zu player=%d gfi=%d "
-                        "pto=%.3f ceil=%.3f meanActs=%.2f target=(%d,%d)\n",
-                        i, macros.size(), m.playerId, m.gfiAllowance,
-                        pr.pto, ceiling, pr.meanActions,
-                        m.targetPos.x, m.targetPos.y);
+        // Probe each macro on the EVOLVING projection (item13 pattern) -- step
+        // k's safety only means anything given steps 1..k-1 -- then execute it
+        // there to advance the occupancy picture.
+        GameState projected = state.clone();
+        for (size_t i = 0; i < macros.size(); ++i) {
+            const Macro& m = macros[i];
+            // The carrier's GFI leg is an ACCEPTED dice risk (tempo emergency):
+            // it gets the relaxed ceiling, everything else stays dice-free.
+            double ceiling = SAFE_PTO;
+            if (m.gfiAllowance == 1) ceiling = SAFE_PTO_GFI1;
+            else if (m.gfiAllowance >= 2) ceiling = SAFE_PTO_GFI2;
+            auto pr = probeMacro(projected, m);
+            if (pr.pto > ceiling || pr.meanActions < 0.5) {
+                if (getenv("BB_CAGE_DEBUG")) {
+                    fprintf(stderr, "[cage DICEY] leg %zu/%zu player=%d gfi=%d "
+                            "pto=%.3f ceil=%.3f meanActs=%.2f target=(%d,%d)\n",
+                            i, macros.size(), m.playerId, m.gfiAllowance,
+                            pr.pto, ceiling, pr.meanActions,
+                            m.targetPos.x, m.targetPos.y);
+                }
+                plan.verdict = CageAdvanceVerdict::DICEY;
+                plan.diceyLegIdx = static_cast<int>(i);
+                plan.diceyPto = pr.pto;
+                plan.diceyCeil = ceiling;
+                plan.diceyMeanActs = pr.meanActions;
+                plan.diagMacros = macros;
+                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
+                return false;
             }
-            plan.verdict = CageAdvanceVerdict::DICEY;
-            plan.diceyLegIdx = static_cast<int>(i);
-            plan.diceyPto = pr.pto;
-            plan.diceyCeil = ceiling;
-            plan.diceyMeanActs = pr.meanActions;
-            plan.diagMacros = macros;
-            plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
-            return plan;
-        }
-        // Execute on the projection. The macro is probed within its risk
-        // ceiling, but the expansion still rolls real dice -- retry before
-        // giving up on the plan (GFI legs fail a real fraction of attempts,
-        // so they get more retries; the RISK is priced above, the retries
-        // just need one clean sample to keep projecting).
-        bool ok = false;
-        int attempts = m.gfiAllowance > 0 ? 8 : 3;
-        for (int attempt = 0; attempt < attempts && !ok; ++attempt) {
-            GameState next = projected.clone();
-            auto r = greedyExpandMacro(next, m, dice_);
-            if (r.turnover || next.phase != GamePhase::PLAY ||
-                next.activeTeam != state.activeTeam) {
-                continue;
+            // Execute on the projection. The macro is probed within its risk
+            // ceiling, but the expansion still rolls real dice -- retry before
+            // giving up on the plan (GFI legs fail a real fraction of attempts,
+            // so they get more retries; the RISK is priced above, the retries
+            // just need one clean sample to keep projecting).
+            bool ok = false;
+            int attempts = m.gfiAllowance > 0 ? 8 : 3;
+            for (int attempt = 0; attempt < attempts && !ok; ++attempt) {
+                GameState next = projected.clone();
+                auto r = greedyExpandMacro(next, m, dice_);
+                if (r.turnover || next.phase != GamePhase::PLAY ||
+                    next.activeTeam != state.activeTeam) {
+                    continue;
+                }
+                const Player& moved = next.getPlayer(m.playerId);
+                int miss = moved.position.distanceTo(m.targetPos);
+                // Movers must ARRIVE; the single 1-GFI corner walks dice-free
+                // and may stop one square short (closes next turn -- header).
+                int allowed = macroGfi[i] ? 1 : 0;
+                if (miss > allowed) continue;
+                projected = std::move(next);
+                ok = true;
             }
-            const Player& moved = next.getPlayer(m.playerId);
-            int miss = moved.position.distanceTo(m.targetPos);
-            // Movers must ARRIVE; the single 1-GFI corner walks dice-free
-            // and may stop one square short (closes next turn -- header).
-            int allowed = macroGfi[i] ? 1 : 0;
-            if (miss > allowed) continue;
-            projected = std::move(next);
-            ok = true;
-        }
-        if (!ok) {
-            if (getenv("BB_CAGE_DEBUG")) {
-                GameState dbg = projected.clone();
-                auto r = greedyExpandMacro(dbg, m, dice_);
-                const Player& moved = dbg.getPlayer(m.playerId);
-                fprintf(stderr, "[cage EXEC-FAIL] leg %zu/%zu player=%d gfi=%d "
-                        "target=(%d,%d) endpos=(%d,%d) to=%d phase=%d acts=%zu\n",
-                        i, macros.size(), m.playerId, m.gfiAllowance,
-                        m.targetPos.x, m.targetPos.y, moved.position.x,
-                        moved.position.y, (int)r.turnover, (int)dbg.phase,
-                        r.actions.size());
+            if (!ok) {
+                if (getenv("BB_CAGE_DEBUG")) {
+                    GameState dbg = projected.clone();
+                    auto r = greedyExpandMacro(dbg, m, dice_);
+                    const Player& moved = dbg.getPlayer(m.playerId);
+                    fprintf(stderr, "[cage EXEC-FAIL] leg %zu/%zu player=%d gfi=%d "
+                            "target=(%d,%d) endpos=(%d,%d) to=%d phase=%d acts=%zu\n",
+                            i, macros.size(), m.playerId, m.gfiAllowance,
+                            m.targetPos.x, m.targetPos.y, moved.position.x,
+                            moved.position.y, (int)r.turnover, (int)dbg.phase,
+                            r.actions.size());
+                }
+                plan.verdict = CageAdvanceVerdict::DICEY;
+                plan.diceyLegIdx = static_cast<int>(i);
+                plan.diceyPto = pr.pto;
+                plan.diceyCeil = ceiling;
+                plan.diceyMeanActs = pr.meanActions;
+                plan.diceyExecFail = true;
+                plan.diagMacros = macros;
+                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
+                return false;
             }
-            plan.verdict = CageAdvanceVerdict::DICEY;
-            plan.diceyLegIdx = static_cast<int>(i);
-            plan.diceyPto = pr.pto;
-            plan.diceyCeil = ceiling;
-            plan.diceyMeanActs = pr.meanActions;
-            plan.diceyExecFail = true;
-            plan.diagMacros = macros;
-            plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
-            return plan;
         }
-    }
 
-    plan.planValue = evaler_.evaluateLeaf(projected, mySide);
-    plan.macros = std::move(macros);
-    plan.verdict = CageAdvanceVerdict::PLAN_READY;
-    plan.valid = true;
-    return plan;
+        plan.planValue = evaler_.evaluateLeaf(projected, mySide);
+        plan.macros = std::move(macros);
+        plan.verdict = CageAdvanceVerdict::PLAN_READY;
+        plan.valid = true;
+        return true;
+    };
+
+    CageAdvancePlan firstTry;
+    bool haveFirst = false;
+    for (int step = finalStep; step >= 1; --step) {
+        AssignmentResult a;
+        if (step == finalStep) {
+            a = assign;
+        } else {
+            a = tryAssign(state, carrier, step, reservedPlayerIds);
+            if (!a.feasible) continue;
+            // Kratší krok nesmí nosiče postavit do zóny soupeře („blok na nosiče se nesmí
+            // stávat vůbec", uživatel 20.08., kniha P42) — to raději dostavět klec na místě.
+            if (countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
+        }
+        CageAdvancePlan candidate = plan;
+        candidate.carrierGfi = std::clamp(step - maxNoGfi, 0, plan.carrierGfi);
+        if (legsAreSafe(candidate, step, a)) {
+            if (step != finalStep) candidate.shortenedFromStep = finalStep;
+            if (getenv("BB_CAGE_DEBUG") && step != finalStep) {
+                fprintf(stderr, "[cage] krok %d nevyšel bez hodu, bere se kratší krok %d\n", finalStep, step);
+            }
+            return candidate;
+        }
+        if (!haveFirst) { firstTry = std::move(candidate); haveFirst = true; }
+    }
+    return firstTry;
 }
 
 } // namespace bb

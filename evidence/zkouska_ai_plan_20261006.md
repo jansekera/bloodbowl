@@ -253,6 +253,42 @@ vlastní hry AI, 3 dvojice ras (dwarf × wood-elf, human × orc, skaven × dwarf
 - Vedlejší nález: test `K6StillEndsTheTurnWhenNothingCanBeDone` stojí na hodnotové funkci, která dává listu skoro přesně strop odhadu 1,0; s cenou se rozdíl mezi dětmi ztratil
   a hledání zvolilo END_TURN rovnou (správná akce, jiná cesta). Test běží bez ceny, důvod je v něm zapsaný.
 
+## Oprava klece P154 (06.10. noc)
+
+Uživatel: *„opravu klece proveď — měl jsem skupinu úkolů okolo klece za dořešenou“*.
+
+| vada | oprava |
+|---|---|
+| K1 přesuny rohů házely úhyb | zastavuje strop na úhyb (P149) |
+| K2 po riskantním nejdelším kroku se zahodil celý plán | plánovač zkouší kratší krok (ne do zóny soupeře) |
+| K3 v dosahu TD řadič ustoupil a hledání neskórovalo | když nosič do zóny bez hodu nedojde a není poslední kolo, tah vede klec |
+| K2 + K3 tah končil s nepohnutými rohy | než hledání ukončí tah, řadič dotáhne klec (postup, nebo rohy kolem nosiče) |
+| K4 zvedač se vybíral jen podle cesty | do rizika se počítá i hod na zvednutí (Sure Hands = přehoz) |
+
+**Pozice z partie** (trpasličí tahy s míčem, 20 plánů na tah):
+
+| tah | uživatel: do TD, rohy | AI ráno: do TD · rohy | AI po opravě: do TD · rohy · 4 rohy |
+|---|---|---|---|
+| 5 | 10, 4 | 10,8 · 1,2 | 10,0 · 3,90 · 18/20 |
+| 7 | 8, 3 | 9,1 · 0,25 | 8,4 · 2,70 · 13/20 |
+| 9 | 6, 4 | 7,8 · 2,6 | 8,0 · 3,90 · 18/20 |
+| 28 | 4, 4 | 6,2 · 1,1 | 4,0 · 4,00 · 20/20 |
+
+Celkem 4 rohy po tahu ve 124 ze 138 plánů s míčem, turnover 19 z 200.
+
+**Celé první poločasy na `main`** (40, AI × AI, trpaslíci přijímají; hry mezi řádky nejsou párové):
+
+| stav | TD trpaslíků | tah se zvednutím: turnover | tahy řízené klecí: turnover | z toho uvnitř maker klece |
+|---|---|---|---|---|
+| ráno 06.10. | 8 | 65 % | 62 % | 19 |
+| + strop na úhyb + cena turnoveru | 18 | — | — | — |
+| + oprava klece | 22 | 33 % | 30 % | 4 |
+
+**Co zůstává špatně:** proti soupeři-AI klec po tahu většinou nestojí. Postup klece vyšel ve 48 tazích (4 rohy 19 ze 47),
+v 79 tazích jen dostavění nebo bloky — a hledání pak nosiče odvedlo o 2,8 pole (průměrně 1,04 rohu). Po zvednutí míče 4 rohy ve 12 ze 41.
+
+**Zkoušeno a vráceno:** držet nosiče v kleci, když postup nevyjde. TD trpaslíků 22 → 12 ze 40, rohy jen 1,04 → 1,40 — klec se nedostaví a nosič stojí. Nenasazeno.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

@@ -145,6 +145,17 @@ void CageController::planStart(const GameState& state) {
             double fail = pathFailProb(state, p, m.targetPos,
                                        p.movementRemaining + maxGfiSquares(p), Position{-1, -1});
             if (fail < 0.0) fail = 1.0;
+            // P154/K4 (06.10.2026): do rizika patří i HOD NA ZVEDNUTÍ, ne jen cesta k míči.
+            // Dosud vyhrál ten, kdo k míči došel bez hodu, i když pak zvedal na 4+ a horší
+            // (40 poločasů na main: 9 ze 42 zvednutí řadičem na 4+ a horší, tah se zvednutím
+            // skončil turnoverem v 65 %). Sure Hands = přehoz zvednutí (bez něj se s přehozem
+            // nepočítá — týmový reroll je zdroj celého tahu).
+            {
+                const int target = calculatePickupTargetAt(state, p, m.targetPos);
+                double pick = std::clamp((target - 1) / 6.0, 0.0, 1.0);
+                if (p.hasSkill(SkillName::SureHands)) pick *= pick;
+                fail = 1.0 - (1.0 - fail) * (1.0 - pick);
+            }
             if (!best || fail < bestFail - 1e-9 ||
                 (std::abs(fail - bestFail) <= 1e-9 &&
                  handler(p) > handler(state.getPlayer(best->playerId)))) {
@@ -163,7 +174,27 @@ void CageController::planStart(const GameState& state) {
 
     // P150 (06.10.2026): stopa rozhodnutí řadiče pod BB_CAGE_DEBUG — proč tah klece není / je.
     const bool dbg = std::getenv("BB_CAGE_DEBUG") != nullptr;
-    if (goal != TurnGoal::ADVANCE_BALL) {
+    // P154/K3 (06.10.2026): tah označený SCORE_BALL (nosič do MA + 2 od TD) řadič dosud celý
+    // přenechal hledání — a to ve středních kolech neskórovalo a tah ukončilo (partie 02.10.,
+    // tahy 9 a 28: TD 0/20, klec stála). Teď: když nosič do zóny NEDOJDE BEZ HODU a není to
+    // poslední kolo poločasu, jde klec dál jako v běžném postupu. Kdo dojde bez hodu, nebo
+    // hraje poslední kolo, zůstává hledání (skórování se nebrání).
+    scoringRangeCage_ = false;
+    if (goal == TurnGoal::SCORE_BALL && state.ball.isHeld && state.ball.carrierId > 0) {
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        const bool lastTurn = state.getTeamState(c.teamSide).turnNumber >= 8;
+        bool walksIn = false;
+        const int ezX = (c.teamSide == TeamSide::HOME) ? 25 : 0;
+        for (int y = 0; y < 15 && !walksIn; ++y) {
+            const Position sq{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
+            if (state.getPlayerAtPosition(sq)) continue;
+            walksIn = pathFailProb(state, c, sq, c.movementRemaining, Position{-1, -1}) == 0.0;
+        }
+        scoringRangeCage_ = !lastTurn && !walksIn && c.teamSide == state.activeTeam;
+        if (dbg) std::fprintf(stderr, "[cage ctl] SCORE_BALL: dojde bez hodu %d, poslední kolo %d => %s\n",
+                              walksIn, lastTurn, scoringRangeCage_ ? "klec jde dál" : "rozhoduje hledání");
+    }
+    if (goal != TurnGoal::ADVANCE_BALL && !scoringRangeCage_) {
         if (dbg) std::fprintf(stderr, "[cage ctl] bez plánu: cíl tahu %d není ADVANCE_BALL\n", static_cast<int>(goal));
         return;
     }
@@ -233,6 +264,48 @@ void CageController::planStart(const GameState& state) {
     stage_ = Stage::AFTER_RUN;
 }
 
+// P154/K2+K3 (06.10.2026): NEŽ HLEDÁNÍ UKONČÍ TAH, DOTÁHNOUT KLEC. Volá MacroMCTSPolicy,
+// když hledání zvolí END_TURN a míč držíme. Dosud po odmítnutém plánu klece (nebo v tahu
+// označeném SCORE_BALL, kde řadič ustoupil a hledání neskórovalo) nebyl žádný náhradní
+// postup: nosič popošel sám a 8–9 hráčů zůstalo stát (partie 02.10., tahy 5, 7, 9, 28).
+// Nosič ještě nehrál ⇒ postup klece (i v dosahu TD, když se neskórovalo), jinak / když
+// postup nevyjde ⇒ aspoň dostavět rohy kolem nosiče tam, kde stojí. Vše bez hodu, jednou za tah.
+bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
+    if (state.phase != GamePhase::PLAY || !ourBall(state)) return false;
+    const int turn = state.getTeamState(state.activeTeam).turnNumber;
+    if (endTurnTeam_ == state.activeTeam && endTurnTurn_ == turn && endTurnHalf_ == state.half) {
+        return false;                       // v tomto tahu už jednou zkoušeno
+    }
+    endTurnTeam_ = state.activeTeam;
+    endTurnTurn_ = turn;
+    endTurnHalf_ = state.half;
+
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    CageAdvancePlan plan;
+    if (freeToAct(carrier) && !released(state, carrier)) {
+        plan = planner_.build(state, {}, /*evenInScoringRange=*/true);
+    } else {
+        plan = planner_.buildFillOnly(state, {});
+    }
+    if (std::getenv("BB_CAGE_DEBUG")) {
+        std::fprintf(stderr, "[cage ctl] před koncem tahu: verdikt %d, platný %d, krok %d, maker %zu\n",
+                     static_cast<int>(plan.verdict), plan.valid, plan.step, plan.macros.size());
+    }
+    if (!plan.valid || plan.macros.empty()) return false;
+    // next() pozná nový tah podle těchto tří polí a frontu by zahodil — nesmí záležet na tom,
+    // jestli se v tomto tahu už volal
+    team_ = state.activeTeam;
+    turn_ = turn;
+    half_ = state.half;
+    queue_ = std::move(plan.macros);
+    idx_ = 0;
+    stage_ = Stage::DONE;
+    phase_ = CagePhase::CAGE;
+    ++adopted_;
+    out = queue_[idx_++];
+    return true;
+}
+
 void CageController::planAfterPickup(const GameState& state) {
     stage_ = Stage::DONE;
     if (!ourBall(state)) return;
@@ -245,7 +318,7 @@ void CageController::planAdvance(const GameState& state) {
     if (!ourBall(state)) return;
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     if (!freeToAct(carrier)) return;
-    CageAdvancePlan plan = planner_.build(state);
+    CageAdvancePlan plan = planner_.build(state, {}, scoringRangeCage_);
     if (std::getenv("BB_CAGE_DEBUG")) {
         std::fprintf(stderr, "[cage ctl] plán postupu: verdikt %d, platný %d, krok %d, rohy stojí %d, po tahu %d, maker %zu\n",
                      static_cast<int>(plan.verdict), plan.valid, plan.step, plan.builtCorners,

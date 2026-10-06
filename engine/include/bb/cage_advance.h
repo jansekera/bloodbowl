@@ -110,6 +110,10 @@ struct CageAdvancePlan {
 
     double planValue = 0.0;      // leaf eval of the projected end state (diag)
 
+    // P154/K2 (06.10.2026): > 0, když delší krok nevyšel bez hodu a plán je pro kratší —
+    // nese krok, který se zkoušel jako první. 0 = plán je pro první zkoušený krok.
+    int shortenedFromStep = 0;
+
     // DIAG (2026-08-06 tempo doctrine): true when the plan was produced by
     // the experimental grind branch (config.cageGrind, default off) -- the
     // schedule was NOT met and the cage pushed at max dice-free step anyway.
@@ -269,7 +273,8 @@ public:
     // builds a cage from scratch on the carrier's destination square (user
     // standard "always build the right cage", a5634c7).
     CageAdvancePlan build(const GameState& state,
-                          const std::vector<int>& reservedPlayerIds = {});
+                          const std::vector<int>& reservedPlayerIds = {},
+                          bool evenInScoringRange = false);
 
     // Generic skill-based corner eligibility (constraint 2). Public for
     // tests and future planners.
@@ -278,7 +283,8 @@ public:
     // The planner proper. build() is a thin wrapper that also records what
     // was decided (bb/turn_plan_record.h).
     CageAdvancePlan buildImpl(const GameState& state,
-                              const std::vector<int>& reservedPlayerIds);
+                              const std::vector<int>& reservedPlayerIds,
+                              bool evenInScoringRange = false);
 
     // Mandated minimum when the advance will not run (user, 2026-08-05):
     // fill the incomplete cage with everything that can reach, carrier

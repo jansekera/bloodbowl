@@ -60,6 +60,10 @@ public:
     // Další makro klece pro tento stav, nebo false = rozhoduje MCTS.
     bool next(const GameState& state, Macro& out);
 
+    // P154: hledání chce ukončit tah a míč držíme ⇒ napřed dotáhnout klec (postup, nebo aspoň
+    // rohy kolem nosiče). True = `out` je první makro; další vydá next(). Jednou za tah.
+    bool beforeEndTurn(const GameState& state, Macro& out);
+
     // Makro z plánu se na skutečné desce neprovedlo ⇒ zbytek tahu patří search().
     void abandonTurn() { queue_.clear(); idx_ = 0; stage_ = Stage::DONE; }
 
@@ -87,6 +91,14 @@ private:
     int releasedScore_ = -1;
 
     int adopted_ = 0;
+
+    // planStart: tah je SCORE_BALL, ale nosič do zóny bez hodu nedojde ⇒ klec postupuje dál
+    bool scoringRangeCage_ = false;
+
+    // beforeEndTurn: ve kterém tahu už se zkoušelo
+    TeamSide endTurnTeam_ = TeamSide::HOME;
+    int endTurnTurn_ = -1;
+    int endTurnHalf_ = -1;
 
     void planStart(const GameState& state);
     void planAfterPickup(const GameState& state);

@@ -1069,6 +1069,15 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     }
     MacroDecisionInfo::Source source =
         fromStagedPlan ? MacroDecisionInfo::Source::CAGE : MacroDecisionInfo::Source::SEARCH;
+    // P154 (06.10.2026): hledání chce tah ukončit a míč držíme ⇒ napřed dotáhnout klec.
+    if (!fromStagedPlan && bestMacro.type == MacroType::END_TURN) {
+        Macro cageMacro;
+        if (cage_->beforeEndTurn(state, cageMacro)) {
+            bestMacro = cageMacro;
+            fromStagedPlan = true;
+            source = MacroDecisionInfo::Source::CAGE;
+        }
+    }
 
     // Log decision if enabled (search-only: a staged-plan macro has no fresh
     // visit distribution -- lastChildVisits() would be stale)
