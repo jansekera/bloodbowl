@@ -24,6 +24,11 @@ int optimalPathStepsToAdjacent(const GameState& state, const Player& player,
                                Position target);
 bool nextStepTowardAdjacent(const GameState& state, const Player& player,
                             Position target, Position& outStep);
+// P149: vede doběh blitzu k cíli přes úhyb na `cap`+ a horší? Přehrává smyčku hry (po každém
+// kroku nové hledání, Break Tackle jen na první úhyb), čítače chůze nemění.
+// `reachesOut` = false, když hráč k cíli nedojde (pak vrací false).
+bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Position target,
+                               int cap, bool* reachesOut = nullptr);
 
 // Zobecneni M14b pro OBECNY pohyb (09.09.2026): prvni krok po nejlevnejsi
 // (riziko-vazene) ceste co NEJBLIZ `target` -- presne na nej, pokud je to

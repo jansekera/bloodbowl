@@ -176,6 +176,52 @@ Uživatel 06.10.: *„měla by se pohybovat celá klec bezpečně kupředu už s
 - ⇒ Záměr „klec jde bezpečně kupředu“ v kódu je, ale neplní se: čtyři rohy má klec po tahu jen ve 22 z 91 tahů, které řadič řídil.
 - Výhrady: soupeřem je táž AI (elfové), 50 iterací, jedna dvojice ras.
 
+## Oprava P149 bod 1: strop na úhyb (06.10. večer)
+
+Schváleno uživatelem („1 ano“): makra BLITZ a REPOSITION nevedou přes úhyb na 4+ a horší; výjimky — poslední aktivace tahu,
+míč v posledním kole poločasu; skórující makra strop nemají. Přesun se zastaví před rizikovým krokem (hráč zůstane, kam bezpečně došel),
+u blitzu se bere nejbezpečnější blitzující, jehož doběh přes takový úhyb nevede (jinak se blitz na ten cíl nehraje).
+
+**Párově na pozicích z partie** (engine `4e142640` + oprava, stejná semínka, 160 plánů na řádek):
+
+| | turnover | úhybů 4+ a horších na tah | z toho BLITZ / REPOSITION | aktivováno hráčů | blitz využit | TD | s míčem po tahu |
+|---|---|---|---|---|---|---|---|
+| elfové, bez stropu | 56 % | 0,61 | 54 / 42 | 5,2 | 97 % | 0 | 31 % |
+| elfové, se stropem | 28 % | 0,00 | 0 / 0 | 6,7 | 97 % | 0 | 32 % |
+| trpaslíci, bez stropu | 29 % | 0,37 | 26 / 21 | 4,4 | 72 % | 38 | 71 % |
+| trpaslíci, se stropem | 16 % | 0,11 | 0 / 0 | 5,1 | 73 % | 39 | 70 % |
+
+Zbylé úhyby na 4+ a horší u trpaslíků: PICKUP 13 (mimo schválený rozsah) a skórující makra 4 (výjimka).
+
+**Celé první poločasy na dnešním `main`** (AI × AI, 40 poločasů na rameno, stejná výchozí semínka — po první odlišné akci už hry párové nejsou):
+
+| | TD trpaslíci | TD elfové | turnover trpaslíci | turnover elfové | úhybů 4+ a horších na tah (trp / elf) | aktivováno (trp / elf) |
+|---|---|---|---|---|---|---|
+| bez stropu | 8 / 40 | 18 / 40 | 55 % | 59 % | 0,49 / 0,49 | 5,5 / 4,4 |
+| se stropem | 20 / 40 | 12 / 40 | 28 % | 44 % | 0,07 / 0,06 | 6,7 / 5,6 |
+
+- Cena: plán tahu trvá déle (pozice z partie 175 → 292 s, celé poločasy 324 → 429 s). Rozhodnutí je o 29 % víc, protože tah nekončí předčasně;
+  zbytek je cena kontroly cesty blitzu a „záchranných“ voleb (hledání vybere makro, které strop zastaví hned — 37 → 138 případů na 160 plánů). Otevřené k optimalizaci.
+- ⛔ První verze stropu u blitzu nefungovala: opřela se o `estimateApproachFailChance`, který oceňuje starou cestu (`pickApproachStep`),
+  kdežto hra od 09.09. chodí přes `nextStepTowardAdjacent`. Runner 5 v tahu 5 dál blitzoval přes úhyby 5+, 4+, 4+. Opraveno dotazem na tutéž cestu
+  (`worstDodgeOnBlitzApproach`); samotné ocenění blitzujícího měří jinou cestu dál ⇒ kniha **P155**.
+- Výhrady: jedna dvojice ras, 50 iterací, soupeřem táž AI; rozdíl v TD (8 → 20) je z nepárových her.
+
+**Po review a rozšíření na zvedání míče (konečná verze, tatáž semínka, 160 plánů na řádek):**
+
+| | turnover | úhybů 4+ a horších na tah | BLITZ / REPOSITION / PICKUP / skórující | aktivováno | blitz využit | TD |
+|---|---|---|---|---|---|---|
+| elfové, bez stropu | 56 % | 0,61 | 54 / 42 / 1 / 0 | 5,2 | 97 % | 0 |
+| elfové, se stropem | 26 % | 0,02 | 0 / 3 / 0 / 0 | 6,7 | 96 % | 0 |
+| trpaslíci, bez stropu | 29 % | 0,37 | 26 / 21 / 8 / 4 | 4,4 | 72 % | 38 |
+| trpaslíci, se stropem | 16 % | 0,06 | 0 / 0 / 5 / 5 | 5,2 | 68 % | 39 |
+
+- Zbylé úhyby jsou výjimky: 8. kolo a míč (PICKUP 5, REPOSITION 2), poslední aktivace tahu (1), skórující makra (5).
+- Review (oddělený průchod) našlo 2 vysoké vady první verze: kontrola cesty blitzu četla jedno hledání místo smyčky hry
+  (337 úniků z 30 000 náhodných pozic — Break Tackle, reroll Dodge) a výjimka „poslední aktivace“ nenastala po přesunu spoluhráče. Obojí opraveno a hlídáno testy.
+- Cena konečné verze: plán tahu na pozicích z partie 184 → 392 s (kopie stavu a hledání na každý krok doběhu blitzu) ⇒ kniha P157 (f).
+
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

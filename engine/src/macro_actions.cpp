@@ -42,6 +42,43 @@ static const Player* findCarrier(const GameState& state) {
 static int teammatesStillToAct(const GameState& state, int excludePlayerId,
                                TeamSide side);
 
+// ⭐⭐⭐ P149 (06.10.2026, uživatel: „1 ano“): STROP NA ÚHYB. Makra BLITZ, REPOSITION
+//   a PICKUP (doplněno týž den: „úhyby při zvedání míče mají mít také strop“)
+//   nesmí vést přes úhyb na 4+ a horší. Zkouška na partii 02.–03.10.
+//   (evidence/zkouska_ai_plan_20261006.md): úhyby na 4+ a horší shazovaly 30 %
+//   trpasličích a 56 % elfích tahů a šly právě z těchto dvou maker (cesty DO 2–4 zón),
+//   často jako první akce tahu. Neúspěšný úhyb je turnover = ztráta aktivací všech,
+//   kdo ještě nehráli.
+//   Výjimky (schválené): (a) je to POSLEDNÍ aktivace tahu — neúspěch už nic dalšího
+//   nestojí; (b) v posledním kole poločasu, když jde o míč. Makra, která skórují
+//   (SCORE, BLITZ_AND_SCORE, ...), strop nemají vůbec.
+//   Strop se váže na CÍL HODU (4+), ne na pravděpodobnost — reroll z dovednosti Dodge ho neposouvá.
+//   Známé meze (kniha P157): strop cestu ZAKÁŽE, ale hledání cesty o něm neví, takže
+//   bezpečnou delší obchůzku nenajde; chůze se zastaví i uvnitř zóny, do které vešla zdarma.
+//   Přepínač je zapnutý; vypnout jde jen kvůli párovému měření „před / po“.
+constexpr int kDodgeCapTarget = 4;
+thread_local bool g_dodgeCapEnabled = true;
+thread_local long g_dodgeCapStops[2] = {0, 0};   // [0] zastavená chůze, [1] vyřazený blitzující
+void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
+void takeDodgeCapStops(long* out2) {
+    for (int i = 0; i < 2; ++i) { out2[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
+}
+
+// Cíl hodu, od kterého se úhyb nehraje (4), nebo 0 = strop se na tuhle aktivaci nevztahuje.
+static int dodgeCapFor(const GameState& state, const Player& mover, bool aboutTheBall) {
+    if (!g_dodgeCapEnabled) return 0;
+    // Poslední aktivace = nikdo další už hrát nebude. ⛔ Ne přes `teammatesStillToAct`: hráč,
+    // který se právě přesunul, má `hasActed` ještě false (uzavře mu ho až první akce dalšího
+    // hráče, action_resolver.cpp), takže by výjimka po přesunu spoluhráče nenastala (review H2).
+    int stillToAct = 0;
+    state.forEachOnPitch(mover.teamSide, [&](const Player& mate) {
+        if (mate.id != mover.id && !mate.hasActed && !mate.hasMoved && mate.canAct()) ++stillToAct;
+    });
+    if (stillToAct == 0) return 0;
+    if (aboutTheBall && state.getTeamState(mover.teamSide).turnNumber >= 8) return 0;
+    return kDodgeCapTarget;
+}
+
 // Score a MOVE action: lower is better.
 // Prefers: close to target, no enemy TZ, no GFI.
 // LEAP do makrove chuze (rodina M), 26.08.2026. Default OFF -- pri OFF je
@@ -1099,6 +1136,21 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
     // prezit = P(dodge OK) * P(GFI OK).
     if (!hasDodge) return failChance;
     return 1.0 - (rerollLive + rerollGone) * (1.0 - failChance);
+}
+
+// P149: smí tento blitzující na cíl? Ne, když jeho doběh vede přes úhyb na 4+ a horší
+// (kromě výjimek v dodgeCapFor), a ne, když k cíli vůbec nedojde (hra by blitz spálila).
+// ⛔ Cestu čte `blitzApproachHitsDodgeCap` přehráním smyčky hry. `estimateApproachFailChance`
+//   výš oceňuje starou hladovou cestu `pickApproachStep` — první verze stropu se o ni opřela
+//   a Runner 5 v tahu 5 partie 02.10. dál blitzoval přes úhyby 5+, 4+, 4+ (kniha P155).
+// ⚠️ Hlídá se při VÝBĚRU blitzujícího (expandBlitz), ne v nabídce (kniha P156).
+static bool blitzDodgeCapped(const GameState& state, const Player& blitzer, const Player& target) {
+    const bool aboutTheBall = state.ball.isHeld && state.ball.carrierId == target.id;
+    const int cap = dodgeCapFor(state, blitzer, aboutTheBall);
+    if (cap == 0) return false;
+    bool reaches = true;
+    const bool hit = blitzApproachHitsDodgeCap(state, blitzer, target.position, cap, &reaches);
+    return hit || !reaches;
 }
 
 // Combined estimate used to rank blitzer candidates for a fixed target:
@@ -2821,7 +2873,8 @@ void takeMoveWalkProfile(long* out4) {
 
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
-                              int maxSteps = 12, Position avoid = {-1, -1}) {
+                              int maxSteps = 12, Position avoid = {-1, -1},
+                              int dodgeCap = 0) {
     Position lastPos{-1, -1};  // Detect loops -- jen LEAP vetev nize, BFS nebloudi z konstrukce
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
@@ -2878,6 +2931,15 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
             } // loop
 
             lastPos = p.position;
+        }
+
+        // P149: krok, který by znamenal úhyb na `dodgeCap`+ a horší, se neudělá — hráč zůstane,
+        // kam bezpečně došel. Brána je pole, které se OPOUŠTÍ (jako v move_handler a pathFailProb).
+        if (dodgeCap > 0 && bestMove.target != p.position &&
+            countTacklezones(state, p.position, p.teamSide) > 0 &&
+            calculateDodgeTarget(state, p, bestMove.target, p.position) >= dodgeCap) {
+            ++g_dodgeCapStops[0];
+            return false;
         }
 
         Position before = p.position;
@@ -3385,13 +3447,12 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
 
     const Player& target = state.getPlayer(macro.targetId);
 
-    // Find best BLITZ action for this target (prefer more dice, closer blitzer)
+    // Nejbezpečnější blitzující na tento cíl (kostky + doběh), který projde stropem na úhyb.
     std::vector<Action> actions;
     getAvailableActions(state, actions);
 
     Action bestBlitzAction{};
     bool found = false;
-    double bestFail = 2.0; // worse than any real fail chance (max 1.0)
     // P35: with the arm on, the same ranking is also run the old way, purely so
     // the counter can say whether the arm changed anything. Zero repicks over a
     // matchup means the two arms executed the same decision -- the null-arm test
@@ -3400,6 +3461,9 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     //   skoda na urovni prahu vyloucena). Rameno odebrano -- default-OFF
     //   rameno, ktere neskodi, je jen dalsi hotova vec, o ktere nikdo nevi
     //   (B2, 30.08., tyz duvod).
+    // P149: kandidáti seřazení od nejmenšího rizika; bere se první, jehož doběh nevede přes
+    // úhyb na 4+ a horší (strop se počítá jen pro ty, na které přijde řada).
+    std::vector<std::pair<double, Action>> ranked;
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
@@ -3407,12 +3471,16 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        double fail = estimateBlitzFailChance(state, blitzer, target);
-        if (fail < bestFail) {
-            bestFail = fail;
-            bestBlitzAction = a;
-            found = true;
-        }
+        ranked.emplace_back(estimateBlitzFailChance(state, blitzer, target), a);
+    }
+    std::stable_sort(ranked.begin(), ranked.end(),
+                     [](const auto& x, const auto& y) { return x.first < y.first; });
+    for (const auto& ranking : ranked) {
+        const Action& a = ranking.second;
+        if (blitzDodgeCapped(state, state.getPlayer(a.playerId), target)) { ++g_dodgeCapStops[1]; continue; }
+        bestBlitzAction = a;
+        found = true;
+        break;
     }
 
     if (!found) return result;
@@ -3536,7 +3604,12 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     // still loose (project_bloodbowl_audit_findings_20260703 finding 6).
     const Player& picker = state.getPlayer(macro.playerId);
     int maxSteps = picker.movementRemaining + maxGfiSquares(picker);
-    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps);
+    // P149 (uživatel 06.10.: „úhyby při zvedání míče mají mít také strop“): cesta k míči i běh
+    // po zvednutí nevedou přes úhyb na 4+ a horší. Jde o míč ⇒ v posledním kole poločasu strop
+    // neplatí; poslední aktivace tahu také ne (dodgeCapFor). Hod na zvednutí strop neřeší (P154/K4).
+    const int pickupDodgeCap = dodgeCapFor(state, picker, /*aboutTheBall=*/true);
+    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps,
+                     Position{-1, -1}, pickupDodgeCap);
     if (result.turnover) return result;
 
     // After pickup: if we now have the ball, advance toward endzone.
@@ -3551,7 +3624,10 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
         p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
         const int budget = p.movementRemaining;
         const Position dest = farthestSafeForward(state, p, budget);
-        if (dest != p.position) movePlayerToward(state, macro.playerId, dest, dice, result, budget);
+        if (dest != p.position) {
+            movePlayerToward(state, macro.playerId, dest, dice, result, budget,
+                             Position{-1, -1}, pickupDodgeCap);
+        }
         return result;
     }
     if (state.ball.isHeld && state.ball.carrierId == macro.playerId &&
@@ -3563,7 +3639,8 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
         if (targetY < 5) targetY++;
         else if (targetY > 9) targetY--;
         Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(targetY)};
-        movePlayerToward(state, macro.playerId, target, dice, result, steps);
+        movePlayerToward(state, macro.playerId, target, dice, result, steps,
+                         Position{-1, -1}, pickupDodgeCap);
     }
     return result;
 }
@@ -3786,8 +3863,14 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
         addBackMoveTurnoverCause(gfiTOBefore);
     }
 
+    // P149: přesun nikdy přes úhyb na 4+ a horší (výjimky v dodgeCapFor). „Jde o míč“ =
+    // přesouvá se sám nosič, nebo cíl sousedí s míčem / jeho nosičem.
+    const bool aboutTheBall = state.ball.isOnPitch() &&
+        ((state.ball.isHeld && state.ball.carrierId == macro.playerId) ||
+         macro.targetPos.distanceTo(state.ball.position) <= 1);
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
-                     maxSteps, avoid);
+                     maxSteps, avoid,
+                     dodgeCapFor(state, state.getPlayer(macro.playerId), aboutTheBall));
 
     // 09.09.2026: mechanismova metrika W-GFI -- jen z pripadu, kdy arm GFI
     // skutecne POVOLIL (ne kdy jen mel prilezitost), zjisti se, jestli krok

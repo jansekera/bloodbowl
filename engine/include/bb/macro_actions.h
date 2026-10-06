@@ -34,6 +34,13 @@ void takeMoveWalkLimitDist(long* out5);
 void takeBlitzAndScoreReal(long* out3);
 
 
+// P149 (06.10.2026): strop na úhyb v makrech BLITZ, REPOSITION a PICKUP (4+ a horší se nehraje;
+// výjimky: poslední aktivace tahu, míč v posledním kole; skórující makra strop nemají). Zapnuto; vypínat jen pro párové
+// měření „před / po“. takeDodgeCapStops: [0] zastavená chůze, [1] vyřazený blitzující —
+// počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
+void setDodgeCapEnabled(bool on);
+void takeDodgeCapStops(long* out2);
+
 enum class MacroType : uint8_t {
     SCORE = 0,
     ADVANCE,

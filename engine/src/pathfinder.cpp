@@ -311,8 +311,36 @@ inline int bestLayerIdx(const int* key, int sq) {
 }
 } // namespace
 
-bool nextStepTowardAdjacent(const GameState& state, const Player& player,
-                            Position target, Position& outStep) {
+// Cílový uzel doběhu blitzu: nejlevnější dosažitelné pole VEDLE cíle (při shodě to, odkud
+// odtlačení míří od našeho nosiče). Jedno místo pro chůzi (`nextStepTowardAdjacent`) i pro
+// kontrolu cesty (`worstDodgeOnBlitzApproach`, P149) — aby obě četly TUTÉŽ cestu.
+// `costOnlyIdx` = uzel podle samotné ceny (pro čítač, kolikrát shodu rozhodl nosič).
+static int pickAdjacentGoalNode(const GameState& state, const Player& player, Position target,
+                                int budget, const int* key, const int8_t* steps,
+                                const Player*& carrierOut, int& costOnlyIdx) {
+    const int startIdx = gridIdx(player.position.x, player.position.y);
+    const Player* carrier = ourCarrierForPush(state, player);
+    carrierOut = carrier;
+    int bestIdx = -1, bestKey = kInfCost, bestTie = -1;
+    costOnlyIdx = -1;
+    for (int i = 0; i < kNodeCount; ++i) {
+        const int sq = i % GRID_SIZE;
+        if (key[i] >= kInfCost || sq == startIdx) continue;
+        if (steps[i] > budget - 1) continue;
+        Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
+        if (p2.distanceTo(target) != 1) continue;
+        const int tie = carrier ? pushAwayScore(p2, target, carrier->position) : 0;
+        if (key[i] < bestKey || (key[i] == bestKey && tie > bestTie)) {
+            bestKey = key[i]; bestIdx = i; bestTie = tie;
+        }
+        if (costOnlyIdx < 0 || key[i] < key[costOnlyIdx]) costOnlyIdx = i;
+    }
+    return bestIdx;
+}
+
+// `countDiag` = false: dotaz (P149), čítače chůze se nemění.
+static bool nextStepTowardAdjacentImpl(const GameState& state, const Player& player,
+                                       Position target, Position& outStep, bool countDiag) {
     const int budget = movementAfterStandUp(player) + maxGfiSquares(player);
     if (budget <= 0) return false;
 
@@ -375,26 +403,11 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     //   vyse. `carrier == nullptr` (nemame mic, nosic je mimo hriste, nebo je
     //   to blitzujici sam) ⇒ vsechna `tie` jsou 0, prvni nalezene minimum tedy
     //   vyhrava presne jako pred touhle zmenou.
-    const Player* carrier = ourCarrierForPush(state, player);
-    int bestIdx = -1, bestKey = kInfCost, bestTie = -1;
-    // ⭐ Co by vybralo pravidlo BEZ tiebreaku -- tedy prvni STRIKTNI minimum
-    //   ceny, presne jak to delal kod pred `a1d9b77d`. Slouzi jen cítaci:
-    //   `flips` smi tiknout jen kdyz se vitez opravdu LISI (viz r. 54-70).
+    const Player* carrier = nullptr;
     int costOnlyIdx = -1;
-    for (int i = 0; i < kNodeCount; ++i) {
-        const int sq = i % GRID_SIZE;
-        if (key[i] >= kInfCost || sq == startIdx) continue;
-        if (steps[i] > budget - 1) continue;
-        Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
-        if (p2.distanceTo(target) != 1) continue;
-        const int tie = carrier ? pushAwayScore(p2, target, carrier->position) : 0;
-        if (key[i] < bestKey || (key[i] == bestKey && tie > bestTie)) {
-            bestKey = key[i]; bestIdx = i; bestTie = tie;
-        }
-        if (costOnlyIdx < 0 || key[i] < key[costOnlyIdx]) costOnlyIdx = i;
-    }
+    const int bestIdx = pickAdjacentGoalNode(state, player, target, budget, key, steps, carrier, costOnlyIdx);
     if (bestIdx < 0) return false;
-    if (carrier) {
+    if (carrier && countDiag) {
         ++g_blitzPushTieEligible;
         if (bestIdx != costOnlyIdx) ++g_blitzPushTieFlips;
     }
@@ -404,10 +417,55 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     if (parent[idx] != startIdx) return false;
     outStep = Position{static_cast<int8_t>((idx % GRID_SIZE) % GRID_W),
                        static_cast<int8_t>((idx % GRID_SIZE) / GRID_W)};
-    const Position greedy = pickApproachStep(state, player, player.position, target);
-    if (greedy != outStep) ++g_blitzPathPicks;
+    if (countDiag) {
+        const Position greedy = pickApproachStep(state, player, player.position, target);
+        if (greedy != outStep) ++g_blitzPathPicks;
+    }
     return true;
 }
+
+bool nextStepTowardAdjacent(const GameState& state, const Player& player,
+                            Position target, Position& outStep) {
+    return nextStepTowardAdjacentImpl(state, player, target, outStep, /*countDiag=*/true);
+}
+
+// P149 (06.10.2026): vede doběh blitzu k cíli přes úhyb na `cap`+ a horší?
+// ⛔ Přehrává SMYČKU HRY, ne jedno hledání: blitz v action_resolver.cpp po KAŽDÉM kroku hledá
+//   znovu (`nextStepTowardAdjacent`). Jedno hledání s celým řetězem se s chůzí rozcházelo
+//   (review 06.10., fuzz 30 000 pozic: 337 úniků) — Break Tackle platí jen na první úhyb
+//   (move_handler.cpp, P77), vrstva rerollu dovednosti Dodge se po kroku počítá od začátku,
+//   a shody cen se po kroku rozhodnou jinak. Proto kopie stavu, krok bez kostek, znovu hledat.
+// Čítače chůze se tu nepočítají — je to dotaz, ne tah. Nedojde-li hráč, vrací false
+// (takový blitz hra neprovede; vyřazuje ho volající).
+bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Position target,
+                               int cap, bool* reachesOut) {
+    if (reachesOut) *reachesOut = true;
+    if (player.position.distanceTo(target) <= 1) return false;
+    GameState sim = state.clone();
+    Player& w = sim.getPlayer(player.id);
+    if (w.state == PlayerState::PRONE) {     // vstání: rozpočet má jedno místo (ř. 690-695)
+        w.movementRemaining = static_cast<int8_t>(movementAfterStandUp(player));
+        w.state = PlayerState::STANDING;
+    }
+    for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
+        Position next;
+        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) {
+            if (reachesOut) *reachesOut = false;
+            return false;
+        }
+        if (countTacklezones(sim, w.position, w.teamSide) > 0) {
+            if (calculateDodgeTarget(sim, w, next, w.position) >= cap) return true;
+            if (w.hasSkill(SkillName::BreakTackle) && !w.breakTackleUsedThisTurn &&
+                w.stats.strength > w.stats.agility) {
+                w.breakTackleUsedThisTurn = true;
+            }
+        }
+        w.position = next;
+        if (w.movementRemaining > 0) --w.movementRemaining;
+    }
+    return false;
+}
+
 
 // Viz pathfinder.h -- 09.09.2026, zobecneni M14b pro OBECNY pohyb
 // (`movePlayerToward`, macro_actions.cpp). `budget` je EXPLICITNI parametr

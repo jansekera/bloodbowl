@@ -1,3 +1,4 @@
+#include <random>
 #include <gtest/gtest.h>
 #include "bb/macro_actions.h"
 #include "bb/game_state.h"
@@ -4084,4 +4085,330 @@ TEST(MacroActions, P71AHungryVampireIsOfferedOnlyTheWalkToAThrall) {
     EXPECT_EQ(others, 0) << "hladovy upir bez Thralla ma mit JEN cestu k nemu";
     EXPECT_EQ(walk->targetPos.distanceTo(t.position), 1);
     EXPECT_EQ(walk->gfiAllowance, 0) << "4 pole na MA 4 nepotrebuji GFI";
+}
+
+// ---------------------------------------------------------------------------
+// P149 (06.10.2026): strop na úhyb — makra BLITZ a REPOSITION nevedou přes úhyb
+// na 4+ a horší. Výjimky: poslední aktivace tahu; míč v posledním kole poločasu.
+// Úhyb: 7 − AG − 1 (+1 za každou zónu na cílovém poli), ř. pravidel o Dodge;
+// AG2 do volného pole = 4+, AG3 do volného pole = 3+.
+// ---------------------------------------------------------------------------
+namespace {
+
+// HOME 1 stojí na (10,7) v zóně AWAY 13 na (11,8); AWAY 12 daleko; HOME 2 ještě nehrál.
+GameState makeDodgeCapState(int moverAgility) {
+    GameState state = makeMinimalState();
+    Player& p1 = state.getPlayer(1);
+    p1.stats = {5, 3, static_cast<int8_t>(moverAgility), 9};
+    p1.movementRemaining = 5;
+
+    Player& mate = state.getPlayer(2);
+    mate.id = 2;
+    mate.teamSide = TeamSide::HOME;
+    mate.state = PlayerState::STANDING;
+    mate.position = {3, 3};
+    mate.stats = {4, 3, 2, 9};
+    mate.movementRemaining = 4;
+
+    Player& marker = state.getPlayer(13);
+    marker.id = 13;
+    marker.teamSide = TeamSide::AWAY;
+    marker.state = PlayerState::STANDING;
+    marker.position = {11, 8};
+    marker.stats = {6, 3, 3, 8};
+    marker.movementRemaining = 6;
+
+    state.getPlayer(12).position = {22, 11};
+    state.ball = BallState::carried({22, 11}, 12);
+    return state;
+}
+
+struct DodgeCapOff {   // vypne strop jen na dobu testu
+    DodgeCapOff() { setDodgeCapEnabled(false); }
+    ~DodgeCapOff() { setDodgeCapEnabled(true); }
+};
+
+}  // namespace
+
+TEST(DodgeCap, RepositionDoesNotDodgeOnFourPlus) {
+    Macro away{MacroType::REPOSITION, 1, -1, {10, 3}};
+    {
+        GameState state = makeDodgeCapState(2);   // AG2: odchod ze zóny = 4+
+        DiceRoller dice(42);
+        auto result = greedyExpandMacro(state, away, dice);
+        EXPECT_TRUE(result.actions.empty());
+        EXPECT_FALSE(result.turnover);
+        EXPECT_EQ(state.getPlayer(1).position, (Position{10, 7}));
+    }
+    {   // pozitivní kontrola: bez stropu táž pozice úhyb hraje
+        DodgeCapOff off;
+        GameState state = makeDodgeCapState(2);
+        DiceRoller dice(42);
+        auto result = greedyExpandMacro(state, away, dice);
+        EXPECT_FALSE(result.actions.empty());
+    }
+}
+
+TEST(DodgeCap, RepositionStillDodgesOnThreePlus) {
+    GameState state = makeDodgeCapState(3);       // AG3: odchod ze zóny do volného pole = 3+
+    DiceRoller dice(42);
+    Macro away{MacroType::REPOSITION, 1, -1, {10, 3}};
+    auto result = greedyExpandMacro(state, away, dice);
+    EXPECT_FALSE(result.actions.empty());
+}
+
+TEST(DodgeCap, LastActivationOfTheTurnMayDodge) {
+    GameState state = makeDodgeCapState(2);
+    state.getPlayer(2).hasActed = true;           // nikdo další už nehraje ⇒ neúspěch nic nestojí
+    DiceRoller dice(42);
+    Macro away{MacroType::REPOSITION, 1, -1, {10, 3}};
+    auto result = greedyExpandMacro(state, away, dice);
+    EXPECT_FALSE(result.actions.empty());
+}
+
+TEST(DodgeCap, RepositionStopsInTheMiddleOfOneWalk) {
+    // Řada soupeřů na x=11 (y = 1, 4, 7, 10, 13) kryje zónami celý pás x = 10..12 přes šířku
+    // hřiště — obejít nejde. AG2 jde z (7,6) na (14,6): do pásu vejde zdarma, další krok by byl
+    // odchod ze zóny do pole v zóně (AG2: 5+ a horší) ⇒ chůze skončí nejdál na x=10.
+    auto position = [] {
+        GameState state = makeDodgeCapState(2);
+        Player& p1 = state.getPlayer(1);
+        p1.position = {7, 6};
+        p1.stats.movement = 7;
+        p1.movementRemaining = 7;
+        const int ys[] = {1, 4, 7, 10, 13};
+        for (int i = 0; i < 5; ++i) {
+            Player& e = state.getPlayer(13 + i);
+            e.id = 13 + i;
+            e.teamSide = TeamSide::AWAY;
+            e.state = PlayerState::STANDING;
+            e.position = {11, static_cast<int8_t>(ys[i])};
+            e.stats = {6, 3, 3, 8};
+            e.movementRemaining = 6;
+        }
+        return state;
+    };
+    const Macro across{MacroType::REPOSITION, 1, -1, {14, 6}};
+    {
+        GameState state = position();
+        DiceRoller dice(42);
+        auto result = greedyExpandMacro(state, across, dice);
+        EXPECT_FALSE(result.turnover);
+        EXPECT_FALSE(result.actions.empty());                    // část cesty ušel
+        EXPECT_GT(state.getPlayer(1).position.x, 7);
+        EXPECT_LE(state.getPlayer(1).position.x, 10);            // za pás zón se nedostal
+    }
+    {   // pozitivní kontrola: bez stropu úhyb hází (projde dál, nebo padne)
+        DodgeCapOff off;
+        GameState state = position();
+        DiceRoller dice(42);
+        auto result = greedyExpandMacro(state, across, dice);
+        EXPECT_TRUE(result.turnover || state.getPlayer(1).position.x > 10);
+    }
+}
+
+TEST(DodgeCap, PickupDoesNotDodgeOnFourPlus) {
+    // Uživatel 06.10.: „úhyby při zvedání míče mají mít také strop“. AG2 v zóně, míč tři pole
+    // opodál: cesta k němu začíná úhybem na 4+.
+    auto position = [](int turn) {
+        GameState state = makeDodgeCapState(2);
+        state.homeTeam.turnNumber = turn;
+        state.ball = BallState::onGround({10, 4});
+        return state;
+    };
+    const Macro pickup{MacroType::PICKUP, 1, -1, {10, 4}};
+    {
+        GameState state = position(3);
+        DiceRoller dice(42);
+        auto result = greedyExpandMacro(state, pickup, dice);
+        EXPECT_TRUE(result.actions.empty());
+        EXPECT_FALSE(result.turnover);
+    }
+    {   // pozitivní kontrola: bez stropu k míči jde
+        DodgeCapOff off;
+        GameState state = position(3);
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, pickup, dice).actions.empty());
+    }
+    {   // výjimka: poslední kolo poločasu, jde o míč
+        GameState state = position(8);
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, pickup, dice).actions.empty());
+    }
+}
+
+TEST(DodgeCap, LastActivationCountsATeammateWhoJustMoved) {
+    // Spoluhráč 2 opravdu odehraje přesun (hasMoved, ale hasActed se mu uzavře až akcí dalšího
+    // hráče). Hráč 1 je pak skutečně poslední ⇒ výjimka platí a úhyb na 4+ smí zkusit.
+    GameState state = makeDodgeCapState(2);
+    DiceRoller dice(42);
+    auto mateMove = greedyExpandMacro(state, Macro{MacroType::REPOSITION, 2, -1, {5, 3}}, dice);
+    ASSERT_FALSE(mateMove.actions.empty());
+    ASSERT_FALSE(state.getPlayer(2).hasActed);                   // předpoklad testu: stav po skutečném přesunu
+    auto result = greedyExpandMacro(state, Macro{MacroType::REPOSITION, 1, -1, {10, 3}}, dice);
+    EXPECT_FALSE(result.actions.empty());
+}
+
+TEST(DodgeCap, BlitzTakesTheNextCandidateWhenTheBestIsCapped) {
+    // Hráč 1 (v zóně 13) by na cíl 12 musel přes úhyb; hráč 2 stojí volně o dvě pole od cíle.
+    GameState state = makeDodgeCapState(2);
+    state.getPlayer(12).position = {12, 5};
+    state.ball = BallState::carried({12, 5}, 12);
+    state.getPlayer(2).position = {12, 2};
+    DiceRoller dice(42);
+    auto result = greedyExpandMacro(state, Macro{MacroType::BLITZ, -1, 12, {-1, -1}}, dice);
+    ASSERT_FALSE(result.actions.empty());
+    EXPECT_EQ(result.actions[0].playerId, 2);
+}
+
+TEST(DodgeCap, CarrierMayDodgeInTheLastTurnOfTheHalf) {
+    // Výjimka „jde o míč v posledním kole“ platí i pro samotného nosiče (review M1).
+    auto position = [](int turn) {
+        GameState state = makeDodgeCapState(2);
+        state.homeTeam.turnNumber = turn;
+        state.ball = BallState::carried({10, 7}, 1);
+        return state;
+    };
+    const Macro away{MacroType::REPOSITION, 1, -1, {10, 3}};
+    {
+        GameState state = position(8);
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, away, dice).actions.empty());
+    }
+    {   // v jiném kole strop platí i pro nosiče
+        GameState state = position(3);
+        DiceRoller dice(42);
+        EXPECT_TRUE(greedyExpandMacro(state, away, dice).actions.empty());
+    }
+}
+
+// Jeden test na místě, kudy prochází všechno: předpověď stropu proti SKUTEČNÉ chůzi blitzu
+// (smyčka hry: nextStepTowardAdjacent + resolveMoveStep, všechny hody 6). Náhodné pozice
+// s Dodge, Break Tackle, Tackle, ležícím blitzujícím a vlastním nosičem (sestavil reviewer
+// 06.10.; první verze dotazu tu měla 337 úniků z 30 000).
+TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
+    struct Six : DiceRollerBase {
+        int rollD6() override { return 6; }
+        int rollD8() override { return 1; }
+    };
+    std::mt19937 rng(12345);
+    auto R = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
+    int checked = 0, walksWithRiskyDodge = 0, leaks = 0, falseBlocks = 0, reachMismatch = 0;
+    for (int it = 0; it < 2500; ++it) {
+        GameState s;
+        s.phase = GamePhase::PLAY; s.activeTeam = TeamSide::HOME; s.half = 1;
+        s.homeTeam.turnNumber = 3; s.weather = Weather::NICE;
+        Position c{static_cast<int8_t>(R(6, 19)), static_cast<int8_t>(R(4, 10))};
+        auto place = [&](int id, TeamSide side, Position pos) -> Player* {
+            if (!pos.isOnPitch() || s.getPlayerAtPosition(pos)) return nullptr;
+            Player& p = s.getPlayer(id);
+            p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+            p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+            return &p;
+        };
+        Player* b = place(1, TeamSide::HOME, c);
+        b->stats = {static_cast<int8_t>(R(4, 8)), static_cast<int8_t>(R(2, 5)), static_cast<int8_t>(R(2, 4)), 8};
+        b->movementRemaining = b->stats.movement;
+        if (R(0, 1)) b->skills.add(SkillName::Dodge);
+        if (R(0, 1)) b->skills.add(SkillName::BreakTackle);
+        if (R(0, 3) == 0) b->state = PlayerState::PRONE;
+        Position tp{-1, -1};
+        Player* t = nullptr;
+        for (int k = 0; k < 50 && !t; ++k) {
+            tp = {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))};
+            if (tp.distanceTo(c) >= 2) t = place(12, TeamSide::AWAY, tp);
+        }
+        if (!t) continue;
+        const int na = R(1, 7);
+        for (int i = 0; i < na; ++i) {
+            Player* a = place(13 + i, TeamSide::AWAY,
+                              {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+            if (a && R(0, 5) == 0) a->skills.add(SkillName::Tackle);
+        }
+        const int nh = R(0, 4);
+        for (int i = 0; i < nh; ++i) {
+            place(2 + i, TeamSide::HOME,
+                  {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+        }
+        if (R(0, 1) && s.getPlayer(2).isOnPitch()) s.ball = BallState::carried(s.getPlayer(2).position, 2);
+        else s.ball = BallState::carried(tp, 12);
+
+        bool predReaches = true;
+        const bool predHit = blitzApproachHitsDodgeCap(s, *b, tp, 4, &predReaches);
+
+        GameState w = s.clone();
+        Six dice;
+        Player& wb = w.getPlayer(1);
+        if (wb.state == PlayerState::PRONE) {
+            if (!resolveStandUp(w, 1, dice, nullptr).success) continue;
+        }
+        int real = 0, guard = 0;
+        bool reached = true;
+        while (wb.position.distanceTo(tp) > 1) {
+            Position nx;
+            if (!nextStepTowardAdjacent(w, wb, tp, nx) || ++guard > 30) { reached = false; break; }
+            if (countTacklezones(w, wb.position, wb.teamSide) > 0) {
+                real = std::max(real, calculateDodgeTarget(w, wb, nx, wb.position));
+            }
+            if (real >= 4) break;      // dotaz končí na prvním úhybu nad stropem; dál se neporovnává
+            const Position before = wb.position;
+            auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+            if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
+        }
+        ++checked;
+        if (real >= 4) {
+            ++walksWithRiskyDodge;
+            if (!predHit) ++leaks;
+        } else if (predHit) {
+            ++falseBlocks;
+        } else if (predReaches != reached) {
+            ++reachMismatch;
+        }
+    }
+    EXPECT_GT(checked, 1500);
+    EXPECT_GT(walksWithRiskyDodge, 100);     // pozitivní kontrola: vzorek rizikové doběhy obsahuje
+    EXPECT_EQ(leaks, 0);                     // chůze by hodila úhyb 4+ a horší, dotaz to neviděl
+    EXPECT_EQ(falseBlocks, 0);               // dotaz zakázal doběh, který takový úhyb nemá
+    EXPECT_EQ(reachMismatch, 0);             // „dojde / nedojde“ se shoduje s chůzí
+}
+
+TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {
+    // Blitzující AG2 stojí v zóně 13; cíl 12 je o dvě pole dál ⇒ doběh začíná úhybem ze zóny
+    // na pole vedle cíle (AG2: 5+). Hlídá se VÝBĚR blitzujícího: makro BLITZ na ten cíl se nerozbalí do žádné akce.
+    auto position = [] {
+        GameState state = makeDodgeCapState(2);
+        state.getPlayer(12).position = {12, 5};
+        state.ball = BallState::carried({12, 5}, 12);
+        return state;
+    };
+    const Macro blitzFar{MacroType::BLITZ, -1, 12, {-1, -1}};
+    {
+        GameState state = position();
+        DiceRoller dice(42);
+        EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+    }
+    {   // soused: žádný doběh, žádný úhyb ⇒ blitz se hraje dál
+        GameState state = position();
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, Macro{MacroType::BLITZ, -1, 13, {-1, -1}}, dice).actions.empty());
+    }
+    {   // pozitivní kontrola: bez stropu se týž blitz zahraje
+        DodgeCapOff off;
+        GameState state = position();
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+    }
+    {   // výjimka: poslední kolo poločasu a cílem je nosič míče
+        GameState state = position();
+        state.homeTeam.turnNumber = 8;
+        DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+    }
+    {   // poslední kolo, ale cíl míč nemá ⇒ strop platí dál
+        GameState state = position();
+        state.homeTeam.turnNumber = 8;
+        state.ball = BallState::carried({11, 8}, 13);
+        DiceRoller dice(42);
+        EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+    }
 }

@@ -528,6 +528,13 @@ PYBIND11_MODULE(bb_engine, m) {
         TurnPlanner(TurnPlanner&&) = delete;
     };
 
+    // P149: strop na úhyb 4+ a horší v makrech BLITZ / REPOSITION — vypínač jen pro měření před / po.
+    m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
+    m.def("take_dodge_cap_stops", []() {
+        long v[2]; bb::takeDodgeCapStops(v);
+        return py::make_tuple(v[0], v[1]);
+    });
+
     m.def("ai_choose_action", [](const bb::GameState& state, const std::string& ai, uint32_t seed,
                                  const std::string& weightsPath, int mctsIterations,
                                  float vfBlend, float policyBlend, bool riskDeferral) {

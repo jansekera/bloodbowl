@@ -417,6 +417,8 @@ NESMÍ se to měřit přes `leapWalkArm`** — buď se ta dvojitost napřed opra
 
 ## A11. ⭐⭐⭐ MÍČ MEZI VÍC NEPŘÁTELI — NEZVEDAT, PŘIVÉST VÍC SVÝCH *(uživatel 12.09.)*
 
+➕ **Uživatel 06.10.2026:** *„někdy je lepší obklíčit míč než jej zkusit zvedat — toto patří do celotahu“* ⇒ potvrzeno, je to tato situace. Čísla z 06.10. (kniha P154, 40 poločasů na `main`): tah se zvednutím končí turnoverem v 65 %, z toho 13× přímo na zvednutí; 9 zvednutí šlo na 4+ a horší. Úhyby cestou k míči od 06.10. zakazuje strop P149 — záměr „tohle kolo míč nezvedáme, obklíčíme ho“ ale dál nemá kam zapsat.
+
 **Doslova:** *„když je míč v sousedství více nepřátel, je i po odsunutí blitzem
 jednoho z nich možná zvednutí stále nebezpečné — pak je třeba jen postoupit
 k míči více našimi a ne pokoušet se o nepravděpodobné zvednutí."*
