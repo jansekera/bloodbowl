@@ -158,6 +158,24 @@ Kontrola, že diagnostika nemění hru: stejná semínka ⇒ stejné turnovery (
 - END_TURN vyhrává těsně: Q +0,671 proti +0,660 u nejlepšího jiného (lepší v 51 z 66), ač v nabídce byl REPOSITION (60 z 66), BLOCK (26), BLITZ (25).
 - ⇒ Otevřené: proč plánovač míří rohem na (20,7) a proč v tazích 9 a 28 mlčí. Teprve pak návrh (menší krok klece, přeskupení rohů podle P143).
 
+### C. Klec po fázích na dnešním `main` (P154)
+
+Uživatel 06.10.: *„měla by se pohybovat celá klec bezpečně kupředu už s aktuálními změnami — nebo se pletu?“*
+40 prvních poločasů AI × AI (trpaslíci přijímají, macro_mcts 50 iterací), po tahu trpaslíků; TD trpaslíků 8 ze 40.
+
+| fáze | tahů | turnover | s míčem po tahu | 4 rohy | 0–1 roh | rohy průměr | postup nosiče |
+|---|---|---|---|---|---|---|---|
+| 1 zvednutí (míč volný) | 54 | 35 = 65 % | 34 | 14 | 9 | 2,53 | — |
+| 2 klec — řadič rozhodl | 95 | 59 = 62 % | 91 | 22 | 50 | 1,77 | 2,69 pole |
+| s míčem, řadič nerozhodl nic | 48 | 18 = 38 % | 45 (+ 8 TD) | 2 | 37 | 0,89 | 3,36 pole |
+
+- Hody uvnitř maker, která řídí klec (mají být bez hodu kromě zvednutí): přesun rohu — úhyb na 4+ a horší 35×, na 2–3+ 8×;
+  zvednutí — 9× na 4+ a horší, 33× na 2–3+, cestou k míči 7 úhybů a 2 GFI.
+- Turnover ve fázi 2: 19× uvnitř makra klece (18× přesun rohu), 40× v makru hledání po kleci (blitz 10, přesun 8 + 4, faul 7 + 2, blok 6).
+- Stopa řadiče na pozicích z partie: tahy 5 a 7 — největší krok (6) vyšel DICEY a plán se zahodil celý; tahy 9, 11, 28 — cíl tahu SCORE_BALL, řadič ustoupil.
+- ⇒ Záměr „klec jde bezpečně kupředu“ v kódu je, ale neplní se: čtyři rohy má klec po tahu jen ve 22 z 91 tahů, které řadič řídil.
+- Výhrady: soupeřem je táž AI (elfové), 50 iterací, jedna dvojice ras.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

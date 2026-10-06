@@ -1,4 +1,6 @@
 #include "bb/one_cage.h"
+#include <cstdio>
+#include <cstdlib>
 #include "bb/helpers.h"
 #include "bb/pathfinder.h"
 #include "bb/turn_planner.h"
@@ -159,9 +161,25 @@ void CageController::planStart(const GameState& state) {
         return;
     }
 
-    if (goal != TurnGoal::ADVANCE_BALL) return;
+    // P150 (06.10.2026): stopa rozhodnutí řadiče pod BB_CAGE_DEBUG — proč tah klece není / je.
+    const bool dbg = std::getenv("BB_CAGE_DEBUG") != nullptr;
+    if (goal != TurnGoal::ADVANCE_BALL) {
+        if (dbg) std::fprintf(stderr, "[cage ctl] bez plánu: cíl tahu %d není ADVANCE_BALL\n", static_cast<int>(goal));
+        return;
+    }
     const Player& carrier = state.getPlayer(state.ball.carrierId);
-    if (!freeToAct(carrier)) return;
+    if (!freeToAct(carrier)) {
+        if (dbg) std::fprintf(stderr, "[cage ctl] bez plánu: nosič %d už hrál nebo nestojí\n", carrier.id);
+        return;
+    }
+    if (dbg) {
+        const ReleaseDecision r = decideRelease(state, carrier, planner_);
+        std::fprintf(stderr, "[cage ctl] nosič %d (%d,%d): do TD %d, tahů %d, krok klece %d, další tempo %d, "
+                     "klec doběhne %d, sólo doběhne %d, už vypuštěn %d => %s\n",
+                     carrier.id, carrier.position.x, carrier.position.y, r.dist, r.turnsLeft, r.cageStep,
+                     r.futurePace, r.cageMakesIt, r.soloMakesIt, released(state, carrier),
+                     (released(state, carrier) || r.release) ? "VÝBĚH (fáze 3)" : "KLEC (fáze 2)");
+    }
 
     if (!released(state, carrier) && !decideRelease(state, carrier, planner_).release) {
         // Fáze 2. Soupeř na poli rohu ⇒ napřed ho shodit (uživatel 02.10.).
@@ -205,6 +223,8 @@ void CageController::planStart(const GameState& state) {
     releasedHalf_ = state.half;
     releasedScore_ = state.homeTeam.score + state.awayTeam.score;
     const Position dest = farthestSafeForward(state, carrier, carrier.movementRemaining);
+    if (dbg) std::fprintf(stderr, "[cage ctl] výběh: nosič (%d,%d) -> (%d,%d)\n", carrier.position.x,
+                          carrier.position.y, dest.x, dest.y);
     if (dest != carrier.position) {
         Macro run{MacroType::REPOSITION, carrier.id, -1, dest};
         run.cageManaged = true;
@@ -226,6 +246,11 @@ void CageController::planAdvance(const GameState& state) {
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     if (!freeToAct(carrier)) return;
     CageAdvancePlan plan = planner_.build(state);
+    if (std::getenv("BB_CAGE_DEBUG")) {
+        std::fprintf(stderr, "[cage ctl] plán postupu: verdikt %d, platný %d, krok %d, rohy stojí %d, po tahu %d, maker %zu\n",
+                     static_cast<int>(plan.verdict), plan.valid, plan.step, plan.builtCorners,
+                     plan.filledCorners, plan.macros.size());
+    }
     if (plan.valid) queue_ = std::move(plan.macros);
 }
 
