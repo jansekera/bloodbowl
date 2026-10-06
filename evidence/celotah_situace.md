@@ -538,3 +538,11 @@ aby soupeři nezbyl čas na odpověď (uživatel za trpaslíky 02.10.). Patří 
 ## C. MÍSTO NA DALŠÍ
 
 *(sem se dopisuje průběžně; nesnažit se to uzavřít)*
+
+## A16. ZDRŽET TOUCHDOWN DO POSLEDNÍHO KOLA *(uživatel 06.10.: „ano — ale až v rámci celotahu“)*
+
+Když má tým nosiče v bezpečí a TD na dosah, neskóruje hned, ale až v posledním kole poločasu — soupeři nezbude tah na odpověď.
+Dnes AI skóruje, jakmile dosáhne (kniha **P151**, zkouška `evidence/zkouska_ai_plan_20261006.md` N3): v partii 02.–03.10. by dala TD
+v 6. kole 1. poločasu (18/20 plánů) a elfům by zbyly 3 tahy; uživatel čekal do 8. kola.
+Protipříklad z téže partie (2. pol., k7): čekání 1 pole od TD stálo turnover a ztrátu míče ⇒ podmínka „nosič v bezpečí“ je část pravidla, ne dodatek.
+
