@@ -289,6 +289,26 @@ v 79 tazích jen dostavění nebo bloky — a hledání pak nosiče odvedlo o 2,
 
 **Zkoušeno a vráceno:** držet nosiče v kleci, když postup nevyjde. TD trpaslíků 22 → 12 ze 40, rohy jen 1,04 → 1,40 — klec se nedostaví a nosič stojí. Nenasazeno.
 
+### Proč klec proti AI-soupeři nestojí (06.10. pozdě v noci)
+
+40 prvních poločasů AI × AI na `main` po opravách, 175 tahů trpaslíků s míčem.
+
+**Stav čtyř polí rohů hned po makrech řadiče klece** (114 tahů, kde řadič něco zahrál; průměr 2,48 rohu, 4 rohy ve 38 tazích):
+
+| stav pole rohu | podíl |
+|---|---|
+| obsazeno naším stojícím hráčem | 62 % |
+| prázdné — v dosahu jsou jen nepohnutí hráči v zóně soupeře | 16 % |
+| prázdné — volný nepohnutý hráč v dosahu je (plánovač ho minul) | 6 % |
+| soupeř stojí na poli rohu | 5 % |
+| prázdné — v dosahu jen hráči, kteří už v tahu hráli | 5 % |
+| soupeř leží na poli rohu · náš leží na rohu · nikdo v dosahu · mimo hřiště | 2 % · 2 % · 1 % · 1 % |
+
+- Trpaslík má na začátku tahu s míčem průměrně 4,4 hráče v zóně soupeře, 4,1 volného a 0,9 ležícího.
+- V 51 ze 114 tahů hledání po kleci ještě pohne nosičem (53× makrem ADVANCE) a rohy klesnou z 2,48 na 1,77. Kde nosič stál, rohy zůstaly (2,44 → 2,38).
+- Verdikt plánu na začátku tahu: postup 48 · jen dostavění 67 · neplatný (riskantní) 30 · výběh 11 · skórovací tah 12.
+- Zkoušeno a vráceno: (1) držet nosiče v kleci — TD 22 → 12; (2) nebrat na roh hráče v zóně soupeře — rohy beze změny, výběhů 11 → 38, TD 22 → 18.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.
