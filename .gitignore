@@ -138,3 +138,7 @@ q3_fouls_*_data/
 # Python prostředí se nezakládá v gitu (P118): viz requirements-py38.txt
 venv/
 venv.*/
+
+# Zkouška „AI plánuje tah“ (06.10.2026): desky po tazích a souhrn se dají znovu vyrobit skriptem
+/evidence/zkouska_ai_plan_20261006/tah_*.md
+/evidence/zkouska_ai_plan_20261006/souhrn.json
