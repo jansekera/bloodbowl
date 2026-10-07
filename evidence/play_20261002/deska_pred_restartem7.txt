@@ -1,0 +1,70 @@
+provedeno: ActionType.MOVE hrac=4 cil_hrac=-1 cil_pole=(13,8)
+   krok hráč 4 na (13, 8)
+vysledek: turnover=False
+aktivni tym: TeamSide.HOME  fáze: GamePhase.PLAY  kolo H:2 A:1
+mic: (13,8)  drzeny=True  nosic=4
+vyrez x=6..20 y=1..14 (cele hriste je x=0..25 y=0..14)
+
+     6        7        8        9        10       11       12       13       14       15       16       17       18       19       20       
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=1 |        |        |        |        |        |        |        |        |        |        |  1     |  1     |  1     |        |        |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=2 |        |        |        |        |        |        |        |        |        |        |  1     |WL12    |  1     |        |        |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=3 |        |        |        |        |        |        |  1     |  1     |  1     |        |  1     |  1     |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=4 |        |        |        |        |        |        |  1     |WTRG17  |  1     |        |  1     |  1     |  1     |  1     |WC19    |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=5 |        |        |        |        |        |DL11/0  |DL1/1   |  1     |  1     |        |  1     |WL15    |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=6 |DR5/0   |        |DTG6/0  |        |        |        |        |WL18_   |        |        |  1     |  1     |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=7 |        |        |        |        |        |        |DL3/0   |DBG8/0  |        |        |  1     |  1     |  1     |  1     |WL13    |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=8 |DTG7/0  |        |DL10/0  |        |        |        |        |DR4o/0  |        |        |  1     |WL16    |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=9 |        |        |        |        |        |        |        |        |        |        |  1     |  1     |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=10|        |        |        |        |        |        |DBG9/0  |  1     |DL2-/1  |  1     |  1     |  1     |  1     |  1     |WC20    |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=11|        |        |        |        |        |        |        |  1     |WW22    |  1     |  1     |WL14    |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=12|        |        |        |        |        |        |        |  1     |  1     |  1     |  1     |  1     |  1     |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=13|        |        |        |        |        |        |        |        |        |        |        |        |        |  1     |WW21    |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+y=14|        |        |        |        |        |        |        |        |        |        |        |        |        |  1     |  1     |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+
+D trpaslik (nas, HOME) · W wood-elf (jejich, AWAY) · +role (L/R/B/T/DR/C/W/TR) +ID
+cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje
+/n u D.. = VZDY (i /0) -- v kolika JEJICH zonach stoji
+u W.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned
+
+--- hráči (staty) ---
+   1 TRP (12, 5) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+   2 TRP (14,10) MA4 ST3 AG2 AV9 PlayerState.STANDING hral
+   3 TRP (12, 7) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+   4 TRP (13, 8) MA6 ST3 AG3 AV8 PlayerState.STANDING hral
+   5 TRP ( 6, 6) MA6 ST3 AG3 AV8 PlayerState.STANDING ceka
+   6 TRP ( 8, 6) MA5 ST3 AG2 AV8 PlayerState.STANDING ceka
+   7 TRP ( 6, 8) MA5 ST3 AG2 AV8 PlayerState.STANDING ceka
+   8 TRP (13, 7) MA5 ST3 AG3 AV9 PlayerState.STANDING ceka
+   9 TRP (12,10) MA5 ST3 AG3 AV9 PlayerState.STANDING ceka
+  10 TRP ( 8, 8) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+  11 TRP (11, 5) MA4 ST3 AG2 AV9 PlayerState.STANDING ceka
+  23 TRP (-1,-1) MA4 ST3 AG2 AV9 PlayerState.OFF_PITCH ceka
+  24 TRP (-1,-1) MA4 ST3 AG2 AV9 PlayerState.OFF_PITCH ceka
+  12 ELF (17, 2) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  13 ELF (20, 7) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  14 ELF (17,11) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  15 ELF (17, 5) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  16 ELF (17, 8) MA7 ST3 AG4 AV7 PlayerState.STANDING hral
+  17 ELF (13, 4) MA2 ST6 AG1 AV10 PlayerState.STANDING ceka
+  18 ELF (13, 6) MA7 ST3 AG4 AV7 PlayerState.PRONE ceka
+  19 ELF (20, 4) MA8 ST2 AG4 AV7 PlayerState.STANDING hral
+  20 ELF (20,10) MA8 ST2 AG4 AV7 PlayerState.STANDING hral
+  21 ELF (20,13) MA8 ST3 AG4 AV7 PlayerState.STANDING hral
+  22 ELF (14,11) MA8 ST3 AG4 AV7 PlayerState.STANDING hral
+  25 ELF (-1,-1) MA7 ST3 AG4 AV7 PlayerState.OFF_PITCH ceka
+  26 ELF (-1,-1) MA7 ST3 AG4 AV7 PlayerState.OFF_PITCH ceka
