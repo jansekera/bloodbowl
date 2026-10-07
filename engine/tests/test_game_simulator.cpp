@@ -788,7 +788,20 @@ TEST(DevelopedRoster, Tv1500SkavenRatOgreAndOneFastGutterRunner) {
     EXPECT_EQ(ma9, 3);
     EXPECT_EQ(grWrestle, 1) << "jeden Gutter Runner má Wrestle místo Block (uživatel 07.10.)";
     EXPECT_EQ(ratOgres, 1) << "Rat Ogre a rychlý Gutter Runner v jedné sestavě (uživatel 08.10.)";
-    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3);
+    // uživatel 08.10.: lovec = Gutter Runner s Wrestle a Horns; Linemani Wrestle místo Block;
+    // jeden Blitzer bez Mighty Blow (MB zůstává jemu druhému a Rat Ogrovi)
+    int hunters = 0, linemenWrestle = 0, linemenBlock = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.stats.movement == 9 && p.hasSkill(SkillName::Wrestle) && p.hasSkill(SkillName::Horns)) ++hunters;
+        const bool lineman = p.stats.movement == 7 && p.stats.armour == 7 && !p.hasSkill(SkillName::Pass);
+        if (lineman && p.hasSkill(SkillName::Wrestle)) ++linemenWrestle;
+        if (lineman && p.hasSkill(SkillName::Block)) ++linemenBlock;
+    });
+    EXPECT_EQ(hunters, 1);
+    EXPECT_EQ(linemenWrestle, 3);
+    EXPECT_EQ(linemenBlock, 0);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 4);
+    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 2);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }
 

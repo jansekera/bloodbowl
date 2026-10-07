@@ -67,7 +67,9 @@ final class Tv1500RostersTest extends TestCase
         $ma = array_count_values(array_map(static fn(MatchPlayerDTO $p): int => $p->getStats()->getMovement(), $players));
         $this->assertSame(1, $ma[10] ?? 0);
         $this->assertSame(3, $ma[9] ?? 0);
-        $this->assertSame(3, $this->withSkill($players, SkillName::Wrestle));
+        $this->assertSame(4, $this->withSkill($players, SkillName::Wrestle), '3 Linemani + lovec');
+        $this->assertSame(1, $this->withSkill($players, SkillName::Horns), 'lovec = Gutter Runner s Wrestle a Horns');
+        $this->assertSame(2, $this->withSkill($players, SkillName::MightyBlow), 'jeden Blitzer + Rat Ogre');
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
         $this->assertSame(1, $this->withSkill($players, SkillName::WildAnimal), 'Rat Ogre v téže sestavě (uživatel 08.10.)');
     }

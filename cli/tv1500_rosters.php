@@ -10,7 +10,7 @@ declare(strict_types=1);
  * agilní tým Side Step. Trpaslíci: rohy = čtyři Longbeardi („blitzeři nejsou vhodní na rohy, ale na
  * blitz a prořezávání cesty vpřed“); Stand Firm hlavně prorážečům (Blitzeři, Troll Slayeři), ne hráči
  * s Wrestle. Skaven: Rat Ogre i rychlý Gutter Runner v jedné sestavě. Výsledná hodnota týmu (ceny BB2016, 11 hráčů + 3 týmové
- * rerolly + lékárník): trpaslíci 1490 · wood-elf 1520 · skaven 1490 · ork 1500 · člověk 1490.
+ * rerolly + lékárník): trpaslíci 1490 · wood-elf 1520 · skaven 1520 · ork 1500 · člověk 1490.
  *
  * Řádek: [pozice, počet, [MA, ST, AG, AV], skilly]. Skilly jsou ÚPLNÉ (vrozené i dokoupené).
  */
@@ -40,14 +40,14 @@ const TV1500_ROSTERS = [
         ['Lineman',   2, [7, 3, 4, 7], [SkillName::Wrestle, SkillName::Dodge]],
     ],
     'Skaven' => [
-        ['Lineman',       1, [7, 3, 3, 7], []],
+        ['Lineman',       3, [7, 3, 3, 7], [SkillName::Wrestle]],
         ['Gutter Runner', 1, [10, 2, 4, 7], [SkillName::Dodge, SkillName::SureFeet, SkillName::Sprint, SkillName::Block, SkillName::SideStep]],
         ['Gutter Runner', 2, [9, 2, 4, 7], [SkillName::Dodge, SkillName::Block, SkillName::SideStep]],
-        ['Gutter Runner', 1, [9, 2, 4, 7], [SkillName::Dodge, SkillName::Wrestle, SkillName::SideStep]],
-        ['Blitzer',       2, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::MightyBlow]],
+        ['Gutter Runner', 1, [9, 2, 4, 7], [SkillName::Dodge, SkillName::Wrestle, SkillName::Horns, SkillName::SideStep]],
+        ['Blitzer',       1, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::MightyBlow]],
+        ['Blitzer',       1, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard]],
         ['Thrower',       1, [7, 3, 3, 7], [SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro]],
         ['Rat Ogre',      1, [6, 5, 2, 8], [SkillName::Loner, SkillName::Frenzy, SkillName::MightyBlow, SkillName::WildAnimal, SkillName::PrehensileTail]],
-        ['Lineman',       2, [7, 3, 3, 7], [SkillName::Wrestle]],
     ],
     'Orc' => [
         ['Blitzer',   2, [6, 3, 3, 9], [SkillName::Block, SkillName::Guard]],

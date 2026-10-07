@@ -1731,3 +1731,22 @@ TEST(BlockHandler, BlockWrestleAttackerWrestlesDownABlockWrestleDefender) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
+
+TEST(BlockHandler, CarrierBlockingABlockWrestleDefenderNeverPicksBothDown) {
+    // Uživatel 08.10.: „proč by nosič … vybral wrestle, aby ztratil míč?“ — nevybírá ho on.
+    // Wrestle je volba OBRÁNCE (Longbearda s Block + Wrestle), a ta nastane jen tehdy, když
+    // Both Down zůstane jako vybraná kostka. Útočník, který drží míč a kostku vybírá, ji proto
+    // nikdy nevezme, má-li jinou: ze dvou kostek [Both Down, Pushed] bere Pushed.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 3, 8);      // ST4 ⇒ 2 kostky, vybírá útočník
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    makeLongbeardWithWrestle(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({10, 7}, 1);
+    FixedDiceRoller dice({2, 3, 3, 3, 3});                         // Both Down, Pushed
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_TRUE(gs.ball.isHeld && gs.ball.carrierId == 1) << "nosič míč drží dál";
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "obránce byl jen odtlačen";
+}
