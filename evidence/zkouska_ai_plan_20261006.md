@@ -325,6 +325,40 @@ Měří se jen, jestli každý mechanismus dělá, co má (uživatel 07.10.: TD 
 - Co ještě nedělá: na konci tahu má klec průměrně jen 2,17 rohu (4 rohy ve 48 ze 178) — hledání po tahu řadiče rohy rozebere (roh zahraje blok 14×, blitz 6×, je sražen 10×; přesun rohu 18× už zavírá zámek).
 - Elfové (27 tahů s míčem): rohy 1,12, čtyři rohy 1 ze 17, nosič po tahu vedle soupeře ve 12 ze 17, do dvou polí od nosiče 2,29 spoluhráče ⇒ u elfů klec nestojí.
 
+### Klec — druhá dávka 07.10. (uvolnění blitzem a s asistencí, rohy drží, elfové)
+
+Zadání uživatele: klec vyřešit samostatně, zjistit, proč elfové klec nestaví, hledat, jak mít čistou klec na konci tahu; využít blok i blitz k uvolnění a příchod pro asistenci.
+
+**Co klec rozebíralo mezi tahem řadiče a koncem tahu (a je zavřeno):** roh po bloku vždy následoval · roh se vybíral jako blitzující ·
+nosič míče se vybíral jako blitzující (29 ze 183 tahů) · roh s Frenzy blokoval a musel následovat · hledání roh přesouvalo · záchranná volba zákazy obcházela.
+
+**Čistota klece na konci tahu** (40 prvních poločasů AI × AI):
+
+| | průměr rohů | čtyři rohy | 0–1 roh | hledání po kleci odvede nosiče |
+|---|---|---|---|---|
+| trpaslíci, 07.10. ráno (po a/b/c) | 2,17 | 48 ze 178 (27 %) | 65 | 20 % |
+| trpaslíci, po druhé dávce | 2,94 | 93 ze 198 (47 %) | 31 | 12 % |
+| elfové při příjmu, po druhé dávce | 2,63 | 33 ze 70 (47 %) | 20 | 9 % |
+
+- Elfové: ranní čísla (1,1 rohu) neplatila — `setup_half` nenastaví kopající tým (kniha P163), takže „elfové přijímají“ byli ve skutečnosti trpaslíci.
+  Při skutečném příjmu staví elfové klec stejně často jako trpaslíci; 10 % polí rohů jim obsazuje stojící trpaslík.
+
+**K čemu klec je — udržení míče přes tah soupeře podle počtu rohů po našem tahu:**
+
+| rohů po našem tahu | trpaslíci | elfové |
+|---|---|---|
+| 0 | 13 z 21 | 5 z 18 |
+| 1 | 9 ze 14 | 8 ze 14 |
+| 2 | 26 ze 30 | 6 z 12 |
+| 3 | 53 ze 60 | 6 z 10 |
+| 4 | 103 ze 103 | 60 ze 66 |
+
+- Tah soupeře klec nahlodá: trpaslíci 3,10 → 2,58 rohu (76× roh odtlačen, 30× sražen), elfové 3,27 → 2,73.
+
+**TD na závěr dávky** (40 poločasů na směr, nepárové): trpaslíci přijímají — trpaslíci 20, elfové 8, turnover 24 % a 44 %;
+elfové přijímají — elfové 16, trpaslíci 15. Trpaslíci při příjmu: 8 (ráno 06.10.) → 18 (strop + cena) → 22 (první část klece) → 20.
+Klec je čistší skoro dvakrát, počet TD se od první části klece nezměnil.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.
