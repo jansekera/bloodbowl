@@ -722,23 +722,30 @@ TEST(DevelopedRoster, DwarfLotsOfGuard) {
 
 // --- P165 (07.10.2026): úroveň TV1500 — co má stát na hřišti (jedenáctka) -------------------
 
-TEST(DevelopedRoster, Tv1500DwarfCornersHaveStandFirmAndMightyBlowOnBlitzers) {
+TEST(DevelopedRoster, Tv1500DwarfCornersAreLongbeardsWithStandFirm) {
     const TeamRoster* r = getDevelopedRoster("dwarf", 1500);
     ASSERT_NE(r, nullptr);
     GameState state;
     setupHalf(state, *r, *r);
-    // rohy klece: 2 Longbeardi s Guardem + 2 Blitzeři, všichni Stand Firm
-    EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 4);
-    // Mighty Blow: 2 Blitzeři (protilehlé rohy) + 2 Troll Slayeři (úderníci)
-    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 4);
-    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
-    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
-    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
-    int frenzyWithStandFirm = 0;   // Troll Slayer (Frenzy) na roh nepatří
+    // rohy klece = čtyři Longbeardi (MA4) se Stand Firm: dva s Guardem, dva s Mighty Blow
+    int sfLongbeards = 0, sfGuard = 0, sfMightyBlow = 0, sfOthers = 0, frenzyWithStandFirm = 0;
     state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
-        if (p.hasSkill(SkillName::Frenzy) && p.hasSkill(SkillName::StandFirm)) ++frenzyWithStandFirm;
+        if (!p.hasSkill(SkillName::StandFirm)) return;
+        if (p.stats.movement == 4) ++sfLongbeards; else ++sfOthers;
+        if (p.hasSkill(SkillName::Guard)) ++sfGuard;
+        if (p.hasSkill(SkillName::MightyBlow)) ++sfMightyBlow;
+        if (p.hasSkill(SkillName::Frenzy)) ++frenzyWithStandFirm;
     });
+    EXPECT_EQ(sfLongbeards, 4);
+    EXPECT_EQ(sfOthers, 0) << "Blitzeři na rohy nepatří (uživatel 07.10.) — Stand Firm nemají";
+    EXPECT_EQ(sfGuard, 2);
+    EXPECT_EQ(sfMightyBlow, 2);
     EXPECT_EQ(frenzyWithStandFirm, 0);
+    // Mighty Blow: 2 rohoví Longbeardi + 2 Blitzeři + 2 Troll Slayeři
+    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 6);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 4);     // 2 Longbeardi + 2 Troll Slayeři
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 1);
 }
 
 TEST(DevelopedRoster, Tv1500WoodElfPassingSkillsAndBlockLinemen) {
@@ -769,6 +776,13 @@ TEST(DevelopedRoster, Tv1500SkavenOneFastGutterRunner) {
     });
     EXPECT_EQ(ma10, 1);
     EXPECT_EQ(ma9, 3);
+    // uživatel 07.10.: jeden Gutter Runner má Wrestle místo Block (+ dva Linemani s Wrestle)
+    int grWrestle = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.stats.movement == 9 && p.hasSkill(SkillName::Wrestle) && !p.hasSkill(SkillName::Block)) ++grWrestle;
+    });
+    EXPECT_EQ(grWrestle, 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }
 

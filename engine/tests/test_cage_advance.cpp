@@ -977,3 +977,25 @@ TEST(CageAdvance, TakesAShorterStepWhenTheLongestNeedsDice) {
     }
     EXPECT_EQ(corners, 4) << "klec má po tahu všechny čtyři rohy";
 }
+
+// P165 (07.10.2026): na roh klece jde přednostně hráč, kterého z něj soupeř neodtlačí
+// (Stand Firm, u agilních Side Step), i když je o pole dál než hráč bez té dovednosti.
+TEST(CageAdvance, CornerGoesToThePlayerWhoCannotBePushedOffIt) {
+    auto assign = [](bool farPlayerHoldsCorner) {
+        GameState state = makeCageState();
+        // jen přední horní roh (13,6) je volný; kandidáti: hráč 4 hned vedle, hráč 6 o pole dál
+        state.getPlayer(4).position = {14, 5};
+        Player& far = state.getPlayer(6);
+        far.id = 6; far.teamSide = TeamSide::HOME; far.state = PlayerState::STANDING;
+        far.position = {15, 4}; far.stats = {4, 3, 2, 9}; far.movementRemaining = 4;
+        if (farPlayerHoldsCorner) far.skills.add(SkillName::StandFirm);
+        CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+        auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+        for (const auto& sa : a.slots) {
+            if (sa.slot == Position{13, 6}) return sa.playerId;
+        }
+        return -1;
+    };
+    EXPECT_EQ(assign(true), 6) << "hráč se Stand Firm má přednost";
+    EXPECT_EQ(assign(false), 4) << "pozitivní kontrola: bez dovednosti rozhoduje vzdálenost";
+}

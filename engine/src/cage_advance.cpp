@@ -320,6 +320,14 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
             bool aFree = countTacklezones(state, a->position, mySide, a->id) == 0;
             bool bFree = countTacklezones(state, b->position, mySide, b->id) == 0;
             if (aFree != bFree) return aFree;
+            // ⭐ P165 (uživatel 07.10.2026: „Stand Firm na rozích … agilní tým má místo Stand
+            //   Firmu Side Step“; „blitzeři u trpaslíků nejsou vhodní na rohy“): kdo na roh
+            //   dojde a nedá se z něj odtlačit, má přednost před bližším hráčem bez té dovednosti.
+            //   Soupeř klec otevírá hlavně odtlačením rohů (76× odtlačen, 30× sražen, 07.10.).
+            auto holdsCorner = [](const Player* p) {
+                return p->hasSkill(SkillName::StandFirm) || p->hasSkill(SkillName::SideStep);
+            };
+            if (holdsCorner(a) != holdsCorner(b)) return holdsCorner(a);
             // Tempo sustainability (user design input 2026-08-03, wired
             // 2026-08-04): a corner slower than the planned step caps the
             // whole cage's pace NEXT turn -- prefer corners whose MA
@@ -344,9 +352,6 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
             bool ga = a->hasSkill(SkillName::Guard);
             bool gb = b->hasSkill(SkillName::Guard);
             if (ga != gb) return ga;
-            bool fa = a->hasSkill(SkillName::StandFirm);
-            bool fb = b->hasSkill(SkillName::StandFirm);
-            if (fa != fb) return fa;
             return a->id < b->id;
         };
         for (const Player* p : pool) {
