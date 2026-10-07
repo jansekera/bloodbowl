@@ -999,3 +999,40 @@ TEST(CageAdvance, CornerGoesToThePlayerWhoCannotBePushedOffIt) {
     EXPECT_EQ(assign(true), 6) << "hráč se Stand Firm má přednost";
     EXPECT_EQ(assign(false), 4) << "pozitivní kontrola: bez dovednosti rozhoduje vzdálenost";
 }
+
+// P165 (07.10.2026): „MB na dvou protilehlých rozích“ — dva rohoví hráči s Mighty Blow skončí
+// na úhlopříčně protilehlých rozích klece, když na ně oba dosáhnou.
+TEST(CageAdvance, MightyBlowCornersEndUpOppositeEachOther) {
+    auto mbCorners = [](bool swapPossible) {
+        GameState state = makeCageState();
+        // všichni čtyři budoucí rohoví hráči stojí opodál; MB mají dva, kteří by „nejbližším
+        // polem“ skončili oba vpředu (stejný sloupec), ne proti sobě
+        state.getPlayer(2).position = {14, 5};   // nejblíž přednímu hornímu (13,6)
+        state.getPlayer(3).position = {14, 9};   // nejblíž přednímu dolnímu (13,8)
+        state.getPlayer(4).position = {10, 5};   // nejblíž zadnímu hornímu (11,6)
+        state.getPlayer(5).position = {10, 9};   // nejblíž zadnímu dolnímu (11,8)
+        state.getPlayer(2).skills.add(SkillName::MightyBlow);
+        state.getPlayer(3).skills.add(SkillName::MightyBlow);
+        if (!swapPossible) {                      // nikdo nedosáhne dál než na svůj nejbližší roh
+            for (int id : {2, 3, 4, 5}) state.getPlayer(id).movementRemaining = 1;
+        }
+        CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+        auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+        std::vector<Position> mb;
+        for (const auto& sa : a.slots) {
+            if (sa.playerId >= 0 && state.getPlayer(sa.playerId).hasSkill(SkillName::MightyBlow)) mb.push_back(sa.slot);
+        }
+        return mb;
+    };
+    {
+        auto mb = mbCorners(true);
+        ASSERT_EQ(mb.size(), 2u);
+        EXPECT_NE(mb[0].x, mb[1].x) << "ne oba vpředu / oba vzadu";
+        EXPECT_NE(mb[0].y, mb[1].y) << "a ne na téže straně ⇒ úhlopříčně proti sobě";
+    }
+    {   // pozitivní kontrola: když se prohodit nedá (nedosáhnou), zůstanou oba vpředu
+        auto mb = mbCorners(false);
+        ASSERT_EQ(mb.size(), 2u);
+        EXPECT_EQ(mb[0].x, mb[1].x);
+    }
+}

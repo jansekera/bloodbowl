@@ -417,6 +417,42 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         assignedIds.push_back(carrierBlocker->id);
     }
 
+    // ⭐ P165 (uživatel 07.10.2026: „Stand Firm na rozích a MB na dvou protilehlých rozích“):
+    //   když mají Mighty Blow právě dva rohoví hráči a nestojí proti sobě, prohodí se jeden z nich
+    //   s rohem, který protilehlý je — jen mezi hráči, kteří se teprve přesouvají, bez GFI, a jen
+    //   když oba na nové pole dosáhnou. Pořadí polí: [0] přední A, [1] přední B, [2] zadní A,
+    //   [3] zadní B ⇒ protilehlé páry jsou (0,3) a (1,2).
+    if (res.slots.size() == 4) {
+        auto hasMb = [&](int i) {
+            return res.slots[i].playerId >= 0 &&
+                   state.getPlayer(res.slots[i].playerId).hasSkill(SkillName::MightyBlow);
+        };
+        auto movable = [&](int i) {
+            return res.slots[i].playerId >= 0 && !res.slots[i].stayPut && !res.slots[i].needsGfi &&
+                   res.slots[i].playerId != (carrierBlocker ? carrierBlocker->id : -1);
+        };
+        auto reaches = [&](int playerId, Position sq) {
+            const Player& p = state.getPlayer(playerId);
+            const int reach = (p.state == PlayerState::PRONE) ? movementAfterStandUp(p)
+                                                              : static_cast<int>(p.movementRemaining);
+            return p.position.distanceTo(sq) <= reach;
+        };
+        std::vector<int> mb;
+        for (int i = 0; i < 4; ++i) if (hasMb(i)) mb.push_back(i);
+        const int opposite[4] = {3, 2, 1, 0};
+        if (mb.size() == 2 && opposite[mb[0]] != mb[1]) {
+            // zkusit přesunout druhého na pole protilehlé prvnímu, pak prvního na pole protilehlé druhému
+            for (int pass = 0; pass < 2; ++pass) {
+                const int keep = mb[pass], move = mb[1 - pass], want = opposite[keep];
+                if (!movable(move) || !movable(want)) continue;
+                if (!reaches(res.slots[move].playerId, res.slots[want].slot) ||
+                    !reaches(res.slots[want].playerId, res.slots[move].slot)) continue;
+                std::swap(res.slots[move].playerId, res.slots[want].playerId);
+                break;
+            }
+        }
+    }
+
     // Feasibility: never degrade the standing cage, and keep at least a
     // 2-corner screen; a 3+-corner cage must stay 3+ after the move.
     int built = 0;
