@@ -732,9 +732,9 @@ const TeamRoster& getWoodElfRoster1200Agile() {
 //
 // Výsledná hodnota týmu (ceny BB2016; 11 hráčů na hřišti + 3 týmové rerolly + lékárník;
 // dokoupený skill 20 tis., na double 30, +MA 30):
-//   trpaslíci 1490 · wood-elf 1520 · skaven 1500 · ork 1500 · člověk 1490
+//   trpaslíci 1490 · wood-elf 1520 · skaven 1510 · ork 1500 · člověk 1490
 //   (týmový reroll: trpaslík, elf, člověk 50 tis., skaven a ork 60 tis.)
-// Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1150 · 1360 · 1290.
+// Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1200 · 1360 · 1290.
 // ⚠️ NOVÁ MĚŘICÍ ÉRA: čísla z TV1500 se s TV1200 neporovnávají.
 // ⛔ Pořadí řádků je významové (sestava se plní od posledního řádku do 11, zbytek první řádek).
 // ============================================================================
@@ -792,7 +792,7 @@ const TeamRoster& getWoodElfRoster1500() {
 
 // Skaven (uživatel 03.10.): JEDEN Gutter Runner +MA + Sure Feet + Sprint, ostatní tři bez Sure
 // Feet. K tomu Block a Side Step Gutter Runnerům, Side Step a Mighty Blow Blitzerům, Block
-// Linemanovi, Pro Throwerovi. (Side Step je pro Blitzera skill na double.)
+// oběma Linemanům bez Wrestle, Pro Throwerovi. (Side Step je pro Blitzera skill na double.)
 const TeamRoster& getSkavenRoster1500() {
     static const TeamRoster roster = {
         "Skaven (TV1500)",
@@ -804,12 +804,12 @@ const TeamRoster& getSkavenRoster1500() {
             // uživatel 07.10.: „jeden GR má mít wrestle místo block“ — Wrestle na rychlém těle dojde
             // ke kleci a na Both Down skládá i nosiče s Block (T5.13, 14.08.)
             {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Wrestle, SkillName::SideStep}), 1, "Gutter Runner +Wrestle+Side Step"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::Tackle, SkillName::SideStep,
-                SkillName::MightyBlow}), 1, "Blitzer +Guard+Tackle+Side Step+Mighty Blow"},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::SideStep, SkillName::MightyBlow}), 1,
+                "Blitzer +Guard+Side Step+Mighty Blow"},
             {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::SideStep,
                 SkillName::MightyBlow}), 1, "Blitzer ball-hunter +Side Step+Mighty Blow"},
             {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro}), 1, "Thrower +Block+Pro"},
-            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle, SkillName::Tackle}), 2, "Lineman +Wrestle+Tackle"},
+            {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},
         },
         8, 60, true
     };

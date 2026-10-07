@@ -260,3 +260,24 @@ TEST(MoveHandler, P77BreakTackleIsSpentOnTheFirstDodge) {
     // dalsi uhyb uz s Obratnosti: 7 - 2 - 1 = 4+
     EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {12, 7}, {11, 7}), 4);
 }
+
+// P165 (07.10.2026) — Sure Feet, ř. 8541-8542: "A player may only use the Sure Feet skill once
+// per turn." Druhý nepovedený GFI v témže kole už přehodit nejde (uživatel 18.09.: ověřit, až
+// ho soupiska dostane — skaven TV1500 má Gutter Runnera se Sure Feet a Sprintem).
+TEST(MoveHandler, SureFeetRerollsOnlyOneGfiPerTurn) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.homeTeam.rerolls = 0;                                  // ať nezasáhne týmový přehoz
+    gs.getPlayer(1).movementRemaining = 0;
+    gs.getPlayer(1).skills.add(SkillName::SureFeet);
+    gs.getPlayer(1).skills.add(SkillName::Sprint);            // tři GFI v kole
+    // 1. GFI: 1 → přehoz Sure Feet 4 (projde). 2. GFI: 1 → přehoz už není; další kostka (6) jde
+    // na brnění (6+1 = 7, neprorazí). Kdyby engine přehazoval podruhé, ta šestka by GFI zachránila
+    // a turnover by nenastal — kostky tedy starou a správnou mechaniku rozliší.
+    FixedDiceRoller dice({1, 4, 1, 6, 1, 1, 1, 1, 1, 1});
+    auto first = resolveMoveStep(gs, 1, {11, 7}, dice, nullptr);
+    ASSERT_TRUE(first.success);
+    auto second = resolveMoveStep(gs, 1, {12, 7}, dice, nullptr);
+    EXPECT_TRUE(second.turnover) << "druhý neúspěšný GFI v kole se nepřehazuje";
+    EXPECT_NE(gs.getPlayer(1).state, PlayerState::STANDING);
+}

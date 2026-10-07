@@ -4,6 +4,7 @@ parameters:
     bootstrapFiles:
         - cli/race_rosters.php
         - cli/developed_rosters.php
+        - cli/tv1500_rosters.php
     paths:
         - src
         - tests

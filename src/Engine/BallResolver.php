@@ -114,6 +114,7 @@ final class BallResolver
         MatchPlayerDTO $catcher,
         int $modifier = 0,
         bool $teamRerollAvailable = false,
+        bool $accuratePass = false,
     ): array {
         $pos = $catcher->getPosition();
         if ($pos === null) {
@@ -148,7 +149,7 @@ final class BallResolver
             return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => false];
         }
 
-        $target = $this->getCatchTarget($state, $catcher, $modifier);
+        $target = $this->getCatchTarget($state, $catcher, $modifier, $accuratePass);
         $roll = $this->dice->rollD6();
         $success = $roll >= $target;
         $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
@@ -352,7 +353,7 @@ final class BallResolver
     /**
      * Calculate catch target: 7 - AG + TZ - modifier, clamped 2-6.
      */
-    public function getCatchTarget(GameState $state, MatchPlayerDTO $catcher, int $modifier = 0): int
+    public function getCatchTarget(GameState $state, MatchPlayerDTO $catcher, int $modifier = 0, bool $accuratePass = false): int
     {
         $pos = $catcher->getPosition();
         if ($pos === null) {
@@ -371,8 +372,10 @@ final class BallResolver
             $target--;
         }
 
-        // Diving Catch: -1 in enemy tackle zone
-        if ($catcher->hasSkill(SkillName::DivingCatch) && $tz > 0) {
+        // OPRAVENO 07.10.2026 (P165) — tady bylo „-1 v zóně soupeře“. Pravidla ř. 8063-8065:
+        // "The player may add 1 to any catch roll from an accurate pass targeted to his square."
+        // ⇒ jen přesná přihrávka na hráčovo pole; zóny soupeře s tím nesouvisí.
+        if ($accuratePass && $catcher->hasSkill(SkillName::DivingCatch)) {
             $target--;
         }
 

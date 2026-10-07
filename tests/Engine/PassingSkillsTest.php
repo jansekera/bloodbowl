@@ -328,11 +328,56 @@ final class PassingSkillsTest extends TestCase
 
     // ========== STEP 7: Diving Catch ==========
 
-    public function testDivingCatchBonusInEnemyTZ(): void
+    /**
+     * P165 (07.10.2026) — Diving Catch, pravidla ř. 8063-8065: +1 jen na chytání PŘESNÉ přihrávky
+     * mířené na hráčovo pole. AG3 bez zón: přesná přihrávka 7-3-1 = 3+, s Diving Catch 2+.
+     * Hod 2 na chytání projde jen se správným pravidlem (dřív „-1 jen v zóně soupeře“ ⇒ 3+).
+     */
+    public function testDivingCatchAddsOneToAnAccuratePassEvenOutsideTackleZones(): void
     {
-        // AG3 catcher with DivingCatch in 1 enemy TZ:
-        // Normal: 7-3+1=5+ (with accurate +1: 4+)
-        // With DC: 7-3+1-1=4+ (with accurate +1: 3+)
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1) // thrower
+            ->addPlayer(TeamSide::HOME, 7, 5, agility: 3, skills: [SkillName::DivingCatch], id: 2) // catcher, nikdo vedle
+            ->addPlayer(TeamSide::AWAY, 20, 12, id: 3)
+            ->withBallCarried(1)
+            ->build();
+
+        // přesnost 4 (krátká přihrávka), chytání 2
+        $dice = new FixedDiceRoller([4, 2]);
+        $resolver = new ActionResolver($dice);
+
+        $result = $resolver->resolve($state, ActionType::PASS, [
+            'playerId' => 1,
+            'targetX' => 7,
+            'targetY' => 5,
+        ]);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertEquals(2, $result->getNewState()->getBall()->getCarrierId());
+    }
+
+    /** Odskočený míč v zóně soupeře: Diving Catch nepomáhá (7-3+1 = 5+, dřív vycházelo 4+). */
+    public function testDivingCatchDoesNotHelpWithABouncingBallInATackleZone(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 7, 5, agility: 3, skills: [SkillName::DivingCatch], id: 2)
+            ->addPlayer(TeamSide::AWAY, 8, 5, id: 3)
+            ->build();
+
+        $ballResolver = new \App\Engine\BallResolver(
+            new FixedDiceRoller([]),
+            new \App\Engine\TacklezoneCalculator(),
+            new \App\Engine\ScatterCalculator(),
+        );
+
+        $this->assertSame(5, $ballResolver->getCatchTarget($state, $state->requirePlayer(2)));
+        $this->assertSame(3, $ballResolver->getCatchTarget($state, $state->requirePlayer(2), 1, true));
+    }
+
+    public function testDivingCatchOnAnAccuratePassInsideATackleZone(): void
+    {
+        // AG3 catcher with DivingCatch in 1 enemy TZ, accurate pass:
+        // 7-3 +1 (zóna) -1 (přesná přihrávka) -1 (Diving Catch) = 3+
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1) // thrower
             ->addPlayer(TeamSide::HOME, 7, 5, agility: 3, skills: [SkillName::DivingCatch], id: 2) // catcher

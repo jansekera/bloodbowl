@@ -217,6 +217,7 @@ final class PassResolver
                     $catcher,
                     modifier: 1,
                     teamRerollAvailable: $isFriendly && $catchTeamReroll,
+                    accuratePass: true,
                 );
                 $events = array_merge($events, $catchResult['events']);
                 $state = $catchResult['state'];

@@ -178,12 +178,24 @@ function getRaceRoster(TeamSide $side, string $race): array
         throw new \InvalidArgumentException("Unknown race: {$race}. Available: " . implode(', ', array_keys(RACE_ROSTERS)));
     }
 
+    return buildRosterFromEntries($side, RACE_ROSTERS[$race]);
+}
+
+/**
+ * Jedenáctka z řádků [pozice, počet, [MA, ST, AG, AV], skilly, (rasa)] — společné pro základní
+ * soupisky i pro úroveň TV1500 (cli/tv1500_rosters.php).
+ *
+ * @param list<array{0: string, 1: int, 2: array{int, int, int, int}, 3: list<SkillName>, 4?: string}> $entries
+ * @return array<int, MatchPlayerDTO>
+ */
+function buildRosterFromEntries(TeamSide $side, array $entries): array
+{
     $players = [];
     $teamPrefix = $side === TeamSide::HOME ? 'H' : 'A';
     $idOffset = $side === TeamSide::HOME ? 1 : 12;
     $idx = 0;
 
-    foreach (RACE_ROSTERS[$race] as $entry) {
+    foreach ($entries as $entry) {
         $positionalName = $entry[0];
         $count = $entry[1];
         $statArr = $entry[2];

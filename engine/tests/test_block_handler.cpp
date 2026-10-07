@@ -1624,3 +1624,33 @@ TEST_F(BlockHandlerManual, WithoutABlitzSquareTheEngineChoosesItsOwn) {   // poz
     EXPECT_NE(gs.getPlayer(9).position, (Position{12, 11})) << "engine by z (12,11) neblokoval";
     clearManualBlockChoices();
 }
+
+// P165 (07.10.2026) — Side Step, ř. 8474-8476: "the coach may choose to move the player to ANY
+// adjacent square, not just the three squares shown on the Push Back diagram." Hráč se Side Step
+// na kraji hřiště, tlačený kolmo ven: všechna tři pole z diagramu jsou mimo hřiště, ale vedle
+// něj na krajní řadě je volno ⇒ do davu nejde.
+TEST(BlockHandler, SideStepAtTheSidelineStepsAlongItInsteadOfIntoTheCrowd) {
+    auto pushed = [](bool sideStep) {
+        GameState gs;
+        gs.phase = GamePhase::PLAY;
+        placePlayer(gs, 1, {11, 1}, TeamSide::HOME, 6, 4, 3, 8);
+        placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+        if (sideStep) gs.getPlayer(12).skills.add(SkillName::SideStep);
+        gs.ball.isHeld = false;
+        gs.ball.position = {0, 7};
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});   // 2 kostky, obě PUSHED; pak případné zranění v davu
+        BlockParams params{1, 12, false, false};
+        resolveBlock(gs, params, dice, nullptr);
+        return gs.getPlayer(12);
+    };
+    {
+        const Player p = pushed(true);
+        EXPECT_TRUE(p.isOnPitch()) << "se Side Step zůstává na hřišti";
+        EXPECT_EQ(p.position.y, 0);
+        EXPECT_EQ(std::abs(p.position.x - 11), 1) << "ukročil po krajní řadě";
+    }
+    {   // pozitivní kontrola: bez Side Step táž rána znamená dav
+        const Player p = pushed(false);
+        EXPECT_FALSE(p.isOnPitch());
+    }
+}
