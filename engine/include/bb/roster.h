@@ -19,7 +19,7 @@ struct PlayerTemplate {
 
 struct TeamRoster {
     const char* name;
-    PlayerTemplate positionals[8];  // max 8 positional types
+    PlayerTemplate positionals[12];  // max 12 řádků (07.10.2026: lidé TV1500 jich mají 9)
     int positionalCount;
     int rerollCost;  // in thousands
     bool hasApothecary;

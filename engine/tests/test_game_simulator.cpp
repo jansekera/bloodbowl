@@ -805,16 +805,51 @@ TEST(DevelopedRoster, Tv1500SkavenRatOgreAndOneFastGutterRunner) {
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }
 
-TEST(DevelopedRoster, Tv1500OrcAndHumanCornersHaveStandFirm) {
-    for (const char* race : {"orc", "human"}) {
-        const TeamRoster* r = getDevelopedRoster(race, 1500);
-        ASSERT_NE(r, nullptr);
-        GameState state;
-        setupHalf(state, *r, *r);
-        EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 4) << race;
-        EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1) << race;
-        EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2) << race;
-    }
+TEST(DevelopedRoster, Tv1500OrcCornersHaveStandFirm) {
+    const TeamRoster* r = getDevelopedRoster("orc", 1500);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 4);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
+}
+
+// Uživatel 07.10.2026: lovec míče Wrestle místo Stand Firm, Blitzer bez Guard Tackle místo
+// Stand Firm („lidé mají málo Tackle a zbytečně moc Stand Firm“).
+TEST(DevelopedRoster, Tv1500HumanHunterHasWrestleAndTwoBlitzersHaveTackle) {
+    const TeamRoster* r = getDevelopedRoster("human", 1500);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 2) << "jen dva Blitzeři s Guard";
+    // „ještě mi chybí u lidí proti orkům Dauntless na jednom blitzerovi … druhý přidat místo MB“
+    EXPECT_EQ(countHomeSkill(state, SkillName::Dauntless), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 2);
+    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 3) << "Blitzer s Guard, úderník, Ogre";
+    int players = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        ++players;
+        if (p.hasSkill(SkillName::Dauntless)) {
+            EXPECT_TRUE(p.hasSkill(SkillName::Guard));
+            EXPECT_TRUE(p.hasSkill(SkillName::StandFirm));
+            EXPECT_FALSE(p.hasSkill(SkillName::MightyBlow));
+        }
+    });
+    EXPECT_EQ(players, 11) << "devět řádků soupisky se vejde";
+    EXPECT_EQ(countHomeSkill(state, SkillName::Tackle), 2);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3) << "dva Linemani + lovec";
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.hasSkill(SkillName::StripBall)) {
+            EXPECT_TRUE(p.hasSkill(SkillName::Wrestle));
+            EXPECT_TRUE(p.hasSkill(SkillName::Tackle));
+            EXPECT_FALSE(p.hasSkill(SkillName::StandFirm));
+        }
+        if (p.hasSkill(SkillName::StandFirm)) EXPECT_TRUE(p.hasSkill(SkillName::Guard));
+    });
 }
 
 TEST(DevelopedRoster, Tv1200IsUntouchedByTheNewLevel) {

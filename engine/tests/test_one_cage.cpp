@@ -126,6 +126,22 @@ TEST(OneCageForward, NeverEndsNextToAStandingOpponentNorDodges) {
     EXPECT_EQ(countTacklezones(b.s, d, TeamSide::HOME, 1), 0) << "nosič nesmí skončit u soupeře";
 }
 
+// P154 (07.10.2026): po zvednutí jde nosič jen tak daleko, aby za ním rohy došly — čtyři hráči
+// s MA 4 dosáhnou na pole rohů nejdál kolem x=9; bez ohledu na klec by nosič doběhl na x=11.
+TEST(OneCageForward, AfterPickupStopsWhereFourCornersCanStillReachHim) {
+    Board b;
+    Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
+    b.put(2, TeamSide::HOME, {6, 5});
+    b.put(3, TeamSide::HOME, {6, 9});
+    b.put(4, TeamSide::HOME, {4, 5});
+    b.put(5, TeamSide::HOME, {4, 9});
+    b.put(12, TeamSide::AWAY, {24, 1});
+    EXPECT_EQ(farthestSafeForward(b.s, c, 6).x, 11) << "pozitivní kontrola: bez klece co nejdál";
+    const Position d = farthestSafeForward(b.s, c, 6, /*forCage=*/true);
+    EXPECT_EQ(d.x, 9);
+    EXPECT_EQ(d.y, 7);
+}
+
 // --- Fáze 3: kdy pustit nosiče ---------------------------------------------------
 
 // Tah 6 (zbývají 3 tahy včetně tohoto), 17 polí. Klec: teď 4, další tah 4 ⇒ 9
@@ -458,6 +474,69 @@ TEST(OneCageFreeing, SafeBlockFreesATeammateHeldByOneOpponent) {
     }
 }
 
+// Uživatel 07.10.2026: „zkus dát všechny hráče na klec a na konci kdyžtak provést i blitz — blitz
+// je sice jeden za kolo, ale bezpečí nosiče je důležitější než pravidlo využít blitz každé kolo“.
+// Má-li klec čtyři rohy bez ran, řadič žádnou uvolňovací ránu ani blitz nehraje (zbydou hledání
+// na konec tahu). Pozitivní kontrola: tatáž pozice bez dvou předních rohů ránou začíná
+// (OneCageFreeing.SafeBlockFreesATeammateHeldByOneOpponent).
+TEST(OneCageOrder, CageComesFirstAndNoFreeingHitsWhenFourCornersStand) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(6, TeamSide::HOME, {13, 6});
+    b.put(7, TeamSide::HOME, {13, 8});
+    b.put(4, TeamSide::HOME, {14, 4});                           // drží ho jen soupeř 13
+    b.put(5, TeamSide::HOME, {16, 3}, 4, 3, {SkillName::Block}); // bezpečná rána by byla po ruce
+    b.put(13, TeamSide::AWAY, {15, 4}, 6);
+    b.put(14, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    for (const Macro& m : ms) {
+        EXPECT_NE(m.type, MacroType::BLOCK) << "hráč " << m.playerId;
+        EXPECT_NE(m.type, MacroType::BLITZ) << "hráč " << m.playerId;
+    }
+    const Position cp = b.s.getPlayer(1).position;
+    int corners = 0;
+    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+        const Player* q = b.s.getPlayerAtPosition({static_cast<int8_t>(cp.x + cx), static_cast<int8_t>(cp.y + cy)});
+        if (q && q->teamSide == TeamSide::HOME && q->state == PlayerState::STANDING) ++corners;
+    }
+    EXPECT_EQ(corners, 4) << "po tahu řadiče stojí čistá klec";
+}
+
+// P169 krok 3 (07.10.2026): nosič bez klece nejde „kamkoli dopředu“ (to dělalo hledání), ale na
+// pole, kolem kterého se ještě v tomto tahu postaví klec — a hledání jím pak už nepohne.
+// Nosič MA 6 stojí sám na (5,7), čtyři spoluhráči MA 4 stojí kolem x=12–13: na rohy u nosiče
+// nedosáhnou, na rohy kolem (11,7) ano.
+TEST(OneCageJoin, CarrierWithoutACageGoesWhereTheCageCanForm) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {5, 7}, 6);
+    b.put(2, TeamSide::HOME, {12, 5});
+    b.put(3, TeamSide::HOME, {12, 9});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(13, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({5, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    {   // pozitivní kontrola fixture: na místě klec postavit nejde, o kus dál ano
+        const Player& c = b.s.getPlayer(1);
+        ASSERT_EQ(cornersWithinReach(b.s, c, c.position), 0);
+        ASSERT_EQ(cornersWithinReach(b.s, c, {11, 7}), 4);
+    }
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    int corners = 0;
+    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+        const Player* q = b.s.getPlayerAtPosition({static_cast<int8_t>(cp.x + cx), static_cast<int8_t>(cp.y + cy)});
+        if (q && q->teamSide == TeamSide::HOME && q->state == PlayerState::STANDING) ++corners;
+    }
+    EXPECT_GT(cp.x, 5) << "nosič se pohnul ke spoluhráčům";
+    EXPECT_EQ(corners, 4) << "a kolem něj stojí klec";
+}
+
 // (b) „nosič dál jen s klecí“ + „na konci poločasu musí vyběhnout, aby stihl TD“
 TEST(OneCagePin, CarrierStaysInTheCageWhenTheAdvanceFails) {
     Board b = walledCageBoard(2);
@@ -467,7 +546,14 @@ TEST(OneCagePin, CarrierStaysInTheCageWhenTheAdvanceFails) {
     EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::ADVANCE, 1, -1, {-1, -1}}));
     EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 1, -1, {12, 3}}));
     EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}})) << "skórovat smí";
-    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "rány kolem klece smí";
+    // P169 (07.10.2026): roh smí jen BEZPEČNOU ránu (2+ kostky, které vybíráme my, a Block) —
+    // rohový hráč, který při ráně spadne, je díra v kleci. Roh 4 tu má proti zdi jednu kostku.
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "riskantní rána rohu ne";
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::FOUL, 4, 13, {-1, -1}})) << "roh nefauluje";
+    b.s.getPlayer(4).stats.strength = 7;                       // silný roh s Block: dvě kostky pro nás
+    b.s.getPlayer(4).skills.add(SkillName::Block);
+    ASSERT_GE(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(13)), 2);
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "bezpečná rána rohu smí";
 }
 
 TEST(OneCagePin, CarrierMayRunWhenWaitingWouldCostTheTouchdown) {
@@ -618,5 +704,119 @@ TEST(OneCageKeepsCorners, FrenzyCornerDoesNotBlock) {
     playAll(cc, b);
     ASSERT_EQ(b.s.getPlayer(4).position, (Position{13, 6}));
     EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "po ráně by musel následovat";
-    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 5, 17, {-1, -1}})) << "roh bez Frenzy blokovat smí";
+    b.s.getPlayer(5).stats.strength = 7;                              // bezpečná rána: 2+ kostky a Block
+    b.s.getPlayer(5).skills.add(SkillName::Block);
+    ASSERT_GE(blockDiceCount(b.s, b.s.getPlayer(5), b.s.getPlayer(17)), 2);
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 5, 17, {-1, -1}})) << "roh bez Frenzy bezpečně blokovat smí";
+}
+
+// P169 (07.10.2026): blitz, který si hráče neurčil, roh klece nevezme — ani když je jediný, kdo
+// na cíl dosáhne („bezpečí nosiče je důležitější než pravidlo využít blitz každé kolo“).
+TEST(OneCageKeepsCorners, UnnamedBlitzNeverTakesACageCorner) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6}, 6, 3, {SkillName::Block});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(13, TeamSide::AWAY, {16, 6}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    FixedDiceRoller dice(std::vector<int>(200, 6));
+    auto r = greedyExpandMacro(b.s, Macro{MacroType::BLITZ, -1, 13, {-1, -1}}, dice);
+    EXPECT_TRUE(r.actions.empty()) << "žádný blitz: na cíl dosáhnou jen rohy";
+    EXPECT_EQ(b.s.getPlayer(4).position, (Position{13, 6}));
+
+    b.put(6, TeamSide::HOME, {14, 2}, 6, 3, {SkillName::Block});      // pozitivní kontrola: volný hráč blitzuje
+    auto r2 = greedyExpandMacro(b.s, Macro{MacroType::BLITZ, -1, 13, {-1, -1}}, dice);
+    ASSERT_FALSE(r2.actions.empty());
+    EXPECT_EQ(r2.actions[0].playerId, 6);
+}
+
+// P169 krok 6 (07.10.2026): když by nosič ani s klecí nestihl TD, výběh volí řadič — bez hodu a
+// ne vedle soupeře (dřív ho vedlo hledání kamkoli dopředu). Kolo 7, do zóny 13 polí, nosič MA 6:
+// sólo to stihne (6 teď + 8 v posledním kole), klec s rohy MA 4 ne.
+TEST(OneCageRun, WhenTimeIsShortTheControllerRunsTheCarrierDiceFreeAndAwayFromOpponents) {
+    Board b(7);
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(13, TeamSide::AWAY, {16, 7}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    const Player& c = b.s.getPlayer(1);
+    EXPECT_GT(c.position.x, 12) << "nosič vyběhl";
+    EXPECT_EQ(countTacklezones(b.s, c.position, TeamSide::HOME, 1), 0) << "ne vedle soupeře";
+    bool carrierByController = false;
+    for (const Macro& m : ms) carrierByController |= (m.playerId == 1 && m.type == MacroType::REPOSITION);
+    EXPECT_TRUE(carrierByController) << "pohyb nosiče zvolil řadič";
+    EXPECT_EQ(b.s.homeTeam.rerolls, 0);
+}
+
+// P131 / P169 krok 7 (uživatel 07.10.2026: „nosič stál vedle okraje hřiště a byl vysurfován — a
+// při Frenzy i z pole vedle okraje“): nosič končí aspoň dvě pole od postranní čáry.
+TEST(OneCageForward, RunNeverEndsWithinTwoRowsOfTheSideline) {
+    Board b;
+    Player& c = b.put(1, TeamSide::HOME, {5, 3}, 6);
+    // soupeři uprostřed tlačí běh ke kraji: volná pole nejdál vpředu jsou na řádcích 0 a 1
+    for (int y = 3; y <= 11; y += 2) b.put(12 + y, TeamSide::AWAY, {9, static_cast<int8_t>(y)});
+    const Position d = farthestSafeForward(b.s, c, 6);
+    EXPECT_GE(d.y, 2) << "(" << int(d.x) << "," << int(d.y) << ")";
+    EXPECT_LE(d.y, 12);
+
+    Board e;                                       // nosič u kraje smí jen ke středu
+    Player& c2 = e.put(1, TeamSide::HOME, {5, 0}, 6);
+    e.put(13, TeamSide::AWAY, {24, 13});
+    const Position d2 = farthestSafeForward(e.s, c2, 6);
+    EXPECT_GE(d2.y, 1);
+    EXPECT_GT(d2.x, 5);
+}
+
+// P169 krok 8 (07.10.2026): soupeře u nosiče blokuje ten, kdo ho odtlačí PRYČ od nosiče. Soupeř
+// stojí před nosičem na (13,7). Hráč 2 za ním na (14,7) by ho tlačil k nosiči (všechna tři pole
+// odtlačení s nosičem sousedí nebo jsou obsazená), hráč 3 na (12,6) ho tlačí šikmo pryč.
+TEST(OneCageFreeing, TheBlockerWhoPushesTheMarkerAwayFromTheCarrierIsChosen) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {14, 7}, 4, 4, {SkillName::Block});   // silnější a s Block, ale tlačí k nosiči
+    b.put(3, TeamSide::HOME, {12, 6}, 4, 3);
+    b.put(13, TeamSide::AWAY, {13, 7}, 6);
+    b.put(14, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_TRUE(cc.next(b.s, m));
+    ASSERT_EQ(m.type, MacroType::BLOCK);
+    EXPECT_EQ(m.targetId, 13);
+    EXPECT_EQ(m.playerId, 3) << "blokuje ten, po jehož ráně soupeř u nosiče nezůstane";
+}
+
+// P169 krok 9 (07.10.2026): míč na začátku tahu nikdo náš nedržel a řadič zvednutí nenabídl;
+// zvedlo ho až hledání (tady nasimulováno). Řadič pak hned dostaví rohy kolem nosiče.
+TEST(OneCageLatePickup, CornersAreBuiltRightAfterAPickupMadeByTheSearch) {
+    Board b(3);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {10, 5});
+    b.put(3, TeamSide::HOME, {10, 9});
+    b.put(4, TeamSide::HOME, {14, 5});
+    b.put(5, TeamSide::HOME, {14, 9});
+    b.put(13, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::onGround({25, 0});                  // míč mimo dosah všech: zvednutí se nenabízí
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_FALSE(cc.next(b.s, m)) << "pozitivní kontrola: bez míče řadič nic nehraje";
+
+    b.s.ball = BallState::carried({12, 7}, 1);                // „hledání“ míč zvedlo hráčem 1
+    b.s.getPlayer(1).hasMoved = true;
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    int corners = 0;
+    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+        const Player* q = b.s.getPlayerAtPosition({static_cast<int8_t>(12 + cx), static_cast<int8_t>(7 + cy)});
+        if (q && q->teamSide == TeamSide::HOME && q->state == PlayerState::STANDING) ++corners;
+    }
+    EXPECT_EQ(corners, 4) << "řadič po zvednutí dostavěl klec (maker " << ms.size() << ")";
 }

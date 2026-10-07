@@ -37,7 +37,11 @@ bool stagedMacroStillValid(const GameState& state, const Macro& m,
     if (state.phase != GamePhase::PLAY) return false;
     if (m.playerId <= 0) return false;
     const Player& p = state.getPlayer(m.playerId);
-    if (!p.isOnPitch() || p.state != PlayerState::STANDING) return false;
+    // P154 (07.10.2026): ležící hráč, kterého řadič klece posílá na roh, napřed vstane
+    // (bez hodu: MA ≥ 3 nebo Jump Up — hlídá plánovač) — pro makro řadiče je platný i vleže.
+    const bool cageStandUp = m.type == MacroType::REPOSITION && m.cageManaged &&
+                             p.state == PlayerState::PRONE;
+    if (!p.isOnPitch() || (p.state != PlayerState::STANDING && !cageStandUp)) return false;
     if (p.hasMoved || p.hasActed) return false;
     if (requireHeldBall) {
         // Cage-fill stage: only meaningful while OUR side holds the ball.

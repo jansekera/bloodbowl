@@ -33,7 +33,17 @@ enum class CagePhase : uint8_t { NONE = 0, PICKUP = 1, CAGE = 2, RELEASE = 3 };
 // nosiče se nesmí stávat vůbec", uživatel 20.08.). Mezi stejně vzdálenými
 // vybírá to, na které dosáhne méně soupeřů, pak blíž středu hřiště. Když nic
 // není lepší než stát, vrací nosičovo pole.
-Position farthestSafeForward(const GameState& state, const Player& carrier, int budget);
+//
+// `forCage` (P154, 07.10.2026 — po zvednutí míče): napřed pole, kolem kterého se ještě v tomto
+// tahu postaví nejvíc rohů (volní spoluhráči, kteří ještě nehráli a na pole rohu dosáhnou),
+// teprve mezi nimi to nejdál. Dosud nosič po zvednutí odběhl co nejdál a rohy za ním nedošly
+// („nikdo v dosahu“: 14 chybějících rohů ve 30 tazích se zvednutím, trpaslíci TV1500).
+Position farthestSafeForward(const GameState& state, const Player& carrier, int budget,
+                             bool forCage = false);
+
+// Kolik ze čtyř polí rohů kolem `sq` ještě v tomto tahu obsadí různí spoluhráči: stojí tam,
+// nebo jsou volní (nehráli, nestojí v zóně soupeře) a na pole dosáhnou pohybem bez GFI.
+int cornersWithinReach(const GameState& state, const Player& carrier, Position sq);
 
 // Kdy pustit nosiče samotného (fáze 3). Spočítá, jestli by klec doběhla:
 // tento tah ujde `cageStep` (největší krok, pro který jdou obsadit rohy), další
@@ -84,6 +94,9 @@ private:
     int turn_ = -1;
     int half_ = -1;
     Stage stage_ = Stage::DONE;
+    // P169 krok 9: míč na začátku tahu náš nebyl a zvedlo ho až hledání ⇒ rohy se dostaví hned potom
+    bool ballOursAtTurnStart_ = false;
+    bool lateFillDone_ = false;
     CagePhase phase_ = CagePhase::NONE;
     std::vector<Macro> queue_;
     size_t idx_ = 0;

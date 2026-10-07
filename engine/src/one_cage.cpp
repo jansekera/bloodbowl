@@ -43,22 +43,73 @@ int threatsTo(const GameState& state, Position sq, TeamSide mySide) {
 
 } // namespace
 
-Position farthestSafeForward(const GameState& state, const Player& carrier, int budget) {
+// Kolik ze čtyř polí rohů kolem `sq` ještě v tomto tahu obsadí různí spoluhráči: stojí tam,
+// nebo jsou volní (nehráli, nestojí v zóně soupeře) a na pole dosáhnou pohybem bez GFI.
+int cornersWithinReach(const GameState& state, const Player& carrier, Position sq) {
     const TeamSide side = carrier.teamSide;
-    // Menší je lepší: vzdálenost k TD zóně, pak kolik soupeřů na pole dosáhne,
-    // pak odklon od středu hřiště.
+    std::vector<Position> slots;
+    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+        const Position c{static_cast<int8_t>(sq.x + cx), static_cast<int8_t>(sq.y + cy)};
+        if (c.isOnPitch()) slots.push_back(c);
+    }
+    std::vector<const Player*> mates;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id != carrier.id && p.state == PlayerState::STANDING) mates.push_back(&p);
+    });
+    auto serves = [&](const Player& p, Position c) {
+        if (p.position == c) return true;
+        const Player* occ = state.getPlayerAtPosition(c);
+        if (occ && occ->id != carrier.id) return false;
+        if (!freeToAct(p) || countTacklezones(state, p.position, side, p.id) > 0) return false;
+        return p.position.distanceTo(c) <= static_cast<int>(p.movementRemaining);
+    };
+    // největší párování (nejvýš 4 pole): zkusit všechna pořadí polí hladově
+    std::sort(slots.begin(), slots.end(), [](Position a, Position b) {
+        return a.x != b.x ? a.x < b.x : a.y < b.y;
+    });
+    int best = 0;
+    do {
+        std::vector<int> used;
+        int n = 0;
+        for (const Position& c : slots) {
+            for (const Player* p : mates) {
+                if (std::find(used.begin(), used.end(), p->id) != used.end()) continue;
+                if (!serves(*p, c)) continue;
+                used.push_back(p->id);
+                ++n;
+                break;
+            }
+        }
+        best = std::max(best, n);
+    } while (best < static_cast<int>(slots.size()) &&
+             std::next_permutation(slots.begin(), slots.end(), [](Position a, Position b) {
+                 return a.x != b.x ? a.x < b.x : a.y < b.y;
+             }));
+    return best;
+}
+
+Position farthestSafeForward(const GameState& state, const Player& carrier, int budget, bool forCage) {
+    const TeamSide side = carrier.teamSide;
+    // Menší je lepší: (pro klec: kolik rohů bude chybět,) vzdálenost k TD zóně, pak kolik
+    // soupeřů na pole dosáhne, pak odklon od středu hřiště.
     auto key = [&](Position sq) {
-        return std::make_tuple(distToEndzone(sq, side), threatsTo(state, sq, side),
+        return std::make_tuple(forCage ? 4 - cornersWithinReach(state, carrier, sq) : 0,
+                               distToEndzone(sq, side), threatsTo(state, sq, side),
                                std::abs(sq.y - 7));
     };
     Position best = carrier.position;
     auto bestKey = key(best);
+    const int startDist = distToEndzone(carrier.position, side);
     for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
         for (int y = carrier.position.y - budget; y <= carrier.position.y + budget; ++y) {
             const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
             if (!sq.isOnPitch() || sq == carrier.position) continue;
             if (sq.y < 1 || sq.y > 13) continue;           // rohy klece musí mít kam stát
-            if (distToEndzone(sq, side) > std::get<0>(bestKey)) continue;
+            // P131 / P169 krok 7: aspoň dvě pole od postranní čáry (surf, s Frenzy i z řádku
+            // vedle kraje). Výjimka jen pro nosiče, který u kraje už stojí a jde ke středu.
+            if ((sq.y < 2 || sq.y > 12) &&
+                std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
+            if (distToEndzone(sq, side) > startDist) continue;   // nikdy dozadu
             if (state.getPlayerAtPosition(sq)) continue;
             if (countTacklezones(state, sq, side, carrier.id) > 0) continue;
             const auto k = key(sq);
@@ -82,7 +133,9 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
     const int reach = ma + 2;   // odsud tah na TD dohraje MCTS (SCORE_BALL)
 
     for (int s = carrier.movementRemaining; s >= 1; --s) {
-        if (planner.tryAssign(state, carrier, s, {}).feasible) { r.cageStep = s; break; }
+        // Odhad tempa klece: jen podle vzdálenosti (07.10.2026 — s přísným „bez hodu“ vyšel
+        // krok kratší, klec „nestíhala“ a nosič se vypouštěl 16× místo 4× ve 40 poločasech).
+        if (planner.tryAssign(state, carrier, s, {}, 0, /*diceFreeReach=*/false).feasible) { r.cageStep = s; break; }
     }
     const int penalty = std::min(2, (corridorResistance(state, carrier, side) + 1) / 2);
     r.futurePace = std::max(0, r.cageStep - penalty);
@@ -237,17 +290,75 @@ void CageController::planStart(const GameState& state) {
     }
 
     if (!released(state, carrier) && !decideRelease(state, carrier, planner_).release) {
-        // Fáze 2. Soupeř na poli rohu ⇒ napřed ho shodit (uživatel 02.10.).
         phase_ = CagePhase::CAGE;
+        // ⭐ P154 (uživatel 07.10.2026: „zkus dát všechny hráče na klec a na konci kdyžtak
+        //   provést i blitz — blitz je sice jeden za kolo, ale bezpečí nosiče je důležitější
+        //   než pravidlo využít blitz každé kolo“). NAPŘED KLEC ZE VŠECH VOLNÝCH HRÁČŮ: vyjde-li
+        //   bez hodu se čtyřmi rohy (krokem, nebo už stojí), hraje se hned a uvolňovací rány,
+        //   příchody pro asistenci ani blitz řadiče se nekonají — rány a blitz zbydou hledání
+        //   na konec tahu. Dosud šly rány napřed a braly hráče, ze kterých se pak klec
+        //   nepostavila („v dosahu jen ti, co hráli jinde“: hlavní důvod 44 ze 106 nečistých
+        //   tahů trpaslíků, 40 poločasů TV1500). Uvolňuje se jen, když klec čtyři rohy nemá.
+        {
+            CageAdvancePlan pre = planner_.build(state, {}, scoringRangeCage_);
+            int standing = 0;
+            for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+                const Player* q = state.getPlayerAtPosition({static_cast<int8_t>(carrier.position.x + cx),
+                                                             static_cast<int8_t>(carrier.position.y + cy)});
+                if (q && q->teamSide == carrier.teamSide && q->state == PlayerState::STANDING) ++standing;
+            }
+            const bool cleanByPlan = pre.valid && pre.filledCorners - pre.gfiCorners >= 4;   // roh na GFI tento tah nestojí
+            // P169 krok 4 (07.10.2026): stojí-li u nosiče soupeř, klec „čistá“ není — napřed rány.
+            const bool carrierMarked = countTacklezones(state, carrier.position, carrier.teamSide) > 0;
+            if (!carrierMarked && (cleanByPlan || (!pre.valid && standing >= 4))) {
+                if (dbg) std::fprintf(stderr, "[cage ctl] klec napřed: %s (krok %d, rohů %d)\n",
+                                      cleanByPlan ? "plán se čtyřmi rohy" : "stojí, plán není",
+                                      pre.step, cleanByPlan ? pre.filledCorners : standing);
+                if (cleanByPlan) queue_ = std::move(pre.macros);
+                stage_ = Stage::AFTER_ADVANCE;
+                return;
+            }
+        }
+        // Klec čtyři rohy nemá ⇒ soupeř na poli rohu se napřed shodí (uživatel 02.10.).
+        // ⭐ P169 krok 4 (uživatel 07.10.2026: „nosič stojí vedle soupeře — tohle jsem na konci
+        //   našeho tahu měl za opravené“). NEBYLO: rány řadiče mířily jen na soupeře na ČTYŘECH
+        //   úhlopříčných polích (rozích). Soupeř, který stál před nosičem, za ním nebo vedle
+        //   něj, zůstal — a nosič v zóně nikam bez úhybu nemůže. Změřeno (trpaslíci, 160
+        //   poločasů): po tahu s nosičem vedle soupeře přišel míč v dalším tahu v 33 z 84
+        //   případů (39 %), jinak v 9 %. Teď se shazuje soupeř na KTERÉMKOLI z osmi polí.
         std::vector<Macro> macros;
         getAvailableMacros(state, macros, config_.dauntlessInOffer);
         std::vector<int> usedAttackers;
         for (const Position& d : carrier.position.getAdjacent()) {
-            if (!d.isOnPitch() || std::abs(d.x - carrier.position.x) != 1 ||
-                std::abs(d.y - carrier.position.y) != 1) continue;
+            if (!d.isOnPitch()) continue;
             const Player* opp = state.getPlayerAtPosition(d);
             if (!opp || opp->teamSide == carrier.teamSide ||
                 opp->state != PlayerState::STANDING) continue;
+            // P169 krok 8 (07.10.2026): KDO HO ODTLAČÍ PRYČ OD NOSIČE. Dosud vyhrál hráč s Block,
+            // pak síla — bez ohledu na to, kam odtlačení povede. Soupeř se odtlačuje směrem OD
+            // útočníka: stojí-li útočník „za“ ním, tlačí ho k nosiči nebo kolem něj a soupeř u
+            // nosiče zůstane (31 z 36 tahů s nosičem vedle soupeře: stál u něj už na začátku,
+            // ve 20 z nich řadič ránu zahrál a soupeř tam byl dál). Pořadí: (1) po odtlačení
+            // už u nosiče nestojí, (2) víc kostek pro nás, (3) Block, (4) síla.
+            auto clearsCarrier = [&](const Player& a) {
+                const int ddx = opp->position.x - a.position.x, ddy = opp->position.y - a.position.y;
+                for (int rot = -1; rot <= 1; ++rot) {
+                    // směr odtlačení a jeho dva sousedé (o 45°)
+                    static const int ring[8][2] = {{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1},{0,-1},{1,-1}};
+                    int at = 0;
+                    for (int i = 0; i < 8; ++i) if (ring[i][0] == ddx && ring[i][1] == ddy) at = i;
+                    const int k = (at + rot + 8) % 8;
+                    const Position dest{static_cast<int8_t>(opp->position.x + ring[k][0]),
+                                        static_cast<int8_t>(opp->position.y + ring[k][1])};
+                    if (!dest.isOnPitch() || state.getPlayerAtPosition(dest)) continue;
+                    if (dest.distanceTo(carrier.position) >= 2) return true;
+                }
+                return false;
+            };
+            auto rank = [&](const Player& a) {
+                return 1000 * (clearsCarrier(a) ? 1 : 0) + 100 * std::clamp(blockDiceCount(state, a, *opp), -3, 3) +
+                       10 * (a.hasSkill(SkillName::Block) ? 1 : 0) + a.stats.strength;
+            };
             const Macro* pickBlock = nullptr;
             for (const Macro& m : macros) {
                 if (m.type != MacroType::BLOCK || m.targetId != opp->id) continue;
@@ -255,13 +366,7 @@ void CageController::planStart(const GameState& state) {
                 if (std::find(usedAttackers.begin(), usedAttackers.end(), m.playerId) !=
                     usedAttackers.end()) continue;
                 const Player& a = state.getPlayer(m.playerId);
-                if (!pickBlock) { pickBlock = &m; continue; }
-                const Player& b = state.getPlayer(pickBlock->playerId);
-                if (a.hasSkill(SkillName::Block) != b.hasSkill(SkillName::Block)
-                        ? a.hasSkill(SkillName::Block)
-                        : a.stats.strength > b.stats.strength) {
-                    pickBlock = &m;
-                }
+                if (!pickBlock || rank(a) > rank(state.getPlayer(pickBlock->playerId))) pickBlock = &m;
             }
             if (pickBlock) {
                 queue_.push_back(*pickBlock);
@@ -324,9 +429,9 @@ void CageController::planStart(const GameState& state) {
             auto addBlocker = [&](int id) {
                 if (std::find(blockers.begin(), blockers.end(), id) == blockers.end()) blockers.push_back(id);
             };
-            for (int cx : {-1, 1}) for (int cy : {-1, 1}) {             // soupeř na poli rohu
-                const Player* o = state.getPlayerAtPosition({static_cast<int8_t>(carrier.position.x + cx),
-                                                             static_cast<int8_t>(carrier.position.y + cy)});
+            for (const Position& sq : carrier.position.getAdjacent()) { // soupeř vedle nosiče (i na rohu)
+                if (!sq.isOnPitch()) continue;
+                const Player* o = state.getPlayerAtPosition(sq);
                 if (o && o->teamSide != side && o->state == PlayerState::STANDING) addBlocker(o->id);
             }
             state.forEachOnPitch(side, [&](const Player& t) {           // jediný držitel našeho volného hráče
@@ -447,6 +552,25 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         }
     }
 
+    // ⭐ P169 (07.10.2026): ROH, KTERÝ STOJÍ, V TOMTO TAHU KLEC NEOPOUŠTÍ ANI PÁDEM. Změřeno
+    //   (trpaslíci, 80 poločasů): ve 20 tazích stála na začátku klec se čtyřmi rohy, nosič
+    //   se nehnul a po tahu měla rohů méně — 15× s turnoverem: rohový hráč blokoval a spadl,
+    //   nebo fauloval. Roh proto smí jen BEZPEČNÝ blok (2+ kostky, které vybíráme my, a má
+    //   Block; bez Frenzy — to hlídá podmínka výš) a nefauluje. Blitz rohu hlídá expandBlitz.
+    if (phase_ == CagePhase::CAGE && m.playerId > 0 && m.playerId != carrier.id &&
+        (m.type == MacroType::BLOCK || m.type == MacroType::FOUL)) {
+        const Player& p = state.getPlayer(m.playerId);
+        const bool isCorner = p.teamSide == carrier.teamSide && p.state == PlayerState::STANDING &&
+                              std::abs(p.position.x - carrier.position.x) == 1 &&
+                              std::abs(p.position.y - carrier.position.y) == 1;
+        if (isCorner) {
+            if (m.type == MacroType::FOUL) return true;
+            const bool safe = m.targetId > 0 && p.hasSkill(SkillName::Block) &&
+                              blockDiceCount(state, p, state.getPlayer(m.targetId)) >= 2;
+            if (!safe) return true;
+        }
+    }
+
     const bool movesCarrier = m.type == MacroType::ADVANCE ||
                               (m.type == MacroType::REPOSITION && m.playerId == carrier.id);
     if (!movesCarrier) return false;
@@ -462,8 +586,12 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
                                                      static_cast<int8_t>(carrier.position.y + cy)});
         if (q && q->teamSide == carrier.teamSide && q->state == PlayerState::STANDING) ++corners;
     }
-    if (!why && corners < 3) why = "klec nemá ani tři rohy";
-    if (!why && waitingCostsTheTouchdown(state, carrier)) why = "čekáním by nestihl TD";
+    // P169 krok 3 (07.10.2026): „klec nemá ani tři rohy“ už nosiče hledání neuvolňuje — pole
+    // pro nosiče bez klece vybírá řadič (planAdvance). Výjimky níž zůstávají.
+    (void)corners;
+    // P169 krok 6: jen když sólo TD ještě stihne; nestihne-li ho ani tak, nosič z klece nejde.
+    if (!why && waitingCostsTheTouchdown(state, carrier) &&
+        decideRelease(state, carrier, planner_).soloMakesIt) why = "čekáním by nestihl TD";
     if (!why && countTacklezones(state, carrier.position, carrier.teamSide) > 0) why = "nosič stojí v zóně soupeře";
     if (why && std::getenv("BB_CAGE_DEBUG")) {
         std::fprintf(stderr, "[cage ctl] hledání smí pohnout nosičem: %s\n", why);
@@ -531,11 +659,67 @@ void CageController::planAdvance(const GameState& state) {
                      static_cast<int>(plan.verdict), plan.valid, plan.step, plan.builtCorners,
                      plan.filledCorners, plan.macros.size());
     }
+    // ⭐ P169 krok 6 (07.10.2026): VÝBĚH NA KONCI POLOČASU VOLÍ ŘADIČ, NE HLEDÁNÍ. Když by
+    //   nosič ani po kroku klece nestihl TD („čekáním by nestihl“), hledání ho dosud smělo vést
+    //   samo — kamkoli dopředu, i k soupeři a přes GFI: 14 takových tahů skončilo s 0–1 rohem a
+    //   9× o míč hned přišel (trpaslíci, 80 poločasů). Teď stejný výběh jako ve fázi 3: co
+    //   nejdál BEZ HODU, ne vedle soupeře, na pole, kam dosáhne nejméně soupeřů; spoluhráči pak
+    //   jdou markovat ty, kdo na něj dosáhnou.
+    // Jen když sólo od TOHOTO tahu TD ještě stihne — jinak výběh nic nezíská a klec míč chrání.
+    if (waitingCostsTheTouchdown(state, carrier) && decideRelease(state, carrier, planner_).soloMakesIt) {
+        const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
+        const int turnsAfterThis = std::clamp(8 - state.getTeamState(carrier.teamSide).turnNumber, 0, 8);
+        const int rest = distToEndzone(carrier.position, carrier.teamSide) - (plan.valid ? plan.step : 0) - (ma + 2);
+        const int soloNeedAfterStep = (rest > 0 ? (rest + ma - 1) / ma : 0) + 1;
+        if (soloNeedAfterStep > turnsAfterThis) {
+            phase_ = CagePhase::RELEASE;
+            releasedCarrier_ = carrier.id;
+            releasedHalf_ = state.half;
+            releasedScore_ = state.homeTeam.score + state.awayTeam.score;
+            const Position dest = farthestSafeForward(state, carrier, carrier.movementRemaining);
+            if (std::getenv("BB_CAGE_DEBUG")) {
+                std::fprintf(stderr, "[cage ctl] výběh kvůli času: nosič (%d,%d) -> (%d,%d)\n",
+                             carrier.position.x, carrier.position.y, dest.x, dest.y);
+            }
+            if (dest != carrier.position) {
+                Macro run{MacroType::REPOSITION, carrier.id, -1, dest};
+                run.cageManaged = true;
+                queue_ = {run};
+            }
+            stage_ = Stage::AFTER_RUN;
+            return;
+        }
+    }
     // ⭐ P154 (b) (uživatel 07.10.2026: „nosič dál jen s klecí“; obklíčená klec: „zůstat stát
     //   a uvolňovat ranami“; „pokud je ta situace na konci poločasu — nosič musí vyběhnout,
     //   aby stihl TD“). Postup klece nevyšel ⇒ nosič tento tah z klece nevybíhá — LEDAŽE by
     //   čekáním přišel o TD: sólo od příštího tahu potřebuje ceil((dist − (MA+2)) / MA) + 1
     //   tahů; nevejde-li se to do zbývajících, běží už teď.
+    //
+    // ⭐ P169 krok 3 (07.10.2026): NOSIČ SE HÝBE JEN TAM, KDE KOLEM NĚJ VZNIKNE KLEC. Když plán
+    //   nevyšel nebo má méně než tři rohy, hledání dosud smělo nosičem pohnout samo („klec nemá
+    //   ani tři rohy“) — a pohnulo jím kamkoli dopředu: klec pak byla čistá v 1 tahu z 21 a
+    //   všech 11 ztrát míče ve vlastním tahu trpaslíků (160 poločasů) bylo právě tímhle
+    //   pohybem. Teď pole vybírá řadič: bez hodu, ne vedle soupeře, ne dozadu, a to, kolem
+    //   kterého se ještě v tomto tahu postaví nejvíc rohů (při shodě nejdál). Jde tam jen,
+    //   když tím rohů přibude; rohy se pak dostaví jako po zvednutí míče.
+    const int planCorners = plan.valid ? plan.filledCorners - plan.gfiCorners : 0;
+    if (planCorners < 3) {
+        const Position dest = farthestSafeForward(state, carrier, carrier.movementRemaining, /*forCage=*/true);
+        const int here = cornersWithinReach(state, carrier, carrier.position);
+        const int there = cornersWithinReach(state, carrier, dest);
+        if (dest != carrier.position && there > std::max(planCorners, here)) {
+            if (std::getenv("BB_CAGE_DEBUG")) {
+                std::fprintf(stderr, "[cage ctl] nosič ke kleci: (%d,%d) -> (%d,%d), rohů v dosahu %d -> %d\n",
+                             carrier.position.x, carrier.position.y, dest.x, dest.y, std::max(planCorners, here), there);
+            }
+            Macro run{MacroType::REPOSITION, carrier.id, -1, dest};
+            run.cageManaged = true;
+            queue_ = {run};
+            stage_ = Stage::AFTER_PICKUP;      // pak dostavět rohy kolem nového místa, pak zaostalci
+            return;
+        }
+    }
     if (plan.valid) queue_ = std::move(plan.macros);
 }
 
@@ -651,6 +835,20 @@ bool CageController::next(const GameState& state, Macro& out) {
         phase_ = CagePhase::NONE;
         queue_.clear();
         idx_ = 0;
+        ballOursAtTurnStart_ = ourBall(state);
+        lateFillDone_ = false;
+    }
+    // ⭐ P169 krok 9 (07.10.2026): MÍČ ZVEDLO HLEDÁNÍ ⇒ ROHY SE STAVÍ HNED POTOM. Když řadič na
+    //   začátku tahu zvednutí nenabídl (míč v zóně soupeře, napřed rána) a míč pak zvedlo
+    //   hledání, řadič už byl „hotov“ a klec nestavěl nikdo: 14 z 25 zvednutí po 1. kole,
+    //   žádný přesun na roh, nosič s 0–1 rohem (trpaslíci, 80 poločasů). Teď se po takovém
+    //   zvednutí jednou za tah dostaví rohy kolem nosiče a zaostalci jdou dopředu.
+    if (stage_ == Stage::DONE && idx_ >= queue_.size() && !ballOursAtTurnStart_ && !lateFillDone_ &&
+        ourBall(state)) {
+        lateFillDone_ = true;
+        phase_ = CagePhase::CAGE;
+        stage_ = Stage::AFTER_PICKUP;
+        if (std::getenv("BB_CAGE_DEBUG")) std::fprintf(stderr, "[cage ctl] míč zvedlo hledání: dostavba rohů\n");
     }
 
     for (int guard = 0; guard < 6; ++guard) {

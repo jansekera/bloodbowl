@@ -44,6 +44,9 @@ int blockDiceCount(const GameState& state, const Player& attacker, const Player&
 // Kolik hráčů strany v tomto tahu ještě může začít aktivaci (kdo nehrál ani se nepohnul a smí hrát).
 int activationsStillAvailable(const GameState& state, TeamSide side, int excludePlayerId = -1);
 void setDodgeCapEnabled(bool on);
+// P162: „faul až jako poslední akce tahu“. Vypínač jen pro měření před/po a pro testy, které
+// zkoušejí aritmetiku priorů s faulem v široké nabídce; ve hře zapnuto.
+void setFoulOnlyLastEnabled(bool on);
 void takeDodgeCapStops(long* out2);
 
 enum class MacroType : uint8_t {

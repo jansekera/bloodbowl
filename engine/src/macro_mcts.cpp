@@ -1081,6 +1081,11 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         }
         bestMacro = replacement;
     }
+    // P169 krok 10 (07.10.2026): zvednutí zvolené hledáním se provede jako zvednutí řadiče —
+    // nosič po něm nejde „co nejdál“ (odběhl spoluhráčům, i po krajním řádku), ale bez hodu na
+    // pole, kolem kterého se ještě postaví klec, aspoň dvě pole od postranní čáry. Rohy pak
+    // dostaví řadič (krok 9). Změřeno: 18 z 33 zvednutí po 1. kole skončilo s 0–1 rohem.
+    if (!fromStagedPlan && bestMacro.type == MacroType::PICKUP) bestMacro.cageManaged = true;
     // P154 (06.10.2026): hledání chce tah ukončit a míč držíme ⇒ napřed dotáhnout klec.
     if (!fromStagedPlan && bestMacro.type == MacroType::END_TURN) {
         Macro cageMacro;

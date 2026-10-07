@@ -109,7 +109,12 @@ GameState makeShortcutVsDetour(bool moverHasDodge, bool markerHasTackle) {
     GameState s;
     s.phase = GamePhase::PLAY;
     s.activeTeam = TeamSide::HOME;
-    Player& mover = mkPlayer(s, 1, TeamSide::HOME, {5, 9}, 3);
+    // P170 (07.10.2026): AG 4 místo AG 3. Cena rizika ve výběru cesty stoupla ze 4 na 24 polí
+    // za jistý pád („pole pohybu nestojí nic, hod ano“): úhyb 3+ s přehozem (11 %) už na jedno
+    // pole zkratky nestačí ani hráči s Dodge. S AG 4 je úhyb 2+: bez dovednosti 1/6 = 4 pole
+    // (obchází se), s přehozem 1/36 = 0,67 pole (zkracuje se) — fixtura měří totéž co dřív:
+    //   zkratka bez Dodge 400 + 400 + 4 = 804 · s Dodge 400 + 67 + 4 = 471 · obcházka 503.
+    Player& mover = mkPlayer(s, 1, TeamSide::HOME, {5, 9}, 4);
     if (moverHasDodge) mover.skills.add(SkillName::Dodge);
     Player& marker = mkPlayer(s, 11, TeamSide::AWAY, {7, 9}, 3);
     if (markerHasTackle) marker.skills.add(SkillName::Tackle);
@@ -135,9 +140,9 @@ void assertShortcutFixtureGeometry(const GameState& s) {
     ASSERT_EQ(countTacklezones(s, Position{7, 7}, TeamSide::HOME), 0)
         << "{7,7} ma tacklezonu -- obtiznost dodge i pocet dodge kroku "
            "zkratky by byly jine";
-    ASSERT_EQ(calculateDodgeTarget(s, mover, Position{7, 7}, Position{6, 8}), 3)
-        << "dodge ze {6,8} na {7,7} neni 3+ ⇒ p != 1/3 a cela cenova "
-           "aritmetika 537/448/503 nesedi";
+    ASSERT_EQ(calculateDodgeTarget(s, mover, Position{7, 7}, Position{6, 8}), 2)
+        << "dodge ze {6,8} na {7,7} neni 2+ ⇒ p != 1/6 a cela cenova "
+           "aritmetika 804/471/503 nesedi";
     // (c) Obchazka NESMI mit ani jeden dodge: zadne z jejich opoustenych poli
     //     nesmi byt v tacklezone (posledni pole {9,5} se neopousti).
     for (const Position sq : {Position{5, 8}, Position{6, 7}, Position{7, 6},
@@ -257,7 +262,7 @@ TEST(PathFailProb, TackleNextToTheLeftSquareRemovesTheDodgeDiscount) {
     const double shortcut = pathFailProb(dodgy, dodgy.getPlayer(1), target, 8, kNoBlock);
     ASSERT_EQ(pathStepsToward(dodgy, dodgy.getPlayer(1), target, 8, kNoBlock), 4)
         << "hrac s Dodge nevzal zkratku -- fixtura nemeri, co tvrdi";
-    EXPECT_NEAR(shortcut, 1.0 / 9.0, 1e-12);
+    EXPECT_NEAR(shortcut, 1.0 / 36.0, 1e-12);   // 2+ s přehozem (P170: fixtura má AG 4)
 
     // Bez dovednosti se jde OBCHAZKOU, ktera dodge nema vubec.
     ASSERT_EQ(pathStepsToward(plain, plain.getPlayer(1), target, 8, kNoBlock), 5)
@@ -397,7 +402,10 @@ TEST(RiskWeightedPath, NonDodgeMoverIsBitIdenticalAcrossTheWholePitch) {
     //   chrani -- kdyby reroll zacal prosakovat, spadne to znovu.
     // ⚠️ Nova konstanta je zmerena na binarce S opravou (dva behy, shodne)
     //   a rucne opsana, ne odvozena z kodu za behu.
-    EXPECT_EQ(acc, 4592050832043868488ull)
+    // P170 (07.10.2026): konstanta přepsána podruhé — cena rizika ve výběru cesty stoupla ze 4
+    // na 24 polí za jistý pád (záměrná změna, viz `kRiskSafeFirst`). Co zámek hlídá, se nemění.
+    // Dřív 4592050832043868488.
+    EXPECT_EQ(acc, 4991738763181773338ull)
         << "chovani hrace BEZ dovednosti Dodge se zmenilo -- zdvojeny stav "
            "prosakuje do vrstvy 0 a nasazena cesta M14b se tise premerila";
 }
@@ -460,7 +468,8 @@ TEST(RiskWeightedPath, EnemyHeldBallDoesNotMoveTheBlitzApproach) {
     }
     (void)takeBlitzPathPicksInSearch();
 
-    EXPECT_EQ(acc, 14228315721395697305ull)
+    // P170 (07.10.2026): konstanta přepsána spolu s cenou rizika (4 → 24), dřív 14228315721395697305.
+    EXPECT_EQ(acc, 16467411822568785236ull)
         << "mic v rukach SOUPERE zmenil vyber pole dosednuti -- podminka "
            "'nosic je NAS' nedrzi a nasazena cesta M14b se tise premerila";
 }
@@ -626,4 +635,74 @@ TEST(Pathfinder, P77BreakTackleIsPricedOnTheFirstDodgeOnly) {
 
     const double pf = pathFailProb(gs, gs.getPlayer(1), {12, 7}, 2, kNoBlock);
     EXPECT_NEAR(pf, 2.0 / 3.0, 1e-9);
+}
+
+// ---------------------------------------------------------------------------
+// Uživatel 07.10.2026: „elfové by měli umět dodge na volné pole — což je 2 plus — zkontroluj, že
+// umějí volit cestu tak, aby uskočili do volného pole, i když cesta není tím přímo vpřed — a toto
+// by měli umět všichni — dodge je pro všechny agilní hráče“.
+// Pravidla (úhyb): hází se při ODCHODU ze zóny, cíl 7 − AG, +1 za úhyb, −1 za každou zónu na
+// CÍLOVÉM poli ⇒ AG 4 do volného pole 2+, do pole v jedné zóně 3+; AG 3 do volného 3+, do zóny 4+.
+// Pozice: hráč (10,7), soupeř hned před ním (11,7), cíl (14,7). Přímo vpřed vede každý první krok
+// do soupeřovy zóny a z ní se uhýbá podruhé; ústup na sloupec x=9 je úhyb do volného pole a zbytek
+// cesty jde obloukem mimo zónu: (9,6) (10,5) (11,5) (12,5) (13,6) (14,7) = 6 polí.
+// ---------------------------------------------------------------------------
+TEST(RiskWeightedPath, DodgesIntoAFreeSquareAndGoesAroundEvenWhenThatIsNotStraightAhead) {
+    for (int agility : {4, 3}) {
+        GameState s;
+        s.phase = GamePhase::PLAY;
+        s.activeTeam = TeamSide::HOME;
+        Player& mover = mkPlayer(s, 1, TeamSide::HOME, {10, 7}, agility);
+        mover.stats.movement = 7;
+        mover.movementRemaining = 7;
+        mkPlayer(s, 12, TeamSide::AWAY, {11, 7}, 3);
+        const Position target{14, 7};
+
+        const double oneDodgeIntoFree = (agility == 4) ? 1.0 / 6.0 : 2.0 / 6.0;
+        EXPECT_NEAR(pathFailProb(s, mover, target, 7, kNoBlock), oneDodgeIntoFree, 1e-9)
+            << "AG " << agility << ": jediný hod cesty je úhyb do volného pole";
+
+        Position first{-1, -1};
+        ASSERT_TRUE(nextStepToward(s, mover, target, 7, kNoBlock, first));
+        EXPECT_EQ(countTacklezones(s, first, TeamSide::HOME, 1), 0)
+            << "AG " << agility << ": první krok (" << int(first.x) << "," << int(first.y)
+            << ") vede do pole bez soupeřovy zóny, ne přímo vpřed";
+    }
+}
+
+// Uživatel 07.10.2026: „zkontroluj zároveň, že se takto nově správně cesta počítá pro volbu
+// i stejně provede pohyb“. Tatáž pozice jako výše: ocenění cesty (`pathFailProb`, podle něj se
+// volí) říká „jeden úhyb na 2+“ — a chůze, krok po kroku přes `nextStepToward` s ubývajícím
+// rozpočtem (tak chodí `movePlayerToward`), musí projít přesně takovou cestu: z kontaktu odejde
+// jednou, do volného pole, a pak už žádné pole v soupeřově zóně neopustí.
+TEST(RiskWeightedPath, TheWalkFollowsTheSameRouteThatWasPriced) {
+    for (int agility : {4, 3}) {
+        GameState s;
+        s.phase = GamePhase::PLAY;
+        s.activeTeam = TeamSide::HOME;
+        Player& mover = mkPlayer(s, 1, TeamSide::HOME, {10, 7}, agility);
+        mover.stats.movement = 7;
+        mover.movementRemaining = 7;
+        mkPlayer(s, 12, TeamSide::AWAY, {11, 7}, 3);
+        const Position target{14, 7};
+        const double priced = pathFailProb(s, mover, target, 7, kNoBlock);
+
+        double survive = 1.0;
+        int dodges = 0, steps = 0;
+        for (int budget = 7; budget > 0 && mover.position != target; --budget) {
+            Position next{-1, -1};
+            ASSERT_TRUE(nextStepToward(s, mover, target, budget, kNoBlock, next)) << "AG " << agility;
+            if (countTacklezones(s, mover.position, TeamSide::HOME, 1) > 0) {
+                ++dodges;
+                survive *= 1.0 - (calculateDodgeTarget(s, mover, next, mover.position) - 1) / 6.0;
+                EXPECT_EQ(countTacklezones(s, next, TeamSide::HOME, 1), 0) << "úhyb vede do volného pole";
+            }
+            mover.position = next;
+            ++steps;
+        }
+        EXPECT_EQ(mover.position, target) << "AG " << agility << ": chůze došla";
+        EXPECT_EQ(dodges, 1) << "AG " << agility;
+        EXPECT_EQ(steps, 6) << "AG " << agility << ": oblouk o dvě pole delší než přímá cesta";
+        EXPECT_NEAR(1.0 - survive, priced, 1e-9) << "AG " << agility << ": prošlá cesta = oceněná cesta";
+    }
 }

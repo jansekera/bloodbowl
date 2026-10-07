@@ -845,18 +845,26 @@ const TeamRoster& getHumanRoster1500() {
         "Human (TV1500)",
         {
             {{6, 3, 3, 8}, makeSkills({SkillName::Block}), 11, "Lineman +Block"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::MightyBlow}), 2,
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::MightyBlow}), 1,
                 "Blitzer +Guard+Stand Firm+Mighty Blow"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow, SkillName::StandFirm}), 1, "Blitzer +Mighty Blow+Stand Firm"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::StandFirm}), 1,
-                "Blitzer ball-hunter +Stand Firm"},
+            // Uživatel 07.10.2026: „ještě mi chybí u lidí proti orkům Dauntless na jednom
+            // blitzerovi“; „aspoň jeden Stand Firm ať zůstane a druhý přidat místo MB“ ⇒ druhý
+            // Blitzer s Guard má Dauntless místo Mighty Blow, Stand Firm mají oba.
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::Dauntless}), 1,
+                "Blitzer +Guard+Stand Firm+Dauntless"},
+            // Uživatel 07.10.2026: „u lidí bych na lovce dal Wrestle místo Stand Firm, a lidé mají
+            // málo Tackle a zbytečně moc Stand Firm … blitzerovi bez Guard dal Tackle místo Stand
+            // Firm — pro univerzálnost“. Stand Firm zůstává jen dvěma Blitzerům s Guard.
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::MightyBlow, SkillName::Tackle}), 1, "Blitzer +Mighty Blow+Tackle"},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::Wrestle}), 1,
+                "Blitzer ball-hunter +Wrestle"},
             {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro}), 1, "Thrower +Block+Pro"},
             {{8, 2, 3, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Block, SkillName::SideStep}), 2, "Catcher +Block+Side Step"},
             {{5, 5, 2, 9}, makeSkills({SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow,
                 SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block}), 1, "Ogre +Block"},
             {{6, 3, 3, 8}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},
         },
-        8, 50, true
+        9, 50, true
     };
     return roster;
 }

@@ -2,6 +2,7 @@
 #include "bb/turn_planner.h"
 #include "bb/helpers.h"
 #include "bb/turn_plan_record.h"
+#include "bb/pathfinder.h"
 #include <algorithm>
 #include <cmath>
 
@@ -195,7 +196,7 @@ CageAdvancePlanner::ProbeStats CageAdvancePlanner::probeMacro(const GameState& s
 
 CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         const GameState& state, const Player& carrier, int step,
-        const std::vector<int>& reservedPlayerIds) const {
+        const std::vector<int>& reservedPlayerIds, int dy, bool diceFreeReach) const {
     AssignmentResult res;
     TeamSide mySide = carrier.teamSide;
     int dx = forwardDx(mySide);
@@ -213,8 +214,12 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
                               + CARRIER_GFI_MAX) {
         return res;
     }
+    // P154 (07.10.2026): krok smí skončit o řádek vedle (šikmo) — když na poli rohu leží tělo
+    // nebo stojí soupeř, klec se postaví o řádek jinde; nosič u kraje hřiště se tak dostane
+    // z řádku, kde rohy nemají kam stát. Jen s krokem ≥ 1 (šikmý krok stojí stejně jako rovný).
+    if (dy != 0 && (step < 1 || std::abs(dy) > step)) return res;
     Position newPos{static_cast<int8_t>(carrier.position.x + dx * step),
-                    carrier.position.y};
+                    static_cast<int8_t>(carrier.position.y + dy)};
     if (!newPos.isOnPitch()) return res;
     if (newPos.y < 1 || newPos.y > 13) return res;  // corner rows must exist
     // The carrier's target may hold a TEAMMATE: real formations right after
@@ -250,10 +255,17 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     };
 
     // Candidate pool: free-to-act, skill-eligible, unreserved teammates.
+    // ⭐ P154 (uživatel 07.10.2026: „ležící spoluhráč může vstát a dojít stát se rohem, pokud
+    //   nevyžaduje dodge nebo riskantní hod“): do výběru patří i ležící hráč, který vstane bez
+    //   hodu (MA ≥ 3, ř. 690-695, nebo Jump Up) — dosah má o tři pole kratší. Omráčený ne.
+    auto standsUpFree = [](const Player& p) {
+        return p.state == PlayerState::PRONE && !p.hasMoved && !p.hasActed &&
+               (p.movementRemaining >= 3 || p.hasSkill(SkillName::JumpUp));
+    };
     std::vector<const Player*> pool;
     state.forEachOnPitch(mySide, [&](const Player& p) {
         if (p.id == carrier.id) return;
-        if (!p.canAct() || p.hasMoved || p.hasActed) return;
+        if (!standsUpFree(p) && (!p.canAct() || p.hasMoved || p.hasActed)) return;
         if (!eligibleCornerPlayer(p)) return;
         if (isReserved(p.id)) return;
         pool.push_back(&p);
@@ -264,6 +276,18 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         return std::find(assignedIds.begin(), assignedIds.end(), id)
                != assignedIds.end();
     };
+
+    // P154 (07.10.2026): KDO NA POLI ROHU UŽ STOJÍ, ZŮSTÁVÁ. Pole se obsazují od předních;
+    // bez tohohle si přední pole „půjčilo“ hráče stojícího na zadním (je nejblíž) a na zadní
+    // pak nemusel nikdo zbýt — klec se čtyřmi rohy se přestavěním změnila na tři.
+    for (const Position& slot : slots) {
+        if (!slot.isOnPitch()) continue;
+        const Player* occ = state.getPlayerAtPosition(slot);
+        if (occ && occ->teamSide == mySide && occ->id != carrier.id &&
+            occ->state == PlayerState::STANDING) {
+            pool.erase(std::remove(pool.begin(), pool.end(), occ), pool.end());
+        }
+    }
 
     int gfiBudget = 1;  // constraint 2: at most ONE corner on the allowance
     for (const Position& slot : slots) {
@@ -284,6 +308,25 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
             continue;
         }
         if (occ && occ->id == carrier.id) {  // cannot happen geometrically
+            res.open++;
+            res.slots.push_back(sa);
+            continue;
+        }
+        if (occ && occ->teamSide == mySide && std::find(pool.begin(), pool.end(), occ) != pool.end() &&
+            standsUpFree(*occ) && !isAssigned(occ->id)) {
+            // leží přímo na poli rohu a vstane bez hodu ⇒ roh (makro „na vlastní pole“ = vstát)
+            sa.playerId = occ->id;
+            res.filled++;
+            assignedIds.push_back(occ->id);
+            pool.erase(std::remove(pool.begin(), pool.end(), occ), pool.end());
+            res.slots.push_back(sa);
+            continue;
+        }
+        if (occ && occ->state != PlayerState::STANDING) {
+            // OPRAVENO 07.10.2026 (P154): ležící / omráčený spoluhráč na poli rohu se dosud
+            // počítal jako stojící roh („a body on the slot is a corner regardless of who it
+            // is“) — plán pak hlásil čtyři rohy a klec měla tři (trpaslíci: 10 rohů ve 40
+            // poločasech). Roh je jen stojící hráč; pole je obsazené, roh zůstává otevřený.
             res.open++;
             res.slots.push_back(sa);
             continue;
@@ -357,8 +400,29 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         for (const Player* p : pool) {
             int d = p->position.distanceTo(slot);
             bool gfi;
-            if (d <= static_cast<int>(p->movementRemaining)) {
+            const bool prone = p->state == PlayerState::PRONE;
+            if (prone) {
+                // vstane (3 pole pohybu) a dojde bez hodu — GFI se ležícímu nepřidává
+                const int reach = movementAfterStandUp(*p);
+                if (d > reach) continue;
+                GameState up = state.clone();
+                Player& w = up.getPlayer(p->id);
+                w.state = PlayerState::STANDING;
+                w.movementRemaining = static_cast<int8_t>(reach);
+                if (pathFailProb(up, w, slot, reach, Position{-1, -1}) > SAFE_PTO) continue;
                 gfi = false;
+            } else if (d <= static_cast<int>(p->movementRemaining)) {
+                gfi = false;
+                // ⭐ P154 (07.10.2026): NA ROH JEN TEN, KDO TAM DOJDE BEZ HODU. Dosud stačila
+                //   vzdálenost; hráč vázaný v zóně soupeře pak dostal roh, kontrola „bez hodu“
+                //   zahodila CELÝ krok a řadič nepostavil nic („plán nevyšel“: 27 z 77 nečistých
+                //   tahů trpaslíků, 19 z 62 elfích, 40 poločasů TV1500). Teď takový hráč o roh
+                //   nesoutěží — roh vezme jiný, nebo zůstane otevřený a zbylé tři se postaví.
+                //   Hráč s Dodge smí jeden úhyb na 2+ (stejná mez jako při kontrole kroku).
+                //   Cesta zastavěná spoluhráčem (−1) se tu nevyřazuje: ten se může hnout dřív.
+                const double fail = pathFailProb(state, *p, slot, p->movementRemaining, Position{-1, -1});
+                const double ceil = p->hasSkill(SkillName::Dodge) ? SAFE_PTO_DODGE_SKILL : SAFE_PTO;
+                if (diceFreeReach && fail > ceil) continue;
             } else if (d == static_cast<int>(p->movementRemaining) + 1 &&
                        gfiBudget > 0) {
                 gfi = true;  // the single 1-GFI allowance (see header)
@@ -897,34 +961,84 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     //   konci tahu“): ČISTÁ KLEC MÁ PŘEDNOST PŘED DÉLKOU KROKU. Nejdelší bezpečný krok se
     //   čtyřmi rohy se bere hned. Vyjde-li jen se dvěma nebo třemi, zkouší se dál kratší kroky
     //   (ne pod tempo, které rozvrh vyžaduje) a bere se ten s nejvíc rohy; při shodě delší.
+    //
+    // ⭐ P154 (07.10.2026, uživatel: „zkus dokončit co nejvíc možností ke zlepšení stavění čisté
+    //   klece na konci tahu“):
+    //   (1) KROK ŠIKMO — nevyjde-li krok rovně se čtyřmi rohy (na poli rohu leží tělo, stojí
+    //       soupeř), zkusí se tentýž krok zakončený o řádek vedle, napřed směrem ke středu.
+    //   (2) KROK NESMÍ MÍT MÉNĚ ROHŮ NEŽ KLEC NA MÍSTĚ, dokud rozvrh čekání snese. Změřeno
+    //       07.10. (40 poločasů TV1500): jakmile plánovač přestal padat na hráčích vázaných
+    //       v zóně, začal brát kroky se třemi rohy a opouštěl kvůli nim stojící čistou klec —
+    //       čistých tahů trpaslíků 54 → 45 %. „Snese čekání“ = i s o tah méně stačí tempo,
+    //       které klec umí (dist / (usable − 1) ≤ achievablePace).
+    // P169 (07.10.2026): roh „na GFI“ smí zůstat pole před cílem a dojde až příští tah (viz
+    // hlavička) — tento tah tedy rohem NENÍ. Plán s ním hlásil čtyři rohy a klec měla tři
+    // (45 tahů „plán se čtyřmi rohy“ skončilo s méně rohy, 80 poločasů trpaslíků). Pro volbu
+    // kroku a pro „klec je čistá“ se počítají jen rohy, které opravdu stojí.
+    auto standing = [](const CageAdvancePlan& p) { return p.filledCorners - p.gfiCorners; };
+    const AssignmentResult stayAssign = tryAssign(state, carrier, 0, reservedPlayerIds);
+    const int stayFilled = stayAssign.filled - stayAssign.gfi;
+    const bool canWait = usable >= 2 &&
+                         static_cast<double>(dist) / (usable - 1) <= std::max(1.0, plan.achievablePace) + 1e-9;
+    const int towardMiddle = (carrier.position.y < 7) ? 1 : -1;
+    // ⭐ P131 / P169 krok 7 (uživatel 07.10.2026: „nezapomeň ani na situaci z naší hry, kdy nosič
+    //   stál vedle okraje hřiště a byl vysurfován — a při Frenzy i z pole vedle okraje“).
+    //   Nosič končí tah aspoň DVĚ pole od postranní čáry (řádky 2–12): z řádku 2 ho ani dvě
+    //   odtlačení (Frenzy) do diváků nedostanou a rohy klece nestojí na krajním řádku. Stojí-li
+    //   u kraje už teď, zkouší se napřed krok šikmo ke středu; krok, který by ho ke kraji
+    //   přivedl, se nebere.
+    auto nearSideline = [](int y) { return y < 2 || y > 12; };
+    const bool carrierAtSideline = nearSideline(carrier.position.y);
+    const int dyOrder[3] = {carrierAtSideline ? towardMiddle : 0, carrierAtSideline ? 0 : towardMiddle,
+                            -towardMiddle};
     CageAdvancePlan bestSafe;
     bool haveSafe = false;
     CageAdvancePlan firstTry;
     bool haveFirst = false;
     for (int step = finalStep; step >= 1; --step) {
-        if (haveSafe && step < scheduleStep) break;        // pod požadované tempo kvůli rohům ne
-        AssignmentResult a;
-        if (step == finalStep) {
-            a = assign;
-        } else {
-            a = tryAssign(state, carrier, step, reservedPlayerIds);
-            if (!a.feasible) continue;
-            // Kratší krok nesmí nosiče postavit do zóny soupeře („blok na nosiče se nesmí
-            // stávat vůbec", uživatel 20.08., kniha P42) — to raději dostavět klec na místě.
-            if (countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
-        }
-        CageAdvancePlan candidate = plan;
-        candidate.carrierGfi = std::clamp(step - maxNoGfi, 0, plan.carrierGfi);
-        if (legsAreSafe(candidate, step, a)) {
-            if (step != finalStep) candidate.shortenedFromStep = finalStep;
-            if (!haveSafe || candidate.filledCorners > bestSafe.filledCorners) {
-                bestSafe = std::move(candidate);
-                haveSafe = true;
+        // pod požadované tempo kvůli rohům ne — leda by krok měl méně rohů, než kolik jich stojí
+        if (haveSafe && step < scheduleStep && standing(bestSafe) >= stayFilled) break;
+        for (int dy : dyOrder) {
+            if (nearSideline(carrier.position.y + dy) &&
+                (!carrierAtSideline || dy == -towardMiddle)) continue;   // ke kraji ne
+            AssignmentResult a;
+            if (step == finalStep && dy == 0) {
+                a = assign;
+                // P169 krok 4 (07.10.2026): ani NEJDELŠÍ krok nesmí nosiče postavit do zóny
+                // soupeře — dosud to hlídaly jen kratší kroky (po tahu s nosičem vedle soupeře
+                // přišel míč ve 39 % případů, jinak v 9 %).
+                if (countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
+            } else {
+                a = tryAssign(state, carrier, step, reservedPlayerIds, dy);
+                if (!a.feasible) continue;
+                // Kratší krok nesmí nosiče postavit do zóny soupeře („blok na nosiče se nesmí
+                // stávat vůbec", uživatel 20.08., kniha P42) — to raději dostavět klec na místě.
+                if (countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
+                if (dy != 0 && haveSafe && a.filled - a.gfi <= standing(bestSafe)) continue;
             }
-            if (bestSafe.filledCorners >= 4) break;
-            continue;
+            CageAdvancePlan candidate = plan;
+            candidate.carrierGfi = std::clamp(step - maxNoGfi, 0, plan.carrierGfi);
+            if (legsAreSafe(candidate, step, a)) {
+                if (step != finalStep) candidate.shortenedFromStep = finalStep;
+                if (!haveSafe || standing(candidate) > standing(bestSafe)) {
+                    bestSafe = std::move(candidate);
+                    haveSafe = true;
+                }
+                if (standing(bestSafe) >= 4) break;
+                continue;
+            }
+            if (!haveFirst) { firstTry = std::move(candidate); haveFirst = true; }
         }
-        if (!haveFirst) { firstTry = std::move(candidate); haveFirst = true; }
+        if (haveSafe && standing(bestSafe) >= 4) break;
+    }
+    if (haveSafe && standing(bestSafe) < stayFilled && canWait) {
+        if (getenv("BB_CAGE_DEBUG")) {
+            fprintf(stderr, "[cage] krok %d by měl %d rohy, na místě jich je %d — klec stojí\n",
+                    bestSafe.step, standing(bestSafe), stayFilled);
+        }
+        CageAdvancePlan stand = plan;                  // neplatný ⇒ build() dostaví klec na místě
+        stand.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
+        return stand;
     }
     if (haveSafe) {
         if (getenv("BB_CAGE_DEBUG") && bestSafe.step != finalStep) {

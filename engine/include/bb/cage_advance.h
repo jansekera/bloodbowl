@@ -312,9 +312,13 @@ public:
         Position newCarrierPos{-1, -1};
         std::vector<SlotAssignment> slots;  // front pair first, then back pair
     };
+    // `dy` (P154, 07.10.2026): nosič smí krok zakončit o řádek vedle (−1 / +1) — viz buildImpl.
+    // `diceFreeReach = false`: rohy se přidělují jen podle vzdálenosti (odhad tempa klece pro
+    // rozhodnutí o vypuštění nosiče — jeden tah s vázanými hráči nemá zkreslit celý zbytek cesty).
     AssignmentResult tryAssign(const GameState& state, const Player& carrier,
                                int step,
-                               const std::vector<int>& reservedPlayerIds) const;
+                               const std::vector<int>& reservedPlayerIds,
+                               int dy = 0, bool diceFreeReach = true) const;
 
 private:
     MCTSConfig config_;

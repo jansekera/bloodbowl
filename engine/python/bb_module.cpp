@@ -533,6 +533,7 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_activation_value", [](double v) { bb::setActivationValue(v); });
     m.def("activation_value", []() { return bb::activationValue(); });
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
+    m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);
         return py::make_tuple(v[0], v[1]);

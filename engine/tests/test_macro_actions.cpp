@@ -4425,6 +4425,7 @@ TEST(MacroActions, BallCarrierIsNeverOfferedABlockOrAFoul) {
         Player& mate = state.getPlayer(2);
         mate.id = 2; mate.teamSide = TeamSide::HOME; mate.state = PlayerState::STANDING;
         mate.position = {3, 3}; mate.stats = {6, 3, 3, 8}; mate.movementRemaining = 6;
+        mate.hasMoved = true; mate.hasActed = true;   // P162: faul se nabízí jen poslednímu, kdo hraje
         if (carrierIsPlayerOne) state.ball = BallState::carried({10, 7}, 1);
         else state.ball = BallState::carried({3, 3}, 2);
         std::vector<Macro> macros;
@@ -4437,4 +4438,27 @@ TEST(MacroActions, BallCarrierIsNeverOfferedABlockOrAFoul) {
     };
     EXPECT_EQ(offer(true), 0) << "nosič neblokuje ani nefauluje";
     EXPECT_GT(offer(false), 0) << "pozitivní kontrola: bez míče má tentýž hráč ránu nebo faul v nabídce";
+}
+
+// P162 (uživatel 07.10.2026): „faulovat se smí až na konci tahu — je obecné pravidlo“. Dokud má
+// hrát ještě někdo jiný, faul v nabídce není; jakmile je fauler poslední, kdo může hrát, je tam.
+TEST(MacroActions, FoulIsOfferedOnlyAsTheLastActivationOfTheTurn) {
+    auto fouls = [](bool mateAlreadyPlayed) {
+        GameState state = makeMinimalState();
+        state.getPlayer(12).position = {20, 2};                  // stojící soupeř daleko
+        Player& prone = state.getPlayer(13);
+        prone.id = 13; prone.teamSide = TeamSide::AWAY; prone.state = PlayerState::PRONE;
+        prone.position = {10, 8}; prone.stats = {6, 3, 3, 8};    // leží vedle HOME 1 na (10,7)
+        Player& mate = state.getPlayer(2);
+        mate.id = 2; mate.teamSide = TeamSide::HOME; mate.state = PlayerState::STANDING;
+        mate.position = {3, 3}; mate.stats = {6, 3, 3, 8}; mate.movementRemaining = 6;
+        mate.hasMoved = mateAlreadyPlayed; mate.hasActed = mateAlreadyPlayed;
+        std::vector<Macro> macros;
+        getAvailableMacros(state, macros);
+        int n = 0;
+        for (const Macro& m : macros) n += (m.type == MacroType::FOUL);
+        return n;
+    };
+    EXPECT_EQ(fouls(false), 0) << "spoluhráč ještě nehrál ⇒ faul se nenabízí";
+    EXPECT_GT(fouls(true), 0) << "fauler je poslední ⇒ faul v nabídce je (pozitivní kontrola)";
 }

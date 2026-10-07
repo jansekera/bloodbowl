@@ -375,6 +375,9 @@ TEST(MacroMCTS, DefensiveRepositionFloorBindsAtLargeNodes) {
 }
 
 TEST(MacroMCTS, DefensiveFoulCapBindsAtSparseNodes) {
+    // P162 (07.10.2026): ve hře se faul nabízí jen jako poslední akce tahu; tenhle test zkouší
+    // aritmetiku priorů s faulem v široké nabídce, proto pravidlo po dobu testu vypíná.
+    struct FoulRuleOff { FoulRuleOff() { setFoulOnlyLastEnabled(false); } ~FoulRuleOff() { setFoulOnlyLastEnabled(true); } } foulRuleOff;
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;
@@ -526,6 +529,9 @@ TEST(MacroMCTS, RepositionFloorNoOpAtSmallNodes) {
 }
 
 TEST(MacroMCTS, OffensivePriorsUntouchedByDefensiveRebalance) {
+    // P162 (07.10.2026): ve hře se faul nabízí jen jako poslední akce tahu; tenhle test zkouší
+    // aritmetiku priorů s faulem v široké nabídce, proto pravidlo po dobu testu vypíná.
+    struct FoulRuleOff { FoulRuleOff() { setFoulOnlyLastEnabled(false); } ~FoulRuleOff() { setFoulOnlyLastEnabled(true); } } foulRuleOff;
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;

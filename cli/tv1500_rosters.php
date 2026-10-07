@@ -60,9 +60,12 @@ const TV1500_ROSTERS = [
     ],
     'Human' => [
         ['Lineman',  1, [6, 3, 3, 8], [SkillName::Block]],
-        ['Blitzer',  2, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::MightyBlow]],
-        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::MightyBlow, SkillName::StandFirm]],
-        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::StandFirm]],
+        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::MightyBlow]],
+        // uživatel 07.10.: Dauntless na jednom Blitzerovi (proti orkům), místo Mighty Blow; Stand Firm oběma s Guard
+        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::StandFirm, SkillName::Dauntless]],
+        // uživatel 07.10.: lovec Wrestle místo Stand Firm; Blitzer bez Guard Tackle místo Stand Firm
+        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::MightyBlow, SkillName::Tackle]],
+        ['Blitzer',  1, [7, 3, 3, 8], [SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::Wrestle]],
         ['Thrower',  1, [6, 3, 3, 8], [SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro]],
         ['Catcher',  2, [8, 2, 3, 7], [SkillName::Catch, SkillName::Dodge, SkillName::Block, SkillName::SideStep]],
         ['Ogre',     1, [5, 5, 2, 9], [SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block]],

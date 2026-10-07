@@ -74,13 +74,36 @@ final class Tv1500RostersTest extends TestCase
         $this->assertSame(1, $this->withSkill($players, SkillName::WildAnimal), 'Rat Ogre v téže sestavě (uživatel 08.10.)');
     }
 
-    public function testOrcAndHumanCornersHaveStandFirm(): void
+    public function testOrcCornersHaveStandFirm(): void
     {
-        foreach (['Orc', 'Human'] as $race) {
-            $players = getTv1500RaceRoster(TeamSide::HOME, $race);
-            $this->assertSame(4, $this->withSkill($players, SkillName::StandFirm), $race);
-            $this->assertSame(1, $this->withSkill($players, SkillName::Pro), $race);
-            $this->assertSame(2, $this->withSkill($players, SkillName::Wrestle), $race);
+        $players = getTv1500RaceRoster(TeamSide::HOME, 'Orc');
+        $this->assertSame(4, $this->withSkill($players, SkillName::StandFirm));
+        $this->assertSame(6, $this->withSkill($players, SkillName::Guard));
+        $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
+        $this->assertSame(2, $this->withSkill($players, SkillName::Wrestle));
+    }
+
+    /** Uživatel 07.10.2026: lovec Wrestle místo Stand Firm, Blitzer bez Guard Tackle místo Stand Firm. */
+    public function testHumanHunterHasWrestleAndTwoBlitzersHaveTackle(): void
+    {
+        $players = getTv1500RaceRoster(TeamSide::HOME, 'Human');
+        $this->assertSame(2, $this->withSkill($players, SkillName::StandFirm), 'jen dva Blitzeři s Guard');
+        $this->assertSame(1, $this->withSkill($players, SkillName::Dauntless), 'jeden Blitzer s Guard, místo Mighty Blow');
+        $this->assertSame(2, $this->withSkill($players, SkillName::Guard));
+        $this->assertSame(3, $this->withSkill($players, SkillName::MightyBlow));
+        $this->assertCount(11, $players);
+        $this->assertSame(2, $this->withSkill($players, SkillName::Tackle));
+        $this->assertSame(3, $this->withSkill($players, SkillName::Wrestle), 'dva Linemani + lovec');
+        $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
+        foreach ($players as $p) {
+            if ($p->hasSkill(SkillName::StripBall)) {
+                $this->assertTrue($p->hasSkill(SkillName::Wrestle));
+                $this->assertTrue($p->hasSkill(SkillName::Tackle));
+                $this->assertFalse($p->hasSkill(SkillName::StandFirm));
+            }
+            if ($p->hasSkill(SkillName::StandFirm)) {
+                $this->assertTrue($p->hasSkill(SkillName::Guard));
+            }
         }
     }
 }

@@ -60,6 +60,8 @@ constexpr int kDodgeCapTarget = 4;
 thread_local bool g_dodgeCapEnabled = true;
 thread_local long g_dodgeCapStops[2] = {0, 0};   // [0] zastavená chůze, [1] vyřazený blitzující
 void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
+thread_local bool g_foulOnlyLast = true;
+void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
     for (int i = 0; i < 2; ++i) { out2[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
 }
@@ -2766,6 +2768,20 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
 void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         bool dauntlessInOffer) {
     buildMacroOffer(state, out, dauntlessInOffer);
+    // ⭐ P162 (uživatel 07.10.2026: „faulovat se smí až na konci tahu — je obecné pravidlo, které
+    //   můžeš přidat hned“). Vyloučení za faul je turnover; dokud má hrát ještě někdo jiný,
+    //   faul se nenabízí. Změřeno 07.10. (80 útočných poločasů TV1500): 47 ze 169 turnoverů
+    //   trpaslíků bylo vyloučení za faul (28 %), u elfů 22 ze 177. Faul bez jména hráče
+    //   (vybírá ho až provedení) se nabízí, až když zbývá jediná aktivace.
+    if (g_foulOnlyLast && state.phase == GamePhase::PLAY) {
+        out.erase(std::remove_if(out.begin(), out.end(), [&](const Macro& m) {
+                      if (m.type != MacroType::FOUL) return false;
+                      return m.playerId > 0
+                                 ? activationsStillAvailable(state, state.activeTeam, m.playerId) > 0
+                                 : activationsStillAvailable(state, state.activeTeam) > 1;
+                  }),
+                  out.end());
+    }
     if (!state.ball.isHeld || state.ball.carrierId <= 0) return;
     const int carrierId = state.ball.carrierId;
     if (state.getPlayer(carrierId).teamSide != state.activeTeam) return;
@@ -3512,7 +3528,11 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
         return c.teamSide == p.teamSide && c.state == PlayerState::STANDING &&
                std::abs(p.position.x - c.position.x) == 1 && std::abs(p.position.y - c.position.y) == 1;
     };
-    for (int pass = 0; pass < 2 && !found; ++pass) {
+    // P169 (07.10.2026): druhý průchod (rohy) jen pro makro, které si blitzujícího samo určilo.
+    // Blitz bez jména roh klece nevezme vůbec — „bezpečí nosiče je důležitější než pravidlo
+    // využít blitz každé kolo“ (uživatel 07.10.).
+    const int passes = (macro.playerId > 0) ? 2 : 1;
+    for (int pass = 0; pass < passes && !found; ++pass) {
         for (const auto& ranking : ranked) {
             const Action& a = ranking.second;
             const Player& cand = state.getPlayer(a.playerId);
@@ -3669,7 +3689,7 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     if (macro.cageManaged && state.ball.isHeld && state.ball.carrierId == macro.playerId &&
         p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
         const int budget = p.movementRemaining;
-        const Position dest = farthestSafeForward(state, p, budget);
+        const Position dest = farthestSafeForward(state, p, budget, /*forCage=*/true);
         if (dest != p.position) {
             movePlayerToward(state, macro.playerId, dest, dice, result, budget,
                              Position{-1, -1}, pickupDodgeCap);

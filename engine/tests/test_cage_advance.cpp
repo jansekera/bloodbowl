@@ -569,16 +569,19 @@ TEST(CageAdvance, GfiAllowanceAtMostOneCornerRestOpen) {
     mk(6, {10, 5});   // dist 5 to {15,6}
     mk(7, {10, 9});   // dist 5 to {15,8}
 
+    // Od 07.10.2026 (P154, krok šikmo) by plán tutéž pozici vyřešil krokem o řádek vedle, kde
+    // GFI není potřeba — pravidlo „nejvýš jeden roh na GFI“ se proto čte přímo z přidělení
+    // rohů pro krok 2 rovně, kudy prochází každý plán.
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
-    CageAdvancePlan plan = planner.build(state);
-    ASSERT_TRUE(plan.valid) << "verdict=" << static_cast<int>(plan.verdict);
-    EXPECT_EQ(plan.gfiCorners, 1);
-    EXPECT_EQ(plan.openCorners, 1);
-    EXPECT_EQ(plan.filledCorners, 3);
-    // REPOSITION never actually GFIs (dice-free contract): the allowance
-    // corner walks and may stop one square short -- but it IS in the plan.
-    EXPECT_TRUE(hasMacroFor(plan, 6));
-    EXPECT_FALSE(hasMacroFor(plan, 7));
+    auto a = planner.tryAssign(state, state.getPlayer(1), 2, {});
+    ASSERT_TRUE(a.feasible);
+    EXPECT_EQ(a.gfi, 1);
+    EXPECT_EQ(a.open, 1);
+    EXPECT_EQ(a.filled, 3);
+    int with6 = 0, with7 = 0;
+    for (const auto& sa : a.slots) { with6 += sa.playerId == 6; with7 += sa.playerId == 7; }
+    EXPECT_EQ(with6, 1);
+    EXPECT_EQ(with7, 0);
 }
 
 // =============================================================
@@ -739,6 +742,141 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
     for (const auto& m : plan.macros) {
         EXPECT_NE(m.playerId, 1) << "the carrier must not be in a fill plan";
     }
+}
+
+// ---------------------------------------------------------------------------
+// P154 (07.10.2026) — čistá klec na konci tahu. Uživatel: „zkus dokončit co nejvíc možností ke
+// zlepšení stavění čisté klece na konci tahu“; „ležící spoluhráč může vstát a dojít stát se
+// rohem, pokud nevyžaduje dodge nebo riskantní hod“.
+
+namespace {
+Player& putPlayer(GameState& state, int id, TeamSide side, Position pos, int8_t ma = 4) {
+    Player& p = state.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING; p.position = pos;
+    p.stats = {ma, 3, 2, 9}; p.movementRemaining = ma; p.hasMoved = false; p.hasActed = false;
+    return p;
+}
+int slotOwner(const CageAdvancePlanner::AssignmentResult& a, Position sq) {
+    for (const auto& sa : a.slots) if (sa.slot == sq) return sa.playerId;
+    return -2;
+}
+}  // namespace
+
+// Roh nedostane hráč, který by na něj musel z kontaktu uhýbat: roh zůstane otevřený a zbylé tři
+// stojí. (Dřív ho dostal, kontrola „bez hodu“ pak zahodila celý krok a klec se nestavěla.)
+TEST(CageAdvance, CornerIsNotGivenToAPlayerWhoWouldHaveToDodge) {
+    GameState state = makeCageState();
+    state.getPlayer(5).position = {14, 10};                 // jediný kandidát na roh (13,8)
+    putPlayer(state, 13, TeamSide::AWAY, {15, 11}, 6);      // drží ho v zóně, na roh nedosahuje
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    EXPECT_EQ(a.filled, 3);
+    EXPECT_EQ(slotOwner(a, {13, 8}), -1) << "roh zůstává otevřený, vázaný hráč o něj nesoutěží";
+
+    // pozitivní kontrola: bez soupeře tentýž hráč roh dostane
+    state.getPlayer(13).state = PlayerState::OFF_PITCH;
+    auto b = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    EXPECT_EQ(b.filled, 4);
+    EXPECT_EQ(slotOwner(b, {13, 8}), 5);
+}
+
+// Omráčený spoluhráč na poli rohu není roh (dřív se počítal: „a body on the slot is a corner“).
+TEST(CageAdvance, StunnedTeammateOnTheCornerSquareIsNotACorner) {
+    GameState state = makeCageState();
+    state.getPlayer(5).state = PlayerState::STUNNED;
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    EXPECT_EQ(a.filled, 3);
+    EXPECT_EQ(a.open, 1);
+}
+
+// Ležící spoluhráč vstane bez hodu (MA ≥ 3, pravidla ř. 690-695) a je rohem: na místě, i když
+// k rohu po vstání dojde. S MA 2 by vstával na 4+ (riskantní hod) ⇒ rohem není.
+TEST(CageAdvance, ProneTeammateStandsUpToBecomeACorner) {
+    GameState state = makeCageState();
+    state.getPlayer(5).state = PlayerState::PRONE;          // leží přímo na rohu (13,8)
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan fill = planner.buildFillOnly(state, {});
+    ASSERT_TRUE(fill.valid);
+    ASSERT_EQ(fill.macros.size(), 1u);
+    EXPECT_EQ(fill.macros[0].playerId, 5);
+    EXPECT_EQ(fill.macros[0].targetPos, (Position{13, 8}));
+    ASSERT_TRUE(stagedMacroStillValid(state, fill.macros[0], true)) << "řadič makro pro ležícího nezahodí";
+    DiceRoller dice(1);
+    auto r = greedyExpandMacro(state, fill.macros[0], dice);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(state.getPlayer(5).state, PlayerState::STANDING);
+    EXPECT_EQ(state.getPlayer(5).position, (Position{13, 8}));
+
+    // leží pole od rohu: MA 4 − 3 za vstání = 1 pole ⇒ dojde; dvě pole od rohu už ne
+    GameState near = makeCageState();
+    near.getPlayer(5).state = PlayerState::PRONE;
+    near.getPlayer(5).position = {14, 9};
+    EXPECT_EQ(slotOwner(planner.tryAssign(near, near.getPlayer(1), 0, {}), {13, 8}), 5);
+    near.getPlayer(5).position = {15, 10};
+    EXPECT_EQ(slotOwner(planner.tryAssign(near, near.getPlayer(1), 0, {}), {13, 8}), -1);
+
+    // MA 2: vstání je hod na 4+ ⇒ rohem se nepočítá
+    GameState slow = makeCageState();
+    slow.getPlayer(5).state = PlayerState::PRONE;
+    slow.getPlayer(5).stats.movement = 2;
+    slow.getPlayer(5).movementRemaining = 2;
+    EXPECT_EQ(planner.tryAssign(slow, slow.getPlayer(1), 0, {}).filled, 3);
+}
+
+// Krok šikmo: na řádku předních rohů leží soupeři, rovně má každý krok nejvýš tři rohy; o řádek
+// vedle vyjdou čtyři.
+TEST(CageAdvance, StepEndsOneRowAsideWhenACornerSquareIsTaken) {
+    GameState state = makeCageState();
+    for (int i = 0; i < 4; ++i) {
+        Player& o = putPlayer(state, 13 + i, TeamSide::AWAY, {static_cast<int8_t>(14 + i), 6}, 6);
+        o.state = PlayerState::PRONE;
+    }
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    for (int step = 1; step <= 4; ++step) {                 // pozitivní kontrola fixture
+        ASSERT_LE(planner.tryAssign(state, state.getPlayer(1), step, {}).filled, 3) << "krok " << step;
+    }
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+    ASSERT_GE(plan.step, 1);
+    EXPECT_EQ(plan.filledCorners, 4);
+    Position carrierTarget{-1, -1};
+    for (const auto& m : plan.macros) if (m.playerId == 1) carrierTarget = m.targetPos;
+    EXPECT_EQ(carrierTarget.y, 8) << "nosič končí o řádek vedle, kde jsou všechna čtyři pole rohů volná";
+}
+
+// Stojící čistou klec plánovač neopustí kvůli kroku se třemi rohy, dokud rozvrh čekání snese;
+// v posledním kole (čekat nejde) jde dál i se třemi.
+TEST(CageAdvance, KeepsTheStandingCageWhenTheStepWouldLoseACorner) {
+    GameState state = makeCageState();
+    state.getPlayer(3).position = {13, 8};
+    state.getPlayer(5).position = {11, 8};
+    state.getPlayer(5).hasMoved = true;                     // zadní roh stojí, ale dál už nejde
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    ASSERT_EQ(planner.tryAssign(state, state.getPlayer(1), 0, {}).filled, 4);
+    CageAdvancePlan plan = planner.build(state);
+    EXPECT_FALSE(plan.valid && plan.step >= 1) << "krok " << plan.step << " se " << plan.filledCorners << " rohy";
+
+    state.homeTeam.turnNumber = 8;
+    CageAdvancePlan last = planner.build(state);
+    ASSERT_TRUE(last.valid);
+    EXPECT_GE(last.step, 1);
+    EXPECT_EQ(last.filledCorners, 3);
+}
+
+// P131 / P169 krok 7: klec se od kraje hřiště odtahuje — nosič na řádku 1 udělá krok šikmo ke
+// středu (řádek 2), ne rovně po řádku 1; a nosič na řádku 2 ke kraji nejde.
+TEST(CageAdvance, CageStepsAwayFromTheSideline) {
+    GameState state = makeCageState();
+    for (int id = 1; id <= 5; ++id) state.getPlayer(id).position.y -= 6;   // nosič (12,1), rohy řádky 0 a 2
+    state.ball = BallState::carried({12, 1}, 1);
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+    ASSERT_GE(plan.step, 1);
+    Position target{-1, -1};
+    for (const auto& m : plan.macros) if (m.playerId == 1) target = m.targetPos;
+    EXPECT_EQ(target.y, 2) << "krok šikmo od kraje";
 }
 
 // ---------------------------------------------------------------------------
@@ -953,8 +1091,10 @@ TEST(CageAdvance, TakesAShorterStepWhenTheLongestNeedsDice) {
     CageAdvancePlan plan = planner.build(state);
     ASSERT_TRUE(plan.valid);
     ASSERT_EQ(plan.verdict, CageAdvanceVerdict::PLAN_READY) << "postup, ne jen dostavění na místě";
-    // pozitivní kontrola: delší krok se opravdu zkoušel a neprošel (dřív = konec, žádný plán)
-    EXPECT_GT(plan.shortenedFromStep, plan.step);
+    // pozitivní kontrola: krok je kratší než čtyři pole, která by nosič ušel (dřív = konec,
+    // žádný plán). Od 07.10.2026 hráč, který by na roh musel uhýbat, o roh nesoutěží, takže
+    // delší krok vypadne už při přidělování rohů a `shortenedFromStep` se nenastaví.
+    EXPECT_LT(plan.step, 4);
     EXPECT_GE(plan.step, 1);
 
     // odehrát plán se skutečnými kostkami: žádný hod se nesmí pokazit, protože žádný není

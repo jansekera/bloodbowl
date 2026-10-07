@@ -149,11 +149,28 @@ namespace {
 //   sdileny zdroj napric celym tahem, jina a nedoresena uloha; zaparkovana
 //   schvalne v `evidence/celotah_situace.md`, oddil `A7`. Neprepinat.
 // ============================================================================
+// ⭐⭐ P170 (uživatel 07.10.2026: „elfové by měli umět dodge na volné pole — což je 2 plus —
+//   zkontroluj, že umějí volit cestu tak, aby uskočili do volného pole, i když cesta není tím
+//   přímo vpřed — a toto by měli umět všichni“). NEUMĚLI: cena cesty byla „1 pole + P(pád) × 4
+//   pole“, tedy jedno pole pohybu stálo stejně jako 25 % rizika turnoveru. Hráč AG 4 vedle
+//   soupeře šel k cíli o 4 pole přímo přes jeho zónu (úhyb 3+ a pak 2+, pád 44 %), ačkoli ústup
+//   do volného pole a oblouk o dvě pole delší stojí jediný úhyb na 2+ (17 %) — test
+//   `RiskWeightedPath.DodgesIntoAFreeSquareAndGoesAroundEvenWhenThatIsNotStraightAhead`.
+//   Pole pohybu, které hráč má, nestojí nic; hod ano. ⇒ DVĚ CENY:
+//     kRiskSafeFirst  = 24 polí za jistý pád (1 pole ≈ 4 % rizika): úhyb 2+ = 4 pole oklikou,
+//                       3+ = 8 polí; úhyb 2+ s přehozem z dovednosti Dodge (2,8 %) = 0,7 pole,
+//                       takže hráč s Dodge uhýbá dál skoro zadarmo.
+//     kRiskShortFirst = 4 (dosavadní): záloha. Hledání má rozpočet kroků a uzel si pamatuje jen
+//                       nejlevnější cestu — s drahým rizikem může bezpečná oklika rozpočet
+//                       vyčerpat a cíl se jeví nedosažitelný, i když kratší cesta přes hod vede.
+//   Volající proto hledá napřed „bezpečně“ a teprve když tak k cíli nedojde, zopakuje hledání
+//   se starou cenou (`searchRoutes` níže) — dosah hráče se tím nezmenšuje.
+static constexpr double kRiskSafeFirst = 24.0;
+static constexpr double kRiskShortFirst = 4.0;
 void riskWeightedDijkstra(const GameState& state, const Player& player,
                           int budget, Position blockedSquare,
                           int* key, int8_t* steps, int16_t* parent,
-                          bool preferStraight = false) {
-    constexpr double kRiskMultiplier = 4.0;
+                          bool preferStraight = false, double kRiskMultiplier = kRiskSafeFirst) {
     constexpr int kScale = 100;     // 1 pole = 100 jednotek klice
     const int freeSteps = movementAfterStandUp(player);   // bez GFI
     const bool rerollAvailable = false;   // viz odduvodneni u puvodni funkce
@@ -309,6 +326,31 @@ inline int bestLayerIdx(const int* key, int sq) {
     if (a >= kInfCost && b >= kInfCost) return -1;
     return (b < a) ? (GRID_SIZE + sq) : sq;
 }
+
+// P170: hledání cest „bezpečně napřed“. `reached(key, steps)` říká, jestli hledání dosáhlo
+// toho, co volající potřebuje; když ne, hledá se znovu se starou cenou rizika (kratší cesta
+// přes hod). Jedno místo pro všechny volající, aby chůze i její ocenění četly tutéž cestu.
+template <typename Reached>
+void searchRoutes(const GameState& state, const Player& player, int budget, Position blockedSquare,
+                  int* key, int8_t* steps, int16_t* parent, bool preferStraight, Reached reached) {
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
+                         kRiskSafeFirst);
+    if (reached(key, steps)) return;
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
+                         kRiskShortFirst);
+}
+
+// Nejmenší vzdálenost k `target`, na kterou hledání došlo (pro chůzi „co nejblíž“).
+int closestReached(const int* key, Position target, int startIdx) {
+    int best = 1000;
+    for (int i = 0; i < kNodeCount; ++i) {
+        const int sq = i % GRID_SIZE;
+        if (key[i] >= kInfCost || sq == startIdx) continue;
+        const Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
+        best = std::min(best, static_cast<int>(p2.distanceTo(target)));
+    }
+    return best;
+}
 } // namespace
 
 // Cílový uzel doběhu blitzu: nejlevnější dosažitelné pole VEDLE cíle (při shodě to, odkud
@@ -392,7 +434,16 @@ static bool nextStepTowardAdjacentImpl(const GameState& state, const Player& pla
     int key[kNodeCount];            // cena (pole + riziko)
     int8_t steps[kNodeCount];       // ciste pole -- na tohle se vaze rozpocet
     int16_t parent[kNodeCount];
-    riskWeightedDijkstra(state, player, budget, /*blockedSquare=*/target, key, steps, parent);
+    searchRoutes(state, player, budget, /*blockedSquare=*/target, key, steps, parent,
+                 /*preferStraight=*/false, [&](const int* k, const int8_t* st) {
+                     for (int i = 0; i < kNodeCount; ++i) {       // došlo na pole vedle cíle?
+                         const int sq = i % GRID_SIZE;
+                         if (k[i] >= kInfCost || st[i] > budget - 1) continue;
+                         const Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
+                         if (p2 != player.position && p2.distanceTo(target) == 1) return true;
+                     }
+                     return false;
+                 });
     const int startIdx = gridIdx(player.position.x, player.position.y);
 
     // Cilove pole: sousedi s `target` a v rozpoctu zbyva pole na BLOK
@@ -488,9 +539,22 @@ bool nextStepToward(const GameState& state, const Player& player,
     int key[kNodeCount];
     int8_t steps[kNodeCount];
     int16_t parent[kNodeCount];
-    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
-                        /*preferStraight=*/true);
     const int startIdx = gridIdx(player.position.x, player.position.y);
+    // P170: bezpečně napřed; kratší cesta přes hod jen tehdy, když dovede BLÍŽ k cíli.
+    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
+                        /*preferStraight=*/true, kRiskSafeFirst);
+    if (bestLayerIdx(key, gridIdx(target.x, target.y)) < 0) {
+        int key2[kNodeCount];
+        int8_t steps2[kNodeCount];
+        int16_t parent2[kNodeCount];
+        riskWeightedDijkstra(state, player, budget, blockedSquare, key2, steps2, parent2,
+                            /*preferStraight=*/true, kRiskShortFirst);
+        if (closestReached(key2, target, startIdx) < closestReached(key, target, startIdx)) {
+            std::copy(key2, key2 + kNodeCount, key);
+            std::copy(steps2, steps2 + kNodeCount, steps);
+            std::copy(parent2, parent2 + kNodeCount, parent);
+        }
+    }
 
     const int curDist = player.position.distanceTo(target);
     int bestDist = curDist, bestKeyAmongTies = kInfCost, goalIdx = -1;
@@ -528,8 +592,8 @@ int pathStepsToward(const GameState& state, const Player& player,
     int key[kNodeCount];
     int8_t steps[kNodeCount];
     int16_t parent[kNodeCount];
-    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
-                        /*preferStraight=*/true);
+    searchRoutes(state, player, budget, blockedSquare, key, steps, parent, /*preferStraight=*/true,
+                 [&](const int* k, const int8_t*) { return bestLayerIdx(k, gridIdx(target.x, target.y)) >= 0; });
     const int targetIdx = bestLayerIdx(key, gridIdx(target.x, target.y));
     if (targetIdx < 0) return -1;
     return steps[targetIdx];
@@ -551,8 +615,8 @@ double pathFailProb(const GameState& state, const Player& player,
     int key[kNodeCount];
     int8_t steps[kNodeCount];
     int16_t parent[kNodeCount];
-    riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
-                        /*preferStraight=*/true);
+    searchRoutes(state, player, budget, blockedSquare, key, steps, parent, /*preferStraight=*/true,
+                 [&](const int* k, const int8_t*) { return bestLayerIdx(k, gridIdx(target.x, target.y)) >= 0; });
     const int startIdx = gridIdx(player.position.x, player.position.y);
     const int targetIdx = bestLayerIdx(key, gridIdx(target.x, target.y));
     if (targetIdx < 0) return -1.0;
