@@ -732,18 +732,18 @@ const TeamRoster& getWoodElfRoster1200Agile() {
 //
 // Výsledná hodnota týmu (ceny BB2016; 11 hráčů na hřišti + 3 týmové rerolly + lékárník;
 // dokoupený skill 20 tis., na double 30, +MA 30):
-//   trpaslíci 1490 · wood-elf 1520 · skaven 1510 · ork 1500 · člověk 1490
+//   trpaslíci 1490 · wood-elf 1520 · skaven 1490 · ork 1500 · člověk 1490
 //   (týmový reroll: trpaslík, elf, člověk 50 tis., skaven a ork 60 tis.)
 // Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1200 · 1360 · 1290.
 // ⚠️ NOVÁ MĚŘICÍ ÉRA: čísla z TV1500 se s TV1200 neporovnávají.
 // ⛔ Pořadí řádků je významové (sestava se plní od posledního řádku do 11, zbytek první řádek).
 // ============================================================================
 
-// Trpaslíci: rohy klece = ČTYŘI LONGBEARDI se Stand Firm — dva s Guardem (jeden protilehlý pár)
-// a dva s Mighty Blow (druhý pár). Uživatel 07.10.: „blitzeři u trpaslíků nejsou vhodní na rohy,
-// ale na blitz a prořezávání cesty vpřed“ ⇒ Blitzeři Tackle + Mighty Blow, bez Stand Firm a bez
-// Guardu; Troll Slayeři Guard + Tackle + Mighty Blow (úderníci, s Frenzy na roh nepatří).
-// Pro má jeden Blitzer. Wrestle má pátý Longbeard (do jedenáctky se vejde jen jeden).
+// Trpaslíci (uživatel 07.–08.10.): rohy klece = ČTYŘI LONGBEARDI — dva s Guardem a Stand Firm,
+// dva s Mighty Blow (protilehlé páry). „Blitzeři nejsou vhodní na rohy, ale na blitz a prořezávání
+// cesty vpřed“; „Stand Firm má větší hodnotu u prorážečů, kteří pak udrží díru v blokovací stěně,
+// než u rohů klece“ ⇒ Stand Firm mají oba Blitzeři i oba Troll Slayeři. „Stand Firm raději někomu,
+// kdo nemá Wrestle“ ⇒ pátý Longbeard (Block + Wrestle) ho nemá. Pro má jeden Blitzer.
 const TeamRoster& getDwarfRoster1500() {
     static const TeamRoster roster = {
         "Dwarf (TV1500)",
@@ -751,14 +751,14 @@ const TeamRoster& getDwarfRoster1500() {
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull}), 11, "Longbeard"},
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard,
                 SkillName::StandFirm}), 2, "Longbeard +Guard+Stand Firm"},
-            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::StandFirm,
-                SkillName::MightyBlow}), 2, "Longbeard +Stand Firm+Mighty Blow"},
-            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow}), 1,
-                "Blitzer +Tackle+Mighty Blow"},
+            {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::MightyBlow}), 2,
+                "Longbeard +Mighty Blow"},
             {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow,
-                SkillName::Pro}), 1, "Blitzer +Tackle+Mighty Blow+Pro"},
+                SkillName::StandFirm}), 1, "Blitzer +Tackle+Mighty Blow+Stand Firm"},
+            {{5, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow,
+                SkillName::StandFirm, SkillName::Pro}), 1, "Blitzer +Tackle+Mighty Blow+Stand Firm+Pro"},
             {{5, 3, 2, 8}, makeSkills({SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull, SkillName::Dauntless,
-                SkillName::Guard, SkillName::Tackle, SkillName::MightyBlow}), 2, "Troll Slayer +Guard+Tackle+Mighty Blow"},
+                SkillName::Guard, SkillName::MightyBlow, SkillName::StandFirm}), 2, "Troll Slayer +Guard+Mighty Blow+Stand Firm"},
             {{6, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::ThickSkull, SkillName::Block}), 2, "Runner +Block"},
             {{4, 3, 2, 9}, makeSkills({SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Wrestle}), 1, "Longbeard +Wrestle"},
         },
@@ -790,25 +790,23 @@ const TeamRoster& getWoodElfRoster1500() {
     return roster;
 }
 
-// Skaven (uživatel 03.10.): JEDEN Gutter Runner +MA + Sure Feet + Sprint, ostatní tři bez Sure
-// Feet. K tomu Block a Side Step Gutter Runnerům, Side Step a Mighty Blow Blitzerům, Block
-// oběma Linemanům bez Wrestle, Pro Throwerovi. (Side Step je pro Blitzera skill na double.)
+// Skaven (uživatel 03.10. a 08.10.): JEDEN Gutter Runner +MA + Sure Feet + Sprint (ostatní bez
+// Sure Feet), jeden Gutter Runner s Wrestle místo Block — a „zkus do jedné sestavy dát Rat Ogra
+// i GR s MA a Sprint … odeber jiné skilly“ ⇒ RAT OGRE místo jednoho Linemana; za to Blitzeři
+// bez Side Stepu a bez lovce míče (oba Guard + Mighty Blow), Lineman bez Block.
 const TeamRoster& getSkavenRoster1500() {
     static const TeamRoster roster = {
         "Skaven (TV1500)",
         {
-            {{7, 3, 3, 7}, makeSkills({SkillName::Block}), 11, "Lineman +Block"},
+            {{7, 3, 3, 7}, {}, 11, "Lineman"},
             {{10, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet, SkillName::Sprint, SkillName::Block,
                 SkillName::SideStep}), 1, "Gutter Runner +MA+Sure Feet+Sprint+Block+Side Step"},
             {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Block, SkillName::SideStep}), 2, "Gutter Runner +Block+Side Step"},
-            // uživatel 07.10.: „jeden GR má mít wrestle místo block“ — Wrestle na rychlém těle dojde
-            // ke kleci a na Both Down skládá i nosiče s Block (T5.13, 14.08.)
             {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Wrestle, SkillName::SideStep}), 1, "Gutter Runner +Wrestle+Side Step"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::SideStep, SkillName::MightyBlow}), 1,
-                "Blitzer +Guard+Side Step+Mighty Blow"},
-            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::SideStep,
-                SkillName::MightyBlow}), 1, "Blitzer ball-hunter +Side Step+Mighty Blow"},
+            {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::MightyBlow}), 2, "Blitzer +Guard+Mighty Blow"},
             {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro}), 1, "Thrower +Block+Pro"},
+            {{6, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Frenzy, SkillName::MightyBlow, SkillName::WildAnimal,
+                SkillName::PrehensileTail}), 1, "Rat Ogre"},
             {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},
         },
         8, 60, true

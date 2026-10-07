@@ -722,30 +722,36 @@ TEST(DevelopedRoster, DwarfLotsOfGuard) {
 
 // --- P165 (07.10.2026): úroveň TV1500 — co má stát na hřišti (jedenáctka) -------------------
 
-TEST(DevelopedRoster, Tv1500DwarfCornersAreLongbeardsWithStandFirm) {
+TEST(DevelopedRoster, Tv1500DwarfStandFirmOnBreakersAndTwoCorners) {
     const TeamRoster* r = getDevelopedRoster("dwarf", 1500);
     ASSERT_NE(r, nullptr);
     GameState state;
     setupHalf(state, *r, *r);
-    // rohy klece = čtyři Longbeardi (MA4) se Stand Firm: dva s Guardem, dva s Mighty Blow
-    int sfLongbeards = 0, sfGuard = 0, sfMightyBlow = 0, sfOthers = 0, frenzyWithStandFirm = 0;
+    // Stand Firm: prorážeči (2 Blitzeři MA5 AG3, 2 Troll Slayeři s Frenzy) + dva rohoví Longbeardi s Guardem
+    int sfBlitzers = 0, sfSlayers = 0, sfLongbeardGuard = 0, sfWithWrestle = 0;
+    int longbeards = 0, longbeardMb = 0, blockAndWrestle = 0;
     state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        const bool longbeard = p.stats.movement == 4;
+        if (longbeard) ++longbeards;
+        if (longbeard && p.hasSkill(SkillName::MightyBlow)) ++longbeardMb;
+        if (p.hasSkill(SkillName::Block) && p.hasSkill(SkillName::Wrestle)) ++blockAndWrestle;
         if (!p.hasSkill(SkillName::StandFirm)) return;
-        if (p.stats.movement == 4) ++sfLongbeards; else ++sfOthers;
-        if (p.hasSkill(SkillName::Guard)) ++sfGuard;
-        if (p.hasSkill(SkillName::MightyBlow)) ++sfMightyBlow;
-        if (p.hasSkill(SkillName::Frenzy)) ++frenzyWithStandFirm;
+        if (p.hasSkill(SkillName::Wrestle)) ++sfWithWrestle;
+        if (p.hasSkill(SkillName::Frenzy)) ++sfSlayers;
+        else if (longbeard && p.hasSkill(SkillName::Guard)) ++sfLongbeardGuard;
+        else if (p.stats.movement == 5) ++sfBlitzers;
     });
-    EXPECT_EQ(sfLongbeards, 4);
-    EXPECT_EQ(sfOthers, 0) << "Blitzeři na rohy nepatří (uživatel 07.10.) — Stand Firm nemají";
-    EXPECT_EQ(sfGuard, 2);
-    EXPECT_EQ(sfMightyBlow, 2);
-    EXPECT_EQ(frenzyWithStandFirm, 0);
-    // Mighty Blow: 2 rohoví Longbeardi + 2 Blitzeři + 2 Troll Slayeři
+    EXPECT_EQ(sfBlitzers, 2);
+    EXPECT_EQ(sfSlayers, 2);
+    EXPECT_EQ(sfLongbeardGuard, 2);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 6);
+    EXPECT_EQ(sfWithWrestle, 0) << "Stand Firm raději někomu, kdo nemá Wrestle (uživatel 08.10.)";
+    EXPECT_EQ(longbeards, 5) << "rohy klece staví Longbeardi";
+    EXPECT_EQ(longbeardMb, 2) << "Mighty Blow na dvou (protilehlých) rozích";
     EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 6);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
-    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 4);     // 2 Longbeardi + 2 Troll Slayeři
-    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 4);
+    EXPECT_EQ(blockAndWrestle, 1) << "jediný hráč s Block i Wrestle: Longbeard";
 }
 
 TEST(DevelopedRoster, Tv1500WoodElfPassingSkillsAndBlockLinemen) {
@@ -761,7 +767,7 @@ TEST(DevelopedRoster, Tv1500WoodElfPassingSkillsAndBlockLinemen) {
     EXPECT_EQ(countHomeSkill(state, SkillName::Block), 8);         // 3 Linemani + 2 Wardanceři + 2 Catcheři + Thrower
 }
 
-TEST(DevelopedRoster, Tv1500SkavenOneFastGutterRunner) {
+TEST(DevelopedRoster, Tv1500SkavenRatOgreAndOneFastGutterRunner) {
     const TeamRoster* r = getDevelopedRoster("skaven", 1500);
     ASSERT_NE(r, nullptr);
     GameState state;
@@ -769,19 +775,19 @@ TEST(DevelopedRoster, Tv1500SkavenOneFastGutterRunner) {
     // uživatel 03.10.: jeden Gutter Runner +MA + Sure Feet + Sprint, ostatní tři bez Sure Feet
     EXPECT_EQ(countHomeSkill(state, SkillName::SureFeet), 1);
     EXPECT_EQ(countHomeSkill(state, SkillName::Sprint), 1);
-    int ma10 = 0, ma9 = 0;
+    int ma10 = 0, ma9 = 0, grWrestle = 0, ratOgres = 0, onPitch = 0;
     state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        ++onPitch;
         if (p.stats.movement == 10) ++ma10;
         if (p.stats.movement == 9) ++ma9;
+        if (p.stats.movement == 9 && p.hasSkill(SkillName::Wrestle) && !p.hasSkill(SkillName::Block)) ++grWrestle;
+        if (p.stats.strength == 5 && p.hasSkill(SkillName::WildAnimal)) ++ratOgres;
     });
+    EXPECT_EQ(onPitch, 11);
     EXPECT_EQ(ma10, 1);
     EXPECT_EQ(ma9, 3);
-    // uživatel 07.10.: jeden Gutter Runner má Wrestle místo Block (+ dva Linemani s Wrestle)
-    int grWrestle = 0;
-    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
-        if (p.stats.movement == 9 && p.hasSkill(SkillName::Wrestle) && !p.hasSkill(SkillName::Block)) ++grWrestle;
-    });
-    EXPECT_EQ(grWrestle, 1);
+    EXPECT_EQ(grWrestle, 1) << "jeden Gutter Runner má Wrestle místo Block (uživatel 07.10.)";
+    EXPECT_EQ(ratOgres, 1) << "Rat Ogre a rychlý Gutter Runner v jedné sestavě (uživatel 08.10.)";
     EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }

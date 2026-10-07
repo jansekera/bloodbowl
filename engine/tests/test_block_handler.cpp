@@ -1654,3 +1654,80 @@ TEST(BlockHandler, SideStepAtTheSidelineStepsAlongItInsteadOfIntoTheCrowd) {
         EXPECT_FALSE(p.isOnPitch());
     }
 }
+
+// ---------------------------------------------------------------------------
+// P165 (08.10.2026) — LONGBEARD S BLOCK I WRESTLE (jediný takový hráč v soupiskách TV1500;
+// uživatel: „zaměř část testů speciálně na něj a na block jeho na někoho s block a bloky na něho“).
+// Wrestle, ř. 8672-8678: smí se použít, když je vybráno Both Down, ať hráč blokuje nebo je
+// blokován; oba jdou k zemi i přes Block, bez hodu na brnění; turnover jen když aktivní hráč
+// držel míč. Je to VOLBA — tyto testy hlídají, kdy ji hráč s Block i Wrestle využije.
+// Jeho rány (útok): AttackerWithBlockAndWrestle… výš. Tady rány NA něho.
+// ---------------------------------------------------------------------------
+namespace {
+void makeLongbeardWithWrestle(GameState& gs, int id, Position pos, TeamSide side) {
+    placePlayer(gs, id, pos, side, 4, 3, 2, 9);
+    for (SkillName s : {SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Wrestle}) {
+        gs.getPlayer(id).skills.add(s);
+    }
+}
+}  // namespace
+
+TEST(BlockHandler, BlockWrestleDefenderKeepsBlockAgainstAnAttackerWithoutBlock) {
+    // Both Down, útočník Block nemá: s Block obránce stojí a útočník padá (hod na brnění, turnover).
+    // Wrestle by útočníka zachránil před brněním i turnoverem ⇒ nesmí se použít.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    makeLongbeardWithWrestle(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({2, 1, 1, 1, 1});               // BOTH DOWN + hod na brnění útočníka
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "Longbeard použil Block, ne Wrestle";
+}
+
+TEST(BlockHandler, BlockWrestleDefenderStaysUpAgainstAnAttackerWithBlock) {
+    // Both Down, oba mají Block a míč nedrží nikdo z nich: bez Wrestle se nestane nic. Obránce
+    // Wrestle nepoužije — položil by i sebe a soupeři by tím jen uvolnil pole.
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    makeLongbeardWithWrestle(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({2});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
+
+TEST(BlockHandler, BlockWrestleDefenderWrestlesDownAnAttackerWhoCarriesTheBall) {
+    // Both Down, útočník s Block DRŽÍ MÍČ: Wrestle ho položí, míč je volný a je to turnover
+    // (ř. 8677-8678 „unless the active player was holding the ball“).
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    makeLongbeardWithWrestle(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({10, 7}, 1);
+    FixedDiceRoller dice({2, 4, 4, 4, 4, 4, 4});          // BOTH DOWN + odskok míče
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(gs.ball.isHeld && gs.ball.carrierId == 1) << "nosič míč pustil";
+}
+
+TEST(BlockHandler, BlockWrestleAttackerWrestlesDownABlockWrestleDefender) {
+    // Longbeard proti Longbeardovi (oba Block + Wrestle), Both Down: útočník Wrestle použije
+    // (soupeř má Block, jinak by se nestalo nic) ⇒ oba leží, bez brnění, bez turnoveru.
+    GameState gs;
+    makeLongbeardWithWrestle(gs, 1, {10, 7}, TeamSide::HOME);
+    makeLongbeardWithWrestle(gs, 12, {11, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({2});
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}

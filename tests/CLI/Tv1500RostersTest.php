@@ -30,17 +30,18 @@ final class Tv1500RostersTest extends TestCase
         }
     }
 
-    public function testDwarfCornersAreLongbeardsWithStandFirm(): void
+    public function testDwarfStandFirmOnBreakersAndTwoCorners(): void
     {
         $players = getTv1500RaceRoster(TeamSide::HOME, 'Dwarf');
         $standFirm = array_filter($players, static fn(MatchPlayerDTO $p): bool => $p->hasSkill(SkillName::StandFirm));
-        $this->assertCount(4, $standFirm);
+        $this->assertCount(6, $standFirm);
+        $byPosition = array_count_values(array_map(static fn(MatchPlayerDTO $p): string => (string) $p->getPositionalName(), $standFirm));
+        $this->assertSame(2, $byPosition['Blitzer'] ?? 0, 'prorážeči');
+        $this->assertSame(2, $byPosition['Troll Slayer'] ?? 0, 'prorážeči');
+        $this->assertSame(2, $byPosition['Blocker'] ?? 0, 'dva rohoví Longbeardi s Guardem');
         foreach ($standFirm as $p) {
-            $this->assertSame('Blocker', $p->getPositionalName(), 'Blitzeři na rohy nepatří (uživatel 07.10.)');
-            $this->assertFalse($p->hasSkill(SkillName::Frenzy));
+            $this->assertFalse($p->hasSkill(SkillName::Wrestle), 'Stand Firm raději někomu, kdo nemá Wrestle');
         }
-        $this->assertSame(2, count(array_filter($standFirm, static fn(MatchPlayerDTO $p): bool => $p->hasSkill(SkillName::Guard))));
-        $this->assertSame(2, count(array_filter($standFirm, static fn(MatchPlayerDTO $p): bool => $p->hasSkill(SkillName::MightyBlow))));
         $this->assertSame(6, $this->withSkill($players, SkillName::MightyBlow));
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
         $this->assertSame(4, $this->withSkill($players, SkillName::Guard));
@@ -68,6 +69,7 @@ final class Tv1500RostersTest extends TestCase
         $this->assertSame(3, $ma[9] ?? 0);
         $this->assertSame(3, $this->withSkill($players, SkillName::Wrestle));
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
+        $this->assertSame(1, $this->withSkill($players, SkillName::WildAnimal), 'Rat Ogre v téže sestavě (uživatel 08.10.)');
     }
 
     public function testOrcAndHumanCornersHaveStandFirm(): void

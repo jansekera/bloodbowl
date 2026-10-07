@@ -8,8 +8,9 @@ declare(strict_types=1);
  *
  * Doktrína rohů klece: Stand Firm na rozích a Mighty Blow na dvou protilehlých rozích (mlátící tým),
  * agilní tým Side Step. Trpaslíci: rohy = čtyři Longbeardi („blitzeři nejsou vhodní na rohy, ale na
- * blitz a prořezávání cesty vpřed“). Výsledná hodnota týmu (ceny BB2016, 11 hráčů + 3 týmové
- * rerolly + lékárník): trpaslíci 1490 · wood-elf 1520 · skaven 1510 · ork 1500 · člověk 1490.
+ * blitz a prořezávání cesty vpřed“); Stand Firm hlavně prorážečům (Blitzeři, Troll Slayeři), ne hráči
+ * s Wrestle. Skaven: Rat Ogre i rychlý Gutter Runner v jedné sestavě. Výsledná hodnota týmu (ceny BB2016, 11 hráčů + 3 týmové
+ * rerolly + lékárník): trpaslíci 1490 · wood-elf 1520 · skaven 1490 · ork 1500 · člověk 1490.
  *
  * Řádek: [pozice, počet, [MA, ST, AG, AV], skilly]. Skilly jsou ÚPLNÉ (vrozené i dokoupené).
  */
@@ -22,10 +23,10 @@ require_once __DIR__ . '/race_rosters.php';
 const TV1500_ROSTERS = [
     'Dwarf' => [
         ['Blocker',      2, [4, 3, 2, 9], [SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Guard, SkillName::StandFirm]],
-        ['Blocker',      2, [4, 3, 2, 9], [SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::StandFirm, SkillName::MightyBlow]],
-        ['Blitzer',      1, [5, 3, 3, 9], [SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow]],
-        ['Blitzer',      1, [5, 3, 3, 9], [SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow, SkillName::Pro]],
-        ['Troll Slayer', 2, [5, 3, 2, 8], [SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull, SkillName::Dauntless, SkillName::Guard, SkillName::Tackle, SkillName::MightyBlow]],
+        ['Blocker',      2, [4, 3, 2, 9], [SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::MightyBlow]],
+        ['Blitzer',      1, [5, 3, 3, 9], [SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow, SkillName::StandFirm]],
+        ['Blitzer',      1, [5, 3, 3, 9], [SkillName::Block, SkillName::ThickSkull, SkillName::Tackle, SkillName::MightyBlow, SkillName::StandFirm, SkillName::Pro]],
+        ['Troll Slayer', 2, [5, 3, 2, 8], [SkillName::Block, SkillName::Frenzy, SkillName::ThickSkull, SkillName::Dauntless, SkillName::Guard, SkillName::MightyBlow, SkillName::StandFirm]],
         ['Runner',       2, [6, 3, 3, 8], [SkillName::SureHands, SkillName::ThickSkull, SkillName::Block]],
         ['Blocker',      1, [4, 3, 2, 9], [SkillName::Block, SkillName::Tackle, SkillName::ThickSkull, SkillName::Wrestle]],
     ],
@@ -39,13 +40,13 @@ const TV1500_ROSTERS = [
         ['Lineman',   2, [7, 3, 4, 7], [SkillName::Wrestle, SkillName::Dodge]],
     ],
     'Skaven' => [
-        ['Lineman',       2, [7, 3, 3, 7], [SkillName::Block]],
+        ['Lineman',       1, [7, 3, 3, 7], []],
         ['Gutter Runner', 1, [10, 2, 4, 7], [SkillName::Dodge, SkillName::SureFeet, SkillName::Sprint, SkillName::Block, SkillName::SideStep]],
         ['Gutter Runner', 2, [9, 2, 4, 7], [SkillName::Dodge, SkillName::Block, SkillName::SideStep]],
         ['Gutter Runner', 1, [9, 2, 4, 7], [SkillName::Dodge, SkillName::Wrestle, SkillName::SideStep]],
-        ['Blitzer',       1, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::SideStep, SkillName::MightyBlow]],
-        ['Blitzer',       1, [7, 3, 3, 8], [SkillName::Block, SkillName::StripBall, SkillName::Tackle, SkillName::SideStep, SkillName::MightyBlow]],
+        ['Blitzer',       2, [7, 3, 3, 8], [SkillName::Block, SkillName::Guard, SkillName::MightyBlow]],
         ['Thrower',       1, [7, 3, 3, 7], [SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro]],
+        ['Rat Ogre',      1, [6, 5, 2, 8], [SkillName::Loner, SkillName::Frenzy, SkillName::MightyBlow, SkillName::WildAnimal, SkillName::PrehensileTail]],
         ['Lineman',       2, [7, 3, 3, 7], [SkillName::Wrestle]],
     ],
     'Orc' => [
