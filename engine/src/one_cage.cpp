@@ -103,6 +103,12 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
     return r;
 }
 
+// Roh klece s Frenzy: po ráně musí následovat, takže blokem roh opustí.
+static bool frenzyCorner(const Player& p, const Player& carrier) {
+    return p.hasSkill(SkillName::Frenzy) && std::abs(p.position.x - carrier.position.x) == 1 &&
+           std::abs(p.position.y - carrier.position.y) == 1;
+}
+
 // P154 (b) (uživatel 07.10.2026: „pokud je ta situace na konci poločasu — nosič musí vyběhnout,
 // aby stihl TD“). Sólo od PŘÍŠTÍHO tahu potřebuje ceil((dist − (MA+2)) / MA) + 1 tahů; nevejde-li
 // se to do tahů, které po tomto zbývají, čekat nejde.
@@ -275,6 +281,7 @@ void CageController::planStart(const GameState& state) {
                 const Player& a = state.getPlayer(m.playerId);
                 const Player& d = state.getPlayer(m.targetId);
                 if (!freeToAct(a) || !a.hasSkill(SkillName::Block)) continue;
+                if (frenzyCorner(a, carrier)) continue;
                 if (blockDiceCount(state, a, d) < 2) continue;
                 int freed = 0;
                 state.forEachOnPitch(carrier.teamSide, [&](const Player& t) {
@@ -340,6 +347,7 @@ void CageController::planStart(const GameState& state) {
                 state.forEachOnPitch(side, [&](const Player& a) {
                     if (done || a.id == carrier.id || !freeToAct(a) || used(a.id)) return;
                     if (!a.hasSkill(SkillName::Block) || a.position.distanceTo(e.position) != 1) return;
+                    if (frenzyCorner(a, carrier)) return;
                     state.forEachOnPitch(side, [&](const Player& m) {
                         if (done || m.id == a.id || m.id == carrier.id || !freeToAct(m) || used(m.id)) return;
                         if (countTacklezones(state, m.position, side, m.id) > 0) return;   // pomocník musí být volný
@@ -425,6 +433,18 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
                               std::abs(p.position.x - carrier.position.x) == 1 &&
                               std::abs(p.position.y - carrier.position.y) == 1;
         if (isCorner && m.targetPos != p.position) return true;
+    }
+
+    // Roh s Frenzy po ráně následovat MUSÍ (ř. 8134-8145) ⇒ blokem z rohu odejde. Ukázka 07.10.
+    // (hra 7, kolo 2): oba Troll Slayeři stáli na rozích, oba zablokovali, klec spadla ze čtyř
+    // rohů na dva a nosič pak vyběhl sám. Roh s Frenzy proto neblokuje.
+    if (phase_ == CagePhase::CAGE && m.type == MacroType::BLOCK && m.playerId > 0 && m.playerId != carrier.id) {
+        const Player& p = state.getPlayer(m.playerId);
+        if (p.teamSide == carrier.teamSide && p.hasSkill(SkillName::Frenzy) &&
+            std::abs(p.position.x - carrier.position.x) == 1 &&
+            std::abs(p.position.y - carrier.position.y) == 1) {
+            return true;
+        }
     }
 
     const bool movesCarrier = m.type == MacroType::ADVANCE ||

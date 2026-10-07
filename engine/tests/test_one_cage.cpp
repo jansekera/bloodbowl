@@ -571,3 +571,52 @@ TEST(OneCageFreeing, BlitzFreesAHeldTeammateWhenNoBlockIsAvailable) {
         for (const Macro& q : ms) EXPECT_NE(q.type, MacroType::BLITZ);
     }
 }
+
+// --- P154: co klec rozebíralo mezi tahem řadiče a koncem tahu (07.10.2026) ------------------
+
+TEST(OneCageKeepsCorners, CornerDoesNotFollowUpAfterABlock) {
+    auto board = [](bool carrierInside) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, carrierInside ? Position{12, 7} : Position{3, 2}, 4);
+        b.put(4, TeamSide::HOME, {13, 6}, 4, 3, {SkillName::Block});   // přední roh klece kolem (12,7)
+        b.put(13, TeamSide::AWAY, {14, 6}, 6);
+        b.put(14, TeamSide::AWAY, {24, 13}, 6);
+        b.s.ball = BallState::carried(b.s.getPlayer(1).position, 1);
+        return b;
+    };
+    {
+        Board b = board(true);
+        play(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}});          // šestky = POW, soupeř odtlačen
+        EXPECT_NE(b.s.getPlayer(13).position, (Position{14, 6})) << "předpoklad: soupeř byl odtlačen";
+        EXPECT_EQ(b.s.getPlayer(4).position, (Position{13, 6})) << "roh zůstal na rohu";
+    }
+    {   // pozitivní kontrola: tentýž hráč mimo klec po ráně následuje
+        Board b = board(false);
+        play(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}});
+        EXPECT_EQ(b.s.getPlayer(4).position, (Position{14, 6}));
+    }
+}
+
+TEST(OneCageKeepsCorners, CarrierIsNeverPickedAsTheBlitzer) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 6, 3, {SkillName::Block});       // nosič: nejblíž a s Block
+    b.put(2, TeamSide::HOME, {11, 3}, 6);                              // dál, bez Block
+    b.put(13, TeamSide::AWAY, {14, 7}, 6);
+    b.put(14, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    FixedDiceRoller dice(std::vector<int>(200, 6));
+    auto r = greedyExpandMacro(b.s, Macro{MacroType::BLITZ, -1, 13, {-1, -1}}, dice);
+    ASSERT_FALSE(r.actions.empty());
+    EXPECT_EQ(r.actions[0].playerId, 2) << "blitzuje druhý hráč, ne nosič";
+    EXPECT_EQ(b.s.getPlayer(1).position, (Position{12, 7}));
+}
+
+TEST(OneCageKeepsCorners, FrenzyCornerDoesNotBlock) {
+    Board b = walledCageBoard(2);
+    b.s.getPlayer(4).skills.add(SkillName::Frenzy);                   // přední roh (13,6) vedle zdi na x=14
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    ASSERT_EQ(b.s.getPlayer(4).position, (Position{13, 6}));
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "po ráně by musel následovat";
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 5, 17, {-1, -1}})) << "roh bez Frenzy blokovat smí";
+}
