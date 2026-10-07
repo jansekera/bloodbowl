@@ -1159,6 +1159,12 @@ static bool blitzDodgeCapped(const GameState& state, const Player& blitzer, cons
     return hit || !reaches;
 }
 
+// Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
+// Veřejná obálka pro řadič klece (P154), bez Dauntless a bez přirážek blitzu.
+int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender) {
+    return getBlockDiceCount(state, attacker, defender, false, false);
+}
+
 // Combined estimate used to rank blitzer candidates for a fixed target:
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).

@@ -38,6 +38,9 @@ void takeBlitzAndScoreReal(long* out3);
 // výjimky: poslední aktivace tahu, míč v posledním kole; skórující makra strop nemají). Zapnuto; vypínat jen pro párové
 // měření „před / po“. takeDodgeCapStops: [0] zastavená chůze, [1] vyřazený blitzující —
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
+// Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
+int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
+
 // Kolik hráčů strany v tomto tahu ještě může začít aktivaci (kdo nehrál ani se nepohnul a smí hrát).
 int activationsStillAvailable(const GameState& state, TeamSide side, int excludePlayerId = -1);
 void setDodgeCapEnabled(bool on);

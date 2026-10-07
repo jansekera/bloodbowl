@@ -60,6 +60,9 @@ public:
     // Další makro klece pro tento stav, nebo false = rozhoduje MCTS.
     bool next(const GameState& state, Macro& out);
 
+    // P154 (b): řadič v tomto tahu drží nosiče v kleci a makro `m` by ho z ní samotného odvedlo.
+    bool forbidsCarrierMove(const GameState& state, const Macro& m) const;
+
     // P154: hledání chce ukončit tah a míč držíme ⇒ napřed dotáhnout klec (postup, nebo aspoň
     // rohy kolem nosiče). True = `out` je první makro; další vydá next(). Jednou za tah.
     bool beforeEndTurn(const GameState& state, Macro& out);
@@ -71,7 +74,7 @@ public:
     int plansAdopted() const { return adopted_; }
 
 private:
-    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_RUN, DONE };
+    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_ADVANCE, AFTER_RUN, DONE };
 
     CageAdvancePlanner planner_;
     MCTSConfig config_;
@@ -92,6 +95,9 @@ private:
 
     int adopted_ = 0;
 
+    // planAdvance: postup klece nevyšel a čekáním se o TD nepřijde ⇒ nosič z klece nevybíhá
+    int pinnedCarrier_ = -1;
+
     // planStart: tah je SCORE_BALL, ale nosič do zóny bez hodu nedojde ⇒ klec postupuje dál
     bool scoringRangeCage_ = false;
 
@@ -103,6 +109,7 @@ private:
     void planStart(const GameState& state);
     void planAfterPickup(const GameState& state);
     void planAdvance(const GameState& state);
+    void planLaggards(const GameState& state);
     void planMarkers(const GameState& state);
     bool released(const GameState& state, const Player& carrier) const;
     bool stillValid(const GameState& state, const Macro& m) const;

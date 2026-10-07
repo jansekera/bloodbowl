@@ -399,3 +399,116 @@ TEST(OneCageBeforeEndTurn, CornersFollowACarrierWhoAlreadyMoved) {
     EXPECT_EQ(corners, 4) << "rohy stojí kolem nosiče";
     EXPECT_FALSE(cc.beforeEndTurn(b.s, m)) << "jen jednou za tah";
 }
+
+// --- P154 a/b/c (uživatel 07.10.2026) ------------------------------------------------------
+
+namespace {
+// Klec kolem (12,7), zeď soupeřů na x=14 ⇒ postup klece nevyjde (jako CageAdvance.FillsTheCage…).
+Board walledCageBoard(int turn) {
+    Board b(turn);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    for (int i = 0; i < 5; ++i) b.put(13 + i, TeamSide::AWAY, {14, static_cast<int8_t>(5 + i)}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    return b;
+}
+void playAll(CageController& cc, Board& b, std::vector<Macro>* out = nullptr) {
+    Macro m;
+    while (cc.next(b.s, m)) {
+        if (out) out->push_back(m);
+        play(b.s, m);
+    }
+}
+}  // namespace
+
+// (a) „uvolnit rohového blokem nebo blitzem — nebo jej nahradit volným“
+TEST(OneCageFreeing, SafeBlockFreesATeammateHeldByOneOpponent) {
+    auto board = [](bool attackerHasBlock) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {12, 7}, 4);
+        b.put(2, TeamSide::HOME, {11, 6});
+        b.put(3, TeamSide::HOME, {11, 8});
+        b.put(4, TeamSide::HOME, {14, 5});                       // drží ho jen soupeř 13
+        std::vector<SkillName> sk;
+        if (attackerHasBlock) sk.push_back(SkillName::Block);
+        b.put(5, TeamSide::HOME, {16, 4}, 4, 3, sk);             // stojí u téhož soupeře z druhé strany
+        b.put(13, TeamSide::AWAY, {15, 5}, 6);
+        b.put(14, TeamSide::AWAY, {24, 13}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(true);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        EXPECT_EQ(m.type, MacroType::BLOCK) << "tah klece začíná uvolňovací ranou";
+        EXPECT_EQ(m.playerId, 5) << "blokuje hráč s Block, který rohem nebude";
+        EXPECT_EQ(m.targetId, 13);
+    }
+    {   // bez dovednosti Block rána bezpečná není ⇒ řadič ji neplánuje
+        Board b = board(false);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::BLOCK);
+    }
+}
+
+// (b) „nosič dál jen s klecí“ + „na konci poločasu musí vyběhnout, aby stihl TD“
+TEST(OneCagePin, CarrierStaysInTheCageWhenTheAdvanceFails) {
+    Board b = walledCageBoard(2);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    EXPECT_EQ(b.s.getPlayer(1).position, (Position{12, 7})) << "řadič nosičem nepohnul";
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::ADVANCE, 1, -1, {-1, -1}}));
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 1, -1, {12, 3}}));
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}})) << "skórovat smí";
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLOCK, 4, 13, {-1, -1}})) << "rány kolem klece smí";
+}
+
+TEST(OneCagePin, CarrierMayRunWhenWaitingWouldCostTheTouchdown) {
+    // 13 polí do zóny, MA4: sólo po čekání potřebuje ceil((13-6)/4)+1 = 3 tahy. V 6. kole zbývají
+    // po tomto tahu jen 2 ⇒ čekat nejde. Ve 2. kole zbývá 6 ⇒ čeká (test výš).
+    Board b = walledCageBoard(6);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::ADVANCE, 1, -1, {-1, -1}}));
+}
+
+TEST(OneCagePin, CornersAreNotRepositionedAway) {
+    Board b = walledCageBoard(2);
+    b.put(6, TeamSide::HOME, {8, 2});                             // volný hráč mimo klec
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    ASSERT_EQ(b.s.getPlayer(2).position, (Position{11, 6}));
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 2, -1, {9, 3}})) << "roh zůstává rohem";
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 2, -1, {11, 6}})) << "stát na místě smí";
+    const Position p6 = b.s.getPlayer(6).position;
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 6, -1, {static_cast<int8_t>(p6.x + 1), p6.y}}))
+        << "hráče mimo klec hledání přesouvat smí";
+}
+
+// (c) „pak co nejdříve dořešit pohyb zaostalců co nejvíce dopředu“
+TEST(OneCageLaggards, FreePlayerLeftBehindMovesForwardWithoutContact) {
+    Board b(1);
+    b.put(1, TeamSide::HOME, {12, 7});
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(6, TeamSide::HOME, {6, 3});                             // zaostalec
+    b.put(14, TeamSide::AWAY, {24, 13});
+    b.s.ball = BallState::carried({12, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    const Player& lag = b.s.getPlayer(6);
+    EXPECT_GT(lag.position.x, 6) << "zaostalec šel dopředu";
+    EXPECT_EQ(lag.position.x, 6 + 4) << "o celý svůj pohyb, bez hodu";
+    EXPECT_EQ(countTacklezones(b.s, lag.position, TeamSide::HOME), 0) << "ne do kontaktu";
+    EXPECT_LE(lag.position.x, b.s.getPlayer(1).position.x + 3) << "nejvýš tři sloupce před nosiče";
+}

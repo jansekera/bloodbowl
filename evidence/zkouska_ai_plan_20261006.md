@@ -309,6 +309,22 @@ v 79 tazích jen dostavění nebo bloky — a hledání pak nosiče odvedlo o 2,
 - Verdikt plánu na začátku tahu: postup 48 · jen dostavění 67 · neplatný (riskantní) 30 · výběh 11 · skórovací tah 12.
 - Zkoušeno a vráceno: (1) držet nosiče v kleci — TD 22 → 12; (2) nebrat na roh hráče v zóně soupeře — rohy beze změny, výběhů 11 → 38, TD 22 → 18.
 
+### Klec podle rozhodnutí uživatele a/b/c (07.10.)
+
+Měří se jen, jestli každý mechanismus dělá, co má (uživatel 07.10.: TD až na závěr dávky). 40 prvních poločasů AI × AI na `main`.
+
+| mechanismus | co má dělat | před | po |
+|---|---|---|---|
+| (a) uvolňovací rány | prázdný roh, protože v dosahu jsou jen hráči v zóně soupeře | 16 % polí rohů | 3 % |
+| | obsazená pole rohů hned po tahu řadiče | 62 % | 79 % |
+| | čtyři rohy hned po tahu řadiče | 38 ze 114 | 67 ze 146 |
+| | cena: turnover na ranách řadiče | — | 2 při 0,97 rány na tah |
+| (b) nosič jen s klecí | hledání po kleci ještě pohne nosičem | 45 % tahů | 20 % |
+| (c) tým před klecí, zaostalci dopředu | hráčů víc než pole za nosičem / před ním / do dvou polí (uživatel v partii 3,1 / 3,6 / 5,0) | neměřeno | 2,70 / 3,53 / 4,75 |
+
+- Co ještě nedělá: na konci tahu má klec průměrně jen 2,17 rohu (4 rohy ve 48 ze 178) — hledání po tahu řadiče rohy rozebere (roh zahraje blok 14×, blitz 6×, je sražen 10×; přesun rohu 18× už zavírá zámek).
+- Elfové (27 tahů s míčem): rohy 1,12, čtyři rohy 1 ze 17, nosič po tahu vedle soupeře ve 12 ze 17, do dvou polí od nosiče 2,29 spoluhráče ⇒ u elfů klec nestojí.
+
 ## Co zkouška neumí
 
 - 16 skutečných tahů na stranu je malý vzorek; „1 turnover z 16“ je hrubé číslo. Opírat se dá o rozdíly v obtížnosti úhybů a v počtu aktivací.

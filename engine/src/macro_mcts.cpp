@@ -1069,6 +1069,18 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     }
     MacroDecisionInfo::Source source =
         fromStagedPlan ? MacroDecisionInfo::Source::CAGE : MacroDecisionInfo::Source::SEARCH;
+    // P154 (b): nosič držený v kleci — makro hledání, které by ho samotného odvedlo, se nehraje;
+    // bere se další nejnavštěvovanější dítě kořene, které to nedělá (jinak END_TURN).
+    if (!fromStagedPlan && cage_->forbidsCarrierMove(state, bestMacro)) {
+        std::vector<MacroChildVisitInfo> ranked = search_.lastChildVisits();
+        std::sort(ranked.begin(), ranked.end(),
+                  [](const MacroChildVisitInfo& a, const MacroChildVisitInfo& b) { return a.visits > b.visits; });
+        Macro replacement{MacroType::END_TURN, -1, -1, {-1, -1}};
+        for (const auto& r : ranked) {
+            if (!cage_->forbidsCarrierMove(state, r.macro)) { replacement = r.macro; break; }
+        }
+        bestMacro = replacement;
+    }
     // P154 (06.10.2026): hledání chce tah ukončit a míč držíme ⇒ napřed dotáhnout klec.
     if (!fromStagedPlan && bestMacro.type == MacroType::END_TURN) {
         Macro cageMacro;
