@@ -185,7 +185,7 @@ int calculatePickupTarget(const GameState& state, const Player& player) {
     return calculatePickupTargetAt(state, player, player.position);
 }
 
-int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier) {
+int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier, bool accuratePass) {
     int target = 7 - catcher.stats.agility - modifier;
 
     if (!catcher.hasSkill(SkillName::NervesOfSteel)) {
@@ -195,7 +195,10 @@ int calculateCatchTarget(const GameState& state, const Player& catcher, int modi
     target += countDisturbingPresence(state, catcher.position, catcher.teamSide);
 
     if (catcher.hasSkill(SkillName::ExtraArms)) target -= 1;
-    if (catcher.hasSkill(SkillName::DivingCatch)) target -= 1;
+    // OPRAVENO 07.10.2026 (P165) — tady bylo +1 z Diving Catch na KAŽDÉ chytání. Pravidla
+    // ř. 8063-8065: "may add 1 to any catch roll from an accurate pass targeted to his square"
+    // ⇒ jen přesná přihrávka; ne odskok, předání, výkop ani vhazování.
+    if (accuratePass && catcher.hasSkill(SkillName::DivingCatch)) target -= 1;
     if (state.weather == Weather::POURING_RAIN) target += 1;
 
     return std::clamp(target, 2, 6);

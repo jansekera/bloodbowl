@@ -9,8 +9,9 @@ namespace bb {
 
 bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
                    std::vector<GameEvent>* events);
+// `accuratePass` = chytá se PŘESNÁ PŘIHRÁVKA mířená na hráčovo pole (jen tehdy platí +1 z Diving Catch).
 bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
-                  int modifier, std::vector<GameEvent>* events);
+                  int modifier, std::vector<GameEvent>* events, bool accuratePass = false);
 void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
                    int depth, std::vector<GameEvent>* events);
 void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExit,

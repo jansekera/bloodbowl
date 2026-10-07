@@ -720,6 +720,79 @@ TEST(DevelopedRoster, DwarfLotsOfGuard) {
     EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 0);
 }
 
+// --- P165 (07.10.2026): úroveň TV1500 — co má stát na hřišti (jedenáctka) -------------------
+
+TEST(DevelopedRoster, Tv1500DwarfCornersHaveStandFirmAndMightyBlowOnBlitzers) {
+    const TeamRoster* r = getDevelopedRoster("dwarf", 1500);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+    // rohy klece: 2 Longbeardi s Guardem + 2 Blitzeři, všichni Stand Firm
+    EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 4);
+    // Mighty Blow: 2 Blitzeři (protilehlé rohy) + 2 Troll Slayeři (úderníci)
+    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 4);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
+    int frenzyWithStandFirm = 0;   // Troll Slayer (Frenzy) na roh nepatří
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.hasSkill(SkillName::Frenzy) && p.hasSkill(SkillName::StandFirm)) ++frenzyWithStandFirm;
+    });
+    EXPECT_EQ(frenzyWithStandFirm, 0);
+}
+
+TEST(DevelopedRoster, Tv1500WoodElfPassingSkillsAndBlockLinemen) {
+    const TeamRoster* r = getDevelopedRoster("wood-elf", 1500);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Accurate), 1);      // Thrower
+    EXPECT_EQ(countHomeSkill(state, SkillName::DivingCatch), 2);   // Catcheři
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);           // Wardancer
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
+    EXPECT_EQ(countHomeSkill(state, SkillName::SideStep), 1) << "Side Step jen Wardancer, rohoví Linemani ne";
+    EXPECT_EQ(countHomeSkill(state, SkillName::Block), 8);         // 3 Linemani + 2 Wardanceři + 2 Catcheři + Thrower
+}
+
+TEST(DevelopedRoster, Tv1500SkavenOneFastGutterRunner) {
+    const TeamRoster* r = getDevelopedRoster("skaven", 1500);
+    ASSERT_NE(r, nullptr);
+    GameState state;
+    setupHalf(state, *r, *r);
+    // uživatel 03.10.: jeden Gutter Runner +MA + Sure Feet + Sprint, ostatní tři bez Sure Feet
+    EXPECT_EQ(countHomeSkill(state, SkillName::SureFeet), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Sprint), 1);
+    int ma10 = 0, ma9 = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (p.stats.movement == 10) ++ma10;
+        if (p.stats.movement == 9) ++ma9;
+    });
+    EXPECT_EQ(ma10, 1);
+    EXPECT_EQ(ma9, 3);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
+}
+
+TEST(DevelopedRoster, Tv1500OrcAndHumanCornersHaveStandFirm) {
+    for (const char* race : {"orc", "human"}) {
+        const TeamRoster* r = getDevelopedRoster(race, 1500);
+        ASSERT_NE(r, nullptr);
+        GameState state;
+        setupHalf(state, *r, *r);
+        EXPECT_EQ(countHomeSkill(state, SkillName::StandFirm), 4) << race;
+        EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1) << race;
+        EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2) << race;
+    }
+}
+
+TEST(DevelopedRoster, Tv1200IsUntouchedByTheNewLevel) {
+    // nová úroveň je VEDLE staré: stará měření musí dál dostat tutéž sestavu
+    EXPECT_STREQ(getDevelopedRoster("dwarf", 1200)->name, "Dwarf (TV1200)");
+    EXPECT_STREQ(getDevelopedRoster("dwarf", 1500)->name, "Dwarf (TV1500)");
+    EXPECT_STREQ(getDevelopedRoster("wood-elf", 1499)->name, "Wood Elf (TV1200)");
+    // rasa bez soupisky TV1500 propadne na základní, jako dosud u TV1200
+    EXPECT_EQ(getDevelopedRoster("chaos", 1500), getRosterByName("chaos"));
+}
+
 TEST(DevelopedRoster, SkavenSureFeetGutterRunners) {
     const TeamRoster* r = getDevelopedRoster("skaven", 1200);
     ASSERT_NE(r, nullptr);

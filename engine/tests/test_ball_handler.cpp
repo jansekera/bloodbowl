@@ -336,3 +336,31 @@ TEST(BallHandler, CatchNoTeamRerollDuringKickoff) {
     EXPECT_EQ(gs.homeTeam.rerolls, 2);
     EXPECT_FALSE(gs.kickoffInProgress);   // scope cleared the flag
 }
+
+// P165 (07.10.2026): Diving Catch — ř. 8063-8065 "The player may add 1 to any catch roll from
+// an ACCURATE PASS targeted to his square." Engine dával +1 na KAŽDÉ chytání (odskok, předání,
+// výkop). AG3: přesná přihrávka 7-3-1 = 3+, s Diving Catch 2+; odskok 7-3 = 4+ i s Diving Catch.
+TEST(BallHandler, DivingCatchHelpsOnlyAnAccuratePassToHisSquare) {
+    auto withBall = [] {
+        GameState gs;
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+        gs.getPlayer(1).skills.add(SkillName::DivingCatch);
+        gs.ball = BallState::onGround({10, 7});
+        return gs;
+    };
+    {   // přesná přihrávka: hod 2 stačí (bez dovednosti by bylo potřeba 3)
+        GameState gs = withBall();
+        FixedDiceRoller dice({2});
+        EXPECT_TRUE(resolveCatch(gs, 1, dice, 1, nullptr, /*accuratePass=*/true));
+    }
+    {   // odskočený míč: 4+, hod 3 nestačí — Diving Catch tu nepomáhá
+        GameState gs = withBall();
+        FixedDiceRoller dice({3, 1, 1, 1, 1, 1, 1, 1});
+        EXPECT_FALSE(resolveCatch(gs, 1, dice, 0, nullptr));
+    }
+    {   // předání (+1 za předání, ale není to přesná PŘIHRÁVKA): 3+, hod 2 nestačí
+        GameState gs = withBall();
+        FixedDiceRoller dice({2, 1, 1, 1, 1, 1, 1, 1});
+        EXPECT_FALSE(resolveCatch(gs, 1, dice, 1, nullptr));
+    }
+}

@@ -30,7 +30,7 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
 }
 
 bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
-                  int modifier, std::vector<GameEvent>* events) {
+                  int modifier, std::vector<GameEvent>* events, bool accuratePass) {
     Player& catcher = state.getPlayer(catcherId);
 
     // P80 (30.09.2026), port PHP 2f930279. r. 857-858: "Prone and Stunned
@@ -48,7 +48,7 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
         return false;
     }
 
-    int target = calculateCatchTarget(state, catcher, modifier);
+    int target = calculateCatchTarget(state, catcher, modifier, accuratePass);
     // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
     bool success = attemptRoll(state, catcherId, dice, target,
                                // Catch, l. 7992-7995: "allowed to re-roll the D6

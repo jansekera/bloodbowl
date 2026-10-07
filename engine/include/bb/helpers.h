@@ -76,7 +76,8 @@ int calculatePickupTarget(const GameState& state, const Player& player);
 // on the ball's square, not on the picker's current one).
 int calculatePickupTargetAt(const GameState& state, const Player& player,
                             Position at);
-int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0);
+int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0,
+                         bool accuratePass = false);
 
 // Block helpers
 // tzExcludeId: CRP "except the player being blocked" — exclude from TZ check

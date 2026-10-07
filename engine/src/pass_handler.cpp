@@ -400,7 +400,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         Player* catcher = state.getPlayerAtPosition(target);
         if (catcher && canAct(catcher->state) && !catcher->hasSkill(SkillName::NoHands)) {
             // Catch with +1 modifier for accurate pass
-            if (resolveCatch(state, catcher->id, dice, 1, events)) {
+            if (resolveCatch(state, catcher->id, dice, 1, events, /*accuratePass=*/true)) {
                 return catcher->teamSide == passer.teamSide
                            ? ActionResult::ok()
                            : ActionResult::turnovr();
