@@ -644,6 +644,32 @@ double pathFailProb(const GameState& state, const Player& player,
     return 1.0 - successProb;
 }
 
+// P154 (07.10.2026): kam blitzující při doběhu k cíli DOJDE a po kolika krocích — přehráním
+// smyčky hry (jako blitzApproachHitsDodgeCap). Vrací false, když nedojde NEBO když by cestou
+// musel uhýbat (řadič klece plánuje jen blitz bez hodu při doběhu).
+bool blitzLandingDiceFree(const GameState& state, const Player& player, Position target,
+                          Position& landing, int& steps) {
+    steps = 0;
+    landing = player.position;
+    if (player.position.distanceTo(target) <= 1) return true;
+    GameState sim = state.clone();
+    Player& w = sim.getPlayer(player.id);
+    if (w.state == PlayerState::PRONE) {
+        w.movementRemaining = static_cast<int8_t>(movementAfterStandUp(player));
+        w.state = PlayerState::STANDING;
+    }
+    for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
+        Position next;
+        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) return false;
+        if (countTacklezones(sim, w.position, w.teamSide) > 0) return false;   // úhyb
+        w.position = next;
+        if (w.movementRemaining > 0) --w.movementRemaining;
+        ++steps;
+    }
+    landing = w.position;
+    return w.position.distanceTo(target) == 1;
+}
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove) {

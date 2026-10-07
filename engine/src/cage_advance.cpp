@@ -770,6 +770,14 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             // The carrier's GFI leg is an ACCEPTED dice risk (tempo emergency):
             // it gets the relaxed ceiling, everything else stays dice-free.
             double ceiling = SAFE_PTO;
+            // P154 (07.10.2026): roh s dovedností Dodge smí cestou jeden úhyb na 2+ (s přehozem
+            // 1/36 = 2,8 %). Strop „bez hodu“ (2 %) elfům klec znemožňoval: vázaný elf odchází
+            // úhybem na 2+ běžně (v partii 22 z 22), a plánovač kvůli němu zahodil krok — elfové
+            // měli po tahu průměrně 1,1 rohu. Úhyby na 4+ a horší dál zastavuje strop P149;
+            // úhyb na 3+ s přehozem (11 %) touto mezí neprojde. Nosiče se to netýká.
+            if (m.playerId != carrier.id && state.getPlayer(m.playerId).hasSkill(SkillName::Dodge)) {
+                ceiling = SAFE_PTO_DODGE_SKILL;
+            }
             if (m.gfiAllowance == 1) ceiling = SAFE_PTO_GFI1;
             else if (m.gfiAllowance >= 2) ceiling = SAFE_PTO_GFI2;
             auto pr = probeMacro(projected, m);
@@ -844,9 +852,16 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         return true;
     };
 
+    // ⭐ P154 (07.10.2026, uživatel: „hledej způsoby, jak zlepšit to, aby byla čistá klec na
+    //   konci tahu“): ČISTÁ KLEC MÁ PŘEDNOST PŘED DÉLKOU KROKU. Nejdelší bezpečný krok se
+    //   čtyřmi rohy se bere hned. Vyjde-li jen se dvěma nebo třemi, zkouší se dál kratší kroky
+    //   (ne pod tempo, které rozvrh vyžaduje) a bere se ten s nejvíc rohy; při shodě delší.
+    CageAdvancePlan bestSafe;
+    bool haveSafe = false;
     CageAdvancePlan firstTry;
     bool haveFirst = false;
     for (int step = finalStep; step >= 1; --step) {
+        if (haveSafe && step < scheduleStep) break;        // pod požadované tempo kvůli rohům ne
         AssignmentResult a;
         if (step == finalStep) {
             a = assign;
@@ -861,12 +876,21 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         candidate.carrierGfi = std::clamp(step - maxNoGfi, 0, plan.carrierGfi);
         if (legsAreSafe(candidate, step, a)) {
             if (step != finalStep) candidate.shortenedFromStep = finalStep;
-            if (getenv("BB_CAGE_DEBUG") && step != finalStep) {
-                fprintf(stderr, "[cage] krok %d nevyšel bez hodu, bere se kratší krok %d\n", finalStep, step);
+            if (!haveSafe || candidate.filledCorners > bestSafe.filledCorners) {
+                bestSafe = std::move(candidate);
+                haveSafe = true;
             }
-            return candidate;
+            if (bestSafe.filledCorners >= 4) break;
+            continue;
         }
         if (!haveFirst) { firstTry = std::move(candidate); haveFirst = true; }
+    }
+    if (haveSafe) {
+        if (getenv("BB_CAGE_DEBUG") && bestSafe.step != finalStep) {
+            fprintf(stderr, "[cage] místo kroku %d se bere krok %d (rohů %d)\n", finalStep, bestSafe.step,
+                    bestSafe.filledCorners);
+        }
+        return bestSafe;
     }
     return firstTry;
 }

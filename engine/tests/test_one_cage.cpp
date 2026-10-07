@@ -512,3 +512,62 @@ TEST(OneCageLaggards, FreePlayerLeftBehindMovesForwardWithoutContact) {
     EXPECT_EQ(countTacklezones(b.s, lag.position, TeamSide::HOME), 0) << "ne do kontaktu";
     EXPECT_LE(lag.position.x, b.s.getPlayer(1).position.x + 3) << "nejvýš tři sloupce před nosiče";
 }
+
+// (a) pokračování — „využij i blitz a block pro uvolnění klece“, „nezapomeň na příchod pro asistenci“
+namespace {
+// Náš hráč 4 na (14,5) je držen jediným soupeřem 13 na (15,5). Klec kolem (12,7) má jen zadní rohy.
+Board heldTeammateBoard() {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {14, 5});
+    b.put(13, TeamSide::AWAY, {15, 5}, 6);
+    b.put(15, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    return b;
+}
+}  // namespace
+
+TEST(OneCageFreeing, FreeTeammateComesToAssistSoTheBlockHasTwoDice) {
+    Board b = heldTeammateBoard();
+    b.put(5, TeamSide::HOME, {16, 4}, 4, 3, {SkillName::Block});   // u soupeře 13 z druhé strany
+    b.put(14, TeamSide::AWAY, {17, 5}, 6);                          // kryje 13: bez pomoci jen 1 kostka
+    b.put(6, TeamSide::HOME, {13, 2});                              // volný pomocník
+    ASSERT_LT(blockDiceCount(b.s, b.s.getPlayer(5), b.s.getPlayer(13)), 2) << "předpoklad: bez příchodu není rána bezpečná";
+
+    CageController cc(nullptr, cfg(), 1);
+    Macro first, second;
+    ASSERT_TRUE(cc.next(b.s, first));
+    EXPECT_EQ(first.type, MacroType::REPOSITION);
+    EXPECT_EQ(first.playerId, 6) << "pro asistenci jde volný hráč, ne roh klece";
+    EXPECT_EQ(first.targetPos.distanceTo(b.s.getPlayer(13).position), 1) << "na pole vedle soupeře";
+    play(b.s, first);
+    EXPECT_GE(blockDiceCount(b.s, b.s.getPlayer(5), b.s.getPlayer(13)), 2) << "po příchodu 2+ kostky, vybíráme my";
+    ASSERT_TRUE(cc.next(b.s, second));
+    EXPECT_EQ(second.type, MacroType::BLOCK);
+    EXPECT_EQ(second.playerId, 5);
+    EXPECT_EQ(second.targetId, 13);
+}
+
+TEST(OneCageFreeing, BlitzFreesAHeldTeammateWhenNoBlockIsAvailable) {
+    Board b = heldTeammateBoard();
+    b.put(5, TeamSide::HOME, {12, 3}, 4, 3, {SkillName::Block});   // volný hráč s Block, dva kroky od soupeře
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_TRUE(cc.next(b.s, m));
+    EXPECT_EQ(m.type, MacroType::BLITZ);
+    EXPECT_EQ(m.playerId, 5);
+    EXPECT_EQ(m.targetId, 13);
+    play(b.s, m);
+    EXPECT_TRUE(b.s.getPlayer(5).usedBlitz) << "blitz zahrál právě určený hráč";
+    {   // už použitý blitz v tahu ⇒ řadič ho neplánuje
+        Board c = heldTeammateBoard();
+        c.put(5, TeamSide::HOME, {12, 3}, 4, 3, {SkillName::Block});
+        c.s.homeTeam.blitzUsedThisTurn = true;
+        CageController cc2(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc2, c, &ms);
+        for (const Macro& q : ms) EXPECT_NE(q.type, MacroType::BLITZ);
+    }
+}

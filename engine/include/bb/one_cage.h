@@ -95,9 +95,6 @@ private:
 
     int adopted_ = 0;
 
-    // planAdvance: postup klece nevyšel a čekáním se o TD nepřijde ⇒ nosič z klece nevybíhá
-    int pinnedCarrier_ = -1;
-
     // planStart: tah je SCORE_BALL, ale nosič do zóny bez hodu nedojde ⇒ klec postupuje dál
     bool scoringRangeCage_ = false;
 

@@ -61,6 +61,11 @@ int pathStepsToward(const GameState& state, const Player& player,
 double pathFailProb(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare);
 
+// P154: pole, na které blitzující při doběhu k cíli dojde, a počet kroků; false = nedojde,
+// nebo by cestou uhýbal. Přehrává smyčku hry, čítače chůze nemění.
+bool blitzLandingDiceFree(const GameState& state, const Player& player, Position target,
+                          Position& landing, int& steps);
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove = 0);

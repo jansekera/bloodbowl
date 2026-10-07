@@ -3487,12 +3487,29 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     }
     std::stable_sort(ranked.begin(), ranked.end(),
                      [](const auto& x, const auto& y) { return x.first < y.first; });
-    for (const auto& ranking : ranked) {
-        const Action& a = ranking.second;
-        if (blitzDodgeCapped(state, state.getPlayer(a.playerId), target)) { ++g_dodgeCapStops[1]; continue; }
-        bestBlitzAction = a;
-        found = true;
-        break;
+    // P154 (07.10.2026): roh klece neblitzuje, když to může udělat někdo jiný — blitz ho z rohu
+    // odvede (6× za 40 poločasů). Dva průchody: napřed kandidáti mimo rohy, pak teprve rohy.
+    auto isCageCorner = [&](const Player& p) {
+        if (!state.ball.isHeld || state.ball.carrierId <= 0 || state.ball.carrierId == p.id) return false;
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        return c.teamSide == p.teamSide && c.state == PlayerState::STANDING &&
+               std::abs(p.position.x - c.position.x) == 1 && std::abs(p.position.y - c.position.y) == 1;
+    };
+    for (int pass = 0; pass < 2 && !found; ++pass) {
+        for (const auto& ranking : ranked) {
+            const Action& a = ranking.second;
+            const Player& cand = state.getPlayer(a.playerId);
+            if (macro.playerId > 0 && a.playerId != macro.playerId) continue;   // makro si blitzujícího určilo
+            // P154 (07.10.2026): NOSIČ MÍČE NEBLITZUJE. Výběr „nejmenší riziko“ bral i nosiče —
+            // ve 29 ze 183 tahů s klecí vyběhl blitzem z klece ven (40 poločasů na main).
+            // Blitz nosiče se skórováním je samostatné makro BLITZ_AND_SCORE, to se netýká.
+            if (state.ball.isHeld && state.ball.carrierId == a.playerId) continue;
+            if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
+            if (blitzDodgeCapped(state, cand, target)) { ++g_dodgeCapStops[1]; continue; }
+            bestBlitzAction = a;
+            found = true;
+            break;
+        }
     }
 
     if (!found) return result;

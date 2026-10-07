@@ -1179,7 +1179,9 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         std::vector<Macro> candidates;
         candidates.reserve(offered.size());
         auto admissible = [&](const Macro& m) {
-            return m.type != MacroType::END_TURN && !sameMacro(m, bestMacro);
+            // P154: záchrana nesmí vybrat makro, které klec zakazuje (odvod nosiče / rohu)
+            return m.type != MacroType::END_TURN && !sameMacro(m, bestMacro) &&
+                   !cage_->forbidsCarrierMove(state, m);
         };
         auto alreadyQueued = [&](const Macro& m) {
             for (const Macro& q : candidates) if (sameMacro(q, m)) return true;

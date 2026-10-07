@@ -544,6 +544,21 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
         return f;
     }
     // Mimo blitz je blok celá aktivace: není co si šetřit, pole zdarma se bere.
+    // ⭐ P154 (07.10.2026): ROH KLECE PO RÁNĚ NENÁSLEDUJE. Dosud běžný blok následoval VŽDY
+    //   (řádek níž), takže roh, který zahrál blok, z rohu odešel — klec měla hned po tahu
+    //   řadiče 3,15 rohu a na konci tahu 2,17; 14× roh „zmizel“ právě blokem (40 poločasů).
+    //   Roh = stojím na úhlopříčce vedle vlastního stojícího nosiče; následování by mě z ní
+    //   odvedlo (uvolněné pole není úhlopříčka nosiče). Frenzy následovat musí (výš).
+    if (state.ball.isHeld && state.ball.carrierId > 0 && state.ball.carrierId != att.id) {
+        const Player& carrier = state.getPlayer(state.ball.carrierId);
+        auto diagonal = [&](Position sq) {
+            return std::abs(sq.x - carrier.position.x) == 1 && std::abs(sq.y - carrier.position.y) == 1;
+        };
+        if (carrier.teamSide == att.teamSide && carrier.state == PlayerState::STANDING &&
+            diagonal(att.position) && !diagonal(vacated)) {
+            return false;
+        }
+    }
     if (!params.isBlitz) return true;
     // Blitzující, který už nemá čím pokračovat, taky nemá co získat.
     if (!canAct(att.state) || att.movementRemaining <= 0) return true;

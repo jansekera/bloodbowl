@@ -103,6 +103,18 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
     return r;
 }
 
+// P154 (b) (uživatel 07.10.2026: „pokud je ta situace na konci poločasu — nosič musí vyběhnout,
+// aby stihl TD“). Sólo od PŘÍŠTÍHO tahu potřebuje ceil((dist − (MA+2)) / MA) + 1 tahů; nevejde-li
+// se to do tahů, které po tomto zbývají, čekat nejde.
+static bool waitingCostsTheTouchdown(const GameState& state, const Player& carrier) {
+    const int dist = distToEndzone(carrier.position, carrier.teamSide);
+    const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
+    const int turnsAfterThis = std::clamp(8 - state.getTeamState(carrier.teamSide).turnNumber, 0, 8);
+    const int rest = dist - (ma + 2);
+    const int soloNeedIfWaiting = (rest > 0 ? (rest + ma - 1) / ma : 0) + 1;
+    return soloNeedIfWaiting > turnsAfterThis;
+}
+
 CageController::CageController(const ValueFunction* vf, MCTSConfig config, uint32_t seed)
     : planner_(vf, config, seed), config_(config) {}
 
@@ -121,6 +133,12 @@ bool CageController::stillValid(const GameState& state, const Macro& m) const {
         const Player& d = state.getPlayer(m.targetId);
         return freeToAct(a) && d.isOnPitch() && d.state == PlayerState::STANDING &&
                a.position.distanceTo(d.position) == 1;
+    }
+    if (m.type == MacroType::BLITZ) {
+        const Player& a = state.getPlayer(m.playerId);
+        const Player& d = state.getPlayer(m.targetId);
+        return freeToAct(a) && d.isOnPitch() && d.state == PlayerState::STANDING &&
+               !state.getTeamState(a.teamSide).blitzUsedThisTurn;
     }
     return false;
 }
@@ -279,6 +297,93 @@ void CageController::planStart(const GameState& state) {
                 usedTargets.push_back(f.m->targetId);
             }
         }
+        // ⭐ P154 (a) pokračování (uživatel 07.10.2026: „využij i blitz a block pro uvolnění
+        //   klece“, „nezapomeň na příchod pro asistenci u blitz a block“). Soupeř, který stojí
+        //   na poli rohu nebo jako jediný drží našeho volného hráče, a bezpečná rána na něj
+        //   zatím není: (A) volný spoluhráč PŘIJDE PRO ASISTENCI (bez hodu, na pole vedle
+        //   soupeře), takže hráč s Block, který u soupeře už stojí, hází 2+ kostky, které
+        //   vybíráme my; (B) jinak jeden BLITZ za tah: hráč s Block doběhne bez úhybu a bez GFI
+        //   a z pole, kam dojde, má 2+ kostky.
+        {
+            const TeamSide side = carrier.teamSide;
+            auto used = [&](int id) {
+                return std::find(usedAttackers.begin(), usedAttackers.end(), id) != usedAttackers.end();
+            };
+            auto targeted = [&](int id) {
+                for (const Macro& q : queue_) if (q.targetId == id) return true;
+                return false;
+            };
+            std::vector<int> blockers;
+            auto addBlocker = [&](int id) {
+                if (std::find(blockers.begin(), blockers.end(), id) == blockers.end()) blockers.push_back(id);
+            };
+            for (int cx : {-1, 1}) for (int cy : {-1, 1}) {             // soupeř na poli rohu
+                const Player* o = state.getPlayerAtPosition({static_cast<int8_t>(carrier.position.x + cx),
+                                                             static_cast<int8_t>(carrier.position.y + cy)});
+                if (o && o->teamSide != side && o->state == PlayerState::STANDING) addBlocker(o->id);
+            }
+            state.forEachOnPitch(side, [&](const Player& t) {           // jediný držitel našeho volného hráče
+                if (t.id == carrier.id || !freeToAct(t)) return;
+                if (countTacklezones(state, t.position, side, t.id) != 1) return;
+                for (const Position& sq : t.position.getAdjacent()) {
+                    if (!sq.isOnPitch()) continue;
+                    const Player* o = state.getPlayerAtPosition(sq);
+                    if (o && o->teamSide != side && o->state == PlayerState::STANDING) addBlocker(o->id);
+                }
+            });
+            bool blitzPlanned = state.getTeamState(side).blitzUsedThisTurn;
+            for (int eid : blockers) {
+                if (targeted(eid)) continue;
+                const Player& e = state.getPlayer(eid);
+                bool done = false;
+                // (A) příchod pro asistenci
+                state.forEachOnPitch(side, [&](const Player& a) {
+                    if (done || a.id == carrier.id || !freeToAct(a) || used(a.id)) return;
+                    if (!a.hasSkill(SkillName::Block) || a.position.distanceTo(e.position) != 1) return;
+                    state.forEachOnPitch(side, [&](const Player& m) {
+                        if (done || m.id == a.id || m.id == carrier.id || !freeToAct(m) || used(m.id)) return;
+                        if (countTacklezones(state, m.position, side, m.id) > 0) return;   // pomocník musí být volný
+                        if (std::abs(m.position.x - carrier.position.x) == 1 &&
+                            std::abs(m.position.y - carrier.position.y) == 1) return;      // roh zůstává rohem
+                        for (const Position& sq : e.position.getAdjacent()) {
+                            if (done) break;
+                            if (!sq.isOnPitch() || state.getPlayerAtPosition(sq)) continue;
+                            if (sq.distanceTo(m.position) > m.movementRemaining) continue;
+                            if (pathFailProb(state, m, sq, m.movementRemaining, Position{-1, -1}) != 0.0) continue;
+                            GameState trial = state.clone();
+                            trial.getPlayer(m.id).position = sq;
+                            if (blockDiceCount(trial, trial.getPlayer(a.id), trial.getPlayer(eid)) < 2) continue;
+                            Macro mv{MacroType::REPOSITION, m.id, -1, sq};
+                            mv.cageManaged = true;
+                            queue_.push_back(mv);
+                            queue_.push_back(Macro{MacroType::BLOCK, a.id, eid, {-1, -1}});
+                            usedAttackers.push_back(m.id);
+                            usedAttackers.push_back(a.id);
+                            done = true;
+                        }
+                    });
+                });
+                if (done || blitzPlanned) continue;
+                // (B) blitz
+                state.forEachOnPitch(side, [&](const Player& b) {
+                    if (done || b.id == carrier.id || !freeToAct(b) || used(b.id)) return;
+                    if (!b.hasSkill(SkillName::Block) || b.position.distanceTo(e.position) <= 1) return;
+                    if (std::abs(b.position.x - carrier.position.x) == 1 &&
+                        std::abs(b.position.y - carrier.position.y) == 1) return;          // roh neblitzuje
+                    Position landing{-1, -1};
+                    int steps = 0;
+                    if (!blitzLandingDiceFree(state, b, e.position, landing, steps)) return;
+                    if (steps > static_cast<int>(b.movementRemaining) - 1) return;          // bez GFI (rána stojí pole)
+                    GameState trial = state.clone();
+                    trial.getPlayer(b.id).position = landing;
+                    if (blockDiceCount(trial, trial.getPlayer(b.id), trial.getPlayer(eid)) < 2) return;
+                    queue_.push_back(Macro{MacroType::BLITZ, b.id, eid, {-1, -1}});
+                    usedAttackers.push_back(b.id);
+                    blitzPlanned = true;
+                    done = true;
+                });
+            }
+        }
         stage_ = Stage::AFTER_BLOCKS;
         return;
     }
@@ -322,11 +427,28 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         if (isCorner && m.targetPos != p.position) return true;
     }
 
-    if (pinnedCarrier_ < 0 || state.ball.carrierId != pinnedCarrier_) return false;
     const bool movesCarrier = m.type == MacroType::ADVANCE ||
-                              (m.type == MacroType::REPOSITION && m.playerId == pinnedCarrier_);
+                              (m.type == MacroType::REPOSITION && m.playerId == carrier.id);
     if (!movesCarrier) return false;
-    return countTacklezones(state, carrier.position, carrier.teamSide) == 0;
+    // Rozhoduje se ze STAVU DESKY ve chvíli volby, ne z toho, jak dopadl plán: ať už řadič plán
+    // nedokončil, nebo ho vůbec nedělal — stojí-li nosič v kleci (aspoň tři rohy), hledání ho
+    // z ní samotného nevyvede. (07.10.: příznak nastavený jen po nevydařeném postupu pustil
+    // nosiče ven ve 34 ze 188 tahů — plán „vyšel“, ale nedohrál se, nebo se neplánoval.)
+    const char* why = nullptr;
+    if (phase_ == CagePhase::RELEASE || released(state, carrier)) why = "nosič je vypuštěn (fáze 3)";
+    int corners = 0;
+    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+        const Player* q = state.getPlayerAtPosition({static_cast<int8_t>(carrier.position.x + cx),
+                                                     static_cast<int8_t>(carrier.position.y + cy)});
+        if (q && q->teamSide == carrier.teamSide && q->state == PlayerState::STANDING) ++corners;
+    }
+    if (!why && corners < 3) why = "klec nemá ani tři rohy";
+    if (!why && waitingCostsTheTouchdown(state, carrier)) why = "čekáním by nestihl TD";
+    if (!why && countTacklezones(state, carrier.position, carrier.teamSide) > 0) why = "nosič stojí v zóně soupeře";
+    if (why && std::getenv("BB_CAGE_DEBUG")) {
+        std::fprintf(stderr, "[cage ctl] hledání smí pohnout nosičem: %s\n", why);
+    }
+    return why == nullptr;
 }
 
 // P154/K2+K3 (06.10.2026): NEŽ HLEDÁNÍ UKONČÍ TAH, DOTÁHNOUT KLEC. Volá MacroMCTSPolicy,
@@ -372,7 +494,7 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
 }
 
 void CageController::planAfterPickup(const GameState& state) {
-    stage_ = Stage::DONE;
+    stage_ = Stage::AFTER_ADVANCE;   // P154 (c): i po zvednutí jdou volní zaostalci dopředu
     if (!ourBall(state)) return;
     CageAdvancePlan plan = planner_.buildFillOnly(state, {});
     if (plan.valid) queue_ = std::move(plan.macros);
@@ -394,20 +516,6 @@ void CageController::planAdvance(const GameState& state) {
     //   aby stihl TD“). Postup klece nevyšel ⇒ nosič tento tah z klece nevybíhá — LEDAŽE by
     //   čekáním přišel o TD: sólo od příštího tahu potřebuje ceil((dist − (MA+2)) / MA) + 1
     //   tahů; nevejde-li se to do zbývajících, běží už teď.
-    pinnedCarrier_ = -1;
-    if (plan.verdict != CageAdvanceVerdict::PLAN_READY) {
-        const int dist = distToEndzone(carrier.position, carrier.teamSide);
-        const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
-        const int turnsAfterThis = std::clamp(8 - state.getTeamState(carrier.teamSide).turnNumber, 0, 8);
-        const int rest = dist - (ma + 2);
-        const int soloNeedIfWaiting = (rest > 0 ? (rest + ma - 1) / ma : 0) + 1;
-        const bool mustRunNow = soloNeedIfWaiting > turnsAfterThis;
-        if (!mustRunNow) pinnedCarrier_ = carrier.id;
-        if (std::getenv("BB_CAGE_DEBUG")) {
-            std::fprintf(stderr, "[cage ctl] postup nevyšel: do TD %d, tahů po tomto %d, sólo po čekání potřebuje %d => %s\n",
-                         dist, turnsAfterThis, soloNeedIfWaiting, mustRunNow ? "nosič smí běžet" : "nosič zůstává v kleci");
-        }
-    }
     if (plan.valid) queue_ = std::move(plan.macros);
 }
 
@@ -519,7 +627,6 @@ bool CageController::next(const GameState& state, Macro& out) {
         team_ = state.activeTeam;
         turn_ = turn;
         half_ = state.half;
-        pinnedCarrier_ = -1;
         stage_ = Stage::START;
         phase_ = CagePhase::NONE;
         queue_.clear();

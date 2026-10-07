@@ -252,6 +252,9 @@ public:
     // turn_planner.h): a macro is safe only if its MC-probed expansion is
     // dice-free in practice and not a no-op.
     static constexpr double SAFE_PTO = 0.02;
+    // Roh s dovedností Dodge: jeden úhyb na 2+ s přehozem (2,8 %); sonda má 48 vzorků,
+    // 0,05 = nejvýš dva neúspěchy ze 48 (P154, 07.10.2026).
+    static constexpr double SAFE_PTO_DODGE_SKILL = 0.05;
     // Relaxed probe ceilings for the carrier's GFI leg ONLY (tempo emergency,
     // user doctrine 2026-08-04: the carrier must arrive even at dice cost).
     // 1 GFI fails 1/6 ~= 0.167, 2 GFI ~= 0.31; the PROBE_K=48 MC estimate
