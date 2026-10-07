@@ -684,3 +684,36 @@ TEST(PassHandler, P78SafeThrowKeptFumbleIsNotRerolledWithPass) {
     EXPECT_FALSE(result.turnover) << "Pass prehodil zachraneny fumble";
     EXPECT_EQ(gs.ball.carrierId, 1);
 }
+
+// P89 (08.10.2026, uživatel: „opravdu? i když diváci vhodí míč zpět a chytí jej náš? prověř“).
+// Pravidla ř. 881-889: "The turnover does not take place until the ball finally comes to rest …
+// The ball could even scatter or bounce out of bounds, be thrown back into an empty square, and
+// as long as it was caught by a player from the moving team then the turnover would be avoided!"
+// Engine po vhození vracel turnover VŽDY.
+TEST(PassHandler, P89ThrowInCaughtByTheMovingTeamIsNoTurnover) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 2, {20, 2}, TeamSide::HOME);
+    gs.ball = BallState::carried({3, 7}, 1);
+    // HMP 4 (nepřesná) · rozptyl D8=1: (20,0) -> mimo · vhazování D6=3, 2D6 = 1+1 -> (20,2)
+    // tam stojí NÁŠ hráč 2 a chytí (6)
+    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld);
+    ASSERT_EQ(gs.ball.carrierId, 2);
+    EXPECT_FALSE(result.turnover) << "míč po vhození chytil hráč týmu na tahu";
+}
+
+TEST(PassHandler, P89ThrowInCaughtByTheOpponentIsStillATurnover) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 13, {20, 2}, TeamSide::AWAY);
+    gs.ball = BallState::carried({3, 7}, 1);
+    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld);
+    ASSERT_EQ(gs.ball.carrierId, 13);
+    EXPECT_TRUE(result.turnover);
+}

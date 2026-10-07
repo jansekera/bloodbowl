@@ -1264,8 +1264,8 @@ static bool carrierCanAdvance(const GameState& state, const Player& carrier);
 
 // --- Macro Generation ---
 
-void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
-                        bool dauntlessInOffer) {
+static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
+                            bool dauntlessInOffer) {
     out.clear();
 
     if (state.phase != GamePhase::PLAY) return;
@@ -2756,6 +2756,23 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
         }
         out.push_back({MacroType::REPOSITION, p.id, -1, target});
     });
+}
+
+// ⭐ P165 / P154 (uživatel 08.10.2026: „nosič nesmí dělat nebezpečné věci — blokovat, faulovat, …“).
+//   Makra BLOCK a FOUL, která by zahrál hráč držící míč, se nenabízejí vůbec: při ráně může
+//   padnout on (míč je venku a je to turnover), při faulu hrozí vyloučení. Blitz nosiče hlídá
+//   výběr blitzujícího (expandBlitz); skórující BLITZ_AND_SCORE zůstává — je to cesta k TD.
+//   Jedno místo, kudy prochází celá nabídka (hledání, řadič klece i záchrana K6).
+void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
+                        bool dauntlessInOffer) {
+    buildMacroOffer(state, out, dauntlessInOffer);
+    if (!state.ball.isHeld || state.ball.carrierId <= 0) return;
+    const int carrierId = state.ball.carrierId;
+    if (state.getPlayer(carrierId).teamSide != state.activeTeam) return;
+    out.erase(std::remove_if(out.begin(), out.end(), [&](const Macro& m) {
+                  return (m.type == MacroType::BLOCK || m.type == MacroType::FOUL) && m.playerId == carrierId;
+              }),
+              out.end());
 }
 
 // --- Macro Expansion ---

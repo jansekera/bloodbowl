@@ -838,10 +838,18 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     weakBlitzer.id = 1;
     weakBlitzer.teamSide = TeamSide::HOME;
     weakBlitzer.state = PlayerState::STANDING;
-    weakBlitzer.position = {14, 7};
+    weakBlitzer.position = {18, 7};
     weakBlitzer.stats = {6, 1, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
+    // Retuned 2026-10-07 (CTVRTE PRELADENI): dvojice z x=14/15 na x=18/19.
+    // Hranu posunulo pravidlo "nosic neblokuje a nefauluje" (getAvailableMacros
+    // mu BLOCK a FOUL z nabidky skrta) -- plati i pro SOUPEROVA nosice v
+    // simulovanych tazich, ten uz nevraci ranu, a zaklad zacal volit REPOSITION.
+    // Zkouseny posuny dvojice o -10..+6 po dvou: rozlisuje jen -6 (x=8/9) a
+    // +4 (x=18/19); ostatni bud zaklad nevoli BLITZ, nebo strazce neodlozi.
+    // Aserce se NEOSLABILA.
+    //
     // Retuned 2026-08-30 (TRETI PRELADENI): volny hrac presunut z {5,3} na
     // {13,3}. Hranu tentokrat posunula oprava M12 -- `ADVANCE` uz nerezignuje,
     // kdyz je zavrena primka a volno vedle, takze v rolloutech SOUPERUV nosic
@@ -882,7 +890,7 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     strongDefender.id = 12;
     strongDefender.teamSide = TeamSide::AWAY;
     strongDefender.state = PlayerState::STANDING;
-    strongDefender.position = {15, 7};
+    strongDefender.position = {19, 7};
     strongDefender.stats = {6, 6, 3, 9};
     strongDefender.movementRemaining = 6;
 

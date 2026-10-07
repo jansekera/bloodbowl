@@ -4412,3 +4412,29 @@ TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {
         EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
     }
 }
+
+// P165 / P154 (uživatel 08.10.2026): „nosič nesmí dělat nebezpečné věci — blokovat, faulovat, …“
+TEST(MacroActions, BallCarrierIsNeverOfferedABlockOrAFoul) {
+    auto offer = [](bool carrierIsPlayerOne) {
+        GameState state = makeMinimalState();
+        // HOME 1 stojí vedle stojícího soupeře 12 a vedle ležícího soupeře 13; HOME 2 opodál
+        state.getPlayer(12).position = {11, 7};
+        Player& prone = state.getPlayer(13);
+        prone.id = 13; prone.teamSide = TeamSide::AWAY; prone.state = PlayerState::PRONE;
+        prone.position = {10, 8}; prone.stats = {6, 3, 3, 8};
+        Player& mate = state.getPlayer(2);
+        mate.id = 2; mate.teamSide = TeamSide::HOME; mate.state = PlayerState::STANDING;
+        mate.position = {3, 3}; mate.stats = {6, 3, 3, 8}; mate.movementRemaining = 6;
+        if (carrierIsPlayerOne) state.ball = BallState::carried({10, 7}, 1);
+        else state.ball = BallState::carried({3, 3}, 2);
+        std::vector<Macro> macros;
+        getAvailableMacros(state, macros);
+        int byPlayerOne = 0;
+        for (const Macro& m : macros) {
+            if ((m.type == MacroType::BLOCK || m.type == MacroType::FOUL) && m.playerId == 1) ++byPlayerOne;
+        }
+        return byPlayerOne;
+    };
+    EXPECT_EQ(offer(true), 0) << "nosič neblokuje ani nefauluje";
+    EXPECT_GT(offer(false), 0) << "pozitivní kontrola: bez míče má tentýž hráč ránu nebo faul v nabídce";
+}

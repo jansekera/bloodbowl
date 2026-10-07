@@ -167,6 +167,14 @@ int checkInterception(GameState& state, int passerId, Position target,
 //
 // P67 (port PHP cd2f72fe, 29.09.2026): jakmile míč opustí hřiště, DÁL SE
 // NEROZPTYLUJE a hned se vhazuje z posledního pole na hřišti (l. 866-869).
+// Hozený míč došel do klidu: turnover není jen tehdy, když ho drží hráč týmu, který házel
+// (ř. 881-889).
+static ActionResult thrownBallTurnover(const GameState& state, TeamSide throwingSide) {
+    const bool ours = state.ball.isHeld && state.ball.carrierId > 0 &&
+                      state.getPlayer(state.ball.carrierId).teamSide == throwingSide;
+    return ours ? ActionResult::ok() : ActionResult::turnovr();
+}
+
 // Vrací true, když míč vyletěl a byl vhozen; jinak je `land` místo dopadu.
 static bool scatterOrThrowIn(GameState& state, Position target, DiceRollerBase& dice,
                              std::vector<GameEvent>* events, Position& land) {
@@ -223,7 +231,10 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         // Inaccurate: 3 single scatters from target (l. 735-737)
         Position landPos;
         if (scatterOrThrowIn(state, target, dice, events, landPos)) {
-            return ActionResult::turnovr();
+            // OPRAVENO 08.10.2026 (P89) — tady byl turnover VŽDY. Pravidla ř. 881-889: turnover
+            // nastává, až když míč „finally comes to rest“, a nenastane, když ho po vhození
+            // chytí hráč týmu na tahu.
+            return thrownBallTurnover(state, passer.teamSide);
         }
 
         state.ball = BallState::onGround(landPos);
@@ -413,7 +424,10 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         // prochazky o max 3 pole, ktera se muze vratit i do ciloveho pole.
         Position landPos;
         if (scatterOrThrowIn(state, target, dice, events, landPos)) {
-            return ActionResult::turnovr();
+            // OPRAVENO 08.10.2026 (P89) — tady byl turnover VŽDY. Pravidla ř. 881-889: turnover
+            // nastává, až když míč „finally comes to rest“, a nenastane, když ho po vhození
+            // chytí hráč týmu na tahu.
+            return thrownBallTurnover(state, passer.teamSide);
         }
 
         state.ball = BallState::onGround(landPos);
