@@ -1312,3 +1312,72 @@ TEST(OneCageMate, ACleanCageIsNotBrokenForAHandOffWithWorseOdds) {
     for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
     EXPECT_EQ(b.s.homeTeam.score, 0);
 }
+
+// Laťka „míč v bezpečí“ (uživatel 08.10.2026: „pokud je klec čistá — nedostaneme se pod 11 %
+// pravděpodobnost ztráty — já bych to ignoroval a postavil laťku výše — jinak budou elfové vždy
+// skórovat a nikdy zdržovat“). Soupeř na nosiče dosáhne, ale jen ranou „dvě kostky, vybírá nosič“
+// (11 %): to je BEZPEČÍ ⇒ zdržuje se — TD doběhem (nosič 3 pole před zónou) i TD předávkou
+// jistému příjemci (Catch, 97 %). Pozitivní kontrola: silnější soupeř má ránu na jednu kostku
+// (33 %) ⇒ skóruje se hned. (Do plné klece se soupeř dostane jen přes úhyb, hrozba je pak pod
+// 5 % — proto má klec v testu tři rohy a nosič sílu 4: soupeř dojde volně, ale rána je slabá.)
+TEST(OneCageMate, AHitOfTwoDiceChosenByTheCarrierCountsAsSafeAndTheTouchdownIsDelayed) {
+    auto walkIn = [](int8_t oppSt) {
+        Board b(5);
+        b.put(1, TeamSide::HOME, {22, 7}, 6, 4);
+        b.put(3, TeamSide::HOME, {21, 8}); b.put(4, TeamSide::HOME, {23, 6}); b.put(5, TeamSide::HOME, {23, 8});
+        b.put(13, TeamSide::AWAY, {18, 4}, 6, oppSt);
+        b.s.ball = BallState::carried({22, 7}, 1);
+        return b;
+    };
+    {
+        Board b = walkIn(3);
+        const double t = blitzThreat(b.s, b.s.getPlayer(1));
+        ASSERT_GT(t, 0.05) << "předpoklad: stará mez 0,05 by tady už skórovala";
+        ASSERT_LE(t, kSafeBlitzThreat) << "předpoklad: jen rána „dvě kostky, vybírá nosič“";
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::SCORE);
+        EXPECT_EQ(b.s.homeTeam.score, 0) << "míč v bezpečí ⇒ TD se zdržuje";
+        EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}}));
+    }
+    {
+        Board b = walkIn(5);
+        ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        EXPECT_EQ(b.s.homeTeam.score, 1) << "pozitivní kontrola: hrozí dobrá rána ⇒ TD hned";
+    }
+    {   // TD předávkou: jistý příjemce (Catch), slabá rána, 2. kolo rychlého týmu ⇒ nepředává se
+        Board b(2);
+        b.put(1, TeamSide::HOME, {12, 7}, 7, 4);
+        b.put(3, TeamSide::HOME, {11, 8}, 7); b.put(4, TeamSide::HOME, {13, 6}, 7); b.put(5, TeamSide::HOME, {13, 8}, 7);
+        b.put(6, TeamSide::HOME, {17, 3}, 9, 3, {SkillName::Catch}).stats.agility = 4;   // chytá na 2+ s přehozem
+        b.put(13, TeamSide::AWAY, {8, 4}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        const double t = blitzThreat(b.s, b.s.getPlayer(1));
+        ASSERT_GT(t, 0.05);
+        ASSERT_LE(t, kSafeBlitzThreat);
+        ASSERT_GT(handOffTdChance(b.s, b.s.getPlayer(1), b.s.getPlayer(6)), 1.0 - t) << "předpoklad: předávka je jistější než čekání";
+        ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1)));
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+        EXPECT_EQ(b.s.homeTeam.score, 0);
+    }
+}
+
+// „předávka nevyjde — počítej s team rerollem, pokud je k dispozici“ (uživatel 08.10.2026).
+// Příjemce bez Catch chytá předávku na 3+ (67 %); s týmovým přehozem 89 %; použitý přehoz nepomůže.
+TEST(OneCageMate, TheTeamRerollCountsTowardTheHandOffChanceWhenItIsAvailable) {
+    Board b = mateBoard(4, {0, 0});
+    const Player& c = b.s.getPlayer(1);
+    const Player& m = b.s.getPlayer(6);
+    const double without = handOffTdChance(b.s, c, m);
+    EXPECT_NEAR(without, 4.0 / 6.0, 1e-9);
+    b.s.homeTeam.rerolls = 2;
+    EXPECT_NEAR(handOffTdChance(b.s, c, m), 1.0 - (2.0 / 6.0) * (2.0 / 6.0), 1e-9);
+    b.s.homeTeam.rerollUsedThisTurn = true;
+    EXPECT_NEAR(handOffTdChance(b.s, c, m), without, 1e-9);
+}

@@ -150,7 +150,11 @@ double handOffTdChance(const GameState& state, const Player& carrier, const Play
     // 2) zachycení předávky
     const int target = std::clamp(calculateCatchTarget(state, receiver, 1), 2, 6);
     double p2 = (7 - target) / 6.0;
-    if (receiver.hasSkill(SkillName::Catch)) p2 = 1.0 - (1.0 - p2) * (1.0 - p2);
+    // přehoz: Catch, jinak týmový přehoz, je-li v tomto tahu k dispozici (uživatel 08.10.2026:
+    // „předávka nevyjde — počítej s team rerollem, pokud je k dispozici“)
+    if (receiver.hasSkill(SkillName::Catch) || state.getTeamState(side).canUseReroll()) {
+        p2 = 1.0 - (1.0 - p2) * (1.0 - p2);
+    }
     // 3) příjemce do zóny
     double p3 = 0.0;
     Position bestEz{-1, -1};
@@ -385,7 +389,8 @@ void CageController::planStart(const GameState& state) {
     // ⭐⭐ P180 (uživatel 08.10.2026: „nosič doběhne, případně předá nebo hodí někomu nachystanému
     //   dát TD“; rozhodnutí téhož dne: 1) „hrozbu ztráty míče řešíme dřívějším TD vždy“,
     //   2) „pokud je míč v bezpečí a máme čas — volíme zdržovat“). Nosič sám do zóny bez hodu
-    //   nedojde. Je-li míč v bezpečí (hrozba rány ≤ 0,05) a tým má časovou rezervu, TD předávkou
+    //   nedojde. Je-li míč v bezpečí (hrozba rány ≤ 0,15 — i čistá klec s ranou „dvě kostky,
+    //   vybírá nosič“) a tým má časovou rezervu, TD předávkou
     //   se nehraje (ani hledáním — dřív díra ve zdržování). Jinak stejné porovnání jako u TD přes
     //   hod: šance TD předávkou teď proti šanci, že míč přežije soupeřův tah (po našem nejlepším
     //   plánu klece); je-li TD aspoň stejně pravděpodobné a lepší než TD nosičem, přikáže ho řadič.
@@ -404,7 +409,7 @@ void CageController::planStart(const GameState& state) {
         });
         if (rid < 0) return false;
         double threat = blitzThreat(state, c);
-        if (threat <= kStallBlitzThreat && teamHasTimeSlack(state, c)) {
+        if (threat <= kSafeBlitzThreat && teamHasTimeSlack(state, c)) {
             mateStall_ = true;
             if (dbg) std::fprintf(stderr, "[cage ctl] TD předávkou by šlo (%.2f), ale míč je v bezpečí a je čas — zdržuje se\n", pm);
             return false;
@@ -480,12 +485,12 @@ void CageController::planStart(const GameState& state) {
         //   kdy máme balon bezpečně v držení a nehrozí blitz na nosiče — na druhou stranu pokud
         //   hrozí blitz na nosiče a ztráta, je lepší dát TD dříve — toto je obojí obecné
         //   pravidlo“). Nosič by do zóny došel bez hodu, není poslední kolo poločasu a soupeř na
-        //   něj v příštím tahu nedosáhne, nebo jen se špatnou ranou (hrozba ≤ 0,05) ⇒ TENTO TAH SE
+        //   něj v příštím tahu nedosáhne, nebo jen ranou „dvě kostky, vybírá nosič“ (hrozba ≤ 0,15; do 08.10. večer 0,05) ⇒ TENTO TAH SE
         //   NESKÓRUJE: nosič stojí, kolem něj se dostaví klec a skórovací makra ani pohyb nosiče
         //   hledání nedostane. Jakmile hrozba na začátku některého dalšího tahu stoupne, nebo
         //   přijde 8. kolo, skóruje se hned (rozhoduje hledání jako dosud).
         if (cageFeatureOn(kFeatStall) && walksIn && !lastTurn && c.teamSide == state.activeTeam &&
-            freeToAct(c) && blitzThreat(state, c) <= kStallBlitzThreat) {
+            freeToAct(c) && blitzThreat(state, c) <= kSafeBlitzThreat) {
             stalling_ = true;
             phase_ = CagePhase::CAGE;
             if (dbg) std::fprintf(stderr, "[cage ctl] zdržování TD: nosič v bezpečí (hrozba rány %.2f), kolo %d\n",

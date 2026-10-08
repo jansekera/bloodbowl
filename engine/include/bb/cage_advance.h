@@ -256,8 +256,12 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
 
 // ⭐ JEDNO MĚŘÍTKO BEZPEČÍ NOSIČE (sjednoceno 08.10.2026, review P181 nález 4): všude se rozhoduje
 //   podle blitzThreat. Meze na jednom místě:
-constexpr double kSafeBlitzThreat = 0.15;    // nejvýš rána „dvě kostky, vybírá nosič“ ⇒ nosič je v bezpečí
-constexpr double kStallBlitzThreat = 0.05;   // tak malá hrozba, že se TD smí zdržovat
+// Nejvýš rána „dvě kostky, vybírá nosič“ (11 %) ⇒ nosič je V BEZPEČÍ. Platí i pro zdržování TD
+// (uživatel 08.10.2026: „pokud je klec čistá — nedostaneme se pod 11 % pravděpodobnost ztráty — já
+// bych to ignoroval a postavil laťku výše — jinak budou elfové vždy skórovat a nikdy zdržovat“).
+// Dřív mělo zdržování vlastní, přísnější mez 0,05 — čistá klec na dosah soupeře by se pak
+// nikdy nezdržovala.
+constexpr double kSafeBlitzThreat = 0.15;
 // Kolik polí pohybu má soupeř na cestu k ráně na nosiče (pohyb + 2 GFI − 1 pole za ránu; ležící
 // vstává za 3 pole, s pohybem pod 3 bez Jump Up se nepočítá) — nebo −1, když hrát nemůže.
 int blitzReachOf(const Player& opp);
