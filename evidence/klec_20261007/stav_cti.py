@@ -40,4 +40,6 @@ for f in sys.argv[1:]:
             cil+=1; nxt=r["tahy"][i+1] if i+1<len(r["tahy"]) else None
             ztr += bool(nxt) and nxt["s1"]["kdo"] in ("A","zem","TD")
         print(f"   nosič na začátku tahu {jm:20s}: {len(q):3d} tahů · TD {tdn:3d} · neskóroval a je v bezpečí/kleci {bezp:3d} · NESKÓROVAL A ZŮSTAL CÍLEM {cil:3d} (pak ztráta {ztr}) · míč v tom tahu ztratil {pryc}")
+    ho=[(r,i,t) for r in R for i,t in enumerate(r["tahy"]) if t["my"] and any(x[0]=="cage" and x[1]=="HAND_OFF_SCORE" for x in t["makra"])]
+    print(f"   TD předávkou příkazem řadiče: {len(ho)} tahů · TD {sum(t['td'] for _,_,t in ho)} · turnover bez TD {sum(1 for _,_,t in ho if t['to'] and not t['td'])}")
     print("   kdo nosiče do ANI-ANI dovedl (skupina, poslední makro nosiče):", dict(kdo.most_common(8)))
