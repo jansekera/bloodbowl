@@ -372,6 +372,7 @@ final class GameState
             //       opravou Take Root; nasla ji az kontrola tohohle mista.
             $clone->players[$id] = $player
                 ->withHasMoved(false)
+                ->withMovedThisTurn(false)
                 ->withHasActed(false)
                 ->withMovementRemaining(
                     $player->isRooted() ? 0 : $player->getStats()->getMovement(),

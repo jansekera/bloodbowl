@@ -187,7 +187,12 @@ final class RerollHandler
         }
 
         // Dodge or GFI: move player to target square
+        // OPRAVENO 09.10.2026 (review P186, H1) -- hráč se tu přesune a `hasMoved` se
+        //   schválně nenastavuje (člověk smí táhnout dál). Zákaz bloku ale stál právě na
+        //   `hasMoved`, takže po přehozeném úhybu / GFI šel BLOCK a týmový blitz zůstal
+        //   nepoužitý. Pravidla ř. 675: "you may not move when you take a Block Action".
         $player = $player
+            ->withMovedThisTurn(true)
             ->withPosition($target)
             ->withMovementRemaining($player->getMovementRemaining() - 1);
         $state = $state->withPlayer($player);

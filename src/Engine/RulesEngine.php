@@ -199,7 +199,7 @@ final class RulesEngine
             // Bomb throw: NESDILI akci Pass (`rules_bb2016.txt` r. 7950-7951) a hrac
             //   se pred hodem nesmi hnout (r. 7953-7954).
             foreach ($state->getTeamPlayers($side) as $player) {
-                if ($player->canAct() && !$player->hasMoved() && $player->hasSkill(SkillName::Bombardier)
+                if ($player->canAct() && !$player->hasMovedThisTurn() && $player->hasSkill(SkillName::Bombardier)
                     && !$player->hasSkill(SkillName::BallAndChain)) {
                     $actions[] = ['type' => ActionType::BOMB_THROW->value, 'playerId' => $player->getId()];
                 }
@@ -1152,7 +1152,9 @@ final class RulesEngine
 
         // Bomba NESDILI tymovou akci Pass ("does not use the team's Pass Action"),
         //   ale hrac se pred hodem nesmi hnout ani zvednout (`rules_bb2016.txt` r. 7949-7955).
-        if ($player->hasMoved()) {
+        // OPRAVENO 09.10.2026 (review P186, H1) -- stalo tu `hasMoved()` ("pohyb ukoncen"):
+        //   po uhybu / GFI prehozenem v dialogu sel hod bombou i po pohybu.
+        if ($player->hasMovedThisTurn()) {
             return ['Bombardier may not move before throwing a bomb'];
         }
 

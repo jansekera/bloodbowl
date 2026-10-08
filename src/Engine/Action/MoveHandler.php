@@ -122,6 +122,12 @@ final class MoveHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException("Player {$playerId} not found");
         }
 
+        // Pohyb (i pouhé vstání) začal: od teď platí zákazy "may not move" -- akce Block
+        //   (`rules_bb2016.txt` ř. 674-676), hod bombou (ř. 7953-7954). Nastavuje se HNED,
+        //   ne až s `hasMoved` na konci: pohyb přerušený dialogem přehozu se neukončí.
+        $player = $player->withMovedThisTurn(true);
+        $state = $state->withPlayer($player);
+
         $events = [];
 
         // Handle PRONE player stand-up
