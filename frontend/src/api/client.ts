@@ -58,8 +58,9 @@ export class ApiClient {
         return res.data;
     }
 
-    async getBlockTargets(matchId: number, playerId: number): Promise<BlockTarget[]> {
-        const res = await this.get<ApiResponse<BlockTarget[]>>(`/matches/${matchId}/players/${playerId}/block-targets`);
+    /** Cíle akce Block, nebo rány v Blitzu (ten jde i po pohybu) -- server nabízí jen to, co pak přijme. */
+    async getBlockTargets(matchId: number, playerId: number, action: 'block' | 'blitz'): Promise<BlockTarget[]> {
+        const res = await this.get<ApiResponse<BlockTarget[]>>(`/matches/${matchId}/players/${playerId}/block-targets?action=${action}`);
         return res.data;
     }
 

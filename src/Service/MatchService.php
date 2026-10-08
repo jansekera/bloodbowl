@@ -318,11 +318,12 @@ final class MatchService
     }
 
     /**
-     * Get block targets for a specific player.
+     * Cíle akce Block, nebo (`$forBlitz`) rány v Blitzu z pole, kde hráč stojí -- nabídka
+     * odpovídá validaci příslušné akce (`RulesEngine::getBlockTargets` / `getBlitzTargets`).
      *
      * @return list<array{playerId: int, name: string, x: int, y: int, diceCount: int, attackerChooses: bool}>
      */
-    public function getBlockTargets(int $matchId, int $playerId): array
+    public function getBlockTargets(int $matchId, int $playerId, bool $forBlitz = false): array
     {
         $state = $this->getGameState($matchId);
         $player = $state->getPlayer($playerId);
@@ -330,7 +331,9 @@ final class MatchService
             return [];
         }
 
-        $targets = $this->rulesEngine->getBlockTargets($state, $player);
+        $targets = $forBlitz
+            ? $this->rulesEngine->getBlitzTargets($state, $player)
+            : $this->rulesEngine->getBlockTargets($state, $player);
         $strengthCalc = new StrengthCalculator();
         $result = [];
         foreach ($targets as $target) {

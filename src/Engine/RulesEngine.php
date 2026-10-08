@@ -576,28 +576,50 @@ final class RulesEngine
     }
 
     /**
-     * Get valid block targets for a player (adjacent standing enemies).
-     *
-     * Slouží i pro výběr cíle Blitzu po pohybu (web), proto tu NENÍ `canTakeBlockAction()`:
-     * jestli hráč smí vzít akci Block, rozhoduje validace akce a nabídka.
+     * Cíle akce Block (i Multiple Block): sousední stojící soupeři hráče, který akci Block
+     * vzít smí. Nabídka odpovídá validaci -- obojí stojí na `canTakeBlockAction()`.
+     * OPRAVENO 09.10.2026 (review P186, L2): tahle funkce sloužila i výběru cíle Blitzu po
+     * pohybu, proto měla vlastní kopii podmínky Jump Up a zákaz po pohybu
+     * (`rules_bb2016.txt` ř. 674-676) v ní chyběl -- web po MOVE v režimu "block" cíle
+     * nabídl a server BLOCK odmítl. Cíle rány v Blitzu dává `getBlitzTargets()`.
      *
      * @return list<MatchPlayerDTO>
      */
     public function getBlockTargets(GameState $state, MatchPlayerDTO $player): array
     {
-        $pos = $player->getPosition();
-        $canBlock = $player->canAct()
-            || ($player->getState() === PlayerState::PRONE
-                && !$player->hasActed()
-                && $player->hasSkill(SkillName::JumpUp));
-        if ($pos === null || !$canBlock) {
+        return $player->canTakeBlockAction() ? $this->adjacentStandingEnemies($state, $player) : [];
+    }
+
+    /**
+     * Cíle rány v Blitzu z pole, kde hráč právě stojí -- i po pohybu (ř. 347-350: "He may
+     * make one block during the move"). Podmínky hráče a týmu jsou tytéž jako ve
+     * `validateBlitz` (ř. 351-352: jeden Blitz za kolo).
+     *
+     * @return list<MatchPlayerDTO>
+     */
+    public function getBlitzTargets(GameState $state, MatchPlayerDTO $player): array
+    {
+        if (!$player->canAct() || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()) {
             return [];
         }
 
-        $enemySide = $player->getTeamSide()->opponent();
-        $targets = [];
+        return $this->adjacentStandingEnemies($state, $player);
+    }
 
-        foreach ($state->getPlayersOnPitch($enemySide) as $enemy) {
+    /**
+     * Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541) na sousednim poli.
+     *
+     * @return list<MatchPlayerDTO>
+     */
+    private function adjacentStandingEnemies(GameState $state, MatchPlayerDTO $player): array
+    {
+        $pos = $player->getPosition();
+        if ($pos === null) {
+            return [];
+        }
+
+        $targets = [];
+        foreach ($state->getPlayersOnPitch($player->getTeamSide()->opponent()) as $enemy) {
             $enemyPos = $enemy->getPosition();
             if ($enemyPos !== null && $pos->distanceTo($enemyPos) === 1 && $enemy->getState()->canAct()) {
                 $targets[] = $enemy;

@@ -220,6 +220,76 @@ final class NoBlockAfterMoveTest extends TestCase
         $this->assertTrue(\App\DTO\MatchPlayerDTO::fromArray($data)->canTakeBlockAction());
     }
 
+    // === Review P186, L2: nabídka cílů odpovídá validaci ===
+    //
+    // Web se na cíle ptá `getBlockTargets` (akce Block) / `getBlitzTargets` (rána v Blitzu).
+    // Dřív byla jedna funkce pro obojí s vlastní kopií podmínky Jump Up a bez zákazu po
+    // pohybu: po MOVE v režimu "block" web cíle nabídl a server BLOCK odmítl.
+
+    /**
+     * @param list<\App\DTO\MatchPlayerDTO> $hraci
+     * @return list<int>
+     */
+    private function ids(array $hraci): array
+    {
+        return array_map(fn(\App\DTO\MatchPlayerDTO $p) => $p->getId(), $hraci);
+    }
+
+    public function testCileBlokuSePoPohybuNenabizeji(): void
+    {
+        $state = $this->stavPoPohybu();
+        $rules = new RulesEngine();
+
+        $this->assertSame([], $rules->getBlockTargets($state, $state->requirePlayer(1)), 'ř. 675: po pohybu žádný cíl akce Block');
+        // Pozitivní kontrola: kdo se nehnul, cíl má.
+        $this->assertSame([2], $this->ids($rules->getBlockTargets($state, $state->requirePlayer(3))));
+    }
+
+    public function testCileBlitzuSePoPohybuNabizeji(): void
+    {
+        // ř. 347-350: rána během pohybu je Blitz -- výběr jeho cíle po pohybu musí fungovat dál.
+        $state = $this->stavPoPohybu();
+        $rules = new RulesEngine();
+
+        $this->assertSame([2], $this->ids($rules->getBlitzTargets($state, $state->requirePlayer(1))));
+
+        // ř. 351-352: "This Action may not be declared by more than one player per turn."
+        $pouzity = $state->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withBlitzUsed());
+        $this->assertSame([], $rules->getBlitzTargets($pouzity, $pouzity->requirePlayer(1)));
+    }
+
+    public function testKazdyNabidnutyCilProjdeValidaciAkce(): void
+    {
+        // Jedno místo, kudy prochází všechno: co funkce nabídne, to validace téže akce přijme
+        // -- před pohybem, po pohybu i po použitém blitzu, pro všechny hráče na tahu.
+        $rules = new RulesEngine();
+        $poPohybu = $this->stavPoPohybu();
+        $stavy = [
+            (new GameStateBuilder())
+                ->addPlayer(TeamSide::HOME, 7, 5, id: 1)
+                ->addPronePlayer(TeamSide::HOME, 7, 6, skills: [SkillName::JumpUp], id: 4)
+                ->addPronePlayer(TeamSide::HOME, 7, 4, id: 5)
+                ->addPlayer(TeamSide::AWAY, 8, 5, id: 2)
+                ->build(),
+            $poPohybu,
+            $poPohybu->withTeamState(TeamSide::HOME, $poPohybu->getTeamState(TeamSide::HOME)->withBlitzUsed()),
+        ];
+        $nabidnuto = 0;
+        foreach ($stavy as $state) {
+            foreach ($state->getTeamPlayers(TeamSide::HOME) as $hrac) {
+                foreach ($rules->getBlockTargets($state, $hrac) as $cil) {
+                    $nabidnuto++;
+                    $this->assertSame([], $rules->validate($state, ActionType::BLOCK, ['playerId' => $hrac->getId(), 'targetId' => $cil->getId()]));
+                }
+                foreach ($rules->getBlitzTargets($state, $hrac) as $cil) {
+                    $nabidnuto++;
+                    $this->assertSame([], $rules->validate($state, ActionType::BLITZ, ['playerId' => $hrac->getId(), 'targetId' => $cil->getId()]));
+                }
+            }
+        }
+        $this->assertGreaterThan(4, $nabidnuto, 'pozitivní kontrola: něco se nabízelo');
+    }
+
     // === Review P186: vstání na místě a Jump Up ===
 
     public function testVstaniNaMisteAPakBlokNejde(): void

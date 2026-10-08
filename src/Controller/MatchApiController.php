@@ -137,7 +137,8 @@ final class MatchApiController
     public function getBlockTargets(int $matchId, int $playerId): void
     {
         try {
-            $targets = $this->matchService->getBlockTargets($matchId, $playerId);
+            // `?action=blitz`: cíle rány v Blitzu (i po pohybu); jinak cíle akce Block.
+            $targets = $this->matchService->getBlockTargets($matchId, $playerId, ($_GET['action'] ?? '') === 'blitz');
 
             $this->json([
                 'data' => $targets,
