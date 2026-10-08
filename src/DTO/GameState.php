@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTO;
 
 use App\Enum\GamePhase;
+use App\Enum\PlayerState;
 use App\Enum\TeamSide;
 use App\Enum\Weather;
 use App\ValueObject\Position;
@@ -112,6 +113,22 @@ final class GameState
     public function getPendingReroll(): ?PendingRerollDTO
     {
         return $this->pendingReroll;
+    }
+
+    /**
+     * Strana, jejíž trenér vybírá kostku čekajícího bloku. `rules_bb2016.txt` ř. 633-634:
+     * "The coach of the stronger player picks which block dice is used."
+     */
+    public function getPendingBlockChooserSide(): ?TeamSide
+    {
+        if ($this->pendingBlock === null) {
+            return null;
+        }
+        $chooserId = $this->pendingBlock->isAttackerChooses()
+            ? $this->pendingBlock->getAttackerId()
+            : $this->pendingBlock->getDefenderId();
+
+        return $this->requirePlayer($chooserId)->getTeamSide();
     }
 
     public function getTeamState(TeamSide $side): TeamStateDTO
@@ -366,13 +383,35 @@ final class GameState
                 //   za VLASTNI kolo (uhyba se jen ve svem kole).
                 ->withDodgeUsedThisTurn(false)
                 // ⭐ 21.09.2026: r. 7991 -- Break Tackle "may only be used once per turn"
-                ->withBreakTackleUsedThisTurn(false);
+                ->withBreakTackleUsedThisTurn(false)
+                // OPRAVENO 08.10.2026 (audit parity, nález 1) -- tady se omráčený rovnou
+                //   otáčel na PRONE, tedy na ZAČÁTKU kola svého týmu: hned v něm vstal a hrál
+                //   a omráčení se nelišilo od sražení. Pravidla ř. 703-707: "turned face up
+                //   at the END of their team's next turn". Otáčí `turnStunnedFaceUp()` na
+                //   konci kola; tady se jen maže příznak, aby hráč omráčený v soupeřově kole
+                //   (nebo v dřívějším vlastním) na konci tohohle kola vstal.
+                ->withStunnedThisTurn(false);
+        }
+        return $clone;
+    }
 
-            // Recover stunned players
-            if ($player->getState() === \App\Enum\PlayerState::STUNNED) {
-                $clone->players[$id] = $clone->players[$id]->withState(\App\Enum\PlayerState::PRONE);
+    /**
+     * Konec kola týmu `$side`: jeho omráčení hráči se otáčejí lícem nahoru (`rules_bb2016.txt`
+     * ř. 703-707: "All face-down players are turned face up at the end of their team's next
+     * turn, even if a turnover takes place. Note that a player may not turn face up on the
+     * turn they are Stunned."). Vzor: C++ `turn_handler.cpp:22-26`.
+     */
+    public function turnStunnedFaceUp(TeamSide $side): self
+    {
+        $clone = clone $this;
+        foreach ($clone->players as $id => $player) {
+            if ($player->getTeamSide() === $side
+                && $player->getState() === PlayerState::STUNNED
+                && !$player->isStunnedThisTurn()) {
+                $clone->players[$id] = $player->withState(PlayerState::PRONE);
             }
         }
+
         return $clone;
     }
 

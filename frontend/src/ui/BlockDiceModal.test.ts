@@ -12,6 +12,7 @@ type Handler = () => void;
 function mockElement() {
     let html = '';
     const dieHandlers = new Map<string, Handler>();
+    let acceptHandler: Handler | null = null;
     const followUp = { checked: true };
     const el = {
         className: '',
@@ -21,22 +22,31 @@ function mockElement() {
         set innerHTML(v: string) {
             html = v;
             dieHandlers.clear();
+            acceptHandler = null;
             followUp.checked = /followup-input"[^>]*checked/.test(v);
         },
         appendChild: vi.fn(),
         remove: vi.fn(),
         querySelectorAll(selector: string) {
             if (selector !== '.block-dice-modal__die') return [];
-            return [...html.matchAll(/data-index="(\d+)"/g)].map(m => ({
-                dataset: { index: m[1] },
-                addEventListener: (_e: string, h: Handler) => dieHandlers.set(m[1], h),
+            // kostky bez data-index (vybira souper) maji dataset prazdny
+            return [...html.matchAll(/class="block-dice-modal__die [^"]*"( data-index="(\d+)")?/g)].map(m => ({
+                dataset: m[2] === undefined ? {} : { index: m[2] },
+                addEventListener: (_e: string, h: Handler) => dieHandlers.set(m[2] ?? 'none', h),
             }));
         },
         querySelector(selector: string) {
+            if (selector === '.block-dice-modal__accept') {
+                return html.includes('block-dice-modal__accept')
+                    ? { addEventListener: (_e: string, h: Handler) => { acceptHandler = h; } }
+                    : null;
+            }
             return selector === '.block-dice-modal__followup-input' && html.includes('followup-input')
                 ? followUp : null;
         },
         clickDie(index: number) { dieHandlers.get(String(index))?.(); },
+        clickAccept() { acceptHandler?.(); },
+        dieHandlerCount() { return dieHandlers.size; },
         followUp,
     };
     return el;
@@ -79,5 +89,23 @@ describe('BlockDiceModal follow-up', () => {
         modalEl.followUp.checked = false;
         modalEl.clickDie(0);
         expect(onChoose).toHaveBeenCalledWith(0, false);
+    });
+
+    // BB2016 r. 633-634: "The coach of the stronger player picks which block dice is used."
+    it('does not let the attacker pick a die when the opponent picks', () => {
+        const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
+        const onChoose = vi.fn();
+        modal.show({ ...pending, attackerChooses: false }, 'A', 'B', onChoose, vi.fn(), true);
+        expect(modalEl.dieHandlerCount()).toBe(0);
+        modalEl.clickDie(1);
+        expect(onChoose).not.toHaveBeenCalled();
+    });
+
+    it('confirms the roll without a face index when the opponent picks', () => {
+        const modal = new BlockDiceModal(mockElement() as unknown as HTMLElement);
+        const onChoose = vi.fn();
+        modal.show({ ...pending, attackerChooses: false }, 'A', 'B', onChoose, vi.fn(), true);
+        modalEl.clickAccept();
+        expect(onChoose).toHaveBeenCalledWith(null, true);
     });
 });

@@ -198,14 +198,23 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
     const attackerName = attacker?.name ?? `#${pending.attackerId}`;
     const defenderName = defender?.name ?? `#${pending.defenderId}`;
 
+    // BB2016 r. 633-634: kostku vybira trener silnejsiho hrace. Je-li to souper vedeny AI,
+    // server volbu utocnika neprijme -- posila se jen potvrzeni hodu a follow-up.
+    const chooser = pending.attackerChooses ? attacker : defender;
+    const opponentPicks = state.aiTeam != null && chooser?.teamSide === state.aiTeam;
+
     blockDiceModal.show(
         pending,
         attackerName,
         defenderName,
-        async (faceIndex: number, followUp: boolean) => {
+        async (faceIndex: number | null, followUp: boolean) => {
             isProcessing = true;
             try {
-                const result = await api.submitAction(matchId, 'choose_block_die', { faceIndex, followUp });
+                const result = await api.submitAction(
+                    matchId,
+                    'choose_block_die',
+                    faceIndex === null ? { followUp } : { faceIndex, followUp },
+                );
                 await handleActionResult(result);
                 clearAllTargets();
                 actionPanel.setSelectedMode(null);
@@ -228,6 +237,7 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
                 isProcessing = false;
             }
         },
+        opponentPicks,
     );
 }
 

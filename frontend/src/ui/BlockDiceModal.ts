@@ -12,7 +12,10 @@ export class BlockDiceModal {
     private container: HTMLElement;
     // P81 krok 3 (30.09.2026): follow-up je volba utocnika (BB2016 r. 608-611);
     // posila se spolu s kostkou. Frenzy nasleduje povinne -- to hlida engine.
-    private onChoose: ((faceIndex: number, followUp: boolean) => void) | null = null;
+    // Audit parity 08.10.2026, nalez 5 (BB2016 r. 633-634): kostku vybira trener SILNEJSIHO
+    // hrace. Vybira-li souper vedeny AI, kostky jsou jen k nahlednuti a klient hod pouze
+    // potvrdi (faceIndex = null) -- kostku zvoli server.
+    private onChoose: ((faceIndex: number | null, followUp: boolean) => void) | null = null;
     private onReroll: ((type: string) => void) | null = null;
 
     constructor(container: HTMLElement) {
@@ -26,8 +29,9 @@ export class BlockDiceModal {
         pending: PendingBlock,
         attackerName: string,
         defenderName: string,
-        onChoose: (faceIndex: number, followUp: boolean) => void,
+        onChoose: (faceIndex: number | null, followUp: boolean) => void,
         onReroll: (type: string) => void,
+        opponentPicks = false,
     ): void {
         this.onChoose = onChoose;
         this.onReroll = onReroll;
@@ -44,7 +48,9 @@ export class BlockDiceModal {
 
         const diceHtml = pending.faces.map((face, idx) => {
             const d = DICE_DISPLAY[face] ?? { label: '?', css: 'default', title: face };
-            return `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" data-index="${idx}" title="${d.title}">${d.label}</button>`;
+            return opponentPicks
+                ? `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" disabled title="${d.title}">${d.label}</button>`
+                : `<button class="block-dice-modal__die block-dice-modal__die--${d.css}" data-index="${idx}" title="${d.title}">${d.label}</button>`;
         }).join('');
 
         const frenzyLabel = pending.isFrenzy ? ' <span class="block-dice-modal__frenzy">(Frenzy)</span>' : '';
@@ -55,6 +61,7 @@ export class BlockDiceModal {
                 <div class="block-dice-modal__title">Block Dice${frenzyLabel}</div>
                 <div class="block-dice-modal__info">${this.escape(chooserLabel)} chooses</div>
                 <div class="block-dice-modal__dice">${diceHtml}</div>
+                ${opponentPicks ? '<button class="block-dice-modal__accept">Continue (opponent picks the die)</button>' : ''}
                 <label class="block-dice-modal__followup"><input type="checkbox" class="block-dice-modal__followup-input" checked> Follow up if the defender is pushed</label>
                 ${rerollButtons ? `<div class="block-dice-modal__rerolls">${rerollButtons}</div>` : ''}
             </div>
@@ -62,17 +69,22 @@ export class BlockDiceModal {
 
         this.container.style.display = '';
 
-        // Bind die click handlers
+        const choose = (idx: number | null): void => {
+            const followUpInput = this.container.querySelector<HTMLInputElement>('.block-dice-modal__followup-input');
+            const followUp = followUpInput?.checked ?? true;
+            const onChoose = this.onChoose;
+            this.hide();
+            onChoose?.(idx, followUp);
+        };
+
+        // Bind die click handlers (kostky bez data-index = vybira souper, neklikaji se)
         this.container.querySelectorAll('.block-dice-modal__die').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt((btn as HTMLElement).dataset.index ?? '0', 10);
-                const followUpInput = this.container.querySelector<HTMLInputElement>('.block-dice-modal__followup-input');
-                const followUp = followUpInput?.checked ?? true;
-                const onChoose = this.onChoose;
-                this.hide();
-                onChoose?.(idx, followUp);
-            });
+            const index = (btn as HTMLElement).dataset.index;
+            if (index !== undefined) {
+                btn.addEventListener('click', () => choose(parseInt(index, 10)));
+            }
         });
+        this.container.querySelector('.block-dice-modal__accept')?.addEventListener('click', () => choose(null));
 
         // Bind reroll handlers
         this.container.querySelectorAll('.block-dice-modal__reroll').forEach(btn => {

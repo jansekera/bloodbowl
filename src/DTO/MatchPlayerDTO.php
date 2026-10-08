@@ -51,6 +51,9 @@ final class MatchPlayerDTO
         private bool $outNextSetup = false,
         private bool $playedThisDrive = false,
         private bool $bloodlustHungry = false,
+        // 08.10.2026: `rules_bb2016.txt` ř. 706-707 -- "a player may not turn face up
+        //   on the turn they are Stunned"
+        private bool $stunnedThisTurn = false,
     ) {}
 
     /**
@@ -242,6 +245,25 @@ final class MatchPlayerDTO
         return $this->state->canAct() && !$this->hasActed;
     }
 
+    /**
+     * Smí hráč vzít akci Block (i Multiple Block)? `rules_bb2016.txt` ř. 674-676: "a player
+     * who stands up may not take a Block Action, because you may not move when you take a
+     * Block Action." Pohyb + rána je Blitz (ř. 347-352), jeden za kolo týmu.
+     * OPRAVENO 08.10.2026 (audit parity, nález 2): hlídalo se jen `canAct()`, takže hráč
+     * po akci Move ještě blokoval a týmový blitz zůstal nepoužitý. Vzor: C++
+     * `rules_engine.cpp:107`.
+     * Jump Up (ř. 8200-8204): blok z lehu, hráč se před ním nehýbe.
+     */
+    public function canTakeBlockAction(): bool
+    {
+        if ($this->hasMoved) {
+            return false;
+        }
+
+        return $this->canAct()
+            || ($this->state === PlayerState::PRONE && !$this->hasActed && $this->hasSkill(SkillName::JumpUp));
+    }
+
     public function canMove(): bool
     {
         return ($this->state === PlayerState::STANDING || $this->state === PlayerState::PRONE) && !$this->hasMoved;
@@ -262,6 +284,9 @@ final class MatchPlayerDTO
     {
         $clone = clone $this;
         $clone->state = $state;
+        if ($state !== PlayerState::STUNNED) {
+            $clone->stunnedThisTurn = false;
+        }
         // Zakoreneni konci, jakmile hrac nestoji -- sraženy, polozeny i odneseny
         //   (`rules_bb2016.txt` r. 8575-8576). Vzor: C++ `game_state.cpp:83`.
         if ($state !== PlayerState::STANDING) {
@@ -286,6 +311,34 @@ final class MatchPlayerDTO
         return $this->state === PlayerState::STANDING
             && $this->hasSkill(SkillName::StandFirm)
             && $this->teamSide !== $blockingSide;
+    }
+
+    /**
+     * Omráčen výsledkem tabulky zranění v PRÁVĚ BĚŽÍCÍM kole (`rules_bb2016.txt` ř. 703-707):
+     * "All face-down players are turned face up at the end of their team's next turn ...
+     * a player may not turn face up on the turn they are Stunned." Příznak drží hráče lícem
+     * dolů přes konec kola, ve kterém byl omráčen; maže se na začátku kola jeho týmu
+     * (`GameState::resetPlayersForNewTurn`). Vzor: C++ `injury.cpp:55`, `turn_handler.cpp:23`.
+     */
+    public function withStunned(): self
+    {
+        $clone = $this->withState(PlayerState::STUNNED);
+        $clone->stunnedThisTurn = true;
+
+        return $clone;
+    }
+
+    public function isStunnedThisTurn(): bool
+    {
+        return $this->stunnedThisTurn;
+    }
+
+    public function withStunnedThisTurn(bool $stunnedThisTurn): self
+    {
+        $clone = clone $this;
+        $clone->stunnedThisTurn = $stunnedThisTurn;
+
+        return $clone;
     }
 
     public function withPosition(?Position $position): self
@@ -434,6 +487,7 @@ final class MatchPlayerDTO
             outNextSetup: $this->outNextSetup,
             playedThisDrive: $this->playedThisDrive,
             bloodlustHungry: $this->bloodlustHungry,
+            stunnedThisTurn: $this->stunnedThisTurn,
         );
     }
 
@@ -464,6 +518,7 @@ final class MatchPlayerDTO
             'outNextSetup' => $this->outNextSetup,
             'playedThisDrive' => $this->playedThisDrive,
             'bloodlustHungry' => $this->bloodlustHungry,
+            'stunnedThisTurn' => $this->stunnedThisTurn,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -508,6 +563,7 @@ final class MatchPlayerDTO
             outNextSetup: (bool) ($data['outNextSetup'] ?? false),
             playedThisDrive: (bool) ($data['playedThisDrive'] ?? false),
             bloodlustHungry: (bool) ($data['bloodlustHungry'] ?? false),
+            stunnedThisTurn: (bool) ($data['stunnedThisTurn'] ?? false),
         );
     }
 }

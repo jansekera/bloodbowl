@@ -342,7 +342,8 @@ final class InjuryResolver
         $modified = $roll + $modifier;
 
         if ($modified <= 7) {
-            $player = $player->withState(PlayerState::STUNNED);
+            // ř. 706-707: v kole, kdy byl omráčen, se hráč neotáčí -- viz `withStunned()`.
+            $player = $player->withStunned();
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
         } elseif ($modified <= 9) {
             // ⛔⛔ OPRAVENO 15.09.2026 -- Thick Skull tu byl podle JINE EDICE
@@ -352,7 +353,7 @@ final class InjuryResolver
             //   ⇒ Modifikovana 8 = Stunned, 9 = KO, zadna kostka navic.
             //   C++ engine to ma spravne (`engine/src/injury.cpp:69`).
             if ($modified === 8 && $player->hasSkill(SkillName::ThickSkull)) {
-                $player = $player->withState(PlayerState::STUNNED);
+                $player = $player->withStunned();
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
             } else {
                 $player = $player->withState(PlayerState::KO)->withPosition(null);

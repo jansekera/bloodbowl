@@ -19,6 +19,12 @@ final class EndTurnHandler implements ActionHandlerInterface
         $teamState = $state->getTeamState($state->getActiveTeam());
         $events = [GameEvent::endTurn($teamState->getName())];
 
+        // OPRAVENO 08.10.2026 (audit parity, nález 1): omráčení se otáčeli na ZAČÁTKU kola
+        //   svého týmu (`GameState::resetPlayersForNewTurn`). Pravidla ř. 703-707: lícem
+        //   nahoru "at the end of their team's next turn, even if a turnover takes place"
+        //   -- proto bezpodmínečně tady, na konci kola týmu, který ho právě dohrál.
+        $state = $state->turnStunnedFaceUp($state->getActiveTeam());
+
         // Switch active team
         $newActiveTeam = $state->getActiveTeam()->opponent();
         $newTeamState = $state->getTeamState($newActiveTeam);
