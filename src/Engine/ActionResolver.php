@@ -72,7 +72,7 @@ final class ActionResolver
         $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
 
         $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver);
-        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver);
+        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver, $this->moveHandler);
         $this->blockHandler->setPassResolver($this->getPassResolver());
         $this->blitzHandler = new BlitzHandler($this->moveHandler, $this->blockHandler, $pathfinder);
         $this->foulHandler = new FoulHandler($dice, $injuryResolver, $this->ballResolver);

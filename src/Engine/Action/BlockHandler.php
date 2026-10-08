@@ -33,6 +33,7 @@ final class BlockHandler implements ActionHandlerInterface
         private readonly TacklezoneCalculator $tzCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
+        private readonly MoveHandler $moveHandler,
     ) {}
 
     /**
@@ -107,12 +108,9 @@ final class BlockHandler implements ActionHandlerInterface
 
         $events[] = GameEvent::playerFell($id);
         $events[] = GameEvent::turnover('Failed Going For It');
-        $fallen = $attacker->withState(PlayerState::PRONE)->withHasActed(true)->withHasMoved(true);
-        $injResult = $this->injuryResolver->resolve($fallen, $this->dice);
-        $fallen = $injResult['player'];
-        $state = $state->withPlayer($fallen);
-        $events = array_merge($events, $injResult['events']);
-        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallen, $events);
+        // Pad na GFI je JEDNA funkce (`MoveHandler::knockDownAt`, r. 1702-1703) -- do
+        //   09.10.2026 tu byla jeji ctvrta kopie (review P186, L1).
+        [$state, $events] = $this->moveHandler->knockDownAt($state, $attacker, $attacker->requirePosition(), $events);
 
         return ['state' => $state, 'outcome' => 'fell'];
     }
