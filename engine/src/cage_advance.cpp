@@ -180,6 +180,26 @@ bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOu
     return need <= turnsLeftIncl - 2;
 }
 
+int blitzReachOf(const Player& o) {
+    if (o.state != PlayerState::STANDING && o.state != PlayerState::PRONE) return -1;
+    int ma = o.stats.movement;
+    if (o.state == PlayerState::PRONE && !o.hasSkill(SkillName::JumpUp)) {
+        if (ma < 3) return -1;                                         // vstávání na hod: nepočítá se
+        ma -= 3;
+    }
+    return ma + 2 - 1;                                                 // jedno pole stojí rána
+}
+
+bool anyOpponentReaches(const GameState& state, TeamSide mySide, Position sq) {
+    bool reach = false;
+    state.forEachOnPitch(opponent(mySide), [&](const Player& o) {
+        if (reach) return;
+        const int r = blitzReachOf(o);
+        if (r >= 0 && o.position.distanceTo(sq) - 1 <= r) reach = true;
+    });
+    return reach;
+}
+
 double blitzThreat(const GameState& state, const Player& carrier, double stopAbove) {
     if (!carrier.isOnPitch()) return 0.0;
     const TeamSide side = carrier.teamSide;
@@ -201,13 +221,10 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
     for (int id : oppIds) {
         Player& o = sim.getPlayer(id);
         const bool wasProne = o.state == PlayerState::PRONE;
-        int ma = o.stats.movement;
-        if (wasProne) {
-            if (ma < 3 && !o.hasSkill(SkillName::JumpUp)) continue;      // vstávání na hod: nepočítá se
-            if (!o.hasSkill(SkillName::JumpUp)) ma -= 3;
-        }
+        const int reach = blitzReachOf(o);
+        if (reach < 0) continue;
+        const int ma = reach - 1;
         const Position home = o.position;
-        const int reach = ma + 2 - 1;                                  // jedno pole stojí rána
         if (home.distanceTo(carrier.position) - 1 > reach) continue;
         o.state = PlayerState::STANDING;
         o.movementRemaining = static_cast<int8_t>(ma);
@@ -922,7 +939,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         //   nejvýš ránu „dvě kostky, vybírá nosič“ (≤ 0,15). Uživatel 08.10.: „bojím se, že změnou
         //   pro čistou klec nebo nic se dostaneš do situace, kdy pohyb klece zpomalíš tak, že
         //   nedojde s trpaslíky vůbec“ — proto není podmínkou čistá klec, ale bezpečný nosič.
-        const double kSafeThreat = 0.15;
+        const double kSafeThreat = kSafeBlitzThreat;
         // LEVNÝ PŘEDVÝBĚR: hrozba rány na desce, kde hráči rovnou stojí na přidělených polích
         // (bez zkoušení cest kostkami). Drahá zkouška „dojdou tam bez hodu a v tomto pořadí“
         // (48 pokusů na každý přesun) se pak dělá jen pro nejlepší kandidáty — první verze

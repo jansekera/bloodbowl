@@ -4,6 +4,7 @@
 #include "bb/game_state.h"
 #include "bb/macro_actions.h"
 #include "bb/mcts.h"
+#include <utility>
 #include <vector>
 
 namespace bb {
@@ -44,12 +45,17 @@ Position farthestSafeForward(const GameState& state, const Player& carrier, int 
 // Kolik ze čtyř polí rohů kolem `sq` ještě v tomto tahu obsadí různí spoluhráči: stojí tam,
 // nebo jsou volní (nehráli, nestojí v zóně soupeře) a na pole dosáhnou pohybem bez GFI.
 int cornersWithinReach(const GameState& state, const Player& carrier, Position sq);
+// Totéž jako seznam (hráč, pole rohu).
+std::vector<std::pair<int, Position>> cornersComing(const GameState& state, const Player& carrier, Position sq);
 
-// P173: pravděpodobnost, že soupeř v příštím tahu míč vezme — jedno měřítko pro všechny rasy
-// (nikdo na nosiče nedosáhne → 0; jinak změřená čísla podle rohů a kontaktu). Viz one_cage.cpp.
-double ballLossRisk(const GameState& state, TeamSide side, int carrierId, Position sq,
-                    int corners, int cornersInContact);
-double carrierLossRisk(const GameState& state, const Player& carrier);
+// ⭐ P173 → sjednoceno 08.10.2026 na blitzThreat (review P181 nález 4; uživatel: „pokud má klec dva
+//   nebo tři rohy tak, ať soupeř nedosáhne na nosiče — tak je to také validní … tři rohy s volným
+//   tím, odkud přijde blitz, jsou víc chyba než správně postavené dva“). Hrozba nejlepší rány na
+//   nosiče, KDYBY skončil na `sq` a kolem něj se postavili ti spoluhráči, kteří tam v tomto tahu
+//   ještě bez hodu dojdou (cornersComing). Nikdo ze soupeřů nedosáhne → 0. Jedno měřítko pro
+//   výběr pole nosiče, pro „smí hledání pohnout nosičem“ i pro plánovač klece.
+//   Dřív tu byla tabulka podle POČTU rohů (ballLossRisk) s jinou definicí dosahu.
+double carrierThreatAt(const GameState& state, const Player& carrier, Position sq, double stopAbove = 2.0);
 
 // ⭐ P176 — HODNOTA RIZIKA (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech
 //   soupeřů a nezraní se — je to relativně bezpečnější“). Šance, že míč ležící na `ball` vezme

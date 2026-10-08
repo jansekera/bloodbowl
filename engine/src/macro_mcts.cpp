@@ -870,7 +870,7 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             if (g_cageLeafWeight > 0.0 && carrier.isOnPitch() && carrier.state == PlayerState::STANDING &&
                 dist > static_cast<int>(carrier.movementRemaining) + maxGfiSquares(carrier)) {
                 const double possession = 0.2 + 0.5 * proximity;
-                heuristic -= g_cageLeafWeight * carrierLossRisk(state, carrier) * possession;
+                heuristic -= g_cageLeafWeight * blitzThreat(state, carrier) * possession;
             }
 
         } else {

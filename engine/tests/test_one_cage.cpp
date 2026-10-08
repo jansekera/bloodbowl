@@ -217,7 +217,15 @@ TEST(OneCageRelease, CarrierRunsAloneThenOthersMarkTheThreats) {
         play(b.s, m);
     }
     std::sort(marked.begin(), marked.end());
-    EXPECT_EQ(marked, (std::vector<int>{12, 13})) << "oba soupeři by k nosiči doběhli";
+    // souseda dostane každý soupeř, který na nosiče ranou dosáhne (pohyb + 2 GFI, pole stojí rána).
+    // Od 08.10. nosič vybíhá tam, kam jich dosáhne nejméně — proto se počítá z desky, ne napevno.
+    std::vector<int> reach;
+    const Position cp = b.s.getPlayer(1).position;
+    for (int id : {12, 13})
+        if (b.s.getPlayer(id).position.distanceTo(cp) - 1 <= blitzReachOf(b.s.getPlayer(id)) ||
+            std::find(marked.begin(), marked.end(), id) != marked.end()) reach.push_back(id);
+    ASSERT_FALSE(marked.empty()) << "pozitivní kontrola: aspoň jeden soupeř na nosiče dosáhne";
+    EXPECT_EQ(marked, reach) << "každý, kdo by k nosiči doběhl, má souseda";
 }
 
 // Jednou vypuštěný nosič se do klece nevrací, ani když by klec zase stíhala.
@@ -811,10 +819,11 @@ TEST(OneCageRun, TheMarkerStandsBetweenTheOpponentAndTheCarrier) {
         return std::make_pair(between, all);
     };
     const auto on = run(0);
-    ASSERT_EQ(on.second, 2) << "oba soupeři dostali souseda";
-    EXPECT_EQ(on.first, 2) << "a oba markeři stojí mezi soupeřem a nosičem";
+    ASSERT_GE(on.second, 1) << "aspoň jeden soupeř na nosiče dosáhne a dostal souseda";
+    EXPECT_EQ(on.first, on.second) << "každý marker stojí mezi soupeřem a nosičem";
     const auto off = run(kFeatMarkerToward);
-    EXPECT_LT(off.first, 2) << "pozitivní kontrola: bez úpravy aspoň jeden stál jinde";
+    ASSERT_GE(off.second, 1);
+    EXPECT_LT(off.first, off.second) << "pozitivní kontrola: bez úpravy aspoň jeden stál jinde";
 }
 
 // P131 / P169 krok 7 (uživatel 07.10.2026: „nosič stál vedle okraje hřiště a byl vysurfován — a
@@ -921,20 +930,43 @@ TEST(OneCagePhaseOne, BlitzBreaksTheWayBeforeTheCageMoves) {
     }
 }
 
-// P173 — jedno měřítko bezpečí nosiče pro všechny rasy (uživatel 08.10.2026: „klec má být
-// univerzální“, „pokud … uteče nosič sám — musí alespoň hlídat, že k němu nikdo ze soupeřů
-// nedojde v příštím kole“).
-TEST(BallLossRisk, OutOfReachIsAsSafeAsACageAndTheNumbersAreTheMeasuredOnes) {
+// JEDNO MĚŘÍTKO BEZPEČÍ NOSIČE (sjednoceno 08.10.2026; uživatel: „klec má být univerzální“, „pokud …
+// uteče nosič sám — musí alespoň hlídat, že k němu nikdo ze soupeřů nedojde v příštím kole“,
+// „pokud má klec dva nebo tři rohy tak, ať soupeř nedosáhne na nosiče — tak je to také validní“).
+// Hrozba rány na nosiče na poli, kam by došel, s rohy, které tam v tomto tahu ještě dojdou.
+TEST(CarrierThreat, OutOfReachIsZeroAndTeammatesWhoWillComeLowerIt) {
+    auto board = [](bool mates) {
+        Board b;
+        b.put(1, TeamSide::HOME, {5, 7}, 6);
+        if (mates) {
+            b.put(2, TeamSide::HOME, {9, 5}); b.put(3, TeamSide::HOME, {9, 9});
+            b.put(4, TeamSide::HOME, {11, 4}); b.put(5, TeamSide::HOME, {11, 10});
+        }
+        b.put(12, TeamSide::AWAY, {20, 7}, 6);       // dosah rány: 6 + 2 GFI − 1 = 7 polí cesty
+        return b;
+    };
+    Board lone = board(false);
+    const Player& c = lone.s.getPlayer(1);
+    EXPECT_DOUBLE_EQ(carrierThreatAt(lone.s, c, {5, 7}), 0.0) << "nikdo nedosáhne ⇒ útěk je stejně bezpečný jako klec";
+    const double alone = carrierThreatAt(lone.s, c, {12, 7});
+    EXPECT_GT(alone, kSafeBlitzThreat) << "v dosahu a sám: dobrá rána";
+    Board caged = board(true);
+    ASSERT_EQ(cornersWithinReach(caged.s, caged.s.getPlayer(1), {12, 7}), 4) << "předpoklad: čtyři rohy tam dojdou";
+    EXPECT_LT(carrierThreatAt(caged.s, caged.s.getPlayer(1), {12, 7}), alone) << "s rohy, které tam dojdou, je hrozba menší";
+}
+
+// Review 08.10.2026: stará tabulka ležícího soupeře nepočítala — nosič „utekl z dosahu“ na pole
+// dvě pole od ležícího soupeře, který vstane (3 pole pohybu) a udeří. Dosah je jeden pro všechno.
+TEST(CarrierThreat, AProneOpponentWhoCanStandUpAndHitCounts) {
     Board b;
     b.put(1, TeamSide::HOME, {5, 7}, 6);
-    b.put(12, TeamSide::AWAY, {20, 7}, 6);                       // dosah 6 + 2 + 1 = 9 polí; je 15 daleko
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {5, 7}, 0, 0), 0.0) << "nikdo nedosáhne";
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 0, 0), 0.44) << "v dosahu a bez rohů";
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 2, 0), 0.20);
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 3, 0), 0.10);
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 4, 0), 0.04);
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 4, 2), 0.09);
-    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {19, 7}, 4, 0), 0.42) << "vedle soupeře";
+    Player& o = b.put(12, TeamSide::AWAY, {8, 7}, 6);
+    o.state = PlayerState::PRONE;
+    EXPECT_TRUE(anyOpponentReaches(b.s, TeamSide::HOME, {5, 7}));
+    EXPECT_GT(carrierThreatAt(b.s, b.s.getPlayer(1), {5, 7}), 0.0);
+    o.stats.movement = 2;                             // vstává na hod 4+ ⇒ nepočítá se
+    EXPECT_FALSE(anyOpponentReaches(b.s, TeamSide::HOME, {5, 7}));
+    EXPECT_DOUBLE_EQ(carrierThreatAt(b.s, b.s.getPlayer(1), {5, 7}), 0.0);
 }
 
 // P175 (uživatel 08.10.2026: „obecně chci, ať s TD zdržujeme za všechny, ale jen v případě, kdy máme
@@ -1115,18 +1147,18 @@ TEST(FallValue, AFallFarFromOpponentsIsCheapAndTheCarrierMayRushThereButNotNextT
         EXPECT_DOUBLE_EQ(looseBallLossRisk(b.s, TeamSide::HOME, {11, 7}), 0.38);
         EXPECT_DOUBLE_EQ(looseBallLossRisk(b.s, TeamSide::HOME, {14, 7}), 0.14);
     }
-    {   // GFI jen jako ÚTĚK Z DOSAHU: soupeř (MA 4, dosah 7 polí) stojí za nosičem na (0,7). Svým
+    {   // GFI jen jako ÚTĚK Z DOSAHU: soupeř (MA 4, dosah rány 5 polí cesty) stojí za nosičem na (0,7). Svým
         // pohybem dojde nosič na x=11 — tam na něj soupeř nedosáhne (11 polí) ⇒ GFI netřeba.
         Board b;
         Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
         b.put(13, TeamSide::AWAY, {0, 7}, 4);
         EXPECT_EQ(farthestSafeForward(b.s, c, 6, /*forCage=*/true).x, 11) << "mimo dosah už bez hodu ⇒ žádné GFI";
     }
-    {   // soupeř MA 8 (dosah 11 polí) na (0,7): na x=11 by na nosiče právě dosáhl, na x=12 už ne ⇒
-        // jedno levné GFI (pád daleko od soupeře) ho z dosahu dostane
+    {   // soupeř MA 9 (9 + 2 GFI − 1 pole za ránu = 10 polí cesty) na (0,7): na x=11 by na nosiče
+        // právě dosáhl, na x=12 už ne ⇒ jedno levné GFI (pád daleko od soupeře) ho z dosahu dostane
         Board b;
         Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
-        b.put(13, TeamSide::AWAY, {0, 7}, 8);
+        b.put(13, TeamSide::AWAY, {0, 7}, 9);
         EXPECT_EQ(farthestSafeForward(b.s, c, 6, /*forCage=*/true).x, 12) << "GFI jako útěk z dosahu";
     }
     {   // soupeři stojí kousek od místa, kam by GFI vedlo: pád by byl drahý ⇒ jen vlastním pohybem

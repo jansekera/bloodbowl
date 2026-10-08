@@ -31,43 +31,17 @@ bool freeToAct(const Player& p) {
            !p.hasMoved && !p.hasActed;
 }
 
-// Kolik stojících soupeřů příští tah dosáhne na pole vedle `sq` (MA + 2 GFI).
+// Kolik soupeřů příští tah dosáhne ranou na pole `sq` (dosah jako v blitzThreat).
 int threatsTo(const GameState& state, Position sq, TeamSide mySide) {
     int n = 0;
     state.forEachOnPitch(opponent(mySide), [&](const Player& o) {
-        if (o.state != PlayerState::STANDING) return;
-        if (o.position.distanceTo(sq) - 1 <= o.stats.movement + 2) ++n;
+        const int r = blitzReachOf(o);
+        if (r >= 0 && o.position.distanceTo(sq) - 1 <= r) ++n;
     });
     return n;
 }
 
 } // namespace
-
-// Kolik ze čtyř polí rohů kolem `sq` ještě v tomto tahu obsadí různí spoluhráči: stojí tam,
-// nebo jsou volní (nehráli, nestojí v zóně soupeře) a na pole dosáhnou pohybem bez GFI.
-// ⭐⭐ P173 — JEDNO MĚŘÍTKO BEZPEČÍ NOSIČE PRO VŠECHNY RASY (uživatel 08.10.2026: „klec má být
-//   univerzální … klec nemá kazit hru skavenům ani rychlým týmům obecně“; „u trpaslíků uvolňuješ
-//   rohy pomocí bloků a blitzu — u agilních týmů bude převažovat dodge a útěk daleko — bude
-//   u každého z týmů vyhodnoceno něco jiného jako bezpečnější“). Pravděpodobnost, že soupeř
-//   v příštím tahu míč vezme, když nosič skončí na `sq`: NIKDO NA NĚJ NEDOSÁHNE → 0 (útěk
-//   daleko je stejně dobrý jako klec); jinak změřená čísla (trpaslíci TV1500, 514 tahů):
-//   nosič vedle stojícího soupeře 42 %; podle stojících rohů 0–1 → 44 %, 2 → 20 %, 3 → 10 %,
-//   4 → 4 % (dva a víc rohů v kontaktu → 9 %). Tým, který klec postaví, vyjde bezpečněji
-//   v kleci; tým, který uteče z dosahu, vyjde bezpečněji útěkem — rozhoduje deska, ne rasa.
-double ballLossRisk(const GameState& state, TeamSide side, int carrierId, Position sq,
-                    int corners, int cornersInContact) {
-    bool reachable = false;
-    state.forEachOnPitch(opponent(side), [&](const Player& o) {
-        if (reachable || o.state != PlayerState::STANDING) return;
-        if (o.position.distanceTo(sq) - 1 <= o.stats.movement + 2) reachable = true;
-    });
-    if (!reachable) return 0.0;
-    if (countTacklezones(state, sq, side, carrierId) > 0) return 0.42;
-    if (corners >= 4) return cornersInContact >= 2 ? 0.09 : 0.04;
-    if (corners == 3) return 0.10;
-    if (corners == 2) return 0.20;
-    return 0.44;
-}
 
 // P176: kolik GFI nosič na cestu k `dest` potřebuje (0, když dojde svým pohybem).
 static int carrierGfiFor(const GameState& state, const Player& carrier, Position dest) {
@@ -96,21 +70,7 @@ double carrierFallCost(const GameState& state, const Player& carrier, Position b
     return std::min(1.0, loss + (1.0 - loss) * pick * 0.5 + tempo);
 }
 
-double carrierLossRisk(const GameState& state, const Player& carrier) {
-    const TeamSide side = carrier.teamSide;
-    int corners = 0, inContact = 0;
-    for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
-        const Position sq{static_cast<int8_t>(carrier.position.x + cx), static_cast<int8_t>(carrier.position.y + cy)};
-        if (!sq.isOnPitch()) continue;
-        const Player* p = state.getPlayerAtPosition(sq);
-        if (!p || p->teamSide != side || p->state != PlayerState::STANDING) continue;
-        ++corners;
-        if (countTacklezones(state, sq, side) > 0) ++inContact;
-    }
-    return ballLossRisk(state, side, carrier.id, carrier.position, corners, inContact);
-}
-
-int cornersWithinReach(const GameState& state, const Player& carrier, Position sq) {
+std::vector<std::pair<int, Position>> cornersComing(const GameState& state, const Player& carrier, Position sq) {
     const TeamSide side = carrier.teamSide;
     std::vector<Position> slots;
     for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
@@ -132,44 +92,61 @@ int cornersWithinReach(const GameState& state, const Player& carrier, Position s
     std::sort(slots.begin(), slots.end(), [](Position a, Position b) {
         return a.x != b.x ? a.x < b.x : a.y < b.y;
     });
-    int best = 0;
+    std::vector<std::pair<int, Position>> best;
     do {
-        std::vector<int> used;
-        int n = 0;
+        std::vector<std::pair<int, Position>> got;
         for (const Position& c : slots) {
             for (const Player* p : mates) {
-                if (std::find(used.begin(), used.end(), p->id) != used.end()) continue;
+                if (std::any_of(got.begin(), got.end(), [&](const auto& g) { return g.first == p->id; })) continue;
                 if (!serves(*p, c)) continue;
-                used.push_back(p->id);
-                ++n;
+                got.push_back({p->id, c});
                 break;
             }
         }
-        best = std::max(best, n);
-    } while (best < static_cast<int>(slots.size()) &&
+        if (got.size() > best.size()) best = std::move(got);
+    } while (best.size() < slots.size() &&
              std::next_permutation(slots.begin(), slots.end(), [](Position a, Position b) {
                  return a.x != b.x ? a.x < b.x : a.y < b.y;
              }));
     return best;
 }
 
+int cornersWithinReach(const GameState& state, const Player& carrier, Position sq) {
+    return static_cast<int>(cornersComing(state, carrier, sq).size());
+}
+
+double carrierThreatAt(const GameState& state, const Player& carrier, Position sq, double stopAbove) {
+    if (!anyOpponentReaches(state, carrier.teamSide, sq)) return 0.0;
+    GameState proj = state.clone();
+    for (const auto& [id, slot] : cornersComing(state, carrier, sq)) proj.getPlayer(id).position = slot;
+    Player& c = proj.getPlayer(carrier.id);
+    c.position = sq;
+    c.state = PlayerState::STANDING;
+    proj.ball = BallState::carried(sq, carrier.id);
+    return blitzThreat(proj, c, stopAbove);
+}
+
 Position farthestSafeForward(const GameState& state, const Player& carrier, int budget, bool forCage) {
     const TeamSide side = carrier.teamSide;
-    // Menší je lepší: (pro klec: kolik rohů bude chybět,) vzdálenost k TD zóně, pak kolik
+    // Menší je lepší: (pro klec: hrozba rány na nosiče po tahu,) vzdálenost k TD zóně, pak kolik
     // soupeřů na pole dosáhne, pak odklon od středu hřiště.
-    auto key = [&](Position sq) {
-        // promile rizika ztráty míče na tomto poli s rohy, které tam ještě dojdou
-        // riziko ztráty míče na tomto poli s rohy, které tam ještě dojdou — po desetinách: čistá
-        // klec (4 %) a útěk z dosahu (0) jsou stejně dobré a rozhodne až vzdálenost k zóně
-        const int risk = forCage ? static_cast<int>(10.0 * ballLossRisk(state, side, carrier.id, sq,
-                                                       cornersWithinReach(state, carrier, sq), 0) + 0.5)
-                                 : 0;
-        return std::make_tuple(risk,
-                               distToEndzone(sq, side), threatsTo(state, sq, side),
-                               std::abs(sq.y - 7));
+    // Hrozba: 0 = v bezpečí (nikdo nedosáhne, nebo nejvýš rána „dvě kostky, vybírá nosič“ — čistá
+    // klec i útěk z dosahu jsou stejně dobré a rozhodne vzdálenost), jinak po desetinách.
+    using Rest = std::tuple<int, int, int>;
+    using Key = std::pair<int, Rest>;
+    auto restOf = [&](Position sq) {
+        return Rest{distToEndzone(sq, side), threatsTo(state, sq, side), std::abs(sq.y - 7)};
+    };
+    // `cap`: stačí vědět, je-li pásmo hrozby nejvýš `cap` (výpočet pak končí dřív); −1 = celé
+    auto riskOf = [&](Position sq, int cap) {
+        if (!forCage) return 0;
+        const double stop = cap < 0 ? 2.0 : std::max(kSafeBlitzThreat, cap / 10.0 + 0.05);
+        const double t = carrierThreatAt(state, carrier, sq, stop);
+        return t <= kSafeBlitzThreat ? 0 : static_cast<int>(10.0 * t + 0.5);
     };
     Position best = carrier.position;
-    auto bestKey = key(best);
+    Key bestKey{riskOf(best, -1), restOf(best)};
+    const Key startKey = bestKey;        // pole přes GFI musí být lepší než stát
     const int startDist = distToEndzone(carrier.position, side);
     // P176: nosič smí přidat GFI jen jako ÚTĚK Z DOSAHU — když pole bez hodu, které by jinak vzal,
     // v dosahu soupeře zůstává, pole přes GFI už ne, a pád by byl levný (šance pádu × cena pádu
@@ -179,7 +156,7 @@ Position farthestSafeForward(const GameState& state, const Player& carrier, int 
     const int extraGfi = (cageFeatureOn(kFeatFallValue) && budget == static_cast<int>(carrier.movementRemaining))
                              ? maxGfiSquares(carrier) : 0;
     Position bestRush{-1, -1};
-    auto bestRushKey = bestKey;
+    Rest bestRushRest{};
     for (int x = carrier.position.x - budget - extraGfi; x <= carrier.position.x + budget + extraGfi; ++x) {
         for (int y = carrier.position.y - budget - extraGfi; y <= carrier.position.y + budget + extraGfi; ++y) {
             const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
@@ -192,25 +169,32 @@ Position farthestSafeForward(const GameState& state, const Player& carrier, int 
             if (distToEndzone(sq, side) > startDist) continue;   // nikdy dozadu
             if (state.getPlayerAtPosition(sq)) continue;
             if (countTacklezones(state, sq, side, carrier.id) > 0) continue;
-            const auto k = key(sq);
+            const Rest rest = restOf(sq);
+            // levné vyřazení dřív než drahé výpočty: pole, které nemůže být lepší než dosud nejlepší
+            const bool freeCouldWin = bestKey.first > 0 || rest < bestKey.second;
+            const bool rushCouldWin = extraGfi > 0 && (bestRush.isOnPitch() ? rest < bestRushRest : Key{0, rest} < startKey);
+            if (!freeCouldWin && !rushCouldWin) continue;
             // -1 = nedojde, > 0 = cesta vede přes hod (dodge nebo GFI)
             const double fail = pathFailProb(state, carrier, sq, budget + extraGfi, Position{-1, -1});
             if (fail < 0.0) continue;
             if (fail == 0.0) {
+                if (!freeCouldWin) continue;
+                const Key k{riskOf(sq, bestKey.first), rest};
                 if (k < bestKey) { best = sq; bestKey = k; }
                 continue;
             }
+            if (!rushCouldWin) continue;
             // P178: pád se cení celý (soupeř u míče + nezvednutí podle obratnosti + ztracený tah u
             // týmu bez časové rezervy); smí se riskovat nejvýš 5 %
             if (fail * carrierFallCost(state, carrier, sq) > 0.05) continue;
-            if (ballLossRisk(state, side, carrier.id, sq, 0, 0) > 0.0) continue;     // i tam by na něj dosáhli
-            if (!bestRush.isOnPitch() || k < bestRushKey) { bestRush = sq; bestRushKey = k; }
+            if (anyOpponentReaches(state, side, sq)) continue;     // i tam by na něj dosáhli
+            bestRush = sq;
+            bestRushRest = rest;
         }
     }
     if (bestRush.isOnPitch()) {
-        // je pole bez hodu už bezpečné (čistá klec, nebo mimo dosah)? pak GFI netřeba
-        const bool freeIsSafe = forCage ? std::get<0>(bestKey) == 0
-                                        : ballLossRisk(state, side, carrier.id, best, 0, 0) == 0.0;
+        // je pole bez hodu už bezpečné (hrozba v pásmu 0, nebo mimo dosah)? pak GFI netřeba
+        const bool freeIsSafe = forCage ? bestKey.first == 0 : !anyOpponentReaches(state, side, best);
         if (!freeIsSafe) return bestRush;
     }
     return best;
@@ -401,7 +385,7 @@ void CageController::planStart(const GameState& state) {
         //   hledání nedostane. Jakmile hrozba na začátku některého dalšího tahu stoupne, nebo
         //   přijde 8. kolo, skóruje se hned (rozhoduje hledání jako dosud).
         if (cageFeatureOn(kFeatStall) && walksIn && !lastTurn && c.teamSide == state.activeTeam &&
-            freeToAct(c) && blitzThreat(state, c) <= 0.05) {
+            freeToAct(c) && blitzThreat(state, c) <= kStallBlitzThreat) {
             stalling_ = true;
             phase_ = CagePhase::CAGE;
             if (dbg) std::fprintf(stderr, "[cage ctl] zdržování TD: nosič v bezpečí (hrozba rány %.2f), kolo %d\n",
@@ -839,13 +823,12 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
     // pro nosiče bez klece vybírá řadič (planAdvance). Výjimky níž zůstávají.
     if (!why && corners < 3 && !cageFeatureOn(kFeatCarrierByCtl)) why = "klec nemá ani tři rohy";
     // P173: NOSIČ SMÍ JÍT TAM, KDE JE BEZPEČNĚJI NEŽ TADY — pro každou rasu stejně. Makro se
-    // zkusí nanečisto (osm sad kostek): pád nebo ztráta míče = riziko 1, TD = 0, jinak riziko
-    // pole, kde skončil, s rohy, které tam ještě dojdou. Tady = riziko pole, kde stojí, s rohy,
-    // které stojí nebo ještě dojdou. Rychlý tým tak uteče z dosahu (riziko 0), pomalý zůstane
+    // zkusí nanečisto (osm sad kostek): pád nebo ztráta míče = riziko 1, TD = 0, jinak hrozba
+    // rány (carrierThreatAt) na poli, kde skončil, s rohy, které tam ještě dojdou. Tady = totéž
+    // na poli, kde stojí. Rychlý tým tak uteče z dosahu (riziko 0), pomalý zůstane
     // v kleci — a nosič s jedním rohem nejde „kamkoli dopředu“, kde je to stejně zlé.
     if (!why && cageFeatureOn(kFeatCarrierByCtl)) {
-        const double here = ballLossRisk(state, carrier.teamSide, carrier.id, carrier.position,
-                                         std::max(corners, cornersWithinReach(state, carrier, carrier.position)), 0);
+        const double here = carrierThreatAt(state, carrier, carrier.position);
         double there = 0.0;
         const int samples = 8;
         for (int k = 0; k < samples; ++k) {
@@ -866,8 +849,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
                 continue;
             }
             const Player& c2 = trial.getPlayer(trial.ball.carrierId);
-            there += ballLossRisk(trial, c2.teamSide, c2.id, c2.position,
-                                  cornersWithinReach(trial, c2, c2.position), 0);
+            there += carrierThreatAt(trial, c2, c2.position);
         }
         there /= samples;
         if (there + 0.02 < here) {
@@ -996,14 +978,16 @@ void CageController::planAdvance(const GameState& state) {
     //   pohybem. Teď pole vybírá řadič: bez hodu, ne vedle soupeře, ne dozadu, a to, kolem
     //   kterého se ještě v tomto tahu postaví nejvíc rohů (při shodě nejdál). Jde tam jen,
     //   když tím rohů přibude; rohy se pak dostaví jako po zvednutí míče.
-    const int planCorners = plan.valid ? plan.filledCorners - plan.gfiCorners : 0;
-    if (planCorners < 3 && cageFeatureOn(kFeatCarrierByCtl)) {
+    // Sjednoceno 08.10.2026 (review P181 nález 4): rozhoduje HROZBA RÁNY, ne počet rohů. Plán,
+    // po kterém je nosič v bezpečí (i se dvěma rohy), platí; dřív ho „méně než tři rohy“ přebilo
+    // a nosič šel sám jinam podle tabulky rohů.
+    const bool planMoves = plan.valid && plan.step >= 1;
+    const bool planSafe = planMoves && plan.blitzThreat <= kSafeBlitzThreat;
+    if (!planSafe && cageFeatureOn(kFeatCarrierByCtl)) {
         const Position dest = farthestSafeForward(state, carrier, carrier.movementRemaining, /*forCage=*/true);
-        // P173: jde tam jen, když je tam bezpečněji (útěk z dosahu soupeře i klec se počítají stejně)
-        const int cornersHere = std::max(planCorners, cornersWithinReach(state, carrier, carrier.position));
-        const int cornersThere = cornersWithinReach(state, carrier, dest);
-        const double here = ballLossRisk(state, carrier.teamSide, carrier.id, carrier.position, cornersHere, 0);
-        const double there = ballLossRisk(state, carrier.teamSide, carrier.id, dest, cornersThere, 0);
+        // jde tam jen, když je tam bezpečněji (útěk z dosahu soupeře i klec se počítají stejně)
+        const double here = planMoves ? plan.blitzThreat : carrierThreatAt(state, carrier, carrier.position);
+        const double there = carrierThreatAt(state, carrier, dest);
         if (dest != carrier.position && there + 0.02 < here) {
             if (std::getenv("BB_CAGE_DEBUG")) {
                 std::fprintf(stderr, "[cage ctl] nosič ke kleci: (%d,%d) -> (%d,%d), riziko %.2f -> %.2f\n",
@@ -1084,7 +1068,7 @@ void CageController::planMarkers(const GameState& state) {
     state.forEachOnPitch(opponent(side), [&](const Player& o) {
         if (o.state != PlayerState::STANDING) return;
         if (countTacklezones(state, o.position, o.teamSide) > 0) return;  // už markovaný
-        if (o.position.distanceTo(cp) - 1 > o.stats.movement + 2) return;
+        if (o.position.distanceTo(cp) - 1 > blitzReachOf(o)) return;
         threats.push_back(&state.getPlayer(o.id));
     });
     std::sort(threats.begin(), threats.end(), [&](const Player* a, const Player* b) {

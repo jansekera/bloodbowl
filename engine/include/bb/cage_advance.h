@@ -254,6 +254,17 @@ bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOu
 //   vědět „je nad mezí“) — plná hodnota se pak nevrací.
 double blitzThreat(const GameState& state, const Player& carrier, double stopAbove = 2.0);
 
+// ⭐ JEDNO MĚŘÍTKO BEZPEČÍ NOSIČE (sjednoceno 08.10.2026, review P181 nález 4): všude se rozhoduje
+//   podle blitzThreat. Meze na jednom místě:
+constexpr double kSafeBlitzThreat = 0.15;    // nejvýš rána „dvě kostky, vybírá nosič“ ⇒ nosič je v bezpečí
+constexpr double kStallBlitzThreat = 0.05;   // tak malá hrozba, že se TD smí zdržovat
+// Kolik polí pohybu má soupeř na cestu k ráně na nosiče (pohyb + 2 GFI − 1 pole za ránu; ležící
+// vstává za 3 pole, s pohybem pod 3 bez Jump Up se nepočítá) — nebo −1, když hrát nemůže.
+int blitzReachOf(const Player& opp);
+// Dosáhne některý soupeř na pole vedle `sq`? Stejná definice dosahu jako v blitzThreat (dřív byly
+// dvě: „MA + 2, ležící se nepočítá“ a tahle).
+bool anyOpponentReaches(const GameState& state, TeamSide mySide, Position sq);
+
 class CageAdvancePlanner {
 public:
     // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,
