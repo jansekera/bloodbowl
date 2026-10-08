@@ -327,31 +327,6 @@ final class ActionResolverTest extends TestCase
         ]);
     }
 
-    public function testStunnedPlayersRecoverOnNewTurn(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
-            ->addPlayer(TeamSide::AWAY, 15, 5, id: 2)
-            ->withActiveTeam(TeamSide::HOME)
-            ->build();
-
-        // Make away player stunned
-        $player = $state->requirePlayer(2);
-        $stunned = $player->withState(PlayerState::STUNNED);
-        $state = $state->withPlayer($stunned);
-
-        $dice = new FixedDiceRoller([]);
-        $resolver = new ActionResolver($dice);
-
-        $result = $resolver->resolve($state, ActionType::END_TURN, []);
-
-        // Stunned player should become prone
-        $player = $result->getNewState()->requirePlayer(2);
-        $this->assertSame(PlayerState::PRONE, $player->getState());
-    }
-
-    // === Block Tests ===
-
     public function testBlockDefenderDown(): void
     {
         $state = (new GameStateBuilder())

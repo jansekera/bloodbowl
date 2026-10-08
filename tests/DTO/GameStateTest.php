@@ -99,19 +99,35 @@ final class GameStateTest extends TestCase
         $this->assertSame(6, $resetPlayer->getMovementRemaining());
     }
 
-    public function testStunnedPlayerRecoveryOnNewTurn(): void
+    /**
+     * `rules_bb2016.txt` ř. 703-707: "All face-down players are turned face up at the end of
+     * their team's next turn ... a player may not turn face up on the turn they are Stunned."
+     * (Dřívější test tu chtěl PRONE už po `resetPlayersForNewTurn`, tedy na ZAČÁTKU kola --
+     * kódoval vadu; audit parity 08.10.2026, nález 1.)
+     */
+    public function testStunnedPlayerTurnsFaceUpAtEndOfTurnNotAtItsStart(): void
     {
         $player = MatchPlayerDTO::create(1, 1, 'Test', 1, 'Lineman', new PlayerStats(6, 3, 3, 8), [], TeamSide::HOME, new Position(5, 5));
-        $stunnedPlayer = $player->withState(PlayerState::STUNNED);
-
         $home = TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 3);
         $away = TeamStateDTO::create(2, 'Away', 'Orc', TeamSide::AWAY, 2);
-        $state = new GameState(1, 1, GamePhase::PLAY, TeamSide::HOME, $home, $away, [1 => $stunnedPlayer], BallState::offPitch(), false, null);
+        $state = new GameState(1, 1, GamePhase::PLAY, TeamSide::HOME, $home, $away, [1 => $player->withStunned()], BallState::offPitch(), false, null);
 
-        $resetState = $state->resetPlayersForNewTurn(TeamSide::HOME);
-        $resetPlayer = $resetState->requirePlayer(1);
+        // Konec kola, ve kterém byl omráčen: neotáčí se. Konec kola soupeře se ho netýká.
+        $this->assertSame(PlayerState::STUNNED, $state->turnStunnedFaceUp(TeamSide::HOME)->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::STUNNED, $state->turnStunnedFaceUp(TeamSide::AWAY)->requirePlayer(1)->getState());
 
-        $this->assertSame(PlayerState::PRONE, $resetPlayer->getState());
+        // Začátek příštího kola jeho týmu: pořád lícem dolů; až na konci toho kola se otočí.
+        $nextTurn = $state->resetPlayersForNewTurn(TeamSide::HOME);
+        $this->assertSame(PlayerState::STUNNED, $nextTurn->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $nextTurn->turnStunnedFaceUp(TeamSide::HOME)->requirePlayer(1)->getState());
+    }
+
+    public function testStunnedThisTurnSurvivesSerialization(): void
+    {
+        $player = MatchPlayerDTO::create(1, 1, 'Test', 1, 'Lineman', new PlayerStats(6, 3, 3, 8), [], TeamSide::HOME, new Position(5, 5));
+
+        $this->assertTrue(MatchPlayerDTO::fromArray($player->withStunned()->toArray())->isStunnedThisTurn());
+        $this->assertFalse(MatchPlayerDTO::fromArray($player->toArray())->isStunnedThisTurn());
     }
 
     public function testSerializationRoundTrip(): void
