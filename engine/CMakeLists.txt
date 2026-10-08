@@ -90,6 +90,7 @@ add_executable(bb_tests
     tests/test_turn_planner.cpp
     tests/test_cage_advance.cpp
     tests/test_one_cage.cpp
+    tests/test_cage_invariants.cpp
     tests/test_pathfinder.cpp
     tests/test_policies.cpp
 )
