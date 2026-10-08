@@ -25,8 +25,6 @@ use App\Engine\TacklezoneCalculator;
 
 final class BlockHandler implements ActionHandlerInterface
 {
-    private ?PassResolver $passResolver = null;
-
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly StrengthCalculator $strCalc,
@@ -34,6 +32,8 @@ final class BlockHandler implements ActionHandlerInterface
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
         private readonly MoveHandler $moveHandler,
+        // Povinny (review P186, L7 -- tyz tvar): s nepovinnym se Dump-Off bez nej tise vynechal.
+        private readonly PassResolver $passResolver,
     ) {}
 
     /**
@@ -147,11 +147,6 @@ final class BlockHandler implements ActionHandlerInterface
         return $tzGo <= $tzStay;
     }
 
-    public function setPassResolver(PassResolver $passResolver): void
-    {
-        $this->passResolver = $passResolver;
-    }
-
     /**
      * @param array<string, mixed> $params
      */
@@ -204,7 +199,6 @@ final class BlockHandler implements ActionHandlerInterface
         if ($defender->hasSkill(SkillName::DumpOff)
             && $state->getBall()->getCarrierId() === $defender->getId()
             && !$state->getTeamState($defender->getTeamSide())->isPassUsedThisTurn()
-            && $this->passResolver !== null
         ) {
             // Find closest friendly teammate adjacent to defender
             $dumpTarget = $this->findDumpOffTarget($state, $defender);
@@ -696,7 +690,6 @@ final class BlockHandler implements ActionHandlerInterface
         if ($defender->hasSkill(SkillName::DumpOff)
             && $state->getBall()->getCarrierId() === $defender->getId()
             && !$state->getTeamState($defender->getTeamSide())->isPassUsedThisTurn()
-            && $this->passResolver !== null
         ) {
             $dumpTarget = $this->findDumpOffTarget($state, $defender);
             if ($dumpTarget !== null) {

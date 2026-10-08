@@ -89,7 +89,7 @@ final class HoldsGroundTest extends TestCase
             $p = $s->requirePlayer($id)->getPosition();
 
             return $p === null ? null : [$p->getX(), $p->getY()];
-        }, $ids);
+        }, array_values($ids));
     }
 
     public function testPushedDoHracuSeStandFirmNikymNepohne(): void
