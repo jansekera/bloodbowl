@@ -213,7 +213,12 @@ final class ChainPushTest extends TestCase
     }
 
     /**
-     * Side Step + chain push: all empty squares taken → Side Step defender chain pushes.
+     * Side Step bez volneho sousedniho pole neplati => bezne odtlaceni, tady retez.
+     * `rules_bb2016.txt` r. 8476-8478: "the player may not use this skill if there are no
+     * open squares on the pitch adjacent to this player."
+     * (Prepsano 08.10.2026, nalez 11 auditu parity: test driv obsadil jen tri pole odtlaceni
+     * a cekal retez -- podle r. 8474-8476 ale Side Step smi na kterekoli sousedni volne pole;
+     * to hlida `SideStepAnyAdjacentSquareTest`.)
      */
     public function testSideStepWithChainPush(): void
     {
@@ -223,12 +228,15 @@ final class ChainPushTest extends TestCase
             ->addPlayer(TeamSide::HOME, 12, 7, id: 3) // in push square
             ->addPlayer(TeamSide::HOME, 12, 6, id: 4) // in push square
             ->addPlayer(TeamSide::HOME, 12, 8, id: 5) // in push square
+            ->addPlayer(TeamSide::HOME, 10, 6, id: 6) // zbyla sousedni pole obrance
+            ->addPlayer(TeamSide::HOME, 10, 8, id: 7)
+            ->addPlayer(TeamSide::HOME, 11, 6, id: 8)
+            ->addPlayer(TeamSide::HOME, 11, 8, id: 9)
             ->withBallOffPitch()
             ->build();
 
         // 3 dice attacker chooses (HOME assists): rolls 3,3,3 → PUSHED
-        // Side Step: all push squares occupied → chain push
-        // Defender with Side Step chooses safest (fewest enemy TZ)
+        // Zadne volne sousedni pole => Side Step neplati => retez pres pole odtlaceni
         $dice = new FixedDiceRoller([3, 3, 3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);

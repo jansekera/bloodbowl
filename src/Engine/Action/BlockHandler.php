@@ -1257,7 +1257,8 @@ final class BlockHandler implements ActionHandlerInterface
      * a normal push back as if the second player had been blocked by the first"
      * (r. 644-646), proto se vola rekurzivne tataz funkce.
      * - pole: volne na hristi > dav (vybira tym na tahu) > obsazene = retez (r. 639-651)
-     * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ);
+     * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ); ten
+     *   voli z VSECH volnych sousednich poli (r. 8474-8478), bez volneho pole neplati;
      * - Grab a Strip Ball patri blokujicimu, plati jen u PRVNIHO odtlaceni
      *   (`$utocnik` je pak null); Grab nesmi zrusit Side Step v retezu (FAQ).
      * - nosic odtlaceny v retezu mic DRZI (neni sraženy).
@@ -1294,7 +1295,28 @@ final class BlockHandler implements ActionHandlerInterface
         $zonySoupere = fn(Position $p): int => $this->tzCalc->countTacklezones($state, $p, $kdo->getTeamSide());
         $pushTo = null;
         $chainPushTarget = null;
-        $grab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
+        // "Grab and Side Step will cancel each other out and the standard pushback rules
+        //   apply" (r. 8151-8153) -- ma-li blokujici Grab, Side Step odtlaceneho neplati.
+        $maGrab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
+        $maSideStep = $kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct();
+        $grab = $maGrab && !$maSideStep;
+        // OPRAVENO 08.10.2026 (audit parity, nález 11) -- Side Step tu vybíral jen ze tří
+        //   polí odtlačení, a když volné nebylo, šel rovnou do řetězu (i tam, kde podle
+        //   běžného pořadí patří hráč do davu). Pravidla ř. 8474-8478: "the coach may choose
+        //   to move the player to any adjacent square, not just the three squares shown on
+        //   the Push Back diagram. Note that the player may not use this skill if there are
+        //   no open squares on the pitch adjacent to this player." Bez volného sousedního
+        //   pole tedy skill neplatí a rozhoduje běžné pořadí níž (volné pole > dav > řetěz).
+        $sideStepSquares = [];
+        if ($maSideStep && !$maGrab) {
+            // tři pole odtlačení napřed: při shodě zón zůstává hráč "od útočníka"
+            $sideStepSquares = $emptySquares;
+            foreach ($kde->getAdjacentPositions() as $pos) {
+                if ($state->getPlayerAtPosition($pos) === null && !in_array($pos, $sideStepSquares, false)) {
+                    $sideStepSquares[] = $pos;
+                }
+            }
+        }
         if ($grab && !$offPitchAvailable) {
             // Grab: utocnik voli nejhorsi volne pole (nejvic zon). Je-li jedno z poli mimo
             //   hriste, rozhoduje bezne poradi niz (volne pole > dav > retez).
@@ -1305,16 +1327,10 @@ final class BlockHandler implements ActionHandlerInterface
                 $pushTo = $occupiedSquares[0]['pos'];
                 $chainPushTarget = $occupiedSquares[0]['player'];
             }
-        } elseif ($kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct()) {
-            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi pole (nejmin zon)
-            if ($emptySquares !== []) {
-                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
-                $pushTo = $emptySquares[0];
-            } elseif ($occupiedSquares !== []) {
-                usort($occupiedSquares, fn(array $a, array $b) => $zonySoupere($a['pos']) <=> $zonySoupere($b['pos']));
-                $pushTo = $occupiedSquares[0]['pos'];
-                $chainPushTarget = $occupiedSquares[0]['player'];
-            }
+        } elseif ($sideStepSquares !== []) {
+            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
+            usort($sideStepSquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
+            $pushTo = $sideStepSquares[0];
         } elseif ($emptySquares !== []) {
             // OPRAVENO 08.10.2026 (audit parity, nález 3a) -- před touhle větví stálo
             //   `elseif ($offPitchAvailable)` ("dav má přednost"): bylo-li kterékoli ze tří
