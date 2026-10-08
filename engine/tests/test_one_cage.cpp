@@ -780,6 +780,43 @@ TEST(OneCageRun, WhenTimeIsShortTheControllerRunsTheCarrierDiceFreeAndAwayFromOp
     EXPECT_EQ(b.s.homeTeam.rerolls, 0);
 }
 
+// P179 (uživatel 08.10.2026: „vypustíme nosiče dopředu a zkusíme dát souseda všem protihráčům, co
+// by na něj dosáhli — nejlépe ve směru k nosiči, ať zavazí co nejvíce“). Spoluhráč postavený vedle
+// soupeřem jen „kde je to nejblíž“ nosiči nepomůže. Markující hráč si má stoupnout mezi soupeře
+// a nosiče (deska z testu OneCageRelease: nosič vyběhne, dva soupeři na něj dosáhnou).
+TEST(OneCageRun, TheMarkerStandsBetweenTheOpponentAndTheCarrier) {
+    // vrací: kolik markerů stojí blíž nosiči než jejich soupeř / kolik markerů celkem
+    auto run = [](unsigned off) {
+        Board b = releaseBoard(6);
+        b.s.getPlayer(6).position = {22, 1};     // volní hráči stojí ZA soupeři: nejbližší pole
+        b.s.getPlayer(7).position = {22, 13};    // u soupeře je za jeho zády
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        int between = 0, all = 0;
+        while (cc.next(b.s, m)) {
+            if (m.playerId != 1) {
+                const Position c = b.s.getPlayer(1).position;
+                for (int id : {12, 13}) {
+                    const Position o = b.s.getPlayer(id).position;
+                    if (o.distanceTo(m.targetPos) != 1) continue;
+                    ++all;
+                    between += m.targetPos.distanceTo(c) < o.distanceTo(c);
+                    break;
+                }
+            }
+            play(b.s, m);
+        }
+        setCageFeaturesOff(0);
+        return std::make_pair(between, all);
+    };
+    const auto on = run(0);
+    ASSERT_EQ(on.second, 2) << "oba soupeři dostali souseda";
+    EXPECT_EQ(on.first, 2) << "a oba markeři stojí mezi soupeřem a nosičem";
+    const auto off = run(kFeatMarkerToward);
+    EXPECT_LT(off.first, 2) << "pozitivní kontrola: bez úpravy aspoň jeden stál jinde";
+}
+
 // P131 / P169 krok 7 (uživatel 07.10.2026: „nosič stál vedle okraje hřiště a byl vysurfován — a
 // při Frenzy i z pole vedle okraje“): nosič končí aspoň dvě pole od postranní čáry.
 TEST(OneCageForward, RunNeverEndsWithinTwoRowsOfTheSideline) {

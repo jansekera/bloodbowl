@@ -1084,7 +1084,13 @@ void CageController::planMarkers(const GameState& state) {
     for (const Player* o : threats) {
         int bestId = -1;
         Position bestSq{-1, -1};
-        int bestSteps = INT_MAX;
+        // ⭐ P179 (uživatel 08.10.2026: „vypustíme nosiče dopředu a zkusíme dát souseda všem
+        //   protihráčům, co by na něj dosáhli — nejlépe ve směru k nosiči, ať zavazí co nejvíce“).
+        //   Dosud se bralo pole u soupeře, kam je to nejblíž — třeba i za jeho zády, kde mu v cestě
+        //   k nosiči nic nestálo. Teď napřed pole NEJBLÍŽ NOSIČI (mezi soupeřem a nosičem), při
+        //   shodě to, kam je to nejblíž.
+        const bool toward = cageFeatureOn(kFeatMarkerToward);
+        std::pair<int, int> bestKey{INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& m) {
             if (m.id == carrier.id || !freeToAct(m)) return;
             if (std::find(usedMarkers.begin(), usedMarkers.end(), m.id) != usedMarkers.end()) return;
@@ -1093,8 +1099,9 @@ void CageController::planMarkers(const GameState& state) {
                 if (std::find(usedSquares.begin(), usedSquares.end(), sq) != usedSquares.end()) continue;
                 if (pathFailProb(state, m, sq, m.movementRemaining, Position{-1, -1}) != 0.0) continue;
                 const int steps = pathStepsToward(state, m, sq, m.movementRemaining, Position{-1, -1});
-                if (steps >= 0 && steps < bestSteps) {
-                    bestSteps = steps;
+                const std::pair<int, int> key{toward ? sq.distanceTo(cp) : 0, steps};
+                if (steps >= 0 && key < bestKey) {
+                    bestKey = key;
                     bestId = m.id;
                     bestSq = sq;
                 }

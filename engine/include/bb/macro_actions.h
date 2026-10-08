@@ -64,6 +64,7 @@ enum CageFeature : unsigned {
     kFeatCleanCageSearch = 512,
     kFeatForceScore     = 32768, // P178: ohrožený nosič, který do zóny dojde, skóruje příkazem řadiče (ne volbou hledání)
     kFeatScreenSpread   = 65536, // P178: předvýběr bezpečného pole bere pole ze všech vzdáleností, ne jen 24 nejdál
+    kFeatMarkerToward   = 131072, // P179: markující hráč si stoupá mezi soupeře a nosiče, ne na nejbližší pole u soupeře
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře
