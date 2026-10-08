@@ -245,6 +245,25 @@ final class MatchPlayerDTO
         return $this->state->canAct() && !$this->hasActed;
     }
 
+    /**
+     * Smí hráč vzít akci Block (i Multiple Block)? `rules_bb2016.txt` ř. 674-676: "a player
+     * who stands up may not take a Block Action, because you may not move when you take a
+     * Block Action." Pohyb + rána je Blitz (ř. 347-352), jeden za kolo týmu.
+     * OPRAVENO 08.10.2026 (audit parity, nález 2): hlídalo se jen `canAct()`, takže hráč
+     * po akci Move ještě blokoval a týmový blitz zůstal nepoužitý. Vzor: C++
+     * `rules_engine.cpp:107`.
+     * Jump Up (ř. 8200-8204): blok z lehu, hráč se před ním nehýbe.
+     */
+    public function canTakeBlockAction(): bool
+    {
+        if ($this->hasMoved) {
+            return false;
+        }
+
+        return $this->canAct()
+            || ($this->state === PlayerState::PRONE && !$this->hasActed && $this->hasSkill(SkillName::JumpUp));
+    }
+
     public function canMove(): bool
     {
         return ($this->state === PlayerState::STANDING || $this->state === PlayerState::PRONE) && !$this->hasMoved;

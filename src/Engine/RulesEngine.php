@@ -153,13 +153,8 @@ final class RulesEngine
                     }
                 }
 
-                // Block: player can act, adjacent enemy standing
-                // Jump Up: prone player with JumpUp can also block
-                $canBlock = $player->canAct()
-                    || ($player->getState() === PlayerState::PRONE
-                        && !$player->hasActed()
-                        && $player->hasSkill(SkillName::JumpUp));
-                if ($canBlock) {
+                // Block: hráč, který se v tomto kole nepohnul (ř. 674-676), vedle stojícího soupeře
+                if ($player->canTakeBlockAction()) {
                     $targets = $this->getBlockTargets($state, $player);
                     if ($targets !== []) {
                         $actions[] = ['type' => ActionType::BLOCK->value, 'playerId' => $player->getId()];
@@ -489,12 +484,8 @@ final class RulesEngine
             return ['Can only block with players from the active team'];
         }
 
-        $canBlock = $player->canAct()
-            || ($player->getState() === PlayerState::PRONE
-                && !$player->hasActed()
-                && $player->hasSkill(SkillName::JumpUp));
-        if (!$canBlock) {
-            return ['Player cannot act (already acted or not standing)'];
+        if (!$player->canTakeBlockAction()) {
+            return ['Player cannot block (already acted, moved this turn or not standing)'];
         }
 
         $target = $state->getPlayer($targetId);
@@ -586,6 +577,9 @@ final class RulesEngine
 
     /**
      * Get valid block targets for a player (adjacent standing enemies).
+     *
+     * Slouží i pro výběr cíle Blitzu po pohybu (web), proto tu NENÍ `canTakeBlockAction()`:
+     * jestli hráč smí vzít akci Block, rozhoduje validace akce a nabídka.
      *
      * @return list<MatchPlayerDTO>
      */
@@ -1293,12 +1287,8 @@ final class RulesEngine
             return ['Can only block with players from the active team'];
         }
 
-        $canBlock = $player->canAct()
-            || ($player->getState() === PlayerState::PRONE
-                && !$player->hasActed()
-                && $player->hasSkill(SkillName::JumpUp));
-        if (!$canBlock) {
-            return ['Player cannot act'];
+        if (!$player->canTakeBlockAction()) {
+            return ['Player cannot block (already acted, moved this turn or not standing)'];
         }
 
         if (!$player->hasSkill(SkillName::MultipleBlock)) {
