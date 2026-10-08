@@ -8,6 +8,7 @@ use App\Engine\Action\MoveHandler;
 use App\Engine\BallResolver;
 use App\Engine\FixedDiceRoller;
 use App\Engine\GameFlowResolver;
+use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\Pathfinder;
 use App\Engine\PassResolver;
@@ -329,7 +330,7 @@ final class WeatherTest extends TestCase
         $dice = new FixedDiceRoller([2]); // GFI roll = 2 -> success
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $pathfinder = new Pathfinder($this->tzCalc);
-        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver);
+        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::NICE)
@@ -345,11 +346,13 @@ final class WeatherTest extends TestCase
 
     public function testGfiThreePlusInBlizzard(): void
     {
-        // Roll 2 -> fails in blizzard (need 3+), team reroll roll 2 -> fail again
-        $dice = new FixedDiceRoller([2, 2]); // GFI roll = 2 fail, team reroll = 2 fail
+        // Roll 2 -> fails in blizzard (need 3+), team reroll roll 2 -> fail again;
+        // pad => hod na brneni 1+1 (`rules_bb2016.txt` r. 1702-1703: "Roll to see if he
+        // was injured") -- bez nej by `MoveHandler` pravidlo tise vynechal (review P186, L7).
+        $dice = new FixedDiceRoller([2, 2, 1, 1]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $pathfinder = new Pathfinder($this->tzCalc);
-        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver);
+        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::BLIZZARD)
@@ -361,6 +364,8 @@ final class WeatherTest extends TestCase
         $result = $moveHandler->resolve($state, ['playerId' => 1, 'x' => 12, 'y' => 7]);
 
         $this->assertTrue($result->isTurnover());
+        $this->assertSame(4, $dice->getRollCount(), 'po padu se hazi na brneni');
+        $this->assertContains('armour_roll', array_map(fn($e) => $e->getType(), $result->getEvents()));
     }
 
     public function testGfiThreeSucceedsInBlizzard(): void
@@ -368,7 +373,7 @@ final class WeatherTest extends TestCase
         $dice = new FixedDiceRoller([3]); // GFI roll = 3 -> success in blizzard
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $pathfinder = new Pathfinder($this->tzCalc);
-        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver);
+        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::BLIZZARD)
@@ -387,7 +392,7 @@ final class WeatherTest extends TestCase
         $dice = new FixedDiceRoller([2, 3]); // GFI=2 fail, Sure Feet reroll=3 success
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $pathfinder = new Pathfinder($this->tzCalc);
-        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver);
+        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::BLIZZARD)
@@ -405,7 +410,7 @@ final class WeatherTest extends TestCase
         $dice = new FixedDiceRoller([2]); // GFI roll = 2 -> success (normal threshold)
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $pathfinder = new Pathfinder($this->tzCalc);
-        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver);
+        $moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::POURING_RAIN)
