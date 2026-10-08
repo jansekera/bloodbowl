@@ -119,36 +119,9 @@ final class ChainPushTest extends TestCase
         $this->assertNull($newState->requirePlayer(6)->getPosition());
     }
 
-    /**
-     * ALL push squares have Stand Firm → cannot chain push → crowd surf.
-     */
-    public function testAllStandFirmCrowdSurf(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1) // attacker
-            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2) // defender
-            ->addPlayer(TeamSide::AWAY, 7, 7, id: 3, skills: [SkillName::StandFirm])
-            ->addPlayer(TeamSide::AWAY, 7, 6, id: 4, skills: [SkillName::StandFirm])
-            ->addPlayer(TeamSide::AWAY, 7, 8, id: 5, skills: [SkillName::StandFirm])
-            ->withBallOffPitch()
-            ->build();
-
-        // 1 die: roll 3 → PUSHED
-        // All push squares occupied by Stand Firm → no chain push possible → crowd surf
-        // Crowd injury rolls: 3+3=6
-        $dice = new FixedDiceRoller([3, 3, 3]);
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-
-        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('crowd_surf', $types);
-        $this->assertNotContains('chain_push', $types);
-
-        $newState = $result->getNewState();
-        $this->assertNull($newState->requirePlayer(2)->getPosition());
-        // All Stand Firm players unmoved
-        $this->assertEquals(7, $newState->requirePlayer(3)->requirePosition()->getX());
-    }
+    // Test `testAllStandFirmCrowdSurf` (vsechna tri pole drzi Stand Firm => dav uprostred
+    //   hriste) kodoval vadu -- odstranen 09.10.2026 (review P186, M3). Pravidla r. 8514-8516:
+    //   "neither player moves"; hlida `HoldsGroundTest::testPushedDoHracuSeStandFirmNikymNepohne`.
 
     /**
      * One Stand Firm occupant, others chain-pushable → chain push skips Stand Firm.
