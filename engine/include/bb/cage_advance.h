@@ -109,6 +109,7 @@ struct CageAdvancePlan {
     int carrierGfi = 0;          // real GFI rolls the carrier leg takes (0-2)
 
     double planValue = 0.0;      // leaf eval of the projected end state (diag)
+    double blitzThreat = 0.0;    // P174: nejlepší soupeřův blitz/blok na nosiče po tomto plánu (0–1)
 
     // P154/K2 (06.10.2026): > 0, když delší krok nevyšel bez hodu a plán je pro kratší —
     // nese krok, který se zkoušel jako první. 0 = plán je pro první zkoušený krok.
@@ -234,6 +235,25 @@ struct CageSnapshot {
 CageSnapshot cageSnapshot(const GameState& state, const Player& carrier,
                           TeamSide mySide);
 
+// ⭐⭐ P174 — „SOUPEŘ DOSÁHNE / NEDOSÁHNE NA NOSIČE“ (uživatel 08.10.2026: „pokud má klec dva nebo
+//   tři rohy tak, ať soupeř nedosáhne na nosiče — tak je to také validní — ale nutné je rozlišit
+//   soupeř dosáhne / nedosáhne na nosiče — když postavíme klec se třemi rohy a necháme volný ten
+//   ve směru, odkud přijde blitz, tak je to víc chyba než správně postavené dva rohy“).
+//   Vrací pravděpodobnost, že soupeř v příštím tahu nosiče srazí NEJLEPŠÍ ranou, kterou má:
+//   pro každého soupeře, který může hrát, každé volné pole vedle nosiče, kam dojde (pohyb + 2 GFI,
+//   jedno pole stojí rána), pravděpodobnost, že tam dojde (úhyby z našich zón, GFI), krát šance
+//   na sražení podle kostek z toho pole (asistence obou stran): 3 kostky 0,70 · 2 kostky 0,55 ·
+//   1 kostka 0,33 · 2 kostky, vybírá nosič 0,11 · 3 kostky, vybírá nosič 0,04. Nikdo nedojde → 0.
+//   Počet rohů v tom není: dva rohy ve směru blitzu vyjdou líp než tři rohy s dírou k soupeři.
+// P177: má tým časovou rezervu? Kolik tahů na TD potřebuje (zbytek cesty po tempu klece = polovina
+// pomalejšího z pohybu nosiče a typického spoluhráče, + poslední tah na doběh) proti tahům, které
+// zbývají, s jedním tahem v záloze. Z pohybu, ne z rasy. `needOut` / `paceOut` jen pro výpis.
+bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOut = nullptr, int* paceOut = nullptr);
+
+//   `stopAbove`: jakmile hrozba překročí tuto mez, výpočet končí (pro předvýběr polí, kde stačí
+//   vědět „je nad mezí“) — plná hodnota se pak nevrací.
+double blitzThreat(const GameState& state, const Player& carrier, double stopAbove = 2.0);
+
 class CageAdvancePlanner {
 public:
     // Step ceiling is COMPUTED from real role MA (user constraint 2026-08-03,
@@ -309,16 +329,20 @@ public:
     struct AssignmentResult {
         bool feasible = false;
         int filled = 0, open = 0, gfi = 0;
+        int dirty = 0;       // obsazené rohy, jejichž pole leží v zóně soupeře („špinavý roh“)
         Position newCarrierPos{-1, -1};
         std::vector<SlotAssignment> slots;  // front pair first, then back pair
     };
     // `dy` (P154, 07.10.2026): nosič smí krok zakončit o řádek vedle (−1 / +1) — viz buildImpl.
+    // `target` (P174, 08.10.2026): klec kolem LIBOVOLNÉHO pole v dosahu nosiče (`step` je pak
+    // vzdálenost k němu) — plánovač už nehledá jen po přímce.
     // `diceFreeReach = false`: rohy se přidělují jen podle vzdálenosti (odhad tempa klece pro
     // rozhodnutí o vypuštění nosiče — jeden tah s vázanými hráči nemá zkreslit celý zbytek cesty).
     AssignmentResult tryAssign(const GameState& state, const Player& carrier,
                                int step,
                                const std::vector<int>& reservedPlayerIds,
-                               int dy = 0, bool diceFreeReach = true) const;
+                               int dy = 0, bool diceFreeReach = true,
+                               const Position* target = nullptr) const;
 
 private:
     MCTSConfig config_;

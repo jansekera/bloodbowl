@@ -334,7 +334,7 @@ template <typename Reached>
 void searchRoutes(const GameState& state, const Player& player, int budget, Position blockedSquare,
                   int* key, int8_t* steps, int16_t* parent, bool preferStraight, Reached reached) {
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
-                         kRiskSafeFirst);
+                         (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst));
     if (reached(key, steps)) return;
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent, preferStraight,
                          kRiskShortFirst);
@@ -542,7 +542,7 @@ bool nextStepToward(const GameState& state, const Player& player,
     const int startIdx = gridIdx(player.position.x, player.position.y);
     // P170: bezpečně napřed; kratší cesta přes hod jen tehdy, když dovede BLÍŽ k cíli.
     riskWeightedDijkstra(state, player, budget, blockedSquare, key, steps, parent,
-                        /*preferStraight=*/true, kRiskSafeFirst);
+                        /*preferStraight=*/true, (cageFeatureOn(kFeatPathRisk) ? kRiskSafeFirst : kRiskShortFirst));
     if (bestLayerIdx(key, gridIdx(target.x, target.y)) < 0) {
         int key2[kNodeCount];
         int8_t steps2[kNodeCount];

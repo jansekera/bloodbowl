@@ -3,7 +3,10 @@
 #include "bb/helpers.h"
 #include "bb/turn_plan_record.h"
 #include "bb/pathfinder.h"
+#include "bb/macro_actions.h"
 #include <algorithm>
+#include <functional>
+#include <map>
 #include <cmath>
 
 namespace bb {
@@ -157,6 +160,80 @@ CageSnapshot cageSnapshot(const GameState& state, const Player& carrier,
     return c;
 }
 
+bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOut, int* paceOut) {
+    const TeamSide side = carrier.teamSide;
+    std::vector<int> mas;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id != carrier.id && p.state == PlayerState::STANDING && CageAdvancePlanner::eligibleCornerPlayer(p)) {
+            mas.push_back(p.stats.movement);
+        }
+    });
+    std::sort(mas.begin(), mas.end());
+    const int ma = std::max(1, static_cast<int>(carrier.stats.movement));
+    const int mateMa = mas.empty() ? ma : mas[mas.size() / 2];
+    const int pace = std::max(1, std::min(ma, mateMa) / 2);
+    const int rest = distToEndzone(carrier.position, side) - (ma + 2);
+    const int need = (rest > 0 ? (rest + pace - 1) / pace : 0) + 1;
+    const int turnsLeftIncl = std::clamp(9 - state.getTeamState(side).turnNumber, 0, 8);
+    if (needOut) *needOut = need;
+    if (paceOut) *paceOut = pace;
+    return need <= turnsLeftIncl - 2;
+}
+
+double blitzThreat(const GameState& state, const Player& carrier, double stopAbove) {
+    if (!carrier.isOnPitch()) return 0.0;
+    const TeamSide side = carrier.teamSide;
+    GameState sim = state.clone();
+    auto downChance = [](int dice) {
+        if (dice >= 3) return 0.70;
+        if (dice == 2) return 0.55;
+        if (dice == 1) return 0.33;
+        if (dice == -2) return 0.11;
+        return 0.04;
+    };
+    std::vector<Position> around;
+    for (const Position& a : carrier.position.getAdjacent()) if (a.isOnPitch()) around.push_back(a);
+    double worst = 0.0;
+    std::vector<int> oppIds;
+    state.forEachOnPitch(opponent(side), [&](const Player& o) {
+        if (o.state == PlayerState::STANDING || o.state == PlayerState::PRONE) oppIds.push_back(o.id);
+    });
+    for (int id : oppIds) {
+        Player& o = sim.getPlayer(id);
+        const bool wasProne = o.state == PlayerState::PRONE;
+        int ma = o.stats.movement;
+        if (wasProne) {
+            if (ma < 3 && !o.hasSkill(SkillName::JumpUp)) continue;      // vstávání na hod: nepočítá se
+            if (!o.hasSkill(SkillName::JumpUp)) ma -= 3;
+        }
+        const Position home = o.position;
+        const int reach = ma + 2 - 1;                                  // jedno pole stojí rána
+        if (home.distanceTo(carrier.position) - 1 > reach) continue;
+        o.state = PlayerState::STANDING;
+        o.movementRemaining = static_cast<int8_t>(ma);
+        o.hasMoved = false;
+        o.hasActed = false;
+        for (const Position& a : around) {
+            double arrive;
+            if (a == home) {
+                arrive = 1.0;
+            } else {
+                if (sim.getPlayerAtPosition(a) || home.distanceTo(a) > reach) continue;
+                const double fail = pathFailProb(sim, o, a, reach, Position{-1, -1});
+                if (fail < 0.0) continue;                              // nedojde
+                arrive = 1.0 - fail;
+            }
+            o.position = a;
+            const double p = arrive * downChance(blockDiceCount(sim, o, sim.getPlayer(carrier.id)));
+            o.position = home;
+            if (p > worst) worst = p;
+            if (worst > stopAbove) return worst;
+        }
+        if (wasProne) o.state = PlayerState::PRONE;                   // ležící zónu nemá — vrátit pro další
+    }
+    return worst;
+}
+
 bool CageAdvancePlanner::eligibleCornerPlayer(const Player& p) {
     // Activation-reliability nega-traits: the corner job is a formation
     // commitment -- a corner that fails its activation roll (or roots) is a
@@ -196,7 +273,8 @@ CageAdvancePlanner::ProbeStats CageAdvancePlanner::probeMacro(const GameState& s
 
 CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         const GameState& state, const Player& carrier, int step,
-        const std::vector<int>& reservedPlayerIds, int dy, bool diceFreeReach) const {
+        const std::vector<int>& reservedPlayerIds, int dy, bool diceFreeReach,
+        const Position* target) const {
     AssignmentResult res;
     TeamSide mySide = carrier.teamSide;
     int dx = forwardDx(mySide);
@@ -217,9 +295,10 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
     // P154 (07.10.2026): krok smí skončit o řádek vedle (šikmo) — když na poli rohu leží tělo
     // nebo stojí soupeř, klec se postaví o řádek jinde; nosič u kraje hřiště se tak dostane
     // z řádku, kde rohy nemají kam stát. Jen s krokem ≥ 1 (šikmý krok stojí stejně jako rovný).
-    if (dy != 0 && (step < 1 || std::abs(dy) > step)) return res;
-    Position newPos{static_cast<int8_t>(carrier.position.x + dx * step),
-                    static_cast<int8_t>(carrier.position.y + dy)};
+    if (!target && dy != 0 && (step < 1 || std::abs(dy) > step)) return res;
+    Position newPos = target ? *target
+                             : Position{static_cast<int8_t>(carrier.position.x + dx * step),
+                                        static_cast<int8_t>(carrier.position.y + dy)};
     if (!newPos.isOnPitch()) return res;
     if (newPos.y < 1 || newPos.y > 13) return res;  // corner rows must exist
     // The carrier's target may hold a TEAMMATE: real formations right after
@@ -527,6 +606,9 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
         const Player* p = state.getPlayerAtPosition(d);
         if (p && p->teamSide == mySide && p->state == PlayerState::STANDING) built++;
     }
+    for (const auto& sa : res.slots) {
+        if (sa.playerId >= 0 && countTacklezones(state, sa.slot, mySide) > 0) res.dirty++;
+    }
     int minFilled = std::min(built, 3);
     res.feasible = (res.filled >= TRIGGER_MIN_CORNERS && res.filled >= minFilled);
     return res;
@@ -641,6 +723,321 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
 
     TeamSide mySide = carrier.teamSide;
     int dx = forwardDx(mySide);
+    auto legsAreSafe = [&](CageAdvancePlan& plan, int step, const AssignmentResult& assign) -> bool {
+        plan.step = step;
+        plan.filledCorners = assign.filled;
+        plan.openCorners = assign.open;
+        plan.gfiCorners = assign.gfi;
+
+        // --- Macros. Base order: front movers, back movers, carrier last
+        // (risk-last -- the screen forms before the carrier commits, and a GFI
+        // carrier leg stays at the very end). Execution order is then
+        // SITUATIONAL (user doctrine 2026-08-04): whoever stands on another
+        // mover's target square goes first, so pile-ups untangle front-first
+        // instead of deadlocking the walk.
+        std::vector<Macro> macros;
+        std::vector<bool> macroGfi;
+        for (const auto& sa : assign.slots) {
+            if (sa.playerId < 0 || sa.stayPut) continue;
+            Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
+            m.cageManaged = true;
+            macros.push_back(m);
+            macroGfi.push_back(sa.needsGfi);
+        }
+        if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
+            Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
+            cm.gfiAllowance = plan.carrierGfi;
+            cm.cageManaged = true;
+            macros.push_back(cm);
+            macroGfi.push_back(false);
+        }
+        // Dependency sort (stable): repeatedly pick the first not-yet-placed
+        // macro whose target square is not the CURRENT position of another
+        // unplaced mover. A cycle (mutual swaps) falls back to base order.
+        {
+            std::vector<Macro> ordered;
+            std::vector<bool> orderedGfi;
+            std::vector<size_t> left(macros.size());
+            for (size_t i = 0; i < left.size(); ++i) left[i] = i;
+            while (!left.empty()) {
+                size_t pickAt = 0;
+                bool found = false;
+                for (size_t li = 0; li < left.size() && !found; ++li) {
+                    const Macro& cand = macros[left[li]];
+                    bool blocked = false;
+                    for (size_t lj = 0; lj < left.size(); ++lj) {
+                        if (lj == li) continue;
+                        const Player& other = state.getPlayer(macros[left[lj]].playerId);
+                        if (other.position == cand.targetPos) { blocked = true; break; }
+                    }
+                    if (!blocked) { pickAt = li; found = true; }
+                }
+                if (!found) pickAt = 0;  // cycle: fall back to base order
+                ordered.push_back(macros[left[pickAt]]);
+                orderedGfi.push_back(macroGfi[left[pickAt]]);
+                left.erase(left.begin() + pickAt);
+            }
+            macros = std::move(ordered);
+            macroGfi = std::move(orderedGfi);
+        }
+
+        // Probe each macro on the EVOLVING projection (item13 pattern) -- step
+        // k's safety only means anything given steps 1..k-1 -- then execute it
+        // there to advance the occupancy picture.
+        GameState projected = state.clone();
+        for (size_t i = 0; i < macros.size(); ++i) {
+            const Macro& m = macros[i];
+            // The carrier's GFI leg is an ACCEPTED dice risk (tempo emergency):
+            // it gets the relaxed ceiling, everything else stays dice-free.
+            double ceiling = SAFE_PTO;
+            // P154 (07.10.2026): roh s dovedností Dodge smí cestou jeden úhyb na 2+ (s přehozem
+            // 1/36 = 2,8 %). Strop „bez hodu“ (2 %) elfům klec znemožňoval: vázaný elf odchází
+            // úhybem na 2+ běžně (v partii 22 z 22), a plánovač kvůli němu zahodil krok — elfové
+            // měli po tahu průměrně 1,1 rohu. Úhyby na 4+ a horší dál zastavuje strop P149;
+            // úhyb na 3+ s přehozem (11 %) touto mezí neprojde. Nosiče se to netýká.
+            if (m.playerId != carrier.id && state.getPlayer(m.playerId).hasSkill(SkillName::Dodge)) {
+                ceiling = SAFE_PTO_DODGE_SKILL;
+            }
+            if (m.gfiAllowance == 1) ceiling = SAFE_PTO_GFI1;
+            else if (m.gfiAllowance >= 2) ceiling = SAFE_PTO_GFI2;
+            auto pr = probeMacro(projected, m);
+            if (pr.pto > ceiling || pr.meanActions < 0.5) {
+                if (getenv("BB_CAGE_DEBUG")) {
+                    fprintf(stderr, "[cage DICEY] leg %zu/%zu player=%d gfi=%d "
+                            "pto=%.3f ceil=%.3f meanActs=%.2f target=(%d,%d)\n",
+                            i, macros.size(), m.playerId, m.gfiAllowance,
+                            pr.pto, ceiling, pr.meanActions,
+                            m.targetPos.x, m.targetPos.y);
+                }
+                plan.verdict = CageAdvanceVerdict::DICEY;
+                plan.diceyLegIdx = static_cast<int>(i);
+                plan.diceyPto = pr.pto;
+                plan.diceyCeil = ceiling;
+                plan.diceyMeanActs = pr.meanActions;
+                plan.diagMacros = macros;
+                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
+                return false;
+            }
+            // Execute on the projection. The macro is probed within its risk
+            // ceiling, but the expansion still rolls real dice -- retry before
+            // giving up on the plan (GFI legs fail a real fraction of attempts,
+            // so they get more retries; the RISK is priced above, the retries
+            // just need one clean sample to keep projecting).
+            bool ok = false;
+            int attempts = m.gfiAllowance > 0 ? 8 : 3;
+            for (int attempt = 0; attempt < attempts && !ok; ++attempt) {
+                GameState next = projected.clone();
+                auto r = greedyExpandMacro(next, m, dice_);
+                if (r.turnover || next.phase != GamePhase::PLAY ||
+                    next.activeTeam != state.activeTeam) {
+                    continue;
+                }
+                const Player& moved = next.getPlayer(m.playerId);
+                int miss = moved.position.distanceTo(m.targetPos);
+                // Movers must ARRIVE; the single 1-GFI corner walks dice-free
+                // and may stop one square short (closes next turn -- header).
+                int allowed = macroGfi[i] ? 1 : 0;
+                if (miss > allowed) continue;
+                projected = std::move(next);
+                ok = true;
+            }
+            if (!ok) {
+                if (getenv("BB_CAGE_DEBUG")) {
+                    GameState dbg = projected.clone();
+                    auto r = greedyExpandMacro(dbg, m, dice_);
+                    const Player& moved = dbg.getPlayer(m.playerId);
+                    fprintf(stderr, "[cage EXEC-FAIL] leg %zu/%zu player=%d gfi=%d "
+                            "target=(%d,%d) endpos=(%d,%d) to=%d phase=%d acts=%zu\n",
+                            i, macros.size(), m.playerId, m.gfiAllowance,
+                            m.targetPos.x, m.targetPos.y, moved.position.x,
+                            moved.position.y, (int)r.turnover, (int)dbg.phase,
+                            r.actions.size());
+                }
+                plan.verdict = CageAdvanceVerdict::DICEY;
+                plan.diceyLegIdx = static_cast<int>(i);
+                plan.diceyPto = pr.pto;
+                plan.diceyCeil = ceiling;
+                plan.diceyMeanActs = pr.meanActions;
+                plan.diceyExecFail = true;
+                plan.diagMacros = macros;
+                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
+                return false;
+            }
+        }
+
+        plan.planValue = evaler_.evaluateLeaf(projected, mySide);
+        if (projected.ball.isHeld && projected.ball.carrierId == carrier.id) {
+            plan.blitzThreat = bb::blitzThreat(projected, projected.getPlayer(carrier.id));
+        }
+        plan.macros = std::move(macros);
+        plan.verdict = CageAdvanceVerdict::PLAN_READY;
+        plan.valid = true;
+        return true;
+    };
+
+    // ⭐⭐⭐ P174 (uživatel 08.10.2026: „cíl klece byl vždy — pokud stavíme klec, musí mít čtyři
+    //   čisté rohy a nosiče uprostřed — zbytek není klec“; k hledání jen po přímce: „už jsem také
+    //   několikrát chtěl, ať se opraví“). PLÁNOVAČ HLEDÁ POLE, NE KROK: všechna pole, kam nosič
+    //   dojde bez hodu (bez GFI), kde nestojí v zóně soupeře a ne u postranní čáry; bere jen ta,
+    //   kde čtyři různí hráči dojdou bez hodu na čtyři rohy a ŽÁDNÝ roh neleží v zóně soupeře.
+    //   Z nich to nejdál vpřed (při shodě blíž středu). Dosud: krok jen rovně (od 07.10. o řádek
+    //   vedle), dva až tři rohy se braly jako klec a čistota rohu se nekontrolovala — čtyři čisté
+    //   rohy po tahu jen ve 29 % tahů, ačkoli takové pole existuje v 95,6 % kol (měření 19.08.).
+    //   Když čistá klec nikde nevyjde, pokračuje se dosavadním postupem (nejmenší zlo).
+    if (cageFeatureOn(kFeatCleanCageSearch)) {
+        struct Cand { Position sq; int progress; AssignmentResult a; };
+        std::vector<Cand> cands;
+        const int budget = static_cast<int>(carrier.movementRemaining);
+        int cleanNow = 0;
+        for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
+            const Position c{static_cast<int8_t>(carrier.position.x + cx), static_cast<int8_t>(carrier.position.y + cy)};
+            const Player* q = c.isOnPitch() ? state.getPlayerAtPosition(c) : nullptr;
+            if (q && q->teamSide == mySide && q->state == PlayerState::STANDING &&
+                countTacklezones(state, c, mySide) == 0) ++cleanNow;
+        }
+        const bool inCleanCage = cleanNow == 4 && countTacklezones(state, carrier.position, mySide) == 0;
+        for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
+            for (int y = carrier.position.y - budget; y <= carrier.position.y + budget; ++y) {
+                const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (!sq.isOnPitch() || sq == carrier.position) continue;
+                const int progress = (sq.x - carrier.position.x) * dx;
+                if (progress < 1) continue;        // jen vpřed; přeskupení na místě řeší dostavba klece
+                (void)inCleanCage;
+                if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
+                    std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
+                if (countTacklezones(state, sq, mySide, carrier.id) > 0) continue;
+                if (pathFailProb(state, carrier, sq, budget, Position{-1, -1}) > 0.0) continue;   // cesta přes hod
+                const int step = carrier.position.distanceTo(sq);
+                AssignmentResult a = tryAssign(state, carrier, step, reservedPlayerIds, 0, true, &sq);
+                if (!a.feasible || a.filled - a.gfi < 2) continue;
+                cands.push_back({sq, progress, std::move(a)});
+            }
+        }
+        // Pořadí, ve kterém se kandidáti zkoušejí (zkouška je drahá): napřed čtyři čisté rohy,
+        // pak víc stojících rohů, pak dál vpřed, pak blíž středu.
+        auto clean4 = [](const Cand& c) { return c.a.filled - c.a.gfi >= 4 && c.a.dirty == 0; };
+        std::stable_sort(cands.begin(), cands.end(), [&](const Cand& p, const Cand& q) {
+            if (clean4(p) != clean4(q)) return clean4(p);
+            if (p.progress != q.progress) return p.progress > q.progress;
+            const int fp = p.a.filled - p.a.gfi, fq = q.a.filled - q.a.gfi;
+            if (fp != fq) return fp > fq;
+            return std::abs(p.sq.y - 7) < std::abs(q.sq.y - 7);
+        });
+        // ⭐ Vybírá se podle toho, JAK DOBROU RÁNU na nosiče soupeř po tahu bude mít (blitzThreat),
+        //   ne podle počtu rohů: nejdál vpřed mezi poli, kde soupeř na nosiče nedosáhne nebo má
+        //   nejvýš ránu „dvě kostky, vybírá nosič“ (≤ 0,15). Uživatel 08.10.: „bojím se, že změnou
+        //   pro čistou klec nebo nic se dostaneš do situace, kdy pohyb klece zpomalíš tak, že
+        //   nedojde s trpaslíky vůbec“ — proto není podmínkou čistá klec, ale bezpečný nosič.
+        const double kSafeThreat = 0.15;
+        // LEVNÝ PŘEDVÝBĚR: hrozba rány na desce, kde hráči rovnou stojí na přidělených polích
+        // (bez zkoušení cest kostkami). Drahá zkouška „dojdou tam bez hodu a v tomto pořadí“
+        // (48 pokusů na každý přesun) se pak dělá jen pro nejlepší kandidáty — první verze
+        // zkoušela všechny a jeden plán trval i desítky sekund.
+        struct Ranked { const Cand* c; double threat; };
+        std::vector<Ranked> ranked;
+        // Předvýběr je drahý (pro každého soupeře v dosahu hledání cesty na každé pole u nosiče) ⇒
+        // jen prvních 24 kandidátů v pořadí výš a s koncem výpočtu, jakmile hrozba mez překročí.
+        // (Bez omezení trval jeden plán při 80 kandidátech ~10 s.)
+        auto screen = [&](const Cand& c) {
+            GameState proj = state.clone();
+            for (const auto& sa : c.a.slots) {
+                if (sa.playerId < 0 || sa.stayPut || sa.needsGfi) continue;
+                Player& mv = proj.getPlayer(sa.playerId);
+                mv.position = sa.slot;
+                mv.state = PlayerState::STANDING;
+            }
+            proj.getPlayer(carrier.id).position = c.sq;
+            proj.ball = BallState::carried(c.sq, carrier.id);
+            const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), kSafeThreat);
+            if (t <= kSafeThreat) ranked.push_back({&c, t});
+        };
+        const size_t kScreenCap = 24;
+        for (size_t i = 0; i < cands.size() && i < kScreenCap; ++i) screen(cands[i]);
+        // ⭐ P178 (uživatel 08.10.2026: „když nosič nemůže skórovat ani být v bezpečí — nesmí nastat“):
+        //   prvních 24 polí „nejdál vpřed“ jsou u rychlého nosiče (dosah 7–9, kandidátů i 80) samá
+        //   pole u soupeře. Když mezi nimi bezpečné nebylo, bližší pole se vůbec nezkoušela a plán
+        //   spadl do „nejmenšího zla“ — nosič pak stál mimo klec v dosahu rány. Teď se v tom
+        //   případě projde dalších 24 polí rovnoměrně ze VŠECH vzdáleností vpřed (z každé napřed
+        //   nejlepší, pak druhé nejlepší …; pořadí uvnitř vzdálenosti je to výš).
+        if (ranked.empty() && cands.size() > kScreenCap && cageFeatureOn(kFeatScreenSpread)) {
+            std::map<int, std::vector<const Cand*>, std::greater<int>> byProgress;
+            for (size_t i = kScreenCap; i < cands.size(); ++i) byProgress[cands[i].progress].push_back(&cands[i]);
+            size_t done = 0;
+            for (size_t rank = 0; done < kScreenCap; ++rank) {
+                bool any = false;
+                for (const auto& [prog, v] : byProgress) {
+                    (void)prog;
+                    if (rank >= v.size() || done >= kScreenCap) continue;
+                    any = true;
+                    ++done;
+                    screen(*v[rank]);
+                }
+                if (!any) break;
+            }
+        }
+        // ⭐⭐ P177 (uživatel 08.10.2026: „rychlejší týmy mohou s klecí dojít spíše bezpečně než co
+        //   nejdál — např. skaveni proti orkům, protože pak jim zbyde dost pohybu na TD později“;
+        //   „skaveni a elfové stihnou TD za 2 kola … trpaslíci za 6“). ČASOVÁ REZERVA z pohybu, ne
+        //   z rasy: kolik tahů tým na TD potřebuje = zbytek cesty po tempu klece (pomalejší z
+        //   nosiče a typického spoluhráče, odpor soupeře bere zhruba polovinu kroku — trpaslíci
+        //   změřeni 1,1–2,3 pole na tah) + poslední tah na doběh nosiče. Má-li tým rezervu i po
+        //   tahu bez postupu a s jedním tahem v záloze, vybírá se NEJBEZPEČNĚJŠÍ pole (hrozba
+        //   rány po dvacetinách), teprve pak nejdál; bez rezervy nejdál mezi bezpečnými, jako dosud.
+        bool hasSlack = false;
+        if (cageFeatureOn(kFeatSlackSafety)) {
+            int need = 0, pace = 0;
+            hasSlack = teamHasTimeSlack(state, carrier, &need, &pace);
+            if (getenv("BB_CAGE_DEBUG")) {
+                fprintf(stderr, "[cage] časová rezerva: potřebuje %d tahů (tempo %d), zbývá %d => %s\n", need, pace,
+                        std::clamp(9 - state.getTeamState(mySide).turnNumber, 0, 8), hasSlack ? "bezpečně" : "co nejdál");
+            }
+        }
+        std::stable_sort(ranked.begin(), ranked.end(), [&](const Ranked& p, const Ranked& q) {
+            if (hasSlack) {
+                const int bp = static_cast<int>(p.threat * 20.0 + 0.5), bq = static_cast<int>(q.threat * 20.0 + 0.5);
+                if (bp != bq) return bp < bq;                      // s rezervou: napřed bezpečí
+            }
+            return p.c->progress > q.c->progress;                  // nejdál vpřed; při shodě pořadí výš
+        });
+        CageAdvancePlan best;
+        bool haveBest = false;
+        int bestProgress = -1;
+        int tried = 0;
+        for (const Ranked& r : ranked) {
+            if (++tried > 4) break;
+            CageAdvancePlan candidate = plan;
+            candidate.carrierGfi = 0;
+            if (!legsAreSafe(candidate, carrier.position.distanceTo(r.c->sq), r.c->a)) continue;
+            if (candidate.blitzThreat > kSafeThreat) continue;
+            best = std::move(candidate);
+            bestProgress = r.c->progress;
+            haveBest = true;
+            break;
+        }
+        if (haveBest) {
+            if (getenv("BB_CAGE_DEBUG")) {
+                fprintf(stderr, "[cage] bezpečná klec: nosič (%d,%d) vpřed o %d, rohů %d, hrozba rány %.2f, kandidátů %zu\n",
+                        carrier.position.x, carrier.position.y, bestProgress, best.filledCorners - best.gfiCorners,
+                        best.blitzThreat, cands.size());
+            }
+            return best;
+        }
+        if (getenv("BB_CAGE_DEBUG")) {
+            fprintf(stderr, "[cage] bezpečné pole pro klec nevyšlo (kandidátů %zu, bezpečných %zu, zkoušeno %d)\n", cands.size(), ranked.size(), std::min(tried, 4));
+        }
+        // P177: bezpečné pole není a tým má časovou rezervu ⇒ do nebezpečí se nejde; klec se
+        // dostaví na místě (build() → dostavba) a postoupí, až to půjde bezpečně nebo dojde rezerva.
+        // ⚠️ Jen když je nosič v bezpečí TAM, KDE STOJÍ. Stojí-li v dosahu dobré rány a bezpečné pole
+        //   není, čekáním o míč přijde („pokud hrozí blitz na nosiče a ztráta — je lepší dát TD
+        //   dříve“) ⇒ pokračuje se dosavadním postupem co nejdál. První verze stála i tehdy:
+        //   skaven 60 → 47 TD, soupeř skóroval první 46 → 57 (160 poločasů).
+        if (hasSlack && bb::blitzThreat(state, carrier, kSafeThreat) <= kSafeThreat) {
+            if (getenv("BB_CAGE_DEBUG")) fprintf(stderr, "[cage] rezerva a nosič je v bezpečí — klec stojí\n");
+            CageAdvancePlan stand = plan;
+            stand.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
+            return stand;
+        }
+    }
     for (auto& d : carrier.position.getAdjacent()) {
         if (!d.isOnPitch()) continue;
         if (std::abs(d.x - carrier.position.x) != 1 ||
@@ -808,154 +1205,6 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     //   se čtyřmi rohy). V celých hrách 30 ze 155 tahů s míčem (kniha P154).
     //   Teď: stejná kontrola „bez hodu“ pro krok finalStep, finalStep-1, … 1; bere se první,
     //   který projde. Když neprojde žádný, vrací se verdikt prvního pokusu (diagnostika).
-    auto legsAreSafe = [&](CageAdvancePlan& plan, int step, const AssignmentResult& assign) -> bool {
-        plan.step = step;
-        plan.filledCorners = assign.filled;
-        plan.openCorners = assign.open;
-        plan.gfiCorners = assign.gfi;
-
-        // --- Macros. Base order: front movers, back movers, carrier last
-        // (risk-last -- the screen forms before the carrier commits, and a GFI
-        // carrier leg stays at the very end). Execution order is then
-        // SITUATIONAL (user doctrine 2026-08-04): whoever stands on another
-        // mover's target square goes first, so pile-ups untangle front-first
-        // instead of deadlocking the walk.
-        std::vector<Macro> macros;
-        std::vector<bool> macroGfi;
-        for (const auto& sa : assign.slots) {
-            if (sa.playerId < 0 || sa.stayPut) continue;
-            Macro m{MacroType::REPOSITION, sa.playerId, -1, sa.slot};
-            m.cageManaged = true;
-            macros.push_back(m);
-            macroGfi.push_back(sa.needsGfi);
-        }
-        if (plan.step > 0) {   // cage-fill (step 0) never moves the carrier
-            Macro cm{MacroType::REPOSITION, carrier.id, -1, assign.newCarrierPos};
-            cm.gfiAllowance = plan.carrierGfi;
-            cm.cageManaged = true;
-            macros.push_back(cm);
-            macroGfi.push_back(false);
-        }
-        // Dependency sort (stable): repeatedly pick the first not-yet-placed
-        // macro whose target square is not the CURRENT position of another
-        // unplaced mover. A cycle (mutual swaps) falls back to base order.
-        {
-            std::vector<Macro> ordered;
-            std::vector<bool> orderedGfi;
-            std::vector<size_t> left(macros.size());
-            for (size_t i = 0; i < left.size(); ++i) left[i] = i;
-            while (!left.empty()) {
-                size_t pickAt = 0;
-                bool found = false;
-                for (size_t li = 0; li < left.size() && !found; ++li) {
-                    const Macro& cand = macros[left[li]];
-                    bool blocked = false;
-                    for (size_t lj = 0; lj < left.size(); ++lj) {
-                        if (lj == li) continue;
-                        const Player& other = state.getPlayer(macros[left[lj]].playerId);
-                        if (other.position == cand.targetPos) { blocked = true; break; }
-                    }
-                    if (!blocked) { pickAt = li; found = true; }
-                }
-                if (!found) pickAt = 0;  // cycle: fall back to base order
-                ordered.push_back(macros[left[pickAt]]);
-                orderedGfi.push_back(macroGfi[left[pickAt]]);
-                left.erase(left.begin() + pickAt);
-            }
-            macros = std::move(ordered);
-            macroGfi = std::move(orderedGfi);
-        }
-
-        // Probe each macro on the EVOLVING projection (item13 pattern) -- step
-        // k's safety only means anything given steps 1..k-1 -- then execute it
-        // there to advance the occupancy picture.
-        GameState projected = state.clone();
-        for (size_t i = 0; i < macros.size(); ++i) {
-            const Macro& m = macros[i];
-            // The carrier's GFI leg is an ACCEPTED dice risk (tempo emergency):
-            // it gets the relaxed ceiling, everything else stays dice-free.
-            double ceiling = SAFE_PTO;
-            // P154 (07.10.2026): roh s dovedností Dodge smí cestou jeden úhyb na 2+ (s přehozem
-            // 1/36 = 2,8 %). Strop „bez hodu“ (2 %) elfům klec znemožňoval: vázaný elf odchází
-            // úhybem na 2+ běžně (v partii 22 z 22), a plánovač kvůli němu zahodil krok — elfové
-            // měli po tahu průměrně 1,1 rohu. Úhyby na 4+ a horší dál zastavuje strop P149;
-            // úhyb na 3+ s přehozem (11 %) touto mezí neprojde. Nosiče se to netýká.
-            if (m.playerId != carrier.id && state.getPlayer(m.playerId).hasSkill(SkillName::Dodge)) {
-                ceiling = SAFE_PTO_DODGE_SKILL;
-            }
-            if (m.gfiAllowance == 1) ceiling = SAFE_PTO_GFI1;
-            else if (m.gfiAllowance >= 2) ceiling = SAFE_PTO_GFI2;
-            auto pr = probeMacro(projected, m);
-            if (pr.pto > ceiling || pr.meanActions < 0.5) {
-                if (getenv("BB_CAGE_DEBUG")) {
-                    fprintf(stderr, "[cage DICEY] leg %zu/%zu player=%d gfi=%d "
-                            "pto=%.3f ceil=%.3f meanActs=%.2f target=(%d,%d)\n",
-                            i, macros.size(), m.playerId, m.gfiAllowance,
-                            pr.pto, ceiling, pr.meanActions,
-                            m.targetPos.x, m.targetPos.y);
-                }
-                plan.verdict = CageAdvanceVerdict::DICEY;
-                plan.diceyLegIdx = static_cast<int>(i);
-                plan.diceyPto = pr.pto;
-                plan.diceyCeil = ceiling;
-                plan.diceyMeanActs = pr.meanActions;
-                plan.diagMacros = macros;
-                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
-                return false;
-            }
-            // Execute on the projection. The macro is probed within its risk
-            // ceiling, but the expansion still rolls real dice -- retry before
-            // giving up on the plan (GFI legs fail a real fraction of attempts,
-            // so they get more retries; the RISK is priced above, the retries
-            // just need one clean sample to keep projecting).
-            bool ok = false;
-            int attempts = m.gfiAllowance > 0 ? 8 : 3;
-            for (int attempt = 0; attempt < attempts && !ok; ++attempt) {
-                GameState next = projected.clone();
-                auto r = greedyExpandMacro(next, m, dice_);
-                if (r.turnover || next.phase != GamePhase::PLAY ||
-                    next.activeTeam != state.activeTeam) {
-                    continue;
-                }
-                const Player& moved = next.getPlayer(m.playerId);
-                int miss = moved.position.distanceTo(m.targetPos);
-                // Movers must ARRIVE; the single 1-GFI corner walks dice-free
-                // and may stop one square short (closes next turn -- header).
-                int allowed = macroGfi[i] ? 1 : 0;
-                if (miss > allowed) continue;
-                projected = std::move(next);
-                ok = true;
-            }
-            if (!ok) {
-                if (getenv("BB_CAGE_DEBUG")) {
-                    GameState dbg = projected.clone();
-                    auto r = greedyExpandMacro(dbg, m, dice_);
-                    const Player& moved = dbg.getPlayer(m.playerId);
-                    fprintf(stderr, "[cage EXEC-FAIL] leg %zu/%zu player=%d gfi=%d "
-                            "target=(%d,%d) endpos=(%d,%d) to=%d phase=%d acts=%zu\n",
-                            i, macros.size(), m.playerId, m.gfiAllowance,
-                            m.targetPos.x, m.targetPos.y, moved.position.x,
-                            moved.position.y, (int)r.turnover, (int)dbg.phase,
-                            r.actions.size());
-                }
-                plan.verdict = CageAdvanceVerdict::DICEY;
-                plan.diceyLegIdx = static_cast<int>(i);
-                plan.diceyPto = pr.pto;
-                plan.diceyCeil = ceiling;
-                plan.diceyMeanActs = pr.meanActions;
-                plan.diceyExecFail = true;
-                plan.diagMacros = macros;
-                plan.diagMacroCornerGfi.assign(macroGfi.begin(), macroGfi.end());
-                return false;
-            }
-        }
-
-        plan.planValue = evaler_.evaluateLeaf(projected, mySide);
-        plan.macros = std::move(macros);
-        plan.verdict = CageAdvanceVerdict::PLAN_READY;
-        plan.valid = true;
-        return true;
-    };
 
     // ⭐ P154 (07.10.2026, uživatel: „hledej způsoby, jak zlepšit to, aby byla čistá klec na
     //   konci tahu“): ČISTÁ KLEC MÁ PŘEDNOST PŘED DÉLKOU KROKU. Nejdelší bezpečný krok se
@@ -987,7 +1236,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     //   odtlačení (Frenzy) do diváků nedostanou a rohy klece nestojí na krajním řádku. Stojí-li
     //   u kraje už teď, zkouší se napřed krok šikmo ke středu; krok, který by ho ke kraji
     //   přivedl, se nebere.
-    auto nearSideline = [](int y) { return y < 2 || y > 12; };
+    auto nearSideline = [](int y) { return cageFeatureOn(kFeatSideline) && (y < 2 || y > 12); };
     const bool carrierAtSideline = nearSideline(carrier.position.y);
     const int dyOrder[3] = {carrierAtSideline ? towardMiddle : 0, carrierAtSideline ? 0 : towardMiddle,
                             -towardMiddle};
@@ -1007,7 +1256,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                 // P169 krok 4 (07.10.2026): ani NEJDELŠÍ krok nesmí nosiče postavit do zóny
                 // soupeře — dosud to hlídaly jen kratší kroky (po tahu s nosičem vedle soupeře
                 // přišel míč ve 39 % případů, jinak v 9 %).
-                if (countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
+                if (cageFeatureOn(kFeatMarkers) && countTacklezones(state, a.newCarrierPos, mySide) > 0) continue;
             } else {
                 a = tryAssign(state, carrier, step, reservedPlayerIds, dy);
                 if (!a.feasible) continue;

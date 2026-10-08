@@ -60,6 +60,9 @@ constexpr int kDodgeCapTarget = 4;
 thread_local bool g_dodgeCapEnabled = true;
 thread_local long g_dodgeCapStops[2] = {0, 0};   // [0] zastavená chůze, [1] vyřazený blitzující
 void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
+thread_local unsigned g_cageFeaturesOff = 0;
+void setCageFeaturesOff(unsigned mask) { g_cageFeaturesOff = mask; }
+unsigned cageFeaturesOff() { return g_cageFeaturesOff; }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
@@ -3531,7 +3534,7 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
     // P169 (07.10.2026): druhý průchod (rohy) jen pro makro, které si blitzujícího samo určilo.
     // Blitz bez jména roh klece nevezme vůbec — „bezpečí nosiče je důležitější než pravidlo
     // využít blitz každé kolo“ (uživatel 07.10.).
-    const int passes = (macro.playerId > 0) ? 2 : 1;
+    const int passes = (macro.playerId > 0 || !cageFeatureOn(kFeatCornersPassive)) ? 2 : 1;
     for (int pass = 0; pass < passes && !found; ++pass) {
         for (const auto& ranking : ranked) {
             const Action& a = ranking.second;
@@ -3689,9 +3692,12 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     if (macro.cageManaged && state.ball.isHeld && state.ball.carrierId == macro.playerId &&
         p.isOnPitch() && p.movementRemaining > 0 && !p.lostTacklezones) {
         const int budget = p.movementRemaining;
-        const Position dest = farthestSafeForward(state, p, budget, /*forCage=*/true);
+        const Position dest = farthestSafeForward(state, p, budget, /*forCage=*/cageFeatureOn(kFeatPickupForCage));
         if (dest != p.position) {
-            movePlayerToward(state, macro.playerId, dest, dice, result, budget,
+            // P176: cíl smí ležet o „levné“ GFI dál (farthestSafeForward to hlídá) — krokový rozpočet
+            // se o ně prodlouží
+            const int steps = pathStepsToward(state, p, dest, budget + maxGfiSquares(p), Position{-1, -1});
+            movePlayerToward(state, macro.playerId, dest, dice, result, std::max(budget, steps),
                              Position{-1, -1}, pickupDodgeCap);
         }
         return result;

@@ -47,6 +47,31 @@ void setDodgeCapEnabled(bool on);
 // P162: „faul až jako poslední akce tahu“. Vypínač jen pro měření před/po a pro testy, které
 // zkoušejí aritmetiku priorů s faulem v široké nabídce; ve hře zapnuto.
 void setFoulOnlyLastEnabled(bool on);
+
+// Vypínače jednotlivých úprav z 07.10.2026 večer (P169/P170) — JEN PRO MĚŘENÍ každé změny
+// zvlášť (uživatel 08.10.: „zkontroluj měření přesně změny samostatně“). Ve hře vše zapnuto;
+// bit v masce = úprava VYPNUTA.
+enum CageFeature : unsigned {
+    kFeatPathRisk       = 1,    // P170: cena rizika ve výběru cesty 24 (vypnuto = 4)
+    kFeatPickupForCage  = 2,    // nosič po zvednutí jen kam dojdou rohy + zvednutí hledáním jako zvednutí řadiče
+    kFeatCarrierByCtl   = 4,    // nosičem bez klece nehýbe hledání („ani tři rohy“ už neuvolňuje) + nosič ke kleci
+    kFeatCornersPassive = 8,    // roh postavené klece neblitzuje / nefauluje / blokuje jen bezpečně
+    kFeatTimeRun        = 16,   // výběh na konci poločasu volí řadič; jen když sólo TD stihne
+    kFeatSideline       = 32,   // nosič ≥ 2 pole od postranní čáry
+    kFeatLateFill       = 64,   // dostavba rohů po zvednutí hledáním
+    kFeatMarkers        = 128,  // soupeř na kterémkoli z 8 polí u nosiče; krok nekončí v zóně; kdo odtlačí pryč
+    kFeatPhaseOneBlitz  = 256,
+    kFeatCleanCageSearch = 512,
+    kFeatForceScore     = 32768, // P178: ohrožený nosič, který do zóny dojde, skóruje příkazem řadiče (ne volbou hledání)
+    kFeatScreenSpread   = 65536, // P178: předvýběr bezpečného pole bere pole ze všech vzdáleností, ne jen 24 nejdál
+    kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
+    kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
+    kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře
+    kFeatScoreEarly     = 4096, // P175: hrozí-li rána na nosiče, TD přes hod má přednost před klecí // P174: plánovač hledá pole pro čistou klec po celém dosahu nosiče  // P172: blitz na proboření obrany + stojící klec nepřeskakuje rány
+};
+void setCageFeaturesOff(unsigned mask);
+unsigned cageFeaturesOff();
+inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; }
 void takeDodgeCapStops(long* out2);
 
 enum class MacroType : uint8_t {

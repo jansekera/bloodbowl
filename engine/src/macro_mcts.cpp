@@ -745,6 +745,19 @@ double MacroMCTSSearch::greedyLookaheadBonus(const GameState& leafState, TeamSid
 constexpr double kActivationValueMeasured = 0.024;
 thread_local double g_activationValue = kActivationValueMeasured;
 void setActivationValue(double v) { g_activationValue = v; }
+
+// ⭐ P171 (a) (07.10.2026): KLEC V OHODNOCENÍ POZICE. Hledání klec dosud v listovém odhadu nemělo
+//   (jen „doprovod jde dopředu“), takže ji rozebíralo pokaždé jinou cestou a každá se zavírala
+//   zvlášť zákazem. Člen = −(pravděpodobnost, že soupeř v příštím tahu míč vezme) × (hodnota
+//   držení míče v tomtéž odhadu). Pravděpodobnosti jsou ZMĚŘENÉ (trpaslíci TV1500, 80 útočných
+//   poločasů, 514 tahů končících s míčem, `evidence/klec_20261007/rohy.py`): nosič vedle
+//   stojícího soupeře 42 %; jinak podle stojících rohů: 0–1 → 44 %, 2 → 20 %, 3 → 10 %,
+//   4 → 4 % (dva a víc rohů v kontaktu se soupeřem → 9 %). Bez soupeře v dosahu nosiče 0.
+//   Váha 0 = vypnuto (výchozí, dokud to uživatel neuvidí změřené); 1 = plná změřená cena.
+thread_local double g_cageLeafWeight = 0.0;
+void setCageLeafWeight(double w) { g_cageLeafWeight = w; }
+double cageLeafWeight() { return g_cageLeafWeight; }
+
 double activationValue() { return g_activationValue; }
 
 double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
@@ -849,6 +862,15 @@ double MacroMCTSSearch::simulate(const GameState& state, TeamSide perspective) {
             // default via config_.leafLookahead): see greedyLookaheadBonus().
             if (config_.leafLookahead) {
                 scoringBonus += greedyLookaheadBonus(state, perspective);
+            }
+
+            // P171 (a): cena nechráněného nosiče. Hodnota držení míče v tomto odhadu =
+            // rozdíl „míč máme“ × „míč má soupeř“ (±0,1 a ±0,25 × blízkost zóny). Neplatí
+            // pro nosiče, který v tomto tahu dojde do zóny (to řeší členy výš).
+            if (g_cageLeafWeight > 0.0 && carrier.isOnPitch() && carrier.state == PlayerState::STANDING &&
+                dist > static_cast<int>(carrier.movementRemaining) + maxGfiSquares(carrier)) {
+                const double possession = 0.2 + 0.5 * proximity;
+                heuristic -= g_cageLeafWeight * carrierLossRisk(state, carrier) * possession;
             }
 
         } else {
@@ -1085,7 +1107,9 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     // nosič po něm nejde „co nejdál“ (odběhl spoluhráčům, i po krajním řádku), ale bez hodu na
     // pole, kolem kterého se ještě postaví klec, aspoň dvě pole od postranní čáry. Rohy pak
     // dostaví řadič (krok 9). Změřeno: 18 z 33 zvednutí po 1. kole skončilo s 0–1 rohem.
-    if (!fromStagedPlan && bestMacro.type == MacroType::PICKUP) bestMacro.cageManaged = true;
+    if (!fromStagedPlan && bestMacro.type == MacroType::PICKUP && cageFeatureOn(kFeatPickupForCage)) {
+        bestMacro.cageManaged = true;
+    }
     // P154 (06.10.2026): hledání chce tah ukončit a míč držíme ⇒ napřed dotáhnout klec.
     if (!fromStagedPlan && bestMacro.type == MacroType::END_TURN) {
         Macro cageMacro;

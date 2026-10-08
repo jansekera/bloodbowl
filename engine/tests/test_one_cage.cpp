@@ -113,7 +113,8 @@ TEST(OneCageForward, GoesAsFarAsTheMovementAllowsInTheOpen) {
     Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
     b.put(12, TeamSide::AWAY, {24, 1});
     const Position d = farthestSafeForward(b.s, c, 6);
-    EXPECT_EQ(d.x, 11) << "6 polí vpřed";
+    // P176 (08.10.2026): jediný soupeř stojí daleko ⇒ pád na GFI by byl levný a nosič přidá dvě GFI
+    EXPECT_EQ(d.x, 11) << "6 polí vpřed; GFI se bere jen jako útěk z dosahu soupeře, a tady na něj nikdo nedosáhne";
 }
 
 TEST(OneCageForward, NeverEndsNextToAStandingOpponentNorDodges) {
@@ -129,17 +130,31 @@ TEST(OneCageForward, NeverEndsNextToAStandingOpponentNorDodges) {
 // P154 (07.10.2026): po zvednutí jde nosič jen tak daleko, aby za ním rohy došly — čtyři hráči
 // s MA 4 dosáhnou na pole rohů nejdál kolem x=9; bez ohledu na klec by nosič doběhl na x=11.
 TEST(OneCageForward, AfterPickupStopsWhereFourCornersCanStillReachHim) {
-    Board b;
-    Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
-    b.put(2, TeamSide::HOME, {6, 5});
-    b.put(3, TeamSide::HOME, {6, 9});
-    b.put(4, TeamSide::HOME, {4, 5});
-    b.put(5, TeamSide::HOME, {4, 9});
-    b.put(12, TeamSide::AWAY, {24, 1});
-    EXPECT_EQ(farthestSafeForward(b.s, c, 6).x, 11) << "pozitivní kontrola: bez klece co nejdál";
-    const Position d = farthestSafeForward(b.s, c, 6, /*forCage=*/true);
-    EXPECT_EQ(d.x, 9);
-    EXPECT_EQ(d.y, 7);
+    auto board = [](Position opponent) {
+        Board b;
+        b.put(1, TeamSide::HOME, {5, 7}, 6);
+        b.put(2, TeamSide::HOME, {6, 5});
+        b.put(3, TeamSide::HOME, {6, 9});
+        b.put(4, TeamSide::HOME, {4, 5});
+        b.put(5, TeamSide::HOME, {4, 9});
+        b.put(12, TeamSide::AWAY, opponent, 6);
+        return b;
+    };
+    {   // soupeř v dosahu (MA 6 + 2 GFI + rána): bezpečněji je v kleci ⇒ jen kam dojdou čtyři rohy
+        Board b = board({18, 7});
+        const Player& c = b.s.getPlayer(1);
+        EXPECT_EQ(farthestSafeForward(b.s, c, 6).x, 11) << "pozitivní kontrola: bez ohledu na klec co nejdál";
+        const Position d = farthestSafeForward(b.s, c, 6, /*forCage=*/true);
+        EXPECT_EQ(d.x, 9);
+        EXPECT_EQ(d.y, 7);
+    }
+    {   // P173 (uživatel 08.10.2026: „útěk daleko“; „musí alespoň hlídat, že k němu nikdo ze soupeřů
+        // nedojde v příštím kole“): soupeř na nosiče nedosáhne nikde ⇒ útěk je stejně bezpečný
+        // jako klec a nosič jde co nejdál — stejné pravidlo pro každou rasu.
+        Board b = board({24, 1});
+        const Player& c = b.s.getPlayer(1);
+        EXPECT_EQ(farthestSafeForward(b.s, c, 6, /*forCage=*/true).x, 11);
+    }
 }
 
 // --- Fáze 3: kdy pustit nosiče ---------------------------------------------------
@@ -375,13 +390,18 @@ TEST(OneCageScoringRange, LastTurnOfTheHalfIsLeftToTheSearch) {
     EXPECT_FALSE(cc.next(b.s, m));
 }
 
-TEST(OneCageScoringRange, CarrierWhoWalksInWithoutDiceIsLeftToTheSearch) {
+// Od 08.10.2026 (P175) platí: dojde bez hodu a hrozí mu rána ⇒ skóruje hned (rozhoduje hledání);
+// dojde bez hodu a je v bezpečí ⇒ TD se zdržuje (OneCageStall).
+TEST(OneCageScoringRange, CarrierWhoWalksInWithoutDiceIsLeftToTheSearchWhenThreatened) {
     Board b = scoringRangeBoard(4);
     b.s.getPlayer(1).position = {20, 7};     // 5 polí, MA6 ⇒ dojde bez hodu
     b.s.ball = BallState::carried({20, 7}, 1);
+    b.put(18, TeamSide::AWAY, {20, 8}, 6);   // soupeř stojí hned u nosiče ⇒ hrozí rána
+    ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.05);
     CageController cc(nullptr, cfg(), 1);
     Macro m;
-    EXPECT_FALSE(cc.next(b.s, m));
+    if (cc.next(b.s, m)) EXPECT_NE(m.playerId, 1) << "řadič nosiče nedrží — smí jen rány na soupeře u něj";
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}})) << "skórovat smí";
 }
 
 // Hledání chce tah ukončit, nosič už popošel a rohy zůstaly stát ⇒ řadič je dotáhne.
@@ -616,6 +636,10 @@ Board heldTeammateBoard() {
 }  // namespace
 
 TEST(OneCageFreeing, FreeTeammateComesToAssistSoTheBlockHasTwoDice) {
+    // P174/P177 (08.10.2026): s hledáním bezpečného pole řadič v této pozici postaví čistou klec
+    // i s volným pomocníkem a rány pak nejsou potřeba („klec napřed“); test zkouší samotný
+    // příchod pro asistenci, proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     Board b = heldTeammateBoard();
     b.put(5, TeamSide::HOME, {16, 4}, 4, 3, {SkillName::Block});   // u soupeře 13 z druhé strany
     b.put(14, TeamSide::AWAY, {17, 5}, 6);                          // kryje 13: bez pomoci jen 1 kostka
@@ -819,4 +843,206 @@ TEST(OneCageLatePickup, CornersAreBuiltRightAfterAPickupMadeByTheSearch) {
         if (q && q->teamSide == TeamSide::HOME && q->state == PlayerState::STANDING) ++corners;
     }
     EXPECT_EQ(corners, 4) << "řadič po zvednutí dostavěl klec (maker " << ms.size() << ")";
+}
+
+// P172 — první fáze celotahu (uživatel 07.10.2026: „první bude klec — kde bude v obsahu i blitz pro
+// proboření obrany nebo blocky na uvolnění klece — pak se provede celý pohyb klece s nosičem“).
+// Soupeř stojí kleci v cestě na (15,7): bez rány klec ujde jedno pole (dál by nosič končil v jeho
+// zóně). Volný hráč s Block a silou na dvě kostky ho blitzem shodí a klec pak jde dál.
+TEST(OneCagePhaseOne, BlitzBreaksTheWayBeforeTheCageMoves) {
+    // P174 (08.10.2026): s hledáním bezpečného pole by klec soupeře v cestě obešla šikmo a blitz
+    // by potřeba nebyl; test zkouší samotný blitz na proboření, proto je hledání vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
+    auto board = [](bool withBlitzer) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {12, 7}, 4);
+        b.put(2, TeamSide::HOME, {11, 6});
+        b.put(3, TeamSide::HOME, {11, 8});
+        b.put(4, TeamSide::HOME, {13, 6});
+        b.put(5, TeamSide::HOME, {13, 8});
+        if (withBlitzer) b.put(6, TeamSide::HOME, {13, 3}, 6, 4, {SkillName::Block});
+        b.put(13, TeamSide::AWAY, {15, 7}, 6);
+        b.put(14, TeamSide::AWAY, {24, 13}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(true);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        EXPECT_EQ(m.type, MacroType::BLITZ) << "tah klece začíná blitzem na soupeře v cestě";
+        EXPECT_EQ(m.playerId, 6);
+        EXPECT_EQ(m.targetId, 13);
+    }
+    {   // pozitivní kontrola: bez hráče, který by bezpečně blitzoval, řadič blitz nehraje
+        Board b = board(false);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::BLITZ);
+    }
+}
+
+// P173 — jedno měřítko bezpečí nosiče pro všechny rasy (uživatel 08.10.2026: „klec má být
+// univerzální“, „pokud … uteče nosič sám — musí alespoň hlídat, že k němu nikdo ze soupeřů
+// nedojde v příštím kole“).
+TEST(BallLossRisk, OutOfReachIsAsSafeAsACageAndTheNumbersAreTheMeasuredOnes) {
+    Board b;
+    b.put(1, TeamSide::HOME, {5, 7}, 6);
+    b.put(12, TeamSide::AWAY, {20, 7}, 6);                       // dosah 6 + 2 + 1 = 9 polí; je 15 daleko
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {5, 7}, 0, 0), 0.0) << "nikdo nedosáhne";
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 0, 0), 0.44) << "v dosahu a bez rohů";
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 2, 0), 0.20);
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 3, 0), 0.10);
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 4, 0), 0.04);
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {11, 7}, 4, 2), 0.09);
+    EXPECT_DOUBLE_EQ(ballLossRisk(b.s, TeamSide::HOME, 1, {19, 7}, 4, 0), 0.42) << "vedle soupeře";
+}
+
+// P175 (uživatel 08.10.2026: „obecně chci, ať s TD zdržujeme za všechny, ale jen v případě, kdy máme
+// balon bezpečně v držení a nehrozí blitz na nosiče — na druhou stranu pokud hrozí blitz na nosiče
+// a ztráta, je lepší dát TD dříve — toto je obojí obecné pravidlo“).
+// Nosič stojí tři pole před zónou a dojde bez hodu.
+TEST(OneCageStall, HoldsTheBallWhenSafeAndScoresWhenThreatenedOrOnTheLastTurn) {
+    auto board = [](int turn, Position opponent) {
+        Board b(turn);
+        b.put(1, TeamSide::HOME, {22, 7}, 6);
+        b.put(2, TeamSide::HOME, {20, 5});
+        b.put(13, TeamSide::AWAY, opponent, 6);
+        b.s.ball = BallState::carried({22, 7}, 1);
+        return b;
+    };
+    const Macro score{MacroType::SCORE, 1, -1, {-1, -1}};
+    {   // 5. kolo, soupeř daleko (dosah 6 + 2 + rána nestačí): TD se zdržuje
+        Board b = board(5, {3, 7});
+        ASSERT_DOUBLE_EQ(blitzThreat(b.s, b.s.getPlayer(1)), 0.0);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        EXPECT_EQ(b.s.getPlayer(1).position, (Position{22, 7})) << "nosič stojí";
+        EXPECT_TRUE(cc.forbidsCarrierMove(b.s, score)) << "skórovat se v tomto tahu nesmí";
+        EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::ADVANCE, 1, -1, {-1, -1}}));
+    }
+    {   // 5. kolo, soupeř na nosiče dosáhne s dobrou ranou: skóruje se hned
+        Board b = board(5, {18, 9});
+        ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.05);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        // P178 (uživatel 08.10.: „tam má být kontrola, ať raději skórují, než zůstat jako cíl pro
+        // blitz“): TD přikáže řadič sám, nenechává ho na volbě hledání.
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::SCORE) << "hrozí blitz ⇒ TD hned, příkazem řadiče";
+        EXPECT_EQ(b.s.getPlayer(1).position.x, 25) << "nosič je v zóně";
+    }
+    {   // 8. kolo: skóruje se, i když je nosič v bezpečí
+        Board b = board(8, {3, 7});
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::SCORE) << "poslední kolo poločasu";
+    }
+    {   // pojistka měření: s vypnutou úpravou řadič TD nepřikazuje (jako do 08.10.)
+        setCageFeaturesOff(kFeatForceScore);
+        Board b = board(5, {18, 9});
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        setCageFeaturesOff(0);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::SCORE);
+    }
+}
+
+// P175, druhá polovina (uživatel 08.10.2026: „pokud hrozí blitz na nosiče a ztráta — je lepší dát TD
+// dříve“). Nosič MA 6 stojí 8 polí před zónou: TD jen přes dvě GFI (vyjde v 69 %). Osamělý nosič se
+// soupeřem v dosahu (rána na jednu kostku, míč přežije v 67 %) má běžet pro TD; nosič v čisté kleci
+// (míč přežije skoro jistě) ne — tam vede klec.
+TEST(OneCageStall, ThreatenedCarrierGoesForTheTouchdownThroughDiceACagedOneDoesNot) {
+    auto board = [](bool caged) {
+        Board b(5);
+        b.put(1, TeamSide::HOME, {17, 7}, 6);
+        if (caged) {
+            b.put(2, TeamSide::HOME, {16, 6}); b.put(3, TeamSide::HOME, {16, 8});
+            b.put(4, TeamSide::HOME, {18, 6}); b.put(5, TeamSide::HOME, {18, 8});
+        }
+        b.put(13, TeamSide::AWAY, {13, 7}, 6);
+        b.s.ball = BallState::carried({17, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(false);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::SCORE) << "P178: řadič nosiče nedrží v kleci a TD přikáže sám";
+        EXPECT_EQ(ms.front().playerId, 1);
+    }
+    {
+        Board b = board(true);
+        ASSERT_LT(blitzThreat(b.s, b.s.getPlayer(1)), 0.31) << "pozitivní kontrola: v kleci je hrozba pod 1 − 0,69";
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        bool carrierWithCage = false;
+        for (const Macro& m : ms) carrierWithCage |= (m.playerId == 1);
+        EXPECT_TRUE(carrierWithCage || b.s.getPlayer(1).position == (Position{17, 7})) << "klec vede, nosič neběží přes hody";
+    }
+}
+
+// P176 — hodnota rizika (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech soupeřů
+// a nezraní se — je to relativně bezpečnější“).
+TEST(FallValue, AFallFarFromOpponentsIsCheapAndTheCarrierMayRushThereButNotNextToThem) {
+    {   // změřená čísla
+        Board b;
+        b.put(1, TeamSide::HOME, {5, 7}, 6);
+        b.put(13, TeamSide::AWAY, {7, 7}, 6);
+        EXPECT_DOUBLE_EQ(looseBallLossRisk(b.s, TeamSide::HOME, {5, 7}), 0.56);
+        EXPECT_DOUBLE_EQ(looseBallLossRisk(b.s, TeamSide::HOME, {11, 7}), 0.38);
+        EXPECT_DOUBLE_EQ(looseBallLossRisk(b.s, TeamSide::HOME, {14, 7}), 0.14);
+    }
+    {   // GFI jen jako ÚTĚK Z DOSAHU: soupeř (MA 4, dosah 7 polí) stojí za nosičem na (0,7). Svým
+        // pohybem dojde nosič na x=11 — tam na něj soupeř nedosáhne (11 polí) ⇒ GFI netřeba.
+        Board b;
+        Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
+        b.put(13, TeamSide::AWAY, {0, 7}, 4);
+        EXPECT_EQ(farthestSafeForward(b.s, c, 6, /*forCage=*/true).x, 11) << "mimo dosah už bez hodu ⇒ žádné GFI";
+    }
+    {   // soupeř MA 8 (dosah 11 polí) na (0,7): na x=11 by na nosiče právě dosáhl, na x=12 už ne ⇒
+        // jedno levné GFI (pád daleko od soupeře) ho z dosahu dostane
+        Board b;
+        Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
+        b.put(13, TeamSide::AWAY, {0, 7}, 8);
+        EXPECT_EQ(farthestSafeForward(b.s, c, 6, /*forCage=*/true).x, 12) << "GFI jako útěk z dosahu";
+    }
+    {   // soupeři stojí kousek od místa, kam by GFI vedlo: pád by byl drahý ⇒ jen vlastním pohybem
+        Board b;
+        Player& c = b.put(1, TeamSide::HOME, {5, 7}, 6);
+        b.put(13, TeamSide::AWAY, {15, 5}, 4);
+        b.put(14, TeamSide::AWAY, {15, 9}, 4);
+        const Position d = farthestSafeForward(b.s, c, 6);
+        EXPECT_LE(d.x, 11) << "u soupeře se GFI neriskuje";
+    }
+}
+
+// P178 (uživatel 08.10.2026: „trpaslíci jsou pomalí a špatně zvedají míč — u nich je cena za pád při
+// GFI vysoká … pomalým týmům a týmům s malou agilitou zvedni cenu GFI, ať to nedělají“). Stejná
+// pozice (soupeř daleko), jiný nosič a jiný tým: cena pádu vyjde z pohybu a obratnosti, ne z rasy.
+TEST(FallValue, AFallCostsASlowClumsyTeamFarMoreThanAFastAgileOne) {
+    auto cost = [](int8_t ma, int8_t ag, int turn) {
+        Board b(turn);
+        Player& c = b.put(1, TeamSide::HOME, {8, 7}, ma);
+        c.stats.agility = ag;
+        for (int i = 0; i < 4; ++i) b.put(2 + i, TeamSide::HOME, {static_cast<int8_t>(7 + (i % 2) * 2), static_cast<int8_t>(6 + (i / 2) * 2)}, ma);
+        b.put(13, TeamSide::AWAY, {24, 1}, 6);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        return carrierFallCost(b.s, b.s.getPlayer(1), {12, 7});
+    };
+    const double slowClumsy = cost(4, 2, 2);     // pohyb 4, obratnost 2: bez časové rezervy, zvedá na 4+
+    const double fastAgile = cost(9, 4, 2);      // pohyb 9, obratnost 4: rezerva, zvedá na 2+
+    EXPECT_GT(slowClumsy, 0.6);
+    EXPECT_LT(fastAgile, 0.3);
+    EXPECT_GT(slowClumsy * (1.0 / 6.0), 0.05) << "jedno GFI pomalého nosiče je nad mezí 5 % ⇒ nedělá ho";
+    EXPECT_LE(fastAgile * (1.0 / 6.0), 0.05) << "jedno GFI rychlého obratného nosiče se vejde";
 }

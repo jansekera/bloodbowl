@@ -8,12 +8,19 @@ def hra(a):
     import bb_kontrola_tahu as kt
     bb=kt.bb; H,A=bb.TeamSide.HOME,bb.TeamSide.AWAY; ST=bb.PlayerState
     assert os.path.realpath(bb.__file__).startswith(os.path.realpath(KOREN)), bb.__file__
+    if os.environ.get("MASKA"): bb.set_cage_features_off(int(os.environ["MASKA"]))     # které úpravy z 07.10. VYPNOUT (měření po jedné)
+    if os.environ.get("VAHA_KLECE"): bb.set_cage_leaf_weight(float(os.environ["VAHA_KLECE"]))
     s=bb.GameState(); bb.setup_half(s, bb.get_developed_roster(prij,1500), bb.get_developed_roster(kop,1500), A); s.kicking_team=A
     bb.simple_kickoff(s, bb.DiceRoller(3000+g))
     r=dict(prij=prij,kop=kop,g=g,td=0,td_soupere=0,tahu=0,to=0,s_micem=0,ciste=0,kolo_td=0)
     for tah in range(16):
         if s.phase!=bb.GamePhase.PLAY: break
         strana=s.active_team
+        if os.environ.get("MASKA_UTOK") is not None or os.environ.get("MASKA_OBRANA") is not None:
+            # úpravy vypnuté jen jedné straně: přijímající (HOME) × kopající (AWAY) — oddělí „útok se
+            # zhoršil“ od „obrana soupeře se zlepšila“
+            m = int(os.environ.get("MASKA_UTOK","0")) if strana==H else int(os.environ.get("MASKA_OBRANA","0"))
+            bb.set_cage_features_off(m & 1023); bb.set_foul_only_last((m & 1024)==0)
         kroky,po,_=kt.plan_tahu(s, ai="macro_mcts", seed=50000+100*g+tah)
         if strana==H:
             r["tahu"]+=1; r["to"]+=any(k["turnover"] for k in kroky)
@@ -26,6 +33,7 @@ def hra(a):
         s=po
     return r
 if __name__=="__main__":
-    ukoly=[(p,k,g) for p,k in itertools.permutations(RASY,2) for g in range(N)]
+    PRIJ=os.environ.get("PRIJ")          # jen tahle rasa přijímá (proti všem ostatním)
+    ukoly=[(p,k,g) for p,k in itertools.permutations(RASY,2) for g in range(N) if not PRIJ or p==PRIJ]
     with mp.Pool(8) as pool: res=pool.map(hra, ukoly, chunksize=1)
     pickle.dump(res, open(VYST,"wb")); print("hotovo", len(res))

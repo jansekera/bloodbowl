@@ -130,6 +130,10 @@ TEST(CageAdvance, NotApplicableOnLooseBall) {
 // =============================================================
 
 TEST(CageAdvance, TempoIsComputedFromDistanceAndSchedule) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     GameState state = makeCageState();
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
@@ -180,6 +184,10 @@ TEST(CageAdvance, NoUsableTurnsLeftStillProducesAPlan) {
 }
 
 TEST(CageAdvance, OpponentScreenInCorridorKillsPaceButNotTheTurn) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     GameState state = makeCageState();
     // Three standing opponents dead ahead in the corridor (x 13..16,
     // |dy| <= 2): a real screen -> pace penalty 2 -> achievable 0.
@@ -208,6 +216,10 @@ TEST(CageAdvance, OpponentScreenInCorridorKillsPaceButNotTheTurn) {
 }
 
 TEST(CageAdvance, SingleStrayMarkerSlowsButStillAdvances) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     // Closer carrier (dist 7, usable 7 -> requiredPace exactly 1.0): one
     // opponent in the corridor costs one square of pace (2 -> 1), which
     // still meets the schedule -> plan fires with step 1.
@@ -242,6 +254,10 @@ TEST(CageAdvance, SingleStrayMarkerSlowsButStillAdvances) {
 // =============================================================
 
 TEST(CageAdvance, CarrierGfiFiresOnlyInTempoEmergency) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     // Carrier MA4 far from the endzone late in the half: dist 20, turn 4
     // -> turnsLeft 5, usable 4 -> requiredPace 5.0 > MA4. Corners are MA6
     // blitzer-ish so the formation sustains step 5-6; the carrier must take
@@ -272,6 +288,10 @@ TEST(CageAdvance, CarrierGfiFiresOnlyInTempoEmergency) {
 }
 
 TEST(CageAdvance, BankWhileClearRevertsToScheduleUnderResistance) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     // Same geometry twice; the only difference is one opponent in the
     // corridor. Clear corridor -> bank at max dice-free pace (4);
     // resistance -> grind at schedule pace only.
@@ -492,6 +512,10 @@ TEST(CageAdvance, GuardPreferredAtEqualDistanceAndReliability) {
 }
 
 TEST(CageAdvance, NegaTraitTreemanNeverDraftedDespiteGuardStandFirm) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     GameState state = makeCageState();
     state.getPlayer(2).state = PlayerState::OFF_PITCH;
     state.getPlayer(3).state = PlayerState::OFF_PITCH;
@@ -624,6 +648,10 @@ TEST(CageAdvance, ReservedPlayersAreNeverDrafted) {
 // Stepping 2 instead meets the schedule exactly and touches nobody. Banking is
 // a bonus; not standing next to an opponent is not.
 TEST(CageAdvance, CarrierAvoidsEndingInsideATacklezoneWhenItIsFree) {
+    // P174 (08.10.2026): plánovač napřed hledá bezpečné pole po celém dosahu nosiče; tenhle test
+    // zkouší ZÁLOŽNÍ postup (krok po přímce podle rozvrhu), který nastupuje, když bezpečné pole
+    // nevyjde — proto je hledání po dobu testu vypnuté.
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
     GameState state = makeCageState();
     Player& marker = state.getPlayer(13);
     marker.id = 13;
@@ -845,23 +873,38 @@ TEST(CageAdvance, StepEndsOneRowAsideWhenACornerSquareIsTaken) {
     EXPECT_EQ(carrierTarget.y, 8) << "nosič končí o řádek vedle, kde jsou všechna čtyři pole rohů volná";
 }
 
-// Stojící čistou klec plánovač neopustí kvůli kroku se třemi rohy, dokud rozvrh čekání snese;
-// v posledním kole (čekat nejde) jde dál i se třemi.
-TEST(CageAdvance, KeepsTheStandingCageWhenTheStepWouldLoseACorner) {
-    GameState state = makeCageState();
-    state.getPlayer(3).position = {13, 8};
-    state.getPlayer(5).position = {11, 8};
-    state.getPlayer(5).hasMoved = true;                     // zadní roh stojí, ale dál už nejde
+// Uživatel 08.10.2026: „pokud má klec dva nebo tři rohy tak, ať soupeř nedosáhne na nosiče — tak je
+// to také validní — ale nutné je rozlišit soupeř dosáhne / nedosáhne na nosiče“. Zadní roh už hrál,
+// takže každý krok vpřed má jen tři rohy. Bez soupeře v dosahu klec jde dál i se třemi; když by
+// soupeř po kroku měl na nosiče dobrou ránu, klec zůstane stát se čtyřmi.
+TEST(CageAdvance, ThreeCornersAdvanceWhenNobodyReachesTheCarrierAndStayWhenSomeoneDoes) {
+    auto board = [](bool opponentNear) {
+        GameState state = makeCageState();
+        state.getPlayer(3).position = {13, 8};
+        state.getPlayer(5).position = {11, 8};
+        state.getPlayer(5).hasMoved = true;                     // zadní roh stojí, ale dál už nejde
+        if (opponentNear) {                                     // dva soupeři za klecí: po kroku mají díru vzadu
+            putPlayer(state, 13, TeamSide::AWAY, {9, 9}, 6);
+            putPlayer(state, 14, TeamSide::AWAY, {9, 10}, 6);
+        }
+        return state;
+    };
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
-    ASSERT_EQ(planner.tryAssign(state, state.getPlayer(1), 0, {}).filled, 4);
-    CageAdvancePlan plan = planner.build(state);
-    EXPECT_FALSE(plan.valid && plan.step >= 1) << "krok " << plan.step << " se " << plan.filledCorners << " rohy";
-
-    state.homeTeam.turnNumber = 8;
-    CageAdvancePlan last = planner.build(state);
-    ASSERT_TRUE(last.valid);
-    EXPECT_GE(last.step, 1);
-    EXPECT_EQ(last.filledCorners, 3);
+    {
+        GameState state = board(false);
+        ASSERT_EQ(planner.tryAssign(state, state.getPlayer(1), 0, {}).filled, 4);
+        CageAdvancePlan plan = planner.build(state);
+        ASSERT_TRUE(plan.valid);
+        EXPECT_GE(plan.step, 1) << "nikdo na nosiče nedosáhne ⇒ tři rohy stačí a klec jde dál";
+        EXPECT_DOUBLE_EQ(plan.blitzThreat, 0.0);
+    }
+    {
+        GameState state = board(true);
+        CageAdvancePlan plan = planner.build(state);
+        if (plan.valid && plan.step >= 1) {
+            EXPECT_LE(plan.blitzThreat, 0.15) << "když už jde dál, tak jen tam, kde soupeř dobrou ránu nemá";
+        }
+    }
 }
 
 // P131 / P169 krok 7: klec se od kraje hřiště odtahuje — nosič na řádku 1 udělá krok šikmo ke
@@ -1175,4 +1218,128 @@ TEST(CageAdvance, MightyBlowCornersEndUpOppositeEachOther) {
         ASSERT_EQ(mb.size(), 2u);
         EXPECT_EQ(mb[0].x, mb[1].x);
     }
+}
+
+// ---------------------------------------------------------------------------
+// P174 — „soupeř dosáhne / nedosáhne na nosiče“ (uživatel 08.10.2026: „když postavíme klec se
+// třemi rohy a necháme volný ten ve směru, odkud přijde blitz, tak je to víc chyba než správně
+// postavené dva rohy“).
+// ---------------------------------------------------------------------------
+namespace {
+GameState threatBoard(std::vector<Position> corners, Position opponent, int8_t oppMa) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.weather = Weather::NICE;
+    putPlayer(s, 1, TeamSide::HOME, {12, 7}, 6);
+    int id = 2;
+    for (Position c : corners) putPlayer(s, id++, TeamSide::HOME, c, 4);
+    putPlayer(s, 12, TeamSide::AWAY, opponent, oppMa);
+    s.ball = BallState::carried({12, 7}, 1);
+    return s;
+}
+}  // namespace
+
+TEST(BlitzThreat, OutOfReachIsZeroAndALoneCarrierInReachFacesAOneDieHit) {
+    GameState far = threatBoard({}, {24, 7}, 6);              // 12 polí, dosah 6 + 2 − 1 = 7
+    EXPECT_DOUBLE_EQ(blitzThreat(far, far.getPlayer(1)), 0.0);
+    GameState near = threatBoard({}, {16, 7}, 6);             // dojde bez GFI, síla 3 proti 3 = jedna kostka
+    EXPECT_NEAR(blitzThreat(near, near.getPlayer(1)), 0.33, 1e-9);
+}
+
+TEST(BlitzThreat, FourCornersTurnTheHitIntoTwoDiceChosenByTheCarrier) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    // Na každém poli u nosiče asistují dva rohy (2 kostky, vybírá nosič = 0,11) a soupeř se na něj
+    // musí z pole v zónách rohů teprve proúhýbat (AG 2 do tří zón: 6+), takže dojde jen v 1 z 6.
+    const double t = blitzThreat(s, s.getPlayer(1));
+    EXPECT_NEAR(t, 0.11 / 6.0, 1e-9);
+    EXPECT_LT(t, 0.33) << "klec je bezpečnější než nosič sám";
+}
+
+TEST(BlitzThreat, TwoCornersTowardTheBlitzBeatThreeCornersWithTheHoleFacingIt) {
+    // soupeř přichází zprava a s pohybem 2 dojde (se dvěma GFI) jen na pole před nosičem
+    GameState two = threatBoard({{13, 6}, {13, 8}}, {16, 7}, 2);
+    GameState threeWithHole = threatBoard({{11, 6}, {11, 8}, {13, 8}}, {16, 7}, 2);   // díra na (13,6)
+    const double a = blitzThreat(two, two.getPlayer(1));
+    const double b = blitzThreat(threeWithHole, threeWithHole.getPlayer(1));
+    EXPECT_LT(a, b) << "dva rohy ve směru blitzu " << a << " × tři rohy s dírou k soupeři " << b;
+    EXPECT_LE(a, 0.11 + 1e-9);
+    EXPECT_GE(b, 0.20);
+}
+
+// Plánovač vybírá pole, kde je nosič po tahu v bezpečí před dobrou ranou, a mezi nimi to nejdál —
+// i šikmo: na řádku nosiče stojí zeď, o tři řádky níž je volno.
+TEST(CageAdvance, PicksTheFarthestSquareWhereTheCarrierIsSafeNotJustStraightAhead) {
+    GameState state = makeCageState();
+    for (int i = 0; i < 3; ++i) putPlayer(state, 13 + i, TeamSide::AWAY, {15, static_cast<int8_t>(5 + i)}, 6);
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    CageAdvancePlan plan = planner.build(state);
+    ASSERT_TRUE(plan.valid);
+    ASSERT_GE(plan.step, 1);
+    EXPECT_LE(plan.blitzThreat, 0.15) << "nosič po tahu není vystaven dobré ráně";
+    Position target{-1, -1};
+    for (const auto& m : plan.macros) if (m.playerId == 1) target = m.targetPos;
+    ASSERT_TRUE(target.isOnPitch());
+    EXPECT_EQ(countTacklezones(state, target, TeamSide::HOME, 1), 0) << "nosič nekončí v zóně soupeře";
+}
+
+// P177 (uživatel 08.10.2026: „rychlejší týmy mohou s klecí dojít spíše bezpečně než co nejdál —
+// např. skaveni proti orkům, protože pak jim zbyde dost pohybu na TD později“; „skaveni a elfové
+// stihnou TD za 2 kola … trpaslíci za 6“). Stejná pozice, jiný pohyb: rychlý tým má ve 2. kole
+// časovou rezervu a vezme nejbezpečnější pole; pomalý ji nemá a jde co nejdál mezi bezpečnými.
+TEST(CageAdvance, ATeamWithTimeToSpareTakesTheSafestSquareASlowTeamTheFarthest) {
+    auto plan = [](int8_t ma) {
+        GameState state = makeCageState();
+        state.homeTeam.turnNumber = 2;
+        for (int id = 1; id <= 5; ++id) {
+            state.getPlayer(id).stats.movement = ma;
+            state.getPlayer(id).movementRemaining = ma;
+        }
+        putPlayer(state, 13, TeamSide::AWAY, {20, 7}, 4);       // soupeř před klecí: čím dál, tím blíž k němu
+        CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+        return planner.build(state);
+    };
+    const CageAdvancePlan slow = plan(4);    // do zóny 13 polí, tempo 2 ⇒ potřebuje 5 tahů ze 7: rezerva těsná
+    const CageAdvancePlan fast = plan(8);    // tempo 4 ⇒ potřebuje 2 tahy: rezerva velká
+    ASSERT_TRUE(slow.valid);
+    EXPECT_GE(slow.step, 1) << "pomalý tým postupuje";
+    if (fast.valid && fast.step >= 1) {
+        EXPECT_LE(fast.blitzThreat, slow.blitzThreat + 1e-9) << "rychlý tým nebere větší riziko než pomalý";
+    }
+    EXPECT_LE(fast.valid ? fast.blitzThreat : 0.0, 0.15);
+}
+
+// P178 (uživatel 08.10.2026: „když nosič nemůže skórovat ani být v bezpečí — nesmí nastat … do té
+// doby má být v kleci“). Rychlý nosič (MA 9) jen se třemi spoluhráči: čistá klec se čtyřmi rohy
+// nevyjde nikde, takže předvýběr dřív prošel jen 24 polí NEJDÁL vpřed — všechna v dosahu dobré
+// rány — a bezpečná pole blíž vůbec nezkusil; plán spadl do „nejmenšího zla“. Bezpečné pole přitom
+// existuje (soupeř s pohybem 3 dosáhne jen na vzdálená pole).
+TEST(CageAdvance, ScreenReachesTheSafeNearSquaresWhenTheFarOnesAreAllUnderAGoodHit) {
+    auto build = [](unsigned off) {
+        GameState state = makeCageState();
+        state.homeTeam.turnNumber = 7;                          // bez časové rezervy ⇒ „stát“ není volba
+        state.getPlayer(5).state = PlayerState::OFF_PITCH;      // jen tři spoluhráči
+        state.getPlayer(5).position = {-1, -1};
+        for (int id = 1; id <= 4; ++id) {
+            state.getPlayer(id).stats.movement = 9;
+            state.getPlayer(id).movementRemaining = 9;
+        }
+        for (int i = 0; i < 7; ++i) {
+            Player& o = putPlayer(state, 13 + i, TeamSide::AWAY, {21, static_cast<int8_t>(1 + 2 * i)}, 3);
+            o.stats.strength = 13;   // rána na tři kostky i proti třem rohům
+            o.stats.agility = 6;     // a z dotyku s rohem uhne na 2+
+        }
+        setCageFeaturesOff(off);
+        CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+        CageAdvancePlan plan = planner.build(state);
+        setCageFeaturesOff(0);
+        return plan;
+    };
+    const CageAdvancePlan on = build(0);
+    ASSERT_TRUE(on.valid);
+    EXPECT_GE(on.step, 1) << "klec postupuje";
+    EXPECT_LE(on.blitzThreat, 0.15) << "a nosič po tahu není vystaven dobré ráně";
+    const CageAdvancePlan off = build(kFeatScreenSpread);
+    EXPECT_GT(off.valid ? off.blitzThreat : 1.0, 0.15) << "pozitivní kontrola: bez úpravy plán bezpečné pole nenašel";
 }

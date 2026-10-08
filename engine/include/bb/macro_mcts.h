@@ -48,6 +48,9 @@ void takeMacroNoopStats(long* out);   // kMacroNoopSlots cisel
 // P149 bod 2 (06.10.2026): hodnota jedné nevyužité aktivace v listovém odhadu hledání
 // (cena turnoveru). Výchozí = změřených 0,024; 0 = vypnuto — jen pro měření před / po.
 void setActivationValue(double v);
+// P171 (a): váha členu „nechráněný nosič“ v listovém odhadu (0 = vypnuto, 1 = změřená cena).
+void setCageLeafWeight(double w);
+double cageLeafWeight();
 double activationValue();
 
 class CageController;     // bb/one_cage.h (P126, jedna klec)

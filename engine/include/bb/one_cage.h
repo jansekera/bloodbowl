@@ -45,6 +45,29 @@ Position farthestSafeForward(const GameState& state, const Player& carrier, int 
 // nebo jsou volní (nehráli, nestojí v zóně soupeře) a na pole dosáhnou pohybem bez GFI.
 int cornersWithinReach(const GameState& state, const Player& carrier, Position sq);
 
+// P173: pravděpodobnost, že soupeř v příštím tahu míč vezme — jedno měřítko pro všechny rasy
+// (nikdo na nosiče nedosáhne → 0; jinak změřená čísla podle rohů a kontaktu). Viz one_cage.cpp.
+double ballLossRisk(const GameState& state, TeamSide side, int carrierId, Position sq,
+                    int corners, int cornersInContact);
+double carrierLossRisk(const GameState& state, const Player& carrier);
+
+// ⭐ P176 — HODNOTA RIZIKA (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech
+//   soupeřů a nezraní se — je to relativně bezpečnější“). Šance, že míč ležící na `ball` vezme
+//   v příštím tahu soupeř, podle vzdálenosti nejbližšího stojícího soupeře. ZMĚŘENO (skaven
+//   TV1500, 160 útočných poločasů, 61 případů míče na zemi po vlastním tahu): do 2 polí 23 ze 41
+//   (56 %), 3–5 polí 5 ze 13 (38 %), 6 a víc 1 ze 7 (14 %).
+double looseBallLossRisk(const GameState& state, TeamSide side, Position ball);
+
+// ⭐ P176 / P178 — CO STOJÍ PÁD NOSIČE (uživatel 08.10.2026: „trpaslíci jsou pomalí a špatně zvedají
+//   míč — u nich je cena za pád při GFI vysoká … pomalým týmům a týmům s malou agilitou zvedni cenu
+//   GFI, ať to nedělají“). Tři složky, všechny z čísel na hřišti, ne z rasy:
+//     · míč vezme soupeř (podle vzdálenosti, looseBallLossRisk),
+//     · míč znovu nezvedneme (hod na zvednutí podle obratnosti nosiče, Sure Hands = přehoz) — půl váhy,
+//     · ztracený tah: tým bez časové rezervy (teamHasTimeSlack) ho nemá ⇒ +0,5.
+//   Trpasličí Runner daleko od soupeře, bez rezervy: 0,14 + 0,05 + 0,5 = 0,69; Gutter Runner
+//   s rezervou: 0,14 + 0,07 = 0,21.
+double carrierFallCost(const GameState& state, const Player& carrier, Position ball);
+
 // Kdy pustit nosiče samotného (fáze 3). Spočítá, jestli by klec doběhla:
 // tento tah ujde `cageStep` (největší krok, pro který jdou obsadit rohy), další
 // tahy `futurePace` (tentýž krok minus přirážka za soupeře v koridoru), a
@@ -110,6 +133,7 @@ private:
 
     // planStart: tah je SCORE_BALL, ale nosič do zóny bez hodu nedojde ⇒ klec postupuje dál
     bool scoringRangeCage_ = false;
+    bool stalling_ = false;      // P175: v tomto tahu se TD zdržuje (míč v bezpečí, není poslední kolo)
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;

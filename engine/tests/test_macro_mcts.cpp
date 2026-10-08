@@ -964,6 +964,9 @@ TEST(MacroMCTSPolicy, ReturnsValidAction) {
 TEST(MacroMCTSPolicy, PlanExecutionMultipleActions) {
     // A SCORE macro should produce multiple MOVE actions from the plan
     GameState state = makeScoringState();
+    // P175 (08.10.2026): mimo poslední kolo se TD s míčem v bezpečí zdržuje; test zkouší průchod
+    // plánu SCORE přes víc akcí, proto je zdržování po dobu testu vypnuté.
+    struct NoStall { NoStall() { setCageFeaturesOff(kFeatStall); } ~NoStall() { setCageFeaturesOff(0); } } noStall;
 
     // Value function that rewards scoring
     std::vector<float> weights(NUM_FEATURES, 0.0f);
