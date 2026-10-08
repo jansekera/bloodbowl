@@ -243,9 +243,11 @@ final class RerollHandler
         }
 
         // Dodge or GFI: player falls
-        $fallPos = $pending->getRollType() === 'gfi'
-            ? new Position($pending->getTargetX(), $pending->getTargetY())
-            : $player->getPosition();
+        // OPRAVENO 08.10.2026 (audit parity, nalez 4a) -- na cilove pole sel jen pad pri GFI,
+        //   po neuspesnem uhybu zustaval hrac na VYCHOZIM poli. Pravidla r. 497-498 (uhyb):
+        //   "Knocked Down in the square he was dodging to"; r. 1702-1703 (GFI): "Knocked
+        //   Down in the square that they moved to".
+        $fallPos = new Position($pending->getTargetX(), $pending->getTargetY());
 
         $events[] = GameEvent::playerFell($pending->getPlayerId());
         $events[] = GameEvent::turnover(

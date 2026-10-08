@@ -49,15 +49,40 @@ final class MoveHandler implements ActionHandlerInterface
      *
      * Poradi je stejne jako v `BlockHandler`: nejdriv zraneni, teprve pak mic.
      *
-     * @param list<\App\DTO\GameEvent> $events
-     * @return array{0: \App\DTO\GameState, 1: list<\App\DTO\GameEvent>}
+     * OPRAVENO 08.10.2026 (audit parity, nalezy 4a a 4b):
+     *   4a -- po neuspesnem uhybu zustaval hrac lezet na VYCHOZIM poli (u GFI a Leapu
+     *         se `withPosition($to)` delalo, u uhybu chybelo). Pravidla r. 497-498:
+     *         "Knocked Down in the square he was dodging to"; GFI r. 1702-1703: "in the
+     *         square that they moved to"; Leap r. 8280-8281: "in the square that he was
+     *         leaping to".
+     *   4b -- `RerollHandler` (pad po dialogu prehozu) mel vlastni kopii padu BEZ hodu na
+     *         brneni a zraneni (r. 498-499, 1703).
+     *   Proto je pad pri pohybu JEDNA funkce: polozi hrace na pole `$pole`, hodi brneni
+     *   a zraneni a pusti mic. Volaji ji vsechny tri pady zde i `RerollHandler`.
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
      */
-    private function resolveKnockDownDuringMove(
-        \App\DTO\GameState $state,
-        \App\DTO\MatchPlayerDTO $fallenPlayer,
+    public function knockDownAt(
+        GameState $state,
+        MatchPlayerDTO $player,
+        Position $pole,
         array $events,
     ): array {
+        $fallenPlayer = $player
+            ->withState(PlayerState::PRONE)
+            ->withPosition($pole)
+            ->withHasMoved(true)
+            ->withHasActed(true)
+            ->withMovementRemaining(0);
+        $state = $state->withPlayer($fallenPlayer);
+
+        // Nosic pousti mic "in the square where they fall" (r. 678-679) -- mic se s nim
+        //   presouva na pole padu driv, nez ho zraneni pripadne odnese ze hriste.
         $wasBallCarrier = $state->getBall()->getCarrierId() === $fallenPlayer->getId();
+        if ($wasBallCarrier) {
+            $state = $state->withBall(BallState::carried($pole, $fallenPlayer->getId()));
+        }
 
         if ($this->injuryResolver !== null) {
             $injResult = $this->injuryResolver->resolve($fallenPlayer, $this->dice);
@@ -150,20 +175,7 @@ final class MoveHandler implements ActionHandlerInterface
                     $events[] = GameEvent::playerFell($playerId);
                     $events[] = GameEvent::turnover('Failed leap');
 
-                    $fallenPlayer = $currentPlayer
-                        ->withState(PlayerState::PRONE)
-                        ->withPosition($to)
-                        ->withHasMoved(true)
-                        ->withHasActed(true)
-                        ->withMovementRemaining(0);
-                    $currentState = $currentState->withPlayer($fallenPlayer);
-
-                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni.
-                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState,
-                        $fallenPlayer,
-                        $events,
-                    );
+                    [$currentState, $events] = $this->knockDownAt($currentState, $currentPlayer, $to, $events);
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),
@@ -375,20 +387,8 @@ final class MoveHandler implements ActionHandlerInterface
                     $events[] = GameEvent::playerFell($playerId);
                     $events[] = GameEvent::turnover('Failed dodge');
 
-                    $fallenPlayer = $currentPlayer
-                        ->withState(PlayerState::PRONE)
-                        ->withHasMoved(true)
-                        ->withHasActed(true)
-                        ->withMovementRemaining(0);
-                    $currentState = $currentState->withPlayer($fallenPlayer);
-
-                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
-                    //   teprve potom mic (stejne poradi jako v `BlockHandler`).
-                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState,
-                        $fallenPlayer,
-                        $events,
-                    );
+                    // Pada na poli, KAM uhybal (r. 497-498) -- viz `knockDownAt`.
+                    [$currentState, $events] = $this->knockDownAt($currentState, $currentPlayer, $to, $events);
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),
@@ -531,21 +531,8 @@ final class MoveHandler implements ActionHandlerInterface
                     $events[] = GameEvent::playerFell($playerId);
                     $events[] = GameEvent::turnover('Failed Going For It');
 
-                    $fallenPlayer = $currentPlayer
-                        ->withState(PlayerState::PRONE)
-                        ->withPosition($to) // falls at destination
-                        ->withHasMoved(true)
-                        ->withHasActed(true)
-                        ->withMovementRemaining(0);
-                    $currentState = $currentState->withPlayer($fallenPlayer);
-
-                    // PHP27: sraceni pri pohybu = hod na brneni a pripadne zraneni,
-                    //   teprve potom mic (stejne poradi jako v `BlockHandler`).
-                    [$currentState, $events] = $this->resolveKnockDownDuringMove(
-                        $currentState,
-                        $fallenPlayer,
-                        $events,
-                    );
+                    // Pada na poli, kam dosel (r. 1702-1703) -- viz `knockDownAt`.
+                    [$currentState, $events] = $this->knockDownAt($currentState, $currentPlayer, $to, $events);
 
                     return ActionResult::turnover(
                         $currentState->withTurnoverPending(true),
