@@ -308,14 +308,7 @@ final class BlockHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('No pending block');
         }
 
-        $faceIndex = (int) $params['faceIndex'];
         $faces = $pending->getFaces();
-
-        if ($faceIndex < 0 || $faceIndex >= count($faces)) {
-            throw new \InvalidArgumentException('Invalid face index');
-        }
-
-        $chosenFace = $faces[$faceIndex];
 
         $attacker = $state->getPlayer($pending->getAttackerId());
         $defender = $state->getPlayer($pending->getDefenderId());
@@ -324,11 +317,20 @@ final class BlockHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Player not found');
         }
 
-        // Validate chooser can pick this face
-        if ($pending->isAttackerChooses()) {
-            // Attacker chooses: any face is valid
+        // OPRAVENO 08.10.2026 (audit parity, nález 5) -- tady stála prázdná "validace"
+        //   (`if attackerChooses {} else {}`) a kostka se vždy vzala z `faceIndex` klienta:
+        //   člověk-útočník si vybíral i tehdy, když vybírá obránce. Pravidla ř. 633-634:
+        //   "The coach of the stronger player picks which block dice is used."
+        //   Vybírá-li strana, kterou vede AI, volí její kouč (`autoChooseBlockDie`) a
+        //   `faceIndex` se nečte. Jinak vybírá člověk v dialogu.
+        if ($state->getPendingBlockChooserSide() === $state->getAiTeam()) {
+            $chosenFace = $this->autoChooseBlockDie($faces, $pending->isAttackerChooses(), $attacker, $defender);
         } else {
-            // Defender chooses: picks worst for attacker (already handled by auto, but validate anyway)
+            $faceIndex = (int) ($params['faceIndex'] ?? -1);
+            if ($faceIndex < 0 || $faceIndex >= count($faces)) {
+                throw new \InvalidArgumentException('Invalid face index');
+            }
+            $chosenFace = $faces[$faceIndex];
         }
 
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);

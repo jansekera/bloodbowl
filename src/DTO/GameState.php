@@ -115,6 +115,22 @@ final class GameState
         return $this->pendingReroll;
     }
 
+    /**
+     * Strana, jejíž trenér vybírá kostku čekajícího bloku. `rules_bb2016.txt` ř. 633-634:
+     * "The coach of the stronger player picks which block dice is used."
+     */
+    public function getPendingBlockChooserSide(): ?TeamSide
+    {
+        if ($this->pendingBlock === null) {
+            return null;
+        }
+        $chooserId = $this->pendingBlock->isAttackerChooses()
+            ? $this->pendingBlock->getAttackerId()
+            : $this->pendingBlock->getDefenderId();
+
+        return $this->requirePlayer($chooserId)->getTeamSide();
+    }
+
     public function getTeamState(TeamSide $side): TeamStateDTO
     {
         return $side === TeamSide::HOME ? $this->homeTeam : $this->awayTeam;

@@ -89,7 +89,7 @@ final class RulesEngine
             ActionType::END_TURN => [],
             ActionType::SETUP_PLAYER => $this->validateSetupPlayer($state, $params),
             ActionType::END_SETUP => $this->validateEndSetup($state),
-            ActionType::CHOOSE_BLOCK_DIE => [],
+            ActionType::CHOOSE_BLOCK_DIE => $this->validateChooseBlockDie($state, $params),
             ActionType::REROLL_BLOCK => [],
             ActionType::AUTO_SETUP => [],
             ActionType::RESOLVE_REROLL => [],
@@ -1197,6 +1197,41 @@ final class RulesEngine
         if (!$player->canStandPat()) {
             return ['Player cannot act'];
         }
+        return [];
+    }
+
+    /**
+     * Kdo smí určit kostku čekajícího bloku. `rules_bb2016.txt` ř. 633-634: "The coach of the
+     * stronger player picks which block dice is used."
+     * OPRAVENO 08.10.2026 (audit parity, nález 5): validace byla prázdná -- `faceIndex` od
+     * člověka-útočníka se přijal i tehdy, když vybírá obránce. Vybírá-li strana, kterou vede
+     * AI, kostku určí server (`BlockHandler::resolveBlockChoice`) a `faceIndex` se nepřijímá;
+     * útočník akcí jen potvrdí hod (a pošle volbu follow-upu).
+     *
+     * @param array<string, mixed> $params
+     * @return list<string>
+     */
+    private function validateChooseBlockDie(GameState $state, array $params): array
+    {
+        $pending = $state->getPendingBlock();
+        if ($pending === null) {
+            return ['No pending block to resolve'];
+        }
+
+        if ($state->getPendingBlockChooserSide() === $state->getAiTeam()) {
+            return isset($params['faceIndex'])
+                ? ["The stronger player's coach picks the block die"]
+                : [];
+        }
+
+        if (!isset($params['faceIndex'])) {
+            return ['faceIndex is required'];
+        }
+        $faceIndex = (int) $params['faceIndex'];
+        if ($faceIndex < 0 || $faceIndex >= count($pending->getFaces())) {
+            return ['Invalid face index'];
+        }
+
         return [];
     }
 
