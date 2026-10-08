@@ -979,8 +979,12 @@ final class BlockHandler implements ActionHandlerInterface
                     $events[] = GameEvent::juggernaut($attacker->getId());
                     break;
                 }
-                // Wrestle: if either has it, both go prone without armor
-                if ($attacker->hasSkill(SkillName::Wrestle) || $defender->hasSkill(SkillName::Wrestle)) {
+                // Wrestle: oba jdou na zem bez hodu na brneni -- kdyz ho nektery z nich POUZIJE.
+                // OPRAVENO 08.10.2026 (audit parity, nález 6) -- tady stálo "má-li Wrestle
+                //   kdokoli z dvojice, použije se vždy". Pravidla ř. 8671-8672: "This player
+                //   **may** use Wrestle when he blocks or is blocked"; ř. 1820: "Skill use is
+                //   not mandatory." Volí se v `wrestleUsed`.
+                if ($this->wrestleUsed($state, $attacker, $defender)) {
                     // ⛔⛔ OPRAVA 11.09.2026: Wrestle NENÍ bezpodmínečně bez
                     //   turnoveru. `rules_bb2016.txt` r. 8677-8678:
                     //   „Use of this skill does not cause a turnover **unless
@@ -1490,6 +1494,34 @@ final class BlockHandler implements ActionHandlerInterface
         );
 
         return $scored[0][0];
+    }
+
+    /**
+     * Použije některý z dvojice Wrestle na výsledek Both Down? (`rules_bb2016.txt`
+     * ř. 8671-8678: "may use", ř. 1820: "Skill use is not mandatory".)
+     * Volba je automatická pro obě strany (dialog na ni web nemá), vzor C++
+     * `block_handler.cpp:931-947`:
+     * - útočník bez Blocku by padl sám (turnover) ⇒ Wrestle vždy; s Blockem jen když je co
+     *   získat (soupeř má Block, takže by se nestalo nic, nebo drží míč) a sám míč nenese
+     *   -- položený nosič týmu na tahu je turnover (ř. 8677-8678);
+     * - obránce bez Blocku padá tak jako tak ⇒ Wrestle (padne i útočník a nehází se na
+     *   brnění); s Blockem by zůstal stát a útočník bez Blocku padl ⇒ Wrestle jen na
+     *   nosiče míče, kterého Block drží na nohou (jeho položení je turnover).
+     */
+    private function wrestleUsed(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): bool
+    {
+        $carrierId = $state->getBall()->getCarrierId();
+        $attHasBall = $carrierId === $attacker->getId();
+        $defHasBall = $carrierId === $defender->getId();
+        $attHasBlock = $attacker->hasSkill(SkillName::Block);
+        $defHasBlock = $defender->hasSkill(SkillName::Block);
+
+        $attWants = $attacker->hasSkill(SkillName::Wrestle)
+            && (!$attHasBlock || (!$attHasBall && ($defHasBlock || $defHasBall)));
+        $defWants = $defender->hasSkill(SkillName::Wrestle)
+            && (!$defHasBlock || ($attHasBall && $attHasBlock));
+
+        return $attWants || $defWants;
     }
 
     private function scoreBlockFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): int
