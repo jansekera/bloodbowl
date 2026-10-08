@@ -496,6 +496,34 @@ final class BallResolver
     }
 
     /**
+     * Hráč se na pole `$pos` dostal jinak než vlastním krokem (odtlačení, pád při úhybu /
+     * GFI / skoku) a leží tam volný míč ⇒ míč odskočí o pole; zvednout ho hráč nesmí.
+     *
+     * DOPLNĚNO 08.10.2026 (audit parity, nález 13) -- tohle v PHP chybělo: řešil se jen míč,
+     *   který hráč NESL (`handleBallOnPlayerDown`), volný míč zůstal ležet pod hráčem.
+     *   Pravidla ř. 441-444: "Players that move into the square with the ball at other
+     *   times (e.g., when pushed back, thrown by another player with Throw Team-Mate, etc.)
+     *   cannot pick up the ball, and instead it will bounce one square. This does not cause
+     *   a turnover." ř. 640-641: "a player pushed to it will cause the ball to bounce";
+     *   ř. 896-900: "a player is pushed to or lands in the ball's square ... it will bounce".
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    public function bounceLooseBallUnderPlayer(GameState $state, Position $pos, array $events): array
+    {
+        $ball = $state->getBall();
+        $ballPos = $ball->getPosition();
+        if ($ball->isHeld() || $ballPos === null || !$ballPos->equals($pos)) {
+            return [$state, $events];
+        }
+
+        $bounceResult = $this->resolveBounce($state, $pos);
+
+        return [$bounceResult['state'], array_merge($events, $bounceResult['events'])];
+    }
+
+    /**
      * Handle ball when a player goes down (drop and bounce).
      *
      * @param list<GameEvent> $events

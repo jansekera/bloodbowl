@@ -93,6 +93,10 @@ final class MoveHandler implements ActionHandlerInterface
 
         if ($wasBallCarrier) {
             [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallenPlayer, $events);
+        } else {
+            // Spadl na pole, kde lezi volny mic (sel si pro nej a neuhnul / nedobehl):
+            //   mic odskoci (r. 896-900) -- i kdyz hrace zraneni vzapeti odnese ze hriste.
+            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $pole, $events);
         }
 
         return [$state, $events];

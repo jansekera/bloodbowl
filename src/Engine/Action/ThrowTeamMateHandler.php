@@ -315,6 +315,12 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             }
         }
 
+        // Hozeny dopadl na pole s volnym micem: zvednout ho nesmi, mic odskoci a turnover
+        //   to neni (`rules_bb2016.txt` r. 441-444) -- viz `bounceLooseBallUnderPlayer`.
+        if (!$hadBall) {
+            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $landingPos, $events);
+        }
+
         return ActionResult::success($state, $events);
     }
 }

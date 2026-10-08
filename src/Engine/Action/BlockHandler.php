@@ -1401,6 +1401,10 @@ final class BlockHandler implements ActionHandlerInterface
             } else {
                 $state = $state->withBall(BallState::carried($pushTo, $kdo->getId()));
             }
+        } else {
+            // Odtlacen (i v retezu) na pole s volnym micem: mic odskoci, neni to turnover
+            //   (r. 441-444, 640-641) -- viz `bounceLooseBallUnderPlayer`.
+            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $pushTo, $events);
         }
 
         return [$state, $events];
