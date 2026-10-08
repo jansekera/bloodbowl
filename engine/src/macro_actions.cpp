@@ -4006,7 +4006,13 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
         const Player& carrier = state.getPlayer(carrierId);
         if (!carrier.isOnPitch() || !carrier.canAct()) return result;
         int dist = carrier.position.distanceTo(receiver.position);
-        if (dist > 1) {
+        // P180: řadič klece nese pole předávky, podle kterého šanci spočítal — jít TAM
+        // (stejná vada jako dřív u SCORE: rozhodnuto podle jedné cesty, hráno jinou).
+        const bool viaGiven = macro.viaPos.isOnPitch() && macro.viaPos.distanceTo(receiver.position) == 1;
+        if (viaGiven && carrier.position != macro.viaPos) {
+            movePlayerToward(state, carrierId, macro.viaPos, dice, result, carrier.movementRemaining);
+            if (result.turnover) return result;
+        } else if (!viaGiven && dist > 1) {
             movePlayerToward(state, carrierId, receiver.position, dice, result,
                              carrier.movementRemaining);
             if (result.turnover) return result;
@@ -4036,6 +4042,7 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
 
     int targetX = endzoneX(newCarrier.teamSide);
     Position target{static_cast<int8_t>(targetX), newCarrier.position.y};
+    if (macro.targetPos.isOnPitch() && macro.targetPos.x == targetX) target = macro.targetPos;   // P180
     movePlayerToward(state, receiverId, target, dice, result, 14);
     return result;
 }

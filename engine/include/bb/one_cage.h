@@ -57,6 +57,14 @@ std::vector<std::pair<int, Position>> cornersComing(const GameState& state, cons
 //   Dřív tu byla tabulka podle POČTU rohů (ballLossRisk) s jinou definicí dosahu.
 double carrierThreatAt(const GameState& state, const Player& carrier, Position sq, double stopAbove = 2.0);
 
+// ⭐ P180 (uživatel 08.10.2026: „rychlejší tým by měl být pouze ve stavech — klec v pořádku — a —
+//   nosič doběhne, případně předá nebo hodí někomu nachystanému dát TD“). Šance TD předávkou
+//   v tomto tahu: nosič dojde na volné pole vedle příjemce × příjemce chytí (předávka +1, −1 za
+//   zónu, Catch = přehoz; pravidla ř. 1687–1692) × příjemce dojde do zóny (i přes GFI). Vrací
+//   nejlepší součin a pole, podle kterých vyšel (`via` = kde nosič předává, `ez` = pole zóny).
+double handOffTdChance(const GameState& state, const Player& carrier, const Player& receiver,
+                       Position* via = nullptr, Position* ez = nullptr);
+
 // ⭐ P176 — HODNOTA RIZIKA (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech
 //   soupeřů a nezraní se — je to relativně bezpečnější“). Šance, že míč ležící na `ball` vezme
 //   v příštím tahu soupeř, podle vzdálenosti nejbližšího stojícího soupeře. ZMĚŘENO (skaven
@@ -140,6 +148,8 @@ private:
     // planStart: tah je SCORE_BALL, ale nosič do zóny bez hodu nedojde ⇒ klec postupuje dál
     bool scoringRangeCage_ = false;
     bool stalling_ = false;      // P175: v tomto tahu se TD zdržuje (míč v bezpečí, není poslední kolo)
+    bool mateStall_ = false;     // P180: míč v bezpečí a tým má čas ⇒ v tomto tahu se neskóruje ani předávkou
+    int readyMateId_ = -1;       // P180: hráč připravený pro předávku — hledání ho v tomto tahu neodvádí
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;

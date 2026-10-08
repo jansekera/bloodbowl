@@ -312,7 +312,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
 
 static bool sameMacro(const Macro& a, const Macro& b) {
     return a.type == b.type && a.playerId == b.playerId && a.targetId == b.targetId &&
-           a.targetPos == b.targetPos && a.thirdId == b.thirdId;
+           a.targetPos == b.targetPos && a.thirdId == b.thirdId && a.viaPos == b.viaPos;
 }
 
 // Q-guarded risk-sequencing defer (queue item 10, gated by

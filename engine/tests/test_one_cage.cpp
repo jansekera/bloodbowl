@@ -1191,3 +1191,124 @@ TEST(FallValue, AFallCostsASlowClumsyTeamFarMoreThanAFastAgileOne) {
     EXPECT_GT(slowClumsy * (1.0 / 6.0), 0.05) << "jedno GFI pomalého nosiče je nad mezí 5 % ⇒ nedělá ho";
     EXPECT_LE(fastAgile * (1.0 / 6.0), 0.05) << "jedno GFI rychlého obratného nosiče se vejde";
 }
+
+// ---------------------------------------------------------------------------------------------
+// P180 (uživatel 08.10.2026: „rychlejší tým by měl být pouze ve stavech — klec v pořádku — a —
+// nosič doběhne, případně předá nebo hodí někomu nachystanému dát TD“; rozhodnutí: „hrozbu ztráty
+// míče řešíme dřívějším TD vždy“, „pokud je míč v bezpečí a máme čas — volíme zdržovat“, „pokud
+// hráč dojde se chystat a nedojde tvořit roh — má se jít chystat“). Hráči jsou zadaní čísly, ne rasou.
+namespace {
+// nosič (MA 6) 13 polí od zóny — sám nedojde; příjemce (MA 9) stojí 8 polí od zóny, 4 pole od nosiče
+Board mateBoard(int turn, Position opponent, int8_t oppSt = 3) {
+    Board b(turn);
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(6, TeamSide::HOME, {17, 7}, 9);
+    b.put(13, TeamSide::AWAY, opponent, 6, oppSt);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    return b;
+}
+}  // namespace
+
+// Nosiči hrozí dobrá rána (soupeř dvě pole od něj, silnější) a sám do zóny nedosáhne; příjemce po
+// předávce dojde bez hodu ⇒ řadič přikáže TD předávkou. Pravidla ř. 1676–1692 (předávka na sousední
+// pole, pohyb před ní ano; zachycení +1), ř. 845–846 (kdo chytil a ještě nehrál, smí hrát).
+TEST(OneCageMate, AThreatenedCarrierWhoCannotReachHandsOffToAReadyTeammateForTheTouchdown) {
+    {
+        Board b = mateBoard(4, {10, 7}, 5);
+        ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.34) << "předpoklad: míč přežije s menší šancí, než je šance předávky";
+        ASSERT_GT(handOffTdChance(b.s, b.s.getPlayer(1), b.s.getPlayer(6)), 0.6);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::HAND_OFF_SCORE);
+        EXPECT_EQ(ms.front().targetId, 6);
+        EXPECT_EQ(b.s.homeTeam.score, 1) << "se šestkami na kostkách předávka i doběh vyjdou";
+    }
+    {   // pojistka měření: s vypnutou úpravou řadič předávku nepřikazuje
+        setCageFeaturesOff(kFeatScoreViaMate);
+        Board b = mateBoard(4, {10, 7}, 5);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        setCageFeaturesOff(0);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+    }
+}
+
+// Míč je v bezpečí (soupeř nedosáhne) a rychlý tým má ve 2. kole času dost ⇒ TD předávkou se
+// nehraje: řadič ho nepřikáže a hledání ho nedostane (dřív díra ve zdržování). V 7. kole týž tým
+// časovou rezervu nemá ⇒ hledání předávku hrát smí.
+TEST(OneCageMate, ASafeBallWithTimeToSpareIsNotHandedOffForAnEarlyTouchdown) {
+    const Macro ho{MacroType::HAND_OFF_SCORE, 1, 6, {-1, -1}};
+    {
+        Board b = mateBoard(2, {0, 0});
+        ASSERT_DOUBLE_EQ(blitzThreat(b.s, b.s.getPlayer(1)), 0.0);
+        ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1)));
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+        EXPECT_EQ(b.s.homeTeam.score, 0);
+        EXPECT_TRUE(cc.forbidsCarrierMove(b.s, ho)) << "ani hledání TD předávkou nedostane";
+    }
+    {
+        Board b = mateBoard(7, {0, 0});
+        ASSERT_FALSE(teamHasTimeSlack(b.s, b.s.getPlayer(1))) << "předpoklad: v 7. kole rezerva není";
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        if (b.s.homeTeam.score == 0) EXPECT_FALSE(cc.forbidsCarrierMove(b.s, ho)) << "bez rezervy se nezdržuje";
+    }
+}
+
+// Příprava: po tahu klece stojí jeden volný hráč tak, aby příští tah došel do zóny bez hodu a nosič
+// k němu došel předat. Pět spoluhráčů (MA 9) stojí na začátku 16–18 polí od zóny: čtyři jdou na rohy, pátý se chystá.
+TEST(OneCageMate, AfterTheCageMovesOneFreePlayerGetsReadyWithinReachOfTheEndZoneAndOfTheCarrier) {
+    auto run = [](unsigned off, bool& ready) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);          // pomalý nosič: klec ujde 4 pole
+        b.put(2, TeamSide::HOME, {7, 6}, 9); b.put(3, TeamSide::HOME, {7, 8}, 9);
+        b.put(4, TeamSide::HOME, {9, 6}, 9); b.put(5, TeamSide::HOME, {9, 8}, 9);
+        b.put(6, TeamSide::HOME, {8, 3}, 9);
+        b.put(13, TeamSide::AWAY, {24, 13}, 4);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        const Player& c = b.s.getPlayer(1);
+        ready = false;                       // kdo z pěti zbude volný, vybírá plánovač klece — stačí kdokoli
+        for (int id = 2; id <= 6; ++id) {
+            const Player& m = b.s.getPlayer(id);
+            const bool corner = std::abs(m.position.x - c.position.x) == 1 && std::abs(m.position.y - c.position.y) == 1;
+            if (!corner && (25 - m.position.x) <= 9 && m.position.distanceTo(c.position) - 1 <= 4) ready = true;
+        }
+        return 25 - c.position.x;
+    };
+    bool ready = false;
+    const int carrierDist = run(0, ready);
+    ASSERT_GT(carrierDist, 4 + 2) << "předpoklad: nosič sám příští tah do zóny nedojde ani s GFI";
+    EXPECT_TRUE(ready) << "volný hráč je připravený";
+    run(kFeatReadyMate, ready);
+    EXPECT_FALSE(ready) << "pozitivní kontrola: bez úpravy jde volný hráč jen tři sloupce před klec — do zóny by nedošel";
+}
+
+// Nosič v čisté kleci (rána nejvýš „dvě kostky, vybírá nosič“, míč přežije v 89 %) a příjemce bez
+// Catch (zachycení 3+ = 67 %): předávka má menší šanci než klec ⇒ klec jde dál.
+TEST(OneCageMate, ACleanCageIsNotBrokenForAHandOffWithWorseOdds) {
+    Board b(4);
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(2, TeamSide::HOME, {11, 6}); b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6}); b.put(5, TeamSide::HOME, {13, 8});
+    b.put(6, TeamSide::HOME, {17, 3}, 9);
+    b.put(13, TeamSide::AWAY, {8, 7}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    const double pm = handOffTdChance(b.s, b.s.getPlayer(1), b.s.getPlayer(6));
+    ASSERT_GT(pm, 0.5) << "předpoklad: předávka možná je";
+    ASSERT_LT(pm, 1.0 - blitzThreat(b.s, b.s.getPlayer(1))) << "předpoklad: klec je bezpečnější";
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+    EXPECT_EQ(b.s.homeTeam.score, 0);
+}

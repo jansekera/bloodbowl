@@ -65,6 +65,8 @@ enum CageFeature : unsigned {
     kFeatForceScore     = 32768, // P178: ohrožený nosič, který do zóny dojde, skóruje příkazem řadiče (ne volbou hledání)
     kFeatScreenSpread   = 65536, // P178: předvýběr bezpečného pole bere pole ze všech vzdáleností, ne jen 24 nejdál
     kFeatMarkerToward   = 131072, // P179: markující hráč si stoupá mezi soupeře a nosiče, ne na nejbližší pole u soupeře
+    kFeatReadyMate      = 262144, // P180: po tahu klece se jeden volný hráč postaví tak, aby příští tah po předávce došel do zóny
+    kFeatScoreViaMate   = 524288, // P180: hrozí-li ztráta míče a nosič sám nedosáhne, TD předávkou přikáže řadič; míč v bezpečí + čas ⇒ zdržuje se i předávka
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře
@@ -99,6 +101,9 @@ struct Macro {
     int targetId = -1;      // target (blitz/block/foul/pass/relay)
     Position targetPos{-1, -1}; // target position (reposition)
     int thirdId = -1;       // third player (CHAIN_SCORE scorer)
+    // HAND_OFF_SCORE (P180): pole, na které jde nosič předat (vedle příjemce). {-1,-1} = zvolí rozbalení.
+    // Pole zóny, kam příjemce doběhne, nese `targetPos`.
+    Position viaPos{-1, -1};
     // REPOSITION only: extra GFI squares the walk may roll for (0-2).
     // Default 0 keeps REPOSITION dice-free; the cage-advance planner sets
     // it for the ball carrier in tempo emergencies (user doctrine 2026-08-04:

@@ -126,6 +126,50 @@ double carrierThreatAt(const GameState& state, const Player& carrier, Position s
     return blitzThreat(proj, c, stopAbove);
 }
 
+double handOffTdChance(const GameState& state, const Player& carrier, const Player& receiver,
+                       Position* via, Position* ez) {
+    if (!carrier.isOnPitch() || !receiver.isOnPitch() || receiver.state != PlayerState::STANDING) return 0.0;
+    if (receiver.hasSkill(SkillName::NoHands) || !receiver.canAct() || receiver.hasMoved || receiver.hasActed) return 0.0;
+    const TeamSide side = carrier.teamSide;
+    // 1) nosič na pole vedle příjemce (svým pohybem, bez GFI)
+    double p1 = 0.0;
+    Position bestVia{-1, -1};
+    if (carrier.position.distanceTo(receiver.position) == 1) {
+        p1 = 1.0;
+        bestVia = carrier.position;
+    } else {
+        for (const Position& v : receiver.position.getAdjacent()) {
+            if (!v.isOnPitch() || state.getPlayerAtPosition(v)) continue;
+            if (v.distanceTo(carrier.position) > static_cast<int>(carrier.movementRemaining)) continue;
+            const double fail = pathFailProb(state, carrier, v, carrier.movementRemaining, Position{-1, -1});
+            if (fail < 0.0) continue;
+            if (1.0 - fail > p1) { p1 = 1.0 - fail; bestVia = v; }
+        }
+    }
+    if (p1 <= 0.0) return 0.0;
+    // 2) zachycení předávky
+    const int target = std::clamp(calculateCatchTarget(state, receiver, 1), 2, 6);
+    double p2 = (7 - target) / 6.0;
+    if (receiver.hasSkill(SkillName::Catch)) p2 = 1.0 - (1.0 - p2) * (1.0 - p2);
+    // 3) příjemce do zóny
+    double p3 = 0.0;
+    Position bestEz{-1, -1};
+    const int ezX = (side == TeamSide::HOME) ? 25 : 0;
+    const int budget = static_cast<int>(receiver.movementRemaining) + maxGfiSquares(receiver);
+    if (distToEndzone(receiver.position, side) > budget) return 0.0;
+    for (int y = 0; y < 15; ++y) {
+        const Position sq{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
+        if (state.getPlayerAtPosition(sq)) continue;
+        const double fail = pathFailProb(state, receiver, sq, budget, Position{-1, -1});
+        if (fail < 0.0) continue;
+        if (1.0 - fail > p3) { p3 = 1.0 - fail; bestEz = sq; }
+    }
+    if (p3 <= 0.0) return 0.0;
+    if (via) *via = bestVia;
+    if (ez) *ez = bestEz;
+    return p1 * p2 * p3;
+}
+
 Position farthestSafeForward(const GameState& state, const Player& carrier, int budget, bool forCage) {
     const TeamSide side = carrier.teamSide;
     // Menší je lepší: (pro klec: hrozba rány na nosiče po tahu,) vzdálenost k TD zóně, pak kolik
@@ -265,6 +309,10 @@ bool CageController::stillValid(const GameState& state, const Macro& m) const {
     if (!ourBall(state)) return false;    // míč pryč ⇒ zbytek plánu nemá smysl
     if (m.type == MacroType::REPOSITION) return stagedMacroStillValid(state, m, true);
     if (m.type == MacroType::SCORE) return state.ball.carrierId == m.playerId && freeToAct(state.getPlayer(m.playerId));
+    if (m.type == MacroType::HAND_OFF_SCORE) {
+        return state.ball.carrierId == m.playerId && freeToAct(state.getPlayer(m.playerId)) &&
+               freeToAct(state.getPlayer(m.targetId));
+    }
     if (m.type == MacroType::BLOCK) {
         const Player& a = state.getPlayer(m.playerId);
         const Player& d = state.getPlayer(m.targetId);
@@ -334,6 +382,58 @@ void CageController::planStart(const GameState& state) {
     // tahy 9 a 28: TD 0/20, klec stála). Teď: když nosič do zóny NEDOJDE BEZ HODU a není to
     // poslední kolo poločasu, jde klec dál jako v běžném postupu. Kdo dojde bez hodu, nebo
     // hraje poslední kolo, zůstává hledání (skórování se nebrání).
+    // ⭐⭐ P180 (uživatel 08.10.2026: „nosič doběhne, případně předá nebo hodí někomu nachystanému
+    //   dát TD“; rozhodnutí téhož dne: 1) „hrozbu ztráty míče řešíme dřívějším TD vždy“,
+    //   2) „pokud je míč v bezpečí a máme čas — volíme zdržovat“). Nosič sám do zóny bez hodu
+    //   nedojde. Je-li míč v bezpečí (hrozba rány ≤ 0,05) a tým má časovou rezervu, TD předávkou
+    //   se nehraje (ani hledáním — dřív díra ve zdržování). Jinak stejné porovnání jako u TD přes
+    //   hod: šance TD předávkou teď proti šanci, že míč přežije soupeřův tah (po našem nejlepším
+    //   plánu klece); je-li TD aspoň stejně pravděpodobné a lepší než TD nosičem, přikáže ho řadič.
+    //   Poslední kolo zůstává hledání (může najít i přihrávku).
+    auto orderViaMate = [&](const Player& c) -> bool {
+        if (!cageFeatureOn(kFeatScoreViaMate) || c.teamSide != state.activeTeam || !freeToAct(c)) return false;
+        if (state.getTeamState(c.teamSide).turnNumber >= 8) return false;
+        double pm = 0.0;
+        int rid = -1;
+        Position via{-1, -1}, ez{-1, -1};
+        state.forEachOnPitch(c.teamSide, [&](const Player& m) {
+            if (m.id == c.id) return;
+            Position v{-1, -1}, e{-1, -1};
+            const double p = handOffTdChance(state, c, m, &v, &e);
+            if (p > pm) { pm = p; rid = m.id; via = v; ez = e; }
+        });
+        if (rid < 0) return false;
+        double threat = blitzThreat(state, c);
+        if (threat <= kStallBlitzThreat && teamHasTimeSlack(state, c)) {
+            mateStall_ = true;
+            if (dbg) std::fprintf(stderr, "[cage ctl] TD předávkou by šlo (%.2f), ale míč je v bezpečí a je čas — zdržuje se\n", pm);
+            return false;
+        }
+        if (pm < 1.0 - threat) return false;
+        double own = 0.0;
+        {
+            const int ezX = (c.teamSide == TeamSide::HOME) ? 25 : 0;
+            const int budget = static_cast<int>(c.movementRemaining) + maxGfiSquares(c);
+            for (int y = 0; y < 15; ++y) {
+                const Position sq{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
+                if (state.getPlayerAtPosition(sq)) continue;
+                const double fail = pathFailProb(state, c, sq, budget, Position{-1, -1});
+                if (fail >= 0.0) own = std::max(own, 1.0 - fail);
+            }
+        }
+        if (own >= pm) return false;                      // nosič sám má aspoň stejnou šanci
+        const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+        if (after.valid) threat = std::min(threat, after.blitzThreat);
+        if (dbg) std::fprintf(stderr, "[cage ctl] TD předávkou %.2f (hráč %d) × míč přežije %.2f => %s\n", pm, rid,
+                              1.0 - threat, pm >= 1.0 - threat ? "předat" : "klec");
+        if (pm < 1.0 - threat) return false;
+        Macro ho{MacroType::HAND_OFF_SCORE, c.id, rid, ez};
+        ho.viaPos = via;
+        phase_ = CagePhase::CAGE;
+        queue_ = {ho};
+        stage_ = Stage::DONE;
+        return true;
+    };
     scoringRangeCage_ = false;
     if (goal == TurnGoal::SCORE_BALL && state.ball.isHeld && state.ball.carrierId > 0) {
         const Player& c = state.getPlayer(state.ball.carrierId);
@@ -403,6 +503,7 @@ void CageController::planStart(const GameState& state) {
         //   (a nezdržuje se — tedy hrozí rána nebo je poslední kolo), nebo když dojde jen přes
         //   hod a TD teď je aspoň stejně pravděpodobné jako to, že míč přežije soupeřův tah.
         //   Poslední kolo s TD jen přes hod zůstává hledání (může najít lepší šanci přihrávkou).
+        if (!walksIn && orderViaMate(c)) return;
         if (cageFeatureOn(kFeatForceScore) && !scoringRangeCage_ && (walksIn || !lastTurn) &&
             c.teamSide == state.activeTeam && freeToAct(c)) {
             if (dbg) std::fprintf(stderr, "[cage ctl] TD příkazem řadiče (dojde bez hodu %d, poslední kolo %d)\n", walksIn, lastTurn);
@@ -414,6 +515,8 @@ void CageController::planStart(const GameState& state) {
         if (dbg) std::fprintf(stderr, "[cage ctl] SCORE_BALL: dojde bez hodu %d, poslední kolo %d => %s\n",
                               walksIn, lastTurn, scoringRangeCage_ ? "klec jde dál" : "rozhoduje hledání");
     }
+    if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
+        orderViaMate(state.getPlayer(state.ball.carrierId))) return;
     if (goal != TurnGoal::ADVANCE_BALL && !scoringRangeCage_) {
         if (dbg) std::fprintf(stderr, "[cage ctl] bez plánu: cíl tahu %d není ADVANCE_BALL\n", static_cast<int>(goal));
         return;
@@ -760,6 +863,13 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         if (scoring || carrierActs || m.type == MacroType::ADVANCE) return true;
     }
 
+    // P180: míč v bezpečí a tým má čas ⇒ TD se nehraje ani přes spoluhráče
+    if (mateStall_ && (m.type == MacroType::HAND_OFF_SCORE || m.type == MacroType::PASS_SCORE ||
+                       m.type == MacroType::CHAIN_SCORE)) return true;
+    // P180: hráče připraveného pro předávku hledání neodvádí
+    if (readyMateId_ > 0 && m.playerId == readyMateId_ && m.type == MacroType::REPOSITION &&
+        m.targetPos != state.getPlayer(readyMateId_).position) return true;
+
     // Roh klece zůstává rohem: hráče, který po tahu řadiče stojí na úhlopříčce vedle nosiče,
     // hledání nepřesouvá jinam. Změřeno 07.10.: tam, kde nosič po kleci stál, klesly rohy
     // z 3,30 na 2,96 — 18× roh odešel přesunem. (Blok z místa roh smí; blitz hledání hráče
@@ -1017,8 +1127,64 @@ void CageController::planLaggards(const GameState& state) {
     const int dx = (side == TeamSide::HOME) ? 1 : -1;
     const Position cp = carrier.position;
     std::vector<Position> taken;
+    // ⭐⭐ P180 — PŘIPRAVENÝ HRÁČ (uživatel 08.10.2026: „nosič doběhne, případně předá nebo hodí někomu
+    //   nachystanému dát TD“; „pokud hráč dojde se chystat a nedojde tvořit roh — má se jít
+    //   chystat“). Po tahu klece se JEDEN volný hráč (rohem není — rohy už odehrály) postaví na
+    //   pole, ze kterého příští tah dojde do zóny bez hodu, kam k němu nosič příští tah dojde
+    //   předat, a kde na něj soupeř nedosáhne dobrou ranou. Jen z pohybu, obratnosti a desky —
+    //   žádné pravidlo podle rasy; pomalému týmu takové pole většinou nevyjde. Stojí-li už na
+    //   takovém poli, zůstane. Jen když nosič sám příští tah do zóny nedojde.
+    readyMateId_ = -1;
+    if (cageFeatureOn(kFeatReadyMate) && distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
+        struct Cand { int id; Position sq; std::tuple<int, int, int, int> key; };
+        std::vector<Cand> cands;
+        state.forEachOnPitch(side, [&](const Player& p) {
+            if (p.id == carrier.id || !freeToAct(p) || p.hasSkill(SkillName::NoHands)) return;
+            if (countTacklezones(state, p.position, side, p.id) > 0) return;
+            if (std::abs(p.position.x - cp.x) == 1 && std::abs(p.position.y - cp.y) == 1) return;   // stojící roh
+            const int target = std::clamp(calculateCatchTarget(state, p, 1), 2, 6);
+            double pc = (7 - target) / 6.0;
+            if (p.hasSkill(SkillName::Catch)) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
+            const int budget = p.movementRemaining;
+            for (int x = p.position.x - budget; x <= p.position.x + budget; ++x) {
+                for (int y = std::max(2, p.position.y - budget); y <= std::min(12, p.position.y + budget); ++y) {
+                    const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                    if (!sq.isOnPitch()) continue;
+                    if (distToEndzone(sq, side) > static_cast<int>(p.stats.movement) || distToEndzone(sq, side) < 1) continue;
+                    if (sq.distanceTo(cp) - 1 > static_cast<int>(carrier.stats.movement) || sq.distanceTo(cp) < 2) continue;
+                    if (sq != p.position) {
+                        if (state.getPlayerAtPosition(sq)) continue;
+                        if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
+                    }
+                    if (countTacklezones(state, sq, side, p.id) > 0) continue;
+                    cands.push_back({p.id, sq, {threatsTo(state, sq, side), -static_cast<int>(pc * 100.0),
+                                                static_cast<int>(sq.distanceTo(cp)), static_cast<int>(sq.distanceTo(p.position))}});
+                }
+            }
+        });
+        std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) { return a.key < b.key; });
+        int tried = 0;
+        for (const Cand& c : cands) {
+            if (++tried > 8) break;                                   // zkouška hrozby je drahá
+            GameState proj = state.clone();
+            Player& pp = proj.getPlayer(c.id);
+            pp.position = c.sq;
+            if (blitzThreat(proj, pp, kSafeBlitzThreat) > kSafeBlitzThreat) continue;
+            readyMateId_ = c.id;
+            if (c.sq != state.getPlayer(c.id).position) {
+                Macro m{MacroType::REPOSITION, c.id, -1, c.sq};
+                m.cageManaged = true;
+                queue_.push_back(m);
+            }
+            taken.push_back(c.sq);
+            if (std::getenv("BB_CAGE_DEBUG")) {
+                std::fprintf(stderr, "[cage ctl] připravený hráč %d -> (%d,%d)\n", c.id, c.sq.x, c.sq.y);
+            }
+            break;
+        }
+    }
     state.forEachOnPitch(side, [&](const Player& p) {
-        if (p.id == carrier.id || !freeToAct(p)) return;
+        if (p.id == carrier.id || !freeToAct(p) || p.id == readyMateId_) return;
         if ((cp.x - p.position.x) * dx <= 1) return;                       // není zaostalec
         if (countTacklezones(state, p.position, side, p.id) > 0) return;   // vázaný: řeší rány
         const int budget = p.movementRemaining;
@@ -1126,6 +1292,8 @@ bool CageController::next(const GameState& state, Macro& out) {
         ballOursAtTurnStart_ = ourBall(state);
         lateFillDone_ = false;
         stalling_ = false;
+        mateStall_ = false;
+        readyMateId_ = -1;
     }
     // ⭐ P169 krok 9 (07.10.2026): MÍČ ZVEDLO HLEDÁNÍ ⇒ ROHY SE STAVÍ HNED POTOM. Když řadič na
     //   začátku tahu zvednutí nenabídl (míč v zóně soupeře, napřed rána) a míč pak zvedlo
