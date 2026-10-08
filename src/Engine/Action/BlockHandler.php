@@ -246,24 +246,8 @@ final class BlockHandler implements ActionHandlerInterface
             return $this->resolveStab($state, $attacker, $defender, $events);
         }
 
-        // Calculate effective strengths
-        $attStr = $this->strCalc->calculateEffectiveStrength($state, $attacker, $defenderPos);
-        $defStr = $this->strCalc->calculateEffectiveStrength($state, $defender, $attackerPos);
-
-        // Horns: +1 ST when blitzing
-        if (!empty($params['hornsBonus'])) {
-            $attStr++;
-        }
-
-        // Dauntless: if attacker ST < defender base ST, roll D6+ST; if >= defender ST, treat as equal
-        if ($attacker->hasSkill(SkillName::Dauntless) && $attacker->getStats()->getStrength() < $defender->getStats()->getStrength()) {
-            $dauntlessRoll = $this->dice->rollD6();
-            $dauntlessTotal = $dauntlessRoll + $attacker->getStats()->getStrength();
-            if ($dauntlessTotal >= $defender->getStats()->getStrength()) {
-                // Treat as equal ST for dice calculation
-                $attStr = max($attStr, $defStr);
-            }
-        }
+        // Sily pro blok: Horns (+1 v blitzu), Dauntless, asistence -- viz `blockStrengths`
+        [$attStr, $defStr] = $this->blockStrengths($state, $attacker, $defender, !empty($params['hornsBonus']) ? 1 : 0, 0);
 
         // Determine dice
         $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
@@ -391,9 +375,9 @@ final class BlockHandler implements ActionHandlerInterface
                 }
                 $frenzyEvents[] = GameEvent::frenzyBlock($pending->getAttackerId(), $pending->getDefenderId());
 
-                // Recalculate strengths at new positions
-                $attStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyAttacker, $frenzyDefender->getPosition());
-                $defStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyDefender, $frenzyAttacker->requirePosition());
+                // Sily znovu na novych polich -- vcetne Dauntless (pred 08.10.2026 se u druhe
+                //   rany nehazel; r. 8026-8027: plati, kdykoli hrac blokuje silnejsiho)
+                [$attStr2, $defStr2] = $this->blockStrengths($frenzyState, $frenzyAttacker, $frenzyDefender, 0, 0);
                 $diceInfo2 = $this->strCalc->getBlockDiceInfo($attStr2, $defStr2);
 
                 $faces2 = [];
@@ -762,18 +746,10 @@ final class BlockHandler implements ActionHandlerInterface
             return [$state, $events, false];
         }
 
-        // Calculate effective strengths with +2 to defender
-        $attStr = $this->strCalc->calculateEffectiveStrength($state, $attacker, $defenderPos);
-        $defStr = $this->strCalc->calculateEffectiveStrength($state, $defender, $attackerPos) + 2;
-
-        // Dauntless: compares base ST (no +2)
-        if ($attacker->hasSkill(SkillName::Dauntless) && $attacker->getStats()->getStrength() < $defender->getStats()->getStrength()) {
-            $dauntlessRoll = $this->dice->rollD6();
-            $dauntlessTotal = $dauntlessRoll + $attacker->getStats()->getStrength();
-            if ($dauntlessTotal >= $defender->getStats()->getStrength()) {
-                $attStr = max($attStr, $defStr);
-            }
-        }
+        // Sily pro blok; obrance ma v Multiple Block +2 (`rules_bb2016.txt` r. 8300-8301:
+        //   "each defender's strength is increased by 2") -- to je modifikator sily, takze
+        //   se s nim pocita uz pro Dauntless ("after all other modifiers", r. 8034-8035).
+        [$attStr, $defStr] = $this->blockStrengths($state, $attacker, $defender, 0, 2);
 
         // Determine dice
         $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
@@ -822,6 +798,46 @@ final class BlockHandler implements ActionHandlerInterface
 
         $attackerDown = $result->isTurnover();
         return [$result->getNewState(), $result->getEvents(), $attackerDown];
+    }
+
+    /**
+     * Síly obou hráčů pro blok: síla + modifikátory (Horns, +2 v Multiple Block), pak
+     * Dauntless, a teprve potom asistence. Jediné místo pro všechny tři rány (běžná,
+     * druhá rána Frenzy, Multiple Block).
+     *
+     * OPRAVENO 08.10.2026 (audit parity, nález 8) -- Dauntless tu byl třikrát špatně:
+     *   úspěch už při rovnosti (`>=`); po úspěchu `max(síla útočníka, síla obránce VČETNĚ
+     *   jeho asistencí)`, takže obranné asistence zmizely a útočné se nepřičetly; porovnával
+     *   holé síly bez Horns; a u druhé rány Frenzy se neházel vůbec.
+     *   Pravidla ř. 8026-8035: "The skill only works when the player attempts to block an
+     *   opponent who is stronger than himself. ... If the total is equal to or lower than
+     *   the opponent's Strength, the player must block using his normal Strength. If the
+     *   total is greater, then the player ... counts as having a Strength equal to his
+     *   opponent's ... The strength of both players is calculated before any defensive or
+     *   offensive assists are added but after all other modifiers."
+     *
+     * @return array{0: int, 1: int} síla útočníka a obránce včetně asistencí
+     */
+    private function blockStrengths(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        int $attackerModifier,
+        int $defenderModifier,
+    ): array {
+        $attSt = $attacker->getStats()->getStrength() + $attackerModifier;
+        $defSt = $defender->getStats()->getStrength() + $defenderModifier;
+
+        if ($attacker->hasSkill(SkillName::Dauntless) && $attSt < $defSt
+            && $this->dice->rollD6() + $attSt > $defSt
+        ) {
+            $attSt = $defSt;
+        }
+
+        return [
+            $attSt + $this->strCalc->countAssists($state, $attacker, $defender->requirePosition()),
+            $defSt + $this->strCalc->countAssists($state, $defender, $attacker->requirePosition()),
+        ];
     }
 
     /**
