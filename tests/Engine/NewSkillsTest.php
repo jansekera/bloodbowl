@@ -121,8 +121,7 @@ final class NewSkillsTest extends TestCase
             new BallResolver(new FixedDiceRoller([]), new TacklezoneCalculator(), new ScatterCalculator()),
         );
 
-        $range = \App\Enum\PassRange::fromDistance(3); // quick pass, modifier +1
-        $this->assertNotNull($range);
+        $range = \App\Enum\PassRange::QUICK_PASS; // modifier +1
         $target = $passResolver->getAccuracyTarget($state, $state->requirePlayer(1), $range);
 
         // Without NervesOfSteel: 7 - 3 + 2(TZ) - 1(quick) = 5
@@ -341,14 +340,14 @@ final class NewSkillsTest extends TestCase
     public function testDauntlessSuccessEqualizesStrength(): void
     {
         // ST3 attacker with Dauntless blocks ST4 defender
-        // Dauntless: roll D6+3, if >= 4 -> treat as equal
-        // Roll 2 -> 2+3 = 5 >= 4, success! Treated as ST4 vs ST4 = 1 die
+        // Dauntless (rules_bb2016.txt r. 8029-8033): D6+3 musi byt VETSI nez 4
+        // Roll 2 -> 2+3 = 5 > 4, success! Treated as ST4 vs ST4 = 1 die
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 3, id: 1, skills: [SkillName::Dauntless])
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 4, id: 2)
             ->build();
 
-        // Dauntless roll: 2 (2+3=5 >= 4), then 1 block die: roll 3 (Pushed, no injury)
+        // Dauntless roll: 2 (2+3=5 > 4), then 1 block die: roll 3 (Pushed, no injury)
         $dice = new FixedDiceRoller([2, 3]);
         $resolver = new ActionResolver($dice);
 
@@ -367,10 +366,8 @@ final class NewSkillsTest extends TestCase
     public function testDauntlessFailureKeepsDisadvantage(): void
     {
         // ST3 attacker with Dauntless blocks ST4 defender
-        // Dauntless: roll D6+3, if < 4 -> no effect
-        // Roll 0 is impossible on D6, but roll 1 -> 1+3 = 4 >= 4 is success
-        // So we need to test the exact boundary. ST3 vs ST5:
-        // Dauntless roll 1 -> 1+3=4 < 5, fail
+        // Dauntless (rules_bb2016.txt r. 8029-8030): soucet "equal to or lower" = neuspech.
+        // ST3 vs ST5, roll 1 -> 1+3=4 < 5, fail (rovnost hlida DauntlessRulesTest)
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 3, id: 1, skills: [SkillName::Dauntless])
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 5, id: 2)

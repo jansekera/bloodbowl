@@ -11,6 +11,7 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingBlockDTO;
 use App\Enum\BlockDiceFace;
+use App\Enum\PassRange;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
@@ -246,24 +247,8 @@ final class BlockHandler implements ActionHandlerInterface
             return $this->resolveStab($state, $attacker, $defender, $events);
         }
 
-        // Calculate effective strengths
-        $attStr = $this->strCalc->calculateEffectiveStrength($state, $attacker, $defenderPos);
-        $defStr = $this->strCalc->calculateEffectiveStrength($state, $defender, $attackerPos);
-
-        // Horns: +1 ST when blitzing
-        if (!empty($params['hornsBonus'])) {
-            $attStr++;
-        }
-
-        // Dauntless: if attacker ST < defender base ST, roll D6+ST; if >= defender ST, treat as equal
-        if ($attacker->hasSkill(SkillName::Dauntless) && $attacker->getStats()->getStrength() < $defender->getStats()->getStrength()) {
-            $dauntlessRoll = $this->dice->rollD6();
-            $dauntlessTotal = $dauntlessRoll + $attacker->getStats()->getStrength();
-            if ($dauntlessTotal >= $defender->getStats()->getStrength()) {
-                // Treat as equal ST for dice calculation
-                $attStr = max($attStr, $defStr);
-            }
-        }
+        // Sily pro blok: Horns (+1 v blitzu), Dauntless, asistence -- viz `blockStrengths`
+        [$attStr, $defStr] = $this->blockStrengths($state, $attacker, $defender, !empty($params['hornsBonus']) ? 1 : 0, 0);
 
         // Determine dice
         $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
@@ -353,8 +338,19 @@ final class BlockHandler implements ActionHandlerInterface
         $followUpChoice = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
         $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice);
 
-        // Frenzy: mandatory second block if both still standing and adjacent
-        if (!$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
+        // Frenzy: povinna druha rana, kdyz oba stoji a sousedi -- ale JEN po vysledku
+        //   Pushed / Defender Stumbles.
+        // OPRAVENO 08.10.2026 (audit parity, nález 7) -- na zvolenou kostku se tu nehledělo:
+        //   druhá rána se házela i po Both Down, když oba díky Blocku zůstali stát.
+        //   Pravidla ř. 8138-8141: "If a 'Pushed' or 'Defender Stumbles' result was chosen,
+        //   the player must immediately throw a second block against the same opponent so
+        //   long as they are both still standing and adjacent."
+        //   Both Down, který Juggernaut v blitzu bere "as if a 'Pushed' result has been
+        //   rolled instead" (ř. 8194-8195), je Pushed.
+        $frenzyTrigger = $chosenFace === BlockDiceFace::PUSHED
+            || $chosenFace === BlockDiceFace::DEFENDER_STUMBLES
+            || ($chosenFace === BlockDiceFace::BOTH_DOWN && $isBlitz && $attacker->hasSkill(SkillName::Juggernaut));
+        if ($frenzyTrigger && !$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
             $frenzyState = $result->getNewState();
             $frenzyAttacker = $frenzyState->getPlayer($pending->getAttackerId());
             $frenzyDefender = $frenzyState->getPlayer($pending->getDefenderId());
@@ -380,9 +376,9 @@ final class BlockHandler implements ActionHandlerInterface
                 }
                 $frenzyEvents[] = GameEvent::frenzyBlock($pending->getAttackerId(), $pending->getDefenderId());
 
-                // Recalculate strengths at new positions
-                $attStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyAttacker, $frenzyDefender->getPosition());
-                $defStr2 = $this->strCalc->calculateEffectiveStrength($frenzyState, $frenzyDefender, $frenzyAttacker->requirePosition());
+                // Sily znovu na novych polich -- vcetne Dauntless (pred 08.10.2026 se u druhe
+                //   rany nehazel; r. 8026-8027: plati, kdykoli hrac blokuje silnejsiho)
+                [$attStr2, $defStr2] = $this->blockStrengths($frenzyState, $frenzyAttacker, $frenzyDefender, 0, 0);
                 $diceInfo2 = $this->strCalc->getBlockDiceInfo($attStr2, $defStr2);
 
                 $faces2 = [];
@@ -751,18 +747,10 @@ final class BlockHandler implements ActionHandlerInterface
             return [$state, $events, false];
         }
 
-        // Calculate effective strengths with +2 to defender
-        $attStr = $this->strCalc->calculateEffectiveStrength($state, $attacker, $defenderPos);
-        $defStr = $this->strCalc->calculateEffectiveStrength($state, $defender, $attackerPos) + 2;
-
-        // Dauntless: compares base ST (no +2)
-        if ($attacker->hasSkill(SkillName::Dauntless) && $attacker->getStats()->getStrength() < $defender->getStats()->getStrength()) {
-            $dauntlessRoll = $this->dice->rollD6();
-            $dauntlessTotal = $dauntlessRoll + $attacker->getStats()->getStrength();
-            if ($dauntlessTotal >= $defender->getStats()->getStrength()) {
-                $attStr = max($attStr, $defStr);
-            }
-        }
+        // Sily pro blok; obrance ma v Multiple Block +2 (`rules_bb2016.txt` r. 8300-8301:
+        //   "each defender's strength is increased by 2") -- to je modifikator sily, takze
+        //   se s nim pocita uz pro Dauntless ("after all other modifiers", r. 8034-8035).
+        [$attStr, $defStr] = $this->blockStrengths($state, $attacker, $defender, 0, 2);
 
         // Determine dice
         $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
@@ -811,6 +799,46 @@ final class BlockHandler implements ActionHandlerInterface
 
         $attackerDown = $result->isTurnover();
         return [$result->getNewState(), $result->getEvents(), $attackerDown];
+    }
+
+    /**
+     * Síly obou hráčů pro blok: síla + modifikátory (Horns, +2 v Multiple Block), pak
+     * Dauntless, a teprve potom asistence. Jediné místo pro všechny tři rány (běžná,
+     * druhá rána Frenzy, Multiple Block).
+     *
+     * OPRAVENO 08.10.2026 (audit parity, nález 8) -- Dauntless tu byl třikrát špatně:
+     *   úspěch už při rovnosti (`>=`); po úspěchu `max(síla útočníka, síla obránce VČETNĚ
+     *   jeho asistencí)`, takže obranné asistence zmizely a útočné se nepřičetly; porovnával
+     *   holé síly bez Horns; a u druhé rány Frenzy se neházel vůbec.
+     *   Pravidla ř. 8026-8035: "The skill only works when the player attempts to block an
+     *   opponent who is stronger than himself. ... If the total is equal to or lower than
+     *   the opponent's Strength, the player must block using his normal Strength. If the
+     *   total is greater, then the player ... counts as having a Strength equal to his
+     *   opponent's ... The strength of both players is calculated before any defensive or
+     *   offensive assists are added but after all other modifiers."
+     *
+     * @return array{0: int, 1: int} síla útočníka a obránce včetně asistencí
+     */
+    private function blockStrengths(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        int $attackerModifier,
+        int $defenderModifier,
+    ): array {
+        $attSt = $attacker->getStats()->getStrength() + $attackerModifier;
+        $defSt = $defender->getStats()->getStrength() + $defenderModifier;
+
+        if ($attacker->hasSkill(SkillName::Dauntless) && $attSt < $defSt
+            && $this->dice->rollD6() + $attSt > $defSt
+        ) {
+            $attSt = $defSt;
+        }
+
+        return [
+            $attSt + $this->strCalc->countAssists($state, $attacker, $defender->requirePosition()),
+            $defSt + $this->strCalc->countAssists($state, $defender, $attacker->requirePosition()),
+        ];
     }
 
     /**
@@ -979,8 +1007,12 @@ final class BlockHandler implements ActionHandlerInterface
                     $events[] = GameEvent::juggernaut($attacker->getId());
                     break;
                 }
-                // Wrestle: if either has it, both go prone without armor
-                if ($attacker->hasSkill(SkillName::Wrestle) || $defender->hasSkill(SkillName::Wrestle)) {
+                // Wrestle: oba jdou na zem bez hodu na brneni -- kdyz ho nektery z nich POUZIJE.
+                // OPRAVENO 08.10.2026 (audit parity, nález 6) -- tady stálo "má-li Wrestle
+                //   kdokoli z dvojice, použije se vždy". Pravidla ř. 8671-8672: "This player
+                //   **may** use Wrestle when he blocks or is blocked"; ř. 1820: "Skill use is
+                //   not mandatory." Volí se v `wrestleUsed`.
+                if ($this->wrestleUsed($state, $attacker, $defender)) {
                     // ⛔⛔ OPRAVA 11.09.2026: Wrestle NENÍ bezpodmínečně bez
                     //   turnoveru. `rules_bb2016.txt` r. 8677-8678:
                     //   „Use of this skill does not cause a turnover **unless
@@ -1226,7 +1258,8 @@ final class BlockHandler implements ActionHandlerInterface
      * a normal push back as if the second player had been blocked by the first"
      * (r. 644-646), proto se vola rekurzivne tataz funkce.
      * - pole: volne na hristi > dav (vybira tym na tahu) > obsazene = retez (r. 639-651)
-     * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ);
+     * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ); ten
+     *   voli z VSECH volnych sousednich poli (r. 8474-8478), bez volneho pole neplati;
      * - Grab a Strip Ball patri blokujicimu, plati jen u PRVNIHO odtlaceni
      *   (`$utocnik` je pak null); Grab nesmi zrusit Side Step v retezu (FAQ).
      * - nosic odtlaceny v retezu mic DRZI (neni sraženy).
@@ -1263,7 +1296,28 @@ final class BlockHandler implements ActionHandlerInterface
         $zonySoupere = fn(Position $p): int => $this->tzCalc->countTacklezones($state, $p, $kdo->getTeamSide());
         $pushTo = null;
         $chainPushTarget = null;
-        $grab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
+        // "Grab and Side Step will cancel each other out and the standard pushback rules
+        //   apply" (r. 8151-8153) -- ma-li blokujici Grab, Side Step odtlaceneho neplati.
+        $maGrab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
+        $maSideStep = $kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct();
+        $grab = $maGrab && !$maSideStep;
+        // OPRAVENO 08.10.2026 (audit parity, nález 11) -- Side Step tu vybíral jen ze tří
+        //   polí odtlačení, a když volné nebylo, šel rovnou do řetězu (i tam, kde podle
+        //   běžného pořadí patří hráč do davu). Pravidla ř. 8474-8478: "the coach may choose
+        //   to move the player to any adjacent square, not just the three squares shown on
+        //   the Push Back diagram. Note that the player may not use this skill if there are
+        //   no open squares on the pitch adjacent to this player." Bez volného sousedního
+        //   pole tedy skill neplatí a rozhoduje běžné pořadí níž (volné pole > dav > řetěz).
+        $sideStepSquares = [];
+        if ($maSideStep && !$maGrab) {
+            // tři pole odtlačení napřed: při shodě zón zůstává hráč "od útočníka"
+            $sideStepSquares = $emptySquares;
+            foreach ($kde->getAdjacentPositions() as $pos) {
+                if ($state->getPlayerAtPosition($pos) === null && !in_array($pos, $sideStepSquares, false)) {
+                    $sideStepSquares[] = $pos;
+                }
+            }
+        }
         if ($grab && !$offPitchAvailable) {
             // Grab: utocnik voli nejhorsi volne pole (nejvic zon). Je-li jedno z poli mimo
             //   hriste, rozhoduje bezne poradi niz (volne pole > dav > retez).
@@ -1274,16 +1328,10 @@ final class BlockHandler implements ActionHandlerInterface
                 $pushTo = $occupiedSquares[0]['pos'];
                 $chainPushTarget = $occupiedSquares[0]['player'];
             }
-        } elseif ($kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct()) {
-            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi pole (nejmin zon)
-            if ($emptySquares !== []) {
-                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
-                $pushTo = $emptySquares[0];
-            } elseif ($occupiedSquares !== []) {
-                usort($occupiedSquares, fn(array $a, array $b) => $zonySoupere($a['pos']) <=> $zonySoupere($b['pos']));
-                $pushTo = $occupiedSquares[0]['pos'];
-                $chainPushTarget = $occupiedSquares[0]['player'];
-            }
+        } elseif ($sideStepSquares !== []) {
+            // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
+            usort($sideStepSquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
+            $pushTo = $sideStepSquares[0];
         } elseif ($emptySquares !== []) {
             // OPRAVENO 08.10.2026 (audit parity, nález 3a) -- před touhle větví stálo
             //   `elseif ($offPitchAvailable)` ("dav má přednost"): bylo-li kterékoli ze tří
@@ -1340,8 +1388,11 @@ final class BlockHandler implements ActionHandlerInterface
         $state = $state->withPlayer($kdo);
 
         // Odtlaceny nosic mic drzi -- jen Strip Ball blokujiciho mu ho vyrazi
+        // OPRAVENO 08.10.2026 (audit parity, nález 10) -- Sure Hands se tu nekontrolovalo.
+        //   Pravidla ř. 8545-8546: "the Strip Ball skill will not work against a player
+        //   with this skill" (totéž ř. 973-976).
         if ($state->getBall()->getCarrierId() === $kdo->getId()) {
-            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall)) {
+            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall) && !$kdo->hasSkill(SkillName::SureHands)) {
                 $events[] = GameEvent::ballStripped($kdo->getId());
                 $state = $state->withBall(BallState::onGround($pushTo));
                 $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
@@ -1350,6 +1401,10 @@ final class BlockHandler implements ActionHandlerInterface
             } else {
                 $state = $state->withBall(BallState::carried($pushTo, $kdo->getId()));
             }
+        } else {
+            // Odtlacen (i v retezu) na pole s volnym micem: mic odskoci, neni to turnover
+            //   (r. 441-444, 640-641) -- viz `bounceLooseBallUnderPlayer`.
+            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $pushTo, $events);
         }
 
         return [$state, $events];
@@ -1433,8 +1488,8 @@ final class BlockHandler implements ActionHandlerInterface
             if ($tPos === null) {
                 continue;
             }
-            // Must be within quick pass range (distance <= 3)
-            if ($carrierPos->distanceTo($tPos) <= 3) {
+            // Dump-Off je Quick Pass (`rules_bb2016.txt` r. 8094) -- pasmo meri pravitko
+            if (PassRange::fromOffset($tPos->getX() - $carrierPos->getX(), $tPos->getY() - $carrierPos->getY()) === PassRange::QUICK_PASS) {
                 $best = $tPos;
                 break;
             }
@@ -1490,6 +1545,34 @@ final class BlockHandler implements ActionHandlerInterface
         );
 
         return $scored[0][0];
+    }
+
+    /**
+     * Použije některý z dvojice Wrestle na výsledek Both Down? (`rules_bb2016.txt`
+     * ř. 8671-8678: "may use", ř. 1820: "Skill use is not mandatory".)
+     * Volba je automatická pro obě strany (dialog na ni web nemá), vzor C++
+     * `block_handler.cpp:931-947`:
+     * - útočník bez Blocku by padl sám (turnover) ⇒ Wrestle vždy; s Blockem jen když je co
+     *   získat (soupeř má Block, takže by se nestalo nic, nebo drží míč) a sám míč nenese
+     *   -- položený nosič týmu na tahu je turnover (ř. 8677-8678);
+     * - obránce bez Blocku padá tak jako tak ⇒ Wrestle (padne i útočník a nehází se na
+     *   brnění); s Blockem by zůstal stát a útočník bez Blocku padl ⇒ Wrestle jen na
+     *   nosiče míče, kterého Block drží na nohou (jeho položení je turnover).
+     */
+    private function wrestleUsed(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): bool
+    {
+        $carrierId = $state->getBall()->getCarrierId();
+        $attHasBall = $carrierId === $attacker->getId();
+        $defHasBall = $carrierId === $defender->getId();
+        $attHasBlock = $attacker->hasSkill(SkillName::Block);
+        $defHasBlock = $defender->hasSkill(SkillName::Block);
+
+        $attWants = $attacker->hasSkill(SkillName::Wrestle)
+            && (!$attHasBlock || (!$attHasBall && ($defHasBlock || $defHasBall)));
+        $defWants = $defender->hasSkill(SkillName::Wrestle)
+            && (!$defHasBlock || ($attHasBall && $attHasBlock));
+
+        return $attWants || $defWants;
     }
 
     private function scoreBlockFace(BlockDiceFace $face, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): int

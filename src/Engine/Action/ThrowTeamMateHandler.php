@@ -132,8 +132,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         }
 
         // Calculate range and accuracy
-        $distance = $throwerPos->distanceTo($landingTarget);
-        $range = PassRange::fromDistance($distance);
+        $range = PassRange::fromOffset($landingTarget->getX() - $throwerPos->getX(), $landingTarget->getY() - $throwerPos->getY());
         if ($range === null) {
             throw new \InvalidArgumentException('Target is out of range');
         }
@@ -314,6 +313,12 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                 $events = array_merge($events, $bounceResult['events']);
                 $state = $bounceResult['state'];
             }
+        }
+
+        // Hozeny dopadl na pole s volnym micem: zvednout ho nesmi, mic odskoci a turnover
+        //   to neni (`rules_bb2016.txt` r. 441-444) -- viz `bounceLooseBallUnderPlayer`.
+        if (!$hadBall) {
+            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $landingPos, $events);
         }
 
         return ActionResult::success($state, $events);

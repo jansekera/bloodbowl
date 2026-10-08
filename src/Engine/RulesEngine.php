@@ -657,7 +657,7 @@ final class RulesEngine
             return ['Target position is off the pitch'];
         }
 
-        $range = PassRange::fromDistance($from->distanceTo($target));
+        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
         if ($range === null) {
             return ['Target is out of pass range'];
         }
@@ -745,7 +745,7 @@ final class RulesEngine
         for ($x = 0; $x < Position::PITCH_WIDTH; $x++) {
             for ($y = 0; $y < Position::PITCH_HEIGHT; $y++) {
                 $targetPos = new Position($x, $y);
-                $range = PassRange::fromDistance($pos->distanceTo($targetPos));
+                $range = PassRange::fromOffset($targetPos->getX() - $pos->getX(), $targetPos->getY() - $pos->getY());
                 if ($range !== null && !$pos->equals($targetPos)
                     && $range->povolenaZaPocasi($state->getWeather())) {
                     $targets[] = [
@@ -848,7 +848,7 @@ final class RulesEngine
         }
 
         $landing = new Position((int) $params['targetX'], (int) $params['targetY']);
-        $range = PassRange::fromDistance($playerPos->distanceTo($landing));
+        $range = PassRange::fromOffset($landing->getX() - $playerPos->getX(), $landing->getY() - $playerPos->getY());
         if ($range === null) {
             return ['Target landing position is out of range'];
         }
@@ -1166,7 +1166,7 @@ final class RulesEngine
             return ['Target position is off the pitch'];
         }
 
-        $range = PassRange::fromDistance($from->distanceTo($target));
+        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
         if ($range === null) {
             return ['Target is out of range'];
         }

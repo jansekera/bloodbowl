@@ -45,7 +45,12 @@ final class StrengthCalculator
             if ($friend->getId() === $blocker->getId()) {
                 continue;
             }
-            if (!$friend->getState()->canAct()) {
+            // OPRAVENO 08.10.2026 (audit parity, nález 9) -- tady se hlídalo jen "stojí".
+            //   Hráč, který ztratil zóny (Bone-head, Really Stupid, Hypnotic Gaze), dál
+            //   asistoval. Pravidla ř. 1662-1669: "In order to make an assist, the player:
+            //   ... 3. Must be standing, and 4. Must have his tackle zones." Platí i pro
+            //   Guard -- ten promíjí jen cizí zónu (ř. 8159-8160).
+            if (!$friend->getState()->canAct() || $friend->hasLostTacklezones()) {
                 continue;
             }
 
@@ -136,7 +141,11 @@ final class StrengthCalculator
             if ($enemy->getId() === $excludeId) {
                 continue;
             }
-            if (!$enemy->getState()->exertsTacklezone()) {
+            // OPRAVENO 08.10.2026 (audit parity, nález 9) -- soupeř bez zón se tu počítal,
+            //   jako by zónu měl, a rušil asistence u bloku i u faulu (ř. 1666-1667,
+            //   1849-1851: asistenci ruší "the tackle zone" soupeře -- kdo zóny ztratil,
+            //   žádnou nemá, ř. 7983).
+            if (!$enemy->getState()->exertsTacklezone() || $enemy->hasLostTacklezones()) {
                 continue;
             }
             $enemyPos = $enemy->getPosition();

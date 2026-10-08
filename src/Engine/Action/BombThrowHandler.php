@@ -71,8 +71,7 @@ final class BombThrowHandler implements ActionHandlerInterface
 
         $events = [];
 
-        $distance = $throwerPos->distanceTo($targetPos);
-        $range = PassRange::fromDistance($distance);
+        $range = PassRange::fromOffset($targetPos->getX() - $throwerPos->getX(), $targetPos->getY() - $throwerPos->getY());
         if ($range === null) {
             throw new \InvalidArgumentException('Target is out of range');
         }
