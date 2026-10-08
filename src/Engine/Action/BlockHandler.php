@@ -353,8 +353,19 @@ final class BlockHandler implements ActionHandlerInterface
         $followUpChoice = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
         $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice);
 
-        // Frenzy: mandatory second block if both still standing and adjacent
-        if (!$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
+        // Frenzy: povinna druha rana, kdyz oba stoji a sousedi -- ale JEN po vysledku
+        //   Pushed / Defender Stumbles.
+        // OPRAVENO 08.10.2026 (audit parity, nález 7) -- na zvolenou kostku se tu nehledělo:
+        //   druhá rána se házela i po Both Down, když oba díky Blocku zůstali stát.
+        //   Pravidla ř. 8138-8141: "If a 'Pushed' or 'Defender Stumbles' result was chosen,
+        //   the player must immediately throw a second block against the same opponent so
+        //   long as they are both still standing and adjacent."
+        //   Both Down, který Juggernaut v blitzu bere "as if a 'Pushed' result has been
+        //   rolled instead" (ř. 8194-8195), je Pushed.
+        $frenzyTrigger = $chosenFace === BlockDiceFace::PUSHED
+            || $chosenFace === BlockDiceFace::DEFENDER_STUMBLES
+            || ($chosenFace === BlockDiceFace::BOTH_DOWN && $isBlitz && $attacker->hasSkill(SkillName::Juggernaut));
+        if ($frenzyTrigger && !$result->isTurnover() && $attacker->hasSkill(SkillName::Frenzy) && !$pending->isFrenzy()) {
             $frenzyState = $result->getNewState();
             $frenzyAttacker = $frenzyState->getPlayer($pending->getAttackerId());
             $frenzyDefender = $frenzyState->getPlayer($pending->getDefenderId());
