@@ -101,8 +101,10 @@ final class InteractiveRerollTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 5, 4)
             ->build();
 
-        // Dodge fails
-        $dice = new FixedDiceRoller([2]);
+        // Dodge fails; po odmítnutém přehozu pád a hod na brnění 1+1 (neprorazí).
+        // `rules_bb2016.txt` ř. 498-499: "a roll must be made to see if he was injured" --
+        // dřív tu byla jediná kostka, test kódoval pád bez hodu na brnění (audit 08.10., nález 4b).
+        $dice = new FixedDiceRoller([2, 1, 1]);
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveRerolls(true);
 

@@ -11,7 +11,6 @@ use App\DTO\GameState;
 use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
-use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\ValueObject\Position;
 
@@ -20,6 +19,7 @@ final class RerollHandler
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly BallResolver $ballResolver,
+        private readonly MoveHandler $moveHandler,
     ) {}
 
     /**
@@ -243,26 +243,23 @@ final class RerollHandler
         }
 
         // Dodge or GFI: player falls
-        // OPRAVENO 08.10.2026 (audit parity, nalez 4a) -- na cilove pole sel jen pad pri GFI,
-        //   po neuspesnem uhybu zustaval hrac na VYCHOZIM poli. Pravidla r. 497-498 (uhyb):
-        //   "Knocked Down in the square he was dodging to"; r. 1702-1703 (GFI): "Knocked
-        //   Down in the square that they moved to".
-        $fallPos = new Position($pending->getTargetX(), $pending->getTargetY());
-
+        // OPRAVENO 08.10.2026 (audit parity, nalezy 4a a 4b) -- tady byla vlastni kopie padu:
+        //   u uhybu nechavala hrace na VYCHOZIM poli (jen GFI slo na cilove) a po padu se
+        //   NEHAZELO na brneni ani zraneni. Pravidla r. 497-499 (uhyb): "Knocked Down in the
+        //   square he was dodging to and a roll must be made to see if he was injured";
+        //   r. 1702-1703 (GFI): "Knocked Down in the square that they moved to. Roll to see
+        //   if he was injured." Pad je ted jedna funkce spolecna s `MoveHandler`.
         $events[] = GameEvent::playerFell($pending->getPlayerId());
         $events[] = GameEvent::turnover(
             $pending->getRollType() === 'gfi' ? 'Failed Going For It' : 'Failed dodge',
         );
 
-        $fallenPlayer = $player
-            ->withState(PlayerState::PRONE)
-            ->withPosition($fallPos)
-            ->withHasMoved(true)
-            ->withHasActed(true)
-            ->withMovementRemaining(0);
-        $state = $state->withPlayer($fallenPlayer);
-
-        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallenPlayer, $events);
+        [$state, $events] = $this->moveHandler->knockDownAt(
+            $state,
+            $player,
+            new Position($pending->getTargetX(), $pending->getTargetY()),
+            $events,
+        );
 
         return ActionResult::turnover($state->withTurnoverPending(true), $events);
     }
