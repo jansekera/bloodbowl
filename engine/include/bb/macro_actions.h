@@ -69,6 +69,7 @@ enum CageFeature : unsigned {
     kFeatScoreViaMate   = 524288, // P180: hrozí-li ztráta míče a nosič sám nedosáhne, TD předávkou přikáže řadič; míč v bezpečí + čas ⇒ zdržuje se i předávka
     kFeatReleaseNeedsNoSlack = 1048576, // P187: nosič se nevypouští, dokud má tým časovou rezervu (rohy ho dojdou)
     kFeatSafeRetreat    = 2097152, // P187: když bezpečné pole vpřed není a nosič stojí v dosahu rány, klec se staví i stranou / vzadu
+    kFeatRootVeto       = 4194304, // P181/7: makra, která řadič klece zakazuje, se z kořene hledání vyřadí PŘED výpočtem
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře

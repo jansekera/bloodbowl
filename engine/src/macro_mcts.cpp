@@ -196,6 +196,21 @@ Macro MacroMCTSSearch::search(const GameState& state) {
 
     // Expand root
     expand(&root, state);
+    if (rootVeto_) {
+        auto& ch = root.children;
+        ch.erase(std::remove_if(ch.begin(), ch.end(), [&](const MacroMCTSNode& c) {
+                     return c.macro.type != MacroType::END_TURN && rootVeto_(c.macro);
+                 }), ch.end());
+        float sum = 0.0f;
+        for (const auto& c : ch) sum += c.prior;
+        if (sum > 0.0f) for (auto& c : ch) c.prior /= sum;
+        if (ch.empty()) {
+            lastIterations_ = 0;
+            lastBestValue_ = 0.0;
+            lastChildVisits_.clear();
+            return {MacroType::END_TURN, -1, -1, {-1, -1}};
+        }
+    }
 
     // Dirichlet noise on root priors (AlphaZero-style exploration)
     if (config_.dirichletAlpha > 0.0f && !root.children.empty()) {
@@ -1087,7 +1102,11 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
     Macro bestMacro;
     bool fromStagedPlan = cage_->next(state, bestMacro);
     if (!fromStagedPlan) {
+        if (cageFeatureOn(kFeatRootVeto)) {
+            search_.setRootVeto([&](const Macro& m) { return cage_->forbidsCarrierMove(state, m); });
+        }
         bestMacro = search_.search(state);
+        search_.setRootVeto(nullptr);
     }
     MacroDecisionInfo::Source source =
         fromStagedPlan ? MacroDecisionInfo::Source::CAGE : MacroDecisionInfo::Source::SEARCH;

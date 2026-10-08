@@ -1330,3 +1330,24 @@ TEST(TurnoverCost, DefaultIsTheMeasuredValueAndItIsOn) {
     // „Hotovo“ = zapnuto ve výchozím stavu (06.10.: odklad rizika byl napsaný a vypnutý).
     EXPECT_NEAR(activationValue(), 0.024, 1e-12);
 }
+
+// Review 08.10.2026 (P181 nález 7): zakázané makro (řadič klece: skórování ve zdržovacím tahu, odvod
+// nosiče z klece…) se z kořene hledání vyřadí PŘED výpočtem — nedostane žádnou návštěvu a strom se
+// staví nad tím, co se hrát smí. Dřív se filtroval až výsledek a hrálo se dítě s hrstkou návštěv.
+TEST(MacroMCTSSearch, AVetoedMacroIsRemovedFromTheRootBeforeTheSearchRuns) {
+    GameState state = makeK6WalledCarrier(/*spareMover=*/true);
+    LinearValueFunction vf = k6StandStillVf();
+    MCTSConfig cfg = k6Config();
+    auto visitsOfRepositions = [&](bool veto, Macro& picked) {
+        MacroMCTSSearch search(&vf, cfg, 42);
+        if (veto) search.setRootVeto([](const Macro& m) { return m.type == MacroType::REPOSITION; });
+        picked = search.search(state);
+        int n = 0;
+        for (const auto& c : search.lastChildVisits()) if (c.macro.type == MacroType::REPOSITION) n += c.visits;
+        return n;
+    };
+    Macro free, vetoed;
+    ASSERT_GT(visitsOfRepositions(false, free), 0) << "pozitivní kontrola: bez zákazu hledání přesuny zkoumá";
+    EXPECT_EQ(visitsOfRepositions(true, vetoed), 0) << "zakázané makro nedostane žádnou návštěvu";
+    EXPECT_NE(vetoed.type, MacroType::REPOSITION);
+}

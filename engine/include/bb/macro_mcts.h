@@ -10,6 +10,7 @@
 #include "bb/dice.h"
 #include <vector>
 #include <memory>
+#include <functional>
 #include <cstdint>
 
 namespace bb {
@@ -111,9 +112,16 @@ class MacroMCTSSearch {
     int lastIterations_ = 0;
     double lastBestValue_ = 0.0;
     std::vector<MacroChildVisitInfo> lastChildVisits_;
+    std::function<bool(const Macro&)> rootVeto_;
 
 public:
     MacroMCTSSearch(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
+
+    // Review 08.10.2026 (P181 nález 7): makra, pro která `veto` vrátí true, se z kořene vyřadí
+    // dřív, než hledání začne. Dřív se zakázané makro (např. skórování ve zdržovacím tahu)
+    // odfiltrovalo až z VÝSLEDKU: celý strom šel za ním a hrálo se „další nejnavštěvovanější“
+    // dítě s hrstkou návštěv — a to při každém rozhodnutí do konce tahu. END_TURN zůstává vždy.
+    void setRootVeto(std::function<bool(const Macro&)> veto) { rootVeto_ = std::move(veto); }
 
     Macro search(const GameState& state);
 

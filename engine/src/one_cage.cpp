@@ -232,6 +232,14 @@ Position farthestSafeForward(const GameState& state, const Player& carrier, int 
                 continue;
             }
             if (!rushCouldWin) continue;
+            // Review 08.10. (nález 5): přes hod smí nosič jen kvůli GFI — ne přes úhyb. Šance pádu
+            // tedy nesmí být větší, než kolik dají samotná GFI na této cestě (1 GFI = 1/6, 2 = 11/36).
+            {
+                const int gfi = carrierGfiFor(state, carrier, sq);
+                if (gfi < 1) continue;
+                const double gfiOnly = gfi >= 2 ? 11.0 / 36.0 : 1.0 / 6.0;
+                if (fail > gfiOnly + 1e-9) continue;
+            }
             // P178: pád se cení celý (soupeř u míče + nezvednutí podle obratnosti + ztracený tah u
             // týmu bez časové rezervy); smí se riskovat nejvýš 5 %
             if (fail * carrierFallCost(state, carrier, sq) > 0.05) continue;
