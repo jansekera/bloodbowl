@@ -34,13 +34,53 @@ enum PassRange: string
             || $this === self::SHORT_PASS;
     }
 
-    public static function fromDistance(int $distance): ?self
+    /**
+     * Pásma pravítka pro posun (|dx|, |dy|) od házejícího: řádek = |dy|, znak = |dx|.
+     * Q = Quick, S = Short, L = Long, B = Long Bomb, tečka = pravítko nedosáhne.
+     * Pravítko je tvarovaná šablona, ne poloměr: (13,0) je Long Bomb, (5,12) hodit nejde.
+     * Převzato z C++ (`engine/include/bb/enums.h`, `passRangeFromOffset`); zdroj je tištěná
+     * tabulka přepsaná v `evidence/pass_range_grid_20260810.txt`. Shodu všech polí s tím
+     * souborem hlídá `tests/Enum/PassRangeTest.php`.
+     */
+    private const RULER = [
+        'QQQQSSSLLLLBBB', // |dy| = 0
+        'QQQQSSSLLLLBBB', // |dy| = 1
+        'QQQSSSSLLLLBBB', // |dy| = 2
+        'QQSSSSSLLLBBB.', // |dy| = 3
+        'SSSSSSLLLLBBB.', // |dy| = 4
+        'SSSSSLLLLBBB..', // |dy| = 5
+        'SSSSLLLLLBBB..', // |dy| = 6
+        'LLLLLLLLBBB...', // |dy| = 7
+        'LLLLLLLBBB....', // |dy| = 8
+        'LLLLLBBBB.....', // |dy| = 9
+        'LLLBBBBB......', // |dy| = 10
+        'BBBBBBB.......', // |dy| = 11
+        'BBBBB.........', // |dy| = 12
+        'BBB...........', // |dy| = 13
+    ];
+
+    /**
+     * Pásmo hodu podle pravítka pro posun cíle od házejícího; `null` = mimo dosah.
+     * (Bere posun, ne dvě `Position` -- vrstva `Enum` smí záviset jen na sobě.)
+     *
+     * OPRAVENO 08.10.2026 (audit parity, nález 12) -- tady bylo `fromDistance()`: pásma podle
+     *   Čebyševovy vzdálenosti max(|dx|,|dy|) s prahy 3/6/10/13. Šikmé hody tím byly lehčí
+     *   a delší: (3,3) Quick místo Short, (6,6) Short místo Long, (10,10) i (13,13) šly
+     *   hodit. Pravidla ř. 765: "the coach must measure the range using the range ruler."
+     */
+    public static function fromOffset(int $dx, int $dy): ?self
     {
-        return match (true) {
-            $distance <= 3 => self::QUICK_PASS,
-            $distance <= 6 => self::SHORT_PASS,
-            $distance <= 10 => self::LONG_PASS,
-            $distance <= 13 => self::LONG_BOMB,
+        $dx = abs($dx);
+        $dy = abs($dy);
+        if ($dx > 13 || $dy > 13) {
+            return null;
+        }
+
+        return match (self::RULER[$dy][$dx]) {
+            'Q' => self::QUICK_PASS,
+            'S' => self::SHORT_PASS,
+            'L' => self::LONG_PASS,
+            'B' => self::LONG_BOMB,
             default => null,
         };
     }

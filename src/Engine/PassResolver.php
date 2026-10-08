@@ -60,7 +60,7 @@ final class PassResolver
             }
         }
 
-        $range = PassRange::fromDistance($from->distanceTo($target));
+        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
         $isHailMary = false;
 
         if ($range === null) {
@@ -622,7 +622,7 @@ final class PassResolver
 
         $events = [GameEvent::dumpOff($thrower->getId())];
 
-        $range = PassRange::fromDistance($from->distanceTo($target));
+        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
         if ($range === null) {
             // Out of range — dump-off fails
             return ['state' => $state, 'events' => $events];

@@ -132,8 +132,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         }
 
         // Calculate range and accuracy
-        $distance = $throwerPos->distanceTo($landingTarget);
-        $range = PassRange::fromDistance($distance);
+        $range = PassRange::fromOffset($landingTarget->getX() - $throwerPos->getX(), $landingTarget->getY() - $throwerPos->getY());
         if ($range === null) {
             throw new \InvalidArgumentException('Target is out of range');
         }

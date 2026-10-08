@@ -11,6 +11,7 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingBlockDTO;
 use App\Enum\BlockDiceFace;
+use App\Enum\PassRange;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
@@ -1483,8 +1484,8 @@ final class BlockHandler implements ActionHandlerInterface
             if ($tPos === null) {
                 continue;
             }
-            // Must be within quick pass range (distance <= 3)
-            if ($carrierPos->distanceTo($tPos) <= 3) {
+            // Dump-Off je Quick Pass (`rules_bb2016.txt` r. 8094) -- pasmo meri pravitko
+            if (PassRange::fromOffset($tPos->getX() - $carrierPos->getX(), $tPos->getY() - $carrierPos->getY()) === PassRange::QUICK_PASS) {
                 $best = $tPos;
                 break;
             }

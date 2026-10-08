@@ -121,8 +121,7 @@ final class NewSkillsTest extends TestCase
             new BallResolver(new FixedDiceRoller([]), new TacklezoneCalculator(), new ScatterCalculator()),
         );
 
-        $range = \App\Enum\PassRange::fromDistance(3); // quick pass, modifier +1
-        $this->assertNotNull($range);
+        $range = \App\Enum\PassRange::QUICK_PASS; // modifier +1
         $target = $passResolver->getAccuracyTarget($state, $state->requirePlayer(1), $range);
 
         // Without NervesOfSteel: 7 - 3 + 2(TZ) - 1(quick) = 5
