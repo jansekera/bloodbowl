@@ -1371,8 +1371,11 @@ final class BlockHandler implements ActionHandlerInterface
         $state = $state->withPlayer($kdo);
 
         // Odtlaceny nosic mic drzi -- jen Strip Ball blokujiciho mu ho vyrazi
+        // OPRAVENO 08.10.2026 (audit parity, nález 10) -- Sure Hands se tu nekontrolovalo.
+        //   Pravidla ř. 8545-8546: "the Strip Ball skill will not work against a player
+        //   with this skill" (totéž ř. 973-976).
         if ($state->getBall()->getCarrierId() === $kdo->getId()) {
-            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall)) {
+            if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall) && !$kdo->hasSkill(SkillName::SureHands)) {
                 $events[] = GameEvent::ballStripped($kdo->getId());
                 $state = $state->withBall(BallState::onGround($pushTo));
                 $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
