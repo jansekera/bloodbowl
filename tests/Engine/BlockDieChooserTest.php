@@ -29,8 +29,11 @@ use PHPUnit\Framework\TestCase;
  */
 final class BlockDieChooserTest extends TestCase
 {
-    /** @return array{0: ActionResolver, 1: GameState} resolver a stav s čekajícím blokem */
-    private function cekajiciBlok(?TeamSide $aiTeam, int $silaObrance = 4, int $rerolls = 0): array
+    /**
+     * @param list<int> $dalsiKostky kostky po prvním hodu bloku (výchozí: brnění 1+1)
+     * @return array{0: ActionResolver, 1: GameState} resolver a stav s čekajícím blokem
+     */
+    private function cekajiciBlok(?TeamSide $aiTeam, int $silaObrance = 4, int $rerolls = 0, array $dalsiKostky = [1, 1]): array
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
@@ -41,7 +44,7 @@ final class BlockDieChooserTest extends TestCase
             ->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withRerolls($rerolls));
 
         // 6, 1 = kostky bloku; 1, 1 = brnění toho, kdo padne (neprorazí AV8).
-        $resolver = new ActionResolver(new FixedDiceRoller([6, 1, 1, 1]));
+        $resolver = new ActionResolver(new FixedDiceRoller([6, 1, ...$dalsiKostky]));
         $resolver->setInteractiveBlocks(true);
         $r = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
@@ -88,10 +91,35 @@ final class BlockDieChooserTest extends TestCase
 
     public function testUtocnikSmiPrehoditIKdyzVybiraObrance(): void
     {
-        // Přehoz je věc trenéra, který hází (ř. 919-924) -- zákaz se týká jen VÝBĚRU kostky.
-        [, $state] = $this->cekajiciBlok(TeamSide::AWAY, rerolls: 1);
+        // Přehoz patří trenérovi, jehož hráč hází -- zákaz se týká jen VÝBĚRU kostky.
+        // ř. 929-933: "A coach may use a team re-roll to re-roll any dice roll ... made by a
+        // player in their own team ... during their own turn"; ř. 920-924: přehazují se
+        // všechny kostky bloku. Nové kostky: 5 = Defender Stumbles, 3 = Pushed.
+        // (Dřívější podoba testu se ptala jen validace, která je pro REROLL_BLOCK prázdná
+        //  v jakémkoli stavu -- nemohla spadnout. Review P186.)
+        [$resolver, $state] = $this->cekajiciBlok(TeamSide::AWAY, rerolls: 1, dalsiKostky: [5, 3]);
+        $this->assertFalse($state->getPendingBlock()?->isAttackerChooses(), 'fixtura: vybírá obránce');
 
-        $this->assertSame([], (new RulesEngine())->validate($state, ActionType::REROLL_BLOCK, ['type' => 'team']));
+        $nabidka = array_column((new RulesEngine())->getAvailableActions($state), 'type');
+        $this->assertContains(ActionType::REROLL_BLOCK->value, $nabidka, 'přehoz se útočníkovi nabízí');
+
+        $r = $resolver->resolve($state, ActionType::REROLL_BLOCK, ['type' => 'team']);
+
+        $pending = $r->getNewState()->getPendingBlock();
+        $this->assertNotNull($pending, 'blok dál čeká na výběr kostky');
+        $this->assertSame(
+            ['defender_stumbles', 'pushed'],
+            array_map(fn($f) => $f->value, $pending->getFaces()),
+            'ř. 920-924: obě kostky bloku jsou přehozené',
+        );
+        $this->assertSame(0, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls(), 'přehoz zaplatil tým útočníka');
+        $this->assertFalse($pending->isAttackerChooses(), 'vybírá dál obránce');
+        // ř. 925-927: tentýž hod se nepřehazuje podruhé.
+        $this->assertFalse($pending->isTeamRerollAvailable());
+        $this->assertNotContains(
+            ActionType::REROLL_BLOCK->value,
+            array_column((new RulesEngine())->getAvailableActions($r->getNewState()), 'type'),
+        );
     }
 
     public function testSilnejsiUtocnikClovekVybiraSam(): void
