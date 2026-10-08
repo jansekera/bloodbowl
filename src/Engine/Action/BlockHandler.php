@@ -1263,7 +1263,8 @@ final class BlockHandler implements ActionHandlerInterface
         $chainPushTarget = null;
         $grab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
         if ($grab && !$offPitchAvailable) {
-            // Grab: utocnik voli nejhorsi volne pole (nejvic zon); pri moznem davu ho nepouzije
+            // Grab: utocnik voli nejhorsi volne pole (nejvic zon). Je-li jedno z poli mimo
+            //   hriste, rozhoduje bezne poradi niz (volne pole > dav > retez).
             if ($emptySquares !== []) {
                 usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($b) <=> $zonySoupere($a));
                 $pushTo = $emptySquares[0];
@@ -1281,9 +1282,12 @@ final class BlockHandler implements ActionHandlerInterface
                 $pushTo = $occupiedSquares[0]['pos'];
                 $chainPushTarget = $occupiedSquares[0]['player'];
             }
-        } elseif ($offPitchAvailable) {
-            // Tym na tahu: dav ma prednost -- pushTo zustava null
         } elseif ($emptySquares !== []) {
+            // OPRAVENO 08.10.2026 (audit parity, nález 3a) -- před touhle větví stálo
+            //   `elseif ($offPitchAvailable)` ("dav má přednost"): bylo-li kterékoli ze tří
+            //   polí mimo hřiště, šel hráč do davu, i když vedle bylo volné pole. Pravidla
+            //   ř. 639: "must be pushed back into an empty square if possible"; ř. 650-651:
+            //   do davu jen "if there are no eligible empty squares on the pitch".
             // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
             usort($emptySquares, function (Position $a, Position $b) use ($zonySoupere) {
                 $tzA = $zonySoupere($a);
@@ -1294,6 +1298,9 @@ final class BlockHandler implements ActionHandlerInterface
                 return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
             });
             $pushTo = $emptySquares[0];
+        } elseif ($offPitchAvailable) {
+            // Zadne volne pole na hristi a jedno z poli je mimo ⇒ dav (r. 650-651), ne retez
+            //   -- pushTo zustava null
         } elseif ($occupiedSquares !== []) {
             $pushTo = $occupiedSquares[0]['pos'];
             $chainPushTarget = $occupiedSquares[0]['player'];

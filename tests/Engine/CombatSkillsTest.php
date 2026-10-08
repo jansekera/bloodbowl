@@ -737,29 +737,34 @@ final class CombatSkillsTest extends TestCase
         $this->assertNotContains('pro', $types);
     }
 
-    // ========== Grab: optional — skip when crowd surf available ==========
+    // ========== Grab u lajny: volné pole na hřišti má přednost před davem ==========
 
-    public function testGrabSkippedWhenCrowdSurfAvailable(): void
+    /**
+     * `rules_bb2016.txt` ř. 639: "The player must be pushed back into an empty square if
+     * possible." ř. 650-651: do davu jen "if there are no eligible empty squares on the pitch".
+     * (Dřívější test `testGrabSkippedWhenCrowdSurfAvailable` tu chtěl crowd surf, protože
+     * "normal logic prefers crowd surf" -- kódoval vadu; audit parity 08.10.2026, nález 3a.)
+     */
+    public function testGrabAtSidelinePushesToEmptySquareNotIntoCrowd(): void
     {
         // Attacker with Grab at (5,1), defender at (6,0) near sideline.
-        // Push squares: (7,-1) off-pitch, (7,0) on-pitch, (6,-1) off-pitch.
-        // Grab would pick (7,0) on-pitch. Without Grab, normal logic prefers crowd surf.
-        // Attacker should choose NOT to use Grab → crowd surf.
+        // Push squares: (7,-1) off-pitch, (7,0) on-pitch and empty, (6,-1) off-pitch.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 1, skills: [SkillName::Grab], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 0, id: 2)
             ->withBallOffPitch()
             ->build();
 
-        // 1 die: roll 3 → PUSHED
-        // Crowd injury: 3+3=6
+        // 1 die: roll 3 → PUSHED. Další dvě kostky by spotřebovalo jen zranění od davu.
         $dice = new FixedDiceRoller([3, 3, 3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertContains('crowd_surf', $types);
-        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition());
+        $this->assertNotContains('crowd_surf', $types);
+        $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
+        $this->assertSame([7, 0], [$pos->getX(), $pos->getY()]);
+        $this->assertSame(1, $dice->getRollCount(), 'jen kostka bloku -- žádné zranění od davu');
     }
 
     // ========== Juggernaut vs Stand Firm ==========
