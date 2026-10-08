@@ -172,12 +172,13 @@ TEST(CageInvariant, NoCageFastTeamOpponentNear) {
     EXPECT_EQ(playTurnAndCheck(b), "");
 }
 
+// NÁLEZ z 08.10.2026, OPRAVENO týž den (P187: klec se staví i vzadu). Původní popis:
 // ⚠ NÁLEZ (P178): žádná klec, pomalý tým (nosič i spoluhráči pohyb 4), 2. kolo, soupeř (pohyb 6) osm
 // polí před nosičem. Řadič nosiče postaví na (11,7) s dvěma rohy; soupeř na něj dosáhne s hrozbou rány
 // 0,33 a TD nepadlo ⇒ stav „ani-ani“ po tahu. Spoluhráči stojí 3–5 polí za nosičem a s pohybem 4 další
 // rohy nedoplní; nosič přitom mohl zůstat dál od soupeře. Podle P178 („když nosič nemůže skórovat ani
 // být v bezpečí — nesmí nastat … do té doby má být v kleci“) se mělo stát: čtyři rohy, nebo nosič mimo dosah.
-TEST(CageInvariant, DISABLED_NoCageSlowTeamOpponentNear) {
+TEST(CageInvariant, NoCageSlowTeamOpponentNear) {
     Board b(2);
     b.put(1, TeamSide::HOME, {9, 7}, 4);
     b.put(2, TeamSide::HOME, {6, 4}, 4);
@@ -267,13 +268,14 @@ TEST(CageInvariant, TwoStrongOpponentsNearSlowCage) {
     EXPECT_EQ(playTurnAndCheck(b), "");
 }
 
+// NÁLEZ z 08.10.2026, OPRAVENO týž den (P187: s časovou rezervou se nosič nevypouští). Původní popis:
 // ⚠ NÁLEZ (P178): rychlý nosič (pohyb 7) na (13,7) je o 7–8 polí před spoluhráči (pohyb 6, x = 5–6),
 // 3. kolo (zbývá 6 tahů), soupeř (síla 4, pohyb 6) na (19,7). Rohy k nosiči nedojdou ⇒ rozhodnutí o
 // vypuštění (fáze 3, „krok klece 0“) pošle nosiče samotného na (20,5), tedy DVA POLE od soupeře: nula
 // rohů, hrozba rány 0,55, do zóny zbývá 5 polí a TD v tomto tahu nepadne. Podle P178 („když nosič
 // nemůže skórovat ani být v bezpečí — nesmí nastat“) se mělo stát: nosič zůstane/ustoupí mimo dosah
 // soupeře, dokud spoluhráči nedojdou (je čas), nebo skóruje; výběh na pole v dosahu rány není ani jedno.
-TEST(CageInvariant, DISABLED_FastCarrierFarAheadOfSlowerMatesOpponentAhead) {
+TEST(CageInvariant, FastCarrierFarAheadOfSlowerMatesOpponentAhead) {
     Board b(3);
     b.put(1, TeamSide::HOME, {13, 7}, 7);
     b.put(2, TeamSide::HOME, {6, 5}, 6);
@@ -574,7 +576,7 @@ TEST(CageStands, WithTimeToSpareAndNoSafeSquareAheadTheCarrierStaysAndTheCornerC
 
 // Opak: nosič je v dosahu dobré rány (dva silní soupeři dvě pole před dosahem, hrozba 0,55) a bezpečné
 // pole vpřed také není. Čekáním o míč přijde („pokud hrozí blitz na nosiče a ztráta — je lepší dát
-// TD dříve“) ⇒ klec nestojí a pokračuje dosavadním postupem vpřed.
+// TD dříve“) ⇒ klec nestojí: jde tam, kde je nosič v bezpečí (vpřed, stranou nebo vzad ke spoluhráčům).
 TEST(CageStands, ACarrierInReachOfAGoodHitDoesNotStand) {
     Board b(2);
     b.put(1, TeamSide::HOME, {8, 7}, 8);
@@ -592,7 +594,10 @@ TEST(CageStands, ACarrierInReachOfAGoodHitDoesNotStand) {
     }
     CageController cc(nullptr, cfg(), 1);
     playAll(cc, b);
-    EXPECT_GT(b.s.getPlayer(1).position.x, 8) << "klec nestála, nosič postoupil";
+    // Od P187 (09.10.2026) smí klec před dobrou ranou i ustoupit ke spoluhráčům; požadavek je, že
+    // nosič NEZŮSTANE STÁT v dosahu dobré rány — pohne se a po tahu je v bezpečí.
+    EXPECT_NE(b.s.getPlayer(1).position, (Position{8, 7})) << "klec nestála";
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "a nosič po tahu není vystaven dobré ráně";
 }
 
 // --- Zdržování TD přes dva tahy na témže řadiči (P175) ------------------------------------------------

@@ -1152,6 +1152,16 @@ bool k6PlayerHasLegalMove(const GameState& state, int playerId) {
 }  // namespace
 
 TEST(MacroMCTSPolicy, K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn) {
+    // P187 (09.10.2026): od té doby se nosič s časovou rezervou „nevypouští“, řadič klece zůstává
+    // ve fázi klece a volného hráče 10 sám pošle dopředu — správně, ale tenhle přípravek míří na
+    // ZÁCHRANU K6 V HLEDÁNÍ (makro rozbalené do prázdna), ne na řadič ⇒ běží se stavem řadiče,
+    // pro který byl postaven (nosič vypuštěn, řadič nic nepřidává).
+    struct ReleasedAsBefore {
+        unsigned saved = cageFeaturesOff();
+        ReleasedAsBefore() { setCageFeaturesOff(saved | kFeatReleaseNeedsNoSlack); }
+        ~ReleasedAsBefore() { setCageFeaturesOff(saved); }
+    } releasedAsBefore;
+
     GameState state = makeK6WalledCarrier(/*spareMover=*/true);
     LinearValueFunction vf = k6StandStillVf();
     MCTSConfig cfg = k6Config();
@@ -1201,6 +1211,16 @@ TEST(MacroMCTSPolicy, K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn) {
 }
 
 TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
+    // P187 (09.10.2026): od té doby se nosič s časovou rezervou „nevypouští“, řadič klece zůstává
+    // ve fázi klece a volného hráče 10 sám pošle dopředu — správně, ale tenhle přípravek míří na
+    // ZÁCHRANU K6 V HLEDÁNÍ (makro rozbalené do prázdna), ne na řadič ⇒ běží se stavem řadiče,
+    // pro který byl postaven (nosič vypuštěn, řadič nic nepřidává).
+    struct ReleasedAsBefore {
+        unsigned saved = cageFeaturesOff();
+        ReleasedAsBefore() { setCageFeaturesOff(saved | kFeatReleaseNeedsNoSlack); }
+        ~ReleasedAsBefore() { setCageFeaturesOff(saved); }
+    } releasedAsBefore;
+
     // ⛔ Druhá polovina páru: oprava NESMÍ vyrábět akci tam, kde žádná není.
     // P149 bod 2 (06.10.2026): tenhle přípravek stojí na hodnotové funkci, která dává listu
     // skoro přesně 1,0 (strop odhadu). Hodnota nevyužitých aktivací ho dorazí na strop, rozdíl

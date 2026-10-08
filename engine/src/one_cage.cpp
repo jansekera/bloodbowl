@@ -278,6 +278,12 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
     r.soloMakesIt = soloNeed <= r.turnsLeft;
 
     r.release = !r.cageMakesIt && r.soloMakesIt;
+    // ⭐ P187 (nález testu invariantu 08.10.2026; uživatel: „když nosič nemůže skórovat ani být
+    //   v bezpečí — nesmí nastat“, „rychlejší tým by měl být pouze ve stavech — klec v pořádku —
+    //   a — nosič doběhne…“). „Klec nestíhá“ vyšlo i tehdy, když rohy jen zůstaly o tah pozadu
+    //   (krok klece 0) — rychlý nosič ve 3. kole pak vyběhl sám dvě pole k soupeři (hrozba 0,55).
+    //   Dokud má tým časovou rezervu, nosič se nevypouští: počká / ustoupí ke spoluhráčům.
+    if (r.release && cageFeatureOn(kFeatReleaseNeedsNoSlack) && teamHasTimeSlack(state, carrier)) r.release = false;
     return r;
 }
 

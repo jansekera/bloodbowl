@@ -911,27 +911,33 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
     //   Když čistá klec nikde nevyjde, pokračuje se dosavadním postupem (nejmenší zlo).
     if (cageFeatureOn(kFeatCleanCageSearch)) {
         struct Cand { Position sq; int progress; AssignmentResult a; };
-        std::vector<Cand> cands;
         const int budget = static_cast<int>(carrier.movementRemaining);
-        for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
-            for (int y = carrier.position.y - budget; y <= carrier.position.y + budget; ++y) {
-                const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
-                if (!sq.isOnPitch() || sq == carrier.position) continue;
-                const int progress = (sq.x - carrier.position.x) * dx;
-                if (progress < 1) continue;        // jen vpřed; přeskupení na místě řeší dostavba klece
-                if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
-                    std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
-                if (countTacklezones(state, sq, mySide, carrier.id) > 0) continue;
-                // > 0 = cesta přes hod. Záměrně NE „!= 0“: −1 vrací i pole, na kterém teď stojí
-                // spoluhráč, a ten ho v plánu napřed uvolní (test CarrierTargetBlockedByTeammate…).
-                // Pole opravdu nedosažitelná vyřadí až drahá zkouška (legsAreSafe).
-                if (pathFailProb(state, carrier, sq, budget, Position{-1, -1}) > 0.0) continue;
-                const int step = carrier.position.distanceTo(sq);
-                AssignmentResult a = tryAssign(state, carrier, step, reservedPlayerIds, 0, true, &sq);
-                if (!a.feasible || a.filled - a.gfi < 2) continue;
-                cands.push_back({sq, progress, std::move(a)});
+        // Kandidáti s postupem v daném rozmezí (vpřed ≥ 1; při ústupu ≤ 0).
+        auto collect = [&](int minProgress, int maxProgress) {
+            std::vector<Cand> out;
+            for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
+                for (int y = carrier.position.y - budget; y <= carrier.position.y + budget; ++y) {
+                    const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                    if (!sq.isOnPitch() || sq == carrier.position) continue;
+                    const int progress = (sq.x - carrier.position.x) * dx;
+                    if (progress < minProgress || progress > maxProgress) continue;
+                    if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
+                        std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
+                    if (countTacklezones(state, sq, mySide, carrier.id) > 0) continue;
+                    // > 0 = cesta přes hod. Záměrně NE „!= 0“: −1 vrací i pole, na kterém teď stojí
+                    // spoluhráč, a ten ho v plánu napřed uvolní (test CarrierTargetBlockedByTeammate…).
+                    // Pole opravdu nedosažitelná vyřadí až drahá zkouška (legsAreSafe).
+                    if (pathFailProb(state, carrier, sq, budget, Position{-1, -1}) > 0.0) continue;
+                    const int step = carrier.position.distanceTo(sq);
+                    AssignmentResult a = tryAssign(state, carrier, step, reservedPlayerIds, 0, true, &sq);
+                    if (!a.feasible || a.filled - a.gfi < 2) continue;
+                    out.push_back({sq, progress, std::move(a)});
+                }
             }
-        }
+            return out;
+        };
+        // jen vpřed; přeskupení na místě řeší dostavba klece
+        std::vector<Cand> cands = collect(1, 99);
         // Pořadí, ve kterém se kandidáti zkoušejí (zkouška je drahá): napřed čtyři čisté rohy,
         // pak víc stojících rohů, pak dál vpřed, pak blíž středu.
         auto clean4 = [](const Cand& c) { return c.a.filled - c.a.gfi >= 4 && c.a.dirty == 0; };
@@ -1050,6 +1056,42 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                         best.blitzThreat, cands.size());
             }
             return best;
+        }
+        // ⭐ P187 (nález testu invariantu 08.10.2026; uživatel: „když nosič nemůže skórovat ani být
+        //   v bezpečí — nesmí nastat“; stavy útoku: „sestaví se klec, klec postupuje…“). Bezpečné
+        //   pole vpřed není a nosič tam, kde stojí, čelí dobré ráně ⇒ klec se SESTAVÍ tam, kde to
+        //   jde bezpečně — stranou nebo o pár polí vzadu, u spoluhráčů (co nejmenší ústup). Dosud
+        //   se hledalo jen vpřed a plán spadl do „nejmenšího zla“: pomalý nosič bez klece popošel
+        //   k soupeři se dvěma rohy (hrozba 0,33), ačkoli o pole vzadu vyšla klec se čtyřmi.
+        //   Když nosiče ochrání už DOSTAVBA NA MÍSTĚ (hrozba po ní ≤ 0,15), neustupuje se.
+        std::vector<Cand> back;
+        bool unsafeHere = !haveBest && cageFeatureOn(kFeatSafeRetreat) &&
+                          bb::blitzThreat(state, carrier, kSafeThreat) > kSafeThreat;
+        if (unsafeHere) {
+            CageAdvancePlan fill = buildFillOnly(state, reservedPlayerIds);
+            if (fill.valid && fill.blitzThreat <= kSafeThreat) {
+                // nosič stojí, klec se kolem něj dostaví a je v bezpečí — místo kroku vpřed do rány
+                if (getenv("BB_CAGE_DEBUG")) {
+                    fprintf(stderr, "[cage] vpřed bezpečno není, dostavba na místě ano (hrozba %.2f) — klec se dostaví a stojí\n", fill.blitzThreat);
+                }
+                return fill;
+            }
+        }
+        if (unsafeHere) {
+            back = collect(-budget, 0);
+            std::stable_sort(back.begin(), back.end(), [&](const Cand& p, const Cand& q) {
+                if (p.progress != q.progress) return p.progress > q.progress;      // co nejmenší ústup
+                if (clean4(p) != clean4(q)) return clean4(p);
+                return std::abs(p.sq.y - 7) < std::abs(q.sq.y - 7);
+            });
+            ranked.clear();
+            for (size_t i = 0; i < back.size() && i < kScreenCap; ++i) screen(back[i]);
+            tryRanked();
+            if (haveBest && getenv("BB_CAGE_DEBUG")) {
+                fprintf(stderr, "[cage] klec se staví stranou / vzadu: nosič (%d,%d) o %d, hrozba rány %.2f\n",
+                        carrier.position.x, carrier.position.y, bestProgress, best.blitzThreat);
+            }
+            if (haveBest) return best;
         }
         if (getenv("BB_CAGE_DEBUG")) {
             fprintf(stderr, "[cage] bezpečné pole pro klec nevyšlo (kandidátů %zu, bezpečných %zu, zkoušeno %d)\n", cands.size(), ranked.size(), tried);
