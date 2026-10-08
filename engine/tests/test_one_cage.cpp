@@ -1257,7 +1257,8 @@ TEST(OneCageMate, ASafeBallWithTimeToSpareIsNotHandedOffForAnEarlyTouchdown) {
         ASSERT_FALSE(teamHasTimeSlack(b.s, b.s.getPlayer(1))) << "předpoklad: v 7. kole rezerva není";
         CageController cc(nullptr, cfg(), 1);
         playAll(cc, b);
-        if (b.s.homeTeam.score == 0) EXPECT_FALSE(cc.forbidsCarrierMove(b.s, ho)) << "bez rezervy se nezdržuje";
+        ASSERT_EQ(b.s.homeTeam.score, 0) << "řadič sám neskóroval (míč je v bezpečí, předávku nepřikazuje)";
+        EXPECT_FALSE(cc.forbidsCarrierMove(b.s, ho)) << "bez rezervy se nezdržuje — hledání předat smí";
     }
 }
 
@@ -1380,4 +1381,20 @@ TEST(OneCageMate, TheTeamRerollCountsTowardTheHandOffChanceWhenItIsAvailable) {
     EXPECT_NEAR(handOffTdChance(b.s, c, m), 1.0 - (2.0 / 6.0) * (2.0 / 6.0), 1e-9);
     b.s.homeTeam.rerollUsedThisTurn = true;
     EXPECT_NEAR(handOffTdChance(b.s, c, m), without, 1e-9);
+}
+
+// Review 08.10.2026 (H1): klec nemůže postoupit a jen se dostavuje ⇒ hrozba po dostavbě se musí
+// spočítat (dřív zůstala 0 = „míč přežije jistě“ a TD při hrozbě se nepřikázalo). Nosič (síla 3)
+// má soupeře (síla 5) hned vedle sebe; spoluhráč dostaví jeden roh, rána zůstává dobrá.
+TEST(OneCageMate, AFillOnlyPlanReportsTheThreatThatRemainsAfterTheFill) {
+    Board b(4);
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(2, TeamSide::HOME, {11, 6}); b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {14, 4});
+    b.put(13, TeamSide::AWAY, {13, 7}, 6, 5);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    CageAdvancePlanner planner(nullptr, cfg(), 1);
+    const CageAdvancePlan fill = planner.buildFillOnly(b.s, {});
+    ASSERT_TRUE(fill.valid) << "předpoklad: roh jde dostavět";
+    EXPECT_GT(fill.blitzThreat, kSafeBlitzThreat) << "soupeř u nosiče má dobrou ránu i po dostavbě";
 }

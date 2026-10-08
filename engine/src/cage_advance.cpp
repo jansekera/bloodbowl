@@ -676,6 +676,14 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
     plan.macros = std::move(macros);
     plan.verdict = CageAdvanceVerdict::FILL_ONLY;
     plan.valid = true;
+    // Review 08.10.2026 (H1): hrozba po dostavbě se tu nepočítala a zůstávala 0 — volající pak
+    // četli „míč přežije jistě“ a TD při hrozbě (přes hod i předávkou) se nepřikázalo nikdy,
+    // kdykoli klec nemohla postoupit a jen se dostavovala.
+    {
+        GameState projected = state.clone();
+        for (const Macro& m : plan.macros) projected.getPlayer(m.playerId).position = m.targetPos;
+        plan.blitzThreat = bb::blitzThreat(projected, projected.getPlayer(carrier.id));
+    }
     return plan;
 }
 

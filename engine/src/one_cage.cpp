@@ -407,14 +407,21 @@ void CageController::planStart(const GameState& state) {
             const double p = handOffTdChance(state, c, m, &v, &e);
             if (p > pm) { pm = p; rid = m.id; via = v; ez = e; }
         });
-        if (rid < 0) return false;
+        // Hrozba PO našem tahu (dostavba / postup klece), ne jak desku nechal soupeř. Review 08.10.
+        // (M1): zdržování i porovnání se rozhodují z téže hrozby.
         double threat = blitzThreat(state, c);
+        if (threat > kSafeBlitzThreat && rid >= 0) {
+            const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+            if (after.valid) threat = std::min(threat, after.blitzThreat);
+        }
+        // míč v bezpečí a je čas ⇒ nehraje se žádné TD přes spoluhráče — ani když příjemce pro
+        // předávku není a šla by jen přihrávka (review M2)
         if (threat <= kSafeBlitzThreat && teamHasTimeSlack(state, c)) {
             mateStall_ = true;
-            if (dbg) std::fprintf(stderr, "[cage ctl] TD předávkou by šlo (%.2f), ale míč je v bezpečí a je čas — zdržuje se\n", pm);
+            if (dbg) std::fprintf(stderr, "[cage ctl] míč v bezpečí (hrozba %.2f) a je čas — TD přes spoluhráče se zdržuje\n", threat);
             return false;
         }
-        if (pm < 1.0 - threat) return false;
+        if (rid < 0) return false;
         double own = 0.0;
         {
             const int ezX = (c.teamSide == TeamSide::HOME) ? 25 : 0;
@@ -427,8 +434,6 @@ void CageController::planStart(const GameState& state) {
             }
         }
         if (own >= pm) return false;                      // nosič sám má aspoň stejnou šanci
-        const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
-        if (after.valid) threat = std::min(threat, after.blitzThreat);
         if (dbg) std::fprintf(stderr, "[cage ctl] TD předávkou %.2f (hráč %d) × míč přežije %.2f => %s\n", pm, rid,
                               1.0 - threat, pm >= 1.0 - threat ? "předat" : "klec");
         if (pm < 1.0 - threat) return false;
@@ -870,7 +875,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
 
     // P180: míč v bezpečí a tým má čas ⇒ TD se nehraje ani přes spoluhráče
     if (mateStall_ && (m.type == MacroType::HAND_OFF_SCORE || m.type == MacroType::PASS_SCORE ||
-                       m.type == MacroType::CHAIN_SCORE)) return true;
+                       m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION)) return true;
     // P180: hráče připraveného pro předávku hledání neodvádí
     if (readyMateId_ > 0 && m.playerId == readyMateId_ && m.type == MacroType::REPOSITION &&
         m.targetPos != state.getPlayer(readyMateId_).position) return true;
@@ -1139,14 +1144,21 @@ void CageController::planLaggards(const GameState& state) {
     //   předat, a kde na něj soupeř nedosáhne dobrou ranou. Jen z pohybu, obratnosti a desky —
     //   žádné pravidlo podle rasy; pomalému týmu takové pole většinou nevyjde. Stojí-li už na
     //   takovém poli, zůstane. Jen když nosič sám příští tah do zóny nedojde.
-    readyMateId_ = -1;
-    if (cageFeatureOn(kFeatReadyMate) && distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
+    // Review 08.10. (M3, M4): chystá se nejvýš JEDEN hráč za tah (dostavba po zvednutí míče volá
+    // tento krok podruhé) a nikdy ten, kdo ještě může dostavět roh — rohy mají přednost.
+    std::vector<int> neededForCorners;
+    for (const auto& [id, slot] : cornersComing(state, carrier, cp)) {
+        (void)slot;
+        neededForCorners.push_back(id);
+    }
+    if (readyMateId_ <= 0 && cageFeatureOn(kFeatReadyMate) &&
+        distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
         struct Cand { int id; Position sq; std::tuple<int, int, int, int> key; };
         std::vector<Cand> cands;
         state.forEachOnPitch(side, [&](const Player& p) {
             if (p.id == carrier.id || !freeToAct(p) || p.hasSkill(SkillName::NoHands)) return;
             if (countTacklezones(state, p.position, side, p.id) > 0) return;
-            if (std::abs(p.position.x - cp.x) == 1 && std::abs(p.position.y - cp.y) == 1) return;   // stojící roh
+            if (std::find(neededForCorners.begin(), neededForCorners.end(), p.id) != neededForCorners.end()) return;   // roh (stojí, nebo ho dostaví)
             const int target = std::clamp(calculateCatchTarget(state, p, 1), 2, 6);
             double pc = (7 - target) / 6.0;
             if (p.hasSkill(SkillName::Catch)) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
@@ -1317,6 +1329,7 @@ bool CageController::next(const GameState& state, Macro& out) {
         if (idx_ < queue_.size()) {
             const Macro& m = queue_[idx_];
             if (!stillValid(state, m)) {   // plán se rozešel s deskou ⇒ zbytek tahu MCTS
+                readyMateId_ = -1;         // připravený se možná nepřesunul ⇒ hledání ho nedrží (review M6)
                 queue_.clear();
                 idx_ = 0;
                 stage_ = Stage::DONE;
