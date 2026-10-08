@@ -9,6 +9,7 @@ use App\Engine\FixedDiceRoller;
 use App\Engine\KickoffResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\BallResolver;
+use App\Engine\InjuryResolver;
 use App\Engine\TacklezoneCalculator;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -40,7 +41,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
 
@@ -73,7 +74,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
 
@@ -101,7 +102,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         // Ball target at (6,7), scatter S by 1 → (6,8) — still in receiving half
         $result = $resolver->resolveKickoff($state, new Position(6, 7));
@@ -129,7 +130,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(10, 7));
 
@@ -159,7 +160,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(10, 7));
 
@@ -188,7 +189,7 @@ final class KickOffReturnTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(14, 7));
 

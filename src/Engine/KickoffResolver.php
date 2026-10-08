@@ -7,6 +7,7 @@ namespace App\Engine;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
+use App\DTO\MatchPlayerDTO;
 use App\Enum\KickoffEvent;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -20,6 +21,7 @@ final class KickoffResolver
         private readonly DiceRollerInterface $dice,
         private readonly ScatterCalculator $scatterCalc,
         private readonly BallResolver $ballResolver,
+        private readonly InjuryResolver $injuryResolver,
     ) {}
 
     /**
@@ -369,39 +371,67 @@ final class KickoffResolver
     }
 
     /**
-     * Throw a Rock! (11): Random opponent player gets stunned.
+     * Throw a Rock! (11). `rules_bb2016.txt` ř. 1342-1350: "Each coach rolls a D6 and adds
+     * their FAME to the roll. The fans of the team that rolls higher are the ones that threw
+     * the rock. In the case of a tie a rock is thrown at each team! Decide randomly which
+     * player in the other team was hit (only players on the pitch are eligible) and roll for
+     * the effects of the injury straight away. No Armour roll is required."
+     *
+     * OPRAVENO 09.10.2026 (review P186) -- do té doby dostaly kámen VŽDY oba týmy, jen
+     * STOJÍCÍ hráč vybraný jednou D6 (sedmý a další nemohl být zasažen nikdy), a byl rovnou
+     * omráčen bez hodu na zranění.
+     * ⚠️ FAME engine nevede -- hází se holé D6 proti D6.
+     *
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolveThrowARock(GameState $state, int $roll, TeamSide $kickingTeam): array
     {
-        // Each team throws a rock at a random opponent
+        $home = $this->dice->rollD6();
+        $away = $this->dice->rollD6();
+
+        $events = [];
         $results = [];
-
         foreach ([TeamSide::HOME, TeamSide::AWAY] as $targetSide) {
+            // Kamen hazeji fanousci tymu s VYSSIM hodem na druhy tym; pri remize na oba.
+            $ownRoll = $targetSide === TeamSide::HOME ? $home : $away;
+            $otherRoll = $targetSide === TeamSide::HOME ? $away : $home;
             $targets = $state->getPlayersOnPitch($targetSide);
-            $standingTargets = array_values(array_filter(
-                $targets,
-                fn($p) => $p->getState() === PlayerState::STANDING,
-            ));
-
-            if (empty($standingTargets)) {
+            if ($ownRoll > $otherRoll || $targets === []) {
                 continue;
             }
 
-            // Random target: use D6 mod number of targets
-            $targetIndex = ($this->dice->rollD6() - 1) % count($standingTargets);
-            $victim = $standingTargets[$targetIndex];
-
-            $state = $state->withPlayer($victim->withState(PlayerState::STUNNED));
+            $victim = $this->randomPlayer($targets);
+            $injResult = $this->injuryResolver->resolveInjuryOnly($victim, $this->dice);
+            // Vykop neni kolo zadneho tymu: omraceny se otaci na konci PRVNIHO kola sveho
+            //   tymu (r. 704-707), priznak "omracen v tomto kole" sem nepatri.
+            $state = $state->withPlayer($injResult['player']->withStunnedThisTurn(false));
+            $events = array_merge($events, $injResult['events']);
             $results[] = $victim->getName();
         }
 
-        $effect = empty($results) ? 'No one was hit' : implode(' and ', $results) . ' stunned by rocks from the crowd';
+        $effect = $results === [] ? 'No one was hit' : implode(' and ', $results) . ' hit by a rock from the crowd';
 
         return [
             'state' => $state,
-            'events' => [GameEvent::kickoffTableEvent($roll, 'Throw a Rock!', $effect)],
+            'events' => [GameEvent::kickoffTableEvent($roll, 'Throw a Rock!', $effect), ...$events],
         ];
+    }
+
+    /**
+     * Rovnomerny los hrace kostkami: dve D6 = cislo 0-35, hodnoty nad nejvyssi nasobek
+     * poctu hracu se hazi znovu (jinak by prvni hraci v seznamu padali casteji).
+     *
+     * @param non-empty-list<MatchPlayerDTO> $players
+     */
+    private function randomPlayer(array $players): MatchPlayerDTO
+    {
+        $count = count($players);
+        $limit = intdiv(36, $count) * $count;
+        do {
+            $index = ($this->dice->rollD6() - 1) * 6 + $this->dice->rollD6() - 1;
+        } while ($index >= $limit);
+
+        return $players[$index % $count];
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Engine\ActionResolver;
 use App\Engine\BallResolver;
 use App\Engine\FixedDiceRoller;
 use App\Engine\GameFlowResolver;
+use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
@@ -191,7 +192,7 @@ final class Phase12SkillsTest extends TestCase
         $tzCalc = new TacklezoneCalculator();
         $scatterCalc = new ScatterCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
 
@@ -219,7 +220,7 @@ final class Phase12SkillsTest extends TestCase
         $tzCalc = new TacklezoneCalculator();
         $scatterCalc = new ScatterCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
 
@@ -256,6 +257,7 @@ final class Phase12SkillsTest extends TestCase
             $dice,
             $scatterCalc,
             new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc),
+            new InjuryResolver(),
         );
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
@@ -284,6 +286,7 @@ final class Phase12SkillsTest extends TestCase
             $dice,
             $scatterCalc,
             new BallResolver($dice, new TacklezoneCalculator(), $scatterCalc),
+            new InjuryResolver(),
         );
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
@@ -353,7 +356,7 @@ final class Phase12SkillsTest extends TestCase
         $tzCalc = new TacklezoneCalculator();
         $scatterCalc = new ScatterCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        $kickoffResolver = new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $kickoffResolver->resolveKickoff($state, new Position(6, 7));
 

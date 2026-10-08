@@ -65,7 +65,7 @@ final class ActionResolver
         $injuryResolver = $injuryResolver ?? new InjuryResolver();
         $this->ballResolver = $ballResolver ?? new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $this->passResolver = $passResolver;
-        $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver);
+        $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
         $this->gameFlowResolver = $gameFlowResolver ?? new GameFlowResolver($dice);
         // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
         //   mice, takze uz to neni bezzavisla trida.

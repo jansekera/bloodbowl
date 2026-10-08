@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Engine;
 
 use App\Engine\BallResolver;
+use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\SeededDiceRoller;
 use App\Engine\ScatterCalculator;
@@ -27,7 +28,7 @@ final class KickTargetChoiceTest extends TestCase
         $tz = new TacklezoneCalculator();
         $dice = new SeededDiceRoller(20261001);
 
-        return new KickoffResolver($dice, new ScatterCalculator(), new BallResolver($dice, $tz, new ScatterCalculator()));
+        return new KickoffResolver($dice, new ScatterCalculator(), new BallResolver($dice, $tz, new ScatterCalculator()), new InjuryResolver());
     }
 
     /**

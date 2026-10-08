@@ -6,6 +6,7 @@ namespace App\Tests\Engine;
 
 use App\Engine\BallResolver;
 use App\Engine\FixedDiceRoller;
+use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
@@ -22,7 +23,7 @@ final class KickoffResolverTest extends TestCase
         $scatterCalc = new ScatterCalculator();
         $tzCalc = new TacklezoneCalculator();
         $ballResolver = new BallResolver($dice, $tzCalc, $scatterCalc);
-        return new KickoffResolver($dice, $scatterCalc, $ballResolver);
+        return new KickoffResolver($dice, $scatterCalc, $ballResolver, new InjuryResolver());
     }
 
     // --- Existing scatter/touchback/catch tests (updated with kickoff table dice) ---
@@ -379,32 +380,89 @@ final class KickoffResolverTest extends TestCase
         $this->assertEquals(12, $p1->requirePosition()->getX());
     }
 
-    public function testKickoffTableThrowARockStunsPlayers(): void
+    // --- Throw a Rock (review P186) ---
+    //
+    // `rules_bb2016.txt` ř. 1342-1350: "Each coach rolls a D6 and adds their FAME to the
+    // roll. The fans of the team that rolls higher are the ones that threw the rock. In the
+    // case of a tie a rock is thrown at each team! Decide randomly which player in the other
+    // team was hit (only players on the pitch are eligible) and roll for the effects of the
+    // injury straight away. No Armour roll is required."
+    //
+    // Stará mechanika: kámen dostaly VŽDY oba týmy, jen STOJÍCÍ hráč, vybraný jednou D6
+    // (sedmý a další hráč nemohl být zasažen nikdy), a byl rovnou OMRÁČEN bez hodu na zranění.
+    // Kostky nově: tabulka 5+6 = 11 · D6 HOME, D6 AWAY (FAME engine nevede) · za každý
+    // zasažený tým: výběr hráče (dvě D6 = los z 36) a zranění 2D6.
+
+    public function testThrowARockHitsOnlyTheTeamWhoseFansRolledLowerAndRollsInjury(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
-            ->addPlayer(TeamSide::HOME, 6, 7, id: 2)
             ->addPlayer(TeamSide::AWAY, 15, 5, id: 3)
-            ->addPlayer(TeamSide::AWAY, 15, 7, id: 4)
             ->build();
 
-        // 5+6=11 = Throw a Rock
-        // Home targets: D6=1 -> index 0 -> player 1
-        // Away targets: D6=2 -> index 1 -> player 4
-        $dice = new FixedDiceRoller([5, 6, 1, 2]);
-        $resolver = $this->createResolver($dice);
+        // HOME 5 > AWAY 2 ⇒ házeli fanoušci HOME na AWAY; výběr 1,1; zranění 4+5 = 9 = KO.
+        $dice = new FixedDiceRoller([5, 6, 5, 2, 1, 1, 4, 5]);
+        $result = $this->createResolver($dice)->resolveKickoffTable($state, TeamSide::HOME);
 
-        $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
+        $this->assertSame(PlayerState::STANDING, $result['state']->requirePlayer(1)->getState(), 'ř. 1345-1346: tým s vyšším hodem zasažen není');
+        $zasazeny = $result['state']->requirePlayer(3);
+        $this->assertSame(PlayerState::KO, $zasazeny->getState(), 'ř. 1349-1350: hází se na zranění, ne rovnou omráčení');
+        $this->assertNull($zasazeny->getPosition());
+        $this->assertSame(8, $dice->getRollCount());
+    }
 
-        $p1 = $result['state']->requirePlayer(1);
-        $this->assertEquals(PlayerState::STUNNED, $p1->getState());
+    public function testThrowARockOnATieHitsBothTeams(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 15, 5, id: 3)
+            ->build();
 
-        $p4 = $result['state']->requirePlayer(4);
-        $this->assertEquals(PlayerState::STUNNED, $p4->getState());
+        // Remíza 3:3 ⇒ kámen na oba. HOME: výběr 1,1, zranění 1+1 = omráčen.
+        // AWAY: výběr 1,1, zranění 4+4 = 8 = KO.
+        $dice = new FixedDiceRoller([5, 6, 3, 3, 1, 1, 1, 1, 1, 1, 4, 4]);
+        $result = $this->createResolver($dice)->resolveKickoffTable($state, TeamSide::HOME);
 
-        // Other players unaffected
-        $p2 = $result['state']->requirePlayer(2);
-        $this->assertEquals(PlayerState::STANDING, $p2->getState());
+        $this->assertSame(PlayerState::STUNNED, $result['state']->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::KO, $result['state']->requirePlayer(3)->getState());
+        // ř. 704-707: výkop není kolo žádného týmu -- omráčený se otočí na konci PRVNÍHO
+        //   kola svého týmu, příznak "omráčen v tomto kole" tu být nesmí.
+        $this->assertFalse($result['state']->requirePlayer(1)->isStunnedThisTurn());
+    }
+
+    public function testThrowARockMayHitAPronePlayer(): void
+    {
+        // ř. 1348-1349: "only players on the pitch are eligible" -- ležící na hřišti je.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
+            ->addPronePlayer(TeamSide::AWAY, 15, 5, id: 3)
+            ->build();
+
+        // HOME 6 > AWAY 1; výběr 1,1; zranění 1+1 = omráčen.
+        $dice = new FixedDiceRoller([5, 6, 6, 1, 1, 1, 1, 1]);
+        $result = $this->createResolver($dice)->resolveKickoffTable($state, TeamSide::HOME);
+
+        $this->assertSame(PlayerState::STUNNED, $result['state']->requirePlayer(3)->getState());
+    }
+
+    public function testThrowARockCanHitAnyOfElevenPlayers(): void
+    {
+        // ř. 1347-1348: "Decide randomly which player" -- los musí dosáhnout na každého.
+        $builder = (new GameStateBuilder())->addPlayer(TeamSide::HOME, 6, 5, id: 1);
+        for ($i = 0; $i < 11; $i++) {
+            $builder->addPlayer(TeamSide::AWAY, 15, 2 + $i, id: 10 + $i);
+        }
+
+        // HOME 6 > AWAY 1; výběr 2,5 ⇒ (2-1)*6 + (5-1) = 10 ⇒ jedenáctý hráč (id 20);
+        // zranění 1+1 = omráčen.
+        $dice = new FixedDiceRoller([5, 6, 6, 1, 2, 5, 1, 1]);
+        $result = $this->createResolver($dice)->resolveKickoffTable($builder->build(), TeamSide::HOME);
+
+        $omraceni = array_filter(
+            $result['state']->getPlayersOnPitch(TeamSide::AWAY),
+            fn($p) => $p->getState() === PlayerState::STUNNED,
+        );
+        $this->assertSame([20], array_values(array_map(fn($p) => $p->getId(), $omraceni)));
     }
 
     public function testKickoffTablePitchInvasionStunsOnSix(): void

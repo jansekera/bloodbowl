@@ -39,7 +39,7 @@ final class WeatherTest extends TestCase
     {
         $dice = new FixedDiceRoller([3, 4, 1, 1]); // kt roll=7, weather roll=2 -> Sweltering Heat
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
@@ -55,7 +55,7 @@ final class WeatherTest extends TestCase
     {
         $dice = new FixedDiceRoller([3, 4, 6, 6]); // kt roll=7, weather roll=12 -> Blizzard
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
@@ -71,7 +71,7 @@ final class WeatherTest extends TestCase
     {
         $dice = new FixedDiceRoller([3, 4, 3, 3]); // kt=7, weather=6 -> Nice
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver, new InjuryResolver());
 
         $state = (new GameStateBuilder())
             ->withWeather(Weather::POURING_RAIN)
@@ -449,7 +449,7 @@ final class WeatherTest extends TestCase
         // ⭐ Zadne kostky na heat se uz neodebiraji.
         $dice = new FixedDiceRoller([1, 1, 1, 4, 6]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(6, 5));
 
@@ -484,7 +484,7 @@ final class WeatherTest extends TestCase
         // Ball: lands at (6,4) - empty, bounce D8=3 -> (7,4)
         $dice = new FixedDiceRoller([1, 1, 2, 4, 3, 3, 3]);
         $ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver);
+        $resolver = new KickoffResolver($dice, $this->scatterCalc, $ballResolver, new InjuryResolver());
 
         $result = $resolver->resolveKickoff($state, new Position(6, 5));
 
