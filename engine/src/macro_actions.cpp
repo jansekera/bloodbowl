@@ -3090,6 +3090,10 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
     }
 
     Position target{static_cast<int8_t>(targetX), static_cast<int8_t>(bestY)};
+    // P178 (review 08.10.2026): řadič klece TD přikazuje podle konkrétního pole zóny (kam nosič
+    // dojde bez hodu / s nejlepší šancí) — makro pak musí jít TAM. Vlastní volba výš zná jen
+    // řádky ±2 a neptá se, je-li pole volné.
+    if (macro.targetPos.isOnPitch() && macro.targetPos.x == targetX) target = macro.targetPos;
 
     movePlayerToward(state, macro.playerId, target, dice, result, 14);
     return result;

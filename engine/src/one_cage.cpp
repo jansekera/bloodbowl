@@ -355,11 +355,13 @@ void CageController::planStart(const GameState& state) {
         const Player& c = state.getPlayer(state.ball.carrierId);
         const bool lastTurn = state.getTeamState(c.teamSide).turnNumber >= 8;
         bool walksIn = false;
+        Position scoreSq{-1, -1};            // pole zóny, podle kterého se rozhodlo — tam TD i půjde
         const int ezX = (c.teamSide == TeamSide::HOME) ? 25 : 0;
         for (int y = 0; y < 15 && !walksIn; ++y) {
             const Position sq{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
             if (state.getPlayerAtPosition(sq)) continue;
             walksIn = pathFailProb(state, c, sq, c.movementRemaining, Position{-1, -1}) == 0.0;
+            if (walksIn) scoreSq = sq;
         }
         scoringRangeCage_ = !lastTurn && !walksIn && c.teamSide == state.activeTeam;
         // ⭐ P175, druhá polovina (uživatel 08.10.2026: „pokud hrozí blitz na nosiče a ztráta — je
@@ -376,9 +378,16 @@ void CageController::planStart(const GameState& state) {
                 const Position sq{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
                 if (state.getPlayerAtPosition(sq)) continue;
                 const double fail = pathFailProb(state, c, sq, budget, Position{-1, -1});
-                if (fail >= 0.0) scoreNow = std::max(scoreNow, 1.0 - fail);
+                if (fail >= 0.0 && 1.0 - fail > scoreNow) { scoreNow = 1.0 - fail; scoreSq = sq; }
             }
-            const double threat = blitzThreat(state, c);
+            double threat = blitzThreat(state, c);
+            // Review 08.10.2026: hrozba na začátku tahu je hrozba na klec, jak ji nechal SOUPEŘ
+            // (odtlačené rohy). Rozhoduje hrozba PO našem tahu — když klec tento tah dostavíme
+            // nebo s ní postoupíme do bezpečí, míč přežije a přes hody se neběží.
+            if (scoreNow > 0.0 && scoreNow >= 1.0 - threat && freeToAct(c)) {
+                const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+                if (after.valid) threat = std::min(threat, after.blitzThreat);
+            }
             if (scoreNow > 0.0 && scoreNow >= 1.0 - threat) scoringRangeCage_ = false;
             if (dbg) std::fprintf(stderr, "[cage ctl] TD teď %.2f × míč přežije %.2f => %s\n", scoreNow, 1.0 - threat,
                                   scoringRangeCage_ ? "klec" : "skórovat hned");
@@ -414,7 +423,7 @@ void CageController::planStart(const GameState& state) {
             c.teamSide == state.activeTeam && freeToAct(c)) {
             if (dbg) std::fprintf(stderr, "[cage ctl] TD příkazem řadiče (dojde bez hodu %d, poslední kolo %d)\n", walksIn, lastTurn);
             phase_ = CagePhase::CAGE;
-            queue_ = {Macro{MacroType::SCORE, c.id, -1, {-1, -1}}};
+            queue_ = {Macro{MacroType::SCORE, c.id, -1, scoreSq}};
             stage_ = Stage::DONE;
             return;
         }
@@ -896,7 +905,10 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
 
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     CageAdvancePlan plan;
-    if (freeToAct(carrier) && !released(state, carrier)) {
+    // Review 08.10.2026: ve zdržovacím tahu (P175) nosič stojí — i tady. Dosud se před koncem tahu
+    // volal postup klece a nosič mohl popojít na pole s hrozbou do 0,15 (zdržuje se jen do 0,05).
+    const bool stallingNow = stalling_ && team_ == state.activeTeam && turn_ == turn && half_ == state.half;
+    if (freeToAct(carrier) && !released(state, carrier) && !stallingNow) {
         plan = planner_.build(state, {}, /*evenInScoringRange=*/true);
     } else {
         plan = planner_.buildFillOnly(state, {});

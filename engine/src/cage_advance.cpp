@@ -888,25 +888,19 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         struct Cand { Position sq; int progress; AssignmentResult a; };
         std::vector<Cand> cands;
         const int budget = static_cast<int>(carrier.movementRemaining);
-        int cleanNow = 0;
-        for (int cx : {-1, 1}) for (int cy : {-1, 1}) {
-            const Position c{static_cast<int8_t>(carrier.position.x + cx), static_cast<int8_t>(carrier.position.y + cy)};
-            const Player* q = c.isOnPitch() ? state.getPlayerAtPosition(c) : nullptr;
-            if (q && q->teamSide == mySide && q->state == PlayerState::STANDING &&
-                countTacklezones(state, c, mySide) == 0) ++cleanNow;
-        }
-        const bool inCleanCage = cleanNow == 4 && countTacklezones(state, carrier.position, mySide) == 0;
         for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
             for (int y = carrier.position.y - budget; y <= carrier.position.y + budget; ++y) {
                 const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
                 if (!sq.isOnPitch() || sq == carrier.position) continue;
                 const int progress = (sq.x - carrier.position.x) * dx;
                 if (progress < 1) continue;        // jen vpřed; přeskupení na místě řeší dostavba klece
-                (void)inCleanCage;
                 if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
                     std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
                 if (countTacklezones(state, sq, mySide, carrier.id) > 0) continue;
-                if (pathFailProb(state, carrier, sq, budget, Position{-1, -1}) > 0.0) continue;   // cesta přes hod
+                // > 0 = cesta přes hod. Záměrně NE „!= 0“: −1 vrací i pole, na kterém teď stojí
+                // spoluhráč, a ten ho v plánu napřed uvolní (test CarrierTargetBlockedByTeammate…).
+                // Pole opravdu nedosažitelná vyřadí až drahá zkouška (legsAreSafe).
+                if (pathFailProb(state, carrier, sq, budget, Position{-1, -1}) > 0.0) continue;
                 const int step = carrier.position.distanceTo(sq);
                 AssignmentResult a = tryAssign(state, carrier, step, reservedPlayerIds, 0, true, &sq);
                 if (!a.feasible || a.filled - a.gfi < 2) continue;
@@ -951,30 +945,6 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), kSafeThreat);
             if (t <= kSafeThreat) ranked.push_back({&c, t});
         };
-        const size_t kScreenCap = 24;
-        for (size_t i = 0; i < cands.size() && i < kScreenCap; ++i) screen(cands[i]);
-        // ⭐ P178 (uživatel 08.10.2026: „když nosič nemůže skórovat ani být v bezpečí — nesmí nastat“):
-        //   prvních 24 polí „nejdál vpřed“ jsou u rychlého nosiče (dosah 7–9, kandidátů i 80) samá
-        //   pole u soupeře. Když mezi nimi bezpečné nebylo, bližší pole se vůbec nezkoušela a plán
-        //   spadl do „nejmenšího zla“ — nosič pak stál mimo klec v dosahu rány. Teď se v tom
-        //   případě projde dalších 24 polí rovnoměrně ze VŠECH vzdáleností vpřed (z každé napřed
-        //   nejlepší, pak druhé nejlepší …; pořadí uvnitř vzdálenosti je to výš).
-        if (ranked.empty() && cands.size() > kScreenCap && cageFeatureOn(kFeatScreenSpread)) {
-            std::map<int, std::vector<const Cand*>, std::greater<int>> byProgress;
-            for (size_t i = kScreenCap; i < cands.size(); ++i) byProgress[cands[i].progress].push_back(&cands[i]);
-            size_t done = 0;
-            for (size_t rank = 0; done < kScreenCap; ++rank) {
-                bool any = false;
-                for (const auto& [prog, v] : byProgress) {
-                    (void)prog;
-                    if (rank >= v.size() || done >= kScreenCap) continue;
-                    any = true;
-                    ++done;
-                    screen(*v[rank]);
-                }
-                if (!any) break;
-            }
-        }
         // ⭐⭐ P177 (uživatel 08.10.2026: „rychlejší týmy mohou s klecí dojít spíše bezpečně než co
         //   nejdál — např. skaveni proti orkům, protože pak jim zbyde dost pohybu na TD později“;
         //   „skaveni a elfové stihnou TD za 2 kola … trpaslíci za 6“). ČASOVÁ REZERVA z pohybu, ne
@@ -992,27 +962,61 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                         std::clamp(9 - state.getTeamState(mySide).turnNumber, 0, 8), hasSlack ? "bezpečně" : "co nejdál");
             }
         }
-        std::stable_sort(ranked.begin(), ranked.end(), [&](const Ranked& p, const Ranked& q) {
-            if (hasSlack) {
-                const int bp = static_cast<int>(p.threat * 20.0 + 0.5), bq = static_cast<int>(q.threat * 20.0 + 0.5);
-                if (bp != bq) return bp < bq;                      // s rezervou: napřed bezpečí
-            }
-            return p.c->progress > q.c->progress;                  // nejdál vpřed; při shodě pořadí výš
-        });
+        const size_t kScreenCap = 24;
         CageAdvancePlan best;
         bool haveBest = false;
         int bestProgress = -1;
         int tried = 0;
-        for (const Ranked& r : ranked) {
-            if (++tried > 4) break;
-            CageAdvancePlan candidate = plan;
-            candidate.carrierGfi = 0;
-            if (!legsAreSafe(candidate, carrier.position.distanceTo(r.c->sq), r.c->a)) continue;
-            if (candidate.blitzThreat > kSafeThreat) continue;
-            best = std::move(candidate);
-            bestProgress = r.c->progress;
-            haveBest = true;
-            break;
+        // Zkouška kandidátů z předvýběru: seřadit a první čtyři projít draze (cesty, pořadí, hrozba).
+        auto tryRanked = [&]() {
+            std::stable_sort(ranked.begin(), ranked.end(), [&](const Ranked& p, const Ranked& q) {
+                if (hasSlack) {
+                    const int bp = static_cast<int>(p.threat * 20.0 + 0.5), bq = static_cast<int>(q.threat * 20.0 + 0.5);
+                    if (bp != bq) return bp < bq;                      // s rezervou: napřed bezpečí
+                }
+                return p.c->progress > q.c->progress;                  // nejdál vpřed; při shodě pořadí výš
+            });
+            int n = 0;
+            for (const Ranked& r : ranked) {
+                if (++n > 4) break;
+                ++tried;
+                CageAdvancePlan candidate = plan;
+                candidate.carrierGfi = 0;
+                if (!legsAreSafe(candidate, carrier.position.distanceTo(r.c->sq), r.c->a)) continue;
+                if (candidate.blitzThreat > kSafeThreat) continue;
+                best = std::move(candidate);
+                bestProgress = r.c->progress;
+                haveBest = true;
+                return;
+            }
+        };
+        for (size_t i = 0; i < cands.size() && i < kScreenCap; ++i) screen(cands[i]);
+        tryRanked();
+        // ⭐ P178 (uživatel 08.10.2026: „když nosič nemůže skórovat ani být v bezpečí — nesmí nastat“):
+        //   prvních 24 polí „nejdál vpřed“ jsou u rychlého nosiče (dosah 7–9, kandidátů i 80) samá
+        //   pole u soupeře. Když z nich bezpečný plán nevyšel, bližší pole se vůbec nezkoušela a
+        //   plán spadl do „nejmenšího zla“ — nosič pak stál mimo klec v dosahu rány. Teď se v tom
+        //   případě projde dalších 24 polí rovnoměrně ze VŠECH vzdáleností vpřed (z každé napřed
+        //   nejlepší, pak druhé nejlepší …; pořadí uvnitř vzdálenosti je to výš).
+        //   Review 08.10.: podmínkou je „plán nevyšel“, ne „předvýběr je prázdný“ — levný předvýběr
+        //   je optimistický a pole, která jím prošla, mohou padnout až v drahé zkoušce.
+        if (!haveBest && cands.size() > kScreenCap && cageFeatureOn(kFeatScreenSpread)) {
+            ranked.clear();
+            std::map<int, std::vector<const Cand*>, std::greater<int>> byProgress;
+            for (size_t i = kScreenCap; i < cands.size(); ++i) byProgress[cands[i].progress].push_back(&cands[i]);
+            size_t done = 0;
+            for (size_t rank = 0; done < kScreenCap; ++rank) {
+                bool any = false;
+                for (const auto& [prog, v] : byProgress) {
+                    (void)prog;
+                    if (rank >= v.size() || done >= kScreenCap) continue;
+                    any = true;
+                    ++done;
+                    screen(*v[rank]);
+                }
+                if (!any) break;
+            }
+            tryRanked();
         }
         if (haveBest) {
             if (getenv("BB_CAGE_DEBUG")) {
@@ -1023,7 +1027,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             return best;
         }
         if (getenv("BB_CAGE_DEBUG")) {
-            fprintf(stderr, "[cage] bezpečné pole pro klec nevyšlo (kandidátů %zu, bezpečných %zu, zkoušeno %d)\n", cands.size(), ranked.size(), std::min(tried, 4));
+            fprintf(stderr, "[cage] bezpečné pole pro klec nevyšlo (kandidátů %zu, bezpečných %zu, zkoušeno %d)\n", cands.size(), ranked.size(), tried);
         }
         // P177: bezpečné pole není a tým má časovou rezervu ⇒ do nebezpečí se nejde; klec se
         // dostaví na místě (build() → dostavba) a postoupí, až to půjde bezpečně nebo dojde rezerva.

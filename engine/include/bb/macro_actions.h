@@ -60,15 +60,15 @@ enum CageFeature : unsigned {
     kFeatSideline       = 32,   // nosič ≥ 2 pole od postranní čáry
     kFeatLateFill       = 64,   // dostavba rohů po zvednutí hledáním
     kFeatMarkers        = 128,  // soupeř na kterémkoli z 8 polí u nosiče; krok nekončí v zóně; kdo odtlačí pryč
-    kFeatPhaseOneBlitz  = 256,
-    kFeatCleanCageSearch = 512,
+    kFeatPhaseOneBlitz  = 256,  // P172: blitz na proboření obrany + stojící klec nepřeskakuje rány
+    kFeatCleanCageSearch = 512, // P174: plánovač hledá pole pro klec po celém dosahu nosiče (vypne i 16384 a 65536, které jsou uvnitř)
     kFeatForceScore     = 32768, // P178: ohrožený nosič, který do zóny dojde, skóruje příkazem řadiče (ne volbou hledání)
     kFeatScreenSpread   = 65536, // P178: předvýběr bezpečného pole bere pole ze všech vzdáleností, ne jen 24 nejdál
     kFeatMarkerToward   = 131072, // P179: markující hráč si stoupá mezi soupeře a nosiče, ne na nejbližší pole u soupeře
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře
-    kFeatScoreEarly     = 4096, // P175: hrozí-li rána na nosiče, TD přes hod má přednost před klecí // P174: plánovač hledá pole pro čistou klec po celém dosahu nosiče  // P172: blitz na proboření obrany + stojící klec nepřeskakuje rány
+    kFeatScoreEarly     = 4096, // P175: hrozí-li rána na nosiče, TD přes hod má přednost před klecí
 };
 void setCageFeaturesOff(unsigned mask);
 unsigned cageFeaturesOff();

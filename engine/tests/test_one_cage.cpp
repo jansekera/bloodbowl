@@ -1022,10 +1022,86 @@ TEST(OneCageStall, ThreatenedCarrierGoesForTheTouchdownThroughDiceACagedOneDoesN
         CageController cc(nullptr, cfg(), 1);
         std::vector<Macro> ms;
         playAll(cc, b, &ms);
-        bool carrierWithCage = false;
-        for (const Macro& m : ms) carrierWithCage |= (m.playerId == 1);
-        EXPECT_TRUE(carrierWithCage || b.s.getPlayer(1).position == (Position{17, 7})) << "klec vede, nosič neběží přes hody";
+        // Review 08.10.: dřív stačilo „nosič dostal nějaké makro“ — prošlo by i přikázané TD přes hody.
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::SCORE) << "nosič v kleci TD přes hody nedostane";
+        EXPECT_LT(b.s.getPlayer(1).position.x, 25) << "klec vede, nosič neběží přes hody";
     }
+}
+
+// Review 08.10.2026 k P175/P178: hrozba se má brát PO našem tahu. Soupeř nosiči odtlačil dva rohy
+// (na začátku tahu je hrozba velká), ale spoluhráči stojí o pole vedle a klec tento tah dostaví ⇒
+// přes dvě GFI se neběží. Pozitivní kontrola: stejný nosič a soupeř bez spoluhráčů ⇒ TD hned.
+TEST(OneCageStall, ThreatIsJudgedAfterTheCageIsRebuiltNotAsTheOpponentLeftIt) {
+    auto board = [](bool matesNearby) {
+        Board b(5);
+        b.put(1, TeamSide::HOME, {17, 7}, 6);
+        if (matesNearby) {
+            b.put(2, TeamSide::HOME, {16, 6}); b.put(3, TeamSide::HOME, {16, 8});
+            b.put(4, TeamSide::HOME, {18, 4}); b.put(5, TeamSide::HOME, {18, 10});
+        }
+        b.put(13, TeamSide::AWAY, {22, 7}, 6);
+        b.s.ball = BallState::carried({17, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(true);
+        ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.31) << "předpoklad: před tahem je nosič vystaven dobré ráně";
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::SCORE) << "klec jde dostavět ⇒ žádné TD přes hody";
+        EXPECT_LT(b.s.getPlayer(1).position.x, 25);
+        EXPECT_LT(blitzThreat(b.s, b.s.getPlayer(1)), 0.31) << "po tahu je míč bezpečnější než TD přes dvě GFI";
+    }
+    {
+        Board b = board(false);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::SCORE) << "klec dostavět nejde ⇒ TD hned";
+    }
+}
+
+// Review 08.10.2026 k P178: přikázané TD jde na to pole zóny, podle kterého řadič rozhodl. Pole
+// zóny v řádcích 5–9 jsou obsazená; bez hodu se dá dojít jen o tři řádky vedle. Makro SCORE si dřív
+// vybíralo samo jen z řádků ±2 a obsazenost nekontrolovalo.
+TEST(OneCageStall, TheOrderedTouchdownGoesToTheSquareTheControllerFound) {
+    Board b(5);
+    b.put(1, TeamSide::HOME, {22, 7}, 6);
+    for (int y = 5; y <= 9; ++y) b.put(y - 3, TeamSide::HOME, {25, static_cast<int8_t>(y)});
+    b.put(13, TeamSide::AWAY, {18, 9}, 6);
+    b.s.ball = BallState::carried({22, 7}, 1);
+    ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.05);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    ASSERT_FALSE(ms.empty());
+    ASSERT_EQ(ms.front().type, MacroType::SCORE);
+    EXPECT_EQ(b.s.homeTeam.score, 1) << "nosič do zóny došel";
+    EXPECT_EQ(b.s.homeTeam.rerolls, 0);
+}
+
+// Review 08.10.2026 k P175: ve zdržovacím tahu nosič stojí i tehdy, když hledání tah ukončí a řadič
+// dostane slovo ještě jednou (beforeEndTurn) — dřív tam volal postup klece i s nosičem.
+TEST(OneCageStall, TheStallingCarrierAlsoStandsWhenTheControllerIsAskedBeforeTheEndOfTurn) {
+    Board b(5);
+    b.put(1, TeamSide::HOME, {22, 7}, 6);
+    b.put(2, TeamSide::HOME, {20, 5});
+    b.put(3, TeamSide::HOME, {19, 6});
+    b.put(4, TeamSide::HOME, {19, 8});
+    b.put(5, TeamSide::HOME, {20, 9});
+    b.put(13, TeamSide::AWAY, {3, 7}, 6);
+    b.s.ball = BallState::carried({22, 7}, 1);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    ASSERT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}})) << "předpoklad: zdržuje se";
+    Macro m;
+    if (cc.beforeEndTurn(b.s, m)) {
+        play(b.s, m);
+        playAll(cc, b);
+    }
+    EXPECT_EQ(b.s.getPlayer(1).position, (Position{22, 7})) << "nosič stojí";
 }
 
 // P176 — hodnota rizika (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech soupeřů
