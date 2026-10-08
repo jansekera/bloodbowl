@@ -25,14 +25,15 @@ use App\Engine\TacklezoneCalculator;
 
 final class BlockHandler implements ActionHandlerInterface
 {
-    private ?PassResolver $passResolver = null;
-
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly StrengthCalculator $strCalc,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
+        private readonly MoveHandler $moveHandler,
+        // Povinny (review P186, L7 -- tyz tvar): s nepovinnym se Dump-Off bez nej tise vynechal.
+        private readonly PassResolver $passResolver,
     ) {}
 
     /**
@@ -107,12 +108,9 @@ final class BlockHandler implements ActionHandlerInterface
 
         $events[] = GameEvent::playerFell($id);
         $events[] = GameEvent::turnover('Failed Going For It');
-        $fallen = $attacker->withState(PlayerState::PRONE)->withHasActed(true)->withHasMoved(true);
-        $injResult = $this->injuryResolver->resolve($fallen, $this->dice);
-        $fallen = $injResult['player'];
-        $state = $state->withPlayer($fallen);
-        $events = array_merge($events, $injResult['events']);
-        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallen, $events);
+        // Pad na GFI je JEDNA funkce (`MoveHandler::knockDownAt`, r. 1702-1703) -- do
+        //   09.10.2026 tu byla jeji ctvrta kopie (review P186, L1).
+        [$state, $events] = $this->moveHandler->knockDownAt($state, $attacker, $attacker->requirePosition(), $events);
 
         return ['state' => $state, 'outcome' => 'fell'];
     }
@@ -147,11 +145,6 @@ final class BlockHandler implements ActionHandlerInterface
         $tzGo = $this->tzCalc->countTacklezones($state, $vacated, $side, $attacker->getId());
 
         return $tzGo <= $tzStay;
-    }
-
-    public function setPassResolver(PassResolver $passResolver): void
-    {
-        $this->passResolver = $passResolver;
     }
 
     /**
@@ -206,7 +199,6 @@ final class BlockHandler implements ActionHandlerInterface
         if ($defender->hasSkill(SkillName::DumpOff)
             && $state->getBall()->getCarrierId() === $defender->getId()
             && !$state->getTeamState($defender->getTeamSide())->isPassUsedThisTurn()
-            && $this->passResolver !== null
         ) {
             // Find closest friendly teammate adjacent to defender
             $dumpTarget = $this->findDumpOffTarget($state, $defender);
@@ -698,7 +690,6 @@ final class BlockHandler implements ActionHandlerInterface
         if ($defender->hasSkill(SkillName::DumpOff)
             && $state->getBall()->getCarrierId() === $defender->getId()
             && !$state->getTeamState($defender->getTeamSide())->isPassUsedThisTurn()
-            && $this->passResolver !== null
         ) {
             $dumpTarget = $this->findDumpOffTarget($state, $defender);
             if ($dumpTarget !== null) {
@@ -1103,6 +1094,12 @@ final class BlockHandler implements ActionHandlerInterface
             if ($defender === null) {
                 return ActionResult::turnover($currentState, $events);
             }
+            // Za obrancem stoji jen hraci, kteri drzi pole: "neither player moves"
+            //   (r. 8514-8516) -- obrance zustal, utocnik nema kam nasledovat; srazeni plati
+            //   na poli, kde stal.
+            if ($defender->getPosition()?->equals($defenderPos) === true) {
+                $defenderPushed = false;
+            }
         }
 
         // Follow-up: attacker moves to defender's old position
@@ -1257,7 +1254,9 @@ final class BlockHandler implements ActionHandlerInterface
      * Jadro odtlaceni. Sekundarni odtlaceni v retezu je "treated exactly like
      * a normal push back as if the second player had been blocked by the first"
      * (r. 644-646), proto se vola rekurzivne tataz funkce.
-     * - pole: volne na hristi > dav (vybira tym na tahu) > obsazene = retez (r. 639-651)
+     * - pole: volne na hristi > dav (vybira tym na tahu) > obsazene = retez (r. 639-651);
+     *   kdyz zadne z nich neni (za hracem jen ti, kdo drzi pole, a zadne pole mimo hriste),
+     *   nehybe se nikdo (r. 8514-8516) -- stav i udalosti se vraci beze zmeny;
      * - smer voli tym na tahu, ledaze ma odtlaceny Side Step -- i v retezu (FAQ); ten
      *   voli z VSECH volnych sousednich poli (r. 8474-8478), bez volneho pole neplati;
      * - Grab a Strip Ball patri blokujicimu, plati jen u PRVNIHO odtlaceni
@@ -1295,7 +1294,8 @@ final class BlockHandler implements ActionHandlerInterface
 
         $zonySoupere = fn(Position $p): int => $this->tzCalc->countTacklezones($state, $p, $kdo->getTeamSide());
         $pushTo = null;
-        $chainPushTarget = null;
+        $retez = false;
+        $doDavu = false;
         // "Grab and Side Step will cancel each other out and the standard pushback rules
         //   apply" (r. 8151-8153) -- ma-li blokujici Grab, Side Step odtlaceneho neplati.
         $maGrab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
@@ -1324,9 +1324,8 @@ final class BlockHandler implements ActionHandlerInterface
             if ($emptySquares !== []) {
                 usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($b) <=> $zonySoupere($a));
                 $pushTo = $emptySquares[0];
-            } elseif ($occupiedSquares !== []) {
-                $pushTo = $occupiedSquares[0]['pos'];
-                $chainPushTarget = $occupiedSquares[0]['player'];
+            } else {
+                $retez = true;
             }
         } elseif ($sideStepSquares !== []) {
             // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
@@ -1350,15 +1349,32 @@ final class BlockHandler implements ActionHandlerInterface
             $pushTo = $emptySquares[0];
         } elseif ($offPitchAvailable) {
             // Zadne volne pole na hristi a jedno z poli je mimo ⇒ dav (r. 650-651), ne retez
-            //   -- pushTo zustava null
-        } elseif ($occupiedSquares !== []) {
-            $pushTo = $occupiedSquares[0]['pos'];
-            $chainPushTarget = $occupiedSquares[0]['player'];
+            $doDavu = true;
+        } else {
+            $retez = true;
         }
 
-        // Retez: nejdriv uvolnit pole tatazi funkci
-        if ($pushTo !== null && $chainPushTarget !== null) {
-            [$state, $events] = $this->odtlacit($state, $kde, $chainPushTarget, $pushTo, $blockingSide, null, $events);
+        // Retez: nejdriv uvolnit pole tatazi funkci. Koho v retezu odtlacit nejde (za nim
+        //   jen hraci, kteri drzi pole), ten pole neuvolni -- zkusi se dalsi obsazene pole.
+        if ($retez) {
+            foreach ($occupiedSquares as $obsazene) {
+                [$poRetezu, $udalostiRetezu] = $this->odtlacit($state, $kde, $obsazene['player'], $obsazene['pos'], $blockingSide, null, $events);
+                if ($poRetezu->getPlayerAtPosition($obsazene['pos']) === null) {
+                    $state = $poRetezu;
+                    $events = $udalostiRetezu;
+                    $pushTo = $obsazene['pos'];
+                    break;
+                }
+            }
+        }
+
+        // OPRAVENO 09.10.2026 (review P186, M3) -- tady stalo `if ($pushTo === null)` = dav,
+        //   at uz pole mimo hriste k dispozici bylo, nebo ne: kdyz vsechna tri pole drzeli
+        //   hraci se Stand Firm / zakoreneni, skoncil odtlaceny v davu i UPROSTRED hriste.
+        //   Pravidla r. 8514-8516: "If a player is pushed back into a player with using
+        //   Stand Firm then neither player moves."; do davu jen pres okraj (r. 650-651).
+        if ($pushTo === null && !$doDavu) {
+            return [$state, $events];
         }
 
         if ($pushTo === null) {

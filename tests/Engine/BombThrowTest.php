@@ -190,8 +190,41 @@ final class BombThrowTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier])
             ->withBallOffPitch()
             ->build();
-        $s = $s->withPlayer($s->requirePlayer(1)->withHasMoved(true));
+        $s = (new ActionResolver(new FixedDiceRoller([])))
+            ->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 6, 'y' => 7])
+            ->getNewState();
 
         $this->assertNotSame([], (new \App\Engine\RulesEngine())->validate($s, ActionType::BOMB_THROW, ['playerId' => 1, 'targetX' => 8, 'targetY' => 7]));
+    }
+
+    /**
+     * Review P186 (H1, týž princip): r. 7953-7954 "the player may not move or stand up
+     * before throwing it". Pohyb, který skončil úspěšným přehozem v dialogu, je pohyb --
+     * dialog ho jen neukončí (`hasMoved` zůstává false, člověk smí táhnout dál).
+     */
+    public function testBombardierMayNotThrowAfterMoveRerolledInDialog(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier])
+            ->addPlayer(TeamSide::AWAY, 4, 7, id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $rules = new \App\Engine\RulesEngine();
+        $hod = ['playerId' => 1, 'targetX' => 9, 'targetY' => 7];
+        $this->assertSame([], $rules->validate($s, ActionType::BOMB_THROW, $hod), 'pozitivní kontrola: před pohybem házet smí');
+
+        // Úhyb ze zóny AWAY 2: 1 = neúspěch ⇒ dialog, týmový přehoz 6 = úspěch.
+        $resolver = new ActionResolver(new FixedDiceRoller([1, 6]));
+        $resolver->setInteractiveRerolls(true);
+        $r = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 6, 'y' => 7]);
+        $r = $resolver->resolve($r->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+        $this->assertSame(6, $r->getNewState()->requirePlayer(1)->requirePosition()->getX(), 'fixtura: hráč se přesunul');
+
+        $this->assertNotSame([], $rules->validate($r->getNewState(), ActionType::BOMB_THROW, $hod));
+        $nabidka = array_filter(
+            $rules->getAvailableActions($r->getNewState()),
+            fn(array $a) => $a['type'] === ActionType::BOMB_THROW->value,
+        );
+        $this->assertSame([], $nabidka, 'po pohybu se hod bombou nenabízí');
     }
 }

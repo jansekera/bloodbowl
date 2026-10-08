@@ -54,6 +54,10 @@ final class MatchPlayerDTO
         // 08.10.2026: `rules_bb2016.txt` ř. 706-707 -- "a player may not turn face up
         //   on the turn they are Stunned"
         private bool $stunnedThisTurn = false,
+        // 09.10.2026: `rules_bb2016.txt` ř. 675 -- "you may not move when you take a Block
+        //   Action". Hráč se v tomto kole pohnul nebo vstal (`hasMoved` znamená něco jiného:
+        //   pohyb je UKONČEN).
+        private bool $movedThisTurn = false,
     ) {}
 
     /**
@@ -253,10 +257,14 @@ final class MatchPlayerDTO
      * po akci Move ještě blokoval a týmový blitz zůstal nepoužitý. Vzor: C++
      * `rules_engine.cpp:107`.
      * Jump Up (ř. 8200-8204): blok z lehu, hráč se před ním nehýbe.
+     * OPRAVENO 09.10.2026 (review P186, H1): zákaz stál na `hasMoved`, což znamená "pohyb
+     * je ukončen", ne "hráč se pohnul". Po úhybu / GFI úspěšně přehozeném v dialogu
+     * (`RerollHandler::applySuccess`) pohyb ukončen není -- člověk smí táhnout dál --
+     * a hráč proto po pohybu ještě blokoval. Zákaz se odvozuje z `movedThisTurn`.
      */
     public function canTakeBlockAction(): bool
     {
-        if ($this->hasMoved) {
+        if ($this->movedThisTurn) {
             return false;
         }
 
@@ -337,6 +345,26 @@ final class MatchPlayerDTO
     {
         $clone = clone $this;
         $clone->stunnedThisTurn = $stunnedThisTurn;
+
+        return $clone;
+    }
+
+    /**
+     * Hráč se v tomto kole pohnul nebo vstal -- nastavuje KAŽDÝ pohyb od prvního pole
+     * (`MoveHandler::resolve`, `RerollHandler::applySuccess`), maže začátek kola jeho týmu
+     * (`GameState::resetPlayersForNewTurn`). Na rozdíl od `hasMoved` neříká, že pohyb skončil.
+     * Stojí na něm zákazy "may not move": akce Block (`rules_bb2016.txt` ř. 674-676)
+     * a hod bombou (ř. 7953-7954).
+     */
+    public function hasMovedThisTurn(): bool
+    {
+        return $this->movedThisTurn;
+    }
+
+    public function withMovedThisTurn(bool $movedThisTurn): self
+    {
+        $clone = clone $this;
+        $clone->movedThisTurn = $movedThisTurn;
 
         return $clone;
     }
@@ -488,6 +516,7 @@ final class MatchPlayerDTO
             playedThisDrive: $this->playedThisDrive,
             bloodlustHungry: $this->bloodlustHungry,
             stunnedThisTurn: $this->stunnedThisTurn,
+            movedThisTurn: $this->movedThisTurn,
         );
     }
 
@@ -519,6 +548,7 @@ final class MatchPlayerDTO
             'playedThisDrive' => $this->playedThisDrive,
             'bloodlustHungry' => $this->bloodlustHungry,
             'stunnedThisTurn' => $this->stunnedThisTurn,
+            'movedThisTurn' => $this->movedThisTurn,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
             'raceName' => $this->raceName,
@@ -564,6 +594,9 @@ final class MatchPlayerDTO
             playedThisDrive: (bool) ($data['playedThisDrive'] ?? false),
             bloodlustHungry: (bool) ($data['bloodlustHungry'] ?? false),
             stunnedThisTurn: (bool) ($data['stunnedThisTurn'] ?? false),
+            // Stav uložený před 09.10.2026 klíč nemá: tehdy zákaz bloku stál na `hasMoved`,
+            //   takže se z něj při načtení odvodí (rozehrané kolo se dohraje po staru).
+            movedThisTurn: (bool) ($data['movedThisTurn'] ?? $data['hasMoved']),
         );
     }
 }

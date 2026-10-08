@@ -412,7 +412,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
             if (player.state === 'standing' && !player.hasActed && player.skills.includes('Multiple Block')) {
                 stateManager.selectPlayer(player.id);
                 try {
-                    blockTargets = await api.getBlockTargets(matchId, player.id);
+                    blockTargets = await api.getBlockTargets(matchId, player.id, 'block');
                     if (blockTargets.length >= 2) {
                         stateManager.setValidTargets(
                             'multiple_block',
@@ -447,7 +447,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                 stateManager.selectPlayer(player.id);
                 // Fetch block targets
                 try {
-                    blockTargets = await api.getBlockTargets(matchId, player.id);
+                    blockTargets = await api.getBlockTargets(matchId, player.id, mode);
                     stateManager.setValidTargets(
                         mode === 'block' ? 'block' : 'blitz',
                         blockTargets.map(t => ({ x: t.x, y: t.y })),

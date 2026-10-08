@@ -30,7 +30,9 @@ final class MoveHandler implements ActionHandlerInterface
         private readonly TacklezoneCalculator $tzCalc,
         private readonly Pathfinder $pathfinder,
         private readonly BallResolver $ballResolver,
-        private readonly ?InjuryResolver $injuryResolver = null,
+        // Povinny (review P186, L7): dokud byl `?InjuryResolver = null`, `knockDownAt` bez
+        //   nej tise vynechal hod na brneni a zraneni (r. 498-499, 1702-1703).
+        private readonly InjuryResolver $injuryResolver,
     ) {}
 
 
@@ -84,12 +86,10 @@ final class MoveHandler implements ActionHandlerInterface
             $state = $state->withBall(BallState::carried($pole, $fallenPlayer->getId()));
         }
 
-        if ($this->injuryResolver !== null) {
-            $injResult = $this->injuryResolver->resolve($fallenPlayer, $this->dice);
-            $fallenPlayer = $injResult['player'];
-            $state = $state->withPlayer($fallenPlayer);
-            $events = array_merge($events, $injResult['events']);
-        }
+        $injResult = $this->injuryResolver->resolve($fallenPlayer, $this->dice);
+        $fallenPlayer = $injResult['player'];
+        $state = $state->withPlayer($fallenPlayer);
+        $events = array_merge($events, $injResult['events']);
 
         if ($wasBallCarrier) {
             [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $fallenPlayer, $events);
@@ -121,6 +121,12 @@ final class MoveHandler implements ActionHandlerInterface
         if ($player === null) {
             throw new \InvalidArgumentException("Player {$playerId} not found");
         }
+
+        // Pohyb (i pouhé vstání) začal: od teď platí zákazy "may not move" -- akce Block
+        //   (`rules_bb2016.txt` ř. 674-676), hod bombou (ř. 7953-7954). Nastavuje se HNED,
+        //   ne až s `hasMoved` na konci: pohyb přerušený dialogem přehozu se neukončí.
+        $player = $player->withMovedThisTurn(true);
+        $state = $state->withPlayer($player);
 
         $events = [];
 

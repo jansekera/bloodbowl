@@ -68,6 +68,37 @@ final class BlitzBlockCostTest extends TestCase
         $this->assertNotContains('block', $types, 'rana se hodila');
     }
 
+    /**
+     * Hlídka pro sjednocení pádu (review P186, L1): pád na GFI za ránu je týž pád jako
+     * kterékoli jiné GFI. `rules_bb2016.txt` ř. 1702-1703: "Knocked Down in the square that
+     * they moved to. Roll to see if he was injured."; ř. 678-680: nosič míč upustí na poli,
+     * kde padl, a míč odskočí.
+     */
+    public function testAFailedGfiForTheBlockRollsArmourAndInjuryAndDropsTheBall(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->withBallCarried(1)
+            ->build();
+        $state = $state->withPlayer($state->requirePlayer(1)->withMovementRemaining(0));
+        $state = $state->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withRerolls(0));
+
+        // GFI 1 = pád · brnění 6+6 prorazí AV8 · zranění 1+1 = omráčen · odskok míče D8 = 1
+        $dice = new FixedDiceRoller([1, 6, 6, 1, 1, 1]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertTrue($result->isTurnover());
+        $hrac = $result->getNewState()->requirePlayer(1);
+        $this->assertSame(PlayerState::STUNNED, $hrac->getState(), 'ř. 1703: hází se na zranění');
+        $this->assertSame([5, 7], [$hrac->requirePosition()->getX(), $hrac->requirePosition()->getY()], 'padá na vlastním poli');
+        $ball = $result->getNewState()->getBall();
+        $this->assertFalse($ball->isHeld(), 'ř. 678-679: nosič míč upustí');
+        $this->assertFalse($ball->getPosition()?->equals($hrac->requirePosition()), 'ř. 680: míč z pole pádu odskočí');
+        $this->assertSame(6, $dice->getRollCount());
+        $this->assertNotContains('block', array_map(fn($e) => $e->getType(), $result->getEvents()), 'rána se nehodila');
+    }
+
     public function testWithNoMovementAndNoGfiLeftNoBlockIsThrown(): void
     {
         $state = (new GameStateBuilder())

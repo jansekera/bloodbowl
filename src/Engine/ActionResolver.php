@@ -65,15 +65,14 @@ final class ActionResolver
         $injuryResolver = $injuryResolver ?? new InjuryResolver();
         $this->ballResolver = $ballResolver ?? new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $this->passResolver = $passResolver;
-        $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver);
+        $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
         $this->gameFlowResolver = $gameFlowResolver ?? new GameFlowResolver($dice);
         // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
         //   mice, takze uz to neni bezzavisla trida.
         $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);
 
         $this->moveHandler = new MoveHandler($dice, $this->tzCalc, $pathfinder, $this->ballResolver, $injuryResolver);
-        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver);
-        $this->blockHandler->setPassResolver($this->getPassResolver());
+        $this->blockHandler = new BlockHandler($dice, $strCalc, $this->tzCalc, $injuryResolver, $this->ballResolver, $this->moveHandler, $this->getPassResolver());
         $this->blitzHandler = new BlitzHandler($this->moveHandler, $this->blockHandler, $pathfinder);
         $this->foulHandler = new FoulHandler($dice, $injuryResolver, $this->ballResolver);
         $this->handOffHandler = new HandOffHandler($this->ballResolver, $dice);

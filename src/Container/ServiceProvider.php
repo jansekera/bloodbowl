@@ -91,6 +91,7 @@ final class ServiceProvider
             $c->get(DiceRollerInterface::class),
             $c->get(ScatterCalculator::class),
             $c->get(BallResolver::class),
+            $c->get(InjuryResolver::class),
         ));
         $container->set(GameFlowResolver::class, fn(Container $c) => new GameFlowResolver(
             $c->get(DiceRollerInterface::class),

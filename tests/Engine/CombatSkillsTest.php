@@ -744,6 +744,10 @@ final class CombatSkillsTest extends TestCase
      * possible." ř. 650-651: do davu jen "if there are no eligible empty squares on the pitch".
      * (Dřívější test `testGrabSkippedWhenCrowdSurfAvailable` tu chtěl crowd surf, protože
      * "normal logic prefers crowd surf" -- kódoval vadu; audit parity 08.10.2026, nález 3a.)
+     * ⚠️ Volbu Grabu tenhle test NEZKOUŠÍ (jedno z polí je mimo hřiště, rozhoduje běžné
+     * pořadí) -- hlídá jen, že ani útočník s Grabem neposílá do davu přes volné pole.
+     * Grab sám: `testGrabJeVolbaBezVolnehoPoleZeTriJdeObranceDoDavu` a
+     * `testGrabSeVsemiTremiPoliNaHristiTlaciNaVolnePole` níž.
      */
     public function testGrabAtSidelinePushesToEmptySquareNotIntoCrowd(): void
     {
@@ -765,6 +769,66 @@ final class CombatSkillsTest extends TestCase
         $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
         $this->assertSame([7, 0], [$pos->getX(), $pos->getY()]);
         $this->assertSame(1, $dice->getRollCount(), 'jen kostka bloku -- žádné zranění od davu');
+    }
+
+    /**
+     * GRAB JE VOLBA (review P186 -- požadavek původního testu
+     * `testGrabSkippedWhenCrowdSurfAvailable`, tentokrát na rozestavení, kde platí).
+     * `rules_bb2016.txt` ř. 8149-8150: "he MAY choose any empty square adjacent to his
+     * opponent"; ř. 1820: "Skill use is not mandatory." Nepoužije-li ho, platí běžné
+     * pořadí, a to tady vede do davu (ř. 650-651): ze tří polí odtlačení jsou (7,-1)
+     * a (6,-1) mimo hřiště a (7,0) je obsazené. Povinný Grab by obránce místo toho
+     * položil na volné sousední pole na hřišti -- útočník o výhodu davu přijít nesmí.
+     */
+    public function testGrabJeVolbaBezVolnehoPoleZeTriJdeObranceDoDavu(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 1, skills: [SkillName::Grab], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 0, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 0, id: 3)
+            ->withBallOffPitch()
+            ->build();
+
+        // 3 = Pushed; zranění od davu 3+3 = omráčen ⇒ do rezerv (ř. 655-658).
+        $dice = new FixedDiceRoller([3, 3, 3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertContains('crowd_surf', $types);
+        $this->assertNotContains('chain_push', $types, 'dav má přednost před řetězem');
+        $this->assertNull($result->getNewState()->requirePlayer(2)->getPosition());
+        $pos3 = $result->getNewState()->requirePlayer(3)->requirePosition();
+        $this->assertSame([7, 0], [$pos3->getX(), $pos3->getY()]);
+    }
+
+    /**
+     * Větev Grabu se VŠEMI třemi poli odtlačení na hřišti (review P186: test výš ji
+     * přeskočí). ř. 8149-8150: Grab tlačí na "empty square adjacent to his opponent";
+     * ř. 8153: "Grab will not work if there are no empty adjacent squares" -- je-li volné
+     * pole, řetěz se nekoná. Útočník (5,2) → obránce (6,1): pole (7,0), (7,1), (6,0);
+     * (7,1) a (6,0) jsou obsazená, volné je jen (7,0) u lajny.
+     * ⚠️ Od běžného odtlačení (ř. 638-639) se výsledek neliší: Grab v PHP vybírá jen ze
+     * tří polí diagramu, ne z kteréhokoli sousedního volného (známá mezera, kniha P182).
+     */
+    public function testGrabSeVsemiTremiPoliNaHristiTlaciNaVolnePole(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 2, skills: [SkillName::Grab], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 1, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 1, id: 3)
+            ->addPlayer(TeamSide::AWAY, 6, 0, id: 4)
+            ->withBallOffPitch()
+            ->build();
+
+        $dice = new FixedDiceRoller([3]);
+        $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertNotContains('chain_push', $types);
+        $this->assertNotContains('crowd_surf', $types);
+        $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
+        $this->assertSame([7, 0], [$pos->getX(), $pos->getY()]);
+        $this->assertSame(1, $dice->getRollCount());
     }
 
     // ========== Juggernaut vs Stand Firm ==========
