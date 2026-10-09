@@ -36,7 +36,13 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
     // P80 (30.09.2026), port PHP 2f930279. r. 857-858: "Prone and Stunned
     // players may never attempt to catch the ball." Ostatni volajici to hlidaji
     // sami; predani ne (prijemce muze mezi nabidkou a provedenim ulehnout).
-    if (catcher.state != PlayerState::STANDING) {
+    //
+    // OPRAVENO 09.10.2026 (audit parity 08.10., nález 19) — hlídal se jen stav. Pravidla
+    // ř. 7983-7986 (Bone-head; stejně Really Stupid ř. 8401-8405 a Hypnotic Gaze
+    // ř. 8185-8188): „The player loses his tackle zones and MAY NOT CATCH, intercept or
+    // pass“. Hráč bez zón tedy nechytá odraz, vhazování, přihrávku ani předání — míč se
+    // od něj odráží jako od ležícího. Zachycení hlídá pass_handler (kandidát musí mít zóny).
+    if (catcher.state != PlayerState::STANDING || catcher.lostTacklezones) {
         emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
                           0, false});
         return false;

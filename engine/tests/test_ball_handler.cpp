@@ -364,3 +364,52 @@ TEST(BallHandler, DivingCatchHelpsOnlyAnAccuratePassToHisSquare) {
         EXPECT_FALSE(resolveCatch(gs, 1, dice, 1, nullptr));
     }
 }
+
+// ---------------------------------------------------------------------------
+// NÁLEZ 19 (audit parity 08.10.2026) — CHYTÁNÍ BEZ TACKLE ZÓN. Pravidla ř. 7983-7986 (Bone-head):
+// „The player loses his tackle zones and MAY NOT CATCH, INTERCEPT OR PASS, assist another player
+// on a block or foul, or voluntarily move until he manages to roll a 2 or better“; totéž Really
+// Stupid a Hypnotic Gaze (ř. 8185-8188: „loses his tackle zones and may not catch, intercept or
+// pass the ball“). Dřív `resolveCatch` hlídal jen stav (stojí / leží).
+// ---------------------------------------------------------------------------
+TEST(BallHandler, N19PlayerWhoLostHisTacklezonesMayNotCatch) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).lostTacklezones = true;
+    gs.ball = BallState::onGround({10, 7});
+
+    FixedDiceRoller dice({6});                       // hod, který by chycení dal
+    EXPECT_FALSE(resolveCatch(gs, 1, dice, 0, nullptr));
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(dice.remaining(), 1u) << "na chycení se vůbec nehází";
+}
+
+// Odraz na takového hráče: nechytá, míč se odráží dál (ř. 903-906). Kostky: D8 = 5 (jih) ⇒ z (10,6)
+// na (10,7), kde stojí; dál 6 — stará mechanika ji vzala jako úspěšný hod na chycení, nová jako
+// D8 dalšího odrazu (6 = jihozápad) ⇒ (9,8).
+TEST(BallHandler, N19BallBouncingOntoAPlayerWithoutTacklezonesBouncesOn) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).lostTacklezones = true;
+
+    FixedDiceRoller dice({5, 6});
+    resolveBounce(gs, {10, 6}, dice, 0, nullptr);
+
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{9, 8}));
+}
+
+// Pozitivní kontrola: tentýž hráč SE zónami týmiž kostkami míč chytí.
+TEST(BallHandler, N19SamePlayerWithTacklezonesCatchesTheBounce) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+
+    FixedDiceRoller dice({5, 6});
+    resolveBounce(gs, {10, 6}, dice, 0, nullptr);
+
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}

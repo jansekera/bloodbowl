@@ -122,15 +122,26 @@ static bool shouldRerollBlock(BlockDiceFace face, const Player& att) {
     return false;
 }
 
-// The square a pushed player leaves the pitch through: one step directly
-// away from whoever pushed him. resolvePushback reports a surf as
-// pushDest = {-1,-1}, which classifyExit cannot read, so the throw-in
+// The square a pushed player leaves the pitch through. resolvePushback reports
+// a surf as pushDest = {-1,-1}, which classifyExit cannot read, so the throw-in
 // template needs this reconstructed exit to know which edge it is centred on.
+// OPRAVENO 09.10.2026 (nález 3b) — dřív vždy pole „rovně za ním“. Od chvíle, kdy
+// se do davu tlačí i hráč, který má mimo hřiště jen NĚKTERÉ ze tří polí odtlačení
+// (ř. 650-651), může pole rovně za ním ležet na hřišti (odtlačení podél lajny) a
+// šablona vhazování by mířila od špatné hrany. Bere se tedy první ze tří polí
+// odtlačení, které je mimo hřiště (rovně, pak obě šikmá).
 static Position pushOffPitchExit(Position pusher, Position pushed) {
-    int dx = pushed.x - pusher.x;
-    int dy = pushed.y - pusher.y;
-    return Position{static_cast<int8_t>(pushed.x + (dx > 0) - (dx < 0)),
-                    static_cast<int8_t>(pushed.y + (dy > 0) - (dy < 0))};
+    const int dx = (pushed.x > pusher.x) - (pushed.x < pusher.x);
+    const int dy = (pushed.y > pusher.y) - (pushed.y < pusher.y);
+    // rovně; pak dvě pole o 45° vedle: u šikmého směru (dx,0) a (0,dy), u přímého ±1 napříč
+    const int dirs[3][2] = {{dx, dy},
+                            {dx != 0 ? dx : -1, dx != 0 && dy != 0 ? 0 : (dy != 0 ? dy : -1)},
+                            {dx != 0 && dy != 0 ? 0 : (dx != 0 ? dx : 1), dy != 0 ? dy : 1}};
+    for (const auto& d : dirs) {
+        const Position p{static_cast<int8_t>(pushed.x + d[0]), static_cast<int8_t>(pushed.y + d[1])};
+        if (!p.isOnPitch()) return p;
+    }
+    return {static_cast<int8_t>(pushed.x + dx), static_cast<int8_t>(pushed.y + dy)};
 }
 
 static int distanceToEdge(Position p) {
@@ -364,6 +375,15 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
         && p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
 }
 
+// Side Step jen STOJÍCÍ. OPRAVENO 09.10.2026 (audit parity 08.10., nález 17) — v řetězu
+// a v pushAwayFrom se četlo holé `hasSkill(SideStep)`, takže si pole vybíral i ležící
+// nebo omráčený hráč. Pravidla ř. 1824-1825: „Only Extraordinary skills work when a
+// player is Prone or Stunned.“ (Side Step je Agility.) Týž princip jako P68 u Stand Firm
+// v holdsGround. Jedno místo pro všechna tři čtení.
+static bool canSideStep(const Player& p) {
+    return p.state == PlayerState::STANDING && p.hasSkill(SkillName::SideStep);
+}
+
 static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                     bool sideStep, bool grab, bool resolveSurfHere,
                     TeamSide blockingSide, DiceRollerBase& dice, Position& dest,
@@ -372,10 +392,21 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
     int count = pushCandidates(state, pusherPos, pushed.position,
                                sideStep || grab, cand);
 
-    // "Players must be pushed off the pitch if there are no eligible empty
-    // squares on the pitch" — reached when nothing away from the pusher is on
-    // the pitch at all.
-    if (count == 0) {
+    bool anyEmpty = false;
+    for (int i = 0; i < count; i++) {
+        if (!state.getPlayerAtPosition(cand[i])) { anyEmpty = true; break; }
+    }
+    Position three[3];
+    const bool squareOffPitch = getPushbackSquares(pusherPos, pushed.position, three) < 3;
+
+    // OPRAVENO 09.10.2026 (audit parity 08.10., nález 3b) — tady stálo `if (count == 0)`:
+    // do davu šel hráč, jen když byla mimo hřiště VŠECHNA tři pole odtlačení; u lajny
+    // s obsazeným polem se řetězilo. Pravidla ř. 639-651: „must be pushed back into an
+    // empty square if possible“ (ř. 639) · řetěz jen „if ALL such squares are occupied
+    // by other players“ (ř. 641-644) · „Players must be pushed off the pitch if there are
+    // no eligible empty squares on the pitch“ (ř. 650-651). Pořadí: volné pole na hřišti >
+    // dav (některé ze tří polí je mimo hřiště a žádné volné) > řetěz. Vzor PHP bdad4afc.
+    if (!anyEmpty && squareOffPitch) {
         Position last = pushed.position;
         emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1, last, {-1, -1}, 0, true});
         dest = {-1, -1};
@@ -392,42 +423,51 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
         return true;
     }
 
-    dest = cand[choosePushSquare(state, cand, count, pusherPos,
-                                 sideStep && !grab, grab && !sideStep,
-                                 pushed, blockingSide)];
+    const int pick = choosePushSquare(state, cand, count, pusherPos,
+                                      sideStep && !grab, grab && !sideStep,
+                                      pushed, blockingSide);
+    dest = cand[pick];
 
-    Player* occupant = state.getPlayerAtPosition(dest);
-    if (occupant && holdsGround(*occupant, blockingSide)) {
-        // The coach picks the direction, so try any other body that will not
-        // dig in before giving the push up.  The end-zone refusal holds here
-        // too -- dodging a Stand Firm jam is not worth conceding a touchdown.
-        for (int i = 0; i < count; i++) {
-            Player* other = state.getPlayerAtPosition(cand[i]);
-            if (other && !holdsGround(*other, blockingSide) &&
-                !pushWouldScore(state, pushed, blockingSide, cand[i])) {
+    // Chain: every candidate is occupied, so the square has to be vacated first.
+    // The coach picks the direction, so the chosen body is tried first and then
+    // any other that will not dig in.  The end-zone refusal holds for those
+    // alternatives too -- dodging a Stand Firm jam is not worth conceding a
+    // touchdown.
+    //
+    // OPRAVENO 09.10.2026 (review P186, M3; vzor PHP d3f2c3ad) — zaseknutí se hlídalo
+    // jen o JEDEN stupeň: když sám hráč v cestě pole nedržel, ale neměl se kam hnout
+    // (za ním jen Stand Firm / zakořenění), zůstal stát a odtlačený byl přesto posunut
+    // NA JEHO POLE — dva hráči na jednom poli a útočník následoval. Pravidla ř. 8514-8516:
+    // „If a player is pushed back into a player with using Stand Firm then neither player
+    // moves“ a ř. 644-646: řetězové odtlačení „is treated exactly like a normal push back“.
+    // Teď se odtlačený pohne jen na pole, které se řetězem OPRAVDU uvolnilo; neuvolní-li
+    // se žádné, nehýbe se nikdo. Neúspěšný pokus stav nemění (vrací se dřív, než kýmkoli
+    // pohne), takže další pole lze zkusit bez vracení.
+    if (!anyEmpty) {
+        bool vacated = false;
+        for (int k = 0; k < count && !vacated && depth < GameState::PLAYERS_TOTAL; k++) {
+            const int i = (k == 0) ? pick : (k <= pick ? k - 1 : k);   // zvolené pole první
+            Player* occupant = state.getPlayerAtPosition(cand[i]);
+            if (!occupant || holdsGround(*occupant, blockingSide)) continue;
+            if (i != pick && pushWouldScore(state, pushed, blockingSide, cand[i])) continue;
+            // "The coach of the moving team decides all push back directions for
+            // secondary push backs unless the pushed player has a skill that
+            // overrides this" — so Side Step carries down the chain, Grab does not
+            // (it only ever applies to the player its owner blocked).
+            Position chainDest;
+            pushOne(state, pushed.position, *occupant,
+                    canSideStep(*occupant), false,
+                    /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
+                    depth + 1);
+            if (occupant->position != cand[i]) {
                 dest = cand[i];
-                occupant = other;
-                break;
+                vacated = true;
             }
         }
-    }
-    if (occupant && holdsGround(*occupant, blockingSide)) {
-        dest = pushed.position;   // "neither player moves"
-        return false;
-    }
-
-    // Chain. Depth is bounded by how many players can stand in a line, and the
-    // guard keeps a corrupt board from recursing forever.
-    if (occupant && depth < GameState::PLAYERS_TOTAL) {
-        // "The coach of the moving team decides all push back directions for
-        // secondary push backs unless the pushed player has a skill that
-        // overrides this" — so Side Step carries down the chain, Grab does not
-        // (it only ever applies to the player its owner blocked).
-        Position chainDest;
-        pushOne(state, pushed.position, *occupant,
-                occupant->hasSkill(SkillName::SideStep), false,
-                /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
-                depth + 1);
+        if (!vacated) {
+            dest = pushed.position;   // "neither player moves"
+            return false;
+        }
     }
 
     emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1,
@@ -463,7 +503,7 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         }
     }
 
-    bool sideStep = defender.hasSkill(SkillName::SideStep);
+    bool sideStep = canSideStep(defender);
     // "Grab only works on a Block Action" and "Grab and Side Step will cancel
     // each other out and the standard pushback rules apply".
     bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
@@ -479,7 +519,7 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
     if (holdsGround(pushed, pusher.teamSide)) return false;
     Position dest;
     const bool surf = pushOne(state, pusher.position, pushed,
-                              pushed.hasSkill(SkillName::SideStep), /*grab=*/false,
+                              canSideStep(pushed), /*grab=*/false,
                               /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
                               events, 0);
     if (!surf) return false;

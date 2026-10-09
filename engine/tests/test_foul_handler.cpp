@@ -294,3 +294,28 @@ TEST(FoulHandler, P77DirtyPlayerStillBreaksArmourWhenThatIsWhatItTakes) {
     resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
+
+// ---------------------------------------------------------------------------
+// T5.26 (audit parity 08.10.2026) — VYLOUČENÝ NOSIČ PŘI FAULU. Pravidla ř. 1882-1884: „If the sent
+// off player was holding the ball, the ball bounces FROM THE SQUARE HE WAS STANDING IN when sent
+// off.“ Dřív se pozice hráče nastavila na (−1,−1) dřív, než se míč pustil, takže se odrážel z pole
+// mimo hřiště. Kostky: brnění 3+3 = dublet (neprorazí AV 8) ⇒ vyloučen; D8 = 7 (západ) ⇒ z (10,7)
+// na (9,7). Stará mechanika: z (−1,−1) na západ = mimo hřiště ⇒ vhazování.
+// ---------------------------------------------------------------------------
+TEST(FoulHandler, T526EjectedCarriersBallBouncesFromHisSquare) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.ball = BallState::carried({10, 7}, 1);
+
+    FixedDiceRoller dice({3, 3, 7});
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+
+    ASSERT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{9, 7}));
+    EXPECT_EQ(dice.remaining(), 0u) << "jediný odraz, žádné vhazování";
+}
