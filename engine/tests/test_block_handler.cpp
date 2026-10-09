@@ -1750,3 +1750,113 @@ TEST(BlockHandler, CarrierBlockingABlockWrestleDefenderNeverPicksBothDown) {
     EXPECT_TRUE(gs.ball.isHeld && gs.ball.carrierId == 1) << "nosič míč drží dál";
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "obránce byl jen odtlačen";
 }
+
+// ---------------------------------------------------------------------------
+// NÁLEZ 3b (audit parity 08.10.2026) — DAV × ŘETĚZ. Pravidla ř. 639-651:
+//   ř. 639     „The player must be pushed back into an empty square if possible.“
+//   ř. 641-644 „If ALL SUCH SQUARES are occupied by other players, then the player is pushed into
+//               an occupied square, and the player that originally occupied the square is pushed
+//               back in turn.“
+//   ř. 650-651 „Players must be pushed off the pitch if there are no eligible empty squares on
+//               the pitch.“
+// Pořadí je tedy: volné pole na hřišti > dav (některé ze tří polí je mimo hřiště a žádné volné)
+// > řetěz (všechna tři pole jsou na hřišti a obsazená). Dřív šel hráč do davu jen tehdy, když
+// byla mimo hřiště VŠECHNA tři pole; u lajny s obsazeným polem řetězil.
+// Kostky: 3,3 = dvě Pushed (ST4 × ST3); zbytek jsou hody davu / vhazování.
+// ---------------------------------------------------------------------------
+TEST(BlockHandler, N3bPushAlongTheSidelineWithNoEmptySquareGoesIntoTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);   // rovně za ním
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);   // šikmo do hřiště; třetí pole (12,-1) je mimo
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 7};
+
+    FixedDiceRoller dice({3, 3, 1, 1, 1, 1});       // zranění v davu 1+1 = omráčen ⇒ rezervy
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch()) << "žádné volné pole a jedno mimo hřiště ⇒ dav";
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 0})) << "řetěz se nekoná, soused stojí";
+    EXPECT_EQ(gs.getPlayer(14).position, (Position{12, 1}));
+}
+
+TEST(BlockHandler, N3bDiagonalPushAtTheSidelineWithNoEmptySquareGoesIntoTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 1}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);   // jediné ze tří polí na hřišti
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 7};
+
+    FixedDiceRoller dice({3, 3, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch());
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 0}));
+}
+
+// Hlídka druhé strany pořadí (ř. 639): volné pole na hřišti má přednost před davem.
+TEST(BlockHandler, N3bAnEmptySquareOnThePitchStillBeatsTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);   // rovně obsazeno, (12,1) volné
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 7};
+
+    FixedDiceRoller dice({3, 3, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 1}));
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 0}));
+}
+
+// Hlídka třetího stupně: všechna tři pole na hřišti a obsazená ⇒ řetěz, ne dav (ř. 641-644).
+TEST(BlockHandler, N3bAllThreeSquaresOnThePitchAndOccupiedStillChains) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 1}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 1}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);
+    placePlayer(gs, 15, {12, 2}, TeamSide::AWAY);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 7};
+
+    FixedDiceRoller dice({3, 3, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 1}));
+    EXPECT_EQ(gs.getPlayer(14).position, (Position{13, 1}));
+}
+
+// Nosič vytlačený do davu PODÉL lajny. Pravidla ř. 659-663: „…he is beaten up by the fans, who are
+// more than happy to throw the ball back into play! The Throw-in template is centred on the last
+// square the player was in before he was pushed off the pitch“ — šablona tedy míří od HORNÍ lajny
+// do hřiště, ne od pole „rovně za ním“, které tu leží na hřišti. Vhazování D6 = 3 ⇒ kolmo do
+// hřiště, 2D6 = 1+1 ⇒ (11,2); prázdné ⇒ odraz D8 = 5 (jih) ⇒ (11,3). Pak zranění v davu.
+TEST(BlockHandler, N3bCarrierSurfedAlongTheSidelineIsThrownInFromThatSideline) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 0}, 12);
+
+    FixedDiceRoller dice({3, 3, 3, 1, 1, 5, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    ASSERT_FALSE(gs.getPlayer(12).isOnPitch());
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 3}));
+}

@@ -122,15 +122,26 @@ static bool shouldRerollBlock(BlockDiceFace face, const Player& att) {
     return false;
 }
 
-// The square a pushed player leaves the pitch through: one step directly
-// away from whoever pushed him. resolvePushback reports a surf as
-// pushDest = {-1,-1}, which classifyExit cannot read, so the throw-in
+// The square a pushed player leaves the pitch through. resolvePushback reports
+// a surf as pushDest = {-1,-1}, which classifyExit cannot read, so the throw-in
 // template needs this reconstructed exit to know which edge it is centred on.
+// OPRAVENO 09.10.2026 (nález 3b) — dřív vždy pole „rovně za ním“. Od chvíle, kdy
+// se do davu tlačí i hráč, který má mimo hřiště jen NĚKTERÉ ze tří polí odtlačení
+// (ř. 650-651), může pole rovně za ním ležet na hřišti (odtlačení podél lajny) a
+// šablona vhazování by mířila od špatné hrany. Bere se tedy první ze tří polí
+// odtlačení, které je mimo hřiště (rovně, pak obě šikmá).
 static Position pushOffPitchExit(Position pusher, Position pushed) {
-    int dx = pushed.x - pusher.x;
-    int dy = pushed.y - pusher.y;
-    return Position{static_cast<int8_t>(pushed.x + (dx > 0) - (dx < 0)),
-                    static_cast<int8_t>(pushed.y + (dy > 0) - (dy < 0))};
+    const int dx = (pushed.x > pusher.x) - (pushed.x < pusher.x);
+    const int dy = (pushed.y > pusher.y) - (pushed.y < pusher.y);
+    // rovně; pak dvě pole o 45° vedle: u šikmého směru (dx,0) a (0,dy), u přímého ±1 napříč
+    const int dirs[3][2] = {{dx, dy},
+                            {dx != 0 ? dx : -1, dx != 0 && dy != 0 ? 0 : (dy != 0 ? dy : -1)},
+                            {dx != 0 && dy != 0 ? 0 : (dx != 0 ? dx : 1), dy != 0 ? dy : 1}};
+    for (const auto& d : dirs) {
+        const Position p{static_cast<int8_t>(pushed.x + d[0]), static_cast<int8_t>(pushed.y + d[1])};
+        if (!p.isOnPitch()) return p;
+    }
+    return {static_cast<int8_t>(pushed.x + dx), static_cast<int8_t>(pushed.y + dy)};
 }
 
 static int distanceToEdge(Position p) {
@@ -372,10 +383,21 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
     int count = pushCandidates(state, pusherPos, pushed.position,
                                sideStep || grab, cand);
 
-    // "Players must be pushed off the pitch if there are no eligible empty
-    // squares on the pitch" — reached when nothing away from the pusher is on
-    // the pitch at all.
-    if (count == 0) {
+    bool anyEmpty = false;
+    for (int i = 0; i < count; i++) {
+        if (!state.getPlayerAtPosition(cand[i])) { anyEmpty = true; break; }
+    }
+    Position three[3];
+    const bool squareOffPitch = getPushbackSquares(pusherPos, pushed.position, three) < 3;
+
+    // OPRAVENO 09.10.2026 (audit parity 08.10., nález 3b) — tady stálo `if (count == 0)`:
+    // do davu šel hráč, jen když byla mimo hřiště VŠECHNA tři pole odtlačení; u lajny
+    // s obsazeným polem se řetězilo. Pravidla ř. 639-651: „must be pushed back into an
+    // empty square if possible“ (ř. 639) · řetěz jen „if ALL such squares are occupied
+    // by other players“ (ř. 641-644) · „Players must be pushed off the pitch if there are
+    // no eligible empty squares on the pitch“ (ř. 650-651). Pořadí: volné pole na hřišti >
+    // dav (některé ze tří polí je mimo hřiště a žádné volné) > řetěz. Vzor PHP bdad4afc.
+    if (!anyEmpty && squareOffPitch) {
         Position last = pushed.position;
         emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1, last, {-1, -1}, 0, true});
         dest = {-1, -1};
