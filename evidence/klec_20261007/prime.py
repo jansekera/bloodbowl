@@ -15,7 +15,7 @@ def hra(a):
         if n.team_side!=H: return dict(kdo="A", x=x, y=y)
         opp=[p for p in kt.hraci(s) if p.team_side==A and p.state==ST.STANDING]
         d=[max(abs(p.position.x-x),abs(p.position.y-y)) for p in opp]
-        return dict(kdo="H", x=x, y=y, id=n.id, ma=n.stats.movement,
+        return dict(kdo="H", x=x, y=y, id=n.id, ma=n.stats.movement, hrozba=(bb.carrier_blitz_threat(s) if hasattr(bb,"carrier_blitz_threat") else None),
                     rohy=sum(1 for p in kt.hraci(s) if p.team_side==H and p.state==ST.STANDING and p.id!=n.id and abs(p.position.x-x)==1 and abs(p.position.y-y)==1),
                     vedle=sum(1 for v in d if v==1), nejbl=min(d) if d else 99,
                     v_dosahu=sum(1 for p in opp if max(abs(p.position.x-x),abs(p.position.y-y))-1 <= p.stats.movement+2))

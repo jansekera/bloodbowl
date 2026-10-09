@@ -73,6 +73,7 @@ enum CageFeature : unsigned {
     kFeatCornerNoDodge  = 8388608,  // P190: na roh jen hráč, který tam dojde úplně bez hodu (ani úhyb s Dodge)
     kFeatEscapeContact  = 16777216, // P190: nosič, který začíná tah v kontaktu a klec ho neochrání, smí z kontaktu úhybem tam, kde je bezpečněji
     kFeatKeepBuiltCage  = 33554432, // P190: hledání neodvede nosiče z dostavěné klece pro malý zisk; ne na krajní řádky; nosič v bezpečí nepřihrává
+    kFeatCornerPathReach = 67108864, // P190: „roh tam dojde“ se počítá podle cesty bez hodu, ne jen podle vzdálenosti
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře

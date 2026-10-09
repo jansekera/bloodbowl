@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include "bb/cage_advance.h"
 #include "bb/block_handler.h"
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -536,6 +537,11 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
+    // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.
+    m.def("carrier_blitz_threat", [](const bb::GameState& s) {
+        if (!s.ball.isHeld || s.ball.carrierId <= 0) return -1.0;
+        return bb::blitzThreat(s, s.getPlayer(s.ball.carrierId));
+    });
     m.def("set_cage_leaf_weight", [](double w) { bb::setCageLeafWeight(w); });
     m.def("cage_leaf_weight", []() { return bb::cageLeafWeight(); });
     m.def("take_dodge_cap_stops", []() {

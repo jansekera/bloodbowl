@@ -81,12 +81,29 @@ std::vector<std::pair<int, Position>> cornersComing(const GameState& state, cons
     state.forEachOnPitch(side, [&](const Player& p) {
         if (p.id != carrier.id && p.state == PlayerState::STANDING) mates.push_back(&p);
     });
+    const std::vector<Position> slots0 = slots;      // pevné pořadí pro mezipaměť
     auto serves = [&](const Player& p, Position c) {
         if (p.position == c) return true;
         const Player* occ = state.getPlayerAtPosition(c);
         if (occ && occ->id != carrier.id) return false;
         if (!freeToAct(p) || countTacklezones(state, p.position, side, p.id) > 0) return false;
-        return p.position.distanceTo(c) <= static_cast<int>(p.movementRemaining);
+        if (p.position.distanceTo(c) > static_cast<int>(p.movementRemaining)) return false;
+        // P190 (rozbor skavenů 09.10.2026): dosud stačila vzdálenost — odhad hrozby po pohybu nosiče
+        // pak počítal s rohy, které přes zeď soupeřů nedojdou (nosič po zvednutí odběhl před tým,
+        // „rohy“ uvízly v půli cesty). Teď jen hráč, který na pole dojde bez hodu. Pole, na kterém
+        // teď stojí nosič (uvolní ho), se bere podle vzdálenosti.
+        if (!cageFeatureOn(kFeatCornerPathReach) || occ) return true;
+        return pathFailProb(state, p, c, p.movementRemaining, Position{-1, -1}) == 0.0;
+    };
+    // „dojde“ se ptá drahý hledač cest ⇒ spočítat jednou pro každou dvojici (hráč, pole), ne při
+    // každém pořadí polí znovu
+    std::vector<std::vector<char>> can(mates.size(), std::vector<char>(slots.size(), -1));
+    auto servesCached = [&](size_t pi, Position c) {
+        size_t si = 0;
+        while (si < slots0.size() && slots0[si] != c) ++si;
+        char& v = can[pi][si];
+        if (v < 0) v = serves(*mates[pi], c) ? 1 : 0;
+        return v == 1;
     };
     // největší párování (nejvýš 4 pole): zkusit všechna pořadí polí hladově
     std::sort(slots.begin(), slots.end(), [](Position a, Position b) {
@@ -96,9 +113,10 @@ std::vector<std::pair<int, Position>> cornersComing(const GameState& state, cons
     do {
         std::vector<std::pair<int, Position>> got;
         for (const Position& c : slots) {
-            for (const Player* p : mates) {
+            for (size_t pi = 0; pi < mates.size(); ++pi) {
+                const Player* p = mates[pi];
                 if (std::any_of(got.begin(), got.end(), [&](const auto& g) { return g.first == p->id; })) continue;
-                if (!serves(*p, c)) continue;
+                if (!servesCached(pi, c)) continue;
                 got.push_back({p->id, c});
                 break;
             }

@@ -1476,3 +1476,18 @@ TEST(OneCageEscape, AnAgileCarrierDodgesOutOfContactToWhereTheCageCanFormAClumsy
     const Position clumsy = run(3, 0, t);
     EXPECT_EQ(clumsy, (Position{12, 7})) << "nosič s úhybem na 3+ neuhýbá";
 }
+
+// P190: „roh tam dojde“ znamená cestu bez hodu, ne jen vzdálenost. Spoluhráč stojí čtyři pole od
+// pole rohu, ale mezi nimi je souvislá zeď soupeřů — nedojde, a odhad bezpečí nosiče s ním nesmí počítat
+// (nosič po zvednutí míče odbíhal před tým k „rohům“, které uvízly v půli cesty).
+TEST(CarrierThreat, ATeammateBehindAWallIsNotCountedAsAComingCorner) {
+    Board b;
+    b.put(1, TeamSide::HOME, {12, 7}, 6);
+    b.put(2, TeamSide::HOME, {13, 12});
+    for (int x = 9; x <= 17; ++x) b.put(4 + x, TeamSide::AWAY, {static_cast<int8_t>(x), 10}, 6);
+    const Player& c = b.s.getPlayer(1);
+    EXPECT_EQ(cornersWithinReach(b.s, c, {12, 7}), 0) << "přes zeď se na roh (13,8) nedostane";
+    setCageFeaturesOff(kFeatCornerPathReach);
+    EXPECT_EQ(cornersWithinReach(b.s, c, {12, 7}), 1) << "pozitivní kontrola: podle vzdálenosti by „došel“";
+    setCageFeaturesOff(0);
+}
