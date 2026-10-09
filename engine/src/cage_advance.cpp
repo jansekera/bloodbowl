@@ -517,8 +517,17 @@ CageAdvancePlanner::AssignmentResult CageAdvancePlanner::tryAssign(
                 //   Hráč s Dodge smí jeden úhyb na 2+ (stejná mez jako při kontrole kroku).
                 //   Cesta zastavěná spoluhráčem (−1) se tu nevyřazuje: ten se může hnout dřív.
                 const double fail = pathFailProb(state, *p, slot, p->movementRemaining, Position{-1, -1});
-                const double ceil = p->hasSkill(SkillName::Dodge) ? SAFE_PTO_DODGE_SKILL : SAFE_PTO;
+                // ⭐ P190 (rozbor skavenů 09.10.2026; uživatel 07.10.: „…dojít stát se rohem, pokud
+                //   nevyžaduje dodge nebo riskantní hod“). Úhyb na 2+ s Dodge se dosud pouštěl
+                //   (strop 0,05) — a v 16 poločasech třikrát nevyšel: turnover uprostřed stavby
+                //   klece, nosič zůstal sám. Na roh se teď chodí úplně bez hodu.
+                const double ceil = (!cageFeatureOn(kFeatCornerNoDodge) && p->hasSkill(SkillName::Dodge))
+                                        ? SAFE_PTO_DODGE_SKILL : SAFE_PTO;
                 if (diceFreeReach && fail > ceil) continue;
+                // P190: −1 = pole je v rozpočtu pohybu nedosažitelné (zeď soupeřů) — dosud prošlo,
+                //   protože −1 vrací i pole, na kterém stojí spoluhráč (ten ho uvolní). Hráč pak
+                //   vyrazil, uvízl v půli cesty a roh zůstal prázdný. Volné pole s −1 se nepřiděluje.
+                if (diceFreeReach && fail < 0.0 && !state.getPlayerAtPosition(slot)) continue;
             } else if (d == static_cast<int>(p->movementRemaining) + 1 &&
                        gfiBudget > 0) {
                 gfi = true;  // the single 1-GFI allowance (see header)

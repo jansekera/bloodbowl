@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "bb/cage_advance.h"
+#include "bb/pathfinder.h"
 #include "bb/macro_mcts.h"
 #include "bb/turn_planner.h"
 #include "bb/game_state.h"
@@ -1342,4 +1343,38 @@ TEST(CageAdvance, ScreenReachesTheSafeNearSquaresWhenTheFarOnesAreAllUnderAGoodH
     EXPECT_LE(on.blitzThreat, 0.15) << "a nosič po tahu není vystaven dobré ráně";
     const CageAdvancePlan off = build(kFeatScreenSpread);
     EXPECT_GT(off.valid ? off.blitzThreat : 1.0, 0.15) << "pozitivní kontrola: bez úpravy plán bezpečné pole nenašel";
+}
+
+// P190 (uživatel 07.10.2026: „ležící spoluhráč může vstát a dojít stát se rohem, pokud nevyžaduje
+// dodge nebo riskantní hod“). Ani hráč s Dodge na roh z kontaktu neuhýbá: úhyb na 2+ s přehozem
+// nevyjde jednou z 36 a turnover uprostřed stavby klece nechá nosiče samotného.
+TEST(CageAdvance, CornerIsNotGivenEvenToADodgerWhoWouldHaveToDodge) {
+    GameState state = makeCageState();
+    state.getPlayer(5).position = {14, 10};
+    state.getPlayer(5).stats.agility = 4;
+    state.getPlayer(5).skills.add(SkillName::Dodge);
+    putPlayer(state, 13, TeamSide::AWAY, {15, 11}, 6);
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    EXPECT_EQ(slotOwner(a, {13, 8}), -1) << "roh zůstává otevřený";
+    setCageFeaturesOff(kFeatCornerNoDodge);
+    auto b = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    setCageFeaturesOff(0);
+    EXPECT_EQ(slotOwner(b, {13, 8}), 5) << "pozitivní kontrola: dřív ho hráč s Dodge dostal";
+}
+
+// P190: volné pole rohu, na které se hráč v rozpočtu pohybu nedostane (mezi ním a rohem stojí zeď
+// soupeřů), se nepřiděluje — dřív hráč vyrazil, uvízl v půli cesty a roh zůstal prázdný.
+TEST(CageAdvance, AnEmptyCornerBehindAWallOfOpponentsIsNotAssigned) {
+    GameState state = makeCageState();
+    state.getPlayer(5).position = {13, 12};                 // k rohu (13,8) rovně 4 pole
+    state.getPlayer(5).stats.movement = 4;
+    state.getPlayer(5).movementRemaining = 4;
+    int id = 13;                                            // souvislá zeď na řádku 10: obejít ji je dál než 4 pole
+    for (int x = 9; x <= 17; ++x) putPlayer(state, id++, TeamSide::AWAY, {static_cast<int8_t>(x), 10}, 6);
+    CageAdvancePlanner planner(nullptr, cageConfig(), 42);
+    ASSERT_LT(pathFailProb(state, state.getPlayer(5), {13, 8}, 4, Position{-1, -1}), 0.0)
+        << "předpoklad: hledač cest hlásí „v rozpočtu nedosažitelné“ (−1), ne cestu přes hod";
+    auto a = planner.tryAssign(state, state.getPlayer(1), 0, {});
+    EXPECT_EQ(slotOwner(a, {13, 8}), -1);
 }

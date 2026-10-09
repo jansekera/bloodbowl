@@ -938,6 +938,11 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
         }
     }
 
+    // P190 (rozbor skavenů 09.10.2026): nosič, který je v bezpečí, míč nepouští přihrávkou —
+    // v měření přihrál z klece hráči stojícímu v zóně soupeře. (Přihrávka má vlastní sekci později.)
+    if (cageFeatureOn(kFeatKeepBuiltCage) && phase_ == CagePhase::CAGE && m.type == MacroType::PASS_ACTION &&
+        blitzThreat(state, carrier, kSafeBlitzThreat) <= kSafeBlitzThreat) return true;
+
     const bool movesCarrier = m.type == MacroType::ADVANCE ||
                               (m.type == MacroType::REPOSITION && m.playerId == carrier.id);
     if (!movesCarrier) return false;
@@ -964,6 +969,7 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
     if (!why && cageFeatureOn(kFeatCarrierByCtl)) {
         const double here = carrierThreatAt(state, carrier, carrier.position);
         double there = 0.0;
+        bool endsOnEdge = false;
         const int samples = 8;
         for (int k = 0; k < samples; ++k) {
             GameState trial = state.clone();
@@ -984,9 +990,18 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
             }
             const Player& c2 = trial.getPlayer(trial.ball.carrierId);
             there += carrierThreatAt(trial, c2, c2.position);
+            // krajní řádky: rohy klece tam nemají kam stát (a hrozí vyhození do davu)
+            if (cageFeatureOn(kFeatKeepBuiltCage) && cageFeatureOn(kFeatSideline) &&
+                (c2.position.y < 2 || c2.position.y > 12) &&
+                std::abs(c2.position.y - 7) >= std::abs(carrier.position.y - 7)) endsOnEdge = true;
         }
         there /= samples;
-        if (there + 0.02 < here) {
+        // ⭐ P190 (rozbor skavenů 09.10.2026): hledání odvádělo nosiče z DOSTAVĚNÉ klece pro zisk
+        //   dvou setin („tady 0,05, po pohybu 0,03“) — klec měla 4 rohy, po pohybu 2. Stojí-li
+        //   kolem nosiče aspoň tři rohy, musí být zisk znatelný (0,15 = rozdíl třídy rány);
+        //   jinak platí dosavadní mez proti kmitání.
+        const double margin = (cageFeatureOn(kFeatKeepBuiltCage) && corners >= 3) ? kSafeBlitzThreat : 0.02;
+        if (!endsOnEdge && there + margin < here) {
             why = "tam je bezpečněji než tady";
             if (std::getenv("BB_CAGE_DEBUG")) {
                 std::fprintf(stderr, "[cage ctl] riziko ztráty míče: tady %.2f, po pohybu %.2f\n", here, there);
@@ -1117,12 +1132,82 @@ void CageController::planAdvance(const GameState& state) {
     // a nosič šel sám jinam podle tabulky rohů.
     const bool planMoves = plan.valid && plan.step >= 1;
     const bool planSafe = planMoves && plan.blitzThreat <= kSafeBlitzThreat;
+    // ⭐⭐ P190 (rozbor skavenů 09.10.2026: 61 % chybějících rohů = nosič začal tah V KONTAKTU se
+    //   soupeřem, pole rohů drží soupeř nebo leží v jeho zónách, a řadič nosiči nedovolil nic —
+    //   bez hodu z kontaktu odejít nejde; uživatel 08.10.: „u agilních týmů bude převažovat dodge
+    //   a útěk daleko — bude u každého z týmů vyhodnoceno něco jiného jako bezpečnější“; „když
+    //   nosič nemůže skórovat ani být v bezpečí — nesmí nastat“). Nosič stojí v zóně soupeře a
+    //   plán klece ho neochrání ⇒ smí z kontaktu ÚHYBEM tam, kde je po tahu bezpečněji — kamkoli,
+    //   i dozadu ke spoluhráčům. Cena = šance, že úhyb nevyjde × cena pádu + jinak hrozba rány
+    //   na cílovém poli (s rohy, které tam dojdou). Jde jen, když je to znatelně lepší než stát.
+    //   Z čísel hráče, ne z rasy: obratný s Dodge uhne skoro zadarmo, neohrabaný zůstane a bije se.
+    if (cageFeatureOn(kFeatEscapeContact) && !planSafe &&
+        countTacklezones(state, carrier.position, carrier.teamSide, carrier.id) > 0) {
+        const TeamSide side = carrier.teamSide;
+        const double here = planMoves ? plan.blitzThreat : carrierThreatAt(state, carrier, carrier.position);
+        const double fallCost = carrierFallCost(state, carrier, carrier.position);
+        const int budget = static_cast<int>(carrier.movementRemaining);
+        struct Esc { Position sq; double fail; int back; };
+        std::vector<Esc> escs;
+        for (int x = carrier.position.x - budget; x <= carrier.position.x + budget; ++x) {
+            for (int y = std::max(0, carrier.position.y - budget); y <= std::min(14, carrier.position.y + budget); ++y) {
+                const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (!sq.isOnPitch() || sq == carrier.position || state.getPlayerAtPosition(sq)) continue;
+                if (cageFeatureOn(kFeatSideline) && (sq.y < 2 || sq.y > 12) &&
+                    std::abs(sq.y - 7) >= std::abs(carrier.position.y - 7)) continue;
+                if (countTacklezones(state, sq, side, carrier.id) > 0) continue;
+                const double fail = pathFailProb(state, carrier, sq, budget, Position{-1, -1});
+                // nedojde / úhyb sám je dražší než stát / hod horší než 2+ (nevyjde častěji než jednou
+                // ze šesti): neúspěch je turnover na ZAČÁTKU tahu, zbytek týmu by nehrál vůbec
+                if (fail < 0.0 || fail * fallCost >= here || fail > 1.0 / 6.0 + 1e-9) continue;
+                escs.push_back({sq, fail, distToEndzone(sq, side) - distToEndzone(carrier.position, side)});
+            }
+        }
+        // napřed nejlevnější úhyb, pak co nejmenší ústup
+        std::sort(escs.begin(), escs.end(), [](const Esc& a, const Esc& b) {
+            if (std::abs(a.fail - b.fail) > 1e-9) return a.fail < b.fail;
+            return a.back < b.back;
+        });
+        double bestCost = here;
+        Position bestSq{-1, -1};
+        std::tuple<int, int, int> bestTie{0, 0, 0};
+        int costly = 0;                         // drahý výpočet hrozby jen pro pole v dosahu soupeře, nejvýš 30×
+        for (const Esc& e : escs) {
+            if (e.fail * fallCost >= bestCost) continue;
+            const bool reachable = anyOpponentReaches(state, side, e.sq);
+            if (reachable && ++costly > 30) continue;
+            const double cost = e.fail * fallCost +
+                                (reachable ? (1.0 - e.fail) * carrierThreatAt(state, carrier, e.sq) : 0.0);
+            // při stejné ceně: kam dojde víc rohů, pak menší ústup, pak blíž středu
+            const std::tuple<int, int, int> tie{-cornersWithinReach(state, carrier, e.sq), e.back, std::abs(e.sq.y - 7)};
+            if (cost < bestCost - 1e-9 || (bestSq.isOnPitch() && std::abs(cost - bestCost) <= 1e-9 && tie < bestTie)) {
+                bestCost = cost;
+                bestSq = e.sq;
+                bestTie = tie;
+            }
+        }
+        if (bestSq.isOnPitch() && bestCost + 0.05 < here) {
+            if (std::getenv("BB_CAGE_DEBUG")) {
+                std::fprintf(stderr, "[cage ctl] nosič z kontaktu úhybem: (%d,%d) -> (%d,%d), riziko %.2f -> %.2f\n",
+                             carrier.position.x, carrier.position.y, bestSq.x, bestSq.y, here, bestCost);
+            }
+            Macro run{MacroType::REPOSITION, carrier.id, -1, bestSq};
+            run.cageManaged = true;
+            queue_ = {run};
+            stage_ = Stage::AFTER_PICKUP;      // pak dostavět rohy kolem nového místa, pak zaostalci
+            return;
+        }
+    }
     if (!planSafe && cageFeatureOn(kFeatCarrierByCtl)) {
         const Position dest = farthestSafeForward(state, carrier, carrier.movementRemaining, /*forCage=*/true);
         // jde tam jen, když je tam bezpečněji (útěk z dosahu soupeře i klec se počítají stejně)
         const double here = planMoves ? plan.blitzThreat : carrierThreatAt(state, carrier, carrier.position);
         const double there = carrierThreatAt(state, carrier, dest);
-        if (dest != carrier.position && there + 0.02 < here) {
+        // P190: nosič, který je tam, kde stojí, v bezpečí (hrozba ≤ 0,15), sám neodbíhá — ani když
+        // by o pár polí dál byl z dosahu úplně („do té doby má být v kleci“). Odběhl by spoluhráčům
+        // a příští tah by klec nebylo z čeho postavit. Týž princip jako u hledání (forbidsCarrierMove).
+        const bool safeHere = cageFeatureOn(kFeatKeepBuiltCage) && here <= kSafeBlitzThreat;
+        if (dest != carrier.position && !safeHere && there + 0.02 < here) {
             if (std::getenv("BB_CAGE_DEBUG")) {
                 std::fprintf(stderr, "[cage ctl] nosič ke kleci: (%d,%d) -> (%d,%d), riziko %.2f -> %.2f\n",
                              carrier.position.x, carrier.position.y, dest.x, dest.y, here, there);

@@ -1398,3 +1398,81 @@ TEST(OneCageMate, AFillOnlyPlanReportsTheThreatThatRemainsAfterTheFill) {
     ASSERT_TRUE(fill.valid) << "předpoklad: roh jde dostavět";
     EXPECT_GT(fill.blitzThreat, kSafeBlitzThreat) << "soupeř u nosiče má dobrou ránu i po dostavbě";
 }
+
+// P190 (rozbor skavenů 09.10.2026; uživatel: „do té doby má být v kleci“). Kolem nosiče stojí tři
+// rohy a soupeř má jen slabou ránu (dvě kostky, vybírá nosič, 11 %). Útěk vpřed z dosahu by hrozbu
+// srazil na nulu — o jedenáct setin. Kvůli tak malému zisku hledání nosiče z klece neodvede
+// (v měření: klec se čtyřmi rohy opuštěna pro zisk dvou setin, po pohybu dva rohy).
+TEST(OneCageKeep, TheSearchDoesNotTakeTheCarrierOutOfABuiltCageForASmallGain) {
+    auto forbidden = [](unsigned off) {
+        Board b(3);
+        b.put(1, TeamSide::HOME, {12, 7}, 6, 4);
+        b.put(3, TeamSide::HOME, {11, 8}); b.put(4, TeamSide::HOME, {13, 6}); b.put(5, TeamSide::HOME, {13, 8});
+        for (int id : {3, 4, 5}) { b.s.getPlayer(id).hasMoved = true; }      // rohy už v tahu hrály
+        b.put(13, TeamSide::AWAY, {8, 4}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        const double t = blitzThreat(b.s, b.s.getPlayer(1));
+        EXPECT_GT(t, 0.05);
+        EXPECT_LE(t, kSafeBlitzThreat);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        Macro first;
+        cc.next(b.s, first);
+        const bool f = cc.forbidsCarrierMove(b.s, Macro{MacroType::ADVANCE, 1, -1, {-1, -1}});
+        setCageFeaturesOff(0);
+        return f;
+    };
+    EXPECT_TRUE(forbidden(0)) << "nosič zůstává v kleci";
+    EXPECT_FALSE(forbidden(kFeatKeepBuiltCage)) << "pozitivní kontrola: dřív stačil zisk nad dvě setiny";
+}
+
+// Týž požadavek pro řadič samotný: nosič v bezpečí (tři rohy, slabá rána) sám dopředu neodbíhá.
+TEST(OneCageKeep, TheControllerDoesNotRunASafeCarrierOutOfTheCageEither) {
+    auto carrierX = [](unsigned off) {
+        Board b(3);
+        b.put(1, TeamSide::HOME, {12, 7}, 6, 4);
+        b.put(3, TeamSide::HOME, {11, 8}); b.put(4, TeamSide::HOME, {13, 6}); b.put(5, TeamSide::HOME, {13, 8});
+        for (int id : {3, 4, 5}) { b.s.getPlayer(id).hasMoved = true; }
+        b.put(13, TeamSide::AWAY, {8, 4}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        return static_cast<int>(b.s.getPlayer(1).position.x);
+    };
+    EXPECT_EQ(carrierX(0), 12) << "nosič v bezpečí zůstává u rohů";
+    EXPECT_GT(carrierX(kFeatKeepBuiltCage), 12) << "pozitivní kontrola: dřív odběhl sám z dosahu";
+}
+
+// P190 (uživatel 08.10.2026: „u agilních týmů bude převažovat dodge a útěk daleko“; „když nosič
+// nemůže skórovat ani být v bezpečí — nesmí nastat“). Nosič stojí v kontaktu se silnějším soupeřem
+// (rána na jednu kostku, 33 %) a klec kolem něj postavit nejde — spoluhráči stojí o šest polí vzadu.
+// Obratný nosič (úhyb na 2+, nevyjde jednou ze šesti) z kontaktu uhne ke spoluhráčům, kde kolem něj
+// klec vznikne. Méně obratný (úhyb na 3+ a hůř) zůstane: neúspěch je turnover na začátku tahu.
+// Z čísel hráče, ne z rasy.
+TEST(OneCageEscape, AnAgileCarrierDodgesOutOfContactToWhereTheCageCanFormAClumsyOneDoesNot) {
+    auto run = [](int8_t ag, unsigned off, double& threatAfter) {
+        Board b(3);
+        b.put(1, TeamSide::HOME, {12, 7}, 7).stats.agility = ag;
+        b.put(2, TeamSide::HOME, {4, 6}); b.put(3, TeamSide::HOME, {4, 8});      // pohyb 4: k nosiči nedojdou
+        b.put(4, TeamSide::HOME, {6, 6}); b.put(5, TeamSide::HOME, {6, 8});
+        b.put(13, TeamSide::AWAY, {13, 7}, 4, 4);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        threatAfter = blitzThreat(b.s, b.s.getPlayer(1));
+        return b.s.getPlayer(1).position;
+    };
+    double t = 1.0;
+    const Position agile = run(4, 0, t);
+    EXPECT_NE(agile, (Position{12, 7})) << "obratný nosič z kontaktu odešel";
+    EXPECT_LE(t, kSafeBlitzThreat) << "a po tahu je v bezpečí";
+    const Position before = run(4, kFeatEscapeContact, t);
+    EXPECT_EQ(before, (Position{12, 7})) << "pozitivní kontrola: bez úpravy řadič nosiče v kontaktu nechal stát";
+    EXPECT_GT(t, kSafeBlitzThreat);
+    const Position clumsy = run(3, 0, t);
+    EXPECT_EQ(clumsy, (Position{12, 7})) << "nosič s úhybem na 3+ neuhýbá";
+}
