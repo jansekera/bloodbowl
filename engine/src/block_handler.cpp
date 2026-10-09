@@ -414,42 +414,51 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
         return true;
     }
 
-    dest = cand[choosePushSquare(state, cand, count, pusherPos,
-                                 sideStep && !grab, grab && !sideStep,
-                                 pushed, blockingSide)];
+    const int pick = choosePushSquare(state, cand, count, pusherPos,
+                                      sideStep && !grab, grab && !sideStep,
+                                      pushed, blockingSide);
+    dest = cand[pick];
 
-    Player* occupant = state.getPlayerAtPosition(dest);
-    if (occupant && holdsGround(*occupant, blockingSide)) {
-        // The coach picks the direction, so try any other body that will not
-        // dig in before giving the push up.  The end-zone refusal holds here
-        // too -- dodging a Stand Firm jam is not worth conceding a touchdown.
-        for (int i = 0; i < count; i++) {
-            Player* other = state.getPlayerAtPosition(cand[i]);
-            if (other && !holdsGround(*other, blockingSide) &&
-                !pushWouldScore(state, pushed, blockingSide, cand[i])) {
+    // Chain: every candidate is occupied, so the square has to be vacated first.
+    // The coach picks the direction, so the chosen body is tried first and then
+    // any other that will not dig in.  The end-zone refusal holds for those
+    // alternatives too -- dodging a Stand Firm jam is not worth conceding a
+    // touchdown.
+    //
+    // OPRAVENO 09.10.2026 (review P186, M3; vzor PHP d3f2c3ad) — zaseknutí se hlídalo
+    // jen o JEDEN stupeň: když sám hráč v cestě pole nedržel, ale neměl se kam hnout
+    // (za ním jen Stand Firm / zakořenění), zůstal stát a odtlačený byl přesto posunut
+    // NA JEHO POLE — dva hráči na jednom poli a útočník následoval. Pravidla ř. 8514-8516:
+    // „If a player is pushed back into a player with using Stand Firm then neither player
+    // moves“ a ř. 644-646: řetězové odtlačení „is treated exactly like a normal push back“.
+    // Teď se odtlačený pohne jen na pole, které se řetězem OPRAVDU uvolnilo; neuvolní-li
+    // se žádné, nehýbe se nikdo. Neúspěšný pokus stav nemění (vrací se dřív, než kýmkoli
+    // pohne), takže další pole lze zkusit bez vracení.
+    if (!anyEmpty) {
+        bool vacated = false;
+        for (int k = 0; k < count && !vacated && depth < GameState::PLAYERS_TOTAL; k++) {
+            const int i = (k == 0) ? pick : (k <= pick ? k - 1 : k);   // zvolené pole první
+            Player* occupant = state.getPlayerAtPosition(cand[i]);
+            if (!occupant || holdsGround(*occupant, blockingSide)) continue;
+            if (i != pick && pushWouldScore(state, pushed, blockingSide, cand[i])) continue;
+            // "The coach of the moving team decides all push back directions for
+            // secondary push backs unless the pushed player has a skill that
+            // overrides this" — so Side Step carries down the chain, Grab does not
+            // (it only ever applies to the player its owner blocked).
+            Position chainDest;
+            pushOne(state, pushed.position, *occupant,
+                    occupant->hasSkill(SkillName::SideStep), false,
+                    /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
+                    depth + 1);
+            if (occupant->position != cand[i]) {
                 dest = cand[i];
-                occupant = other;
-                break;
+                vacated = true;
             }
         }
-    }
-    if (occupant && holdsGround(*occupant, blockingSide)) {
-        dest = pushed.position;   // "neither player moves"
-        return false;
-    }
-
-    // Chain. Depth is bounded by how many players can stand in a line, and the
-    // guard keeps a corrupt board from recursing forever.
-    if (occupant && depth < GameState::PLAYERS_TOTAL) {
-        // "The coach of the moving team decides all push back directions for
-        // secondary push backs unless the pushed player has a skill that
-        // overrides this" — so Side Step carries down the chain, Grab does not
-        // (it only ever applies to the player its owner blocked).
-        Position chainDest;
-        pushOne(state, pushed.position, *occupant,
-                occupant->hasSkill(SkillName::SideStep), false,
-                /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
-                depth + 1);
+        if (!vacated) {
+            dest = pushed.position;   // "neither player moves"
+            return false;
+        }
     }
 
     emitEvent(events, {GameEvent::Type::PUSH, pushed.id, -1,

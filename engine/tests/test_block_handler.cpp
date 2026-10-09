@@ -1860,3 +1860,94 @@ TEST(BlockHandler, N3bCarrierSurfedAlongTheSidelineIsThrownInFromThatSideline) {
     EXPECT_FALSE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.position, (Position{11, 3}));
 }
+
+// ---------------------------------------------------------------------------
+// STAND FIRM / ZAKOŘENĚNÍ UVNITŘ ŘETĚZU (review P186, M3). Pravidla ř. 8514-8516: „If a player is
+// pushed back into a player with using Stand Firm then neither player moves.“ a ř. 644-646: řetězové
+// odtlačení „is treated exactly like a normal push back as if the second player had been blocked
+// by the first“. Když se tedy druhý v řetězu nemá kam hnout (všechna jeho pole drží Stand Firm),
+// nehne se ani on, ani ten, kdo do něj byl tlačen, a útočník nemá kam následovat.
+// Dřív: zaseknutí se hlídalo jen o jeden stupeň — druhý v řetězu zůstal stát a první byl přesto
+// posunut NA JEHO POLE (dva hráči na jednom poli) a útočník následoval.
+// ---------------------------------------------------------------------------
+TEST(BlockHandler, ChainThatJamsOnStandFirmFurtherDownMovesNobody) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 7}, TeamSide::AWAY);           // bez Stand Firm, ale nemá kam
+    placePlayer(gs, 14, {12, 6}, TeamSide::AWAY);
+    placePlayer(gs, 15, {12, 8}, TeamSide::AWAY);
+    placePlayer(gs, 16, {13, 6}, TeamSide::AWAY);
+    placePlayer(gs, 17, {13, 7}, TeamSide::AWAY);
+    placePlayer(gs, 18, {13, 8}, TeamSide::AWAY);
+    for (int id : {14, 15, 16, 17, 18}) gs.getPlayer(id).skills.add(SkillName::StandFirm);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});               // dvě Pushed
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7})) << "obránce byl posunut na obsazené pole";
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7})) << "útočník nemá kam následovat";
+    for (int i = 1; i <= GameState::PLAYERS_TOTAL; i++) {
+        for (int j = i + 1; j <= GameState::PLAYERS_TOTAL; j++) {
+            const Player& a = gs.getPlayer(i);
+            const Player& b = gs.getPlayer(j);
+            if (a.isOnPitch() && b.isOnPitch()) {
+                EXPECT_NE(a.position, b.position) << "hráči " << i << " a " << j << " na jednom poli";
+            }
+        }
+    }
+}
+
+// Totéž se zakořeněnými (ř. 8578-8579 „may not … be pushed back for any reason“).
+TEST(BlockHandler, ChainThatJamsOnRootedPlayersFurtherDownMovesNobody) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 7}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 6}, TeamSide::AWAY);
+    placePlayer(gs, 15, {12, 8}, TeamSide::AWAY);
+    placePlayer(gs, 16, {13, 6}, TeamSide::AWAY);
+    placePlayer(gs, 17, {13, 7}, TeamSide::AWAY);
+    placePlayer(gs, 18, {13, 8}, TeamSide::AWAY);
+    for (int id : {14, 15, 16, 17, 18}) gs.getPlayer(id).rooted = true;
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 0};
+
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{10, 7}));
+}
+
+// U lajny rozhoduje pořadí z ř. 639-651 (nález 3b): žádné volné pole a jedno mimo hřiště ⇒ dav,
+// i když zbylá pole drží Stand Firm — „neither player moves“ platí jen tam, kde se do hráče se
+// Stand Firm skutečně tlačí, tj. když jsou všechna tři pole na hřišti (shodně s PHP d3f2c3ad).
+TEST(BlockHandler, StandFirmBehindTheDefenderAtTheSidelineDoesNotSaveHimFromTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);
+    gs.getPlayer(13).skills.add(SkillName::StandFirm);
+    gs.getPlayer(14).skills.add(SkillName::StandFirm);
+    gs.ball.isHeld = false;
+    gs.ball.position = {0, 7};
+
+    FixedDiceRoller dice({3, 3, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch());
+    EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 0}));
+    EXPECT_EQ(gs.getPlayer(14).position, (Position{12, 1}));
+}
