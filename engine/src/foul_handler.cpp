@@ -154,9 +154,13 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     // Doubles: fouler ejected (SneakyGit prevents)
     if (isDoubles) {
         if (!fouler.hasSkill(SkillName::SneakyGit)) {
+            // OPRAVENO 09.10.2026 (T5.26) — pozice se nastavila na (−1,−1) DŘÍV, než se míč
+            // pustil, takže se odrážel z pole mimo hřiště. Pravidla ř. 1882-1884: „If the sent
+            // off player was holding the ball, the ball bounces from the square he was standing
+            // in when sent off.“
+            handleBallOnPlayerDown(state, fouler.id, dice, events);
             fouler.setState(PlayerState::EJECTED);
             fouler.position = {-1, -1};
-            handleBallOnPlayerDown(state, fouler.id, dice, events);
             emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},
                               0, false});
         }

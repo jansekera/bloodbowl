@@ -1996,3 +1996,46 @@ TEST(BlockHandler, N17ProneSideStepperInAChainDoesNotChooseHisSquare) {
         EXPECT_EQ(gs.getPlayer(15).position, (Position{13, 7}));
     }
 }
+
+// ---------------------------------------------------------------------------
+// TÝŽ PRINCIP JAKO T5.26 — NOSIČ, KTERÝ PO SRAŽENÍ OPUSTÍ HŘIŠTĚ (KO / zranění). Pravidla
+// ř. 678-681: „A player who is carrying the ball and who is knocked down or placed prone will drop
+// the ball IN THE SQUARE WHERE THEY FALL. The dropped ball will bounce one square in a random
+// direction after the player's armour and injury rolls (if any) are fully resolved.“ Dřív hod na
+// zranění při KO / Casualty nastavil pozici na (−1,−1) a míč se pak pouštěl odtamtud.
+// Kostky: Skull (1) ⇒ padá útočník-nosič na (10,7); brnění 5+4 = 9 > AV 8; zranění; D8 = 7 (západ)
+// ⇒ míč na (9,7). Stará mechanika: z (−1,−1) na západ = mimo hřiště ⇒ vhazování.
+// ---------------------------------------------------------------------------
+TEST(BlockHandler, CarrierRemovedFromThePitchDropsTheBallWhereHeFell) {
+    auto skull = [](int inj1, int inj2, std::vector<int> tail) {
+        GameState gs;
+        gs.phase = GamePhase::PLAY;
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 3, 3, 8);
+        placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+        gs.ball = BallState::carried({10, 7}, 1);
+        std::vector<int> rolls{1, 5, 4, inj1, inj2};
+        rolls.insert(rolls.end(), tail.begin(), tail.end());
+        FixedDiceRoller dice(rolls);
+        BlockParams params{1, 12, false, false};
+        resolveBlock(gs, params, dice, nullptr);
+        EXPECT_EQ(dice.remaining(), 0u) << "jediný odraz, žádné vhazování";
+        return gs;
+    };
+    {   // zranění 4+5 = 9 ⇒ KO
+        const GameState gs = skull(4, 5, {7});
+        ASSERT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+        EXPECT_FALSE(gs.ball.isHeld);
+        EXPECT_EQ(gs.ball.position, (Position{9, 7}));
+    }
+    {   // zranění 6+5 = 11 ⇒ Casualty (tabulka zranění D6 = 3, D8 = 1; pak odraz)
+        const GameState gs = skull(6, 5, {3, 1, 7});
+        ASSERT_FALSE(gs.getPlayer(1).isOnPitch());
+        EXPECT_FALSE(gs.ball.isHeld);
+        EXPECT_EQ(gs.ball.position, (Position{9, 7}));
+    }
+    {   // pozitivní kontrola: zranění 3+4 = 7 ⇒ Stunned, zůstává na hřišti — míč stejně na (9,7)
+        const GameState gs = skull(3, 4, {7});
+        ASSERT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+        EXPECT_EQ(gs.ball.position, (Position{9, 7}));
+    }
+}

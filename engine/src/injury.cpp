@@ -23,6 +23,19 @@ CasualtyResult rollCasualty(DiceRollerBase& dice) {
     }
 }
 
+// Hráč opouští hřiště (KO, lavička, zranění). OPRAVENO 09.10.2026 (týž princip jako T5.26) —
+// pozice se tu nastavila na (−1,−1) a volající pak pouštěl míč přes handleBallOnPlayerDown
+// odtamtud, takže míč sraženého nosiče, který skončil KO nebo zraněný, se odrážel z pole mimo
+// hřiště. Pravidla ř. 678-681: „will drop the ball in the square where they fall. The dropped ball
+// will bounce one square in a random direction after the player's armour and injury rolls (if any)
+// are fully resolved.“ Proto se míč pouští TADY — po hodech, z pole, kde hráč ještě leží.
+static void leavePitch(GameState& state, Player& player, PlayerState newState,
+                       DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    handleBallOnPlayerDown(state, player.id, dice, events);
+    player.setState(newState);
+    player.position = {-1, -1};
+}
+
 int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
                       const InjuryContext& ctx, std::vector<GameEvent>* events,
                       bool* outDoubles) {
@@ -73,10 +86,9 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
                               static_cast<int>(SkillName::ThickSkull), true});
             return injuryRoll;
         }
-        player.setState(PlayerState::KO);
-        player.position = {-1, -1};
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, {}, {},
                           injuryRoll, false, d1, d2});
+        leavePitch(state, player, PlayerState::KO, dice, events);
     } else {
         // Casualty (10+) -- roll on the CASUALTY TABLE (package G, 2026-08-10).
         // Until now a 10+ was flatly INJURED, so death could not occur at all:
@@ -137,8 +149,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
             // was the original Casualty roll) the Apothecary has managed to
             // patch him up ... the player may be moved into the Reserves box."
             if (cas == CasualtyResult::BADLY_HURT) {
-                player.setState(PlayerState::OFF_PITCH);   // Reserves
-                player.position = {-1, -1};
+                leavePitch(state, player, PlayerState::OFF_PITCH, dice, events);   // Reserves
                 return injuryRoll;
             }
         }
@@ -152,15 +163,14 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
             emitEvent(events, {GameEvent::Type::REGENERATION, playerId, -1, {}, {},
                               regenRoll, regenRoll >= 4});
             if (regenRoll >= 4) {
-                player.setState(PlayerState::OFF_PITCH);   // Reserves
-                player.position = {-1, -1};
+                leavePitch(state, player, PlayerState::OFF_PITCH, dice, events);   // Reserves
                 return injuryRoll;
             }
         }
 
-        player.state = (cas == CasualtyResult::DEAD) ? PlayerState::DEAD
-                                                     : PlayerState::INJURED;
-        player.position = {-1, -1};
+        leavePitch(state, player,
+                   (cas == CasualtyResult::DEAD) ? PlayerState::DEAD : PlayerState::INJURED,
+                   dice, events);
         emitEvent(events, {GameEvent::Type::CASUALTY, playerId,
                           static_cast<int>(cas), {}, {},
                           injuryRoll, cas == CasualtyResult::DEAD, d1, d2});
