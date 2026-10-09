@@ -1304,3 +1304,32 @@ TEST(KickoffBlitzLanding, MacrosOfferSquaresAroundTheLandingButNoPickup) {
     }
     EXPECT_TRUE(aroundLanding) << "žádné makro nevede hráče k místu dopadu";
 }
+
+// Hlídka (09.10.2026, podle oprav PHP 1fe2937e). ř. 1347-1349: „Decide randomly which player in the
+// other team was hit (only players on the pitch are eligible)“ — kterýkoli z jedenácti, ne jen
+// prvních šest. Domácí 5 > hosté 2 ⇒ kámen na hosty; výběr 2D6 (2,2) ⇒ index 7 = osmý hráč;
+// zranění 6+6 = Casualty.
+TEST(KickoffTable, ThrowARockCanHitAPlayerBeyondTheSixth) {
+    auto gs = kickFixture();
+    std::vector<int> away;
+    gs.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) { away.push_back(p.id); });
+    ASSERT_EQ(away.size(), 11u);
+    FixedDiceRoller dice(onThree(5, 6, {5, 2, 2, 2, 6, 6, 1, 1, 3, 3, 3}));
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_FALSE(gs.getPlayer(away[7]).isOnPitch()) << "osmý hráč zasažen a zraněn";
+    for (int i = 0; i < 11; i++)
+        if (i != 7) EXPECT_TRUE(gs.getPlayer(away[i]).isOnPitch()) << "hráč " << i << " zasažen být neměl";
+}
+
+// Hlídka (09.10.2026). ř. 1347-1349: „only players on the pitch are eligible“ — způsobilý je každý
+// hráč NA HŘIŠTI, i ležící (dřív se losovalo jen ze stojících). Týž los jako výše, osmý hráč leží.
+TEST(KickoffTable, ThrowARockCanHitAPlayerOnTheGround) {
+    auto gs = kickFixture();
+    std::vector<int> away;
+    gs.forEachOnPitch(TeamSide::AWAY, [&](const Player& p) { away.push_back(p.id); });
+    ASSERT_EQ(away.size(), 11u);
+    gs.getPlayer(away[7]).state = PlayerState::PRONE;
+    FixedDiceRoller dice(onThree(5, 6, {5, 2, 2, 2, 6, 6, 1, 1, 3, 3, 3}));
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_FALSE(gs.getPlayer(away[7]).isOnPitch()) << "ležící hráč zasažen a zraněn";
+}
