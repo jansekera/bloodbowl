@@ -1951,3 +1951,48 @@ TEST(BlockHandler, StandFirmBehindTheDefenderAtTheSidelineDoesNotSaveHimFromTheC
     EXPECT_EQ(gs.getPlayer(13).position, (Position{12, 0}));
     EXPECT_EQ(gs.getPlayer(14).position, (Position{12, 1}));
 }
+
+// ---------------------------------------------------------------------------
+// NÁLEZ 17 (audit parity 08.10.2026) — SIDE STEP VLEŽE V ŘETĚZU. Pravidla ř. 1824-1825: „Only
+// Extraordinary skills work when a player is Prone or Stunned.“ Side Step (Agility) tedy ležícímu
+// neplatí a směr řetězového odtlačení volí trenér týmu na tahu (ř. 647-649). Dřív si pole vybíral
+// i ležící hráč se Side Step (týž princip jako P68 u Stand Firm).
+// Rozestavení: obránce 12 je tlačen do 13 na (12,7); tři pole za 13 jsou obsazená, volná jsou jen
+// (11,6) a (11,8) směrem K útočníkovi — tam smí jen Side Step. Bez něj řetěz pokračuje přes (13,7).
+// ---------------------------------------------------------------------------
+TEST(BlockHandler, N17ProneSideStepperInAChainDoesNotChooseHisSquare) {
+    auto chained = [](PlayerState stateOf13) {
+        GameState gs;
+        gs.phase = GamePhase::PLAY;
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 8);
+        placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+        placePlayer(gs, 13, {12, 7}, TeamSide::AWAY);
+        gs.getPlayer(13).skills.add(SkillName::SideStep);
+        gs.getPlayer(13).state = stateOf13;
+        placePlayer(gs, 2, {12, 6}, TeamSide::HOME);
+        placePlayer(gs, 3, {12, 8}, TeamSide::HOME);
+        placePlayer(gs, 14, {13, 6}, TeamSide::AWAY);
+        placePlayer(gs, 15, {13, 7}, TeamSide::AWAY);
+        placePlayer(gs, 16, {13, 8}, TeamSide::AWAY);
+        gs.ball.isHeld = false;
+        gs.ball.position = {0, 0};
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3});           // Pushed na všech kostkách
+        BlockParams params{1, 12, false, false};
+        resolveBlock(gs, params, dice, nullptr);
+        return gs;
+    };
+    {
+        const GameState gs = chained(PlayerState::PRONE);
+        EXPECT_EQ(gs.getPlayer(13).position, (Position{13, 7})) << "ležící si pole nevybírá";
+        EXPECT_EQ(gs.getPlayer(15).position, (Position{14, 7})) << "řetěz pokračuje rovně";
+    }
+    {
+        const GameState gs = chained(PlayerState::STUNNED);
+        EXPECT_EQ(gs.getPlayer(13).position, (Position{13, 7})) << "omráčený si pole nevybírá";
+    }
+    {   // pozitivní kontrola: STOJÍCÍ se Side Step v řetězu ukročí na volné pole a řetěz skončí
+        const GameState gs = chained(PlayerState::STANDING);
+        EXPECT_EQ(gs.getPlayer(13).position.x, 11);
+        EXPECT_EQ(gs.getPlayer(15).position, (Position{13, 7}));
+    }
+}

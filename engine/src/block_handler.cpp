@@ -375,6 +375,15 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
         && p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
 }
 
+// Side Step jen STOJÍCÍ. OPRAVENO 09.10.2026 (audit parity 08.10., nález 17) — v řetězu
+// a v pushAwayFrom se četlo holé `hasSkill(SideStep)`, takže si pole vybíral i ležící
+// nebo omráčený hráč. Pravidla ř. 1824-1825: „Only Extraordinary skills work when a
+// player is Prone or Stunned.“ (Side Step je Agility.) Týž princip jako P68 u Stand Firm
+// v holdsGround. Jedno místo pro všechna tři čtení.
+static bool canSideStep(const Player& p) {
+    return p.state == PlayerState::STANDING && p.hasSkill(SkillName::SideStep);
+}
+
 static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                     bool sideStep, bool grab, bool resolveSurfHere,
                     TeamSide blockingSide, DiceRollerBase& dice, Position& dest,
@@ -447,7 +456,7 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
             // (it only ever applies to the player its owner blocked).
             Position chainDest;
             pushOne(state, pushed.position, *occupant,
-                    occupant->hasSkill(SkillName::SideStep), false,
+                    canSideStep(*occupant), false,
                     /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
                     depth + 1);
             if (occupant->position != cand[i]) {
@@ -494,7 +503,7 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         }
     }
 
-    bool sideStep = defender.hasSkill(SkillName::SideStep);
+    bool sideStep = canSideStep(defender);
     // "Grab only works on a Block Action" and "Grab and Side Step will cancel
     // each other out and the standard pushback rules apply".
     bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
@@ -510,7 +519,7 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
     if (holdsGround(pushed, pusher.teamSide)) return false;
     Position dest;
     const bool surf = pushOne(state, pusher.position, pushed,
-                              pushed.hasSkill(SkillName::SideStep), /*grab=*/false,
+                              canSideStep(pushed), /*grab=*/false,
                               /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
                               events, 0);
     if (!surf) return false;
