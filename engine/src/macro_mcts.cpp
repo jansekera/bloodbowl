@@ -1277,6 +1277,13 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
         // No actions from expansion — fall back to END_TURN. Po K6 kroku 2 se
         // sem dojde teprve, kdyz ANI JEDNO nabidnute makro akce nedalo.
         ++g_k6Noop[3];
+        // Záznam rozhodnutí má říkat, co se ODEHRÁLO: konec tahu, protože nic z nabídky
+        // nešlo provést. Co hledání chtělo, zůstává vidět v `children` (návštěvy).
+        // Příklad (test_plan_rika_proc_macro_mcts_ano_greedy_ne, semínko 5): hledání
+        // zvolí REPOSITION hráče, který právě blitzoval a stojí v zóně; rozbalení krok
+        // odmítne (P149, úhyb 4+ a horší) a jiné makro než END_TURN v nabídce není.
+        lastDecision_.macro = Macro{MacroType::END_TURN, -1, -1, {-1, -1}};
+        lastDecision_.source = MacroDecisionInfo::Source::NO_ACTIONS;
         return Action{ActionType::END_TURN, -1, -1, {-1, -1}};
     }
 

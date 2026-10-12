@@ -485,3 +485,99 @@ TEST(CoachChoicePass, PassSkillStaysAutomatic) {
     EXPECT_NO_THROW(resolvePass(gs, 1, {8, 7}, dice, nullptr));
     EXPECT_EQ(gs.homeTeam.rerolls, 3);
 }
+
+// ───────────── hody velkých hráčů a kostka silnějšího obránce ─────────────
+#include "bb/big_guy_handler.h"
+
+static GameState ogre() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.rerolls = 1;
+    placePlayer(gs, 1, {10, 7});
+    gs.getPlayer(1).skills.add(SkillName::BoneHead);
+    gs.getPlayer(1).skills.add(SkillName::Loner);
+    return gs;
+}
+
+TEST(CoachChoiceBigGuy, AiNeverRerollsBoneHead) {
+    GameState gs = ogre();
+    FixedDiceRoller dice({1, 6, 6});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
+    EXPECT_FALSE(r.proceed);
+    EXPECT_EQ(gs.homeTeam.rerolls, 1);
+    EXPECT_EQ(dice.remaining(), 2u);
+}
+
+TEST(CoachChoiceBigGuy, CoachIsOfferedTheReroll) {
+    GameState gs = ogre();
+    FixedDiceRoller dice({1, 6, 6});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr); FAIL(); }
+    catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::REROLL);
+        EXPECT_EQ(p.roll, 1);
+        EXPECT_EQ(p.target, 2);
+    }
+}
+
+TEST(CoachChoiceBigGuy, LonerPasses_RerollSavesTheAction) {
+    GameState gs = ogre();
+    FixedDiceRoller dice({1, 4, 5});   // Bone Head 1, Loner 4, přehoz 5
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
+    EXPECT_TRUE(r.proceed);
+    EXPECT_FALSE(gs.getPlayer(1).lostTacklezones);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}
+
+TEST(CoachChoiceBigGuy, LonerFails_RerollLost_ActionStillWasted) {
+    GameState gs = ogre();
+    FixedDiceRoller dice({1, 3, 5});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
+    EXPECT_FALSE(r.proceed);
+    EXPECT_TRUE(gs.getPlayer(1).lostTacklezones);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+    EXPECT_EQ(dice.remaining(), 1u);
+}
+
+TEST(CoachChoiceBigGuy, CoachKeeps_NothingSpent) {
+    GameState gs = ogre();
+    FixedDiceRoller dice({1, 6});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+    auto r = resolveBigGuyCheck(gs, 1, ActionType::BLOCK, dice, nullptr);
+    EXPECT_FALSE(r.proceed);
+    EXPECT_EQ(gs.homeTeam.rerolls, 1);
+}
+
+TEST(CoachChoiceBlock, StrongerDefender_HisCoachPicksTheDie) {
+    GameState gs = blockPair();
+    gs.getPlayer(12).stats.strength = 4;   // ST3 × ST4 ⇒ 2 kostky, vybírá obránce
+    {
+        FixedDiceRoller dice({1, 6, 1, 1, 1, 1});
+        CoachChoiceScope scope(TeamSide::AWAY, {});
+        try { block(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+            EXPECT_EQ(p.question, CoachQuestion::BLOCK_FACE);
+            EXPECT_EQ(p.playerId, 12);
+            EXPECT_EQ(p.options, (1 << static_cast<int>(BlockDiceFace::ATTACKER_DOWN)) |
+                                 (1 << static_cast<int>(BlockDiceFace::DEFENDER_DOWN)));
+        }
+    }
+    GameState gs2 = blockPair();
+    gs2.getPlayer(12).stats.strength = 4;
+    FixedDiceRoller dice({1, 6, 1, 1, 1, 1});
+    // kouč obránce vezme Defender Down (proti svému zájmu) -- engine by vzal lebku
+    CoachChoiceScope scope(TeamSide::AWAY, {static_cast<int>(BlockDiceFace::DEFENDER_DOWN)});
+    block(gs2, dice);
+    EXPECT_EQ(gs2.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(CoachChoiceBlock, StrongerDefenderOfTheOtherSide_StaysAutomatic) {
+    GameState gs = blockPair();
+    gs.getPlayer(12).stats.strength = 4;
+    FixedDiceRoller dice({1, 6, 1, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});   // HOME: jen dotaz na přehoz? rerolly 0 ⇒ žádný
+    EXPECT_NO_THROW(block(gs, dice));
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);          // obránce (engine) vzal lebku
+}

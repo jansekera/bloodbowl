@@ -11,11 +11,30 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     Player& player = state.getPlayer(playerId);
     BigGuyResult result;
 
-    // BoneHead: D6, 1=fail → lostTZ + hasActed + hasMoved
-    if (player.hasSkill(SkillName::BoneHead)) {
+    // Hod velkého hráče + událost. P130 (uživatel 12.10.2026): v živé partii smí KOUČ
+    // neúspěšný hod přehodit (týmový reroll -- u Lonera napřed 4+ --, případně Pro);
+    // AI ho dál NEPŘEHAZUJE ("může vyhodnotit, že to za to nestojí").
+    auto bigGuyRoll = [&](int target, SkillName skill) {
         int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::BoneHead), roll >= 2, roll});
+                          static_cast<int>(skill), roll >= target, roll});
+        if (roll < target && coachDecides(player.teamSide)) {
+            const int original = roll;
+            bool viaPro = false;
+            const bool teamAllowed = player.teamSide == state.activeTeam && !state.kickoffInProgress;
+            if (coachAskReroll(state, player, dice, CoachQuestion::REROLL, -1, roll, target,
+                               teamAllowed, events, viaPro)) {
+                roll = dice.rollD6();
+                emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 0,
+                                  roll >= target, original, roll});
+            }
+        }
+        return roll;
+    };
+
+    // BoneHead: D6, 1=fail → lostTZ + hasActed + hasMoved
+    if (player.hasSkill(SkillName::BoneHead)) {
+        int roll = bigGuyRoll(2, SkillName::BoneHead);
         if (roll >= 2) {
             // M3: "until he manages to roll a 2 OR BETTER at the start of a
             // future Action" (r. 7985-7986) -- uspesny hod stav ukoncuje.
@@ -63,9 +82,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         }
 
         int target = hasAdjacentAlly ? 2 : 4;
-        int roll = dice.rollD6();
-        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::ReallyStupid), roll >= target, roll});
+        int roll = bigGuyRoll(target, SkillName::ReallyStupid);
         if (roll >= target) {
             // M3: r. 8404-8405, "until he manages to roll a successful result
             // for a Really Stupid roll at the start of a future Action".
@@ -95,9 +112,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         bool hitting = (actionType == ActionType::BLOCK ||
                         actionType == ActionType::BLITZ);
         int target = hitting ? 2 : 4;
-        int roll = dice.rollD6();
-        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::WildAnimal), roll >= target, roll});
+        int roll = bigGuyRoll(target, SkillName::WildAnimal);
         if (roll < target) {
             // WildAnimal keeps tacklezones (unlike BoneHead/ReallyStupid)
             player.hasActed = true;
@@ -118,9 +133,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     // players without following-up as part of a Block Action") a zakazuje ho
     // jen po neuspesnem hodu v ramci BLITZE.
     if (player.hasSkill(SkillName::TakeRoot) && !player.rooted) {
-        int roll = dice.rollD6();
-        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::TakeRoot), roll >= 2, roll});
+        int roll = bigGuyRoll(2, SkillName::TakeRoot);
         if (roll == 1) {
             // l. 8574-8576: MA = 0 az do konce drivu (nebo do srazeni).
             player.rooted = true;
@@ -162,9 +175,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
     // AUTO-KO Thralla a z upira bez Thralla take KO, a ani jedno nebylo
     // turnover. Pravidlo rika neco jineho na obou stranach.
     if (player.hasSkill(SkillName::Bloodlust) && !player.bloodlustHungry) {
-        int roll = dice.rollD6();
-        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(SkillName::Bloodlust), roll >= 2, roll});
+        int roll = bigGuyRoll(2, SkillName::Bloodlust);
         if (roll == 1) {
             // ⛔ P71 (30.09.2026), vzor PHP 9e980cac. r. 7929-7936: upir akci
             //   DOKONCI a krmi se az na jejim konci ("at the end of the action,

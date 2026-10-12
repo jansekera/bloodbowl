@@ -990,6 +990,21 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         }
     }
 
+    // P130 (uživatel 12.10.2026: "ať je to podle pravidel"): když je obránce silnější,
+    // kostku vybírá JEHO kouč (l. 566-570) -- v živé partii se ho engine zeptá.
+    if (!diceInfo.attackerChooses && coachDecides(def.teamSide)) {
+        bool differ = false;
+        int opts = 0;
+        for (int i = 0; i < diceInfo.count; i++) {
+            differ = differ || faces[i] != faces[0];
+            opts |= 1 << static_cast<int>(faces[i]);
+        }
+        if (differ) {
+            chosen = static_cast<BlockDiceFace>(
+                askCoach(CoachQuestion::BLOCK_FACE, def.id, att.id, packFaces(), diceInfo.count, opts));
+        }
+    }
+
     if (g_manualFace >= 0 && diceInfo.attackerChooses) {   // kouč vybral kostku (jen z hozených)
         for (int i = 0; i < diceInfo.count; i++)
             if (static_cast<int>(faces[i]) == g_manualFace) { chosen = faces[i]; break; }

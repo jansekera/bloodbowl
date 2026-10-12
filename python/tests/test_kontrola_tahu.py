@@ -376,8 +376,10 @@ def test_plan_rika_proc_macro_mcts_ano_greedy_ne():
     kroky = kt.plan_tahu(s, ai="macro_mcts", seed=5)[0]
     assert "macro" in kroky[0], "první krok tahu vždy začíná novým rozhodnutím"
     rozhodnuti = [k["macro"] for k in kroky if "macro" in k]
-    assert all(m["type"] in MAKRA and m["source"] in ("cage", "search", "rescue", "greedy_fallback")
+    assert all(m["type"] in MAKRA and m["source"] in ("cage", "search", "rescue", "greedy_fallback", "no_actions")
                for m in rozhodnuti)
+    # „no_actions“ = nic z nabídky nešlo provést; takové rozhodnutí je vždy konec tahu
+    assert all(m["type"] == "END_TURN" for m in rozhodnuti if m["source"] == "no_actions")
     # krok, kterým AI tah sama končí, nese rozhodnutí END_TURN (hráče makra nehlídáme: BLITZ a BLOCK
     # ho v makru nemají, útočníka vybírá až rozbalení)
     if kroky[-1]["action"].type == bb.ActionType.END_TURN and "macro" in kroky[-1]:

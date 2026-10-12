@@ -87,7 +87,10 @@ struct MacroChildVisitInfo {
 // P149 (06.10.2026): PROČ padla akce — které makro ji vyvolalo a kdo o něm rozhodl.
 // Jen diagnostika (vazba ai_plan_turn ji přikládá ke kroku plánu), hru neovlivňuje.
 struct MacroDecisionInfo {
-    enum class Source : uint8_t { CAGE, SEARCH, RESCUE, GREEDY_FALLBACK };
+    // NO_ACTIONS (12.10.2026): ani zvolené makro, ani žádné jiné z nabídky nedalo akci,
+    // tah proto končí. Dřív záznam tvrdil zvolené makro (např. REPOSITION) se zdrojem
+    // SEARCH, ačkoli se odehrál END_TURN. APPEND ONLY -- bb_module.cpp mapuje pořadím.
+    enum class Source : uint8_t { CAGE, SEARCH, RESCUE, GREEDY_FALLBACK, NO_ACTIONS };
     Macro macro;                 // makro, které se rozbalilo do plánu (po případné záchraně K6)
     Source source = Source::SEARCH;
     std::vector<MacroChildVisitInfo> children;   // děti kořene hledání; prázdné u makra klece
