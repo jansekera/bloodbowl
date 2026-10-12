@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bb/coach_choice.h"
 #include "bb/game_state.h"
 #include "bb/dice.h"
 #include "bb/game_event.h"
@@ -101,6 +102,14 @@ Position looseBallSquare(const GameState& state);
 
 // Reroll chain: skill → Pro → team reroll (with Loner gate)
 // skillReroll = SKILL_COUNT means no skill reroll available
+// P130: zeptá se kouče na přehoz (nechat / tým / Pro) a vyřídí jeho cenu --
+// spotřebu týmového rerollu, Loner 4+, hod na Pro i jeho případný přehoz.
+// Vrací true, když se má hod PŘEHODIT (přehoz hází volající). Když není co
+// nabídnout, neptá se a vrací false. `viaPro` = přehoz jde na účet Pro.
+bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
+                    CoachQuestion question, int otherId, int shown, int target,
+                    bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);
+
 bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  int target, SkillName skillReroll,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,

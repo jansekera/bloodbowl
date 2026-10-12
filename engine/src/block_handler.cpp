@@ -1,3 +1,4 @@
+#include "bb/coach_choice.h"
 #include "bb/block_handler.h"
 #include <cmath>
 #include "bb/helpers.h"
@@ -259,6 +260,7 @@ thread_local Position g_manualBlitzSquare{-1, -1};
 // spotřebuje se na jednom bloku) a zda útočník NEPOUŽIJE Tackle (ř. 8569-8571: „…and uses the Tackle skill“).
 thread_local int g_manualFace = -1;
 thread_local bool g_manualNoTackle = false;
+thread_local Position g_manualSideStep{-1, -1};   // P130: pole, kam Side Step uhne
 }  // namespace
 
 void setManualPushChoice(Position p) { g_manualPush = p; }
@@ -266,13 +268,14 @@ void setManualFollowUp(bool follow) { g_manualFollowUp = follow ? 1 : 0; }
 void setManualBlitzSquare(Position p) { g_manualBlitzSquare = p; }
 void setManualBlockFace(int face) { g_manualFace = face; }
 void setManualNoTackle(bool noTackle) { g_manualNoTackle = noTackle; }
+void setManualSideStepSquare(Position p) { g_manualSideStep = p; }
 Position takeManualBlitzSquare() {
     const Position p = g_manualBlitzSquare;
     g_manualBlitzSquare = {-1, -1};
     return p;
 }
 ManualBlockChoices saveManualBlockChoices() {
-    return {g_manualPush, g_manualFollowUp, g_manualBlitzSquare, g_manualFace, g_manualNoTackle};
+    return {g_manualPush, g_manualFollowUp, g_manualBlitzSquare, g_manualFace, g_manualNoTackle, g_manualSideStep};
 }
 void restoreManualBlockChoices(const ManualBlockChoices& c) {
     g_manualPush = c.push;
@@ -280,6 +283,7 @@ void restoreManualBlockChoices(const ManualBlockChoices& c) {
     g_manualBlitzSquare = c.blitzSquare;
     g_manualFace = c.face;
     g_manualNoTackle = c.noTackle;
+    g_manualSideStep = c.sideStep;
 }
 void clearManualBlockChoices() {
     restoreManualBlockChoices(ManualBlockChoices{});   // výchozí = „nezvoleno“, jen ve struct
@@ -306,6 +310,15 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         }
     }
 
+    // P130: pole pro Side Step má vlastní volbu (`sidestep`), ne `push` -- jinak by
+    // se pole zvolené útočníkem použilo jako volba obránce a naopak.
+    if (defenderChooses && coachDecides(pushed.teamSide) && g_manualSideStep.isOnPitch()) {
+        const Position want = g_manualSideStep;
+        g_manualSideStep = {-1, -1};
+        for (int i = 0; i < count; i++) {
+            if (cand[i] == want && !(anyEmpty && state.getPlayerAtPosition(cand[i]))) return i;
+        }
+    }
     if (!defenderChooses && g_manualPush.isOnPitch()) {
         const Position want = g_manualPush;
         g_manualPush = {-1, -1};
@@ -371,8 +384,14 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
     if (p.rooted) return true;
     // Stand Firm jen STOJICI: "Only Extraordinary skills work when a player is
     // Prone or Stunned" (r. 1824-1825). P68 (30.09.2026), vzor PHP 3cec72e2.
-    return p.state == PlayerState::STANDING
-        && p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide;
+    if (!(p.state == PlayerState::STANDING
+          && p.hasSkill(SkillName::StandFirm) && p.teamSide != blockingSide)) return false;
+    // P130: v živé partii volí kouč ("may choose to not be pushed back",
+    // l. 8511) -- nechat se odtlačit může chtít kvůli pasti na Frenzy nebo
+    // řetězovému odtlačení (uživatel 12.10.).
+    if (coachDecides(p.teamSide))
+        return askCoach(CoachQuestion::USE_STAND_FIRM, p.id, -1, 0, 0, 3) == 1;
+    return true;
 }
 
 // Side Step jen STOJÍCÍ. OPRAVENO 09.10.2026 (audit parity 08.10., nález 17) — v řetězu
@@ -382,6 +401,15 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
 // v holdsGround. Jedno místo pro všechna tři čtení.
 static bool canSideStep(const Player& p) {
     return p.state == PlayerState::STANDING && p.hasSkill(SkillName::SideStep);
+}
+
+// P130: Side Step je volba ("his coach MAY choose", l. 8471-8473). V živé partii
+// se kouč odtlačeného ptá; pole pak určí příkazem `sidestep` (jinak co nejdál od útočníka).
+static bool usesSideStep(const Player& p) {
+    if (!canSideStep(p)) return false;
+    if (coachDecides(p.teamSide))
+        return askCoach(CoachQuestion::USE_SIDE_STEP, p.id, -1, 0, 0, 3) == 1;
+    return true;
 }
 
 static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
@@ -456,7 +484,7 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
             // (it only ever applies to the player its owner blocked).
             Position chainDest;
             pushOne(state, pushed.position, *occupant,
-                    canSideStep(*occupant), false,
+                    usesSideStep(*occupant), false,
                     /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
                     depth + 1);
             if (occupant->position != cand[i]) {
@@ -497,7 +525,10 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     // StandFirm check (Juggernaut ignores on blitz)
     if (defender.hasSkill(SkillName::StandFirm)) {
         bool juggernautOverride = isBlitz && attacker.hasSkill(SkillName::Juggernaut);
-        if (!juggernautOverride) {
+        // P130: v živé partii volí kouč obránce, jestli Stand Firm použije.
+        const bool declined = !juggernautOverride && coachDecides(defender.teamSide) &&
+            askCoach(CoachQuestion::USE_STAND_FIRM, defender.id, attacker.id, 0, 0, 3) == 0;
+        if (!juggernautOverride && !declined) {
             pushDest = defender.position;
             return false; // no push
         }
@@ -508,6 +539,7 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     // each other out and the standard pushback rules apply".
     bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
     if (sideStep && grab) { sideStep = false; grab = false; }
+    if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
 
     return pushOne(state, attacker.position, defender, sideStep, grab,
                    /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
@@ -519,7 +551,7 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
     if (holdsGround(pushed, pusher.teamSide)) return false;
     Position dest;
     const bool surf = pushOne(state, pusher.position, pushed,
-                              canSideStep(pushed), /*grab=*/false,
+                              usesSideStep(pushed), /*grab=*/false,
                               /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
                               events, 0);
     if (!surf) return false;
@@ -849,8 +881,44 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         chosen = BlockDiceFace::PUSHED;
     }
 
+    // P130: v živé partii se kouč útočníka ptá PO KAŽDÉM hodu kostek, ještě
+    // před výběrem kostky a před push/follow -- co je u bloku "neúspěch", ví
+    // jen on (uživatel 10.10.: chce třeba jiný výsledek kvůli vytlačení do davu).
+    // Přehoz hází VŠECHNY kostky znovu (l. 920).
+    const bool coachAttacker = coachDecides(att.teamSide);
+    auto packFaces = [&]() {
+        int packed = 0;
+        for (int i = 0; i < diceInfo.count; i++) packed |= (static_cast<int>(faces[i]) + 1) << (3 * i);
+        return packed;
+    };
+    if (coachAttacker) {
+        const int before = packFaces();
+        bool viaPro = false;
+        if (coachAskReroll(state, att, dice, CoachQuestion::BLOCK_REROLL, def.id, before,
+                           diceInfo.count, /*teamAllowed=*/true, events, viaPro)) {
+            for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
+            emitEvent(events, {GameEvent::Type::REROLL, att.id, def.id, {}, {}, 0,
+                              true, before, packFaces()});
+        }
+        chosen = autoChooseBlockDie(faces, diceInfo.count, diceInfo.attackerChooses, att, def);
+        // Výběr kostky: kouč vidí hozené kostky a vybere (jen když vybírá útočník
+        // a je z čeho). Starší příkaz `kostka` (g_manualFace) má přednost.
+        bool differ = false;
+        for (int i = 1; i < diceInfo.count; i++) differ = differ || faces[i] != faces[0];
+        if (diceInfo.attackerChooses && differ && g_manualFace < 0) {
+            int opts = 0;
+            for (int i = 0; i < diceInfo.count; i++) opts |= 1 << static_cast<int>(faces[i]);
+            chosen = static_cast<BlockDiceFace>(
+                askCoach(CoachQuestion::BLOCK_FACE, att.id, def.id, packFaces(), diceInfo.count, opts));
+        }
+        if (chosen == BlockDiceFace::BOTH_DOWN && params.isBlitz &&
+            att.hasSkill(SkillName::Juggernaut)) {
+            chosen = BlockDiceFace::PUSHED;
+        }
+    }
+
     // Pro/team reroll on bad result
-    if (shouldRerollBlock(chosen, att)) {
+    if (!coachAttacker && shouldRerollBlock(chosen, att)) {
         bool rerolled = false;
 
         // Pro reroll
@@ -990,8 +1058,13 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // Juggernaut na blitzu rusi Wrestle OBRANCE (rules parity 10.08.):
             // "the opposing player may not use his Fend, Stand Firm or Wrestle
             // skills against the Juggernaut player's blocks."
-            bool defWrestle = defWantsWrestle &&
+            const bool defWrestleAllowed = def.hasSkill(SkillName::Wrestle) &&
                               !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
+            bool defWrestle = defWantsWrestle && defWrestleAllowed;
+            // P130: Wrestle obránce je v živé partii volba jeho kouče.
+            if (defWrestleAllowed && coachDecides(def.teamSide)) {
+                defWrestle = askCoach(CoachQuestion::USE_WRESTLE, def.id, att.id, 0, 0, 3) == 1;
+            }
             bool attWrestle = attWantsWrestle;
 
             if (defWrestle || attWrestle) {
@@ -1072,7 +1145,14 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // Dodge saves: DS → PUSHED (unless Tackle)
             // Tackle, l. 8569-8571: "...nor may they use their Dodge skill if
             // the player throws a block at them and uses the Tackle skill."
-            if (def.hasSkill(SkillName::Dodge) && !(att.hasSkill(SkillName::Tackle) && !g_manualNoTackle)) {
+            // P130: Dodge je volba obránce (l. 985, 1820) -- bez něj je odtlačen
+            // A PAK sražen (l. 524-527), takže Frenzy nedostane druhý blok.
+            bool useDodge = def.hasSkill(SkillName::Dodge) &&
+                            !(att.hasSkill(SkillName::Tackle) && !g_manualNoTackle);
+            if (useDodge && coachDecides(def.teamSide)) {
+                useDodge = askCoach(CoachQuestion::USE_DODGE, def.id, att.id, 0, 0, 3) == 1;
+            }
+            if (useDodge) {
                 defPushed = true; // just a push
             } else {
                 defPushed = true;

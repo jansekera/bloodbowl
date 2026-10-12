@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include "bb/coach_choice.h"
 #include "bb/cage_advance.h"
 #include "bb/block_handler.h"
 #include <pybind11/stl.h>
@@ -440,6 +441,9 @@ PYBIND11_MODULE(bb_engine, m) {
     });
     m.def("set_manual_block_face", [](int face) { bb::setManualBlockFace(face); });
     m.def("set_manual_no_tackle", [](bool v) { bb::setManualNoTackle(v); });
+    m.def("set_manual_side_step", [](int x, int y) {
+        bb::setManualSideStepSquare(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
+    });
     m.def("clear_manual_block_choices", []() { bb::clearManualBlockChoices(); });
 
     m.def("execute_action", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
@@ -457,7 +461,7 @@ PYBIND11_MODULE(bb_engine, m) {
             "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
             "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
             "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
-            "BLOODLUST_FEED"};
+            "BLOODLUST_FEED", "REROLL"};
         py::list ev;
         for (const auto& e : events) {
             py::dict d;
@@ -480,6 +484,50 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::DiceRollerBase& base = dice;
         bb::ActionResult r = bb::executeAction(state, action, base, &events);
         return py::make_tuple(r, eventsToList(events));
+    });
+
+    // P130 (12.10.2026): akce živé partie, ve které za stranu `coach_side` rozhoduje
+    // KOUČ -- přehoz (nechat / tým / Pro), výběr kostky bloku a volitelné skilly obránce
+    // (Dodge, Wrestle, Stand Firm, Side Step). `answers` = dosavadní odpovědi v pořadí
+    // otázek. Vrací (výsledek, události, None), nebo -- když akce narazí na otázku bez
+    // odpovědi -- (None, události do té chvíle, otázka). V tom případě se stav, kostky
+    // i ruční volby VRÁTÍ do stavu před akcí; volající odpověď přidá a zavolá znovu.
+    // Totéž při chybě (neplatná odpověď): nic se nezmění a výjimka jde dál.
+    m.def("execute_action_coach", [eventsToList](bb::GameState& state, const bb::Action& action,
+                                                 bb::DiceRoller& dice, bb::TeamSide coachSide,
+                                                 const std::vector<int>& answers) {
+        const bb::GameState stateBefore = state;
+        const bb::DiceRoller diceBefore = dice;
+        const bb::ManualBlockChoices manualBefore = bb::saveManualBlockChoices();
+        std::vector<bb::GameEvent> events;
+        bb::DiceRollerBase& base = dice;
+        auto restore = [&]() {
+            state = stateBefore;
+            dice = diceBefore;
+            bb::restoreManualBlockChoices(manualBefore);
+        };
+        try {
+            bb::CoachChoiceScope scope(coachSide, answers);
+            bb::ActionResult r = bb::executeAction(state, action, base, &events);
+            return py::make_tuple(py::cast(r), eventsToList(events), py::none());
+        } catch (const bb::CoachChoicePending& q) {
+            restore();
+            py::dict d;
+            static const char* names[] = {"REROLL", "PRO_GATE_REROLL", "BLOCK_REROLL", "PASS_REROLL",
+                                          "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
+                                          "USE_SIDE_STEP", "BLOCK_FACE"};
+            const size_t k = static_cast<size_t>(q.question);
+            d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
+            d["player"] = q.playerId;
+            d["other"] = q.otherId;
+            d["roll"] = q.roll;
+            d["target"] = q.target;
+            d["options"] = q.options;
+            return py::make_tuple(py::none(), eventsToList(events), d);
+        } catch (...) {
+            restore();
+            throw;
+        }
     });
 
     // P146 (05.10.2026): „AI plánuje tah“ — jak by AI odehrála celý tah týmu, který je na tahu.

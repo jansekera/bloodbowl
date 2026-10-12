@@ -53,11 +53,23 @@ struct GameEvent {
              // ačkoli obránce uvolní pole jen v 80 % blitzů).
              // `from` = kde útočník stál, `to` = uvolněné pole obránce.
         BLOODLUST_FEED // P71 (30.09.2026): hladovy upir se krmi na konci akce.
-             // MUST STAY LAST: bb_module.cpp maps this enum to names
-             // positionally, so append only.
+             // bb_module.cpp maps this enum to names positionally, so
+             // append only.
              // `playerId` = upir, `targetId` = kousnuty Thrall (-1 = zadny),
              // `success` = nakrmil se (false = rezervy + turnover). Bez teto
              // udalosti krmeni v logu nebylo videt vubec.
+             ,
+        REROLL // P130 (12.10.2026): tymovy prehoz / Pro nemely vlastni radek --
+             // v partii 02.10. padlo 8 tymovych rerollu a ani jeden nebyl videt.
+             // Emituje se JEN v zive partii (coachModeOn), aby se proudy
+             // udalosti z mereni a korpusu nezmenily.
+             // `roll` = druh: 0 tymovy prehoz hodu, 1 hod na Pro, 2 tymovy
+             // prehoz hodu na Pro, 3 Loner neprosel (reroll propadl);
+             // druh 0 a 2: `die1` = PUVODNI hod, `die2` = novy hod, `success`
+             // = novy hod uspel; druh 1 a 3: `die1` = hod na Pro / Loner,
+             // `success` = 4+.
+             // U bloku jsou die1/die2 kostky po 3 bitech jako v BLOCK.
+             // MUST STAY LAST (bb_module.cpp mapuje poradim).
     };
 
     Type type;

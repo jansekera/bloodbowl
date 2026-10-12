@@ -127,6 +127,7 @@ void setManualFollowUp(bool follow);
 void setManualBlitzSquare(Position p);
 void setManualBlockFace(int face);      // index do BlockDiceFace; -1 = engine
 void setManualNoTackle(bool noTackle);
+void setManualSideStepSquare(Position p);   // P130: pole pro Side Step (volí kouč odtlačeného)
 Position takeManualBlitzSquare();   // přečte a smaže
 void clearManualBlockChoices();
 
@@ -138,6 +139,7 @@ struct ManualBlockChoices {
     Position blitzSquare{-1, -1};
     int face = -1;
     bool noTackle = false;
+    Position sideStep{-1, -1};
 };
 ManualBlockChoices saveManualBlockChoices();
 void restoreManualBlockChoices(const ManualBlockChoices& c);

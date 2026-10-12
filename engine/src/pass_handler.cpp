@@ -1,3 +1,4 @@
+#include "bb/coach_choice.h"
 #include "bb/pass_handler.h"
 #include "bb/ball_handler.h"
 #include "bb/helpers.h"
@@ -353,6 +354,23 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
                               static_cast<int>(SkillName::Pass),
                               roll >= passTarget && !isFumble(roll)});
+        } else if (coachDecides(passer.teamSide)) {
+            // P130: v živé partii rozhoduje kouč, a to u fumble I u nepřesné
+            // přihrávky (schváleno 03.10. a 10.10.) -- pravidla přehoz dovolují
+            // u obojího, engine ho sám bere jen na fumble.
+            const int original = roll;
+            bool viaPro = false;
+            if (coachAskReroll(state, passer, dice, CoachQuestion::PASS_REROLL, -1, roll,
+                               passTarget, /*teamAllowed=*/true, events, viaPro)) {
+                roll = dice.rollD6();
+                const bool ok = roll >= passTarget && !isFumble(roll);
+                if (viaPro) {
+                    emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
+                                      static_cast<int>(SkillName::Pro), ok, roll});
+                } else {
+                    emitEvent(events, {GameEvent::Type::REROLL, passerId, -1, {}, {}, 0, ok, original, roll});
+                }
+            }
         } else if (fumbledFirst) {
             // Pro a tymovy reroll zustavaji jen na FUMBLE. Pravidla je dovoluji
             // i na neprecnou prihravku, ale to uz je volba trenéra (utratit

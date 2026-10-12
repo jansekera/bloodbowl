@@ -11,6 +11,7 @@ add_library(bb_engine SHARED
     src/game_state.cpp
     src/dice.cpp
     src/helpers.cpp
+    src/coach_choice.cpp
     src/injury.cpp
     src/ball_handler.cpp
     src/move_handler.cpp
@@ -65,6 +66,7 @@ add_executable(bb_tests
     tests/test_turn_handler.cpp
     tests/test_dice.cpp
     tests/test_helpers.cpp
+    tests/test_coach_choice.cpp
     tests/test_injury.cpp
     tests/test_ball_handler.cpp
     tests/test_move_handler.cpp

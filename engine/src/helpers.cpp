@@ -1,4 +1,5 @@
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
 #include <algorithm>
 
 namespace bb {
@@ -295,6 +296,48 @@ Position scatterDirection(int d8) {
     return {offsets[idx][0], offsets[idx][1]};
 }
 
+bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
+                    CoachQuestion question, int otherId, int shown, int target,
+                    bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro) {
+    viaPro = false;
+    TeamState& team = state.getTeamState(player.teamSide);
+    const bool proAvail = player.hasSkill(SkillName::Pro) && !player.proUsedThisTurn;
+    const bool teamAvail = teamAllowed && team.canUseReroll();
+    if (!proAvail && !teamAvail) return false;
+    const int opts = (1 << CoachAnswer::NONE) | (teamAvail ? 1 << CoachAnswer::TEAM : 0) |
+                     (proAvail ? 1 << CoachAnswer::PRO : 0);
+    const int answer = askCoach(question, player.id, otherId, shown, target, opts);
+    if (answer == CoachAnswer::NONE) return false;
+    // Týmový přehoz: spotřebuje se, Loner napřed 4+ (l. 8287-8290: na 1-3
+    // "the original result stands ... but the team re-roll is lost").
+    auto spendTeamReroll = [&]() {
+        team.rerolls--;
+        team.rerollUsedThisTurn = true;
+        if (!player.hasSkill(SkillName::Loner)) return true;
+        const int lonerRoll = dice.rollD6();
+        if (lonerRoll >= 4) return true;
+        emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 3, false, lonerRoll, 0});
+        return false;
+    };
+    if (answer == CoachAnswer::TEAM) return spendTeamReroll();
+    // Pro, l. 8385-8389: 4+ přehoz; na 1-3 původní výsledek platí, hod na Pro
+    // ale smí přehodit týmový reroll -- druhá otázka.
+    viaPro = true;
+    player.proUsedThisTurn = true;
+    int proRoll = dice.rollD6();
+    emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 1, proRoll >= 4, proRoll, 0});
+    if (proRoll < 4 && teamAvail &&
+        askCoach(CoachQuestion::PRO_GATE_REROLL, player.id, otherId, proRoll, 4,
+                 (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM)) == CoachAnswer::TEAM) {
+        if (spendTeamReroll()) {
+            const int gate = proRoll;
+            proRoll = dice.rollD6();
+            emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 2, proRoll >= 4, gate, proRoll});
+        }
+    }
+    return proRoll >= 4;
+}
+
 bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  int target, SkillName skillReroll,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,
@@ -332,6 +375,22 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
                           static_cast<int>(skillReroll), roll >= target});
         return roll >= target;   // hod už byl jednou přehozen -- konec
+    }
+
+    // P130: v živé partii o přehozu rozhoduje kouč (nechat / tým / Pro).
+    if (coachDecides(player.teamSide)) {
+        const int original = roll;
+        bool viaPro = false;
+        if (!coachAskReroll(state, player, dice, CoachQuestion::REROLL, -1, roll, target,
+                            canUseTeamReroll, events, viaPro)) return false;
+        roll = dice.rollD6();
+        if (viaPro) {
+            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                              static_cast<int>(SkillName::Pro), roll >= target, roll});
+        } else {
+            emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 0, roll >= target, original, roll});
+        }
+        return roll >= target;
     }
 
     // (2) Pro
