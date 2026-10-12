@@ -137,6 +137,7 @@ PYBIND11_MODULE(bb_engine, m) {
         .def_readwrite("side", &bb::TeamState::side)
         .def_readwrite("score", &bb::TeamState::score)
         .def_readwrite("rerolls", &bb::TeamState::rerolls)
+        .def_readwrite("reroll_used_this_turn", &bb::TeamState::rerollUsedThisTurn)   // P130: výpis v partii
         .def_readwrite("turn_number", &bb::TeamState::turnNumber)
         // P146 kontrola tahu: nevyužitý blitz / faul (ř. 429-430 Blitz a Pass, ř. 359-361 Hand-off a Foul: jednou za tah)
         .def_readwrite("blitz_used_this_turn", &bb::TeamState::blitzUsedThisTurn)
