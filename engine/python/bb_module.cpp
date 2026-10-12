@@ -686,6 +686,11 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("setup_half",
           [](bb::GameState& state, const bb::TeamRoster& home,
              const bb::TeamRoster& away, bb::TeamSide kickingTeam) {
+              // OPRAVENO 12.10.2026 (P195): chybělo -- výkop bere přijímající jako
+              // opponent(state.kickingTeam), takže při kicking_team=HOME se rozestavilo
+              // "kope HOME", ale výkop proběhl, jako by kopali AWAY (výchozí hodnota).
+              // setup_drive a setup_second_half to nastavovaly; volání s AWAY se nemění.
+              state.kickingTeam = kickingTeam;
               bb::setupHalf(state, home, away, kickingTeam, nullptr);
           },
           py::arg("state"), py::arg("home"), py::arg("away"),

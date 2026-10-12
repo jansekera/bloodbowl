@@ -112,3 +112,18 @@ def test_vypis_prehozu():
     assert "původní hod 2" in ps.event_str(e) and "nový hod 5" in ps.event_str(e)
     e.update(roll=3, die1=2, die2=0, success=False)
     assert "PROPADL" in ps.event_str(e)
+
+
+def test_prvni_vykop_respektuje_kopajici_stranu():
+    # P195: setup_half nenastavoval state.kicking_team ⇒ výkop vždy proběhl, jako by kopali AWAY.
+    # Po výkopu je (až na události výkopu) na tahu ten, kdo PŘIJÍMÁ.
+    for kope, prijima in ((H, A), (A, H)):
+        na_tahu = []
+        for seed in range(1, 41):
+            s = bb.GameState()
+            d = bb.DiceRoller(seed)
+            bb.setup_half(s, bb.get_developed_roster("human", 1500), bb.get_developed_roster("orc", 1500), kope)
+            assert s.kicking_team == kope
+            bb.simple_kickoff(s, d)
+            na_tahu.append(s.active_team)
+        assert na_tahu.count(prijima) > 30, (kope, na_tahu.count(prijima))
