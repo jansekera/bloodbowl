@@ -724,6 +724,12 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::rollMatchWeather(state, base);
     });
 
+    // P195 (12.10.2026): co po vyhraném losu volí AI s touto soupiskou (true = KOPAT).
+    // Táž funkce, kterou používá simulace (game_simulator.cpp, kniha Q13).
+    m.def("ai_toss_elects_kick", [](const bb::TeamRoster* roster) {
+        return bb::defaultTossElection(*roster) == bb::TossElection::KICK;
+    });
+
     m.def("extract_features", [](const bb::GameState& state, bb::TeamSide perspective) {
         float features[bb::NUM_FEATURES];
         bb::extractFeatures(state, perspective, features);

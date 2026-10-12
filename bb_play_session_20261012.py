@@ -14,6 +14,8 @@ Příkazy:
   actions <HOME|AWAY>      -- vypíše dostupné akce pro danou stranu, číslovaně
   do <index>               -- provede akci podle čísla z 'actions'
   kouc <HOME|AWAY|ne>      -- P130: za tuto stranu rozhoduje KOUČ; `ne` = engine jako dřív
+  los                      -- P195: začátek zápasu — počasí a los (D6: 1-3 HOME, 4-6 AWAY); vítěz volí
+  volba <kopat|prijimat>   -- P195: volba kouče po vyhraném losu (za AI volí engine sám)
   odp <odpověď>            -- P130: odpověď na otázku, na které se akce zastavila:
                               přehoz: ne | tym | pro · skill: ano | ne · kostka: číslo kostky
   push <x> <y>             -- příští odtlačení na toto pole (volba útočníka; jinak engine)
@@ -23,7 +25,7 @@ Příkazy:
   kostka <0-4>             -- příští blok: kterou z hozených kostek vzít (pro stranu bez `kouc`)
   beztackle                -- příští blok: útočník nepoužije Tackle
   vykop <HOME|AWAY>        -- po TD: rozestavení + výkop, kdo KOPE
-  polocas <HOME|AWAY>      -- 2. poločas: rozestavení + výkop, kdo KOPE
+  polocas [HOME|AWAY]      -- 2. poločas: rozestavení + výkop; kope, kdo v 1. poločase přijímal
   tahai [greedy|macro] [semínko] [iterace]
                            -- jak by tah odehrála AI — NANEČISTO (kopie stavu, vlastní kostky)
   kontrola [posledni]      -- kontrola rozehraného / posledního dokončeného tahu
@@ -64,12 +66,31 @@ def new_game(seed=20261012):
     orc = bb.get_developed_roster("orc", 1500)
     ROSTERS = (human, orc)
     state = bb.GameState()
-    # kdo kope první výkop: proměnná BB_KOPE (HOME|AWAY), výchozí AWAY = lidé přijímají
-    kope = bb.TeamSide.HOME if os.environ.get("BB_KOPE", "AWAY").upper() == "HOME" else bb.TeamSide.AWAY
-    bb.setup_half(state, human, orc, kope)
-    dice = bb.DiceRoller(seed)
-    bb.simple_kickoff(state, dice)
+    dice = bb.DiceRoller(int(os.environ.get("BB_SEED", seed)))   # BB_SEED jen pro zkoušky
     return state, dice
+
+
+POCASI = {"SWELTERING_HEAT": "úmorné vedro", "VERY_SUNNY": "ostré slunce", "NICE": "pěkně",
+          "POURING_RAIN": "lije", "BLIZZARD": "vánice"}
+
+
+def pocasi_str(state):
+    jm = str(state.weather).split(".")[-1]
+    return POCASI.get(jm, jm)
+
+
+def strana_str(side):
+    return "LIDÉ (HOME)" if side == bb.TeamSide.HOME else "ORKOVÉ (AWAY)"
+
+
+def druha(side):
+    return bb.TeamSide.AWAY if side == bb.TeamSide.HOME else bb.TeamSide.HOME
+
+
+def zahaj(state, dice, kope):
+    """Rozestavení a první výkop; `kope` = strana, která kope."""
+    bb.setup_half(state, ROSTERS[0], ROSTERS[1], kope)
+    bb.simple_kickoff(state, dice)
 
 
 def enum_players(state):
@@ -212,6 +233,7 @@ def board(state):
     venku = [(sq, v) for sq, v in cell.items() if not (xlo <= sq[0] <= xhi)]
 
     lines = []
+    lines.append(f"počasí: {pocasi_str(state)}")
     lines.append(f"aktivni tym: {state.active_team}  fáze: {state.phase}  "
                  f"kolo H:{state.home_team.turn_number} A:{state.away_team.turn_number}")
     lines.append(f"mic: ({state.ball.position.x},{state.ball.position.y})  "
@@ -385,9 +407,14 @@ def action_str(a):
 def main():
     state, dice = new_game()
     last_actions = []
+    # P195: zápas začíná počasím a losem (ř. 2551, 304-307). Vítěz losu volí, zda kope, nebo
+    # přijímá; za AI volí defaultTossElection (rychlé soupisky přijímají, ostatní kopou).
+    # `kouc` říká, která strana je člověk -- los vyhraný druhou stranou rozhodne AI hned.
+    zalozeno = False
+    los_vitez = None      # kdo vyhrál los a ještě nezvolil
+    prvni_kope = None     # kdo kopal první výkop (2. poločas kope druhá strana, ř. 1016-1017)
     with open(OUT, "w") as f:
-        f.write("=== NOVA HRA ZALOZENA (lidé HOME vs orkové AWAY, TV1500) ===\n")
-        f.write(board(state) + "\n")
+        f.write("=== NOVÁ HRA: lidé HOME × orkové AWAY, TV1500 — napřed `kouc HOME`, pak `los` ===\n")
 
     LOG = os.path.join(DIR, "prikazy.log")
     replay = []
@@ -450,7 +477,7 @@ def main():
                 line = f.read().strip()
             os.remove(CMD)
             if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
-                                                      "kouc", "odp", "sidestep"):
+                                                      "kouc", "odp", "sidestep", "los", "volba"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
         parts = line.split()
@@ -463,6 +490,36 @@ def main():
                 with open(OUT, "w") as f:
                     f.write("server ukoncen\n")
                 break
+            elif cmd == "los" and not zalozeno and los_vitez is None:
+                bb.roll_match_weather(state, dice)
+                result_lines.append(f"počasí: {pocasi_str(state)}")
+                hod = dice.roll_d6()
+                vitez = bb.TeamSide.HOME if hod <= 3 else bb.TeamSide.AWAY
+                result_lines.append(f"los: hod {hod} (1-3 HOME, 4-6 AWAY) -> vyhrávají {strana_str(vitez)}")
+                if coach is not None and vitez == coach:
+                    los_vitez = vitez
+                    result_lines.append("❓ vyhrál jsi los: `volba kopat`, nebo `volba prijimat`?")
+                else:
+                    kopou = bb.ai_toss_elects_kick(ROSTERS[0] if vitez == bb.TeamSide.HOME else ROSTERS[1])
+                    prvni_kope = vitez if kopou else druha(vitez)
+                    result_lines.append(f"AI volí: {'KOPAT' if kopou else 'PŘIJÍMAT'} -> první výkop kopou {strana_str(prvni_kope)}")
+                    zahaj(state, dice, prvni_kope)
+                    zalozeno = True
+                    result_lines.append(board(state))
+            elif cmd == "volba" and len(parts) == 2 and los_vitez is not None:
+                v = parts[1].lower()
+                if v not in ("kopat", "prijimat", "přijímat"):
+                    result_lines.append("❓ `volba kopat`, nebo `volba prijimat`")
+                else:
+                    prvni_kope = los_vitez if v == "kopat" else druha(los_vitez)
+                    los_vitez = None
+                    result_lines.append(f"první výkop kopou {strana_str(prvni_kope)}")
+                    zahaj(state, dice, prvni_kope)
+                    zalozeno = True
+                    result_lines.append(board(state))
+            elif not zalozeno and cmd != "kouc":
+                result_lines.append("zápas ještě nezačal: napřed `kouc HOME` (kdo je člověk), pak `los`"
+                                    + ("; teď čeká `volba kopat|prijimat`" if los_vitez is not None else ""))
             elif cmd == "board":
                 result_lines.append(board(state))
                 if cekajici:
@@ -509,9 +566,13 @@ def main():
                 bb.simple_kickoff(state, dice)
                 result_lines.append(f"rozestavení + výkop, kope {kick}")
                 result_lines.append(board(state))
-            elif cmd == "polocas" and len(parts) == 2:
-                # začátek 2. poločasu: parts[1] = kdo KOPE (HOME|AWAY)
-                kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
+            elif cmd == "polocas" and len(parts) in (1, 2):
+                # začátek 2. poločasu: kope ten, kdo v 1. poločase přijímal (ř. 1016-1017);
+                # parts[1] (HOME|AWAY) to smí přepsat
+                if len(parts) == 2:
+                    kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
+                else:
+                    kick = druha(prvni_kope)
                 bb.setup_second_half(state, ROSTERS[0], ROSTERS[1], kick, dice)
                 bb.simple_kickoff(state, dice)
                 result_lines.append(f"2. poločas: rozestavení + výkop, kope {kick}")
