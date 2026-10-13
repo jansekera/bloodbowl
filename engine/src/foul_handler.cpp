@@ -158,9 +158,8 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
             // pustil, takže se odrážel z pole mimo hřiště. Pravidla ř. 1882-1884: „If the sent
             // off player was holding the ball, the ball bounces from the square he was standing
             // in when sent off.“
-            handleBallOnPlayerDown(state, fouler.id, dice, events);
-            fouler.setState(PlayerState::EJECTED);
-            fouler.position = {-1, -1};
+            // 13.10.2026: pořadí (hráč pryč, pak odraz) drží removeFromPitch.
+            removeFromPitch(state, fouler.id, PlayerState::EJECTED, dice, events);
             emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},
                               0, false});
         }

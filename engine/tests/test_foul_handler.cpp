@@ -319,3 +319,25 @@ TEST(FoulHandler, T526EjectedCarriersBallBouncesFromHisSquare) {
     EXPECT_EQ(gs.ball.position, (Position{9, 7}));
     EXPECT_EQ(dice.remaining(), 0u) << "jediný odraz, žádné vhazování";
 }
+
+// P192 review (1), 13.10.2026 -- vyloučený nosič: míč „bounces from the square he
+// was standing in when sent off“ (ř. 1882-1884). Hráč je v tu chvíli už pryč;
+// vrátí-li se míč na jeho pole, je prázdné a míč tam zůstane. Dřív tam vyloučený
+// ještě STÁL, míč chytil a odnesl ho ze hřiště.
+TEST(FoulHandler, P192BallBouncingBackToTheSquareOfASentOffCarrierIsNotCaughtByHim) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.ball = BallState::carried({10, 7}, 1);
+    // brnění 3+3 (dvojice => vyloučen). Odraz D8 = 3 (východ) -> (11,7), leží tam
+    // faulovaný => odraz D8 = 7 (západ) -> (10,7), prázdné pole. (Kostka 6 je pro
+    // starou mechaniku: vyloučený by chytal.)
+    FixedDiceRoller dice({3, 3, 3, 7, 6});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    ASSERT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_FALSE(gs.ball.isHeld) << "vyloučený hráč míč nechytá";
+    EXPECT_EQ(gs.ball.position, (Position{10, 7}));
+    EXPECT_EQ(dice.remaining(), 1u);
+}

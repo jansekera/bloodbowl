@@ -283,6 +283,26 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
     resolveBounce(state, origin, dice, 0, events);
 }
 
+// JEDNO místo pro pořadí „hráč pryč -> míč se odráží“.
+// 09.10.2026 (T5.26 a týž princip u KO / zranění): pozice se nastavila na (−1,−1) dřív,
+// než se míč pustil, takže se odrážel z pole mimo hřiště.
+// OPRAVENO 13.10.2026 (P192 review, nález 1) -- po opravě z 09.10. se míč pouštěl, dokud
+// hráč na poli ještě byl: odraz zpět ho „viděl“ (ležící = další odraz; stojící vyloučený
+// nebo upír míč chytil a odnesl ze hřiště). Pravidla ř. 678-681: míč se odráží „AFTER the
+// player's armour and injury rolls (if any) are FULLY RESOLVED“ -- hráč už je v tu chvíli
+// pryč; ř. 1882-1884: „bounces from the square he was standing in when sent off“.
+void removeFromPitch(GameState& state, int playerId, PlayerState newState,
+                     DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    Player& player = state.getPlayer(playerId);
+    const Position pos = player.position;
+    const bool carried = state.ball.isHeld && state.ball.carrierId == playerId;
+    const bool lyingOnIt = !state.ball.isHeld && pos.isOnPitch() && state.ball.position == pos;
+    player.setState(newState);
+    player.position = {-1, -1};
+    if (carried) state.ball = BallState::onGround(pos);
+    if (carried || lyingOnIt) resolveBounce(state, pos, dice, 0, events);
+}
+
 void handleBallOnPlayerDown(GameState& state, int playerId, DiceRollerBase& dice,
                             std::vector<GameEvent>* events) {
     Position pos = state.getPlayer(playerId).position;

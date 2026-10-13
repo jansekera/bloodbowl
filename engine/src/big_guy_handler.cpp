@@ -237,11 +237,7 @@ bool feedBloodlust(GameState& state, int vampireId, DiceRollerBase& dice,
     // l. 7942-7947: "Failure to bite a Thrall IS A TURNOVER ... move the
     // Vampire to the RESERVES BOX. If he was holding the ball, IT BOUNCES from
     // the square he occupied."
-    if (state.ball.isHeld && state.ball.carrierId == vampireId) {
-        handleBallOnPlayerDown(state, vampireId, dice, events);
-    }
-    vampire.setState(PlayerState::OFF_PITCH);   // reserves
-    vampire.position = {-1, -1};
+    removeFromPitch(state, vampireId, PlayerState::OFF_PITCH, dice, events);   // reserves
     return true;
 }
 

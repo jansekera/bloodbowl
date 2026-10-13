@@ -420,3 +420,30 @@ TEST(Injury, P145CrowdSurfHasItsOwnEventAndNoZeroInjuryRoll) {
     }
     EXPECT_EQ(surf, 1);
 }
+
+// ---------------------------------------------------------------------------
+// P192 review (1), 13.10.2026 -- pořadí při odchodu ze hřiště. Pravidla ř. 678-681:
+// „The dropped ball will bounce one square in a random direction AFTER the player's
+// armour and injury rolls (if any) are FULLY RESOLVED.“ Hráč, který jde do KO /
+// zranění, je tedy ze hřiště pryč dřív, než se míč odrazí: vrátí-li se míč na jeho
+// pole, je PRÁZDNÉ a míč tam zůstane. Dřív se míč pouštěl, dokud tam hráč ještě
+// ležel, a odrážel se od něj znovu.
+// ---------------------------------------------------------------------------
+TEST(Injury, P192BallBouncingBackToTheSquareOfARemovedCarrierRestsThere) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.getPlayer(2).state = PlayerState::PRONE;
+    gs.ball = BallState::carried({10, 7}, 1);
+    // brnění 6+6, zranění 4+4 = 8 => KO. Odraz D8 = 3 (východ) -> (11,7), leží tam
+    // hráč 2 => odraz D8 = 7 (západ) -> (10,7): pole po hráči 1 je prázdné, míč zůstane.
+    // (Poslední kostka 1 je pro starou mechaniku: odraz od „ležícího“ hráče 1 na sever.)
+    FixedDiceRoller dice({6, 6, 4, 4, 3, 7, 1});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    ASSERT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{10, 7}));
+    EXPECT_EQ(dice.remaining(), 1u) << "dva odrazy, třetí už ne";
+}
