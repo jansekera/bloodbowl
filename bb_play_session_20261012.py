@@ -129,10 +129,9 @@ def role(p):
         if st == (5, 5, 2, 9):
             return "OG"                      # Ogre +Block (Loner)
         if st == (7, 3, 3, 8):               # Blitzer
-            if "Dauntless" in sk:
-                return "BD"                  # +Guard+Stand Firm+Dauntless
+            # uživatel 13.10.: v kódu role ukazovat G = Guard (mění asistence), Mighty Blow ne
             if "Guard" in sk:
-                return "BG"                  # +Guard+Stand Firm+Mighty Blow
+                return "BG"                  # +Guard+Stand Firm (+Dauntless / +Mighty Blow)
             if "StripBall" in sk:
                 return "BH"                  # lovec míče +Wrestle+Tackle
             return "BT"                      # +Mighty Blow+Tackle
@@ -142,7 +141,7 @@ def role(p):
             return "LW"                      # Lineman +Wrestle
         return "L"                           # Lineman +Block
     if st == (4, 4, 2, 9):
-        return "KM" if "MightyBlow" in sk else "K"   # Black Orc (+Mighty Blow)
+        return "KG" if "Guard" in sk else "K"        # Black Orc (+Guard); Mighty Blow se neznačí
     if st == (6, 3, 3, 9):                   # Blitzer
         if "Pro" in sk:
             return "BP"                      # +Mighty Blow+Pro
@@ -267,10 +266,11 @@ def board(state):
         lines.append(f"⚠️ MIMO VYREZ stoji: " + ", ".join(f"{v}@{sq}" for sq, v in sorted(venku)))
     lines.append("")
     lines.append("H člověk (náš, HOME) · O ork (jejich, AWAY) · +role +ID")
-    lines.append("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG/BD blitzer Guard+Stand Firm"
-                 " (MB / Dauntless) · BT blitzer MB+Tackle · BH lovec míče · OG ogre")
-    lines.append("role orkové: L · LW lineman Wrestle · T thrower · BG blitzer Guard · BP blitzer MB+Pro · BH lovec míče"
-                 " · K black orc · KM black orc +MB")
+    lines.append("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
+                 " · BT blitzer MB+Tackle · BH lovec míče · OG ogre")
+    lines.append("role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro · BH lovec míče"
+                 " · KG black orc s GUARD")
+    lines.append("G v kódu role = Guard (asistuje i v soupeřově zóně)")
     lines.append("cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje")
     lines.append("/n u H.. = VZDY (i /0) -- v kolika JEJICH zonach stoji")
     lines.append("u O.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned")
