@@ -31,6 +31,17 @@
 
 namespace py = pybind11;
 
+// Jména typů událostí -- poziční mapa na GameEvent::Type, JEN PŘIDÁVAT NA KONEC.
+// P145 (13.10.2026): byly tu dvě kopie (log zápasu a živá partie) a ta první
+// neměla REROLL; jedna tabulka, aby se nemohly rozejít.
+static const char* const kEventNames[] = {
+    "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
+    "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
+    "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
+    "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
+    "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
+    "BLOODLUST_FEED", "REROLL", "APOTHECARY", "CROWD_SURF"};
+
 PYBIND11_MODULE(bb_engine, m) {
     m.doc() = "Blood Bowl C++ Engine - Python bindings";
 
@@ -248,16 +259,6 @@ PYBIND11_MODULE(bb_engine, m) {
         })
         .def("get_turn_logs", [](const bb::LoggedGameResult& lgr) {
             py::list result;
-            // GameEvent type names
-            static const char* eventNames[] = {
-                "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
-                "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
-                "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
-                "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
-                "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
-                "BLOODLUST_FEED"
-                // Positional map onto GameEvent::Type -- append only.
-            };
             for (auto& turn : lgr.turnLogs) {
                 py::dict t;
                 t["half"] = turn.half;
@@ -374,9 +375,9 @@ PYBIND11_MODULE(bb_engine, m) {
                     // Velikost se bere z pole, aby se to při dalším přidání
                     // typu nemohlo opakovat.
                     constexpr int kNumEventNames =
-                        static_cast<int>(sizeof(eventNames) / sizeof(eventNames[0]));
+                        static_cast<int>(sizeof(kEventNames) / sizeof(kEventNames[0]));
                     ed["type"] = (typeIdx >= 0 && typeIdx < kNumEventNames)
-                                     ? eventNames[typeIdx] : "UNKNOWN";
+                                     ? kEventNames[typeIdx] : "UNKNOWN";
                     ed["player_id"] = ev.playerId;
                     ed["target_id"] = ev.targetId;
                     ed["from_x"] = ev.from.x;
@@ -456,24 +457,18 @@ PYBIND11_MODULE(bb_engine, m) {
     // ať hráč vidí, co padlo. Jména podle GameEvent::Type (pořadí jako get_turn_logs).
     // Události jako seznam slovníků — sdílí execute_action_logged a ai_plan_turn.
     auto eventsToList = [](const std::vector<bb::GameEvent>& events) {
-        static const char* names[] = {
-            "MOVE", "DODGE", "GFI", "BLOCK", "PUSH", "INJURY",
-            "TOUCHDOWN", "TURNOVER", "BALL_BOUNCE", "PASS", "CATCH",
-            "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
-            "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
-            "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
-            "BLOODLUST_FEED", "REROLL"};
         py::list ev;
         for (const auto& e : events) {
             py::dict d;
             const size_t t = static_cast<size_t>(e.type);
-            d["type"] = t < sizeof(names) / sizeof(names[0]) ? names[t] : "?";
+            d["type"] = t < sizeof(kEventNames) / sizeof(kEventNames[0]) ? kEventNames[t] : "?";
             d["player"] = e.playerId;
             d["target"] = e.targetId;
             d["roll"] = e.roll;
             d["success"] = e.success;
             d["die1"] = e.die1;
             d["die2"] = e.die2;
+            d["from"] = py::make_tuple(e.from.x, e.from.y);
             d["to"] = py::make_tuple(e.to.x, e.to.y);
             ev.append(d);
         }

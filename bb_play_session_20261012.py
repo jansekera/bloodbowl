@@ -361,6 +361,14 @@ def preloz_odpoved(q, text):
     return a if a is not None and q["options"] & (1 << a) else None
 
 
+ZRANENI = ["Badly Hurt (vrátí se příští zápas)", "Miss Next Game", "Niggling Injury", "-1 MA", "-1 AV",
+           "-1 AG", "-1 ST", "MRTEV"]   # enums.h CasualtyResult
+
+
+def zraneni_str(i):
+    return ZRANENI[i] if 0 <= i < len(ZRANENI) else f"? ({i})"
+
+
 def event_str(e):
     """Jeden řádek: co se stalo a co padlo na kostkách."""
     t = e["type"]
@@ -372,11 +380,36 @@ def event_str(e):
         hozeno = f" · hozeno {e['die2']}: " + ", ".join(vse) if vse else ""
         return f"BLOK {who} na {e['target']}: zvolená kostka = {face}{hozeno}"
     if t in ("DODGE", "GFI", "PICKUP", "CATCH", "PASS", "STAND_UP", "LEAP"):
-        # engine v `roll` posílá CÍLOVÉ číslo hodu (move_handler.cpp: `target`), ne padlou kostku
-        return f"{t} {who}: potřeba {e['roll']}+ -> {'OK' if e['success'] else 'NEPROŠEL'}"
-    if t in ("ARMOR_BREAK", "INJURY", "CASUALTY"):
+        # `roll` = CÍLOVÉ číslo hodu, `die1` = kostka, která platí (P145; 0 = engine ji neposlal,
+        # např. chytání bez hodu nebo PASS)
+        if not e["roll"]:   # vstávání s MA 3+, No Hands, ležící „chytač“ -- nehází se
+            return f"{t} {who}: bez hodu -> {'OK' if e['success'] else 'NEPROŠEL'}"
+        padlo = f", padlo {e['die1']}" if e["die1"] else ""
+        return f"{t} {who}: potřeba {e['roll']}+{padlo} -> {'OK' if e['success'] else 'NEPROŠEL'}"
+    if t in ("ARMOR_BREAK", "INJURY"):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
-        return f"{t} hráč {e['target'] if e['target'] > 0 else e['player']}: {e['roll']}{dice}"
+        co = ""
+        if t == "INJURY":   # injury.cpp: do 7 omráčen, 8-9 KO (10+ jde jako CASUALTY)
+            co = " -> omráčen" if e["roll"] <= 7 else " -> KO"
+        return f"{t} {who}: {e['roll']}{dice}{co}"
+    if t == "CASUALTY":
+        # P145 (c): `target` je VÝSLEDEK tabulky zranění, ne hráč (tisklo se „CASUALTY hráč 1“)
+        dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
+        return f"CASUALTY {who}: {e['roll']}{dice} -> {zraneni_str(e['target'])}"
+    if t == "APOTHECARY":
+        return (f"LÉKÁRNÍK {who}: {zraneni_str(e['die1'] - 1)} / {zraneni_str(e['die2'] - 1)}"
+                f" -> platí {zraneni_str(e['roll'])}")
+    if t == "CROWD_SURF":
+        return f"DO DAVU {who} z pole {e['from']}"
+    if t == "BALL_BOUNCE":
+        # die1 = kostka šablony ⇒ vhazování (roll = 2D6, první pole je výchozí, FAQ ř. 9307-9314);
+        # jinak odraz (roll = D8 směr). `to` mimo hřiště = míč vyletěl do autu.
+        fx, fy = e["from"]
+        tx, ty = e["to"]
+        aut = "" if 0 <= tx < 26 and 0 <= ty < 15 else " — DO AUTU"
+        if e["die1"]:
+            return f"VHAZOVÁNÍ z ({fx},{fy}): šablona {e['die1']}, 2D6 = {e['roll']} -> ({tx},{ty}){aut}"
+        return f"ODRAZ míče ({fx},{fy}) -> ({tx},{ty}), D8 = {e['roll']}{aut}"
     if t == "REROLL":
         # P130: roll = druh (0 přehoz hodu, 1 hod na Pro, 2 přehoz hodu na Pro, 3 Loner neprošel)
         if e["roll"] == 1:
@@ -395,6 +428,8 @@ def event_str(e):
     if t in ("SKILL", "SKILL_USED"):
         # roll = číslo skillu (enum SkillName), die1 = hozená kostka (big_guy_handler, 02.10.)
         jm = SKILL_NAMES[e["roll"]] if 0 <= e["roll"] < len(SKILL_NAMES) else e["roll"]
+        if e["die2"]:   # přehoz skillem (helpers.cpp attemptRoll): die2 = původní hod, die1 = nový
+            return f"SKILL {jm} {who}: přehoz {e['die2']} -> {e['die1']} ({'OK' if e['success'] else 'NEPROŠEL'})"
         hod = f" hod {e['die1']}" if e["die1"] else ""
         return f"SKILL {jm} {who}:{hod} -> {'OK' if e['success'] else 'NEPROŠEL'}"
     return f"{t} {who} cíl {e['target']} hod {e['roll']}"

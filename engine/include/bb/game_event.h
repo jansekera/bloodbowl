@@ -69,7 +69,18 @@ struct GameEvent {
              // = novy hod uspel; druh 1 a 3: `die1` = hod na Pro / Loner,
              // `success` = 4+.
              // U bloku jsou die1/die2 kostky po 3 bitech jako v BLOCK.
-             // MUST STAY LAST (bb_module.cpp mapuje poradim).
+             ,
+        APOTHECARY // P145 (13.10.2026): lekarnik se posilal jako SKILL_USED
+             // s `roll` = vysledek zraneni, takze se ve vypisu partie 02.10.
+             // tiskl jako skill s timtez cislem ("SKILL Block").
+             // `roll` = PLATNY vysledek (CasualtyResult), `die1` / `die2` =
+             // prvni / druhy vysledek + 1 (aby 0 znamenala "neuvedeno").
+             ,
+        CROWD_SURF // P145 (13.10.2026): vytlaceni do davu se znacilo udalosti
+             // INJURY s hodem 0 ("INJURY hrac N: 0"), nerozlisitelnou od hodu
+             // na zraneni. `from` = pole, ze ktereho sel hrac do davu; hod na
+             // zraneni v davu nasleduje jako bezna INJURY / CASUALTY.
+             // Nove typy pridavat ZA tenhle (bb_module.cpp mapuje poradim).
     };
 
     Type type;

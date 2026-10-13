@@ -338,10 +338,27 @@ bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
     return proRoll >= 4;
 }
 
+static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice,
+                            int target, SkillName skillReroll,
+                            bool skillNegatedByOpponent, bool canUseTeamReroll,
+                            std::vector<GameEvent>* events, int& roll);
+
 bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  int target, SkillName skillReroll,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,
-                 std::vector<GameEvent>* events) {
+                 std::vector<GameEvent>* events, int* rolled) {
+    int roll = 0;
+    const bool ok = attemptRollImpl(state, playerId, dice, target, skillReroll,
+                                    skillNegatedByOpponent, canUseTeamReroll, events, roll);
+    if (rolled) *rolled = roll;
+    return ok;
+}
+
+// `roll` = kostka, která platí (viz `rolled` v hlavičce).
+static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice,
+                            int target, SkillName skillReroll,
+                            bool skillNegatedByOpponent, bool canUseTeamReroll,
+                            std::vector<GameEvent>* events, int& roll) {
     Player& player = state.getPlayer(playerId);
     // Týmový přehoz jen hráči týmu na tahu a nikdy během výkopu (P64;
     // BB2016 l. 929-933 "during their own turn", l. 1261-1263) -- platí pro
@@ -350,7 +367,7 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                        !state.kickoffInProgress;
 
     // Initial roll
-    int roll = dice.rollD6();
+    roll = dice.rollD6();
     if (roll >= target) return true;
 
     // ⛔⛔ JEDEN HOD = NEJVÝŠ JEDEN REROLL (oprava TA1/P57, 24.08.2026).
@@ -371,9 +388,11 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
         player.hasSkill(skillReroll) && !skillNegatedByOpponent &&
         !(skillOncePerTurn && *skillOncePerTurn)) {
         if (skillOncePerTurn) *skillOncePerTurn = true;
+        const int original = roll;
         roll = dice.rollD6();
+        // P145: die1 = nový hod, die2 = původní (přehozený) hod.
         emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                          static_cast<int>(skillReroll), roll >= target});
+                          static_cast<int>(skillReroll), roll >= target, roll, original});
         return roll >= target;   // hod už byl jednou přehozen -- konec
     }
 

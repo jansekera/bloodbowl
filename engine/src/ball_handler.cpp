@@ -15,11 +15,12 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
     }
 
     int target = calculatePickupTarget(state, player);
+    int rolled = 0;   // P145: padlá kostka do `die1` události
     bool success = attemptRoll(state, playerId, dice, target,
-                               SkillName::SureHands, false, true, events);
+                               SkillName::SureHands, false, true, events, &rolled);
 
     emitEvent(events, {GameEvent::Type::PICKUP, playerId, -1, player.position, {},
-                      target, success});
+                      target, success, rolled});
 
     if (success) {
         state.ball = BallState::carried(player.position, playerId);
@@ -56,15 +57,16 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
 
     int target = calculateCatchTarget(state, catcher, modifier, accuratePass);
     // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
+    int rolled = 0;   // P145: padlá kostka do `die1` události
     bool success = attemptRoll(state, catcherId, dice, target,
                                // Catch, l. 7992-7995: "allowed to re-roll the D6
                                // if he fails a catch roll. It also allows the
                                // player to re-roll the D6 if he drops a hand-off
                                // or fails to make an interception."
-                               SkillName::Catch, false, true, events);
+                               SkillName::Catch, false, true, events, &rolled);
 
     emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
-                      target, success});
+                      target, success, rolled});
 
     if (success) {
         state.ball = BallState::carried(catcher.position, catcherId);
@@ -142,52 +144,50 @@ ExitEdge classifyExit(Position offPitchExit) {
 // uniform 8-way Bounce scatter template). For a corner exit, a D3 picks one
 // of 3 directions -- straight along one edge, the pure diagonal into the
 // corner, or straight along the other edge.
-Position throwInDirection(ExitEdge edge, DiceRollerBase& dice) {
+// `templateDie` = hozená D6 (P145: jde do `die1` události vhazování).
+Position throwInDirection(ExitEdge edge, DiceRollerBase& dice, int& templateDie) {
+    const int d6 = templateDie = dice.rollD6();
     switch (edge) {
         case ExitEdge::TOP: {
-            int d6 = dice.rollD6();
             if (d6 <= 2) return {-1, 1};   // SW
             if (d6 <= 4) return {0, 1};    // S (straight back in)
             return {1, 1};                  // SE
         }
         case ExitEdge::BOTTOM: {
-            int d6 = dice.rollD6();
             if (d6 <= 2) return {-1, -1};  // NW
             if (d6 <= 4) return {0, -1};   // N
             return {1, -1};                 // NE
         }
         case ExitEdge::LEFT: {
-            int d6 = dice.rollD6();
             if (d6 <= 2) return {1, -1};   // NE
             if (d6 <= 4) return {1, 0};    // E
             return {1, 1};                  // SE
         }
         case ExitEdge::RIGHT: {
-            int d6 = dice.rollD6();
             if (d6 <= 2) return {-1, -1};  // NW
             if (d6 <= 4) return {-1, 0};   // W
             return {-1, 1};                 // SW
         }
         case ExitEdge::TOP_LEFT: {
-            int d3 = (dice.rollD6() + 1) / 2;
+            int d3 = (d6 + 1) / 2;
             if (d3 == 1) return {1, 0};    // E, along the top edge
             if (d3 == 2) return {1, 1};    // SE, pure diagonal
             return {0, 1};                   // S, along the left edge
         }
         case ExitEdge::TOP_RIGHT: {
-            int d3 = (dice.rollD6() + 1) / 2;
+            int d3 = (d6 + 1) / 2;
             if (d3 == 1) return {-1, 0};   // W, along the top edge
             if (d3 == 2) return {-1, 1};   // SW, pure diagonal
             return {0, 1};                   // S, along the right edge
         }
         case ExitEdge::BOTTOM_LEFT: {
-            int d3 = (dice.rollD6() + 1) / 2;
+            int d3 = (d6 + 1) / 2;
             if (d3 == 1) return {1, 0};    // E, along the bottom edge
             if (d3 == 2) return {1, -1};   // NE, pure diagonal
             return {0, -1};                  // N, along the left edge
         }
         default: {  // BOTTOM_RIGHT
-            int d3 = (dice.rollD6() + 1) / 2;
+            int d3 = (d6 + 1) / 2;
             if (d3 == 1) return {-1, 0};   // W, along the bottom edge
             if (d3 == 2) return {-1, -1};  // NW, pure diagonal
             return {0, -1};                  // N, along the right edge
@@ -220,7 +220,8 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
 
     for (int attempt = 0; attempt < 8; ++attempt) {
         ExitEdge edge = classifyExit(exitAt);
-        Position offset = throwInDirection(edge, dice);
+        int templateDie = 0;
+        Position offset = throwInDirection(edge, dice, templateDie);
         int distance = dice.roll2D6();
 
         // Mic se posouva po JEDNOM poli, aby se dalo najit "the LAST SQUARE it
@@ -247,8 +248,10 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
             lastInside = dest;
         }
 
+        // P145: `die1` = kostka šablony -- podle ní se vhazování (2D6 v `roll`)
+        // pozná od odrazu (D8 v `roll`, `die1` = 0).
         emitEvent(events, {GameEvent::Type::BALL_BOUNCE, -1, -1, origin, dest,
-                          distance, !leftPitch});
+                          distance, !leftPitch, templateDie});
 
         if (leftPitch) {
             // l. 875-877: letel ven znovu => vhazuje se ZNOVU, ale z POSLEDNIHO

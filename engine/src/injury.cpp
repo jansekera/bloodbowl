@@ -141,10 +141,13 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
                                 cas == CasualtyResult::DEAD);
         if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving && worthSpendingOn) {
             ts.apothecaryUsed = true;
+            const CasualtyResult first = cas;
             CasualtyResult second = rollCasualty(dice);
             if (casualtySeverity(second) < casualtySeverity(cas)) cas = second;
-            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(cas), true});
+            // P145: vlastní událost (bylo SKILL_USED s výsledkem zranění v `roll`).
+            emitEvent(events, {GameEvent::Type::APOTHECARY, playerId, -1, {}, {},
+                              static_cast<int>(cas), true,
+                              static_cast<int>(first) + 1, static_cast<int>(second) + 1});
             // "If the player is only Badly Hurt after this roll (even if it
             // was the original Casualty roll) the Apothecary has managed to
             // patch him up ... the player may be moved into the Reserves box."
@@ -239,7 +242,8 @@ void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
                       std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
 
-    emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
+    // P145: vlastní událost (bylo INJURY s hodem 0).
+    emitEvent(events, {GameEvent::Type::CROWD_SURF, playerId, -1, player.position, {},
                       0, true});
 
     // Crowd injury: one plain Injury roll, NO modifiers (rules parity,

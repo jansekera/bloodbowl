@@ -166,11 +166,12 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
         // nemohla utect od pravidla, ktere se tady opravdu resolvuje.
         bool tackleNegates = tackleNegatesDodgeReroll(state, player, from);
 
+        int rolled = 0;   // P145: padlá kostka do `die1` události
         bool dodgeOk = attemptRoll(state, playerId, dice, target,
-                                    SkillName::Dodge, tackleNegates, true, events);
+                                    SkillName::Dodge, tackleNegates, true, events, &rolled);
 
         emitEvent(events, {GameEvent::Type::DODGE, playerId, -1, from, to,
-                          target, dodgeOk});
+                          target, dodgeOk, rolled});
 
         if (!dodgeOk) {
             // Failed dodge: player falls at destination
@@ -191,11 +192,12 @@ ActionResult resolveMoveStep(GameState& state, int playerId, Position to,
     if (needsGfi) {
         int gfiTarget = (state.weather == Weather::BLIZZARD) ? 3 : 2;
 
+        int rolled = 0;   // P145: padlá kostka do `die1` události
         bool gfiOk = attemptRoll(state, playerId, dice, gfiTarget,
-                                  SkillName::SureFeet, false, true, events);
+                                  SkillName::SureFeet, false, true, events, &rolled);
 
         emitEvent(events, {GameEvent::Type::GFI, playerId, -1, from, to,
-                          gfiTarget, gfiOk});
+                          gfiTarget, gfiOk, rolled});
 
         if (!gfiOk) {
             // Failed GFI: player falls at destination
@@ -300,12 +302,13 @@ ActionResult resolveLeap(GameState& state, int playerId, Position to,
 
     int target = calculateLeapTarget(player);   // sdilene s ocenenim
 
+    int rolled = 0;   // P145: padlá kostka do `die1` události
     bool leapOk = attemptRoll(state, playerId, dice, target,
-                               SkillName::SKILL_COUNT, false, true, events);
+                               SkillName::SKILL_COUNT, false, true, events, &rolled);
 
     // T5.31 (26.08.): bylo DODGE -- skok se v korpusu nedal odlisit od dodge.
     emitEvent(events, {GameEvent::Type::LEAP, playerId, -1, from, to,
-                      target, leapOk});
+                      target, leapOk, rolled});
 
     if (!leapOk) {
         // Failed leap: player prone at destination, armor+injury, turnover
@@ -426,11 +429,12 @@ ActionResult resolveStandUp(GameState& state, int playerId, DiceRollerBase& dice
         // skill reroll -> Pro -> týmový reroll s Loner bránou. Holý hod
         // znamenal, že Treemanovi nešel použít týmový reroll -- tedy přesně
         // to selhání, které měl P45 odstranit.
+        int rolled = 0;   // P145: padlá kostka do `die1` události
         bool ok = attemptRoll(state, playerId, dice, /*target=*/4,
                               SkillName::SKILL_COUNT, /*negated=*/false,
-                              /*canUseTeamReroll=*/true, events);
+                              /*canUseTeamReroll=*/true, events, &rolled);
         emitEvent(events, {GameEvent::Type::STAND_UP, playerId, -1,
-                          player.position, player.position, 4, ok});
+                          player.position, player.position, 4, ok, rolled});
         if (!ok) {
             // Action is used up, but this is explicitly NOT a turnover.
             player.hasActed = true;

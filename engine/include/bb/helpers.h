@@ -110,9 +110,13 @@ bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);
 
+// `rolled` (P145, 13.10.2026): kostka, která nakonec PLATÍ (po případném přehozu;
+// když Pro nebo Loner neprojde, platí původní hod). Volající ji dává do `die1`
+// události hodu -- do té doby nesla událost jen cílové číslo a výpis partie psal
+// „potřeba 3+“ bez toho, co padlo.
 bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  int target, SkillName skillReroll,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,
-                 std::vector<GameEvent>* events);
+                 std::vector<GameEvent>* events, int* rolled = nullptr);
 
 } // namespace bb

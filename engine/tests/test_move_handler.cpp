@@ -281,3 +281,56 @@ TEST(MoveHandler, SureFeetRerollsOnlyOneGfiPerTurn) {
     EXPECT_TRUE(second.turnover) << "druhý neúspěšný GFI v kole se nepřehazuje";
     EXPECT_NE(gs.getPlayer(1).state, PlayerState::STANDING);
 }
+
+// ---------------------------------------------------------------------------
+// P145 (e), 13.10.2026: událost hodu nesla v `roll` jen CÍLOVÉ číslo, padlá kostka
+// v ní nebyla vůbec -- výpis partie 02.10. psal „DODGE potřeba 3+ -> OK“ a co
+// padlo, se nedalo dohledat. `die1` = kostka, která platí; u přehozu skillem
+// nese SKILL_USED nový hod (`die1`) i původní (`die2`).
+// ---------------------------------------------------------------------------
+static const GameEvent* firstEvent(const std::vector<GameEvent>& evs, GameEvent::Type t) {
+    for (const auto& e : evs) if (e.type == t) return &e;
+    return nullptr;
+}
+
+TEST(MoveHandler, P145DodgeEventCarriesTheDieThatWasRolled) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({5});   // AG3 úhyb do volného pole: cíl 3, padlo 5
+    std::vector<GameEvent> evs;
+    resolveMoveStep(gs, 1, {11, 7}, dice, &evs);
+    const GameEvent* e = firstEvent(evs, GameEvent::Type::DODGE);
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->roll, 3) << "`roll` dál nese cílové číslo";
+    EXPECT_EQ(e->die1, 5) << "`die1` má nést padlou kostku";
+}
+
+TEST(MoveHandler, P145SkillRerollEventCarriesBothTheNewAndTheOriginalDie) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Dodge);
+    placePlayer(gs, 12, {9, 7}, TeamSide::AWAY);
+    FixedDiceRoller dice({2, 4});   // 2 neprojde, Dodge přehodí na 4
+    std::vector<GameEvent> evs;
+    resolveMoveStep(gs, 1, {11, 7}, dice, &evs);
+    const GameEvent* s = firstEvent(evs, GameEvent::Type::SKILL_USED);
+    ASSERT_NE(s, nullptr);
+    EXPECT_EQ(s->die1, 4);
+    EXPECT_EQ(s->die2, 2);
+    const GameEvent* e = firstEvent(evs, GameEvent::Type::DODGE);
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->die1, 4) << "platí přehozená kostka";
+}
+
+TEST(MoveHandler, P145GfiEventCarriesTheDieThatWasRolled) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).movementRemaining = 0;
+    FixedDiceRoller dice({6});
+    std::vector<GameEvent> evs;
+    resolveMoveStep(gs, 1, {11, 7}, dice, &evs);
+    const GameEvent* e = firstEvent(evs, GameEvent::Type::GFI);
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->die1, 6);
+}

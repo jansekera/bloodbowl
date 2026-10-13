@@ -429,3 +429,44 @@ TEST(BallHandler, N19SamePlayerWithTacklezonesCatchesTheBounce) {
     EXPECT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, 1);
 }
+
+// P145 (e), 13.10.2026: PICKUP a CATCH nesou v `die1` padlou kostku (v `roll`
+// zůstává cílové číslo) -- viz test_move_handler.cpp.
+TEST(BallHandler, P145PickupAndCatchEventsCarryTheDieThatWasRolled) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.ball = BallState::onGround({10, 7});
+    FixedDiceRoller dice({5});
+    std::vector<GameEvent> evs;
+    ASSERT_TRUE(resolvePickup(gs, 1, dice, &evs));
+    ASSERT_FALSE(evs.empty());
+    EXPECT_EQ(evs.back().type, GameEvent::Type::PICKUP);
+    EXPECT_EQ(evs.back().die1, 5);
+
+    GameState gc;
+    placePlayer(gc, 1, {10, 7}, TeamSide::HOME);
+    gc.ball = BallState::onGround({10, 7});
+    FixedDiceRoller diceC({6});
+    std::vector<GameEvent> evc;
+    ASSERT_TRUE(resolveCatch(gc, 1, diceC, 0, &evc));
+    ASSERT_FALSE(evc.empty());
+    EXPECT_EQ(evc.back().type, GameEvent::Type::CATCH);
+    EXPECT_EQ(evc.back().die1, 6);
+}
+
+// P145 (a), výpis: vhazování a odraz jsou obojí BALL_BOUNCE a ve výpisu partie
+// 02.10. se nedaly rozlišit (D8 1-8 × 2D6 2-12 se překrývají). Vhazování nese
+// v `die1` kostku šablony (D6), odraz tam má 0.
+TEST(BallHandler, P145ThrowInEventCarriesTheTemplateDieAndABounceDoesNot) {
+    GameState gs;
+    FixedDiceRoller dice({3, 3, 2, 3});   // šablona 3, 2D6 = 5, odraz D8 = 3
+    std::vector<GameEvent> evs;
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, &evs);
+    ASSERT_EQ(evs.size(), 2u);
+    EXPECT_EQ(evs[0].type, GameEvent::Type::BALL_BOUNCE);
+    EXPECT_EQ(evs[0].roll, 5);
+    EXPECT_EQ(evs[0].die1, 3) << "vhazování: kostka šablony";
+    EXPECT_EQ(evs[0].to, (Position{10, 4}));
+    EXPECT_EQ(evs[1].type, GameEvent::Type::BALL_BOUNCE);
+    EXPECT_EQ(evs[1].die1, 0) << "odraz: žádná kostka šablony";
+}

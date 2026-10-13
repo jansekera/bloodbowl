@@ -368,3 +368,55 @@ TEST(Injury, ApothecaryOnAnOriginalBadlyHurtIsACertainReturn) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH) << "back in Reserves";
     EXPECT_TRUE(gs.getTeamState(TeamSide::HOME).apothecaryUsed);
 }
+
+// ---------------------------------------------------------------------------
+// P145 (b), (d) -- 13.10.2026, výpis partie 02.10.:
+// (b) lékárník se posílal jako SKILL_USED s `roll` = výsledek zranění, takže se
+//     tiskl jako skill s tímtéž číslem („SKILL Block“);
+// (d) vytlačení do davu se značilo událostí INJURY s hodem 0 („INJURY hráč N: 0“),
+//     nerozlišitelnou od hodu na zranění.
+// Obojí má vlastní typ události.
+// ---------------------------------------------------------------------------
+TEST(Injury, P145ApothecaryHasItsOwnEventNotASkillEvent) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Blitzer";
+    gs.getTeamState(TeamSide::HOME).hasApothecary = true;
+    // brnění, zranění 10, první D68 = 6,1 (DEAD), lékárník D68 = 1,1 (BH)
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    InjuryContext ctx;
+    std::vector<GameEvent> events;
+    resolveArmourAndInjury(gs, 1, dice, ctx, &events);
+    int apo = 0;
+    for (const auto& e : events) {
+        EXPECT_NE(e.type, GameEvent::Type::SKILL_USED) << "lékárník není skill";
+        if (e.type != GameEvent::Type::APOTHECARY) continue;
+        ++apo;
+        EXPECT_EQ(e.playerId, 1);
+        EXPECT_EQ(e.roll, static_cast<int>(CasualtyResult::BADLY_HURT)) << "platný výsledek";
+        EXPECT_EQ(e.die1, static_cast<int>(CasualtyResult::DEAD) + 1) << "první výsledek + 1";
+        EXPECT_EQ(e.die2, static_cast<int>(CasualtyResult::BADLY_HURT) + 1) << "druhý výsledek + 1";
+    }
+    EXPECT_EQ(apo, 1);
+}
+
+TEST(Injury, P145CrowdSurfHasItsOwnEventAndNoZeroInjuryRoll) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME);
+    FixedDiceRoller dice({3, 3});
+    std::vector<GameEvent> events;
+    resolveCrowdSurf(gs, 1, dice, &events);
+    int surf = 0;
+    for (const auto& e : events) {
+        if (e.type == GameEvent::Type::INJURY) {
+            EXPECT_GT(e.roll, 0) << "INJURY s hodem 0 není hod na zranění";
+        }
+        if (e.type == GameEvent::Type::CROWD_SURF) {
+            ++surf;
+            EXPECT_EQ(e.playerId, 1);
+            EXPECT_EQ(e.from, (Position{10, 0})) << "pole, ze kterého šel do davu";
+        }
+    }
+    EXPECT_EQ(surf, 1);
+}
