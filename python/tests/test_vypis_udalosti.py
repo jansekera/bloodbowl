@@ -78,3 +78,12 @@ def test_vypis_zraneni_lekarnika_a_davu():
     # přehoz skillem: původní i nový hod
     r = ps.event_str(udalost("SKILL", roll=ps.SKILL_NAMES.index("Dodge"), die1=4, die2=2))
     assert "Dodge" in r and "2 -> 4" in r
+
+
+def test_vypis_faulu_ukazuje_kostky_kvuli_vylouceni():
+    # uživatel 13.10.: „u faulu přidej zobrazení kostek pro kontrolu vyloučení“
+    r = ps.event_str(udalost("FOUL", player=12, target=4, roll=6, die1=2, die2=3, success=False))
+    assert "2+3" in r and "+1 asistence" in r and "= 6" in r and "vydrželo" in r and "dvojice nepadla" in r
+    r = ps.event_str(udalost("FOUL", player=12, target=4, roll=10, die1=5, die2=5, success=True))
+    assert "5+5" in r and "PROLOMENO" in r and "DVOJICE -> vyloučení" in r
+    assert ps.event_str(udalost("EJECTED", player=12)).startswith("VYLOUČEN hráč 12")

@@ -399,6 +399,17 @@ def event_str(e):
     if t == "APOTHECARY":
         return (f"LÉKÁRNÍK {who}: {zraneni_str(e['die1'] - 1)} / {zraneni_str(e['die2'] - 1)}"
                 f" -> platí {zraneni_str(e['roll'])}")
+    if t == "FOUL":
+        # uživatel 13.10.: u faulu ukázat kostky kvůli kontrole vyloučení (dvojice na brnění NEBO
+        # na zranění = vyloučen, ř. 1876-1880). roll = brnění včetně asistencí, die1/die2 = kostky.
+        d1, d2 = e["die1"], e["die2"]
+        navic = e["roll"] - d1 - d2
+        plus = f" {'+' if navic >= 0 else '-'}{abs(navic)} asistence" if navic else ""
+        dvojice = " · DVOJICE -> vyloučení" if d1 == d2 else " · dvojice nepadla"
+        return (f"FAUL {who} na hráče {e['target']}: brnění {d1}+{d2}{plus} = {e['roll']} -> "
+                f"{'PROLOMENO' if e['success'] else 'vydrželo'}{dvojice}")
+    if t == "EJECTED":
+        return f"VYLOUČEN {who} (dvojice při faulu)"
     if t == "CROWD_SURF":
         return f"DO DAVU {who} z pole {e['from']}"
     if t == "BALL_BOUNCE":
