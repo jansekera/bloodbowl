@@ -201,26 +201,41 @@ TEST(BallHandler, HandleBallOnPlayerDownNotCarrier) {
     EXPECT_EQ(gs.ball.carrierId, 2);
 }
 
+// T5.24 / P145 (13.10.2026) -- BB2016 FAQ l. 9307-9314: "The square with the
+// Blood Bowl logo over it COUNTS AS THE FIRST SQUARE of the ball's movement.
+// So, if the result of the 2D6 roll was a 2, the ball would be placed in the
+// square with the Blood Bowl logo over it, then move ONE square in the relevant
+// direction." Do 13.10. letel mic plnych 2D6 poli od posledniho pole v hristi.
+TEST(BallHandler, ThrowInOfTwoMovesTheBallOneSquareFromTheLastPitchSquare) {
+    GameState gs;
+    // presne priklad z FAQ: vystup nahoru z (10,0), D6=3 => rovne dovnitr,
+    // 2D6 = 1+1 = 2 => JEDNO pole: (10,1). Odraz D8=3 (vychod) -> (11,1).
+    FixedDiceRoller dice({3, 1, 1, 3});
+    resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
+    EXPECT_EQ(gs.ball.position, (Position{11, 1}));
+}
+
 TEST(BallHandler, ThrowInSideExitStraight) {
     GameState gs;
     // Ball exited off the TOP edge (offPitchExit y<0). LRB6 throw-in
     // template for a side exit: D6 1-2/3-4/5-6 = diagonal/straight-in/
-    // diagonal. D6=3 -> straight in (0,+1). Distance 2D6=3+2=5:
-    // (10,0) + (0,1)*5 = (10,5). Mandatory final bounce: D8=3 (East) -> (11,5).
+    // diagonal. D6=3 -> straight in (0,+1). Distance 2D6=3+2=5, the first
+    // square being (10,0) itself (FAQ l. 9307-9314): (10,0) + (0,1)*4 = (10,4).
+    // Mandatory final bounce: D8=3 (East) -> (11,4).
     FixedDiceRoller dice({3, 3, 2, 3});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
-    EXPECT_EQ(gs.ball.position, (Position{11, 5}));
+    EXPECT_EQ(gs.ball.position, (Position{11, 4}));
     EXPECT_FALSE(gs.ball.isHeld);
 }
 
 TEST(BallHandler, ThrowInSideExitDiagonal) {
     GameState gs;
     // Same TOP exit, but D6=1 (<=2) -> diagonal SW (-1,+1), not straight.
-    // Distance 2D6=4+3=7: (10,0) + (-1,1)*7 = (3,7). Final bounce D8=3
-    // (East) -> (4,7).
+    // Distance 2D6=4+3=7, first square (10,0): (10,0) + (-1,1)*6 = (4,6).
+    // Final bounce D8=3 (East) -> (5,6).
     FixedDiceRoller dice({1, 4, 3, 3});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
-    EXPECT_EQ(gs.ball.position, (Position{4, 7}));
+    EXPECT_EQ(gs.ball.position, (Position{5, 6}));
 }
 
 TEST(BallHandler, ThrowInCornerExit) {
@@ -228,11 +243,11 @@ TEST(BallHandler, ThrowInCornerExit) {
     // Ball exited off the TOP-LEFT corner (x<0 and y<0). LRB6 corner
     // throw-in: D3 picks straight-along-one-edge / diagonal / straight-
     // along-the-other-edge. D6=5 -> D3=(5+1)/2=3 -> "S, along the left
-    // edge" (0,+1). Distance 2D6=2+2=4: (0,0) + (0,1)*4 = (0,4). Final
-    // bounce D8=3 (East) -> (1,4).
+    // edge" (0,+1). Distance 2D6=2+2=4, first square (0,0): (0,0) + (0,1)*3
+    // = (0,3). Final bounce D8=3 (East) -> (1,3).
     FixedDiceRoller dice({5, 2, 2, 3});
     resolveThrowIn(gs, {0, 0}, {-1, -1}, dice, nullptr);
-    EXPECT_EQ(gs.ball.position, (Position{1, 4}));
+    EXPECT_EQ(gs.ball.position, (Position{1, 3}));
 }
 
 // ============================================================================
@@ -246,27 +261,27 @@ TEST(BallHandler, ThrowInIsCaughtByAStandingPlayerInTheLandingSquare) {
     // player, that player MUST attempt to catch the ball." Do 24.08. se
     // z pole dopadu VZDY odrazelo, takze vhozeny mic nikdo nikdy nechytil.
     GameState gs;
-    placePlayer(gs, 1, {10, 5}, TeamSide::HOME);
-    // stejne kostky jako ThrowInSideExitStraight: dopad na (10,5), kde stoji
+    placePlayer(gs, 1, {10, 4}, TeamSide::HOME);
+    // stejne kostky jako ThrowInSideExitStraight: dopad na (10,4), kde stoji
     // hráč 1 => chyt AG3, cil 4, hod 5 => uspech. Zadny odraz.
     FixedDiceRoller dice({3, 3, 2, 5});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
     EXPECT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, 1);
-    EXPECT_EQ(gs.ball.position, (Position{10, 5}));
+    EXPECT_EQ(gs.ball.position, (Position{10, 4}));
 }
 
 TEST(BallHandler, ThrowInBouncesOffAPRONEPlayerInsteadOfBeingCaught) {
     // druha strana hranice, l. 872-874: "If the ball lands in an empty square
     // or a square occupied by a PRONE OR STUNNED player, then it will bounce."
     GameState gs;
-    placePlayer(gs, 1, {10, 5}, TeamSide::HOME);
+    placePlayer(gs, 1, {10, 4}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
-    // dopad (10,5) na leziciho => zadny chyt, odraz D8=3 (vychod) -> (11,5)
+    // dopad (10,4) na leziciho => zadny chyt, odraz D8=3 (vychod) -> (11,4)
     FixedDiceRoller dice({3, 3, 2, 3});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
     EXPECT_FALSE(gs.ball.isHeld);
-    EXPECT_EQ(gs.ball.position, (Position{11, 5}));
+    EXPECT_EQ(gs.ball.position, (Position{11, 4}));
 }
 
 TEST(BallHandler, ThrowInThatLeavesThePitchAgainIsThrownInAgain) {
@@ -275,22 +290,23 @@ TEST(BallHandler, ThrowInThatLeavesThePitchAgainIsThrownInAgain) {
     // it left the pitch." Do 24.08. se misto toho orizlo na kraj hriste.
     GameState gs;
     // 1. vhazeni z (10,0) po vystupu nahoru: D6=1 => diagonala (-1,+1),
-    //    2D6 = 6+6 = 12. Mic jde po poli: (9,1)...(0,10) je posledni pole
-    //    V HRISTI, dalsi krok (-1,11) uz je ven -- vlevo.
+    //    2D6 = 6+6 = 12, tedy 11 kroku (prvni pole je (10,0), FAQ l. 9307-9314).
+    //    Mic jde po poli: (9,1)...(0,10) je posledni pole V HRISTI (10. krok),
+    //    11. krok (-1,11) uz je ven -- vlevo.
     // 2. vhazeni tedy z (0,10), NE z (10,0), a sablonou pro LEVY kraj:
-    //    D6=3 => rovne dovnitr (+1,0), 2D6 = 2+2 = 4 => (4,10).
-    //    Prazdne pole => odraz D8=3 (vychod) -> (5,10).
+    //    D6=3 => rovne dovnitr (+1,0), 2D6 = 2+2 = 4 => 3 kroky => (3,10).
+    //    Prazdne pole => odraz D8=3 (vychod) -> (4,10).
     FixedDiceRoller dice({1, 6, 6, 3, 2, 2, 3});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);
     EXPECT_TRUE(gs.ball.position.isOnPitch());
-    EXPECT_EQ(gs.ball.position, (Position{5, 10}));
+    EXPECT_EQ(gs.ball.position, (Position{4, 10}));
 }
 
 TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
     GameState gs;
-    placePlayer(gs, 1, {11, 5}, TeamSide::HOME);
+    placePlayer(gs, 1, {11, 4}, TeamSide::HOME);
     // Same as ThrowInSideExitStraight, but a player sits at the final
-    // bounce destination (11,5) and must attempt a catch (AG3 target 4,
+    // bounce destination (11,4) and must attempt a catch (AG3 target 4,
     // roll 5 -> success).
     FixedDiceRoller dice({3, 3, 2, 3, 5});
     resolveThrowIn(gs, {10, 0}, {10, -1}, dice, nullptr);

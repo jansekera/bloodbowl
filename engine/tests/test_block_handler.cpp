@@ -1842,7 +1842,8 @@ TEST(BlockHandler, N3bAllThreeSquaresOnThePitchAndOccupiedStillChains) {
 // more than happy to throw the ball back into play! The Throw-in template is centred on the last
 // square the player was in before he was pushed off the pitch“ — šablona tedy míří od HORNÍ lajny
 // do hřiště, ne od pole „rovně za ním“, které tu leží na hřišti. Vhazování D6 = 3 ⇒ kolmo do
-// hřiště, 2D6 = 1+1 ⇒ (11,2); prázdné ⇒ odraz D8 = 5 (jih) ⇒ (11,3). Pak zranění v davu.
+// hřiště, 2D6 = 1+1 ⇒ JEDNO pole (první pole pohybu je (11,0) samo, FAQ ř. 9307-9314) ⇒ (11,1);
+// prázdné ⇒ odraz D8 = 5 (jih) ⇒ (11,2). Pak zranění v davu.
 TEST(BlockHandler, N3bCarrierSurfedAlongTheSidelineIsThrownInFromThatSideline) {
     GameState gs;
     gs.phase = GamePhase::PLAY;
@@ -1858,7 +1859,7 @@ TEST(BlockHandler, N3bCarrierSurfedAlongTheSidelineIsThrownInFromThatSideline) {
 
     ASSERT_FALSE(gs.getPlayer(12).isOnPitch());
     EXPECT_FALSE(gs.ball.isHeld);
-    EXPECT_EQ(gs.ball.position, (Position{11, 3}));
+    EXPECT_EQ(gs.ball.position, (Position{11, 2}));
 }
 
 // ---------------------------------------------------------------------------

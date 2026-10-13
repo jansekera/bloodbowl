@@ -231,7 +231,12 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
         Position lastInside = origin;
         Position firstOutside = origin;
         bool leftPitch = false;
-        for (int step = 0; step < distance; ++step) {
+        // OPRAVENO 13.10.2026 (T5.24 / P145) -- tady bylo `step < distance`, mic
+        // letel o pole dal. FAQ l. 9307-9314: "The square with the Blood Bowl
+        // logo over it counts as the FIRST square of the ball's movement. So, if
+        // the result of the 2D6 roll was a 2, the ball would be ... placed in the
+        // square with the Blood Bowl logo over it, then move ONE square".
+        for (int step = 0; step < distance - 1; ++step) {
             dest.x = static_cast<int8_t>(dest.x + offset.x);
             dest.y = static_cast<int8_t>(dest.y + offset.y);
             if (!dest.isOnPitch()) {

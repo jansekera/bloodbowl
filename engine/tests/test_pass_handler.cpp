@@ -561,9 +561,10 @@ TEST(PassHandler, InaccuratePassStopsScatteringAtTheSideline) {
     gs.ball = BallState::carried({3, 7}, 1);
 
     // HMP 4 (inaccurate) · D8=1 (N): (20,0) -> (20,-1), OFF -- no more scatter
-    // throw-in from (20,0), top edge: D6=3 -> S, 2D6 = 1+1 = 2 -> (20,2)
+    // throw-in from (20,0), top edge: D6=3 -> S, 2D6 = 1+2 = 3, the first square
+    // being (20,0) itself (FAQ l. 9307-9314) -> two squares on -> (20,2)
     // player 2 stands there and must catch: 6 succeeds
-    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    FixedDiceRoller dice({4, 1, 3, 1, 2, 6});
     auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
 
     EXPECT_TRUE(gs.ball.isHeld);
@@ -696,9 +697,10 @@ TEST(PassHandler, P89ThrowInCaughtByTheMovingTeamIsNoTurnover) {
     gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
     placePlayer(gs, 2, {20, 2}, TeamSide::HOME);
     gs.ball = BallState::carried({3, 7}, 1);
-    // HMP 4 (nepřesná) · rozptyl D8=1: (20,0) -> mimo · vhazování D6=3, 2D6 = 1+1 -> (20,2)
+    // HMP 4 (nepřesná) · rozptyl D8=1: (20,0) -> mimo · vhazování D6=3, 2D6 = 1+2 = 3,
+    // první pole je (20,0) samo (FAQ ř. 9307-9314) -> (20,2)
     // tam stojí NÁŠ hráč 2 a chytí (6)
-    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    FixedDiceRoller dice({4, 1, 3, 1, 2, 6});
     auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
     ASSERT_TRUE(gs.ball.isHeld);
     ASSERT_EQ(gs.ball.carrierId, 2);
@@ -711,7 +713,7 @@ TEST(PassHandler, P89ThrowInCaughtByTheOpponentIsStillATurnover) {
     gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
     placePlayer(gs, 13, {20, 2}, TeamSide::AWAY);
     gs.ball = BallState::carried({3, 7}, 1);
-    FixedDiceRoller dice({4, 1, 3, 1, 1, 6});
+    FixedDiceRoller dice({4, 1, 3, 1, 2, 6});
     auto result = resolvePass(gs, 1, {20, 0}, dice, nullptr);
     ASSERT_TRUE(gs.ball.isHeld);
     ASSERT_EQ(gs.ball.carrierId, 13);
