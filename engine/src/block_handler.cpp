@@ -644,6 +644,32 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
     return true;
 }
 
+// Follow-up útočníka na pole uvolněné obráncem (l. 606-611). Volá se HNED po
+// odtlačení, před jakýmkoli dalším hodem (l. 609-610) -- míč, který se pak odrazí
+// na jeho nové pole, tak najde stojícího hráče a ten ho chytá (resolveBounce).
+// 2026-08-28: FOLLOW_UP se emituje I KDYŽ se nenásleduje -- `success` nese volbu,
+// ne úspěch hodu; bez toho v logu chybí jmenovatel (viz game_event.h).
+static void followUp(GameState& state, Player& att, const Player& def, const BlockParams& params,
+                     Position defOldPos, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    const Position attOldPos = att.position;
+    const bool wants = wantsFollowUp(state, att, params, defOldPos);
+    emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id, attOldPos, defOldPos, 0, wants});
+    if (!wants) return;
+    att.position = defOldPos;
+    if (state.ball.isHeld && state.ball.carrierId == att.id) {
+        state.ball.position = att.position;
+    } else if (!state.ball.isHeld && state.ball.position == att.position) {
+        // Míč na uvolněném poli už leží: odrazil se tam během odtlačení (odtlačený
+        // vstoupil na pole s míčem, l. 605-607), tedy hodem, který podle l. 609-610
+        // přišel až PO rozhodnutí o follow-upu -- útočník tam už stál a míč CHYTÁ.
+        // OPRAVENO 13.10.2026 (P194/6, uživatel: „ano chytá ... při follow se hýbe
+        // voluntarily“) -- tady bylo zvednutí (jiný cíl hodu) a neúspěch = turnover.
+        if (!resolveCatch(state, att.id, dice, 0, events)) {
+            resolveBounce(state, att.position, dice, 0, events);
+        }
+    }
+}
+
 // ============================================================================
 // Q3 krok B (31.08.2026): MERIDLO SOUPEROVY ODPOVEDI NA VSTANI
 //
@@ -1210,6 +1236,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // the ball a single bounce from the edge -- so a surf won us the
             // removal AND the ball, and was badly overpaid.
             Position lastPos = def.position;
+            // OPRAVENO 13.10.2026 (P194/6) -- follow-up se tu řešil AŽ PO vhazování
+            // a hodu na zranění v davu. Pravidla ř. 609-610: "The player's coach
+            // must decide whether to follow up BEFORE ANY OTHER DICE ROLLS are made."
+            if (!noFollowUp) followUp(state, att, def, params, defOldPos, dice, events);
             if (state.ball.isHeld && state.ball.carrierId == def.id) {
                 state.ball = BallState::onGround(lastPos);
                 resolveThrowIn(state, lastPos, pushOffPitchExit(att.position, lastPos),
@@ -1222,28 +1252,6 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
             // StripBall: ball drops at crowd edge (already handled by crowd surf)
 
-            // Follow-up: attacker to old defender position -- but only if he
-            // wants it (l. 608-611). See wantsFollowUp above.
-            if (!noFollowUp) {
-                // 2026-08-28: FOLLOW_UP se emituje I KDYZ se nenasleduje.
-                // Bez toho v logu chybi jmenovatel -- viz game_event.h.
-                const Position attOldPos = att.position;
-                const bool wants = wantsFollowUp(state, att, params, defOldPos);
-                emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id,
-                                  attOldPos, defOldPos, 0, wants});
-                if (wants) {
-                    att.position = defOldPos;
-                    if (state.ball.isHeld && state.ball.carrierId == att.id) {
-                        state.ball.position = att.position;
-                    } else if (!state.ball.isHeld && state.ball.position == att.position) {
-                        // Following up onto a loose ball attempts a pickup,
-                        // same as deliberately moving onto one.
-                        if (!resolvePickup(state, att.id, dice, events)) {
-                            turnover = true;
-                        }
-                    }
-                }
-            }
             endBlockActivation(att, params);
 
             // Handle BD attacker knockdown
@@ -1254,27 +1262,6 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 handleBallOnPlayerDown(state, att.id, dice, events);
             }
             return turnover ? ActionResult::turnovr() : ActionResult::ok();
-        }
-
-        // Strip Ball, l. 8517-8521: "When a player with this skill blocks an
-        // opponent with the ball, applying a 'Pushed' or 'Defender Stumbles'
-        // result will cause the opposing player to DROP THE BALL IN THE SQUARE
-        // THAT THEY ARE PUSHED TO, EVEN IF the opposing player is NOT KNOCKED
-        // DOWN." Sražený nosič mic pusti i bez Strip Ballu, takze zdejsi vetev
-        // resi prave to "i kdyz nespadl". Sure Hands ho rusi (l. 8546-8548).
-        // Mic padá z def.position, coz uz JE cilove pole odsunu (odsun probehl
-        // vys v resolvePushback).
-        if (!defKnockedDown && state.ball.isHeld && state.ball.carrierId == def.id &&
-            att.hasSkill(SkillName::StripBall)) {
-            if (def.hasSkill(SkillName::SureHands)) {
-                // Sure Hands negates Strip Ball (BB2016/LRB6) — ball stays with carrier.
-                emitEvent(events, {GameEvent::Type::SKILL_USED, def.id, att.id,
-                                  def.position, {},
-                                  static_cast<int>(SkillName::SureHands), true});
-            } else {
-                state.ball = BallState::onGround(def.position);
-                resolveBounce(state, def.position, dice, 0, events);
-            }
         }
 
         // Follow-up: attacker moves to old defender position.
@@ -1293,25 +1280,29 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // we used to walk the attacker onto him -- two players on one square.
         bool defVacated = def.position != defOldPos;
         if (!noFollowUp && !fendPrevents && defVacated) {
-            // 2026-08-28: FOLLOW_UP se emituje I KDYZ se nenasleduje --
-            // `success` nese volbu, ne uspech hodu. Podminka nad tim je
-            // PRILEZITOST (pole se uvolnilo a nic ji nezakazuje), takze
-            // odmitnuti uz jde odlisit od "nebylo co odmitnout".
-            const Position attOldPos = att.position;
-            const bool wants = wantsFollowUp(state, att, params, defOldPos);
-            emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id,
-                              attOldPos, defOldPos, 0, wants});
-            if (wants) {
-                att.position = defOldPos;
-                if (state.ball.isHeld && state.ball.carrierId == att.id) {
-                    state.ball.position = att.position;
-                } else if (!state.ball.isHeld && state.ball.position == att.position) {
-                    // Following up onto a loose ball attempts a pickup, same
-                    // as deliberately moving onto one.
-                    if (!resolvePickup(state, att.id, dice, events)) {
-                        turnover = true;
-                    }
-                }
+            followUp(state, att, def, params, defOldPos, dice, events);
+        }
+
+        // OPRAVENO 13.10.2026 (P194/6) -- vyražení míče Strip Ballem stálo PŘED
+        // follow-upem, takže se míč odrážel dřív, než kouč rozhodl (ř. 609-610).
+        // Strip Ball, l. 8517-8521: "When a player with this skill blocks an
+        // opponent with the ball, applying a 'Pushed' or 'Defender Stumbles'
+        // result will cause the opposing player to DROP THE BALL IN THE SQUARE
+        // THAT THEY ARE PUSHED TO, EVEN IF the opposing player is NOT KNOCKED
+        // DOWN." Sražený nosič mic pusti i bez Strip Ballu, takze zdejsi vetev
+        // resi prave to "i kdyz nespadl". Sure Hands ho rusi (l. 8546-8548).
+        // Mic padá z def.position, coz uz JE cilove pole odsunu (odsun probehl
+        // vys v resolvePushback).
+        if (!defKnockedDown && state.ball.isHeld && state.ball.carrierId == def.id &&
+            att.hasSkill(SkillName::StripBall)) {
+            if (def.hasSkill(SkillName::SureHands)) {
+                // Sure Hands negates Strip Ball (BB2016/LRB6) — ball stays with carrier.
+                emitEvent(events, {GameEvent::Type::SKILL_USED, def.id, att.id,
+                                  def.position, {},
+                                  static_cast<int>(SkillName::SureHands), true});
+            } else {
+                state.ball = BallState::onGround(def.position);
+                resolveBounce(state, def.position, dice, 0, events);
             }
         }
 

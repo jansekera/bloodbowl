@@ -222,39 +222,44 @@ TEST(BlockHandler, ChainPushOntoLooseBallBounces) {
     EXPECT_EQ(gs.ball.position, (Position{14, 7}));
 }
 
-TEST(BlockHandler, FollowUpOntoLooseBallPicksUp) {
+// P194 (6), 13.10.2026 -- oba testy dřív stavěly stav, který ve hře nenastane
+// (STOJÍCÍ obránce na poli s volným míčem), a hlídaly na něm ZVEDNUTÍ s turnoverem
+// při neúspěchu. Skutečná cesta, kterou míč na uvolněné pole doputuje dřív, než
+// tam útočník dojde: odtlačený vstoupí na pole s míčem a míč se odrazí zpět
+// (ř. 605-607). O follow-upu se ale rozhoduje před tím hodem (ř. 609-610), útočník
+// tam tedy už stojí a míč CHYTÁ (ř. 856-857); nechycený odražený míč není turnover.
+TEST(BlockHandler, FollowUpOntoTheSquareTheBallBouncedBackToIsACatch) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-    gs.ball = BallState::onGround({11, 7}); // defender stands on a loose ball
-    // Roll PUSHED (D6=3). Defender pushed east to (12,7); the ball wasn't
-    // carried, so it stays at (11,7). Attacker follows up onto (11,7) and
-    // attempts a pickup: AG3 target 3, roll 4 -> success.
-    FixedDiceRoller dice({3, 4});
+    gs.ball = BallState::onGround({12, 7});
+    // Pushed (3): obránce na (12,7), kde leží míč => odraz D8 = 7 (západ) -> (11,7).
+    // Útočník následuje a chytá: AG3 4+, -1 za zónu obránce = 5+; hod 5 stačí.
+    FixedDiceRoller dice({3, 7, 5});
     BlockParams params{1, 12, false, false};
-    auto result = resolveBlock(gs, params, dice, nullptr);
+    std::vector<GameEvent> evs;
+    auto result = resolveBlock(gs, params, dice, &evs);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
     EXPECT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, 1);
     EXPECT_FALSE(result.turnover);
+    for (const auto& e : evs) EXPECT_NE(e.type, GameEvent::Type::PICKUP);
 }
 
-TEST(BlockHandler, FollowUpOntoLooseBallFailedPickupTurnsOver) {
+TEST(BlockHandler, FollowUpOntoTheSquareTheBallBouncedBackToFailedCatchIsNoTurnover) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-    gs.ball = BallState::onGround({11, 7});
-    // Roll PUSHED (D6=3). Follow-up pickup fails (roll 2), ball bounces
-    // (D8=3 -> East -> (12,7)) instead of resting under the attacker --
-    // and (12,7) is exactly where the pushed defender now stands, who
-    // then attempts (and makes, AG3 target 4, roll 5) the catch.
-    FixedDiceRoller dice({3, 2, 3, 5});
+    gs.ball = BallState::onGround({12, 7});
+    // Totéž, hod 4 na chycení (5+) nestačí -- zvednutí (3+1 = 4+) by prošlo.
+    // Míč se odráží dál: D8 = 1 (sever) -> (11,6).
+    FixedDiceRoller dice({3, 7, 4, 1});
     BlockParams params{1, 12, false, false};
     auto result = resolveBlock(gs, params, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
-    EXPECT_TRUE(gs.ball.isHeld);
-    EXPECT_EQ(gs.ball.carrierId, 12);
-    EXPECT_TRUE(result.turnover);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 6}));
+    EXPECT_FALSE(result.turnover);
 }
 
 TEST(BlockHandler, KnockdownBounceCanLandOnFollowedUpAttacker) {
@@ -2039,4 +2044,87 @@ TEST(BlockHandler, CarrierRemovedFromThePitchDropsTheBallWhereHeFell) {
         ASSERT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
         EXPECT_EQ(gs.ball.position, (Position{9, 7}));
     }
+}
+
+// ---------------------------------------------------------------------------
+// P194 (6), uživatel 10.10.2026: „ano chytá — nechytá pouze pokud nestojí nebo se
+// pohnul ne voluntarily — při follow se hýbe voluntarily“. Pravidla ř. 609-610:
+// „The player's coach must decide whether to follow up BEFORE ANY OTHER DICE ROLLS
+// are made.“ Útočník tedy na uvolněném poli už STOJÍ, když se míč odráží, a míč,
+// který tam dopadne, CHYTÁ (ř. 856-857) — nezvedá ho a neúspěch není turnover.
+// Dřív: se Strip Ballem a u nosiče vytlačeného do davu se míč odrazil PŘED
+// rozhodnutím o follow-upu, dopadl na prázdné pole a útočník ho pak ZVEDAL
+// (jiný cíl hodu, neúspěch = turnover).
+// ---------------------------------------------------------------------------
+static int eventIndex(const std::vector<GameEvent>& evs, GameEvent::Type t) {
+    for (size_t i = 0; i < evs.size(); ++i) if (evs[i].type == t) return static_cast<int>(i);
+    return -1;
+}
+
+TEST(BlockHandler, P194StripBallBounceOntoTheFollowedUpAttackerIsACatchNotAPickup) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::StripBall);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 7}, 12);
+    // Pushed (3): obránce na (12,7), útočník následuje na (11,7). Strip Ball: míč padá
+    // na (12,7), odraz D8 = 7 (západ) -> (11,7), kde útočník STOJÍ => chytá: AG3 4+,
+    // -1 za zónu obránce = 5+. Hod 4 NESTAČÍ (zvednutí by bylo 3+1 = 4+ a prošlo by)
+    // => odraz D8 = 1 (sever) -> (11,6). Není to turnover.
+    FixedDiceRoller dice({3, 7, 4, 1});
+    BlockParams params{1, 12, false, false};
+    std::vector<GameEvent> evs;
+    auto result = resolveBlock(gs, params, dice, &evs);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    EXPECT_FALSE(gs.ball.isHeld) << "hod 4 na chycení (5+) nestačí";
+    EXPECT_EQ(gs.ball.position, (Position{11, 6}));
+    EXPECT_FALSE(result.turnover) << "nechycený odražený míč není turnover";
+    EXPECT_EQ(eventIndex(evs, GameEvent::Type::PICKUP), -1) << "míč se chytá, nezvedá";
+    ASSERT_GE(eventIndex(evs, GameEvent::Type::FOLLOW_UP), 0);
+    EXPECT_LT(eventIndex(evs, GameEvent::Type::FOLLOW_UP), eventIndex(evs, GameEvent::Type::BALL_BOUNCE))
+        << "o follow-upu se rozhoduje před jakýmkoli dalším hodem (ř. 609-610)";
+}
+
+TEST(BlockHandler, P194StripBallBounceCaughtByTheFollowedUpAttacker) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::StripBall);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 7}, 12);
+    FixedDiceRoller dice({3, 7, 5});   // totéž, chycení 5+ hodem 5
+    BlockParams params{1, 12, false, false};
+    auto result = resolveBlock(gs, params, dice, nullptr);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+    EXPECT_FALSE(result.turnover);
+}
+
+// Nosič vytlačený do davu (sestava z N3b): i tady se o follow-upu rozhoduje před
+// vhazováním. Vhazování 2D6 = 2 -> (11,1), odraz D8 = 1 (sever) -> (11,0), kde už
+// stojí útočník => chytá: 4+ a -2 za zóny hráčů 13 a 14 = 6+. Hod 5 nestačí
+// (zvednutí 3+2 = 5+ by prošlo) => odraz D8 = 5 (jih) -> (11,1).
+TEST(BlockHandler, P194FollowUpIsDecidedBeforeTheCrowdThrowsTheBallBackIn) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 0}, TeamSide::HOME, 6, 4, 3, 8);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 0}, 12);
+
+    FixedDiceRoller dice({3, 3, 3, 1, 1, 1, 5, 5, 1, 1, 1, 1});
+    BlockParams params{1, 12, false, false};
+    std::vector<GameEvent> evs;
+    auto result = resolveBlock(gs, params, dice, &evs);
+
+    ASSERT_FALSE(gs.getPlayer(12).isOnPitch());
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 0}));
+    EXPECT_FALSE(gs.ball.isHeld) << "hod 5 na chycení (6+) nestačí";
+    EXPECT_EQ(gs.ball.position, (Position{11, 1}));
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(eventIndex(evs, GameEvent::Type::PICKUP), -1);
+    ASSERT_GE(eventIndex(evs, GameEvent::Type::FOLLOW_UP), 0);
+    EXPECT_LT(eventIndex(evs, GameEvent::Type::FOLLOW_UP), eventIndex(evs, GameEvent::Type::BALL_BOUNCE));
 }
