@@ -466,7 +466,7 @@ def preloz_odpoved(q, text):
     return a if a is not None and q["options"] & (1 << a) else None
 
 
-ZRANENI = ["Badly Hurt (vrátí se příští zápas)", "Miss Next Game", "Niggling Injury", "-1 MA", "-1 AV",
+ZRANENI = ["Badly Hurt (do konce zápasu mimo)", "Miss Next Game", "Niggling Injury", "-1 MA", "-1 AV",
            "-1 AG", "-1 ST", "MRTEV"]   # enums.h CasualtyResult
 
 
@@ -494,8 +494,8 @@ def event_str(e):
     if t in ("ARMOR_BREAK", "INJURY"):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
         co = ""
-        if t == "INJURY":   # injury.cpp: do 7 omráčen, 8-9 KO (10+ jde jako CASUALTY)
-            co = " -> omráčen" if e["roll"] <= 7 else " -> KO"
+        if t == "INJURY":   # injury.cpp: do 7 omráčen, 8-9 KO; 10+ jen při lékárníkovi / Regeneraci (P201 (2))
+            co = " -> omráčen" if e["roll"] <= 7 else " -> KO" if e["roll"] <= 9 else " -> ZRANĚNÍ (hod na tabulku zranění)"
         return f"{t} {who}: {e['roll']}{dice}{co}"
     if t == "CASUALTY":
         # P145 (c): `target` je VÝSLEDEK tabulky zranění, ne hráč (tisklo se „CASUALTY hráč 1“)
@@ -504,8 +504,9 @@ def event_str(e):
     if t == "APOTHECARY":
         if e["roll"] < 0:   # P201 (1): lékárník na KO -- hráč zůstává na hřišti omráčený
             return f"LÉKÁRNÍK {who}: místo KO zůstává na hřišti omráčený"
+        rezervy = " -> lékárník ho poslal do REZERV, v zápase pokračuje" if e["roll"] == 0 else ""   # 0 = BADLY_HURT
         return (f"LÉKÁRNÍK {who}: {zraneni_str(e['die1'] - 1)} / {zraneni_str(e['die2'] - 1)}"
-                f" -> platí {zraneni_str(e['roll'])}")
+                f" -> platí {zraneni_str(e['roll'])}{rezervy}")
     if t == "FOUL":
         # uživatel 13.10.: u faulu ukázat kostky kvůli kontrole vyloučení (dvojice na brnění NEBO
         # na zranění = vyloučen, ř. 1876-1880). roll = brnění včetně asistencí, die1/die2 = kostky.
@@ -534,6 +535,8 @@ def event_str(e):
             return f"PRO {who}: hod {e['die1']} (potřeba 4+) -> {'smí přehodit' if e['success'] else 'NEPROŠEL, původní hod platí'}"
         if e["roll"] == 2:
             return f"TÝMOVÝ REROLL na hod Pro {who}: {e['die1']} -> {e['die2']} ({'smí přehodit' if e['success'] else 'NEPROŠEL'})"
+        if e["roll"] == 4:   # P201 (11): týmový reroll vzal engine (strana bez kouče)
+            return f"TÝMOVÝ REROLL {who}: použil ho engine (strana bez kouče)"
         if e["roll"] == 3:
             return f"TÝMOVÝ REROLL {who}: Loner hodil {e['die1']} (potřeba 4+) -> reroll PROPADL, původní hod platí"
         if e["target"] > 0:   # blok: die1/die2 = kostky před a po, po 3 bitech (face+1)
@@ -559,6 +562,8 @@ def event_str(e):
         jm = SKILL_NAMES[e["roll"]] if 0 <= e["roll"] < len(SKILL_NAMES) else e["roll"]
         if e["die2"]:   # přehoz skillem (helpers.cpp attemptRoll): die2 = původní hod, die1 = nový
             return f"SKILL {jm} {who}: přehoz {e['die2']} -> {e['die1']} ({'OK' if e['success'] else 'NEPROŠEL'})"
+        if jm == "StandFirm":   # P201 (4)
+            return f"STAND FIRM {who}: zůstává stát, odtlačen není"
         if jm == "KickOffReturn":
             return f"SKILL Kick-Off Return {who}: {e['from']} -> {e['to']}"
         hod = f" hod {e['die1']}" if e["die1"] else ""

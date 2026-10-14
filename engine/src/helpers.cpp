@@ -296,6 +296,12 @@ Position scatterDirection(int d8) {
     return {offsets[idx][0], offsets[idx][1]};
 }
 
+void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEvent>* events) {
+    team.rerolls--;
+    team.rerollUsedThisTurn = true;
+    if (coachModeOn()) emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 4, true});
+}
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro) {
@@ -423,8 +429,7 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
         if (proRoll < 4 && canUseTeamReroll) {
             TeamState& team = state.getTeamState(player.teamSide);
             if (team.canUseReroll()) {
-                team.rerolls--;
-                team.rerollUsedThisTurn = true;
+                spendTeamRerollByEngine(team, playerId, events);
                 bool lonerOk = true;
                 if (player.hasSkill(SkillName::Loner)) {
                     lonerOk = dice.rollD6() >= 4;
@@ -445,8 +450,7 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
     if (canUseTeamReroll) {
         TeamState& team = state.getTeamState(player.teamSide);
         if (team.canUseReroll()) {
-            team.rerolls--;
-            team.rerollUsedThisTurn = true;
+            spendTeamRerollByEngine(team, playerId, events);
 
             // Loner gate
             if (player.hasSkill(SkillName::Loner)) {

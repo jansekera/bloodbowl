@@ -106,6 +106,11 @@ Position looseBallSquare(const GameState& state);
 // spotřebu týmového rerollu, Loner 4+, hod na Pro i jeho případný přehoz.
 // Vrací true, když se má hod PŘEHODIT (přehoz hází volající). Když není co
 // nabídnout, neptá se a vrací false. `viaPro` = přehoz jde na účet Pro.
+// P201 (11), 14.10.2026: týmový reroll, který bere ENGINE (AI, strana bez kouče). Jedno místo
+// pro odečet i zápis: dřív se v živé partii počítadlo snížilo bez události. REROLL druh 4 se
+// emituje jen v živé partii (coachModeOn), proudy událostí měření se nemění.
+void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEvent>* events);
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);

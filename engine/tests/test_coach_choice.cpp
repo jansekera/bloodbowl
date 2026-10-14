@@ -759,3 +759,75 @@ TEST(CoachChoiceApothecary, OtherSide_StaysAutomatic) {
     EXPECT_NO_THROW(resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr));
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);    // dosavadní pravidlo enginu
 }
+
+// ───────────── P201 (2), (4), (9), (11): výpis živé partie ─────────────
+// Nové řádky výpisu jen v živé partii (coachModeOn), jako REROLL -- proudy událostí měření se nemění.
+static const GameEvent* najdi(const std::vector<GameEvent>& ev, GameEvent::Type t) {
+    for (const auto& e : ev) if (e.type == t) return &e;
+    return nullptr;
+}
+
+TEST(P201Vypis, PassEventCarriesTargetAndDie) {
+    // (9): PASS nesl v `roll` hozenou kostku, výpis ji tiskl jako „potřeba N+“. Nově jako ostatní
+    // hody (P145): roll = cílové číslo, die1 = kostka.
+    GameState gs = passSetup();                      // rychlá přihrávka, potřeba 3+
+    FixedDiceRoller dice({4, 5});
+    std::vector<GameEvent> ev;
+    resolvePass(gs, 1, {8, 7}, dice, &ev);
+    const GameEvent* p = najdi(ev, GameEvent::Type::PASS);
+    ASSERT_NE(p, nullptr);
+    EXPECT_EQ(p->roll, 3);
+    EXPECT_EQ(p->die1, 4);
+    EXPECT_TRUE(p->success);
+}
+
+TEST(P201Vypis, StandFirmHasItsOwnLine) {
+    // (4): Stand Firm obránce bez kouče nechal ve výpisu jen „odtlačen nebyl“ bez důvodu.
+    GameState gs = blockPair();
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+    FixedDiceRoller dice({3});                       // Pushed
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    block(gs, dice, &ev);
+    bool seen = false;
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::SKILL_USED && e.playerId == 12 &&
+            e.roll == static_cast<int>(SkillName::StandFirm)) seen = true;
+    EXPECT_TRUE(seen);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 11);
+}
+
+TEST(P201Vypis, AiTeamRerollHasALine) {
+    // (11): týmový reroll strany bez kouče snížil počítadlo bez události.
+    GameState gs = homeWithReroll();
+    FixedDiceRoller dice({2, 5});
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::AWAY, {});      // kouč je AWAY, hází HOME (AI)
+    EXPECT_TRUE(roll4(gs, dice, &ev));
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+    const GameEvent* r = najdi(ev, GameEvent::Type::REROLL);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->roll, 4);                           // druh 4 = týmový reroll použila AI
+    EXPECT_EQ(r->playerId, 1);
+}
+
+TEST(P201Vypis, AiTeamRerollOutsideLiveGame_NoEvent) {
+    GameState gs = homeWithReroll();
+    FixedDiceRoller dice({2, 5});
+    std::vector<GameEvent> ev;
+    EXPECT_TRUE(roll4(gs, dice, &ev));               // mimo živou partii: proud událostí beze změny
+    EXPECT_EQ(najdi(ev, GameEvent::Type::REROLL), nullptr);
+}
+
+TEST(P201Vypis, ApothecaryToReserves_InjuryRollIsShown) {
+    // (2): hod 10+ neměl řádek, když lékárník poslal hráče do rezerv (návrat před CASUALTY).
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, 1});
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, &ev);
+    const GameEvent* inj = najdi(ev, GameEvent::Type::INJURY);
+    ASSERT_NE(inj, nullptr);
+    EXPECT_EQ(inj->roll, 10);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+}

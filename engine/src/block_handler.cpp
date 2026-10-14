@@ -529,6 +529,9 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         const bool declined = !juggernautOverride && coachDecides(defender.teamSide) &&
             askCoach(CoachQuestion::USE_STAND_FIRM, defender.id, attacker.id, 0, 0, 3) == 0;
         if (!juggernautOverride && !declined) {
+            // P201 (4): v živé partii vlastní řádek (dřív bez důvodu, proč odtlačen nebyl)
+            if (coachModeOn()) emitEvent(events, {GameEvent::Type::SKILL_USED, defender.id, attacker.id, {}, {},
+                                                  static_cast<int>(SkillName::StandFirm), true});
             pushDest = defender.position;
             return false; // no push
         }
@@ -973,8 +976,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (proRoll < 4) {
                 TeamState& team = state.getTeamState(att.teamSide);
                 if (team.canUseReroll()) {
-                    team.rerolls--;
-                    team.rerollUsedThisTurn = true;
+                    spendTeamRerollByEngine(team, att.id, events);
 
                     bool canReroll = true;
                     if (att.hasSkill(SkillName::Loner)) {
@@ -1002,8 +1004,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         if (!rerolled && !proAttempted && shouldRerollBlock(chosen, att)) {
             TeamState& team = state.getTeamState(att.teamSide);
             if (team.canUseReroll()) {
-                team.rerolls--;
-                team.rerollUsedThisTurn = true;
+                spendTeamRerollByEngine(team, att.id, events);
 
                 bool canReroll = true;
                 if (att.hasSkill(SkillName::Loner)) {

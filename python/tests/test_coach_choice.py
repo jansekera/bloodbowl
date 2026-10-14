@@ -166,3 +166,14 @@ def test_vypis_vykopu():
         presun += any("přesun při výkopu" in l for l in out)
         rr += any("týmové rerolly" in l for l in out)
     assert tabulka == 40 and presun > 0 and rr > 0, (tabulka, presun, rr)
+
+
+def test_vypis_p201_body_2_3_4_9_11():
+    u = lambda **kw: dict({"player": 7, "target": -1, "roll": 0, "success": True, "die1": 0, "die2": 0,
+                           "from": (0, 0), "to": (0, 0)}, **kw)
+    assert "potřeba 3+, padlo 4" in ps.event_str(u(type="PASS", roll=3, die1=4))                   # (9)
+    assert "ZRANĚNÍ" in ps.event_str(u(type="INJURY", roll=10, die1=5, die2=5))                    # (2)
+    lek = ps.event_str(u(type="APOTHECARY", roll=0, die1=8, die2=1))
+    assert "REZERV" in lek and "vrátí se příští zápas" not in lek                                   # (3)
+    assert "STAND FIRM" in ps.event_str(u(type="SKILL", roll=ps.SKILL_NAMES.index("StandFirm")))    # (4)
+    assert "engine" in ps.event_str(u(type="REROLL", roll=4))                                      # (11)

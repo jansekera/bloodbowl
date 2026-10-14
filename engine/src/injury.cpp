@@ -151,6 +151,12 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
             (coach ? askCoach(CoachQuestion::USE_APOTHECARY, playerId, -1, static_cast<int>(cas), 0,
                               anoNe) == CoachAnswer::TEAM
                    : worthSaving && worthSpendingOn);
+        // P201 (2), 14.10.2026: hod 10+ neměl ve výpisu řádek, když lékárník nebo Regenerace
+        // vrátí hráče do rezerv (CASUALTY se pak neemituje). V živé partii ho ukáže INJURY.
+        const bool showInjury = coachModeOn() &&
+            (use || (player.hasSkill(SkillName::Regeneration) && !ctx.hasStakes));
+        if (showInjury)
+            emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, {}, {}, injuryRoll, false, d1, d2});
         if (use) {
             ts.apothecaryUsed = true;
             const CasualtyResult first = cas;

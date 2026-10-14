@@ -220,8 +220,9 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     if (isHailMary) {
         // Hail Mary: no interception, D6: 1=fumble, 2+=inaccurate
         int hmpRoll = dice.rollD6();
+        // P201 (9): roll = cílové číslo, die1 = kostka (jako ostatní hody, P145)
         emitEvent(events, {GameEvent::Type::PASS, passerId, -1, passer.position, target,
-                          hmpRoll, hmpRoll >= 2});
+                          2, hmpRoll >= 2, hmpRoll});
 
         if (hmpRoll == 1) {
             // Fumble: ball bounces from thrower
@@ -327,8 +328,10 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
 
     int roll = dice.rollD6();
 
+    // P201 (9), 14.10.2026: roll = cílové číslo, die1 = kostka (jako ostatní hody, P145). Dřív
+    // nesl `roll` kostku a výpis partie ji tiskl jako „potřeba N+“.
     emitEvent(events, {GameEvent::Type::PASS, passerId, -1, passer.position, target,
-                      roll, roll >= passTarget && !isFumble(roll)});
+                      passTarget, roll >= passTarget && !isFumble(roll), roll});
 
     // P78 (PHP e81bb57d): Safe Throw -- fumble jinak nez prirozenou 1 hazec
     // "manages to keep hold of the ball ... and the team does not suffer a
@@ -385,8 +388,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                 if (proRoll < 4) {
                     TeamState& team = state.getTeamState(passer.teamSide);
                     if (team.canUseReroll()) {
-                        team.rerolls--;
-                        team.rerollUsedThisTurn = true;
+                        spendTeamRerollByEngine(team, passerId, events);
                         bool lonerOk = true;
                         if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
                         if (lonerOk) proRoll = dice.rollD6();
@@ -396,8 +398,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             } else {
                 TeamState& team = state.getTeamState(passer.teamSide);
                 if (team.canUseReroll()) {
-                    team.rerolls--;
-                    team.rerollUsedThisTurn = true;
+                    spendTeamRerollByEngine(team, passerId, events);
                     bool lonerOk = true;
                     if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
                     if (lonerOk) roll = dice.rollD6();
