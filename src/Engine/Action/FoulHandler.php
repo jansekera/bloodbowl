@@ -142,18 +142,20 @@ final class FoulHandler implements ActionHandlerInterface
             $freshAttacker = $state->getPlayer($attackerId);
             if ($freshAttacker !== null) {
                 $ejectedPos = $freshAttacker->getPosition();
+                $nesl = $state->getBall()->getCarrierId() === $attackerId;
 
-                // Handle ball if fouler was carrying it
-                if ($state->getBall()->getCarrierId() === $attackerId && $ejectedPos !== null) {
+                // OPRAVENO 14.10.2026 (P199, převod C++ P192 review (1)) -- míč se odrážel, když
+                //   vyloučený ještě stál na poli: vrátil-li se odrazem zpět, chytil ho a odnesl ze
+                //   hřiště. Ř. 1882-1884 + 678-681: hráč je pryč, pak se jeho míč odrazí.
+                $state = $state->withPlayer(
+                    $freshAttacker->withState(PlayerState::EJECTED)->withPosition(null),
+                );
+                if ($nesl && $ejectedPos !== null) {
                     $state = $state->withBall(BallState::onGround($ejectedPos));
                     $bounceResult = $this->ballResolver->resolveBounce($state, $ejectedPos);
                     $events = array_merge($events, $bounceResult['events']);
                     $state = $bounceResult['state'];
                 }
-
-                $state = $state->withPlayer(
-                    $freshAttacker->withState(PlayerState::EJECTED)->withPosition(null),
-                );
             }
         }
 

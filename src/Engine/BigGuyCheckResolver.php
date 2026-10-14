@@ -363,10 +363,13 @@ final class BigGuyCheckResolver
         }
 
         $events = [GameEvent::bloodlustFail($vampire->getId(), 1)];
-        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $vampire, $events);
+        // OPRAVENO 14.10.2026 (P199, převod C++ P192 review (1)) -- míč se odrážel, když upír ještě
+        //   stál na poli (vrátil-li se odrazem zpět, upír ho chytil a odnesl do rezerv). Hráč je
+        //   napřed pryč, pak se jeho míč odrazí z pole, kde stál (`$vampire` nese jeho pozici).
         $state = $state->withPlayer(
             $vampire->withPosition(null)->withState(PlayerState::OFF_PITCH)->withHasMoved(true)->withHasActed(true),
         );
+        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $vampire, $events);
 
         return ['state' => $state, 'events' => $events, 'turnover' => true];
     }
