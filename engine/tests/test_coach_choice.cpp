@@ -871,3 +871,32 @@ TEST(CoachChoiceBlock, AttackerWrestle_Declined_BlockKeepsHimStanding) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
+
+// ───────────── P201 (8): kam se započetl +1 z Mighty Blow ─────────────
+// Výpis ukazoval jen součet; z „9 (4+4)“ šlo +1 odhadnout, ale ne říct, že je to Mighty Blow.
+// V živé partii SKILL_USED MightyBlow, die1 = 1 brnění, 2 zranění (ř. 8285-8292: jen jeden z hodů).
+static int mbKam(const std::vector<GameEvent>& ev) {
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::MightyBlow)) return e.die1;
+    return 0;
+}
+
+TEST(P201Vypis, MightyBlowOnArmour) {
+    GameState gs = hurtHome();                       // AV 8
+    InjuryContext ctx; ctx.mightyBlow = true;
+    FixedDiceRoller dice({4, 4, 1, 1});              // brnění 8 + 1 = 9 prorazí, zranění 2
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    resolveArmourAndInjury(gs, 1, dice, ctx, &ev);
+    EXPECT_EQ(mbKam(ev), 1);
+}
+
+TEST(P201Vypis, MightyBlowOnInjury) {
+    GameState gs = hurtHome();
+    InjuryContext ctx; ctx.mightyBlow = true;
+    FixedDiceRoller dice({5, 5, 3, 4});              // brnění 10 prorazí samo, zranění 7 + 1 = 8
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});   // KO: lékárník ne
+    resolveArmourAndInjury(gs, 1, dice, ctx, &ev);
+    EXPECT_EQ(mbKam(ev), 2);
+}

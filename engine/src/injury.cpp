@@ -254,9 +254,18 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
     emitEvent(events, {GameEvent::Type::ARMOR_BREAK, playerId, -1, player.position, {},
                       armourRoll, broken, aD1, aD2});
 
+    // P201 (8), 14.10.2026: v živé partii řádek, kam se +1 z Mighty Blow započetl (1 brnění, 2 zranění)
+    if (spentOnArmour && coachModeOn())
+        emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                           static_cast<int>(SkillName::MightyBlow), true, 1});
     if (broken) {
         InjuryContext injCtx = ctx;
-        if (ctx.mightyBlow && !spentOnArmour) injCtx.injuryModifier += 1;
+        if (ctx.mightyBlow && !spentOnArmour) {
+            injCtx.injuryModifier += 1;
+            if (coachModeOn())
+                emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
+                                   static_cast<int>(SkillName::MightyBlow), true, 2});
+        }
         resolveInjuryRoll(state, playerId, dice, injCtx, events);
         return true;
     }

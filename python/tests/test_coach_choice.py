@@ -177,3 +177,14 @@ def test_vypis_p201_body_2_3_4_9_11():
     assert "REZERV" in lek and "vrátí se příští zápas" not in lek                                   # (3)
     assert "STAND FIRM" in ps.event_str(u(type="SKILL", roll=ps.SKILL_NAMES.index("StandFirm")))    # (4)
     assert "engine" in ps.event_str(u(type="REROLL", roll=4))                                      # (11)
+
+
+def test_vypis_mighty_blow():
+    # P201 (8): kam se započetl +1, a modifikátor u hodu zvlášť
+    u = lambda **kw: dict({"player": 12, "target": -1, "roll": 0, "success": True, "die1": 0, "die2": 0,
+                           "from": (0, 0), "to": (0, 0)}, **kw)
+    mb = ps.SKILL_NAMES.index("MightyBlow")
+    assert "+1 na brnění" in ps.event_str(u(type="SKILL", roll=mb, die1=1))
+    assert "+1 na zranění" in ps.event_str(u(type="SKILL", roll=mb, die1=2))
+    assert "9 (4+4 +1)" in ps.event_str(u(type="ARMOR_BREAK", roll=9, die1=4, die2=4))
+    assert "8 (4+4)" in ps.event_str(u(type="ARMOR_BREAK", roll=8, die1=4, die2=4))

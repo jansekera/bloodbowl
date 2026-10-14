@@ -493,7 +493,10 @@ def event_str(e):
         padlo = f", padlo {e['die1']}" if e["die1"] else ""
         return f"{t} {who}: potřeba {e['roll']}+{padlo} -> {'OK' if e['success'] else 'NEPROŠEL'}"
     if t in ("ARMOR_BREAK", "INJURY"):
-        dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
+        # P201 (8): modifikátor (Mighty Blow, Stunty, asistence u faulu) zvlášť: „9 (4+4 +1)“
+        mod = e["roll"] - e["die1"] - e["die2"]
+        dice = (f" ({e['die1']}+{e['die2']}" + (f" {'+' if mod > 0 else '-'}{abs(mod)}" if mod else "") + ")"
+                if e["die1"] else "")
         co = ""
         if t == "INJURY":   # injury.cpp: do 7 omráčen, 8-9 KO; 10+ jen při lékárníkovi / Regeneraci (P201 (2))
             co = " -> omráčen" if e["roll"] <= 7 else " -> KO" if e["roll"] <= 9 else " -> ZRANĚNÍ (hod na tabulku zranění)"
@@ -563,6 +566,8 @@ def event_str(e):
         jm = SKILL_NAMES[e["roll"]] if 0 <= e["roll"] < len(SKILL_NAMES) else e["roll"]
         if e["die2"]:   # přehoz skillem (helpers.cpp attemptRoll): die2 = původní hod, die1 = nový
             return f"SKILL {jm} {who}: přehoz {e['die2']} -> {e['die1']} ({'OK' if e['success'] else 'NEPROŠEL'})"
+        if jm == "MightyBlow":   # P201 (8): die1 = 1 brnění, 2 zranění
+            return f"MIGHTY BLOW: +1 na {'brnění' if e['die1'] == 1 else 'zranění'} {who}"
         if jm == "StandFirm":   # P201 (4)
             return f"STAND FIRM {who}: zůstává stát, odtlačen není"
         if jm == "KickOffReturn":
