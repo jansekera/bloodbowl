@@ -1,10 +1,11 @@
 #!/usr/local/bin/python3.8
-"""Živá partie 12.10.2026 — uživatel (LIDÉ, HOME) proti Claude (ORKOVÉ, AWAY), TV1500.
+"""Živá partie — uživatel (HOME, kouč) proti Claude (AWAY), TV1500. Partii vybírá BB_PARTIE
+(slovník PARTIE níž): `lide-orkove` (výchozí, 12.–13.10.2026) · `skaveni-trpaslici` (14.10.2026).
 
 Vychází z bb_play_session_20261002.py (server na pozadí, příkazy přes soubory, log se po
 restartu přehraje). Navíc P130: rozhodnutí kouče uprostřed akce.
 
-Komunikace přes soubory v evidence/play_20261012/:
+Komunikace přes soubory v evidence/<adresář partie>/ (play_20261012, play_20261014):
   cmd.txt    -- napíše se sem příkaz, server ho přečte a smaže
   out.txt    -- server sem napíše odpověď
 Pohodlněji: ./bb_play_cmd.py <příkaz ...>  (pošle příkaz, počká a vypíše odpověď)
@@ -49,22 +50,109 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "engine", "build"))
 import bb_engine as bb  # noqa: E402
 import bb_kontrola_tahu as kt  # noqa: E402
 
+
+
+def _role_lide(p, st, sk):
+    if st == (8, 2, 3, 7):
+        return "C"                       # Catcher +Block+Side Step (Dodge, Catch)
+    if st == (5, 5, 2, 9):
+        return "OG"                      # Ogre +Block (Loner)
+    if st == (7, 3, 3, 8):               # Blitzer
+        # uživatel 13.10.: v kódu role ukazovat G = Guard (mění asistence), Mighty Blow ne
+        if "Guard" in sk:
+            return "BG"                  # +Guard+Stand Firm (+Dauntless / +Mighty Blow)
+        if "StripBall" in sk:
+            return "BH"                  # lovec míče +Wrestle+Tackle
+        return "BT"                      # +Mighty Blow+Tackle
+    if "Pass" in sk:
+        return "T"                       # Thrower +Block+Pro
+    if "Wrestle" in sk:
+        return "LW"                      # Lineman +Wrestle
+    return "L"                           # Lineman +Block
+
+
+def _role_orkove(p, st, sk):
+    if st == (4, 4, 2, 9):
+        return "KG" if "Guard" in sk else "K"        # Black Orc (+Guard); Mighty Blow se neznačí
+    if st == (6, 3, 3, 9):                   # Blitzer
+        if "Pro" in sk:
+            return "BP"                      # +Mighty Blow+Pro
+        if "StripBall" in sk:
+            return "BH"                      # lovec míče +Tackle
+        return "BG"                          # +Guard
+    if st == (5, 3, 3, 8):
+        return "T"                           # Thrower +Block
+    if "Wrestle" in sk:
+        return "LW"                          # Lineman +Wrestle
+    return "L"
+
+
+def _role_skaveni(p, st, sk):
+    if st == (6, 5, 2, 8):
+        return "OG"                          # Rat Ogre +Mighty Blow (Frenzy, Wild Animal, Loner)
+    if st[0] >= 9:                           # Gutter Runner
+        if "Sprint" in sk:
+            return "RS"                      # MA10 +Block+Sure Feet+Sprint
+        if "Wrestle" in sk:
+            return "RW"                      # +Horns+Wrestle
+        return "R"                           # +Block
+    if st == (7, 3, 3, 8):
+        return "BG"                          # Storm Vermin +Block+Guard (+Mighty Blow)
+    if "Pass" in sk:
+        return "T"                           # Thrower +Block+Pro (Sure Hands, Kick-Off Return)
+    return "LW"                              # Lineman +Wrestle
+
+
+def _role_trpaslici(p, st, sk):
+    if st == (6, 3, 3, 8):
+        return "R"                           # Runner (Sure Hands; jeden +Kick+Kick-Off Return)
+    if st == (5, 3, 2, 8):
+        return "SG"                          # Troll Slayer +Guard+Stand Firm+Mighty Blow (Frenzy, Dauntless)
+    if st == (5, 3, 3, 9):
+        return "BP" if "Pro" in sk else "B"  # Blitzer +Mighty Blow+Stand Firm+Tackle (+Pro)
+    if "Guard" in sk:
+        return "LG"                          # Longbeard +Guard+Stand Firm+Tackle
+    if "Wrestle" in sk:
+        return "LW"                          # Longbeard +Tackle+Wrestle
+    return "L"                               # Longbeard (+Tackle / +Mighty Blow)
+
+
+# Partie = soupisky, jména a kódy rolí; BB_PARTIE vybírá. Uživatel je vždy HOME (kouč).
+PARTIE = {
+    "lide-orkove": {   # 12.–13.10.2026
+        "soupisky": ("human", "orc"), "tv": 1500, "seminko": 20261012, "adresar": "play_20261012",
+        "jmena": ("LIDÉ", "ORKOVÉ"), "kratce": ("LID", "ORK"), "pismena": ("H", "O"),
+        "kdo": ("člověk", "ork"), "role": (_role_lide, _role_orkove),
+        "legenda": ("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
+                    " · BT blitzer MB+Tackle · BH lovec míče · OG ogre",
+                    "role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro"
+                    " · BH lovec míče · KG black orc s GUARD")},
+    "skaveni-trpaslici": {   # 14.10.2026 (P203: Claude hraje trpaslíky s návrhem AI po ruce)
+        "soupisky": ("skaven", "dwarf"), "tv": 1500, "seminko": 20261014, "adresar": "play_20261014",
+        "jmena": ("SKAVENI", "TRPASLÍCI"), "kratce": ("SKA", "TRP"), "pismena": ("S", "D"),
+        "kdo": ("skaven", "trpaslík"), "role": (_role_skaveni, _role_trpaslici),
+        "legenda": ("role skaveni: LW lineman Wrestle · T thrower (Pro) · BG storm vermin s GUARD · R gutter runner"
+                    " · RW runner Horns+Wrestle · RS runner Sprint · OG rat ogre",
+                    "role trpaslíci: L longbeard · LW longbeard Wrestle · LG longbeard s GUARD · R runner"
+                    " · B blitzer · BP blitzer s Pro · SG troll slayer s GUARD")},
+}
+P = PARTIE[os.environ.get("BB_PARTIE", "lide-orkove")]
+
 # BB_PLAY_DIR = jiný adresář partie (zkoušky); stejnou proměnnou čte bb_play_cmd.py
 DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                   os.environ.get("BB_PLAY_DIR", os.path.join("evidence", "play_20261012")))
+                   os.environ.get("BB_PLAY_DIR", os.path.join("evidence", P["adresar"])))
 os.makedirs(DIR, exist_ok=True)
 CMD = os.path.join(DIR, "cmd.txt")
 OUT = os.path.join(DIR, "out.txt")
 
-ENDZONE_HOME_X = 0   # lidé (HOME) brání nižší x
-ENDZONE_AWAY_X = 25  # orkové (AWAY) brání vyšší x
+ENDZONE_HOME_X = 0   # HOME brání nižší x
+ENDZONE_AWAY_X = 25  # AWAY brání vyšší x
 
 
-def new_game(seed=20261012):
+def new_game(seed=None):
     global ROSTERS
-    human = bb.get_developed_roster("human", 1500)
-    orc = bb.get_developed_roster("orc", 1500)
-    ROSTERS = (human, orc)
+    ROSTERS = tuple(bb.get_developed_roster(r, P["tv"]) for r in P["soupisky"])
+    seed = P["seminko"] if seed is None else seed
     state = bb.GameState()
     dice = bb.DiceRoller(int(os.environ.get("BB_SEED", seed)))   # BB_SEED jen pro zkoušky
     return state, dice
@@ -80,7 +168,7 @@ def pocasi_str(state):
 
 
 def strana_str(side):
-    return "LIDÉ (HOME)" if side == bb.TeamSide.HOME else "ORKOVÉ (AWAY)"
+    return f"{P['jmena'][0]} (HOME)" if side == bb.TeamSide.HOME else f"{P['jmena'][1]} (AWAY)"
 
 
 def druha(side):
@@ -120,39 +208,9 @@ def skilly(p):
 
 
 def role(p):
-    """Krátký kód role v TV1500 podle statů a skillů (lidé HOME, orkové AWAY)."""
+    """Krátký kód role podle statů a skillů (podle partie, HOME / AWAY)."""
     st = (p.stats.movement, p.stats.strength, p.stats.agility, p.stats.armour)
-    sk = set(skilly(p))
-    if p.team_side == bb.TeamSide.HOME:      # lidé
-        if st == (8, 2, 3, 7):
-            return "C"                       # Catcher +Block+Side Step (Dodge, Catch)
-        if st == (5, 5, 2, 9):
-            return "OG"                      # Ogre +Block (Loner)
-        if st == (7, 3, 3, 8):               # Blitzer
-            # uživatel 13.10.: v kódu role ukazovat G = Guard (mění asistence), Mighty Blow ne
-            if "Guard" in sk:
-                return "BG"                  # +Guard+Stand Firm (+Dauntless / +Mighty Blow)
-            if "StripBall" in sk:
-                return "BH"                  # lovec míče +Wrestle+Tackle
-            return "BT"                      # +Mighty Blow+Tackle
-        if "Pass" in sk:
-            return "T"                       # Thrower +Block+Pro
-        if "Wrestle" in sk:
-            return "LW"                      # Lineman +Wrestle
-        return "L"                           # Lineman +Block
-    if st == (4, 4, 2, 9):
-        return "KG" if "Guard" in sk else "K"        # Black Orc (+Guard); Mighty Blow se neznačí
-    if st == (6, 3, 3, 9):                   # Blitzer
-        if "Pro" in sk:
-            return "BP"                      # +Mighty Blow+Pro
-        if "StripBall" in sk:
-            return "BH"                      # lovec míče +Tackle
-        return "BG"                          # +Guard
-    if st == (5, 3, 3, 8):
-        return "T"                           # Thrower +Block
-    if "Wrestle" in sk:
-        return "LW"                          # Lineman +Wrestle
-    return "L"
+    return P["role"][0 if p.team_side == bb.TeamSide.HOME else 1](p, st, set(skilly(p)))
 
 
 def zon(sq, kdo):
@@ -172,7 +230,7 @@ def board(state):
         if p.state not in (bb.PlayerState.STANDING, bb.PlayerState.PRONE,
                             bb.PlayerState.STUNNED):
             continue
-        side = "H" if p.team_side == bb.TeamSide.HOME else "O"
+        side = P["pismena"][0 if p.team_side == bb.TeamSide.HOME else 1]
         rl = role(p)
         # ⭐ ID jako pripona: bez ni by 4 stejni Longbeardove vypadali
         #   identicky a nesli by odlisit pro hlaseni tahu (na rozdil od
@@ -209,7 +267,7 @@ def board(state):
                if p.team_side == bb.TeamSide.HOME and p.state == bb.PlayerState.STANDING}
     st_away = {(p.position.x, p.position.y) for p in players
                if p.team_side == bb.TeamSide.AWAY and p.state == bb.PlayerState.STANDING}
-    # `/n` jen u NASICH stojicich (lidé = HOME), VZDY i s /0.
+    # `/n` jen u NASICH stojicich (HOME), VZDY i s /0.
     for (x, y) in list(st_home):
         if (x, y) in cell:
             cell[(x, y)] = f"{cell[(x, y)]}/{zon((x, y), st_away)}"
@@ -265,23 +323,21 @@ def board(state):
     if venku:
         lines.append(f"⚠️ MIMO VYREZ stoji: " + ", ".join(f"{v}@{sq}" for sq, v in sorted(venku)))
     lines.append("")
-    lines.append("H člověk (náš, HOME) · O ork (jejich, AWAY) · +role +ID")
-    lines.append("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
-                 " · BT blitzer MB+Tackle · BH lovec míče · OG ogre")
-    lines.append("role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro · BH lovec míče"
-                 " · KG black orc s GUARD")
+    lines.append(f"{P['pismena'][0]} {P['kdo'][0]} (náš, HOME) · {P['pismena'][1]} {P['kdo'][1]} (jejich, AWAY)"
+                 " · +role +ID")
+    lines += list(P["legenda"])
     lines.append("G v kódu role = Guard (asistuje i v soupeřově zóně)")
     lines.append("cislo v prazdnem poli = kolik JEJICH tacklezon na nej dosahuje")
-    lines.append("/n u H.. = VZDY (i /0) -- v kolika JEJICH zonach stoji")
-    lines.append("u O.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned")
+    lines.append(f"/n u {P['pismena'][0]}.. = VZDY (i /0) -- v kolika JEJICH zonach stoji")
+    lines.append(f"u {P['pismena'][1]}.. cislo NENI (matoucí) · '_' lezi · 'o' drzi mic · 'B' blitzoval · '-' uz hral · malymi = stunned")
     lines.append("")
-    for jm, t in (("LIDÉ (HOME)", state.home_team), ("ORKOVÉ (AWAY)", state.away_team)):
+    for jm, t in ((strana_str(bb.TeamSide.HOME), state.home_team), (strana_str(bb.TeamSide.AWAY), state.away_team)):
         lines.append(f"{jm}: skóre {t.score} · týmové rerolly {t.rerolls}"
                      + (" (v tomto tahu už použit)" if t.reroll_used_this_turn else ""))
     lines.append("")
     lines.append("--- hráči (staty, skilly) ---")
     for p in sorted(players, key=lambda q: (q.team_side != bb.TeamSide.HOME, q.id)):
-        strana = "LID" if p.team_side == bb.TeamSide.HOME else "ORK"
+        strana = P["kratce"][0 if p.team_side == bb.TeamSide.HOME else 1]
         acted = "hral" if (p.has_acted or p.has_moved) else "ceka"
         lines.append(
             f"  {p.id:2d} {strana} {role(p):<2} ({p.position.x:2d},{p.position.y:2d}) "
@@ -472,7 +528,8 @@ def main():
     los_vitez = None      # kdo vyhrál los a ještě nezvolil
     prvni_kope = None     # kdo kopal první výkop (2. poločas kope druhá strana, ř. 1016-1017)
     with open(OUT, "w") as f:
-        f.write("=== NOVÁ HRA: lidé HOME × orkové AWAY, TV1500 — napřed `kouc HOME`, pak `los` ===\n")
+        f.write(f"=== NOVÁ HRA: {P['jmena'][0]} HOME × {P['jmena'][1]} AWAY, TV{P['tv']} — napřed `kouc HOME`,"
+                " pak `los` ===\n")
 
     LOG = os.path.join(DIR, "prikazy.log")
     replay = []
