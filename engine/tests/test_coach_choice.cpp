@@ -900,3 +900,18 @@ TEST(P201Vypis, MightyBlowOnInjury) {
     resolveArmourAndInjury(gs, 1, dice, ctx, &ev);
     EXPECT_EQ(mbKam(ev), 2);
 }
+
+// ───────────── P201 (6): kouč za obě strany ─────────────
+// `kouc` uměl jen jednu stranu; za druhou (v partii 13.10. orkové = Claude) vybíral kostku bloku,
+// přehozy a skilly engine. Režim „obě strany“ se ptá za každou stranu.
+TEST(CoachChoice, BothSides_AskedForEither) {
+    {
+        CoachChoiceScope scope(TeamSide::HOME, {}, /*bothSides=*/true);
+        EXPECT_TRUE(coachDecides(TeamSide::HOME));
+        EXPECT_TRUE(coachDecides(TeamSide::AWAY));
+    }
+    GameState gs = homeWithReroll();
+    FixedDiceRoller dice({2, 5});
+    CoachChoiceScope scope(TeamSide::AWAY, {}, /*bothSides=*/true);   // hází HOME, kouč „AWAY + obě“
+    EXPECT_THROW(roll4(gs, dice), CoachChoicePending);
+}

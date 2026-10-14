@@ -8,11 +8,12 @@ namespace bb {
 namespace {
 thread_local bool g_coachOn = false;
 thread_local TeamSide g_coachSide = TeamSide::HOME;
+thread_local bool g_coachBoth = false;
 thread_local std::vector<int> g_coachAnswers;
 thread_local size_t g_coachNext = 0;
 }
 
-bool coachDecides(TeamSide side) { return g_coachOn && side == g_coachSide; }
+bool coachDecides(TeamSide side) { return g_coachOn && (g_coachBoth || side == g_coachSide); }
 bool coachModeOn() { return g_coachOn; }
 
 int askCoach(CoachQuestion q, int playerId, int otherId, int roll, int target, int options) {
@@ -25,15 +26,17 @@ int askCoach(CoachQuestion q, int playerId, int otherId, int roll, int target, i
     return a;
 }
 
-CoachChoiceScope::CoachChoiceScope(TeamSide side, std::vector<int> answers) {
+CoachChoiceScope::CoachChoiceScope(TeamSide side, std::vector<int> answers, bool bothSides) {
     g_coachOn = true;
     g_coachSide = side;
+    g_coachBoth = bothSides;
     g_coachAnswers = std::move(answers);
     g_coachNext = 0;
 }
 
 CoachChoiceScope::~CoachChoiceScope() {
     g_coachOn = false;
+    g_coachBoth = false;
     g_coachAnswers.clear();
     g_coachNext = 0;
 }

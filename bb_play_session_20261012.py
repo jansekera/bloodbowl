@@ -14,7 +14,7 @@ Příkazy:
   board                    -- vykreslí desku a panel hráčů (se skilly a rerolly)
   actions <HOME|AWAY>      -- vypíše dostupné akce pro danou stranu, číslovaně
   do <index>               -- provede akci podle čísla z 'actions'
-  kouc <HOME|AWAY|ne>      -- P130: za tuto stranu rozhoduje KOUČ; `ne` = engine jako dřív
+  kouc <HOME|AWAY|OBE|ne>  -- P130: za tuto stranu rozhoduje KOUČ; OBE = za obě (P201 (6)); `ne` = engine
   los                      -- P195: začátek zápasu — počasí a los (D6: 1-3 HOME, 4-6 AWAY); vítěz volí
   volba <kopat|prijimat>   -- P195: volba kouče po vyhraném losu (za AI volí engine sám)
   odp <odpověď>            -- P130: odpověď na otázku, na které se akce zastavila:
@@ -623,6 +623,7 @@ def main():
     posledni_tah = None   # (start, konec, strana, kroky) posledního dokončeného tahu
     # P130: strana, za kterou rozhoduje kouč (None = engine jako dřív), a akce čekající na odpověď
     coach = None
+    oba = False           # P201 (6): `kouc OBE` = kouč rozhoduje za obě strany (druhou hraje Claude ručně)
     cekajici = None       # {"action": akce, "answers": [dosavadní odpovědi], "q": otázka}
 
     def proved(a, answers):
@@ -632,7 +633,7 @@ def main():
             r, events = bb.execute_action_logged(state, a, dice)
             q = None
         else:
-            r, events, q = bb.execute_action_coach(state, a, dice, coach, answers)
+            r, events, q = bb.execute_action_coach(state, a, dice, coach, answers, oba)
         out = []
         if q is not None:
             cekajici = {"action": a, "answers": list(answers), "q": q}
@@ -710,7 +711,7 @@ def main():
                 hod = dice.roll_d6()
                 vitez = bb.TeamSide.HOME if hod <= 3 else bb.TeamSide.AWAY
                 result_lines.append(f"los: hod {hod} (1-3 HOME, 4-6 AWAY) -> vyhrávají {strana_str(vitez)}")
-                if coach is not None and vitez == coach:
+                if coach is not None and (vitez == coach or oba):
                     los_vitez = vitez
                     result_lines.append("❓ vyhrál jsi los: `volba kopat`, nebo `volba prijimat`?")
                 else:
@@ -754,8 +755,10 @@ def main():
                         result_lines += proved(cekajici["action"], cekajici["answers"] + [a])
             elif cmd == "kouc" and len(parts) == 2:
                 v = parts[1].upper()
-                coach = bb.TeamSide.HOME if v == "HOME" else bb.TeamSide.AWAY if v == "AWAY" else None
-                result_lines.append(f"rozhodnutí kouče (P130): {coach if coach is not None else 'vypnuto, rozhoduje engine'}")
+                oba = v == "OBE"
+                coach = bb.TeamSide.HOME if v in ("HOME", "OBE") else bb.TeamSide.AWAY if v == "AWAY" else None
+                result_lines.append("rozhodnutí kouče (P130): " + ("OBĚ STRANY" if oba else
+                                    str(coach) if coach is not None else "vypnuto, rozhoduje engine"))
             elif cmd == "sidestep" and len(parts) == 3:
                 bb.set_manual_side_step(int(parts[1]), int(parts[2]))
                 result_lines.append(f"Side Step uhne na: ({parts[1]},{parts[2]})")

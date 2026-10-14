@@ -188,3 +188,24 @@ def test_vypis_mighty_blow():
     assert "+1 na zranění" in ps.event_str(u(type="SKILL", roll=mb, die1=2))
     assert "9 (4+4 +1)" in ps.event_str(u(type="ARMOR_BREAK", roll=9, die1=4, die2=4))
     assert "8 (4+4)" in ps.event_str(u(type="ARMOR_BREAK", roll=8, die1=4, die2=4))
+
+
+def test_kouc_za_obe_strany():
+    # P201 (6): s both_sides se ptá i strana, za kterou by jinak rozhodl engine
+    s, d = nova_hra(3)
+    ptala = set()
+    for seed in range(1, 31):
+        s, d = nova_hra(seed)
+        for krok in range(80):
+            akce = list(bb.get_available_actions(s))
+            if not akce or s.phase != bb.GamePhase.PLAY:
+                break
+            a = akce[(seed * 7 + krok * 13) % len(akce)]
+            odp = []
+            for _ in range(12):
+                r, ev, q = bb.execute_action_coach(s, a, d, H, odp, True)
+                if q is None:
+                    break
+                ptala.add(s.get_player(q["player"]).team_side)
+                odp.append(next(i for i in range(8) if q["options"] & (1 << i)))
+    assert ptala == {H, A}, ptala

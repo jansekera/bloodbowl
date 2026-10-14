@@ -65,7 +65,9 @@ int askCoach(CoachQuestion q, int playerId, int otherId, int roll, int target, i
 
 class CoachChoiceScope {
 public:
-    CoachChoiceScope(TeamSide side, std::vector<int> answers);
+    // P201 (6), 14.10.2026: `bothSides` = kouč rozhoduje za OBĚ strany (živá partie, kde druhou
+    // stranu hraje ručně Claude); `side` pak určuje jen výchozí stranu pro výpis.
+    CoachChoiceScope(TeamSide side, std::vector<int> answers, bool bothSides = false);
     ~CoachChoiceScope();
     CoachChoiceScope(const CoachChoiceScope&) = delete;
     CoachChoiceScope& operator=(const CoachChoiceScope&) = delete;

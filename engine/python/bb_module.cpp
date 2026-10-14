@@ -492,7 +492,7 @@ PYBIND11_MODULE(bb_engine, m) {
     // Totéž při chybě (neplatná odpověď): nic se nezmění a výjimka jde dál.
     m.def("execute_action_coach", [eventsToList](bb::GameState& state, const bb::Action& action,
                                                  bb::DiceRoller& dice, bb::TeamSide coachSide,
-                                                 const std::vector<int>& answers) {
+                                                 const std::vector<int>& answers, bool bothSides) {
         const bb::GameState stateBefore = state;
         const bb::DiceRoller diceBefore = dice;
         const bb::ManualBlockChoices manualBefore = bb::saveManualBlockChoices();
@@ -504,7 +504,7 @@ PYBIND11_MODULE(bb_engine, m) {
             bb::restoreManualBlockChoices(manualBefore);
         };
         try {
-            bb::CoachChoiceScope scope(coachSide, answers);
+            bb::CoachChoiceScope scope(coachSide, answers, bothSides);
             bb::ActionResult r = bb::executeAction(state, action, base, &events);
             return py::make_tuple(py::cast(r), eventsToList(events), py::none());
         } catch (const bb::CoachChoicePending& q) {
@@ -526,7 +526,8 @@ PYBIND11_MODULE(bb_engine, m) {
             restore();
             throw;
         }
-    });
+    }, py::arg("state"), py::arg("action"), py::arg("dice"), py::arg("coach_side"), py::arg("answers"),
+       py::arg("both_sides") = false);
 
     // P146 (05.10.2026): „AI plánuje tah“ — jak by AI odehrála celý tah týmu, který je na tahu.
     // Běží NANEČISTO na kopii stavu a s VLASTNÍMI kostkami (politika i hody), takže se nedotkne
