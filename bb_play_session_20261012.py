@@ -449,6 +449,10 @@ def otazka_str(q):
         volby = " · ".join(f"{i} = {BLOCK_FACES[i]}" for i in range(5) if q["options"] & (1 << i))
         return (f"❓ BLOK hráč {p} na {o}: hozeno {kostky_str(q['roll'])} — kterou kostku?  ->  odp <číslo>: {volby}"
                 "   (před odpovědí lze zadat push x y)")
+    if t == "KICKOFF_RETURN":   # P200 (1)
+        pole = " · ".join(f"{i} = {tuple(xy)}" for i, xy in enumerate(q.get("squares", []), 1))
+        return (f"❓ KICK-OFF RETURN hráč {p}: míč dopadne na ({q['target'] // 100},{q['target'] % 100}) — kam jít (až 3 pole)?"
+                f"  ->  odp 0 = nepoužít · {pole}")
     if t == "USE_FOLLOW_UP":
         return f"❓ hráč {p} odtlačil hráče {o}: následovat (follow-up)?  ->  odp ano / ne"
     if t == "USE_APOTHECARY":
@@ -467,7 +471,7 @@ def otazka_str(q):
 def preloz_odpoved(q, text):
     """Odpověď kouče -> číslo pro engine; None = nerozumím / není mezi možnostmi."""
     t = q["question"]
-    if t == "BLOCK_FACE":
+    if t in ("BLOCK_FACE", "KICKOFF_RETURN"):
         a = int(text) if text.isdigit() else None
     elif t == "APOTHECARY_PICK":
         a = {"1": 0, "2": 1}.get(text)

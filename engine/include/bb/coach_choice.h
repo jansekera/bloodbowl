@@ -34,7 +34,11 @@ enum class CoachQuestion : int {
     // P201 (14.10.2026):
     USE_FOLLOW_UP = 10,  // po odtlačení: následovat? (l. 606-611 "coach must decide")
     USE_APOTHECARY = 11, // použít lékárníka? roll = CasualtyResult, nebo -1 u KO (l. 1200-1210)
-    APOTHECARY_PICK = 12 // který výsledek platí: 0 = první (roll), 1 = druhý (target)
+    APOTHECARY_PICK = 12, // který výsledek platí: 0 = první (roll), 1 = druhý (target)
+    // P200 (1), 14.10.2026: Kick-Off Return (ř. 8249-8256 "may use"). playerId = hráč, roll = počet
+    // nabízených polí, target = dopad míče x*100+y; odpověď 0 = nepoužít, i = i-té pole
+    // z kickoffReturnSquares (seřazená od nejlepšího pro AI).
+    KICKOFF_RETURN = 13
 };
 
 namespace CoachAnswer {

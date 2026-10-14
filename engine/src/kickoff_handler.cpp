@@ -1,4 +1,5 @@
 #include "bb/kickoff_handler.h"
+#include "bb/coach_choice.h"
 #include "bb/ball_handler.h"
 #include "bb/helpers.h"
 #include "bb/injury.h"
@@ -97,49 +98,46 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
 void resolveKickOffReturn(GameState& state, TeamSide receiving, Position ballPos,
                           std::vector<GameEvent>* events) {
     const int losX = losXOf(receiving);
-    int bestId = -1;
-    int bestDist = 999;
+    // Kandidáti: KOR, stojí, ne na lajně, ne v soupeřově zóně; AI bere toho nejblíž míči.
+    std::vector<std::pair<int, int>> cand;   // (vzdálenost, id) v pořadí hřiště
     state.forEachOnPitch(receiving, [&](const Player& p) {
         if (p.state != PlayerState::STANDING || !p.hasSkill(SkillName::KickOffReturn)) return;
         if (p.position.x == losX) return;                                   // na lajně ne
         if (countTacklezones(state, p.position, receiving) > 0) return;     // v soupeřově zóně ne
-        const int d = p.position.distanceTo(ballPos);
-        if (d < bestDist) { bestDist = d; bestId = p.id; }
+        cand.push_back({p.position.distanceTo(ballPos), p.id});
     });
-    if (bestId < 0) return;
+    if (cand.empty()) return;
+    std::stable_sort(cand.begin(), cand.end(), [](auto& a, auto& b) { return a.first < b.first; });
 
-    // Pohyb během výkopu bez uhýbání (uživatel 02.10., review #7): z pole v soupeřově tacklezóně se
-    // NEODCHÁZÍ (vstoupit smí, pak stojí) a ze stejně dobrých cílů má přednost pole mimo tacklezóny.
-    // OPRAVENO 02.10. — dřív šel nenasytně k míči přes jakákoli pole, i z tacklezóny do tacklezóny.
-    // Prohledání do šířky (nejvýš 3 kroky): cíl = nejblíž míči, pak mimo TZ, pak méně kroků.
-    Player& p = state.getPlayer(bestId);
-    const Position from = p.position;
-    auto inTz = [&](Position q) { return countTacklezones(state, q, receiving) > 0; };
-    bool seen[Position::PITCH_WIDTH][Position::PITCH_HEIGHT] = {};
-    seen[from.x][from.y] = true;
-    std::vector<Position> frontier{from};
-    Position best = from;
-    auto key = [&](Position q) { return q.distanceTo(ballPos) * 2 + (inTz(q) ? 1 : 0); };
-    int bestKey = key(from);
-    for (int step = 0; step < 3; ++step) {
-        std::vector<Position> next;
-        for (const Position& at : frontier) {
-            if (at != from && inTz(at)) continue;                 // z tacklezóny dál nejde
-            for (const Position& q : at.getAdjacent()) {
-                if (!q.isOnPitch() || !inHalfOf(receiving, q) || seen[q.x][q.y] ||
-                    state.getPlayerAtPosition(q) != nullptr) continue;
-                seen[q.x][q.y] = true;
-                next.push_back(q);
-                if (const int k = key(q); k < bestKey) { bestKey = k; best = q; }
-            }
+    auto move = [&](int id, Position to) {
+        Player& p = state.getPlayer(id);
+        const Position from = p.position;
+        p.position = to;
+        if (to != from) {
+            emitEvent(events, {GameEvent::Type::SKILL_USED, id, -1, from, to,
+                               static_cast<int>(SkillName::KickOffReturn), true});
         }
-        frontier = std::move(next);
+    };
+
+    // P200 (1), 14.10.2026: v živé partii volí kouč přijímajících -- zda, kým a kam.
+    if (coachDecides(receiving)) {
+        for (const auto& [d, id] : cand) {
+            const std::vector<Position> sq = kickoffReturnSquares(state, id, ballPos);
+            if (sq.empty()) continue;
+            const int n = static_cast<int>(sq.size());
+            const int a = askCoach(CoachQuestion::KICKOFF_RETURN, id, -1, n, ballPos.x * 100 + ballPos.y,
+                                   (1 << (n + 1)) - 1);
+            if (a > 0) { move(id, sq[a - 1]); return; }   // jen jeden hráč za výkop
+        }
+        return;
     }
-    p.position = best;
-    if (p.position != from) {
-        emitEvent(events, {GameEvent::Type::SKILL_USED, bestId, -1, from, p.position,
-                           static_cast<int>(SkillName::KickOffReturn), true});
-    }
+
+    // AI: nejbližší kandidát, nejlepší pole, jen když je lepší než stát.
+    const int id = cand.front().second;
+    const Player& p = state.getPlayer(id);
+    const std::vector<Position> sq = kickoffReturnSquares(state, id, ballPos);
+    auto key = [&](Position q) { return q.distanceTo(ballPos) * 2 + (countTacklezones(state, q, receiving) > 0 ? 1 : 0); };
+    if (!sq.empty() && key(sq.front()) < key(p.position)) move(id, sq.front());
 }
 
 // Riot, ř. 1284-1296. OPRAVENO 02.10. (Ž3) — dřív se hýbala jen značka přijímajícího, bez D6.
@@ -349,6 +347,37 @@ void finishKickoff(GameState& state, Position landing, DiceRollerBase& dice,
 }
 
 } // anonymous namespace
+
+std::vector<Position> kickoffReturnSquares(const GameState& state, int playerId, Position ballPos) {
+    // Pohyb během výkopu bez uhýbání (uživatel 02.10., review #7): z pole v soupeřově tacklezóně se
+    // NEODCHÁZÍ (vstoupit smí, pak stojí). Prohledání do šířky, nejvýš 3 kroky (ř. 8252).
+    const Player& p = state.getPlayer(playerId);
+    const TeamSide receiving = p.teamSide;
+    const Position from = p.position;
+    auto inTz = [&](Position q) { return countTacklezones(state, q, receiving) > 0; };
+    bool seen[Position::PITCH_WIDTH][Position::PITCH_HEIGHT] = {};
+    seen[from.x][from.y] = true;
+    std::vector<Position> frontier{from}, found;
+    for (int step = 0; step < 3; ++step) {
+        std::vector<Position> next;
+        for (const Position& at : frontier) {
+            if (at != from && inTz(at)) continue;                 // z tacklezóny dál nejde
+            for (const Position& q : at.getAdjacent()) {
+                if (!q.isOnPitch() || !inHalfOf(receiving, q) || seen[q.x][q.y] ||
+                    state.getPlayerAtPosition(q) != nullptr) continue;
+                seen[q.x][q.y] = true;
+                next.push_back(q);
+                found.push_back(q);
+            }
+        }
+        frontier = std::move(next);
+    }
+    // nejblíž míči, pak mimo tacklezóny; při shodě dřív nalezené (méně kroků)
+    auto key = [&](Position q) { return q.distanceTo(ballPos) * 2 + (inTz(q) ? 1 : 0); };
+    std::stable_sort(found.begin(), found.end(), [&](Position a, Position b) { return key(a) < key(b); });
+    if (found.size() > 30) found.resize(30);   // otázka kouče: odpověď je bit masky (askCoach 0..30)
+    return found;
+}
 
 bool receivingTeamHasATurnLeft(const GameState& state) {
     return state.getTeamState(opponent(state.kickingTeam)).turnNumber < 8;

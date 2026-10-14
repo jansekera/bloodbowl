@@ -259,3 +259,29 @@ def test_vykop_se_pta_na_lekarnika():
         else:
             raise AssertionError("výkop se ptá donekonečna")
     assert lekarnik >= 1, f"pozitivní kontrola: ve 400 výkopech žádný dotaz na lékárníka ({druhy})"
+
+
+def test_kick_off_return_na_volbu_kouce():
+    # P200 (1): přijímající kouč volí, zda a kam jde hráč s Kick-Off Return
+    for seed in range(1, 60):
+        s = bb.GameState()
+        bb.setup_half(s, bb.get_developed_roster("skaven", 1500), bb.get_developed_roster("dwarf", 1500), A)
+        d = bb.DiceRoller(seed)
+        _, _, q = bb.kickoff_coach(s, d, H, [])
+        if q is None or q["question"] != "KICKOFF_RETURN":
+            continue
+        assert q["squares"] and q["options"] == (1 << (len(q["squares"]) + 1)) - 1
+        assert "odp 0 = nepoužít" in ps.otazka_str(q)
+        assert ps.preloz_odpoved(q, str(len(q["squares"]))) == len(q["squares"])
+        kor = q["player"]
+        cil = tuple(q["squares"][-1])
+        odp = [len(q["squares"])]
+        for _ in range(8):
+            _, _, q2 = bb.kickoff_coach(s, d, H, odp)
+            if q2 is None:
+                break
+            odp.append(0)
+        p = s.get_player(kor)
+        assert (p.position.x, p.position.y) == cil
+        return
+    raise AssertionError("pozitivní kontrola: v 60 výkopech se Kick-Off Return nenabídl")

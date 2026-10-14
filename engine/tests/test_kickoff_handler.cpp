@@ -1375,3 +1375,53 @@ TEST(KickoffHandler, P201KoRecoveryIsLogged) {
     EXPECT_FALSE(ev[0].success);
     EXPECT_EQ(gs.getPlayer(ko).state, PlayerState::KO);
 }
+
+// ───────────── P200 (1): Kick-Off Return na volbu kouče (14.10.2026) ─────────────
+// ř. 8249-8256 "MAY use this skill" -- volba přijímajícího kouče, i kam jde (až 3 pole). Dřív
+// engine sám šel co nejblíž míči. Otázka KICKOFF_RETURN: odpověď 0 = nepoužít, i = i-té pole
+// z `kickoffReturnSquares` (seřazená od nejlepšího pro AI).
+#include "bb/coach_choice.h"
+
+TEST(KickOffReturn, CoachIsAsked) {
+    auto gs = korFixture();
+    const int id = placeKor(gs, {8, 2});
+    FixedDiceRoller dice(kickDice());
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { resolveKickoff(gs, dice, nullptr); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::KICKOFF_RETURN);
+        EXPECT_EQ(p.playerId, id);
+        EXPECT_GE(p.roll, 1);                                   // počet nabízených polí
+        EXPECT_EQ(p.options, (1 << (p.roll + 1)) - 1);
+    }
+}
+
+TEST(KickOffReturn, CoachDeclines_PlayerStays) {
+    auto gs = korFixture();
+    const int id = placeKor(gs, {8, 2});
+    FixedDiceRoller dice(kickDice());
+    CoachChoiceScope scope(TeamSide::HOME, {0});
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(id).position, (Position{8, 2}));
+}
+
+TEST(KickOffReturn, CoachPicksTheLastSquare) {
+    auto gs = korFixture();
+    const int id = placeKor(gs, {8, 2});
+    int n = 0;
+    Position landing{};
+    {
+        GameState g2 = gs;
+        FixedDiceRoller d2(kickDice());
+        CoachChoiceScope scope(TeamSide::HOME, {});
+        try { resolveKickoff(g2, d2, nullptr); } catch (const CoachChoicePending& p) {
+            n = p.roll; landing = {static_cast<int8_t>(p.target / 100), static_cast<int8_t>(p.target % 100)};
+        }
+    }
+    ASSERT_GE(n, 2);
+    const auto squares = kickoffReturnSquares(gs, id, landing);
+    ASSERT_EQ(static_cast<int>(squares.size()), n);
+    FixedDiceRoller dice(kickDice());
+    CoachChoiceScope scope(TeamSide::HOME, {n});                 // poslední = nejhorší pro AI
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(id).position, squares.back());
+}

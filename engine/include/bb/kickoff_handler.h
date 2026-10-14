@@ -14,6 +14,11 @@ namespace bb {
 // ve vzduchu (`GameState::kickoffBallInAir`); dopad pak dodělá `resolveKickoffLanding`.
 void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P200 (1): pole, kam smí hráč s Kick-Off Return jít (až 3 kroky, jen vlastní polovina, volná pole,
+// z tacklezóny soupeře dál nejde; ř. 8249-8256), seřazená od nejlepšího pro AI (nejblíž míči,
+// pak mimo tacklezóny, pak méně kroků), nejvýš 30 nejlepších. Výchozí pole v seznamu není.
+std::vector<Position> kickoffReturnSquares(const GameState& state, int playerId, Position ballPos);
+
 // Koná se výkop? Ř. 1033-1035: „Play stops when both coaches have had eight turns each“ ⇒ přijímající
 // (soupeř `state.kickingTeam`) musí mít ještě kolo. Volat PŘED `setupDrive`: návrat z KO a Sweltering
 // Heat se hází jen před výkopem, který se koná (ř. 1007-1012).
