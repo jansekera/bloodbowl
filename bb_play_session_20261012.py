@@ -453,6 +453,10 @@ def otazka_str(q):
         pole = " · ".join(f"{i} = {tuple(xy)}" for i, xy in enumerate(q.get("squares", []), 1))
         return (f"❓ KICK-OFF RETURN hráč {p}: míč dopadne na ({q['target'] // 100},{q['target'] % 100}) — kam jít (až 3 pole)?"
                 f"  ->  odp 0 = nepoužít · {pole}")
+    if t == "KICKOFF_RETURN_PLAYER":   # uživatel 14.10.: napřed kdo
+        kdo = " · ".join(f"{i} = hráč {pid}" for i, pid in enumerate(q.get("players", []), 1))
+        return (f"❓ KICK-OFF RETURN: míč dopadne na ({q['target'] // 100},{q['target'] % 100}) — který hráč půjde?"
+                f"  ->  odp 0 = nikdo · {kdo}")
     if t == "USE_FOLLOW_UP":
         return f"❓ hráč {p} odtlačil hráče {o}: následovat (follow-up)?  ->  odp ano / ne"
     if t == "USE_APOTHECARY":
@@ -471,7 +475,7 @@ def otazka_str(q):
 def preloz_odpoved(q, text):
     """Odpověď kouče -> číslo pro engine; None = nerozumím / není mezi možnostmi."""
     t = q["question"]
-    if t in ("BLOCK_FACE", "KICKOFF_RETURN"):
+    if t in ("BLOCK_FACE", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER"):
         a = int(text) if text.isdigit() else None
     elif t == "APOTHECARY_PICK":
         a = {"1": 0, "2": 1}.get(text)

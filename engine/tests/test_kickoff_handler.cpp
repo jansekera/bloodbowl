@@ -1425,3 +1425,45 @@ TEST(KickOffReturn, CoachPicksTheLastSquare) {
     resolveKickoff(gs, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(id).position, squares.back());
 }
+
+// Uživatel 14.10.: „teoreticky může mít KOR více hráčů = kouč nejdříve vybere jednoho, co je možno
+// vybrat podle pravidel, a pak s ním pohne“ ⇒ při více oprávněných napřed KICKOFF_RETURN_PLAYER
+// (0 = nikdo, i = i-tý z kickoffReturnCandidates), pak KICKOFF_RETURN pro vybraného.
+TEST(KickOffReturn, CoachPicksThePlayerFirst) {
+    auto gs = korFixture();
+    const int a = placeKor(gs, {8, 2});
+    const int b = placeKor(gs, {8, 12});
+    std::vector<int> kandidati;
+    {
+        GameState g2 = gs;
+        FixedDiceRoller d2(kickDice());
+        CoachChoiceScope scope(TeamSide::HOME, {});
+        try { resolveKickoff(g2, d2, nullptr); FAIL(); } catch (const CoachChoicePending& p) {
+            EXPECT_EQ(p.question, CoachQuestion::KICKOFF_RETURN_PLAYER);
+            EXPECT_EQ(p.roll, 2);
+            EXPECT_EQ(p.options, 0b111);
+            kandidati = kickoffReturnCandidates(g2, TeamSide::HOME,
+                {static_cast<int8_t>(p.target / 100), static_cast<int8_t>(p.target % 100)});
+        }
+    }
+    ASSERT_EQ(kandidati.size(), 2u);
+    const int druhy = kandidati[1];
+    FixedDiceRoller dice(kickDice());
+    CoachChoiceScope scope(TeamSide::HOME, {2, 1});   // druhý kandidát, první pole
+    resolveKickoff(gs, dice, nullptr);
+    const Position start = druhy == a ? Position{8, 2} : Position{8, 12};
+    const Position jinyStart = druhy == a ? Position{8, 12} : Position{8, 2};
+    EXPECT_NE(gs.getPlayer(druhy).position, start);
+    EXPECT_EQ(gs.getPlayer(druhy == a ? b : a).position, jinyStart);
+}
+
+TEST(KickOffReturn, CoachPicksNobody) {
+    auto gs = korFixture();
+    const int a = placeKor(gs, {8, 2});
+    const int b = placeKor(gs, {8, 12});
+    FixedDiceRoller dice(kickDice());
+    CoachChoiceScope scope(TeamSide::HOME, {0});
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(a).position, (Position{8, 2}));
+    EXPECT_EQ(gs.getPlayer(b).position, (Position{8, 12}));
+}

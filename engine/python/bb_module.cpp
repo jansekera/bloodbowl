@@ -515,7 +515,7 @@ PYBIND11_MODULE(bb_engine, m) {
             static const char* names[] = {"REROLL", "PRO_GATE_REROLL", "BLOCK_REROLL", "PASS_REROLL",
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
-                                          "APOTHECARY_PICK", "KICKOFF_RETURN"};
+                                          "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;
@@ -529,6 +529,10 @@ PYBIND11_MODULE(bb_engine, m) {
                          state, q.playerId, {static_cast<int8_t>(q.target / 100), static_cast<int8_t>(q.target % 100)}))
                     sq.append(py::make_tuple(p.x, p.y));
                 d["squares"] = sq;
+            }
+            if (q.question == bb::CoachQuestion::KICKOFF_RETURN_PLAYER) {   // kdo smí jít
+                d["players"] = bb::kickoffReturnCandidates(state, bb::opponent(state.kickingTeam),
+                    {static_cast<int8_t>(q.target / 100), static_cast<int8_t>(q.target % 100)});
             }
             return py::make_tuple(py::none(), eventsToList(events), d);
         } catch (...) {

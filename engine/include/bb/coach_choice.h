@@ -38,7 +38,10 @@ enum class CoachQuestion : int {
     // P200 (1), 14.10.2026: Kick-Off Return (ř. 8249-8256 "may use"). playerId = hráč, roll = počet
     // nabízených polí, target = dopad míče x*100+y; odpověď 0 = nepoužít, i = i-té pole
     // z kickoffReturnSquares (seřazená od nejlepšího pro AI).
-    KICKOFF_RETURN = 13
+    KICKOFF_RETURN = 13,
+    // Uživatel 14.10.: víc oprávněných nositelů KOR ⇒ napřed KDO. playerId = -1, roll = počet,
+    // target = dopad x*100+y; odpověď 0 = nikdo, i = i-tý z kickoffReturnCandidates.
+    KICKOFF_RETURN_PLAYER = 14
 };
 
 namespace CoachAnswer {

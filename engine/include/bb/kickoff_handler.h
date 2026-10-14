@@ -19,6 +19,10 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
 // pak mimo tacklezóny, pak méně kroků), nejvýš 30 nejlepších. Výchozí pole v seznamu není.
 std::vector<Position> kickoffReturnSquares(const GameState& state, int playerId, Position ballPos);
 
+// Kdo smí Kick-Off Return použít (ř. 8249-8256): má skill, stojí, není na lajně ani v soupeřově
+// zóně a má kam jít; seřazeno od nejbližšího k míči (AI bere prvního), nejvýš 30.
+std::vector<int> kickoffReturnCandidates(const GameState& state, TeamSide receiving, Position ballPos);
+
 // Koná se výkop? Ř. 1033-1035: „Play stops when both coaches have had eight turns each“ ⇒ přijímající
 // (soupeř `state.kickingTeam`) musí mít ještě kolo. Volat PŘED `setupDrive`: návrat z KO a Sweltering
 // Heat se hází jen před výkopem, který se koná (ř. 1007-1012).
