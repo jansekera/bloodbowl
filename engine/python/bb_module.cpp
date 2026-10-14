@@ -490,14 +490,16 @@ PYBIND11_MODULE(bb_engine, m) {
     // odpovědi -- (None, události do té chvíle, otázka). V tom případě se stav, kostky
     // i ruční volby VRÁTÍ do stavu před akcí; volající odpověď přidá a zavolá znovu.
     // Totéž při chybě (neplatná odpověď): nic se nezmění a výjimka jde dál.
-    m.def("execute_action_coach", [eventsToList](bb::GameState& state, const bb::Action& action,
-                                                 bb::DiceRoller& dice, bb::TeamSide coachSide,
-                                                 const std::vector<int>& answers, bool bothSides) {
+    // P130: jedna akce živé partie s otázkami kouče. P208 (9), 14.10.2026: týž mechanismus i pro
+    // výkop (`kickoff_coach`) -- zranění z výkopové tabulky (kámen, invaze) řešilo lékárníka
+    // za kouče engine, proti P201 (1). Narazí-li běh na otázku, stav i kostky se vrátí na
+    // začátek a vrátí se otázka; s odpovědí se běh spustí znovu se stejnými kostkami.
+    auto runCoached = [eventsToList](bb::GameState& state, bb::DiceRoller& dice, bb::TeamSide coachSide,
+                                     const std::vector<int>& answers, bool bothSides, auto&& body) {
         const bb::GameState stateBefore = state;
         const bb::DiceRoller diceBefore = dice;
         const bb::ManualBlockChoices manualBefore = bb::saveManualBlockChoices();
         std::vector<bb::GameEvent> events;
-        bb::DiceRollerBase& base = dice;
         auto restore = [&]() {
             state = stateBefore;
             dice = diceBefore;
@@ -505,8 +507,8 @@ PYBIND11_MODULE(bb_engine, m) {
         };
         try {
             bb::CoachChoiceScope scope(coachSide, answers, bothSides);
-            bb::ActionResult r = bb::executeAction(state, action, base, &events);
-            return py::make_tuple(py::cast(r), eventsToList(events), py::none());
+            py::object r = body(events);
+            return py::make_tuple(r, eventsToList(events), py::none());
         } catch (const bb::CoachChoicePending& q) {
             restore();
             py::dict d;
@@ -526,7 +528,25 @@ PYBIND11_MODULE(bb_engine, m) {
             restore();
             throw;
         }
+    };
+    m.def("execute_action_coach", [runCoached](bb::GameState& state, const bb::Action& action,
+                                               bb::DiceRoller& dice, bb::TeamSide coachSide,
+                                               const std::vector<int>& answers, bool bothSides) {
+        return runCoached(state, dice, coachSide, answers, bothSides, [&](std::vector<bb::GameEvent>& ev) {
+            bb::DiceRollerBase& base = dice;
+            return py::cast(bb::executeAction(state, action, base, &ev));
+        });
     }, py::arg("state"), py::arg("action"), py::arg("dice"), py::arg("coach_side"), py::arg("answers"),
+       py::arg("both_sides") = false);
+    // Výkop s otázkami kouče; vrací (None, události, otázka|None) jako execute_action_coach.
+    m.def("kickoff_coach", [runCoached](bb::GameState& state, bb::DiceRoller& dice, bb::TeamSide coachSide,
+                                        const std::vector<int>& answers, bool bothSides) {
+        return runCoached(state, dice, coachSide, answers, bothSides, [&](std::vector<bb::GameEvent>& ev) {
+            bb::DiceRollerBase& base = dice;
+            bb::resolveKickoff(state, base, &ev);
+            return py::object(py::none());
+        });
+    }, py::arg("state"), py::arg("dice"), py::arg("coach_side"), py::arg("answers"),
        py::arg("both_sides") = false);
 
     // P146 (05.10.2026): „AI plánuje tah“ — jak by AI odehrála celý tah týmu, který je na tahu.

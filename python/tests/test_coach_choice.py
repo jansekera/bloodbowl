@@ -235,3 +235,27 @@ def test_varovani_nosic_s_rozehranou_akci():
                         break
             bb.execute_action_logged(s, akce[(seed * 7 + krok * 13) % len(akce)], d)
     assert nalezeno >= 3, nalezeno                        # pozitivní kontrola: situace opravdu nastala
+
+
+def test_vykop_se_pta_na_lekarnika():
+    # P208 (9): zranění z výkopové tabulky (kámen, invaze) — lékárník jen na požádání kouče;
+    # při výkopu se ptá i Pro u chytání (týmový přehoz u výkopu ne, ř. 1261-1263)
+    druhy, lekarnik = set(), 0
+    for seed in range(1, 400):
+        s = bb.GameState()
+        bb.setup_half(s, bb.get_developed_roster("human", 1500), bb.get_developed_roster("orc", 1500), A)
+        d = bb.DiceRoller(seed)
+        pred = otisk(s)
+        odp = []
+        for _ in range(10):
+            _, ev, q = bb.kickoff_coach(s, d, H, odp)
+            if q is None:
+                break
+            assert otisk(s) == pred, "otázka nesmí změnit stav"
+            druhy.add(q["question"])
+            if q["question"] == "USE_APOTHECARY":
+                lekarnik += 1
+            odp.append(0)
+        else:
+            raise AssertionError("výkop se ptá donekonečna")
+    assert lekarnik >= 1, f"pozitivní kontrola: ve 400 výkopech žádný dotaz na lékárníka ({druhy})"
