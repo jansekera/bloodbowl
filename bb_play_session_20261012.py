@@ -446,7 +446,7 @@ def otazka_str(q):
         return (f"❓ LÉKÁRNÍK hráč {p}: první hod {zraneni_str(q['roll'])}, druhý {zraneni_str(q['target'])}"
                 " — který platí?  ->  odp 1 / 2")
     if t in SKILL_OTAZKY:
-        kdo = f" (blokuje hráč {o})" if o > 0 else ""
+        kdo = f" (v bloku s hráčem {o})" if o > 0 else ""   # P201 (5): ptá se i útočník
         navic = "   (před `odp ano` lze zadat sidestep x y)" if t == "USE_SIDE_STEP" else ""
         return f"❓ hráč {p}{kdo}: použít {SKILL_OTAZKY[t]}?  ->  odp ano / ne{navic}"
     return f"❓ {q}"

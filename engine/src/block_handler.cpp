@@ -1116,6 +1116,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 defWrestle = askCoach(CoachQuestion::USE_WRESTLE, def.id, att.id, 0, 0, 3) == 1;
             }
             bool attWrestle = attWantsWrestle;
+            // P201 (5), 14.10.2026: i Wrestle útočníka je v živé partii volba jeho kouče
+            // (ř. 8672-8676 "MAY USE"); dřív rozhodl engine. Ptá se jen, když Wrestle
+            // obránce už oba nepoložil.
+            if (!defWrestle && att.hasSkill(SkillName::Wrestle) && coachDecides(att.teamSide)) {
+                attWrestle = askCoach(CoachQuestion::USE_WRESTLE, att.id, def.id, 0, 0, 3) == 1;
+            }
 
             if (defWrestle || attWrestle) {
                 // F11, 24.08.2026: Wrestle NENI bezpodminecne bez turnoveru.

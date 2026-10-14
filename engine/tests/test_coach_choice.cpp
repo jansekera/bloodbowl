@@ -831,3 +831,43 @@ TEST(P201Vypis, ApothecaryToReserves_InjuryRollIsShown) {
     EXPECT_EQ(inj->roll, 10);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
 }
+
+// ───────────── P201 (5): Wrestle útočníka při Both Down je volba jeho kouče ─────────────
+// BB2016 ř. 8672-8676: "This player MAY USE Wrestle" — volba. Kouč obránce se ptal (P130),
+// kouč útočníka ne: engine rozhodl sám (partie 13.10.).
+TEST(CoachChoiceBlock, AttackerWrestle_Asked) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.getPlayer(1).skills.add(SkillName::Block);    // engine by Wrestle nepoužil (obránce Block nemá)
+    FixedDiceRoller dice({2, 1, 1});                 // Both Down, zbroj obránce 1+1
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { block(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_WRESTLE);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+    }
+}
+
+TEST(CoachChoiceBlock, AttackerWrestle_Used_BothProne) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    FixedDiceRoller dice({2, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {1});
+    auto r = block(gs, dice);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(dice.remaining(), 2u);                 // Wrestle: bez hodu na zbroj
+}
+
+TEST(CoachChoiceBlock, AttackerWrestle_Declined_BlockKeepsHimStanding) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Wrestle);
+    gs.getPlayer(1).skills.add(SkillName::Block);
+    FixedDiceRoller dice({2, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {0});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
