@@ -73,9 +73,11 @@ final class Phase12SkillsTest extends TestCase
         $this->assertContains('fend', $types);
     }
 
-    public function testFendNoEffectOnKnockdown(): void
+    public function testFendAlsoWorksOnKnockdown(): void
     {
-        // Defender with Fend knocked down → follow-up still happens (Fend only works when standing)
+        // OPRAVENO 14.10.2026 (P198) -- test dřív tvrdil opak („Fend only works when standing“) a
+        // kódoval vadu. Fend ř. 8113-8118: "Opposing players may not follow-up blocks made against
+        // this player EVEN IF the Fend player is Knocked Down."
         // Equal ST → 1 die, roll 6 = DEFENDER_DOWN
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
@@ -90,12 +92,10 @@ final class Phase12SkillsTest extends TestCase
         $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $this->assertTrue($result->isSuccess());
-        // Attacker should be at (6,5) — follow-up happened
         $attPos = $result->getNewState()->requirePlayer(1)->requirePosition();
-        $this->assertEquals(6, $attPos->getX());
-        // No fend event (Fend doesn't trigger on knockdown)
+        $this->assertEquals(5, $attPos->getX(), 'útočník nenásleduje ani sraženého obránce s Fend');
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
-        $this->assertNotContains('fend', $types);
+        $this->assertContains('fend', $types);
     }
 
     public function testPilingOnRerollsArmor(): void

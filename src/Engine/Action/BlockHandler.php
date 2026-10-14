@@ -25,6 +25,15 @@ use App\Engine\TacklezoneCalculator;
 
 final class BlockHandler implements ActionHandlerInterface
 {
+    /** P198: odložit odraz / dav přímého obránce za follow-up (nastavuje resolvePushback). */
+    private bool $odlozitPoFollowUp = false;
+
+    /** P198: pole, kam odtlačený upustil míč vyražený Strip Ballem (odraz až po follow-upu). */
+    private ?Position $odlozenyStrip = null;
+
+    /** @var array{kde: Position, odkud: Position, hadBall: bool, kdo: int}|null P198: vytlačení do davu */
+    private ?array $odlozenyDav = null;
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly StrengthCalculator $strCalc,
@@ -1088,6 +1097,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $defender,
                 $defenderPos,
                 $events,
+                odlozitPoFollowUp: true,
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
@@ -1107,9 +1117,17 @@ final class BlockHandler implements ActionHandlerInterface
         // Multiple Block: no follow-up allowed
         // ⛔ P83 (30.09.2026): zakoreneny blokuje „without following-up"
         //   (`rules_bb2016.txt` r. 8580-8581). Vzor C++ `block_handler.cpp:548`.
+        // OPRAVENO 14.10.2026 (P198, převod C++ 2026-08-10) -- tady bylo `&& !$defenderDown`: Fend
+        //   platil jen u nesraženého obránce. Fend ř. 8113-8118: "may not follow-up blocks made
+        //   against this player EVEN IF the Fend player is Knocked Down". Juggernaut na blitzu
+        //   ho ruší ("may not use his Fend, Stand Firm or Wrestle"). Událost `fend` jen tehdy,
+        //   když Fend opravdu zakázal follow-up (dřív i když útočník sám nenásledoval).
+        $fend = $defender->hasSkill(SkillName::Fend) && !($isBlitz && $attacker->hasSkill(SkillName::Juggernaut));
         if ($noFollowUp || $attacker->isRooted()) {
             // Skip follow-up entirely for Multiple Block / rooted attacker
-        } elseif ($defenderPushed && !($defender->hasSkill(SkillName::Fend) && !$defenderDown)
+        } elseif ($defenderPushed && $fend) {
+            $events[] = GameEvent::fend($defender->getId());
+        } elseif ($defenderPushed
             && $this->wantsFollowUp($currentState, $attacker, $attackerPos, $defenderPos, $isBlitz, $followUpChoice)) {
             $events[] = GameEvent::followUp($attacker->getId(), (string) $attackerPos, (string) $defenderPos);
             $attacker = $attacker->withPosition($defenderPos);
@@ -1119,10 +1137,10 @@ final class BlockHandler implements ActionHandlerInterface
             if ($currentState->getBall()->getCarrierId() === $attacker->getId()) {
                 $currentState = $currentState->withBall(BallState::carried($defenderPos, $attacker->getId()));
             }
-        } elseif ($defenderPushed) {
-            // Fend: defender has Fend and is not down (guaranteed by previous branch logic)
-            $events[] = GameEvent::fend($defender->getId());
         }
+        // P198: odraz vyraženého míče a dav až po follow-upu
+        [$currentState, $events] = $this->dokoncitOdlozene($currentState, $events);
+        $defender = $currentState->getPlayer($defender->getId()) ?? $defender;
 
         // Handle defender knockdown
         if ($defenderDown && $defender->getPosition() !== null) {
@@ -1241,13 +1259,51 @@ final class BlockHandler implements ActionHandlerInterface
         MatchPlayerDTO $defender,
         Position $defenderOriginalPos,
         array $events,
+        bool $odlozitPoFollowUp = false,
     ): array {
         $attackerPos = $attacker->getPosition();
         if ($attackerPos === null) {
             return [$state, $events];
         }
 
-        return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events);
+        $this->odlozitPoFollowUp = $odlozitPoFollowUp;
+        $this->odlozenyStrip = null;
+        $this->odlozenyDav = null;
+        try {
+            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events);
+        } finally {
+            $this->odlozitPoFollowUp = false;
+        }
+    }
+
+    /**
+     * P198 (14.10.2026), převod C++ P194 (6) + review P208: co odtlačení PŘÍMÉHO obránce
+     * odložilo za follow-up (ř. 609-610 "before any other dice rolls") -- odraz vyraženého
+     * míče (Strip Ball), vhazování a zranění v davu. Obránce v davu už na hřišti není.
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function dokoncitOdlozene(GameState $state, array $events): array
+    {
+        $strip = $this->odlozenyStrip;
+        $o = $this->odlozenyDav;
+        $this->odlozenyStrip = null;
+        $this->odlozenyDav = null;
+        if ($strip !== null) {
+            $bounce = $this->ballResolver->resolveBounce($state, $strip);
+
+            return [$bounce['state'], array_merge($events, $bounce['events'])];
+        }
+        if ($o === null) {
+            return [$state, $events];
+        }
+        if ($o['hadBall']) {
+            [$state, $events] = $this->throwInFromCrowd($state, $o['kde'], $o['odkud'], $events);
+        }
+        $injResult = $this->injuryResolver->resolveCrowdSurf($state->requirePlayer($o['kdo']), $this->dice);
+
+        return [$state->withPlayer($injResult['player']), array_merge($events, $injResult['events'])];
     }
 
     /**
@@ -1388,6 +1444,14 @@ final class BlockHandler implements ActionHandlerInterface
             $hadBall = $state->getBall()->getCarrierId() === $kdo->getId();
             $kdo = $kdo->withPosition(null);
             $state = $state->withPlayer($kdo);
+            if ($utocnik !== null && $this->odlozitPoFollowUp) {
+                $this->odlozenyDav = ['kde' => $kde, 'odkud' => $odkud, 'hadBall' => $hadBall, 'kdo' => $kdo->getId()];
+                if ($hadBall) {
+                    $state = $state->withBall(BallState::onGround($kde));   // nosič je v davu, míč čeká na vhazování
+                }
+
+                return [$state, $events];
+            }
             if ($hadBall) {
                 [$state, $events] = $this->throwInFromCrowd($state, $kde, $odkud, $events);
             }
@@ -1411,6 +1475,11 @@ final class BlockHandler implements ActionHandlerInterface
             if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall) && !$kdo->hasSkill(SkillName::SureHands)) {
                 $events[] = GameEvent::ballStripped($kdo->getId());
                 $state = $state->withBall(BallState::onGround($pushTo));
+                if ($this->odlozitPoFollowUp) {
+                    $this->odlozenyStrip = $pushTo;
+
+                    return [$state, $events];
+                }
                 $bounceResult = $this->ballResolver->resolveBounce($state, $pushTo);
                 $events = array_merge($events, $bounceResult['events']);
                 $state = $bounceResult['state'];
