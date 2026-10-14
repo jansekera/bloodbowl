@@ -13,18 +13,14 @@ require_once __DIR__ . '/../../cli/developed_rosters.php';
 
 final class DevelopedRostersTest extends TestCase
 {
-    /**
-     * @dataProvider allRacesProvider
-     */
+    #[DataProvider('allRacesProvider')]
     public function testDevelopedRosterReturns11Players(string $race): void
     {
         $players = getDevelopedRaceRoster(TeamSide::HOME, $race);
         $this->assertCount(11, $players, "Race {$race} should have 11 players");
     }
 
-    /**
-     * @dataProvider allRacesProvider
-     */
+    #[DataProvider('allRacesProvider')]
     public function testDevelopedRosterHasMoreOrEqualSkillsThanBase(string $race): void
     {
         $basePlayers = getRaceRoster(TeamSide::HOME, $race);

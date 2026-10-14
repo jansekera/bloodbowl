@@ -6,6 +6,7 @@ namespace App\Tests\Engine;
 
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 // Include race roster definitions (shared with cli/simulate.php)
@@ -16,9 +17,7 @@ require_once __DIR__ . '/../../cli/race_rosters.php';
  */
 final class RaceRosterTest extends TestCase
 {
-    /**
-     * @dataProvider raceProvider
-     */
+    #[DataProvider('raceProvider')]
     public function testAllRacesProduceElevenPlayers(string $race): void
     {
         $players = getRaceRoster(TeamSide::HOME, $race);

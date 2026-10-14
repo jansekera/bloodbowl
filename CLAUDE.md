@@ -95,6 +95,6 @@ Tři pravidla z Brasty (Domain Protection, Repository Pattern, No Direct DB Acce
 
 ## Známé mezery (01.10.2026)
 
-- PHPUnit hlásí 3 *PHPUnit Deprecations*.
+- ~~PHPUnit hlásí 3 *PHPUnit Deprecations*~~ — odstraněno 14.10.2026 (`@dataProvider` → atribut `#[DataProvider]`).
 - Testy architektury, mutační testy, bezpečnostní brány a CI zatím nejsou — kniha **P98–P116**.
 - Lint: `vendor/bin/php-cs-fixer fix` opraví formát PHP; commity jen s formátem patří do `.git-blame-ignore-revs`.
