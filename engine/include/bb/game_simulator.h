@@ -25,13 +25,15 @@ struct GameResult {
 // dice is needed for the KO recovery roll at each kick-off (package G);
 // pass nullptr in tests that do not care -- KO'd players then simply stay out.
 void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
-               TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr);
+               TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr,
+               std::vector<GameEvent>* events = nullptr);   // P201 (13): KO_RECOVERY
 
 // Same player/ball placement as setupHalf, for restarting play after a touchdown
 // mid-half -- does NOT reset each team's turn clock or reroll pool (unlike
 // setupHalf, which is reserved for true half boundaries: game start, half-time).
 void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr);
+                TeamSide kickingTeam = TeamSide::AWAY, DiceRollerBase* dice = nullptr,
+                std::vector<GameEvent>* events = nullptr);
 
 // Pre-match coin toss -- BB2016 l. 304-307: "Flip the Blood Bowl coin or roll
 // a D6 to see which coach will choose who will set up first. The team that sets

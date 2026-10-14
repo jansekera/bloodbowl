@@ -40,7 +40,8 @@ static const char* const kEventNames[] = {
     "PICKUP", "FOUL", "KICKOFF", "WEATHER", "SKILL",
     "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
     "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
-    "BLOODLUST_FEED", "REROLL", "APOTHECARY", "CROWD_SURF"};
+    "BLOODLUST_FEED", "REROLL", "APOTHECARY", "CROWD_SURF", "KICKOFF_TABLE",
+    "KO_RECOVERY"};
 
 PYBIND11_MODULE(bb_engine, m) {
     m.doc() = "Blood Bowl C++ Engine - Python bindings";
@@ -693,30 +694,37 @@ PYBIND11_MODULE(bb_engine, m) {
           py::arg("kicking_team") = bb::TeamSide::AWAY);
     // 02.10.2026 (živá partie): rozestavení po touchdownu uvnitř poločasu (KO hráči hází na návrat).
     m.def("setup_drive",
-          [](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
+          [eventsToList](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
              bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
               bb::DiceRollerBase& base = dice;
               state.kickingTeam = kickingTeam;   // simpleKickoff bere přijímající = opponent(state.kickingTeam)
-              bb::setupDrive(state, home, away, kickingTeam, &base);
+              std::vector<bb::GameEvent> events;   // P201 (13): návrat z KO
+              bb::setupDrive(state, home, away, kickingTeam, &base, &events);
+              return eventsToList(events);
           },
           py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
     // 02.10.2026 (živá partie): začátek 2. poločasu jako v simulateGame (half=2, kopou přijímající z 1. poločasu,
     // KO hráči hází na návrat — proto s kostkami, na rozdíl od setup_half).
     m.def("setup_second_half",
-          [](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
+          [eventsToList](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
              bb::TeamSide kickingTeam, bb::DiceRoller& dice) {
               bb::DiceRollerBase& base = dice;
               state.half = 2;
               state.kickingTeam = kickingTeam;
-              bb::setupHalf(state, home, away, kickingTeam, &base);
+              std::vector<bb::GameEvent> events;   // P201 (13): návrat z KO
+              bb::setupHalf(state, home, away, kickingTeam, &base, &events);
+              return eventsToList(events);
           },
           py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"));
     // Jméno zůstalo kvůli skriptům; od 02.10.2026 je to JEDINÝ výkop enginu (resolveKickoff:
     // tabulka, Kick-Off Return, touchback). Po Blitz! je na tahu KOPAJÍCÍ tým a míč letí
     // (state.ball mimo hřiště); dopadne po jeho END_TURN v execute_action.
-    m.def("simple_kickoff", [](bb::GameState& state, bb::DiceRoller& dice) {
+    // P200 (14.10.2026): vrací události výkopu (rozptyl, tabulka, Kick-Off Return, chytání).
+    m.def("simple_kickoff", [eventsToList](bb::GameState& state, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;
-        bb::resolveKickoff(state, base, nullptr);
+        std::vector<bb::GameEvent> events;
+        bb::resolveKickoff(state, base, &events);
+        return eventsToList(events);
     });
     // P66 (29.09.2026): výkop už počasí nehází -- hra řízená z Pythonu ho
     // musí hodit sama, jednou před prvním výkopem (BB2016 l. 2571-2573).

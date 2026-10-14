@@ -388,19 +388,24 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
     const int kickY = 7;
 
     // Scatter: D6 for distance, D8 for direction
-    int dist = dice.rollD6();
+    const int distRoll = dice.rollD6();
+    int dist = distRoll;
     // Kick skill, BB2016 l. 8211-8213: "you may choose to halve the number of
     // squares that the ball scatters on kick-off, ROUNDING ANY FRACTIONS DOWN
     // (i.e., 1 = 0, 2-3 = 1, 4-5 = 2, 6 = 3)". Do 24.08.2026 se zaokrouhlovalo
     // NAHORU, takze u tri hodu ze sesti (1, 3, 5) mic uletel o pole dal, nez ma.
     if (hasKickPlayer(state, state.kickingTeam)) dist = dist / 2;
-    const Position scatter = scatterDirection(dice.rollD8());
+    const int dirRoll = dice.rollD8();
+    const Position scatter = scatterDirection(dirRoll);
     // P123 (OPRAVENO 02.10.): žádný `clamp` — míč mimo hřiště je touchback (landBall), ne okraj.
     Position landing{static_cast<int8_t>(kickX + scatter.x * dist), static_cast<int8_t>(kickY + scatter.y * dist)};
     // Míč letí: na zem přijde až při dopadu (ř. 1242-1248).
     state.ball = BallState::offPitch();
 
-    emitEvent(events, {GameEvent::Type::KICKOFF, -1, -1, {}, landing, 0, true});
+    // P200 (14.10.2026): `from` = kam se mířilo, `roll` = rozptyl po Kicku, die1 / die2 = D6 / D8.
+    emitEvent(events, {GameEvent::Type::KICKOFF, -1, -1,
+                       {static_cast<int8_t>(kickX), static_cast<int8_t>(kickY)}, landing, dist, true,
+                       distRoll, dirRoll});
 
     // Kick-Off Return PŘED výkopovou tabulkou (P122); „may not be used for a touchback kick-off“.
     if (landing.isOnPitch() && inHalfOf(receiving, landing))
@@ -408,6 +413,8 @@ void resolveKickoff(GameState& state, DiceRollerBase& dice, std::vector<GameEven
 
     const int kickoffRoll = dice.roll2D6();
     const KickoffEvent koEvent = kickoffEventFromRoll(std::clamp(kickoffRoll, 2, 12));
+    emitEvent(events, {GameEvent::Type::KICKOFF_TABLE, -1, static_cast<int>(koEvent), {}, {},
+                       kickoffRoll, true});
     if (resolveKickoffEvent(state, koEvent, receiving, landing, dice, events)) {
         state.phase = GamePhase::PLAY;       // Blitz!: na tahu kopající, míč ve vzduchu
         return;

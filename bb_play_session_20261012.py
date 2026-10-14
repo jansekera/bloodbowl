@@ -175,10 +175,49 @@ def druha(side):
     return bb.TeamSide.AWAY if side == bb.TeamSide.HOME else bb.TeamSide.HOME
 
 
+VYKOPOVA_TABULKA = {2: "Get the Ref (úplatky engine nemá — bez účinku)", 3: "Riot (posun značek kol)",
+                    4: "Perfect Defence (kopající smí přestavět — engine nepřestavuje)",
+                    5: "High Kick (hráč přijímajících pod míč)", 6: "Cheering Fans (D3: vyšší dostane reroll)",
+                    7: "Changing Weather", 8: "Brilliant Coaching (D3: vyšší dostane reroll)",
+                    9: "Quick Snap (přijímající se posunou o pole)", 10: "Blitz! (kopající mají volný tah)",
+                    11: "Throw a Rock", 12: "Pitch Invasion"}
+
+
+def vykop(state, dice, kope, rozestaveni):
+    """P200 (14.10.2026): rozestavení + výkop, vrací řádky výpisu. `rozestaveni` = funkce
+    (state, kope, dice) -> události rozestavení (návrat z KO). Co výkopová tabulka změnila
+    (rerolly, značky kol, přesuny hráčů), se čte z rozdílu stavu před a po výkopu."""
+    out = [f"rozestavení + výkop, kope {strana_str(kope)}"]
+    out += ["   " + event_str(e) for e in rozestaveni(state, kope, dice)]
+    pred_rr = (state.home_team.rerolls, state.away_team.rerolls)
+    pred_kolo = (state.home_team.turn_number, state.away_team.turn_number)
+    pred_pole = {p.id: (p.position.x, p.position.y) for p in enum_players(state)}
+    pred_pocasi = pocasi_str(state)
+    ev = bb.simple_kickoff(state, dice)
+    out += ["   " + event_str(e) for e in ev]
+    kor = {e["player"] for e in ev if e["type"] in ("SKILL", "SKILL_USED")}
+    for p in enum_players(state):
+        a, b = pred_pole.get(p.id), (p.position.x, p.position.y)
+        if a and a != b and p.id not in kor:
+            out.append(f"   hráč {p.id} při výkopu odchází ze hřiště: {str(p.state).split('.')[-1]}" if b == (-1, -1)
+                       else f"   přesun při výkopu: hráč {p.id} {a} -> {b}")
+    if pocasi_str(state) != pred_pocasi:
+        out.append(f"   počasí teď: {pocasi_str(state)} (bylo {pred_pocasi})")
+    for jm, a, b in (("HOME", pred_rr[0], state.home_team.rerolls), ("AWAY", pred_rr[1], state.away_team.rerolls)):
+        if a != b:
+            out.append(f"   týmové rerolly {jm}: {a} -> {b}")
+    prijima = druha(kope)   # výkop přijímajícím vždy začne další kolo; jiný posun = Riot
+    if pred_kolo != (state.home_team.turn_number - (prijima == bb.TeamSide.HOME),
+                     state.away_team.turn_number - (prijima == bb.TeamSide.AWAY)):
+        out.append(f"   značky kol po výkopu: H:{state.home_team.turn_number} A:{state.away_team.turn_number}")
+    if state.active_team == kope:
+        out.append("   ⚠️ na tahu jsou KOPAJÍCÍ (Blitz!) — míč je ve vzduchu")
+    return out
+
+
 def zahaj(state, dice, kope):
-    """Rozestavení a první výkop; `kope` = strana, která kope."""
-    bb.setup_half(state, ROSTERS[0], ROSTERS[1], kope)
-    bb.simple_kickoff(state, dice)
+    """Rozestavení a první výkop; `kope` = strana, která kope. Vrací řádky výpisu."""
+    return vykop(state, dice, kope, lambda s, k, d: bb.setup_half(s, ROSTERS[0], ROSTERS[1], k) or [])
 
 
 def enum_players(state):
@@ -502,6 +541,17 @@ def event_str(e):
         return f"TÝMOVÝ REROLL {who}: původní hod {e['die1']} -> nový hod {e['die2']} ({'OK' if e['success'] else 'NEPROŠEL'})"
     if t == "FOLLOW_UP":
         return f"follow-up {who}: {'ano' if e['success'] else 'ne'}"
+    if t == "KICKOFF":
+        # P200: from = kam se mířilo, roll = rozptyl po Kicku, die1 = D6, die2 = D8 (1 = sever, po směru hodin)
+        kick = f" (Kick půlí {e['die1']} -> {e['roll']})" if e["roll"] != e["die1"] else ""
+        return (f"VÝKOP: míří na {e['from']}, rozptyl D6 = {e['die1']}{kick}, směr D8 = {e['die2']}"
+                f" -> dopad {e['to']}")
+    if t == "KICKOFF_TABLE":
+        return f"VÝKOPOVÁ TABULKA: 2D6 = {e['roll']} -> {VYKOPOVA_TABULKA.get(e['target'], e['target'])}"
+    if t == "WEATHER":
+        return f"ZMĚNA POČASÍ: 2D6 = {e['roll']}"
+    if t == "KO_RECOVERY":
+        return f"NÁVRAT Z KO {who}: D6 = {e['roll']} -> {'vrací se' if e['success'] else 'zůstává v KO'} (4+)"
     if t == "MOVE":
         return f"krok {who} na {e['to']}"
     if t in ("SKILL", "SKILL_USED"):
@@ -509,6 +559,8 @@ def event_str(e):
         jm = SKILL_NAMES[e["roll"]] if 0 <= e["roll"] < len(SKILL_NAMES) else e["roll"]
         if e["die2"]:   # přehoz skillem (helpers.cpp attemptRoll): die2 = původní hod, die1 = nový
             return f"SKILL {jm} {who}: přehoz {e['die2']} -> {e['die1']} ({'OK' if e['success'] else 'NEPROŠEL'})"
+        if jm == "KickOffReturn":
+            return f"SKILL Kick-Off Return {who}: {e['from']} -> {e['to']}"
         hod = f" hod {e['die1']}" if e["die1"] else ""
         return f"SKILL {jm} {who}:{hod} -> {'OK' if e['success'] else 'NEPROŠEL'}"
     return f"{t} {who} cíl {e['target']} hod {e['roll']}"
@@ -618,7 +670,7 @@ def main():
                     kopou = bb.ai_toss_elects_kick(ROSTERS[0] if vitez == bb.TeamSide.HOME else ROSTERS[1])
                     prvni_kope = vitez if kopou else druha(vitez)
                     result_lines.append(f"AI volí: {'KOPAT' if kopou else 'PŘIJÍMAT'} -> první výkop kopou {strana_str(prvni_kope)}")
-                    zahaj(state, dice, prvni_kope)
+                    result_lines += zahaj(state, dice, prvni_kope)
                     zalozeno = True
                     result_lines.append(board(state))
             elif cmd == "volba" and len(parts) == 2 and los_vitez is not None:
@@ -629,7 +681,7 @@ def main():
                     prvni_kope = los_vitez if v == "kopat" else druha(los_vitez)
                     los_vitez = None
                     result_lines.append(f"první výkop kopou {strana_str(prvni_kope)}")
-                    zahaj(state, dice, prvni_kope)
+                    result_lines += zahaj(state, dice, prvni_kope)
                     zalozeno = True
                     result_lines.append(board(state))
             elif not zalozeno and cmd != "kouc":
@@ -677,9 +729,8 @@ def main():
             elif cmd == "vykop" and len(parts) == 2:
                 # po TD: rozestavení (KO hází na návrat) + výkop; parts[1] = kdo KOPE (HOME|AWAY)
                 kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
-                bb.setup_drive(state, ROSTERS[0], ROSTERS[1], kick, dice)
-                bb.simple_kickoff(state, dice)
-                result_lines.append(f"rozestavení + výkop, kope {kick}")
+                result_lines += vykop(state, dice, kick,
+                                      lambda s, k, d: bb.setup_drive(s, ROSTERS[0], ROSTERS[1], k, d))
                 result_lines.append(board(state))
             elif cmd == "polocas" and len(parts) in (1, 2):
                 # začátek 2. poločasu: kope ten, kdo v 1. poločase přijímal (ř. 1016-1017);
@@ -688,9 +739,9 @@ def main():
                     kick = bb.TeamSide.HOME if parts[1].upper() == "HOME" else bb.TeamSide.AWAY
                 else:
                     kick = druha(prvni_kope)
-                bb.setup_second_half(state, ROSTERS[0], ROSTERS[1], kick, dice)
-                bb.simple_kickoff(state, dice)
-                result_lines.append(f"2. poločas: rozestavení + výkop, kope {kick}")
+                result_lines.append("2. poločas")
+                result_lines += vykop(state, dice, kick,
+                                      lambda s, k, d: bb.setup_second_half(s, ROSTERS[0], ROSTERS[1], k, d))
                 result_lines.append(board(state))
             elif cmd == "kostka" and len(parts) == 2:
                 # volba kouče: kterou z hozených kostek vzít (0 lebka,1 Both Down,2 Pushed,3 Stumbles,4 POW)

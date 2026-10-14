@@ -145,3 +145,24 @@ def test_prvni_vykop_respektuje_kopajici_stranu():
             bb.simple_kickoff(s, d)
             na_tahu.append(s.active_team)
         assert na_tahu.count(prijima) > 30, (kope, na_tahu.count(prijima))
+
+
+def test_vypis_vykopu():
+    # P200 (3) a P201 (13): výkop má ve výpisu rozptyl, tabulku a návrat z KO
+    e = {"type": "KICKOFF", "player": -1, "target": -1, "roll": 1, "success": True, "die1": 3, "die2": 8,
+         "from": (3, 7), "to": (2, 6)}
+    r = ps.event_str(e)
+    assert "D6 = 3" in r and "Kick půlí 3 -> 1" in r and "D8 = 8" in r and "(2, 6)" in r
+    e.update(type="KICKOFF_TABLE", roll=6, target=6)
+    assert "2D6 = 6" in ps.event_str(e) and "Cheering Fans" in ps.event_str(e)
+    e.update(type="KO_RECOVERY", player=4, roll=3, success=False)
+    assert "zůstává v KO" in ps.event_str(e)
+    # celý výkop: ve 40 výkopech se objeví tabulka v každém a aspoň jednou přesun i reroll navíc
+    tabulka = presun = rr = 0
+    for seed in range(1, 41):
+        s, d = ps.new_game(seed)
+        out = ps.zahaj(s, d, A)
+        tabulka += sum("VÝKOPOVÁ TABULKA" in l for l in out)
+        presun += any("přesun při výkopu" in l for l in out)
+        rr += any("týmové rerolly" in l for l in out)
+    assert tabulka == 40 and presun > 0 and rr > 0, (tabulka, presun, rr)

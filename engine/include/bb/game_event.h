@@ -81,6 +81,12 @@ struct GameEvent {
              // na zraneni. `from` = pole, ze ktereho sel hrac do davu; hod na
              // zraneni v davu nasleduje jako bezna INJURY / CASUALTY.
              // Nove typy pridavat ZA tenhle (bb_module.cpp mapuje poradim).
+             ,
+        KICKOFF_TABLE, // P200 (14.10.2026): hod na vykopovou tabulku nemel ve
+             // vypisu nic. `roll` = 2D6, `targetId` = KickoffEvent.
+        KO_RECOVERY // P201 (13), 14.10.2026: navrat z KO pred vykopem
+             // (r. 1007-1012). `playerId`, `roll` = D6, `success` = 4+ (vraci se).
+             // Nove typy pridavat ZA tenhle (bb_module.cpp mapuje poradim).
     };
 
     Type type;

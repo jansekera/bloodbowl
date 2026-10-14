@@ -354,7 +354,8 @@ namespace {
 // must be false for setupDrive, or every touchdown grants both teams a fresh
 // 8-turn half (see project_bloodbowl_audit_findings_20260703 finding 2).
 void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                      TeamSide kickingTeam, bool isNewHalf, DiceRollerBase* dice) {
+                      TeamSide kickingTeam, bool isNewHalf, DiceRollerBase* dice,
+                      std::vector<GameEvent>* events) {
     // Package G, layer 1 (2026-08-10): casualties must SURVIVE the end of a
     // drive. This loop used to reset EVERY player to OFF_PITCH with no branch
     // for KO/INJURED/DEAD, and buildTeam then stood them all up again -- so
@@ -407,7 +408,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     for (auto& p : state.players) {
         // KO recovery happens BEFORE anyone is set up, per the rules above.
         if (p.state == PlayerState::KO && dice) {
-            if (dice->rollD6() >= 4) p.setState(PlayerState::OFF_PITCH);
+            const int roll = dice->rollD6();
+            if (roll >= 4) p.setState(PlayerState::OFF_PITCH);
+            emitEvent(events, {GameEvent::Type::KO_RECOVERY, p.id, -1, {}, {}, roll, roll >= 4});
         }
         // Out for the rest of the match: casualties, deaths, sendings-off,
         // and any KO that failed its recovery roll. Keep the state, keep them
@@ -491,13 +494,13 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
 } // anonymous namespace
 
 void setupHalf(GameState& state, const TeamRoster& home, const TeamRoster& away,
-               TeamSide kickingTeam, DiceRollerBase* dice) {
-    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true, dice);
+               TeamSide kickingTeam, DiceRollerBase* dice, std::vector<GameEvent>* events) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/true, dice, events);
 }
 
 void setupDrive(GameState& state, const TeamRoster& home, const TeamRoster& away,
-                TeamSide kickingTeam, DiceRollerBase* dice) {
-    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false, dice);
+                TeamSide kickingTeam, DiceRollerBase* dice, std::vector<GameEvent>* events) {
+    setupHalfOrDrive(state, home, away, kickingTeam, /*isNewHalf=*/false, dice, events);
 }
 
 // BB2016 l. 304-307: los pred zapasem. Do 24.08.2026 se nehazel VUBEC --

@@ -1333,3 +1333,45 @@ TEST(KickoffTable, ThrowARockCanHitAPlayerOnTheGround) {
     resolveKickoff(gs, dice, nullptr);
     EXPECT_FALSE(gs.getPlayer(away[7]).isOnPitch()) << "ležící hráč zasažen a zraněn";
 }
+
+// P200 (3) / P201 (13), 14.10.2026: výkop v živé partii neměl ve výpisu nic -- rozptyl, hod na
+// výkopovou tabulku ani návrat z KO. KICKOFF teď nese kam se mířilo (`from`), dopad (`to`),
+// vzdálenost po Kicku (`roll`) a kostky D6 / D8 (`die1`, `die2`); KICKOFF_TABLE hod 2D6 a událost.
+TEST(KickoffHandler, P200KickoffEventsCarryScatterAndTable) {
+    auto gs = makeKickoffState();                    // kopající lidé mají hráče s Kickem
+    FixedDiceRoller dice({4, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});   // rozptyl 4 směr 3, tabulka 3+3
+    std::vector<GameEvent> ev;
+    resolveKickoff(gs, dice, &ev);
+    const GameEvent* kick = nullptr;
+    const GameEvent* table = nullptr;
+    for (const auto& e : ev) {
+        if (e.type == GameEvent::Type::KICKOFF) kick = &e;
+        if (e.type == GameEvent::Type::KICKOFF_TABLE) table = &e;
+    }
+    ASSERT_NE(kick, nullptr);
+    EXPECT_EQ(kick->roll, 2);                        // Kick půlí dolů: 4-5 = 2 (ř. 8211-8213)
+    EXPECT_EQ(kick->die1, 4);                        // padlá kostka zůstává vidět
+    EXPECT_EQ(kick->die2, 3);
+    EXPECT_EQ(kick->from.distanceTo(kick->to), 2);
+    ASSERT_NE(table, nullptr);
+    EXPECT_EQ(table->roll, 6);
+    EXPECT_EQ(table->targetId, static_cast<int>(KickoffEvent::CHEERING));
+}
+
+TEST(KickoffHandler, P201KoRecoveryIsLogged) {
+    GameState gs;
+    gs.kickingTeam = TeamSide::AWAY;
+    setupHalf(gs, getHumanRoster(), getHumanRoster());
+    int ko = -1;
+    gs.forEachOnPitch(TeamSide::HOME, [&](const Player& p) { if (ko < 0) ko = p.id; });
+    gs.getPlayer(ko).setState(PlayerState::KO);
+    FixedDiceRoller dice({3});                       // 1-3 zůstává v KO (ř. 1007-1012)
+    std::vector<GameEvent> ev;
+    setupDrive(gs, getHumanRoster(), getHumanRoster(), TeamSide::AWAY, &dice, &ev);
+    ASSERT_EQ(ev.size(), 1u);
+    EXPECT_EQ(ev[0].type, GameEvent::Type::KO_RECOVERY);
+    EXPECT_EQ(ev[0].playerId, ko);
+    EXPECT_EQ(ev[0].roll, 3);
+    EXPECT_FALSE(ev[0].success);
+    EXPECT_EQ(gs.getPlayer(ko).state, PlayerState::KO);
+}
