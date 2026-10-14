@@ -618,6 +618,14 @@ PYBIND11_MODULE(bb_engine, m) {
     });
     m.def("set_cage_leaf_weight", [](double w) { bb::setCageLeafWeight(w); });
     m.def("cage_leaf_weight", []() { return bb::cageLeafWeight(); });
+    // P196 (14.10.2026): čítač K6 -- [0] rozhodnutí, [1] první rozbalení prázdné, [2] záchrana
+    // jiným makrem, [3] konec tahu, protože nic z nabídky nešlo provést; [4+typ] prázdné podle typu.
+    // Čte a nuluje (thread_local, tj. za proces / vlákno).
+    m.def("take_macro_noop_stats", []() {
+        long out[bb::kMacroNoopSlots];
+        bb::takeMacroNoopStats(out);
+        return std::vector<long>(out, out + bb::kMacroNoopSlots);
+    });
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);
         return py::make_tuple(v[0], v[1]);
