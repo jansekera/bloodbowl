@@ -766,11 +766,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         att.movementRemaining--;
         if (att.movementRemaining < 0) {
             int gfiTarget = (state.weather == Weather::BLIZZARD) ? 3 : 2;
-            int rolled = 0;   // P145: padlá kostka do `die1` události
-            bool gfiOk = attemptRoll(state, att.id, dice, gfiTarget,
-                                     SkillName::SureFeet, false, true, events, &rolled);
-            emitEvent(events, {GameEvent::Type::GFI, att.id, -1, att.position,
-                              att.position, gfiTarget, gfiOk, rolled});
+            bool gfiOk = attemptRollLogged(state, att.id, dice, gfiTarget, SkillName::SureFeet, false, true,
+                                           events, GameEvent::Type::GFI, att.position, att.position);
             if (!gfiOk) {
                 // Falls before the block is thrown
                 att.setState(PlayerState::PRONE);

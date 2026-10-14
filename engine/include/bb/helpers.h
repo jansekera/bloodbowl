@@ -124,4 +124,11 @@ bool attemptRoll(GameState& state, int playerId, DiceRollerBase& dice,
                  bool skillNegatedByOpponent, bool canUseTeamReroll,
                  std::vector<GameEvent>* events, int* rolled = nullptr);
 
+// P208 (10), 14.10.2026: attemptRoll + událost hodu na jednom místě (`roll` = cíl, `success`,
+// `die1` = kostka, která platí -- P145). Dřív stejné tři řádky na sedmi místech a každé si
+// muselo pamatovat předat `rolled`, jinak výpis tiskl hod bez kostky.
+bool attemptRollLogged(GameState& state, int playerId, DiceRollerBase& dice, int target,
+                       SkillName skillReroll, bool skillNegatedByOpponent, bool canUseTeamReroll,
+                       std::vector<GameEvent>* events, GameEvent::Type type, Position from, Position to);
+
 } // namespace bb

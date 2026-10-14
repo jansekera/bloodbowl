@@ -15,12 +15,8 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
     }
 
     int target = calculatePickupTarget(state, player);
-    int rolled = 0;   // P145: padlá kostka do `die1` události
-    bool success = attemptRoll(state, playerId, dice, target,
-                               SkillName::SureHands, false, true, events, &rolled);
-
-    emitEvent(events, {GameEvent::Type::PICKUP, playerId, -1, player.position, {},
-                      target, success, rolled});
+    bool success = attemptRollLogged(state, playerId, dice, target, SkillName::SureHands, false, true,
+                                     events, GameEvent::Type::PICKUP, player.position, {});
 
     if (success) {
         state.ball = BallState::carried(player.position, playerId);
@@ -57,16 +53,10 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
 
     int target = calculateCatchTarget(state, catcher, modifier, accuratePass);
     // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
-    int rolled = 0;   // P145: padlá kostka do `die1` události
-    bool success = attemptRoll(state, catcherId, dice, target,
-                               // Catch, l. 7992-7995: "allowed to re-roll the D6
-                               // if he fails a catch roll. It also allows the
-                               // player to re-roll the D6 if he drops a hand-off
-                               // or fails to make an interception."
-                               SkillName::Catch, false, true, events, &rolled);
-
-    emitEvent(events, {GameEvent::Type::CATCH, catcherId, -1, catcher.position, {},
-                      target, success, rolled});
+    // Catch, l. 7992-7995: "allowed to re-roll the D6 if he fails a catch roll. It also allows
+    // the player to re-roll the D6 if he drops a hand-off or fails to make an interception."
+    bool success = attemptRollLogged(state, catcherId, dice, target, SkillName::Catch, false, true,
+                                     events, GameEvent::Type::CATCH, catcher.position, {});
 
     if (success) {
         state.ball = BallState::carried(catcher.position, catcherId);

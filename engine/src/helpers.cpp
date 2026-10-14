@@ -296,6 +296,16 @@ Position scatterDirection(int d8) {
     return {offsets[idx][0], offsets[idx][1]};
 }
 
+bool attemptRollLogged(GameState& state, int playerId, DiceRollerBase& dice, int target,
+                       SkillName skillReroll, bool skillNegatedByOpponent, bool canUseTeamReroll,
+                       std::vector<GameEvent>* events, GameEvent::Type type, Position from, Position to) {
+    int rolled = 0;
+    const bool ok = attemptRoll(state, playerId, dice, target, skillReroll, skillNegatedByOpponent,
+                                canUseTeamReroll, events, &rolled);
+    emitEvent(events, {type, playerId, -1, from, to, target, ok, rolled});
+    return ok;
+}
+
 void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEvent>* events) {
     team.rerolls--;
     team.rerollUsedThisTurn = true;
