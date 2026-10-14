@@ -279,7 +279,10 @@ final class BallResolver
             $dest = $origin;
             $lastInside = $origin;
             $leftPitch = false;
-            for ($step = 0; $step < $distance; $step++) {
+            // OPRAVENO 14.10.2026 (P197, převod C++ T5.24) -- tady bylo `$step < $distance`, míč letěl
+            // o pole dál. FAQ ř. 9307-9314: pole s logem šablony je PRVNÍ pole pohybu, při 2D6 = 2
+            // se míč posune o JEDNO pole.
+            for ($step = 0; $step < $distance - 1; $step++) {
                 $dest = new Position($dest->getX() + $dx, $dest->getY() + $dy);
                 if (!$dest->isOnPitch()) {
                     $leftPitch = true;

@@ -399,9 +399,9 @@ final class BallResolverTest extends TestCase
             ->build();
 
         // D8=7 (West) -> off pitch
-        // Throw-in (r. 868-871): sablona 3 = kolmo (V), 2D6 = 1+2 -> (3,7) na hristi,
+        // Throw-in (r. 868-871): sablona 3 = kolmo (V), 2D6 = 2+2 -> 3 pole (3,7) na hristi (P197: 2D6 − 1 polí),
         // (hrac 1 na vychozim poli drahu neovlivni); (3,7) prazdne -> odskok 3 (V) -> (4,7)
-        $dice = new FixedDiceRoller([7, 3, 1, 2, 3]);
+        $dice = new FixedDiceRoller([7, 3, 2, 2, 3]);
         $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveBounce($state, $ballPos);
 
@@ -417,8 +417,8 @@ final class BallResolverTest extends TestCase
             ->withBallOnGround(0, 7)
             ->build();
 
-        // sablona 4 = kolmo (V), 2D6 = 2+2 -> (4,7) prazdne -> odskok 1 (S) -> (4,6)
-        $dice = new FixedDiceRoller([4, 2, 2, 1]);
+        // sablona 4 = kolmo (V), 2D6 = 2+3 -> 4 pole (4,7) prazdne -> odskok 1 (S) -> (4,6) (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([4, 2, 3, 1]);
         $ballPos = $state->getBall()->requirePosition();
         $result = $this->resolver($dice)->resolveThrowIn($state, $ballPos, new \App\ValueObject\Position(-1, 7));
 

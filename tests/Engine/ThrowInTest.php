@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Throw-in podle rules_bb2016 r. 868-878:
- *  - sablona Throw-in od posledniho pole na hristi, vzdalenost 2D6;
+ *  - sablona Throw-in od posledniho pole na hristi, vzdalenost 2D6 − 1 (FAQ ř. 9307-9314, P197);
  *  - stojici hrac na cilovem poli MUSI chytat; prazdne pole nebo lezici/omraceny = odskok;
  *  - kdyz mic vyleti znovu, vhazuje se znovu od posledniho pole, kde byl.
  * Sablona (LRB6, shodne s C++ `ball_handler.cpp:129`): u strany D6 -- 1-2 diagonala,
@@ -43,12 +43,29 @@ final class ThrowInTest extends TestCase
         return array_values(array_filter($events, fn($e) => $e->getType() === 'throw_in'));
     }
 
+    /**
+     * P197 (14.10.2026), převod C++ T5.24 / P145: FAQ ř. 9307-9314 — "The square with the Blood Bowl
+     * logo over it counts as the FIRST square of the ball's movement. So, if the result of the 2D6
+     * roll was a 2, the ball would be ... placed in the square with the Blood Bowl logo over it, then
+     * move ONE square". Míč letí 2D6 − 1 polí od posledního pole, dřív plných 2D6.
+     */
+    public function testFaqTwoOnTwoD6MovesOneSquare(): void
+    {
+        $state = (new GameStateBuilder())->withBallOnGround(0, 7)->build();
+
+        // šablona 3 = kolmo (V), 2D6 = 1+1 = 2 -> o JEDNO pole (1,7) -> odskok 5 (J) -> (1,8)
+        $dice = new FixedDiceRoller([3, 1, 1, 5]);
+        $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7));
+
+        $this->assertSame('(1,7)', $this->throwIns($result['events'])[0]->getData()['to']);
+    }
+
     public function testFromLeftEdgeStraightIn2D6ThenBounce(): void
     {
         $state = (new GameStateBuilder())->withBallOnGround(0, 7)->build();
 
-        // sablona 3 = kolmo (V), 2D6 = 2+3 = 5 -> (5,7) prazdne -> odskok 5 (J) -> (5,8)
-        $dice = new FixedDiceRoller([3, 2, 3, 5]);
+        // sablona 3 = kolmo (V), 2D6 = 3+3 = 6 -> 5 polí (5,7) prazdne -> odskok 5 (J) -> (5,8) (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([3, 3, 3, 5]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7));
 
         $this->assertEquals(new Position(5, 8), $result['state']->getBall()->requirePosition());
@@ -63,8 +80,8 @@ final class ThrowInTest extends TestCase
             ->withBallOnGround(10, 14)
             ->build();
 
-        // sablona 6 = diagonala SV, 2D6 = 1+1 = 2 -> (12,12), hrac chyta 6
-        $dice = new FixedDiceRoller([6, 1, 1, 6]);
+        // sablona 6 = diagonala SV, 2D6 = 1+2 = 3 -> 2 pole (12,12), hrac chyta 6 (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([6, 1, 2, 6]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(10, 14), new Position(10, 15));
 
         $this->assertSame(1, $result['state']->getBall()->getCarrierId());
@@ -75,8 +92,8 @@ final class ThrowInTest extends TestCase
     {
         $state = (new GameStateBuilder())->withBallOnGround(0, 0)->build();
 
-        // roh vlevo nahore: D6 3 -> D3 2 = diagonala JV; 2D6 = 1+2 = 3 -> (3,3) -> odskok 3 (V) -> (4,3)
-        $dice = new FixedDiceRoller([3, 1, 2, 3]);
+        // roh vlevo nahore: D6 3 -> D3 2 = diagonala JV; 2D6 = 2+2 = 4 -> 3 pole (3,3) -> odskok 3 (V) -> (4,3) (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([3, 2, 2, 3]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 0), new Position(-1, -1));
 
         $this->assertEquals(new Position(4, 3), $result['state']->getBall()->requirePosition());
@@ -91,8 +108,8 @@ final class ThrowInTest extends TestCase
             ->build();
         $state = $state->withPlayer($state->requirePlayer(1)->withState(PlayerState::PRONE));
 
-        // sablona 4 = kolmo, 2D6 = 2+2 -> (4,7) lezici hrac -> odskok 3 -> (5,7)
-        $dice = new FixedDiceRoller([4, 2, 2, 3]);
+        // sablona 4 = kolmo, 2D6 = 2+3 -> 4 pole (4,7) lezici hrac -> odskok 3 -> (5,7) (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([4, 2, 3, 3]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7));
 
         $this->assertEquals(new Position(5, 7), $result['state']->getBall()->requirePosition());
@@ -105,8 +122,8 @@ final class ThrowInTest extends TestCase
         $state = (new GameStateBuilder())->withBallOnGround(10, 0)->build();
 
         // horni hrana: 1 = diagonala JZ, 2D6 = 12 -> (9,1)...(0,10), dalsi krok (-1,11) mimo;
-        // znovu od (0,10), leva hrana: 3 = V, 2D6 = 2 -> (2,10) -> odskok 3 -> (3,10)
-        $dice = new FixedDiceRoller([1, 6, 6, 3, 1, 1, 3]);
+        // znovu od (0,10), leva hrana: 3 = V, 2D6 = 3 -> 2 pole (2,10) -> odskok 3 -> (3,10) (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([1, 6, 6, 3, 1, 2, 3]);
         $result = $this->resolver($dice)->resolveThrowIn($state, new Position(10, 0), new Position(10, -1));
 
         $throwIns = $this->throwIns($result['events']);
@@ -124,9 +141,9 @@ final class ThrowInTest extends TestCase
             ->withBallCarried(2)
             ->build();
 
-        // blok 3 = odstrceni do davu; throw-in: sablona 3 = Z, 2D6 = 1+2 -> (22,5) -> odskok 5 -> (22,6);
-        // zraneni od davu 2D6 = 3+3
-        $dice = new FixedDiceRoller([3, 3, 1, 2, 5, 3, 3]);
+        // blok 3 = odstrceni do davu; throw-in: sablona 3 = Z, 2D6 = 2+2 -> 3 pole (22,5) -> odskok 5 -> (22,6);
+        // zraneni od davu 2D6 = 3+3 (P197: 2D6 − 1 polí)
+        $dice = new FixedDiceRoller([3, 3, 2, 2, 5, 3, 3]);
         $result = (new ActionResolver($dice))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $throwIns = $this->throwIns($result->getEvents());
