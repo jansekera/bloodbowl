@@ -204,59 +204,15 @@ final class InjuryResolver
     }
 
     /**
-     * Re-roll injury with apothecary (take better result).
-     * Returns the better of original and re-rolled results.
-     *
-     * @param list<GameEvent> $events
-     * @return array{player: MatchPlayerDTO, events: list<GameEvent>}
+     * P206 (14.10.2026): rozhodnutí „použít lékárníka?“ po Casualty, nastavuje ActionResolver na
+     * dobu akce (zná stav týmů a lavičky). fn(MatchPlayerDTO $hrac, CasualtyResult $prvni): bool.
+     * Bez něj (testy samotného InjuryResolveru) se lékárník nepoužívá.
      */
-    public function resolveApothecary(
-        MatchPlayerDTO $player,
-        DiceRollerInterface $dice,
-        PlayerState $originalState,
-        int $originalModifier,
-        array $events,
-    ): array {
-        // Re-roll injury
-        // Lekarnik prehazuje ZRANENI, ne Regeneration -- ta prijde az po nem, jednou.
-        $rerollResult = $this->resolveInjury($player, $dice, $originalModifier, [], regenerace: false);
-        $rerolledState = $rerollResult['player']->getState();
+    private ?\Closure $lekarnik = null;
 
-        // Take the better result (stunned > KO > injured)
-        $stateOrder = [
-            PlayerState::STUNNED->value => 0,
-            PlayerState::KO->value => 1,
-            PlayerState::INJURED->value => 2,
-        ];
-
-        $originalScore = $stateOrder[$originalState->value] ?? 2;
-        $rerolledScore = $stateOrder[$rerolledState->value] ?? 2;
-
-        if ($rerolledScore <= $originalScore) {
-            // Reroll is same or better
-            $events[] = GameEvent::apothecaryUsed(
-                $player->getId(),
-                $originalState->value,
-                $rerolledState->value,
-            );
-            $events = array_merge($events, $rerollResult['events']);
-            return ['player' => $rerollResult['player'], 'events' => $events];
-        }
-
-        // Original was better, keep it
-        $events[] = GameEvent::apothecaryUsed(
-            $player->getId(),
-            $originalState->value,
-            $originalState->value,
-        );
-
-        // Restore original state on the player
-        $restoredPlayer = $player->withState($originalState);
-        if ($originalState === PlayerState::KO || $originalState === PlayerState::INJURED) {
-            $restoredPlayer = $restoredPlayer->withPosition(null);
-        }
-
-        return ['player' => $restoredPlayer, 'events' => $events];
+    public function setLekarnik(?\Closure $lekarnik): void
+    {
+        $this->lekarnik = $lekarnik;
     }
 
     /**
@@ -367,9 +323,6 @@ final class InjuryResolver
             //   Lisi se az v LIZE. Vysledek se proto ZAZNAMENAVA do udalosti,
             //   i kdyz ho zatim nic necte.
             $cas = $this->rollCasualty($dice);
-            $player = $player
-                ->withState($cas['result'] === CasualtyResult::DEAD ? PlayerState::DEAD : PlayerState::INJURED)
-                ->withPosition(null);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'casualty');
             $events[] = GameEvent::casualty(
                 $player->getId(),
@@ -377,6 +330,29 @@ final class InjuryResolver
                 $cas['units'],
                 $cas['result']->value,
             );
+            // P206 (14.10.2026, převod C++ `injury.cpp`) -- lékárník HNED po Casualty a PŘED
+            //   Regenerací (ř. 8433-8440). OPRAVENO: dřív jen v bloku a přehazoval CELÝ hod na
+            //   zranění. Pravidla ř. 1200-1210: soupeř hodí znovu na tabulku Casualty, vybere se
+            //   jeden výsledek (AI: mírnější); Badly Hurt -- i původní -- ⇒ rezervy.
+            $vysledek = $cas['result'];
+            $rezervy = false;
+            if ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {
+                if ($vysledek !== CasualtyResult::BADLY_HURT) {
+                    $druhy = $this->rollCasualty($dice)['result'];
+                    $poradi = array_flip(array_map(fn(CasualtyResult $c) => $c->value, CasualtyResult::cases()));
+                    if ($poradi[$druhy->value] < $poradi[$vysledek->value]) {
+                        $vysledek = $druhy;
+                    }
+                }
+                $events[] = GameEvent::apothecaryUsed($player->getId(), $cas['result']->value, $vysledek->value);
+                $rezervy = $vysledek === CasualtyResult::BADLY_HURT;
+            }
+            if ($rezervy) {
+                return ['player' => $player->withState(PlayerState::OFF_PITCH)->withPosition(null), 'events' => $events, 'dice' => [$die1, $die2]];
+            }
+            $player = $player
+                ->withState($vysledek === CasualtyResult::DEAD ? PlayerState::DEAD : PlayerState::INJURED)
+                ->withPosition(null);
 
             // Nurgle's Rot: flavor event when attacker has the skill
             if ($hasNurglesRot) {

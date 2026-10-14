@@ -704,6 +704,8 @@ final class ActionResolverTest extends TestCase
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 24, 5, strength: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 25, 5, strength: 3, id: 2)
+            // bez lékárníka: od P206 (14.10.) platí i u davu (Badly Hurt ⇒ rezervy); test je o davu
+            ->withAwayTeam(\App\DTO\TeamStateDTO::create(2, 'Away', 'Orc', TeamSide::AWAY, 2, hasApothecary: false))
             ->build();
 
         // kostka bloku 3 = PUSHED; zraneni 6+6=12 => casualty

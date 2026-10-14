@@ -7,6 +7,7 @@ namespace App\Engine;
 use App\DTO\ActionResult;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
+use App\DTO\MatchPlayerDTO;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
 use App\Engine\Action\BlockHandler;
@@ -20,11 +21,15 @@ use App\Engine\Action\RerollHandler;
 use App\Engine\Action\SetupHandler;
 use App\Engine\Action\ThrowTeamMateHandler;
 use App\Enum\ActionType;
+use App\Enum\CasualtyResult;
+use App\Enum\PlayerState;
+use App\Enum\TeamSide;
 
 final class ActionResolver
 {
     private bool $interactiveBlocks = false;
     private bool $interactiveRerolls = false;
+    private readonly InjuryResolver $injuryResolver;
     private readonly MoveHandler $moveHandler;
     private readonly BlockHandler $blockHandler;
     private readonly BlitzHandler $blitzHandler;
@@ -63,6 +68,7 @@ final class ActionResolver
         $pathfinder = $pathfinder ?? new Pathfinder($this->tzCalc);
         $strCalc = $strCalc ?? new StrengthCalculator();
         $injuryResolver = $injuryResolver ?? new InjuryResolver();
+        $this->injuryResolver = $injuryResolver;
         $this->ballResolver = $ballResolver ?? new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
         $this->passResolver = $passResolver;
         $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
@@ -181,6 +187,45 @@ final class ActionResolver
      * @param array<string, mixed> $params
      */
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
+    {
+        // P206 (14.10.2026): lékárník pro všechna zranění akce (i výkopu přes SetupHandler) na jednom
+        //   místě. Rozhodnutí AI = C++ `injury.cpp`: jen na Badly Hurt nebo smrt a jen hráče, kterého
+        //   nenahradí stejný hráč z lavičky. ⏰ Volba kouče ve webové hře zatím není -- P206 (b).
+        $pouzit = [];
+        $this->injuryResolver->setLekarnik(function (MatchPlayerDTO $hrac, CasualtyResult $prvni) use ($state, &$pouzit): bool {
+            $strana = $hrac->getTeamSide();
+            if (isset($pouzit[$strana->value]) || !$state->getTeamState($strana)->canUseApothecary()) {
+                return false;
+            }
+            if (!in_array($prvni, [CasualtyResult::BADLY_HURT, CasualtyResult::DEAD], true)) {
+                return false;   // střední pásmo: lékárník se šetří
+            }
+            foreach ($state->getPlayers() as $p) {
+                if ($p->getId() !== $hrac->getId() && $p->getTeamSide() === $strana
+                    && $p->getState() === PlayerState::OFF_PITCH && $p->getPositionalName() === $hrac->getPositionalName()) {
+                    return false;   // lavička ho nahradí
+                }
+            }
+            $pouzit[$strana->value] = true;
+
+            return true;
+        });
+        try {
+            $r = $this->resolveAkce($state, $action, $params);
+        } finally {
+            $this->injuryResolver->setLekarnik(null);
+        }
+        $st = $r->getNewState();
+        foreach (array_keys($pouzit) as $strana) {
+            $side = TeamSide::from($strana);
+            $st = $st->withTeamState($side, $st->getTeamState($side)->withApothecaryUsed());
+        }
+
+        return new ActionResult($st, $r->isSuccess(), $r->isTurnover(), $r->getEvents());
+    }
+
+    /** @param array<string, mixed> $params */
+    private function resolveAkce(GameState $state, ActionType $action, array $params): ActionResult
     {
         // ⛔ P81 (30.09.2026): pokracovani blitzu po rane. Je to TAZ akce (Blitz),
         //   takze se neopakuje kontrola pred akci; a propadne, jakmile jedna jiny

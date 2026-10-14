@@ -37,6 +37,8 @@ final class HandOffReceiverRemovedTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bloodlust])
             ->addPlayer(TeamSide::HOME, 6, 7, id: 2)
             ->withBallCarried(1)
+            // bez lékárníka: od P206 (14.10.) se lékárník používá u všech zranění a test o něm není
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Vampire', TeamSide::HOME, 2, hasApothecary: false))
             ->build();
 
         $rules = new RulesEngine();

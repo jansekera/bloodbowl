@@ -30,9 +30,10 @@ final class RegenerationAfterApothecaryTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // blok 6 = Defender Down; brneni 6+6; zraneni 5+5 = CAS + tabulka D68 (1,1 = Badly Hurt);
-        // lekarnik: zraneni 5+6 = CAS + D68 (1,1); Regeneration JEDNOU: 4 => rezervy
-        $r = (new ActionResolver(new FixedDiceRoller([6, 6, 6, 5, 5, 1, 1, 5, 6, 1, 1, 4])))
+        // PŘEPOČTENO 14.10.2026 (P206: lékárník přehazuje TABULKU Casualty, ř. 1200-1210):
+        // blok 6 = Defender Down; brneni 6+6; zraneni 5+5 = CAS, D68 6+1 = mrtev;
+        // lekarnik D68 5+1 = Niggling (mírnější); Regeneration JEDNOU: 4 => rezervy
+        $r = (new ActionResolver(new FixedDiceRoller([6, 6, 6, 5, 5, 6, 1, 5, 1, 4])))
             ->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $typy = array_map(static fn($e) => $e->getType(), $r->getEvents());
@@ -42,8 +43,8 @@ final class RegenerationAfterApothecaryTest extends TestCase
         $this->assertSame(PlayerState::OFF_PITCH, $r->getNewState()->requirePlayer(2)->getState());
     }
 
-    /** Lekarnik zlepsi CAS na KO => Regeneration se vubec nehazi (neni co regenerovat). */
-    public function testApothecaryImprovesToKoNoRegenerationRoll(): void
+    /** Lekarnik da Badly Hurt => hrac do rezerv, Regeneration se vubec nehazi (neni co regenerovat). */
+    public function testApothecaryBadlyHurtToReservesNoRegenerationRoll(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 3, id: 1)
@@ -52,12 +53,13 @@ final class RegenerationAfterApothecaryTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // blok 6; brneni 6+6; zraneni 5+5 = CAS + D68 (1,1); lekarnik: zraneni 3+5 = 8 => KO
-        $r = (new ActionResolver(new FixedDiceRoller([6, 6, 6, 5, 5, 1, 1, 3, 5])))
+        // PŘEPOČTENO 14.10.2026 (P206): blok 6; brneni 6+6; zraneni 5+5 = CAS, D68 6+1 = mrtev;
+        // lekarnik D68 1+1 = Badly Hurt ⇒ rezervy (dřív: lékárník přehodil zranění na KO)
+        $r = (new ActionResolver(new FixedDiceRoller([6, 6, 6, 5, 5, 6, 1, 1, 1])))
             ->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
 
         $typy = array_map(static fn($e) => $e->getType(), $r->getEvents());
         $this->assertNotContains('regeneration', $typy);
-        $this->assertSame(PlayerState::KO, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertSame(PlayerState::OFF_PITCH, $r->getNewState()->requirePlayer(2)->getState());
     }
 }

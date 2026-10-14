@@ -1179,16 +1179,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $currentState = $currentState->withPlayer($freshAttackerForPO);
             }
 
-            // Apothecary: auto-use on casualty
-            $defenderSide = $defender->getTeamSide();
-            if ($defender->getState() === PlayerState::INJURED && $currentState->getTeamState($defenderSide)->canUseApothecary()) {
-                $currentState = $currentState->withTeamState($defenderSide, $currentState->getTeamState($defenderSide)->withApothecaryUsed());
-                $apoResult = $this->injuryResolver->resolveApothecary($defender, $this->dice, PlayerState::INJURED, 0, $events);
-                $defender = $apoResult['player'];
-                $currentState = $currentState->withPlayer($defender);
-                $events = $apoResult['events'];
-            }
-            // Regeneration az PO lekarnikovi, jednou (r. 8434-8436)
+            // Regeneration (r. 8434-8436); lékárník řeší ActionResolver po akci (P206)
             $regen = $this->injuryResolver->resolveRegeneration($defender, $this->dice, $hasStakes, $events);
             $defender = $regen['player'];
             $currentState = $currentState->withPlayer($defender);
@@ -1218,16 +1209,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $currentState = $currentState->withPlayer($freshAttacker);
                 $events = array_merge($events, $injResult['events']);
 
-                // Apothecary: auto-use on casualty for attacker
-                $attackerSide = $freshAttacker->getTeamSide();
-                if ($freshAttacker->getState() === PlayerState::INJURED && $currentState->getTeamState($attackerSide)->canUseApothecary()) {
-                    $currentState = $currentState->withTeamState($attackerSide, $currentState->getTeamState($attackerSide)->withApothecaryUsed());
-                    $apoResult = $this->injuryResolver->resolveApothecary($freshAttacker, $this->dice, PlayerState::INJURED, 0, $events);
-                    $freshAttacker = $apoResult['player'];
-                    $currentState = $currentState->withPlayer($freshAttacker);
-                    $events = $apoResult['events'];
-                }
-                // Regeneration az PO lekarnikovi, jednou (r. 8434-8436)
+                // Regeneration (r. 8434-8436); lékárník řeší ActionResolver po akci (P206)
                 $regen = $this->injuryResolver->resolveRegeneration($freshAttacker, $this->dice, false, $events);
                 $freshAttacker = $regen['player'];
                 $currentState = $currentState->withPlayer($freshAttacker);
