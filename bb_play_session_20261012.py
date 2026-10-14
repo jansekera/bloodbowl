@@ -30,6 +30,7 @@ Příkazy:
   tahai [greedy|macro] [semínko] [iterace]
                            -- jak by tah odehrála AI — NANEČISTO (kopie stavu, vlastní kostky)
   kontrola [posledni]      -- kontrola rozehraného / posledního dokončeného tahu
+  zpet                     -- P201 (14): vrátí poslední akci (do + odp + volby), záloha logu vedle
   quit                     -- ukončí server
 
 P130 — jak otázka probíhá: akce se spustí; narazí-li na rozhodnutí kouče (přehoz, kostka
@@ -575,6 +576,24 @@ def action_str(a):
     return f"{a.type} hrac={a.player_id} cil_hrac={a.target_id} cil_pole=({a.target.x},{a.target.y})"
 
 
+VOLBY_AKCE = ("push", "follow", "blitzfrom", "sidestep", "kostka", "beztackle", "actions")
+
+
+def odstrihni_posledni_akci(radky):
+    """P201 (14), 14.10.2026: řádky logu bez poslední akce (`do` i s odpověďmi `odp` a volbami
+    zadanými před ní a po ní). None = není co vrátit (poslední změnou stavu je los / výkop).
+    Dřív se vracelo ručně ustřižením prikazy.log (13.10. dvakrát)."""
+    i = len(radky)
+    while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE + ("odp",):
+        i -= 1
+    if i == 0 or radky[i - 1].split()[0] != "do":
+        return None
+    i -= 1
+    while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE:
+        i -= 1
+    return radky[:i], radky[i:]
+
+
 def main():
     state, dice = new_game()
     last_actions = []
@@ -641,6 +660,7 @@ def main():
             tah_start = state.clone() if state.phase == bb.GamePhase.PLAY else None
         if replay:
             line = replay.pop(0)
+            ticho = bool(replay)   # během přehrávání se odpověď zapíše jen po posledním řádku
         elif not os.path.exists(CMD):
             time.sleep(0.3)
             continue
@@ -648,6 +668,7 @@ def main():
             with open(CMD) as f:
                 line = f.read().strip()
             os.remove(CMD)
+            ticho = False
             if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
                                                       "kouc", "odp", "sidestep", "los", "volba"):
                 with open(LOG, "a") as f:
@@ -662,6 +683,22 @@ def main():
                 with open(OUT, "w") as f:
                     f.write("server ukoncen\n")
                 break
+            elif cmd == "zpet":
+                # P201 (14): log bez poslední akce, záloha vedle, server se spustí znovu a přehraje ho
+                with open(LOG) as f:
+                    radky = [l.strip() for l in f if l.strip()]
+                rez = odstrihni_posledni_akci(radky)
+                if rez is None:
+                    result_lines.append("⛔ není co vrátit (poslední změnou je los / výkop / poločas)")
+                else:
+                    nove, pryc = rez
+                    zaloha = os.path.join(DIR, time.strftime("prikazy_pred_vracenim_%Y%m%d_%H%M%S.log"))
+                    with open(zaloha, "w") as f:
+                        f.write("\n".join(radky) + "\n")
+                    with open(LOG, "w") as f:
+                        f.write("".join(l + "\n" for l in nove))
+                    os.environ["BB_ZPET"] = f"↩ vráceno ({len(pryc)} řádků logu: {' · '.join(pryc)}); záloha {os.path.basename(zaloha)}"
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
             elif cmd == "los" and not zalozeno and los_vitez is None:
                 bb.roll_match_weather(state, dice)
                 result_lines.append(f"počasí: {pocasi_str(state)}")
@@ -696,7 +733,7 @@ def main():
                 result_lines.append(board(state))
                 if cekajici:
                     result_lines.append(otazka_str(cekajici["q"]))
-            elif cekajici and cmd not in ("odp", "push", "sidestep", "follow"):
+            elif cekajici and cmd not in ("odp", "push", "sidestep", "follow", "zpet"):
                 # hod už byl vidět -- z akce nejde vycouvat ani ji měnit
                 result_lines.append("⛔ akce čeká na rozhodnutí kouče; teď jde jen odp / push / sidestep / follow / board")
                 result_lines.append(otazka_str(cekajici["q"]))
@@ -803,6 +840,13 @@ def main():
                 result_lines.append(f"neznamy prikaz: {line}")
         except Exception as e:
             result_lines.append(f"CHYBA: {e}")
+        if ticho:
+            continue
+        zpet = os.environ.pop("BB_ZPET", None)
+        if zpet:   # první odpověď po přehrání zkráceného logu
+            result_lines = [zpet] + result_lines + [board(state)]
+            if cekajici:
+                result_lines.append(otazka_str(cekajici["q"]))
         with open(OUT, "w") as f:
             f.write("\n".join(result_lines) + "\n")
 
