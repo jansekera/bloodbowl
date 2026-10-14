@@ -6,6 +6,9 @@ stejně jako na serveru `bb_play_session_20261012.py` (kouč, los, otázky kouč
 na začátku každého tahu AI naplánuje celý tah nanečisto (vlastní kostky) a plán se položí vedle
 tahu, který se skutečně hrál. Míry a výpis tahu jsou tytéž jako v `bb_zkouska_ai_plan_20261006.py`.
 
+⚠️ Log se přehraje jen na enginu značky `zkouska-ai-plan-20261013-baze` (worktree): od 14.10. se
+server ptá i na follow-up a lékárníka (P201) a vhazování je o pole kratší — log na ně odpovědi nemá.
+
   /usr/local/bin/python3.8 bb_zkouska_ai_plan_20261013.py            # přehrání + plány
   /usr/local/bin/python3.8 bb_zkouska_ai_plan_20261013.py --kontrola # jen kontroly přehrání
 

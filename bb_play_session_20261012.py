@@ -611,7 +611,9 @@ def odstrihni_posledni_akci(radky):
     if i == 0 or radky[i - 1].split()[0] not in ("do", "do!"):
         return None
     i -= 1
-    while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE:
+    # `actions` před akcí zůstává: přehrání pak skončí se stejnou nabídkou, jakou má
+    # uživatel na obrazovce (review 14.10.: jinak by další `do N` sáhl do zastaralé nabídky)
+    while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE and radky[i - 1].split()[0] != "actions":
         i -= 1
     return radky[:i], radky[i:]
 
@@ -625,9 +627,12 @@ def main():
     zalozeno = False
     los_vitez = None      # kdo vyhrál los a ještě nezvolil
     prvni_kope = None     # kdo kopal první výkop (2. poločas kope druhá strana, ř. 1016-1017)
-    with open(OUT, "w") as f:
-        f.write(f"=== NOVÁ HRA: {P['jmena'][0]} HOME × {P['jmena'][1]} AWAY, TV{P['tv']} — napřed `kouc HOME`,"
-                " pak `los` ===\n")
+    # review 14.10.: po `zpet` (restart + přehrání) by úvodní hláška přepsala výstup dřív, než
+    # přehrání doběhne, a klient by ji vypsal místo „vráceno“
+    if "BB_ZPET" not in os.environ:
+        with open(OUT, "w") as f:
+            f.write(f"=== NOVÁ HRA: {P['jmena'][0]} HOME × {P['jmena'][1]} AWAY, TV{P['tv']} — napřed `kouc HOME`,"
+                    " pak `los` ===\n")
 
     LOG = os.path.join(DIR, "prikazy.log")
     replay = []
@@ -683,7 +688,8 @@ def main():
             tah_start = state.clone() if state.phase == bb.GamePhase.PLAY else None
         if replay:
             line = replay.pop(0)
-            ticho = bool(replay)   # během přehrávání se odpověď zapíše jen po posledním řádku
+            ticho = bool(replay)
+            zalogovano = False   # během přehrávání se odpověď zapíše jen po posledním řádku
         elif not os.path.exists(CMD):
             time.sleep(0.3)
             continue
@@ -692,15 +698,18 @@ def main():
                 line = f.read().strip()
             os.remove(CMD)
             ticho = False
+            zalogovano = False
             if line.split() and line.split()[0] in ("do", "do!", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
                                                       "kouc", "odp", "sidestep", "los", "volba"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
+                zalogovano = True
         parts = line.split()
         if not parts:
             continue
         cmd = parts[0]
         result_lines = []
+        odmitnuto = False   # review 14.10.: odmítnutý příkaz z logu ven, jinak ho `zpet` vezme za akci
         try:
             if cmd == "quit":
                 with open(OUT, "w") as f:
@@ -759,14 +768,17 @@ def main():
             elif cekajici and cmd not in ("odp", "push", "sidestep", "follow", "zpet"):
                 # hod už byl vidět -- z akce nejde vycouvat ani ji měnit
                 result_lines.append("⛔ akce čeká na rozhodnutí kouče; teď jde jen odp / push / sidestep / follow / board")
+                odmitnuto = True
                 result_lines.append(otazka_str(cekajici["q"]))
             elif cmd == "odp" and len(parts) == 2:
                 if not cekajici:
                     result_lines.append("žádná otázka nečeká")
+                    odmitnuto = True
                 else:
                     a = preloz_odpoved(cekajici["q"], parts[1])
                     if a is None:
                         result_lines.append(f"⛔ odpověď `{parts[1]}` není mezi možnostmi")
+                        odmitnuto = True
                         result_lines.append(otazka_str(cekajici["q"]))
                     else:
                         result_lines += proved(cekajici["action"], cekajici["answers"] + [a])
@@ -831,6 +843,7 @@ def main():
                 varovani = varovani_nosic(state, last_actions, a) if cmd == "do" else None
                 if varovani:
                     result_lines.append(varovani)
+                    odmitnuto = True
                 else:
                     result_lines += proved(a, [])
             elif cmd == "tahai":
@@ -869,6 +882,12 @@ def main():
                 result_lines.append(f"neznamy prikaz: {line}")
         except Exception as e:
             result_lines.append(f"CHYBA: {e}")
+            odmitnuto = True
+        if odmitnuto and zalogovano:
+            with open(LOG) as f:
+                radky = f.readlines()
+            with open(LOG, "w") as f:
+                f.writelines(radky[:-1])
         if ticho:
             continue
         zpet = os.environ.pop("BB_ZPET", None)

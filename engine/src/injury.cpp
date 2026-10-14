@@ -273,12 +273,12 @@ bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice
     return false;
 }
 
-void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
+void resolveCrowdSurf(GameState& state, int playerId, Position from, DiceRollerBase& dice,
                       std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
 
     // P145: vlastní událost (bylo INJURY s hodem 0).
-    emitEvent(events, {GameEvent::Type::CROWD_SURF, playerId, -1, player.position, {},
+    emitEvent(events, {GameEvent::Type::CROWD_SURF, playerId, -1, from, {},
                       0, true});
 
     // Crowd injury: one plain Injury roll, NO modifiers (rules parity,

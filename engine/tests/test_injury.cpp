@@ -219,7 +219,7 @@ TEST(Injury, CrowdSurfHasNoInjuryModifier) {
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     FixedDiceRoller dice({3, 3});
     std::vector<GameEvent> events;
-    resolveCrowdSurf(gs, 1, dice, &events);
+    resolveCrowdSurf(gs, 1, gs.getPlayer(1).position, dice, &events);
     auto injuryEvt = std::find_if(events.begin(), events.end(), [](const GameEvent& e) {
         return e.type == GameEvent::Type::INJURY && e.roll > 0;
     });
@@ -236,7 +236,7 @@ TEST(Injury, CrowdSurf) {
     // ends." We used to force a KO, which is harsher -- a KO then needs 4+ to
     // return at all.
     FixedDiceRoller dice({3, 3});
-    resolveCrowdSurf(gs, 1, dice, nullptr);
+    resolveCrowdSurf(gs, 1, gs.getPlayer(1).position, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
     EXPECT_EQ(gs.getPlayer(1).position, (Position{-1, -1}));
 }
@@ -406,7 +406,7 @@ TEST(Injury, P145CrowdSurfHasItsOwnEventAndNoZeroInjuryRoll) {
     placePlayer(gs, 1, {10, 0}, TeamSide::HOME);
     FixedDiceRoller dice({3, 3});
     std::vector<GameEvent> events;
-    resolveCrowdSurf(gs, 1, dice, &events);
+    resolveCrowdSurf(gs, 1, gs.getPlayer(1).position, dice, &events);
     int surf = 0;
     for (const auto& e : events) {
         if (e.type == GameEvent::Type::INJURY) {

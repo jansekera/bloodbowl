@@ -154,8 +154,9 @@ ActionResult resolveBallAndChain(GameState& state, int playerId,
         // zraneni, ne automaticke KO; turnover to neni (r. 369-370).
         if (!target.isOnPitch()) {
             handleBallOnPlayerDown(state, playerId, dice, events);
+            const Position last = bcp.position;
             bcp.position = {-1, -1};
-            resolveCrowdSurf(state, playerId, dice, events);
+            resolveCrowdSurf(state, playerId, last, dice, events);
             if (bcp.state == PlayerState::STUNNED || bcp.state == PlayerState::OFF_PITCH) {
                 bcp.setState(PlayerState::KO);
             }

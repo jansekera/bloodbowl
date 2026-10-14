@@ -50,7 +50,9 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
                       const InjuryContext& ctx, std::vector<GameEvent>* events,
                       bool* outDoubles = nullptr);
 
-void resolveCrowdSurf(GameState& state, int playerId, DiceRollerBase& dice,
+// `from` = poslední pole na hřišti (review 14.10.: volající pozici napřed mažou, takže
+// událost CROWD_SURF nesla vždy (-1,-1)).
+void resolveCrowdSurf(GameState& state, int playerId, Position from, DiceRollerBase& dice,
                       std::vector<GameEvent>* events);
 
 } // namespace bb

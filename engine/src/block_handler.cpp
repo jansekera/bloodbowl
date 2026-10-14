@@ -446,7 +446,7 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                 handleBallOnPlayerDown(state, pushed.id, dice, events);
             }
             pushed.position = {-1, -1};
-            resolveCrowdSurf(state, pushed.id, dice, events);
+            resolveCrowdSurf(state, pushed.id, last, dice, events);
         }
         return true;
     }
@@ -568,7 +568,7 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
         handleBallOnPlayerDown(state, pushed.id, dice, events);
     }
     pushed.position = {-1, -1};
-    resolveCrowdSurf(state, pushed.id, dice, events);
+    resolveCrowdSurf(state, pushed.id, lastPos, dice, events);
     return true;
 }
 
@@ -1253,16 +1253,22 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // OPRAVENO 13.10.2026 (P194/6) -- follow-up se tu řešil AŽ PO vhazování
             // a hodu na zranění v davu. Pravidla ř. 609-610: "The player's coach
             // must decide whether to follow up BEFORE ANY OTHER DICE ROLLS are made."
-            if (!noFollowUp) followUp(state, att, def, params, defOldPos, dice, events);
-            if (state.ball.isHeld && state.ball.carrierId == def.id) {
-                state.ball = BallState::onGround(lastPos);
-                resolveThrowIn(state, lastPos, pushOffPitchExit(att.position, lastPos),
-                               dice, events);
-            } else {
-                handleBallOnPlayerDown(state, def.id, dice, events);
-            }
+            // OPRAVENO 14.10.2026 (review) -- obránce je v davu UŽ PŘED follow-upem: dřív
+            // stál při vhazování na hřišti (mohl chytit vlastní vhazovaný míč) a směr
+            // vhazování se počítal z útočníkova NOVÉHO pole (tj. z pole obránce ⇒ (0,0)).
+            // Fend zakazuje follow-up i tady (ř. 8115), Juggernaut na blitzu ho ruší.
+            const Position exitAt = pushOffPitchExit(att.position, lastPos);
+            const bool defHadBall = state.ball.isHeld && state.ball.carrierId == def.id;
+            if (!defHadBall) handleBallOnPlayerDown(state, def.id, dice, events);
             def.position = {-1, -1};
-            resolveCrowdSurf(state, def.id, dice, events);
+            const bool fendBlocks = def.hasSkill(SkillName::Fend) &&
+                                    !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
+            if (!noFollowUp && !fendBlocks) followUp(state, att, def, params, defOldPos, dice, events);
+            if (defHadBall) {
+                state.ball = BallState::onGround(lastPos);
+                resolveThrowIn(state, lastPos, exitAt, dice, events);
+            }
+            resolveCrowdSurf(state, def.id, lastPos, dice, events);
 
             // StripBall: ball drops at crowd edge (already handled by crowd surf)
 

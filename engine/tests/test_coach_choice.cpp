@@ -738,7 +738,7 @@ TEST(CoachChoiceApothecary, CrowdKO_Used_GoesToReserves) {
     gs.getPlayer(1).state = PlayerState::STANDING;
     FixedDiceRoller dice({4, 5});                    // dav: zranění 9 = KO
     CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
-    resolveCrowdSurf(gs, 1, dice, nullptr);
+    resolveCrowdSurf(gs, 1, gs.getPlayer(1).position, dice, nullptr);
     EXPECT_TRUE(gs.homeTeam.apothecaryUsed);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);    // „in the Reserves box if not on the pitch“
 }
@@ -914,4 +914,54 @@ TEST(CoachChoice, BothSides_AskedForEither) {
     FixedDiceRoller dice({2, 5});
     CoachChoiceScope scope(TeamSide::AWAY, {}, /*bothSides=*/true);   // hází HOME, kouč „AWAY + obě“
     EXPECT_THROW(roll4(gs, dice), CoachChoicePending);
+}
+
+// ───────────── Review 14.10. (nálezy 1, 2, 3, 7): vytlačení do davu ─────────────
+// P194 (6) posunul follow-up před vhazování -- ale obránce byl v tu chvíli ještě na hřišti
+// (mohl chytit vhazovaný míč) a směr vhazování se počítal z útočníkova NOVÉHO pole.
+static GameState davPair(Position att, Position def) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, att);
+    placePlayer(gs, 12, def);
+    return gs;
+}
+
+TEST(DoDavu, VhazovaniPodleSmeruOdtlaceni_ObranceUzNeniNaHristi) {
+    GameState gs = davPair({24, 0}, {25, 0});        // odtlačení na východ do davu, útočník následuje
+    gs.ball = BallState::carried({25, 0}, 12);
+    // Pushed · šablona 3 (vpravo = na západ, nahoře = na jih) · 2D6 = 3 · dav 1+1 · zbytek odrazy
+    FixedDiceRoller dice({3, 3, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1});
+    std::vector<GameEvent> ev;
+    block(gs, dice, &ev);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{25, 0}));      // follow-up proběhl
+    bool vhoz = false;
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::BALL_BOUNCE && e.die1 != 0) {   // vhazování nese kostku šablony
+            vhoz = true;
+            EXPECT_LT(e.to.x, e.from.x) << "vhazování z PRAVÉHO okraje míří na západ";
+        }
+    EXPECT_TRUE(vhoz);
+    EXPECT_FALSE(gs.ball.isHeld && gs.ball.carrierId == 12) << "obránce v davu míč držet nesmí";
+}
+
+TEST(DoDavu, CrowdSurfNesePoleZeKterehoSelDoDavu) {
+    GameState gs = davPair({24, 5}, {25, 5});
+    FixedDiceRoller dice({3, 1, 1, 1, 1});
+    std::vector<GameEvent> ev;
+    block(gs, dice, &ev);
+    bool seen = false;
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::CROWD_SURF) { seen = true; EXPECT_EQ(e.from, (Position{25, 5})); }
+    EXPECT_TRUE(seen);
+}
+
+TEST(DoDavu, FendZakazujeFollowUpIPriVytlaceni) {
+    // Fend ř. 8115: "Opposing players may not follow-up blocks made against this player".
+    GameState gs = davPair({24, 5}, {25, 5});
+    gs.getPlayer(12).skills.add(SkillName::Fend);
+    FixedDiceRoller dice({3, 1, 1, 1, 1});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{24, 5}));
 }

@@ -139,7 +139,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
             state.ball = BallState::onGround(lastOnPitch);
             resolveThrowIn(state, lastOnPitch, landPos, dice, events);
         }
-        resolveCrowdSurf(state, projectileId, dice, events);
+        resolveCrowdSurf(state, projectileId, lastOnPitch, dice, events);
         return projectileHadBall ? ActionResult::turnovr() : ActionResult::ok();
     };
 
