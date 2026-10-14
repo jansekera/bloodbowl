@@ -30,6 +30,7 @@ Příkazy:
   tahai [greedy|macro] [semínko] [iterace]
                            -- jak by tah odehrála AI — NANEČISTO (kopie stavu, vlastní kostky)
   kontrola [posledni]      -- kontrola rozehraného / posledního dokončeného tahu
+  do! <i>                  -- P201 (7): akce i přes varování, že nosič s rozehranou akcí ztratí přihrávku
   zpet                     -- P201 (14): vrátí poslední akci (do + odp + volby), záloha logu vedle
   quit                     -- ukončí server
 
@@ -581,6 +582,22 @@ def action_str(a):
     return f"{a.type} hrac={a.player_id} cil_hrac={a.target_id} cil_pole=({a.target.x},{a.target.y})"
 
 
+def varovani_nosic(state, akce, a):
+    """P201 (7) a (15), 14.10.2026: nosič s rozehranou akcí, který ještě smí přihrát nebo předat,
+    a akce JINÉHO hráče ⇒ nosičova akce skončí a přihrávka propadne (v partii 13.10. dvakrát).
+    Vrací text varování, nebo None."""
+    if not state.ball.is_held or a.player_id is None or a.player_id < 1:
+        return None
+    nosic = state.get_player(state.ball.carrier_id)
+    if nosic.team_side != state.active_team or not nosic.has_moved or nosic.has_acted or a.player_id == nosic.id:
+        return None
+    muze = sorted({x.type.name for x in akce if x.player_id == nosic.id and x.type.name in ("PASS", "HAND_OFF")})
+    if not muze:
+        return None
+    return (f"⚠️ nosič {nosic.id} má rozehranou akci a ještě může {' / '.join(muze)} — akcí hráče {a.player_id} "
+            f"jeho akce skončí a tahle možnost propadne. Opravdu? `do! <číslo>`")
+
+
 VOLBY_AKCE = ("push", "follow", "blitzfrom", "sidestep", "kostka", "beztackle", "actions")
 
 
@@ -591,7 +608,7 @@ def odstrihni_posledni_akci(radky):
     i = len(radky)
     while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE + ("odp",):
         i -= 1
-    if i == 0 or radky[i - 1].split()[0] != "do":
+    if i == 0 or radky[i - 1].split()[0] not in ("do", "do!"):
         return None
     i -= 1
     while i > 0 and radky[i - 1].split()[0] in VOLBY_AKCE:
@@ -675,7 +692,7 @@ def main():
                 line = f.read().strip()
             os.remove(CMD)
             ticho = False
-            if line.split() and line.split()[0] in ("do", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
+            if line.split() and line.split()[0] in ("do", "do!", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
                                                       "kouc", "odp", "sidestep", "los", "volba"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
@@ -809,9 +826,13 @@ def main():
             elif cmd == "follow" and len(parts) == 2:
                 bb.set_manual_follow_up(parts[1] == "1")
                 result_lines.append(f"příští follow-up: {'ano' if parts[1] == '1' else 'ne'}")
-            elif cmd == "do" and len(parts) in (2, 3):
+            elif cmd in ("do", "do!") and len(parts) in (2, 3):
                 a = last_actions[int(parts[-1])]   # `do 5` i starší tvar `do HOME 5`
-                result_lines += proved(a, [])
+                varovani = varovani_nosic(state, last_actions, a) if cmd == "do" else None
+                if varovani:
+                    result_lines.append(varovani)
+                else:
+                    result_lines += proved(a, [])
             elif cmd == "tahai":
                 # tahai [greedy|macro] [semínko] [iterace] — první číslo bez jména AI = semínko
                 args = parts[1:]

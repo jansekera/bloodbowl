@@ -209,3 +209,29 @@ def test_kouc_za_obe_strany():
                 ptala.add(s.get_player(q["player"]).team_side)
                 odp.append(next(i for i in range(8) if q["options"] & (1 << i)))
     assert ptala == {H, A}, ptala
+
+
+def test_varovani_nosic_s_rozehranou_akci():
+    # P201 (7) a (15): najít v náhodných hrách nosiče po pohybu, který ještě smí přihrát/předat
+    nalezeno = 0
+    for seed in range(1, 60):
+        s, d = nova_hra(seed)
+        for krok in range(120):
+            akce = list(bb.get_available_actions(s))
+            if not akce or s.phase != bb.GamePhase.PLAY:
+                break
+            if s.ball.is_held:
+                n = s.ball.carrier_id
+                tah = [a for a in akce if a.player_id == n and str(a.type).endswith("MOVE")]
+                if tah:                                   # nosič udělá krok ⇒ akce je rozehraná
+                    bb.execute_action_logged(s, tah[0], d)
+                    akce = list(bb.get_available_actions(s))
+                    jiny = [a for a in akce if a.player_id not in (n, -1) and a.player_id is not None and a.player_id > 0]
+                    prihr = [a for a in akce if a.player_id == n and str(a.type).split(".")[-1] in ("PASS", "HAND_OFF")]
+                    if jiny and prihr and s.get_player(n).team_side == s.active_team:
+                        assert ps.varovani_nosic(s, akce, jiny[0]) is not None
+                        assert ps.varovani_nosic(s, akce, prihr[0]) is None     # nosič sám: bez varování
+                        nalezeno += 1
+                        break
+            bb.execute_action_logged(s, akce[(seed * 7 + krok * 13) % len(akce)], d)
+    assert nalezeno >= 3, nalezeno                        # pozitivní kontrola: situace opravdu nastala
