@@ -368,7 +368,7 @@ TEST(CoachChoiceBlock, TeamReroll_RollsAllDiceAgain_AndLogsBoth) {
     gs.homeTeam.rerolls = 1;
     FixedDiceRoller dice({1, 6, 1, 1, 1, 1});   // lebka → přehoz → Defender Down
     std::vector<GameEvent> ev;
-    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::TEAM});   // přehoz, follow-up (P201)
     auto r = block(gs, dice, &ev);
     EXPECT_FALSE(r.turnover);
     EXPECT_EQ(gs.homeTeam.rerolls, 0);
@@ -405,7 +405,8 @@ TEST(CoachChoiceBlock, FaceChoice_AskedAndRespected) {
     }
     GameState gs2 = blockPair(4);
     FixedDiceRoller dice({3, 6, 1, 1});
-    CoachChoiceScope scope(TeamSide::HOME, {static_cast<int>(BlockDiceFace::PUSHED)});
+    CoachChoiceScope scope(TeamSide::HOME, {static_cast<int>(BlockDiceFace::PUSHED),
+                                             CoachAnswer::NONE});   // kostka, follow-up (P201)
     block(gs2, dice);
     EXPECT_EQ(gs2.getPlayer(12).state, PlayerState::STANDING);   // engine by vzal Defender Down
     EXPECT_EQ(gs2.getPlayer(12).position.x, 12);
@@ -580,4 +581,181 @@ TEST(CoachChoiceBlock, StrongerDefenderOfTheOtherSide_StaysAutomatic) {
     CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});   // HOME: jen dotaz na přehoz? rerolly 0 ⇒ žádný
     EXPECT_NO_THROW(block(gs, dice));
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);          // obránce (engine) vzal lebku
+}
+
+// ───────────── P201 (12): follow-up jako otázka kouče útočníka ─────────────
+// Pravidla ř. 606-611: "The player's COACH MUST DECIDE whether to follow up" -- rozhoduje se
+// AŽ po odtlačení (po kostkách i po přehozu), ne předem. Dřív se v partii volba zadávala
+// příkazem `follow` před akcí a po přehozu kostek ji nešlo změnit (partie 13.10.).
+static const int ANO_NE = (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM);
+
+TEST(CoachChoiceFollowUp, AskedAfterPush) {
+    GameState gs = blockPair();
+    FixedDiceRoller dice({3});                       // jedna kostka: Pushed
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { block(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_FOLLOW_UP);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+        EXPECT_EQ(p.options, ANO_NE);
+    }
+}
+
+TEST(CoachChoiceFollowUp, Declined_AttackerStays) {
+    GameState gs = blockPair();                      // engine by u běžného bloku následoval
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(1).position.x, 10);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);
+}
+
+TEST(CoachChoiceFollowUp, Accepted_AttackerFollows) {
+    GameState gs = blockPair();
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    block(gs, dice);
+    EXPECT_EQ(gs.getPlayer(1).position.x, 11);
+}
+
+TEST(CoachChoiceFollowUp, AfterBlockReroll_StillAsked) {
+    GameState gs = blockPair();
+    gs.homeTeam.rerolls = 1;
+    FixedDiceRoller dice({1, 3});                    // lebka → přehoz → Pushed
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    try { block(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_FOLLOW_UP);
+    }
+}
+
+TEST(CoachChoiceFollowUp, Frenzy_MustFollow_NoQuestion) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);   // ř. 8138: "must always follow up"
+    FixedDiceRoller dice({3, 3});                    // Pushed, druhý blok Pushed
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    EXPECT_NO_THROW(block(gs, dice));
+}
+
+TEST(CoachChoiceFollowUp, OtherSide_StaysAutomatic) {
+    GameState gs = blockPair();
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::AWAY, {});      // útočí HOME, kouč je AWAY
+    EXPECT_NO_THROW(block(gs, dice));
+    EXPECT_EQ(gs.getPlayer(1).position.x, 11);
+}
+
+// ───────────── P201 (1): lékárník na požádání kouče ─────────────
+// Pravidla ř. 1200-1210: lékárník smí léčit hráče po Casualty NEBO po KO, jednou za zápas.
+// KO ⇒ hráč zůstane na hřišti Stunned (mimo hřiště ⇒ rezervy). Casualty ⇒ soupeř hodí znovu
+// a KOUČ vybere, který ze dvou výsledků platí; Badly Hurt ⇒ rezervy. Dřív lékárníka použil
+// engine sám podle svého pravidla (partie 13.10., blitzer 11) -- uživatel: „musí být na požádání“.
+#include "bb/injury.h"
+
+static GameState hurtHome() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7});
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).positionName = "Blitzer";
+    gs.homeTeam.hasApothecary = true;
+    return gs;
+}
+
+TEST(CoachChoiceApothecary, Casualty_Asked) {
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1});        // zbroj 10, zranění 10, D68 61 = mrtev
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr); FAIL(); }
+    catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_APOTHECARY);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.roll, static_cast<int>(CasualtyResult::DEAD));
+        EXPECT_EQ(p.options, ANO_NE);
+    }
+}
+
+TEST(CoachChoiceApothecary, Casualty_Declined_StaysDead) {
+    GameState gs = hurtHome();                       // engine by ho u mrtvého blitzera použil sám
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::DEAD);
+    EXPECT_FALSE(gs.homeTeam.apothecaryUsed);
+}
+
+TEST(CoachChoiceApothecary, Casualty_UsedOnMiddleBand_CoachPicksSecond) {
+    GameState gs = hurtHome();                       // engine by ho u Miss Next Game šetřil
+    FixedDiceRoller dice({5, 5, 5, 5, 4, 1, 1, 1});  // D68 41 = Miss Next Game, druhý 11 = Badly Hurt
+    {
+        CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+        try { resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr); FAIL(); }
+        catch (const CoachChoicePending& p) {
+            EXPECT_EQ(p.question, CoachQuestion::APOTHECARY_PICK);
+            EXPECT_EQ(p.roll, static_cast<int>(CasualtyResult::MISS_NEXT_GAME));
+            EXPECT_EQ(p.target, static_cast<int>(CasualtyResult::BADLY_HURT));
+            EXPECT_EQ(p.options, 3);
+        }
+    }
+    GameState gs2 = hurtHome();
+    FixedDiceRoller dice2({5, 5, 5, 5, 4, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, 1});
+    resolveArmourAndInjury(gs2, 1, dice2, InjuryContext{}, nullptr);
+    EXPECT_TRUE(gs2.homeTeam.apothecaryUsed);
+    EXPECT_EQ(gs2.getPlayer(1).state, PlayerState::OFF_PITCH);   // Badly Hurt ⇒ rezervy
+}
+
+TEST(CoachChoiceApothecary, Casualty_CoachMayKeepTheFirst) {
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 5, 5, 4, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, 0});   // „vybere, který“ -- i horší
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr);
+    EXPECT_TRUE(gs.homeTeam.apothecaryUsed);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
+}
+
+TEST(CoachChoiceApothecary, KO_Used_StaysOnPitchStunned) {
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 4, 5});              // zbroj 10, zranění 9 = KO
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr);
+    EXPECT_TRUE(gs.homeTeam.apothecaryUsed);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+    EXPECT_EQ(gs.getPlayer(1).position.x, 10);
+}
+
+TEST(CoachChoiceApothecary, KO_Declined_GoesToKO) {
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 4, 5});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr);
+    EXPECT_FALSE(gs.homeTeam.apothecaryUsed);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+}
+
+TEST(CoachChoiceApothecary, CrowdKO_Used_GoesToReserves) {
+    GameState gs = hurtHome();
+    gs.getPlayer(1).state = PlayerState::STANDING;
+    FixedDiceRoller dice({4, 5});                    // dav: zranění 9 = KO
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    resolveCrowdSurf(gs, 1, dice, nullptr);
+    EXPECT_TRUE(gs.homeTeam.apothecaryUsed);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);    // „in the Reserves box if not on the pitch“
+}
+
+TEST(CoachChoiceApothecary, AlreadyUsed_NoQuestion) {
+    GameState gs = hurtHome();
+    gs.homeTeam.apothecaryUsed = true;
+    FixedDiceRoller dice({5, 5, 4, 5});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    EXPECT_NO_THROW(resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr));
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+}
+
+TEST(CoachChoiceApothecary, OtherSide_StaysAutomatic) {
+    GameState gs = hurtHome();
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    EXPECT_NO_THROW(resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr));
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);    // dosavadní pravidlo enginu
 }

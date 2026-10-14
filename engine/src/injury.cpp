@@ -1,6 +1,7 @@
 #include "bb/injury.h"
 #include "bb/helpers.h"
 #include "bb/ball_handler.h"
+#include "bb/coach_choice.h"
 #include <string>
 
 namespace bb {
@@ -75,6 +76,21 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         }
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, {}, {},
                           injuryRoll, false, d1, d2});
+        // P201 (1), 14.10.2026: lékárník i na KO (l. 1200-1203 "cure a player who has suffered
+        // a Casualty or been KO'd ... If the player was KO'd leave him on the pitch Stunned or
+        // in the Reserves box if not on the pitch"). Jen na požádání kouče; AI ho na KO dál
+        // nepoužívá (dosavadní pravidlo enginu). Dav: hráč je tu ještě na poli a
+        // resolveCrowdSurf omráčeného pošle do rezerv -- přesně "if not on the pitch".
+        TeamState& tsKo = state.getTeamState(player.teamSide);
+        if (coachDecides(player.teamSide) && tsKo.hasApothecary && !tsKo.apothecaryUsed &&
+            askCoach(CoachQuestion::USE_APOTHECARY, playerId, -1, -1, 0,
+                     (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM)) == CoachAnswer::TEAM) {
+            tsKo.apothecaryUsed = true;
+            player.setState(PlayerState::STUNNED);
+            player.stunnedThisTurn = true;
+            emitEvent(events, {GameEvent::Type::APOTHECARY, playerId, -1, {}, {}, -1, true, 0, 0});
+            return injuryRoll;
+        }
         removeFromPitch(state, player.id, PlayerState::KO, dice, events);
     } else {
         // Casualty (10+) -- roll on the CASUALTY TABLE (package G, 2026-08-10).
@@ -126,11 +142,28 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         bool worthSaving = !replaceable;
         bool worthSpendingOn = (cas == CasualtyResult::BADLY_HURT ||
                                 cas == CasualtyResult::DEAD);
-        if (ts.hasApothecary && !ts.apothecaryUsed && worthSaving && worthSpendingOn) {
+        // P201 (1), 14.10.2026: v živé partii rozhoduje kouč -- zda lékárníka použít i který
+        // ze dvou výsledků platí ("you choose which of the two results to apply"). Dřív ho
+        // engine použil sám i za kouče (partie 13.10., blitzer 11).
+        const int anoNe = (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM);
+        const bool coach = coachDecides(player.teamSide);
+        const bool use = ts.hasApothecary && !ts.apothecaryUsed &&
+            (coach ? askCoach(CoachQuestion::USE_APOTHECARY, playerId, -1, static_cast<int>(cas), 0,
+                              anoNe) == CoachAnswer::TEAM
+                   : worthSaving && worthSpendingOn);
+        if (use) {
             ts.apothecaryUsed = true;
             const CasualtyResult first = cas;
             CasualtyResult second = rollCasualty(dice);
-            if (casualtySeverity(second) < casualtySeverity(cas)) cas = second;
+            if (coach) {
+                if (second != first &&
+                    askCoach(CoachQuestion::APOTHECARY_PICK, playerId, -1, static_cast<int>(first),
+                             static_cast<int>(second), 0b11) == 1) {
+                    cas = second;
+                }
+            } else if (casualtySeverity(second) < casualtySeverity(cas)) {
+                cas = second;
+            }
             // P145: vlastní událost (bylo SKILL_USED s výsledkem zranění v `roll`).
             emitEvent(events, {GameEvent::Type::APOTHECARY, playerId, -1, {}, {},
                               static_cast<int>(cas), true,

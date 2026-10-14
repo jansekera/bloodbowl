@@ -57,7 +57,7 @@ def test_otazka_vrati_stav_i_kostky_a_potka_vsechny_druhy():
             else:
                 raise AssertionError("akce se ptá donekonečna")
     assert videno >= {"REROLL", "BLOCK_REROLL", "BLOCK_FACE", "USE_DODGE", "USE_WRESTLE",
-                      "USE_STAND_FIRM", "USE_SIDE_STEP"}, videno
+                      "USE_STAND_FIRM", "USE_SIDE_STEP", "USE_FOLLOW_UP", "USE_APOTHECARY"}, videno
 
 
 def test_neplatna_odpoved_nic_nezmeni():
@@ -105,6 +105,24 @@ def test_preklad_odpovedi():
     assert ps.preloz_odpoved(kostka, "3") == 3
     assert ps.preloz_odpoved(kostka, "4") is None
     assert "Defender Stumbles" in ps.otazka_str(kostka) and "lebka" in ps.otazka_str(kostka)
+
+
+def test_preklad_odpovedi_follow_up_a_lekarnik():
+    # P201 (1) a (12): ano / ne; u výběru výsledku lékárníka „1“ = první hod, „2“ = druhý
+    f = {"question": "USE_FOLLOW_UP", "player": 1, "other": 16, "roll": 0, "target": 0, "options": 0b11}
+    assert ps.preloz_odpoved(f, "ano") == 1 and ps.preloz_odpoved(f, "ne") == 0
+    assert "následovat" in ps.otazka_str(f)
+    ko = {"question": "USE_APOTHECARY", "player": 11, "other": -1, "roll": -1, "target": 0, "options": 0b11}
+    assert ps.preloz_odpoved(ko, "ano") == 1 and "KO" in ps.otazka_str(ko)
+    cas = dict(ko, roll=7)
+    assert "MRTEV" in ps.otazka_str(cas)
+    vyber = {"question": "APOTHECARY_PICK", "player": 11, "other": -1, "roll": 7, "target": 0, "options": 0b11}
+    assert ps.preloz_odpoved(vyber, "1") == 0 and ps.preloz_odpoved(vyber, "2") == 1
+    assert ps.preloz_odpoved(vyber, "ano") is None
+    assert "MRTEV" in ps.otazka_str(vyber) and "Badly Hurt" in ps.otazka_str(vyber)
+    ev = {"type": "APOTHECARY", "player": 11, "target": -1, "roll": -1, "success": True, "die1": 0, "die2": 0,
+          "to": (0, 0)}
+    assert "omráčený" in ps.event_str(ev)
 
 
 def test_vypis_prehozu():

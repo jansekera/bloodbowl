@@ -20,7 +20,7 @@ Příkazy:
                               přehoz: ne | tym | pro · skill: ano | ne · kostka: číslo kostky
   push <x> <y>             -- příští odtlačení na toto pole (volba útočníka; jinak engine)
   sidestep <x> <y>         -- P130: pole, kam uhne hráč se Side Stepem (volba jeho kouče)
-  follow <0|1>             -- příští follow-up ano/ne (volba kouče; jinak engine)
+  follow <0|1>             -- příští follow-up ano/ne pro stranu BEZ kouče (za kouče se server ptá po odtlačení, P201)
   blitzfrom <x> <y>        -- příští blitz blokuje z tohoto pole (volba kouče; jinak engine)
   kostka <0-4>             -- příští blok: kterou z hozených kostek vzít (pro stranu bez `kouc`)
   beztackle                -- příští blok: útočník nepoužije Tackle
@@ -32,8 +32,8 @@ Příkazy:
   quit                     -- ukončí server
 
 P130 — jak otázka probíhá: akce se spustí; narazí-li na rozhodnutí kouče (přehoz, kostka
-bloku, Dodge / Wrestle / Stand Firm / Side Step jeho hráče), server vrátí stav i kostky
-před akci, ukáže, co padlo, a čeká na `odp`. Po odpovědi akci spustí znovu se stejnými
+bloku, Dodge / Wrestle / Stand Firm / Side Step jeho hráče, follow-up a lékárník -- P201),
+server vrátí stav i kostky před akci, ukáže, co padlo, a čeká na `odp`. Po odpovědi akci spustí znovu se stejnými
 kostkami — výsledek přehozu tak předem nevidí nikdo. Dokud otázka čeká, jde zadat jen
 `odp`, `push`, `sidestep`, `follow`, `board`. Skillové rerolly (Dodge, Sure Hands, Sure
 Feet, Pass, Catch) a Block při Both Down zůstávají automatické.
@@ -341,7 +341,15 @@ def otazka_str(q):
     if t == "BLOCK_FACE":
         volby = " · ".join(f"{i} = {BLOCK_FACES[i]}" for i in range(5) if q["options"] & (1 << i))
         return (f"❓ BLOK hráč {p} na {o}: hozeno {kostky_str(q['roll'])} — kterou kostku?  ->  odp <číslo>: {volby}"
-                "   (před odpovědí lze zadat push x y / follow 0|1)")
+                "   (před odpovědí lze zadat push x y)")
+    if t == "USE_FOLLOW_UP":
+        return f"❓ hráč {p} odtlačil hráče {o}: následovat (follow-up)?  ->  odp ano / ne"
+    if t == "USE_APOTHECARY":
+        co = "KO" if q["roll"] < 0 else f"zranění {zraneni_str(q['roll'])}"
+        return f"❓ LÉKÁRNÍK? hráč {p}: {co} — použít lékárníka (jednou za zápas)?  ->  odp ano / ne"
+    if t == "APOTHECARY_PICK":
+        return (f"❓ LÉKÁRNÍK hráč {p}: první hod {zraneni_str(q['roll'])}, druhý {zraneni_str(q['target'])}"
+                " — který platí?  ->  odp 1 / 2")
     if t in SKILL_OTAZKY:
         kdo = f" (blokuje hráč {o})" if o > 0 else ""
         navic = "   (před `odp ano` lze zadat sidestep x y)" if t == "USE_SIDE_STEP" else ""
@@ -354,7 +362,9 @@ def preloz_odpoved(q, text):
     t = q["question"]
     if t == "BLOCK_FACE":
         a = int(text) if text.isdigit() else None
-    elif t in SKILL_OTAZKY:
+    elif t == "APOTHECARY_PICK":
+        a = {"1": 0, "2": 1}.get(text)
+    elif t in SKILL_OTAZKY or t in ("USE_FOLLOW_UP", "USE_APOTHECARY"):
         a = ANO_NE.get(text.lower())
     else:
         a = PREHOZ.get(text.lower())
@@ -397,6 +407,8 @@ def event_str(e):
         dice = f" ({e['die1']}+{e['die2']})" if e["die1"] else ""
         return f"CASUALTY {who}: {e['roll']}{dice} -> {zraneni_str(e['target'])}"
     if t == "APOTHECARY":
+        if e["roll"] < 0:   # P201 (1): lékárník na KO -- hráč zůstává na hřišti omráčený
+            return f"LÉKÁRNÍK {who}: místo KO zůstává na hřišti omráčený"
         return (f"LÉKÁRNÍK {who}: {zraneni_str(e['die1'] - 1)} / {zraneni_str(e['die2'] - 1)}"
                 f" -> platí {zraneni_str(e['roll'])}")
     if t == "FOUL":

@@ -601,7 +601,7 @@ static void endBlockActivation(Player& att, const BlockParams& params) {
 // zones"). Je to tedy obvykle výhoda, ne past -- odmítá se jen tam, kde má
 // blitzující ještě otevřenou aktivaci a uvolněné pole by ho dalo do VÍC
 // soupeřových zón než to, kde stojí. To je přesně hit-and-run (M1/N10).
-static bool wantsFollowUp(const GameState& state, const Player& att,
+static bool wantsFollowUp(const GameState& state, const Player& att, const Player& def,
                           const BlockParams& params, Position vacated) {
     // Povinné případy -- pravidla volbu neposkytují:
     //   Frenzy l. 8138: "must always follow up if they can"
@@ -614,6 +614,13 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
         const bool f = g_manualFollowUp == 1;
         g_manualFollowUp = -1;
         return f;
+    }
+    // P201 (12), 14.10.2026: v živé partii se kouč útočníka ptá AŽ TEĎ -- po kostkách, po
+    // přehozu i po odtlačení (l. 606-611 "The player's COACH MUST DECIDE"). Dřív šlo jen
+    // předem příkazem `follow`, a po přehozu kostek bloku už volbu nešlo změnit.
+    if (coachDecides(att.teamSide)) {
+        return askCoach(CoachQuestion::USE_FOLLOW_UP, att.id, def.id, 0, 0,
+                        (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM)) == CoachAnswer::TEAM;
     }
     // Mimo blitz je blok celá aktivace: není co si šetřit, pole zdarma se bere.
     // ⭐ P154 (07.10.2026): ROH KLECE PO RÁNĚ NENÁSLEDUJE. Dosud běžný blok následoval VŽDY
@@ -652,7 +659,7 @@ static bool wantsFollowUp(const GameState& state, const Player& att,
 static void followUp(GameState& state, Player& att, const Player& def, const BlockParams& params,
                      Position defOldPos, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     const Position attOldPos = att.position;
-    const bool wants = wantsFollowUp(state, att, params, defOldPos);
+    const bool wants = wantsFollowUp(state, att, def, params, defOldPos);
     emitEvent(events, {GameEvent::Type::FOLLOW_UP, att.id, def.id, attOldPos, defOldPos, 0, wants});
     if (!wants) return;
     att.position = defOldPos;

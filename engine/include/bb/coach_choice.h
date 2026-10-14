@@ -30,7 +30,11 @@ enum class CoachQuestion : int {
     USE_WRESTLE = 6,     // Both Down: použít Wrestle?
     USE_STAND_FIRM = 7,  // odtlačení: zůstat stát?
     USE_SIDE_STEP = 8,   // odtlačení: vybrat pole sám?
-    BLOCK_FACE = 9       // kterou z hozených kostek vzít; odpověď = index BlockDiceFace
+    BLOCK_FACE = 9,      // kterou z hozených kostek vzít; odpověď = index BlockDiceFace
+    // P201 (14.10.2026):
+    USE_FOLLOW_UP = 10,  // po odtlačení: následovat? (l. 606-611 "coach must decide")
+    USE_APOTHECARY = 11, // použít lékárníka? roll = CasualtyResult, nebo -1 u KO (l. 1200-1210)
+    APOTHECARY_PICK = 12 // který výsledek platí: 0 = první (roll), 1 = druhý (target)
 };
 
 namespace CoachAnswer {
