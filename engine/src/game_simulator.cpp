@@ -172,7 +172,7 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
 // turn clock and reroll allowance. false for a post-touchdown drive restart, which
 // only re-places players/ball and must NOT grant a fresh 8-turn clock or reroll pool.
 void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
-               const FormationPos formation[11], bool resetHalfState) {
+               const FormationPos formation[11], bool resetHalfState, bool kicking) {
     const int baseLOS = (side == TeamSide::HOME) ? 12 : 13;
     constexpr int SQUAD = GameState::SQUAD_SIZE;
     constexpr int STARTERS = GameState::STARTERS;
@@ -272,12 +272,28 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
             return (t.skills.has(SkillName::SureHands) ? 100 : 0)
                  + t.stats.agility * 10 + t.stats.movement;
         };
-        // Bodies on the line: armour first, Block next, and a handler is
-        // pushed out of contention entirely -- he is worth more deep than he
-        // is worth absorbing the opponent's opening blocks.
+        // Bodies on the line. OPRAVENO 14.10.2026 (doktrína uživatele 24.09., schváleno 14.10.):
+        // dřív jen „brnění, pak Block“ bez ohledu na roli -- trpaslíci tak dali na linii
+        // Blitzery, lidé Ogra, skaveni Rat Ogra i gutter runnera, elfové Treemana, orkové
+        // i v obraně Black Orky. Teď: LINEMANI napřed; kopající (obrana) nikdy ST 4, když
+        // je jiná možnost („síla 4 je vzácná, radši blitzera“); přijímající (útok) ST 4
+        // před linemany („když útočí ork, patří na linii síla 4“); big guy (Loner) na
+        // linii ne -- jeho pravidlo (tři kostky / soupeř si netroufne) potřebuje vidět
+        // soupeře, odloženo. Uvnitř skupin dál brnění a Block; nosič míče dál ven.
+        const PlayerStats& linemanStats = roster.positionals[0].stats;
         auto lineScore = [&](int k) {
             const PlayerTemplate& t = roster.positionals[templateOf[available[k]]];
-            return t.stats.armour * 10 + (t.skills.has(SkillName::Block) ? 5 : 0)
+            const bool lineman = t.stats.movement == linemanStats.movement &&
+                t.stats.strength == linemanStats.strength && t.stats.agility == linemanStats.agility &&
+                t.stats.armour == linemanStats.armour &&
+                !t.skills.has(SkillName::SureHands) && !t.skills.has(SkillName::Pass);   // thrower má staty linemana
+            const bool bigGuy = t.skills.has(SkillName::Loner);
+            const bool strong = t.stats.strength >= 4 && !bigGuy;
+            int role = 0;
+            if (bigGuy) role = -10000;
+            else if (strong) role = kicking ? -500 : 2000;
+            else if (lineman) role = 1000;
+            return role + t.stats.armour * 10 + (t.skills.has(SkillName::Block) ? 5 : 0)
                  - (t.skills.has(SkillName::SureHands) ? 100 : 0);
         };
 
@@ -460,8 +476,8 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     const auto* awayForm = (kickingTeam == TeamSide::AWAY)
         ? awayKickForm : AWAY_DEEP_RECEIVER_FORMATION;
 
-    buildTeam(state, TeamSide::HOME, home, homeForm, isNewHalf);
-    buildTeam(state, TeamSide::AWAY, away, awayForm, isNewHalf);
+    buildTeam(state, TeamSide::HOME, home, homeForm, isNewHalf, kickingTeam == TeamSide::HOME);
+    buildTeam(state, TeamSide::AWAY, away, awayForm, isNewHalf, kickingTeam == TeamSide::AWAY);
 
     // Give the kicking team's sweeper/deep safety the Kick skill. This used
     // to read squad slot 10, which was the deepest man only because identity

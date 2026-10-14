@@ -1308,3 +1308,58 @@ TEST(GameSimulator, OneKickOffReturnPlayerPerTeamOnTheThrowerOrDwarfRunner) {
         }
     }
 }
+
+// ───────────── Sloty na linii podle role (uživatel 24.09. a 14.10.2026) ─────────────
+// Doktrína (project_bloodbowl_los_slot_doctrine_20260924): na linii patří LINEMANI. V obraně
+// (kopající) po nich Blitzer, nikdy ST 4 („síla 4 je vzácná“); v útoku (přijímající) ST 4 napřed
+// („když útočí ork, patří na linii síla 4“). Big guy (Loner) na linii ne — jeho pravidlo potřebuje
+// vidět soupeře (14.10.: „2 ano“). Dřív rozhodovalo jen brnění + Block: trpaslíci dali na linii
+// Blitzery, lidé Ogra, skaveni Rat Ogra i gutter runnera, elfové Treemana.
+static std::vector<const Player*> losPlayers(const GameState& gs, TeamSide side) {
+    const int los = side == TeamSide::HOME ? 12 : 13;
+    std::vector<const Player*> out;
+    gs.forEachOnPitch(side, [&](const Player& p) { if (p.position.x == los) out.push_back(&p); });
+    return out;
+}
+
+static bool isLineman(const Player& p, const TeamRoster& r) {
+    const auto& s = r.positionals[0].stats;
+    return p.stats.movement == s.movement && p.stats.strength == s.strength &&
+           p.stats.agility == s.agility && p.stats.armour == s.armour &&
+           !p.hasSkill(SkillName::SureHands) && !p.hasSkill(SkillName::Pass);   // thrower má staty linemana
+}
+
+TEST(SlotyNaLinii, LinemaniVObraneIVUtoku_BigGuyNikdy) {
+    for (const char* rasa : {"human", "dwarf", "skaven", "wood-elf"}) {
+        const TeamRoster& r = *getDevelopedRoster(rasa, 1500);
+        GameState gs;
+        setupHalf(gs, r, r, TeamSide::AWAY);         // HOME přijímá (útok), AWAY kope (obrana)
+        for (TeamSide side : {TeamSide::HOME, TeamSide::AWAY}) {
+            auto los = losPlayers(gs, side);
+            ASSERT_FALSE(los.empty()) << rasa;
+            // Linemani napřed: když je na linii nelineman (linemanů není na všechny sloty),
+            // nesmí žádný lineman stát mimo linii.
+            int nelinemanNaLinii = 0, linemanMimo = 0;
+            for (const Player* p : los) {
+                nelinemanNaLinii += !isLineman(*p, r);
+                EXPECT_FALSE(p->hasSkill(SkillName::Loner)) << rasa << ": big guy na linii";
+            }
+            const int x = side == TeamSide::HOME ? 12 : 13;
+            gs.forEachOnPitch(side, [&](const Player& p) { linemanMimo += isLineman(p, r) && p.position.x != x; });
+            EXPECT_TRUE(nelinemanNaLinii == 0 || linemanMimo == 0)
+                << rasa << (side == TeamSide::HOME ? " útok" : " obrana") << ": nelinemanů na linii "
+                << nelinemanNaLinii << ", linemanů mimo " << linemanMimo;
+        }
+    }
+}
+
+TEST(SlotyNaLinii, OrkoveVObraneBezSily4_VUtokuSila4) {
+    const TeamRoster& r = *getDevelopedRoster("orc", 1500);
+    GameState gs;
+    setupHalf(gs, r, r, TeamSide::AWAY);
+    for (const Player* p : losPlayers(gs, TeamSide::AWAY))
+        EXPECT_LT(p->stats.strength, 4) << "obrana: Black Ork na linii (" << p->positionName << ")";
+    int sila4 = 0;
+    for (const Player* p : losPlayers(gs, TeamSide::HOME)) sila4 += p->stats.strength >= 4;
+    EXPECT_GE(sila4, 1) << "útok: síla 4 patří na linii";
+}
