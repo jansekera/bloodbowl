@@ -615,6 +615,20 @@ TEST(MacroActions, P211OnDefenseTheEscapeGoesIntoTheTwoColumnLine) {
     EXPECT_EQ(countTacklezones(state, esc.targetPos, TeamSide::HOME), 0);
 }
 
+// V obraně co nejkratší odskok, ne pole se slabší odpovědí o řady stranou: pomalý soupeř 13 s Mighty
+// Blow (MA3, dosah 5) dosáhne na sloupec x=9 kolem y=7, ne na y≤3 — dřív tam hráč utekl a nechal díru.
+TEST(MacroActions, P211OnDefenseTheEscapeStaysInItsRow) {
+    GameState state = p211State(false);
+    Player& mb = state.getPlayer(13);
+    mb.id = 13; mb.teamSide = TeamSide::AWAY; mb.state = PlayerState::STANDING;
+    mb.position = {6, 10}; mb.stats = {3, 4, 2, 9}; mb.movementRemaining = 3;
+    mb.skills.add(SkillName::MightyBlow);
+    Macro esc;
+    ASSERT_TRUE(endOfTurnEscape(state, esc));
+    EXPECT_EQ(esc.targetPos.x, 9);
+    EXPECT_LE(std::abs(esc.targetPos.y - 7), 1) << "odskok o pole, ne o řady stranou";
+}
+
 // Hráč bez Dodge s AG 3 v kontaktu neutíká (RepositionNotForEngagedPlayer výš) — a agilní hráč
 // neuteče, když všechna pole v dosahu leží v cizí tacklezoně.
 TEST(MacroActions, P211NoEscapeWhenEverySquareIsCovered) {

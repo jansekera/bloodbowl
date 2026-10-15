@@ -1103,8 +1103,11 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
             cands.push_back({column, cost, p.position.distanceTo(c), c});
         }
     }
-    std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
-        return std::tie(a.column, a.cost, a.steps) < std::tie(b.column, b.cost, b.steps);
+    // obrana: co nejkratší odskok (zůstat v řadě, ne utéct o šest řad stranou a nechat díru —
+    // zachyceno na skavenech 15.10.), slabší odpověď až při shodě; útok: slabší odpověď napřed
+    std::sort(cands.begin(), cands.end(), [offense](const Cand& a, const Cand& b) {
+        return offense ? std::tie(a.cost, a.steps) < std::tie(b.cost, b.steps)
+                       : std::tie(a.column, a.steps, a.cost) < std::tie(b.column, b.steps, b.cost);
     });
     const Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
     int tries = 0;
