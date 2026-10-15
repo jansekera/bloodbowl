@@ -4691,3 +4691,66 @@ TEST(MacroActions, P156WildAnimalRepositionHasABlitzVariant) {
     EXPECT_EQ(exp.actions[0].type, ActionType::BLITZ) << "rozbalení napřed ohlásí blitz";
     EXPECT_NE(trial.getPlayer(1).position, (Position{3, 3})) << "s trojkou (+2 = 5) se má pohnout";
 }
+
+// P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“). Blitzující se dřív vybíral jen podle
+// rizika, že sám spadne — tady má menší riziko hráč, který soupeře srazí hůř, a lepší kandidát musí
+// napřed uhnout na 3+ (doběhne ve 2/3).
+namespace {
+Player& p211cPut(GameState& s, int id, TeamSide side, Position pos, PlayerStats st) {
+    Player& p = s.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+    p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    p.hasMoved = false; p.hasActed = false;
+    return p;
+}
+// Cíl 12 na (15,7). Kandidát 2 (AG 3) stojí vedle soupeře 13 — musí uhnout na 3+; kandidát 3 volně.
+GameState p211cBoard(PlayerStats targetStats, PlayerStats twoStats, PlayerStats threeStats) {
+    GameState s = makeMinimalState();
+    s.getPlayer(1).position = {2, 2};
+    p211cPut(s, 12, TeamSide::AWAY, {15, 7}, targetStats);
+    p211cPut(s, 13, TeamSide::AWAY, {11, 11}, {6, 3, 3, 8});
+    p211cPut(s, 2, TeamSide::HOME, {11, 10}, twoStats);
+    p211cPut(s, 3, TeamSide::HOME, {12, 7}, threeStats);
+    s.ball = BallState::carried({2, 2}, 1);
+    return s;
+}
+int p211cBlitzer(GameState s) {
+    FixedDiceRoller dice(std::vector<int>(60, 6));
+    const MacroExpansionResult r = greedyExpandMacro(s, Macro{MacroType::BLITZ, -1, 12, {-1, -1}}, dice);
+    for (const Action& a : r.actions) if (a.type == ActionType::BLITZ) return a.playerId;
+    return -1;
+}
+}  // namespace
+
+// Blitzer (síla 3, Block) proti gutter runnerovi (síla 2, Block) na soupeře se silou 3: runner hází
+// 2 kostky, které vybírá soupeř — sám spadne zřídka (Block), srazí ve 1/4; blitzer jednu kostku
+// a srazí v 1/2, i po úhybu 3+ (× 2/3) víc.
+TEST(MacroActions, P211cBlitzerWhoKnocksDownGoesBeforeASaferRunner) {
+    GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {9, 2, 4, 7});
+    s.getPlayer(2).skills.add(SkillName::Block);
+    s.getPlayer(3).skills.add(SkillName::Block);
+    EXPECT_EQ(p211cBlitzer(s), 2) << "blitzuje ten, kdo spíš srazí";
+}
+
+// Strip Ball na nosiče: odsun taky vyrazí míč (ř. 8517-8521) ⇒ 5 stěn ze 6 místo 3.
+TEST(MacroActions, P211cStripBallGoesForTheBallCarrier) {
+    GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {7, 3, 3, 8});
+    s.ball = BallState::carried({15, 7}, 12);
+    s.getPlayer(2).skills.add(SkillName::StripBall);
+    EXPECT_EQ(p211cBlitzer(s), 2) << "Strip Ball na nosiče";
+}
+
+// Bez Strip Ballu a se stejnou šancí srazit rozhoduje dál menší riziko: volný hráč 3.
+TEST(MacroActions, P211cEqualKnockdownFallsBackToLowerRisk) {
+    GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {7, 3, 3, 8});
+    EXPECT_EQ(p211cBlitzer(s), 3) << "kdo nemusí uhýbat";
+}
+
+// Sure Hands ruší Strip Ball (ř. 8543-8546) ⇒ výhoda mizí, rozhoduje riziko.
+TEST(MacroActions, P211cStripBallDoesNotCountAgainstSureHands) {
+    GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {7, 3, 3, 8});
+    s.ball = BallState::carried({15, 7}, 12);
+    s.getPlayer(12).skills.add(SkillName::SureHands);
+    s.getPlayer(2).skills.add(SkillName::StripBall);
+    EXPECT_EQ(p211cBlitzer(s), 3);
+}

@@ -1221,8 +1221,31 @@ double blitzApproachRiskForTest(const GameState& state, const Player& mover,
     return estimateApproachFailChance(state, mover, target.position);
 }
 
-static double estimateBlitzFailChance(const GameState& state, const Player& blitzer,
-                                       const Player& target) {
+// P211c: šance blitzu ze dvou stran — `fail` = náš hráč cestou nebo při bloku spadne (turnover),
+// `success` = doběhne a soupeř skončí na zemi nebo přijde o míč.
+struct BlitzOdds { double fail; double success; };
+
+// ⭐ P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“). Na jedné kostce: soupeř jde k zemi,
+//   nebo nosič pustí míč. Rozhodnutí kostky jako resolver (block_handler.cpp):
+//     Defender Down — vždy; Defender Stumbles — ne, když má Dodge a útočník nemá Tackle
+//     (ř. 8086-8092, 8566-8571), pak je to odsun; Pushed — jen Strip Ball na nosiče bez Sure Hands
+//     (ř. 8517-8521, 8543-8546); Both Down — Wrestle kohokoli (oba k zemi, ř. 8670-8676),
+//     jinak soupeř padá, nemá-li Block; Attacker Down — nikdy.
+//   ⛔ Frenzy (druhý blok po odsunu) se nepočítá — odhad je u Frenzy nižší, než je.
+static double blockDieKnockFraction(const GameState& state, const Player& att, const Player& def,
+                                    bool defWouldWrestle) {
+    const bool carrier = state.ball.isHeld && state.ball.carrierId == def.id;
+    const bool strip = carrier && att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
+    double faces = 1.0;                                                         // Defender Down
+    const bool stumbleIsPush = def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle);
+    if (!stumbleIsPush || strip) faces += 1.0;                                   // Defender Stumbles
+    if (strip) faces += 2.0;                                                     // Pushed ×2
+    if (att.hasSkill(SkillName::Wrestle) || defWouldWrestle || !def.hasSkill(SkillName::Block)) faces += 1.0;   // Both Down
+    return faces / 6.0;
+}
+
+static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer,
+                                   const Player& target) {
     // Risk estimate and feature extraction keep the raw strengths: they describe
     // the block as thrown, not whether to offer it.
     Position landing{-1, -1};
@@ -1267,7 +1290,16 @@ static double estimateBlitzFailChance(const GameState& state, const Player& blit
     if (defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestleDefenderPriced;
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
                                                defWrestle);
-    return 1.0 - (1.0 - blockFail) * (1.0 - approachFail);
+    // P211c (15.10.2026): Wild Animal po ohlášení blitzu hází k6 +2, na 1 akce propadá
+    // (ř. 8666-8669) — není to turnover, ale blitz se nestane. Dřív tu hod chyběl.
+    const double wildFail = blitzer.hasSkill(SkillName::WildAnimal) ? 1.0 / 6.0 : 0.0;
+    const double k = blockDieKnockFraction(state, blitzer, target, defWrestle);
+    const int n = std::abs(diceCount);
+    const double knock = n == 0 ? 0.0
+                       : diceCount > 0 ? 1.0 - std::pow(1.0 - k, n)   // vybíráme my: stačí jedna
+                                       : std::pow(k, n);              // vybírá soupeř: musí všechny
+    return {1.0 - (1.0 - blockFail) * (1.0 - approachFail),
+            (1.0 - approachFail) * (1.0 - wildFail) * knock};
 }
 
 // Find nearest free standing teammate to a position (excluding specific player)
@@ -3672,7 +3704,7 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
     //   (B2, 30.08., tyz duvod).
     // P149: kandidáti seřazení od nejmenšího rizika; bere se první, jehož doběh nevede přes
     // úhyb na 4+ a horší (strop se počítá jen pro ty, na které přijde řada).
-    std::vector<std::pair<double, Action>> ranked;
+    std::vector<std::pair<BlitzOdds, Action>> ranked;
     for (auto& a : actions) {
         if (a.type != ActionType::BLITZ || a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
@@ -3680,10 +3712,15 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        ranked.emplace_back(estimateBlitzFailChance(state, blitzer, target), a);
+        ranked.emplace_back(estimateBlitzOdds(state, blitzer, target), a);
     }
-    std::stable_sort(ranked.begin(), ranked.end(),
-                     [](const auto& x, const auto& y) { return x.first < y.first; });
+    // ⭐ P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“): napřed kdo soupeře nejspíš srazí
+    //   (nebo mu vyrazí míč), při shodě kdo méně riskuje. Dřív jen riziko — gutter runner se silou 2
+    //   a Blockem sám padal málokdy, ale málokdy i srazil (p156b: 177 z 551 blitzů skavenů).
+    std::stable_sort(ranked.begin(), ranked.end(), [](const auto& x, const auto& y) {
+        if (std::abs(x.first.success - y.first.success) > 1e-9) return x.first.success > y.first.success;
+        return x.first.fail < y.first.fail;
+    });
     // P154 (07.10.2026): roh klece neblitzuje, když to může udělat někdo jiný — blitz ho z rohu
     // odvede (6× za 40 poločasů). Dva průchody: napřed kandidáti mimo rohy, pak teprve rohy.
     auto isCageCorner = [&](const Player& p) {
@@ -3754,7 +3791,8 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
         if (a.type != ActionType::BLITZ) continue;
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
-        double fail = estimateBlitzFailChance(state, blitzer, blocker);
+        // Tady jde o uvolnění cesty nosiči (odsun stačí), proto dál jen riziko.
+        double fail = estimateBlitzOdds(state, blitzer, blocker).fail;
         bool isCarrier = (a.playerId == carrierId);
         double score = -fail + (isCarrier ? 0.0 : 0.001);
         if (score > bestScore) {
