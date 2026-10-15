@@ -31,6 +31,17 @@ bool freeToAct(const Player& p) {
            !p.hasMoved && !p.hasActed;
 }
 
+// ⭐ P211b (uživatel 15.10.2026: „Rat Ogre nemá být roh klece — a jako zaostalý se zkusí pohnout až
+//   poté, co se provede blitz — jen pokud blitz není spuštěn, může pro pohyb využít akci blitz“;
+//   „zaostalci nemusí být v plánu rovnou klece — můžou mít vlastní blok později po kleci“). Přesuny
+//   řadiče (připravený hráč, zaostalci, markeři) jsou „bez hodu“ — u Wild Animal ale každá akce začíná
+//   hodem (ř. 8666-8669: 1-3 akce propadá, +2 jen u Block/Blitz). Změřeno (evidence/p156b_20261015):
+//   41× ho řadič přesunul, když byl blitz ještě volný, a 19× propadl. Řadič ho během tahu nebere
+//   (může dostat vlastní blok s +2 v hledání); dojde až před koncem tahu (`wildAnimalLaggards`).
+bool cageMayMove(const Player& p) {
+    return freeToAct(p) && !p.hasSkill(SkillName::WildAnimal);
+}
+
 // Kolik soupeřů příští tah dosáhne ranou na pole `sq` (dosah jako v blitzThreat).
 int threatsTo(const GameState& state, Position sq, TeamSide mySide) {
     int n = 0;
@@ -1042,6 +1053,31 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
 // postup: nosič popošel sám a 8–9 hráčů zůstalo stát (partie 02.10., tahy 5, 7, 9, 28).
 // Nosič ještě nehrál ⇒ postup klece (i v dosahu TD, když se neskórovalo), jinak / když
 // postup nevyjde ⇒ aspoň dostavět rohy kolem nosiče tam, kde stojí. Vše bez hodu, jednou za tah.
+static Position laggardSquare(const GameState& state, const Player& p, Position cp, const std::vector<Position>& taken);
+
+// P211b: Wild Animal zaostalec dojde až před koncem tahu — tedy po blitzu, pokud se hrál. Zůstal-li
+// týmový blitz nevyužitý, přesun ho ohlásí (+2 k hodu, ř. 8666-8669); táž primitivní nabídka jako
+// u hledání (BLITZ bez cíle, rules_engine.cpp).
+static void wildAnimalLaggards(const GameState& state, std::vector<Macro>& queue) {
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    std::vector<Position> taken;
+    for (const Macro& m : queue) taken.push_back(m.targetPos);
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    state.forEachOnPitch(carrier.teamSide, [&](const Player& p) {
+        if (p.id == carrier.id || !freeToAct(p) || !p.hasSkill(SkillName::WildAnimal)) return;
+        const Position best = laggardSquare(state, p, carrier.position, taken);
+        if (best == p.position) return;
+        Macro m{MacroType::REPOSITION, p.id, -1, best};
+        m.cageManaged = true;
+        m.declareBlitz = std::any_of(actions.begin(), actions.end(), [&](const Action& a) {
+            return a.type == ActionType::BLITZ && a.playerId == p.id && a.targetId < 0;
+        });
+        queue.push_back(m);
+        taken.push_back(best);
+    });
+}
+
 bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
     if (state.phase != GamePhase::PLAY || !ourBall(state)) return false;
     const int turn = state.getTeamState(state.activeTeam).turnNumber;
@@ -1066,17 +1102,21 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
         std::fprintf(stderr, "[cage ctl] před koncem tahu: verdikt %d, platný %d, krok %d, maker %zu\n",
                      static_cast<int>(plan.verdict), plan.valid, plan.step, plan.macros.size());
     }
-    if (!plan.valid || plan.macros.empty()) return false;
+    std::vector<Macro> q;
+    if (plan.valid) q = std::move(plan.macros);
+    const bool adoptPlan = !q.empty();
+    wildAnimalLaggards(state, q);
+    if (q.empty()) return false;
     // next() pozná nový tah podle těchto tří polí a frontu by zahodil — nesmí záležet na tom,
     // jestli se v tomto tahu už volal
     team_ = state.activeTeam;
     turn_ = turn;
     half_ = state.half;
-    queue_ = std::move(plan.macros);
+    queue_ = std::move(q);
     idx_ = 0;
     stage_ = Stage::DONE;
     phase_ = CagePhase::CAGE;
-    ++adopted_;
+    if (adoptPlan) ++adopted_;
     out = queue_[idx_++];
     return true;
 }
@@ -1241,6 +1281,41 @@ void CageController::planAdvance(const GameState& state) {
     if (plan.valid) queue_ = std::move(plan.macros);
 }
 
+// Kam zaostalec `p` dojde dopředu bez hodu (P154 c): nejvýš 3 sloupce před nosiče, ne do kontaktu,
+// co nejblíž spoluhráči. `p.position` = není kam, nebo `p` zaostalcem není.
+static Position laggardSquare(const GameState& state, const Player& p, Position cp, const std::vector<Position>& taken) {
+    const TeamSide side = p.teamSide;
+    const int dx = (side == TeamSide::HOME) ? 1 : -1;
+    if ((cp.x - p.position.x) * dx <= 1) return p.position;               // není zaostalec
+    if (countTacklezones(state, p.position, side, p.id) > 0) return p.position;   // vázaný: řeší rány
+    const int budget = p.movementRemaining;
+    Position best = p.position;
+    long bestKey = LONG_MAX;
+    for (int x = 0; x < 26; ++x) {
+        if ((x - p.position.x) * dx <= 0) continue;                    // jen dopředu
+        if ((x - cp.x) * dx > 3) continue;                             // nejvýš 3 sloupce před nosiče
+        for (int y = 0; y < 15; ++y) {
+            const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+            if (sq.distanceTo(p.position) > budget) continue;
+            if (state.getPlayerAtPosition(sq)) continue;
+            if (std::find(taken.begin(), taken.end(), sq) != taken.end()) continue;
+            if (countTacklezones(state, sq, side, p.id) > 0) continue; // ne do kontaktu
+            if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
+            int nearMate = 99;
+            state.forEachOnPitch(side, [&](const Player& m) {
+                if (m.id == p.id || m.state != PlayerState::STANDING) return;
+                nearMate = std::min(nearMate, static_cast<int>(m.position.distanceTo(sq)));
+            });
+            for (const Position& t : taken) nearMate = std::min(nearMate, static_cast<int>(t.distanceTo(sq)));
+            const int ahead = (x - cp.x) * dx;                          // co nejvíc dopředu
+            const long key = -1000L * ahead + 100L * std::max(0, nearMate - 2) +
+                             10L * sq.distanceTo(cp) + std::abs(y - 7);
+            if (key < bestKey) { bestKey = key; best = sq; }
+        }
+    }
+    return best;
+}
+
 // ⭐ P154 (c) (uživatel 07.10.2026: „držet zbytek týmu u klece — respektive PŘED klecí — ať se
 //   nosič může přesunout dopředu do nové klece — pak co nejdříve dořešit pohyb zaostalců co
 //   nejvíce dopředu“). Po tahu klece: kdo stojí volně a zůstal víc než pole za nosičem, jde bez
@@ -1273,7 +1348,7 @@ void CageController::planLaggards(const GameState& state) {
         struct Cand { int id; Position sq; std::tuple<int, int, int, int> key; };
         std::vector<Cand> cands;
         state.forEachOnPitch(side, [&](const Player& p) {
-            if (p.id == carrier.id || !freeToAct(p) || p.hasSkill(SkillName::NoHands)) return;
+            if (p.id == carrier.id || !cageMayMove(p) || p.hasSkill(SkillName::NoHands)) return;
             if (countTacklezones(state, p.position, side, p.id) > 0) return;
             if (std::find(neededForCorners.begin(), neededForCorners.end(), p.id) != neededForCorners.end()) return;   // roh (stojí, nebo ho dostaví)
             const int target = std::clamp(calculateCatchTarget(state, p, 1), 2, 6);
@@ -1318,34 +1393,8 @@ void CageController::planLaggards(const GameState& state) {
         }
     }
     state.forEachOnPitch(side, [&](const Player& p) {
-        if (p.id == carrier.id || !freeToAct(p) || p.id == readyMateId_) return;
-        if ((cp.x - p.position.x) * dx <= 1) return;                       // není zaostalec
-        if (countTacklezones(state, p.position, side, p.id) > 0) return;   // vázaný: řeší rány
-        const int budget = p.movementRemaining;
-        Position best = p.position;
-        long bestKey = LONG_MAX;
-        for (int x = 0; x < 26; ++x) {
-            if ((x - p.position.x) * dx <= 0) continue;                    // jen dopředu
-            if ((x - cp.x) * dx > 3) continue;                             // nejvýš 3 sloupce před nosiče
-            for (int y = 0; y < 15; ++y) {
-                const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
-                if (sq.distanceTo(p.position) > budget) continue;
-                if (state.getPlayerAtPosition(sq)) continue;
-                if (std::find(taken.begin(), taken.end(), sq) != taken.end()) continue;
-                if (countTacklezones(state, sq, side, p.id) > 0) continue; // ne do kontaktu
-                if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
-                int nearMate = 99;
-                state.forEachOnPitch(side, [&](const Player& m) {
-                    if (m.id == p.id || m.state != PlayerState::STANDING) return;
-                    nearMate = std::min(nearMate, static_cast<int>(m.position.distanceTo(sq)));
-                });
-                for (const Position& t : taken) nearMate = std::min(nearMate, static_cast<int>(t.distanceTo(sq)));
-                const int ahead = (x - cp.x) * dx;                          // co nejvíc dopředu
-                const long key = -1000L * ahead + 100L * std::max(0, nearMate - 2) +
-                                 10L * sq.distanceTo(cp) + std::abs(y - 7);
-                if (key < bestKey) { bestKey = key; best = sq; }
-            }
-        }
+        if (p.id == carrier.id || !cageMayMove(p) || p.id == readyMateId_) return;
+        const Position best = laggardSquare(state, p, cp, taken);
         if (best == p.position) return;
         Macro m{MacroType::REPOSITION, p.id, -1, best};
         m.cageManaged = true;                                              // bez GFI navrch
@@ -1388,7 +1437,7 @@ void CageController::planMarkers(const GameState& state) {
         const bool toward = cageFeatureOn(kFeatMarkerToward);
         std::pair<int, int> bestKey{INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& m) {
-            if (m.id == carrier.id || !freeToAct(m)) return;
+            if (m.id == carrier.id || !cageMayMove(m)) return;
             if (std::find(usedMarkers.begin(), usedMarkers.end(), m.id) != usedMarkers.end()) return;
             for (const Position& sq : o->position.getAdjacent()) {
                 if (!sq.isOnPitch() || state.getPlayerAtPosition(sq)) continue;

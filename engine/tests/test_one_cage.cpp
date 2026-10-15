@@ -627,6 +627,58 @@ TEST(OneCageLaggards, FreePlayerLeftBehindMovesForwardWithoutContact) {
     EXPECT_LE(lag.position.x, b.s.getPlayer(1).position.x + 3) << "nejvýš tři sloupce před nosiče";
 }
 
+// P211b (uživatel 15.10.2026: „Rat Ogre nemá být roh klece — a jako zaostalý se zkusí pohnout až
+// poté, co se provede blitz — jen pokud blitz není spuštěn, může pro pohyb využít akci blitz“).
+// Pravidla ř. 8666-8669: Wild Animal hází po ohlášení každé akce, +2 jen u Block/Blitz.
+namespace {
+Board wildAnimalLaggardBoard() {
+    Board b(1);
+    b.put(1, TeamSide::HOME, {12, 7});
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {13, 6});
+    b.put(5, TeamSide::HOME, {13, 8});
+    b.put(6, TeamSide::HOME, {6, 3});                             // zaostalec s Wild Animal
+    b.s.getPlayer(6).skills.add(SkillName::WildAnimal);
+    b.put(14, TeamSide::AWAY, {24, 13});
+    b.s.ball = BallState::carried({12, 7}, 1);
+    return b;
+}
+}  // namespace
+
+TEST(OneCageLaggards, P211bWildAnimalIsNotMovedDuringTheCageTurn) {
+    Board b = wildAnimalLaggardBoard();
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    for (const Macro& m : ms) EXPECT_NE(m.playerId, 6) << "řadič Wild Animal během tahu nepřesouvá";
+    EXPECT_EQ(b.s.getPlayer(6).position, (Position{6, 3}));
+}
+
+TEST(OneCageLaggards, P211bWildAnimalLaggardDeclaresTheUnusedBlitzBeforeTheTurnEnds) {
+    Board b = wildAnimalLaggardBoard();
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    Macro m;
+    ASSERT_TRUE(cc.beforeEndTurn(b.s, m)) << "před koncem tahu zaostalec dojde";
+    while (m.playerId != 6) ASSERT_TRUE(cc.next(b.s, m)) << "Ogre je ve frontě před koncem tahu";
+    EXPECT_EQ(m.type, MacroType::REPOSITION);
+    EXPECT_GT(m.targetPos.x, 6) << "dopředu";
+    EXPECT_TRUE(m.declareBlitz) << "blitz zůstal nevyužitý ⇒ přesun ho ohlásí (+2)";
+}
+
+TEST(OneCageLaggards, P211bWildAnimalLaggardMovesPlainAfterTheBlitzWasUsed) {
+    Board b = wildAnimalLaggardBoard();
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    b.s.homeTeam.blitzUsedThisTurn = true;                         // blitz už v tahu proběhl
+    Macro m;
+    ASSERT_TRUE(cc.beforeEndTurn(b.s, m));
+    while (m.playerId != 6) ASSERT_TRUE(cc.next(b.s, m));
+    EXPECT_EQ(m.type, MacroType::REPOSITION);
+    EXPECT_FALSE(m.declareBlitz) << "blitz je pryč ⇒ obyčejný přesun";
+}
+
 // (a) pokračování — „využij i blitz a block pro uvolnění klece“, „nezapomeň na příchod pro asistenci“
 namespace {
 // Náš hráč 4 na (14,5) je držen jediným soupeřem 13 na (15,5). Klec kolem (12,7) má jen zadní rohy.
