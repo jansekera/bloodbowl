@@ -669,7 +669,7 @@ PYBIND11_MODULE(bb_engine, m) {
             "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE", "PASS_SCORE", "CHAIN_SCORE"};
         static_assert(sizeof(macroNames) / sizeof(macroNames[0]) == static_cast<size_t>(bb::MacroType::MACRO_COUNT),
                       "macroNames musí krýt celý výčet MacroType");
-        static const char* sourceNames[] = {"cage", "search", "rescue", "greedy_fallback", "no_actions"};
+        static const char* sourceNames[] = {"cage", "search", "rescue", "greedy_fallback", "no_actions", "escape"};
         auto macroDict = [](const bb::Macro& m) {
             py::dict d;
             d["type"] = macroNames[static_cast<size_t>(m.type)];

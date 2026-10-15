@@ -402,6 +402,10 @@ bool placeboAdvanceArm(TeamSide side);
 // EVALUATION. Zero over a matchup means both arms took the same decision.
 long takeCageAwareAdvancePicksInSearch();
 
+// P211 (15.10.2026): agilní hráč (Dodge / AG 4+) v kontaktu uteče až na konci tahu — makro přesunu
+// pro prvního takového, nebo false. Volá MacroMCTSPolicy, když hledání chce tah ukončit.
+bool endOfTurnEscape(const GameState& state, Macro& out);
+
 // Expand a macro into a sequence of low-level actions via greedy heuristics.
 // Modifies state in-place as actions are executed.
 MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,

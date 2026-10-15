@@ -1137,6 +1137,11 @@ Action MacroMCTSPolicy::operator()(const GameState& state) {
             bestMacro = cageMacro;
             fromStagedPlan = true;
             source = MacroDecisionInfo::Source::CAGE;
+        } else if (endOfTurnEscape(state, cageMacro)) {
+            // P211 (uživatel 15.10.: „útěk z kontaktu až na konec tahu“): až po kleci, jako poslední
+            bestMacro = cageMacro;
+            fromStagedPlan = true;
+            source = MacroDecisionInfo::Source::ESCAPE;
         }
     }
 

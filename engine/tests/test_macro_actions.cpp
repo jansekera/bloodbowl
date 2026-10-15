@@ -556,46 +556,73 @@ TEST(MacroActions, RepositionNotForEngagedPlayer) {
 }
 
 // P211 (uživatel 15.10.2026): „s gutter runnery utéct z dosahu, ať se nenechají mlátit — stejné
-// pravidlo platí i pro elfy s Dodge, obecně agilní“. Gutter runner (MA9 AG4 Dodge) v kontaktu
-// s jediným soupeřem (MA6 + 2 GFI = blitz dosáhne na 8 polí) dostane přesun, který ho dostane
-// z tacklezony i z dosahu blitzu, ne na kraj hřiště — a přesun se opravdu odehraje.
-TEST(MacroActions, P211AgilePlayerInContactIsOfferedAnEscapeOutOfReach) {
+// pravidlo platí i pro elfy s Dodge, obecně agilní“; „útěk z kontaktu až na konec tahu — a taky
+// elfové mají utíkat z kontaktu do 2col obrany“ (P132: přední řada s jedním prázdným polem od
+// soupeře, druhá hned za ní).
+namespace {
+// Gutter runner (MA9 AG4 Dodge) na (10,7) v kontaktu s jediným soupeřem 12 na (11,7) (MA6 + 2 GFI).
+GameState p211State(bool weHaveTheBall) {
     GameState state = makeMinimalState();
     Player& gr = state.getPlayer(1);
     gr.stats = {9, 2, 4, 7};
     gr.movementRemaining = 9;
     gr.skills.add(SkillName::Dodge);
     state.getPlayer(12).position = {11, 7};
-    state.ball = BallState::carried({11, 7}, 12);
+    if (weHaveTheBall) {
+        Player& c = state.getPlayer(2);
+        c.id = 2; c.teamSide = TeamSide::HOME; c.state = PlayerState::STANDING;
+        c.position = {3, 12}; c.stats = {6, 3, 3, 8}; c.movementRemaining = 6;
+        state.ball = BallState::carried({3, 12}, 2);
+    } else {
+        state.ball = BallState::carried({11, 7}, 12);
+    }
+    return state;
+}
+}  // namespace
 
+TEST(MacroActions, P211EscapeIsNotOfferedDuringTheTurn) {
+    const GameState state = p211State(false);
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
-    const Macro* esc = nullptr;
     for (const auto& m : macros)
-        if (m.type == MacroType::REPOSITION && m.playerId == 1) esc = &m;
-    ASSERT_NE(esc, nullptr) << "agilní hráč v kontaktu má dostat přesun pryč";
-    EXPECT_EQ(countTacklezones(state, esc->targetPos, TeamSide::HOME), 0);
-    EXPECT_GT(esc->targetPos.distanceTo({11, 7}), 8) << "mimo dosah blitzu soupeře";
-    EXPECT_TRUE(esc->targetPos.y > 0 && esc->targetPos.y < 14) << "ne na kraj hřiště";
+        EXPECT_FALSE(m.type == MacroType::REPOSITION && m.playerId == 1) << "útěk až na konci tahu";
+}
+
+TEST(MacroActions, P211OnOffenseTheEscapeGoesOutOfBlitzReach) {
+    const GameState state = p211State(true);
+    Macro esc;
+    ASSERT_TRUE(endOfTurnEscape(state, esc)) << "agilní hráč v kontaktu má na konci tahu kam utéct";
+    EXPECT_EQ(esc.playerId, 1);
+    EXPECT_EQ(countTacklezones(state, esc.targetPos, TeamSide::HOME), 0);
+    EXPECT_GT(esc.targetPos.distanceTo({11, 7}), 8) << "mimo dosah blitzu soupeře";
+    EXPECT_TRUE(esc.targetPos.y > 0 && esc.targetPos.y < 14) << "ne na kraj hřiště";
 
     GameState s = state.clone();
     FixedDiceRoller dice(std::vector<int>(40, 6));
-    const MacroExpansionResult r = greedyExpandMacro(s, *esc, dice);
+    const MacroExpansionResult r = greedyExpandMacro(s, esc, dice);
     ASSERT_FALSE(r.actions.empty());
     EXPECT_FALSE(r.turnover);
-    EXPECT_EQ(s.getPlayer(1).position, esc->targetPos) << "přesun dojde na nabídnuté pole";
+    EXPECT_EQ(s.getPlayer(1).position, esc.targetPos) << "přesun dojde na nabídnuté pole";
 }
 
-// P211: hráč bez Dodge a s AG 3 (trpaslík, lineman) v kontaktu dál přesun nedostává
-// (RepositionNotForEngagedPlayer výš) — a agilní hráč ho nedostane, když není kam: všechna pole
-// v dosahu jsou v cizí tacklezoně nebo nepomůžou.
+// V obraně (míč má soupeř) do dvou sloupců: čelo soupeře x=11, naše zóna x=0 ⇒ přední řada x=9
+// (jedno prázdné pole mezi), druhá x=8 — ne „co nejdál“.
+TEST(MacroActions, P211OnDefenseTheEscapeGoesIntoTheTwoColumnLine) {
+    const GameState state = p211State(false);
+    Macro esc;
+    ASSERT_TRUE(endOfTurnEscape(state, esc));
+    EXPECT_EQ(esc.targetPos.x, 9) << "přední řada s jedním prázdným polem od soupeře";
+    EXPECT_EQ(countTacklezones(state, esc.targetPos, TeamSide::HOME), 0);
+}
+
+// Hráč bez Dodge s AG 3 v kontaktu neutíká (RepositionNotForEngagedPlayer výš) — a agilní hráč
+// neuteče, když všechna pole v dosahu leží v cizí tacklezoně.
 TEST(MacroActions, P211NoEscapeWhenEverySquareIsCovered) {
     GameState state = makeMinimalState();
     Player& gr = state.getPlayer(1);
     gr.stats = {1, 2, 4, 7};   // jediné pole pohybu
     gr.movementRemaining = 1;
     gr.skills.add(SkillName::Dodge);
-    // soupeři kolem: každé sousední pole hráče je v cizí tacklezoně
     const Position ring[] = {{11, 7}, {9, 7}, {10, 9}, {10, 5}};
     int id = 12;
     for (const Position& pos : ring) {
@@ -605,11 +632,16 @@ TEST(MacroActions, P211NoEscapeWhenEverySquareIsCovered) {
         ++id;
     }
     state.ball = BallState::carried({11, 7}, 12);
-    std::vector<Macro> macros;
-    getAvailableMacros(state, macros);
-    for (const auto& m : macros)
-        EXPECT_FALSE(m.type == MacroType::REPOSITION && m.playerId == 1)
-            << "přesun na (" << int(m.targetPos.x) << "," << int(m.targetPos.y) << ") vede do tacklezony";
+    Macro esc;
+    EXPECT_FALSE(endOfTurnEscape(state, esc));
+}
+
+TEST(MacroActions, P211PlayerWithoutAgilityDoesNotEscape) {
+    GameState state = p211State(false);
+    state.getPlayer(1).stats = {6, 3, 3, 8};
+    state.getPlayer(1).skills = {};
+    Macro esc;
+    EXPECT_FALSE(endOfTurnEscape(state, esc));
 }
 
 // Regression for Strategy 0.5 (intercept lane, research_fable_20260709

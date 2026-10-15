@@ -1057,19 +1057,35 @@ static double worstReplyCost(const GameState& state, const Player& p,
 
 // ⭐ P211 (uživatel 15.10.2026: „s gutter runnery utéct z dosahu, ať se nenechají mlátit — stejné
 //   pravidlo platí i pro elfy s Dodge, obecně agilní“). Změřeno (evidence/p156b_20261015): gutter
-//   runner, který tah začal v kontaktu a tah skončil bez turnoveru, nedostal 233× žádný přesun —
-//   obecná REPOSITION bere jen volné hráče. Agilní (Dodge nebo AG 4+) stojící hráč v kontaktu
-//   dostane přesun na pole bez cizí tacklezony, kam soupeř dosáhne nejslabší ranou
-//   (`worstReplyCost`), ne na kraj hřiště. Jen PŘIDÁVÁ možnost — zůstat a blokovat zůstává.
-//   Riziko cesty jako W-GFI / Q3-N: P(turnover) × zbývající aktivace < 1; úhyb na 4+ dál hlídá
-//   strop chůze (P149). {-1,-1} = není kam, nebo by to nepomohlo.
+//   runner, který tah začal v kontaktu a tah skončil bez turnoveru, nedostal 233× žádný přesun.
+//   Agilní (Dodge nebo AG 4+) stojící hráč v kontaktu dostane přesun na pole bez cizí tacklezony,
+//   ne na kraj hřiště:
+//   - v útoku (míč máme my) tam, kam soupeř dosáhne nejslabší ranou (`worstReplyCost`, i mimo dosah
+//     blitzu);
+//   - v obraně (uživatel 15.10.: „elfové mají utíkat z kontaktu do 2col obrany“; P132, partie 02.10.:
+//     „přední řada s JEDNÍM prázdným polem od soupeře, druhá hned za ní“, hloubka = minimum, které
+//     vynutí blitz místo bloku) do sloupce o dva za čelem soupeřů, se kterými je v kontaktu, nebo
+//     do sloupce hned za ním; přednost má přední.
+//   ⛔ 15.10. (A/B p211_20261015: turnoverů z útěků 18 → 47) útěk až NA KONCI TAHU (`endOfTurnEscape`,
+//   uživatel: „útěk z kontaktu až na konec tahu“) — turnover pak nestojí žádnou aktivaci spoluhráčů.
+//   {-1,-1} = není kam, nebo by to nepomohlo.
 static Position agileEscapeSquare(const GameState& state, const Player& p) {
     if (!p.hasSkill(SkillName::Dodge) && p.stats.agility < 4) return {-1, -1};
     const int budget = p.movementRemaining;
     if (budget <= 0) return {-1, -1};
     const TeamSide mySide = p.teamSide;
+    const bool offense = state.ball.isHeld && state.ball.carrierId > 0 &&
+                         state.getPlayer(state.ball.carrierId).teamSide == mySide;
+    // obrana: směr k naší zóně a čelo soupeřů v kontaktu s hráčem
+    const int dir = endzoneX(opponent(mySide)) > p.position.x ? 1 : -1;
+    int front = -1;
+    for (const Position& a : p.position.getAdjacent()) {
+        const Player* o = a.isOnPitch() ? state.getPlayerAtPosition(a) : nullptr;
+        if (!o || o->teamSide == mySide || o->state != PlayerState::STANDING) continue;
+        if (front < 0 || (o->position.x - front) * dir > 0) front = o->position.x;
+    }
     const double stayCost = worstReplyCost(state, p, p.position, true);
-    struct Cand { double cost; int steps; Position pos; };
+    struct Cand { int column; double cost; int steps; Position pos; };
     std::vector<Cand> cands;
     for (int dx = -budget; dx <= budget; ++dx) {
         for (int dy = -budget; dy <= budget; ++dy) {
@@ -1077,20 +1093,24 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
             if (!c.isOnPitch() || c.y == 0 || c.y == 14) continue;   // ne na kraj (vytlačení do publika)
             if (state.getPlayerAtPosition(c) != nullptr) continue;
             if (countTacklezones(state, c, mySide) > 0) continue;
+            int column = 0;
+            if (!offense) {
+                column = (c.x - front) * dir - 2;                     // 0 = přední řada, 1 = druhá
+                if (column < 0 || column > 1) continue;
+            }
             const double cost = worstReplyCost(state, p, c, true);
-            if (cost < stayCost - 1e-9) cands.push_back({cost, p.position.distanceTo(c), c});
+            if (offense && cost >= stayCost - 1e-9) continue;          // v útoku jen tam, kde to pomůže
+            cands.push_back({column, cost, p.position.distanceTo(c), c});
         }
     }
     std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
-        return std::tie(a.cost, a.steps) < std::tie(b.cost, b.steps);
+        return std::tie(a.column, a.cost, a.steps) < std::tie(b.column, b.cost, b.steps);
     });
     const Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
-    const int remaining = activationsStillAvailable(state, mySide, p.id);
     int tries = 0;
     for (const Cand& c : cands) {
-        if (++tries > 8) break;   // cesta (BFS) jen k nejlepším polím — běží v každé simulaci
-        const double pFail = pathFailProb(state, p, c.pos, budget, avoid);
-        if (pFail >= 0.0 && pFail * remaining < 1.0) return c.pos;
+        if (++tries > 8) break;   // cesta (BFS) jen k nejlepším polím
+        if (pathFailProb(state, p, c.pos, budget, avoid) >= 0.0) return c.pos;
     }
     return {-1, -1};
 }
@@ -2556,11 +2576,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 break;
             }
         }
-        if (hasAdjacentEnemy) {
-            const Position esc = agileEscapeSquare(state, p);   // P211
-            if (esc.x >= 0) out.push_back({MacroType::REPOSITION, p.id, -1, esc});
-            return;
-        }
+        if (hasAdjacentEnemy) return;   // P211: útěk agilních z kontaktu až na konci tahu (endOfTurnEscape)
 
         Position target;
 
@@ -4133,6 +4149,22 @@ static RepositionWalk repositionWalk(const GameState& st, const Macro& macro, bo
 static bool repositionCanStart(const GameState& state, const Macro& macro) {
     const RepositionWalk w = repositionWalk(state, macro, /*count=*/false);
     return walkCanStart(state, state.getPlayer(macro.playerId), macro.targetPos, w.maxSteps, w.avoid, w.dodgeCap);
+}
+
+bool endOfTurnEscape(const GameState& state, Macro& out) {
+    if (state.phase != GamePhase::PLAY) return false;
+    bool found = false;
+    state.forEachOnPitch(state.activeTeam, [&](const Player& p) {
+        if (found || !isFreeToAct(p) || (state.ball.isHeld && state.ball.carrierId == p.id)) return;
+        if (countTacklezones(state, p.position, p.teamSide) == 0) return;   // jen v kontaktu
+        const Position esc = agileEscapeSquare(state, p);
+        if (esc.x < 0) return;
+        const Macro m{MacroType::REPOSITION, p.id, -1, esc};
+        if (!repositionCanStart(state, m)) return;   // táž chůze jako rozbalení (úhyb 4+ ne, P149)
+        out = m;
+        found = true;
+    });
+    return found;
 }
 
 static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,

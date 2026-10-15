@@ -1348,3 +1348,33 @@ TEST(MacroMCTSSearch, AVetoedMacroIsRemovedFromTheRootBeforeTheSearchRuns) {
     EXPECT_EQ(visitsOfRepositions(true, vetoed), 0) << "zakázané makro nedostane žádnou návštěvu";
     EXPECT_NE(vetoed.type, MacroType::REPOSITION);
 }
+
+// P211 (uživatel 15.10.2026: „útěk z kontaktu až na konec tahu“). Jediný náš hráč — gutter runner
+// (MA9 AG4 Dodge) — stojí v obraně v kontaktu se soupeřem, výhodný blok nemá. Hledání chce tah
+// ukončit; před koncem tahu se zahraje útěk (zdroj ESCAPE), ne END_TURN.
+TEST(MacroMCTSPolicy, P211AgilePlayerEscapesBeforeTheTurnEnds) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 2;
+    state.weather = Weather::NICE;
+    Player& gr = state.getPlayer(1);
+    gr.id = 1; gr.teamSide = TeamSide::HOME; gr.state = PlayerState::STANDING;
+    gr.position = {10, 7}; gr.stats = {9, 2, 4, 7}; gr.movementRemaining = 9;
+    gr.skills.add(SkillName::Dodge);
+    Player& o = state.getPlayer(12);
+    o.id = 12; o.teamSide = TeamSide::AWAY; o.state = PlayerState::STANDING;
+    o.position = {11, 7}; o.stats = {6, 3, 3, 8}; o.movementRemaining = 6;
+    state.ball = BallState::carried({11, 7}, 12);
+
+    MCTSConfig config;
+    config.timeBudgetMs = 0;
+    config.maxIterations = 50;
+    MacroMCTSPolicy policy(nullptr, config, 42);
+    const Action action = policy(state);
+    EXPECT_EQ(action.playerId, 1) << "hraje se útěk, ne konec tahu";
+    EXPECT_NE(action.type, ActionType::END_TURN);
+    EXPECT_EQ(policy.lastDecision().source, MacroDecisionInfo::Source::ESCAPE);
+    EXPECT_EQ(policy.lastDecision().macro.type, MacroType::REPOSITION);
+}
