@@ -10,7 +10,8 @@
 #include "bb/move_handler.h"      // Q3: měřidlo provedeného vstání
 #include "bb/action_resolver.h"   // Q3: resolveAction
 #include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
-#include "bb/pathfinder.h"        // KLEC/K5: pathFailProb -- cena ústupu nosiče
+#include "bb/pathfinder.h"
+#include "bb/kickoff_handler.h"   // P196: resolveKickoff        // KLEC/K5: pathFailProb -- cena ústupu nosiče
 #include <algorithm>
 #include <set>
 
@@ -374,6 +375,9 @@ TEST(MacroActions, BlockNotAvailableWith1Die) {
 TEST(MacroActions, BlitzAvailable) {
     GameState state = makeMinimalState();
     state.homeTeam.blitzUsedThisTurn = false;
+    // P196 (15.10.2026): dřív na cíl nikdo nedosáhl (blitz, který se rozbalí do prázdna) — test
+    // prošel na makru, které nejde provést. Geometrie posunuta tak, aby blitz šel.
+    state.getPlayer(12).position = {14, 7};
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
@@ -517,12 +521,19 @@ TEST(MacroActions, RepositionForFreePlayer) {
     state.getPlayer(12).position = {20, 7}; // far away
 
     // Ball held by someone else to avoid PICKUP macro
-    state.ball = BallState::carried({15, 7}, 12);
+    // P196 (15.10.2026): dřív `carried({15, 7}, 12)` při nosiči na (20, 7) a hráč 1 dostal jen
+    // REPOSITION na vlastní pole — makro bez jediné akce, které test počítal jako „přesun“.
+    state.ball = BallState::carried({20, 7}, 12);
+    state.getPlayer(1).position = {2, 2};   // daleko od místa, kam ho obrana pošle
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
-    EXPECT_TRUE(hasMacroType(macros, MacroType::REPOSITION));
+    bool realMove = false;
+    for (const auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1 && m.targetPos != state.getPlayer(1).position)
+            realMove = true;
+    EXPECT_TRUE(realMove) << "volný hráč má dostat přesun, který ho opravdu někam pošle";
 }
 
 TEST(MacroActions, RepositionNotForEngagedPlayer) {
@@ -1415,13 +1426,17 @@ TEST(MacroActions, BlitzDefensePrioritizesCarrier) {
     GameState state = makeDefensiveState();
     state.homeTeam.blitzUsedThisTurn = false;
 
-    // Add another away player far away
+    // Add another away player
     Player& p13 = state.getPlayer(13);
     p13.id = 13;
     p13.teamSide = TeamSide::AWAY;
     p13.state = PlayerState::STANDING;
-    p13.position = {20, 10};
+    // P196 (15.10.2026): dřív na cíl nikdo nedosáhl (blitz, který se rozbalí do prázdna) — test
+    // prošel na makru, které nejde provést. Geometrie posunuta tak, aby blitz šel.
+    p13.position = {9, 10};
     p13.stats = {6, 3, 3, 8};
+    state.getPlayer(12).position = {11, 7};
+    state.ball = BallState::carried({11, 7}, 12);
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
@@ -1445,8 +1460,12 @@ TEST(MacroActions, BlitzDefenseMultipleTargets) {
     p13.id = 13;
     p13.teamSide = TeamSide::AWAY;
     p13.state = PlayerState::STANDING;
-    p13.position = {18, 5};
     p13.stats = {6, 3, 3, 8};
+    // P196 (15.10.2026): dřív na cíl nikdo nedosáhl (blitz, který se rozbalí do prázdna) — test
+    // prošel na makru, které nejde provést. Geometrie posunuta tak, aby blitz šel.
+    p13.position = {10, 4};
+    state.getPlayer(12).position = {11, 7};
+    state.ball = BallState::carried({11, 7}, 12);
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
@@ -1467,8 +1486,18 @@ TEST(MacroActions, BlitzOffenseSingleTarget) {
     p13.id = 13;
     p13.teamSide = TeamSide::AWAY;
     p13.state = PlayerState::STANDING;
-    p13.position = {18, 5};
     p13.stats = {6, 3, 3, 8};
+    // P196 (15.10.2026): dřív na cíl nikdo nedosáhl (blitz, který se rozbalí do prázdna) — test
+    // prošel na makru, které nejde provést. Nosič neblitzuje (P154) ⇒ přidán blitzující hráč 2 a cíle posunuty tak, aby blitz šel.
+    p13.position = {15, 5};
+    state.getPlayer(12).position = {15, 8};
+    Player& p2 = state.getPlayer(2);
+    p2.id = 2;
+    p2.teamSide = TeamSide::HOME;
+    p2.state = PlayerState::STANDING;
+    p2.position = {12, 5};   // ne roh klece (P169: blitz bez jména roh nevezme)
+    p2.stats = {6, 3, 3, 8};
+    p2.movementRemaining = 6;
 
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
@@ -1970,14 +1999,22 @@ TEST(MacroActions, RepositionLooseBallAlreadyAdjacentStaysPut) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
-    int repositions = 0;  // P100: bez nabídky REPOSITION se dřív netvrdilo nic
     for (auto& m : macros) {
         if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
-        ++repositions;
         EXPECT_EQ(m.targetPos, (Position{12, 7}))
             << "already-denying player sent on a pointless walk";
     }
-    EXPECT_GE(repositions, 1) << "hráč u míče má dostat aspoň nabídku zůstat";
+    // P196 (15.10.2026): dřív se tu chtěla „aspoň nabídka zůstat“ (P100: ať test netvrdí nic bez
+    // nabídky). Zůstat = REPOSITION na vlastní pole = makro bez jediné akce; nabídka ho už nedává.
+    // Kontrola, že výše nejde o prázdné tvrzení: o pole dál od míče hráč přesun K MÍČI dostane.
+    state.getPlayer(1).position = {11, 7};
+    macros.clear();
+    getAvailableMacros(state, macros);
+    bool towardBall = false;
+    for (auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1 && m.targetPos.distanceTo(state.ball.position) == 1)
+            towardBall = true;
+    EXPECT_TRUE(towardBall) << "pozitivní kontrola: hráč o pole dál má dostat přesun k míči";
 }
 
 // Item 11, waypoint variant: retargeting alone is not enough -- when the only
@@ -4005,6 +4042,9 @@ static GameState stupefiedBoneHeadState() {
 
 TEST(MacroActions, P93AStupefiedBoneHeadIsOfferedAMacro) {
     GameState state = stupefiedBoneHeadState();
+    // P196 (15.10.2026): v původní pozici dostal hráč jen REPOSITION na vlastní pole — makro bez
+    // akce, takže k hodu na Bone-head by se stejně nedostal. Míč na zemi ⇒ má kam jít doopravdy.
+    state.ball = BallState::onGround({14, 7});
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
     int mine = 0;
@@ -4461,4 +4501,59 @@ TEST(MacroActions, FoulIsOfferedOnlyAsTheLastActivationOfTheTurn) {
     };
     EXPECT_EQ(fouls(false), 0) << "spoluhráč ještě nehrál ⇒ faul se nenabízí";
     EXPECT_GT(fouls(true), 0) << "fauler je poslední ⇒ faul v nabídce je (pozitivní kontrola)";
+}
+
+// ⭐ P196 (15.10.2026): NABÍDKA = JEN PROVEDITELNÉ. Makro, které rozbalení odmítne (prázdný plán),
+//   hledání ocení, jako by se stalo, a když na něj padne volba, tah skončí „no_actions“ — změřeno
+//   7,6 % tahů (evidence/p196_20261015). Uživatel 15.10.: „jestliže hráč už jednal a nebyl to začátek
+//   blitzu — tak mu nemohl být nabídnut ještě block zvlášť“ (pravidla ř. 675). Chokepoint: v pozicích
+//   z náhodných her, i UPROSTŘED aktivace (hráč se pohnul a ještě nedohrál), se každé nabízené makro
+//   musí dát rozbalit aspoň na jednu akci. Neprázdnost plánu nezávisí na kostkách: akce se do plánu
+//   zapíše dřív, než se hodí (executeAndRecord).
+TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
+    static const char* names[] = {"SCORE", "ADVANCE", "CAGE", "BLITZ", "BLOCK", "PICKUP", "PASS_ACTION",
+                                  "FOUL", "REPOSITION", "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE",
+                                  "PASS_SCORE", "CHAIN_SCORE"};
+    static_assert(sizeof(names) / sizeof(names[0]) == static_cast<size_t>(MacroType::MACRO_COUNT), "");
+    const char* rosters[][2] = {{"human", "orc"}, {"dwarf", "skaven"}, {"wood-elf", "dwarf"},
+                                {"orc", "human"}, {"skaven", "wood-elf"}};
+    int failed[static_cast<int>(MacroType::MACRO_COUNT)] = {0};
+    int offered = 0, midActivation = 0;
+    for (int seed = 1; seed <= 10; ++seed) {
+        const auto& rs = rosters[seed % 5];
+        GameState state;
+        DiceRoller dice(static_cast<uint32_t>(seed));
+        setupHalf(state, *getDevelopedRoster(rs[0], 1500), *getDevelopedRoster(rs[1], 1500), TeamSide::AWAY, &dice);
+        resolveKickoff(state, dice, nullptr);
+        std::mt19937 pick(static_cast<uint32_t>(seed));
+        for (int step = 0; step < 120 && state.phase == GamePhase::PLAY; ++step) {
+            std::vector<Macro> macros;
+            getAvailableMacros(state, macros);
+            if (state.currentActivationId > 0 && state.getPlayer(state.currentActivationId).hasMoved &&
+                !state.getPlayer(state.currentActivationId).hasActed) ++midActivation;
+            for (const Macro& m : macros) {
+                if (m.type == MacroType::END_TURN) continue;
+                ++offered;
+                GameState trial = state.clone();
+                DiceRoller trialDice(static_cast<uint32_t>(seed * 1000 + step));
+                if (greedyExpandMacro(trial, m, trialDice).actions.empty()) ++failed[static_cast<int>(m.type)];
+            }
+            std::vector<Action> actions;
+            getAvailableActions(state, actions);
+            if (actions.empty()) break;
+            // END_TURN jen občas, ať se hraje i uprostřed aktivací
+            Action a = actions[pick() % actions.size()];
+            if (a.type == ActionType::END_TURN && pick() % 4 != 0) a = actions[pick() % actions.size()];
+            executeAction(state, a, dice, nullptr);
+        }
+    }
+    ASSERT_GT(offered, 300) << "pozitivní kontrola: test musí projít dost nabídek";
+    ASSERT_GT(midActivation, 20) << "pozitivní kontrola: pozice uprostřed aktivace musí nastat";
+    std::string report;
+    int total = 0;
+    for (int t = 0; t < static_cast<int>(MacroType::MACRO_COUNT); ++t) {
+        total += failed[t];
+        if (failed[t]) report += std::string(names[t]) + "=" + std::to_string(failed[t]) + " ";
+    }
+    EXPECT_EQ(total, 0) << "nabídnuto, ale rozbalení dalo prázdný plán (z " << offered << "): " << report;
 }

@@ -502,7 +502,9 @@ TEST(MacroMCTS, RepositionFloorNoOpAtSmallNodes) {
         p.id = id;
         p.teamSide = TeamSide::HOME;
         p.state = PlayerState::STANDING;
-        p.position = {static_cast<int8_t>(20 + i), static_cast<int8_t>(1 + i)};
+        // P196 (15.10.2026): dřív (20+i, 1+i) — na soupeře nikdo nedosáhl a oba BLITZY se rozbalily
+        // do prázdna; nabídka je už nedává. Teď na dosah.
+        p.position = {static_cast<int8_t>(11), static_cast<int8_t>(3 + 3 * i)};
         p.stats = {6, 3, 3, 8};
         p.movementRemaining = 6;
     }
@@ -1175,38 +1177,36 @@ TEST(MacroMCTSPolicy, K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn) {
     // (b) hráč 11 pohyb MÁ -- jinak by se nedalo tvrdit, že o něco přišel.
     ASSERT_TRUE(k6PlayerHasLegalMove(state, 11))
         << "fixture je vadný: druhý hráč nemá co dělat, propadlé kolo nic nestojí";
-    // (c) hledání skutečně zvolí makro, které se rozbalí do NIČEHO. Bez téhle
-    //     kontroly by test prošel i tak, že hledání zvolí rovnou to funkční
-    //     makro -- a neměřil by vůbec nic (dnes se tak stalo 4x).
-    MacroMCTSSearch probe(&vf, cfg, 42);
-    Macro pick = probe.search(state);
-    ASSERT_EQ(k6ExpandCount(state, pick), 0u)
-        << "hledání nezvolilo prázdné makro (zvolilo typ "
-        << static_cast<int>(pick.type) << ") -- test by neměřil nic";
-    // (d) a existuje jiné nabídnuté makro, které akce dá.
+    // (c) P196 (15.10.2026): dřív se tu chtělo, aby hledání zvolilo makro, které se rozbalí
+    //     do NIČEHO (SCORE zazděného nosiče) a záchrana K6 ho nahradila. Nabídka takové makro
+    //     už nedává (MacroActions.EveryOfferedMacroExpandsToAnAction) ⇒ požadavek „kolo
+    //     nepropadne“ se plní dřív: v nabídce zůstane jen to, co jde, a hledání zvolí rovnou to.
+    //     Kontrola, že to není prázdné tvrzení: nabídka má co nabídnout a nic z ní není prázdné.
     std::vector<Macro> offered;
     getAvailableMacros(state, offered, cfg.dauntlessInOffer);
     size_t workable = 0;
     for (auto& m : offered) {
-        if (m.type != MacroType::END_TURN && k6ExpandCount(state, m) > 0) ++workable;
+        if (m.type == MacroType::END_TURN) continue;
+        ASSERT_GT(k6ExpandCount(state, m), 0u) << "nabídka dala prázdné makro typu " << static_cast<int>(m.type);
+        ++workable;
     }
-    ASSERT_GE(workable, 1u) << "fixture je vadný: zachraňovat není čím";
+    ASSERT_GE(workable, 1u) << "fixture je vadný: hráč 11 nedostal nic";
 
     long drain[kMacroNoopSlots]; takeMacroNoopStats(drain);
 
     MacroMCTSPolicy policy(&vf, cfg, 42);
     Action action = policy(state);
 
-    EXPECT_NE(action.type, ActionType::END_TURN)
-        << "prázdné rozbalení propadlo celé kolo -- to je ta vada K6";
+    // P196: dřív tu stálo „akce není END_TURN a patří hráči 11“. S touhle hodnotovou funkcí
+    // (pohyb vpřed je horší než stát) ale hledání END_TURN cení výš než přesun hráče 11
+    // (Q 0,667 × 0,505, 15.10.2026) — prázdné SCORE dřív vyhrávalo jen tím, že se nestalo nic.
+    // Platí dál: rozhodlo hledání nad tím, co jde, ne záchrana.
     EXPECT_NE(action.playerId, 1) << "nosič se hýbat nemůže, akce nemůže být jeho";
-    EXPECT_TRUE(k6PlayerHasLegalMove(state, action.playerId))
-        << "vrácená akce patří hráči, který se hýbat nemůže";
+    EXPECT_EQ(policy.lastDecision().source, MacroDecisionInfo::Source::SEARCH);
 
     long k6[kMacroNoopSlots]; takeMacroNoopStats(k6);
     EXPECT_EQ(k6[0], 1) << "měřidlo: jedno zahrané makro";
-    EXPECT_EQ(k6[1], 1) << "měřidlo: a rozbalilo se do prázdna";
-    EXPECT_EQ(k6[2], 1) << "měřidlo: zachráněno jiným makrem";
+    EXPECT_EQ(k6[1], 0) << "měřidlo: zahrané makro se rozbalilo do prázdna (P196: nemá kde vzniknout)";
     EXPECT_EQ(k6[3], 0) << "měřidlo: kolo tedy propadnout nesmělo";
 }
 
@@ -1236,17 +1236,15 @@ TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
     LinearValueFunction vf = k6StandStillVf();
     MCTSConfig cfg = k6Config();
 
-    // SEBEKONTROLA: ŽÁDNÉ nabídnuté makro (mimo END_TURN) nedá ani jednu akci.
-    // Tohle je ta přesná podmínka, za které END_TURN zůstává správná odpověď.
+    // SEBEKONTROLA: nic jiného než END_TURN nejde. P196 (15.10.2026): dřív nabídka dávala navíc
+    // SCORE zazděného nosiče, který se rozbalil do prázdna, a test hlídal, že ho záchrana K6
+    // „nezachrání“ vymyšlenou akcí. Nabídka ho už nedává ⇒ zbývá jen END_TURN — přesná podmínka,
+    // za které END_TURN zůstává správná odpověď. Pozitivní kontrola tého fixtury s volným hráčem
+    // je K6EmptyExpansionDoesNotForfeitTheRestOfTheTurn (tam nabídka něco má).
     std::vector<Macro> offered;
     getAvailableMacros(state, offered, cfg.dauntlessInOffer);
-    ASSERT_GE(offered.size(), 2u) << "fixture je vadný: není z čeho vybírat";
-    for (auto& m : offered) {
-        if (m.type == MacroType::END_TURN) continue;
-        ASSERT_EQ(k6ExpandCount(state, m), 0u)
-            << "fixture je vadný: makro typu " << static_cast<int>(m.type)
-            << " akce DAVA, tohle uz neni stav, kde nejde nic";
-    }
+    for (auto& m : offered)
+        ASSERT_EQ(m.type, MacroType::END_TURN) << "fixture je vadný: nabídnuto makro typu " << static_cast<int>(m.type);
     ASSERT_FALSE(k6PlayerHasLegalMove(state, 1));
 
     long drain[kMacroNoopSlots]; takeMacroNoopStats(drain);
@@ -1258,9 +1256,8 @@ TEST(MacroMCTSPolicy, K6StillEndsTheTurnWhenNothingCanBeDone) {
         << "když opravdu nic nejde, kolo se ukončit MÁ -- jinak je to přeoprava";
 
     long k6[kMacroNoopSlots]; takeMacroNoopStats(k6);
-    EXPECT_EQ(k6[1], 1) << "měřidlo: zahrané makro se rozbalilo do prázdna";
-    EXPECT_EQ(k6[2], 0) << "měřidlo: zachránit nebylo čím";
-    EXPECT_EQ(k6[3], 1) << "měřidlo: a kolo tedy skončilo právem";
+    EXPECT_EQ(k6[1], 0) << "měřidlo: nic prázdného se nezahrálo";
+    EXPECT_EQ(k6[2], 0) << "měřidlo: zachraňovat nebylo co";
 }
 
 // ---------------------------------------------------------------------------

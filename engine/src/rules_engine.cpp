@@ -97,14 +97,13 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // ⚠️ Tahle straz musi byt VYSLOVNA: `p.hasMoved` je v okamziku
         // deklarace jeste false, takze zavor nize by blok lezicimu nezabranil.
         for (auto& pos : adj) {
-            if (prone) break;
+            if (!mayBlockNow(p)) break;
             // ⚠️ VÝJIMKA PRO BLITZ (oprava 21.08.): pohyb + blok JE blitz.
             // `expandBlitzAndScore` provede BLITZ akci, pak si dojde k cíli
             // vlastními kroky MOVE a teprve pak hledá BLOCK -- holé
             // `if (p.hasMoved) break` mu ten blok sebralo a blitz se
             // spotřeboval bez rány. `usedBlitz` se nastavuje na začátku
             // BLITZ akce, takže rozlišuje "deklaroval blitz" od "jen se hnul".
-            if (p.hasMoved && !p.usedBlitz) break;
             if (!pos.isOnPitch()) continue;
             const Player* enemy = state.getPlayerAtPosition(pos);
             if (enemy && enemy->teamSide == enemySide && canAct(enemy->state)) {

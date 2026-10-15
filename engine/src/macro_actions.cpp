@@ -1154,7 +1154,7 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // ⛔ Cestu čte `blitzApproachHitsDodgeCap` přehráním smyčky hry. `estimateApproachFailChance`
 //   výš oceňuje starou hladovou cestu `pickApproachStep` — první verze stropu se o ni opřela
 //   a Runner 5 v tahu 5 partie 02.10. dál blitzoval přes úhyby 5+, 4+, 4+ (kniha P155).
-// ⚠️ Hlídá se při VÝBĚRU blitzujícího (expandBlitz), ne v nabídce (kniha P156).
+// Hlídá se při výběru blitzujícího (pickBlitzer) — v rozbalení i v nabídce (P196, 15.10.2026).
 static bool blitzDodgeCapped(const GameState& state, const Player& blitzer, const Player& target) {
     const bool aboutTheBall = state.ball.isHeld && state.ball.carrierId == target.id;
     const int cap = dodgeCapFor(state, blitzer, aboutTheBall);
@@ -1268,6 +1268,9 @@ static AdvanceTargetPlan computeAdvanceTarget(const GameState& state,
 static bool carrierCanAdvance(const GameState& state, const Player& carrier);
 
 // --- Macro Generation ---
+
+static bool pickBlitzer(const GameState& state, const Macro& macro, const std::vector<Action>& actions,
+                        Action& out, bool count);
 
 static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                             bool dauntlessInOffer) {
@@ -2075,10 +2078,19 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                   });
 
         // On defense: top 2 targets for MCTS choice; on offense: top 1
-        int maxBlitz = (onDef && candidates.size() > 1) ? 2 : 1;
-        maxBlitz = std::min(maxBlitz, static_cast<int>(candidates.size()));
-        for (int i = 0; i < maxBlitz; ++i) {
-            out.push_back({MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}});
+        // P196 (15.10.2026): jen cíle, na které někdo opravdu smí (pickBlitzer, týž výběr jako
+        // rozbalení) — v pořadí skóre se bere první proveditelný, ne první vůbec (jinak tým o blitz
+        // přijde, i když na jiný cíl dosáhne; P157 c).
+        const size_t maxBlitz = onDef ? 2 : 1;
+        std::vector<Action> actions;
+        getAvailableActions(state, actions);
+        size_t offered = 0;
+        for (size_t i = 0; i < candidates.size() && offered < maxBlitz; ++i) {
+            const Macro m{MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}};
+            Action ignored;
+            if (!pickBlitzer(state, m, actions, ignored, /*count=*/false)) continue;
+            out.push_back(m);
+            ++offered;
         }
     }
 
@@ -2146,6 +2158,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
     // BLOCK: favorable block (2+ dice, attacker chooses)
     state.forEachOnPitch(mySide, [&](const Player& att) {
         if (!att.canAct() || att.hasActed) return;
+        if (!mayBlockNow(att)) return;   // P196: táž podmínka jako primitivní BLOCK (rules_engine.h)
         if (att.hasSkill(SkillName::BallAndChain)) return;
 
         auto adj = att.position.getAdjacent();
@@ -2768,8 +2781,13 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
 //   padnout on (míč je venku a je to turnover), při faulu hrozí vyloučení. Blitz nosiče hlídá
 //   výběr blitzujícího (expandBlitz); skórující BLITZ_AND_SCORE zůstává — je to cesta k TD.
 //   Jedno místo, kudy prochází celá nabídka (hledání, řadič klece i záchrana K6).
-void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
-                        bool dauntlessInOffer) {
+static bool repositionCanStart(const GameState& state, const Macro& macro);
+static bool pickupCanStart(const GameState& state, const Macro& macro);
+static bool scoreCanStart(const GameState& state, const Macro& macro);
+static bool advanceCanStart(const GameState& state, const Macro& macro);
+
+static void offerBeforeFeasibility(const GameState& state, std::vector<Macro>& out,
+                                   bool dauntlessInOffer) {
     buildMacroOffer(state, out, dauntlessInOffer);
     // ⭐ P162 (uživatel 07.10.2026: „faulovat se smí až na konci tahu — je obecné pravidlo, které
     //   můžeš přidat hned“). Vyloučení za faul je turnover; dokud má hrát ještě někdo jiný,
@@ -2790,6 +2808,26 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
     if (state.getPlayer(carrierId).teamSide != state.activeTeam) return;
     out.erase(std::remove_if(out.begin(), out.end(), [&](const Macro& m) {
                   return (m.type == MacroType::BLOCK || m.type == MacroType::FOUL) && m.playerId == carrierId;
+              }),
+              out.end());
+}
+
+// ⭐ P196 (15.10.2026): NABÍDKA = JEN PROVEDITELNÉ. Makro, jehož rozbalení nedá ani jednu akci,
+//   hledání ocení, jako by se stalo; když na něj padne volba, tah skončí („no_actions“, 7,6 % tahů,
+//   evidence/p196_20261015). BLITZ se ptá téhož výběru blitzujícího (pickBlitzer), REPOSITION, PICKUP,
+//   SCORE a ADVANCE téže chůze (nextWalkStep) k témuž cíli, kam pak rozbalení jde; BLOCK `mayBlockNow`
+//   (rules_engine.h).
+//   Test MacroActions.EveryOfferedMacroExpandsToAnAction.
+void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
+                        bool dauntlessInOffer) {
+    offerBeforeFeasibility(state, out, dauntlessInOffer);
+    // BLITZ hlídá už generátor (bere první proveditelný cíl v pořadí, ne první vůbec).
+    out.erase(std::remove_if(out.begin(), out.end(), [&](const Macro& m) {
+                  if (m.type == MacroType::SCORE) return !scoreCanStart(state, m);
+                  if (m.type == MacroType::ADVANCE) return !advanceCanStart(state, m);
+                  if (m.type == MacroType::REPOSITION) return !repositionCanStart(state, m);
+                  if (m.type == MacroType::PICKUP) return !pickupCanStart(state, m);
+                  return false;
               }),
               out.end());
 }
@@ -2919,6 +2957,63 @@ void takeMoveWalkProfile(long* out4) {
     g_mwArrived=g_mwLoopSteps=g_mwLoopStep0=g_mwLoopDist=0;
 }
 
+// P149: krok, který by znamenal úhyb na `dodgeCap`+ a horší, se neudělá. Brána je pole, které se
+// OPOUŠTÍ (jako v move_handler a pathFailProb).
+static bool walkStepHitsDodgeCap(const GameState& state, const Player& p, Position dest, int dodgeCap) {
+    return dodgeCap > 0 && dest != p.position && countTacklezones(state, p.position, p.teamSide) > 0 &&
+           calculateDodgeTarget(state, p, dest, p.position) >= dodgeCap;
+}
+
+// Jeden krok makrové chůze (bez LEAP ramene), bez kostek: co by chůze teď udělala.
+// P196 (15.10.2026): JEDINÉ místo pro chůzi (`movePlayerToward`) i pro nabídku (`walkCanStart`) —
+// nabídka dávala REPOSITION / PICKUP, jejichž první krok chůze odmítla (strop úhybu P149, žádná
+// cesta, cíl = vlastní pole stojícího), a rozbalení vrátilo prázdný plán. `count` = tikat čítače chůze
+// (jen skutečná chůze, ne dotaz nabídky).
+enum class WalkStep { ARRIVED, STEP, STOP };
+static WalkStep nextWalkStep(const GameState& state, const Player& p, Position target, int budget,
+                             Position avoid, int dodgeCap, Action& out, bool count) {
+    if (!p.isOnPitch() || p.lostTacklezones) return WalkStep::STOP;
+    // A PRONE player standing on the target square has NOT arrived -- he
+    // still has to get up. Before 2026-08-21 this returned "arrived", so a
+    // REPOSITION onto one's own square was a silent no-op and the macro
+    // layer had no way to stand anybody up at all.
+    if (p.position == target && p.state != PlayerState::PRONE) {
+        if (count) ++g_mwArrived;
+        return WalkStep::ARRIVED;
+    }
+    if (target == p.position) {
+        // Vstavani NA MISTE (PRONE, viz vyse): neni kam jit, jen se postavit. `nextStepToward`
+        // cestu nehleda (uz na cili), takze se MOVE na vlastni pole sestavi rovnou -- presne akce,
+        // kterou by z `getAvailableActions` vybral i puvodni hladovy vyber (vzdalenost 0 vyhrava).
+        if (budget <= 0) return WalkStep::STOP;
+        out = Action{ActionType::MOVE, p.id, -1, target};
+    } else {
+        Position next;
+        if (!nextStepToward(state, p, target, budget, avoid, next)) {
+            if (count) ++g_mwNoStep;
+            return WalkStep::STOP;
+        }
+        out = Action{ActionType::MOVE, p.id, -1, next};
+    }
+    if (walkStepHitsDodgeCap(state, p, out.target, dodgeCap)) {
+        if (count) ++g_dodgeCapStops[0];
+        return WalkStep::STOP;
+    }
+    return WalkStep::STEP;
+}
+
+// Udělá chůze aspoň jeden krok? (dotaz nabídky; LEAP rameno = nevíme, nabídka zůstává)
+static bool walkCanStart(const GameState& state, const Player& p, Position target, int maxSteps,
+                         Position avoid, int dodgeCap) {
+    if (leapWalkArm(p.teamSide)) return true;
+    // Rozbalení napřed vrátí zóny hráči, kterému chybí z minula (greedyExpandMacro, P79/P93) —
+    // dotaz musí počítat s týmž hráčem.
+    Player mover = p;
+    mover.regainTacklezonesAtActionStart();
+    Action ignored;
+    return nextWalkStep(state, mover, target, maxSteps, avoid, dodgeCap, ignored, /*count=*/false) == WalkStep::STEP;
+}
+
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
                               int maxSteps = 12, Position avoid = {-1, -1},
@@ -2926,12 +3021,6 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
     Position lastPos{-1, -1};  // Detect loops -- jen LEAP vetev nize, BFS nebloudi z konstrukce
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
-        if (!p.isOnPitch() || p.lostTacklezones) return false;
-        // A PRONE player standing on the target square has NOT arrived -- he
-        // still has to get up. Before 2026-08-21 this returned "arrived", so a
-        // REPOSITION onto one's own square was a silent no-op and the macro
-        // layer had no way to stand anybody up at all.
-        if (p.position == target && p.state != PlayerState::PRONE) { ++g_mwArrived; return true; }
 
         // ⭐⭐⭐ 09.09.2026 (W-GFI nalez): BFS (`nextStepToward`, M14b
         //   zobecnene pro obecny pohyb) MISTO hladoveho findMoveToward/
@@ -2947,20 +3036,12 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         //   bylo predcasne.
         Action bestMove;
         if (!leapWalkArm(p.teamSide)) {
-            if (target == p.position) {
-                // Vstavani NA MISTE (PRONE, viz komentar vyse): neni kam jit,
-                // jen se postavit. `nextStepToward` cestu nehleda (uz na cili),
-                // takze se MOVE na vlastni pole sestavi rovnou -- presne akce,
-                // kterou by z `getAvailableActions` vybral i puvodni hladovy
-                // vyber (vzdalenost 0 vyhrava skore vzdycky).
-                bestMove = Action{ActionType::MOVE, playerId, -1, target};
-            } else {
-                Position bestNext;
-                const int budget = maxSteps - step;
-                if (!nextStepToward(state, p, target, budget, avoid, bestNext)) { ++g_mwNoStep; return false; }
-                bestMove = Action{ActionType::MOVE, playerId, -1, bestNext};
-            }
+            const WalkStep w = nextWalkStep(state, p, target, maxSteps - step, avoid, dodgeCap, bestMove, true);
+            if (w == WalkStep::ARRIVED) return true;
+            if (w == WalkStep::STOP) return false;
         } else {
+            if (!p.isOnPitch() || p.lostTacklezones) return false;
+            if (p.position == target && p.state != PlayerState::PRONE) { ++g_mwArrived; return true; }
             std::vector<Action> actions;
             getAvailableActions(state, actions);
             if (!findMoveToward(actions, playerId, target, bestMove, &state, avoid)) { ++g_mwNoStep; return false; }
@@ -2979,15 +3060,7 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
             } // loop
 
             lastPos = p.position;
-        }
-
-        // P149: krok, který by znamenal úhyb na `dodgeCap`+ a horší, se neudělá — hráč zůstane,
-        // kam bezpečně došel. Brána je pole, které se OPOUŠTÍ (jako v move_handler a pathFailProb).
-        if (dodgeCap > 0 && bestMove.target != p.position &&
-            countTacklezones(state, p.position, p.teamSide) > 0 &&
-            calculateDodgeTarget(state, p, bestMove.target, p.position) >= dodgeCap) {
-            ++g_dodgeCapStops[0];
-            return false;
+            if (walkStepHitsDodgeCap(state, p, bestMove.target, dodgeCap)) { ++g_dodgeCapStops[0]; return false; }
         }
 
         Position before = p.position;
@@ -3030,27 +3103,10 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
     return false;
 }
 
-static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
-                                         DiceRollerBase& dice) {
-    MacroExpansionResult result;
+// Kam jde nosič při SCORE: pole koncové zóny s nejméně zónami na přímé cestě (nebo `macro.targetPos`).
+// P196 (15.10.2026): jediné místo pro rozbalení i pro nabídku (`scoreCanStart`).
+static Position scoreTarget(const GameState& state, const Macro& macro) {
     const Player& carrier = state.getPlayer(macro.playerId);
-
-    // Guard against a stale SCORE macro replayed against a carrier who is no
-    // longer on pitch. replayToNode replays a macro path open-loop (fresh
-    // dice each MCTS iteration), so the player cached in macro.playerId can
-    // have been KO'd/crowd-surfed off pitch by an earlier macro *in this
-    // same replay* even though the macro itself was only ever generated for
-    // an on-pitch carrier. Without this check carrier.position is the
-    // {-1,-1} off-pitch sentinel, and the TZ-probe walk below assumes
-    // position.x is between the carrier and their own endzone -- for an
-    // AWAY carrier (dx=-1, targetX=0) starting at x=-1, cx walks away from
-    // 0 and only terminates after a signed-integer-overflow wraparound
-    // (confirmed via gdb on a live hang: cx observed at 224583956 mid-spin,
-    // i.e. ~4 billion iterations in, ~100-200s of wall time and technically
-    // undefined behavior). Mirrors the same guard expandBlitzAndScore
-    // already has before its own movePlayerToward call (:934).
-    if (!carrier.isOnPitch()) return result;
-
     int targetX = endzoneX(carrier.teamSide);
     int dx = forwardDx(carrier.teamSide);
 
@@ -3095,6 +3151,43 @@ static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
     // řádky ±2 a neptá se, je-li pole volné.
     if (macro.targetPos.isOnPitch() && macro.targetPos.x == targetX) target = macro.targetPos;
 
+    return target;
+}
+
+static bool scoreCanStart(const GameState& state, const Macro& macro) {
+    const Player& carrier = state.getPlayer(macro.playerId);
+    return carrier.isOnPitch() &&
+           walkCanStart(state, carrier, scoreTarget(state, macro), 14, Position{-1, -1}, 0);
+}
+
+static bool advanceCanStart(const GameState& state, const Macro& macro) {
+    const Player& carrier = state.getPlayer(macro.playerId);
+    const AdvanceTargetPlan plan = computeAdvanceTarget(state, carrier);   // čistá funkce, bez čítačů
+    return plan.steps > 0 && walkCanStart(state, carrier, plan.target, plan.steps + 2, Position{-1, -1}, 0);
+}
+
+static MacroExpansionResult expandScore(GameState& state, const Macro& macro,
+                                         DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    const Player& carrier = state.getPlayer(macro.playerId);
+
+    // Guard against a stale SCORE macro replayed against a carrier who is no
+    // longer on pitch. replayToNode replays a macro path open-loop (fresh
+    // dice each MCTS iteration), so the player cached in macro.playerId can
+    // have been KO'd/crowd-surfed off pitch by an earlier macro *in this
+    // same replay* even though the macro itself was only ever generated for
+    // an on-pitch carrier. Without this check carrier.position is the
+    // {-1,-1} off-pitch sentinel, and the TZ-probe walk below assumes
+    // position.x is between the carrier and their own endzone -- for an
+    // AWAY carrier (dx=-1, targetX=0) starting at x=-1, cx walks away from
+    // 0 and only terminates after a signed-integer-overflow wraparound
+    // (confirmed via gdb on a live hang: cx observed at 224583956 mid-spin,
+    // i.e. ~4 billion iterations in, ~100-200s of wall time and technically
+    // undefined behavior). Mirrors the same guard expandBlitzAndScore
+    // already has before its own movePlayerToward call (:934).
+    if (!carrier.isOnPitch()) return result;
+
+    const Position target = scoreTarget(state, macro);
     movePlayerToward(state, macro.playerId, target, dice, result, 14);
     return result;
 }
@@ -3493,17 +3586,14 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     return result;
 }
 
-static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
-                                         DiceRollerBase& dice) {
-    MacroExpansionResult result;
-
+// Kdo provede makro BLITZ: nejbezpečnější blitzující na cíl (kostky + doběh), který projde stropem
+// na úhyb. P196 (15.10.2026): jediné místo pro rozbalení i pro nabídku — nabídka dávala cíl, na který
+// nikdo nesměl (nedosáhne, nosič, roh klece, strop úhybu), a rozbalení vrátilo prázdný plán.
+// `actions` = getAvailableActions(state); `count` = tikat čítač stropu (jen skutečné rozbalení).
+static bool pickBlitzer(const GameState& state, const Macro& macro, const std::vector<Action>& actions,
+                        Action& out, bool count) {
     const Player& target = state.getPlayer(macro.targetId);
 
-    // Nejbezpečnější blitzující na tento cíl (kostky + doběh), který projde stropem na úhyb.
-    std::vector<Action> actions;
-    getAvailableActions(state, actions);
-
-    Action bestBlitzAction{};
     bool found = false;
     // P35: with the arm on, the same ranking is also run the old way, purely so
     // the counter can say whether the arm changed anything. Zero repicks over a
@@ -3549,14 +3639,23 @@ static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
             // Blitz nosiče se skórováním je samostatné makro BLITZ_AND_SCORE, to se netýká.
             if (state.ball.isHeld && state.ball.carrierId == a.playerId) continue;
             if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
-            if (blitzDodgeCapped(state, cand, target)) { ++g_dodgeCapStops[1]; continue; }
-            bestBlitzAction = a;
+            if (blitzDodgeCapped(state, cand, target)) { if (count) ++g_dodgeCapStops[1]; continue; }
+            out = a;
             found = true;
             break;
         }
     }
 
-    if (!found) return result;
+    return found;
+}
+
+static MacroExpansionResult expandBlitz(GameState& state, const Macro& macro,
+                                         DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    Action bestBlitzAction{};
+    if (!pickBlitzer(state, macro, actions, bestBlitzAction, /*count=*/true)) return result;
 
     executeAndRecord(state, bestBlitzAction, dice, result);
     return result;
@@ -3666,6 +3765,22 @@ static MacroExpansionResult expandBlock(GameState& state, const Macro& macro,
     return result;
 }
 
+// Chůze k míči: rozpočet = pohyb + GFI (výběr zvedajícího je připouští), strop úhybu.
+// P149 (uživatel 06.10.: „úhyby při zvedání míče mají mít také strop“): cesta k míči i běh
+// po zvednutí nevedou přes úhyb na 4+ a horší. Jde o míč ⇒ v posledním kole poločasu strop
+// neplatí; poslední aktivace tahu také ne (dodgeCapFor). Hod na zvednutí strop neřeší (P154/K4).
+// P196: jediné místo pro rozbalení i pro nabídku.
+struct PickupWalk { int maxSteps; int dodgeCap; };
+static PickupWalk pickupWalk(const GameState& state, const Player& picker) {
+    return {picker.movementRemaining + maxGfiSquares(picker), dodgeCapFor(state, picker, /*aboutTheBall=*/true)};
+}
+
+static bool pickupCanStart(const GameState& state, const Macro& macro) {
+    const Player& picker = state.getPlayer(macro.playerId);
+    const PickupWalk w = pickupWalk(state, picker);
+    return walkCanStart(state, picker, macro.targetPos, w.maxSteps, Position{-1, -1}, w.dodgeCap);
+}
+
 static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
                                           DiceRollerBase& dice) {
     MacroExpansionResult result;
@@ -3675,13 +3790,9 @@ static MacroExpansionResult expandPickup(GameState& state, const Macro& macro,
     // 9-11 (e.g. MA9 Skaven Gutter Runners) walks the previously-hardcoded
     // 8 steps, stops short, and wastes the whole activation with the ball
     // still loose (project_bloodbowl_audit_findings_20260703 finding 6).
-    const Player& picker = state.getPlayer(macro.playerId);
-    int maxSteps = picker.movementRemaining + maxGfiSquares(picker);
-    // P149 (uživatel 06.10.: „úhyby při zvedání míče mají mít také strop“): cesta k míči i běh
-    // po zvednutí nevedou přes úhyb na 4+ a horší. Jde o míč ⇒ v posledním kole poločasu strop
-    // neplatí; poslední aktivace tahu také ne (dodgeCapFor). Hod na zvednutí strop neřeší (P154/K4).
-    const int pickupDodgeCap = dodgeCapFor(state, picker, /*aboutTheBall=*/true);
-    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, maxSteps,
+    const PickupWalk walk = pickupWalk(state, state.getPlayer(macro.playerId));
+    const int pickupDodgeCap = walk.dodgeCap;
+    movePlayerToward(state, macro.playerId, macro.targetPos, dice, result, walk.maxSteps,
                      Position{-1, -1}, pickupDodgeCap);
     if (result.turnover) return result;
 
@@ -3803,9 +3914,11 @@ static int teammatesStillToAct(const GameState& state, int excludePlayerId,
     return remaining;
 }
 
-static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
-                                              DiceRollerBase& dice) {
-    MacroExpansionResult result;
+// Parametry chůze REPOSITION: rozpočet kroků, pole, kam nevstoupit, strop úhybu. P196 (15.10.2026):
+// jediné místo pro rozbalení i pro nabídku (`repositionCanStart`). `count` = tikat čítače W-GFI
+// (jen skutečné rozbalení).
+struct RepositionWalk { int maxSteps; Position avoid; int dodgeCap; int localGfiAllowance; };
+static RepositionWalk repositionWalk(const GameState& st, const Macro& macro, bool count) {
     // Candidate generation (getAvailableMacros) hands out REPOSITION targets
     // with no reach check at all (safety/screen spots are routinely 5-10+
     // squares away), but the walk here was hardcoded to maxSteps=4 -- any
@@ -3825,7 +3938,7 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     // protoze skutecna cesta (pathStepsToward) musi vedet o stejnem
     // vyhybani jako pozdejsi chuze -- jinak by se meril jiny problem, nez
     // jaky pak resi `nextStepToward`.
-    Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
+    Position avoid = st.ball.isHeld ? Position{-1, -1} : st.ball.position;
     // ⭐⭐⭐ W-GFI rameno (04.09.2026, default OFF, setRepositionGfiArm):
     //   misto pausalniho zakazu se rozhoduje POCITANOU cenou -- tyz tvar
     //   jako Q3-N. `gap` = kolik GFI poli by zavrelo mezeru mezi hracem a
@@ -3842,7 +3955,7 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     //   staci se ji zeptat MISTO distanceTo.
     int localGfiAllowance = 0;
     {
-        const Player& mover = state.getPlayer(macro.playerId);
+        const Player& mover = st.getPlayer(macro.playerId);
         // ⛔⛔⛔ 09.09.2026 (nalezeno pri kontrole dopadu nasazeni): `macro.
         //   gfiAllowance` NESTACI k rozliseni -- cage-advance nastavuje
         //   gfiAllowance JEN na tom jednom rohu, ktery GFI dostane; ostatni
@@ -3860,7 +3973,7 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
             // vsechny 2 pole". Presahuje-li hrac Sprintem 2 (smi 3), gap se
             // stejne klampuje na 2 nize -- teto meritce na tom nezalezi.
             const int probeBudget = static_cast<int>(mover.movementRemaining) + 2;
-            const int need = pathStepsToward(state, mover, macro.targetPos,
+            const int need = pathStepsToward(st, mover, macro.targetPos,
                                              probeBudget, avoid);
             // need < 0: cil neni dosazitelny ani s max GFI -- GFI by tu byl
             // cisty risk bez zisku (dice se hodi, i kdyz cesta nikam nevede),
@@ -3868,7 +3981,7 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
             const int gap = (need < 0) ? 0
                 : std::clamp(need - static_cast<int>(mover.movementRemaining), 0, 2);
             if (gap > 0) {
-                ++g_repositionGfiOpportunity;
+                if (count) ++g_repositionGfiOpportunity;
                 // ⛔⛔⛔ 09.09.2026 (uzivatel: "riskantni dodge se ma taky
                 //   vyhodnotit a kdyztak neprovest"): PUVODNE tu stalo
                 //   `gfiSequenceFailProb(gap, ...)` -- cenilo JEN GFI. Zmereno
@@ -3879,28 +3992,46 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
                 //   (dodge + GFI dohromady), stejnym rozpoctem jako `need`
                 //   vyse -- takze pFail*zbyvajici < 1 ted skutecne odpovida
                 //   celkove cene, ne jen jejimu GFI kouskem.
-                const double pFail = pathFailProb(state, mover, macro.targetPos,
+                const double pFail = pathFailProb(st, mover, macro.targetPos,
                                                   probeBudget, avoid);
-                const int remaining = teammatesStillToAct(state, mover.id, mover.teamSide);
+                const int remaining = teammatesStillToAct(st, mover.id, mover.teamSide);
                 if (pFail >= 0.0 && pFail * remaining < 1.0) {
                     localGfiAllowance = gap;
-                    ++g_repositionGfiGranted;
+                    if (count) ++g_repositionGfiGranted;
                 } else {
-                    ++g_repositionGfiTooRisky;
+                    if (count) ++g_repositionGfiTooRisky;
                 }
             }
         }
     }
-    int maxSteps = state.getPlayer(macro.playerId).movementRemaining
+    int maxSteps = st.getPlayer(macro.playerId).movementRemaining
                    + std::clamp(std::max(macro.gfiAllowance, localGfiAllowance), 0, 2);
     // Pojistka (21.08.): vstávací makro má cíl == vlastní pole hráče. Kdyby na
     // něm ležel volný míč, `avoid` by tu JEDINOU akci vetoval, expanze by
     // vrátila prázdno a MacroMCTSPolicy z toho udělá END_TURN -- tedy zahodí
     // zbytek kola CELÉHO týmu. Vstáváním se na pole nevstupuje, jen se na něm
     // hráč zvedá, takže tu žádný pickup hrozit nemůže.
-    if (macro.targetPos == state.getPlayer(macro.playerId).position) {
+    if (macro.targetPos == st.getPlayer(macro.playerId).position) {
         avoid = Position{-1, -1};
     }
+    // P149: přesun nikdy přes úhyb na 4+ a horší (výjimky v dodgeCapFor). „Jde o míč“ =
+    // přesouvá se sám nosič, nebo cíl sousedí s míčem / jeho nosičem.
+    const bool aboutTheBall = st.ball.isOnPitch() &&
+        ((st.ball.isHeld && st.ball.carrierId == macro.playerId) ||
+         macro.targetPos.distanceTo(st.ball.position) <= 1);
+    return {maxSteps, avoid, dodgeCapFor(st, st.getPlayer(macro.playerId), aboutTheBall), localGfiAllowance};
+}
+
+static bool repositionCanStart(const GameState& state, const Macro& macro) {
+    const RepositionWalk w = repositionWalk(state, macro, /*count=*/false);
+    return walkCanStart(state, state.getPlayer(macro.playerId), macro.targetPos, w.maxSteps, w.avoid, w.dodgeCap);
+}
+
+static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
+                                              DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    const RepositionWalk walk = repositionWalk(state, macro, /*count=*/true);
+    const int localGfiAllowance = walk.localGfiAllowance;
     // ⭐⭐ Q3 MERIDLO (03.09.): rozliseni se dela PRED chuzi -- potom uz hrac
     //   lezici neni. „Vstat a zustat" ma cil == vlastni pole (viz vyse),
     //   „vstat a odejit" cokoli jineho.
@@ -3939,14 +4070,8 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
         addBackMoveTurnoverCause(gfiTOBefore);
     }
 
-    // P149: přesun nikdy přes úhyb na 4+ a horší (výjimky v dodgeCapFor). „Jde o míč“ =
-    // přesouvá se sám nosič, nebo cíl sousedí s míčem / jeho nosičem.
-    const bool aboutTheBall = state.ball.isOnPitch() &&
-        ((state.ball.isHeld && state.ball.carrierId == macro.playerId) ||
-         macro.targetPos.distanceTo(state.ball.position) <= 1);
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
-                     maxSteps, avoid,
-                     dodgeCapFor(state, state.getPlayer(macro.playerId), aboutTheBall));
+                     walk.maxSteps, walk.avoid, walk.dodgeCap);
 
     // 09.09.2026: mechanismova metrika W-GFI -- jen z pripadu, kdy arm GFI
     // skutecne POVOLIL (ne kdy jen mel prilezitost), zjisti se, jestli krok
