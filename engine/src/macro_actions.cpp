@@ -2840,6 +2840,19 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                   return false;
               }),
               out.end());
+    // P156 (15.10.2026): k přesunu hráče s Wild Animal i varianta s ohlášeným blitzem (2+ místo 4+,
+    // stojí týmový blitz) — kterou zahrát, rozhodne hledání. Jen kde rozbalení ohlášení provede: táž
+    // primitivní nabídka (BLITZ bez cíle, rules_engine.cpp).
+    const size_t n = out.size();
+    for (size_t i = 0; i < n; ++i) {
+        const Macro& m = out[i];
+        if (m.type != MacroType::REPOSITION || m.declareBlitz) continue;
+        if (!state.getPlayer(m.playerId).hasSkill(SkillName::WildAnimal)) continue;
+        if (!hasPrimitive(ActionType::BLITZ, m.playerId, -1)) continue;
+        Macro v = m;
+        v.declareBlitz = true;
+        out.push_back(v);
+    }
 }
 
 // --- Macro Expansion ---
@@ -4043,6 +4056,12 @@ static bool repositionCanStart(const GameState& state, const Macro& macro) {
 static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
                                               DiceRollerBase& dice) {
     MacroExpansionResult result;
+    if (macro.declareBlitz) {
+        // P156: napřed ohlásit blitz bez cíle (Wild Animal s +2). Neprošel-li hod, akce propadla.
+        const Action declare{ActionType::BLITZ, macro.playerId, -1, state.getPlayer(macro.playerId).position};
+        if (executeAndRecord(state, declare, dice, result)) return result;
+        if (state.getPlayer(macro.playerId).hasActed) return result;
+    }
     const RepositionWalk walk = repositionWalk(state, macro, /*count=*/true);
     const int localGfiAllowance = walk.localGfiAllowance;
     // ⭐⭐ Q3 MERIDLO (03.09.): rozliseni se dela PRED chuzi -- potom uz hrac

@@ -107,7 +107,7 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
 
     // Priority 4: Blitz actions
     for (auto& a : actions) {
-        if (a.type == ActionType::BLITZ) return a;
+        if (a.type == ActionType::BLITZ && a.targetId > 0) return a;   // P156: ohlášení bez cíle ne
     }
 
     // Priority 5: Move actions (non-carrier)

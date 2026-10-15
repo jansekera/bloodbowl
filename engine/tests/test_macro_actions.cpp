@@ -4557,3 +4557,80 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
     }
     EXPECT_EQ(total, 0) << "nabídnuto, ale rozbalení dalo prázdný plán (z " << offered << "): " << report;
 }
+
+// ⭐ P156 (15.10.2026), uživatel 06.10.: „Blitz se nabízí i na cíl, kam nikdo nedosáhne — tohle jsem
+//   už několikrát komentoval, že pomůže Rat Ogrovi se pohnout na 2+ za cenu blitzu.“ Wild Animal
+//   (ř. 8666-8669): hod hned po OHLÁŠENÍ akce, +2 u Block / Blitz; na 1-3 se nehne. Blitz je pohyb, ve
+//   kterém SMÍ padnout jeden blok (ř. 347-350) — ohlásit ho jde i bez cíle. Engine to neuměl: BLITZ
+//   byl jen „dojdi k cíli a blokuj“, takže Rat Ogre kvůli pohybu blitzovat nemohl vůbec.
+namespace {
+GameState wildAnimalState(bool wildAnimal) {
+    GameState state = makeMinimalState();
+    Player& ogre = state.getPlayer(1);
+    ogre.stats = {6, 5, 1, 9};
+    if (wildAnimal) ogre.skills.add(SkillName::WildAnimal);
+    state.getPlayer(12).position = {22, 2};   // daleko — blitz na něj nedosáhne
+    state.ball = BallState::carried({22, 2}, 12);
+    return state;
+}
+bool offersTargetlessBlitz(const GameState& state, int playerId) {
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    for (const Action& a : actions)
+        if (a.type == ActionType::BLITZ && a.playerId == playerId && a.targetId < 0) return true;
+    return false;
+}
+}  // namespace
+
+TEST(MacroActions, P156WildAnimalMayDeclareABlitzWithoutATarget) {
+    GameState state = wildAnimalState(true);
+    EXPECT_TRUE(offersTargetlessBlitz(state, 1)) << "Rat Ogre má smět ohlásit blitz kvůli pohybu";
+    EXPECT_FALSE(offersTargetlessBlitz(wildAnimalState(false), 1))
+        << "ostatním se nenabízí — blitz bez rány by jim jen spálil týmový blitz";
+    state.homeTeam.blitzUsedThisTurn = true;
+    EXPECT_FALSE(offersTargetlessBlitz(state, 1)) << "blitz je jeden za tah";
+}
+
+TEST(MacroActions, P156TargetlessBlitzRollsWildAnimalAtTwoPlusThenMoves) {
+    {   // přirozená 2 projde (+2 ⇒ 4): ohlášeno, pak smí jít
+        GameState state = wildAnimalState(true);
+        FixedDiceRoller dice({2});
+        executeAction(state, Action{ActionType::BLITZ, 1, -1, state.getPlayer(1).position}, dice, nullptr);
+        EXPECT_TRUE(state.homeTeam.blitzUsedThisTurn);
+        EXPECT_TRUE(state.getPlayer(1).usedBlitz);
+        bool move = false;
+        std::vector<Action> actions;
+        getAvailableActions(state, actions);
+        for (const Action& a : actions) if (a.type == ActionType::MOVE && a.playerId == 1) move = true;
+        EXPECT_TRUE(move) << "po ohlášeném blitzu se Rat Ogre smí hýbat";
+    }
+    {   // přirozená 1 neprojde nikdy: akce propadá, nehne se
+        GameState state = wildAnimalState(true);
+        FixedDiceRoller dice({1});
+        executeAction(state, Action{ActionType::BLITZ, 1, -1, state.getPlayer(1).position}, dice, nullptr);
+        std::vector<Action> actions;
+        getAvailableActions(state, actions);
+        for (const Action& a : actions) EXPECT_FALSE(a.type == ActionType::MOVE && a.playerId == 1);
+    }
+}
+
+TEST(MacroActions, P156WildAnimalRepositionHasABlitzVariant) {
+    GameState state = wildAnimalState(true);
+    state.getPlayer(1).position = {3, 3};   // ať má obrana kam ho poslat
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* plain = nullptr;
+    const Macro* viaBlitz = nullptr;
+    for (const Macro& m : macros) {
+        if (m.type != MacroType::REPOSITION || m.playerId != 1) continue;
+        (m.declareBlitz ? viaBlitz : plain) = &m;
+    }
+    ASSERT_NE(plain, nullptr) << "pozitivní kontrola: obyčejný přesun (4+) zůstává";
+    ASSERT_NE(viaBlitz, nullptr) << "přesun s ohlášeným blitzem (2+) má být v nabídce";
+    GameState trial = state.clone();
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    const auto exp = greedyExpandMacro(trial, *viaBlitz, dice);
+    ASSERT_FALSE(exp.actions.empty());
+    EXPECT_EQ(exp.actions[0].type, ActionType::BLITZ) << "rozbalení napřed ohlásí blitz";
+    EXPECT_NE(trial.getPlayer(1).position, (Position{3, 3})) << "s trojkou (+2 = 5) se má pohnout";
+}

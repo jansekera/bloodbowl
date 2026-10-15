@@ -119,6 +119,13 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // ⭐ Odsud je uzivateluv tah z 27.08. ("zacal bych blitz z (14,2)")
         // vubec zahratelny -- do ted lezici hrac blitz NIKDY nedostal.
         if (!team.blitzUsedThisTurn && !p.usedBlitz) {
+            // P156 (15.10.2026): blitz smí padnout i bez rány (ř. 347-350: „may make one block“).
+            // Nabízí se jen hráči s Wild Animal — tomu ohlášení blitzu dá +2 na hod (ř. 8666-8669);
+            // ostatním by jen spálilo týmový blitz. `targetId = -1`, cíl = vlastní pole (ohlášení).
+            if (p.hasSkill(SkillName::WildAnimal) && !p.hasMoved &&
+                movementAfterStandUp(p) + (p.rooted ? 0 : maxGfiSquares(p)) >= 1) {
+                out.push_back({ActionType::BLITZ, p.id, -1, p.position});
+            }
             state.forEachOnPitch(enemySide, [&](const Player& enemy) {
                 if (!canAct(enemy.state) && !isOnPitch(enemy.state)) return;
                 if (enemy.state != PlayerState::STANDING) return;

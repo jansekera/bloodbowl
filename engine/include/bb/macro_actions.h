@@ -128,6 +128,10 @@ struct Macro {
     // breaks that invariant (found via CageAdvance unit tests failing at
     // W-GFI's unconditional deploy).
     bool cageManaged = false;
+    // P156 (15.10.2026): REPOSITION hráče s Wild Animal, který napřed OHLÁSÍ BLITZ bez cíle — hod na
+    // Wild Animal pak má +2 (2+ místo 4+, ř. 8666-8669) za cenu týmového blitzu. Uživatel 06.10.:
+    // „pomůže Rat Ogrovi se pohnout na 2+ za cenu blitzu“.
+    bool declareBlitz = false;
 };
 
 struct MacroExpansionResult {

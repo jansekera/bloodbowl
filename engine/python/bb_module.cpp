@@ -677,6 +677,7 @@ PYBIND11_MODULE(bb_engine, m) {
             d["target"] = m.targetId;
             d["target_pos"] = py::make_tuple(m.targetPos.x, m.targetPos.y);
             d["gfi_allowance"] = m.gfiAllowance;
+            d["declare_blitz"] = m.declareBlitz;   // P156
             return d;
         };
         int decisionsSeen = 0;

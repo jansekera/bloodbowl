@@ -338,6 +338,14 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
 
         case ActionType::BLITZ: {
             Player& player = state.getPlayer(action.playerId);
+            if (action.targetId < 0) {
+                // P156: ohlášení blitzu bez cíle (Wild Animal už hodil s +2 výš). Pak běžné kroky MOVE
+                // a nejvýš jeden blok (BLOCK po ohlášeném blitzu je blok blitzu, viz case BLOCK).
+                state.getTeamState(player.teamSide).blitzUsedThisTurn = true;
+                player.usedBlitz = true;
+                if (player.state == PlayerState::PRONE) return resolveStandUp(state, action.playerId, dice, events);
+                return ActionResult::ok();
+            }
             Player& target = state.getPlayer(action.targetId);
             // P37b diagnostika: byl blitzujici pri DEKLARACI uz soused?
             // Rozliseni rozhodne, kde vada je: u souseda = vada NABIDKY,
