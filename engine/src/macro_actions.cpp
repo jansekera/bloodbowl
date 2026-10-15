@@ -1055,6 +1055,46 @@ static double worstReplyCost(const GameState& state, const Player& p,
     return worst;
 }
 
+// ⭐ P211 (uživatel 15.10.2026: „s gutter runnery utéct z dosahu, ať se nenechají mlátit — stejné
+//   pravidlo platí i pro elfy s Dodge, obecně agilní“). Změřeno (evidence/p156b_20261015): gutter
+//   runner, který tah začal v kontaktu a tah skončil bez turnoveru, nedostal 233× žádný přesun —
+//   obecná REPOSITION bere jen volné hráče. Agilní (Dodge nebo AG 4+) stojící hráč v kontaktu
+//   dostane přesun na pole bez cizí tacklezony, kam soupeř dosáhne nejslabší ranou
+//   (`worstReplyCost`), ne na kraj hřiště. Jen PŘIDÁVÁ možnost — zůstat a blokovat zůstává.
+//   Riziko cesty jako W-GFI / Q3-N: P(turnover) × zbývající aktivace < 1; úhyb na 4+ dál hlídá
+//   strop chůze (P149). {-1,-1} = není kam, nebo by to nepomohlo.
+static Position agileEscapeSquare(const GameState& state, const Player& p) {
+    if (!p.hasSkill(SkillName::Dodge) && p.stats.agility < 4) return {-1, -1};
+    const int budget = p.movementRemaining;
+    if (budget <= 0) return {-1, -1};
+    const TeamSide mySide = p.teamSide;
+    const double stayCost = worstReplyCost(state, p, p.position, true);
+    struct Cand { double cost; int steps; Position pos; };
+    std::vector<Cand> cands;
+    for (int dx = -budget; dx <= budget; ++dx) {
+        for (int dy = -budget; dy <= budget; ++dy) {
+            const Position c{static_cast<int8_t>(p.position.x + dx), static_cast<int8_t>(p.position.y + dy)};
+            if (!c.isOnPitch() || c.y == 0 || c.y == 14) continue;   // ne na kraj (vytlačení do publika)
+            if (state.getPlayerAtPosition(c) != nullptr) continue;
+            if (countTacklezones(state, c, mySide) > 0) continue;
+            const double cost = worstReplyCost(state, p, c, true);
+            if (cost < stayCost - 1e-9) cands.push_back({cost, p.position.distanceTo(c), c});
+        }
+    }
+    std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) {
+        return std::tie(a.cost, a.steps) < std::tie(b.cost, b.steps);
+    });
+    const Position avoid = state.ball.isHeld ? Position{-1, -1} : state.ball.position;
+    const int remaining = activationsStillAvailable(state, mySide, p.id);
+    int tries = 0;
+    for (const Cand& c : cands) {
+        if (++tries > 8) break;   // cesta (BFS) jen k nejlepším polím — běží v každé simulaci
+        const double pFail = pathFailProb(state, p, c.pos, budget, avoid);
+        if (pFail >= 0.0 && pFail * remaining < 1.0) return c.pos;
+    }
+    return {-1, -1};
+}
+
 static double estimateApproachFailChance(const GameState& state, const Player& mover,
                                           Position target, Position* landingOut = nullptr) {
     if (landingOut) *landingOut = mover.position;
@@ -2484,7 +2524,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 break;
             }
         }
-        if (hasAdjacentEnemy) return;
+        if (hasAdjacentEnemy) {
+            const Position esc = agileEscapeSquare(state, p);   // P211
+            if (esc.x >= 0) out.push_back({MacroType::REPOSITION, p.id, -1, esc});
+            return;
+        }
 
         Position target;
 

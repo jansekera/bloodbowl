@@ -555,6 +555,63 @@ TEST(MacroActions, RepositionNotForEngagedPlayer) {
     EXPECT_FALSE(hasRepoForP1);
 }
 
+// P211 (uživatel 15.10.2026): „s gutter runnery utéct z dosahu, ať se nenechají mlátit — stejné
+// pravidlo platí i pro elfy s Dodge, obecně agilní“. Gutter runner (MA9 AG4 Dodge) v kontaktu
+// s jediným soupeřem (MA6 + 2 GFI = blitz dosáhne na 8 polí) dostane přesun, který ho dostane
+// z tacklezony i z dosahu blitzu, ne na kraj hřiště — a přesun se opravdu odehraje.
+TEST(MacroActions, P211AgilePlayerInContactIsOfferedAnEscapeOutOfReach) {
+    GameState state = makeMinimalState();
+    Player& gr = state.getPlayer(1);
+    gr.stats = {9, 2, 4, 7};
+    gr.movementRemaining = 9;
+    gr.skills.add(SkillName::Dodge);
+    state.getPlayer(12).position = {11, 7};
+    state.ball = BallState::carried({11, 7}, 12);
+
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* esc = nullptr;
+    for (const auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) esc = &m;
+    ASSERT_NE(esc, nullptr) << "agilní hráč v kontaktu má dostat přesun pryč";
+    EXPECT_EQ(countTacklezones(state, esc->targetPos, TeamSide::HOME), 0);
+    EXPECT_GT(esc->targetPos.distanceTo({11, 7}), 8) << "mimo dosah blitzu soupeře";
+    EXPECT_TRUE(esc->targetPos.y > 0 && esc->targetPos.y < 14) << "ne na kraj hřiště";
+
+    GameState s = state.clone();
+    FixedDiceRoller dice(std::vector<int>(40, 6));
+    const MacroExpansionResult r = greedyExpandMacro(s, *esc, dice);
+    ASSERT_FALSE(r.actions.empty());
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(s.getPlayer(1).position, esc->targetPos) << "přesun dojde na nabídnuté pole";
+}
+
+// P211: hráč bez Dodge a s AG 3 (trpaslík, lineman) v kontaktu dál přesun nedostává
+// (RepositionNotForEngagedPlayer výš) — a agilní hráč ho nedostane, když není kam: všechna pole
+// v dosahu jsou v cizí tacklezoně nebo nepomůžou.
+TEST(MacroActions, P211NoEscapeWhenEverySquareIsCovered) {
+    GameState state = makeMinimalState();
+    Player& gr = state.getPlayer(1);
+    gr.stats = {1, 2, 4, 7};   // jediné pole pohybu
+    gr.movementRemaining = 1;
+    gr.skills.add(SkillName::Dodge);
+    // soupeři kolem: každé sousední pole hráče je v cizí tacklezoně
+    const Position ring[] = {{11, 7}, {9, 7}, {10, 9}, {10, 5}};
+    int id = 12;
+    for (const Position& pos : ring) {
+        Player& e = state.getPlayer(id);
+        e.id = id; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = pos; e.stats = {6, 3, 3, 8}; e.movementRemaining = 6;
+        ++id;
+    }
+    state.ball = BallState::carried({11, 7}, 12);
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    for (const auto& m : macros)
+        EXPECT_FALSE(m.type == MacroType::REPOSITION && m.playerId == 1)
+            << "přesun na (" << int(m.targetPos.x) << "," << int(m.targetPos.y) << ") vede do tacklezony";
+}
+
 // Regression for Strategy 0.5 (intercept lane, research_fable_20260709
 // section 3b): on defense the first goal-side defender must be sent into
 // the carrier's ACTUAL Y lane, between the carrier and the defended
