@@ -4311,8 +4311,9 @@ TEST(DodgeCap, LastActivationOfTheTurnMayDodge) {
 
 TEST(DodgeCap, RepositionStopsInTheMiddleOfOneWalk) {
     // Řada soupeřů na x=11 (y = 1, 4, 7, 10, 13) kryje zónami celý pás x = 10..12 přes šířku
-    // hřiště — obejít nejde. AG2 jde z (7,6) na (14,6): do pásu vejde zdarma, další krok by byl
-    // odchod ze zóny do pole v zóně (AG2: 5+ a horší) ⇒ chůze skončí nejdál na x=10.
+    // hřiště — obejít nejde. AG2 jde z (7,6) na (14,6). Dřív do pásu vešel zdarma a strop úhybu ho
+    // zastavil na x=10. P211e (15.10.2026, uživatel: „1 i 2 oprav — pro všechny hráče“): přesun do
+    // cizí tacklezony cestou nevstoupí vůbec ⇒ skončí před pásem, na x=9, se stropem i bez něj.
     auto position = [] {
         GameState state = makeDodgeCapState(2);
         Player& p1 = state.getPlayer(1);
@@ -4339,14 +4340,15 @@ TEST(DodgeCap, RepositionStopsInTheMiddleOfOneWalk) {
         EXPECT_FALSE(result.turnover);
         EXPECT_FALSE(result.actions.empty());                    // část cesty ušel
         EXPECT_GT(state.getPlayer(1).position.x, 7);
-        EXPECT_LE(state.getPlayer(1).position.x, 10);            // za pás zón se nedostal
+        EXPECT_EQ(state.getPlayer(1).position.x, 9);             // před pásem zón (P211e)
     }
-    {   // pozitivní kontrola: bez stropu úhyb hází (projde dál, nebo padne)
+    {   // bez stropu úhybu totéž — do kontaktu nevede strop, ale P211e
         DodgeCapOff off;
         GameState state = position();
         DiceRoller dice(42);
         auto result = greedyExpandMacro(state, across, dice);
-        EXPECT_TRUE(result.turnover || state.getPlayer(1).position.x > 10);
+        EXPECT_FALSE(result.turnover);
+        EXPECT_EQ(state.getPlayer(1).position.x, 9);
     }
 }
 
@@ -4799,4 +4801,80 @@ TEST(MacroActions, P211cStripBallDoesNotCountAgainstSureHands) {
     s.getPlayer(12).skills.add(SkillName::SureHands);
     s.getPlayer(2).skills.add(SkillName::StripBall);
     EXPECT_EQ(p211cBlitzer(s), 3);
+}
+
+// P211e (uživatel 15.10.2026: „1 i 2 oprav — pro všechny hráče“). Dvě pravidla na místě, kudy prochází
+// celá nabídka: (1) v obraně (míč má soupeř) žádný nabídnutý přesun nemíří do cizí tacklezony, leda
+// k jejich nosiči (značení, roh jeho klece); (2) přesun skončí v cizí tacklezoně jen na svém cíli —
+// cestou do kontaktu nevleze.
+TEST(MacroActions, P211eRepositionDoesNotWalkIntoContact) {
+    const char* rosters[][2] = {{"human", "orc"}, {"dwarf", "skaven"}, {"wood-elf", "dwarf"},
+                                {"orc", "human"}, {"skaven", "wood-elf"}, {"wood-elf", "human"}};
+    int defenseOffers = 0, intoContactTargets = 0, walks = 0, stuckInContact = 0;
+    std::string where;
+    for (int seed = 1; seed <= 6; ++seed) {
+        const auto& rs = rosters[seed % 6];
+        GameState state;
+        DiceRoller dice(static_cast<uint32_t>(seed));
+        setupHalf(state, *getDevelopedRoster(rs[0], 1500), *getDevelopedRoster(rs[1], 1500), TeamSide::AWAY, &dice);
+        resolveKickoff(state, dice, nullptr);
+        std::mt19937 pick(static_cast<uint32_t>(seed));
+        for (int step = 0; step < 100 && state.phase == GamePhase::PLAY; ++step) {
+            std::vector<Macro> macros;
+            getAvailableMacros(state, macros);
+            const TeamSide me = state.activeTeam;
+            const Player* oppCarrier = (state.ball.isHeld && state.ball.carrierId > 0 &&
+                                        state.getPlayer(state.ball.carrierId).teamSide != me)
+                                           ? &state.getPlayer(state.ball.carrierId) : nullptr;
+            for (const Macro& m : macros) {
+                if (m.type != MacroType::REPOSITION) continue;
+                const Player& p = state.getPlayer(m.playerId);
+                if (oppCarrier && m.targetPos != p.position) {
+                    ++defenseOffers;
+                    if (countTacklezones(state, m.targetPos, me) > 0 && m.targetPos.distanceTo(oppCarrier->position) != 1) {
+                        ++intoContactTargets;
+                        where += "(" + std::to_string(m.targetPos.x) + "," + std::to_string(m.targetPos.y) + ") ";
+                    }
+                }
+                GameState trial = state.clone();
+                DiceRoller trialDice(static_cast<uint32_t>(seed * 1000 + step));
+                const MacroExpansionResult r = greedyExpandMacro(trial, m, trialDice);
+                if (r.turnover || r.actions.empty()) continue;
+                const Player& q = trial.getPlayer(m.playerId);
+                if (q.position == p.position || q.state != PlayerState::STANDING) continue;
+                ++walks;
+                if (q.position != m.targetPos && countTacklezones(trial, q.position, me) > 0) ++stuckInContact;
+            }
+            std::vector<Action> actions;
+            getAvailableActions(state, actions);
+            if (actions.empty()) break;
+            Action a = actions[pick() % actions.size()];
+            if (a.type == ActionType::END_TURN && pick() % 4 != 0) a = actions[pick() % actions.size()];
+            executeAction(state, a, dice, nullptr);
+        }
+    }
+    ASSERT_GT(defenseOffers, 50) << "pozitivní kontrola: obranné přesuny musí nastat";
+    ASSERT_GT(walks, 100) << "pozitivní kontrola: přesuny se musí odehrát";
+    EXPECT_EQ(intoContactTargets, 0) << "obranný cíl v cizí tacklezoně: " << where;
+    EXPECT_EQ(stuckInContact, 0) << "přesun uvízl cestou v kontaktu (z " << walks << ")";
+}
+
+// P211e (2): zeď soupeřů na x=9 (tacklezony x 8–10, y 3–11), hráč MA6 na (3,7) jde na (12,7) — tento tah
+// nedojde a jakákoli cesta vede přes kontakt. Skončí před zdí, ne v ní.
+TEST(MacroActions, P211eFarRepositionStopsBeforeContact) {
+    GameState s = makeMinimalState();
+    s.getPlayer(1).position = {3, 7};
+    s.getPlayer(12).position = {9, 7};
+    for (int id : {13, 14}) {
+        Player& e = s.getPlayer(id);
+        e.id = id; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = {9, static_cast<int8_t>(id == 13 ? 4 : 10)}; e.stats = {6, 3, 3, 8}; e.movementRemaining = 6;
+    }
+    s.ball = BallState::carried({9, 7}, 12);
+    FixedDiceRoller dice(std::vector<int>(40, 6));
+    const MacroExpansionResult r = greedyExpandMacro(s, Macro{MacroType::REPOSITION, 1, -1, {12, 7}}, dice);
+    ASSERT_FALSE(r.actions.empty());
+    const Player& p = s.getPlayer(1);
+    EXPECT_GT(p.position.x, 3) << "šel dopředu";
+    EXPECT_EQ(countTacklezones(s, p.position, TeamSide::HOME), 0) << "skončil na posledním volném poli";
 }

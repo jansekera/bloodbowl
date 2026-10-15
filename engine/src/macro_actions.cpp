@@ -1118,6 +1118,29 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
     return {-1, -1};
 }
 
+// P211e: nejbližší pole k `around` (do 3 polí), které neleží v cizí tacklezoně, je volné a není na
+// kraji hřiště; při shodě blíž hráči. {-1,-1} = žádné.
+static Position nearestSquareOutOfContact(const GameState& state, Position around, const Player& p) {
+    for (int r = 0; r <= 3; ++r) {
+        Position best{-1, -1};
+        int bestFromPlayer = 999;
+        for (int dx = -r; dx <= r; ++dx) {
+            for (int dy = -r; dy <= r; ++dy) {
+                if (std::max(std::abs(dx), std::abs(dy)) != r) continue;
+                const Position c{static_cast<int8_t>(around.x + dx), static_cast<int8_t>(around.y + dy)};
+                if (!c.isOnPitch() || c.y == 0 || c.y == 14) continue;
+                const Player* occ = state.getPlayerAtPosition(c);
+                if (occ && occ->id != p.id) continue;
+                if (countTacklezones(state, c, p.teamSide) > 0) continue;
+                const int d = p.position.distanceTo(c);
+                if (d < bestFromPlayer) { bestFromPlayer = d; best = c; }
+            }
+        }
+        if (best.x >= 0) return best;
+    }
+    return {-1, -1};
+}
+
 static double estimateApproachFailChance(const GameState& state, const Player& mover,
                                           Position target, Position* landingOut = nullptr) {
     if (landingOut) *landingOut = mover.position;
@@ -2814,6 +2837,17 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                       static_cast<int8_t>(7)}; // center Y
         }
 
+        // ⭐ P211e (uživatel 15.10.2026: „1 i 2 oprav — pro všechny hráče“). Obranné cíle s pevnou
+        //   souřadnicí (průsek 8, bezpečnost 9, hlídka zóny 11, zástěna 12) nehlídaly, jestli pole
+        //   neleží v cizí tacklezoně: 135 přesunů došlo na cíl, který sám stál v kontaktu
+        //   (evidence/p211e_20261015). Cíl se posune na nejbližší pole mimo kontakt; značení nosiče (10)
+        //   a roh jeho klece (7) míří do kontaktu záměrně a zůstávají.
+        if (onDefense && (repBranch == 8 || repBranch == 9 || repBranch == 11 || repBranch == 12) &&
+            countTacklezones(state, target, mySide) > 0) {
+            target = nearestSquareOutOfContact(state, target, p);
+            if (target.x < 0) return;   // kolem cíle samý kontakt ⇒ nabídku vynecháme
+        }
+
         // ⭐⭐ W-CIL MERIDLO (02.09.): u KAZDEHO vydaneho cile zaznamenej, ktera
         //   vetev ho vydala a v jakem stavu to pole je. Bez toho by se opravovalo
         //   poslepu -- nektere vetve mirí na obsazene pole ZAMERNE (`carrier->position`
@@ -3088,8 +3122,12 @@ static bool walkStepHitsDodgeCap(const GameState& state, const Player& p, Positi
 // cesta, cíl = vlastní pole stojícího), a rozbalení vrátilo prázdný plán. `count` = tikat čítače chůze
 // (jen skutečná chůze, ne dotaz nabídky).
 enum class WalkStep { ARRIVED, STEP, STOP };
+// P211e (uživatel 15.10.2026: „1 i 2 oprav — pro všechny hráče“): `stayOutOfContact` = krok do cizí
+// tacklezony jen na samotný cíl. Změřeno (evidence/p211e_20261015): 112 přesunů ke vzdálenému nosiči
+// soupeře uvízlo cestou v kontaktu s jiným soupeřem — hráč tah odehrál a stál u něj na ránu.
 static WalkStep nextWalkStep(const GameState& state, const Player& p, Position target, int budget,
-                             Position avoid, int dodgeCap, Action& out, bool count) {
+                             Position avoid, int dodgeCap, Action& out, bool count,
+                             bool stayOutOfContact = false) {
     if (!p.isOnPitch() || p.lostTacklezones) return WalkStep::STOP;
     // A PRONE player standing on the target square has NOT arrived -- he
     // still has to get up. Before 2026-08-21 this returned "arrived", so a
@@ -3117,25 +3155,28 @@ static WalkStep nextWalkStep(const GameState& state, const Player& p, Position t
         if (count) ++g_dodgeCapStops[0];
         return WalkStep::STOP;
     }
+    if (stayOutOfContact && out.target != target && countTacklezones(state, out.target, p.teamSide) > 0)
+        return WalkStep::STOP;   // P211e: zůstat na posledním volném poli
     return WalkStep::STEP;
 }
 
 // Udělá chůze aspoň jeden krok? (dotaz nabídky; LEAP rameno = nevíme, nabídka zůstává)
 static bool walkCanStart(const GameState& state, const Player& p, Position target, int maxSteps,
-                         Position avoid, int dodgeCap) {
+                         Position avoid, int dodgeCap, bool stayOutOfContact = false) {
     if (leapWalkArm(p.teamSide)) return true;
     // Rozbalení napřed vrátí zóny hráči, kterému chybí z minula (greedyExpandMacro, P79/P93) —
     // dotaz musí počítat s týmž hráčem.
     Player mover = p;
     mover.regainTacklezonesAtActionStart();
     Action ignored;
-    return nextWalkStep(state, mover, target, maxSteps, avoid, dodgeCap, ignored, /*count=*/false) == WalkStep::STEP;
+    return nextWalkStep(state, mover, target, maxSteps, avoid, dodgeCap, ignored, /*count=*/false,
+                        stayOutOfContact) == WalkStep::STEP;
 }
 
 static bool movePlayerToward(GameState& state, int playerId, Position target,
                               DiceRollerBase& dice, MacroExpansionResult& result,
                               int maxSteps = 12, Position avoid = {-1, -1},
-                              int dodgeCap = 0) {
+                              int dodgeCap = 0, bool stayOutOfContact = false) {
     Position lastPos{-1, -1};  // Detect loops -- jen LEAP vetev nize, BFS nebloudi z konstrukce
     for (int step = 0; step < maxSteps; ++step) {
         const Player& p = state.getPlayer(playerId);
@@ -3154,7 +3195,8 @@ static bool movePlayerToward(GameState& state, int playerId, Position target,
         //   bylo predcasne.
         Action bestMove;
         if (!leapWalkArm(p.teamSide)) {
-            const WalkStep w = nextWalkStep(state, p, target, maxSteps - step, avoid, dodgeCap, bestMove, true);
+            const WalkStep w = nextWalkStep(state, p, target, maxSteps - step, avoid, dodgeCap, bestMove, true,
+                                            stayOutOfContact);
             if (w == WalkStep::ARRIVED) return true;
             if (w == WalkStep::STOP) return false;
         } else {
@@ -4044,7 +4086,8 @@ static int teammatesStillToAct(const GameState& state, int excludePlayerId,
 // Parametry chůze REPOSITION: rozpočet kroků, pole, kam nevstoupit, strop úhybu. P196 (15.10.2026):
 // jediné místo pro rozbalení i pro nabídku (`repositionCanStart`). `count` = tikat čítače W-GFI
 // (jen skutečné rozbalení).
-struct RepositionWalk { int maxSteps; Position avoid; int dodgeCap; int localGfiAllowance; };
+// stayOutOfContact: P211e — přesun nevstoupí do cizí tacklezony jinde než na cíli (všichni hráči).
+struct RepositionWalk { int maxSteps; Position avoid; int dodgeCap; int localGfiAllowance; bool stayOutOfContact; };
 static RepositionWalk repositionWalk(const GameState& st, const Macro& macro, bool count) {
     // Candidate generation (getAvailableMacros) hands out REPOSITION targets
     // with no reach check at all (safety/screen spots are routinely 5-10+
@@ -4146,12 +4189,14 @@ static RepositionWalk repositionWalk(const GameState& st, const Macro& macro, bo
     const bool aboutTheBall = st.ball.isOnPitch() &&
         ((st.ball.isHeld && st.ball.carrierId == macro.playerId) ||
          macro.targetPos.distanceTo(st.ball.position) <= 1);
-    return {maxSteps, avoid, dodgeCapFor(st, st.getPlayer(macro.playerId), aboutTheBall), localGfiAllowance};
+    return {maxSteps, avoid, dodgeCapFor(st, st.getPlayer(macro.playerId), aboutTheBall), localGfiAllowance,
+            /*stayOutOfContact=*/true};
 }
 
 static bool repositionCanStart(const GameState& state, const Macro& macro) {
     const RepositionWalk w = repositionWalk(state, macro, /*count=*/false);
-    return walkCanStart(state, state.getPlayer(macro.playerId), macro.targetPos, w.maxSteps, w.avoid, w.dodgeCap);
+    return walkCanStart(state, state.getPlayer(macro.playerId), macro.targetPos, w.maxSteps, w.avoid, w.dodgeCap,
+                        w.stayOutOfContact);
 }
 
 bool endOfTurnEscape(const GameState& state, Macro& out) {
@@ -4220,7 +4265,7 @@ static MacroExpansionResult expandReposition(GameState& state, const Macro& macr
     }
 
     movePlayerToward(state, macro.playerId, macro.targetPos, dice, result,
-                     walk.maxSteps, walk.avoid, walk.dodgeCap);
+                     walk.maxSteps, walk.avoid, walk.dodgeCap, walk.stayOutOfContact);
 
     // 09.09.2026: mechanismova metrika W-GFI -- jen z pripadu, kdy arm GFI
     // skutecne POVOLIL (ne kdy jen mel prilezitost), zjisti se, jestli krok
