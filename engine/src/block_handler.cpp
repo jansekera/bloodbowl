@@ -790,7 +790,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // Ř. 8131-8133: „too revolted to make the block and IT is wasted“ — propadá BLOK, ne akce
             // (srov. „the Action is wasted“ u Wild Animal ř. 8669). V blitzu tedy smí dál běžet
             // (ř. 548-553), blok blitzu je spotřebován (blitzBlockThrown). Dřív `hasActed = true`
-            // vždy (15.10.2026). ⚠️ Zda propadlý blok stojí pole (ř. 550), text neříká — strhává se výš.
+            // vždy (15.10.2026). Propadlý blok pole STOJÍ (ř. 550, strhává se výš) — uživatel 15.10.:
+            // „nikde nevidím důvod nespotřebovat bod pohybu na deklarovaný block“.
             endBlockActivation(att, params);
             emitEvent(events, {GameEvent::Type::SKILL_USED, def.id, att.id, {}, {},
                               static_cast<int>(SkillName::FoulAppearance), true});

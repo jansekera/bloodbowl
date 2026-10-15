@@ -2232,6 +2232,9 @@ TEST(BlockHandler, FoulAppearanceInBlitzWastesOnlyTheBlock) {
     executeAction(state, Action{ActionType::BLITZ, 1, 12, {12, 7}}, dice, nullptr);
     ASSERT_EQ(state.getPlayer(1).position.distanceTo(fa.position), 1) << "fixture: blitzující má dojít vedle cíle";
     ASSERT_EQ(fa.state, PlayerState::STANDING) << "fixture: blok měl propadnout";
+    // Uživatel 15.10.: „nikde nevidím důvod nespotřebovat bod pohybu na deklarovaný block, i když jej
+    // Foul Appearance znehodnotil“ (ř. 550: blok „costs one square of movement“) ⇒ 1 pole chůze + 1 za blok.
+    EXPECT_EQ(state.getPlayer(1).movementRemaining, 6 - 1 - 1) << "propadlý blok stojí pole pohybu";
     std::vector<Action> actions;
     getAvailableActions(state, actions);
     bool move = false, block = false;
