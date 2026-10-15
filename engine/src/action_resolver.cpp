@@ -322,11 +322,17 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
         }
 
         case ActionType::BLOCK: {
+            // 15.10.2026 (P156): blok hráče, který ohlásil blitz a ještě neblokoval, JE blok toho
+            // blitzu (ř. 347-350: „may make one block during the move“) — stojí pole pohybu a platí
+            // Horns (ř. 8172-8175). Dřív `isBlitz = false` vždy; nastávalo to po blitzu, který
+            // nedošel (blok potom dohrával `expandBlitzAndScore` krokem BLOCK zdarma).
+            const Player& blocker = state.getPlayer(action.playerId);
+            const bool blitzBlock = blocker.usedBlitz && !blocker.blitzBlockThrown;
             BlockParams params;
             params.attackerId = action.playerId;
             params.targetId = action.targetId;
-            params.isBlitz = false;
-            params.hornsBonus = false;
+            params.isBlitz = blitzBlock;
+            params.hornsBonus = blitzBlock;
             return resolveBlock(state, params, dice, events);
         }
 

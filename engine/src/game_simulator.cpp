@@ -137,6 +137,7 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
+        p.blitzBlockThrown = false;
         p.lostTacklezones = false;
         p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.bloodlustHungry = false;      // P71: hlad konci s drivem
@@ -215,6 +216,7 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
+        p.blitzBlockThrown = false;
         p.lostTacklezones = false;
         p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.bloodlustHungry = false;      // P71: hlad konci s drivem
@@ -437,6 +439,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
             p.hasMoved = false;
             p.hasActed = false;
             p.usedBlitz = false;
+            p.blitzBlockThrown = false;
             p.lostTacklezones = false;
         p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.bloodlustHungry = false;      // P71: hlad konci s drivem
@@ -451,6 +454,7 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
+        p.blitzBlockThrown = false;
         p.lostTacklezones = false;
         p.bigGuyStupefied = false;      // M3: "or the drive ends" 
         p.bloodlustHungry = false;      // P71: hlad konci s drivem

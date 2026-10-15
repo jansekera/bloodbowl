@@ -297,7 +297,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // Vylouceni se resi na druhe strane: `resolveMultipleBlock` pousti oba
         // bloky s `frenzyDisabled`, takze Frenzy uvnitr nezasahne.
         // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
-        if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Chainsaw)) {
+        // 15.10.2026: jen „at the start of a Block Action“ (ř. 8299) — ne po pohybu a ne v blitzu
+        // (dřív se nabízel i hráči, který se už hnul; táž díra jako u BLOCK, viz mayBlockNow).
+        if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Chainsaw) &&
+            !p.hasMoved && !p.usedBlitz) {
             // Collect adjacent standing enemies
             int adjEnemies[8];
             int nAdj = 0;

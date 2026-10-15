@@ -2128,3 +2128,118 @@ TEST(BlockHandler, P194FollowUpIsDecidedBeforeTheCrowdThrowsTheBallBackIn) {
     ASSERT_GE(eventIndex(evs, GameEvent::Type::FOLLOW_UP), 0);
     EXPECT_LT(eventIndex(evs, GameEvent::Type::FOLLOW_UP), eventIndex(evs, GameEvent::Type::BALL_BOUNCE));
 }
+
+// ⭐ 15.10.2026 (nalezeno při P156): V BLITZU JEN JEDEN BLOK. BB2016 ř. 347-350: „He may make one
+//   block during the move.“ Po bloku v blitzu zůstává aktivace otevřená (M1/N10 — smí dál běžet),
+//   ale podmínka bloku pouštěla každého s `usedBlitz` ⇒ engine nabízel druhý BLOCK (4793× ve 199
+//   výkopech lidé × orkové). Kostky se tu neřídí: hledá se semínko, po kterém útočník stojí a vedle
+//   něj stojí druhý soupeř — pak se smí jen hýbat.
+TEST(BlockHandler, BlitzAllowsOnlyOneBlock) {
+    int checked = 0;
+    for (uint32_t seed = 1; seed <= 60 && checked < 5; ++seed) {
+        GameState state;
+        state.phase = GamePhase::PLAY;
+        state.activeTeam = TeamSide::HOME;
+        state.homeTeam.turnNumber = 2;
+        Player& att = state.getPlayer(1);
+        att.id = 1; att.teamSide = TeamSide::HOME; att.state = PlayerState::STANDING;
+        att.position = {10, 7}; att.stats = {6, 4, 3, 8}; att.movementRemaining = 6;
+        att.skills.add(SkillName::Block);
+        const Position defPos[3] = {{13, 7}, {13, 6}, {13, 8}};   // cíl + soused každého pole příchodu
+        for (int k = 0; k < 3; ++k) {
+            Player& d = state.getPlayer(12 + k);
+            d.id = 12 + k; d.teamSide = TeamSide::AWAY; d.state = PlayerState::STANDING;
+            d.position = defPos[k];
+            d.stats = {6, 3, 3, 8}; d.movementRemaining = 6;
+        }
+        state.ball = BallState::onGround({2, 2});
+        DiceRoller dice(seed);
+        const ActionResult r = executeAction(state, Action{ActionType::BLITZ, 1, 12, {13, 7}}, dice, nullptr);
+        if (r.turnover || state.getPlayer(1).state != PlayerState::STANDING) continue;
+        bool nextToStanding = false;
+        for (int k = 0; k < 3; ++k) {
+            const Player& d = state.getPlayer(12 + k);
+            if (d.state == PlayerState::STANDING && d.position.distanceTo(state.getPlayer(1).position) == 1)
+                nextToStanding = true;
+        }
+        if (!nextToStanding) continue;
+        ++checked;
+        std::vector<Action> actions;
+        getAvailableActions(state, actions);
+        bool canStillMove = false;
+        for (const Action& a : actions) {
+            EXPECT_FALSE(a.type == ActionType::BLOCK && a.playerId == 1)
+                << "semínko " << seed << ": po bloku v blitzu nabídnut druhý BLOCK na " << a.targetId;
+            if (a.type == ActionType::MOVE && a.playerId == 1) canStillMove = true;
+        }
+        // Druhá polovina pravidla (ř. 347-350, M1/N10): po bloku smí v blitzu dál BĚŽET.
+        if (state.getPlayer(1).movementRemaining > 0)
+            EXPECT_TRUE(canStillMove) << "semínko " << seed << ": po bloku v blitzu už nesmí ani chodit";
+    }
+    ASSERT_GE(checked, 1) << "pozitivní kontrola: situace „po blitzu stojí vedle soupeře“ musí nastat";
+}
+
+// 15.10.2026: Multiple Block jen „at the start of a Block Action“ (ř. 8299) — hráč, který se
+// pohnul (nebo ohlásil blitz), ho už vyhlásit nesmí. Pozitivní kontrola: na začátku aktivace ano.
+TEST(BlockHandler, MultipleBlockOnlyAtTheStartOfTheAction) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    Player& att = state.getPlayer(1);
+    att.id = 1; att.teamSide = TeamSide::HOME; att.state = PlayerState::STANDING;
+    att.position = {10, 7}; att.stats = {6, 4, 3, 8}; att.movementRemaining = 6;
+    att.skills.add(SkillName::MultipleBlock);
+    for (int k = 0; k < 2; ++k) {
+        Player& d = state.getPlayer(12 + k);
+        d.id = 12 + k; d.teamSide = TeamSide::AWAY; d.state = PlayerState::STANDING;
+        d.position = {11, static_cast<int8_t>(6 + 2 * k)}; d.stats = {6, 3, 3, 8};
+    }
+    state.ball = BallState::onGround({2, 2});
+    auto offered = [&] {
+        std::vector<Action> actions;
+        getAvailableActions(state, actions);
+        for (const Action& a : actions) if (a.type == ActionType::MULTIPLE_BLOCK && a.playerId == 1) return true;
+        return false;
+    };
+    ASSERT_TRUE(offered()) << "pozitivní kontrola: na začátku aktivace se nabídnout má";
+    state.getPlayer(1).hasMoved = true;
+    state.currentActivationId = 1;
+    EXPECT_FALSE(offered()) << "po pohybu už to Block Action není";
+}
+
+// 15.10.2026 (uživatel přinesl čtení pravidel): Foul Appearance v BLITZU. Ř. 8131-8133: na 1 je
+// „too revolted to make the block and IT is wasted“ — propadá blok, ne akce Blitz; podle ř. 347-350
+// smí blitzující dál běžet (jen už neblokuje, blok blitzu byl spotřebován). Dřív FA aktivaci zavíral.
+TEST(BlockHandler, FoulAppearanceInBlitzWastesOnlyTheBlock) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.homeTeam.turnNumber = 2;
+    Player& att = state.getPlayer(1);
+    att.id = 1; att.teamSide = TeamSide::HOME; att.state = PlayerState::STANDING;
+    att.position = {10, 7}; att.stats = {6, 3, 3, 8}; att.movementRemaining = 6;
+    Player& fa = state.getPlayer(12);
+    fa.id = 12; fa.teamSide = TeamSide::AWAY; fa.state = PlayerState::STANDING;
+    fa.position = {12, 7}; fa.stats = {6, 3, 3, 8};
+    fa.skills.add(SkillName::FoulAppearance);
+    for (int k = 0; k < 2; ++k) {   // druzí soupeři: každé pole příchodu (11,6..8) sousedí s jedním
+        Player& other = state.getPlayer(13 + k);
+        other.id = 13 + k; other.teamSide = TeamSide::AWAY; other.state = PlayerState::STANDING;
+        other.position = {12, static_cast<int8_t>(6 + 2 * k)}; other.stats = {6, 3, 3, 8};
+    }
+    state.ball = BallState::onGround({2, 2});
+    FixedDiceRoller dice({1, 1, 1, 1});    // první hod = Foul Appearance: 1
+    executeAction(state, Action{ActionType::BLITZ, 1, 12, {12, 7}}, dice, nullptr);
+    ASSERT_EQ(state.getPlayer(1).position.distanceTo(fa.position), 1) << "fixture: blitzující má dojít vedle cíle";
+    ASSERT_EQ(fa.state, PlayerState::STANDING) << "fixture: blok měl propadnout";
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    bool move = false, block = false;
+    for (const Action& a : actions) {
+        if (a.playerId != 1) continue;
+        if (a.type == ActionType::MOVE) move = true;
+        if (a.type == ActionType::BLOCK) block = true;
+    }
+    EXPECT_TRUE(move) << "po propadlém bloku smí blitzující dál běžet";
+    EXPECT_FALSE(block) << "blok blitzu je spotřebován — druhý ne";
+}

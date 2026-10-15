@@ -20,8 +20,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out);
 // blitz (ř. 675: „you may not move when you take a Block Action“). P196 (15.10.2026): jediné místo pro
 // primitivní BLOCK i pro makro BLOCK — nabídka makra hlídala jen `hasActed`, které se nastaví až
 // aktivací JINÉHO hráče, takže hráč s rozehraným MOVE dostal BLOCK, který rozbalení nenašlo.
+// Blitz smí blokovat jen jednou (ř. 347-350, `blitzBlockThrown`).
 inline bool mayBlockNow(const Player& p) {
-    return p.state == PlayerState::STANDING && !(p.hasMoved && !p.usedBlitz);
+    return p.state == PlayerState::STANDING && !(p.hasMoved && !p.usedBlitz) &&
+           !(p.usedBlitz && p.blitzBlockThrown);
 }
 
 } // namespace bb

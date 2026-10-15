@@ -42,6 +42,10 @@ struct Player {
     bool stunnedThisTurn = false;
     bool hasActed = false;
     bool usedBlitz = false;
+    // BB2016 ř. 347-350: v blitzu „one block during the move“. Po bloku zůstává aktivace otevřená
+    // (M1/N10, smí dál běžet), takže `usedBlitz` sám neříká, zda už blokoval (15.10.2026: engine
+    // nabízel druhý BLOCK). Nastavuje resolveBlock u bloku v blitzu, nuluje se s `usedBlitz`.
+    bool blitzBlockThrown = false;
     bool lostTacklezones = false;
     // M3/N12 (29.08.2026): `lostTacklezones` nese DVE ruzne delky trvani a na
     // tu delsi byl kratky. Hypnotic Gaze (r. 8185-8188) konci "until the START

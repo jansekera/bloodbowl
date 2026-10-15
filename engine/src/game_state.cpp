@@ -67,6 +67,7 @@ void GameState::resetPlayersForNewTurn(TeamSide side) {
         p.hasMoved = false;
         p.hasActed = false;
         p.usedBlitz = false;
+        p.blitzBlockThrown = false;
         // M3/N12: gaze konci pristim kolem obeti, big-guy stav az uspesnym
         // hodem nebo koncem drivu -- viz komentar u `bigGuyStupefied`.
         // P79/P93 (30.09.2026): ztracene zony se tu UZ NEVRACI -- gaze ani

@@ -2822,7 +2822,17 @@ void getAvailableMacros(const GameState& state, std::vector<Macro>& out,
                         bool dauntlessInOffer) {
     offerBeforeFeasibility(state, out, dauntlessInOffer);
     // BLITZ hlídá už generátor (bere první proveditelný cíl v pořadí, ne první vůbec).
+    // PASS_SCORE začíná primitivní přihrávkou nosiče na příjemce (expandPassScore) — bez ní nic.
+    std::vector<Action> actions;
+    bool haveActions = false;
+    auto hasPrimitive = [&](ActionType t, int playerId, int targetId) {
+        if (!haveActions) { getAvailableActions(state, actions); haveActions = true; }
+        for (const Action& a : actions)
+            if (a.type == t && a.playerId == playerId && a.targetId == targetId) return true;
+        return false;
+    };
     out.erase(std::remove_if(out.begin(), out.end(), [&](const Macro& m) {
+                  if (m.type == MacroType::PASS_SCORE) return !hasPrimitive(ActionType::PASS, m.playerId, m.targetId);
                   if (m.type == MacroType::SCORE) return !scoreCanStart(state, m);
                   if (m.type == MacroType::ADVANCE) return !advanceCanStart(state, m);
                   if (m.type == MacroType::REPOSITION) return !repositionCanStart(state, m);
@@ -3715,6 +3725,9 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
         // idiom as MAX_TZ_PROBE_STEPS above). break, not return: Step 2
         // (carrier scores) must still run.
         if (!blocker.isOnPitch()) break;
+        // Ř. 347-350: blok tohoto blitzu už padl (BLITZ ho hodí sám, když dojde) ⇒ dál jen nosič.
+        // Dřív tu blitzující blokoval týž cíl podruhé, protože engine druhý BLOCK nabízel.
+        if (state.getPlayer(bestBlitz.playerId).blitzBlockThrown) break;
         actions.clear();
         getAvailableActions(state, actions);
 

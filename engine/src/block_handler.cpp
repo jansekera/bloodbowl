@@ -749,6 +749,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // -- follow-up by ho vytahl z pole, ktere opustit nesmi (l. 8578-8579).
     if (att.rooted) noFollowUp = true;
 
+    // Ř. 347-350: v blitzu jen jeden blok (Frenzy druhý blok je táž rána). Viz Player::blitzBlockThrown.
+    if (params.isBlitz) att.blitzBlockThrown = true;
+
     // CRP: a block thrown as part of a Blitz costs 1 point of movement.
     // Out of normal movement the blitzer may GFI into the block (2+, 3+
     // in a blizzard, counts against the GFI limit); with no GFI left the
@@ -784,10 +787,14 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     if (def.hasSkill(SkillName::FoulAppearance)) {
         int faRoll = dice.rollD6();
         if (faRoll == 1) {
-            att.hasActed = true;
+            // Ř. 8131-8133: „too revolted to make the block and IT is wasted“ — propadá BLOK, ne akce
+            // (srov. „the Action is wasted“ u Wild Animal ř. 8669). V blitzu tedy smí dál běžet
+            // (ř. 548-553), blok blitzu je spotřebován (blitzBlockThrown). Dřív `hasActed = true`
+            // vždy (15.10.2026). ⚠️ Zda propadlý blok stojí pole (ř. 550), text neříká — strhává se výš.
+            endBlockActivation(att, params);
             emitEvent(events, {GameEvent::Type::SKILL_USED, def.id, att.id, {}, {},
                               static_cast<int>(SkillName::FoulAppearance), true});
-            return ActionResult::fail(); // action wasted, not turnover
+            return ActionResult::fail(); // block wasted, not turnover
         }
     }
 
@@ -1185,7 +1192,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 resolveArmourAndInjury(state, att.id, dice, attCtx, events);
                 handleBallOnPlayerDown(state, att.id, dice, events);
             }
-            att.hasActed = true;
+            // 15.10.2026: dřív `att.hasActed = true` vždy — útočník s Blockem, který Both Down
+            // ustál, v blitzu nesměl dál běžet (ř. 347-350). Zavírá jediné místo (endBlockActivation):
+            // stojí-li a je to blitz, aktivace zůstává otevřená; ležícímu se zavře.
+            endBlockActivation(att, params);
             return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
 
