@@ -1316,7 +1316,10 @@ Board mateBoard(int turn, Position opponent, int8_t oppSt = 3) {
 // předávce dojde bez hodu ⇒ řadič přikáže TD předávkou. Pravidla ř. 1676–1692 (předávka na sousední
 // pole, pohyb před ní ano; zachycení +1), ř. 845–846 (kdo chytil a ještě nehrál, smí hrát).
 TEST(OneCageMate, AThreatenedCarrierWhoCannotReachHandsOffToAReadyTeammateForTheTouchdown) {
+    // 16.10. večer: útěk do bezpečí (P213) má přednost — tady by vyhrál; test zkouší samotné P180
+    struct NoEscape { NoEscape() { setCageFeaturesOff(kFeatSafetyHandOff); } ~NoEscape() { setCageFeaturesOff(0); } };
     {
+        NoEscape off;
         Board b = mateBoard(4, {10, 7}, 5);
         ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), 0.34) << "předpoklad: míč přežije s menší šancí, než je šance předávky";
         ASSERT_GT(handOffTdChance(b.s, b.s.getPlayer(1), b.s.getPlayer(6)), 0.6);
@@ -1369,6 +1372,24 @@ TEST(OneCageMate, InTheLastTurnTheControllerOrdersTheSafestTouchdown) {
 // bez klece (MA4), silný soupeř dvě pole od něj; vedle stojí rychlý spoluhráč (MA9, Catch), který do zóny
 // nedoběhne (16 polí), ale s míčem uteče z dosahu ⇒ řadič přikáže předávku kvůli bezpečí. Bez soupeře
 // (míč v bezpečí) se nepředává.
+// Uživatel 16.10. večer: „útěk do bezpečí je lepší než předčasné TD … pozdější TD znamená méně příležitostí
+// pro soupeře vyrovnat“; hody jsou stejné ⇒ TD předávkou jen, když bezpečné pole mimo dosah není.
+// Tatáž pozice jako u TD předávkou: příjemce by skóroval, ale může i utéct ⇒ útěk.
+TEST(OneCageMate, EscapeToSafetyIsPreferredToAnEarlyHandOffTouchdown) {
+    Board b = mateBoard(4, {10, 7}, 5);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_TRUE(cc.next(b.s, m));
+    EXPECT_EQ(m.type, MacroType::HAND_OFF_SCORE);
+    EXPECT_NE(m.targetPos.x, 25) << "útěk, ne TD";
+    setCageFeaturesOff(kFeatSafetyHandOff);   // pojistka: bez P213 TD předávkou
+    CageController cc2(nullptr, cfg(), 1);
+    Board b2 = mateBoard(4, {10, 7}, 5);
+    ASSERT_TRUE(cc2.next(b2.s, m));
+    setCageFeaturesOff(0);
+    EXPECT_EQ(m.targetPos.x, 25);
+}
+
 TEST(OneCageMate, AThreatenedCarrierHandsOffToATeammateWhoRunsOutOfReach) {
     auto board = [](bool threatened) {
         Board b(2);
