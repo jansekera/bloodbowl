@@ -214,6 +214,18 @@ def test_kontakt_dve_kostky_pro_soupere():
     assert "4 proti 3" in radek and "2 kostky" in radek
 
 
+def test_hrac_bez_zon_neasistuje():
+    # P215 (16.10.2026): hráč po Bone-head / zhypnotizovaný „loses his tackle zones and may not … assist“
+    # (ř. 7983-7986, 8185-8188). Táž pozice jako u dvou kostek: asistence elfovi se nepočítá ⇒ 3 proti 3.
+    s = prazdne_hriste()
+    postav(s, H, 10, 7)
+    postav(s, A, 11, 7)
+    pomocnik = postav(s, A, 9, 6)
+    pomocnik.lost_tacklezones = True
+    radek = nalezy(s, "KONTAKT")[0]
+    assert "3 proti 3" in radek, radek
+
+
 def test_asistence_v_cizi_zone_neplati_s_guard_ano():
     # strana = elfové, útočí trpaslík; pomocník trpaslíků stojí v zóně druhého elfa
     def pozice(guard):

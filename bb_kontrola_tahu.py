@@ -73,6 +73,13 @@ def _stoji(p):
     return p.state == bb.PlayerState.STANDING
 
 
+def _ma_zony(p):
+    """Stojí a vyvíjí tackle zónu. P215 (uživatel 16.10.2026: „příznak bez tackle zón … využij obecně“):
+    hráč po neúspěšném Bone-head / Really Stupid nebo zhypnotizovaný „loses his tackle zones and may not
+    … assist“ (ř. 7983-7986, 8401-8405, 8185-8188) — nemarkuje a neasistuje."""
+    return _stoji(p) and not getattr(p, "lost_tacklezones", False)
+
+
 def jmeno(p):
     return f"{'H' if p.team_side == bb.TeamSide.HOME else 'A'}{p.id}@{_xy(p)}"
 
@@ -145,9 +152,9 @@ def _sila_bloku(utocnik, obrance, utocnici_tym, obranci_tym):
     def asistence(pomocnici, cil, nepratele, vynechat):
         n = 0
         for q in pomocnici:
-            if q.id == vynechat.id or not _stoji(q) or not _vedle(_xy(q), _xy(cil)):
+            if q.id == vynechat.id or not _ma_zony(q) or not _vedle(_xy(q), _xy(cil)):
                 continue
-            jine_zony = [r for r in nepratele if r.id != cil.id and _stoji(r) and _vedle(_xy(r), _xy(q))]
+            jine_zony = [r for r in nepratele if r.id != cil.id and _ma_zony(r) and _vedle(_xy(r), _xy(q))]
             if not jine_zony or ma_skill(q, "Guard"):
                 n += 1
         return n
@@ -170,7 +177,7 @@ def kontrola_tahu(start, konec, strana, kroky=None):
     vsichni = hraci(konec)
     nasi = [p for p in vsichni if p.team_side == strana]
     jejich = [p for p in vsichni if p.team_side != strana]
-    nasi_stojici = [_xy(p) for p in nasi if _stoji(p)]
+    nasi_stojici = [_xy(p) for p in nasi if _ma_zony(p)]   # zdroje zón pro uhýbání (P215)
     obsazeno = {_xy(p) for p in vsichni if p.state in (bb.PlayerState.STANDING, bb.PlayerState.PRONE,
                                                       bb.PlayerState.STUNNED)}
 
