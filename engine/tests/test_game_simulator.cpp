@@ -760,10 +760,12 @@ TEST(DevelopedRoster, Tv1500WoodElfPassingSkillsAndBlockLinemen) {
     GameState state;
     setupHalf(state, *r, *r);
     EXPECT_EQ(countHomeSkill(state, SkillName::Accurate), 1);      // Thrower
-    EXPECT_EQ(countHomeSkill(state, SkillName::DivingCatch), 2);   // Catcheři
+    EXPECT_EQ(countHomeSkill(state, SkillName::DivingCatch), 1);   // Catcher (druhý má Nerves of Steel, 16.10.)
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);           // Wardancer
     EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
     EXPECT_EQ(countHomeSkill(state, SkillName::SideStep), 1) << "Side Step jen Wardancer, rohoví Linemani ne";
+    // 16.10.2026 (uživatel, P180 bod 7a): jeden Catcher má Block + Nerves of Steel (místo Diving Catch)
+    EXPECT_EQ(countHomeSkill(state, SkillName::NervesOfSteel), 1);
     EXPECT_EQ(countHomeSkill(state, SkillName::Block), 8);         // 3 Linemani + 2 Wardanceři + 2 Catcheři + Thrower
 }
 

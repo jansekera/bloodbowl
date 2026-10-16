@@ -732,7 +732,7 @@ const TeamRoster& getWoodElfRoster1200Agile() {
 //
 // Výsledná hodnota týmu (ceny BB2016; 11 hráčů na hřišti + 3 týmové rerolly + lékárník;
 // dokoupený skill 20 tis., na double 30, +MA 30):
-//   trpaslíci 1490 · wood-elf 1520 · skaven 1520 · ork 1500 · člověk 1490
+//   trpaslíci 1490 · wood-elf 1530 (16.10.: jeden Catcher NoS místo Diving Catch) · skaven 1520 · ork 1500 · člověk 1490
 //   (týmový reroll: trpaslík, elf, člověk 50 tis., skaven a ork 60 tis.)
 // Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1200 · 1360 · 1290.
 // ⚠️ NOVÁ MĚŘICÍ ÉRA: čísla z TV1500 se s TV1200 neporovnávají.
@@ -779,13 +779,19 @@ const TeamRoster& getWoodElfRoster1500() {
                 SkillName::Pro}), 1, "Wardancer ball-hunter +Pro"},
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::SideStep}), 1, "Wardancer +Side Step"},
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block,
-                SkillName::DivingCatch}), 2, "Catcher +Block+Diving Catch"},
+                SkillName::DivingCatch}), 1, "Catcher +Block+Diving Catch"},
+            // Uživatel 16.10.2026 (P180 bod 7a): připravený příjemce stojí často v zóně obránce ⇒ jeden
+            // Catcher má Nerves of Steel (chytá bez −1 za zóny, ř. 8316-8317; Passing = double za 30 tis.);
+            // „ať může jeden catcher mít i block i nerves“ ⇒ Block zůstal, odebrán Diving Catch (jen přesná
+            // přihrávka; −20 tis.) ⇒ TV +10.
+            {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block,
+                SkillName::NervesOfSteel}), 1, "Catcher +Block+Nerves of Steel"},
             {{7, 3, 4, 7}, makeSkills({SkillName::Pass, SkillName::Block, SkillName::Accurate}), 1, "Thrower +Block+Accurate"},
             {{2, 6, 1, 10}, makeSkills({SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm, SkillName::MightyBlow,
                 SkillName::ThickSkull, SkillName::Guard}), 1, "Treeman +Guard"},
             {{7, 3, 4, 7}, makeSkills({SkillName::Wrestle, SkillName::Dodge}), 2, "Lineman +Wrestle+Dodge"},
         },
-        7, 50, true
+        8, 50, true
     };
     return roster;
 }
