@@ -102,6 +102,7 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
 
 class CageController {
 public:
+    const std::vector<int>& readyMates() const { return readyMates_; }   // P180: pro testy a výpis
     CageController(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
 
     // Další makro klece pro tento stav, nebo false = rozhoduje MCTS.
@@ -149,7 +150,9 @@ private:
     bool scoringRangeCage_ = false;
     bool stalling_ = false;      // P175: v tomto tahu se TD zdržuje (míč v bezpečí, není poslední kolo)
     bool mateStall_ = false;     // P180: míč v bezpečí a tým má čas ⇒ v tomto tahu se neskóruje ani předávkou
-    int readyMateId_ = -1;       // P180: hráč připravený pro předávku — hledání ho v tomto tahu neodvádí
+    // P180: hráči připravení pro předávku — hledání je v tomto tahu neodvádí. Víc než jeden jen agilní
+    // (AG 4+, uživatel 16.10.2026, bod 7), od sebe aspoň 3 pole (jeden obránce nemarkuje dva).
+    std::vector<int> readyMates_;
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;

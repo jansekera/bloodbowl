@@ -391,11 +391,21 @@ TEST(OneCageScoringRange, CageKeepsAdvancingWhenTheCarrierCannotWalkInWithoutDic
     EXPECT_LT(b.s.getPlayer(1).position.x, 25) << "a neskórovala přes GFI";
 }
 
-TEST(OneCageScoringRange, LastTurnOfTheHalfIsLeftToTheSearch) {
+// PŘEPSÁNO 16.10.2026 — P180 (6), uživatel: „poslední kolo poločasu je poslední šance dát TD — vše pro
+// dát TD — vyhledat nejbezpečnější možnost“. Dřív tu stálo, že poslední kolo řadič přenechá hledání;
+// teď řadič přikáže TD s největší šancí (tady nosič sám přes GFI — předávku nemá komu dát).
+TEST(OneCageScoringRange, LastTurnOfTheHalfOrdersTheBestTouchdown) {
     Board b = scoringRangeBoard(8);          // poslední kolo: skórovat se musí zkusit
     CageController cc(nullptr, cfg(), 1);
     Macro m;
-    EXPECT_FALSE(cc.next(b.s, m));
+    ASSERT_TRUE(cc.next(b.s, m));
+    EXPECT_EQ(m.type, MacroType::SCORE);
+    EXPECT_EQ(m.playerId, 1);
+    setCageFeaturesOff(kFeatLastTurnBestTd);  // pojistka: bez úpravy staré chování (hledání)
+    CageController old(nullptr, cfg(), 1);
+    Board b2 = scoringRangeBoard(8);
+    EXPECT_FALSE(old.next(b2.s, m));
+    setCageFeaturesOff(0);
 }
 
 // Od 08.10.2026 (P175) platí: dojde bez hodu a hrozí mu rána ⇒ skóruje hned (rozhoduje hledání);
@@ -1329,6 +1339,31 @@ TEST(OneCageMate, AThreatenedCarrierWhoCannotReachHandsOffToAReadyTeammateForThe
     }
 }
 
+// P180 (6), uživatel 16.10.2026: „poslední kolo poločasu je poslední šance dát TD — vše pro dát TD —
+// vyhledat nejbezpečnější možnost“. V 8. kole nosič sám nedosáhne, předávkou TD jde ⇒ řadič přikáže
+// TD předávkou (dřív v posledním kole rozhodovalo hledání a klec šla dál).
+TEST(OneCageMate, InTheLastTurnTheControllerOrdersTheSafestTouchdown) {
+    {
+        Board b = mateBoard(8, {0, 0});
+        ASSERT_GT(handOffTdChance(b.s, b.s.getPlayer(1), b.s.getPlayer(6)), 0.6);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::HAND_OFF_SCORE) << "poslední kolo: TD předávkou";
+        EXPECT_EQ(ms.front().targetId, 6);
+    }
+    {   // pojistka měření: s vypnutou úpravou řadič TD v posledním kole nepřikazuje
+        setCageFeaturesOff(kFeatLastTurnBestTd);
+        Board b = mateBoard(8, {0, 0});
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        setCageFeaturesOff(0);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+    }
+}
+
 // Míč je v bezpečí (soupeř nedosáhne) a rychlý tým má ve 2. kole času dost ⇒ TD předávkou se
 // nehraje: řadič ho nepřikáže a hledání ho nedostane (dřív díra ve zdržování). V 7. kole týž tým
 // časovou rezervu nemá ⇒ hledání předávku hrát smí.
@@ -1385,6 +1420,61 @@ TEST(OneCageMate, AfterTheCageMovesOneFreePlayerGetsReadyWithinReachOfTheEndZone
     EXPECT_TRUE(ready) << "volný hráč je připravený";
     run(kFeatReadyMate, ready);
     EXPECT_FALSE(ready) << "pozitivní kontrola: bez úpravy jde volný hráč jen tři sloupce před klec — do zóny by nedošel";
+}
+
+// P180 (7), uživatel 16.10.2026: „u elfů všichni, kdo netvoří klec a neblitzují a dojdou — postaví se o dvě
+// od sebe, ať obránce nemůže markovat dva jedním svým“; „platí pro agilní spíše než rychlé“.
+TEST(OneCageMate, AgilePlayersGetReadySeveralAndAtLeastThreeSquaresApart) {
+    auto run = [](int8_t ag, unsigned off) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(2, TeamSide::HOME, {7, 6}, 5); b.put(3, TeamSide::HOME, {7, 8}, 5);   // rohy MA5: k zóně nedojdou
+        b.put(4, TeamSide::HOME, {9, 6}, 5); b.put(5, TeamSide::HOME, {9, 8}, 5);
+        b.put(6, TeamSide::HOME, {7, 1}, 9).stats.agility = ag;                      // volní, od rohů dál než rohy
+        b.put(7, TeamSide::HOME, {7, 13}, 9).stats.agility = ag;
+        b.put(13, TeamSide::AWAY, {24, 13}, 4);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        std::vector<Position> sq;
+        for (int id : cc.readyMates()) sq.push_back(b.s.getPlayer(id).position);
+        return sq;
+    };
+    const auto agile = run(4, 0);
+    ASSERT_GE(agile.size(), 2u) << "agilní: víc připravených";
+    for (size_t i = 0; i < agile.size(); ++i)
+        for (size_t j = i + 1; j < agile.size(); ++j)
+            EXPECT_GE(agile[i].distanceTo(agile[j]), 3) << "jeden obránce nesmí markovat dva";
+    EXPECT_EQ(run(3, 0).size(), 1u) << "neagilní: jeden připravený";
+    EXPECT_EQ(run(4, kFeatReadyMany).size(), 1u) << "pojistka: bez úpravy jeden";
+}
+
+// P180 (9), uživatel 16.10.2026: „preferujeme ne, ale zahrnujeme i ano“ — když žádné pole bez hodu
+// nejde, připraví se hráč i na pole, odkud do zóny doběhne s GFI. MA8 z x=7: tento tah nejdál x=15,
+// bez GFI by potřeboval x ≥ 17, s GFI stačí x ≥ 15.
+TEST(OneCageMate, AReadySquareNeedingGfiIsUsedOnlyWhenThereIsNoOther) {
+    auto run = [](unsigned off) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(2, TeamSide::HOME, {7, 6}, 5); b.put(3, TeamSide::HOME, {7, 8}, 5);   // rohy MA5: k zóně nedojdou
+        b.put(4, TeamSide::HOME, {9, 6}, 5); b.put(5, TeamSide::HOME, {9, 8}, 5);
+        b.put(6, TeamSide::HOME, {7, 1}, 8);                                         // od rohů dál než rohy
+        b.put(13, TeamSide::AWAY, {24, 13}, 4);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        std::vector<int> r = cc.readyMates();
+        return std::make_pair(r, b.s.getPlayer(6).position);
+    };
+    const auto [withGfi, pos] = run(0);
+    ASSERT_EQ(withGfi.size(), 1u) << "připraví se i přes GFI";
+    EXPECT_EQ(withGfi.front(), 6);
+    EXPECT_GE(pos.x, 15);
+    EXPECT_TRUE(run(kFeatReadyMateGfi).first.empty()) << "pojistka: bez úpravy se nechystá nikdo";
 }
 
 // Nosič v čisté kleci (rána nejvýš „dvě kostky, vybírá nosič“, míč přežije v 89 %) a příjemce bez

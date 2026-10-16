@@ -74,6 +74,9 @@ enum CageFeature : unsigned {
     kFeatEscapeContact  = 16777216, // P190: nosič, který začíná tah v kontaktu a klec ho neochrání, smí z kontaktu úhybem tam, kde je bezpečněji
     kFeatKeepBuiltCage  = 33554432, // P190: hledání neodvede nosiče z dostavěné klece pro malý zisk; ne na krajní řádky; nosič v bezpečí nepřihrává
     kFeatCornerPathReach = 67108864, // P190: „roh tam dojde“ se počítá podle cesty bez hodu, ne jen podle vzdálenosti
+    kFeatLastTurnBestTd = 134217728, // P180 (6): v posledním kole poločasu řadič přikáže TD s největší šancí (nosičem i přes hod / předávkou)
+    kFeatReadyMany      = 268435456, // P180 (7): agilní (AG 4+) — víc připravených hráčů, od sebe aspoň 3 pole
+    kFeatReadyMateGfi   = 536870912, // P180 (9): připravené pole s doběhem přes GFI, když jiné nejde
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře
