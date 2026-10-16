@@ -1328,8 +1328,9 @@ TEST(OneCageMate, AThreatenedCarrierWhoCannotReachHandsOffToAReadyTeammateForThe
         EXPECT_EQ(ms.front().targetId, 6);
         EXPECT_EQ(b.s.homeTeam.score, 1) << "se šestkami na kostkách předávka i doběh vyjdou";
     }
-    {   // pojistka měření: s vypnutou úpravou řadič předávku nepřikazuje
-        setCageFeaturesOff(kFeatScoreViaMate);
+    {   // pojistka měření: s vypnutou úpravou řadič předávku nepřikazuje (P213 — předávka kvůli bezpečí —
+        // by tu jinak předávala taky, správně: nosiči hrozí rána a příjemce uteče; proto vypnutá i ona)
+        setCageFeaturesOff(kFeatScoreViaMate | kFeatSafetyHandOff);
         Board b = mateBoard(4, {10, 7}, 5);
         CageController cc(nullptr, cfg(), 1);
         std::vector<Macro> ms;
@@ -1361,6 +1362,52 @@ TEST(OneCageMate, InTheLastTurnTheControllerOrdersTheSafestTouchdown) {
         playAll(cc, b, &ms);
         setCageFeaturesOff(0);
         for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
+    }
+}
+
+// P213, uživatel 16.10.2026: „pokud uteče — předat — pokud byl předtím v bezpečí — zdržovat“. Pomalý nosič
+// bez klece (MA4), silný soupeř dvě pole od něj; vedle stojí rychlý spoluhráč (MA9, Catch), který do zóny
+// nedoběhne (16 polí), ale s míčem uteče z dosahu ⇒ řadič přikáže předávku kvůli bezpečí. Bez soupeře
+// (míč v bezpečí) se nepředává.
+TEST(OneCageMate, AThreatenedCarrierHandsOffToATeammateWhoRunsOutOfReach) {
+    auto board = [](bool threatened) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(6, TeamSide::HOME, {9, 7}, 9, 3, {SkillName::Catch}).stats.agility = 4;
+        if (threatened) b.put(13, TeamSide::AWAY, {6, 7}, 6, 5);   // silný soupeř dvě pole od nosiče
+        else b.put(13, TeamSide::AWAY, {1, 1}, 3, 5);               // pomalý a daleko: na nosiče nedosáhne
+        b.s.ball = BallState::carried({8, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(true);
+        ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: nosiči hrozí rána";
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        EXPECT_EQ(m.type, MacroType::HAND_OFF_SCORE);
+        EXPECT_EQ(m.targetId, 6);
+        EXPECT_NE(m.targetPos.x, 25) << "ne TD — bezpečné pole";
+        GameState proj = b.s.clone();
+        proj.getPlayer(6).position = m.targetPos;
+        proj.ball = BallState::carried(m.targetPos, 6);
+        EXPECT_LE(blitzThreat(proj, proj.getPlayer(6)), kSafeBlitzThreat) << "příjemce je mimo dosah";
+    }
+    {
+        Board b = board(false);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE) << "míč v bezpečí ⇒ zdržovat";
+    }
+    {   // pojistka měření
+        setCageFeaturesOff(kFeatSafetyHandOff);
+        Board b = board(true);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        const bool any = cc.next(b.s, m);
+        setCageFeaturesOff(0);
+        if (any) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
     }
 }
 

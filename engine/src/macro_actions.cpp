@@ -4382,6 +4382,12 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
     int targetX = endzoneX(newCarrier.teamSide);
     Position target{static_cast<int8_t>(targetX), newCarrier.position.y};
     if (macro.targetPos.isOnPitch() && macro.targetPos.x == targetX) target = macro.targetPos;   // P180
+    // P213 (16.10.2026): předávka kvůli bezpečí míče — cíl příjemce není zóna, ale bezpečné pole,
+    // na které řadič klece spočítal doběh BEZ hodu (jen vlastním pohybem, žádné GFI).
+    if (macro.targetPos.isOnPitch() && macro.targetPos.x != targetX) {
+        movePlayerToward(state, receiverId, macro.targetPos, dice, result, newCarrier.movementRemaining);
+        return result;
+    }
     movePlayerToward(state, receiverId, target, dice, result, 14);
     return result;
 }
