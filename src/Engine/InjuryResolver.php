@@ -324,10 +324,15 @@ final class InjuryResolver
                 $player = $player->withStunned();
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
             } else {
-                if ($this->odlozitLekarnika !== null) {
-                    ($this->odlozitLekarnika)($player, 'ko', null);
+                // P206 (b): o lékárníkovi rozhodne kouč po akci ⇒ hráč do té doby ZŮSTÁVÁ na svém poli
+                //   (stav KO, pole obsazené) — podle pravidel se rozhoduje hned a omráčený s lékárníkem
+                //   na poli zůstává (ř. 1202-1203), takže do jeho pole mezitím nikdo vstoupit nesmí
+                //   (uživatel 16.10.: „pole obsazené — toto by se nemělo stát“).
+                $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'ko', null);
+                $player = $player->withState(PlayerState::KO);
+                if (!$odlozeno) {
+                    $player = $player->withPosition(null);
                 }
-                $player = $player->withState(PlayerState::KO)->withPosition(null);
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
             }
         } else {

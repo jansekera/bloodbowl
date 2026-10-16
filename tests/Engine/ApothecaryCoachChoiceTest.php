@@ -44,6 +44,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
         $r = $this->resolver([1, 6, 6, 4, 4])->resolve($this->state(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
         $s = $r->getNewState();
         $this->assertSame(PlayerState::KO, $s->requirePlayer(1)->getState(), 'fixtura: KO');
+        $this->assertSame(1, $s->getPlayerAtPosition(new \App\ValueObject\Position(5, 7))?->getId(), 'do volby drží své pole — nikdo jiný tam nevstoupí');
         $this->assertNotNull($s->getPendingApothecary(), 'lékárník se nabízí');
         $this->assertSame([ActionType::RESOLVE_APOTHECARY->value], array_column((new RulesEngine())->getAvailableActions($s), 'type'));
 
@@ -60,6 +61,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
         $s = $this->resolver([1, 6, 6, 4, 4])->resolve($this->state(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
         $u = $this->resolver([])->resolve($s, ActionType::RESOLVE_APOTHECARY, ['playerId' => 0]);
         $this->assertSame(PlayerState::KO, $u->getNewState()->requirePlayer(1)->getState());
+        $this->assertNull($u->getNewState()->requirePlayer(1)->getPosition(), 'nepoužito ⇒ teprve teď z hřiště');
         $this->assertTrue($u->getNewState()->getTeamState(TeamSide::HOME)->canUseApothecary());
         $this->assertNull($u->getNewState()->getPendingApothecary());
     }

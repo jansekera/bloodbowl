@@ -487,6 +487,13 @@ final class ActionResolver
         $events = [];
         $hotovo = function (GameState $st) use ($pending, &$events): ActionResult {
             $st = $st->withPendingApothecary(null);
+            // KO, u nichž se lékárník nepoužil: teprve teď z hřiště (do volby drželi své pole)
+            foreach ($pending->getOffers() as $o) {
+                $hrac = $st->getPlayer($o['playerId']);
+                if ($o['kind'] === 'ko' && $hrac !== null && $hrac->getState() === PlayerState::KO && $hrac->getPosition() !== null) {
+                    $st = $st->withPlayer($hrac->withPosition(null));
+                }
+            }
             // Regenerace hráčů, o kterých se rozhodovalo, až teď (lékárník má přednost, ř. 8433-8440)
             foreach ($pending->getOffers() as $o) {
                 $hrac = $st->getPlayer($o['playerId']);
@@ -531,9 +538,10 @@ final class ActionResolver
         $state = $state->withTeamState($strana, $state->getTeamState($strana)->withApothecaryUsed());
 
         if ($o['kind'] === 'ko') {
-            $pole = ($o['x'] !== null && $o['y'] !== null) ? new \App\ValueObject\Position($o['x'], $o['y']) : null;
-            if ($pole !== null && $state->getPlayerAtPosition($pole) === null) {
-                $state = $state->withPlayer($hrac->withPosition($pole)->withState(PlayerState::STUNNED));
+            // hráč do volby drží své pole (InjuryResolver) ⇒ omráčený zůstává tam; z davu (bez pole) do rezerv
+            $pole = $hrac->getPosition();
+            if ($pole !== null) {
+                $state = $state->withPlayer($hrac->withState(PlayerState::STUNNED));
                 $events[] = GameEvent::apothecaryUsed($id, 'ko', 'stunned');
                 // omráčený položený na volný míč: míč odskočí (ř. 893-898)
                 $mic = $state->getBall();
