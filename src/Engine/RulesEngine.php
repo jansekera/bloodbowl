@@ -73,6 +73,13 @@ final class RulesEngine
             return $errors;
         }
 
+        // P210 (16.10.2026): kdo ohlasil blitz, smi uz jen chodit a dat jednu ranu (r. 346-349).
+        $declared = $state->getDeclaredBlitzerId();
+        if ($declared !== null && isset($params['playerId']) && (int) $params['playerId'] === $declared
+            && $action !== ActionType::MOVE && $action !== ActionType::BLITZ) {
+            return ['A player who declared a Blitz may only move and make one block'];
+        }
+
         return match ($action) {
             ActionType::MOVE => $this->validateMove($state, $params),
             ActionType::BLOCK => $this->validateBlock($state, $params),
@@ -119,7 +126,18 @@ final class RulesEngine
         if ($state->getPhase()->isPlayable()) {
             $teamState = $state->getTeamState($side);
 
+            $declaredId = $state->getDeclaredBlitzerId();
             foreach ($state->getTeamPlayers($side) as $player) {
+                // P210 (16.10.2026): ohlaseny blitzujici smi jen chodit (kamkoli) a dat jednu ranu.
+                if ($player->getId() === $declaredId) {
+                    if ($player->canMove() && $this->canPlayerMoveAnywhere($state, $player)) {
+                        $actions[] = ['type' => ActionType::MOVE->value, 'playerId' => $player->getId()];
+                    }
+                    if ($player->canAct()) {
+                        $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
+                    }
+                    continue;
+                }
                 // ⭐ PHP25: "nic nedelat" se nabizi KAZDEMU, kdo jeste ma co
                 //   utratit -- vcetne Ball & Chain.
                 // ⛔ OPRAVA 11.09.2026: nejdriv jsem B&C hrace vyradil s tim,
@@ -175,10 +193,11 @@ final class RulesEngine
                 }
             }
 
-            // Blitz: once per turn, any unmoved player (excluding B&C)
+            // Blitz: once per turn, any unmoved player (excluding B&C). P210: ohlasuje se na zacatku
+            //   aktivace -- kdo uz ohlasil pohyb (MOVE), blitz nedostane (r. 346-349, 414-427).
             if (!$teamState->isBlitzUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canAct() && !$player->hasSkill(SkillName::BallAndChain)) {
+                    if ($player->canAct() && !$player->hasMoved() && !$player->hasSkill(SkillName::BallAndChain)) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                 }
@@ -530,12 +549,7 @@ final class RulesEngine
         if (!isset($params['playerId'])) {
             return ['playerId is required'];
         }
-        if (!isset($params['targetId'])) {
-            return ['targetId is required'];
-        }
-
         $playerId = (int) $params['playerId'];
-        $targetId = (int) $params['targetId'];
 
         $player = $state->getPlayer($playerId);
         if ($player === null) {
@@ -550,10 +564,27 @@ final class RulesEngine
             return ['Player cannot act'];
         }
 
-        $teamState = $state->getTeamState($player->getTeamSide());
-        if ($teamState->isBlitzUsedThisTurn()) {
-            return ['Blitz already used this turn'];
+        // P210 (16.10.2026): ohlaseny blitzujici uz blitz ma -- jeho rana je soucast teze akce.
+        $declared = $state->getDeclaredBlitzerId() === $playerId;
+        if (!$declared) {
+            $teamState = $state->getTeamState($player->getTeamSide());
+            if ($teamState->isBlitzUsedThisTurn()) {
+                return ['Blitz already used this turn'];
+            }
+            // Blitz se ohlasuje na zacatku aktivace; kdo ohlasil pohyb, z neho blitz neudela.
+            if ($player->hasMoved()) {
+                return ['A player who has moved cannot declare a Blitz'];
+            }
+            if ($player->hasSkill(SkillName::BallAndChain)) {
+                return ['Ball & Chain can only move'];
+            }
         }
+
+        // Ohlaseni bez cile (r. 346-349: cil se nerika, rana je volitelna).
+        if (!isset($params['targetId'])) {
+            return $declared ? ['Blitz already declared'] : [];
+        }
+        $targetId = (int) $params['targetId'];
 
         $target = $state->getPlayer($targetId);
         if ($target === null) {
@@ -599,8 +630,10 @@ final class RulesEngine
      */
     public function getBlitzTargets(GameState $state, MatchPlayerDTO $player): array
     {
-        if (!$player->canAct() || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()) {
-            return [];
+        $declared = $state->getDeclaredBlitzerId() === $player->getId();   // P210: ohlášený blitz
+        if (!$player->canAct() || (!$declared && ($player->hasMoved()
+                || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()))) {
+            return [];   // bez ohlášení: blitz jen na začátku aktivace (P210)
         }
 
         return $this->adjacentStandingEnemies($state, $player);

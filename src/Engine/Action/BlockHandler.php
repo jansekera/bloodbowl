@@ -1650,8 +1650,11 @@ final class BlockHandler implements ActionHandlerInterface
 
         $attWants = $attacker->hasSkill(SkillName::Wrestle)
             && (!$attHasBlock || (!$attHasBall && ($defHasBlock || $defHasBall)));
+        // ROZHODL UZIVATEL 16.10.2026: obrance s Wrestle ho pouzije, ma-li utocnik Block (jinak by
+        //   Both Down ustal); ma-li Block obrance a utocnik ne, Wrestle nevoli (utocnik pada sam).
+        //   Drive jen proti nosici s Blockem. Tataz podminka v C++ (`block_handler.cpp`).
         $defWants = $defender->hasSkill(SkillName::Wrestle)
-            && (!$defHasBlock || ($attHasBall && $attHasBlock));
+            && (!$defHasBlock || $attHasBlock);
 
         return $attWants || $defWants;
     }
@@ -1668,8 +1671,9 @@ final class BlockHandler implements ActionHandlerInterface
             BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW => 100,
             BlockDiceFace::DEFENDER_STUMBLES => ($defenderHasDodge && !$attackerHasTackle) ? 30 : 80,
             BlockDiceFace::PUSHED => 30,
+            // 16.10.2026: obránce s Wrestle útočníka s Blockem položí (viz wrestleUsed) ⇒ oba na zemi.
             BlockDiceFace::BOTH_DOWN => $attackerHasBlock
-                ? ($defenderHasBlock ? 20 : 90)
+                ? ($defender->hasSkill(SkillName::Wrestle) ? 10 : ($defenderHasBlock ? 20 : 90))
                 : ($attackerHasWrestle ? 25 : -50),
             BlockDiceFace::ATTACKER_DOWN => -100,
         };

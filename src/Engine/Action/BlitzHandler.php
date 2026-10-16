@@ -26,6 +26,21 @@ final class BlitzHandler implements ActionHandlerInterface
     public function resolve(GameState $state, array $params): ActionResult
     {
         $attackerId = (int) $params['playerId'];
+
+        // P210 (16.10.2026): OHLASENI blitzu bez cile. `rules_bb2016.txt` r. 346-349: „The player may
+        //   move … He may make one block during the move. The block may be made at any point during the
+        //   move“ -- cil se pri ohlaseni nerika, hrac pak chodi kamkoli (MOVE) a ranu da, kdy chce
+        //   (BLITZ s cilem). Kontrola pred akci (Wild Animal s +2) uz probehla v `ActionResolver`.
+        if (!isset($params['targetId'])) {
+            $side = $state->getPlayer($attackerId)?->getTeamSide();
+            if ($side === null) {
+                throw new \InvalidArgumentException('Player not found');
+            }
+            $state = $state->withTeamState($side, $state->getTeamState($side)->withBlitzUsed())
+                ->withDeclaredBlitzer($attackerId);
+
+            return ActionResult::success($state, []);
+        }
         $targetId = (int) $params['targetId'];
 
         $attacker = $state->getPlayer($attackerId);
@@ -38,9 +53,10 @@ final class BlitzHandler implements ActionHandlerInterface
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
 
-        // Mark blitz used for this turn
+        // Mark blitz used for this turn (u ohlaseneho blitzu uz je; rana ohlaseni uzavre -- P210)
         $teamState = $state->getTeamState($attacker->getTeamSide());
-        $state = $state->withTeamState($attacker->getTeamSide(), $teamState->withBlitzUsed());
+        $state = $state->withTeamState($attacker->getTeamSide(), $teamState->withBlitzUsed())
+            ->withDeclaredBlitzer(null);
 
         // ⛔⛔ OPRAVA 14.09.2026 (PHP29): CIL UZ NA HRISTI BYT NEMUSI.
         //   Tataz trida jako uzavreny PHP17 u hand-offu: nabidka vybira cile

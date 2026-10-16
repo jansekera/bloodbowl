@@ -80,14 +80,16 @@ final class NoBlockAfterMoveTest extends TestCase
         $this->assertSame([], (new RulesEngine())->validate($state, ActionType::BLOCK, ['playerId' => 3, 'targetId' => 2]));
     }
 
-    public function testPohybARanaJeBlitzATenJdeIPoPohybu(): void
+    public function testPohybARanaJeBlitzOhlasenyPredPohybem(): void
     {
-        // "Smí jen X" není "musí X": zakázaný je Block, ne rána jako taková. Pohyb + rána je
-        // Blitz (ř. 347-350) -- ten po pohybu zůstává k dispozici a spotřebuje týmový blitz.
+        // PŘEPSÁNO 16.10.2026 (P210, uživatel: „ten blitz oprav, ať jde pohyb kamkoliv“). Dřív tu stálo,
+        // že po MOVE zůstává Blitz k dispozici -- hráč ale ohlásil POHYB, ne Blitz (ř. 414-427: akce se
+        // ohlašuje na začátku aktivace). Pohyb + rána je Blitz (ř. 346-349), jen musí být ohlášený:
+        // BLITZ bez cíle, pak MOVE kamkoli, pak rána (`BlitzDeclareFreeMoveTest`).
         $state = $this->stavPoPohybu();
 
-        $this->assertContains(1, $this->nabidka($state, ActionType::BLITZ));
-        $this->assertSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]));
+        $this->assertNotContains(1, $this->nabidka($state, ActionType::BLITZ), 'z ohlášeného pohybu blitz nevznikne');
+        $this->assertNotSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]));
     }
 
     public function testHracKteryVstalNeblokuje(): void
@@ -248,10 +250,14 @@ final class NoBlockAfterMoveTest extends TestCase
     public function testCileBlitzuSePoPohybuNabizeji(): void
     {
         // ř. 347-350: rána během pohybu je Blitz -- výběr jeho cíle po pohybu musí fungovat dál.
+        // PŘEPSÁNO 16.10.2026 (P210): jen u OHLÁŠENÉHO blitzujícího; po ohlášeném pohybu (MOVE) ne.
         $state = $this->stavPoPohybu();
         $rules = new RulesEngine();
 
-        $this->assertSame([2], $this->ids($rules->getBlitzTargets($state, $state->requirePlayer(1))));
+        $this->assertSame([], $this->ids($rules->getBlitzTargets($state, $state->requirePlayer(1))), 'po MOVE ne');
+        $ohlaseny = $state->withDeclaredBlitzer(1)
+            ->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withBlitzUsed());
+        $this->assertSame([2], $this->ids($rules->getBlitzTargets($ohlaseny, $ohlaseny->requirePlayer(1))));
 
         // ř. 351-352: "This Action may not be declared by more than one player per turn."
         $pouzity = $state->withTeamState(TeamSide::HOME, $state->getTeamState(TeamSide::HOME)->withBlitzUsed());

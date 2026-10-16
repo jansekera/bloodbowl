@@ -1721,9 +1721,11 @@ TEST(BlockHandler, BlockWrestleDefenderKeepsBlockAgainstAnAttackerWithoutBlock) 
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "Longbeard použil Block, ne Wrestle";
 }
 
-TEST(BlockHandler, BlockWrestleDefenderStaysUpAgainstAnAttackerWithBlock) {
-    // Both Down, oba mají Block a míč nedrží nikdo z nich: bez Wrestle se nestane nic. Obránce
-    // Wrestle nepoužije — položil by i sebe a soupeři by tím jen uvolnil pole.
+TEST(BlockHandler, BlockWrestleDefenderWrestlesDownAnAttackerWithBlock) {
+    // PŘEPSÁNO 16.10.2026 — ROZHODL UŽIVATEL: „pokud má obránce wrestle a útočník block — tak obránce
+    // použije“. Dřív tu stálo opačně (obránce zůstal stát, „bez Wrestle se nestane nic“). Both Down,
+    // oba mají Block, míč nedrží nikdo: Wrestle položí oba, bez hodu na brnění, turnover to není
+    // (ř. 8677-8678).
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).skills.add(SkillName::Block);
@@ -1732,8 +1734,8 @@ TEST(BlockHandler, BlockWrestleDefenderStaysUpAgainstAnAttackerWithBlock) {
     BlockParams params{1, 12, false, false};
     auto result = resolveBlock(gs, params, dice, nullptr);
     EXPECT_FALSE(result.turnover);
-    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
-    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
 
 TEST(BlockHandler, BlockWrestleDefenderWrestlesDownAnAttackerWhoCarriesTheBall) {

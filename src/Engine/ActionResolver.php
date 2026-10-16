@@ -246,6 +246,23 @@ final class ActionResolver
                 $state = $state->withBlitzContinuation(null);
             }
         }
+        // P210 (16.10.2026): ohlaseny blitz (cil se pri ohlaseni nerika, `rules_bb2016.txt` r. 346-349).
+        //   Pohyb a rana blitzujiciho jsou TAZ akce -- kontrola pred akci (Wild Animal s +2, Bone-head …)
+        //   probehla pri ohlaseni a neopakuje se. Jakmile jedna jiny hrac nebo tym ukonci kolo, aktivace
+        //   blitzujiciho je u konce (jako u pokracovani P81).
+        $declaredId = $state->getDeclaredBlitzerId();
+        if ($declaredId !== null) {
+            $actorId = isset($params['playerId']) ? (int) $params['playerId'] : null;
+            if (($action === ActionType::MOVE || $action === ActionType::BLITZ) && $actorId === $declaredId) {
+                $isContinuation = true;
+            } elseif ($action === ActionType::END_TURN || ($action->requiresPlayer() && $actorId !== $declaredId)) {
+                $blitzer = $state->getPlayer($declaredId);
+                if ($blitzer !== null) {
+                    $state = $state->withPlayer($blitzer->withHasMoved(true)->withHasActed(true));
+                }
+                $state = $state->withDeclaredBlitzer(null);
+            }
+        }
 
         // Big Guy pre-action check for player actions
         /** @var list<\App\DTO\GameEvent> $preEvents */

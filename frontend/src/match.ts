@@ -438,6 +438,12 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                 await submitBlock(sel.selectedPlayerId, target.playerId, mode);
                 return;
             }
+            // P210 (16.10.2026): v Blitzu se běží kamkoli (ř. 346-349) -- klik na pole pohybu blitz
+            // ohlásí (bez cíle) a hráč doběhne; rána pak z nového pole.
+            if (mode === 'blitz' && moveTargets.some(t => t.x === gridPos.x && t.y === gridPos.y)) {
+                await submitBlitzMove(sel.selectedPlayerId, gridPos.x, gridPos.y);
+                return;
+            }
         }
 
         // Select a player for block/blitz
@@ -454,6 +460,15 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                     );
                 } catch {
                     blockTargets = [];
+                }
+                // P210: blitzující, který ještě neběžel, dostane i pole pohybu
+                moveTargets = [];
+                if (mode === 'blitz' && !player.hasMoved) {
+                    try {
+                        moveTargets = await api.getValidMoves(matchId, player.id);
+                    } catch {
+                        moveTargets = [];
+                    }
                 }
             }
         }
@@ -652,6 +667,31 @@ async function submitMove(playerId: number, x: number, y: number): Promise<void>
     } catch (err) {
         console.error(err);
         toast.error('Move failed');
+    } finally {
+        isProcessing = false;
+    }
+}
+
+/** P210: Blitz s volným pohybem -- napřed ohlásit (BLITZ bez cíle), pak doběhnout; cíle rány z nového pole. */
+async function submitBlitzMove(playerId: number, x: number, y: number): Promise<void> {
+    isProcessing = true;
+    try {
+        if (stateManager.getGameState()?.declaredBlitzerId !== playerId) {
+            const declared = await api.submitAction(matchId, 'blitz', { playerId });
+            await handleActionResult(declared);
+            if (stateManager.getGameState()?.declaredBlitzerId !== playerId) {
+                return;   // ohlášení propadlo (Wild Animal, Bone-head …) -- výsledek ukázal handleActionResult
+            }
+        }
+        const result = await api.submitAction(matchId, 'move', { playerId, x, y });
+        await handleActionResult(result);
+        clearAllTargets();
+        stateManager.selectPlayer(playerId);
+        blockTargets = await api.getBlockTargets(matchId, playerId, 'blitz');
+        stateManager.setValidTargets('blitz', blockTargets.map(t => ({ x: t.x, y: t.y })));
+    } catch (err) {
+        console.error(err);
+        toast.error('Blitz move failed');
     } finally {
         isProcessing = false;
     }

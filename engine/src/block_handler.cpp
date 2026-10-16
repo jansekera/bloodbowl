@@ -99,7 +99,7 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     // konzervativne: bez mice, tj. jak to vypada ve zdi.
     bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
                       (!attBlock || defBlock);
-    bool defWrestle = def.hasSkill(SkillName::Wrestle) && !defBlock;
+    bool defWrestle = def.hasSkill(SkillName::Wrestle) && (!defBlock || attBlock);   // táž podmínka jako v resolveru (16.10.)
 
     int bestIdx = 0;
     int bestScore = scoreFace(faces[0], attBlock, defBlock, defDodge, attTackle,
@@ -1106,13 +1106,15 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 (!att.hasSkill(SkillName::Block) ||
                  (!attHasBall && (def.hasSkill(SkillName::Block) || defHasBall)));
 
-            // Obrance: kdyz ma Block, Both Down ho necha stat a slozi utocnika
-            // -- to je lepsi nez Wrestle, ledaze utocnik drzi mic (pak je jeho
-            // polozeni na zem turnover, l. 368-372). Bez Blocku pada tak jako
-            // tak, takze Wrestle bere jako lepsi variantu (bez hodu na zbroj).
+            // Obrance (ROZHODL UZIVATEL 16.10.2026, audit parity 08.10. bod (a)): „pokud ma obrance
+            // wrestle a utocnik block — tak obrance pouzije“; „pokud nosic block nema a obrance ma —
+            // wrestle nevoli“. Utocnik s Blockem by Both Down ustal, takze Wrestle je jediny zpusob,
+            // jak ho polozit. Bez Blocku utocnik pada sam a obrance s Blockem stoji -- Wrestle by ho
+            // jen polozil taky. Obrance bez Blocku pada tak jako tak => Wrestle (bez hodu na zbroj).
+            // Drive: s Blockem jen proti nosici (i bez Blocku nosice) -- a ne proti utocniku s Blockem.
             const bool defWantsWrestle =
                 def.hasSkill(SkillName::Wrestle) &&
-                (!def.hasSkill(SkillName::Block) || attHasBall);
+                (!def.hasSkill(SkillName::Block) || att.hasSkill(SkillName::Block));
 
             // Juggernaut na blitzu rusi Wrestle OBRANCE (rules parity 10.08.):
             // "the opposing player may not use his Fend, Stand Firm or Wrestle

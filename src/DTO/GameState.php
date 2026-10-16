@@ -36,6 +36,10 @@ final class GameState
         //   (`rules_bb2016.txt` r. 551-552). Propadne, jakmile jedna jiny hrac
         //   nebo skonci kolo -- viz `ActionResolver::resolve`.
         private ?int $blitzContinuationPlayerId = null,
+        // P210 (16.10.2026): hrac, ktery OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt`
+        //   r. 346-349: cil se pri ohlaseni nerika, rana kdykoli behem pohybu). Propadne jako
+        //   pokracovani -- jakmile jedna jiny hrac nebo skonci kolo.
+        private ?int $declaredBlitzerId = null,
     ) {}
 
     /**
@@ -297,6 +301,18 @@ final class GameState
         return $clone;
     }
 
+    public function getDeclaredBlitzerId(): ?int
+    {
+        return $this->declaredBlitzerId;
+    }
+
+    public function withDeclaredBlitzer(?int $playerId): self
+    {
+        $clone = clone $this;
+        $clone->declaredBlitzerId = $playerId;
+        return $clone;
+    }
+
     public function withTurnoverPending(bool $pending): self
     {
         $clone = clone $this;
@@ -346,6 +362,7 @@ final class GameState
     {
         $clone = clone $this;
         $clone->blitzContinuationPlayerId = null;   // P81: pokracovani konci s kolem
+        $clone->declaredBlitzerId = null;           // P210: ohlaseny blitz konci s kolem
         foreach ($clone->players as $id => $player) {
             // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
             //   turn" plati pro KAZDE kolo, i souperovo (Pro jde pouzit i mimo
@@ -442,6 +459,7 @@ final class GameState
             'pendingBlock' => $this->pendingBlock?->toArray(),
             'pendingReroll' => $this->pendingReroll?->toArray(),
             'blitzContinuationPlayerId' => $this->blitzContinuationPlayerId,
+            'declaredBlitzerId' => $this->declaredBlitzerId,
         ];
     }
 
@@ -472,6 +490,7 @@ final class GameState
             pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
             blitzContinuationPlayerId: isset($data['blitzContinuationPlayerId']) ? (int) $data['blitzContinuationPlayerId'] : null,
+            declaredBlitzerId: isset($data['declaredBlitzerId']) ? (int) $data['declaredBlitzerId'] : null,
         );
     }
 }

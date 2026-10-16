@@ -85,6 +85,8 @@ export interface GameState {
     weather: string;
     pendingBlock?: PendingBlock | null;
     pendingReroll?: PendingReroll | null;
+    /** P210: hráč, který ohlásil Blitz a ještě nedal ránu (chodí kamkoli, pak jedna rána). */
+    declaredBlitzerId?: number | null;
 }
 
 export interface TeamState {
