@@ -1150,6 +1150,17 @@ final class BlockHandler implements ActionHandlerInterface
             // Move ball with attacker if carried
             if ($currentState->getBall()->getCarrierId() === $attacker->getId()) {
                 $currentState = $currentState->withBall(BallState::carried($defenderPos, $attacker->getId()));
+            } elseif ($this->odlozenyStrip === null && $this->odlozenyDav === null
+                && !$currentState->getBall()->isHeld() && $currentState->getBall()->getPosition()?->equals($defenderPos)) {
+                // (odložený odraz po Strip Ballu / vhazování z davu se hází až po follow-upu níž)
+                // OPRAVENO 16.10.2026 (audit parity 08.10. bod (c), rozhodl uzivatel: „follow up chyta“;
+                //   C++ od 13.10., P194/6). Mic se odrazil na uvolnene pole behem odtlaceni -- hodem,
+                //   ktery podle `rules_bb2016.txt` r. 609-610 prisel az PO rozhodnuti o follow-upu,
+                //   takze utocnik tam uz stal a mic CHYTA. Driv na lezici mic jen vstoupil.
+                $chyceni = $this->ballResolver->resolveCatch($currentState, $attacker);
+                $currentState = $chyceni['state'];
+                $events = array_merge($events, $chyceni['events']);
+                $attacker = $currentState->getPlayer($attacker->getId()) ?? $attacker;
             }
         }
         // P198: odraz vyraženého míče a dav až po follow-upu

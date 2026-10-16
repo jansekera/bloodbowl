@@ -658,6 +658,29 @@ TEST(BlockHandler, MultipleBlockBothResolve) {
     EXPECT_EQ(gs.getPlayer(13).state, PlayerState::PRONE);
 }
 
+// Audit parity 08.10. bod (b), uživatel 16.10.2026 (ověřeno proti textu): Dauntless v Multiple Block
+// porovnává s obráncem VČETNĚ +2 (ř. 8299-8301 „each defender's strength is increased by 2“ je modifikátor),
+// ale PŘED asistencemi (ř. 8033-8035). ST3 proti ST3+2 = 5: hod 3 ⇒ 3 + 3 = 6 > 5 ⇒ útočník má sílu 5.
+// Kdyby se +2 nepočítalo, Dauntless by se nehodil vůbec (3 není víc než 3); kdyby se počítala asistence
+// druhého obránce (5 + 1 = 6), hod 3 by neprošel.
+TEST(BlockHandler, DauntlessInMultipleBlockCountsThePlusTwoButNotAssists) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);                 // ST3
+    gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    gs.getPlayer(1).skills.add(SkillName::Dauntless);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);                // ST3 (+2), druhý obránce mu asistuje
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+    FixedDiceRoller dice({3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});
+    std::vector<GameEvent> events;
+    resolveMultipleBlock(gs, 1, 12, 13, dice, &events);
+    const GameEvent* d = nullptr;
+    for (const auto& e : events)
+        if (e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::Dauntless)) { d = &e; break; }
+    ASSERT_NE(d, nullptr) << "proti ST 3 + 2 se Dauntless hází";
+    EXPECT_TRUE(d->success) << "3 + 3 > 5 — asistence se do porovnání nepočítá";
+}
+
 TEST(BlockHandler, MultipleBlockNoFollowUp) {
     GameState gs;
     gs.phase = GamePhase::PLAY;
