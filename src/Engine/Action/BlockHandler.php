@@ -59,7 +59,7 @@ final class BlockHandler implements ActionHandlerInterface
      */
     private function payBlitzBlock(GameState $state, MatchPlayerDTO $attacker, array &$events): array
     {
-        $gfiFloor = $attacker->isRooted() ? 0 : ($attacker->hasSkill(SkillName::Sprint) ? -3 : -2);
+        $gfiFloor = $this->gfiPodlaha($attacker);
         $remaining = $attacker->getMovementRemaining() - 1;
         if ($remaining < $gfiFloor) {
             $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(true));
@@ -156,6 +156,28 @@ final class BlockHandler implements ActionHandlerInterface
         return $tzGo <= $tzStay;
     }
 
+    /** Nejnižší zbývající pohyb, kam hráč smí jít přes GFI (2, se Sprintem 3; zakořeněný 0). Jedno místo (review 16.10.). */
+    private function gfiPodlaha(MatchPlayerDTO $hrac): int
+    {
+        return $hrac->isRooted() ? 0 : ($hrac->hasSkill(SkillName::Sprint) ? -3 : -2);
+    }
+
+    /**
+     * Konec rány: útočník už jednal. V BLITZU smí stojící, nezakořeněný útočník dojít zbytkem pohybu
+     * (`rules_bb2016.txt` ř. 551-552) — `hasMoved=false` pustí MOVE, `hasActed=true` zakáže cokoli jiného.
+     * Jedno místo pro ránu i pro propadlou ránu (Foul Appearance) — review 16.10. (dřív dvě kopie).
+     */
+    private function ukoncitRanu(GameState $state, MatchPlayerDTO $attacker, bool $vBlitzu): GameState
+    {
+        $mayContinue = $vBlitzu
+            && $attacker->getState() === PlayerState::STANDING
+            && !$attacker->isRooted()
+            && $attacker->getMovementRemaining() > $this->gfiPodlaha($attacker);
+        $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(!$mayContinue));
+
+        return $mayContinue ? $state->withBlitzContinuation($attacker->getId()) : $state;
+    }
+
     /**
      * @param array<string, mixed> $params
      */
@@ -236,17 +258,7 @@ final class BlockHandler implements ActionHandlerInterface
                 //   r. 8669). V blitzu smi tedy dal bezet (r. 551-552); pole za ranu uz je zaplacene
                 //   (P82 vyse; rozhodl uzivatel 15.10.). Mimo blitz akce Block konci jako drive.
                 $attacker = $state->getPlayer($attackerId) ?? $attacker;
-                $gfiFloor = $attacker->hasSkill(SkillName::Sprint) ? -3 : -2;
-                $mayContinue = !empty($params['isBlitz'])
-                    && $attacker->getState() === PlayerState::STANDING
-                    && !$attacker->isRooted()
-                    && $attacker->getMovementRemaining() > $gfiFloor;
-                $state = $state->withPlayer(
-                    $attacker->withHasActed(true)->withHasMoved(!$mayContinue),
-                );
-                if ($mayContinue) {
-                    $state = $state->withBlitzContinuation($attackerId);
-                }
+                $state = $this->ukoncitRanu($state, $attacker, !empty($params['isBlitz']));
                 return ActionResult::success($state, $events);
             }
         }
@@ -427,17 +439,7 @@ final class BlockHandler implements ActionHandlerInterface
             //   r. 551-552) -- vcetne GFI, ktere mu zbyly; zakoreneny ne.
             //   Aktivace zustava otevrena: `hasMoved=false` pusti MOVE,
             //   `hasActed=true` zakaze cokoli jineho.
-            $gfiFloor = $updatedAttacker->hasSkill(SkillName::Sprint) ? -3 : -2;
-            $mayContinue = $isBlitz && !$result->isTurnover()
-                && $updatedAttacker->getState() === PlayerState::STANDING
-                && !$updatedAttacker->isRooted()
-                && $updatedAttacker->getMovementRemaining() > $gfiFloor;
-            $finalState = $finalState->withPlayer(
-                $updatedAttacker->withHasActed(true)->withHasMoved(!$mayContinue),
-            );
-            if ($mayContinue) {
-                $finalState = $finalState->withBlitzContinuation($updatedAttacker->getId());
-            }
+            $finalState = $this->ukoncitRanu($finalState, $updatedAttacker, $isBlitz && !$result->isTurnover());
         }
 
         if ($result->isTurnover()) {

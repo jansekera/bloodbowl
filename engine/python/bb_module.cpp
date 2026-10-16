@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <functional>
 #include "bb/coach_choice.h"
 #include "bb/cage_advance.h"
 #include "bb/block_handler.h"
@@ -513,6 +514,11 @@ PYBIND11_MODULE(bb_engine, m) {
             // Review 16.10.: nabídka (pole, hráči) se čte ze stavu V OKAMŽIKU otázky — po události
             // z výkopové tabulky (Quick Snap, Blitz!) — a teprve potom se stav vrátí. Dřív se četla
             // až po restore(), tedy z pozic před výkopem, a odpověď „odp N“ mířila jinam než u enginu.
+            // Druhé review 16.10.: stav se vrátí i tehdy, když sestavení nabídky vyhodí výjimku.
+            struct RestoreGuard {
+                std::function<void()> fn;
+                ~RestoreGuard() { if (fn) fn(); }
+            } guard{restore};
             py::dict d;
             static const char* names[] = {"REROLL", "PRO_GATE_REROLL", "BLOCK_REROLL", "PASS_REROLL",
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
@@ -536,6 +542,7 @@ PYBIND11_MODULE(bb_engine, m) {
                 d["players"] = bb::kickoffReturnCandidates(state, bb::opponent(state.kickingTeam),
                     {static_cast<int8_t>(q.target / 100), static_cast<int8_t>(q.target % 100)});
             }
+            guard.fn = nullptr;
             restore();
             return py::make_tuple(py::none(), eventsToList(events), d);
         } catch (...) {

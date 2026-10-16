@@ -356,7 +356,7 @@ final class InjuryResolver
             //   jeden výsledek (AI: mírnější); Badly Hurt -- i původní -- ⇒ rezervy.
             $vysledek = $cas['result'];
             $rezervy = false;
-            $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek);
+            $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek, $hasStakes);
             if ($odlozeno) {
                 $regenerace = false;   // Regenerace až po volbě kouče (lékárník má přednost, ř. 8433-8440)
             } elseif ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {

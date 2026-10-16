@@ -160,6 +160,8 @@ double carrierThreatAt(const GameState& state, const Player& carrier, Position s
 double handOffTdChance(const GameState& state, const Player& carrier, const Player& receiver,
                        Position* via, Position* ez) {
     if (!carrier.isOnPitch() || !receiver.isOnPitch() || receiver.state != PlayerState::STANDING) return 0.0;
+    // review 16.10.2026: předávka je jedna za tah — řadič by ji jinak po přeplánování nabídl podruhé
+    if (state.getTeamState(carrier.teamSide).handOffUsedThisTurn) return 0.0;
     if (receiver.hasSkill(SkillName::NoHands) || !receiver.canAct() || receiver.hasMoved || receiver.hasActed) return 0.0;
     const TeamSide side = carrier.teamSide;
     // 1) nosič na pole vedle příjemce (svým pohybem, bez GFI)
@@ -622,6 +624,7 @@ void CageController::planStart(const GameState& state) {
     //   nic (zdržuje se jako dosud).
     auto orderSafetyHandOff = [&](const Player& c) -> bool {
         if (!cageFeatureOn(kFeatSafetyHandOff) || c.teamSide != state.activeTeam || !freeToAct(c)) return false;
+        if (state.getTeamState(c.teamSide).handOffUsedThisTurn) return false;   // jedna předávka za tah
         double threat = blitzThreat(state, c);
         if (threat <= kSafeBlitzThreat) return false;
         const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);

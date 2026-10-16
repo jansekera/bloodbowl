@@ -223,10 +223,10 @@ final class ActionResolver
         });
         // P206 (b), 16.10.2026 (uživatel: „lékárník se má ptát hráče na vše“): zranění hráče kouče-člověka
         //   (KO i Casualty) se zapíše jako nabídka; akce doběhne celá a pak se kouč zeptá (PendingApothecary).
-        /** @var list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool}> $nabidky */
+        /** @var list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool, stakes: bool}> $nabidky */
         $nabidky = [];
         $lide = $this->interactiveApothecary;
-        $this->injuryResolver->setOdlozitLekarnika($lide === [] ? null : function (MatchPlayerDTO $hrac, string $druh, ?CasualtyResult $vysledek) use ($state, $lide, &$nabidky): bool {
+        $this->injuryResolver->setOdlozitLekarnika($lide === [] ? null : function (MatchPlayerDTO $hrac, string $druh, ?CasualtyResult $vysledek, bool $stakes = false) use ($state, $lide, &$nabidky): bool {
             $strana = $hrac->getTeamSide();
             if (!in_array($strana, $lide, true) || !$state->getTeamState($strana)->canUseApothecary()) {
                 return false;
@@ -239,6 +239,7 @@ final class ActionResolver
                 'x' => $pos?->getX(),
                 'y' => $pos?->getY(),
                 'regeneration' => $hrac->hasSkill(\App\Enum\SkillName::Regeneration),
+                'stakes' => $stakes,   // review 16.10.: Stakes ruší Regeneraci i po odložené volbě
             ];
 
             return true;
@@ -249,15 +250,16 @@ final class ActionResolver
             $this->injuryResolver->setLekarnik(null);
             $this->injuryResolver->setOdlozitLekarnika(null);
         }
-        if ($nabidky !== []) {
-            $st = $r->getNewState()->withPendingApothecary(new PendingApothecaryDTO($nabidky, $r->isTurnover()));
-
-            return new ActionResult($st, $r->isSuccess(), false, $r->getEvents());
-        }
         $st = $r->getNewState();
         foreach (array_keys($pouzit) as $strana) {
             $side = TeamSide::from($strana);
             $st = $st->withTeamState($side, $st->getTeamState($side)->withApothecaryUsed());
+        }
+        // Review 16.10.: až PO zápisu lékárníka AI — dřív návrat napřed a AI mohla lékárníka použít znovu
+        if ($nabidky !== []) {
+            $st = $st->withPendingApothecary(new PendingApothecaryDTO($nabidky, $r->isTurnover()));
+
+            return new ActionResult($st, $r->isSuccess(), false, $r->getEvents());
         }
 
         return new ActionResult($st, $r->isSuccess(), $r->isTurnover(), $r->getEvents());
@@ -499,7 +501,7 @@ final class ActionResolver
                 $hrac = $st->getPlayer($o['playerId']);
                 if ($o['regeneration'] && $hrac !== null
                     && in_array($hrac->getState(), [PlayerState::INJURED, PlayerState::DEAD], true)) {
-                    ['player' => $hrac, 'events' => $events] = $this->injuryResolver->resolveRegeneration($hrac, $this->dice, false, $events);
+                    ['player' => $hrac, 'events' => $events] = $this->injuryResolver->resolveRegeneration($hrac, $this->dice, $o['stakes'], $events);
                     $st = $st->withPlayer($hrac);
                 }
             }
@@ -541,7 +543,8 @@ final class ActionResolver
             // hráč do volby drží své pole (InjuryResolver) ⇒ omráčený zůstává tam; z davu (bez pole) do rezerv
             $pole = $hrac->getPosition();
             if ($pole !== null) {
-                $state = $state->withPlayer($hrac->withState(PlayerState::STUNNED));
+                // review 16.10.: withStunned() — omráčený se v tomto kole neotáčí (ř. 703-707)
+                $state = $state->withPlayer($hrac->withStunned());
                 $events[] = GameEvent::apothecaryUsed($id, 'ko', 'stunned');
                 // omráčený položený na volný míč: míč odskočí (ř. 893-898)
                 $mic = $state->getBall();

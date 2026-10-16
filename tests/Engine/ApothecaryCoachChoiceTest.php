@@ -54,6 +54,7 @@ final class ApothecaryCoachChoiceTest extends TestCase
         $this->assertSame([5, 7], [$p->requirePosition()->getX(), $p->requirePosition()->getY()]);
         $this->assertFalse($u->getNewState()->getTeamState(TeamSide::HOME)->canUseApothecary(), 'jednou za zápas');
         $this->assertTrue($u->isTurnover(), 'turnover z akce platí až po volbě');
+        $this->assertTrue($p->isStunnedThisTurn(), 'review 16.10.: omráčený v tomto kole se na konci kola neotáčí (ř. 703-707)');
     }
 
     public function testDecliningKeepsTheKnockOutAndTheApothecary(): void
@@ -79,6 +80,19 @@ final class ApothecaryCoachChoiceTest extends TestCase
         $u = $this->resolver([])->resolve($s2, ActionType::RESOLVE_APOTHECARY, ['result' => 'badly_hurt']);
         $this->assertSame(PlayerState::OFF_PITCH, $u->getNewState()->requirePlayer(1)->getState(), 'Badly Hurt ⇒ rezervy');
         $this->assertNull($u->getNewState()->getPendingApothecary());
+    }
+
+    public function testAnAiApothecaryUsedInTheSameActionIsStillRecorded(): void
+    {
+        // review 16.10.: Both Down bez Blocku — AI hráč (AWAY) Casualty a AI lékárníka použije, náš (HOME) KO.
+        // Dřív návrat kvůli odložené volbě přeskočil zápis „AI lékárník použit“.
+        // 2 = Both Down; napřed obránce AWAY: brnění 6+6, zranění 6+6, casualty 6/1 (Dead) ⇒ AI lékárník:
+        // druhý hod 1/1 (Badly Hurt); pak útočník HOME: brnění 6+6, zranění 4+4 (KO)
+        $r = $this->resolver([2, 6, 6, 6, 6, 6, 1, 1, 1, 6, 6, 4, 4])
+            ->resolve($this->state(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $s = $r->getNewState();
+        $this->assertNotNull($s->getPendingApothecary(), 'fixtura: náš hráč čeká na volbu');
+        $this->assertFalse($s->getTeamState(TeamSide::AWAY)->canUseApothecary(), 'AI lékárník je zapsaný jako použitý');
     }
 
     public function testWithoutInteractiveApothecaryNothingIsAsked(): void

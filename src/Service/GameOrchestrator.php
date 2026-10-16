@@ -117,8 +117,10 @@ final class GameOrchestrator
             $allEvents = array_merge($allEvents, $setupResult->getEvents());
         }
 
-        // AI auto-play for turn
-        if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isPlayable()) {
+        // AI auto-play for turn — ne, čeká-li kouč-člověk na lékárníka (review 16.10.: např. Throw a Rock
+        //   ve výkopu po END_SETUP AI; AI by jinak volbu odpověděla sama nebo ukončila tah)
+        if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isPlayable()
+            && $newState->getPendingApothecary() === null) {
             $aiTurnService = new AITurnService($this->aiCoach, $this->rulesEngine, $lide);
             if ($this->gameLogger !== null) {
                 $aiTurnService->setGameLogger($this->gameLogger);

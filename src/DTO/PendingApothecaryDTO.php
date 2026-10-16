@@ -16,7 +16,7 @@ namespace App\DTO;
 final class PendingApothecaryDTO
 {
     /**
-     * @param list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool}> $offers
+     * @param list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool, stakes: bool}> $offers
      * @param list<string> $options
      */
     public function __construct(
@@ -27,7 +27,7 @@ final class PendingApothecaryDTO
         private readonly array $options = [],
     ) {}
 
-    /** @return list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool}> */
+    /** @return list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool, stakes: bool}> */
     public function getOffers(): array
     {
         return $this->offers;
@@ -54,7 +54,7 @@ final class PendingApothecaryDTO
         return $this->options;
     }
 
-    /** @return array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool}|null */
+    /** @return array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool, stakes: bool}|null */
     public function offerFor(int $playerId): ?array
     {
         foreach ($this->offers as $o) {
@@ -96,6 +96,7 @@ final class PendingApothecaryDTO
                 'x' => isset($o['x']) ? (int) $o['x'] : null,
                 'y' => isset($o['y']) ? (int) $o['y'] : null,
                 'regeneration' => (bool) ($o['regeneration'] ?? false),
+                'stakes' => (bool) ($o['stakes'] ?? false),
             ];
         }
         return new self(

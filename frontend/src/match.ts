@@ -985,6 +985,10 @@ async function init(): Promise<void> {
         if (state.pendingBlock && state.aiTeam !== state.activeTeam) {
             showBlockDiceModal(state);
         }
+        // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme
+        if (state.pendingApothecary) {
+            showApothecaryModal(state);
+        }
 
         // Initialize replay controls for finished games
         if (state.phase === 'game_over') {

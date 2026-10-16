@@ -44,7 +44,8 @@ final class AITurnService
         $maxActions = 100;
 
         for ($i = 0; $i < $maxActions; $i++) {
-            if ($state->getActiveTeam() !== $aiTeam || !$state->getPhase()->isPlayable()) {
+            if ($state->getActiveTeam() !== $aiTeam || !$state->getPhase()->isPlayable()
+                || $state->getPendingApothecary() !== null) {
                 break;
             }
 

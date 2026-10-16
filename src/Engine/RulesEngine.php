@@ -46,6 +46,12 @@ final class RulesEngine
     {
         $errors = [];
 
+        // P206 (b), review 16.10.: čekající volba o lékárníkovi má přednost před VŠÍM (i před volbou kostky
+        //   bloku a výkopem) — jinak by další odložené zranění přepsalo nabídku.
+        if ($state->getPendingApothecary() !== null && $action !== ActionType::RESOLVE_APOTHECARY) {
+            return ['Must resolve the apothecary choice first'];
+        }
+
         // Check game phase
         if ($action === ActionType::SETUP_PLAYER || $action === ActionType::END_SETUP || $action === ActionType::AUTO_SETUP) {
             if (!$state->getPhase()->isSetup()) {
@@ -59,8 +65,6 @@ final class RulesEngine
             if ($state->getPendingApothecary() === null) {
                 $errors[] = 'No pending apothecary choice';
             }
-        } elseif ($state->getPendingApothecary() !== null) {
-            $errors[] = 'Must resolve the apothecary choice first';   // P206 (b)
         } elseif ($action === ActionType::RESOLVE_REROLL) {
             if ($state->getPendingReroll() === null) {
                 $errors[] = 'No pending reroll to resolve';

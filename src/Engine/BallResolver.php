@@ -304,7 +304,9 @@ final class BallResolver
 
             $state = $state->withBall(BallState::onGround($dest));
             $playerAtLanding = $state->getPlayerAtPosition($dest);
-            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
+            // review 16.10. (nález 19 i pro vhazování): hráč bez tackle zón nechytá
+            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING
+                && !$playerAtLanding->hasLostTacklezones()) {
                 $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth);
                 return ['state' => $catchResult['state'], 'events' => array_merge($events, $catchResult['events'])];
             }
