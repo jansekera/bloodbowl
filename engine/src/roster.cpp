@@ -732,7 +732,7 @@ const TeamRoster& getWoodElfRoster1200Agile() {
 //
 // Výsledná hodnota týmu (ceny BB2016; 11 hráčů na hřišti + 3 týmové rerolly + lékárník;
 // dokoupený skill 20 tis., na double 30, +MA 30):
-//   trpaslíci 1490 · wood-elf 1530 (16.10.: jeden Catcher NoS místo Diving Catch) · skaven 1520 · ork 1500 · člověk 1490
+//   trpaslíci 1490 · wood-elf 1510 (16.10.: jeden Catcher NoS místo Diving Catch, Wardancer bez Side Step) · skaven 1520 · ork 1500 · člověk 1490
 //   (týmový reroll: trpaslík, elf, člověk 50 tis., skaven a ork 60 tis.)
 // Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1200 · 1360 · 1290.
 // ⚠️ NOVÁ MĚŘICÍ ÉRA: čísla z TV1500 se s TV1200 neporovnávají.
@@ -777,7 +777,9 @@ const TeamRoster& getWoodElfRoster1500() {
             {{7, 3, 4, 7}, makeSkills({SkillName::Block}), 11, "Lineman +Block"},
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::StripBall,
                 SkillName::Pro}), 1, "Wardancer ball-hunter +Pro"},
-            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::SideStep}), 1, "Wardancer +Side Step"},
+            // 16.10.2026 (uživatel: „můžeš i odebrat víc, když má TV elfů víc než ostatní“): Side Step pryč —
+            // z TV1200, v doktríně uživatele není (rohy jsou Linemani s Block) ⇒ TV 1510.
+            {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap}), 1, "Wardancer"},
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block,
                 SkillName::DivingCatch}), 1, "Catcher +Block+Diving Catch"},
             // Uživatel 16.10.2026 (P180 bod 7a): připravený příjemce stojí často v zóně obránce ⇒ jeden
