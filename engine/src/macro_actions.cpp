@@ -1098,6 +1098,10 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
                 column = (c.x - front) * dir - 2;                     // 0 = přední řada, 1 = druhá
                 if (column < 0 || column > 1) continue;
             }
+            // Uživatel 16.10.2026 (review P212 (4)): „od nosiče a míče utíkat nemá“ — při volném míči
+            // útěk nesmí hráče od míče vzdálit.
+            if (!state.ball.isHeld && state.ball.position.isOnPitch() &&
+                c.distanceTo(state.ball.position) > p.position.distanceTo(state.ball.position)) continue;
             const double cost = worstReplyCost(state, p, c, true);
             if (offense && cost >= stayCost - 1e-9) continue;          // v útoku jen tam, kde to pomůže
             cands.push_back({column, cost, p.position.distanceTo(c), c});
@@ -4213,6 +4217,10 @@ bool endOfTurnEscape(const GameState& state, Macro& out) {
         if (state.ball.isHeld && state.ball.carrierId > 0) {
             const Player& c = state.getPlayer(state.ball.carrierId);
             if (c.teamSide == p.teamSide && c.position.distanceTo(p.position) == 1) return;
+            // Uživatel 16.10.2026: od nosiče neutíká ani v obraně — kdo značí soupeřova nosiče,
+            // zůstává (nosič pak musí uhýbat).
+            if (c.teamSide != p.teamSide && c.state == PlayerState::STANDING &&
+                c.position.distanceTo(p.position) == 1) return;
         }
         const Position esc = agileEscapeSquare(state, p);
         if (esc.x < 0) return;

@@ -229,10 +229,24 @@ final class BlockHandler implements ActionHandlerInterface
             $faRoll = $this->dice->rollD6();
             $events[] = GameEvent::foulAppearance($defender->getId(), $attacker->getId(), $faRoll, $faRoll >= 2);
             if ($faRoll < 2) {
-                // Failed: attacker loses action, NOT a turnover
+                // Failed: rana propadla, NOT a turnover.
+                // OPRAVENO 16.10.2026 (P210, prevod C++ P209 (4)) -- tady se zavirala cela akce.
+                //   `rules_bb2016.txt` r. 8131-8132: „too revolted to make the block and IT is wasted“
+                //   -- propada rana, ne akce (jinde pravidla pisou vyslovne „the Action is wasted“,
+                //   r. 8669). V blitzu smi tedy dal bezet (r. 551-552); pole za ranu uz je zaplacene
+                //   (P82 vyse; rozhodl uzivatel 15.10.). Mimo blitz akce Block konci jako drive.
+                $attacker = $state->getPlayer($attackerId) ?? $attacker;
+                $gfiFloor = $attacker->hasSkill(SkillName::Sprint) ? -3 : -2;
+                $mayContinue = !empty($params['isBlitz'])
+                    && $attacker->getState() === PlayerState::STANDING
+                    && !$attacker->isRooted()
+                    && $attacker->getMovementRemaining() > $gfiFloor;
                 $state = $state->withPlayer(
-                    $attacker->withHasActed(true)->withHasMoved(true),
+                    $attacker->withHasActed(true)->withHasMoved(!$mayContinue),
                 );
+                if ($mayContinue) {
+                    $state = $state->withBlitzContinuation($attackerId);
+                }
                 return ActionResult::success($state, $events);
             }
         }

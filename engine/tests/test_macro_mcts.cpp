@@ -1366,7 +1366,12 @@ TEST(MacroMCTSPolicy, P211AgilePlayerEscapesBeforeTheTurnEnds) {
     Player& o = state.getPlayer(12);
     o.id = 12; o.teamSide = TeamSide::AWAY; o.state = PlayerState::STANDING;
     o.position = {11, 7}; o.stats = {6, 3, 3, 8}; o.movementRemaining = 6;
-    state.ball = BallState::carried({11, 7}, 12);
+    // 16.10.2026: míč nese jiný soupeř — od nosiče se neutíká (DefenderMarkingTheCarrierDoesNotEscape).
+    Player& c = state.getPlayer(13);
+    c.id = 13; c.teamSide = TeamSide::AWAY; c.state = PlayerState::STANDING;
+    c.position = {22, 2}; c.stats = {6, 3, 3, 8}; c.movementRemaining = 6;
+    state.ball = BallState::carried({22, 2}, 13);
+    state.homeTeam.blitzUsedThisTurn = true;   // test zkouší útěk na konci tahu, ne volbu blitzu
 
     MCTSConfig config;
     config.timeBudgetMs = 0;

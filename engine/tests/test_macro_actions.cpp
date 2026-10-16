@@ -587,7 +587,12 @@ GameState p211State(bool weHaveTheBall) {
         c.position = {3, 12}; c.stats = {6, 3, 3, 8}; c.movementRemaining = 6;
         state.ball = BallState::carried({3, 12}, 2);
     } else {
-        state.ball = BallState::carried({11, 7}, 12);
+        // Míč má soupeř, ale jiný než ten v kontaktu (16.10.2026: od nosiče se neutíká — viz
+        // DefenderMarkingTheCarrierDoesNotEscape); dřív nesl míč právě soupeř 12 vedle hráče.
+        Player& c = state.getPlayer(13);
+        c.id = 13; c.teamSide = TeamSide::AWAY; c.state = PlayerState::STANDING;
+        c.position = {22, 2}; c.stats = {6, 3, 3, 8}; c.movementRemaining = 6;
+        state.ball = BallState::carried({22, 2}, 13);
     }
     return state;
 }
@@ -627,6 +632,28 @@ TEST(MacroActions, CageCornerNextToOurCarrierDoesNotEscape) {
     state.ball = BallState::carried(cp, 2);
     Macro esc;
     EXPECT_FALSE(endOfTurnEscape(state, esc)) << "roh klece neopouští nosiče";
+}
+
+// Uživatel 16.10.2026: „od nosiče a míče utíkat nemá“. Hráč 1 značí soupeřova nosiče 12 ⇒ zůstává.
+TEST(MacroActions, DefenderMarkingTheCarrierDoesNotEscape) {
+    GameState state = p211State(false);
+    state.ball = BallState::carried({11, 7}, 12);                  // nosič soupeře 12 hned vedle
+    Macro ctrl;
+    ASSERT_TRUE(endOfTurnEscape(p211State(false), ctrl)) << "pozitivní kontrola: vedle nenosiče utíká";
+    Macro esc;
+    EXPECT_FALSE(endOfTurnEscape(state, esc)) << "značení nosiče má přednost před útěkem";
+}
+
+// Volný míč vedle hráče: útěk (jinak do dvou sloupců za soupeřem) ho od míče nevzdálí.
+TEST(MacroActions, EscapeNeverMovesAwayFromALooseBall) {
+    GameState state = p211State(false);
+    const Position gr = state.getPlayer(1).position;
+    // míč na straně soupeře (vedle něj): obvyklý útěk dozadu do dvou sloupců by od míče vzdálil
+    state.ball = BallState::onGround({static_cast<int8_t>(gr.x + 1), static_cast<int8_t>(gr.y + 1)});
+    Macro esc;
+    if (endOfTurnEscape(state, esc))
+        EXPECT_LE(esc.targetPos.distanceTo(state.ball.position), gr.distanceTo(state.ball.position))
+            << "od volného míče se neutíká";
 }
 
 // V obraně (míč má soupeř) do dvou sloupců: čelo soupeře x=11, naše zóna x=0 ⇒ přední řada x=9
