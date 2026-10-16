@@ -1378,3 +1378,49 @@ TEST(MacroMCTSPolicy, P211AgilePlayerEscapesBeforeTheTurnEnds) {
     EXPECT_EQ(policy.lastDecision().source, MacroDecisionInfo::Source::ESCAPE);
     EXPECT_EQ(policy.lastDecision().macro.type, MacroType::REPOSITION);
 }
+
+// P159 (16.10.2026): odklad riskantní akce smí riskantní makro jen ODSUNOUT.
+// Bezpečná alternativa, po které riskantní makro propadne (přesun TÉHOŽ hráče —
+// blitz už nikdy nepřijde), se nesmí vybrat; přesun jiného, vzdáleného hráče ano.
+TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 1;
+    state.homeTeam.rerolls = 0;
+    state.awayTeam.rerolls = 0;
+    state.homeTeam.blitzUsedThisTurn = false;
+    state.weather = Weather::NICE;
+
+    auto put = [&](int id, TeamSide side, Position pos, PlayerStats st) {
+        Player& p = state.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    };
+    put(1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});   // slabý blitzer
+    put(2, TeamSide::HOME, {3, 12}, {6, 3, 3, 8});   // daleko od děje
+    put(12, TeamSide::AWAY, {13, 7}, {6, 4, 3, 9});  // silný cíl blitzu
+
+    std::vector<Macro> offer;
+    getAvailableMacros(state, offer);
+    const Macro* blitz = nullptr;
+    const Macro* sameRepos = nullptr;
+    const Macro* otherRepos = nullptr;
+    for (const auto& m : offer) {
+        // BLITZ nese jen cíl; blitzujícího vybere až rozbalení (pickBlitzer). Hráč 2 na cíl nedoběhne.
+        if (m.type == MacroType::BLITZ && m.targetId == 12) blitz = &m;
+        if (m.type == MacroType::REPOSITION && m.playerId == 1 && !sameRepos) sameRepos = &m;
+        if (m.type == MacroType::REPOSITION && m.playerId == 2 && !otherRepos) otherRepos = &m;
+    }
+    ASSERT_NE(blitz, nullptr);
+    ASSERT_NE(sameRepos, nullptr);
+    ASSERT_NE(otherRepos, nullptr);
+
+    DiceRoller dice(159);
+    // pickPto = 1.0: tady rozhoduje jen to, zda blitz po alternativě vůbec zůstane.
+    EXPECT_FALSE(deferralKeepsPick(state, *sameRepos, *blitz, 1.0, dice, 24))
+        << "přesun téhož hráče blitz zruší — to není odklad";
+    EXPECT_TRUE(deferralKeepsPick(state, *otherRepos, *blitz, 1.0, dice, 24))
+        << "přesun vzdáleného hráče blitz nechá na později";
+}

@@ -210,4 +210,12 @@ public:
     int cagePlansAdopted() const;
 };
 
+// P159 (16.10.2026): odklad smí riskantní makro jen odsunout, ne zrušit.
+// Vrací true, když po bezpečném `alt` zůstane `pick` v nabídce a jeho podíl
+// turnoverů nevzroste nad `pickPto` o víc než rezervu — tj. alt nepoužil
+// téhož hráče, nevzal asistenci ani nezastoupil cestu.
+bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
+                       double pickPto, DiceRoller& dice, int samples,
+                       bool dauntlessInOffer = false);
+
 } // namespace bb

@@ -369,6 +369,35 @@ constexpr double RISK_DEFER_RISKY_PTO = 0.10;
 constexpr double RISK_DEFER_SAFE_PTO  = 0.02;
 constexpr double RISK_DEFER_Q_MARGIN  = 0.04;
 constexpr int    RISK_DEFER_PROBE_K   = 48;
+constexpr double RISK_DEFER_PTO_SLACK = 0.05;
+
+// P159 (16.10.2026). OPRAVENO — bezpečná alternativa se dřív vybírala jen podle
+// vlastního rizika a Q; mohl to být přesun TÉHOŽ hráče (riskantní makro pak
+// propadlo úplně — „risk-never“, ne „risk-last“) nebo blok asistenta, který
+// riskantnímu bloku vzal asistenci (nález S2 z 28.07.: „safe-alternative picker
+// doesn't preserve assist geometry“). Teď se alternativa přijme, jen když po ní
+// riskantní makro zůstane v nabídce a jeho podíl turnoverů nevzroste.
+bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
+                       double pickPto, DiceRoller& dice, int samples,
+                       bool dauntlessInOffer) {
+    int missing = 0, nTO = 0, played = 0;
+    std::vector<Macro> offer;
+    for (int k = 0; k < samples; ++k) {
+        GameState sim = state.clone();
+        auto res = greedyExpandMacro(sim, alt, dice);
+        if (res.turnover || sim.activeTeam != state.activeTeam) { missing++; continue; }
+        offer.clear();
+        getAvailableMacros(sim, offer, dauntlessInOffer);
+        auto it = std::find_if(offer.begin(), offer.end(),
+                               [&](const Macro& m) { return sameMacro(m, pick); });
+        if (it == offer.end()) { missing++; continue; }
+        played++;
+        if (greedyExpandMacro(sim, *it, dice).turnover) nTO++;
+    }
+    if (missing * 10 > samples) return false;
+    if (played == 0) return false;
+    return static_cast<double>(nTO) / played <= pickPto + RISK_DEFER_PTO_SLACK;
+}
 
 Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
                                          const Macro& pick, TeamSide perspective) {
@@ -401,7 +430,10 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
         if (pr.pto > RISK_DEFER_SAFE_PTO) continue;       // must be dice-free
         if (pr.meanActions < 0.5) continue;                // must not be a no-op
         if (pr.q < pickProbe.q - RISK_DEFER_Q_MARGIN) continue;  // Q-guard
-        if (pr.q > bestQ) { bestQ = pr.q; bestAlt = &m; }
+        if (pr.q <= bestQ) continue;
+        if (!deferralKeepsPick(state, m, pick, pickProbe.pto, dice_, RISK_DEFER_PROBE_K / 2,
+                               config_.dauntlessInOffer)) continue;
+        bestQ = pr.q; bestAlt = &m;
     }
     return bestAlt ? *bestAlt : pick;
 }
