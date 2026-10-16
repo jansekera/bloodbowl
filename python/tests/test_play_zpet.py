@@ -25,6 +25,16 @@ def _cmd(d, *prikaz):
                           capture_output=True, text=True, timeout=90).stdout
 
 
+def _po_vykopu(d):
+    # Od P200 (14.10.2026) se výkop ptá kouče přijímajících na Kick-Off Return (kdo / kam). Tyhle testy
+    # zkoušejí `zpet` a odmítnutý příkaz, ne výkop ⇒ odpovědět „0“ (nikdo / zůstat). Dřív tu chyběla
+    # a testy padaly od 14.10. (`check-py` není v `make check`).
+    for _ in range(3):
+        if "KICK-OFF RETURN" not in _cmd(d, "board"):
+            return
+        _cmd(d, "odp", "0")
+
+
 def _deska(text):
     i = text.find("--- hráči")
     return text[i:]
@@ -41,6 +51,7 @@ def test_zpet_vrati_stav(tmp_path):
         out = _cmd(d, "los")
         if "volba" in out:
             _cmd(d, "volba", "prijimat")
+        _po_vykopu(d)
         pred = _deska(_cmd(d, "board"))
         akce = _cmd(d, "actions", "HOME")
         assert "[0]" in akce
@@ -80,6 +91,7 @@ def test_odmitnuty_do_neni_v_logu(tmp_path):
         _cmd(d, "kouc", "HOME")
         if "volba" in _cmd(d, "los"):
             _cmd(d, "volba", "prijimat")
+        _po_vykopu(d)
         _cmd(d, "actions", "HOME")
         assert "CHYBA" in _cmd(d, "do", "9999")
         assert "do 9999" not in open(os.path.join(d, "prikazy.log")).read()
