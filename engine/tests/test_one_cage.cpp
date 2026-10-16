@@ -679,6 +679,32 @@ TEST(OneCageLaggards, P211bWildAnimalLaggardMovesPlainAfterTheBlitzWasUsed) {
     EXPECT_FALSE(m.declareBlitz) << "blitz je pryč ⇒ obyčejný přesun";
 }
 
+// Review 16.10.2026: týmový blitz je jeden — dva zaostalí Wild Animal nesmí ve frontě oba nést ohlášení.
+TEST(OneCageLaggards, TwoWildAnimalLaggardsDeclareTheTeamBlitzOnlyOnce) {
+    Board b = wildAnimalLaggardBoard();
+    b.put(7, TeamSide::HOME, {5, 11});                            // druhý zaostalec s Wild Animal
+    b.s.getPlayer(7).skills.add(SkillName::WildAnimal);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    Macro m;
+    int declared = 0, laggards = 0;
+    for (bool ok = cc.beforeEndTurn(b.s, m); ok; ok = cc.next(b.s, m)) {
+        if (m.playerId == 6 || m.playerId == 7) { laggards++; declared += m.declareBlitz; }
+    }
+    ASSERT_EQ(laggards, 2) << "oba zaostalci jsou ve frontě před koncem tahu";
+    EXPECT_EQ(declared, 1) << "blitz ohlásí jen jeden";
+}
+
+TEST(OneCageLaggards, StaleDeclareBlitzMacroDoesNotDeclareASecondBlitz) {
+    Board b = wildAnimalLaggardBoard();
+    b.s.homeTeam.blitzUsedThisTurn = true;                         // blitz už spotřebovalo jiné makro
+    Macro m{MacroType::REPOSITION, 6, -1, {9, 5}};
+    m.declareBlitz = true;                                         // zastaralé makro z dřívější nabídky
+    DiceRoller dice(7);
+    const auto res = greedyExpandMacro(b.s, m, dice);
+    for (const Action& a : res.actions) EXPECT_NE(a.type, ActionType::BLITZ) << "druhý blitz v tahu";
+}
+
 // (a) pokračování — „využij i blitz a block pro uvolnění klece“, „nezapomeň na příchod pro asistenci“
 namespace {
 // Náš hráč 4 na (14,5) je držen jediným soupeřem 13 na (15,5). Klec kolem (12,7) má jen zadní rohy.
@@ -718,6 +744,21 @@ TEST(OneCageFreeing, FreeTeammateComesToAssistSoTheBlockHasTwoDice) {
     EXPECT_EQ(second.type, MacroType::BLOCK);
     EXPECT_EQ(second.playerId, 5);
     EXPECT_EQ(second.targetId, 13);
+}
+
+// Review 16.10.2026: P211b i pro pomocníka u asistence — pomocník se k soupeři PŘESOUVÁ, a Wild Animal
+// řadič klece během tahu nepřesouvá. Tatáž pozice jako výše, jen volný pomocník má Wild Animal.
+TEST(OneCageFreeing, WildAnimalDoesNotWalkInToAssist) {
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
+    Board b = heldTeammateBoard();
+    b.put(5, TeamSide::HOME, {16, 4}, 4, 3, {SkillName::Block});
+    b.put(14, TeamSide::AWAY, {17, 5}, 6);
+    b.put(6, TeamSide::HOME, {13, 2});
+    b.s.getPlayer(6).skills.add(SkillName::WildAnimal);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    for (const Macro& m : ms) EXPECT_NE(m.playerId, 6) << "Wild Animal nejde pro asistenci";
 }
 
 TEST(OneCageFreeing, BlitzFreesAHeldTeammateWhenNoBlockIsAvailable) {

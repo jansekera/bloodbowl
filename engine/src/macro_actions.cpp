@@ -1290,8 +1290,11 @@ static double blockDieKnockFraction(const GameState& state, const Player& att, c
     return faces / 6.0;
 }
 
+// count: tikat diagnostický čítač ceny proti Wrestle (g_wrestleDefenderPriced). Review 16.10.: jen při
+// rozbalení makra, ne při sestavování nabídky (P196 volá pickBlitzer i tam) — čítač by se jinak nafoukl
+// o dotazy nabídky a měřil by něco jiného než dřív.
 static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer,
-                                   const Player& target) {
+                                   const Player& target, bool count = true) {
     // Risk estimate and feature extraction keep the raw strengths: they describe
     // the block as thrown, not whether to offer it.
     Position landing{-1, -1};
@@ -1333,7 +1336,7 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
     //   PRAVIDLA -- vada, kterou projekt vede pod
     //   `feedback_implement_the_rule_not_the_outcome`.
     const bool defWrestle = defWouldWrestle;
-    if (defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestleDefenderPriced;
+    if (count && defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestleDefenderPriced;
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
                                                defWrestle);
     // P211c (15.10.2026): Wild Animal po ohlášení blitzu hází k6 +2, na 1 akce propadá
@@ -3773,7 +3776,7 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        ranked.emplace_back(estimateBlitzOdds(state, blitzer, target), a);
+        ranked.emplace_back(estimateBlitzOdds(state, blitzer, target, count), a);
     }
     // ⭐ P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“): napřed kdo soupeře nejspíš srazí
     //   (nebo mu vyrazí míč), při shodě kdo méně riskuje. Dřív jen riziko — gutter runner se silou 2
@@ -4205,6 +4208,12 @@ bool endOfTurnEscape(const GameState& state, Macro& out) {
     state.forEachOnPitch(state.activeTeam, [&](const Player& p) {
         if (found || !isFreeToAct(p) || (state.ball.isHeld && state.ball.carrierId == p.id)) return;
         if (countTacklezones(state, p.position, p.teamSide) == 0) return;   // jen v kontaktu
+        // Review 16.10.: hráč vedle našeho nosiče je roh klece — neutíká, jinak klec na konci tahu
+        // sám rozebere (u elfů je agilní každý: AG4). Dřív se vyřazoval jen nosič.
+        if (state.ball.isHeld && state.ball.carrierId > 0) {
+            const Player& c = state.getPlayer(state.ball.carrierId);
+            if (c.teamSide == p.teamSide && c.position.distanceTo(p.position) == 1) return;
+        }
         const Position esc = agileEscapeSquare(state, p);
         if (esc.x < 0) return;
         const Macro m{MacroType::REPOSITION, p.id, -1, esc};
@@ -4218,7 +4227,10 @@ bool endOfTurnEscape(const GameState& state, Macro& out) {
 static MacroExpansionResult expandReposition(GameState& state, const Macro& macro,
                                               DiceRollerBase& dice) {
     MacroExpansionResult result;
-    if (macro.declareBlitz) {
+    // Review 16.10.: ohlásit jen, je-li týmový blitz ještě volný — makro mohlo vzniknout dřív, než ho
+    // spotřebovalo jiné (druhý Wild Animal ve frontě klece, zastaralé makro při replayToNode);
+    // executeAction legalitu neověřuje, takže dřív šly dva blitzy v jednom tahu.
+    if (macro.declareBlitz && !state.getTeamState(state.activeTeam).blitzUsedThisTurn) {
         // P156: napřed ohlásit blitz bez cíle (Wild Animal s +2). Neprošel-li hod, akce propadla.
         const Action declare{ActionType::BLITZ, macro.playerId, -1, state.getPlayer(macro.playerId).position};
         if (executeAndRecord(state, declare, dice, result)) return result;

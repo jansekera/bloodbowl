@@ -110,6 +110,9 @@ void resolveKickOffReturn(GameState& state, TeamSide receiving, Position ballPos
         }
     };
 
+    // Review 16.10.: odpovědi 0..n jako bity masky. Dřív `(1 << (n + 1)) - 1` v int — při stropu
+    // n = 30 je 1 << 31 přetečení (nedefinované chování); bez znaménka vyjde 0x7FFFFFFF.
+    auto answerMask = [](int n) { return static_cast<int>((1u << (n + 1)) - 1u); };
     // P200 (1), 14.10.2026: v živé partii volí kouč přijímajících -- KDO (při víc oprávněných;
     // uživatel 14.10.) a KAM; jen jeden hráč za výkop.
     if (coachDecides(receiving)) {
@@ -117,13 +120,13 @@ void resolveKickOffReturn(GameState& state, TeamSide receiving, Position ballPos
         int id = cand.front();
         if (cand.size() > 1) {
             const int n = static_cast<int>(cand.size());
-            const int a = askCoach(CoachQuestion::KICKOFF_RETURN_PLAYER, -1, -1, n, code, (1 << (n + 1)) - 1);
+            const int a = askCoach(CoachQuestion::KICKOFF_RETURN_PLAYER, -1, -1, n, code, answerMask(n));
             if (a == 0) return;
             id = cand[a - 1];
         }
         const std::vector<Position> sq = kickoffReturnSquares(state, id, ballPos);
         const int n = static_cast<int>(sq.size());
-        const int a = askCoach(CoachQuestion::KICKOFF_RETURN, id, -1, n, code, (1 << (n + 1)) - 1);
+        const int a = askCoach(CoachQuestion::KICKOFF_RETURN, id, -1, n, code, answerMask(n));
         if (a > 0) move(id, sq[a - 1]);
         return;
     }

@@ -97,7 +97,9 @@ std::vector<std::pair<int, Position>> cornersComing(const GameState& state, cons
         if (p.position == c) return true;
         const Player* occ = state.getPlayerAtPosition(c);
         if (occ && occ->id != carrier.id) return false;
-        if (!freeToAct(p) || countTacklezones(state, p.position, side, p.id) > 0) return false;
+        // Review 16.10.: P211b platí i pro výběr rohů — Wild Animal roh klece není („Rat Ogre nemá
+        // být roh klece“); přesun do rohu by na 4+ v polovině případů propadl.
+        if (!cageMayMove(p) || countTacklezones(state, p.position, side, p.id) > 0) return false;
         if (p.position.distanceTo(c) > static_cast<int>(p.movementRemaining)) return false;
         // P190 (rozbor skavenů 09.10.2026): dosud stačila vzdálenost — odhad hrozby po pohybu nosiče
         // pak počítal s rohy, které přes zeď soupeřů nedojdou (nosič po zvednutí odběhl před tým,
@@ -759,7 +761,7 @@ void CageController::planStart(const GameState& state) {
                     if (!a.hasSkill(SkillName::Block) || a.position.distanceTo(e.position) != 1) return;
                     if (frenzyCorner(a, carrier)) return;
                     state.forEachOnPitch(side, [&](const Player& m) {
-                        if (done || m.id == a.id || m.id == carrier.id || !freeToAct(m) || used(m.id)) return;
+                        if (done || m.id == a.id || m.id == carrier.id || !cageMayMove(m) || used(m.id)) return;   // pomocník se přesouvá ⇒ ne Wild Animal (P211b)
                         if (countTacklezones(state, m.position, side, m.id) > 0) return;   // pomocník musí být volný
                         if (std::abs(m.position.x - carrier.position.x) == 1 &&
                             std::abs(m.position.y - carrier.position.y) == 1) return;      // roh zůstává rohem
@@ -1064,15 +1066,17 @@ static void wildAnimalLaggards(const GameState& state, std::vector<Macro>& queue
     for (const Macro& m : queue) taken.push_back(m.targetPos);
     std::vector<Action> actions;
     getAvailableActions(state, actions);
+    bool blitzGiven = false;   // týmový blitz je jeden: ohlásí ho jen první Wild Animal ve frontě
     state.forEachOnPitch(carrier.teamSide, [&](const Player& p) {
         if (p.id == carrier.id || !freeToAct(p) || !p.hasSkill(SkillName::WildAnimal)) return;
         const Position best = laggardSquare(state, p, carrier.position, taken);
         if (best == p.position) return;
         Macro m{MacroType::REPOSITION, p.id, -1, best};
         m.cageManaged = true;
-        m.declareBlitz = std::any_of(actions.begin(), actions.end(), [&](const Action& a) {
+        m.declareBlitz = !blitzGiven && std::any_of(actions.begin(), actions.end(), [&](const Action& a) {
             return a.type == ActionType::BLITZ && a.playerId == p.id && a.targetId < 0;
         });
+        blitzGiven = blitzGiven || m.declareBlitz;
         queue.push_back(m);
         taken.push_back(best);
     });

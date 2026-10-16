@@ -130,6 +130,19 @@ TEST(MacroActions, WrestlePricingAppliesForABlockAttackerVsWrestleDefender) {
         << "cena proti obránci, který Wrestle POUŽIJE, se musí lišit";
 }
 
+// Review 16.10.2026: od P196 sestavení nabídky volá pickBlitzer (proveditelnost) — čítač ceny ale
+// patří jen rozbalení, jak říká komentář výše; vypsání nabídky ho tikat nesmí.
+TEST(MacroActions, WrestlePricingCounterDoesNotTickWhenBuildingTheOffer) {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).skills.add(SkillName::Block);
+    state.getPlayer(12).skills.add(SkillName::Wrestle);
+    state.getPlayer(12).position = {11, 7};
+    std::vector<Macro> macros;
+    takeWrestleDefenderPricedInSearch();
+    getAvailableMacros(state, macros);
+    EXPECT_EQ(takeWrestleDefenderPricedInSearch(), 0) << "nabídka nic neoceňuje, ocení až rozbalení";
+}
+
 TEST(MacroActions, WrestlePricingDoesNotApplyWithoutWrestle) {
     GameState state = makeMinimalState();
     state.getPlayer(1).skills.add(SkillName::Block);
@@ -603,6 +616,17 @@ TEST(MacroActions, P211OnOffenseTheEscapeGoesOutOfBlitzReach) {
     ASSERT_FALSE(r.actions.empty());
     EXPECT_FALSE(r.turnover);
     EXPECT_EQ(s.getPlayer(1).position, esc.targetPos) << "přesun dojde na nabídnuté pole";
+}
+
+// Review 16.10.2026: roh klece (vedle našeho nosiče) na konci tahu neutíká, i když je agilní a v kontaktu.
+TEST(MacroActions, CageCornerNextToOurCarrierDoesNotEscape) {
+    GameState state = p211State(true);
+    const Position gr = state.getPlayer(1).position;
+    const Position cp{static_cast<int8_t>(gr.x - 1), static_cast<int8_t>(gr.y + 1)};
+    state.getPlayer(2).position = cp;                    // nosič hned vedle (diagonálně) ⇒ hráč 1 je roh
+    state.ball = BallState::carried(cp, 2);
+    Macro esc;
+    EXPECT_FALSE(endOfTurnEscape(state, esc)) << "roh klece neopouští nosiče";
 }
 
 // V obraně (míč má soupeř) do dvou sloupců: čelo soupeře x=11, naše zóna x=0 ⇒ přední řada x=9
