@@ -3,7 +3,7 @@
 # Za náš tah: rozpad turnoveru podle (a) neúspěšné události v kroku s turnoverem, (b) makra, ve kterém nastal;
 # a počty POKUSŮ o riskantní hody (každá událost se "success") podle typu — rozliší "méně pokusů" od "menší neúspěšnosti".
 # Navíc počet aktivací (maker) za tah: kdyby AI jen méně hrála, klesne i tohle.
-# ab.py KOREN vystup.pkl [semínek]
+# ab.py KOREN vystup.pkl [semínek]  ·  RISK=1 v prostředí = odklad zapnutý (risk_deferral), jinak vypnutý
 import sys, os, pickle, time, multiprocessing as mp
 KOREN = sys.argv[1]; VYST = sys.argv[2]; N = int(sys.argv[3]) if len(sys.argv) > 3 else 12
 RISK = {"DODGE", "GFI", "PICKUP", "CATCH", "PASS", "HAND_OFF", "LEAP", "INTERCEPTION", "FOUL", "THROW_TEAMMATE", "STAND_UP"}
@@ -26,7 +26,9 @@ def hra(a):
         nas_tah = s.active_team == my
         stojici = {p.id for p in kt.hraci(s) if p.team_side == my and kt._stoji(p)}
         t0 = time.time()
-        kroky, po, _ = kt.plan_tahu(s, ai="macro_mcts", seed=50000 + 100 * g + tah)
+        kroky, po, _ = bb.ai_plan_turn(s, ai="macro_mcts", seed=50000 + 100 * g + tah,
+                                       weights_path=os.path.join(KOREN, "weights_best.json"), mcts_iterations=50,
+                                       risk_deferral=os.environ.get("RISK") == "1")
         if nas_tah: r["cas"] += time.time() - t0
         if nas_tah:
             r["tahu"] += 1

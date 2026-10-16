@@ -848,8 +848,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         InjuryContext ctx;
         ctx.unmodifiedArmour = true;   // Stab: "unmodified Armour roll" (P75: bez +3 za pilu)
         if (att.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
-        resolveArmourAndInjury(state, def.id, dice, ctx, events);
-        handleBallOnPlayerDown(state, def.id, dice, events);
+        // OPRAVENO 16.10.2026 (P199) — tady se míč pouštěl vždy, i když bodnutí zbroj neprorazilo.
+        // Pravidla ř. 8496-8498: „less than or equal to the victim's Armour value then the attack has
+        // no effect“ ⇒ obránce stojí a míč drží. Probodnutý: KO / zranění odrazí removeFromPitch,
+        // omráčený se odrazí tady — obojí až po hodu na zranění (ř. 678-681).
+        const bool wounded = resolveArmourAndInjury(state, def.id, dice, ctx, events);
+        if (wounded) handleBallOnPlayerDown(state, def.id, dice, events);
         att.hasActed = true;
         return ActionResult::ok(); // Stab never causes turnover
     }

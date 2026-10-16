@@ -446,6 +446,36 @@ TEST(BlockHandler, StabArmorRoll) {
     EXPECT_FALSE(result.turnover); // Stab never causes turnover
 }
 
+// P199 (16.10.2026), ř. 8496-8498: „If the score is less than or equal to the victim's Armour value
+// then the attack has no effect.“ Neprobodnutý nosič stojí dál a míč drží. Dřív se míč pustil vždy.
+TEST(BlockHandler, P199StabWithNoEffectLeavesTheBallWithTheCarrier) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Stab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 7}, 12);
+    FixedDiceRoller dice({2, 3, 4, 4, 4, 4, 4, 4});   // zbroj 5 ≤ AV8 ⇒ bez účinku
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_TRUE(gs.ball.isHeld) << "bodnutí bez účinku míč nevyrazí";
+    EXPECT_EQ(gs.ball.carrierId, 12);
+}
+
+// Tentýž hod, ale probodnutý (Stunned): míč se odrazí až po hodu na zranění, z jeho pole.
+TEST(BlockHandler, P199StabbedCarrierDropsTheBall) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Stab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.ball = BallState::carried({11, 7}, 12);
+    FixedDiceRoller dice({5, 4, 3, 3, 4, 4, 4, 4});   // zbroj 9 > 8, zranění 6 ⇒ Stunned, pak odraz
+    BlockParams params{1, 12, false, false};
+    resolveBlock(gs, params, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
+    EXPECT_FALSE(gs.ball.isHeld && gs.ball.carrierId == 12) << "omráčený míč neudrží";
+}
+
 TEST(BlockHandler, ChainsawSuccess) {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);

@@ -130,7 +130,10 @@ final class BallResolver
         //   byla spravne -- neslo o chybejici pravidlo, ale o JEDNU Z DVOU
         //   CEST, ktera ho nemela. Ted je na jednom miste pro vsechny
         //   volajici.
-        if (!$catcher->getState()->canAct()) {
+        // ⛔ DOPLNENO 16.10.2026 (audit parity, nalez 19; C++ `f64cb396`): hrac bez tackle zon
+        //   (Bone-head, Really Stupid, Hypnotic Gaze) nechyta -- `rules_bb2016.txt` r. 7983-7986:
+        //   „loses his tackle zones and may not catch, intercept or pass“. Hlidalo se jen u zachyceni.
+        if (!$catcher->getState()->canAct() || $catcher->hasLostTacklezones()) {
             $bounceResult = $this->resolveBounce($state, $pos);
 
             return [
@@ -235,7 +238,7 @@ final class BallResolver
 
         // Player on landing square? Try to catch
         $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-        if ($playerAtLanding !== null && $playerAtLanding->getState()->canAct()) {
+        if ($playerAtLanding !== null && $playerAtLanding->getState()->canAct() && !$playerAtLanding->hasLostTacklezones()) {
             $state = $state->withBall(BallState::onGround($landingPos));
             $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth);
             $events = array_merge($events, $catchResult['events']);
