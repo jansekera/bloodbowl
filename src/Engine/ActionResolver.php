@@ -8,6 +8,8 @@ use App\DTO\ActionResult;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingApothecaryDTO;
+use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
 use App\Engine\Action\BlockHandler;
@@ -102,6 +104,15 @@ final class ActionResolver
     public function setInteractiveBlocks(bool $interactive): void
     {
         $this->interactiveBlocks = $interactive;
+    }
+
+    /** @var list<TeamSide> P206 (b): strany kouče-člověka — o lékárníkovi se jich ptá po akci */
+    private array $interactiveApothecary = [];
+
+    /** @param list<TeamSide> $sides */
+    public function setInteractiveApothecary(array $sides): void
+    {
+        $this->interactiveApothecary = $sides;
     }
 
     public function setInteractiveRerolls(bool $interactive): void
@@ -210,10 +221,38 @@ final class ActionResolver
 
             return true;
         });
+        // P206 (b), 16.10.2026 (uživatel: „lékárník se má ptát hráče na vše“): zranění hráče kouče-člověka
+        //   (KO i Casualty) se zapíše jako nabídka; akce doběhne celá a pak se kouč zeptá (PendingApothecary).
+        /** @var list<array{playerId: int, kind: string, result: ?string, x: ?int, y: ?int, regeneration: bool}> $nabidky */
+        $nabidky = [];
+        $lide = $this->interactiveApothecary;
+        $this->injuryResolver->setOdlozitLekarnika($lide === [] ? null : function (MatchPlayerDTO $hrac, string $druh, ?CasualtyResult $vysledek) use ($state, $lide, &$nabidky): bool {
+            $strana = $hrac->getTeamSide();
+            if (!in_array($strana, $lide, true) || !$state->getTeamState($strana)->canUseApothecary()) {
+                return false;
+            }
+            $pos = $hrac->getPosition();
+            $nabidky[] = [
+                'playerId' => $hrac->getId(),
+                'kind' => $druh,
+                'result' => $vysledek?->value,
+                'x' => $pos?->getX(),
+                'y' => $pos?->getY(),
+                'regeneration' => $hrac->hasSkill(\App\Enum\SkillName::Regeneration),
+            ];
+
+            return true;
+        });
         try {
             $r = $this->resolveAkce($state, $action, $params);
         } finally {
             $this->injuryResolver->setLekarnik(null);
+            $this->injuryResolver->setOdlozitLekarnika(null);
+        }
+        if ($nabidky !== []) {
+            $st = $r->getNewState()->withPendingApothecary(new PendingApothecaryDTO($nabidky, $r->isTurnover()));
+
+            return new ActionResult($st, $r->isSuccess(), false, $r->getEvents());
         }
         $st = $r->getNewState();
         foreach (array_keys($pouzit) as $strana) {
@@ -372,6 +411,7 @@ final class ActionResolver
             ActionType::CHOOSE_BLOCK_DIE => $this->blockHandler->resolveBlockChoice($state, $params),
             ActionType::REROLL_BLOCK => $this->blockHandler->resolveBlockReroll($state, $params),
             ActionType::RESOLVE_REROLL => $this->rerollHandler->resolve($state, $params),
+            ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)
@@ -428,5 +468,107 @@ final class ActionResolver
         }
 
         return $result;
+    }
+
+    /**
+     * P206 (b), 16.10.2026 — odpověď kouče na nabídku lékárníka. `rules_bb2016.txt` ř. 1200-1210:
+     * KO ⇒ zpět na hřiště omráčený na pole, odkud odešel (byl-li na hřišti), jinak rezervy; Casualty ⇒
+     * soupeř hodí znovu na tabulku a kouč vybere jeden z výsledků; Badly Hurt ⇒ rezervy. Jednou za zápas.
+     * params: stage 'offer' → `playerId` (0 = nepoužít); stage 'choose' → `result` (hodnota CasualtyResult).
+     *
+     * @param array<string, mixed> $params
+     */
+    private function resolveApothecary(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingApothecary();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending apothecary choice');
+        }
+        $events = [];
+        $hotovo = function (GameState $st) use ($pending, &$events): ActionResult {
+            $st = $st->withPendingApothecary(null);
+            // Regenerace hráčů, o kterých se rozhodovalo, až teď (lékárník má přednost, ř. 8433-8440)
+            foreach ($pending->getOffers() as $o) {
+                $hrac = $st->getPlayer($o['playerId']);
+                if ($o['regeneration'] && $hrac !== null
+                    && in_array($hrac->getState(), [PlayerState::INJURED, PlayerState::DEAD], true)) {
+                    ['player' => $hrac, 'events' => $events] = $this->injuryResolver->resolveRegeneration($hrac, $this->dice, false, $events);
+                    $st = $st->withPlayer($hrac);
+                }
+            }
+
+            return new ActionResult($st, true, $pending->isTurnover(), $events);
+        };
+
+        if ($pending->getStage() === 'choose') {
+            $volba = CasualtyResult::from((string) ($params['result'] ?? ''));
+            if (!in_array($volba->value, $pending->getOptions(), true)) {
+                throw new \InvalidArgumentException('Result not offered');
+            }
+            $id = (int) $pending->getChosenPlayerId();
+            $o = $pending->offerFor($id);
+            $hrac = $state->requirePlayer($id);
+            $events[] = GameEvent::apothecaryUsed($id, (string) ($o['result'] ?? ''), $volba->value);
+            $hrac = match ($volba) {
+                CasualtyResult::BADLY_HURT => $hrac->withState(PlayerState::OFF_PITCH)->withPosition(null),
+                CasualtyResult::DEAD => $hrac->withState(PlayerState::DEAD)->withPosition(null),
+                default => $hrac->withState(PlayerState::INJURED)->withPosition(null),
+            };
+
+            return $hotovo($state->withPlayer($hrac));
+        }
+
+        $id = (int) ($params['playerId'] ?? 0);
+        if ($id === 0) {
+            return $hotovo($state);   // lékárník se nepoužil
+        }
+        $o = $pending->offerFor($id);
+        if ($o === null) {
+            throw new \InvalidArgumentException('Player not offered');
+        }
+        $hrac = $state->requirePlayer($id);
+        $strana = $hrac->getTeamSide();
+        $state = $state->withTeamState($strana, $state->getTeamState($strana)->withApothecaryUsed());
+
+        if ($o['kind'] === 'ko') {
+            $pole = ($o['x'] !== null && $o['y'] !== null) ? new \App\ValueObject\Position($o['x'], $o['y']) : null;
+            if ($pole !== null && $state->getPlayerAtPosition($pole) === null) {
+                $state = $state->withPlayer($hrac->withPosition($pole)->withState(PlayerState::STUNNED));
+                $events[] = GameEvent::apothecaryUsed($id, 'ko', 'stunned');
+                // omráčený položený na volný míč: míč odskočí (ř. 893-898)
+                $mic = $state->getBall();
+                if (!$mic->isHeld() && $mic->getPosition()?->equals($pole)) {
+                    $odraz = $this->ballResolver->resolveBounce($state, $pole);
+                    $state = $odraz['state'];
+                    $events = array_merge($events, $odraz['events']);
+                }
+            } else {
+                $state = $state->withPlayer($hrac->withState(PlayerState::OFF_PITCH)->withPosition(null));
+                $events[] = GameEvent::apothecaryUsed($id, 'ko', 'reserves');
+            }
+
+            return $hotovo($state);
+        }
+
+        // Casualty: Badly Hurt rovnou do rezerv, jinak druhý hod a volba kouče
+        $prvni = CasualtyResult::from((string) $o['result']);
+        if ($prvni === CasualtyResult::BADLY_HURT) {
+            $events[] = GameEvent::apothecaryUsed($id, $prvni->value, $prvni->value);
+
+            return $hotovo($state->withPlayer($hrac->withState(PlayerState::OFF_PITCH)->withPosition(null)));
+        }
+        $druhy = $this->injuryResolver->rollCasualty($this->dice)['result'];
+        if ($druhy === $prvni) {
+            $events[] = GameEvent::apothecaryUsed($id, $prvni->value, $prvni->value);
+
+            return $hotovo($state);
+        }
+
+        return new ActionResult(
+            $state->withPendingApothecary($pending->withChoice($id, [$prvni->value, $druhy->value])),
+            true,
+            false,
+            $events,
+        );
     }
 }

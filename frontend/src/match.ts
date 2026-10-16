@@ -17,6 +17,7 @@ import { DugoutPanel } from './ui/DugoutPanel';
 import { PlayerCard } from './ui/PlayerCard';
 import { BlockDiceModal } from './ui/BlockDiceModal';
 import { RerollModal } from './ui/RerollModal';
+import { ApothecaryModal } from './ui/ApothecaryModal';
 
 const api = new ApiClient();
 
@@ -81,6 +82,7 @@ const levelUpModal = new LevelUpModal(levelUpEl);
 
 const blockDiceModal = new BlockDiceModal(container);
 const rerollModal = new RerollModal(container);
+const apothecaryModal = new ApothecaryModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -187,6 +189,31 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     if (result.state.pendingReroll && result.state.aiTeam !== result.state.activeTeam) {
         showRerollModal(result.state);
     }
+
+    // P206 (b): lékárník — ptá se kouče-člověka i uprostřed tahu AI (server tah AI zastavil)
+    if (result.state.pendingApothecary) {
+        showApothecaryModal(result.state);
+    }
+}
+
+function showApothecaryModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingApothecary;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    apothecaryModal.show(pending, nameOf, async (params: Record<string, unknown>) => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_apothecary', params);
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Apothecary choice failed');
+        } finally {
+            isProcessing = false;
+        }
+    });
 }
 
 function showBlockDiceModal(state: import('./api/types').GameState): void {

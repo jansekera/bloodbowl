@@ -55,6 +55,12 @@ final class RulesEngine
             if ($state->getPendingBlock() === null) {
                 $errors[] = 'No pending block to resolve';
             }
+        } elseif ($action === ActionType::RESOLVE_APOTHECARY) {
+            if ($state->getPendingApothecary() === null) {
+                $errors[] = 'No pending apothecary choice';
+            }
+        } elseif ($state->getPendingApothecary() !== null) {
+            $errors[] = 'Must resolve the apothecary choice first';   // P206 (b)
         } elseif ($action === ActionType::RESOLVE_REROLL) {
             if ($state->getPendingReroll() === null) {
                 $errors[] = 'No pending reroll to resolve';
@@ -100,6 +106,7 @@ final class RulesEngine
             ActionType::REROLL_BLOCK => [],
             ActionType::AUTO_SETUP => [],
             ActionType::RESOLVE_REROLL => [],
+            ActionType::RESOLVE_APOTHECARY => [],
         };
     }
 
@@ -112,6 +119,11 @@ final class RulesEngine
     {
         $actions = [];
         $side = $state->getActiveTeam();
+
+        // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče
+        if ($state->getPendingApothecary() !== null) {
+            return [['type' => ActionType::RESOLVE_APOTHECARY->value]];
+        }
 
         // When there's a pending block, only block-choice actions are available
         if ($state->getPendingBlock() !== null) {

@@ -69,6 +69,15 @@ export interface PendingReroll {
     targetY: number;
 }
 
+/** P206 (b): čekající volba o lékárníkovi */
+export interface PendingApothecary {
+    offers: { playerId: number; kind: 'ko' | 'casualty'; result: string | null; x: number | null; y: number | null; regeneration: boolean }[];
+    turnover: boolean;
+    stage: 'offer' | 'choose';
+    chosenPlayerId: number | null;
+    options: string[];
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -87,6 +96,7 @@ export interface GameState {
     pendingReroll?: PendingReroll | null;
     /** P210: hráč, který ohlásil Blitz a ještě nedal ránu (chodí kamkoli, pak jedna rána). */
     declaredBlitzerId?: number | null;
+    pendingApothecary?: PendingApothecary | null;
 }
 
 export interface TeamState {

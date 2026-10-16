@@ -13,6 +13,7 @@ use App\Engine\ActionResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\RulesEngine;
 use App\Enum\ActionType;
+use App\Enum\TeamSide;
 use App\Enum\GamePhase;
 use App\Exception\ValidationException;
 
@@ -61,13 +62,17 @@ final class GameOrchestrator
             $resolver->setInteractiveBlocks(true);
             $resolver->setInteractiveRerolls(true);
         }
+        // P206 (b): o lékárníkovi se ptá kouč-člověk — i když se jeho hráč zranil v tahu soupeře
+        $lide = $aiTeam === null ? [TeamSide::HOME, TeamSide::AWAY] : [$aiTeam->opponent()];
+        $resolver->setInteractiveApothecary($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();
         $newState = $result->getNewState();
 
         // If there's a pending block or reroll (human player), return immediately
-        if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null) {
+        if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null
+            || $newState->getPendingApothecary() !== null) {
             return [
                 'state' => $newState,
                 'events' => $allEvents,
@@ -114,7 +119,7 @@ final class GameOrchestrator
 
         // AI auto-play for turn
         if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isPlayable()) {
-            $aiTurnService = new AITurnService($this->aiCoach, $this->rulesEngine);
+            $aiTurnService = new AITurnService($this->aiCoach, $this->rulesEngine, $lide);
             if ($this->gameLogger !== null) {
                 $aiTurnService->setGameLogger($this->gameLogger);
             }

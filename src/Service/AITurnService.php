@@ -17,9 +17,11 @@ final class AITurnService
 {
     private ?GameLogger $gameLogger = null;
 
+    /** @param list<\App\Enum\TeamSide> $interactiveApothecary P206 (b): strany kouče-člověka */
     public function __construct(
         private readonly AICoachInterface $aiCoach,
         private readonly RulesEngine $rulesEngine,
+        private readonly array $interactiveApothecary = [],
     ) {}
 
     public function setGameLogger(GameLogger $logger): void
@@ -35,6 +37,7 @@ final class AITurnService
     public function playTurn(GameState $state, DiceRollerInterface $dice): array
     {
         $resolver = new ActionResolver($dice);
+        $resolver->setInteractiveApothecary($this->interactiveApothecary);
         $gameFlow = $resolver->getGameFlowResolver();
         $allEvents = [];
         $aiTeam = $state->getAiTeam();
@@ -57,6 +60,12 @@ final class AITurnService
             $result = $resolver->resolve($state, $action, $params);
             $state = $result->getNewState();
             $allEvents = array_merge($allEvents, $result->getEvents());
+
+            // P206 (b): zranil se hráč kouče-člověka ⇒ tah AI stojí, dokud kouč nerozhodne o lékárníkovi
+            //   (turnover akce nese PendingApothecaryDTO a orchestrátor ho dořeší po odpovědi).
+            if ($state->getPendingApothecary() !== null) {
+                break;
+            }
 
             if ($result->isTurnover()) {
                 $endTurnResult = $resolver->resolve($state, ActionType::END_TURN, []);

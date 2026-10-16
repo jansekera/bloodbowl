@@ -210,6 +210,18 @@ final class InjuryResolver
      */
     private ?\Closure $lekarnik = null;
 
+    /**
+     * P206 (b), 16.10.2026: hráč kouče-člověka — o lékárníkovi rozhodne kouč PO akci (PendingApothecaryDTO).
+     * Volá se se zraněným hráčem (ještě s pozicí, ze které odchází), druhem ('ko' / 'casualty') a výsledkem;
+     * vrátí-li true, InjuryResolver lékárníka ani Regeneraci nepoužije (volba přijde po akci).
+     */
+    private ?\Closure $odlozitLekarnika = null;
+
+    public function setOdlozitLekarnika(?\Closure $odlozit): void
+    {
+        $this->odlozitLekarnika = $odlozit;
+    }
+
     public function setLekarnik(?\Closure $lekarnik): void
     {
         $this->lekarnik = $lekarnik;
@@ -312,6 +324,9 @@ final class InjuryResolver
                 $player = $player->withStunned();
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
             } else {
+                if ($this->odlozitLekarnika !== null) {
+                    ($this->odlozitLekarnika)($player, 'ko', null);
+                }
                 $player = $player->withState(PlayerState::KO)->withPosition(null);
                 $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
             }
@@ -336,7 +351,10 @@ final class InjuryResolver
             //   jeden výsledek (AI: mírnější); Badly Hurt -- i původní -- ⇒ rezervy.
             $vysledek = $cas['result'];
             $rezervy = false;
-            if ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {
+            $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek);
+            if ($odlozeno) {
+                $regenerace = false;   // Regenerace až po volbě kouče (lékárník má přednost, ř. 8433-8440)
+            } elseif ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {
                 if ($vysledek !== CasualtyResult::BADLY_HURT) {
                     $druhy = $this->rollCasualty($dice)['result'];
                     $poradi = array_flip(array_map(fn(CasualtyResult $c) => $c->value, CasualtyResult::cases()));

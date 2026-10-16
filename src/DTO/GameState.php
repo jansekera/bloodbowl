@@ -40,6 +40,8 @@ final class GameState
         //   r. 346-349: cil se pri ohlaseni nerika, rana kdykoli behem pohybu). Propadne jako
         //   pokracovani -- jakmile jedna jiny hrac nebo skonci kolo.
         private ?int $declaredBlitzerId = null,
+        // P206 (b), 16.10.2026: čekající volba kouče o lékárníkovi po akci (viz PendingApothecaryDTO).
+        private ?PendingApothecaryDTO $pendingApothecary = null,
     ) {}
 
     /**
@@ -301,6 +303,18 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingApothecary(): ?PendingApothecaryDTO
+    {
+        return $this->pendingApothecary;
+    }
+
+    public function withPendingApothecary(?PendingApothecaryDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingApothecary = $pending;
+        return $clone;
+    }
+
     public function getDeclaredBlitzerId(): ?int
     {
         return $this->declaredBlitzerId;
@@ -460,6 +474,7 @@ final class GameState
             'pendingReroll' => $this->pendingReroll?->toArray(),
             'blitzContinuationPlayerId' => $this->blitzContinuationPlayerId,
             'declaredBlitzerId' => $this->declaredBlitzerId,
+            'pendingApothecary' => $this->pendingApothecary?->toArray(),
         ];
     }
 
@@ -491,6 +506,7 @@ final class GameState
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
             blitzContinuationPlayerId: isset($data['blitzContinuationPlayerId']) ? (int) $data['blitzContinuationPlayerId'] : null,
             declaredBlitzerId: isset($data['declaredBlitzerId']) ? (int) $data['declaredBlitzerId'] : null,
+            pendingApothecary: isset($data['pendingApothecary']) ? PendingApothecaryDTO::fromArray((array) $data['pendingApothecary']) : null,
         );
     }
 }
