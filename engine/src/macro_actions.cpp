@@ -4626,4 +4626,49 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     }
 }
 
+
+// ⭐ P159 (17.10.2026, uživatel: „vše musí jít vyhodnotit hned - pravděpodobnost risku“): pravděpodobnost,
+//   že akce skončí turnoverem, SPOČÍTANÁ z hodů — žádné zkušební hry. Hody v jedné akci se skládají
+//   („pokud potřebuju dodge i GFI počítám celou náročnost“). Zvednutí míče se NEPOČÍTÁ (uživatel:
+//   „zvednutí míče je zvlášť - i Khemri musí zkusit zvednout míč a jít s ním do TD zóny“), jen cesta k němu.
+//   −1 = akce, které se odklad netýká (skórování, klec, přihrávka, faul, postup nosiče) nebo cesta nevede.
+double macroDirectRisk(const GameState& state, const Macro& m) {
+    switch (m.type) {
+        case MacroType::BLITZ: {
+            std::vector<Action> actions;
+            getAvailableActions(state, actions);
+            Action a{};
+            if (m.targetId <= 0 || !pickBlitzer(state, m, actions, a, /*count=*/false)) return -1.0;
+            return estimateBlitzOdds(state, state.getPlayer(a.playerId), state.getPlayer(m.targetId),
+                                     /*count=*/false).fail;
+        }
+        case MacroType::BLOCK: {
+            if (m.playerId <= 0 || m.targetId <= 0) return -1.0;
+            const Player& att = state.getPlayer(m.playerId);
+            const Player& def = state.getPlayer(m.targetId);
+            const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
+            // Tatáž podmínka Wrestle jako v resolveru a v estimateBlitzOdds.
+            const bool defWrestle = def.hasSkill(SkillName::Wrestle) &&
+                                    (!def.hasSkill(SkillName::Block) || attHasBall);
+            return estimateBlockFailChance(getBlockDiceCount(state, att, def, false, false),
+                                           att.hasSkill(SkillName::Block), defWrestle);
+        }
+        case MacroType::REPOSITION: {
+            if (m.playerId <= 0) return -1.0;
+            const Player& p = state.getPlayer(m.playerId);
+            if (m.targetPos == p.position) return 0.0;
+            const RepositionWalk walk = repositionWalk(state, m, /*count=*/false);
+            return pathFailProb(state, p, m.targetPos, walk.maxSteps, walk.avoid);
+        }
+        case MacroType::PICKUP: {
+            if (m.playerId <= 0) return -1.0;
+            const Player& p = state.getPlayer(m.playerId);
+            if (m.targetPos == p.position) return 0.0;
+            return pathFailProb(state, p, m.targetPos, pickupWalk(state, p).maxSteps, Position{-1, -1});
+        }
+        default:
+            return -1.0;
+    }
+}
+
 } // namespace bb

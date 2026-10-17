@@ -175,19 +175,6 @@ MacroMCTSNode* MacroMCTSNode::mostVisitedChild() const {
 MacroMCTSSearch::MacroMCTSSearch(const ValueFunction* vf, MCTSConfig config, uint32_t seed)
     : valueFn_(vf), config_(config), dice_(seed) {}
 
-// P159: vypínač pro měření (Python `set_risk_deferral_agile(False)`); výchozí zapnuto.
-static bool g_riskDeferralAgile = true;
-void setRiskDeferralAgile(bool on) { g_riskDeferralAgile = on; }
-
-bool isAgileTeam(const GameState& state, TeamSide side) {
-    int all = 0, agile = 0;
-    state.forEachOnPitch(side, [&](const Player& p) {
-        ++all;
-        if (p.stats.agility >= 4) ++agile;
-    });
-    return all > 0 && 2 * agile >= all;
-}
-
 Macro MacroMCTSSearch::search(const GameState& state) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros, config_.dauntlessInOffer);
@@ -329,8 +316,7 @@ Macro MacroMCTSSearch::search(const GameState& state) {
         lastBestValue_ = best->visits > 0
             ? best->totalValue / best->visits : 0.0;
         Macro pick = best->macro;
-        if (config_.riskDeferral ||
-            (config_.riskDeferralAgile && g_riskDeferralAgile && isAgileTeam(state, searchingSide))) {
+        if (config_.riskDeferral) {
             pick = applyRiskDeferral(root, state, pick, searchingSide);
         }
         return pick;
@@ -379,85 +365,67 @@ static bool sameMacro(const Macro& a, const Macro& b) {
 // across the deferred safe activations) and the effect did not reproduce at
 // smaller N -- consistent with N=200 sampling noise on a borderline effect,
 // not a real Q-guard failure mode.
-constexpr double RISK_DEFER_RISKY_PTO = 0.10;
-constexpr double RISK_DEFER_SAFE_PTO  = 0.02;
-constexpr double RISK_DEFER_Q_MARGIN  = 0.04;
-constexpr int    RISK_DEFER_PROBE_K   = 48;
-constexpr double RISK_DEFER_PTO_SLACK = 0.05;
-// Sonda alternativy smí skončit prvním turnoverem jen proto, že už jeden turnover z K
-// překročí strop bezpečné alternativy.
-static_assert(RISK_DEFER_SAFE_PTO * RISK_DEFER_PROBE_K < 1.0,
-              "stopOnTurnover v applyRiskDeferral předpokládá: 1 turnover z K > RISK_DEFER_SAFE_PTO");
+// ⭐ P159 (17.10.2026, uživatel: „vše musí jít vyhodnotit hned - pravděpodobnost risku“): riziko
+//   se POČÍTÁ (`macroDirectRisk`, macro_actions.cpp), nehraje se už 48 zkušebních her na každou
+//   možnost — ty skavenům zdvojnásobily čas tahu. Stupně podle CELKOVÉ pravděpodobnosti selhání
+//   akce (uživatel: „pokud potřebuju dodge i GFI počítám celou náročnost“):
+//     ≤ 1/6 (hod 2+) kdykoli · ≤ 1/3 (hod 3+) na konci tahu · víc (4+ a hůř) jen když není jiná
+//     možnost (to z většiny hlídá už strop úhybu P149).
+//   Odklad: zvolí-li hledání akci stupně 3+ a horšího a JINÝ hráč má přesun BEZ hodu, který hledání
+//   nehodnotí o víc než RISK_DEFER_Q_MARGIN hůř, hraje se napřed přesun. Hodnoty jsou z hledání.
+constexpr double RISK_DEFER_Q_MARGIN = 0.04;   // moje číslo; uživatel 17.10.: „jestli už jsi to spočítal, tak OK“
 
-// P159 (16.10.2026). OPRAVENO — bezpečná alternativa se dřív vybírala jen podle
-// vlastního rizika a Q; mohl to být přesun TÉHOŽ hráče (riskantní makro pak
-// propadlo úplně — „risk-never“, ne „risk-last“) nebo blok asistenta, který
-// riskantnímu bloku vzal asistenci (nález S2 z 28.07.: „safe-alternative picker
-// doesn't preserve assist geometry“). Teď se alternativa přijme, jen když po ní
-// riskantní makro zůstane v nabídce a jeho podíl turnoverů nevzroste.
+int riskTier(double pFail) {
+    if (pFail <= 1.0 / 6.0 + 1e-9) return 0;
+    if (pFail <= 1.0 / 3.0 + 1e-9) return 1;
+    return 2;
+}
+
+// P159: odklad smí riskantní akci jen odsunout, ne zrušit (nález S2 z 28.07., oprava 16.10.).
+// Alternativa je přesun bez hodu, takže se zahraje JEDNOU (kostky nerozhodují) a pak se jen čte:
+// zůstala riskantní akce v nabídce a nezhoršil se její stupeň rizika?
 bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
-                       double pickPto, DiceRoller& dice, int samples,
-                       bool dauntlessInOffer) {
-    int missing = 0, nTO = 0, played = 0;
+                       DiceRoller& dice, bool dauntlessInOffer) {
+    const double before = macroDirectRisk(state, pick);
+    if (before < 0.0) return false;
+    GameState sim = state.clone();
+    auto res = greedyExpandMacro(sim, alt, dice);
+    if (res.turnover || sim.activeTeam != state.activeTeam) return false;
     std::vector<Macro> offer;
-    for (int k = 0; k < samples; ++k) {
-        GameState sim = state.clone();
-        auto res = greedyExpandMacro(sim, alt, dice);
-        if (res.turnover || sim.activeTeam != state.activeTeam) { if (++missing * 10 > samples) return false; continue; }
-        offer.clear();
-        getAvailableMacros(sim, offer, dauntlessInOffer);
-        auto it = std::find_if(offer.begin(), offer.end(),
-                               [&](const Macro& m) { return sameMacro(m, pick); });
-        if (it == offer.end()) { if (++missing * 10 > samples) return false; continue; }
-        played++;
-        if (greedyExpandMacro(sim, *it, dice).turnover) nTO++;
-    }
-    if (missing * 10 > samples) return false;
-    if (played == 0) return false;
-    return static_cast<double>(nTO) / played <= pickPto + RISK_DEFER_PTO_SLACK;
+    getAvailableMacros(sim, offer, dauntlessInOffer);
+    if (std::none_of(offer.begin(), offer.end(), [&](const Macro& m) { return sameMacro(m, pick); }))
+        return false;
+    const double after = macroDirectRisk(sim, pick);
+    return after >= 0.0 && riskTier(after) <= riskTier(before);
 }
 
 Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
-                                         const Macro& pick, TeamSide perspective) {
-    // P159 (17.10.2026): bezpečná alternativa nesmí mít ani jeden turnover (viz static_assert u
-    // konstant), takže sonda alternativy končí prvním turnoverem — výsledek filtru je týž, jen
-    // bez zbylých sond. Skaveni v obraně: čas odkladu ~2× menší (diagnostika 17.10.).
-    auto probe = [&](const Macro& m, bool stopOnTurnover = false) {
-        struct { double pto = 0, q = 0, meanActions = 0; } r;
-        int nTO = 0; double qs = 0, acts = 0;
-        for (int k = 0; k < RISK_DEFER_PROBE_K; ++k) {
-            GameState sim = state.clone();
-            auto res = greedyExpandMacro(sim, m, dice_);
-            if (res.turnover) nTO++;
-            if (stopOnTurnover && nTO > 0) { r.pto = 1.0; return r; }
-            qs += simulate(sim, perspective);
-            acts += static_cast<double>(res.actions.size());
-        }
-        r.pto = static_cast<double>(nTO) / RISK_DEFER_PROBE_K;
-        r.q = qs / RISK_DEFER_PROBE_K;
-        r.meanActions = acts / RISK_DEFER_PROBE_K;
-        return r;
-    };
+                                         const Macro& pick, TeamSide /*perspective*/) {
+    const double pickRisk = macroDirectRisk(state, pick);
+    if (pickRisk < 0.0 || riskTier(pickRisk) == 0) return pick;   // 2+ a lehčí: kdykoli
 
-    auto pickProbe = probe(pick);
-    if (pickProbe.pto < RISK_DEFER_RISKY_PTO) return pick;  // not risky, nothing to defer
+    auto qOf = [](const MacroMCTSNode& c) { return c.totalValue / c.visits; };
+    const MacroMCTSNode* pickNode = nullptr;
+    for (const auto& c : root.children)
+        if (c.visits > 0 && sameMacro(c.macro, pick)) pickNode = &c;
+    if (!pickNode) return pick;
+    const double pickQ = qOf(*pickNode);
 
-    double bestQ = -1e9;
-    const Macro* bestAlt = nullptr;
-    for (const auto& child : root.children) {
-        const Macro& m = child.macro;
-        if (m.type == MacroType::END_TURN) continue;
-        if (sameMacro(m, pick)) continue;
-        auto pr = probe(m, /*stopOnTurnover=*/true);
-        if (pr.pto > RISK_DEFER_SAFE_PTO) continue;       // must be dice-free
-        if (pr.meanActions < 0.5) continue;                // must not be a no-op
-        if (pr.q < pickProbe.q - RISK_DEFER_Q_MARGIN) continue;  // Q-guard
-        if (pr.q <= bestQ) continue;
-        if (!deferralKeepsPick(state, m, pick, pickProbe.pto, dice_, RISK_DEFER_PROBE_K / 2,
-                               config_.dauntlessInOffer)) continue;
-        bestQ = pr.q; bestAlt = &m;
+    std::vector<const MacroMCTSNode*> alts;
+    for (const auto& c : root.children) {
+        const Macro& m = c.macro;
+        if (c.visits == 0 || m.type != MacroType::REPOSITION || m.playerId <= 0) continue;
+        if (m.playerId == pick.playerId) continue;                          // jiný hráč
+        if (m.targetPos == state.getPlayer(m.playerId).position) continue;   // ne „nic nedělat“
+        if (qOf(c) < pickQ - RISK_DEFER_Q_MARGIN) continue;
+        if (macroDirectRisk(state, m) != 0.0) continue;                      // bez hodu
+        alts.push_back(&c);
     }
-    return bestAlt ? *bestAlt : pick;
+    std::stable_sort(alts.begin(), alts.end(),
+                     [&](const MacroMCTSNode* x, const MacroMCTSNode* y) { return qOf(*x) > qOf(*y); });
+    for (const MacroMCTSNode* c : alts)
+        if (deferralKeepsPick(state, c->macro, pick, dice_, config_.dauntlessInOffer)) return c->macro;
+    return pick;
 }
 
 MacroMCTSNode* MacroMCTSSearch::select(MacroMCTSNode* root, TeamSide searchingSide) {

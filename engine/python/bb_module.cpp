@@ -624,8 +624,6 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("activation_value", []() { return bb::activationValue(); });
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
-    // P159 (17.10.2026): odklad riskantních akcí pro agilní tým (výchozí zapnuto); False = vypnout pro měření.
-    m.def("set_risk_deferral_agile", [](bool on) { bb::setRiskDeferralAgile(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
     // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.
@@ -656,7 +654,7 @@ PYBIND11_MODULE(bb_engine, m) {
         return planner.pick(state);
     }, py::arg("state"), py::arg("ai") = "macro_mcts", py::arg("seed") = 1,
        py::arg("weights_path") = "", py::arg("mcts_iterations") = 50,
-       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = false);
+       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = true);
 
     // Vrací (kroky, stav_po_tahu, dokončeno). dokončeno = False, když došlo `max_actions`
     // dřív, než tah skončil (END_TURN / turnover / konec fáze).
@@ -729,7 +727,7 @@ PYBIND11_MODULE(bb_engine, m) {
         return py::make_tuple(steps, s, hotovo);
     }, py::arg("state"), py::arg("ai") = "macro_mcts", py::arg("seed") = 1,
        py::arg("weights_path") = "", py::arg("mcts_iterations") = 50, py::arg("max_actions") = 200,
-       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = false);
+       py::arg("vf_blend") = 0.0f, py::arg("policy_blend") = 0.0f, py::arg("risk_deferral") = true);
 
     // KO recovery (package G) needs a dice source; the Python binding keeps
     // its old 4-argument shape and passes nullptr, which simply means KO'd
@@ -880,7 +878,7 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("mcts_iterations") = 0,
        py::arg("policy_blend") = 0.0f,
        py::arg("vf_blend") = 0.0f,
-       py::arg("risk_deferral") = false);  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
+       py::arg("risk_deferral") = true);  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
 
     // simulate_game_logged: returns result + features at turn boundaries + policy decisions
     m.def("simulate_game_logged", [](const bb::TeamRoster& home, const bb::TeamRoster& away,
@@ -1036,7 +1034,7 @@ PYBIND11_MODULE(bb_engine, m) {
        py::arg("exploration_c") = 0.5f,   // T2: 2.0 over-explored, flat target; 0.5 sharpens. eval path (simulate_game) uses its own 1.0
        py::arg("n_rollouts") = 1,
        py::arg("leaf_lookahead") = false,  // 2026-07-02 experiment: bounded greedy 1-ply leaf look-ahead (macro_mcts only)
-       py::arg("risk_deferral") = false,
+       py::arg("risk_deferral") = true,
        py::arg("away_policy_weights_path") = "",
        py::arg("away_policy_blend") = -1.0f,  // -1 = inherit policy_blend  // 2026-07-28 (item 10): Q-guarded risk-sequencing defer (macro_mcts only)
        // staged_pickup / cage_advance zrušeny 02.10.2026 (P126): klec je jedna a vždy zapnutá.

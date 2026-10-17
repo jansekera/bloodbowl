@@ -159,7 +159,6 @@ MCTSConfig makeRiskSeqConfig(PolicyNetwork* zeroPolicy, bool riskDeferral) {
     cfg.policyBlend = 0.0f;       // floors (matches production replay config);
                                    // blend=0 means the (zero) weights are never used.
     cfg.riskDeferral = riskDeferral;
-    cfg.riskDeferralAgile = false;   // P159 17.10.: testy odkladu řídí jen riskDeferral
     return cfg;
 }
 
@@ -940,48 +939,47 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     EXPECT_EQ(guarded.playerId, 2);
 }
 
-// P159 (17.10.2026, uživatel: „zapneme jen pro agilní tým“): riskDeferralAgile zapne odklad
-// i bez riskDeferral, ale JEN když hledající tým je agilní. Tentýž rozlišující fixture:
-// bez agility (AG3) zůstane riskantní BLITZ, s AG4 odklad vybere bezpečný REPOSITION.
-TEST(MacroMCTS, P159AgileTeamGetsDeferralOthersDoNot) {
-    PolicyNetwork zeroPolicy;
-    MCTSConfig cfgAgile = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
-    cfgAgile.riskDeferralAgile = true;
+// P159 (17.10.2026, uživatel: „vše musí jít vyhodnotit hned - pravděpodobnost risku“): riziko akce
+// se počítá z hodů. Úhyb AG4 na volné pole 2+ (1/6, stupeň 0), AG3 3+ (1/3, stupeň 1); úhyb + GFI
+// se skládají („počítám celou náročnost“); zvednutí míče se nepočítá, jen cesta k němu.
+TEST(MacroMCTS, P159DirectRiskIsComputedFromTheRolls) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.homeTeam.turnNumber = 1;
+    s.weather = Weather::NICE;
+    auto put = [&](int id, TeamSide side, Position pos, PlayerStats st) {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    };
+    put(1, TeamSide::HOME, {10, 7}, {6, 3, 4, 8});   // AG4
+    put(12, TeamSide::AWAY, {11, 7}, {6, 3, 3, 9});  // drží hráče 1 v tacklezóně
+    Macro away;
+    away.type = MacroType::REPOSITION; away.playerId = 1; away.targetPos = {8, 7};
+    EXPECT_NEAR(macroDirectRisk(s, away), 1.0 / 6.0, 1e-9) << "AG4 úhyb do prázdna = 2+";
+    EXPECT_EQ(riskTier(macroDirectRisk(s, away)), 0);
 
-    GameState slow = makeHandBuiltMismatch();
-    ASSERT_FALSE(isAgileTeam(slow, TeamSide::HOME));
-    MacroMCTSSearch searchSlow(nullptr, cfgAgile, 42);
-    EXPECT_EQ(searchSlow.search(slow).type, MacroType::BLITZ)
-        << "neagilní tým odklad nemá dostat";
+    s.getPlayer(1).stats.agility = 3;
+    EXPECT_NEAR(macroDirectRisk(s, away), 1.0 / 3.0, 1e-9) << "AG3 úhyb do prázdna = 3+";
+    EXPECT_EQ(riskTier(macroDirectRisk(s, away)), 1);
 
-    GameState agile = makeHandBuiltMismatch();
-    agile.getPlayer(1).stats.agility = 4;
-    agile.getPlayer(2).stats.agility = 4;
-    ASSERT_TRUE(isAgileTeam(agile, TeamSide::HOME));
-    MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
-    MacroMCTSSearch searchOff(nullptr, cfgOff, 42);
-    ASSERT_EQ(searchOff.search(agile).type, MacroType::BLITZ)
-        << "předpoklad: i s AG4 by bez odkladu padl riskantní BLITZ";
-    MacroMCTSSearch searchAgile(nullptr, cfgAgile, 42);
-    const Macro m = searchAgile.search(agile);
-    EXPECT_EQ(m.type, MacroType::REPOSITION);
-    EXPECT_EQ(m.playerId, 2);
-}
+    s.getPlayer(1).stats.agility = 4;
+    s.getPlayer(1).movementRemaining = 1;   // na pole o 2 dál už jen s GFI
+    Macro far = away;
+    far.targetPos = {8, 7};
+    far.gfiAllowance = 1;
+    const double both = macroDirectRisk(s, far);
+    EXPECT_NEAR(both, 1.0 - (5.0 / 6.0) * (5.0 / 6.0), 1e-9) << "úhyb 2+ i GFI 2+ dohromady";
+    EXPECT_EQ(riskTier(both), 1);
 
-TEST(MacroMCTS, P159IsAgileTeamWoodElvesYesSkavenNo) {
-    std::vector<RiskSnap> snaps;
-    for (int id = 1; id <= 22; ++id) {
-        RiskSnap s{};
-        s.id = id; s.st = 0;
-        s.x = id <= 11 ? 10 : 15; s.y = 1 + (id - 1) % 11;
-        snaps.push_back(s);
-    }
-    GameState elves = makeRiskSeqState("wood-elf", "skaven", TeamSide::HOME, 1, 1, 0, 0,
-                                       10, 1, -1, snaps, {});
-    EXPECT_TRUE(isAgileTeam(elves, TeamSide::HOME));
-    EXPECT_FALSE(isAgileTeam(elves, TeamSide::AWAY));
-    GameState none;   // nikdo na hřišti
-    EXPECT_FALSE(isAgileTeam(none, TeamSide::HOME));
+    // Zvednutí míče: cesta bez úhybu ⇒ riziko 0, i když hod na zvednutí čeká.
+    put(2, TeamSide::HOME, {3, 3}, {5, 3, 2, 9});   // AG2, daleko od soupeře
+    s.ball.isHeld = false; s.ball.carrierId = -1; s.ball.position = {5, 3};
+    Macro pick;
+    pick.type = MacroType::PICKUP; pick.playerId = 2; pick.targetPos = {5, 3};
+    EXPECT_EQ(macroDirectRisk(s, pick), 0.0);
 }
 
 // =============================================================
@@ -1473,9 +1471,8 @@ TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
     ASSERT_NE(otherRepos, nullptr);
 
     DiceRoller dice(159);
-    // pickPto = 1.0: tady rozhoduje jen to, zda blitz po alternativě vůbec zůstane.
-    EXPECT_FALSE(deferralKeepsPick(state, *sameRepos, *blitz, 1.0, dice, 24))
+    EXPECT_FALSE(deferralKeepsPick(state, *sameRepos, *blitz, dice))
         << "přesun téhož hráče blitz zruší — to není odklad";
-    EXPECT_TRUE(deferralKeepsPick(state, *otherRepos, *blitz, 1.0, dice, 24))
+    EXPECT_TRUE(deferralKeepsPick(state, *otherRepos, *blitz, dice))
         << "přesun vzdáleného hráče blitz nechá na později";
 }

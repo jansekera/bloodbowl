@@ -340,6 +340,9 @@ long takeStandEscapeOfferedInSearch();
 // dve kopie tehoz pravidla by se rozesly (viz `endBlockActivation`, M1/N10).
 // Domena `gfiSquares` je [0,2]; volajici si vstup clampuje.
 double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard);
+// P159 (17.10.2026): pravděpodobnost turnoveru akce spočítaná z hodů (úhyby + GFI + kostky bloku
+// dohromady; zvednutí míče se nepočítá). −1 = akce, které se odklad netýká.
+double macroDirectRisk(const GameState& state, const Macro& m);
 
 // ⭐ W-GFI (04.09., NASAZENO 09.09.2026, nepodmineny): volnemu hraci
 //   mirici na REPOZICI (bezpecnost/screen/marker/roh, ne nosic) se GFI
