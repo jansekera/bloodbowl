@@ -175,6 +175,19 @@ MacroMCTSNode* MacroMCTSNode::mostVisitedChild() const {
 MacroMCTSSearch::MacroMCTSSearch(const ValueFunction* vf, MCTSConfig config, uint32_t seed)
     : valueFn_(vf), config_(config), dice_(seed) {}
 
+// P159: vypínač pro měření (Python `set_risk_deferral_agile(False)`); výchozí zapnuto.
+static bool g_riskDeferralAgile = true;
+void setRiskDeferralAgile(bool on) { g_riskDeferralAgile = on; }
+
+bool isAgileTeam(const GameState& state, TeamSide side) {
+    int all = 0, agile = 0;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        ++all;
+        if (p.stats.agility >= 4) ++agile;
+    });
+    return all > 0 && 2 * agile >= all;
+}
+
 Macro MacroMCTSSearch::search(const GameState& state) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros, config_.dauntlessInOffer);
@@ -316,7 +329,8 @@ Macro MacroMCTSSearch::search(const GameState& state) {
         lastBestValue_ = best->visits > 0
             ? best->totalValue / best->visits : 0.0;
         Macro pick = best->macro;
-        if (config_.riskDeferral) {
+        if (config_.riskDeferral ||
+            (config_.riskDeferralAgile && g_riskDeferralAgile && isAgileTeam(state, searchingSide))) {
             pick = applyRiskDeferral(root, state, pick, searchingSide);
         }
         return pick;

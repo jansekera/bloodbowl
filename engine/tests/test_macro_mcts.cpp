@@ -159,6 +159,7 @@ MCTSConfig makeRiskSeqConfig(PolicyNetwork* zeroPolicy, bool riskDeferral) {
     cfg.policyBlend = 0.0f;       // floors (matches production replay config);
                                    // blend=0 means the (zero) weights are never used.
     cfg.riskDeferral = riskDeferral;
+    cfg.riskDeferralAgile = false;   // P159 17.10.: testy odkladu řídí jen riskDeferral
     return cfg;
 }
 
@@ -831,7 +832,7 @@ TEST(MacroMCTS, RiskDeferralRefusesToDeferOnS7BigQEdge) {
 // RISK_DEFER_Q_MARGIN of the safe REPOSITION's -- dice probabilities are
 // quantized (1/6, 1/36, ...) and can't be tuned to hit an exact margin, but
 // this board-position term is continuous and can.
-TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
+GameState makeHandBuiltMismatch() {
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;
@@ -919,6 +920,11 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     state.ball.isHeld = true;
     state.ball.carrierId = 12;
     state.ball.position = strongDefender.position;
+    return state;
+}
+
+TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
+    GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;
     MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
@@ -932,6 +938,50 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     Macro guarded = searchOn.search(state);
     EXPECT_EQ(guarded.type, MacroType::REPOSITION);
     EXPECT_EQ(guarded.playerId, 2);
+}
+
+// P159 (17.10.2026, uživatel: „zapneme jen pro agilní tým“): riskDeferralAgile zapne odklad
+// i bez riskDeferral, ale JEN když hledající tým je agilní. Tentýž rozlišující fixture:
+// bez agility (AG3) zůstane riskantní BLITZ, s AG4 odklad vybere bezpečný REPOSITION.
+TEST(MacroMCTS, P159AgileTeamGetsDeferralOthersDoNot) {
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfgAgile = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    cfgAgile.riskDeferralAgile = true;
+
+    GameState slow = makeHandBuiltMismatch();
+    ASSERT_FALSE(isAgileTeam(slow, TeamSide::HOME));
+    MacroMCTSSearch searchSlow(nullptr, cfgAgile, 42);
+    EXPECT_EQ(searchSlow.search(slow).type, MacroType::BLITZ)
+        << "neagilní tým odklad nemá dostat";
+
+    GameState agile = makeHandBuiltMismatch();
+    agile.getPlayer(1).stats.agility = 4;
+    agile.getPlayer(2).stats.agility = 4;
+    ASSERT_TRUE(isAgileTeam(agile, TeamSide::HOME));
+    MCTSConfig cfgOff = makeRiskSeqConfig(&zeroPolicy, /*riskDeferral=*/false);
+    MacroMCTSSearch searchOff(nullptr, cfgOff, 42);
+    ASSERT_EQ(searchOff.search(agile).type, MacroType::BLITZ)
+        << "předpoklad: i s AG4 by bez odkladu padl riskantní BLITZ";
+    MacroMCTSSearch searchAgile(nullptr, cfgAgile, 42);
+    const Macro m = searchAgile.search(agile);
+    EXPECT_EQ(m.type, MacroType::REPOSITION);
+    EXPECT_EQ(m.playerId, 2);
+}
+
+TEST(MacroMCTS, P159IsAgileTeamWoodElvesYesSkavenNo) {
+    std::vector<RiskSnap> snaps;
+    for (int id = 1; id <= 22; ++id) {
+        RiskSnap s{};
+        s.id = id; s.st = 0;
+        s.x = id <= 11 ? 10 : 15; s.y = 1 + (id - 1) % 11;
+        snaps.push_back(s);
+    }
+    GameState elves = makeRiskSeqState("wood-elf", "skaven", TeamSide::HOME, 1, 1, 0, 0,
+                                       10, 1, -1, snaps, {});
+    EXPECT_TRUE(isAgileTeam(elves, TeamSide::HOME));
+    EXPECT_FALSE(isAgileTeam(elves, TeamSide::AWAY));
+    GameState none;   // nikdo na hřišti
+    EXPECT_FALSE(isAgileTeam(none, TeamSide::HOME));
 }
 
 // =============================================================

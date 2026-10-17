@@ -624,6 +624,8 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("activation_value", []() { return bb::activationValue(); });
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
+    // P159 (17.10.2026): odklad riskantních akcí pro agilní tým (výchozí zapnuto); False = vypnout pro měření.
+    m.def("set_risk_deferral_agile", [](bool on) { bb::setRiskDeferralAgile(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
     // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.

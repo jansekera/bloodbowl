@@ -26,6 +26,10 @@ struct MCTSConfig {
     int nRollouts = 1;            // Rollouts averaged per leaf eval (open-loop): >1 cuts macro Q-variance ~sqrt(K)
     bool leafLookahead = false;   // Macro-MCTS only: bounded greedy 1-ply forward look at leaf eval (2026-07-02 experiment)
     bool riskDeferral = false;    // Macro-MCTS only: Q-guarded risk-sequencing defer at search() return (queue item 10, 2026-07-28)
+    // P159 (17.10.2026, uživatel: „zapneme jen pro agilní tým“): odklad zapnutý i bez riskDeferral,
+    // když hledající tým je agilní (isAgileTeam). Víkend 17.10.: propadlé aktivace −5,9σ, čas na tah
+    // u elfů +17 %, u skavenů skoro 2× — proto ne pro všechny. false = čistě vypnuto (měření).
+    bool riskDeferralAgile = true;
     // Offer a block whose strength Dauntless would equalise (2026-08-14).
     // getBlockDiceCount weighs Horns but never Dauntless, so a ST3 Slayer beside
     // a ST4 Black Orc prices as uphill, the count goes negative and the offer is

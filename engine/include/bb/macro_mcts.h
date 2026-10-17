@@ -210,6 +210,12 @@ public:
     int cagePlansAdopted() const;
 };
 
+// P159 (17.10.2026): agilní tým = aspoň polovina jeho hráčů na hřišti má AG4+ (lesní elfové ano,
+// skaveni a lidé ne). Řídí MCTSConfig::riskDeferralAgile.
+bool isAgileTeam(const GameState& state, TeamSide side);
+// Celoprocesní vypínač téhož (měření A/B): false = agilní odklad nikde.
+void setRiskDeferralAgile(bool on);
+
 // P159 (16.10.2026): odklad smí riskantní makro jen odsunout, ne zrušit.
 // Vrací true, když po bezpečném `alt` zůstane `pick` v nabídce a jeho podíl
 // turnoverů nevzroste nad `pickPto` o víc než rezervu — tj. alt nepoužil
