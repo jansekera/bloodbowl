@@ -384,6 +384,10 @@ constexpr double RISK_DEFER_SAFE_PTO  = 0.02;
 constexpr double RISK_DEFER_Q_MARGIN  = 0.04;
 constexpr int    RISK_DEFER_PROBE_K   = 48;
 constexpr double RISK_DEFER_PTO_SLACK = 0.05;
+// Sonda alternativy smí skončit prvním turnoverem jen proto, že už jeden turnover z K
+// překročí strop bezpečné alternativy.
+static_assert(RISK_DEFER_SAFE_PTO * RISK_DEFER_PROBE_K < 1.0,
+              "stopOnTurnover v applyRiskDeferral předpokládá: 1 turnover z K > RISK_DEFER_SAFE_PTO");
 
 // P159 (16.10.2026). OPRAVENO — bezpečná alternativa se dřív vybírala jen podle
 // vlastního rizika a Q; mohl to být přesun TÉHOŽ hráče (riskantní makro pak
@@ -399,12 +403,12 @@ bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pi
     for (int k = 0; k < samples; ++k) {
         GameState sim = state.clone();
         auto res = greedyExpandMacro(sim, alt, dice);
-        if (res.turnover || sim.activeTeam != state.activeTeam) { missing++; continue; }
+        if (res.turnover || sim.activeTeam != state.activeTeam) { if (++missing * 10 > samples) return false; continue; }
         offer.clear();
         getAvailableMacros(sim, offer, dauntlessInOffer);
         auto it = std::find_if(offer.begin(), offer.end(),
                                [&](const Macro& m) { return sameMacro(m, pick); });
-        if (it == offer.end()) { missing++; continue; }
+        if (it == offer.end()) { if (++missing * 10 > samples) return false; continue; }
         played++;
         if (greedyExpandMacro(sim, *it, dice).turnover) nTO++;
     }
@@ -415,13 +419,17 @@ bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pi
 
 Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
                                          const Macro& pick, TeamSide perspective) {
-    auto probe = [&](const Macro& m) {
+    // P159 (17.10.2026): bezpečná alternativa nesmí mít ani jeden turnover (viz static_assert u
+    // konstant), takže sonda alternativy končí prvním turnoverem — výsledek filtru je týž, jen
+    // bez zbylých sond. Skaveni v obraně: čas odkladu ~2× menší (diagnostika 17.10.).
+    auto probe = [&](const Macro& m, bool stopOnTurnover = false) {
         struct { double pto = 0, q = 0, meanActions = 0; } r;
         int nTO = 0; double qs = 0, acts = 0;
         for (int k = 0; k < RISK_DEFER_PROBE_K; ++k) {
             GameState sim = state.clone();
             auto res = greedyExpandMacro(sim, m, dice_);
             if (res.turnover) nTO++;
+            if (stopOnTurnover && nTO > 0) { r.pto = 1.0; return r; }
             qs += simulate(sim, perspective);
             acts += static_cast<double>(res.actions.size());
         }
@@ -440,7 +448,7 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
         const Macro& m = child.macro;
         if (m.type == MacroType::END_TURN) continue;
         if (sameMacro(m, pick)) continue;
-        auto pr = probe(m);
+        auto pr = probe(m, /*stopOnTurnover=*/true);
         if (pr.pto > RISK_DEFER_SAFE_PTO) continue;       // must be dice-free
         if (pr.meanActions < 0.5) continue;                // must not be a no-op
         if (pr.q < pickProbe.q - RISK_DEFER_Q_MARGIN) continue;  // Q-guard
