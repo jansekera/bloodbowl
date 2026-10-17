@@ -1,0 +1,73 @@
+diff --git a/engine/include/bb/helpers.h b/engine/include/bb/helpers.h
+index 3da618f5..4155e5fb 100644
+--- a/engine/include/bb/helpers.h
++++ b/engine/include/bb/helpers.h
+@@ -35,6 +35,12 @@ Position pickApproachStep(const GameState& state, const Player& mover,
+                           Position from, Position targetPos);
+ 
+ // Agility roll targets (clamped to 2-6)
++// Úhyb podle AG hráče, který má uhýbat (uživatel 17.10.2026: „AG4 OK - AG3 - na hraně - AG2 -
++// nedodgovat“, „jde o AG hráče co má dodgovat“, „AG2 dodguje v posledním kole - když není jiná
++// méně riskantní možnost“): AG4+ uhýbá kamkoli; AG3 jen na pole bez cizí tacklezóny; AG2 a míň
++// vůbec. V posledním kole poločasu zákaz neplatí (cestu i tak volí nejmenší riziko). Platí jen
++// pro tým na tahu — dosah soupeře se dál odhaduje celý, jak by mohl hrát.
++bool agilityForbidsDodge(const GameState& state, const Player& player, Position dest);
+ int calculateDodgeTarget(const GameState& state, const Player& player,
+                          Position dest, Position source);
+ // Rusi nektery ze souperu, kteri drzi tacklezonu nad polem `from`, dovednosti
+diff --git a/engine/src/helpers.cpp b/engine/src/helpers.cpp
+index 9d92b76a..ecb3f778 100644
+--- a/engine/src/helpers.cpp
++++ b/engine/src/helpers.cpp
+@@ -83,6 +83,15 @@ int calculateLeapTarget(const Player& player) {
+     return std::clamp(target, 2, 6);
+ }
+ 
++bool agilityForbidsDodge(const GameState& state, const Player& player, Position dest) {
++    if (player.teamSide != state.activeTeam) return false;
++    if (state.getTeamState(player.teamSide).turnNumber >= 8) return false;
++    const int ag = player.stats.agility;
++    if (ag >= 4) return false;
++    if (ag == 3) return countTacklezones(state, dest, player.teamSide) > 0;
++    return true;
++}
++
+ int calculateDodgeTarget(const GameState& state, const Player& player,
+                          Position dest, Position source) {
+     int ag = player.stats.agility;
+diff --git a/engine/src/macro_actions.cpp b/engine/src/macro_actions.cpp
+index 7d5089d4..6805df60 100644
+--- a/engine/src/macro_actions.cpp
++++ b/engine/src/macro_actions.cpp
+@@ -1517,6 +1517,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
+                     // Cilem je VEN Z KONTAKTU, ne "o kus dal": pole s cizi
+                     // tacklezonou by hrace nechalo v teze situaci.
+                     if (countTacklezones(state, cand, mySide) > 0) continue;
++                    if (agilityForbidsDodge(state, p, cand)) continue;   // úhyb podle AG (17.10.)
+                     if (priced) {
+                         // ⭐ Pod ramenem se pole vybira podle NEJHORSI ODPOVEDI,
+                         //   ne podle vzdalenosti. Pole bez tacklezony jeste
+@@ -3119,8 +3120,9 @@ void takeMoveWalkProfile(long* out4) {
+ // P149: krok, který by znamenal úhyb na `dodgeCap`+ a horší, se neudělá. Brána je pole, které se
+ // OPOUŠTÍ (jako v move_handler a pathFailProb).
+ static bool walkStepHitsDodgeCap(const GameState& state, const Player& p, Position dest, int dodgeCap) {
+-    return dodgeCap > 0 && dest != p.position && countTacklezones(state, p.position, p.teamSide) > 0 &&
+-           calculateDodgeTarget(state, p, dest, p.position) >= dodgeCap;
++    if (dest == p.position || countTacklezones(state, p.position, p.teamSide) == 0) return false;
++    if (agilityForbidsDodge(state, p, dest)) return true;   // úhyb podle AG (17.10.)
++    return dodgeCap > 0 && calculateDodgeTarget(state, p, dest, p.position) >= dodgeCap;
+ }
+ 
+ // Jeden krok makrové chůze (bez LEAP ramene), bez kostek: co by chůze teď udělala.
+diff --git a/engine/src/pathfinder.cpp b/engine/src/pathfinder.cpp
+index 3a28ee05..fdcf68ba 100644
+--- a/engine/src/pathfinder.cpp
++++ b/engine/src/pathfinder.cpp
+@@ -228,6 +228,7 @@ void riskWeightedDijkstra(const GameState& state, const Player& player,
+             //   (FRONTA A: „vady prubezne, bez ohledu na deltu"), ne taktika.
+             //   `estimateApproachFailChance` uz to melo spravne (`cur`).
+             if (countTacklezones(state, curPos, player.teamSide) > 0) {
++                if (agilityForbidsDodge(state, player, np)) continue;   // úhyb podle AG (17.10.)
+                 // `calculateDodgeTarget` uz vraci cil clampnuty do [2,6],
+                 // takze P_fail sama od sebe padne do [1/6, 5/6].
+                 const int dodgeTarget =
