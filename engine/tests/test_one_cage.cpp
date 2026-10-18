@@ -1389,6 +1389,12 @@ TEST(OneCageMate, EscapeToSafetyIsPreferredToAnEarlyHandOffTouchdown) {
     ASSERT_TRUE(cc2.next(b2.s, m));
     setCageFeaturesOff(0);
     EXPECT_EQ(m.targetPos.x, 25);
+    setP213PartsOff(kP213EscapeFirst);        // pojistka měření: staré pořadí ⇒ TD předávkou
+    CageController cc3(nullptr, cfg(), 1);
+    Board b3 = mateBoard(4, {10, 7}, 5);
+    ASSERT_TRUE(cc3.next(b3.s, m));
+    setP213PartsOff(0);
+    EXPECT_EQ(m.targetPos.x, 25);
 }
 
 TEST(OneCageMate, AThreatenedCarrierHandsOffToATeammateWhoRunsOutOfReach) {
@@ -1799,6 +1805,15 @@ TEST(OneCageMate, TheEscapeMayUseGoingForItOnlyWhenNoRollFreeSafeSquareExists) {
         const Player& r = b.s.getPlayer(6);
         EXPECT_GT(r.position.distanceTo(m.targetPos), 3) << "cíl je za pohybem příjemce";
         EXPECT_LE(riskTier(pathFailProb(b.s, r, m.targetPos, 3 + maxGfiSquares(r), Position{-1, -1})), 1);
+    }
+    {   // pojistka měření: bez části „útěk s hodem“ pomalý příjemce míč nedostane
+        setP213PartsOff(kP213EscapeRolls);
+        Board b = board(3);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        const bool any = cc.next(b.s, m);
+        setP213PartsOff(0);
+        if (any) EXPECT_NE(m.type, MacroType::HAND_OFF_SCORE);
     }
     {
         Board b = board(6);

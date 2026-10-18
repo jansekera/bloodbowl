@@ -63,6 +63,9 @@ void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
 thread_local unsigned g_cageFeaturesOff = 0;
 void setCageFeaturesOff(unsigned mask) { g_cageFeaturesOff = mask; }
 unsigned cageFeaturesOff() { return g_cageFeaturesOff; }
+static unsigned g_p213PartsOff = 0;
+void setP213PartsOff(unsigned mask) { g_p213PartsOff = mask; }
+unsigned p213PartsOff() { return g_p213PartsOff; }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
@@ -4349,7 +4352,8 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
         // (stejná vada jako dřív u SCORE: rozhodnuto podle jedné cesty, hráno jinou).
         const bool viaGiven = macro.viaPos.isOnPitch() && macro.viaPos.distanceTo(receiver.position) == 1;
         // P213 útěk (cíl příjemce mimo zónu): řadič počítal doběh nosiče i s GFI; P180 (TD) bez GFI.
-        const bool escape = macro.targetPos.isOnPitch() && macro.targetPos.x != endzoneX(carrier.teamSide);
+        const bool escape = macro.targetPos.isOnPitch() && macro.targetPos.x != endzoneX(carrier.teamSide) &&
+                            p213PartOn(kP213EscapeRolls);
         if (viaGiven && carrier.position != macro.viaPos) {
             movePlayerToward(state, carrierId, macro.viaPos, dice, result,
                              carrier.movementRemaining + (escape ? maxGfiSquares(carrier) : 0));
@@ -4389,7 +4393,7 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
     // na které řadič klece spočítal doběh (17.10.: i s GFI a úhybem do 3+ — „i útěk může obsahovat GFI“).
     if (macro.targetPos.isOnPitch() && macro.targetPos.x != targetX) {
         movePlayerToward(state, receiverId, macro.targetPos, dice, result,
-                         newCarrier.movementRemaining + maxGfiSquares(newCarrier));
+                         newCarrier.movementRemaining + (p213PartOn(kP213EscapeRolls) ? maxGfiSquares(newCarrier) : 0));
         return result;
     }
     movePlayerToward(state, receiverId, target, dice, result, 14);

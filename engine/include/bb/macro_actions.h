@@ -87,6 +87,12 @@ enum CageFeature : unsigned {
 void setCageFeaturesOff(unsigned mask);
 unsigned cageFeaturesOff();
 inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; }
+// P213 po částech — JEN PRO MĚŘENÍ (uživatel 18.10.: „rozděl ty dvě měření zvlášť“; CageFeature nemá volný bit).
+// Bit = část VYPNUTA: útěk před TD předávkou (`2bfe769a`; vypnuto = staré pořadí) · útěk s GFI a úhybem (`b77b8c55`).
+enum P213Part : unsigned { kP213EscapeFirst = 1, kP213EscapeRolls = 2 };
+void setP213PartsOff(unsigned mask);
+unsigned p213PartsOff();
+inline bool p213PartOn(P213Part f) { return (p213PartsOff() & f) == 0; }
 void takeDodgeCapStops(long* out2);
 
 enum class MacroType : uint8_t {

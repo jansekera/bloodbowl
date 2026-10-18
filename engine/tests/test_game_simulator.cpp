@@ -805,7 +805,8 @@ TEST(DevelopedRoster, Tv1500SkavenRatOgreAndOneFastGutterRunner) {
     EXPECT_EQ(linemenWrestle, 2);
     EXPECT_EQ(linemenBlock, 0);
     EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3);
-    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1) << "Strip Ball má lovec";
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 2) << "Strip Ball má GR lovec a hlavní Blitzer";
+    EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 1) << "Guard jen druhému Blitzerovi";
     EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 2);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }

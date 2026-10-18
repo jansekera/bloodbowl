@@ -625,6 +625,8 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_dodge_cap", [](bool on) { bb::setDodgeCapEnabled(on); });
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
+    // P213 po částech, jen pro měření: 1 = útěk před TD předávkou vypnut, 2 = útěk s GFI/úhybem vypnut
+    m.def("set_p213_parts_off", [](unsigned mask) { bb::setP213PartsOff(mask); });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
     // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.
     m.def("carrier_blitz_threat", [](const bb::GameState& s) {

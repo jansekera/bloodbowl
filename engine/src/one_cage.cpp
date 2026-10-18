@@ -587,7 +587,8 @@ void CageController::planStart(const GameState& state) {
             // 1) nosič na pole vedle příjemce — bez hodu
             Position via{-1, -1};
             double pvOk = 0.0;   // doběh nosiče k příjemci
-            const int carrierBudget = c.movementRemaining + maxGfiSquares(c);
+            const bool rolls = p213PartOn(kP213EscapeRolls);
+            const int carrierBudget = c.movementRemaining + (rolls ? maxGfiSquares(c) : 0);
             if (c.position.distanceTo(m.position) == 1) {
                 via = c.position;
                 pvOk = 1.0;
@@ -596,7 +597,7 @@ void CageController::planStart(const GameState& state) {
                     if (!v.isOnPitch() || state.getPlayerAtPosition(v)) continue;
                     if (v.distanceTo(c.position) > carrierBudget) continue;
                     const double pf = pathFailProb(state, c, v, carrierBudget, Position{-1, -1});
-                    if (pf < 0.0 || riskTier(pf) > 1 || 1.0 - pf <= pvOk) continue;
+                    if (pf < 0.0 || riskTier(pf) > 1 || 1.0 - pf <= pvOk || (!rolls && pf != 0.0)) continue;
                     via = v;
                     pvOk = 1.0 - pf;
                     if (pf == 0.0) break;
@@ -611,7 +612,7 @@ void CageController::planStart(const GameState& state) {
             // 3) bezpečné pole příjemce — i s GFI a úhybem do 3+; napřed pole nejdál od soupeřů
             struct Sq { int key; Position sq; };
             std::vector<Sq> cands;
-            const int budget = m.movementRemaining + maxGfiSquares(m);
+            const int budget = m.movementRemaining + (rolls ? maxGfiSquares(m) : 0);
             for (int x = m.position.x - budget; x <= m.position.x + budget; ++x)
                 for (int y = std::max(1, m.position.y - budget); y <= std::min(13, m.position.y + budget); ++y) {
                     const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
@@ -624,7 +625,7 @@ void CageController::planStart(const GameState& state) {
             // napřed jen pole bez hodu; s hodem (do 3+) jen když bez hodu žádné bezpečné není
             // (uživatel 17.10.: „více riskantní pouze když není jiná možnost mín riskantní“)
             bool safeFound = false;
-            for (int pass = 0; pass < 2 && !safeFound; ++pass) {
+            for (int pass = 0; pass < (rolls ? 2 : 1) && !safeFound; ++pass) {
             int tried = 0;
             for (const Sq& q : cands) {
                 const double pr = q.sq == m.position ? 0.0 : pathFailProb(state, m, q.sq, budget, Position{-1, -1});
@@ -730,7 +731,7 @@ void CageController::planStart(const GameState& state) {
         // P213 (uživatel 16.10. večer): útěk do bezpečí má PŘEDNOST před TD předávkou — hody jsou stejné
         // (chycení, případně úhyb a GFI), pozdější TD nechá soupeři méně kol na vyrovnání; TD předávkou
         // jen tehdy, když bezpečné pole mimo dosah soupeřů není. Poslední kolo zvlášť (výše: vždy TD).
-        if (!lastTurn && !walksIn && orderSafetyHandOff(c)) return;
+        if (p213PartOn(kP213EscapeFirst) && !lastTurn && !walksIn && orderSafetyHandOff(c)) return;
         if (!walksIn && orderViaMate(c)) return;
         if (cageFeatureOn(kFeatForceScore) && !scoringRangeCage_ && (walksIn || !lastTurn) &&
             c.teamSide == state.activeTeam && freeToAct(c)) {
@@ -745,10 +746,13 @@ void CageController::planStart(const GameState& state) {
     }
     if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
         lastTurnBestTd(state.getPlayer(state.ball.carrierId))) return;
-    if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
+    const bool escapeFirst = p213PartOn(kP213EscapeFirst);
+    if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 && escapeFirst &&
         orderSafetyHandOff(state.getPlayer(state.ball.carrierId))) return;   // P213 před TD předávkou (16.10.)
     if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
         orderViaMate(state.getPlayer(state.ball.carrierId))) return;
+    if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 && !escapeFirst &&
+        orderSafetyHandOff(state.getPlayer(state.ball.carrierId))) return;   // staré pořadí (jen měření)
     if (goal != TurnGoal::ADVANCE_BALL && !scoringRangeCage_) {
         if (dbg) std::fprintf(stderr, "[cage ctl] bez plánu: cíl tahu %d není ADVANCE_BALL\n", static_cast<int>(goal));
         return;
