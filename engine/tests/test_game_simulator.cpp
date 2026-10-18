@@ -800,10 +800,12 @@ TEST(DevelopedRoster, Tv1500SkavenRatOgreAndOneFastGutterRunner) {
         if (lineman && p.hasSkill(SkillName::Wrestle)) ++linemenWrestle;
         if (lineman && p.hasSkill(SkillName::Block)) ++linemenBlock;
     });
+    // uživatel 18.10.: „stripball na GR lovce výměnou za wrestle na jednom linemanovi“
     EXPECT_EQ(hunters, 1);
-    EXPECT_EQ(linemenWrestle, 3);
+    EXPECT_EQ(linemenWrestle, 2);
     EXPECT_EQ(linemenBlock, 0);
-    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 4);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 3);
+    EXPECT_EQ(countHomeSkill(state, SkillName::StripBall), 1) << "Strip Ball má lovec";
     EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 2);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
 }
