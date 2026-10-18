@@ -1366,3 +1366,22 @@ TEST(SlotyNaLinii, OrkoveVObraneBezSily4_VUtokuSila4) {
     for (const Player* p : losPlayers(gs, TeamSide::HOME)) sila4 += p->stats.strength >= 4;
     EXPECT_GE(sila4, 1) << "útok: síla 4 patří na linii";
 }
+
+// Uživatel 18.10.2026 (lovec skavenů +Strip Ball za Wrestle jednoho Linemana): po přidání řádku do
+// soupisky zůstal ručně psaný počet řádků 8 ⇒ poslední řádek (Rat Ogre) tiše vypadl ze sestavy.
+// Počet řádků musí sedět se skutečně vyplněnými řádky u každé soupisky a úrovně.
+TEST(Roster, PositionalCountMatchesTheFilledRowsOfEveryRoster) {
+    const char* names[] = {"human", "orc", "skaven", "dwarf", "wood-elf", "dwarf-nw", "wood-elf-agile", "orc-mb",
+                           "chaos", "undead", "lizardmen", "darkelf", "halfling", "norse", "highelf", "vampire",
+                           "amazon", "necromantic", "bretonnian", "khemri", "goblin", "chaosdwarf", "ogre",
+                           "nurgle", "proelf"};
+    for (int tv : {1000, 1200, 1500})
+        for (const char* n : names) {
+            const TeamRoster* r = getDevelopedRoster(n, tv);
+            if (!r) continue;   // varianty (dwarf-nw, orc-mb …) jen na TV1200
+            ASSERT_LE(r->positionalCount, 12) << r->name;
+            int filled = 0;
+            for (const PlayerTemplate& t : r->positionals) filled += t.quantity > 0 ? 1 : 0;
+            EXPECT_EQ(r->positionalCount, filled) << r->name << " (TV " << tv << ")";
+        }
+}

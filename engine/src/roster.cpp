@@ -732,7 +732,7 @@ const TeamRoster& getWoodElfRoster1200Agile() {
 //
 // Výsledná hodnota týmu (ceny BB2016; 11 hráčů na hřišti + 3 týmové rerolly + lékárník;
 // dokoupený skill 20 tis., na double 30, +MA 30):
-//   trpaslíci 1490 · wood-elf 1510 (16.10.: jeden Catcher NoS místo Diving Catch, jeden Lineman bez Wrestle) · skaven 1520 · ork 1500 · člověk 1490
+//   trpaslíci 1490 · wood-elf 1510 (16.10.: jeden Catcher NoS místo Diving Catch, jeden Lineman bez Wrestle) · skaven 1520 (18.10.: Strip Ball lovci za Wrestle jednoho Linemana) · ork 1500 · člověk 1490
 //   (týmový reroll: trpaslík, elf, člověk 50 tis., skaven a ork 60 tis.)
 // Úroveň TV1200 pro srovnání týmž účtem: 1330 · 1340 · 1200 · 1360 · 1290.
 // ⚠️ NOVÁ MĚŘICÍ ÉRA: čísla z TV1500 se s TV1200 neporovnávají.
@@ -805,23 +805,26 @@ const TeamRoster& getWoodElfRoster1500() {
 // (+Side Step): doběhne ke kleci, při blitzu má sílu 3 a na Both Down položí i nosiče s Block.
 // „linemanovi dej wrestle místo block — linemanům víc sedí wrestle proti blitzerům“ ⇒ všichni
 // tři Linemani na hřišti mají Wrestle. (Horns je pro Gutter Runnera skill na double.)
+// Uživatel 18.10.: „u GR lovce mi chybí stripball … stripball na GR lovce výměnou za wrestle na jednom
+// linemanovi“ ⇒ lovec +Strip Ball, jeden ze tří Linemanů na hřišti bez Wrestle (hodnota týmu stejná).
 const TeamRoster& getSkavenRoster1500() {
     static const TeamRoster roster = {
         "Skaven (TV1500)",
         {
             {{7, 3, 3, 7}, makeSkills({SkillName::Wrestle}), 11, "Lineman +Wrestle"},
+            {{7, 3, 3, 7}, {}, 1, "Lineman"},
             {{10, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::SureFeet, SkillName::Sprint, SkillName::Block,
                 SkillName::SideStep}), 1, "Gutter Runner +MA+Sure Feet+Sprint+Block+Side Step"},
             {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Block, SkillName::SideStep}), 2, "Gutter Runner +Block+Side Step"},
-            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Wrestle, SkillName::Horns, SkillName::SideStep}), 1,
-                "Gutter Runner hunter +Wrestle+Horns+Side Step"},
+            {{9, 2, 4, 7}, makeSkills({SkillName::Dodge, SkillName::Wrestle, SkillName::Horns, SkillName::SideStep,
+                SkillName::StripBall}), 1, "Gutter Runner hunter +Wrestle+Horns+Side Step+Strip Ball"},
             {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard, SkillName::MightyBlow}), 1, "Blitzer +Guard+Mighty Blow"},
             {{7, 3, 3, 8}, makeSkills({SkillName::Block, SkillName::Guard}), 1, "Blitzer +Guard"},
             {{7, 3, 3, 7}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block, SkillName::Pro}), 1, "Thrower +Block+Pro"},
             {{6, 5, 2, 8}, makeSkills({SkillName::Loner, SkillName::Frenzy, SkillName::MightyBlow, SkillName::WildAnimal,
                 SkillName::PrehensileTail}), 1, "Rat Ogre"},
         },
-        8, 60, true
+        9, 60, true
     };
     return roster;
 }
