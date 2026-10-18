@@ -4348,8 +4348,11 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
         // P180: řadič klece nese pole předávky, podle kterého šanci spočítal — jít TAM
         // (stejná vada jako dřív u SCORE: rozhodnuto podle jedné cesty, hráno jinou).
         const bool viaGiven = macro.viaPos.isOnPitch() && macro.viaPos.distanceTo(receiver.position) == 1;
+        // P213 útěk (cíl příjemce mimo zónu): řadič počítal doběh nosiče i s GFI; P180 (TD) bez GFI.
+        const bool escape = macro.targetPos.isOnPitch() && macro.targetPos.x != endzoneX(carrier.teamSide);
         if (viaGiven && carrier.position != macro.viaPos) {
-            movePlayerToward(state, carrierId, macro.viaPos, dice, result, carrier.movementRemaining);
+            movePlayerToward(state, carrierId, macro.viaPos, dice, result,
+                             carrier.movementRemaining + (escape ? maxGfiSquares(carrier) : 0));
             if (result.turnover) return result;
         } else if (!viaGiven && dist > 1) {
             movePlayerToward(state, carrierId, receiver.position, dice, result,
@@ -4383,9 +4386,10 @@ static MacroExpansionResult expandHandOffScore(GameState& state, const Macro& ma
     Position target{static_cast<int8_t>(targetX), newCarrier.position.y};
     if (macro.targetPos.isOnPitch() && macro.targetPos.x == targetX) target = macro.targetPos;   // P180
     // P213 (16.10.2026): předávka kvůli bezpečí míče — cíl příjemce není zóna, ale bezpečné pole,
-    // na které řadič klece spočítal doběh BEZ hodu (jen vlastním pohybem, žádné GFI).
+    // na které řadič klece spočítal doběh (17.10.: i s GFI a úhybem do 3+ — „i útěk může obsahovat GFI“).
     if (macro.targetPos.isOnPitch() && macro.targetPos.x != targetX) {
-        movePlayerToward(state, receiverId, macro.targetPos, dice, result, newCarrier.movementRemaining);
+        movePlayerToward(state, receiverId, macro.targetPos, dice, result,
+                         newCarrier.movementRemaining + maxGfiSquares(newCarrier));
         return result;
     }
     movePlayerToward(state, receiverId, target, dice, result, 14);
@@ -4626,6 +4630,12 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     }
 }
 
+
+int riskTier(double pFail) {
+    if (pFail <= 1.0 / 6.0 + 1e-9) return 0;
+    if (pFail <= 1.0 / 3.0 + 1e-9) return 1;
+    return 2;
+}
 
 // ⭐ P159 (17.10.2026, uživatel: „vše musí jít vyhodnotit hned - pravděpodobnost risku“): pravděpodobnost,
 //   že akce skončí turnoverem, SPOČÍTANÁ z hodů — žádné zkušební hry. Hody v jedné akci se skládají

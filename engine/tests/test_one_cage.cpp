@@ -3,6 +3,7 @@
 // uživatele, ne tvar kódu: kdo se kdy hýbe, kam a co se nesmí stát.
 #include <gtest/gtest.h>
 #include "bb/one_cage.h"
+#include "bb/pathfinder.h"
 #include "bb/game_simulator.h"
 #include "bb/helpers.h"
 #include "bb/dice.h"
@@ -1721,7 +1722,8 @@ TEST(OneCageEscape, AnAgileCarrierDodgesOutOfContactToWhereTheCageCanFormAClumsy
     const Position agile = run(4, 0, t);
     EXPECT_NE(agile, (Position{12, 7})) << "obratný nosič z kontaktu odešel";
     EXPECT_LE(t, kSafeBlitzThreat) << "a po tahu je v bezpečí";
-    const Position before = run(4, kFeatEscapeContact, t);
+    // pojistka vypíná i P213: od 17.10. (útěk smí mít úhyb) nosiče z kontaktu dostane i předávka kvůli bezpečí
+    const Position before = run(4, kFeatEscapeContact | kFeatSafetyHandOff, t);
     EXPECT_EQ(before, (Position{12, 7})) << "pozitivní kontrola: bez úpravy řadič nosiče v kontaktu nechal stát";
     EXPECT_GT(t, kSafeBlitzThreat);
     const Position clumsy = run(3, 0, t);
@@ -1741,4 +1743,38 @@ TEST(CarrierThreat, ATeammateBehindAWallIsNotCountedAsAComingCorner) {
     setCageFeaturesOff(kFeatCornerPathReach);
     EXPECT_EQ(cornersWithinReach(b.s, c, {12, 7}), 1) << "pozitivní kontrola: podle vzdálenosti by „došel“";
     setCageFeaturesOff(0);
+}
+
+// P213, uživatel 17.10.2026: „i útěk může obsahovat GFI“ a „více riskantní pouze když není jiná možnost
+// mín riskantní“. Pozice jako výše, ale pomalý příjemce (MA3): bez hodu z dosahu neuteče, s GFI ano ⇒ předá
+// a příjemce utíká s GFI (dřív se nepředávalo vůbec). Rychlý příjemce (MA6) bezpečné pole bez hodu má ⇒ GFI
+// nehraje.
+TEST(OneCageMate, TheEscapeMayUseGoingForItOnlyWhenNoRollFreeSafeSquareExists) {
+    auto board = [](int ma) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(6, TeamSide::HOME, {9, 7}, ma, 3, {SkillName::Catch}).stats.agility = 4;
+        b.put(13, TeamSide::AWAY, {6, 7}, 6, 5);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board(3);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        ASSERT_EQ(m.type, MacroType::HAND_OFF_SCORE) << "pomalý příjemce: útěk s GFI";
+        const Player& r = b.s.getPlayer(6);
+        EXPECT_GT(r.position.distanceTo(m.targetPos), 3) << "cíl je za pohybem příjemce";
+        EXPECT_LE(riskTier(pathFailProb(b.s, r, m.targetPos, 3 + maxGfiSquares(r), Position{-1, -1})), 1);
+    }
+    {
+        Board b = board(6);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        ASSERT_EQ(m.type, MacroType::HAND_OFF_SCORE);
+        const Player& r = b.s.getPlayer(6);
+        EXPECT_DOUBLE_EQ(pathFailProb(b.s, r, m.targetPos, 6, Position{-1, -1}), 0.0) << "rychlý: bez hodu";
+    }
 }

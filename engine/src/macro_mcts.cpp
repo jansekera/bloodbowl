@@ -375,11 +375,6 @@ static bool sameMacro(const Macro& a, const Macro& b) {
 //   nehodnotí o víc než RISK_DEFER_Q_MARGIN hůř, hraje se napřed přesun. Hodnoty jsou z hledání.
 constexpr double RISK_DEFER_Q_MARGIN = 0.04;   // moje číslo; uživatel 17.10.: „jestli už jsi to spočítal, tak OK“
 
-int riskTier(double pFail) {
-    if (pFail <= 1.0 / 6.0 + 1e-9) return 0;
-    if (pFail <= 1.0 / 3.0 + 1e-9) return 1;
-    return 2;
-}
 
 // P159: odklad smí riskantní akci jen odsunout, ne zrušit (nález S2 z 28.07., oprava 16.10.).
 // Alternativa je přesun bez hodu, takže se zahraje JEDNOU (kostky nerozhodují) a pak se jen čte:

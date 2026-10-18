@@ -343,6 +343,9 @@ double gfiSequenceFailProb(int gfiSquares, bool rerollAvailable, bool blizzard);
 // P159 (17.10.2026): pravděpodobnost turnoveru akce spočítaná z hodů (úhyby + GFI + kostky bloku
 // dohromady; zvednutí míče se nepočítá). −1 = akce, které se odklad netýká.
 double macroDirectRisk(const GameState& state, const Macro& m);
+// Stupeň rizika podle pravděpodobnosti selhání (uživatel 17.10.): 0 = do 1/6 (2+, kdykoli),
+// 1 = do 1/3 (3+, na konci tahu), 2 = víc (jen když není méně riskantní možnost).
+int riskTier(double pFail);
 
 // ⭐ W-GFI (04.09., NASAZENO 09.09.2026, nepodmineny): volnemu hraci
 //   mirici na REPOZICI (bezpecnost/screen/marker/roh, ne nosic) se GFI

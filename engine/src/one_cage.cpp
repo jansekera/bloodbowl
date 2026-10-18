@@ -533,9 +533,11 @@ void CageController::planStart(const GameState& state) {
     };
     // ⭐ P213 (uživatel 16.10.2026: „pokud uteče — předat — pokud byl předtím v bezpečí — zdržovat“).
     //   Klec míč neochrání ani po nejlepším plánu (hrozba > 0,15) a spoluhráč po předávce s míčem
-    //   doběhne bez hodu tam, kam soupeř dobře nedosáhne (hrozba ≤ 0,15) ⇒ předat, je-li šance, že
-    //   míč přežije (doběh nosiče × chycení × bezpečí příjemce), větší než v kleci. Nosič v bezpečí ⇒
+    //   doběhne tam, kam soupeř dobře nedosáhne (hrozba ≤ 0,15) ⇒ předat, je-li šance, že míč přežije
+    //   (doběh nosiče × chycení × doběh příjemce × bezpečí příjemce), větší než v kleci. Nosič v bezpečí ⇒
     //   nic (zdržuje se jako dosud).
+    //   17.10. (uživatel: „i útěk může obsahovat GFI“): doběh nosiče i příjemce smí mít GFI a úhyb do
+    //   stupně 3+ (riskTier ≤ 1, celá cesta dohromady); jejich riziko se násobí do přežití míče.
     auto orderSafetyHandOff = [&](const Player& c) -> bool {
         if (!cageFeatureOn(kFeatSafetyHandOff) || c.teamSide != state.activeTeam || !freeToAct(c)) return false;
         if (state.getTeamState(c.teamSide).handOffUsedThisTurn) return false;   // jedna předávka za tah
@@ -553,15 +555,20 @@ void CageController::planStart(const GameState& state) {
                 m.hasSkill(SkillName::NoHands) || !cageMayMove(m)) return;
             // 1) nosič na pole vedle příjemce — bez hodu
             Position via{-1, -1};
+            double pvOk = 0.0;   // doběh nosiče k příjemci
+            const int carrierBudget = c.movementRemaining + maxGfiSquares(c);
             if (c.position.distanceTo(m.position) == 1) {
                 via = c.position;
+                pvOk = 1.0;
             } else {
                 for (const Position& v : m.position.getAdjacent()) {
                     if (!v.isOnPitch() || state.getPlayerAtPosition(v)) continue;
-                    if (v.distanceTo(c.position) > static_cast<int>(c.movementRemaining)) continue;
-                    if (pathFailProb(state, c, v, c.movementRemaining, Position{-1, -1}) != 0.0) continue;
+                    if (v.distanceTo(c.position) > carrierBudget) continue;
+                    const double pf = pathFailProb(state, c, v, carrierBudget, Position{-1, -1});
+                    if (pf < 0.0 || riskTier(pf) > 1 || 1.0 - pf <= pvOk) continue;
                     via = v;
-                    break;
+                    pvOk = 1.0 - pf;
+                    if (pf == 0.0) break;
                 }
             }
             if (!via.isOnPitch()) return;
@@ -569,11 +576,11 @@ void CageController::planStart(const GameState& state) {
             const int target = std::clamp(calculateCatchTarget(state, m, 1), 2, 6);
             double pc = (7 - target) / 6.0;
             if (m.hasSkill(SkillName::Catch) || state.getTeamState(side).canUseReroll()) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
-            if (pc <= best) return;
-            // 3) bezpečné pole příjemce — vlastním pohybem bez hodu; napřed pole nejdál od soupeřů
+            if (pvOk * pc <= best) return;
+            // 3) bezpečné pole příjemce — i s GFI a úhybem do 3+; napřed pole nejdál od soupeřů
             struct Sq { int key; Position sq; };
             std::vector<Sq> cands;
-            const int budget = m.movementRemaining;
+            const int budget = m.movementRemaining + maxGfiSquares(m);
             for (int x = m.position.x - budget; x <= m.position.x + budget; ++x)
                 for (int y = std::max(1, m.position.y - budget); y <= std::min(13, m.position.y + budget); ++y) {
                     const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
@@ -583,10 +590,15 @@ void CageController::planStart(const GameState& state) {
                     cands.push_back({threatsTo(state, sq, side) * 100 + distToEndzone(sq, side), sq});
                 }
             std::sort(cands.begin(), cands.end(), [](const Sq& a, const Sq& b) { return a.key < b.key; });
+            // napřed jen pole bez hodu; s hodem (do 3+) jen když bez hodu žádné bezpečné není
+            // (uživatel 17.10.: „více riskantní pouze když není jiná možnost mín riskantní“)
+            bool safeFound = false;
+            for (int pass = 0; pass < 2 && !safeFound; ++pass) {
             int tried = 0;
             for (const Sq& q : cands) {
+                const double pr = q.sq == m.position ? 0.0 : pathFailProb(state, m, q.sq, budget, Position{-1, -1});
+                if (pr < 0.0 || riskTier(pr) > 1 || (pass == 0) != (pr == 0.0)) continue;
                 if (++tried > 10) break;
-                if (q.sq != m.position && pathFailProb(state, m, q.sq, budget, Position{-1, -1}) != 0.0) continue;
                 GameState proj = state.clone();
                 proj.getPlayer(c.id).position = via;
                 Player& pm = proj.getPlayer(m.id);
@@ -594,14 +606,16 @@ void CageController::planStart(const GameState& state) {
                 proj.ball = BallState::carried(q.sq, m.id);
                 const double tm = blitzThreat(proj, pm, kSafeBlitzThreat);
                 if (tm > kSafeBlitzThreat) continue;
-                const double survive = pc * (1.0 - tm);
+                safeFound = true;
+                const double survive = pvOk * pc * (1.0 - pr) * (1.0 - tm);
                 if (survive > best) {
                     best = survive;
                     pick = Macro{MacroType::HAND_OFF_SCORE, c.id, m.id, q.sq};
                     pick.viaPos = via;
                     found = true;
                 }
-                break;   // nejbezpečnější dosažitelné pole tohoto příjemce
+                if (pass == 0) break;   // nejbezpečnější dosažitelné pole bez hodu
+            }
             }
         });
         if (dbg) std::fprintf(stderr, "[cage ctl] P213: klec míč udrží %.2f, předávka kvůli bezpečí %s\n", 1.0 - threat,

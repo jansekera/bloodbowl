@@ -215,7 +215,5 @@ public:
 // `pick` v nabídce a jeho stupeň rizika (riskTier) se nezhorší.
 bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
                        DiceRoller& dice, bool dauntlessInOffer = false);
-// Stupeň rizika podle pravděpodobnosti selhání: 0 = do 1/6 (2+), 1 = do 1/3 (3+), 2 = víc.
-int riskTier(double pFail);
 
 } // namespace bb
