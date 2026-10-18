@@ -20,7 +20,7 @@ Uživatel: „zastav pak práci na bb a odlož na další dny“. Všechno je co
 
 ## Pořadí po návratu
 
-1. **Vyhodnotit P159:** `cd evidence/p159c_20261017 && /usr/local/bin/python3.8 vyhodnoceni.py`.
+1. ✅ (18.10.: čas +9 %, propadlé aktivace −25 %, 3,6σ — zapsáno v knize) **Vyhodnotit P159:** `cd evidence/p159c_20261017 && /usr/local/bin/python3.8 vyhodnoceni.py`.
    - Rozhoduje **čas na tah** (má být zhruba jako bez odkladu; dřív skaveni 12 → 23 s) a **propadlé aktivace** po turnoveru (víkend: −24 %).
    - TD jen s výhradou (180 párů je na TD málo).
    - Výsledek zapsat do knihy `evidence/task_queue.md`, řádek P159.
