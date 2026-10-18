@@ -1,0 +1,63 @@
+diff --git a/engine/src/one_cage.cpp b/engine/src/one_cage.cpp
+index cb68378f..0b7e5139 100644
+--- a/engine/src/one_cage.cpp
++++ b/engine/src/one_cage.cpp
+@@ -1529,6 +1529,7 @@ void CageController::planLaggards(const GameState& state) {
+         (void)slot;
+         neededForCorners.push_back(id);
+     }
++    if (std::getenv("BB_DIAG216")) std::fprintf(stderr, "DIAG216 volano ready=%zu dist=%d ma=%d\n", readyMates_.size(), distToEndzone(cp, side), (int)carrier.stats.movement);
+     if (readyMates_.empty() && cageFeatureOn(kFeatReadyMate) &&
+         distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
+         // P180 (9), uživatel 16.10.2026: „preferujeme ne, ale zahrnujeme i ano“ ⇒ první klíč = potřebuje
+@@ -1538,6 +1539,7 @@ void CageController::planLaggards(const GameState& state) {
+         const bool surround = cageFeatureOn(kFeatReadySurround);
+         const bool weaker = weakerTeam(state, side);
+         struct Cand { int id; Position sq; std::tuple<int, int, int, int, int, int> key; };
++        int dg[6] = {0, 0, 0, 0, 0, 0};
+         std::vector<Cand> cands;
+         state.forEachOnPitch(side, [&](const Player& p) {
+             if (p.id == carrier.id || !cageMayMove(p) || p.hasSkill(SkillName::NoHands)) return;
+@@ -1545,6 +1547,7 @@ void CageController::planLaggards(const GameState& state) {
+             if (std::find(neededForCorners.begin(), neededForCorners.end(), p.id) != neededForCorners.end()) return;   // roh (stojí, nebo ho dostaví)
+             // P180 (7): „kdo netvoří klec a neblitzují“ — kdo už má v tahu klece jinou akci (blitz, rána, roh), se nechystá
+             if (std::any_of(queue_.begin(), queue_.end(), [&](const Macro& q) { return q.playerId == p.id; })) return;
++            ++dg[0]; if (p.movementRemaining == 0) ++dg[5];
+             const int target = std::clamp(calculateCatchTarget(state, p, 1), 2, 6);
+             double pc = (7 - target) / 6.0;
+             if (p.hasSkill(SkillName::Catch)) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
+@@ -1557,12 +1560,16 @@ void CageController::planLaggards(const GameState& state) {
+                     const int gfiNeed = toEz > static_cast<int>(p.stats.movement) ? 1 : 0;
+                     if ((gfiNeed && !cageFeatureOn(kFeatReadyMateGfi)) ||
+                         toEz > static_cast<int>(p.stats.movement) + maxGfiSquares(p) || toEz < 1) continue;
++                    ++dg[1];
+                     if (sq.distanceTo(cp) - 1 > static_cast<int>(carrier.stats.movement) || sq.distanceTo(cp) < 2) continue;
++                    ++dg[2];
+                     if (sq != p.position) {
+                         if (state.getPlayerAtPosition(sq)) continue;
+                         if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
+                     }
++                    ++dg[3];
+                     if (countTacklezones(state, sq, side, p.id) > 0) continue;
++                    ++dg[4];
+                     int tier = 0;
+                     double chance = pc;
+                     if (surround) {
+@@ -1576,6 +1583,7 @@ void CageController::planLaggards(const GameState& state) {
+             }
+         });
+         std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) { return a.key < b.key; });
++        if (std::getenv("BB_DIAG216")) std::fprintf(stderr, "DIAG216 kandidatu %zu hracu %d (MR0 %d) zona %d nosic %d cesta %d bezTZ %d\n", cands.size(), dg[0], dg[5], dg[1], dg[2], dg[3], dg[4]);
+         // P180 (7), uživatel 16.10.2026: „u elfů všichni, kdo netvoří klec a neblitzují a dojdou — postaví
+         //   se o dvě od sebe, ať obránce nemůže markovat dva jedním svým“; „platí pro agilní spíše než
+         //   rychlé“ ⇒ víc připravených jen AG 4+ (první může být kdokoli); mezi nimi aspoň 3 pole, aby
+@@ -1600,7 +1608,8 @@ void CageController::planLaggards(const GameState& state) {
+             GameState proj = state.clone();
+             Player& pp = proj.getPlayer(c.id);
+             pp.position = c.sq;
+-            if (blitzThreat(proj, pp, kSafeBlitzThreat) > kSafeBlitzThreat) continue;
++            if (blitzThreat(proj, pp, kSafeBlitzThreat) > kSafeBlitzThreat) { if (std::getenv("BB_DIAG216")) std::fprintf(stderr, "DIAG216 hrozba\n"); continue; }
++            if (std::getenv("BB_DIAG216")) std::fprintf(stderr, "DIAG216 POSTAVEN tier=%d\n", std::get<0>(c.key));
+             readyMates_.push_back(c.id);
+             if (c.sq != state.getPlayer(c.id).position) {
+                 Macro m{MacroType::REPOSITION, c.id, -1, c.sq};
