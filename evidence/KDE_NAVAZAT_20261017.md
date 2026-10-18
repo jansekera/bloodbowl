@@ -26,7 +26,7 @@ Uživatel: „zastav pak práci na bb a odlož na další dny“. Všechno je co
    - Výsledek zapsat do knihy `evidence/task_queue.md`, řádek P159.
 2. ⏳ (18.10.: napsáno `b77b8c55`, měření `evidence/p213b_20261018/` běží od 13:14, ~3,5 h → `vyhodnoceni_noc.py`) **P213 útěk nosiče:** útěk smí použít i GFI a úhyb, spočítaný podle dosahu soupeřů. Pak změřit verzi `2bfe769a` (útěk před TD předávkou) proti noci 16.10. (`evidence/p213_20261016/`).
 3. ⏳ (18.10.: jednotahová část `eba21a2b`; měření `evidence/p216_20261018/` naváže samo po P213b) **P216:** připravený hráč nesmí stát v obklíčení; slabší tým se připravuje vždy („slabší tým musí být rychlejší“).
-4. **Strop úhybu P149** (`macro_actions.cpp:45`, úhyb na 4+ se nehraje): ověřit, že AG4 do dvou zón pustí jen tehdy, když není méně riskantní možnost.
+4. ✅ (18.10.: ověřeno čtením — cíl úhybu = 7 − AG − 1 + zóny v cílovém poli (`calculateDodgeTarget`), AG4 do dvou zón = 4+ ⇒ strop `dodgeCapFor` ho zakáže; výjimky jen poslední aktivace tahu / míč v 8. kole / skórující makra = „když není méně riskantní možnost“; AG2 do prázdna je týž cíl 4+ a hlídá ho test `DodgeCap.RepositionDoesNotDodgeOnFourPlus`) **Strop úhybu P149** (`macro_actions.cpp:45`, úhyb na 4+ se nehraje): ověřit, že AG4 do dvou zón pustí jen tehdy, když není méně riskantní možnost.
 5. **Pondělní kontroly 19.10.:** audit parity PHP × C++ od 16.10., `composer audit` + `npm audit`, `make check-all`.
 
 ## Poučení z 17.10.
