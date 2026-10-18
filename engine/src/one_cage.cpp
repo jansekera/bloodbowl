@@ -52,6 +52,37 @@ int threatsTo(const GameState& state, Position sq, TeamSide mySide) {
     return n;
 }
 
+// ⭐ P216 (uživatel 18.10.2026: „stejně jako řeší kdo jej blitzne a zkouší utéct z dosahu — tak zkouší
+//   utéct i z možnosti obklíčit — rychlejší bude lépe utíkat z dosahu všech, agilnější bude možno přijmout
+//   s Nerves of Steel v obklíčení a odskočit do prázdného pole a utéct“). Nejhorší odpověď soupeře: vedle
+//   připraveného na poli `sq` se postaví každý, kdo tam příští tah dojde (`threatsTo`). Šance, že pak míč
+//   z předávky chytí (zóny podle Nerves of Steel) a — je-li obstoupen — uhne do prázdného pole.
+double readyMateChance(const GameState& state, const Player& p, Position sq, TeamSide side) {
+    const int k = threatsTo(state, sq, side);
+    GameState proj = state.clone();
+    proj.getPlayer(p.id).position = sq;
+    int ct = calculateCatchTarget(proj, proj.getPlayer(p.id), 1);
+    if (!p.hasSkill(SkillName::NervesOfSteel)) ct = std::min(6, ct + k);
+    double pc = (7 - ct) / 6.0;
+    if (p.hasSkill(SkillName::Catch)) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
+    if (k == 0) return pc;
+    const int dt = std::clamp(6 - static_cast<int>(p.stats.agility), 2, 6);   // úhyb do pole bez zón
+    double pd = (7 - dt) / 6.0;
+    if (p.hasSkill(SkillName::Dodge)) pd = 1.0 - (1.0 - pd) * (1.0 - pd);
+    return pc * pd;
+}
+
+// P216 (uživatel 16.10.: „stále platí, že jsem slabší — tak musím být rychlejší“): slabší = menší součet
+// síly stojících hráčů na hřišti.
+bool weakerTeam(const GameState& state, TeamSide side) {
+    int st[2] = {0, 0};
+    for (TeamSide t : {side, opponent(side)})
+        state.forEachOnPitch(t, [&](const Player& p) {
+            if (p.state == PlayerState::STANDING) st[t == side ? 0 : 1] += p.stats.strength;
+        });
+    return st[0] < st[1];
+}
+
 } // namespace
 
 // P176: kolik GFI nosič na cestu k `dest` potřebuje (0, když dojde svým pohybem).
@@ -1498,7 +1529,11 @@ void CageController::planLaggards(const GameState& state) {
         distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
         // P180 (9), uživatel 16.10.2026: „preferujeme ne, ale zahrnujeme i ano“ ⇒ první klíč = potřebuje
         //   příjemce na doběh do zóny GFI (0 / 1): pole s GFI se zkusí, až když žádné bez hodu neprojde.
-        struct Cand { int id; Position sq; std::tuple<int, int, int, int, int> key; };
+        // P216: první klíč = stupeň rizika nejhorší odpovědi (obstoupení); stupeň 2 (4+ a hůř) jen slabší tým
+        //   a jen když nic lepšího neprojde („slabší se chystá vždy … ať uteču, nebo to aspoň zkusím“).
+        const bool surround = cageFeatureOn(kFeatReadySurround);
+        const bool weaker = weakerTeam(state, side);
+        struct Cand { int id; Position sq; std::tuple<int, int, int, int, int, int> key; };
         std::vector<Cand> cands;
         state.forEachOnPitch(side, [&](const Player& p) {
             if (p.id == carrier.id || !cageMayMove(p) || p.hasSkill(SkillName::NoHands)) return;
@@ -1524,7 +1559,14 @@ void CageController::planLaggards(const GameState& state) {
                         if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
                     }
                     if (countTacklezones(state, sq, side, p.id) > 0) continue;
-                    cands.push_back({p.id, sq, {gfiNeed, threatsTo(state, sq, side), -static_cast<int>(pc * 100.0),
+                    int tier = 0;
+                    double chance = pc;
+                    if (surround) {
+                        chance = readyMateChance(state, p, sq, side);
+                        tier = riskTier(1.0 - chance);
+                        if (tier > 1 && !weaker) continue;
+                    }
+                    cands.push_back({p.id, sq, {tier, gfiNeed, threatsTo(state, sq, side), -static_cast<int>(chance * 100.0),
                                                 static_cast<int>(sq.distanceTo(cp)), static_cast<int>(sq.distanceTo(p.position))}});
                 }
             }
@@ -1539,6 +1581,7 @@ void CageController::planLaggards(const GameState& state) {
         for (const Cand& c : cands) {
             if (++tried > 24) break;                                  // zkouška hrozby je drahá
             if (std::find(readyMates_.begin(), readyMates_.end(), c.id) != readyMates_.end()) continue;
+            if (std::get<0>(c.key) > 1 && !readyMates_.empty()) continue;   // pokus slabšího jen jeden
             if (!readyMates_.empty()) {
                 if (!multi || state.getPlayer(c.id).stats.agility < 4) continue;
                 bool tooClose = false;

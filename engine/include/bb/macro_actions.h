@@ -78,6 +78,7 @@ enum CageFeature : unsigned {
     kFeatReadyMany      = 268435456, // P180 (7): agilní (AG 4+) — víc připravených hráčů, od sebe aspoň 3 pole
     kFeatReadyMateGfi   = 536870912, // P180 (9): připravené pole s doběhem přes GFI, když jiné nejde
     kFeatSafetyHandOff  = 1073741824, // P213: nosič v ohrožení předá spoluhráči, který s míčem uteče mimo dosah
+    kFeatReadySurround  = 2147483648u, // P216: připravené pole podle nejhorší odpovědi soupeře — obstoupí ho, kdo dojde (⚠️ poslední volný bit)
     kFeatStall          = 2048, // P175: zdržování TD, když je míč v bezpečí
     kFeatSlackSafety    = 16384, // P177: dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál
     kFeatFallValue      = 8192, // P176: cena pádu podle vzdálenosti soupeře od míče; GFI nosiče daleko od soupeře

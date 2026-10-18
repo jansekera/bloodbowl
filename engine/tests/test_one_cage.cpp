@@ -1491,6 +1491,38 @@ TEST(OneCageMate, AfterTheCageMovesOneFreePlayerGetsReadyWithinReachOfTheEndZone
     EXPECT_FALSE(ready) << "pozitivní kontrola: bez úpravy jde volný hráč jen tři sloupce před klec — do zóny by nedošel";
 }
 
+// P216 (uživatel 18.10.2026: „stejně jako řeší kdo jej blitzne a zkouší utéct z dosahu — tak zkouší utéct i
+// z možnosti obklíčit“). Pozice jako výše, ale před zónou čekají tři slabí soupeři (ST2 — rána na připraveného
+// nehrozí), kteří ke každému připravenému poli příští tah dojdou a obstoupí ho. Neobratný připravený (AG3, bez
+// Nerves of Steel) by míč ve třech zónách chytil na 6+ ⇒ silnější tým takové pole nepoužije; slabší tým
+// („stále platí, že jsem slabší — tak musím být rychlejší“) se přesto chystá.
+TEST(OneCageMate, AReadyPlayerIsNotPlacedWhereHeWouldBeSurroundedUnlessHisTeamIsTheWeakerOne) {
+    auto run = [](unsigned off, bool weaker) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {8, 7}, 4);
+        b.put(2, TeamSide::HOME, {7, 6}, 9); b.put(3, TeamSide::HOME, {7, 8}, 9);
+        b.put(4, TeamSide::HOME, {9, 6}, 9); b.put(5, TeamSide::HOME, {9, 8}, 9);
+        b.put(6, TeamSide::HOME, {8, 3}, 9);
+        for (int i = 0; i < 3; ++i) b.put(13 + i, TeamSide::AWAY, {20, static_cast<int8_t>(3 + 4 * i)}, 6, 2);
+        if (weaker) for (int i = 0; i < 4; ++i) b.put(16 + i, TeamSide::AWAY, {static_cast<int8_t>(i), 0}, 1, 6);
+        b.s.ball = BallState::carried({8, 7}, 1);
+        setCageFeaturesOff(off);
+        CageController cc(nullptr, cfg(), 1);
+        playAll(cc, b);
+        setCageFeaturesOff(0);
+        const Player& c = b.s.getPlayer(1);
+        for (int id = 2; id <= 6; ++id) {
+            const Player& m = b.s.getPlayer(id);
+            const bool corner = std::abs(m.position.x - c.position.x) == 1 && std::abs(m.position.y - c.position.y) == 1;
+            if (!corner && (25 - m.position.x) <= 9 && m.position.distanceTo(c.position) - 1 <= 4) return true;
+        }
+        return false;
+    };
+    EXPECT_FALSE(run(0, false)) << "silnější tým: připravený by stál v obklíčení";
+    EXPECT_TRUE(run(kFeatReadySurround, false)) << "pozitivní kontrola: bez úpravy se postaví";
+    EXPECT_TRUE(run(0, true)) << "slabší tým se chystá i tak";
+}
+
 // P180 (7), uživatel 16.10.2026: „u elfů všichni, kdo netvoří klec a neblitzují a dojdou — postaví se o dvě
 // od sebe, ať obránce nemůže markovat dva jedním svým“; „platí pro agilní spíše než rychlé“.
 TEST(OneCageMate, AgilePlayersGetReadySeveralAndAtLeastThreeSquaresApart) {
