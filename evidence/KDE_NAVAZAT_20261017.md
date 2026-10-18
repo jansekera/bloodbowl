@@ -25,7 +25,7 @@ Uživatel: „zastav pak práci na bb a odlož na další dny“. Všechno je co
    - TD jen s výhradou (180 párů je na TD málo).
    - Výsledek zapsat do knihy `evidence/task_queue.md`, řádek P159.
 2. ⏳ (18.10.: napsáno `b77b8c55`, měření `evidence/p213b_20261018/` běží od 13:14, ~3,5 h → `vyhodnoceni_noc.py`) **P213 útěk nosiče:** útěk smí použít i GFI a úhyb, spočítaný podle dosahu soupeřů. Pak změřit verzi `2bfe769a` (útěk před TD předávkou) proti noci 16.10. (`evidence/p213_20261016/`).
-3. **P216:** připravený hráč nesmí stát v obklíčení; slabší tým se připravuje vždy („slabší tým musí být rychlejší“).
+3. ⏳ (18.10.: jednotahová část `eba21a2b`; měření `evidence/p216_20261018/` naváže samo po P213b) **P216:** připravený hráč nesmí stát v obklíčení; slabší tým se připravuje vždy („slabší tým musí být rychlejší“).
 4. **Strop úhybu P149** (`macro_actions.cpp:45`, úhyb na 4+ se nehraje): ověřit, že AG4 do dvou zón pustí jen tehdy, když není méně riskantní možnost.
 5. **Pondělní kontroly 19.10.:** audit parity PHP × C++ od 16.10., `composer audit` + `npm audit`, `make check-all`.
 
