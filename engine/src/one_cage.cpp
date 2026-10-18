@@ -72,17 +72,6 @@ double readyMateChance(const GameState& state, const Player& p, Position sq, Tea
     return pc * pd;
 }
 
-// P216 (uživatel 16.10.: „stále platí, že jsem slabší — tak musím být rychlejší“): slabší = menší součet
-// síly stojících hráčů na hřišti.
-bool weakerTeam(const GameState& state, TeamSide side) {
-    int st[2] = {0, 0};
-    for (TeamSide t : {side, opponent(side)})
-        state.forEachOnPitch(t, [&](const Player& p) {
-            if (p.state == PlayerState::STANDING) st[t == side ? 0 : 1] += p.stats.strength;
-        });
-    return st[0] < st[1];
-}
-
 } // namespace
 
 // P176: kolik GFI nosič na cestu k `dest` potřebuje (0, když dojde svým pohybem).
@@ -587,7 +576,7 @@ void CageController::planStart(const GameState& state) {
             // 1) nosič na pole vedle příjemce — bez hodu
             Position via{-1, -1};
             double pvOk = 0.0;   // doběh nosiče k příjemci
-            const bool rolls = p213PartOn(kP213EscapeRolls);
+            const bool rolls = extraFeatureOn(kP213EscapeRolls);
             const int carrierBudget = c.movementRemaining + (rolls ? maxGfiSquares(c) : 0);
             if (c.position.distanceTo(m.position) == 1) {
                 via = c.position;
@@ -731,7 +720,7 @@ void CageController::planStart(const GameState& state) {
         // P213 (uživatel 16.10. večer): útěk do bezpečí má PŘEDNOST před TD předávkou — hody jsou stejné
         // (chycení, případně úhyb a GFI), pozdější TD nechá soupeři méně kol na vyrovnání; TD předávkou
         // jen tehdy, když bezpečné pole mimo dosah soupeřů není. Poslední kolo zvlášť (výše: vždy TD).
-        if (p213PartOn(kP213EscapeFirst) && !lastTurn && !walksIn && orderSafetyHandOff(c)) return;
+        if (extraFeatureOn(kP213EscapeFirst) && !lastTurn && !walksIn && orderSafetyHandOff(c)) return;
         if (!walksIn && orderViaMate(c)) return;
         if (cageFeatureOn(kFeatForceScore) && !scoringRangeCage_ && (walksIn || !lastTurn) &&
             c.teamSide == state.activeTeam && freeToAct(c)) {
@@ -746,7 +735,7 @@ void CageController::planStart(const GameState& state) {
     }
     if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
         lastTurnBestTd(state.getPlayer(state.ball.carrierId))) return;
-    const bool escapeFirst = p213PartOn(kP213EscapeFirst);
+    const bool escapeFirst = extraFeatureOn(kP213EscapeFirst);
     if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 && escapeFirst &&
         orderSafetyHandOff(state.getPlayer(state.ball.carrierId))) return;   // P213 před TD předávkou (16.10.)
     if (goal == TurnGoal::ADVANCE_BALL && state.ball.isHeld && state.ball.carrierId > 0 &&
@@ -1533,10 +1522,8 @@ void CageController::planLaggards(const GameState& state) {
         distToEndzone(cp, side) > static_cast<int>(carrier.stats.movement)) {
         // P180 (9), uživatel 16.10.2026: „preferujeme ne, ale zahrnujeme i ano“ ⇒ první klíč = potřebuje
         //   příjemce na doběh do zóny GFI (0 / 1): pole s GFI se zkusí, až když žádné bez hodu neprojde.
-        // P216: první klíč = stupeň rizika nejhorší odpovědi (obstoupení); stupeň 2 (4+ a hůř) jen slabší tým
-        //   a jen když nic lepšího neprojde („slabší se chystá vždy … ať uteču, nebo to aspoň zkusím“).
+        // P216: první klíč = stupeň rizika nejhorší odpovědi (obstoupení); stupeň 2 (4+ a hůř) jen v záloze níže.
         const bool surround = cageFeatureOn(kFeatReadySurround);
-        const bool weaker = weakerTeam(state, side);
         struct Cand { int id; Position sq; std::tuple<int, int, int, int, int, int> key; };
         std::vector<Cand> cands;
         state.forEachOnPitch(side, [&](const Player& p) {
@@ -1568,7 +1555,6 @@ void CageController::planLaggards(const GameState& state) {
                     if (surround) {
                         chance = readyMateChance(state, p, sq, side);
                         tier = riskTier(1.0 - chance);
-                        if (tier > 1 && !weaker) continue;
                     }
                     cands.push_back({p.id, sq, {tier, gfiNeed, threatsTo(state, sq, side), -static_cast<int>(chance * 100.0),
                                                 static_cast<int>(sq.distanceTo(cp)), static_cast<int>(sq.distanceTo(p.position))}});
@@ -1585,7 +1571,7 @@ void CageController::planLaggards(const GameState& state) {
         for (const Cand& c : cands) {
             if (++tried > 24) break;                                  // zkouška hrozby je drahá
             if (std::find(readyMates_.begin(), readyMates_.end(), c.id) != readyMates_.end()) continue;
-            if (std::get<0>(c.key) > 1 && !readyMates_.empty()) continue;   // pokus slabšího jen jeden
+            if (std::get<0>(c.key) > 1) continue;                    // obklíčený jen v záloze níže
             if (!readyMates_.empty()) {
                 if (!multi || state.getPlayer(c.id).stats.agility < 4) continue;
                 bool tooClose = false;
@@ -1612,6 +1598,26 @@ void CageController::planLaggards(const GameState& state) {
                 std::fprintf(stderr, "[cage ctl] připravený hráč %d -> (%d,%d)\n", c.id, c.sq.x, c.sq.y);
             }
             if (!multi) break;                                        // další už jen agilní (výše)
+        }
+        // ⭐ P216 záloha (uživatel 18.10.: „blitz je jeden a připravených může být více … když nejde nachystat
+        //   tak ať jednoho blitznou a další obklíčí — tak je stejně chystej“; „když bude více hráčů volných se
+        //   nachystat — tak může být“): žádné pole neprošlo ⇒ chystají se VŠICHNI volní, kdo dojdou, i přes
+        //   hrozbu rány a obklíčení; mezi každými dvěma aspoň dvě pole („ať žádné dva nechytí jeden oponent —
+        //   např. Rat Ogre s Prehensile Tail nebo Spawn s Tentacles“).
+        if (readyMates_.empty() && extraFeatureOn(kP216ReadyAnyway)) {
+            for (const Cand& c : cands) {
+                if (std::find(readyMates_.begin(), readyMates_.end(), c.id) != readyMates_.end()) continue;
+                if (std::any_of(taken.begin(), taken.end(), [&](const Position& t) { return t.distanceTo(c.sq) < 3; })) continue;
+                readyMates_.push_back(c.id);
+                if (c.sq != state.getPlayer(c.id).position) {
+                    Macro m{MacroType::REPOSITION, c.id, -1, c.sq};
+                    m.cageManaged = true;
+                    queue_.push_back(m);
+                }
+                taken.push_back(c.sq);
+                if (std::getenv("BB_CAGE_DEBUG"))
+                    std::fprintf(stderr, "[cage ctl] připravený hráč (záloha) %d -> (%d,%d)\n", c.id, c.sq.x, c.sq.y);
+            }
         }
     }
     state.forEachOnPitch(side, [&](const Player& p) {
