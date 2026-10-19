@@ -34,3 +34,11 @@ Uživatel: „zastav pak práci na bb a odlož na další dny“. Všechno je co
 - Před novým pravidlem napřed hledat, jestli už v enginu není (pravidlo úhybu podle AG jsem začal psát znovu, ač ho dělá P149; rozpracovaný patch je zálohovaný v `evidence/p159_20261016/ag_uhyb_rozpracovano_20261017.patch`).
 - Riziko a nejhorší odpověď soupeře se **počítají hned**, ne zkušebními hrami.
 - Uživateli psát **krátce**.
+
+## Stav 19.10. odpoledne
+
+- **P213** útěk nosiče: v situacích rychlých týmů míč přežije 0,83 vs 0,57, ubírá jen brzká TD (TD v 7.–8. kole beze změny, soupeři po TD zbývá 1,0 vs 2,0 tahu). Pořadí beze změny.
+- **P217** pořadí rozhodnutí s míčem: (1) zdržující klec bankuje k zóně ✅ · (5) nenastane, nepíše se · (3) nejvyšší šance na úspěch (jen náš tah × nejlepší rána soupeře) ✅ zapnuto, změřeno v 20 situacích: úspěch +0,07 (2,3σ), turnovery −0,11 (3,3σ). ⏳ obecná kontrola celou hrou (čas tahu).
+- **P218** elfové a zbytečný blitz — měření běží `evidence/p218_20261019/` → vyhodnotit, jen popis.
+- ⛔ Nová pravidla uživatele (paměť + `CLAUDE.md`): počítat **jen náš tah + nejhorší odpověď soupeře**; jednu úpravu měřit **jen v jejím tahu**, celá hra je obecná kontrola.
+- Pondělní kontroly hotové (npm: 3 nálezy vitest jen `--force` — rozhodne uživatel).
