@@ -4963,6 +4963,22 @@ TEST(P219AgileBlitz, EscapeDependsOnAgilityDodgeMovementAndFrenzy) {
     EXPECT_DOUBLE_EQ(agileEscapeChance(slayer, slayer.getPlayer(1), {10, 7}, 2), 0.0) << "Frenzy: zůstane v kontaktu";
     const GameState slow = p219Board(2, 4, {});
     EXPECT_LT(agileEscapeChance(slow, slow.getPlayer(1), {10, 7}, 1), 2.0 / 3.0) << "AG2 bez Dodge: úhyb na 4+";
+    // AG3 bez Dodge do prázdného pole: 3+ = přesně 2/3 — hraniční, za agilního se nepočítá (uživatel 19.10.)
+    const GameState human = p219Board(3, 6, {});
+    EXPECT_NEAR(agileEscapeChance(human, human.getPlayer(1), {10, 7}, 3), 2.0 / 3.0, 1e-9);
+    auto offered = [](int8_t ag) {
+        GameState s = p219Board(ag, 7, {});
+        s.getPlayer(1).position = {6, 7};
+        Player& t = s.getPlayer(12);
+        t.position = {9, 7};
+        t.stats = {6, 3, 3, 9};   // stejná síla ⇒ jedna kostka
+        s.ball = BallState::onGround({20, 7});
+        std::vector<Macro> ms;
+        getAvailableMacros(s, ms);
+        return std::any_of(ms.begin(), ms.end(), [](const Macro& m) { return m.type == MacroType::BLITZ; });
+    };
+    EXPECT_TRUE(offered(3)) << "AG3: pravidlo se ho netýká, blitz na jednu kostku zůstává";
+    EXPECT_FALSE(offered(4)) << "AG4 bez Dodge: odskočí (0,83), jedna kostka (~0,5 × 0,83 < 0,5) ⇒ neblitzuje";
     EXPECT_DOUBLE_EQ(agileEscapeChance(elf, elf.getPlayer(1), {5, 7}, 4), 1.0) << "mimo zóny ⇒ jistě";
 }
 
@@ -4985,4 +5001,27 @@ TEST(P219AgileBlitz, AnAgileBlitzerDoesNotBlitzWhenTheKnockdownIsUnlikely) {
     EXPECT_FALSE(offered(false, 0)) << "srazí málokdy ⇒ agilní hráč neblitzuje";
     EXPECT_TRUE(offered(false, kP219AgileBlitz)) << "pozitivní kontrola: bez P219 se nabízí";
     EXPECT_TRUE(offered(true, 0)) << "na nosiče míče vždy";
+}
+
+// P219b (uživatel 19.10.: „AG 3 bez dodge je samo na hraně“, „AG3 bez dodge jo proti MB“, „porovnej rizika“).
+// Odskok z kontaktu na konci tahu, když úhyb selže × pád + vyjde × rána na novém poli < rána na místě − 0,15.
+// Soupeř se stejnou silou (blok 0,44): AG3 bez Dodge (úhyb selže 1/3) zůstává, AG4 (1/6) odskočí; vedle
+// Mighty Blow (0,59) odskočí i AG3. Pozitivní kontrola: bez P219b AG3 bez Dodge neodskakuje nikdy.
+TEST(MacroActions, P219bTheEscapeComparesTheDodgeRiskWithTheRiskOfStaying) {
+    auto escapes = [](int8_t ag, bool mightyBlow, unsigned off) {
+        setExtraFeaturesOff(off);
+        GameState state = p211State(false);
+        Player& me = state.getPlayer(1);
+        me.stats = {9, 3, ag, 7};
+        me.skills = {};
+        if (mightyBlow) state.getPlayer(12).skills.add(SkillName::MightyBlow);
+        Macro esc;
+        const bool r = endOfTurnEscape(state, esc);
+        setExtraFeaturesOff(0);
+        return r;
+    };
+    EXPECT_FALSE(escapes(3, false, 0)) << "AG3 vedle obyčejného soupeře zůstává";
+    EXPECT_TRUE(escapes(3, true, 0)) << "AG3 vedle Mighty Blow odskočí";
+    EXPECT_TRUE(escapes(4, false, 0)) << "AG4 odskakuje";
+    EXPECT_FALSE(escapes(3, true, kP219bEscapeByRisk)) << "pozitivní kontrola: bez P219b AG3 bez Dodge nikdy";
 }

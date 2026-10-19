@@ -94,7 +94,7 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; 
 //   nejvyšší šance na TD s nejhorší odpovědí soupeře (3). P219: blitz agilního hráče podle šance srazit × odskočit.
 enum ExtraFeature : unsigned {
     kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
-    kP217StallBanks = 8, kP217BestChance = 16, kP219AgileBlitz = 32
+    kP217StallBanks = 8, kP217BestChance = 16, kP219AgileBlitz = 32, kP219bEscapeByRisk = 64
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();

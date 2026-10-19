@@ -1072,8 +1072,18 @@ static double worstReplyCost(const GameState& state, const Player& p,
 //   ⛔ 15.10. (A/B p211_20261015: turnoverů z útěků 18 → 47) útěk až NA KONCI TAHU (`endOfTurnEscape`,
 //   uživatel: „útěk z kontaktu až na konec tahu“) — turnover pak nestojí žádnou aktivaci spoluhráčů.
 //   {-1,-1} = není kam, nebo by to nepomohlo.
+// P219b: cena za to, že odskokem pustíme soupeře ze své tackle zóny. Návrh 0,15 počítal i blitz na novém poli,
+// ten je ale už v `worstReplyCost` nového pole (obrana: 0,45 × 0,44 = 0,20) ⇒ 0,05: AG4 proti stejné síle
+// odskočí (0,33 < 0,39), AG3 zůstane (0,46), AG3 proti Mighty Blow odskočí (0,51 < 0,54) — jak chce uživatel.
+constexpr double kReleaseCost = 0.05;
+
 static Position agileEscapeSquare(const GameState& state, const Player& p) {
-    if (!p.hasSkill(SkillName::Dodge) && p.stats.agility < 4) return {-1, -1};
+    // P219b (uživatel 19.10.2026: „AG 3 bez dodge je samo na hraně a elfové s AG 4 mají odskakovat skoro
+    //   všude“; „AG 3 by mělo dodgovat jen pokud např. stojí u MB“; „AG3 bez dodge jo proti MB“; „umíš
+    //   porovnat rizika — porovnej — přepočti“ → „ano — přepiš to tak“). Dosud odskakoval jen Dodge nebo
+    //   AG 4+ a vždy. Teď kdokoli, ale jen když se odskok vyplatí: úhyb selže × pád (1,0) + vyjde × nejhorší
+    //   rána na novém poli < nejhorší rána na místě − cena za puštění soupeře ze zóny (kReleaseCost).
+    if (!extraFeatureOn(kP219bEscapeByRisk) && !p.hasSkill(SkillName::Dodge) && p.stats.agility < 4) return {-1, -1};
     const int budget = p.movementRemaining;
     if (budget <= 0) return {-1, -1};
     const TeamSide mySide = p.teamSide;
@@ -1107,6 +1117,7 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
                 c.distanceTo(state.ball.position) > p.position.distanceTo(state.ball.position)) continue;
             const double cost = worstReplyCost(state, p, c, true);
             if (offense && cost >= stayCost - 1e-9) continue;          // v útoku jen tam, kde to pomůže
+            if (extraFeatureOn(kP219bEscapeByRisk) && cost >= stayCost - kReleaseCost) continue;   // P219b: nemá smysl
             cands.push_back({column, cost, p.position.distanceTo(c), c});
         }
     }
@@ -1120,7 +1131,11 @@ static Position agileEscapeSquare(const GameState& state, const Player& p) {
     int tries = 0;
     for (const Cand& c : cands) {
         if (++tries > 8) break;   // cesta (BFS) jen k nejlepším polím
-        if (pathFailProb(state, p, c.pos, budget, avoid) >= 0.0) return c.pos;
+        const double fail = pathFailProb(state, p, c.pos, budget, avoid);
+        if (fail < 0.0) continue;
+        // P219b: riziko odskoku (pád = jisté sražení) proti riziku zůstat
+        if (extraFeatureOn(kP219bEscapeByRisk) && fail * 1.0 + (1.0 - fail) * c.cost >= stayCost - kReleaseCost) continue;
+        return c.pos;
     }
     return {-1, -1};
 }
@@ -3762,6 +3777,8 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
 //   tahu dělá P211 (`agileEscapeSquare`, `endOfTurnEscape`); tady jen šance na něj. Šance, že hráč stojící na `from`
 //   se zbylým pohybem `moveLeft` (+ GFI) skončí tah mimo tackle zóny soupeře: blitz po ráně smí dál běžet
 //   (ř. 551-552). Frenzy ⇒ 0 (musí za odtlačeným a blokovat znovu). Jen náš tah — nejvýš dva úhyby.
+constexpr double kAgileEscapeMin = 2.0 / 3.0 + 1e-6;   // P219: hranice „umí odskočit“ (ostře nad 2/3)
+
 double agileEscapeChance(const GameState& state, const Player& p, Position from, int moveLeft) {
     if (p.hasSkill(SkillName::Frenzy)) return 0.0;
     GameState proj = state.clone();
@@ -3862,7 +3879,9 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
                 if (land.isOnPitch()) {
                     const int moveLeft = static_cast<int>(cand.movementRemaining) - land.distanceTo(cand.position) - 1;
                     const double esc = agileEscapeChance(state, cand, land, moveLeft);
-                    if (esc >= 2.0 / 3.0 && ranking.first.success * esc < 0.5) continue;
+                    // odskok VÍC než 2/3 (uživatel 19.10.: „AG 3 bez Dodge je samo na hraně a elfové s AG 4 mají
+                    //   odskakovat skoro všude“) — AG3 bez Dodge do prázdna (3+ = přesně 2/3) se nepočítá
+                    if (esc > kAgileEscapeMin && ranking.first.success * esc < 0.5) continue;
                 }
             }
             out = a;
