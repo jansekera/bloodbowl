@@ -75,7 +75,11 @@ GameState worstCaseReply(const GameState& state, const Player& carrier, Position
 // míč přežije tah soupeře (1 − hrozba rány) × na desce po nejhorší odpovědi dojde do zóny (úhyby, GFI),
 // nebo — když tam nedojde — postoupí na pole s nejlepší šancí a totéž o tah později. `turnsLeft` =
 // kolik našich tahů po tomto ještě zbývá (0 ⇒ 0).
-double tdChanceFrom(const GameState& state, const Player& carrier, Position sq, int turnsLeft);
+// `cornersCome` = spoluhráči, kteří tam ještě dojdou, se postaví do rohů (carrierThreatAt); false = nosič
+// zůstane sám (výběh, P217 — klec ho nedoprovází).
+double tdChanceFrom(const GameState& state, const Player& carrier, Position sq, int turnsLeft, bool cornersCome = true);
+// Hrozba rány na nosiče na `sq`, když kolem něj nikdo nepřijde (výběh).
+double loneCarrierThreatAt(const GameState& state, const Player& carrier, Position sq);
 
 // ⭐ P176 — HODNOTA RIZIKA (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech
 //   soupeřů a nezraní se — je to relativně bezpečnější“). Šance, že míč ležící na `ball` vezme
@@ -141,6 +145,9 @@ private:
 
     // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
     CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);
+    // P217 (3): šance na TD do konce poločasu, když klec jde s nosičem dál — každý tah plán klece na desce
+    //   po nejhorší odpovědi soupeře; `turns` = kolik našich tahů včetně tohoto.
+    double cageTdChance(const GameState& state, int carrierId, int turns, bool scoreNowAllowed);
 
     // stav jednoho tahu
     TeamSide team_ = TeamSide::HOME;

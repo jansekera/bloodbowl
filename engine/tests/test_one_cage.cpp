@@ -18,6 +18,14 @@ using namespace bb;
 
 namespace {
 
+// P217 (3) přebíjí staré pořadí rozhodování s míčem (P175/P178 TD hned, P180 TD předávkou, P187 výběh podle
+// vzdálenosti, P213 útěk). Testy toho pořadí běží s vypnutým P217 — hlídají dál samotné části, které P217
+// používá jako varianty (provedení výběhu, markery, předávka, útěk, připravení hráči).
+struct P217Off {
+    P217Off() { setExtraFeaturesOff(kP217BestChance); }
+    ~P217Off() { setExtraFeaturesOff(0); }
+};
+
 struct Board {
     GameState s;
     Board(int turn = 1) {
@@ -412,6 +420,7 @@ TEST(OneCageScoringRange, LastTurnOfTheHalfOrdersTheBestTouchdown) {
 // Od 08.10.2026 (P175) platí: dojde bez hodu a hrozí mu rána ⇒ skóruje hned (rozhoduje hledání);
 // dojde bez hodu a je v bezpečí ⇒ TD se zdržuje (OneCageStall).
 TEST(OneCageScoringRange, CarrierWhoWalksInWithoutDiceIsLeftToTheSearchWhenThreatened) {
+    P217Off p217off;
     Board b = scoringRangeBoard(4);
     b.s.getPlayer(1).position = {20, 7};     // 5 polí, MA6 ⇒ dojde bez hodu
     b.s.ball = BallState::carried({20, 7}, 1);
@@ -551,6 +560,7 @@ TEST(OneCageOrder, CageComesFirstAndNoFreeingHitsWhenFourCornersStand) {
 // Nosič MA 6 stojí sám na (5,7), čtyři spoluhráči MA 4 stojí kolem x=12–13: na rohy u nosiče
 // nedosáhnou, na rohy kolem (11,7) ano.
 TEST(OneCageJoin, CarrierWithoutACageGoesWhereTheCageCanForm) {
+    P217Off p217off;
     Board b(2);
     b.put(1, TeamSide::HOME, {5, 7}, 6);
     b.put(2, TeamSide::HOME, {12, 5});
@@ -1078,6 +1088,7 @@ TEST(CarrierThreat, AProneOpponentWhoCanStandUpAndHitCounts) {
 // a ztráta, je lepší dát TD dříve — toto je obojí obecné pravidlo“).
 // Nosič stojí tři pole před zónou a dojde bez hodu.
 TEST(OneCageStall, HoldsTheBallWhenSafeAndScoresWhenThreatenedOrOnTheLastTurn) {
+    P217Off p217off;
     auto board = [](int turn, Position opponent) {
         Board b(turn);
         b.put(1, TeamSide::HOME, {22, 7}, 6);
@@ -1132,6 +1143,7 @@ TEST(OneCageStall, HoldsTheBallWhenSafeAndScoresWhenThreatenedOrOnTheLastTurn) {
 // soupeřem v dosahu (rána na jednu kostku, míč přežije v 67 %) má běžet pro TD; nosič v čisté kleci
 // (míč přežije skoro jistě) ne — tam vede klec.
 TEST(OneCageStall, ThreatenedCarrierGoesForTheTouchdownThroughDiceACagedOneDoesNot) {
+    P217Off p217off;
     auto board = [](bool caged) {
         Board b(5);
         b.put(1, TeamSide::HOME, {17, 7}, 6);
@@ -1390,6 +1402,7 @@ Board mateBoard(int turn, Position opponent, int8_t oppSt = 3) {
 // předávce dojde bez hodu ⇒ řadič přikáže TD předávkou. Pravidla ř. 1676–1692 (předávka na sousední
 // pole, pohyb před ní ano; zachycení +1), ř. 845–846 (kdo chytil a ještě nehrál, smí hrát).
 TEST(OneCageMate, AThreatenedCarrierWhoCannotReachHandsOffToAReadyTeammateForTheTouchdown) {
+    P217Off p217off;
     // 16.10. večer: útěk do bezpečí (P213) má přednost — tady by vyhrál; test zkouší samotné P180
     struct NoEscape { NoEscape() { setCageFeaturesOff(kFeatSafetyHandOff); } ~NoEscape() { setCageFeaturesOff(0); } };
     {
@@ -1450,6 +1463,7 @@ TEST(OneCageMate, InTheLastTurnTheControllerOrdersTheSafestTouchdown) {
 // pro soupeře vyrovnat“; hody jsou stejné ⇒ TD předávkou jen, když bezpečné pole mimo dosah není.
 // Tatáž pozice jako u TD předávkou: příjemce by skóroval, ale může i utéct ⇒ útěk.
 TEST(OneCageMate, EscapeToSafetyIsPreferredToAnEarlyHandOffTouchdown) {
+    P217Off p217off;
     Board b = mateBoard(4, {10, 7}, 5);
     CageController cc(nullptr, cfg(), 1);
     Macro m;
@@ -1462,11 +1476,11 @@ TEST(OneCageMate, EscapeToSafetyIsPreferredToAnEarlyHandOffTouchdown) {
     ASSERT_TRUE(cc2.next(b2.s, m));
     setCageFeaturesOff(0);
     EXPECT_EQ(m.targetPos.x, 25);
-    setExtraFeaturesOff(kP213EscapeFirst);        // pojistka měření: staré pořadí ⇒ TD předávkou
+    setExtraFeaturesOff(kP213EscapeFirst | kP217BestChance);        // pojistka měření: staré pořadí ⇒ TD předávkou
     CageController cc3(nullptr, cfg(), 1);
     Board b3 = mateBoard(4, {10, 7}, 5);
     ASSERT_TRUE(cc3.next(b3.s, m));
-    setExtraFeaturesOff(0);
+    setExtraFeaturesOff(kP217BestChance);
     EXPECT_EQ(m.targetPos.x, 25);
 }
 
@@ -1541,6 +1555,7 @@ TEST(OneCageMate, ASafeBallWithTimeToSpareIsNotHandedOffForAnEarlyTouchdown) {
 // Příprava: po tahu klece stojí jeden volný hráč tak, aby příští tah došel do zóny bez hodu a nosič
 // k němu došel předat. Pět spoluhráčů (MA 9) stojí na začátku 16–18 polí od zóny: čtyři jdou na rohy, pátý se chystá.
 TEST(OneCageMate, AfterTheCageMovesOneFreePlayerGetsReadyWithinReachOfTheEndZoneAndOfTheCarrier) {
+    P217Off p217off;
     auto run = [](unsigned off, bool& ready) {
         Board b(2);
         b.put(1, TeamSide::HOME, {8, 7}, 4);          // pomalý nosič: klec ujde 4 pole
@@ -1613,6 +1628,7 @@ TEST(OneCageMate, WhenNoReadySquareIsSafeTwoPlayersGetReadyAnywayApartFromEachOt
 // P180 (7), uživatel 16.10.2026: „u elfů všichni, kdo netvoří klec a neblitzují a dojdou — postaví se o dvě
 // od sebe, ať obránce nemůže markovat dva jedním svým“; „platí pro agilní spíše než rychlé“.
 TEST(OneCageMate, AgilePlayersGetReadySeveralAndAtLeastThreeSquaresApart) {
+    P217Off p217off;
     auto run = [](int8_t ag, unsigned off) {
         Board b(2);
         b.put(1, TeamSide::HOME, {8, 7}, 4);
@@ -1643,6 +1659,7 @@ TEST(OneCageMate, AgilePlayersGetReadySeveralAndAtLeastThreeSquaresApart) {
 // nejde, připraví se hráč i na pole, odkud do zóny doběhne s GFI. MA8 z x=7: tento tah nejdál x=15,
 // bez GFI by potřeboval x ≥ 17, s GFI stačí x ≥ 15.
 TEST(OneCageMate, AReadySquareNeedingGfiIsUsedOnlyWhenThereIsNoOther) {
+    P217Off p217off;
     auto run = [](unsigned off) {
         Board b(2);
         b.put(1, TeamSide::HOME, {8, 7}, 4);
@@ -1905,4 +1922,56 @@ TEST(OneCageMate, TheEscapeMayUseGoingForItOnlyWhenNoRollFreeSafeSquareExists) {
         const Player& r = b.s.getPlayer(6);
         EXPECT_DOUBLE_EQ(pathFailProb(b.s, r, m.targetPos, 6, Position{-1, -1}), 0.0) << "rychlý: bez hodu";
     }
+}
+
+// P217 (3) (uživatel 19.10.: „přednost má to, co má nejnižší pravděpodobnost neúspěchu“). Osamělý nosič MA 6
+// osm polí před zónou, soupeř v dosahu: TD teď jen přes dvě GFI (0,72). Výběh o 6 polí bez hodu ho dostane
+// z dosahu soupeře (ten má MA 6) a TD v dalším tahu je jisté (2 pole) ⇒ výběh, ne TD přes hody. Pozitivní
+// kontrola: bez P217 přikáže řadič TD hned (P178).
+TEST(OneCageBestChance, ARunOutOfReachBeatsATouchdownThroughTwoRushes) {
+    auto board = [] {
+        Board b(5);
+        b.put(1, TeamSide::HOME, {17, 7}, 6);
+        b.put(13, TeamSide::AWAY, {13, 7}, 6);
+        b.s.ball = BallState::carried({17, 7}, 1);
+        return b;
+    };
+    {
+        Board b = board();
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::SCORE) << "TD přes dvě GFI se nehraje";
+        EXPECT_GT(b.s.getPlayer(1).position.x, 17) << "nosič vyběhl";
+        EXPECT_LT(b.s.getPlayer(1).position.x, 25);
+        EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "mimo dosah soupeře";
+    }
+    {
+        P217Off off;
+        Board b = board();
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        ASSERT_FALSE(ms.empty());
+        EXPECT_EQ(ms.front().type, MacroType::SCORE) << "pozitivní kontrola: bez P217 TD hned";
+    }
+}
+
+// P217 (3): při stejné šanci vyhrává pozdější TD (uživatel 16.10.: „pozdější TD znamená méně příležitostí pro
+// soupeře vyrovnat“). Pozice z P213: TD předávkou teď i útěk s předávkou vycházejí stejně ⇒ útěk.
+// Staré pořadí P213 (útěk napřed) je vypnuté, aby rozhodlo jen P217; pozitivní kontrola: bez obou TD teď.
+TEST(OneCageBestChance, OnATieTheLaterTouchdownWins) {
+    auto first = [](unsigned extraOff) {
+        setExtraFeaturesOff(extraOff);
+        Board b = mateBoard(4, {10, 7}, 5);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        const bool any = cc.next(b.s, m);
+        setExtraFeaturesOff(0);
+        EXPECT_TRUE(any);
+        EXPECT_EQ(m.type, MacroType::HAND_OFF_SCORE);
+        return m.targetPos.x;
+    };
+    EXPECT_NE(first(kP213EscapeFirst), 25) << "P217: shoda ⇒ útěk, ne TD teď";
+    EXPECT_EQ(first(kP213EscapeFirst | kP217BestChance), 25) << "pozitivní kontrola: bez P217 a starého pořadí TD teď";
 }
