@@ -1436,6 +1436,8 @@ TEST(MacroMCTSPolicy, P211AgilePlayerEscapesBeforeTheTurnEnds) {
 // Bezpečná alternativa, po které riskantní makro propadne (přesun TÉHOŽ hráče —
 // blitz už nikdy nepřijde), se nesmí vybrat; přesun jiného, vzdáleného hráče ano.
 TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
+    // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
+    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;

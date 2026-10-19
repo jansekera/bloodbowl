@@ -91,10 +91,10 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; 
 //   P213 po částech (uživatel 18.10.: „rozděl ty dvě měření zvlášť“): útěk před TD předávkou (`2bfe769a`;
 //   vypnuto = staré pořadí) · útěk s GFI a úhybem (`b77b8c55`). P216: příprava i bez bezpečného pole.
 //   P217 (uživatel 19.10.: „dokud je bezpečná klec — nic jiného“): zdržování bankuje k zóně (1) ·
-//   nejvyšší šance na TD s nejhorší odpovědí soupeře (3).
+//   nejvyšší šance na TD s nejhorší odpovědí soupeře (3). P219: blitz agilního hráče podle šance srazit × odskočit.
 enum ExtraFeature : unsigned {
     kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
-    kP217StallBanks = 8, kP217BestChance = 16
+    kP217StallBanks = 8, kP217BestChance = 16, kP219AgileBlitz = 32
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
@@ -150,6 +150,10 @@ struct Macro {
     // „pomůže Rat Ogrovi se pohnout na 2+ za cenu blitzu“.
     bool declareBlitz = false;
 };
+
+// P219: šance, že hráč na `from` se zbylým pohybem `moveLeft` (+ GFI) skončí tah mimo tackle zóny soupeře
+// (nejvýš dva úhyby, Dodge = přehoz prvního; Frenzy ⇒ 0).
+double agileEscapeChance(const GameState& state, const Player& p, Position from, int moveLeft);
 
 struct MacroExpansionResult {
     std::vector<Action> actions;

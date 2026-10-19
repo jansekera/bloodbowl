@@ -830,6 +830,8 @@ TEST(OneCageKeepsCorners, CornerDoesNotFollowUpAfterABlock) {
 }
 
 TEST(OneCageKeepsCorners, CarrierIsNeverPickedAsTheBlitzer) {
+    // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
+    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     Board b(2);
     b.put(1, TeamSide::HOME, {12, 7}, 6, 3, {SkillName::Block});       // nosič: nejblíž a s Block
     b.put(2, TeamSide::HOME, {11, 3}, 6);                              // dál, bez Block
@@ -859,6 +861,8 @@ TEST(OneCageKeepsCorners, FrenzyCornerDoesNotBlock) {
 // P169 (07.10.2026): blitz, který si hráče neurčil, roh klece nevezme — ani když je jediný, kdo
 // na cíl dosáhne („bezpečí nosiče je důležitější než pravidlo využít blitz každé kolo“).
 TEST(OneCageKeepsCorners, UnnamedBlitzNeverTakesACageCorner) {
+    // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
+    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     Board b(2);
     b.put(1, TeamSide::HOME, {12, 7}, 4);
     b.put(2, TeamSide::HOME, {11, 6});
