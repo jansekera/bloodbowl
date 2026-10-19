@@ -87,6 +87,13 @@ Tři pravidla z Brasty (Domain Protection, Repository Pattern, No Direct DB Acce
 - Mění se jen stav ve sloupci; **přepisuje se jedině oddíl „CO JE TEĎ PRVNÍ“**.
 - Co se rozhodlo **nedělat**, se zapisuje taky (s důvodem) — jinak se po roce neodliší „nevyplatilo se“ od „nikoho to nenapadlo“.
 
+## Hodnocení tahu AI (uživatel opakuje dokola, 19.10.2026)
+
+- ⛔⛔⛔ **Počítá se JEN náš aktuální tah × nejhorší odpověď soupeře v jeho příštím tahu.** Víc dopředu ne,
+  složitý výpočet ne (*„počítej jen aktuální kolo a pak maximální odpověď oponenta v příštím kole — víc dopředu
+  určitě ne a složitý výpočet taky ne“*). Nejhorší odpověď se **čte** (dosah, nejlepší rána), nehledá.
+- Co jeden tah neukáže (časová rezerva, „klec nestihne dojít“), řeší **podmínka**, ne delší výpočet.
+
 ## Kód
 
 - Komentář u opravy pravidla: **co bylo špatně předtím + řádek pravidel** (`OPRAVENO 16. 9. — tady bylo +1. Pravidla ř. 651–654: …`).
