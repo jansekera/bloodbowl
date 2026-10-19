@@ -65,6 +65,18 @@ double carrierThreatAt(const GameState& state, const Player& carrier, Position s
 double handOffTdChance(const GameState& state, const Player& carrier, const Player& receiver,
                        Position* via = nullptr, Position* ez = nullptr);
 
+// ⭐ P217 (3) (uživatel 19.10.2026: „přednost má to, co má nejnižší pravděpodobnost neúspěchu — počítej
+//   i naše kolo — dodge a GFI — i další kolo soupeře pro blitz na nosiče“; „všechno umíš spočítat
+//   a vybrat co nejhoršího může oponent provést a to brát pro výpočet“). Nejhorší odpověď soupeře na
+//   hráče s míčem na `sq`: každý soupeř, který tam příští tah dojde, se postaví vedle (obklíčení),
+//   ostatní, kdo dojdou, zavřou zónami cestu k TD; blitz je v `carrierThreatAt`.
+GameState worstCaseReply(const GameState& state, const Player& carrier, Position sq);
+// Šance, že hráč s míčem, jehož tah skončí na `sq`, dá TD do konce poločasu proti nejhorší odpovědi:
+// míč přežije tah soupeře (1 − hrozba rány) × na desce po nejhorší odpovědi dojde do zóny (úhyby, GFI),
+// nebo — když tam nedojde — postoupí na pole s nejlepší šancí a totéž o tah později. `turnsLeft` =
+// kolik našich tahů po tomto ještě zbývá (0 ⇒ 0).
+double tdChanceFrom(const GameState& state, const Player& carrier, Position sq, int turnsLeft);
+
 // ⭐ P176 — HODNOTA RIZIKA (uživatel 08.10.2026: „když skaven upadne na GFI daleko ode všech
 //   soupeřů a nezraní se — je to relativně bezpečnější“). Šance, že míč ležící na `ball` vezme
 //   v příštím tahu soupeř, podle vzdálenosti nejbližšího stojícího soupeře. ZMĚŘENO (skaven
@@ -126,6 +138,9 @@ private:
 
     CageAdvancePlanner planner_;
     MCTSConfig config_;
+
+    // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
+    CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);
 
     // stav jednoho tahu
     TeamSide team_ = TeamSide::HOME;

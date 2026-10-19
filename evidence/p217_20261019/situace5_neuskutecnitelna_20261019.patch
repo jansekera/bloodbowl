@@ -1,0 +1,84 @@
+diff --git a/engine/include/bb/macro_actions.h b/engine/include/bb/macro_actions.h
+index 61bc1865..9ebaa5bb 100644
+--- a/engine/include/bb/macro_actions.h
++++ b/engine/include/bb/macro_actions.h
+@@ -90,7 +90,12 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0;
+ // Další vypínače JEN PRO MĚŘENÍ (CageFeature nemá volný bit). Bit = úprava VYPNUTA.
+ //   P213 po částech (uživatel 18.10.: „rozděl ty dvě měření zvlášť“): útěk před TD předávkou (`2bfe769a`;
+ //   vypnuto = staré pořadí) · útěk s GFI a úhybem (`b77b8c55`). P216: příprava i bez bezpečného pole.
+-enum ExtraFeature : unsigned { kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4 };
++//   P217 (uživatel 19.10.: „dokud je bezpečná klec — nic jiného“): bezpečná klec s rezervou neskóruje
++//   přes hod (5) · zdržování bankuje k zóně (1) · nejvyšší šance na TD s nejhorší odpovědí soupeře (3).
++enum ExtraFeature : unsigned {
++    kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
++    kP217SafeCageWaits = 8, kP217StallBanks = 16, kP217BestChance = 32
++};
+ void setExtraFeaturesOff(unsigned mask);
+ unsigned extraFeaturesOff();
+ inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
+diff --git a/engine/src/one_cage.cpp b/engine/src/one_cage.cpp
+index 881b7fc9..c5578c19 100644
+--- a/engine/src/one_cage.cpp
++++ b/engine/src/one_cage.cpp
+@@ -685,7 +685,13 @@ void CageController::planStart(const GameState& state) {
+                 const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+                 if (after.valid) threat = std::min(threat, after.blitzThreat);
+             }
+-            if (scoreNow > 0.0 && scoreNow >= 1.0 - threat) scoringRangeCage_ = false;
++            // P217 (5) (uživatel 19.10.: „dokud je bezpečná klec — nic jiného — pak útěk nebo TD, když klec
++            //   nedojde nebo není bezpečná“; k situaci 5: „OK“). Dosud se skórovalo přes hod i z bezpečné
++            //   klece, kdykoli TD teď vyšlo aspoň tak jisté jako přežití míče (hrozba 0,10 ⇒ stačilo 0,90).
++            //   Bezpečná klec, která do zóny ještě dojde (časová rezerva), jde dál a neskóruje.
++            const bool safeCageWaits = extraFeatureOn(kP217SafeCageWaits) && threat <= kSafeBlitzThreat &&
++                                       teamHasTimeSlack(state, c);
++            if (scoreNow > 0.0 && scoreNow >= 1.0 - threat && !safeCageWaits) scoringRangeCage_ = false;
+             if (dbg) std::fprintf(stderr, "[cage ctl] TD teď %.2f × míč přežije %.2f => %s\n", scoreNow, 1.0 - threat,
+                                   scoringRangeCage_ ? "klec" : "skórovat hned");
+         }
+diff --git a/engine/tests/test_one_cage.cpp b/engine/tests/test_one_cage.cpp
+index 7501557d..b4b46d3c 100644
+--- a/engine/tests/test_one_cage.cpp
++++ b/engine/tests/test_one_cage.cpp
+@@ -1164,6 +1164,42 @@ TEST(OneCageStall, ThreatenedCarrierGoesForTheTouchdownThroughDiceACagedOneDoesN
+     }
+ }
+ 
++// P217 (5) (uživatel 19.10.: „dokud je bezpečná klec — nic jiného — pak útěk nebo TD, když klec nedojde
++// nebo není bezpečná“; situace 5 — bezpečná klec, TD přes hod s velkou šancí: „OK“). Nosič MA 6 sedm polí
++// před zónou: TD přes jedno GFI s týmovým přehozem (~0,97). Klec stojí, soupeř dosáhne jen slabou ranou
++// (hrozba pod 0,15, ale nad 1 − 0,97). Ve 3. kole má tým rezervu ⇒ klec jde dál a neskóruje; v 7. kole
++// rezervu nemá ⇒ skóruje se hned (jako dosud). Pojistka: s vypnutou úpravou skóruje i ve 3. kole.
++TEST(OneCageStall, ASafeCageWithTimeToSpareDoesNotScoreThroughDice) {
++    auto board = [](int turn) {
++        Board b(turn);
++        b.s.homeTeam.rerolls = 1;
++        b.put(1, TeamSide::HOME, {18, 7}, 6, 3, {SkillName::SureFeet});
++        b.put(2, TeamSide::HOME, {17, 6}); b.put(3, TeamSide::HOME, {17, 8});
++        b.put(4, TeamSide::HOME, {19, 6}); b.put(5, TeamSide::HOME, {19, 8});
++        b.put(13, TeamSide::AWAY, {static_cast<int8_t>(atoi(getenv("OX"))), static_cast<int8_t>(atoi(getenv("OY")))}, 6);
++        b.s.ball = BallState::carried({18, 7}, 1);
++        return b;
++    };
++    auto scored = [&](int turn) {
++        Board b = board(turn);
++        CageController cc(nullptr, cfg(), 1);
++        std::vector<Macro> ms;
++        playAll(cc, b, &ms);
++        return std::any_of(ms.begin(), ms.end(), [](const Macro& m) { return m.type == MacroType::SCORE; });
++    };
++    {
++        Board b = board(3);
++        const double t = blitzThreat(b.s, b.s.getPlayer(1));
++        fprintf(stderr, "THREAT %.3f slack3 %d slack7 %d\n", t, teamHasTimeSlack(b.s, b.s.getPlayer(1)),
++                teamHasTimeSlack(board(7).s, board(7).s.getPlayer(1)));
++    }
++    EXPECT_FALSE(scored(3)) << "bezpečná klec s rezervou: TD přes hod se nehraje";
++    EXPECT_TRUE(scored(7)) << "bez rezervy: TD hned";
++    setExtraFeaturesOff(kP217SafeCageWaits);
++    EXPECT_TRUE(scored(3)) << "pozitivní kontrola: bez úpravy skóruje i ve 3. kole";
++    setExtraFeaturesOff(0);
++}
++
+ // Review 08.10.2026 k P175/P178: hrozba se má brát PO našem tahu. Soupeř nosiči odtlačil dva rohy
+ // (na začátku tahu je hrozba velká), ale spoluhráči stojí o pole vedle a klec tento tah dostaví ⇒
+ // přes dvě GFI se neběží. Pozitivní kontrola: stejný nosič a soupeř bez spoluhráčů ⇒ TD hned.

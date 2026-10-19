@@ -1164,6 +1164,79 @@ TEST(OneCageStall, ThreatenedCarrierGoesForTheTouchdownThroughDiceACagedOneDoesN
     }
 }
 
+// P217 (1) (uživatel 19.10.: bezpečná klec, ze které nosič dojde do zóny bez hodu — „pokud to jde —
+// přibližujeme se k TD zóně“; bezpečná klec obecně „postupujeme dopředu“ = bankování). Nosič MA 6 šest
+// polí před zónou, kolem něj klec, soupeř daleko: zdržuje se (TD se nehraje), ale klec postoupí k zóně
+// a nosič zůstane před ní. Pozitivní kontrola: s vypnutou úpravou nosič stojí (jako dosud).
+TEST(OneCageStall, TheStallingCageStillAdvancesTowardsTheEndZone) {
+    auto run = [](bool banks) {
+        if (!banks) setExtraFeaturesOff(kP217StallBanks);
+        Board b(4);
+        b.put(1, TeamSide::HOME, {19, 7}, 6);
+        b.put(2, TeamSide::HOME, {18, 6}); b.put(3, TeamSide::HOME, {18, 8});
+        b.put(4, TeamSide::HOME, {20, 6}); b.put(5, TeamSide::HOME, {20, 8});
+        b.put(13, TeamSide::AWAY, {3, 7}, 6);
+        b.s.ball = BallState::carried({19, 7}, 1);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        Macro m;
+        if (cc.beforeEndTurn(b.s, m)) { play(b.s, m); playAll(cc, b, &ms); }
+        setExtraFeaturesOff(0);
+        for (const Macro& x : ms) EXPECT_NE(x.type, MacroType::SCORE) << "zdržuje se — TD se nehraje";
+        EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::SCORE, 1, -1, {-1, -1}})) << "předpoklad: zdržovací tah";
+        EXPECT_EQ(b.s.homeTeam.score, 0);
+        EXPECT_LT(b.s.getPlayer(1).position.x, 25) << "nosič zůstal před zónou";
+        EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "a v bezpečí";
+        return b.s.getPlayer(1).position.x;
+    };
+    EXPECT_GT(run(true), 19) << "klec postoupila k zóně";
+    EXPECT_EQ(run(false), 19) << "pozitivní kontrola: bez úpravy nosič stojí";
+}
+
+// P217 (3) (uživatel 19.10.: „počítej i naše kolo — dodge a GFI — i další kolo soupeře pro blitz na
+// nosiče“; „vybrat co nejhoršího může oponent provést a to brát pro výpočet“). Šance na TD do konce
+// poločasu z pole, kde náš tah skončí.
+TEST(TdChance, OpenFieldNeedsEnoughTurnsAndNothingElse) {
+    Board b(3);
+    b.put(1, TeamSide::HOME, {15, 7}, 6);
+    b.s.ball = BallState::carried({15, 7}, 1);
+    const Player& c = b.s.getPlayer(1);
+    EXPECT_DOUBLE_EQ(tdChanceFrom(b.s, c, {15, 7}, 1), 0.0) << "10 polí: za jeden tah (6 + 2 GFI) nedojde";
+    EXPECT_DOUBLE_EQ(tdChanceFrom(b.s, c, {15, 7}, 2), 1.0) << "za dva tahy dojde bez hodu, nikdo nepřekáží";
+    EXPECT_DOUBLE_EQ(tdChanceFrom(b.s, c, {15, 7}, 0), 0.0) << "žádný další tah ⇒ žádné TD";
+}
+
+// Soupeř, který nosiče příští tah dosáhne, šanci sníží: rána (míč může vypadnout) a obklíčení (úhyb).
+// Pozitivní kontrola: tentýž soupeř mimo dosah na šanci nic nemění.
+TEST(TdChance, TheWorstOpponentReplyLowersIt) {
+    auto chance = [](Position opp) {
+        Board b(3);
+        b.put(1, TeamSide::HOME, {19, 7}, 6);
+        b.put(13, TeamSide::AWAY, opp, 6);
+        b.s.ball = BallState::carried({19, 7}, 1);
+        return tdChanceFrom(b.s, b.s.getPlayer(1), {19, 7}, 1);
+    };
+    const double far = chance({3, 7});
+    const double near = chance({14, 7});
+    EXPECT_DOUBLE_EQ(far, 1.0) << "soupeř nedosáhne ⇒ TD jisté (6 polí bez hodu)";
+    EXPECT_LT(near, 0.9) << "soupeř dosáhne ⇒ rána a obklíčení";
+    EXPECT_GT(near, 0.0);
+}
+
+// Nejhorší odpověď: soupeř, který dojde, se postaví vedle nosiče (nosič pak uhýbá).
+TEST(TdChance, WorstReplyPutsReachingOpponentsNextToTheCarrier) {
+    Board b(3);
+    b.put(1, TeamSide::HOME, {19, 7}, 6);
+    b.put(13, TeamSide::AWAY, {14, 7}, 6);
+    b.put(14, TeamSide::AWAY, {2, 2}, 6);
+    b.s.ball = BallState::carried({19, 7}, 1);
+    const GameState w = worstCaseReply(b.s, b.s.getPlayer(1), {19, 7});
+    EXPECT_EQ(w.getPlayer(13).position.distanceTo(Position{19, 7}), 1) << "dosáhne ⇒ stojí vedle nosiče";
+    EXPECT_GT(w.getPlayer(13).position.x, 19) << "vpřed, mezi nosičem a zónou";
+    EXPECT_EQ(w.getPlayer(14).position, (Position{2, 2})) << "nedosáhne ⇒ zůstane";
+}
+
 // Review 08.10.2026 k P175/P178: hrozba se má brát PO našem tahu. Soupeř nosiči odtlačil dva rohy
 // (na začátku tahu je hrozba velká), ale spoluhráči stojí o pole vedle a klec tento tah dostaví ⇒
 // přes dvě GFI se neběží. Pozitivní kontrola: stejný nosič a soupeř bez spoluhráčů ⇒ TD hned.

@@ -177,6 +177,85 @@ double carrierThreatAt(const GameState& state, const Player& carrier, Position s
     return blitzThreat(proj, c, stopAbove);
 }
 
+GameState worstCaseReply(const GameState& state, const Player& carrier, Position sq) {
+    const TeamSide side = carrier.teamSide;
+    GameState proj = state.clone();
+    Player& c = proj.getPlayer(carrier.id);
+    c.position = sq;
+    c.state = PlayerState::STANDING;
+    proj.ball = BallState::carried(sq, carrier.id);
+    const int dx = (side == TeamSide::HOME) ? 1 : -1;
+    // soupeři od nejbližšího: nejdřív obsadí pole vedle nosiče (vpřed napřed), pak pole na cestě k zóně
+    std::vector<int> opp;
+    proj.forEachOnPitch(opponent(side), [&](const Player& o) { if (blitzReachOf(o) >= 0) opp.push_back(o.id); });
+    std::sort(opp.begin(), opp.end(), [&](int a, int b) {
+        return proj.getPlayer(a).position.distanceTo(sq) < proj.getPlayer(b).position.distanceTo(sq);
+    });
+    for (int id : opp) {
+        Player& o = proj.getPlayer(id);
+        const int reach = blitzReachOf(o) + 1;   // pohyb bez rány: MA + 2 GFI
+        Position best{-1, -1};
+        int bestKey = INT_MAX;
+        for (int x = sq.x - 3; x <= sq.x + 3; ++x)
+            for (int y = sq.y - 3; y <= sq.y + 3; ++y) {
+                const Position t{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (!t.isOnPitch() || t == sq || proj.getPlayerAtPosition(t)) continue;
+                if (o.position.distanceTo(t) > reach) continue;
+                const int ahead = (t.x - sq.x) * dx;   // > 0 = mezi nosičem a zónou
+                if (ahead < 0 && t.distanceTo(sq) > 1) continue;
+                // vedle nosiče napřed (vpřed dřív než vzadu), pak pole na cestě vpřed co nejblíž ose
+                const int key = t.distanceTo(sq) == 1 ? (1 - std::min(ahead, 1)) : 10 + t.distanceTo(sq) + std::abs(t.y - sq.y);
+                if (key < bestKey) { bestKey = key; best = t; }
+            }
+        if (best.isOnPitch()) o.position = best;
+    }
+    return proj;
+}
+
+double tdChanceFrom(const GameState& state, const Player& carrier, Position sq, int turnsLeft) {
+    if (turnsLeft <= 0) return 0.0;
+    const TeamSide side = carrier.teamSide;
+    const double survive = 1.0 - carrierThreatAt(state, carrier, sq);
+    if (survive <= 0.0) return 0.0;
+    GameState proj = worstCaseReply(state, carrier, sq);
+    Player& c = proj.getPlayer(carrier.id);
+    c.movementRemaining = c.stats.movement;
+    c.hasMoved = c.hasActed = false;
+    const int budget = static_cast<int>(c.stats.movement) + maxGfiSquares(c);
+    const int ezX = (side == TeamSide::HOME) ? 25 : 0;
+    double best = 0.0;
+    for (int y = 0; y < 15; ++y) {
+        const Position ez{static_cast<int8_t>(ezX), static_cast<int8_t>(y)};
+        if (proj.getPlayerAtPosition(ez)) continue;
+        const double fail = pathFailProb(proj, c, ez, budget, Position{-1, -1});
+        if (fail >= 0.0) best = std::max(best, 1.0 - fail);
+    }
+    if (turnsLeft > 1) {
+        // do zóny ještě ne: postoupit bez GFI a zkusit o tah později — kandidáti nejdál vpřed
+        struct Cand { int key; Position sq; };
+        std::vector<Cand> cands;
+        const int ma = c.stats.movement;
+        for (int x = sq.x - ma; x <= sq.x + ma; ++x)
+            for (int y = std::max(1, sq.y - ma); y <= std::min(13, sq.y + ma); ++y) {
+                const Position t{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (!t.isOnPitch() || distToEndzone(t, side) < 1 || (t != sq && proj.getPlayerAtPosition(t))) continue;
+                if (distToEndzone(t, side) >= distToEndzone(sq, side) && t != sq) continue;
+                cands.push_back({distToEndzone(t, side) * 10 + threatsTo(proj, t, side), t});
+            }
+        std::sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) { return a.key < b.key; });
+        // šíře: poslední dva tahy se zkouší 3 nejlepší pole, dál jen nejlepší (jinak 6^tahů výpočtů)
+        const int width = turnsLeft > 2 ? 1 : 3;
+        int tried = 0;
+        for (const Cand& k : cands) {
+            const double failHere = k.sq == sq ? 0.0 : pathFailProb(proj, c, k.sq, ma, Position{-1, -1});
+            if (failHere < 0.0) continue;
+            if (++tried > width) break;
+            best = std::max(best, (1.0 - failHere) * tdChanceFrom(proj, c, k.sq, turnsLeft - 1));
+        }
+    }
+    return survive * best;
+}
+
 double handOffTdChance(const GameState& state, const Player& carrier, const Player& receiver,
                        Position* via, Position* ez) {
     if (!carrier.isOnPitch() || !receiver.isOnPitch() || receiver.state != PlayerState::STANDING) return 0.0;
@@ -703,7 +782,7 @@ void CageController::planStart(const GameState& state) {
             phase_ = CagePhase::CAGE;
             if (dbg) std::fprintf(stderr, "[cage ctl] zdržování TD: nosič v bezpečí (hrozba rány %.2f), kolo %d\n",
                                   blitzThreat(state, c), state.getTeamState(c.teamSide).turnNumber);
-            CageAdvancePlan fill = planner_.buildFillOnly(state, {});
+            CageAdvancePlan fill = stallPlan(state, c);
             if (fill.valid) queue_ = std::move(fill.macros);
             stage_ = Stage::AFTER_ADVANCE;
             return;
@@ -1073,6 +1152,27 @@ void CageController::planStart(const GameState& state) {
 // v kleci (postup nevyšel a čekáním o TD nepřijde) — kromě maker, která skórují nebo míč
 // předávají, a kromě nosiče, který sám stojí v zóně soupeře (ústup z kontaktu má přednost:
 // „blok na nosiče se nesmí stávat vůbec").
+// P217 (1) (uživatel 19.10. k bezpečné kleci, ze které nosič dojde do zóny bez hodu: „pokud to jde —
+// přibližujeme se k TD zóně“; k bezpečné kleci obecně: „postupujeme dopředu“ = bankování, doktrína
+// 04.08./10.08. „druhé kolo bankuj a prorážej cestu kupředu“). Dosud zdržování (P175) klec jen dostavělo
+// na místě a nosič stál. Teď klec postoupí stejným plánem jako v bankování (nejdelší krok bez hodu),
+// pokud nosič zůstane před zónou (TD se v tomto tahu nehraje) a po kroku je dál v bezpečí. Jinak
+// dostavba na místě jako dřív.
+CageAdvancePlan CageController::stallPlan(const GameState& state, const Player& carrier) {
+    if (extraFeatureOn(kP217StallBanks)) {
+        CageAdvancePlan adv = planner_.build(state, {}, /*evenInScoringRange=*/true);
+        if (adv.valid && adv.step > 0 && adv.carrierGfi == 0 &&
+            adv.step < distToEndzone(carrier.position, carrier.teamSide) && adv.blitzThreat <= kSafeBlitzThreat) {
+            if (std::getenv("BB_CAGE_DEBUG")) {
+                std::fprintf(stderr, "[cage ctl] zdržování bankuje: klec o %d pole k zóně (hrozba %.2f)\n", adv.step,
+                             adv.blitzThreat);
+            }
+            return adv;
+        }
+    }
+    return planner_.buildFillOnly(state, {});
+}
+
 bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) const {
     if (!ourBall(state)) return false;
     if (state.activeTeam != team_ || state.getTeamState(team_).turnNumber != turn_ || state.half != half_) return false;
@@ -1270,6 +1370,8 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
     const bool stallingNow = stalling_ && team_ == state.activeTeam && turn_ == turn && half_ == state.half;
     if (freeToAct(carrier) && !released(state, carrier) && !stallingNow) {
         plan = planner_.build(state, {}, /*evenInScoringRange=*/true);
+    } else if (stallingNow && freeToAct(carrier)) {
+        plan = stallPlan(state, carrier);
     } else {
         plan = planner_.buildFillOnly(state, {});
     }

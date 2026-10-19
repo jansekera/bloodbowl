@@ -90,7 +90,12 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; 
 // Další vypínače JEN PRO MĚŘENÍ (CageFeature nemá volný bit). Bit = úprava VYPNUTA.
 //   P213 po částech (uživatel 18.10.: „rozděl ty dvě měření zvlášť“): útěk před TD předávkou (`2bfe769a`;
 //   vypnuto = staré pořadí) · útěk s GFI a úhybem (`b77b8c55`). P216: příprava i bez bezpečného pole.
-enum ExtraFeature : unsigned { kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4 };
+//   P217 (uživatel 19.10.: „dokud je bezpečná klec — nic jiného“): zdržování bankuje k zóně (1) ·
+//   nejvyšší šance na TD s nejhorší odpovědí soupeře (3).
+enum ExtraFeature : unsigned {
+    kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
+    kP217StallBanks = 8, kP217BestChance = 16
+};
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
 inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
