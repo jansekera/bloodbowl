@@ -2301,3 +2301,50 @@ TEST(BlockHandler, FoulAppearanceInBlitzWastesOnlyTheBlock) {
     EXPECT_TRUE(move) << "po propadlém bloku smí blitzující dál běžet";
     EXPECT_FALSE(block) << "blok blitzu je spotřebován — druhý ne";
 }
+
+// ---------------------------------------------------------------------------
+// P192 review (3)(4)(5) — Grab × Side Step. Grab, ř. 8148-8154: „only while making a Block
+// Action, if his block results in a push back he MAY choose any empty square adjacent to his
+// opponent … When making a Block OR BLITZ Action, Grab and Side Step will cancel each other out
+// and the standard pushback rules apply. Grab will not work if there are no empty adjacent
+// squares.“ Side Step, ř. 8477-8478: „may not use this skill if there are no open squares on
+// the pitch adjacent to this player.“
+// ---------------------------------------------------------------------------
+namespace {
+// Útočník HOME (10,7) → obránce AWAY (11,7); tři pole odtlačení (12,6..8) drží HOME přihlížející,
+// vedle obránce (11,6) a (11,8) je volno ⇒ Side Step uhne na hřiště, běžné odtlačení řetězí.
+GameState grabVsSideStepFixture(bool attackerHasGrab) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    if (attackerHasGrab) gs.getPlayer(1).skills.add(SkillName::Grab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    placePlayer(gs, 2, {12, 6}, TeamSide::HOME);
+    placePlayer(gs, 3, {12, 7}, TeamSide::HOME);
+    placePlayer(gs, 4, {12, 8}, TeamSide::HOME);
+    gs.ball = BallState::onGround({2, 2});
+    return gs;
+}
+}  // namespace
+
+// (3) Grab v BLITZU sám nepůsobí („only while making a Block Action“), ale Side Step ruší dál
+// („When making a Block or Blitz Action … cancel each other out“). Dřív `grab = … && !isBlitz`
+// počítalo zrušení až z oslabeného `grab`, takže v blitzu si obránce pole vybral sám.
+TEST(BlockHandler, P192GrabCancelsSideStepOnABlitzToo) {
+    {
+        GameState gs = grabVsSideStepFixture(true);
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});   // až 3 kostky (asistence), vše PUSHED
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr, false, /*noFollowUp=*/true);
+        EXPECT_EQ(gs.getPlayer(12).position.x, 12)
+            << "Grab × Side Step se ruší i v blitzu ⇒ běžné odtlačení (tři pole za ním, řetěz)";
+    }
+    {   // pozitivní kontrola: bez Grabu v témž blitzu Side Step platí a obránce uhne vedle
+        GameState gs = grabVsSideStepFixture(false);
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr, false, true);
+        EXPECT_NE(gs.getPlayer(12).position.x, 12);
+        EXPECT_EQ(gs.getPlayer(3).position, (Position{12, 7})) << "nikdo neřetězen";
+    }
+}
+

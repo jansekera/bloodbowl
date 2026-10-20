@@ -540,8 +540,13 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     bool sideStep = canSideStep(defender);
     // "Grab only works on a Block Action" and "Grab and Side Step will cancel
     // each other out and the standard pushback rules apply".
-    bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
-    if (sideStep && grab) { sideStep = false; grab = false; }
+    // OPRAVENO 20.10.2026 (review P192, nález 3) -- zrušení se počítalo z `grab`, které je
+    // v blitzu vypnuté, takže v blitzu si obránce se Side Step pole vybíral sám. Pravidla
+    // ř. 8151-8153: „When making a Block OR BLITZ Action, Grab and Side Step will cancel
+    // each other out“ -- Grab v blitzu sám nepůsobí (ř. 8148), Side Step ale ruší.
+    const bool hasGrab = attacker.hasSkill(SkillName::Grab);
+    bool grab = hasGrab && !isBlitz;
+    if (sideStep && hasGrab) { sideStep = false; grab = false; }
     if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
 
     return pushOne(state, attacker.position, defender, sideStep, grab,
