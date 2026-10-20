@@ -440,7 +440,7 @@ final class PassingSkillsTest extends TestCase
 
         // Accuracy: 2 (inaccurate, target 4+), team reroll: 2 (still inaccurate)
         // Scatter 3x (r. 735): J (10,6), V (11,6), Z (10,6) empty
-        // DC player at (10,7) is adjacent → moves to (10,6), catch attempt
+        // DC player at (10,7) is adjacent → catches from his own square (ř. 8068)
         // Catch roll: 4 (AG3, target 4+)
         $dice = new FixedDiceRoller([2, 2, 5, 3, 7, 4]);
         $resolver = new ActionResolver($dice);

@@ -276,14 +276,11 @@ final class PassResolver
                     $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
                 }
             } else {
-                // Diving Catch: check adjacent players before bounce
+                // Diving Catch: hráč chytá ze SVÉHO pole, neúspěch odskočí z jeho pole
+                // (resolveCatch pracuje s pozicí chytajícího).
                 $divingCatcher = $this->findDivingCatchPlayer($state, $landingPos);
                 if ($divingCatcher !== null) {
                     $events[] = GameEvent::divingCatch($divingCatcher->getId());
-                    // Move player to landing square
-                    $dcPos = $divingCatcher->getPosition();
-                    $divingCatcher = $divingCatcher->withPosition($landingPos);
-                    $state = $state->withPlayer($divingCatcher);
                     $isFriendly = $divingCatcher->getTeamSide() === $activeSide;
                     $catchResult = $this->ballResolver->resolveCatch(
                         $state,
@@ -710,27 +707,35 @@ final class PassResolver
     }
 
     /**
-     * Find a player with Diving Catch adjacent to the landing position.
-     * Must be standing, within 1 square, and the landing square must be empty.
+     * Hráč s Diving Catch, který smí chytit míč dopadající na sousední pole.
+     *
+     * OPRAVENO 20. 10. 2026 (P221) — tady se hráč PŘESOUVAL na pole dopadu (a odtud se počítaly
+     *   zóny i odskok), chytal i bez tackle zón, i na pole s ležícím hráčem, a ze dvou hráčů
+     *   s Diving Catch se vrhl první nalezený. Pravidla ř. 8065-8071: "...that would land in an
+     *   empty square in one of his tackle zones as if it had landed in his own square without
+     *   leaving his current square. A failed catch will bounce from the Diving Catch player's
+     *   square. If there are two or more players attempting to use this skill then they get in
+     *   each other's way and neither can use it." Bez zón "may not catch" (ř. 7983-7986).
      */
     private function findDivingCatchPlayer(GameState $state, Position $landingPos): ?MatchPlayerDTO
     {
+        if ($state->getPlayerAtPosition($landingPos) !== null) {
+            return null;
+        }
+
+        $candidates = [];
         foreach ($state->getPlayers() as $player) {
-            if (!$player->hasSkill(SkillName::DivingCatch)) {
-                continue;
-            }
-            if ($player->getState() !== PlayerState::STANDING) {
-                continue;
-            }
             $playerPos = $player->getPosition();
-            if ($playerPos === null) {
-                continue;
-            }
-            if ($playerPos->distanceTo($landingPos) === 1) {
-                return $player;
+            if ($playerPos !== null
+                && $player->hasSkill(SkillName::DivingCatch)
+                && $player->getState() === PlayerState::STANDING
+                && !$player->hasLostTacklezones()
+                && $playerPos->distanceTo($landingPos) === 1) {
+                $candidates[] = $player;
             }
         }
-        return null;
+
+        return count($candidates) === 1 ? $candidates[0] : null;
     }
 
     /**
