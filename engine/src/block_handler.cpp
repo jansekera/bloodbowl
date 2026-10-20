@@ -1381,7 +1381,6 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
             if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
             if (att.hasSkill(SkillName::Stakes)) defCtx.hasStakes = true;
-            if (def.hasSkill(SkillName::Decay)) defCtx.hasDecay = true;
 
             resolveArmourAndInjury(state, def.id, dice, defCtx, events);
             handleBallOnPlayerDown(state, def.id, dice, events);

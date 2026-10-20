@@ -18,7 +18,6 @@ struct InjuryContext {
     bool mightyBlow = false;
     bool hasClaw = false;     // armor broken on 8+
     bool hasStakes = false;   // blocks Regeneration
-    bool hasDecay = false;    // roll injury twice, take worse
     bool hasNurglesRot = false;
     // P75 (30.09.2026), Chainsaw r. 7996-8018: +3 k brneni, kdyz obet zasahla
     // pila, kdyz je obet NOSITEL pily sraženy "for any reason", nebo kdyz se
