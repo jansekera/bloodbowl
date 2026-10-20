@@ -239,27 +239,8 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
             return thrownBallTurnover(state, passer.teamSide);
         }
 
-        state.ball = BallState::onGround(landPos);
-
-        // Catch attempt at landing (no modifier)
-        Player* catcher = state.getPlayerAtPosition(landPos);
-        if (catcher && canAct(catcher->state) && catcher->teamSide == passer.teamSide) {
-            if (resolveCatch(state, catcher->id, dice, 0, events)) {
-                return ActionResult::ok();
-            }
-        } else if (catcher && canAct(catcher->state)) {
-            // Enemy catch = interception
-            if (resolveCatch(state, catcher->id, dice, 0, events)) {
-                return ActionResult::turnovr();
-            }
-        }
-        // Ball not caught by own team
-        if (!state.ball.isHeld) {
-            resolveBounce(state, landPos, dice, 0, events);
-        }
-        return state.ball.isHeld && state.getPlayer(state.ball.carrierId).teamSide == passer.teamSide
-                   ? ActionResult::ok()
-                   : ActionResult::turnovr();
+        resolveLanding(state, landPos, dice, events);
+        return thrownBallTurnover(state, passer.teamSide);
     }
 
     // Normal pass
@@ -422,57 +403,18 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         return ActionResult::turnovr();
     }
 
-    bool accurate = (roll >= passTarget);
-
-    if (accurate) {
-        // Ball lands at target
-        state.ball = BallState::onGround(target);
-        Player* catcher = state.getPlayerAtPosition(target);
-        if (catcher && canAct(catcher->state) && !catcher->hasSkill(SkillName::NoHands)) {
-            // Catch with +1 modifier for accurate pass
-            if (resolveCatch(state, catcher->id, dice, 1, events, /*accuratePass=*/true)) {
-                return catcher->teamSide == passer.teamSide
-                           ? ActionResult::ok()
-                           : ActionResult::turnovr();
-            }
-        }
-    } else {
-        // F8, l. 735-737: tri samostatne rozptyly po JEDNOM poli. Do 24.08.2026
-        // se sem recyklovala VYKOPOVA sablona (jeden smer D8 x vzdalenost D6),
-        // takze neprecna prihravka letela az 6 poli rovne misto trikrokove
-        // prochazky o max 3 pole, ktera se muze vratit i do ciloveho pole.
-        Position landPos;
-        if (scatterOrThrowIn(state, target, dice, events, landPos)) {
-            // OPRAVENO 08.10.2026 (P89) — tady byl turnover VŽDY. Pravidla ř. 881-889: turnover
-            // nastává, až když míč „finally comes to rest“, a nenastane, když ho po vhození
-            // chytí hráč týmu na tahu.
-            return thrownBallTurnover(state, passer.teamSide);
-        }
-
-        state.ball = BallState::onGround(landPos);
-
-        // Catch attempt at landing (no modifier)
-        Player* catcher = state.getPlayerAtPosition(landPos);
-        if (catcher && canAct(catcher->state) && !catcher->hasSkill(SkillName::NoHands)) {
-            if (resolveCatch(state, catcher->id, dice, 0, events)) {
-                return catcher->teamSide == passer.teamSide
-                           ? ActionResult::ok()
-                           : ActionResult::turnovr();
-            }
-        }
+    const bool accurate = (roll >= passTarget);
+    Position landPos = target;
+    // F8, l. 735-737: neprecna prihravka = tri samostatne rozptyly po JEDNOM poli. Do 24.08.2026
+    // se sem recyklovala VYKOPOVA sablona (jeden smer D8 x vzdalenost D6).
+    // OPRAVENO 08.10.2026 (P89) — po vhozeni byl turnover VŽDY. Pravidla ř. 881-889: turnover
+    // nastává, až když míč „finally comes to rest“, a nenastane, když ho chytí hráč týmu na tahu.
+    if (!accurate && scatterOrThrowIn(state, target, dice, events, landPos)) {
+        return thrownBallTurnover(state, passer.teamSide);
     }
-
-    // Ball not caught — bounce
-    if (!state.ball.isHeld) {
-        resolveBounce(state, state.ball.position, dice, 0, events);
-    }
-
-    // If own team caught it somehow (via bounce), not a turnover
-    if (state.ball.isHeld && state.getPlayer(state.ball.carrierId).teamSide == passer.teamSide) {
-        return ActionResult::ok();
-    }
-
-    return ActionResult::turnovr();
+    // P223: dopad (chytání, Diving Catch, odraz) na jednom místě — `resolveLanding`.
+    resolveLanding(state, landPos, dice, events, accurate);
+    return thrownBallTurnover(state, passer.teamSide);
 }
 
 ActionResult resolveHandOff(GameState& state, int giverId, int receiverId,

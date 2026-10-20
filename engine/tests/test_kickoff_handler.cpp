@@ -455,6 +455,35 @@ TEST(KickoffLanding, KickingPlayerUnderTheBallMustTryToCatchIt) {
     EXPECT_EQ(gs.ball.carrierId, away.id);
 }
 
+// P223. Diving Catch i u výkopu (ř. 8066: "any pass, KICK OFF or crowd throw-in ... that would land
+// in an empty square in one of his tackle zones"). (3,7) + 1 na V = prázdné (4,7); hráč přijímajících
+// s Diving Catch na (4,8) chytá 6 ze svého pole. Stará mechanika: odraz D8 6 = JZ na (3,8).
+TEST(KickoffLanding, DivingCatchCatchesAKickLandingNextToHim) {
+    auto gs = kickFixture(/*withKick=*/false);
+    Player& elf = playerAt(gs, {7, 7});
+    elf.position = {4, 8};
+    elf.skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({1, 3, 1, 1, 6});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, elf.id);
+    EXPECT_EQ(elf.position, (Position{4, 8})) << "\"without leaving his current square\" (ř. 8068)";
+}
+
+// P223. Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7) vedle prázdného (12,7). Míč "as if it
+// had landed in his own square" (ř. 8068) = v kopající polovině ⇒ touchback (ř. 280-283, FAQ
+// ř. 9316-9318). Stará mechanika: odraz D8 7 = Z na (11,7), míč leží.
+TEST(KickoffLanding, DivingCatchByAKickingPlayerOverTheLineIsATouchback) {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.receiverSpeed = RosterSpeed::FAST;          // krátký kop na (7,7)
+    playerAt(gs, {12, 7}).position = {2, 2};       // uvolní pole dopadu na LoS
+    playerAt(gs, {13, 7}).skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({5, 3, 1, 1, 7});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld) << "touchback";
+    EXPECT_EQ(gs.getPlayer(gs.ball.carrierId).teamSide, TeamSide::HOME);
+}
+
 // ř. 1033-1035: „Play stops when both coaches have had eight turns each.“ Přijímající, kterému
 // nezbývá kolo, už výkop nedostane (dřív se kopalo, házelo na tabulku a teprve pak skončil poločas).
 TEST(KickoffHandler, NoKickoffWhenTheReceivingTeamHasNoTurnLeft) {

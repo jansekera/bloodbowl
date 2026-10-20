@@ -108,6 +108,54 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
     }
 }
 
+// P223 (20.10.2026) — Diving Catch u míče dopadajícího VEDLE hráče v C++ chyběl úplně (byl jen +1
+// k přesné přihrávce, helpers.cpp). Pravidla ř. 8065-8071: "the player can attempt to catch any
+// pass, kick off or crowd throw-in, but not bouncing ball, that would land in an EMPTY square in
+// one of his tackle zones as if it had landed in his own square WITHOUT LEAVING HIS CURRENT SQUARE.
+// A failed catch will bounce from the Diving Catch player's square. If there are two or more
+// players attempting to use this skill then they get in each other's way and neither can use it."
+// Bez zón "may not catch" (ř. 7983-7986). Smí kterýkoli tým, i sám přihrávající (uživatel 20.10.).
+int divingCatcherFor(const GameState& state, Position at) {
+    if (state.getPlayerAtPosition(at)) return -1;
+    int found = -1;
+    int count = 0;
+    for (const auto& p : state.players) {
+        if (!p.isOnPitch() || p.state != PlayerState::STANDING || p.lostTacklezones) continue;
+        if (!p.hasSkill(SkillName::DivingCatch) || p.position.distanceTo(at) != 1) continue;
+        found = p.id;
+        ++count;
+    }
+    return count == 1 ? found : -1;
+}
+
+void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
+                    std::vector<GameEvent>* events, bool accuratePass) {
+    state.ball = BallState::onGround(at);
+    const Player* p = state.getPlayerAtPosition(at);
+    int catcherId = -1;
+    bool diving = false;
+    if (p) {
+        if (p->state == PlayerState::STANDING && !p->hasSkill(SkillName::NoHands)) catcherId = p->id;
+    } else {
+        catcherId = divingCatcherFor(state, at);
+        diving = catcherId >= 0;
+    }
+    if (catcherId < 0) {
+        resolveBounce(state, at, dice, 0, events);
+        return;
+    }
+    const Position from = state.getPlayer(catcherId).position;
+    if (diving) {
+        emitEvent(events, {GameEvent::Type::SKILL_USED, catcherId, -1, at, from,
+                          static_cast<int>(SkillName::DivingCatch), true});
+        state.ball = BallState::onGround(from);
+    }
+    // Skokem chycená přesná přihrávka má +1 "Catching an accurate pass" (ř. 891), ale ne +1 z Diving
+    // Catch — ten je jen "from an accurate pass TARGETED TO HIS SQUARE" (ř. 8063-8064).
+    if (resolveCatch(state, catcherId, dice, accuratePass ? 1 : 0, events, accuratePass && !diving)) return;
+    resolveBounce(state, from, dice, 0, events);
+}
+
 namespace {
 
 enum class ExitEdge { LEFT, RIGHT, TOP, BOTTOM,
@@ -251,21 +299,10 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
             continue;
         }
 
-        Player* catcher = state.getPlayerAtPosition(dest);
-        if (catcher && catcher->state == PlayerState::STANDING &&
-            !catcher->hasSkill(SkillName::NoHands)) {
-            // l. 871-872: stojici hráč chytat MUSI (neni to volba).
-            // l. 878: "Throw-ins cannot be intercepted" -- chytani vhozeneho
-            // mice tedy neni intercept a plati pro obe strany stejne.
-            state.ball = BallState::onGround(dest);
-            if (resolveCatch(state, catcher->id, dice, 0, events)) return;
-            // nechytil => odrazi se z jeho pole
-            resolveBounce(state, dest, dice, 0, events);
-            return;
-        }
-
-        // l. 872-874: prazdne pole, nebo lezici/omraceny => odraz
-        resolveBounce(state, dest, dice, 0, events);
+        // l. 871-874: stojici hráč chytat MUSI; prazdne pole, nebo lezici/omraceny => odraz
+        // (P223: na prazdne pole smi skocit hrac s Diving Catch). l. 878: "Throw-ins cannot be
+        // intercepted" -- chytani vhozeneho mice neni intercept a plati pro obe strany stejne.
+        resolveLanding(state, dest, dice, events);
         return;
     }
 
