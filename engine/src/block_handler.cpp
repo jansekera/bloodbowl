@@ -519,6 +519,38 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
     return false;
 }
 
+// Kdo vybírá pole prvního odtlačení: Side Step obránce × Grab útočníka. Jedno místo pro blok
+// (resolvePushback) i blok Ball & Chain (pushAwayFrom). `grabMayApply` = Grab smí působit
+// (Block Action; u B&C „as if a Block Action was being used“, ř. 7829-7831), v blitzu ne.
+static void pushSkills(const GameState& state, const Player& attacker, const Player& defender,
+                       bool grabMayApply, bool& sideStep, bool& grab) {
+    sideStep = canSideStep(defender);
+    // "Grab only works on a Block Action" and "Grab and Side Step will cancel
+    // each other out and the standard pushback rules apply".
+    // OPRAVENO 20.10.2026 (review P192, nález 3) -- zrušení se počítalo z `grab`, které je
+    // v blitzu vypnuté, takže v blitzu si obránce se Side Step pole vybíral sám. Pravidla
+    // ř. 8151-8153: „When making a Block OR BLITZ Action, Grab and Side Step will cancel
+    // each other out“ -- Grab v blitzu sám nepůsobí (ř. 8148), Side Step ale ruší.
+    const bool hasGrab = attacker.hasSkill(SkillName::Grab);
+    grab = hasGrab && grabMayApply;
+    if (sideStep && hasGrab) { sideStep = false; grab = false; }
+    if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
+    // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen
+    // prázdná pole na hřišti, útočník s Grabem nikdy nevytlačil do davu. Grab je volba
+    // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
+    // vede-li běžné odtlačení do davu (žádné ze tří polí volné, některé mimo hřiště,
+    // ř. 650-651 -- táž podmínka jako v pushOne), útočník ho nepoužije.
+    if (grab) {
+        Position three[3];
+        const int onPitch = getPushbackSquares(attacker.position, defender.position, three);
+        bool anyEmpty = false;
+        for (int i = 0; i < onPitch; i++) {
+            if (!state.getPlayerAtPosition(three[i])) anyEmpty = true;
+        }
+        if (onPitch < 3 && !anyEmpty) grab = false;
+    }
+}
+
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
                             bool isBlitz, DiceRollerBase& dice,
@@ -546,43 +578,25 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         }
     }
 
-    bool sideStep = canSideStep(defender);
-    // "Grab only works on a Block Action" and "Grab and Side Step will cancel
-    // each other out and the standard pushback rules apply".
-    // OPRAVENO 20.10.2026 (review P192, nález 3) -- zrušení se počítalo z `grab`, které je
-    // v blitzu vypnuté, takže v blitzu si obránce se Side Step pole vybíral sám. Pravidla
-    // ř. 8151-8153: „When making a Block OR BLITZ Action, Grab and Side Step will cancel
-    // each other out“ -- Grab v blitzu sám nepůsobí (ř. 8148), Side Step ale ruší.
-    const bool hasGrab = attacker.hasSkill(SkillName::Grab);
-    bool grab = hasGrab && !isBlitz;
-    if (sideStep && hasGrab) { sideStep = false; grab = false; }
-    if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
-    // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen
-    // prázdná pole na hřišti, útočník s Grabem nikdy nevytlačil do davu. Grab je volba
-    // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
-    // vede-li běžné odtlačení do davu (žádné ze tří polí volné, některé mimo hřiště,
-    // ř. 650-651 -- táž podmínka jako v pushOne), útočník ho nepoužije.
-    if (grab) {
-        Position three[3];
-        const int onPitch = getPushbackSquares(attacker.position, defender.position, three);
-        bool anyEmpty = false;
-        for (int i = 0; i < onPitch; i++) {
-            if (!state.getPlayerAtPosition(three[i])) anyEmpty = true;
-        }
-        if (onPitch < 3 && !anyEmpty) grab = false;
-    }
-
+    bool sideStep, grab;
+    pushSkills(state, attacker, defender, /*grabMayApply=*/!isBlitz, sideStep, grab);
     return pushOne(state, attacker.position, defender, sideStep, grab,
                    /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
                    events, 0);
 }
 
-bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed,
+bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed, bool isBlock,
                   DiceRollerBase& dice, std::vector<GameEvent>* events) {
     if (holdsGround(pushed, pusher.teamSide)) return false;
+    // OPRAVENO 20.10.2026 (P222) -- tady stálo `grab=false` napevno, takže B&C s Grabem tlačil
+    // jen běžně. Pravidla ř. 7829-7831: „A Ball & Chain player may use the Grab skill (as if a
+    // Block Action was being used) with his blocks“ ⇒ u BLOKU tatáž volba jako v Block Action
+    // (i zrušení se Side Step); odtlačení ležícího blok není (ř. 7843-7845), tam Grab neplatí.
+    bool sideStep = false, grab = false;
+    if (isBlock) pushSkills(state, pusher, pushed, /*grabMayApply=*/true, sideStep, grab);
+    else sideStep = usesSideStep(pushed);
     Position dest;
-    const bool surf = pushOne(state, pusher.position, pushed,
-                              usesSideStep(pushed), /*grab=*/false,
+    const bool surf = pushOne(state, pusher.position, pushed, sideStep, grab,
                               /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
                               events, 0);
     if (!surf) return false;

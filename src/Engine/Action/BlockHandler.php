@@ -1114,7 +1114,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $defenderPos,
                 $events,
                 odlozitPoFollowUp: true,
-                isBlitz: $isBlitz,
+                grabNeplati: $isBlitz, // ř. 8148 "only while making a Block Action"
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
@@ -1270,7 +1270,7 @@ final class BlockHandler implements ActionHandlerInterface
         Position $defenderOriginalPos,
         array $events,
         bool $odlozitPoFollowUp = false,
-        bool $isBlitz = false,
+        bool $grabNeplati = false,
     ): array {
         $attackerPos = $attacker->getPosition();
         if ($attackerPos === null) {
@@ -1281,7 +1281,7 @@ final class BlockHandler implements ActionHandlerInterface
         $this->odlozenyStrip = null;
         $this->odlozenyDav = null;
         try {
-            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events, $isBlitz);
+            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events, $grabNeplati);
         } finally {
             $this->odlozitPoFollowUp = false;
         }
@@ -1341,7 +1341,7 @@ final class BlockHandler implements ActionHandlerInterface
         TeamSide $blockingSide,
         ?MatchPlayerDTO $utocnik,
         array $events,
-        bool $blitz = false,
+        bool $grabNeplati = false,
     ): array {
         $emptySquares = [];
         $occupiedSquares = [];
@@ -1370,7 +1370,7 @@ final class BlockHandler implements ActionHandlerInterface
         $maSideStep = $kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct();
         // OPRAVENO 20.10.2026 (P192, parita) -- Grab platil i v blitzu. Pravidla ř. 8148: "only
         //   while making a Block Action"; Side Step ale ruší i v blitzu (ř. 8151, `$maGrab` výš).
-        $grab = $maGrab && !$maSideStep && !$blitz;
+        $grab = $maGrab && !$maSideStep && !$grabNeplati;
         // OPRAVENO 08.10.2026 (audit parity, nález 11) -- Side Step tu vybíral jen ze tří
         //   polí odtlačení, a když volné nebylo, šel rovnou do řetězu (i tam, kde podle
         //   běžného pořadí patří hráč do davu). Pravidla ř. 8474-8478: "the coach may choose
