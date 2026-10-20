@@ -2348,3 +2348,30 @@ TEST(BlockHandler, P192GrabCancelsSideStepOnABlitzToo) {
     }
 }
 
+// (4) Grab je VOLBA (uživatel 10.10.: „většina skillů jsou nepovinné - může grab nevyužít pro
+// vysurfování“; ř. 8149 „he MAY choose“). Grab umí jen PRÁZDNÁ pole na hřišti, do davu tedy
+// jedině bez něj. Dřív se Grab použil vždy a obránce u lajny do davu nešel nikdy.
+TEST(BlockHandler, P192AttackerDeclinesGrabWhenTheStandardPushGoesIntoTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {11, 1}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);   // všechna tři pole odtlačení mimo hřiště
+    gs.ball = BallState::onGround({2, 7});
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});  // PUSHED; pak zranění v davu
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch()) << "útočník Grab nepoužije a vytlačí do davu";
+}
+
+// Pozitivní kontrola k (4): kde běžné odtlačení do davu nevede, Grab platí — obránce jde na
+// volné sousední pole MIMO tři pole diagramu místo řetězu (ř. 8149-8150).
+TEST(BlockHandler, P192GrabStillPicksAnyEmptyAdjacentSquareInsteadOfAChain) {
+    GameState gs = grabVsSideStepFixture(true);
+    gs.getPlayer(12).skills = SkillSet{};             // obránce bez Side Step
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_NE(gs.getPlayer(12).position.x, 12) << "Grab: volné pole vedle, ne řetěz";
+    EXPECT_TRUE(gs.getPlayer(12).isOnPitch());
+    EXPECT_EQ(gs.getPlayer(3).position, (Position{12, 7}));
+}
+

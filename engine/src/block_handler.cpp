@@ -548,6 +548,20 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     bool grab = hasGrab && !isBlitz;
     if (sideStep && hasGrab) { sideStep = false; grab = false; }
     if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
+    // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen
+    // prázdná pole na hřišti, útočník s Grabem nikdy nevytlačil do davu. Grab je volba
+    // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
+    // vede-li běžné odtlačení do davu (žádné ze tří polí volné, některé mimo hřiště,
+    // ř. 650-651 -- táž podmínka jako v pushOne), útočník ho nepoužije.
+    if (grab) {
+        Position three[3];
+        const int onPitch = getPushbackSquares(attacker.position, defender.position, three);
+        bool anyEmpty = false;
+        for (int i = 0; i < onPitch; i++) {
+            if (!state.getPlayerAtPosition(three[i])) anyEmpty = true;
+        }
+        if (onPitch < 3 && !anyEmpty) grab = false;
+    }
 
     return pushOne(state, attacker.position, defender, sideStep, grab,
                    /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
