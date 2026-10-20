@@ -106,7 +106,13 @@ final class InjuryResolver
         //   Pravidla ř. 8406-8408: "If the player suffers a Casualty result ... roll a D6 for
         //   Regeneration after the roll on the Casualty table" -- Dead je výsledek té tabulky (C++ totéž).
         $poCasualty = $player->getState() === PlayerState::INJURED || $player->getState() === PlayerState::DEAD;
-        if (!$poCasualty || !$player->hasSkill(SkillName::Regeneration)) {
+        // OPRAVENO 20.10.2026 (P221, review P192) -- u kouče-člověka se tu Regenerace hodila hned
+        //   po bloku (BlockHandler), PŘED odloženou volbou lékárníka, a po volbě znovu (ActionResolver);
+        //   úspěšnou ji volba lékárníka navíc přepsala. Pravidla ř. 8406-8411: "roll a D6 for
+        //   Regeneration after the roll on the Casualty table and after any Apothecary roll if
+        //   allowed ... Regeneration rolls may not be re-rolled." ⇒ hodí se jednou, až po volbě.
+        $poVolbe = isset($this->regeneracePoVolbe[$player->getId()]);
+        if (!$poCasualty || $poVolbe || !$player->hasSkill(SkillName::Regeneration)) {
             return ['player' => $player, 'events' => $events];
         }
         if ($hasStakes) {
@@ -221,9 +227,18 @@ final class InjuryResolver
      */
     private ?\Closure $odlozitLekarnika = null;
 
+    /**
+     * Hráči s odloženou volbou lékárníka u Casualty v probíhající akci: Regenerace se jim hodí až po
+     * volbě kouče (ActionResolver::resolveApothecary), ne v `resolveRegeneration()` během akce.
+     *
+     * @var array<int, true>
+     */
+    private array $regeneracePoVolbe = [];
+
     public function setOdlozitLekarnika(?\Closure $odlozit): void
     {
         $this->odlozitLekarnika = $odlozit;
+        $this->regeneracePoVolbe = [];
     }
 
     public function setLekarnik(?\Closure $lekarnik): void
@@ -371,6 +386,7 @@ final class InjuryResolver
             $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek, $hasStakes);
             if ($odlozeno) {
                 $regenerace = false;   // Regenerace až po volbě kouče (lékárník má přednost, ř. 8433-8440)
+                $this->regeneracePoVolbe[$player->getId()] = true;
             } elseif ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {
                 if ($vysledek !== CasualtyResult::BADLY_HURT) {
                     $druhy = $this->rollCasualty($dice)['result'];

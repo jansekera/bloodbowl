@@ -95,6 +95,60 @@ final class ApothecaryCoachChoiceTest extends TestCase
         $this->assertFalse($s->getTeamState(TeamSide::AWAY)->canUseApothecary(), 'AI lékárník je zapsaný jako použitý');
     }
 
+    /**
+     * P221 (review P192): Regenerace se hází JEDNOU a až PO lékárníkovi — ř. 8406-8408: "roll a D6
+     * for Regeneration after the roll on the Casualty table and after any Apothecary roll if
+     * allowed"; ř. 8410-8411: "Regeneration rolls may not be re-rolled". Dřív ji BlockHandler hodil
+     * hned po bloku (před volbou lékárníka) a ActionResolver po volbě znovu.
+     */
+    private function stateWithRegeneratingAttacker(): GameState
+    {
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [\App\Enum\SkillName::Regeneration], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->withBallOffPitch()
+            ->build();
+    }
+
+    /** @param list<\App\DTO\GameEvent> $events */
+    private function regenerationRolls(array $events): int
+    {
+        return count(array_filter($events, static fn($e) => $e->getType() === 'regeneration'));
+    }
+
+    public function testRegenerationWaitsForTheApothecaryDecisionAndIsRolledOnce(): void
+    {
+        // Attacker Down, brnění 6+6, zranění 6+6 ⇒ Casualty 6/1 = Dead; poslední 3 = (stará mechanika)
+        //   Regenerace hned po bloku, neúspěšná
+        $r = $this->resolver([1, 6, 6, 6, 6, 6, 1, 3])->resolve($this->stateWithRegeneratingAttacker(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $this->assertNotNull($r->getNewState()->getPendingApothecary(), 'fixtura: lékárník se nabízí');
+        $this->assertSame(0, $this->regenerationRolls($r->getEvents()), 'Regenerace až po lékárníkovi (ř. 8407-8408)');
+        $this->assertSame(PlayerState::DEAD, $r->getNewState()->requirePlayer(1)->getState());
+
+        // kouč lékárníka nepoužije ⇒ teď jediný hod na Regeneraci: 4 ⇒ rezervy
+        $u = $this->resolver([4])->resolve($r->getNewState(), ActionType::RESOLVE_APOTHECARY, ['playerId' => 0]);
+        $this->assertSame(1, $this->regenerationRolls($u->getEvents()));
+        $this->assertSame(PlayerState::OFF_PITCH, $u->getNewState()->requirePlayer(1)->getState());
+    }
+
+    public function testRegenerationAfterTheChosenApothecaryResult(): void
+    {
+        // Casualty Dead; Regenerace se během bloku nehází (stará mechanika: 4 = úspěch, pak ji volba
+        //   lékárníka přepsala a hodilo se znovu)
+        $r = $this->resolver([1, 6, 6, 6, 6, 6, 1, 4])->resolve($this->stateWithRegeneratingAttacker(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $this->assertSame(0, $this->regenerationRolls($r->getEvents()), 'během bloku se Regenerace nehází');
+        $s = $r->getNewState();
+        $this->assertSame(PlayerState::DEAD, $s->requirePlayer(1)->getState(), 'do volby lékárníka platí výsledek tabulky Casualty');
+        // lékárník: druhý hod 1/2 = Badly Hurt ⇒ volba Dead × Badly Hurt
+        $s2 = $this->resolver([1, 2])->resolve($s, ActionType::RESOLVE_APOTHECARY, ['playerId' => 1])->getNewState();
+        $this->assertNotNull($s2->getPendingApothecary(), 'volba ze dvou výsledků');
+        // kouč zvolí Dead ⇒ pak jediný hod na Regeneraci: 3 ⇒ mrtvý
+        $this->assertSame(['dead', 'badly_hurt'], $s2->getPendingApothecary()->getOptions());
+        $u = $this->resolver([3])->resolve($s2, ActionType::RESOLVE_APOTHECARY, ['result' => 'dead']);
+        $this->assertSame(1, $this->regenerationRolls($u->getEvents()), 'Regenerace jednou, po volbě');
+        $this->assertSame(PlayerState::DEAD, $u->getNewState()->requirePlayer(1)->getState());
+    }
+
     public function testWithoutInteractiveApothecaryNothingIsAsked(): void
     {
         $s = (new ActionResolver(new FixedDiceRoller([1, 6, 6, 4, 4])))
