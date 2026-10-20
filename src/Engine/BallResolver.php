@@ -235,6 +235,7 @@ final class BallResolver
         bool $accuratePass = false,
         ?TeamSide $rerollSide = null,
         int $depth = 0,
+        bool $divingCatch = true,
     ): array {
         $state = $state->withBall(BallState::onGround($landing));
         $events = [];
@@ -242,7 +243,8 @@ final class BallResolver
         $catcher = $state->getPlayerAtPosition($landing);
         $diving = false;
         if ($catcher === null) {
-            $catcher = $this->findDivingCatchPlayer($state, $landing);
+            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8066) — viz KickoffResolver
+            $catcher = $divingCatch ? $this->findDivingCatchPlayer($state, $landing) : null;
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
             $catcher = null;

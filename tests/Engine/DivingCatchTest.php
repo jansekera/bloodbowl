@@ -263,12 +263,13 @@ final class DivingCatchTest extends TestCase
         $this->assertAt(7, 8, $result['state']->requirePlayer(1), 'chytá ze svého pole');
     }
 
-    public function testKickOffCaughtByKickingDivingCatchPlayerOverLineIsTouchback(): void
+    public function testKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback(): void
     {
-        // Výkop na (10,7), rozptyl V o 2 ⇒ prázdné (12,7) = poslední sloupec přijímající poloviny.
-        // Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7). Míč "as if it had landed in his
-        // own square" (ř. 8068) = v kopající polovině ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318).
-        // Stará mechanika: odskok z (12,7) D8 7 = Z na (11,7), míč leží.
+        // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
+        // touchback — tyto skilly nejsou povinné“). Výkop na (10,7), rozptyl V o 2 ⇒ prázdné (12,7).
+        // Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7); skokem by míč „dopadl“ na jeho pole
+        // v kopající polovině = touchback pro soupeře (ř. 8068, 281-282) ⇒ skill je volba („can
+        // attempt“, ř. 8066), neskočí. Míč odskočí z (12,7) D8 7 = Z na (11,7) a leží. Dřív: touchback.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 7, agility: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 13, 7, agility: 3, skills: [SkillName::DivingCatch], id: 2)
@@ -278,8 +279,11 @@ final class DivingCatchTest extends TestCase
             ->resolveKickoff($state, new Position(10, 7));
 
         $types = array_map(static fn($e) => $e->getType(), $result['events']);
-        $this->assertContains('touchback', $types);
-        $this->assertSame(1, $result['state']->getBall()->getCarrierId(), 'míč dostane přijímající tým');
+        $this->assertNotContains('diving_catch', $types);
+        $this->assertNotContains('touchback', $types);
+        $ball = $result['state']->getBall();
+        $this->assertNull($ball->getCarrierId(), 'míč nikdo nedrží');
+        $this->assertSame([11, 7], [$ball->getPosition()->getX(), $ball->getPosition()->getY()], 'odraz z pole dopadu');
     }
 
     public function testCrowdThrowInLandingNextToDivingCatchPlayer(): void
