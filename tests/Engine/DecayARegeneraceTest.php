@@ -79,9 +79,24 @@ final class DecayARegeneraceTest extends TestCase
 
     public function testDecayHaziDvakratNaTabulceCasualtyAPlatiObaVysledky(): void
     {
-        // zranění 5+5 ⇒ Casualty · D68 6,1 = Dead · druhý D68 1,1 = Badly Hurt ⇒ mrtvý.
-        //   Stará mechanika: druhé zranění 6+1 = 7 (lepší, zůstává 10), D68 1,1 ⇒ jen zraněný.
-        $this->assertSame(PlayerState::DEAD, $this->stav([SkillName::Decay], [6, 6, 5, 5, 6, 1, 1, 1]));
+        // zranění 5+5 ⇒ Casualty · D68 1,1 = Badly Hurt · druhý D68 6,1 = Dead ⇒ mrtvý.
+        //   OPRAVENO 20.10.2026 (P221, review P192 M1) -- kostky byly obráceně (Dead napřed), takže
+        //   test prošel, i kdyby se druhý hod vůbec nehodil. Teď smrt přinese JEN druhý hod.
+        $dice = new FixedDiceRoller([6, 6, 5, 5, 1, 1, 6, 1]);
+        $stav = (new InjuryResolver())->resolve($this->hrac([SkillName::Decay]), $dice)['player']->getState();
+
+        $this->assertSame(PlayerState::DEAD, $stav);
+        $this->assertSame(8, $dice->getRollCount(), 'dva hody na tabulce Casualty');
+    }
+
+    public function testBezDecayPlatiJenPrvniHodNaTabulceCasualty(): void
+    {
+        // Pozitivní kontrola: tytéž kostky bez Decay ⇒ jen Badly Hurt (zraněný), druhý D68 se nehází.
+        $dice = new FixedDiceRoller([6, 6, 5, 5, 1, 1, 6, 1]);
+        $stav = (new InjuryResolver())->resolve($this->hrac([]), $dice)['player']->getState();
+
+        $this->assertSame(PlayerState::INJURED, $stav);
+        $this->assertSame(6, $dice->getRollCount());
     }
 
     public function testDecayARegeneraceLeciObaVysledky(): void
