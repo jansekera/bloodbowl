@@ -40,9 +40,7 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
     // Casualty and doubles the CASUALTY roll -- it never made the injury
     // itself worse. We used to roll the injury twice and keep the worse,
     // which made a Decay player markedly easier to remove from the match.
-    // Since this engine models a single match and has no Casualty table
-    // (10+ is simply INJURED), a correct Decay has no in-match effect at
-    // all; ctx.hasDecay is kept for the day a league/Casualty model exists.
+    // Druhý hod na tabulce Casualty viz níž (P192, 20.10.2026).
 
     // Stunty: +1 to injury
     if (player.hasSkill(SkillName::Stunty)) {
@@ -98,6 +96,15 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         // DEAD/game read 0.00 across 3200 games. CRP rolls D68 here; a sixth
         // of casualties are fatal.
         CasualtyResult cas = rollCasualty(dice);
+        // OPRAVENO 20.10.2026 (P192 parita) -- Decay se tu nehodil vůbec (komentář výš pocházel
+        // z doby bez tabulky Casualty a příznak ctx.hasDecay nikdo nečetl). Pravidla ř. 8036-8042:
+        // „roll twice on the Casualty table and apply both results“ -- v zápase platí horší
+        // (smrt, je-li mrtvý kterýkoli); Regenerace níž léčí oba. Lékárníka týmy s Decay
+        // nemají (ř. 1198-1199). Skill oběti se čte přímo, ne z kontextu (každá cesta k zranění).
+        if (player.hasSkill(SkillName::Decay)) {
+            const CasualtyResult second = rollCasualty(dice);
+            if (casualtySeverity(second) > casualtySeverity(cas)) cas = second;
+        }
 
         // Apothecary: "immediately after the player suffers the Casualty, you
         // can use the Apothecary to make your opponent roll again on the
@@ -289,7 +296,6 @@ void resolveCrowdSurf(GameState& state, int playerId, Position from, DiceRollerB
     // sentence is about the CROWD lacking skills like Mighty Blow.
     InjuryContext ctx;
     ctx.injuryModifier = 0;
-    if (player.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
 
     // No armor roll — go straight to injury
     resolveInjuryRoll(state, playerId, dice, ctx, events);

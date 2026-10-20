@@ -160,14 +160,16 @@ static int distanceToEdge(Position p) {
 // there are no open squares on the pitch adjacent to this player" / "Grab will
 // not work if there are no empty adjacent squares"), so a wide set that turns
 // up empty-handed falls back to the standard three and the push chains as usual.
+// `wide` se pak vrací jako false: skill neplatí ani pro výběr mezi třemi poli.
 static int pushCandidates(const GameState& state, Position pusherPos,
-                          Position pushedPos, bool wide, Position out[8]) {
+                          Position pushedPos, bool& wide, Position out[8]) {
     if (wide) {
         int n = 0;
         for (Position p : pushedPos.getAdjacent()) {
             if (p.isOnPitch() && !state.getPlayerAtPosition(p)) out[n++] = p;
         }
         if (n > 0) return n;
+        wide = false;
     }
     return getPushbackSquares(pusherPos, pushedPos, out);
 }
@@ -417,8 +419,15 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                     TeamSide blockingSide, DiceRollerBase& dice, Position& dest,
                     std::vector<GameEvent>* events, int depth) {
     Position cand[8];
-    int count = pushCandidates(state, pusherPos, pushed.position,
-                               sideStep || grab, cand);
+    bool wide = sideStep || grab;
+    int count = pushCandidates(state, pusherPos, pushed.position, wide, cand);
+    // OPRAVENO 20.10.2026 (review P192, nález 5) -- bez volného sousedního pole se
+    // kandidáti vrátili na tři pole diagramu, ale výběr mezi nimi (komu se řetězí) dál
+    // řídil skill: u Side Step obránce, u Grabu „k lajně“. Pravidla ř. 8153-8154 („Grab
+    // will not work if there are no empty adjacent squares“) a ř. 8477-8478 (Side Step
+    // „may not use this skill if there are no open squares on the pitch adjacent“) ⇒
+    // platí běžná pravidla včetně toho, kdo volí (ř. 637-638: kouč útočníka).
+    if (!wide) { sideStep = false; grab = false; }
 
     bool anyEmpty = false;
     for (int i = 0; i < count; i++) {
@@ -540,9 +549,28 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     bool sideStep = canSideStep(defender);
     // "Grab only works on a Block Action" and "Grab and Side Step will cancel
     // each other out and the standard pushback rules apply".
-    bool grab = attacker.hasSkill(SkillName::Grab) && !isBlitz;
-    if (sideStep && grab) { sideStep = false; grab = false; }
+    // OPRAVENO 20.10.2026 (review P192, nález 3) -- zrušení se počítalo z `grab`, které je
+    // v blitzu vypnuté, takže v blitzu si obránce se Side Step pole vybíral sám. Pravidla
+    // ř. 8151-8153: „When making a Block OR BLITZ Action, Grab and Side Step will cancel
+    // each other out“ -- Grab v blitzu sám nepůsobí (ř. 8148), Side Step ale ruší.
+    const bool hasGrab = attacker.hasSkill(SkillName::Grab);
+    bool grab = hasGrab && !isBlitz;
+    if (sideStep && hasGrab) { sideStep = false; grab = false; }
     if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
+    // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen
+    // prázdná pole na hřišti, útočník s Grabem nikdy nevytlačil do davu. Grab je volba
+    // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
+    // vede-li běžné odtlačení do davu (žádné ze tří polí volné, některé mimo hřiště,
+    // ř. 650-651 -- táž podmínka jako v pushOne), útočník ho nepoužije.
+    if (grab) {
+        Position three[3];
+        const int onPitch = getPushbackSquares(attacker.position, defender.position, three);
+        bool anyEmpty = false;
+        for (int i = 0; i < onPitch; i++) {
+            if (!state.getPlayerAtPosition(three[i])) anyEmpty = true;
+        }
+        if (onPitch < 3 && !anyEmpty) grab = false;
+    }
 
     return pushOne(state, attacker.position, defender, sideStep, grab,
                    /*resolveSurfHere=*/false, attacker.teamSide, dice, pushDest,
@@ -1353,7 +1381,6 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (att.hasSkill(SkillName::MightyBlow)) defCtx.mightyBlow = true;
             if (att.hasSkill(SkillName::Claw)) defCtx.hasClaw = true;
             if (att.hasSkill(SkillName::Stakes)) defCtx.hasStakes = true;
-            if (def.hasSkill(SkillName::Decay)) defCtx.hasDecay = true;
 
             resolveArmourAndInjury(state, def.id, dice, defCtx, events);
             handleBallOnPlayerDown(state, def.id, dice, events);

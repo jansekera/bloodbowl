@@ -139,7 +139,6 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
         InjuryContext ctx;
         ctx.armourModifier = 0; // already applied to armor roll
         if (dirtyOnInjury) ctx.injuryModifier += 1;   // P77: Dirty Player na zraneni
-        if (target.hasSkill(SkillName::Decay)) ctx.hasDecay = true;
         if (fouler.hasSkill(SkillName::Stakes)) ctx.hasStakes = true;
 
         // BB2016 l. 1878: "if the Armour AND/OR Injury roll is a doubles".

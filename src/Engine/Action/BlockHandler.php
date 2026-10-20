@@ -1114,6 +1114,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $defenderPos,
                 $events,
                 odlozitPoFollowUp: true,
+                isBlitz: $isBlitz,
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
@@ -1269,6 +1270,7 @@ final class BlockHandler implements ActionHandlerInterface
         Position $defenderOriginalPos,
         array $events,
         bool $odlozitPoFollowUp = false,
+        bool $isBlitz = false,
     ): array {
         $attackerPos = $attacker->getPosition();
         if ($attackerPos === null) {
@@ -1279,7 +1281,7 @@ final class BlockHandler implements ActionHandlerInterface
         $this->odlozenyStrip = null;
         $this->odlozenyDav = null;
         try {
-            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events);
+            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events, $isBlitz);
         } finally {
             $this->odlozitPoFollowUp = false;
         }
@@ -1339,6 +1341,7 @@ final class BlockHandler implements ActionHandlerInterface
         TeamSide $blockingSide,
         ?MatchPlayerDTO $utocnik,
         array $events,
+        bool $blitz = false,
     ): array {
         $emptySquares = [];
         $occupiedSquares = [];
@@ -1365,7 +1368,9 @@ final class BlockHandler implements ActionHandlerInterface
         //   apply" (r. 8151-8153) -- ma-li blokujici Grab, Side Step odtlaceneho neplati.
         $maGrab = $utocnik !== null && $utocnik->hasSkill(SkillName::Grab) && !$utocnik->hasSkill(SkillName::Frenzy);
         $maSideStep = $kdo->hasSkill(SkillName::SideStep) && $kdo->getState()->canAct();
-        $grab = $maGrab && !$maSideStep;
+        // OPRAVENO 20.10.2026 (P192, parita) -- Grab platil i v blitzu. Pravidla ř. 8148: "only
+        //   while making a Block Action"; Side Step ale ruší i v blitzu (ř. 8151, `$maGrab` výš).
+        $grab = $maGrab && !$maSideStep && !$blitz;
         // OPRAVENO 08.10.2026 (audit parity, nález 11) -- Side Step tu vybíral jen ze tří
         //   polí odtlačení, a když volné nebylo, šel rovnou do řetězu (i tam, kde podle
         //   běžného pořadí patří hráč do davu). Pravidla ř. 8474-8478: "the coach may choose
@@ -1383,15 +1388,31 @@ final class BlockHandler implements ActionHandlerInterface
                 }
             }
         }
-        if ($grab && !$offPitchAvailable) {
-            // Grab: utocnik voli nejhorsi volne pole (nejvic zon). Je-li jedno z poli mimo
-            //   hriste, rozhoduje bezne poradi niz (volne pole > dav > retez).
-            if ($emptySquares !== []) {
-                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($b) <=> $zonySoupere($a));
-                $pushTo = $emptySquares[0];
-            } else {
-                $retez = true;
+        // OPRAVENO 20.10.2026 (P192, parita s C++) -- Grab vybíral jen ze tří polí diagramu
+        //   a při obsazených řetězil. Pravidla ř. 8149-8150: "he may choose ANY EMPTY SQUARE
+        //   ADJACENT TO HIS OPPONENT"; ř. 8153-8154: bez volného sousedního pole neplatí (běžné
+        //   pořadí níž). Je to volba (ř. 8149 "may"; uživatel 10.10. "může grab nevyužít pro
+        //   vysurfování"): vede-li běžné odtlačení do davu, útočník ho nepoužije.
+        $grabSquares = [];
+        if ($grab && !($emptySquares === [] && $offPitchAvailable)) {
+            foreach ($kde->getAdjacentPositions() as $pos) {
+                if ($state->getPlayerAtPosition($pos) === null) {
+                    $grabSquares[] = $pos;
+                }
             }
+        }
+        // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
+        $nejhorsiPrvni = function (Position $a, Position $b) use ($zonySoupere): int {
+            $tzA = $zonySoupere($a);
+            $tzB = $zonySoupere($b);
+            if ($tzA !== $tzB) {
+                return $tzB <=> $tzA;
+            }
+            return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
+        };
+        if ($grabSquares !== []) {
+            usort($grabSquares, $nejhorsiPrvni);
+            $pushTo = $grabSquares[0];
         } elseif ($sideStepSquares !== []) {
             // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
             usort($sideStepSquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
@@ -1402,15 +1423,7 @@ final class BlockHandler implements ActionHandlerInterface
             //   polí mimo hřiště, šel hráč do davu, i když vedle bylo volné pole. Pravidla
             //   ř. 639: "must be pushed back into an empty square if possible"; ř. 650-651:
             //   do davu jen "if there are no eligible empty squares on the pitch".
-            // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
-            usort($emptySquares, function (Position $a, Position $b) use ($zonySoupere) {
-                $tzA = $zonySoupere($a);
-                $tzB = $zonySoupere($b);
-                if ($tzA !== $tzB) {
-                    return $tzB <=> $tzA;
-                }
-                return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
-            });
+            usort($emptySquares, $nejhorsiPrvni);
             $pushTo = $emptySquares[0];
         } elseif ($offPitchAvailable) {
             // Zadne volne pole na hristi a jedno z poli je mimo ⇒ dav (r. 650-651), ne retez

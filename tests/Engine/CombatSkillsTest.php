@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Engine;
 
+use App\DTO\ActionResult;
 use App\Engine\ActionResolver;
 use App\Engine\FixedDiceRoller;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
+use App\ValueObject\Position;
 use PHPUnit\Framework\TestCase;
 
 final class CombatSkillsTest extends TestCase
@@ -767,7 +769,8 @@ final class CombatSkillsTest extends TestCase
         $types = array_map(fn($e) => $e->getType(), $result->getEvents());
         $this->assertNotContains('crowd_surf', $types);
         $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
-        $this->assertSame([7, 0], [$pos->getX(), $pos->getY()]);
+        // P192 (20.10.): pravý Grab smí na kterékoli volné sousední pole (ř. 8149-8150), ne jen (7,0)
+        $this->assertSame(1, $pos->distanceTo(new Position(6, 0)));
         $this->assertSame(1, $dice->getRollCount(), 'jen kostka bloku -- žádné zranění od davu');
     }
 
@@ -807,8 +810,7 @@ final class CombatSkillsTest extends TestCase
      * ř. 8153: "Grab will not work if there are no empty adjacent squares" -- je-li volné
      * pole, řetěz se nekoná. Útočník (5,2) → obránce (6,1): pole (7,0), (7,1), (6,0);
      * (7,1) a (6,0) jsou obsazená, volné je jen (7,0) u lajny.
-     * ⚠️ Od běžného odtlačení (ř. 638-639) se výsledek neliší: Grab v PHP vybírá jen ze
-     * tří polí diagramu, ne z kteréhokoli sousedního volného (známá mezera, kniha P182).
+     * P192 (20.10.): pravý Grab vybírá z kteréhokoli volného sousedního pole, nejen (7,0).
      */
     public function testGrabSeVsemiTremiPoliNaHristiTlaciNaVolnePole(): void
     {
@@ -827,8 +829,18 @@ final class CombatSkillsTest extends TestCase
         $this->assertNotContains('chain_push', $types);
         $this->assertNotContains('crowd_surf', $types);
         $pos = $result->getNewState()->requirePlayer(2)->requirePosition();
-        $this->assertSame([7, 0], [$pos->getX(), $pos->getY()]);
+        $this->assertSame(1, $pos->distanceTo(new Position(6, 1)), 'sousední pole obránce');
+        $this->assertSame([7, 1], $this->poleHrace($result, 3), 'obsazená pole zůstala');
+        $this->assertSame([6, 0], $this->poleHrace($result, 4));
         $this->assertSame(1, $dice->getRollCount());
+    }
+
+    /** @return array{0: int, 1: int} */
+    private function poleHrace(ActionResult $r, int $id): array
+    {
+        $p = $r->getNewState()->requirePlayer($id)->requirePosition();
+
+        return [$p->getX(), $p->getY()];
     }
 
     // ========== Juggernaut vs Stand Firm ==========

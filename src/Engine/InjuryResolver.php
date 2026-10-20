@@ -102,7 +102,11 @@ final class InjuryResolver
      */
     public function resolveRegeneration(MatchPlayerDTO $player, DiceRollerInterface $dice, bool $hasStakes, array $events): array
     {
-        if ($player->getState() !== PlayerState::INJURED || !$player->hasSkill(SkillName::Regeneration)) {
+        // OPRAVENO 20.10.2026 (P192 parita) -- tady bylo jen INJURED, mrtvý se neregeneroval.
+        //   Pravidla ř. 8406-8408: "If the player suffers a Casualty result ... roll a D6 for
+        //   Regeneration after the roll on the Casualty table" -- Dead je výsledek té tabulky (C++ totéž).
+        $poCasualty = $player->getState() === PlayerState::INJURED || $player->getState() === PlayerState::DEAD;
+        if (!$poCasualty || !$player->hasSkill(SkillName::Regeneration)) {
             return ['player' => $player, 'events' => $events];
         }
         if ($hasStakes) {
@@ -290,19 +294,6 @@ final class InjuryResolver
         $die1 = $dice->rollD6();
         $die2 = $dice->rollD6();
         $roll = $die1 + $die2;
-        // Decay: roll injury twice, take worse (higher) result
-        if ($player->hasSkill(SkillName::Decay)) {
-            $decayDie1 = $dice->rollD6();
-            $decayDie2 = $dice->rollD6();
-            $roll2 = $decayDie1 + $decayDie2;
-            if ($roll2 > $roll) {
-                // Plati horsi hod, a tedy i JEHO kostky (dublet se cte z toho,
-                // ktery se pouzil).
-                $roll = $roll2;
-                $die1 = $decayDie1;
-                $die2 = $decayDie2;
-            }
-        }
         // Stunty: +1 to injury roll (more vulnerable)
         if ($player->hasSkill(SkillName::Stunty)) {
             $modifier++;
@@ -355,6 +346,19 @@ final class InjuryResolver
             //   zranění. Pravidla ř. 1200-1210: soupeř hodí znovu na tabulku Casualty, vybere se
             //   jeden výsledek (AI: mírnější); Badly Hurt -- i původní -- ⇒ rezervy.
             $vysledek = $cas['result'];
+            // OPRAVENO 20.10.2026 (P192 parita) -- Decay tu házel ZRANĚNÍ dvakrát a bral horší.
+            //   Pravidla ř. 8036-8042: "When this player suffers a Casualty result on the Injury
+            //   table, roll twice on the CASUALTY TABLE and apply both results ... A successful
+            //   Regeneration roll will heal both results." V zápase platí horší (smrt); lékárníka
+            //   týmy s Decay nemají (ř. 1198-1199). C++ totéž (`injury.cpp`).
+            if ($player->hasSkill(SkillName::Decay)) {
+                $druhyDecay = $this->rollCasualty($dice);
+                $events[] = GameEvent::casualty($player->getId(), $druhyDecay['tens'], $druhyDecay['units'], $druhyDecay['result']->value);
+                $poradi = array_flip(array_map(fn(CasualtyResult $c) => $c->value, CasualtyResult::cases()));
+                if ($poradi[$druhyDecay['result']->value] > $poradi[$vysledek->value]) {
+                    $vysledek = $druhyDecay['result'];   // horší z obou (pořadí výčtu = závažnost)
+                }
+            }
             $rezervy = false;
             $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek, $hasStakes);
             if ($odlozeno) {

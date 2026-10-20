@@ -82,7 +82,6 @@ TEST(Injury, DecayDoesNotAffectTheInjuryRoll) {
     // The trailing 5,4 must NOT be consumed as a second injury roll.
     FixedDiceRoller dice({5, 4, 3, 3, 5, 4});
     InjuryContext ctx;
-    ctx.hasDecay = true;
     std::vector<GameEvent> events;
     bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, &events);
     ASSERT_TRUE(broken);
@@ -446,4 +445,40 @@ TEST(Injury, P192BallBouncingBackToTheSquareOfARemovedCarrierRestsThere) {
     EXPECT_FALSE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.position, (Position{10, 7}));
     EXPECT_EQ(dice.remaining(), 1u) << "dva odrazy, třetí už ne";
+}
+
+// P192 parita (20.10.2026) — Decay, ř. 8036-8042: „When this player suffers a Casualty result on
+// the Injury table, roll twice on the Casualty table and apply both results … A successful
+// Regeneration roll will heal both results.“ V zápase rozhoduje smrt: je-li mrtvý kterýkoli
+// z obou výsledků, hráč je mrtvý. Dřív se druhý hod na tabulce nehodil (komentář výš z doby,
+// kdy engine tabulku Casualty neměl) ⇒ Decay neměl žádný účinek.
+TEST(Injury, P192DecayRollsTheCasualtyTableTwiceAndDeathStands) {
+    auto vysledek = [](bool decay) {
+        GameState gs;
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+        gs.getPlayer(1).state = PlayerState::PRONE;
+        if (decay) gs.getPlayer(1).skills.add(SkillName::Decay);
+        // brnění 5+5 > 8 · zranění 5+5 = 10 ⇒ Casualty · D68: 1,1 = Badly Hurt · 6,1 = Dead
+        FixedDiceRoller dice({5, 5, 5, 5, 1, 1, 6, 1});
+        InjuryContext ctx;
+        resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+        return gs.getPlayer(1).state;
+    };
+    EXPECT_EQ(vysledek(true), PlayerState::DEAD) << "druhý hod na tabulce Casualty = smrt";
+    EXPECT_EQ(vysledek(false), PlayerState::INJURED) << "pozitivní kontrola: bez Decay jen první hod";
+}
+
+// Regenerace léčí oba výsledky (ř. 8041-8042) a hází se i po smrti (ř. 8406-8411: „If the
+// player suffers a Casualty result“ — Dead je výsledek tabulky Casualty). Hlídka.
+TEST(Injury, P192RegenerationHealsDecaysBothResultsIncludingDeath) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::Decay);
+    gs.getPlayer(1).skills.add(SkillName::Regeneration);
+    FixedDiceRoller dice({5, 5, 5, 5, 6, 1, 6, 2, 4});   // … dvakrát Dead, Regenerace 4
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+    EXPECT_EQ(dice.remaining(), 0u);
 }

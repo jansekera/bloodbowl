@@ -252,6 +252,8 @@ final class ChainPushTest extends TestCase
 
     /**
      * Grab + chain push: all empty squares taken → Grab attacker chain pushes.
+     * P192 (20.10.): "all" = všech osm sousedních polí -- pravý Grab tlačí na kterékoli volné
+     * sousední pole (ř. 8149-8150), bez něj neplatí (ř. 8153-8154). Dřív stačila tři pole diagramu.
      */
     public function testGrabWithChainPush(): void
     {
@@ -261,6 +263,10 @@ final class ChainPushTest extends TestCase
             ->addPlayer(TeamSide::HOME, 12, 7, id: 3) // in push square
             ->addPlayer(TeamSide::HOME, 12, 6, id: 4) // in push square
             ->addPlayer(TeamSide::HOME, 12, 8, id: 5) // in push square
+            ->addPlayer(TeamSide::HOME, 10, 6, id: 6)
+            ->addPlayer(TeamSide::HOME, 10, 8, id: 7)
+            ->addPlayer(TeamSide::HOME, 11, 6, id: 8)
+            ->addPlayer(TeamSide::HOME, 11, 8, id: 9)
             ->withBallOffPitch()
             ->build();
 

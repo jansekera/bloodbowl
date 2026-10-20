@@ -2301,3 +2301,118 @@ TEST(BlockHandler, FoulAppearanceInBlitzWastesOnlyTheBlock) {
     EXPECT_TRUE(move) << "po propadlém bloku smí blitzující dál běžet";
     EXPECT_FALSE(block) << "blok blitzu je spotřebován — druhý ne";
 }
+
+// ---------------------------------------------------------------------------
+// P192 review (3)(4)(5) — Grab × Side Step. Grab, ř. 8148-8154: „only while making a Block
+// Action, if his block results in a push back he MAY choose any empty square adjacent to his
+// opponent … When making a Block OR BLITZ Action, Grab and Side Step will cancel each other out
+// and the standard pushback rules apply. Grab will not work if there are no empty adjacent
+// squares.“ Side Step, ř. 8477-8478: „may not use this skill if there are no open squares on
+// the pitch adjacent to this player.“
+// ---------------------------------------------------------------------------
+namespace {
+// Útočník HOME (10,7) → obránce AWAY (11,7); tři pole odtlačení (12,6..8) drží HOME přihlížející,
+// vedle obránce (11,6) a (11,8) je volno ⇒ Side Step uhne na hřiště, běžné odtlačení řetězí.
+GameState grabVsSideStepFixture(bool attackerHasGrab) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    if (attackerHasGrab) gs.getPlayer(1).skills.add(SkillName::Grab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    placePlayer(gs, 2, {12, 6}, TeamSide::HOME);
+    placePlayer(gs, 3, {12, 7}, TeamSide::HOME);
+    placePlayer(gs, 4, {12, 8}, TeamSide::HOME);
+    gs.ball = BallState::onGround({2, 2});
+    return gs;
+}
+}  // namespace
+
+// (3) Grab v BLITZU sám nepůsobí („only while making a Block Action“), ale Side Step ruší dál
+// („When making a Block or Blitz Action … cancel each other out“). Dřív `grab = … && !isBlitz`
+// počítalo zrušení až z oslabeného `grab`, takže v blitzu si obránce pole vybral sám.
+TEST(BlockHandler, P192GrabCancelsSideStepOnABlitzToo) {
+    {
+        GameState gs = grabVsSideStepFixture(true);
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});   // až 3 kostky (asistence), vše PUSHED
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr, false, /*noFollowUp=*/true);
+        EXPECT_EQ(gs.getPlayer(12).position.x, 12)
+            << "Grab × Side Step se ruší i v blitzu ⇒ běžné odtlačení (tři pole za ním, řetěz)";
+    }
+    {   // pozitivní kontrola: bez Grabu v témž blitzu Side Step platí a obránce uhne vedle
+        GameState gs = grabVsSideStepFixture(false);
+        FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+        resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr, false, true);
+        EXPECT_NE(gs.getPlayer(12).position.x, 12);
+        EXPECT_EQ(gs.getPlayer(3).position, (Position{12, 7})) << "nikdo neřetězen";
+    }
+}
+
+// (4) Grab je VOLBA (uživatel 10.10.: „většina skillů jsou nepovinné - může grab nevyužít pro
+// vysurfování“; ř. 8149 „he MAY choose“). Grab umí jen PRÁZDNÁ pole na hřišti, do davu tedy
+// jedině bez něj. Dřív se Grab použil vždy a obránce u lajny do davu nešel nikdy.
+TEST(BlockHandler, P192AttackerDeclinesGrabWhenTheStandardPushGoesIntoTheCrowd) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {11, 1}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);   // všechna tři pole odtlačení mimo hřiště
+    gs.ball = BallState::onGround({2, 7});
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});  // PUSHED; pak zranění v davu
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch()) << "útočník Grab nepoužije a vytlačí do davu";
+}
+
+// Pozitivní kontrola k (4): kde běžné odtlačení do davu nevede, Grab platí — obránce jde na
+// volné sousední pole MIMO tři pole diagramu místo řetězu (ř. 8149-8150).
+TEST(BlockHandler, P192GrabStillPicksAnyEmptyAdjacentSquareInsteadOfAChain) {
+    GameState gs = grabVsSideStepFixture(true);
+    gs.getPlayer(12).skills = SkillSet{};             // obránce bez Side Step
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_NE(gs.getPlayer(12).position.x, 12) << "Grab: volné pole vedle, ne řetěz";
+    EXPECT_TRUE(gs.getPlayer(12).isOnPitch());
+    EXPECT_EQ(gs.getPlayer(3).position, (Position{12, 7}));
+}
+
+// (5) Bez volného sousedního pole Side Step ani Grab neplatí (ř. 8153-8154, 8477-8478) —
+// a pak NESMÍ ani vybírat, kam se řetězí: platí běžná pravidla, pole volí útočník běžnou
+// volbou (pushDestScore: co nejdál od našeho nosiče). Dřív se kandidáti vrátili na tři pole,
+// ale výběr mezi nimi dál řídil skill (Side Step: obránce; Grab: „k lajně“).
+namespace {
+GameState surroundedDefenderFixture() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    const Position around[7] = {{10, 6}, {10, 8}, {11, 6}, {11, 8}, {12, 6}, {12, 7}, {12, 8}};
+    for (int k = 0; k < 7; ++k) placePlayer(gs, 2 + k, around[k], TeamSide::HOME);
+    placePlayer(gs, 9, {13, 9}, TeamSide::HOME);     // náš nosič: běžná volba tlačí od něj ⇒ (12,6)
+    gs.ball = BallState::carried({13, 9}, 9);
+    return gs;
+}
+}  // namespace
+
+TEST(BlockHandler, P192SideStepWithNoOpenSquareDoesNotPickTheChainSquare) {
+    GameState gs = surroundedDefenderFixture();
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
+
+TEST(BlockHandler, P192GrabWithNoEmptySquareDoesNotPickTheChainSquare) {
+    GameState gs = surroundedDefenderFixture();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
+
+// Pozitivní kontrola k (5): táž rána bez skillů vede na (12,6) — fixture měří, co má.
+TEST(BlockHandler, P192SurroundedDefenderWithoutSkillsIsChainedAwayFromOurCarrier) {
+    GameState gs = surroundedDefenderFixture();
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
