@@ -551,7 +551,12 @@ static void pushSkills(const GameState& state, const Player& attacker, const Pla
     // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
     // vede-li běžné odtlačení do davu (žádné ze tří polí volné, některé mimo hřiště,
     // ř. 650-651 -- táž podmínka jako v pushOne), útočník ho nepoužije.
-    if (grab) {
+    // P222 (2): v živé partii volí kouč útočníka (uživatel 20.10.: „grab ano ptát se — pro
+    // možnost vytlačení“); ptá se jen, když Grab platit může (ř. 8153-8154: volné pole vedle).
+    if (grab && !hasOpenAdjacent(state, defender.position)) grab = false;
+    if (grab && coachDecides(attacker.teamSide)) {
+        grab = askCoach(CoachQuestion::USE_GRAB, attacker.id, defender.id, 0, 0, 3) == 1;
+    } else if (grab) {
         Position three[3];
         const int onPitch = getPushbackSquares(attacker.position, defender.position, three);
         bool anyEmpty = false;

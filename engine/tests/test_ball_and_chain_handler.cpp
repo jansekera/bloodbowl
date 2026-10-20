@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "bb/ball_and_chain_handler.h"
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
 #include "bb/game_simulator.h"
 #include "bb/roster.h"
 #include <vector>
@@ -230,4 +231,18 @@ TEST(BallAndChainHandler, P222PushingAProneOccupantIsNotABlockSoNoGrab) {
     FixedDiceRoller dice(std::vector<int>(30, 3));
     resolveBallAndChain(gs, 1, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).position.x, 12) << "bez bloku Grab neplatí ⇒ řetěz";
+}
+// P222 (2): v živé partii se kouče B&C ptá, jestli Grab použije.
+TEST(BallAndChainHandler, P222LiveGameAsksTheCoachAboutGrab) {
+    auto gs = fanaticBlocksFixture(true);
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveBallAndChain(gs, 1, dice, nullptr);
+        FAIL() << "otázka USE_GRAB nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_GRAB);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+    }
 }

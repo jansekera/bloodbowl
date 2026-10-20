@@ -285,3 +285,11 @@ def test_kick_off_return_na_volbu_kouce():
         assert (p.position.x, p.position.y) == cil
         return
     raise AssertionError("pozitivní kontrola: v 60 výkopech se Kick-Off Return nenabídl")
+
+
+def test_grab_otazka_a_odpoved():
+    # P222 (2): útočník s Grabem — ano / ne, nápověda k volbě pole příkazem `push`
+    g = {"question": "USE_GRAB", "player": 1, "other": 16, "roll": 0, "target": 0, "options": 0b11}
+    assert ps.preloz_odpoved(g, "ano") == 1 and ps.preloz_odpoved(g, "ne") == 0
+    assert "Grab" in ps.otazka_str(g) and "push x y" in ps.otazka_str(g)
+

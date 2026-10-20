@@ -524,7 +524,8 @@ PYBIND11_MODULE(bb_engine, m) {
             static const char* names[] = {"REROLL", "PRO_GATE_REROLL", "BLOCK_REROLL", "PASS_REROLL",
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
-                                          "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER"};
+                                          "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER",
+                                          "USE_GRAB"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;

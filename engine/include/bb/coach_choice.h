@@ -41,7 +41,11 @@ enum class CoachQuestion : int {
     KICKOFF_RETURN = 13,
     // Uživatel 14.10.: víc oprávněných nositelů KOR ⇒ napřed KDO. playerId = -1, roll = počet,
     // target = dopad x*100+y; odpověď 0 = nikdo, i = i-tý z kickoffReturnCandidates.
-    KICKOFF_RETURN_PLAYER = 14
+    KICKOFF_RETURN_PLAYER = 14,
+    // P222 (20.10.2026): útočník s Grabem při odtlačení (ř. 8149 "may choose"); playerId =
+    // útočník, otherId = odtlačený. Ptá se jen, když Grab platit může (Block Action / blok B&C,
+    // volné pole vedle soupeře, bez Side Step obránce). Pole pak volí příkaz `push`.
+    USE_GRAB = 15
 };
 
 namespace CoachAnswer {
