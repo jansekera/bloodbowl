@@ -119,9 +119,8 @@ final class GameEvent
      * Vysledek hodu na tabulce nasledku (D68) -- `rules_bb2016.txt` r. 2405-2423.
      * `tens`/`units` jsou v datech kvuli dohledatelnosti: bez nich nejde zpetne
      * overit, ze rozlozeni sedi na tabulku.
-     */
-    /**
-     * Hod na tabulce Casualty. U Decay (ř. 8036-8042) nese TATÁŽ událost i druhý hod (`decay`)
+     *
+     * U Decay (ř. 8036-8042) nese TATÁŽ událost i druhý hod (`decay`)
      * a platný výsledek (`applied`, horší z obou) -- jedno zranění = jedna událost.
      *
      * @param array{tens: int, units: int, result: string}|null $decay

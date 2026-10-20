@@ -1207,7 +1207,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $currentState = $currentState->withPlayer($freshAttackerForPO);
             }
 
-            // Regeneration (r. 8434-8436); lékárník řeší ActionResolver po akci (P206)
+            // Regeneration (r. 8406-8411); lékárník řeší ActionResolver po akci (P206)
             $regen = $this->injuryResolver->resolveRegeneration($defender, $this->dice, $hasStakes, $events);
             $defender = $regen['player'];
             $currentState = $currentState->withPlayer($defender);
@@ -1237,7 +1237,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $currentState = $currentState->withPlayer($freshAttacker);
                 $events = array_merge($events, $injResult['events']);
 
-                // Regeneration (r. 8434-8436); lékárník řeší ActionResolver po akci (P206)
+                // Regeneration (r. 8406-8411); lékárník řeší ActionResolver po akci (P206)
                 $regen = $this->injuryResolver->resolveRegeneration($freshAttacker, $this->dice, false, $events);
                 $freshAttacker = $regen['player'];
                 $currentState = $currentState->withPlayer($freshAttacker);

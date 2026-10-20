@@ -93,7 +93,7 @@ final class InjuryResolver
     }
 
     /**
-     * Regeneration (`rules_bb2016.txt` r. 8433-8440): po zraneni -- a az PO
+     * Regeneration (`rules_bb2016.txt` r. 8406-8411): po zraneni -- a az PO
      * pripadnem lekarnikovi -- D6, na 4+ do rezerv. Hazi se JEDNOU, neprehazuje se.
      * Stakes Regeneration zakazou.
      *
@@ -351,7 +351,7 @@ final class InjuryResolver
             $cas = $this->rollCasualty($dice);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'casualty');
             // P206 (14.10.2026, převod C++ `injury.cpp`) -- lékárník HNED po Casualty a PŘED
-            //   Regenerací (ř. 8433-8440). OPRAVENO: dřív jen v bloku a přehazoval CELÝ hod na
+            //   Regenerací (ř. 8406-8411). OPRAVENO: dřív jen v bloku a přehazoval CELÝ hod na
             //   zranění. Pravidla ř. 1200-1210: soupeř hodí znovu na tabulku Casualty, vybere se
             //   jeden výsledek (AI: mírnější); Badly Hurt -- i původní -- ⇒ rezervy.
             $vysledek = $cas['result'];
@@ -385,7 +385,7 @@ final class InjuryResolver
             $rezervy = false;
             $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek, $hasStakes);
             if ($odlozeno) {
-                $regenerace = false;   // Regenerace až po volbě kouče (lékárník má přednost, ř. 8433-8440)
+                $regenerace = false;   // Regenerace až po volbě kouče (lékárník má přednost, ř. 8406-8411)
                 $this->regeneracePoVolbe[$player->getId()] = true;
             } elseif ($this->lekarnik !== null && ($this->lekarnik)($player, $vysledek)) {
                 if ($vysledek !== CasualtyResult::BADLY_HURT) {

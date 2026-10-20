@@ -496,7 +496,7 @@ final class ActionResolver
                     $st = $st->withPlayer($hrac->withPosition(null));
                 }
             }
-            // Regenerace hráčů, o kterých se rozhodovalo, až teď (lékárník má přednost, ř. 8433-8440)
+            // Regenerace hráčů, o kterých se rozhodovalo, až teď (lékárník má přednost, ř. 8406-8411)
             foreach ($pending->getOffers() as $o) {
                 $hrac = $st->getPlayer($o['playerId']);
                 if ($o['regeneration'] && $hrac !== null
