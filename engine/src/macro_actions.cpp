@@ -3771,44 +3771,6 @@ static MacroExpansionResult expandAdvance(GameState& state, const Macro& macro,
     return result;
 }
 
-// ⭐ P219 (uživatel 19.10.2026: „blitzovat by se mělo podle pravděpodobnosti, že bude cíl sražen a blitzující
-//   nezůstane v kontaktu — platí pro agilní tým, který pak může odskočit — neplatí pro trollslayera s malým MA
-//   a AG a s frenzy“; hranice „1 i 2 ano“: hodnota ≥ 0,5, odskok ≥ 2/3). Samotný odskok z kontaktu na konci
-//   tahu dělá P211 (`agileEscapeSquare`, `endOfTurnEscape`); tady jen šance na něj. Šance, že hráč stojící na `from`
-//   se zbylým pohybem `moveLeft` (+ GFI) skončí tah mimo tackle zóny soupeře: blitz po ráně smí dál běžet
-//   (ř. 551-552). Frenzy ⇒ 0 (musí za odtlačeným a blokovat znovu). Jen náš tah — nejvýš dva úhyby.
-constexpr double kAgileEscapeMin = 2.0 / 3.0 + 1e-6;   // P219: hranice „umí odskočit“ (ostře nad 2/3)
-
-double agileEscapeChance(const GameState& state, const Player& p, Position from, int moveLeft) {
-    if (p.hasSkill(SkillName::Frenzy)) return 0.0;
-    GameState proj = state.clone();
-    Player& q = proj.getPlayer(p.id);
-    q.position = from;
-    if (countTacklezones(proj, from, p.teamSide) == 0) return 1.0;
-    const int budget = moveLeft + maxGfiSquares(p);
-    if (budget < 1) return 0.0;
-    auto stepOk = [&](int stepIdx) { return stepIdx < moveLeft ? 1.0 : 5.0 / 6.0; };   // krok přes GFI
-    auto dodge = [&](Position to, Position fromSq, bool reroll) {
-        const int t = std::clamp(calculateDodgeTarget(proj, q, to, fromSq), 2, 6);
-        const double pd = (7 - t) / 6.0;
-        return reroll ? 1.0 - (1.0 - pd) * (1.0 - pd) : pd;
-    };
-    const bool hasDodge = p.hasSkill(SkillName::Dodge);
-    double best = 0.0;
-    for (const Position& d : from.getAdjacent()) {
-        if (!d.isOnPitch() || proj.getPlayerAtPosition(d)) continue;
-        const double p1 = dodge(d, from, hasDodge) * stepOk(0);
-        if (countTacklezones(proj, d, p.teamSide) == 0) { best = std::max(best, p1); continue; }
-        if (budget < 2) continue;
-        for (const Position& e : d.getAdjacent()) {
-            if (!e.isOnPitch() || e == from || proj.getPlayerAtPosition(e)) continue;
-            if (countTacklezones(proj, e, p.teamSide) > 0) continue;
-            best = std::max(best, p1 * dodge(e, d, false) * stepOk(1));
-        }
-    }
-    return best;
-}
-
 // Kdo provede makro BLITZ: nejbezpečnější blitzující na cíl (kostky + doběh), který projde stropem
 // na úhyb. P196 (15.10.2026): jediné místo pro rozbalení i pro nabídku — nabídka dávala cíl, na který
 // nikdo nesměl (nedosáhne, nosič, roh klece, strop úhybu), a rozbalení vrátilo prázdný plán.
@@ -3868,22 +3830,6 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
             if (state.ball.isHeld && state.ball.carrierId == a.playerId) continue;
             if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
             if (blitzDodgeCapped(state, cand, target)) { if (count) ++g_dodgeCapStops[1]; continue; }
-            // P219: agilní blitzující (odskočí ≥ 2/3) jen při šanci srazit × odskočit ≥ 0,5; blitz na nosiče
-            //   míče a hráči, kteří odskočit neumějí (Frenzy, malé MA a AG), beze změny.
-            if (extraFeatureOn(kP219AgileBlitz) && !(state.ball.isHeld && state.ball.carrierId == target.id)) {
-                Position land{-1, -1};
-                for (const Position& d : target.position.getAdjacent()) {
-                    if (!d.isOnPitch() || (state.getPlayerAtPosition(d) && d != cand.position)) continue;
-                    if (!land.isOnPitch() || d.distanceTo(cand.position) < land.distanceTo(cand.position)) land = d;
-                }
-                if (land.isOnPitch()) {
-                    const int moveLeft = static_cast<int>(cand.movementRemaining) - land.distanceTo(cand.position) - 1;
-                    const double esc = agileEscapeChance(state, cand, land, moveLeft);
-                    // odskok VÍC než 2/3 (uživatel 19.10.: „AG 3 bez Dodge je samo na hraně a elfové s AG 4 mají
-                    //   odskakovat skoro všude“) — AG3 bez Dodge do prázdna (3+ = přesně 2/3) se nepočítá
-                    if (esc > kAgileEscapeMin && ranking.first.success * esc < 0.5) continue;
-                }
-            }
             out = a;
             found = true;
             break;

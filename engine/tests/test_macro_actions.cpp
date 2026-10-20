@@ -387,7 +387,6 @@ TEST(MacroActions, BlockNotAvailableWith1Die) {
 
 TEST(MacroActions, BlitzAvailable) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
-    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState state = makeMinimalState();
     state.homeTeam.blitzUsedThisTurn = false;
     // P196 (15.10.2026): dřív na cíl nikdo nedosáhl (blitz, který se rozbalí do prázdna) — test
@@ -1239,7 +1238,6 @@ TEST(MacroExpansion, BlitzAndScoreStopsFollowUpWhenBlockerSurfedOffPitch) {
 // blitzer 2 instead (~96% combined fail vs ~33%).
 TEST(MacroExpansion, BlitzPrefersSaferBlitzerOverRiskyApproach) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
-    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;
@@ -1635,7 +1633,6 @@ TEST(MacroActions, BlitzDefenseMultipleTargets) {
 
 TEST(MacroActions, BlitzOffenseSingleTarget) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
-    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState state = makeMinimalState();
     // Offense: we have the ball
     state.ball = BallState::carried({10, 7}, 1);
@@ -4832,7 +4829,6 @@ int p211cBlitzer(GameState s) {
 // a srazí v 1/2, i po úhybu 3+ (× 2/3) víc.
 TEST(MacroActions, P211cBlitzerWhoKnocksDownGoesBeforeASaferRunner) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
-    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {9, 2, 4, 7});
     s.getPlayer(2).skills.add(SkillName::Block);
     s.getPlayer(3).skills.add(SkillName::Block);
@@ -4850,7 +4846,6 @@ TEST(MacroActions, P211cStripBallGoesForTheBallCarrier) {
 // Bez Strip Ballu a se stejnou šancí srazit rozhoduje dál menší riziko: volný hráč 3.
 TEST(MacroActions, P211cEqualKnockdownFallsBackToLowerRisk) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
-    struct NoP219 { NoP219() { setExtraFeaturesOff(kP219AgileBlitz); } ~NoP219() { setExtraFeaturesOff(0); } } noP219;
     GameState s = p211cBoard({6, 3, 3, 8}, {7, 3, 3, 8}, {7, 3, 3, 8});
     EXPECT_EQ(p211cBlitzer(s), 3) << "kdo nemusí uhýbat";
 }
@@ -4938,69 +4933,6 @@ TEST(MacroActions, P211eFarRepositionStopsBeforeContact) {
     const Player& p = s.getPlayer(1);
     EXPECT_GT(p.position.x, 3) << "šel dopředu";
     EXPECT_EQ(countTacklezones(s, p.position, TeamSide::HOME), 0) << "skončil na posledním volném poli";
-}
-
-// ⭐ P219 (uživatel 19.10.2026: „blitzovat by se mělo podle pravděpodobnosti, že bude cíl sražen a blitzující
-// nezůstane v kontaktu — platí pro agilní tým, který pak může odskočit — neplatí pro trollslayera s malým MA
-// a AG a s frenzy“; hranice hodnota ≥ 0,5 a odskok ≥ 2/3 odsouhlaseny). Odskok podle schopností, ne týmu.
-namespace {
-GameState p219Board(int8_t ag, int8_t ma, std::vector<SkillName> skills) {
-    GameState s = makeMinimalState();
-    Player& b = s.getPlayer(1);
-    b.position = {10, 7};
-    b.stats = {ma, 3, ag, 8};
-    b.movementRemaining = ma;
-    for (auto sk : skills) b.skills.add(sk);
-    s.getPlayer(12).position = {11, 7};   // soupeř vedle
-    return s;
-}
-}  // namespace
-
-TEST(P219AgileBlitz, EscapeDependsOnAgilityDodgeMovementAndFrenzy) {
-    const GameState elf = p219Board(4, 7, {SkillName::Dodge});
-    EXPECT_GE(agileEscapeChance(elf, elf.getPlayer(1), {10, 7}, 4), 2.0 / 3.0) << "AG4 s Dodge odskočí";
-    const GameState slayer = p219Board(2, 5, {SkillName::Frenzy, SkillName::Dauntless});
-    EXPECT_DOUBLE_EQ(agileEscapeChance(slayer, slayer.getPlayer(1), {10, 7}, 2), 0.0) << "Frenzy: zůstane v kontaktu";
-    const GameState slow = p219Board(2, 4, {});
-    EXPECT_LT(agileEscapeChance(slow, slow.getPlayer(1), {10, 7}, 1), 2.0 / 3.0) << "AG2 bez Dodge: úhyb na 4+";
-    // AG3 bez Dodge do prázdného pole: 3+ = přesně 2/3 — hraniční, za agilního se nepočítá (uživatel 19.10.)
-    const GameState human = p219Board(3, 6, {});
-    EXPECT_NEAR(agileEscapeChance(human, human.getPlayer(1), {10, 7}, 3), 2.0 / 3.0, 1e-9);
-    auto offered = [](int8_t ag) {
-        GameState s = p219Board(ag, 7, {});
-        s.getPlayer(1).position = {6, 7};
-        Player& t = s.getPlayer(12);
-        t.position = {9, 7};
-        t.stats = {6, 3, 3, 9};   // stejná síla ⇒ jedna kostka
-        s.ball = BallState::onGround({20, 7});
-        std::vector<Macro> ms;
-        getAvailableMacros(s, ms);
-        return std::any_of(ms.begin(), ms.end(), [](const Macro& m) { return m.type == MacroType::BLITZ; });
-    };
-    EXPECT_TRUE(offered(3)) << "AG3: pravidlo se ho netýká, blitz na jednu kostku zůstává";
-    EXPECT_FALSE(offered(4)) << "AG4 bez Dodge: odskočí (0,83), jedna kostka (~0,5 × 0,83 < 0,5) ⇒ neblitzuje";
-    EXPECT_DOUBLE_EQ(agileEscapeChance(elf, elf.getPlayer(1), {5, 7}, 4), 1.0) << "mimo zóny ⇒ jistě";
-}
-
-// Agilní blitzující proti silnějšímu cíli (jedna kostka, vybírá soupeř): srazí málokdy ⇒ blitz se nenabízí.
-// Pozitivní kontrola: s vypnutým P219 se nabízí. Na nosiče míče se nabízí vždy.
-TEST(P219AgileBlitz, AnAgileBlitzerDoesNotBlitzWhenTheKnockdownIsUnlikely) {
-    auto offered = [](bool carrier, unsigned off) {
-        setExtraFeaturesOff(off);
-        GameState s = p219Board(4, 7, {SkillName::Dodge});
-        s.getPlayer(1).position = {6, 7};
-        Player& t = s.getPlayer(12);
-        t.position = {9, 7};
-        t.stats = {6, 5, 3, 9};   // síla 5 proti 3 ⇒ dvě kostky pro soupeře
-        s.ball = carrier ? BallState::carried({9, 7}, 12) : BallState::onGround({20, 7});
-        std::vector<Macro> ms;
-        getAvailableMacros(s, ms);
-        setExtraFeaturesOff(0);
-        return std::any_of(ms.begin(), ms.end(), [](const Macro& m) { return m.type == MacroType::BLITZ; });
-    };
-    EXPECT_FALSE(offered(false, 0)) << "srazí málokdy ⇒ agilní hráč neblitzuje";
-    EXPECT_TRUE(offered(false, kP219AgileBlitz)) << "pozitivní kontrola: bez P219 se nabízí";
-    EXPECT_TRUE(offered(true, 0)) << "na nosiče míče vždy";
 }
 
 // P219b (uživatel 19.10.: „AG 3 bez dodge je samo na hraně“, „AG3 bez dodge jo proti MB“, „porovnej rizika“).
