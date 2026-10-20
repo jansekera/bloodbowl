@@ -52,9 +52,11 @@ final class Tv1500RostersTest extends TestCase
     {
         $players = getTv1500RaceRoster(TeamSide::HOME, 'Wood Elf');
         $this->assertSame(1, $this->withSkill($players, SkillName::Accurate));
-        $this->assertSame(2, $this->withSkill($players, SkillName::DivingCatch));
+        // uživatel 16.10.: jeden Catcher Nerves of Steel místo Diving Catch (parita s C++ 20.10.)
+        $this->assertSame(1, $this->withSkill($players, SkillName::DivingCatch));
+        $this->assertSame(1, $this->withSkill($players, SkillName::NervesOfSteel));
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
-        $this->assertSame(2, $this->withSkill($players, SkillName::Wrestle));
+        $this->assertSame(1, $this->withSkill($players, SkillName::Wrestle), 'uživatel 16.10.: jeden Lineman bez Wrestle');
         $this->assertSame(1, $this->withSkill($players, SkillName::SideStep), 'Side Step jen Wardancer, rohoví Linemani ne');
         $this->assertSame(8, $this->withSkill($players, SkillName::Block));
     }
@@ -67,7 +69,9 @@ final class Tv1500RostersTest extends TestCase
         $ma = array_count_values(array_map(static fn(MatchPlayerDTO $p): int => $p->getStats()->getMovement(), $players));
         $this->assertSame(1, $ma[10] ?? 0);
         $this->assertSame(3, $ma[9] ?? 0);
-        $this->assertSame(4, $this->withSkill($players, SkillName::Wrestle), '3 Linemani + lovec');
+        $this->assertSame(3, $this->withSkill($players, SkillName::Wrestle), '2 Linemani + lovec (18.10.: lovec Strip Ball za Wrestle Linemana)');
+        $this->assertSame(2, $this->withSkill($players, SkillName::StripBall), 'lovec + hlavní Blitzer (18.10.)');
+        $this->assertSame(1, $this->withSkill($players, SkillName::Guard), 'Guard jen druhému Blitzerovi (18.10.)');
         $this->assertSame(1, $this->withSkill($players, SkillName::Horns), 'lovec = Gutter Runner s Wrestle a Horns');
         $this->assertSame(2, $this->withSkill($players, SkillName::MightyBlow), 'jeden Blitzer + Rat Ogre');
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
@@ -81,6 +85,8 @@ final class Tv1500RostersTest extends TestCase
         $this->assertSame(6, $this->withSkill($players, SkillName::Guard));
         $this->assertSame(1, $this->withSkill($players, SkillName::Pro));
         $this->assertSame(2, $this->withSkill($players, SkillName::Wrestle));
+        $this->assertSame(1, $this->withSkill($players, SkillName::Grab), 'uživatel 20.10.: Grab jednomu Black Orkovi místo Mighty Blow');
+        $this->assertSame(2, $this->withSkill($players, SkillName::MightyBlow), 'Black Ork + Blitzer');
     }
 
     /** Uživatel 07.10.2026: lovec Wrestle místo Stand Firm, Blitzer bez Guard Tackle místo Stand Firm. */

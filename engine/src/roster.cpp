@@ -830,7 +830,7 @@ const TeamRoster& getSkavenRoster1500() {
     return roster;
 }
 
-// Ork: rohy klece = čtyři Black Orci se Stand Firm, dva z nich s Mighty Blow; Pro má Blitzer.
+// Ork: rohy klece = čtyři Black Orci se Stand Firm, jeden s Mighty Blow, jeden s Grab (20.10.); Pro má Blitzer.
 const TeamRoster& getOrcRoster1500() {
     static const TeamRoster roster = {
         "Orc (TV1500)",
@@ -839,13 +839,18 @@ const TeamRoster& getOrcRoster1500() {
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::Guard}), 2, "Blitzer +Guard"},
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::MightyBlow, SkillName::Pro}), 1, "Blitzer +Mighty Blow+Pro"},
             {{6, 3, 3, 9}, makeSkills({SkillName::Block, SkillName::StripBall, SkillName::Tackle}), 1, "Blitzer ball-hunter"},
-            {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block, SkillName::StandFirm, SkillName::MightyBlow}), 2,
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block, SkillName::StandFirm, SkillName::MightyBlow}), 1,
                 "Black Orc +Guard+Block+Stand Firm+Mighty Blow"},
+            // Uživatel 20.10.2026: „dej grab někomu ze silných orků místo něčeho“ (Grab dosud nikdo v TV1500;
+            // P192/P222 Grab jako volba proti davu) ⇒ druhý rohový Black Ork Grab místo Mighty Blow (TV stejná,
+            // oba skilly normal 20 tis.); Stand Firm na rozích a Guard beze změny.
+            {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block, SkillName::StandFirm, SkillName::Grab}), 1,
+                "Black Orc +Guard+Block+Stand Firm+Grab"},
             {{4, 4, 2, 9}, makeSkills({SkillName::Guard, SkillName::Block, SkillName::StandFirm}), 2, "Black Orc +Guard+Block+Stand Firm"},
             {{5, 3, 3, 8}, makeSkills({SkillName::SureHands, SkillName::Pass, SkillName::Block}), 1, "Thrower +Block"},
             {{5, 3, 3, 9}, makeSkills({SkillName::Wrestle}), 2, "Lineman +Wrestle"},
         },
-        8, 60, true
+        9, 60, true
     };
     return roster;
 }

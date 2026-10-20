@@ -820,6 +820,9 @@ TEST(DevelopedRoster, Tv1500OrcCornersHaveStandFirm) {
     EXPECT_EQ(countHomeSkill(state, SkillName::Guard), 6);
     EXPECT_EQ(countHomeSkill(state, SkillName::Pro), 1);
     EXPECT_EQ(countHomeSkill(state, SkillName::Wrestle), 2);
+    // Uživatel 20.10.2026: Grab jednomu rohovému Black Orkovi místo Mighty Blow (Grab dosud nikdo v TV1500).
+    EXPECT_EQ(countHomeSkill(state, SkillName::Grab), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::MightyBlow), 2) << "Black Ork + Blitzer";
 }
 
 // Uživatel 07.10.2026: lovec míče Wrestle místo Stand Firm, Blitzer bez Guard Tackle místo
