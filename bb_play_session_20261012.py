@@ -75,6 +75,8 @@ def _role_lide(p, st, sk):
 
 def _role_orkove(p, st, sk):
     if st == (4, 4, 2, 9):
+        if "Grab" in sk:
+            return "KX"                      # Black Orc +Guard+Grab (20.10.: Grab místo Mighty Blow)
         return "KG" if "Guard" in sk else "K"        # Black Orc (+Guard); Mighty Blow se neznačí
     if st == (6, 3, 3, 9):                   # Blitzer
         if "Pro" in sk:
@@ -128,7 +130,7 @@ PARTIE = {
         "legenda": ("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
                     " · BT blitzer MB+Tackle · BH lovec míče · OG ogre",
                     "role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro"
-                    " · BH lovec míče · KG black orc s GUARD")},
+                    " · BH lovec míče · KG black orc s GUARD · KX black orc s GUARD a GRAB")},
     "skaveni-trpaslici": {   # 14.10.2026 (P203: Claude hraje trpaslíky s návrhem AI po ruce)
         "soupisky": ("skaven", "dwarf"), "tv": 1500, "seminko": 20261014, "adresar": "play_20261014",
         "jmena": ("SKAVENI", "TRPASLÍCI"), "kratce": ("SKA", "TRP"), "pismena": ("S", "D"),
