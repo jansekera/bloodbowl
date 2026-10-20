@@ -117,16 +117,16 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
             return bcFalls;
         }
         case BlockDiceFace::PUSHED:
-            pushAwayFrom(state, bcp, target, dice, events);
+            pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
             return false;
         case BlockDiceFace::DEFENDER_STUMBLES: {
             const bool down = !target.hasSkill(SkillName::Dodge) || bcp.hasSkill(SkillName::Tackle);
-            const bool surfed = pushAwayFrom(state, bcp, target, dice, events);
+            const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
             if (down && !surfed) knockDownTarget(state, target, dice, events);
             return false;
         }
         default: {   // DEFENDER_DOWN
-            const bool surfed = pushAwayFrom(state, bcp, target, dice, events);
+            const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
             if (!surfed) knockDownTarget(state, target, dice, events);
             return false;
         }
@@ -170,7 +170,7 @@ ActionResult resolveBallAndChain(GameState& state, int playerId,
             } else {
                 // Lezici nebo omraceny: odtlacit a hod na brneni misto bloku
                 // (r. 7843-7845). Omraceny zustava omraceny.
-                const bool surfed = pushAwayFrom(state, bcp, *occupant, dice, events);
+                const bool surfed = pushAwayFrom(state, bcp, *occupant, /*isBlock=*/false, dice, events);
                 if (!surfed && occupant->isOnPitch()) {
                     InjuryContext ctx;
                     resolveArmourAndInjury(state, occupant->id, dice, ctx, events);

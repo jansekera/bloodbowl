@@ -358,7 +358,9 @@ final class BallAndChainHandler implements ActionHandlerInterface
      */
     private function odtlacitLeziciho(GameState $state, MatchPlayerDTO $bnc, MatchPlayerDTO $obet, array $events): array
     {
-        [$state, $events] = $this->resolvePush($state, $bnc, $obet, $events);
+        // OPRAVENO 20.10.2026 (P222, parita s C++) -- i tady platil Grab. Pravidla ř. 7829-7831: Grab
+        //   jen "with his blocks"; na ležícího se neblokuje (ř. 7843-7845 "instead of the block").
+        [$state, $events] = $this->resolvePush($state, $bnc, $obet, $events, grabNeplati: true);
         $obet = $state->requirePlayer($obet->getId());
         if ($obet->getPosition() === null) {
             return [$state, $events]; // vytlacen do davu -- tam uz se hazelo
@@ -371,7 +373,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
     /**
      * Odtlaceni od B&C = bezne odtlaceni (`rules_bb2016.txt` r. 7840-7847):
-     * retez, dav, Grab i Side Step resi `BlockHandler::resolvePushback`.
+     * retez, dav, Grab i Side Step resi `BlockHandler::resolvePushback`. Grab jen u bloku
+     * (r. 7829-7831 "as if a Block Action was being used with his blocks").
      * Kdo drzi pole (zakoreneny; stojici Stand Firm soupere), se neodtlaci;
      * lezici Stand Firm nepouzije (r. 1824-1825).
      *
@@ -383,12 +386,13 @@ final class BallAndChainHandler implements ActionHandlerInterface
         MatchPlayerDTO $pusher,
         MatchPlayerDTO $target,
         array $events,
+        bool $grabNeplati = false,
     ): array {
         $targetPos = $target->getPosition();
         if ($pusher->getPosition() === null || $targetPos === null || $target->holdsGround($pusher->getTeamSide())) {
             return [$state, $events];
         }
 
-        return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events);
+        return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events, grabNeplati: $grabNeplati);
     }
 }

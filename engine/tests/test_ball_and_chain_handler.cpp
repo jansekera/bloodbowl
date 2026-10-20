@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 #include "bb/ball_and_chain_handler.h"
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
+#include "bb/game_simulator.h"
+#include "bb/roster.h"
 #include <vector>
 
 using namespace bb;
@@ -142,4 +145,104 @@ TEST(BallAndChainHandler, NoHandsBounce) {
     resolveBallAndChain(gs, 1, dice, nullptr);
     EXPECT_FALSE(gs.ball.isHeld);                   // No Hands
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+}
+
+// ============================================================================
+// P222 (1): Ball & Chain smí použít Grab. Pravidla ř. 7829-7831: „A Ball & Chain player may use
+// the Grab skill (as if a Block Action was being used) with his blocks (if he has learned it!)“.
+// Grab ř. 8148-8154: „he may choose any empty square adjacent to his opponent … Grab and Side
+// Step will cancel each other out … Grab will not work if there are no empty adjacent squares.“
+// Dřív pushAwayFrom předával grab=false ⇒ B&C s Grabem tlačil jen běžně (řetěz).
+// Hráč: goblinní fanatik z TV1500 (id 9, BallAndChain bez Grabu) — Grab mu přidává fixture.
+// Za obráncem (11,7) stojí na všech třech polích odtlačení naši (12,6..8), vedle něj je volno.
+// ============================================================================
+namespace {
+GameState fanaticBlocksFixture(bool withGrab, bool bystanders = true) {
+    GameState real;
+    setupHalf(real, *getDevelopedRoster("goblin", 1500), *getDevelopedRoster("orc", 1500));
+    const Player& fanatic = real.getPlayer(9);
+    EXPECT_TRUE(fanatic.hasSkill(SkillName::BallAndChain)) << "soupiska: id 9 = Ball & Chain";
+    EXPECT_FALSE(fanatic.hasSkill(SkillName::Grab)) << "soupiska: Grab nemá, přidává ho test";
+
+    auto gs = bncState();
+    Player& bcp = gs.getPlayer(1);
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    bcp.stats = fanatic.stats;
+    bcp.stats.movement = 1;                         // jeden krok = jeden blok
+    bcp.movementRemaining = 1;
+    bcp.skills = fanatic.skills;
+    if (withGrab) bcp.skills.add(SkillName::Grab);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    if (bystanders)
+        for (int id : {2, 3, 4}) placePlayer(gs, id, {12, static_cast<int8_t>(4 + id)}, TeamSide::HOME);
+    return gs;
+}
+bool bystandersStayed(const GameState& gs) {
+    return gs.getPlayer(2).position == (Position{12, 6}) && gs.getPlayer(3).position == (Position{12, 7}) &&
+           gs.getPlayer(4).position == (Position{12, 8});
+}
+}  // namespace
+
+TEST(BallAndChainHandler, P222WithGrabPushesToAnyEmptyAdjacentSquareInsteadOfAChain) {
+    auto gs = fanaticBlocksFixture(true);
+    FixedDiceRoller dice(std::vector<int>(30, 3));  // rovne na (11,7); kostky bloku Pushed
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_TRUE(gs.getPlayer(12).isOnPitch());
+    EXPECT_NE(gs.getPlayer(12).position.x, 12) << "Grab: volné pole vedle obránce, ne řetěz";
+    EXPECT_TRUE(bystandersStayed(gs)) << "s Grabem se nikdo neřetězí";
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "povinný follow-up";
+}
+
+// Kontrola: tentýž blok BEZ Grabu řetězí (fixture měří, co má).
+TEST(BallAndChainHandler, P222WithoutGrabTheSameBlockChains) {
+    auto gs = fanaticBlocksFixture(false);
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);
+    EXPECT_FALSE(bystandersStayed(gs));
+}
+
+// „as if a Block Action was being used“ ⇒ i zrušení se Side Step (ř. 8151-8153): běžné odtlačení.
+TEST(BallAndChainHandler, P222GrabCancelsTheDefendersSideStep) {
+    auto gs = fanaticBlocksFixture(true);
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12) << "Grab × Side Step se ruší ⇒ řetěz";
+}
+
+// Grab je volba (ř. 8149 „may“; uživatel 10.10. „může grab nevyužít pro vysurfování“) — stejně
+// jako v Block Action: vede-li běžné odtlačení do davu, útočník ho nepoužije.
+TEST(BallAndChainHandler, P222DeclinesGrabWhenTheStandardPushGoesIntoTheCrowd) {
+    auto gs = fanaticBlocksFixture(true, /*bystanders=*/false);
+    gs.getPlayer(1).position = {11, 1};
+    gs.getPlayer(12).position = {11, 0};            // natočení -y, rovně = blok; za ním dav
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_FALSE(gs.getPlayer(12).isOnPitch()) << "Grab nepoužit ⇒ do davu";
+}
+
+// Grab jen „with his blocks“; ležícího B&C neblokuje, jen odtlačí (ř. 7843-7845 „instead of the
+// block being thrown at them“) ⇒ běžné odtlačení i s Grabem.
+TEST(BallAndChainHandler, P222PushingAProneOccupantIsNotABlockSoNoGrab) {
+    auto gs = fanaticBlocksFixture(true);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    placePlayer(gs, 13, {20, 7}, TeamSide::AWAY);   // nejbližší STOJÍCÍ ⇒ natočení +x
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12) << "bez bloku Grab neplatí ⇒ řetěz";
+}
+// P222 (2): v živé partii se kouče B&C ptá, jestli Grab použije.
+TEST(BallAndChainHandler, P222LiveGameAsksTheCoachAboutGrab) {
+    auto gs = fanaticBlocksFixture(true);
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveBallAndChain(gs, 1, dice, nullptr);
+        FAIL() << "otázka USE_GRAB nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_GRAB);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+    }
 }

@@ -585,9 +585,129 @@ TEST(CoachChoiceBlock, StrongerDefenderOfTheOtherSide_StaysAutomatic) {
 
 // ───────────── P201 (12): follow-up jako otázka kouče útočníka ─────────────
 // Pravidla ř. 606-611: "The player's COACH MUST DECIDE whether to follow up" -- rozhoduje se
+// P222 (3), review M6: bez volného sousedního pole Side Step použít nejde (ř. 8477-8478 „may not
+// use this skill if there are no open squares on the pitch adjacent to this player“) ⇒ kouče se
+// na něj nesmí ptát. Dřív se usesSideStep ptal dřív, než se vědělo, že skill platí.
+static GameState surrounded() {
+    GameState gs = blockPair();
+    const Position around[7] = {{10, 6}, {10, 8}, {11, 6}, {11, 8}, {12, 6}, {12, 7}, {12, 8}};
+    for (int k = 0; k < 7; ++k) placePlayer(gs, 2 + k, around[k]);   // id 2-8 = HOME
+    return gs;
+}
+
+TEST(CoachChoiceBlock, SideStepWithNoOpenSquare_NotAsked) {
+    GameState gs = surrounded();
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    FixedDiceRoller dice(std::vector<int>(20, 3));   // Pushed ⇒ řetěz
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    EXPECT_NO_THROW(block(gs, dice));
+}
+
+// Táž otázka v řetězu: odtlačený hráč s Side Step, kolem něhož není volno, se neptá.
+TEST(CoachChoiceBlock, SideStepInChainWithNoOpenSquare_NotAsked) {
+    GameState gs = blockPair();
+    for (int id : {13, 14, 15}) placePlayer(gs, id, {12, static_cast<int8_t>(id - 7)});   // (12,6..8)
+    for (int id : {13, 14, 15}) gs.getPlayer(id).skills.add(SkillName::SideStep);
+    for (int y = 5; y <= 9; ++y) placePlayer(gs, 11 + y - 5 + 5, {13, static_cast<int8_t>(y)});  // id 16-20
+    placePlayer(gs, 21, {12, 5});
+    placePlayer(gs, 22, {12, 9});
+    placePlayer(gs, 2, {11, 6});
+    placePlayer(gs, 3, {11, 8});
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    EXPECT_NO_THROW(block(gs, dice));
+}
+
+static const int ANO_NE = (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM);
+
+// P222 (2): Grab je volba útočníka (ř. 8149 „he MAY choose any empty square adjacent to his
+// opponent“). Uživatel 20.10.: „grab ano ptát se — pro možnost vytlačení“ ⇒ v živé partii se kouče
+// útočníka ptá; pole pak určí příkazem `push` (kterékoli volné vedle soupeře). Ptát se jen tam, kde
+// Grab platit může: Block Action (ne blitz, ř. 8148), volné sousední pole (ř. 8153-8154), bez
+// Side Step obránce (ř. 8151-8153 se navzájem ruší). Odpovědi: Grab, pak follow-up.
+static CoachQuestion firstQuestion(GameState gs, BlockParams params, TeamSide coach) {
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    CoachChoiceScope scope(coach, {});
+    try { resolveBlock(gs, params, dice, nullptr); } catch (const CoachChoicePending& p) { return p.question; }
+    return CoachQuestion::REROLL;   // „žádná otázka“ -- v těchto testech se na přehoz nikdy neptá
+}
+
+TEST(CoachChoiceGrab, AskedOnABlock) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { block(gs, dice); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_GRAB);
+        EXPECT_EQ(p.playerId, 1);
+        EXPECT_EQ(p.otherId, 12);
+        EXPECT_EQ(p.options, ANO_NE);
+    }
+}
+
+TEST(CoachChoiceGrab, Used_CoachPushesToASquareBesideTheOpponent) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    setManualPushChoice({11, 6});                    // mimo tři pole diagramu -- jen s Grabem
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::NONE});
+    block(gs, dice);
+    clearManualBlockChoices();
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 6}));
+}
+
+TEST(CoachChoiceGrab, Declined_StandardPush) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    setManualPushChoice({11, 6});                    // bez Grabu pole není mezi kandidáty
+    FixedDiceRoller dice({3});
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE, CoachAnswer::NONE});
+    block(gs, dice);
+    clearManualBlockChoices();
+    EXPECT_EQ(gs.getPlayer(12).position.x, 12);
+}
+
+// Proč se ptát: u lajny kouč Grab odmítne a soupeře vytlačí do davu -- nebo ho použije a nechá na hřišti.
+TEST(CoachChoiceGrab, AtTheSidelineTheCoachChoosesCrowdOrGrab) {
+    for (int useGrab : {0, 1}) {
+        GameState gs = blockPair();
+        gs.getPlayer(1).position = {11, 1};
+        gs.getPlayer(12).position = {11, 0};
+        gs.getPlayer(1).skills.add(SkillName::Grab);
+        FixedDiceRoller dice({3, 3, 3, 3, 3});
+        CoachChoiceScope scope(TeamSide::HOME, {useGrab, CoachAnswer::NONE, CoachAnswer::NONE});
+        block(gs, dice);
+        EXPECT_EQ(gs.getPlayer(12).isOnPitch(), useGrab == 1) << "Grab " << useGrab;
+    }
+}
+
+TEST(CoachChoiceGrab, NotAskedOnABlitz) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    EXPECT_EQ(firstQuestion(gs, BlockParams{1, 12, true, false}, TeamSide::HOME), CoachQuestion::USE_FOLLOW_UP);
+}
+
+TEST(CoachChoiceGrab, NotAskedWithNoOpenSquare) {
+    GameState gs = surrounded();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    EXPECT_EQ(firstQuestion(gs, BlockParams{1, 12, false, false}, TeamSide::HOME), CoachQuestion::USE_FOLLOW_UP);
+}
+
+TEST(CoachChoiceGrab, NotAskedWhenSideStepCancelsIt) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    EXPECT_EQ(firstQuestion(gs, BlockParams{1, 12, false, false}, TeamSide::HOME), CoachQuestion::USE_FOLLOW_UP);
+}
+
+TEST(CoachChoiceGrab, OpponentsGrabStaysAutomatic) {
+    GameState gs = blockPair();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    EXPECT_EQ(firstQuestion(gs, BlockParams{1, 12, false, false}, TeamSide::AWAY), CoachQuestion::REROLL);
+}
+
 // AŽ po odtlačení (po kostkách i po přehozu), ne předem. Dřív se v partii volba zadávala
 // příkazem `follow` před akcí a po přehozu kostek ji nešlo změnit (partie 13.10.).
-static const int ANO_NE = (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM);
 
 TEST(CoachChoiceFollowUp, AskedAfterPush) {
     GameState gs = blockPair();

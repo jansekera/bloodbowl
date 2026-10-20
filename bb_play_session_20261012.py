@@ -35,7 +35,7 @@ Příkazy:
   quit                     -- ukončí server
 
 P130 — jak otázka probíhá: akce se spustí; narazí-li na rozhodnutí kouče (přehoz, kostka
-bloku, Dodge / Wrestle / Stand Firm / Side Step jeho hráče, follow-up a lékárník -- P201),
+bloku, Dodge / Wrestle / Stand Firm / Side Step / Grab jeho hráče, follow-up a lékárník -- P201, P222),
 server vrátí stav i kostky před akci, ukáže, co padlo, a čeká na `odp`. Po odpovědi akci spustí znovu se stejnými
 kostkami — výsledek přehozu tak předem nevidí nikdo. Dokud otázka čeká, jde zadat jen
 `odp`, `push`, `sidestep`, `follow`, `board`. Skillové rerolly (Dodge, Sure Hands, Sure
@@ -425,7 +425,7 @@ def kostky_str(packed):
 PREHOZ = {"ne": 0, "tym": 1, "tým": 1, "pro": 2}
 ANO_NE = {"ne": 0, "ano": 1}
 SKILL_OTAZKY = {"USE_DODGE": "Dodge", "USE_WRESTLE": "Wrestle", "USE_STAND_FIRM": "Stand Firm",
-                "USE_SIDE_STEP": "Side Step"}
+                "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab"}
 
 
 def moznosti_prehozu(q):
@@ -467,7 +467,9 @@ def otazka_str(q):
                 " — který platí?  ->  odp 1 / 2")
     if t in SKILL_OTAZKY:
         kdo = f" (v bloku s hráčem {o})" if o > 0 else ""   # P201 (5): ptá se i útočník
-        navic = "   (před `odp ano` lze zadat sidestep x y)" if t == "USE_SIDE_STEP" else ""
+        navic = {"USE_SIDE_STEP": "   (před `odp ano` lze zadat sidestep x y)",
+                 # P222: s Grabem kterékoli volné pole vedle soupeře; `ne` = běžné odtlačení (i do davu)
+                 "USE_GRAB": "   (před `odp ano` lze zadat push x y — kterékoli volné pole vedle soupeře)"}.get(t, "")
         return f"❓ hráč {p}{kdo}: použít {SKILL_OTAZKY[t]}?  ->  odp ano / ne{navic}"
     return f"❓ {q}"
 
