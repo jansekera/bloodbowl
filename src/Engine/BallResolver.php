@@ -11,6 +11,7 @@ use App\DTO\MatchPlayerDTO;
 use App\Enum\GamePhase;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
+use App\Enum\TeamSide;
 use App\Enum\Weather;
 use App\ValueObject\Position;
 
@@ -213,6 +214,99 @@ final class BallResolver
     }
 
     /**
+     * Míč DOPADÁ ZE VZDUCHU na pole `$landing` na hřišti — přihrávka (přesná i nepřesná), Hail Mary,
+     * Dump-Off, výkop, vhazování. NE odraz (`resolveBounce`). Jediné místo, kde se rozhoduje, kdo
+     * dopadající míč chytá: stojící hráč na poli; na prázdné pole hráč s Diving Catch; jinak odraz.
+     *
+     * DOPLNĚNO 20. 10. 2026 (P223) — Diving Catch byl jen u nepřesné přihrávky (P221, kopie
+     *   v `PassResolver`). Pravidla ř. 8066-8067: "the player can attempt to catch ANY PASS, KICK OFF
+     *   OR CROWD THROW-IN, but not bouncing ball, that would land in an empty square in one of his
+     *   tackle zones". Přesná přihrávka chycená skokem dostane +1 "Catching an accurate pass"
+     *   (ř. 891), ale ne +1 z Diving Catch — ten je jen "from an accurate pass targeted to his
+     *   square" (ř. 8063-8064).
+     *
+     * @param TeamSide|null $rerollSide tým, jehož týmový přehoz smí jít na chytání (jen jeho hráč);
+     *                                  null = žádný (výkop ř. 1261-1263, Dump-Off v soupeřově tahu)
+     * @return array{state: GameState, events: list<GameEvent>}
+     */
+    public function resolveLanding(
+        GameState $state,
+        Position $landing,
+        bool $accuratePass = false,
+        ?TeamSide $rerollSide = null,
+        int $depth = 0,
+        bool $divingCatch = true,
+    ): array {
+        $state = $state->withBall(BallState::onGround($landing));
+        $events = [];
+
+        $catcher = $state->getPlayerAtPosition($landing);
+        $diving = false;
+        if ($catcher === null) {
+            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8066) — viz KickoffResolver
+            $catcher = $divingCatch ? $this->findDivingCatchPlayer($state, $landing) : null;
+            $diving = $catcher !== null;
+        } elseif ($catcher->getState() !== PlayerState::STANDING) {
+            $catcher = null;
+        }
+
+        if ($catcher === null) {
+            return $this->resolveBounce($state, $landing, $depth);
+        }
+
+        if ($diving) {
+            $events[] = GameEvent::divingCatch($catcher->getId());
+        }
+        $side = $catcher->getTeamSide();
+        $catchResult = $this->resolveCatch(
+            $state,
+            $catcher,
+            modifier: $accuratePass ? 1 : 0,
+            teamRerollAvailable: $rerollSide === $side && $state->getTeamState($side)->canUseReroll(),
+            accuratePass: $accuratePass && !$diving,
+        );
+        $state = $catchResult['state'];
+        if ($catchResult['teamRerollUsed']) {
+            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+        }
+
+        return ['state' => $state, 'events' => array_merge($events, $catchResult['events'])];
+    }
+
+    /**
+     * Hráč s Diving Catch, který smí chytit míč dopadající na sousední prázdné pole (null = nikdo).
+     *
+     * OPRAVENO 20. 10. 2026 (P221) — tady se hráč PŘESOUVAL na pole dopadu (a odtud se počítaly
+     *   zóny i odskok), chytal i bez tackle zón, i na pole s ležícím hráčem, a ze dvou hráčů
+     *   s Diving Catch se vrhl první nalezený. Pravidla ř. 8065-8071: "...that would land in an
+     *   empty square in one of his tackle zones as if it had landed in his own square without
+     *   leaving his current square. A failed catch will bounce from the Diving Catch player's
+     *   square. If there are two or more players attempting to use this skill then they get in
+     *   each other's way and neither can use it." Bez zón "may not catch" (ř. 7983-7986).
+     *   Smí kterýkoli tým (i soupeř přihrávajícího, i sám přihrávající).
+     */
+    public function findDivingCatchPlayer(GameState $state, Position $landingPos): ?MatchPlayerDTO
+    {
+        if ($state->getPlayerAtPosition($landingPos) !== null) {
+            return null;
+        }
+
+        $candidates = [];
+        foreach ($state->getPlayers() as $player) {
+            $playerPos = $player->getPosition();
+            if ($playerPos !== null
+                && $player->hasSkill(SkillName::DivingCatch)
+                && $player->getState() === PlayerState::STANDING
+                && !$player->hasLostTacklezones()
+                && $playerPos->distanceTo($landingPos) === 1) {
+                $candidates[] = $player;
+            }
+        }
+
+        return count($candidates) === 1 ? $candidates[0] : null;
+    }
+
+    /**
      * Bounce ball from a position. If lands on player, they try to catch.
      * @return array{state: GameState, events: list<GameEvent>}
      */
@@ -302,17 +396,15 @@ final class BallResolver
                 continue;
             }
 
-            $state = $state->withBall(BallState::onGround($dest));
-            $playerAtLanding = $state->getPlayerAtPosition($dest);
-            // review 16.10. (nález 19 i pro vhazování): hráč bez tackle zón nechytá
-            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING
-                && !$playerAtLanding->hasLostTacklezones()) {
-                $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth);
-                return ['state' => $catchResult['state'], 'events' => array_merge($events, $catchResult['events'])];
-            }
-
-            $bounceResult = $this->resolveBounce($state, $dest, $depth + 1);
-            return ['state' => $bounceResult['state'], 'events' => array_merge($events, $bounceResult['events'])];
+            // Týmový přehoz chytání jen ve vlastním tahu (ř. 929-933); hráč bez zón nechytá
+            // (review 16.10., nález 19) -- hlídá `resolveCatch`.
+            $landingResult = $this->resolveLanding(
+                $state,
+                $dest,
+                rerollSide: $state->getPhase() === GamePhase::PLAY ? $state->getActiveTeam() : null,
+                depth: $depth + 1,
+            );
+            return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
         }
 
         $state = $state->withBall(BallState::onGround($origin));

@@ -455,6 +455,40 @@ TEST(KickoffLanding, KickingPlayerUnderTheBallMustTryToCatchIt) {
     EXPECT_EQ(gs.ball.carrierId, away.id);
 }
 
+// P223. Diving Catch i u výkopu (ř. 8066: "any pass, KICK OFF or crowd throw-in ... that would land
+// in an empty square in one of his tackle zones"). (3,7) + 1 na V = prázdné (4,7); hráč přijímajících
+// s Diving Catch na (4,8) chytá 6 ze svého pole. Stará mechanika: odraz D8 6 = JZ na (3,8).
+TEST(KickoffLanding, DivingCatchCatchesAKickLandingNextToHim) {
+    auto gs = kickFixture(/*withKick=*/false);
+    Player& elf = playerAt(gs, {7, 7});
+    elf.position = {4, 8};
+    elf.skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({1, 3, 1, 1, 6});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, elf.id);
+    EXPECT_EQ(elf.position, (Position{4, 8})) << "\"without leaving his current square\" (ř. 8068)";
+}
+
+// P223, OPRAVENO 20.10.2026 (uživatel: „proč by automaticky volil použití diving catch, ať je touchback —
+// tyto skilly nejsou povinné“). Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7) vedle prázdného
+// (12,7). Skokem by míč „dopadl“ na jeho pole v kopající polovině = touchback pro soupeře (ř. 8068,
+// 280-283) ⇒ skill je volba („can attempt“, ř. 8066), kopající neskočí. Míč dopadne na (12,7) a odrazí
+// se D8 7 = Z na (11,7), kde leží. Dřív: vynucený skok ⇒ touchback.
+TEST(KickoffLanding, AKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback) {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.receiverSpeed = RosterSpeed::FAST;          // krátký kop na (7,7)
+    playerAt(gs, {12, 7}).position = {2, 2};       // uvolní pole dopadu na LoS
+    playerAt(gs, {13, 7}).skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({5, 3, 1, 1, 7});
+    std::vector<GameEvent> ev;
+    resolveKickoff(gs, dice, &ev);
+    EXPECT_FALSE(gs.ball.isHeld) << "žádný touchback";
+    EXPECT_EQ(gs.ball.position, (Position{11, 7})) << "odraz z pole dopadu (12,7)";
+    for (const GameEvent& e : ev)
+        EXPECT_FALSE(e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::DivingCatch));
+}
+
 // ř. 1033-1035: „Play stops when both coaches have had eight turns each.“ Přijímající, kterému
 // nezbývá kolo, už výkop nedostane (dřív se kopalo, házelo na tabulku a teprve pak skončil poločas).
 TEST(KickoffHandler, NoKickoffWhenTheReceivingTeamHasNoTurnLeft) {

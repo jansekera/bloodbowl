@@ -87,19 +87,30 @@ final class KickoffResolver
         $state = $korResult['state'];
         $events = array_merge($events, $korResult['events']);
 
-        // Check if there's a player at landing position
-        $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-        if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
-            // Attempt catch
-            $catchResult = $this->ballResolver->resolveCatch($state, $playerAtLanding);
-            $events = array_merge($events, $catchResult['events']);
-            return ['state' => $catchResult['state'], 'events' => $events];
+        // DOPLNĚNO 20. 10. 2026 (P223): Diving Catch i u výkopu (ř. 8066). Hráč chytá "as if it had
+        //   landed in his own square" (ř. 8068) -- stojí-li v kopající polovině (kopající hráč na
+        //   lajně), míč tam "dopadl" ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318), bez hodu.
+        $diver = $this->ballResolver->findDivingCatchPlayer($state, $landingPos);
+        $diverPos = $diver?->getPosition();
+        $skok = true;
+        if ($diverPos !== null && !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam)) {
+            // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
+            //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8066).
+            //   Kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně.
+            //   Přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
+            //   Jako jeden ze dvou kandidátů kopající dál „skočí“ a zruší přijímajícího (ř. 8069-8071) —
+            //   to řeší `findDivingCatchPlayer` (vrátí null), sem se nedostane.
+            if ($diver->getTeamSide() === $receivingTeam) {
+                $events[] = GameEvent::divingCatch($diver->getId());
+                $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
+                return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
+            }
+            $skok = false;
         }
 
-        // No player at landing - ball bounces
-        $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
-        $events = array_merge($events, $bounceResult['events']);
-        return ['state' => $bounceResult['state'], 'events' => $events];
+        // Chytání při dopadu výkopu bez týmového přehozu (ř. 1261-1263).
+        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, divingCatch: $skok);
+        return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
 
     /**

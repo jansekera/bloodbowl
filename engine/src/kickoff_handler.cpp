@@ -78,6 +78,27 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
             return;
         }
         Player* p = state.getPlayerAtPosition(at);
+        // P223: Diving Catch i u výkopu (ř. 8066). Hráč chytá "as if it had landed in his own
+        // square" (ř. 8068) ⇒ míč „dopadne“ na jeho pole: v kopající polovině (kopající na lajně) je
+        // to touchback, jinak tam chytá a neúspěch odskočí z jeho pole. Odraz (`bounced`) se nechytá.
+        if (!p && !bounced) {
+            int diver = divingCatcherFor(state, at);
+            // OPRAVENO 20.10.2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
+            //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8066).
+            //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ neskočí, míč dopadne
+            //   normálně. Přijímající v kopající polovině (Quick Snap) skočí. Rušení dvou kandidátů
+            //   (ř. 8069-8071) řeší `divingCatcherFor` (vrátí -1).
+            if (diver >= 0 && state.getPlayer(diver).teamSide != receiving &&
+                !inHalfOf(receiving, state.getPlayer(diver).position))
+                diver = -1;
+            if (diver >= 0) {
+                const Position from = state.getPlayer(diver).position;
+                emitEvent(events, {GameEvent::Type::SKILL_USED, diver, -1, at, from,
+                                  static_cast<int>(SkillName::DivingCatch), true});
+                at = from;
+                continue;
+            }
+        }
         // Míč na zem DŘÍV, než ho kdo chytá — resolveCatch při neúspěchu míčem nehýbe (11.08.).
         state.ball = BallState::onGround(at);
         if (!p && bounced) return;                  // po odrazu na prázdné pole zůstane ležet

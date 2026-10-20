@@ -75,6 +75,7 @@ add_executable(bb_tests
     tests/test_rules_engine.cpp
     tests/test_action_resolver.cpp
     tests/test_pass_handler.cpp
+    tests/test_diving_catch.cpp
     tests/test_big_guy_handler.cpp
     tests/test_kickoff_handler.cpp
     tests/test_feature_extractor.cpp
