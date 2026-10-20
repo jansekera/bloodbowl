@@ -201,104 +201,21 @@ final class PassResolver
             );
         }
 
-        // Team reroll availability for catch (may have been used for accuracy)
-        $catchTeamReroll = $state->getTeamState($activeSide)->canUseReroll();
-
-        if ($accurate) {
-            // Ball lands on target square - update ball position
-            $state = $state->withBall(BallState::onGround($target));
-
-            // Check if there's a player at target to catch
-            $catcher = $state->getPlayerAtPosition($target);
-            if ($catcher !== null && $catcher->getState() === PlayerState::STANDING) {
-                $isFriendly = $catcher->getTeamSide() === $activeSide;
-                $catchResult = $this->ballResolver->resolveCatch(
-                    $state,
-                    $catcher,
-                    modifier: 1,
-                    teamRerollAvailable: $isFriendly && $catchTeamReroll,
-                    accuratePass: true,
-                );
-                $events = array_merge($events, $catchResult['events']);
-                $state = $catchResult['state'];
-
-                if ($catchResult['teamRerollUsed']) {
-                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                }
-
-                if (!$catchResult['success']) {
-                    if (!$this->ballCaughtByTeam($state, $activeSide)) {
-                        $events[] = GameEvent::turnover('Pass not caught');
-                        return ActionResult::turnover($state->withTurnoverPending(true), $events);
-                    }
-                }
-
-                return ActionResult::success($state, $events);
+        // Kam míč dopadne: přesná přihrávka na cílové pole, nepřesná se třikrát rozptýlí (ř. 735-740).
+        $landingPos = $target;
+        if (!$accurate) {
+            [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
+            if (!$landingPos->isOnPitch()) {
+                $state = $state->withBall(BallState::onGround($lastOnPitch));
+                $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
+                $events = array_merge($events, $throwInResult['events']);
+                $state = $throwInResult['state'];
             }
-
-            // No one at target: ball on ground, bounce
-            $bounceResult = $this->ballResolver->resolveBounce($state, $target);
-            $events = array_merge($events, $bounceResult['events']);
-            $state = $bounceResult['state'];
-
-            if (!$this->ballCaughtByTeam($state, $activeSide)) {
-                $events[] = GameEvent::turnover('Pass not caught');
-                return ActionResult::turnover($state->withTurnoverPending(true), $events);
-            }
-
-            return ActionResult::success($state, $events);
         }
-
-        // Inaccurate pass - scatter from target
-        [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
-
-        if (!$landingPos->isOnPitch()) {
-            // Scattered off pitch
-            $state = $state->withBall(BallState::onGround($lastOnPitch));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
-            $events = array_merge($events, $throwInResult['events']);
-            $state = $throwInResult['state'];
-        } else {
-            $state = $state->withBall(BallState::onGround($landingPos));
-
-            $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
-                $isFriendly = $playerAtLanding->getTeamSide() === $activeSide;
-                $catchResult = $this->ballResolver->resolveCatch(
-                    $state,
-                    $playerAtLanding,
-                    teamRerollAvailable: $isFriendly && $catchTeamReroll,
-                );
-                $events = array_merge($events, $catchResult['events']);
-                $state = $catchResult['state'];
-
-                if ($catchResult['teamRerollUsed']) {
-                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                }
-            } else {
-                // Diving Catch: hráč chytá ze SVÉHO pole, neúspěch odskočí z jeho pole
-                // (resolveCatch pracuje s pozicí chytajícího).
-                $divingCatcher = $this->findDivingCatchPlayer($state, $landingPos);
-                if ($divingCatcher !== null) {
-                    $events[] = GameEvent::divingCatch($divingCatcher->getId());
-                    $isFriendly = $divingCatcher->getTeamSide() === $activeSide;
-                    $catchResult = $this->ballResolver->resolveCatch(
-                        $state,
-                        $divingCatcher,
-                        teamRerollAvailable: $isFriendly && $catchTeamReroll,
-                    );
-                    $events = array_merge($events, $catchResult['events']);
-                    $state = $catchResult['state'];
-                    if ($catchResult['teamRerollUsed']) {
-                        $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                    }
-                } else {
-                    // Empty square - bounce
-                    $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
-                    $events = array_merge($events, $bounceResult['events']);
-                    $state = $bounceResult['state'];
-                }
-            }
+        if ($landingPos->isOnPitch()) {
+            $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $activeSide);
+            $events = array_merge($events, $landingResult['events']);
+            $state = $landingResult['state'];
         }
 
         // Check if own team ended up with the ball
@@ -576,26 +493,9 @@ final class PassResolver
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
-            $state = $state->withBall(BallState::onGround($landingPos));
-            $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-            if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
-                $isFriendly = $playerAtLanding->getTeamSide() === $activeSide;
-                $catchResult = $this->ballResolver->resolveCatch(
-                    $state,
-                    $playerAtLanding,
-                    teamRerollAvailable: $isFriendly && $state->getTeamState($activeSide)->canUseReroll(),
-                );
-                $events = array_merge($events, $catchResult['events']);
-                $state = $catchResult['state'];
-                // ⛔ OPRAVA 18.09.2026 (review): pouzity tymovy prehoz se tu nezapisoval
-                if ($catchResult['teamRerollUsed']) {
-                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                }
-            } else {
-                $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
-                $events = array_merge($events, $bounceResult['events']);
-                $state = $bounceResult['state'];
-            }
+            $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, rerollSide: $activeSide);
+            $events = array_merge($events, $landingResult['events']);
+            $state = $landingResult['state'];
         }
 
         if (!$this->ballCaughtByTeam($state, $activeSide)) {
@@ -648,41 +548,19 @@ final class PassResolver
             return ['state' => $bounceResult['state'], 'events' => $events];
         }
 
-        if ($accurate) {
-            $state = $state->withBall(BallState::onGround($target));
-            $catcher = $state->getPlayerAtPosition($target);
-            if ($catcher !== null && $catcher->getState() === PlayerState::STANDING) {
-                // Catch attempt (no rerolls for dump-off)
-                $catchResult = $this->ballResolver->resolveCatch($state, $catcher, modifier: 1);
-                $events = array_merge($events, $catchResult['events']);
-                return ['state' => $catchResult['state'], 'events' => $events];
+        $landingPos = $target;
+        if (!$accurate) {
+            [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
+            if (!$landingPos->isOnPitch()) {
+                $state = $state->withBall(BallState::onGround($lastOnPitch));
+                $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
+                return ['state' => $throwInResult['state'], 'events' => array_merge($events, $throwInResult['events'])];
             }
-            $bounceResult = $this->ballResolver->resolveBounce($state, $target);
-            $events = array_merge($events, $bounceResult['events']);
-            return ['state' => $bounceResult['state'], 'events' => $events];
         }
 
-        // Inaccurate
-        [$landingPos, $lastOnPitch] = $this->scatterMissedPass($target);
-
-        if (!$landingPos->isOnPitch()) {
-            $state = $state->withBall(BallState::onGround($lastOnPitch));
-            $throwInResult = $this->ballResolver->resolveThrowIn($state, $lastOnPitch, $landingPos);
-            $events = array_merge($events, $throwInResult['events']);
-            return ['state' => $throwInResult['state'], 'events' => $events];
-        }
-
-        $state = $state->withBall(BallState::onGround($landingPos));
-        $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-        if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
-            $catchResult = $this->ballResolver->resolveCatch($state, $playerAtLanding);
-            $events = array_merge($events, $catchResult['events']);
-            return ['state' => $catchResult['state'], 'events' => $events];
-        }
-
-        $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
-        $events = array_merge($events, $bounceResult['events']);
-        return ['state' => $bounceResult['state'], 'events' => $events];
+        // Bez týmového přehozu -- Dump-Off se hází v soupeřově tahu (ř. 929-933).
+        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate);
+        return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
 
     /**
@@ -704,38 +582,6 @@ final class PassResolver
         }
 
         return [$pos, $pos];
-    }
-
-    /**
-     * Hráč s Diving Catch, který smí chytit míč dopadající na sousední pole.
-     *
-     * OPRAVENO 20. 10. 2026 (P221) — tady se hráč PŘESOUVAL na pole dopadu (a odtud se počítaly
-     *   zóny i odskok), chytal i bez tackle zón, i na pole s ležícím hráčem, a ze dvou hráčů
-     *   s Diving Catch se vrhl první nalezený. Pravidla ř. 8065-8071: "...that would land in an
-     *   empty square in one of his tackle zones as if it had landed in his own square without
-     *   leaving his current square. A failed catch will bounce from the Diving Catch player's
-     *   square. If there are two or more players attempting to use this skill then they get in
-     *   each other's way and neither can use it." Bez zón "may not catch" (ř. 7983-7986).
-     */
-    private function findDivingCatchPlayer(GameState $state, Position $landingPos): ?MatchPlayerDTO
-    {
-        if ($state->getPlayerAtPosition($landingPos) !== null) {
-            return null;
-        }
-
-        $candidates = [];
-        foreach ($state->getPlayers() as $player) {
-            $playerPos = $player->getPosition();
-            if ($playerPos !== null
-                && $player->hasSkill(SkillName::DivingCatch)
-                && $player->getState() === PlayerState::STANDING
-                && !$player->hasLostTacklezones()
-                && $playerPos->distanceTo($landingPos) === 1) {
-                $candidates[] = $player;
-            }
-        }
-
-        return count($candidates) === 1 ? $candidates[0] : null;
     }
 
     /**

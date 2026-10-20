@@ -87,19 +87,20 @@ final class KickoffResolver
         $state = $korResult['state'];
         $events = array_merge($events, $korResult['events']);
 
-        // Check if there's a player at landing position
-        $playerAtLanding = $state->getPlayerAtPosition($landingPos);
-        if ($playerAtLanding !== null && $playerAtLanding->getState() === PlayerState::STANDING) {
-            // Attempt catch
-            $catchResult = $this->ballResolver->resolveCatch($state, $playerAtLanding);
-            $events = array_merge($events, $catchResult['events']);
-            return ['state' => $catchResult['state'], 'events' => $events];
+        // DOPLNĚNO 20. 10. 2026 (P223): Diving Catch i u výkopu (ř. 8066). Hráč chytá "as if it had
+        //   landed in his own square" (ř. 8068) -- stojí-li v kopající polovině (kopající hráč na
+        //   lajně), míč tam "dopadl" ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318), bez hodu.
+        $diver = $this->ballResolver->findDivingCatchPlayer($state, $landingPos);
+        $diverPos = $diver?->getPosition();
+        if ($diverPos !== null && !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam)) {
+            $events[] = GameEvent::divingCatch($diver->getId());
+            $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
+            return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
         }
 
-        // No player at landing - ball bounces
-        $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
-        $events = array_merge($events, $bounceResult['events']);
-        return ['state' => $bounceResult['state'], 'events' => $events];
+        // Chytání při dopadu výkopu bez týmového přehozu (ř. 1261-1263).
+        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos);
+        return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
 
     /**
