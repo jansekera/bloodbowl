@@ -585,6 +585,39 @@ TEST(CoachChoiceBlock, StrongerDefenderOfTheOtherSide_StaysAutomatic) {
 
 // ───────────── P201 (12): follow-up jako otázka kouče útočníka ─────────────
 // Pravidla ř. 606-611: "The player's COACH MUST DECIDE whether to follow up" -- rozhoduje se
+// P222 (3), review M6: bez volného sousedního pole Side Step použít nejde (ř. 8477-8478 „may not
+// use this skill if there are no open squares on the pitch adjacent to this player“) ⇒ kouče se
+// na něj nesmí ptát. Dřív se usesSideStep ptal dřív, než se vědělo, že skill platí.
+static GameState surrounded() {
+    GameState gs = blockPair();
+    const Position around[7] = {{10, 6}, {10, 8}, {11, 6}, {11, 8}, {12, 6}, {12, 7}, {12, 8}};
+    for (int k = 0; k < 7; ++k) placePlayer(gs, 2 + k, around[k]);   // id 2-8 = HOME
+    return gs;
+}
+
+TEST(CoachChoiceBlock, SideStepWithNoOpenSquare_NotAsked) {
+    GameState gs = surrounded();
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    FixedDiceRoller dice(std::vector<int>(20, 3));   // Pushed ⇒ řetěz
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    EXPECT_NO_THROW(block(gs, dice));
+}
+
+// Táž otázka v řetězu: odtlačený hráč s Side Step, kolem něhož není volno, se neptá.
+TEST(CoachChoiceBlock, SideStepInChainWithNoOpenSquare_NotAsked) {
+    GameState gs = blockPair();
+    for (int id : {13, 14, 15}) placePlayer(gs, id, {12, static_cast<int8_t>(id - 7)});   // (12,6..8)
+    for (int id : {13, 14, 15}) gs.getPlayer(id).skills.add(SkillName::SideStep);
+    for (int y = 5; y <= 9; ++y) placePlayer(gs, 11 + y - 5 + 5, {13, static_cast<int8_t>(y)});  // id 16-20
+    placePlayer(gs, 21, {12, 5});
+    placePlayer(gs, 22, {12, 9});
+    placePlayer(gs, 2, {11, 6});
+    placePlayer(gs, 3, {11, 8});
+    FixedDiceRoller dice(std::vector<int>(20, 3));
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    EXPECT_NO_THROW(block(gs, dice));
+}
+
 // AŽ po odtlačení (po kostkách i po přehozu), ne předem. Dřív se v partii volba zadávala
 // příkazem `follow` před akcí a po přehozu kostek ji nešlo změnit (partie 13.10.).
 static const int ANO_NE = (1 << CoachAnswer::NONE) | (1 << CoachAnswer::TEAM);

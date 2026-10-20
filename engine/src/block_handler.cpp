@@ -405,10 +405,21 @@ static bool canSideStep(const Player& p) {
     return p.state == PlayerState::STANDING && p.hasSkill(SkillName::SideStep);
 }
 
+// Je vedle pole volné pole na hřišti? Bez něj Side Step ani Grab neplatí (ř. 8477-8478,
+// 8153-8154) -- táž podmínka jako `wide` v pushCandidates.
+static bool hasOpenAdjacent(const GameState& state, Position pos) {
+    for (Position p : pos.getAdjacent())
+        if (p.isOnPitch() && !state.getPlayerAtPosition(p)) return true;
+    return false;
+}
+
 // P130: Side Step je volba ("his coach MAY choose", l. 8471-8473). V živé partii
 // se kouč odtlačeného ptá; pole pak určí příkazem `sidestep` (jinak co nejdál od útočníka).
-static bool usesSideStep(const Player& p) {
-    if (!canSideStep(p)) return false;
+// OPRAVENO 20.10.2026 (P222, review M6) -- kouče se ptalo i tehdy, když vedle hráče nebylo
+// volné pole a skill použít nešel (ř. 8477-8478 „may not use this skill if there are no open
+// squares on the pitch adjacent to this player“). Teď se ptá, jen když platit může.
+static bool usesSideStep(const GameState& state, const Player& p) {
+    if (!canSideStep(p) || !hasOpenAdjacent(state, p.position)) return false;
     if (coachDecides(p.teamSide))
         return askCoach(CoachQuestion::USE_SIDE_STEP, p.id, -1, 0, 0, 3) == 1;
     return true;
@@ -493,7 +504,7 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
             // (it only ever applies to the player its owner blocked).
             Position chainDest;
             pushOne(state, pushed.position, *occupant,
-                    usesSideStep(*occupant), false,
+                    usesSideStep(state, *occupant), false,
                     /*resolveSurfHere=*/true, blockingSide, dice, chainDest, events,
                     depth + 1);
             if (occupant->position != cand[i]) {
@@ -534,7 +545,7 @@ static void pushSkills(const GameState& state, const Player& attacker, const Pla
     const bool hasGrab = attacker.hasSkill(SkillName::Grab);
     grab = hasGrab && grabMayApply;
     if (sideStep && hasGrab) { sideStep = false; grab = false; }
-    if (sideStep) sideStep = usesSideStep(defender);   // P130: volba kouče
+    if (sideStep) sideStep = usesSideStep(state, defender);   // P130: volba kouče
     // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen
     // prázdná pole na hřišti, útočník s Grabem nikdy nevytlačil do davu. Grab je volba
     // (ř. 8149 „he MAY choose“; uživatel 10.10.: „může grab nevyužít pro vysurfování“):
@@ -594,7 +605,7 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed, bool isBlock
     // (i zrušení se Side Step); odtlačení ležícího blok není (ř. 7843-7845), tam Grab neplatí.
     bool sideStep = false, grab = false;
     if (isBlock) pushSkills(state, pusher, pushed, /*grabMayApply=*/true, sideStep, grab);
-    else sideStep = usesSideStep(pushed);
+    else sideStep = usesSideStep(state, pushed);
     Position dest;
     const bool surf = pushOne(state, pusher.position, pushed, sideStep, grab,
                               /*resolveSurfHere=*/false, pusher.teamSide, dice, dest,
