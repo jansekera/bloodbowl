@@ -55,7 +55,11 @@ def blitz_rozbor(kt, bb, s0, kroky, po, H, A):
         a = k["action"]
         if a.type.name != "BLITZ": continue
         b, t = a.player_id, a.target_id
-        t0, t1 = s0.get_player(t), po.get_player(t)
+        try:
+            t0, t1 = s0.get_player(t), po.get_player(t)
+        except IndexError:   # blitz ohlášen, ale bez bloku (cíl neplatný) — 20.10. spadl na tom celý běh
+            return dict(blitzer=b, agilni=int(agilni(kt, s0.get_player(b))), vysledek="bez_bloku", cil_nosic=0, uvolnil=0,
+                        dal_tahl=0, kontakt=0, turnover_v_blitzu=int(k["turnover"]), mame_mic=0, dopredu=0, pred_nosicem=0)
         srazen = any(e["type"] == "KNOCKED_DOWN" and e["player"] == t for e in k["events"])
         posun = (not srazen) and (not t1.is_on_pitch() or kt._xy(t0) != kt._xy(t1))
         nasi0 = [p for p in kt.hraci(s0) if p.team_side == H and p.id != b and kt._stoji(p) and kt._vedle(kt._xy(p), kt._xy(t0))]
@@ -74,6 +78,14 @@ def blitz_rozbor(kt, bb, s0, kroky, po, H, A):
 
 
 def hra(a):
+    try:
+        return _hra(a)
+    except Exception as e:   # jedna vadná hra nesmí zahodit ostatní (20.10.: ztraceno 66 her)
+        print("CHYBA", a, repr(e), flush=True)
+        return []
+
+
+def _hra(a):
     nasi, sou, g, utok = a
     import bb_kontrola_tahu as kt
     bb = kt.bb; H, A = bb.TeamSide.HOME, bb.TeamSide.AWAY
