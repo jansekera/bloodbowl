@@ -283,7 +283,9 @@ final class DivingCatchTest extends TestCase
         $this->assertNotContains('touchback', $types);
         $ball = $result['state']->getBall();
         $this->assertNull($ball->getCarrierId(), 'míč nikdo nedrží');
-        $this->assertSame([11, 7], [$ball->getPosition()->getX(), $ball->getPosition()->getY()], 'odraz z pole dopadu');
+        $pos = $ball->getPosition();
+        $this->assertNotNull($pos);
+        $this->assertSame([11, 7], [$pos->getX(), $pos->getY()], 'odraz z pole dopadu');
     }
 
     public function testCrowdThrowInLandingNextToDivingCatchPlayer(): void
