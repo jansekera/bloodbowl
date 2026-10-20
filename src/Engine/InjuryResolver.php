@@ -102,7 +102,11 @@ final class InjuryResolver
      */
     public function resolveRegeneration(MatchPlayerDTO $player, DiceRollerInterface $dice, bool $hasStakes, array $events): array
     {
-        if ($player->getState() !== PlayerState::INJURED || !$player->hasSkill(SkillName::Regeneration)) {
+        // OPRAVENO 20.10.2026 (P192 parita) -- tady bylo jen INJURED, mrtvý se neregeneroval.
+        //   Pravidla ř. 8406-8408: "If the player suffers a Casualty result ... roll a D6 for
+        //   Regeneration after the roll on the Casualty table" -- Dead je výsledek té tabulky (C++ totéž).
+        $poCasualty = $player->getState() === PlayerState::INJURED || $player->getState() === PlayerState::DEAD;
+        if (!$poCasualty || !$player->hasSkill(SkillName::Regeneration)) {
             return ['player' => $player, 'events' => $events];
         }
         if ($hasStakes) {
