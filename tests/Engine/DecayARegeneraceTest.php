@@ -89,6 +89,20 @@ final class DecayARegeneraceTest extends TestCase
         $this->assertSame(8, $dice->getRollCount(), 'dva hody na tabulce Casualty');
     }
 
+    public function testDecayJeJednaUdalostCasualtySObemaHody(): void
+    {
+        // Review P192 M5: Decay vydával DVĚ události `casualty` (C++ jednu) ⇒ kdo by je počítal,
+        //   napočítal by dvě zranění jednoho hráče. Jedna událost nese oba hody a platný výsledek.
+        $result = (new InjuryResolver())->resolve($this->hrac([SkillName::Decay]), new FixedDiceRoller([6, 6, 5, 5, 1, 1, 6, 1]));
+
+        $cas = array_values(array_filter($result['events'], static fn($e) => $e->getType() === 'casualty'));
+        $this->assertCount(1, $cas, 'jedno zranění = jedna událost casualty');
+        $data = $cas[0]->getData();
+        $this->assertSame([1, 1, 'badly_hurt'], [$data['tens'], $data['units'], $data['result']], 'první hod');
+        $this->assertSame(['tens' => 6, 'units' => 1, 'result' => 'dead'], $data['decay'], 'druhý hod (Decay)');
+        $this->assertSame('dead', $data['applied'], 'platí horší z obou');
+    }
+
     public function testBezDecayPlatiJenPrvniHodNaTabulceCasualty(): void
     {
         // Pozitivní kontrola: tytéž kostky bez Decay ⇒ jen Badly Hurt (zraněný), druhý D68 se nehází.

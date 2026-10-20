@@ -120,14 +120,28 @@ final class GameEvent
      * `tens`/`units` jsou v datech kvuli dohledatelnosti: bez nich nejde zpetne
      * overit, ze rozlozeni sedi na tabulku.
      */
-    public static function casualty(int $playerId, int $tens, int $units, string $result): self
+    /**
+     * Hod na tabulce Casualty. U Decay (ř. 8036-8042) nese TATÁŽ událost i druhý hod (`decay`)
+     * a platný výsledek (`applied`, horší z obou) -- jedno zranění = jedna událost.
+     *
+     * @param array{tens: int, units: int, result: string}|null $decay
+     */
+    public static function casualty(int $playerId, int $tens, int $units, string $result, ?array $decay = null, ?string $applied = null): self
     {
-        return new self('casualty', "Casualty: {$result} (D68 {$tens}{$units})", [
+        $data = [
             'playerId' => $playerId,
             'tens' => $tens,
             'units' => $units,
             'result' => $result,
-        ]);
+        ];
+        $description = "Casualty: {$result} (D68 {$tens}{$units})";
+        if ($decay !== null) {
+            $data['decay'] = $decay;
+            $data['applied'] = $applied ?? $result;
+            $description .= ", Decay: {$decay['result']} (D68 {$decay['tens']}{$decay['units']}) => {$data['applied']}";
+        }
+
+        return new self('casualty', $description, $data);
     }
 
     public static function crowdSurf(int $playerId): self

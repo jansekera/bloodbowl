@@ -335,12 +335,6 @@ final class InjuryResolver
             //   i kdyz ho zatim nic necte.
             $cas = $this->rollCasualty($dice);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'casualty');
-            $events[] = GameEvent::casualty(
-                $player->getId(),
-                $cas['tens'],
-                $cas['units'],
-                $cas['result']->value,
-            );
             // P206 (14.10.2026, převod C++ `injury.cpp`) -- lékárník HNED po Casualty a PŘED
             //   Regenerací (ř. 8433-8440). OPRAVENO: dřív jen v bloku a přehazoval CELÝ hod na
             //   zranění. Pravidla ř. 1200-1210: soupeř hodí znovu na tabulku Casualty, vybere se
@@ -351,14 +345,28 @@ final class InjuryResolver
             //   table, roll twice on the CASUALTY TABLE and apply both results ... A successful
             //   Regeneration roll will heal both results." V zápase platí horší (smrt); lékárníka
             //   týmy s Decay nemají (ř. 1198-1199). C++ totéž (`injury.cpp`).
+            //   OPRAVENO 20.10.2026 (P221, review P192 M5) -- druhý hod měl vlastní událost `casualty`,
+            //   takže jedno zranění dávalo dvě (C++ jednu). Teď jedna událost nese oba hody.
+            $druhyDecay = null;
             if ($player->hasSkill(SkillName::Decay)) {
                 $druhyDecay = $this->rollCasualty($dice);
-                $events[] = GameEvent::casualty($player->getId(), $druhyDecay['tens'], $druhyDecay['units'], $druhyDecay['result']->value);
                 $poradi = array_flip(array_map(fn(CasualtyResult $c) => $c->value, CasualtyResult::cases()));
                 if ($poradi[$druhyDecay['result']->value] > $poradi[$vysledek->value]) {
                     $vysledek = $druhyDecay['result'];   // horší z obou (pořadí výčtu = závažnost)
                 }
             }
+            $events[] = GameEvent::casualty(
+                $player->getId(),
+                $cas['tens'],
+                $cas['units'],
+                $cas['result']->value,
+                $druhyDecay === null ? null : [
+                    'tens' => $druhyDecay['tens'],
+                    'units' => $druhyDecay['units'],
+                    'result' => $druhyDecay['result']->value,
+                ],
+                $vysledek->value,
+            );
             $rezervy = false;
             $odlozeno = $this->odlozitLekarnika !== null && ($this->odlozitLekarnika)($player, 'casualty', $vysledek, $hasStakes);
             if ($odlozeno) {
