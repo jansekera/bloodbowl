@@ -65,4 +65,32 @@ final class DecayARegeneraceTest extends TestCase
         // pozitivní kontrola: Regenerace 3 ⇒ mrtvý zůstává mrtvý
         $this->assertSame(PlayerState::DEAD, $this->stav([SkillName::Regeneration], [6, 6, 6, 6, 6, 1, 3]));
     }
+
+    public function testDecayNehaziZraneniDvakrat(): void
+    {
+        // brnění 6+6 · zranění 3+3 = omráčen. Stará mechanika hodila zranění znovu (5+5 = 10,
+        //   horší) ⇒ Casualty a D68 1,1 ⇒ zraněný.
+        $dice = new FixedDiceRoller([6, 6, 3, 3, 5, 5, 1, 1]);
+        $stav = (new InjuryResolver())->resolve($this->hrac([SkillName::Decay]), $dice)['player']->getState();
+
+        $this->assertSame(PlayerState::STUNNED, $stav);
+        $this->assertSame(4, $dice->getRollCount(), 'jen brnění a jedno zranění');
+    }
+
+    public function testDecayHaziDvakratNaTabulceCasualtyAPlatiObaVysledky(): void
+    {
+        // zranění 5+5 ⇒ Casualty · D68 6,1 = Dead · druhý D68 1,1 = Badly Hurt ⇒ mrtvý.
+        //   Stará mechanika: druhé zranění 6+1 = 7 (lepší, zůstává 10), D68 1,1 ⇒ jen zraněný.
+        $this->assertSame(PlayerState::DEAD, $this->stav([SkillName::Decay], [6, 6, 5, 5, 6, 1, 1, 1]));
+    }
+
+    public function testDecayARegeneraceLeciObaVysledky(): void
+    {
+        // dvakrát Dead (6,1 a 6,2), Regenerace 4 ⇒ rezervy (ř. 8041-8042 "heal both results")
+        $dice = new FixedDiceRoller([6, 6, 5, 5, 6, 1, 6, 2, 4]);
+        $stav = (new InjuryResolver())->resolve($this->hrac([SkillName::Decay, SkillName::Regeneration]), $dice)['player']->getState();
+
+        $this->assertSame(PlayerState::OFF_PITCH, $stav);
+        $this->assertSame(9, $dice->getRollCount());
+    }
 }
