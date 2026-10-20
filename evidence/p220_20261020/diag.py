@@ -10,6 +10,9 @@
 #   být cílem srazit“ ⇒ u každého blitzu i jeho výsledek: cíl sražen / jen odsunut / nic; cíl = nosič;
 #   kolik našich hráčů blitz uvolnil (cíl je markoval před tahem, po tahu už ne); blitzující po bloku dál táhl;
 #   blitzující na konci v kontaktu; blitzující sražen v odpovědi soupeře.
+# Uživatel 20.10.: „agilní hráč pak může odskočit, i když blitz nesrazí — např. pro uvolnění cesty pro příjemce pro
+#   pass další kolo — blitzer může být zároveň první kandidát na příjemce“ ⇒ i: míč máme, blitzující o kolik polí
+#   vpřed (HOME útočí k x = 25), skončil před nosičem, volný (stojí, bez zóny soupeře) po odpovědi soupeře.
 import sys, os, pickle, collections, multiprocessing as mp
 KOREN = sys.argv[1]; VYST = sys.argv[2]; N = int(sys.argv[3]) if len(sys.argv) > 3 else 6
 NASI = ["wood-elf", "skaven"]; SOUPERI = ["dwarf", "orc", "human"]
@@ -60,7 +63,11 @@ def blitz_rozbor(kt, bb, s0, kroky, po, H, A):
         dal = any(kk["action"].player_id == b for kk in kroky[i + 1:])
         bp = po.get_player(b)
         kontakt = kt._ma_zony(bp) and any(q.team_side == A and kt._ma_zony(q) and kt._vedle(kt._xy(bp), kt._xy(q)) for q in kt.hraci(po))
-        return dict(blitzer=b, agilni=int(agilni(kt, s0.get_player(b))), cil_nosic=int(s0.ball.carrier_id == t),
+        nos = po.ball.carrier_id
+        mame = any(p.id == nos and p.team_side == H for p in kt.hraci(po))
+        return dict(mame_mic=int(mame), dopredu=bp.position.x - s0.get_player(b).position.x if bp.is_on_pitch() else 0,
+                    pred_nosicem=int(mame and bp.is_on_pitch() and bp.position.x > po.get_player(nos).position.x),
+                    blitzer=b, agilni=int(agilni(kt, s0.get_player(b))), cil_nosic=int(s0.ball.carrier_id == t),
                     vysledek="srazen" if srazen else ("posun" if posun else "nic"), uvolnil=uvolnil,
                     dal_tahl=int(dal), kontakt=int(bool(kontakt)), turnover_v_blitzu=int(k["turnover"]))
     return None
@@ -89,7 +96,11 @@ def hra(a):
                 srazeni = set()
                 bl = blitz_rozbor(kt, bb, s, kroky, po, H, A)
                 if po.phase == bb.GamePhase.PLAY and po.active_team == A and (kat or bl):
-                    k2, _, _ = kt.plan_tahu(po, ai="macro_mcts", seed=seed + 1)
+                    k2, po2, _ = kt.plan_tahu(po, ai="macro_mcts", seed=seed + 1)
+                    if bl:
+                        q = po2.get_player(bl["blitzer"])
+                        bl["volny_po_odpovedi"] = int(q.is_on_pitch() and kt._ma_zony(q) and not any(
+                            o.team_side == A and kt._ma_zony(o) and kt._vedle(kt._xy(q), kt._xy(o)) for o in kt.hraci(po2)))
                     srazeni = {e["player"] for k in k2 for e in k["events"] if e["type"] == "KNOCKED_DOWN"}
                 if bl: bl["blitzer_srazen"] = int(bl["blitzer"] in srazeni)
                 zaznam["ramena"][r] = dict(kat=kat, srazen={pid: int(pid in srazeni) for pid in kat}, blitz=bl,
