@@ -69,6 +69,24 @@ final class GrabPravyTest extends TestCase
             ->build();
     }
 
+    public function testGrabTlaciNaKterekoliVolneSousedniPoleMistoRetezu(): void
+    {
+        // 3 asistence ⇒ 2 kostky, obě 3 = Pushed. Stará mechanika: řetěz na (7,x).
+        $r = $this->rana($this->triPoleObsazena([SkillName::Grab]), ActionType::BLOCK, [3, 3, 3, 3]);
+
+        $this->assertNotContains('chain_push', $this->typy($r), 'ř. 8149-8150: kterékoli volné sousední pole');
+        $this->assertNotSame(7, $this->pole($r, 2)[0]);
+        $this->assertSame([7, 7], $this->pole($r, 4));
+    }
+
+    public function testBezGrabuTataRanaRetezi(): void
+    {
+        // Pozitivní kontrola k testu výš: rozestavení opravdu vede běžným odtlačením do řetězu.
+        $r = $this->rana($this->triPoleObsazena([]), ActionType::BLOCK, [3, 3, 3, 3]);
+
+        $this->assertContains('chain_push', $this->typy($r));
+    }
+
     public function testGrabVBlitzuNeplati(): void
     {
         // ř. 8148 "only while making a Block Action". Prázdné okolí: Grab by mohl zvolit jiné
@@ -98,5 +116,29 @@ final class GrabPravyTest extends TestCase
         $this->assertSame(7, $this->pole($sGrabem, 2)[0]);
         $this->assertNotContains('chain_push', $this->typy($bezGrabu));
         $this->assertNotSame(7, $this->pole($bezGrabu, 2)[0]);
+    }
+
+    public function testGrabBezVolnehoSousednihoPoleNeridiRetez(): void
+    {
+        // ř. 8153-8154 "Grab will not work if there are no empty adjacent squares" ⇒ běžná
+        //   pravidla včetně volby pole řetězu: výsledek musí být týž jako bez Grabu.
+        $state = function (bool $grab): GameState {
+            $b = (new GameStateBuilder())
+                ->addPlayer(TeamSide::HOME, 5, 7, skills: $grab ? [SkillName::Grab] : [], id: 1)
+                ->addPlayer(TeamSide::AWAY, 6, 7, id: 2);
+            $id = 3;
+            foreach ([[5, 6], [5, 8], [6, 6], [6, 8], [7, 6], [7, 7], [7, 8]] as [$x, $y]) {
+                $b = $b->addPlayer(TeamSide::HOME, $x, $y, id: $id++);
+            }
+
+            return $b->withBallOffPitch()->build();
+        };
+
+        $sGrabem = $this->rana($state(true), ActionType::BLOCK, [3, 3, 3, 3]);
+        $bezGrabu = $this->rana($state(false), ActionType::BLOCK, [3, 3, 3, 3]);
+
+        foreach ([2, 3, 4, 5, 6, 7, 8, 9] as $id) {
+            $this->assertSame($this->pole($bezGrabu, $id), $this->pole($sGrabem, $id), "hráč $id");
+        }
     }
 }

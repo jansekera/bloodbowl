@@ -1388,15 +1388,31 @@ final class BlockHandler implements ActionHandlerInterface
                 }
             }
         }
-        if ($grab && !$offPitchAvailable) {
-            // Grab: utocnik voli nejhorsi volne pole (nejvic zon). Je-li jedno z poli mimo
-            //   hriste, rozhoduje bezne poradi niz (volne pole > dav > retez).
-            if ($emptySquares !== []) {
-                usort($emptySquares, fn(Position $a, Position $b) => $zonySoupere($b) <=> $zonySoupere($a));
-                $pushTo = $emptySquares[0];
-            } else {
-                $retez = true;
+        // OPRAVENO 20.10.2026 (P192, parita s C++) -- Grab vybíral jen ze tří polí diagramu
+        //   a při obsazených řetězil. Pravidla ř. 8149-8150: "he may choose ANY EMPTY SQUARE
+        //   ADJACENT TO HIS OPPONENT"; ř. 8153-8154: bez volného sousedního pole neplatí (běžné
+        //   pořadí níž). Je to volba (ř. 8149 "may"; uživatel 10.10. "může grab nevyužít pro
+        //   vysurfování"): vede-li běžné odtlačení do davu, útočník ho nepoužije.
+        $grabSquares = [];
+        if ($grab && !($emptySquares === [] && $offPitchAvailable)) {
+            foreach ($kde->getAdjacentPositions() as $pos) {
+                if ($state->getPlayerAtPosition($pos) === null) {
+                    $grabSquares[] = $pos;
+                }
             }
+        }
+        // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
+        $nejhorsiPrvni = function (Position $a, Position $b) use ($zonySoupere): int {
+            $tzA = $zonySoupere($a);
+            $tzB = $zonySoupere($b);
+            if ($tzA !== $tzB) {
+                return $tzB <=> $tzA;
+            }
+            return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
+        };
+        if ($grabSquares !== []) {
+            usort($grabSquares, $nejhorsiPrvni);
+            $pushTo = $grabSquares[0];
         } elseif ($sideStepSquares !== []) {
             // Side Step (i v retezu): odtlaceny voli nejbezpecnejsi sousedni pole (nejmin zon)
             usort($sideStepSquares, fn(Position $a, Position $b) => $zonySoupere($a) <=> $zonySoupere($b));
@@ -1407,15 +1423,7 @@ final class BlockHandler implements ActionHandlerInterface
             //   polí mimo hřiště, šel hráč do davu, i když vedle bylo volné pole. Pravidla
             //   ř. 639: "must be pushed back into an empty square if possible"; ř. 650-651:
             //   do davu jen "if there are no eligible empty squares on the pitch".
-            // nejhorsi volne pole pro odtlaceneho: nejvic zon, pak bliz k lajne
-            usort($emptySquares, function (Position $a, Position $b) use ($zonySoupere) {
-                $tzA = $zonySoupere($a);
-                $tzB = $zonySoupere($b);
-                if ($tzA !== $tzB) {
-                    return $tzB <=> $tzA;
-                }
-                return min($a->getY(), 14 - $a->getY()) <=> min($b->getY(), 14 - $b->getY());
-            });
+            usort($emptySquares, $nejhorsiPrvni);
             $pushTo = $emptySquares[0];
         } elseif ($offPitchAvailable) {
             // Zadne volne pole na hristi a jedno z poli je mimo ⇒ dav (r. 650-651), ne retez

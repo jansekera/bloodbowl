@@ -159,29 +159,6 @@ final class SmartPushbackTest extends TestCase
     }
 
     /**
-     * Grab still uses its own attacker-worst-for-defender path.
-     */
-    public function testPushWithGrabStillAttackerWorst(): void
-    {
-        $state = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 9, 7, skills: [SkillName::Grab], id: 1)
-            ->addPlayer(TeamSide::AWAY, 10, 7, id: 2)
-            ->addPlayer(TeamSide::HOME, 12, 7, id: 3) // TZ source
-            ->withBallOffPitch()
-            ->build();
-
-        // 1 die: roll 3 → PUSHED
-        $dice = new FixedDiceRoller([3]);
-        $resolver = new ActionResolver($dice);
-        $result = $resolver->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
-
-        $defPos = $result->getNewState()->requirePlayer(2)->requirePosition();
-        // Grab picks most TZs for defender. All 3 squares have 1 TZ from player 3.
-        // Grab has no sideline tiebreak, just picks first in TZ order.
-        $this->assertEquals(11, $defPos->getX());
-    }
-
-    /**
      * All 3 push squares on-pitch. No crowd surf, sorts by TZ + sideline.
      * Defender in middle of pitch, all push squares valid and on-pitch.
      */
