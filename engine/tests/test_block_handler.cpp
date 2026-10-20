@@ -2375,3 +2375,44 @@ TEST(BlockHandler, P192GrabStillPicksAnyEmptyAdjacentSquareInsteadOfAChain) {
     EXPECT_EQ(gs.getPlayer(3).position, (Position{12, 7}));
 }
 
+// (5) Bez volného sousedního pole Side Step ani Grab neplatí (ř. 8153-8154, 8477-8478) —
+// a pak NESMÍ ani vybírat, kam se řetězí: platí běžná pravidla, pole volí útočník běžnou
+// volbou (pushDestScore: co nejdál od našeho nosiče). Dřív se kandidáti vrátili na tři pole,
+// ale výběr mezi nimi dál řídil skill (Side Step: obránce; Grab: „k lajně“).
+namespace {
+GameState surroundedDefenderFixture() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    const Position around[7] = {{10, 6}, {10, 8}, {11, 6}, {11, 8}, {12, 6}, {12, 7}, {12, 8}};
+    for (int k = 0; k < 7; ++k) placePlayer(gs, 2 + k, around[k], TeamSide::HOME);
+    placePlayer(gs, 9, {13, 9}, TeamSide::HOME);     // náš nosič: běžná volba tlačí od něj ⇒ (12,6)
+    gs.ball = BallState::carried({13, 9}, 9);
+    return gs;
+}
+}  // namespace
+
+TEST(BlockHandler, P192SideStepWithNoOpenSquareDoesNotPickTheChainSquare) {
+    GameState gs = surroundedDefenderFixture();
+    gs.getPlayer(12).skills.add(SkillName::SideStep);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
+
+TEST(BlockHandler, P192GrabWithNoEmptySquareDoesNotPickTheChainSquare) {
+    GameState gs = surroundedDefenderFixture();
+    gs.getPlayer(1).skills.add(SkillName::Grab);
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
+
+// Pozitivní kontrola k (5): táž rána bez skillů vede na (12,6) — fixture měří, co má.
+TEST(BlockHandler, P192SurroundedDefenderWithoutSkillsIsChainedAwayFromOurCarrier) {
+    GameState gs = surroundedDefenderFixture();
+    FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}

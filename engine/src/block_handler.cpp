@@ -160,14 +160,16 @@ static int distanceToEdge(Position p) {
 // there are no open squares on the pitch adjacent to this player" / "Grab will
 // not work if there are no empty adjacent squares"), so a wide set that turns
 // up empty-handed falls back to the standard three and the push chains as usual.
+// `wide` se pak vrací jako false: skill neplatí ani pro výběr mezi třemi poli.
 static int pushCandidates(const GameState& state, Position pusherPos,
-                          Position pushedPos, bool wide, Position out[8]) {
+                          Position pushedPos, bool& wide, Position out[8]) {
     if (wide) {
         int n = 0;
         for (Position p : pushedPos.getAdjacent()) {
             if (p.isOnPitch() && !state.getPlayerAtPosition(p)) out[n++] = p;
         }
         if (n > 0) return n;
+        wide = false;
     }
     return getPushbackSquares(pusherPos, pushedPos, out);
 }
@@ -417,8 +419,15 @@ static bool pushOne(GameState& state, Position pusherPos, Player& pushed,
                     TeamSide blockingSide, DiceRollerBase& dice, Position& dest,
                     std::vector<GameEvent>* events, int depth) {
     Position cand[8];
-    int count = pushCandidates(state, pusherPos, pushed.position,
-                               sideStep || grab, cand);
+    bool wide = sideStep || grab;
+    int count = pushCandidates(state, pusherPos, pushed.position, wide, cand);
+    // OPRAVENO 20.10.2026 (review P192, nález 5) -- bez volného sousedního pole se
+    // kandidáti vrátili na tři pole diagramu, ale výběr mezi nimi (komu se řetězí) dál
+    // řídil skill: u Side Step obránce, u Grabu „k lajně“. Pravidla ř. 8153-8154 („Grab
+    // will not work if there are no empty adjacent squares“) a ř. 8477-8478 (Side Step
+    // „may not use this skill if there are no open squares on the pitch adjacent“) ⇒
+    // platí běžná pravidla včetně toho, kdo volí (ř. 637-638: kouč útočníka).
+    if (!wide) { sideStep = false; grab = false; }
 
     bool anyEmpty = false;
     for (int i = 0; i < count; i++) {
