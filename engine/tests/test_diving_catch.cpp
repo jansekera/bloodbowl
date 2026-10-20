@@ -14,7 +14,9 @@
 #include <gtest/gtest.h>
 #include "bb/pass_handler.h"
 #include "bb/ball_handler.h"
+#include "bb/game_simulator.h"
 #include "bb/helpers.h"
+#include "bb/roster.h"
 
 using namespace bb;
 
@@ -213,4 +215,40 @@ TEST(DivingCatch, BouncingBallIsNotDivingCaught) {
     EXPECT_EQ(divingCatchEvents(events), 0);
     EXPECT_FALSE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.position, (Position{5, 7}));
+}
+
+// Pozitivní kontrola na skutečné soupisce: Wood Elf TV1500 (`getDevelopedRoster("woodelf", 1500)`),
+// Catcher AG4 s Catch, Dodge, Sprint, Block, Diving Catch. Soupeř na (11,5) dává zónu na pole dopadu
+// (10,6), ne na hráčovo pole (10,7): "as if it had landed in his own square" ⇒ 7-4 = 3+.
+TEST(DivingCatch, WoodElfTv1500CatcherCatchesWithModifiersOfHisOwnSquare) {
+    const TeamRoster* roster = getDevelopedRoster("woodelf", 1500);
+    ASSERT_NE(roster, nullptr);
+    GameState team;
+    setupHalf(team, *roster, *roster);
+    const Player* elf = nullptr;
+    for (const auto& p : team.players)
+        if (p.teamSide == TeamSide::HOME && p.hasSkill(SkillName::DivingCatch)) elf = &p;
+    ASSERT_NE(elf, nullptr) << "soupiska TV1500 elfů má hráče s Diving Catch";
+
+    GameState gs = passSetup();
+    placePlayer(gs, 1, {5, 5}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 5}, 1);
+    placePlayer(gs, 13, {11, 5}, TeamSide::AWAY);
+    Player& catcher = gs.getPlayer(2);
+    catcher = *elf;
+    catcher.id = 2;
+    catcher.teamSide = TeamSide::HOME;
+    catcher.state = PlayerState::STANDING;
+    catcher.position = {10, 7};
+    ASSERT_EQ(catcher.stats.agility, 4);
+
+    FixedDiceRoller dice(inaccurateToTenSix({3}));
+    std::vector<GameEvent> events;
+    auto result = resolvePass(gs, 1, {10, 5}, dice, &events);
+
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2) << "chytil na 3+ (modifikátory jeho pole)";
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{10, 7}));
+    EXPECT_FALSE(result.turnover);
 }
