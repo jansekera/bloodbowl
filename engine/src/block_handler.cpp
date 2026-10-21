@@ -63,6 +63,11 @@ thread_local long g_dauntlessRolls = 0;
 thread_local long g_pushGeometryPicks = 0;
 thread_local long g_pushGeometryPicksDodge = 0;   // redirected AND pushed target has Dodge
 thread_local long g_pushGeometryPicksFastMA = 0;  // redirected AND pushed target MA >= 6 (first-pass "fast mover" cutoff, not a tuned constant)
+thread_local long g_standFirmDeclinedForFrenzy = 0;   // P225
+long takeStandFirmDeclinedForFrenzy() {
+    long v = g_standFirmDeclinedForFrenzy; g_standFirmDeclinedForFrenzy = 0; return v;
+}
+
 
 long takeDauntlessRollEvalsInSearch() {
     long v = g_dauntlessRolls;
@@ -393,6 +398,11 @@ static bool holdsGround(const Player& p, TeamSide blockingSide) {
     // řetězovému odtlačení (uživatel 12.10.).
     if (coachDecides(p.teamSide))
         return askCoach(CoachQuestion::USE_STAND_FIRM, p.id, -1, 0, 0, 3) == 1;
+    // P225 (past na Frenzy) tu záměrně NENÍ: sem chodí jen hráč v ŘETĚZU odtlačení
+    // a pushAwayFrom (B&C, odtlačení mimo blok). Druhý blok Frenzy míří na přímo
+    // blokovaného obránce (ř. 8139-8141 "against the same opponent"), ne na hráče v řetězu,
+    // a pushAwayFrom druhý blok Frenzy nemá -- past tu nevzniká, AI drží pole jako dosud.
+    // Přímo blokovaného obránce rozhoduje resolvePushback.
     return true;
 }
 
@@ -567,9 +577,69 @@ static void pushSkills(const GameState& state, const Player& attacker, const Pla
     }
 }
 
+// Smí blitzující zaplatit další blok (pole pohybu, případně GFI)? ř. 8143-8145: Frenzy
+// v blitzu "must pay a square of Movement and must make the second block unless he has no
+// further normal movement and cannot go for it again". Jedno místo pro druhý blok Frenzy
+// i pro P225 (past na Frenzy počítá jen s blokem, který se opravdu hodí).
+static bool blitzBlockPayable(const Player& att) {
+    // Take Root, l. 8577-8578: zakorenený nesmi GFI.
+    const int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
+    return att.movementRemaining - 1 >= gfiFloor;
+}
+
+// P225: podepsaný počet kostek bloku jako getBlockDiceCount (+ volí útočník, − obránce),
+// se skutečnými asistencemi z polí, kde hráči právě stojí. Horns na druhý blok neplatí
+// (block_handler: secondParams.hornsBonus = false); Dauntless se hází u obou bloků stejně,
+// takže srovnání dvou poloh nemění -- vynechán.
+static int secondBlockDice(const GameState& state, const Player& att, const Player& def) {
+    const int a = countAssists(state, def.position, att.teamSide, att.id, def.id, def.id);
+    const int d = countAssists(state, att.position, def.teamSide, att.id, def.id, att.id);
+    const BlockDiceInfo info = getBlockDiceInfo(att.stats.strength + a, def.stats.strength + d);
+    return info.attackerChooses ? info.count : -info.count;
+}
+
+// P225 (uživatel 21.10.2026): nachystaná past na Frenzy. Stand Firm je volba (ř. 8510-8516
+// "may choose to not be pushed back"; ř. 985 a 1820 "Skill use is not mandatory"). Frenzy po
+// Pushed / Defender Stumbles musí následovat a hodit druhý blok, dokud oba stojí a sousedí
+// (ř. 8134-8141). Se Stand Firm hází druhý blok ze STEJNÉHO pole, bez něj z NOVÉHO po
+// odtlačení a follow-upu. Past = druhý blok z nového pole je pro útočníka horší (méně kostek
+// pro něj), odtlačení nevede do davu a obránce nenese míč. Jen tato akce, žádný výhled dál.
+// Kam bude obránce odtlačen, rozhoduje útočník -- proto se odtlačení přehraje na kopii stavu
+// TÝMIŽ funkcemi jako skutečné (pushSkills + pushOne: výběr pole, Side Step, Grab, řetěz, dav),
+// s neutrálními kostkami (hází se jen v řetězu u cizích hráčů, na pole obránce to nemá vliv).
+// Volá se jen mimo živou partii: tam pole volí člověk až potom, AI ho předem nezná.
+static bool frenzyTrapReady(const GameState& state, const Player& att, const Player& def,
+                            bool isBlitz) {
+    if (state.ball.isHeld && state.ball.carrierId == def.id) return false;      // (c)
+    struct NeutralDice : DiceRollerBase {
+        int rollD6() override { return 4; }
+        int rollD8() override { return 1; }
+    } neutral;
+    const ManualBlockChoices manual = saveManualBlockChoices();
+    const long picks = g_pushGeometryPicks, picksDodge = g_pushGeometryPicksDodge,
+               picksFast = g_pushGeometryPicksFastMA;
+    GameState sim = state;
+    Player& sa = sim.getPlayer(att.id);
+    Player& sd = sim.getPlayer(def.id);
+    bool sideStep, grab;
+    pushSkills(sim, sa, sd, /*grabMayApply=*/!isBlitz, sideStep, grab);
+    Position dest;
+    const bool surf = pushOne(sim, sa.position, sd, sideStep, grab, /*resolveSurfHere=*/false,
+                              sa.teamSide, neutral, dest, nullptr, 0);
+    restoreManualBlockChoices(manual);
+    g_pushGeometryPicks = picks; g_pushGeometryPicksDodge = picksDodge; g_pushGeometryPicksFastMA = picksFast;
+    if (surf) return false;                                                      // (b)
+    if (sd.position == def.position) return false;   // řetěz se zasekl: nikdo se nehne, tentýž blok
+    sa.position = def.position;                      // povinný follow-up Frenzy (ř. 8138)
+    if (!canAct(sd.state) || sa.position.distanceTo(sd.position) != 1) return false;   // druhý blok nebude
+    return secondBlockDice(sim, sa, sd) < secondBlockDice(state, att, def);    // (a)
+}
+
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
+// `frenzyTrapPossible` (P225): druhý blok Frenzy po tomto odtlačení se hodí, jestli obránce
+// zůstane stát a útočník smí následovat -- skládá ho resolveBlock, který to ví.
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
-                            bool isBlitz, DiceRollerBase& dice,
+                            bool isBlitz, bool frenzyTrapPossible, DiceRollerBase& dice,
                             Position& pushDest, std::vector<GameEvent>* events) {
     // Take Root, l. 8578-8579: zakorenený hráč "may not Go For It, BE PUSHED
     // BACK FOR ANY REASON, or use any skill that would allow him to move out of
@@ -583,8 +653,17 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
     if (defender.hasSkill(SkillName::StandFirm)) {
         bool juggernautOverride = isBlitz && attacker.hasSkill(SkillName::Juggernaut);
         // P130: v živé partii volí kouč obránce, jestli Stand Firm použije.
-        const bool declined = !juggernautOverride && coachDecides(defender.teamSide) &&
+        bool declined = !juggernautOverride && coachDecides(defender.teamSide) &&
             askCoach(CoachQuestion::USE_STAND_FIRM, defender.id, attacker.id, 0, 0, 3) == 0;
+        // P225: AI obránce nepoužije Stand Firm, když na něj útočník s Frenzy nachystal past
+        // (frenzyTrapReady). Rozhoduje se TADY, ne v holdsGround: přímo blokovaného obránce řeší
+        // jen tahle větev; holdsGround slouží řetězu a pushAwayFrom, kde past nevzniká (viz tam).
+        if (!juggernautOverride && !declined && !coachModeOn() && frenzyTrapPossible &&
+            extraFeatureOn(kP225FrenzyTrapStandFirm) &&
+            frenzyTrapReady(state, attacker, defender, isBlitz)) {
+            declined = true;
+            ++g_standFirmDeclinedForFrenzy;
+        }
         if (!juggernautOverride && !declined) {
             // P201 (4): v živé partii vlastní řádek (dřív bez důvodu, proč odtlačen nebyl)
             if (coachModeOn()) emitEvent(events, {GameEvent::Type::SKILL_USED, defender.id, attacker.id, {}, {},
@@ -816,9 +895,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     // block cannot be thrown at all. This is what denies a Frenzy second
     // block after "GFI to arrive + GFI for the first block".
     if (params.isBlitz) {
-        // Take Root, l. 8577-8578: zakorenený nesmi GFI.
-        int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
-        if (att.movementRemaining - 1 < gfiFloor) {
+        if (!blitzBlockPayable(att)) {
             // No movement and no GFI left: no block is thrown.
             ++g_blitzBlockUnpayable;   // P37b
             att.hasActed = true;
@@ -1306,10 +1383,18 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         return ActionResult::turnovr();
     }
 
+    // Fend zakazuje follow-up i sraženému a i do davu (ř. 8115); Juggernaut ho v blitzu ruší.
+    const bool fendPrevents = def.hasSkill(SkillName::Fend) &&
+                              !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
     // Pushback resolution
     if (defPushed) {
-        bool crowdSurf = resolvePushback(state, att, def, params.isBlitz, dice,
-                                          pushDest, events);
+        // P225: past na Frenzy jen tam, kde by se druhý blok bez Stand Firm opravdu hodil:
+        // obránce po odtlačení stojí, útočník (Frenzy) smí následovat a v blitzu ho zaplatí.
+        const bool frenzyTrapPossible = !frenzySecondBlock && !frenzyDisabled && !defKnockedDown &&
+            att.hasSkill(SkillName::Frenzy) && !noFollowUp && !fendPrevents &&
+            (!params.isBlitz || blitzBlockPayable(att));
+        bool crowdSurf = resolvePushback(state, att, def, params.isBlitz, frenzyTrapPossible,
+                                          dice, pushDest, events);
 
         if (crowdSurf) {
             // Crowd surf. A surfed BALL CARRIER does not just drop the ball
@@ -1333,9 +1418,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             const bool defHadBall = state.ball.isHeld && state.ball.carrierId == def.id;
             if (!defHadBall) handleBallOnPlayerDown(state, def.id, dice, events);
             def.position = {-1, -1};
-            const bool fendBlocks = def.hasSkill(SkillName::Fend) &&
-                                    !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
-            if (!noFollowUp && !fendBlocks) followUp(state, att, def, params, defOldPos, dice, events);
+            if (!noFollowUp && !fendPrevents) followUp(state, att, def, params, defOldPos, dice, events);
             if (defHadBall) {
                 state.ball = BallState::onGround(lastPos);
                 resolveThrowIn(state, lastPos, exitAt, dice, events);
@@ -1365,8 +1448,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // it working only on a clean Pushed. Juggernaut cancels it on a
         // Blitz: "the opposing player may not use his Fend, Stand Firm or
         // Wrestle skills against the Juggernaut player's blocks."
-        bool fendPrevents = def.hasSkill(SkillName::Fend) &&
-                            !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
+        // (fendPrevents výš, před odtlačením -- čte ho i P225.)
         // A follow-up needs a square that was actually vacated. Stand Firm (and
         // a chain that jams against one) leaves the defender where he stood, and
         // we used to walk the attacker onto him -- two players on one square.
@@ -1458,12 +1540,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
         // no movement and no GFI left it is not thrown. Gated here (not
         // only via the charge in the recursive call) so the first block's
         // outcome is preserved unchanged when the second is impossible.
-        if (params.isBlitz) {
-            // Take Root, l. 8577-8578: zakorenený nesmi GFI.
-            int gfiFloor = att.rooted ? 0 : (att.hasSkill(SkillName::Sprint) ? -3 : -2);
-            if (att.movementRemaining - 1 < gfiFloor) {
-                return turnover ? ActionResult::turnovr() : ActionResult::ok();
-            }
+        if (params.isBlitz && !blitzBlockPayable(att)) {
+            return turnover ? ActionResult::turnovr() : ActionResult::ok();
         }
         // Mandatory second block
         BlockParams secondParams = params;

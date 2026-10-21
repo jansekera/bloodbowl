@@ -119,6 +119,9 @@ long blockThrowSeq();
 // P37b: blitz deklarovan, ale na ranu uz nezbylo pole pohybu (r. 549-550).
 // Tym prisel o svuj jediny blitz na kolo a rana nepadla.
 long takeBlitzBlockUnpayableInSearch();
+// P225: kolikrát AI obránce odmítl Stand Firm kvůli pasti na Frenzy (od posledního čtení;
+// čte a nuluje). Tiká i v simulacích hledání -- čte se z her bez hledání (greedy).
+long takeStandFirmDeclinedForFrenzy();
 
 // Ruční volba útočícího kouče pro živou partii s člověkem (02.10.2026):
 // jednorázová, platí pro nejbližší odtlačení / follow-up. Volbu, kterou

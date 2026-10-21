@@ -1,3 +1,4 @@
+#include "bb/block_handler.h"   // P225: čítač odmítnutých Stand Firm
 #include "bb/game_simulator.h"
 #include "bb/policies.h"
 #include "bb/roster.h"
@@ -167,6 +168,8 @@ int main(int argc, char* argv[]) {
               << " - " << (1.0 * totalAwayScore / opts.games) << "\n";
     std::cout << "Time:      " << totalSec << "s ("
               << (opts.games / totalSec) << " games/sec)\n";
+    // P225: pozitivní kontrola mechanismu (u mcts tiká i v simulacích hledání, u greedy jen v partiích).
+    std::cout << "P225 Stand Firm odmítnut (past na Frenzy): " << takeStandFirmDeclinedForFrenzy() << "\n";
 
     return 0;
 }

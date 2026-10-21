@@ -4,6 +4,7 @@
 #include "bb/macro_actions.h"   // M1/N10 arm
 #include "bb/rules_engine.h"
 #include "bb/action_resolver.h"
+#include "bb/coach_choice.h"   // P225: kouč dál dostává otázku Stand Firm
 
 using namespace bb;
 
@@ -2415,4 +2416,139 @@ TEST(BlockHandler, P192SurroundedDefenderWithoutSkillsIsChainedAwayFromOurCarrie
     FixedDiceRoller dice({3, 3, 3, 3, 3, 3, 3, 3});
     resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr, false, true);
     EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6}));
+}
+
+// ============================================================================
+// P225 (uživatel 21.10.2026, „AI jej nepoužije, když má nachystanou frenzy trap“).
+// Stand Firm je volba (ř. 8510-8516 „may choose to not be pushed back“; ř. 985, 1820
+// „Skill use is not mandatory“). Frenzy po Pushed / Defender Stumbles MUSÍ následovat
+// a hodit druhý blok, pokud oba stojí a sousedí (ř. 8134-8141).
+// AI obránce Stand Firm NEPOUŽIJE, když zároveň: (a) druhý blok z nového pole (po
+// odtlačení a follow-upu) je pro útočníka horší než ze stejného pole, (b) odtlačení
+// nepošle obránce do davu, (c) obránce nenese míč. Jinak Stand Firm použije.
+//
+// Past: útočník (Frenzy) z (10,7) na obránce (11,7) se Stand Firm. Dva soupeřovi
+// pomocníci na (12,6) a (12,8): od (10,7) jsou 2 pole, k (11,7) sousedí. Jediné volné
+// pole odtlačení je (12,7) ⇒ útočník následuje na (11,7) a druhý blok hází proti dvěma
+// asistencím obránce: ST3 vs ST5 = 2 kostky volí obránce (−2). Ze stejného pole 1 kostka (+1).
+// Kostky: 1. blok Pushed (3); druhý blok samé Attacker Down (1) — útočník leží, nikdo
+// dál nikam netlačí, takže poloha obránce čte jen rozhodnutí o Stand Firm.
+// ============================================================================
+namespace {
+GameState frenzyTrapFixture() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+    placePlayer(gs, 13, {12, 6}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 8}, TeamSide::AWAY);
+    return gs;
+}
+std::vector<int> trapDice() { return {3, 1, 1, 1, 1, 1, 1, 1, 1}; }
+}  // namespace
+
+TEST(BlockHandler, P225FrenzyTrapReady_AiDeclinesStandFirmAndIsPushed) {
+    GameState gs = frenzyTrapFixture();
+    FixedDiceRoller dice(trapDice());
+    takeStandFirmDeclinedForFrenzy();
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));   // odtlačen
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));    // Frenzy následoval
+    EXPECT_EQ(takeStandFirmDeclinedForFrenzy(), 1);
+}
+
+// Defender Stumbles s Dodge = jen odtlačení (obránce stojí) ⇒ táž past.
+TEST(BlockHandler, P225FrenzyTrapOnStumblesWithDodge_AiDeclinesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    gs.getPlayer(12).skills.add(SkillName::Dodge);
+    FixedDiceRoller dice({5, 1, 1, 1, 1, 1, 1, 1, 1});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
+}
+
+// Pomocníci na (12,6) a (12,8) jsou v zóně našeho hráče na (13,7) ⇒ neasistují;
+// druhý blok z nového pole je zase 1 kostka (+1 = +1, ne horší) ⇒ Stand Firm.
+TEST(BlockHandler, P225NoWorseDiceFromNewSquare_AiUsesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    placePlayer(gs, 2, {13, 7}, TeamSide::HOME);
+    FixedDiceRoller dice(trapDice());
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}
+
+// Odtlačení do davu: obránce u lajny (11,0), útočník šikmo z (10,1); jediné pole odtlačení
+// na hřišti (12,0) obsazené ⇒ dav (ř. 650-651). Pomocník (12,1) sousedí s (11,0), ne s (10,1).
+TEST(BlockHandler, P225PushIntoCrowd_AiUsesStandFirm) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    placePlayer(gs, 1, {10, 1}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Frenzy);
+    placePlayer(gs, 12, {11, 0}, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::StandFirm);
+    placePlayer(gs, 13, {12, 0}, TeamSide::AWAY);
+    placePlayer(gs, 14, {12, 1}, TeamSide::AWAY);
+    FixedDiceRoller dice(trapDice());
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 0}));
+    EXPECT_TRUE(gs.getPlayer(12).isOnPitch());
+}
+
+TEST(BlockHandler, P225DefenderCarriesBall_AiUsesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    gs.ball = BallState::carried({11, 7}, 12);
+    FixedDiceRoller dice(trapDice());
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}
+
+TEST(BlockHandler, P225AttackerWithoutFrenzy_AiUsesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    gs.getPlayer(1).skills = SkillSet{};
+    FixedDiceRoller dice(trapDice());
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}
+
+// Defender Stumbles bez Dodge: obránce padá tak jako tak, druhý blok nebude ⇒ past není.
+TEST(BlockHandler, P225StumblesWithoutDodge_NoSecondBlock_AiUsesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    FixedDiceRoller dice({5, 1, 1, 1, 1, 1, 1});
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+// Blitz bez zbytku pohybu: druhý blok se nehází (ř. 8143-8145) ⇒ past není.
+TEST(BlockHandler, P225BlitzWithoutMovementForSecondBlock_AiUsesStandFirm) {
+    GameState gs = frenzyTrapFixture();
+    gs.getPlayer(1).movementRemaining = -1;   // první GFI už padl na příchod
+    FixedDiceRoller dice({6, 3});              // GFI za blok, Pushed
+    resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}
+
+TEST(BlockHandler, P225SwitchOff_AiUsesStandFirmAsBefore) {
+    GameState gs = frenzyTrapFixture();
+    setExtraFeaturesOff(kP225FrenzyTrapStandFirm);
+    FixedDiceRoller dice(trapDice());
+    resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+    setExtraFeaturesOff(0);
+    EXPECT_EQ(gs.getPlayer(12).position, (Position{11, 7}));
+}
+
+// Kouč (P130) dostává otázku dál, i když je past nachystaná — volí on, ne AI.
+TEST(BlockHandler, P225CoachDefenderIsStillAsked) {
+    GameState gs = frenzyTrapFixture();
+    FixedDiceRoller dice(trapDice());
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    try {
+        resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+        FAIL() << "kouč obránce nedostal otázku";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_STAND_FIRM);
+        EXPECT_EQ(p.playerId, 12);
+    }
 }
