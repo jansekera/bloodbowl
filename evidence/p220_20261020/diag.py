@@ -7,7 +7,7 @@
 #   · nosic (došel a markuje nosiče — výjimka) · asist (došel vedle cíle bloku/blitzu, který přišel PO jeho pohybu)
 #   · jen_dosel (došel do kontaktu bez toho — porušení P220) · jine.
 # Uživatel 20.10.: „agilní hráči mohou po blitzu provést dodge — některý blitz může sloužit k posunu, nemusí nutně
-#   být cílem srazit“ ⇒ u každého blitzu i jeho výsledek: cíl sražen / jen odsunut / nic; cíl = nosič;
+#   být cílem srazit“ ⇒ u každého blitzu i jeho výsledek: cíl sražen / jen odsunut / nic — od 21.10. rozděleno na padl_blitzujici · bez_ucinku · oba_lezi (Wrestle); cíl = nosič;
 #   kolik našich hráčů blitz uvolnil (cíl je markoval před tahem, po tahu už ne); blitzující po bloku dál táhl;
 #   blitzující na konci v kontaktu; blitzující sražen v odpovědi soupeře.
 # Uživatel 20.10.: „agilní hráč pak může odskočit, i když blitz nesrazí — např. pro uvolnění cesty pro příjemce pro
@@ -62,6 +62,15 @@ def blitz_rozbor(kt, bb, s0, kroky, po, H, A):
                         dal_tahl=0, kontakt=0, turnover_v_blitzu=int(k["turnover"]), mame_mic=0, dopredu=0, pred_nosicem=0)
         srazen = any(e["type"] == "KNOCKED_DOWN" and e["player"] == t for e in k["events"])
         posun = (not srazen) and (not t1.is_on_pitch() or kt._xy(t0) != kt._xy(t1))
+        # 21.10. (uživatel: „rozděl na 3“): dřívější „nic“ míchalo tři různé věci (sonda
+        # evidence/prazdne_blitzy_20261021): náš blitzující padl / blok bez účinku (Stand Firm, oba Block)
+        # / oba leží po Wrestle — Wrestle pokládá bez KNOCKED_DOWN, takže cíl ležel, ale vedl se jako „nic“.
+        bp1 = po.get_player(b)
+        lezi = lambda q: q.is_on_pitch() and q.state != bb.PlayerState.STANDING
+        if not srazen and not posun:
+            if lezi(t1) and lezi(bp1): nic = "oba_lezi"
+            elif k["turnover"] or lezi(bp1) or not bp1.is_on_pitch(): nic = "padl_blitzujici"
+            else: nic = "bez_ucinku"
         nasi0 = [p for p in kt.hraci(s0) if p.team_side == H and p.id != b and kt._stoji(p) and kt._vedle(kt._xy(p), kt._xy(t0))]
         uvolnil = sum(1 for p in nasi0 if not (t1.is_on_pitch() and kt._ma_zony(t1) and kt._vedle(kt._xy(po.get_player(p.id)), kt._xy(t1))))
         dal = any(kk["action"].player_id == b for kk in kroky[i + 1:])
@@ -72,7 +81,7 @@ def blitz_rozbor(kt, bb, s0, kroky, po, H, A):
         return dict(mame_mic=int(mame), dopredu=bp.position.x - s0.get_player(b).position.x if bp.is_on_pitch() else 0,
                     pred_nosicem=int(mame and bp.is_on_pitch() and bp.position.x > po.get_player(nos).position.x),
                     blitzer=b, agilni=int(agilni(kt, s0.get_player(b))), cil_nosic=int(s0.ball.carrier_id == t),
-                    vysledek="srazen" if srazen else ("posun" if posun else "nic"), uvolnil=uvolnil,
+                    vysledek="srazen" if srazen else ("posun" if posun else nic), uvolnil=uvolnil,
                     dal_tahl=int(dal), kontakt=int(bool(kontakt)), turnover_v_blitzu=int(k["turnover"]))
     return None
 
