@@ -201,7 +201,8 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     }
 
     // P226: Stand Firm — ptá se kouče bránícího hráče, i uprostřed tahu AI (server tah AI zastavil)
-    if (result.state.pendingStandFirm) {
+    // review P226: s lékárníkem naráz ⇒ napřed lékárník (server jinou odpověď nepřijme), Stand Firm po něm
+    if (result.state.pendingStandFirm && !result.state.pendingApothecary) {
         showStandFirmModal(result.state);
     }
 
@@ -1048,7 +1049,7 @@ async function init(): Promise<void> {
             showGrabModal(state);
         }
         // P226: čekající otázka na Stand Firm i po obnovení stránky
-        if (state.pendingStandFirm) {
+        if (state.pendingStandFirm && !state.pendingApothecary) {
             showStandFirmModal(state);
         }
         // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme

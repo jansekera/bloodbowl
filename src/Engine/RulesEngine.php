@@ -55,8 +55,11 @@ final class RulesEngine
         if ($state->getPendingGrab() !== null && $action !== ActionType::RESOLVE_GRAB) {
             return ['Must answer the Grab question first'];
         }
-        // P226: otázka na Stand Firm přeruší blok před odtlačením (i v tahu AI) — do odpovědi nic jiného
-        if ($state->getPendingStandFirm() !== null && $action !== ActionType::RESOLVE_STAND_FIRM) {
+        // P226: otázka na Stand Firm přeruší blok před odtlačením (i v tahu AI) — do odpovědi nic jiného.
+        //   Review P226: s nabídkou lékárníka může čekat naráz (první rána Frenzy zranila, druhá se ptá)
+        //   — lékárník (výsledek první rány) má přednost (výš), na Stand Firm se odpovídá potom.
+        if ($state->getPendingStandFirm() !== null && $action !== ActionType::RESOLVE_STAND_FIRM
+            && $action !== ActionType::RESOLVE_APOTHECARY) {
             return ['Must answer the Stand Firm question first'];
         }
 

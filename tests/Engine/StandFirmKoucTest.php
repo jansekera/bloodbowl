@@ -310,4 +310,55 @@ final class StandFirmKoucTest extends TestCase
         $this->expectException(ValidationException::class);
         $o->executeAction($q, ActionType::END_TURN, []);
     }
+
+    /**
+     * Review P226 (HIGH): v tahu AI první rána Frenzy řetězem vytlačí hráče kouče do davu (KO ⇒
+     * nabídka lékárníka, P206 b) a druhá rána položí otázku na Stand Firm. Obojí čeká naráz --
+     * lékárník má přednost (odpovídá se na výsledek první rány), Stand Firm se zeptá potom.
+     * Dřív RulesEngine odmítl obě odpovědi a partie nešla dohrát.
+     */
+    public function testLekarnikPredOtazkouNaStandFirmVTahuAI(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 6, 2, skills: [SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 1, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 5, 0, id: 3)
+            ->addPlayer(TeamSide::HOME, 6, 0, id: 4)
+            ->addPlayer(TeamSide::HOME, 7, 0, id: 5)
+            ->withBallOffPitch()
+            ->withActiveTeam(TeamSide::HOME)
+            ->build()
+            ->withAiTeam(TeamSide::AWAY);
+        $tahy = 0;
+        $ai = $this->createStub(AICoachInterface::class);
+        $ai->method('decideAction')->willReturnCallback(static function () use (&$tahy): array {
+            return $tahy++ === 0
+                ? ['action' => ActionType::BLOCK, 'params' => ['playerId' => 1, 'targetId' => 2]]
+                : ['action' => ActionType::END_TURN, 'params' => []];
+        });
+        // blok Pushed | zranění v davu 4+4 = KO | druhá rána Pushed, dál trojky
+        $o = new GameOrchestrator(new RulesEngine(), new FixedDiceRoller(array_merge([3], [4, 4], array_fill(0, 60, 3))), $ai);
+        $e = new RulesEngine();
+
+        $q = $o->executeAction($s, ActionType::END_TURN, [])['state'];
+        $this->assertNotNull($q->getPendingStandFirm(), 'fixtura: otázka na první ránu');
+        $oba = $o->executeAction($q, ActionType::RESOLVE_STAND_FIRM, ['use' => false])['state'];
+        $this->assertNotNull($oba->getPendingApothecary(), 'fixtura: hráč v davu KO ⇒ lékárník');
+        $this->assertNotNull($oba->getPendingStandFirm(), 'fixtura: druhá rána Frenzy ⇒ otázka');
+
+        $this->assertSame([ActionType::RESOLVE_APOTHECARY->value], array_column($e->getAvailableActions($oba), 'type'));
+        $this->assertSame([], $e->validate($oba, ActionType::RESOLVE_APOTHECARY, ['playerId' => 0]), 'lékárník má přednost');
+        $this->assertNotSame([], $e->validate($oba, ActionType::RESOLVE_STAND_FIRM, ['use' => true]), 'Stand Firm až po lékárníkovi');
+
+        $poLekarnikovi = $o->executeAction($oba, ActionType::RESOLVE_APOTHECARY, ['playerId' => 0])['state'];
+        $this->assertNull($poLekarnikovi->getPendingApothecary());
+        $this->assertNotNull($poLekarnikovi->getPendingStandFirm(), 'otázka na Stand Firm dál čeká');
+        $this->assertSame(TeamSide::AWAY, $poLekarnikovi->getActiveTeam(), 'tah AI stojí');
+        $this->assertSame([ActionType::RESOLVE_STAND_FIRM->value], array_column($e->getAvailableActions($poLekarnikovi), 'type'));
+
+        $konec = $o->executeAction($poLekarnikovi, ActionType::RESOLVE_STAND_FIRM, ['use' => true])['state'];
+        $this->assertNull($konec->getPendingStandFirm());
+        $this->assertNull($konec->getPendingBlock());
+        $this->assertSame(TeamSide::HOME, $konec->getActiveTeam(), 'AI dohrála tah');
+    }
 }
