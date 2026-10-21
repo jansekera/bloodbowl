@@ -18,6 +18,7 @@ import { PlayerCard } from './ui/PlayerCard';
 import { BlockDiceModal } from './ui/BlockDiceModal';
 import { RerollModal } from './ui/RerollModal';
 import { ApothecaryModal } from './ui/ApothecaryModal';
+import { GrabModal } from './ui/GrabModal';
 
 const api = new ApiClient();
 
@@ -83,6 +84,7 @@ const levelUpModal = new LevelUpModal(levelUpEl);
 const blockDiceModal = new BlockDiceModal(container);
 const rerollModal = new RerollModal(container);
 const apothecaryModal = new ApothecaryModal(container);
+const grabModal = new GrabModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -180,8 +182,8 @@ async function handleActionResult(result: ActionResult): Promise<void> {
 
     stateManager.setGameState(result.state);
 
-    // Show block dice modal if there's a pending block
-    if (result.state.pendingBlock && result.state.aiTeam !== result.state.activeTeam) {
+    // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
+    if (result.state.pendingBlock && !result.state.pendingGrab && result.state.aiTeam !== result.state.activeTeam) {
         showBlockDiceModal(result.state);
     }
 
@@ -190,10 +192,37 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showRerollModal(result.state);
     }
 
+    // P224: Grab — kostka bloku je zvolená, kouč volí odtlačení
+    if (result.state.pendingGrab) {
+        showGrabModal(result.state);
+    }
+
     // P206 (b): lékárník — ptá se kouče-člověka i uprostřed tahu AI (server tah AI zastavil)
     if (result.state.pendingApothecary) {
         showApothecaryModal(result.state);
     }
+}
+
+function showGrabModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingGrab;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    const dieFace = pending.face ?? state.pendingBlock?.faces[pending.faceIndex] ?? '?';
+    grabModal.show(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), dieFace, async (params: Record<string, unknown>) => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_grab', params);
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Grab choice failed');
+            showGrabModal(state); // otázka na serveru stále čeká — bez dialogu by kouč uvázl do reloadu
+        } finally {
+            isProcessing = false;
+        }
+    });
 }
 
 function showApothecaryModal(state: import('./api/types').GameState): void {
@@ -982,8 +1011,12 @@ async function init(): Promise<void> {
         stateManager.setGameState(state);
 
         // Show block dice modal if there's a pending block on load
-        if (state.pendingBlock && state.aiTeam !== state.activeTeam) {
+        if (state.pendingBlock && !state.pendingGrab && state.aiTeam !== state.activeTeam) {
             showBlockDiceModal(state);
+        }
+        // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme
+        if (state.pendingGrab) {
+            showGrabModal(state);
         }
         // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme
         if (state.pendingApothecary) {

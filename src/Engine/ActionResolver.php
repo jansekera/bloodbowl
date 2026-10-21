@@ -26,6 +26,7 @@ use App\Enum\ActionType;
 use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
 use App\Enum\TeamSide;
+use App\ValueObject\Position;
 
 final class ActionResolver
 {
@@ -104,6 +105,8 @@ final class ActionResolver
     public function setInteractiveBlocks(bool $interactive): void
     {
         $this->interactiveBlocks = $interactive;
+        // P224: kouč-člověk se při odtlačení ptá na Grab; AI (neinteraktivní blok) se neptá
+        $this->blockHandler->setAskGrab($interactive);
     }
 
     /** @var list<TeamSide> P206 (b): strany kouče-člověka — o lékárníkovi se jich ptá po akci */
@@ -414,6 +417,7 @@ final class ActionResolver
             ActionType::REROLL_BLOCK => $this->blockHandler->resolveBlockReroll($state, $params),
             ActionType::RESOLVE_REROLL => $this->rerollHandler->resolve($state, $params),
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
+            ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)
@@ -455,7 +459,7 @@ final class ActionResolver
         // Blood Lust: hladovy upir se krmi na KONCI akce -- pred prihravkou, predanim
         //   i TD (TD se vyhodnocuje az po akci). `rules_bb2016.txt` r. 7934-7947.
         $novy = $result->getNewState();
-        if ($novy->getPendingBlock() === null && $novy->getPendingReroll() === null) {
+        if ($novy->getPendingBlock() === null && $novy->getPendingReroll() === null && $novy->getPendingGrab() === null) {
             foreach ($novy->getPlayers() as $upir) {
                 if (!$upir->isBloodlustHungry()
                     || !($upir->hasActed() || $upir->hasMoved() || $action === ActionType::END_TURN)) {
@@ -470,6 +474,36 @@ final class ActionResolver
         }
 
         return $result;
+    }
+
+    /**
+     * P224 — odpověď kouče na otázku, jestli útočník použije Grab (`rules_bb2016.txt` ř. 8147-8154).
+     * params: `use` (bool), při `use` ano `x`,`y` = zvolené volné pole vedle obránce. Rozpracovaný
+     * blok (kostka už zvolena) se dokončí s touto volbou.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function resolveGrab(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingGrab();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending Grab question');
+        }
+        $volba = $params['use'] === true
+            ? new Position((int) $params['x'], (int) $params['y'])
+            : false;
+
+        if ($pending->getKind() === 'bnc') {
+            return $this->ballAndChainHandler->resumeGrab($state, $pending, $volba);
+        }
+
+        // follow-up se volí s odpovědí (po odtlačení, `rules_bb2016.txt` ř. 608-611)
+        $blockParams = ['faceIndex' => $pending->getFaceIndex()];
+        if (isset($params['followUp'])) {
+            $blockParams['followUp'] = $params['followUp'];
+        }
+
+        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba);
     }
 
     /**

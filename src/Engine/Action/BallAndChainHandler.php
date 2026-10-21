@@ -9,6 +9,7 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingGrabDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -48,47 +49,91 @@ final class BallAndChainHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Player must have Ball & Chain skill');
         }
 
-        $events = [];
+        return $this->kroky($state, $playerId, 0, [], null);
+    }
+
+    /**
+     * P224: odpověď kouče na otázku o Grabu uprostřed pohybu B&C -- dokončí rozpracovaný blok
+     * (odtlačení podle odpovědi) a pokračuje dalšími kroky. `$volba`: zvolené pole, nebo false.
+     */
+    public function resumeGrab(GameState $state, PendingGrabDTO $pending, Position|false $volba): ActionResult
+    {
+        $face = $pending->getFace();
+        if ($face === null) {
+            throw new \InvalidArgumentException('Pending Grab question has no block face');
+        }
+
+        return $this->kroky(
+            $state->withPendingGrab(null),
+            $pending->getAttackerId(),
+            $pending->getStep(),
+            [],
+            ['target' => $pending->getDefenderId(), 'face' => $face, 'volba' => $volba],
+        );
+    }
+
+    /**
+     * Kroky pohybu B&C od kroku `$odKroku`. `$obnoveno`: pokračování po otázce na Grab -- krok
+     * už je hozený a blok vybraný, zbývá odtlačení.
+     *
+     * @param list<GameEvent> $events
+     * @param array{target: int, face: BlockDiceFace, volba: Position|false}|null $obnoveno
+     */
+    private function kroky(GameState $state, int $playerId, int $odKroku, array $events, ?array $obnoveno): ActionResult
+    {
+        $player = $state->requirePlayer($playerId);
         $srazenPriBloku = false;
         $ma = $player->getStats()->getMovement();
 
-        for ($step = 0; $step < $ma; $step++) {
+        for ($step = $odKroku; $step < $ma; $step++) {
             $currentPos = $player->getPosition();
             if ($currentPos === null) {
                 break; // Player was KO'd off pitch
             }
 
-            // Sablona vhazovani natocena podle volby kouce + D6 (`rules_bb2016.txt`
-            //   r. 7829-7833); volba viz `zvolNatoceni`.
-            $smer = $this->zvolNatoceni($state, $player, $currentPos);
-            $direction = $this->dice->rollD6();
-            [$dx, $dy] = $this->scatterCalc->templateOffset($smer, $direction);
-            $newPos = new Position($currentPos->getX() + $dx, $currentPos->getY() + $dy);
+            $direction = 0; // hozený jen při novém kroku; po otázce na Grab se pohyb už neopakuje
+            if ($obnoveno !== null) {
+                $occupant = $state->requirePlayer($obnoveno['target']);
+                $newPos = $occupant->requirePosition();
+            } else {
+                // Sablona vhazovani natocena podle volby kouce + D6 (`rules_bb2016.txt`
+                //   r. 7829-7833); volba viz `zvolNatoceni`.
+                $smer = $this->zvolNatoceni($state, $player, $currentPos);
+                $direction = $this->dice->rollD6();
+                [$dx, $dy] = $this->scatterCalc->templateOffset($smer, $direction);
+                $newPos = new Position($currentPos->getX() + $dx, $currentPos->getY() + $dy);
 
-            // Mimo hriste: dav ho zbije jako vytlaceneho (r. 7835-7837) -- hod na
-            //   zraneni, ne automaticke KO; turnover to neni (r. 369-370).
-            if (!$newPos->isOnPitch()) {
-                $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, 'off-pitch', $direction);
-                $events[] = GameEvent::crowdSurf($playerId);
-                [$state, $events] = $this->zranitBnc($state, $player, $events, true);
-                $player = $state->getPlayer($playerId);
-                break;
+                // Mimo hriste: dav ho zbije jako vytlaceneho (r. 7835-7837) -- hod na
+                //   zraneni, ne automaticke KO; turnover to neni (r. 369-370).
+                if (!$newPos->isOnPitch()) {
+                    $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, 'off-pitch', $direction);
+                    $events[] = GameEvent::crowdSurf($playerId);
+                    [$state, $events] = $this->zranitBnc($state, $player, $events, true);
+                    $player = $state->getPlayer($playerId);
+                    break;
+                }
+
+                // Check for occupant
+                $occupant = $state->getPlayerAtPosition($newPos);
             }
-
-            // Check for occupant
-            $occupant = $state->getPlayerAtPosition($newPos);
             if ($occupant !== null) {
-                // Auto-block the occupant
-                $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, (string) $newPos, $direction);
-                $events[] = GameEvent::ballAndChainBlock($playerId, $occupant->getId());
+                if ($obnoveno === null) {
+                    // Auto-block the occupant
+                    $events[] = GameEvent::ballAndChainMove($playerId, (string) $currentPos, (string) $newPos, $direction);
+                    $events[] = GameEvent::ballAndChainBlock($playerId, $occupant->getId());
+                }
 
                 // B&C zustava na svem poli a blokuje odtud (r. 7840-7842); lezici
                 //   nebo omraceny v ceste se misto bloku odtlaci a hazi na brneni (r. 7843-7845).
                 if ($occupant->getState()->canAct()) {
-                    [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events);
+                    [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events, $step, $obnoveno);
+                    if ($state->getPendingGrab() !== null) {
+                        return ActionResult::success($state, $events); // P224: čeká otázka na Grab
+                    }
                 } else {
                     [$state, $events] = $this->odtlacitLeziciho($state, $player, $occupant, $events);
                 }
+                $obnoveno = null;
 
                 // If player was knocked down during auto-block, stop movement
                 $player = $state->getPlayer($playerId);
@@ -210,7 +255,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
     /**
      * Resolve automatic 1-die block for Ball & Chain.
      *
+     * P224: kouč-člověk se před odtlačením ptá na Grab -- vrácený stav pak nese `PendingGrabDTO`
+     * a blok se dokončí v `resumeGrab` (`$obnoveno` = už vybraná strana kostky a odpověď).
+     *
      * @param list<GameEvent> $events
+     * @param array{target: int, face: BlockDiceFace, volba: Position|false}|null $obnoveno
      * @return array{0: GameState, 1: list<GameEvent>, 2: MatchPlayerDTO}
      */
     private function resolveAutoBlock(
@@ -218,6 +267,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
         MatchPlayerDTO $bncPlayer,
         MatchPlayerDTO $target,
         array $events,
+        int $step,
+        ?array $obnoveno,
     ): array {
         $bncPos = $bncPlayer->getPosition();
         $targetPos = $target->getPosition();
@@ -226,31 +277,49 @@ final class BallAndChainHandler implements ActionHandlerInterface
             return [$state, $events, $bncPlayer];
         }
 
-        // Blok podle beznych pravidel (r. 7840-7842): kostky podle sily vc. asistenci.
-        $attStr = $this->strCalc->calculateEffectiveStrength($state, $bncPlayer, $targetPos);
-        $defStr = $this->strCalc->calculateEffectiveStrength($state, $target, $bncPos);
-        $info = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
-        $faces = [];
-        for ($i = 0; $i < $info['count']; $i++) {
-            $faces[] = match ($this->dice->rollD6()) {
-                1 => BlockDiceFace::ATTACKER_DOWN,
-                2 => BlockDiceFace::BOTH_DOWN,
-                3, 4 => BlockDiceFace::PUSHED,
-                5 => BlockDiceFace::DEFENDER_STUMBLES,
-                default => BlockDiceFace::DEFENDER_DOWN,
-            };
-        }
-        assert($faces !== []); // getBlockDiceInfo vraci vzdy 1-3 kostky
-        $face = $this->vyberStranu($faces, $target->getTeamSide() === $bncPlayer->getTeamSide(), $info['attackerChooses']);
+        if ($obnoveno !== null) {
+            $face = $obnoveno['face'];
+            $grabVolba = $obnoveno['volba'];
+        } else {
+            $grabVolba = null;
+            // Blok podle beznych pravidel (r. 7840-7842): kostky podle sily vc. asistenci.
+            $attStr = $this->strCalc->calculateEffectiveStrength($state, $bncPlayer, $targetPos);
+            $defStr = $this->strCalc->calculateEffectiveStrength($state, $target, $bncPos);
+            $info = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
+            $faces = [];
+            for ($i = 0; $i < $info['count']; $i++) {
+                $faces[] = match ($this->dice->rollD6()) {
+                    1 => BlockDiceFace::ATTACKER_DOWN,
+                    2 => BlockDiceFace::BOTH_DOWN,
+                    3, 4 => BlockDiceFace::PUSHED,
+                    5 => BlockDiceFace::DEFENDER_STUMBLES,
+                    default => BlockDiceFace::DEFENDER_DOWN,
+                };
+            }
+            assert($faces !== []); // getBlockDiceInfo vraci vzdy 1-3 kostky
+            $face = $this->vyberStranu($faces, $target->getTeamSide() === $bncPlayer->getTeamSide(), $info['attackerChooses']);
 
-        $events[] = GameEvent::blockAttempt(
-            $bncPlayer->getId(),
-            $target->getId(),
-            $info['count'],
-            $info['attackerChooses'],
-            array_map(static fn(BlockDiceFace $f) => $f->value, $faces),
-            $face->value,
-        );
+            $events[] = GameEvent::blockAttempt(
+                $bncPlayer->getId(),
+                $target->getId(),
+                $info['count'],
+                $info['attackerChooses'],
+                array_map(static fn(BlockDiceFace $f) => $f->value, $faces),
+                $face->value,
+            );
+
+            $squares = $this->blockHandler->grabQuestionSquares($state, $bncPlayer, $target, $face, false);
+            if ($squares !== []) {
+                return [$state->withPendingGrab(new PendingGrabDTO(
+                    'bnc',
+                    $bncPlayer->getId(),
+                    $target->getId(),
+                    $squares,
+                    face: $face,
+                    step: $step,
+                )), $events, $bncPlayer];
+            }
+        }
 
         // Simplified block resolution for auto-block
         switch ($face) {
@@ -282,13 +351,13 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
             case BlockDiceFace::PUSHED:
                 // Push target away (simple: find first empty adjacent or crowd surf)
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events);
+                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
                 break;
 
             case BlockDiceFace::DEFENDER_STUMBLES:
                 // Push + knockdown (unless Dodge without Tackle)
                 $knockdown = !$target->hasSkill(SkillName::Dodge) || $bncPlayer->hasSkill(SkillName::Tackle);
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events);
+                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
                 if ($knockdown) {
                     $target = $state->getPlayer($target->getId());
                     if ($target !== null && $target->getPosition() !== null) {
@@ -307,7 +376,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
             case BlockDiceFace::DEFENDER_DOWN:
             case BlockDiceFace::POW:
                 // Push + knockdown
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events);
+                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
                 $target = $state->getPlayer($target->getId());
                 if ($target !== null && $target->getPosition() !== null) {
                     $events[] = GameEvent::playerFell($target->getId());
@@ -387,12 +456,13 @@ final class BallAndChainHandler implements ActionHandlerInterface
         MatchPlayerDTO $target,
         array $events,
         bool $grabNeplati = false,
+        Position|false|null $grabVolba = null,
     ): array {
         $targetPos = $target->getPosition();
         if ($pusher->getPosition() === null || $targetPos === null || $target->holdsGround($pusher->getTeamSide())) {
             return [$state, $events];
         }
 
-        return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events, grabNeplati: $grabNeplati);
+        return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events, grabNeplati: $grabNeplati, grabVolba: $grabVolba);
     }
 }
