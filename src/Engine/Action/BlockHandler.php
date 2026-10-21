@@ -10,6 +10,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingBlockDTO;
+use App\DTO\PendingGrabDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PassRange;
 use App\Enum\PlayerState;
@@ -44,6 +45,65 @@ final class BlockHandler implements ActionHandlerInterface
         // Povinny (review P186, L7 -- tyz tvar): s nepovinnym se Dump-Off bez nej tise vynechal.
         private readonly PassResolver $passResolver,
     ) {}
+
+    /** P224: ptá se kouče-člověka na Grab (`ActionResolver::setInteractiveBlocks`); AI se neptá */
+    private bool $ptatSeNaGrab = false;
+
+    public function setAskGrab(bool $ptatSe): void
+    {
+        $this->ptatSeNaGrab = $ptatSe;
+    }
+
+    /**
+     * P224, parita s C++ P222 (`pushSkills`, `USE_GRAB`): volná pole, mezi kterými si kouč-člověk
+     * vybírá, když útočník může použít Grab; prázdný seznam = otázka se neklade.
+     * `rules_bb2016.txt` ř. 8147-8154: Grab jen u akce Block (ne v blitzu), "any empty square
+     * adjacent to his opponent", s Side Step se ruší, bez volného sousedního pole neplatí.
+     * Se skillem Frenzy se Grab nepoužívá (stejně jako v `odtlacit`).
+     *
+     * @return list<Position>
+     */
+    private function grabSquares(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz): array
+    {
+        $defenderPos = $defender->getPosition();
+        if ($isBlitz || $defenderPos === null || !$attacker->hasSkill(SkillName::Grab) || $attacker->hasSkill(SkillName::Frenzy)) {
+            return [];
+        }
+        if ($defender->hasSkill(SkillName::SideStep) && $defender->getState()->canAct()) {
+            return [];
+        }
+        $squares = [];
+        foreach ($defenderPos->getAdjacentPositions() as $pos) {
+            if ($state->getPlayerAtPosition($pos) === null) {
+                $squares[] = $pos;
+            }
+        }
+
+        return $squares;
+    }
+
+    /**
+     * P224: kouč-člověk se má zeptat na Grab? Vrací nabízená pole, nebo [] (neptat se): AI se
+     * neptá, strana kostky musí obránce odtlačit (Stand Firm a zakořeněný se neodtlačí,
+     * ř. 8578-8579) a musí být kam (viz `grabSquares`).
+     *
+     * @return list<Position>
+     */
+    public function grabQuestionSquares(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        BlockDiceFace $face,
+        bool $isBlitz,
+    ): array {
+        $pushes = match ($face) {
+            BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW
+                => !$defender->isRooted() && !$defender->hasSkill(SkillName::StandFirm),
+            default => false,
+        };
+
+        return $this->ptatSeNaGrab && $pushes ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
+    }
 
     /**
      * P82 (30.09.2026), port C++ 366fda3e / `block_handler.cpp:553-582`.
@@ -345,6 +405,26 @@ final class BlockHandler implements ActionHandlerInterface
             $chosenFace = $faces[$faceIndex];
         }
 
+        // P224: kouč-člověk se ptá na Grab dřív, než se blok vyhodnotí; odpověď (`grabVolba`: pole
+        //   nebo false) přijde přes `ActionType::RESOLVE_GRAB` a blok se dokončí stejnou volbou kostky.
+        $grabVolba = $params['grabVolba'] ?? null;
+        if ($grabVolba === null) {
+            $squares = $this->grabQuestionSquares($state, $attacker, $defender, $chosenFace, $pending->isBlitz());
+            if ($squares !== []) {
+                $followUp = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
+                $index = array_search($chosenFace, $faces, true);
+
+                return ActionResult::success($state->withPendingGrab(new PendingGrabDTO(
+                    'block',
+                    $attacker->getId(),
+                    $defender->getId(),
+                    $squares,
+                    faceIndex: $index === false ? 0 : (int) $index,
+                    followUp: $followUp,
+                )), []);
+            }
+        }
+
         $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
         $events = [];
         $events[] = GameEvent::blockAttempt(
@@ -363,7 +443,7 @@ final class BlockHandler implements ActionHandlerInterface
         // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
         //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
         $followUpChoice = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
-        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice);
+        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba);
 
         // Frenzy: povinna druha rana, kdyz oba stoji a sousedi -- ale JEN po vysledku
         //   Pushed / Defender Stumbles.
@@ -999,6 +1079,7 @@ final class BlockHandler implements ActionHandlerInterface
         bool $isBlitz = false,
         bool $noFollowUp = false,
         ?bool $followUpChoice = null,
+        Position|false|null $grabVolba = null,
     ): ActionResult {
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
@@ -1115,6 +1196,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $events,
                 odlozitPoFollowUp: true,
                 grabNeplati: $isBlitz, // ř. 8148 "only while making a Block Action"
+                grabVolba: $grabVolba,
             );
             // Re-fetch defender (position may have changed)
             $defender = $currentState->getPlayer($defender->getId());
@@ -1271,6 +1353,7 @@ final class BlockHandler implements ActionHandlerInterface
         array $events,
         bool $odlozitPoFollowUp = false,
         bool $grabNeplati = false,
+        Position|false|null $grabVolba = null,
     ): array {
         $attackerPos = $attacker->getPosition();
         if ($attackerPos === null) {
@@ -1281,7 +1364,7 @@ final class BlockHandler implements ActionHandlerInterface
         $this->odlozenyStrip = null;
         $this->odlozenyDav = null;
         try {
-            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events, $grabNeplati);
+            return $this->odtlacit($state, $attackerPos, $defender, $defenderOriginalPos, $attacker->getTeamSide(), $attacker, $events, $grabNeplati, $grabVolba);
         } finally {
             $this->odlozitPoFollowUp = false;
         }
@@ -1342,6 +1425,7 @@ final class BlockHandler implements ActionHandlerInterface
         ?MatchPlayerDTO $utocnik,
         array $events,
         bool $grabNeplati = false,
+        Position|false|null $grabVolba = null,
     ): array {
         $emptySquares = [];
         $occupiedSquares = [];
@@ -1371,6 +1455,11 @@ final class BlockHandler implements ActionHandlerInterface
         // OPRAVENO 20.10.2026 (P192, parita) -- Grab platil i v blitzu. Pravidla ř. 8148: "only
         //   while making a Block Action"; Side Step ale ruší i v blitzu (ř. 8151, `$maGrab` výš).
         $grab = $maGrab && !$maSideStep && !$grabNeplati;
+        // P224: kouč-člověk už odpověděl (`grabVolba`): ne ⇒ běžné odtlačení, ano ⇒ jím zvolené pole.
+        //   Nezávisí na tom, vede-li běžné odtlačení do davu — to je právě důvod, proč Grab zvolit.
+        if ($grabVolba === false) {
+            $grab = false;
+        }
         // OPRAVENO 08.10.2026 (audit parity, nález 11) -- Side Step tu vybíral jen ze tří
         //   polí odtlačení, a když volné nebylo, šel rovnou do řetězu (i tam, kde podle
         //   běžného pořadí patří hráč do davu). Pravidla ř. 8474-8478: "the coach may choose
@@ -1394,7 +1483,9 @@ final class BlockHandler implements ActionHandlerInterface
         //   pořadí níž). Je to volba (ř. 8149 "may"; uživatel 10.10. "může grab nevyužít pro
         //   vysurfování"): vede-li běžné odtlačení do davu, útočník ho nepoužije.
         $grabSquares = [];
-        if ($grab && !($emptySquares === [] && $offPitchAvailable)) {
+        if ($grab && $grabVolba instanceof Position) {
+            $grabSquares = [$grabVolba];
+        } elseif ($grab && !($emptySquares === [] && $offPitchAvailable)) {
             foreach ($kde->getAdjacentPositions() as $pos) {
                 if ($state->getPlayerAtPosition($pos) === null) {
                     $grabSquares[] = $pos;

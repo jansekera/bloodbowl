@@ -51,6 +51,10 @@ final class RulesEngine
         if ($state->getPendingApothecary() !== null && $action !== ActionType::RESOLVE_APOTHECARY) {
             return ['Must resolve the apothecary choice first'];
         }
+        // P224: otázka na Grab přeruší blok před odtlačením — do odpovědi nejde nic jiného
+        if ($state->getPendingGrab() !== null && $action !== ActionType::RESOLVE_GRAB) {
+            return ['Must answer the Grab question first'];
+        }
 
         // Check game phase
         if ($action === ActionType::SETUP_PLAYER || $action === ActionType::END_SETUP || $action === ActionType::AUTO_SETUP) {
@@ -64,6 +68,10 @@ final class RulesEngine
         } elseif ($action === ActionType::RESOLVE_APOTHECARY) {
             if ($state->getPendingApothecary() === null) {
                 $errors[] = 'No pending apothecary choice';
+            }
+        } elseif ($action === ActionType::RESOLVE_GRAB) {
+            if ($state->getPendingGrab() === null) {
+                $errors[] = 'No pending Grab question';
             }
         } elseif ($action === ActionType::RESOLVE_REROLL) {
             if ($state->getPendingReroll() === null) {
@@ -111,6 +119,7 @@ final class RulesEngine
             ActionType::AUTO_SETUP => [],
             ActionType::RESOLVE_REROLL => [],
             ActionType::RESOLVE_APOTHECARY => [],
+            ActionType::RESOLVE_GRAB => $this->validateResolveGrab($state, $params),
         };
     }
 
@@ -127,6 +136,11 @@ final class RulesEngine
         // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče
         if ($state->getPendingApothecary() !== null) {
             return [['type' => ActionType::RESOLVE_APOTHECARY->value]];
+        }
+
+        // P224: čekající otázka na Grab — jen odpověď kouče
+        if ($state->getPendingGrab() !== null) {
+            return [['type' => ActionType::RESOLVE_GRAB->value]];
         }
 
         // When there's a pending block, only block-choice actions are available
@@ -1303,6 +1317,35 @@ final class RulesEngine
         $faceIndex = (int) $params['faceIndex'];
         if ($faceIndex < 0 || $faceIndex >= count($pending->getFaces())) {
             return ['Invalid face index'];
+        }
+
+        return [];
+    }
+
+    /**
+     * P224: odpověď na otázku o Grabu. `use` ne ⇒ běžné odtlačení; `use` ano ⇒ `x`,`y` je jedno
+     * z nabízených volných polí vedle obránce (`rules_bb2016.txt` ř. 8149-8150).
+     *
+     * @param array<string, mixed> $params
+     * @return list<string>
+     */
+    private function validateResolveGrab(GameState $state, array $params): array
+    {
+        $pending = $state->getPendingGrab();
+        if ($pending === null) {
+            return ['No pending Grab question'];
+        }
+        if (!array_key_exists('use', $params)) {
+            return ['use is required'];
+        }
+        if (!filter_var($params['use'], FILTER_VALIDATE_BOOLEAN)) {
+            return [];
+        }
+        if (!isset($params['x'], $params['y'])) {
+            return ['x and y are required when using Grab'];
+        }
+        if (!$pending->offers((int) $params['x'], (int) $params['y'])) {
+            return ['Grab square must be an empty square adjacent to the opponent'];
         }
 
         return [];

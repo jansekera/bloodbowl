@@ -34,11 +34,12 @@ enum ActionType: string
     case AUTO_SETUP = 'auto_setup';
     case RESOLVE_REROLL = 'resolve_reroll';
     case RESOLVE_APOTHECARY = 'resolve_apothecary';   // P206 (b): volba kouče o lékárníkovi
+    case RESOLVE_GRAB = 'resolve_grab';               // P224: odpověď kouče, zda útočník použije Grab
 
     public function requiresPlayer(): bool
     {
         return match ($this) {
-            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY => false,
+            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY, self::RESOLVE_GRAB => false,
             default => true,
         };
     }

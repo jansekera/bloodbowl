@@ -72,7 +72,7 @@ final class GameOrchestrator
 
         // If there's a pending block or reroll (human player), return immediately
         if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null
-            || $newState->getPendingApothecary() !== null) {
+            || $newState->getPendingApothecary() !== null || $newState->getPendingGrab() !== null) {
             return [
                 'state' => $newState,
                 'events' => $allEvents,
