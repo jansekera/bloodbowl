@@ -587,14 +587,20 @@ static bool blitzBlockPayable(const Player& att) {
     return att.movementRemaining - 1 >= gfiFloor;
 }
 
-// P225: podepsaný počet kostek bloku jako getBlockDiceCount (+ volí útočník, − obránce),
-// se skutečnými asistencemi z polí, kde hráči právě stojí. Horns na druhý blok neplatí
-// (block_handler: secondParams.hornsBonus = false); Dauntless se hází u obou bloků stejně,
-// takže srovnání dvou poloh nemění -- vynechán.
-static int secondBlockDice(const GameState& state, const Player& att, const Player& def) {
+// Kostky bloku ze strengthů PO Horns a Dauntless a PŘED asistencemi (ř. 8023-8033: Dauntless
+// "before any defensive or offensive assists are added") + asistence z polí, kde hráči právě
+// stojí. Jedno místo pro hod bloku (resolveBlock) i pro P225 (frenzyTrapReady).
+static BlockDiceInfo blockDiceFor(const GameState& state, const Player& att, const Player& def,
+                                  int attST, int defST) {
     const int a = countAssists(state, def.position, att.teamSide, att.id, def.id, def.id);
     const int d = countAssists(state, att.position, def.teamSide, att.id, def.id, att.id);
-    const BlockDiceInfo info = getBlockDiceInfo(att.stats.strength + a, def.stats.strength + d);
+    return getBlockDiceInfo(attST + a, defST + d);
+}
+
+// P225: podepsaný počet kostek (+ volí útočník, − obránce), jako getBlockDiceCount.
+// Horns na druhý blok neplatí (secondParams.hornsBonus = false).
+static int signedDice(const GameState& state, const Player& att, const Player& def, int attST) {
+    const BlockDiceInfo info = blockDiceFor(state, att, def, attST, def.stats.strength);
     return info.attackerChooses ? info.count : -info.count;
 }
 
@@ -608,16 +614,29 @@ static int secondBlockDice(const GameState& state, const Player& att, const Play
 // TÝMIŽ funkcemi jako skutečné (pushSkills + pushOne: výběr pole, Side Step, Grab, řetěz, dav),
 // s neutrálními kostkami (hází se jen v řetězu u cizích hráčů, na pole obránce to nemá vliv).
 // Volá se jen mimo živou partii: tam pole volí člověk až potom, AI ho předem nezná.
+// Útočník, který NESMÍ následovat (Fend obránce ř. 8113-8118 bez Juggernautu v blitzu; Take Root
+// ř. 8581-8582 „without following-up“), zůstane stát a odtlačený obránce s ním přestane sousedit
+// ⇒ druhý blok Frenzy odpadne (ř. 8139-8141 „both still standing and adjacent“). Se Stand Firm by
+// přišel. Uživatel 21.10. („1 ano“): i tehdy AI Stand Firm nepoužije (za týchž podmínek (b), (c)).
+// Zůstane-li obránce po odtlačení vedle (Side Step, řetěz), druhý blok přijde a platí srovnání (a).
 static bool frenzyTrapReady(const GameState& state, const Player& att, const Player& def,
-                            bool isBlitz) {
+                            bool isBlitz, bool followUpAllowed) {
     if (state.ball.isHeld && state.ball.carrierId == def.id) return false;      // (c)
     struct NeutralDice : DiceRollerBase {
         int rollD6() override { return 4; }
         int rollD8() override { return 1; }
     } neutral;
-    const ManualBlockChoices manual = saveManualBlockChoices();
-    const long picks = g_pushGeometryPicks, picksDodge = g_pushGeometryPicksDodge,
-               picksFast = g_pushGeometryPicksFastMA;
+    // Přehrání nesmí sníst ruční volbu kouče ani tiknout diagnostické čítače geometrie
+    // odtlačení -- strážce je vrátí na každé cestě ven.
+    struct RestoreOnExit {
+        ManualBlockChoices manual = saveManualBlockChoices();
+        long picks = g_pushGeometryPicks, dodge = g_pushGeometryPicksDodge,
+             fast = g_pushGeometryPicksFastMA;
+        ~RestoreOnExit() {
+            restoreManualBlockChoices(manual);
+            g_pushGeometryPicks = picks; g_pushGeometryPicksDodge = dodge; g_pushGeometryPicksFastMA = fast;
+        }
+    } restore;
     GameState sim = state;
     Player& sa = sim.getPlayer(att.id);
     Player& sd = sim.getPlayer(def.id);
@@ -626,20 +645,36 @@ static bool frenzyTrapReady(const GameState& state, const Player& att, const Pla
     Position dest;
     const bool surf = pushOne(sim, sa.position, sd, sideStep, grab, /*resolveSurfHere=*/false,
                               sa.teamSide, neutral, dest, nullptr, 0);
-    restoreManualBlockChoices(manual);
-    g_pushGeometryPicks = picks; g_pushGeometryPicksDodge = picksDodge; g_pushGeometryPicksFastMA = picksFast;
-    if (surf) return false;                                                      // (b)
+    // (b) explicitně: do davu ⇒ Stand Firm. Kryla by to i kontrola polohy níž (obránce mimo
+    // hřiště nesousedí), ale podmínka zadání má stát na vlastním řádku.
+    if (surf) return false;
     if (sd.position == def.position) return false;   // řetěz se zasekl: nikdo se nehne, tentýž blok
-    sa.position = def.position;                      // povinný follow-up Frenzy (ř. 8138)
-    if (!canAct(sd.state) || sa.position.distanceTo(sd.position) != 1) return false;   // druhý blok nebude
-    return secondBlockDice(sim, sa, sd) < secondBlockDice(state, att, def);    // (a)
+    if (followUpAllowed) sa.position = def.position; // povinný follow-up Frenzy (ř. 8138)
+    // Bez Stand Firm druhý blok nebude (bez follow-upu obránce odletěl), se Stand Firm by přišel
+    // ⇒ Stand Firm nepoužít. S follow-upem sem nedojde: útočník stojí na uvolněném poli vedle.
+    if (!canAct(sd.state) || sa.position.distanceTo(sd.position) != 1) return true;
+    // (a) Dauntless (ř. 8023-8033) zvedá ST útočníka na ST obránce PŘED asistencemi, a kostky
+    // jsou poměrové -- jedno srovnání bez něj by lhalo (ST3 vs ST6: +asistence obránce mění
+    // počet kostek jinak než u ST6 vs ST6). Hod Dauntless ještě nepadl ⇒ obě větve: past jen,
+    // když je nové pole horší aspoň v jedné a v žádné lepší.
+    const int baseST = att.stats.strength;
+    const bool dauntless = att.hasSkill(SkillName::Dauntless) && def.stats.strength > baseST;
+    bool worse = false;
+    for (const int st : {baseST, dauntless ? def.stats.strength : baseST}) {
+        const int fresh = signedDice(sim, sa, sd, st), same = signedDice(state, att, def, st);
+        if (fresh > same) return false;
+        worse = worse || fresh < same;
+    }
+    return worse;
 }
 
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
-// `frenzyTrapPossible` (P225): druhý blok Frenzy po tomto odtlačení se hodí, jestli obránce
-// zůstane stát a útočník smí následovat -- skládá ho resolveBlock, který to ví.
+// `frenzyTrapPossible` (P225): se Stand Firm by po tomto odtlačení přišel druhý blok Frenzy
+// (obránce zůstane stát, v blitzu je čím zaplatit); `followUpAllowed`: útočník smí následovat.
+// Obojí skládá resolveBlock, který to ví.
 static bool resolvePushback(GameState& state, Player& attacker, Player& defender,
-                            bool isBlitz, bool frenzyTrapPossible, DiceRollerBase& dice,
+                            bool isBlitz, bool frenzyTrapPossible, bool followUpAllowed,
+                            DiceRollerBase& dice,
                             Position& pushDest, std::vector<GameEvent>* events) {
     // Take Root, l. 8578-8579: zakorenený hráč "may not Go For It, BE PUSHED
     // BACK FOR ANY REASON, or use any skill that would allow him to move out of
@@ -655,12 +690,13 @@ static bool resolvePushback(GameState& state, Player& attacker, Player& defender
         // P130: v živé partii volí kouč obránce, jestli Stand Firm použije.
         bool declined = !juggernautOverride && coachDecides(defender.teamSide) &&
             askCoach(CoachQuestion::USE_STAND_FIRM, defender.id, attacker.id, 0, 0, 3) == 0;
-        // P225: AI obránce nepoužije Stand Firm, když na něj útočník s Frenzy nachystal past
+        // P225: AI obránce nepoužije Stand Firm, když na něj útočník s Frenzy nachystal past,
+        // nebo když bez Stand Firm druhý blok Frenzy odpadne, protože útočník nesmí následovat
         // (frenzyTrapReady). Rozhoduje se TADY, ne v holdsGround: přímo blokovaného obránce řeší
         // jen tahle větev; holdsGround slouží řetězu a pushAwayFrom, kde past nevzniká (viz tam).
         if (!juggernautOverride && !declined && !coachModeOn() && frenzyTrapPossible &&
             extraFeatureOn(kP225FrenzyTrapStandFirm) &&
-            frenzyTrapReady(state, attacker, defender, isBlitz)) {
+            frenzyTrapReady(state, attacker, defender, isBlitz, followUpAllowed)) {
             declined = true;
             ++g_standFirmDeclinedForFrenzy;
         }
@@ -1038,14 +1074,8 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           static_cast<int>(SkillName::Dauntless), psyched});
     }
 
-    int attAssists = countAssists(state, def.position, att.teamSide, att.id, def.id, def.id);
-    int defAssists = countAssists(state, att.position, def.teamSide, att.id, def.id, att.id);
-
-    int effAttST = attST + attAssists;
-    int effDefST = defST + defAssists;
-
     // Roll block dice
-    BlockDiceInfo diceInfo = getBlockDiceInfo(effAttST, effDefST);
+    BlockDiceInfo diceInfo = blockDiceFor(state, att, def, attST, defST);
 
     BlockDiceFace faces[3];
     for (int i = 0; i < diceInfo.count; i++) {
@@ -1388,13 +1418,12 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                               !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
     // Pushback resolution
     if (defPushed) {
-        // P225: past na Frenzy jen tam, kde by se druhý blok bez Stand Firm opravdu hodil:
-        // obránce po odtlačení stojí, útočník (Frenzy) smí následovat a v blitzu ho zaplatí.
+        // P225: past na Frenzy jen tam, kde by se druhý blok se Stand Firm opravdu hodil:
+        // obránce stojí, není to druhý blok ani Multiple Block a v blitzu ho útočník zaplatí.
         const bool frenzyTrapPossible = !frenzySecondBlock && !frenzyDisabled && !defKnockedDown &&
-            att.hasSkill(SkillName::Frenzy) && !noFollowUp && !fendPrevents &&
-            (!params.isBlitz || blitzBlockPayable(att));
+            att.hasSkill(SkillName::Frenzy) && (!params.isBlitz || blitzBlockPayable(att));
         bool crowdSurf = resolvePushback(state, att, def, params.isBlitz, frenzyTrapPossible,
-                                          dice, pushDest, events);
+                                          !noFollowUp && !fendPrevents, dice, pushDest, events);
 
         if (crowdSurf) {
             // Crowd surf. A surfed BALL CARRIER does not just drop the ball
