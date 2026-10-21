@@ -34,6 +34,9 @@ def blitzy(kt, s0, kroky, po):
             pass
         try:
             t0, t1 = s0.get_player(t), po.get_player(t)
+            z.update(cil_nosic=int(s0.ball.carrier_id == t),   # 21.10.: blitz do kostek proti — byl to nosič?
+                     cil_ag=t0.stats.agility, nas_nosic=int(any(q.id == s0.ball.carrier_id and q.team_side == s0.active_team
+                                                                 for q in kt.hraci(s0))))
             z.update(cil_skilly=skilly(kt, t0), cil_st=t0.stats.strength, cil_stav_po=str(t1.state),
                      cil_pohnul=int((not t1.is_on_pitch()) or kt._xy(t0) != kt._xy(t1)),
                      cil_srazen=int(any(e.get("type") == "KNOCKED_DOWN" and e.get("player") == t for e in k["events"])))

@@ -33,3 +33,18 @@ Sraženo 76, jen odsunuto 52 ⇒ měřidlo rozlišuje všechny tři výsledky.
 ## Důsledek pro P220 / přehodnocení P219
 
 Kategorie „nic“ v `p220_20261020/diag.py` se má rozdělit na **padl blitzující / bez účinku (Stand Firm, oboustranný Block) / oba leží (Wrestle)** a Wrestle počítat jako cíl na zemi.
+
+## Blitz do kostek, kde volí obránce — druhý běh 21. 10. (uživatel: „prověř blitzy kostek“)
+
+Druhý běh sondy (`blitzy2.pkl`, tytéž hry a semínka, navíc příznak „cíl je nosič“). Volbu obránce poznám jen tehdy,
+když zvolená stěna je pro útočníka horší než jiná hozená (`kostky.py`) ⇒ **dolní odhad**.
+
+| blitz s blokem | n | cíl nosič | cíl sražen | turnover |
+|---|---|---|---|---|
+| prokazatelně volí obránce | **22** (12 %) | 3 | **1** (5 %) | **9** (41 %) |
+| ostatní | 162 | 10 | 75 (46 %) | 10 (6 %) |
+
+- Oba blitzy na **3 kostky proti** (elf ST2 → ork, skaven ST2 → trpaslík) **nemířily na nosiče**.
+- Na nosiče míče mířily jen 3 z 22. Zbytek: náš ST2–3 proti ST3 s převahou asistencí soupeře.
+- Uživatel 21. 10.: *„Tři proti nedává smysl ani proti nosiči.“* O dvou proti rozhodne podle těchto čísel.
+- Příčina v kódu: `buildMacroOffer` skóruje cíl `dice * 2` bez prahu (v obraně nosič +10, hrozba TD +4, volný +2), `pickBlitzer` bere blitzujícího bez prahu kostek.
