@@ -78,6 +78,14 @@ export interface PendingApothecary {
     options: string[];
 }
 
+/** P224: čekající otázka, jestli útočník použije Grab (volná pole vedle obránce) */
+export interface PendingGrab {
+    kind: 'block' | 'bnc';
+    attackerId: number;
+    defenderId: number;
+    squares: { x: number; y: number }[];
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -97,6 +105,7 @@ export interface GameState {
     /** P210: hráč, který ohlásil Blitz a ještě nedal ránu (chodí kamkoli, pak jedna rána). */
     declaredBlitzerId?: number | null;
     pendingApothecary?: PendingApothecary | null;
+    pendingGrab?: PendingGrab | null;
 }
 
 export interface TeamState {
