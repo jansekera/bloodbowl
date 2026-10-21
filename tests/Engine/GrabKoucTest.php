@@ -6,6 +6,12 @@ namespace App\Tests\Engine;
 
 use App\DTO\ActionResult;
 use App\DTO\GameState;
+use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingGrabDTO;
+use App\Enum\BlockDiceFace;
+use App\Enum\PlayerState;
+use App\Service\GameOrchestrator;
+use App\AI\AICoachInterface;
 use App\Engine\ActionResolver;
 use App\Engine\FixedDiceRoller;
 use App\Engine\RulesEngine;
@@ -54,13 +60,14 @@ final class GrabKoucTest extends TestCase
      * Hodí blok (výchozí 1 kostka = Pushed) a člověk zvolí první kostku.
      *
      * @param list<int> $kostky
+     * @param array<string, mixed> $navic další parametry volby kostky (klient je může poslat cokoli)
      */
-    private function zvolKostku(GameState $stav, ActionType $akce = ActionType::BLOCK, array $kostky = [3]): ActionResult
+    private function zvolKostku(GameState $stav, ActionType $akce = ActionType::BLOCK, array $kostky = [3], array $navic = []): ActionResult
     {
         $hod = $this->resolver($kostky)->resolve($stav, $akce, ['playerId' => 1, 'targetId' => 2]);
         $this->assertNotNull($hod->getNewState()->getPendingBlock(), 'fixtura: čeká volba kostky');
 
-        return $this->resolver([3, 3, 3, 3, 3, 3])->resolve($hod->getNewState(), ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+        return $this->resolver([3, 3, 3, 3, 3, 3])->resolve($hod->getNewState(), ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0] + $navic);
     }
 
     /** @return array{0: int, 1: int} */
@@ -194,8 +201,10 @@ final class GrabKoucTest extends TestCase
         $this->assertSame([5, 7], $this->pole($q, 1), 'B&C zatím nepostoupil');
         $this->assertFalse($q->getNewState()->requirePlayer(1)->hasActed(), 'akce ještě neskončila');
 
-        $r = $this->resolver(array_fill(0, 20, 3))->resolve($q->getNewState(), ActionType::RESOLVE_GRAB, ['use' => true, 'x' => 6, 'y' => 6]);
-        $this->assertSame([6, 6], $this->pole($r, 2));
+        // (5,6): pole, které automatický Grab (nejvíc zón, pak ke kraji: (6,6)) nevybere ⇒ test
+        //   spadne, kdyby se kouč-ova volba zahodila
+        $r = $this->resolver(array_fill(0, 20, 3))->resolve($q->getNewState(), ActionType::RESOLVE_GRAB, ['use' => true, 'x' => 5, 'y' => 6]);
+        $this->assertSame([5, 6], $this->pole($r, 2));
         $this->assertSame([6, 7], $this->pole($r, 1), 'povinný follow-up');
         $this->assertTrue($r->getNewState()->requirePlayer(1)->hasActed());
         $this->assertNull($r->getNewState()->getPendingGrab());
@@ -214,5 +223,145 @@ final class GrabKoucTest extends TestCase
         $r = $this->resolver(array_fill(0, 20, 3), clovek: false)->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
 
         $this->assertNull($r->getNewState()->getPendingGrab());
+    }
+
+    public function testAutomatickyGrabVybiraJinePoleNezKouc(): void
+    {
+        // Pozitivní kontrola k testům výš: AI/automatický Grab na prázdném poli vybere (5,6),
+        // kouč volí (6,6) ⇒ volba se opravdu čte (zahozená volba by dala (5,6) nebo x=7).
+        $auto = $this->resolver([3, 3, 3, 3], clovek: false)->resolve($this->stav(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $this->assertSame([5, 6], $this->pole($auto, 2));
+    }
+
+    public function testKlientNemuzeOtazkuObejitParametremGrabVolba(): void
+    {
+        // M1: `grabVolba` je vnitřní argument; v parametrech akce se ignoruje (dřív by otázku
+        // přeskočil, nebo `true`/pole způsobilo TypeError).
+        foreach ([true, false, ['x' => 6, 'y' => 6], 'x'] as $podvrh) {
+            $r = $this->zvolKostku($this->stav(), navic: ['grabVolba' => $podvrh]);
+            $this->assertNotNull($r->getNewState()->getPendingGrab(), 'otázka se položí i s podvrženým grabVolba');
+            $this->assertSame([6, 7], $this->pole($r, 2));
+        }
+    }
+
+    public function testStandFirmObranceBezOtazky(): void
+    {
+        // Stand Firm soupeře odtlačení zastaví ⇒ Grab nemá co volit
+        $r = $this->zvolKostku($this->stav(obrance: [SkillName::StandFirm]));
+        $this->assertNull($r->getNewState()->getPendingGrab());
+        $this->assertSame([6, 7], $this->pole($r, 2));
+    }
+
+    public function testZakorenenyObranceBezOtazky(): void
+    {
+        $s = $this->stav();
+        $s = $s->withPlayer($s->requirePlayer(2)->withRooted(true));
+        $r = $this->zvolKostku($s);
+        $this->assertNull($r->getNewState()->getPendingGrab());
+    }
+
+    public function testDefenderDownAStumblesSeTakeNepta(): void
+    {
+        foreach ([6 => BlockDiceFace::DEFENDER_DOWN, 5 => BlockDiceFace::DEFENDER_STUMBLES] as $kostka => $strana) {
+            $r = $this->zvolKostku($this->stav(), kostky: [$kostka]);
+            $this->assertNotNull($r->getNewState()->getPendingGrab(), $strana->value . ' odtlačuje ⇒ otázka');
+        }
+        // Stumbles proti Dodge pořád odtlačuje
+        $r = $this->zvolKostku($this->stav(obrance: [SkillName::Dodge]), kostky: [5]);
+        $this->assertNotNull($r->getNewState()->getPendingGrab());
+    }
+
+    public function testDefenderDownSGrabemObrancePadneNaZvolenemPoli(): void
+    {
+        $q = $this->zvolKostku($this->stav(), kostky: [6])->getNewState();
+        $r = $this->resolver([3, 3, 3, 3, 3, 3])->resolve($q, ActionType::RESOLVE_GRAB, ['use' => true, 'x' => 6, 'y' => 8]);
+
+        $this->assertSame([6, 8], $this->pole($r, 2));
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+    }
+
+    public function testBothDownSeNepta(): void
+    {
+        // Both Down (2) neodtlačuje
+        $r = $this->zvolKostku($this->stav(), kostky: [2]);
+        $this->assertNull($r->getNewState()->getPendingGrab());
+    }
+
+    public function testFollowUpSeVoliAzSOdpovediNeSKostkou(): void
+    {
+        // M5: kostka poslaná s followUp=false (BlockDiceModal) se při otázce ignoruje;
+        // pravidla ř. 608-611: nejdřív odtlačení, pak follow-up ⇒ rozhoduje odpověď.
+        $q = $this->zvolKostku($this->stav(), navic: ['followUp' => false])->getNewState();
+        $slede = $this->resolver([3, 3, 3])->resolve($q, ActionType::RESOLVE_GRAB, ['use' => false, 'followUp' => true]);
+        $this->assertSame([6, 7], $this->pole($slede, 1), 'follow-up z odpovědi');
+
+        $neslede = $this->resolver([3, 3, 3])->resolve($q, ActionType::RESOLVE_GRAB, ['use' => true, 'x' => 6, 'y' => 6, 'followUp' => false]);
+        $this->assertSame([5, 7], $this->pole($neslede, 1), 'followUp=false z odpovědi zachován');
+        $this->assertSame([6, 6], $this->pole($neslede, 2));
+    }
+
+    public function testBlokBezOtazkyBeriFollowUpZKostky(): void
+    {
+        // beze změny: bez Grabu se followUp posílá s kostkou
+        $r = $this->zvolKostku($this->stav(utocnik: []), navic: ['followUp' => false]);
+        $this->assertSame([5, 7], $this->pole($r, 1));
+    }
+
+    public function testOdpovedPouzeSeSkutecnymBoolem(): void
+    {
+        $q = $this->zvolKostku($this->stav())->getNewState();
+        $e = new RulesEngine();
+        foreach (['abc', 'true', 1, 0, '', null] as $podvrh) {
+            $this->assertNotSame([], $e->validate($q, ActionType::RESOLVE_GRAB, ['use' => $podvrh]), 'use=' . var_export($podvrh, true));
+        }
+        $this->assertNotSame([], $e->validate($q, ActionType::RESOLVE_GRAB, ['use' => false, 'followUp' => 'ano']));
+        $this->assertNotSame([], $e->validate($q, ActionType::RESOLVE_GRAB, ['use' => true, 'x' => '6', 'y' => '8']), 'souřadnice jako text');
+        $this->assertSame([], $e->validate($q, ActionType::RESOLVE_GRAB, ['use' => false]));
+        $this->assertSame([], $e->validate($q, ActionType::RESOLVE_GRAB, ['use' => false, 'followUp' => true]));
+    }
+
+    public function testPendingGrabProjdeToArrayFromArray(): void
+    {
+        $blok = $this->zvolKostku($this->stav())->getNewState();
+        $znovu = GameState::fromArray($blok->toArray())->getPendingGrab();
+        $this->assertEquals($blok->getPendingGrab(), $znovu);
+        $this->assertNotNull($znovu);
+        $this->assertSame('block', $znovu->getKind());
+
+        $bnc = new PendingGrabDTO('bnc', 1, 2, [new \App\ValueObject\Position(5, 6)], face: BlockDiceFace::DEFENDER_DOWN, step: 2);
+        $this->assertEquals($bnc, PendingGrabDTO::fromArray($bnc->toArray()));
+        $this->assertNull(GameState::fromArray($this->stav()->toArray())->getPendingGrab());
+    }
+
+    public function testOrchestratorSPendingGrabVratiHnedAKoucCekaNaOdpoved(): void
+    {
+        $dice = new FixedDiceRoller([3]);
+        $o = new GameOrchestrator(new RulesEngine(), $dice, $this->createStub(AICoachInterface::class));
+        $hod = $o->executeAction($this->stav(), ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+        $r = $o->executeAction($hod['state'], ActionType::CHOOSE_BLOCK_DIE, ['faceIndex' => 0]);
+
+        $this->assertNotNull($r['state']->getPendingGrab());
+        $this->assertFalse($r['isTurnover']);
+        $this->assertSame(TeamSide::HOME, $r['state']->getActiveTeam());
+        $this->assertSame([ActionType::RESOLVE_GRAB->value], array_column((new RulesEngine())->getAvailableActions($r['state']), 'type'));
+        $this->expectException(\App\Exception\ValidationException::class);
+        $o->executeAction($r['state'], ActionType::END_TURN, []);
+    }
+
+    public function testStandFirmVlastnihoTymuBncProtiVlastnimuGrabOtazku(): void
+    {
+        // L1: Stand Firm drží pole jen proti SOUPEŘI (ř. 1824-1825) -- B&C blokující vlastního
+        // hráče se Stand Firm ho odtlačí, Grab je tedy na místě. Vlastní hráči na všech čtyřech
+        // stranách, ať se šablona (natočení volí kouč) vždycky trefí do některého z nich.
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands, SkillName::Grab], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 4, 7, skills: [SkillName::StandFirm], id: 3)
+            ->addPlayer(TeamSide::HOME, 5, 6, skills: [SkillName::StandFirm], id: 4)
+            ->addPlayer(TeamSide::HOME, 5, 8, skills: [SkillName::StandFirm], id: 5)
+            ->withBallOffPitch()
+            ->build();
+        $r = $this->resolver(array_fill(0, 20, 3))->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        $this->assertNotNull($r->getNewState()->getPendingGrab());
     }
 }

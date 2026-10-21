@@ -12,8 +12,8 @@ use App\ValueObject\Position;
  * použije Grab při odtlačení (`rules_bb2016.txt` ř. 8147-8154: "may choose any empty square
  * adjacent to his opponent"). Otázka přeruší vyhodnocení bloku těsně před odtlačením:
  *
- *  - kind 'block': blok z akce Block; čeká i `PendingBlockDTO`, `faceIndex`/`followUp` je už
- *    učiněná volba kostky a follow-upu, která se po odpovědi dokončí;
+ *  - kind 'block': blok z akce Block; čeká i `PendingBlockDTO`, `faceIndex` je už zvolená kostka;
+ *    follow-up se volí až s odpovědí (pravidla ř. 608-611: nejdřív odtlačení);
  *  - kind 'bnc': automatický blok Ball & Chain (ř. 7829-7831); `face` je zvolená strana kostky,
  *    `step` krok pohybu, ve kterém ke bloku došlo, a `newPos` pole, na kterém stál obránce.
  */
@@ -26,7 +26,6 @@ final class PendingGrabDTO
         private readonly int $defenderId,
         private readonly array $squares,
         private readonly int $faceIndex = 0,
-        private readonly ?bool $followUp = null,
         private readonly ?BlockDiceFace $face = null,
         private readonly int $step = 0,
     ) {}
@@ -55,11 +54,6 @@ final class PendingGrabDTO
     public function getFaceIndex(): int
     {
         return $this->faceIndex;
-    }
-
-    public function getFollowUp(): ?bool
-    {
-        return $this->followUp;
     }
 
     public function getFace(): ?BlockDiceFace
@@ -92,7 +86,6 @@ final class PendingGrabDTO
             'defenderId' => $this->defenderId,
             'squares' => array_map(static fn(Position $p) => ['x' => $p->getX(), 'y' => $p->getY()], $this->squares),
             'faceIndex' => $this->faceIndex,
-            'followUp' => $this->followUp,
             'face' => $this->face?->value,
             'step' => $this->step,
         ];
@@ -113,7 +106,6 @@ final class PendingGrabDTO
             (int) $data['defenderId'],
             $squares,
             (int) ($data['faceIndex'] ?? 0),
-            isset($data['followUp']) ? (bool) $data['followUp'] : null,
             isset($data['face']) ? BlockDiceFace::from((string) $data['face']) : null,
             (int) ($data['step'] ?? 0),
         );

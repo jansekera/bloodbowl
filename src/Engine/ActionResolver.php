@@ -489,7 +489,7 @@ final class ActionResolver
         if ($pending === null) {
             throw new \InvalidArgumentException('No pending Grab question');
         }
-        $volba = filter_var($params['use'], FILTER_VALIDATE_BOOLEAN)
+        $volba = $params['use'] === true
             ? new Position((int) $params['x'], (int) $params['y'])
             : false;
 
@@ -497,12 +497,13 @@ final class ActionResolver
             return $this->ballAndChainHandler->resumeGrab($state, $pending, $volba);
         }
 
-        $blockParams = ['faceIndex' => $pending->getFaceIndex(), 'grabVolba' => $volba];
-        if ($pending->getFollowUp() !== null) {
-            $blockParams['followUp'] = $pending->getFollowUp();
+        // follow-up se volí s odpovědí (po odtlačení, `rules_bb2016.txt` ř. 608-611)
+        $blockParams = ['faceIndex' => $pending->getFaceIndex()];
+        if (isset($params['followUp'])) {
+            $blockParams['followUp'] = $params['followUp'];
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams);
+        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba);
     }
 
     /**

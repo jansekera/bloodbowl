@@ -84,6 +84,10 @@ export interface PendingGrab {
     attackerId: number;
     defenderId: number;
     squares: { x: number; y: number }[];
+    /** index zvolené kostky v pendingBlock.faces (kind 'block') */
+    faceIndex: number;
+    /** zvolená strana kostky u Ball & Chain (kind 'bnc') */
+    face: string | null;
 }
 
 /** Full game state sent from the server */

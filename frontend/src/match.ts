@@ -207,7 +207,8 @@ function showGrabModal(state: import('./api/types').GameState): void {
     const pending = state.pendingGrab;
     if (!pending) return;
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
-    grabModal.show(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), async (params: Record<string, unknown>) => {
+    const dieFace = pending.face ?? state.pendingBlock?.faces[pending.faceIndex] ?? '?';
+    grabModal.show(pending, nameOf(pending.attackerId), nameOf(pending.defenderId), dieFace, async (params: Record<string, unknown>) => {
         isProcessing = true;
         try {
             const result = await api.submitAction(matchId, 'resolve_grab', params);
@@ -217,6 +218,7 @@ function showGrabModal(state: import('./api/types').GameState): void {
         } catch (err) {
             console.error(err);
             toast.error('Grab choice failed');
+            showGrabModal(state); // otázka na serveru stále čeká — bez dialogu by kouč uvázl do reloadu
         } finally {
             isProcessing = false;
         }

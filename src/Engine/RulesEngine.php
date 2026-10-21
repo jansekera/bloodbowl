@@ -1335,13 +1335,16 @@ final class RulesEngine
         if ($pending === null) {
             return ['No pending Grab question'];
         }
-        if (!array_key_exists('use', $params)) {
-            return ['use is required'];
+        if (!isset($params['use']) || !is_bool($params['use'])) {
+            return ['use must be a boolean'];
         }
-        if (!filter_var($params['use'], FILTER_VALIDATE_BOOLEAN)) {
+        if (isset($params['followUp']) && !is_bool($params['followUp'])) {
+            return ['followUp must be a boolean'];
+        }
+        if ($params['use'] === false) {
             return [];
         }
-        if (!isset($params['x'], $params['y'])) {
+        if (!isset($params['x'], $params['y']) || !is_int($params['x']) || !is_int($params['y'])) {
             return ['x and y are required when using Grab'];
         }
         if (!$pending->offers((int) $params['x'], (int) $params['y'])) {
