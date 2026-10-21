@@ -923,6 +923,10 @@ GameState makeHandBuiltMismatch() {
 }
 
 TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
+    // P227 (21.10.2026): fixtura stojí na blitzu 1 proti 6 (obránce volí ze 3), který AI od P227 nenabízí.
+    // Test hlídá strážce odkladu, ne práh kostek, a hrana fixtury je laděná na tenhle blitz ⇒ P227 vypnuto.
+    setExtraFeaturesOff(kP227BlitzDice);
+    struct Restore { ~Restore() { setExtraFeaturesOff(0); } } restore;
     GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;
@@ -1455,6 +1459,9 @@ TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
     put(1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});   // slabý blitzer
     put(2, TeamSide::HOME, {3, 12}, {6, 3, 3, 8});   // daleko od děje
     put(12, TeamSide::AWAY, {13, 7}, {6, 4, 3, 9});  // silný cíl blitzu
+    // P227 (21.10.2026): 2 kostky proti se nabízejí jen na soupeřova nosiče — cíl nese míč, jinak by
+    // riskantní blitz v nabídce vůbec nebyl (test hlídá odklad, ne práh kostek).
+    state.ball = BallState::carried({13, 7}, 12);
 
     std::vector<Macro> offer;
     getAvailableMacros(state, offer);

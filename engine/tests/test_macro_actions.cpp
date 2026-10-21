@@ -4957,3 +4957,136 @@ TEST(MacroActions, P219bTheEscapeComparesTheDodgeRiskWithTheRiskOfStaying) {
     EXPECT_TRUE(escapes(4, false, 0)) << "AG4 odskakuje";
     EXPECT_FALSE(escapes(3, true, kP219bEscapeByRisk)) << "pozitivní kontrola: bez P219b AG3 bez Dodge nikdy";
 }
+
+// ⭐ P227 (uživatel 21.10.2026: „Tři proti nedává smysl ani proti nosiči“; ke dvěma proti volba „3b“ =
+//   jen na nosiče míče). AI nenabízí ani nevybírá blitz, kde kostky volí obránce ze 3+ kostek (nikdy),
+//   ze 2 kostek jen na soupeřova nosiče. Kostky = podepsaný počet z pole, odkud se bude blokovat (P35).
+//   Podklad: evidence/prazdne_blitzy_20261021/vysledek.md (22/184 blitzů, turnover 41 %).
+namespace {
+Player& p227Put(GameState& s, int id, TeamSide side, Position pos, PlayerStats st) {
+    Player& p = s.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+    p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    p.hasMoved = false; p.hasActed = false;
+    return p;
+}
+bool offersBlitzOn(const GameState& state, int targetId) {
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    for (const Macro& m : macros)
+        if (m.type == MacroType::BLITZ && m.targetId == targetId) return true;
+    return false;
+}
+// Obrana: náš jediný hráč 1 (síla 2) na (10,7), soupeřův nosič 12 na (14,7) — dosáhne bez úhybu.
+GameState p227CarrierState(int8_t carrierST) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {14, 7}, {6, carrierST, 3, 8});
+    s.ball = BallState::carried({14, 7}, 12);
+    return s;
+}
+struct P227Off {
+    explicit P227Off(unsigned m) { setExtraFeaturesOff(m); }
+    ~P227Off() { setExtraFeaturesOff(0); }
+};
+}  // namespace
+
+TEST(MacroActions, P227NoBlitzIntoThreeDiceAgainstEvenOnTheCarrier) {
+    P227Off on(0);
+    const GameState s = p227CarrierState(5);   // 2 proti 5 ⇒ obránce volí ze 3
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -3) << "fixtura: 3 kostky proti";
+    EXPECT_FALSE(offersBlitzOn(s, 12)) << "3 proti se nenabízí ani na nosiče";
+}
+
+TEST(MacroActions, P227TwoDiceAgainstStayOfferedOnTheCarrier) {
+    P227Off on(0);
+    const GameState s = p227CarrierState(3);   // 2 proti 3 ⇒ obránce volí ze 2
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -2) << "fixtura: 2 kostky proti";
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "2 proti na soupeřova nosiče zůstává";
+}
+
+TEST(MacroActions, P227SwitchedOffTheOldOfferReturns) {
+    P227Off off(kP227BlitzDice);
+    const GameState s = p227CarrierState(5);
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "pozitivní kontrola: s vypnutým P227 se 3 proti nabízí jako dřív";
+}
+
+// Obrana, nosič 12 daleko (nedosáhne). Soupeř 13 (síla 4) ⇒ 2 proti, není nosič; soupeř 14 (síla 2) ⇒ 1 kostka
+// pro nás. Dřív se v obraně nabízely oba (nejvýš 2 cíle); teď jen 14.
+TEST(MacroActions, P227TwoDiceAgainstOffTheCarrierAreNotOfferedTheBetterTargetIs) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {24, 13}, {6, 3, 3, 8});
+    p227Put(s, 13, TeamSide::AWAY, {14, 5}, {6, 4, 3, 8});
+    p227Put(s, 14, TeamSide::AWAY, {14, 10}, {6, 2, 3, 8});
+    s.ball = BallState::carried({24, 13}, 12);
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(13)), -2);
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(14)), 1);
+    {
+        P227Off on(0);
+        EXPECT_FALSE(offersBlitzOn(s, 13)) << "2 proti mimo nosiče se nenabízí";
+        EXPECT_TRUE(offersBlitzOn(s, 14)) << "1 kostka pro nás beze změny";
+    }
+    P227Off off(kP227BlitzDice);
+    EXPECT_TRUE(offersBlitzOn(s, 13)) << "pozitivní kontrola: dřív se nabízel";
+}
+
+// Výběr blitzujícího (pickBlitzer): hráč 1 vedle nosiče 12 má 3 proti, ale se Strip Ball a Wrestle by ho
+// podle odhadu „srazí / vyrazí míč“ vybral (0,58 proti 0,31). Hráč 2 (síla 5) doběhne a má 2 pro nás.
+TEST(MacroExpansion, P227BlitzerWithThreeDiceAgainstIsNotPicked) {
+    auto pick = [](unsigned off) {
+        P227Off o(off);
+        GameState s = makeMinimalState();
+        Player& t = p227Put(s, 12, TeamSide::AWAY, {15, 7}, {6, 5, 3, 8});
+        t.skills.add(SkillName::Block);
+        t.skills.add(SkillName::Dodge);
+        Player& a = p227Put(s, 1, TeamSide::HOME, {14, 7}, {6, 2, 3, 8});
+        a.skills.add(SkillName::StripBall);
+        a.skills.add(SkillName::Wrestle);
+        p227Put(s, 2, TeamSide::HOME, {11, 7}, {6, 5, 3, 8});
+        s.ball = BallState::carried({15, 7}, 12);
+        EXPECT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -3) << "fixtura";
+        FixedDiceRoller dice(std::vector<int>(40, 6));
+        const auto r = greedyExpandMacro(s, Macro{MacroType::BLITZ, -1, 12, {-1, -1}}, dice);
+        return r.actions.empty() || r.actions[0].type != ActionType::BLITZ ? -1 : r.actions[0].playerId;
+    };
+    EXPECT_EQ(pick(kP227BlitzDice), 1) << "pozitivní kontrola: bez P227 se vybral hráč se 3 proti";
+    EXPECT_EQ(pick(0), 2) << "blitzující se 3 proti se nevybere, když jiný na týž cíl smí";
+}
+
+// BLITZ_AND_SCORE je taky blitz: nosič 1 (síla 3) by blokujícího 12 (síla 5, není nosič) blitzoval 2 proti.
+TEST(MacroActions, P227BlitzAndScoreIsNotOfferedWithTwoDiceAgainst) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {17, 7}, {6, 3, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {19, 7}, {6, 5, 3, 8});
+    s.ball = BallState::carried({17, 7}, 1);
+    auto offered = [&](unsigned off) {
+        P227Off o(off);
+        std::vector<Macro> macros;
+        getAvailableMacros(s, macros);
+        return hasMacroType(macros, MacroType::BLITZ_AND_SCORE);
+    };
+    EXPECT_TRUE(offered(kP227BlitzDice)) << "pozitivní kontrola: dřív se nabízel";
+    EXPECT_FALSE(offered(0)) << "BLITZ_AND_SCORE do 2 proti mimo nosiče se nenabízí";
+    s.getPlayer(12).stats.strength = 3;
+    EXPECT_TRUE(offered(0)) << "1 kostka pro nás beze změny";
+}
+
+// Rat Ogre: ohlášení blitzu bez cíle (P156, cíl −1) kvůli hodu Wild Animal na 2+ se P227 netýká — i když
+// jediný soupeř v dosahu je 3 proti (blitz na něj se nenabídne).
+TEST(MacroActions, P227TargetlessWildAnimalBlitzStaysOffered) {
+    P227Off on(0);
+    GameState s = wildAnimalState(true);
+    Player& ogre = s.getPlayer(1);
+    ogre.position = {3, 3};
+    ogre.stats.strength = 2;
+    p227Put(s, 13, TeamSide::AWAY, {6, 3}, {6, 5, 3, 8});   // nosič 12 zůstává daleko (22,2)
+    ASSERT_EQ(blockDiceCount(s, ogre, s.getPlayer(13)), -3);
+    EXPECT_FALSE(offersBlitzOn(s, 13));
+    EXPECT_TRUE(offersTargetlessBlitz(s, 1)) << "primitivní ohlášení bez cíle zůstává";
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+    bool viaBlitz = false;
+    for (const Macro& m : macros) viaBlitz |= (m.type == MacroType::REPOSITION && m.playerId == 1 && m.declareBlitz);
+    EXPECT_TRUE(viaBlitz) << "přesun s ohlášeným blitzem (2+) zůstává v nabídce";
+}
