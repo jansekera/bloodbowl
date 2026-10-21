@@ -51,11 +51,11 @@ final class StandFirmFrenzyPastTest extends TestCase
      *
      * @param list<int> $kostky kostky prvního bloku
      */
-    private function blok(GameState $s, array $kostky = [3, 3]): GameState
+    private function blok(GameState $s, array $kostky = [3, 3], ActionType $akce = ActionType::BLOCK): GameState
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
         $r->setInteractiveBlocks(true);
-        $hod = $r->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
+        $hod = $r->resolve($s, $akce, ['playerId' => 1, 'targetId' => 2])->getNewState();
         $this->assertNotNull($hod->getPendingBlock(), 'fixtura: čeká volba kostky');
 
         $r2 = new ActionResolver(new FixedDiceRoller(array_fill(0, 12, 3)));
@@ -150,12 +150,127 @@ final class StandFirmFrenzyPastTest extends TestCase
         $this->assertSame([7, 8], $this->pole($s, 2));
     }
 
-    public function testFendPouzije(): void
+    /**
+     * NOVÉ PRAVIDLO (uživatel 21.10.2026, „1 ano“): útočník s Frenzy NEMŮŽE následovat ⇒ obránce bez
+     * Stand Firm odletí, nesousedí a druhá rána odpadne (Frenzy ř. 8139-8141 "both still standing
+     * and adjacent"; Fend ř. 8113-8118; Take Root ř. 8580-8583) ⇒ AI Stand Firm nepoužije.
+     * Bez pomocníků: kostky by se nezhoršily, rozhoduje jen to, že druhá rána odpadne.
+     */
+    public function testFendObranceNepouzije(): void
     {
-        // Fend: útočník nesmí následovat (ř. 8113-8118) ⇒ nesousedí, druhý blok nebude
-        $s = $this->blok($this->past(obrance: [SkillName::StandFirm, SkillName::Fend])->build());
+        $s = $this->blok($this->past(obrance: [SkillName::StandFirm, SkillName::Fend], pomocnici: false)->build(), [3]);
+
+        $this->assertSame(7, $this->pole($s, 2)[0], 'obránce se nechal odtlačit');
+        $this->assertSame([5, 7], $this->pole($s, 1), 'Fend: útočník nenásleduje');
+        $this->assertNull($s->getPendingBlock(), 'druhá rána odpadla');
+    }
+
+    public function testZakorenenyUtocnikNepouzije(): void
+    {
+        $s = $this->past(pomocnici: false)->build();
+        $s = $s->withPlayer($s->requirePlayer(1)->withRooted(true));
+        $s = $this->blok($s, [3]);
+
+        $this->assertSame(7, $this->pole($s, 2)[0]);
+        $this->assertSame([5, 7], $this->pole($s, 1));
+        $this->assertNull($s->getPendingBlock());
+    }
+
+    public function testFendADavPouzije(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 1, skills: [SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::AWAY, 5, 0, skills: [SkillName::StandFirm, SkillName::Fend], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $s = $this->blok($s, [3]);
+
+        $this->assertSame([5, 0], $this->pole($s, 2), 'do davu ne');
+    }
+
+    public function testFendANosicPouzije(): void
+    {
+        $s = $this->blok($this->past(obrance: [SkillName::StandFirm, SkillName::Fend], pomocnici: false)->withBallCarried(2)->build(), [3]);
 
         $this->assertSame([6, 7], $this->pole($s, 2));
+    }
+
+    public function testFendAJuggernautVBlitzuStandFirmNeplatiAUtocnikNasleduje(): void
+    {
+        // Juggernaut v blitzu: soupeř nesmí použít Fend ani Stand Firm (ř. 8193-8196) ⇒ odtlačen,
+        // útočník následuje a druhá rána se hází (oba stojí a sousedí)
+        $s = $this->past(utocnik: [SkillName::Frenzy, SkillName::Juggernaut], obrance: [SkillName::StandFirm, SkillName::Fend], pomocnici: false)->build();
+        $s = $this->blok($s, [3], ActionType::BLITZ);
+
+        $this->assertSame(7, $this->pole($s, 2)[0]);
+        $this->assertSame([6, 7], $this->pole($s, 1), 'Fend proti Juggernautovi v blitzu neplatí');
+        $this->assertNotNull($s->getPendingBlock(), 'druhá rána Frenzy');
+    }
+
+    public function testBlitzSGfiNaDruhouRanuJePast(): void
+    {
+        // pohyb 0: první rána stojí GFI (zbude -1), druhá jde ještě za GFI (-2) ⇒ druhá rána bude
+        $s = $this->past()->build();
+        $s = $s->withPlayer($s->requirePlayer(1)->withMovementRemaining(0));
+        $s = $this->blok($s, [3, 3, 3], ActionType::BLITZ);   // GFI 3, kostky 3,3
+
+        $this->assertSame([7, 8], $this->pole($s, 2));
+    }
+
+    public function testBlitzBezPohybuNaDruhouRanuPouzije(): void
+    {
+        // pohyb -1: první rána za GFI (zbude -2), na druhou už pole ani GFI nezbývá (ř. 8143-8145) ⇒ past není
+        $s = $this->past()->build();
+        $s = $s->withPlayer($s->requirePlayer(1)->withMovementRemaining(-1));
+        $s = $this->blok($s, [3, 3, 3], ActionType::BLITZ);
+
+        $this->assertSame([6, 7], $this->pole($s, 2));
+    }
+
+    public function testMultipleBlockPouzije(): void
+    {
+        // Multiple Block: bez follow-upu a bez druhé rány Frenzy ⇒ past nevzniká
+        $s = $this->past(utocnik: [SkillName::Frenzy, SkillName::MultipleBlock])->addPlayer(TeamSide::AWAY, 4, 7, id: 9)->build();
+        $r = new ActionResolver(new FixedDiceRoller(array_fill(0, 30, 3)));
+        $s = $r->resolve($s, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 9])->getNewState();
+
+        $this->assertSame([6, 7], $this->pole($s, 2));
+    }
+
+    public function testAIHracSeStandFirmVRetezuDrziIPriPasti(): void
+    {
+        // Za obráncem (7,6),(7,7) AWAY se Stand Firm a (7,8) AWAY bez něj ⇒ řetěz jde přes (7,8).
+        // Ze stejného pole 4:3 (+2), z nového 3:5 (−2) ⇒ past; v řetězu AI Stand Firm drží jako dosud.
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::Frenzy], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 5, 6, id: 3)
+            ->addPlayer(TeamSide::AWAY, 7, 8, id: 4)
+            ->addPlayer(TeamSide::AWAY, 7, 6, skills: [SkillName::StandFirm], id: 5)
+            ->addPlayer(TeamSide::AWAY, 7, 7, skills: [SkillName::StandFirm], id: 6)
+            ->withBallOffPitch()
+            ->build();
+        $s = $this->blok($s);
+
+        $this->assertSame([7, 8], $this->pole($s, 2), 'obránce Stand Firm nepoužil');
+        $this->assertSame(8, $this->pole($s, 4)[0], 'řetěz odtlačil hráče bez Stand Firm');
+        $this->assertSame([7, 6], $this->pole($s, 5));
+        $this->assertSame([7, 7], $this->pole($s, 6));
+    }
+
+    public function testSideStepPrehraniDaTotezPoleJakoOdtlaceni(): void
+    {
+        // Side Step obránce vybírá pole sám (nejméně zón): (7,6). Běžné odtlačení by šlo na (7,8)
+        // (nejvíc zón, HOME (8,8)), odkud by druhá rána nebyla horší (asistence (8,8) ⇒ +2 = +2).
+        // Z (7,6) je 3:3 (+1) < +2 ⇒ past jen tehdy, když přehrání vybere pole jako skutečné odtlačení.
+        $s = $this->past(obrance: [SkillName::StandFirm, SkillName::SideStep], pomocnici: false)
+            ->addPlayer(TeamSide::HOME, 5, 6, id: 3)
+            ->addPlayer(TeamSide::HOME, 8, 8, id: 4)
+            ->build();
+        $s = $this->blok($s);
+
+        $this->assertSame([7, 6], $this->pole($s, 2), 'Side Step, Stand Firm nepoužit');
+        $this->assertSame([6, 7], $this->pole($s, 1));
     }
 
     public function testDruhaRanaFrenzyStandFirmPouzije(): void

@@ -459,7 +459,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
         Position|false|null $grabVolba = null,
     ): array {
         $targetPos = $target->getPosition();
-        if ($pusher->getPosition() === null || $targetPos === null || $target->holdsGround($pusher->getTeamSide())) {
+        if ($pusher->getPosition() === null || $targetPos === null || $this->blockHandler->obranceDrziPole($state, $pusher, $target, false, null)) {
             return [$state, $events];
         }
 
