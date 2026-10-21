@@ -65,6 +65,8 @@ final class GameOrchestrator
         // P206 (b): o lékárníkovi se ptá kouč-člověk — i když se jeho hráč zranil v tahu soupeře
         $lide = $aiTeam === null ? [TeamSide::HOME, TeamSide::AWAY] : [$aiTeam->opponent()];
         $resolver->setInteractiveApothecary($lide);
+        // P226: na Stand Firm se ptá kouč-člověk bránícího hráče — i v tahu soupeře (tah AI se zastaví)
+        $resolver->setInteractiveStandFirm($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();
@@ -72,7 +74,8 @@ final class GameOrchestrator
 
         // If there's a pending block or reroll (human player), return immediately
         if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null
-            || $newState->getPendingApothecary() !== null || $newState->getPendingGrab() !== null) {
+            || $newState->getPendingApothecary() !== null || $newState->getPendingGrab() !== null
+            || $newState->getPendingStandFirm() !== null) {
             return [
                 'state' => $newState,
                 'events' => $allEvents,
@@ -120,7 +123,7 @@ final class GameOrchestrator
         // AI auto-play for turn — ne, čeká-li kouč-člověk na lékárníka (review 16.10.: např. Throw a Rock
         //   ve výkopu po END_SETUP AI; AI by jinak volbu odpověděla sama nebo ukončila tah)
         if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isPlayable()
-            && $newState->getPendingApothecary() === null) {
+            && $newState->getPendingApothecary() === null && $newState->getPendingStandFirm() === null) {
             $aiTurnService = new AITurnService($this->aiCoach, $this->rulesEngine, $lide);
             if ($this->gameLogger !== null) {
                 $aiTurnService->setGameLogger($this->gameLogger);

@@ -118,6 +118,17 @@ final class ActionResolver
         $this->interactiveApothecary = $sides;
     }
 
+    /**
+     * P226: strany kouče-člověka -- jeho hráče se Stand Firm se při odtlačení ptá (i v tahu soupeře);
+     * hráče AI rozhoduje engine (P225).
+     *
+     * @param list<TeamSide> $sides
+     */
+    public function setInteractiveStandFirm(array $sides): void
+    {
+        $this->blockHandler->setAskStandFirm($sides);
+    }
+
     public function setInteractiveRerolls(bool $interactive): void
     {
         $this->interactiveRerolls = $interactive;
@@ -418,6 +429,7 @@ final class ActionResolver
             ActionType::RESOLVE_REROLL => $this->rerollHandler->resolve($state, $params),
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
+            ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)
@@ -432,7 +444,8 @@ final class ActionResolver
 
         // Auto-resolve pending blocks (unless interactive mode for human players)
         if (!$this->interactiveBlocks) {
-            while ($result->getNewState()->getPendingBlock() !== null) {
+            // P226: čeká-li kouč-člověk na otázku o Stand Firm, blok (pendingBlock) dál čeká na odpověď
+            while ($result->getNewState()->getPendingBlock() !== null && $result->getNewState()->getPendingStandFirm() === null) {
                 $autoResult = $this->blockHandler->autoResolvePendingBlock($result->getNewState());
                 $mergedEvents = array_merge($result->getEvents(), $autoResult->getEvents());
                 if ($autoResult->isTurnover()) {
@@ -459,7 +472,8 @@ final class ActionResolver
         // Blood Lust: hladovy upir se krmi na KONCI akce -- pred prihravkou, predanim
         //   i TD (TD se vyhodnocuje az po akci). `rules_bb2016.txt` r. 7934-7947.
         $novy = $result->getNewState();
-        if ($novy->getPendingBlock() === null && $novy->getPendingReroll() === null && $novy->getPendingGrab() === null) {
+        if ($novy->getPendingBlock() === null && $novy->getPendingReroll() === null && $novy->getPendingGrab() === null
+            && $novy->getPendingStandFirm() === null) {
             foreach ($novy->getPlayers() as $upir) {
                 if (!$upir->isBloodlustHungry()
                     || !($upir->hasActed() || $upir->hasMoved() || $action === ActionType::END_TURN)) {
@@ -503,7 +517,30 @@ final class ActionResolver
             $blockParams['followUp'] = $params['followUp'];
         }
 
-        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba);
+        return $this->blockHandler->resolveBlockChoice($state->withPendingGrab(null), $blockParams, $volba, $pending->getStandFirm());
+    }
+
+    /**
+     * P226 — odpověď kouče na otázku, jestli jeho hráč použije Stand Firm (`rules_bb2016.txt`
+     * ř. 8510-8516). params: `use` (bool). Rozpracovaný blok se vyhodnotí znovu od téže kostky
+     * se všemi dosavadními odpověďmi (followUp z volby kostky a odpověď na Grab zůstávají).
+     *
+     * @param array<string, mixed> $params
+     */
+    private function resolveStandFirm(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingStandFirm();
+        if ($pending === null) {
+            throw new \InvalidArgumentException('No pending Stand Firm question');
+        }
+        $blockParams = ['faceIndex' => $pending->getFaceIndex()];
+        if ($pending->getFollowUp() !== null) {
+            $blockParams['followUp'] = $pending->getFollowUp();
+        }
+        $odpovedi = $pending->getAnswers();
+        $odpovedi[$pending->getPlayerId()] = $params['use'] === true;
+
+        return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi);
     }
 
     /**

@@ -11,6 +11,7 @@ use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingBlockDTO;
 use App\DTO\PendingGrabDTO;
+use App\DTO\PendingStandFirmDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PassRange;
 use App\Enum\PlayerState;
@@ -54,6 +55,69 @@ final class BlockHandler implements ActionHandlerInterface
         $this->ptatSeNaGrab = $ptatSe;
     }
 
+    /** @var list<TeamSide> P226: strany kouče-člověka -- jejich hráčů se Stand Firm se ptá */
+    private array $ptatSeNaStandFirm = [];
+
+    /**
+     * @var array<int, bool>|null P226: odpovědi kouče v právě vyhodnocovaném bloku (id => použije
+     *   Stand Firm). null = neptat se (Ball & Chain, Multiple Block, odtlačení nanečisto).
+     */
+    private ?array $standFirmOdpovedi = null;
+
+    /** @param list<TeamSide> $strany */
+    public function setAskStandFirm(array $strany): void
+    {
+        $this->ptatSeNaStandFirm = $strany;
+    }
+
+    /**
+     * P226: odpověď kouče-člověka na Stand Firm hráče `$hrac`; null = rozhoduje AI (kouč se neptá).
+     * Bez odpovědi přeruší vyhodnocení bloku otázkou (`StandFirmQuestion`, chytá `resolveBlockChoice`).
+     */
+    private function odpovedKouce(MatchPlayerDTO $hrac): ?bool
+    {
+        if ($this->standFirmOdpovedi === null || !in_array($hrac->getTeamSide(), $this->ptatSeNaStandFirm, true)) {
+            return null;
+        }
+
+        return $this->standFirmOdpovedi[$hrac->getId()] ?? throw new StandFirmQuestion($hrac->getId());
+    }
+
+    /**
+     * Drží hráč v ŘETĚZU odtlačení pole? (`rules_bb2016.txt` ř. 8514-8516: "pushed back into a player
+     * using Stand Firm then neither player moves".) Zakořeněný vždy (ř. 8578-8579); Stand Firm podle
+     * `holdsGround` a volby kouče-člověka (P226), AI ho použije vždy.
+     */
+    private function drziPole(MatchPlayerDTO $hrac, TeamSide $blockingSide): bool
+    {
+        if (!$hrac->holdsGround($blockingSide)) {
+            return false;
+        }
+
+        return $hrac->isRooted() || ($this->odpovedKouce($hrac) ?? true);
+    }
+
+    /**
+     * Drží PŘÍMO BLOKOVANÝ obránce pole? Jediné místo pro blok i otázku na Grab.
+     * Zakořeněný vždy (ř. 8578-8579 "for any reason"); Juggernaut v blitzu Stand Firm ruší
+     * (ř. 8193-8196); jinak volí kouč-člověk (P226), AI ho použije vždy.
+     */
+    private function obranceDrziPole(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        bool $isBlitz,
+    ): bool {
+        if ($defender->isRooted()) {
+            return true;
+        }
+        if (!$defender->holdsGround($attacker->getTeamSide()) || ($isBlitz && $attacker->hasSkill(SkillName::Juggernaut))) {
+            return false;
+        }
+
+        return $this->odpovedKouce($defender) ?? true;
+    }
+
     /** Grab používá hráč se skillem Grab bez Frenzy (stejně jako dřív v `odtlacit`). */
     private function maGrab(?MatchPlayerDTO $utocnik): bool
     {
@@ -92,8 +156,10 @@ final class BlockHandler implements ActionHandlerInterface
 
     /**
      * P224: kouč-člověk se má zeptat na Grab? Vrací nabízená pole, nebo [] (neptat se): AI se
-     * neptá, strana kostky musí obránce odtlačit (`holdsGround` -- zakořeněný a Stand Firm soupeře
+     * neptá, strana kostky musí obránce odtlačit (`obranceDrziPole` -- zakořeněný a Stand Firm soupeře
      * se neodtlačí, ř. 8578-8579, 1824-1825; stejně jako při skutečném odtlačení) a musí být kam.
+     * P226: Stand Firm se rozhoduje dřív než Grab (bez odtlačení není co volit, ř. 8146-8150) --
+     * neodpověděl-li ještě kouč obránce, vyletí odtud otázka na Stand Firm.
      *
      * @return list<Position>
      */
@@ -104,13 +170,14 @@ final class BlockHandler implements ActionHandlerInterface
         BlockDiceFace $face,
         bool $isBlitz,
     ): array {
-        $pushes = match ($face) {
+        $squares = $this->ptatSeNaGrab ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
+        $pushes = $squares !== [] && match ($face) {
             BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW
-                => !$defender->holdsGround($attacker->getTeamSide()),
+                => !$this->obranceDrziPole($state, $attacker, $defender, $isBlitz),
             default => false,
         };
 
-        return $this->ptatSeNaGrab && $pushes ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
+        return $pushes ? $squares : [];
     }
 
     /**
@@ -379,10 +446,19 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * Resolve block choice: apply chosen die face from pending block.
      *
+     * P226: `$standFirm` = dosavadní odpovědi kouče-člověka na Stand Firm (id => použije); vnitřní
+     * argument (`ActionResolver::resolveStandFirm`, `resolveGrab`), klient ho poslat nemůže.
+     *
      * @param array<string, mixed> $params
+     * @param array<int, bool>|null $standFirm
      */
-    public function resolveBlockChoice(GameState $state, array $params, Position|false|null $grabVolba = null): ActionResult
-    {
+    public function resolveBlockChoice(
+        GameState $state,
+        array $params,
+        Position|false|null $grabVolba = null,
+        ?array $standFirm = null,
+    ): ActionResult {
+        $puvodni = $state;
         $pending = $state->getPendingBlock();
         if ($pending === null) {
             throw new \InvalidArgumentException('No pending block');
@@ -418,43 +494,62 @@ final class BlockHandler implements ActionHandlerInterface
         //   `$grabVolba` je jen vnitřní argument (volá ho `ActionResolver::resolveGrab`), klient ho
         //   v parametrech akce poslat nemůže. Follow-up se při otázce nebere z kostky: pravidla
         //   (ř. 608-611) ho řadí až za odtlačení, volí se spolu s odpovědí.
-        if ($grabVolba === null) {
-            $squares = $this->grabQuestionSquares($state, $attacker, $defender, $chosenFace, $pending->isBlitz());
-            if ($squares !== []) {
-                $index = array_search($chosenFace, $faces, true);
-                if ($index === false) {
-                    throw new \LogicException('Chosen block face is not among the rolled faces');
-                }
-
-                return ActionResult::success($state->withPendingGrab(new PendingGrabDTO(
-                    'block',
-                    $attacker->getId(),
-                    $defender->getId(),
-                    $squares,
-                    faceIndex: (int) $index,
-                )), []);
-            }
+        $index = array_search($chosenFace, $faces, true);
+        if ($index === false) {
+            throw new \LogicException('Chosen block face is not among the rolled faces');
         }
-
-        $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
-        $events = [];
-        $events[] = GameEvent::blockAttempt(
-            $pending->getAttackerId(),
-            $pending->getDefenderId(),
-            count($faces),
-            $pending->isAttackerChooses(),
-            $faceValues,
-            $chosenFace->value,
-        );
-
-        // Clear pending block
-        $state = $state->withPendingBlock(null);
-
         $isBlitz = $pending->isBlitz();
         // P81 krok 3: follow-up je volba -- clovek ji posila spolu s kostkou,
         //   bez parametru rozhodne pravidlo AI (`wantsFollowUp`).
         $followUpChoice = array_key_exists('followUp', $params) ? (bool) $params['followUp'] : null;
-        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba);
+
+        // P226: otázka na Stand Firm (přímý obránce i řetěz) přeruší vyhodnocení dřív, než se cokoli
+        //   hodí nebo pohne (odtlačení je až do rozhodnutí čisté) -- stav se vrací s čekajícím blokem
+        //   a po odpovědi se blok vyhodnotí znovu od téže kostky se všemi odpověďmi.
+        $this->standFirmOdpovedi = $standFirm ?? [];
+        try {
+            if ($grabVolba === null) {
+                $squares = $this->grabQuestionSquares($state, $attacker, $defender, $chosenFace, $isBlitz);
+                if ($squares !== []) {
+                    return ActionResult::success($state->withPendingGrab(new PendingGrabDTO(
+                        'block',
+                        $attacker->getId(),
+                        $defender->getId(),
+                        $squares,
+                        faceIndex: (int) $index,
+                        standFirm: $this->standFirmOdpovedi,
+                    )), []);
+                }
+            }
+
+            $faceValues = array_map(fn(BlockDiceFace $f) => $f->value, $faces);
+            $events = [];
+            $events[] = GameEvent::blockAttempt(
+                $pending->getAttackerId(),
+                $pending->getDefenderId(),
+                count($faces),
+                $pending->isAttackerChooses(),
+                $faceValues,
+                $chosenFace->value,
+            );
+
+            // Clear pending block
+            $state = $state->withPendingBlock(null);
+
+            $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba);
+        } catch (StandFirmQuestion $otazka) {
+            return ActionResult::success($puvodni->withPendingStandFirm(new PendingStandFirmDTO(
+                $otazka->playerId,
+                $attacker->getId(),
+                $defender->getId(),
+                (int) $index,
+                $this->standFirmOdpovedi ?? [],
+                $followUpChoice,
+                $grabVolba,
+            )), []);
+        } finally {
+            $this->standFirmOdpovedi = null;
+        }
 
         // Frenzy: povinna druha rana, kdyz oba stoji a sousedi -- ale JEN po vysledku
         //   Pushed / Defender Stumbles.
@@ -1188,12 +1283,10 @@ final class BlockHandler implements ActionHandlerInterface
 
         $currentState = $state;
 
-        // Stand Firm prevents pushback (but not knockdown)
-        // Juggernaut on blitz ignores Stand Firm
+        // Stand Firm prevents pushback (but not knockdown); Juggernaut on blitz ignores Stand Firm.
         // Zakoreneny se neodtlaci nikdy, ani Juggernautem (r. 8578-8579 "for any reason").
-        if ($defenderPushed && ($defender->isRooted() || ($defender->hasSkill(SkillName::StandFirm)
-            && !($isBlitz && $attacker->hasSkill(SkillName::Juggernaut))))
-        ) {
+        // P226: Stand Firm je volba (ř. 8510-8516) -- kouč-člověk se ptá.
+        if ($defenderPushed && $this->obranceDrziPole($state, $attacker, $defender, $isBlitz)) {
             $defenderPushed = false;
         }
 
@@ -1449,10 +1542,9 @@ final class BlockHandler implements ActionHandlerInterface
             $occupant = $state->getPlayerAtPosition($pos);
             if ($occupant === null) {
                 $emptySquares[] = $pos;
-            } elseif (!$occupant->holdsGround($blockingSide)) {
+            } else {
                 $occupiedSquares[] = ['pos' => $pos, 'player' => $occupant];
             }
-            // Kdo drzi pole (zakoreneny, stojici Stand Firm soupere), neni cil odtlaceni
         }
 
         $zonySoupere = fn(Position $p): int => $this->tzCalc->countTacklezones($state, $p, $kdo->getTeamSide());
@@ -1533,6 +1625,11 @@ final class BlockHandler implements ActionHandlerInterface
         //   jen hraci, kteri drzi pole), ten pole neuvolni -- zkusi se dalsi obsazene pole.
         if ($retez) {
             foreach ($occupiedSquares as $obsazene) {
+                // Kdo drzi pole (zakoreneny, Stand Firm soupere), neni cil odtlaceni. P226: kouce-cloveka
+                //   se pta az tady -- jen kdyz retez na jeho hrace opravdu dojde (C++ `pushOne`).
+                if ($this->drziPole($obsazene['player'], $blockingSide)) {
+                    continue;
+                }
                 [$poRetezu, $udalostiRetezu] = $this->odtlacit($state, $kde, $obsazene['player'], $obsazene['pos'], $blockingSide, null, $events);
                 if ($poRetezu->getPlayerAtPosition($obsazene['pos']) === null) {
                     $state = $poRetezu;

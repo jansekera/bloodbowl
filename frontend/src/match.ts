@@ -19,6 +19,7 @@ import { BlockDiceModal } from './ui/BlockDiceModal';
 import { RerollModal } from './ui/RerollModal';
 import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
+import { StandFirmModal } from './ui/StandFirmModal';
 
 const api = new ApiClient();
 
@@ -85,6 +86,7 @@ const blockDiceModal = new BlockDiceModal(container);
 const rerollModal = new RerollModal(container);
 const apothecaryModal = new ApothecaryModal(container);
 const grabModal = new GrabModal(container);
+const standFirmModal = new StandFirmModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -183,7 +185,8 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     stateManager.setGameState(result.state);
 
     // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
-    if (result.state.pendingBlock && !result.state.pendingGrab && result.state.aiTeam !== result.state.activeTeam) {
+    if (result.state.pendingBlock && !result.state.pendingGrab && !result.state.pendingStandFirm
+        && result.state.aiTeam !== result.state.activeTeam) {
         showBlockDiceModal(result.state);
     }
 
@@ -197,10 +200,36 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showGrabModal(result.state);
     }
 
+    // P226: Stand Firm — ptá se kouče bránícího hráče, i uprostřed tahu AI (server tah AI zastavil)
+    if (result.state.pendingStandFirm) {
+        showStandFirmModal(result.state);
+    }
+
     // P206 (b): lékárník — ptá se kouče-člověka i uprostřed tahu AI (server tah AI zastavil)
     if (result.state.pendingApothecary) {
         showApothecaryModal(result.state);
     }
+}
+
+function showStandFirmModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingStandFirm;
+    if (!pending) return;
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    standFirmModal.show(pending, nameOf(pending.playerId), nameOf(pending.attackerId), async (params: Record<string, unknown>) => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_stand_firm', params);
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Stand Firm choice failed');
+            showStandFirmModal(state); // otázka na serveru stále čeká
+        } finally {
+            isProcessing = false;
+        }
+    });
 }
 
 function showGrabModal(state: import('./api/types').GameState): void {
@@ -1011,12 +1040,16 @@ async function init(): Promise<void> {
         stateManager.setGameState(state);
 
         // Show block dice modal if there's a pending block on load
-        if (state.pendingBlock && !state.pendingGrab && state.aiTeam !== state.activeTeam) {
+        if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {
             showBlockDiceModal(state);
         }
         // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme
         if (state.pendingGrab) {
             showGrabModal(state);
+        }
+        // P226: čekající otázka na Stand Firm i po obnovení stránky
+        if (state.pendingStandFirm) {
+            showStandFirmModal(state);
         }
         // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme
         if (state.pendingApothecary) {

@@ -90,6 +90,13 @@ export interface PendingGrab {
     face: string | null;
 }
 
+/** P226: čekající otázka, jestli hráč kouče-člověka použije Stand Firm (playerId ≠ defenderId = řetěz) */
+export interface PendingStandFirm {
+    playerId: number;
+    attackerId: number;
+    defenderId: number;
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -110,6 +117,7 @@ export interface GameState {
     declaredBlitzerId?: number | null;
     pendingApothecary?: PendingApothecary | null;
     pendingGrab?: PendingGrab | null;
+    pendingStandFirm?: PendingStandFirm | null;
 }
 
 export interface TeamState {
