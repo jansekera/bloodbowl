@@ -64,6 +64,9 @@ final class BlockHandler implements ActionHandlerInterface
      */
     private ?array $standFirmOdpovedi = null;
 
+    /** P225: odtlačení nanečisto -- jen pozice, bez kostek (zranění v davu, odrazy míče). */
+    private bool $nanecisto = false;
+
     /** @param list<TeamSide> $strany */
     public function setAskStandFirm(array $strany): void
     {
@@ -86,7 +89,8 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * Drží hráč v ŘETĚZU odtlačení pole? (`rules_bb2016.txt` ř. 8514-8516: "pushed back into a player
      * using Stand Firm then neither player moves".) Zakořeněný vždy (ř. 8578-8579); Stand Firm podle
-     * `holdsGround` a volby kouče-člověka (P226), AI ho použije vždy.
+     * `holdsGround` a volby kouče-člověka (P226), AI ho v řetězu použije vždy (P225: past na Frenzy
+     * míří jen na přímo blokovaného obránce, ř. 8139-8141 "against the same opponent").
      */
     private function drziPole(MatchPlayerDTO $hrac, TeamSide $blockingSide): bool
     {
@@ -98,15 +102,18 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
-     * Drží PŘÍMO BLOKOVANÝ obránce pole? Jediné místo pro blok i otázku na Grab.
+     * Drží PŘÍMO BLOKOVANÝ obránce pole? Jediné místo pro blok, otázku na Grab i past na Frenzy.
      * Zakořeněný vždy (ř. 8578-8579 "for any reason"); Juggernaut v blitzu Stand Firm ruší
-     * (ř. 8193-8196); jinak volí kouč-člověk (P226), AI ho použije vždy.
+     * (ř. 8193-8196); jinak volí kouč-člověk (P226), AI podle P225 (`pastNaFrenzy`).
+     * `$bezDruheRany`: blok, po kterém Frenzy druhou ránu nehází (sama druhá rána, Multiple Block).
      */
     private function obranceDrziPole(
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
+        BlockDiceFace $face,
         bool $isBlitz,
+        bool $bezDruheRany,
     ): bool {
         if ($defender->isRooted()) {
             return true;
@@ -115,7 +122,72 @@ final class BlockHandler implements ActionHandlerInterface
             return false;
         }
 
-        return $this->odpovedKouce($defender) ?? true;
+        return $this->odpovedKouce($defender)
+            ?? !($bezDruheRany === false && $this->pastNaFrenzy($state, $attacker, $defender, $face, $isBlitz));
+    }
+
+    /**
+     * P225 (uživatel 21.10.2026, parita s C++ `frenzyTrapReady`): nachystaná past na Frenzy -- AI
+     * obránce Stand Firm nepoužije. Frenzy (ř. 8134-8145) po Pushed / Defender Stumbles musí
+     * následovat a hodit druhý blok, "so long as they are both still standing and adjacent"; v blitzu
+     * jen se zbytkem pohybu nebo GFI. Se Stand Firm hází ze STEJNÉHO pole, bez něj z NOVÉHO po
+     * odtlačení a follow-upu. Past = (a) druhý blok z nového pole je pro útočníka horší (podepsané
+     * kostky), (b) odtlačení nevede do davu, (c) obránce nenese míč. Kam bude obránce odtlačen, se
+     * přehraje nanečisto TÝMŽ `odtlacit` jako skutečné odtlačení. Jen tato akce, žádný výhled dál.
+     */
+    private function pastNaFrenzy(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        BlockDiceFace $face,
+        bool $isBlitz,
+    ): bool {
+        $obranceStoji = $face === BlockDiceFace::PUSHED || ($face === BlockDiceFace::DEFENDER_STUMBLES
+            && $defender->hasSkill(SkillName::Dodge) && !$attacker->hasSkill(SkillName::Tackle));
+        if (!$attacker->hasSkill(SkillName::Frenzy) || !$obranceStoji
+            || $attacker->isRooted() || $defender->hasSkill(SkillName::Fend)          // bez follow-upu nesousedí
+            || ($isBlitz && $attacker->getMovementRemaining() - 1 < $this->gfiPodlaha($attacker))
+            || $state->getBall()->getCarrierId() === $defender->getId()) {            // (c)
+            return false;
+        }
+
+        $defenderPos = $defender->requirePosition();
+        $this->nanecisto = true;
+        $odpovedi = $this->standFirmOdpovedi;
+        $this->standFirmOdpovedi = null;
+        try {
+            [$po] = $this->resolvePushback($state, $attacker, $defender, $defenderPos, [], odlozitPoFollowUp: true, grabNeplati: $isBlitz);
+        } finally {
+            $this->nanecisto = false;
+            $this->standFirmOdpovedi = $odpovedi;
+            $this->odlozenyStrip = null;
+            $this->odlozenyDav = null;
+        }
+        $obrancePo = $po->requirePlayer($defender->getId());
+        $novePole = $obrancePo->getPosition();
+        if ($novePole === null || $novePole->equals($defenderPos)) {
+            return false;   // (b) dav; nebo řetěz zaseknutý -- nikdo se nehne, tentýž blok
+        }
+        $utocnikPo = $po->requirePlayer($attacker->getId())->withPosition($defenderPos);   // povinný follow-up (ř. 8138)
+        $po = $po->withPlayer($utocnikPo);
+
+        return $novePole->distanceTo($defenderPos) === 1
+            && $this->kostkyDruheRany($po, $utocnikPo, $obrancePo) < $this->kostkyDruheRany($state, $attacker, $defender);
+    }
+
+    /**
+     * P225: podepsaný počet kostek druhé rány (+ volí útočník, − obránce) se skutečnými asistencemi
+     * z polí, kde hráči stojí. Horns na druhou ránu neplatí; Dauntless se hází u obou poloh stejně --
+     * vynechán (jako C++ `secondBlockDice`).
+     */
+    private function kostkyDruheRany(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): int
+    {
+        $info = $this->strCalc->getBlockDiceInfo(
+            $attacker->getStats()->getStrength() + $this->strCalc->countAssists($state, $attacker, $defender->requirePosition()),
+            $defender->getStats()->getStrength() + $this->strCalc->countAssists($state, $defender, $attacker->requirePosition()),
+        );
+
+        return $info['attackerChooses'] ? $info['count'] : -$info['count'];
     }
 
     /** Grab používá hráč se skillem Grab bez Frenzy (stejně jako dřív v `odtlacit`). */
@@ -173,7 +245,8 @@ final class BlockHandler implements ActionHandlerInterface
         $squares = $this->ptatSeNaGrab ? $this->grabSquares($state, $attacker, $defender, $isBlitz) : [];
         $pushes = $squares !== [] && match ($face) {
             BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW
-                => !$this->obranceDrziPole($state, $attacker, $defender, $isBlitz),
+                // Grab a Frenzy se vylučují (`maGrab`) ⇒ past na Frenzy tu nevzniká
+                => !$this->obranceDrziPole($state, $attacker, $defender, $face, $isBlitz, bezDruheRany: true),
             default => false,
         };
 
@@ -536,7 +609,7 @@ final class BlockHandler implements ActionHandlerInterface
             // Clear pending block
             $state = $state->withPendingBlock(null);
 
-            $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba);
+            $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba, $pending->isFrenzy());
         } catch (StandFirmQuestion $otazka) {
             return ActionResult::success($puvodni->withPendingStandFirm(new PendingStandFirmDTO(
                 $otazka->playerId,
@@ -1186,6 +1259,7 @@ final class BlockHandler implements ActionHandlerInterface
         bool $noFollowUp = false,
         ?bool $followUpChoice = null,
         Position|false|null $grabVolba = null,
+        bool $druhaRanaFrenzy = false,
     ): ActionResult {
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
@@ -1285,8 +1359,8 @@ final class BlockHandler implements ActionHandlerInterface
 
         // Stand Firm prevents pushback (but not knockdown); Juggernaut on blitz ignores Stand Firm.
         // Zakoreneny se neodtlaci nikdy, ani Juggernautem (r. 8578-8579 "for any reason").
-        // P226: Stand Firm je volba (ř. 8510-8516) -- kouč-člověk se ptá.
-        if ($defenderPushed && $this->obranceDrziPole($state, $attacker, $defender, $isBlitz)) {
+        // P226/P225: Stand Firm je volba (ř. 8510-8516) -- kouč-člověk, nebo AI (past na Frenzy).
+        if ($defenderPushed && $this->obranceDrziPole($state, $attacker, $defender, $face, $isBlitz, $druhaRanaFrenzy || $noFollowUp)) {
             $defenderPushed = false;
         }
 
@@ -1668,6 +1742,9 @@ final class BlockHandler implements ActionHandlerInterface
 
                 return [$state, $events];
             }
+            if ($this->nanecisto) {
+                return [$state, $events];   // P225: jen pozice, bez kostek
+            }
             if ($hadBall) {
                 [$state, $events] = $this->throwInFromCrowd($state, $kde, $odkud, $events);
             }
@@ -1691,7 +1768,7 @@ final class BlockHandler implements ActionHandlerInterface
             if ($utocnik !== null && $utocnik->hasSkill(SkillName::StripBall) && !$kdo->hasSkill(SkillName::SureHands)) {
                 $events[] = GameEvent::ballStripped($kdo->getId());
                 $state = $state->withBall(BallState::onGround($pushTo));
-                if ($this->odlozitPoFollowUp) {
+                if ($this->odlozitPoFollowUp || $this->nanecisto) {
                     $this->odlozenyStrip = $pushTo;
 
                     return [$state, $events];
@@ -1705,7 +1782,9 @@ final class BlockHandler implements ActionHandlerInterface
         } else {
             // Odtlacen (i v retezu) na pole s volnym micem: mic odskoci, neni to turnover
             //   (r. 441-444, 640-641) -- viz `bounceLooseBallUnderPlayer`.
-            [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $pushTo, $events);
+            if (!$this->nanecisto) {
+                [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $pushTo, $events);
+            }
         }
 
         return [$state, $events];
