@@ -361,4 +361,162 @@ final class StandFirmKoucTest extends TestCase
         $this->assertNull($konec->getPendingBlock());
         $this->assertSame(TeamSide::HOME, $konec->getActiveTeam(), 'AI dohrála tah');
     }
+
+    // === review MEDIUM 2: otázka nese stranu kostky a pole, kam by hráč bez Stand Firm šel ===
+
+    public function testOtazkaNeseStranuKostkyAPoleKamBySel(): void
+    {
+        foreach ([3 => \App\Enum\BlockDiceFace::PUSHED, 6 => \App\Enum\BlockDiceFace::DEFENDER_DOWN] as $kostka => $strana) {
+            $q = $this->zvolKostku($this->stav(), kostky: [$kostka])->getNewState();
+            $otazka = $q->getPendingStandFirm();
+            $this->assertNotNull($otazka);
+            $this->assertSame($strana, $otazka->getFace(), 'ř. 8511-8513: Pushed vs Knock-down');
+            $this->assertSame(0, $otazka->getFaceIndex());
+
+            $po = $this->odpovez($q, ['use' => false])->getNewState();
+            $this->assertNotNull($otazka->getPushTo());
+            $this->assertSame($this->pole($po, 2), [$otazka->getPushTo()->getX(), $otazka->getPushTo()->getY()], 'pole v otázce = skutečné odtlačení');
+        }
+    }
+
+    public function testOtazkaVRetezuNesePoleHraceVRetezu(): void
+    {
+        $q = $this->zvolKostku($this->retez())->getNewState();
+        $otazka = $q->getPendingStandFirm();
+        $this->assertNotNull($otazka);
+        $pole = $otazka->getPushTo();
+        $this->assertNotNull($pole);
+        $this->assertSame(8, $pole->getX());
+
+        $po = $this->odpovez($q, ['use' => false])->getNewState();
+        $this->assertSame($this->pole($po, $otazka->getPlayerId()), [$pole->getX(), $pole->getY()]);
+    }
+
+    public function testOtazkaUDavuNemaPole(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 1, id: 1)
+            ->addPlayer(TeamSide::AWAY, 5, 0, skills: [SkillName::StandFirm], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $otazka = $this->zvolKostku($s)->getNewState()->getPendingStandFirm();
+        $this->assertNotNull($otazka);
+        $this->assertNull($otazka->getPushTo(), 'do davu');
+    }
+
+    // === Ball & Chain (uživatel 21.10. „1 ano“): blok "following normal blocking rules" (ř. 7829-7831) ===
+
+    /** B&C HOME (5,7), pohyb 1, síla 7 ⇒ šablona rovně na (6,7) (kostka 3), 3 kostky Pushed. */
+    private function bnc(): GameState
+    {
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->withBallOffPitch()
+            ->build();
+    }
+
+    public function testBallAndChainSeKouceZeptaANeOdtlaciAFollowUp(): void
+    {
+        $q = $this->resolver(array_fill(0, 20, 3))->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+        $otazka = $q->getPendingStandFirm();
+        $this->assertNotNull($otazka, 'B&C blokuje hráče kouče-člověka se Stand Firm ⇒ otázka');
+        $this->assertSame('bnc', $otazka->getKind());
+        $this->assertSame([5, 7], $this->pole($q, 1));
+        $this->assertSame([6, 7], $this->pole($q, 2));
+        $this->assertFalse($q->requirePlayer(1)->hasActed());
+
+        $s = $this->odpovez($q, ['use' => false])->getNewState();
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame(7, $this->pole($s, 2)[0], 'odtlačen');
+        $this->assertSame([6, 7], $this->pole($s, 1), 'povinný follow-up B&C');
+        $this->assertTrue($s->requirePlayer(1)->hasActed());
+    }
+
+    public function testBallAndChainAnoFanatikZustaneAPolePohybuJeSpotrebovane(): void
+    {
+        // FAQ 05/2020: hráč se Stand Firm se nenechá odtlačit ⇒ B&C zůstane na svém poli a krok ho
+        // to stálo (pohyb 1 ⇒ akce skončila)
+        $q = $this->resolver(array_fill(0, 20, 3))->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+        $s = $this->odpovez($q, ['use' => true])->getNewState();
+
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame([6, 7], $this->pole($s, 2));
+        $this->assertSame([5, 7], $this->pole($s, 1));
+        $this->assertTrue($s->requirePlayer(1)->hasActed(), 'krok spotřebován, pohyb 1 ⇒ konec');
+    }
+
+    public function testBallAndChainAIObranceSeNepta(): void
+    {
+        $s = $this->resolver(array_fill(0, 20, 3), [TeamSide::HOME])->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame([6, 7], $this->pole($s, 2), 'AI Stand Firm použije');
+    }
+
+    public function testBallAndChainProtiVlastnimuHraciSeStandFirmSeNepta(): void
+    {
+        // Stand Firm drží jen proti soupeři (`holdsGround`) -- vlastní hráč B&C se odtlačí, otázka není.
+        // Vlastní hráči na všech čtyřech stranách, ať se šablona trefí do některého z nich.
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 4, 7, skills: [SkillName::StandFirm], id: 3)
+            ->addPlayer(TeamSide::HOME, 5, 6, skills: [SkillName::StandFirm], id: 4)
+            ->addPlayer(TeamSide::HOME, 5, 8, skills: [SkillName::StandFirm], id: 5)
+            ->withBallOffPitch()
+            ->build();
+        $r = $this->resolver(array_fill(0, 20, 3))->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+
+        $this->assertNull($r->getPendingStandFirm());
+        $this->assertNotSame([5, 7], $this->pole($r, 1), 'vlastní hráč odtlačen, B&C následoval');
+    }
+
+    // === Multiple Block (uživatel 21.10. „2 ano“): "Make each block in turn as normal", bez follow-upu ===
+
+    private function multipleBlock(): GameState
+    {
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::MultipleBlock], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::AWAY, 4, 7, skills: [SkillName::StandFirm], id: 3)
+            ->withBallOffPitch()
+            ->build();
+    }
+
+    public function testMultipleBlockSePtaUKazdehoCile(): void
+    {
+        $r = $this->resolver(array_fill(0, 30, 3));
+        $q = $r->resolve($this->multipleBlock(), ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3])->getNewState();
+        $prvni = $q->getPendingStandFirm();
+        $this->assertNotNull($prvni, 'první cíl');
+        $this->assertSame('mb', $prvni->getKind());
+        $this->assertSame(2, $prvni->getPlayerId());
+        $this->assertSame([6, 7], $this->pole($q, 2));
+        $this->assertSame([4, 7], $this->pole($q, 3));
+
+        $q2 = $this->odpovez($q, ['use' => false])->getNewState();
+        $druha = $q2->getPendingStandFirm();
+        $this->assertNotNull($druha, 'druhý cíl');
+        $this->assertSame(3, $druha->getPlayerId());
+        $this->assertSame(7, $this->pole($q2, 2)[0], 'první odtlačen');
+        $this->assertFalse($q2->requirePlayer(1)->hasActed());
+
+        $s = $this->odpovez($q2, ['use' => true])->getNewState();
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame([4, 7], $this->pole($s, 3), 'druhý drží');
+        $this->assertSame([5, 7], $this->pole($s, 1), 'Multiple Block bez follow-upu');
+        $this->assertTrue($s->requirePlayer(1)->hasActed());
+    }
+
+    public function testMultipleBlockAIObranceSeNepta(): void
+    {
+        $s = $this->resolver(array_fill(0, 30, 3), [TeamSide::HOME])
+            ->resolve($this->multipleBlock(), ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3])->getNewState();
+
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame([6, 7], $this->pole($s, 2));
+        $this->assertSame([4, 7], $this->pole($s, 3));
+        $this->assertTrue($s->requirePlayer(1)->hasActed());
+    }
 }

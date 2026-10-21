@@ -218,6 +218,50 @@ final class BlockHandler implements ActionHandlerInterface
     }
 
     /**
+     * P226: vyhodnotí odtlačení (`$fn`) s odpověďmi kouče-člověka na Stand Firm `$odpovedi`. Narazí-li
+     * na jeho hráče bez odpovědi, vrátí místo výsledku id toho hráče -- do té chvíle se při odtlačení
+     * nic nehodilo ani nepohnulo (stav je neměnný, kostky padají až po rozhodnutí). Jedno místo pro
+     * blok, Multiple Block i Ball & Chain.
+     *
+     * @template T
+     * @param array<int, bool> $odpovedi
+     * @param callable(): T $fn
+     * @return array{0: T|null, 1: int|null}
+     */
+    public function sOtazkouNaStandFirm(array $odpovedi, callable $fn): array
+    {
+        $this->standFirmOdpovedi = $odpovedi;
+        try {
+            return [$fn(), null];
+        } catch (StandFirmQuestion $otazka) {
+            return [null, $otazka->playerId];
+        } finally {
+            $this->standFirmOdpovedi = null;
+        }
+    }
+
+    /**
+     * P226 (review MEDIUM 2): kam by hráč `$kdo` šel, kdyby Stand Firm nepoužil -- přehrání odtlačení
+     * přímého obránce nanečisto (bez Grabu, ten volí útočník až potom); null = do davu.
+     *
+     * @param array<int, bool> $odpovedi
+     */
+    public function poleBezStandFirm(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        bool $isBlitz,
+        array $odpovedi,
+        Position|false|null $grabVolba,
+        int $kdo,
+    ): ?Position {
+        $odpovedi[$kdo] = false;
+
+        return $this->odtlacitNanecisto($state, $attacker, $defender, $isBlitz, $odpovedi, $grabVolba ?? false)
+            ->requirePlayer($kdo)->getPosition();
+    }
+
+    /**
      * P225: podepsaný počet kostek druhé rány (+ volí útočník, − obránce) se skutečnými asistencemi
      * z polí, kde hráči stojí -- tytéž síly jako skutečná rána (`blockStrengths`). Horns na druhou
      * ránu neplatí; Dauntless se hází u obou poloh stejně -- vynechán (jako C++ `secondBlockDice`).
@@ -579,7 +623,6 @@ final class BlockHandler implements ActionHandlerInterface
         Position|false|null $grabVolba = null,
         ?array $standFirm = null,
     ): ActionResult {
-        $puvodni = $state;
         $pending = $state->getPendingBlock();
         if ($pending === null) {
             throw new \InvalidArgumentException('No pending block');
@@ -627,8 +670,8 @@ final class BlockHandler implements ActionHandlerInterface
         // P226: otázka na Stand Firm (přímý obránce i řetěz) přeruší vyhodnocení dřív, než se cokoli
         //   hodí nebo pohne (odtlačení je až do rozhodnutí čisté) -- stav se vrací s čekajícím blokem
         //   a po odpovědi se blok vyhodnotí znovu od téže kostky se všemi odpověďmi.
-        $this->standFirmOdpovedi = $standFirm ?? [];
-        try {
+        $odpovedi = $standFirm ?? [];
+        [$result, $kdo] = $this->sOtazkouNaStandFirm($odpovedi, function () use ($state, $attacker, $defender, $chosenFace, $isBlitz, $grabVolba, $index, $odpovedi, $faces, $pending, $followUpChoice): ActionResult {
             if ($grabVolba === null) {
                 $squares = $this->grabQuestionSquares($state, $attacker, $defender, $chosenFace, $isBlitz);
                 if ($squares !== []) {
@@ -638,7 +681,7 @@ final class BlockHandler implements ActionHandlerInterface
                         $defender->getId(),
                         $squares,
                         faceIndex: (int) $index,
-                        standFirm: $this->standFirmOdpovedi,
+                        standFirm: $odpovedi,
                     )), []);
                 }
             }
@@ -655,21 +698,24 @@ final class BlockHandler implements ActionHandlerInterface
             );
 
             // Clear pending block
-            $state = $state->withPendingBlock(null);
-
-            $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba, $pending->isFrenzy());
-        } catch (StandFirmQuestion $otazka) {
-            return ActionResult::success($puvodni->withPendingStandFirm(new PendingStandFirmDTO(
-                $otazka->playerId,
+            return $this->applyBlockResult($state->withPendingBlock(null), $attacker, $defender, $chosenFace, $events, $isBlitz, false, $followUpChoice, $grabVolba, $pending->isFrenzy());
+        });
+        if ($kdo !== null) {
+            return ActionResult::success($state->withPendingStandFirm(new PendingStandFirmDTO(
+                $kdo,
                 $attacker->getId(),
                 $defender->getId(),
-                (int) $index,
-                $this->standFirmOdpovedi ?? [],
-                $followUpChoice,
-                $grabVolba,
+                $chosenFace,
+                $this->poleBezStandFirm($state, $attacker, $defender, $isBlitz, $odpovedi, $grabVolba, $kdo),
+                faceIndex: (int) $index,
+                answers: $odpovedi,
+                followUp: $followUpChoice,
+                grab: $grabVolba,
             )), []);
-        } finally {
-            $this->standFirmOdpovedi = null;
+        }
+        assert($result instanceof ActionResult);
+        if ($result->getNewState()->getPendingGrab() !== null) {
+            return $result;
         }
 
         // Frenzy: povinna druha rana, kdyz oba stoji a sousedi -- ale JEN po vysledku
@@ -940,82 +986,100 @@ final class BlockHandler implements ActionHandlerInterface
 
         $events[] = GameEvent::multipleBlock($attackerId, $targetId1, $targetId2);
 
-        // === Block 1: target defender1 ===
-        [$state, $events, $attackerDown] = $this->resolveSingleMultipleBlock(
-            $state,
-            $attacker,
-            $defender1,
-            $events,
+        return $this->multipleBlockOd($state, $attackerId, [$targetId1, $targetId2], 0, $events, null);
+    }
+
+    /**
+     * P226: odpověď kouče-člověka na Stand Firm uprostřed Multiple Block -- dokončí rozpracovaný
+     * blok (kostka už padla) a pokračuje dalším cílem.
+     *
+     * @param array<int, bool> $odpovedi
+     */
+    public function resumeMultipleBlock(GameState $state, PendingStandFirmDTO $pending, array $odpovedi): ActionResult
+    {
+        return $this->multipleBlockOd(
+            $state->withPendingStandFirm(null),
+            $pending->getAttackerId(),
+            $pending->getTargets(),
+            $pending->getIndex(),
+            [],
+            ['face' => $pending->getFace(), 'odpovedi' => $odpovedi],
         );
+    }
 
-        // If attacker went down on first block, turnover, no second block
-        if ($attackerDown) {
-            $finalState = $state;
-            $updatedAttacker = $finalState->getPlayer($attackerId);
-            if ($updatedAttacker !== null) {
-                $finalState = $finalState->withPlayer(
-                    $updatedAttacker->withHasActed(true)->withHasMoved(true),
-                );
+    /**
+     * Bloky Multiple Block od cíle `$od` ("Make each block in turn as normal"). `$obnoveno`: kostka
+     * a odpovědi na Stand Firm pro blok, na kterém akce čekala na kouče (P226).
+     *
+     * @param list<int> $targets
+     * @param list<GameEvent> $events
+     * @param array{face: BlockDiceFace, odpovedi: array<int, bool>}|null $obnoveno
+     */
+    private function multipleBlockOd(GameState $state, int $attackerId, array $targets, int $od, array $events, ?array $obnoveno): ActionResult
+    {
+        foreach ($targets as $i => $targetId) {
+            if ($i < $od) {
+                continue;
             }
-            return ActionResult::turnover($finalState, $events);
-        }
-
-        // === Block 2: target defender2 (if attacker still standing) ===
-        $attacker = $state->getPlayer($attackerId);
-        $defender2 = $state->getPlayer($targetId2);
-
-        if ($attacker !== null && $defender2 !== null
-            && $attacker->getState() === PlayerState::STANDING
-            && $attacker->getPosition() !== null
-        ) {
-            [$state, $events, $attackerDown2] = $this->resolveSingleMultipleBlock(
-                $state,
-                $attacker,
-                $defender2,
-                $events,
-            );
-
-            if ($attackerDown2) {
-                $finalState = $state;
-                $updatedAttacker = $finalState->getPlayer($attackerId);
-                if ($updatedAttacker !== null) {
-                    $finalState = $finalState->withPlayer(
-                        $updatedAttacker->withHasActed(true)->withHasMoved(true),
-                    );
-                }
-                return ActionResult::turnover($finalState, $events);
+            $attacker = $state->getPlayer($attackerId);
+            $defender = $state->getPlayer($targetId);
+            if ($attacker === null || $defender === null) {
+                break;
+            }
+            // Block 2 jen, když útočník stojí na hřišti
+            if ($i > 0 && ($attacker->getState() !== PlayerState::STANDING || $attacker->getPosition() === null)) {
+                break;
+            }
+            [$state, $events, $attackerDown, $otazka] = $this->resolveSingleMultipleBlock($state, $attacker, $defender, $events, $obnoveno, $targets, $i);
+            $obnoveno = null;
+            if ($otazka !== null) {
+                return ActionResult::success($state->withPendingStandFirm($otazka), $events);
+            }
+            // If attacker went down, turnover, no further block
+            if ($attackerDown) {
+                return ActionResult::turnover($this->multipleBlockHotovo($state, $attackerId), $events);
             }
         }
 
-        // Mark attacker as acted
-        $finalState = $state;
-        $updatedAttacker = $finalState->getPlayer($attackerId);
-        if ($updatedAttacker !== null) {
-            $finalState = $finalState->withPlayer(
-                $updatedAttacker->withHasActed(true)->withHasMoved(true),
-            );
-        }
+        return ActionResult::success($this->multipleBlockHotovo($state, $attackerId), $events);
+    }
 
-        return ActionResult::success($finalState, $events);
+    private function multipleBlockHotovo(GameState $state, int $attackerId): GameState
+    {
+        $updatedAttacker = $state->getPlayer($attackerId);
+
+        return $updatedAttacker === null
+            ? $state
+            : $state->withPlayer($updatedAttacker->withHasActed(true)->withHasMoved(true));
     }
 
     /**
      * Resolve a single block within a Multiple Block action (+2 defender ST, no follow-up).
+     * P226: hráče kouče-člověka se ptá na Stand Firm -- vrátí stav před odtlačením a otázku
+     * (4. prvek); `$obnoveno` = kostka už padla, zbývá odtlačení s odpověďmi.
      *
      * @param list<GameEvent> $events
-     * @return array{0: GameState, 1: list<GameEvent>, 2: bool} Updated state, events, and whether attacker went down
+     * @param array{face: BlockDiceFace, odpovedi: array<int, bool>}|null $obnoveno
+     * @param list<int> $targets
+     * @return array{0: GameState, 1: list<GameEvent>, 2: bool, 3: ?PendingStandFirmDTO} Updated state, events, whether attacker went down, question
      */
     private function resolveSingleMultipleBlock(
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
         array $events,
+        ?array $obnoveno,
+        array $targets,
+        int $index,
     ): array {
         $attackerPos = $attacker->getPosition();
         $defenderPos = $defender->getPosition();
 
         if ($attackerPos === null || $defenderPos === null) {
-            return [$state, $events, false];
+            return [$state, $events, false, null];
+        }
+        if ($obnoveno !== null) {
+            return $this->multipleBlockOdtlaceni($state, $attacker, $defender, $events, $obnoveno['face'], $obnoveno['odpovedi'], $targets, $index);
         }
 
         // Dump-Off: defender with ball can quick pass before block
@@ -1031,7 +1095,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $attacker = $state->getPlayer($attacker->getId());
                 $defender = $state->getPlayer($defender->getId());
                 if ($attacker === null || $defender === null) {
-                    return [$state, $events, false];
+                    return [$state, $events, false, null];
                 }
             }
         }
@@ -1042,7 +1106,7 @@ final class BlockHandler implements ActionHandlerInterface
             $events[] = GameEvent::foulAppearance($defender->getId(), $attacker->getId(), $faRoll, $faRoll >= 2);
             if ($faRoll < 2) {
                 // Failed: this block does nothing (but does NOT end the Multiple Block action)
-                return [$state, $events, false];
+                return [$state, $events, false, null];
             }
         }
 
@@ -1067,7 +1131,7 @@ final class BlockHandler implements ActionHandlerInterface
             if ($wasBallCarrier && $defender->getState() !== PlayerState::STANDING) {
                 [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $defender, $events);
             }
-            return [$state, $events, false];
+            return [$state, $events, false, null];
         }
 
         // Sily pro blok; obrance ma v Multiple Block +2 (`rules_bb2016.txt` r. 8300-8301:
@@ -1117,11 +1181,48 @@ final class BlockHandler implements ActionHandlerInterface
             $chosenFace->value,
         );
 
-        // Apply block result with noFollowUp = true
-        $result = $this->applyBlockResult($state, $attacker, $defender, $chosenFace, $events, false, true);
+        return $this->multipleBlockOdtlaceni($state, $attacker, $defender, $events, $chosenFace, [], $targets, $index);
+    }
 
-        $attackerDown = $result->isTurnover();
-        return [$result->getNewState(), $result->getEvents(), $attackerDown];
+    /**
+     * Výsledek jednoho bloku Multiple Block (bez follow-upu) s otázkou na Stand Firm (P226).
+     *
+     * @param list<GameEvent> $events
+     * @param array<int, bool> $odpovedi
+     * @param list<int> $targets
+     * @return array{0: GameState, 1: list<GameEvent>, 2: bool, 3: ?PendingStandFirmDTO}
+     */
+    private function multipleBlockOdtlaceni(
+        GameState $state,
+        MatchPlayerDTO $attacker,
+        MatchPlayerDTO $defender,
+        array $events,
+        BlockDiceFace $face,
+        array $odpovedi,
+        array $targets,
+        int $index,
+    ): array {
+        // Apply block result with noFollowUp = true
+        [$result, $kdo] = $this->sOtazkouNaStandFirm(
+            $odpovedi,
+            fn(): ActionResult => $this->applyBlockResult($state, $attacker, $defender, $face, $events, false, true),
+        );
+        if ($kdo !== null) {
+            return [$state, $events, false, new PendingStandFirmDTO(
+                $kdo,
+                $attacker->getId(),
+                $defender->getId(),
+                $face,
+                $this->poleBezStandFirm($state, $attacker, $defender, false, $odpovedi, null, $kdo),
+                kind: 'mb',
+                answers: $odpovedi,
+                targets: $targets,
+                index: $index,
+            )];
+        }
+        assert($result instanceof ActionResult);
+
+        return [$result->getNewState(), $result->getEvents(), $result->isTurnover(), null];
     }
 
     /**

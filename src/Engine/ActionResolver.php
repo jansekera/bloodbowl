@@ -533,12 +533,18 @@ final class ActionResolver
         if ($pending === null) {
             throw new \InvalidArgumentException('No pending Stand Firm question');
         }
+        $odpovedi = $pending->getAnswers();
+        $odpovedi[$pending->getPlayerId()] = $params['use'] === true;
+        if ($pending->getKind() === 'bnc') {
+            return $this->ballAndChainHandler->resumeStandFirm($state, $pending, $odpovedi);
+        }
+        if ($pending->getKind() === 'mb') {
+            return $this->blockHandler->resumeMultipleBlock($state, $pending, $odpovedi);
+        }
         $blockParams = ['faceIndex' => $pending->getFaceIndex()];
         if ($pending->getFollowUp() !== null) {
             $blockParams['followUp'] = $pending->getFollowUp();
         }
-        $odpovedi = $pending->getAnswers();
-        $odpovedi[$pending->getPlayerId()] = $params['use'] === true;
 
         return $this->blockHandler->resolveBlockChoice($state->withPendingStandFirm(null), $blockParams, $pending->getGrab(), $odpovedi);
     }

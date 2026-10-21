@@ -95,6 +95,14 @@ export interface PendingStandFirm {
     playerId: number;
     attackerId: number;
     defenderId: number;
+    /** 'block' (Block/Blitz), 'bnc' (Ball & Chain), 'mb' (Multiple Block) */
+    kind: 'block' | 'bnc' | 'mb';
+    /** zvolená strana kostky (Pushed vs Knock-down, ř. 8511-8513) */
+    face: string;
+    /** index zvolené kostky v pendingBlock.faces (kind 'block') */
+    faceIndex: number;
+    /** kam by hráč bez Stand Firm šel; null = do davu */
+    pushTo: { x: number; y: number } | null;
 }
 
 /** Full game state sent from the server */

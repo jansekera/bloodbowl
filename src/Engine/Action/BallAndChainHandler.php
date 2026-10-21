@@ -10,6 +10,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingGrabDTO;
+use App\DTO\PendingStandFirmDTO;
 use App\Enum\BlockDiceFace;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -68,16 +69,34 @@ final class BallAndChainHandler implements ActionHandlerInterface
             $pending->getAttackerId(),
             $pending->getStep(),
             [],
-            ['target' => $pending->getDefenderId(), 'face' => $face, 'volba' => $volba],
+            ['target' => $pending->getDefenderId(), 'face' => $face, 'volba' => $volba, 'standFirm' => $pending->getStandFirm()],
         );
     }
 
     /**
-     * Kroky pohybu B&C od kroku `$odKroku`. `$obnoveno`: pokračování po otázce na Grab -- krok
-     * už je hozený a blok vybraný, zbývá odtlačení.
+     * P226: odpověď kouče-člověka na Stand Firm uprostřed pohybu B&C -- dokončí rozpracovaný blok
+     * (odtlačení s odpověďmi `$odpovedi`) a pokračuje dalšími kroky. Drží-li hráč pole, B&C zůstane
+     * na svém poli a krok ho stál (oficiální FAQ 05/2020; povinný follow-up jen na uvolněné pole).
+     *
+     * @param array<int, bool> $odpovedi
+     */
+    public function resumeStandFirm(GameState $state, PendingStandFirmDTO $pending, array $odpovedi): ActionResult
+    {
+        return $this->kroky(
+            $state->withPendingStandFirm(null),
+            $pending->getAttackerId(),
+            $pending->getStep(),
+            [],
+            ['target' => $pending->getDefenderId(), 'face' => $pending->getFace(), 'volba' => $pending->getGrab(), 'standFirm' => $odpovedi],
+        );
+    }
+
+    /**
+     * Kroky pohybu B&C od kroku `$odKroku`. `$obnoveno`: pokračování po otázce na Grab nebo na
+     * Stand Firm (P226) -- krok už je hozený a blok vybraný, zbývá odtlačení.
      *
      * @param list<GameEvent> $events
-     * @param array{target: int, face: BlockDiceFace, volba: Position|false}|null $obnoveno
+     * @param array{target: int, face: BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
      */
     private function kroky(GameState $state, int $playerId, int $odKroku, array $events, ?array $obnoveno): ActionResult
     {
@@ -127,8 +146,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 //   nebo omraceny v ceste se misto bloku odtlaci a hazi na brneni (r. 7843-7845).
                 if ($occupant->getState()->canAct()) {
                     [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events, $step, $obnoveno);
-                    if ($state->getPendingGrab() !== null) {
-                        return ActionResult::success($state, $events); // P224: čeká otázka na Grab
+                    if ($state->getPendingGrab() !== null || $state->getPendingStandFirm() !== null) {
+                        return ActionResult::success($state, $events); // P224/P226: čeká otázka kouči
                     }
                 } else {
                     [$state, $events] = $this->odtlacitLeziciho($state, $player, $occupant, $events);
@@ -257,9 +276,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
      *
      * P224: kouč-člověk se před odtlačením ptá na Grab -- vrácený stav pak nese `PendingGrabDTO`
      * a blok se dokončí v `resumeGrab` (`$obnoveno` = už vybraná strana kostky a odpověď).
+     * P226: napřed se ptá kouče odtlačovaného hráče (i v řetězu) na Stand Firm -- `PendingStandFirmDTO`,
+     * dokončí `resumeStandFirm`. B&C blokuje "following normal blocking rules" (ř. 7829-7831).
      *
      * @param list<GameEvent> $events
-     * @param array{target: int, face: BlockDiceFace, volba: Position|false}|null $obnoveno
+     * @param array{target: int, face: BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
      * @return array{0: GameState, 1: list<GameEvent>, 2: MatchPlayerDTO}
      */
     private function resolveAutoBlock(
@@ -277,9 +298,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
             return [$state, $events, $bncPlayer];
         }
 
+        $odpovedi = [];
         if ($obnoveno !== null) {
             $face = $obnoveno['face'];
             $grabVolba = $obnoveno['volba'];
+            $odpovedi = $obnoveno['standFirm'];
         } else {
             $grabVolba = null;
             // Blok podle beznych pravidel (r. 7840-7842): kostky podle sily vc. asistenci.
@@ -307,16 +330,41 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 array_map(static fn(BlockDiceFace $f) => $f->value, $faces),
                 $face->value,
             );
+        }
 
-            $squares = $this->blockHandler->grabQuestionSquares($state, $bncPlayer, $target, $face, false);
-            if ($squares !== []) {
+        // Odtlačení (Pushed, Stumbles, Down) s otázkami kouči: Stand Firm napřed (bez odtlačení není
+        //   co volit), pak Grab (P224). Do odpovědí se nic nehodí ani nepohne.
+        $odtlaceno = null;
+        if (in_array($face, [BlockDiceFace::PUSHED, BlockDiceFace::DEFENDER_STUMBLES, BlockDiceFace::DEFENDER_DOWN, BlockDiceFace::POW], true)) {
+            [$odtlaceno, $kdo] = $this->blockHandler->sOtazkouNaStandFirm($odpovedi, function () use ($state, $bncPlayer, $target, $face, $events, $grabVolba): ?array {
+                if ($grabVolba === null && $this->blockHandler->grabQuestionSquares($state, $bncPlayer, $target, $face, false) !== []) {
+                    return null;   // čeká otázka na Grab
+                }
+
+                return $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
+            });
+            if ($kdo !== null) {
+                return [$state->withPendingStandFirm(new PendingStandFirmDTO(
+                    $kdo,
+                    $bncPlayer->getId(),
+                    $target->getId(),
+                    $face,
+                    $this->blockHandler->poleBezStandFirm($state, $bncPlayer, $target, false, $odpovedi, $grabVolba, $kdo),
+                    kind: 'bnc',
+                    answers: $odpovedi,
+                    grab: $grabVolba,
+                    step: $step,
+                )), $events, $bncPlayer];
+            }
+            if ($odtlaceno === null) {
                 return [$state->withPendingGrab(new PendingGrabDTO(
                     'bnc',
                     $bncPlayer->getId(),
                     $target->getId(),
-                    $squares,
+                    $this->blockHandler->grabQuestionSquares($state, $bncPlayer, $target, $face, false),
                     face: $face,
                     step: $step,
+                    standFirm: $odpovedi,
                 )), $events, $bncPlayer];
             }
         }
@@ -351,13 +399,15 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
             case BlockDiceFace::PUSHED:
                 // Push target away (simple: find first empty adjacent or crowd surf)
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
+                assert($odtlaceno !== null);
+                [$state, $events] = $odtlaceno;
                 break;
 
             case BlockDiceFace::DEFENDER_STUMBLES:
                 // Push + knockdown (unless Dodge without Tackle)
                 $knockdown = !$target->hasSkill(SkillName::Dodge) || $bncPlayer->hasSkill(SkillName::Tackle);
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
+                assert($odtlaceno !== null);
+                [$state, $events] = $odtlaceno;
                 if ($knockdown) {
                     $target = $state->getPlayer($target->getId());
                     if ($target !== null && $target->getPosition() !== null) {
@@ -376,7 +426,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
             case BlockDiceFace::DEFENDER_DOWN:
             case BlockDiceFace::POW:
                 // Push + knockdown
-                [$state, $events] = $this->resolvePush($state, $bncPlayer, $target, $events, grabVolba: $grabVolba);
+                assert($odtlaceno !== null);
+                [$state, $events] = $odtlaceno;
                 $target = $state->getPlayer($target->getId());
                 if ($target !== null && $target->getPosition() !== null) {
                     $events[] = GameEvent::playerFell($target->getId());

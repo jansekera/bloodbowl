@@ -216,7 +216,8 @@ function showStandFirmModal(state: import('./api/types').GameState): void {
     const pending = state.pendingStandFirm;
     if (!pending) return;
     const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
-    standFirmModal.show(pending, nameOf(pending.playerId), nameOf(pending.attackerId), async (params: Record<string, unknown>) => {
+    const playerPos = state.players.find(p => p.id === pending.playerId)?.position ?? null;
+    standFirmModal.show(pending, nameOf(pending.playerId), nameOf(pending.attackerId), playerPos, async (params: Record<string, unknown>) => {
         isProcessing = true;
         try {
             const result = await api.submitAction(matchId, 'resolve_stand_firm', params);
