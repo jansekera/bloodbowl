@@ -3147,6 +3147,38 @@ static bool walkStepHitsDodgeCap(const GameState& state, const Player& p, Positi
 // cesta, cíl = vlastní pole stojícího), a rozbalení vrátilo prázdný plán. `count` = tikat čítače chůze
 // (jen skutečná chůze, ne dotaz nabídky).
 enum class WalkStep { ARRIVED, STEP, STOP };
+
+// ⭐ P220 (uživatel 20.10.2026: „bez plánu asistence pro blitz [agilní] nemají [docházet k soupeři a označit ho]
+//   vůbec“; markování nosiče v obraně smí; platí pro všechny agilní). Diagnostika (evidence/p220_20261020):
+//   „jen došel do kontaktu“ elfové 48 na 100 tahů, skaveni 23. Agilní = AG4+, nebo AG3 s Dodge.
+//   Smí skončit přesun v zóně soupeře na `sq` jen jako (a) marker jejich nosiče, nebo (b) asistence bloku, který
+//   v tomto tahu ještě může přijít: u soupeře X na sousedním poli stojí spoluhráč, který ještě nehrál, nebo
+//   na X dosáhne blitzem (pohyb + GFI), dokud je blitz volný. Asistence podle pravidel ř. 1662–1668: asistent
+//   nesmí být v zóně jiného soupeře než X (Guard smí). (c) vlastní blok/blitz chůzí neprochází.
+//   Čte se jen stav, neplánuje se: „blok může přijít“, ne „blok přijde“.
+static bool p220MustAvoidContact(const GameState& state, const Player& p, Position sq) {
+    if (!extraFeatureOn(kP220AgileNoContact)) return false;
+    if (p.stats.agility < 4 && !(p.stats.agility == 3 && p.hasSkill(SkillName::Dodge))) return false;
+    const TeamSide me = p.teamSide;
+    if (state.ball.isHeld && state.ball.carrierId > 0) {   // (a)
+        const Player& c = state.getPlayer(state.ball.carrierId);
+        if (c.teamSide != me && c.isOnPitch() && c.position.distanceTo(sq) == 1) return false;
+    }
+    const bool blitzFree = !state.getTeamState(me).blitzUsedThisTurn;
+    for (const Position& a : sq.getAdjacent()) {             // (b)
+        const Player* x = a.isOnPitch() ? state.getPlayerAtPosition(a) : nullptr;
+        if (!x || x->teamSide == me || x->state != PlayerState::STANDING || x->lostTacklezones) continue;
+        if (!p.hasSkill(SkillName::Guard) && countTacklezones(state, sq, me, x->id) > 0) continue;
+        bool blockable = false;
+        state.forEachOnPitch(me, [&](const Player& m) {
+            if (blockable || m.id == p.id || !isFreeToAct(m) || m.state != PlayerState::STANDING) return;
+            const int d = m.position.distanceTo(x->position);
+            blockable = d == 1 || (blitzFree && d <= m.movementRemaining + maxGfiSquares(m));
+        });
+        if (blockable) return false;
+    }
+    return true;
+}
 // P211e (uživatel 15.10.2026: „1 i 2 oprav — pro všechny hráče“): `stayOutOfContact` = krok do cizí
 // tacklezony jen na samotný cíl. Změřeno (evidence/p211e_20261015): 112 přesunů ke vzdálenému nosiči
 // soupeře uvízlo cestou v kontaktu s jiným soupeřem — hráč tah odehrál a stál u něj na ránu.
@@ -3182,6 +3214,10 @@ static WalkStep nextWalkStep(const GameState& state, const Player& p, Position t
     }
     if (stayOutOfContact && out.target != target && countTacklezones(state, out.target, p.teamSide) > 0)
         return WalkStep::STOP;   // P211e: zůstat na posledním volném poli
+    // P220: agilní přesun nekončí v kontaktu — zůstane na posledním volném poli (vstání na místě se nepočítá)
+    if (stayOutOfContact && out.target == target && target != p.position &&
+        countTacklezones(state, target, p.teamSide) > 0 && p220MustAvoidContact(state, p, target))
+        return WalkStep::STOP;
     return WalkStep::STEP;
 }
 

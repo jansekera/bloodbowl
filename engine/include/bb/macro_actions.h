@@ -92,9 +92,11 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; 
 //   vypnuto = staré pořadí) · útěk s GFI a úhybem (`b77b8c55`). P216: příprava i bez bezpečného pole.
 //   P217 (uživatel 19.10.: „dokud je bezpečná klec — nic jiného“): zdržování bankuje k zóně (1) ·
 //   nejvyšší šance na TD s nejhorší odpovědí soupeře (3). (P219 blitz agilního podle šance srazit × odskočit — odstraněn 20.10., P220.)
+//   P220 (uživatel 20.10.): agilní hráč nekončí přesun v kontaktu, leda u nosiče soupeře / jako asistence bloku.
 enum ExtraFeature : unsigned {
     kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
-    kP217StallBanks = 8, kP217BestChance = 16, kP219bEscapeByRisk = 64   // 32 = P219, ODSTRANĚNO 20.10. (bral dobré blitzy; P220)
+    kP217StallBanks = 8, kP217BestChance = 16, kP219bEscapeByRisk = 64,  // 32 = P219, ODSTRANĚNO 20.10. (bral dobré blitzy; P220)
+    kP220AgileNoContact = 128   // P220: agilní přesun nekončí v kontaktu (výjimky nosič / asistence / vlastní blok)
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
