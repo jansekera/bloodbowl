@@ -1,6 +1,7 @@
 #include "bb/policies.h"
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
+#include "bb/macro_actions.h"   // P227: blitzDiceAllowed
 #include <algorithm>
 
 namespace bb {
@@ -107,7 +108,10 @@ Action greedyPolicy(const GameState& state, DiceRollerBase& dice) {
 
     // Priority 4: Blitz actions
     for (auto& a : actions) {
-        if (a.type == ActionType::BLITZ && a.targetId > 0) return a;   // P156: ohlášení bez cíle ne
+        if (a.type != ActionType::BLITZ || a.targetId <= 0) continue;   // P156: ohlášení bez cíle ne
+        // P227: ne do kostek, kde volí obránce ze 3+ (ze 2 mimo nosiče) — greedy hraje i makro AI jako záchranu
+        if (!blitzDiceAllowed(state, state.getPlayer(a.playerId), state.getPlayer(a.targetId))) continue;
+        return a;
     }
 
     // Priority 5: Move actions (non-carrier)

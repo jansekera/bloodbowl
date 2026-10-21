@@ -1291,7 +1291,7 @@ double blitzApproachRiskForTest(const GameState& state, const Player& mover,
 
 // P211c: šance blitzu ze dvou stran — `fail` = náš hráč cestou nebo při bloku spadne (turnover),
 // `success` = doběhne a soupeř skončí na zemi nebo přijde o míč.
-struct BlitzOdds { double fail; double success; int dice; };   // dice: kostky z pole dopadu (P35), jako getBlockDiceCount
+struct BlitzOdds { double fail; double success; };
 
 // ⭐ P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“). Na jedné kostce: soupeř jde k zemi,
 //   nebo nosič pustí míč. Rozhodnutí kostky jako resolver (block_handler.cpp):
@@ -1370,25 +1370,31 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
                        : diceCount > 0 ? 1.0 - std::pow(1.0 - k, n)   // vybíráme my: stačí jedna
                                        : std::pow(k, n);              // vybírá soupeř: musí všechny
     return {1.0 - (1.0 - blockFail) * (1.0 - approachFail),
-            (1.0 - approachFail) * (1.0 - wildFail) * knock, diceCount};
+            (1.0 - approachFail) * (1.0 - wildFail) * knock};
 }
 
 // ⭐ P227 (uživatel 21.10.2026: „Tři proti nedává smysl ani proti nosiči“; ke dvěma proti „3b“ = jen na
-//   nosiče). Smí AI blitzovat do těchto kostek? `dice` podepsaně jako getBlockDiceCount (− = volí obránce),
-//   z pole, odkud se bude blokovat (estimateBlitzOdds, P35). Obránce volí ze 3+ ⇒ nikdy; ze 2 ⇒ jen
-//   na soupeřova nosiče míče. Dřív se blitz do kostek, kde volí obránce, nabízel i vybíral bez prahu:
-//   22 ze 184 blitzů, z toho jen 3 na nosiče, sražen 1, turnover 9 (evidence/prazdne_blitzy_20261021).
+//   nosiče). Smí AI tohoto hráče poslat blitzem na tento cíl? Kostky podepsaně jako getBlockDiceCount
+//   (− = volí obránce) z pole, ze kterého hra opravdu bude blokovat (`blitzLandingSquare` přehraje
+//   chůzi blitzu, P35). Obránce volí ze 3+ ⇒ nikdy; ze 2 ⇒ jen na soupeřova nosiče míče. Dřív se
+//   blitz do kostek, kde volí obránce, nabízel i vybíral bez prahu: 22 ze 184 blitzů, z toho jen 3
+//   na nosiče, sražen 1, turnover 9 (evidence/prazdne_blitzy_20261021).
 //   JEDINÉ místo pravidla — volá ho výběr blitzujícího (pickBlitzer, tím i nabídka BLITZ přes P196),
-//   skóre cíle v nabídce a BLITZ_AND_SCORE (nabídka i rozbalení).
-//   ⛔ Netýká se ohlášení blitzu bez cíle (Wild Animal, P156) — tam se nepočítají žádné kostky.
-static bool blitzDiceAllowed(int dice, bool targetIsCarrier) {
+//   skóre cíle v nabídce BLITZ, BLITZ_AND_SCORE (nabídka i rozbalení) a greedyPolicy (policies.cpp —
+//   hraje ji i makro AI jako záchranu, GREEDY_FALLBACK; sonda tudy našla blitz 2 proti mimo nosiče).
+//   ⛔ Pole dopadu NE z estimateBlitzOdds: ta chodí starou hladovou cestou (pickApproachStep), ne cestou
+//     hry — první verze se o ni opřela a sonda našla 8 blitzů 2 proti mimo nosiče (předpovězený dopad
+//     jinde než skutečný, evidence/p227_20261021).
+//   ⛔ Netýká se ohlášení blitzu bez cíle (Wild Animal, P156) — tam se žádné kostky nehází.
+//   Kdo k cíli nedojde, toho pravidlo nesoudí (blitz stejně nejde — hlídá to nabídka hry a P149).
+bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target) {
     if (!extraFeatureOn(kP227BlitzDice)) return true;
+    Position landing;
+    if (!blitzLandingSquare(state, blitzer, target.position, landing)) return true;
+    const int dice = getBlockDiceCount(state, blitzer, target, true, false, landing);
     if (dice <= -3) return false;
-    if (dice == -2) return targetIsCarrier;
+    if (dice == -2) return state.ball.isHeld && state.ball.carrierId == target.id;
     return true;
-}
-static bool blitzDiceAllowed(const GameState& state, const BlitzOdds& odds, const Player& target) {
-    return blitzDiceAllowed(odds.dice, state.ball.isHeld && state.ball.carrierId == target.id);
 }
 
 // Find nearest free standing teammate to a position (excluding specific player)
@@ -2225,8 +2231,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 // P227: dvojice, kde by kostky volil obránce ze 3+ (ze 2 mimo nosiče), se do skóre cíle
                 // nezapočítá. Kostky z pole dopadu jako ve výběru blitzujícího (pickBlitzer); počítá se
                 // jen u dvojice, která by skóre cíle zvedla.
-                if (score > targetBestScore && extraFeatureOn(kP227BlitzDice) &&
-                    !blitzDiceAllowed(state, estimateBlitzOdds(state, blitzer, def, false), def)) return;
+                if (score > targetBestScore && !blitzDiceAllowed(state, blitzer, def)) return;
 
                 if (score > targetBestScore) {
                     targetBestScore = score;
@@ -2323,8 +2328,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 bool anyAllowed = false;
                 for (const Action& a : actions) {
                     if (a.type != ActionType::BLITZ || a.targetId != bestBlocker) continue;
-                    anyAllowed = blitzDiceAllowed(state, estimateBlitzOdds(state, state.getPlayer(a.playerId),
-                                                                          blocker, false), blocker);
+                    anyAllowed = blitzDiceAllowed(state, state.getPlayer(a.playerId), blocker);
                     if (anyAllowed) break;
                 }
                 if (!anyAllowed) bestBlocker = -1;
@@ -3836,9 +3840,7 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
         // path combined), not just the most dice + shortest raw distance --
         // item 14: raw dice/distance alone can pick a low-agility, no-Dodge
         // blitzer through a crowded midfield over a safer alternative.
-        const BlitzOdds odds = estimateBlitzOdds(state, blitzer, target, count);
-        if (!blitzDiceAllowed(state, odds, target)) continue;   // P227
-        ranked.emplace_back(odds, a);
+        ranked.emplace_back(estimateBlitzOdds(state, blitzer, target, count), a);
     }
     // ⭐ P211c (uživatel 15.10.2026: „výpočet doběhne × srazí“): napřed kdo soupeře nejspíš srazí
     //   (nebo mu vyrazí míč), při shodě kdo méně riskuje. Dřív jen riziko — gutter runner se silou 2
@@ -3869,6 +3871,7 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
             // Blitz nosiče se skórováním je samostatné makro BLITZ_AND_SCORE, to se netýká.
             if (state.ball.isHeld && state.ball.carrierId == a.playerId) continue;
             if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
+            if (!blitzDiceAllowed(state, cand, target)) continue;   // P227
             if (blitzDodgeCapped(state, cand, target)) { if (count) ++g_dodgeCapStops[1]; continue; }
             out = a;
             found = true;
@@ -3918,9 +3921,8 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
         // Tady jde o uvolnění cesty nosiči (odsun stačí), proto dál jen riziko.
-        const BlitzOdds odds = estimateBlitzOdds(state, blitzer, blocker);
-        if (!blitzDiceAllowed(state, odds, blocker)) continue;   // P227
-        double fail = odds.fail;
+        if (!blitzDiceAllowed(state, blitzer, blocker)) continue;   // P227
+        double fail = estimateBlitzOdds(state, blitzer, blocker).fail;
         bool isCarrier = (a.playerId == carrierId);
         double score = -fail + (isCarrier ? 0.0 : 0.001);
         if (score > bestScore) {

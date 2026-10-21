@@ -734,6 +734,25 @@ bool blitzLandingDiceFree(const GameState& state, const Player& player, Position
     return w.position.distanceTo(target) == 1;
 }
 
+bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing) {
+    landing = player.position;
+    if (player.position.distanceTo(target) <= 1) return true;
+    GameState sim = state.clone();
+    Player& w = sim.getPlayer(player.id);
+    if (w.state == PlayerState::PRONE) {
+        w.movementRemaining = static_cast<int8_t>(movementAfterStandUp(player));
+        w.state = PlayerState::STANDING;
+    }
+    for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
+        Position next;
+        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) return false;
+        w.position = next;
+        if (w.movementRemaining > 0) --w.movementRemaining;
+    }
+    landing = w.position;
+    return w.position.distanceTo(target) == 1;
+}
+
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,
                         int reserveMove) {

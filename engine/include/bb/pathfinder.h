@@ -65,6 +65,9 @@ double pathFailProb(const GameState& state, const Player& player,
 // nebo by cestou uhýbal. Přehrává smyčku hry, čítače chůze nemění.
 bool blitzLandingDiceFree(const GameState& state, const Player& player, Position target,
                           Position& landing, int& steps);
+// P227: pole, ze kterého blitzující po doběhu hry k cíli blokuje (přehrává smyčku hry, úhyby nevadí);
+// false = nedojde. Sousedí-li už, vrací jeho pole.
+bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing);
 
 bool canReachAdjacentTo(const GameState& state, const Player& player,
                         Position target, Position& outAdjacent,

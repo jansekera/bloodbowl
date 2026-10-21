@@ -11,6 +11,7 @@
 #include "bb/action_resolver.h"   // Q3: resolveAction
 #include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
 #include "bb/pathfinder.h"
+#include "bb/policies.h"      // P227: greedyPolicy (záchrana makro AI)
 #include "bb/kickoff_handler.h"   // P196: resolveKickoff        // KLEC/K5: pathFailProb -- cena ústupu nosiče
 #include <algorithm>
 #include <set>
@@ -5089,4 +5090,18 @@ TEST(MacroActions, P227TargetlessWildAnimalBlitzStaysOffered) {
     bool viaBlitz = false;
     for (const Macro& m : macros) viaBlitz |= (m.type == MacroType::REPOSITION && m.playerId == 1 && m.declareBlitz);
     EXPECT_TRUE(viaBlitz) << "přesun s ohlášeným blitzem (2+) zůstává v nabídce";
+}
+
+// Záchrana makro AI (macro_mcts.cpp, GREEDY_FALLBACK) hraje greedyPolicy — ta brala první blitz bez ohledu na
+// kostky. Sonda P227 tudy našla blitz 2 proti mimo nosiče (wood-elf × human, hra 1, útok, tah 6).
+TEST(MacroActions, P227GreedyPolicyDoesNotBlitzIntoThreeDiceAgainst) {
+    auto picksBlitz = [](unsigned off) {
+        P227Off o(off);
+        const GameState s = p227CarrierState(5);
+        FixedDiceRoller dice(std::vector<int>(10, 1));
+        const Action a = greedyPolicy(s, dice);
+        return a.type == ActionType::BLITZ && a.targetId == 12;
+    };
+    EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 3 proti";
+    EXPECT_FALSE(picksBlitz(0)) << "greedy (i jako záchrana makro AI) nevybere blitz 3 proti";
 }

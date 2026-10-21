@@ -40,6 +40,9 @@ void takeBlitzAndScoreReal(long* out3);
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
 // Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
 int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
+// P227: smí AI poslat `blitzer` blitzem na `target`? Ne, když obránce volí ze 3+ kostek, ze 2 jen na
+// soupeřova nosiče (kostky z pole, odkud hra bude blokovat). Vypínač kP227BlitzDice. Definice a důvod v .cpp.
+bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target);
 
 // Kolik hráčů strany v tomto tahu ještě může začít aktivaci (kdo nehrál ani se nepohnul a smí hrát).
 int activationsStillAvailable(const GameState& state, TeamSide side, int excludePlayerId = -1);
