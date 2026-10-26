@@ -5224,6 +5224,17 @@ TEST(MacroActions, P227DauntlessBeyondTwoStrengthStaysForbidden) {
     EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola hranice";
 }
 
+// Horns vstupuje i do rozdílu sil u Dauntless (review 26.10.): 2 + Horns proti 5 = rozdíl 2 ⇒ smí;
+// bez Horns rozdíl 3 ⇒ ne.
+TEST(MacroActions, P227DauntlessGapCountsHorns) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 5);
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Horns rozdíl 3";
+    s.getPlayer(1).skills.add(SkillName::Horns);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+}
+
 // Dauntless vyrovná jen sílu, asistence zůstávají: 2 proti 4 + asistence = 2 proti 5 ⇒ 3 proti (víc než
 // dvojnásobek); po úspěchu 4 proti 5 ⇒ 2 proti — na nosiče smí, mimo nosiče ne.
 TEST(MacroActions, P227DauntlessMustAlsoPassTheThresholdAfterSuccess) {

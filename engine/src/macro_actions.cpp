@@ -881,13 +881,18 @@ long takeHandOffOfferEvalsInSearch() {
 // attPos: the square the attacker throws the block FROM. Defaults to where he
 // stands, which is correct for a BLOCK; a BLITZ must pass the landing square,
 // because that is where block_handler will count the defender's assists (P35).
+// Síla útočníka po úpravách a před asistencemi (Horns +1 při blitzu). Jedno místo pro práh kostek
+// i pro rozdíl sil u Dauntless (P227) — ř. 8031-8033 „before any assists but after all other modifiers“.
+static int modifiedAttackST(const Player& att, bool isBlitz) {
+    return att.stats.strength + (isBlitz && att.hasSkill(SkillName::Horns) ? 1 : 0);
+}
+
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
                              bool isBlitz, bool dauntlessInOffer,
                              Position attPos = Position{-1, -1}, bool countOffer = true) {
     if (attPos.x < 0) attPos = att.position;
-    int attST = att.stats.strength;
+    int attST = modifiedAttackST(att, isBlitz);
     int defST = def.stats.strength;
-    if (isBlitz && att.hasSkill(SkillName::Horns)) attST += 1;
     // Dauntless, the same way block_handler resolves it: before assists, and
     // equalising onto the opponent's pre-assist strength. Leaving it out here
     // priced a Slayer beside a Black Orc as ST3 against ST4 -- uphill, negative
@@ -1400,8 +1405,7 @@ bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Playe
     auto passes = [&](int dice) { return dice > -2 || (dice == -2 && onCarrier); };
     if (passes(getBlockDiceCount(state, blitzer, target, true, false, landing))) return true;
     if (!blitzer.hasSkill(SkillName::Dauntless)) return false;
-    const int attST = blitzer.stats.strength + (blitzer.hasSkill(SkillName::Horns) ? 1 : 0);
-    const int gap = target.stats.strength - attST;
+    const int gap = target.stats.strength - modifiedAttackST(blitzer, true);
     if (gap <= 0 || gap > 2) return false;
     return passes(getBlockDiceCount(state, blitzer, target, true, true, landing, /*countOffer=*/false));   // dotaz prahu, ne nabídka
 }
