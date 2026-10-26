@@ -5034,9 +5034,11 @@ GameState p227CarrierState(int8_t carrierST) {
     s.ball = BallState::carried({14, 7}, 12);
     return s;
 }
+// Maska se po testu vrací na hodnotu PŘED testem (review L1), ne natvrdo na 0.
 struct P227Off {
-    explicit P227Off(unsigned m) { setExtraFeaturesOff(m); }
-    ~P227Off() { setExtraFeaturesOff(0); }
+    explicit P227Off(unsigned m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
+    ~P227Off() { setExtraFeaturesOff(saved); }
+    unsigned saved;
 };
 }  // namespace
 
@@ -5152,4 +5154,99 @@ TEST(MacroActions, P227GreedyPolicyDoesNotBlitzIntoThreeDiceAgainst) {
     };
     EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 3 proti";
     EXPECT_FALSE(picksBlitz(0)) << "greedy (i jako záchrana makro AI) nevybere blitz 3 proti";
+}
+
+// --- P227 doplněno po review 23.10.2026 (M1) a rozhodnutí o Dauntless (uživatel 26.10. „2 ano“) ---
+namespace {
+// Útok mimo nosiče: náš 1 na (10,7), soupeř 13 (není nosič) na (14,7), soupeřův nosič 12 daleko.
+GameState p227OffCarrier(int8_t attST, int8_t defST) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, attST, 3, 8});
+    p227Put(s, 13, TeamSide::AWAY, {14, 7}, {6, defST, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {24, 13}, {6, 3, 3, 8});
+    s.ball = BallState::carried({24, 13}, 12);
+    return s;
+}
+}  // namespace
+
+// Kostky se počítají z pole DOPADU, ne ze startu (P35): soupeř 15 na (13,7) asistuje proti každému poli
+// vedle cíle na naší straně, ale ne proti startu. Ze startu 1 kostka pro nás, z dopadu 2 proti.
+TEST(MacroActions, P227DiceAreCountedFromTheLandingSquareNotTheStart) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 3);
+    p227Put(s, 15, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});
+    Position landing;
+    ASSERT_TRUE(blitzLandingSquare(s, s.getPlayer(1), s.getPlayer(13).position, landing));
+    ASSERT_NE(landing, s.getPlayer(1).position);
+    ASSERT_EQ(landing.distanceTo(Position{13, 7}), 1) << "fixtura: dopad vedle asistujícího 15";
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(13)), 1) << "fixtura: ze startu 1 pro nás";
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "z dopadu 3 proti 4 ⇒ 2 proti mimo nosiče";
+    s.getPlayer(15).position = {20, 2};
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez asistence 1 kostka";
+}
+
+// Guard (ř. pravidel Guard): náš 2 asistuje, i když ho markuje soupeř 16 ⇒ 3+1 proti 4 = 1 kostka.
+TEST(MacroActions, P227GuardAssistInAnOpponentsZoneCounts) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 4);
+    p227Put(s, 2, TeamSide::HOME, {15, 6}, {6, 3, 3, 8});
+    p227Put(s, 16, TeamSide::AWAY, {16, 5}, {6, 3, 3, 8});
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "bez Guard asistence neplatí ⇒ 2 proti";
+    s.getPlayer(2).skills.add(SkillName::Guard);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "s Guard 4 proti 4 ⇒ 1 kostka";
+}
+
+// Horns (+1 síla při blitzu): 3 proti 4 je 2 proti, s Horns 4 proti 4 = 1 kostka.
+TEST(MacroActions, P227HornsTurnTwoAgainstIntoOne) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 4);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+    s.getPlayer(1).skills.add(SkillName::Horns);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+}
+
+// Dauntless (ř. 8023-8033): D6 + síla > síla soupeře ⇒ stejná síla. Uživatel 26.10.: povolit, když se
+// povede aspoň ve 2 ze 3 (rozdíl sil ≤ 2) a kostky po úspěchu projdou prahem.
+TEST(MacroActions, P227DauntlessAllowsTheBlitzWithinTwoStrength) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 5);                       // 3 proti 5 ⇒ 2 proti, rozdíl 2 (šance 4/6)
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Dauntless ne";
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "Dauntless 4/6 ⇒ 5 proti 5";
+}
+
+TEST(MacroActions, P227DauntlessBeyondTwoStrengthStaysForbidden) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 5);                       // rozdíl 3 ⇒ šance 3/6 < 2/3
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+    s.getPlayer(13).stats.strength = 4;                       // rozdíl 2 ⇒ šance 4/6
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola hranice";
+}
+
+// Dauntless vyrovná jen sílu, asistence zůstávají: 2 proti 4 + asistence = 2 proti 5 ⇒ 3 proti (víc než
+// dvojnásobek); po úspěchu 4 proti 5 ⇒ 2 proti — na nosiče smí, mimo nosiče ne.
+TEST(MacroActions, P227DauntlessMustAlsoPassTheThresholdAfterSuccess) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 4);
+    p227Put(s, 15, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});
+    s.ball = BallState::carried({14, 7}, 13);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Dauntless 3 proti";
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "na nosiče: po úspěchu 2 proti smí";
+    s.ball = BallState::carried({24, 13}, 12);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "mimo nosiče: po úspěchu 2 proti nesmí";
+}
+
+// Záchrana makro AI (greedyPolicy) a 2 proti MIMO nosiče (review M1: dosud jen 3 proti).
+TEST(MacroActions, P227GreedyPolicyDoesNotBlitzTwoAgainstOffTheCarrier) {
+    auto picksBlitz = [](unsigned off) {
+        P227Off o(off);
+        const GameState s = p227OffCarrier(2, 3);
+        FixedDiceRoller dice(std::vector<int>(10, 1));
+        const Action a = greedyPolicy(s, dice);
+        return a.type == ActionType::BLITZ && a.targetId == 13;
+    };
+    EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 2 proti";
+    EXPECT_FALSE(picksBlitz(0));
 }

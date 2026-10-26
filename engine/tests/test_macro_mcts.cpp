@@ -847,9 +847,13 @@ GameState makeHandBuiltMismatch() {
     weakBlitzer.teamSide = TeamSide::HOME;
     weakBlitzer.state = PlayerState::STANDING;
     weakBlitzer.position = {18, 7};
-    weakBlitzer.stats = {6, 1, 3, 8};
+    weakBlitzer.stats = {6, 3, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
+    // Retuned 2026-10-26 (PATE PRELADENI, P227): blitzujici sila 1 -> 3 (2 proti na nosice misto 3 proti,
+    // ktere P227 zakazuje) a volny hrac {13,3} -> {15,3}. Zkouseno {9,3} {11,3} {13,5} {16,4} {17,3}:
+    // zaklad pak nevoli BLITZ nebo strazce neodlozi. Aserce se NEOSLABILA.
+    //
     // Retuned 2026-10-07 (CTVRTE PRELADENI): dvojice z x=14/15 na x=18/19.
     // Hranu posunulo pravidlo "nosic neblokuje a nefauluje" (getAvailableMacros
     // mu BLOCK a FOUL z nabidky skrta) -- plati i pro SOUPEROVA nosice v
@@ -906,7 +910,7 @@ GameState makeHandBuiltMismatch() {
     freePlayer.id = 2;
     freePlayer.teamSide = TeamSide::HOME;
     freePlayer.state = PlayerState::STANDING;
-    freePlayer.position = {13, 3};
+    freePlayer.position = {15, 3};
     freePlayer.stats = {6, 3, 3, 8};
     freePlayer.movementRemaining = 6;
 
@@ -923,10 +927,9 @@ GameState makeHandBuiltMismatch() {
 }
 
 TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
-    // P227 (21.10.2026): fixtura stojí na blitzu 1 proti 6 (obránce volí ze 3), který AI od P227 nenabízí.
-    // Test hlídá strážce odkladu, ne práh kostek, a hrana fixtury je laděná na tenhle blitz ⇒ P227 vypnuto.
-    setExtraFeaturesOff(kP227BlitzDice);
-    struct Restore { ~Restore() { setExtraFeaturesOff(0); } } restore;
+    // P227 (přeladěno 26.10.2026 po review M4): běží ve VÝCHOZÍ masce. Dřív tu bylo P227 vypnuté, protože
+    // fixtura stála na blitzu 1 proti 6 (3 proti), který AI od P227 nenabízí — test tak hlídal situaci,
+    // která ve hře nenastane. Teď síla 3 proti 6 = 2 proti na nosiče (P227 povolí).
     GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;

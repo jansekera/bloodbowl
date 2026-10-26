@@ -883,7 +883,7 @@ long takeHandOffOfferEvalsInSearch() {
 // because that is where block_handler will count the defender's assists (P35).
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
                              bool isBlitz, bool dauntlessInOffer,
-                             Position attPos = Position{-1, -1}) {
+                             Position attPos = Position{-1, -1}, bool countOffer = true) {
     if (attPos.x < 0) attPos = att.position;
     int attST = att.stats.strength;
     int defST = def.stats.strength;
@@ -911,7 +911,7 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
         // event did not exist, and read as "no effect" rather than "no change".
         // The branch is only reachable with the flag on, i.e. in the candidate
         // arm, so the count needs no per-policy plumbing.
-        ++g_dauntlessOffers;
+        if (countOffer) ++g_dauntlessOffers;
     }
     int attAssists = countAssists(state, def.position, att.teamSide,
                                   att.id, def.id, def.id);
@@ -1387,14 +1387,23 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
 //     jinde než skutečný, evidence/p227_20261021).
 //   ⛔ Netýká se ohlášení blitzu bez cíle (Wild Animal, P156) — tam se žádné kostky nehází.
 //   Kdo k cíli nedojde, toho pravidlo nesoudí (blitz stejně nejde — hlídá to nabídka hry a P149).
+//   ⭐ Dauntless (uživatel 26.10.2026 „2 ano“ — varianta „c: podle šance“ z 23.10.): blitz, který
+//     práh neprojde, smí AI zkusit, když se Dauntless povede aspoň ve 2 ze 3 případů A kostky po
+//     úspěchu práh projdou. Pravidla ř. 8023-8033: D6 + síla > síla soupeře (obě před asistencemi,
+//     po ostatních úpravách — tedy i s Horns) ⇒ stejná síla; šance (6 − rozdíl) / 6 ≥ 2/3 ⇔ rozdíl ≤ 2.
+//     Dřív se Dauntless v prahu nepočítal vůbec (kostky bez něj).
 bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target) {
     if (!extraFeatureOn(kP227BlitzDice)) return true;
     Position landing;
     if (!blitzLandingSquare(state, blitzer, target.position, landing)) return true;
-    const int dice = getBlockDiceCount(state, blitzer, target, true, false, landing);
-    if (dice <= -3) return false;
-    if (dice == -2) return state.ball.isHeld && state.ball.carrierId == target.id;
-    return true;
+    const bool onCarrier = state.ball.isHeld && state.ball.carrierId == target.id;
+    auto passes = [&](int dice) { return dice > -2 || (dice == -2 && onCarrier); };
+    if (passes(getBlockDiceCount(state, blitzer, target, true, false, landing))) return true;
+    if (!blitzer.hasSkill(SkillName::Dauntless)) return false;
+    const int attST = blitzer.stats.strength + (blitzer.hasSkill(SkillName::Horns) ? 1 : 0);
+    const int gap = target.stats.strength - attST;
+    if (gap <= 0 || gap > 2) return false;
+    return passes(getBlockDiceCount(state, blitzer, target, true, true, landing, /*countOffer=*/false));   // dotaz prahu, ne nabídka
 }
 
 // Find nearest free standing teammate to a position (excluding specific player)
