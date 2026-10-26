@@ -4482,62 +4482,73 @@ TEST(DodgeCap, CarrierMayDodgeInTheLastTurnOfTheHalf) {
     }
 }
 
+// Náhodná pozice pro doběh blitzu: blitzující 1 (HOME, náhodně Dodge, Break Tackle, ležící),
+// cíl 12 (AWAY) aspoň dvě pole daleko, 1–7 soupeřů (někteří s Tackle), 0–4 spoluhráči, míč u
+// spoluhráče nebo u cíle (sestavil reviewer 06.10.). Vrací false, když se cíl nepodařilo umístit.
+struct SixDice : DiceRollerBase {
+    int rollD6() override { return 6; }
+    int rollD8() override { return 1; }
+};
+static bool randomBlitzBoard(std::mt19937& rng, GameState& s, Position& tp) {
+    auto R = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
+    s = GameState{};
+    s.phase = GamePhase::PLAY; s.activeTeam = TeamSide::HOME; s.half = 1;
+    s.homeTeam.turnNumber = 3; s.weather = Weather::NICE;
+    Position c{static_cast<int8_t>(R(6, 19)), static_cast<int8_t>(R(4, 10))};
+    auto place = [&](int id, TeamSide side, Position pos) -> Player* {
+        if (!pos.isOnPitch() || s.getPlayerAtPosition(pos)) return nullptr;
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        return &p;
+    };
+    Player* b = place(1, TeamSide::HOME, c);
+    b->stats = {static_cast<int8_t>(R(4, 8)), static_cast<int8_t>(R(2, 5)), static_cast<int8_t>(R(2, 4)), 8};
+    b->movementRemaining = b->stats.movement;
+    if (R(0, 1)) b->skills.add(SkillName::Dodge);
+    if (R(0, 1)) b->skills.add(SkillName::BreakTackle);
+    if (R(0, 3) == 0) b->state = PlayerState::PRONE;
+    tp = {-1, -1};
+    Player* t = nullptr;
+    for (int k = 0; k < 50 && !t; ++k) {
+        tp = {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))};
+        if (tp.distanceTo(c) >= 2) t = place(12, TeamSide::AWAY, tp);
+    }
+    if (!t) return false;
+    const int na = R(1, 7);
+    for (int i = 0; i < na; ++i) {
+        Player* a = place(13 + i, TeamSide::AWAY,
+                          {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+        if (a && R(0, 5) == 0) a->skills.add(SkillName::Tackle);
+    }
+    const int nh = R(0, 4);
+    for (int i = 0; i < nh; ++i) {
+        place(2 + i, TeamSide::HOME,
+              {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+    }
+    if (R(0, 1) && s.getPlayer(2).isOnPitch()) s.ball = BallState::carried(s.getPlayer(2).position, 2);
+    else s.ball = BallState::carried(tp, 12);
+    return true;
+}
+
 // Jeden test na místě, kudy prochází všechno: předpověď stropu proti SKUTEČNÉ chůzi blitzu
 // (smyčka hry: nextStepTowardAdjacent + resolveMoveStep, všechny hody 6). Náhodné pozice
 // s Dodge, Break Tackle, Tackle, ležícím blitzujícím a vlastním nosičem (sestavil reviewer
 // 06.10.; první verze dotazu tu měla 337 úniků z 30 000).
 TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
-    struct Six : DiceRollerBase {
-        int rollD6() override { return 6; }
-        int rollD8() override { return 1; }
-    };
     std::mt19937 rng(12345);
-    auto R = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
     int checked = 0, walksWithRiskyDodge = 0, leaks = 0, falseBlocks = 0, reachMismatch = 0;
     for (int it = 0; it < 2500; ++it) {
         GameState s;
-        s.phase = GamePhase::PLAY; s.activeTeam = TeamSide::HOME; s.half = 1;
-        s.homeTeam.turnNumber = 3; s.weather = Weather::NICE;
-        Position c{static_cast<int8_t>(R(6, 19)), static_cast<int8_t>(R(4, 10))};
-        auto place = [&](int id, TeamSide side, Position pos) -> Player* {
-            if (!pos.isOnPitch() || s.getPlayerAtPosition(pos)) return nullptr;
-            Player& p = s.getPlayer(id);
-            p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
-            p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
-            return &p;
-        };
-        Player* b = place(1, TeamSide::HOME, c);
-        b->stats = {static_cast<int8_t>(R(4, 8)), static_cast<int8_t>(R(2, 5)), static_cast<int8_t>(R(2, 4)), 8};
-        b->movementRemaining = b->stats.movement;
-        if (R(0, 1)) b->skills.add(SkillName::Dodge);
-        if (R(0, 1)) b->skills.add(SkillName::BreakTackle);
-        if (R(0, 3) == 0) b->state = PlayerState::PRONE;
-        Position tp{-1, -1};
-        Player* t = nullptr;
-        for (int k = 0; k < 50 && !t; ++k) {
-            tp = {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))};
-            if (tp.distanceTo(c) >= 2) t = place(12, TeamSide::AWAY, tp);
-        }
-        if (!t) continue;
-        const int na = R(1, 7);
-        for (int i = 0; i < na; ++i) {
-            Player* a = place(13 + i, TeamSide::AWAY,
-                              {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
-            if (a && R(0, 5) == 0) a->skills.add(SkillName::Tackle);
-        }
-        const int nh = R(0, 4);
-        for (int i = 0; i < nh; ++i) {
-            place(2 + i, TeamSide::HOME,
-                  {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
-        }
-        if (R(0, 1) && s.getPlayer(2).isOnPitch()) s.ball = BallState::carried(s.getPlayer(2).position, 2);
-        else s.ball = BallState::carried(tp, 12);
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        const Player* b = &s.getPlayer(1);
 
         bool predReaches = true;
         const bool predHit = blitzApproachHitsDodgeCap(s, *b, tp, 4, &predReaches);
 
         GameState w = s.clone();
-        Six dice;
+        SixDice dice;
         Player& wb = w.getPlayer(1);
         if (wb.state == PlayerState::PRONE) {
             if (!resolveStandUp(w, 1, dice, nullptr).success) continue;
@@ -4570,6 +4581,43 @@ TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
     EXPECT_EQ(leaks, 0);                     // chůze by hodila úhyb 4+ a horší, dotaz to neviděl
     EXPECT_EQ(falseBlocks, 0);               // dotaz zakázal doběh, který takový úhyb nemá
     EXPECT_EQ(reachMismatch, 0);             // „dojde / nedojde“ se shoduje s chůzí
+}
+
+// P227 review H1 (23.10.2026): pole dopadu, ze kterého P227 počítá kostky bloku, proti SKUTEČNÉ
+// chůzi blitzu (všechny hody 6, takže každý úhyb projde a Break Tackle se spotřebuje jako ve hře).
+// Dřív `blitzLandingSquare` Break Tackle nespotřebovávala a po prvním úhybu hledala cestu, jako by
+// ho měl blitzující pořád — předpověděný dopad se pak lišil od skutečného.
+TEST(DodgeCap, BlitzLandingMatchesTheRealWalk) {
+    std::mt19937 rng(777);
+    int checked = 0, withBreakTackleDodge = 0, mismatches = 0;
+    for (int it = 0; it < 4000; ++it) {
+        GameState s;
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        Position predicted;
+        const bool predReaches = blitzLandingSquare(s, s.getPlayer(1), tp, predicted);
+
+        GameState w = s.clone();
+        SixDice dice;
+        Player& wb = w.getPlayer(1);
+        if (wb.state == PlayerState::PRONE && !resolveStandUp(w, 1, dice, nullptr).success) continue;
+        bool reached = true, btDodge = false;
+        for (int guard = 0; wb.position.distanceTo(tp) > 1; ++guard) {
+            Position nx;
+            if (guard > 30 || !nextStepTowardAdjacent(w, wb, tp, nx)) { reached = false; break; }
+            const bool btBefore = wb.breakTackleUsedThisTurn;
+            const Position before = wb.position;
+            auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+            if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
+            if (!btBefore && wb.breakTackleUsedThisTurn) btDodge = true;
+        }
+        ++checked;
+        if (btDodge) ++withBreakTackleDodge;
+        if (predReaches != reached || (reached && predicted != wb.position)) ++mismatches;
+    }
+    EXPECT_GT(checked, 2500);
+    EXPECT_GT(withBreakTackleDodge, 100);    // pozitivní kontrola: doběhy, kde se Break Tackle spotřebuje
+    EXPECT_EQ(mismatches, 0);                // předpověď dopadu = skutečné pole, odkud hra blokuje
 }
 
 TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {
