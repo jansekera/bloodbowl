@@ -5367,6 +5367,8 @@ TEST(MacroActions, P227GreedyPolicyDoesNotBlitzTwoAgainstOffTheCarrier) {
     };
     EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 2 proti";
     EXPECT_FALSE(picksBlitz(0));
+}
+
 // ⭐ P220 (uživatel 20.10.2026: „bez plánu asistence pro blitz [agilní] nemají [docházet k soupeři a označit ho]
 // vůbec“; výjimka: markování nosiče míče v obraně; platí pro VŠECHNY agilní = AG4+ nebo AG3 s Dodge). Agilní hráč
 // neskončí přesun v tackle zóně soupeře, leda (a) markuje jejich nosiče, (b) je asistencí bloku/blitzu, který se
