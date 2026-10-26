@@ -200,7 +200,11 @@ bool anyOpponentReaches(const GameState& state, TeamSide mySide, Position sq) {
     return reach;
 }
 
-double blitzThreat(const GameState& state, const Player& carrier, double stopAbove) {
+// Jedna rána na nosiče (blitz / blok) nejlepším soupeřem, který může jednat. `cannotAct` = soupeři,
+// kteří už v tomto tahu jednali (zablokovali roh) — ti na nosiče jít nemohou, ale stojí dál a
+// asistují. Bez P228 jediná hrozba.
+static double singleHitThreat(const GameState& state, const Player& carrier, double stopAbove,
+                              const std::vector<int>& cannotAct) {
     if (!carrier.isOnPitch()) return 0.0;
     const TeamSide side = carrier.teamSide;
     GameState sim = state.clone();
@@ -219,6 +223,7 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
         if (o.state == PlayerState::STANDING || o.state == PlayerState::PRONE) oppIds.push_back(o.id);
     });
     for (int id : oppIds) {
+        if (std::find(cannotAct.begin(), cannotAct.end(), id) != cannotAct.end()) continue;
         Player& o = sim.getPlayer(id);
         const bool wasProne = o.state == PlayerState::PRONE;
         const int reach = blitzReachOf(o);
@@ -247,6 +252,91 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
             if (worst > stopAbove) return worst;
         }
         if (wasProne) o.state = PlayerState::PRONE;                   // ležící zónu nemá — vrátit pro další
+    }
+    return worst;
+}
+
+// P228: šance, že blok soupeře `att` odstraní našeho hráče `corner` z jeho pole (sražen nebo odtlačen).
+// Strany kostky (ř. pravidel Block): Attacker Down, Both Down, 2× Pushed, Defender Stumbles, Defender Down.
+// Pushed: odtlačen, leda Stand Firm. Stumbles: s Dodge (a útočník bez Tackle) jen odtlačen, jinak sražen.
+// Defender Down: sražen. Both Down: roh padá, leda má Block (Wrestle útočníka položí oba vždy).
+// Vybírá-li útočník, stačí jedna dobrá kostka ze n; vybírá-li roh, musí být dobré všechny.
+static double cornerRemovalChance(const GameState& state, const Player& att, const Player& corner) {
+    const bool sf = corner.hasSkill(SkillName::StandFirm);
+    const bool dodges = corner.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle);
+    double q = 1.0 / 6.0;                                              // Defender Down
+    if (!sf) q += 2.0 / 6.0;                                           // Pushed
+    if (!dodges || !sf) q += 1.0 / 6.0;                                // Stumbles: sražen, nebo odtlačen
+    if (!corner.hasSkill(SkillName::Block) || att.hasSkill(SkillName::Wrestle)) q += 1.0 / 6.0;   // Both Down
+    const int dice = blockDiceCount(state, att, corner);
+    const int n = std::abs(dice);
+    return dice > 0 ? 1.0 - std::pow(1.0 - q, n) : std::pow(q, n);
+}
+
+// ⭐ P228 ŠPINAVÝ ROH (uživatel 23.10.2026: „pokud nebude mít block na roh a následný blitz na balon —
+//   tak může být roh špinavý — spočítej podle pravděpodobnosti nejhoršího soupeřova pohybu“; 23.10.:
+//   „když jsou špinavé dva rohy — tak je stále jeden blitz na nosiče — jen pravděpodobnost sražení pak
+//   může být vyšší“; schváleno 26.10. „1 ano“ s mezí kSafeBlitzThreat). Nejhorší odpověď soupeře v jeho
+//   příštím tahu: bloky (neomezeně, každý jiný hráč) na naše hráče vedle nosiče, kteří stojí v jeho
+//   zóně, a pak JEDNA rána na nosiče hráčem, který ještě nejednal. Riziko = součet přes výsledky bloků
+//   (které rohy zmizí) × rána na desce bez nich. Soupeř si vybere, které rohy napadne — bere se
+//   nejhorší volba. Blokaře na každý roh vybírá nejlepšího volného (hladově), blokaři pak nejednají.
+//   Čte se, nehledá: jen tento tah soupeře, nic dál.
+double blitzThreat(const GameState& state, const Player& carrier, double stopAbove) {
+    static const std::vector<int> kNone;
+    const double plain = singleHitThreat(state, carrier, stopAbove, kNone);
+    if (!extraFeatureOn(kP228DirtyCorner) || !carrier.isOnPitch() || plain > stopAbove) return plain;
+    const TeamSide side = carrier.teamSide;
+    std::vector<int> dirty;
+    for (const Position& a : carrier.position.getAdjacent()) {
+        const Player* p = a.isOnPitch() ? state.getPlayerAtPosition(a) : nullptr;
+        if (p && p->teamSide == side && p->state == PlayerState::STANDING && countTacklezones(state, a, side) > 0)
+            dirty.push_back(p->id);
+    }
+    if (dirty.empty()) return plain;
+    double worst = plain;
+    const int k = static_cast<int>(dirty.size());
+    for (int attackMask = 1; attackMask < (1 << k); ++attackMask) {      // které rohy soupeř napadne
+        std::vector<int> blockers;
+        std::vector<std::pair<int, double>> hits;                        // (roh, šance odstranění)
+        for (int i = 0; i < k; ++i) {
+            if (!(attackMask & (1 << i))) continue;
+            const Player& c = state.getPlayer(dirty[i]);
+            int bestId = -1;
+            double bestP = 0.0;
+            state.forEachOnPitch(opponent(side), [&](const Player& o) {
+                if (o.state != PlayerState::STANDING || o.lostTacklezones || o.position.distanceTo(c.position) != 1) return;
+                if (std::find(blockers.begin(), blockers.end(), o.id) != blockers.end()) return;
+                const double pr = cornerRemovalChance(state, o, c);
+                if (pr > bestP) { bestP = pr; bestId = o.id; }
+            });
+            if (bestId < 0) { hits.clear(); break; }                     // roh nemá kdo napadnout
+            blockers.push_back(bestId);
+            hits.push_back({c.id, bestP});
+        }
+        if (hits.empty()) continue;
+        double risk = 0.0;
+        const int h = static_cast<int>(hits.size());
+        for (int gone = 0; gone < (1 << h); ++gone) {                    // které rohy blok odstranil
+            double pr = 1.0;
+            GameState sim = state.clone();
+            for (int i = 0; i < h; ++i) {
+                if (gone & (1 << i)) {
+                    pr *= hits[i].second;
+                    // Roh pryč z desky. Sražený by ležel na poli (pole by blokoval, jen bez zóny a asistence),
+                    // odtlačený pole uvolní — bere se horší z obou: pole volné.
+                    Player& gone1 = sim.getPlayer(hits[i].first);
+                    gone1.state = PlayerState::OFF_PITCH;
+                    gone1.position = Position{-1, -1};
+                } else {
+                    pr *= 1.0 - hits[i].second;
+                }
+            }
+            if (pr <= 0.0) continue;
+            risk += pr * singleHitThreat(sim, sim.getPlayer(carrier.id), 2.0, blockers);
+        }
+        if (risk > worst) worst = risk;
+        if (worst > stopAbove) return worst;
     }
     return worst;
 }

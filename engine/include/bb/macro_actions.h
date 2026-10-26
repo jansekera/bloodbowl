@@ -102,7 +102,8 @@ enum ExtraFeature : unsigned {
     kP220AgileNoContact = 128,   // P220: agilní přesun nekončí v kontaktu (výjimky nosič / asistence / vlastní blok)
     // P225: AI obránce nepoužije Stand Firm při nachystané pasti na Frenzy.
     kP225FrenzyTrapStandFirm = 256,
-    kP227BlitzDice = 512   // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
+    kP227BlitzDice = 512,  // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
+    kP228DirtyCorner = 1024   // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
