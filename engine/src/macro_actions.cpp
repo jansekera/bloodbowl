@@ -881,13 +881,18 @@ long takeHandOffOfferEvalsInSearch() {
 // attPos: the square the attacker throws the block FROM. Defaults to where he
 // stands, which is correct for a BLOCK; a BLITZ must pass the landing square,
 // because that is where block_handler will count the defender's assists (P35).
+// Síla útočníka po úpravách a před asistencemi (Horns +1 při blitzu). Jedno místo pro práh kostek
+// i pro rozdíl sil u Dauntless (P227) — ř. 8031-8033 „before any assists but after all other modifiers“.
+static int modifiedAttackST(const Player& att, bool isBlitz) {
+    return att.stats.strength + (isBlitz && att.hasSkill(SkillName::Horns) ? 1 : 0);
+}
+
 static int getBlockDiceCount(const GameState& state, const Player& att, const Player& def,
                              bool isBlitz, bool dauntlessInOffer,
-                             Position attPos = Position{-1, -1}) {
+                             Position attPos = Position{-1, -1}, bool countOffer = true) {
     if (attPos.x < 0) attPos = att.position;
-    int attST = att.stats.strength;
+    int attST = modifiedAttackST(att, isBlitz);
     int defST = def.stats.strength;
-    if (isBlitz && att.hasSkill(SkillName::Horns)) attST += 1;
     // Dauntless, the same way block_handler resolves it: before assists, and
     // equalising onto the opponent's pre-assist strength. Leaving it out here
     // priced a Slayer beside a Black Orc as ST3 against ST4 -- uphill, negative
@@ -911,7 +916,7 @@ static int getBlockDiceCount(const GameState& state, const Player& att, const Pl
         // event did not exist, and read as "no effect" rather than "no change".
         // The branch is only reachable with the flag on, i.e. in the candidate
         // arm, so the count needs no per-policy plumbing.
-        ++g_dauntlessOffers;
+        if (countOffer) ++g_dauntlessOffers;
     }
     int attAssists = countAssists(state, def.position, att.teamSide,
                                   att.id, def.id, def.id);
@@ -1373,6 +1378,38 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
             (1.0 - approachFail) * (1.0 - wildFail) * knock};
 }
 
+// ⭐ P227 (uživatel 21.10.2026: „Tři proti nedává smysl ani proti nosiči“; ke dvěma proti „3b“ = jen na
+//   nosiče). Smí AI tohoto hráče poslat blitzem na tento cíl? Kostky podepsaně jako getBlockDiceCount
+//   (− = volí obránce) z pole, ze kterého hra opravdu bude blokovat (`blitzLandingSquare` přehraje
+//   chůzi blitzu, P35). Obránce volí ze 3+ ⇒ nikdy; ze 2 ⇒ jen na soupeřova nosiče míče. Dřív se
+//   blitz do kostek, kde volí obránce, nabízel i vybíral bez prahu: 22 ze 184 blitzů, z toho jen 3
+//   na nosiče, sražen 1, turnover 9 (evidence/prazdne_blitzy_20261021).
+//   JEDINÉ místo pravidla — volá ho výběr blitzujícího (pickBlitzer, tím i nabídka BLITZ přes P196),
+//   skóre cíle v nabídce BLITZ, BLITZ_AND_SCORE (nabídka i rozbalení) a greedyPolicy (policies.cpp —
+//   hraje ji i makro AI jako záchranu, GREEDY_FALLBACK; sonda tudy našla blitz 2 proti mimo nosiče).
+//   ⛔ Pole dopadu NE z estimateBlitzOdds: ta chodí starou hladovou cestou (pickApproachStep), ne cestou
+//     hry — první verze se o ni opřela a sonda našla 8 blitzů 2 proti mimo nosiče (předpovězený dopad
+//     jinde než skutečný, evidence/p227_20261021).
+//   ⛔ Netýká se ohlášení blitzu bez cíle (Wild Animal, P156) — tam se žádné kostky nehází.
+//   Kdo k cíli nedojde, toho pravidlo nesoudí (blitz stejně nejde — hlídá to nabídka hry a P149).
+//   ⭐ Dauntless (uživatel 26.10.2026 „2 ano“ — varianta „c: podle šance“ z 23.10.): blitz, který
+//     práh neprojde, smí AI zkusit, když se Dauntless povede aspoň ve 2 ze 3 případů A kostky po
+//     úspěchu práh projdou. Pravidla ř. 8023-8033: D6 + síla > síla soupeře (obě před asistencemi,
+//     po ostatních úpravách — tedy i s Horns) ⇒ stejná síla; šance (6 − rozdíl) / 6 ≥ 2/3 ⇔ rozdíl ≤ 2.
+//     Dřív se Dauntless v prahu nepočítal vůbec (kostky bez něj).
+bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target) {
+    if (!extraFeatureOn(kP227BlitzDice)) return true;
+    Position landing;
+    if (!blitzLandingSquare(state, blitzer, target.position, landing)) return true;
+    const bool onCarrier = state.ball.isHeld && state.ball.carrierId == target.id;
+    auto passes = [&](int dice) { return dice > -2 || (dice == -2 && onCarrier); };
+    if (passes(getBlockDiceCount(state, blitzer, target, true, false, landing))) return true;
+    if (!blitzer.hasSkill(SkillName::Dauntless)) return false;
+    const int gap = target.stats.strength - modifiedAttackST(blitzer, true);
+    if (gap <= 0 || gap > 2) return false;
+    return passes(getBlockDiceCount(state, blitzer, target, true, true, landing, /*countOffer=*/false));   // dotaz prahu, ne nabídka
+}
+
 // Find nearest free standing teammate to a position (excluding specific player)
 static const Player* findNearestFreePlayer(const GameState& state, Position target,
                                             int excludeId = -1) {
@@ -1436,7 +1473,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         const Player& v = state.getPlayer(state.currentActivationId);
         if (v.teamSide == mySide && v.bloodlustHungry && v.isOnPitch() &&
             !v.hasActed && adjacentThrall(state, v) < 0) {
-            const int reach = std::max(0, static_cast<int>(v.movementRemaining)) + maxGfiSquares(v);
+            // OPRAVENO 26.10.2026 — tady byl pohyb oříznutý na nulu (`max(0, MA)`); upír, který už šel přes
+            // GFI, má MA v záporu a zbývá mu jen MA + GFI (move_handler.cpp). Dosah se tak nadsazoval.
+            const int reach = static_cast<int>(v.movementRemaining) + maxGfiSquares(v);
             Position best{-1, -1};
             int bestDist = 99;
             state.forEachOnPitch(mySide, [&](const Player& t) {
@@ -1449,7 +1488,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             });
             if (best.x >= 0) {
                 Macro m{MacroType::REPOSITION, v.id, -1, best};
-                m.gfiAllowance = std::min(2, std::max(0, bestDist - std::max(0, static_cast<int>(v.movementRemaining))));
+                // OPRAVENO 26.10.2026 — strop byl natvrdo 2; se Sprintem jsou GFI tři (ř. 8487-8490) a `reach`
+                // je už počítal, takže se nabídla cesta, na kterou povolené GFI nestačily.
+                m.gfiAllowance = std::min(maxGfiSquares(v), std::max(0, bestDist - std::max(0, static_cast<int>(v.movementRemaining))));
                 out.push_back(m);
                 return;
             }
@@ -2204,6 +2245,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                     }
                 }
 
+                // P227: dvojice, kde by kostky volil obránce ze 3+ (ze 2 mimo nosiče), se do skóre cíle
+                // nezapočítá. Kostky z pole dopadu jako ve výběru blitzujícího (pickBlitzer); počítá se
+                // jen u dvojice, která by skóre cíle zvedla.
+                if (score > targetBestScore && !blitzDiceAllowed(state, blitzer, def)) return;
+
                 if (score > targetBestScore) {
                     targetBestScore = score;
                 }
@@ -2291,6 +2337,19 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 }
             });
 
+            // P227: jen když na blokujícího smí aspoň jeden blitzující (týž práh jako rozbalení).
+            if (bestBlocker > 0 && extraFeatureOn(kP227BlitzDice)) {
+                std::vector<Action> actions;
+                getAvailableActions(state, actions);
+                const Player& blocker = state.getPlayer(bestBlocker);
+                bool anyAllowed = false;
+                for (const Action& a : actions) {
+                    if (a.type != ActionType::BLITZ || a.targetId != bestBlocker) continue;
+                    anyAllowed = blitzDiceAllowed(state, state.getPlayer(a.playerId), blocker);
+                    if (anyAllowed) break;
+                }
+                if (!anyAllowed) bestBlocker = -1;
+            }
             if (bestBlocker > 0) {
                 ++g_basOfferSearch;
                 out.push_back({MacroType::BLITZ_AND_SCORE, carrier->id, bestBlocker, {-1, -1}});
@@ -3829,6 +3888,7 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
             // Blitz nosiče se skórováním je samostatné makro BLITZ_AND_SCORE, to se netýká.
             if (state.ball.isHeld && state.ball.carrierId == a.playerId) continue;
             if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
+            if (!blitzDiceAllowed(state, cand, target)) continue;   // P227
             if (blitzDodgeCapped(state, cand, target)) { if (count) ++g_dodgeCapStops[1]; continue; }
             out = a;
             found = true;
@@ -3878,6 +3938,7 @@ static MacroExpansionResult expandBlitzAndScore(GameState& state, const Macro& m
         if (a.targetId != macro.targetId) continue;
         const Player& blitzer = state.getPlayer(a.playerId);
         // Tady jde o uvolnění cesty nosiči (odsun stačí), proto dál jen riziko.
+        if (!blitzDiceAllowed(state, blitzer, blocker)) continue;   // P227
         double fail = estimateBlitzOdds(state, blitzer, blocker).fail;
         bool isCarrier = (a.playerId == carrierId);
         double score = -fail + (isCarrier ? 0.0 : 0.001);
@@ -4607,7 +4668,9 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
                 const Player& p = state.getPlayer(macro.playerId);
                 if (p.isOnPitch()) {
                     int dist = distToEndzone(p.position, mySide);
-                    int gfis = std::max(0, dist - p.movementRemaining);
+                    // OPRAVENO 26.10.2026 — bylo `dist - MA` i se záporným MA (po GFI), takže GFI vycházelo o
+                    // jedno navíc za každou už použitou; při MA ≤ 0 je každé další pole právě jedna GFI.
+                    int gfis = std::max(0, dist - std::max(0, static_cast<int>(p.movementRemaining)));
                     out[13] = gfis * 0.17f; // ~1/6 per GFI
                 }
             }

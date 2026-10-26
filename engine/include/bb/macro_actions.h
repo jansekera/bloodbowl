@@ -40,6 +40,9 @@ void takeBlitzAndScoreReal(long* out3);
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
 // Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
 int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
+// P227: smí AI poslat `blitzer` blitzem na `target`? Ne, když obránce volí ze 3+ kostek, ze 2 jen na
+// soupeřova nosiče (kostky z pole, odkud hra bude blokovat). Vypínač kP227BlitzDice. Definice a důvod v .cpp.
+bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target);
 
 // Kolik hráčů strany v tomto tahu ještě může začít aktivaci (kdo nehrál ani se nepohnul a smí hrát).
 int activationsStillAvailable(const GameState& state, TeamSide side, int excludePlayerId = -1);
@@ -96,7 +99,8 @@ enum ExtraFeature : unsigned {
     kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
     kP217StallBanks = 8, kP217BestChance = 16, kP219bEscapeByRisk = 64,  // 32 = P219, ODSTRANĚNO 20.10. (bral dobré blitzy; P220)
     // 128 = P220 (paralelní větev). P225: AI obránce nepoužije Stand Firm při nachystané pasti na Frenzy.
-    kP225FrenzyTrapStandFirm = 256
+    kP225FrenzyTrapStandFirm = 256,
+    kP227BlitzDice = 512   // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();

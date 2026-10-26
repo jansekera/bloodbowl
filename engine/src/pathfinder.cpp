@@ -480,18 +480,22 @@ bool nextStepTowardAdjacent(const GameState& state, const Player& player,
     return nextStepTowardAdjacentImpl(state, player, target, outStep, /*countDiag=*/true);
 }
 
-// P149 (06.10.2026): vede doběh blitzu k cíli přes úhyb na `cap`+ a horší?
-// ⛔ Přehrává SMYČKU HRY, ne jedno hledání: blitz v action_resolver.cpp po KAŽDÉM kroku hledá
-//   znovu (`nextStepTowardAdjacent`). Jedno hledání s celým řetězem se s chůzí rozcházelo
-//   (review 06.10., fuzz 30 000 pozic: 337 úniků) — Break Tackle platí jen na první úhyb
-//   (move_handler.cpp, P77), vrstva rerollu dovednosti Dodge se po kroku počítá od začátku,
-//   a shody cen se po kroku rozhodnou jinak. Proto kopie stavu, krok bez kostek, znovu hledat.
-// Čítače chůze se tu nepočítají — je to dotaz, ne tah. Nedojde-li hráč, vrací false
-// (takový blitz hra neprovede; vyřazuje ho volající).
-bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Position target,
-                               int cap, bool* reachesOut) {
-    if (reachesOut) *reachesOut = true;
-    if (player.position.distanceTo(target) <= 1) return false;
+// ⭐ JEDNO MÍSTO přehrání doběhu blitzu (review P227 23.10.2026, H1): dřív tři kopie téže smyčky
+//   a jen jedna z nich spotřebovávala Break Tackle — `blitzLandingSquare` tak po prvním úhybu hledala
+//   další krok, jako by Break Tackle pořád měl, a mohla předpovědět jiné pole dopadu než hra.
+// Přehrává SMYČKU HRY, ne jedno hledání: blitz v action_resolver.cpp po KAŽDÉM kroku hledá znovu
+// (`nextStepTowardAdjacent`). Jedno hledání s celým řetězem se s chůzí rozcházelo (review 06.10.,
+// fuzz 30 000 pozic: 337 úniků) — Break Tackle platí jen na první úhyb (move_handler.cpp, P77),
+// vrstva rerollu dovednosti Dodge se po kroku počítá od začátku a shody cen se po kroku rozhodnou
+// jinak. Proto kopie stavu, krok bez kostek, znovu hledat.
+// `onStep(sim, walker, next, dodge)` se volá před každým krokem; vrátí-li false, přehrání končí (Stopped).
+enum class ApproachEnd { Reached, NoPath, Stopped };
+template <class OnStep>
+static ApproachEnd replayBlitzApproach(const GameState& state, const Player& player, Position target,
+                                       Position& landing, int& steps, OnStep onStep) {
+    steps = 0;
+    landing = player.position;
+    if (player.position.distanceTo(target) <= 1) return ApproachEnd::Reached;
     GameState sim = state.clone();
     Player& w = sim.getPlayer(player.id);
     if (w.state == PlayerState::PRONE) {     // vstání: rozpočet má jedno místo (ř. 690-695)
@@ -500,21 +504,35 @@ bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Pos
     }
     for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
         Position next;
-        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) {
-            if (reachesOut) *reachesOut = false;
-            return false;
-        }
-        if (countTacklezones(sim, w.position, w.teamSide) > 0) {
-            if (calculateDodgeTarget(sim, w, next, w.position) >= cap) return true;
-            if (w.hasSkill(SkillName::BreakTackle) && !w.breakTackleUsedThisTurn &&
-                w.stats.strength > w.stats.agility) {
-                w.breakTackleUsedThisTurn = true;
-            }
+        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) return ApproachEnd::NoPath;
+        const bool dodge = countTacklezones(sim, w.position, w.teamSide) > 0;
+        if (!onStep(sim, w, next, dodge)) return ApproachEnd::Stopped;
+        // Spotřeba Break Tackle přesně jako move_handler.cpp (P77): první úhyb, kde Síla nahradí Obratnost.
+        if (dodge && w.hasSkill(SkillName::BreakTackle) && !w.breakTackleUsedThisTurn &&
+            w.stats.strength > w.stats.agility) {
+            w.breakTackleUsedThisTurn = true;
         }
         w.position = next;
-        if (w.movementRemaining > 0) --w.movementRemaining;
+        --w.movementRemaining;               // jako move_handler.cpp: při GFI do záporu (dřív se zastavilo na 0)
+        ++steps;
+        landing = w.position;
     }
-    return false;
+    return w.position.distanceTo(target) == 1 ? ApproachEnd::Reached : ApproachEnd::NoPath;
+}
+
+// P149 (06.10.2026): vede doběh blitzu k cíli přes úhyb na `cap`+ a horší?
+// Čítače chůze se tu nepočítají — je to dotaz, ne tah. Nedojde-li hráč, vrací false
+// (takový blitz hra neprovede; vyřazuje ho volající).
+bool blitzApproachHitsDodgeCap(const GameState& state, const Player& player, Position target,
+                               int cap, bool* reachesOut) {
+    Position landing;
+    int steps = 0;
+    const ApproachEnd end = replayBlitzApproach(state, player, target, landing, steps,
+        [&](const GameState& sim, const Player& w, Position next, bool dodge) {
+            return !(dodge && calculateDodgeTarget(sim, w, next, w.position) >= cap);
+        });
+    if (reachesOut) *reachesOut = end != ApproachEnd::NoPath;
+    return end == ApproachEnd::Stopped;
 }
 
 
@@ -713,25 +731,16 @@ double pathFailProb(const GameState& state, const Player& player,
 // musel uhýbat (řadič klece plánuje jen blitz bez hodu při doběhu).
 bool blitzLandingDiceFree(const GameState& state, const Player& player, Position target,
                           Position& landing, int& steps) {
-    steps = 0;
-    landing = player.position;
-    if (player.position.distanceTo(target) <= 1) return true;
-    GameState sim = state.clone();
-    Player& w = sim.getPlayer(player.id);
-    if (w.state == PlayerState::PRONE) {
-        w.movementRemaining = static_cast<int8_t>(movementAfterStandUp(player));
-        w.state = PlayerState::STANDING;
-    }
-    for (int guard = 0; guard < 24 && w.position.distanceTo(target) > 1; ++guard) {
-        Position next;
-        if (!nextStepTowardAdjacentImpl(sim, w, target, next, /*countDiag=*/false)) return false;
-        if (countTacklezones(sim, w.position, w.teamSide) > 0) return false;   // úhyb
-        w.position = next;
-        if (w.movementRemaining > 0) --w.movementRemaining;
-        ++steps;
-    }
-    landing = w.position;
-    return w.position.distanceTo(target) == 1;
+    return replayBlitzApproach(state, player, target, landing, steps,
+               [](const GameState&, const Player&, Position, bool dodge) { return !dodge; })   // úhyb
+           == ApproachEnd::Reached;
+}
+
+bool blitzLandingSquare(const GameState& state, const Player& player, Position target, Position& landing) {
+    int steps = 0;
+    return replayBlitzApproach(state, player, target, landing, steps,
+               [](const GameState&, const Player&, Position, bool) { return true; })
+           == ApproachEnd::Reached;
 }
 
 bool canReachAdjacentTo(const GameState& state, const Player& player,

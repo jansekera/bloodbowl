@@ -11,6 +11,7 @@
 #include "bb/action_resolver.h"   // Q3: resolveAction
 #include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
 #include "bb/pathfinder.h"
+#include "bb/policies.h"      // P227: greedyPolicy (záchrana makro AI)
 #include "bb/kickoff_handler.h"   // P196: resolveKickoff        // KLEC/K5: pathFailProb -- cena ústupu nosiče
 #include <algorithm>
 #include <set>
@@ -4284,6 +4285,70 @@ TEST(MacroActions, P71AHungryVampireIsOfferedOnlyTheWalkToAThrall) {
     EXPECT_EQ(walk->gfiAllowance, 0) << "4 pole na MA 4 nepotrebuji GFI";
 }
 
+// Upír, který už jednou šel přes GFI (MA −1), má zbývající dosah jen 1 pole (2 GFI − 1). Pole vedle Thralla
+// je o 2 dál ⇒ cesta se nenabídne; dřív se dosah počítal z MA oříznutého na 0 (= 2 pole).
+TEST(MacroActions, P71VampirePastGfiDoesNotOverreachToTheThrall) {
+    GameState state = makeMinimalState();
+    Player& v = state.getPlayer(1);                 // na (10,7)
+    v.skills.add(SkillName::Bloodlust);
+    v.bloodlustHungry = true;
+    v.hasMoved = true;
+    state.currentActivationId = 1;
+    Player& t = state.getPlayer(2);
+    t.id = 2; t.teamSide = TeamSide::HOME; t.state = PlayerState::STANDING;
+    t.position = {13, 7}; t.stats = {6, 3, 3, 8}; t.movementRemaining = 6;   // nejbližší pole vedle: (12,x), 2 daleko
+    auto walkOffered = [&](int mr) {
+        v.movementRemaining = static_cast<int8_t>(mr);
+        std::vector<Macro> macros;
+        getAvailableMacros(state, macros);
+        for (const auto& m : macros)
+            if (m.type == MacroType::REPOSITION && m.playerId == 1 && m.targetPos.distanceTo(t.position) == 1) return true;
+        return false;
+    };
+    EXPECT_TRUE(walkOffered(0)) << "pozitivní kontrola: s MA 0 zbývají 2 GFI = 2 pole";
+    EXPECT_FALSE(walkOffered(-1)) << "po jedné GFI zbývá 1 pole — na pole vedle Thralla nedosáhne";
+}
+
+// Upír se Sprintem a MA 0: pole vedle Thralla o 3 dál je na tři GFI (ř. 8487-8490) ⇒ povolené GFI 3, ne 2.
+TEST(MacroActions, P71SprintingVampireGetsThreeGfiToTheThrall) {
+    GameState state = makeMinimalState();
+    Player& v = state.getPlayer(1);                 // na (10,7)
+    v.skills.add(SkillName::Bloodlust);
+    v.skills.add(SkillName::Sprint);
+    v.bloodlustHungry = true;
+    v.hasMoved = true;
+    v.movementRemaining = 0;
+    state.currentActivationId = 1;
+    Player& t = state.getPlayer(2);
+    t.id = 2; t.teamSide = TeamSide::HOME; t.state = PlayerState::STANDING;
+    t.position = {14, 7}; t.stats = {6, 3, 3, 8}; t.movementRemaining = 6;   // nejbližší pole vedle: (13,x), 3 daleko
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* walk = nullptr;
+    for (const auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) walk = &m;
+    ASSERT_NE(walk, nullptr) << "pozitivní kontrola: se Sprintem dosáhne";
+    EXPECT_EQ(walk->targetPos.distanceTo(v.position), 3);
+    EXPECT_EQ(walk->gfiAllowance, 3);
+}
+
+// Riziko SCORE ve vstupu sítě (vlastnost 13): po jedné GFI (MA −1) je pole do endzóny o 1 dál právě
+// jedna GFI, ne dvě.
+TEST(MacroActions, ScoreRiskFeatureCountsGfiFromTheRemainingMove) {
+    GameState state = makeMinimalState();          // aktivní HOME, endzóna x = 25
+    Player& p = state.getPlayer(1);
+    p.position = {24, 7};
+    state.ball = BallState::carried(p.position, 1);
+    const Macro score{MacroType::SCORE, 1, -1, {-1, -1}};
+    float f[NUM_ACTION_FEATURES];
+    p.movementRemaining = 0;
+    extractMacroFeatures(state, score, f);
+    EXPECT_NEAR(f[13], 0.17f, 1e-6) << "pozitivní kontrola: MA 0, jedno pole ⇒ jedna GFI";
+    p.movementRemaining = -1;
+    extractMacroFeatures(state, score, f);
+    EXPECT_NEAR(f[13], 0.17f, 1e-6) << "MA −1 (po jedné GFI), jedno pole ⇒ pořád jedna GFI";
+}
+
 // ---------------------------------------------------------------------------
 // P149 (06.10.2026): strop na úhyb — makra BLITZ a REPOSITION nevedou přes úhyb
 // na 4+ a horší. Výjimky: poslední aktivace tahu; míč v posledním kole poločasu.
@@ -4481,62 +4546,73 @@ TEST(DodgeCap, CarrierMayDodgeInTheLastTurnOfTheHalf) {
     }
 }
 
+// Náhodná pozice pro doběh blitzu: blitzující 1 (HOME, náhodně Dodge, Break Tackle, ležící),
+// cíl 12 (AWAY) aspoň dvě pole daleko, 1–7 soupeřů (někteří s Tackle), 0–4 spoluhráči, míč u
+// spoluhráče nebo u cíle (sestavil reviewer 06.10.). Vrací false, když se cíl nepodařilo umístit.
+struct SixDice : DiceRollerBase {
+    int rollD6() override { return 6; }
+    int rollD8() override { return 1; }
+};
+static bool randomBlitzBoard(std::mt19937& rng, GameState& s, Position& tp) {
+    auto R = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
+    s = GameState{};
+    s.phase = GamePhase::PLAY; s.activeTeam = TeamSide::HOME; s.half = 1;
+    s.homeTeam.turnNumber = 3; s.weather = Weather::NICE;
+    Position c{static_cast<int8_t>(R(6, 19)), static_cast<int8_t>(R(4, 10))};
+    auto place = [&](int id, TeamSide side, Position pos) -> Player* {
+        if (!pos.isOnPitch() || s.getPlayerAtPosition(pos)) return nullptr;
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+        p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
+        return &p;
+    };
+    Player* b = place(1, TeamSide::HOME, c);
+    b->stats = {static_cast<int8_t>(R(4, 8)), static_cast<int8_t>(R(2, 5)), static_cast<int8_t>(R(2, 4)), 8};
+    b->movementRemaining = b->stats.movement;
+    if (R(0, 1)) b->skills.add(SkillName::Dodge);
+    if (R(0, 1)) b->skills.add(SkillName::BreakTackle);
+    if (R(0, 3) == 0) b->state = PlayerState::PRONE;
+    tp = {-1, -1};
+    Player* t = nullptr;
+    for (int k = 0; k < 50 && !t; ++k) {
+        tp = {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))};
+        if (tp.distanceTo(c) >= 2) t = place(12, TeamSide::AWAY, tp);
+    }
+    if (!t) return false;
+    const int na = R(1, 7);
+    for (int i = 0; i < na; ++i) {
+        Player* a = place(13 + i, TeamSide::AWAY,
+                          {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+        if (a && R(0, 5) == 0) a->skills.add(SkillName::Tackle);
+    }
+    const int nh = R(0, 4);
+    for (int i = 0; i < nh; ++i) {
+        place(2 + i, TeamSide::HOME,
+              {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
+    }
+    if (R(0, 1) && s.getPlayer(2).isOnPitch()) s.ball = BallState::carried(s.getPlayer(2).position, 2);
+    else s.ball = BallState::carried(tp, 12);
+    return true;
+}
+
 // Jeden test na místě, kudy prochází všechno: předpověď stropu proti SKUTEČNÉ chůzi blitzu
 // (smyčka hry: nextStepTowardAdjacent + resolveMoveStep, všechny hody 6). Náhodné pozice
 // s Dodge, Break Tackle, Tackle, ležícím blitzujícím a vlastním nosičem (sestavil reviewer
 // 06.10.; první verze dotazu tu měla 337 úniků z 30 000).
 TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
-    struct Six : DiceRollerBase {
-        int rollD6() override { return 6; }
-        int rollD8() override { return 1; }
-    };
     std::mt19937 rng(12345);
-    auto R = [&](int a, int b) { return std::uniform_int_distribution<int>(a, b)(rng); };
     int checked = 0, walksWithRiskyDodge = 0, leaks = 0, falseBlocks = 0, reachMismatch = 0;
     for (int it = 0; it < 2500; ++it) {
         GameState s;
-        s.phase = GamePhase::PLAY; s.activeTeam = TeamSide::HOME; s.half = 1;
-        s.homeTeam.turnNumber = 3; s.weather = Weather::NICE;
-        Position c{static_cast<int8_t>(R(6, 19)), static_cast<int8_t>(R(4, 10))};
-        auto place = [&](int id, TeamSide side, Position pos) -> Player* {
-            if (!pos.isOnPitch() || s.getPlayerAtPosition(pos)) return nullptr;
-            Player& p = s.getPlayer(id);
-            p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
-            p.position = pos; p.stats = {6, 3, 3, 8}; p.movementRemaining = 6;
-            return &p;
-        };
-        Player* b = place(1, TeamSide::HOME, c);
-        b->stats = {static_cast<int8_t>(R(4, 8)), static_cast<int8_t>(R(2, 5)), static_cast<int8_t>(R(2, 4)), 8};
-        b->movementRemaining = b->stats.movement;
-        if (R(0, 1)) b->skills.add(SkillName::Dodge);
-        if (R(0, 1)) b->skills.add(SkillName::BreakTackle);
-        if (R(0, 3) == 0) b->state = PlayerState::PRONE;
-        Position tp{-1, -1};
-        Player* t = nullptr;
-        for (int k = 0; k < 50 && !t; ++k) {
-            tp = {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))};
-            if (tp.distanceTo(c) >= 2) t = place(12, TeamSide::AWAY, tp);
-        }
-        if (!t) continue;
-        const int na = R(1, 7);
-        for (int i = 0; i < na; ++i) {
-            Player* a = place(13 + i, TeamSide::AWAY,
-                              {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
-            if (a && R(0, 5) == 0) a->skills.add(SkillName::Tackle);
-        }
-        const int nh = R(0, 4);
-        for (int i = 0; i < nh; ++i) {
-            place(2 + i, TeamSide::HOME,
-                  {static_cast<int8_t>(c.x + R(-5, 5)), static_cast<int8_t>(c.y + R(-4, 4))});
-        }
-        if (R(0, 1) && s.getPlayer(2).isOnPitch()) s.ball = BallState::carried(s.getPlayer(2).position, 2);
-        else s.ball = BallState::carried(tp, 12);
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        const Player* b = &s.getPlayer(1);
 
         bool predReaches = true;
         const bool predHit = blitzApproachHitsDodgeCap(s, *b, tp, 4, &predReaches);
 
         GameState w = s.clone();
-        Six dice;
+        SixDice dice;
         Player& wb = w.getPlayer(1);
         if (wb.state == PlayerState::PRONE) {
             if (!resolveStandUp(w, 1, dice, nullptr).success) continue;
@@ -4569,6 +4645,83 @@ TEST(DodgeCap, BlitzPredictionMatchesTheRealWalk) {
     EXPECT_EQ(leaks, 0);                     // chůze by hodila úhyb 4+ a horší, dotaz to neviděl
     EXPECT_EQ(falseBlocks, 0);               // dotaz zakázal doběh, který takový úhyb nemá
     EXPECT_EQ(reachMismatch, 0);             // „dojde / nedojde“ se shoduje s chůzí
+}
+
+// P227 review H1 (23.10.2026): pole dopadu, ze kterého P227 počítá kostky bloku, proti SKUTEČNÉ
+// chůzi blitzu (všechny hody 6, takže každý úhyb projde a Break Tackle se spotřebuje jako ve hře).
+// Dřív `blitzLandingSquare` Break Tackle nespotřebovávala a po prvním úhybu hledala cestu, jako by
+// ho měl blitzující pořád — předpověděný dopad se pak lišil od skutečného.
+TEST(DodgeCap, BlitzLandingMatchesTheRealWalk) {
+    std::mt19937 rng(777);
+    int checked = 0, withBreakTackleDodge = 0, mismatches = 0;
+    for (int it = 0; it < 4000; ++it) {
+        GameState s;
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        Position predicted;
+        const bool predReaches = blitzLandingSquare(s, s.getPlayer(1), tp, predicted);
+
+        GameState w = s.clone();
+        SixDice dice;
+        Player& wb = w.getPlayer(1);
+        if (wb.state == PlayerState::PRONE && !resolveStandUp(w, 1, dice, nullptr).success) continue;
+        bool reached = true, btDodge = false;
+        for (int guard = 0; wb.position.distanceTo(tp) > 1; ++guard) {
+            Position nx;
+            if (guard > 30 || !nextStepTowardAdjacent(w, wb, tp, nx)) { reached = false; break; }
+            const bool btBefore = wb.breakTackleUsedThisTurn;
+            const Position before = wb.position;
+            auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+            if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
+            if (!btBefore && wb.breakTackleUsedThisTurn) btDodge = true;
+        }
+        ++checked;
+        if (btDodge) ++withBreakTackleDodge;
+        if (predReaches != reached || (reached && predicted != wb.position)) ++mismatches;
+    }
+    EXPECT_GT(checked, 2500);
+    EXPECT_GT(withBreakTackleDodge, 100);    // pozitivní kontrola: doběhy, kde se Break Tackle spotřebuje
+    EXPECT_EQ(mismatches, 0);                // předpověď dopadu = skutečné pole, odkud hra blokuje
+}
+
+// Review P227 26.10.2026: přehrání doběhu neodečítalo krok pod nulu (`if (movementRemaining > 0)`),
+// hra ale při GFI jde do záporu (move_handler.cpp) — rozpočet GFI tak v přehrání zůstával celý.
+// Stejné pozice jako výš, jen blitzující má Sprint (3 GFI) a na začátku málo pohybu (0–2): se dvěma GFI
+// doběh skončí dřív, než pohyb klesne pod nulu, takže se vada ukáže jen se Sprintem.
+TEST(DodgeCap, BlitzLandingMatchesTheRealWalkThroughGfi) {
+    std::mt19937 rng(4242);
+    int checked = 0, withGfi = 0, mismatches = 0;
+    for (int it = 0; it < 6000; ++it) {
+        GameState s;
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        Player& b = s.getPlayer(1);
+        b.state = PlayerState::STANDING;
+        b.skills.add(SkillName::Sprint);     // 3 GFI: jen tak může pohyb klesnout pod nulu a doběh ještě pokračovat
+        b.movementRemaining = static_cast<int8_t>(std::uniform_int_distribution<int>(0, 2)(rng));
+        Position predicted;
+        const bool predReaches = blitzLandingSquare(s, b, tp, predicted);
+
+        GameState w = s.clone();
+        SixDice dice;
+        Player& wb = w.getPlayer(1);
+        bool reached = true;
+        for (int guard = 0; wb.position.distanceTo(tp) > 1; ++guard) {
+            Position nx;
+            if (guard > 30 || !nextStepTowardAdjacent(w, wb, tp, nx)) { reached = false; break; }
+            const Position before = wb.position;
+            auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+            if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
+        }
+        ++checked;
+        if (reached && wb.movementRemaining < -1) ++withGfi;   // aspoň dvě GFI
+        if (predReaches != reached || (reached && predicted != wb.position)) ++mismatches;
+    }
+    EXPECT_GT(checked, 4000);
+    // Pozitivní kontrola míří na kategorii vady: na starém kódu bylo 21 z 25 rozdílů právě v doběhu, který
+    // došel přes dvě GFI (pak přehrání s rozpočtem oříznutým na 0 zvolilo jinou cestu a jiné pole dopadu).
+    EXPECT_GT(withGfi, 200);
+    EXPECT_EQ(mismatches, 0);
 }
 
 TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {
@@ -4956,4 +5109,259 @@ TEST(MacroActions, P219bTheEscapeComparesTheDodgeRiskWithTheRiskOfStaying) {
     EXPECT_TRUE(escapes(3, true, 0)) << "AG3 vedle Mighty Blow odskočí";
     EXPECT_TRUE(escapes(4, false, 0)) << "AG4 odskakuje";
     EXPECT_FALSE(escapes(3, true, kP219bEscapeByRisk)) << "pozitivní kontrola: bez P219b AG3 bez Dodge nikdy";
+}
+
+// ⭐ P227 (uživatel 21.10.2026: „Tři proti nedává smysl ani proti nosiči“; ke dvěma proti volba „3b“ =
+//   jen na nosiče míče). AI nenabízí ani nevybírá blitz, kde kostky volí obránce ze 3+ kostek (nikdy),
+//   ze 2 kostek jen na soupeřova nosiče. Kostky = podepsaný počet z pole, odkud se bude blokovat (P35).
+//   Podklad: evidence/prazdne_blitzy_20261021/vysledek.md (22/184 blitzů, turnover 41 %).
+namespace {
+Player& p227Put(GameState& s, int id, TeamSide side, Position pos, PlayerStats st) {
+    Player& p = s.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING;
+    p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    p.hasMoved = false; p.hasActed = false;
+    return p;
+}
+bool offersBlitzOn(const GameState& state, int targetId) {
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    for (const Macro& m : macros)
+        if (m.type == MacroType::BLITZ && m.targetId == targetId) return true;
+    return false;
+}
+// Obrana: náš jediný hráč 1 (síla 2) na (10,7), soupeřův nosič 12 na (14,7) — dosáhne bez úhybu.
+GameState p227CarrierState(int8_t carrierST) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {14, 7}, {6, carrierST, 3, 8});
+    s.ball = BallState::carried({14, 7}, 12);
+    return s;
+}
+// Maska se po testu vrací na hodnotu PŘED testem (review L1), ne natvrdo na 0.
+struct P227Off {
+    explicit P227Off(unsigned m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
+    ~P227Off() { setExtraFeaturesOff(saved); }
+    unsigned saved;
+};
+}  // namespace
+
+TEST(MacroActions, P227NoBlitzIntoThreeDiceAgainstEvenOnTheCarrier) {
+    P227Off on(0);
+    const GameState s = p227CarrierState(5);   // 2 proti 5 ⇒ obránce volí ze 3
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -3) << "fixtura: 3 kostky proti";
+    EXPECT_FALSE(offersBlitzOn(s, 12)) << "3 proti se nenabízí ani na nosiče";
+}
+
+TEST(MacroActions, P227TwoDiceAgainstStayOfferedOnTheCarrier) {
+    P227Off on(0);
+    const GameState s = p227CarrierState(3);   // 2 proti 3 ⇒ obránce volí ze 2
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -2) << "fixtura: 2 kostky proti";
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "2 proti na soupeřova nosiče zůstává";
+}
+
+TEST(MacroActions, P227SwitchedOffTheOldOfferReturns) {
+    P227Off off(kP227BlitzDice);
+    const GameState s = p227CarrierState(5);
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "pozitivní kontrola: s vypnutým P227 se 3 proti nabízí jako dřív";
+}
+
+// Obrana, nosič 12 daleko (nedosáhne). Soupeř 13 (síla 4) ⇒ 2 proti, není nosič; soupeř 14 (síla 2) ⇒ 1 kostka
+// pro nás. Dřív se v obraně nabízely oba (nejvýš 2 cíle); teď jen 14.
+TEST(MacroActions, P227TwoDiceAgainstOffTheCarrierAreNotOfferedTheBetterTargetIs) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, 2, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {24, 13}, {6, 3, 3, 8});
+    p227Put(s, 13, TeamSide::AWAY, {14, 5}, {6, 4, 3, 8});
+    p227Put(s, 14, TeamSide::AWAY, {14, 10}, {6, 2, 3, 8});
+    s.ball = BallState::carried({24, 13}, 12);
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(13)), -2);
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(14)), 1);
+    {
+        P227Off on(0);
+        EXPECT_FALSE(offersBlitzOn(s, 13)) << "2 proti mimo nosiče se nenabízí";
+        EXPECT_TRUE(offersBlitzOn(s, 14)) << "1 kostka pro nás beze změny";
+    }
+    P227Off off(kP227BlitzDice);
+    EXPECT_TRUE(offersBlitzOn(s, 13)) << "pozitivní kontrola: dřív se nabízel";
+}
+
+// Výběr blitzujícího (pickBlitzer): hráč 1 vedle nosiče 12 má 3 proti, ale se Strip Ball a Wrestle by ho
+// podle odhadu „srazí / vyrazí míč“ vybral (0,58 proti 0,31). Hráč 2 (síla 5) doběhne a má 2 pro nás.
+TEST(MacroExpansion, P227BlitzerWithThreeDiceAgainstIsNotPicked) {
+    auto pick = [](unsigned off) {
+        P227Off o(off);
+        GameState s = makeMinimalState();
+        Player& t = p227Put(s, 12, TeamSide::AWAY, {15, 7}, {6, 5, 3, 8});
+        t.skills.add(SkillName::Block);
+        t.skills.add(SkillName::Dodge);
+        Player& a = p227Put(s, 1, TeamSide::HOME, {14, 7}, {6, 2, 3, 8});
+        a.skills.add(SkillName::StripBall);
+        a.skills.add(SkillName::Wrestle);
+        p227Put(s, 2, TeamSide::HOME, {11, 7}, {6, 5, 3, 8});
+        s.ball = BallState::carried({15, 7}, 12);
+        EXPECT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -3) << "fixtura";
+        FixedDiceRoller dice(std::vector<int>(40, 6));
+        const auto r = greedyExpandMacro(s, Macro{MacroType::BLITZ, -1, 12, {-1, -1}}, dice);
+        return r.actions.empty() || r.actions[0].type != ActionType::BLITZ ? -1 : r.actions[0].playerId;
+    };
+    EXPECT_EQ(pick(kP227BlitzDice), 1) << "pozitivní kontrola: bez P227 se vybral hráč se 3 proti";
+    EXPECT_EQ(pick(0), 2) << "blitzující se 3 proti se nevybere, když jiný na týž cíl smí";
+}
+
+// BLITZ_AND_SCORE je taky blitz: nosič 1 (síla 3) by blokujícího 12 (síla 5, není nosič) blitzoval 2 proti.
+TEST(MacroActions, P227BlitzAndScoreIsNotOfferedWithTwoDiceAgainst) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {17, 7}, {6, 3, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {19, 7}, {6, 5, 3, 8});
+    s.ball = BallState::carried({17, 7}, 1);
+    auto offered = [&](unsigned off) {
+        P227Off o(off);
+        std::vector<Macro> macros;
+        getAvailableMacros(s, macros);
+        return hasMacroType(macros, MacroType::BLITZ_AND_SCORE);
+    };
+    EXPECT_TRUE(offered(kP227BlitzDice)) << "pozitivní kontrola: dřív se nabízel";
+    EXPECT_FALSE(offered(0)) << "BLITZ_AND_SCORE do 2 proti mimo nosiče se nenabízí";
+    s.getPlayer(12).stats.strength = 3;
+    EXPECT_TRUE(offered(0)) << "1 kostka pro nás beze změny";
+}
+
+// Rat Ogre: ohlášení blitzu bez cíle (P156, cíl −1) kvůli hodu Wild Animal na 2+ se P227 netýká — i když
+// jediný soupeř v dosahu je 3 proti (blitz na něj se nenabídne).
+TEST(MacroActions, P227TargetlessWildAnimalBlitzStaysOffered) {
+    P227Off on(0);
+    GameState s = wildAnimalState(true);
+    Player& ogre = s.getPlayer(1);
+    ogre.position = {3, 3};
+    ogre.stats.strength = 2;
+    p227Put(s, 13, TeamSide::AWAY, {6, 3}, {6, 5, 3, 8});   // nosič 12 zůstává daleko (22,2)
+    ASSERT_EQ(blockDiceCount(s, ogre, s.getPlayer(13)), -3);
+    EXPECT_FALSE(offersBlitzOn(s, 13));
+    EXPECT_TRUE(offersTargetlessBlitz(s, 1)) << "primitivní ohlášení bez cíle zůstává";
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+    bool viaBlitz = false;
+    for (const Macro& m : macros) viaBlitz |= (m.type == MacroType::REPOSITION && m.playerId == 1 && m.declareBlitz);
+    EXPECT_TRUE(viaBlitz) << "přesun s ohlášeným blitzem (2+) zůstává v nabídce";
+}
+
+// Záchrana makro AI (macro_mcts.cpp, GREEDY_FALLBACK) hraje greedyPolicy — ta brala první blitz bez ohledu na
+// kostky. Sonda P227 tudy našla blitz 2 proti mimo nosiče (wood-elf × human, hra 1, útok, tah 6).
+TEST(MacroActions, P227GreedyPolicyDoesNotBlitzIntoThreeDiceAgainst) {
+    auto picksBlitz = [](unsigned off) {
+        P227Off o(off);
+        const GameState s = p227CarrierState(5);
+        FixedDiceRoller dice(std::vector<int>(10, 1));
+        const Action a = greedyPolicy(s, dice);
+        return a.type == ActionType::BLITZ && a.targetId == 12;
+    };
+    EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 3 proti";
+    EXPECT_FALSE(picksBlitz(0)) << "greedy (i jako záchrana makro AI) nevybere blitz 3 proti";
+}
+
+// --- P227 doplněno po review 23.10.2026 (M1) a rozhodnutí o Dauntless (uživatel 26.10. „2 ano“) ---
+namespace {
+// Útok mimo nosiče: náš 1 na (10,7), soupeř 13 (není nosič) na (14,7), soupeřův nosič 12 daleko.
+GameState p227OffCarrier(int8_t attST, int8_t defST) {
+    GameState s = makeMinimalState();
+    p227Put(s, 1, TeamSide::HOME, {10, 7}, {6, attST, 3, 8});
+    p227Put(s, 13, TeamSide::AWAY, {14, 7}, {6, defST, 3, 8});
+    p227Put(s, 12, TeamSide::AWAY, {24, 13}, {6, 3, 3, 8});
+    s.ball = BallState::carried({24, 13}, 12);
+    return s;
+}
+}  // namespace
+
+// Kostky se počítají z pole DOPADU, ne ze startu (P35): soupeř 15 na (13,7) asistuje proti každému poli
+// vedle cíle na naší straně, ale ne proti startu. Ze startu 1 kostka pro nás, z dopadu 2 proti.
+TEST(MacroActions, P227DiceAreCountedFromTheLandingSquareNotTheStart) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 3);
+    p227Put(s, 15, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});
+    Position landing;
+    ASSERT_TRUE(blitzLandingSquare(s, s.getPlayer(1), s.getPlayer(13).position, landing));
+    ASSERT_NE(landing, s.getPlayer(1).position);
+    ASSERT_EQ(landing.distanceTo(Position{13, 7}), 1) << "fixtura: dopad vedle asistujícího 15";
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(13)), 1) << "fixtura: ze startu 1 pro nás";
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "z dopadu 3 proti 4 ⇒ 2 proti mimo nosiče";
+    s.getPlayer(15).position = {20, 2};
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez asistence 1 kostka";
+}
+
+// Guard (ř. pravidel Guard): náš 2 asistuje, i když ho markuje soupeř 16 ⇒ 3+1 proti 4 = 1 kostka.
+TEST(MacroActions, P227GuardAssistInAnOpponentsZoneCounts) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 4);
+    p227Put(s, 2, TeamSide::HOME, {15, 6}, {6, 3, 3, 8});
+    p227Put(s, 16, TeamSide::AWAY, {16, 5}, {6, 3, 3, 8});
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "bez Guard asistence neplatí ⇒ 2 proti";
+    s.getPlayer(2).skills.add(SkillName::Guard);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "s Guard 4 proti 4 ⇒ 1 kostka";
+}
+
+// Horns (+1 síla při blitzu): 3 proti 4 je 2 proti, s Horns 4 proti 4 = 1 kostka.
+TEST(MacroActions, P227HornsTurnTwoAgainstIntoOne) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 4);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+    s.getPlayer(1).skills.add(SkillName::Horns);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+}
+
+// Dauntless (ř. 8023-8033): D6 + síla > síla soupeře ⇒ stejná síla. Uživatel 26.10.: povolit, když se
+// povede aspoň ve 2 ze 3 (rozdíl sil ≤ 2) a kostky po úspěchu projdou prahem.
+TEST(MacroActions, P227DauntlessAllowsTheBlitzWithinTwoStrength) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(3, 5);                       // 3 proti 5 ⇒ 2 proti, rozdíl 2 (šance 4/6)
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Dauntless ne";
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "Dauntless 4/6 ⇒ 5 proti 5";
+}
+
+TEST(MacroActions, P227DauntlessBeyondTwoStrengthStaysForbidden) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 5);                       // rozdíl 3 ⇒ šance 3/6 < 2/3
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+    s.getPlayer(13).stats.strength = 4;                       // rozdíl 2 ⇒ šance 4/6
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola hranice";
+}
+
+// Horns vstupuje i do rozdílu sil u Dauntless (review 26.10.): 2 + Horns proti 5 = rozdíl 2 ⇒ smí;
+// bez Horns rozdíl 3 ⇒ ne.
+TEST(MacroActions, P227DauntlessGapCountsHorns) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 5);
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Horns rozdíl 3";
+    s.getPlayer(1).skills.add(SkillName::Horns);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13)));
+}
+
+// Dauntless vyrovná jen sílu, asistence zůstávají: 2 proti 4 + asistence = 2 proti 5 ⇒ 3 proti (víc než
+// dvojnásobek); po úspěchu 4 proti 5 ⇒ 2 proti — na nosiče smí, mimo nosiče ne.
+TEST(MacroActions, P227DauntlessMustAlsoPassTheThresholdAfterSuccess) {
+    P227Off on(0);
+    GameState s = p227OffCarrier(2, 4);
+    p227Put(s, 15, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});
+    s.ball = BallState::carried({14, 7}, 13);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "pozitivní kontrola: bez Dauntless 3 proti";
+    s.getPlayer(1).skills.add(SkillName::Dauntless);
+    EXPECT_TRUE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "na nosiče: po úspěchu 2 proti smí";
+    s.ball = BallState::carried({24, 13}, 12);
+    EXPECT_FALSE(blitzDiceAllowed(s, s.getPlayer(1), s.getPlayer(13))) << "mimo nosiče: po úspěchu 2 proti nesmí";
+}
+
+// Záchrana makro AI (greedyPolicy) a 2 proti MIMO nosiče (review M1: dosud jen 3 proti).
+TEST(MacroActions, P227GreedyPolicyDoesNotBlitzTwoAgainstOffTheCarrier) {
+    auto picksBlitz = [](unsigned off) {
+        P227Off o(off);
+        const GameState s = p227OffCarrier(2, 3);
+        FixedDiceRoller dice(std::vector<int>(10, 1));
+        const Action a = greedyPolicy(s, dice);
+        return a.type == ActionType::BLITZ && a.targetId == 13;
+    };
+    EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 2 proti";
+    EXPECT_FALSE(picksBlitz(0));
 }
