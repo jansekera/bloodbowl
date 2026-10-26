@@ -1,0 +1,94 @@
+tahů celkem 466
+
+## všichni — 466 tahů
+
+| na 100 tahů | P220 zap. | vyp. (128) | rozdíl ± SE | σ párově |
+|---|---:|---:|---:|---:|
+| agilní blok | 42.7 | 43.3 | -0.6 ± 0.6 | 13.9 |
+| agilní stal | 37.6 | 37.1 | +0.4 ± 0.4 | 9.3 |
+| agilní nosic | 8.8 | 8.6 | +0.2 ± 0.2 | 4.6 |
+| agilní asist | 7.1 | 7.5 | -0.4 ± 0.5 | 11.4 |
+| agilní jen_dosel | 29.6 | 33.3 | -3.6 ± 1.4 | 30.2 |
+| agilní jine | 0.0 | 0.0 | +0.0 ± 0.0 | 0.0 |
+|   z toho jen_dosel u našeho nosiče | 3.9 | 6.0 | -2.1 ± 0.8 | 17.2 |
+|   z toho jen_dosel bez pohybu | 23.0 | 21.7 | +1.3 ± 0.8 | 17.3 |
+| agilní v kontaktu sraženi v odpovědi | 33.5 | 35.4 | -1.9 ± 1.2 | 24.9 |
+|   z toho jen_dosel sraženi | 8.8 | 10.9 | -2.1 ± 0.7 | 15.9 |
+| naši v kontaktu celkem | 228.5 | 231.8 | -3.2 ± 1.8 | 39.5 |
+| naši sraženi v odpovědi (všichni) | 82.0 | 83.0 | -1.1 ± 1.2 | 26.6 |
+| turnover našeho tahu | 21.5 | 21.5 | +0.0 ± 0.3 | 6.6 |
+| soupeři sraženi naším tahem | 75.3 | 76.6 | -1.3 ± 0.7 | 16.0 |
+| blitzy | 84.8 | 85.0 | -0.2 ± 0.2 | 4.6 |
+|   agilní blitzy | 47.6 | 48.1 | -0.4 ± 0.4 | 9.3 |
+|   blitz → srazen | 28.1 | 28.5 | -0.4 ± 0.4 | 9.3 |
+|   blitz → posun | 25.3 | 25.5 | -0.2 ± 0.5 | 10.4 |
+|   blitz → padl_blitzujici | 10.3 | 10.3 | +0.0 ± 0.0 | 0.0 |
+|   blitz → bez_ucinku | 15.0 | 14.6 | +0.4 ± 0.5 | 11.4 |
+|   blitz → oba_lezi | 3.4 | 3.6 | -0.2 ± 0.2 | 4.6 |
+|   blitz → bez_bloku | 2.6 | 2.4 | +0.2 ± 0.2 | 4.6 |
+|   blitzující v kontaktu na konci | 23.4 | 23.4 | +0.0 ± 0.3 | 6.6 |
+|   blitzující sražen v odpovědi | 9.4 | 9.2 | +0.2 ± 0.4 | 8.0 |
+
+## wood-elf — 229 tahů
+
+| na 100 tahů | P220 zap. | vyp. (128) | rozdíl ± SE | σ párově |
+|---|---:|---:|---:|---:|
+| agilní blok | 74.2 | 75.1 | -0.9 ± 1.2 | 18.7 |
+| agilní stal | 52.8 | 51.5 | +1.3 ± 0.8 | 11.4 |
+| agilní nosic | 9.2 | 8.7 | +0.4 ± 0.4 | 6.6 |
+| agilní asist | 11.4 | 11.8 | -0.4 ± 1.0 | 14.8 |
+| agilní jen_dosel | 41.5 | 45.0 | -3.5 ± 2.4 | 36.1 |
+| agilní jine | 0.0 | 0.0 | +0.0 ± 0.0 | 0.0 |
+|   z toho jen_dosel u našeho nosiče | 5.7 | 7.9 | -2.2 ± 1.3 | 19.7 |
+|   z toho jen_dosel bez pohybu | 34.1 | 31.4 | +2.6 ± 1.5 | 22.8 |
+| agilní v kontaktu sraženi v odpovědi | 53.7 | 55.0 | -1.3 ± 2.1 | 31.7 |
+|   z toho jen_dosel sraženi | 12.2 | 14.4 | -2.2 ± 1.1 | 17.4 |
+| naši v kontaktu celkem | 206.6 | 209.2 | -2.6 ± 2.9 | 43.9 |
+| naši sraženi v odpovědi (všichni) | 75.5 | 76.9 | -1.3 ± 2.3 | 34.4 |
+| turnover našeho tahu | 17.9 | 17.5 | +0.4 ± 0.4 | 6.6 |
+| soupeři sraženi naším tahem | 78.6 | 79.5 | -0.9 ± 1.2 | 18.7 |
+| blitzy | 83.4 | 83.8 | -0.4 ± 0.4 | 6.6 |
+|   agilní blitzy | 71.6 | 72.9 | -1.3 ± 0.8 | 11.4 |
+|   blitz → srazen | 27.5 | 27.9 | -0.4 ± 0.8 | 11.5 |
+|   blitz → posun | 22.3 | 22.7 | -0.4 ± 0.8 | 11.5 |
+|   blitz → padl_blitzujici | 11.4 | 11.4 | +0.0 ± 0.0 | 0.0 |
+|   blitz → bez_ucinku | 17.5 | 17.0 | +0.4 ± 0.8 | 11.5 |
+|   blitz → oba_lezi | 4.8 | 4.8 | +0.0 ± 0.0 | 0.0 |
+|   blitz → bez_bloku | 0.0 | 0.0 | +0.0 ± 0.0 | 0.0 |
+|   blitzující v kontaktu na konci | 20.1 | 19.7 | +0.4 ± 0.4 | 6.6 |
+|   blitzující sražen v odpovědi | 8.3 | 7.9 | +0.4 ± 0.8 | 11.5 |
+
+## skaven — 237 tahů
+
+| na 100 tahů | P220 zap. | vyp. (128) | rozdíl ± SE | σ párově |
+|---|---:|---:|---:|---:|
+| agilní blok | 12.2 | 12.7 | -0.4 ± 0.4 | 6.5 |
+| agilní stal | 22.8 | 23.2 | -0.4 ± 0.4 | 6.5 |
+| agilní nosic | 8.4 | 8.4 | +0.0 ± 0.0 | 0.0 |
+| agilní asist | 3.0 | 3.4 | -0.4 ± 0.4 | 6.5 |
+| agilní jen_dosel | 18.1 | 21.9 | -3.8 ± 1.5 | 23.2 |
+| agilní jine | 0.0 | 0.0 | +0.0 ± 0.0 | 0.0 |
+|   z toho jen_dosel u našeho nosiče | 2.1 | 4.2 | -2.1 ± 0.9 | 14.4 |
+|   z toho jen_dosel bez pohybu | 12.2 | 12.2 | +0.0 ± 0.6 | 9.2 |
+| agilní v kontaktu sraženi v odpovědi | 13.9 | 16.5 | -2.5 ± 1.0 | 15.7 |
+|   z toho jen_dosel sraženi | 5.5 | 7.6 | -2.1 ± 0.9 | 14.4 |
+| naši v kontaktu celkem | 249.8 | 253.6 | -3.8 ± 2.3 | 34.8 |
+| naši sraženi v odpovědi (všichni) | 88.2 | 89.0 | -0.8 ± 1.0 | 15.9 |
+| turnover našeho tahu | 24.9 | 25.3 | -0.4 ± 0.4 | 6.5 |
+| soupeři sraženi naším tahem | 72.2 | 73.8 | -1.7 ± 0.8 | 12.9 |
+| blitzy | 86.1 | 86.1 | +0.0 ± 0.0 | 0.0 |
+|   agilní blitzy | 24.5 | 24.1 | +0.4 ± 0.4 | 6.5 |
+|   blitz → srazen | 28.7 | 29.1 | -0.4 ± 0.4 | 6.5 |
+|   blitz → posun | 28.3 | 28.3 | +0.0 ± 0.6 | 9.2 |
+|   blitz → padl_blitzujici | 9.3 | 9.3 | +0.0 ± 0.0 | 0.0 |
+|   blitz → bez_ucinku | 12.7 | 12.2 | +0.4 ± 0.7 | 11.3 |
+|   blitz → oba_lezi | 2.1 | 2.5 | -0.4 ± 0.4 | 6.5 |
+|   blitz → bez_bloku | 5.1 | 4.6 | +0.4 ± 0.4 | 6.5 |
+|   blitzující v kontaktu na konci | 26.6 | 27.0 | -0.4 ± 0.4 | 6.5 |
+|   blitzující sražen v odpovědi | 10.5 | 10.5 | +0.0 ± 0.0 | 0.0 |
+- wood-elf × dwarf: 85 tahů, jen_dosel na 100 tahů 37.6 (zap.) × 35.3 (vyp.)
+- wood-elf × orc: 75 tahů, jen_dosel na 100 tahů 42.7 (zap.) × 45.3 (vyp.)
+- wood-elf × human: 69 tahů, jen_dosel na 100 tahů 44.9 (zap.) × 56.5 (vyp.)
+- skaven × dwarf: 82 tahů, jen_dosel na 100 tahů 18.3 (zap.) × 22.0 (vyp.)
+- skaven × orc: 80 tahů, jen_dosel na 100 tahů 10.0 (zap.) × 16.2 (vyp.)
+- skaven × human: 75 tahů, jen_dosel na 100 tahů 26.7 (zap.) × 28.0 (vyp.)

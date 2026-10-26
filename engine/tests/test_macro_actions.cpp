@@ -4831,6 +4831,7 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
                                 {"orc", "human"}, {"skaven", "wood-elf"}};
     int failed[static_cast<int>(MacroType::MACRO_COUNT)] = {0};
     int offered = 0, midActivation = 0;
+    const long p220Before = p220StopsTotal();
     for (int seed = 1; seed <= 10; ++seed) {
         const auto& rs = rosters[seed % 5];
         GameState state;
@@ -4861,6 +4862,8 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
     }
     ASSERT_GT(offered, 300) << "pozitivní kontrola: test musí projít dost nabídek";
     ASSERT_GT(midActivation, 20) << "pozitivní kontrola: pozice uprostřed aktivace musí nastat";
+    // Review P220 (26.10.): invariant musí projít i přes zastavení P220 — vzorek ho musí obsahovat.
+    ASSERT_GT(p220StopsTotal() - p220Before, 0) << "pozitivní kontrola: P220 v testu aspoň jednou zastavilo";
     std::string report;
     int total = 0;
     for (int t = 0; t < static_cast<int>(MacroType::MACRO_COUNT); ++t) {
@@ -5364,4 +5367,127 @@ TEST(MacroActions, P227GreedyPolicyDoesNotBlitzTwoAgainstOffTheCarrier) {
     };
     EXPECT_TRUE(picksBlitz(kP227BlitzDice)) << "pozitivní kontrola: bez P227 greedy blitzuje 2 proti";
     EXPECT_FALSE(picksBlitz(0));
+// ⭐ P220 (uživatel 20.10.2026: „bez plánu asistence pro blitz [agilní] nemají [docházet k soupeři a označit ho]
+// vůbec“; výjimka: markování nosiče míče v obraně; platí pro VŠECHNY agilní = AG4+ nebo AG3 s Dodge). Agilní hráč
+// neskončí přesun v tackle zóně soupeře, leda (a) markuje jejich nosiče, (b) je asistencí bloku/blitzu, který se
+// v tomto tahu ještě může hodit (pravidla ř. 1662–1668: asistent stojí u cíle a není v zóně jiného soupeře,
+// Guard výjimkou), (c) blokuje/blitzuje sám. Když nemá kam, zůstane na posledním volném poli.
+// Deska: náš hráč 1 na (3,7) jde přesunem na (7,7), vedle soupeře 12 na (8,7); míč leží daleko.
+namespace {
+GameState p220Board(int8_t ag, bool dodge) {
+    GameState s = makeMinimalState();
+    Player& me = s.getPlayer(1);
+    me.position = {3, 7};
+    me.stats = {7, 3, ag, 7};
+    me.movementRemaining = 7;
+    if (dodge) me.skills.add(SkillName::Dodge);
+    s.getPlayer(12).position = {8, 7};
+    s.ball = BallState::onGround({20, 2});
+    return s;
+}
+void p220Mate(GameState& s, int id, Position pos) {
+    Player& m = s.getPlayer(id);
+    m.id = id; m.teamSide = TeamSide::HOME; m.state = PlayerState::STANDING;
+    m.position = pos; m.stats = {6, 3, 3, 8}; m.movementRemaining = 6;
+}
+Position p220Walk(GameState s, Position to = {7, 7}, unsigned off = 0) {
+    setExtraFeaturesOff(off);
+    FixedDiceRoller dice(std::vector<int>(40, 6));
+    greedyExpandMacro(s, Macro{MacroType::REPOSITION, 1, -1, to}, dice);
+    setExtraFeaturesOff(0);
+    return s.getPlayer(1).position;
+}
+const Position kP220Contact{7, 7};
+}  // namespace
+
+TEST(MacroActions, P220AgilePlayerDoesNotEndTheMoveInContact) {
+    for (const auto& [ag, dodge] : {std::pair<int8_t, bool>{4, false}, {3, true}, {5, false}}) {
+        GameState s = p220Board(ag, dodge);
+        const Position end = p220Walk(s);
+        EXPECT_NE(end, kP220Contact) << "agilní AG" << int(ag) << (dodge ? "+Dodge" : "") << " nedojde do kontaktu";
+        EXPECT_EQ(countTacklezones(s, end, TeamSide::HOME), 0) << "skončí mimo zóny soupeře";
+        EXPECT_GT(end.x, 3) << "šel k cíli, jen nedošel do kontaktu";
+    }
+    EXPECT_EQ(p220Walk(p220Board(4, false), kP220Contact, kP220AgileNoContact), kP220Contact)
+        << "pozitivní kontrola: s vypnutým P220 (maska 128) staré chování — dojde do kontaktu";
+}
+
+TEST(MacroActions, P220DoesNotTouchANonAgilePlayer) {
+    EXPECT_EQ(p220Walk(p220Board(3, false)), kP220Contact) << "AG3 bez Dodge není agilní";
+    EXPECT_EQ(p220Walk(p220Board(2, true)), kP220Contact) << "AG2 s Dodge není agilní (definice diagnostiky P220)";
+}
+
+TEST(MacroActions, P220ExceptionMarkingTheOpponentBallCarrier) {
+    GameState s = p220Board(4, false);
+    s.ball = BallState::carried({8, 7}, 12);
+    EXPECT_EQ(p220Walk(s), kP220Contact) << "(a) markovat soupeřova nosiče smí";
+}
+
+TEST(MacroActions, P220ExceptionAssistForABlockStillToComeThisTurn) {
+    {   // spoluhráč stojí u soupeře a ještě nehrál ⇒ blok může přijít ⇒ asistence
+        GameState s = p220Board(4, false);
+        p220Mate(s, 2, {9, 7});
+        EXPECT_EQ(p220Walk(s), kP220Contact) << "(b) asistence pro blok téhož tahu";
+        s.getPlayer(2).hasActed = true;
+        s.homeTeam.blitzUsedThisTurn = true;
+        EXPECT_NE(p220Walk(s), kP220Contact) << "spoluhráč už hrál a blitz je pryč ⇒ žádný blok nepřijde";
+    }
+    {   // spoluhráč daleko, ale dosáhne blitzem ⇒ asistence; po použitém blitzu ne
+        GameState s = p220Board(4, false);
+        p220Mate(s, 2, {14, 7});
+        EXPECT_EQ(p220Walk(s), kP220Contact) << "(b) asistence pro blitz téhož tahu";
+        s.homeTeam.blitzUsedThisTurn = true;
+        EXPECT_NE(p220Walk(s), kP220Contact) << "blitz už byl ⇒ asistence k ničemu";
+    }
+    {   // (7,6) leží v zóně 12 i dalšího soupeře 13 ⇒ asistence neplatí (ř. 1666–1667), s Guard ano
+        GameState s = p220Board(4, false);
+        p220Mate(s, 2, {9, 7});
+        Player& e = s.getPlayer(13);
+        e.id = 13; e.teamSide = TeamSide::AWAY; e.state = PlayerState::STANDING;
+        e.position = {8, 5}; e.stats = {6, 3, 3, 8}; e.movementRemaining = 6;
+        const Position twoZones{7, 6};
+        EXPECT_NE(p220Walk(s, twoZones), twoZones) << "v zóně dalšího soupeře asistovat nejde";
+        s.getPlayer(1).skills.add(SkillName::Guard);
+        EXPECT_EQ(p220Walk(s, twoZones), twoZones) << "s Guard asistuje i v zóně dalšího soupeře";
+    }
+}
+
+// Review P220 (23.10., MEDIUM): přesun z plánovače klece (`cageManaged`) P220 nezastaví — o rohu rozhoduje
+// plánovač. Dřív by chůze roh zastavila, rozbalení vrátilo prázdno a `abandonTurn` zahodil celý plán klece.
+TEST(MacroActions, P220LeavesCagePlannedMovesToThePlanner) {
+    auto walk = [](bool cage) {
+        GameState s = p220Board(4, false);
+        FixedDiceRoller dice(std::vector<int>(40, 6));
+        Macro m{MacroType::REPOSITION, 1, -1, kP220Contact};
+        m.cageManaged = cage;
+        greedyExpandMacro(s, m, dice);
+        return s.getPlayer(1).position;
+    };
+    EXPECT_NE(walk(false), kP220Contact) << "pozitivní kontrola: běžný přesun P220 zastaví";
+    EXPECT_EQ(walk(true), kP220Contact) << "přesun z plánovače klece dojde";
+}
+
+// Čítač zastavení (review L): tiká při zastavení v rozbalení, ne u přesunu, který P220 nesoudí.
+// (Dotaz nabídky se testem nedá zachytit: generátor nabídky přesun do kontaktu nevytváří — ověřeno 26.10.)
+TEST(MacroActions, P220StopCounterTicksOnlyOnARealStop) {
+    long before = p220StopsTotal();
+    p220Walk(p220Board(4, false));
+    EXPECT_EQ(p220StopsTotal() - before, 1) << "agilní zastaven před kontaktem";
+    before = p220StopsTotal();
+    p220Walk(p220Board(3, false));
+    EXPECT_EQ(p220StopsTotal() - before, 0) << "neagilní dojde, čítač netiká";
+}
+
+TEST(MacroActions, P220ExceptionOwnBlitzStillHappens) {
+    GameState s = p220Board(4, false);
+    s.getPlayer(1).skills.add(SkillName::Block);
+    // Pozitivní kontrola (review 23.10.): na TÉŽE desce P220 přesun do kontaktu zastaví -- bez toho by test
+    // prošel i bez P220 a nic by nedokazoval. Blitz pak musí do kontaktu dojít, i když je P220 zapnuté.
+    ASSERT_NE(p220Walk(s), kP220Contact) << "P220 je na této desce aktivní (přesun do kontaktu zastaví)";
+    FixedDiceRoller dice(std::vector<int>(40, 6));
+    const MacroExpansionResult r = greedyExpandMacro(s, Macro{MacroType::BLITZ, 1, 12, {8, 7}}, dice);
+    const bool blitzed = std::any_of(r.actions.begin(), r.actions.end(), [](const Action& a) {
+        return a.playerId == 1 && a.type == ActionType::BLITZ;
+    });
+    EXPECT_TRUE(blitzed) << "(c) vlastní blitz agilního se hraje dál";
 }
