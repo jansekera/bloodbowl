@@ -179,7 +179,26 @@ final class BlockHandler implements ActionHandlerInterface
         }
         $po = $po->withPlayer($utocnikPo);
 
-        return $this->kostkyDruheRany($po, $utocnikPo, $obrancePo) < $this->kostkyDruheRany($state, $attacker, $defender);
+        // (a) Dauntless (ř. 8023-8033) zvedá sílu útočníka na sílu obránce PŘED asistencemi a kostky jsou
+        // poměrové -- jedno srovnání bez něj by lhalo. Hod Dauntless ještě nepadl ⇒ obě větve (jako C++
+        // `frenzyTrapReady`): past jen, když je nové pole horší aspoň v jedné a v žádné lepší.
+        // OPRAVENO 26.10.2026 (parita s C++, review P226 MEDIUM) -- dřív se srovnávalo jen bez Dauntless.
+        $silaNavic = [0];
+        $rozdil = $defender->getStats()->getStrength() - $attacker->getStats()->getStrength();
+        if ($attacker->hasSkill(SkillName::Dauntless) && $rozdil > 0) {
+            $silaNavic[] = $rozdil;
+        }
+        $horsi = false;
+        foreach ($silaNavic as $navic) {
+            $nove = $this->kostkyDruheRany($po, $utocnikPo, $obrancePo, $navic);
+            $stejne = $this->kostkyDruheRany($state, $attacker, $defender, $navic);
+            if ($nove > $stejne) {
+                return false;
+            }
+            $horsi = $horsi || $nove < $stejne;
+        }
+
+        return $horsi;
     }
 
     /**
@@ -264,11 +283,12 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * P225: podepsaný počet kostek druhé rány (+ volí útočník, − obránce) se skutečnými asistencemi
      * z polí, kde hráči stojí -- tytéž síly jako skutečná rána (`blockStrengths`). Horns na druhou
-     * ránu neplatí; Dauntless se hází u obou poloh stejně -- vynechán (jako C++ `secondBlockDice`).
+     * ránu neplatí. Dauntless se tu nehází: `$silaNavic` je větev, kterou volající zkouší (0 = bez
+     * Dauntless, rozdíl sil = Dauntless uspěl), viz `pastNaFrenzy`.
      */
-    private function kostkyDruheRany(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender): int
+    private function kostkyDruheRany(GameState $state, MatchPlayerDTO $attacker, MatchPlayerDTO $defender, int $silaNavic = 0): int
     {
-        [$att, $def] = $this->blockStrengths($state, $attacker, $defender, 0, 0, dauntless: false);
+        [$att, $def] = $this->blockStrengths($state, $attacker, $defender, $silaNavic, 0, dauntless: false);
         $info = $this->strCalc->getBlockDiceInfo($att, $def);
 
         return $info['attackerChooses'] ? $info['count'] : -$info['count'];

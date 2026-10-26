@@ -95,6 +95,25 @@ final class StandFirmFrenzyPastTest extends TestCase
         $this->assertFalse($druhy->isAttackerChooses(), 'z nového pole volí obránce');
     }
 
+    /**
+     * Dauntless (parita s C++ `P225DauntlessBranchMakesTheTrap`, review P226 MEDIUM): útočník ST1 + Dauntless,
+     * obránce ST6. Bez Dauntless je druhá rána z obou polí stejná (2:6 i 1:7 = 3 kostky volí obránce), ale
+     * když Dauntless uspěje, je ze stejného pole 7:6 (+2) a z nového 6:7 (−2) ⇒ past, Stand Firm nepoužije.
+     * Dřív PHP srovnávalo jen větev bez Dauntless a Stand Firm použilo.
+     */
+    public function testDauntlessVetevDelaPast(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, strength: 1, skills: [SkillName::Frenzy, SkillName::Dauntless], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 6, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 5, 6, id: 3)
+            ->addPlayer(TeamSide::AWAY, 7, 6, id: 4)
+            ->withBallOffPitch()->build();
+        $s = $this->blok($s, [6, 3, 3]);   // Dauntless 6 (1+6 > 6) ⇒ 7:6, dvě kostky útočníka; Pushed
+        $this->assertSame([7, 8], $this->pole($s, 2), 'obránce se nechal odtlačit');
+        $this->assertSame([6, 7], $this->pole($s, 1), 'Frenzy následuje');
+    }
+
     public function testBezHorsichKostekPouzije(): void
     {
         // bez pomocníků: 3:3 = 1 kostka ze stejného i z nového pole ⇒ není horší
