@@ -17,7 +17,7 @@ final class AITurnService
 {
     private ?GameLogger $gameLogger = null;
 
-    /** @param list<\App\Enum\TeamSide> $interactiveApothecary P206 (b): strany kouče-člověka */
+    /** @param list<\App\Enum\TeamSide> $interactiveApothecary P206 (b): strany kouče-člověka (P226: i Stand Firm) */
     public function __construct(
         private readonly AICoachInterface $aiCoach,
         private readonly RulesEngine $rulesEngine,
@@ -38,6 +38,7 @@ final class AITurnService
     {
         $resolver = new ActionResolver($dice);
         $resolver->setInteractiveApothecary($this->interactiveApothecary);
+        $resolver->setInteractiveStandFirm($this->interactiveApothecary);
         $gameFlow = $resolver->getGameFlowResolver();
         $allEvents = [];
         $aiTeam = $state->getAiTeam();
@@ -45,7 +46,7 @@ final class AITurnService
 
         for ($i = 0; $i < $maxActions; $i++) {
             if ($state->getActiveTeam() !== $aiTeam || !$state->getPhase()->isPlayable()
-                || $state->getPendingApothecary() !== null) {
+                || $state->getPendingApothecary() !== null || $state->getPendingStandFirm() !== null) {
                 break;
             }
 
@@ -64,7 +65,8 @@ final class AITurnService
 
             // P206 (b): zranil se hráč kouče-člověka ⇒ tah AI stojí, dokud kouč nerozhodne o lékárníkovi
             //   (turnover akce nese PendingApothecaryDTO a orchestrátor ho dořeší po odpovědi).
-            if ($state->getPendingApothecary() !== null) {
+            // P226: kouč-člověk odpovídá na Stand Firm svého hráče ⇒ tah AI stojí (blok čeká v pendingBlock)
+            if ($state->getPendingApothecary() !== null || $state->getPendingStandFirm() !== null) {
                 break;
             }
 

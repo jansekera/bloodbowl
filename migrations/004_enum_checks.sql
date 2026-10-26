@@ -33,7 +33,7 @@ ALTER TABLE skills ADD CONSTRAINT skills_category_check
         'General', 'Agility', 'Strength', 'Passing', 'Mutation', 'Extraordinary'
     ));
 
--- 2) match_events.event_type -- 81 hodnot podle App\Enum\GameEventType
+-- 2) match_events.event_type -- všechny hodnoty App\Enum\GameEventType (shodu hlídá GameEventTypeTest)
 ALTER TABLE match_events DROP CONSTRAINT IF EXISTS match_events_event_type_check;
 ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
     CHECK (event_type IN (
@@ -53,7 +53,7 @@ ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
         'pickup', 'piling_on', 'player_fell', 'player_move',
         'pro', 'push', 'really_stupid', 'regeneration',
         'reroll', 'safe_throw', 'secret_weapon', 'shadowing',
-        'sneaky_git', 'stab', 'stakes_block_regen', 'stand_pat', 'stand_up',
+        'sneaky_git', 'stab', 'stakes_block_regen', 'stand_firm', 'stand_pat', 'stand_up',
         'strip_ball', 'sweltering_heat', 'take_root', 'tentacles',
         'throw_in', 'throw_team_mate', 'touchback', 'touchdown',
         'ttm_landing', 'turnover', 'weather_change', 'wild_animal',

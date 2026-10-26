@@ -90,6 +90,25 @@ export interface PendingGrab {
     face: string | null;
 }
 
+/** P226: čekající otázka, jestli hráč kouče-člověka použije Stand Firm (playerId ≠ defenderId = řetěz) */
+export interface PendingStandFirm {
+    playerId: number;
+    attackerId: number;
+    defenderId: number;
+    /** 'block' (Block/Blitz), 'bnc' (Ball & Chain), 'mb' (Multiple Block) */
+    kind: 'block' | 'bnc' | 'mb';
+    /** zvolená strana kostky (Pushed vs Knock-down, ř. 8511-8513); null = B&C odtlačuje ležícího bez bloku */
+    face: string | null;
+    /** index zvolené kostky v pendingBlock.faces (kind 'block') */
+    faceIndex: number;
+    /** kam by hráč bez Stand Firm šel; null = do davu */
+    pushTo: { x: number; y: number } | null;
+    /** útočník-člověk se smí po odpovědi „ne“ Grabem rozhodnout pro jiné pole (pushTo je bez Grabu) */
+    grabPossible?: boolean;
+    /** hráči v řetězu, kteří ještě neodpověděli -- pushTo závisí na jejich Stand Firm */
+    pushToDependsOn?: number[];
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -110,6 +129,7 @@ export interface GameState {
     declaredBlitzerId?: number | null;
     pendingApothecary?: PendingApothecary | null;
     pendingGrab?: PendingGrab | null;
+    pendingStandFirm?: PendingStandFirm | null;
 }
 
 export interface TeamState {

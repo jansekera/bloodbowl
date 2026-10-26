@@ -55,6 +55,13 @@ final class RulesEngine
         if ($state->getPendingGrab() !== null && $action !== ActionType::RESOLVE_GRAB) {
             return ['Must answer the Grab question first'];
         }
+        // P226: otázka na Stand Firm přeruší blok před odtlačením (i v tahu AI) — do odpovědi nic jiného.
+        //   Review P226: s nabídkou lékárníka může čekat naráz (první rána Frenzy zranila, druhá se ptá)
+        //   — lékárník (výsledek první rány) má přednost (výš), na Stand Firm se odpovídá potom.
+        if ($state->getPendingStandFirm() !== null && $action !== ActionType::RESOLVE_STAND_FIRM
+            && $action !== ActionType::RESOLVE_APOTHECARY) {
+            return ['Must answer the Stand Firm question first'];
+        }
 
         // Check game phase
         if ($action === ActionType::SETUP_PLAYER || $action === ActionType::END_SETUP || $action === ActionType::AUTO_SETUP) {
@@ -72,6 +79,12 @@ final class RulesEngine
         } elseif ($action === ActionType::RESOLVE_GRAB) {
             if ($state->getPendingGrab() === null) {
                 $errors[] = 'No pending Grab question';
+            }
+        } elseif ($action === ActionType::RESOLVE_STAND_FIRM) {
+            if ($state->getPendingStandFirm() === null) {
+                $errors[] = 'No pending Stand Firm question';
+            } elseif (!isset($params['use']) || !is_bool($params['use'])) {
+                $errors[] = 'use must be a boolean';
             }
         } elseif ($action === ActionType::RESOLVE_REROLL) {
             if ($state->getPendingReroll() === null) {
@@ -120,6 +133,7 @@ final class RulesEngine
             ActionType::RESOLVE_REROLL => [],
             ActionType::RESOLVE_APOTHECARY => [],
             ActionType::RESOLVE_GRAB => $this->validateResolveGrab($state, $params),
+            ActionType::RESOLVE_STAND_FIRM => [],
         };
     }
 
@@ -141,6 +155,11 @@ final class RulesEngine
         // P224: čekající otázka na Grab — jen odpověď kouče
         if ($state->getPendingGrab() !== null) {
             return [['type' => ActionType::RESOLVE_GRAB->value]];
+        }
+
+        // P226: čekající otázka na Stand Firm — jen odpověď kouče
+        if ($state->getPendingStandFirm() !== null) {
+            return [['type' => ActionType::RESOLVE_STAND_FIRM->value]];
         }
 
         // When there's a pending block, only block-choice actions are available
