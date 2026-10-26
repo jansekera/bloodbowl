@@ -4309,6 +4309,46 @@ TEST(MacroActions, P71VampirePastGfiDoesNotOverreachToTheThrall) {
     EXPECT_FALSE(walkOffered(-1)) << "po jedné GFI zbývá 1 pole — na pole vedle Thralla nedosáhne";
 }
 
+// Upír se Sprintem a MA 0: pole vedle Thralla o 3 dál je na tři GFI (ř. 8487-8490) ⇒ povolené GFI 3, ne 2.
+TEST(MacroActions, P71SprintingVampireGetsThreeGfiToTheThrall) {
+    GameState state = makeMinimalState();
+    Player& v = state.getPlayer(1);                 // na (10,7)
+    v.skills.add(SkillName::Bloodlust);
+    v.skills.add(SkillName::Sprint);
+    v.bloodlustHungry = true;
+    v.hasMoved = true;
+    v.movementRemaining = 0;
+    state.currentActivationId = 1;
+    Player& t = state.getPlayer(2);
+    t.id = 2; t.teamSide = TeamSide::HOME; t.state = PlayerState::STANDING;
+    t.position = {14, 7}; t.stats = {6, 3, 3, 8}; t.movementRemaining = 6;   // nejbližší pole vedle: (13,x), 3 daleko
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    const Macro* walk = nullptr;
+    for (const auto& m : macros)
+        if (m.type == MacroType::REPOSITION && m.playerId == 1) walk = &m;
+    ASSERT_NE(walk, nullptr) << "pozitivní kontrola: se Sprintem dosáhne";
+    EXPECT_EQ(walk->targetPos.distanceTo(v.position), 3);
+    EXPECT_EQ(walk->gfiAllowance, 3);
+}
+
+// Riziko SCORE ve vstupu sítě (vlastnost 13): po jedné GFI (MA −1) je pole do endzóny o 1 dál právě
+// jedna GFI, ne dvě.
+TEST(MacroActions, ScoreRiskFeatureCountsGfiFromTheRemainingMove) {
+    GameState state = makeMinimalState();          // aktivní HOME, endzóna x = 25
+    Player& p = state.getPlayer(1);
+    p.position = {24, 7};
+    state.ball = BallState::carried(p.position, 1);
+    const Macro score{MacroType::SCORE, 1, -1, {-1, -1}};
+    float f[NUM_ACTION_FEATURES];
+    p.movementRemaining = 0;
+    extractMacroFeatures(state, score, f);
+    EXPECT_NEAR(f[13], 0.17f, 1e-6) << "pozitivní kontrola: MA 0, jedno pole ⇒ jedna GFI";
+    p.movementRemaining = -1;
+    extractMacroFeatures(state, score, f);
+    EXPECT_NEAR(f[13], 0.17f, 1e-6) << "MA −1 (po jedné GFI), jedno pole ⇒ pořád jedna GFI";
+}
+
 // ---------------------------------------------------------------------------
 // P149 (06.10.2026): strop na úhyb — makra BLITZ a REPOSITION nevedou přes úhyb
 // na 4+ a horší. Výjimky: poslední aktivace tahu; míč v posledním kole poločasu.
@@ -4678,7 +4718,9 @@ TEST(DodgeCap, BlitzLandingMatchesTheRealWalkThroughGfi) {
         if (predReaches != reached || (reached && predicted != wb.position)) ++mismatches;
     }
     EXPECT_GT(checked, 4000);
-    EXPECT_GT(withGfi, 200);                 // pozitivní kontrola: vzorek obsahuje doběhy přes GFI
+    // Pozitivní kontrola míří na kategorii vady: na starém kódu bylo 21 z 25 rozdílů právě v doběhu, který
+    // došel přes dvě GFI (pak přehrání s rozpočtem oříznutým na 0 zvolilo jinou cestu a jiné pole dopadu).
+    EXPECT_GT(withGfi, 200);
     EXPECT_EQ(mismatches, 0);
 }
 

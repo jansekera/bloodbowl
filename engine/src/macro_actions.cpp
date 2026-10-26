@@ -1488,7 +1488,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             });
             if (best.x >= 0) {
                 Macro m{MacroType::REPOSITION, v.id, -1, best};
-                m.gfiAllowance = std::min(2, std::max(0, bestDist - std::max(0, static_cast<int>(v.movementRemaining))));
+                // OPRAVENO 26.10.2026 — strop byl natvrdo 2; se Sprintem jsou GFI tři (ř. 8487-8490) a `reach`
+                // je už počítal, takže se nabídla cesta, na kterou povolené GFI nestačily.
+                m.gfiAllowance = std::min(maxGfiSquares(v), std::max(0, bestDist - std::max(0, static_cast<int>(v.movementRemaining))));
                 out.push_back(m);
                 return;
             }
@@ -4666,7 +4668,9 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
                 const Player& p = state.getPlayer(macro.playerId);
                 if (p.isOnPitch()) {
                     int dist = distToEndzone(p.position, mySide);
-                    int gfis = std::max(0, dist - p.movementRemaining);
+                    // OPRAVENO 26.10.2026 — bylo `dist - MA` i se záporným MA (po GFI), takže GFI vycházelo o
+                    // jedno navíc za každou už použitou; při MA ≤ 0 je každé další pole právě jedna GFI.
+                    int gfis = std::max(0, dist - std::max(0, static_cast<int>(p.movementRemaining)));
                     out[13] = gfis * 0.17f; // ~1/6 per GFI
                 }
             }
