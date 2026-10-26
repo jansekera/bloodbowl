@@ -648,6 +648,8 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[2]; bb::takeDodgeCapStops(v);
         return py::make_tuple(v[0], v[1]);
     });
+    // P225: kolikrát AI obránce odmítl Stand Firm kvůli pasti na Frenzy (čte a nuluje).
+    m.def("take_stand_firm_declined_for_frenzy", []() { return bb::takeStandFirmDeclinedForFrenzy(); });
 
     m.def("ai_choose_action", [](const bb::GameState& state, const std::string& ai, uint32_t seed,
                                  const std::string& weightsPath, int mctsIterations,

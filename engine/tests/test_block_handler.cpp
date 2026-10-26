@@ -2599,9 +2599,12 @@ TEST(BlockHandler, P225FendVsJuggernautBlitz_FollowsUpAsUsual) {
     gs.getPlayer(12).skills.add(SkillName::Fend);
     gs.getPlayer(1).skills.add(SkillName::Juggernaut);
     FixedDiceRoller dice(trapDice());
+    takeStandFirmDeclinedForFrenzy();
     resolveBlock(gs, BlockParams{1, 12, true, false}, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7}));
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7}));
+    // Stand Firm proti Juggernautu nejde použít, takže ho AI ani „neodmítá“ -- čítač zůstane 0.
+    EXPECT_EQ(takeStandFirmDeclinedForFrenzy(), 0);
 }
 
 TEST(BlockHandler, P225FendDefenderPushedIntoCrowd_AiUsesStandFirm) {
