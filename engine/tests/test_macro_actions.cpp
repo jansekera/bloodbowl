@@ -5043,9 +5043,36 @@ TEST(MacroActions, P220ExceptionAssistForABlockStillToComeThisTurn) {
     }
 }
 
+// Review P220 (23.10., MEDIUM): přesun z plánovače klece (`cageManaged`) P220 nezastaví — o rohu rozhoduje
+// plánovač. Dřív by chůze roh zastavila, rozbalení vrátilo prázdno a `abandonTurn` zahodil celý plán klece.
+TEST(MacroActions, P220LeavesCagePlannedMovesToThePlanner) {
+    auto walk = [](bool cage) {
+        GameState s = p220Board(4, false);
+        FixedDiceRoller dice(std::vector<int>(40, 6));
+        Macro m{MacroType::REPOSITION, 1, -1, kP220Contact};
+        m.cageManaged = cage;
+        greedyExpandMacro(s, m, dice);
+        return s.getPlayer(1).position;
+    };
+    EXPECT_NE(walk(false), kP220Contact) << "pozitivní kontrola: běžný přesun P220 zastaví";
+    EXPECT_EQ(walk(true), kP220Contact) << "přesun z plánovače klece dojde";
+}
+
+// Čítač zastavení (review L): tiká jen při skutečném zastavení, ne u přesunu, který P220 nesoudí.
+TEST(MacroActions, P220StopCounterTicksOnlyOnARealStop) {
+    takeP220Stops();
+    p220Walk(p220Board(4, false));
+    EXPECT_EQ(takeP220Stops(), 1) << "agilní zastaven před kontaktem";
+    p220Walk(p220Board(3, false));
+    EXPECT_EQ(takeP220Stops(), 0) << "neagilní dojde, čítač netiká";
+}
+
 TEST(MacroActions, P220ExceptionOwnBlitzStillHappens) {
     GameState s = p220Board(4, false);
     s.getPlayer(1).skills.add(SkillName::Block);
+    // Pozitivní kontrola (review 23.10.): na TÉŽE desce P220 přesun do kontaktu zastaví -- bez toho by test
+    // prošel i bez P220 a nic by nedokazoval. Blitz pak musí do kontaktu dojít, i když je P220 zapnuté.
+    ASSERT_NE(p220Walk(s), kP220Contact) << "P220 je na této desce aktivní (přesun do kontaktu zastaví)";
     FixedDiceRoller dice(std::vector<int>(40, 6));
     const MacroExpansionResult r = greedyExpandMacro(s, Macro{MacroType::BLITZ, 1, 12, {8, 7}}, dice);
     const bool blitzed = std::any_of(r.actions.begin(), r.actions.end(), [](const Action& a) {
