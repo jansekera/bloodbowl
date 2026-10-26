@@ -1473,7 +1473,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         const Player& v = state.getPlayer(state.currentActivationId);
         if (v.teamSide == mySide && v.bloodlustHungry && v.isOnPitch() &&
             !v.hasActed && adjacentThrall(state, v) < 0) {
-            const int reach = std::max(0, static_cast<int>(v.movementRemaining)) + maxGfiSquares(v);
+            // OPRAVENO 26.10.2026 — tady byl pohyb oříznutý na nulu (`max(0, MA)`); upír, který už šel přes
+            // GFI, má MA v záporu a zbývá mu jen MA + GFI (move_handler.cpp). Dosah se tak nadsazoval.
+            const int reach = static_cast<int>(v.movementRemaining) + maxGfiSquares(v);
             Position best{-1, -1};
             int bestDist = 99;
             state.forEachOnPitch(mySide, [&](const Player& t) {

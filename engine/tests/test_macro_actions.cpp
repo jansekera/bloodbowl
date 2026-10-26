@@ -4285,6 +4285,30 @@ TEST(MacroActions, P71AHungryVampireIsOfferedOnlyTheWalkToAThrall) {
     EXPECT_EQ(walk->gfiAllowance, 0) << "4 pole na MA 4 nepotrebuji GFI";
 }
 
+// Upír, který už jednou šel přes GFI (MA −1), má zbývající dosah jen 1 pole (2 GFI − 1). Pole vedle Thralla
+// je o 2 dál ⇒ cesta se nenabídne; dřív se dosah počítal z MA oříznutého na 0 (= 2 pole).
+TEST(MacroActions, P71VampirePastGfiDoesNotOverreachToTheThrall) {
+    GameState state = makeMinimalState();
+    Player& v = state.getPlayer(1);                 // na (10,7)
+    v.skills.add(SkillName::Bloodlust);
+    v.bloodlustHungry = true;
+    v.hasMoved = true;
+    state.currentActivationId = 1;
+    Player& t = state.getPlayer(2);
+    t.id = 2; t.teamSide = TeamSide::HOME; t.state = PlayerState::STANDING;
+    t.position = {13, 7}; t.stats = {6, 3, 3, 8}; t.movementRemaining = 6;   // nejbližší pole vedle: (12,x), 2 daleko
+    auto walkOffered = [&](int mr) {
+        v.movementRemaining = static_cast<int8_t>(mr);
+        std::vector<Macro> macros;
+        getAvailableMacros(state, macros);
+        for (const auto& m : macros)
+            if (m.type == MacroType::REPOSITION && m.playerId == 1 && m.targetPos.distanceTo(t.position) == 1) return true;
+        return false;
+    };
+    EXPECT_TRUE(walkOffered(0)) << "pozitivní kontrola: s MA 0 zbývají 2 GFI = 2 pole";
+    EXPECT_FALSE(walkOffered(-1)) << "po jedné GFI zbývá 1 pole — na pole vedle Thralla nedosáhne";
+}
+
 // ---------------------------------------------------------------------------
 // P149 (06.10.2026): strop na úhyb — makra BLITZ a REPOSITION nevedou přes úhyb
 // na 4+ a horší. Výjimky: poslední aktivace tahu; míč v posledním kole poločasu.
@@ -4618,6 +4642,44 @@ TEST(DodgeCap, BlitzLandingMatchesTheRealWalk) {
     EXPECT_GT(checked, 2500);
     EXPECT_GT(withBreakTackleDodge, 100);    // pozitivní kontrola: doběhy, kde se Break Tackle spotřebuje
     EXPECT_EQ(mismatches, 0);                // předpověď dopadu = skutečné pole, odkud hra blokuje
+}
+
+// Review P227 26.10.2026: přehrání doběhu neodečítalo krok pod nulu (`if (movementRemaining > 0)`),
+// hra ale při GFI jde do záporu (move_handler.cpp) — rozpočet GFI tak v přehrání zůstával celý.
+// Stejné pozice jako výš, jen blitzující má Sprint (3 GFI) a na začátku málo pohybu (0–2): se dvěma GFI
+// doběh skončí dřív, než pohyb klesne pod nulu, takže se vada ukáže jen se Sprintem.
+TEST(DodgeCap, BlitzLandingMatchesTheRealWalkThroughGfi) {
+    std::mt19937 rng(4242);
+    int checked = 0, withGfi = 0, mismatches = 0;
+    for (int it = 0; it < 6000; ++it) {
+        GameState s;
+        Position tp;
+        if (!randomBlitzBoard(rng, s, tp)) continue;
+        Player& b = s.getPlayer(1);
+        b.state = PlayerState::STANDING;
+        b.skills.add(SkillName::Sprint);     // 3 GFI: jen tak může pohyb klesnout pod nulu a doběh ještě pokračovat
+        b.movementRemaining = static_cast<int8_t>(std::uniform_int_distribution<int>(0, 2)(rng));
+        Position predicted;
+        const bool predReaches = blitzLandingSquare(s, b, tp, predicted);
+
+        GameState w = s.clone();
+        SixDice dice;
+        Player& wb = w.getPlayer(1);
+        bool reached = true;
+        for (int guard = 0; wb.position.distanceTo(tp) > 1; ++guard) {
+            Position nx;
+            if (guard > 30 || !nextStepTowardAdjacent(w, wb, tp, nx)) { reached = false; break; }
+            const Position before = wb.position;
+            auto r = resolveMoveStep(w, 1, nx, dice, nullptr);
+            if (!r.success || wb.position == before || wb.state != PlayerState::STANDING) { reached = false; break; }
+        }
+        ++checked;
+        if (reached && wb.movementRemaining < -1) ++withGfi;   // aspoň dvě GFI
+        if (predReaches != reached || (reached && predicted != wb.position)) ++mismatches;
+    }
+    EXPECT_GT(checked, 4000);
+    EXPECT_GT(withGfi, 200);                 // pozitivní kontrola: vzorek obsahuje doběhy přes GFI
+    EXPECT_EQ(mismatches, 0);
 }
 
 TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {

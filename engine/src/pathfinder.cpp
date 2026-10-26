@@ -513,7 +513,7 @@ static ApproachEnd replayBlitzApproach(const GameState& state, const Player& pla
             w.breakTackleUsedThisTurn = true;
         }
         w.position = next;
-        if (w.movementRemaining > 0) --w.movementRemaining;
+        --w.movementRemaining;               // jako move_handler.cpp: při GFI do záporu (dřív se zastavilo na 0)
         ++steps;
         landing = w.position;
     }
