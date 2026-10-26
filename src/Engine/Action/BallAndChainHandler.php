@@ -75,7 +75,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
     /**
      * P226: odpověď kouče-člověka na Stand Firm uprostřed pohybu B&C -- dokončí rozpracovaný blok
-     * (odtlačení s odpověďmi `$odpovedi`) a pokračuje dalšími kroky. Drží-li hráč pole, B&C zůstane
+     * nebo odtlačení ležícího (`face` null; s odpověďmi `$odpovedi`) a pokračuje dalšími kroky. Drží-li hráč pole, B&C zůstane
      * na svém poli a krok ho stál (oficiální FAQ 05/2020; povinný follow-up jen na uvolněné pole).
      *
      * @param array<int, bool> $odpovedi
@@ -96,7 +96,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
      * Stand Firm (P226) -- krok už je hozený a blok vybraný, zbývá odtlačení.
      *
      * @param list<GameEvent> $events
-     * @param array{target: int, face: BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
+     * @param array{target: int, face: ?BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
      */
     private function kroky(GameState $state, int $playerId, int $odKroku, array $events, ?array $obnoveno): ActionResult
     {
@@ -150,7 +150,30 @@ final class BallAndChainHandler implements ActionHandlerInterface
                         return ActionResult::success($state, $events); // P224/P226: čeká otázka kouči
                     }
                 } else {
-                    [$state, $events] = $this->odtlacitLeziciho($state, $player, $occupant, $events);
+                    // OPRAVENO 26.10.2026 (review P226, LOW 2) -- odtlačení ležícího běželo bez otázky:
+                    //   člověk se Stand Firm v řetězu držel, aniž se ho kdo zeptal (`drziPole` → AI).
+                    //   Stand Firm je volba (ř. 8510-8516); ležící sám ho nepoužije (`holdsGround`).
+                    //   Do odpovědi se nic nehodí (brnění až po odtlačení), stav je čistý.
+                    $obet = $occupant;
+                    $odpovedi = $obnoveno['standFirm'] ?? [];
+                    [$odtlaceno, $kdo] = $this->blockHandler->sOtazkouNaStandFirm(
+                        $odpovedi,
+                        fn(): array => $this->odtlacitLeziciho($state, $player, $obet, $events),
+                    );
+                    if ($kdo !== null) {
+                        return ActionResult::success($state->withPendingStandFirm(new PendingStandFirmDTO(
+                            $kdo,
+                            $playerId,
+                            $obet->getId(),
+                            null,
+                            ...$this->blockHandler->otazkaNaStandFirm($state, $player, $obet, true, $odpovedi, null, false, $kdo),
+                            kind: 'bnc',
+                            answers: $odpovedi,
+                            step: $step,
+                        )), $events);
+                    }
+                    assert($odtlaceno !== null);
+                    [$state, $events] = $odtlaceno;
                 }
                 $obnoveno = null;
 
@@ -280,7 +303,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
      * dokončí `resumeStandFirm`. B&C blokuje "following normal blocking rules" (ř. 7829-7831).
      *
      * @param list<GameEvent> $events
-     * @param array{target: int, face: BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
+     * @param array{target: int, face: ?BlockDiceFace, volba: Position|false|null, standFirm: array<int, bool>}|null $obnoveno
      * @return array{0: GameState, 1: list<GameEvent>, 2: MatchPlayerDTO}
      */
     private function resolveAutoBlock(
@@ -300,7 +323,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
 
         $odpovedi = [];
         if ($obnoveno !== null) {
-            $face = $obnoveno['face'];
+            $face = $obnoveno['face'] ?? throw new \LogicException('Ball & Chain block resumed without a block face');
             $grabVolba = $obnoveno['volba'];
             $odpovedi = $obnoveno['standFirm'];
         } else {
@@ -349,7 +372,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
                     $bncPlayer->getId(),
                     $target->getId(),
                     $face,
-                    $this->blockHandler->poleBezStandFirm($state, $bncPlayer, $target, false, $odpovedi, $grabVolba, $kdo),
+                    ...$this->blockHandler->otazkaNaStandFirm($state, $bncPlayer, $target, false, $odpovedi, $grabVolba, true, $kdo),
                     kind: 'bnc',
                     answers: $odpovedi,
                     grab: $grabVolba,
@@ -510,8 +533,11 @@ final class BallAndChainHandler implements ActionHandlerInterface
         Position|false|null $grabVolba = null,
     ): array {
         $targetPos = $target->getPosition();
-        if ($pusher->getPosition() === null || $targetPos === null || $this->blockHandler->obranceDrziPole($state, $pusher, $target, false, null)) {
+        if ($pusher->getPosition() === null || $targetPos === null) {
             return [$state, $events];
+        }
+        if ($this->blockHandler->obranceDrziPole($state, $pusher, $target, false, null)) {
+            return [$state, $this->blockHandler->udalostStandFirm($pusher, $target, $events)];
         }
 
         return $this->blockHandler->resolvePushback($state, $pusher, $target, $targetPos, $events, grabNeplati: $grabNeplati, grabVolba: $grabVolba);

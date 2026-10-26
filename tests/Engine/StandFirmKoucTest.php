@@ -519,4 +519,213 @@ final class StandFirmKoucTest extends TestCase
         $this->assertSame([4, 7], $this->pole($s, 3));
         $this->assertTrue($s->requirePlayer(1)->hasActed());
     }
+
+    // === review P226 (26.10.2026) ===
+
+    /**
+     * @param list<\App\DTO\GameEvent> $udalosti
+     * @return list<int> id hráčů z událostí Stand Firm
+     */
+    private function standFirmUdalosti(array $udalosti): array
+    {
+        return array_values(array_map(
+            static fn(\App\DTO\GameEvent $e): int => (int) $e->getData()['playerId'],
+            array_filter($udalosti, static fn(\App\DTO\GameEvent $e): bool => $e->getType() === 'stand_firm'),
+        ));
+    }
+
+    /**
+     * MEDIUM 1: AI útočník (HOME, Grab) se na Grab neptá -- skutečné odtlačení Grab použije
+     * (ř. 8147-8150 "may choose any empty square adjacent to his opponent") a pošle obránce na
+     * nejhorší pole (5,6) vedle hráčů HOME. Pole v otázce kouče obránce musí být totéž.
+     */
+    public function testAIUtocnikSGrabemPoleVOtazceJeSkutecnePole(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, skills: [SkillName::Grab], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 3)
+            ->addPlayer(TeamSide::HOME, 6, 4, id: 5)
+            ->withBallOffPitch()
+            ->build();
+        $ai = function (): ActionResolver {
+            $r = new ActionResolver(new FixedDiceRoller(array_fill(0, 20, 3)));
+            $r->setInteractiveStandFirm([TeamSide::AWAY]);   // tah AI: na Grab se neptá
+
+            return $r;
+        };
+        $q = $ai()->resolve($s, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
+        $otazka = $q->getPendingStandFirm();
+        $this->assertNotNull($otazka);
+        $this->assertFalse($otazka->isGrabPossible(), 'AI útočník se na Grab neptá');
+        $this->assertSame([], $otazka->getPushToDependsOn());
+
+        $po = $ai()->resolve($q, ActionType::RESOLVE_STAND_FIRM, ['use' => false])->getNewState();
+        $this->assertNull($po->getPendingGrab());
+        $this->assertNotSame(7, $this->pole($po, 2)[0], 'fixtura: Grab poslal obránce mimo diagram odtlačení');
+        $this->assertNotNull($otazka->getPushTo());
+        $this->assertSame($this->pole($po, 2), [$otazka->getPushTo()->getX(), $otazka->getPushTo()->getY()]);
+    }
+
+    /** MEDIUM 1: útočníka-člověka se na Grab zeptá až po odpovědi ⇒ dialog řekne, že Grab může pole změnit. */
+    public function testClovekUtocnikSGrabemOtazkaRikaZeGrabMuzePoleZmenit(): void
+    {
+        $sGrabem = $this->zvolKostku($this->stav(utocnik: [SkillName::Grab]))->getNewState()->getPendingStandFirm();
+        $this->assertNotNull($sGrabem);
+        $this->assertTrue($sGrabem->isGrabPossible());
+        $this->assertSame(7, $sGrabem->getPushTo()?->getX(), 'pole bez Grabu -- diagram odtlačení za obráncem');
+
+        $bezGrabu = $this->zvolKostku($this->stav())->getNewState()->getPendingStandFirm();
+        $this->assertNotNull($bezGrabu);
+        $this->assertFalse($bezGrabu->isGrabPossible());
+
+        $znovu = \App\DTO\PendingStandFirmDTO::fromArray(json_decode(json_encode($sGrabem->toArray(), JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR));
+        $this->assertEquals($sGrabem, $znovu);
+    }
+
+    /**
+     * LOW 4: obránce 2 (Stand Firm), za ním tři hráči se Stand Firm. Při otázce na 2 ještě nikdo
+     * z nich neodpověděl -- přehrání je bere jako držící, a pole proto závisí na jejich odpovědích.
+     */
+    public function testPoleVOtazceZavisiNaHracichVRetezuKteriNeodpovedeli(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 6, skills: [SkillName::StandFirm], id: 3)
+            ->addPlayer(TeamSide::AWAY, 7, 7, skills: [SkillName::StandFirm], id: 4)
+            ->addPlayer(TeamSide::AWAY, 7, 8, skills: [SkillName::StandFirm], id: 5)
+            ->withBallOffPitch()
+            ->build();
+        $q = $this->zvolKostku($s, kostky: [3, 3, 3])->getNewState();
+        $prvni = $q->getPendingStandFirm();
+        $this->assertNotNull($prvni);
+        $this->assertSame(2, $prvni->getPlayerId());
+        $zavisi = $prvni->getPushToDependsOn();
+        sort($zavisi);
+        $this->assertSame([3, 4, 5], $zavisi);
+
+        // „ne“ obránce i hráče v řetězu ⇒ obránce skončí jinde, než říkalo pole bez odpovědí řetězu
+        while (($otazka = $q->getPendingStandFirm()) !== null) {
+            if ($otazka->getPlayerId() !== 2) {
+                $this->assertSame([], $otazka->getPushToDependsOn(), 'za hráčem v řetězu je volné pole');
+            }
+            $q = $this->odpovez($q, ['use' => false])->getNewState();
+        }
+        $this->assertNotSame($this->pole($q, 2), [$prvni->getPushTo()?->getX(), $prvni->getPushTo()?->getY()]);
+    }
+
+    /** B&C HOME (5,7) šablonou na ležícího AWAY (6,7); za ním tři hráči se Stand Firm (ř. 7843-7845). */
+    private function bncNaLeziciho(): GameState
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 6, skills: [SkillName::StandFirm], id: 3)
+            ->addPlayer(TeamSide::AWAY, 7, 7, skills: [SkillName::StandFirm], id: 4)
+            ->addPlayer(TeamSide::AWAY, 7, 8, skills: [SkillName::StandFirm], id: 5)
+            ->withBallOffPitch()
+            ->build();
+
+        return $s->withPlayer($s->requirePlayer(2)->withState(\App\Enum\PlayerState::PRONE));
+    }
+
+    /**
+     * LOW 2: B&C odtlačuje ležícího (bez bloku) do řetězu -- hráč kouče-člověka se Stand Firm v řetězu
+     * se má rozhodnout sám (ř. 8510-8516 "may choose"); dřív držel bez otázky.
+     */
+    public function testBallAndChainNaLezicihoSeHraceVRetezuZepta(): void
+    {
+        $q = $this->resolver(array_fill(0, 20, 3))->resolve($this->bncNaLeziciho(), ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+        $otazka = $q->getPendingStandFirm();
+        $this->assertNotNull($otazka, 'řetěz do hráče se Stand Firm ⇒ otázka');
+        $this->assertContains($otazka->getPlayerId(), [3, 4, 5]);
+        $this->assertSame('bnc', $otazka->getKind());
+        $this->assertNull($otazka->getFace(), 'bez bloku');
+        $this->assertSame(2, $otazka->getDefenderId());
+        $this->assertSame([6, 7], $this->pole($q, 2), 'do odpovědi se nic nehne');
+        $znovu = GameState::fromArray(json_decode(json_encode($q->toArray(), JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR));
+        $this->assertEquals($otazka, $znovu->getPendingStandFirm());
+
+        // ne ⇒ hráč v řetězu odtlačen tam, kam říkala otázka, ležící na jeho pole, B&C následuje
+        $kdo = $otazka->getPlayerId();
+        $puvodni = $this->pole($q, $kdo);
+        $ne = $this->odpovez($q, ['use' => false])->getNewState();
+        $this->assertNull($ne->getPendingStandFirm());
+        $this->assertNotNull($otazka->getPushTo());
+        $this->assertSame([$otazka->getPushTo()->getX(), $otazka->getPushTo()->getY()], $this->pole($ne, $kdo));
+        $this->assertSame($puvodni, $this->pole($ne, 2));
+        $this->assertSame([6, 7], $this->pole($ne, 1));
+        $this->assertTrue($ne->requirePlayer(1)->hasActed());
+
+        // ano u všech ⇒ nikdo se nehne ("neither player moves")
+        $s = $q;
+        while ($s->getPendingStandFirm() !== null) {
+            $s = $this->odpovez($s, ['use' => true])->getNewState();
+        }
+        $this->assertSame([6, 7], $this->pole($s, 2));
+        foreach ([3 => [7, 6], 4 => [7, 7], 5 => [7, 8]] as $id => $pole) {
+            $this->assertSame($pole, $this->pole($s, $id));
+        }
+        $this->assertSame([5, 7], $this->pole($s, 1));
+    }
+
+    public function testBallAndChainNaLezicihoAIVRetezuSeNeptaADrzi(): void
+    {
+        $s = $this->resolver(array_fill(0, 20, 3), [TeamSide::HOME])->resolve($this->bncNaLeziciho(), ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+
+        $this->assertNull($s->getPendingStandFirm());
+        $this->assertSame([6, 7], $this->pole($s, 2));
+    }
+
+    /**
+     * LOW 3: B&C s pohybem 3 (ř. 7829-7833: pohyb po krocích šablonou). Odpověď v kroku 0 nesmí
+     * krok zopakovat ani přeskočit: ano ⇒ B&C stojí a pokračuje krokem 1; ne ⇒ obránce na (7,6),
+     * B&C následuje na (6,7), krok 1 na (7,7), krok 2 do obránce ⇒ další otázka v kroku 2.
+     */
+    public function testBallAndChainSPohybem3PokracujeDalsimKrokem(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 3, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands], id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 7, skills: [SkillName::StandFirm], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $q = $this->resolver(array_fill(0, 40, 3))->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1])->getNewState();
+        $this->assertSame(0, $q->getPendingStandFirm()?->getStep());
+
+        $ano = $this->resolver(array_fill(0, 40, 3))->resolve($q, ActionType::RESOLVE_STAND_FIRM, ['use' => true]);
+        $this->assertSame(1, $ano->getNewState()->getPendingStandFirm()?->getStep(), 'krok 1 znovu do téhož hráče');
+        $this->assertSame([5, 7], $this->pole($ano->getNewState(), 1));
+        $this->assertSame([6, 7], $this->pole($ano->getNewState(), 2));
+        $this->assertSame([], array_filter($ano->getEvents(), static fn($e) => $e->getType() === 'ball_and_chain_move' && $e->getData()['from'] !== '(5,7)'));
+
+        $ne = $this->resolver(array_fill(0, 40, 3))->resolve($q, ActionType::RESOLVE_STAND_FIRM, ['use' => false]);
+        $po = $ne->getNewState();
+        $this->assertSame(2, $po->getPendingStandFirm()?->getStep());
+        $this->assertSame([7, 6], $this->pole($po, 2));
+        $this->assertSame([7, 7], $this->pole($po, 1), 'follow-up na (6,7), krok 1 na (7,7)');
+        $pohyby = array_values(array_map(
+            static fn($e) => $e->getData()['from'] . '>' . $e->getData()['to'],
+            array_filter($ne->getEvents(), static fn($e) => $e->getType() === 'ball_and_chain_move'),
+        ));
+        $this->assertSame(['(6,7)>(7,7)', '(7,7)>(7,6)'], $pohyby, 'krok 1 a 2, nic dvakrát');
+    }
+
+    /** LOW 7 (parita s C++ P201 (4) SKILL_USED StandFirm): záznam říká, proč obránce zůstal stát. */
+    public function testUdalostStandFirmJenKdyzHoHracPouzije(): void
+    {
+        $q = $this->zvolKostku($this->stav())->getNewState();
+        $this->assertSame([2], $this->standFirmUdalosti($this->odpovez($q, ['use' => true])->getEvents()), 'člověk ano');
+        $this->assertSame([], $this->standFirmUdalosti($this->odpovez($q, ['use' => false])->getEvents()), 'člověk ne');
+
+        $ai = $this->zvolKostku($this->stav(), lide: [TeamSide::HOME]);
+        $this->assertSame([2], $this->standFirmUdalosti($ai->getEvents()), 'AI ho použije');
+
+        $s = $this->stav();
+        $zakoreneny = $this->zvolKostku($s->withPlayer($s->requirePlayer(2)->withRooted(true)), lide: [TeamSide::HOME]);
+        $this->assertSame([], $this->standFirmUdalosti($zakoreneny->getEvents()), 'zakořeněný není Stand Firm');
+
+        $bnc = $this->resolver(array_fill(0, 20, 3), [TeamSide::HOME])->resolve($this->bnc(), ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+        $this->assertSame([2], $this->standFirmUdalosti($bnc->getEvents()), 'i proti B&C');
+    }
 }

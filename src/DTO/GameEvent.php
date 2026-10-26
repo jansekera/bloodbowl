@@ -600,6 +600,18 @@ final class GameEvent
         ]);
     }
 
+    /**
+     * P226 (review LOW 7), parita s C++ P201 (4) (`SKILL_USED` StandFirm): hráč použil Stand Firm a
+     * nebyl odtlačen (`rules_bb2016.txt` ř. 8510-8516) -- v záznamu partie je vidět, proč zůstal stát.
+     */
+    public static function standFirm(int $playerId, int $attackerId): self
+    {
+        return new self('stand_firm', 'Stand Firm! Player is not pushed back', [
+            'playerId' => $playerId,
+            'attackerId' => $attackerId,
+        ]);
+    }
+
     public static function fend(int $playerId): self
     {
         return new self('fend', "Fend! No follow-up allowed", [

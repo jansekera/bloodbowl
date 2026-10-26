@@ -67,6 +67,12 @@ final class BlockHandler implements ActionHandlerInterface
     /** P225: odtlačení nanečisto -- jen pozice, bez kostek (zranění v davu, odrazy míče). */
     private bool $nanecisto = false;
 
+    /**
+     * @var array<int, true> review P226 (LOW 4): lidé v řetězu, kteří při přehrání nanečisto ještě
+     *   neodpověděli (přehrání je bere jako držící) -- na jejich odpovědi pole v otázce závisí.
+     */
+    private array $neodpovezeni = [];
+
     /** @param list<TeamSide> $strany */
     public function setAskStandFirm(array $strany): void
     {
@@ -76,7 +82,7 @@ final class BlockHandler implements ActionHandlerInterface
     /**
      * P226: odpověď kouče-člověka na Stand Firm hráče `$hrac`; null = rozhoduje AI (kouč se neptá).
      * Bez odpovědi přeruší vyhodnocení bloku otázkou (`StandFirmQuestion`, chytá `resolveBlockChoice`);
-     * při odtlačení nanečisto se neptá -- kdo ještě neodpověděl, drží.
+     * při odtlačení nanečisto se neptá -- kdo ještě neodpověděl, drží (a zapíše se do `neodpovezeni`).
      */
     private function odpovedKouce(MatchPlayerDTO $hrac): ?bool
     {
@@ -84,8 +90,16 @@ final class BlockHandler implements ActionHandlerInterface
             return null;
         }
 
-        return $this->standFirmOdpovedi[$hrac->getId()]
-            ?? ($this->nanecisto ? true : throw new StandFirmQuestion($hrac->getId()));
+        $odpoved = $this->standFirmOdpovedi[$hrac->getId()] ?? null;
+        if ($odpoved !== null) {
+            return $odpoved;
+        }
+        if (!$this->nanecisto) {
+            throw new StandFirmQuestion($hrac->getId());
+        }
+        $this->neodpovezeni[$hrac->getId()] = true;
+
+        return true;
     }
 
     /**
@@ -129,6 +143,23 @@ final class BlockHandler implements ActionHandlerInterface
             ?? !($pastFace !== null && $this->pastNaFrenzy($state, $attacker, $defender, $pastFace, $isBlitz));
     }
 
+    /**
+     * Review P226 (LOW 7, parita s C++ P201 (4) `SKILL_USED` StandFirm): obránce, který podle
+     * `obranceDrziPole` drží pole, použil Stand Firm -- ledaže je zakořeněný (to Stand Firm není,
+     * ř. 8578-8579). Dřív záznam partie neříkal, proč obránce odtlačen nebyl.
+     *
+     * @param list<GameEvent> $events
+     * @return list<GameEvent>
+     */
+    public function udalostStandFirm(MatchPlayerDTO $attacker, MatchPlayerDTO $defender, array $events): array
+    {
+        if (!$defender->isRooted()) {
+            $events[] = GameEvent::standFirm($defender->getId(), $attacker->getId());
+        }
+
+        return $events;
+    }
+
     /** Fend obránce zakazuje follow-up (ř. 8113-8118); Juggernaut v blitzu ho ruší (ř. 8193-8196). */
     private function fendBrani(MatchPlayerDTO $attacker, MatchPlayerDTO $defender, bool $isBlitz): bool
     {
@@ -148,6 +179,12 @@ final class BlockHandler implements ActionHandlerInterface
      * obránce bez Juggernautu v blitzu, ř. 8113-8118; zakořeněný útočník, ř. 8580-8583) a obránce
      * po odtlačení s ním nesousedí, druhá rána odpadne (ř. 8139-8141) ⇒ Stand Firm také nepoužije
      * (za podmínek (b), (c) a strany kostky výš). Sousedí-li dál, platí srovnání kostek (a).
+     *
+     * PROČ I V ŽIVÉ PARTII (review P226, LOW 5; rozhodnutí uživatele „1 a“): C++ v živé partii počítá
+     * s nejhorším přípustným polem odtlačení, protože tam pole volí kouč. V PHP je pole odtlačení
+     * deterministické -- kouč ho nevolí (`odtlacit` bere nejhorší pole sám), follow-up Frenzy je
+     * povinný, Grab se s Frenzy vylučuje (`maGrab`) a Side Step volí obránce-AI týmž pravidlem ⇒
+     * přehrání nanečisto je přesné a past platí i v živé partii.
      */
     private function pastNaFrenzy(
         GameState $state,
@@ -212,7 +249,7 @@ final class BlockHandler implements ActionHandlerInterface
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
-        bool $isBlitz,
+        bool $grabNeplati,
         ?array $odpovedi,
         Position|false|null $grabVolba,
     ): GameState {
@@ -225,7 +262,7 @@ final class BlockHandler implements ActionHandlerInterface
         $puvodni = $this->standFirmOdpovedi;
         $this->standFirmOdpovedi = $odpovedi;
         try {
-            [$po] = $this->resolvePushback($state, $attacker, $defender, $defender->requirePosition(), [], odlozitPoFollowUp: true, grabNeplati: $isBlitz, grabVolba: $grabVolba);
+            [$po] = $this->resolvePushback($state, $attacker, $defender, $defender->requirePosition(), [], odlozitPoFollowUp: true, grabNeplati: $grabNeplati, grabVolba: $grabVolba);
         } finally {
             $this->nanecisto = false;
             $this->standFirmOdpovedi = $puvodni;
@@ -249,35 +286,58 @@ final class BlockHandler implements ActionHandlerInterface
      */
     public function sOtazkouNaStandFirm(array $odpovedi, callable $fn): array
     {
+        // OPRAVENO 26.10.2026 (review P226, LOW 6) -- `finally` nuloval odpovědi (`= null`): vnořené
+        //   volání by vnějšímu zahodilo jeho odpovědi a vnější blok by se dál choval jako AI (drží).
+        //   Teď se uloží a vrátí jako v `odtlacitNanecisto`. Vnořená cesta dnes není (blok, MB, B&C
+        //   blok i B&C na ležícího volají tuhle metodu každý zvlášť).
+        $puvodni = $this->standFirmOdpovedi;
         $this->standFirmOdpovedi = $odpovedi;
         try {
             return [$fn(), null];
         } catch (StandFirmQuestion $otazka) {
             return [null, $otazka->playerId];
         } finally {
-            $this->standFirmOdpovedi = null;
+            $this->standFirmOdpovedi = $puvodni;
         }
     }
 
     /**
-     * P226 (review MEDIUM 2): kam by hráč `$kdo` šel, kdyby Stand Firm nepoužil -- přehrání odtlačení
-     * přímého obránce nanečisto (bez Grabu, ten volí útočník až potom); null = do davu.
+     * P226 (review MEDIUM 2): otázka na Stand Firm hráče `$kdo` s polem, kam by šel, kdyby Stand Firm
+     * nepoužil -- přehrání odtlačení přímo odtlačovaného `$defender` nanečisto, s týmiž argumenty jako
+     * skutečné odtlačení (`$grabNeplati`, `$grabVolba`). Vrací argumenty `PendingStandFirmDTO`:
+     *  - `pushTo`: pole; null = do davu;
+     *  - `grabPossible`: útočníka-člověka se po odpovědi „ne“ zeptá na Grab (`$sOtazkouNaGrab` --
+     *    blok a blok B&C, P224) ⇒ pole je bez Grabu a Grab ho může změnit;
+     *  - `pushToDependsOn`: lidé v řetězu, kteří ještě neodpověděli -- přehrání je bere jako držící,
+     *    jejich „ne“ pole změní.
+     *
+     * OPRAVENO 26.10.2026 (review P226, MEDIUM 1) -- přehrání vždy počítalo bez Grabu (`?? false`).
+     *   AI útočník se na Grab neptá a skutečné odtlačení s `grabVolba` null Grab použije (`odtlacit`,
+     *   `nejhorsiPrvni`) ⇒ dialog ukazoval jiné pole, než kam hráč skutečně šel. Pravidla ř. 8147-8150.
+     * OPRAVENO 26.10.2026 (review P226, LOW 4) -- kdo v řetězu ještě neodpověděl, toho přehrání bere
+     *   jako držícího; dialog pak říkal „nikam“, i když po jeho „ne“ hráč odtlačen byl.
      *
      * @param array<int, bool> $odpovedi
+     * @return array{pushTo: ?Position, grabPossible: bool, pushToDependsOn: list<int>}
      */
-    public function poleBezStandFirm(
+    public function otazkaNaStandFirm(
         GameState $state,
         MatchPlayerDTO $attacker,
         MatchPlayerDTO $defender,
-        bool $isBlitz,
+        bool $grabNeplati,
         array $odpovedi,
         Position|false|null $grabVolba,
+        bool $sOtazkouNaGrab,
         int $kdo,
-    ): ?Position {
+    ): array {
+        $grabPossible = $sOtazkouNaGrab && $grabVolba === null && $this->ptatSeNaGrab
+            && $this->grabSquares($state, $attacker, $defender, $grabNeplati) !== [];
         $odpovedi[$kdo] = false;
-
-        return $this->odtlacitNanecisto($state, $attacker, $defender, $isBlitz, $odpovedi, $grabVolba ?? false)
+        $this->neodpovezeni = [];
+        $pushTo = $this->odtlacitNanecisto($state, $attacker, $defender, $grabNeplati, $odpovedi, $grabPossible ? false : $grabVolba)
             ->requirePlayer($kdo)->getPosition();
+
+        return ['pushTo' => $pushTo, 'grabPossible' => $grabPossible, 'pushToDependsOn' => array_keys($this->neodpovezeni)];
     }
 
     /**
@@ -726,7 +786,7 @@ final class BlockHandler implements ActionHandlerInterface
                 $attacker->getId(),
                 $defender->getId(),
                 $chosenFace,
-                $this->poleBezStandFirm($state, $attacker, $defender, $isBlitz, $odpovedi, $grabVolba, $kdo),
+                ...$this->otazkaNaStandFirm($state, $attacker, $defender, $isBlitz, $odpovedi, $grabVolba, true, $kdo),
                 faceIndex: (int) $index,
                 answers: $odpovedi,
                 followUp: $followUpChoice,
@@ -1023,7 +1083,7 @@ final class BlockHandler implements ActionHandlerInterface
             $pending->getTargets(),
             $pending->getIndex(),
             [],
-            ['face' => $pending->getFace(), 'odpovedi' => $odpovedi],
+            ['face' => $pending->getFace() ?? throw new \LogicException('Multiple Block Stand Firm question has no block face'), 'odpovedi' => $odpovedi],
         );
     }
 
@@ -1233,7 +1293,8 @@ final class BlockHandler implements ActionHandlerInterface
                 $attacker->getId(),
                 $defender->getId(),
                 $face,
-                $this->poleBezStandFirm($state, $attacker, $defender, false, $odpovedi, null, $kdo),
+                // Multiple Block se na Grab neptá -- skutečné odtlačení volí jako AI (`grabVolba` null)
+                ...$this->otazkaNaStandFirm($state, $attacker, $defender, false, $odpovedi, null, false, $kdo),
                 kind: 'mb',
                 answers: $odpovedi,
                 targets: $targets,
@@ -1532,6 +1593,7 @@ final class BlockHandler implements ActionHandlerInterface
         // P226/P225: Stand Firm je volba (ř. 8510-8516) -- kouč-člověk, nebo AI (past na Frenzy).
         if ($defenderPushed && $this->obranceDrziPole($state, $attacker, $defender, $isBlitz, $druhaRanaFrenzy || $noFollowUp ? null : $face)) {
             $defenderPushed = false;
+            $events = $this->udalostStandFirm($attacker, $defender, $events);
         }
 
         // Handle pushback first

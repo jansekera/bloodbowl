@@ -117,6 +117,7 @@ export class GameLog {
             case 'wrestle': return 'block';
             case 'tentacles': return 'roll';
             case 'juggernaut': return 'block';
+            case 'stand_firm': return 'block';
             case 'diving_tackle': return 'roll';
             case 'leap': return 'roll';
             case 'throw_team_mate': return 'ball';
