@@ -102,7 +102,11 @@ void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
 inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
 void takeDodgeCapStops(long* out2);
-long takeP220Stops();   // P220: zastavení agilního před kontaktem ve skutečné chůzi (čte a nuluje)
+// P220: zastavení agilního před kontaktem. Total = každé rozbalení vč. simulací (nenuluje se);
+// Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
+long p220StopsTotal();
+void addP220RealStops(long n);
+long takeP220RealStops();
 
 enum class MacroType : uint8_t {
     SCORE = 0,

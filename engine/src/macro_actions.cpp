@@ -71,9 +71,14 @@ void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
     for (int i = 0; i < 2; ++i) { out2[i] = g_dodgeCapStops[i]; g_dodgeCapStops[i] = 0; }
 }
-// P220: kolikrát skutečná chůze (ne dotaz nabídky) zastavila agilního před kontaktem. Měřidlo mechanismu.
+// P220: zastavení agilního před kontaktem. `g_p220Stops` = každé rozbalení (i simulace hledání a klece),
+// ne dotaz nabídky; `g_p220RealStops` = jen skutečně hraný tah — přičítá ho macro_mcts.cpp rozdílem kolem
+// rozbalení vybraného makra (jako g_k6Noop). Pro měření „kolikrát se to stalo ve hře“ jen to druhé.
 thread_local long g_p220Stops = 0;
-long takeP220Stops() { const long v = g_p220Stops; g_p220Stops = 0; return v; }
+thread_local long g_p220RealStops = 0;
+long p220StopsTotal() { return g_p220Stops; }
+void addP220RealStops(long n) { g_p220RealStops += n; }
+long takeP220RealStops() { const long v = g_p220RealStops; g_p220RealStops = 0; return v; }
 
 // Kolik hráčů strany v tomto tahu ještě může začít aktivaci (stojící i ležící, kdo ještě
 // nehrál ani se nepohnul). Jedno místo pro strop na úhyb i pro cenu turnoveru v hledání.
@@ -3176,6 +3181,7 @@ static bool p220MustAvoidContact(const GameState& state, const Player& p, Positi
         state.forEachOnPitch(me, [&](const Player& m) {
             if (blockable || m.id == p.id || !isFreeToAct(m) || m.state != PlayerState::STANDING) return;
             const int d = m.position.distanceTo(x->position);
+            // Blitz: d − 1 kroků na pole vedle X a blok sám „costs one square of movement“ (ř. 549-550) ⇒ d.
             blockable = d == 1 || (blitzFree && d <= m.movementRemaining + maxGfiSquares(m));
         });
         if (blockable) return false;
@@ -3183,9 +3189,10 @@ static bool p220MustAvoidContact(const GameState& state, const Player& p, Positi
     return true;
 }
 // Kontakt se soupeřem při přesunu. `Free` = bez omezení. `EnRoute` = P211e (níž). `EnRouteAgileEnd` = navíc
-// P220: agilní hráč přesun nekončí v kontaktu. Přesuny z plánovače klece (`cageManaged`) mají jen `EnRoute`:
-// o poli rohu rozhoduje plánovač (pravidlo špinavého rohu), ne chůze — jinak by chůze roh zastavila,
-// rozbalení vrátilo prázdno a `abandonTurn` zahodil celý plán klece (review P220 23.10., MEDIUM).
+// P220: agilní hráč přesun nekončí v kontaktu. KAŽDÝ přesun z řadiče / plánovače klece (`cageManaged`: rohy,
+// nosič, markeři hrozeb P179, zaostalci, pomocníci — one_cage.cpp, cage_advance.cpp) má jen `EnRoute`:
+// o poli rozhoduje plánovač, ne chůze — jinak by chůze přesun zastavila, rozbalení vrátilo prázdno
+// a `abandonTurn` zahodil celý plán klece (review P220 23.10., MEDIUM).
 enum class Contact { Free, EnRoute, EnRouteAgileEnd };
 
 // P211e (uživatel 15.10.2026: „1 i 2 oprav — pro všechny hráče“): `Contact::EnRoute` = krok do cizí

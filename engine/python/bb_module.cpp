@@ -644,7 +644,7 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::takeMacroNoopStats(out);
         return std::vector<long>(out, out + bb::kMacroNoopSlots);
     });
-    m.def("take_p220_stops", []() { return bb::takeP220Stops(); });   // P220: čte a nuluje
+    m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);
         return py::make_tuple(v[0], v[1]);

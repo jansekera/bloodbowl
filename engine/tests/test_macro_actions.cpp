@@ -4678,6 +4678,7 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
                                 {"orc", "human"}, {"skaven", "wood-elf"}};
     int failed[static_cast<int>(MacroType::MACRO_COUNT)] = {0};
     int offered = 0, midActivation = 0;
+    const long p220Before = p220StopsTotal();
     for (int seed = 1; seed <= 10; ++seed) {
         const auto& rs = rosters[seed % 5];
         GameState state;
@@ -4708,6 +4709,8 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
     }
     ASSERT_GT(offered, 300) << "pozitivní kontrola: test musí projít dost nabídek";
     ASSERT_GT(midActivation, 20) << "pozitivní kontrola: pozice uprostřed aktivace musí nastat";
+    // Review P220 (26.10.): invariant musí projít i přes zastavení P220 — vzorek ho musí obsahovat.
+    ASSERT_GT(p220StopsTotal() - p220Before, 0) << "pozitivní kontrola: P220 v testu aspoň jednou zastavilo";
     std::string report;
     int total = 0;
     for (int t = 0; t < static_cast<int>(MacroType::MACRO_COUNT); ++t) {
@@ -5058,13 +5061,15 @@ TEST(MacroActions, P220LeavesCagePlannedMovesToThePlanner) {
     EXPECT_EQ(walk(true), kP220Contact) << "přesun z plánovače klece dojde";
 }
 
-// Čítač zastavení (review L): tiká jen při skutečném zastavení, ne u přesunu, který P220 nesoudí.
+// Čítač zastavení (review L): tiká při zastavení v rozbalení, ne u přesunu, který P220 nesoudí.
+// (Dotaz nabídky se testem nedá zachytit: generátor nabídky přesun do kontaktu nevytváří — ověřeno 26.10.)
 TEST(MacroActions, P220StopCounterTicksOnlyOnARealStop) {
-    takeP220Stops();
+    long before = p220StopsTotal();
     p220Walk(p220Board(4, false));
-    EXPECT_EQ(takeP220Stops(), 1) << "agilní zastaven před kontaktem";
+    EXPECT_EQ(p220StopsTotal() - before, 1) << "agilní zastaven před kontaktem";
+    before = p220StopsTotal();
     p220Walk(p220Board(3, false));
-    EXPECT_EQ(takeP220Stops(), 0) << "neagilní dojde, čítač netiká";
+    EXPECT_EQ(p220StopsTotal() - before, 0) << "neagilní dojde, čítač netiká";
 }
 
 TEST(MacroActions, P220ExceptionOwnBlitzStillHappens) {
