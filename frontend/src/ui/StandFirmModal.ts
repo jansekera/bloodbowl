@@ -33,7 +33,8 @@ export class StandFirmModal {
             : (playerPos && playerPos.x === pending.pushTo.x && playerPos.y === pending.pushTo.y)
                 ? 'nowhere (the push is blocked)'
                 : `to (${pending.pushTo.x}, ${pending.pushTo.y})`;
-        const die = pending.face === null ? 'Ball & Chain push of a prone player' : `die: ${pending.face}`;
+        // B&C na ležícího není blok (bez kostky) — „'s block“ by tu lhalo.
+        const what = pending.face === null ? 'Ball & Chain push of a prone player' : `block, die: ${pending.face}`;
         const notes = [
             pending.grabPossible ? 'The attacker may still choose another square with Grab.' : '',
             dependsOnNames.length > 0 ? `The square depends on Stand Firm of ${dependsOnNames.join(', ')} (not asked yet).` : '',
@@ -41,7 +42,7 @@ export class StandFirmModal {
         this.container.innerHTML = `
             <div class="reroll-modal__backdrop"></div>
             <div class="reroll-modal__content">
-                <div class="reroll-modal__title">${this.escape(playerName)} has Stand Firm — ${this.escape(attackerName)}'s block, ${this.escape(die)}${chain}. Use Stand Firm?</div>
+                <div class="reroll-modal__title">${this.escape(playerName)} has Stand Firm — ${this.escape(attackerName)}'s ${this.escape(what)}${chain}. Use Stand Firm?</div>
                 <div class="reroll-modal__text">Without Stand Firm he is pushed ${this.escape(target)}.${notes}</div>
                 <div class="reroll-modal__buttons">
                     <button class="reroll-modal__btn reroll-modal__btn--team" data-use="1">Stand Firm (stay)</button>

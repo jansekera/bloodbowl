@@ -33,7 +33,7 @@ ALTER TABLE skills ADD CONSTRAINT skills_category_check
         'General', 'Agility', 'Strength', 'Passing', 'Mutation', 'Extraordinary'
     ));
 
--- 2) match_events.event_type -- 81 hodnot podle App\Enum\GameEventType
+-- 2) match_events.event_type -- všechny hodnoty App\Enum\GameEventType (shodu hlídá GameEventTypeTest)
 ALTER TABLE match_events DROP CONSTRAINT IF EXISTS match_events_event_type_check;
 ALTER TABLE match_events ADD CONSTRAINT match_events_event_type_check
     CHECK (event_type IN (
