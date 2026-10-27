@@ -1334,6 +1334,39 @@ TEST(BlitzThreat, P228SturdyCornerIsSaferThanAPlainOne) {
     EXPECT_LT(threatWith(sturdy, 0), threatWith(plain, 0));
 }
 
+// ⭐ Uživatel 27.10.2026: „primární je, aby klec byla bezpečná — zjednodušení je, aby klec byla čistá,
+// ale při pohybu pomalého týmu vpřed se kontaktu za cenu, že posílíme, aby roh nebyl sražen, lze —
+// když jsme slabší tým, špinavý roh klece znamená sražení a blitz na nosiče — umíš ověřit“.
+// Zeď soupeřů na x = 14 (řádky 5–9) před klecí kolem (12,7): oba přední rohy stojí v její zóně.
+namespace {
+GameState wallThreatBoard(int8_t cornerSt, int8_t wallSt) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {14, 5}, 6);
+    for (int i = 0; i < 5; ++i) putPlayer(s, 12 + i, TeamSide::AWAY, {14, static_cast<int8_t>(5 + i)}, 6).stats.strength = wallSt;
+    for (int id = 2; id <= 5; ++id) s.getPlayer(id).stats.strength = cornerSt;
+    return s;
+}
+}  // namespace
+
+TEST(BlitzThreat, P228WeakerDirtyCornerMeansTheCarrierIsHitStrongerOrReinforcedIsSafer) {
+    const GameState equal = wallThreatBoard(3, 3);
+    const GameState weaker = wallThreatBoard(3, 4);
+    const GameState stronger = wallThreatBoard(4, 3);
+    GameState reinforced = equal.clone();                     // posílení: Guard na křídlech u předních rohů
+    putPlayer(reinforced, 6, TeamSide::HOME, {13, 5}).skills.add(SkillName::Guard);
+    putPlayer(reinforced, 7, TeamSide::HOME, {13, 9}).skills.add(SkillName::Guard);
+    const double tEq = threatWith(equal, 0), tWeak = threatWith(weaker, 0), tStrong = threatWith(stronger, 0),
+                 tReinf = threatWith(reinforced, 0), tEqOff = threatWith(equal, kP228DirtyCorner);
+    std::fprintf(stderr, "[P228 ověření] bez P228 %.3f · stejná síla %.3f · slabší %.3f · silnější %.3f · posílené Guardem %.3f\n",
+                 tEqOff, tEq, tWeak, tStrong, tReinf);
+    // 27.10.: bez P228 0,055 · stejná síla 0,33 · slabší 0,55 · silnější 0,33 · posílené 0,087
+    EXPECT_GT(tWeak, kSafeBlitzThreat) << "slabší špinavý roh = sražení a rána na nosiče";
+    EXPECT_GT(tWeak, tEq + 0.1);
+    EXPECT_LE(tReinf, kSafeBlitzThreat) << "posílený roh (Guard: soupeř blokuje roh proti 2 kostkám) je bezpečný";
+    // Silnější roh BEZ posílení nepomůže: soupeř u zdi si přivede asistenci souseda (ST3+1 na ST4 =
+    // jedna kostka) a roh je pryč i při Pushed (5 ze 6 stěn) — riziko zůstává nad mezí.
+    EXPECT_GT(tStrong, kSafeBlitzThreat);
+}
+
 // Plánovač vybírá pole, kde je nosič po tahu v bezpečí před dobrou ranou, a mezi nimi to nejdál —
 // i šikmo: na řádku nosiče stojí zeď, o tři řádky níž je volno.
 TEST(CageAdvance, PicksTheFarthestSquareWhereTheCarrierIsSafeNotJustStraightAhead) {
