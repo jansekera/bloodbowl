@@ -139,8 +139,48 @@ PARTIE = {
                     " · RW runner Horns+Wrestle · RS runner Sprint · OG rat ogre",
                     "role trpaslíci: L longbeard · LW longbeard Wrestle · LG longbeard s GUARD · R runner"
                     " · B blitzer · BP blitzer s Pro · SG troll slayer s GUARD")},
+    "zed-orkove": {   # 27.10.2026 (P229): pomalejší orčí klec před zdí lidí, přední rohy bez Block
+        "soupisky": ("orc", "human"), "tv": 1500, "seminko": 20261027, "adresar": "play_20261027_zed",
+        "jmena": ("ORKOVÉ", "LIDÉ"), "kratce": ("ORK", "LID"), "pismena": ("O", "H"),
+        "kdo": ("ork", "člověk"), "role": (_role_orkove, _role_lide),
+        "legenda": ("role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro"
+                    " · BH lovec míče · KG black orc s GUARD · KX black orc s GUARD a GRAB",
+                    "role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
+                    " · BT blitzer MB+Tackle · BH lovec míče · OG ogre"),
+        # id: (x, y) — orkové útočí doprava (TD x=25), na tahu jsou orkové, 1. poločas 4. kolo
+        "pozice": {3: (12, 7), 4: (11, 6), 5: (11, 8), 1: (13, 6), 2: (13, 8), 8: (9, 2), 6: (9, 12), 7: (8, 7),
+                   9: (6, 4), 10: (6, 10), 11: (5, 7),
+                   13: (14, 5), 14: (14, 6), 21: (14, 7), 12: (14, 8), 22: (14, 9),
+                   16: (17, 3), 17: (17, 11), 18: (20, 7), 19: (19, 9), 20: (19, 5), 15: (22, 7)},
+        "nosic": 3, "kolo": 4},
 }
 P = PARTIE[os.environ.get("BB_PARTIE", "lide-orkove")]
+
+
+def zaloz_pozici(state):
+    """Partie s hotovou pozicí (P["pozice"]): soupisky, rozestavení, míč u nosiče, na tahu HOME."""
+    bb.setup_half(state, ROSTERS[0], ROSTERS[1], bb.TeamSide.AWAY)
+    for pid in range(1, 33):          # všichni z obou soupisek, i náhradníci (lidé od id 12)
+        try:
+            p = state.get_player(pid)
+        except Exception:
+            continue
+        x, y = P["pozice"].get(pid, (-1, -1))
+        p.position = bb.Position(x, y)
+        p.state = bb.PlayerState.STANDING if x >= 0 else bb.PlayerState.OFF_PITCH
+        p.movement_remaining = p.stats.movement
+        p.has_moved = False
+        p.has_acted = False
+    c = state.get_player(P["nosic"])
+    state.ball.position = c.position
+    state.ball.is_held = True
+    state.ball.carrier_id = c.id
+    state.kicking_team = bb.TeamSide.AWAY
+    state.active_team = bb.TeamSide.HOME
+    state.phase = bb.GamePhase.PLAY
+    state.half = 1
+    state.home_team.turn_number = P["kolo"]
+    state.away_team.turn_number = P["kolo"] - 1   # soupeři se kolo zvýší, až převezme tah
 
 # BB_PLAY_DIR = jiný adresář partie (zkoušky); stejnou proměnnou čte bb_play_cmd.py
 DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -739,7 +779,7 @@ def main():
             ticho = False
             zalogovano = False
             if line.split() and line.split()[0] in ("do", "do!", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
-                                                      "kouc", "odp", "sidestep", "los", "volba"):
+                                                      "kouc", "odp", "sidestep", "los", "volba", "pozice"):
                 with open(LOG, "a") as f:
                     f.write(line + "\n")
                 zalogovano = True
@@ -797,6 +837,10 @@ def main():
                     result_lines += kopni(prvni_kope, lambda s, k, d: bb.setup_half(s, ROSTERS[0], ROSTERS[1], k) or [])
                     zalozeno = True
                     result_lines.append(board(state))
+            elif cmd == "pozice" and not zalozeno and "pozice" in P:
+                zaloz_pozici(state)
+                zalozeno = True
+                result_lines.append(board(state))
             elif not zalozeno and cmd != "kouc":
                 result_lines.append("zápas ještě nezačal: napřed `kouc HOME` (kdo je člověk), pak `los`"
                                     + ("; teď čeká `volba kopat|prijimat`" if los_vitez is not None else ""))
