@@ -885,7 +885,7 @@ TEST(OneCageWallShift, TwoRowsWithTheBoundCornerAsACornerNotOneRowNextToIt) {
     b.s.getPlayer(1).movementRemaining = 2;
     const CageTurn t = cageTurn(b);
     EXPECT_EQ(t.carrier.x, 12);
-    EXPECT_TRUE(t.carrier.y == 5 || t.carrier.y == 9) << "nosič (" << t.carrier.x << "," << t.carrier.y << ")";
+    EXPECT_TRUE(t.carrier.y == 5 || t.carrier.y == 9) << "nosič (" << int(t.carrier.x) << "," << int(t.carrier.y) << ")";
     EXPECT_EQ(cornersAround(b.s, t.carrier), 4);
     EXPECT_TRUE(b.s.getPlayer(4).position == (Position{13, 6}) && b.s.getPlayer(5).position == (Position{13, 8}))
         << "přední rohy zůstaly u zdi";
@@ -930,6 +930,27 @@ TEST(OneCageWallShift, AHalfBuiltShiftIsAbandoned) {
     while (cc.next(b.s, m)) { rest.push_back(m); play(b.s, m); }
     for (const Macro& r : rest) EXPECT_NE(r.playerId, 1) << "nosič k nedostavěné kleci";
     EXPECT_EQ(b.s.getPlayer(1).position, (Position{12, 7}));
+}
+
+// Review 27.10.: roh přes GFI je ÚPLNĚ poslední akce tahu (nepovedené GFI = turnover) — až po nosiči,
+// vazačích i zaostalcích. Na roh (13,3) dojde jen hráč 9 (MA 1) přes jedno GFI (ostatní mají málo pohybu).
+TEST(OneCageWallShift, TheGfiCornerIsTheLastActionOfTheTurn) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(6).position = {2, 13};                          // daleko, na rohy nedojde
+    b.s.getPlayer(8).position = {2, 1};
+    b.s.getPlayer(7).position = {9, 3};                           // MA 2: dojde jen na (11,3)
+    b.s.getPlayer(7).movementRemaining = 2;
+    b.s.getPlayer(2).movementRemaining = 2;                       // zadní roh MA 2: na (13,3) nedojde
+    b.put(9, TeamSide::HOME, {11, 1}, 1);
+    const CageTurn t = cageTurn(b);
+    int gfiAt = -1, carrierAt = -1;
+    for (size_t i = 0; i < t.macros.size(); ++i) {
+        if (t.macros[i].playerId == 1) carrierAt = static_cast<int>(i);
+        if (t.macros[i].gfiAllowance > 0 && t.macros[i].playerId != 1) gfiAt = static_cast<int>(i);
+    }
+    ASSERT_GE(gfiAt, 0) << "předpoklad: klec se dostaví jen s rohem přes GFI";
+    EXPECT_GT(gfiAt, carrierAt) << "roh přes GFI až po nosiči";
+    EXPECT_EQ(gfiAt, static_cast<int>(t.macros.size()) - 1) << "a úplně poslední";
 }
 
 TEST(OneCageHits, OneDieOnlyWithBlockOrWrestle) {
