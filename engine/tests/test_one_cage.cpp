@@ -878,6 +878,60 @@ TEST(OneCageWallShift, CornerGoesToAPlayerWithoutGfiFirst) {
     for (const Macro& m : t.macros) EXPECT_FALSE(m.playerId == 9 && m.gfiAllowance > 0) << "roh přes GFI, i když šel bez hodu";
 }
 
+// Review 27.10.: nosič dojde jen o 1–2 řady. O řadu by stál přímo vedle vázaného předního rohu (klec = jen
+// čtyři rohy ⇒ ne); o dvě řady je vázaný přední roh rohem nové klece (dřív se o dvě řady nedalo nikdy).
+TEST(OneCageWallShift, TwoRowsWithTheBoundCornerAsACornerNotOneRowNextToIt) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(1).movementRemaining = 2;
+    const CageTurn t = cageTurn(b);
+    EXPECT_EQ(t.carrier.x, 12);
+    EXPECT_TRUE(t.carrier.y == 5 || t.carrier.y == 9) << "nosič (" << t.carrier.x << "," << t.carrier.y << ")";
+    EXPECT_EQ(cornersAround(b.s, t.carrier), 4);
+    EXPECT_TRUE(b.s.getPlayer(4).position == (Position{13, 6}) && b.s.getPlayer(5).position == (Position{13, 8}))
+        << "přední rohy zůstaly u zdi";
+}
+TEST(OneCageWallShift, NeverOneRowNextToTheBoundCorner) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(1).movementRemaining = 1;
+    const CageTurn t = cageTurn(b);
+    EXPECT_NE(t.carrier, (Position{12, 6})) << "vedle vázaného rohu (13,6)";
+    EXPECT_NE(t.carrier, (Position{12, 8})) << "vedle vázaného rohu (13,8)";
+}
+
+// „Klec má být jen čtyři rohy“ (uživatel 27.10.) platí i pro zaostalce: dojde-li zaostalec nejdál ke sloupci
+// nosiče, nestaví se na pole přímo vedle něj. Klec stojí (4 rohy), zaostalec MA4 z (8,7) dojde nejdál do
+// sloupce 12.
+TEST(OneCageLaggards, LaggardDoesNotStandRightNextToTheCarrier) {
+    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak | kP230WallShift); } ~Off() { setExtraFeaturesOff(0); } } off;
+    Board b = walledCageBoard(2);                                 // klec stojí (OneCagePin)
+    b.put(6, TeamSide::HOME, {8, 7}, 4);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    ASSERT_EQ(cp, (Position{12, 7})) << "předpoklad: klec stojí";
+    const Position p6 = b.s.getPlayer(6).position;
+    ASSERT_NE(p6, (Position{8, 7})) << "předpoklad: zaostalec šel dopředu";
+    EXPECT_NE(std::abs(p6.x - cp.x) + std::abs(p6.y - cp.y), 1) << "zaostalec (" << int(p6.x) << "," << int(p6.y) << ") vedle nosiče";
+}
+
+// Review 27.10. (nález 5): přestavba P230 platí jen celá. První přesun na roh „nedojde“ (tady ho ručně vrátíme
+// na start) ⇒ řadič zbytek přestavby nehraje (zbytek tahu dostane hledání) a nosič se k nedostavěné kleci nepřesune.
+TEST(OneCageWallShift, AHalfBuiltShiftIsAbandoned) {
+    Board b = wallWithHelpers(4);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    ASSERT_TRUE(cc.next(b.s, m));
+    ASSERT_EQ(m.type, MacroType::REPOSITION);
+    ASSERT_NE(m.playerId, 1) << "přestavba začíná rohem";
+    const Position start = b.s.getPlayer(m.playerId).position;
+    play(b.s, m);
+    b.s.getPlayer(m.playerId).position = start;                  // nedošel
+    std::vector<Macro> rest;
+    while (cc.next(b.s, m)) { rest.push_back(m); play(b.s, m); }
+    for (const Macro& r : rest) EXPECT_NE(r.playerId, 1) << "nosič k nedostavěné kleci";
+    EXPECT_EQ(b.s.getPlayer(1).position, (Position{12, 7}));
+}
+
 TEST(OneCageHits, OneDieOnlyWithBlockOrWrestle) {
     Board b(2);
     b.put(1, TeamSide::HOME, {12, 7});

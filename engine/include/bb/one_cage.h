@@ -136,6 +136,8 @@ private:
     // P230: pomalejší klec u zdi, na zeď nesmí bít nikdo ⇒ celá klec (4 rohy) ve stejném sloupci posunutá
     // po řadách; `bound` = přední rohy, které zeď drží (zůstávají). True = do fronty šel přesun.
     bool planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound);
+    // P230: přestavba klece platí jen celá — nedojde-li hráč na své pole, zbytek fronty se zahodí (review 27.10.)
+    bool strictQueue_ = false;
 
     // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
     CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);
