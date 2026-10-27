@@ -488,6 +488,34 @@ void playAll(CageController& cc, Board& b, std::vector<Macro>* out = nullptr) {
 }
 }  // namespace
 
+// P169 krok 4 + uživatel 27.10.2026 („block na 1 kostku bez block se nemá dít“). Řadič bere rány z nabídky
+// hledání (getAvailableMacros), a ta pravidlo hlídá (hitAllowed) — test hlídá požadavek na tom místě. Soupeř ST 5 stojí
+// přímo před nosičem (12,7). Bijí na něj dva naši, oba na jednu kostku (ST 3 + 2 asistence):
+// hráč 4 z (12,6) vedle nosiče, bez Block (jeho odsun na (14,8) soupeře od nosiče odvede — dřív proto
+// vyhrál by, kdyby ho nabídka pustila) a hráč 5 z (14,7) s Block.
+// Řadič vezme toho, kdo jednu kostku smí, tedy 5.
+TEST(OneCageFreeing, MarkerNextToTheCarrierIsHitOnOneDieOnlyWithBlock) {
+    struct Off { Off() { setExtraFeaturesOff(kP213EscapeFirst | kP217BestChance | kP229WallBreak); } ~Off() { setExtraFeaturesOff(0); } } off;
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7}, 4);
+    b.put(2, TeamSide::HOME, {11, 6});
+    b.put(3, TeamSide::HOME, {11, 8});
+    b.put(4, TeamSide::HOME, {12, 6});
+    b.put(5, TeamSide::HOME, {14, 7}, 4, 3, {SkillName::Block});
+    b.put(13, TeamSide::AWAY, {13, 7}, 6, 5);
+    b.put(14, TeamSide::AWAY, {24, 13}, 6);
+    b.s.ball = BallState::carried({12, 7}, 1);
+    ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(13)), 1);
+    ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(5), b.s.getPlayer(13)), 1);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    for (const Macro& m : ms) EXPECT_FALSE(m.type == MacroType::BLOCK && m.playerId == 4) << "1 kostka bez Block";
+    EXPECT_TRUE(std::any_of(ms.begin(), ms.end(), [](const Macro& m) {
+        return m.type == MacroType::BLOCK && m.playerId == 5 && m.targetId == 13;
+    })) << "soupeře od nosiče shodí hráč s Block";
+}
+
 // (a) „uvolnit rohového blokem nebo blitzem — nebo jej nahradit volným“
 TEST(OneCageFreeing, SafeBlockFreesATeammateHeldByOneOpponent) {
     auto board = [](bool attackerHasBlock) {
@@ -588,6 +616,10 @@ TEST(OneCageJoin, CarrierWithoutACageGoesWhereTheCageCanForm) {
 
 // (b) „nosič dál jen s klecí“ + „na konci poločasu musí vyběhnout, aby stihl TD“
 TEST(OneCagePin, CarrierStaysInTheCageWhenTheAdvanceFails) {
+    // Hlídá P154 b (nosič bez postupu klece nevybíhá) se starou hrozbou. S P228 jsou rohy u zdi špinavé
+    // (hrozba 0,29) a bez prolomení (rohy bez Block na 1 kostku nebijí) řadič nosiče odvede tam, kde je
+    // hrozba menší — to je jiné pravidlo (P169 krok 3), ne tohle.
+    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = walledCageBoard(2);
     CageController cc(nullptr, cfg(), 1);
     playAll(cc, b);
@@ -651,6 +683,20 @@ Board wallWithHelpers(int8_t runnersMa) {
     b.put(8, TeamSide::HOME, {9, 7}, 9);
     return b;
 }
+// Přední rohy a blitzer s Block: rány zdi jsou tu na jednu kostku (asistence ruší křídla i rohy navzájem),
+// a ta je při prolamování dovolená jen s Block (uživatel 27.10.: „block na 1 kostku bez block se nemá dít“).
+Board wallWithBlockers(int8_t runnersMa) {
+    Board b = wallWithHelpers(runnersMa);
+    for (int id : {4, 5, 8}) b.s.getPlayer(id).skills.add(SkillName::Block);
+    return b;
+}
+// kostky rány `att` na `def` na desce, kde už stojí asistenti na křídlech (13,5) a (13,9)
+int diceWithWings(const Board& b, int att, int def) {
+    GameState s = b.s.clone();
+    s.getPlayer(6).position = {13, 5};
+    s.getPlayer(7).position = {13, 9};
+    return blockDiceCount(s, s.getPlayer(att), s.getPlayer(def));
+}
 struct CageTurn { std::vector<Macro> macros; Position carrier; };
 CageTurn cageTurn(Board& b) {
     CageController cc(nullptr, cfg(), 1);
@@ -672,7 +718,8 @@ bool hasMacro(const CageTurn& t, MacroType type, int player, int target = -1, Po
 }  // namespace
 
 TEST(OneCageWallBreak, SlowerCageBreaksTheWallInTheUsersOrder) {
-    Board b = wallWithHelpers(4);
+    Board b = wallWithBlockers(4);
+    ASSERT_EQ(diceWithWings(b, 4, 14), 1) << "s asistenty na křídlech jedna kostka";
     ASSERT_EQ(b.s.getPlayer(14).position, (Position{14, 6}));
     ASSERT_EQ(b.s.getPlayer(15).position, (Position{14, 7}));
     ASSERT_EQ(b.s.getPlayer(16).position, (Position{14, 8}));
@@ -692,6 +739,49 @@ TEST(OneCageWallBreak, SlowerCageBreaksTheWallInTheUsersOrder) {
     EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič stojí — neobíhá";
 }
 
+// Review 27.10.: kostky se počítají znovu těsně před ranou. Křídlo (13,5) po přesunu zmizí (tady ručně —
+// ve hře třeba nevyjde přesun) ⇒ soupeř 13 na (14,5) zase asistuje a roh 4 na soupeře 14 by bil na dvě
+// kostky, které volí obránce ⇒ rána se nehraje (zbytek tahu přebírá hledání).
+TEST(OneCageWallBreak, DiceAreCheckedAgainRightBeforeTheHit) {
+    Board b = wallWithBlockers(4);
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> played;
+    Macro m;
+    bool wingGone = false;
+    while (cc.next(b.s, m)) {
+        played.push_back(m);
+        play(b.s, m);
+        if (!wingGone && m.type == MacroType::REPOSITION && m.playerId == 6 && b.s.getPlayer(6).position == (Position{13, 5})) {
+            b.s.getPlayer(6).position = {10, 3};
+            wingGone = true;
+            ASSERT_LT(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(14)), 1) << "předpoklad: bez křídla volí obránce";
+        }
+    }
+    ASSERT_TRUE(wingGone) << "prolomení začalo křídlem 6";
+    // plán se rozešel s deskou ⇒ zbytek tahu dostane hledání (next() vrátí false), řadič už nebije
+    for (const Macro& p : played) EXPECT_FALSE(p.type == MacroType::BLOCK && p.playerId == 4) << "roh 4 bez křídla neblokuje";
+}
+
+// Uživatel 27.10.2026: „block na 1 kostku bez block se nemá dít“. Táž zeď jako výš, rohy i blitzer bez
+// Block: každá rána by byla na jednu kostku (turnover 1/3) ⇒ prolomení nebije vůbec.
+TEST(OneCageWallBreak, NoOneDieHitWithoutBlock) {
+    Board b = wallWithHelpers(4);
+    ASSERT_EQ(diceWithWings(b, 4, 14), 1) << "s asistenty na křídlech jedna kostka";
+    ASSERT_EQ(diceWithWings(b, 5, 16), 1);
+    {   // blitzer 8 z pole před nosičem (13,7) na soupeře 15: taky jedna kostka
+        GameState s = b.s.clone();
+        s.getPlayer(6).position = {13, 5};
+        s.getPlayer(7).position = {13, 9};
+        s.getPlayer(8).position = {13, 7};
+        ASSERT_EQ(blockDiceCount(s, s.getPlayer(8), s.getPlayer(15)), 1);
+    }
+    const CageTurn t = cageTurn(b);
+    for (const Macro& m : t.macros) {
+        if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) continue;
+        ADD_FAILURE() << "rána hráče " << m.playerId << " na " << m.targetId << " bez Block";
+    }
+}
+
 // Review 27.10. (nález 1): nosič stojí vedle soupeře, kterého rány řadiče neodstraní (ST 7, Stand
 // Firm) ⇒ zeď nepočká jen na prolamování: napřed úhyb nosiče z kontaktu (P190) a pojistky bezpečí.
 // Prolomení by nosiče nechalo stát v kontaktu.
@@ -708,7 +798,7 @@ TEST(OneCageWallBreak, MarkedCarrierDoesNotBreakTheWall) {
 // „Pozor na průměr — počítej jen část týmu“: daleko od klece stojí tři hráči MA 10, průměr týmu
 // (77 / 11 = 7) je nad zdí (MA 6). Obíhat by ale musel nosič a zadní rohy MA 4 ⇒ prolamuje.
 TEST(OneCageWallBreak, TeamAverageDoesNotMakeTheCageFaster) {
-    Board b = wallWithHelpers(4);
+    Board b = wallWithBlockers(4);
     b.put(9, TeamSide::HOME, {2, 1}, 10);
     b.put(10, TeamSide::HOME, {2, 13}, 10);
     b.put(11, TeamSide::HOME, {1, 7}, 10);
@@ -733,17 +823,78 @@ TEST(OneCageWallBreak, FasterCageDoesNotBreakTheWall) {
     EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));
 }
 
-// Rychlejší, ale silnější (přední rohy ST 4 proti ST 3; asistence soupeřů ruší křídla ⇒ 2 kostky
-// pro nás) ⇒ prolamuje.
+// Rychlejší, ale silnější (přední rohy ST 4 proti ST 3; s křídly 2 kostky pro nás) ⇒ prolamuje
+// (uživatel 27.10.: „silnější prolamuje, i když je rychlejší“).
 TEST(OneCageWallBreak, FasterButStrongerCageBreaksTheWall) {
     Board b = wallWithHelpers(7);
     b.s.getPlayer(4).stats.strength = 4;
     b.s.getPlayer(5).stats.strength = 4;
-    ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(14)), 1) << "bez křídel jen jedna kostka (asistence zdi)";
+    ASSERT_EQ(diceWithWings(b, 4, 14), 2);
     const CageTurn t = cageTurn(b);
     EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 4, 14));
     EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 5, 16));
     EXPECT_EQ(t.carrier, (Position{12, 7}));
+}
+
+// --- P230 (partie 27.10.2026): pomalejší klec u zdi, rána nejde ⇒ celá klec po řadách ve stejném sloupci ---
+// Uživatel: „šel bych do cílové situace, kdy je celá klec OK na místě s nižším Y“; „klec má být jen čtyři
+// rohy“; „A [prolomit] dělá pomalejší … nejhorší je nedělat nic“. Deska jako NoOneDieHitWithoutBlock:
+// přední rohy bez Block mají na zeď jen jednu kostku ⇒ prolomení nebije.
+static int cornersAround(const GameState& s, Position c) {
+    int n = 0;
+    for (int dx : {-1, 1}) for (int dy : {-1, 1}) {
+        const Player* q = s.getPlayerAtPosition({static_cast<int8_t>(c.x + dx), static_cast<int8_t>(c.y + dy)});
+        if (q && q->teamSide == TeamSide::HOME && q->state == PlayerState::STANDING) ++n;
+    }
+    return n;
+}
+TEST(OneCageWallShift, SlowerCageThatMayNotHitShiftsAlongTheWall) {
+    Board b = wallWithHelpers(4);
+    const double before = blitzThreat(b.s, b.s.getPlayer(1));
+    const CageTurn t = cageTurn(b);
+    for (const Macro& m : t.macros) EXPECT_FALSE(m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) << "hráč " << m.playerId;
+    EXPECT_EQ(t.carrier.x, 12) << "stejný sloupec — neobíhá, neustupuje";
+    EXPECT_NE(t.carrier.y, 7) << "klec se posunula po řadách (nestojí)";
+    EXPECT_EQ(cornersAround(b.s, t.carrier), 4) << "celá klec: čtyři rohy";
+    for (int dx = -1; dx <= 1; ++dx) for (int dy = -1; dy <= 1; ++dy) {
+        if ((dx == 0) == (dy == 0)) continue;                         // jen pole přímo vedle nosiče
+        const Player* q = b.s.getPlayerAtPosition({static_cast<int8_t>(t.carrier.x + dx), static_cast<int8_t>(t.carrier.y + dy)});
+        EXPECT_FALSE(q && q->teamSide == TeamSide::HOME) << "naši vedle nosiče na (" << t.carrier.x + dx << "," << t.carrier.y + dy << ")";
+    }
+    EXPECT_EQ(b.s.getPlayer(4).position, (Position{13, 6})) << "přední roh drží zeď";
+    EXPECT_EQ(b.s.getPlayer(5).position, (Position{13, 8}));
+    EXPECT_LT(blitzThreat(b.s, b.s.getPlayer(1)), before) << "nosič po přestavbě bezpečněji";
+}
+
+// „jestli by na roh došel někdo bez GFI … asi by měl přednost“: hráč 9 (MA 1) stojí u rohu blíž, ale dojde
+// jen přes GFI; roh dostane hráč, který dojde bez hodu.
+TEST(OneCageWallShift, CornerGoesToAPlayerWithoutGfiFirst) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(6).position = {8, 3};
+    b.put(9, TeamSide::HOME, {11, 1}, 1);
+    const CageTurn t = cageTurn(b);
+    ASSERT_EQ(t.carrier.x, 12);
+    ASSERT_EQ(cornersAround(b.s, t.carrier), 4);
+    for (const Macro& m : t.macros) EXPECT_FALSE(m.playerId == 9 && m.gfiAllowance > 0) << "roh přes GFI, i když šel bez hodu";
+}
+
+TEST(OneCageHits, OneDieOnlyWithBlockOrWrestle) {
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 7});
+    b.put(2, TeamSide::HOME, {12, 9}, 6, 3, {SkillName::Block});
+    b.put(3, TeamSide::HOME, {12, 11}, 6, 3, {SkillName::Wrestle});
+    b.put(4, TeamSide::HOME, {12, 13}, 6, 3, {SkillName::Wrestle});
+    b.s.ball = BallState::carried({12, 13}, 4);
+    EXPECT_TRUE(hitAllowed(b.s, b.s.getPlayer(1), 2));
+    EXPECT_TRUE(hitAllowed(b.s, b.s.getPlayer(1), 3));
+    EXPECT_FALSE(hitAllowed(b.s, b.s.getPlayer(1), 1)) << "1 kostka bez Block a Wrestle";
+    EXPECT_TRUE(hitAllowed(b.s, b.s.getPlayer(2), 1)) << "1 kostka s Block";
+    EXPECT_FALSE(hitAllowed(b.s, b.s.getPlayer(2), -2)) << "volí obránce";
+    // uživatel 27.10.: „stejně jako bereš 1 kostku s block, tak ber stejně s wrestle — není turnover na both down“
+    EXPECT_TRUE(hitAllowed(b.s, b.s.getPlayer(3), 1)) << "1 kostka s Wrestle";
+    EXPECT_FALSE(hitAllowed(b.s, b.s.getPlayer(3), -2)) << "Wrestle nepomůže, když volí obránce";
+    // ř. 8670–8677: Wrestle u nosiče = turnover (položí i jeho)
+    EXPECT_FALSE(hitAllowed(b.s, b.s.getPlayer(4), 1)) << "nosič s Wrestle ne";
 }
 
 // Pomalejší klec bez předních rohů (jako CageAdvance.FillsTheCageWhenTheAdvanceCannotRun): plánovač
@@ -978,6 +1129,9 @@ TEST(OneCageKeepsCorners, CarrierIsNeverPickedAsTheBlitzer) {
 }
 
 TEST(OneCageKeepsCorners, FrenzyCornerDoesNotBlock) {
+    // Hlídá P169 (Frenzy roh neblokuje) u klece, která stojí. S P228–P230 klec u zdi bez volných hráčů stát
+    // nezůstane (nosič odejde na pole s nižší hrozbou) — jiné pravidlo, proto bez nich.
+    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak | kP230WallShift); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = walledCageBoard(2);
     b.s.getPlayer(4).skills.add(SkillName::Frenzy);                   // přední roh (13,6) vedle zdi na x=14
     CageController cc(nullptr, cfg(), 1);

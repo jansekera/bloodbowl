@@ -1291,6 +1291,14 @@ int blockDiceCount(const GameState& state, const Player& attacker, const Player&
     return getBlockDiceCount(state, attacker, defender, false, false);
 }
 
+bool hitAllowed(const GameState& state, const Player& attacker, int dice) {
+    if (dice >= 2) return true;
+    if (dice != 1) return false;
+    if (attacker.hasSkill(SkillName::Block)) return true;
+    const bool holdsBall = state.ball.isHeld && state.ball.carrierId == attacker.id;
+    return attacker.hasSkill(SkillName::Wrestle) && !holdsBall;
+}
+
 // Combined estimate used to rank blitzer candidates for a fixed target:
 // block-dice risk and approach risk are treated as independent enough for
 // a cheap combination. Lower is better (0 = certain success).
@@ -2395,10 +2403,8 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // (negative count). The ball carrier is excluded outright: his
             // turnovers are the ones that end drives.
             int dice = getBlockDiceCount(state, att, *def, false, dauntlessInOffer);
-            bool oneDieWorthOffering =
-                dice == 1 && att.hasSkill(SkillName::Block) &&
-                !(state.ball.isHeld && state.ball.carrierId == att.id);
-            if (dice >= 2 || oneDieWorthOffering) {
+            const bool carrierOnOneDie = dice == 1 && state.ball.isHeld && state.ball.carrierId == att.id;
+            if (hitAllowed(state, att, dice) && !carrierOnOneDie) {
                 out.push_back({MacroType::BLOCK, att.id, def->id, {-1, -1}});
             }
         }

@@ -133,6 +133,9 @@ private:
     // P229: zeď soupeřů před klecí. True = do fronty šel plán prolomení (asistenti na křídla,
     // bloky předních rohů dopředu, blitz z pole před nosičem); false = rozhoduje dosavadní řadič.
     bool planWallBreak(const GameState& state, const Player& carrier);
+    // P230: pomalejší klec u zdi, na zeď nesmí bít nikdo ⇒ celá klec (4 rohy) ve stejném sloupci posunutá
+    // po řadách; `bound` = přední rohy, které zeď drží (zůstávají). True = do fronty šel přesun.
+    bool planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound);
 
     // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
     CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);

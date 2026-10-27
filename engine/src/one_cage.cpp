@@ -1,3 +1,6 @@
+#include <array>
+#include <cmath>
+#include <optional>
 #include "bb/one_cage.h"
 #include <cstdio>
 #include <cstdlib>
@@ -397,14 +400,21 @@ bool CageController::stillValid(const GameState& state, const Macro& m) const {
     if (m.type == MacroType::BLOCK) {
         const Player& a = state.getPlayer(m.playerId);
         const Player& d = state.getPlayer(m.targetId);
+        // kostky znovu těsně před ranou: předchozí rána nebo vypadlé křídlo je mohly změnit (review 27.10.)
         return freeToAct(a) && d.isOnPitch() && d.state == PlayerState::STANDING &&
-               a.position.distanceTo(d.position) == 1;
+               a.position.distanceTo(d.position) == 1 && hitAllowed(state, a, blockDiceCount(state, a, d));
     }
     if (m.type == MacroType::BLITZ) {
         const Player& a = state.getPlayer(m.playerId);
         const Player& d = state.getPlayer(m.targetId);
-        return freeToAct(a) && d.isOnPitch() && d.state == PlayerState::STANDING &&
-               !state.getTeamState(a.teamSide).blitzUsedThisTurn;
+        if (!freeToAct(a) || !d.isOnPitch() || d.state != PlayerState::STANDING ||
+            state.getTeamState(a.teamSide).blitzUsedThisTurn) return false;
+        if (!m.viaPos.isOnPitch()) return true;   // pole doběhu neurčené (P154/P172): kostky hlídá jejich výběr
+        const Player* there = state.getPlayerAtPosition(m.viaPos);
+        if (there && there->id != a.id) return false;
+        GameState sim = state.clone();
+        sim.getPlayer(a.id).position = m.viaPos;
+        return hitAllowed(sim, a, blockDiceCount(sim, sim.getPlayer(a.id), sim.getPlayer(d.id)));
     }
     return false;
 }
@@ -1645,6 +1655,8 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     if (countTacklezones(state, cp, side, carrier.id) > 0) return false;
     // čekáním by nosič nestihl TD: rozhoduje výběh na konci poločasu, ne prolamování (review 27.10.)
     if (cageFeatureOn(kFeatTimeRun) && waitingCostsTheTouchdown(state, carrier)) return false;
+    // Uživatel 27.10.2026: „A [prolomit] dělá pomalejší a B [obejít] dělá rychlejší — nic mezi — nejhorší je
+    // nedělat nic“; „silnější prolamuje, i když je rychlejší“. Bezpečný krok kolem zdi se tu neporovnává.
     const Player* ahead[2] = {wallAt(at(2, -1)), wallAt(at(2, 1))};
     const Player* centre = wallAt(at(2, 0));
     if ((ahead[0] != nullptr) + (ahead[1] != nullptr) + (centre != nullptr) < 2) return false;
@@ -1711,7 +1723,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         // roh s Frenzy by musel za odsunutým do zdi a nechal díru u nosiče (P169) ⇒ neblokuje
         const bool canBlock = freeToAct(*front[i]) && !frenzyCorner(*front[i], carrier);
         if (dice < 2 || !canBlock) stronger = false;          // silnější = oba rohy opravdu bijí 2+ (nález 12)
-        if (dice >= 1 && canBlock) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
+        if (hitAllowed(state, *front[i], dice) && canBlock) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
     }
     if (faster && !stronger) return false;       // rychlejší obíhá (útěk podle P228)
 
@@ -1720,6 +1732,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     if (centre && !state.getTeamState(side).blitzUsedThisTurn) {
         const Position frontSq = at(1, 0);
         const Player* best = nullptr;
+        Position bestLanding{-1, -1};
         std::tuple<int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& p) {
             if (!cageMayMove(p) || isUsed(p.id) || inCage(p)) return;
@@ -1728,16 +1741,24 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             if (!blitzLandingDiceFree(state, p, centre->position, landing, steps)) return;
             if (state.getPlayerAtPosition(landing) && landing != p.position) return;
             // kostky z pole, odkud bude blokovat — asistence soupeře se počítají kolem něj (review 27.10. nález 5)
-            GameState sim = state.clone();
+            // s asistenty už na křídlech (review 27.10. odp. nález 2)
+            GameState sim = after.clone();
             sim.getPlayer(p.id).position = landing;
             const int dice = blockDiceCount(sim, sim.getPlayer(p.id), sim.getPlayer(centre->id));
-            if (dice < 1) return;                                 // blitz, kde volí obránce, ne
+            if (!hitAllowed(sim, p, dice)) return;
             const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -dice, steps};
-            if (key < bestKey) { bestKey = key; best = &p; }
+            if (key < bestKey) { bestKey = key; best = &p; bestLanding = landing; }
         });
-        if (best) blitz.push_back(Macro{MacroType::BLITZ, best->id, centre->id, {-1, -1}});
+        if (best) {
+            Macro bz{MacroType::BLITZ, best->id, centre->id, {-1, -1}};
+            bz.viaPos = bestLanding;               // pro kontrolu kostek těsně před blitzem (stillValid)
+            blitz.push_back(bz);
+        }
     }
-    if (blocks.empty() && blitz.empty()) return false;
+    if (blocks.empty() && blitz.empty()) {
+        // nikdo nesmí bít (P229 kostky) ⇒ pomalejší klec nestojí — přestaví se po řadách (P230)
+        return !faster && extraFeatureOn(kP230WallShift) && planWallShift(state, carrier, {front[0]->id, front[1]->id});
+    }
 
     if (std::getenv("BB_CAGE_DEBUG")) {
         std::fprintf(stderr, "[cage ctl] P229 zeď před klecí: běžci MA %d × zeď MA %d (%s), %s ⇒ prolomení: křídla %zu, bloky %zu, blitz %zu\n",
@@ -1747,6 +1768,162 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     queue_ = std::move(wings);
     queue_.insert(queue_.end(), blocks.begin(), blocks.end());
     queue_.insert(queue_.end(), blitz.begin(), blitz.end());
+    return true;
+}
+
+// ⭐ P230 (partie 27.10.2026, `evidence/play_20261027_zed/zaver.md`; uživatel: „šel bych do cílové situace,
+//   kdy je celá klec OK na místě s nižším Y — první všechny zadní hráče až na jednoho poslat blíž k míči
+//   dopředu — další volné dopředu — další na sousedy se zdí, ať se zeď pak nemůže hnout k našemu nosiči“;
+//   „zadní rohy na volnější křídlo, kudy bude moct běžet nosič k TD zóně soupeře“; „klec má být jen čtyři
+//   rohy“; „jestli by na roh došel někdo bez GFI … asi by měl přednost“; „A [prolomit] dělá pomalejší …
+//   nejhorší je nedělat nic“; když bezpečné pole není: „vzít pole“ s nejnižším rizikem).
+//   Cíl = pole ve STEJNÉM sloupci jako nosič, o 1–4 řady výš nebo níž (nosič a rohy ne na krajní řadě),
+//   kam nosič dojde bez hodu a kolem kterého se postaví všechny čtyři rohy: napřed hráči bez hodu, GFI jen
+//   když jinak roh nikdo neobsadí. Přední rohy u zdi (`bound`) zůstávají a drží ji. Vyhrává nejnižší hrozba
+//   rány na nosiče po přestavbě (P228), při shodě volnější křídlo (méně soupeřů v dosahu pole před cílem),
+//   pak bližší pole. Pak volní hráči na pole vedle hráčů zdi, které ještě nikdo nedrží (bez hodu, ne vedle
+//   nosiče). Zbytek dořeší zaostalci (P154 c).
+bool CageController::planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound) {
+    const TeamSide side = carrier.teamSide;
+    const int dir = side == TeamSide::HOME ? 1 : -1;
+    const Position cp = carrier.position;
+    const bool dbg = std::getenv("BB_CAGE_DEBUG") != nullptr;
+    auto isBound = [&](int id) { return std::find(bound.begin(), bound.end(), id) != bound.end(); };
+    // kandidáti na rohy: kdo se smí hýbat, není nosič ani vázaný přední roh
+    std::vector<const Player*> movers;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id == carrier.id || isBound(p.id) || !cageMayMove(p)) return;
+        movers.push_back(&p);
+    });
+    struct Pick { Position target; std::vector<Macro> macros; double threat; int crowd; int dist; };
+    std::optional<Pick> best;
+    for (int k = 1; k <= 4; ++k) {
+        for (int sgn : {-1, 1}) {
+            const Position t{cp.x, static_cast<int8_t>(cp.y + sgn * k)};
+            if (t.y < 2 || t.y > 12) continue;                          // rohy ne na krajní řadě
+            if (state.getPlayerAtPosition(t)) continue;
+            if (pathFailProb(state, carrier, t, static_cast<int>(carrier.movementRemaining), Position{-1, -1}) != 0.0) continue;
+            // rohy: pro každý roh kandidáti s cenou (0 = bez hodu, 1 = s GFI)
+            std::array<Position, 4> corners;
+            int ci = 0;
+            for (int cx : {-1, 1}) for (int cy : {-1, 1})
+                corners[ci++] = Position{static_cast<int8_t>(t.x + cx), static_cast<int8_t>(t.y + cy)};
+            std::vector<int> used;
+            std::vector<Macro> macros;
+            bool ok = true;
+            int gfiUsed = 0;
+            GameState sim = state.clone();
+            for (const Position& c : corners) {
+                if (!c.isOnPitch()) { ok = false; break; }
+                const Player* there = state.getPlayerAtPosition(c);
+                if (there && there->teamSide == side && there->state == PlayerState::STANDING && !isBound(there->id) &&
+                    there->id != carrier.id && std::find(used.begin(), used.end(), there->id) == used.end()) {
+                    used.push_back(there->id);                         // roh už stojí
+                    continue;
+                }
+                if (there) { ok = false; break; }
+                const Player* pick = nullptr;
+                std::tuple<int, int, int> pickKey{INT_MAX, INT_MAX, INT_MAX};
+                for (const Player* p : movers) {
+                    if (std::find(used.begin(), used.end(), p->id) != used.end()) continue;
+                    if (p->position.distanceTo(t) == 1 && p->position != c) {
+                        // stojí-li už jako roh nové klece jinde, nechat ho tam
+                        bool isCorner = std::find(corners.begin(), corners.end(), p->position) != corners.end();
+                        if (isCorner) continue;
+                    }
+                    const int ma = static_cast<int>(p->movementRemaining);
+                    const double free = pathFailProb(state, *p, c, ma, Position{-1, -1});
+                    int cost = -1;
+                    if (free == 0.0) cost = 0;
+                    else {
+                        const double g = pathFailProb(state, *p, c, ma + maxGfiSquares(*p), Position{-1, -1});
+                        if (g >= 0.0 && riskTier(g) <= 1 && countTacklezones(state, p->position, side, p->id) == 0) cost = 1;
+                    }
+                    if (cost < 0) continue;
+                    // napřed bez hodu, pak kdo je dál od zdi (ne ten, kdo by jinde chyběl), pak blíž
+                    const std::tuple<int, int, int> key{cost, 0, p->position.distanceTo(c)};
+                    if (key < pickKey) { pickKey = key; pick = p; }
+                }
+                if (!pick) { ok = false; break; }
+                if (std::get<0>(pickKey) > 0) ++gfiUsed;
+                used.push_back(pick->id);
+                Macro m{MacroType::REPOSITION, pick->id, -1, c};
+                m.cageManaged = true;
+                if (std::get<0>(pickKey) > 0) m.gfiAllowance = maxGfiSquares(*pick);
+                macros.push_back(m);
+                sim.getPlayer(pick->id).position = c;
+            }
+            if (!ok || gfiUsed > 1) continue;                            // nejvýš jeden roh přes GFI
+            Macro run{MacroType::REPOSITION, carrier.id, -1, t};
+            run.cageManaged = true;
+            macros.push_back(run);
+            Player& sc = sim.getPlayer(carrier.id);
+            sc.position = t;
+            sim.ball = BallState::carried(t, carrier.id);
+            const double threat = blitzThreat(sim, sc);
+            // volnější křídlo: soupeři, kteří dosáhnou na pole dva sloupce před cílem
+            const Position ahead{static_cast<int8_t>(t.x + 2 * dir), t.y};
+            int crowd = 0;
+            state.forEachOnPitch(side == TeamSide::HOME ? TeamSide::AWAY : TeamSide::HOME, [&](const Player& o) {
+                if (o.state != PlayerState::STANDING) return;
+                if (o.position.distanceTo(ahead) <= static_cast<int>(o.stats.movement) + 2) ++crowd;
+            });
+            Pick cand{t, std::move(macros), threat + 0.01 * gfiUsed, crowd, k};
+            auto key = [](const Pick& p) { return std::make_tuple(std::round(p.threat * 1000), p.crowd, p.dist); };
+            if (!best || key(cand) < key(*best)) best = std::move(cand);
+        }
+    }
+    if (!best) return false;
+    // hráči na sousedy zdi, které ještě nikdo nedrží — bez hodu, ne na pole vedle nosiče (klec = jen rohy)
+    std::vector<int> busy{carrier.id};
+    for (const Macro& m : best->macros) busy.push_back(m.playerId);
+    for (int id : bound) busy.push_back(id);
+    std::vector<Position> taken;
+    for (const Macro& m : best->macros) taken.push_back(m.targetPos);
+    std::vector<Macro> binders;
+    state.forEachOnPitch(side == TeamSide::HOME ? TeamSide::AWAY : TeamSide::HOME, [&](const Player& w) {
+        if (w.state != PlayerState::STANDING || w.lostTacklezones) return;
+        if (std::abs(w.position.x - (cp.x + 2 * dir)) > 1 || std::abs(w.position.y - cp.y) > 3) return;   // zeď
+        // drží ho někdo, kdo zůstane stát (ne ten, kdo odchází na roh), nebo kdo na sousední pole přijde
+        bool held = false;
+        state.forEachOnPitch(side, [&](const Player& o) {
+            const bool leaves = std::any_of(best->macros.begin(), best->macros.end(), [&](const Macro& m) { return m.playerId == o.id; });
+            if (o.state == PlayerState::STANDING && !leaves && o.position.distanceTo(w.position) == 1) held = true;
+        });
+        for (const Position& q : taken) if (q.distanceTo(w.position) == 1) held = true;
+        if (held) return;
+        const Player* pick = nullptr;
+        Position pickSq{-1, -1};
+        int pickD = INT_MAX;
+        state.forEachOnPitch(side, [&](const Player& p) {
+            if (!cageMayMove(p) || std::find(busy.begin(), busy.end(), p.id) != busy.end()) return;
+            for (const Position& sq : w.position.getAdjacent()) {
+                if (!sq.isOnPitch() || state.getPlayerAtPosition(sq)) continue;
+                if (std::find(taken.begin(), taken.end(), sq) != taken.end()) continue;
+                if (sq.distanceTo(best->target) <= 1) continue;
+                if (pathFailProb(state, p, sq, static_cast<int>(p.movementRemaining), Position{-1, -1}) != 0.0) continue;
+                const int d = p.position.distanceTo(sq);
+                if (d < pickD) { pickD = d; pick = &p; pickSq = sq; }
+            }
+        });
+        if (!pick) return;
+        busy.push_back(pick->id);
+        taken.push_back(pickSq);
+        Macro m{MacroType::REPOSITION, pick->id, -1, pickSq};
+        m.cageManaged = true;
+        binders.push_back(m);
+    });
+    if (dbg) {
+        std::fprintf(stderr, "[cage ctl] P230 klec po řadách: nosič (%d,%d) -> (%d,%d), hrozba %.2f, soupeřů před cílem %d, rohů k přesunu %zu, vazačů %zu\n",
+                     cp.x, cp.y, best->target.x, best->target.y, best->threat, best->crowd, best->macros.size() - 1, binders.size());
+    }
+    // pořadí: rohy (bez nosiče), nosič, vazači zdi
+    queue_.clear();
+    Macro carrierMove = best->macros.back();
+    best->macros.pop_back();
+    queue_ = std::move(best->macros);
+    queue_.push_back(carrierMove);
+    queue_.insert(queue_.end(), binders.begin(), binders.end());
     return true;
 }
 

@@ -40,6 +40,13 @@ void takeBlitzAndScoreReal(long* out3);
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
 // Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
 int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
+// Rána (blok i blitz) jen na 2+ kostky, které volíme my, nebo na jednu kostku s Block (uživatel 27.10.2026:
+// „block na 1 kostku bez block se nemá dít“; nabídka hledání to tak dělá od 11.08.) nebo s Wrestle
+// (uživatel 27.10.: „stejně jako bereš 1 kostku s block, tak ber stejně s wrestle — není turnover na both
+// down“; pravidla ř. 8670–8677: Both Down s Wrestle položí oba, turnover jen když útočník drží míč —
+// proto Wrestle neplatí pro nosiče). `dice` jako blockDiceCount (záporné = volí obránce). Jedna kostka bez
+// Block a Wrestle = turnover 1/3, s nimi 1/6.
+bool hitAllowed(const GameState& state, const Player& attacker, int dice);
 // P227: smí AI poslat `blitzer` blitzem na `target`? Ne, když obránce volí ze 3+ kostek, ze 2 jen na
 // soupeřova nosiče (kostky z pole, odkud hra bude blokovat). Vypínač kP227BlitzDice. Definice a důvod v .cpp.
 bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target);
@@ -104,7 +111,8 @@ enum ExtraFeature : unsigned {
     kP225FrenzyTrapStandFirm = 256,
     kP227BlitzDice = 512,  // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
     kP228DirtyCorner = 1024,  // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
-    kP229WallBreak = 2048     // P229: zeď před klecí — pomalejší (nebo silnější) tým ji prolomí, rychlejší obejde
+    kP229WallBreak = 2048,    // P229: zeď před klecí — pomalejší (nebo silnější) tým ji prolomí, rychlejší obejde
+    kP230WallShift = 4096     // P230: pomalejší klec u zdi, rána nejde — klec se přestaví po řadách na volnější křídlo
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
