@@ -760,8 +760,15 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
         m.movementRemaining = 6;
         ++id;
     }
+    // P228 (27.10.2026): s hrozbou přes špinavé rohy je dostavba u zdi riziková (rohy v zóně
+    // soupeřů) a plánovač pak klec posílá jinam (P187). Tento test hlídá samotnou zálohu
+    // „postup nejde ⇒ dostavba“, proto běží se starou hrozbou. Že pomalejší klec u zdi dostaví
+    // i s P228, hlídá řadič: OneCageWallBreak.SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround.
+    const unsigned savedMask = extraFeaturesOff();
+    setExtraFeaturesOff(kP228DirtyCorner);
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
+    setExtraFeaturesOff(savedMask);
     // P100: dřív se při jiném verdiktu (právě tom, který test hlídá) neověřilo nic.
     ASSERT_TRUE(plan.valid) << "the plan must be that fill, not nothing";
     ASSERT_EQ(plan.verdict, CageAdvanceVerdict::FILL_ONLY);

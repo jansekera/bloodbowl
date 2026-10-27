@@ -130,6 +130,10 @@ private:
     CageAdvancePlanner planner_;
     MCTSConfig config_;
 
+    // P229: zeď soupeřů před klecí. True = do fronty šel plán prolomení (asistenti na křídla,
+    // bloky předních rohů dopředu, blitz z pole před nosičem); false = rozhoduje dosavadní řadič.
+    bool planWallBreak(const GameState& state, const Player& carrier);
+
     // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
     CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);
 

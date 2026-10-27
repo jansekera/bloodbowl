@@ -895,6 +895,12 @@ void CageController::planStart(const GameState& state) {
                                        countTacklezones(state, carrier.position, carrier.teamSide) > 0;
             // P172: klec, která stojí, ale nepostoupí („plán není“), zkratku nebere — pokračuje
             // se ranami na uvolnění a blitzem na proboření obrany níž.
+            // P229: zeď přímo před klecí rozhoduje dřív než plán „klec napřed“ — ten by pomalejší
+            // klec stáhl dozadu nebo poslal bokem (s P228 jsou rohy u zdi špinavé)
+            if (!carrierMarked && extraFeatureOn(kP229WallBreak) && planWallBreak(state, carrier)) {
+                stage_ = Stage::AFTER_ADVANCE;
+                return;
+            }
             if (!carrierMarked && (cleanByPlan || (!cageFeatureOn(kFeatPhaseOneBlitz) && !pre.valid && standing >= 4))) {
                 if (!cleanByPlan) { stage_ = Stage::AFTER_ADVANCE; return; }
                 if (dbg) std::fprintf(stderr, "[cage ctl] klec napřed: plán se čtyřmi rohy (krok %d, rohů %d)\n",
@@ -1497,6 +1503,12 @@ void CageController::planAdvance(const GameState& state) {
     // Sjednoceno 08.10.2026 (review P181 nález 4): rozhoduje HROZBA RÁNY, ne počet rohů. Plán,
     // po kterém je nosič v bezpečí (i se dvěma rohy), platí; dřív ho „méně než tři rohy“ přebilo
     // a nosič šel sám jinam podle tabulky rohů.
+    // P229: zeď přímo před klecí rozhoduje dřív než plán postupu — ten by pomalejší klec poslal
+    // kolem zdi bokem, a to doktrína nechce (zeď ji dožene). Prolomení nejde ⇒ dál jako dřív.
+    if (extraFeatureOn(kP229WallBreak) && planWallBreak(state, carrier)) {
+        stage_ = Stage::AFTER_ADVANCE;         // nosič tento tah stojí; pak zaostalci
+        return;
+    }
     const bool planMoves = plan.valid && plan.step >= 1;
     const bool planSafe = planMoves && plan.blitzThreat <= kSafeBlitzThreat;
     // ⭐⭐ P190 (rozbor skavenů 09.10.2026: 61 % chybějících rohů = nosič začal tah V KONTAKTU se
@@ -1588,6 +1600,140 @@ void CageController::planAdvance(const GameState& state) {
         }
     }
     if (plan.valid) queue_ = std::move(plan.macros);
+}
+
+// ⭐ P229 (uživatel 26.10.2026: „když jsme silnější — dáme asistenty na 13,5 a 13,9 a přední rohy
+//   block dopředu a pak blitz dopředu z 13,7 a skrz bariéru — když jsme rychlejší, ostatní kromě
+//   předních rohů obíhají a pak se přesunou i bývalé přední rohy s dodge“; upřesnění: „silnější musíš
+//   spočítat podle síly předních rohů a asistencí s případným guard — rychlejší spočítáš z MA — pozor
+//   na průměr — počítej jen část týmu — trpaslíci proti orkům … jsou pomalejší — tak nemohou obíhat —
+//   i když nespočítáš, že jsou silnější“).
+//   Zeď = stojící soupeři ve sloupci dva kroky před nosičem (řádky nosiče ±2); musí stát aspoň před
+//   oběma předními rohy, nebo před jedním a před nosičem.
+//   RYCHLEJŠÍ = nejpomalejší z těch, kdo by obíhali (nosič a zadní rohy — přední rohy zůstávají a
+//   přejdou až potom), má MA větší než nejrychlejší hráč zdi. Ne průměr týmu: u ještěrů by rychlí
+//   skinkové zakryli pomalé sauruse, u zdi zase jeden pomalý zakryl rychlého.
+//   SILNĚJŠÍ = každý přední roh má na soupeře před sebou aspoň 2 kostky, které volíme my — počítáno
+//   s asistenty už na křídlech (asistence a Guard jako ve hře, `blockDiceCount`).
+//   Prolamuje se, když jsme silnější, nebo nejsme rychlejší; jinak (rychlejší, ne silnější) rozhoduje
+//   dosavadní řadič — útěk nosiče s půlkou klece (P228).
+//   Pořadí jako v doktríně: (1) asistenti na křídla (vedle předních rohů, ven od nosiče) — napřed hráči
+//   mimo klec, pak zadní rohy; jen bez hodu. Křídlo stojí v zóně krajního hráče zdi, takže sám
+//   neasistuje, ale tím, že ho drží, ruší jeho asistenci soupeři. (2) bloky předních rohů dopředu —
+//   ne tam, kde by volil obránce, a ne roh s Frenzy (P169). (3) blitz na soupeře před nosičem; blitzuje hráč, který bez hodu
+//   dojde na pole před nosičem (jiné pole bez hodu jen, když tam nedojde nikdo). Nosič tento tah stojí.
+//   Chybí-li přední rohy, pomalejší klec se dostaví na místě (prolomí příští tah); plánovač by ji
+//   jinak s P228 poslal kolem zdi bokem nebo dozadu. Když nejde blok ani blitz, prolomení se
+//   nehraje a rozhoduje dosavadní řadič.
+bool CageController::planWallBreak(const GameState& state, const Player& carrier) {
+    const TeamSide side = carrier.teamSide;
+    const int dir = side == TeamSide::HOME ? 1 : -1;
+    const Position cp = carrier.position;
+    auto at = [&](int dx, int dy) { return Position{static_cast<int8_t>(cp.x + dx * dir), static_cast<int8_t>(cp.y + dy)}; };
+    auto ours = [&](Position sq) -> const Player* {
+        if (!sq.isOnPitch()) return nullptr;
+        const Player* p = state.getPlayerAtPosition(sq);
+        return p && p->teamSide == side && p->state == PlayerState::STANDING ? p : nullptr;
+    };
+    auto wallAt = [&](Position sq) -> const Player* {
+        if (!sq.isOnPitch()) return nullptr;
+        const Player* p = state.getPlayerAtPosition(sq);
+        return p && p->teamSide != side && p->state == PlayerState::STANDING && !p->lostTacklezones ? p : nullptr;
+    };
+
+    const Player* ahead[2] = {wallAt(at(2, -1)), wallAt(at(2, 1))};
+    const Player* centre = wallAt(at(2, 0));
+    if ((ahead[0] != nullptr) + (ahead[1] != nullptr) + (centre != nullptr) < 2) return false;
+
+    // rychlejší: nosič + zadní rohy proti zdi (řádky nosiče ±2)
+    int runnersMin = carrier.stats.movement;
+    for (int dy : {-1, 1}) if (const Player* r = ours(at(-1, dy))) runnersMin = std::min<int>(runnersMin, r->stats.movement);
+    int wallMax = 0;
+    for (int dy = -2; dy <= 2; ++dy) if (const Player* w = wallAt(at(2, dy))) wallMax = std::max<int>(wallMax, w->stats.movement);
+    const bool faster = runnersMin > wallMax;
+
+    // přední rohy chybí: pomalejší klec zeď neobchází (plánovač by ji s P228 poslal bokem nebo
+    // dozadu) — dostaví se na místě a prolamovat bude příští tah
+    const Player* front[2] = {ours(at(1, -1)), ours(at(1, 1))};
+    if (!front[0] || !front[1]) {
+        if (faster) return false;
+        CageAdvancePlan fill = planner_.buildFillOnly(state, {});
+        if (!fill.valid) return false;
+        if (std::getenv("BB_CAGE_DEBUG")) {
+            std::fprintf(stderr, "[cage ctl] P229 zeď před klecí: běžci MA %d × zeď MA %d (ne rychlejší), přední rohy chybí ⇒ dostavba na místě (%zu)\n",
+                         runnersMin, wallMax, fill.macros.size());
+        }
+        queue_ = std::move(fill.macros);
+        return true;
+    }
+
+    // asistenti na křídla: napřed hráči mimo klec, pak zadní rohy; jen bez hodu
+    std::vector<int> used{carrier.id, front[0]->id, front[1]->id};
+    auto isUsed = [&](int id) { return std::find(used.begin(), used.end(), id) != used.end(); };
+    auto inCage = [&](const Player& p) { return p.position.distanceTo(cp) == 1; };
+    std::vector<Macro> wings;
+    GameState after = state;                      // deska s asistenty na křídlech (pro kostky bloků)
+    for (int dy : {-2, 2}) {
+        const Position sq = at(1, dy);
+        if (!sq.isOnPitch() || state.getPlayerAtPosition(sq)) continue;
+        const Player* best = nullptr;
+        std::tuple<int, int> bestKey{INT_MAX, INT_MAX};
+        state.forEachOnPitch(side, [&](const Player& p) {
+            if (!cageMayMove(p) || isUsed(p.id)) return;
+            const double fail = pathFailProb(state, p, sq, static_cast<int>(p.movementRemaining), Position{-1, -1});
+            if (fail < 0.0 || fail > 1e-9) return;
+            const std::tuple<int, int> key{inCage(p) ? 1 : 0, p.position.distanceTo(sq)};
+            if (key < bestKey) { bestKey = key; best = &p; }
+        });
+        if (!best) continue;
+        used.push_back(best->id);
+        Macro m{MacroType::REPOSITION, best->id, -1, sq};
+        m.cageManaged = true;
+        wings.push_back(m);
+        Player& moved = after.getPlayer(best->id);
+        moved.position = sq;
+    }
+
+    // silnější: oba přední rohy mají na soupeře před sebou 2+ kostky, které volíme my
+    bool stronger = true;
+    std::vector<Macro> blocks;
+    for (int i = 0; i < 2; ++i) {
+        if (!ahead[i]) { stronger = false; continue; }
+        const int dice = blockDiceCount(after, after.getPlayer(front[i]->id), after.getPlayer(ahead[i]->id));
+        if (dice < 2) stronger = false;
+        // roh s Frenzy by musel za odsunutým do zdi a nechal díru u nosiče (P169) ⇒ neblokuje
+        if (dice >= 1 && freeToAct(*front[i]) && !frenzyCorner(*front[i], carrier)) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
+    }
+    if (faster && !stronger) return false;       // rychlejší obíhá (útěk podle P228)
+
+    // blitz na soupeře před nosičem
+    std::vector<Macro> blitz;
+    if (centre && !state.getTeamState(side).blitzUsedThisTurn) {
+        const Position frontSq = at(1, 0);
+        const Player* best = nullptr;
+        std::tuple<int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX};
+        state.forEachOnPitch(side, [&](const Player& p) {
+            if (!cageMayMove(p) || isUsed(p.id) || inCage(p)) return;
+            Position landing{-1, -1};
+            int steps = 0;
+            if (!blitzLandingDiceFree(state, p, centre->position, landing, steps)) return;
+            if (state.getPlayerAtPosition(landing) && landing != p.position) return;
+            const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -blockDiceCount(state, p, *centre), steps};
+            if (key < bestKey) { bestKey = key; best = &p; }
+        });
+        if (best && blockDiceCount(state, *best, *centre) >= 1) blitz.push_back(Macro{MacroType::BLITZ, best->id, centre->id, {-1, -1}});
+    }
+    if (blocks.empty() && blitz.empty()) return false;
+
+    if (std::getenv("BB_CAGE_DEBUG")) {
+        std::fprintf(stderr, "[cage ctl] P229 zeď před klecí: běžci MA %d × zeď MA %d (%s), %s ⇒ prolomení: křídla %zu, bloky %zu, blitz %zu\n",
+                     runnersMin, wallMax, faster ? "rychlejší" : "ne rychlejší", stronger ? "silnější" : "ne silnější",
+                     wings.size(), blocks.size(), blitz.size());
+    }
+    queue_ = std::move(wings);
+    queue_.insert(queue_.end(), blocks.begin(), blocks.end());
+    queue_.insert(queue_.end(), blitz.begin(), blitz.end());
+    return true;
 }
 
 // Kam zaostalec `p` dojde dopředu bez hodu (P154 c): nejvýš 3 sloupce před nosiče, ne do kontaktu,

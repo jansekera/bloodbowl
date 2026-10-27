@@ -615,6 +615,10 @@ TEST(OneCagePin, CarrierMayRunWhenWaitingWouldCostTheTouchdown) {
 }
 
 TEST(OneCagePin, CornersAreNotRepositionedAway) {
+    // Hlídá zákaz pro HLEDÁNÍ (P154 b) u klece, kterou řadič drží na místě. S P228 + P229 řadič
+    // u téhle zdi sám pošle zadní roh na křídlo (prolomení, testy OneCageWallBreak) — klec tu pak
+    // „na místě“ nestojí. Proto se starou hrozbou a bez prolomení.
+    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = walledCageBoard(2);
     b.put(6, TeamSide::HOME, {8, 2});                             // volný hráč mimo klec
     CageController cc(nullptr, cfg(), 1);
@@ -625,6 +629,118 @@ TEST(OneCagePin, CornersAreNotRepositionedAway) {
     const Position p6 = b.s.getPlayer(6).position;
     EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 6, -1, {static_cast<int8_t>(p6.x + 1), p6.y}}))
         << "hráče mimo klec hledání přesouvat smí";
+}
+
+// --- P229 (uživatel 26.10.2026): zeď před klecí — pomalejší nebo silnější prolomí, rychlejší obejde ---
+// „když jsme silnější — dáme asistenty na 13,5 a 13,9 a přední rohy block dopředu a pak blitz dopředu
+// z 13,7 a skrz bariéru — když jsme rychlejší, ostatní kromě předních rohů obíhají“; „rychlejší
+// spočítáš z MA — pozor na průměr — počítej jen část týmu — trpaslíci proti orkům … jsou pomalejší —
+// tak nemohou obíhat — i když nespočítáš, že jsou silnější“. Zeď je walledCageBoard: klec kolem
+// (12,7), soupeři MA 6 na x = 14, řádky 5–9 — přesně příklad uživatele.
+namespace {
+// Tři volní hráči MA 9 (průměr týmu tím vyskočí nad zeď, obíhat by ale musel nosič a zadní rohy MA 4):
+// dva dojdou na křídla, třetí bez hodu na pole před nosičem (13,7).
+Board wallWithHelpers(int8_t runnersMa) {
+    Board b = walledCageBoard(2);
+    for (int id : {1, 2, 3}) {
+        b.s.getPlayer(id).stats.movement = runnersMa;
+        b.s.getPlayer(id).movementRemaining = runnersMa;
+    }
+    b.put(6, TeamSide::HOME, {10, 3}, 9);
+    b.put(7, TeamSide::HOME, {10, 11}, 9);
+    b.put(8, TeamSide::HOME, {9, 7}, 9);
+    return b;
+}
+struct CageTurn { std::vector<Macro> macros; Position carrier; };
+CageTurn cageTurn(Board& b) {
+    CageController cc(nullptr, cfg(), 1);
+    CageTurn t;
+    Macro m;
+    while (cc.next(b.s, m)) {             // jen plán řadiče (bez hledání), kostky 6 = vše vyjde
+        t.macros.push_back(m);
+        play(b.s, m);
+    }
+    t.carrier = b.s.getPlayer(1).position;
+    return t;
+}
+bool hasMacro(const CageTurn& t, MacroType type, int player, int target = -1, Position sq = {-1, -1}) {
+    return std::any_of(t.macros.begin(), t.macros.end(), [&](const Macro& m) {
+        return m.type == type && m.playerId == player && (target < 0 || m.targetId == target) &&
+               (sq.x < 0 || m.targetPos == sq);
+    });
+}
+}  // namespace
+
+TEST(OneCageWallBreak, SlowerCageBreaksTheWallInTheUsersOrder) {
+    Board b = wallWithHelpers(4);
+    ASSERT_EQ(b.s.getPlayer(14).position, (Position{14, 6}));
+    ASSERT_EQ(b.s.getPlayer(15).position, (Position{14, 7}));
+    ASSERT_EQ(b.s.getPlayer(16).position, (Position{14, 8}));
+    const CageTurn t = cageTurn(b);
+    EXPECT_TRUE(hasMacro(t, MacroType::REPOSITION, 6, -1, {13, 5})) << "asistent na křídlo 13,5";
+    EXPECT_TRUE(hasMacro(t, MacroType::REPOSITION, 7, -1, {13, 9})) << "asistent na křídlo 13,9";
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 4, 14)) << "přední roh (13,6) blokuje dopředu";
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 5, 16)) << "přední roh (13,8) blokuje dopředu";
+    EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 8, 15)) << "blitz na soupeře před nosičem";
+    // pořadí: křídla → bloky → blitz
+    auto idx = [&](MacroType ty, int pl) {
+        for (size_t i = 0; i < t.macros.size(); ++i) if (t.macros[i].type == ty && t.macros[i].playerId == pl) return static_cast<int>(i);
+        return -1;
+    };
+    EXPECT_LT(idx(MacroType::REPOSITION, 7), idx(MacroType::BLOCK, 4));
+    EXPECT_LT(idx(MacroType::BLOCK, 5), idx(MacroType::BLITZ, 8));
+    EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič stojí — neobíhá";
+}
+
+// „Pozor na průměr — počítej jen část týmu“: daleko od klece stojí čtyři hráči MA 10, průměr týmu
+// (87 / 12 ≈ 7,3) je nad zdí (MA 6). Obíhat by ale musel nosič a zadní rohy MA 4 ⇒ prolamuje.
+TEST(OneCageWallBreak, TeamAverageDoesNotMakeTheCageFaster) {
+    Board b = wallWithHelpers(4);
+    b.put(9, TeamSide::HOME, {2, 1}, 10);
+    b.put(10, TeamSide::HOME, {2, 13}, 10);
+    b.put(11, TeamSide::HOME, {1, 5}, 10);
+    b.put(12, TeamSide::HOME, {1, 9}, 10);
+    const CageTurn t = cageTurn(b);
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 4, 14)) << "přední roh blokuje dopředu";
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 5, 16));
+    EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič neobíhá";
+}
+
+// Rychlejší (nosič i zadní rohy MA 7 > zeď MA 6) a ne silnější (rohy ST 3 na ST 3 = jedna kostka)
+// ⇒ neprolamuje; rozhoduje dosavadní řadič (útěk s půlkou klece, P228).
+TEST(OneCageWallBreak, FasterCageDoesNotBreakTheWall) {
+    Board b = wallWithHelpers(7);
+    const CageTurn t = cageTurn(b);
+    EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 4)) << "přední roh neblokuje";
+    EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 5)) << "přední roh neblokuje";
+    EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));
+}
+
+// Rychlejší, ale silnější (přední rohy ST 4 proti ST 3; asistence soupeřů ruší křídla ⇒ 2 kostky
+// pro nás) ⇒ prolamuje.
+TEST(OneCageWallBreak, FasterButStrongerCageBreaksTheWall) {
+    Board b = wallWithHelpers(7);
+    b.s.getPlayer(4).stats.strength = 4;
+    b.s.getPlayer(5).stats.strength = 4;
+    ASSERT_EQ(blockDiceCount(b.s, b.s.getPlayer(4), b.s.getPlayer(14)), 1) << "bez křídel jen jedna kostka (asistence zdi)";
+    const CageTurn t = cageTurn(b);
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 4, 14));
+    EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 5, 16));
+    EXPECT_EQ(t.carrier, (Position{12, 7}));
+}
+
+// Pomalejší klec bez předních rohů (jako CageAdvance.FillsTheCageWhenTheAdvanceCannotRun): plánovač
+// by ji s P228 poslal kolem zdi; doktrína: pomalejší neobíhá ⇒ dostaví se na místě.
+TEST(OneCageWallBreak, SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround) {
+    Board b = walledCageBoard(2);
+    b.s.getPlayer(4).position = {10, 5};
+    b.s.getPlayer(5).position = {10, 9};
+    const CageTurn t = cageTurn(b);
+    EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič neobíhá";
+    const Player* f1 = b.s.getPlayerAtPosition({13, 6});
+    const Player* f2 = b.s.getPlayerAtPosition({13, 8});
+    EXPECT_TRUE(f1 && f1->teamSide == TeamSide::HOME) << "přední roh (13,6) dostavěn";
+    EXPECT_TRUE(f2 && f2->teamSide == TeamSide::HOME) << "přední roh (13,8) dostavěn";
 }
 
 // (c) „pak co nejdříve dořešit pohyb zaostalců co nejvíce dopředu“

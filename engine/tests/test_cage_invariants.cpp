@@ -557,11 +557,14 @@ Board standBoard(int wallX, int8_t oppSt) {
 }
 }  // namespace
 
-// P177: „dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál“. Zeď soupeřů na x = 10 vpřed
-// nepustí (každé pole vpřed leží v jejich zóně), nosič je tam, kde stojí, v bezpečí (hrozba 0,11
-// s klecí, jejíž jeden roh je o dvě pole vzadu) ⇒ klec stojí: nosič se nehne a chybějící roh se dostaví.
+// P177: „dokud má tým časovou rezervu, klec jde bezpečně, ne co nejdál“. Zeď soupeřů na x = 11 vpřed
+// nepustí (každé pole vpřed leží v jejich zóně), nosič je tam, kde stojí, v bezpečí ⇒ klec stojí:
+// nosič se nehne a chybějící roh se dostaví.
+// P228 (27.10.2026): zeď stála na x = 10, přímo u předních rohů (9,6)/(9,8) — ty pak stály v zóně
+// soupeřů, hrozba přes špinavé rohy je 0,33 a předpoklad „nosič je v bezpečí“ přestal platit. Na
+// x = 11 jsou rohy čisté a pole vpřed pořád v zóně zdi. Bez P177 (maska 16384) test padá.
 TEST(CageStands, WithTimeToSpareAndNoSafeSquareAheadTheCarrierStaysAndTheCornerComes) {
-    Board b = standBoard(10, 3);
+    Board b = standBoard(11, 3);
     b.s.getPlayer(3).position = {6, 9};                     // jeden roh vzadu
     ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1))) << "předpoklad: tým má rezervu";
     ASSERT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: nosič je v bezpečí tam, kde stojí";

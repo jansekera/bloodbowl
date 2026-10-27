@@ -103,7 +103,8 @@ enum ExtraFeature : unsigned {
     // P225: AI obránce nepoužije Stand Firm při nachystané pasti na Frenzy.
     kP225FrenzyTrapStandFirm = 256,
     kP227BlitzDice = 512,  // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
-    kP228DirtyCorner = 1024   // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
+    kP228DirtyCorner = 1024,  // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
+    kP229WallBreak = 2048     // P229: zeď před klecí — pomalejší (nebo silnější) tým ji prolomí, rychlejší obejde
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
