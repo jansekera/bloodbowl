@@ -1240,6 +1240,15 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
     // P180: míč v bezpečí a tým má čas ⇒ TD se nehraje ani přes spoluhráče
     if (mateStall_ && (m.type == MacroType::HAND_OFF_SCORE || m.type == MacroType::PASS_SCORE ||
                        m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION)) return true;
+    // P230: zálohu vzadu hledání nepošle dopředu (k nosiči blíž než 2 sloupce) — přesunem (review 27.10. H1)
+    //   ani blitzem či faulem na soupeře u klece (review 2: blitz stojí i týmový blitz, který záloha příští tah potřebuje)
+    if (std::find(backups_.begin(), backups_.end(), m.playerId) != backups_.end()) {
+        Position to{-1, -1};
+        if (m.type == MacroType::REPOSITION) to = m.targetPos;
+        else if ((m.type == MacroType::BLITZ || m.type == MacroType::FOUL) && m.targetId > 0)
+            to = state.getPlayer(m.targetId).position;
+        if (to.x >= 0 && (carrier.position.x - to.x) * ((carrier.teamSide == TeamSide::HOME) ? 1 : -1) < 2) return true;
+    }
     // P180: hráče připraveného pro předávku hledání neodvádí
     if (m.type == MacroType::REPOSITION &&
         std::find(readyMates_.begin(), readyMates_.end(), m.playerId) != readyMates_.end() &&
@@ -1380,7 +1389,7 @@ static Position laggardSquare(const GameState& state, const Player& p, Position 
 // P211b: Wild Animal zaostalec dojde až před koncem tahu — tedy po blitzu, pokud se hrál. Zůstal-li
 // týmový blitz nevyužitý, přesun ho ohlásí (+2 k hodu, ř. 8666-8669); táž primitivní nabídka jako
 // u hledání (BLITZ bez cíle, rules_engine.cpp).
-static void wildAnimalLaggards(const GameState& state, std::vector<Macro>& queue) {
+static void wildAnimalLaggards(const GameState& state, std::vector<Macro>& queue, const std::vector<int>& backups) {
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     std::vector<Position> taken;
     for (const Macro& m : queue) taken.push_back(m.targetPos);
@@ -1389,6 +1398,7 @@ static void wildAnimalLaggards(const GameState& state, std::vector<Macro>& queue
     bool blitzGiven = false;   // týmový blitz je jeden: ohlásí ho jen první Wild Animal ve frontě
     state.forEachOnPitch(carrier.teamSide, [&](const Player& p) {
         if (p.id == carrier.id || !freeToAct(p) || !p.hasSkill(SkillName::WildAnimal)) return;
+        if (std::find(backups.begin(), backups.end(), p.id) != backups.end()) return;   // P230: záloha vzadu stojí
         const Position best = laggardSquare(state, p, carrier.position, taken);
         if (best == p.position) return;
         Macro m{MacroType::REPOSITION, p.id, -1, best};
@@ -1431,7 +1441,8 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
     std::vector<Macro> q;
     if (plan.valid) q = std::move(plan.macros);
     const bool adoptPlan = !q.empty();
-    wildAnimalLaggards(state, q);
+    const bool sameTurn = team_ == state.activeTeam && turn_ == turn && half_ == state.half;
+    wildAnimalLaggards(state, q, sameTurn ? backups_ : std::vector<int>{});
     if (q.empty()) return false;
     // next() pozná nový tah podle těchto tří polí a frontu by zahodil — nesmí záležet na tom,
     // jestli se v tomto tahu už volal
@@ -2042,6 +2053,122 @@ static Position laggardSquare(const GameState& state, const Player& p, Position 
     return best;
 }
 
+// ⭐ P230 záloha vzadu (uživatel 27.10.2026: „vzadu nechat zálohu, co může blitznout soupeře, když nám on
+//   sebere míč — jednoho nebo dva, ať pokryjí šířku plochy“; v partii: „první všechny zadní hráče až na jednoho
+//   poslat blíž k míči dopředu“). Vzadu = 2+ sloupce za nosičem, mimo zóny soupeře. Řada y je pokrytá, když
+//   na pole (sloupec nosiče, y) záloha příští tah dojde blitzem (pohyb + 1). Šířka = řady 1–13 (0 a 14 jsou
+//   u postranní čáry). Co už vzadu stojí a v tahu hrálo, nebo je zálohou z dřívějška v tahu, pokrývá napřed.
+//   Chybí-li pokrytí, zůstane vzadu jeden ze zaostalců (nejlépe pokrývající pole bez hodu, co nejblíž
+//   nosiči); nepokryje-li šířku jeden, zkusí se dvojice. Celkem nejvýš dva. Wild Animal smí zálohou zůstat
+//   jen na místě (přesun během tahu klece ho stojí hod).
+namespace {
+constexpr int kBackupRowLo = 1, kBackupRowHi = 13;
+struct BackupSpot { const Player* p; Position sq; int far; int behindCols; int moved; };
+int uncoveredRows(const std::vector<std::pair<Position, int>>& guards, Position cp) {
+    int n = 0;
+    for (int y = kBackupRowLo; y <= kBackupRowHi; ++y) {
+        const Position t{cp.x, static_cast<int8_t>(y)};
+        if (std::none_of(guards.begin(), guards.end(), [&](const auto& g) {
+                return static_cast<int>(g.first.distanceTo(t)) <= g.second + 1; })) ++n;
+    }
+    return n;
+}
+}  // namespace
+
+static std::vector<Macro> planBackups(const GameState& state, const Player& carrier, const std::vector<int>& busy,
+                                      std::vector<Position>& taken, std::vector<int>& backups) {
+    const TeamSide side = carrier.teamSide;
+    const int dx = (side == TeamSide::HOME) ? 1 : -1;
+    const Position cp = carrier.position;
+    auto isBusy = [&](int id) { return std::find(busy.begin(), busy.end(), id) != busy.end(); };
+    auto isBackup = [&](int id) { return std::find(backups.begin(), backups.end(), id) != backups.end(); };
+    auto behindFree = [&](const Player& p, Position sq) {
+        return (cp.x - sq.x) * dx >= 2 && countTacklezones(state, sq, side, p.id) == 0;
+    };
+    std::vector<std::pair<Position, int>> guards;            // kdo už vzadu kryje: pole, pohyb
+    std::vector<BackupSpot> spots;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.id == carrier.id || p.state != PlayerState::STANDING || isBusy(p.id)) return;
+        if (!behindFree(p, p.position)) return;
+        if (isBackup(p.id) || !freeToAct(p)) { guards.push_back({p.position, p.stats.movement}); return; }
+        const bool mayMove = cageMayMove(p);
+        const int budget = mayMove ? p.movementRemaining : 0;
+        for (int x = p.position.x - budget; x <= p.position.x + budget; ++x) {
+            for (int y = p.position.y - budget; y <= p.position.y + budget; ++y) {
+                const Position sq{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (!sq.isOnPitch() || !behindFree(p, sq)) continue;
+                if (sq != p.position) {
+                    if (state.getPlayerAtPosition(sq)) continue;
+                    if (std::find(taken.begin(), taken.end(), sq) != taken.end()) continue;
+                    if (pathFailProb(state, p, sq, budget, Position{-1, -1}) != 0.0) continue;
+                }
+                spots.push_back({&p, sq, std::max(0, static_cast<int>(sq.distanceTo(cp)) - static_cast<int>(p.stats.movement)),
+                                 (cp.x - x) * dx, static_cast<int>(sq.distanceTo(p.position))});
+            }
+        }
+    });
+    // na hráče a řadu jen nejlepší pole (blíž nosiči, méně chůze) — dvojice se pak hledá z desítek polí, ne stovek
+    std::sort(spots.begin(), spots.end(), [](const BackupSpot& a, const BackupSpot& b) {
+        return std::make_tuple(a.p->id, a.sq.y, a.far, a.behindCols, a.moved) <
+               std::make_tuple(b.p->id, b.sq.y, b.far, b.behindCols, b.moved);
+    });
+    spots.erase(std::unique(spots.begin(), spots.end(), [](const BackupSpot& a, const BackupSpot& b) {
+                    return a.p == b.p && a.sq.y == b.sq.y; }), spots.end());
+    const int base = uncoveredRows(guards, cp);
+    // „jednoho nebo dva“: místo zabere jen ten, kdo kryje řadu, kterou jiný už vzadu nekryje (review 2, nález 4 —
+    //   dva, kteří hráli na stejném křídle, nesmí zablokovat zálohu na druhé křídlo)
+    int needed = 0;
+    for (size_t i = 0; i < guards.size(); ++i) {
+        auto rest = guards;
+        rest.erase(rest.begin() + static_cast<long>(i));
+        if (uncoveredRows(rest, cp) > base) ++needed;
+    }
+    const int slots = 2 - needed;
+    if (slots <= 0 || base == 0 || spots.empty()) return {};
+    using Key = std::tuple<int, int, int, int, int>;
+    auto keyOf = [&](std::initializer_list<const BackupSpot*> ss) {
+        auto g = guards;
+        int far = 0, cols = 0, moved = 0, ma = 0;
+        for (const BackupSpot* s : ss) {
+            g.push_back({s->sq, s->p->stats.movement});
+            far += s->far; cols += s->behindCols; moved += s->moved; ma -= s->p->stats.movement;
+        }
+        return Key{uncoveredRows(g, cp), far, cols, moved, ma};
+    };
+    std::vector<const BackupSpot*> best;
+    Key bestKey{INT_MAX, 0, 0, 0, 0};
+    for (const BackupSpot& s : spots) {
+        const Key k = keyOf({&s});
+        if (k < bestKey) { bestKey = k; best = {&s}; }
+    }
+    if (std::get<0>(bestKey) > 0 && slots >= 2) {                // jeden šířku nepokryje ⇒ dvojice
+        // druhý zůstane vzadu, JEN když pokryje víc řad („všechny zadní až na jednoho dopředu“; review 2, M-1)
+        std::vector<const BackupSpot*> pair;
+        Key pairKey{INT_MAX, 0, 0, 0, 0};
+        for (size_t i = 0; i < spots.size(); ++i)
+            for (size_t j = i + 1; j < spots.size(); ++j) {
+                if (spots[i].p == spots[j].p || spots[i].sq == spots[j].sq) continue;
+                const Key k = keyOf({&spots[i], &spots[j]});
+                if (k < pairKey) { pairKey = k; pair = {&spots[i], &spots[j]}; }
+            }
+        if (std::get<0>(pairKey) < std::get<0>(bestKey)) { bestKey = pairKey; best = pair; }
+    }
+    if (std::get<0>(bestKey) >= base) return {};                 // nic nepřidá
+    std::vector<Macro> out;
+    for (const BackupSpot* s : best) {
+        backups.push_back(s->p->id);
+        taken.push_back(s->sq);
+        if (s->sq != s->p->position) {
+            Macro m{MacroType::REPOSITION, s->p->id, -1, s->sq};
+            m.cageManaged = true;
+            out.push_back(m);
+        }
+        if (std::getenv("BB_CAGE_DEBUG"))
+            std::fprintf(stderr, "[cage ctl] záloha vzadu %d -> (%d,%d)\n", s->p->id, s->sq.x, s->sq.y);
+    }
+    return out;
+}
+
 // ⭐ P154 (c) (uživatel 07.10.2026: „držet zbytek týmu u klece — respektive PŘED klecí — ať se
 //   nosič může přesunout dopředu do nové klece — pak co nejdříve dořešit pohyb zaostalců co
 //   nejvíce dopředu“). Po tahu klece: kdo stojí volně a zůstal víc než pole za nosičem, jde bez
@@ -2080,6 +2207,7 @@ void CageController::planLaggards(const GameState& state) {
         std::vector<Cand> cands;
         state.forEachOnPitch(side, [&](const Player& p) {
             if (p.id == carrier.id || !cageMayMove(p) || p.hasSkill(SkillName::NoHands)) return;
+            if (std::find(backups_.begin(), backups_.end(), p.id) != backups_.end()) return;   // P230 záloha vzadu
             if (countTacklezones(state, p.position, side, p.id) > 0) return;
             if (std::find(neededForCorners.begin(), neededForCorners.end(), p.id) != neededForCorners.end()) return;   // roh (stojí, nebo ho dostaví)
             // P180 (7): „kdo netvoří klec a neblitzují“ — kdo už má v tahu klece jinou akci (blitz, rána, roh), se nechystá
@@ -2172,9 +2300,20 @@ void CageController::planLaggards(const GameState& state) {
             }
         }
     }
+    // P230 záloha vzadu: vybere se napřed (pole do `taken`), přesune se až po zaostalcích
+    //   („první všechny zadní hráče až na jednoho poslat blíž k míči dopředu“)
+    std::vector<Macro> backupMoves;
+    if (extraFeatureOn(kP230Backup)) {
+        std::vector<int> busy = readyMates_;
+        busy.insert(busy.end(), neededForCorners.begin(), neededForCorners.end());
+        for (const Macro& q : deferredGfi_) busy.push_back(q.playerId);
+        backupMoves = planBackups(state, carrier, busy, taken, backups_);
+    }
+    const size_t laggardsFrom = queue_.size();
     state.forEachOnPitch(side, [&](const Player& p) {
         if (p.id == carrier.id || !cageMayMove(p) ||
-            std::find(readyMates_.begin(), readyMates_.end(), p.id) != readyMates_.end()) return;
+            std::find(readyMates_.begin(), readyMates_.end(), p.id) != readyMates_.end() ||
+            std::find(backups_.begin(), backups_.end(), p.id) != backups_.end()) return;
         const Position best = laggardSquare(state, p, cp, taken);
         if (best == p.position) return;
         Macro m{MacroType::REPOSITION, p.id, -1, best};
@@ -2182,6 +2321,21 @@ void CageController::planLaggards(const GameState& state) {
         queue_.push_back(m);
         taken.push_back(best);
     });
+    // cesta zálohy se počítala před zaostalci — kdo ji teď zatarasí, pošle zálohu před sebe (review 2, nález 6)
+    if (!backupMoves.empty()) {
+        GameState sim = state.clone();
+        for (size_t i = laggardsFrom; i < queue_.size(); ++i) {
+            const Macro& q = queue_[i];
+            if (q.type == MacroType::REPOSITION) sim.getPlayer(q.playerId).position = q.targetPos;
+        }
+        for (const Macro& b : backupMoves) {
+            const Player& bp = state.getPlayer(b.playerId);
+            if (pathFailProb(sim, bp, b.targetPos, bp.movementRemaining, Position{-1, -1}) == 0.0)
+                queue_.push_back(b);
+            else
+                queue_.insert(queue_.begin() + static_cast<long>(laggardsFrom), b);
+        }
+    }
     // P230: roh přes GFI až úplně na konec tahu — nepovede-li se, nepřijdeme o nic dalšího (review 27.10.)
     queue_.insert(queue_.end(), deferredGfi_.begin(), deferredGfi_.end());
     deferredGfi_.clear();
@@ -2263,6 +2417,7 @@ bool CageController::next(const GameState& state, Macro& out) {
         stalling_ = false;
         mateStall_ = false;
         readyMates_.clear();
+        backups_.clear();          // P230: záloha platí jen v tahu, kdy ji řadič vybral (po zahození fronty zůstává)
     }
     // ⭐ P169 krok 9 (07.10.2026): MÍČ ZVEDLO HLEDÁNÍ ⇒ ROHY SE STAVÍ HNED POTOM. Když řadič na
     //   začátku tahu zvednutí nenabídl (míč v zóně soupeře, napřed rána) a míč pak zvedlo

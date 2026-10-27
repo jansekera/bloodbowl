@@ -650,7 +650,8 @@ TEST(OneCagePin, CornersAreNotRepositionedAway) {
     // Hlídá zákaz pro HLEDÁNÍ (P154 b) u klece, kterou řadič drží na místě. S P228 + P229 řadič
     // u téhle zdi sám pošle zadní roh na křídlo (prolomení, testy OneCageWallBreak) — klec tu pak
     // „na místě“ nestojí. Proto se starou hrozbou a bez prolomení.
-    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak); } ~Off() { setExtraFeaturesOff(0); } } off;
+    // P230 záloha vypnutá: jediný zaostalec by zůstal zálohou a hledání by ho dopředu nepustilo (OneCageBackup)
+    struct Off { Off() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak | kP230Backup); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = walledCageBoard(2);
     b.put(6, TeamSide::HOME, {8, 2});                             // volný hráč mimo klec
     CageController cc(nullptr, cfg(), 1);
@@ -988,6 +989,7 @@ TEST(OneCageWallBreak, SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround) {
 
 // (c) „pak co nejdříve dořešit pohyb zaostalců co nejvíce dopředu“
 TEST(OneCageLaggards, FreePlayerLeftBehindMovesForwardWithoutContact) {
+    struct Off { Off() { setExtraFeaturesOff(kP230Backup); } ~Off() { setExtraFeaturesOff(0); } } off;   // jediný zaostalec by zůstal zálohou
     Board b(1);
     b.put(1, TeamSide::HOME, {12, 7});
     b.put(2, TeamSide::HOME, {11, 6});
@@ -2295,4 +2297,156 @@ TEST(OneCageBestChance, OnATieTheLaterTouchdownWins) {
     };
     EXPECT_NE(first(kP213EscapeFirst), 25) << "P217: shoda ⇒ útěk, ne TD teď";
     EXPECT_EQ(first(kP213EscapeFirst | kP217BestChance), 25) << "pozitivní kontrola: bez P217 a starého pořadí TD teď";
+}
+
+// ⭐ P230 záloha vzadu (uživatel 27.10.2026: „vzadu nechat zálohu, co může blitznout soupeře, když nám on sebere
+// míč — jednoho nebo dva, ať pokryjí šířku plochy“; „první všechny zadní hráče až na jednoho poslat blíž k míči
+// dopředu“). Klec stojí v sloupci 12; zaostalec, který jde dopředu, dojde nejméně do sloupce 11, záloha stojí 2+ sloupce za nosičem.
+namespace {
+// Klec stojí (zeď na x=14, P228–P230 vypnuté jako v OneCageLaggards.LaggardDoesNotStandRightNextToTheCarrier).
+struct WallOff { WallOff() { setExtraFeaturesOff(kP228DirtyCorner | kP229WallBreak | kP230WallShift); } ~WallOff() { setExtraFeaturesOff(0); } };
+Board backupBoard() { return walledCageBoard(2); }
+// Dojde záloha `p` blitzem (pohyb + pole vedle) na řadu `y` ve sloupci nosiče?
+bool covers(const Player& p, Position cp, int y) {
+    const Position sq{cp.x, static_cast<int8_t>(y)};
+    return static_cast<int>(p.position.distanceTo(sq)) <= p.stats.movement + 1;
+}
+bool behind(const Player& p, Position cp) { return cp.x - p.position.x >= 2; }
+}  // namespace
+
+// Rychlý hráč (MA 6) pokryje šířku sám ⇒ vzadu zůstane jen on, ostatní zaostalci jdou dopředu.
+TEST(OneCageBackup, OneFastPlayerStaysBackTheOthersGoForward) {
+    WallOff off;
+    Board b = backupBoard();
+    b.put(6, TeamSide::HOME, {8, 3}, 4);
+    b.put(7, TeamSide::HOME, {8, 11}, 6);
+    b.put(8, TeamSide::HOME, {7, 7}, 4);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    int back = 0;
+    for (int id : {6, 7, 8}) back += behind(b.s.getPlayer(id), cp);
+    EXPECT_EQ(back, 1) << "vzadu jeden, ostatní dopředu";
+    const Player& z = b.s.getPlayer(7);
+    EXPECT_TRUE(behind(z, cp)) << "záloha je ten, kdo pokryje šířku (MA 6)";
+    for (int y = 1; y <= 13; ++y) EXPECT_TRUE(covers(z, cp, y)) << "řada " << y << " bez zálohy";
+    EXPECT_EQ(countTacklezones(b.s, z.position, TeamSide::HOME), 0);
+    EXPECT_GT(b.s.getPlayer(6).position.x, 8) << "zaostalec šel dopředu";
+    EXPECT_GT(b.s.getPlayer(8).position.x, 7) << "zaostalec šel dopředu";
+}
+
+// Pomalý tým (vše MA 4): jeden šířku nepokryje ⇒ vzadu dva, každý na jedné polovině, dohromady řady 1–13.
+TEST(OneCageBackup, SlowTeamKeepsTwoBackupsCoveringTheWidth) {
+    WallOff off;
+    Board b = backupBoard();
+    b.put(6, TeamSide::HOME, {8, 3}, 4);
+    b.put(7, TeamSide::HOME, {8, 11}, 4);
+    b.put(8, TeamSide::HOME, {7, 7}, 4);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    std::vector<const Player*> zs;
+    for (int id : {6, 7, 8}) if (behind(b.s.getPlayer(id), cp)) zs.push_back(&b.s.getPlayer(id));
+    ASSERT_EQ(zs.size(), 2u) << "vzadu dva, třetí dopředu";
+    for (int y = 1; y <= 13; ++y)
+        EXPECT_TRUE(covers(*zs[0], cp, y) || covers(*zs[1], cp, y)) << "řada " << y << " bez zálohy";
+}
+
+// Záloha se bere jen ze zaostalců — hráče před klecí zpátky netahá.
+// Příprava na přihrávku (P180) vypnutá — jinak by si oba hráče vzala a test by filtr nezkoušel.
+TEST(OneCageBackup, NoOneIsPulledBackFromTheFront) {
+    WallOff off;
+    struct ReadyOff { ReadyOff() { setCageFeaturesOff(kFeatReadyMate); } ~ReadyOff() { setCageFeaturesOff(0); } } readyOff;
+    Board b = backupBoard();
+    b.put(6, TeamSide::HOME, {13, 2}, 6);
+    b.put(7, TeamSide::HOME, {13, 12}, 6);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    for (int id : {6, 7}) EXPECT_FALSE(behind(b.s.getPlayer(id), cp)) << id;
+}
+
+// Review 27.10. (H1): záloha, která už stojí na svém poli, nedostane od řadiče přesun — hledání ji přesto
+// nepošle dopředu k nosiči (méně než 2 sloupce za něj); přesun, po kterém zůstane vzadu, smí.
+TEST(OneCageBackup, BackupAlreadyInPlaceIsNotSentForwardBySearch) {
+    WallOff off;
+    Board b = backupBoard();
+    b.put(7, TeamSide::HOME, {10, 7}, 6);                         // už stojí jako záloha
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    ASSERT_EQ(b.s.getPlayer(1).position, (Position{12, 7})) << "předpoklad: klec stojí";
+    ASSERT_EQ(b.s.getPlayer(7).position, (Position{10, 7}));
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 7, -1, {12, 3}})) << "záloha k nosiči";
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 7, -1, {11, 3}})) << "záloha sloupec za nosiče";
+    EXPECT_FALSE(cc.forbidsCarrierMove(b.s, Macro{MacroType::REPOSITION, 7, -1, {10, 5}})) << "zůstane vzadu";
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::BLITZ, 7, 13, {-1, -1}})) << "blitz na zeď u klece";
+    EXPECT_TRUE(cc.forbidsCarrierMove(b.s, Macro{MacroType::FOUL, 7, 13, {-1, -1}})) << "faul u klece";
+}
+
+// Soupeřova strana (útok doleva): totéž zrcadlově — vzadu jeden rychlý, ostatní dopředu.
+TEST(OneCageBackup, AwayTeamKeepsTheBackupBehindToo) {
+    WallOff off;
+    Board b(2);
+    b.s.activeTeam = TeamSide::AWAY;
+    b.s.awayTeam.turnNumber = 2;
+    b.put(13, TeamSide::AWAY, {13, 7}, 4);
+    b.put(14, TeamSide::AWAY, {14, 6});
+    b.put(15, TeamSide::AWAY, {14, 8});
+    b.put(16, TeamSide::AWAY, {12, 6});
+    b.put(17, TeamSide::AWAY, {12, 8});
+    for (int i = 0; i < 5; ++i) b.put(1 + i, TeamSide::HOME, {11, static_cast<int8_t>(5 + i)}, 6);
+    b.put(18, TeamSide::AWAY, {17, 3}, 4);
+    b.put(19, TeamSide::AWAY, {17, 11}, 6);
+    b.put(20, TeamSide::AWAY, {18, 7}, 4);
+    b.s.ball = BallState::carried({13, 7}, 13);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(13).position;
+    auto behindAway = [&](int id) { return b.s.getPlayer(id).position.x - cp.x >= 2; };
+    int back = 0;
+    for (int id : {18, 19, 20}) back += behindAway(id);
+    EXPECT_EQ(back, 1) << "vzadu jeden, ostatní dopředu";
+    EXPECT_TRUE(behindAway(19)) << "záloha je ten, kdo pokryje šířku (MA 6)";
+    for (int y = 1; y <= 13; ++y) EXPECT_TRUE(covers(b.s.getPlayer(19), cp, y)) << "řada " << y;
+}
+
+// Review 27.10. (M2): nosič mimo prostřední řadu (3) — dva pomalí v záloze pokryjí přesto řady 1–13.
+TEST(OneCageBackup, CarrierOffTheMiddleRowStillTheWholeWidthIsCovered) {
+    WallOff off;
+    Board b(2);
+    b.put(1, TeamSide::HOME, {12, 3}, 4);
+    b.put(2, TeamSide::HOME, {11, 2});
+    b.put(3, TeamSide::HOME, {11, 4});
+    b.put(4, TeamSide::HOME, {13, 2});
+    b.put(5, TeamSide::HOME, {13, 4});
+    for (int i = 0; i < 5; ++i) b.put(13 + i, TeamSide::AWAY, {14, static_cast<int8_t>(1 + i)}, 6);
+    b.s.ball = BallState::carried({12, 3}, 1);
+    b.put(6, TeamSide::HOME, {8, 5}, 4);
+    b.put(7, TeamSide::HOME, {8, 11}, 4);
+    b.put(8, TeamSide::HOME, {7, 8}, 4);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    std::vector<const Player*> zs;
+    for (int id : {6, 7, 8}) if (behind(b.s.getPlayer(id), cp)) zs.push_back(&b.s.getPlayer(id));
+    ASSERT_EQ(zs.size(), 2u);
+    for (int y = 1; y <= 13; ++y)
+        EXPECT_TRUE(covers(*zs[0], cp, y) || covers(*zs[1], cp, y)) << "řada " << y << " bez zálohy";
+}
+
+// Review 27.10. (M3): kdo už vzadu stojí a v tahu hrál (blok z místa), zálohu dělá — zaostalci jdou všichni dopředu.
+TEST(OneCageBackup, PlayerWhoAlreadyActedBehindIsTheBackup) {
+    WallOff off;
+    Board b = backupBoard();
+    Player& done = b.put(9, TeamSide::HOME, {10, 7}, 6);
+    done.hasActed = true;
+    done.movementRemaining = 0;
+    b.put(6, TeamSide::HOME, {8, 3}, 4);
+    b.put(8, TeamSide::HOME, {7, 7}, 4);
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    const Position cp = b.s.getPlayer(1).position;
+    EXPECT_FALSE(behind(b.s.getPlayer(6), cp)) << "zaostalec dopředu";
+    EXPECT_FALSE(behind(b.s.getPlayer(8), cp)) << "zaostalec dopředu";
 }

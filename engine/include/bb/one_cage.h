@@ -106,6 +106,7 @@ ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
 class CageController {
 public:
     const std::vector<int>& readyMates() const { return readyMates_; }   // P180: pro testy a výpis
+    const std::vector<int>& backups() const { return backups_; }         // P230: pro testy
     CageController(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
 
     // Další makro klece pro tento stav, nebo false = rozhoduje MCTS.
@@ -170,6 +171,8 @@ private:
     // P180: hráči připravení pro předávku — hledání je v tomto tahu neodvádí. Víc než jeden jen agilní
     // (AG 4+, uživatel 16.10.2026, bod 7), od sebe aspoň 3 pole (jeden obránce nemarkuje dva).
     std::vector<int> readyMates_;
+    // P230: záloha vzadu (1–2 hráči přes šířku hřiště) — hledání ji v tomto tahu nepošle dopředu.
+    std::vector<int> backups_;
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;

@@ -112,7 +112,8 @@ enum ExtraFeature : unsigned {
     kP227BlitzDice = 512,  // P227: blitz, kde volí obránce — ze 3+ kostek nikdy, ze 2 jen na soupeřova nosiče
     kP228DirtyCorner = 1024,  // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
     kP229WallBreak = 2048,    // P229: zeď před klecí — pomalejší (nebo silnější) tým ji prolomí, rychlejší obejde
-    kP230WallShift = 4096     // P230: pomalejší klec u zdi, rána nejde — klec se přestaví po řadách na volnější křídlo
+    kP230WallShift = 4096,    // P230: pomalejší klec u zdi, rána nejde — klec se přestaví po řadách na volnější křídlo
+    kP230Backup = 8192        // P230: ze zaostalců zůstane vzadu záloha (1–2 hráči přes šířku hřiště) na blitz zloděje míče
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
