@@ -692,14 +692,26 @@ TEST(OneCageWallBreak, SlowerCageBreaksTheWallInTheUsersOrder) {
     EXPECT_EQ(t.carrier, (Position{12, 7})) << "nosič stojí — neobíhá";
 }
 
-// „Pozor na průměr — počítej jen část týmu“: daleko od klece stojí čtyři hráči MA 10, průměr týmu
-// (87 / 12 ≈ 7,3) je nad zdí (MA 6). Obíhat by ale musel nosič a zadní rohy MA 4 ⇒ prolamuje.
+// Review 27.10. (nález 1): nosič stojí vedle soupeře, kterého rány řadiče neodstraní (ST 7, Stand
+// Firm) ⇒ zeď nepočká jen na prolamování: napřed úhyb nosiče z kontaktu (P190) a pojistky bezpečí.
+// Prolomení by nosiče nechalo stát v kontaktu.
+TEST(OneCageWallBreak, MarkedCarrierDoesNotBreakTheWall) {
+    struct Off { Off() { setExtraFeaturesOff(kP213EscapeFirst | kP217BestChance); } ~Off() { setExtraFeaturesOff(0); } } off;
+    Board b = wallWithHelpers(4);
+    b.put(18, TeamSide::AWAY, {12, 6}, 6, 7, {SkillName::StandFirm});
+    ASSERT_GT(countTacklezones(b.s, Position{12, 7}, TeamSide::HOME), 0);
+    const CageTurn t = cageTurn(b);
+    EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 4, 14)) << "přední roh neprolamuje";
+    EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 5, 16)) << "přední roh neprolamuje";
+}
+
+// „Pozor na průměr — počítej jen část týmu“: daleko od klece stojí tři hráči MA 10, průměr týmu
+// (77 / 11 = 7) je nad zdí (MA 6). Obíhat by ale musel nosič a zadní rohy MA 4 ⇒ prolamuje.
 TEST(OneCageWallBreak, TeamAverageDoesNotMakeTheCageFaster) {
     Board b = wallWithHelpers(4);
     b.put(9, TeamSide::HOME, {2, 1}, 10);
     b.put(10, TeamSide::HOME, {2, 13}, 10);
-    b.put(11, TeamSide::HOME, {1, 5}, 10);
-    b.put(12, TeamSide::HOME, {1, 9}, 10);
+    b.put(11, TeamSide::HOME, {1, 7}, 10);
     const CageTurn t = cageTurn(b);
     EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 4, 14)) << "přední roh blokuje dopředu";
     EXPECT_TRUE(hasMacro(t, MacroType::BLOCK, 5, 16));
@@ -707,10 +719,15 @@ TEST(OneCageWallBreak, TeamAverageDoesNotMakeTheCageFaster) {
 }
 
 // Rychlejší (nosič i zadní rohy MA 7 > zeď MA 6) a ne silnější (rohy ST 3 na ST 3 = jedna kostka)
-// ⇒ neprolamuje; rozhoduje dosavadní řadič (útěk s půlkou klece, P228).
+// ⇒ neprolamuje, obíhá: nosič se zadními rohy a volnými hráči kolem kraje zdi, přední rohy stojí.
 TEST(OneCageWallBreak, FasterCageDoesNotBreakTheWall) {
     Board b = wallWithHelpers(7);
     const CageTurn t = cageTurn(b);
+    // co dělat MÁ (review 27.10. nález 13): „ostatní kromě předních rohů obíhají“ — nosič je po tahu za
+    // zdí (x > 14) a v bezpečí, přední rohy (13,6)/(13,8) tento tah nejdou nikam
+    EXPECT_GT(t.carrier.x, 14) << "klec oběhla zeď";
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "nosič po tahu v bezpečí";
+    for (const Macro& m : t.macros) EXPECT_TRUE(m.playerId != 4 && m.playerId != 5) << "přední roh " << m.playerId << " zůstává";
     EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 4)) << "přední roh neblokuje";
     EXPECT_FALSE(hasMacro(t, MacroType::BLOCK, 5)) << "přední roh neblokuje";
     EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));

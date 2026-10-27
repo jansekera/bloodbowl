@@ -562,19 +562,42 @@ Board standBoard(int wallX, int8_t oppSt) {
 // nosič se nehne a chybějící roh se dostaví.
 // P228 (27.10.2026): zeď stála na x = 10, přímo u předních rohů (9,6)/(9,8) — ty pak stály v zóně
 // soupeřů, hrozba přes špinavé rohy je 0,33 a předpoklad „nosič je v bezpečí“ přestal platit. Na
-// x = 11 jsou rohy čisté a pole vpřed pořád v zóně zdi. Bez P177 (maska 16384) test padá.
+// x = 11 jsou rohy čisté a pole vpřed pořád v zóně zdi (vpřed by rohy stály špinavé — i to hlídá
+// předpoklad níž; bez P228 by plán bezpečné pole vpřed našel). Bez P177 (maska 16384) test padá.
 TEST(CageStands, WithTimeToSpareAndNoSafeSquareAheadTheCarrierStaysAndTheCornerComes) {
     Board b = standBoard(11, 3);
+
     b.s.getPlayer(3).position = {6, 9};                     // jeden roh vzadu
     ASSERT_TRUE(teamHasTimeSlack(b.s, b.s.getPlayer(1))) << "předpoklad: tým má rezervu";
     ASSERT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: nosič je v bezpečí tam, kde stojí";
     ASSERT_EQ(standingCorners(b.s, b.s.getPlayer(1)), 3);
+    {   // předpoklad (review 27.10., nález 6): bezpečné pole vpřed není — plán klece nosičem dopředu nehne
+        CageAdvancePlanner planner(nullptr, cfg(), 1);
+        ASSERT_LE(planner.buildImpl(b.s, {}, false).step, 0) << "předpoklad: bezpečné pole vpřed není";
+    }
     CageController cc(nullptr, cfg(), 1);
     std::vector<Macro> ms;
     playAll(cc, b, &ms);
     EXPECT_EQ(b.s.getPlayer(1).position, (Position{8, 7})) << "nosič se nehnul";
     EXPECT_EQ(standingCorners(b.s, b.s.getPlayer(1)), 4) << "rohy se dostavěly";
     for (const Macro& m : ms) EXPECT_NE(m.playerId, 1) << "nosič nedostal žádné makro";
+}
+
+// P228 (review 27.10.2026, nález 6): táž klec u zdi na x = 10 — přední rohy (9,6)/(9,8) stojí v zóně
+// soupeřů, takže je soupeř může napřed srazit a pak udeřit na nosiče (hrozba 0,29). Čtyři rohy tu
+// bezpečí neznamenají; vzadu stojí dva volní hráči, klec se dá postavit bezpečně o pole vzadu ⇒ po tahu
+// je nosič v bezpečí. (Bez volných hráčů klec stojí: přední rohy se bez úhybu nepohnou a P217 dává
+// stání nejvyšší šanci 0,71 — to je nejmenší zlo, ne vada.) Uživatel 27.10.: „primární je, aby klec
+// byla bezpečná — zjednodušení je, aby klec byla čistá“.
+TEST(CageStands, FourDirtyCornersInReachOfAGoodHitAreNotASafeCage) {
+    Board b = standBoard(10, 3);
+    b.put(6, TeamSide::HOME, {4, 6}, 8);                          // volní hráči vzadu: klec se dá postavit jinde
+    b.put(7, TeamSide::HOME, {4, 8}, 8);
+    ASSERT_EQ(standingCorners(b.s, b.s.getPlayer(1)), 4);
+    ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "předpoklad: špinavé rohy, nosič v dosahu rány";
+    CageController cc(nullptr, cfg(), 1);
+    playAll(cc, b);
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat) << "po tahu je nosič v bezpečí";
 }
 
 // Opak: nosič je v dosahu dobré rány (dva silní soupeři dvě pole před dosahem, hrozba 0,55) a bezpečné

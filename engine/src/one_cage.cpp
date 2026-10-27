@@ -1641,6 +1641,10 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         return p && p->teamSide != side && p->state == PlayerState::STANDING && !p->lostTacklezones ? p : nullptr;
     };
 
+    // nosič vedle soupeře: napřed P190 (úhyb z kontaktu) / rány řadiče — zeď počká (review 27.10. nález 1)
+    if (countTacklezones(state, cp, side, carrier.id) > 0) return false;
+    // čekáním by nosič nestihl TD: rozhoduje výběh na konci poločasu, ne prolamování (review 27.10.)
+    if (cageFeatureOn(kFeatTimeRun) && waitingCostsTheTouchdown(state, carrier)) return false;
     const Player* ahead[2] = {wallAt(at(2, -1)), wallAt(at(2, 1))};
     const Player* centre = wallAt(at(2, 0));
     if ((ahead[0] != nullptr) + (ahead[1] != nullptr) + (centre != nullptr) < 2) return false;
@@ -1658,7 +1662,11 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     if (!front[0] || !front[1]) {
         if (faster) return false;
         CageAdvancePlan fill = planner_.buildFillOnly(state, {});
-        if (!fill.valid) return false;
+        // jen dostavba, která přední roh opravdu doplní (review 27.10. nález 9) — jinak rozhoduje plánovač
+        const bool fillsFront = fill.valid && std::any_of(fill.macros.begin(), fill.macros.end(), [&](const Macro& m) {
+            return m.targetPos == at(1, -1) || m.targetPos == at(1, 1);
+        });
+        if (!fillsFront) return false;
         if (std::getenv("BB_CAGE_DEBUG")) {
             std::fprintf(stderr, "[cage ctl] P229 zeď před klecí: běžci MA %d × zeď MA %d (ne rychlejší), přední rohy chybí ⇒ dostavba na místě (%zu)\n",
                          runnersMin, wallMax, fill.macros.size());
@@ -1700,9 +1708,10 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     for (int i = 0; i < 2; ++i) {
         if (!ahead[i]) { stronger = false; continue; }
         const int dice = blockDiceCount(after, after.getPlayer(front[i]->id), after.getPlayer(ahead[i]->id));
-        if (dice < 2) stronger = false;
         // roh s Frenzy by musel za odsunutým do zdi a nechal díru u nosiče (P169) ⇒ neblokuje
-        if (dice >= 1 && freeToAct(*front[i]) && !frenzyCorner(*front[i], carrier)) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
+        const bool canBlock = freeToAct(*front[i]) && !frenzyCorner(*front[i], carrier);
+        if (dice < 2 || !canBlock) stronger = false;          // silnější = oba rohy opravdu bijí 2+ (nález 12)
+        if (dice >= 1 && canBlock) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
     }
     if (faster && !stronger) return false;       // rychlejší obíhá (útěk podle P228)
 
@@ -1718,10 +1727,15 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             int steps = 0;
             if (!blitzLandingDiceFree(state, p, centre->position, landing, steps)) return;
             if (state.getPlayerAtPosition(landing) && landing != p.position) return;
-            const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -blockDiceCount(state, p, *centre), steps};
+            // kostky z pole, odkud bude blokovat — asistence soupeře se počítají kolem něj (review 27.10. nález 5)
+            GameState sim = state.clone();
+            sim.getPlayer(p.id).position = landing;
+            const int dice = blockDiceCount(sim, sim.getPlayer(p.id), sim.getPlayer(centre->id));
+            if (dice < 1) return;                                 // blitz, kde volí obránce, ne
+            const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -dice, steps};
             if (key < bestKey) { bestKey = key; best = &p; }
         });
-        if (best && blockDiceCount(state, *best, *centre) >= 1) blitz.push_back(Macro{MacroType::BLITZ, best->id, centre->id, {-1, -1}});
+        if (best) blitz.push_back(Macro{MacroType::BLITZ, best->id, centre->id, {-1, -1}});
     }
     if (blocks.empty() && blitz.empty()) return false;
 

@@ -1334,6 +1334,19 @@ TEST(BlitzThreat, P228SturdyCornerIsSaferThanAPlainOne) {
     EXPECT_LT(threatWith(sturdy, 0), threatWith(plain, 0));
 }
 
+// Review 27.10. (nález 3): blok soupeře na roh může skončit jeho turnoverem (Attacker Down; Both Down,
+// když útočník nemá Block — pravidla ř. 366-371) a pak rána na nosiče nepřijde. Soupeř s Block na
+// Both Down stojí a roh padá ⇒ hrozba je vyšší než u stejného soupeře bez Block. Dřív se Both Down
+// počítal jako „roh pryč, tah pokračuje“ bez ohledu na Block útočníka (obě hodnoty stejné).
+TEST(BlitzThreat, P228ABlockerWithoutBlockRisksATurnoverOnBothDown) {
+    GameState plain = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    putPlayer(plain, 13, TeamSide::AWAY, {14, 5}, 6);
+    GameState withBlock = plain.clone();
+    withBlock.getPlayer(13).skills.add(SkillName::Block);
+    EXPECT_GT(threatWith(withBlock, 0), threatWith(plain, 0) + 0.01)
+        << "s Block " << threatWith(withBlock, 0) << " × bez " << threatWith(plain, 0);
+}
+
 // ⭐ Uživatel 27.10.2026: „primární je, aby klec byla bezpečná — zjednodušení je, aby klec byla čistá,
 // ale při pohybu pomalého týmu vpřed se kontaktu za cenu, že posílíme, aby roh nebyl sražen, lze —
 // když jsme slabší tým, špinavý roh klece znamená sražení a blitz na nosiče — umíš ověřit“.
