@@ -1,11 +1,12 @@
 # P230 cílené měření (27.10.2026): náhodné běžné hry situaci „pomalejší klec před zdí“ skoro nemají
 # (souhrn.md: P230 0× z 296 tahů). Pozice podle partie zed-orkove: klec kolem nosiče, zeď 5 soupeřů o dva
 # sloupce před ním, zbytek našich vzadu, zbytek soupeřů za zdí. Ramena ze stejného stavu a semínka:
-# "vse" (0), "bez230" (4096), "bez_zalohy" (8192 = P230 záloha vzadu vypnutá). Po rameni jen odpověď soupeře.
+# "vse" (0), "bez230" (4096), "bez_zalohy" (8192 = P230 záloha vzadu vypnutá), "bez_hranice" (16384 = posun u zdi bez
+# hranice rizika), "bez_p232" (32768 = vpřed i s rizikem vypnuto; doplněno 28.10.). Po rameni jen odpověď soupeře.
 import sys, os, pickle, random, time, multiprocessing as mp
 KOREN = sys.argv[1]; VYST = sys.argv[2]; N = int(sys.argv[3])
 DVOJICE = [("orc", "human"), ("orc", "skaven"), ("orc", "wood-elf"), ("dwarf", "human"), ("dwarf", "skaven"), ("dwarf", "wood-elf")]
-RAMENA = {"vse": 0, "bez230": 4096, "bez_zalohy": 8192}
+RAMENA = {"vse": 0, "bez230": 4096, "bez_zalohy": 8192, "bez_hranice": 16384, "bez_p232": 32768}
 sys.path.insert(0, KOREN)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -109,3 +110,5 @@ if __name__ == "__main__":
     with mp.Pool(int(os.environ.get("JADER", "6"))) as pool: res = pool.map(ukol, ukoly, chunksize=1)
     z = [x for x in res if x]
     pickle.dump(z, open(VYST, "wb")); print("hotovo pozic", len(z))
+    if len(z) < len(ukoly):          # 28.10.: noc spadla na chybějících vahách a tabulka vyšla prázdná — chyba = nenulový konec
+        print("CHYBY:", len(ukoly) - len(z), "pozic"); sys.exit(1)

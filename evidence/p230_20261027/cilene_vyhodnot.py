@@ -4,7 +4,7 @@ z = pickle.load(open(sys.argv[1], "rb"))
 M = ["prolom", "posun", "radu", "hrozba", "nosic_srazen", "mic_ztracen", "turnover", "rohy_srazeny", "nasi_srazeni", "zaloha", "nekryto", "td", "cas"]
 def tab(zz, nadpis):
     print(f"## {nadpis} — {len(zz)} pozic\n")
-    for b in ("bez230", "bez_zalohy"):
+    for b in [r for r in zz[0]["ramena"] if r != "vse"] if zz else []:
         lisi = sum(1 for x in zz if any(x["ramena"]["vse"][k] != x["ramena"][b][k] for k in M if k != "cas"))
         print(f"### vse × {b} (liší se v {lisi} pozicích)\n\n| na 100 pozic | vse | {b} | rozdíl ± SE |\n|---|---:|---:|---:|")
         for k in M:
