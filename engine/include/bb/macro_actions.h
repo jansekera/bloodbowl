@@ -113,7 +113,10 @@ enum ExtraFeature : unsigned {
     kP228DirtyCorner = 1024,  // P228: špinavý roh klece — hrozba rány na nosiče počítá i bloky na rohy v zóně soupeře
     kP229WallBreak = 2048,    // P229: zeď před klecí — pomalejší (nebo silnější) tým ji prolomí, rychlejší obejde
     kP230WallShift = 4096,    // P230: pomalejší klec u zdi, rána nejde — klec se přestaví po řadách na volnější křídlo
-    kP230Backup = 8192        // P230: ze zaostalců zůstane vzadu záloha (1–2 hráči přes šířku hřiště) na blitz zloděje míče
+    kP230Backup = 8192,       // P230: ze zaostalců zůstane vzadu záloha (1–2 hráči přes šířku hřiště) na blitz zloděje míče
+    kP230ShiftCap = 16384,    // P230: do strany jen do hranice riskEdge, jinak stát (do ní) / o sloupec dozadu (do 0,15) / nejnižší hrozba, ne vyšší než stát
+    kP232RiskyForward = 32768, // P232: bez bezpečného pole vpřed i s rizikem do riskEdge; vpřed, není-li horší než stát
+    kP232KeepThreat = 65536   // P232: přesun hráče mimo klec (připravený, zaostalec, záloha, Wild Animal) nezvedne hrozbu na nosiče
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();

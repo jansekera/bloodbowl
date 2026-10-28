@@ -499,7 +499,7 @@ void CageController::planStart(const GameState& state) {
         // (M1): zdržování i porovnání se rozhodují z téže hrozby.
         double threat = blitzThreat(state, c);
         if (threat > kSafeBlitzThreat && rid >= 0) {
-            const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+            const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true, /*riskyForward=*/false);
             if (after.valid) threat = std::min(threat, after.blitzThreat);
         }
         // míč v bezpečí a je čas ⇒ nehraje se žádné TD přes spoluhráče — ani když příjemce pro
@@ -586,7 +586,7 @@ void CageController::planStart(const GameState& state) {
         if (state.getTeamState(c.teamSide).handOffUsedThisTurn) return false;   // jedna předávka za tah
         double threat = blitzThreat(state, c);
         if (threat <= kSafeBlitzThreat) return false;
-        const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true);
+        const CageAdvancePlan after = planner_.build(state, {}, /*evenInScoringRange=*/true, /*riskyForward=*/false);
         if (after.valid) threat = std::min(threat, after.blitzThreat);
         if (threat <= kSafeBlitzThreat) return false;
         const TeamSide side = c.teamSide;
@@ -689,7 +689,7 @@ void CageController::planStart(const GameState& state) {
         double threat = blitzThreat(state, c);
         // levná kontrola napřed: bezpečný už teď a (čas, nebo zdržování) ⇒ nic dalšího se nepočítá
         if (threat <= kSafeBlitzThreat && (walksIn || teamHasTimeSlack(state, c))) return false;
-        const CageAdvancePlan cage = planner_.build(state, {}, /*evenInScoringRange=*/true);
+        const CageAdvancePlan cage = planner_.build(state, {}, /*evenInScoringRange=*/true, /*riskyForward=*/false);
         if (cage.valid) threat = std::min(threat, cage.blitzThreat);
         const bool safe = threat <= kSafeBlitzThreat;
         if (safe && teamHasTimeSlack(state, c)) return false;  // bezpečná klec s časem — nic jiného
@@ -1249,6 +1249,10 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
             to = state.getPlayer(m.targetId).position;
         if (to.x >= 0 && (carrier.position.x - to.x) * ((carrier.teamSide == TeamSide::HOME) ? 1 : -1) < 2) return true;
     }
+    // P232: hráče, který zůstal stát, protože by odchodem zvedl hrozbu na nosiče, hledání nepošle jinam
+    if (std::find(threatHeld_.begin(), threatHeld_.end(), m.playerId) != threatHeld_.end() &&
+        (m.type == MacroType::REPOSITION || m.type == MacroType::BLITZ || m.type == MacroType::FOUL) &&
+        !(m.type == MacroType::REPOSITION && m.targetPos == state.getPlayer(m.playerId).position)) return true;
     // P180: hráče připraveného pro předávku hledání neodvádí
     if (m.type == MacroType::REPOSITION &&
         std::find(readyMates_.begin(), readyMates_.end(), m.playerId) != readyMates_.end() &&
@@ -1386,6 +1390,45 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
 // postup nevyjde ⇒ aspoň dostavět rohy kolem nosiče tam, kde stojí. Vše bez hodu, jednou za tah.
 static Position laggardSquare(const GameState& state, const Player& p, Position cp, const std::vector<Position>& taken);
 
+// ⭐ P232 (uživatel 28.10.: riziko „popsat“ a „AI se jím řídí“): hrozba rány na nosiče, se kterou klec tah přijala,
+//   nesmí vzrůst přesunem hráče mimo klec (zaostalec, záloha, připravený hráč, Wild Animal) — kdo stojí soupeři
+//   v cestě k nosiči, zůstane (sonda 28.10.: plán 0,24, zaostalec odešel z cesty dopředu ⇒ po tahu 0,55). Přesuny
+//   fronty od `from` se zkoušejí v jejich pořadí na desce, kde už stojí dříve přijaté; mez = hrozba teď + 0,01.
+//   Záloha, jejíž cesta po vyřazení jiného přesunu chce hod, se taky vyřadí. Vyřazení hráči jdou do `held`
+//   (hledání je pak nepošle jinam — forbidsCarrierMove).
+void dropThreatRaisingMoves(const GameState& state, std::vector<Macro>& queue, size_t from,
+                            const std::vector<int>& backups, std::vector<int>& held) {
+    if (!extraFeatureOn(kP232KeepThreat) || !state.ball.isHeld || state.ball.carrierId <= 0) return;
+    const int cid = state.ball.carrierId;
+    GameState keep = state.clone();
+    const double base = blitzThreat(keep, keep.getPlayer(cid));
+    const bool dbg = std::getenv("BB_CAGE_DEBUG") != nullptr;
+    std::vector<Macro> kept(queue.begin(), queue.begin() + static_cast<long>(std::min(from, queue.size())));
+    for (size_t i = from; i < queue.size(); ++i) {
+        const Macro& q = queue[i];
+        if (q.type != MacroType::REPOSITION || q.playerId == cid) { kept.push_back(q); continue; }
+        Player& p = keep.getPlayer(q.playerId);
+        const bool isBackup = std::find(backups.begin(), backups.end(), q.playerId) != backups.end();
+        if (isBackup && pathFailProb(keep, p, q.targetPos, p.movementRemaining, Position{-1, -1}) != 0.0) {
+            held.push_back(q.playerId);
+            continue;
+        }
+        const Position fromSq = p.position;
+        p.position = q.targetPos;
+        const double t = blitzThreat(keep, keep.getPlayer(cid), base + 0.02);
+        if (t > base + 0.01) {
+            p.position = fromSq;
+            held.push_back(q.playerId);
+            if (dbg)
+                std::fprintf(stderr, "[cage ctl] P232 hráč %d zůstane: přesun na (%d,%d) by zvedl hrozbu na nosiče %.2f -> %.2f\n",
+                             q.playerId, q.targetPos.x, q.targetPos.y, base, t);
+            continue;
+        }
+        kept.push_back(q);
+    }
+    queue = std::move(kept);
+}
+
 // P211b: Wild Animal zaostalec dojde až před koncem tahu — tedy po blitzu, pokud se hrál. Zůstal-li
 // týmový blitz nevyužitý, přesun ho ohlásí (+2 k hodu, ř. 8666-8669); táž primitivní nabídka jako
 // u hledání (BLITZ bez cíle, rules_engine.cpp).
@@ -1442,7 +1485,23 @@ bool CageController::beforeEndTurn(const GameState& state, Macro& out) {
     if (plan.valid) q = std::move(plan.macros);
     const bool adoptPlan = !q.empty();
     const bool sameTurn = team_ == state.activeTeam && turn_ == turn && half_ == state.half;
+    const size_t waFrom = q.size();
     wildAnimalLaggards(state, q, sameTurn ? backups_ : std::vector<int>{});
+    // P232: ani Wild Animal zaostalec nezvedne hrozbu na nosiče (na desce po plánu klece: jen jeho přesuny)
+    if (q.size() > waFrom) {
+        GameState after = state.clone();
+        for (size_t k = 0; k < waFrom; ++k) {
+            if (q[k].type != MacroType::REPOSITION) continue;
+            after.getPlayer(q[k].playerId).position = q[k].targetPos;
+            if (q[k].playerId == carrier.id) after.ball = BallState::carried(q[k].targetPos, carrier.id);
+        }
+        std::vector<Macro> wa(q.begin() + static_cast<long>(waFrom), q.end());
+        std::vector<int> held;
+        dropThreatRaisingMoves(after, wa, 0, {}, held);
+        q.resize(waFrom);
+        q.insert(q.end(), wa.begin(), wa.end());
+        if (sameTurn) threatHeld_.insert(threatHeld_.end(), held.begin(), held.end());
+    }
     if (q.empty()) return false;
     // next() pozná nový tah podle těchto tří polí a frontu by zahodil — nesmí záležet na tom,
     // jestli se v tomto tahu už volal
@@ -1533,7 +1592,9 @@ void CageController::planAdvance(const GameState& state) {
         return;
     }
     const bool planMoves = plan.valid && plan.step >= 1;
-    const bool planSafe = planMoves && plan.blitzThreat <= kSafeBlitzThreat;
+    // P232: krok vpřed s rizikem, který plánovač vědomě přijal (do hranice / není horší než stát), řadič nepřebije
+    //   útěkem nosiče stranou ani úhybem — pořadí vpřed > stranou > stát > vzad (review P232 nález 1)
+    const bool planSafe = planMoves && (plan.blitzThreat <= kSafeBlitzThreat || plan.riskAccepted);
     // ⭐⭐ P190 (rozbor skavenů 09.10.2026: 61 % chybějících rohů = nosič začal tah V KONTAKTU se
     //   soupeřem, pole rohů drží soupeř nebo leží v jeho zónách, a řadič nosiči nedovolil nic —
     //   bez hodu z kontaktu odejít nejde; uživatel 08.10.: „u agilních týmů bude převažovat dodge
@@ -1799,8 +1860,20 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
 //   které nikdo nedrží. Cesty se počítají postupně na desce po předchozích přesunech (review: dřív jen na
 //   výchozí desce). Vyhrává nejnižší hrozba rány na nosiče po přestavbě i s vazači (P228), pak méně GFI,
 //   volnější křídlo (méně soupeřů v dosahu pole před cílem), bližší pole. Pořadí: rohy bez hodu (a kdo musí od
-//   nosiče odejít), nosič, vazači, zaostalci a až úplně nakonec roh přes GFI (nepovedené GFI = turnover). Se stáním se neporovnává — „nejhorší je
-//   nedělat nic“.
+//   nosiče odejít), nosič, vazači, zaostalci a až úplně nakonec roh přes GFI (nepovedené GFI = turnover). Do strany,
+//   stát, nebo ustoupit o sloupec — viz pořadí u výběru níže (kP230ShiftCap; bez něj vždy do strany: „nejhorší je
+//   nedělat nic“).
+WallShiftChoice wallShiftChoice(std::optional<double> side, double stay, std::optional<double> back, double edge) {
+    if (side && *side <= edge) return WallShiftChoice::SIDE;
+    if (stay <= edge) return WallShiftChoice::STAY;
+    if (back && *back <= kSafeBlitzThreat) return WallShiftChoice::BACK;
+    // bez bezpečného pole nejnižší hrozba — ale ne vyšší než stát (P232: přesun, který je rizikovější než stát, ne;
+    //   review P232 nález 2)
+    if (side && (!back || *side <= *back) && *side <= stay) return WallShiftChoice::SIDE;
+    if (back && *back <= stay) return WallShiftChoice::BACK;
+    return WallShiftChoice::STAY;
+}
+
 bool CageController::planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound) {
     const TeamSide side = carrier.teamSide;
     const TeamSide opp = side == TeamSide::HOME ? TeamSide::AWAY : TeamSide::HOME;
@@ -1828,12 +1901,21 @@ bool CageController::planWallShift(const GameState& state, const Player& carrier
         return (g >= 0.0 && std::abs(g - gfiOnly) < 1e-6) ? 1 : -1;
     };
     struct Pick { Position target; std::vector<Macro> queue; double threat; int gfi; int crowd; int dist; std::vector<Macro> gfiLast; };
-    std::optional<Pick> best;
+    std::optional<Pick> best, bestBack;
     auto key = [](const Pick& p) { return std::make_tuple(std::lround(p.threat * 1000), p.gfi, p.crowd, p.dist); };
-    for (int k = 1; k <= 4; ++k) {
-        for (int sgn : {-1, 1}) {
-            const Position t{cp.x, static_cast<int8_t>(cp.y + sgn * k)};
-            if (t.y < 2 || t.y > 12 || state.getPlayerAtPosition(t)) continue;
+    // cíle: do strany ve stejném sloupci (o 1–4 řady) a o sloupec dozadu (rovně nebo o řadu) — ústup do čisté klece
+    struct Target { Position t; int k; bool back; };
+    std::vector<Target> targets;
+    for (int k = 1; k <= 4; ++k)
+        for (int sgn : {-1, 1}) targets.push_back({Position{cp.x, static_cast<int8_t>(cp.y + sgn * k)}, k, false});
+    if (extraFeatureOn(kP230ShiftCap))
+        for (int d : {0, -1, 1})
+            targets.push_back({Position{static_cast<int8_t>(cp.x - dir), static_cast<int8_t>(cp.y + d)}, 1, true});
+    for (const Target& tg : targets) {
+        {
+            const Position t = tg.t;
+            const int k = tg.k;
+            if (!t.isOnPitch() || t.y < 2 || t.y > 12 || state.getPlayerAtPosition(t)) continue;
             // levné předfiltry (review 27.10.): nosič tam bez hodu dojde už na výchozí desce (přesuny rohů
             // na x ± 1 mu cestu sloupcem nezavřou), a vedle cíle nestojí nikdo z našich, kdo se pohnout nesmí
             if (k > static_cast<int>(carrier.movementRemaining)) continue;
@@ -2002,8 +2084,30 @@ bool CageController::planWallShift(const GameState& state, const Player& carrier
             queue.push_back(pick->run);
             queue.insert(queue.end(), binders.begin(), binders.end());
             Pick local{t, std::move(queue), threat, pick->gfi, crowd, k, pick->gfiMoves};
-            if (!best || key(local) < key(*best)) best = std::move(local);
+            std::optional<Pick>& slot = tg.back ? bestBack : best;
+            if (!slot || key(local) < key(*slot)) slot = std::move(local);
         }
+    }
+    // ⭐ Pořadí (uživatel 27.10.2026: „jsem pro posun do boku s rizikem okolo 0,2 — posun kupředu je víc než stát
+    //   nebo dozadu“; ano k návrhu: do strany do 0,20 — od 28.10. hranice podle času riskEdge (P232) —, ústup jen do
+    //   bezpečí 0,15; bez bezpečného pole „vzít pole“
+    //   s nejnižším rizikem): do strany do hranice riskEdge (P232: podle času) ⇒ jinak stát, je-li na místě hrozba do ní
+    //   (dostaví se běžně) ⇒ jinak o sloupec dozadu do čisté klece (do kSafeBlitzThreat) ⇒ jinak nejnižší hrozba.
+    if (extraFeatureOn(kP230ShiftCap)) {
+        CageAdvancePlan fill;
+        const double stay = planner_.stayThreat(state, {}, &fill);   // stát = po dostavbě na místě (jako P232)
+        const WallShiftChoice c = wallShiftChoice(best ? std::optional<double>(best->threat) : std::nullopt, stay,
+                                                  bestBack ? std::optional<double>(bestBack->threat) : std::nullopt,
+                                                  riskEdge(state, carrier));
+        if (dbg)
+            std::fprintf(stderr, "[cage ctl] P230: do strany %.2f, na místě %.2f, dozadu %.2f (-1 = nejde) ⇒ %d\n", best ? best->threat : -1.0,
+                         stay, bestBack ? bestBack->threat : -1.0, static_cast<int>(c));
+        if (c == WallShiftChoice::STAY) {                     // klec stojí a dostaví se na místě (review P232 nález 4)
+            queue_ = fill.valid ? std::move(fill.macros) : std::vector<Macro>{};
+            strictQueue_ = false;
+            return true;
+        }
+        if (c == WallShiftChoice::BACK) best = std::move(bestBack);
     }
     if (!best) return false;
     if (dbg) {
@@ -2177,6 +2281,7 @@ static std::vector<Macro> planBackups(const GameState& state, const Player& carr
 void CageController::planLaggards(const GameState& state) {
     stage_ = Stage::DONE;
     if (!ourBall(state)) return;
+    const size_t ownFrom = queue_.size();    // přesuny tohoto kroku (P232 je kontroluje od tohoto místa)
     const Player& carrier = state.getPlayer(state.ball.carrierId);
     const TeamSide side = carrier.teamSide;
     const int dx = (side == TeamSide::HOME) ? 1 : -1;
@@ -2336,6 +2441,13 @@ void CageController::planLaggards(const GameState& state) {
                 queue_.insert(queue_.begin() + static_cast<long>(laggardsFrom), b);
         }
     }
+    // P232: jedno místo pro připravené hráče, zaostalce i zálohy (od začátku fronty tohoto kroku), v pořadí fronty
+    {
+        const size_t before = threatHeld_.size();
+        dropThreatRaisingMoves(state, queue_, ownFrom, backups_, threatHeld_);
+        for (size_t k = before; k < threatHeld_.size(); ++k)    // vyřazený připravený hráč už připravený není
+            readyMates_.erase(std::remove(readyMates_.begin(), readyMates_.end(), threatHeld_[k]), readyMates_.end());
+    }
     // P230: roh přes GFI až úplně na konec tahu — nepovede-li se, nepřijdeme o nic dalšího (review 27.10.)
     queue_.insert(queue_.end(), deferredGfi_.begin(), deferredGfi_.end());
     deferredGfi_.clear();
@@ -2418,6 +2530,7 @@ bool CageController::next(const GameState& state, Macro& out) {
         mateStall_ = false;
         readyMates_.clear();
         backups_.clear();          // P230: záloha platí jen v tahu, kdy ji řadič vybral (po zahození fronty zůstává)
+        threatHeld_.clear();       // P232: kdo zůstal stát kvůli hrozbě na nosiče — jen v tomto tahu
     }
     // ⭐ P169 krok 9 (07.10.2026): MÍČ ZVEDLO HLEDÁNÍ ⇒ ROHY SE STAVÍ HNED POTOM. Když řadič na
     //   začátku tahu zvednutí nenabídl (míč v zóně soupeře, napřed rána) a míč pak zvedlo

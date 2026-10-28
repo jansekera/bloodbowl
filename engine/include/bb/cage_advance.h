@@ -110,6 +110,8 @@ struct CageAdvancePlan {
 
     double planValue = 0.0;      // leaf eval of the projected end state (diag)
     double blitzThreat = 0.0;    // P174: nejlepší soupeřův blitz/blok na nosiče po tomto plánu (0–1)
+    bool riskAccepted = false;   // P232: krok vpřed nad 0,15 přijatý vědomě (do hranice / není horší než stát) —
+                                 //   řadič ho nepřebije útěkem nosiče stranou (one_cage.cpp planSafe)
 
     // P154/K2 (06.10.2026): > 0, když delší krok nevyšel bez hodu a plán je pro kratší —
     // nese krok, který se zkoušel jako první. 0 = plán je pro první zkoušený krok.
@@ -262,6 +264,12 @@ double blitzThreat(const GameState& state, const Player& carrier, double stopAbo
 // Dřív mělo zdržování vlastní, přísnější mez 0,05 — čistá klec na dosah soupeře by se pak
 // nikdy nezdržovala.
 constexpr double kSafeBlitzThreat = 0.15;
+// ⭐ HRANICE RIZIKA S MÍČEM PODLE ČASU (P232, uživatel 28.10.2026: „2 ano — podle času“; dřív P230 pevně 0,20 —
+//   „číslo hrany nemusí být přesně 0,2“). Tým s časovou rezervou (teamHasTimeSlack) jde jen do bezpečí
+//   (kSafeBlitzThreat), tým bez rezervy přijme hrozbu rány na nosiče až kRiskEdgeNoSlack — bez kroku TD nepadne.
+//   Čísla zpřesní kalibrace evidence/p230_20261027 (skutečná ztráta míče podle hrozby).
+constexpr double kRiskEdgeNoSlack = 0.30;
+double riskEdge(const GameState& state, const Player& carrier);
 // Kolik polí pohybu má soupeř na cestu k ráně na nosiče (pohyb + 2 GFI − 1 pole za ránu; ležící
 // vstává za 3 pole, s pohybem pod 3 bez Jump Up se nepočítá) — nebo −1, když hrát nemůže.
 int blitzReachOf(const Player& opp);
@@ -310,9 +318,11 @@ public:
     // minimum is placed on corners already standing at plan time: the plan
     // builds a cage from scratch on the carrier's destination square (user
     // standard "always build the right cage", a5634c7).
+    // `riskyForwardAllowed` = false: bez P232 — pro dotazy „jak bezpečně může být nosič po našem tahu“ (porovnání
+    //   klece s předávkou / útěkem / TD v řadiči), kde se má počítat nejbezpečnější možnost, ne krok vpřed s rizikem.
     CageAdvancePlan build(const GameState& state,
                           const std::vector<int>& reservedPlayerIds = {},
-                          bool evenInScoringRange = false);
+                          bool evenInScoringRange = false, bool riskyForwardAllowed = true);
 
     // Generic skill-based corner eligibility (constraint 2). Public for
     // tests and future planners.
@@ -329,6 +339,14 @@ public:
     // stays put. Hierarchy: advance -> fill -> never a solo run.
     CageAdvancePlan buildFillOnly(const GameState& state,
                                   const std::vector<int>& reservedPlayerIds);
+
+    // P232: bez bezpečného kroku vpřed krok vpřed i s rizikem (do riskEdge, nebo není-li horší než stát).
+    //   `fillOut` = dostavba na místě, pokud se kvůli hrozbě stání počítala (build() ji použije znovu).
+    CageAdvancePlan riskyForward(const GameState& state, CageAdvancePlan plan,
+                                 const std::vector<int>& reservedPlayerIds, bool evenInScoringRange,
+                                 CageAdvancePlan* fillOut = nullptr);
+    // Hrozba rány na nosiče, když klec stojí a dostaví se na místě (P232 i P230 „stát“ — jedna definice).
+    double stayThreat(const GameState& state, const std::vector<int>& reservedPlayerIds, CageAdvancePlan* fillOut = nullptr);
 
     // Corner-slot assignment around the carrier's position after a `step`
     // squares forward move. Public since 2026-08-07: the item13 staged
@@ -362,6 +380,7 @@ public:
 private:
     MCTSConfig config_;
     MacroMCTSSearch evaler_;  // leaf eval only (evaluateLeaf)
+    double riskyLimit_ = 0.0;  // P232: > 0 = druhý průchod buildImpl, jen pole vpřed do této hrozby
     DiceRoller dice_;
 
     struct ProbeStats {

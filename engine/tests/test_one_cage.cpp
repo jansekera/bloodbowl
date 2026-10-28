@@ -882,6 +882,8 @@ TEST(OneCageWallShift, CornerGoesToAPlayerWithoutGfiFirst) {
 // Review 27.10.: nosič dojde jen o 1–2 řady. O řadu by stál přímo vedle vázaného předního rohu (klec = jen
 // čtyři rohy ⇒ ne); o dvě řady je vázaný přední roh rohem nové klece (dřív se o dvě řady nedalo nikdy).
 TEST(OneCageWallShift, TwoRowsWithTheBoundCornerAsACornerNotOneRowNextToIt) {
+    // mechanika posunu po řadách; pořadí do strany / stát / dozadu hlídají testy OneCageShiftCap
+    struct Off { Off() { setExtraFeaturesOff(kP230ShiftCap); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = wallWithHelpers(4);
     b.s.getPlayer(1).movementRemaining = 2;
     const CageTurn t = cageTurn(b);
@@ -892,6 +894,8 @@ TEST(OneCageWallShift, TwoRowsWithTheBoundCornerAsACornerNotOneRowNextToIt) {
         << "přední rohy zůstaly u zdi";
 }
 TEST(OneCageWallShift, NeverOneRowNextToTheBoundCorner) {
+    // mechanika posunu po řadách; pořadí do strany / stát / dozadu hlídají testy OneCageShiftCap
+    struct Off { Off() { setExtraFeaturesOff(kP230ShiftCap); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = wallWithHelpers(4);
     b.s.getPlayer(1).movementRemaining = 1;
     const CageTurn t = cageTurn(b);
@@ -2449,4 +2453,39 @@ TEST(OneCageBackup, PlayerWhoAlreadyActedBehindIsTheBackup) {
     const Position cp = b.s.getPlayer(1).position;
     EXPECT_FALSE(behind(b.s.getPlayer(6), cp)) << "zaostalec dopředu";
     EXPECT_FALSE(behind(b.s.getPlayer(8), cp)) << "zaostalec dopředu";
+}
+
+// ⭐ P230 pořadí (uživatel 27.10.2026: „jsem pro posun do boku s rizikem okolo 0,2 — posun kupředu je víc než stát
+// nebo dozadu“): do strany do hranice (P232: s časovou rezervou 0,15, bez ní 0,30), jinak stát (na místě do hranice), jinak o sloupec dozadu do čisté klece (do 0,15), jinak nejnižší hrozba, není-li vyšší než stát.
+// Nosič MA 2 dojde jen o dvě řady: tam i na místě hrozba 0,29 (zeď) ⇒ ustoupí o sloupec do čisté klece.
+TEST(OneCageShiftCap, RiskySidewaysAndRiskyStayRetreatIntoACleanCage) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(1).movementRemaining = 2;
+    // ústup (ne posun do strany s 0,29) jen proto, že tým má časovou rezervu ⇒ hranice 0,15 (P232)
+    ASSERT_EQ(riskEdge(b.s, b.s.getPlayer(1)), kSafeBlitzThreat);
+    const CageTurn t = cageTurn(b);
+    EXPECT_EQ(t.carrier.x, 11) << "o sloupec dozadu";
+    EXPECT_EQ(cornersAround(b.s, t.carrier), 4) << "čistá klec";
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), kSafeBlitzThreat);
+}
+// Pořadí samo na číslech (pozice „do strany nad hranicí, na místě do ní“ u zdi bez povolené rány se postavit nedá —
+// slabší zeď pustí rány a hraje se prolomení P229).
+TEST(OneCageShiftCap, OrderSidewaysStayBack) {
+    using C = WallShiftChoice;
+    const double e = kRiskEdgeNoSlack;   // hranice bez časové rezervy (P232: riskEdge podle času)
+    EXPECT_EQ(wallShiftChoice(0.30, 0.05, 0.01, e), C::SIDE) << "do strany do hranice i proti bezpečnějšímu stání";
+    EXPECT_EQ(wallShiftChoice(0.31, 0.30, 0.01, e), C::STAY) << "stát (do hranice) je víc než dozadu";
+    EXPECT_EQ(wallShiftChoice(0.31, 0.31, 0.15, e), C::BACK) << "dozadu jen do bezpečí";
+    EXPECT_EQ(wallShiftChoice(0.35, 0.40, 0.16, e), C::BACK) << "bez bezpečí nejnižší hrozba";
+    EXPECT_EQ(wallShiftChoice(0.31, 0.40, 0.35, e), C::SIDE) << "bez bezpečí nejnižší hrozba";
+    EXPECT_EQ(wallShiftChoice(std::nullopt, 0.40, 0.35, e), C::BACK) << "jen dozadu — nejhorší je nedělat nic";
+    EXPECT_EQ(wallShiftChoice(0.35, 0.40, std::nullopt, e), C::SIDE);
+    EXPECT_EQ(wallShiftChoice(std::nullopt, 0.40, std::nullopt, e), C::STAY) << "nic nejde";
+    // přesun rizikovější než stát ne (P232)
+    EXPECT_EQ(wallShiftChoice(std::nullopt, 0.31, 0.60, e), C::STAY);
+    EXPECT_EQ(wallShiftChoice(0.90, 0.31, std::nullopt, e), C::STAY);
+    EXPECT_EQ(wallShiftChoice(0.50, 0.31, 0.45, e), C::STAY);
+    // hranice se posouvá s časem: s rezervou 0,15, bez ní 0,30 (P232)
+    EXPECT_EQ(wallShiftChoice(0.20, 0.25, 0.01, kSafeBlitzThreat), C::BACK) << "s rezervou do strany jen do bezpečí";
+    EXPECT_EQ(wallShiftChoice(0.29, 0.29, 0.01, kRiskEdgeNoSlack), C::SIDE) << "bez rezervy do strany i s 0,29";
 }

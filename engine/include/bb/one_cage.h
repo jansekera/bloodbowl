@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 
 #include "bb/cage_advance.h"
 #include "bb/game_state.h"
@@ -103,6 +104,18 @@ struct ReleaseDecision {
 ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
                               const CageAdvancePlanner& planner);
 
+// ⭐ P230 pořadí u zdi (uživatel 27.10.2026: „jsem pro posun do boku s rizikem okolo 0,2 — posun kupředu je víc
+//   než stát nebo dozadu“; bez bezpečného pole „vzít pole“ s nejnižším rizikem): do strany do hranice `edge` ⇒
+//   stát, je-li na místě do `edge` ⇒ o sloupec dozadu do kSafeBlitzThreat ⇒ nejnižší hrozba ze strany a
+//   dozadu, není-li vyšší než stát (P232) ⇒ stát. Prázdné = taková přestavba nejde. `edge` = riskEdge (P232, podle
+//   času); `stay` = hrozba po dostavbě na místě (CageAdvancePlanner::stayThreat).
+// P232: z přesunů fronty od `from` vyřadí ty, které by zvedly hrozbu rány na nosiče (a zálohu, jejíž cesta pak chce
+//   hod); vyřazení hráči přibudou do `held`. Jedno místo pro připravené, zaostalce, zálohy i Wild Animal.
+void dropThreatRaisingMoves(const GameState& state, std::vector<Macro>& queue, size_t from,
+                            const std::vector<int>& backups, std::vector<int>& held);
+enum class WallShiftChoice { SIDE, STAY, BACK };
+WallShiftChoice wallShiftChoice(std::optional<double> side, double stay, std::optional<double> back, double edge);
+
 class CageController {
 public:
     const std::vector<int>& readyMates() const { return readyMates_; }   // P180: pro testy a výpis
@@ -173,6 +186,7 @@ private:
     std::vector<int> readyMates_;
     // P230: záloha vzadu (1–2 hráči přes šířku hřiště) — hledání ji v tomto tahu nepošle dopředu.
     std::vector<int> backups_;
+    std::vector<int> threatHeld_;   // P232: zůstali stát, protože by odchodem zvedli hrozbu na nosiče (jen tento tah)
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;

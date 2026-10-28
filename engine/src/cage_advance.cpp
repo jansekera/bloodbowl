@@ -160,6 +160,11 @@ CageSnapshot cageSnapshot(const GameState& state, const Player& carrier,
     return c;
 }
 
+double riskEdge(const GameState& state, const Player& carrier) {
+    // rezerva platí jen tam, kde ji plánovač bere v úvahu (kFeatSlackSafety) — jedna definice (review P232 nález 11)
+    return cageFeatureOn(kFeatSlackSafety) && teamHasTimeSlack(state, carrier) ? kSafeBlitzThreat : kRiskEdgeNoSlack;
+}
+
 bool teamHasTimeSlack(const GameState& state, const Player& carrier, int* needOut, int* paceOut) {
     const TeamSide side = carrier.teamSide;
     std::vector<int> mas;
@@ -809,6 +814,108 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
     return plan;
 }
 
+// ⭐⭐ P232 VPŘED I S RIZIKEM (uživatel 28.10.2026: „jde o princip donutit se pohnout kupředu s míčem i přes riziko
+//   a to riziko popsat — stejně jako jsme se donutili zvednout míč i přes riziko — cílem je dojít a dát TD“; obecně,
+//   ne jen pro trpaslíky; „ano“ k: hranice podle času a „krok vpřed, který není rizikovější než stát, se zahraje“).
+//   Pořadí: bezpečně vpřed (do 0,15, jak ho našel dosavadní plán) ⇒ vpřed s rizikem do hranice riskEdge (s časovou
+//   rezervou 0,15, bez ní 0,30; v jednom průchodu nejdál vpřed, proti dosavadnímu kroku vpřed ten s nižší hrozbou) ⇒ vpřed, není-li hrozba vyšší než při stání
+//   (dostavba na místě) a nemá-li dosavadní plán pole do hranice (bezpečný krok stranou / ústup) ⇒ dosavadní plán
+//   (bezpečný ústup, dostavba, stání) — ale krok vpřed nad hranicí i nad stáním už ne: dřív ho postup „co nejdál bez
+//   hodu“ hrál bez vážení rizika (klec šla na hrozbu 0,49, stát vycházelo 0,02). Riziko = hrozba rány na nosiče po
+//   tahu (blitzThreat) — totéž číslo, kterým se rozhoduje; s hranicí a stáním ve výpisu BB_CAGE_DEBUG.
+double CageAdvancePlanner::stayThreat(const GameState& state, const std::vector<int>& reservedPlayerIds,
+                                      CageAdvancePlan* fillOut) {
+    CageAdvancePlan fill = buildFillOnly(state, reservedPlayerIds);
+    const double t = fill.valid ? fill.blitzThreat : bb::blitzThreat(state, state.getPlayer(state.ball.carrierId));
+    if (fillOut) *fillOut = std::move(fill);
+    return t;
+}
+
+CageAdvancePlan CageAdvancePlanner::riskyForward(const GameState& state, CageAdvancePlan plan,
+                                                 const std::vector<int>& reservedPlayerIds, bool evenInScoringRange,
+                                                 CageAdvancePlan* fillOut) {
+    if (!cageFeatureOn(kFeatCleanCageSearch) || !state.ball.isHeld || state.ball.carrierId <= 0) return plan;
+    // tytéž podmínky spuštění jako buildImpl (náš míč, cíl postup, nosič ještě nehrál) — jinak nic nepočítat
+    const TurnGoal goal = classifyTurnGoal(state);
+    if (goal != TurnGoal::ADVANCE_BALL && !(evenInScoringRange && goal == TurnGoal::SCORE_BALL)) return plan;
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    if (!carrier.canAct() || carrier.hasMoved || carrier.hasActed) return plan;
+    const int dx = forwardDx(carrier.teamSide);
+    auto progress = [&](const CageAdvancePlan& p) {
+        for (const Macro& m : p.macros)
+            if (m.playerId == carrier.id && m.type == MacroType::REPOSITION) return (m.targetPos.x - carrier.position.x) * dx;
+        return 0;
+    };
+    const bool dbg = getenv("BB_CAGE_DEBUG") != nullptr;
+    const bool forward = plan.valid && plan.step >= 1 && progress(plan) >= 1;
+    if (forward && plan.blitzThreat <= kSafeBlitzThreat) return plan;          // bezpečně vpřed
+    const double edge = riskEdge(state, carrier);
+    double stay = -1.0;                                                         // počítá se, až je potřeba
+    auto stayNow = [&]() {
+        if (stay < 0.0) stay = stayThreat(state, reservedPlayerIds, fillOut);
+        return stay;
+    };
+    // druhý průchod plánu s vyšší mezí; mez se vrátí i při výjimce
+    auto pass = [&](double lim) {
+        struct Reset { double& v; ~Reset() { v = 0.0; } } reset{riskyLimit_};
+        riskyLimit_ = lim;
+        return buildImpl(state, reservedPlayerIds, evenInScoringRange);
+    };
+    // krok vpřed z druhého průchodu nahradí dosavadní krok vpřed jen s nižší hrozbou (review P232 nález 5)
+    auto better = [&](const CageAdvancePlan& r) {
+        return r.valid && progress(r) >= 1 && !(forward && plan.blitzThreat <= r.blitzThreat);
+    };
+    auto say = [&](const char* what, const CageAdvancePlan& p) {
+        if (dbg)
+            fprintf(stderr, "[cage] P232 %s: nosič (%d,%d) postup %d, hrozba rány %.2f (hranice %.2f, stát %.2f)\n", what,
+                    carrier.position.x, carrier.position.y, p.valid ? progress(p) : 0, p.valid ? p.blitzThreat : -1.0, edge, stay);
+    };
+    // 1) vpřed s rizikem do hranice (dosavadní krok vpřed do hranice se nechá, je-li bezpečnější)
+    if (edge > kSafeBlitzThreat && !(forward && plan.blitzThreat <= edge)) {
+        CageAdvancePlan risky = pass(edge);
+        if (better(risky)) {
+            risky.riskAccepted = true;
+            say("vpřed s rizikem do hranice", risky);
+            return risky;
+        }
+    }
+    if (forward && plan.blitzThreat <= edge) {
+        plan.riskAccepted = true;
+        say("vpřed s rizikem do hranice (dosavadní plán)", plan);
+        return plan;
+    }
+    // 2) vpřed, není-li horší než stát — jen když dosavadní plán nemá pole do hranice (bezpečný krok stranou / ústup
+    //    má přednost před krokem vpřed s hrozbou 0,49 jen proto, že stát je taky 0,49)
+    const bool altWithinEdge = plan.valid && plan.step >= 1 && plan.blitzThreat <= edge;
+    if (!altWithinEdge && stayNow() > edge) {
+        CageAdvancePlan risky = pass(stay);
+        if (better(risky)) {
+            risky.riskAccepted = true;
+            say("vpřed, není horší než stát", risky);
+            return risky;
+        }
+        if (forward && plan.blitzThreat <= stay) {
+            plan.riskAccepted = true;
+            say("vpřed, není horší než stát (dosavadní plán)", plan);
+            return plan;
+        }
+    }
+    // 3) krok vpřed nad hranicí i nad stáním se nehraje — klec stojí a dostaví se na místě
+    if (forward && plan.blitzThreat > std::max(edge, stayNow())) {
+        say("krok vpřed nad hranicí i nad stáním — klec stojí", plan);
+        CageAdvancePlan stand = plan;                    // diagnostika tempa zůstane (TurnPlanRecord)
+        stand.valid = false;
+        stand.verdict = CageAdvanceVerdict::NOT_APPLICABLE;
+        stand.macros.clear();
+        stand.step = 0;
+        stand.blitzThreat = stayNow();                   // hrozba toho, co se opravdu stane (stání)
+        return stand;                                    // build() dostaví klec na místě
+    }
+    say(plan.valid && plan.step >= 1 ? "vpřed nejde, dosavadní plán (stranou / vzad)" : "vpřed nejde, klec stojí", plan);
+    return plan;
+}
+
+
 // Thin wrapper: run the planner, then record what it decided. Every number
 // below used to be computed and discarded, which made "the cage crawls with
 // nobody in front of it" undiagnosable -- there was no telling a plan that
@@ -816,10 +923,13 @@ CageAdvancePlan CageAdvancePlanner::buildFillOnly(
 // and hands the turn to search(). Those two want opposite fixes.
 CageAdvancePlan CageAdvancePlanner::build(const GameState& state,
                                           const std::vector<int>& reservedPlayerIds,
-                                          bool evenInScoringRange) {
+                                          bool evenInScoringRange, bool riskyForwardAllowed) {
     CageAdvancePlan plan = buildImpl(state, reservedPlayerIds, evenInScoringRange);
+    CageAdvancePlan fillP232;                    // dostavba spočtená v P232 (stání), ať se nepočítá dvakrát
+    if (riskyForwardAllowed && extraFeatureOn(kP232RiskyForward))
+        plan = riskyForward(state, std::move(plan), reservedPlayerIds, evenInScoringRange, &fillP232);
     if (!plan.valid) {
-        CageAdvancePlan fill = buildFillOnly(state, reservedPlayerIds);
+        CageAdvancePlan fill = fillP232.valid ? std::move(fillP232) : buildFillOnly(state, reservedPlayerIds);
         if (fill.valid) {
             fill.requiredPace = plan.requiredPace;
             fill.achievablePace = plan.achievablePace;
@@ -1076,6 +1186,8 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
         //   pro čistou klec nebo nic se dostaneš do situace, kdy pohyb klece zpomalíš tak, že
         //   nedojde s trpaslíky vůbec“ — proto není podmínkou čistá klec, ale bezpečný nosič.
         const double kSafeThreat = kSafeBlitzThreat;
+        // Mez hrozby, do které předvýběr a zkouška pole berou; P232 ji zvedá (vpřed i s rizikem).
+        double limit = riskyLimit_ > 0.0 ? riskyLimit_ : kSafeThreat;
         // LEVNÝ PŘEDVÝBĚR: hrozba rány na desce, kde hráči rovnou stojí na přidělených polích
         // (bez zkoušení cest kostkami). Drahá zkouška „dojdou tam bez hodu a v tomto pořadí“
         // (48 pokusů na každý přesun) se pak dělá jen pro nejlepší kandidáty — první verze
@@ -1095,8 +1207,8 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             }
             proj.getPlayer(carrier.id).position = c.sq;
             proj.ball = BallState::carried(c.sq, carrier.id);
-            const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), kSafeThreat);
-            if (t <= kSafeThreat) ranked.push_back({&c, t});
+            const double t = bb::blitzThreat(proj, proj.getPlayer(carrier.id), limit);
+            if (t <= limit) ranked.push_back({&c, t});
         };
         // ⭐⭐ P177 (uživatel 08.10.2026: „rychlejší týmy mohou s klecí dojít spíše bezpečně než co
         //   nejdál — např. skaveni proti orkům, protože pak jim zbyde dost pohybu na TD později“;
@@ -1136,7 +1248,7 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
                 CageAdvancePlan candidate = plan;
                 candidate.carrierGfi = 0;
                 if (!legsAreSafe(candidate, carrier.position.distanceTo(r.c->sq), r.c->a)) continue;
-                if (candidate.blitzThreat > kSafeThreat) continue;
+                if (candidate.blitzThreat > limit) continue;
                 best = std::move(candidate);
                 bestProgress = r.c->progress;
                 haveBest = true;
@@ -1171,6 +1283,8 @@ CageAdvancePlan CageAdvancePlanner::buildImpl(const GameState& state,
             }
             tryRanked();
         }
+        // P232 druhý průchod (build → riskyForward): jen pole vpřed do meze riskyLimit_, nic dalšího.
+        if (riskyLimit_ > 0.0) return haveBest ? best : plan;
         if (haveBest) {
             if (getenv("BB_CAGE_DEBUG")) {
                 fprintf(stderr, "[cage] bezpečná klec: nosič (%d,%d) vpřed o %d, rohů %d, hrozba rány %.2f, kandidátů %zu\n",
