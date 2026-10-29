@@ -1,0 +1,13 @@
+tahů celkem 391, s míčem 275
+řadič u zdi (P229 nebo P233) v rameni vse: 1 tahů
+P233 došel na řadu: 0 tahů; rána P233: 0 tahů (0 ran)
+ramena se liší (jiné akce): 0 tahů; z toho s P233 v rameni vse: 0
+
+na 100 tahů s míčem           vse   bez_p233   rozdíl ± SE
+posun                          2.45     2.45   +0.00 ± 0.00
+nosic_srazen                   6.91     6.91   +0.00 ± 0.00
+mic_ztracen                    9.09     9.09   +0.00 ± 0.00
+turnover                      12.00    12.00   +0.00 ± 0.00
+td                             6.55     6.55   +0.00 ± 0.00
+rohy_srazeny                  21.45    21.45   +0.00 ± 0.00
+cas                           32.81    32.72   +0.09 ± 0.51
