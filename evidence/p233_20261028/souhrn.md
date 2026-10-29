@@ -22,3 +22,18 @@ v běžných hrách nenastane (generátor staví zeď jinak než soupeř ve hře
 
 Další krok (návrh): spočítat, jak často P233 dojde ke slovu v běžných hrách (`BB_CAGE_DEBUG` řádky P229/P233
 v hrách jako u P232); nastane-li, měřit párově na těch tazích.
+
+## Konkrétní situace × předchozí commit (29.10., `situace_p233.py`)
+
+Zombíci (MA 4, ST 3, bez Block) v kleci kolem (12,7), zeď beastmenů chaosu (MA 6, ST 3) na x = 14; P233 (8fa3c1db)
+proti předchozímu commitu 407527c6 (`../p230_20261027/zmrazeno_p232`), 5 semínek, náš tah + odpověď.
+
+| situace | předchozí commit | P233 |
+|---|---|---|
+| S1 zeď 5, pomocníci 3 (příklad uživatele) | celá klec se posune o 3 řady ke kraji (nosič (12,4)), přední roh blitzuje krajního (14,5); 1× z 5 turnover | asistent → blitz pomocníkem na kraj (14,9) → roh blokuje dovnitř; 2× z 5 všechny 3 rány (zeď 5 → 2, klec na místě); 3× jen blitz (soupeř neupadl) a klec pak uhne o 2 řady k otevřenému kraji |
+| S2 zeď 4 | blok rohem + blitz (P229) | totéž — zeď 4 má 2 kostky už bez P233 |
+| S3 jeden pomocník | žádná rána, klec o 2 řady | totéž (kontrola) |
+| S4 za zdí leží 7 soupeřů (řetěz všude) | blitz do řetězu (1× nosič sražen a míč ztracen, 1× turnover) | totéž — P233 nebije, převezme staré chování |
+| S5 jeden ležící na (15,6) | jako S1 | jako S1 (P233 bije druhý kraj už v S1) |
+
+Odpověď soupeře: nosič sražen 0/5 u obou v S1; hrozba (carrier_blitz_threat) 0,04–0,06 předtím (klec dál od zdi) × 0,07 s P233.
