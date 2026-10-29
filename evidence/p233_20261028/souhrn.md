@@ -39,3 +39,5 @@ proti předchozímu commitu 407527c6 (`../p230_20261027/zmrazeno_p232`), 5 semí
 Odpověď soupeře: nosič sražen 0/5 u obou v S1; hrozba (carrier_blitz_threat) 0,04–0,06 předtím (klec dál od zdi) × 0,07 s P233.
 
 Uživatel 29.10.: „jsem pro pohyb do boku“ — když po blitzu další rána na 2 kostky nejde, klec smí uhnout do boku k otevřenému kraji (tak to P233 v S1 dělá) ⇒ beze změny.
+
+Uživatel 29.10.: „řetězový blok jen směrem od klece“, „pozor na sidestep“ ⇒ commit 43e08d71 (větev p231-zaloha): rána u klece (P233 i P229) se hraje, jen když nikdo kromě útočníka nově nestojí vedle nosiče — přehráno nanečisto (previewPushBack), Side Step obránce i řetězu jako nejhorší volba, kontrola znovu těsně před ranou. Mutace 8/8 zabity, make check zelený.
