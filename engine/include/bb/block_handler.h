@@ -42,6 +42,13 @@ ActionResult resolveMultipleBlock(GameState& state, int attackerId,
 bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed, bool isBlock,
                   DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P233: odtlačení rány nanečisto (stejný výběr pole, Side Step podle AI, řetěz včetně Stand Firm v řetězu, dav jako
+// skutečná rána; neutrální kostky, bez follow-upu). Stand Firm / Take Root PŘÍMÉHO obránce se nemodeluje — přehrání
+// odtlačí vždy (opatrné: může odmítnout neškodnou ránu, nikdy nepustí škodlivou). Útočník stojí na `attackerPos`.
+// `surf` = obránce šel do davu. Volat mimo CoachChoiceScope (jinak by se ptalo kouče).
+GameState previewPushBack(const GameState& state, int attackerId, int defenderId, Position attackerPos,
+                          bool isBlitz, bool& surf);
+
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
                                  const Player& att, const Player& def);

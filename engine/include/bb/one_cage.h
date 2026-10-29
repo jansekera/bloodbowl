@@ -156,6 +156,7 @@ private:
     bool planWallClear(const GameState& state);
     bool wallClearing_ = false;   // planWallBreak předal tah čištění zdi (P233)
     double wallThreat_ = -1.0;    // P233: hrozba na nosiče na začátku čištění zdi (-1 = ještě nezměřena)
+    std::vector<std::pair<int, int>> wallHits_;   // rány do zdi (P229 bloky rohů a blitz, P233) útočník→cíl: před ranou znovu hitKeepsCage
     // P230: přestavba klece platí jen celá — nedojde-li hráč na své pole, zbytek fronty se zahodí (review 27.10.)
     bool strictQueue_ = false;
     // P230: roh přes GFI se hraje až na konci tahu (po zaostalcích) — nepovedené GFI je turnover (review 27.10.)

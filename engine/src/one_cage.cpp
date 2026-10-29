@@ -5,6 +5,7 @@
 #include "bb/one_cage.h"
 #include <cstdio>
 #include <cstdlib>
+#include "bb/block_handler.h"
 #include "bb/helpers.h"
 #include "bb/pathfinder.h"
 #include "bb/turn_planner.h"
@@ -1716,6 +1717,40 @@ void CageController::planAdvance(const GameState& state) {
 //   Chybí-li přední rohy, pomalejší klec se dostaví na místě (prolomí příští tah); plánovač by ji
 //   jinak s P228 poslal kolem zdi bokem nebo dozadu. Když nejde blok ani blitz, prolomení se
 //   nehraje a rozhoduje dosavadní řadič.
+// Rána u klece (P229 prolomení i P233 zeď od kraje) smí odtlačit (i řetězem) jen směrem od klece (uživatel 28.10.2026:
+//   „ať si nezměníme klec na více hráčů“; 29.10.: „řetězový blok jen směrem od klece“). Pravidlo: NIKDO kromě útočníka
+//   nesmí nově vstoupit na pole vedle nosiče (ani nosičovo pole) — soupeř ani náš hráč. Stačí to i na „náš hráč vedle
+//   nosiče se pohnul“: řetěz začíná u obránce mimo tu zónu (zeď stojí dva sloupce před nosičem), takže jeho pole vždy
+//   obsadí někdo, kdo do zóny nově vstoupil. Pole volí útočník a pushDestScore bere pole nejdál od nosiče, to ale
+//   klec nechrání vždy (rána zezadu, Stand Firm v řetězu) ⇒ odtlačení se přehraje nanečisto týmiž funkcemi
+//   (previewPushBack). Side Step volí obránce sám (v živé partii člověk) ⇒ nejhorší volba: má-li obránce Side Step
+//   a volné sousední pole vedle nosiče, rána se nehraje (review 4). Volat mimo CoachChoiceScope (plánování).
+static bool hitKeepsCage(const GameState& b, int carrierId, int attId, Position attPos, int defId, bool isBlitz) {
+    const Position cp = b.getPlayer(carrierId).position;
+    const bool grab = b.getPlayer(attId).hasSkill(SkillName::Grab);   // Grab ruší Side Step (pushSkills)
+    // hráč se Side Step, který se pohne (obránce, nebo kdokoli v řetězu), si pole volí sám ⇒ nejhorší volba
+    auto sideStepIntoZone = [&](const Player& p) {
+        if (grab || p.state != PlayerState::STANDING || !p.hasSkill(SkillName::SideStep)) return false;
+        for (const Position& q : p.position.getAdjacent())
+            if (q.isOnPitch() && q.distanceTo(cp) <= 1 && !b.getPlayerAtPosition(q) && q != attPos) return true;
+        return false;
+    };
+    if (sideStepIntoZone(b.getPlayer(defId))) return false;
+    bool surf = false;
+    const GameState sim = previewPushBack(b, attId, defId, attPos, isBlitz, surf);
+    bool ok = true;
+    sim.forEachOnPitch(b.getPlayer(defId).teamSide, [&](const Player& p) {   // Side Step v řetězu (review 5)
+        if (p.id != defId && b.getPlayer(p.id).position != p.position && sideStepIntoZone(b.getPlayer(p.id))) ok = false;
+    });
+    auto check = [&](const Player& p) {
+        if (p.id == attId) return;
+        if (p.position.distanceTo(cp) <= 1 && b.getPlayer(p.id).position != p.position) ok = false;
+    };
+    sim.forEachOnPitch(TeamSide::HOME, check);
+    sim.forEachOnPitch(TeamSide::AWAY, check);
+    return ok;
+}
+
 bool CageController::planWallBreak(const GameState& state, const Player& carrier) {
     const TeamSide side = carrier.teamSide;
     const int dir = side == TeamSide::HOME ? 1 : -1;
@@ -1803,8 +1838,11 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         const int dice = blockDiceCount(after, after.getPlayer(front[i]->id), after.getPlayer(ahead[i]->id));
         // roh s Frenzy by musel za odsunutým do zdi a nechal díru u nosiče (P169) ⇒ neblokuje
         const bool canBlock = freeToAct(*front[i]) && !frenzyCorner(*front[i], carrier);
-        if (dice < 2 || !canBlock) stronger = false;          // silnější = oba rohy opravdu bijí 2+ (nález 12)
-        if (hitAllowed(state, *front[i], dice) && canBlock) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
+        // i blok rohu jen od klece (Side Step obránce na pole vedle nosiče, řetěz; 29.10.); zakázaný blok silou není
+        //   (review 5: jinak by rychlejší neobíhal, i když rohy bít nesmějí)
+        const bool keeps = canBlock && hitKeepsCage(after, carrier.id, front[i]->id, front[i]->position, ahead[i]->id, false);
+        if (dice < 2 || !canBlock || !keeps) stronger = false;   // silnější = oba rohy opravdu bijí 2+ (nález 12)
+        if (hitAllowed(state, *front[i], dice) && canBlock && keeps) blocks.push_back(Macro{MacroType::BLOCK, front[i]->id, ahead[i]->id, {-1, -1}});
     }
     if (faster && !stronger) return false;       // rychlejší obíhá (útěk podle P228)
 
@@ -1827,6 +1865,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             sim.getPlayer(p.id).position = landing;
             const int dice = blockDiceCount(sim, sim.getPlayer(p.id), sim.getPlayer(centre->id));
             if (!hitAllowed(sim, p, dice)) return;
+            if (!hitKeepsCage(sim, carrier.id, p.id, landing, centre->id, true)) return;   // ne zezadu do klece (29.10.)
             const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -dice, steps};
             if (key < bestKey) { bestKey = key; best = &p; bestLanding = landing; }
         });
@@ -1839,7 +1878,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
     if (blocks.empty() && blitz.empty()) {
         // nikdo nesmí bít (P229 kostky). P233 (uživatel 28.10.): pomalejší mlátí — zeď od kraje, s asistenty na 2 kostky
         //   naše, klec se toto kolo nepohne. Nejde-li ani to ⇒ přestavba po řadách (P230). Rychlejší a silnější sem
-        //   nedojde (silnější = 2+ kostky ⇒ rána je).
+        //   nedojde (silnější = oba rohy bijí 2+ kostkami a kontrola klece ránu pustí ⇒ rána je).
         if (extraFeatureOn(kP233WallClear) && planWallClear(state)) {
             wallClearing_ = true;
             return true;
@@ -1852,6 +1891,8 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
                      runnersMin, wallMax, faster ? "rychlejší" : "ne rychlejší", stronger ? "silnější" : "ne silnější",
                      wings.size(), blocks.size(), blitz.size());
     }
+    for (const Macro& h : blocks) wallHits_.push_back({h.playerId, h.targetId});   // jen u přijatého plánu (review 5)
+    for (const Macro& h : blitz) wallHits_.push_back({h.playerId, h.targetId});
     queue_ = std::move(wings);
     queue_.insert(queue_.end(), blocks.begin(), blocks.end());
     queue_.insert(queue_.end(), blitz.begin(), blitz.end());
@@ -1970,18 +2011,8 @@ bool CageController::planWallClear(const GameState& state) {
         }
         return cur.first;
     };
-    // Rána, po které má soupeř kam couvnout jinam než na našeho hráče (review F6: plné pole odtlačení = řetěz)
-    auto freePush = [&](const GameState& b, Position attPos, Position defPos) {
-        const int dx = defPos.x - attPos.x, dy = defPos.y - attPos.y;
-        std::vector<Position> push{{static_cast<int8_t>(defPos.x + dx), static_cast<int8_t>(defPos.y + dy)}};
-        if (dx == 0) { push.push_back({static_cast<int8_t>(defPos.x - 1), static_cast<int8_t>(defPos.y + dy)});
-                       push.push_back({static_cast<int8_t>(defPos.x + 1), static_cast<int8_t>(defPos.y + dy)}); }
-        else if (dy == 0) { push.push_back({static_cast<int8_t>(defPos.x + dx), static_cast<int8_t>(defPos.y - 1)});
-                            push.push_back({static_cast<int8_t>(defPos.x + dx), static_cast<int8_t>(defPos.y + 1)}); }
-        else { push.push_back({static_cast<int8_t>(defPos.x + dx), defPos.y}); push.push_back({defPos.x, static_cast<int8_t>(defPos.y + dy)}); }
-        for (const Position& q : push) if (!q.isOnPitch() || !b.getPlayerAtPosition(q)) return true;   // mimo hřiště = do publika
-        return false;
-    };
+    // Řetězové odtlačení se NEzakazuje (uživatel 29.10.2026: „nevidím zádrhel — proč by se nemělo dělat řetězové
+    //   odtlačení“); dřív (review F6) se rána bez volného pole odtlačení nehrála. Klec hlídá hitKeepsCage.
     // Přesuny rány nesmí zvednout hrozbu na nosiče (P232, review F4)
     auto keepsThreat = [&](const GameState& b) {
         return !extraFeatureOn(kP232KeepThreat) || blitzThreat(b, b.getPlayer(carrier.id)) <= threatNow + 0.01;
@@ -1995,7 +2026,7 @@ bool CageController::planWallClear(const GameState& state) {
             GameState board = state.clone();
             Hit h;
             h.dice = addAssists(board, a.id, a.position, target->id, h.assists);
-            if (h.dice < 2 || !freePush(board, a.position, target->position) || !keepsThreat(board)) return;
+            if (h.dice < 2 || !keepsThreat(board) || !hitKeepsCage(board, carrier.id, a.id, a.position, target->id, false)) return;
             h.hit = Macro{MacroType::BLOCK, a.id, target->id, {-1, -1}};
             h.rowDist = rowDist;
             if (!best || better(h, *best)) best = std::move(h);
@@ -2020,7 +2051,7 @@ bool CageController::planWallClear(const GameState& state) {
                 steps2 > a.movementRemaining) return;
             GameState after = board.clone();
             after.getPlayer(a.id).position = landing;
-            if (!freePush(after, landing, target->position) || !keepsThreat(after)) return;
+            if (!keepsThreat(after) || !hitKeepsCage(after, carrier.id, a.id, landing, target->id, true)) return;
             h.hit = Macro{MacroType::BLITZ, a.id, target->id, {-1, -1}};
             h.hit.viaPos = landing;
             h.blitz = true;
@@ -2040,6 +2071,7 @@ bool CageController::planWallClear(const GameState& state) {
     }
     queue_ = std::move(best->assists);
     queue_.push_back(best->hit);
+    wallHits_.push_back({best->hit.playerId, best->hit.targetId});
     return true;
 }
 
@@ -2708,6 +2740,13 @@ void CageController::planMarkers(const GameState& state) {
     }
 }
 
+// Rána do zdi těsně před zahráním: odtlačení stále jen od klece (rány rohů P229 a asistenti mezitím postavení mění; review 4)
+static bool wallHitKeepsCage(const GameState& state, const Macro& m) {
+    if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) return true;
+    const Position from = (m.type == MacroType::BLITZ && m.viaPos.isOnPitch()) ? m.viaPos : state.getPlayer(m.playerId).position;
+    return hitKeepsCage(state, state.ball.carrierId, m.playerId, from, m.targetId, m.type == MacroType::BLITZ);
+}
+
 // P233: rána do zdi jen na 2+ kostky naše, i útočníkem s Block (stillValid pustí s Block i 1 kostku — review 2)
 static bool wallHitTwoDice(const GameState& state, const Macro& m) {
     if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) return true;
@@ -2737,6 +2776,7 @@ bool CageController::next(const GameState& state, Macro& out) {
         backups_.clear();          // P230: záloha platí jen v tahu, kdy ji řadič vybral (po zahození fronty zůstává)
         threatHeld_.clear();       // P232: kdo zůstal stát kvůli hrozbě na nosiče — jen v tomto tahu
         wallThreat_ = -1.0;        // P233: hrozba ze začátku čištění zdi — jen v tomto tahu
+        wallHits_.clear();
     }
     // ⭐ P169 krok 9 (07.10.2026): MÍČ ZVEDLO HLEDÁNÍ ⇒ ROHY SE STAVÍ HNED POTOM. Když řadič na
     //   začátku tahu zvednutí nenabídl (míč v zóně soupeře, napřed rána) a míč pak zvedlo
@@ -2758,14 +2798,17 @@ bool CageController::next(const GameState& state, Macro& out) {
             // napůl ⇒ zbytek přestavby nehrát (review 27.10. nález 5)
             const bool broken = strictQueue_ && idx_ > 0 && queue_[idx_ - 1].type == MacroType::REPOSITION &&
                                 state.getPlayer(queue_[idx_ - 1].playerId).position != queue_[idx_ - 1].targetPos;
-            if (!broken && stage_ == Stage::WALL_CLEAR && ourBall(state) && (!stillValid(state, m) || !wallHitTwoDice(state, m))) {
+            const bool wallHit = std::find(wallHits_.begin(), wallHits_.end(), std::make_pair(m.playerId, m.targetId)) != wallHits_.end() &&
+                                 (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ);
+            const bool cageBroken = wallHit && ourBall(state) && !wallHitKeepsCage(state, m);
+            if (!broken && stage_ == Stage::WALL_CLEAR && ourBall(state) && (!stillValid(state, m) || !wallHitTwoDice(state, m) || cageBroken)) {
                 // P233: rána nevyšla na 2 kostky naše (asistent nedošel…) ⇒ nebije se; zaostalci jako po ranách (review F7)
                 queue_.clear();
                 idx_ = 0;
                 stage_ = Stage::AFTER_ADVANCE;
                 continue;
             }
-            if (broken || !stillValid(state, m)) {   // plán se rozešel s deskou ⇒ zbytek tahu MCTS
+            if (broken || !stillValid(state, m) || cageBroken) {   // plán se rozešel s deskou ⇒ zbytek tahu MCTS
                 readyMates_.clear();       // připravený se možná nepřesunul ⇒ hledání ho nedrží (review M6)
                 strictQueue_ = false;
                 deferredGfi_.clear();

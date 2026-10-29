@@ -1,3 +1,4 @@
+#include <cassert>
 #include "bb/coach_choice.h"
 #include "bb/block_handler.h"
 #include <cmath>
@@ -666,6 +667,37 @@ static bool frenzyTrapReady(const GameState& state, const Player& att, const Pla
         worse = worse || fresh < same;
     }
     return worse;
+}
+
+// P233 (29.10.2026): odtlačení rány nanečisto -- týmiž funkcemi jako skutečná rána (pushSkills + pushOne:
+// výběr pole, Side Step, Grab, řetěz, Stand Firm, dav) a s neutrálními kostkami jako frenzyTrapReady.
+// Útočník stojí na `attackerPos` (u blitzu pole doběhu), follow-up se nehraje.
+GameState previewPushBack(const GameState& state, int attackerId, int defenderId, Position attackerPos,
+                          bool isBlitz, bool& surf) {
+    assert(!coachModeOn() && "previewPushBack: volat mimo CoachChoiceScope (jinak se ptá kouče)");
+    struct NeutralDice : DiceRollerBase {
+        int rollD6() override { return 4; }
+        int rollD8() override { return 1; }
+    } neutral;
+    struct RestoreOnExit {
+        ManualBlockChoices manual = saveManualBlockChoices();
+        long picks = g_pushGeometryPicks, dodge = g_pushGeometryPicksDodge,
+             fast = g_pushGeometryPicksFastMA;
+        ~RestoreOnExit() {
+            restoreManualBlockChoices(manual);
+            g_pushGeometryPicks = picks; g_pushGeometryPicksDodge = dodge; g_pushGeometryPicksFastMA = fast;
+        }
+    } restore;
+    GameState sim = state;
+    Player& sa = sim.getPlayer(attackerId);
+    Player& sd = sim.getPlayer(defenderId);
+    sa.position = attackerPos;
+    bool sideStep, grab;
+    pushSkills(sim, sa, sd, /*grabMayApply=*/!isBlitz, sideStep, grab);
+    Position dest;
+    surf = pushOne(sim, sa.position, sd, sideStep, grab, /*resolveSurfHere=*/false, sa.teamSide, neutral, dest,
+                   nullptr, 0);
+    return sim;
 }
 
 // Resolve pushback: returns true if defender was pushed off pitch (crowd surf)
