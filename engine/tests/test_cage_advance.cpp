@@ -760,8 +760,15 @@ TEST(CageAdvance, FillsTheCageWhenTheAdvanceCannotRun) {
         m.movementRemaining = 6;
         ++id;
     }
+    // P228 (27.10.2026): s hrozbou přes špinavé rohy je dostavba u zdi riziková (rohy v zóně
+    // soupeřů) a plánovač pak klec posílá jinam (P187). Tento test hlídá samotnou zálohu
+    // „postup nejde ⇒ dostavba“, proto běží se starou hrozbou. Že pomalejší klec u zdi dostaví
+    // i s P228, hlídá řadič: OneCageWallBreak.SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround.
+    const unsigned savedMask = extraFeaturesOff();
+    setExtraFeaturesOff(kP228DirtyCorner);
     CageAdvancePlanner planner(nullptr, cageConfig(), 42);
     CageAdvancePlan plan = planner.build(state);
+    setExtraFeaturesOff(savedMask);
     // P100: dřív se při jiném verdiktu (právě tom, který test hlídá) neověřilo nic.
     ASSERT_TRUE(plan.valid) << "the plan must be that fill, not nothing";
     ASSERT_EQ(plan.verdict, CageAdvanceVerdict::FILL_ONLY);
@@ -1267,6 +1274,110 @@ TEST(BlitzThreat, TwoCornersTowardTheBlitzBeatThreeCornersWithTheHoleFacingIt) {
     EXPECT_LT(a, b) << "dva rohy ve směru blitzu " << a << " × tři rohy s dírou k soupeři " << b;
     EXPECT_LE(a, 0.11 + 1e-9);
     EXPECT_GE(b, 0.20);
+}
+
+// ---------------------------------------------------------------------------
+// P228 ŠPINAVÝ ROH (uživatel 23.10. + 26.10.2026 „1 ano“): nejhorší odpověď soupeře = bloky na naše
+// hráče vedle nosiče, kteří stojí v jeho zóně (každý jiný blokař), pak JEDNA rána na nosiče hráčem,
+// který ještě nejednal. Riziko = součet přes výsledky bloků × rána na desce bez odstraněných rohů.
+// ---------------------------------------------------------------------------
+namespace {
+struct P228Mask {
+    explicit P228Mask(unsigned m) : saved(extraFeaturesOff()) { setExtraFeaturesOff(m); }
+    ~P228Mask() { setExtraFeaturesOff(saved); }
+    unsigned saved;
+};
+double threatWith(const GameState& s, unsigned off) {
+    P228Mask m(off);
+    return blitzThreat(s, s.getPlayer(1));
+}
+}  // namespace
+
+// Čtyři rohy, blitzující 12 zprava (0,11/6 bez P228). Soupeř 13 na (14,5) markuje roh (13,6): roh
+// je špinavý. 13 ho zablokuje (1 kostka, odstraní v 5/6: vše kromě Attacker Down) a 12 pak jde na
+// nosiče dírou po rohu. Bez P228 se blok na roh nepočítal.
+TEST(BlitzThreat, P228DirtyCornerBlockedFirstRaisesTheThreat) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    putPlayer(s, 13, TeamSide::AWAY, {14, 5}, 6);
+    const double off = threatWith(s, kP228DirtyCorner);
+    const double on = threatWith(s, 0);
+    EXPECT_GT(on, off + 0.05) << "P228 zapnuto " << on << " × vypnuto " << off;
+    EXPECT_GT(on, kSafeBlitzThreat) << "klec se špinavým rohem a blitzem v dosahu není bezpečná";
+}
+
+// Čistá klec: žádný náš hráč vedle nosiče nestojí v zóně soupeře ⇒ P228 nic nemění.
+TEST(BlitzThreat, P228CleanCageIsUnchanged) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    EXPECT_DOUBLE_EQ(threatWith(s, 0), threatWith(s, kP228DirtyCorner));
+}
+
+// Blokař na nosiče už nejde: jediný soupeř markuje roh a zároveň by dosáhl na nosiče. Buď roh
+// zablokuje (pak nejedná dál ⇒ rána 0), nebo jde rovnou na nosiče (= hrozba bez P228). Nejhorší
+// volba je ta druhá ⇒ stejná hodnota. Kdyby se blokař počítal i do rány, P228 by hrozbu zvedl.
+TEST(BlitzThreat, P228TheBlockerCannotAlsoHitTheCarrier) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {14, 5}, 6);
+    ASSERT_GT(countTacklezones(s, Position{13, 6}, TeamSide::HOME), 0) << "fixtura: roh (13,6) je špinavý";
+    EXPECT_NEAR(threatWith(s, 0), threatWith(s, kP228DirtyCorner), 1e-12);
+}
+
+// Stand Firm a Block na rohu: blok ho skoro neodstraní (jen Defender Down; Both Down s Blockem
+// nepadá, Pushed/Stumbles drží) ⇒ riziko menší než u rohu bez dovedností.
+TEST(BlitzThreat, P228SturdyCornerIsSaferThanAPlainOne) {
+    GameState plain = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    putPlayer(plain, 13, TeamSide::AWAY, {14, 5}, 6);
+    GameState sturdy = plain.clone();
+    for (int id = 2; id <= 5; ++id)
+        if (sturdy.getPlayer(id).position == Position{13, 6}) {
+            sturdy.getPlayer(id).skills.add(SkillName::StandFirm);
+            sturdy.getPlayer(id).skills.add(SkillName::Block);
+        }
+    EXPECT_LT(threatWith(sturdy, 0), threatWith(plain, 0));
+}
+
+// Review 27.10. (nález 3): blok soupeře na roh může skončit jeho turnoverem (Attacker Down; Both Down,
+// když útočník nemá Block — pravidla ř. 366-371) a pak rána na nosiče nepřijde. Soupeř s Block na
+// Both Down stojí a roh padá ⇒ hrozba je vyšší než u stejného soupeře bez Block. Dřív se Both Down
+// počítal jako „roh pryč, tah pokračuje“ bez ohledu na Block útočníka (obě hodnoty stejné).
+TEST(BlitzThreat, P228ABlockerWithoutBlockRisksATurnoverOnBothDown) {
+    GameState plain = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {16, 7}, 6);
+    putPlayer(plain, 13, TeamSide::AWAY, {14, 5}, 6);
+    GameState withBlock = plain.clone();
+    withBlock.getPlayer(13).skills.add(SkillName::Block);
+    EXPECT_GT(threatWith(withBlock, 0), threatWith(plain, 0) + 0.01)
+        << "s Block " << threatWith(withBlock, 0) << " × bez " << threatWith(plain, 0);
+}
+
+// ⭐ Uživatel 27.10.2026: „primární je, aby klec byla bezpečná — zjednodušení je, aby klec byla čistá,
+// ale při pohybu pomalého týmu vpřed se kontaktu za cenu, že posílíme, aby roh nebyl sražen, lze —
+// když jsme slabší tým, špinavý roh klece znamená sražení a blitz na nosiče — umíš ověřit“.
+// Zeď soupeřů na x = 14 (řádky 5–9) před klecí kolem (12,7): oba přední rohy stojí v její zóně.
+namespace {
+GameState wallThreatBoard(int8_t cornerSt, int8_t wallSt) {
+    GameState s = threatBoard({{11, 6}, {11, 8}, {13, 6}, {13, 8}}, {14, 5}, 6);
+    for (int i = 0; i < 5; ++i) putPlayer(s, 12 + i, TeamSide::AWAY, {14, static_cast<int8_t>(5 + i)}, 6).stats.strength = wallSt;
+    for (int id = 2; id <= 5; ++id) s.getPlayer(id).stats.strength = cornerSt;
+    return s;
+}
+}  // namespace
+
+TEST(BlitzThreat, P228WeakerDirtyCornerMeansTheCarrierIsHitStrongerOrReinforcedIsSafer) {
+    const GameState equal = wallThreatBoard(3, 3);
+    const GameState weaker = wallThreatBoard(3, 4);
+    const GameState stronger = wallThreatBoard(4, 3);
+    GameState reinforced = equal.clone();                     // posílení: Guard na křídlech u předních rohů
+    putPlayer(reinforced, 6, TeamSide::HOME, {13, 5}).skills.add(SkillName::Guard);
+    putPlayer(reinforced, 7, TeamSide::HOME, {13, 9}).skills.add(SkillName::Guard);
+    const double tEq = threatWith(equal, 0), tWeak = threatWith(weaker, 0), tStrong = threatWith(stronger, 0),
+                 tReinf = threatWith(reinforced, 0), tEqOff = threatWith(equal, kP228DirtyCorner);
+    std::fprintf(stderr, "[P228 ověření] bez P228 %.3f · stejná síla %.3f · slabší %.3f · silnější %.3f · posílené Guardem %.3f\n",
+                 tEqOff, tEq, tWeak, tStrong, tReinf);
+    // 27.10.: bez P228 0,055 · stejná síla 0,33 · slabší 0,55 · silnější 0,33 · posílené 0,087
+    EXPECT_GT(tWeak, kSafeBlitzThreat) << "slabší špinavý roh = sražení a rána na nosiče";
+    EXPECT_GT(tWeak, tEq + 0.1);
+    EXPECT_LE(tReinf, kSafeBlitzThreat) << "posílený roh (Guard: soupeř blokuje roh proti 2 kostkám) je bezpečný";
+    // Silnější roh BEZ posílení nepomůže: soupeř u zdi si přivede asistenci souseda (ST3+1 na ST4 =
+    // jedna kostka) a roh je pryč i při Pushed (5 ze 6 stěn) — riziko zůstává nad mezí.
+    EXPECT_GT(tStrong, kSafeBlitzThreat);
 }
 
 // Plánovač vybírá pole, kde je nosič po tahu v bezpečí před dobrou ranou, a mezi nimi to nejdál —

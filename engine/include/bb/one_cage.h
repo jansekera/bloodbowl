@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 
 #include "bb/cage_advance.h"
 #include "bb/game_state.h"
@@ -103,9 +104,22 @@ struct ReleaseDecision {
 ReleaseDecision decideRelease(const GameState& state, const Player& carrier,
                               const CageAdvancePlanner& planner);
 
+// ⭐ P230 pořadí u zdi (uživatel 27.10.2026: „jsem pro posun do boku s rizikem okolo 0,2 — posun kupředu je víc
+//   než stát nebo dozadu“; bez bezpečného pole „vzít pole“ s nejnižším rizikem): do strany do hranice `edge` ⇒
+//   stát, je-li na místě do `edge` ⇒ o sloupec dozadu do kSafeBlitzThreat ⇒ nejnižší hrozba ze strany a
+//   dozadu, není-li vyšší než stát (P232) ⇒ stát. Prázdné = taková přestavba nejde. `edge` = riskEdge (P232, podle
+//   času); `stay` = hrozba po dostavbě na místě (CageAdvancePlanner::stayThreat).
+// P232: z přesunů fronty od `from` vyřadí ty, které by zvedly hrozbu rány na nosiče (a zálohu, jejíž cesta pak chce
+//   hod); vyřazení hráči přibudou do `held`. Jedno místo pro připravené, zaostalce, zálohy i Wild Animal.
+void dropThreatRaisingMoves(const GameState& state, std::vector<Macro>& queue, size_t from,
+                            const std::vector<int>& backups, std::vector<int>& held);
+enum class WallShiftChoice { SIDE, STAY, BACK };
+WallShiftChoice wallShiftChoice(std::optional<double> side, double stay, std::optional<double> back, double edge);
+
 class CageController {
 public:
     const std::vector<int>& readyMates() const { return readyMates_; }   // P180: pro testy a výpis
+    const std::vector<int>& backups() const { return backups_; }         // P230: pro testy
     CageController(const ValueFunction* vf, MCTSConfig config, uint32_t seed = 0);
 
     // Další makro klece pro tento stav, nebo false = rozhoduje MCTS.
@@ -125,10 +139,28 @@ public:
     int plansAdopted() const { return adopted_; }
 
 private:
-    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_ADVANCE, AFTER_RUN, DONE };
+    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_ADVANCE, AFTER_RUN, WALL_CLEAR, DONE };
 
     CageAdvancePlanner planner_;
     MCTSConfig config_;
+
+    // P229: zeď soupeřů před klecí. True = do fronty šel plán prolomení (asistenti na křídla,
+    // bloky předních rohů dopředu, blitz z pole před nosičem); false = rozhoduje dosavadní řadič.
+    bool planWallBreak(const GameState& state, const Player& carrier);
+    // P230: pomalejší klec u zdi, na zeď nesmí bít nikdo ⇒ celá klec (4 rohy) ve stejném sloupci posunutá
+    // po řadách; `bound` = přední rohy, které zeď drží (zůstávají). True = do fronty šel přesun.
+    bool planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound);
+    // P233: jeden krok čištění zdi od kraje — rána (blok stojícího u krajního hráče, nebo blitz) na 2+ kostky, které
+    // volíme my, s asistenty přidanými jen tolik, kolik je třeba; nikdo z nich vedle nosiče. True = do fronty šla rána.
+    // Volá se znovu po každé ráně (Stage::WALL_CLEAR), dokud další taková rána jde.
+    bool planWallClear(const GameState& state);
+    bool wallClearing_ = false;   // planWallBreak předal tah čištění zdi (P233)
+    double wallThreat_ = -1.0;    // P233: hrozba na nosiče na začátku čištění zdi (-1 = ještě nezměřena)
+    std::vector<std::pair<int, int>> wallHits_;   // rány do zdi (P229 bloky rohů a blitz, P233) útočník→cíl: před ranou znovu hitKeepsCage
+    // P230: přestavba klece platí jen celá — nedojde-li hráč na své pole, zbytek fronty se zahodí (review 27.10.)
+    bool strictQueue_ = false;
+    // P230: roh přes GFI se hraje až na konci tahu (po zaostalcích) — nepovedené GFI je turnover (review 27.10.)
+    std::vector<Macro> deferredGfi_;
 
     // P217 (1): plán zdržovacího tahu — bankování k zóně, nebo dostavba na místě
     CageAdvancePlan stallPlan(const GameState& state, const Player& carrier);
@@ -159,6 +191,9 @@ private:
     // P180: hráči připravení pro předávku — hledání je v tomto tahu neodvádí. Víc než jeden jen agilní
     // (AG 4+, uživatel 16.10.2026, bod 7), od sebe aspoň 3 pole (jeden obránce nemarkuje dva).
     std::vector<int> readyMates_;
+    // P230: záloha vzadu (1–2 hráči přes šířku hřiště) — hledání ji v tomto tahu nepošle dopředu.
+    std::vector<int> backups_;
+    std::vector<int> threatHeld_;   // P232: zůstali stát, protože by odchodem zvedli hrozbu na nosiče (jen tento tah)
 
     // beforeEndTurn: ve kterém tahu už se zkoušelo
     TeamSide endTurnTeam_ = TeamSide::HOME;
