@@ -94,13 +94,7 @@ final class BlitzHandler implements ActionHandlerInterface
             //   podle mereni v tomhle souboru slo o 3,58 % rozhodnuti, takze
             //   to nebylo teoreticke.
             $validMoves = $this->pathfinder->findValidMoves($state, $attacker);
-            // P82 (30.09.2026): rana stoji pole (`BlockHandler::payBlitzBlock`),
-            //   takze cil blitzu je jen pole, odkud na ni jeste zbyde -- normalni
-            //   pohyb, nebo aspon jedno GFI.
-            $gfiCap = $attacker->hasSkill(SkillName::Sprint) ? 3 : 2;
-            $maxCost = $attacker->getMovementRemaining() + $gfiCap - 1;
-            $payable = array_filter($validMoves, fn($p) => $p->getTotalCost() <= $maxCost);
-            $moveTarget = $this->findBlitzMoveTarget($payable, $defenderPos);
+            $moveTarget = self::poleDopadu($validMoves, $attacker, $defenderPos);
 
             // ⛔⛔⛔ OPRAVA 11.09.2026: TADY SE HÁZELA VÝJIMKA
             //   `throw new \InvalidArgumentException('Cannot reach target for blitz')`
@@ -248,11 +242,30 @@ final class BlitzHandler implements ActionHandlerInterface
     }
 
     /**
+     * Pole, na ktere blitz dobehne pred ranou (null = na sousedni pole cile nedosahne). JEDINE misto
+     * vyberu -- vola ho `resolve` i AI pres `RulesEngine::blitzLandingSquares` (P227: kostky blitzu se
+     * pocitaji z pole, odkud hra opravdu blokuje, ne odkud hrac vychazi).
+     *
+     * @param array<string, \App\DTO\MovePath> $validMoves `Pathfinder::findValidMoves` pro utocnika
+     */
+    public static function poleDopadu(array $validMoves, MatchPlayerDTO $attacker, Position $defenderPos): ?Position
+    {
+        // P82 (30.09.2026): rana stoji pole (`BlockHandler::payBlitzBlock`),
+        //   takze cil blitzu je jen pole, odkud na ni jeste zbyde -- normalni
+        //   pohyb, nebo aspon jedno GFI.
+        $gfiCap = $attacker->hasSkill(SkillName::Sprint) ? 3 : 2;
+        $maxCost = $attacker->getMovementRemaining() + $gfiCap - 1;
+        $payable = array_filter($validMoves, fn($p) => $p->getTotalCost() <= $maxCost);
+
+        return self::findBlitzMoveTarget($payable, $defenderPos);
+    }
+
+    /**
      * Find best adjacent square to defender for a blitz move.
      *
      * @param array<string, \App\DTO\MovePath> $validMoves
      */
-    private function findBlitzMoveTarget(array $validMoves, Position $defenderPos): ?Position
+    private static function findBlitzMoveTarget(array $validMoves, Position $defenderPos): ?Position
     {
         $bestTarget = null;
         $bestScore = PHP_INT_MAX;

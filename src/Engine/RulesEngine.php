@@ -689,6 +689,36 @@ final class RulesEngine
     }
 
     /**
+     * P227: pole, ze kterych hrac `$attackerId` po dobehu blitzu na jednotlive cile blokuje -- tatez, ktera
+     * vybere `BlitzHandler::resolve` (`BlitzHandler::poleDopadu`). Sousedi-li uz, jeho pole; null = na
+     * sousedni pole cile nedojde (blok se pak nekona). Pathfinder bezi jednou pro vsechny cile
+     * (review 29.10.: po jednom cili to byl ~10x pomalejsi vypocet, viz `LearningAICoach::buildBlitzAction`).
+     *
+     * @param list<MatchPlayerDTO> $targets
+     * @return array<int, ?Position> podle id cile
+     */
+    public function blitzLandingSquares(GameState $state, int $attackerId, array $targets): array
+    {
+        $attacker = $state->getPlayer($attackerId);
+        $from = $attacker?->getPosition();
+        $moves = null;
+        $out = [];
+        foreach ($targets as $target) {
+            $to = $target->getPosition();
+            if ($attacker === null || $from === null || $to === null) {
+                $out[$target->getId()] = null;
+            } elseif ($from->distanceTo($to) === 1) {
+                $out[$target->getId()] = $from;
+            } else {
+                $moves ??= $this->pathfinder->findValidMoves($state, $attacker);
+                $out[$target->getId()] = Action\BlitzHandler::poleDopadu($moves, $attacker, $to);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Blokovat lze jen STOJICIHO hrace (`rules_bb2016.txt` r. 540-541) na sousednim poli.
      *
      * @return list<MatchPlayerDTO>

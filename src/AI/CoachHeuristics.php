@@ -211,6 +211,9 @@ final class CoachHeuristics
      * pocita uz pro engine.
      *
      * @param int $bonusObrance +2 u Multiple Blocku (`BlockHandler:468`)
+     * @param Position|null $odkud pole, ze ktereho utocnik blokuje (u blitzu pole dopadu); null = kde stoji.
+     *   Asistence obrance se pocitaji kolem tohoto pole (ř. 1662-1669), proto se na nej utocnik presune.
+     * @param int $bonusUtocnika sila navic pred asistencemi (Horns v blitzu, uspesny Dauntless)
      * @return array{count: int, attackerChooses: bool, signed: int}
      */
     public static function kostkyBloku(
@@ -219,7 +222,13 @@ final class CoachHeuristics
         MatchPlayerDTO $utocnik,
         MatchPlayerDTO $obrance,
         int $bonusObrance = 0,
+        ?Position $odkud = null,
+        int $bonusUtocnika = 0,
     ): array {
+        if ($odkud !== null && $utocnik->getPosition() !== null && !$odkud->equals($utocnik->getPosition())) {
+            $utocnik = $utocnik->withPosition($odkud);
+            $state = $state->withPlayer($utocnik);
+        }
         $up = $utocnik->getPosition();
         $op = $obrance->getPosition();
         if ($up === null || $op === null) {
@@ -227,7 +236,7 @@ final class CoachHeuristics
         }
 
         $info = $str->getBlockDiceInfo(
-            $str->calculateEffectiveStrength($state, $utocnik, $op),
+            $str->calculateEffectiveStrength($state, $utocnik, $op) + $bonusUtocnika,
             $str->calculateEffectiveStrength($state, $obrance, $up) + $bonusObrance,
         );
 
@@ -236,6 +245,43 @@ final class CoachHeuristics
         $info['signed'] = $info['attackerChooses'] ? $info['count'] : -$info['count'];
 
         return $info;
+    }
+
+    /**
+     * ⭐ P227 (uzivatel 21.10.2026: „Tri proti nedava smysl ani proti nosici“; ke dvema proti „3b“ = jen
+     *   na nosice). Smi kouc poslat `$utocnik` blitzem na `$obrance`? Obrance voli ze 3+ kostek ⇒ nikdy;
+     *   ze 2 ⇒ jen na soupeřova nosice mice. Kostky z pole `$dopad`, odkud hra po dobehu opravdu blokuje
+     *   (`RulesEngine::blitzLandingSquares`), s Horns (+1 v blitzu, ř. 8172-8175).
+     *   JEDINE misto pravidla v PHP -- vola ho nabidka blitzu obou koucu. Parita s C++ `blitzDiceAllowed`
+     *   (sloučeno 26.10., `64fcb256`). Dřív PHP kouci blitz do kostek, kde voli obrance, nabizeli:
+     *   Learning jen s pokutou (bonus za nosice ji prebil), Greedy bez prahu.
+     * ⭐ Dauntless (uzivatel 26.10. „2 ano“): blitz, ktery prah neprojde, smi, kdyz se Dauntless povede
+     *   aspon ve 2 ze 3 pripadu A kostky po uspechu prah projdou. Pravidla ř. 8023-8035: D6 + sila > sila
+     *   soupere (obe pred asistencemi, po ostatnich upravach) ⇒ stejna sila; sance (6 − rozdil) / 6 ≥ 2/3
+     *   ⇔ rozdil ≤ 2.
+     */
+    public static function blitzKostkamiPovolen(
+        StrengthCalculator $str,
+        GameState $state,
+        MatchPlayerDTO $utocnik,
+        MatchPlayerDTO $obrance,
+        Position $dopad,
+    ): bool {
+        $naNosice = $state->getBall()->isHeld() && $state->getBall()->getCarrierId() === $obrance->getId();
+        $projde = static fn(int $signed): bool => $signed > -2 || ($signed === -2 && $naNosice);
+        $horns = $utocnik->hasSkill(SkillName::Horns) ? 1 : 0;
+        if ($projde(self::kostkyBloku($str, $state, $utocnik, $obrance, 0, $dopad, $horns)['signed'])) {
+            return true;
+        }
+        if (!$utocnik->hasSkill(SkillName::Dauntless)) {
+            return false;
+        }
+        $rozdil = $obrance->getStats()->getStrength() - ($utocnik->getStats()->getStrength() + $horns);
+        if ($rozdil <= 0 || $rozdil > 2) {
+            return false;
+        }
+
+        return $projde(self::kostkyBloku($str, $state, $utocnik, $obrance, 0, $dopad, $horns + $rozdil)['signed']);
     }
 
     /**

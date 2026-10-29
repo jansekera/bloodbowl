@@ -455,20 +455,21 @@ final class LearningAICoach implements AICoachInterface
      * vybira utocnik, zaporne, kdyz je vybira souper. ⛔ Uz NEVRACI `null` --
      * to zahazovalo i bloky na silnejsiho NOSICE, kde se to presto vyplati.
      */
-    private function oceneniBloku(GameState $state, MatchPlayerDTO $utocnik, MatchPlayerDTO $obrance): float
-    {
-        $up = $utocnik->getPosition();
-        $op = $obrance->getPosition();
-        if ($up === null || $op === null) {
+    private function oceneniBloku(
+        GameState $state,
+        MatchPlayerDTO $utocnik,
+        MatchPlayerDTO $obrance,
+        ?Position $odkud = null,
+        int $bonusUtocnika = 0,
+    ): float {
+        if ($utocnik->getPosition() === null || $obrance->getPosition() === null) {
             return 0.05;
         }
 
-        // ⭐ Bezstavovy pomocnik patri do konstruktoru, ne do `static`
-        //   promenne uvnitr metody (nalez /simplify).
-        $kostky = $this->strCalc->getBlockDiceInfo(
-            $this->strCalc->calculateEffectiveStrength($state, $utocnik, $op),
-            $this->strCalc->calculateEffectiveStrength($state, $obrance, $up),
-        );
+        // OPRAVENO 29.10.2026 (P227, týž princip jako C++ `13d922bf`) -- u blitzu se kostky počítaly
+        //   z pole, kde hráč stojí, a bez Horns. Asistence obránce se ale počítají kolem pole, ODKUD se
+        //   blokuje (ř. 1662-1669), a Horns platí v blitzu (ř. 8172-8175). Jedno místo: `kostkyBloku`.
+        $kostky = CoachHeuristics::kostkyBloku($this->strCalc, $state, $utocnik, $obrance, 0, $odkud, $bonusUtocnika);
 
         // ⛔ KOSTKY PROTI NAM: tezka pokuta, ale UZ NE `null`.
         //   ⭐ OPRAVA 13.09. (review): tvrde odmitnuti bezelo PRED bonusem za
@@ -1400,6 +1401,7 @@ final class LearningAICoach implements AICoachInterface
         //   vsechny cile -- volal se ale pro kazdeho soupere zvlast (zmereno
         //   ~10x prepocet, 122 ms proti 12,8 ms). Spocita se JEDNOU.
         $moznaPole = $this->moznaPole($state, $rules, $playerId);
+        $dopady = $rules->blitzLandingSquares($state, $playerId, $enemies);
 
         foreach ($enemies as $enemy) {
             // ⛔ OPRAVA 13.09. (review): lezici a omracene cile se preskakuji.
@@ -1410,10 +1412,20 @@ final class LearningAICoach implements AICoachInterface
                 continue;
             }
 
+            // ⭐ P227: blitz do kostek, kde voli obrance ze 3+ (ze 2 mimo nosice), se nenabizi -- pravidlo
+            //   `CoachHeuristics::blitzKostkamiPovolen`, kostky z pole dopadu (`BlitzHandler::poleDopadu`).
+            // OPRAVENO 29.10.2026 (review P227) -- cil bez pole dopadu se ocenoval jako blok z mista, kde hrac
+            //   stoji, a blitz se volil; `BlitzHandler::resolve` pak jen priblizi (P82: rana stoji pole, dobeh
+            //   s plnym GFI uz na ni nezbyde) a blok se nekona. `sanceDojitK` takova pole pocita.
+            $dopad = $dopady[$enemy->getId()] ?? null;
+            if ($dopad === null || !CoachHeuristics::blitzKostkamiPovolen($this->strCalc, $state, $player, $enemy, $dopad)) {
+                continue;
+            }
+
             // ⛔ Blitz je TYZ blok, jen s rozbehem -- oceni se stejne,
             //   a nevyhodny dostane zapornou hodnotu. Navic je blitz JEDEN ZA KOLO,
             //   takze ho utratit za spatne kostky je drazsi nez u bloku.
-            $ocena = $this->oceneniBloku($state, $player, $enemy);
+            $ocena = $this->oceneniBloku($state, $player, $enemy, $dopad, $player->hasSkill(SkillName::Horns) ? 1 : 0);
 
             // ⛔⛔ RIZIKO CESTY K CILI (13.09.2026). Blitz je blok S ROZBEHEM,
             //   jenze `buildBlitzAction` vybira SOUPERE, ne policko -- o ceste

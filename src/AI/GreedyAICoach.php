@@ -261,7 +261,7 @@ final class GreedyAICoach implements AICoachInterface
         return match ($type) {
             ActionType::MOVE => $this->scoreMove($state, $rules, $playerId, $side),
             ActionType::BLOCK => $this->scoreBlock($state, $playerId, $side),
-            ActionType::BLITZ => $this->scoreBlitz($state, $playerId, $side),
+            ActionType::BLITZ => $this->scoreBlitz($state, $rules, $playerId, $side),
             ActionType::PASS => $this->scorePass($state, $rules, $playerId, $side),
             ActionType::HAND_OFF => $this->scoreHandOff($state, $rules, $playerId, $side),
             ActionType::FOUL => $this->scoreFoul($state, $rules, $playerId),
@@ -448,10 +448,7 @@ final class GreedyAICoach implements AICoachInterface
                 continue;
             }
 
-            $attStr = $this->strCalc->calculateEffectiveStrength($state, $player, $enemyPos);
-            $defStr = $this->strCalc->calculateEffectiveStrength($state, $enemy, $player->getPosition());
-            $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
-            $dice = $diceInfo['attackerChooses'] ? $diceInfo['count'] : -$diceInfo['count'];
+            $dice = CoachHeuristics::kostkyBloku($this->strCalc, $state, $player, $enemy)['signed'];
             $score = match (true) {
                 $dice >= 2 => 300,
                 $dice === 1 => 150,
@@ -486,6 +483,7 @@ final class GreedyAICoach implements AICoachInterface
      */
     private function scoreBlitz(
         GameState $state,
+        RulesEngine $rules,
         int $playerId,
         TeamSide $side,
     ): ?array {
@@ -499,6 +497,7 @@ final class GreedyAICoach implements AICoachInterface
 
         $bestScore = -1;
         $bestTargetId = null;
+        $dopady = $rules->blitzLandingSquares($state, $playerId, $enemies);
 
         foreach ($enemies as $enemy) {
             $enemyPos = $enemy->getPosition();
@@ -511,6 +510,16 @@ final class GreedyAICoach implements AICoachInterface
                 continue;
             }
 
+            // ⭐ P227: ne do kostek, kde voli obrance ze 3+ (ze 2 mimo nosice) -- totez pravidlo jako
+            //   `LearningAICoach` (`CoachHeuristics::blitzKostkamiPovolen`). Dřív se tu blitz vybíral bez
+            //   prahu a nosič dostal +400 i do tří kostek proti.
+            // OPRAVENO 29.10.2026 (review P227) -- dosah se nehlídal vůbec: vzdálený nosič vyhrál s 500
+            //   a jednorázový blitz se utratil za procházku bez rány (`BlitzHandler::resolve`, P82).
+            $dopad = $dopady[$enemy->getId()] ?? null;
+            if ($dopad === null || !CoachHeuristics::blitzKostkamiPovolen($this->strCalc, $state, $player, $enemy, $dopad)) {
+                continue;
+            }
+
             $score = 100;
 
             // High priority: blitz the ball carrier
@@ -518,11 +527,17 @@ final class GreedyAICoach implements AICoachInterface
                 $score = 500;
             }
 
-            // Bonus for favorable strength
-            $attStr = $this->strCalc->calculateEffectiveStrength($state, $player, $enemyPos);
-            $defStr = $this->strCalc->calculateEffectiveStrength($state, $enemy, $player->getPosition());
-            $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
-            $dice = $diceInfo['attackerChooses'] ? $diceInfo['count'] : -$diceInfo['count'];
+            // Bonus for favorable strength -- OPRAVENO 29.10.2026 (P227): kostky z pole dopadu a s Horns,
+            //   dřív z pole, kde hráč stojí (asistence obránce se počítají kolem pole bloku, ř. 1662-1669).
+            $dice = CoachHeuristics::kostkyBloku(
+                $this->strCalc,
+                $state,
+                $player,
+                $enemy,
+                0,
+                $dopad,
+                $player->hasSkill(SkillName::Horns) ? 1 : 0,
+            )['signed'];
             $score += max(0, $dice) * 30;
 
             if ($score > $bestScore) {
@@ -888,10 +903,7 @@ final class GreedyAICoach implements AICoachInterface
             }
 
             // Each defender gets +2 ST in Multiple Block
-            $attStr = $this->strCalc->calculateEffectiveStrength($state, $player, $enemyPos);
-            $defStr = $this->strCalc->calculateEffectiveStrength($state, $enemy, $player->getPosition()) + 2;
-            $diceInfo = $this->strCalc->getBlockDiceInfo($attStr, $defStr);
-            $dice = $diceInfo['attackerChooses'] ? $diceInfo['count'] : -$diceInfo['count'];
+            $dice = CoachHeuristics::kostkyBloku($this->strCalc, $state, $player, $enemy, 2)['signed'];
             $score = match (true) {
                 $dice >= 2 => 120,
                 $dice === 1 => 60,
