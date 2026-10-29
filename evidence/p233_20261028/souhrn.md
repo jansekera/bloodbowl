@@ -37,3 +37,5 @@ proti předchozímu commitu 407527c6 (`../p230_20261027/zmrazeno_p232`), 5 semí
 | S5 jeden ležící na (15,6) | jako S1 | jako S1 (P233 bije druhý kraj už v S1) |
 
 Odpověď soupeře: nosič sražen 0/5 u obou v S1; hrozba (carrier_blitz_threat) 0,04–0,06 předtím (klec dál od zdi) × 0,07 s P233.
+
+Uživatel 29.10.: „jsem pro pohyb do boku“ — když po blitzu další rána na 2 kostky nejde, klec smí uhnout do boku k otevřenému kraji (tak to P233 v S1 dělá) ⇒ beze změny.
