@@ -776,10 +776,23 @@ TEST(OneCageWallBreak, NoOneDieHitWithoutBlock) {
         s.getPlayer(8).position = {13, 7};
         ASSERT_EQ(blockDiceCount(s, s.getPlayer(8), s.getPlayer(15)), 1);
     }
-    const CageTurn t = cageTurn(b);
-    for (const Macro& m : t.macros) {
-        if (m.type != MacroType::BLOCK && m.type != MacroType::BLITZ) continue;
-        ADD_FAILURE() << "rána hráče " << m.playerId << " na " << m.targetId << " bez Block";
+    // požadavek: žádná rána na jednu kostku bez Block — kostky se čtou v okamžiku rány (P233 bije na 2 naše)
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) {
+            GameState s = b.s.clone();
+            if (m.type == MacroType::BLITZ) {             // skutečné pole doběhu na desce v okamžiku rány
+                Position landing{-1, -1};
+                int steps = 0;
+                if (blitzLandingDiceFree(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId).position, landing, steps))
+                    s.getPlayer(m.playerId).position = landing;
+            }
+            const int dice = blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId));
+            EXPECT_TRUE(dice >= 2 || b.s.getPlayer(m.playerId).hasSkill(SkillName::Block))
+                << "rána hráče " << m.playerId << " na " << m.targetId << " na " << dice << " kostek";
+        }
+        play(b.s, m);
     }
 }
 
@@ -850,6 +863,8 @@ static int cornersAround(const GameState& s, Position c) {
     return n;
 }
 TEST(OneCageWallShift, SlowerCageThatMayNotHitShiftsAlongTheWall) {
+    // posun po řadách (P230) — bez čištění zdi P233, které má, když jde, přednost (testy OneCageWallClear)
+    struct Off { Off() { setExtraFeaturesOff(kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = wallWithHelpers(4);
     const double before = blitzThreat(b.s, b.s.getPlayer(1));
     const CageTurn t = cageTurn(b);
@@ -883,7 +898,7 @@ TEST(OneCageWallShift, CornerGoesToAPlayerWithoutGfiFirst) {
 // čtyři rohy ⇒ ne); o dvě řady je vázaný přední roh rohem nové klece (dřív se o dvě řady nedalo nikdy).
 TEST(OneCageWallShift, TwoRowsWithTheBoundCornerAsACornerNotOneRowNextToIt) {
     // mechanika posunu po řadách; pořadí do strany / stát / dozadu hlídají testy OneCageShiftCap
-    struct Off { Off() { setExtraFeaturesOff(kP230ShiftCap); } ~Off() { setExtraFeaturesOff(0); } } off;
+    struct Off { Off() { setExtraFeaturesOff(kP230ShiftCap | kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;
     Board b = wallWithHelpers(4);
     b.s.getPlayer(1).movementRemaining = 2;
     const CageTurn t = cageTurn(b);
@@ -2459,6 +2474,7 @@ TEST(OneCageBackup, PlayerWhoAlreadyActedBehindIsTheBackup) {
 // nebo dozadu“): do strany do hranice (P232: s časovou rezervou 0,15, bez ní 0,30), jinak stát (na místě do hranice), jinak o sloupec dozadu do čisté klece (do 0,15), jinak nejnižší hrozba, není-li vyšší než stát.
 // Nosič MA 2 dojde jen o dvě řady: tam i na místě hrozba 0,29 (zeď) ⇒ ustoupí o sloupec do čisté klece.
 TEST(OneCageShiftCap, RiskySidewaysAndRiskyStayRetreatIntoACleanCage) {
+    struct Off { Off() { setExtraFeaturesOff(kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;   // jen P230
     Board b = wallWithHelpers(4);
     b.s.getPlayer(1).movementRemaining = 2;
     // ústup (ne posun do strany s 0,29) jen proto, že tým má časovou rezervu ⇒ hranice 0,15 (P232)
@@ -2488,4 +2504,449 @@ TEST(OneCageShiftCap, OrderSidewaysStayBack) {
     // hranice se posouvá s časem: s rezervou 0,15, bez ní 0,30 (P232)
     EXPECT_EQ(wallShiftChoice(0.20, 0.25, 0.01, kSafeBlitzThreat), C::BACK) << "s rezervou do strany jen do bezpečí";
     EXPECT_EQ(wallShiftChoice(0.29, 0.29, 0.01, kRiskEdgeNoSlack), C::SIDE) << "bez rezervy do strany i s 0,29";
+}
+
+// ⭐ P233 ZEĎ OD KRAJE (uživatel 28.10.2026: „já bych volil blitz na 14,5 — s pomocí, když by nebyly dvě kostky jinak —
+//   tím by se pak otevřela možnost mlátit block linemanem na 13,6 na dvě kostky a postupně bych přidával asistence —
+//   cíl by byl očistit zeď za cenu, že se toto kolo nepohne dopředu“; „postup od kraje dál“; „nezapomenout, ať si
+//   asistencemi nezměníme klec na více hráčů, kteří by v kleci byli navíc a škodili možností chain push“).
+//   Zeď pěti hráčů ST 3 na x = 14 před klecí (12,7) pomalých orků bez Block; volní hráči 6, 7, 8 (pohyb 9).
+//   Kostky jsou všechny šestky — rány vyjdou, takže je vidět celý sled.
+namespace {
+struct Hit { Macro m; int dice; int movesBefore = 0; };   // movesBefore: přesuny od předchozí rány
+std::vector<Hit> wallClearTurn(Board& b) {
+    std::vector<Hit> hits;
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    int moves = 0;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::REPOSITION) ++moves;
+        if (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) {
+            GameState s = b.s.clone();
+            if (m.type == MacroType::BLITZ) {             // skutečné pole doběhu na desce v okamžiku rány
+                Position landing{-1, -1};
+                int steps = 0;
+                if (blitzLandingDiceFree(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId).position, landing, steps))
+                    s.getPlayer(m.playerId).position = landing;
+            }
+            hits.push_back({m, blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId)), moves});
+            moves = 0;
+        }
+        play(b.s, m);
+    }
+    return hits;
+}
+}  // namespace
+
+TEST(OneCageWallClear, BlitzOnTheEndThenTheCornerBlocksInwardsAllOnTwoDiceOurs) {
+    Board b = wallWithHelpers(4);
+    // předpoklad: bez pomoci nejde rána na dvě kostky naše nikde (proto dřív posun po řadách)
+    for (int att : {4, 5}) for (int def = 13; def <= 17; ++def) {
+        const Player& a = b.s.getPlayer(att);
+        if (a.position.distanceTo(b.s.getPlayer(def).position) == 1) ASSERT_LT(blockDiceCount(b.s, a, b.s.getPlayer(def)), 2);
+    }
+    const std::vector<Hit> hits = wallClearTurn(b);
+    ASSERT_GE(hits.size(), 2u);
+    EXPECT_EQ(hits[0].m.type, MacroType::BLITZ) << "napřed blitz";
+    EXPECT_EQ(hits[0].movesBefore, 1) << "jen tolik asistentů, kolik je na 2 kostky potřeba (tady jeden)";
+    const int firstTarget = hits[0].m.targetId;
+    EXPECT_TRUE(firstTarget == 13 || firstTarget == 17) << "na krajního hráče zdi";
+    EXPECT_EQ(hits[1].m.type, MacroType::BLOCK) << "pak blok";
+    EXPECT_TRUE(hits[1].m.playerId == 4 || hits[1].m.playerId == 5) << "blok rohem";
+    EXPECT_EQ(hits[1].m.targetId, firstTarget == 13 ? 14 : 16) << "další od kraje dovnitř";
+    for (const Hit& h : hits) EXPECT_GE(h.dice, 2) << "rána hráče " << h.m.playerId << " na " << h.m.targetId;
+}
+
+TEST(OneCageWallClear, TheCageDoesNotMoveAndNoOneExtraStandsNextToTheCarrier) {
+    Board b = wallWithHelpers(4);
+    wallClearTurn(b);
+    EXPECT_EQ(b.s.getPlayer(1).position, (Position{12, 7})) << "toto kolo se klec nepohne";
+    EXPECT_EQ(cornersAround(b.s, {12, 7}), 4);
+    int ours = 0;
+    for (const Position& sq : Position{12, 7}.getAdjacent()) {
+        const Player* q = b.s.getPlayerAtPosition(sq);
+        if (q && q->teamSide == TeamSide::HOME) ++ours;
+    }
+    EXPECT_EQ(ours, 4) << "vedle nosiče jen čtyři rohy (chain push)";
+}
+
+// Pozitivní kontrola: bez P233 se tu nebije a klec se posune po řadách (P230).
+TEST(OneCageWallClear, WithoutItTheCageShiftsAlongTheWall) {
+    struct Off { Off() { setExtraFeaturesOff(kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;
+    Board b = wallWithHelpers(4);
+    EXPECT_TRUE(wallClearTurn(b).empty());
+    EXPECT_NE(b.s.getPlayer(1).position.y, 7);
+}
+
+// Bez volných hráčů na asistenci rána na dvě kostky naše nejde ⇒ řadič hraje přesně jako bez P233.
+TEST(OneCageWallClear, WithoutHelpersNoHitAndTheOldShift) {
+    Board b = wallWithHelpers(4);
+    for (int id : {6, 7, 8}) { b.s.getPlayer(id).position = {-1, -1}; b.s.getPlayer(id).state = PlayerState::OFF_PITCH; }
+    Board old = b;
+    EXPECT_TRUE(wallClearTurn(b).empty());
+    {   // totéž, co dělal řadič bez P233
+        struct Off { Off() { setExtraFeaturesOff(kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;
+        wallClearTurn(old);
+    }
+    for (int id = 1; id <= 17; ++id) EXPECT_EQ(b.s.getPlayer(id).position, old.s.getPlayer(id).position) << "hráč " << id;
+}
+
+// Asistent nedošel (tah mu „vypadne“) ⇒ rána, která by bez něj nebyla na 2 kostky naše, se nehraje (review P233 T2).
+TEST(OneCageWallClear, AHitWhoseAssistDidNotArriveIsNotPlayed) {
+    Board b = wallWithHelpers(4);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool skipped = false;
+    int hits = 0;
+    while (cc.next(b.s, m)) {
+        if (!skipped && m.type == MacroType::REPOSITION && m.playerId != 1 && b.s.getPlayer(m.playerId).position.x >= 9 &&
+            m.targetPos.x >= 13) {
+            skipped = true;                           // první asistence u zdi se nezahraje
+            continue;
+        }
+        if (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) {
+            GameState s = b.s.clone();
+            if (m.type == MacroType::BLITZ) {
+                Position landing{-1, -1};
+                int steps = 0;
+                ASSERT_TRUE(blitzLandingDiceFree(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId).position, landing, steps));
+                s.getPlayer(m.playerId).position = landing;
+            }
+            EXPECT_GE(blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId)), 2) << "rána hráče " << m.playerId;
+            ++hits;
+        }
+        play(b.s, m);
+    }
+    ASSERT_TRUE(skipped) << "předpoklad: P233 poslal asistenta";
+    (void)hits;
+}
+
+// Totéž s blitzerem s Block: pravidla P229 by mu jednu kostku dovolila, čištění zdi chce 2 kostky naše (review 2).
+TEST(OneCageWallClear, AHitWhoseAssistDidNotArriveIsNotPlayedEvenWithBlock) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(6).skills.add(SkillName::Block);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool skipped = false;
+    while (cc.next(b.s, m)) {
+        if (!skipped && m.type == MacroType::REPOSITION && m.playerId == 8) {
+            ASSERT_EQ(m.targetPos, (Position{14, 4})) << "předpoklad: 8 jde asistovat blitzu hráče 6 na (14,5)";
+            skipped = true;
+            continue;
+        }
+        if (skipped && m.type == MacroType::BLITZ) {
+            GameState s = b.s.clone();
+            s.getPlayer(m.playerId).position = m.viaPos;
+            EXPECT_GE(blockDiceCount(s, s.getPlayer(m.playerId), s.getPlayer(m.targetId)), 2) << "blitz hráče " << m.playerId;
+        }
+        play(b.s, m);
+    }
+    ASSERT_TRUE(skipped);
+}
+
+// Zmařená rána tah neukončí: zbytek týmu hraje dál jako po ranách (review P233 F7).
+TEST(OneCageWallClear, AThwartedHitDoesNotEndTheTurn) {
+    Board b = wallWithHelpers(4);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool skipped = false;
+    int after = 0;
+    while (cc.next(b.s, m)) {
+        if (!skipped && m.type == MacroType::REPOSITION && m.playerId == 8) {   // asistent nedošel
+            ASSERT_EQ(m.targetPos, (Position{14, 4})) << "předpoklad: 8 jde asistovat k cíli (14,5)";
+            skipped = true;
+            continue;
+        }
+        if (skipped) {
+            EXPECT_FALSE(m.type == MacroType::BLITZ && m.targetId == 13) << "rána bez asistence se nehraje";
+            if (m.playerId != 8) ++after;
+        }
+        play(b.s, m);
+    }
+    ASSERT_TRUE(skipped) << "předpoklad: první asistentem je 8";
+    EXPECT_GT(after, 0) << "po zmařené ráně se ostatní hráči ještě hýbou";
+}
+
+// Strana AWAY zrcadlově: táž zeď, táž rána od kraje.
+TEST(OneCageWallClear, AwaySideMirrored) {
+    Board h = wallWithHelpers(4);
+    Board b(2);
+    b.s = h.s.clone();
+    for (int id = 1; id <= GameState::PLAYERS_TOTAL; ++id) {
+        const Player& from = h.s.getPlayer(id);
+        const int to = id <= 11 ? id + 11 : (id <= 22 ? id - 11 : id);
+        Player& p = b.s.getPlayer(to);
+        p = from;
+        p.id = to;
+        if (id <= 22) p.teamSide = from.teamSide == TeamSide::HOME ? TeamSide::AWAY : TeamSide::HOME;
+        if (from.position.isOnPitch()) p.position = {static_cast<int8_t>(25 - from.position.x), from.position.y};
+    }
+    b.s.homeTeam = h.s.awayTeam; b.s.awayTeam = h.s.homeTeam;
+    b.s.homeTeam.side = TeamSide::HOME; b.s.awayTeam.side = TeamSide::AWAY;
+    b.s.activeTeam = TeamSide::AWAY;
+    b.s.ball = BallState::carried({13, 7}, 12);
+    const std::vector<Hit> hits = wallClearTurn(b);
+    ASSERT_GE(hits.size(), 2u);
+    for (const Hit& h : hits) EXPECT_GE(h.dice, 2) << "rána hráče " << h.m.playerId << " na " << h.m.targetId;
+    EXPECT_EQ(b.s.getPlayer(15).position, (Position{12, 6})) << "přední roh (zrcadlo 4) zůstal";
+    EXPECT_EQ(b.s.getPlayer(16).position, (Position{12, 8})) << "přední roh (zrcadlo 5) zůstal";
+    EXPECT_EQ(hits[0].m.type, MacroType::BLITZ);
+    EXPECT_TRUE(hits[0].m.targetId == 2 || hits[0].m.targetId == 6) << "krajní hráč zdi (zrcadlo 13 / 17)";
+    EXPECT_EQ(b.s.getPlayer(12).position, (Position{13, 7})) << "klec stojí";
+}
+
+// Odtržený soupeř za mezerou zdí není: cílem je konec souvislého úseku před nosičem (review P233 F5).
+TEST(OneCageWallClear, ADetachedPlayerBeyondAGapIsNotTheEnd) {
+    {   // zeď 14,6–14,9, za mezerou 13 na (14,4): bije se od konce zdi dovnitř, odtržený 13 ne
+        Board b = wallWithHelpers(4);
+        b.s.getPlayer(13).position = {14, 4};
+        const std::vector<Hit> hits = wallClearTurn(b);
+        ASSERT_FALSE(hits.empty());
+        EXPECT_TRUE(hits[0].m.targetId == 14 || hits[0].m.targetId == 17) << "konec souvislé zdi";
+        for (const Hit& h : hits) EXPECT_NE(h.m.targetId, 13) << "odtržený hráč není konec zdi";
+    }
+    {   // zeď 14,6–14,8, odtržení na (14,4) a (14,10) — oba v řádcích nosiče ±3. Konce 14 a 16 stojí mezi
+        //   soupeři (zóny na polích asistence) ⇒ na 2 kostky naše nejdou ⇒ nebije se vůbec, ani do odtržených.
+        Board b = wallWithHelpers(4);
+        b.s.getPlayer(13).position = {14, 4};
+        b.s.getPlayer(17).position = {14, 10};
+        EXPECT_TRUE(wallClearTurn(b).empty());
+    }
+}
+
+// Rána jen na 2 kostky naše: s jediným pomocníkem vyjde nejvýš jedna kostka ⇒ nebije se a řadič hraje přesně
+//   jako bez P233 (review P233 W3, W6 — dřív asistent odešel ke zdi a rána pak neprošla).
+TEST(OneCageWallClear, WithOneHelperOnlyOneDieNoHitAndTheOldShift) {
+    Board b = wallWithHelpers(4);
+    for (int id : {7, 8}) { b.s.getPlayer(id).position = {-1, -1}; b.s.getPlayer(id).state = PlayerState::OFF_PITCH; }
+    Board old = b;
+    EXPECT_TRUE(wallClearTurn(b).empty());
+    {
+        struct Off { Off() { setExtraFeaturesOff(kP233WallClear); } ~Off() { setExtraFeaturesOff(0); } } off;
+        wallClearTurn(old);
+    }
+    for (int id = 1; id <= 17; ++id) EXPECT_EQ(b.s.getPlayer(id).position, old.s.getPlayer(id).position) << "hráč " << id;
+}
+
+// Asistence se přidávají, dokud nejsou 2 kostky, i když jedna sama kostky nezmění (review P233 F3): konce zdi ST 5,
+//   na 2 kostky naše proti ST 3 jsou potřeba tři asistence (4 proti 5 je pořád soupeřova volba).
+TEST(OneCageWallClear, ThreeAssistsWhenOneAloneDoesNotChangeTheDice) {
+    Board b = wallWithHelpers(4);
+    for (int id : {13, 17}) b.s.getPlayer(id).stats.strength = 5;
+    b.put(9, TeamSide::HOME, {10, 1}, 9);
+    b.put(10, TeamSide::HOME, {10, 13}, 9);
+    b.put(11, TeamSide::HOME, {9, 5}, 9);
+    const std::vector<Hit> hits = wallClearTurn(b);
+    ASSERT_FALSE(hits.empty()) << "rána do konce zdi ST 5 se třemi asistencemi";
+    EXPECT_TRUE(hits[0].m.targetId == 13 || hits[0].m.targetId == 17);
+    for (const Hit& h : hits) EXPECT_GE(h.dice, 2) << "rána hráče " << h.m.playerId << " na " << h.m.targetId;
+}
+
+// Kam soupeře odtlačit: rána, po které by všechna tři pole odtlačení byla obsazená (odtlačení řetězem), se nehraje
+//   (review P233 F6 — pravidlo z review, ne od uživatele). Za zdí leží soupeři (bez zón — nepomáhají ani nehrozí).
+TEST(OneCageWallClear, NoHitWhosePushSquaresAreAllTaken) {
+    Board b = wallWithHelpers(4);
+    const int ids[] = {18, 19, 20, 21, 22, 25, 26};   // soupeřovy sloty (23, 24 = naše lavička)
+    for (int i = 0; i < 7; ++i) b.put(ids[i], TeamSide::AWAY, {15, static_cast<int8_t>(4 + i)}, 1).state = PlayerState::PRONE;
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    int hits = 0;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) {
+            Position from = b.s.getPlayer(m.playerId).position;
+            if (m.type == MacroType::BLITZ) {
+                int steps = 0;
+                ASSERT_TRUE(blitzLandingDiceFree(b.s, b.s.getPlayer(m.playerId), b.s.getPlayer(m.targetId).position, from, steps));
+            }
+            const Position d = b.s.getPlayer(m.targetId).position;
+            const Position behind{static_cast<int8_t>(2 * d.x - from.x), static_cast<int8_t>(2 * d.y - from.y)};
+            int free = 0, squares = 0;                  // pole odtlačení = pole za cílem a jeho dva sousedé od útočníka
+            for (const Position& q : d.getAdjacent())
+                if (q.distanceTo(from) == 2 && q.distanceTo(behind) <= 1) {
+                    ++squares;
+                    if (!q.isOnPitch() || !b.s.getPlayerAtPosition(q)) ++free;
+                }
+            ASSERT_EQ(squares, 3);
+            EXPECT_GT(free, 0) << "rána hráče " << m.playerId << " z (" << int(from.x) << "," << int(from.y) << ") na " << m.targetId;
+            ++hits;
+        }
+        play(b.s, m);
+    }
+    EXPECT_GT(hits, 0) << "předpoklad: zeď se tu bije (pole odtlačení volná jinde)";
+}
+
+// Přesuny rány nesmí zvednout hrozbu na nosiče (P232, review P233 F4): hráč 8 na (10,7) drží zónou cestu silného
+//   soupeře zezadu (8,7) ke kleci; jeho odchod k zdi by hrozbu zvedl (0,29 → 0,41).
+TEST(OneCageWallClear, AnAssistDoesNotOpenTheWayToTheCarrier) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(8).position = {10, 7};
+    b.put(18, TeamSide::AWAY, {8, 7}, 6, 5).stats.agility = 4;
+    const double before = blitzThreat(b.s, b.s.getPlayer(1));
+    Board unguarded = b;
+    const std::vector<Hit> hits = wallClearTurn(b);
+    ASSERT_FALSE(hits.empty()) << "předpoklad: zeď se bije";
+    EXPECT_LE(blitzThreat(b.s, b.s.getPlayer(1)), before + 0.01);
+    {   // pozitivní kontrola: bez hlídání hrozby (P232) by tah hrozbu zvedl
+        struct Off { Off() { setExtraFeaturesOff(kP232KeepThreat); } ~Off() { setExtraFeaturesOff(0); } } off;
+        wallClearTurn(unguarded);
+        EXPECT_GT(blitzThreat(unguarded.s, unguarded.s.getPlayer(1)), before + 0.01);
+    }
+}
+
+// Nosič označený uprostřed čištění (třeba soupeř vstal vedle něj): další rány do zdi už ne (review P233 F8).
+//   Soupeř stojí ZA nosičem (11,7): mimo zeď, pole asistentů i odtlačení — rány tak nezastaví nic jiného než
+//   označení nosiče (review 3: soupeř na (13,7) by asistoval zdi a mohl by srazit kostky pod 2).
+//   Platí i bez hlídání hrozby (P232 vypnuté): sousední soupeř hrozbu zvedne, takže se zapnutým P232 by rány zastavilo
+//   už hlídání hrozby a samotná kontrola označení by testem neprošla (mutace 29.10.).
+TEST(OneCageWallClear, NoMoreWallHitsOnceTheCarrierIsMarked) {
+    struct Off { explicit Off(int m) { setExtraFeaturesOff(m); } ~Off() { setExtraFeaturesOff(0); } };
+    for (const int off : {0, static_cast<int>(kP232KeepThreat)}) {
+        int wallHits = 0;
+        bool marked = false;
+        {
+            Off guard(off);
+            Board b = wallWithHelpers(4);
+            CageController cc(nullptr, cfg(), 1);
+            Macro m;
+            while (cc.next(b.s, m)) {
+                const bool wallHit = (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) && m.targetId >= 13 && m.targetId <= 17;
+                if (wallHit) ++wallHits;
+                if (marked) EXPECT_FALSE(wallHit) << "rána do zdi hráčem " << m.playerId << " na " << m.targetId << " (vypnuto " << off << ")";
+                play(b.s, m);
+                if (m.type == MacroType::BLITZ && !marked) {
+                    EXPECT_EQ(b.s.getPlayerAtPosition({11, 7}), nullptr) << "předpoklad: pole za nosičem volné";
+                    b.put(18, TeamSide::AWAY, {11, 7}, 6);     // soupeř vedle nosiče, za ním
+                    marked = true;
+                }
+            }
+        }
+        ASSERT_TRUE(marked) << "předpoklad: první ranou je blitz (vypnuto " << off << ")";
+        // pozitivní kontrola: bez označení by se do zdi bilo dál
+        Board c = wallWithHelpers(4);
+        int unmarked = 0;
+        {
+            Off guard(off);
+            for (const Hit& h : wallClearTurn(c)) unmarked += h.m.targetId >= 13 && h.m.targetId <= 17;
+        }
+        ASSERT_GE(unmarked, 2) << "předpoklad: bez označení víc než jedna rána do zdi (vypnuto " << off << ")";
+        EXPECT_EQ(wallHits, 1);
+    }
+}
+
+// Frenzy rohy do zdi nebijí: povinný druhý blok a následování by je vytáhly z klece (review P233 F9).
+TEST(OneCageWallClear, FrenzyCornersDoNotHitTheWall) {
+    Board b = wallWithHelpers(4);
+    for (int id : {4, 5}) b.s.getPlayer(id).skills.add(SkillName::Frenzy);
+    const std::vector<Hit> hits = wallClearTurn(b);
+    ASSERT_FALSE(hits.empty()) << "předpoklad: zeď se bije (blitz pomocníkem)";
+    for (const Hit& h : hits) EXPECT_TRUE(h.m.playerId != 4 && h.m.playerId != 5) << "Frenzy roh " << h.m.playerId;
+    EXPECT_EQ(b.s.getPlayer(4).position, (Position{13, 6}));
+    EXPECT_EQ(b.s.getPlayer(5).position, (Position{13, 8}));
+}
+
+// Blitz se hraje jen z pole, pro které byl spočítán (kostky, odtlačení, hrozba, ne vedle nosiče — review P233 F1):
+//   cíl po příchodu asistenta uhne na (15,4) ⇒ doběh by skončil jinde ⇒ blitz se nehraje, tah jde dál.
+TEST(OneCageWallClear, TheBlitzIsPlayedOnlyFromThePlannedSquare) {
+    Board b = wallWithHelpers(4);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool moved = false;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::BLITZ) {
+            Position landing{-1, -1};
+            int steps = 0;
+            ASSERT_TRUE(blitzLandingDiceFree(b.s, b.s.getPlayer(m.playerId), b.s.getPlayer(m.targetId).position, landing, steps));
+            EXPECT_EQ(landing, m.viaPos) << "blitz hráče " << m.playerId << " na " << m.targetId;
+        }
+        play(b.s, m);
+        if (!moved && m.type == MacroType::REPOSITION && m.playerId == 8) {
+            ASSERT_EQ(b.s.getPlayer(8).position, (Position{14, 4})) << "předpoklad: 8 asistuje na cíl (14,5)";
+            b.s.getPlayer(13).position = {15, 4};       // cíl uhnul
+            moved = true;
+        }
+    }
+    ASSERT_TRUE(moved);
+}
+
+// Blitz do zdi bez GFI: nevyjde-li, je to turnover s asistenty u zdi a klecí na místě (review 2). Pomocník 6 má MA 2
+//   a ke konci zdi (14,5) je nejblíž — doběhne jen s GFI.
+TEST(OneCageWallClear, NoBlitzThatNeedsAGoForIt) {
+    Board b = wallWithHelpers(4);
+    b.s.getPlayer(6).stats.movement = 2;
+    b.s.getPlayer(6).movementRemaining = 2;
+    {
+        Position landing{-1, -1};
+        int steps = 0;
+        ASSERT_TRUE(blitzLandingDiceFree(b.s, b.s.getPlayer(6), b.s.getPlayer(13).position, landing, steps));
+        ASSERT_GT(steps, 2) << "předpoklad: blitz hráče 6 na konec zdi potřebuje GFI";
+    }
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::BLITZ) {
+            Position landing{-1, -1};
+            int steps = 0;
+            ASSERT_TRUE(blitzLandingDiceFree(b.s, b.s.getPlayer(m.playerId), b.s.getPlayer(m.targetId).position, landing, steps));
+            EXPECT_LE(steps, b.s.getPlayer(m.playerId).movementRemaining) << "blitz hráče " << m.playerId << " s GFI";
+        }
+        play(b.s, m);
+    }
+}
+
+// Kontrola doběhu blitzu po asistencích v planWallClear (review P233 F1a) zůstala bez zabíjejícího testu: v prohledaných
+//   pozicích (asistent na cestě blitzera, tělo na každém poli kolem cíle) se doběh asistencí nezměnil. Nedosažitelnost
+//   tím dokázaná není — kontrola zůstává jako pojistka.
+// Mutace 29.10. bez zabíjejícího testu, s důvodem:
+//   - GFI blitzu hlídají dvě kontroly (doběh před asistencemi a po nich). Shodují se, jen když asistenti doběh nezmění —
+//     v prohledaných pozicích vždy (viz F1a výš). Vypnutí obou zachytí NoBlitzThatNeedsAGoForIt; vypnutí jen druhé
+//     (asistent doběh prodlouží do GFI) testem kryté není; první navíc odmítne blitz, který by asistent zkrátil.
+//   - `ourBall` ve větvi WALL_CLEAR v next(): bez míče je stillValid false; bez té podmínky jde řadič přes
+//     AFTER_ADVANCE do planLaggards, který bez míče hned skončí (DONE). Nevyčištěné readyMates_ a deferredGfi_
+//     nevadí: readyMates_ plní až planLaggards (po čištění zdi) a forbids bez míče hned končí.
+
+// Hrozba na nosiče se měří proti začátku čištění zdi, ne proti poslední ráně (review 2; tady začíná čištění tah,
+//   takže je to i začátek tahu): po blitzu se objeví silný soupeř
+//   a hrozba vyskočí z 0,29 na 0,49 ⇒ další rány do zdi už ne. S bází přepočítanou před každou ranou by hrozba
+//   „plížila“ nahoru po kouscích a rána by se zahrála.
+TEST(OneCageWallClear, TheThreatIsHeldAgainstTheStartOfClearing) {
+    Board b = wallWithHelpers(4);
+    const double atStart = blitzThreat(b.s, b.s.getPlayer(1));
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool placed = false;
+    int later = 0;
+    while (cc.next(b.s, m)) {
+        if (placed && (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) && m.targetId >= 13 && m.targetId <= 17) ++later;
+        play(b.s, m);
+        if (m.type == MacroType::BLITZ && !placed) {
+            placed = true;
+            ASSERT_EQ(b.s.getPlayerAtPosition({18, 7}), nullptr);
+            b.put(18, TeamSide::AWAY, {18, 7}, 8, 6, {SkillName::Block, SkillName::Tackle});
+            ASSERT_GT(blitzThreat(b.s, b.s.getPlayer(1)), atStart + 0.1) << "předpoklad: soupeř hrozbu zvedne";
+        }
+    }
+    ASSERT_TRUE(placed) << "předpoklad: první ranou je blitz";
+    EXPECT_EQ(later, 0) << "rána do zdi po zvednutí hrozby nad začátek čištění";
+    // pozitivní kontrola: tentýž soupeř, hlídání hrozby vypnuté ⇒ rány pokračují (zastavuje je jen hrozba)
+    {
+        struct Off { Off() { setExtraFeaturesOff(kP232KeepThreat); } ~Off() { setExtraFeaturesOff(0); } } off;
+        Board c = wallWithHelpers(4);
+        CageController cc2(nullptr, cfg(), 1);
+        bool placed2 = false;
+        int later2 = 0;
+        while (cc2.next(c.s, m)) {
+            if (placed2 && (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ) && m.targetId >= 13 && m.targetId <= 17) ++later2;
+            play(c.s, m);
+            if (m.type == MacroType::BLITZ && !placed2) {
+                placed2 = true;
+                c.put(18, TeamSide::AWAY, {18, 7}, 8, 6, {SkillName::Block, SkillName::Tackle});
+            }
+        }
+        EXPECT_GE(later2, 1) << "bez hlídání hrozby by se po blitzu bilo dál";
+    }
+    // pozitivní kontrola: bez nového soupeře se po blitzu bije dál
+    Board c = wallWithHelpers(4);
+    int wall = 0;
+    for (const Hit& h : wallClearTurn(c)) wall += h.m.targetId >= 13 && h.m.targetId <= 17;
+    ASSERT_GE(wall, 2);
 }

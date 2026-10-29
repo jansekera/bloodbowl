@@ -139,7 +139,7 @@ public:
     int plansAdopted() const { return adopted_; }
 
 private:
-    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_ADVANCE, AFTER_RUN, DONE };
+    enum class Stage { START, AFTER_PICKUP, AFTER_BLOCKS, AFTER_ADVANCE, AFTER_RUN, WALL_CLEAR, DONE };
 
     CageAdvancePlanner planner_;
     MCTSConfig config_;
@@ -150,6 +150,12 @@ private:
     // P230: pomalejší klec u zdi, na zeď nesmí bít nikdo ⇒ celá klec (4 rohy) ve stejném sloupci posunutá
     // po řadách; `bound` = přední rohy, které zeď drží (zůstávají). True = do fronty šel přesun.
     bool planWallShift(const GameState& state, const Player& carrier, const std::vector<int>& bound);
+    // P233: jeden krok čištění zdi od kraje — rána (blok stojícího u krajního hráče, nebo blitz) na 2+ kostky, které
+    // volíme my, s asistenty přidanými jen tolik, kolik je třeba; nikdo z nich vedle nosiče. True = do fronty šla rána.
+    // Volá se znovu po každé ráně (Stage::WALL_CLEAR), dokud další taková rána jde.
+    bool planWallClear(const GameState& state);
+    bool wallClearing_ = false;   // planWallBreak předal tah čištění zdi (P233)
+    double wallThreat_ = -1.0;    // P233: hrozba na nosiče na začátku čištění zdi (-1 = ještě nezměřena)
     // P230: přestavba klece platí jen celá — nedojde-li hráč na své pole, zbytek fronty se zahodí (review 27.10.)
     bool strictQueue_ = false;
     // P230: roh přes GFI se hraje až na konci tahu (po zaostalcích) — nepovedené GFI je turnover (review 27.10.)

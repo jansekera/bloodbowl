@@ -116,7 +116,8 @@ enum ExtraFeature : unsigned {
     kP230Backup = 8192,       // P230: ze zaostalců zůstane vzadu záloha (1–2 hráči přes šířku hřiště) na blitz zloděje míče
     kP230ShiftCap = 16384,    // P230: do strany jen do hranice riskEdge, jinak stát (do ní) / o sloupec dozadu (do 0,15) / nejnižší hrozba, ne vyšší než stát
     kP232RiskyForward = 32768, // P232: bez bezpečného pole vpřed i s rizikem do riskEdge; vpřed, není-li horší než stát
-    kP232KeepThreat = 65536   // P232: přesun hráče mimo klec (připravený, zaostalec, záloha, Wild Animal) nezvedne hrozbu na nosiče
+    kP232KeepThreat = 65536,  // P232: přesun hráče mimo klec (připravený, zaostalec, záloha, Wild Animal) nezvedne hrozbu na nosiče
+    kP233WallClear = 131072   // P233: pomalejší klec bez povolené rány čistí zeď od kraje ranami na 2 kostky naše s asistenty
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
