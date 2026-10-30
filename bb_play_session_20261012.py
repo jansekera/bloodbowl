@@ -179,7 +179,8 @@ def _otisk(p, soupiska):
 
 
 def _hraci(state):
-    """Všichni z obou soupisek, i náhradníci (lidé od id 12)."""
+    """Všichni z obou soupisek, i náhradníci (lidé od id 12). zaloz_pozici / zrcadlo potřebují i náhradníky,
+    proto nejdou přes enum_players (ta filtruje hřiště)."""
     out = []
     for pid in range(1, 33):
         try:
@@ -339,15 +340,7 @@ def zahaj(state, dice, kope):
 
 
 def enum_players(state):
-    out = []
-    for pid in range(1, 33):
-        try:
-            p = state.get_player(pid)
-        except Exception:
-            continue
-        if p.is_on_pitch:
-            out.append(p)
-    return out
+    return [p for p in _hraci(state) if p.is_on_pitch]
 
 
 def skilly(p):

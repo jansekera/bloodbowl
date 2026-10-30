@@ -139,13 +139,16 @@ Hraje se z worktree větve (do main není sloučeno). Proměnnou `BB_PLAY_DIR` �
 a čeká marně. ⚠️ Pro partii 2 **nový adresář**: v main checkoutu leží v `evidence/play_20261027_zed/`
 `prikazy.log` z 27.10. a server by ho po startu přehrál (= pokračování staré partie).
 
+Oprava 30.10. (recenze, nález 2): dřív `echo $! > …pgid` — v interaktivním terminálu je `$!` PID
+rodiče, který `setsid` hned opustí, takže záložní `kill -- -PGID` mířil vedle.
+
 ### Partie 1 — AI (AWAY) hraje orčí klec, uživatel (HOME) lidskou zeď
 ```bash
 cd /home/jenda/claude/blood-bowl/.claude/worktrees/noc-partie-zrcadlo
 make check-cpp                                   # jistota: bb_engine_py postavený z tohoto kódu
 export BB_PLAY_DIR=evidence/play_20261030_zed_lide
-BB_PARTIE=zed-lide setsid venv/bin/python bb_play_session_20261012.py > /tmp/partie1_server.log 2>&1 &
-echo $! > /tmp/partie1.pgid                       # setsid ⇒ PID = PGID
+BB_PARTIE=zed-lide setsid bash -c 'echo $$ > /tmp/partie1.pgid; exec venv/bin/python bb_play_session_20261012.py' \
+    > /tmp/partie1_server.log 2>&1 &              # $$ = PID vedoucího nové relace = PGID; exec ho zachová
 ./bb_play_cmd.py kouc HOME                        # uživatel rozhoduje za lidi (přehozy, Stand Firm, Side Step…)
 ./bb_play_cmd.py pozice                           # rozestaví zrcadlo; na tahu ORKOVÉ (AWAY), kolo H:3 A:4
 ./bb_play_cmd.py tahai macro 1 200                # tah orků NANEČISTO — ukázat uživateli PŘED provedením
@@ -165,8 +168,8 @@ echo $! > /tmp/partie1.pgid                       # setsid ⇒ PID = PGID
 ```bash
 cd /home/jenda/claude/blood-bowl/.claude/worktrees/noc-partie-zrcadlo
 export BB_PLAY_DIR=evidence/play_20261030_zed_orkove      # NE play_20261027_zed (starý log by se přehrál)
-BB_PARTIE=zed-orkove setsid venv/bin/python bb_play_session_20261012.py > /tmp/partie2_server.log 2>&1 &
-echo $! > /tmp/partie2.pgid
+BB_PARTIE=zed-orkove setsid bash -c 'echo $$ > /tmp/partie2.pgid; exec venv/bin/python bb_play_session_20261012.py' \
+    > /tmp/partie2_server.log 2>&1 &              # $$ = PID vedoucího nové relace = PGID; exec ho zachová
 ./bb_play_cmd.py kouc HOME
 ./bb_play_cmd.py pozice                           # na tahu ORKOVÉ (HOME) = uživatel, kolo H:4 A:3
 ./bb_play_cmd.py tahai macro 1 200                # RADA: jak by tah orků zahrála AI (nanečisto)

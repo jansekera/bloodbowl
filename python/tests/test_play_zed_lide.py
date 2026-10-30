@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 
 KOREN = os.path.join(os.path.dirname(__file__), "..", "..")
 
@@ -72,3 +73,27 @@ def test_zed_orkove_beze_zmeny(tmp_path):
     # výchozí chování ostatních presetů: na tahu HOME
     v = _pozice("zed-orkove", tmp_path)
     assert (v["na_tahu"], v["kope"], v["kolo"]) == ("HOME", "AWAY", {"HOME": 4, "AWAY": 3})
+
+
+def _cmd(d, *prikaz):
+    env = dict(os.environ, BB_PLAY_DIR=d, BB_PLAY_LIMIT="60")
+    return subprocess.run([sys.executable, os.path.join(KOREN, "bb_play_cmd.py"), *prikaz], env=env,
+                          capture_output=True, text=True, timeout=90).stdout
+
+
+def test_zed_lide_pres_server_prikaz_pozice(tmp_path):
+    # recenze 30.10. (nález 1): partie začíná příkazem `pozice` přes server, ne voláním zaloz_pozici()
+    d = str(tmp_path)
+    server = subprocess.Popen([sys.executable, os.path.join(KOREN, "bb_play_session_20261012.py")],
+                              env=dict(os.environ, BB_PLAY_DIR=d, BB_PARTIE="zed-lide"),
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        time.sleep(1.5)
+        _cmd(d, "kouc", "HOME")
+        out = _cmd(d, "pozice")
+        assert "nezačal" not in out, out[:300]
+        deska = _cmd(d, "board")
+        assert "aktivni tym: TeamSide.AWAY" in deska and "kolo H:3 A:4" in deska, deska[-400:]
+    finally:
+        _cmd(d, "quit")
+        server.wait(timeout=30)
