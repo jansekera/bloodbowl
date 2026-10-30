@@ -67,6 +67,8 @@ final class GameOrchestrator
         $resolver->setInteractiveApothecary($lide);
         // P226: na Stand Firm se ptá kouč-člověk bránícího hráče — i v tahu soupeře (tah AI se zastaví)
         $resolver->setInteractiveStandFirm($lide);
+        // 30.10.2026: na Diving Catch se ptá kouč-člověk hráče — i v tahu soupeře a u výkopu (tah AI se zastaví)
+        $resolver->setInteractiveDivingCatch($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();
@@ -75,7 +77,7 @@ final class GameOrchestrator
         // If there's a pending block or reroll (human player), return immediately
         if ($newState->getPendingBlock() !== null || $newState->getPendingReroll() !== null
             || $newState->getPendingApothecary() !== null || $newState->getPendingGrab() !== null
-            || $newState->getPendingStandFirm() !== null) {
+            || $newState->getPendingStandFirm() !== null || $newState->getPendingDivingCatch() !== null) {
             return [
                 'state' => $newState,
                 'events' => $allEvents,
@@ -113,7 +115,8 @@ final class GameOrchestrator
 
         // AI auto-play for setup
         $aiTeam = $newState->getAiTeam();
-        if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isSetup()) {
+        if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isSetup()
+            && $newState->getPendingDivingCatch() === null) {
             $newState = $this->aiCoach->setupFormation($newState, $aiTeam);
             $setupResult = $resolver->resolve($newState, ActionType::END_SETUP, []);
             $newState = $setupResult->getNewState();
@@ -123,7 +126,8 @@ final class GameOrchestrator
         // AI auto-play for turn — ne, čeká-li kouč-člověk na lékárníka (review 16.10.: např. Throw a Rock
         //   ve výkopu po END_SETUP AI; AI by jinak volbu odpověděla sama nebo ukončila tah)
         if ($aiTeam !== null && $newState->getActiveTeam() === $aiTeam && $newState->getPhase()->isPlayable()
-            && $newState->getPendingApothecary() === null && $newState->getPendingStandFirm() === null) {
+            && $newState->getPendingApothecary() === null && $newState->getPendingStandFirm() === null
+            && $newState->getPendingDivingCatch() === null) {
             $aiTurnService = new AITurnService($this->aiCoach, $this->rulesEngine, $lide);
             if ($this->gameLogger !== null) {
                 $aiTurnService->setGameLogger($this->gameLogger);

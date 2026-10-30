@@ -1,5 +1,6 @@
 #include "bb/ball_handler.h"
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
 
 namespace bb {
 
@@ -128,6 +129,11 @@ int divingCatcherFor(const GameState& state, Position at) {
     return count == 1 ? found : -1;
 }
 
+bool divingCatchChosen(const GameState& state, int diver, Position at, bool aiJumps) {
+    if (!coachDecides(state.getPlayer(diver).teamSide)) return aiJumps;
+    return askCoach(CoachQuestion::USE_DIVING_CATCH, diver, -1, 0, at.x * 100 + at.y, 3) == CoachAnswer::TEAM;
+}
+
 void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
                     std::vector<GameEvent>* events, bool accuratePass, int depth) {
     state.ball = BallState::onGround(at);
@@ -138,6 +144,7 @@ void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
         if (p->state == PlayerState::STANDING && !p->hasSkill(SkillName::NoHands)) catcherId = p->id;
     } else {
         catcherId = divingCatcherFor(state, at);
+        if (catcherId >= 0 && !divingCatchChosen(state, catcherId, at, /*aiJumps=*/true)) catcherId = -1;
         diving = catcherId >= 0;
     }
     if (catcherId < 0) {

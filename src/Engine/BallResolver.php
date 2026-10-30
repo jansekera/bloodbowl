@@ -19,11 +19,47 @@ final class BallResolver
 {
     private const MAX_BOUNCES = 5;
 
+    /** @var list<TeamSide> strany kouče-člověka -- jeho hráče se na Diving Catch ptá (i v tahu soupeře) */
+    private array $divingCatchSides = [];
+    /** @var list<bool> odpovědi na otázky Diving Catch v pořadí, v jakém je akce položí (přehrání) */
+    private array $divingCatchAnswers = [];
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
     ) {}
+
+    /** @param list<TeamSide> $sides */
+    public function setInteractiveDivingCatch(array $sides): void
+    {
+        $this->divingCatchSides = $sides;
+    }
+
+    /** @param list<bool> $answers */
+    public function setDivingCatchAnswers(array $answers): void
+    {
+        $this->divingCatchAnswers = $answers;
+    }
+
+    /**
+     * Uživatel 30.10.2026: Diving Catch jako otázka kouči. Skočí `$diver` pro míč dopadající na
+     * `$landing`? Skill je volba (ř. 8065 "can attempt", ř. 1820 "Skill use is not mandatory"):
+     * hráče kouče-člověka se ptá -- bez odpovědi akci přeruší `DivingCatchQuestion` (viz
+     * `ReplayDiceRoller`); AI rozhoduje `$aiJumps` jako dosud.
+     */
+    public function divingCatchJumps(MatchPlayerDTO $diver, Position $landing, bool $aiJumps): bool
+    {
+        if (!in_array($diver->getTeamSide(), $this->divingCatchSides, true)) {
+            return $aiJumps;
+        }
+        $answer = array_shift($this->divingCatchAnswers);
+        if ($answer === null) {
+            throw new DivingCatchQuestion($diver->getId(), $landing);
+        }
+
+        return $answer;
+    }
 
     /**
      * Attempt to pick up ball when player moves onto ball square.
@@ -238,7 +274,7 @@ final class BallResolver
         bool $accuratePass = false,
         ?TeamSide $rerollSide = null,
         int $depth = 0,
-        bool $divingCatch = true,
+        ?bool $divingCatch = null,
         ?TeamSide $kickoffReceiving = null,
     ): array {
         $state = $state->withBall(BallState::onGround($landing));
@@ -247,8 +283,12 @@ final class BallResolver
         $catcher = $state->getPlayerAtPosition($landing);
         $diving = false;
         if ($catcher === null) {
-            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8065) — viz KickoffResolver
-            $catcher = $divingCatch ? $this->findDivingCatchPlayer($state, $landing) : null;
+            // $divingCatch: o skoku už rozhodl volající (výkop, viz KickoffResolver); null = rozhodne se tu
+            //   (kouč-člověk odpoví, AI skočí vždy). Skill je volba (ř. 8065).
+            $catcher = $divingCatch === false ? null : $this->findDivingCatchPlayer($state, $landing);
+            if ($catcher !== null && $divingCatch === null && !$this->divingCatchJumps($catcher, $landing, true)) {
+                $catcher = null;
+            }
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
             $catcher = null;

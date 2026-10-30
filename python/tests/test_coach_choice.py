@@ -329,3 +329,46 @@ def test_grab_otazka_prijde_z_vazby_jako_use_grab():
             volby = [i for i in range(8) if q["options"] & (1 << i)]
             odpovedi.append(volby[(seed + pokus) % len(volby)])
     raise AssertionError("ve 40 blocích orka s Grabem otázka USE_GRAB nepřišla: %s" % videno)
+
+
+def test_diving_catch_otazka_a_odpoved():
+    # 30.10.2026: Diving Catch jako otázka kouči — ano / ne a pole dopadu ve výpisu
+    q = {"question": "USE_DIVING_CATCH", "player": 7, "other": -1, "roll": 0, "target": 1006, "options": 0b11}
+    assert ps.preloz_odpoved(q, "ano") == 1 and ps.preloz_odpoved(q, "ne") == 0
+    text = ps.otazka_str(q)
+    assert "DIVING CATCH" in text and "hráč 7" in text and "(10,6)" in text and "odp ano / ne" in text
+
+
+def test_diving_catch_otazka_prijde_z_vazby_jako_use_diving_catch():
+    # Otázka přijde z enginu (vazba `names[16]` přeloží CoachQuestion::USE_DIVING_CATCH = 16): Wood Elf
+    # TV1500 má Catchera s Diving Catch. Elf přihrává přesně na prázdné pole vedle něj (ř. 8065-8068);
+    # kouč hraje za soupeře (AWAY) ⇒ ptá se i v cizím tahu ("any pass").
+    dc = ps.SKILL_NAMES.index("DivingCatch")
+    for seed in range(1, 41):
+        s = bb.GameState()
+        bb.setup_half(s, bb.get_developed_roster("orc", 1500), bb.get_developed_roster("wood-elf", 1500), A)
+        d = bb.DiceRoller(seed)
+        s.phase = bb.GamePhase.PLAY
+        s.active_team = H
+        hraci = [s.get_player(i) for i in range(1, 23)]
+        for p in hraci:            # prázdné hřiště kromě dvou hráčů
+            p.position = bb.Position(-1, -1)
+        nahravac = next(p for p in hraci if p.team_side == H)
+        chytac = next(p for p in hraci if p.team_side == A and p.has_skill_index(dc))
+        nahravac.position = bb.Position(5, 7)
+        nahravac.state = bb.PlayerState.STANDING
+        chytac.position = bb.Position(10, 8)
+        chytac.state = bb.PlayerState.STANDING
+        s.ball.position = bb.Position(5, 7)
+        s.ball.is_held = True
+        s.ball.carrier_id = nahravac.id
+        a = bb.Action()
+        a.type = bb.ActionType.PASS
+        a.player_id = nahravac.id
+        a.target = bb.Position(10, 7)
+        _, _, q = bb.execute_action_coach(s, a, d, A, [], False)
+        if q is not None and q["question"] == "USE_DIVING_CATCH":
+            assert q["player"] == chytac.id and q["options"] == 0b11
+            assert "DIVING CATCH" in ps.otazka_str(q)
+            return
+    raise AssertionError("ve 40 přihrávkách vedle Catchera s Diving Catch otázka USE_DIVING_CATCH nepřišla")

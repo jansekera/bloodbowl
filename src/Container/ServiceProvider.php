@@ -14,17 +14,10 @@ use App\Controller\PageController;
 use App\Controller\TeamApiController;
 use App\Controller\TeamPageController;
 use App\Engine\ActionResolver;
-use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
-use App\Engine\GameFlowResolver;
-use App\Engine\InjuryResolver;
-use App\Engine\KickoffResolver;
 use App\Engine\Pathfinder;
-use App\Engine\PassResolver;
 use App\Engine\RandomDiceRoller;
 use App\Engine\RulesEngine;
-use App\Engine\ScatterCalculator;
-use App\Engine\StrengthCalculator;
 use App\Engine\TacklezoneCalculator;
 use App\Repository\CoachRepository;
 use App\Repository\MatchEventRepository;
@@ -70,43 +63,12 @@ final class ServiceProvider
         // Engine
         $container->set(DiceRollerInterface::class, fn() => new RandomDiceRoller());
         $container->set(TacklezoneCalculator::class, fn() => new TacklezoneCalculator());
-        $container->set(ScatterCalculator::class, fn() => new ScatterCalculator());
-        $container->set(StrengthCalculator::class, fn() => new StrengthCalculator());
-        $container->set(InjuryResolver::class, fn() => new InjuryResolver());
         $container->set(Pathfinder::class, fn(Container $c) => new Pathfinder(
             $c->get(TacklezoneCalculator::class),
         ));
-        $container->set(BallResolver::class, fn(Container $c) => new BallResolver(
-            $c->get(DiceRollerInterface::class),
-            $c->get(TacklezoneCalculator::class),
-            $c->get(ScatterCalculator::class),
-        ));
-        $container->set(PassResolver::class, fn(Container $c) => new PassResolver(
-            $c->get(DiceRollerInterface::class),
-            $c->get(TacklezoneCalculator::class),
-            $c->get(ScatterCalculator::class),
-            $c->get(BallResolver::class),
-        ));
-        $container->set(KickoffResolver::class, fn(Container $c) => new KickoffResolver(
-            $c->get(DiceRollerInterface::class),
-            $c->get(ScatterCalculator::class),
-            $c->get(BallResolver::class),
-            $c->get(InjuryResolver::class),
-        ));
-        $container->set(GameFlowResolver::class, fn(Container $c) => new GameFlowResolver(
-            $c->get(DiceRollerInterface::class),
-        ));
+        // Resolvery s kostkami staví ActionResolver sám nad záznamem hodů (recenze 30.10. C/1).
         $container->set(ActionResolver::class, fn(Container $c) => new ActionResolver(
             $c->get(DiceRollerInterface::class),
-            $c->get(TacklezoneCalculator::class),
-            $c->get(Pathfinder::class),
-            $c->get(StrengthCalculator::class),
-            $c->get(InjuryResolver::class),
-            $c->get(BallResolver::class),
-            $c->get(ScatterCalculator::class),
-            $c->get(PassResolver::class),
-            $c->get(KickoffResolver::class),
-            $c->get(GameFlowResolver::class),
         ));
         $container->set(RulesEngine::class, fn(Container $c) => new RulesEngine(
             $c->get(TacklezoneCalculator::class),

@@ -88,8 +88,10 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
             //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ neskočí, míč dopadne
             //   normálně. Přijímající v kopající polovině (Quick Snap) skočí. Rušení dvou kandidátů
             //   (ř. 8069-8071) řeší `divingCatcherFor` (vrátí -1).
-            if (diver >= 0 && state.getPlayer(diver).teamSide != receiving &&
-                !inHalfOf(receiving, state.getPlayer(diver).position))
+            // Uživatel 30.10.2026: v živé partii se ptá kouče hráče (`divingCatchChosen`), i kopajícího.
+            if (diver >= 0 && !divingCatchChosen(state, diver, at,
+                                                 /*aiJumps=*/state.getPlayer(diver).teamSide == receiving ||
+                                                     inHalfOf(receiving, state.getPlayer(diver).position)))
                 diver = -1;
             if (diver >= 0) {
                 const Position from = state.getPlayer(diver).position;

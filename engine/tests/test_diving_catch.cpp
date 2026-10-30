@@ -17,6 +17,7 @@
 #include "bb/game_simulator.h"
 #include "bb/helpers.h"
 #include "bb/roster.h"
+#include "bb/coach_choice.h"
 
 using namespace bb;
 
@@ -324,4 +325,110 @@ TEST(DivingCatch, WoodElfTv1500CatcherCatchesWithModifiersOfHisOwnSquare) {
     EXPECT_EQ(gs.ball.carrierId, 2) << "chytil na 3+ (modifikátory jeho pole)";
     EXPECT_EQ(gs.getPlayer(2).position, (Position{10, 7}));
     EXPECT_FALSE(result.turnover);
+}
+
+// ============================================================================
+// Uživatel 30.10.2026: Diving Catch jako otázka kouči (USE_DIVING_CATCH). Skill je volba (ř. 8065
+// "can attempt", ř. 1820 "Skill use is not mandatory"). V živé partii (CoachChoiceScope) se ptá kouče
+// hráče — i v tahu soupeře ("any pass"); mimo ni (AI, měření) beze změny: skočí.
+// Dřív se v živé partii nikdo neptal a hráč skočil vždy.
+// ============================================================================
+namespace {
+// Vrátí otázku, která v živé partii (kouč `coach`, odpovědi `answers`) při přihrávce přišla; jinak nic.
+bool passAsks(GameState gs, TeamSide coach, std::vector<int> dice, CoachChoicePending* out = nullptr) {
+    FixedDiceRoller roller(std::move(dice));
+    CoachChoiceScope scope(coach, {});
+    try {
+        resolvePass(gs, 1, {10, 5}, roller, nullptr);
+    } catch (const CoachChoicePending& p) {
+        if (out) *out = p;
+        return p.question == CoachQuestion::USE_DIVING_CATCH;
+    }
+    return false;
+}
+}  // namespace
+
+TEST(DivingCatchCoach, LiveGameAsksTheDivingCatchersCoach) {
+    CoachChoicePending q(CoachQuestion::REROLL, 0, 0, 0, 0, 0);
+    ASSERT_TRUE(passAsks(thrownToTenFive(), TeamSide::HOME, inaccurateToTenSix({4}), &q));
+    EXPECT_EQ(q.playerId, 2);
+    EXPECT_EQ(q.target, 10 * 100 + 6) << "pole dopadu";
+    EXPECT_EQ(q.options, 3) << "ne / ano";
+}
+
+TEST(DivingCatchCoach, AsksAlsoInTheOpponentsTurn) {
+    GameState gs = thrownToTenFive();
+    gs.getPlayer(2).teamSide = TeamSide::AWAY;          // skáče hráč soupeře přihrávajícího
+    EXPECT_TRUE(passAsks(gs, TeamSide::AWAY, inaccurateToTenSix({4})));
+}
+
+TEST(DivingCatchCoach, YesDivesAndCatches) {
+    GameState gs = thrownToTenFive();
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    std::vector<GameEvent> events;
+    {
+        CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+        resolvePass(gs, 1, {10, 5}, dice, &events);
+    }
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+}
+
+TEST(DivingCatchCoach, NoMeansNoAttemptAndTheBallLandsNormally) {
+    GameState gs = thrownToTenFive();
+    FixedDiceRoller dice(inaccurateToTenSix({4}));      // 4: ano by chytil; ne = odraz z (10,6) na JV (11,7)
+    std::vector<GameEvent> events;
+    {
+        CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::NONE});
+        resolvePass(gs, 1, {10, 5}, dice, &events);
+    }
+    EXPECT_EQ(divingCatchEvents(events), 0);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 7}));
+}
+
+TEST(DivingCatchCoach, TheOtherSidesCoachIsNotAskedAndTheEngineDivesAsBefore) {
+    GameState gs = thrownToTenFive();
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    std::vector<GameEvent> events;
+    {
+        CoachChoiceScope scope(TeamSide::AWAY, {});         // kouč hraje AWAY, skáče hráč HOME
+        resolvePass(gs, 1, {10, 5}, dice, &events);
+    }
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+}
+
+TEST(DivingCatchCoach, TwoCandidatesNobodyIsAsked) {
+    GameState gs = thrownToTenFive();
+    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);
+    gs.getPlayer(3).skills.add(SkillName::DivingCatch);
+    EXPECT_FALSE(passAsks(gs, TeamSide::HOME, inaccurateToTenSix({4, 4, 4})));
+}
+
+TEST(DivingCatchCoach, ABouncingBallIsNotAsked) {
+    GameState gs = passSetup();
+    placePlayer(gs, 1, {5, 8}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({5, 6});                      // odraz z (5,6) na J (5,7) vedle něj
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    EXPECT_NO_THROW(resolveBounce(gs, {5, 6}, dice, 0, nullptr));
+    EXPECT_EQ(gs.ball.position, (Position{5, 7}));
+}
+
+TEST(DivingCatchCoach, ACrowdThrowInIsAsked) {
+    GameState gs = passSetup();
+    placePlayer(gs, 1, {5, 8}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::DivingCatch);
+    gs.ball = BallState::onGround({0, 7});
+    FixedDiceRoller dice({3, 3, 3, 4});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveThrowIn(gs, {0, 7}, {-1, 7}, dice, nullptr);
+        FAIL() << "otázka USE_DIVING_CATCH nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_DIVING_CATCH);
+        EXPECT_EQ(p.target, 5 * 100 + 7);
+    }
 }

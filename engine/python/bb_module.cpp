@@ -525,7 +525,7 @@ PYBIND11_MODULE(bb_engine, m) {
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
                                           "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER",
-                                          "USE_GRAB"};
+                                          "USE_GRAB", "USE_DIVING_CATCH"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;

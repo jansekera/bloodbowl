@@ -554,7 +554,10 @@ static void pushSkills(const GameState& state, const Player& attacker, const Pla
     // ř. 8151-8153: „When making a Block OR BLITZ Action, Grab and Side Step will cancel
     // each other out“ -- Grab v blitzu sám nepůsobí (ř. 8148), Side Step ale ruší.
     const bool hasGrab = attacker.hasSkill(SkillName::Grab);
-    grab = hasGrab && grabMayApply;
+    // OPRAVENO 30.10.2026 (uživatel) -- Grab platil i proti spoluhráči (blok B&C „friend or
+    // foe“, ř. 7820-7822). Grab ř. 8146-8150: „grab his opponent … any empty square adjacent
+    // to his opponent to push back his opponent“ ⇒ spoluhráče B&C odtlačí běžně.
+    grab = hasGrab && grabMayApply && defender.teamSide != attacker.teamSide;
     if (sideStep && hasGrab) { sideStep = false; grab = false; }
     if (sideStep) sideStep = usesSideStep(state, defender);   // P130: volba kouče
     // OPRAVENO 20.10.2026 (review P192, nález 4) -- Grab se použil vždy, a protože umí jen

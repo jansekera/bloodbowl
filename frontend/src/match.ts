@@ -20,6 +20,7 @@ import { RerollModal } from './ui/RerollModal';
 import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
+import { DivingCatchModal } from './ui/DivingCatchModal';
 
 const api = new ApiClient();
 
@@ -87,6 +88,7 @@ const rerollModal = new RerollModal(container);
 const apothecaryModal = new ApothecaryModal(container);
 const grabModal = new GrabModal(container);
 const standFirmModal = new StandFirmModal(container);
+const divingCatchModal = new DivingCatchModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -184,6 +186,13 @@ async function handleActionResult(result: ActionResult): Promise<void> {
 
     stateManager.setGameState(result.state);
 
+    // 30.10.2026: Diving Catch má přednost před vším — stav je stav PŘED přerušenou akcí (může nést i jiné
+    //   čekající volby, ze kterých akce vyšla); po odpovědi ji server přehraje. I uprostřed tahu AI.
+    if (result.state.pendingDivingCatch) {
+        showDivingCatchModal(result.state);
+        return;
+    }
+
     // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
     if (result.state.pendingBlock && !result.state.pendingGrab && !result.state.pendingStandFirm
         && result.state.aiTeam !== result.state.activeTeam) {
@@ -210,6 +219,27 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     if (result.state.pendingApothecary) {
         showApothecaryModal(result.state);
     }
+}
+
+function showDivingCatchModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingDivingCatch;
+    if (!pending) return;
+    const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
+    divingCatchModal.show(pending, name, async (params: Record<string, unknown>) => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_diving_catch', params);
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Diving Catch choice failed');
+            showDivingCatchModal(state); // otázka na serveru stále čeká
+        } finally {
+            isProcessing = false;
+        }
+    });
 }
 
 function showStandFirmModal(state: import('./api/types').GameState): void {
@@ -1042,21 +1072,26 @@ async function init(): Promise<void> {
         const state = await api.getMatchState(matchId);
         stateManager.setGameState(state);
 
-        // Show block dice modal if there's a pending block on load
-        if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {
-            showBlockDiceModal(state);
-        }
-        // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme
-        if (state.pendingGrab) {
-            showGrabModal(state);
-        }
-        // P226: čekající otázka na Stand Firm i po obnovení stránky
-        if (state.pendingStandFirm && !state.pendingApothecary) {
-            showStandFirmModal(state);
-        }
-        // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme
-        if (state.pendingApothecary) {
-            showApothecaryModal(state);
+        // 30.10.2026: čekající otázka na Diving Catch i po obnovení stránky — přednost před vším (viz handleActionResult)
+        if (state.pendingDivingCatch) {
+            showDivingCatchModal(state);
+        } else {
+            // Show block dice modal if there's a pending block on load
+            if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {
+                showBlockDiceModal(state);
+            }
+            // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme
+            if (state.pendingGrab) {
+                showGrabModal(state);
+            }
+            // P226: čekající otázka na Stand Firm i po obnovení stránky
+            if (state.pendingStandFirm && !state.pendingApothecary) {
+                showStandFirmModal(state);
+            }
+            // review 16.10.: čekající volba o lékárníkovi i po obnovení stránky — server jinou akci nepřijme
+            if (state.pendingApothecary) {
+                showApothecaryModal(state);
+            }
         }
 
         // Initialize replay controls for finished games

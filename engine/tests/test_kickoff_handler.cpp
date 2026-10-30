@@ -1521,3 +1521,107 @@ TEST(KickOffReturn, CoachPicksNobody) {
     EXPECT_EQ(gs.getPlayer(a).position, (Position{8, 2}));
     EXPECT_EQ(gs.getPlayer(b).position, (Position{8, 12}));
 }
+
+// Uživatel 30.10.2026: Diving Catch jako otázka kouči (USE_DIVING_CATCH) i u výkopu. Kopající na lajně
+// (jako AKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback): kouč-člověk se ptá — ano = skok
+// do touchbacku („as if it had landed in his own square“, ř. 8068), ne = odraz z pole dopadu. AI beze
+// změny (test výš).
+namespace {
+GameState kickingDiverOnTheLine() {
+    auto gs = kickFixture(/*withKick=*/false);
+    gs.receiverSpeed = RosterSpeed::FAST;
+    playerAt(gs, {12, 7}).position = {2, 2};
+    playerAt(gs, {13, 7}).skills.add(SkillName::DivingCatch);
+    return gs;
+}
+}  // namespace
+
+TEST(KickoffLanding, LiveGameAsksTheKickingDivingCatchersCoach) {
+    auto gs = kickingDiverOnTheLine();
+    const int diver = playerAt(gs, {13, 7}).id;
+    FixedDiceRoller dice({5, 3, 1, 1, 7});
+    CoachChoiceScope scope(gs.getPlayer(diver).teamSide, {});
+    try {
+        resolveKickoff(gs, dice, nullptr);
+        FAIL() << "otázka USE_DIVING_CATCH nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_DIVING_CATCH);
+        EXPECT_EQ(p.playerId, diver);
+        EXPECT_EQ(p.target, 12 * 100 + 7);
+    }
+}
+
+TEST(KickoffLanding, KickingDiverAnsweringYesDivesIntoATouchback) {
+    auto gs = kickingDiverOnTheLine();
+    const TeamSide kicking = playerAt(gs, {13, 7}).teamSide;
+    FixedDiceRoller dice({5, 3, 1, 1, 7, 1, 1, 1, 1});
+    {
+        CoachChoiceScope scope(kicking, {CoachAnswer::TEAM});
+        resolveKickoff(gs, dice, nullptr);
+    }
+    ASSERT_TRUE(gs.ball.isHeld) << "touchback: míč dostane hráč přijímajících";
+    EXPECT_NE(gs.getPlayer(gs.ball.carrierId).teamSide, kicking);
+}
+
+TEST(KickoffLanding, KickingDiverAnsweringNoLetsTheBallLand) {
+    auto gs = kickingDiverOnTheLine();
+    FixedDiceRoller dice({5, 3, 1, 1, 7});
+    {
+        CoachChoiceScope scope(playerAt(gs, {13, 7}).teamSide, {CoachAnswer::NONE});
+        resolveKickoff(gs, dice, nullptr);
+    }
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 7}));
+}
+
+// Recenze 30.10. C/2: i PŘIJÍMAJÍCÍ hráč kouče-člověka v přijímající polovině (nejčastější případ) se
+// ptá — dřív hlídal jen kopající na lajně. Jako DivingCatchCatchesAKickLandingNextToHim: míč na prázdné
+// (4,7), hráč s Diving Catch na (4,8). Ne = dopad na (4,7) a odraz D8 6 = JZ na (3,8); ano = chytá 6.
+namespace {
+GameState receivingDiverNextToTheLanding() {
+    auto gs = kickFixture(/*withKick=*/false);
+    Player& elf = playerAt(gs, {7, 7});
+    elf.position = {4, 8};
+    elf.skills.add(SkillName::DivingCatch);
+    return gs;
+}
+}  // namespace
+
+TEST(KickoffLanding, LiveGameAsksTheReceivingDivingCatchersCoach) {
+    auto gs = receivingDiverNextToTheLanding();
+    const int diver = playerAt(gs, {4, 8}).id;
+    FixedDiceRoller dice({1, 3, 1, 1, 6});
+    CoachChoiceScope scope(gs.getPlayer(diver).teamSide, {});
+    try {
+        resolveKickoff(gs, dice, nullptr);
+        FAIL() << "otázka USE_DIVING_CATCH nepřišla";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::USE_DIVING_CATCH);
+        EXPECT_EQ(p.playerId, diver);
+        EXPECT_EQ(p.target, 4 * 100 + 7);
+    }
+}
+
+TEST(KickoffLanding, ReceivingDiverAnsweringNoLetsTheBallBounceFromTheLanding) {
+    auto gs = receivingDiverNextToTheLanding();
+    const int diver = playerAt(gs, {4, 8}).id;
+    FixedDiceRoller dice({1, 3, 1, 1, 6});
+    {
+        CoachChoiceScope scope(gs.getPlayer(diver).teamSide, {CoachAnswer::NONE});
+        resolveKickoff(gs, dice, nullptr);
+    }
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{3, 8}));
+}
+
+TEST(KickoffLanding, ReceivingDiverAnsweringYesCatches) {
+    auto gs = receivingDiverNextToTheLanding();
+    const int diver = playerAt(gs, {4, 8}).id;
+    FixedDiceRoller dice({1, 3, 1, 1, 6});
+    {
+        CoachChoiceScope scope(gs.getPlayer(diver).teamSide, {CoachAnswer::TEAM});
+        resolveKickoff(gs, dice, nullptr);
+    }
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, diver);
+}

@@ -111,4 +111,46 @@ final class BallAndChainGrabTest extends TestCase
 
         $this->assertSame(7, $this->pole($r, 2)[0] ?? null, 'bez bloku Grab neplatí ⇒ řetěz');
     }
+
+    /**
+     * Uživatel 30.10.2026: Grab B&C JEN proti soupeři. Grab ř. 8146-8150 "grab his opponent … any
+     * empty square adjacent to his opponent to push back his opponent"; B&C blokuje "friend or foe"
+     * (ř. 7820-7822), Grab smí jen "with his blocks" (ř. 7830-7831) ⇒ spoluhráče odtlačí běžně.
+     * B&C (5,7) → spoluhráč (6,7); natočení +x: šablona +x = 0 (spoluhráč -2, soupeři (6,6),(6,8)
+     * +2), ±y = -1 (naši (4,6),(4,8)), -x = -4. Vedle spoluhráče je volno (5,6), (5,8).
+     */
+    private function fanatikNaSpoluhrace(): GameState
+    {
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands, SkillName::Grab], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 2)
+            ->addPlayer(TeamSide::AWAY, 6, 6, id: 6)
+            ->addPlayer(TeamSide::AWAY, 6, 8, id: 7)
+            ->addPlayer(TeamSide::HOME, 4, 6, id: 8)
+            ->addPlayer(TeamSide::HOME, 4, 8, id: 9)
+            ->addPlayer(TeamSide::HOME, 7, 6, id: 3)
+            ->addPlayer(TeamSide::HOME, 7, 7, id: 4)
+            ->addPlayer(TeamSide::HOME, 7, 8, id: 5)
+            ->withBallOffPitch()
+            ->build();
+    }
+
+    public function testGrabSeNaSpoluhraceNepouzije(): void
+    {
+        $r = $this->krok($this->fanatikNaSpoluhrace());
+
+        $this->assertSame([6, 7], $this->pole($r, 1), 'fixtura: B&C šel rovně na spoluhráče a následoval');
+        $this->assertSame(7, $this->pole($r, 2)[0] ?? null, 'spoluhráč: běžné odtlačení ⇒ řetěz, ne Grab');
+        $this->assertFalse($this->nikdoNeretezen($r));
+    }
+
+    public function testKoucSeNaGrabProtiSpoluhraciNepta(): void
+    {
+        $resolver = new ActionResolver(new FixedDiceRoller(array_fill(0, 20, 3)));
+        $resolver->setInteractiveBlocks(true);
+        $r = $resolver->resolve($this->fanatikNaSpoluhrace(), ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+
+        $this->assertNull($r->getNewState()->getPendingGrab(), 'Grab proti spoluhráči se nenabízí');
+        $this->assertSame([6, 7], $this->pole($r, 1), 'fixtura: B&C šel rovně na spoluhráče a následoval');
+    }
 }

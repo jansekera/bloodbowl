@@ -351,8 +351,11 @@ final class GrabKoucTest extends TestCase
     public function testStandFirmVlastnihoTymuBncProtiVlastnimuGrabOtazku(): void
     {
         // L1: Stand Firm drží pole jen proti SOUPEŘI (ř. 1824-1825) -- B&C blokující vlastního
-        // hráče se Stand Firm ho odtlačí, Grab je tedy na místě. Vlastní hráči na všech čtyřech
-        // stranách, ať se šablona (natočení volí kouč) vždycky trefí do některého z nich.
+        // hráče se Stand Firm ho odtlačí. Vlastní hráči na všech čtyřech stranách, ať se šablona
+        // (natočení volí kouč) vždycky trefí do některého z nich.
+        // Změněno 30.10.2026 (uživatel: Grab jen proti soupeři, ř. 8146-8150 "his opponent") -- dřív
+        // test četl odtlačení z otázky na Grab; proti spoluhráči se na Grab už neptá, takže
+        // odtlačení se čte z toho, že B&C následoval (pole se uvolnilo).
         $s = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, movement: 1, strength: 7, skills: [SkillName::BallAndChain, SkillName::NoHands, SkillName::Grab], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::StandFirm], id: 2)
@@ -362,6 +365,8 @@ final class GrabKoucTest extends TestCase
             ->withBallOffPitch()
             ->build();
         $r = $this->resolver(array_fill(0, 20, 3))->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
-        $this->assertNotNull($r->getNewState()->getPendingGrab());
+        $this->assertNull($r->getNewState()->getPendingGrab(), 'Grab proti spoluhráči se nenabízí');
+        $this->assertNull($r->getNewState()->getPendingStandFirm(), 'Stand Firm proti vlastnímu B&C nedrží');
+        $this->assertNotSame([5, 7], $this->pole($r, 1), 'spoluhráč odtlačen ⇒ B&C následoval');
     }
 }
