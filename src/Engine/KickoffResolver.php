@@ -109,8 +109,23 @@ final class KickoffResolver
         }
 
         // Chytání při dopadu výkopu bez týmového přehozu (ř. 1261-1263).
-        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, divingCatch: $skok);
-        return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
+        $landingResult = $this->ballResolver->resolveLanding(
+            $state,
+            $landingPos,
+            divingCatch: $skok,
+            kickoffReceiving: $receivingTeam,
+        );
+        $state = $landingResult['state'];
+        $events = array_merge($events, $landingResult['events']);
+
+        // Míč se odrazil ven nebo za lajnu (ř. 279-281, FAQ ř. 9315-9318) — `resolveBounce` ho tam nechal.
+        $ball = $state->getBall();
+        if (!$ball->isHeld() && !$this->scatterCalc->isInReceivingHalf($ball->requirePosition(), $receivingTeam)) {
+            $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
+            return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
+        }
+
+        return ['state' => $state, 'events' => $events];
     }
 
     /**

@@ -140,6 +140,75 @@ final class KickoffResolverTest extends TestCase
         $this->assertEquals(1, $result['state']->getBall()->getCarrierId());
     }
 
+    // Pravidla ř. 279-281: "If the ball scatters OR BOUNCES off the pitch or into the kicking
+    // team's half, the receiving coach is awarded a 'touchback'"; FAQ ř. 9315-9318: "any event
+    // that causes the ball to go out of bounds or over the line of scrimmage during a kick-off
+    // results in a touchback". Míč dopadne na (12,7) — poslední sloupec domácí poloviny.
+
+    public function testKickoffBouncingOverTheLineOfScrimmageIsATouchback(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 18, 7, id: 2)
+            ->build();
+
+        // D8 východ, D6 = 1 ⇒ (12,7) prázdné; tabulka 7 + počasí; odraz D8 = 3 (východ) ⇒ (13,7)
+        $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 3]);
+        $result = $this->createResolver($dice)->resolveKickoff($state, new Position(11, 7));
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'odraz za lajnu = touchback');
+        $this->assertSame(1, $result['state']->getBall()->getCarrierId());
+    }
+
+    public function testKickoffBouncingOntoAKickingPlayerOverTheLineIsATouchbackNotACatch(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 13, 7, agility: 3, id: 2)
+            ->build();
+
+        // (12,7) prázdné (kopající hráč 2 vedle nemá Diving Catch); odraz na hráče 2 na (13,7);
+        // kdyby chytal, padne mu 6.
+        $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 3, 6]);
+        $result = $this->createResolver($dice)->resolveKickoff($state, new Position(11, 7));
+
+        $this->assertSame(1, $result['state']->getBall()->getCarrierId(), 'odraz za lajnu = touchback, kopající nechytá');
+    }
+
+    public function testKickoffBouncingOffThePitchIsATouchbackNotAThrowIn(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 1)
+            ->addPlayer(TeamSide::AWAY, 18, 7, id: 2)
+            ->build();
+
+        // D8 sever, D6 = 1 ⇒ (6,0) prázdné; tabulka 7 + počasí; odraz D8 = 1 (sever) ⇒ (6,-1) mimo
+        // hřiště. Za nimi kostky vhazování (šablona, 2D6, odraz), kdyby se vhazovalo.
+        $dice = new FixedDiceRoller([1, 1, 3, 4, 3, 3, 1, 3, 2, 2, 5, 5, 5]);
+        $result = $this->createResolver($dice)->resolveKickoff($state, new Position(6, 1));
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'odraz mimo hřiště = touchback');
+        $this->assertSame(1, $result['state']->getBall()->getCarrierId());
+        $types = array_map(fn($e) => $e->getType(), $result['events']);
+        $this->assertNotContains('throw_in', $types);
+    }
+
+    public function testKickoffFailedCatchBouncingOverTheLineOfScrimmageIsATouchback(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 12, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 3)
+            ->addPlayer(TeamSide::AWAY, 18, 7, id: 2)
+            ->build();
+
+        // míč na hráče 1 na (12,7); chytání 1 = neúspěch; odraz D8 = 3 (východ) ⇒ (13,7)
+        $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 1, 3]);
+        $result = $this->createResolver($dice)->resolveKickoff($state, new Position(11, 7));
+
+        $this->assertTrue($result['state']->getBall()->isHeld(), 'odraz za lajnu po neúspěšném chytání = touchback');
+        $this->assertSame(3, $result['state']->getBall()->getCarrierId());
+    }
+
     // --- Kickoff Table Event Tests ---
 
     public function testKickoffTableGetTheRef(): void

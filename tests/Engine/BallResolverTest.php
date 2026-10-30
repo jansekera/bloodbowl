@@ -427,6 +427,34 @@ final class BallResolverTest extends TestCase
         $this->assertEquals(6, $ballPos->getY());
     }
 
+    /**
+     * Pojistka `MAX_BOUNCES` (není pravidlo, jen strop řetězu odrazů) musí platit i přes vhazování
+     * s neúspěšným chytáním. P223 review LOW: `resolveLanding` → `resolveCatch` při neúspěchu
+     * odrážel s hloubkou 0 ⇒ smyčka „odraz ven → vhazování → nechytí → odraz ven“ neměla strop.
+     * A na (6,0) a B na (6,1), oba nechytají (1); každý odraz na sever, vhazování kolmo dovnitř
+     * o jedno pole na B. Kostek je na 30 kol smyčky — bez stropu dojdou.
+     */
+    public function testBounceChainThroughThrowInsWithFailedCatchesStopsAtTheSafetyCap(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::AWAY, 6, 0, agility: 1, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 1, agility: 1, id: 2)
+            ->withBallOnGround(6, 0)
+            ->build();
+
+        // odraz z A ven (1); vhazování: šablona 3, 2D6 = 1+1 ⇒ B; B nechytí (1), odraz (1) ⇒ A;
+        // A nechytí (1), odraz (1) ⇒ ven; …
+        $rolls = [1];
+        for ($i = 0; $i < 30; $i++) {
+            array_push($rolls, 3, 1, 1, 1, 1, 1, 1);
+        }
+        $dice = new FixedDiceRoller($rolls);
+        $result = $this->resolver($dice)->resolveBounce($state, new \App\ValueObject\Position(6, 0));
+
+        $this->assertFalse($result['state']->getBall()->isHeld());
+        $this->assertTrue($dice->hasRemainingRolls(), 'řetěz odrazů se zastavil na pojistce');
+    }
+
     public function testPickupTargetCalculation(): void
     {
         $state = (new GameStateBuilder())

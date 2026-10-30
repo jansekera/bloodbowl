@@ -237,6 +237,38 @@ final class DivingCatchTest extends TestCase
         $this->assertAt(8, 7, $result->getNewState()->requirePlayer(4), 'chytá ze svého pole');
     }
 
+    /**
+     * P223 review LOW: přesný Dump-Off — Dump-Off je Quick Pass a "the normal throwing rules apply"
+     * (ř. 8094-8099) ⇒ chytání přesné přihrávky +1 (ř. 891) a hráč s Diving Catch na cílovém poli
+     * dalších +1 (ř. 8063-8064 "from an accurate pass targeted to his square").
+     * Hráč 3 na (8,5) AG2: bez modifikátorů 5+, s přesnou 4+, s Diving Catch 3+.
+     * Kostky: přesnost 4 (Quick Pass AG3 = 3+), chytání, blok 3 = odstrčení (při nechycení odraz 3 a blok 3).
+     *
+     * @param list<SkillName> $catcherSkills
+     */
+    private function accurateDumpOffTo8x5(array $catcherSkills, int $catchRoll): ActionResult
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 6, 5, agility: 3, skills: [SkillName::DumpOff], id: 2)
+            ->addPlayer(TeamSide::AWAY, 8, 5, agility: 2, skills: $catcherSkills, id: 3)
+            ->withBallCarried(2)
+            ->build();
+
+        return (new ActionResolver(new FixedDiceRoller([4, $catchRoll, 3, 3])))
+            ->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+    }
+
+    public function testAccurateDumpOffIsCaughtWithTheAccuratePassModifier(): void
+    {
+        $this->assertSame(3, $this->accurateDumpOffTo8x5([], 4)->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testAccurateDumpOffToADivingCatchPlayerAddsTheDivingCatchModifier(): void
+    {
+        $this->assertSame(3, $this->accurateDumpOffTo8x5([SkillName::DivingCatch], 3)->getNewState()->getBall()->getCarrierId());
+    }
+
     private function kickoffResolver(FixedDiceRoller $dice): KickoffResolver
     {
         $scatter = new ScatterCalculator();
@@ -305,6 +337,95 @@ final class DivingCatchTest extends TestCase
         $this->assertContains('diving_catch', $types);
         $this->assertSame(1, $result['state']->getBall()->getCarrierId());
         $this->assertAt(5, 8, $result['state']->requirePlayer(1), 'chytá ze svého pole');
+    }
+
+    // --- P223 review LOW: chybějící testy (30. 10. 2026) ---
+
+    public function testFailedDivingCatchOnAKickOffBouncesFromTheDivingCatchPlayersSquare(): void
+    {
+        // Jako `testKickOffLandingNextToDivingCatchPlayer`, ale chytání 1 = neúspěch (u výkopu bez
+        // přehozu, ř. 1261-1263). "A failed catch will bounce from the Diving Catch player's square"
+        // (ř. 8068-8069): z (7,8) D8 3 = V na (8,8). Odraz z pole dopadu (7,7) by dal (8,7).
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 7, 8, agility: 3, skills: [SkillName::DivingCatch], id: 1)
+            ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
+            ->build();
+
+        $result = $this->kickoffResolver(new FixedDiceRoller([3, 1, 3, 4, 3, 3, 1, 3]))
+            ->resolveKickoff($state, new Position(6, 7));
+
+        $this->assertBallOnGroundAt(8, 8, $result['state'], 'odraz z pole hráče s Diving Catch');
+        $this->assertAt(7, 8, $result['state']->requirePlayer(1), 'ani při neúspěchu se hráč nepohne');
+    }
+
+    /** Vhazování od (0,7) na prázdné (5,7) vedle hráče 1 s Diving Catch na (5,8); chytá 1, pak 4. */
+    private function throwInDivedForWithFirstCatchFailed(TeamSide $catcherSide): GameState
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer($catcherSide, 5, 8, agility: 3, skills: [SkillName::DivingCatch], id: 1)
+            ->withBallOnGround(0, 7)
+            ->build();
+        $dice = new FixedDiceRoller([3, 3, 3, 1, 4]);
+
+        return (new BallResolver($dice, new TacklezoneCalculator(), new ScatterCalculator()))
+            ->resolveThrowIn($state, new Position(0, 7), new Position(-1, 7))['state'];
+    }
+
+    public function testDivingCatchOfAThrowInMayUseATeamRerollInOwnTurn(): void
+    {
+        // ř. 929-933: týmový přehoz na hod hráče vlastního týmu ve vlastním tahu (na tahu HOME, 3 přehozy).
+        $after = $this->throwInDivedForWithFirstCatchFailed(TeamSide::HOME);
+
+        $this->assertSame(1, $after->getBall()->getCarrierId(), 'přehoz 4 = chyceno');
+        $this->assertSame(2, $after->getTeamState(TeamSide::HOME)->getRerolls(), 'týmový přehoz spotřebován');
+    }
+
+    public function testDivingCatchOfAThrowInGetsNoTeamRerollInOpponentsTurn(): void
+    {
+        // Totéž, ale skáče hráč AWAY v tahu HOME ⇒ bez přehozu; 4 je odraz z (5,8) na JV (6,9).
+        $after = $this->throwInDivedForWithFirstCatchFailed(TeamSide::AWAY);
+
+        $this->assertBallOnGroundAt(6, 9, $after, 'bez týmového přehozu v soupeřově tahu');
+        $this->assertSame(2, $after->getTeamState(TeamSide::AWAY)->getRerolls());
+    }
+
+    public function testOpposingDivingCatchPlayerCatchesAnAccuratePassToAnEmptySquare(): void
+    {
+        // Přesná přihrávka (6) na prázdné (10,5); hráč SOUPEŘE s Diving Catch na (11,5) (za cílem, ne
+        // mezi — žádné zachycení). Smí kterýkoli tým (ř. 8066 "any pass"). +1 za přesnou (ř. 891), ne +2
+        // (ř. 8063-8064) ⇒ AG3 3+: hod 2 nechytí (odraz z (11,5) D8 3 = V na (12,5)), hod 3 chytí.
+        $build = static fn(): GameState => (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1)
+            ->addPlayer(TeamSide::AWAY, 11, 5, agility: 3, skills: [SkillName::DivingCatch], id: 2)
+            ->withBallCarried(1)
+            ->build();
+
+        $caught = (new ActionResolver(new FixedDiceRoller([6, 3])))
+            ->resolve($build(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $this->assertContains('diving_catch', $this->eventTypes($caught));
+        $this->assertSame(2, $caught->getNewState()->getBall()->getCarrierId());
+        $this->assertTrue($caught->isTurnover(), 'míč u soupeře = turnover');
+
+        $missed = (new ActionResolver(new FixedDiceRoller([6, 2, 3])))
+            ->resolve($build(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $this->assertBallOnGroundAt(12, 5, $missed->getNewState(), 'hod 2 na 3+ nestačí — jen +1');
+    }
+
+    public function testDivingCatchMayUseProToRerollAFailedCatch(): void
+    {
+        // Nepřesná přihrávka na (10,6), hráč 2 s Diving Catch a Pro na (10,7): chytá 1, Pro 4 (4+,
+        // ř. 8385-8389) dovolí přehoz, přehoz 4 chytí (AG3 4+). Týmový přehoz padl na přesnost.
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, skills: [SkillName::DivingCatch, SkillName::Pro], id: 2)
+            ->withBallCarried(1)
+            ->build();
+
+        $result = $this->inaccuratePassLandingAt10x6($state, [1, 4, 4]);
+
+        $this->assertContains('diving_catch', $this->eventTypes($result));
+        $this->assertSame(2, $result->getNewState()->getBall()->getCarrierId());
+        $this->assertFalse($result->isTurnover());
     }
 
     public function testBouncingBallIsNotDivingCaught(): void

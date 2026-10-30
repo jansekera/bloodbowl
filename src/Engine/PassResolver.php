@@ -559,6 +559,9 @@ final class PassResolver
         }
 
         // Bez týmového přehozu -- Dump-Off se hází v soupeřově tahu (ř. 929-933).
+        // Přesný Dump-Off = přesná přihrávka ("the normal throwing rules apply", ř. 8097-8098):
+        //   chytání +1 (ř. 891) a Diving Catch na cílovém poli +1 (ř. 8063-8064). Do P223 jen +1
+        //   bez Diving Catch.
         $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate);
         return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
