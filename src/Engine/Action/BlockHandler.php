@@ -380,6 +380,12 @@ final class BlockHandler implements ActionHandlerInterface
         if ($grabNeplati || $defenderPos === null || !$this->maGrab($attacker) || $this->maSideStep($defender)) {
             return [];
         }
+        // OPRAVENO 30.10.2026 (uživatel, parita s C++ `pushSkills`) -- Grab platil i proti spoluhráči
+        // (blok B&C "friend or foe", ř. 7820-7822). Grab ř. 8146-8150: "grab his opponent … any empty
+        // square adjacent to his opponent to push back his opponent" ⇒ spoluhráče B&C odtlačí běžně.
+        if ($attacker?->getTeamSide() === $defender->getTeamSide()) {
+            return [];
+        }
         $squares = [];
         foreach ($defenderPos->getAdjacentPositions() as $pos) {
             if ($state->getPlayerAtPosition($pos) === null) {

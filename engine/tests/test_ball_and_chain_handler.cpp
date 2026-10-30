@@ -246,3 +246,43 @@ TEST(BallAndChainHandler, P222LiveGameAsksTheCoachAboutGrab) {
         EXPECT_EQ(p.otherId, 12);
     }
 }
+
+// ============================================================================
+// Uživatel 30.10.2026: Grab B&C JEN proti soupeři. Grab ř. 8146-8150: „grab his opponent …
+// any empty square adjacent to his opponent to push back his opponent“; B&C blokuje „friend or
+// foe“ (ř. 7820-7822), Grab smí jen „with his blocks“ (ř. 7830-7831) ⇒ blok spoluhráče bez Grabu.
+// Dřív pushSkills tým cíle nečetl ⇒ spoluhráč šel na libovolné volné pole (a kouč dostal USE_GRAB).
+// ============================================================================
+namespace {
+GameState fanaticBlocksTeammateFixture() {
+    auto gs = fanaticBlocksFixture(true);
+    // natočení +x: šablona +x = 0 (spoluhráč -2, dva soupeři +2), ±y = -1, -x = -4
+    gs.getPlayer(12).position = {11, 6};
+    placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+    placePlayer(gs, 6, {9, 6}, TeamSide::HOME);
+    placePlayer(gs, 7, {9, 8}, TeamSide::HOME);
+    placePlayer(gs, 5, {11, 7}, TeamSide::HOME);    // rovně stojí spoluhráč; vedle něj volno (10,6)
+    return gs;
+}
+}  // namespace
+
+TEST(BallAndChainHandler, GrabIsNotUsedAgainstATeammate) {
+    auto gs = fanaticBlocksTeammateFixture();
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "fixture: B&C šel rovně na spoluhráče";
+    EXPECT_EQ(gs.getPlayer(5).position.x, 12) << "spoluhráč: běžné odtlačení ⇒ řetěz, ne Grab";
+    EXPECT_FALSE(bystandersStayed(gs));
+}
+
+TEST(BallAndChainHandler, LiveGameDoesNotAskAboutGrabAgainstATeammate) {
+    auto gs = fanaticBlocksTeammateFixture();
+    FixedDiceRoller dice(std::vector<int>(30, 3));
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveBallAndChain(gs, 1, dice, nullptr);
+        EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "fixture: B&C šel rovně na spoluhráče";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_NE(p.question, CoachQuestion::USE_GRAB) << "Grab proti spoluhráči se nenabízí";
+    }
+}
