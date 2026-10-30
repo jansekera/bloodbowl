@@ -1,6 +1,9 @@
 #!/usr/local/bin/python3.8
 """Živá partie — uživatel (HOME, kouč) proti Claude (AWAY), TV1500. Partii vybírá BB_PARTIE
-(slovník PARTIE níž): `lide-orkove` (výchozí, 12.–13.10.2026) · `skaveni-trpaslici` (14.10.2026).
+(slovník PARTIE níž): `lide-orkove` (výchozí, 12.–13.10.2026) · `skaveni-trpaslici` (14.10.2026) ·
+`zed-orkove` (27.10.2026: uživatel orčí klec, engine lidskou zeď) · `zed-lide` (30.10.2026: táž pozice
+zrcadlená — uživatel lidskou zeď, engine orčí klec, na tahu orkové). Uživatel je vždy HOME.
+Partie s hotovou pozicí (`zed-*`) začínají `kouc HOME` a `pozice` místo `los`.
 
 Vychází z bb_play_session_20261002.py (server na pozadí, příkazy přes soubory, log se po
 restartu přehraje). Navíc P130: rozhodnutí kouče uprostřed akce.
@@ -15,6 +18,7 @@ Příkazy:
   actions <HOME|AWAY>      -- vypíše dostupné akce pro danou stranu, číslovaně
   do <index>               -- provede akci podle čísla z 'actions'
   kouc <HOME|AWAY|OBE|ne>  -- P130: za tuto stranu rozhoduje KOUČ; OBE = za obě (P201 (6)); `ne` = engine
+  pozice                   -- partie `zed-*`: místo losu rozestaví hotovou pozici (na tahu, kdo je v presetu)
   los                      -- P195: začátek zápasu — počasí a los (D6: 1-3 HOME, 4-6 AWAY); vítěz volí
   volba <kopat|prijimat>   -- P195: volba kouče po vyhraném losu (za AI volí engine sám)
   odp <odpověď>            -- P130: odpověď na otázku, na které se akce zastavila:
@@ -153,34 +157,95 @@ PARTIE = {
                    13: (14, 5), 14: (14, 6), 21: (14, 7), 12: (14, 8), 22: (14, 9),
                    16: (17, 3), 17: (17, 11), 18: (20, 7), 19: (19, 9), 20: (19, 5), 15: (22, 7)},
         "nosic": 3, "kolo": 4},
+    "zed-lide": {   # 30.10.2026: pozice zed-orkove zrcadlená — uživatel lidskou zeď (HOME), engine orčí klec (AWAY)
+        "soupisky": ("human", "orc"), "tv": 1500, "seminko": 20261030, "adresar": "play_20261030_zed_lide",
+        "jmena": ("LIDÉ", "ORKOVÉ"), "kratce": ("LID", "ORK"), "pismena": ("H", "O"),
+        "kdo": ("člověk", "ork"), "role": (_role_lide, _role_orkove),
+        "legenda": ("role lidé: L lineman · LW lineman Wrestle · T thrower (Pro) · C catcher · BG blitzer s GUARD"
+                    " · BT blitzer MB+Tackle · BH lovec míče · OG ogre",
+                    "role orkové: L · LW lineman Wrestle · T thrower · BG blitzer s GUARD · BP blitzer MB+Pro"
+                    " · BH lovec míče · KG black orc s GUARD · KX black orc s GUARD a GRAB"),
+        # orkové útočí doleva (TD x=0), na tahu jsou orkové (AWAY), 1. poločas 4. kolo orků
+        "zrcadlo": "zed-orkove", "na_tahu": "AWAY", "kolo": 4},
 }
 P = PARTIE[os.environ.get("BB_PARTIE", "lide-orkove")]
+MA_POZICI = "pozice" in P or "zrcadlo" in P
+
+
+def _otisk(p, soupiska):
+    """Hráč bez id: soupiska, staty a skilly. Id závisí na pořadí soupisek (HOME má nižší id)."""
+    st = p.stats
+    return (soupiska, st.movement, st.strength, st.agility, st.armour, tuple(skilly(p)))
+
+
+def _hraci(state):
+    """Všichni z obou soupisek, i náhradníci (lidé od id 12). zaloz_pozici / zrcadlo potřebují i náhradníky,
+    proto nejdou přes enum_players (ta filtruje hřiště)."""
+    out = []
+    for pid in range(1, 33):
+        try:
+            out.append(state.get_player(pid))
+        except Exception:
+            continue
+    return out
+
+
+def _kope(partie):
+    """V 1. poločase táhne první přijímající ⇒ kope strana, která na tahu NENÍ. Na kopající stranu
+    dá rozestavení skill Kick (nejhlubší hráč), proto se podle ní volá i setup_half."""
+    return bb.TeamSide.HOME if partie.get("na_tahu") == "AWAY" else bb.TeamSide.AWAY
+
+
+def zrcadlo(vzor, state):
+    """Pozice partie `vzor` zrcadlená vodorovně (x' = 25 - x, y beze změny) na hráče `state`
+    (soupisky už rozestavené). Páruje se podle soupisky, statů a skillů, ne podle id.
+    Vrací (id -> pole, id nosiče)."""
+    V = PARTIE[vzor]
+    s = bb.GameState()
+    bb.setup_half(s, *(bb.get_developed_roster(r, V["tv"]) for r in V["soupisky"]), _kope(V))
+    pole = {}                           # otisk -> volná zrcadlená pole
+    for p in _hraci(s):
+        if p.id in V["pozice"]:
+            x, y = V["pozice"][p.id]
+            pole.setdefault(_otisk(p, V["soupisky"][p.team_side != bb.TeamSide.HOME]), []).append((25 - x, y))
+    pozice = {}
+    for p in _hraci(state):
+        volna = pole.get(_otisk(p, P["soupisky"][p.team_side != bb.TeamSide.HOME]))
+        if volna:
+            pozice[p.id] = volna.pop(0)
+    zbylo = [q for v in pole.values() for q in v]
+    if zbylo:
+        raise ValueError(f"zrcadlo {vzor}: pro pole {zbylo} není hráč se stejnou soupiskou, staty a skilly")
+    x, y = V["pozice"][V["nosic"]]
+    return pozice, next(pid for pid, q in pozice.items() if q == (25 - x, y))
 
 
 def zaloz_pozici(state):
-    """Partie s hotovou pozicí (P["pozice"]): soupisky, rozestavení, míč u nosiče, na tahu HOME."""
-    bb.setup_half(state, ROSTERS[0], ROSTERS[1], bb.TeamSide.AWAY)
-    for pid in range(1, 33):          # všichni z obou soupisek, i náhradníci (lidé od id 12)
-        try:
-            p = state.get_player(pid)
-        except Exception:
-            continue
-        x, y = P["pozice"].get(pid, (-1, -1))
+    """Partie s hotovou pozicí (P["pozice"], nebo P["zrcadlo"] = zrcadlená pozice jiné partie):
+    soupisky, rozestavení, míč u nosiče, na tahu P["na_tahu"] (výchozí HOME), ten hraje P["kolo"]."""
+    kope = _kope(P)
+    bb.setup_half(state, ROSTERS[0], ROSTERS[1], kope)
+    pozice, nosic = zrcadlo(P["zrcadlo"], state) if "zrcadlo" in P else (P["pozice"], P["nosic"])
+    for p in _hraci(state):
+        x, y = pozice.get(p.id, (-1, -1))
         p.position = bb.Position(x, y)
         p.state = bb.PlayerState.STANDING if x >= 0 else bb.PlayerState.OFF_PITCH
         p.movement_remaining = p.stats.movement
         p.has_moved = False
         p.has_acted = False
-    c = state.get_player(P["nosic"])
+    c = state.get_player(nosic)
     state.ball.position = c.position
     state.ball.is_held = True
     state.ball.carrier_id = c.id
-    state.kicking_team = bb.TeamSide.AWAY
-    state.active_team = bb.TeamSide.HOME
+    na_tahu = druha(kope)
+    state.kicking_team = kope
+    state.active_team = na_tahu
     state.phase = bb.GamePhase.PLAY
     state.half = 1
-    state.home_team.turn_number = P["kolo"]
-    state.away_team.turn_number = P["kolo"] - 1   # soupeři se kolo zvýší, až převezme tah
+    tahne, ceka = ((state.home_team, state.away_team) if na_tahu == bb.TeamSide.HOME
+                   else (state.away_team, state.home_team))
+    tahne.turn_number = P["kolo"]
+    ceka.turn_number = P["kolo"] - 1   # soupeři se kolo zvýší, až převezme tah
 
 # BB_PLAY_DIR = jiný adresář partie (zkoušky); stejnou proměnnou čte bb_play_cmd.py
 DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -275,15 +340,7 @@ def zahaj(state, dice, kope):
 
 
 def enum_players(state):
-    out = []
-    for pid in range(1, 33):
-        try:
-            p = state.get_player(pid)
-        except Exception:
-            continue
-        if p.is_on_pitch:
-            out.append(p)
-    return out
+    return [p for p in _hraci(state) if p.is_on_pitch]
 
 
 def skilly(p):
@@ -694,7 +751,7 @@ def main():
     if "BB_ZPET" not in os.environ:
         with open(OUT, "w") as f:
             f.write(f"=== NOVÁ HRA: {P['jmena'][0]} HOME × {P['jmena'][1]} AWAY, TV{P['tv']} — napřed `kouc HOME`,"
-                    " pak `los` ===\n")
+                    f" pak `{'pozice' if MA_POZICI else 'los'}` ===\n")
 
     LOG = os.path.join(DIR, "prikazy.log")
     replay = []
@@ -837,12 +894,12 @@ def main():
                     result_lines += kopni(prvni_kope, lambda s, k, d: bb.setup_half(s, ROSTERS[0], ROSTERS[1], k) or [])
                     zalozeno = True
                     result_lines.append(board(state))
-            elif cmd == "pozice" and not zalozeno and "pozice" in P:
+            elif cmd == "pozice" and not zalozeno and MA_POZICI:
                 zaloz_pozici(state)
                 zalozeno = True
                 result_lines.append(board(state))
             elif not zalozeno and cmd != "kouc":
-                result_lines.append("zápas ještě nezačal: napřed `kouc HOME` (kdo je člověk), pak `los`"
+                result_lines.append(f"zápas ještě nezačal: napřed `kouc HOME` (kdo je člověk), pak `{'pozice' if MA_POZICI else 'los'}`"
                                     + ("; teď čeká `volba kopat|prijimat`" if los_vitez is not None else ""))
             elif cmd == "board":
                 result_lines.append(board(state))
