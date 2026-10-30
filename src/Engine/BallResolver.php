@@ -52,8 +52,9 @@ final class BallResolver
      *   Pravidla ř. 8069-8071 "If there are two or more players ATTEMPTING to use this skill then they
      *   get in each other's way and neither can use it" a ř. 986-990 "the coach whose turn is taking
      *   place must use his skill first" ⇒ napřed strana na tahu (`$naTahu`, výchozí aktivní tým) o každém
-     *   svém kandidátovi, pak druhá; otázka nese počet dalších kandidátů a kdo už skáče. Právě jeden
-     *   pokus ⇒ chytá, dva a víc ⇒ nikdo (další otázky už nic nezmění, nekladou se).
+     *   svém kandidátovi, pak druhá; otázka nese počet dalších kandidátů (bez těch, kdo už odmítli —
+     *   recenze 30.10. D/2) a kdo už skáče. Právě jeden pokus ⇒ chytá, dva a víc ⇒ nikdo (další otázky
+     *   už nic nezmění, nekladou se).
      *
      * @param callable(MatchPlayerDTO): bool $aiJumps
      */
@@ -63,6 +64,7 @@ final class BallResolver
         $naTahu ??= $state->getActiveTeam();
         /** @var list<MatchPlayerDTO> $skacou */
         $skacou = [];
+        $odmitli = 0; // recenze 30.10. D/2: kdo už odmítl, do „dalších kandidátů“ v otázce nepatří
         foreach ([$naTahu, $naTahu->opponent()] as $strana) {
             $svoji = array_values(array_filter($kandidati, static fn(MatchPlayerDTO $p) => $p->getTeamSide() === $strana));
             if (in_array($strana, $this->divingCatchSides, true)) {
@@ -71,9 +73,11 @@ final class BallResolver
                         break;
                     }
                     $odpoved = array_shift($this->divingCatchAnswers)
-                        ?? throw new DivingCatchQuestion($hrac->getId(), $landing, count($kandidati) - 1, ($skacou[0] ?? null)?->getId());
+                        ?? throw new DivingCatchQuestion($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId());
                     if ($odpoved) {
                         $skacou[] = $hrac;
+                    } else {
+                        $odmitli++;
                     }
                 }
                 continue;
@@ -84,8 +88,10 @@ final class BallResolver
                     $nejlepsi = $hrac;
                 }
             }
+            $odmitli += count($svoji);
             if ($nejlepsi !== null) {
                 $skacou[] = $nejlepsi;
+                $odmitli--;
             }
         }
 

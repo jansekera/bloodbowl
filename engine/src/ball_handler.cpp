@@ -131,29 +131,37 @@ std::vector<int> divingCatchCandidates(const GameState& state, Position at) {
 // ř. 8069-8071 "two or more players ATTEMPTING to use this skill ... neither can use it" (pokus je volba,
 // ř. 985) a ř. 986-990 "the coach whose turn is taking place must use his skill first" ⇒ napřed strana
 // na tahu (o každém svém kandidátovi), pak druhá; ta v otázce vidí, kdo už skáče (otherId). Kouč-člověk
-// odpovídá na každého hráče zvlášť (roll = počet dalších kandidátů); AI skočí s jedním hráčem (nejlepší
+// odpovídá na každého hráče zvlášť (roll = počet dalších kandidátů bez těch, kdo už odmítli); AI skočí s jedním hráčem (nejlepší
 // cíl hodu), smí-li (`aiJumps`). Dva a víc pokusů ⇒ nikdo (další otázky už nic nezmění, nekladou se).
 int divingCatchAttempt(const GameState& state, Position at, const std::function<bool(const Player&)>& aiJumps) {
     const std::vector<int> candidates = divingCatchCandidates(state, at);
     std::vector<int> attempting;
+    int declined = 0;   // recenze 30.10. D/2: kdo už odmítl, do „dalších kandidátů“ v otázce nepatří
     for (TeamSide side : {state.activeTeam, opponent(state.activeTeam)}) {
         if (coachDecides(side)) {
             for (int id : candidates) {
                 if (state.getPlayer(id).teamSide != side || attempting.size() >= 2) continue;
                 if (askCoach(CoachQuestion::USE_DIVING_CATCH, id, attempting.empty() ? -1 : attempting.front(),
-                             static_cast<int>(candidates.size()) - 1, at.x * 100 + at.y, 3) == CoachAnswer::TEAM)
+                             static_cast<int>(candidates.size()) - 1 - declined, at.x * 100 + at.y, 3) == CoachAnswer::TEAM)
                     attempting.push_back(id);
+                else
+                    ++declined;
             }
             continue;
         }
         int best = -1;
         for (int id : candidates) {
             const Player& p = state.getPlayer(id);
-            if (p.teamSide != side || !aiJumps(p)) continue;
+            if (p.teamSide != side) continue;
+            ++declined;
+            if (!aiJumps(p)) continue;
             if (best < 0 || calculateCatchTarget(state, p) < calculateCatchTarget(state, state.getPlayer(best)))
                 best = id;
         }
-        if (best >= 0) attempting.push_back(best);
+        if (best >= 0) {
+            attempting.push_back(best);
+            --declined;
+        }
     }
     return attempting.size() == 1 ? attempting.front() : -1;
 }

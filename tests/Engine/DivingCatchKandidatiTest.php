@@ -9,6 +9,7 @@ use App\DTO\GameState;
 use App\DTO\PendingDivingCatchDTO;
 use App\Engine\ActionResolver;
 use App\Engine\BallResolver;
+use App\Engine\DivingCatchQuestion;
 use App\Engine\FixedDiceRoller;
 use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
@@ -269,5 +270,69 @@ final class DivingCatchKandidatiTest extends TestCase
 
         $this->assertCount(1, array_filter($r['events'], static fn($e) => $e->getType() === 'diving_catch'));
         $this->assertSame(4, $r['state']->getBall()->getCarrierId());
+    }
+
+    /**
+     * Recenze 30.10. D/1: pořadí stran u výkopu hlídal jen kód (mutace `naTahu: $receivingTeam->opponent()`
+     * přežila celé tests/Engine). Ř. 986-990 "the coach whose turn is taking place must use his skill first"
+     * — dopad výkopu je už v kole přijímajících (jako C++ `finishKickoff`). Jako DivingCatchKoucTest::vykop:
+     * výkop na (10,7), rozptyl V o 2 ⇒ prázdné (12,7); kopající AWAY 2 s Diving Catch na lajně (13,7),
+     * přijímající HOME 3 s Diving Catch na (11,8); oba kouči lidé. Aktivní tým při výkopu je schválně
+     * KOPAJÍCÍ, aby test spadl i tehdy, kdyby se strana na tahu vzala z aktivního týmu.
+     *
+     * @param list<bool> $odpovedi
+     */
+    private function otazkaVykopu(array $odpovedi): DivingCatchQuestion
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 6, 7, agility: 3, id: 1)
+            ->addPlayer(TeamSide::AWAY, 13, 7, agility: 3, skills: [SkillName::DivingCatch], id: 2)
+            ->addPlayer(TeamSide::HOME, 11, 8, agility: 3, skills: [SkillName::DivingCatch], id: 3)
+            ->withActiveTeam(TeamSide::AWAY)
+            ->build();
+        $dice = new FixedDiceRoller([3, 2, 3, 4, 3, 3, 7]);
+        $scatter = new ScatterCalculator();
+        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
+        $ball->setInteractiveDivingCatch([TeamSide::HOME, TeamSide::AWAY]);
+        $ball->setDivingCatchAnswers($odpovedi);
+        try {
+            (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(10, 7));
+        } catch (DivingCatchQuestion $q) {
+            return $q;
+        }
+        self::fail('otázka nepřišla');
+    }
+
+    public function testVykopNaprvSePtaPrijimajiciPakKopajici(): void
+    {
+        $prvni = $this->otazkaVykopu([]);
+        $this->assertSame(3, $prvni->playerId, 'napřed přijímající (je na tahu)');
+        $this->assertNull($prvni->attemptingId);
+
+        $druha = $this->otazkaVykopu([true]);
+        $this->assertSame(2, $druha->playerId);
+        $this->assertSame(3, $druha->attemptingId, 'kopající ví, že přijímající už skáče');
+    }
+
+    /**
+     * Recenze 30.10. D/2: počet dalších kandidátů v otázce nepočítá ty, kdo skok už odmítli — od nich
+     * riziko zrušení (ř. 8069-8071 "two or more players ATTEMPTING") nehrozí. Dřív pevně kandidáti - 1.
+     */
+    public function testDalsiKandidatiNepocitajiTyKdoOdmitli(): void
+    {
+        $this->assertSame(0, $this->otazka($this->dvaDomaci(), [TeamSide::HOME], [false])->getOtherCandidates(), 'hráč 2 odmítl');
+        $this->assertSame(1, $this->otazka($this->dvaDomaci(), [TeamSide::HOME], [true])->getOtherCandidates(), 'hráč 2 skáče');
+
+        // AI (HOME, na tahu) má dva kandidáty a skočí jen s jedním ⇒ kouč AWAY má jednoho dalšího, ne dva.
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 7, agility: 3, skills: [SkillName::DivingCatch], id: 2)
+            ->addPlayer(TeamSide::HOME, 9, 7, agility: 3, skills: [SkillName::DivingCatch], id: 3)
+            ->addPlayer(TeamSide::AWAY, 11, 5, agility: 3, skills: [SkillName::DivingCatch], id: 13)
+            ->withBallCarried(1)
+            ->build();
+        $q = $this->otazka($s, [TeamSide::AWAY]);
+        $this->assertSame(13, $q->getPlayerId());
+        $this->assertSame(1, $q->getOtherCandidates());
     }
 }

@@ -34,9 +34,9 @@ Větev `dc-varianta-b` (z `oprava-grab-dc`).
 | P237 | Noc 30.10. D: Diving Catch — víc kandidátů, varianta B (uživatel 30.10.: „změň na B“; ř. 8069-8071 „ATTEMPTING“, ř. 985, ř. 986-990). Napřed strana na tahu (u výkopu přijímající), pak druhá; kouč-člověk odpovídá na každého svého kandidáta (otázka nese počet dalších kandidátů a kdo už skáče), AI skočí s jedním (nejlepší cíl hodu). Právě jeden pokus ⇒ chytá, dva a víc ⇒ nikdo. C++ `divingCatchAttempt` (+ vazba/živá partie text), PHP `BallResolver::divingCatchAttempt` + `PendingDivingCatchDTO` + dialog ve webu. Oba enginy ⇒ převod netřeba. | hotovo (větev dc-varianta-b), čeká recenze |
 - 1. make check: 76 chyb PHPUnit = jen PDO (chyběl `.env`, port 5432) — `.env` zkopírován z main (v .gitignore), znovu
 - 2. `make check` ⇒ **„== check: vše zelené“** (PHPUnit 1595 OK, vitest 101, C++ 1323 PASSED, kouř 6 her; log mimo git /tmp/d_scratch/check2.log). Python `test_coach_choice.py`: 19 passed (`check-py` celé ani e2e nespuštěno).
+- 3. commit b679118c + push větve dc-varianta-b (opraveno v opravném průchodu — řádek byl omylem v oddílu „Nedělal jsem“, recenze D/4)
 
 ## Nedělal jsem
 - Celý server živé partie ani web v prohlížeči jsem nespouštěl (žádná předvolba nemá dva hráče s Diving Catch u jednoho dopadu); text otázky ověřen testem `otazka_str`, dialog vitestem.
-- commit + push větve dc-varianta-b
 
 HOTOVO

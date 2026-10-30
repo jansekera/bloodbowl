@@ -1653,3 +1653,36 @@ TEST(KickoffLanding, AiDivesWithOnlyOneOfTwoReceivingDivingCatchers) {
     ASSERT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, second.id);
 }
+
+// Recenze 30.10. D/1: pořadí stran u výkopu hlídal jen kód (mutace „kopající první“ přežila celou sadu).
+// Ř. 986-990: "the coach whose turn is taking place must use his skill first" — výkop je kolo přijímajících
+// (`finishKickoff` jim předá tah před dopadem). Dopad na prázdné (12,7) na lajně; kopající s Diving Catch
+// na (13,7), přijímající (11,8) dostane Diving Catch; oba kouči lidé ⇒ napřed se ptá přijímající, kopající
+// pak ví, že přijímající skáče (otherId).
+TEST(KickoffLanding, ReceivingCoachIsAskedAboutDivingCatchBeforeTheKickingCoach) {
+    auto gs = kickingDiverOnTheLine();
+    Player& receiver = playerAt(gs, {11, 8});
+    receiver.skills.add(SkillName::DivingCatch);
+    const int kicker = playerAt(gs, {13, 7}).id;
+    ASSERT_NE(receiver.teamSide, gs.getPlayer(kicker).teamSide);
+    const auto ask = [&](std::vector<int> answers) {
+        GameState copy = gs;
+        FixedDiceRoller dice({5, 3, 1, 1, 7});
+        CoachChoiceScope scope(receiver.teamSide, std::move(answers), /*bothSides=*/true);
+        try {
+            resolveKickoff(copy, dice, nullptr);
+        } catch (const CoachChoicePending& p) {
+            return p;
+        }
+        ADD_FAILURE() << "otázka nepřišla";
+        return CoachChoicePending(CoachQuestion::REROLL, -9, -9, -9, -9, 0);
+    };
+    const CoachChoicePending first = ask({});
+    EXPECT_EQ(first.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(first.playerId, receiver.id) << "napřed přijímající (je na tahu)";
+    EXPECT_EQ(first.otherId, -1);
+    const CoachChoicePending second = ask({CoachAnswer::TEAM});
+    EXPECT_EQ(second.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(second.playerId, kicker);
+    EXPECT_EQ(second.otherId, receiver.id) << "kopající ví, že přijímající už skáče";
+}

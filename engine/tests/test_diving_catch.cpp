@@ -605,3 +605,19 @@ TEST(DivingCatchCandidates, HumanOffTheTurnIsToldTheAiAlreadyDived) {
     EXPECT_EQ(no.dives, 1);
     EXPECT_EQ(no.carrier, 3);
 }
+
+// Recenze 30.10. D/2: počet DALŠÍCH kandidátů v otázce (roll) nepočítá ty, kdo už skok odmítli — od nich
+// riziko zrušení (ř. 8069-8071 "two or more players ATTEMPTING") nehrozí. Dřív pevně kandidáti - 1.
+TEST(DivingCatchCandidates, OtherCandidatesLeaveOutThoseWhoDeclined) {
+    EXPECT_EQ(nextQuestion(twoHomeCandidates(), TeamSide::HOME, {CoachAnswer::NONE}).roll, 0)
+        << "hráč 2 odmítl ⇒ žádný další";
+    EXPECT_EQ(nextQuestion(twoHomeCandidates(), TeamSide::HOME, {CoachAnswer::TEAM}).roll, 1)
+        << "hráč 2 skáče ⇒ pořád jeden další";
+    // AI (HOME, na tahu) má dva kandidáty a skočí jen s jedním ⇒ kouč AWAY má jednoho dalšího, ne dva.
+    GameState gs = twoHomeCandidates();
+    placePlayer(gs, 13, {11, 5}, TeamSide::AWAY);
+    gs.getPlayer(13).skills.add(SkillName::DivingCatch);
+    const CoachChoicePending q = nextQuestion(gs, TeamSide::AWAY, {});
+    EXPECT_EQ(q.playerId, 13);
+    EXPECT_EQ(q.roll, 1);
+}
