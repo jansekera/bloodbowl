@@ -116,6 +116,8 @@ final class BallResolver
         int $modifier = 0,
         bool $teamRerollAvailable = false,
         bool $accuratePass = false,
+        ?TeamSide $kickoffReceiving = null,
+        int $depth = 0,
     ): array {
         $pos = $catcher->getPosition();
         if ($pos === null) {
@@ -135,7 +137,7 @@ final class BallResolver
         //   (Bone-head, Really Stupid, Hypnotic Gaze) nechyta -- `rules_bb2016.txt` r. 7983-7986:
         //   „loses his tackle zones and may not catch, intercept or pass“. Hlidalo se jen u zachyceni.
         if (!$catcher->getState()->canAct() || $catcher->hasLostTacklezones()) {
-            $bounceResult = $this->resolveBounce($state, $pos);
+            $bounceResult = $this->resolveBounce($state, $pos, $depth, $kickoffReceiving);
 
             return [
                 'state' => $bounceResult['state'],
@@ -148,7 +150,7 @@ final class BallResolver
         // No Hands: cannot catch the ball
         if ($catcher->hasSkill(SkillName::NoHands)) {
             $events = [GameEvent::noHands($catcher->getId())];
-            $bounceResult = $this->resolveBounce($state, $pos);
+            $bounceResult = $this->resolveBounce($state, $pos, $depth, $kickoffReceiving);
             $events = array_merge($events, $bounceResult['events']);
             return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => false];
         }
@@ -207,7 +209,7 @@ final class BallResolver
         }
 
         // Failed: bounce from catcher's square
-        $bounceResult = $this->resolveBounce($state, $pos);
+        $bounceResult = $this->resolveBounce($state, $pos, $depth, $kickoffReceiving);
         $events = array_merge($events, $bounceResult['events']);
 
         return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => $teamRerollUsed];
@@ -219,7 +221,7 @@ final class BallResolver
      * dopadající míč chytá: stojící hráč na poli; na prázdné pole hráč s Diving Catch; jinak odraz.
      *
      * DOPLNĚNO 20. 10. 2026 (P223) — Diving Catch byl jen u nepřesné přihrávky (P221, kopie
-     *   v `PassResolver`). Pravidla ř. 8066-8067: "the player can attempt to catch ANY PASS, KICK OFF
+     *   v `PassResolver`). Pravidla ř. 8065-8067: "the player can attempt to catch ANY PASS, KICK OFF
      *   OR CROWD THROW-IN, but not bouncing ball, that would land in an empty square in one of his
      *   tackle zones". Přesná přihrávka chycená skokem dostane +1 "Catching an accurate pass"
      *   (ř. 891), ale ne +1 z Diving Catch — ten je jen "from an accurate pass targeted to his
@@ -227,6 +229,7 @@ final class BallResolver
      *
      * @param TeamSide|null $rerollSide tým, jehož týmový přehoz smí jít na chytání (jen jeho hráč);
      *                                  null = žádný (výkop ř. 1261-1263, Dump-Off v soupeřově tahu)
+     * @param TeamSide|null $kickoffReceiving jen u výkopu: přijímající tým — viz `resolveBounce`
      * @return array{state: GameState, events: list<GameEvent>}
      */
     public function resolveLanding(
@@ -236,6 +239,7 @@ final class BallResolver
         ?TeamSide $rerollSide = null,
         int $depth = 0,
         bool $divingCatch = true,
+        ?TeamSide $kickoffReceiving = null,
     ): array {
         $state = $state->withBall(BallState::onGround($landing));
         $events = [];
@@ -243,7 +247,7 @@ final class BallResolver
         $catcher = $state->getPlayerAtPosition($landing);
         $diving = false;
         if ($catcher === null) {
-            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8066) — viz KickoffResolver
+            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8065) — viz KickoffResolver
             $catcher = $divingCatch ? $this->findDivingCatchPlayer($state, $landing) : null;
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
@@ -251,7 +255,7 @@ final class BallResolver
         }
 
         if ($catcher === null) {
-            return $this->resolveBounce($state, $landing, $depth);
+            return $this->resolveBounce($state, $landing, $depth, $kickoffReceiving);
         }
 
         if ($diving) {
@@ -264,6 +268,10 @@ final class BallResolver
             modifier: $accuratePass ? 1 : 0,
             teamRerollAvailable: $rerollSide === $side && $state->getTeamState($side)->canUseReroll(),
             accuratePass: $accuratePass && !$diving,
+            kickoffReceiving: $kickoffReceiving,
+            // OPRAVENO 30. 10. 2026 (P223 review LOW) — hloubka se tu ztrácela (odraz po neúspěchu
+            //   začínal od 0) ⇒ řetěz „vhazování → nechytí → odraz ven“ obcházel pojistku MAX_BOUNCES.
+            depth: $depth,
         );
         $state = $catchResult['state'];
         if ($catchResult['teamRerollUsed']) {
@@ -308,9 +316,13 @@ final class BallResolver
 
     /**
      * Bounce ball from a position. If lands on player, they try to catch.
+     *
+     * @param TeamSide|null $kickoffReceiving jen u výkopu: přijímající tým. Odraz mimo hřiště nebo
+     *   do kopající poloviny se pak NEvhazuje ani nechytá — míč zůstane na tom poli a výkop
+     *   (`KickoffResolver`) dá touchback.
      * @return array{state: GameState, events: list<GameEvent>}
      */
-    public function resolveBounce(GameState $state, Position $from, int $depth = 0): array
+    public function resolveBounce(GameState $state, Position $from, int $depth = 0, ?TeamSide $kickoffReceiving = null): array
     {
         if ($depth >= self::MAX_BOUNCES) {
             // Safety: leave ball on ground
@@ -323,6 +335,16 @@ final class BallResolver
 
         $events = [GameEvent::ballBounce((string) $from, (string) $landingPos, $direction)];
 
+        // OPRAVENO 30. 10. 2026 (P223 review, parita s C++ `landBall`) — u výkopu se míč po odrazu
+        //   ven vhazoval a po odrazu do kopající poloviny tam zůstal ležet (nebo ho chytil soupeř).
+        //   Pravidla ř. 280-282: "If the ball scatters or BOUNCES off the pitch or into the kicking
+        //   team's half, the receiving coach is awarded a 'touchback'"; FAQ ř. 9315-9318: "any event
+        //   that causes the ball to go out of bounds or over the line of scrimmage during a kick-off
+        //   results in a touchback".
+        if ($kickoffReceiving !== null && !$this->scatterCalc->isInReceivingHalf($landingPos, $kickoffReceiving)) {
+            return ['state' => $state->withBall(BallState::onGround($landingPos)), 'events' => $events];
+        }
+
         // Off pitch? Throw-in
         if (!$landingPos->isOnPitch()) {
             $throwInResult = $this->resolveThrowIn($state, $from, $landingPos, $depth);
@@ -334,14 +356,14 @@ final class BallResolver
         $playerAtLanding = $state->getPlayerAtPosition($landingPos);
         if ($playerAtLanding !== null && $playerAtLanding->getState()->canAct() && !$playerAtLanding->hasLostTacklezones()) {
             $state = $state->withBall(BallState::onGround($landingPos));
-            $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth);
+            $catchResult = $this->resolveCatchFromBounce($state, $playerAtLanding, $depth, $kickoffReceiving);
             $events = array_merge($events, $catchResult['events']);
             return ['state' => $catchResult['state'], 'events' => $events];
         }
 
         // Lezici nebo omraceny hrac: mic odskakuje dal (r. 893-898)
         if ($playerAtLanding !== null) {
-            $bounceResult = $this->resolveBounce($state, $landingPos, $depth + 1);
+            $bounceResult = $this->resolveBounce($state, $landingPos, $depth + 1, $kickoffReceiving);
             return ['state' => $bounceResult['state'], 'events' => array_merge($events, $bounceResult['events'])];
         }
 
@@ -496,7 +518,7 @@ final class BallResolver
      * Internal: catch attempt from bounce (no modifier, recurse on failure).
      * @return array{state: GameState, events: list<GameEvent>}
      */
-    private function resolveCatchFromBounce(GameState $state, MatchPlayerDTO $catcher, int $depth): array
+    private function resolveCatchFromBounce(GameState $state, MatchPlayerDTO $catcher, int $depth, ?TeamSide $kickoffReceiving): array
     {
         $pos = $catcher->getPosition();
         if ($pos === null) {
@@ -506,7 +528,7 @@ final class BallResolver
         // No Hands: cannot catch, bounce again
         if ($catcher->hasSkill(SkillName::NoHands)) {
             $events = [GameEvent::noHands($catcher->getId())];
-            $bounceResult = $this->resolveBounce($state, $pos, $depth + 1);
+            $bounceResult = $this->resolveBounce($state, $pos, $depth + 1, $kickoffReceiving);
             $events = array_merge($events, $bounceResult['events']);
             return ['state' => $bounceResult['state'], 'events' => $events];
         }
@@ -590,7 +612,7 @@ final class BallResolver
         }
 
         // Failed: bounce again
-        $bounceResult = $this->resolveBounce($state, $pos, $depth + 1);
+        $bounceResult = $this->resolveBounce($state, $pos, $depth + 1, $kickoffReceiving);
         $events = array_merge($events, $bounceResult['events']);
         return ['state' => $bounceResult['state'], 'events' => $events];
     }

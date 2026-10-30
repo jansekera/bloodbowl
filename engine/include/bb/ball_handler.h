@@ -21,15 +21,16 @@ int divingCatcherFor(const GameState& state, Position at);
 // i nepřesná), Hail Mary, vhazování (výkop má vlastní `landBall` kvůli touchbacku, hráče s Diving
 // Catch bere z `divingCatcherFor`). Ne odraz. Stojící hráč chytá; na prázdné pole hráč s Diving
 // Catch ze SVÉHO pole; neúspěch i prázdné pole ⇒ odraz. `accuratePass` = přesná přihrávka mířená sem.
+// `depth` = hloubka odrazů (pojistka v `resolveBounce`) — u vhazování ji nese řetěz dál.
 void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
-                    std::vector<GameEvent>* events, bool accuratePass = false);
+                    std::vector<GameEvent>* events, bool accuratePass = false, int depth = 0);
 // Hráč opouští hřiště (KO, zranění, lavička, vyloučení). Napřed zmizí on, pak se míč,
 // který držel (nebo který pod ním ležel), odrazí z jeho pole -- viz ball_handler.cpp.
 void removeFromPitch(GameState& state, int playerId, PlayerState newState,
                      DiceRollerBase& dice, std::vector<GameEvent>* events);
 
 void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExit,
-                    DiceRollerBase& dice, std::vector<GameEvent>* events);
+                    DiceRollerBase& dice, std::vector<GameEvent>* events, int depth = 0);
 void handleBallOnPlayerDown(GameState& state, int playerId, DiceRollerBase& dice,
                             std::vector<GameEvent>* events);
 
