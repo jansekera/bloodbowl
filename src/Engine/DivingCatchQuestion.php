@@ -15,6 +15,8 @@ final class DivingCatchQuestion extends \RuntimeException
     public function __construct(
         public readonly int $playerId,
         public readonly Position $landing,
+        public readonly int $otherCandidates = 0,
+        public readonly ?int $attemptingId = null,
     ) {
         parent::__construct('Diving Catch question pending');
     }

@@ -82,17 +82,15 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
         // square" (ř. 8068) ⇒ míč „dopadne“ na jeho pole: v kopající polovině (kopající na lajně) je
         // to touchback, jinak tam chytá a neúspěch odskočí z jeho pole. Odraz (`bounced`) se nechytá.
         if (!p && !bounced) {
-            int diver = divingCatcherFor(state, at);
             // OPRAVENO 20.10.2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
             //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
-            //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ neskočí, míč dopadne
-            //   normálně. Přijímající v kopající polovině (Quick Snap) skočí. Rušení dvou kandidátů
-            //   (ř. 8069-8071) řeší `divingCatcherFor` (vrátí -1).
-            // Uživatel 30.10.2026: v živé partii se ptá kouče hráče (`divingCatchChosen`), i kopajícího.
-            if (diver >= 0 && !divingCatchChosen(state, diver, at,
-                                                 /*aiJumps=*/state.getPlayer(diver).teamSide == receiving ||
-                                                     inHalfOf(receiving, state.getPlayer(diver).position)))
-                diver = -1;
+            //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ AI neskočí, míč dopadne
+            //   normálně. Přijímající v kopající polovině (Quick Snap) skočí.
+            // Uživatel 30.10.2026: v živé partii se ptá kouče hráče, i kopajícího; víc kandidátů (ř. 8069-8071)
+            // a pořadí stran řeší `divingCatchAttempt` (na tahu je tu přijímající).
+            const int diver = divingCatchAttempt(state, at, [&](const Player& d) {
+                return d.teamSide == receiving || inHalfOf(receiving, d.position);
+            });
             if (diver >= 0) {
                 const Position from = state.getPlayer(diver).position;
                 emitEvent(events, {GameEvent::Type::SKILL_USED, diver, -1, at, from,

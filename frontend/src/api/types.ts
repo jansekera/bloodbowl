@@ -121,6 +121,10 @@ export interface PendingDivingCatch {
     params: Record<string, unknown>;
     dice: number[];
     answers: boolean[];
+    /** varianta B (30.10.2026): počet DALŠÍCH hráčů s Diving Catch v dosahu dopadu */
+    otherCandidates: number;
+    /** hráč, který už se pokouší (null = nikdo); dva pokusy se ruší (ř. 8069-8071) */
+    attemptingId: number | null;
 }
 
 /** Full game state sent from the server */

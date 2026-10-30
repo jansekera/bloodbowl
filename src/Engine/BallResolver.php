@@ -43,22 +43,53 @@ final class BallResolver
     }
 
     /**
-     * Uživatel 30.10.2026: Diving Catch jako otázka kouči. Skočí `$diver` pro míč dopadající na
-     * `$landing`? Skill je volba (ř. 8065 "can attempt", ř. 1820 "Skill use is not mandatory"):
-     * hráče kouče-člověka se ptá -- bez odpovědi akci přeruší `DivingCatchQuestion` (viz
-     * `ReplayDiceRoller`); AI rozhoduje `$aiJumps` jako dosud.
+     * Kdo skočí pro míč dopadající na prázdné `$landing` (null = nikdo). Skill je volba (ř. 8065 "can
+     * attempt", ř. 985): hráče kouče-člověka se ptá -- bez odpovědi akci přeruší `DivingCatchQuestion`
+     * (viz `ReplayDiceRoller`); AI skočí s jedním hráčem (nejlepší cíl hodu) z těch, pro které
+     * `$aiJumps` vrátí true.
+     *
+     * OPRAVENO 30. 10. 2026 (uživatel, varianta B) — dřív dva a víc kandidátů ⇒ nikdo, bez otázky.
+     *   Pravidla ř. 8069-8071 "If there are two or more players ATTEMPTING to use this skill then they
+     *   get in each other's way and neither can use it" a ř. 986-990 "the coach whose turn is taking
+     *   place must use his skill first" ⇒ napřed strana na tahu (`$naTahu`, výchozí aktivní tým) o každém
+     *   svém kandidátovi, pak druhá; otázka nese počet dalších kandidátů a kdo už skáče. Právě jeden
+     *   pokus ⇒ chytá, dva a víc ⇒ nikdo (další otázky už nic nezmění, nekladou se).
+     *
+     * @param callable(MatchPlayerDTO): bool $aiJumps
      */
-    public function divingCatchJumps(MatchPlayerDTO $diver, Position $landing, bool $aiJumps): bool
+    public function divingCatchAttempt(GameState $state, Position $landing, callable $aiJumps, ?TeamSide $naTahu = null): ?MatchPlayerDTO
     {
-        if (!in_array($diver->getTeamSide(), $this->divingCatchSides, true)) {
-            return $aiJumps;
-        }
-        $answer = array_shift($this->divingCatchAnswers);
-        if ($answer === null) {
-            throw new DivingCatchQuestion($diver->getId(), $landing);
+        $kandidati = $this->divingCatchCandidates($state, $landing);
+        $naTahu ??= $state->getActiveTeam();
+        /** @var list<MatchPlayerDTO> $skacou */
+        $skacou = [];
+        foreach ([$naTahu, $naTahu->opponent()] as $strana) {
+            $svoji = array_values(array_filter($kandidati, static fn(MatchPlayerDTO $p) => $p->getTeamSide() === $strana));
+            if (in_array($strana, $this->divingCatchSides, true)) {
+                foreach ($svoji as $hrac) {
+                    if (count($skacou) >= 2) {
+                        break;
+                    }
+                    $odpoved = array_shift($this->divingCatchAnswers)
+                        ?? throw new DivingCatchQuestion($hrac->getId(), $landing, count($kandidati) - 1, ($skacou[0] ?? null)?->getId());
+                    if ($odpoved) {
+                        $skacou[] = $hrac;
+                    }
+                }
+                continue;
+            }
+            $nejlepsi = null;
+            foreach ($svoji as $hrac) {
+                if ($aiJumps($hrac) && ($nejlepsi === null || $this->getCatchTarget($state, $hrac) < $this->getCatchTarget($state, $nejlepsi))) {
+                    $nejlepsi = $hrac;
+                }
+            }
+            if ($nejlepsi !== null) {
+                $skacou[] = $nejlepsi;
+            }
         }
 
-        return $answer;
+        return count($skacou) === 1 ? $skacou[0] : null;
     }
 
     /**
@@ -274,7 +305,7 @@ final class BallResolver
         bool $accuratePass = false,
         ?TeamSide $rerollSide = null,
         int $depth = 0,
-        ?bool $divingCatch = null,
+        MatchPlayerDTO|false|null $divingCatcher = null,
         ?TeamSide $kickoffReceiving = null,
     ): array {
         $state = $state->withBall(BallState::onGround($landing));
@@ -283,12 +314,10 @@ final class BallResolver
         $catcher = $state->getPlayerAtPosition($landing);
         $diving = false;
         if ($catcher === null) {
-            // $divingCatch: o skoku už rozhodl volající (výkop, viz KickoffResolver); null = rozhodne se tu
-            //   (kouč-člověk odpoví, AI skočí vždy). Skill je volba (ř. 8065).
-            $catcher = $divingCatch === false ? null : $this->findDivingCatchPlayer($state, $landing);
-            if ($catcher !== null && $divingCatch === null && !$this->divingCatchJumps($catcher, $landing, true)) {
-                $catcher = null;
-            }
+            // $divingCatcher: o skoku už rozhodl volající (výkop, viz KickoffResolver; false = nikdo);
+            //   null = rozhodne se tu (kouč-člověk odpoví, AI skočí). Skill je volba (ř. 8065).
+            $catcher = $divingCatcher ?? $this->divingCatchAttempt($state, $landing, static fn() => true);
+            $catcher = $catcher === false ? null : $catcher;
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
             $catcher = null;
@@ -322,7 +351,7 @@ final class BallResolver
     }
 
     /**
-     * Hráč s Diving Catch, který smí chytit míč dopadající na sousední prázdné pole (null = nikdo).
+     * Hráči s Diving Catch, kteří smí chytit míč dopadající na sousední prázdné pole (kdo skočí: `divingCatchAttempt`).
      *
      * OPRAVENO 20. 10. 2026 (P221) — tady se hráč PŘESOUVAL na pole dopadu (a odtud se počítaly
      *   zóny i odskok), chytal i bez tackle zón, i na pole s ležícím hráčem, a ze dvou hráčů
@@ -332,11 +361,13 @@ final class BallResolver
      *   square. If there are two or more players attempting to use this skill then they get in
      *   each other's way and neither can use it." Bez zón "may not catch" (ř. 7983-7986).
      *   Smí kterýkoli tým (i soupeř přihrávajícího, i sám přihrávající).
+     *
+     * @return list<MatchPlayerDTO>
      */
-    public function findDivingCatchPlayer(GameState $state, Position $landingPos): ?MatchPlayerDTO
+    public function divingCatchCandidates(GameState $state, Position $landingPos): array
     {
         if ($state->getPlayerAtPosition($landingPos) !== null) {
-            return null;
+            return [];
         }
 
         $candidates = [];
@@ -351,7 +382,7 @@ final class BallResolver
             }
         }
 
-        return count($candidates) === 1 ? $candidates[0] : null;
+        return $candidates;
     }
 
     /**

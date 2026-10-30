@@ -337,6 +337,18 @@ def test_diving_catch_otazka_a_odpoved():
     assert ps.preloz_odpoved(q, "ano") == 1 and ps.preloz_odpoved(q, "ne") == 0
     text = ps.otazka_str(q)
     assert "DIVING CATCH" in text and "hráč 7" in text and "(10,6)" in text and "odp ano / ne" in text
+    assert "ruší" not in text, "jediný kandidát — o rušení pokusů nemluví"
+
+
+def test_diving_catch_otazka_s_dalsimi_kandidaty():
+    # Varianta B (uživatel 30.10.2026): víc kandidátů ⇒ otázka na každého. Text řekne, kolik dalších hráčů
+    # dopad stihne, že dva pokusy se ruší (ř. 8069-8071) a kdo už skáče (other).
+    q = {"question": "USE_DIVING_CATCH", "player": 7, "other": -1, "roll": 2, "target": 1006, "options": 0b11}
+    text = ps.otazka_str(q)
+    assert "další 2" in text and "ruší" in text and "už skáče" not in text
+    q2 = dict(q, roll=1, other=15)
+    text2 = ps.otazka_str(q2)
+    assert "další 1" in text2 and "hráč 15 už skáče" in text2
 
 
 def test_diving_catch_otazka_prijde_z_vazby_jako_use_diving_catch():

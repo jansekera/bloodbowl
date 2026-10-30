@@ -147,20 +147,6 @@ final class DivingCatchKoucTest extends TestCase
         $this->assertSame(2, $r->getNewState()->getBall()->getCarrierId());
     }
 
-    public function testDvaKandidatiNikdoANikdoSeNepta(): void
-    {
-        // ř. 8069-8071: dva se ruší ⇒ žádná otázka, odskok D8 4 z (10,6) na (11,7).
-        $s = $this->prihravka()->withPlayer(
-            (new GameStateBuilder())->addPlayer(TeamSide::HOME, 9, 7, agility: 3, skills: [SkillName::DivingCatch], id: 3)
-                ->build()->requirePlayer(3),
-        );
-        $r = $this->prihraj($s, [TeamSide::HOME, TeamSide::AWAY], [4]);
-
-        $this->assertNull($r->getNewState()->getPendingDivingCatch());
-        $this->assertNotContains('diving_catch', $this->udalosti($r));
-        $this->assertSame([11, 7], $this->mic($r->getNewState()));
-    }
-
     public function testOdrazejiciSeMicSeNechytaANepta(): void
     {
         // "but not bouncing ball" (ř. 8066): odskok z (5,6) D8 5 = J na prázdné (5,7) vedle hráče na (5,8).

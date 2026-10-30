@@ -1625,3 +1625,31 @@ TEST(KickoffLanding, ReceivingDiverAnsweringYesCatches) {
     ASSERT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, diver);
 }
+
+// Uživatel 30.10.2026, varianta B (ř. 8069-8071 "two or more players ATTEMPTING"): dva hráči přijímajících
+// s Diving Catch vedle dopadu (4,7) — AI skočí jen s jedním (nejlepší cíl hodu: AG4 na (5,8) ⇒ 3+),
+// chytá 3. Dřív: dva v dosahu ⇒ nikdo, míč dopadl na (4,7) a odrazil se.
+TEST(KickoffLanding, AiDivesWithOnlyOneOfTwoReceivingDivingCatchers) {
+    auto gs = receivingDiverNextToTheLanding();
+    ASSERT_EQ(gs.getPlayerAtPosition({5, 8}), nullptr);
+    const Player& first = playerAt(gs, {4, 8});
+    Player* other = nullptr;
+    for (auto& p : gs.players)
+        if (p.teamSide == first.teamSide && p.isOnPitch() && p.id != first.id) other = &p;
+    ASSERT_NE(other, nullptr);
+    Player& second = *other;
+    second.position = {5, 8};
+    second.state = PlayerState::STANDING;
+    second.stats.agility = 4;
+    second.skills.add(SkillName::DivingCatch);
+    ASSERT_EQ(countTacklezones(gs, {5, 8}, second.teamSide), 0);
+    FixedDiceRoller dice({1, 3, 1, 1, 3});
+    std::vector<GameEvent> ev;
+    resolveKickoff(gs, dice, &ev);
+    int dives = 0;
+    for (const GameEvent& e : ev)
+        if (e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::DivingCatch)) ++dives;
+    EXPECT_EQ(dives, 1);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, second.id);
+}

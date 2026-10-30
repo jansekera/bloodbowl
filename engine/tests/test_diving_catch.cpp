@@ -400,12 +400,6 @@ TEST(DivingCatchCoach, TheOtherSidesCoachIsNotAskedAndTheEngineDivesAsBefore) {
     EXPECT_EQ(gs.ball.carrierId, 2);
 }
 
-TEST(DivingCatchCoach, TwoCandidatesNobodyIsAsked) {
-    GameState gs = thrownToTenFive();
-    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);
-    gs.getPlayer(3).skills.add(SkillName::DivingCatch);
-    EXPECT_FALSE(passAsks(gs, TeamSide::HOME, inaccurateToTenSix({4, 4, 4})));
-}
 
 TEST(DivingCatchCoach, ABouncingBallIsNotAsked) {
     GameState gs = passSetup();
@@ -431,4 +425,183 @@ TEST(DivingCatchCoach, ACrowdThrowInIsAsked) {
         EXPECT_EQ(p.question, CoachQuestion::USE_DIVING_CATCH);
         EXPECT_EQ(p.target, 5 * 100 + 7);
     }
+}
+
+// ============================================================================
+// Uživatel 30.10.2026, varianta B: víc kandidátů Diving Catch. Dřív: dva a víc v dosahu dopadu ⇒ nikdo,
+// bez otázky. Pravidla ř. 8069-8071 "If there are two or more players ATTEMPTING to use this skill then
+// they get in each other's way and neither can use it" + ř. 985 (skill se použít nemusí) + ř. 986-990
+// ("the coach whose turn is taking place must use his skill first") ⇒ napřed rozhodne strana na tahu
+// (o každém svém kandidátovi), pak druhá, která ví, jak odpověděla první. Pokouší-li se právě jeden,
+// chytá; dva a víc ⇒ nikdo, míč dopadne normálně. AI za stranu skočí jen s jedním (nejlepší cíl hodu).
+//
+// Míč z nepřesné přihrávky HOME dopadá na prázdné (10,6) (thrownToTenFive); odraz D8 4 = JV na (11,7).
+// ============================================================================
+namespace {
+// Kandidát HOME 3 na (9,7) a kandidát AWAY 13 na (11,5) (za cílem — nezachytává; zóna na (10,7) ne).
+GameState homeAndAwayCandidates() {
+    GameState gs = thrownToTenFive();
+    gs.getPlayer(2).skills.remove(SkillName::DivingCatch);
+    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);
+    gs.getPlayer(3).skills.add(SkillName::DivingCatch);
+    placePlayer(gs, 13, {11, 5}, TeamSide::AWAY);
+    gs.getPlayer(13).skills.add(SkillName::DivingCatch);
+    return gs;
+}
+
+// Dva kandidáti HOME: 2 na (10,7) a 3 na (9,7).
+GameState twoHomeCandidates() {
+    GameState gs = thrownToTenFive();
+    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);
+    gs.getPlayer(3).skills.add(SkillName::DivingCatch);
+    return gs;
+}
+
+struct Outcome {
+    int dives = 0;
+    int carrier = -1;
+    Position ball{};
+};
+
+// Přihrávka v živé partii s odpověďmi `answers`; poslední kostka 4 = chytání (AG3 4+), nebo odraz JV na (11,7).
+Outcome livePass(GameState gs, TeamSide coach, std::vector<int> answers, bool bothSides = false) {
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    std::vector<GameEvent> events;
+    CoachChoiceScope scope(coach, std::move(answers), bothSides);
+    resolvePass(gs, 1, {10, 5}, dice, &events);
+    return {divingCatchEvents(events), gs.ball.isHeld ? gs.ball.carrierId : -1, gs.ball.position};
+}
+
+// Otázka, která v živé partii po odpovědích `answers` přijde jako další.
+CoachChoicePending nextQuestion(GameState gs, TeamSide coach, std::vector<int> answers, bool bothSides = false) {
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    CoachChoiceScope scope(coach, std::move(answers), bothSides);
+    try {
+        resolvePass(gs, 1, {10, 5}, dice, nullptr);
+    } catch (const CoachChoicePending& p) {
+        return p;
+    }
+    ADD_FAILURE() << "otázka nepřišla";
+    return CoachChoicePending(CoachQuestion::REROLL, -9, -9, -9, -9, 0);
+}
+}  // namespace
+
+TEST(DivingCatchCandidates, OneCandidateIsAskedWithNoOtherCandidates) {
+    CoachChoicePending q = nextQuestion(thrownToTenFive(), TeamSide::HOME, {});
+    EXPECT_EQ(q.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(q.playerId, 2);
+    EXPECT_EQ(q.roll, 0) << "počet dalších kandidátů";
+    EXPECT_EQ(q.otherId, -1) << "nikdo další se zatím nepokouší";
+}
+
+TEST(DivingCatchCandidates, CoachIsAskedAboutEachOfHisCandidates) {
+    GameState gs = twoHomeCandidates();
+    CoachChoicePending first = nextQuestion(gs, TeamSide::HOME, {});
+    EXPECT_EQ(first.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(first.playerId, 2);
+    EXPECT_EQ(first.roll, 1) << "jeden další kandidát";
+    CoachChoicePending second = nextQuestion(gs, TeamSide::HOME, {CoachAnswer::NONE});
+    EXPECT_EQ(second.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(second.playerId, 3);
+    EXPECT_EQ(second.otherId, -1);
+}
+
+TEST(DivingCatchCandidates, NoForTheFirstLetsTheSecondCatch) {
+    Outcome o = livePass(twoHomeCandidates(), TeamSide::HOME, {CoachAnswer::NONE, CoachAnswer::TEAM});
+    EXPECT_EQ(o.dives, 1);
+    EXPECT_EQ(o.carrier, 3);
+}
+
+TEST(DivingCatchCandidates, YesForTheFirstNoForTheSecondLetsTheFirstCatch) {
+    Outcome o = livePass(twoHomeCandidates(), TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::NONE});
+    EXPECT_EQ(o.dives, 1);
+    EXPECT_EQ(o.carrier, 2);
+}
+
+TEST(DivingCatchCandidates, TwoAttemptsOfOneTeamGetInEachOthersWay) {
+    GameState gs = twoHomeCandidates();
+    CoachChoicePending second = nextQuestion(gs, TeamSide::HOME, {CoachAnswer::TEAM});
+    EXPECT_EQ(second.playerId, 3);
+    EXPECT_EQ(second.otherId, 2) << "kouč ví, že hráč 2 už skáče";
+    Outcome o = livePass(gs, TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::TEAM});
+    EXPECT_EQ(o.dives, 0) << "\"neither can use it\" (ř. 8070-8071)";
+    EXPECT_EQ(o.carrier, -1);
+    EXPECT_EQ(o.ball, (Position{11, 7})) << "odraz z pole dopadu";
+}
+
+// Strana na tahu (HOME) první, i když hráč soupeře má nižší id — ř. 986-990.
+TEST(DivingCatchCandidates, TheSideOnTheTurnIsAskedFirst) {
+    GameState gs = homeAndAwayCandidates();
+    CoachChoicePending first = nextQuestion(gs, TeamSide::HOME, {}, /*bothSides=*/true);
+    EXPECT_EQ(first.playerId, 3);
+    EXPECT_EQ(first.roll, 1);
+    CoachChoicePending second = nextQuestion(gs, TeamSide::HOME, {CoachAnswer::TEAM}, true);
+    EXPECT_EQ(second.playerId, 13);
+    EXPECT_EQ(second.otherId, 3) << "druhá strana ví, že HOME skáče";
+
+    GameState awayTurn = homeAndAwayCandidates();
+    awayTurn.activeTeam = TeamSide::AWAY;
+    EXPECT_EQ(nextQuestion(awayTurn, TeamSide::HOME, {}, true).playerId, 13) << "na tahu AWAY ⇒ napřed AWAY";
+}
+
+TEST(DivingCatchCandidates, BothSidesAttemptingNobodyCatches) {
+    Outcome o = livePass(homeAndAwayCandidates(), TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::TEAM}, true);
+    EXPECT_EQ(o.dives, 0);
+    EXPECT_EQ(o.carrier, -1);
+    EXPECT_EQ(o.ball, (Position{11, 7}));
+}
+
+TEST(DivingCatchCandidates, OnlyOneSideAttemptingCatches) {
+    Outcome home = livePass(homeAndAwayCandidates(), TeamSide::HOME, {CoachAnswer::TEAM, CoachAnswer::NONE}, true);
+    EXPECT_EQ(home.dives, 1);
+    EXPECT_EQ(home.carrier, 3);
+    Outcome away = livePass(homeAndAwayCandidates(), TeamSide::HOME, {CoachAnswer::NONE, CoachAnswer::TEAM}, true);
+    EXPECT_EQ(away.dives, 1);
+    EXPECT_EQ(away.carrier, 13);
+}
+
+// AI × AI (mimo živou partii): dva kandidáti téže strany ⇒ skočí jen jeden, ten s nejlepším cílem hodu
+// (hráč 3 AG4 ⇒ 3+, hráč 2 AG3 ⇒ 4+). Dřív: nikdo. Chytání 3: AG4 chytí, AG3 ne.
+TEST(DivingCatchCandidates, AiDivesWithOnlyTheBestOfItsCandidates) {
+    GameState gs = twoHomeCandidates();
+    gs.getPlayer(3).stats.agility = 4;
+    FixedDiceRoller dice(inaccurateToTenSix({3}));
+    std::vector<GameEvent> events;
+    resolvePass(gs, 1, {10, 5}, dice, &events);
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 3);
+}
+
+// AI × AI, kandidáti obou stran: každá AI skočí ⇒ dva pokusy ⇒ nikdo (beze změny).
+TEST(DivingCatchCandidates, AiOnBothSidesGetInEachOthersWay) {
+    GameState gs = homeAndAwayCandidates();
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    std::vector<GameEvent> events;
+    resolvePass(gs, 1, {10, 5}, dice, &events);
+    EXPECT_EQ(divingCatchEvents(events), 0);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{11, 7}));
+}
+
+// AI × člověk: kouč hraje HOME (na tahu) — ptá se napřed on; AI (AWAY) pak skočí vždy.
+TEST(DivingCatchCandidates, HumanOnTheTurnFirstThenTheAiDives) {
+    EXPECT_EQ(nextQuestion(homeAndAwayCandidates(), TeamSide::HOME, {}).playerId, 3);
+    Outcome yes = livePass(homeAndAwayCandidates(), TeamSide::HOME, {CoachAnswer::TEAM});
+    EXPECT_EQ(yes.dives, 0) << "AI skočila taky ⇒ nikdo";
+    EXPECT_EQ(yes.carrier, -1);
+    Outcome no = livePass(homeAndAwayCandidates(), TeamSide::HOME, {CoachAnswer::NONE});
+    EXPECT_EQ(no.dives, 1);
+    EXPECT_EQ(no.carrier, 13);
+}
+
+// AI × člověk: kouč hraje AWAY (není na tahu) — AI (HOME) už skočila, otázka to říká (otherId).
+TEST(DivingCatchCandidates, HumanOffTheTurnIsToldTheAiAlreadyDived) {
+    CoachChoicePending q = nextQuestion(homeAndAwayCandidates(), TeamSide::AWAY, {});
+    EXPECT_EQ(q.question, CoachQuestion::USE_DIVING_CATCH);
+    EXPECT_EQ(q.playerId, 13);
+    EXPECT_EQ(q.otherId, 3);
+    Outcome no = livePass(homeAndAwayCandidates(), TeamSide::AWAY, {CoachAnswer::NONE});
+    EXPECT_EQ(no.dives, 1);
+    EXPECT_EQ(no.carrier, 3);
 }
