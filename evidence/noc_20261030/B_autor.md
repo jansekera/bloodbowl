@@ -12,7 +12,7 @@ Průběžný zápis.
 ## 1. MEDIUM P223 — PHP výkop: touchback po odrazu ven / za lajnu (parita s C++)
 - **Co bylo špatně:** PHP po dopadu výkopu volalo `BallResolver::resolveLanding` a dál běžná pravidla:
   odraz mimo hřiště ⇒ **vhazování**, odraz do kopající poloviny ⇒ míč tam ležel / chytil ho kopající.
-  Pravidla ř. 279-281 („scatters **or bounces** off the pitch or into the kicking team's half … touchback“),
+  Pravidla ř. 280-282 („scatters **or bounces** off the pitch or into the kicking team's half … touchback“),
   FAQ ř. 9316-9318 („any event that causes the ball to go out of bounds or over the line of scrimmage during
   a kick-off results in a touchback“). C++ `kickoff_handler.cpp` `landBall` to dělá správně (kontrola
   na začátku každé smyčky odrazu) — tentýž případ.
@@ -89,7 +89,7 @@ Chování bylo v obou enginech správné ⇒ testy jsou strážní; že umí spa
 
 ## NEDĚLÁNO — návrhy a otázky pro uživatele
 - **MEDIUM P223: Diving Catch jako otázka kouči** (nová volba). Dnes skáče automaticky každý jediný kandidát
-  (kromě kopajícího u výkopu, kde by skok dal touchback). Pravidla ř. 8066 „can attempt“ ⇒ kouč-člověk by měl
+  (kromě kopajícího u výkopu, kde by skok dal touchback). Pravidla ř. 8065 „can attempt“ ⇒ kouč-člověk by měl
   dostat otázku (C++ `CoachQuestion` nové číslo 16, PHP čekající otázka jako `PendingGrabDTO`). Pro AI pravidlo:
   skočit vždy, kromě případů, kdy skok škodí (výkop do kopající poloviny; soupeř chytá u jeho lajny?). ❓
 - **Sjednocení „rozhodnutí na dvou místech“** (LOW P223, refaktor): v PHP rozhoduje o skoku u výkopu

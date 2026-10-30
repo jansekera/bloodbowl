@@ -84,7 +84,7 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
 
     if (!dest.isOnPitch()) {
         // Ball goes off pitch — throw-in from last on-pitch position
-        resolveThrowIn(state, from, dest, dice, events);
+        resolveThrowIn(state, from, dest, dice, events, depth);
         return;
     }
 
@@ -129,7 +129,7 @@ int divingCatcherFor(const GameState& state, Position at) {
 }
 
 void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
-                    std::vector<GameEvent>* events, bool accuratePass) {
+                    std::vector<GameEvent>* events, bool accuratePass, int depth) {
     state.ball = BallState::onGround(at);
     const Player* p = state.getPlayerAtPosition(at);
     int catcherId = -1;
@@ -141,7 +141,7 @@ void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
         diving = catcherId >= 0;
     }
     if (catcherId < 0) {
-        resolveBounce(state, at, dice, 0, events);
+        resolveBounce(state, at, dice, depth, events);
         return;
     }
     const Position from = state.getPlayer(catcherId).position;
@@ -153,7 +153,7 @@ void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
     // Skokem chycená přesná přihrávka má +1 "Catching an accurate pass" (ř. 891), ale ne +1 z Diving
     // Catch — ten je jen "from an accurate pass TARGETED TO HIS SQUARE" (ř. 8063-8064).
     if (resolveCatch(state, catcherId, dice, accuratePass ? 1 : 0, events, accuratePass && !diving)) return;
-    resolveBounce(state, from, dice, 0, events);
+    resolveBounce(state, from, dice, depth, events);
 }
 
 namespace {
@@ -252,7 +252,7 @@ Position throwInDirection(ExitEdge edge, DiceRollerBase& dice, int& templateDie)
 // stavu (mic mimo, zadny hrac). Po strope se mic polozi na posledni pole
 // v hristi a odrazi se -- to uz je nase volba, ne pravidlo.
 void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExit,
-                    DiceRollerBase& dice, std::vector<GameEvent>* events) {
+                    DiceRollerBase& dice, std::vector<GameEvent>* events, int depth) {
     Position origin = lastOnPitch;
     Position exitAt = offPitchExit;
 
@@ -302,12 +302,14 @@ void resolveThrowIn(GameState& state, Position lastOnPitch, Position offPitchExi
         // l. 871-874: stojici hráč chytat MUSI; prazdne pole, nebo lezici/omraceny => odraz
         // (P223: na prazdne pole smi skocit hrac s Diving Catch). l. 878: "Throw-ins cannot be
         // intercepted" -- chytani vhozeneho mice neni intercept a plati pro obe strany stejne.
-        resolveLanding(state, dest, dice, events);
+        // OPRAVENO 30. 10. 2026 (převod PHP, P223 review LOW) — tady a níž hloubka startovala od 0
+        //   ⇒ smyčka „odraz ven → vhazování → nechytí → odraz ven“ obcházela pojistku `depth > 200`.
+        resolveLanding(state, dest, dice, events, false, depth + 1);
         return;
     }
 
     // Strop: mic polozime na posledni pole v hristi a odrazime.
-    resolveBounce(state, origin, dice, 0, events);
+    resolveBounce(state, origin, dice, depth + 1, events);
 }
 
 // JEDNO místo pro pořadí „hráč pryč -> míč se odráží“.

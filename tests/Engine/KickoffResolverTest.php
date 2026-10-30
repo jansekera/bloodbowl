@@ -10,10 +10,13 @@ use App\Engine\InjuryResolver;
 use App\Engine\KickoffResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
+use App\Enum\GamePhase;
 use App\Enum\KickoffEvent;
 use App\Enum\PlayerState;
+use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class KickoffResolverTest extends TestCase
@@ -140,7 +143,7 @@ final class KickoffResolverTest extends TestCase
         $this->assertEquals(1, $result['state']->getBall()->getCarrierId());
     }
 
-    // Pravidla ř. 279-281: "If the ball scatters OR BOUNCES off the pitch or into the kicking
+    // Pravidla ř. 280-282: "If the ball scatters OR BOUNCES off the pitch or into the kicking
     // team's half, the receiving coach is awarded a 'touchback'"; FAQ ř. 9315-9318: "any event
     // that causes the ball to go out of bounds or over the line of scrimmage during a kick-off
     // results in a touchback". Míč dopadne na (12,7) — poslední sloupec domácí poloviny.
@@ -206,7 +209,56 @@ final class KickoffResolverTest extends TestCase
         $result = $this->createResolver($dice)->resolveKickoff($state, new Position(11, 7));
 
         $this->assertTrue($result['state']->getBall()->isHeld(), 'odraz za lajnu po neúspěšném chytání = touchback');
-        $this->assertSame(3, $result['state']->getBall()->getCarrierId());
+        // komu přijímající kouč míč dá, je jeho volba ("give the ball to any player", ř. 282)
+        $carrier = $result['state']->getPlayer((int) $result['state']->getBall()->getCarrierId());
+        $this->assertSame(TeamSide::HOME, $carrier?->getTeamSide());
+    }
+
+    /**
+     * Každá cesta, kudy míč po dopadu výkopu odskočí dál, a na jejím konci stojící kopající hráč
+     * za lajnou, kterému padne 6. Pravidla ř. 280-282 + FAQ ř. 9315-9318 ⇒ touchback, kopající
+     * nechytá. Hráč 2 (kopající) stojí na (13,7), přijímající 3 na (6,7) dostane touchback.
+     *
+     * @return array<string, array{int, string, list<int>}>
+     */
+    public static function bounceRoutesOntoAKickingPlayer(): array
+    {
+        // výkop D8 východ, D6 1 z (11,y) ⇒ (12,y); tabulka 3+4 = počasí 3+3
+        return [
+            // dopad přímo na hráče na (12,7), ten nechytá; odraz D8 3 ⇒ (13,7); kopající hodí 6
+            'dopad na hráče bez tackle zón' => [7, 'bez zón', [3, 1, 3, 4, 3, 3, 3, 6]],
+            'dopad na hráče s No Hands' => [7, 'No Hands', [3, 1, 3, 4, 3, 3, 3, 6]],
+            // dopad na prázdné (12,6), odraz D8 5 ⇒ hráč na (12,7), pak odraz D8 3 ⇒ (13,7)
+            'odraz na hráče, který nechytí' => [6, 'nechytí', [3, 1, 3, 4, 3, 3, 5, 1, 3, 6]],
+            'odraz na hráče s No Hands' => [6, 'No Hands', [3, 1, 3, 4, 3, 3, 5, 3, 6]],
+            'odraz přes ležícího hráče' => [6, 'leží', [3, 1, 3, 4, 3, 3, 5, 3, 6]],
+        ];
+    }
+
+    /** @param list<int> $rolls */
+    #[DataProvider('bounceRoutesOntoAKickingPlayer')]
+    public function testKickoffBallReachingAStandingKickingPlayerOverTheLineIsATouchback(int $kickY, string $receiver, array $rolls): void
+    {
+        $state = (new GameStateBuilder())
+            ->withPhase(GamePhase::KICKOFF)
+            ->addPlayer(TeamSide::HOME, 12, 7, agility: 3, skills: $receiver === 'No Hands' ? [SkillName::NoHands] : [], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 7, id: 3)
+            ->addPlayer(TeamSide::AWAY, 13, 7, agility: 3, id: 2)
+            ->build();
+        $player1 = $state->getPlayer(1);
+        $this->assertNotNull($player1);
+        if ($receiver === 'bez zón') {
+            $state = $state->withPlayer($player1->withLostTacklezones(true));
+        } elseif ($receiver === 'leží') {
+            $state = $state->withPlayer($player1->withState(PlayerState::PRONE));
+        }
+
+        $result = $this->createResolver(new FixedDiceRoller($rolls))->resolveKickoff($state, new Position(11, $kickY));
+
+        $ball = $result['state']->getBall();
+        $this->assertTrue($ball->isHeld(), 'touchback: míč drží přijímající tým');
+        $this->assertNotSame(2, $ball->getCarrierId(), 'kopající za lajnou nechytá');
+        $this->assertSame(TeamSide::HOME, $result['state']->getPlayer((int) $ball->getCarrierId())?->getTeamSide());
     }
 
     // --- Kickoff Table Event Tests ---

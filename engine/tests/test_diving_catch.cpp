@@ -237,7 +237,7 @@ TEST(DivingCatch, ThrowInDivingCatchGetsNoTeamRerollInOpponentsTurn) {
 }
 
 // Přesná přihrávka (6) na prázdné (10,5); hráč SOUPEŘE s Diving Catch na (11,5) (za cílem — žádné
-// zachycení). Smí kterýkoli tým (ř. 8066 "any pass"); +1 za přesnou (ř. 891), ne +2 (ř. 8063-8064)
+// zachycení). Smí kterýkoli tým (ř. 8065 "any pass"); +1 za přesnou (ř. 891), ne +2 (ř. 8063-8064)
 // ⇒ AG3 3+: hod 3 chytí (turnover), hod 2 ne (odraz z (11,5) D8 3 = V na (12,5)).
 TEST(DivingCatch, OpposingDivingCatchPlayerCatchesAnAccuratePassToAnEmptySquare) {
     auto build = [] {

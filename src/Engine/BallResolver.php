@@ -221,7 +221,7 @@ final class BallResolver
      * dopadající míč chytá: stojící hráč na poli; na prázdné pole hráč s Diving Catch; jinak odraz.
      *
      * DOPLNĚNO 20. 10. 2026 (P223) — Diving Catch byl jen u nepřesné přihrávky (P221, kopie
-     *   v `PassResolver`). Pravidla ř. 8066-8067: "the player can attempt to catch ANY PASS, KICK OFF
+     *   v `PassResolver`). Pravidla ř. 8065-8067: "the player can attempt to catch ANY PASS, KICK OFF
      *   OR CROWD THROW-IN, but not bouncing ball, that would land in an empty square in one of his
      *   tackle zones". Přesná přihrávka chycená skokem dostane +1 "Catching an accurate pass"
      *   (ř. 891), ale ne +1 z Diving Catch — ten je jen "from an accurate pass targeted to his
@@ -247,7 +247,7 @@ final class BallResolver
         $catcher = $state->getPlayerAtPosition($landing);
         $diving = false;
         if ($catcher === null) {
-            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8066) — viz KickoffResolver
+            // $divingCatch = false: kandidát skok odmítl (skill je volba, ř. 8065) — viz KickoffResolver
             $catcher = $divingCatch ? $this->findDivingCatchPlayer($state, $landing) : null;
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
@@ -337,7 +337,7 @@ final class BallResolver
 
         // OPRAVENO 30. 10. 2026 (P223 review, parita s C++ `landBall`) — u výkopu se míč po odrazu
         //   ven vhazoval a po odrazu do kopající poloviny tam zůstal ležet (nebo ho chytil soupeř).
-        //   Pravidla ř. 279-281: "If the ball scatters or BOUNCES off the pitch or into the kicking
+        //   Pravidla ř. 280-282: "If the ball scatters or BOUNCES off the pitch or into the kicking
         //   team's half, the receiving coach is awarded a 'touchback'"; FAQ ř. 9315-9318: "any event
         //   that causes the ball to go out of bounds or over the line of scrimmage during a kick-off
         //   results in a touchback".

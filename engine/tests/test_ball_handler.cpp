@@ -314,6 +314,26 @@ TEST(BallHandler, ThrowInFinalBounceOntoPlayer) {
     EXPECT_EQ(gs.ball.carrierId, 1);
 }
 
+// Převod PHP opravy (P223 review LOW, `BallResolverTest::testBounceChainThroughThrowInsWith
+// FailedCatchesStopsAtTheSafetyCap`): vhazování a dopad (`resolveThrowIn` → `resolveLanding`)
+// startovaly hloubku odrazů od 0 ⇒ smyčka „odraz ven → vhazování → nechytí → odraz ven“ obcházela
+// pojistku `depth > 200`. A na (6,0) a B na (6,1), AG1, oba nechytají (1); každý odraz na sever,
+// vhazování kolmo dovnitř o jedno pole na B. Kostek je na 300 kol smyčky — bez pojistky dojdou.
+TEST(BallHandler, BounceChainThroughThrowInsWithFailedCatchesStopsAtTheSafetyCap) {
+    GameState gs;
+    placePlayer(gs, 1, {6, 0}, TeamSide::HOME, 6, 3, 1);
+    placePlayer(gs, 2, {6, 1}, TeamSide::HOME, 6, 3, 1);
+    gs.ball = BallState::onGround({6, 0});
+    // odraz z A ven (1); vhazování: šablona 3, 2D6 = 1+1 ⇒ B; B nechytí (1), odraz (1) ⇒ A;
+    // A nechytí (1), odraz (1) ⇒ ven; …
+    std::vector<int> rolls{1};
+    for (int i = 0; i < 300; ++i) rolls.insert(rolls.end(), {3, 1, 1, 1, 1, 1, 1});
+    FixedDiceRoller dice(rolls);
+    EXPECT_NO_THROW(resolveBounce(gs, {6, 0}, dice, 0, nullptr));
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_GT(dice.remaining(), 0u) << "řetěz odrazů se zastavil na pojistce";
+}
+
 // --- P64 (port PHP a7603e8f): team re-roll on a catch only in own turn,
 // never on a kick-off landing. BB2016 l. 929-933 and l. 1261-1263.
 static GameState catchFixture(TeamSide active) {

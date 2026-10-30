@@ -168,7 +168,7 @@ final class DivingCatchTest extends TestCase
     }
 
     // --- P223: Diving Catch na VŠECH cestách, kde míč dopadá ze vzduchu ---------------------
-    // ř. 8066-8067: "any pass, kick off or crowd throw-in, but not bouncing ball, that would land
+    // ř. 8065-8067: "any pass, kick off or crowd throw-in, but not bouncing ball, that would land
     // in an empty square in one of his tackle zones". Dřív jen nepřesná přihrávka.
 
     public function testAccuratePassToEmptySquareIsCaughtWithAccuratePassModifierOnly(): void
@@ -269,6 +269,17 @@ final class DivingCatchTest extends TestCase
         $this->assertSame(3, $this->accurateDumpOffTo8x5([SkillName::DivingCatch], 3)->getNewState()->getBall()->getCarrierId());
     }
 
+    // Horní hranice (recenze P222/P223 LOW 3): o jedna méně nechytí ⇒ bonus je právě +1 / +2.
+    public function testAccurateDumpOffIsNotCaughtOneBelowTheAccuratePassTarget(): void
+    {
+        $this->assertNotSame(3, $this->accurateDumpOffTo8x5([], 3)->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testAccurateDumpOffToADivingCatchPlayerIsNotCaughtOneBelowItsTarget(): void
+    {
+        $this->assertNotSame(3, $this->accurateDumpOffTo8x5([SkillName::DivingCatch], 2)->getNewState()->getBall()->getCarrierId());
+    }
+
     private function kickoffResolver(FixedDiceRoller $dice): KickoffResolver
     {
         $scatter = new ScatterCalculator();
@@ -301,7 +312,7 @@ final class DivingCatchTest extends TestCase
         // touchback — tyto skilly nejsou povinné“). Výkop na (10,7), rozptyl V o 2 ⇒ prázdné (12,7).
         // Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7); skokem by míč „dopadl“ na jeho pole
         // v kopající polovině = touchback pro soupeře (ř. 8068, 281-282) ⇒ skill je volba („can
-        // attempt“, ř. 8066), neskočí. Míč odskočí z (12,7) D8 7 = Z na (11,7) a leží. Dřív: touchback.
+        // attempt“, ř. 8065), neskočí. Míč odskočí z (12,7) D8 7 = Z na (11,7) a leží. Dřív: touchback.
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 7, agility: 3, id: 1)
             ->addPlayer(TeamSide::AWAY, 13, 7, agility: 3, skills: [SkillName::DivingCatch], id: 2)
@@ -392,7 +403,7 @@ final class DivingCatchTest extends TestCase
     public function testOpposingDivingCatchPlayerCatchesAnAccuratePassToAnEmptySquare(): void
     {
         // Přesná přihrávka (6) na prázdné (10,5); hráč SOUPEŘE s Diving Catch na (11,5) (za cílem, ne
-        // mezi — žádné zachycení). Smí kterýkoli tým (ř. 8066 "any pass"). +1 za přesnou (ř. 891), ne +2
+        // mezi — žádné zachycení). Smí kterýkoli tým (ř. 8065 "any pass"). +1 za přesnou (ř. 891), ne +2
         // (ř. 8063-8064) ⇒ AG3 3+: hod 2 nechytí (odraz z (11,5) D8 3 = V na (12,5)), hod 3 chytí.
         $build = static fn(): GameState => (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, agility: 3, id: 1)

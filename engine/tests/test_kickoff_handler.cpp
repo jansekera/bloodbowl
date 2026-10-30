@@ -455,7 +455,7 @@ TEST(KickoffLanding, KickingPlayerUnderTheBallMustTryToCatchIt) {
     EXPECT_EQ(gs.ball.carrierId, away.id);
 }
 
-// P223. Diving Catch i u výkopu (ř. 8066: "any pass, KICK OFF or crowd throw-in ... that would land
+// P223. Diving Catch i u výkopu (ř. 8065-8066: "any pass, KICK OFF or crowd throw-in ... that would land
 // in an empty square in one of his tackle zones"). (3,7) + 1 na V = prázdné (4,7); hráč přijímajících
 // s Diving Catch na (4,8) chytá 6 ze svého pole. Stará mechanika: odraz D8 6 = JZ na (3,8).
 TEST(KickoffLanding, DivingCatchCatchesAKickLandingNextToHim) {
@@ -473,7 +473,7 @@ TEST(KickoffLanding, DivingCatchCatchesAKickLandingNextToHim) {
 // P223, OPRAVENO 20.10.2026 (uživatel: „proč by automaticky volil použití diving catch, ať je touchback —
 // tyto skilly nejsou povinné“). Jediný hráč s Diving Catch je KOPAJÍCÍ na lajně (13,7) vedle prázdného
 // (12,7). Skokem by míč „dopadl“ na jeho pole v kopající polovině = touchback pro soupeře (ř. 8068,
-// 280-283) ⇒ skill je volba („can attempt“, ř. 8066), kopající neskočí. Míč dopadne na (12,7) a odrazí
+// 280-283) ⇒ skill je volba („can attempt“, ř. 8065), kopající neskočí. Míč dopadne na (12,7) a odrazí
 // se D8 7 = Z na (11,7), kde leží. Dřív: vynucený skok ⇒ touchback.
 TEST(KickoffLanding, AKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback) {
     auto gs = kickFixture(/*withKick=*/false);
