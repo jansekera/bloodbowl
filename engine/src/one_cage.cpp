@@ -19,6 +19,21 @@ namespace bb {
 
 namespace {
 
+// ⭐ GFI PŘI DOBĚHU BLITZU DO ZDI (P229 prolomení, P233 zeď od kraje) — uživatel 30.10.2026: „jsem pro GFI pro blitz
+//   na rozražení zdi“ (varianta: jen s týmovým přehozem po ruce, selhání nejvýš 10 %). OPRAVENO 30. 10. — dřív P229
+//   GFI nehlídal vůbec (2× GFI i bez přehozu, selhání 31 %) a P233 porovnával kroky s MA bez pole za ránu (P82), takže
+//   1× GFI šel bez přehozu. Pravidla ř. 1695-1697 (jedno až dvě pole navíc), ř. 1701-1706 (padlá jednička = turnover).
+//   `steps` = kroky doběhu (blitzLandingDiceFree); rána stojí ještě jedno pole (block_handler.cpp, P82). Víc než
+//   dvě GFI doběh nevrátí (pathfinder si pole za ránu rezervuje sám) a blitzující vždy stojí (freeToAct).
+constexpr double kWallBlitzGfiMaxFail = 0.10;
+int wallBlitzGfi(const Player& p, int steps) { return std::max(0, steps + 1 - static_cast<int>(p.movementRemaining)); }
+bool wallBlitzGfiOk(const GameState& state, const Player& p, int steps) {
+    const int gfi = wallBlitzGfi(p, steps);
+    if (gfi == 0) return true;
+    const bool reroll = state.getTeamState(p.teamSide).canUseReroll() && !p.hasSkill(SkillName::Loner);
+    return reroll && gfiSequenceFailProb(gfi, true, state.weather == Weather::BLIZZARD) <= kWallBlitzGfiMaxFail;
+}
+
 int distToEndzone(Position pos, TeamSide side) {
     return std::abs(pos.x - ((side == TeamSide::HOME) ? 25 : 0));
 }
@@ -417,7 +432,8 @@ bool CageController::stillValid(const GameState& state, const Macro& m) const {
         // doběh hry musí skončit na plánovaném poli — jinde kostky neplatí (review P233 F1)
         Position landing{-1, -1};
         int steps = 0;
-        if (!blitzLandingDiceFree(state, a, d.position, landing, steps) || landing != m.viaPos) return false;
+        if (!blitzLandingDiceFree(state, a, d.position, landing, steps) || landing != m.viaPos ||
+            !wallBlitzGfiOk(state, a, steps)) return false;   // přehoz mohl mezitím padnout (30.10.)
         GameState sim = state.clone();
         sim.getPlayer(a.id).position = m.viaPos;
         return hitAllowed(sim, a, blockDiceCount(sim, sim.getPlayer(a.id), sim.getPlayer(d.id)));
@@ -1852,12 +1868,13 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
         const Position frontSq = at(1, 0);
         const Player* best = nullptr;
         Position bestLanding{-1, -1};
-        std::tuple<int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX};
+        std::tuple<int, int, int, int> bestKey{INT_MAX, INT_MAX, INT_MAX, INT_MAX};
         state.forEachOnPitch(side, [&](const Player& p) {
             if (!cageMayMove(p) || isUsed(p.id) || inCage(p)) return;
             Position landing{-1, -1};
             int steps = 0;
             if (!blitzLandingDiceFree(state, p, centre->position, landing, steps)) return;
+            if (!wallBlitzGfiOk(state, p, steps)) return;
             if (state.getPlayerAtPosition(landing) && landing != p.position) return;
             // kostky z pole, odkud bude blokovat — asistence soupeře se počítají kolem něj (review 27.10. nález 5)
             // s asistenty už na křídlech (review 27.10. odp. nález 2)
@@ -1866,7 +1883,8 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             const int dice = blockDiceCount(sim, sim.getPlayer(p.id), sim.getPlayer(centre->id));
             if (!hitAllowed(sim, p, dice)) return;
             if (!hitKeepsCage(sim, carrier.id, p.id, landing, centre->id, true)) return;   // ne zezadu do klece (29.10.)
-            const std::tuple<int, int, int> key{landing == frontSq ? 0 : 1, -dice, steps};
+            // bez GFI před GFI (review 30.10. nález 1: jinak riziko a přehoz, i když jde blitz bez hodu)
+            const std::tuple<int, int, int, int> key{landing == frontSq ? 0 : 1, wallBlitzGfi(p, steps), -dice, steps};
             if (key < bestKey) { bestKey = key; best = &p; bestLanding = landing; }
         });
         if (best) {
@@ -1950,11 +1968,11 @@ bool CageController::planWallClear(const GameState& state) {
     if (extraFeatureOn(kP232KeepThreat) && wallThreat_ < 0) wallThreat_ = blitzThreat(state, carrier);
     const double threatNow = wallThreat_;
 
-    struct Hit { std::vector<Macro> assists; Macro hit; int dice = -9; bool blitz = false; int rowDist = 99; int steps = 0; };
+    struct Hit { std::vector<Macro> assists; Macro hit; int dice = -9; bool blitz = false; int rowDist = 99; int gfi = 0; int steps = 0; };
     std::optional<Hit> best;
     auto better = [](const Hit& a, const Hit& b) {
-        return std::make_tuple(a.assists.size(), a.blitz, a.rowDist, a.steps) <
-               std::make_tuple(b.assists.size(), b.blitz, b.rowDist, b.steps);
+        return std::make_tuple(a.assists.size(), a.blitz, a.rowDist, a.gfi, a.steps) <
+               std::make_tuple(b.assists.size(), b.blitz, b.rowDist, b.gfi, b.steps);   // bez GFI dřív (30.10.)
     };
     // síla rány: kostky, při shodě čistý rozdíl asistencí (review F3: jeden asistent kostky nezmění, dva ano)
     auto strength = [&](const GameState& b, int attId, Position attPos, int defId) {
@@ -2038,7 +2056,7 @@ bool CageController::planWallClear(const GameState& state) {
             Position landing{-1, -1};
             int steps = 0;
             if (!blitzLandingDiceFree(state, a, target->position, landing, steps)) return;
-            if (steps > a.movementRemaining) return;      // bez GFI: nevyjde-li, je to turnover s asistenty u zdi (review 2)
+            if (!wallBlitzGfiOk(state, a, steps)) return;
             if (nextToCarrier(landing) || (state.getPlayerAtPosition(landing) && landing != a.position)) return;
             GameState board = state.clone();
             Hit h;
@@ -2048,7 +2066,7 @@ bool CageController::planWallClear(const GameState& state) {
             Position again{-1, -1};
             int steps2 = 0;
             if (!blitzLandingDiceFree(board, board.getPlayer(a.id), target->position, again, steps2) || again != landing ||
-                steps2 > a.movementRemaining) return;
+                !wallBlitzGfiOk(board, board.getPlayer(a.id), steps2)) return;
             GameState after = board.clone();
             after.getPlayer(a.id).position = landing;
             if (!keepsThreat(after) || !hitKeepsCage(after, carrier.id, a.id, landing, target->id, true)) return;
@@ -2057,6 +2075,7 @@ bool CageController::planWallClear(const GameState& state) {
             h.blitz = true;
             h.rowDist = rowDist;
             h.steps = steps2;
+            h.gfi = wallBlitzGfi(a, steps2);
             if (!best || better(h, *best)) best = std::move(h);
         });
     }

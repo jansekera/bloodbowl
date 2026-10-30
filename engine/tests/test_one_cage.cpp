@@ -1007,6 +1007,76 @@ TEST(OneCageWallBreak, SlowerCageWithoutFrontCornersFillsInsteadOfGoingAround) {
     EXPECT_TRUE(f2 && f2->teamSide == TeamSide::HOME) << "přední roh (13,8) dostavěn";
 }
 
+// ⭐ GFI PŘI DOBĚHU BLITZU DO ZDI (uživatel 30.10.2026 k partii zed-lide: „jsem pro GFI pro blitz na rozražení zdi“ —
+//   varianta „GFI jen s týmovým přehozem po ruce, selhání nejvýš 10 %“). Dřív řadič hlídal u doběhu jen úhyb, GFI
+//   vůbec ne: blitz s 2× GFI šel i bez přehozu (selhání 31 %). Pravidla ř. 1695-1697: „one or two extra squares“. Blitzer 8 z (9,7) dojde na (13,7) za 4 kroky, rána stojí pole (P82) ⇒ MA 3 = 2× GFI.
+namespace {
+Board gfiWall(int8_t blitzerMa, int rerolls, bool rerollUsed) {
+    Board b = wallWithBlockers(4);
+    b.s.getPlayer(8).stats.movement = blitzerMa;
+    b.s.getPlayer(8).movementRemaining = blitzerMa;
+    b.s.homeTeam.rerolls = static_cast<int8_t>(rerolls);
+    b.s.homeTeam.rerollUsedThisTurn = rerollUsed;
+    return b;
+}
+}  // namespace
+
+TEST(OneCageWallBreakGfi, TwoGfiWithATeamRerollAreAllowed) {          // 2× GFI s přehozem: selhání 7,4 %
+    Board b = gfiWall(3, 1, false);
+    EXPECT_TRUE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+TEST(OneCageWallBreakGfi, TwoGfiWithoutATeamRerollAreNot) {           // bez přehozu 31 %
+    Board b = gfiWall(3, 0, false);
+    EXPECT_FALSE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+TEST(OneCageWallBreakGfi, OneGfiWhenTheRerollWasAlreadyUsedIsNot) {   // 1× GFI bez přehozu 16,7 %
+    Board b = gfiWall(4, 1, true);
+    EXPECT_FALSE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+TEST(OneCageWallBreakGfi, OneGfiWithARerollIsAllowed) {               // 2,8 %
+    Board b = gfiWall(4, 1, false);
+    EXPECT_TRUE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+// Strážný test: 3× GFI neplánuje už pathfinder (pole za ránu si rezervuje sám, pathfinder.cpp) — hlídá, že to tak zůstane.
+TEST(OneCageWallBreakGfi, ThreeGfiAreNeverPlanned) {                  // ř. 1695-1697: nejvýš 2 pole navíc (bez Sprint)
+    Board b = gfiWall(2, 1, false);
+    EXPECT_FALSE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+// Dva kandidáti na pole před nosičem: 8 blíž, ale s 2× GFI bez přehozu; 9 o krok dál, bez GFI. Blitzovat má 9 —
+//   kdyby výběr GFI nehlídal, vybral by bližšího 8 a ten by těsně před ranou neprošel (nebyl by žádný blitz).
+TEST(OneCageWallBreakGfi, TheBlitzerWithoutGfiIsChosenOverACloserOneWithGfi) {
+    Board b = gfiWall(3, 0, false);
+    b.put(9, TeamSide::HOME, {8, 7}, 9);
+    b.s.getPlayer(9).skills.add(SkillName::Block);
+    const CageTurn t = cageTurn(b);
+    EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 9, 15));
+    EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));
+}
+// Review 30.10. nález 1: s přehozem smí 8 (1× GFI), ale 9 dojde bez hodu ⇒ blitzuje 9, i když je o krok dál.
+TEST(OneCageWallBreakGfi, WithARerollTheBlitzerWithoutGfiStillComesFirst) {
+    Board b = gfiWall(4, 1, false);
+    b.put(9, TeamSide::HOME, {8, 7}, 9);
+    b.s.getPlayer(9).skills.add(SkillName::Block);
+    const CageTurn t = cageTurn(b);
+    EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 9, 15));
+    EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));
+}
+// Přehoz se utratí mezi plánem a blitzem (třeba na přesun křídla) ⇒ těsně před ranou se GFI znovu posoudí a blitz se nehraje.
+TEST(OneCageWallBreakGfi, ARerollSpentBeforeTheBlitzCancelsIt) {
+    Board b = gfiWall(3, 1, false);
+    CageController cc(nullptr, cfg(), 1);
+    Macro m;
+    bool planned = false, blitzed = false;
+    while (cc.next(b.s, m)) {
+        if (m.type == MacroType::REPOSITION && m.playerId == 6) { planned = true; b.s.homeTeam.rerollUsedThisTurn = true; }
+        if (m.type == MacroType::BLITZ && m.playerId == 8) blitzed = true;
+        play(b.s, m);
+    }
+    ASSERT_TRUE(planned) << "prolomení začalo křídlem 6";
+    EXPECT_FALSE(blitzed);
+}
+
+
 // (c) „pak co nejdříve dořešit pohyb zaostalců co nejvíce dopředu“
 TEST(OneCageLaggards, FreePlayerLeftBehindMovesForwardWithoutContact) {
     struct Off { Off() { setExtraFeaturesOff(kP230Backup); } ~Off() { setExtraFeaturesOff(0); } } off;   // jediný zaostalec by zůstal zálohou
@@ -2569,6 +2639,34 @@ TEST(OneCageWallClear, TheCageDoesNotMoveAndNoOneExtraStandsNextToTheCarrier) {
         if (q && q->teamSide == TeamSide::HOME) ++ours;
     }
     EXPECT_EQ(ours, 4) << "vedle nosiče jen čtyři rohy (chain push)";
+}
+
+// P233 (zeď od kraje) má tentýž doběh: blitz na kraj zdi s GFI (6 a 7 jednou, 8 dvakrát) bez přehozu se nehraje.
+TEST(OneCageWallClear, TheEdgeBlitzWithGfiOfWallClearingFollowsTheSameRule) {
+    Board withRr = wallWithHelpers(4), noRr = wallWithHelpers(4);
+    for (Board* b : {&withRr, &noRr})
+        // MA 3: nejbližší pole u kraje zdi (13,4)/(13,10) je od 6 a 7 tři kroky + pole za ránu ⇒ každý blitz z 6, 7, 8 má GFI
+        for (int id : {6, 7, 8}) { b->s.getPlayer(id).stats.movement = 3; b->s.getPlayer(id).movementRemaining = 3; }
+    withRr.s.homeTeam.rerolls = 1;
+    auto blitzes = [](const std::vector<Hit>& hs) {
+        return std::count_if(hs.begin(), hs.end(), [](const Hit& h) { return h.m.type == MacroType::BLITZ; });
+    };
+    const auto with = wallClearTurn(withRr), without = wallClearTurn(noRr);
+    ASSERT_GT(blitzes(with), 0) << "pozitivní kontrola: s přehozem blitz s GFI na kraj zdi jde";
+    EXPECT_EQ(blitzes(without), 0);
+}
+
+// Review 30.10. nález 1 v P233: s přehozem by na kraj došli 6 a 7 s 1× GFI, 9 a 10 o krok dál bez GFI ⇒ blitzuje 9 nebo 10.
+TEST(OneCageWallClear, WithARerollTheEdgeBlitzerWithoutGfiComesFirst) {
+    Board b = wallWithHelpers(4);
+    for (int id : {6, 7, 8}) { b.s.getPlayer(id).stats.movement = 3; b.s.getPlayer(id).movementRemaining = 3; }
+    b.put(9, TeamSide::HOME, {9, 3}, 9);
+    b.put(10, TeamSide::HOME, {9, 11}, 9);
+    b.s.homeTeam.rerolls = 1;
+    const std::vector<Hit> hits = wallClearTurn(b);
+    const auto bz = std::find_if(hits.begin(), hits.end(), [](const Hit& h) { return h.m.type == MacroType::BLITZ; });
+    ASSERT_NE(bz, hits.end()) << "pozitivní kontrola: blitz na kraj zdi je";
+    EXPECT_TRUE(bz->m.playerId == 9 || bz->m.playerId == 10) << "blitzoval " << bz->m.playerId;
 }
 
 // Pozitivní kontrola: bez P233 se tu nebije a klec se posune po řadách (P230).
