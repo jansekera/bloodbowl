@@ -203,6 +203,79 @@ TEST(DivingCatch, CrowdThrowInLandingNextToDivingCatchPlayer) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{5, 8}));
 }
 
+// --- P223 review LOW (30.10.2026): chybějící testy, zrcadlo PHP `DivingCatchTest` -------------------
+
+namespace {
+// Vhazování od (0,7) na prázdné (5,7) vedle hráče 1 s Diving Catch na (5,8); chytá 1, pak 4.
+GameState throwInDivedForWithFirstCatchFailed(TeamSide catcherSide) {
+    GameState gs = passSetup();
+    gs.homeTeam.rerolls = 1;
+    gs.awayTeam.rerolls = 1;
+    placePlayer(gs, 1, {5, 8}, catcherSide);
+    gs.getPlayer(1).skills.add(SkillName::DivingCatch);
+    gs.ball = BallState::onGround({0, 7});
+    FixedDiceRoller dice({3, 3, 3, 1, 4});
+    resolveThrowIn(gs, {0, 7}, {-1, 7}, dice, nullptr);
+    return gs;
+}
+}  // namespace
+
+// ř. 929-933: týmový přehoz na hod hráče vlastního týmu ve vlastním tahu (na tahu HOME).
+TEST(DivingCatch, ThrowInDivingCatchMayUseATeamRerollInOwnTurn) {
+    GameState gs = throwInDivedForWithFirstCatchFailed(TeamSide::HOME);
+    ASSERT_TRUE(gs.ball.isHeld) << "přehoz 4 = chyceno";
+    EXPECT_EQ(gs.ball.carrierId, 1);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}
+
+// Totéž, ale skáče hráč AWAY v tahu HOME ⇒ bez přehozu; 4 je odraz z (5,8) na JV (6,9).
+TEST(DivingCatch, ThrowInDivingCatchGetsNoTeamRerollInOpponentsTurn) {
+    GameState gs = throwInDivedForWithFirstCatchFailed(TeamSide::AWAY);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{6, 9}));
+    EXPECT_EQ(gs.awayTeam.rerolls, 1);
+}
+
+// Přesná přihrávka (6) na prázdné (10,5); hráč SOUPEŘE s Diving Catch na (11,5) (za cílem — žádné
+// zachycení). Smí kterýkoli tým (ř. 8066 "any pass"); +1 za přesnou (ř. 891), ne +2 (ř. 8063-8064)
+// ⇒ AG3 3+: hod 3 chytí (turnover), hod 2 ne (odraz z (11,5) D8 3 = V na (12,5)).
+TEST(DivingCatch, OpposingDivingCatchPlayerCatchesAnAccuratePassToAnEmptySquare) {
+    auto build = [] {
+        GameState gs = passSetup();
+        placePlayer(gs, 1, {5, 5}, TeamSide::HOME);
+        placePlayer(gs, 13, {11, 5}, TeamSide::AWAY);
+        gs.getPlayer(13).skills.add(SkillName::DivingCatch);
+        gs.ball = BallState::carried({5, 5}, 1);
+        return gs;
+    };
+    GameState caught = build();
+    FixedDiceRoller d1({6, 3});
+    std::vector<GameEvent> events;
+    auto r1 = resolvePass(caught, 1, {10, 5}, d1, &events);
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    ASSERT_TRUE(caught.ball.isHeld);
+    EXPECT_EQ(caught.ball.carrierId, 13);
+    EXPECT_TRUE(r1.turnover);
+
+    GameState missed = build();
+    FixedDiceRoller d2({6, 2, 3});
+    resolvePass(missed, 1, {10, 5}, d2, nullptr);
+    EXPECT_FALSE(missed.ball.isHeld) << "hod 2 na 3+ nestačí — jen +1";
+    EXPECT_EQ(missed.ball.position, (Position{12, 5}));
+}
+
+// Pro (ř. 8385-8389): neúspěšné chytání skokem (1), Pro 4 dovolí přehoz, přehoz 4 chytí (AG3 4+).
+TEST(DivingCatch, DivingCatchMayUseProToRerollAFailedCatch) {
+    GameState gs = thrownToTenFive();
+    gs.getPlayer(2).skills.add(SkillName::Pro);
+    FixedDiceRoller dice(inaccurateToTenSix({1, 4, 4}));
+    auto result = resolvePass(gs, 1, {10, 5}, dice, nullptr);
+
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    EXPECT_FALSE(result.turnover);
+}
+
 // Strážní test (prošel i před P223): "but not bouncing ball" (ř. 8066).
 TEST(DivingCatch, BouncingBallIsNotDivingCaught) {
     GameState gs = passSetup();

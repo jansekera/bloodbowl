@@ -293,3 +293,39 @@ def test_grab_otazka_a_odpoved():
     assert ps.preloz_odpoved(g, "ano") == 1 and ps.preloz_odpoved(g, "ne") == 0
     assert "Grab" in ps.otazka_str(g) and "push x y" in ps.otazka_str(g)
 
+
+
+def test_grab_otazka_prijde_z_vazby_jako_use_grab():
+    # P222 review LOW: `test_grab_otazka_a_odpoved` si slovník s "USE_GRAB" vyrobí sám, takže nečte, jak
+    # vazba (bb_module.cpp, `names[15]`) přeloží CoachQuestion::USE_GRAB = 15. Tady otázka přijde z enginu:
+    # Black Ork TV1500 s Grabem blokuje lidského hráče bez Side Step a Stand Firm na volném hřišti.
+    grab, side_step, stand_firm = (ps.SKILL_NAMES.index(n) for n in ("Grab", "SideStep", "StandFirm"))
+    videno = set()
+    for seed in range(1, 41):
+        s, d = nova_hra(seed)
+        s.phase = bb.GamePhase.PLAY
+        s.active_team = A
+        hraci = [s.get_player(i) for i in range(1, 23)]
+        ork = next(p for p in hraci if p.team_side == A and p.is_on_pitch() and p.has_skill_index(grab))
+        clovek = next(p for p in hraci if p.team_side == H and p.is_on_pitch()
+                      and not p.has_skill_index(side_step) and not p.has_skill_index(stand_firm))
+        obsazeno = {(p.position.x, p.position.y) for p in hraci if p.is_on_pitch() and p.id not in (ork.id, clovek.id)}
+        x, y = next((x, y) for y in range(2, 13) for x in range(2, 23)
+                    if not {(x + dx, y + dy) for dx in range(-1, 3) for dy in range(-1, 2)} & obsazeno)
+        ork.position = bb.Position(x, y)
+        clovek.position = bb.Position(x + 1, y)
+        a = next(a for a in bb.get_available_actions(s)
+                 if str(a.type).endswith("BLOCK") and a.player_id == ork.id and a.target_id == clovek.id)
+        odpovedi = []
+        for pokus in range(12):
+            _, _, q = bb.execute_action_coach(s, a, d, A, odpovedi)
+            if q is None:
+                break
+            videno.add(q["question"])
+            if q["question"] == "USE_GRAB":
+                assert (q["player"], q["other"]) == (ork.id, clovek.id)
+                assert q["options"] == 0b11
+                return
+            volby = [i for i in range(8) if q["options"] & (1 << i)]
+            odpovedi.append(volby[(seed + pokus) % len(volby)])
+    raise AssertionError("ve 40 blocích orka s Grabem otázka USE_GRAB nepřišla: %s" % videno)

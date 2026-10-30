@@ -489,6 +489,26 @@ TEST(KickoffLanding, AKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback
         EXPECT_FALSE(e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::DivingCatch));
 }
 
+// P223 review LOW (30.10.2026): chybějící test — zrcadlo PHP `DivingCatchTest`. Strážní: chování C++
+// bylo správné, test hlídá, aby zůstalo (mutace v evidence/noc_20261030/B_autor.md).
+
+// ř. 8068-8069: „A failed catch will bounce from the Diving Catch player's square.“ Jako
+// DivingCatchCatchesAKickLandingNextToHim, ale chytání 1 (u výkopu bez přehozu, ř. 1261-1263) a odraz
+// D8 3 = V z (4,8) na (5,8). Odraz z pole dopadu (4,7) by dal (5,7).
+TEST(KickoffLanding, FailedDivingCatchBouncesFromTheDivingCatchPlayersSquare) {
+    auto gs = kickFixture(/*withKick=*/false);
+    Player& elf = playerAt(gs, {7, 7});
+    elf.position = {4, 8};
+    elf.skills.add(SkillName::DivingCatch);
+    ASSERT_EQ(gs.getPlayerAtPosition({5, 8}), nullptr);
+    ASSERT_EQ(gs.getPlayerAtPosition({5, 7}), nullptr);
+    FixedDiceRoller dice({1, 3, 1, 1, 1, 3});
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{5, 8}));
+    EXPECT_EQ(elf.position, (Position{4, 8})) << "ani při neúspěchu se hráč nepohne";
+}
+
 // ř. 1033-1035: „Play stops when both coaches have had eight turns each.“ Přijímající, kterému
 // nezbývá kolo, už výkop nedostane (dřív se kopalo, házelo na tabulku a teprve pak skončil poločas).
 TEST(KickoffHandler, NoKickoffWhenTheReceivingTeamHasNoTurnLeft) {
@@ -909,7 +929,7 @@ TEST(KickoffLanding, BounceOffThePitchIsATouchback) {
     EXPECT_EQ(dice.remaining(), 0u);
 }
 
-// FAQ ř. 9312-9314: „If a player fails to catch a ball from a kick-off, and the ball bounces over the
+// FAQ ř. 9315-9318: „If a player fails to catch a ball from a kick-off, and the ball bounces over the
 // line of scrimmage, is it a touchback? A. Yes“. Krátký kop (7,7) + 5 na východ = (12,7) na hráče
 // na LoS; chytání 1 ⇒ odraz na východ (13,7) = kopající polovina.
 TEST(KickoffLanding, FailedCatchBouncingOverTheLineOfScrimmageIsATouchback) {
