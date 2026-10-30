@@ -9,6 +9,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
+use App\DTO\PendingDivingCatchDTO;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
@@ -47,6 +48,7 @@ final class ActionResolver
     private readonly RerollHandler $rerollHandler;
     private ?PassResolver $passResolver = null;
     private readonly DiceRollerInterface $dice;
+    private readonly ReplayDiceRoller $replayDice;
     private readonly TacklezoneCalculator $tzCalc;
     private readonly ScatterCalculator $scatterCalc;
     private readonly BallResolver $ballResolver;
@@ -65,6 +67,11 @@ final class ActionResolver
         ?KickoffResolver $kickoffResolver = null,
         ?GameFlowResolver $gameFlowResolver = null,
     ) {
+        // 30.10.2026: všechny hody akce jdou přes záznam, aby šla po otázce Diving Catch přehrát (viz `resolve`).
+        //   Předané `$ballResolver` / `$kickoffResolver` mají kostky vlastní — přehrání počítá s tím, že je
+        //   staví tenhle konstruktor (tak to dělají GameOrchestrator i AITurnService).
+        $this->replayDice = new ReplayDiceRoller($dice);
+        $dice = $this->replayDice;
         $this->dice = $dice;
         $this->tzCalc = $tzCalc ?? new TacklezoneCalculator();
         $this->scatterCalc = $scatterCalc ?? new ScatterCalculator();
@@ -127,6 +134,17 @@ final class ActionResolver
     public function setInteractiveStandFirm(array $sides): void
     {
         $this->blockHandler->setAskStandFirm($sides);
+    }
+
+    /**
+     * 30.10.2026: strany kouče-člověka -- jeho hráče s Diving Catch se ptá, jestli skočí (i v tahu
+     * soupeře); hráče AI rozhoduje engine jako dosud.
+     *
+     * @param list<TeamSide> $sides
+     */
+    public function setInteractiveDivingCatch(array $sides): void
+    {
+        $this->ballResolver->setInteractiveDivingCatch($sides);
     }
 
     public function setInteractiveRerolls(bool $interactive): void
@@ -212,6 +230,54 @@ final class ActionResolver
      * @param array<string, mixed> $params
      */
     public function resolve(GameState $state, ActionType $action, array $params): ActionResult
+    {
+        // 30.10.2026: Diving Catch jako otázka kouči (ř. 8065 "can attempt"). Otázka přijde uprostřed
+        //   akce, až po hodech; akce se přeruší (`DivingCatchQuestion`), vrátí se stav PŘED ní s otázkou
+        //   a po odpovědi se přehraje se zapsanými hody a všemi dosavadními odpověďmi (`ReplayDiceRoller`).
+        if ($action === ActionType::RESOLVE_DIVING_CATCH) {
+            $pending = $state->getPendingDivingCatch() ?? throw new \InvalidArgumentException('No pending Diving Catch question');
+
+            return $this->resolveSPrehranim(
+                $state->withPendingDivingCatch(null),
+                $pending->getAction(),
+                $pending->getParams(),
+                $pending->getDice(),
+                [...$pending->getAnswers(), (bool) ($params['use'] ?? false)],
+            );
+        }
+
+        return $this->resolveSPrehranim($state, $action, $params, [], []);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param list<int> $hody
+     * @param list<bool> $odpovedi
+     */
+    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, array $odpovedi): ActionResult
+    {
+        $this->replayDice->begin($hody);
+        $this->ballResolver->setDivingCatchAnswers($odpovedi);
+        try {
+            return $this->resolveJednou($state, $action, $params);
+        } catch (DivingCatchQuestion $q) {
+            return ActionResult::success($state->withPendingDivingCatch(new PendingDivingCatchDTO(
+                $q->playerId,
+                $q->landing,
+                $action,
+                $params,
+                $this->replayDice->getLog(),
+                $odpovedi,
+            )), []);
+        } finally {
+            $this->ballResolver->setDivingCatchAnswers([]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function resolveJednou(GameState $state, ActionType $action, array $params): ActionResult
     {
         // P206 (14.10.2026): lékárník pro všechna zranění akce (i výkopu přes SetupHandler) na jednom
         //   místě. Rozhodnutí AI = C++ `injury.cpp`: jen na Badly Hurt nebo smrt a jen hráče, kterého
@@ -430,6 +496,7 @@ final class ActionResolver
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
+            ActionType::RESOLVE_DIVING_CATCH => throw new \LogicException('RESOLVE_DIVING_CATCH se vyřizuje v resolve()'),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)

@@ -17,6 +17,9 @@ void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,
 // P223: hráč s Diving Catch, který smí chytit míč dopadající ze vzduchu na PRÁZDNÉ pole `at`
 // (stojí, má tackle zóny, sousedí; jediný takový — dva a víc se ruší, ř. 8065-8071); -1 = nikdo.
 int divingCatcherFor(const GameState& state, Position at);
+// Uživatel 30.10.2026: skočí hráč `diver` pro míč dopadající na `at`? Skill je volba (ř. 8065 "can
+// attempt"): v živé partii odpoví kouč hráče (USE_DIVING_CATCH, i v tahu soupeře), jinak `aiJumps`.
+bool divingCatchChosen(const GameState& state, int diver, Position at, bool aiJumps);
 // P223: JEDINÉ místo „míč dopadá ze vzduchu na pole `at` na hřišti“ — přihrávka (přesná
 // i nepřesná), Hail Mary, vhazování (výkop má vlastní `landBall` kvůli touchbacku, hráče s Diving
 // Catch bere z `divingCatcherFor`). Ne odraz. Stojící hráč chytá; na prázdné pole hráč s Diving

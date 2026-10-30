@@ -92,20 +92,26 @@ final class KickoffResolver
         //   lajně), míč tam "dopadl" ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318), bez hodu.
         $diver = $this->ballResolver->findDivingCatchPlayer($state, $landingPos);
         $diverPos = $diver?->getPosition();
-        $skok = true;
-        if ($diverPos !== null && !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam)) {
+        $skok = false;
+        if ($diver !== null && $diverPos !== null) {
+            $vKopajici = !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam);
             // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
             //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
-            //   Kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně.
-            //   Přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
+            //   AI: kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně;
+            //   přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
             //   Jako jeden ze dvou kandidátů kopající dál „skočí“ a zruší přijímajícího (ř. 8069-8071) —
             //   to řeší `findDivingCatchPlayer` (vrátí null), sem se nedostane.
-            if ($diver->getTeamSide() === $receivingTeam) {
+            // Uživatel 30.10.2026: hráče kouče-člověka se ptá (`divingCatchJumps`), i kopajícího.
+            $skok = $this->ballResolver->divingCatchJumps(
+                $diver,
+                $landingPos,
+                aiJumps: !$vKopajici || $diver->getTeamSide() === $receivingTeam,
+            );
+            if ($skok && $vKopajici) {
                 $events[] = GameEvent::divingCatch($diver->getId());
                 $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
                 return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
             }
-            $skok = false;
         }
 
         // Chytání při dopadu výkopu bez týmového přehozu (ř. 1261-1263).

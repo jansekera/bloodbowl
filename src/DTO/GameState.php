@@ -46,6 +46,8 @@ final class GameState
         private ?PendingGrabDTO $pendingGrab = null,
         // P226, 21.10.2026: čekající otázka kouče, jestli jeho hráč použije Stand Firm (viz PendingStandFirmDTO).
         private ?PendingStandFirmDTO $pendingStandFirm = null,
+        // 30.10.2026: čekající otázka kouče, jestli jeho hráč použije Diving Catch (viz PendingDivingCatchDTO).
+        private ?PendingDivingCatchDTO $pendingDivingCatch = null,
     ) {}
 
     /**
@@ -343,6 +345,18 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingDivingCatch(): ?PendingDivingCatchDTO
+    {
+        return $this->pendingDivingCatch;
+    }
+
+    public function withPendingDivingCatch(?PendingDivingCatchDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingDivingCatch = $pending;
+        return $clone;
+    }
+
     public function getDeclaredBlitzerId(): ?int
     {
         return $this->declaredBlitzerId;
@@ -505,6 +519,7 @@ final class GameState
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
             'pendingGrab' => $this->pendingGrab?->toArray(),
             'pendingStandFirm' => $this->pendingStandFirm?->toArray(),
+            'pendingDivingCatch' => $this->pendingDivingCatch?->toArray(),
         ];
     }
 
@@ -539,6 +554,7 @@ final class GameState
             pendingApothecary: isset($data['pendingApothecary']) ? PendingApothecaryDTO::fromArray((array) $data['pendingApothecary']) : null,
             pendingGrab: isset($data['pendingGrab']) ? PendingGrabDTO::fromArray((array) $data['pendingGrab']) : null,
             pendingStandFirm: isset($data['pendingStandFirm']) ? PendingStandFirmDTO::fromArray((array) $data['pendingStandFirm']) : null,
+            pendingDivingCatch: isset($data['pendingDivingCatch']) ? PendingDivingCatchDTO::fromArray((array) $data['pendingDivingCatch']) : null,
         );
     }
 }

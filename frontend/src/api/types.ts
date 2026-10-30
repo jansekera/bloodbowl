@@ -109,6 +109,20 @@ export interface PendingStandFirm {
     pushToDependsOn?: number[];
 }
 
+/**
+ * 30.10.2026: kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt` ř. 8065-8071).
+ * Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje (`action`, `params`, `dice`, `answers`).
+ */
+export interface PendingDivingCatch {
+    playerId: number;
+    /** prázdné pole v jeho tackle zóně, kam míč dopadá */
+    landing: { x: number; y: number };
+    action: string;
+    params: Record<string, unknown>;
+    dice: number[];
+    answers: boolean[];
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -130,6 +144,7 @@ export interface GameState {
     pendingApothecary?: PendingApothecary | null;
     pendingGrab?: PendingGrab | null;
     pendingStandFirm?: PendingStandFirm | null;
+    pendingDivingCatch?: PendingDivingCatch | null;
 }
 
 export interface TeamState {

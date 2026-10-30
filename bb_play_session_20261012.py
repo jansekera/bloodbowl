@@ -524,7 +524,7 @@ def kostky_str(packed):
 PREHOZ = {"ne": 0, "tym": 1, "tým": 1, "pro": 2}
 ANO_NE = {"ne": 0, "ano": 1}
 SKILL_OTAZKY = {"USE_DODGE": "Dodge", "USE_WRESTLE": "Wrestle", "USE_STAND_FIRM": "Stand Firm",
-                "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab"}
+                "USE_SIDE_STEP": "Side Step", "USE_GRAB": "Grab", "USE_DIVING_CATCH": "Diving Catch"}
 
 
 def moznosti_prehozu(q):
@@ -564,6 +564,9 @@ def otazka_str(q):
     if t == "APOTHECARY_PICK":
         return (f"❓ LÉKÁRNÍK hráč {p}: první hod {zraneni_str(q['roll'])}, druhý {zraneni_str(q['target'])}"
                 " — který platí?  ->  odp 1 / 2")
+    if t == "USE_DIVING_CATCH":   # 30.10.2026: míč dopadá na prázdné pole vedle hráče (ř. 8065-8071)
+        return (f"❓ DIVING CATCH hráč {p}: míč dopadá na ({q['target'] // 100},{q['target'] % 100}) vedle něj"
+                " — skočit (chytá ze svého pole, neúspěch odskočí od něj)?  ->  odp ano / ne (ne = míč dopadne a odrazí se)")
     if t in SKILL_OTAZKY:
         kdo = f" (v bloku s hráčem {o})" if o > 0 else ""   # P201 (5): ptá se i útočník
         navic = {"USE_SIDE_STEP": "   (před `odp ano` lze zadat sidestep x y)",

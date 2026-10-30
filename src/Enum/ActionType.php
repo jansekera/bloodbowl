@@ -36,11 +36,12 @@ enum ActionType: string
     case RESOLVE_APOTHECARY = 'resolve_apothecary';   // P206 (b): volba kouče o lékárníkovi
     case RESOLVE_GRAB = 'resolve_grab';               // P224: odpověď kouče, zda útočník použije Grab
     case RESOLVE_STAND_FIRM = 'resolve_stand_firm';   // P226: odpověď kouče, zda jeho hráč použije Stand Firm
+    case RESOLVE_DIVING_CATCH = 'resolve_diving_catch'; // 30.10.2026: odpověď kouče, zda jeho hráč použije Diving Catch
 
     public function requiresPlayer(): bool
     {
         return match ($this) {
-            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY, self::RESOLVE_GRAB, self::RESOLVE_STAND_FIRM => false,
+            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY, self::RESOLVE_GRAB, self::RESOLVE_STAND_FIRM, self::RESOLVE_DIVING_CATCH => false,
             default => true,
         };
     }

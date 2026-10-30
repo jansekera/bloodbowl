@@ -45,7 +45,11 @@ enum class CoachQuestion : int {
     // P222 (20.10.2026): útočník s Grabem při odtlačení (ř. 8149 "may choose"); playerId =
     // útočník, otherId = odtlačený. Ptá se jen, když Grab platit může (Block Action / blok B&C,
     // volné pole vedle soupeře, bez Side Step obránce). Pole pak volí příkaz `push`.
-    USE_GRAB = 15
+    USE_GRAB = 15,
+    // Uživatel 30.10.2026: hráč s Diving Catch, když míč z přihrávky, výkopu nebo vhazování (ne odraz)
+    // dopadá na prázdné pole v jeho tackle zóně a jiný kandidát není (ř. 8065-8071 "can attempt").
+    // playerId = hráč, target = pole dopadu x*100+y. Ptá se kouče hráče, i v tahu soupeře.
+    USE_DIVING_CATCH = 16
 };
 
 namespace CoachAnswer {

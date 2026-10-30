@@ -46,6 +46,15 @@ final class RulesEngine
     {
         $errors = [];
 
+        // 30.10.2026: otázka na Diving Catch má přednost úplně před vším — stav je stav PŘED přerušenou akcí
+        //   (může nést i jiné čekající volby, ze kterých akce vyšla) a po odpovědi se akce přehraje.
+        if ($state->getPendingDivingCatch() !== null) {
+            return $action !== ActionType::RESOLVE_DIVING_CATCH ? ['Must answer the Diving Catch question first']
+                : (isset($params['use']) && is_bool($params['use']) ? [] : ['use must be a boolean']);
+        }
+        if ($action === ActionType::RESOLVE_DIVING_CATCH) {
+            return ['No pending Diving Catch question'];
+        }
         // P206 (b), review 16.10.: čekající volba o lékárníkovi má přednost před VŠÍM (i před volbou kostky
         //   bloku a výkopem) — jinak by další odložené zranění přepsalo nabídku.
         if ($state->getPendingApothecary() !== null && $action !== ActionType::RESOLVE_APOTHECARY) {
@@ -146,6 +155,11 @@ final class RulesEngine
     {
         $actions = [];
         $side = $state->getActiveTeam();
+
+        // 30.10.2026: čekající otázka na Diving Catch — jen odpověď kouče (přednost před vším, viz validate)
+        if ($state->getPendingDivingCatch() !== null) {
+            return [['type' => ActionType::RESOLVE_DIVING_CATCH->value]];
+        }
 
         // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče
         if ($state->getPendingApothecary() !== null) {
