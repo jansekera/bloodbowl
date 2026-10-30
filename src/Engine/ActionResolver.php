@@ -55,34 +55,24 @@ final class ActionResolver
     private readonly GameFlowResolver $gameFlowResolver;
     private readonly BigGuyCheckResolver $bigGuyCheckResolver;
 
-    public function __construct(
-        DiceRollerInterface $dice,
-        ?TacklezoneCalculator $tzCalc = null,
-        ?Pathfinder $pathfinder = null,
-        ?StrengthCalculator $strCalc = null,
-        ?InjuryResolver $injuryResolver = null,
-        ?BallResolver $ballResolver = null,
-        ?ScatterCalculator $scatterCalc = null,
-        ?PassResolver $passResolver = null,
-        ?KickoffResolver $kickoffResolver = null,
-        ?GameFlowResolver $gameFlowResolver = null,
-    ) {
+    public function __construct(DiceRollerInterface $dice)
+    {
         // 30.10.2026: všechny hody akce jdou přes záznam, aby šla po otázce Diving Catch přehrát (viz `resolve`).
-        //   Předané `$ballResolver` / `$kickoffResolver` mají kostky vlastní — přehrání počítá s tím, že je
-        //   staví tenhle konstruktor (tak to dělají GameOrchestrator i AITurnService).
+        // OPRAVENO 30.10.2026 (recenze C/1) — konstruktor dřív bral i hotové BallResolver/PassResolver/
+        //   KickoffResolver/GameFlowResolver s vlastními kostkami mimo záznam (tak je předával kontejner) ⇒ po
+        //   odpovědi se akce přehrála s novými hody. Proto se všechny resolvery staví tady nad `$replayDice`.
         $this->replayDice = new ReplayDiceRoller($dice);
         $dice = $this->replayDice;
         $this->dice = $dice;
-        $this->tzCalc = $tzCalc ?? new TacklezoneCalculator();
-        $this->scatterCalc = $scatterCalc ?? new ScatterCalculator();
-        $pathfinder = $pathfinder ?? new Pathfinder($this->tzCalc);
-        $strCalc = $strCalc ?? new StrengthCalculator();
-        $injuryResolver = $injuryResolver ?? new InjuryResolver();
+        $this->tzCalc = new TacklezoneCalculator();
+        $this->scatterCalc = new ScatterCalculator();
+        $pathfinder = new Pathfinder($this->tzCalc);
+        $strCalc = new StrengthCalculator();
+        $injuryResolver = new InjuryResolver();
         $this->injuryResolver = $injuryResolver;
-        $this->ballResolver = $ballResolver ?? new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
-        $this->passResolver = $passResolver;
-        $kickoffResolver = $kickoffResolver ?? new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
-        $this->gameFlowResolver = $gameFlowResolver ?? new GameFlowResolver($dice);
+        $this->ballResolver = new BallResolver($dice, $this->tzCalc, $this->scatterCalc);
+        $kickoffResolver = new KickoffResolver($dice, $this->scatterCalc, $this->ballResolver, $injuryResolver);
+        $this->gameFlowResolver = new GameFlowResolver($dice);
         // ⭐ 11.09.2026 (PHP22): Bloodlust potrebuje hod na zraneni a odraz
         //   mice, takze uz to neni bezzavisla trida.
         $this->bigGuyCheckResolver = new BigGuyCheckResolver($injuryResolver, $this->ballResolver);

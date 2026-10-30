@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Engine;
 
 use App\AI\AICoachInterface;
+use App\Container\Container;
+use App\Container\ServiceProvider;
 use App\DTO\ActionResult;
 use App\DTO\GameState;
 use App\Engine\ActionResolver;
 use App\Engine\BallResolver;
+use App\Engine\DiceRollerInterface;
 use App\Engine\DivingCatchQuestion;
 use App\Engine\FixedDiceRoller;
 use App\Engine\InjuryResolver;
@@ -254,6 +257,73 @@ final class DivingCatchKoucTest extends TestCase
         }
     }
 
+    /**
+     * Recenze 30.10. C/2: PŘIJÍMAJÍCÍ hráč (HOME) kouče-člověka v přijímající polovině — nejčastější případ.
+     * Jako DivingCatchTest::testKickOffLandingNextToDivingCatchPlayer: výkop na (6,7), rozptyl V o 1 ⇒
+     * prázdné (7,7), hráč s Diving Catch na (7,8). Ne ⇒ odskok z (7,7) D8 4 = JV na (8,8); ano ⇒ chytá 4.
+     *
+     * @param list<bool> $odpovedi
+     * @return array{state: GameState, events: list<\App\DTO\GameEvent>}
+     */
+    private function vykopPrijimajici(array $odpovedi): array
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 7, 8, agility: 3, skills: [SkillName::DivingCatch], id: 1)
+            ->addPlayer(TeamSide::AWAY, 15, 7, id: 2)
+            ->build();
+        $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 4]);
+        $scatter = new ScatterCalculator();
+        $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
+        $ball->setInteractiveDivingCatch([TeamSide::HOME]);
+        $ball->setDivingCatchAnswers($odpovedi);
+
+        return (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(6, 7));
+    }
+
+    public function testVykopPrijimajicihoClovekaSePta(): void
+    {
+        $this->expectException(DivingCatchQuestion::class);
+        $this->vykopPrijimajici([]);
+    }
+
+    public function testVykopPrijimajiciNeMicOdskociZPoleDopaduAnoChyta(): void
+    {
+        $this->assertSame([8, 8], $this->mic($this->vykopPrijimajici([false])['state']));
+        $this->assertSame(1, $this->vykopPrijimajici([true])['state']->getBall()->getCarrierId());
+    }
+
+    public function testDveOtazkyVJedneAkciOdpovediSeSpotrebujiPopoade(): void
+    {
+        // Recenze 30.10. C/3: fronta odpovědí délky 2. Přihrávka (5,1) → (10,1), přesnost 2, přehoz 2,
+        // rozptyl S, V, Z ⇒ prázdné (10,0) vedle hráče 2 (DC, (10,1)) = otázka 1. Ne ⇒ dopad a odraz D8 1 = S
+        // ven ⇒ vhazování od horní lajny: šablona 3 = rovně dolů, 2D6 3+3 ⇒ prázdné (10,5) vedle hráče 3
+        // (DC, (10,6)) = otázka 2. Ano ⇒ hráč 3 chytá 6. Kdyby přehrání dalo druhou odpověď (ano) hráči 2,
+        // chytil by hráč 2.
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 1, agility: 3, id: 1)
+            ->addPlayer(TeamSide::HOME, 10, 1, agility: 3, skills: [SkillName::DivingCatch], id: 2)
+            ->addPlayer(TeamSide::HOME, 10, 6, agility: 3, skills: [SkillName::DivingCatch], id: 3)
+            ->withBallCarried(1)
+            ->build();
+
+        $q1 = $this->resolver([2, 2, 1, 3, 7], [TeamSide::HOME])
+            ->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 1])->getNewState();
+        $this->assertSame(2, $q1->getPendingDivingCatch()?->getPlayerId());
+
+        // Odpověď jiným resolverem jen s novými kostkami — hody přihrávky se přehrají ze záznamu.
+        $q2 = $this->resolver([1, 3, 3, 3], [TeamSide::HOME])
+            ->resolve($q1, ActionType::RESOLVE_DIVING_CATCH, ['use' => false])->getNewState();
+        $druha = $q2->getPendingDivingCatch();
+        $this->assertNotNull($druha);
+        $this->assertSame(3, $druha->getPlayerId(), 'druhá otázka u vhazování');
+        $this->assertSame([10, 5], [$druha->getLanding()->getX(), $druha->getLanding()->getY()]);
+        $this->assertSame([false], $druha->getAnswers());
+
+        $r = $this->resolver([6], [TeamSide::HOME])->resolve($q2, ActionType::RESOLVE_DIVING_CATCH, ['use' => true]);
+        $this->assertNull($r->getNewState()->getPendingDivingCatch());
+        $this->assertSame(3, $r->getNewState()->getBall()->getCarrierId());
+    }
+
     public function testVTahuAIOrchestratorZastaviAPoOdpovediTahAIPokracuje(): void
     {
         // AI = AWAY přihrává z (5,5); člověk HOME má hráče 2 s Diving Catch na (10,7).
@@ -294,5 +364,23 @@ final class DivingCatchKoucTest extends TestCase
 
         $r = $this->resolver([4], [TeamSide::HOME])->resolve($ulozeny, ActionType::RESOLVE_DIVING_CATCH, ['use' => true]);
         $this->assertSame(2, $r->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testActionResolverZKontejneruPrehrajeAkciSeStejnymiHody(): void
+    {
+        // Recenze 30.10. C/1: kontejner předával resolvery s vlastními kostkami mimo záznam ⇒ po odpovědi
+        // se přihrávka přehrála s NOVÝMI hody (tady 4, 3, 3 … místo 2, 2, 5, 3, 7) a míč šel jinam.
+        $c = new Container();
+        ServiceProvider::register($c);
+        $c->set(DiceRollerInterface::class, fn() => new FixedDiceRoller(array_merge(self::HODY_PRIHRAVKY, [4], array_fill(0, 20, 3))));
+        $r = $c->get(ActionResolver::class);
+        $r->setInteractiveDivingCatch([TeamSide::HOME]);
+
+        $q = $r->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5])->getNewState();
+        $this->assertSame(2, $q->getPendingDivingCatch()?->getPlayerId());
+
+        $po = $r->resolve($q, ActionType::RESOLVE_DIVING_CATCH, ['use' => true]);
+        $this->assertContains('diving_catch', $this->udalosti($po));
+        $this->assertSame(2, $po->getNewState()->getBall()->getCarrierId(), 'přehrání = tytéž hody, pak chytání 4');
     }
 }

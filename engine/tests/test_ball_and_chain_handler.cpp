@@ -279,10 +279,15 @@ TEST(BallAndChainHandler, LiveGameDoesNotAskAboutGrabAgainstATeammate) {
     auto gs = fanaticBlocksTeammateFixture();
     FixedDiceRoller dice(std::vector<int>(30, 3));
     CoachChoiceScope scope(TeamSide::HOME, {});
+    // Recenze 30.10. C/4: dřív `catch` přijal JAKOUKOLI jinou otázku a nic dál nekontroloval. Teď kouč
+    // nedostane žádnou otázku a B&C musí dojít ke spoluhráči a odtlačit ho jako bez kouče. Přibude-li
+    // jiná otázka (třeba natočení), test spadne a odpověď se do scope doplní vědomě.
     try {
         resolveBallAndChain(gs, 1, dice, nullptr);
-        EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "fixture: B&C šel rovně na spoluhráče";
     } catch (const CoachChoicePending& p) {
-        EXPECT_NE(p.question, CoachQuestion::USE_GRAB) << "Grab proti spoluhráči se nenabízí";
+        FAIL() << "neočekávaná otázka " << static_cast<int>(p.question) << " (USE_GRAB = "
+               << static_cast<int>(CoachQuestion::USE_GRAB) << ")";
     }
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "fixture: B&C šel rovně na spoluhráče";
+    EXPECT_EQ(gs.getPlayer(5).position.x, 12) << "spoluhráč: běžné odtlačení ⇒ řetěz, ne Grab";
 }
