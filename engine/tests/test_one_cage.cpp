@@ -1052,6 +1052,23 @@ TEST(OneCageWallBreakGfi, TheBlitzerWithoutGfiIsChosenOverACloserOneWithGfi) {
     EXPECT_TRUE(hasMacro(t, MacroType::BLITZ, 9, 15));
     EXPECT_FALSE(hasMacro(t, MacroType::BLITZ, 8, 15));
 }
+// Uživatel 30.10.2026: „povolil bych jedno GFI v blizzardu s RR — je to zásadní pro celý tah“. Ve vánici padá GFI
+//   na 1–2 (ř. 1489-1492) ⇒ 1× GFI s přehozem 11 % (nad 10 %), přesto smí; 2× GFI s přehozem 26 % ne.
+TEST(OneCageWallBreakGfi, InABlizzardOneGfiWithARerollIsAllowed) {
+    Board b = gfiWall(4, 1, false);
+    b.s.weather = Weather::BLIZZARD;
+    EXPECT_TRUE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+TEST(OneCageWallBreakGfi, InABlizzardTwoGfiAreNot) {
+    Board b = gfiWall(3, 1, false);
+    b.s.weather = Weather::BLIZZARD;
+    EXPECT_FALSE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
+TEST(OneCageWallBreakGfi, InABlizzardOneGfiWithoutARerollIsNot) {
+    Board b = gfiWall(4, 0, false);
+    b.s.weather = Weather::BLIZZARD;
+    EXPECT_FALSE(hasMacro(cageTurn(b), MacroType::BLITZ, 8, 15));
+}
 // Review 30.10. nález 1: s přehozem smí 8 (1× GFI), ale 9 dojde bez hodu ⇒ blitzuje 9, i když je o krok dál.
 TEST(OneCageWallBreakGfi, WithARerollTheBlitzerWithoutGfiStillComesFirst) {
     Board b = gfiWall(4, 1, false);
@@ -1253,6 +1270,64 @@ TEST(OneCageFreeing, BlitzFreesAHeldTeammateWhenNoBlockIsAvailable) {
         playAll(cc2, c, &ms);
         for (const Macro& q : ms) EXPECT_NE(q.type, MacroType::BLITZ);
     }
+}
+
+// Uživatel 30.10.2026: „povol jedno GFI obecně“ — i blitz na uvolnění klece smí jedno GFI, když je po ruce týmový
+//   přehoz (dřív žádné GFI). Hráč 5 z (10,2) dojde k soupeři 13 na (15,5) za čtyři kroky; MA 4 ⇒ rána stojí pole navíc
+//   = 1× GFI. (S menší MA blíž by ho řadič vzal za roh klece a uvolnění by nepřišlo na řadu.)
+namespace {
+Board freeingGfi(int8_t ma, int rerolls, Position at = {10, 2}) {
+    Board b = heldTeammateBoard();
+    b.put(5, TeamSide::HOME, at, ma, 3, {SkillName::Block});
+    b.s.homeTeam.rerolls = static_cast<int8_t>(rerolls);
+    return b;
+}
+// P172 (blitz na proboření cesty) má totéž pravidlo — vypnutý, ať test měří právě uvolnění klece (review 30.10. nález 4)
+struct NoPhaseOneBlitz { NoPhaseOneBlitz() { setCageFeaturesOff(kFeatPhaseOneBlitz); } ~NoPhaseOneBlitz() { setCageFeaturesOff(0); } };
+bool blitzes(Board& b, int player) {
+    NoPhaseOneBlitz off;
+    CageController cc(nullptr, cfg(), 1);
+    std::vector<Macro> ms;
+    playAll(cc, b, &ms);
+    return std::any_of(ms.begin(), ms.end(), [&](const Macro& m) { return m.type == MacroType::BLITZ && m.playerId == player; });
+}
+}  // namespace
+TEST(OneCageFreeingGfi, OneGfiWithATeamRerollIsAllowed) {
+    Board b = freeingGfi(4, 1);
+    EXPECT_TRUE(blitzes(b, 5));
+}
+TEST(OneCageFreeingGfi, OneGfiWithoutARerollIsNot) {
+    Board b = freeingGfi(4, 0);
+    EXPECT_FALSE(blitzes(b, 5));
+}
+// Přehoz padne mezi plánem a blitzem (tady ručně po prvním bloku) ⇒ blitz s 1× GFI se těsně před ranou nehraje.
+//   Napřed blok hráče 7 (ST 4) na soupeře 16 vedle nosiče, pak blitz hráče 5 s 1× GFI na držitele 13.
+TEST(OneCageFreeingGfi, ARerollSpentBeforeTheBlitzCancelsIt) {
+    NoPhaseOneBlitz off;
+    auto run = [](bool spend) {
+        Board b = freeingGfi(4, 1);
+        b.put(16, TeamSide::AWAY, {13, 8}, 6);
+        b.put(7, TeamSide::HOME, {14, 9}, 6, 4, {SkillName::Block});
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        bool blocked = false, blitzed = false;
+        while (cc.next(b.s, m)) {
+            if (m.type == MacroType::BLITZ && m.playerId == 5) blitzed = true;
+            play(b.s, m);
+            if (m.type == MacroType::BLOCK && m.playerId == 7) { blocked = true; if (spend) b.s.homeTeam.rerollUsedThisTurn = true; }
+        }
+        return std::make_tuple(blocked, blitzed, b.s.getPlayer(1).position);
+    };
+    const auto kept = run(false), spent = run(true);
+    ASSERT_TRUE(std::get<0>(kept) && std::get<1>(kept)) << "pozitivní kontrola: blok 7, pak blitz 5 s 1× GFI";
+    EXPECT_TRUE(std::get<0>(spent));
+    EXPECT_FALSE(std::get<1>(spent)) << "přehoz už není ⇒ blitz s GFI ne";
+    // review 30.10. nález 1: zrušený blitz nevzdá tah řadiče — klec po něm postoupí jako s ním
+    EXPECT_NE(std::get<2>(spent), (Position{12, 7})) << "klec se pohnula";
+}
+TEST(OneCageFreeingGfi, TwoGfiAreNot) {                 // z (9,2) pět kroků + rána = 2× GFI (s MA 3 blíž by byl rohem)
+    Board b = freeingGfi(4, 1, {9, 2});
+    EXPECT_FALSE(blitzes(b, 5));
 }
 
 // --- P154: co klec rozebíralo mezi tahem řadiče a koncem tahu (07.10.2026) ------------------
@@ -1497,6 +1572,50 @@ TEST(OneCagePhaseOne, BlitzBreaksTheWayBeforeTheCageMoves) {
         std::vector<Macro> ms;
         playAll(cc, b, &ms);
         for (const Macro& m : ms) EXPECT_NE(m.type, MacroType::BLITZ);
+    }
+}
+
+// Uživatel 30.10.2026: „povol jedno GFI obecně“ — i blitz na proboření cesty (P172) smí jedno GFI s týmovým přehozem.
+//   Hráč 6 z (13,3) dojde k soupeři 13 na (15,7) za tři kroky; MA 3 ⇒ 1× GFI.
+TEST(OneCagePhaseOne, TheBreakingBlitzMayUseOneGfiWithATeamReroll) {
+    struct OldPath { OldPath() { setCageFeaturesOff(kFeatCleanCageSearch); } ~OldPath() { setCageFeaturesOff(0); } } oldPath;
+    auto board = [](int rerolls) {
+        Board b(2);
+        b.put(1, TeamSide::HOME, {12, 7}, 4);
+        b.put(2, TeamSide::HOME, {11, 6});
+        b.put(3, TeamSide::HOME, {11, 8});
+        b.put(4, TeamSide::HOME, {13, 6});
+        b.put(5, TeamSide::HOME, {13, 8});
+        b.put(6, TeamSide::HOME, {13, 3}, 3, 4, {SkillName::Block});
+        b.put(13, TeamSide::AWAY, {15, 7}, 6);
+        b.put(14, TeamSide::AWAY, {24, 13}, 6);
+        b.s.ball = BallState::carried({12, 7}, 1);
+        b.s.homeTeam.rerolls = static_cast<int8_t>(rerolls);
+        return b;
+    };
+    {
+        Board b = board(1);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        EXPECT_EQ(m.type, MacroType::BLITZ) << "s přehozem blitz s jedním GFI";
+        EXPECT_EQ(m.playerId, 6);
+    }
+    {
+        Board b = board(0);
+        CageController cc(nullptr, cfg(), 1);
+        std::vector<Macro> ms;
+        playAll(cc, b, &ms);
+        for (const Macro& m : ms) EXPECT_FALSE(m.type == MacroType::BLITZ && m.playerId == 6) << "bez přehozu ne";
+    }
+    {   // bez GFI před GFI: hráč 7 z (13,2) dojde za čtyři kroky bez GFI (MA 9), 6 za tři s 1× GFI ⇒ blitzuje 7
+        Board b = board(1);
+        b.put(7, TeamSide::HOME, {13, 2}, 9, 4, {SkillName::Block});
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        ASSERT_TRUE(cc.next(b.s, m));
+        EXPECT_EQ(m.type, MacroType::BLITZ);
+        EXPECT_EQ(m.playerId, 7);
     }
 }
 

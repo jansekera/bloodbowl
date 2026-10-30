@@ -20,18 +20,46 @@ namespace bb {
 namespace {
 
 // ⭐ GFI PŘI DOBĚHU BLITZU DO ZDI (P229 prolomení, P233 zeď od kraje) — uživatel 30.10.2026: „jsem pro GFI pro blitz
-//   na rozražení zdi“ (varianta: jen s týmovým přehozem po ruce, selhání nejvýš 10 %). OPRAVENO 30. 10. — dřív P229
+//   na rozražení zdi“ (varianta: jen s týmovým přehozem po ruce, selhání nejvýš 10 %; jedno GFI s přehozem vždy, i ve
+//   vánici — uživatel 30.10.: „povolil bych jedno GFI v blizzardu s RR“). OPRAVENO 30. 10. — dřív P229
 //   GFI nehlídal vůbec (2× GFI i bez přehozu, selhání 31 %) a P233 porovnával kroky s MA bez pole za ránu (P82), takže
 //   1× GFI šel bez přehozu. Pravidla ř. 1695-1697 (jedno až dvě pole navíc), ř. 1701-1706 (padlá jednička = turnover).
 //   `steps` = kroky doběhu (blitzLandingDiceFree); rána stojí ještě jedno pole (block_handler.cpp, P82). Víc než
 //   dvě GFI doběh nevrátí (pathfinder si pole za ránu rezervuje sám) a blitzující vždy stojí (freeToAct).
 constexpr double kWallBlitzGfiMaxFail = 0.10;
-int wallBlitzGfi(const Player& p, int steps) { return std::max(0, steps + 1 - static_cast<int>(p.movementRemaining)); }
+int blitzGfiCount(const Player& p, int steps) { return std::max(0, steps + 1 - static_cast<int>(p.movementRemaining)); }
+// Vědomě přísnější než pravidla: Loner (týmový přehoz na 4+) se počítá jako bez přehozu, Sure Feet se nepočítá.
+bool teamRerollFor(const GameState& state, const Player& p) {
+    return state.getTeamState(p.teamSide).canUseReroll() && !p.hasSkill(SkillName::Loner);
+}
+// Ostatní blitzy řadiče (uvolnění klece, proboření cesty P172) — uživatel 30.10.2026: „povol jedno GFI obecně“.
+//   OPRAVENO 30. 10. — dřív žádné GFI. Jedno GFI jen s týmovým přehozem po ruce (bez něj 1/6 turnover).
+bool cageBlitzGfiOk(const GameState& state, const Player& p, int steps) {
+    const int gfi = blitzGfiCount(p, steps);
+    return gfi == 0 || (gfi == 1 && teamRerollFor(state, p));
+}
 bool wallBlitzGfiOk(const GameState& state, const Player& p, int steps) {
-    const int gfi = wallBlitzGfi(p, steps);
+    const int gfi = blitzGfiCount(p, steps);
     if (gfi == 0) return true;
-    const bool reroll = state.getTeamState(p.teamSide).canUseReroll() && !p.hasSkill(SkillName::Loner);
-    return reroll && gfiSequenceFailProb(gfi, true, state.weather == Weather::BLIZZARD) <= kWallBlitzGfiMaxFail;
+    if (!teamRerollFor(state, p)) return false;
+    // jedno GFI s přehozem i ve vánici (11 %; uživatel 30.10.: „povolil bych jedno GFI v blizzardu s RR — je to
+    //   zásadní pro celý tah“; vánice ř. 1489-1492: GFI padá na 1–2)
+    if (gfi == 1) return true;
+    return gfiSequenceFailProb(gfi, true, state.weather == Weather::BLIZZARD) <= kWallBlitzGfiMaxFail;
+}
+
+// Doběh blitzu těsně před ranou (review 30.10. nálezy 1 a 6): přehoz mohl mezi plánem a ranou padnout, nebo blitz bez
+//   určeného pole doběhu (uvolnění klece, P172) už nedoběhne bez úhybu ⇒ jen TENTO blitz se přeskočí a zbytek tahu
+//   (postup klece) běží dál — dřív by `stillValid` vzdal celý tah řadiče. Blitz s polem doběhu (zeď) bez doběhu bez
+//   hodu dál hlídá `stillValid` jako dřív.
+bool blitzRunStillOk(const GameState& state, const Macro& m) {
+    const Player& a = state.getPlayer(m.playerId);
+    const Player& d = state.getPlayer(m.targetId);
+    if (a.position.distanceTo(d.position) <= 1) return true;
+    Position landing{-1, -1};
+    int steps = 0;
+    if (!blitzLandingDiceFree(state, a, d.position, landing, steps)) return m.viaPos.isOnPitch();
+    return m.viaPos.isOnPitch() ? wallBlitzGfiOk(state, a, steps) : cageBlitzGfiOk(state, a, steps);
 }
 
 int distToEndzone(Position pos, TeamSide side) {
@@ -432,8 +460,7 @@ bool CageController::stillValid(const GameState& state, const Macro& m) const {
         // doběh hry musí skončit na plánovaném poli — jinde kostky neplatí (review P233 F1)
         Position landing{-1, -1};
         int steps = 0;
-        if (!blitzLandingDiceFree(state, a, d.position, landing, steps) || landing != m.viaPos ||
-            !wallBlitzGfiOk(state, a, steps)) return false;   // přehoz mohl mezitím padnout (30.10.)
+        if (!blitzLandingDiceFree(state, a, d.position, landing, steps) || landing != m.viaPos) return false;
         GameState sim = state.clone();
         sim.getPlayer(a.id).position = m.viaPos;
         return hitAllowed(sim, a, blockDiceCount(sim, sim.getPlayer(a.id), sim.getPlayer(d.id)));
@@ -1040,8 +1067,8 @@ void CageController::planStart(const GameState& state) {
         //   na poli rohu nebo jako jediný drží našeho volného hráče, a bezpečná rána na něj
         //   zatím není: (A) volný spoluhráč PŘIJDE PRO ASISTENCI (bez hodu, na pole vedle
         //   soupeře), takže hráč s Block, který u soupeře už stojí, hází 2+ kostky, které
-        //   vybíráme my; (B) jinak jeden BLITZ za tah: hráč s Block doběhne bez úhybu a bez GFI
-        //   a z pole, kam dojde, má 2+ kostky.
+        //   vybíráme my; (B) jinak jeden BLITZ za tah: hráč s Block doběhne bez úhybu, nejvýš s 1× GFI
+        //   s přehozem (30.10.), a z pole, kam dojde, má 2+ kostky; z kandidátů bez GFI, nejvíc kostek, nejkratší doběh.
         {
             const TeamSide side = carrier.teamSide;
             auto used = [&](int id) {
@@ -1104,7 +1131,9 @@ void CageController::planStart(const GameState& state) {
                     });
                 });
                 if (done || blitzPlanned) continue;
-                // (B) blitz
+                // (B) blitz — nejlepší kandidát (bez GFI, nejvíc kostek, nejkratší doběh; review 30.10. nález 2)
+                int bzId = -1;
+                std::tuple<int, int, int> bzKey{INT_MAX, INT_MAX, INT_MAX};
                 state.forEachOnPitch(side, [&](const Player& b) {
                     if (done || b.id == carrier.id || !freeToAct(b) || used(b.id)) return;
                     if (!b.hasSkill(SkillName::Block) || b.position.distanceTo(e.position) <= 1) return;
@@ -1113,15 +1142,19 @@ void CageController::planStart(const GameState& state) {
                     Position landing{-1, -1};
                     int steps = 0;
                     if (!blitzLandingDiceFree(state, b, e.position, landing, steps)) return;
-                    if (steps > static_cast<int>(b.movementRemaining) - 1) return;          // bez GFI (rána stojí pole)
+                    if (!cageBlitzGfiOk(state, b, steps)) return;                           // nejvýš 1× GFI s přehozem
                     GameState trial = state.clone();
                     trial.getPlayer(b.id).position = landing;
-                    if (blockDiceCount(trial, trial.getPlayer(b.id), trial.getPlayer(eid)) < 2) return;
-                    queue_.push_back(Macro{MacroType::BLITZ, b.id, eid, {-1, -1}});
-                    usedAttackers.push_back(b.id);
-                    blitzPlanned = true;
-                    done = true;
+                    const int dice = blockDiceCount(trial, trial.getPlayer(b.id), trial.getPlayer(eid));
+                    if (dice < 2) return;
+                    const std::tuple<int, int, int> key{blitzGfiCount(b, steps), -dice, steps};
+                    if (key < bzKey) { bzKey = key; bzId = b.id; }
                 });
+                if (bzId >= 0) {
+                    queue_.push_back(Macro{MacroType::BLITZ, bzId, eid, {-1, -1}});
+                    usedAttackers.push_back(bzId);
+                    blitzPlanned = true;
+                }
             }
         }
         // ⭐⭐ P172 — PRVNÍ FÁZE CELOTAHU (uživatel 07.10.2026: „první bude klec — kde bude v obsahu
@@ -1129,7 +1162,7 @@ void CageController::planStart(const GameState& state) {
         //   klece s nosičem — pak ostatní věci — např. blitz, když nebyl proveden — nakonec kdyžtak
         //   faul“). BLITZ NA PROBOŘENÍ OBRANY: když rány výš blitz nespotřebovaly, zkusí se, jestli
         //   by shození některého soupeře v cestě klece dalo lepší postup (víc stojících rohů, pak
-        //   delší krok) než bez něj. Jen bezpečný blitz: hráč s Block, doběh bez hodu a bez GFI,
+        //   delší krok) než bez něj. Jen bezpečný blitz: hráč s Block, doběh bez úhybu, nejvýš 1× GFI s přehozem (30.10.),
         //   2+ kostky, které vybíráme my; roh klece ani nosič neblitzují. Postup klece se pak
         //   plánuje znovu na desce po ráně (planAdvance).
         {
@@ -1154,12 +1187,12 @@ void CageController::planStart(const GameState& state) {
                 });
                 if (inPath.size() > 3) inPath.resize(3);
                 const int base = planScore(pre);
-                int bestScore = base, bestBlitzer = -1, bestTarget = -1;
+                int bestScore = base, bestBlitzer = -1, bestTarget = -1, bestGfi = 9;
                 for (const Player* o : inPath) {
                     // Napřed BEZ plánování vybrat jednoho blitzujícího na cíl (nejvíc kostek, pak
                     // nejkratší doběh) — plán klece se pak staví jen jednou na cíl. (První verze
                     // stavěla plán pro každou dvojici hráč × cíl: sada testů 90 s → 32 min.)
-                    int pickId = -1, pickDice = 0, pickSteps = 99;
+                    int pickId = -1, pickDice = 0, pickSteps = 99, pickGfi = 9;
                     Position pickLanding{-1, -1};
                     state.forEachOnPitch(side, [&](const Player& b) {
                         if (b.id == carrier.id || !freeToAct(b) || !b.hasSkill(SkillName::Block)) return;
@@ -1171,14 +1204,16 @@ void CageController::planStart(const GameState& state) {
                         int steps = 0;
                         if (b.position.distanceTo(o->position) > 1) {
                             if (!blitzLandingDiceFree(state, b, o->position, landing, steps)) return;
-                            if (steps > static_cast<int>(b.movementRemaining) - 1) return;
+                            if (!cageBlitzGfiOk(state, b, steps)) return;
                         }
                         GameState at = state.clone();
                         at.getPlayer(b.id).position = landing;
                         const int dice = blockDiceCount(at, at.getPlayer(b.id), at.getPlayer(o->id));
                         if (dice < 2) return;
-                        if (dice > pickDice || (dice == pickDice && steps < pickSteps)) {
-                            pickId = b.id; pickDice = dice; pickSteps = steps; pickLanding = landing;
+                        // bez GFI před GFI (30.10.), pak nejvíc kostek, pak nejkratší doběh
+                        const int gfi = b.position.distanceTo(o->position) > 1 ? blitzGfiCount(b, steps) : 0;
+                        if (std::make_tuple(gfi, -dice, steps) < std::make_tuple(pickGfi, -pickDice, pickSteps)) {
+                            pickId = b.id; pickDice = dice; pickSteps = steps; pickGfi = gfi; pickLanding = landing;
                         }
                     });
                     if (pickId < 0) continue;
@@ -1188,7 +1223,10 @@ void CageController::planStart(const GameState& state) {
                     tb.hasMoved = true;                                   // do klece už nepůjde
                     trial.getPlayer(o->id).state = PlayerState::PRONE;    // sražený soupeř zónu nemá
                     const int sc = planScore(planner_.build(trial, {}, scoringRangeCage_));
-                    if (sc > bestScore) { bestScore = sc; bestBlitzer = pickId; bestTarget = o->id; }
+                    // při stejně dobrém plánu blitz bez GFI (review 30.10. nález 3)
+                    if (sc > bestScore || (bestBlitzer > 0 && sc == bestScore && pickGfi < bestGfi)) {
+                        bestScore = sc; bestBlitzer = pickId; bestTarget = o->id; bestGfi = pickGfi;
+                    }
                 }
                 if (bestBlitzer > 0) {
                     if (dbg) std::fprintf(stderr, "[cage ctl] blitz na proboření: hráč %d na %d, plán %d -> %d\n",
@@ -1884,7 +1922,7 @@ bool CageController::planWallBreak(const GameState& state, const Player& carrier
             if (!hitAllowed(sim, p, dice)) return;
             if (!hitKeepsCage(sim, carrier.id, p.id, landing, centre->id, true)) return;   // ne zezadu do klece (29.10.)
             // bez GFI před GFI (review 30.10. nález 1: jinak riziko a přehoz, i když jde blitz bez hodu)
-            const std::tuple<int, int, int, int> key{landing == frontSq ? 0 : 1, wallBlitzGfi(p, steps), -dice, steps};
+            const std::tuple<int, int, int, int> key{landing == frontSq ? 0 : 1, blitzGfiCount(p, steps), -dice, steps};
             if (key < bestKey) { bestKey = key; best = &p; bestLanding = landing; }
         });
         if (best) {
@@ -2075,7 +2113,7 @@ bool CageController::planWallClear(const GameState& state) {
             h.blitz = true;
             h.rowDist = rowDist;
             h.steps = steps2;
-            h.gfi = wallBlitzGfi(a, steps2);
+            h.gfi = blitzGfiCount(a, steps2);
             if (!best || better(h, *best)) best = std::move(h);
         });
     }
@@ -2820,6 +2858,10 @@ bool CageController::next(const GameState& state, Macro& out) {
             const bool wallHit = std::find(wallHits_.begin(), wallHits_.end(), std::make_pair(m.playerId, m.targetId)) != wallHits_.end() &&
                                  (m.type == MacroType::BLOCK || m.type == MacroType::BLITZ);
             const bool cageBroken = wallHit && ourBall(state) && !wallHitKeepsCage(state, m);
+            if (!broken && m.type == MacroType::BLITZ && stillValid(state, m) && !blitzRunStillOk(state, m)) {
+                ++idx_;                    // GFI bez přehozu / úhyb: jen tento blitz se nehraje, tah řadiče jde dál (30.10.)
+                continue;
+            }
             if (!broken && stage_ == Stage::WALL_CLEAR && ourBall(state) && (!stillValid(state, m) || !wallHitTwoDice(state, m) || cageBroken)) {
                 // P233: rána nevyšla na 2 kostky naše (asistent nedošel…) ⇒ nebije se; zaostalci jako po ranách (review F7)
                 queue_.clear();
