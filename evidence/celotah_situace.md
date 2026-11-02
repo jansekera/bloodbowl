@@ -558,4 +558,6 @@ Uživatel: *„poslat obranu tak aby zavazela nosiči co nejvíce - lze spočít
 |---|---|---|
 | obránci se staví tak, aby nosič na cestě k TD musel co nejvíc uhýbat / obíhat (zóny přes jeho nejkratší cesty) | počet nosičových cest k TD bez úhybu a nejmenší počet úhybů po tahu obrany (čte se z desky) | o kolik obrana P245 zvýší úhyby/délku cesty nosiče oproti dnešku |
 
+Doplněk uživatele 02.11.: *„nosiče u čáry napadne nejlépe skaven - lidi na to mají malou pravděpodobnost na blitz a dodge a dvě kostky proti“* ⇒ volba útok × zavazet závisí na rase: úhyb + blitz se 2 kostkami proti jen pro rychlé a obratné (skaveni); lidé a pomalejší zavazí.
+
 Kniha **P245**. Zápis partie `evidence/play_20261030_zed_orkove/zaver.md`.
