@@ -621,3 +621,106 @@ TEST(DivingCatchCandidates, OtherCandidatesLeaveOutThoseWhoDeclined) {
     EXPECT_EQ(q.playerId, 13);
     EXPECT_EQ(q.roll, 1);
 }
+
+// P239b (uživatel 2.11.2026): AI vybírá skokana podle ŠANCE CHYCENÍ včetně přehozu, ne jen podle cíle hodu.
+// Catch (ř. 7992-7995) ⇒ p + (1−p)·p. Hráč bez Catch smí počítat s týmovým přehozem jen ve vlastním tahu
+// s přehozem po ruce (ř. 928-936, FAQ ř. 9253; Loner 4+, ř. 8287-8290); při stejné šanci skáče hráč s Catch
+// (týmový přehoz se šetří — uživatel: „ber to jako horší než hráč s catch“).
+// Kostka chytání 4: chytí AG3 (4+) i AG4 (3+) ⇒ nosič ukáže, kdo skočil.
+namespace {
+int aiDiver(GameState gs) {
+    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    std::vector<GameEvent> events;
+    resolvePass(gs, 1, {10, 5}, dice, &events);
+    return divingCatchEvents(events) == 1 && gs.ball.isHeld ? gs.ball.carrierId : -1;
+}
+}  // namespace
+
+// Bez týmového přehozu: AG3 s Catch 3/4 > AG4 bez přehozu 2/3. Dřív skočil AG4 (lepší cíl hodu).
+TEST(DivingCatchAiChoice, CatchRerollBeatsBetterAgilityWithoutAReroll) {
+    GameState gs = twoHomeCandidates();
+    gs.getPlayer(2).skills.add(SkillName::Catch);
+    gs.getPlayer(3).stats.agility = 4;
+    EXPECT_EQ(aiDiver(gs), 2);
+}
+
+// Týmový přehoz ve vlastním tahu se počítá: AG4 s přehozem 8/9 > AG3 s Catch 3/4 ⇒ AG4. Bez započtení
+// přehozu by AG4 měl 2/3 a skočil by AG3 s Catch (jako v testu výš).
+TEST(DivingCatchAiChoice, TeamRerollCountsInTheOwnTurn) {
+    GameState gs = twoHomeCandidates();
+    gs.homeTeam.rerolls = 1;
+    gs.getPlayer(2).skills.add(SkillName::Catch);
+    gs.getPlayer(3).stats.agility = 4;
+    EXPECT_EQ(aiDiver(gs), 3);
+}
+
+// Stejná šance (AG3 s Catch × AG3 s týmovým přehozem, obojí 3/4) ⇒ hráč s Catch, přehoz se šetří.
+// Dřív při shodě cíle první v pořadí (hráč 2).
+TEST(DivingCatchAiChoice, OnATieTheCatchPlayerDivesAndTheTeamRerollIsSaved) {
+    GameState gs = twoHomeCandidates();
+    gs.homeTeam.rerolls = 1;
+    gs.getPlayer(3).skills.add(SkillName::Catch);
+    EXPECT_EQ(aiDiver(gs), 3);
+}
+
+// Loner (ř. 8287-8290) omezuje jen týmový přehoz (4+), ne Catch. (1) S přehozem oba AG3: hráč 2 s Loner
+// 1/2 + 1/2·1/2·1/2 = 5/8 < hráč 3 bez Loner 3/4 ⇒ hráč 3 (bez brány Loner by byla shoda ⇒ první, hráč 2).
+// (2) Bez přehozu: AG3 s Catch a Loner 3/4 > AG4 2/3 — kdyby Loner tlumil i Catch (5/8), skočil by AG4.
+TEST(DivingCatchAiChoice, LonerHalvesTheTeamRerollButNotCatch) {
+    GameState loner = twoHomeCandidates();
+    loner.homeTeam.rerolls = 1;
+    loner.getPlayer(2).skills.add(SkillName::Loner);
+    EXPECT_EQ(aiDiver(loner), 3);
+    GameState catcher = twoHomeCandidates();
+    catcher.getPlayer(2).skills.add(SkillName::Catch);
+    catcher.getPlayer(2).skills.add(SkillName::Loner);
+    catcher.getPlayer(3).stats.agility = 4;
+    EXPECT_EQ(aiDiver(catcher), 2);
+}
+
+// Tah soupeře: AWAY s přehozem v zásobě ho na chytání použít nesmí (ř. 9253) ⇒ AG4 bez Catch má jen 2/3
+// a AG3 s Catch 3/4 ⇒ skočí AG3 s Catch. Kdyby se přehoz počítal i mimo vlastní tah, AG4 by měl 8/9.
+TEST(DivingCatchAiChoice, NoTeamRerollInTheOpponentsTurn) {
+    GameState gs = thrownToTenFive();
+    gs.getPlayer(2).skills.remove(SkillName::DivingCatch);
+    gs.getPlayer(2).position = {2, 2};   // jeho zóna by AWAY na (11,7) přidala −1 k chytání
+    gs.awayTeam.rerolls = 1;
+    placePlayer(gs, 13, {11, 5}, TeamSide::AWAY, 4);
+    gs.getPlayer(13).skills.add(SkillName::DivingCatch);
+    placePlayer(gs, 14, {11, 7}, TeamSide::AWAY, 3);
+    gs.getPlayer(14).skills.add(SkillName::DivingCatch);
+    gs.getPlayer(14).skills.add(SkillName::Catch);
+    EXPECT_EQ(aiDiver(gs), 14);
+}
+
+// Recenze P239 LOW-5: přehoz v zásobě, ale v tomto tahu už použitý (ř. 934-935 "may not use more than one
+// Re-roll counter per turn") ⇒ nepočítá se: AG4 bez přehozu 2/3 < AG3 s Catch 3/4 ⇒ AG3.
+TEST(DivingCatchAiChoice, ATeamRerollAlreadyUsedThisTurnDoesNotCount) {
+    GameState gs = twoHomeCandidates();
+    gs.homeTeam.rerolls = 1;
+    gs.homeTeam.rerollUsedThisTurn = true;
+    gs.getPlayer(2).skills.add(SkillName::Catch);
+    gs.getPlayer(3).stats.agility = 4;
+    EXPECT_EQ(aiDiver(gs), 2);
+}
+
+// Recenze P239 LOW-3: šance počítá s +1 za přesnou přihrávku jako skutečné chytání (ř. 891). Přesná přihrávka
+// (5,5) → prázdné (10,5); hráč 2 na (10,6) AG5 bez Catch s přehozem, hráč 3 na (11,6) AG4 s Catch. Bez +1:
+// AG5 2+ ⇒ 35/36 > AG4 3+ s Catch 8/9 ⇒ hráč 2. S +1 oba 2+ ⇒ shoda 35/36 ⇒ hráč s Catch (přehoz se šetří).
+TEST(DivingCatchAiChoice, ChanceIncludesTheAccuratePassModifier) {
+    GameState gs = passSetup();
+    gs.homeTeam.rerolls = 1;
+    placePlayer(gs, 1, {5, 5}, TeamSide::HOME);
+    placePlayer(gs, 2, {10, 6}, TeamSide::HOME, 5);
+    gs.getPlayer(2).skills.add(SkillName::DivingCatch);
+    placePlayer(gs, 3, {11, 6}, TeamSide::HOME, 4);
+    gs.getPlayer(3).skills.add(SkillName::DivingCatch);
+    gs.getPlayer(3).skills.add(SkillName::Catch);
+    gs.ball = BallState::carried({5, 5}, 1);
+    FixedDiceRoller dice({6, 3});
+    std::vector<GameEvent> events;
+    resolvePass(gs, 1, {10, 5}, dice, &events);
+    EXPECT_EQ(divingCatchEvents(events), 1);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 3);
+}

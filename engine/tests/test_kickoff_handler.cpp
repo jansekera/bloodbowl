@@ -1686,3 +1686,67 @@ TEST(KickoffLanding, ReceivingCoachIsAskedAboutDivingCatchBeforeTheKickingCoach)
     EXPECT_EQ(second.playerId, kicker);
     EXPECT_EQ(second.otherId, receiver.id) << "kopající ví, že přijímající už skáče";
 }
+
+// P239a (uživatel 2.11.2026): kopající AI na lajně skočí, PRÁVĚ KDYŽ už skáče přijímající. Sama by skokem
+// dala touchback (test AKickingDivingCatchPlayerOnTheLineDoesNotDiveIntoATouchback), ale proti skákajícímu
+// přijímajícímu jsou to dva pokusy ⇒ nechytá nikdo (ř. 8069-8071), touchback nevznikne, míč dopadne na (12,7)
+// a odrazí se (D8 7 ⇒ (11,7)). Dřív: přijímající chytil sám (kostka 7 ≥ cíl).
+TEST(KickoffLanding, AiKickerOnTheLineDivesWhenTheReceiverAlreadyDives) {
+    auto gs = kickingDiverOnTheLine();
+    playerAt(gs, {11, 8}).skills.add(SkillName::DivingCatch);
+    FixedDiceRoller dice({5, 3, 1, 1, 7, 1, 1, 1});
+    std::vector<GameEvent> ev;
+    resolveKickoff(gs, dice, &ev);
+    EXPECT_FALSE(gs.ball.isHeld) << "dva pokusy ⇒ nikdo";
+    EXPECT_EQ(gs.ball.position, (Position{11, 7}));
+}
+
+// Přijímající je člověk: „ano“ ⇒ kopající AI skočí taky (nikdo nechytá); „ne“ ⇒ kopající AI neskočí
+// (žádný touchback), míč dopadne a odrazí se.
+TEST(KickoffLanding, AiKickerAnswersTheHumanReceiversDive) {
+    auto base = kickingDiverOnTheLine();
+    Player& receiver = playerAt(base, {11, 8});
+    receiver.skills.add(SkillName::DivingCatch);
+    const TeamSide receiving = receiver.teamSide;
+    for (int answer : {CoachAnswer::TEAM, CoachAnswer::NONE}) {
+        GameState gs = base;
+        FixedDiceRoller dice({5, 3, 1, 1, 7, 1, 1, 1});
+        std::vector<GameEvent> ev;
+        {
+            CoachChoiceScope scope(receiving, {answer});
+            resolveKickoff(gs, dice, &ev);
+        }
+        int dives = 0;
+        for (const GameEvent& e : ev)
+            if (e.type == GameEvent::Type::SKILL_USED && e.roll == static_cast<int>(SkillName::DivingCatch)) ++dives;
+        EXPECT_EQ(dives, 0) << "odpověď " << answer;
+        EXPECT_FALSE(gs.ball.isHeld) << "odpověď " << answer;
+        EXPECT_EQ(gs.ball.position, (Position{11, 7})) << "odpověď " << answer;
+    }
+}
+
+// P239b: při výkopu se týmový přehoz nepočítá ani přijímajícím (ř. 1261-1263, `attemptRoll`), i když ho mají
+// v zásobě ⇒ AG3 s Catch (3/4) skočí před AG4 bez Catch (2/3; s přehozem by měl 8/9). Kostka chytání 4.
+TEST(KickoffLanding, AiReceiverChoiceIgnoresTheTeamRerollAtTheKickoff) {
+    auto gs = receivingDiverNextToTheLanding();
+    Player& first = playerAt(gs, {4, 8});
+    first.stats.agility = 3;
+    first.skills.add(SkillName::Catch);
+    gs.getTeamState(first.teamSide).rerolls = 1;
+    Player* other = nullptr;
+    for (auto& p : gs.players)
+        if (p.teamSide == first.teamSide && p.isOnPitch() && p.id != first.id) other = &p;
+    ASSERT_NE(other, nullptr);
+    other->position = {5, 8};
+    other->state = PlayerState::STANDING;
+    other->stats.agility = 4;
+    other->skills.add(SkillName::DivingCatch);
+    other->skills.remove(SkillName::Catch);   // ve fixture ho má
+    ASSERT_EQ(countTacklezones(gs, {5, 8}, other->teamSide), 0);
+    ASSERT_EQ(countTacklezones(gs, {4, 8}, first.teamSide), 0);
+    const int firstId = first.id;
+    FixedDiceRoller dice({1, 3, 1, 1, 4});
+    resolveKickoff(gs, dice, nullptr);
+    ASSERT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, firstId);
+}

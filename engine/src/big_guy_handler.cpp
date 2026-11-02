@@ -21,7 +21,7 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         if (roll < target && coachDecides(player.teamSide)) {
             const int original = roll;
             bool viaPro = false;
-            const bool teamAllowed = player.teamSide == state.activeTeam && !state.kickoffInProgress;
+            const bool teamAllowed = teamRerollAllowed(state, player);
             if (coachAskReroll(state, player, dice, CoachQuestion::REROLL, -1, roll, target,
                                teamAllowed, events, viaPro)) {
                 roll = dice.rollD6();

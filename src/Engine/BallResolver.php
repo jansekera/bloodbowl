@@ -45,8 +45,8 @@ final class BallResolver
     /**
      * Kdo skočí pro míč dopadající na prázdné `$landing` (null = nikdo). Skill je volba (ř. 8065 "can
      * attempt", ř. 985): hráče kouče-člověka se ptá -- bez odpovědi akci přeruší `DivingCatchQuestion`
-     * (viz `ReplayDiceRoller`); AI skočí s jedním hráčem (nejlepší cíl hodu) z těch, pro které
-     * `$aiJumps` vrátí true.
+     * (viz `ReplayDiceRoller`); AI skočí s jedním hráčem (nejvyšší šance chycení i s přehozem) z těch, pro
+     * které `$aiJumps` vrátí true.
      *
      * OPRAVENO 30. 10. 2026 (uživatel, varianta B) — dřív dva a víc kandidátů ⇒ nikdo, bez otázky.
      *   Pravidla ř. 8069-8071 "If there are two or more players ATTEMPTING to use this skill then they
@@ -56,10 +56,21 @@ final class BallResolver
      *   recenze 30.10. D/2) a kdo už skáče. Právě jeden pokus ⇒ chytá, dva a víc ⇒ nikdo (další otázky
      *   už nic nezmění, nekladou se).
      *
-     * @param callable(MatchPlayerDTO): bool $aiJumps
+     * P239 (uživatel 2.11.2026): AI vybírá skokana podle šance chycení i s přehozem (`divingCatchChance`);
+     *   `$aiJumps` dostane i to, jestli už někdo skáče (kopající na lajně pak skočí — viz KickoffResolver).
+     *
+     * @param callable(MatchPlayerDTO, bool): bool $aiJumps (hráč, už někdo skáče)
+     * @param TeamSide|null $rerollSide tým, jehož týmový přehoz smí jít na chytání (jako `resolveLanding`)
+     * @param int $catchModifier modifikátor skutečného chytání (+1 přesná přihrávka) — do šance (recenze P239 LOW-3)
      */
-    public function divingCatchAttempt(GameState $state, Position $landing, callable $aiJumps, ?TeamSide $naTahu = null): ?MatchPlayerDTO
-    {
+    public function divingCatchAttempt(
+        GameState $state,
+        Position $landing,
+        callable $aiJumps,
+        ?TeamSide $naTahu = null,
+        ?TeamSide $rerollSide = null,
+        int $catchModifier = 0,
+    ): ?MatchPlayerDTO {
         $kandidati = $this->divingCatchCandidates($state, $landing);
         $naTahu ??= $state->getActiveTeam();
         /** @var list<MatchPlayerDTO> $skacou */
@@ -83,9 +94,17 @@ final class BallResolver
                 continue;
             }
             $nejlepsi = null;
+            $nejlepsiSance = ['sance' => 0.0, 'tymovy' => false];
             foreach ($svoji as $hrac) {
-                if ($aiJumps($hrac) && ($nejlepsi === null || $this->getCatchTarget($state, $hrac) < $this->getCatchTarget($state, $nejlepsi))) {
+                if (!$aiJumps($hrac, $skacou !== [])) {
+                    continue;
+                }
+                $sance = $this->divingCatchChance($state, $hrac, $rerollSide, $catchModifier);
+                $lepsi = $sance['sance'] > $nejlepsiSance['sance'] + 1e-9
+                    || ($sance['sance'] > $nejlepsiSance['sance'] - 1e-9 && $nejlepsiSance['tymovy'] && !$sance['tymovy']);
+                if ($nejlepsi === null || $lepsi) {
                     $nejlepsi = $hrac;
+                    $nejlepsiSance = $sance;
                 }
             }
             $odmitli += count($svoji);
@@ -96,6 +115,41 @@ final class BallResolver
         }
 
         return count($skacou) === 1 ? $skacou[0] : null;
+    }
+
+    /**
+     * P239b (uživatel 2.11.2026): šance, že hráč skokem míč chytí, i s přehozem — podle té AI vybírá skokana.
+     * Catch (ř. 7992-7995) ⇒ p + (1−p)·p. Bez Catch týmový přehoz, jen týmu `$rerollSide` s přehozem po ruce
+     * (výkop a tah soupeře ne: ř. 928-936, 1261-1263, FAQ ř. 9253); Loner napřed 4+ (ř. 8287-8290).
+     * `tymovy` = šance stojí na týmovém přehozu (uživatel: „ber to jako horší než hráč s catch“ ⇒ při shodě
+     * skáče hráč s Catch). `$modifikator` = jako skutečné chytání (+1 přesná přihrávka, ř. 891). Pro
+     * (ř. 8385-8389) se nepočítá — vědomé zjednodušení. Parita: C++ `divingCatchChance` (ball_handler.cpp).
+     *
+     * @return array{sance: float, tymovy: bool}
+     */
+    private function divingCatchChance(GameState $state, MatchPlayerDTO $hrac, ?TeamSide $rerollSide, int $modifikator): array
+    {
+        $jednou = (7 - max(2, min(6, $this->getCatchTarget($state, $hrac, $modifikator)))) / 6;
+        if ($hrac->hasSkill(SkillName::Catch)) {
+            return ['sance' => $jednou + (1 - $jednou) * $jednou, 'tymovy' => false];
+        }
+        if (!self::tymovyPrehozPoRuce($state, $hrac->getTeamSide(), $rerollSide)) {
+            return ['sance' => $jednou, 'tymovy' => false];
+        }
+        $brana = $hrac->hasSkill(SkillName::Loner) ? 0.5 : 1.0;
+
+        return ['sance' => $jednou + (1 - $jednou) * $brana * $jednou, 'tymovy' => true];
+    }
+
+    /**
+     * Recenze P239 (2.11.2026, LOW-2): JEDINÉ místo podmínky „hráč strany `$strana` smí na chytání použít týmový
+     * přehoz“ — jen tým `$rerollSide`, který určil volající (tým na tahu ve fázi hry; výkop a tah soupeře null,
+     * ř. 929-933, 1261-1263), a jen s přehozem po ruce. Dřív tři kopie (resolveLanding, chytání odrazu, volba
+     * Diving Catch). Parita: C++ `teamRerollAllowed` + `canUseReroll`.
+     */
+    private static function tymovyPrehozPoRuce(GameState $state, TeamSide $strana, ?TeamSide $rerollSide): bool
+    {
+        return $strana === $rerollSide && $state->getTeamState($strana)->canUseReroll();
     }
 
     /**
@@ -322,7 +376,7 @@ final class BallResolver
         if ($catcher === null) {
             // $divingCatcher: o skoku už rozhodl volající (výkop, viz KickoffResolver; false = nikdo);
             //   null = rozhodne se tu (kouč-člověk odpoví, AI skočí). Skill je volba (ř. 8065).
-            $catcher = $divingCatcher ?? $this->divingCatchAttempt($state, $landing, static fn() => true);
+            $catcher = $divingCatcher ?? $this->divingCatchAttempt($state, $landing, static fn() => true, rerollSide: $rerollSide, catchModifier: $accuratePass ? 1 : 0);
             $catcher = $catcher === false ? null : $catcher;
             $diving = $catcher !== null;
         } elseif ($catcher->getState() !== PlayerState::STANDING) {
@@ -341,7 +395,7 @@ final class BallResolver
             $state,
             $catcher,
             modifier: $accuratePass ? 1 : 0,
-            teamRerollAvailable: $rerollSide === $side && $state->getTeamState($side)->canUseReroll(),
+            teamRerollAvailable: self::tymovyPrehozPoRuce($state, $side, $rerollSide),
             accuratePass: $accuratePass && !$diving,
             kickoffReceiving: $kickoffReceiving,
             // OPRAVENO 30. 10. 2026 (P223 review LOW) — hloubka se tu ztrácela (odraz po neúspěchu
@@ -644,9 +698,11 @@ final class BallResolver
         //   ten se resi v `resolveCatch()`, kam `teamRerollAvailable` posila
         //   volajici a `KickoffResolver` ho necha na `false`.
         $side = $catcher->getTeamSide();
-        $teamRerollAvailable = $state->getPhase() === GamePhase::PLAY
-            && $state->getActiveTeam() === $side
-            && $state->getTeamState($side)->canUseReroll();
+        $teamRerollAvailable = self::tymovyPrehozPoRuce(
+            $state,
+            $side,
+            $state->getPhase() === GamePhase::PLAY ? $state->getActiveTeam() : null,
+        );
 
         $proUsed = false;
         if (!$success && !$skillRerollUsed

@@ -100,6 +100,12 @@ Position scatterDirection(int d8);
 // ⇒ {-1,-1}. ⛔ Míč ve vzduchu nikdo nezvedne: na pole dopadu se smí postavit (při dopadu chytá).
 Position looseBallSquare(const GameState& state);
 
+// Recenze P239 (2.11.2026, LOW-2): JEDINÉ místo podmínky „hráč smí na svůj hod použít týmový přehoz“
+// (bez ohledu na zásobu — tu hlídá `TeamState::canUseReroll`): jen hráč týmu na tahu a nikdy během
+// výkopu (P64; BB2016 ř. 929-933 "during their own turn", ř. 1261-1263). Dřív tři kopie (attemptRoll,
+// velcí hráči, volba Diving Catch).
+bool teamRerollAllowed(const GameState& state, const Player& player);
+
 // Reroll chain: skill → Pro → team reroll (with Loner gate)
 // skillReroll = SKILL_COUNT means no skill reroll available
 // P130: zeptá se kouče na přehoz (nechat / tým / Pro) a vyřídí jeho cenu --

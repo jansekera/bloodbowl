@@ -558,11 +558,14 @@ final class PassResolver
             }
         }
 
-        // Bez týmového přehozu -- Dump-Off se hází v soupeřově tahu (ř. 929-933).
+        // OPRAVENO 2. 11. 2026 (recenze P239 LOW-1) — tady nebyl týmový přehoz pro nikoho („Dump-Off se hází
+        //   v soupeřově tahu“). Pravidla ř. 929-933: přehoz smí hráč týmu na tahu "during their own turn" — házející
+        //   tým ho nemá, ale hráč BLOKUJÍCÍHO týmu (na tahu), který rozptýlený Dump-Off chytá skokem (Diving Catch),
+        //   ano. ⇒ přehoz smí jen tým na tahu.
         // Přesný Dump-Off = přesná přihrávka ("the normal throwing rules apply", ř. 8097-8098):
         //   chytání +1 (ř. 891) a Diving Catch na cílovém poli +1 (ř. 8063-8064). Do P223 jen +1
         //   bez Diving Catch.
-        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate);
+        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $state->getActiveTeam());
         return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
 

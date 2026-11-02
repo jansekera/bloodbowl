@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "bb/ball_handler.h"
 #include "bb/helpers.h"
 #include "bb/coach_choice.h"
@@ -127,13 +128,32 @@ std::vector<int> divingCatchCandidates(const GameState& state, Position at) {
     return found;
 }
 
+namespace {
+// P239b (uživatel 2.11.2026): šance, že hráč skokem míč chytí, i s přehozem — podle té AI vybírá skokana.
+// Catch (ř. 7992-7995) ⇒ p + (1−p)·p. Bez Catch týmový přehoz, jen hráči týmu na tahu mimo výkop
+// s přehozem po ruce (stejná podmínka jako `attemptRoll`; ř. 928-936, FAQ ř. 9253); Loner napřed 4+
+// (ř. 8287-8290). `teamReroll` = šance stojí na týmovém přehozu (uživatel: „ber to jako horší než hráč
+// s catch“ ⇒ při shodě skáče hráč s Catch). `modifier` = jako skutečné chytání (+1 přesná přihrávka,
+// ř. 891). Pro (ř. 8385-8389) se nepočítá — vědomé zjednodušení.
+double divingCatchChance(const GameState& state, const Player& p, int modifier, bool& teamReroll) {
+    const double once = (7 - std::clamp(calculateCatchTarget(state, p, modifier), 2, 6)) / 6.0;
+    teamReroll = false;
+    if (p.hasSkill(SkillName::Catch)) return once + (1 - once) * once;
+    if (!teamRerollAllowed(state, p) || !state.getTeamState(p.teamSide).canUseReroll()) return once;
+    teamReroll = true;
+    const double gate = p.hasSkill(SkillName::Loner) ? 0.5 : 1.0;
+    return once + (1 - once) * gate * once;
+}
+}  // namespace
+
 // Uživatel 30.10.2026, varianta B. OPRAVENO — dřív dva a víc kandidátů ⇒ nikdo, bez otázky. Pravidla
 // ř. 8069-8071 "two or more players ATTEMPTING to use this skill ... neither can use it" (pokus je volba,
 // ř. 985) a ř. 986-990 "the coach whose turn is taking place must use his skill first" ⇒ napřed strana
 // na tahu (o každém svém kandidátovi), pak druhá; ta v otázce vidí, kdo už skáče (otherId). Kouč-člověk
-// odpovídá na každého hráče zvlášť (roll = počet dalších kandidátů bez těch, kdo už odmítli); AI skočí s jedním hráčem (nejlepší
-// cíl hodu), smí-li (`aiJumps`). Dva a víc pokusů ⇒ nikdo (další otázky už nic nezmění, nekladou se).
-int divingCatchAttempt(const GameState& state, Position at, const std::function<bool(const Player&)>& aiJumps) {
+// odpovídá na každého hráče zvlášť (roll = počet dalších kandidátů bez těch, kdo už odmítli); AI skočí s jedním hráčem (nejvyšší
+// šance chycení i s přehozem, P239b), smí-li (`aiJumps`). Dva a víc pokusů ⇒ nikdo (další otázky už nic nezmění, nekladou se).
+int divingCatchAttempt(const GameState& state, Position at,
+                       const std::function<bool(const Player&, bool othersAttempting)>& aiJumps, int catchModifier) {
     const std::vector<int> candidates = divingCatchCandidates(state, at);
     std::vector<int> attempting;
     int declined = 0;   // recenze 30.10. D/2: kdo už odmítl, do „dalších kandidátů“ v otázce nepatří
@@ -150,13 +170,22 @@ int divingCatchAttempt(const GameState& state, Position at, const std::function<
             continue;
         }
         int best = -1;
+        double bestChance = 0;
+        bool bestTeamReroll = false;
         for (int id : candidates) {
             const Player& p = state.getPlayer(id);
             if (p.teamSide != side) continue;
             ++declined;
-            if (!aiJumps(p)) continue;
-            if (best < 0 || calculateCatchTarget(state, p) < calculateCatchTarget(state, state.getPlayer(best)))
+            if (!aiJumps(p, !attempting.empty())) continue;
+            bool teamReroll = false;
+            const double chance = divingCatchChance(state, p, catchModifier, teamReroll);
+            const bool better = chance > bestChance + 1e-9 ||
+                                (chance > bestChance - 1e-9 && bestTeamReroll && !teamReroll);
+            if (best < 0 || better) {
                 best = id;
+                bestChance = chance;
+                bestTeamReroll = teamReroll;
+            }
         }
         if (best >= 0) {
             attempting.push_back(best);
@@ -175,7 +204,7 @@ void resolveLanding(GameState& state, Position at, DiceRollerBase& dice,
     if (p) {
         if (p->state == PlayerState::STANDING && !p->hasSkill(SkillName::NoHands)) catcherId = p->id;
     } else {
-        catcherId = divingCatchAttempt(state, at, [](const Player&) { return true; });
+        catcherId = divingCatchAttempt(state, at, [](const Player&, bool) { return true; }, accuratePass ? 1 : 0);
         diving = catcherId >= 0;
     }
     if (catcherId < 0) {

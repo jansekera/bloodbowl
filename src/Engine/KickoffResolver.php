@@ -92,7 +92,8 @@ final class KickoffResolver
         //   lajně), míč tam "dopadl" ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318), bez hodu.
         // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
         //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
-        //   AI: kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně;
+        //   AI: kopající hráč na lajně by skokem dal soupeři touchback ⇒ sám neskočí (do P239 neskočil nikdy)
+        //   a míč dopadne normálně;
         //   přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
         // Uživatel 30.10.2026: hráče kouče-člověka se ptá, i kopajícího; víc kandidátů (ř. 8069-8071)
         //   a pořadí stran řeší `divingCatchAttempt` — první rozhoduje přijímající (jako C++ `landBall`,
@@ -100,8 +101,12 @@ final class KickoffResolver
         $diver = $this->ballResolver->divingCatchAttempt(
             $state,
             $landingPos,
-            fn(MatchPlayerDTO $p) => $p->getTeamSide() === $receivingTeam
-                || $this->scatterCalc->isInReceivingHalf($p->getPosition() ?? $landingPos, $receivingTeam),
+            // P239a (uživatel 2.11.2026): kopající AI na lajně skočí, PRÁVĚ KDYŽ už skáče přijímající — dva
+            //   pokusy ⇒ nechytá nikdo (ř. 8069-8071), touchback nevznikne. Týmový přehoz se při výkopu
+            //   nepočítá (`rerollSide` null, ř. 1261-1263).
+            fn(MatchPlayerDTO $p, bool $uzNekdoSkace) => $p->getTeamSide() === $receivingTeam
+                || $this->scatterCalc->isInReceivingHalf($p->getPosition() ?? $landingPos, $receivingTeam)
+                || $uzNekdoSkace,
             naTahu: $receivingTeam,
         );
         $diverPos = $diver?->getPosition();

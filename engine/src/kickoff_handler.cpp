@@ -84,12 +84,14 @@ void landBall(GameState& state, TeamSide receiving, Position at, DiceRollerBase&
         if (!p && !bounced) {
             // OPRAVENO 20.10.2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
             //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
-            //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ AI neskočí, míč dopadne
-            //   normálně. Přijímající v kopající polovině (Quick Snap) skočí.
+            //   Kopající hráč v kopající polovině by skokem dal soupeři touchback ⇒ AI sama neskočí, míč dopadne
+            //   normálně (do P239 neskočila nikdy). Přijímající v kopající polovině (Quick Snap) skočí.
             // Uživatel 30.10.2026: v živé partii se ptá kouče hráče, i kopajícího; víc kandidátů (ř. 8069-8071)
             // a pořadí stran řeší `divingCatchAttempt` (na tahu je tu přijímající).
-            const int diver = divingCatchAttempt(state, at, [&](const Player& d) {
-                return d.teamSide == receiving || inHalfOf(receiving, d.position);
+            // P239a (uživatel 2.11.2026): kopající AI na lajně skočí, PRÁVĚ KDYŽ už skáče přijímající — dva
+            //   pokusy ⇒ nechytá nikdo (ř. 8069-8071), touchback nevznikne, soupeř přijde o jisté chytání.
+            const int diver = divingCatchAttempt(state, at, [&](const Player& d, bool othersAttempting) {
+                return d.teamSide == receiving || inHalfOf(receiving, d.position) || othersAttempting;
             });
             if (diver >= 0) {
                 const Position from = state.getPlayer(diver).position;
