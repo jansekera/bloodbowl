@@ -258,6 +258,8 @@ final class ActionResolver
                 $params,
                 $this->replayDice->getLog(),
                 $odpovedi,
+                $q->otherCandidates,
+                $q->attemptingId,
             )), []);
         } finally {
             $this->ballResolver->setDivingCatchAnswers([]);

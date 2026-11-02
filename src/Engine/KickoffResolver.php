@@ -90,35 +90,32 @@ final class KickoffResolver
         // DOPLNĚNO 20. 10. 2026 (P223): Diving Catch i u výkopu (ř. 8065-8066). Hráč chytá "as if it had
         //   landed in his own square" (ř. 8068) -- stojí-li v kopající polovině (kopající hráč na
         //   lajně), míč tam "dopadl" ⇒ touchback (ř. 281-282, FAQ ř. 9316-9318), bez hodu.
-        $diver = $this->ballResolver->findDivingCatchPlayer($state, $landingPos);
+        // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
+        //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
+        //   AI: kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně;
+        //   přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
+        // Uživatel 30.10.2026: hráče kouče-člověka se ptá, i kopajícího; víc kandidátů (ř. 8069-8071)
+        //   a pořadí stran řeší `divingCatchAttempt` — první rozhoduje přijímající (jako C++ `landBall`,
+        //   kde je při dopadu na tahu přijímající).
+        $diver = $this->ballResolver->divingCatchAttempt(
+            $state,
+            $landingPos,
+            fn(MatchPlayerDTO $p) => $p->getTeamSide() === $receivingTeam
+                || $this->scatterCalc->isInReceivingHalf($p->getPosition() ?? $landingPos, $receivingTeam),
+            naTahu: $receivingTeam,
+        );
         $diverPos = $diver?->getPosition();
-        $skok = false;
-        if ($diver !== null && $diverPos !== null) {
-            $vKopajici = !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam);
-            // OPRAVENO 20. 10. 2026 (uživatel: „proč by automaticky volil použití diving catch, ať je
-            //   touchback — tyto skilly nejsou povinné“): Diving Catch je volba („can attempt“, ř. 8065).
-            //   AI: kopající hráč na lajně by skokem dal soupeři touchback ⇒ neskočí a míč dopadne normálně;
-            //   přijímající hráč v kopající polovině (po Quick Snap) skočí — touchback je pro něj.
-            //   Jako jeden ze dvou kandidátů kopající dál „skočí“ a zruší přijímajícího (ř. 8069-8071) —
-            //   to řeší `findDivingCatchPlayer` (vrátí null), sem se nedostane.
-            // Uživatel 30.10.2026: hráče kouče-člověka se ptá (`divingCatchJumps`), i kopajícího.
-            $skok = $this->ballResolver->divingCatchJumps(
-                $diver,
-                $landingPos,
-                aiJumps: !$vKopajici || $diver->getTeamSide() === $receivingTeam,
-            );
-            if ($skok && $vKopajici) {
-                $events[] = GameEvent::divingCatch($diver->getId());
-                $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
-                return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
-            }
+        if ($diver !== null && $diverPos !== null && !$this->scatterCalc->isInReceivingHalf($diverPos, $receivingTeam)) {
+            $events[] = GameEvent::divingCatch($diver->getId());
+            $touchbackResult = $this->resolveTouchback($state, $receivingTeam);
+            return ['state' => $touchbackResult['state'], 'events' => array_merge($events, $touchbackResult['events'])];
         }
 
         // Chytání při dopadu výkopu bez týmového přehozu (ř. 1261-1263).
         $landingResult = $this->ballResolver->resolveLanding(
             $state,
             $landingPos,
-            divingCatch: $skok,
+            divingCatcher: $diver ?? false,
             kickoffReceiving: $receivingTeam,
         );
         $state = $landingResult['state'];

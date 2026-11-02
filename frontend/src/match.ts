@@ -224,8 +224,9 @@ async function handleActionResult(result: ActionResult): Promise<void> {
 function showDivingCatchModal(state: import('./api/types').GameState): void {
     const pending = state.pendingDivingCatch;
     if (!pending) return;
-    const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
-    divingCatchModal.show(pending, name, async (params: Record<string, unknown>) => {
+    const nameOf = (id: number) => state.players.find(p => p.id === id)?.name ?? `#${id}`;
+    const attempting = pending.attemptingId !== null ? nameOf(pending.attemptingId) : null;
+    divingCatchModal.show(pending, nameOf(pending.playerId), attempting, async (params: Record<string, unknown>) => {
         isProcessing = true;
         try {
             const result = await api.submitAction(matchId, 'resolve_diving_catch', params);

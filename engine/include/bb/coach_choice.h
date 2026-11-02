@@ -47,8 +47,9 @@ enum class CoachQuestion : int {
     // volné pole vedle soupeře, bez Side Step obránce). Pole pak volí příkaz `push`.
     USE_GRAB = 15,
     // Uživatel 30.10.2026: hráč s Diving Catch, když míč z přihrávky, výkopu nebo vhazování (ne odraz)
-    // dopadá na prázdné pole v jeho tackle zóně a jiný kandidát není (ř. 8065-8071 "can attempt").
-    // playerId = hráč, target = pole dopadu x*100+y. Ptá se kouče hráče, i v tahu soupeře.
+    // dopadá na prázdné pole v jeho tackle zóně (ř. 8065-8071 "can attempt"). playerId = hráč, target =
+    // pole dopadu x*100+y, roll = počet DALŠÍCH kandidátů, otherId = hráč, který už se pokouší (-1 = nikdo).
+    // Ptá se kouče hráče, i v tahu soupeře; víc kandidátů = otázka na každého (varianta B, divingCatchAttempt).
     USE_DIVING_CATCH = 16
 };
 

@@ -565,8 +565,13 @@ def otazka_str(q):
         return (f"❓ LÉKÁRNÍK hráč {p}: první hod {zraneni_str(q['roll'])}, druhý {zraneni_str(q['target'])}"
                 " — který platí?  ->  odp 1 / 2")
     if t == "USE_DIVING_CATCH":   # 30.10.2026: míč dopadá na prázdné pole vedle hráče (ř. 8065-8071)
+        # Varianta B (30.10.): roll = počet DALŠÍCH kandidátů, other = kdo už skáče (-1 = nikdo).
+        kandidati = (f" | další {q['roll']} s Diving Catch to stihne — skočí-li dva a víc, ruší se a nechytá nikdo"
+                     if q["roll"] > 0 else "")
+        uz = f" | hráč {o} už skáče" if o >= 0 else ""
         return (f"❓ DIVING CATCH hráč {p}: míč dopadá na ({q['target'] // 100},{q['target'] % 100}) vedle něj"
-                " — skočit (chytá ze svého pole, neúspěch odskočí od něj)?  ->  odp ano / ne (ne = míč dopadne a odrazí se)")
+                f" — skočit (chytá ze svého pole, neúspěch odskočí od něj)?{kandidati}{uz}"
+                "  ->  odp ano / ne (ne = míč dopadne a odrazí se)")
     if t in SKILL_OTAZKY:
         kdo = f" (v bloku s hráčem {o})" if o > 0 else ""   # P201 (5): ptá se i útočník
         navic = {"USE_SIDE_STEP": "   (před `odp ano` lze zadat sidestep x y)",
