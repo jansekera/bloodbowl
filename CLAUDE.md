@@ -14,7 +14,8 @@ Po zelené: **commit + push bez ptaní**.
 |---|---|
 | před každým commitem | `make check` |
 | po dávce oprav (~5–10 commitů) | `/code-review` + `/simplify`; refaktor ⇒ stejné zápasy se stejným semínkem před/po; pravidlová oprava ⇒ řádek „převést do druhého enginu“ |
-| **každé pondělí** | **audit parity PHP × C++** (`evidence/fable_brief_rules_parity_20260821.md`) · `php composer.phar audit` + `npm audit --omit=dev` · (po P108) gitleaks + Semgrep |
+| **každé pondělí** | `php composer.phar audit` + `npm audit --omit=dev` · gitleaks (`gitleaks git .` celá historie) + Semgrep (`semgrep --config p/default --metrics=off src public frontend/src config.php`) — oba napřed na sondě s vloženou vadou (pozitivní kontrola); nástroje nejsou v repu (gitleaks binárka z GitHub release s kontrolou SHA-256, Semgrep `pip install --target`) |
+| **každý pátek** (uživatel 2.11.: „změň na pátek“) | **audit parity PHP × C++** (`evidence/fable_brief_rules_parity_20260821.md`) |
 | v noci, volná kapacita | mutační testy (po P104) |
 | měsíčně / větší změna webu | security review (jako P98), aktualizace závislostí |
 | ⛔ ne pravidelně | měření síly AI jako „regresní test“ — jen párově na konkrétní otázku |

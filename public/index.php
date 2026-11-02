@@ -41,17 +41,9 @@ if (RouteIds::outOfRange($uri)) {
     throw new NotFoundException('Not found');
 }
 
-// CORS for API
-if ($apiPath !== null) {
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-    if ($method === 'OPTIONS') {
-        http_response_code(204);
-        exit;
-    }
-}
+// OPRAVENO 2. 11. 2026 — tady bylo CORS `Access-Control-Allow-Origin: *` pro celé API (nález Semgrep
+// php-permissive-cors). Frontend volá API ze stejného originu (`/api/v1`), CORS nepotřebuje; povolení
+// všech originů jen otevíralo API cizím stránkám.
 
 // ========== API Routes ==========
 if ($apiPath !== null) {
