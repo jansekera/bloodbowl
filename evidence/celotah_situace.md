@@ -548,3 +548,14 @@ Dnes AI skóruje, jakmile dosáhne (kniha **P151**, zkouška `evidence/zkouska_a
 v 6. kole 1. poločasu (18/20 plánů) a elfům by zbyly 3 tahy; uživatel čekal do 8. kola.
 Protipříklad z téže partie (2. pol., k7): čekání 1 pole od TD stálo turnover a ztrátu míče ⇒ podmínka „nosič v bezpečí“ je část pravidla, ne dodatek.
 
+
+## A17. OBRANA ZAVAZÍ NOSIČI CO NEJVÍC *(uživatel 02.11., partie 2 30.–31.10.)*
+
+Nosič orků (uživatel) na (19,0) u postranní čáry; AI lidí ho nenapadla, protože každá cesta k němu chtěla úhyb, a HBH19 poslala se 2× GFI do vlastní koncové zóny. Nosič v 7. kole doběhl řadou 0 mimo tackle zóny ⇒ TD.
+Uživatel: *„poslat obranu tak aby zavazela nosiči co nejvíce - lze spočítat“*.
+
+| co má hráč rozeznat | ✅ co jde měřit **DNES** | ⏰ co se změří **až to bude umět** |
+|---|---|---|
+| obránci se staví tak, aby nosič na cestě k TD musel co nejvíc uhýbat / obíhat (zóny přes jeho nejkratší cesty) | počet nosičových cest k TD bez úhybu a nejmenší počet úhybů po tahu obrany (čte se z desky) | o kolik obrana P245 zvýší úhyby/délku cesty nosiče oproti dnešku |
+
+Kniha **P245**. Zápis partie `evidence/play_20261030_zed_orkove/zaver.md`.
