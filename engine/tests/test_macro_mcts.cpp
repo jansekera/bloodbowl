@@ -930,6 +930,11 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     // P227 (přeladěno 26.10.2026 po review M4): běží ve VÝCHOZÍ masce. Dřív tu bylo P227 vypnuté, protože
     // fixtura stála na blitzu 1 proti 6 (3 proti), který AI od P227 nenabízí — test tak hlídal situaci,
     // která ve hře nenastane. Teď síla 3 proti 6 = 2 proti na nosiče (P227 povolí).
+    // P242b (03.11.2026): pojistka teď stojí v hloubce dosahu soupeře, ne v zóně. Bezpečný přesun hráče 2
+    //   tím zhodnotil a základ ho volí sám — test pak nerozlišuje. Zkoušeno 50 polí volného hráče (x 5–22,
+    //   y 1–12) s MA 6 i MA 5: žádné nedalo „základ BLITZ, strážce odloží“. Test hlídá ODKLAD RIZIKA, ne
+    //   pojistku, proto P242b po dobu testu vypíná (jako P162 u priorů s faulem). Aserce se NEOSLABILA.
+    struct SafetyDepthOff { SafetyDepthOff() { setExtraFeaturesOff(kP242SafetyDepth); } ~SafetyDepthOff() { setExtraFeaturesOff(0); } } safetyDepthOff;
     GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;

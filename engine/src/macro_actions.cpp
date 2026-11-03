@@ -1468,6 +1468,29 @@ static bool carrierCanAdvance(const GameState& state, const Player& carrier);
 static bool pickBlitzer(const GameState& state, const Macro& macro, const std::vector<Action>& actions,
                         Action& out, bool count);
 
+// ⭐ P242b (uživatel 3.11.2026: „pojistka v obraně má být tak daleko jak doběhne nejvíc dopředu soupeř - ať
+//   může reagovat - ne zbytečně být vzadu mimo“). OPRAVENO 3. 11. — dřív pevně ve vlastní zóně (řádek 7):
+//   v partii 2 catcher lidí odběhl na (25,7), 13 polí od míče, i když pomalí orkové (MA 5) tam v příštím
+//   tahu nedoběhli. Teď sloupec, kam nejdál k naší zóně doběhne kterýkoli soupeř v příštím tahu
+//   (stojící MA + 2 GFI, ležící MA − 3 + 2, bez Jump Up; omráčený nikam) — nejvýš sama zóna.
+//   Uživatel 3.11.: „počítej s nejhorším od soupeře - tedy i s přihrávkou“ ⇒ dosah KAŽDÉHO soupeře, ne jen
+//   nosiče: spoluhráč doběhne do své hloubky a míč tam chytí (přihrávka), nebo míč dostane z ruky a doběhne
+//   potom (předávka) — obojí končí nejdál tam, kam doběhne on. (Throw Team-Mate a Sprint se nepočítají.)
+//   Horizont: jen příští tah soupeře (dosah se čte, nehledá).
+int safetyDepthX(const GameState& state, TeamSide mySide) {
+    const int ez = endzoneX(opponent(mySide));
+    const int dir = forwardDx(opponent(mySide));          // kam soupeř útočí (k naší zóně)
+    int deepest = ez - dir * 25;                           // „nikdo nikam“ = na druhém konci
+    state.forEachOnPitch(opponent(mySide), [&](const Player& o) {
+        const int r = blitzReachOf(o);
+        if (r < 0) return;
+        const int x = o.position.x + dir * (r + 1);        // r + 1 = celý dosah pohybu (MA + 2)
+        if ((x - deepest) * dir > 0) deepest = x;
+    });
+    if ((deepest - ez) * dir > 0) deepest = ez;            // dál než zóna nejde
+    return std::clamp(deepest, 0, 25);
+}
+
 static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                             bool dauntlessInOffer) {
     out.clear();
@@ -2870,7 +2893,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // Strategy 1: Safety player (fast, near our endzone)
             if (!safetyPlaced && p.stats.movement >= 6) {
                 repBranch = 9;
-                target = {static_cast<int8_t>(myEndzone),
+                target = {static_cast<int8_t>(extraFeatureOn(kP242SafetyDepth) ? safetyDepthX(state, mySide) : myEndzone),
                           static_cast<int8_t>(7)};
                 safetyPlaced = true;
             }
@@ -2998,6 +3021,14 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                     ++g_repTz[repBranch];
                 }
             }
+        }
+        // ⭐ P242a (uživatel 3.11.2026 „a ano“): cíl, na kterém stojí SPOLUHRÁČ, je zastaralý (partie 2:
+        //   pole (18,7) obsadil hráč 17, který šel dřív) — na obsazené pole dojít nejde a hráč by jen
+        //   promrhal aktivaci. Nenabízí se; hledání vybere jinou akci. Cíl na SOUPEŘOVĚ poli zůstává
+        //   („jdi k němu“ — chůze dojde vedle, P242 část 1).
+        if (extraFeatureOn(kP242OwnOccupied) && target != p.position) {
+            const Player* occ = state.getPlayerAtPosition(target);
+            if (occ && occ->teamSide == mySide) return;
         }
         out.push_back({MacroType::REPOSITION, p.id, -1, target});
     });

@@ -1689,15 +1689,16 @@ TEST(MacroActions, RepositionDefenseSafetyPlayer) {
     std::vector<Macro> macros;
     getAvailableMacros(state, macros);
 
-    // One REPOSITION should target near our endzone (safety)
-    // Home endzone is at x=0
+    // P242b (uživatel 3.11.2026): pojistka stojí tak hluboko, kam nejdál doběhne soupeř (i s přihrávkou),
+    //   ne pevně u zóny (dřív se tu chtělo x ≤ 2 = staré zadání).
+    const int depth = safetyDepthX(state, TeamSide::HOME);
     bool hasSafety = false;
     for (auto& m : macros) {
-        if (m.type == MacroType::REPOSITION && m.targetPos.x <= 2) {
+        if (m.type == MacroType::REPOSITION && m.targetPos.x == depth) {
             hasSafety = true;
         }
     }
-    EXPECT_TRUE(hasSafety) << "Should have a safety REPOSITION near endzone";
+    EXPECT_TRUE(hasSafety) << "Should have a safety REPOSITION at the opponents' deepest reach x=" << depth;
 }
 
 TEST(MacroActions, RepositionDefenseEndzoneGuard) {
@@ -5492,4 +5493,92 @@ TEST(MacroActions, P220ExceptionOwnBlitzStillHappens) {
         return a.playerId == 1 && a.type == ActionType::BLITZ;
     });
     EXPECT_TRUE(blitzed) << "(c) vlastní blitz agilního se hraje dál";
+}
+
+// =============================================================
+// P242 část 2 (uživatel 3.11.2026): (a) „a ano“ — přesun na pole, kde stojí spoluhráč, se nenabízí;
+// (b) „pojistka v obraně má být tak daleko jak doběhne nejvíc dopředu soupeř - ať může reagovat - ne
+// zbytečně být vzadu mimo“. Brání HOME, míč drží AWAY; směry a zóna se čtou z enginu, ne natvrdo.
+// =============================================================
+namespace {
+GameState makeP242Defense() {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.homeTeam.turnNumber = 3;
+    s.weather = Weather::NICE;
+    auto put = [&](int id, TeamSide side, Position pos, int8_t ma) -> Player& {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING; p.position = pos;
+        p.stats = {ma, 3, 3, 8}; p.movementRemaining = ma; p.hasMoved = false; p.hasActed = false;
+        return p;
+    };
+    put(12, TeamSide::AWAY, {12, 7}, 5);           // nosič soupeře, pomalý
+    s.ball = BallState::carried({12, 7}, 12);
+    put(1, TeamSide::HOME, {11, 2}, 6);            // rychlí obránci (MA 6 = kandidáti na pojistku)
+    put(2, TeamSide::HOME, {12, 12}, 6);
+    return s;
+}
+}  // namespace
+
+TEST(MacroActions, P242SafetyDepthIsTheOpponentsDeepestReach) {
+    GameState s = makeP242Defense();
+    const int ez = 0, dir = -1;   // HOME skóruje na x = 25, brání x = 0; AWAY útočí k x = 0
+    EXPECT_EQ(safetyDepthX(s, TeamSide::HOME), 12 + dir * 7) << "MA 5 + 2 GFI";
+    Player& prone = s.getPlayer(12);
+    prone.state = PlayerState::PRONE;
+    EXPECT_EQ(safetyDepthX(s, TeamSide::HOME), 12 + dir * 4) << "ležící: MA 5 − 3 na vstání + 2";
+    prone.state = PlayerState::STUNNED;
+    Player& fast = s.getPlayer(13);   // spoluhráč nosiče: přihrávka / předávka ⇒ míč doběhne s ním
+    fast.id = 13;
+    fast.teamSide = TeamSide::AWAY; fast.state = PlayerState::STANDING; fast.position = {static_cast<int8_t>(ez - dir * 3), 2};
+    fast.stats = {8, 3, 3, 8};
+    EXPECT_EQ(safetyDepthX(s, TeamSide::HOME), ez) << "nejhorší odpověď je i přihrávka: kdo bez míče doběhne do zóny, tam ho může i chytit";
+}
+
+TEST(MacroActions, P242SafetyStandsAtTheDepthNotInTheEndzone) {
+    const GameState s = makeP242Defense();
+    const int ez = 0;   // zóna, kterou HOME brání
+    const Position depth{static_cast<int8_t>(safetyDepthX(s, TeamSide::HOME)), 7};
+    ASSERT_NE(depth.x, ez) << "fixtura: pomalý soupeř do zóny nedoběhne";
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+    bool atDepth = false, inZone = false;
+    for (const auto& m : macros) {
+        if (m.type != MacroType::REPOSITION) continue;
+        if (m.targetPos == depth) atDepth = true;
+        if (m.targetPos == Position{static_cast<int8_t>(ez), 7}) inZone = true;
+    }
+    EXPECT_TRUE(atDepth) << "pojistka v hloubce dosahu soupeře (" << int(depth.x) << ",7)";
+    EXPECT_FALSE(inZone) << "pojistka zbytečně vzadu v zóně";
+
+    setExtraFeaturesOff(kP242SafetyDepth);   // pozitivní kontrola: dřívější pojistka v zóně
+    macros.clear();
+    getAvailableMacros(s, macros);
+    setExtraFeaturesOff(0);
+    bool oldZone = false;
+    for (const auto& m : macros)
+        oldZone |= m.type == MacroType::REPOSITION && m.targetPos == Position{static_cast<int8_t>(ez), 7};
+    EXPECT_TRUE(oldZone);
+}
+
+TEST(MacroActions, P242NoRepositionOntoATeammate) {
+    GameState s = makeP242Defense();
+    const Position depth{static_cast<int8_t>(safetyDepthX(s, TeamSide::HOME)), 7};
+    Player& mate = s.getPlayer(3);
+    mate.id = 3; mate.teamSide = TeamSide::HOME; mate.state = PlayerState::STANDING; mate.position = depth;
+    mate.stats = {6, 3, 3, 8}; mate.hasActed = true; mate.hasMoved = true; mate.movementRemaining = 0;
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+    for (const auto& m : macros)
+        EXPECT_FALSE(m.type == MacroType::REPOSITION && m.targetPos == depth && m.playerId != 3)
+            << "hráč " << m.playerId << " posílán na pole spoluhráče";
+    setExtraFeaturesOff(kP242OwnOccupied);
+    macros.clear();
+    getAvailableMacros(s, macros);
+    setExtraFeaturesOff(0);
+    bool old = false;
+    for (const auto& m : macros) old |= m.type == MacroType::REPOSITION && m.targetPos == depth && m.playerId != 3;
+    EXPECT_TRUE(old) << "pozitivní kontrola: bez P242a se na pole spoluhráče posílá";
 }

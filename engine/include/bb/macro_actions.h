@@ -47,6 +47,8 @@ int blockDiceCount(const GameState& state, const Player& attacker, const Player&
 // proto Wrestle neplatí pro nosiče). `dice` jako blockDiceCount (záporné = volí obránce). Jedna kostka bez
 // Block a Wrestle = turnover 1/3, s nimi 1/6.
 bool hitAllowed(const GameState& state, const Player& attacker, int dice);
+// P242b: sloupec pojistky v obraně — kam nejdál k naší zóně doběhne soupeř v příštím tahu (nejvýš zóna).
+int safetyDepthX(const GameState& state, TeamSide mySide);
 // P227: smí AI poslat `blitzer` blitzem na `target`? Ne, když obránce volí ze 3+ kostek, ze 2 jen na
 // soupeřova nosiče (kostky z pole, odkud hra bude blokovat). Vypínač kP227BlitzDice. Definice a důvod v .cpp.
 bool blitzDiceAllowed(const GameState& state, const Player& blitzer, const Player& target);
@@ -119,7 +121,9 @@ enum ExtraFeature : unsigned {
     kP232KeepThreat = 65536,  // P232: přesun hráče mimo klec (připravený, zaostalec, záloha, Wild Animal) nezvedne hrozbu na nosiče
     kP233WallClear = 131072,  // P233: pomalejší klec bez povolené rány čistí zeď od kraje ranami na 2 kostky naše s asistenty
     kP240GuardTarget = 262144, // P240: blok/blitz na hráče s Guard má v MCTS přednost (prior aspoň 0,20 jako nosič, P10a)
-    kP241DoubleGfi = 524288    // P241: útěk s míčem (P213) přes 2× GFI jen z dosahu soupeřů, nebo když pád nedá soupeři míč
+    kP241DoubleGfi = 524288,   // P241: útěk s míčem (P213) přes 2× GFI jen z dosahu soupeřů, nebo když pád nedá soupeři míč
+    kP242OwnOccupied = 1048576, // P242a: přesun na pole, kde stojí spoluhráč, se nenabízí
+    kP242SafetyDepth = 2097152  // P242b: pojistka v obraně stojí tak hluboko, kam nejdál doběhne soupeř (ne v zóně)
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
