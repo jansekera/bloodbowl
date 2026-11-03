@@ -98,3 +98,62 @@ def test_odmitnuty_do_neni_v_logu(tmp_path):
     finally:
         _cmd(d, "quit")
         server.wait(timeout=30)
+
+
+def _server(d, partie=None):
+    env = dict(os.environ, BB_PLAY_DIR=d)
+    if partie:
+        env["BB_PARTIE"] = partie
+    return subprocess.Popen([sys.executable, os.path.join(KOREN, "bb_play_session_20261012.py")],
+                            env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def test_prehrani_logu_neodmitne_akci_kterou_ted_varovani_odmita(tmp_path):
+    # P243 (3.11.2026): log je, co se hrálo. Blok zahraný v partii přes `do` dřív, než přišlo varování
+    # u bloku, který by AI nedala, se po restartu musí přehrát — jinak se partie rozejde (partie 2
+    # zed-orkove po zavedení varování skončila při přehrání 0:0 místo 1:0).
+    d = str(tmp_path)
+    server = _server(d, "zed-orkove")
+    try:
+        time.sleep(1.5)
+        _cmd(d, "kouc", "OBE")
+        _cmd(d, "pozice")
+        varovany = None
+        for _ in range(12):
+            bloky = [l.split("]")[0].strip(" [") for l in _cmd(d, "actions", "HOME").splitlines()
+                     if "ActionType.BLOCK " in l]
+            for idx in bloky:
+                out = _cmd(d, "do", idx)
+                if "⚠️ blok" in out:
+                    varovany = idx
+                    break
+                if "ČEKÁ" in out or "❓" in out:   # neodmítnutý blok proběhl ⇒ nabídka je jiná
+                    break
+            if varovany is not None:
+                break
+        assert varovany is not None, "pozitivní kontrola: v pozici se musí najít blok s varováním"
+        po = _cmd(d, "do!", varovany)
+        for _ in range(8):                         # otázky kouče: kostka 0, ostatní „ne“
+            if "❓" not in po:
+                break
+            po = _cmd(d, "odp", "0" if "kterou kostku" in po else "ne")
+        deska = _deska(_cmd(d, "board"))
+        log = os.path.join(d, "prikazy.log")
+        radky = open(log).read().splitlines()
+        assert f"do! {varovany}" in radky
+        # jako log ze dřívějška: týž blok přes `do`
+        open(log, "w").write("\n".join("do " + r[4:] if r == f"do! {varovany}" else r for r in radky) + "\n")
+    finally:
+        _cmd(d, "quit")
+        server.wait(timeout=30)
+    os.remove(os.path.join(d, "out.txt"))
+    server = _server(d, "zed-orkove")
+    try:
+        for _ in range(120):
+            if os.path.exists(os.path.join(d, "out.txt")):
+                break
+            time.sleep(0.5)
+        assert _deska(_cmd(d, "board")) == deska
+    finally:
+        _cmd(d, "quit")
+        server.wait(timeout=30)

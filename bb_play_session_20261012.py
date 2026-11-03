@@ -850,6 +850,7 @@ def main():
         if replay:
             line = replay.pop(0)
             ticho = bool(replay)
+            z_logu = True        # P243: log je, co se hrálo — varování se při přehrání neptají znovu
             zalogovano = False   # během přehrávání se odpověď zapíše jen po posledním řádku
         elif not os.path.exists(CMD):
             time.sleep(0.3)
@@ -859,6 +860,7 @@ def main():
                 line = f.read().strip()
             os.remove(CMD)
             ticho = False
+            z_logu = False
             zalogovano = False
             if line.split() and line.split()[0] in ("do", "do!", "push", "follow", "blitzfrom", "actions", "vykop", "polocas", "kostka", "beztackle",
                                                       "kouc", "odp", "sidestep", "los", "volba", "pozice"):
@@ -1007,7 +1009,8 @@ def main():
                 result_lines.append(f"příští follow-up: {'ano' if parts[1] == '1' else 'ne'}")
             elif cmd in ("do", "do!") and len(parts) in (2, 3):
                 a = last_actions[int(parts[-1])]   # `do 5` i starší tvar `do HOME 5`
-                varovani = (varovani_nosic(state, last_actions, a) or varovani_blok(state, a)) if cmd == "do" else None
+                varovani = ((varovani_nosic(state, last_actions, a) or varovani_blok(state, a))
+                            if cmd == "do" and not z_logu else None)
                 if varovani:
                     result_lines.append(varovani)
                     odmitnuto = True
