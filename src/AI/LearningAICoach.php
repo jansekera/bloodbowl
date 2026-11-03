@@ -439,15 +439,47 @@ final class LearningAICoach implements AICoachInterface
             //     * PRONE se postavi za 3 pole pohybu a zbytkem dojde,
             //     * PRONE s JUMP UP se postavi ZADARMO, takze ma plny dosah,
             //     * STUNNED tenhle tah jednat nemuze, ten se opravdu nepocita.
-            $ma = $souper->getStats()->getMovement();
-            $dosah = match (true) {
-                $souper->getState() === PlayerState::STANDING => $ma + 2,
-                $souper->getState() === PlayerState::PRONE
-                    && $souper->hasSkill(SkillName::JumpUp) => $ma + 2,
-                $souper->getState() === PlayerState::PRONE => max(0, $ma - 3) + 2,
-                default => -1,   // STUNNED a spol. -- letos nikam nejde
-            };
+            $dosah = self::dosahSoupere($souper);
             if ($dosah >= 0 && $sp->distanceTo($cil) <= $dosah) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Kam soupeř v příštím tahu doběhne (MA + 2 GFI; ležící bez Jump Up MA − 3), −1 = nejde. */
+    private static function dosahSoupere(MatchPlayerDTO $souper): int
+    {
+        $ma = $souper->getStats()->getMovement();
+
+        return match (true) {
+            $souper->getState() === PlayerState::STANDING => $ma + 2,
+            $souper->getState() === PlayerState::PRONE
+                && $souper->hasSkill(SkillName::JumpUp) => $ma + 2,
+            $souper->getState() === PlayerState::PRONE => max(0, $ma - 3) + 2,
+            default => -1,   // STUNNED a spol. -- letos nikam nejde
+        };
+    }
+
+    /**
+     * ⭐ P241 (uzivatel 2.11.2026: "2 GFI jen pokud na nej nikdo nedosahne"; "pokud nosic upadne daleko
+     *   od protihracu ... pad tolik nevadi"; 3.11.: "2x GFI ma byt vyjimka, ne obecny pohyb", levny pad =
+     *   souper nedosahne na mic). OPRAVENO 3. 11. -- driv nosic smel na pole pres 2x GFI (pad s micem
+     *   11/36, pravidla r. 1695-1697, 1701-1706) za pouhou srazku skore. Ted jen kdyz (1) na cilove pole
+     *   zadny souper v pristim tahu nedobehne, nebo (2) pad je levny: mic skonci nejvys 2 pole od cile
+     *   (pad na poli GFI vedle cile + odskok o 1) a zadny souper na takove pole nedobehne.
+     *   Do TD zony se neomezuje (vetev TD v `buildMoveAction` je pred timhle). C++: `doubleGfiAllowed`.
+     */
+    private function dveGfiNosiceSmi(GameState $state, TeamSide $side, Position $cil): bool
+    {
+        if ($this->souperNedosahne($state, $side, $cil)) {
+            return true;
+        }
+        foreach ($state->getPlayersOnPitch($side->opponent()) as $souper) {
+            $sp = $souper->getPosition();
+            $dosah = self::dosahSoupere($souper);
+            if ($sp !== null && $dosah >= 0 && $sp->distanceTo($cil) <= $dosah + 2) {
                 return false;
             }
         }
@@ -984,6 +1016,12 @@ final class LearningAICoach implements AICoachInterface
                 }
             }
 
+            // P241: nosic pres 2x GFI jen jako vyjimka (z dosahu / levny pad) -- `dveGfiNosiceSmi`
+            if ($isCarrier && (int) ($target['gfis'] ?? 0) >= 2
+                && !$this->dveGfiNosiceSmi($state, $side, new Position($target['x'], $target['y']))) {
+                continue;
+            }
+
             // Pick up ball
             if (!$ball->isHeld() && $ball->isOnPitch()) {
                 $ballPos = $ball->getPosition();
@@ -1322,6 +1360,11 @@ final class LearningAICoach implements AICoachInterface
                 $bestScore = $score;
                 $bestTarget = $target;
             }
+        }
+
+        // P241: vsechna pole vyrazena (jen 2x GFI nosice) -- jinak by vyhralo `$targets[0]` bez skore
+        if ($bestScore === -PHP_FLOAT_MAX) {
+            return null;
         }
 
         // Add base state evaluation to the score

@@ -85,6 +85,8 @@ double looseBallLossRisk(const GameState& state, TeamSide side, Position ball);
 //   Trpasličí Runner daleko od soupeře, bez rezervy: 0,14 + 0,05 + 0,5 = 0,69; Gutter Runner
 //   s rezervou: 0,14 + 0,07 = 0,21.
 double carrierFallCost(const GameState& state, const Player& carrier, Position ball);
+// P241: smí hráč `p` na `dest` přes 2× GFI? (méně GFI vždy). `withBall` = na `dest` bude stát s míčem.
+bool doubleGfiAllowed(const GameState& state, const Player& p, Position dest, bool withBall);
 
 // Kdy pustit nosiče samotného (fáze 3). Spočítá, jestli by klec doběhla:
 // tento tah ujde `cageStep` (největší krok, pro který jdou obsadit rohy), další

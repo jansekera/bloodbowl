@@ -2417,15 +2417,36 @@ TEST(CarrierThreat, ATeammateBehindAWallIsNotCountedAsAComingCorner) {
 // mín riskantní“. Pozice jako výše, ale pomalý příjemce (MA3): bez hodu z dosahu neuteče, s GFI ano ⇒ předá
 // a příjemce utíká s GFI (dřív se nepředávalo vůbec). Rychlý příjemce (MA6) bezpečné pole bez hodu má ⇒ GFI
 // nehraje.
+// P241 (uživatel 2.–3.11.2026: „2 GFI jen pokud na něj nikdo nedosáhne“, „2x GFI má být výjimka“): pomalý
+// příjemce se soupeřem na (6,7) utíkal přes 2× GFI na (14,12), kam soupeř (8 polí, MA 6 + 2) doběhne ⇒ to už
+// nesmí. Se soupeřem na (4,7) je cíl 10 polí od něj, mimo dosah ⇒ útěk s GFI zůstává (výjimka (1)).
 TEST(OneCageMate, TheEscapeMayUseGoingForItOnlyWhenNoRollFreeSafeSquareExists) {
-    auto board = [](int ma) {
+    auto board = [](int ma, int8_t oppX = 4) {
         Board b(2);
         b.put(1, TeamSide::HOME, {8, 7}, 4);
         b.put(6, TeamSide::HOME, {9, 7}, ma, 3, {SkillName::Catch}).stats.agility = 4;
-        b.put(13, TeamSide::AWAY, {6, 7}, 6, 5);
+        b.put(13, TeamSide::AWAY, {oppX, 7}, 6, 5);
         b.s.ball = BallState::carried({8, 7}, 1);
         return b;
     };
+    {   // P241: 2× GFI do dosahu soupeře ne; pozitivní kontrola: bez P241 tamtéž útěk s 2× GFI (dřívější stav)
+        Board b = board(3, 6);
+        CageController cc(nullptr, cfg(), 1);
+        Macro m;
+        const bool any = cc.next(b.s, m);
+        const Player& r = b.s.getPlayer(6);
+        if (any && m.type == MacroType::HAND_OFF_SCORE) {
+            EXPECT_LT(r.position.distanceTo(m.targetPos), 5) << "příjemce MA 3 přes 2× GFI do dosahu soupeře";
+        }
+        setExtraFeaturesOff(kP241DoubleGfi);
+        Board b0 = board(3, 6);
+        CageController cc0(nullptr, cfg(), 1);
+        Macro m0;
+        ASSERT_TRUE(cc0.next(b0.s, m0));
+        setExtraFeaturesOff(0);
+        ASSERT_EQ(m0.type, MacroType::HAND_OFF_SCORE) << "pozitivní kontrola: bez P241 útěk s 2× GFI";
+        EXPECT_EQ(b0.s.getPlayer(6).position.distanceTo(m0.targetPos), 5);
+    }
     {
         Board b = board(3);
         CageController cc(nullptr, cfg(), 1);
@@ -3431,5 +3452,47 @@ TEST(OneCageWallClear, TheThreatIsHeldAgainstTheStartOfClearing) {
     int wall = 0;
     for (const Hit& h : wallClearTurn(c)) wall += h.m.targetId >= 13 && h.m.targetId <= 17;
     ASSERT_GE(wall, 2);
+}
+
+
+// =============================================================
+// P241 (uživatel 2.–3.11.2026): „2 GFI jen pokud na něj nikdo nedosáhne“, „2x GFI má být výjimka,
+// ne obecný pohyb“, levný pád = soupeř nedosáhne na míč. Jedno místo pravidla: doubleGfiAllowed
+// (volá ho útěk P213 pro doběh nosiče i nového nosiče). Hráč MA 5 na (10,7); cíl (17,7) = 7 polí = 2× GFI,
+// (16,7) = 6 polí = 1× GFI. Soupeř MA 6 dosáhne vedle cíle do 8 polí, na míč (2 pole od cíle) do 10 polí.
+// =============================================================
+TEST(OneCage, P241DoubleGfiOnlyOutOfReachOrCheapFall) {
+    auto board = [](Position opp, PlayerState st = PlayerState::STANDING) {
+        Board b;
+        b.put(1, TeamSide::HOME, {10, 7}, 5);
+        b.put(12, TeamSide::AWAY, opp, 6).state = st;
+        return b;
+    };
+    const Position two{17, 7}, one{16, 7};
+    {   // partie 1: soupeř na dosah (3 pole) ⇒ 2× GFI ne, ani s míčem, ani bez
+        Board b = board({20, 7});
+        ASSERT_EQ(pathFailProb(b.s, b.s.getPlayer(1), two, 7, Position{-1, -1}) > 0.0, true) << "cíl jen přes GFI";
+        EXPECT_FALSE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, true));
+        EXPECT_FALSE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, false));
+        EXPECT_TRUE(doubleGfiAllowed(b.s, b.s.getPlayer(1), one, true)) << "1× GFI se P241 netýká";
+        setExtraFeaturesOff(kP241DoubleGfi);
+        EXPECT_TRUE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, true)) << "vypínač = staré chování";
+        setExtraFeaturesOff(0);
+    }
+    {   // 9 polí: vedle nosiče nedoběhne (8), na míč ano (10) ⇒ s míčem smí, bez míče ne
+        Board b = board({8, 7});                   // 9 polí od cíle (17,7)
+        EXPECT_TRUE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, true)) << "(1) z dosahu";
+        EXPECT_FALSE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, false)) << "pád u soupeře na dosah míče";
+    }
+    {   // 11 polí: na míč nedosáhne ⇒ pád je levný, smí i bez míče
+        Board b = board({6, 7});                   // 11 polí od cíle
+        EXPECT_TRUE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, false)) << "(2) levný pád";
+    }
+    {   // ležící soupeř bez Jump Up: MA 6 − 3 na vstání ⇒ vedle cíle jen do 5 polí
+        Board b = board({23, 7}, PlayerState::PRONE);   // 6 polí od cíle
+        EXPECT_TRUE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, true));
+        b.s.getPlayer(12).position = {22, 7};      // 5 polí
+        EXPECT_FALSE(doubleGfiAllowed(b.s, b.s.getPlayer(1), two, true));
+    }
 }
 

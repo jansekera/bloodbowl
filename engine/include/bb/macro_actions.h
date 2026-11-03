@@ -118,7 +118,8 @@ enum ExtraFeature : unsigned {
     kP232RiskyForward = 32768, // P232: bez bezpečného pole vpřed i s rizikem do riskEdge; vpřed, není-li horší než stát
     kP232KeepThreat = 65536,  // P232: přesun hráče mimo klec (připravený, zaostalec, záloha, Wild Animal) nezvedne hrozbu na nosiče
     kP233WallClear = 131072,  // P233: pomalejší klec bez povolené rány čistí zeď od kraje ranami na 2 kostky naše s asistenty
-    kP240GuardTarget = 262144 // P240: blok/blitz na hráče s Guard má v MCTS přednost (prior aspoň 0,20 jako nosič, P10a)
+    kP240GuardTarget = 262144, // P240: blok/blitz na hráče s Guard má v MCTS přednost (prior aspoň 0,20 jako nosič, P10a)
+    kP241DoubleGfi = 524288    // P241: útěk s míčem (P213) přes 2× GFI jen z dosahu soupeřů, nebo když pád nedá soupeři míč
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();

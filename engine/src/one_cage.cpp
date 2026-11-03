@@ -129,6 +129,31 @@ static int carrierGfiFor(const GameState& state, const Player& carrier, Position
     return std::clamp(steps - mr, 0, 2);
 }
 
+// ⭐ P241 (uživatel 2.11.2026: „2 GFI jen pokud na něj nikdo nedosáhne“; „pokud nosič upadne daleko od
+//   protihráčů … pád tolik nevadí“; 3.11.: „2x GFI má být výjimka, ne obecný pohyb“, levný pád = soupeř
+//   nedosáhne na míč). Partie 1 (30.10.): O14 po předávce P213 ustoupil dozadu přes 2× GFI na (19,8), pád
+//   s míčem 11/36 ≈ 31 % (ř. 1695-1697, 1701-1706), a na pole dosáhl H5 bez GFI. OPRAVENO 3. 11. — dřív P213
+//   hlídal jen stupeň rizika celé cesty (do 3+), 2× GFI tedy prošlo vždy. Teď 2× GFI jen když:
+//   (1) hráč tam stojí s míčem a žádný soupeř v příštím tahu nedoběhne vedle něj (anyOpponentReaches), nebo
+//   (2) pád je levný: míč skončí nejvýš 2 pole od cíle (pád na poli GFI vedle cíle + odskok o 1, ř. 1701-1706)
+//       a žádný soupeř na takové pole nedoběhne (MA + 2 GFI; ležící MA − 3, bez Jump Up).
+//   Horizont: náš tah × dosah soupeře v jeho příštím tahu, nic dál. TD (zóna) se neomezuje — P213 do zóny nejde.
+static bool fallIsCheap(const GameState& state, TeamSide side, Position sq) {
+    bool cheap = true;
+    state.forEachOnPitch(opponent(side), [&](const Player& o) {
+        if (!cheap) return;
+        const int r = blitzReachOf(o);                       // pole vedle cíle = dosah k míči − 1
+        if (r >= 0 && static_cast<int>(o.position.distanceTo(sq)) <= r + 1 + 2) cheap = false;
+    });
+    return cheap;
+}
+
+bool doubleGfiAllowed(const GameState& state, const Player& p, Position dest, bool withBall) {
+    if (!extraFeatureOn(kP241DoubleGfi) || carrierGfiFor(state, p, dest) < 2) return true;
+    if (withBall && !anyOpponentReaches(state, p.teamSide, dest)) return true;
+    return fallIsCheap(state, p.teamSide, dest);
+}
+
 double looseBallLossRisk(const GameState& state, TeamSide side, Position ball) {
     int nearest = 99;
     state.forEachOnPitch(opponent(side), [&](const Player& o) {
@@ -658,6 +683,7 @@ void CageController::planStart(const GameState& state) {
                     if (v.distanceTo(c.position) > carrierBudget) continue;
                     const double pf = pathFailProb(state, c, v, carrierBudget, Position{-1, -1});
                     if (pf < 0.0 || riskTier(pf) > 1 || 1.0 - pf <= pvOk || (!rolls && pf != 0.0)) continue;
+                    if (!doubleGfiAllowed(state, c, v, /*withBall=*/false)) continue;   // P241: po předávce míč nemá
                     via = v;
                     pvOk = 1.0 - pf;
                     if (pf == 0.0) break;
@@ -690,6 +716,7 @@ void CageController::planStart(const GameState& state) {
             for (const Sq& q : cands) {
                 const double pr = q.sq == m.position ? 0.0 : pathFailProb(state, m, q.sq, budget, Position{-1, -1});
                 if (pr < 0.0 || riskTier(pr) > 1 || (pass == 0) != (pr == 0.0)) continue;
+                if (pr > 0.0 && !doubleGfiAllowed(state, m, q.sq, /*withBall=*/true)) continue;   // P241
                 if (++tried > 10) break;
                 GameState proj = state.clone();
                 proj.getPlayer(c.id).position = via;
