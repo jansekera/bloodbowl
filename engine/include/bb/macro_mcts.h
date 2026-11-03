@@ -23,6 +23,10 @@ namespace bb {
 // control ("MOVED WITHOUT THE ARM ACTING") needs.
 long takeCarrierBlockPriorEvalsInSearch();
 
+// P240 (03.11.2026): blok/blitz `m` míří na stojícího soupeře s Guard — v MCTS dostane prior aspoň 0,20
+//   (týž jako nosič, P10a). Vypínač kP240GuardTarget. Povolení bloku ani kostky nemění.
+bool p240GuardTarget(const GameState& state, const Macro& m);
+
 // ⭐ W-GFI krok (0) (04.09.2026): kolik F1 cage-advance planu vyslo DICEY
 //   (zamitnuto jako prilis rizikove) a kolik z toho souviselo s 1-GFI
 //   povolenim na rohu. `cage_advance.cpp` zustava jen ZDROJ DAT -- toto

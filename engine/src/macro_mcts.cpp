@@ -67,6 +67,19 @@ static int greedyMacroRank(MacroType t) {
     }
 }
 
+// ⭐ P240 (uživatel 3.11.2026: „block s block nebo wrestle je OK na 1 kostku - účel je navíc jako
+//   preference koho blokovat přednostně“; účel z 2.11.: „…nebo to má jinou výhodu při sražení - např.
+//   nepřítele s guard“). Sražený hráč s Guard přestane dávat asistence i v cizí tackle zóně
+//   (Guard, pravidla ř. 8158-8161), proto je to cíl s účelem. Povolení bloku (hitAllowed) ani kostky se
+//   NEMĚNÍ — jen blok/blitz na takový cíl dostane v MCTS aspoň prior 0,20, stejně jako nosič (P10a).
+//   Prohledávání ho tak rozbalí přednostně; zvolí ho dál podle hodnoty. Nosič zůstává podle P10a.
+//   PHP protějšek: LearningAICoach::P240_GUARD_BONUS.
+bool p240GuardTarget(const GameState& state, const Macro& m) {
+    if (!extraFeatureOn(kP240GuardTarget) || m.targetId <= 0) return false;
+    const Player& d = state.getPlayer(m.targetId);
+    return d.teamSide != state.activeTeam && d.state == PlayerState::STANDING && d.hasSkill(SkillName::Guard);
+}
+
 namespace {
 
 // P10a (2026-08-18): can we contest the ball if the opponent's carrier goes
@@ -592,6 +605,7 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                         minPrior = 0.20f;
                         ++g_carrierBlockPriorEvals;
                     }
+                    if (p240GuardTarget(state, macros[i])) minPrior = std::max(minPrior, 0.20f);   // P240
                     break;
                 case MacroType::BLOCK:
                     minPrior = 0.12f;
@@ -605,6 +619,7 @@ void MacroMCTSSearch::expand(MacroMCTSNode* node, const GameState& state) {
                         minPrior = 0.20f;
                         ++g_carrierBlockPriorEvals;
                     }
+                    if (p240GuardTarget(state, macros[i])) minPrior = std::max(minPrior, 0.20f);   // P240
                     break;
                 case MacroType::PICKUP:
                     minPrior = 0.20f;

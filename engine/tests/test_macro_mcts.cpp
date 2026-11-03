@@ -1487,3 +1487,101 @@ TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
     EXPECT_TRUE(deferralKeepsPick(state, *otherRepos, *blitz, dice))
         << "přesun vzdáleného hráče blitz nechá na později";
 }
+
+// =============================================================
+// P240 (uživatel 3.11.2026): blok na 1 kostku s Block nebo Wrestle je OK; účel je preference, koho
+// blokovat přednostně — mimo jiné hráč s Guard. Blok na něj dostane v MCTS prior aspoň 0,20 (jako
+// nosič, P10a). Útočník s Block stojí mezi dvěma stejnými soupeři (oba 1 kostka), jen jeden má Guard.
+// =============================================================
+namespace {
+GameState makeP240State() {
+    GameState state;
+    state.phase = GamePhase::PLAY;
+    state.activeTeam = TeamSide::HOME;
+    state.half = 1;
+    state.homeTeam.turnNumber = 3;
+    state.homeTeam.rerolls = 3;
+    state.awayTeam.rerolls = 3;
+    state.weather = Weather::NICE;
+    auto place = [&](int id, TeamSide side, Position pos) -> Player& {
+        Player& p = state.getPlayer(id);
+        p.id = id;
+        p.teamSide = side;
+        p.state = PlayerState::STANDING;
+        p.position = pos;
+        p.stats = {6, 3, 3, 8};
+        p.movementRemaining = 6;
+        return p;
+    };
+    Player& att = place(1, TeamSide::HOME, {10, 7});
+    att.stats.strength = 4;   // 4 proti 3 + asistence druhého obránce = 1 kostka na každého
+    att.skills.add(SkillName::Block);
+    place(12, TeamSide::AWAY, {11, 6});                                   // bez Guard
+    place(13, TeamSide::AWAY, {11, 8}).skills.add(SkillName::Guard);      // s Guard
+    // nosič soupeře daleko, aby blok nebyl na nosiče (P10a) a nabídka byla široká (víc než 5
+    // kandidátů — jinak je rovnoměrný prior 1/n nad oběma prahy a žádný práh nezabere)
+    place(14, TeamSide::AWAY, {3, 2});
+    state.ball = BallState::carried({3, 2}, 14);
+    for (int i = 0; i < 8; ++i) place(2 + i, TeamSide::HOME, {static_cast<int8_t>(18 + i % 3), static_cast<int8_t>(1 + i)});
+    return state;
+}
+
+std::pair<float, float> p240BlockPriors(const GameState& state) {
+    PolicyNetwork zeroPolicy;
+    MCTSConfig cfg;
+    cfg.policy = &zeroPolicy;
+    cfg.policyBlend = 0.0f;
+    MacroMCTSSearch search(nullptr, cfg, 42);
+    float plain = -1.0f, guard = -1.0f;
+    for (auto& [m, prior] : search.expandRootPriorsForTest(state)) {
+        if (m.type != MacroType::BLOCK || m.playerId != 1) continue;
+        if (m.targetId == 12) plain = prior;
+        if (m.targetId == 13) guard = prior;
+    }
+    return {plain, guard};
+}
+} // namespace
+
+TEST(MacroMCTS, P240GuardTargetHelper) {
+    GameState state = makeP240State();
+    EXPECT_TRUE(p240GuardTarget(state, Macro{MacroType::BLOCK, 1, 13, {-1, -1}}));
+    EXPECT_FALSE(p240GuardTarget(state, Macro{MacroType::BLOCK, 1, 12, {-1, -1}})) << "bez Guard";
+    EXPECT_TRUE(p240GuardTarget(state, Macro{MacroType::BLITZ, 1, 13, {-1, -1}})) << "blitz je taky blok";
+    state.getPlayer(13).state = PlayerState::PRONE;
+    EXPECT_FALSE(p240GuardTarget(state, Macro{MacroType::BLOCK, 1, 13, {-1, -1}})) << "ležící se neblokuje";
+    state.getPlayer(13).state = PlayerState::STANDING;
+    state.getPlayer(2).skills.add(SkillName::Guard);
+    EXPECT_FALSE(p240GuardTarget(state, Macro{MacroType::BLOCK, 1, 2, {-1, -1}})) << "vlastní hráč s Guard";
+    setExtraFeaturesOff(kP240GuardTarget);
+    EXPECT_FALSE(p240GuardTarget(state, Macro{MacroType::BLOCK, 1, 13, {-1, -1}})) << "vypínač";
+    setExtraFeaturesOff(0);
+}
+
+TEST(MacroMCTS, P240GuardTargetGetsBlockPriorFloor) {
+    const GameState state = makeP240State();
+    ASSERT_EQ(blockDiceCount(state, state.getPlayer(1), state.getPlayer(12)), 1) << "oba bloky na 1 kostku";
+    ASSERT_EQ(blockDiceCount(state, state.getPlayer(1), state.getPlayer(13)), 1);
+
+    const auto [plainOn, guardOn] = p240BlockPriors(state);
+    ASSERT_GT(plainOn, 0.0f) << "blok na 1 kostku s Block zůstává v nabídce";
+    ASSERT_GT(guardOn, 0.0f);
+    // práhy přežijí společnou renormalizaci jako poměr: 0,20 / 0,12
+    EXPECT_NEAR(guardOn / plainOn, 0.20f / 0.12f, 0.05f);
+
+    // negativní kontrola: bez P240 mají oba bloky týž prior
+    setExtraFeaturesOff(kP240GuardTarget);
+    const auto [plainOff, guardOff] = p240BlockPriors(state);
+    setExtraFeaturesOff(0);
+    EXPECT_NEAR(guardOff / plainOff, 1.0f, 0.01f);
+}
+
+TEST(MacroMCTS, P240WrestleOneDieBlockStillOffered) {
+    // uživatel 3.11.: „block s block nebo wrestle je OK na 1 kostku“ — Wrestle bez Block se z nabídky nevyřazuje
+    GameState state = makeP240State();
+    Player& att = state.getPlayer(1);
+    att.skills.remove(SkillName::Block);
+    att.skills.add(SkillName::Wrestle);
+    const auto [plain, guard] = p240BlockPriors(state);
+    EXPECT_GT(plain, 0.0f);
+    EXPECT_GT(guard, 0.0f);
+}

@@ -70,6 +70,16 @@ final class LearningAICoach implements AICoachInterface
      *   silnejsiho nosice tim zustane hratelny jako nouzova moznost,
      *   presne jak si uzivatel 13.09. vyzadal.
      */
+    /**
+     * ⭐ P240 (uzivatel 3.11.2026: "block s block nebo wrestle je OK na 1 kostku - ucel je navic jako
+     *   preference koho blokovat prednostne"; ucel z 2.11.: "...nebo to ma jinou vyhodu pri srazeni -
+     *   napr. nepritele s guard"). Srazeny hrac s Guard prestane davat asistence i v cizi tackle zone (pravidla ř. 8158-8161).
+     *   Bonus k vyberu cile bloku i blitzu, ne k povoleni: kostky rozhoduji dal (2+ proti 1 kostce je
+     *   rozdil 0,6, Guard ho neprebije). Velikost jako krajni cara u bloku; nosic ma vic (0,5 / 0,8).
+     *   C++ protejsek: `p240GuardTarget` (macro_mcts.cpp), prior aspon 0,20 jako nosic.
+     */
+    private const P240_GUARD_BONUS = 0.3;
+
     private const BLOCK_DICE_VALUE = [
         // ⏰ Zaporne polozky DOCASNE ZPET (14.09.2026): PHP38 je mel nahradit
         //   turnoverovou branou, ale `oceneniBloku()` je cte dal a chybejici
@@ -1350,6 +1360,10 @@ final class LearningAICoach implements AICoachInterface
                 $score += 0.5;
             }
 
+            if ($target->hasSkill(SkillName::Guard)) {
+                $score += self::P240_GUARD_BONUS;
+            }
+
             // Sideline surfing bonus
             $targetPos = $target->getPosition();
             if ($targetPos !== null) {
@@ -1445,6 +1459,10 @@ final class LearningAICoach implements AICoachInterface
             $score = $baseScore + $ocena - $riziko;
             if ($ball->isHeld() && $ball->getCarrierId() === $enemy->getId()) {
                 $score += 0.8;
+            }
+
+            if ($enemy->hasSkill(SkillName::Guard)) {
+                $score += self::P240_GUARD_BONUS;
             }
 
             // Sideline surfing bonus (higher for blitz — it's a scarce resource)
