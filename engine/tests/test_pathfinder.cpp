@@ -706,3 +706,35 @@ TEST(RiskWeightedPath, TheWalkFollowsTheSameRouteThatWasPriced) {
         EXPECT_NEAR(1.0 - survive, priced, 1e-9) << "AG " << agility << ": prošlá cesta = oceněná cesta";
     }
 }
+
+// ===========================================================================
+// P242 (partie 2, 30.10.2026: catcher lidí „tam a zpět“ (17,6)↔(18,6) 4× v plánu tahu; uživatel 2.11.:
+// „prověřit“). Příčina: cíl přesunu (18,7) mezitím obsadil spoluhráč, hráč stál vedle něj (vzdálenost 1)
+// a `nextStepToward` bral za „nejlepší“ i pole ve STEJNÉ vzdálenosti jako teď ⇒ krok do strany, zpět,
+// do strany… až do konce pohybu. Krok, který k cíli nepřiblíží, nemá smysl: prohledávání už vidělo
+// všechna dosažitelná pole, a když žádné není blíž, další kroky to nezmění.
+// ===========================================================================
+TEST(NextStepToward, NoStepWhenNothingReachableIsCloser) {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    mkPlayer(s, 1, TeamSide::HOME, {19, 6}, 3);          // cíl (18,7) je vedle
+    mkPlayer(s, 2, TeamSide::HOME, {18, 7}, 3);          // spoluhráč na cíli
+    Position step{-1, -1};
+    EXPECT_FALSE(nextStepToward(s, s.getPlayer(1), {18, 7}, 6, kNoBlock, step))
+        << "krok do strany na (" << int(step.x) << "," << int(step.y) << ") k cíli nepřiblíží";
+
+    // pozitivní kontrola: volný cíl — krok na něj
+    s.getPlayer(2).position = {10, 10};
+    ASSERT_TRUE(nextStepToward(s, s.getPlayer(1), {18, 7}, 6, kNoBlock, step));
+    EXPECT_EQ(step, (Position{18, 7}));
+
+    // obcházka zůstává: cíl za soupeřovou zdí, první krok může jít do strany, když cesta pak vede BLÍŽ
+    GameState w;
+    w.phase = GamePhase::PLAY;
+    w.activeTeam = TeamSide::HOME;
+    mkPlayer(w, 1, TeamSide::HOME, {10, 7}, 3);
+    for (int y = 5; y <= 9; ++y) mkPlayer(w, y - 3, TeamSide::HOME, {11, static_cast<int8_t>(y)}, 3);   // vlastní zeď
+    ASSERT_TRUE(nextStepToward(w, w.getPlayer(1), {13, 7}, 6, kNoBlock, step));
+    EXPECT_EQ(step.x, 10) << "obchází zeď (krok do strany), protože dál vede blíž";
+}

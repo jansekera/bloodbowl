@@ -585,7 +585,11 @@ bool nextStepToward(const GameState& state, const Player& player,
             bestDist = d; bestKeyAmongTies = key[i]; goalIdx = i;
         }
     }
-    if (goalIdx < 0) return false;   // nic nezlepsi vzdalenost -- opravdu zaseknuto
+    // OPRAVENO 3. 11. 2026 (P242) -- dřív stačilo pole ve STEJNÉ vzdálenosti jako teď (`bestDist` začíná
+    //   na `curDist` a remíza se brala): u nedosažitelného cíle (partie 2: cíl obsadil spoluhráč, hráč stál
+    //   vedle) šel hráč do strany, zpět, do strany… až do konce pohybu. Prohledávání vidělo všechna pole
+    //   v rozpočtu; když žádné není blíž, krok nic nepřinese ⇒ zůstat stát.
+    if (goalIdx < 0 || bestDist >= curDist) return false;   // nic nezlepsi vzdalenost -- opravdu zaseknuto
 
     int idx = goalIdx;
     while (parent[idx] != -1 && parent[idx] != startIdx) idx = parent[idx];
