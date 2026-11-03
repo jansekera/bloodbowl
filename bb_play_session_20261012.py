@@ -34,7 +34,8 @@ Příkazy:
   tahai [greedy|macro] [semínko] [iterace]
                            -- jak by tah odehrála AI — NANEČISTO (kopie stavu, vlastní kostky)
   kontrola [posledni]      -- kontrola rozehraného / posledního dokončeného tahu
-  do! <i>                  -- P201 (7): akce i přes varování, že nosič s rozehranou akcí ztratí přihrávku
+  do! <i>                  -- P201 (7): akce i přes varování, že nosič s rozehranou akcí ztratí přihrávku;
+                              P243: i blok, který by AI nedala (kostky volí obránce / 1 kostka bez Block a Wrestle)
   zpet                     -- P201 (14): vrátí poslední akci (do + odp + volby), záloha logu vedle
   quit                     -- ukončí server
 
@@ -725,6 +726,22 @@ def varovani_nosic(state, akce, a):
             f"jeho akce skončí a tahle možnost propadne. Opravdu? `do! <číslo>`")
 
 
+def varovani_blok(state, a):
+    """P243 (uživatel 3.11.2026, „2 ano“): ruční BLOCK, který by AI sama nenabídla (hitAllowed) —
+    kostky volí obránce, nebo 1 kostka bez Block a Wrestle. V partii 2 (4. kolo lidí) se blok hrál
+    podle plánu ze začátku tahu, kdy počítal 1 kostku; dřívější bloky ale soupeře nesrazily a ti
+    asistovali ⇒ 2 kostky pro obránce. Vrací text varování, nebo None."""
+    if a.type.name != "BLOCK" or a.player_id is None or a.target_id is None or a.target_id < 1:
+        return None
+    # jako nabídka AI: s Dauntless se počítá, že hod projde (AI takový blok nabídne)
+    k = bb.block_dice_count(state, a.player_id, a.target_id, True)
+    if bb.hit_allowed(state, a.player_id, k):
+        return None
+    proc = (f"{-k} kostky volí OBRÁNCE" if k < 0 else f"{k} kostka bez Block a Wrestle (turnover 1/3)")
+    return (f"⚠️ blok hráče {a.player_id} na {a.target_id}: {proc} — AI by tenhle blok sama nedala. "
+            f"Hraješ-li podle plánu, přepočítej ho (`tahai`). Opravdu? `do! <číslo>`")
+
+
 VOLBY_AKCE = ("push", "follow", "blitzfrom", "sidestep", "kostka", "beztackle", "actions")
 
 
@@ -990,7 +1007,7 @@ def main():
                 result_lines.append(f"příští follow-up: {'ano' if parts[1] == '1' else 'ne'}")
             elif cmd in ("do", "do!") and len(parts) in (2, 3):
                 a = last_actions[int(parts[-1])]   # `do 5` i starší tvar `do HOME 5`
-                varovani = varovani_nosic(state, last_actions, a) if cmd == "do" else None
+                varovani = (varovani_nosic(state, last_actions, a) or varovani_blok(state, a)) if cmd == "do" else None
                 if varovani:
                     result_lines.append(varovani)
                     odmitnuto = True

@@ -450,6 +450,16 @@ PYBIND11_MODULE(bb_engine, m) {
         bb::setManualSideStepSquare(bb::Position{static_cast<int8_t>(x), static_cast<int8_t>(y)});
     });
     m.def("clear_manual_block_choices", []() { bb::clearManualBlockChoices(); });
+    // P243 (uživatel 3.11.2026): server partie varuje před ručním blokem, který by AI sama nedala.
+    // Kostky z místa, kde útočník stojí (kladné = volí útočník, záporné = obránce), a hitAllowed.
+    // as_offered = jako nabídka AI (Dauntless počítán jako úspěšný); bez něj = síla před hodem Dauntless.
+    m.def("block_dice_count", [](const bb::GameState& s, int attackerId, int defenderId, bool asOffered) {
+        return asOffered ? bb::blockDiceCountAsOffered(s, s.getPlayer(attackerId), s.getPlayer(defenderId))
+                         : bb::blockDiceCount(s, s.getPlayer(attackerId), s.getPlayer(defenderId));
+    }, py::arg("state"), py::arg("attacker_id"), py::arg("defender_id"), py::arg("as_offered") = false);
+    m.def("hit_allowed", [](const bb::GameState& s, int attackerId, int dice) {
+        return bb::hitAllowed(s, s.getPlayer(attackerId), dice);
+    });
 
     m.def("execute_action", [](bb::GameState& state, const bb::Action& action, bb::DiceRoller& dice) {
         bb::DiceRollerBase& base = dice;

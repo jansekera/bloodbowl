@@ -1291,6 +1291,10 @@ int blockDiceCount(const GameState& state, const Player& attacker, const Player&
     return getBlockDiceCount(state, attacker, defender, false, false);
 }
 
+int blockDiceCountAsOffered(const GameState& state, const Player& attacker, const Player& defender) {
+    return getBlockDiceCount(state, attacker, defender, false, true, Position{-1, -1}, false);
+}
+
 bool hitAllowed(const GameState& state, const Player& attacker, int dice) {
     if (dice >= 2) return true;
     if (dice != 1) return false;

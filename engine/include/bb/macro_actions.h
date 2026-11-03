@@ -40,6 +40,9 @@ void takeBlitzAndScoreReal(long* out3);
 // počítá i uvnitř hledání, čte se jen jako „zasáhl strop vůbec?“.
 // Kostky bloku z místa, kde útočník stojí: kladné = vybírá útočník, záporné = vybírá obránce.
 int blockDiceCount(const GameState& state, const Player& attacker, const Player& defender);
+// P243 (3.11.2026): kostky BLOKU tak, jak je ocení nabídka AI (MCTSConfig::dauntlessInOffer = true:
+// s Dauntless vyrovnaná síla, jako by hod prošel); čítač nabídek Dauntless se netiká.
+int blockDiceCountAsOffered(const GameState& state, const Player& attacker, const Player& defender);
 // Rána (blok i blitz) jen na 2+ kostky, které volíme my, nebo na jednu kostku s Block (uživatel 27.10.2026:
 // „block na 1 kostku bez block se nemá dít“; nabídka hledání to tak dělá od 11.08.) nebo s Wrestle
 // (uživatel 27.10.: „stejně jako bereš 1 kostku s block, tak ber stejně s wrestle — není turnover na both

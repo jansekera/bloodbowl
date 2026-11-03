@@ -237,6 +237,57 @@ def test_varovani_nosic_s_rozehranou_akci():
     assert nalezeno >= 3, nalezeno                        # pozitivní kontrola: situace opravdu nastala
 
 
+def test_varovani_blok_ktery_by_ai_nedala():
+    # P243 (uživatel 3.11.2026): ruční BLOCK, který AI sama nedá (kostky volí obránce, 1 kostka bez
+    # Block a Wrestle), server odmítne s varováním; ostatní bloky projdou. Kostky ve varování se musí
+    # shodovat s tím, kolik jich blok opravdu hodí (v partii 2 se plán a provedení rozešly).
+    varovano = povoleno = porovnano = dauntless_videt = bez_hodu = 0
+    for seed in range(1, 80):
+        s, d = nova_hra(seed)
+        for krok in range(150):
+            akce = list(bb.get_available_actions(s))
+            if not akce or s.phase != bb.GamePhase.PLAY:
+                break
+            bloky = [a for a in akce if a.type.name == "BLOCK"]
+            for b in bloky:
+                k = bb.block_dice_count(s, b.player_id, b.target_id, True)   # jako nabídka AI
+                v = ps.varovani_blok(s, b)
+                u = s.get_player(b.player_id)
+                ma = lambda jm: u.has_skill_index(ps.SKILL_NAMES.index(jm))   # noqa: E731
+                nese = s.ball.is_held and s.ball.carrier_id == u.id   # Wrestle nosiči nepomůže (turnover)
+                if k < 0 or (k == 1 and not ma("Block") and not (ma("Wrestle") and not nese)):
+                    assert v is not None, (seed, krok, k)
+                    assert (f"{-k} kost" in v and "OBRÁNCE" in v) if k < 0 else "1 kostka bez Block" in v
+                    varovano += 1
+                else:
+                    assert v is None, (seed, krok, k, v)
+                    povoleno += 1
+            a = (bloky or akce)[(seed * 7 + krok * 13) % len(bloky or akce)]
+            blok = a.type.name == "BLOCK"
+            # bez Dauntless = síla před hodem; po úspěšném hodu Dauntless platí vyrovnaná (jako nabídka)
+            k0 = bb.block_dice_count(s, a.player_id, a.target_id) if blok else None
+            kd = bb.block_dice_count(s, a.player_id, a.target_id, True) if blok else None
+            _, ev = bb.execute_action_logged(s, a, d)
+            if not blok:
+                continue
+            prvni = next((e for e in ev if e["type"] == "BLOCK"), None)
+            if prvni is None:                     # blok se nehodil (Bone Head) — kostky není s čím srovnat
+                bez_hodu += 1
+                continue
+            dauntless_prosel = any(e["type"] in ("SKILL", "SKILL_USED") and e["success"]
+                                   and e["roll"] == ps.SKILL_NAMES.index("Dauntless") for e in ev)
+            ocek = kd if dauntless_prosel else k0
+            assert prvni["die2"] == abs(ocek), (seed, krok, k0, kd, prvni["die2"])
+            porovnano += 1
+            dauntless_videt += dauntless_prosel
+    # pozitivní kontrola: obě větve i porovnání s provedeným blokem opravdu nastaly
+    assert varovano >= 5 and povoleno >= 5 and porovnano >= 20 and dauntless_videt >= 1, (
+        varovano, povoleno, porovnano, dauntless_videt, bez_hodu)
+    # jiná akce než BLOCK varování nedostane
+    s, d = nova_hra(1)
+    assert all(ps.varovani_blok(s, a) is None for a in bb.get_available_actions(s) if a.type.name != "BLOCK")
+
+
 def test_vykop_se_pta_na_lekarnika():
     # P208 (9): zranění z výkopové tabulky (kámen, invaze) — lékárník jen na požádání kouče;
     # při výkopu se ptá i Pro u chytání (týmový přehoz u výkopu ne, ř. 1261-1263)
