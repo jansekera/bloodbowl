@@ -217,6 +217,8 @@ public:
 
 // P159: odklad smí riskantní makro jen odsunout, ne zrušit. True, když po přesunu `alt` zůstane
 // `pick` v nabídce a jeho stupeň rizika (riskTier) se nezhorší.
+// P244b diagnostika (čte a nuluje): [0] zvolený blitz stupně 1, [1] platí výjimka, [2] výjimka změnila volbu.
+void takeP244BlitzFirst(long* out3);
 bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
                        DiceRoller& dice, bool dauntlessInOffer = false);
 

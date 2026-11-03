@@ -126,7 +126,8 @@ enum ExtraFeature : unsigned {
     kP240GuardTarget = 262144, // P240: blok/blitz na hráče s Guard má v MCTS přednost (prior aspoň 0,20 jako nosič, P10a)
     kP241DoubleGfi = 524288,   // P241: útěk s míčem (P213) přes 2× GFI jen z dosahu soupeřů, nebo když pád nedá soupeři míč
     kP242OwnOccupied = 1048576, // P242a: přesun na pole, kde stojí spoluhráč, se nenabízí
-    kP242SafetyDepth = 2097152  // P242b: pojistka v obraně stojí tak hluboko, kam nejdál doběhne soupeř (ne v zóně)
+    kP242SafetyDepth = 2097152, // P242b: pojistka v obraně stojí tak hluboko, kam nejdál doběhne soupeř (ne v zóně)
+    kP244BlitzFirst = 4194304   // P244b: riskantní blitz (do 1/3) se neodkládá, když je míč v bezpečí a sražení cíle otevře cestu
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
@@ -399,6 +400,12 @@ double macroDirectRisk(const GameState& state, const Macro& m);
 // Stupeň rizika podle pravděpodobnosti selhání (uživatel 17.10.): 0 = do 1/6 (2+, kdykoli),
 // 1 = do 1/3 (3+, na konci tahu), 2 = víc (jen když není méně riskantní možnost).
 int riskTier(double pFail);
+// ⭐ P244b (uživatel 3.11.2026: „AI může riskantní akci odkládat - ale … když je míč safe - začít kolo
+//   blitzem Ogra aby se někudy dalo projít pak“; návrh odsouhlasen „ano“). Výjimka z odkladu P159:
+//   blitz se hraje hned, když (1) náš nosič stojí mimo dosah všech soupeřů (anyOpponentReaches —
+//   ani turnover hned teď by míč nevydal), (2) jiný náš hráč, který ještě nehrál, stojí v tackle zóně
+//   JEN cíle — po sražení odejde bez úhybu, (3) riziko blitzu je stupně 1 (do 1/3). Čte se, nehledá.
+bool blitzOpensPathWithBallSafe(const GameState& state, const Macro& blitz);
 
 // ⭐ W-GFI (04.09., NASAZENO 09.09.2026, nepodmineny): volnemu hraci
 //   mirici na REPOZICI (bezpecnost/screen/marker/roh, ne nosic) se GFI

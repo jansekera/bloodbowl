@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include "bb/macro_mcts.h"
+#include "bb/cage_advance.h"
+#include "bb/helpers.h"
 #include "bb/game_state.h"
 #include "bb/game_simulator.h"
 #include "bb/roster.h"
@@ -1589,4 +1591,92 @@ TEST(MacroMCTS, P240WrestleOneDieBlockStillOffered) {
     const auto [plain, guard] = p240BlockPriors(state);
     EXPECT_GT(plain, 0.0f);
     EXPECT_GT(guard, 0.0f);
+}
+
+// ⭐ P244b (uživatel 3.11.2026: „AI může riskantní akci odkládat - ale … když je míč safe - začít kolo
+// blitzem Ogra aby se někudy dalo projít pak“; návrh odsouhlasen „ano“). Výjimka z odkladu P159: blitz
+// stupně rizika 1 jde první, když (1) náš nosič je mimo dosah všech soupeřů a (2) sražení cíle dá jinému
+// našemu hráči, který ještě nehrál, odchod bez úhybu (stojí v zóně jen cíle). Každá podmínka i porušená.
+namespace {
+GameState p244Fixture() {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.homeTeam.turnNumber = 3;
+    s.awayTeam.turnNumber = 3;
+    s.weather = Weather::NICE;
+    auto put = [&](int id, Position pos, PlayerStats st) {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = id <= 11 ? TeamSide::HOME : TeamSide::AWAY;
+        p.state = PlayerState::STANDING; p.position = pos; p.stats = st; p.movementRemaining = st.movement;
+    };
+    put(1, {9, 7}, {5, 5, 2, 9});     // ogr ST5 MA5: 5 polí k cíli + 1 za ránu ⇒ 1× GFI (1/6) + blok 2 kostky naše
+    put(2, {16, 6}, {6, 3, 3, 8});    // spoluhráč v tackle zóně cíle
+    put(3, {2, 7}, {6, 3, 3, 8});     // nosič daleko vzadu
+    put(12, {15, 7}, {5, 3, 3, 9});   // cíl blitzu
+    s.ball.isHeld = true; s.ball.carrierId = 3; s.ball.position = {2, 7};
+    return s;
+}
+Macro p244Blitz() {
+    Macro m;
+    m.type = MacroType::BLITZ; m.targetId = 12; m.declareBlitz = true;
+    return m;
+}
+}  // namespace
+
+TEST(MacroMCTS, P244bFixtureIsWhatItClaims) {
+    const GameState s = p244Fixture();
+    const double r = macroDirectRisk(s, p244Blitz());
+    EXPECT_EQ(riskTier(r), 1) << r;
+    EXPECT_FALSE(anyOpponentReaches(s, TeamSide::HOME, s.getPlayer(3).position));
+    // spoluhráč 2 stojí v tackle zóně jen cíle (12)
+    EXPECT_EQ(countTacklezones(s, s.getPlayer(2).position, TeamSide::HOME), 1);
+}
+
+TEST(MacroMCTS, P244bBlitzFirstWhenBallSafeAndItOpensAPath) {
+    EXPECT_TRUE(blitzOpensPathWithBallSafe(p244Fixture(), p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotWhenTheCarrierIsReachable) {
+    GameState s = p244Fixture();
+    Player& o = s.getPlayer(13);
+    o.id = 13; o.teamSide = TeamSide::AWAY;
+    o.state = PlayerState::STANDING; o.position = {6, 7}; o.stats = {6, 3, 3, 9}; o.movementRemaining = 6;
+    ASSERT_TRUE(anyOpponentReaches(s, TeamSide::HOME, s.getPlayer(3).position));
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotWhenWeDoNotHoldTheBall) {
+    GameState s = p244Fixture();
+    s.ball.isHeld = false; s.ball.carrierId = -1;
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotWhenNothingOpens) {
+    GameState s = p244Fixture();
+    s.getPlayer(2).position = {5, 2};   // spoluhráč mimo zónu cíle — sražení mu nic neuvolní
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotWhenTheTeammateStaysMarkedByAnother) {
+    GameState s = p244Fixture();
+    Player& o = s.getPlayer(14);   // druhý soupeř drží spoluhráče 2 taky ⇒ sražení cíle ho neuvolní
+    o.id = 14; o.teamSide = TeamSide::AWAY;
+    o.state = PlayerState::STANDING; o.position = {17, 5}; o.stats = {5, 3, 3, 9}; o.movementRemaining = 5;
+    ASSERT_FALSE(anyOpponentReaches(s, TeamSide::HOME, s.getPlayer(3).position));
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotWhenTheFreedTeammateAlreadyPlayed) {
+    GameState s = p244Fixture();
+    s.getPlayer(2).hasActed = true;
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
+}
+
+TEST(MacroMCTS, P244bNotForTierTwoRisk) {
+    GameState s = p244Fixture();
+    s.getPlayer(1).position = {8, 7};   // o pole dál ⇒ 2× GFI
+    ASSERT_EQ(riskTier(macroDirectRisk(s, p244Blitz())), 2);
+    EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
 }

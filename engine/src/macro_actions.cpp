@@ -4820,6 +4820,33 @@ int riskTier(double pFail) {
 //   („pokud potřebuju dodge i GFI počítám celou náročnost“). Zvednutí míče se NEPOČÍTÁ (uživatel:
 //   „zvednutí míče je zvlášť - i Khemri musí zkusit zvednout míč a jít s ním do TD zóny“), jen cesta k němu.
 //   −1 = akce, které se odklad netýká (skórování, klec, přihrávka, faul, postup nosiče) nebo cesta nevede.
+bool blitzOpensPathWithBallSafe(const GameState& state, const Macro& blitz) {
+    if (blitz.type != MacroType::BLITZ || blitz.targetId <= 0) return false;
+    const TeamSide me = state.activeTeam;
+    // (1) míč v bezpečí: drží ho náš hráč a žádný soupeř na něj nedosáhne
+    if (!state.ball.isHeld || state.ball.carrierId <= 0) return false;
+    const Player& carrier = state.getPlayer(state.ball.carrierId);
+    if (carrier.teamSide != me || anyOpponentReaches(state, me, carrier.position)) return false;
+    // (3) stupeň rizika 1
+    const double risk = macroDirectRisk(state, blitz);
+    if (risk < 0.0 || riskTier(risk) != 1) return false;
+    const Player& target = state.getPlayer(blitz.targetId);
+    if (target.state != PlayerState::STANDING || !target.isOnPitch()) return false;
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    Action a{};
+    if (!pickBlitzer(state, blitz, actions, a, /*count=*/false)) return false;
+    // (2) cíl ležící = bez tackle zóny: jiný náš hráč, který ještě nehrál, stojí v zóně JEN tohoto cíle
+    //     ⇒ po sražení odejde bez úhybu (zeď: ogr srazí jejího hráče a linemani projdou)
+    for (const Player& p : state.players) {
+        if (p.teamSide != me || p.id == a.playerId || p.state != PlayerState::STANDING || !p.isOnPitch()) continue;
+        if (p.hasActed || p.hasMoved) continue;
+        if (countTacklezones(state, p.position, me) > 0 && countTacklezones(state, p.position, me, target.id) == 0)
+            return true;
+    }
+    return false;
+}
+
 double macroDirectRisk(const GameState& state, const Macro& m) {
     switch (m.type) {
         case MacroType::BLITZ: {

@@ -392,6 +392,11 @@ constexpr double RISK_DEFER_Q_MARGIN = 0.04;   // moje číslo; uživatel 17.10.
 // P159: odklad smí riskantní akci jen odsunout, ne zrušit (nález S2 z 28.07., oprava 16.10.).
 // Alternativa je přesun bez hodu, takže se zahraje JEDNOU (kostky nerozhodují) a pak se jen čte:
 // zůstala riskantní akce v nabídce a nezhoršil se její stupeň rizika?
+// P244b, jen diagnostika (čte a nuluje): [0] zvolený blitz stupně 1, [1] z toho platí výjimka,
+// [2] z toho by ho odklad jinak odsunul (výjimka ZMĚNILA volbu).
+static long g_p244[3] = {0, 0, 0};
+void takeP244BlitzFirst(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p244[i]; g_p244[i] = 0; } }
+
 bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pick,
                        DiceRoller& dice, bool dauntlessInOffer) {
     const double before = macroDirectRisk(state, pick);
@@ -411,6 +416,9 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
                                          const Macro& pick, TeamSide /*perspective*/) {
     const double pickRisk = macroDirectRisk(state, pick);
     if (pickRisk < 0.0 || riskTier(pickRisk) == 0) return pick;   // 2+ a lehčí: kdykoli
+    // P244b: blitz, který při bezpečném míči otevře cestu ostatním, jde první (výjimka z odkladu)
+    const bool blitzFirst = extraFeatureOn(kP244BlitzFirst) && blitzOpensPathWithBallSafe(state, pick);
+    if (pick.type == MacroType::BLITZ && riskTier(pickRisk) == 1) { ++g_p244[0]; if (blitzFirst) ++g_p244[1]; }
 
     auto qOf = [](const MacroMCTSNode& c) { return c.totalValue / c.visits; };
     const MacroMCTSNode* pickNode = nullptr;
@@ -432,7 +440,10 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
     std::stable_sort(alts.begin(), alts.end(),
                      [&](const MacroMCTSNode* x, const MacroMCTSNode* y) { return qOf(*x) > qOf(*y); });
     for (const MacroMCTSNode* c : alts)
-        if (deferralKeepsPick(state, c->macro, pick, dice_, config_.dauntlessInOffer)) return c->macro;
+        if (deferralKeepsPick(state, c->macro, pick, dice_, config_.dauntlessInOffer)) {
+            if (blitzFirst) { ++g_p244[2]; return pick; }   // bez výjimky by se odložil
+            return c->macro;
+        }
     return pick;
 }
 
