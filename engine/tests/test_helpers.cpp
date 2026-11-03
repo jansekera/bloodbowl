@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
 
 using namespace bb;
 
@@ -463,4 +464,67 @@ TEST(Helpers, AttemptRollTeamRerollRerollsTheProRollItself) {
     bool ok = attemptRoll(gs, 1, dice, 4, SkillName::SKILL_COUNT, false, true, nullptr);
     EXPECT_TRUE(ok);
     EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}
+
+// P244 (3.11.2026): v živé partii (partie 2, ogr lidí, GFI na 1) engine za stranu bez kouče utratil
+// týmový přehoz, ale výpis nevěděl, zda propadl Loner (ř. 8287-8290: na 1-3 „the original result
+// stands ... but the team re-roll is lost“), nebo znovu padl přehozený hod. Obojí má mít řádek.
+namespace {
+std::vector<GameEvent> rerolly(const std::vector<GameEvent>& ev) {
+    std::vector<GameEvent> out;
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::REROLL) out.push_back(e);
+    return out;
+}
+}  // namespace
+
+TEST(Helpers, P244LonerFailureIsLoggedForTheSideWithoutCoach) {
+    GameState gs;
+    placePlayer(gs, 12, {10, 7}, TeamSide::AWAY);   // id 12+ = AWAY (placePlayer stranu nemění)
+    ASSERT_EQ(gs.getPlayer(12).teamSide, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Loner);
+    gs.awayTeam.rerolls = 2;
+    gs.activeTeam = TeamSide::AWAY;                   // přehoz jen týmu na tahu
+    CoachChoiceScope scope(TeamSide::HOME, {});      // živá partie, AWAY hraje engine
+    FixedDiceRoller dice({1, 3});                     // GFI 1, Loner 3 ⇒ přehoz propadl
+    std::vector<GameEvent> ev;
+    EXPECT_FALSE(attemptRoll(gs, 12, dice, 2, SkillName::SKILL_COUNT, false, true, &ev));
+    EXPECT_EQ(gs.awayTeam.rerolls, 1);
+    const auto r = rerolly(ev);
+    ASSERT_EQ(r.size(), 2u);
+    EXPECT_EQ(r[0].roll, 4);                          // engine utratil přehoz
+    EXPECT_EQ(r[1].roll, 3);                          // Loner neprošel
+    EXPECT_EQ(r[1].die1, 3);
+}
+
+TEST(Helpers, P244EngineRerollLogsOriginalAndNewRoll) {
+    GameState gs;
+    placePlayer(gs, 12, {10, 7}, TeamSide::AWAY);   // id 12+ = AWAY (placePlayer stranu nemění)
+    ASSERT_EQ(gs.getPlayer(12).teamSide, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Loner);
+    gs.awayTeam.rerolls = 2;
+    gs.activeTeam = TeamSide::AWAY;                   // přehoz jen týmu na tahu
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    FixedDiceRoller dice({1, 5, 1});                  // GFI 1, Loner 5 ⇒ přehoz, nový hod 1
+    std::vector<GameEvent> ev;
+    EXPECT_FALSE(attemptRoll(gs, 12, dice, 2, SkillName::SKILL_COUNT, false, true, &ev));
+    const auto r = rerolly(ev);
+    ASSERT_EQ(r.size(), 2u);
+    EXPECT_EQ(r[1].roll, 0);                          // přehoz hodu: původní → nový
+    EXPECT_EQ(r[1].die1, 1);
+    EXPECT_EQ(r[1].die2, 1);
+}
+
+TEST(Helpers, P244NoNewEventsOutsideLiveGame) {
+    // měření a trénink: proud událostí beze změny (jako spendTeamRerollByEngine)
+    GameState gs;
+    placePlayer(gs, 12, {10, 7}, TeamSide::AWAY);   // id 12+ = AWAY (placePlayer stranu nemění)
+    ASSERT_EQ(gs.getPlayer(12).teamSide, TeamSide::AWAY);
+    gs.getPlayer(12).skills.add(SkillName::Loner);
+    gs.awayTeam.rerolls = 2;
+    gs.activeTeam = TeamSide::AWAY;                   // přehoz jen týmu na tahu
+    FixedDiceRoller dice({1, 3});
+    std::vector<GameEvent> ev;
+    EXPECT_FALSE(attemptRoll(gs, 12, dice, 2, SkillName::SKILL_COUNT, false, true, &ev));
+    EXPECT_TRUE(rerolly(ev).empty());
 }

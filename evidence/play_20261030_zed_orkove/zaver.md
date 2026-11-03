@@ -11,6 +11,6 @@
 ## Co dělala AI lidí (k potvrzení uživatelem)
 1. **Catcher HC16 běhal tam a zpět** (17,6)↔(18,6) 4× v plánu tahu — pravděpodobná vada plánování přesunu (C++ macro_mcts, 4. kolo).
 2. **Bloky na 1 kostku**, i bez Block (HLW14 jen Wrestle); jeden blok skončil **2 kostkami, které volil obránce** (plán počítal s jinými asistencemi).
-3. Ogr blitzoval s GFI a padl na 1 (Loner — přehoz nepoužit) ⇒ turnover lidí.
+3. Ogr blitzoval s GFI a padl na 1 (Loner — přehoz nepoužit) ⇒ turnover lidí. **Oprava 3.11. (P244):** přehoz použit, Loner hodil 3 ⇒ propadl; výpis to tehdy neukazoval.
 4. **Nosiče u postranní čáry (19,0) nikdo nenapadl** — každá cesta k němu chtěla úhyb; AI místo toho poslala HBH19 se 2× GFI do vlastní koncové zóny.
 5. Lidé opakovaně brali Stand Firm správně; AI použila Wrestle k záchraně turnoveru (HLW14).

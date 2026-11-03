@@ -312,6 +312,18 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
     if (coachModeOn()) emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 4, true});
 }
 
+// Loner po spotřebovaném týmovém přehozu (pravidla ř. 8287-8290): 4+, jinak „the original result
+// stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
+// místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
+// znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
+bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    if (!player.hasSkill(SkillName::Loner)) return true;
+    const int lonerRoll = dice.rollD6();
+    if (lonerRoll >= 4) return true;
+    if (coachModeOn()) emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 3, false, lonerRoll, 0});
+    return false;
+}
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro) {
@@ -329,11 +341,7 @@ bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
     auto spendTeamReroll = [&]() {
         team.rerolls--;
         team.rerollUsedThisTurn = true;
-        if (!player.hasSkill(SkillName::Loner)) return true;
-        const int lonerRoll = dice.rollD6();
-        if (lonerRoll >= 4) return true;
-        emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 3, false, lonerRoll, 0});
-        return false;
+        return lonerAllowsTeamReroll(player, dice, events);
     };
     if (answer == CoachAnswer::TEAM) return spendTeamReroll();
     // Pro, l. 8385-8389: 4+ přehoz; na 1-3 původní výsledek platí, hod na Pro
@@ -442,11 +450,7 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
             TeamState& team = state.getTeamState(player.teamSide);
             if (team.canUseReroll()) {
                 spendTeamRerollByEngine(team, playerId, events);
-                bool lonerOk = true;
-                if (player.hasSkill(SkillName::Loner)) {
-                    lonerOk = dice.rollD6() >= 4;
-                }
-                if (lonerOk) proRoll = dice.rollD6();
+                if (lonerAllowsTeamReroll(player, dice, events)) proRoll = dice.rollD6();
             }
         }
         if (proRoll >= 4) {
@@ -463,16 +467,13 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
         TeamState& team = state.getTeamState(player.teamSide);
         if (team.canUseReroll()) {
             spendTeamRerollByEngine(team, playerId, events);
+            if (!lonerAllowsTeamReroll(player, dice, events)) return false;   // přehoz propadl
 
-            // Loner gate
-            if (player.hasSkill(SkillName::Loner)) {
-                int lonerRoll = dice.rollD6();
-                if (lonerRoll < 4) {
-                    return false; // reroll wasted
-                }
-            }
-
+            const int original = roll;
             roll = dice.rollD6();
+            // P244: v živé partii i u strany bez kouče původní a nový hod (jako u kouče)
+            if (coachModeOn())
+                emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 0, roll >= target, original, roll});
             return roll >= target;
         }
     }

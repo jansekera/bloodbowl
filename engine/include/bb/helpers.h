@@ -116,6 +116,8 @@ bool teamRerollAllowed(const GameState& state, const Player& player);
 // pro odečet i zápis: dřív se v živé partii počítadlo snížilo bez události. REROLL druh 4 se
 // emituje jen v živé partii (coachModeOn), proudy událostí měření se nemění.
 void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEvent>* events);
+// Loner 4+ po spotřebovaném týmovém přehozu; neúspěch v živé partii = REROLL druh 3 (P244).
+bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,

@@ -1186,13 +1186,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                 TeamState& team = state.getTeamState(att.teamSide);
                 if (team.canUseReroll()) {
                     spendTeamRerollByEngine(team, att.id, events);
-
-                    bool canReroll = true;
-                    if (att.hasSkill(SkillName::Loner)) {
-                        int lonerRoll = dice.rollD6();
-                        if (lonerRoll < 4) canReroll = false;
-                    }
-                    if (canReroll) proRoll = dice.rollD6();
+                    if (lonerAllowsTeamReroll(att, dice, events)) proRoll = dice.rollD6();
                 }
             }
 
@@ -1215,13 +1209,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             if (team.canUseReroll()) {
                 spendTeamRerollByEngine(team, att.id, events);
 
-                bool canReroll = true;
-                if (att.hasSkill(SkillName::Loner)) {
-                    int lonerRoll = dice.rollD6();
-                    if (lonerRoll < 4) canReroll = false;
-                }
-
-                if (canReroll) {
+                if (lonerAllowsTeamReroll(att, dice, events)) {
                     for (int i = 0; i < diceInfo.count; i++) faces[i] = dice.rollBlockDie();
                     chosen = autoChooseBlockDie(faces, diceInfo.count,
                                                  diceInfo.attackerChooses, att, def);

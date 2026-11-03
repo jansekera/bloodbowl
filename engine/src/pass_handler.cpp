@@ -370,9 +370,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                     TeamState& team = state.getTeamState(passer.teamSide);
                     if (team.canUseReroll()) {
                         spendTeamRerollByEngine(team, passerId, events);
-                        bool lonerOk = true;
-                        if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
-                        if (lonerOk) proRoll = dice.rollD6();
+                        if (lonerAllowsTeamReroll(passer, dice, events)) proRoll = dice.rollD6();
                     }
                 }
                 if (proRoll >= 4) roll = dice.rollD6();
@@ -380,9 +378,14 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                 TeamState& team = state.getTeamState(passer.teamSide);
                 if (team.canUseReroll()) {
                     spendTeamRerollByEngine(team, passerId, events);
-                    bool lonerOk = true;
-                    if (passer.hasSkill(SkillName::Loner)) lonerOk = (dice.rollD6() >= 4);
-                    if (lonerOk) roll = dice.rollD6();
+                    if (lonerAllowsTeamReroll(passer, dice, events)) {
+                        const int original = roll;
+                        roll = dice.rollD6();
+                        // P244: v živé partii i u strany bez kouče původní a nový hod
+                        if (coachModeOn())
+                            emitEvent(events, {GameEvent::Type::REROLL, passerId, -1, {}, {}, 0,
+                                              roll >= passTarget && !isFumble(roll), original, roll});
+                    }
                 }
             }
         }
