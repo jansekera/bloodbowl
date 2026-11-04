@@ -929,6 +929,8 @@ GameState makeHandBuiltMismatch() {
 }
 
 TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
+    // P245 bod 3 (4.11.2026): 2 proti na nosiče se teď nabízí jen lovci (AG ≥ 4 + Strip Ball + Wrestle) nebo v nouzi;
+    //   test hlídá odklad rizika, ne tuhle bránu ani zavazení zástěny (P245 bod 2 tu volí přesun sám) ⇒ po dobu testu vypnuto.
     // P227 (přeladěno 26.10.2026 po review M4): běží ve VÝCHOZÍ masce. Dřív tu bylo P227 vypnuté, protože
     // fixtura stála na blitzu 1 proti 6 (3 proti), který AI od P227 nenabízí — test tak hlídal situaci,
     // která ve hře nenastane. Teď síla 3 proti 6 = 2 proti na nosiče (P227 povolí).
@@ -936,7 +938,8 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     //   tím zhodnotil a základ ho volí sám — test pak nerozlišuje. Zkoušeno 50 polí volného hráče (x 5–22,
     //   y 1–12) s MA 6 i MA 5: žádné nedalo „základ BLITZ, strážce odloží“. Test hlídá ODKLAD RIZIKA, ne
     //   pojistku, proto P242b po dobu testu vypíná (jako P162 u priorů s faulem). Aserce se NEOSLABILA.
-    struct SafetyDepthOff { SafetyDepthOff() { setExtraFeaturesOff(kP242SafetyDepth); } ~SafetyDepthOff() { setExtraFeaturesOff(0); } } safetyDepthOff;
+    // ⛔ jedna maska: dvě struktury za sebou by si `setExtraFeaturesOff` přepsaly
+    struct SafetyDepthOff { SafetyDepthOff() { setExtraFeaturesOff(kP242SafetyDepth | kP245CarrierBlitzGate | kP245Obstruct); } ~SafetyDepthOff() { setExtraFeaturesOff(0); } } safetyDepthOff;
     GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;
@@ -1451,6 +1454,8 @@ TEST(MacroMCTSPolicy, P211AgilePlayerEscapesBeforeTheTurnEnds) {
 // blitz už nikdy nepřijde), se nesmí vybrat; přesun jiného, vzdáleného hráče ano.
 TEST(MacroMCTS, P159DeferralNeverDropsTheRiskyMacro) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
+    // P245 bod 3 (blitz na soupeřova nosiče jen se šancí srazit ≥ 1/2) taky — 2 kostky proti; po dobu testu vypnuto.
+    struct GateOff { GateOff() { setExtraFeaturesOff(kP245CarrierBlitzGate); } ~GateOff() { setExtraFeaturesOff(0); } } gateOff;
     GameState state;
     state.phase = GamePhase::PLAY;
     state.activeTeam = TeamSide::HOME;

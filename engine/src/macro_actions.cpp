@@ -1469,6 +1469,83 @@ static bool carrierCanAdvance(const GameState& state, const Player& carrier);
 
 // --- Macro Generation ---
 
+// ⭐⭐ P245 (uživatel 2.11. a 4.11.2026): OBRANA ZAVAZÍ NOSIČI. *„poslat obranu tak aby zavazela nosiči co
+//   nejvíce - lze spočítat“* · *„nosič - zvlášť agilní nebo zoufalý v posledním kole - může udělat dodge …
+//   ať mu nenecháme cestu s ne příliš riskantním dodge“* · návrh odsouhlasen *„1 ano, 2 ano, 3 ano“*.
+//   Partie 2 (30.–31.10.): nosič orků na (19,0) u čáry, zástěna stála na pevných řádcích 3–11 a řadu 0 nezavřel
+//   nikdo ⇒ TD. Zástěna (12) a hlídka zóny (11) teď volí z polí, kam obránce dojde bez hodu a mimo kontakt,
+//   to, po kterém má nosič v PŘÍŠTÍM tahu nejmenší šanci na TD (úhyby i GFI, jak je útok počítá vlastnímu
+//   nosiči) a mimo poslední kolo soupeře pak nejdál od zóny po cestě s neúspěchem do 1/3 (hranice útěku P213).
+//   Při shodě zůstává cíl, který dala původní větev. Bezpečnost (9) zůstává vzadu.
+static long g_p245[4] = {0, 0, 0, 0};
+void takeP245Obstruct(long* out4) { for (int i = 0; i < 4; ++i) { out4[i] = g_p245[i]; g_p245[i] = 0; } }
+constexpr double kP245CarrierRisk = 1.0 / 3.0;   // „rozumné riziko“ nosiče — totéž, co útok bere při útěku (P213)
+
+// P245 bod 3, režim podle týmů (uživatel 4.11.: „problém nastane u skavenů … a wardancer u elfů — parametrizuj podle
+//   soupeř je silnější a my rychlejší nebo agilnější s hunterem na nosiče“; lovec = AG ≥ 4 + Strip Ball + Wrestle, „lovec by měl mít obojí“).
+//   Strip Ball: nosič pustí míč i při Pushed a Defender Stumbles (ř. 8517-8521), u Both Down ne; Wrestle: při Both Down
+//   jdou oba k zemi bez turnoveru (ř. 8670-8678) ⇒ nosič na zemi míč pustí. Lovec se tak u 2 kostek proti srazí/oloupí
+//   častěji a agilní tým si pokus může dovolit ⇒ zůstává P227 „3b“ (2 proti na nosiče se nabízí). Ostatní konzervativně.
+static bool carrierHunter(const Player& b) {
+    return b.stats.agility >= 4 && b.hasSkill(SkillName::StripBall) && b.hasSkill(SkillName::Wrestle);   // uživatel: „lovec by měl mít obojí“
+}
+static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
+    double ma[2] = {0, 0}, ag[2] = {0, 0}; int n[2] = {0, 0};
+    for (const Player& p : state.players) {
+        if (!p.isOnPitch() || p.state != PlayerState::STANDING) continue;
+        const int i = (p.teamSide == me) ? 0 : 1;
+        ma[i] += p.stats.movement; ag[i] += p.stats.agility; ++n[i];
+    }
+    if (n[0] == 0 || n[1] == 0) return false;
+    return ma[0] / n[0] > ma[1] / n[1] || ag[0] / n[0] > ag[1] / n[1];
+}
+
+static bool carrierLastTurn(const GameState& state, const Player& carrier) {
+    return state.getTeamState(carrier.teamSide).turnNumber + 1 >= 8;   // jeho příští tah je poslední v poločase
+}
+
+// Lepší (pro obranu) je menší šance na TD; mimo poslední kolo při shodě větší vzdálenost od zóny.
+static bool outlookBetterForDefense(const CarrierOutlook& a, const CarrierOutlook& b, bool lastTurn) {
+    if (a.tdChance < b.tdChance - 1e-9) return true;
+    if (a.tdChance > b.tdChance + 1e-9) return false;
+    return !lastTurn && a.bestDistance > b.bestDistance;
+}
+
+static Position obstructSquare(const GameState& state, const Player& p, const Player& carrier, Position fallback) {
+    // ⛔ Uživatel 4.11.: „zase děláš dlouhé hledání místo krátkého počítání nej možnosti?“ ⇒ žádné zkoušení
+    //   polí. Nosičova nejlepší cesta se spočítá JEDNOU; obránce si stoupne tak, aby jeho tackle zóna padla
+    //   na její nejbližší pole od nosiče, kam dojde bez hodu a mimo kontakt (při shodě pole, které jich
+    //   kryje nejvíc). Pak jediná kontrola: není-li to pro obranu lepší než cíl původní větve, zůstává ten.
+    ++g_p245[0];
+    const bool lastTurn = carrierLastTurn(state, carrier);
+    std::vector<Position> route;   // od cíle k nosiči
+    GameState sim = state;
+    Player& me = sim.getPlayer(p.id);
+    const Player& simCarrier = sim.getPlayer(carrier.id);
+    carrierNextTurnOutlook(state, carrier, kP245CarrierRisk, &route);
+    if (route.empty()) return fallback;
+    std::vector<Position> reach;
+    diceFreeReach(state, p, reach);
+    Position best{-1, -1};
+    for (auto r = route.rbegin(); r != route.rend() && best.x < 0; ++r) {   // od nosiče k zóně
+        int bestCover = 0;
+        for (const Position& q : reach) {
+            if (q.distanceTo(*r) > 1 || countTacklezones(state, q, p.teamSide) > 0) continue;
+            int cover = 0;
+            for (const Position& t : route) cover += q.distanceTo(t) <= 1;
+            if (cover > bestCover) { bestCover = cover; best = q; }
+        }
+    }
+    if (best.x < 0 || best == fallback) return fallback;
+    me.position = best;
+    const CarrierOutlook withBest = carrierNextTurnOutlook(sim, simCarrier, kP245CarrierRisk);
+    me.position = fallback.isOnPitch() ? fallback : p.position;
+    const CarrierOutlook withFallback = carrierNextTurnOutlook(sim, simCarrier, kP245CarrierRisk);
+    if (!outlookBetterForDefense(withBest, withFallback, lastTurn)) return fallback;
+    ++g_p245[1];
+    return best;
+}
+
 static bool pickBlitzer(const GameState& state, const Macro& macro, const std::vector<Action>& actions,
                         Action& out, bool count);
 
@@ -2321,6 +2398,19 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             const Macro m{MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}};
             Action ignored;
             if (!pickBlitzer(state, m, actions, ignored, /*count=*/false)) continue;
+            if (onDef && extraFeatureOn(kP245CarrierBlitzGate) && state.ball.isHeld &&
+                state.ball.carrierId == m.targetId) {
+                // P245 bod 3: útok na nosiče (úhyb + blitz, často 2 kostky proti) jen se šancí srazit ≥ 1/2;
+                //   jinak zavazet. Výjimka: nosič by jinak skóroval s šancí > 1/2 — pak i horší pokus.
+                const Player& tgt = state.getPlayer(m.targetId);
+                const Player& blitzer = state.getPlayer(ignored.playerId);
+                const bool hunterMode = carrierHunter(blitzer) && teamFasterOrMoreAgile(state, mySide);
+                const double hit = estimateBlitzOdds(state, blitzer, tgt, false).success;
+                if (!hunterMode && hit < 0.5) {
+                    if (carrierNextTurnOutlook(state, tgt, kP245CarrierRisk).tdChance <= 0.5) { ++g_p245[2]; continue; }
+                    ++g_p245[3];
+                }
+            }
             out.push_back(m);
             ++offered;
         }
@@ -2951,6 +3041,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 repBranch = 12;
                 target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
                           static_cast<int8_t>(screenY)};
+            }
+            // P245: zástěna a hlídka zóny zavazí nosiči (viz obstructSquare).
+            if (extraFeatureOn(kP245Obstruct) && oppCarrierPtr != nullptr && (repBranch == 11 || repBranch == 12) &&
+                oppCarrierPtr->state == PlayerState::STANDING) {
+                target = obstructSquare(state, p, *oppCarrierPtr, target);
             }
             } // end !usedIntercept
             } // end !usedCageTag

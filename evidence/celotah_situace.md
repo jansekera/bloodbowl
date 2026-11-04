@@ -561,3 +561,13 @@ Uživatel: *„poslat obranu tak aby zavazela nosiči co nejvíce - lze spočít
 Doplněk uživatele 02.11.: *„nosiče u čáry napadne nejlépe skaven - lidi na to mají malou pravděpodobnost na blitz a dodge a dvě kostky proti“* ⇒ volba útok × zavazet závisí na rase: úhyb + blitz se 2 kostkami proti jen pro rychlé a obratné (skaveni); lidé a pomalejší zavazí.
 
 Kniha **P245**. Zápis partie `evidence/play_20261030_zed_orkove/zaver.md`.
+
+## A18. SEBRAT MÍČ = SHODIT + ZVEDNOUT + ODNÉST + ZEĎ *(uživatel 4.11., z P245/P248)*
+
+Uživatel: *„při příležitosti shodit míč je potřeba mít zároveň nachystaného někoho dalšího, kdo míč zvedne a odnese jinam, a také ještě další, kteří kolem míče sestaví aspoň zeď, když ne klec — sebrání míče, aby bylo úspěšné, je komplikovanější než jen shodit nosiče“*. Lovec (AG ≥ 4 + Strip Ball + Wrestle) je vzácný: mimo tuhle příležitost stojí za hradbou svých, přes kterou ho soupeř neblitzne.
+
+| co má hráč rozeznat | ✅ co jde měřit **DNES** | ⏰ co se změří **až to bude umět** |
+|---|---|---|
+| blitz na nosiče má cenu jen s připraveným zvedačem (ještě nehrál, dojde k místu dopadu) a aspoň dvěma na zeď | po blitzu na nosiče: míč na zemi × kdo ho v témže tahu zvedl × kolik našich stálo do 2 polí × kdo měl míč po tahu soupeře | o kolik častěji míč po shození zůstane u nás |
+
+Kniha **P248**.

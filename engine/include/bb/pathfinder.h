@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "bb/game_state.h"
 #include "bb/position.h"
 
@@ -60,6 +62,19 @@ int pathStepsToward(const GameState& state, const Player& player,
 // risk podcenoval cesty, ktere vedou pres tacklezonu.
 double pathFailProb(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare);
+
+// ⭐ P245 (uživatel 4.11.2026: „poslat obranu tak, aby zavazela nosiči co nejvíce“ + „nosič — zvlášť agilní
+//   nebo zoufalý v posledním kole — může udělat dodge … ať mu nenecháme cestu s ne příliš riskantním dodge“).
+//   Výhled nosiče na JEHO PŘÍŠTÍ tah (plný pohyb + GFI, úhyby i Dodge jako `pathFailProb` — tatáž cena,
+//   jakou útok počítá vlastnímu nosiči): `tdChance` = nejlepší šance doběhnout do zóny (jakékoli riziko,
+//   „zoufalý“ nosič), `bestDistance` = nejmenší vzdálenost od zóny (sloupce), kam dojde s neúspěchem
+//   nejvýš `maxFail` (útok P213 bere útěk do 1/3). Stojí-li nosič, kde je, `bestDistance` je jeho dnešní.
+struct CarrierOutlook { double tdChance = 0.0; int bestDistance = 26; };
+// `route` (volitelně): pole té nejlepší cesty — k TD, jinak k nejbližšímu doběhu.
+CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
+                                      std::vector<Position>* route = nullptr);
+// P245: volná pole, kam hráč v tomto tahu dojde bez hodu (bez úhybu i GFI).
+void diceFreeReach(const GameState& state, const Player& player, std::vector<Position>& out);
 
 // P154: pole, na které blitzující při doběhu k cíli dojde, a počet kroků; false = nedojde,
 // nebo by cestou uhýbal (pak `landing` a `steps` nedefinované). Přehrává smyčku hry, čítače chůze nemění.

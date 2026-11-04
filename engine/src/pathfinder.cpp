@@ -629,6 +629,11 @@ int pathStepsToward(const GameState& state, const Player& player,
 //   rameno cenilo jen GFI a dodge riziko na sve vlastni ceste vubec
 //   nevidelo. Nezavisle udalosti: P(fail) = 1 - prod(1-p_i) pres CELOU
 //   cestu. -1.0 = nedosazitelne v rozpoctu.
+// Pravděpodobnost neúspěchu už nalezené cesty do uzlu `targetIdx` (po `searchRoutes`). Jedno místo pro
+// `pathFailProb` i výhled nosiče (P245), aby obě četly stejné riziko.
+static double chainFailProb(const GameState& state, const Player& player, const int16_t* parent,
+                            int targetIdx);
+
 double pathFailProb(const GameState& state, const Player& player,
                     Position target, int budget, Position blockedSquare) {
     if (budget <= 0) return -1.0;
@@ -639,9 +644,14 @@ double pathFailProb(const GameState& state, const Player& player,
     int16_t parent[kNodeCount];
     searchRoutes(state, player, budget, blockedSquare, key, steps, parent, /*preferStraight=*/true,
                  [&](const int* k, const int8_t*) { return bestLayerIdx(k, gridIdx(target.x, target.y)) >= 0; });
-    const int startIdx = gridIdx(player.position.x, player.position.y);
     const int targetIdx = bestLayerIdx(key, gridIdx(target.x, target.y));
     if (targetIdx < 0) return -1.0;
+    return chainFailProb(state, player, parent, targetIdx);
+}
+
+static double chainFailProb(const GameState& state, const Player& player, const int16_t* parent,
+                            int targetIdx) {
+    const int startIdx = gridIdx(player.position.x, player.position.y);
 
     // Zrekonstruuj CELOU cestu (ne jen prvni krok jako nextStepToward) --
     // parent[] jde od cile zpatky ke startu. `chain` nese INDEXY UZLU
@@ -728,6 +738,72 @@ double pathFailProb(const GameState& state, const Player& player,
     }
     if (hasDodge) successProb *= (rerollLive + rerollGone);
     return 1.0 - successProb;
+}
+
+// P245: pole, kam hráč v tomto tahu dojde bez hodu (bez úhybu i bez GFI).
+void diceFreeReach(const GameState& state, const Player& player, std::vector<Position>& out) {
+    out.clear();
+    const int budget = movementAfterStandUp(player);
+    if (budget <= 0) return;
+    int key[kNodeCount];
+    int8_t steps[kNodeCount];
+    int16_t parent[kNodeCount];
+    searchRoutes(state, player, budget, Position{-1, -1}, key, steps, parent, /*preferStraight=*/true,
+                 [](const int*, const int8_t*) { return true; });
+    for (int sq = 0; sq < GRID_SIZE; ++sq) {
+        const int idx = bestLayerIdx(key, sq);
+        if (idx < 0 || steps[idx] > budget) continue;
+        const Position p2{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)};
+        if (p2 == player.position || state.getPlayerAtPosition(p2)) continue;
+        if (chainFailProb(state, player, parent, idx) > 0.0) continue;
+        out.push_back(p2);
+    }
+}
+
+// ⭐ P245 (uživatel 4.11.2026): výhled soupeřova nosiče na jeho příští tah — viz pathfinder.h.
+CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
+                                      std::vector<Position>* route) {
+    CarrierOutlook out;
+    Player w = carrier;                                   // příští tah: plný pohyb, Break Tackle znovu
+    w.movementRemaining = static_cast<int8_t>(w.stats.movement);
+    w.breakTackleUsedThisTurn = false;
+    const int budget = movementAfterStandUp(w) + maxGfiSquares(w);
+    if (budget <= 0 || !w.isOnPitch()) { out.bestDistance = 26; return out; }
+    const int ezX = (w.teamSide == TeamSide::HOME) ? 25 : 0;
+    int key[kNodeCount];
+    int8_t steps[kNodeCount];
+    int16_t parent[kNodeCount];
+    const bool ezInBudget = std::abs(w.position.x - ezX) <= budget;   // jinak druhé hledání nic nenajde
+    searchRoutes(state, w, budget, Position{-1, -1}, key, steps, parent, /*preferStraight=*/true,
+                 [&](const int* k, const int8_t*) {
+                     if (!ezInBudget) return true;
+                     for (int y = 0; y < GRID_H; ++y) if (bestLayerIdx(k, gridIdx(ezX, y)) >= 0) return true;
+                     return false;
+                 });
+    out.bestDistance = std::abs(w.position.x - ezX);
+    int tdIdx = -1, distIdx = -1;
+    for (int sq = 0; sq < GRID_SIZE; ++sq) {
+        const int idx = bestLayerIdx(key, sq);
+        if (idx < 0) continue;
+        const int x = sq % GRID_W, y = sq / GRID_W;
+        const Position p2{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+        if (p2 != w.position && state.getPlayerAtPosition(p2)) continue;
+        const int dist = std::abs(x - ezX);
+        if (dist >= out.bestDistance && x != ezX) continue;   // nic nezlepší ⇒ cestu ani nepočítat
+        const double fail = (p2 == w.position) ? 0.0 : chainFailProb(state, w, parent, idx);
+        if (x == ezX && 1.0 - fail > out.tdChance) { out.tdChance = 1.0 - fail; tdIdx = idx; }
+        if (fail <= maxFail && dist < out.bestDistance) { out.bestDistance = dist; distIdx = idx; }
+    }
+    if (route) {   // pole nejlepší cesty (k TD, jinak k nejbližšímu doběhu) bez startu
+        route->clear();
+        const int startIdx = gridIdx(w.position.x, w.position.y);
+        for (int idx = (tdIdx >= 0 ? tdIdx : distIdx); idx >= 0 && idx != startIdx; idx = parent[idx]) {
+            const int sq = idx % GRID_SIZE;
+            route->push_back(Position{static_cast<int8_t>(sq % GRID_W), static_cast<int8_t>(sq / GRID_W)});
+            if (route->size() > static_cast<size_t>(kNodeCount)) break;
+        }
+    }
+    return out;
 }
 
 // P154 (07.10.2026): kam blitzující při doběhu k cíli DOJDE a po kolika krocích — přehráním

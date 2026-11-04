@@ -1609,6 +1609,8 @@ TEST(MacroActions, BlitzDefensePrioritizesCarrier) {
 }
 
 TEST(MacroActions, BlitzDefenseMultipleTargets) {
+    // P245 bod 3 (blitz na nosiče jen se šancí ≥ 1/2) hlídá vlastní test; tady jde o počet nabízených cílů.
+    struct GateOff { GateOff() { setExtraFeaturesOff(kP245CarrierBlitzGate); } ~GateOff() { setExtraFeaturesOff(0); } } gateOff;
     GameState state = makeDefensiveState();
     state.homeTeam.blitzUsedThisTurn = false;
 
@@ -5158,14 +5160,14 @@ TEST(MacroActions, P227NoBlitzIntoThreeDiceAgainstEvenOnTheCarrier) {
 }
 
 TEST(MacroActions, P227TwoDiceAgainstStayOfferedOnTheCarrier) {
-    P227Off on(0);
+    P227Off on(kP245CarrierBlitzGate);   // P227 sám 2 proti na nosiče pouští; P245 bod 3 je zvláštní test níž
     const GameState s = p227CarrierState(3);   // 2 proti 3 ⇒ obránce volí ze 2
     ASSERT_EQ(blockDiceCount(s, s.getPlayer(1), s.getPlayer(12)), -2) << "fixtura: 2 kostky proti";
     EXPECT_TRUE(offersBlitzOn(s, 12)) << "2 proti na soupeřova nosiče zůstává";
 }
 
 TEST(MacroActions, P227SwitchedOffTheOldOfferReturns) {
-    P227Off off(kP227BlitzDice);
+    P227Off off(kP227BlitzDice | kP245CarrierBlitzGate);
     const GameState s = p227CarrierState(5);
     EXPECT_TRUE(offersBlitzOn(s, 12)) << "pozitivní kontrola: s vypnutým P227 se 3 proti nabízí jako dřív";
 }
@@ -5581,4 +5583,118 @@ TEST(MacroActions, P242NoRepositionOntoATeammate) {
     bool old = false;
     for (const auto& m : macros) old |= m.type == MacroType::REPOSITION && m.targetPos == depth && m.playerId != 3;
     EXPECT_TRUE(old) << "pozitivní kontrola: bez P242a se na pole spoluhráče posílá";
+}
+
+// =============================================================
+// P245 (uživatel 2.11. a 4.11.2026): obrana zavazí nosiči. Výhled nosiče počítá i úhyby („agilní nebo
+// zoufalý nosič může udělat dodge“); zástěna volí pole, po kterém má nosič nejmenší šanci a nejkratší doběh.
+// Brání HOME (zóna x = 0), míč drží AWAY. Pozice jako v partii 2 (30.–31.10.): nosič u postranní čáry.
+// =============================================================
+namespace {
+GameState makeP245Sideline() {
+    GameState s;
+    s.phase = GamePhase::PLAY;
+    s.activeTeam = TeamSide::HOME;
+    s.half = 1;
+    s.homeTeam.turnNumber = 3;
+    s.awayTeam.turnNumber = 3;
+    s.weather = Weather::NICE;
+    auto put = [&](int id, TeamSide side, Position pos, int8_t ma, int8_t ag) -> Player& {
+        Player& p = s.getPlayer(id);
+        p.id = id; p.teamSide = side; p.state = PlayerState::STANDING; p.position = pos;
+        p.stats = {ma, 3, ag, 9}; p.movementRemaining = ma; p.hasMoved = false; p.hasActed = false;
+        return p;
+    };
+    put(12, TeamSide::AWAY, {9, 0}, 5, 3);         // nosič u čáry (řada 0), 9 sloupců od zóny
+    s.ball = BallState::carried({9, 0}, 12);
+    put(1, TeamSide::HOME, {3, 7}, 6, 3);          // pojistka (MA 6)
+    put(2, TeamSide::HOME, {12, 9}, 5, 3);         // značkovač
+    put(3, TeamSide::HOME, {7, 5}, 5, 3);          // zástěna (pevné řádky 3–11), čáru by stihla zavřít
+    put(4, TeamSide::HOME, {6, 10}, 5, 3);
+    return s;
+}
+}  // namespace
+
+TEST(MacroActions, P245OutlookCountsDodgesNotOnlyFreePaths) {
+    GameState s = makeP245Sideline();
+    Player& c = s.getPlayer(12);
+    c.position = {5, 0}; s.ball = BallState::carried({5, 0}, 12);
+    EXPECT_NEAR(carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance, 1.0, 1e-9) << "volná řada 0: doběhne jistě";
+    Player& d = s.getPlayer(1);
+    d.position = {4, 1};   // obránce šikmo před ním: první krok je úhyb
+    const CarrierOutlook ag3 = carrierNextTurnOutlook(s, c, 1.0 / 3.0);
+    EXPECT_GT(ag3.tdChance, 0.1) << "úhyb není zeď — cesta s úhyby zůstává otevřená";
+    EXPECT_LT(ag3.tdChance, 0.95);
+    c.stats.agility = 4;
+    const double ag4 = carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance;
+    EXPECT_GT(ag4, ag3.tdChance) << "agilní nosič má větší šanci";
+    c.skills.add(SkillName::Dodge);
+    EXPECT_GT(carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance, ag4) << "Dodge = přehoz úhybu";
+}
+
+TEST(MacroActions, P245OutlookSidelineRunWithoutObstruction) {
+    // pozitivní kontrola měřidla na pozici z partie 2: řada 0 volná ⇒ dojde do 2 sloupců od zóny bez hodu
+    const GameState s = makeP245Sideline();
+    const CarrierOutlook o = carrierNextTurnOutlook(s, s.getPlayer(12), 1.0 / 3.0);
+    EXPECT_NEAR(o.tdChance, 0.0, 1e-9) << "9 sloupců > MA 5 + 2 GFI";
+    EXPECT_EQ(o.bestDistance, 2);
+}
+
+TEST(MacroActions, P245ScreenObstructsTheSidelineCarrier) {
+    const GameState s = makeP245Sideline();
+    const int carrierId = 12;
+    // výhled nosiče po přesunu, který nabídka dává hráči `id` (zástěna = hráči 3 a 4)
+    auto outlookFor = [&](unsigned off, int id) {
+        setExtraFeaturesOff(off);
+        std::vector<Macro> macros;
+        getAvailableMacros(s, macros);
+        setExtraFeaturesOff(0);
+        for (const auto& m : macros) {
+            if (m.type != MacroType::REPOSITION || m.playerId != id) continue;
+            GameState after = s;
+            after.getPlayer(id).position = m.targetPos;
+            return carrierNextTurnOutlook(after, after.getPlayer(carrierId), 1.0 / 3.0);
+        }
+        ADD_FAILURE() << "hráč " << id << " nemá přesun";
+        return CarrierOutlook{};
+    };
+    const CarrierOutlook old3 = outlookFor(kP245Obstruct, 3), new3 = outlookFor(0, 3);
+    const CarrierOutlook old4 = outlookFor(kP245Obstruct, 4), new4 = outlookFor(0, 4);
+    EXPECT_EQ(old3.bestDistance, 2) << "pozitivní kontrola: pevná zástěna nosiče u čáry nezdrží (jako v partii 2)";
+    EXPECT_GT(new3.bestDistance, old3.bestDistance) << "s P245 zástěna zavře čáru";
+    EXPECT_GE(new4.bestDistance, old4.bestDistance) << "P245 nikdy nezhorší";
+}
+TEST(MacroActions, P245NoLongShotBlitzOnTheCarrierUnlessHeScoresAnyway) {
+    GameState s = makeP245Sideline();
+    s.getPlayer(12).stats.strength = 4;          // nosič silnější ⇒ blitz se 2 kostkami proti (srazí ~1/4)
+    auto carrierBlitzOffered = [&](unsigned off) {
+        setExtraFeaturesOff(off);
+        std::vector<Macro> macros;
+        getAvailableMacros(s, macros);
+        setExtraFeaturesOff(0);
+        for (const auto& m : macros) if (m.type == MacroType::BLITZ && m.targetId == 12) return true;
+        return false;
+    };
+    EXPECT_TRUE(carrierBlitzOffered(kP245CarrierBlitzGate)) << "pozitivní kontrola: bez brány se nabízí";
+    EXPECT_FALSE(carrierBlitzOffered(0)) << "šance srazit < 1/2 ⇒ zavazet, ne útočit";
+    Player& c = s.getPlayer(12);                 // nosič, který jinak skóruje (volná řada 0 do zóny)
+    c.position = {6, 0};
+    s.ball = BallState::carried({6, 0}, 12);
+    ASSERT_GT(carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance, 0.5);
+    EXPECT_TRUE(carrierBlitzOffered(0)) << "výjimka: nosič by jinak skóroval ⇒ i horší pokus";
+}
+
+TEST(MacroActions, P245HunterOfAFasterTeamKeepsTheTwoDiceBlitzOnTheCarrier) {
+    // uživatel 4.11.: lovec = AG ≥ 4 + Strip Ball + Wrestle („lovec by měl mít obojí“); jeho tým rychlejší
+    // nebo agilnější ⇒ 2 proti na nosiče se nabízí (P227 „3b“). Bez lovce konzervativně (jen v nouzi).
+    // Pozn.: Strip Ball (Pushed, Stumbles) + Wrestle (Both Down) zvednou i samotný odhad zásahu na ~0,69 u 2 proti.
+    GameState s = p227CarrierState(3);           // 2 proti 3 ⇒ obránce volí ze 2
+    Player& b = s.getPlayer(1);
+    ASSERT_EQ(blockDiceCount(s, b, s.getPlayer(12)), -2);
+    EXPECT_FALSE(offersBlitzOn(s, 12)) << "AG 3 bez dovedností: konzervativně";
+    b.stats.agility = 4;
+    b.skills.add(SkillName::Wrestle);
+    EXPECT_FALSE(offersBlitzOn(s, 12)) << "jen Wrestle nestačí (srazí ~1/4)";
+    b.skills.add(SkillName::StripBall);
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "lovec blitzuje i 2 proti";
 }

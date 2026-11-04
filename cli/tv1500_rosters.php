@@ -32,7 +32,8 @@ const TV1500_ROSTERS = [
     ],
     'Wood Elf' => [
         ['Lineman',   3, [7, 3, 4, 7], [SkillName::Block]],
-        ['Wardancer', 1, [8, 3, 4, 7], [SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::StripBall, SkillName::Pro]],
+        // uživatel 4.11.: lovec (AG ≥ 4 + Strip Ball + Wrestle) i u elfů ⇒ Wrestle z Linemana na Wardancera, TV stejná
+        ['Wardancer', 1, [8, 3, 4, 7], [SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::StripBall, SkillName::Pro, SkillName::Wrestle]],
         ['Wardancer', 1, [8, 3, 4, 7], [SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::SideStep]],
         ['Catcher',   1, [8, 2, 4, 7], [SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block, SkillName::DivingCatch]],
         // uživatel 16.10.: jeden Catcher Nerves of Steel místo Diving Catch (chytá bez −1 za zóny)
@@ -41,7 +42,7 @@ const TV1500_ROSTERS = [
         ['Treeman',   1, [2, 6, 1, 10], [SkillName::Loner, SkillName::TakeRoot, SkillName::StandFirm, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::Guard]],
         // uživatel 16.10.: jeden Lineman bez Wrestle (jen Dodge), TV 1510
         ['Lineman',   1, [7, 3, 4, 7], [SkillName::Dodge]],
-        ['Lineman',   1, [7, 3, 4, 7], [SkillName::Wrestle, SkillName::Dodge]],
+        ['Lineman',   1, [7, 3, 4, 7], [SkillName::Dodge]],
     ],
     'Skaven' => [
         // uživatel 18.10.: lovec +Strip Ball za Wrestle jednoho Linemana; hlavní Blitzer Strip Ball místo Guard

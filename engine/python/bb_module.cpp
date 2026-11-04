@@ -29,6 +29,7 @@
 #include "bb/mcts.h"
 #include "bb/macro_mcts.h"
 #include "bb/macro_actions.h"
+#include "bb/pathfinder.h"
 
 namespace py = pybind11;
 
@@ -658,6 +659,14 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[3]; bb::takeP244BlitzFirst(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
+    m.def("take_p245_obstruct", []() {   // P245: (přesunů posouzeno, cíl změněn, blitz na nosiče nenabídnut, výjimkou nabídnut); čte a nuluje
+        long v[4]; bb::takeP245Obstruct(v);
+        return py::make_tuple(v[0], v[1], v[2], v[3]);
+    });
+    m.def("carrier_outlook", [](const bb::GameState& s, int carrierId, double maxFail) {   // P245: (šance na TD, vzdálenost od zóny s rizikem do maxFail)
+        const bb::CarrierOutlook o = bb::carrierNextTurnOutlook(s, s.getPlayer(carrierId), maxFail);
+        return py::make_tuple(o.tdChance, o.bestDistance);
+    }, py::arg("state"), py::arg("carrier_id"), py::arg("max_fail") = 1.0 / 3.0);
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);

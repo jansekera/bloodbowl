@@ -775,8 +775,10 @@ const TeamRoster& getWoodElfRoster1500() {
         "Wood Elf (TV1500)",
         {
             {{7, 3, 4, 7}, makeSkills({SkillName::Block}), 11, "Lineman +Block"},
+            // 4.11.2026 (uživatel: „uprav welfy ať mají lovce taky“; lovec = AG ≥ 4 + Strip Ball + Wrestle, P245):
+            //   Wrestle přešel z Linemana na tohoto Wardancera ⇒ TV beze změny, Wrestle v týmu dál jedno (16.10.).
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::StripBall,
-                SkillName::Pro}), 1, "Wardancer ball-hunter +Pro"},
+                SkillName::Pro, SkillName::Wrestle}), 1, "Wardancer ball-hunter +Pro+Wrestle"},
             {{8, 3, 4, 7}, makeSkills({SkillName::Block, SkillName::Dodge, SkillName::Leap, SkillName::SideStep}), 1, "Wardancer +Side Step"},
             {{8, 2, 4, 7}, makeSkills({SkillName::Catch, SkillName::Dodge, SkillName::Sprint, SkillName::Block,
                 SkillName::DivingCatch}), 1, "Catcher +Block+Diving Catch"},
@@ -792,7 +794,7 @@ const TeamRoster& getWoodElfRoster1500() {
             // 16.10.2026 (uživatel: „odeber třeba wrestle linemana — ať zůstane aspoň jedno wrestle“;
             // „sidestep wardancera neodebírej“) ⇒ jeden Lineman jen Dodge, TV 1510.
             {{7, 3, 4, 7}, makeSkills({SkillName::Dodge}), 1, "Lineman +Dodge"},
-            {{7, 3, 4, 7}, makeSkills({SkillName::Wrestle, SkillName::Dodge}), 1, "Lineman +Wrestle+Dodge"},
+            {{7, 3, 4, 7}, makeSkills({SkillName::Dodge}), 1, "Lineman +Dodge (Wrestle 4.11. Wardancerovi)"},
         },
         9, 50, true
     };
