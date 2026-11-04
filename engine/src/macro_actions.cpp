@@ -1503,6 +1503,9 @@ static bool someoneBlocksCarrierForFree(const GameState& state, TeamSide me, con
     return found;
 }
 static long g_p249[3] = {0, 0, 0};
+static long g_p249x[3] = {0, 0, 0};   // [0] P249b blok na nosiče nabídnut navíc, [1] P249c přehoz kvůli nosiči, [2] P249d odsun jinam než rovně
+void noteP249Extra(int i) { ++g_p249x[i]; }
+void takeP249Extra(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p249x[i]; g_p249x[i] = 0; } }
 void takeP249CarrierBlitzFirst(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p249[i]; g_p249[i] = 0; } }
 static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
     double ma[2] = {0, 0}, ag[2] = {0, 0}; int n[2] = {0, 0};
@@ -2594,7 +2597,14 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // turnovers are the ones that end drives.
             int dice = getBlockDiceCount(state, att, *def, false, dauntlessInOffer);
             const bool carrierOnOneDie = dice == 1 && state.ball.isHeld && state.ball.carrierId == att.id;
-            if (hitAllowed(state, att, dice) && !carrierOnOneDie) {
+            // P249b (uživatel 4.11.2026: „i když je šance pod polovinu jen málo — stále preferuji zkusit jej srazit“;
+            //   „Grunner na nosiče … jde vždy na 2 proti — vyhýbá se 3 proti“): na soupeřova nosiče se blok nabízí
+            //   i na 1 kostku bez Block a na 2 proti (obránce volí ze 2), nikdy na 3 proti. Turnover tu váží míč.
+            const bool onOppCarrier = state.ball.isHeld && state.ball.carrierId == def->id;
+            const bool carrierAnyChance = extraFeatureOn(kP249bCarrierBlock) && onOppCarrier && !carrierOnOneDie &&
+                                          (dice == 1 || dice == -2);
+            if (carrierAnyChance && !(hitAllowed(state, att, dice) && !carrierOnOneDie)) noteP249Extra(0);
+            if ((hitAllowed(state, att, dice) && !carrierOnOneDie) || carrierAnyChance) {
                 // P248: lovec blokuje jiného než nosiče jen s revanší pod mezí (stojí, kde je).
                 if (extraFeatureOn(kP248HunterGuard) && carrierHunter(att) &&
                     !(state.ball.isHeld && state.ball.carrierId == def->id) &&

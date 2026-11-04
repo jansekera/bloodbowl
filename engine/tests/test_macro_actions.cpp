@@ -5851,3 +5851,31 @@ TEST(MacroActions, P248HunterDoesNotBlitzOffTheCarrierIntoRevenge) {
     EXPECT_TRUE(blitzOn13(kP248HunterGuard)) << "pozitivní kontrola: bez P248 lovec blitzuje";
     EXPECT_FALSE(blitzOn13(0)) << "revanš na lovce po blitzu nad mezí ⇒ lovec neblitzuje mimo nosiče";
 }
+
+// =============================================================
+// P249b (uživatel 4.11.2026: „i když je šance pod polovinu jen málo — stále preferuji zkusit jej srazit“; „Grunner
+// na nosiče … jde vždy na 2 proti — vyhýbá se 3 proti“): blok na soupeřova nosiče i na 1 kostku bez Block a na 2 proti.
+// =============================================================
+TEST(MacroActions, P249bBlockOnTheCarrierWithAnyChanceButNeverThreeAgainst) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    p248Put(s, 1, TeamSide::HOME, {2, 2}, {6, 3, 3, 8});
+    Player& a = p248Put(s, 2, TeamSide::HOME, {10, 7}, {6, 3, 3, 8});    // bez Block
+    Player& c = p248Put(s, 12, TeamSide::AWAY, {11, 7}, {6, 3, 3, 8});
+    p248Put(s, 13, TeamSide::AWAY, {20, 3}, {6, 3, 3, 8});
+    s.ball = BallState::carried({11, 7}, 12);
+    ASSERT_EQ(blockDiceCount(s, a, c), 1);
+    setExtraFeaturesOff(kP249bCarrierBlock);
+    EXPECT_FALSE(offersBlock(s, 2, 12)) << "pozitivní kontrola: bez P249b 1 kostka bez Block neprojde";
+    setExtraFeaturesOff(0);
+    EXPECT_TRUE(offersBlock(s, 2, 12)) << "1 kostka na nosiče: zkusit";
+    s.ball = BallState::carried({20, 3}, 13);
+    EXPECT_FALSE(offersBlock(s, 2, 12)) << "mimo nosiče platí dál: 1 kostka bez Block ne";
+    s.ball = BallState::carried({11, 7}, 12);
+    c.stats.strength = 4;
+    ASSERT_EQ(blockDiceCount(s, a, c), -2);
+    EXPECT_TRUE(offersBlock(s, 2, 12)) << "2 proti na nosiče: zkusit";
+    c.stats.strength = 7;
+    ASSERT_EQ(blockDiceCount(s, a, c), -3);
+    EXPECT_FALSE(offersBlock(s, 2, 12)) << "3 proti nikdy";
+}

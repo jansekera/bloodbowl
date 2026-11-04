@@ -667,6 +667,10 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[3]; bb::takeP248Hunter(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
+    m.def("take_p249_extra", []() {   // P249b/c/d: (blok na nosiče navíc, přehoz kvůli nosiči, odsun jinam než rovně); čte a nuluje
+        long v[3]; bb::takeP249Extra(v);
+        return py::make_tuple(v[0], v[1], v[2]);
+    });
     m.def("take_p249_carrier_blitz_first", []() {   // P249: (B4 platilo, blitz na jiný cíl vynechán, brána přeskočena); čte a nuluje
         long v[3]; bb::takeP249CarrierBlitzFirst(v);
         return py::make_tuple(v[0], v[1], v[2]);

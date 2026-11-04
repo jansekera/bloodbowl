@@ -132,6 +132,9 @@ enum ExtraFeature : unsigned {
     kP245CarrierBlitzGate = 16777216 // P245: blitz na soupeřova nosiče v obraně jen se šancí srazit ≥ 1/2 (nebo když nosič jinak skóruje s > 1/2); lovec (AG ≥ 4 + Strip Ball + Wrestle) rychlejšího/agilnějšího týmu bránu nemá
     , kP248HunterGuard = 33554432   // P248: lovec chráněn — blok/blitz mimo nosiče jen s revanší ≤ 0,15, v obraně číhá za hradbou
     , kP249CarrierBlitzFirst = 67108864 // P249: B4 — v obraně, když k soupeřovu nosiči nikdo z našich nesousedí (blok zdarma), se blitz nabízí jen na nosiče; brána P245 tu neplatí
+    , kP249bCarrierBlock = 134217728    // P249b: blok na soupeřova nosiče i na 1 kostku bez Block a na 2 proti (nikdy 3 proti)
+    , kP249cCarrierReroll = 268435456   // P249c: blok/blitz na soupeřova nosiče — přehodit (Pro, pak týmový) každý výsledek, který ho nesrazí ani nevezme míč
+    , kP249dCarrierPush = 536870912     // P249d: nosiče, kterého jsme nesrazili, odsunout k našemu hráči, který ještě může blokovat; následovat
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
@@ -143,6 +146,9 @@ void takeP245Obstruct(long* out4);
 void takeP248Hunter(long* out3);
 // P249: [0] B4 platilo (nabídka jen na nosiče), [1] blitz na jiný cíl vynechán, [2] brána P245 přeskočena kvůli B4. Kumulativní, nuluje se čtením.
 void takeP249CarrierBlitzFirst(long* out3);
+// P249b/c/d: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d). Kumulativní, nuluje se čtením.
+void noteP249Extra(int i);
+void takeP249Extra(long* out3);
 // P220: zastavení agilního před kontaktem. Total = každé rozbalení vč. simulací (nenuluje se);
 // Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
 long p220StopsTotal();

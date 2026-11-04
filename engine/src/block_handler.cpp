@@ -123,6 +123,27 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     return faces[bestIdx];
 }
 
+// P249c (uživatel 4.11.2026: „blok na nosiče a nesrazíme jej — toto je maximální příležitost pro využití team RR“):
+//   srazí tahle stěna soupeřova nosiče, nebo mu vezme míč? Rozhodnutí jako resolver níž (a jako blockDieKnockFraction
+//   v macro_actions.cpp): Defender Down vždy; Stumbles — ne, když má Dodge a útočník nemá Tackle (ř. 8566-8571), leda
+//   Strip Ball; Pushed — jen Strip Ball na nosiče bez Sure Hands (ř. 8517-8521); Both Down — Wrestle kohokoli (oba
+//   k zemi, ř. 8670-8676; podmínky použití jako v autoChooseBlockDie), jinak padá, nemá-li Block; Attacker Down nikdy.
+static bool faceDropsCarrier(BlockDiceFace face, const Player& att, const Player& def) {
+    const bool strip = att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
+    const bool attBlock = att.hasSkill(SkillName::Block), defBlock = def.hasSkill(SkillName::Block);
+    switch (face) {
+        case BlockDiceFace::DEFENDER_DOWN: return true;
+        case BlockDiceFace::DEFENDER_STUMBLES:
+            return strip || !(def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle));
+        case BlockDiceFace::PUSHED: return strip;
+        case BlockDiceFace::BOTH_DOWN:
+            return (att.hasSkill(SkillName::Wrestle) && (!attBlock || defBlock)) ||
+                   (def.hasSkill(SkillName::Wrestle) && (!defBlock || attBlock)) || !defBlock;
+        case BlockDiceFace::ATTACKER_DOWN: return false;
+    }
+    return false;
+}
+
 static bool shouldRerollBlock(BlockDiceFace face, const Player& att) {
     if (face == BlockDiceFace::ATTACKER_DOWN) return true;
     if (face == BlockDiceFace::BOTH_DOWN && !att.hasSkill(SkillName::Block)) return true;
@@ -254,6 +275,28 @@ static int pushDestScore(const GameState& state, TeamSide blockingSide,
     return 10000 * dist + (dirties ? 0 : 100) + straightBackScore;
 }
 
+// P249d (uživatel 4.11.2026: „případně blockem nebo blitzem posunout k dalšímu hráči, co jej pak může blocknout taky“):
+//   kam odsunout soupeřova nosiče, kterého jsme nesrazili. Pořadí: (1) vedle co nejvíc našich, kteří ho v tomto tahu
+//   ještě zablokují zdarma (stojí, nehráli, mají zóny; ležící s Jump Up, ř. 8200-8204; ne ten, kdo právě blokuje);
+//   (2) kam ještě dojde náš nehraný hráč, když blitz zbývá; (3) dál od zóny, kam skóruje; (4) rovně dozadu.
+//   Že neskóruje, hlídá volající (refuseScoring) dřív.
+static int carrierPushScore(const GameState& state, TeamSide blockingSide, const Player& pushed, Position pusherPos,
+                            Position dest, int straightBackScore) {
+    int blockers = 0;
+    bool blitzReach = false;
+    const bool blitzLeft = !state.getTeamState(blockingSide).blitzUsedThisTurn;
+    state.forEachOnPitch(blockingSide, [&](const Player& p) {
+        if (p.position == pusherPos || p.hasActed || p.lostTacklezones) return;
+        const bool up = p.state == PlayerState::STANDING;
+        const bool canBlock = up || (p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp));
+        const int d = std::max(std::abs(p.position.x - dest.x), std::abs(p.position.y - dest.y));
+        if (canBlock && d == 1) ++blockers;
+        else if (up && blitzLeft && d - 1 <= p.movementRemaining) blitzReach = true;
+    });
+    const int ezX = pushed.teamSide == TeamSide::AWAY ? 0 : Position::PITCH_WIDTH - 1;   // HOME skóruje na x = 25 (turn_handler.cpp)
+    return 100000 * std::min(blockers, 3) + 10000 * (blitzReach ? 1 : 0) + 100 * std::abs(dest.x - ezX) + straightBackScore;
+}
+
 // Ruční volba kouče (živá partie s člověkem, 02.10.2026). Pravidla dávají
 // výběr pole odtlačení i follow-up útočícímu kouči (l. 608-611); AI je volí
 // pravidly níž, člověk je chce volit sám. Jednorázové: platí pro nejbližší
@@ -335,6 +378,8 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         }
     }
 
+    const bool p249dCarrier = extraFeatureOn(kP249dCarrierPush) && pushed.teamSide != blockingSide &&
+                              state.ball.isHeld && state.ball.carrierId == pushed.id;
     int best = -1, bestScore = 0;
     for (int i = 0; i < count; i++) {
         if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
@@ -342,10 +387,21 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         int score;
         if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
         else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
+        else if (p249dCarrier) score = carrierPushScore(state, blockingSide, pushed, pusherPos, cand[i], count - i);
         else                   score = pushDestScore(state, blockingSide, cand[i], count - i);  // P9/P9c
         if (best < 0 || score > bestScore) { best = i; bestScore = score; }
     }
     if (best < 0) return 0;
+    if (p249dCarrier && !defenderChooses && !towardEdge) {
+        int plain = -1, plainScore = 0;   // co by vybralo staré pravidlo (P9/P9c, v obraně rovně dozadu)
+        for (int i = 0; i < count; i++) {
+            if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
+            if (refuseScoring && pushWouldScore(state, pushed, blockingSide, cand[i])) continue;
+            const int sc = pushDestScore(state, blockingSide, cand[i], count - i);
+            if (plain < 0 || sc > plainScore) { plain = i; plainScore = sc; }
+        }
+        if (plain != best) noteP249Extra(2);
+    }
 
     // Diagnostic only, ticks on every redirect now that the rule is
     // unconditional -- no longer an A/B signal (see modeHasArmSignal-style
@@ -849,6 +905,11 @@ static bool wantsFollowUp(const GameState& state, const Player& att, const Playe
             return false;
         }
     }
+    // P249d: za soupeřovým nosičem, který po odtlačení stojí s míčem, následovat — ať ho dál markujeme.
+    if (extraFeatureOn(kP249dCarrierPush) && def.teamSide != att.teamSide && def.state == PlayerState::STANDING &&
+        state.ball.isHeld && state.ball.carrierId == def.id) {
+        return true;
+    }
     if (!params.isBlitz) return true;
     // Blitzující, který už nemá čím pokračovat, taky nemá co získat.
     if (!canAct(att.state) || att.movementRemaining <= 0) return true;
@@ -1164,7 +1225,14 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     }
 
     // Pro/team reroll on bad result
-    if (!coachAttacker && shouldRerollBlock(chosen, att)) {
+    // P249c: na soupeřova nosiče je „špatný výsledek“ každý, který ho nesrazí ani nevezme míč.
+    const bool onOppCarrier = extraFeatureOn(kP249cCarrierReroll) && def.teamSide != att.teamSide &&
+                              state.ball.isHeld && state.ball.carrierId == def.id;
+    auto wantsReroll = [&](BlockDiceFace f) {
+        return shouldRerollBlock(f, att) || (onOppCarrier && !faceDropsCarrier(f, att, def));
+    };
+    if (!coachAttacker && onOppCarrier && !shouldRerollBlock(chosen, att) && wantsReroll(chosen)) noteP249Extra(1);
+    if (!coachAttacker && wantsReroll(chosen)) {
         bool rerolled = false;
 
         // Pro reroll
@@ -1204,7 +1272,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 
         // Team reroll -- jen kdyz se Pro vubec nezkouselo (r. 8386: po neuspesnem
         //   Pro uz kostky prehodit nelze ani tymovym prehozem)
-        if (!rerolled && !proAttempted && shouldRerollBlock(chosen, att)) {
+        if (!rerolled && !proAttempted && wantsReroll(chosen)) {
             TeamState& team = state.getTeamState(att.teamSide);
             if (team.canUseReroll()) {
                 spendTeamRerollByEngine(team, att.id, events);

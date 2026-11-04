@@ -2709,3 +2709,60 @@ TEST(BlockHandler, P225CoachDefenderIsStillAsked) {
         EXPECT_EQ(p.playerId, 12);
     }
 }
+
+// ============================================================================
+// P249c/d (uživatel 4.11.2026): blok na soupeřova nosiče, který ho nesrazí, je „maximální příležitost pro využití
+// team RR“ (c); a když nesrazí ani tak, odsunout ho k dalšímu našemu hráči, který ho ještě zablokuje (d).
+// Kostky: 1 AD, 2 BD, 3-4 Pushed, 5 Stumbles, 6 DD (dice.h).
+// ============================================================================
+namespace {
+GameState p249Block(int rerolls) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(1).teamSide = TeamSide::HOME;
+    gs.getPlayer(12).teamSide = TeamSide::AWAY;
+    gs.ball = BallState::carried({11, 7}, 12);
+    gs.getTeamState(TeamSide::HOME).rerolls = rerolls;
+    return gs;
+}
+}  // namespace
+
+TEST(BlockHandler, P249cRerollTheBlockOnTheCarrierThatLeavesHimStanding) {
+    for (bool on : {false, true}) {
+        GameState gs = p249Block(1);
+        gs.getPlayer(12).skills.add(SkillName::Dodge);   // Stumbles = jen odsun (ř. 8566-8571)
+        setExtraFeaturesOff(on ? 0u : static_cast<unsigned>(kP249cCarrierReroll));
+        FixedDiceRoller dice({5, 6, 3, 3, 1, 1, 1, 1, 1, 1});   // Stumbles; (přehoz) DD; brnění 3+3; odraz míče
+        resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+        setExtraFeaturesOff(0);
+        if (!on) {
+            EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "pozitivní kontrola: Stumbles se dřív nepřehazoval";
+            EXPECT_EQ(gs.getTeamState(TeamSide::HOME).rerolls, 1);
+        } else {
+            EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE) << "P249c: přehoz na nosiče, padla DD";
+            EXPECT_EQ(gs.getTeamState(TeamSide::HOME).rerolls, 0);
+        }
+    }
+}
+
+TEST(BlockHandler, P249dPushTheCarrierNextToOurNextBlocker) {
+    for (bool on : {false, true}) {
+        GameState gs = p249Block(0);                       // bez přehozu, ať se Pushed nepřehazuje (P249c)
+        placePlayer(gs, 3, {13, 9}, TeamSide::HOME);        // nehrál, stojí — sousedí jen s polem (12,8)
+        gs.getPlayer(3).teamSide = TeamSide::HOME;
+        setExtraFeaturesOff(on ? 0u : static_cast<unsigned>(kP249dCarrierPush));
+        FixedDiceRoller dice({3, 1, 1, 1, 1});
+        resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+        setExtraFeaturesOff(0);
+        const Position p = gs.getPlayer(12).position;
+        if (!on) {
+            EXPECT_EQ(p, (Position{12, 7})) << "pozitivní kontrola: dřív rovně dozadu";
+        } else {
+            EXPECT_EQ(p, (Position{12, 8})) << "P249d: k našemu hráči, který ho ještě zablokuje";
+            EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "P249d: následovat a dál markovat";
+        }
+    }
+}

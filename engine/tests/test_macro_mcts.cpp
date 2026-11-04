@@ -939,7 +939,10 @@ TEST(MacroMCTS, RiskDeferralDefersOnHandBuiltMismatch) {
     //   y 1–12) s MA 6 i MA 5: žádné nedalo „základ BLITZ, strážce odloží“. Test hlídá ODKLAD RIZIKA, ne
     //   pojistku, proto P242b po dobu testu vypíná (jako P162 u priorů s faulem). Aserce se NEOSLABILA.
     // ⛔ jedna maska: dvě struktury za sebou by si `setExtraFeaturesOff` přepsaly
-    struct SafetyDepthOff { SafetyDepthOff() { setExtraFeaturesOff(kP242SafetyDepth | kP245CarrierBlitzGate | kP245Obstruct); } ~SafetyDepthOff() { setExtraFeaturesOff(0); } } safetyDepthOff;
+    // P249b/d (4.11.2026): útočník u nosiče teď smí i blok 2 proti (b) a odsun nosiče k dalšímu blokujícímu (d) mění
+    //   hodnotu blitzu v simulacích — MCTS pak riskantní blitz nevolí sám. Test hlídá odklad rizika blitzu, ne P249b/d
+    //   ⇒ po dobu testu vypnuto (aserce beze změny; zkoušeno: s d zapnutým základ blitz nevolí).
+    struct SafetyDepthOff { SafetyDepthOff() { setExtraFeaturesOff(kP242SafetyDepth | kP245CarrierBlitzGate | kP245Obstruct | kP249bCarrierBlock | kP249dCarrierPush); } ~SafetyDepthOff() { setExtraFeaturesOff(0); } } safetyDepthOff;
     GameState state = makeHandBuiltMismatch();
 
     PolicyNetwork zeroPolicy;
