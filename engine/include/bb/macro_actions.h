@@ -130,6 +130,7 @@ enum ExtraFeature : unsigned {
     kP244BlitzFirst = 4194304,  // P244b: riskantní blitz (do 1/3) se neodkládá, když je míč v bezpečí a sražení cíle otevře cestu
     kP245Obstruct = 8388608,    // P245: zástěna a hlídka zóny stojí tam, kde soupeřovu nosiči nejvíc zavazí (šance na TD, doběh s rizikem do 1/3)
     kP245CarrierBlitzGate = 16777216 // P245: blitz na soupeřova nosiče v obraně jen se šancí srazit ≥ 1/2 (nebo když nosič jinak skóruje s > 1/2); lovec (AG ≥ 4 + Strip Ball + Wrestle) rychlejšího/agilnějšího týmu bránu nemá
+    , kP248HunterGuard = 33554432   // P248: lovec chráněn — blok/blitz mimo nosiče jen s revanší ≤ 0,15, v obraně číhá za hradbou
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
@@ -137,6 +138,8 @@ inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 
 void takeDodgeCapStops(long* out2);
 // P245: [0] přesunů obrany posouzeno, [1] cíl změněn kvůli nosiči, [2] blitz na nosiče nenabídnut (šance < 1/2), [3] nabídnut výjimkou (nosič jinak skóruje). Kumulativní, nuluje se čtením.
 void takeP245Obstruct(long* out4);
+// P248: [0] blok lovce nenabídnut, [1] lovec vynechán jako blitzující, [2] lovec stažen za hradbu. Kumulativní, nuluje se čtením.
+void takeP248Hunter(long* out3);
 // P220: zastavení agilního před kontaktem. Total = každé rozbalení vč. simulací (nenuluje se);
 // Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
 long p220StopsTotal();

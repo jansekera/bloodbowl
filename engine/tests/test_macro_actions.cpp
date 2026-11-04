@@ -11,6 +11,7 @@
 #include "bb/action_resolver.h"   // Q3: resolveAction
 #include "bb/foul_handler.h"      // měřidlo exkluzivity faulu
 #include "bb/pathfinder.h"
+#include "bb/cage_advance.h"   // P248: blitzThreat
 #include "bb/policies.h"      // P227: greedyPolicy (záchrana makro AI)
 #include "bb/kickoff_handler.h"   // P196: resolveKickoff        // KLEC/K5: pathFailProb -- cena ústupu nosiče
 #include <algorithm>
@@ -5697,4 +5698,98 @@ TEST(MacroActions, P245HunterOfAFasterTeamKeepsTheTwoDiceBlitzOnTheCarrier) {
     EXPECT_FALSE(offersBlitzOn(s, 12)) << "jen Wrestle nestačí (srazí ~1/4)";
     b.skills.add(SkillName::StripBall);
     EXPECT_TRUE(offersBlitzOn(s, 12)) << "lovec blitzuje i 2 proti";
+}
+
+// =============================================================
+// P248 (uživatel 4.11.2026): lovec (AG ≥ 4 + Strip Ball + Wrestle) je vzácný — chránit. Blok mimo nosiče jen
+// s revanší (nejhorší ranou soupeře na lovce v příštím tahu) ≤ 0,15; v obraně číhá co nejblíž nosiči za hradbou.
+// =============================================================
+namespace {
+Player& p248Put(GameState& s, int id, TeamSide side, Position pos, PlayerStats st) {
+    Player& p = s.getPlayer(id);
+    p.id = id; p.teamSide = side; p.state = PlayerState::STANDING; p.position = pos;
+    p.stats = st; p.movementRemaining = st.movement; p.hasMoved = false; p.hasActed = false;
+    return p;
+}
+void makeHunter(Player& h) {
+    h.skills.add(SkillName::Block); h.skills.add(SkillName::Dodge);
+    h.skills.add(SkillName::StripBall); h.skills.add(SkillName::Wrestle);
+}
+bool offersBlock(const GameState& s, int att, int def) {
+    std::vector<Macro> m;
+    getAvailableMacros(s, m);
+    for (const auto& x : m) if (x.type == MacroType::BLOCK && x.playerId == att && x.targetId == def) return true;
+    return false;
+}
+}  // namespace
+
+TEST(MacroActions, P248HunterBlocksOffTheCarrierOnlyWithLowRevenge) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    Player& h = p248Put(s, 3, TeamSide::HOME, {10, 7}, {8, 3, 4, 7});
+    makeHunter(h);
+    p248Put(s, 2, TeamSide::HOME, {12, 7}, {6, 3, 3, 8});      // asistuje lovci i při revanši (stojí u soupeře 13)
+    p248Put(s, 13, TeamSide::AWAY, {11, 7}, {6, 3, 3, 8});     // cíl bloku, není nosič
+    p248Put(s, 12, TeamSide::AWAY, {22, 12}, {6, 3, 3, 8});    // soupeřův nosič daleko
+    s.ball = BallState::carried({22, 12}, 12);
+    ASSERT_EQ(blockDiceCount(s, s.getPlayer(13), h), -2) << "fixtura: revanš cíle jen 2 kostky proti němu";
+    EXPECT_TRUE(offersBlock(s, 3, 13)) << "revanš ≤ 0,15 ⇒ lovec smí blokovat (využít aktivaci)";
+    p248Put(s, 14, TeamSide::AWAY, {15, 4}, {7, 3, 3, 8});     // volný soupeř, který lovce v příštím tahu blitzne na 1 kostku
+    EXPECT_FALSE(offersBlock(s, 3, 13)) << "revanš nad mezí ⇒ lovec se nebije";
+    setExtraFeaturesOff(kP248HunterGuard);
+    EXPECT_TRUE(offersBlock(s, 3, 13)) << "pozitivní kontrola: bez P248 se blok nabízí";
+    setExtraFeaturesOff(0);
+    h.skills = SkillSet{};
+    h.skills.add(SkillName::Block);
+    EXPECT_TRUE(offersBlock(s, 3, 13)) << "obyčejný hráč (ne lovec) blokuje jako dřív";
+}
+
+TEST(MacroActions, P248HunterLurksBehindTheWallNotNextToTheCarrier) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    p248Put(s, 1, TeamSide::HOME, {4, 7}, {6, 3, 3, 8});       // pojistka (první volný s MA 6)
+    Player& h = p248Put(s, 2, TeamSide::HOME, {6, 9}, {8, 3, 4, 7});   // lovec = druhý volný ⇒ dnes značkovač u nosiče
+    makeHunter(h);
+    p248Put(s, 12, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});     // soupeřův nosič
+    s.ball = BallState::carried({13, 7}, 12);
+    auto hunterTarget = [&](unsigned off) {
+        setExtraFeaturesOff(off);
+        std::vector<Macro> m;
+        getAvailableMacros(s, m);
+        setExtraFeaturesOff(0);
+        for (const auto& x : m) if (x.type == MacroType::REPOSITION && x.playerId == 2) return x.targetPos;
+        return Position{-1, -1};
+    };
+    auto threatAt = [&](Position at) {
+        GameState sim = s;
+        sim.getPlayer(2).position = at;
+        return blitzThreat(sim, sim.getPlayer(2));
+    };
+    const Position oldT = hunterTarget(kP248HunterGuard), newT = hunterTarget(0);
+    ASSERT_TRUE(oldT.isOnPitch() && newT.isOnPitch());
+    EXPECT_GT(threatAt(oldT), 0.15) << "pozitivní kontrola: bez P248 jde lovec k nosiči pod ránu";
+    EXPECT_LE(threatAt(newT), 0.15) << "s P248 stojí, kde ho soupeř dobře nedosáhne";
+    EXPECT_GT(newT.distanceTo(s.getPlayer(12).position), 1) << "ne v kontaktu s nosičem";
+}
+
+TEST(MacroActions, P248HunterDoesNotBlitzOffTheCarrierIntoRevenge) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    Player& h = p248Put(s, 3, TeamSide::HOME, {6, 7}, {8, 3, 4, 7});   // jediný, kdo blitz může
+    makeHunter(h);
+    s.getPlayer(1).hasActed = true;                            // hráč 1 výchozího stavu už hrál (jinak blitzne místo lovce)
+    p248Put(s, 13, TeamSide::AWAY, {10, 7}, {6, 2, 3, 8});     // slabý cíl, není nosič (1 kostka pro nás)
+    p248Put(s, 14, TeamSide::AWAY, {13, 4}, {7, 3, 3, 8});     // volný soupeř — revanš na lovce po blitzu
+    p248Put(s, 12, TeamSide::AWAY, {22, 12}, {6, 3, 3, 8});
+    s.ball = BallState::carried({22, 12}, 12);
+    auto blitzOn13 = [&](unsigned off) {
+        setExtraFeaturesOff(off);
+        std::vector<Macro> m;
+        getAvailableMacros(s, m);
+        setExtraFeaturesOff(0);
+        for (const auto& x : m) if (x.type == MacroType::BLITZ && x.targetId == 13) return true;
+        return false;
+    };
+    EXPECT_TRUE(blitzOn13(kP248HunterGuard)) << "pozitivní kontrola: bez P248 lovec blitzuje";
+    EXPECT_FALSE(blitzOn13(0)) << "revanš na lovce po blitzu nad mezí ⇒ lovec neblitzuje mimo nosiče";
 }

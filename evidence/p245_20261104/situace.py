@@ -7,8 +7,10 @@ import sys, os, pickle, multiprocessing as mp
 KOREN = sys.argv[1]; VYST = sys.argv[2]; N = int(sys.argv[3]) if len(sys.argv) > 3 else 6
 K = int(sys.argv[4]) if len(sys.argv) > 4 else 6
 NASI = ["human", "orc", "dwarf"]; SOUPERI = ["orc", "human", "skaven"]
-P245 = 8388608 | 16777216
-RAMENA = {"vse": 0, "bez": P245}
+ZAVAZ, BRANA, P248 = 8388608, 16777216, 33554432
+# 4.11. doměření: obě části P245 zvlášť; P248 (ochrana lovce) ve všech ramenech vypnuto, ať měření čte jen P245
+RAMENA = {"vse": P248, "bez_brany": P248 | BRANA, "bez_zavazeni": P248 | ZAVAZ, "bez": P248 | ZAVAZ | BRANA}
+P245 = ZAVAZ | BRANA
 sys.path.insert(0, KOREN)
 
 
@@ -24,7 +26,7 @@ def jeden_tah(kt, bb, s0, rameno, seed, H, A):
     bb.set_extra_features_off(0)
     o = dict(turnover=int(any(k["turnover"] for k in kroky)), td_sance=0.0, dobeh=26, nosic_mic=0,
              blitz_nosic=int(any(k.get("macro", {}).get("type") == "BLITZ" and k["macro"]["target"] == s0.ball.carrier_id for k in kroky)),
-             td_soupere=0, mic_ztracen=0, postup=0)
+             td_soupere=0, mic_ztracen=0, postup=0, nasi_srazeni=0)
     c = nosic(bb, po, A)
     if c is None:
         o["mic_ztracen"] = 1   # už v našem tahu (sražen / vypadl)
@@ -35,6 +37,8 @@ def jeden_tah(kt, bb, s0, rameno, seed, H, A):
         ez = 25 if A == bb.TeamSide.HOME else 0
         d0 = abs(c.position.x - ez)
         k2, po2, _ = kt.plan_tahu(po, ai="macro_mcts", seed=seed + 1)
+        nasi = {p.id for p in kt.hraci(po) if p.team_side == H}
+        o["nasi_srazeni"] = sum(1 for k in k2 for e in k["events"] if e["type"] == "KNOCKED_DOWN" and e["player"] in nasi)
         skore = lambda st: st.home_team.score if A == bb.TeamSide.HOME else st.away_team.score
         o["td_soupere"] = int(skore(po2) > skore(po))
         c2 = nosic(bb, po2, A)
@@ -57,10 +61,10 @@ def hra(a):
     for tah in range(16):
         if s.phase != bb.GamePhase.PLAY: break
         seed = 70000 + 100 * g + tah + (50 if utok else 0)
-        bb.set_extra_features_off(0)
+        bb.set_extra_features_off(RAMENA["vse"])
         kroky, po, _ = kt.plan_tahu(s, ai="macro_mcts", seed=seed)
         if s.active_team == H and nosic(bb, s, A) is not None:
-            bb.set_extra_features_off(P245)
+            bb.set_extra_features_off(RAMENA["bez"])
             kroky0, po0, _ = kt.plan_tahu(s, ai="macro_mcts", seed=seed)
             bb.set_extra_features_off(0)
             mk = lambda ks: [(k["macro"]["type"], k["macro"]["player"], tuple(k["macro"]["target_pos"])) for k in ks if "macro" in k]

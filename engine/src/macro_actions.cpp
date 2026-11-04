@@ -4,6 +4,7 @@
 #include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
+#include "bb/cage_advance.h"   // P248: blitzThreat — nejhorší odpověď soupeře na lovce
 #include "bb/pathfinder.h"     // nextStepToward -- BFS pro movePlayerToward (09.09.2026)
 #include <algorithm>
 #include <tuple>
@@ -1500,6 +1501,43 @@ static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
     return ma[0] / n[0] > ma[1] / n[1] || ag[0] / n[0] > ag[1] / n[1];
 }
 
+// ⭐ P248 (uživatel 4.11.2026): LOVEC JE VZÁCNÝ — CHRÁNIT. *„tím se zároveň stane vzácným a bude jej potřeba chránit
+//   krom situace s příležitostí sebrat balon“*; blok/blitz na jiného než nosiče *„smí, když spočítáme šanci pro revanč
+//   pod mezí — může se stát, že bychom jinak neměli jak využít blitz v kole“*; postavení *„může stát blíže za hradbou
+//   svých, přes kterou jej soupeř neblitzne“*; mez 0,15 odsouhlasena (*„čísla počítej ze situací“* ⇒ ověřit měřením).
+//   Revanš = nejhorší rána soupeře na lovce v jeho příštím tahu, čtená (`blitzThreat`: doběh i přes úhyby našimi
+//   zónami × kostky). Sebrání míče (shodit + zvednout + zeď) patří do celotahu (A18) — tady se blitz na nosiče nemění.
+constexpr double kP248HunterSafe = 0.15;
+static long g_p248[3] = {0, 0, 0};   // [0] blok lovce nenabídnut, [1] lovec jako blitzující vynechán, [2] lovec stažen za hradbu
+void takeP248Hunter(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p248[i]; g_p248[i] = 0; } }
+
+static bool hunterExposedAt(const GameState& state, const Player& hunter, Position at) {
+    GameState sim = state;
+    sim.getPlayer(hunter.id).position = at;
+    return blitzThreat(sim, sim.getPlayer(hunter.id), kP248HunterSafe) > kP248HunterSafe;
+}
+
+// Nejbližší pole k soupeřovu nosiči, kam lovec dojde bez hodu a kde je nejhorší rána soupeře ≤ mez. Krátký výpočet:
+//   pole se berou od nejbližšího k nosiči a první bezpečné vyhrává; kam žádný soupeř nedoběhne, je bezpečné hned, jinak
+//   plný výpočet rány (nejvýš kP248Probe polí — hradba); žádné ⇒ `fallback`.
+static Position hunterLurkSquare(const GameState& state, const Player& hunter, const Player& carrier, Position fallback) {
+    constexpr int kP248Probe = 12;
+    std::vector<Position> reach;
+    diceFreeReach(state, hunter, reach);
+    reach.push_back(hunter.position);
+    std::sort(reach.begin(), reach.end(), [&](Position a, Position b) {
+        return a.distanceTo(carrier.position) < b.distanceTo(carrier.position);
+    });
+    int probes = 0;
+    for (const Position& q : reach) {
+        if (q.distanceTo(carrier.position) <= 1) continue;          // vedle nosiče = v kontaktu, to je útok, ne číhání
+        if (!anyOpponentReaches(state, hunter.teamSide, q)) return q;   // nikdo nedoběhne ⇒ bezpečné bez počítání rány
+        // sem soupeř dosáhne vzdáleností — rozhoduje hradba (úhyby přes naše zóny) a kostky; plný výpočet jen pro pár polí
+        if (probes < kP248Probe && (++probes, !hunterExposedAt(state, hunter, q))) return q;
+    }
+    return fallback;
+}
+
 static bool carrierLastTurn(const GameState& state, const Player& carrier) {
     return state.getTeamState(carrier.teamSide).turnNumber + 1 >= 8;   // jeho příští tah je poslední v poločase
 }
@@ -2522,6 +2560,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             int dice = getBlockDiceCount(state, att, *def, false, dauntlessInOffer);
             const bool carrierOnOneDie = dice == 1 && state.ball.isHeld && state.ball.carrierId == att.id;
             if (hitAllowed(state, att, dice) && !carrierOnOneDie) {
+                // P248: lovec blokuje jiného než nosiče jen s revanší pod mezí (stojí, kde je).
+                if (extraFeatureOn(kP248HunterGuard) && carrierHunter(att) &&
+                    !(state.ball.isHeld && state.ball.carrierId == def->id) &&
+                    hunterExposedAt(state, att, att.position)) { ++g_p248[0]; continue; }
                 out.push_back({MacroType::BLOCK, att.id, def->id, {-1, -1}});
             }
         }
@@ -3041,6 +3083,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 repBranch = 12;
                 target = {static_cast<int8_t>(std::clamp(screenX, 1, 24)),
                           static_cast<int8_t>(screenY)};
+            }
+            // P248: lovec v obraně číhá co nejblíž nosiči za hradbou (revanš ≤ mez), ne v pevné roli.
+            if (extraFeatureOn(kP248HunterGuard) && oppCarrierPtr != nullptr && carrierHunter(p)) {
+                const Position lurk = hunterLurkSquare(state, p, *oppCarrierPtr, target);
+                if (lurk != target) { ++g_p248[2]; target = lurk; }
             }
             // P245: zástěna a hlídka zóny zavazí nosiči (viz obstructSquare).
             if (extraFeatureOn(kP245Obstruct) && oppCarrierPtr != nullptr && (repBranch == 11 || repBranch == 12) &&
@@ -4080,6 +4127,15 @@ static bool pickBlitzer(const GameState& state, const Macro& macro, const std::v
             if ((pass == 0) == isCageCorner(cand) && macro.playerId <= 0) continue;
             if (!blitzDiceAllowed(state, cand, target)) continue;   // P227
             if (blitzDodgeCapped(state, cand, target)) { if (count) ++g_dodgeCapStops[1]; continue; }
+            // P248: lovec blitzuje jiného než nosiče jen s revanší pod mezí na poli, odkud blokuje.
+            if (extraFeatureOn(kP248HunterGuard) && carrierHunter(cand) &&
+                !(state.ball.isHeld && state.ball.carrierId == target.id)) {
+                Position landing{-1, -1};
+                if (!blitzLandingSquare(state, cand, target.position, landing) || hunterExposedAt(state, cand, landing)) {
+                    if (count) ++g_p248[1];
+                    continue;
+                }
+            }
             out = a;
             found = true;
             break;
