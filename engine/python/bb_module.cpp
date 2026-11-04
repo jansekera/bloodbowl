@@ -663,7 +663,19 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[4]; bb::takeP245Obstruct(v);
         return py::make_tuple(v[0], v[1], v[2], v[3]);
     });
-    m.def("carrier_outlook", [](const bb::GameState& s, int carrierId, double maxFail) {   // P245: (šance na TD, vzdálenost od zóny s rizikem do maxFail)
+    m.def("take_p248_hunter", []() {   // P248: (blok lovce nenabídnut, lovec jako blitzující vynechán, lovec stažen za hradbu); čte a nuluje
+        long v[3]; bb::takeP248Hunter(v);
+        return py::make_tuple(v[0], v[1], v[2]);
+    });
+    m.def("take_p249_carrier_blitz_first", []() {   // P249: (B4 platilo, blitz na jiný cíl vynechán, brána přeskočena); čte a nuluje
+        long v[3]; bb::takeP249CarrierBlitzFirst(v);
+        return py::make_tuple(v[0], v[1], v[2]);
+    });
+    // Měřidlo P248: nejlepší rána soupeře na tohoto hráče na této desce (0–1) — totéž, čím engine hlídá lovce.
+    m.def("player_blitz_threat", [](const bb::GameState& s, int playerId) {
+        return bb::blitzThreat(s, s.getPlayer(playerId));
+    });
+    m.def("carrier_outlook",[](const bb::GameState& s, int carrierId, double maxFail) {   // P245: (šance na TD, vzdálenost od zóny s rizikem do maxFail)
         const bb::CarrierOutlook o = bb::carrierNextTurnOutlook(s, s.getPlayer(carrierId), maxFail);
         return py::make_tuple(o.tdChance, o.bestDistance);
     }, py::arg("state"), py::arg("carrier_id"), py::arg("max_fail") = 1.0 / 3.0);

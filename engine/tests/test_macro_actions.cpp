@@ -1610,8 +1610,9 @@ TEST(MacroActions, BlitzDefensePrioritizesCarrier) {
 }
 
 TEST(MacroActions, BlitzDefenseMultipleTargets) {
-    // P245 bod 3 (blitz na nosiče jen se šancí ≥ 1/2) hlídá vlastní test; tady jde o počet nabízených cílů.
-    struct GateOff { GateOff() { setExtraFeaturesOff(kP245CarrierBlitzGate); } ~GateOff() { setExtraFeaturesOff(0); } } gateOff;
+    // P245 bod 3 (blitz na nosiče jen se šancí ≥ 1/2) a P249 (B4: k nosiči nikdo nesousedí ⇒ blitz jen na něj) hlídají
+    // vlastní testy; tady jde o počet nabízených cílů.
+    struct GateOff { GateOff() { setExtraFeaturesOff(kP245CarrierBlitzGate | kP249CarrierBlitzFirst); } ~GateOff() { setExtraFeaturesOff(0); } } gateOff;
     GameState state = makeDefensiveState();
     state.homeTeam.blitzUsedThisTurn = false;
 
@@ -5667,6 +5668,8 @@ TEST(MacroActions, P245ScreenObstructsTheSidelineCarrier) {
 }
 TEST(MacroActions, P245NoLongShotBlitzOnTheCarrierUnlessHeScoresAnyway) {
     GameState s = makeP245Sideline();
+    // P249: tady k nosiči nikdo nesousedí ⇒ platí B4 a brána by se neuplatnila; test hlídá bránu samotnou, P249 vypnuto.
+    constexpr unsigned kB4 = kP249CarrierBlitzFirst;
     s.getPlayer(12).stats.strength = 4;          // nosič silnější ⇒ blitz se 2 kostkami proti (srazí ~1/4)
     auto carrierBlitzOffered = [&](unsigned off) {
         setExtraFeaturesOff(off);
@@ -5676,13 +5679,13 @@ TEST(MacroActions, P245NoLongShotBlitzOnTheCarrierUnlessHeScoresAnyway) {
         for (const auto& m : macros) if (m.type == MacroType::BLITZ && m.targetId == 12) return true;
         return false;
     };
-    EXPECT_TRUE(carrierBlitzOffered(kP245CarrierBlitzGate)) << "pozitivní kontrola: bez brány se nabízí";
-    EXPECT_FALSE(carrierBlitzOffered(0)) << "šance srazit < 1/2 ⇒ zavazet, ne útočit";
+    EXPECT_TRUE(carrierBlitzOffered(kP245CarrierBlitzGate | kB4)) << "pozitivní kontrola: bez brány se nabízí";
+    EXPECT_FALSE(carrierBlitzOffered(kB4)) << "šance srazit < 1/2 ⇒ zavazet, ne útočit";
     Player& c = s.getPlayer(12);                 // nosič, který jinak skóruje (volná řada 0 do zóny)
     c.position = {6, 0};
     s.ball = BallState::carried({6, 0}, 12);
     ASSERT_GT(carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance, 0.5);
-    EXPECT_TRUE(carrierBlitzOffered(0)) << "výjimka: nosič by jinak skóroval ⇒ i horší pokus";
+    EXPECT_TRUE(carrierBlitzOffered(kB4)) << "výjimka: nosič by jinak skóroval ⇒ i horší pokus";
 }
 
 TEST(MacroActions, P245HunterOfAFasterTeamKeepsTheTwoDiceBlitzOnTheCarrier) {
@@ -5690,6 +5693,9 @@ TEST(MacroActions, P245HunterOfAFasterTeamKeepsTheTwoDiceBlitzOnTheCarrier) {
     // nebo agilnější ⇒ 2 proti na nosiče se nabízí (P227 „3b“). Bez lovce konzervativně (jen v nouzi).
     // Pozn.: Strip Ball (Pushed, Stumbles) + Wrestle (Both Down) zvednou i samotný odhad zásahu na ~0,69 u 2 proti.
     GameState s = p227CarrierState(3);           // 2 proti 3 ⇒ obránce volí ze 2
+    // P249: k nosiči tu nikdo nesousedí ⇒ B4 by bránu přebilo; test hlídá výjimku brány pro lovce, P249 vypnuto.
+    setExtraFeaturesOff(kP249CarrierBlitzFirst);
+    struct Restore { ~Restore() { setExtraFeaturesOff(0); } } restore;
     Player& b = s.getPlayer(1);
     ASSERT_EQ(blockDiceCount(s, b, s.getPlayer(12)), -2);
     EXPECT_FALSE(offersBlitzOn(s, 12)) << "AG 3 bez dovedností: konzervativně";
@@ -5698,6 +5704,58 @@ TEST(MacroActions, P245HunterOfAFasterTeamKeepsTheTwoDiceBlitzOnTheCarrier) {
     EXPECT_FALSE(offersBlitzOn(s, 12)) << "jen Wrestle nestačí (srazí ~1/4)";
     b.skills.add(SkillName::StripBall);
     EXPECT_TRUE(offersBlitzOn(s, 12)) << "lovec blitzuje i 2 proti";
+}
+
+// =============================================================
+// P249 (uživatel 4.11.2026: „B4 musí mít prioritu a brána nesmí jít proti ní“; spec ČÁST 14.2 B4): v obraně, když
+// k soupeřovu nosiči nikdo z našich nesousedí (blok zdarma), je blitz jediný nástroj, jak se k němu dostat ⇒ nabízí
+// se jen na nosiče a brána P245 ho nezakáže. Ležící soused blokovat smí jen s Jump Up (ř. 8200-8204).
+// =============================================================
+namespace {
+std::vector<int> blitzTargets(const GameState& s, unsigned off) {
+    setExtraFeaturesOff(off);
+    std::vector<Macro> macros;
+    getAvailableMacros(s, macros);
+    setExtraFeaturesOff(0);
+    std::vector<int> out;
+    for (const auto& m : macros) if (m.type == MacroType::BLITZ) out.push_back(m.targetId);
+    return out;
+}
+bool has(const std::vector<int>& v, int x) { return std::find(v.begin(), v.end(), x) != v.end(); }
+GameState makeP249() {
+    GameState s = makeP245Sideline();
+    s.getPlayer(12).stats.strength = 4;          // nosič silnější ⇒ blitz se 2 kostkami proti (srazí ~1/4, brána by ho zakázala)
+    s.getPlayer(12).skills.add(SkillName::Block); // i s asistencí souseda (1 kostka) srazí jen POW a Stumble = 1/3 < 1/2
+    Player& o = s.getPlayer(13);                 // jiný soupeř, na kterého blitz dosáhne
+    o.id = 13; o.teamSide = TeamSide::AWAY; o.state = PlayerState::STANDING; o.position = {12, 7};
+    o.stats = {5, 3, 3, 9}; o.movementRemaining = 5; o.hasMoved = false; o.hasActed = false;
+    return s;
+}
+}  // namespace
+
+TEST(MacroActions, P249NobodyNextToTheCarrierBlitzGoesOnlyOnHimDespiteTheGate) {
+    GameState s = makeP249();
+    const auto off = blitzTargets(s, kP249CarrierBlitzFirst);
+    EXPECT_TRUE(has(off, 13)) << "pozitivní kontrola: bez P249 se nabízí blitz na jiného soupeře";
+    EXPECT_FALSE(has(off, 12)) << "pozitivní kontrola: bez P249 brána blitz na nosiče (šance < 1/2) zakáže";
+    const auto on = blitzTargets(s, 0);
+    EXPECT_TRUE(has(on, 12)) << "B4: brána nesmí jít proti blitzu na nosiče, ke kterému nikdo nesousedí";
+    EXPECT_FALSE(has(on, 13)) << "B4: blitz se neutrácí jinde";
+}
+
+TEST(MacroActions, P249TeammateWhoCanBlockTheCarrierLeavesTheGateInForce) {
+    GameState s = makeP249();
+    Player& n = s.getPlayer(4);
+    n.position = {10, 1};                        // stojí u nosiče (9,0) ⇒ blok zdarma, B4 neplatí
+    auto on = blitzTargets(s, 0);
+    EXPECT_FALSE(has(on, 12)) << "u nosiče stojí náš ⇒ brána platí dál";
+    n.state = PlayerState::PRONE;                // leží bez Jump Up ⇒ blokovat nesmí (ř. 8200-8204) ⇒ B4 platí
+    on = blitzTargets(s, 0);
+    EXPECT_TRUE(has(on, 12)) << "ležící bez Jump Up se za souseda nepočítá";
+    EXPECT_FALSE(has(on, 13));
+    n.skills.add(SkillName::JumpUp);             // s Jump Up smí blokovat z lehu ⇒ B4 neplatí
+    on = blitzTargets(s, 0);
+    EXPECT_FALSE(has(on, 12)) << "ležící s Jump Up nosiče zablokuje sám ⇒ brána platí";
 }
 
 // =============================================================

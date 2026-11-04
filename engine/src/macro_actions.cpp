@@ -1490,6 +1490,20 @@ constexpr double kP245CarrierRisk = 1.0 / 3.0;   // „rozumné riziko“ nosič
 static bool carrierHunter(const Player& b) {
     return b.stats.agility >= 4 && b.hasSkill(SkillName::StripBall) && b.hasSkill(SkillName::Wrestle);   // uživatel: „lovec by měl mít obojí“
 }
+// P249 (uživatel 4.11.2026: „B4 musí mít prioritu a brána nesmí jít proti ní“; spec ČÁST 14.2 B4): umí soupeřova
+//   nosiče v tomto tahu zablokovat někdo z našich zdarma, bez blitzu? Stojící soused, který ještě nehrál a má zóny;
+//   ležící jen s Jump Up (ř. 8200-8204: „may also declare a Block Action while Prone“ — bez něj blokovat nesmí).
+static bool someoneBlocksCarrierForFree(const GameState& state, TeamSide me, const Player& carrier) {
+    bool found = false;
+    state.forEachOnPitch(me, [&](const Player& p) {
+        if (found || p.hasActed || p.lostTacklezones || p.position.distanceTo(carrier.position) != 1) return;
+        if (p.state == PlayerState::STANDING ||
+            (p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp))) found = true;
+    });
+    return found;
+}
+static long g_p249[3] = {0, 0, 0};
+void takeP249CarrierBlitzFirst(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p249[i]; g_p249[i] = 0; } }
 static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
     double ma[2] = {0, 0}, ag[2] = {0, 0}; int n[2] = {0, 0};
     for (const Player& p : state.players) {
@@ -2431,22 +2445,43 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         const size_t maxBlitz = onDef ? 2 : 1;
         std::vector<Action> actions;
         getAvailableActions(state, actions);
+        // P249 (B4): soupeřův nosič, ke kterému nikdo z našich nesousedí ⇒ blitz je jediný nástroj, jak se k němu
+        //   dostat, a jde jen na něj. Platí, když na něj někdo opravdu smí (pickBlitzer, P227 v kandidátech) a blitz
+        //   má aspoň nějakou šanci; jinak zůstává nabídka jako dřív. Brána P245 se tu neuplatní.
+        bool b4 = false;
+        if (onDef && extraFeatureOn(kP249CarrierBlitzFirst) && state.ball.isHeld && state.ball.carrierId > 0) {
+            const Player& c = state.getPlayer(state.ball.carrierId);
+            if (c.teamSide != mySide && !someoneBlocksCarrierForFree(state, mySide, c)) {
+                for (const auto& cand : candidates) {
+                    if (cand.targetId != c.id) continue;
+                    Action a;
+                    const Macro cm{MacroType::BLITZ, -1, c.id, {-1, -1}};
+                    if (pickBlitzer(state, cm, actions, a, /*count=*/false) &&
+                        estimateBlitzOdds(state, state.getPlayer(a.playerId), c, false).success > 0.0) b4 = true;
+                    break;
+                }
+            }
+        }
+        if (b4) ++g_p249[0];
         size_t offered = 0;
         for (size_t i = 0; i < candidates.size() && offered < maxBlitz; ++i) {
             const Macro m{MacroType::BLITZ, -1, candidates[i].targetId, {-1, -1}};
+            if (b4 && m.targetId != state.ball.carrierId) { ++g_p249[1]; continue; }
             Action ignored;
             if (!pickBlitzer(state, m, actions, ignored, /*count=*/false)) continue;
             if (onDef && extraFeatureOn(kP245CarrierBlitzGate) && state.ball.isHeld &&
                 state.ball.carrierId == m.targetId) {
                 // P245 bod 3: útok na nosiče (úhyb + blitz, často 2 kostky proti) jen se šancí srazit ≥ 1/2;
                 //   jinak zavazet. Výjimka: nosič by jinak skóroval s šancí > 1/2 — pak i horší pokus.
+                // P249: když platí B4, brána proti němu nejde — jen se započte, že by blitz zakázala.
                 const Player& tgt = state.getPlayer(m.targetId);
                 const Player& blitzer = state.getPlayer(ignored.playerId);
                 const bool hunterMode = carrierHunter(blitzer) && teamFasterOrMoreAgile(state, mySide);
                 const double hit = estimateBlitzOdds(state, blitzer, tgt, false).success;
                 if (!hunterMode && hit < 0.5) {
-                    if (carrierNextTurnOutlook(state, tgt, kP245CarrierRisk).tdChance <= 0.5) { ++g_p245[2]; continue; }
-                    ++g_p245[3];
+                    if (carrierNextTurnOutlook(state, tgt, kP245CarrierRisk).tdChance > 0.5) ++g_p245[3];
+                    else if (b4) ++g_p249[2];
+                    else { ++g_p245[2]; continue; }
                 }
             }
             out.push_back(m);
