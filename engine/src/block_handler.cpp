@@ -398,6 +398,21 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
 
     const bool p249dCarrier = extraFeatureOn(kP249dCarrierPush) && pushed.teamSide != blockingSide &&
                               state.ball.isHeld && state.ball.carrierId == pushed.id;
+    // P250 (uživatel 5.11.2026: „případně pushnout blockem někoho na balon — klidně i našeho přes chainpush — když
+    //   máme okolo převahu“): ř. 640-641 „a player pushed to it will cause the ball to bounce“. Při převaze našich
+    //   stojících kolem volného míče se odtlačený (soupeř i náš v řetězu) pošle na pole s míčem; nepovedené chycení
+    //   odrazu není turnover (na rozdíl od nepovedeného zvednutí).
+    bool p250Ball = false;
+    if (extraFeatureOn(kP250PushOntoBall) && !state.ball.isHeld && state.ball.position.isOnPitch()) {
+        int ours = 0, theirs = 0;
+        for (const Position& q : state.ball.position.getAdjacent()) {
+            if (!q.isOnPitch()) continue;
+            const Player* o = state.getPlayerAtPosition(q);
+            if (!o || o->state != PlayerState::STANDING || o->id == pushed.id) continue;
+            (o->teamSide == blockingSide ? ours : theirs) += 1;
+        }
+        p250Ball = ours > theirs;
+    }
     int best = -1, bestScore = 0;
     for (int i = 0; i < count; i++) {
         if (anyEmpty && state.getPlayerAtPosition(cand[i])) continue;
@@ -405,11 +420,13 @@ static int choosePushSquare(const GameState& state, const Position* cand, int co
         int score;
         if (defenderChooses)   score = cand[i].distanceTo(pusherPos);   // Side Step: get clear
         else if (towardEdge)   score = 100 - distanceToEdge(cand[i]);   // Grab: toward the crowd
+        else if (p250Ball && cand[i] == state.ball.position) score = 1 << 28;   // P250: odraz míče k našim
         else if (p249dCarrier) score = carrierPushScore(state, blockingSide, pushed, pusherPos, cand[i], count - i);
         else                   score = pushDestScore(state, blockingSide, cand[i], count - i);  // P9/P9c
         if (best < 0 || score > bestScore) { best = i; bestScore = score; }
     }
     if (best < 0) return 0;
+    if (p250Ball && !defenderChooses && !towardEdge && cand[best] == state.ball.position) noteP250(2);
     if (p249dCarrier && !defenderChooses && !towardEdge) {
         int plain = -1, plainScore = 0;   // co by vybralo staré pravidlo (P9/P9c, v obraně rovně dozadu)
         for (int i = 0; i < count; i++) {

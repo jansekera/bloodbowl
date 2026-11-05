@@ -2766,3 +2766,28 @@ TEST(BlockHandler, P249dPushTheCarrierNextToOurNextBlocker) {
         }
     }
 }
+
+// P250 (uživatel 5.11.2026: „případně pushnout blockem někoho na balon — klidně i našeho přes chainpush — když máme okolo
+// převahu“; ř. 640-641: „a player pushed to it will cause the ball to bounce“).
+TEST(BlockHandler, P250PushSomeoneOntoTheLooseBallWhenWeOutnumberAroundIt) {
+    for (bool on : {false, true}) {
+        GameState gs;
+        gs.phase = GamePhase::PLAY;
+        gs.activeTeam = TeamSide::HOME;
+        placePlayer(gs, 1, {10, 7}, TeamSide::HOME); gs.getPlayer(1).teamSide = TeamSide::HOME;
+        placePlayer(gs, 12, {11, 7}, TeamSide::AWAY); gs.getPlayer(12).teamSide = TeamSide::AWAY;
+        placePlayer(gs, 2, {11, 5}, TeamSide::HOME); gs.getPlayer(2).teamSide = TeamSide::HOME;   // naši kolem míče
+        placePlayer(gs, 3, {13, 5}, TeamSide::HOME); gs.getPlayer(3).teamSide = TeamSide::HOME;
+        gs.ball = BallState::onGround({12, 6});
+        setExtraFeaturesOff(on ? 0ull : static_cast<uint64_t>(kP250PushOntoBall));
+        FixedDiceRoller dice({3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});   // Pushed; odraz a případné chycení
+        resolveBlock(gs, BlockParams{1, 12, false, false}, dice, nullptr);
+        setExtraFeaturesOff(0);
+        if (!on) {
+            EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 7})) << "pozitivní kontrola: dřív rovně dozadu";
+        } else {
+            EXPECT_EQ(gs.getPlayer(12).position, (Position{12, 6})) << "P250: odtlačen na míč";
+            EXPECT_FALSE(gs.ball.position == (Position{12, 6}) && !gs.ball.isHeld) << "míč se odrazil";
+        }
+    }
+}

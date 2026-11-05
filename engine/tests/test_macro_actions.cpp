@@ -5972,3 +5972,51 @@ TEST(MacroActions, P249NeighbourWhoseBlockIsNotOfferedDoesNotStopTheBlitz) {
     EXPECT_TRUE(has(on, 12)) << "nikdo ho reálně nezablokuje ⇒ B4: blitz na nosiče, brána proti němu nejde";
     EXPECT_FALSE(has(on, 13));
 }
+
+// =============================================================
+// P250 (uživatel 5.11.2026; rozbor A18: vyražený míč zvedneme jen v ~40 %, turnover 15× na úhybu cestou, 6× na
+// zvednutí): zvedač podle šance celé akce; „pokud by se mělo zvedat s vysokým rizikem, je lepší míč obestoupit“.
+// =============================================================
+namespace {
+GameState makeP250() {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    p248Put(s, 1, TeamSide::HOME, {2, 2}, {6, 3, 3, 8});
+    p248Put(s, 2, TeamSide::HOME, {11, 8}, {6, 3, 3, 8});     // vedle míče, ale v zóně soupeře 13 ⇒ úhyb (3+)
+    p248Put(s, 3, TeamSide::HOME, {14, 8}, {6, 3, 3, 8});     // dvě pole od míče, cesta bez hodu
+    p248Put(s, 13, TeamSide::AWAY, {10, 9}, {6, 3, 3, 8});
+    s.ball = BallState::onGround({12, 7});
+    return s;
+}
+int firstPicker(const GameState& s, uint64_t off) {
+    setExtraFeaturesOff(off);
+    std::vector<Macro> m;
+    getAvailableMacros(s, m);
+    setExtraFeaturesOff(0);
+    for (const auto& x : m) if (x.type == MacroType::PICKUP) return x.playerId;
+    return -1;
+}
+}  // namespace
+
+TEST(MacroActions, P250PickerIsTheCheapestWholeActionNotTheNearest) {
+    GameState s = makeP250();
+    EXPECT_EQ(firstPicker(s, kP250PickerPathRisk), 2) << "pozitivní kontrola: dřív nejbližší (úhyb cestou se nepočítal)";
+    EXPECT_EQ(firstPicker(s, 0), 3) << "P250: zvedá ten, kdo dojde bez hodu (2/3 × zvednutí < zvednutí − 1 pole)";
+}
+
+TEST(MacroActions, P250SurroundTheLooseBallIsOffered) {
+    GameState s = makeP250();
+    p248Put(s, 4, TeamSide::HOME, {16, 4}, {6, 3, 3, 8});
+    auto surround = [&](uint64_t off) {
+        setExtraFeaturesOff(off);
+        std::vector<Macro> m;
+        getAvailableMacros(s, m);
+        setExtraFeaturesOff(0);
+        int n = 0;
+        for (const auto& x : m)
+            if (x.type == MacroType::REPOSITION && x.targetPos.distanceTo(s.ball.position) == 1 && x.playerId == 4) ++n;
+        return n;
+    };
+    const int before = surround(kP250Surround);
+    EXPECT_EQ(surround(0), before + 1) << "P250: navíc přesun bez hodu na pole vedle volného míče (dřív " << before << ")";
+}

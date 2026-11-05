@@ -638,7 +638,7 @@ PYBIND11_MODULE(bb_engine, m) {
     m.def("set_foul_only_last", [](bool on) { bb::setFoulOnlyLastEnabled(on); });
     m.def("set_cage_features_off", [](unsigned mask) { bb::setCageFeaturesOff(mask); });
     // jen pro měření: 1 = P213 útěk před TD vypnut, 2 = P213 útěk s GFI/úhybem vypnut, 4 = P216 příprava i bez bezpečného pole vypnuta
-    m.def("set_extra_features_off", [](unsigned mask) { bb::setExtraFeaturesOff(mask); });
+    m.def("set_extra_features_off", [](unsigned long long mask) { bb::setExtraFeaturesOff(mask); });
     m.def("cage_features_off", []() { return bb::cageFeaturesOff(); });
     // Měřidlo P178: hrozba nejlepší rány soupeře na nosiče na této desce (0–1); −1, když míč nikdo nedrží.
     m.def("carrier_blitz_threat", [](const bb::GameState& s) {
@@ -665,6 +665,10 @@ PYBIND11_MODULE(bb_engine, m) {
     });
     m.def("take_p248_hunter", []() {   // P248: (blok lovce nenabídnut, lovec jako blitzující vynechán, lovec stažen za hradbu); čte a nuluje
         long v[3]; bb::takeP248Hunter(v);
+        return py::make_tuple(v[0], v[1], v[2]);
+    });
+    m.def("take_p250", []() {   // P250: (zvedač změněn kvůli riziku cesty, přesun k obestoupení nabídnut, hráč odtlačen na míč); čte a nuluje
+        long v[3]; bb::takeP250(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
     m.def("take_p249_extra", []() {   // P249b–f: (blok navíc, přehoz, odsun jinam, blitz odložen za mimo-zálohu, strop úhybu nepoužit); čte a nuluje

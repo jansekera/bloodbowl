@@ -65,9 +65,12 @@ void setDodgeCapEnabled(bool on) { g_dodgeCapEnabled = on; }
 thread_local unsigned g_cageFeaturesOff = 0;
 void setCageFeaturesOff(unsigned mask) { g_cageFeaturesOff = mask; }
 unsigned cageFeaturesOff() { return g_cageFeaturesOff; }
-static unsigned g_extraFeaturesOff = 0;
-void setExtraFeaturesOff(unsigned mask) { g_extraFeaturesOff = mask; }
-unsigned extraFeaturesOff() { return g_extraFeaturesOff; }
+static uint64_t g_extraFeaturesOff = 0;
+void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
+uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
+static long g_p250[3] = {0, 0, 0};
+void noteP250(int i) { ++g_p250[i]; }
+void takeP250(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p250[i]; g_p250[i] = 0; } }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
@@ -2678,6 +2681,12 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             if (p.hasSkill(SkillName::SureHands)) {
                 chance += (1.0 - chance) * chance;  // personal reroll
             }
+            // P250 (uživatel 5.11.2026; rozbor A18: z 21 turnoverů po vyraženém míči 15 padlo na úhybu cestou, 6 na
+            //   zvednutí): cena zvedače je šance CELÉ akce — doběh bez pádu (úhyby a GFI) × zvednutí.
+            if (extraFeatureOn(kP250PickerPathRisk) && dist > 0) {
+                const double pathFail = pathFailProb(state, p, state.ball.position, maxReach, Position{-1, -1});
+                if (pathFail > 0.0) { chance *= (1.0 - pathFail); ++g_p250[0]; }
+            }
             int score = static_cast<int>(std::lround(chance * 100.0)) - dist * 5;
 
             if (score > bestPickerScore) {
@@ -2707,6 +2716,33 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         }
         if (bestPicker) {
             out.push_back({MacroType::PICKUP, bestPicker->id, -1, state.ball.position});
+        }
+        // P250 (uživatel 5.11.2026: „pokud by se mělo zvedat s vysokým rizikem, je lepší míč obestoupit“): přesun bez hodu
+        //   na pole vedle volného míče pro dva nejbližší volné hráče — nabídka vedle zvednutí, vybere MCTS.
+        if (extraFeatureOn(kP250Surround)) {
+            std::vector<std::pair<int, const Player*>> near;
+            state.forEachOnPitch(mySide, [&](const Player& p) {
+                if (!isFreeToAct(p) || p.state != PlayerState::STANDING) return;
+                if (p.position.distanceTo(state.ball.position) <= 1) return;               // už stojí u míče
+                near.push_back({p.position.distanceTo(state.ball.position), &p});
+            });
+            std::sort(near.begin(), near.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+            int offeredSurround = 0;
+            for (const auto& [d, p] : near) {
+                if (offeredSurround >= 2) break;
+                std::vector<Position> reach;
+                diceFreeReach(state, *p, reach);
+                Position best{-1, -1};
+                int bestD = 99;
+                for (const Position& q : reach) {
+                    if (q.distanceTo(state.ball.position) != 1) continue;
+                    const int dq = p->position.distanceTo(q);
+                    if (dq < bestD) { bestD = dq; best = q; }
+                }
+                if (best.x < 0) continue;
+                out.push_back({MacroType::REPOSITION, p->id, -1, best});
+                ++offeredSurround; ++g_p250[1];
+            }
         }
         // Secondary picker: only from the main loop (never from the
         // findNearestFreePlayer fallback -- secondPicker stays null there).

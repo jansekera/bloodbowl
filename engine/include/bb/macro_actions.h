@@ -108,7 +108,7 @@ inline bool cageFeatureOn(CageFeature f) { return (cageFeaturesOff() & f) == 0; 
 //   P217 (uživatel 19.10.: „dokud je bezpečná klec — nic jiného“): zdržování bankuje k zóně (1) ·
 //   nejvyšší šance na TD s nejhorší odpovědí soupeře (3). (P219 blitz agilního podle šance srazit × odskočit — odstraněn 20.10., P220.)
 //   P220 (uživatel 20.10.): agilní hráč nekončí přesun v kontaktu, leda u nosiče soupeře / jako asistence bloku.
-enum ExtraFeature : unsigned {
+enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     kP213EscapeFirst = 1, kP213EscapeRolls = 2, kP216ReadyAnyway = 4,
     kP217StallBanks = 8, kP217BestChance = 16, kP219bEscapeByRisk = 64,  // 32 = P219, ODSTRANĚNO 20.10. (bral dobré blitzy; P220)
     kP220AgileNoContact = 128,   // P220: agilní přesun nekončí v kontaktu (výjimky nosič / asistence / vlastní blok)
@@ -137,9 +137,12 @@ enum ExtraFeature : unsigned {
     , kP249dCarrierPush = 536870912     // P249d: nosiče, kterého jsme nesrazili, odsunout k našemu hráči, který ještě může blokovat; následovat
     , kP249eCarrierBlitzLast = 1073741824 // P249e: blitz na soupeřova nosiče PO PŘÍPRAVĚ (bezpečné přesuny ostatních — vstát, blíž, asistence), PŘED ZÁLOHOU (zvedač + 2 na zeď)
     , kP249fCarrierNoDodgeCap = 2147483648u // P249f: blitz na soupeřova nosiče nemá strop úhybu (i riziko nad třetinu, jako člověk)
+    , kP250PickerPathRisk = 1ull << 32 // P250: zvedač volného míče podle šance celé akce (cesta: úhyby a GFI × zvednutí), ne jen zvednutí
+    , kP250Surround = 1ull << 33       // P250: obestoupit volný míč — přesuny bez hodu na pole vedle míče (převaha zón kolem něj)
+    , kP250PushOntoBall = 1ull << 34   // P250: při převaze kolem volného míče odtlačit hráče (i našeho řetězem) na pole s míčem ⇒ odraz k našim
 };
-void setExtraFeaturesOff(unsigned mask);
-unsigned extraFeaturesOff();
+void setExtraFeaturesOff(uint64_t mask);
+uint64_t extraFeaturesOff();
 inline bool extraFeatureOn(ExtraFeature f) { return (extraFeaturesOff() & f) == 0; }
 void takeDodgeCapStops(long* out2);
 // P245: [0] přesunů obrany posouzeno, [1] cíl změněn kvůli nosiči, [2] blitz na nosiče nenabídnut (šance < 1/2), [3] nabídnut výjimkou (nosič jinak skóruje). Kumulativní, nuluje se čtením.
@@ -148,6 +151,9 @@ void takeP245Obstruct(long* out4);
 void takeP248Hunter(long* out3);
 // P249: [0] B4 platilo (nabídka jen na nosiče), [1] blitz na jiný cíl vynechán, [2] brána P245 přeskočena kvůli B4. Kumulativní, nuluje se čtením.
 void takeP249CarrierBlitzFirst(long* out3);
+// P250: [0] zvedač změněn kvůli riziku cesty, [1] nabídnut přesun k obestoupení míče, [2] hráč odtlačen na volný míč. Kumulativní, nuluje se čtením.
+void noteP250(int i);
+void takeP250(long* out3);
 // P249b–f: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d),
 //   [3] blitz na nosiče odložen za přesun hráče mimo zálohu (e), [4] strop úhybu u blitzu na nosiče nepoužit (f). Kumulativní, nuluje se čtením.
 constexpr int kP249ExtraSlots = 5;
