@@ -1509,7 +1509,9 @@ static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
 //   svých, přes kterou jej soupeř neblitzne“*; mez 0,15 odsouhlasena (*„čísla počítej ze situací“* ⇒ ověřit měřením).
 //   Revanš = nejhorší rána soupeře na lovce v jeho příštím tahu, čtená (`blitzThreat`: doběh i přes úhyby našimi
 //   zónami × kostky). Sebrání míče (shodit + zvednout + zeď) patří do celotahu (A18) — tady se blitz na nosiče nemění.
-constexpr double kP248HunterSafe = 0.15;
+// 5.11.2026 (uživatel: „mez 0,30 ano“): 0,15 → 0,30 podle měření (evidence/p248_20261104/vysledek.md): pod hrozbou 0,30
+//   soupeř lovce nesrazil ani jednou (0 ze 156), 0,30–0,45 1,5 %, 0,45–0,60 14 %. Hrozba je horní mez nejhorší rány.
+constexpr double kP248HunterSafe = 0.30;
 static long g_p248[3] = {0, 0, 0};   // [0] blok lovce nenabídnut, [1] lovec jako blitzující vynechán, [2] lovec stažen za hradbu
 void takeP248Hunter(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p248[i]; g_p248[i] = 0; } }
 

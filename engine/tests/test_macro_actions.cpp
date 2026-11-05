@@ -5765,7 +5765,7 @@ TEST(MacroActions, P249TeammateWhoCanBlockTheCarrierLeavesTheGateInForce) {
 
 // =============================================================
 // P248 (uživatel 4.11.2026): lovec (AG ≥ 4 + Strip Ball + Wrestle) je vzácný — chránit. Blok mimo nosiče jen
-// s revanší (nejhorší ranou soupeře na lovce v příštím tahu) ≤ 0,15; v obraně číhá co nejblíž nosiči za hradbou.
+// s revanší (nejhorší ranou soupeře na lovce v příštím tahu) ≤ 0,30 (do 5.11. 0,15); v obraně číhá co nejblíž nosiči za hradbou.
 // =============================================================
 namespace {
 Player& p248Put(GameState& s, int id, TeamSide side, Position pos, PlayerStats st) {
@@ -5796,7 +5796,7 @@ TEST(MacroActions, P248HunterBlocksOffTheCarrierOnlyWithLowRevenge) {
     p248Put(s, 12, TeamSide::AWAY, {22, 12}, {6, 3, 3, 8});    // soupeřův nosič daleko
     s.ball = BallState::carried({22, 12}, 12);
     ASSERT_EQ(blockDiceCount(s, s.getPlayer(13), h), -2) << "fixtura: revanš cíle jen 2 kostky proti němu";
-    EXPECT_TRUE(offersBlock(s, 3, 13)) << "revanš ≤ 0,15 ⇒ lovec smí blokovat (využít aktivaci)";
+    EXPECT_TRUE(offersBlock(s, 3, 13)) << "revanš ≤ 0,30 ⇒ lovec smí blokovat (využít aktivaci)";
     p248Put(s, 14, TeamSide::AWAY, {15, 4}, {7, 3, 3, 8});     // volný soupeř, který lovce v příštím tahu blitzne na 1 kostku
     EXPECT_FALSE(offersBlock(s, 3, 13)) << "revanš nad mezí ⇒ lovec se nebije";
     setExtraFeaturesOff(kP248HunterGuard);
@@ -5813,7 +5813,7 @@ TEST(MacroActions, P248HunterLurksBehindTheWallNotNextToTheCarrier) {
     p248Put(s, 1, TeamSide::HOME, {4, 7}, {6, 3, 3, 8});       // pojistka (první volný s MA 6)
     Player& h = p248Put(s, 2, TeamSide::HOME, {6, 9}, {8, 3, 4, 7});   // lovec = druhý volný ⇒ dnes značkovač u nosiče
     makeHunter(h);
-    p248Put(s, 12, TeamSide::AWAY, {13, 7}, {6, 3, 3, 8});     // soupeřův nosič
+    p248Put(s, 12, TeamSide::AWAY, {13, 7}, {6, 4, 3, 8});     // soupeřův nosič; 5.11. (mez 0,30): ST 4, ať je u něj opravdu rána (2 kostky)
     s.ball = BallState::carried({13, 7}, 12);
     auto hunterTarget = [&](unsigned off) {
         setExtraFeaturesOff(off);
@@ -5830,8 +5830,8 @@ TEST(MacroActions, P248HunterLurksBehindTheWallNotNextToTheCarrier) {
     };
     const Position oldT = hunterTarget(kP248HunterGuard), newT = hunterTarget(0);
     ASSERT_TRUE(oldT.isOnPitch() && newT.isOnPitch());
-    EXPECT_GT(threatAt(oldT), 0.15) << "pozitivní kontrola: bez P248 jde lovec k nosiči pod ránu";
-    EXPECT_LE(threatAt(newT), 0.15) << "s P248 stojí, kde ho soupeř dobře nedosáhne";
+    EXPECT_GT(threatAt(oldT), 0.30) << "pozitivní kontrola: bez P248 jde lovec k nosiči pod ránu";
+    EXPECT_LE(threatAt(newT), 0.30) << "s P248 stojí, kde ho soupeř dobře nedosáhne";
     EXPECT_GT(newT.distanceTo(s.getPlayer(12).position), 1) << "ne v kontaktu s nosičem";
 }
 
