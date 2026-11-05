@@ -415,7 +415,16 @@ bool deferralKeepsPick(const GameState& state, const Macro& alt, const Macro& pi
 Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameState& state,
                                          const Macro& pick, TeamSide /*perspective*/) {
     const double pickRisk = macroDirectRisk(state, pick);
-    if (pickRisk < 0.0 || riskTier(pickRisk) == 0) return pick;   // 2+ a lehčí: kdykoli
+    // P249e (uživatel 5.11.2026: „po blitzu na nosiče musí zůstat jeden, co zvedne míč, a další, co mu udělají zeď nebo
+    //   klec“; upřesněno: „vstát a jít blíže k akci před tím blitz a pak si nechat na to ostatní hráče“): blitz na
+    //   soupeřova nosiče jde PO PŘÍPRAVĚ — odkládá se za bezpečné přesuny ostatních (vstát, blíž, asistence) vždy (i stupeň
+    //   0) — a PŘED ZÁLOHOU: za přesuny zálohy se neodkládá, ta zůstane nehraná na dobu po blitzu.
+    const bool carrierLast = extraFeatureOn(kP249eCarrierBlitzLast) && pick.type == MacroType::BLITZ &&
+                             state.ball.isHeld && state.ball.carrierId == pick.targetId && pick.targetId > 0 &&
+                             state.getPlayer(pick.targetId).teamSide != state.activeTeam;
+    std::vector<int> reserve;
+    if (carrierLast) carrierBlitzReserve(state, reserve);
+    if (pickRisk < 0.0 || (riskTier(pickRisk) == 0 && !carrierLast)) return pick;   // 2+ a lehčí: kdykoli
     // P244b: blitz, který při bezpečném míči otevře cestu ostatním, jde první (výjimka z odkladu)
     const bool blitzFirst = extraFeatureOn(kP244BlitzFirst) && blitzOpensPathWithBallSafe(state, pick);
     if (pick.type == MacroType::BLITZ && riskTier(pickRisk) == 1) { ++g_p244[0]; if (blitzFirst) ++g_p244[1]; }
@@ -432,6 +441,7 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
         const Macro& m = c.macro;
         if (c.visits == 0 || m.type != MacroType::REPOSITION || m.playerId <= 0) continue;
         if (m.playerId == pick.playerId) continue;                          // jiný hráč
+        if (std::find(reserve.begin(), reserve.end(), m.playerId) != reserve.end()) continue;   // P249e: záloha čeká
         if (m.targetPos == state.getPlayer(m.playerId).position) continue;   // ne „nic nedělat“
         if (qOf(c) < pickQ - RISK_DEFER_Q_MARGIN) continue;
         if (macroDirectRisk(state, m) != 0.0) continue;                      // bez hodu
@@ -442,6 +452,7 @@ Macro MacroMCTSSearch::applyRiskDeferral(const MacroMCTSNode& root, const GameSt
     for (const MacroMCTSNode* c : alts)
         if (deferralKeepsPick(state, c->macro, pick, dice_, config_.dauntlessInOffer)) {
             if (blitzFirst) { ++g_p244[2]; return pick; }   // bez výjimky by se odložil
+            if (carrierLast) noteP249Extra(3);
             return c->macro;
         }
     return pick;

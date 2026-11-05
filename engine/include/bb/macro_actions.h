@@ -135,6 +135,8 @@ enum ExtraFeature : unsigned {
     , kP249bCarrierBlock = 134217728    // P249b: blok na soupeřova nosiče i na 1 kostku bez Block a na 2 proti (nikdy 3 proti)
     , kP249cCarrierReroll = 268435456   // P249c: blok/blitz na soupeřova nosiče — přehodit (Pro, pak týmový) každý výsledek, který ho nesrazí ani nevezme míč
     , kP249dCarrierPush = 536870912     // P249d: nosiče, kterého jsme nesrazili, odsunout k našemu hráči, který ještě může blokovat; následovat
+    , kP249eCarrierBlitzLast = 1073741824 // P249e: blitz na soupeřova nosiče PO PŘÍPRAVĚ (bezpečné přesuny ostatních — vstát, blíž, asistence), PŘED ZÁLOHOU (zvedač + 2 na zeď)
+    , kP249fCarrierNoDodgeCap = 2147483648u // P249f: blitz na soupeřova nosiče nemá strop úhybu (i riziko nad třetinu, jako člověk)
 };
 void setExtraFeaturesOff(unsigned mask);
 unsigned extraFeaturesOff();
@@ -146,9 +148,17 @@ void takeP245Obstruct(long* out4);
 void takeP248Hunter(long* out3);
 // P249: [0] B4 platilo (nabídka jen na nosiče), [1] blitz na jiný cíl vynechán, [2] brána P245 přeskočena kvůli B4. Kumulativní, nuluje se čtením.
 void takeP249CarrierBlitzFirst(long* out3);
-// P249b/c/d: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d). Kumulativní, nuluje se čtením.
+// P249b–f: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d),
+//   [3] blitz na nosiče odložen za přesun hráče mimo zálohu (e), [4] strop úhybu u blitzu na nosiče nepoužit (f). Kumulativní, nuluje se čtením.
+constexpr int kP249ExtraSlots = 5;
 void noteP249Extra(int i);
-void takeP249Extra(long* out3);
+void takeP249Extra(long* out5);
+// P249e: záloha pro blitz na soupeřova nosiče — zvedač + 2 na zeď = tři nehraní stojící hráči nejblíž nosiči, mimo toho,
+//   kdo by blitzoval (pickBlitzer). Prázdné, když soupeř míč nedrží nebo na nosiče nikdo nesmí.
+void carrierBlitzReserve(const GameState& state, std::vector<int>& out);
+// Měřidlo P249f: nejlepší blitz na soupeřova nosiče (tentýž výběr jako hra): riziko neúspěchu, šance srazit / vzít míč.
+//   false, když na nosiče nikdo nesmí.
+bool carrierBlitzOdds(const GameState& state, double& fail, double& success);
 // P220: zastavení agilního před kontaktem. Total = každé rozbalení vč. simulací (nenuluje se);
 // Real = jen skutečně hraný tah (macro_mcts.cpp), čte a nuluje.
 long p220StopsTotal();

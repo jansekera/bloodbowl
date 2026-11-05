@@ -1280,6 +1280,13 @@ static double estimateApproachFailChance(const GameState& state, const Player& m
 // Hlídá se při výběru blitzujícího (pickBlitzer) — v rozbalení i v nabídce (P196, 15.10.2026).
 static bool blitzDodgeCapped(const GameState& state, const Player& blitzer, const Player& target) {
     const bool aboutTheBall = state.ball.isHeld && state.ball.carrierId == target.id;
+    // P249f (uživatel 5.11.2026: „jestliže je riziko přes třetinu, AI šanci zahodí, ale člověk se po ní vrhne — uprav,
+    //   ať i AI bere i tyto šance“): na soupeřova nosiče strop úhybu neplatí (dřív jen v posledním kole). Cena pádu je
+    //   v odhadu blitzu (approachFail) a blitz jde až na konec tahu (P249e).
+    if (aboutTheBall && target.teamSide != blitzer.teamSide && extraFeatureOn(kP249fCarrierNoDodgeCap)) {
+        if (dodgeCapFor(state, blitzer, true) != 0) noteP249Extra(4);
+        return false;
+    }
     const int cap = dodgeCapFor(state, blitzer, aboutTheBall);
     if (cap == 0) return false;
     bool reaches = true;
@@ -1482,15 +1489,20 @@ static bool carrierHunter(const Player& b) {
 //   ležící jen s Jump Up (ř. 8200-8204: „may also declare a Block Action while Prone“ — bez něj blokovat nesmí).
 static bool someoneBlocksCarrierForFree(const GameState& state, TeamSide me, const Player& carrier) {
     bool found = false;
+    // 5.11.2026 (uživatel: „bojím se, že nastavíš statické číslo rizika … a AI nepůjde sebrat míč soupeři“): soused se
+    //   počítá jen tehdy, když se mu blok na nosiče opravdu NABÍDNE (P227/P249b: 3 proti nikdy) — jinak by B4 neplatilo,
+    //   brána P245 (< 1/2) blitz zakázala a nosiče by nezkusil nikdo.
     state.forEachOnPitch(me, [&](const Player& p) {
-        if (!found && p.position.distanceTo(carrier.position) == 1 && blocksThisTurnForFree(p)) found = true;
+        if (found || p.position.distanceTo(carrier.position) != 1 || !blocksThisTurnForFree(p)) return;
+        const int dice = getBlockDiceCount(state, p, carrier, false, false);
+        if (hitAllowed(state, p, dice) || (extraFeatureOn(kP249bCarrierBlock) && (dice == 1 || dice == -2))) found = true;
     });
     return found;
 }
 static long g_p249[3] = {0, 0, 0};
-static long g_p249x[3] = {0, 0, 0};   // [0] P249b blok na nosiče nabídnut navíc, [1] P249c přehoz kvůli nosiči, [2] P249d odsun jinam než rovně
+static long g_p249x[kP249ExtraSlots] = {0, 0, 0, 0, 0};   // viz macro_actions.h
 void noteP249Extra(int i) { ++g_p249x[i]; }
-void takeP249Extra(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p249x[i]; g_p249x[i] = 0; } }
+void takeP249Extra(long* out5) { for (int i = 0; i < kP249ExtraSlots; ++i) { out5[i] = g_p249x[i]; g_p249x[i] = 0; } }
 void takeP249CarrierBlitzFirst(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p249[i]; g_p249[i] = 0; } }
 static bool teamFasterOrMoreAgile(const GameState& state, TeamSide me) {
     double ma[2] = {0, 0}, ag[2] = {0, 0}; int n[2] = {0, 0};
@@ -5028,6 +5040,39 @@ bool blitzOpensPathWithBallSafe(const GameState& state, const Macro& blitz) {
             return true;
     }
     return false;
+}
+
+static bool carrierBlitzer(const GameState& state, const Player*& carrier, Action& a) {
+    if (!state.ball.isHeld || state.ball.carrierId <= 0) return false;
+    carrier = &state.getPlayer(state.ball.carrierId);
+    if (carrier->teamSide == state.activeTeam || !carrier->isOnPitch()) return false;
+    std::vector<Action> actions;
+    getAvailableActions(state, actions);
+    const Macro cm{MacroType::BLITZ, -1, carrier->id, {-1, -1}};
+    return pickBlitzer(state, cm, actions, a, /*count=*/false);
+}
+
+void carrierBlitzReserve(const GameState& state, std::vector<int>& out) {
+    out.clear();
+    const Player* c = nullptr;
+    Action a;
+    if (!carrierBlitzer(state, c, a)) return;
+    std::vector<std::pair<int, int>> cand;   // (vzdálenost k nosiči, id)
+    state.forEachOnPitch(state.activeTeam, [&](const Player& p) {
+        if (p.id == a.playerId || p.hasActed || !p.canAct() || p.state != PlayerState::STANDING) return;
+        cand.push_back({p.position.distanceTo(c->position), p.id});
+    });
+    std::sort(cand.begin(), cand.end());
+    for (size_t i = 0; i < cand.size() && i < 3; ++i) out.push_back(cand[i].second);   // zvedač + 2 na zeď (A18)
+}
+
+bool carrierBlitzOdds(const GameState& state, double& fail, double& success) {
+    const Player* c = nullptr;
+    Action a;
+    if (!carrierBlitzer(state, c, a)) return false;
+    const BlitzOdds o = estimateBlitzOdds(state, state.getPlayer(a.playerId), *c, /*count=*/false);
+    fail = o.fail; success = o.success;
+    return true;
 }
 
 double blitzKnockOddsForTest(const GameState& state, const Player& blitzer, const Player& target) {

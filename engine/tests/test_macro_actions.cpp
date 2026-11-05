@@ -4737,37 +4737,50 @@ TEST(DodgeCap, BlitzLandingMatchesTheRealWalkThroughGfi) {
 TEST(DodgeCap, BlitzThroughFourPlusDodgeIsNotPlayed) {
     // Blitzující AG2 stojí v zóně 13; cíl 12 je o dvě pole dál ⇒ doběh začíná úhybem ze zóny
     // na pole vedle cíle (AG2: 5+). Hlídá se VÝBĚR blitzujícího: makro BLITZ na ten cíl se nerozbalí do žádné akce.
-    auto position = [] {
+    // ⭐ 5.11.2026 P249f (uživatel: „jestliže je riziko přes třetinu, AI šanci zahodí, ale člověk se po ní vrhne — uprav,
+    //   ať i AI bere i tyto šance“): na SOUPEŘOVA NOSIČE strop neplatí nikdy (dřív jen v posledním kole). Strop se proto
+    //   hlídá na cíli, který míč NEMÁ; výjimka „poslední kolo“ s vypnutým P249f.
+    auto position = [](bool carrier) {
         GameState state = makeDodgeCapState(2);
         state.getPlayer(12).position = {12, 5};
-        state.ball = BallState::carried({12, 5}, 12);
+        state.ball = carrier ? BallState::carried({12, 5}, 12) : BallState::onGround({20, 1});
         return state;
     };
     const Macro blitzFar{MacroType::BLITZ, -1, 12, {-1, -1}};
     {
-        GameState state = position();
+        GameState state = position(false);
         DiceRoller dice(42);
-        EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+        EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty()) << "cíl bez míče: strop platí";
     }
     {   // soused: žádný doběh, žádný úhyb ⇒ blitz se hraje dál
-        GameState state = position();
+        GameState state = position(false);
         DiceRoller dice(42);
         EXPECT_FALSE(greedyExpandMacro(state, Macro{MacroType::BLITZ, -1, 13, {-1, -1}}, dice).actions.empty());
     }
     {   // pozitivní kontrola: bez stropu se týž blitz zahraje
         DodgeCapOff off;
-        GameState state = position();
+        GameState state = position(false);
         DiceRoller dice(42);
         EXPECT_FALSE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
     }
-    {   // výjimka: poslední kolo poločasu a cílem je nosič míče
-        GameState state = position();
-        state.homeTeam.turnNumber = 8;
+    {   // P249f: na soupeřova nosiče i přes úhyb 5+
+        GameState state = position(true);
         DiceRoller dice(42);
+        EXPECT_FALSE(greedyExpandMacro(state, blitzFar, dice).actions.empty()) << "P249f: nosiče zkusit i s rizikem nad třetinu";
+    }
+    {   // bez P249f: na nosiče strop platí (jako do 5.11.) …
+        setExtraFeaturesOff(kP249fCarrierNoDodgeCap);
+        GameState state = position(true);
+        DiceRoller dice(42);
+        EXPECT_TRUE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+        // … kromě posledního kola poločasu
+        state = position(true);
+        state.homeTeam.turnNumber = 8;
         EXPECT_FALSE(greedyExpandMacro(state, blitzFar, dice).actions.empty());
+        setExtraFeaturesOff(0);
     }
     {   // poslední kolo, ale cíl míč nemá ⇒ strop platí dál
-        GameState state = position();
+        GameState state = position(true);
         state.homeTeam.turnNumber = 8;
         state.ball = BallState::carried({11, 8}, 13);
         DiceRoller dice(42);
@@ -5906,4 +5919,56 @@ TEST(MacroActions, OddsReadTheSameWrestleChoiceAsTheResolver) {
     EXPECT_NEAR(macroDirectRisk(s, blk), 2.0 / 6.0, 1e-9) << "Attacker Down + Both Down (Wrestle položí i útočníka)";
     s.ball = BallState::carried({11, 7}, 12);        // obránce nosič: Both Down ⇒ oba na zemi ⇒ míč pryč
     EXPECT_NEAR(blitzKnockOddsForTest(s, a, d), 3.0 / 6.0, 1e-9) << "Defender Down + Stumbles + Both Down (Wrestle)";
+}
+
+// =============================================================
+// P249e/f (uživatel 5.11.2026): „blitz jako poslední akce — po blitzu na nosiče musí zůstat jeden, co zvedne míč,
+// a další, co mu udělají zeď nebo klec“ (e); „jestliže je riziko přes třetinu, AI šanci zahodí, ale člověk se po ní
+// vrhne — uprav, ať i AI bere i tyto šance“ (f).
+// =============================================================
+TEST(MacroActions, P249fCarrierBlitzIgnoresTheDodgeCap) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    s.homeTeam.turnNumber = 3; s.awayTeam.turnNumber = 3;
+    p248Put(s, 1, TeamSide::HOME, {2, 2}, {6, 3, 3, 8});             // další nehraný ⇒ není poslední aktivace
+    p248Put(s, 2, TeamSide::HOME, {10, 7}, {6, 3, 2, 8});            // blitzující AG 2 v zóně soupeře 13 ⇒ úhyb k nosiči 5+ a horší
+    p248Put(s, 13, TeamSide::AWAY, {10, 8}, {6, 3, 3, 8});
+    p248Put(s, 12, TeamSide::AWAY, {12, 7}, {6, 3, 3, 8});           // nosič
+    s.ball = BallState::carried({12, 7}, 12);
+    setExtraFeaturesOff(kP249fCarrierNoDodgeCap);
+    EXPECT_FALSE(offersBlitzOn(s, 12)) << "pozitivní kontrola: strop úhybu (5+ a horší) blitz na nosiče dřív zakázal";
+    setExtraFeaturesOff(0);
+    EXPECT_TRUE(offersBlitzOn(s, 12)) << "P249f: na nosiče i s rizikem nad třetinu";
+}
+
+TEST(MacroActions, P249eReserveIsThePickerAndTwoForTheWall) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    p248Put(s, 1, TeamSide::HOME, {2, 2}, {6, 3, 3, 8});              // daleko
+    p248Put(s, 2, TeamSide::HOME, {10, 7}, {6, 3, 3, 8});             // blitzující (nejblíž, volný)
+    p248Put(s, 3, TeamSide::HOME, {9, 9}, {6, 3, 3, 8});
+    p248Put(s, 4, TeamSide::HOME, {8, 5}, {6, 3, 3, 8});
+    p248Put(s, 5, TeamSide::HOME, {7, 7}, {6, 3, 3, 8});
+    p248Put(s, 6, TeamSide::HOME, {4, 12}, {6, 3, 3, 8});
+    Player& acted = p248Put(s, 7, TeamSide::HOME, {11, 9}, {6, 3, 3, 8});
+    acted.hasActed = true;                                            // už hrál ⇒ do zálohy ne
+    p248Put(s, 12, TeamSide::AWAY, {12, 7}, {6, 3, 3, 8});
+    s.ball = BallState::carried({12, 7}, 12);
+    std::vector<int> r;
+    carrierBlitzReserve(s, r);
+    ASSERT_EQ(r.size(), 3u) << "zvedač + 2 na zeď (A18)";
+    std::sort(r.begin(), r.end());
+    EXPECT_EQ(r, (std::vector<int>{3, 4, 5})) << "tři nehraní nejblíž nosiči, bez blitzujícího a bez toho, kdo hrál";
+}
+
+TEST(MacroActions, P249NeighbourWhoseBlockIsNotOfferedDoesNotStopTheBlitz) {
+    // 5.11.2026: soused, kterému se blok na nosiče nenabídne (3 proti, P227/P249b), se za „blokuje zdarma“ nepočítá ⇒ B4.
+    GameState s = makeP249();
+    Player& n = s.getPlayer(4);
+    n.position = {10, 1};                        // stojí u nosiče (9,0), nosič ST 4
+    n.stats.strength = 1;                        // 4 > 2 × 1 ⇒ 3 proti
+    ASSERT_EQ(blockDiceCount(s, n, s.getPlayer(12)), -3);
+    const auto on = blitzTargets(s, 0);
+    EXPECT_TRUE(has(on, 12)) << "nikdo ho reálně nezablokuje ⇒ B4: blitz na nosiče, brána proti němu nejde";
+    EXPECT_FALSE(has(on, 13));
 }

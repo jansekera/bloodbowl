@@ -667,9 +667,14 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[3]; bb::takeP248Hunter(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
-    m.def("take_p249_extra", []() {   // P249b/c/d: (blok na nosiče navíc, přehoz kvůli nosiči, odsun jinam než rovně); čte a nuluje
-        long v[3]; bb::takeP249Extra(v);
-        return py::make_tuple(v[0], v[1], v[2]);
+    m.def("take_p249_extra", []() {   // P249b–f: (blok navíc, přehoz, odsun jinam, blitz odložen za mimo-zálohu, strop úhybu nepoužit); čte a nuluje
+        long v[bb::kP249ExtraSlots]; bb::takeP249Extra(v);
+        return py::make_tuple(v[0], v[1], v[2], v[3], v[4]);
+    });
+    m.def("carrier_blitz_odds", [](const bb::GameState& s) {   // měřidlo P249f: (riziko neúspěchu, šance srazit/vzít míč) nebo None
+        double f = 0, su = 0;
+        if (!bb::carrierBlitzOdds(s, f, su)) return py::object(py::none());
+        return py::object(py::make_tuple(f, su));
     });
     m.def("take_p249_carrier_blitz_first", []() {   // P249: (B4 platilo, blitz na jiný cíl vynechán, brána přeskočena); čte a nuluje
         long v[3]; bb::takeP249CarrierBlitzFirst(v);
