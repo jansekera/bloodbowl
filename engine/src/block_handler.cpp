@@ -105,7 +105,7 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     // konzervativne: bez mice, tj. jak to vypada ve zdi.
     bool attWrestle = att.hasSkill(SkillName::Wrestle) &&
                       (!attBlock || defBlock);
-    bool defWrestle = def.hasSkill(SkillName::Wrestle) && (!defBlock || attBlock);   // táž podmínka jako v resolveru (16.10.)
+    bool defWrestle = defenderWouldWrestle(att, def, /*isBlitz=*/false);   // SSOT 5.11.: totéž rozhodnutí jako resolver (16.10.)
 
     int bestIdx = 0;
     int bestScore = scoreFace(faces[0], attBlock, defBlock, defDodge, attTackle,
@@ -123,22 +123,40 @@ BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
     return faces[bestIdx];
 }
 
-// P249c (uživatel 4.11.2026: „blok na nosiče a nesrazíme jej — toto je maximální příležitost pro využití team RR“):
-//   srazí tahle stěna soupeřova nosiče, nebo mu vezme míč? Rozhodnutí jako resolver níž (a jako blockDieKnockFraction
-//   v macro_actions.cpp): Defender Down vždy; Stumbles — ne, když má Dodge a útočník nemá Tackle (ř. 8566-8571), leda
-//   Strip Ball; Pushed — jen Strip Ball na nosiče bez Sure Hands (ř. 8517-8521); Both Down — Wrestle kohokoli (oba
-//   k zemi, ř. 8670-8676; podmínky použití jako v autoChooseBlockDie), jinak padá, nemá-li Block; Attacker Down nikdy.
-static bool faceDropsCarrier(BlockDiceFace face, const Player& att, const Player& def) {
-    const bool strip = att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
-    const bool attBlock = att.hasSkill(SkillName::Block), defBlock = def.hasSkill(SkillName::Block);
+// Útočník: bez Blocku ho Both Down složí tak jako tak, takže Wrestle je lepší vždy (složí i soupeře a nikdo nehází
+// na zbroj). S Blockem by zůstal stát, takže Wrestle stojí za to jen když je co získat: soupeř má Block (jinak by
+// se NESTALO NIC), nebo drží míč.
+bool attackerWouldWrestle(const GameState& state, const Player& att, const Player& def) {
+    const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
+    const bool defHasBall = state.ball.isHeld && state.ball.carrierId == def.id;
+    return att.hasSkill(SkillName::Wrestle) &&
+           (!att.hasSkill(SkillName::Block) || (!attHasBall && (def.hasSkill(SkillName::Block) || defHasBall)));
+}
+
+// Obránce (ROZHODL UŽIVATEL 16.10.2026, audit parity 08.10. bod (a)): „pokud má obránce wrestle a útočník block —
+// tak obránce použije“; „pokud nosič block nemá a obránce má — wrestle nevolí“. Juggernaut na blitzu Wrestle obránce
+// ruší (ř. Juggernaut: „may not use his Fend, Stand Firm or Wrestle skills against the Juggernaut player's blocks“).
+bool defenderWouldWrestle(const Player& att, const Player& def, bool isBlitz) {
+    return def.hasSkill(SkillName::Wrestle) && (!def.hasSkill(SkillName::Block) || att.hasSkill(SkillName::Block)) &&
+           !(isBlitz && att.hasSkill(SkillName::Juggernaut));
+}
+
+// Defender Down vždy; Stumbles — ne, když má Dodge a útočník nemá Tackle (ř. 8566-8571), leda Strip Ball; Pushed — jen
+// Strip Ball na nosiče bez Sure Hands (ř. 8517-8521); Both Down — Juggernaut na blitzu z něj dělá Pushed, jinak Wrestle
+// kohokoli (oba k zemi, ř. 8670-8676), jinak obránce padá, nemá-li Block; Attacker Down nikdy.
+bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Player& att, const Player& def,
+                            bool isBlitz) {
+    const bool carrier = state.ball.isHeld && state.ball.carrierId == def.id;
+    const bool strip = carrier && att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
+    if (face == BlockDiceFace::BOTH_DOWN && isBlitz && att.hasSkill(SkillName::Juggernaut)) face = BlockDiceFace::PUSHED;
     switch (face) {
         case BlockDiceFace::DEFENDER_DOWN: return true;
         case BlockDiceFace::DEFENDER_STUMBLES:
             return strip || !(def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle));
         case BlockDiceFace::PUSHED: return strip;
         case BlockDiceFace::BOTH_DOWN:
-            return (att.hasSkill(SkillName::Wrestle) && (!attBlock || defBlock)) ||
-                   (def.hasSkill(SkillName::Wrestle) && (!defBlock || attBlock)) || !defBlock;
+            return attackerWouldWrestle(state, att, def) || defenderWouldWrestle(att, def, isBlitz) ||
+                   !def.hasSkill(SkillName::Block);
         case BlockDiceFace::ATTACKER_DOWN: return false;
     }
     return false;
@@ -288,7 +306,7 @@ static int carrierPushScore(const GameState& state, TeamSide blockingSide, const
     state.forEachOnPitch(blockingSide, [&](const Player& p) {
         if (p.position == pusherPos || p.hasActed || p.lostTacklezones) return;
         const bool up = p.state == PlayerState::STANDING;
-        const bool canBlock = up || (p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp));
+        const bool canBlock = blocksThisTurnForFree(p);
         const int d = std::max(std::abs(p.position.x - dest.x), std::abs(p.position.y - dest.y));
         if (canBlock && d == 1) ++blockers;
         else if (up && blitzLeft && d - 1 <= p.movementRemaining) blitzReach = true;
@@ -1229,7 +1247,7 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     const bool onOppCarrier = extraFeatureOn(kP249cCarrierReroll) && def.teamSide != att.teamSide &&
                               state.ball.isHeld && state.ball.carrierId == def.id;
     auto wantsReroll = [&](BlockDiceFace f) {
-        return shouldRerollBlock(f, att) || (onOppCarrier && !faceDropsCarrier(f, att, def));
+        return shouldRerollBlock(f, att) || (onOppCarrier && !blockFaceDownsOrStrips(state, f, att, def, params.isBlitz));
     };
     if (!coachAttacker && onOppCarrier && !shouldRerollBlock(chosen, att) && wantsReroll(chosen)) noteP249Extra(1);
     if (!coachAttacker && wantsReroll(chosen)) {
@@ -1350,34 +1368,15 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
             // naopak VZDY. Kombinace Block+Wrestle na jednom hráči tim byla
             // v utoku mrtva -- prave ta, kvuli ktere se o Wrestle u trpaslika
             // uvazuje (Longbeard).
-            const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
-            const bool defHasBall = state.ball.isHeld && state.ball.carrierId == def.id;
-
-            // Utocnik: bez Blocku ho Both Down slozi tak jako tak, takze Wrestle
-            // je lepsi vzdy (slozi i souperě a nikdo nehazi na zbroj). S Blockem
-            // by zustal stat, takze Wrestle stoji za to jen kdyz je co ziskat:
-            // souper ma Block (jinak by se NESTALO NIC), nebo drzi mic.
-            const bool attWantsWrestle =
-                att.hasSkill(SkillName::Wrestle) &&
-                (!att.hasSkill(SkillName::Block) ||
-                 (!attHasBall && (def.hasSkill(SkillName::Block) || defHasBall)));
-
-            // Obrance (ROZHODL UZIVATEL 16.10.2026, audit parity 08.10. bod (a)): „pokud ma obrance
-            // wrestle a utocnik block — tak obrance pouzije“; „pokud nosic block nema a obrance ma —
-            // wrestle nevoli“. Utocnik s Blockem by Both Down ustal, takze Wrestle je jediny zpusob,
-            // jak ho polozit. Bez Blocku utocnik pada sam a obrance s Blockem stoji -- Wrestle by ho
-            // jen polozil taky. Obrance bez Blocku pada tak jako tak => Wrestle (bez hodu na zbroj).
-            // Drive: s Blockem jen proti nosici (i bez Blocku nosice) -- a ne proti utocniku s Blockem.
-            const bool defWantsWrestle =
-                def.hasSkill(SkillName::Wrestle) &&
-                (!def.hasSkill(SkillName::Block) || att.hasSkill(SkillName::Block));
+            // Volby AI o Wrestle (útočník i obránce) jsou jedno místo: attackerWouldWrestle / defenderWouldWrestle výš.
+            const bool attWantsWrestle = attackerWouldWrestle(state, att, def);
 
             // Juggernaut na blitzu rusi Wrestle OBRANCE (rules parity 10.08.):
             // "the opposing player may not use his Fend, Stand Firm or Wrestle
             // skills against the Juggernaut player's blocks."
             const bool defWrestleAllowed = def.hasSkill(SkillName::Wrestle) &&
                               !(params.isBlitz && att.hasSkill(SkillName::Juggernaut));
-            bool defWrestle = defWantsWrestle && defWrestleAllowed;
+            bool defWrestle = defenderWouldWrestle(att, def, params.isBlitz);
             // P130: Wrestle obránce je v živé partii volba jeho kouče.
             if (defWrestleAllowed && coachDecides(def.teamSide)) {
                 defWrestle = askCoach(CoachQuestion::USE_WRESTLE, def.id, att.id, 0, 0, 3) == 1;

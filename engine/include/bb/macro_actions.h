@@ -378,6 +378,9 @@ long takeCageCritRepicksInSearch();
 long takeStandOfferedInSearch();
 long takeStandOfferedNextToEnemyInSearch();
 long takeStandOfferedNextToHitterInSearch();
+// Testovací přístup k šanci blitzu srazit cíl nebo mu vzít míč (estimateBlitzOdds.success) — hlídá, že odhad čte
+// stejná rozhodnutí o Wrestle jako resolver (SSOT 5.11.2026).
+double blitzKnockOddsForTest(const GameState& state, const Player& blitzer, const Player& target);
 double blitzApproachRiskForTest(const GameState& state, const Player& mover,
                                 const Player& target);
 // Kde se makrova chuze vzdava: [nenasel, obchazka, smycka, stoji, limit].

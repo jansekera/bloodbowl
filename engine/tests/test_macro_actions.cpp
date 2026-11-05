@@ -1,6 +1,7 @@
 #include <random>
 #include <gtest/gtest.h>
 #include "bb/macro_actions.h"
+#include "bb/block_handler.h"   // SSOT 5.11.: defenderWouldWrestle
 #include "bb/game_state.h"
 #include "bb/game_simulator.h"
 #include "bb/roster.h"
@@ -160,26 +161,30 @@ TEST(MacroActions, WrestlePricingDoesNotApplyWithoutWrestle) {
 }
 
 TEST(MacroActions, WrestlePricingIgnoresADefenderWhoWouldNotWrestle) {
-    // ⛔ 27.08.: obránce, který má Block I Wrestle, by Wrestle NEPOUŽIL --
-    // Both Down ho nechá stát a složí útočníka. Vybírač proto nesmí počítat
-    // 2/6, jinak oceňuje jinou věc, než se pak stane (táž podmínka jako
-    // block_handler.cpp, case BOTH_DOWN). Dřív tu stálo pouhé „Wrestle má".
-    // Ožilo to 27.08. s Longbeardy, kteří mají obojí.
+    // ⛔ PŘEPSÁNO 5.11.2026 (revize P249, SSOT). Do dneška test tvrdil: obránce s Block I Wrestle proti útočníkovi
+    //   s Block Wrestle NEPOUŽIJE (stav 27.08.). Uživatel 16.10.2026 rozhodl opak — „pokud má obránce wrestle a útočník
+    //   block — tak obránce použije“ — a resolver to tak má od 16.10.; zelený zůstal jen proto, že zastaralou podmínku
+    //   nesl i odhad (a test tak hlídal tvar odhadu, ne rozhodnutí). Záměr testu zůstává: obránce, který Wrestle
+    //   NEPOUŽIJE, se do ceny nepočítá. Ten případ dnes nastává u Juggernauta na blitzu (Wrestle proti němu nesmí).
     GameState state = makeMinimalState();
     state.getPlayer(1).skills.add(SkillName::Block);
     Player& def = state.getPlayer(12);
     def.position = {11, 7};
     def.skills.add(SkillName::Wrestle);
-    def.skills.add(SkillName::Block);                  // ⇒ Wrestle by nepoužil
-    // míč drží nosič, ale NE náš blitzující => výjimka `attHasBall` neplatí
+    def.skills.add(SkillName::Block);
     state.ball = BallState::onGround({20, 1});
 
-    takeWrestleDefenderPricedInSearch();
-    FixedDiceRoller dice(std::vector<int>(40, 4));
-    Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
-    greedyExpandMacro(state, blitz, dice);
-    EXPECT_EQ(takeWrestleDefenderPricedInSearch(), 0)
-        << "obránce s Blockem by Wrestle nepoužil => cena se měnit nesmí";
+    auto priced = [&]() {
+        takeWrestleDefenderPricedInSearch();
+        FixedDiceRoller dice(std::vector<int>(40, 4));
+        Macro blitz{MacroType::BLITZ, 1, 12, {11, 7}};
+        GameState s = state;
+        greedyExpandMacro(s, blitz, dice);
+        return takeWrestleDefenderPricedInSearch();
+    };
+    EXPECT_EQ(priced(), 1) << "16.10.: obránce s Wrestle proti útočníkovi s Block Wrestle použije ⇒ cena se mění";
+    state.getPlayer(1).skills.add(SkillName::Juggernaut);
+    EXPECT_EQ(priced(), 0) << "Juggernaut na blitzu: obránce Wrestle použít nesmí ⇒ cena se měnit nesmí";
 }
 
 TEST(MacroActions, BlitzAndScoreIsNotOfferedOutOfReach) {
@@ -5878,4 +5883,27 @@ TEST(MacroActions, P249bBlockOnTheCarrierWithAnyChanceButNeverThreeAgainst) {
     c.stats.strength = 7;
     ASSERT_EQ(blockDiceCount(s, a, c), -3);
     EXPECT_FALSE(offersBlock(s, 2, 12)) << "3 proti nikdy";
+}
+
+// =============================================================
+// SSOT 5.11.2026 (revize P249): odhad šance blitzu a rizika bloku četl o Wrestle obránce pravidlo z doby PŘED
+// rozhodnutím uživatele 16.10.2026 („pokud má obránce wrestle a útočník block — tak obránce použije“), resolver už
+// podle nového. Ř. 8670-8676: Wrestle při Both Down položí oba „even if one or both have the Block skill“.
+// Útočník s Block, obránce s Block + Wrestle, 1 kostka: Both Down = oba na zemi (obránce Wrestle použije).
+// =============================================================
+TEST(MacroActions, OddsReadTheSameWrestleChoiceAsTheResolver) {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    p248Put(s, 1, TeamSide::HOME, {2, 2}, {6, 3, 3, 8});
+    Player& a = p248Put(s, 2, TeamSide::HOME, {10, 7}, {6, 3, 3, 8});
+    a.skills.add(SkillName::Block);
+    Player& d = p248Put(s, 12, TeamSide::AWAY, {11, 7}, {6, 3, 3, 8});
+    d.skills.add(SkillName::Block); d.skills.add(SkillName::Wrestle);
+    p248Put(s, 13, TeamSide::AWAY, {20, 3}, {6, 3, 3, 8});
+    s.ball = BallState::carried({20, 3}, 13);
+    ASSERT_TRUE(defenderWouldWrestle(a, d, false)) << "resolver: obránce s Wrestle proti útočníkovi s Block použije";
+    const Macro blk{MacroType::BLOCK, 2, 12, {-1, -1}};
+    EXPECT_NEAR(macroDirectRisk(s, blk), 2.0 / 6.0, 1e-9) << "Attacker Down + Both Down (Wrestle položí i útočníka)";
+    s.ball = BallState::carried({11, 7}, 12);        // obránce nosič: Both Down ⇒ oba na zemi ⇒ míč pryč
+    EXPECT_NEAR(blitzKnockOddsForTest(s, a, d), 3.0 / 6.0, 1e-9) << "Defender Down + Stumbles + Both Down (Wrestle)";
 }

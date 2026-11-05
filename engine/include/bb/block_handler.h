@@ -49,6 +49,14 @@ bool pushAwayFrom(GameState& state, Player& pusher, Player& pushed, bool isBlock
 GameState previewPushBack(const GameState& state, int attackerId, int defenderId, Position attackerPos,
                           bool isBlitz, bool& surf);
 
+// SSOT (5.11.2026): rozhodnutí AI o Wrestle při Both Down (ř. 8670-8678 „MAY USE“) a co stěna kostky udělá s obráncem
+//   — jedno místo pro resolver, odhad šance blitzu (macro_actions) i přehoz na nosiče (P249c).
+bool attackerWouldWrestle(const GameState& state, const Player& att, const Player& def);
+bool defenderWouldWrestle(const Player& att, const Player& def, bool isBlitz);
+// Skončí obránce po téhle stěně na zemi, nebo (je-li nosič) přijde o míč? Strip Ball jen na nosiče bez Sure Hands.
+bool blockFaceDownsOrStrips(const GameState& state, BlockDiceFace face, const Player& att, const Player& def,
+                            bool isBlitz);
+
 BlockDiceFace autoChooseBlockDie(const BlockDiceFace* faces, int count,
                                  bool attackerChooses,
                                  const Player& att, const Player& def);

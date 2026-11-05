@@ -10,6 +10,14 @@
 
 namespace bb {
 
+// P249 (SSOT, 5.11.2026): zablokuje tenhle hráč v tomto tahu soupeře vedle sebe zdarma (bez blitzu)? Stojí, ještě
+//   nehrál a má zóny; ležící jen s Jump Up (ř. 8200-8204: „may also declare a Block Action while Prone“).
+//   Jediné místo — čte ho B4 (nabídka blitzu, macro_actions) i odsun nosiče P249d (block_handler).
+inline bool blocksThisTurnForFree(const Player& p) {
+    if (p.hasActed || p.lostTacklezones) return false;
+    return p.state == PlayerState::STANDING || (p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp));
+}
+
 inline void emitEvent(std::vector<GameEvent>* events, GameEvent evt) {
     if (events) events->push_back(evt);
 }

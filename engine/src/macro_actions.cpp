@@ -4,6 +4,7 @@
 #include "bb/move_handler.h"   // Q3: rozpad turnoveru uvnitr uteku (03.09.)
 #include "bb/action_resolver.h"
 #include "bb/helpers.h"
+#include "bb/block_handler.h"   // SSOT 5.11.: Wrestle a stěny kostky jako resolver
 #include "bb/cage_advance.h"   // P248: blitzThreat — nejhorší odpověď soupeře na lovce
 #include "bb/pathfinder.h"     // nextStepToward -- BFS pro movePlayerToward (09.09.2026)
 #include <algorithm>
@@ -1326,15 +1327,12 @@ struct BlitzOdds { double fail; double success; };
 //     (ř. 8517-8521, 8543-8546); Both Down — Wrestle kohokoli (oba k zemi, ř. 8670-8676),
 //     jinak soupeř padá, nemá-li Block; Attacker Down — nikdy.
 //   ⛔ Frenzy (druhý blok po odsunu) se nepočítá — odhad je u Frenzy nižší, než je.
-static double blockDieKnockFraction(const GameState& state, const Player& att, const Player& def,
-                                    bool defWouldWrestle) {
-    const bool carrier = state.ball.isHeld && state.ball.carrierId == def.id;
-    const bool strip = carrier && att.hasSkill(SkillName::StripBall) && !def.hasSkill(SkillName::SureHands);
-    double faces = 1.0;                                                         // Defender Down
-    const bool stumbleIsPush = def.hasSkill(SkillName::Dodge) && !att.hasSkill(SkillName::Tackle);
-    if (!stumbleIsPush || strip) faces += 1.0;                                   // Defender Stumbles
-    if (strip) faces += 2.0;                                                     // Pushed ×2
-    if (att.hasSkill(SkillName::Wrestle) || defWouldWrestle || !def.hasSkill(SkillName::Block)) faces += 1.0;   // Both Down
+static double blockDieKnockFraction(const GameState& state, const Player& att, const Player& def) {
+    // SSOT 5.11.2026: tatáž rozhodnutí jako resolver (blockFaceDownsOrStrips, block_handler.cpp); Pushed jsou 2 stěny.
+    using F = BlockDiceFace;
+    double faces = 0.0;
+    for (F f : {F::DEFENDER_DOWN, F::DEFENDER_STUMBLES, F::PUSHED, F::PUSHED, F::BOTH_DOWN, F::ATTACKER_DOWN})
+        if (blockFaceDownsOrStrips(state, f, att, def, /*isBlitz=*/true)) faces += 1.0;
     return faces / 6.0;
 }
 
@@ -1360,29 +1358,18 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
     //   27.08. dostaly všechny týmy dva linemany s Wrestle a u trpaslíka jsou
     //   to Longbeardi, kteří Block MAJÍ, takže ta větev ožila.
     //   Resolver (`block_handler.cpp`, case BOTH_DOWN) rozhoduje takto:
-    //     defWantsWrestle = Wrestle && (!Block || attHasBall)
+    //     defWantsWrestle = Wrestle && (!Block || attHasBall)   ⛔ STAV DO 16.10.2026 — dnes viz defenderWouldWrestle
     //   -- obránce s Blockem by Both Down přestál VESTOJE a útočníka složil,
     //   což je lepší než jít k zemi s ním; sáhne po Wrestle jen tehdy, když
     //   útočník drží míč (jeho položení je turnover).
     //   ⇒ Kdyby vybírač počítal 2/6 i tam, kde by obránce Wrestle NEPOUŽIL,
     //     oceňuje JINOU VĚC, NEŽ SE PAK STANE -- táž vada, před kterou varuje
     //     `autoChooseBlockDie` o dvě stě řádků výš.
-    const bool attHasBall = state.ball.isHeld &&
-                            state.ball.carrierId == blitzer.id;
-    const bool defWouldWrestle = target.hasSkill(SkillName::Wrestle) &&
-                                 (!target.hasSkill(SkillName::Block) || attHasBall);
-    // ⭐ NASAZENO 30.08.2026 (B2). Do téhle změny cena visela na rameni
-    //   `setWrestlePricingArm`, které se v produkci nikdy nezapínalo -- engine
-    //   tedy hrál dál s cenou, o které je DOLOŽENO, že je špatná: r. 8670-8676
-    //   položí při Both Down OBA hráče, i když jeden nebo oba mají Block,
-    //   takže špatné jsou DVĚ šestiny, ne jedna (2 kostky: 11,1 %, ne 2,8 %).
-    //   Noc 29.->30.08. změřila, že oprava nic nezhorší: delta +0,0010 ± 0,0034,
-    //   celé 95% CI [-0,0057; +0,0078] uvnitř prahu ±0,015 => EKVIVALENCE.
-    // ⛔ Rameno TÍM padá. „Neškodí" není důvod nechat v kódu vypínač, který
-    //   nikdo nikdy nepřepne (uživatel 30.08.); a nechat místo toho v enginu
-    //   prokazatelně špatnou cenu by bylo implementovat VÝSLEDEK místo
-    //   PRAVIDLA -- vada, kterou projekt vede pod
-    //   `feedback_implement_the_rule_not_the_outcome`.
+    // ⛔ OPRAVENO 5.11.2026 (revize P249, SSOT): tady stálo `Wrestle && (!Block || útočník drží míč)` — pravidlo
+    //   z doby PŘED rozhodnutím uživatele 16.10.2026 („pokud má obránce wrestle a útočník block — tak obránce použije“),
+    //   resolver už četl nové. Odhad tak u obránce s Block + Wrestle proti útočníkovi s Block nepočítal Both Down jako
+    //   pád obou (ř. 8670-8676) — nosiče podceňoval a riziko bloku taky. Teď jediné místo: defenderWouldWrestle.
+    const bool defWouldWrestle = defenderWouldWrestle(blitzer, target, /*isBlitz=*/true);
     const bool defWrestle = defWouldWrestle;
     if (count && defWrestle && blitzer.hasSkill(SkillName::Block)) ++g_wrestleDefenderPriced;
     double blockFail = estimateBlockFailChance(diceCount, blitzer.hasSkill(SkillName::Block),
@@ -1390,7 +1377,7 @@ static BlitzOdds estimateBlitzOdds(const GameState& state, const Player& blitzer
     // P211c (15.10.2026): Wild Animal po ohlášení blitzu hází k6 +2, na 1 akce propadá
     // (ř. 8666-8669) — není to turnover, ale blitz se nestane. Dřív tu hod chyběl.
     const double wildFail = blitzer.hasSkill(SkillName::WildAnimal) ? 1.0 / 6.0 : 0.0;
-    const double k = blockDieKnockFraction(state, blitzer, target, defWrestle);
+    const double k = blockDieKnockFraction(state, blitzer, target);
     const int n = std::abs(diceCount);
     const double knock = n == 0 ? 0.0
                        : diceCount > 0 ? 1.0 - std::pow(1.0 - k, n)   // vybíráme my: stačí jedna
@@ -1496,9 +1483,7 @@ static bool carrierHunter(const Player& b) {
 static bool someoneBlocksCarrierForFree(const GameState& state, TeamSide me, const Player& carrier) {
     bool found = false;
     state.forEachOnPitch(me, [&](const Player& p) {
-        if (found || p.hasActed || p.lostTacklezones || p.position.distanceTo(carrier.position) != 1) return;
-        if (p.state == PlayerState::STANDING ||
-            (p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp))) found = true;
+        if (!found && p.position.distanceTo(carrier.position) == 1 && blocksThisTurnForFree(p)) found = true;
     });
     return found;
 }
@@ -5043,6 +5028,10 @@ bool blitzOpensPathWithBallSafe(const GameState& state, const Macro& blitz) {
     return false;
 }
 
+double blitzKnockOddsForTest(const GameState& state, const Player& blitzer, const Player& target) {
+    return estimateBlitzOdds(state, blitzer, target, /*count=*/false).success;
+}
+
 double macroDirectRisk(const GameState& state, const Macro& m) {
     switch (m.type) {
         case MacroType::BLITZ: {
@@ -5057,10 +5046,8 @@ double macroDirectRisk(const GameState& state, const Macro& m) {
             if (m.playerId <= 0 || m.targetId <= 0) return -1.0;
             const Player& att = state.getPlayer(m.playerId);
             const Player& def = state.getPlayer(m.targetId);
-            const bool attHasBall = state.ball.isHeld && state.ball.carrierId == att.id;
-            // Tatáž podmínka Wrestle jako v resolveru a v estimateBlitzOdds.
-            const bool defWrestle = def.hasSkill(SkillName::Wrestle) &&
-                                    (!def.hasSkill(SkillName::Block) || attHasBall);
+            // SSOT 5.11.2026: rozhodnutí obránce o Wrestle jako resolver (OPRAVENO — dřív zastaralá podmínka, viz estimateBlitzOdds).
+            const bool defWrestle = defenderWouldWrestle(att, def, /*isBlitz=*/false);
             return estimateBlockFailChance(getBlockDiceCount(state, att, def, false, false),
                                            att.hasSkill(SkillName::Block), defWrestle);
         }
