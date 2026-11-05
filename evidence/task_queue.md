@@ -747,7 +747,7 @@ Bití bylo **systematicky podhodnocené ve všech třech vrstvách naráz**:
 | pořadí | položka | stav |
 |---|---|---|
 | 1 | **P249e/f** — blitz na nosiče po přípravě a před zálohou (zvedač + 2 na zeď); bez stropu úhybu; soused jen s nabídnutým blokem | ✅ na main (db8999f3); **změřeno 5.11.** (169 situací, `evidence/p249ef_20261105/vysledek.md`): blitz na nosiče +53 b. (+15σ; riziko ≥ 1/2 dřív 11 %, teď 72 %), míč v našem tahu +6,2 b., turnover +28 b., TD beze změny; se šancí ≥ 0,3 bez pokusu jen 1 situace |
-| 1b | ⚠️ **A18: míč vyrazíme (13 %), ale po našem tahu ho máme jen v 5 %, po tahu soupeře v 1,8 %** ⇒ rozebrat situace „míč na zemi po blitzu“: kdo dosáhl, proč nezvedl | ⏳ další krok |
+| 1b | ⚠️ **A18: míč vyrazíme (13 %), ale po našem tahu ho máme jen v 5 %, po tahu soupeře v 1,8 %.** Rozbor 5.11.: ve 27 případech „spadl, nemáme“ se zvedat zkoušelo vždy (náš hráč 1–2 pole od míče), soupeř míč nechytil ani jednou; turnover 21× — **15× úhyb/GFI cestou k míči, 6× zvednutí** (0 z 6). Přehrání 44 případů bez P249c (tytéž kostky): soupeř by míč **udržel ve 20** (blitz bez přehozu nesrazí) a zvednutí vyjde stejně (~40 %) ⇒ P249c zvedání neškodí. **Úzké místo = zvednutí v zónách soupeřů u míče.** Návrh uživateli: nejdřív bloky na soupeře u míče (zóny pryč), zvedá nejlevnější zvedač (úhyby × AG × Sure Hands), reroll šetřit na zvednutí | ⏳ čeká na souhlas |
 | 2 | Po měření: situace se šancí ≥ 0,3 bez pokusu vypsat a dohledat, co zastavilo (žádná pevná mez rizika — jen 3 proti, pravidlo uživatele) | čeká na měření |
 | 3 | A18 celotah: po shození míče zvednout + odnést + zeď — změřit „míč u nás po tahu soupeře“ | metrika v měření P249e/f |
 | 4 | ⏰ PÁ 6.11. audit parity PHP × C++ (+P247); bod Wrestle 16.10. ✅ ověřen 5.11. | naplánováno |
