@@ -218,6 +218,40 @@ TEST(TTMHandler, P251LonerAlwaysHungrySpendsTheRerollButFailsTheLonerRoll) {
     EXPECT_EQ(gs.getPlayer(2).position, (Position{11, 7}));
 }
 
+TEST(TTMHandler, P251AlwaysHungryRerolledToAnotherOneThenTheSecondRollEats) {
+    // přehoz platí jen jednou (ř. 925-927): 1, přehoz 1 ⇒ pokus o sežrání, druhý hod 1 ⇒ sežrán
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    gs.getPlayer(1).skills.add(SkillName::AlwaysHungry);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+
+    FixedDiceRoller dice({1, 1, 1});
+    resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::DEAD);
+}
+
+TEST(TTMHandler, P251AnInaccurateTeamMateThrowIsNotRerolled) {
+    // uživatel 6.11.: „nepřesný hod je vždy — ten nepřehazovat“ (ř. 8609-8612: hod spoluhráčem se vždy rozptýlí)
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+
+    // hod 2 < cíl 4 (nepřesný, ne fumble); rozptyly D8=3 ×3 → (16,7); dopad 5
+    FixedDiceRoller dice({2, 3, 3, 3, 5});
+    resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{16, 7}));
+}
+
 TEST(TTMHandler, ThrownCarrierOffThePitchIsATurnover) {
     // druha strana l. 8430-8431: "...UNLESS HE WAS HOLDING THE BALL"
     auto gs = ttmSetup();

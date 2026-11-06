@@ -132,7 +132,9 @@ bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vect
 // přehazuje jako pass_handler (P247): Pass přehodí hod zdarma, jinak týmový přehoz (jeden za tah, Loner 4+);
 // Catch přehodí chycení zdarma, jinak týmový přehoz, pokud nepadl na hod. `pThrow < 0` = předání (jen chycení).
 // `withTeam` = se všemi přehozy, `skillOnly` = jen se skilly (Pass, Catch) — podle něj se dává přednost hráčům,
-// kteří týmový přehoz nespotřebují. Pro se nepočítá (KISS).
+// kteří týmový přehoz nespotřebují. Pro se nepočítá (KISS) — ZNÁMÉ NADHODNOCENÍ u hráče s nepoužitým Pro: engine
+// místo týmového přehozu hodí Pro (4+, po neúspěchu týmový přehoz jen na hod Pro), takže skutečná šance je nižší,
+// ale týmový přehoz častěji zbude na chycení. Pro je v soupiskách vzácné.
 struct PassChance { double withTeam; double skillOnly; };
 PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
                                 bool teamReroll, bool throwerLoner, bool catcherLoner);

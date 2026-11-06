@@ -6106,3 +6106,15 @@ TEST(MacroActions, P253WithoutACatchReceiverTheTeamRerollPassIsOffered) {
     p253Receiver(state, 3, {8, 9});
     EXPECT_TRUE(p253Offered(state, 3));
 }
+
+TEST(MacroActions, P253ATeamRerollReceiverCloserToTheEndzoneIsStillOffered) {
+    // review P253: přednost skillů jen tam, kde skill-nabídka vede aspoň stejně blízko k endzóně. Hráč 2 s Catch
+    // (8,7) jde jen se skillem; hráč 3 bez Catch (9,9) je dál vpřed a jde jen s týmovým přehozem (krátká 4+:
+    // 1/2 × 8/9 + 1/2 × 1/2 × 2/3 = 0,61) — nesmí ho schovat horší plán.
+    GameState state = p253PassState();
+    p253Receiver(state, 2, {8, 7});
+    state.getPlayer(2).skills.add(SkillName::Catch);
+    p253Receiver(state, 3, {9, 9});
+    EXPECT_TRUE(p253Offered(state, 2));
+    EXPECT_TRUE(p253Offered(state, 3));
+}

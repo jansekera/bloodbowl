@@ -288,9 +288,11 @@ double handOffTdChance(const GameState& state, const Player& carrier, const Play
     double p2 = (7 - target) / 6.0;
     // přehoz: Catch, jinak týmový přehoz, je-li v tomto tahu k dispozici (uživatel 08.10.2026:
     // „předávka nevyjde — počítej s team rerollem, pokud je k dispozici“)
-    if (receiver.hasSkill(SkillName::Catch) || state.getTeamState(side).canUseReroll()) {
-        p2 = 1.0 - (1.0 - p2) * (1.0 - p2);
-    }
+    // Review P253 (SSOT): přes passCompletionChance (helpers.cpp) — dřív vlastní vzorec, který bral Catch i týmový
+    // přehoz jako plný přehoz a ignoroval Loner příjemce (ř. 8287-8290).
+    p2 = passCompletionChance(-1.0, p2, false, receiver.hasSkill(SkillName::Catch),
+                              state.getTeamState(side).canUseReroll(), false,
+                              receiver.hasSkill(SkillName::Loner)).withTeam;
     // 3) příjemce do zóny
     double p3 = 0.0;
     Position bestEz{-1, -1};
@@ -693,7 +695,9 @@ void CageController::planStart(const GameState& state) {
             // 2) chycení (přehoz Catch / týmový jako u TD předávkou)
             const int target = std::clamp(calculateCatchTarget(state, m, 1), 2, 6);
             double pc = (7 - target) / 6.0;
-            if (m.hasSkill(SkillName::Catch) || state.getTeamState(side).canUseReroll()) pc = 1.0 - (1.0 - pc) * (1.0 - pc);
+            pc = passCompletionChance(-1.0, pc, false, m.hasSkill(SkillName::Catch),   // review P253: SSOT
+                                      state.getTeamState(side).canUseReroll(), false,
+                                      m.hasSkill(SkillName::Loner)).withTeam;
             if (pvOk * pc <= best) return;
             // 3) bezpečné pole příjemce — i s GFI a úhybem do 3+; napřed pole nejdál od soupeřů
             struct Sq { int key; Position sq; };

@@ -2761,7 +2761,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         && !(myTeam.passUsedThisTurn && myTeam.handOffUsedThisTurn)) {
         // P253: nabídky se sbírají a teprve pak vydají — když aspoň jedna vyjde jen se skilly (Pass/Catch),
         // vypadnou ty, které stojí na týmovém přehozu (uživatel: „preferovat má skill pass a catch“).
-        struct PassOffer { int targetId; bool skillOk; bool emergency; };
+        // Review P253: jen v rámci stejného druhu (hod × předání) a jen když nabídka bez týmového přehozu vede
+        // aspoň stejně blízko k endzóně — „preferovat“, ne zahodit lepší plán (např. přihrávku do skórovací zóny).
+        struct PassOffer { int targetId; bool skillOk; bool emergency; bool handOff; int targetDist; };
         std::vector<PassOffer> passOffers;
         state.forEachOnPitch(mySide, [&](const Player& target) {
             if (target.id == carrier->id) return;
@@ -2877,15 +2879,17 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             const bool worthIt = handOff ? (swap && complete >= 0.5)
                                          : (complete >= 0.5);
             if (worthIt || emergency) {
-                if (handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch()
                 const bool skillOk = handOff ? (swap && pc.skillOnly >= 0.5) : (pc.skillOnly >= 0.5);
-                passOffers.push_back({target.id, skillOk, emergency});
+                passOffers.push_back({target.id, skillOk, emergency, handOff, targetDist});
             }
         });
-        bool anySkillOk = false;
-        for (const PassOffer& o : passOffers) anySkillOk = anySkillOk || o.skillOk;
         for (const PassOffer& o : passOffers) {
-            if (anySkillOk && !o.skillOk && !o.emergency) continue;   // P253: přednost bez týmového přehozu
+            bool preferredElsewhere = false;   // P253: přednost nabídky, která týmový přehoz nespotřebuje
+            if (!o.skillOk && !o.emergency)
+                for (const PassOffer& s : passOffers)
+                    if (s.skillOk && s.handOff == o.handOff && s.targetDist <= o.targetDist) preferredElsewhere = true;
+            if (preferredElsewhere) continue;
+            if (o.handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch() — až vydaná nabídka
             out.push_back({MacroType::PASS_ACTION, carrier->id, o.targetId, {-1, -1}});
         }
     }
