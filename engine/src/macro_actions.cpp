@@ -2759,6 +2759,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
     // jeden z nich; rozhodne se uvnitř, až je známá vzdálenost.
     if (iHaveBall && carrier->canAct()
         && !(myTeam.passUsedThisTurn && myTeam.handOffUsedThisTurn)) {
+        // P253: nabídky se sbírají a teprve pak vydají — když aspoň jedna vyjde jen se skilly (Pass/Catch),
+        // vypadnou ty, které stojí na týmovém přehozu (uživatel: „preferovat má skill pass a catch“).
+        struct PassOffer { int targetId; bool skillOk; bool emergency; };
+        std::vector<PassOffer> passOffers;
         state.forEachOnPitch(mySide, [&](const Player& target) {
             if (target.id == carrier->id) return;
             if (target.state != PlayerState::STANDING) return;
@@ -2819,10 +2823,20 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
                 return;
             }
-            int throwTarget = 7 - carrier->stats.agility - passModifier(range)
-                            + countTacklezones(state, carrier->position, mySide);
-            int catchTarget = 7 - target.stats.agility - 1   // accurate pass
-                            + countTacklezones(state, target.position, mySide);
+            // P253: tytéž modifikátory hodu jako resolver (pass_handler): Strong Arm posune pásmo, Accurate,
+            // Nerves of Steel, Disturbing Presence, Very Sunny.
+            PassRange band = range;
+            if (carrier->hasSkill(SkillName::StrongArm) && band != PassRange::QUICK_PASS)
+                band = static_cast<PassRange>(static_cast<int>(band) - 1);
+            int throwTarget = 7 - carrier->stats.agility - passModifier(band)
+                            - (carrier->hasSkill(SkillName::Accurate) ? 1 : 0)
+                            + (carrier->hasSkill(SkillName::NervesOfSteel)
+                                   ? 0 : countTacklezones(state, carrier->position, mySide))
+                            + countDisturbingPresence(state, carrier->position, mySide)
+                            + (state.weather == Weather::VERY_SUNNY ? 1 : 0);
+            // chycení: totéž místo jako engine (helpers.cpp calculateCatchTarget) — +1 za přesnou přihrávku
+            // i za předání (resolveHandOff), Diving Catch jen u přesné přihrávky
+            const int catchTarget = calculateCatchTarget(state, target, 1, !handOff);
             auto chance = [](int t) {
                 return (7.0 - static_cast<double>(std::clamp(t, 2, 6))) / 6.0;
             };
@@ -2842,9 +2856,14 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // cleared 0.5, so the macro was dead in every turn of every game,
             // and with it the only way to get the ball off a carrier who should
             // not be holding it (measured 2026-08-13).
-            const double complete = handOff
-                                  ? chance(catchTarget)
-                                  : chance(throwTarget) * chance(catchTarget);
+            // P253: s přehozy, jak je engine opravdu hodí (P247) — dřív bez přehozů, takže brána odmítala
+            // přihrávky, které s Pass / Catch / týmovým přehozem dojdou (AG3 krátká k volnému AG3: 0,33 × s
+            // týmovým přehozem ~0,47; s Pass a Catch ~0,62).
+            const PassChance pc = passCompletionChance(
+                handOff ? -1.0 : chance(throwTarget), chance(catchTarget),
+                carrier->hasSkill(SkillName::Pass), target.hasSkill(SkillName::Catch),
+                myTeam.canUseReroll(), carrier->hasSkill(SkillName::Loner), target.hasSkill(SkillName::Loner));
+            const double complete = pc.withTeam;
 
             const int turnsLeft = 9 - myTeam.turnNumber;
             const bool emergency =
@@ -2859,9 +2878,16 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                                          : (complete >= 0.5);
             if (worthIt || emergency) {
                 if (handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch()
-                out.push_back({MacroType::PASS_ACTION, carrier->id, target.id, {-1, -1}});
+                const bool skillOk = handOff ? (swap && pc.skillOnly >= 0.5) : (pc.skillOnly >= 0.5);
+                passOffers.push_back({target.id, skillOk, emergency});
             }
         });
+        bool anySkillOk = false;
+        for (const PassOffer& o : passOffers) anySkillOk = anySkillOk || o.skillOk;
+        for (const PassOffer& o : passOffers) {
+            if (anySkillOk && !o.skillOk && !o.emergency) continue;   // P253: přednost bez týmového přehozu
+            out.push_back({MacroType::PASS_ACTION, carrier->id, o.targetId, {-1, -1}});
+        }
     }
 
     // FOUL: foul not used, prone/stunned enemy adjacent

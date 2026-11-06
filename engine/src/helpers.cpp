@@ -316,6 +316,25 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
 // místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
 // znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
+PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
+                                bool teamReroll, bool throwerLoner, bool catcherLoner) {
+    const double lt = throwerLoner ? 0.5 : 1.0;   // Loner 4+ (ř. 8287-8290)
+    const double lc = catcherLoner ? 0.5 : 1.0;
+    const double qSkill = catchSkill ? qCatch + (1.0 - qCatch) * qCatch : qCatch;
+    // chycení, když je týmový přehoz ještě po ruce (Catch má přednost — nestojí přehoz)
+    const double qTeam = catchSkill ? qSkill : qCatch + (1.0 - qCatch) * lc * qCatch;
+    if (pThrow < 0) {   // předání: žádný hod (pass_handler resolveHandOff)
+        return {teamReroll ? qTeam : qSkill, qSkill};
+    }
+    const double pSkill = passSkill ? pThrow + (1.0 - pThrow) * pThrow : pThrow;
+    const double skillOnly = pSkill * qSkill;
+    if (!teamReroll) return {skillOnly, skillOnly};
+    if (passSkill) return {pSkill * qTeam, skillOnly};   // hod přehodí Pass, týmový přehoz zbude na chycení
+    // bez Pass: přesný napoprvé ⇒ přehoz zbude na chycení; jinak padne na hod (i když Loner neprojde)
+    const double withTeam = pThrow * qTeam + (1.0 - pThrow) * lt * pThrow * qSkill;
+    return {withTeam, skillOnly};
+}
+
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     if (!player.hasSkill(SkillName::Loner)) return true;
     const int lonerRoll = dice.rollD6();

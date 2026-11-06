@@ -127,6 +127,16 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // Loner 4+ po spotřebovaném týmovém přehozu; neúspěch v živé partii = REROLL druh 3 (P244).
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P253 (uživatel 6.11.2026: „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat
+// má skill Pass a Catch, co mají reroll bez týmového“). Šance, že přihrávka dojde (přesný hod × chycení), když engine
+// přehazuje jako pass_handler (P247): Pass přehodí hod zdarma, jinak týmový přehoz (jeden za tah, Loner 4+);
+// Catch přehodí chycení zdarma, jinak týmový přehoz, pokud nepadl na hod. `pThrow < 0` = předání (jen chycení).
+// `withTeam` = se všemi přehozy, `skillOnly` = jen se skilly (Pass, Catch) — podle něj se dává přednost hráčům,
+// kteří týmový přehoz nespotřebují. Pro se nepočítá (KISS).
+struct PassChance { double withTeam; double skillOnly; };
+PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
+                                bool teamReroll, bool throwerLoner, bool catcherLoner);
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);

@@ -6020,3 +6020,89 @@ TEST(MacroActions, P250SurroundTheLooseBallIsOffered) {
     const int before = surround(kP250Surround);
     EXPECT_EQ(surround(0), before + 1) << "P250: navíc přesun bez hodu na pole vedle volného míče (dřív " << before << ")";
 }
+
+// ===== P253 (uživatel 6.11.2026): přihrávka se cení s přehozy, přednost mají Pass a Catch =====
+// „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat má skill pass a catch, co mají
+// reroll bez týmového“. Dřív brána cenila hod × chycení BEZ přehozů, ačkoli engine (P247) přehazuje.
+
+TEST(PassCompletionChance, P253TeamRerollIsSharedBetweenTheThrowAndTheCatch) {
+    // p = 1/2, q = 2/3, bez skillů, týmový přehoz: přesná napoprvé ⇒ přehoz na chycení; jinak padne na hod
+    const PassChance c = passCompletionChance(0.5, 2.0 / 3.0, false, false, true, false, false);
+    const double q2 = 2.0 / 3.0 + (1.0 / 3.0) * (2.0 / 3.0);
+    EXPECT_NEAR(c.withTeam, 0.5 * q2 + 0.5 * 0.5 * (2.0 / 3.0), 1e-9);
+    EXPECT_NEAR(c.skillOnly, 0.5 * (2.0 / 3.0), 1e-9);
+}
+
+TEST(PassCompletionChance, P253PassAndCatchRerollWithoutTheTeamReroll) {
+    const PassChance c = passCompletionChance(0.5, 0.5, true, true, false, false, false);
+    EXPECT_NEAR(c.skillOnly, 0.75 * 0.75, 1e-9);
+    EXPECT_NEAR(c.withTeam, c.skillOnly, 1e-9);   // bez týmového přehozu stejné
+}
+
+TEST(PassCompletionChance, P253LonerHalvesOnlyTheTeamReroll) {
+    const PassChance c = passCompletionChance(0.5, 1.0, false, false, true, true, false);
+    EXPECT_NEAR(c.withTeam, 0.5 + 0.5 * 0.5 * 0.5, 1e-9);   // ř. 8287-8290: Loner 4+
+    const PassChance hand = passCompletionChance(-1.0, 0.5, false, false, true, false, true);
+    EXPECT_NEAR(hand.withTeam, 0.5 + 0.5 * 0.5 * 0.5, 1e-9);   // předání: jen chycení, Loner chytače
+}
+
+namespace {
+GameState p253PassState() {
+    GameState state = makeMinimalState();
+    state.getPlayer(1).position = {5, 7};
+    state.getPlayer(1).stats = {6, 3, 3, 8};      // AG3
+    state.ball = BallState::carried({5, 7}, 1);
+    state.homeTeam.passUsedThisTurn = false;
+    state.homeTeam.turnNumber = 1;                 // žádná nouze
+    return state;
+}
+void p253Receiver(GameState& state, int id, Position at) {
+    Player& p = state.getPlayer(id);
+    p.id = id;
+    p.teamSide = TeamSide::HOME;
+    p.state = PlayerState::STANDING;
+    p.position = at;
+    p.stats = {6, 3, 3, 8};                        // AG3
+    p.movementRemaining = 6;
+}
+bool p253Offered(const GameState& state, int targetId) {
+    std::vector<Macro> macros;
+    getAvailableMacros(state, macros);
+    for (auto& m : macros)
+        if (m.type == MacroType::PASS_ACTION && m.targetId == targetId) return true;
+    return false;
+}
+}  // namespace
+
+TEST(MacroActions, P253ShortPassIsOfferedWhenTheTeamRerollMakesItLikely) {
+    // AG3 → AG3, 5 polí (krátká, 4+), volno: bez přehozů 1/2 × 2/3 = 0,33 (dřív odmítnuto);
+    // s týmovým přehozem 0,61 ⇒ nabídnout.
+    GameState state = p253PassState();
+    p253Receiver(state, 2, {10, 7});
+    EXPECT_TRUE(p253Offered(state, 2));
+}
+
+TEST(MacroActions, P253WithoutRerollsTheSamePassIsStillRefused) {
+    GameState state = p253PassState();
+    state.homeTeam.rerolls = 0;
+    p253Receiver(state, 2, {10, 7});
+    EXPECT_FALSE(p253Offered(state, 2)) << "bez přehozů 0,33 < 0,5";
+}
+
+TEST(MacroActions, P253ACatchReceiverIsPreferredOverOneNeedingTheTeamReroll) {
+    // rychlá přihrávka (3 pole, 3+): hráč 2 s Catch 2/3 × 8/9 = 0,59 jen se skillem; hráč 3 bez Catch 0,44
+    // jen se skillem, s týmovým přehozem 0,74. Uživatel: přednost má ten, kdo týmový přehoz nespotřebuje.
+    GameState state = p253PassState();
+    p253Receiver(state, 2, {8, 7});
+    state.getPlayer(2).skills.add(SkillName::Catch);
+    p253Receiver(state, 3, {8, 9});
+    EXPECT_TRUE(p253Offered(state, 2));
+    EXPECT_FALSE(p253Offered(state, 3));
+}
+
+TEST(MacroActions, P253WithoutACatchReceiverTheTeamRerollPassIsOffered) {
+    // pozitivní kontrola k testu výš: bez hráče s Catch se nabídne i přihrávka stojící na týmovém přehozu
+    GameState state = p253PassState();
+    p253Receiver(state, 3, {8, 9});
+    EXPECT_TRUE(p253Offered(state, 3));
+}

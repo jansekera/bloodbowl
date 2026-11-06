@@ -180,6 +180,44 @@ TEST(TTMHandler, AlwaysHungrySecondRollTwoToSixIsJustAFumble) {
     EXPECT_FALSE(result.turnover);
 }
 
+// P251 (uživatel 6.11.2026: „always hungry ano — nepřesný hod je vždy — ten nepřehazovat“). Ř. 929-931: týmový
+// přehoz smí přehodit kterýkoli hod ⇒ i jedničku na Always Hungry. Dřív ji C++ nepřehazoval (PHP ano).
+TEST(TTMHandler, P251AlwaysHungryOneIsRerolledWithATeamReroll) {
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    gs.getPlayer(1).skills.add(SkillName::AlwaysHungry);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+
+    // 1 = hlad; přehoz 5 = v pořádku; hod 5 projde; rozptyly D8=3 ×3 → (16,7); dopad 5 na nohou.
+    // Starý kód: druhý hod 5 = vykroutil se ⇒ fumble, spoluhráč zůstane na (11,7).
+    FixedDiceRoller dice({1, 5, 5, 3, 3, 3, 5});
+    resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{16, 7}));
+}
+
+TEST(TTMHandler, P251LonerAlwaysHungrySpendsTheRerollButFailsTheLonerRoll) {
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 4, 5, 1, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    gs.getPlayer(1).skills.add(SkillName::AlwaysHungry);
+    gs.getPlayer(1).skills.add(SkillName::Loner);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+
+    // 1 = hlad; Loner 2 neprojde (ř. 8287-8290, přehoz propadl); druhý hod 4 = vykroutil se; dopad 5
+    FixedDiceRoller dice({1, 2, 4, 5});
+    resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{11, 7}));
+}
+
 TEST(TTMHandler, ThrownCarrierOffThePitchIsATurnover) {
     // druha strana l. 8430-8431: "...UNLESS HE WAS HOLDING THE BALL"
     auto gs = ttmSetup();

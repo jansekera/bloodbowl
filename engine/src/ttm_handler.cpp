@@ -30,6 +30,23 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool forcedFumble = false;
     if (thrower.hasSkill(SkillName::AlwaysHungry)) {
         int hungryRoll = dice.rollD6();
+        // P251 (uživatel 6.11.2026: „always hungry ano — nepřesný hod je vždy — ten nepřehazovat“). Dřív se
+        // jednička na Always Hungry v C++ nepřehazovala vůbec, PHP (ThrowTeamMateHandler) týmovým přehozem ano.
+        // Ř. 929-931: týmový přehoz smí přehodit kterýkoli hod. Kouč-člověk v živé partii volí sám.
+        if (hungryRoll == 1) {
+            if (coachDecides(thrower.teamSide)) {
+                bool viaPro = false;
+                if (coachAskReroll(state, thrower, dice, CoachQuestion::REROLL, projectileId, hungryRoll, 2,
+                                   /*teamAllowed=*/true, events, viaPro))
+                    hungryRoll = dice.rollD6();
+            } else {
+                TeamState& team = state.getTeamState(thrower.teamSide);
+                if (team.canUseReroll()) {
+                    spendTeamRerollByEngine(team, throwerId, events);
+                    if (lonerAllowsTeamReroll(thrower, dice, events)) hungryRoll = dice.rollD6();
+                }
+            }
+        }
         if (hungryRoll == 1) {
             int second = dice.rollD6();
             emitEvent(events, {GameEvent::Type::SKILL_USED, throwerId, projectileId,
