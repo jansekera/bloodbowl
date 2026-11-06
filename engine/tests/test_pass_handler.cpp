@@ -118,21 +118,126 @@ TEST(PassHandler, PassSkillRerollsAnINACCURATEPassToo) {
     EXPECT_EQ(gs.ball.position.x, 8);   // dopadlo na CIL, ne po rozptylu
 }
 
-TEST(PassHandler, WithoutThePassSkillAnInaccuratePassIsNotRerolled) {
-    // druha strana hranice: bez Pass skillu se nepresna prihravka NErerolluje
-    // (tymovy reroll na nepresnou prihravku je volba trenéra, ne pravidlo, a
-    // chovani se tu zamerne nemeni -- viz komentar v pass_handler.cpp)
+// P247 (uživatel 6.11.2026: „přehoď i nepřesnou vždy“). Ř. 929-931: týmový přehoz smí přehodit kterýkoli hod
+// kromě zbroje a zranění ⇒ i nepřesnou přihrávku. Dřív tu test hlídal opak (AI přehazovala jen fumble) a PHP
+// přehazovala i nepřesnou — rozdíl volby AI z auditu parity 6.11. (evidence/audit_parity_20261106.md).
+TEST(PassHandler, P247WithoutThePassSkillTheTeamRerollRerollsAnInaccuratePass) {
     auto gs = makePassSetup();
     gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // hod 2 => nepřesná (cíl 3); týmový přehoz: 5 => přesná; chytání 3 (cíl 3 s +1 za přesnou)
+    FixedDiceRoller dice({2, 5, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);   // týmový přehoz utracen
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 2);     // dopadlo na cíl a chytil ji
+}
+
+TEST(PassHandler, P247ProRerollsAnInaccuratePassBeforeTheTeamReroll) {
+    // Volba enginu: nejdřív Pro (nestojí týmový přehoz), týmový přehoz až po neúspěšném hodu Pro (ř. 8385-8387).
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // hod 2 => nepřesná; Pro 4 => smí přehodit; nový hod 5 => přesná; chytání 3
+    FixedDiceRoller dice({2, 4, 5, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);   // týmový přehoz nesáhnut
+    EXPECT_TRUE(gs.getPlayer(1).proUsedThisTurn);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+}
+
+TEST(PassHandler, P247TeamRerollAlreadyUsedThisTurnLeavesTheInaccuratePass) {
+    // ř. 934-936: jeden týmový přehoz za tah — když už padl, nepřesná přihrávka se jen rozptýlí
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 3;
+    gs.homeTeam.rerollUsedThisTurn = true;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    FixedDiceRoller dice({2, 3, 3, 3, 4});   // tytéž kostky jako bez přehozů ⇒ týž rozptyl
+    resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);
+    EXPECT_EQ(gs.ball.position.x, 11);
+}
+
+// Ř. 8170-8171: „This skill may not be used in a blizzard“. Do 6.11.2026 C++ házel Hail Mary i ve vánici
+// (PHP PassResolver ne) — nalezeno při review P247.
+TEST(PassHandler, HailMaryIsNotUsedInABlizzardQuickPassIsANormalPass) {
+    auto gs = makePassSetup();
+    gs.weather = Weather::BLIZZARD;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    // běžná rychlá přihrávka: hod 5 => přesná; chytání 3 => chycena na cíli (Hail Mary by se rozptýlila)
+    FixedDiceRoller dice({5, 3});
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+}
+
+// review P254: dlouhá přihrávka (7–13 polí) ve vánici se odmítne DŘÍV, než se pustí míč a hodí na zachycení —
+// dřív se míč pustil, soupeř na dráze házel na zachycení a pak padl fail s volným míčem pod házečem.
+TEST(PassHandler, BlizzardLongPassIsRefusedBeforeTheBallIsReleased) {
+    auto gs = makePassSetup();
+    gs.weather = Weather::BLIZZARD;
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 10, {8, 7}, TeamSide::AWAY);     // na dráze hodu — dřív by házel na zachycení
+    gs.ball = BallState::carried({3, 7}, 1);
+
+    FixedDiceRoller dice({});                       // žádná kostka se nesmí hodit
+    auto result = resolvePass(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_TRUE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+    EXPECT_FALSE(gs.homeTeam.passUsedThisTurn);     // nelegální hod akci nespotřebuje
+}
+
+TEST(PassHandler, HailMaryIsNotUsedInABlizzardLongThrowIsRefused) {
+    auto gs = makePassSetup();
+    gs.weather = Weather::BLIZZARD;
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    gs.ball = BallState::carried({3, 7}, 1);
+
+    FixedDiceRoller dice({});
+    auto result = resolvePass(gs, 1, {20, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(gs.ball.isHeld);          // míč zůstal házeči, nic se nehodilo
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}
+
+TEST(PassHandler, P247WithoutRerollsAnInaccuratePassJustScatters) {
+    // hranice: bez přehozů zůstane nepřesná a rozptýlí se (stejné kostky jako dřívější test)
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
     placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
     placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
     gs.ball = BallState::carried({5, 7}, 1);
 
     FixedDiceRoller dice({2, 3, 3, 3, 4});
-    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+    resolvePass(gs, 1, {8, 7}, dice, nullptr);
 
-    EXPECT_EQ(gs.homeTeam.rerolls, 3);   // tymovy reroll se nesahl
-    EXPECT_EQ(gs.ball.position.x, 11);   // proste se rozptylila
+    EXPECT_EQ(gs.ball.position.x, 11);   // prostě se rozptýlila
 }
 
 TEST(PassHandler, FumbleOnNatural1) {

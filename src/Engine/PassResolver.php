@@ -122,7 +122,9 @@ final class PassResolver
         $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
 
         // Reroll if not accurate
-        if (!$accurate) {
+        // OPRAVENO 6.11.2026 (P252, review P247) — přehazoval se i fumble, který Safe Throw podrží (r. 8440-8443);
+        //   nový hod mohl dát přirozenou 1 = skutečný fumble a turnover. Parita s C++ P78 (`inaccurateFirst`).
+        if (!$accurate && !$this->safeThrowKeeps($thrower, $roll, $fumble)) {
             $skillRerollUsed = false;
             $teamRerollUsed = false;
 
@@ -181,7 +183,7 @@ final class PassResolver
         //   fumbles a pass on any roll other than a natural 1 then he manages to
         //   keep hold of the ball instead of suffering a fumble and the team
         //   does not suffer a turnover." Pred opravou fumble jinak nez 1 neexistoval.
-        if ($fumble && $roll !== 1 && $thrower->hasSkill(SkillName::SafeThrow)) {
+        if ($this->safeThrowKeeps($thrower, $roll, $fumble)) {
             $events[] = GameEvent::safeThrow($playerId, $roll, true);
             return ActionResult::success($state, $events);
         }
@@ -286,6 +288,12 @@ final class PassResolver
         }
 
         return $modifier;
+    }
+
+    /** Safe Throw (r. 8440-8443): fumble jinak než přirozenou 1 hráč podrží — jedno místo pro přehoz i výsledek. */
+    private function safeThrowKeeps(MatchPlayerDTO $thrower, int $roll, bool $fumble): bool
+    {
+        return $fumble && $roll !== 1 && $thrower->hasSkill(SkillName::SafeThrow);
     }
 
     /**

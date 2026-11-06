@@ -197,20 +197,30 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& passer = state.getPlayer(passerId);
 
+    // ZMĚNĚNO 6.11.2026 (P254 + review) — legalita hodu na JEDNOM místě a PŘED puštěním míče. Dřív se míč
+    // pustil a házelo se na zachycení, a teprve pak padlo „mimo pravítko“ / „dlouhá ve vánici“ (fail s volným
+    // míčem pod házečem, nebo zachycení u zakázaného hodu); hod přes 13 polí vracel turnover. PHP PassResolver
+    // nelegální cíl odmítne výjimkou dřív, než sáhne na stav.
+    // Ř. 8170-8171: Hail Mary „may not be used in a blizzard“ ⇒ ve vánici běžná přihrávka.
+    // CRP vánice: „only quick or short passes can be attempted“ (pásmo pravítka, před Strong Arm).
+    const bool isHailMary = passer.hasSkill(SkillName::HailMaryPass) && state.weather != Weather::BLIZZARD;
+    PassRange range = PassRange::LONG_BOMB;
+    if (!isHailMary) {
+        if (!passRangeFromOffset(target.x - passer.position.x, target.y - passer.position.y, range)) {
+            return ActionResult::fail();   // mimo mřížku pravítka (i dál než 13 polí)
+        }
+        if (state.weather == Weather::BLIZZARD &&
+            (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
+            return ActionResult::fail();
+        }
+    }
+
     // Mark pass used
     state.getTeamState(passer.teamSide).passUsedThisTurn = true;
     passer.hasActed = true;
 
     // Ball must be held by passer
     if (!state.ball.isHeld || state.ball.carrierId != passerId) {
-        return ActionResult::turnovr();
-    }
-
-    bool isHailMary = passer.hasSkill(SkillName::HailMaryPass);
-    int dist = passer.position.distanceTo(target);
-
-    // Regular pass range check (Hail Mary has no range limit)
-    if (!isHailMary && dist > 13) {
         return ActionResult::turnovr();
     }
 
@@ -251,25 +261,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         return ActionResult::turnovr();
     }
 
-    // Calculate pass accuracy target
-    // Range comes from the ruler GRID, not a distance (rules parity,
-    // 2026-08-10). Out-of-range targets are filtered out when actions are
-    // generated; falling back to Long Bomb here is a belt-and-braces guard
-    // so a hand-built Action can never silently become a free long throw.
-    PassRange range = PassRange::LONG_BOMB;
-    if (!passRangeFromOffset(target.x - passer.position.x,
-                             target.y - passer.position.y, range)) {
-        return ActionResult::fail();
-    }
-
-    // Blizzard restricts the RANGE, it does not tax the roll (rules parity,
-    // 2026-08-10). CRP: "the snow means that only quick or short passes can
-    // be attempted." Checked on the ruler band before Strong Arm, which
-    // improves the modifier rather than the distance actually thrown.
-    if (state.weather == Weather::BLIZZARD &&
-        (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
-        return ActionResult::fail();
-    }
+    // Pásmo pravítka (`range`) i omezení vánice jsou spočtené a ověřené nahoře, před puštěním míče.
 
     // StrongArm reduces range by one band
     if (passer.hasSkill(SkillName::StrongArm) && range != PassRange::QUICK_PASS) {
@@ -317,7 +309,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     // P78 (PHP e81bb57d): Safe Throw -- fumble jinak nez prirozenou 1 hazec
     // "manages to keep hold of the ball ... and the team does not suffer a
     // turnover". Takovy fumble nehrozi turnoverem, takze se za nej neplati
-    // prehozem (doktrina: Pro/tymovy prehoz jen na fumble).
+    // prehozem (fumble zachraneny Safe Throw se neprehazuje).
     auto safeThrowKeeps = [&](int r) {
         return passer.hasSkill(SkillName::SafeThrow) && r != 1 && isFumble(r);
     };
@@ -341,7 +333,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         } else if (coachDecides(passer.teamSide)) {
             // P130: v živé partii rozhoduje kouč, a to u fumble I u nepřesné
             // přihrávky (schváleno 03.10. a 10.10.) -- pravidla přehoz dovolují
-            // u obojího, engine ho sám bere jen na fumble.
+            // u obojího; engine od P247 (6.11.) taky u obojího.
             const int original = roll;
             bool viaPro = false;
             if (coachAskReroll(state, passer, dice, CoachQuestion::PASS_REROLL, -1, roll,
@@ -355,11 +347,13 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                     emitEvent(events, {GameEvent::Type::REROLL, passerId, -1, {}, {}, 0, ok, original, roll});
                 }
             }
-        } else if (fumbledFirst) {
-            // Pro a tymovy reroll zustavaji jen na FUMBLE. Pravidla je dovoluji
-            // i na neprecnou prihravku, ale to uz je volba trenéra (utratit
-            // tymovy reroll za nepresny pass), ne oprava -- a menit ji tady by
-            // byl zasah do doktriny, ne do pravidel. Chovani zustava jako driv.
+        } else {
+            // ZMĚNĚNO 6.11.2026 (P247, uživatel: „přehoď i nepřesnou vždy“) — dřív tu bylo
+            // `else if (fumbledFirst)`: Pro a týmový přehoz jen na FUMBLE, s odůvodněním, že
+            // turnover hrozí jen u fumble. Neplatí: nepřesná přihrávka se rozptýlí a nechytí-li ji
+            // spoluhráč, je to turnover taky (ř. 881-889). Ř. 929-931: týmový přehoz smí přehodit
+            // kterýkoli hod kromě zbroje/zranění. PHP (PassResolver) přehazuje nepřesnou odjakživa
+            // ⇒ teď stejně v obou enginech (audit parity 6.11.).
             // P70 (30.09.2026), r. 8385-8387: po neuspesnem hodu Pro plati
             // puvodni vysledek a tymovy prehoz smi prehodit jen HOD PRO.
             // Vzor attemptRoll (helpers.cpp) a bloku; PHP 84f7dc46.
@@ -373,7 +367,12 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                         if (lonerAllowsTeamReroll(passer, dice, events)) proRoll = dice.rollD6();
                     }
                 }
-                if (proRoll >= 4) roll = dice.rollD6();
+                if (proRoll >= 4) {
+                    roll = dice.rollD6();
+                    // review P247: hod Pro má v záznamu stopu jako v attemptRoll (helpers.cpp)
+                    emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
+                                      static_cast<int>(SkillName::Pro), roll >= passTarget && !isFumble(roll), roll});
+                }
             } else {
                 TeamState& team = state.getTeamState(passer.teamSide);
                 if (team.canUseReroll()) {

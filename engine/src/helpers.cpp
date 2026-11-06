@@ -456,7 +456,7 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
         if (proRoll >= 4) {
             roll = dice.rollD6();
             emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(SkillName::Pro), roll >= target});
+                              static_cast<int>(SkillName::Pro), roll >= target, roll});   // review P247: kostka do záznamu
             return roll >= target;
         }
         return false;   // původní výsledek platí a nesmí se přehodit

@@ -629,7 +629,13 @@ TEST(DivingCatchCandidates, OtherCandidatesLeaveOutThoseWhoDeclined) {
 // Kostka chytání 4: chytí AG3 (4+) i AG4 (3+) ⇒ nosič ukáže, kdo skočil.
 namespace {
 int aiDiver(GameState gs) {
-    FixedDiceRoller dice(inaccurateToTenSix({4}));
+    // P247 (6.11.2026): engine přehazuje týmovým přehozem i NEPŘESNOU přihrávku, takže by přehoz na chytání
+    // nezbyl. Tytéž situace (přehoz po ruce při skoku) ve hře nastanou, když házeč přehodí skillem Pass —
+    // proto Pass a druhá nepřesná dvojka (Pass přehoz); zbytek kostek beze změny.
+    gs.getPlayer(1).skills.add(SkillName::Pass);
+    std::vector<int> d = inaccurateToTenSix({4});
+    d.insert(d.begin() + 1, 2);
+    FixedDiceRoller dice(d);
     std::vector<GameEvent> events;
     resolvePass(gs, 1, {10, 5}, dice, &events);
     return divingCatchEvents(events) == 1 && gs.ball.isHeld ? gs.ball.carrierId : -1;

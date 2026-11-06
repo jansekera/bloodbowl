@@ -110,4 +110,23 @@ final class PassFumbleRulesTest extends TestCase
         $this->assertTrue($r->isTurnover());
         $this->assertNotSame(1, $r->getNewState()->getBall()->getCarrierId());
     }
+
+    /**
+     * P252 (review P247, 6.11.2026): fumble, který Safe Throw podrží, se nepřehazuje — přehoz by mohl dát
+     * přirozenou 1 = skutečný fumble a turnover (parita s C++ P78, `inaccurateFirst`). Dřív PHP přehazovalo
+     * každou ne-přesnou přihrávku včetně zachráněného fumble.
+     */
+    public function testSafeThrowZachranenyFumbleSeNeprehazuje(): void
+    {
+        $s = $this->stav([SkillName::SafeThrow]);
+        $s = $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(3));
+        // Long bomb -2: hod 3 => 1 => fumble, ale ne přirozená 1 ⇒ Safe Throw podrží. Přehoz by hodil 1.
+        $r = (new ActionResolver(new FixedDiceRoller([3, 1, 1, 1, 1])))->resolve($s, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 17, 'targetY' => 5,
+        ]);
+
+        $this->assertFalse($r->isTurnover());
+        $this->assertSame(1, $r->getNewState()->getBall()->getCarrierId());
+        $this->assertSame(3, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls(), 'přehoz se nesmí utratit');
+    }
 }
