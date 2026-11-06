@@ -27,5 +27,5 @@ Decay a Regenerace po smrti (P192), blitz do kostek, kde volí obránce (P227).
 
 ## Výsledek
 
-**Žádná nová mezera v pravidlech z commitů od 19.10.** Review P247 týž den ale našlo dvě vady pravidel: **P252** (PHP Safe Throw) a **P254** (C++ Hail Mary ve vánici + legalita hodu až po puštění míče) — obě opraveny 6.11. P247 = rozdíl ve volbě AI — uživatel 6.11. „přehoď i nepřesnou vždy“ ⇒ C++ srovnáno s PHP týž den. Týž princip jinde: **P251** (Always Hungry u TTM přehazuje jen PHP; přesnost TTM a bomby nepřehazuje ani jeden) — čeká uživatel.
+**Žádná nová mezera v pravidlech z commitů od 19.10.** Review P247 týž den ale našlo dvě vady pravidel: **P252** (PHP Safe Throw) a **P254** (C++ Hail Mary ve vánici + legalita hodu až po puštění míče) — obě opraveny 6.11. P247 = rozdíl ve volbě AI — uživatel 6.11. „přehoď i nepřesnou vždy“ ⇒ C++ srovnáno s PHP týž den. Týž princip jinde: **P251** (Always Hungry u TTM přehazovalo jen PHP; přesnost TTM a bomby nepřehazoval ani jeden) — uživatel 6.11.: Always Hungry ano, přesnost TTM ne, bomba jen fumble a Loner bombař bez týmového přehozu ⇒ hotovo v obou enginech týž den. **P253** (AI cení přihrávku s přehozy, přednost Pass/Catch) hotovo.
 Otevřené z dřívějších auditů beze změny (viz `audit_parity_20261019.md`).
