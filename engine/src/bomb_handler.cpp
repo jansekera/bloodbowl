@@ -2,6 +2,7 @@
 #include "bb/helpers.h"
 #include "bb/injury.h"
 #include "bb/ball_handler.h"
+#include "bb/coach_choice.h"
 #include <algorithm>
 
 namespace bb {
@@ -54,6 +55,21 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     int roll = dice.rollD6();
     emitEvent(events, {GameEvent::Type::PASS, throwerId, -1, thrower.position, target,
                       roll, roll >= passTarget && !isFumble(roll)});
+
+    // P251 (6.11.2026, uzivatel: „bombu jen na fumble“) -- driv se fumble bomby neprehazoval vubec.
+    // R. 7957-7958: "All skills that may be used when a ball is thrown may be used when a bomb is
+    // thrown also" => Pass (zdarma), Pro, tymovy prehoz (zebricek spolecny s prihravkou,
+    // rerollThrowByEngine). NEPRESNA bomba se neprehazuje (volba uzivatele). Bomber s Lonerem
+    // tymovy prehoz na bombu VUBEC nepouzije, ani na fumble (uzivatel 6.11.: „jestli ma bomber
+    // loner - tak se prikloň k neprehozeni ani fumble“); Pass a Pro (zdarma) mu zustavaji.
+    // Zivy kouc (CoachQuestion::PASS_REROLL) se pro bombu NEPTA -- otazka je napsana pro prihravku;
+    // kouc tedy bombu neprehazuje, krome Pass (zdarma, bez rozhodnuti, jako u prihravky).
+    // Parita s PHP: BombThrowHandler.php.
+    if (isFumble(roll) &&
+        (!coachDecides(thrower.teamSide) || thrower.hasSkill(SkillName::Pass))) {
+        rerollThrowByEngine(state, thrower, dice, events, roll, passTarget, bombMods,
+                            /*teamAllowed=*/!thrower.hasSkill(SkillName::Loner));
+    }
 
     // Determine explosion position
     Position explosionPos = target;
