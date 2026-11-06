@@ -111,10 +111,11 @@ final class BombThrowTest extends TestCase
         $s = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier])
             ->addPlayer(TeamSide::AWAY, 6, 7, id: 2)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->withBallOffPitch()
             ->build();
 
-        // fumble 1; stred = hazec (5,7): brneni 4+4; (6,7): D6 4 => brneni 4+4
+        // fumble 1 (bez prehozu, P251); stred = hazec (5,7): brneni 4+4; (6,7): D6 4 => brneni 4+4
         $r = $this->hod($s, [1, 4, 4, 4, 4, 4]);
 
         $this->assertTrue($r->isTurnover());
@@ -226,5 +227,97 @@ final class BombThrowTest extends TestCase
             fn(array $a) => $a['type'] === ActionType::BOMB_THROW->value,
         );
         $this->assertSame([], $nabidka, 'po pohybu se hod bombou nenabízí');
+    }
+
+    // ===== P251 (6.11.2026, uzivatel: „bombu jen na fumble“) =====
+    // R. 7957-7958 (dovednosti hodu mice platí i pro bombu), 8336-8337 (Pass), 8385-8387 (Pro),
+    // 929-936 (tymovy prehoz 1x za kolo), 8287-8290 (Loner), 925-927 (jeden prehoz na hod).
+    // Hazec (5,7), cil (8,7) quick, AG3 => cil hodu 3+. Hod 1 = fumble.
+
+    /** @param list<SkillName> $skills */
+    private function hazec(array $skills = [], int $rerolls = 2, bool $used = false): \App\DTO\GameState
+    {
+        $team = \App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, $rerolls);
+        if ($used) {
+            $team = $team->withRerollUsed();
+        }
+
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: array_merge([SkillName::Bombardier], $skills))
+            ->addPlayer(TeamSide::AWAY, 8, 7, id: 2)
+            ->withHomeTeam($team)
+            ->withBallOffPitch()
+            ->build();
+    }
+
+    public function testFumbleIsRerolledByTeamReroll(): void
+    {
+        // fumble 1, tymovy prehoz => 5 presne; stred (8,7): brneni 3+3 neprorazi
+        $r = $this->hod($this->hazec(), [1, 5, 3, 3]);
+
+        $home = $r->getNewState()->getTeamState(TeamSide::HOME);
+        $this->assertSame(1, $home->getRerolls(), 'tymovy prehoz utracen');
+        $this->assertTrue($home->isRerollUsedThisTurn());
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($r->isTurnover());
+    }
+
+    public function testInaccurateBombIsNotRerolled(): void
+    {
+        // Volba uzivatele: nepresna se neprehazuje. (Hlidaci test: projde i na starem kodu.)
+        $r = $this->hod($this->hazec(), [2, 3, 3, 3]);
+
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertFalse($r->getNewState()->getTeamState(TeamSide::HOME)->isRerollUsedThisTurn());
+    }
+
+    public function testPassSkillRerollsFumbleWithoutSpendingTeamReroll(): void
+    {
+        $r = $this->hod($this->hazec([SkillName::Pass]), [1, 5, 3, 3]);
+
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($r->isTurnover());
+    }
+
+    public function testProRerollsFumbleBeforeTeamReroll(): void
+    {
+        // fumble, Pro 4 projde, novy hod 5
+        $r = $this->hod($this->hazec([SkillName::Pro]), [1, 4, 5, 3, 3]);
+
+        $this->assertTrue($r->getNewState()->requirePlayer(1)->isProUsedThisTurn());
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($r->isTurnover());
+    }
+
+    public function testFumbleStandsWhenTeamRerollAlreadyUsed(): void
+    {
+        // (Hlidaci test.) Fumble: stred = hazec, brneni 2+2.
+        $r = $this->hod($this->hazec(used: true), [1, 2, 2]);
+
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertTrue($r->isTurnover());
+    }
+
+    public function testLonerBomberDoesNotSpendTeamRerollOnFumble(): void
+    {
+        // Uzivatel 6.11.: „jestli ma bomber loner - tak se prikloň k neprehozeni ani fumble“.
+        $r = $this->hod($this->hazec([SkillName::Loner]), [1, 2, 2]);
+
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
+        $this->assertTrue($r->isTurnover());
+    }
+
+    public function testLonerBomberWithPassSkillStillRerollsFumble(): void
+    {
+        $r = $this->hod($this->hazec([SkillName::Loner, SkillName::Pass]), [1, 5, 3, 3]);
+
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
+        $this->assertFalse($r->isTurnover());
     }
 }

@@ -172,3 +172,117 @@ TEST(BombHandler, P73AStunnedPlayerHitByTheBombStaysStunned) {
 
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
+
+// ============================================================================
+// P251 (6.11.2026, uzivatel: „bombu jen na fumble“): fumble bomby se prehazuje,
+// nepresna ne. Pravidla r. 7957-7958: "All skills that may be used when a ball
+// is thrown may be used when a bomb is thrown also"; Pass r. 8336-8337; tymovy
+// prehoz r. 929-936; jeden hod = nejvys jeden prehoz r. 925-927.
+// ============================================================================
+
+// Hazec AG3 na (10,7), cil (13,7), dosah quick => cil hodu 3. Hod 1 = fumble.
+static GameState makeBombSetup(int rerolls) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    gs.homeTeam.rerolls = rerolls;
+    gs.homeTeam.turnNumber = 1;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(BombHandler, P251FumbleIsRerolledByTeamReroll) {
+    GameState gs = makeBombSetup(2);
+    // 1 = fumble, tymovy prehoz -> 5 = presne; vybuch v cili, brneni 3+3 neprorazi.
+    // Stary kod: fumble stoji, vybuch u hazece (hazec PRONE, prehoz neutracen).
+    FixedDiceRoller dice({1, 5, 3, 3});
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 1) << "r. 929-936: tymovy prehoz se utratil";
+    EXPECT_TRUE(gs.homeTeam.rerollUsedThisTurn);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE) << "bomba dopadla podle noveho hodu";
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BombHandler, P251InaccurateBombIsNotRerolled) {
+    // Rozhodnuti uzivatele: nepresna bomba se NEPREHAZUJE, ani kdyz prehoz je.
+    // (Hlidaci test: na starem kodu take prochazi.)
+    GameState gs = makeBombSetup(2);
+    FixedDiceRoller dice({2, 1, 1, 1});    // 2 < 3 nepresna; 3x rozptyl na vychod -> (16,7)
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_FALSE(gs.homeTeam.rerollUsedThisTurn);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BombHandler, P251PassSkillRerollsFumbleWithoutSpendingTeamReroll) {
+    GameState gs = makeBombSetup(2);
+    gs.getPlayer(1).skills.add(SkillName::Pass);
+    FixedDiceRoller dice({1, 5, 3, 3});    // fumble -> Pass: 5 presne
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2) << "r. 8336-8337: Pass je zdarma";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BombHandler, P251ProRerollsFumbleBeforeTeamReroll) {
+    GameState gs = makeBombSetup(2);
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    FixedDiceRoller dice({1, 4, 5, 3, 3});  // fumble, Pro 4+ projde, novy hod 5
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_TRUE(gs.getPlayer(1).proUsedThisTurn);
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(result.turnover);
+}
+
+TEST(BombHandler, P251FumbleStandsWhenTeamRerollAlreadyUsedThisTurn) {
+    // r. 929-936: jeden tymovy prehoz za kolo. (Hlidaci test.)
+    GameState gs = makeBombSetup(2);
+    gs.homeTeam.rerollUsedThisTurn = true;
+    FixedDiceRoller dice({1, 2, 2});
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(result.turnover);
+}
+
+TEST(BombHandler, P251LonerBomberDoesNotSpendTeamRerollOnFumble) {
+    // Uzivatel 6.11.: „jestli ma bomber loner - tak se prikloni k neprehozeni
+    // ani fumble“. (Hlidaci test: stary kod take neprehazuje.)
+    GameState gs = makeBombSetup(2);
+    gs.getPlayer(1).skills.add(SkillName::Loner);
+    FixedDiceRoller dice({1, 2, 2});
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_FALSE(gs.homeTeam.rerollUsedThisTurn);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(result.turnover);
+}
+
+TEST(BombHandler, P251LonerBomberWithPassSkillStillRerollsFumble) {
+    // Loner omezuje jen TYMOVE prehozy (r. 8287-8290); Pass zustava.
+    GameState gs = makeBombSetup(2);
+    gs.getPlayer(1).skills.add(SkillName::Loner);
+    gs.getPlayer(1).skills.add(SkillName::Pass);
+    FixedDiceRoller dice({1, 5, 3, 3});
+    auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_FALSE(result.turnover);
+}

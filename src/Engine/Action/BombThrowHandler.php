@@ -18,6 +18,7 @@ use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
+use App\Engine\ProCheck;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 
@@ -82,6 +83,48 @@ final class BombThrowHandler implements ActionHandlerInterface
         $accurate = !$fumble && $roll >= $accuracyTarget;
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
         $events[] = GameEvent::bombThrow($throwerId, $roll, $resultStr);
+
+        // PRIDANO 6.11.2026 (P251, uzivatel: „bombu jen na fumble“) -- driv se fumble bomby
+        //   neprehazoval vubec. R. 7957-7958: "All skills that may be used when a ball is thrown
+        //   may be used when a bomb is thrown also" => Pass (r. 8336-8337, zdarma), pak Pro
+        //   (r. 8385-8387, po neuspesnem hodu Pro smi tymovy prehoz jen hod Pro), pak tymovy
+        //   prehoz (r. 929-936, Loner 4+ r. 8287-8290). Jeden hod = nejvys jeden prehoz (r. 925-927).
+        //   NEPRESNA bomba se neprehazuje (volba uzivatele). Hazec s Lonerem tymovy prehoz na bombu
+        //   VUBEC nepouzije, ani na fumble (uzivatel 6.11.: „jestli ma bomber loner - tak se
+        //   prikloň k neprehozeni ani fumble“); Pass a Pro (zdarma) mu zustavaji.
+        //   Parita s C++ (bomb_handler.cpp, rerollThrowByEngine).
+        if ($fumble) {
+            $teamAllowed = !$thrower->hasSkill(SkillName::Loner);
+            $skillRerolled = false;
+            if ($thrower->hasSkill(SkillName::Pass)) {
+                $skillRerolled = true;
+                $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
+            } elseif ($thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
+                $thrower = $thrower->withProUsedThisTurn(true);
+                $state = $state->withPlayer($thrower);
+                $pro = ProCheck::roll(
+                    $this->dice,
+                    $thrower,
+                    $teamAllowed && $state->getTeamState($activeSide)->canUseReroll(),
+                    $events,
+                );
+                if ($pro['teamRerollUsed']) {
+                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
+                }
+                $skillRerolled = $pro['allowed'];
+            } elseif ($teamAllowed && $state->getTeamState($activeSide)->canUseReroll()) {
+                $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
+                $skillRerolled = true;
+                $events[] = GameEvent::rerollUsed($throwerId, 'Team Reroll');
+            }
+            if ($skillRerolled) {
+                $roll = $this->dice->rollD6();
+                $fumble = $roll === 1 || $roll + $modifier <= 1;
+                $accurate = !$fumble && $roll >= $accuracyTarget;
+                $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
+                $events[] = GameEvent::bombThrow($throwerId, $roll, $resultStr);
+            }
+        }
 
         if ($fumble) {
             $landingPos = $throwerPos;

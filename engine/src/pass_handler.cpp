@@ -325,12 +325,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         // jmenuje.
         // ⚠️ TA1 (l. 925-927): jeden hod = nejvys jeden reroll, takze se
         // stupne uz NERETEZI -- driv tu byla kaskada Pass -> Pro -> tymovy.
-        if (passer.hasSkill(SkillName::Pass)) {
-            roll = dice.rollD6();
-            emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
-                              static_cast<int>(SkillName::Pass),
-                              roll >= passTarget && !isFumble(roll)});
-        } else if (coachDecides(passer.teamSide)) {
+        if (!passer.hasSkill(SkillName::Pass) && coachDecides(passer.teamSide)) {
             // P130: v živé partii rozhoduje kouč, a to u fumble I u nepřesné
             // přihrávky (schváleno 03.10. a 10.10.) -- pravidla přehoz dovolují
             // u obojího; engine od P247 (6.11.) taky u obojího.
@@ -348,45 +343,8 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                 }
             }
         } else {
-            // ZMĚNĚNO 6.11.2026 (P247, uživatel: „přehoď i nepřesnou vždy“) — dřív tu bylo
-            // `else if (fumbledFirst)`: Pro a týmový přehoz jen na FUMBLE, s odůvodněním, že
-            // turnover hrozí jen u fumble. Neplatí: nepřesná přihrávka se rozptýlí a nechytí-li ji
-            // spoluhráč, je to turnover taky (ř. 881-889). Ř. 929-931: týmový přehoz smí přehodit
-            // kterýkoli hod kromě zbroje/zranění. PHP (PassResolver) přehazuje nepřesnou odjakživa
-            // ⇒ teď stejně v obou enginech (audit parity 6.11.).
-            // P70 (30.09.2026), r. 8385-8387: po neuspesnem hodu Pro plati
-            // puvodni vysledek a tymovy prehoz smi prehodit jen HOD PRO.
-            // Vzor attemptRoll (helpers.cpp) a bloku; PHP 84f7dc46.
-            if (passer.hasSkill(SkillName::Pro) && !passer.proUsedThisTurn) {
-                passer.proUsedThisTurn = true;
-                int proRoll = dice.rollD6();
-                if (proRoll < 4) {
-                    TeamState& team = state.getTeamState(passer.teamSide);
-                    if (team.canUseReroll()) {
-                        spendTeamRerollByEngine(team, passerId, events);
-                        if (lonerAllowsTeamReroll(passer, dice, events)) proRoll = dice.rollD6();
-                    }
-                }
-                if (proRoll >= 4) {
-                    roll = dice.rollD6();
-                    // review P247: hod Pro má v záznamu stopu jako v attemptRoll (helpers.cpp)
-                    emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
-                                      static_cast<int>(SkillName::Pro), roll >= passTarget && !isFumble(roll), roll});
-                }
-            } else {
-                TeamState& team = state.getTeamState(passer.teamSide);
-                if (team.canUseReroll()) {
-                    spendTeamRerollByEngine(team, passerId, events);
-                    if (lonerAllowsTeamReroll(passer, dice, events)) {
-                        const int original = roll;
-                        roll = dice.rollD6();
-                        // P244: v živé partii i u strany bez kouče původní a nový hod
-                        if (coachModeOn())
-                            emitEvent(events, {GameEvent::Type::REROLL, passerId, -1, {}, {}, 0,
-                                              roll >= passTarget && !isFumble(roll), original, roll});
-                    }
-                }
-            }
+            // Pass -> Pro -> tymovy prehoz: spolecne s bombou (rerollThrowByEngine, helpers.cpp).
+            rerollThrowByEngine(state, passer, dice, events, roll, passTarget, passMods, /*teamAllowed=*/true);
         }
     }
 

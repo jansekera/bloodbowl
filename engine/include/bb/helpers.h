@@ -127,6 +127,12 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // Loner 4+ po spotřebovaném týmovém přehozu; neúspěch v živé partii = REROLL druh 3 (P244).
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// Přehoz hodu míče/bomby bez kouče: Pass -> Pro -> týmový přehoz (viz helpers.cpp). `roll` se přepíše
+// novým hodem; `teamAllowed=false` zakáže týmový přehoz (i po neúspěšném Pro).
+void rerollThrowByEngine(GameState& state, Player& thrower, DiceRollerBase& dice,
+                         std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
+                         bool teamAllowed);
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);
