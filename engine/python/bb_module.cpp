@@ -671,6 +671,10 @@ PYBIND11_MODULE(bb_engine, m) {
         long v[3]; bb::takeP250(v);
         return py::make_tuple(v[0], v[1], v[2]);
     });
+    m.def("take_p253", []() {   // P253: (přihrávka nabídnuta jen díky přehozům, nabídka vyřazena kvůli přednosti skillů); čte a nuluje
+        long v[2]; bb::takeP253(v);
+        return py::make_tuple(v[0], v[1]);
+    });
     m.def("take_p249_extra", []() {   // P249b–f: (blok navíc, přehoz, odsun jinam, blitz odložen za mimo-zálohu, strop úhybu nepoužit); čte a nuluje
         long v[bb::kP249ExtraSlots]; bb::takeP249Extra(v);
         return py::make_tuple(v[0], v[1], v[2], v[3], v[4]);

@@ -420,6 +420,34 @@ TEST(PassHandler, HailMaryPassScatters3Times) {
     EXPECT_FALSE(result.turnover);
 }
 
+// P255 (review dávky 7.11.2026): Hail Mary jen tam, kam pravítko nedosáhne — jako PHP (PassResolver: HMP jen
+// mimo dosah). Dřív C++ hodil Hail Mary u KAŽDÉ přihrávky hráče s HMP (vždy nepřesná, 3 rozptyly), i rychlé.
+// Ř. 8164-8171 „may throw the ball to any square … no matter what the range“ = smí, ne musí.
+TEST(PassHandler, P255HailMaryPlayerThrowsANormalPassWithinTheRuler) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({5, 7}, 1);
+
+    FixedDiceRoller dice({5, 3});            // běžná rychlá: 5 = přesná; chytání 3 (Hail Mary by se rozptýlila)
+    auto result = resolvePass(gs, 1, {8, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+}
+
+TEST(PassHandler, P255WithoutHailMaryAThrowBeyondTheRulerIsRefused) {
+    auto gs = makePassSetup();
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.ball = BallState::carried({3, 7}, 1);
+    FixedDiceRoller dice({});
+    auto result = resolvePass(gs, 1, {20, 7}, dice, nullptr);
+    EXPECT_FALSE(result.success);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.ball.carrierId, 1);
+}
+
 // ===== HAND-OFF TESTS =====
 
 TEST(PassHandler, HandOffSuccess) {

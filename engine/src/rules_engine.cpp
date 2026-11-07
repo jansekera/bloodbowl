@@ -194,17 +194,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                 // Reach comes from the ruler grid, not a Chebyshev radius
                 // (rules parity, 2026-08-10): "within 13" offered 45 targets
                 // the ruler cannot actually reach.
-                PassRange range;
-                if (!passRangeFromOffset(teammate.position.x - p.position.x,
-                                         teammate.position.y - p.position.y,
-                                         range)) {
-                    return;
-                }
-                // Blizzard: "only quick or short passes can be attempted".
-                if (state.weather == Weather::BLIZZARD &&
-                    (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
-                    return;
-                }
+                // P257: legalita na jednom místě (helpers.cpp passTargetLegal). Hail Mary (mimo pravítko) se
+                // tu nenabízí — dřív ani ne (jen cíle na pravítku); nabídnout ho by byla nová volba AI.
+                const PassLegality leg = passTargetLegal(state, p, teammate.position);
+                if (!leg.legal || leg.hailMary) return;
                 out.push_back({ActionType::PASS, p.id, teammate.id, teammate.position});
             });
         }

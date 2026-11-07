@@ -127,6 +127,12 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // Loner 4+ po spotřebovaném týmovém přehozu; neúspěch v živé partii = REROLL druh 3 (P244).
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P255 + P257 (review dávky 7.11.2026): legalita hodu míče (i bomby) na JEDNOM místě. Na pravítku = běžná
+// přihrávka, pokud pásmo projde počasím; mimo pravítko jen Hail Mary (ř. 8164-8171), a ne ve vánici. Jako PHP
+// PassResolver (HMP jen mimo dosah, výjimka u nelegálního cíle). `band` platí jen pro běžnou přihrávku.
+struct PassLegality { bool legal; bool hailMary; PassRange band; };
+PassLegality passTargetLegal(const GameState& state, const Player& thrower, Position target);
+
 // P253 (uživatel 6.11.2026: „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat
 // má skill Pass a Catch, co mají reroll bez týmového“). Šance, že přihrávka dojde (přesný hod × chycení), když engine
 // přehazuje jako pass_handler (P247): Pass přehodí hod zdarma, jinak týmový přehoz (jeden za tah, Loner 4+);

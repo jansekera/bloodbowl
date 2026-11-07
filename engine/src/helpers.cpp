@@ -316,6 +316,17 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
 // místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
 // znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
+PassLegality passTargetLegal(const GameState& state, const Player& thrower, Position target) {
+    PassLegality r{false, false, PassRange::LONG_BOMB};
+    if (passRangeFromOffset(target.x - thrower.position.x, target.y - thrower.position.y, r.band)) {
+        r.legal = passBandAllowedInWeather(r.band, state.weather);
+        return r;
+    }
+    r.hailMary = thrower.hasSkill(SkillName::HailMaryPass) && state.weather != Weather::BLIZZARD;
+    r.legal = r.hailMary;
+    return r;
+}
+
 PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
                                 bool teamReroll, bool throwerLoner, bool catcherLoner) {
     const double lt = throwerLoner ? 0.5 : 1.0;   // Loner 4+ (ř. 8287-8290)

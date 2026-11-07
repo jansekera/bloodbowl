@@ -140,6 +140,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kP250PickerPathRisk = 1ull << 32 // P250: zvedač volného míče podle šance celé akce (cesta: úhyby a GFI × zvednutí), ne jen zvednutí
     , kP250Surround = 1ull << 33       // P250: obestoupit volný míč — přesuny bez hodu na pole vedle míče (převaha zón kolem něj)
     , kP250PushOntoBall = 1ull << 34   // P250: při převaze kolem volného míče odtlačit hráče (i našeho řetězem) na pole s míčem ⇒ odraz k našim
+    , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
 void setExtraFeaturesOff(uint64_t mask);
 uint64_t extraFeaturesOff();
@@ -154,6 +155,8 @@ void takeP249CarrierBlitzFirst(long* out3);
 // P250: [0] zvedač změněn kvůli riziku cesty, [1] nabídnut přesun k obestoupení míče, [2] hráč odtlačen na volný míč. Kumulativní, nuluje se čtením.
 void noteP250(int i);
 void takeP250(long* out3);
+// P253: (nabídka přihrávky jen díky přehozům, nabídka vyřazena kvůli přednosti skillů); čte a nuluje
+void takeP253(long* out2);
 // P249b–f: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d),
 //   [3] blitz na nosiče odložen za přesun hráče mimo zálohu (e), [4] strop úhybu u blitzu na nosiče nepoužit (f). Kumulativní, nuluje se čtením.
 constexpr int kP249ExtraSlots = 5;

@@ -197,23 +197,13 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& passer = state.getPlayer(passerId);
 
-    // ZMĚNĚNO 6.11.2026 (P254 + review) — legalita hodu na JEDNOM místě a PŘED puštěním míče. Dřív se míč
-    // pustil a házelo se na zachycení, a teprve pak padlo „mimo pravítko“ / „dlouhá ve vánici“ (fail s volným
-    // míčem pod házečem, nebo zachycení u zakázaného hodu); hod přes 13 polí vracel turnover. PHP PassResolver
-    // nelegální cíl odmítne výjimkou dřív, než sáhne na stav.
-    // Ř. 8170-8171: Hail Mary „may not be used in a blizzard“ ⇒ ve vánici běžná přihrávka.
-    // CRP vánice: „only quick or short passes can be attempted“ (pásmo pravítka, před Strong Arm).
-    const bool isHailMary = passer.hasSkill(SkillName::HailMaryPass) && state.weather != Weather::BLIZZARD;
-    PassRange range = PassRange::LONG_BOMB;
-    if (!isHailMary) {
-        if (!passRangeFromOffset(target.x - passer.position.x, target.y - passer.position.y, range)) {
-            return ActionResult::fail();   // mimo mřížku pravítka (i dál než 13 polí)
-        }
-        if (state.weather == Weather::BLIZZARD &&
-            (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
-            return ActionResult::fail();
-        }
-    }
+    // ZMĚNĚNO 6.11.2026 (P254 + review) — legalita hodu PŘED puštěním míče (dřív míč puštěn, zachycení, pak fail).
+    // ZMĚNĚNO 7.11.2026 (P255/P257) — jedno místo `passTargetLegal` (helpers.cpp); Hail Mary jen MIMO pravítko
+    // (dřív u každé přihrávky hráče s HMP, i rychlé — PHP to má jen mimo dosah). Ř. 8164-8171, CRP vánice.
+    const PassLegality legality = passTargetLegal(state, passer, target);
+    if (!legality.legal) return ActionResult::fail();
+    const bool isHailMary = legality.hailMary;
+    PassRange range = legality.band;
 
     // Mark pass used
     state.getTeamState(passer.teamSide).passUsedThisTurn = true;

@@ -71,6 +71,8 @@ uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
 static long g_p250[3] = {0, 0, 0};
 void noteP250(int i) { ++g_p250[i]; }
 void takeP250(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p250[i]; g_p250[i] = 0; } }
+static long g_p253[2] = {0, 0};
+void takeP253(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_p253[i]; g_p253[i] = 0; } }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
@@ -2815,16 +2817,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // pass "only in an emergency". Emergency is not a mood: it is the
             // last two turns, the carrier out of reach of the endzone, and a
             // team-mate who is not.
-            PassRange range;
-            if (!passRangeFromOffset(target.position.x - carrier->position.x,
-                                     target.position.y - carrier->position.y,
-                                     range)) {
-                return;
-            }
-            if (state.weather == Weather::BLIZZARD &&
-                (range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB)) {
-                return;
-            }
+            // P257: legalita na jednom místě (helpers.cpp passTargetLegal); Hail Mary se tu nenabízí (jako dřív)
+            const PassLegality leg = passTargetLegal(state, *carrier, target.position);
+            if (!leg.legal || leg.hailMary) return;
+            const PassRange range = leg.band;
             // P253: tytéž modifikátory hodu jako resolver (pass_handler): Strong Arm posune pásmo, Accurate,
             // Nerves of Steel, Disturbing Presence, Very Sunny.
             PassRange band = range;
@@ -2865,7 +2861,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 handOff ? -1.0 : chance(throwTarget), chance(catchTarget),
                 carrier->hasSkill(SkillName::Pass), target.hasSkill(SkillName::Catch),
                 myTeam.canUseReroll(), carrier->hasSkill(SkillName::Loner), target.hasSkill(SkillName::Loner));
-            const double complete = pc.withTeam;
+            // vypínač kP253PassPricing (měření P253): vypnuto = dřívější cena bez přehozů a bez přednosti skillů
+            const bool p253 = extraFeatureOn(kP253PassPricing);
+            const double rawComplete = handOff ? chance(catchTarget) : chance(throwTarget) * chance(catchTarget);
+            const double complete = p253 ? pc.withTeam : rawComplete;
 
             const int turnsLeft = 9 - myTeam.turnNumber;
             const bool emergency =
@@ -2878,8 +2877,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // the half ends without it either way.
             const bool worthIt = handOff ? (swap && complete >= 0.5)
                                          : (complete >= 0.5);
+            if (p253 && (worthIt && !emergency) && rawComplete < 0.5) ++g_p253[0];   // P253 čítač (pozitivní kontrola)
             if (worthIt || emergency) {
-                const bool skillOk = handOff ? (swap && pc.skillOnly >= 0.5) : (pc.skillOnly >= 0.5);
+                const bool skillOk = !p253 || (handOff ? (swap && pc.skillOnly >= 0.5) : (pc.skillOnly >= 0.5));
                 passOffers.push_back({target.id, skillOk, emergency, handOff, targetDist});
             }
         });
@@ -2888,7 +2888,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             if (!o.skillOk && !o.emergency)
                 for (const PassOffer& s : passOffers)
                     if (s.skillOk && s.handOff == o.handOff && s.targetDist <= o.targetDist) preferredElsewhere = true;
-            if (preferredElsewhere) continue;
+            if (preferredElsewhere) { ++g_p253[1]; continue; }
             if (o.handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch() — až vydaná nabídka
             out.push_back({MacroType::PASS_ACTION, carrier->id, o.targetId, {-1, -1}});
         }

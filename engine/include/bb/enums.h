@@ -237,6 +237,12 @@ inline bool passRangeFromOffset(int dx, int dy, PassRange& out) {
     return true;
 }
 
+// P257 (review dávky 7.11.2026): CRP vánice — „only quick or short passes can be attempted“ (pásmo pravítka,
+// před Strong Arm). Jedno místo pro resolver, generátor akcí i bránu AI (dřív tři kopie). PHP: PassRange::povolenaZaPocasi.
+inline bool passBandAllowedInWeather(PassRange band, Weather w) {
+    return !(w == Weather::BLIZZARD && (band == PassRange::LONG_PASS || band == PassRange::LONG_BOMB));
+}
+
 inline Weather weatherFromRoll(int roll) {
     if (roll <= 2)  return Weather::SWELTERING_HEAT;
     if (roll == 3)  return Weather::VERY_SUNNY;
