@@ -30,7 +30,8 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool forcedFumble = false;
     if (thrower.hasSkill(SkillName::AlwaysHungry)) {
         // P251 (uživatel 6.11.2026: „always hungry ano — nepřesný hod je vždy — ten nepřehazovat“). Dřív se
-        // jednička na Always Hungry v C++ nepřehazovala vůbec, PHP (ThrowTeamMateHandler) týmovým přehozem ano.
+        // jednička na Always Hungry v C++ nepřehazovala vůbec, PHP (ThrowTeamMateHandler) týmovým přehozem ano;
+        // od 7.11. (P259) obě strany stejně: Pro, pak týmový přehoz (Loner 4+).
         // Ř. 929-931: týmový přehoz smí přehodit kterýkoli hod. Přes attemptRoll (helpers.cpp): kouč-člověk volí
         // sám, engine Pro, pak týmový přehoz (Loner 4+), a kostka jde do záznamu (review P251).
         int hungryRoll = 0;

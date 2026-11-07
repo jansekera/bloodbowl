@@ -520,4 +520,24 @@ final class ThrowTeamMateTest extends TestCase
         ]);
         $this->assertSame(6, $result->getNewState()->requirePlayer(2)->requirePosition()->getX());
     }
+
+    /**
+     * P259 (review dávky 7.11.2026): jednička na Always Hungry se přehazuje i skillem Pro (r. 8381-8387: Pro smí
+     * přehodit kterýkoli hod), jako C++ (ttm_handler přes attemptRoll: Pro, pak týmový přehoz). Dřív PHP jen týmovým.
+     */
+    public function testP259AlwaysHungryPrehodiPro(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate, SkillName::AlwaysHungry, SkillName::Pro], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $s = $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(0));
+        // 1 = hlad; Pro 4 projde; přehoz 5 = v pořádku; hod 4; rozptyly 3 ×3 z (8,5) → (11,5); dopad 4.
+        // Starý kód: bez Pro ⇒ druhý hod 4 = vykroutil se ⇒ fumble, hráč zůstane na (6,5).
+        $r = (new ActionResolver(new FixedDiceRoller([1, 4, 5, 4, 3, 3, 3, 4])))->resolve($s, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
+        ]);
+        $this->assertSame(11, $r->getNewState()->requirePlayer(2)->requirePosition()->getX());
+    }
 }

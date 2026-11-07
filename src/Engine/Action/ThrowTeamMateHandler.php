@@ -86,8 +86,26 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $hungryRoll = $this->dice->rollD6();
             $eaten = $hungryRoll === 1;
 
-            // Try team reroll on failure
-            if ($eaten) {
+            // P259 (review dávky 7.11.2026): napřed Pro (r. 8381-8387, smí přehodit kterýkoli hod; po neúspěšném
+            //   hodu Pro smí týmový přehoz jen hod Pro), teprve pak týmový přehoz s Lonerem — jako C++ (attemptRoll).
+            //   Dřív jen týmový přehoz.
+            $proUsed = false;
+            if ($eaten && $thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
+                $proUsed = true;
+                $thrower = $thrower->withProUsedThisTurn(true);
+                $state = $state->withPlayer($thrower);
+                $pro = \App\Engine\ProCheck::roll($this->dice, $thrower, $state->getTeamState($activeSide)->canUseReroll(), $events);
+                if ($pro['teamRerollUsed']) {
+                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
+                }
+                if ($pro['allowed']) {
+                    $hungryRoll = $this->dice->rollD6();
+                    $eaten = $hungryRoll === 1;
+                }
+            }
+
+            // Try team reroll on failure (jen když se nepoužil Pro — jeden hod = jeden přehoz, r. 925-927)
+            if ($eaten && !$proUsed) {
                 $teamState = $state->getTeamState($activeSide);
                 if ($teamState->canUseReroll()) {
                     $state = $state->withTeamState($activeSide, $teamState->withRerollUsed());
