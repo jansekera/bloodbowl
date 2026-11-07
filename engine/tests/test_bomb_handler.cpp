@@ -286,3 +286,50 @@ TEST(BombHandler, P251LonerBomberWithPassSkillStillRerollsFumble) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
     EXPECT_FALSE(result.turnover);
 }
+
+// ───────────── P251b (uživatel 7.11.2026: „přehoz bomby se má člověka ptát“) ─────────────
+// Živá partie: kouč-člověk rozhoduje o přehozu fumble bomby sám (nechat / tým / Pro), jako u přihrávky
+// (CoachQuestion::PASS_REROLL). Dřív se ho engine neptal a fumble nechal stát (kromě Pass zdarma).
+#include "bb/coach_choice.h"
+
+static GameState bombCoachSetup() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.rerolls = 3;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);   // AG3, rychlý hod na (13,7): 3+
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(CoachChoiceBomb, P251bFumble_CoachIsAsked) {
+    GameState gs = bombCoachSetup();
+    FixedDiceRoller dice({1, 5, 3, 3});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try { resolveBombThrow(gs, 1, {13, 7}, dice, nullptr); FAIL(); } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::BOMB_REROLL);
+        EXPECT_EQ(p.roll, 1);
+        EXPECT_EQ(p.target, 3);
+    }
+}
+
+TEST(CoachChoiceBomb, P251bInaccurateBomb_CoachIsNotAsked) {
+    // nepřesná bomba se nepřehazuje (uživatel 6.11.) ⇒ ani se neptá
+    GameState gs = bombCoachSetup();
+    gs.getPlayer(1).stats.agility = 2;               // cíl 4+, hod 2 = nepřesná, ne fumble
+    FixedDiceRoller dice({2, 1, 1, 1});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    EXPECT_NO_THROW(resolveBombThrow(gs, 1, {13, 7}, dice, nullptr));
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);
+}
+
+TEST(CoachChoiceBomb, P251bTeamRerollOnFumble_BombHitsTheTarget) {
+    GameState gs = bombCoachSetup();
+    FixedDiceRoller dice({1, 5, 3, 3});              // fumble → týmový přehoz 5 → přesná; zbroj 3+3
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
+    resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+    EXPECT_EQ(gs.homeTeam.rerolls, 2);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);       // vybuchla na cíli
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);      // ne u házeče
+}

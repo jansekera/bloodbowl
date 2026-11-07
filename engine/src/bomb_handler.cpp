@@ -62,13 +62,29 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     // rerollThrowByEngine). NEPRESNA bomba se neprehazuje (volba uzivatele). Bomber s Lonerem
     // tymovy prehoz na bombu VUBEC nepouzije, ani na fumble (uzivatel 6.11.: „jestli ma bomber
     // loner - tak se prikloň k neprehozeni ani fumble“); Pass a Pro (zdarma) mu zustavaji.
-    // Zivy kouc (CoachQuestion::PASS_REROLL) se pro bombu NEPTA -- otazka je napsana pro prihravku;
-    // kouc tedy bombu neprehazuje, krome Pass (zdarma, bez rozhodnuti, jako u prihravky).
-    // Parita s PHP: BombThrowHandler.php.
-    if (isFumble(roll) &&
-        (!coachDecides(thrower.teamSide) || thrower.hasSkill(SkillName::Pass))) {
-        rerollThrowByEngine(state, thrower, dice, events, roll, passTarget, bombMods,
-                            /*teamAllowed=*/!thrower.hasSkill(SkillName::Loner));
+    // ZMĚNĚNO 7.11.2026 (P251b, uživatel: „přehoz bomby se má člověka ptát“) — dřív se živý kouč na bombu
+    // neptal a fumble nechal stát (kromě Pass). Teď jako u přihrávky: Pass zdarma bez otázky, jinak se kouče
+    // ptá CoachQuestion::BOMB_REROLL (nechat / tým / Pro); Loner omezení výše je volba AI, člověk volí sám.
+    // Parita s PHP: BombThrowHandler.php (webová hra se na přehoz přihrávky ani bomby neptá).
+    if (isFumble(roll)) {
+        if (!coachDecides(thrower.teamSide) || thrower.hasSkill(SkillName::Pass)) {
+            rerollThrowByEngine(state, thrower, dice, events, roll, passTarget, bombMods,
+                                /*teamAllowed=*/!thrower.hasSkill(SkillName::Loner));
+        } else {
+            const int original = roll;
+            bool viaPro = false;
+            if (coachAskReroll(state, thrower, dice, CoachQuestion::BOMB_REROLL, -1, roll, passTarget,
+                               /*teamAllowed=*/true, events, viaPro)) {
+                roll = dice.rollD6();
+                const bool ok = roll >= passTarget && !isFumble(roll);
+                if (viaPro) {
+                    emitEvent(events, {GameEvent::Type::SKILL_USED, throwerId, -1, {}, {},
+                                      static_cast<int>(SkillName::Pro), ok, roll});
+                } else {
+                    emitEvent(events, {GameEvent::Type::REROLL, throwerId, -1, {}, {}, 0, ok, original, roll});
+                }
+            }
+        }
     }
 
     // Determine explosion position

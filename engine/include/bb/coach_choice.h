@@ -50,7 +50,10 @@ enum class CoachQuestion : int {
     // dopadá na prázdné pole v jeho tackle zóně (ř. 8065-8071 "can attempt"). playerId = hráč, target =
     // pole dopadu x*100+y, roll = počet DALŠÍCH kandidátů, otherId = hráč, který už se pokouší (-1 = nikdo).
     // Ptá se kouče hráče, i v tahu soupeře; víc kandidátů = otázka na každého (varianta B, divingCatchAttempt).
-    USE_DIVING_CATCH = 16
+    USE_DIVING_CATCH = 16,
+    // P251b (uživatel 7.11.2026: „přehoz bomby se má člověka ptát“): fumble bomby (Bombardier). playerId = házeč,
+    // roll = kostka, target = cíl hodu. Odpověď: nechat / tým / Pro (jako PASS_REROLL). Nepřesná bomba se neptá.
+    BOMB_REROLL = 17
 };
 
 namespace CoachAnswer {

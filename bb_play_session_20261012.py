@@ -539,6 +539,8 @@ def otazka_str(q):
         return f"❓ PŘEHOZ? hráč {p}: padlo {q['roll']}, potřeba {q['target']}+  ->  odp {moznosti_prehozu(q)}"
     if t == "PASS_REROLL":
         return f"❓ PŘEHOZ PŘIHRÁVKY? hráč {p}: padlo {q['roll']}, potřeba {q['target']}+  ->  odp {moznosti_prehozu(q)}"
+    if t == "BOMB_REROLL":   # P251b (uživatel 7.11.): fumble bomby — přehodit?
+        return f"❓ PŘEHOZ BOMBY (fumble)? hráč {p}: padlo {q['roll']}, potřeba {q['target']}+  ->  odp {moznosti_prehozu(q)}"
     if t == "PRO_GATE_REROLL":
         return (f"❓ hod na Pro hráče {p} NEPROŠEL: padlo {q['roll']}, potřeba 4+ — přehodit HOD NA PRO týmovým "
                 f"rerollem?  ->  odp {moznosti_prehozu(q)}")
