@@ -2821,17 +2821,8 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             const PassLegality leg = passTargetLegal(state, *carrier, target.position);
             if (!leg.legal || leg.hailMary) return;
             const PassRange range = leg.band;
-            // P253: tytéž modifikátory hodu jako resolver (pass_handler): Strong Arm posune pásmo, Accurate,
-            // Nerves of Steel, Disturbing Presence, Very Sunny.
-            PassRange band = range;
-            if (carrier->hasSkill(SkillName::StrongArm) && band != PassRange::QUICK_PASS)
-                band = static_cast<PassRange>(static_cast<int>(band) - 1);
-            int throwTarget = 7 - carrier->stats.agility - passModifier(band)
-                            - (carrier->hasSkill(SkillName::Accurate) ? 1 : 0)
-                            + (carrier->hasSkill(SkillName::NervesOfSteel)
-                                   ? 0 : countTacklezones(state, carrier->position, mySide))
-                            + countDisturbingPresence(state, carrier->position, mySide)
-                            + (state.weather == Weather::VERY_SUNNY ? 1 : 0);
+            // P256: modifikátory hodu z téhož místa jako resolver (helpers.cpp throwRollMods)
+            const int throwTarget = 7 - carrier->stats.agility - throwRollMods(state, *carrier, range);
             // chycení: totéž místo jako engine (helpers.cpp calculateCatchTarget) — +1 za přesnou přihrávku
             // i za předání (resolveHandOff), Diving Catch jen u přesné přihrávky
             const int catchTarget = calculateCatchTarget(state, target, 1, !handOff);

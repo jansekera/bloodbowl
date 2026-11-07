@@ -316,6 +316,17 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
 // místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
 // znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
+int throwRollMods(const GameState& state, const Player& thrower, PassRange band) {
+    if (thrower.hasSkill(SkillName::StrongArm) && band != PassRange::QUICK_PASS)
+        band = static_cast<PassRange>(static_cast<int>(band) - 1);
+    int mods = passModifier(band);   // rychlá +1, krátká 0, dlouhá −1, dlouhá bomba −2
+    if (thrower.hasSkill(SkillName::Accurate)) mods += 1;
+    if (!thrower.hasSkill(SkillName::NervesOfSteel)) mods -= countTacklezones(state, thrower.position, thrower.teamSide);
+    mods -= countDisturbingPresence(state, thrower.position, thrower.teamSide);
+    if (state.weather == Weather::VERY_SUNNY) mods -= 1;   // jen Very Sunny; déšť patří k chytání, vánice k dosahu
+    return mods;
+}
+
 PassLegality passTargetLegal(const GameState& state, const Player& thrower, Position target) {
     PassLegality r{false, false, PassRange::LONG_BOMB};
     if (passRangeFromOffset(target.x - thrower.position.x, target.y - thrower.position.y, r.band)) {

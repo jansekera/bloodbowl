@@ -127,6 +127,14 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
 // Loner 4+ po spotřebovaném týmovém přehozu; neúspěch v živé partii = REROLL druh 3 (P244).
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
+// P256 (review dávky 7.11.2026): součet modifikátorů K HODU na přihrávku (kladný = pomáhá) na JEDNOM místě — pro
+// přihrávku, bombu (ř. 7952-7958: „rules for throwing the ball“), hod spoluhráčem (ř. 8605-8607 „exactly the same“,
+// −1 přičte volající) i bránu AI. `band` = pásmo pravítka PŘED Strong Arm (Strong Arm ho posune o jedno, ř. 8522-8524).
+// Accurate +1 (ř. 7780-7781), tackle zóny −1 (ne s Nerves of Steel), Disturbing Presence −1, Very Sunny −1.
+// Cíl hodu = clamp(7 − AG − mods, 2, 6); fumble = hod 1 nebo hod + mods ≤ 1 (ř. 1742-1744). PHP: getPassRollModifier.
+int throwRollMods(const GameState& state, const Player& thrower, PassRange band);
+inline bool isThrowFumble(int roll, int mods) { return roll == 1 || roll + mods <= 1; }
+
 // P255 + P257 (review dávky 7.11.2026): legalita hodu míče (i bomby) na JEDNOM místě. Na pravítku = běžná
 // přihrávka, pokud pásmo projde počasím; mimo pravítko jen Hail Mary (ř. 8164-8171), a ne ve vánici. Jako PHP
 // PassResolver (HMP jen mimo dosah, výjimka u nelegálního cíle). `band` platí jen pro běžnou přihrávku.

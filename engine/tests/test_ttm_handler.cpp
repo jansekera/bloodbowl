@@ -252,6 +252,25 @@ TEST(TTMHandler, P251AnInaccurateTeamMateThrowIsNotRerolled) {
     EXPECT_EQ(gs.getPlayer(2).position, (Position{16, 7}));
 }
 
+// P256 (review dávky 7.11.2026): hod spoluhráčem „is worked out exactly the same as … passing a ball, except …
+// subtract 1“ (ř. 8605-8607) ⇒ Disturbing Presence, Very Sunny i Accurate jako u přihrávky. Dřív C++ i PHP DP
+// a Very Sunny vynechávaly. Modifikátor rozhoduje o fumble (ř. 1742-1744: hod + modifikátory ≤ 1).
+TEST(TTMHandler, P256DisturbingPresenceCanTurnTheThrowIntoAFumble) {
+    auto gs = ttmSetup();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    placePlayer(gs, 12, {10, 10}, TeamSide::AWAY, 6, 3, 3, 8);   // 3 pole od házeče, mimo zóny
+    gs.getPlayer(12).skills.add(SkillName::DisturbingPresence);
+
+    // rychlá +1, TTM −1, DP −1 ⇒ −1: hod 2 → 1 = fumble ⇒ spoluhráč zůstane na (11,7); dopad 5.
+    // Bez DP: hod 2 → 2 = ne fumble ⇒ rozptyl (kostky 3,3,3) na (16,7).
+    FixedDiceRoller dice({2, 5, 3, 3, 3, 5});
+    resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{11, 7}));
+}
+
 TEST(TTMHandler, ThrownCarrierOffThePitchIsATurnover) {
     // druha strana l. 8430-8431: "...UNLESS HE WAS HOLDING THE BALL"
     auto gs = ttmSetup();

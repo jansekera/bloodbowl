@@ -21,13 +21,19 @@ use App\Engine\TacklezoneCalculator;
 
 final class ThrowTeamMateHandler implements ActionHandlerInterface
 {
+    private readonly \App\Engine\PassResolver $passResolver;
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
         private readonly ScatterCalculator $scatterCalc,
         private readonly InjuryResolver $injuryResolver,
         private readonly BallResolver $ballResolver,
-    ) {}
+    ) {
+        // P256: hod se počítá „exactly the same as … passing a ball“ (r. 8605-8607) — modifikátory z přihrávky
+        //   (jako BombThrowHandler).
+        $this->passResolver = new \App\Engine\PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver);
+    }
 
     /**
      * @param array<string, mixed> $params {playerId, targetId, targetX, targetY}
@@ -149,12 +155,10 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         //   passes the player." Ta -1 tady chybela.
         //   A protoze se hod resi "exactly the same", plati i r. 1742-1745:
         //   fumble je pri hodu 1 **nebo pri modifikovanem vysledku <= 1**.
+        //   OPRAVENO 7.11.2026 (P256, review dávky): „exactly the same“ ⇒ i Disturbing Presence, Very Sunny,
+        //   Accurate a Strong Arm — dřív jen pásmo a zóny. Parita s C++ ttm_handler.cpp (throwRollMods − 1).
         $ag = $thrower->getStats()->getAgility();
-        $tz = $thrower->hasSkill(SkillName::NervesOfSteel)
-            ? 0
-            : $this->tzCalc->countTacklezones($state, $throwerPos, $thrower->getTeamSide());
-
-        $modifikator = $range->modifier() - $tz - 1;
+        $modifikator = $this->passResolver->getThrowRollModifierForRulerBand($state, $thrower, $range) - 1;
         $accuracyTarget = max(2, min(6, 7 - $ag - $modifikator));
 
         $roll = $this->dice->rollD6();

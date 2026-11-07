@@ -232,6 +232,18 @@ final class PassResolver
     /**
      * Calculate accuracy target: 7 - AG + range_modifier + TZ, clamped 2-6.
      */
+    /**
+     * P256 (review dávky 7.11.2026): modifikátory hodu pro bombu a hod spoluhráčem z pásma pravítka — Strong Arm
+     * posune pásmo (r. 8522-8524), zbytek jako přihrávka (getPassRollModifier: zóny/NoS, DP, Very Sunny, Accurate).
+     * Bomba „using the rules for throwing the ball“ (r. 7952-7958), TTM „exactly the same … except subtract 1“
+     * (r. 8605-8607, −1 přičte volající). Přihrávka si Strong Arm posouvá sama v resolve(). Parita s C++ throwRollMods.
+     */
+    public function getThrowRollModifierForRulerBand(GameState $state, MatchPlayerDTO $thrower, PassRange $rulerBand): int
+    {
+        $band = $thrower->hasSkill(SkillName::StrongArm) ? $rulerBand->reduced() : $rulerBand;
+        return $this->getPassRollModifier($state, $thrower, $band);
+    }
+
     public function getAccuracyTarget(GameState $state, MatchPlayerDTO $thrower, PassRange $range): int
     {
         $ag = $thrower->getStats()->getAgility();

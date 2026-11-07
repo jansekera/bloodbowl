@@ -71,25 +71,13 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         return ActionResult::fail();
     }
 
-    if (thrower.hasSkill(SkillName::StrongArm) && range != PassRange::QUICK_PASS) {
-        range = static_cast<PassRange>(static_cast<int>(range) - 1);
-    }
-
-    int passTarget = 7 - thrower.stats.agility;
-    passTarget -= passModifier(range);
-
-    if (!thrower.hasSkill(SkillName::NervesOfSteel)) {
-        passTarget += countTacklezones(state, thrower.position, thrower.teamSide);
-    }
-
-    // ⛔ TA3, l. 8606-8607: "the player must SUBTRACT 1 FROM THE D6 ROLL when he
-    // passes the player". Ten postih tu nebyl vubec.
-    passTarget += 1;
-
-    // P76 (30.09.2026): fumble je "1 OR LESS BEFORE OR AFTER MODIFICATION"
-    // (r. 1742-1744). Soucet modifikaci se da spocitat jen PRED orezem 2..6.
-    // Vzor PHP 01bdfd77 a bomby (P73).
-    const int ttmMods = (7 - thrower.stats.agility) - passTarget;
+    // OPRAVENO 7.11.2026 (P256, review dávky) — „worked out exactly the same as … passing a ball, except the player
+    // must subtract 1“ (ř. 8605-8607): modifikátory z téhož místa jako přihrávka (helpers.cpp throwRollMods: Strong
+    // Arm, Accurate, zóny/NoS, Disturbing Presence, Very Sunny). Dřív tu chyběly DP, Very Sunny a Accurate.
+    // ⛔ TA3, ř. 8606-8607: −1 za hod spoluhráčem (dřív chybělo úplně).
+    // P76 (30.09.2026): fumble je „1 OR LESS BEFORE OR AFTER MODIFICATION“ (ř. 1742-1744) ⇒ součet před ořezem.
+    const int ttmMods = throwRollMods(state, thrower, range) - 1;
+    int passTarget = 7 - thrower.stats.agility - ttmMods;
 
     passTarget = std::clamp(passTarget, 2, 6);
 
@@ -98,7 +86,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool fumble = forcedFumble;
     if (!forcedFumble) {
         int roll = dice.rollD6();
-        fumble = (roll == 1 || roll + ttmMods <= 1);
+        fumble = isThrowFumble(roll, ttmMods);
         emitEvent(events, {GameEvent::Type::PASS, throwerId, projectileId, thrower.position,
                           target, roll, !fumble});
     }

@@ -320,4 +320,35 @@ final class BombThrowTest extends TestCase
         $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(2)->getState());
         $this->assertFalse($r->isTurnover());
     }
+
+    /**
+     * P256 (review dávky 7.11.2026): bomba = hod míčem (r. 7952-7958) ⇒ Strong Arm (r. 8522-8524) i omezení vánice.
+     * Dřív PHP bomba Strong Arm nebrala a ve vánici šla i dlouhá.
+     */
+    public function testP256StrongArmPomahaKratkeBombe(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier, SkillName::StrongArm])
+            ->addPlayer(TeamSide::AWAY, 10, 7, id: 2)
+            ->withBallOffPitch()
+            ->build();
+        // 5 polí = krátká (cíl 4+); Strong Arm ⇒ jako rychlá (3+): hod 3 = přesná ⇒ výbuch na (10,7)
+        $result = (new ActionResolver(new FixedDiceRoller([3, 1, 1, 1, 1])))->resolve($state, ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 10, 'targetY' => 7,
+        ]);
+        $this->assertNotSame(\App\Enum\PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
+    }
+
+    public function testP256VeVaniciDlouhaBombaNejde(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier])
+            ->withWeather(\App\Enum\Weather::BLIZZARD)
+            ->withBallOffPitch()
+            ->build();
+        $this->expectException(\InvalidArgumentException::class);
+        (new ActionResolver(new FixedDiceRoller([5, 5, 5, 5])))->resolve($state, ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 14, 'targetY' => 7,
+        ]);
+    }
 }

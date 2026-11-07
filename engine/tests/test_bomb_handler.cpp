@@ -333,3 +333,45 @@ TEST(CoachChoiceBomb, P251bTeamRerollOnFumble_BombHitsTheTarget) {
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);       // vybuchla na cíli
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);      // ne u házeče
 }
+
+// ───────────── P256 (review dávky 7.11.2026): bomba = hod míčem (ř. 7952-7958) ─────────────
+// „The bomb is thrown using the rules for throwing the ball (including weather effects …)“ a „All skills that may
+// be used when a ball is thrown may be used when a bomb is thrown“ ⇒ Accurate, Strong Arm, vánice jako u přihrávky.
+// Dřív C++ bomba Accurate ani Strong Arm nebrala a ve vánici házela i dlouhé (PHP Accurate bralo přes getAccuracyTarget).
+static GameState bombP256() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);   // AG3
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {13, 7}, TeamSide::AWAY);   // rychlý hod na (13,7)
+    return gs;
+}
+
+TEST(BombHandler, P256AccurateHelpsTheBomb) {
+    GameState gs = bombP256();
+    gs.getPlayer(1).skills.add(SkillName::Accurate);
+    // cíl 7-3-1(rychlá)-1(Accurate) = 2: hod 2 = přesná ⇒ výbuch na (13,7); zbroj 3+3. Bez Accurate cíl 3 ⇒ rozptyl.
+    FixedDiceRoller dice({2, 3, 3});
+    resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BombHandler, P256StrongArmHelpsAShortBomb) {
+    GameState gs = bombP256();
+    gs.getPlayer(1).skills.add(SkillName::StrongArm);
+    gs.getPlayer(12).position = {15, 7};             // 5 polí = krátká (0); Strong Arm ⇒ jako rychlá (+1): cíl 3
+    FixedDiceRoller dice({3, 3, 3});                  // hod 3 = přesná (bez Strong Arm cíl 4 ⇒ rozptyl)
+    resolveBombThrow(gs, 1, {15, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BombHandler, P256NoLongBombInABlizzard) {
+    GameState gs = bombP256();
+    gs.weather = Weather::BLIZZARD;
+    gs.getPlayer(12).position = {19, 7};             // 9 polí = dlouhá ⇒ ve vánici nejde
+    FixedDiceRoller dice({});
+    auto result = resolveBombThrow(gs, 1, {19, 7}, dice, nullptr);
+    EXPECT_FALSE(result.success);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}

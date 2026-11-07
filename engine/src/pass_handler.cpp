@@ -253,33 +253,10 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
 
     // Pásmo pravítka (`range`) i omezení vánice jsou spočtené a ověřené nahoře, před puštěním míče.
 
-    // StrongArm reduces range by one band
-    if (passer.hasSkill(SkillName::StrongArm) && range != PassRange::QUICK_PASS) {
-        range = static_cast<PassRange>(static_cast<int>(range) - 1);
-    }
-
-    // ⛔ F7 (24.08.2026): modifikatory se u nas syply do CILE, ne do HODU, takze
-    // "modifikovany hod" v kodu vubec neexistoval -- a prave o nem mluvi pravidlo
-    // o fumblu (l. 1742-1744: "1 or less BEFORE OR AFTER MODIFICATION"). Vedeme
-    // je proto zvlast; `passTarget` z nich vznika, ale je oriznuty na 2..6, takze
-    // se z nej soucet zpetne dopocitat NEDA.
-    int passMods = passModifier(range);  // QP=+1, SP=0, LP=-1, LB=-2
-    if (passer.hasSkill(SkillName::Accurate)) passMods += 1;
-    if (!passer.hasSkill(SkillName::NervesOfSteel)) {
-        passMods -= countTacklezones(state, passer.position, passer.teamSide);
-    }
-    passMods -= countDisturbingPresence(state, passer.position, passer.teamSide);
-
-    // Weather: ONLY Very Sunny penalises a throw (rules parity,
-    // 2026-08-10). CRP: "Very Sunny: the blinding sunshine causes a -1
-    // modifier on all passing rolls"; Pouring Rain's -1 is on "catch,
-    // intercept, or pick-up" and never on the throw, and Blizzard restricts
-    // the RANGE ("only quick or short passes can be attempted") rather than
-    // taxing the roll. We used to charge all three.
-    if (state.weather == Weather::VERY_SUNNY) {
-        passMods -= 1;
-    }
-
+    // P256 (7.11.2026): modifikátory hodu (Strong Arm, Accurate, zóny/NoS, DP, Very Sunny) na jednom místě —
+    // helpers.cpp throwRollMods; dřív tu byly rozepsané (a v bombě a TTM jinak). F7 (24.08.): modifikátory jdou
+    // do HODU, ne jen do cíle, protože fumble je „1 or less before or after modification“ (ř. 1742-1744).
+    const int passMods = throwRollMods(state, passer, range);
     int passTarget = std::clamp(7 - passer.stats.agility - passMods, 2, 6);
 
     // BB2016 l. 1742-1744 (F7): "if the D6 roll for a pass is 1 OR LESS BEFORE
@@ -287,7 +264,7 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     // fumblovalo jen na PRIROZENOU 1, takze jsme fumblovali MIN, nez mame:
     // hazec se dvema tackle zonami fumbluje uz na 3, u nas to byla jen neprecna
     // prihravka.
-    auto isFumble = [&](int r) { return r == 1 || r + passMods <= 1; };
+    auto isFumble = [&](int r) { return isThrowFumble(r, passMods); };
 
     int roll = dice.rollD6();
 

@@ -76,8 +76,14 @@ final class BombThrowHandler implements ActionHandlerInterface
         if ($range === null) {
             throw new \InvalidArgumentException('Target is out of range');
         }
-        $accuracyTarget = $this->passResolver->getAccuracyTarget($state, $thrower, $range);
-        $modifier = $this->passResolver->getPassRollModifier($state, $thrower, $range);
+        // OPRAVENO 7.11.2026 (P256, review dávky) — bomba je hod míčem (r. 7952-7958: „including weather effects“,
+        //   „all skills that may be used when a ball is thrown“): ve vánici jen rychlá/krátká a Strong Arm platí.
+        //   Dřív ani jedno. Parita s C++ bomb_handler.cpp (passTargetLegal, throwRollMods).
+        if (!$range->povolenaZaPocasi($state->getWeather())) {
+            throw new \InvalidArgumentException('Blizzard: only quick or short passes can be attempted');
+        }
+        $modifier = $this->passResolver->getThrowRollModifierForRulerBand($state, $thrower, $range);
+        $accuracyTarget = max(2, min(6, 7 - $thrower->getStats()->getAgility() - $modifier));
         $roll = $this->dice->rollD6();
         $fumble = $roll === 1 || $roll + $modifier <= 1;
         $accurate = !$fumble && $roll >= $accuracyTarget;

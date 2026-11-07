@@ -500,4 +500,24 @@ final class ThrowTeamMateTest extends TestCase
             'playerId' => 1, 'targetId' => 2, 'targetX' => 10, 'targetY' => 5,
         ]);
     }
+
+    /**
+     * P256 (review dávky 7.11.2026): hod spoluhráčem „exactly the same as … passing a ball, except … subtract 1“
+     * (r. 8605-8607) ⇒ i Disturbing Presence (a Very Sunny, Accurate, Strong Arm) jako u přihrávky. Dřív je PHP
+     * vynechávalo. Rozhoduje to o fumble (hod + modifikátory ≤ 1, r. 1742-1744).
+     */
+    public function testP256DisturbingPresenceUdelaZHoduFumble(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
+            ->addPlayer(TeamSide::AWAY, 5, 8, skills: [SkillName::DisturbingPresence], id: 10)   // 3 pole, mimo zóny
+            ->withBallOffPitch()
+            ->build();
+        // rychlá +1, TTM −1, DP −1 ⇒ −1: hod 2 → 1 = fumble ⇒ hráč zůstane na (6,5). Bez DP by se rozptýlil.
+        $result = (new ActionResolver(new FixedDiceRoller([2, 4, 4, 4, 4, 4])))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
+        ]);
+        $this->assertSame(6, $result->getNewState()->requirePlayer(2)->requirePosition()->getX());
+    }
 }

@@ -19,38 +19,16 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     thrower.hasActed = true;
 
     // 1. Accuracy roll (same as pass)
-    // Bombs use the ball's throwing rules, so the same ruler grid
-    // (rules parity, 2026-08-10).
-    PassRange range;
-    if (!passRangeFromOffset(target.x - thrower.position.x,
-                             target.y - thrower.position.y, range)) {
-        return ActionResult::fail();
-    }
-
-    int passTarget = 7 - thrower.stats.agility;
-    passTarget -= passModifier(range);
-
-    if (!thrower.hasSkill(SkillName::NervesOfSteel)) {
-        passTarget += countTacklezones(state, thrower.position, thrower.teamSide);
-    }
-
-    passTarget += countDisturbingPresence(state, thrower.position, thrower.teamSide);
-
-    // Bomba se hazi "using the rules for throwing the ball (INCLUDING WEATHER
-    // EFFECTS)" (l. 7952-7954), a u mice plati od 10.08.: postih na HOD dava
-    // JEN Very Sunny. Pouring Rain ma -1 na chytani/intercept/sber, ne na hod,
-    // a Blizzard omezuje DOSAH, ne hod. Tady se poresne dan vsechny tri.
-    if (state.weather == Weather::VERY_SUNNY) {
-        passTarget += 1;
-    }
-
-    // P73 (30.09.2026): fumble je "1 OR LESS BEFORE OR AFTER MODIFICATION"
-    // (r. 1742-1744), jako u mice (pass_handler.cpp). Soucet modifikaci se
-    // da spocitat PRED orezem na 2..6 -- potom uz ne. Vzor PHP d9910a96.
-    const int bombMods = (7 - thrower.stats.agility) - passTarget;
-    auto isFumble = [&](int r) { return r == 1 || r + bombMods <= 1; };
-
-    passTarget = std::clamp(passTarget, 2, 6);
+    // OPRAVENO 7.11.2026 (P256, review dávky) — bomba je hod míčem (ř. 7952-7958: „using the rules for throwing
+    // the ball (including weather effects …)“, „all skills that may be used when a ball is thrown“). Dřív tu chyběl
+    // Accurate a Strong Arm (PHP Accurate bralo) a ve vánici šla i dlouhá. Teď legalita i modifikátory z téhož
+    // místa jako přihrávka (helpers.cpp passTargetLegal, throwRollMods). ⏳ Hail Mary u bomby (ř. 7953) zatím ne
+    // — mimo pravítko se bomba odmítne jako dřív (P263).
+    const PassLegality legality = passTargetLegal(state, thrower, target);
+    if (!legality.legal || legality.hailMary) return ActionResult::fail();
+    const int bombMods = throwRollMods(state, thrower, legality.band);
+    const int passTarget = std::clamp(7 - thrower.stats.agility - bombMods, 2, 6);
+    auto isFumble = [&](int r) { return isThrowFumble(r, bombMods); };
 
     int roll = dice.rollD6();
     emitEvent(events, {GameEvent::Type::PASS, throwerId, -1, thrower.position, target,
