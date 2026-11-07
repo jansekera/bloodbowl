@@ -17,6 +17,7 @@ use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\ScatterCalculator;
+use App\Engine\ThrowReroll;
 use App\Engine\TacklezoneCalculator;
 
 final class ThrowTeamMateHandler implements ActionHandlerInterface
@@ -86,40 +87,15 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $hungryRoll = $this->dice->rollD6();
             $eaten = $hungryRoll === 1;
 
-            // P259 (review dávky 7.11.2026): napřed Pro (r. 8381-8387, smí přehodit kterýkoli hod; po neúspěšném
-            //   hodu Pro smí týmový přehoz jen hod Pro), teprve pak týmový přehoz s Lonerem — jako C++ (attemptRoll).
-            //   Dřív jen týmový přehoz.
-            $proUsed = false;
-            if ($eaten && $thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
-                $proUsed = true;
-                $thrower = $thrower->withProUsedThisTurn(true);
-                $state = $state->withPlayer($thrower);
-                $pro = \App\Engine\ProCheck::roll($this->dice, $thrower, $state->getTeamState($activeSide)->canUseReroll(), $events);
-                if ($pro['teamRerollUsed']) {
-                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                }
-                if ($pro['allowed']) {
+            // P259 (review dávky 7.11.2026): napřed Pro, teprve pak týmový přehoz s Lonerem — jako C++ (attemptRoll);
+            //   společný žebříček ThrowReroll (jeden hod = jeden přehoz, r. 925-927).
+            if ($eaten) {
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events);
+                $state = $res['state'];
+                $thrower = $res['thrower'];
+                if ($res['rerolled']) {
                     $hungryRoll = $this->dice->rollD6();
                     $eaten = $hungryRoll === 1;
-                }
-            }
-
-            // Try team reroll on failure (jen když se nepoužil Pro — jeden hod = jeden přehoz, r. 925-927)
-            if ($eaten && !$proUsed) {
-                $teamState = $state->getTeamState($activeSide);
-                if ($teamState->canUseReroll()) {
-                    $state = $state->withTeamState($activeSide, $teamState->withRerollUsed());
-                    $lonerBlocked = false;
-                    if ($thrower->hasSkill(SkillName::Loner)) {
-                        $lonerRoll = $this->dice->rollD6();
-                        $lonerBlocked = $lonerRoll < 4;
-                        $events[] = GameEvent::lonerCheck($thrower->getId(), $lonerRoll, !$lonerBlocked);
-                    }
-                    if (!$lonerBlocked) {
-                        $hungryRoll = $this->dice->rollD6();
-                        $eaten = $hungryRoll === 1;
-                        $events[] = GameEvent::rerollUsed($thrower->getId(), 'Team Reroll');
-                    }
                 }
             }
 

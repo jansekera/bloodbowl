@@ -18,7 +18,7 @@ use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
-use App\Engine\ProCheck;
+use App\Engine\ThrowReroll;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 
@@ -98,30 +98,24 @@ final class BombThrowHandler implements ActionHandlerInterface
         //   NEPRESNA bomba se neprehazuje (volba uzivatele). Hazec s Lonerem tymovy prehoz na bombu
         //   VUBEC nepouzije, ani na fumble (uzivatel 6.11.: „jestli ma bomber loner - tak se
         //   prikloň k neprehozeni ani fumble“); Pass a Pro (zdarma) mu zustavaji.
-        //   Parita s C++ (bomb_handler.cpp, rerollThrowByEngine).
+        //   Parita s C++ (bomb_handler.cpp, rerollThrow).
         if ($fumble) {
-            $teamAllowed = !$thrower->hasSkill(SkillName::Loner);
             $skillRerolled = false;
             if ($thrower->hasSkill(SkillName::Pass)) {
                 $skillRerolled = true;
                 $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
-            } elseif ($thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
-                $thrower = $thrower->withProUsedThisTurn(true);
-                $state = $state->withPlayer($thrower);
-                $pro = ProCheck::roll(
+            } else {
+                $res = ThrowReroll::proThenTeam(
                     $this->dice,
+                    $state,
                     $thrower,
-                    $teamAllowed && $state->getTeamState($activeSide)->canUseReroll(),
+                    $activeSide,
+                    !$thrower->hasSkill(SkillName::Loner),
                     $events,
                 );
-                if ($pro['teamRerollUsed']) {
-                    $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                }
-                $skillRerolled = $pro['allowed'];
-            } elseif ($teamAllowed && $state->getTeamState($activeSide)->canUseReroll()) {
-                $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-                $skillRerolled = true;
-                $events[] = GameEvent::rerollUsed($throwerId, 'Team Reroll');
+                $state = $res['state'];
+                $thrower = $res['thrower'];
+                $skillRerolled = $res['rerolled'];
             }
             if ($skillRerolled) {
                 $roll = $this->dice->rollD6();

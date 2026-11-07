@@ -471,6 +471,25 @@ TEST(CoachChoicePass, TeamRerollOnInaccurate_PassThenCaught) {
     EXPECT_TRUE(seen);
 }
 
+TEST(CoachChoicePass, ProOnInaccurate_RerollsWithoutSpendingTeamReroll) {
+    GameState gs = passSetup();
+    gs.getPlayer(1).skills.add(SkillName::Pro);
+    FixedDiceRoller dice({2, 4, 5, 5});  // nepřesná 2, Pro 4+ projde, přehoz 5, chycení 5
+    std::vector<GameEvent> ev;
+    CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::PRO});
+    auto r = resolvePass(gs, 1, {8, 7}, dice, &ev);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.homeTeam.rerolls, 3);             // Pro je zdarma
+    EXPECT_TRUE(gs.getPlayer(1).proUsedThisTurn);
+    EXPECT_EQ(gs.ball.carrierId, 2);
+    bool seen = false;
+    for (const auto& e : ev) if (e.type == GameEvent::Type::SKILL_USED &&
+                                  e.roll == static_cast<int>(SkillName::Pro)) {
+        seen = true; EXPECT_EQ(e.die1, 5);
+    }
+    EXPECT_TRUE(seen);
+}
+
 TEST(CoachChoicePass, KeepInaccurate_RerollNotSpent) {
     GameState gs = passSetup();
     FixedDiceRoller dice({2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});

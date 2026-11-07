@@ -365,51 +365,6 @@ bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vect
     return false;
 }
 
-// Jeden žebříček přehozu hodu "hází se míč" (přihrávka i bomba): Pass -> Pro -> týmový přehoz.
-// Jeden hod = nejvýš jeden přehoz (ř. 925-927). Volající sám rozhodne, ZDA přehazovat.
-// ZMĚNĚNO 6.11.2026 (P247, uživatel: „přehoď i nepřesnou vždy“) — u přihrávky dřív Pro a týmový
-// přehoz jen na FUMBLE; nepřesná přihrávka je turnover taky (ř. 881-889), ř. 929-931: týmový
-// přehoz smí přehodit kterýkoli hod kromě zbroje/zranění. P70 (30.09.2026), ř. 8385-8387: po
-// neúspěšném hodu Pro platí původní výsledek a týmový přehoz smí přehodit jen HOD PRO.
-// P251 (6.11.2026): bomba tentýž žebříček (ř. 7957-7958: dovednosti hodu míče platí i pro bombu).
-void rerollThrowByEngine(GameState& state, Player& thrower, DiceRollerBase& dice,
-                         std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
-                         bool teamAllowed) {
-    auto isFumble = [&](int r) { return r == 1 || r + fumbleMods <= 1; };
-    auto ok = [&](int r) { return r >= target && !isFumble(r); };
-    if (thrower.hasSkill(SkillName::Pass)) {
-        // Ř. 8336-8337: Pass přehazuje nepřesný hod i fumble, zdarma.
-        roll = dice.rollD6();
-        emitEvent(events, {GameEvent::Type::SKILL_USED, thrower.id, -1, {}, {},
-                          static_cast<int>(SkillName::Pass), ok(roll)});
-        return;
-    }
-    TeamState& team = state.getTeamState(thrower.teamSide);
-    if (thrower.hasSkill(SkillName::Pro) && !thrower.proUsedThisTurn) {
-        thrower.proUsedThisTurn = true;
-        int proRoll = dice.rollD6();
-        if (proRoll < 4 && teamAllowed && team.canUseReroll()) {
-            spendTeamRerollByEngine(team, thrower.id, events);
-            if (lonerAllowsTeamReroll(thrower, dice, events)) proRoll = dice.rollD6();
-        }
-        if (proRoll >= 4) {
-            roll = dice.rollD6();
-            emitEvent(events, {GameEvent::Type::SKILL_USED, thrower.id, -1, {}, {},
-                              static_cast<int>(SkillName::Pro), ok(roll), roll});
-        }
-    } else if (teamAllowed && team.canUseReroll()) {
-        spendTeamRerollByEngine(team, thrower.id, events);
-        if (lonerAllowsTeamReroll(thrower, dice, events)) {
-            const int original = roll;
-            roll = dice.rollD6();
-            // P244: v živé partii i u strany bez kouče původní a nový hod
-            if (coachModeOn())
-                emitEvent(events, {GameEvent::Type::REROLL, thrower.id, -1, {}, {}, 0, ok(roll),
-                                  original, roll});
-        }
-    }
-}
-
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro) {
@@ -446,6 +401,86 @@ bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
         }
     }
     return proRoll >= 4;
+}
+
+// Kouč rozhodl, že se přehazuje: nový hod + událost (Pro: SKILL_USED, jinak REROLL původní/nový). Jediné místo
+// rozhodování kouče o přehozu hodu (přihrávka, bomba, ostatní hody přes attemptRoll). Vrací, zda se přehazovalo.
+// `fumbleMods` = modifikátor fumblu hodu (0 u hodů bez fumblu); `teamAllowed` = smí kouč vzít týmový přehoz.
+static bool coachRerollRoll(GameState& state, Player& player, DiceRollerBase& dice, CoachQuestion question,
+                            std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
+                            bool teamAllowed) {
+    const int original = roll;
+    bool viaPro = false;
+    if (!coachAskReroll(state, player, dice, question, -1, roll, target, teamAllowed, events, viaPro)) return false;
+    roll = dice.rollD6();
+    const bool ok = roll >= target && !isThrowFumble(roll, fumbleMods);
+    if (viaPro) {
+        emitEvent(events, {GameEvent::Type::SKILL_USED, player.id, -1, {}, {},
+                          static_cast<int>(SkillName::Pro), ok, roll});
+    } else {
+        emitEvent(events, {GameEvent::Type::REROLL, player.id, -1, {}, {}, 0, ok, original, roll});
+    }
+    return true;
+}
+
+// Přehoz bez kouče: Pro -> týmový přehoz (jeden hod = nejvýš jeden přehoz, ř. 925-927). Pro, ř. 8385-8389: hod D6,
+// na 4-6 se přehazuje, na 1-3 původní výsledek platí a týmový přehoz smí přehodit jen HOD PRO (P70). `roll` se
+// přepíše novým hodem, jen když přehoz proběhl. Společné pro hody míče/bomby i attemptRoll.
+static void engineRerollProTeam(GameState& state, Player& thrower, DiceRollerBase& dice,
+                                std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
+                                bool teamAllowed) {
+    auto ok = [&](int r) { return r >= target && !isThrowFumble(r, fumbleMods); };
+    TeamState& team = state.getTeamState(thrower.teamSide);
+    if (thrower.hasSkill(SkillName::Pro) && !thrower.proUsedThisTurn) {
+        thrower.proUsedThisTurn = true;
+        int proRoll = dice.rollD6();
+        if (proRoll < 4 && teamAllowed && team.canUseReroll()) {
+            spendTeamRerollByEngine(team, thrower.id, events);
+            if (lonerAllowsTeamReroll(thrower, dice, events)) proRoll = dice.rollD6();
+        }
+        if (proRoll >= 4) {
+            roll = dice.rollD6();
+            emitEvent(events, {GameEvent::Type::SKILL_USED, thrower.id, -1, {}, {},
+                              static_cast<int>(SkillName::Pro), ok(roll), roll});   // review P247: kostka do záznamu
+        }
+    } else if (teamAllowed && team.canUseReroll()) {
+        spendTeamRerollByEngine(team, thrower.id, events);
+        if (lonerAllowsTeamReroll(thrower, dice, events)) {
+            const int original = roll;
+            roll = dice.rollD6();
+            // P244: v živé partii i u strany bez kouče původní a nový hod
+            if (coachModeOn())
+                emitEvent(events, {GameEvent::Type::REROLL, thrower.id, -1, {}, {}, 0, ok(roll), original, roll});
+        }
+    }
+}
+
+// Jeden žebříček přehozu hodu "hází se míč" (přihrávka i bomba): Pass (zdarma) -> kouč (živá partie) | Pro -> týmový
+// přehoz. Volající sám rozhodne, ZDA přehazovat. `teamAllowedForEngine` = smí týmový přehoz engine (bomba s Lonerem
+// ne); kouč rozhoduje sám a smí vždy.
+// ZMĚNĚNO 6.11.2026 (P247, uživatel: „přehoď i nepřesnou vždy“) — u přihrávky dřív Pro a týmový přehoz jen na
+// FUMBLE; nepřesná přihrávka je turnover taky (ř. 881-889), ř. 929-931: týmový přehoz smí přehodit kterýkoli hod
+// kromě zbroje/zranění. P251 (6.11.2026): bomba tentýž žebříček (ř. 7957-7958).
+// P258 (7.11.2026): tři kopie (přihrávka, bomba, attemptRoll) sloučeny; událost Pass má die1 = nový hod,
+// die2 = původní (dřív bez kostek, jako u attemptRoll P145).
+void rerollThrow(GameState& state, Player& thrower, DiceRollerBase& dice, CoachQuestion coachQuestion,
+                 std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
+                 bool teamAllowedForEngine) {
+    if (thrower.hasSkill(SkillName::Pass)) {
+        // Ř. 8336-8337: Pass přehazuje nepřesný hod i fumble, zdarma.
+        const int original = roll;
+        roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::SKILL_USED, thrower.id, -1, {}, {},
+                          static_cast<int>(SkillName::Pass), roll >= target && !isThrowFumble(roll, fumbleMods),
+                          roll, original});
+        return;
+    }
+    // P130: v živé partii rozhoduje kouč (u fumble i nepřesné; schváleno 03.10. a 10.10.).
+    if (coachDecides(thrower.teamSide)) {
+        coachRerollRoll(state, thrower, dice, coachQuestion, events, roll, target, fumbleMods, /*teamAllowed=*/true);
+        return;
+    }
+    engineRerollProTeam(state, thrower, dice, events, roll, target, fumbleMods, teamAllowedForEngine);
 }
 
 static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice,
@@ -508,63 +543,15 @@ static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice
         return roll >= target;   // hod už byl jednou přehozen -- konec
     }
 
-    // P130: v živé partii o přehozu rozhoduje kouč (nechat / tým / Pro).
+    // P130: v živé partii o přehozu rozhoduje kouč (nechat / tým / Pro); jinak engine: Pro -> týmový přehoz.
+    // Hod už selhal ⇒ když přehoz neproběhne (Pro/Loner neprojde), `roll` zůstává původní a nesplňuje cíl.
     if (coachDecides(player.teamSide)) {
-        const int original = roll;
-        bool viaPro = false;
-        if (!coachAskReroll(state, player, dice, CoachQuestion::REROLL, -1, roll, target,
-                            canUseTeamReroll, events, viaPro)) return false;
-        roll = dice.rollD6();
-        if (viaPro) {
-            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(SkillName::Pro), roll >= target, roll});
-        } else {
-            emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 0, roll >= target, original, roll});
-        }
-        return roll >= target;
+        coachRerollRoll(state, player, dice, CoachQuestion::REROLL, events, roll, target, /*fumbleMods=*/0,
+                        canUseTeamReroll);
+    } else {
+        engineRerollProTeam(state, player, dice, events, roll, target, /*fumbleMods=*/0, canUseTeamReroll);
     }
-
-    // (2) Pro
-    // BB2016 l. 8385-8389: před rerollem hod D6; na 4-6 se reroll provede, na
-    // 1-3 "the original result stands and may not be re-rolled with a skill or
-    // team re-roll; however you can re-roll the Pro roll with a Team re-roll."
-    // ⇒ týmový reroll tu smí přehodit BRÁNU, ne původní hod.
-    if (player.hasSkill(SkillName::Pro) && !player.proUsedThisTurn) {
-        player.proUsedThisTurn = true;
-        int proRoll = dice.rollD6();
-        if (proRoll < 4 && canUseTeamReroll) {
-            TeamState& team = state.getTeamState(player.teamSide);
-            if (team.canUseReroll()) {
-                spendTeamRerollByEngine(team, playerId, events);
-                if (lonerAllowsTeamReroll(player, dice, events)) proRoll = dice.rollD6();
-            }
-        }
-        if (proRoll >= 4) {
-            roll = dice.rollD6();
-            emitEvent(events, {GameEvent::Type::SKILL_USED, playerId, -1, {}, {},
-                              static_cast<int>(SkillName::Pro), roll >= target, roll});   // review P247: kostka do záznamu
-            return roll >= target;
-        }
-        return false;   // původní výsledek platí a nesmí se přehodit
-    }
-
-    // (3) Týmový reroll -- jen když hod ještě nebyl přehozen
-    if (canUseTeamReroll) {
-        TeamState& team = state.getTeamState(player.teamSide);
-        if (team.canUseReroll()) {
-            spendTeamRerollByEngine(team, playerId, events);
-            if (!lonerAllowsTeamReroll(player, dice, events)) return false;   // přehoz propadl
-
-            const int original = roll;
-            roll = dice.rollD6();
-            // P244: v živé partii i u strany bez kouče původní a nový hod (jako u kouče)
-            if (coachModeOn())
-                emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 0, roll >= target, original, roll});
-            return roll >= target;
-        }
-    }
-
-    return false;
+    return roll >= target;
 }
 
 } // namespace bb

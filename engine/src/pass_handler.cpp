@@ -287,29 +287,11 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         // the D6 if he throws AN INACCURATE PASS OR FUMBLES." Do 24.08. se
         // rerollovalo jen na fumble, tj. na polovinu pripadu, ktere pravidlo
         // jmenuje.
-        // ⚠️ TA1 (l. 925-927): jeden hod = nejvýš jeden přehoz — Pass, jinak Pro, jinak týmový (dřív se stupně
-        // řetězily: po neúspěšném Pass ještě Pro a týmový).
-        if (!passer.hasSkill(SkillName::Pass) && coachDecides(passer.teamSide)) {
-            // P130: v živé partii rozhoduje kouč, a to u fumble I u nepřesné
-            // přihrávky (schváleno 03.10. a 10.10.) -- pravidla přehoz dovolují
-            // u obojího; engine od P247 (6.11.) taky u obojího.
-            const int original = roll;
-            bool viaPro = false;
-            if (coachAskReroll(state, passer, dice, CoachQuestion::PASS_REROLL, -1, roll,
-                               passTarget, /*teamAllowed=*/true, events, viaPro)) {
-                roll = dice.rollD6();
-                const bool ok = roll >= passTarget && !isFumble(roll);
-                if (viaPro) {
-                    emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
-                                      static_cast<int>(SkillName::Pro), ok, roll});
-                } else {
-                    emitEvent(events, {GameEvent::Type::REROLL, passerId, -1, {}, {}, 0, ok, original, roll});
-                }
-            }
-        } else {
-            // Pass -> Pro -> tymovy prehoz: spolecne s bombou (rerollThrowByEngine, helpers.cpp).
-            rerollThrowByEngine(state, passer, dice, events, roll, passTarget, passMods, /*teamAllowed=*/true);
-        }
+        // ⚠️ TA1 (l. 925-927): jeden hod = nejvýš jeden přehoz — Pass, jinak kouč | Pro | týmový (dřív se stupně
+        // řetězily). Žebříček je společný s bombou (rerollThrow, helpers.cpp). P130/P247: kouč se ptá u fumble
+        // I u nepřesné.
+        rerollThrow(state, passer, dice, CoachQuestion::PASS_REROLL, events, roll, passTarget, passMods,
+                    /*teamAllowedForEngine=*/true);
     }
 
     if (safeThrowKeeps(roll)) {

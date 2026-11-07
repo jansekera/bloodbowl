@@ -39,7 +39,7 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     // P251 (6.11.2026, uzivatel: „bombu jen na fumble“) -- driv se fumble bomby neprehazoval vubec.
     // R. 7957-7958: "All skills that may be used when a ball is thrown may be used when a bomb is
     // thrown also" => Pass (zdarma), Pro, tymovy prehoz (zebricek spolecny s prihravkou,
-    // rerollThrowByEngine). NEPRESNA bomba se neprehazuje (volba uzivatele). Bomber s Lonerem
+    // rerollThrow). NEPRESNA bomba se neprehazuje (volba uzivatele). Bomber s Lonerem
     // tymovy prehoz na bombu VUBEC nepouzije, ani na fumble (uzivatel 6.11.: „jestli ma bomber
     // loner - tak se prikloň k neprehozeni ani fumble“); Pass a Pro (zdarma) mu zustavaji.
     // ZMĚNĚNO 7.11.2026 (P251b, uživatel: „přehoz bomby se má člověka ptát“) — dřív se živý kouč na bombu
@@ -47,24 +47,8 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     // ptá CoachQuestion::BOMB_REROLL (nechat / tým / Pro); Loner omezení výše je volba AI, člověk volí sám.
     // Parita s PHP: BombThrowHandler.php (webová hra se na přehoz přihrávky ani bomby neptá).
     if (isFumble(roll)) {
-        if (!coachDecides(thrower.teamSide) || thrower.hasSkill(SkillName::Pass)) {
-            rerollThrowByEngine(state, thrower, dice, events, roll, passTarget, bombMods,
-                                /*teamAllowed=*/!thrower.hasSkill(SkillName::Loner));
-        } else {
-            const int original = roll;
-            bool viaPro = false;
-            if (coachAskReroll(state, thrower, dice, CoachQuestion::BOMB_REROLL, -1, roll, passTarget,
-                               /*teamAllowed=*/true, events, viaPro)) {
-                roll = dice.rollD6();
-                const bool ok = roll >= passTarget && !isFumble(roll);
-                if (viaPro) {
-                    emitEvent(events, {GameEvent::Type::SKILL_USED, throwerId, -1, {}, {},
-                                      static_cast<int>(SkillName::Pro), ok, roll});
-                } else {
-                    emitEvent(events, {GameEvent::Type::REROLL, throwerId, -1, {}, {}, 0, ok, original, roll});
-                }
-            }
-        }
+        rerollThrow(state, thrower, dice, CoachQuestion::BOMB_REROLL, events, roll, passTarget, bombMods,
+                    /*teamAllowedForEngine=*/!thrower.hasSkill(SkillName::Loner));
     }
 
     // Determine explosion position

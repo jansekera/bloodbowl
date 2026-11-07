@@ -153,11 +153,12 @@ struct PassChance { double withTeam; double skillOnly; };
 PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
                                 bool teamReroll, bool throwerLoner, bool catcherLoner);
 
-// Přehoz hodu míče/bomby bez kouče: Pass -> Pro -> týmový přehoz (viz helpers.cpp). `roll` se přepíše
-// novým hodem; `teamAllowed=false` zakáže týmový přehoz (i po neúspěšném Pro).
-void rerollThrowByEngine(GameState& state, Player& thrower, DiceRollerBase& dice,
-                         std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
-                         bool teamAllowed);
+// Přehoz neúspěšného hodu míče/bomby: Pass -> kouč (živá partie, `coachQuestion`) | Pro -> týmový přehoz (viz
+// helpers.cpp). `roll` se přepíše novým hodem; `teamAllowedForEngine=false` zakáže týmový přehoz enginu (i po
+// neúspěšném Pro), kouč smí vždy.
+void rerollThrow(GameState& state, Player& thrower, DiceRollerBase& dice, CoachQuestion coachQuestion,
+                 std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
+                 bool teamAllowedForEngine);
 
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
