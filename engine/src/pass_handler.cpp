@@ -251,8 +251,6 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
         return ActionResult::turnovr();
     }
 
-    // Pásmo pravítka (`range`) i omezení vánice jsou spočtené a ověřené nahoře, před puštěním míče.
-
     // P256 (7.11.2026): modifikátory hodu (Strong Arm, Accurate, zóny/NoS, DP, Very Sunny) na jednom místě —
     // helpers.cpp throwRollMods; dřív tu byly rozepsané (a v bombě a TTM jinak). F7 (24.08.): modifikátory jdou
     // do HODU, ne jen do cíle, protože fumble je „1 or less before or after modification“ (ř. 1742-1744).
@@ -280,18 +278,17 @@ ActionResult resolvePass(GameState& state, int passerId, Position target,
     auto safeThrowKeeps = [&](int r) {
         return passer.hasSkill(SkillName::SafeThrow) && r != 1 && isFumble(r);
     };
-    const bool fumbledFirst = isFumble(roll) && !safeThrowKeeps(roll);
-    // review P78: fumble zachraneny Safe Throw neni "neprecna prihravka" --
-    // jinak by ho prehodil Pass a novy hod mohl byt skutecny fumble.
-    const bool inaccurateFirst = !isFumble(roll) && roll < passTarget;
+    // P260 (úklid 7.11.): od P247 se přehazuje fumble i nepřesná stejně ⇒ jedna podmínka. Fumble, který Safe Throw
+    // podrží (review P78), se nepřehazuje — nový hod by mohl být skutečný fumble.
+    const bool needsReroll = !(roll >= passTarget && !isFumble(roll)) && !safeThrowKeeps(roll);
 
-    if (fumbledFirst || inaccurateFirst) {
+    if (needsReroll) {
         // F6, l. 8336-8337: "A player with the Pass skill is allowed to re-roll
         // the D6 if he throws AN INACCURATE PASS OR FUMBLES." Do 24.08. se
         // rerollovalo jen na fumble, tj. na polovinu pripadu, ktere pravidlo
         // jmenuje.
-        // ⚠️ TA1 (l. 925-927): jeden hod = nejvys jeden reroll, takze se
-        // stupne uz NERETEZI -- driv tu byla kaskada Pass -> Pro -> tymovy.
+        // ⚠️ TA1 (l. 925-927): jeden hod = nejvýš jeden přehoz — Pass, jinak Pro, jinak týmový (dřív se stupně
+        // řetězily: po neúspěšném Pass ještě Pro a týmový).
         if (!passer.hasSkill(SkillName::Pass) && coachDecides(passer.teamSide)) {
             // P130: v živé partii rozhoduje kouč, a to u fumble I u nepřesné
             // přihrávky (schváleno 03.10. a 10.10.) -- pravidla přehoz dovolují

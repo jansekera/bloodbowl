@@ -114,8 +114,10 @@ final class PassResolver
         $accuracyTarget = $this->getAccuracyTarget($state, $thrower, $range);
         $passModifier = $this->getPassRollModifier($state, $thrower, $range);
         $roll = $this->dice->rollD6();
-        $accurate = $roll !== 1 && $roll >= $accuracyTarget;
+        // OPRAVENO 7.11.2026 (P261, review dávky) — „přesná“ se počítala bez upraveného fumble (`$roll !== 1`);
+        //   hod, který je fumble až po modifikátorech (r. 1742-1744), byl zároveň „přesná“ a přehoz se přeskočil.
         $fumble = $this->jeFumble($roll, $passModifier);
+        $accurate = !$fumble && $roll >= $accuracyTarget;
 
         $events = array_merge($animosityEvents, $passBlockEvents, $interceptResult['events']);
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
@@ -132,8 +134,8 @@ final class PassResolver
             if ($thrower->hasSkill(SkillName::Pass)) {
                 $skillRerollUsed = true;
                 $roll = $this->dice->rollD6();
-                $accurate = $roll !== 1 && $roll >= $accuracyTarget;
                 $fumble = $this->jeFumble($roll, $passModifier);
+                $accurate = !$fumble && $roll >= $accuracyTarget;
                 $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                 $events[] = GameEvent::rerollUsed($playerId, 'Pass');
                 $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
@@ -152,8 +154,8 @@ final class PassResolver
                 }
                 if ($pro['allowed']) {
                     $roll = $this->dice->rollD6();
-                    $accurate = $roll !== 1 && $roll >= $accuracyTarget;
                     $fumble = $this->jeFumble($roll, $passModifier);
+                    $accurate = !$fumble && $roll >= $accuracyTarget;
                     $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                     $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
                 }
@@ -170,8 +172,8 @@ final class PassResolver
                 }
                 if (!$lonerBlocked) {
                     $roll = $this->dice->rollD6();
-                    $accurate = $roll !== 1 && $roll >= $accuracyTarget;
                     $fumble = $this->jeFumble($roll, $passModifier);
+                    $accurate = !$fumble && $roll >= $accuracyTarget;
                     $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                     $events[] = GameEvent::rerollUsed($playerId, 'Team Reroll');
                     $events[] = GameEvent::passAttempt($playerId, (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);
@@ -548,8 +550,8 @@ final class PassResolver
         $accuracyTarget = $this->getAccuracyTarget($state, $thrower, $range);
         $passModifier = $this->getPassRollModifier($state, $thrower, $range);
         $roll = $this->dice->rollD6();
-        $accurate = $roll !== 1 && $roll >= $accuracyTarget;
         $fumble = $this->jeFumble($roll, $passModifier);
+        $accurate = !$fumble && $roll >= $accuracyTarget;
 
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
         $events[] = GameEvent::passAttempt($thrower->getId(), (string) $from, (string) $target, $range->value, $accuracyTarget, $roll, $resultStr);

@@ -31,8 +31,10 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     auto isFumble = [&](int r) { return isThrowFumble(r, bombMods); };
 
     int roll = dice.rollD6();
+    // P262 (review dávky 7.11.2026): roll = cílové číslo, die1 = kostka (konvence P201/P145 jako u přihrávky);
+    // dřív nesl `roll` kostku a výpis partie ji tiskl jako „potřeba N+“.
     emitEvent(events, {GameEvent::Type::PASS, throwerId, -1, thrower.position, target,
-                      roll, roll >= passTarget && !isFumble(roll)});
+                      passTarget, roll >= passTarget && !isFumble(roll), roll});
 
     // P251 (6.11.2026, uzivatel: „bombu jen na fumble“) -- driv se fumble bomby neprehazoval vubec.
     // R. 7957-7958: "All skills that may be used when a ball is thrown may be used when a bomb is

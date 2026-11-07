@@ -87,8 +87,9 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     if (!forcedFumble) {
         int roll = dice.rollD6();
         fumble = isThrowFumble(roll, ttmMods);
+        // P262: roll = cíl, die1 = kostka (konvence P201/P145)
         emitEvent(events, {GameEvent::Type::PASS, throwerId, projectileId, thrower.position,
-                          target, roll, !fumble});
+                          target, passTarget, !fumble, roll});
     }
 
     Position landPos;

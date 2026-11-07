@@ -312,10 +312,6 @@ void spendTeamRerollByEngine(TeamState& team, int playerId, std::vector<GameEven
     if (coachModeOn()) emitEvent(events, {GameEvent::Type::REROLL, playerId, -1, {}, {}, 4, true});
 }
 
-// Loner po spotřebovaném týmovém přehozu (pravidla ř. 8287-8290): 4+, jinak „the original result
-// stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
-// místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
-// znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
 int throwRollMods(const GameState& state, const Player& thrower, PassRange band) {
     if (thrower.hasSkill(SkillName::StrongArm) && band != PassRange::QUICK_PASS)
         band = static_cast<PassRange>(static_cast<int>(band) - 1);
@@ -357,6 +353,10 @@ PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bo
     return {withTeam, skillOnly};
 }
 
+// Loner po spotřebovaném týmovém přehozu (pravidla ř. 8287-8290): 4+, jinak „the original result
+// stands ... but the team re-roll is lost“. P244 (3.11.2026): dřív se brána hodila na čtyřech
+// místech bez události — v živé partii (ogr lidí, GFI) nešlo poznat, zda propadl Loner, nebo padl
+// znovu přehozený hod. Neúspěch = REROLL druh 3 (die1 = hod Loner), jako u kouče.
 bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     if (!player.hasSkill(SkillName::Loner)) return true;
     const int lonerRoll = dice.rollD6();

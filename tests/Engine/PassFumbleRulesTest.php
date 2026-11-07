@@ -129,4 +129,25 @@ final class PassFumbleRulesTest extends TestCase
         $this->assertSame(1, $r->getNewState()->getBall()->getCarrierId());
         $this->assertSame(3, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls(), 'přehoz se nesmí utratit');
     }
+
+    /**
+     * P261 (review dávky 7.11.2026): přesná přihrávka nesmí být zároveň fumble. AG6, dlouhá −1 a jedna zóna −1 ⇒
+     * cíl 3+, hod 3 → 3 − 2 = 1 = fumble (r. 1742-1744). Dřív `$accurate = $roll !== 1 && $roll >= cíl` řekl
+     * „přesná“, přehoz se přeskočil a fumble platil. Teď je to fumble ⇒ přehoz (týmový) a nový hod 6 = přesná.
+     */
+    public function testP261UpravenyFumbleNeniPresnaAPrehazujeSe(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, agility: 6, id: 1)
+            ->addPlayer(TeamSide::HOME, 12, 5, agility: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 5, 4, id: 10)
+            ->withBallCarried(1)
+            ->build();
+        $s = $s->withTeamState(TeamSide::HOME, $s->getTeamState(TeamSide::HOME)->withRerolls(3));
+        $r = (new ActionResolver(new FixedDiceRoller([3, 6, 6, 6, 6])))->resolve($s, ActionType::PASS, [
+            'playerId' => 1, 'targetX' => 12, 'targetY' => 5,
+        ]);
+        $this->assertSame(2, $r->getNewState()->getTeamState(TeamSide::HOME)->getRerolls(), 'fumble se má přehodit');
+        $this->assertFalse($r->isTurnover());
+    }
 }

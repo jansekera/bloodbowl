@@ -2874,11 +2874,13 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 passOffers.push_back({target.id, skillOk, emergency, handOff, targetDist});
             }
         });
+        // P260: nejbližší nabídka bez týmového přehozu zvlášť pro hod [0] a předání [1] (O(n) místo O(n²))
+        int minSkillDist[2] = {1 << 20, 1 << 20};
+        for (const PassOffer& s : passOffers)
+            if (s.skillOk) minSkillDist[s.handOff] = std::min(minSkillDist[s.handOff], s.targetDist);
         for (const PassOffer& o : passOffers) {
-            bool preferredElsewhere = false;   // P253: přednost nabídky, která týmový přehoz nespotřebuje
-            if (!o.skillOk && !o.emergency)
-                for (const PassOffer& s : passOffers)
-                    if (s.skillOk && s.handOff == o.handOff && s.targetDist <= o.targetDist) preferredElsewhere = true;
+            // P253: přednost nabídky, která týmový přehoz nespotřebuje
+            const bool preferredElsewhere = !o.skillOk && !o.emergency && minSkillDist[o.handOff] <= o.targetDist;
             if (preferredElsewhere) { ++g_p253[1]; continue; }
             if (o.handOff) ++g_handOffOffers;   // P21, see takeHandOffOfferEvalsInSearch() — až vydaná nabídka
             out.push_back({MacroType::PASS_ACTION, carrier->id, o.targetId, {-1, -1}});

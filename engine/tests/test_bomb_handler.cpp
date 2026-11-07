@@ -375,3 +375,14 @@ TEST(BombHandler, P256NoLongBombInABlizzard) {
     EXPECT_FALSE(result.success);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
 }
+
+TEST(BombHandler, P262PassEventCarriesTheTargetAndTheDie) {
+    // konvence P201/P145: roll = cílové číslo, die1 = kostka (dřív u bomby obráceně)
+    GameState gs = bombP256();
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({5, 3, 3});                 // rychlá, cíl 3; hod 5
+    resolveBombThrow(gs, 1, {13, 7}, dice, &ev);
+    bool seen = false;
+    for (const auto& e : ev) if (e.type == GameEvent::Type::PASS) { seen = true; EXPECT_EQ(e.roll, 3); EXPECT_EQ(e.die1, 5); }
+    EXPECT_TRUE(seen);
+}
