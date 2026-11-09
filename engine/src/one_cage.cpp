@@ -1322,7 +1322,8 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
     if (stalling_) {
         const bool scoring = m.type == MacroType::SCORE || m.type == MacroType::BLITZ_AND_SCORE ||
                              m.type == MacroType::HAND_OFF_SCORE || m.type == MacroType::PASS_SCORE ||
-                             m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION;
+                             m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION ||
+                             m.type == MacroType::THROW_TEAM_MATE;   // P268: hod spoluhráčem přesune nosiče
         const bool carrierActs = m.playerId == carrier.id &&
                                  (m.type == MacroType::ADVANCE || m.type == MacroType::REPOSITION);
         if (scoring || carrierActs || m.type == MacroType::ADVANCE) return true;
@@ -1330,7 +1331,8 @@ bool CageController::forbidsCarrierMove(const GameState& state, const Macro& m) 
 
     // P180: míč v bezpečí a tým má čas ⇒ TD se nehraje ani přes spoluhráče
     if (mateStall_ && (m.type == MacroType::HAND_OFF_SCORE || m.type == MacroType::PASS_SCORE ||
-                       m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION)) return true;
+                       m.type == MacroType::CHAIN_SCORE || m.type == MacroType::PASS_ACTION ||
+                       m.type == MacroType::THROW_TEAM_MATE)) return true;   // P268
     // P230: zálohu vzadu hledání nepošle dopředu (k nosiči blíž než 2 sloupce) — přesunem (review 27.10. H1)
     //   ani blitzem či faulem na soupeře u klece (review 2: blitz stojí i týmový blitz, který záloha příští tah potřebuje)
     if (std::find(backups_.begin(), backups_.end(), m.playerId) != backups_.end()) {

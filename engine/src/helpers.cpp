@@ -334,6 +334,13 @@ PassLegality passTargetLegal(const GameState& state, const Player& thrower, Posi
     return r;
 }
 
+bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band) {
+    PassRange r;
+    if (!passRangeFromOffset(target.x - thrower.position.x, target.y - thrower.position.y, r)) return false;
+    if (band) *band = r;
+    return r == PassRange::QUICK_PASS || r == PassRange::SHORT_PASS;
+}
+
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
     bool clear = true;
     state.forEachOnPitch(opponent(throwerSide), [&](const Player& p) {

@@ -85,6 +85,7 @@ add_executable(bb_tests
     tests/test_ttm_handler.cpp
     tests/test_bomb_handler.cpp
     tests/test_hail_mary_ai.cpp
+    tests/test_bomb_ttm_macros.cpp
     tests/test_gaze_handler.cpp
     tests/test_ball_and_chain_handler.cpp
     tests/test_action_features.cpp

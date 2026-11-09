@@ -189,7 +189,11 @@ enum class MacroType : uint8_t {
     HAND_OFF_SCORE,
     PASS_SCORE,
     CHAIN_SCORE,
-    MACRO_COUNT  // = 14
+    // P268 (uživatel 9.11.2026: „bomba i hod spoluhráčem“) — dřív je hlavní AI neměla vůbec. Rysy: BOMB sdílí
+    // pozici BLOCK, THROW_TEAM_MATE pozici PASS_ACTION (extractMacroFeatures) ⇒ šířka vektoru se nemění.
+    BOMB,
+    THROW_TEAM_MATE,
+    MACRO_COUNT  // = 16
 };
 
 struct Macro {

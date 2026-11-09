@@ -145,6 +145,9 @@ PassLegality passTargetLegal(const GameState& state, const Player& thrower, Posi
 // do kHailMaryClearRadius polí od cíle nestojí soupeř — míč se 3× rozptýlí (ř. 8167-8168), takže dopadne nejvýš
 // 3 pole od cíle, a stojící soupeř tam by ho sebral. Ležící/omráčený míč nesebere.
 constexpr int kHailMaryClearRadius = 3;
+// P268: hod spoluhráčem jen rychlá/krátká (ř. 8597-8600 „Max. TTM“; vánice dovolí obě). Jedno místo pro nabídku
+// (rules_engine, makro) i resolver (ttm_handler); `band` se vyplní, když je cíl na pravítku.
+bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band = nullptr);
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide);
 // Nabídka HMP přihrávky pro AI (rules_engine i makro): spoluhráč vpřed (HOME útočí na x = 25) a cíl volný.
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target);

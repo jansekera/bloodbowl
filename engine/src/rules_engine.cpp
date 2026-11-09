@@ -245,9 +245,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                     // For simplicity, generate targets every 3 squares in each direction
                     for (int tx = 0; tx < 26; tx += 3) {
                         for (int ty = 0; ty < 15; ty += 3) {
-                            int dist = p.position.distanceTo({static_cast<int8_t>(tx),
-                                                              static_cast<int8_t>(ty)});
-                            if (dist > 0 && dist <= 13) {
+                            // OPRAVENO 9.11.2026 (P268) — dřív Chebyshev ≤ 13, tedy i dlouhé hody, které
+                            //   resolver odmítne (ř. 8597-8600); teď jen rychlá/krátká (ttmTargetLegal).
+                            const Position t{static_cast<int8_t>(tx), static_cast<int8_t>(ty)};
+                            if (t != p.position && ttmTargetLegal(p, t)) {
                                 out.push_back({ActionType::THROW_TEAM_MATE, p.id,
                                               teammate->id,
                                               {static_cast<int8_t>(tx), static_cast<int8_t>(ty)}});

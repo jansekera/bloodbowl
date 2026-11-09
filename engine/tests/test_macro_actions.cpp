@@ -4848,15 +4848,17 @@ TEST(MacroActions, FoulIsOfferedOnlyAsTheLastActivationOfTheTurn) {
 TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
     static const char* names[] = {"SCORE", "ADVANCE", "CAGE", "BLITZ", "BLOCK", "PICKUP", "PASS_ACTION",
                                   "FOUL", "REPOSITION", "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE",
-                                  "PASS_SCORE", "CHAIN_SCORE"};
+                                  "PASS_SCORE", "CHAIN_SCORE", "BOMB", "THROW_TEAM_MATE"};
     static_assert(sizeof(names) / sizeof(names[0]) == static_cast<size_t>(MacroType::MACRO_COUNT), "");
+    // P268 (9.11.2026): + goblini TV1500 (P267), ať chokepoint projde i makra bomby a hodu spoluhráčem
     const char* rosters[][2] = {{"human", "orc"}, {"dwarf", "skaven"}, {"wood-elf", "dwarf"},
-                                {"orc", "human"}, {"skaven", "wood-elf"}};
+                                {"orc", "human"}, {"skaven", "wood-elf"}, {"goblin", "orc"}};
     int failed[static_cast<int>(MacroType::MACRO_COUNT)] = {0};
+    int offeredType[static_cast<int>(MacroType::MACRO_COUNT)] = {0};
     int offered = 0, midActivation = 0;
     const long p220Before = p220StopsTotal();
-    for (int seed = 1; seed <= 10; ++seed) {
-        const auto& rs = rosters[seed % 5];
+    for (int seed = 1; seed <= 12; ++seed) {
+        const auto& rs = rosters[seed % 6];
         GameState state;
         DiceRoller dice(static_cast<uint32_t>(seed));
         setupHalf(state, *getDevelopedRoster(rs[0], 1500), *getDevelopedRoster(rs[1], 1500), TeamSide::AWAY, &dice);
@@ -4870,6 +4872,7 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
             for (const Macro& m : macros) {
                 if (m.type == MacroType::END_TURN) continue;
                 ++offered;
+                ++offeredType[static_cast<int>(m.type)];
                 GameState trial = state.clone();
                 DiceRoller trialDice(static_cast<uint32_t>(seed * 1000 + step));
                 if (greedyExpandMacro(trial, m, trialDice).actions.empty()) ++failed[static_cast<int>(m.type)];
@@ -4885,6 +4888,7 @@ TEST(MacroActions, EveryOfferedMacroExpandsToAnAction) {
     }
     ASSERT_GT(offered, 300) << "pozitivní kontrola: test musí projít dost nabídek";
     ASSERT_GT(midActivation, 20) << "pozitivní kontrola: pozice uprostřed aktivace musí nastat";
+    ASSERT_GT(offeredType[static_cast<int>(MacroType::BOMB)], 0) << "pozitivní kontrola: goblini nabídli bombu (P268)";
     // Review P220 (26.10.): invariant musí projít i přes zastavení P220 — vzorek ho musí obsahovat.
     ASSERT_GT(p220StopsTotal() - p220Before, 0) << "pozitivní kontrola: P220 v testu aspoň jednou zastavilo";
     std::string report;

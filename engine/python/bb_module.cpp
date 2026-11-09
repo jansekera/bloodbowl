@@ -735,7 +735,8 @@ PYBIND11_MODULE(bb_engine, m) {
         // jak hledání ocenilo nabídku). Jen macro_mcts; u greedy klíč "macro" chybí.
         static const char* macroNames[] = {
             "SCORE", "ADVANCE", "CAGE", "BLITZ", "BLOCK", "PICKUP", "PASS_ACTION", "FOUL", "REPOSITION",
-            "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE", "PASS_SCORE", "CHAIN_SCORE"};
+            "END_TURN", "BLITZ_AND_SCORE", "HAND_OFF_SCORE", "PASS_SCORE", "CHAIN_SCORE", "BOMB",
+            "THROW_TEAM_MATE"};
         static_assert(sizeof(macroNames) / sizeof(macroNames[0]) == static_cast<size_t>(bb::MacroType::MACRO_COUNT),
                       "macroNames musí krýt celý výčet MacroType");
         static const char* sourceNames[] = {"cage", "search", "rescue", "greedy_fallback", "no_actions", "escape"};

@@ -1631,6 +1631,81 @@ int safetyDepthX(const GameState& state, TeamSide mySide) {
     return std::clamp(deepest, 0, 25);
 }
 
+// ─── P268 (uživatel 9.11.2026: „bomba i hod spoluhráčem“) ───────────────────────────────────────────────────
+// Bomba: cílové pole srazí vždy, sousední na 4+ (ř. 7968-7972); sražený hráč týmu na tahu = turnover (ř. 7956-7958).
+// Cena pole = očekávaní sražení soupeři − 2× očekávaní sražení naši (turnover); stojící soupeř 1, ležící jen zranění
+// (0,3). Nabízí se nejlepší pole na soupeři s cenou ≥ 1 a bez našeho hráče v dosahu výbuchu; Hail Mary (mimo pravítko,
+// P263) jen když kolem cíle do 4 polí (3 rozptyly + výbuch) žádný náš není. Kolik to opravdu stojí, rozhodne hledání.
+static double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
+    double v = 0.0;
+    hitsUs = false;
+    for (int dx = -1; dx <= 1; ++dx)
+        for (int dy = -1; dy <= 1; ++dy) {
+            const Position q{static_cast<int8_t>(c.x + dx), static_cast<int8_t>(c.y + dy)};
+            if (!q.isOnPitch()) continue;
+            const Player* p = state.getPlayerAtPosition(q);
+            if (!p) continue;
+            const double hit = (dx == 0 && dy == 0) ? 1.0 : 0.5;
+            if (p->teamSide == mySide) { hitsUs = true; v -= 2.0 * hit; continue; }
+            v += hit * (p->state == PlayerState::STANDING ? 1.0 : 0.3);
+        }
+    return v;
+}
+
+static bool ownPlayerWithin(const GameState& state, Position c, TeamSide mySide, int radius) {
+    bool near = false;
+    state.forEachOnPitch(mySide, [&](const Player& p) { if (p.position.distanceTo(c) <= radius) near = true; });
+    return near;
+}
+
+// Hod spoluhráčem: sousední stojící nosič míče s Right Stuff, hod na prázdné pole (rychlá/krátká, ttmTargetLegal)
+// aspoň kTtmMinGain sloupců k endzóně — hozený se vždy 3× rozptýlí (ř. 8609-8612), a když přistane a ještě netáhl,
+// smí táhnout dál (Right Stuff ř. „may take an Action later this turn“), takže hod jeho běh prodlouží. Mezi
+// takovými nejblíž endzóně, při shodě s méně zónami soupeře (přistání −1 za zónu). Hody ne-nosičů se nenabízejí.
+constexpr int kTtmMinGain = 4;
+static void offerBombAndTtmMacros(const GameState& state, TeamSide mySide, std::vector<Macro>& out) {
+    const TeamState& myTeam = state.getTeamState(mySide);
+    state.forEachOnPitch(mySide, [&](const Player& p) {
+        if (!p.canAct() || p.hasActed || p.state != PlayerState::STANDING) return;
+        if (p.hasSkill(SkillName::Bombardier) && !p.hasMoved) {
+            // [0] = na pravítku, [1] = Hail Mary; Hail Mary jen když na pravítku nic nevyšlo
+            double best[2] = {0.999, 0.999};
+            Position bestPos[2] = {{-1, -1}, {-1, -1}};
+            state.forEachOnPitch(opponent(mySide), [&](const Player& e) {
+                const PassLegality leg = passTargetLegal(state, p, e.position);
+                if (!leg.legal) return;
+                if (leg.hailMary && ownPlayerWithin(state, e.position, mySide, 4)) return;
+                bool hitsUs = false;
+                const double v = bombSquareValue(state, e.position, mySide, hitsUs);
+                const int k = leg.hailMary ? 1 : 0;
+                if (!hitsUs && v > best[k]) { best[k] = v; bestPos[k] = e.position; }
+            });
+            const Position target = bestPos[0].x >= 0 ? bestPos[0] : bestPos[1];
+            if (target.x >= 0) out.push_back({MacroType::BOMB, p.id, -1, target});
+        }
+        if (p.hasSkill(SkillName::ThrowTeamMate) && !myTeam.passUsedThisTurn && state.ball.isHeld) {
+            const Player& carrier = state.getPlayer(state.ball.carrierId);
+            if (carrier.teamSide != mySide || carrier.id == p.id || carrier.state != PlayerState::STANDING ||
+                !carrier.hasSkill(SkillName::RightStuff) || carrier.position.distanceTo(p.position) != 1)
+                return;
+            int bestDist = distToEndzone(carrier.position, mySide) - kTtmMinGain + 1;
+            int bestTz = 99;
+            Position bestPos{-1, -1};
+            for (int dx = -7; dx <= 7; ++dx)
+                for (int dy = -7; dy <= 7; ++dy) {
+                    const Position t{static_cast<int8_t>(p.position.x + dx), static_cast<int8_t>(p.position.y + dy)};
+                    if (!t.isOnPitch() || state.getPlayerAtPosition(t) || !ttmTargetLegal(p, t)) continue;
+                    const int d = distToEndzone(t, mySide);
+                    const int tz = countTacklezones(state, t, mySide);
+                    if (d < bestDist || (d == bestDist && bestPos.x >= 0 && tz < bestTz)) {
+                        bestDist = d; bestTz = tz; bestPos = t;
+                    }
+                }
+            if (bestPos.x >= 0) out.push_back({MacroType::THROW_TEAM_MATE, p.id, carrier.id, bestPos});
+        }
+    });
+}
+
 static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                             bool dauntlessInOffer) {
     out.clear();
@@ -2894,6 +2969,9 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             out.push_back({MacroType::PASS_ACTION, carrier->id, o.targetId, {-1, -1}});
         }
     }
+
+    // P268 (uživatel 9.11.2026: „bomba i hod spoluhráčem“) — dřív hlavní AI bombu ani hod spoluhráčem neměla.
+    offerBombAndTtmMacros(state, mySide, out);
 
     // FOUL: foul not used, prone/stunned enemy adjacent
     if (!myTeam.foulUsedThisTurn) {
@@ -4464,6 +4542,14 @@ static MacroExpansionResult expandPass(GameState& state, const Macro& macro,
     return result;
 }
 
+// P268: bomba a hod spoluhráčem — cíl volí nabídka (offerBombAndTtmMacros), akce se provede přímo (rules_engine
+// nabízí TTM jen po mřížce, takže hledat ji v seznamu by cíl měnilo). Legalitu hlídá resolver.
+static MacroExpansionResult expandDirect(GameState& state, const Action& a, DiceRollerBase& dice) {
+    MacroExpansionResult result;
+    executeAndRecord(state, a, dice, result);
+    return result;
+}
+
 static MacroExpansionResult expandFoul(GameState& state, const Macro& macro,
                                         DiceRollerBase& dice) {
     MacroExpansionResult result;
@@ -4945,6 +5031,9 @@ MacroExpansionResult greedyExpandMacro(GameState& state, const Macro& macro,
         case MacroType::HAND_OFF_SCORE:  return expandHandOffScore(state, macro, dice);
         case MacroType::PASS_SCORE:      return expandPassScore(state, macro, dice);
         case MacroType::CHAIN_SCORE:     return expandChainScore(state, macro, dice);
+        case MacroType::BOMB:            return expandDirect(state, {ActionType::BOMB_THROW, macro.playerId, -1, macro.targetPos}, dice);
+        case MacroType::THROW_TEAM_MATE: return expandDirect(state, {ActionType::THROW_TEAM_MATE, macro.playerId,
+                                                                     macro.targetId, macro.targetPos}, dice);
         default:                     return {};
     }
 }
@@ -4959,6 +5048,10 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
     // [0-9] one-hot macro type (BLITZ_AND_SCORE shares BLITZ slot, HAND_OFF_SCORE shares SCORE slot)
     if (macro.type == MacroType::BLITZ_AND_SCORE) {
         out[static_cast<int>(MacroType::BLITZ)] = 1.0f;
+    } else if (macro.type == MacroType::BOMB) {                 // P268: sráží jako blok
+        out[static_cast<int>(MacroType::BLOCK)] = 1.0f;
+    } else if (macro.type == MacroType::THROW_TEAM_MATE) {      // P268: hod
+        out[static_cast<int>(MacroType::PASS_ACTION)] = 1.0f;
     } else if (macro.type == MacroType::HAND_OFF_SCORE ||
                macro.type == MacroType::PASS_SCORE ||
                macro.type == MacroType::CHAIN_SCORE) {
@@ -5047,6 +5140,12 @@ void extractMacroFeatures(const GameState& state, const Macro& macro, float* out
             break;
         case MacroType::FOUL:
             out[13] = 0.08f; // ejection risk
+            break;
+        case MacroType::BOMB:
+            out[13] = 0.17f; // P268: fumble 1/6 ⇒ výbuch u házeče
+            break;
+        case MacroType::THROW_TEAM_MATE:
+            out[13] = 0.5f;  // P268: hod −1 + přistání nosiče, pád = turnover
             break;
         default:
             out[13] = 0.1f;

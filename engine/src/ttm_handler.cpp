@@ -12,6 +12,12 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     Player& thrower = state.getPlayer(throwerId);
     Player& projectile = state.getPlayer(projectileId);
 
+    // OPRAVENO 9.11.2026 (P268) — dosah se kontroloval až po označení házeče za hotového a spotřebování týmové
+    //   přihrávky, takže cíl mimo dosah stál hráče akci (a nabídky po mřížce takové cíle dávaly). Ř. 8597-8600:
+    //   „Long Pass or Long Bomb range passes are not possible“ ⇒ jen rychlá/krátká.
+    PassRange range;
+    if (!ttmTargetLegal(thrower, target, &range)) return ActionResult::fail();
+
     thrower.hasActed = true;
     state.getTeamState(thrower.teamSide).passUsedThisTurn = true;
 
@@ -65,12 +71,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     // 2026-08-10), and CRP Throw Team-Mate caps it: "Long Pass or Long Bomb
     // range passes are not possible" -- Short Pass is the ceiling, which is
     // what the printed grid marks as "Max. TTM".
-    PassRange range;
-    if (!passRangeFromOffset(target.x - thrower.position.x,
-                             target.y - thrower.position.y, range) ||
-        range == PassRange::LONG_PASS || range == PassRange::LONG_BOMB) {
-        return ActionResult::fail();
-    }
+    // (dosah ověřen na začátku — P268)
 
     // OPRAVENO 7.11.2026 (P256, review dávky) — „worked out exactly the same as … passing a ball, except the player
     // must subtract 1“ (ř. 8605-8607): modifikátory z téhož místa jako přihrávka (helpers.cpp throwRollMods: Strong
