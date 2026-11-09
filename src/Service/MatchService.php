@@ -373,7 +373,8 @@ final class MatchService
             return [];
         }
 
-        return $this->rulesEngine->getPassTargets($state, $player);
+        // P265: cíle pro kouče-člověka včetně Hail Mary (pole mimo pravítko, r. 8164-8169)
+        return $this->rulesEngine->getPassTargets($state, $player, sHailMary: true);
     }
 
     /**

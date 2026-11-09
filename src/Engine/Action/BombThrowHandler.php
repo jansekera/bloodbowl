@@ -9,7 +9,6 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
-use App\Enum\PassRange;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
@@ -21,6 +20,7 @@ use App\Engine\PassResolver;
 use App\Engine\ThrowReroll;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
+use App\Engine\ThrowTarget;
 
 final class BombThrowHandler implements ActionHandlerInterface
 {
@@ -72,21 +72,21 @@ final class BombThrowHandler implements ActionHandlerInterface
 
         $events = [];
 
-        $range = PassRange::fromOffset($targetPos->getX() - $throwerPos->getX(), $targetPos->getY() - $throwerPos->getY());
-        if ($range === null) {
-            throw new \InvalidArgumentException('Target is out of range');
-        }
         // OPRAVENO 7.11.2026 (P256, review dávky) — bomba je hod míčem (r. 7952-7958: „including weather effects“,
         //   „all skills that may be used when a ball is thrown“): ve vánici jen rychlá/krátká a Strong Arm platí.
         //   Dřív ani jedno. Parita s C++ bomb_handler.cpp (passTargetLegal, throwRollMods).
-        if (!$range->povolenaZaPocasi($state->getWeather())) {
-            throw new \InvalidArgumentException('Blizzard: only quick or short passes can be attempted');
+        // P263 (7.11.2026, uživatel „OK“): Hail Mary u bomby — r. 7952-7954 „including … use of Hail Mary Pass“,
+        //   r. 8164-8171: mimo pravítko jen s HMP a ne ve vánici; D6: 1 = fumble, 2-6 projde, ale „never accurate“
+        //   ⇒ vždy 3 rozptyly od cíle; bez modifikátorů. Dřív se bomba mimo pravítko odmítla.
+        ['range' => $range, 'hailMary' => $hailMary, 'chyba' => $chyba] = ThrowTarget::posud($state, $thrower, $throwerPos, $targetPos);
+        if ($chyba !== null) {
+            throw new \InvalidArgumentException($chyba);
         }
-        $modifier = $this->passResolver->getThrowRollModifierForRulerBand($state, $thrower, $range);
+        $modifier = $range === null ? 0 : $this->passResolver->getThrowRollModifierForRulerBand($state, $thrower, $range);
         $accuracyTarget = max(2, min(6, 7 - $thrower->getStats()->getAgility() - $modifier));
         $roll = $this->dice->rollD6();
         $fumble = $roll === 1 || $roll + $modifier <= 1;
-        $accurate = !$fumble && $roll >= $accuracyTarget;
+        $accurate = !$hailMary && !$fumble && $roll >= $accuracyTarget;
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
         $events[] = GameEvent::bombThrow($throwerId, $roll, $resultStr);
 
@@ -120,7 +120,7 @@ final class BombThrowHandler implements ActionHandlerInterface
             if ($skillRerolled) {
                 $roll = $this->dice->rollD6();
                 $fumble = $roll === 1 || $roll + $modifier <= 1;
-                $accurate = !$fumble && $roll >= $accuracyTarget;
+                $accurate = !$hailMary && !$fumble && $roll >= $accuracyTarget;
                 $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
                 $events[] = GameEvent::bombThrow($throwerId, $roll, $resultStr);
             }
@@ -131,7 +131,7 @@ final class BombThrowHandler implements ActionHandlerInterface
         } elseif ($accurate) {
             $landingPos = $targetPos;
         } else {
-            // Nepresne: tri rozptyly od cile, jako u prihravky
+            // Nepresne (a Hail Mary vzdy, P263): tri rozptyly od cile, jako u prihravky
             $landingPos = $targetPos;
             for ($i = 0; $i < 3; $i++) {
                 $landingPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());

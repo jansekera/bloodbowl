@@ -22,12 +22,15 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
     // OPRAVENO 7.11.2026 (P256, review dávky) — bomba je hod míčem (ř. 7952-7958: „using the rules for throwing
     // the ball (including weather effects …)“, „all skills that may be used when a ball is thrown“). Dřív tu chyběl
     // Accurate a Strong Arm (PHP Accurate bralo) a ve vánici šla i dlouhá. Teď legalita i modifikátory z téhož
-    // místa jako přihrávka (helpers.cpp passTargetLegal, throwRollMods). ⏳ Hail Mary u bomby (ř. 7953) zatím ne
-    // — mimo pravítko se bomba odmítne jako dřív (P263).
+    // místa jako přihrávka (helpers.cpp passTargetLegal, throwRollMods).
+    // P263 (7.11.2026, uživatel „OK“): Hail Mary u bomby — ř. 7952-7954 „including … use of Hail Mary Pass“, ř. 8164-8169:
+    // mimo pravítko (jen s HMP, ne ve vánici) se hází D6: 1 = fumble, 2-6 = hod projde, ale „never accurate“ ⇒ vždy
+    // 3 rozptyly od cíle; „may not be intercepted“ (bomba se tu nezachytává ani jinak). Žádné modifikátory ani AG.
     const PassLegality legality = passTargetLegal(state, thrower, target);
-    if (!legality.legal || legality.hailMary) return ActionResult::fail();
-    const int bombMods = throwRollMods(state, thrower, legality.band);
-    const int passTarget = std::clamp(7 - thrower.stats.agility - bombMods, 2, 6);
+    if (!legality.legal) return ActionResult::fail();
+    const bool hailMary = legality.hailMary;
+    const int bombMods = hailMary ? 0 : throwRollMods(state, thrower, legality.band);
+    const int passTarget = hailMary ? 2 : std::clamp(7 - thrower.stats.agility - bombMods, 2, 6);
     auto isFumble = [&](int r) { return isThrowFumble(r, bombMods); };
 
     int roll = dice.rollD6();
@@ -58,8 +61,8 @@ ActionResult resolveBombThrow(GameState& state, int throwerId, Position target,
         // TA4, l. 7967-7968: "If the bomb is FUMBLED it explodes IN THE BOMB
         // THROWER'S SQUARE." Puvodne se rozptylovala D8 od hazece.
         explosionPos = thrower.position;
-    } else if (roll < passTarget) {
-        // Inaccurate: 3x scatter from target
+    } else if (hailMary || roll < passTarget) {
+        // Inaccurate (a Hail Mary vždy, P263): 3x scatter from target
         for (int i = 0; i < 3; i++) {
             int d8 = dice.rollD8();
             Position scatter = scatterDirection(d8);

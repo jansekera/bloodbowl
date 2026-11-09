@@ -805,15 +805,11 @@ final class RulesEngine
             return ['Target position is off the pitch'];
         }
 
-        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
-        if ($range === null) {
-            return ['Target is out of pass range'];
-        }
-        if (!$range->povolenaZaPocasi($state->getWeather())) {
-            return ['Blizzard: only quick or short passes can be attempted'];
-        }
+        // OPRAVENO 9.11.2026 (P265) — tady stálo jen pravítko, takže Hail Mary Pass (r. 8164-8169: „any square on
+        //   the pitch“) člověk nemohl použít, ač ho PassResolver uměl. Teď stejné místo jako handler.
+        $chyba = ThrowTarget::posud($state, $player, $from, $target)['chyba'];
 
-        return [];
+        return $chyba === null ? [] : [$chyba];
     }
 
     /**
@@ -882,7 +878,7 @@ final class RulesEngine
      *
      * @return list<array{x: int, y: int, range: string}>
      */
-    public function getPassTargets(GameState $state, MatchPlayerDTO $player): array
+    public function getPassTargets(GameState $state, MatchPlayerDTO $player, bool $sHailMary = false): array
     {
         $pos = $player->getPosition();
         if ($pos === null) {
@@ -893,15 +889,20 @@ final class RulesEngine
         for ($x = 0; $x < Position::PITCH_WIDTH; $x++) {
             for ($y = 0; $y < Position::PITCH_HEIGHT; $y++) {
                 $targetPos = new Position($x, $y);
-                $range = PassRange::fromOffset($targetPos->getX() - $pos->getX(), $targetPos->getY() - $pos->getY());
-                if ($range !== null && !$pos->equals($targetPos)
-                    && $range->povolenaZaPocasi($state->getWeather())) {
-                    $targets[] = [
-                        'x' => $x,
-                        'y' => $y,
-                        'range' => $range->value,
-                    ];
+                if ($pos->equals($targetPos)) {
+                    continue;
                 }
+                // P265 (9.11.2026): pole mimo pravítko s Hail Mary jen pro kouče-člověka ($sHailMary) —
+                //   kouči AI dostávají seznam jako dřív (HMP pro AI = nová volba, napřed představit uživateli).
+                ['range' => $range, 'hailMary' => $hailMary, 'chyba' => $chyba] = ThrowTarget::posud($state, $player, $pos, $targetPos);
+                if ($chyba !== null || ($hailMary && !$sHailMary)) {
+                    continue;
+                }
+                $targets[] = [
+                    'x' => $x,
+                    'y' => $y,
+                    'range' => $range === null ? 'hail_mary' : $range->value,
+                ];
             }
         }
 
@@ -1316,12 +1317,10 @@ final class RulesEngine
             return ['Target position is off the pitch'];
         }
 
-        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
-        if ($range === null) {
-            return ['Target is out of range'];
-        }
+        // OPRAVENO 9.11.2026 (P263) — tady stálo jen pravítko (bez vánice a bez Hail Mary, r. 7952-7954).
+        $chyba = ThrowTarget::posud($state, $player, $from, $target)['chyba'];
 
-        return [];
+        return $chyba === null ? [] : [$chyba];
     }
 
     /**

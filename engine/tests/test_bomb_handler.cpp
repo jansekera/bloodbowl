@@ -386,3 +386,53 @@ TEST(BombHandler, P262PassEventCarriesTheTargetAndTheDie) {
     for (const auto& e : ev) if (e.type == GameEvent::Type::PASS) { seen = true; EXPECT_EQ(e.roll, 3); EXPECT_EQ(e.die1, 5); }
     EXPECT_TRUE(seen);
 }
+
+// ───────────── P263 (uživatel 7.11.2026: „OK“): Hail Mary u bomby ─────────────
+// Ř. 7952-7954: bomba se hází „using the rules for throwing the ball (including … use of Hail Mary Pass)“.
+// Ř. 8164-8169: cíl kdekoli na hřišti, pravítko se nepoužívá; D6: 1 = fumble (bomba vybuchne u házeče, ř. 7966-7967),
+// 2-6 = hod projde, ale „never accurate“ ⇒ vždy 3 rozptyly od cíle; nejde zachytit. Ve vánici ne (ř. 8170).
+// Hod NENÍ test obratnosti s modifikátory (tak to tvrdil podklad z webu) — jen 1 vs 2-6.
+static GameState bombHmp() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {3, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    gs.getPlayer(1).skills.add(SkillName::HailMaryPass);
+    placePlayer(gs, 12, {23, 7}, TeamSide::AWAY);     // 20 polí — mimo pravítko
+    return gs;
+}
+
+TEST(BombHandler, P263HailMaryBombScattersThreeTimesFromTheTarget) {
+    GameState gs = bombHmp();
+    // hod 2 (projde); rozptyly D8=3 (V) ×3 z (20,7) → (23,7) ⇒ výbuch na hráči 12; zbroj 3+3
+    FixedDiceRoller dice({2, 3, 3, 3, 3, 3});
+    auto result = resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+}
+
+TEST(BombHandler, P263HailMaryBombIsNeverAccurate) {
+    // i šestka se rozptýlí: hod 6; rozptyly D8=7 (Z) ×3 z (23,7) → (20,7) ⇒ hráč 12 na (23,7) zůstane stát
+    GameState gs = bombHmp();
+    FixedDiceRoller dice({6, 7, 7, 7});
+    resolveBombThrow(gs, 1, {23, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
+
+TEST(BombHandler, P263HailMaryBombFumbleOnOneExplodesAtTheThrower) {
+    GameState gs = bombHmp();
+    gs.homeTeam.rerolls = 0;
+    FixedDiceRoller dice({1, 3, 3});                  // 1 = fumble ⇒ výbuch u házeče; zbroj 3+3
+    auto result = resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
+    EXPECT_TRUE(result.turnover);                     // ř. 7956-7958: srazí vlastního hráče
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+}
+
+TEST(BombHandler, P263NoHailMaryBombInABlizzard) {
+    GameState gs = bombHmp();
+    gs.weather = Weather::BLIZZARD;
+    FixedDiceRoller dice({});
+    auto result = resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
+    EXPECT_FALSE(result.success);
+}

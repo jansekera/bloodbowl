@@ -652,12 +652,14 @@ export class PitchRenderer {
             'short_pass': 'rgba(255, 255, 100, 0.2)',
             'long_pass': 'rgba(255, 165, 0, 0.2)',
             'long_bomb': 'rgba(255, 80, 80, 0.2)',
+            'hail_mary': 'rgba(180, 120, 255, 0.2)',
         };
         const rangeLabels: Record<string, string> = {
             'quick_pass': 'Q',
             'short_pass': 'S',
             'long_pass': 'L',
             'long_bomb': 'LB',
+            'hail_mary': 'HM',
         };
 
         for (const t of targets) {

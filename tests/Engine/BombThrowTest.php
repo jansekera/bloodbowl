@@ -351,4 +351,58 @@ final class BombThrowTest extends TestCase
             'playerId' => 1, 'targetX' => 14, 'targetY' => 7,
         ]);
     }
+
+    // ───── P263 (uživatel 7.11.2026: „OK“): Hail Mary u bomby — parita s C++ BombHandler.P263* ─────
+    // R. 7952-7954: bomba se hází „using the rules for throwing the ball (including … use of Hail Mary Pass)“.
+    // R. 8164-8169: cíl kdekoli, pravítko ne; D6: 1 = fumble (výbuch u házeče, r. 7966-7967), 2-6 projde,
+    // ale „never accurate“ ⇒ vždy 3 rozptyly od cíle; bez modifikátorů. Ve vánici ne (r. 8170).
+    private function bombaHmp(?\App\Enum\Weather $pocasi = null, int $prehozy = 3): \App\DTO\GameState
+    {
+        $b = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 3, 7, id: 1, skills: [SkillName::Bombardier, SkillName::HailMaryPass])
+            ->addPlayer(TeamSide::AWAY, 23, 7, id: 12)      // 20 polí — mimo pravítko
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, $prehozy))
+            ->withBallOffPitch();
+        if ($pocasi !== null) {
+            $b = $b->withWeather($pocasi);
+        }
+        return $b->build();
+    }
+
+    public function testP263HailMaryBombaSeRozptyliTrikratOdCile(): void
+    {
+        // hod 2 (projde); D8=3 (V) ×3 z (20,7) → (23,7) ⇒ výbuch na hráči 12; zbroj 3+3
+        $result = (new ActionResolver(new FixedDiceRoller([2, 3, 3, 3, 3, 3])))->resolve($this->bombaHmp(), ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 20, 'targetY' => 7,
+        ]);
+        $this->assertFalse($result->isTurnover());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(12)->getState());
+    }
+
+    public function testP263HailMaryBombaNikdyNeniPresna(): void
+    {
+        // i šestka se rozptýlí: D8=7 (Z) ×3 z (23,7) → (20,7) ⇒ hráč 12 zůstane stát
+        $result = (new ActionResolver(new FixedDiceRoller([6, 7, 7, 7])))->resolve($this->bombaHmp(), ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 23, 'targetY' => 7,
+        ]);
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(12)->getState());
+    }
+
+    public function testP263HailMaryBombaFumbleNaJednickuVybuchneUHazece(): void
+    {
+        // 1 = fumble, bez přehozů ⇒ výbuch u házeče; zbroj 3+3
+        $result = (new ActionResolver(new FixedDiceRoller([1, 3, 3])))->resolve($this->bombaHmp(prehozy: 0), ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 20, 'targetY' => 7,
+        ]);
+        $this->assertTrue($result->isTurnover());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
+    }
+
+    public function testP263VeVaniciHailMaryBombaNejde(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new ActionResolver(new FixedDiceRoller([5, 5, 5, 5])))->resolve($this->bombaHmp(\App\Enum\Weather::BLIZZARD), ActionType::BOMB_THROW, [
+            'playerId' => 1, 'targetX' => 20, 'targetY' => 7,
+        ]);
+    }
 }

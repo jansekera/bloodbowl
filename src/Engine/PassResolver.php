@@ -60,22 +60,14 @@ final class PassResolver
             }
         }
 
-        $range = PassRange::fromOffset($target->getX() - $from->getX(), $target->getY() - $from->getY());
-        $isHailMary = false;
-
-        if ($range === null) {
-            // r. 8170-8171: Hail Mary Pass "may not be used in a blizzard".
-            if ($thrower->hasSkill(SkillName::HailMaryPass) && $state->getWeather() !== Weather::BLIZZARD) {
-                $isHailMary = true;
-            } else {
-                throw new \InvalidArgumentException('Target is out of range');
-            }
-        } elseif (!$range->povolenaZaPocasi($state->getWeather())) {
-            throw new \InvalidArgumentException('Blizzard: only quick or short passes can be attempted');
+        // Pásmo, vánice a Hail Mary (r. 8164-8171) — jedno místo pro přihrávku, bombu i validátor (P265).
+        ['range' => $range, 'hailMary' => $isHailMary, 'chyba' => $chyba] = ThrowTarget::posud($state, $thrower, $from, $target);
+        if ($chyba !== null) {
+            throw new \InvalidArgumentException($chyba);
         }
 
         // Strong Arm: reduce effective range by one band (not for HMP)
-        if (!$isHailMary && $thrower->hasSkill(SkillName::StrongArm)) {
+        if ($range !== null && $thrower->hasSkill(SkillName::StrongArm)) {
             $range = $range->reduced();
         }
 
