@@ -861,6 +861,35 @@ TEST(DevelopedRoster, Tv1500HumanHunterHasWrestleAndTwoBlitzersHaveTackle) {
     });
 }
 
+// P267 (uživatel 9.11.2026): goblini TV1500 se star playery — tým na ověření pravidel (bomba s HMP, pila,
+// Ball & Chain, hod spoluhráčem, Dirty Player, Grab, Very Long Legs). Star playeři ř. 7627-7641, max 2 (ř. 2907).
+TEST(DevelopedRoster, Tv1500GoblinFieldsTheSecretWeaponsAndTwoStars) {
+    const TeamRoster* r = getDevelopedRoster("goblin", 1500);
+    ASSERT_NE(r, nullptr);
+    EXPECT_STREQ(r->name, "Goblin (TV1500)");
+    GameState state;
+    setupHalf(state, *r, *r);
+    int onPitch = 0, stars = 0, trolls = 0;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        ++onPitch;
+        if (p.hasSkill(SkillName::Loner) && !p.hasSkill(SkillName::AlwaysHungry)) ++stars;   // Ripper, Scrappa
+        if (p.hasSkill(SkillName::AlwaysHungry)) ++trolls;
+        if (p.hasSkill(SkillName::Bombardier)) EXPECT_TRUE(p.hasSkill(SkillName::HailMaryPass)) << "Bomma +HMP (P263/P266)";
+    });
+    EXPECT_EQ(onPitch, 11);
+    EXPECT_EQ(stars, 2);
+    EXPECT_EQ(trolls, 2);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Bombardier), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::Chainsaw), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::BallAndChain), 1);
+    EXPECT_EQ(countHomeSkill(state, SkillName::SecretWeapon), 3);
+    EXPECT_EQ(countHomeSkill(state, SkillName::ThrowTeamMate), 3);   // 2 Trollové + Ripper
+    EXPECT_EQ(countHomeSkill(state, SkillName::DirtyPlayer), 1);     // Scrappa
+    EXPECT_EQ(countHomeSkill(state, SkillName::Grab), 1);            // Ripper
+    EXPECT_EQ(countHomeSkill(state, SkillName::VeryLongLegs), 2);    // Pogoer, Scrappa
+    EXPECT_GE(countHomeSkill(state, SkillName::RightStuff), 4);      // je koho házet
+}
+
 TEST(DevelopedRoster, Tv1200IsUntouchedByTheNewLevel) {
     // nová úroveň je VEDLE staré: stará měření musí dál dostat tutéž sestavu
     EXPECT_STREQ(getDevelopedRoster("dwarf", 1200)->name, "Dwarf (TV1200)");

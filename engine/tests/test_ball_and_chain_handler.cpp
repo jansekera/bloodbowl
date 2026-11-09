@@ -160,8 +160,13 @@ namespace {
 GameState fanaticBlocksFixture(bool withGrab, bool bystanders = true) {
     GameState real;
     setupHalf(real, *getDevelopedRoster("goblin", 1500), *getDevelopedRoster("orc", 1500));
-    const Player& fanatic = real.getPlayer(9);
-    EXPECT_TRUE(fanatic.hasSkill(SkillName::BallAndChain)) << "soupiska: id 9 = Ball & Chain";
+    // 9.11.2026 (P267): fanatik se hledá podle skillu — dřív id 9 v základní goblinní soupisce, ta pro TV1500 byla
+    //   jen náhradní; goblini mají od P267 vlastní soupisku TV1500.
+    int fanaticId = -1;
+    real.forEachOnPitch(TeamSide::HOME, [&](const Player& p) { if (p.hasSkill(SkillName::BallAndChain)) fanaticId = p.id; });
+    if (fanaticId < 0) ADD_FAILURE() << "soupiska: na hřišti chybí Ball & Chain";
+    const Player& fanatic = real.getPlayer(fanaticId < 0 ? 0 : fanaticId);
+    EXPECT_TRUE(fanatic.hasSkill(SkillName::BallAndChain));
     EXPECT_FALSE(fanatic.hasSkill(SkillName::Grab)) << "soupiska: Grab nemá, přidává ho test";
 
     auto gs = bncState();

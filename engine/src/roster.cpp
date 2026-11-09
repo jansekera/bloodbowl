@@ -889,8 +889,50 @@ const TeamRoster& getHumanRoster1500() {
     return roster;
 }
 
+// Goblin (P267, uživatel 9.11.2026: „přidej tým goblinů se star playery ať mají TV taky 1500“ — „u goblinů jde o
+// ověření pravidel“) ⇒ na hřišti co nejvíc goblinních mechanik: bomba s Hail Mary (P263/P266), motorová pila,
+// Ball & Chain, Very Long Legs + Leap, hod spoluhráčem s Right Stuff, Dirty Player, Grab, Regeneration, Always
+// Hungry, Really Stupid, vyloučení secret weapons. Star playeři (max 2, ř. 2899-2913; ceny ř. 8836-8838):
+// Ripper Bolgrot 270 (ř. 7627-7631) a Scrappa Sorehead 150 (ř. 7637-7641). Madcap Miggz, Doom Diver a 'Ooligan
+// ne — engine nemá Claws, Swoop ani Fan Favourite. Ceny ř. 8817-8834 (týmový reroll 60 tis.); skilly Goblinů
+// normal A (20), double GSP (30); Trollů normal S, double GAP.
+// Jedenáctka: Ripper 270 + Scrappa 150 + Troll +Block+Guard 170 + Troll +Block 140 + Fanatic 70
+//   + Pogoer +Sure Feet+Side Step 110 + Bomma +Hail Mary Pass 70 + Looney 40 + Goblin +Side Step+Sure Hands 90
+//   + 2× Goblin +Side Step+Sure Feet 160 = 1270; + 3 rerolly 180 + lékárník 50 = **1500**.
+const TeamRoster& getGoblinRoster1500() {
+    static const TeamRoster roster = {
+        "Goblin (TV1500)",
+        {
+            {{6, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep,
+                SkillName::SureFeet}), 11, "Goblin +Side Step+Sure Feet"},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep,
+                SkillName::SureHands}), 1, "Goblin +Side Step+Sure Hands"},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Bombardier, SkillName::Dodge, SkillName::SecretWeapon, SkillName::Stunty,
+                SkillName::HailMaryPass}), 1, "Bomma +Hail Mary Pass"},
+            {{6, 2, 3, 7}, makeSkills({SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty}), 1, "Looney"},
+            {{3, 7, 3, 7}, makeSkills({SkillName::BallAndChain, SkillName::NoHands, SkillName::SecretWeapon,
+                SkillName::Stunty}), 1, "Fanatic"},
+            {{7, 2, 3, 7}, makeSkills({SkillName::Dodge, SkillName::Leap, SkillName::VeryLongLegs, SkillName::Stunty,
+                SkillName::SureFeet, SkillName::SideStep}), 1, "Pogoer +Sure Feet+Side Step"},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow,
+                SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block}), 1,
+                "Troll +Block"},
+            {{4, 5, 1, 9}, makeSkills({SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow,
+                SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block,
+                SkillName::Guard}), 1, "Troll +Block+Guard"},
+            {{7, 2, 3, 7}, makeSkills({SkillName::Loner, SkillName::DirtyPlayer, SkillName::Dodge, SkillName::Leap,
+                SkillName::RightStuff, SkillName::Sprint, SkillName::Stunty, SkillName::SureFeet,
+                SkillName::VeryLongLegs}), 1, "Scrappa Sorehead (star)"},
+            {{4, 6, 1, 9}, makeSkills({SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration,
+                SkillName::ThrowTeamMate}), 1, "Ripper Bolgrot (star)"},
+        },
+        10, 60, true
+    };
+    return roster;
+}
+
 const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
-    if (tv >= 1500) {   // P165: úroveň TV1500 jen pro pět měřených ras; ostatní propadnou níž
+    if (tv >= 1500) {   // P165: úroveň TV1500 pro pět měřených ras + goblini (P267, ověření pravidel); ostatní propadnou níž
         std::string normalized;
         for (char c : toLower(name)) {
             if (c != ' ' && c != '_' && c != '-') normalized += c;
@@ -900,6 +942,7 @@ const TeamRoster* getDevelopedRoster(const std::string& name, int tv) {
         if (normalized == "dwarf") return &getDwarfRoster1500();
         if (normalized == "skaven") return &getSkavenRoster1500();
         if (normalized == "woodelf") return &getWoodElfRoster1500();
+        if (normalized == "goblin") return &getGoblinRoster1500();   // P267
     }
     if (tv >= 1200) {
         std::string lower = toLower(name);
