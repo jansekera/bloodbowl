@@ -334,6 +334,20 @@ PassLegality passTargetLegal(const GameState& state, const Player& thrower, Posi
     return r;
 }
 
+bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
+    bool clear = true;
+    state.forEachOnPitch(opponent(throwerSide), [&](const Player& p) {
+        if (p.state == PlayerState::STANDING && p.position.distanceTo(target) <= kHailMaryClearRadius) clear = false;
+    });
+    return clear;
+}
+
+bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target) {
+    const bool ahead = thrower.teamSide == TeamSide::HOME ? target.position.x > thrower.position.x
+                                                          : target.position.x < thrower.position.x;
+    return ahead && hailMaryLandingClear(state, target.position, thrower.teamSide);
+}
+
 PassChance passCompletionChance(double pThrow, double qCatch, bool passSkill, bool catchSkill,
                                 bool teamReroll, bool throwerLoner, bool catcherLoner) {
     const double lt = throwerLoner ? 0.5 : 1.0;   // Loner 4+ (ř. 8287-8290)

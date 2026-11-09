@@ -2773,6 +2773,14 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             int dist = carrier->position.distanceTo(target.position);
             int targetDist = distToEndzone(target.position, mySide);
             int carrierDist = distToEndzone(carrier->position, mySide);
+            // P266 (uživatel 9.11.2026: „hail mary když je oponent daleko“): spoluhráč mimo pravítko vpřed, u cíle
+            //   do 3 polí žádný stojící soupeř ⇒ Hail Mary (3 rozptyly, nikdo nesebere). Cenu neodhaduje — rozhodne
+            //   hledání; nespotřebuje týmový přehoz, proto skillOk (přednost P253 ho nevyřadí).
+            if (!myTeam.passUsedThisTurn && passTargetLegal(state, *carrier, target.position).hailMary) {
+                if (hailMaryPassWorthOffering(state, *carrier, target))
+                    passOffers.push_back({target.id, true, false, false, targetDist});
+                return;
+            }
             if (dist > 10 || dist < 1) return;
 
             // "Ahead of the carrier" is the right gate for a THROW, whose point

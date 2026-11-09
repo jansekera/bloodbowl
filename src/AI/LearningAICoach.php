@@ -1555,7 +1555,7 @@ final class LearningAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = $rules->getPassTargets($state, $player);
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, false);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -1626,6 +1626,11 @@ final class LearningAICoach implements AICoachInterface
             }
 
             $sanceCelkem = $sanceHodu * $sanceChyceni;
+            if ($target['range'] === 'hail_mary') {
+                // P266: HMP jen jako poslední akce tahu do volna (cileHoduProAi) — nechycení tah neukončí dřív,
+                //   míč leží u našeho hráče; riziko je jen fumble (1 na D6, r. 8165-8166) ⇒ míč u házeče.
+                $sanceCelkem = 5 / 6;
+            }
             $score = $baseScore - $rangePenalty + $ziskPole * 0.1
                 - (1 - $sanceCelkem) * self::CATCH_FAIL_WEIGHT;
 
@@ -1820,7 +1825,7 @@ final class LearningAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = $rules->getPassTargets($state, $player);
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, true);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -1856,7 +1861,8 @@ final class LearningAICoach implements AICoachInterface
                 continue;
             }
 
-            $score = $baseScore + $enemyCount * 0.08 - $allyCount * 0.06;
+            $score = $baseScore + $enemyCount * 0.08 - $allyCount * 0.06
+                - ($target['range'] === 'hail_mary' ? 0.06 : 0.0);   // P266: HMP bomba vždy 3 rozptyly od cíle
 
             if ($score > $bestScore) {
                 $bestScore = $score;

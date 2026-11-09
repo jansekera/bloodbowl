@@ -141,6 +141,14 @@ inline bool isThrowFumble(int roll, int mods) { return roll == 1 || roll + mods 
 struct PassLegality { bool legal; bool hailMary; PassRange band; };
 PassLegality passTargetLegal(const GameState& state, const Player& thrower, Position target);
 
+// P266 (uživatel 9.11.2026: „hail mary když je oponent daleko“): Hail Mary přihrávka se AI nabídne, jen když
+// do kHailMaryClearRadius polí od cíle nestojí soupeř — míč se 3× rozptýlí (ř. 8167-8168), takže dopadne nejvýš
+// 3 pole od cíle, a stojící soupeř tam by ho sebral. Ležící/omráčený míč nesebere.
+constexpr int kHailMaryClearRadius = 3;
+bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide);
+// Nabídka HMP přihrávky pro AI (rules_engine i makro): spoluhráč vpřed (HOME útočí na x = 25) a cíl volný.
+bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target);
+
 // P253 (uživatel 6.11.2026: „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat
 // má skill Pass a Catch, co mají reroll bez týmového“). Šance, že přihrávka dojde (přesný hod × chycení), když engine
 // přehazuje jako pass_handler (P247): Pass přehodí hod zdarma, jinak týmový přehoz (jeden za tah, Loner 4+);

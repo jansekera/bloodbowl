@@ -571,7 +571,7 @@ final class GreedyAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = $rules->getPassTargets($state, $player);
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, false);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -602,6 +602,8 @@ final class GreedyAICoach implements AICoachInterface
                 'short_pass' => 10,
                 'long_pass' => 30,
                 'long_bomb' => 60,
+                // P266: Hail Mary jen jako poslední akce do volna (cileHoduProAi) — vždy nepřesná, nikdy nechycená
+                'hail_mary' => 70,
                 default => 20,
             };
             $score -= $rangePenalty;
@@ -808,7 +810,7 @@ final class GreedyAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = $rules->getPassTargets($state, $player);
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, true);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -853,6 +855,7 @@ final class GreedyAICoach implements AICoachInterface
                 'short_pass' => 10,
                 'long_pass' => 25,
                 'long_bomb' => 50,
+                'hail_mary' => 60,   // P266: vždy 3 rozptyly od cíle
                 default => 15,
             };
 

@@ -194,10 +194,12 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                 // Reach comes from the ruler grid, not a Chebyshev radius
                 // (rules parity, 2026-08-10): "within 13" offered 45 targets
                 // the ruler cannot actually reach.
-                // P257: legalita na jednom místě (helpers.cpp passTargetLegal). Hail Mary (mimo pravítko) se
-                // tu nenabízí — dřív ani ne (jen cíle na pravítku); nabídnout ho by byla nová volba AI.
+                // P257: legalita na jednom místě (helpers.cpp passTargetLegal).
+                // P266 (uživatel 9.11.2026): Hail Mary (mimo pravítko) jen vpřed a jen když u cíle nestojí soupeř
+                //   (hailMaryLandingClear) — dřív se HMP nenabízel vůbec.
                 const PassLegality leg = passTargetLegal(state, p, teammate.position);
-                if (!leg.legal || leg.hailMary) return;
+                if (!leg.legal) return;
+                if (leg.hailMary && !hailMaryPassWorthOffering(state, p, teammate)) return;
                 out.push_back({ActionType::PASS, p.id, teammate.id, teammate.position});
             });
         }
@@ -266,12 +268,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             p.state == PlayerState::STANDING) {
             state.forEachOnPitch(enemySide, [&](const Player& enemy) {
                 if (enemy.state != PlayerState::STANDING) return;
-                PassRange range;
-                if (!passRangeFromOffset(enemy.position.x - p.position.x,
-                                         enemy.position.y - p.position.y,
-                                         range)) {
-                    return;
-                }
+                // OPRAVENO 9.11.2026 (P266) — tady stálo jen pravítko: ve vánici se nabízela i dlouhá bomba
+                //   (resolver ji pak odmítl, ř. 1490-1494) a soupeř mimo pravítko nešel zasáhnout ani s Hail Mary
+                //   (ř. 7952-7954). Teď legalita z téhož místa jako resolver (passTargetLegal).
+                if (!passTargetLegal(state, p, enemy.position).legal) return;
                 out.push_back({ActionType::BOMB_THROW, p.id, -1, enemy.position});
             });
         }
