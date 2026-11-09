@@ -268,6 +268,7 @@ final class GreedyAICoach implements AICoachInterface
             ActionType::BALL_AND_CHAIN => $this->scoreBallAndChain($playerId),
             ActionType::HYPNOTIC_GAZE => $this->scoreHypnoticGaze($state, $rules, $playerId, $side),
             ActionType::BOMB_THROW => $this->scoreBombThrow($state, $rules, $playerId, $side),
+            ActionType::THROW_TEAM_MATE => $this->scoreThrowTeamMate($state, $playerId),
             ActionType::MULTIPLE_BLOCK => $this->scoreMultipleBlock($state, $playerId, $side),
             default => null,
         };
@@ -794,6 +795,25 @@ final class GreedyAICoach implements AICoachInterface
             'params' => ['playerId' => $playerId, 'targetId' => $bestTargetId],
             'score' => max(1, $bestScore),
         ];
+    }
+
+    /**
+     * P270: hod nosiče s Right Stuff vpřed (CoachHeuristics::hodSpoluhraceProAi). Cena jako pohyb nosiče k endzóně
+     *   (150 − 5 × zbývající sloupce, stupnice scorePass) minus riziko: hod −1, vždy 3 rozptyly, přistání na AG.
+     *
+     * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
+     */
+    private function scoreThrowTeamMate(GameState $state, int $playerId): ?array
+    {
+        $hazec = $state->getPlayer($playerId);
+        $hod = $hazec === null ? null : CoachHeuristics::hodSpoluhraceProAi($state, $hazec);
+        if ($hod === null || $hazec === null) {
+            return null;
+        }
+        $score = 150 - CoachHeuristics::doKoncoveZony($hazec->getTeamSide(), $hod['targetX']) * 5 - 60;
+        return $score > 0
+            ? ['action' => ActionType::THROW_TEAM_MATE, 'params' => ['playerId' => $playerId] + $hod, 'score' => $score]
+            : null;
     }
 
     /**

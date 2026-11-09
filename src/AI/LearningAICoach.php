@@ -957,6 +957,7 @@ final class LearningAICoach implements AICoachInterface
             ActionType::BALL_AND_CHAIN => $this->buildBallAndChainAction($baseScore, $playerId),
             ActionType::HYPNOTIC_GAZE => $this->buildHypnoticGazeAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::BOMB_THROW => $this->buildBombThrowAction($state, $rules, $playerId, $side, $baseScore),
+            ActionType::THROW_TEAM_MATE => $this->buildThrowTeamMateAction($state, $playerId, $baseScore),
             ActionType::MULTIPLE_BLOCK => $this->buildMultipleBlockAction($state, $rules, $playerId, $side, $baseScore),
             default => null,
         };
@@ -1812,6 +1813,32 @@ final class LearningAICoach implements AICoachInterface
             'action' => ActionType::HYPNOTIC_GAZE,
             'params' => ['playerId' => $playerId, 'targetId' => $bestTarget->getId()],
             'score' => $bestScore,
+        ];
+    }
+
+    /**
+     * P270: hod nosiče s Right Stuff vpřed (CoachHeuristics::hodSpoluhraceProAi); zisk sloupců × 0,1 (stupnice
+     * buildPassAction), riziko přistání jako u přihrávky (CATCH_FAIL_WEIGHT × šance pádu).
+     *
+     * @return array{action: ActionType, params: array<string, mixed>, score: float}|null
+     */
+    private function buildThrowTeamMateAction(GameState $state, int $playerId, float $baseScore): ?array
+    {
+        $hazec = $state->getPlayer($playerId);
+        $hod = $hazec === null ? null : CoachHeuristics::hodSpoluhraceProAi($state, $hazec);
+        if ($hod === null || $hazec === null) {
+            return null;
+        }
+        $nosic = $state->requirePlayer($hod['targetId']);
+        $strana = $hazec->getTeamSide();
+        $zisk = CoachHeuristics::doKoncoveZony($strana, $nosic->requirePosition()->getX())
+            - CoachHeuristics::doKoncoveZony($strana, $hod['targetX']);
+        // přistání = hod na AG (cíl 7 − AG, 1 vždy selže, 6 vždy projde), bez zón u cíle (vybrán s nejméně zónami)
+        $sancePristani = max(1, min(5, $nosic->getStats()->getAgility())) / 6.0;
+        return [
+            'action' => ActionType::THROW_TEAM_MATE,
+            'params' => ['playerId' => $playerId] + $hod,
+            'score' => $baseScore + $zisk * 0.1 - (1 - $sancePristani) * self::CATCH_FAIL_WEIGHT,
         ];
     }
 

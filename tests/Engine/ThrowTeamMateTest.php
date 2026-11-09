@@ -540,4 +540,25 @@ final class ThrowTeamMateTest extends TestCase
         ]);
         $this->assertSame(11, $r->getNewState()->requirePlayer(2)->requirePosition()->getX());
     }
+
+    /**
+     * P269 (9.11.2026, nalezeno při P268): Right Stuff — „If the player is not injured during his landing he may take
+     * an Action later this turn if he has not already done so.“ Do 9.11. PHP hozeného hráče po přistání označilo
+     * za hotového (hasActed + hasMoved), takže už nesměl táhnout; C++ (ttm_handler) mu stav nechávalo.
+     */
+    public function testP269PoPristaniSmiHozenyJesteTahnout(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $result = (new ActionResolver(new FixedDiceRoller([4, 3, 3, 3, 4])))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
+        ]);
+        $landed = $result->getNewState()->requirePlayer(2);
+        $this->assertSame(PlayerState::STANDING, $landed->getState());   // pozitivní kontrola: přistál na nohy
+        $this->assertTrue($landed->canAct(), 'po přistání smí ještě táhnout (Right Stuff)');
+        $this->assertFalse($landed->hasMoved(), 'aktivaci ještě nezačal — smí i blitz');
+    }
 }

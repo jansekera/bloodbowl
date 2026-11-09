@@ -277,7 +277,10 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         }
 
         // Place player at landing position
-        $projectile = $projectile->withPosition($landingPos)->withHasMoved(true)->withHasActed(true);
+        // OPRAVENO 9.11.2026 (P269) — tady stálo ->withHasMoved(true)->withHasActed(true), takže hozený hráč už
+        //   nesměl táhnout. Right Stuff: „If the player is not injured during his landing he may take an Action
+        //   later this turn if he has not already done so.“ ⇒ stav aktivace se nemění (jako C++ ttm_handler).
+        $projectile = $projectile->withPosition($landingPos);
         $state = $state->withPlayer($projectile);
 
         // Move ball with player if carried

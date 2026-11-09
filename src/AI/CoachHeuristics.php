@@ -406,4 +406,58 @@ final class CoachHeuristics
         }
         return $cile;
     }
+
+    /** P270: o kolik sloupců vpřed musí hod spoluhráčem nosiče posunout (3 rozptyly); C++ kTtmMinGain. */
+    public const TTM_MIN_ZISK = 4;
+
+    /**
+     * P270 (9.11.2026, převod P268; uživatel „bomba i hod spoluhráčem“) — parita s C++ offerBombAndTtmMacros:
+     * hráč s Throw Team-Mate hodí sousedního stojícího nosiče míče s Right Stuff na prázdné pole rychlou/krátkou
+     * přihrávkou (r. 8608-8609) aspoň TTM_MIN_ZISK sloupců k endzóně; po přistání smí nosič ještě táhnout (Right
+     * Stuff, P269). Mezi takovými nejblíž endzóně, při shodě s méně zónami soupeře (přistání −1 za zónu).
+     *
+     * @return array{targetId: int, targetX: int, targetY: int}|null
+     */
+    public static function hodSpoluhraceProAi(GameState $state, MatchPlayerDTO $hazec): ?array
+    {
+        $odkud = $hazec->getPosition();
+        $strana = $hazec->getTeamSide();
+        if ($odkud === null || !$hazec->canAct() || !$hazec->hasSkill(SkillName::ThrowTeamMate)
+            || $state->getTeamState($strana)->isPassUsedThisTurn()) {
+            return null;
+        }
+        $nosic = self::nosic($state, $strana);
+        $np = $nosic?->getPosition();
+        if ($nosic === null || $np === null || $nosic->getId() === $hazec->getId()
+            || $nosic->getState() !== PlayerState::STANDING || !$nosic->hasSkill(SkillName::RightStuff)
+            || $np->distanceTo($odkud) !== 1) {
+            return null;
+        }
+        $nejDal = self::doKoncoveZony($strana, $np->getX()) - self::TTM_MIN_ZISK + 1;
+        $nejZony = PHP_INT_MAX;
+        $cil = null;
+        for ($dx = -7; $dx <= 7; $dx++) {
+            for ($dy = -7; $dy <= 7; $dy++) {
+                $x = $odkud->getX() + $dx;
+                $y = $odkud->getY() + $dy;
+                if ($x < 0 || $y < 0 || $x >= Position::PITCH_WIDTH || $y >= Position::PITCH_HEIGHT) {
+                    continue;
+                }
+                $t = new Position($x, $y);
+                $dosah = PassRange::fromOffset($dx, $dy);
+                if (($dosah !== PassRange::QUICK_PASS && $dosah !== PassRange::SHORT_PASS)
+                    || $state->getPlayerAtPosition($t) !== null) {
+                    continue;
+                }
+                $d = self::doKoncoveZony($strana, $x);
+                $z = self::zonyZachyceni($state, $t, $strana);
+                if ($d < $nejDal || ($d === $nejDal && $cil !== null && $z < $nejZony)) {
+                    $nejDal = $d;
+                    $nejZony = $z;
+                    $cil = $t;
+                }
+            }
+        }
+        return $cil === null ? null : ['targetId' => $nosic->getId(), 'targetX' => $cil->getX(), 'targetY' => $cil->getY()];
+    }
 }
