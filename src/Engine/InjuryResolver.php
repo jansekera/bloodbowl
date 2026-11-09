@@ -309,17 +309,18 @@ final class InjuryResolver
         $die1 = $dice->rollD6();
         $die2 = $dice->rollD6();
         $roll = $die1 + $die2;
-        // Stunty: +1 to injury roll (more vulnerable)
-        if ($player->hasSkill(SkillName::Stunty)) {
-            $modifier++;
-        }
+        // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500 P267; parita s C++ injury.cpp) — tady bylo „Stunty: +1
+        //   ke zranění“. r. 8534-8536: „treats a roll of 7 and 9 on the Injury table after any modifiers have been
+        //   applied as a KO'd and Badly Hurt result respectively“ ⇒ 7 = KO, 9 = Badly Hurt bez hodu na tabulku
+        //   (dřív 9 + 1 = 10 ⇒ tabulka s 1/6 smrti); Thick Skull se ptá na nemodifikovanou 8.
+        $stunty = $player->hasSkill(SkillName::Stunty);
         $modified = $roll + $modifier;
 
-        if ($modified <= 7) {
+        if ($modified <= ($stunty ? 6 : 7)) {
             // ř. 706-707: v kole, kdy byl omráčen, se hráč neotáčí -- viz `withStunned()`.
             $player = $player->withStunned();
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');
-        } elseif ($modified <= 9) {
+        } elseif ($modified <= ($stunty ? 8 : 9)) {
             // ⛔⛔ OPRAVENO 15.09.2026 -- Thick Skull tu byl podle JINE EDICE
             //   (pri KO hod D6, na 4+ omracen). `rules_bb2016.txt` r. 8595-8598:
             //   "treats a roll of 8 on the Injury table, after any modifiers have
@@ -348,7 +349,11 @@ final class InjuryResolver
             //   a ztratami vlastnosti rozdil nulovy -- hrac je venku tak jako tak.
             //   Lisi se az v LIZE. Vysledek se proto ZAZNAMENAVA do udalosti,
             //   i kdyz ho zatim nic necte.
-            $cas = $this->rollCasualty($dice);
+            // T5.23: Stunty na 9 = Badly Hurt rovnou (r. 8534-8536), bez hodu na tabulku (ani druhého za Decay)
+            $stuntyBadlyHurt = $stunty && $modified === 9;
+            $cas = $stuntyBadlyHurt
+                ? ['result' => CasualtyResult::BADLY_HURT, 'tens' => 0, 'units' => 0]
+                : $this->rollCasualty($dice);
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'casualty');
             // P206 (14.10.2026, převod C++ `injury.cpp`) -- lékárník HNED po Casualty a PŘED
             //   Regenerací (ř. 8406-8411). OPRAVENO: dřív jen v bloku a přehazoval CELÝ hod na
@@ -363,7 +368,7 @@ final class InjuryResolver
             //   OPRAVENO 20.10.2026 (P221, review P192 M5) -- druhý hod měl vlastní událost `casualty`,
             //   takže jedno zranění dávalo dvě (C++ jednu). Teď jedna událost nese oba hody.
             $druhyDecay = null;
-            if ($player->hasSkill(SkillName::Decay)) {
+            if ($player->hasSkill(SkillName::Decay) && !$stuntyBadlyHurt) {
                 $druhyDecay = $this->rollCasualty($dice);
                 $poradi = array_flip(array_map(fn(CasualtyResult $c) => $c->value, CasualtyResult::cases()));
                 if ($poradi[$druhyDecay['result']->value] > $poradi[$vysledek->value]) {

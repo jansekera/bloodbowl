@@ -126,7 +126,9 @@ int calculateDodgeTarget(const GameState& state, const Player& player,
     // IS MOVING TO when he makes a Dodge roll". Neni to plosne -1, je to
     // odecteni CELE penalizace za cil -- ve trech tackle zonach je to rozdil
     // -1 proti -3.
-    if (player.hasSkill(SkillName::Stunty)) {
+    // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500) — chyběla výjimka ř. 8538-8539: „Stunties that are armed
+    //   with a Secret Weapon are not allowed to ignore enemy tackle zones“ (Bomma, Looney, Fanatic).
+    if (player.hasSkill(SkillName::Stunty) && !player.hasSkill(SkillName::SecretWeapon)) {
         target -= countTacklezones(state, dest, player.teamSide);
     }
     // Titchy, l. 8638-8639: "may add 1 to any Dodge roll he attempts."

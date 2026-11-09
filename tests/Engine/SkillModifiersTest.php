@@ -94,59 +94,71 @@ final class SkillModifiersTest extends TestCase
         //   (cil -1 A JESTE re-roll). Podle pravidel: AG3 => 4+, "+1 Making
         //   a Dodge roll", "-1 za kazdou souperovu TZ na cilovem poli" (tady 1)
         //   => 4 - 1 + 1 = 4, a Stunty -1 => 3. Skill Dodge se v cili neprojevi.
-        // ⚠️ POZOR, SHODA NAHODOU: Stunty ma podle pravidel TZ na cilovem poli
-        //   IGNOROVAT ("may ignore any enemy tackle zones on the square he is
-        //   moving to"), ne odecitat 1. Pri PRAVE JEDNE zone vyjde obojí stejne,
-        //   pri trech uz ne. Engine to ma jako `-1` => samostatny nalez, zatim
-        //   NEOPRAVENO (Stunty nema v zadnem rosteru nikdo, takze to nesepne).
+        //   (Stunty zóny na cílovém poli ignoruje — opraveno 14.09. v TacklezoneCalculator; tady jedna zóna.)
         $target = $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7));
         $this->assertEquals(3, $target);
     }
 
-    public function testStuntyInjuryModifier(): void
+    /**
+     * T5.23 (9.11.2026): r. 8538-8539 — „Stunties that are armed with a Secret Weapon are not allowed to ignore enemy
+     * tackle zones“. AG3, cíl se 2 zónami soupeře: Stunty 7−3−1 = 3; se Secret Weapon 3 + 2 = 5. Parita s C++.
+     */
+    public function testStuntySSecretWeaponZonyNeignoruje(): void
     {
-        $player = MatchPlayerDTO::create(
+        $tzCalc = new TacklezoneCalculator();
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 7, agility: 3, id: 1, skills: [SkillName::Stunty, SkillName::SecretWeapon])
+            ->addPlayer(TeamSide::HOME, 4, 7, agility: 3, id: 3, skills: [SkillName::Stunty])
+            ->addPlayer(TeamSide::AWAY, 7, 6, id: 2)
+            ->addPlayer(TeamSide::AWAY, 7, 8, id: 4)
+            ->build();
+        $this->assertEquals(5, $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(1), new Position(6, 7), new Position(5, 7)));
+        $this->assertEquals(3, $tzCalc->calculateDodgeTarget($state, $state->requirePlayer(3), new Position(6, 7), new Position(4, 7)));   // pozitivní kontrola
+    }
+
+    /**
+     * T5.23 (9.11.2026, živé od goblinů TV1500; parita s C++ test_injury.cpp Stunty*): r. 8534-8536 — Stunty „treats
+     * a roll of 7 and 9 on the Injury table after any modifiers have been applied as a KO'd and Badly Hurt result
+     * respectively“. Dřív +1 ke zranění; oba staré testy tvar přišpendlily (8 + 1 = 9 ⇒ KO, 9 + 1 = 10 ⇒ casualty).
+     *
+     * @param list<SkillName> $skilly
+     */
+    private function goblin(array $skilly = [SkillName::Stunty]): MatchPlayerDTO
+    {
+        return MatchPlayerDTO::create(
             id: 1,
             playerId: 1,
             name: 'Goblin',
             number: 1,
             positionalName: 'Goblin',
             stats: new PlayerStats(6, 2, 3, 7),
-            skills: [SkillName::Stunty],
+            skills: $skilly,
             teamSide: TeamSide::HOME,
             position: new Position(5, 7),
         )->withState(PlayerState::PRONE);
+    }
 
-        $injuryResolver = new InjuryResolver();
-        // Armor: 5+3=8 > 7 (broken)
-        // Injury: 4+4=8 (normally KO, 8-9) but Stunty +1 = 9 (still KO, 8-9)
-        $dice = new FixedDiceRoller([5, 3, 4, 4]);
-        $result = $injuryResolver->resolve($player, $dice);
-
+    public function testStuntySedmJeKo(): void
+    {
+        // zbroj 5+3 = 8 > 7; zranění 3+4 = 7 ⇒ KO (bez Stunty omráčen)
+        $result = (new InjuryResolver())->resolve($this->goblin(), new FixedDiceRoller([5, 3, 3, 4]));
         $this->assertEquals(PlayerState::KO, $result['player']->getState());
     }
 
-    public function testStuntyInjuryMakesCasualtyEasier(): void
+    public function testStuntyDevetJeBadlyHurtBezTabulky(): void
     {
-        $player = MatchPlayerDTO::create(
-            id: 1,
-            playerId: 1,
-            name: 'Goblin',
-            number: 1,
-            positionalName: 'Goblin',
-            stats: new PlayerStats(6, 2, 3, 7),
-            skills: [SkillName::Stunty],
-            teamSide: TeamSide::HOME,
-            position: new Position(5, 7),
-        )->withState(PlayerState::PRONE);
-
-        $injuryResolver = new InjuryResolver();
-        // Armor: 4+4=8 > 7 (broken)
-        // Injury: 5+4=9 (normally KO) + Stunty +1 = 10 → casualty
-        $dice = new FixedDiceRoller([4, 4, 5, 4, 1, 1]);
-        $result = $injuryResolver->resolve($player, $dice);
-
+        // zbroj 4+4 = 8 > 7; zranění 5+4 = 9 ⇒ Badly Hurt rovnou — žádná další kostka (dřív 10 ⇒ tabulka Casualty)
+        $kostky = new FixedDiceRoller([4, 4, 5, 4]);
+        $result = (new InjuryResolver())->resolve($this->goblin(), $kostky);
         $this->assertEquals(PlayerState::INJURED, $result['player']->getState());
+        $this->assertFalse($kostky->hasRemainingRolls());
+    }
+
+    public function testStuntyOsmSThickSkullJeOmracen(): void
+    {
+        // zranění 4+4 = 8: Thick Skull ⇒ omráčen (dřív 8 + 1 = 9 ⇒ KO)
+        $result = (new InjuryResolver())->resolve($this->goblin([SkillName::Stunty, SkillName::ThickSkull]), new FixedDiceRoller([5, 3, 4, 4]));
+        $this->assertEquals(PlayerState::STUNNED, $result['player']->getState());
     }
 
     // === BigHand ===

@@ -240,17 +240,55 @@ TEST(Injury, CrowdSurf) {
     EXPECT_EQ(gs.getPlayer(1).position, (Position{-1, -1}));
 }
 
-TEST(Injury, StuntyInjuryBonus) {
+// T5.23 (9.11.2026, živé od goblinů TV1500): ř. 8534-8536 — Stunty „treats a roll of 7 and 9 on the Injury table
+// after any modifiers have been applied as a KO'd and Badly Hurt result respectively“. Dřív +1 ke zranění (test
+// 7 + 1 = 8 ⇒ KO přišpendloval tvar, ne pravidlo — KO dává 7 i podle pravidla).
+static GameState stuntyProne() {
     GameState gs;
     placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
     gs.getPlayer(1).state = PlayerState::PRONE;
     gs.getPlayer(1).skills.add(SkillName::Stunty);
-    // Armor: 5+4=9 > 8. Injury: 3+4=7 +1(Stunty)=8 → KO
-    FixedDiceRoller dice({5, 4, 3, 4});
+    return gs;
+}
+
+TEST(Injury, StuntySevenIsKo) {
+    GameState gs = stuntyProne();
+    FixedDiceRoller dice({5, 4, 3, 4});              // zbroj 9 > 8; zranění 7 ⇒ KO
     InjuryContext ctx;
-    bool broken = resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
-    EXPECT_TRUE(broken);
+    EXPECT_TRUE(resolveArmourAndInjury(gs, 1, dice, ctx, nullptr));
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+}
+
+TEST(Injury, StuntySixIsStunned) {
+    // dřív 6 + 1 = 7 ⇒ omráčen taky; hranice omráčení se nemění — kontrola, že 6 zůstává omráčení
+    GameState gs = stuntyProne();
+    FixedDiceRoller dice({5, 4, 3, 3});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STUNNED);
+}
+
+TEST(Injury, StuntyNineIsBadlyHurtWithoutTheCasualtyTable) {
+    // dřív 9 + 1 = 10 ⇒ hod na tabulku Casualty (1/6 smrt); teď Badly Hurt rovnou — žádná další kostka
+    GameState gs = stuntyProne();
+    FixedDiceRoller dice({5, 4, 4, 5});
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+TEST(Injury, StuntyEightIsKoAndThickSkullStillSavesIt) {
+    GameState gs = stuntyProne();
+    FixedDiceRoller dice({5, 4, 4, 4});              // zranění 8 ⇒ KO (dřív 9 ⇒ KO taky)
+    InjuryContext ctx;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    GameState ts = stuntyProne();
+    ts.getPlayer(1).skills.add(SkillName::ThickSkull);
+    FixedDiceRoller d2({5, 4, 4, 4});                // Thick Skull: 8 ⇒ omráčen (dřív 8 + 1 = 9 ⇒ KO)
+    resolveArmourAndInjury(ts, 1, d2, ctx, nullptr);
+    EXPECT_EQ(ts.getPlayer(1).state, PlayerState::STUNNED);
 }
 
 
@@ -481,4 +519,17 @@ TEST(Injury, P192RegenerationHealsDecaysBothResultsIncludingDeath) {
     resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
     EXPECT_EQ(dice.remaining(), 0u);
+}
+
+// T5.23 (9.11.2026): ř. 8538-8539 — „Stunties that are armed with a Secret Weapon are not allowed to ignore enemy
+// tackle zones“. AG3, cíl se 2 zónami soupeře: Stunty 7−3−1 = 3; se Secret Weapon 3 + 2 = 5. Parita s PHP.
+TEST(Injury, StuntyWithASecretWeaponDoesNotIgnoreTackleZonesOnDodge) {
+    GameState gs;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Stunty);
+    placePlayer(gs, 12, {7, 6}, TeamSide::AWAY);
+    placePlayer(gs, 13, {7, 8}, TeamSide::AWAY);
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {6, 7}, {5, 7}), 3);   // pozitivní kontrola
+    gs.getPlayer(1).skills.add(SkillName::SecretWeapon);
+    EXPECT_EQ(calculateDodgeTarget(gs, gs.getPlayer(1), {6, 7}, {5, 7}), 5);
 }

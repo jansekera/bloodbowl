@@ -203,7 +203,9 @@ final class TacklezoneCalculator
         //   Pri PRAVE JEDNE zone vyjde obojí stejne -- proto to tak dlouho
         //   nikdo nevidel -- ale pri trech uz ne: pravidla davaji porad
         //   (7-AG)-1, engine daval (7-AG)-1+3-1.
-        if ($player->hasSkill(SkillName::Stunty)) {
+        // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500; parita s C++) — chyběla výjimka r. 8538-8539:
+        //   „Stunties that are armed with a Secret Weapon are not allowed to ignore enemy tackle zones“.
+        if ($player->hasSkill(SkillName::Stunty) && !$player->hasSkill(SkillName::SecretWeapon)) {
             $target -= $tzAtDest;
         }
 

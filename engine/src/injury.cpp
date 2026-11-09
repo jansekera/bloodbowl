@@ -42,19 +42,20 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
     // which made a Decay player markedly easier to remove from the match.
     // Druhý hod na tabulce Casualty viz níž (P192, 20.10.2026).
 
-    // Stunty: +1 to injury
-    if (player.hasSkill(SkillName::Stunty)) {
-        injuryRoll += 1;
-    }
+    // OPRAVENO 9.11.2026 (T5.23, živé od goblinů TV1500 P267) — tady bylo „Stunty: +1 ke zranění“. Pravidla
+    //   ř. 8534-8536: „treats a roll of 7 and 9 on the Injury table after any modifiers have been applied as a KO'd
+    //   and Badly Hurt result respectively“ ⇒ 7 = KO (ne omráčen), 9 = Badly Hurt bez hodu na tabulku Casualty (dřív
+    //   9 + 1 = 10 ⇒ tabulka s 1/6 smrti); Thick Skull se ptá na nemodifikovanou 8.
+    const bool stunty = player.hasSkill(SkillName::Stunty);
 
-    if (injuryRoll <= 7) {
+    if (injuryRoll <= (stunty ? 6 : 7)) {
         // Stunned
         player.setState(PlayerState::STUNNED);
         // BB2016 l. 707: may not turn face up on the turn he is Stunned.
         player.stunnedThisTurn = true;
         emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {},
                           injuryRoll, false, d1, d2});
-    } else if (injuryRoll <= 9) {
+    } else if (injuryRoll <= (stunty ? 8 : 9)) {
         // Thick Skull is DETERMINISTIC and applies to a modified 8 only
         // (rules parity, 2026-08-10). CRP: "This player treats a roll of 8 on
         // the Injury table, after any modifiers have been applied, as a
@@ -95,13 +96,15 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
         // Until now a 10+ was flatly INJURED, so death could not occur at all:
         // DEAD/game read 0.00 across 3200 games. CRP rolls D68 here; a sixth
         // of casualties are fatal.
-        CasualtyResult cas = rollCasualty(dice);
+        // T5.23: Stunty na 9 = Badly Hurt rovnou (ř. 8534-8536), bez hodu na tabulku (ani druhého za Decay)
+        const bool stuntyBadlyHurt = stunty && injuryRoll == 9;
+        CasualtyResult cas = stuntyBadlyHurt ? CasualtyResult::BADLY_HURT : rollCasualty(dice);
         // OPRAVENO 20.10.2026 (P192 parita) -- Decay se tu nehodil vůbec (komentář výš pocházel
         // z doby bez tabulky Casualty a příznak ctx.hasDecay nikdo nečetl). Pravidla ř. 8036-8042:
         // „roll twice on the Casualty table and apply both results“ -- v zápase platí horší
         // (smrt, je-li mrtvý kterýkoli); Regenerace níž léčí oba. Lékárníka týmy s Decay
         // nemají (ř. 1198-1199). Skill oběti se čte přímo, ne z kontextu (každá cesta k zranění).
-        if (player.hasSkill(SkillName::Decay)) {
+        if (player.hasSkill(SkillName::Decay) && !stuntyBadlyHurt) {
             const CasualtyResult second = rollCasualty(dice);
             if (casualtySeverity(second) > casualtySeverity(cas)) cas = second;
         }
