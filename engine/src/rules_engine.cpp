@@ -246,7 +246,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                     for (int tx = 0; tx < 26; tx += 3) {
                         for (int ty = 0; ty < 15; ty += 3) {
                             // OPRAVENO 9.11.2026 (P268) — dřív Chebyshev ≤ 13, tedy i dlouhé hody, které
-                            //   resolver odmítne (ř. 8597-8600); teď jen rychlá/krátká (ttmTargetLegal).
+                            //   resolver odmítne (ř. 8608-8609); teď jen rychlá/krátká (ttmTargetLegal).
                             const Position t{static_cast<int8_t>(tx), static_cast<int8_t>(ty)};
                             if (t != p.position && ttmTargetLegal(p, t)) {
                                 out.push_back({ActionType::THROW_TEAM_MATE, p.id,

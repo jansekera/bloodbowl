@@ -341,6 +341,18 @@ bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band) {
     return r == PassRange::QUICK_PASS || r == PassRange::SHORT_PASS;
 }
 
+bool sideHasPlayerWithin(const GameState& state, TeamSide side, Position c, int r, bool standingOnly) {
+    bool found = false;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if ((!standingOnly || p.state == PlayerState::STANDING) && p.position.distanceTo(c) <= r) found = true;
+    });
+    return found;
+}
+
+bool canCatchBomb(const Player& p) {
+    return p.state == PlayerState::STANDING && !p.lostTacklezones && !p.hasSkill(SkillName::NoHands);
+}
+
 double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
     double v = 0.0;
     hitsUs = false;
@@ -350,37 +362,54 @@ double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool
             if (!q.isOnPitch()) continue;
             const Player* p = state.getPlayerAtPosition(q);
             if (!p) continue;
-            const double hit = (dx == 0 && dy == 0) ? 1.0 : 0.5;
+            const bool centre = dx == 0 && dy == 0;
+            const double hit = centre ? 1.0 : 0.5;
             if (p->teamSide == mySide) { hitsUs = true; v -= 2.0 * hit; continue; }
-            v += hit * (p->state == PlayerState::STANDING ? 1.0 : 0.3);
+            double w = p->state == PlayerState::STANDING ? 1.0 : 0.3;
+            if (centre && canCatchBomb(*p)) {
+                // přesná bomba: chytá s +1 (Diving Catch platí); Catch přehodí neúspěch
+                double fail = (calculateCatchTarget(state, *p, 1, true) - 1) / 6.0;
+                if (p->hasSkill(SkillName::Catch)) fail *= fail;
+                w *= fail;
+            }
+            v += hit * w;
         }
     return v;
 }
 
-Position chooseBombRethrowTarget(const GameState& state, const Player& thrower) {
-    double best = -1e9;
+BombChoice chooseBombTarget(const GameState& state, const Player& thrower, bool mustThrow) {
+    BombChoice best[2];            // [0] pravítko, [1] Hail Mary
+    best[0].value = best[1].value = mustThrow ? -1e9 : 0.999;
     int bestFar = -1;
-    Position bestPos{-1, -1};
     for (int x = 0; x < 26; ++x)
         for (int y = 0; y < 15; ++y) {
             const Position c{static_cast<int8_t>(x), static_cast<int8_t>(y)};
-            if (c == thrower.position || !passTargetLegal(state, thrower, c).legal) continue;
+            if (c == thrower.position) continue;
+            const PassLegality leg = passTargetLegal(state, thrower, c);
+            if (!leg.legal) continue;
             bool hitsUs = false;
             const double v = bombSquareValue(state, c, thrower.teamSide, hitsUs);
-            if (hitsUs && v <= 0.0) continue;
-            int far = 99;   // nejbližší náš od cíle — při shodě ceny čím dál, tím líp
-            state.forEachOnPitch(thrower.teamSide, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
-            if (v > best || (v == best && far > bestFar)) { best = v; bestFar = far; bestPos = c; }
+            if (mustThrow) {
+                int far = 99;   // nejbližší náš od cíle — při shodě ceny čím dál, tím líp
+                state.forEachOnPitch(thrower.teamSide, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
+                if (v > best[0].value || (v == best[0].value && far > bestFar)) {
+                    best[0] = {c, v, leg.hailMary};
+                    bestFar = far;
+                }
+                continue;
+            }
+            if (hitsUs) continue;
+            if (leg.hailMary && sideHasPlayerWithin(state, thrower.teamSide, c, 4, false)) continue;
+            BombChoice& b = best[leg.hailMary ? 1 : 0];
+            if (v > b.value) b = {c, v, leg.hailMary};
         }
-    return bestPos;
+    if (mustThrow) return best[0];
+    if (best[0].pos.x >= 0) return best[0];
+    return best[1].pos.x >= 0 ? best[1] : BombChoice{};
 }
 
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
-    bool clear = true;
-    state.forEachOnPitch(opponent(throwerSide), [&](const Player& p) {
-        if (p.state == PlayerState::STANDING && p.position.distanceTo(target) <= kHailMaryClearRadius) clear = false;
-    });
-    return clear;
+    return !sideHasPlayerWithin(state, opponent(throwerSide), target, kHailMaryClearRadius, true);
 }
 
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target) {
@@ -530,12 +559,15 @@ void rerollThrow(GameState& state, Player& thrower, DiceRollerBase& dice, CoachQ
                           roll, original});
         return;
     }
+    // OPRAVENO 9.11.2026 (review P264, M1) — kouč dostal týmový přehoz vždy, i při hodu chycené bomby týmem, který
+    //   není na tahu; ř. 929-932: týmové přehozy jen ve vlastním tahu (teamRerollAllowed, pro kouče i engine).
+    const bool teamOnTurn = teamRerollAllowed(state, thrower);
     // P130: v živé partii rozhoduje kouč (u fumble i nepřesné; schváleno 03.10. a 10.10.).
     if (coachDecides(thrower.teamSide)) {
-        coachRerollRoll(state, thrower, dice, coachQuestion, events, roll, target, fumbleMods, /*teamAllowed=*/true);
+        coachRerollRoll(state, thrower, dice, coachQuestion, events, roll, target, fumbleMods, teamOnTurn);
         return;
     }
-    engineRerollProTeam(state, thrower, dice, events, roll, target, fumbleMods, teamAllowedForEngine);
+    engineRerollProTeam(state, thrower, dice, events, roll, target, fumbleMods, teamAllowedForEngine && teamOnTurn);
 }
 
 static bool attemptRollImpl(GameState& state, int playerId, DiceRollerBase& dice,

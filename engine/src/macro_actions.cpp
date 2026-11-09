@@ -1633,15 +1633,8 @@ int safetyDepthX(const GameState& state, TeamSide mySide) {
 
 // ─── P268 (uživatel 9.11.2026: „bomba i hod spoluhráčem“) ───────────────────────────────────────────────────
 // Bomba: cílové pole srazí vždy, sousední na 4+ (ř. 7968-7972); sražený hráč týmu na tahu = turnover (ř. 7956-7958).
-// Cena pole = očekávaní sražení soupeři − 2× očekávaní sražení naši (turnover); stojící soupeř 1, ležící jen zranění
-// (0,3). Nabízí se nejlepší pole na soupeři s cenou ≥ 1 a bez našeho hráče v dosahu výbuchu; Hail Mary (mimo pravítko,
-// P263) jen když kolem cíle do 4 polí (3 rozptyly + výbuch) žádný náš není. Kolik to opravdu stojí, rozhodne hledání.
-static bool ownPlayerWithin(const GameState& state, Position c, TeamSide mySide, int radius) {
-    bool near = false;
-    state.forEachOnPitch(mySide, [&](const Player& p) { if (p.position.distanceTo(c) <= radius) near = true; });
-    return near;
-}
-
+// Cíl: helpers.cpp chooseBombTarget (cena bombSquareValue, pravítko napřed, Hail Mary jen bez našeho do 4 polí).
+// Kolik to opravdu stojí, rozhodne hledání.
 // Hod spoluhráčem: sousední stojící nosič míče s Right Stuff, hod na prázdné pole (rychlá/krátká, ttmTargetLegal)
 // aspoň kTtmMinGain sloupců k endzóně — hozený se vždy 3× rozptýlí (ř. 8609-8612), a když přistane a ještě netáhl,
 // smí táhnout dál (Right Stuff ř. „may take an Action later this turn“), takže hod jeho běh prodlouží. Mezi
@@ -1652,20 +1645,9 @@ static void offerBombAndTtmMacros(const GameState& state, TeamSide mySide, std::
     state.forEachOnPitch(mySide, [&](const Player& p) {
         if (!p.canAct() || p.hasActed || p.state != PlayerState::STANDING) return;
         if (p.hasSkill(SkillName::Bombardier) && !p.hasMoved) {
-            // [0] = na pravítku, [1] = Hail Mary; Hail Mary jen když na pravítku nic nevyšlo
-            double best[2] = {0.999, 0.999};
-            Position bestPos[2] = {{-1, -1}, {-1, -1}};
-            state.forEachOnPitch(opponent(mySide), [&](const Player& e) {
-                const PassLegality leg = passTargetLegal(state, p, e.position);
-                if (!leg.legal) return;
-                if (leg.hailMary && ownPlayerWithin(state, e.position, mySide, 4)) return;
-                bool hitsUs = false;
-                const double v = bombSquareValue(state, e.position, mySide, hitsUs);
-                const int k = leg.hailMary ? 1 : 0;
-                if (!hitsUs && v > best[k]) { best[k] = v; bestPos[k] = e.position; }
-            });
-            const Position target = bestPos[0].x >= 0 ? bestPos[0] : bestPos[1];
-            if (target.x >= 0) out.push_back({MacroType::BOMB, p.id, -1, target});
+            // pravidla výběru (pravítko, Hail Mary až potom, cena ≥ 1, náš mimo výbuch) na jednom místě s hodem dál
+            const BombChoice c = chooseBombTarget(state, p, false);
+            if (c.pos.x >= 0) out.push_back({MacroType::BOMB, p.id, -1, c.pos});
         }
         if (p.hasSkill(SkillName::ThrowTeamMate) && !myTeam.passUsedThisTurn && state.ball.isHeld) {
             const Player& carrier = state.getPlayer(state.ball.carrierId);

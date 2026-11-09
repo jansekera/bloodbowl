@@ -48,8 +48,6 @@ int checkInterception(GameState& state, int passerId, Position target,
     if (interceptorId < 0 || !rollInterception(state, passer, interceptorId, dice, events)) return -1;
     const Player& interceptor = state.getPlayer(interceptorId);
     state.ball = BallState::carried(interceptor.position, interceptor.id);
-    emitEvent(events, {GameEvent::Type::CATCH, interceptor.id, passerId, interceptor.position, {},
-                      interceptionTarget(state, interceptor), true});
     return interceptor.id;
 }
 
@@ -82,9 +80,10 @@ int pickInterceptor(const GameState& state, const Player& passer, Position targe
         // Ruler overlaps the square: centre within ~1 square of the line.
         if (distSqToSegment4(p.position, passer.position, target) > 4) return;
         const int t = interceptionTarget(state, p);
-        if (t < bestTarget || (t == bestTarget && interceptor &&
-                               p.hasSkill(SkillName::Catch) &&
-                               !interceptor->hasSkill(SkillName::Catch))) {
+        // shoda: přednost Catch, pak nižší id (review 9.11.: výslovně, ať nerozhoduje pořadí procházení — parita s PHP)
+        const bool catchBetter = interceptor && p.hasSkill(SkillName::Catch) && !interceptor->hasSkill(SkillName::Catch);
+        const bool sameCatch = interceptor && p.hasSkill(SkillName::Catch) == interceptor->hasSkill(SkillName::Catch);
+        if (t < bestTarget || (t == bestTarget && (catchBetter || (sameCatch && p.id < interceptor->id)))) {
             bestTarget = t;
             interceptor = &p;
         }
@@ -132,6 +131,9 @@ bool rollInterception(GameState& state, const Player& passer, int interceptorId,
                               static_cast<int>(SkillName::SafeThrow), true});
         }
     }
+    // Review 9.11. (L11): výsledek se zapisuje vždy, i nepovedený (dřív jen úspěch, a to u volajícího) — jako PHP
+    //   hodZachyceni (událost interception).
+    emitEvent(events, {GameEvent::Type::CATCH, interceptor->id, passerId, interceptor->position, {}, intTarget, success});
     return success;
 }
 

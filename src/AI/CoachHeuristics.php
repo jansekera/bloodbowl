@@ -346,17 +346,16 @@ final class CoachHeuristics
     public const HAIL_MARY_VOLNO = 3;
 
     /**
-     * P266 (uživatel 9.11.2026: „hail mary když je oponent daleko“, upřesnil „obojí“) — cíle hodu pro kouče AI
+     * P266 (uživatel 9.11.2026: „hail mary když je oponent daleko“, upřesnil „obojí“) — cíle PŘIHRÁVKY pro kouče AI
      * na jednom místě: pravítko jako dřív + Hail Mary (mimo pravítko, ne ve vánici — RulesEngine/ThrowTarget) jen
-     *  - bomba: na stojícího soupeře;
-     *  - přihrávka: na stojícího spoluhráče vpřed, do HAIL_MARY_VOLNO polí od něj žádný stojící soupeř, a jen jako
+     *  na stojícího spoluhráče vpřed, do HAIL_MARY_VOLNO polí od něj žádný stojící soupeř, a jen jako
      *    POSLEDNÍ akce tahu (ostatní naši už táhli) — nechycená HMP je turnover.
      * Parita s C++ rules_engine.cpp / helpers.cpp hailMaryPassWorthOffering (C++ podmínku „poslední akce“ nemá —
-     * turnover tam ocení hledání).
+     * turnover tam ocení hledání). Bomba má vlastní výběr: Engine\BombTarget (review 9.11. M4).
      *
      * @return list<array{x: int, y: int, range: string}>
      */
-    public static function cileHoduProAi(RulesEngine $rules, GameState $state, MatchPlayerDTO $hazec, bool $bomba): array
+    public static function cileHoduProAi(RulesEngine $rules, GameState $state, MatchPlayerDTO $hazec): array
     {
         $odkud = $hazec->getPosition();
         if ($odkud === null) {
@@ -381,26 +380,11 @@ final class CoachHeuristics
             if ($kdo === null || $kdo->getState() !== PlayerState::STANDING) {
                 continue;
             }
-            if ($bomba) {
-                if ($kdo->getTeamSide() !== $strana) {
-                    $cile[] = $t;
-                }
-                continue;
-            }
             if ($kdo->getTeamSide() !== $strana || !$posledni
                 || self::doKoncoveZony($strana, $t['x']) >= self::doKoncoveZony($strana, $odkud->getX())) {
                 continue;
             }
-            $volno = true;
-            foreach ($state->getPlayersOnPitch($strana->opponent()) as $souper) {
-                $sp = $souper->getPosition();
-                if ($sp !== null && $souper->getState() === PlayerState::STANDING
-                    && $sp->distanceTo($pos) <= self::HAIL_MARY_VOLNO) {
-                    $volno = false;
-                    break;
-                }
-            }
-            if ($volno) {
+            if (!$state->maHraceDo($strana->opponent(), $pos, self::HAIL_MARY_VOLNO, true)) {
                 $cile[] = $t;
             }
         }

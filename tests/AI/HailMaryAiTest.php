@@ -30,6 +30,8 @@ final class HailMaryAiTest extends TestCase
             ->withWeather($pocasi)
             ->addPlayer(TeamSide::HOME, 3, 7, id: 1, skills: $skilly)
             ->addPlayer(TeamSide::AWAY, 22, 7, id: 12)      // 19 polí — mimo pravítko
+            // review 9.11. (M2): osamělý stojící soupeř bombu v cíli spíš chytí (cena < 1) ⇒ shluk dvou
+            ->addPlayer(TeamSide::AWAY, 22, 8, id: 13)
             ->withBallOffPitch()
             ->build();
     }
@@ -37,14 +39,26 @@ final class HailMaryAiTest extends TestCase
     /** @return list<string> */
     private function hmpCile(\App\DTO\GameState $s, bool $bomba): array
     {
-        $cile = CoachHeuristics::cileHoduProAi(new RulesEngine(), $s, $s->requirePlayer(1), $bomba);
+        if ($bomba) {
+            // review 9.11. (M4): cíl bomby ze sdíleného BombTarget::vyber (parita s C++ chooseBombTarget)
+            $tz = new \App\Engine\TacklezoneCalculator();
+            $ball = new \App\Engine\BallResolver(new \App\Engine\FixedDiceRoller([]), $tz, new \App\Engine\ScatterCalculator());
+            $cil = \App\Engine\BombTarget::vyber($s, $s->requirePlayer(1), false, $ball);
+            return $cil !== null && $cil['hailMary'] ? [$cil['pos']->getX() . ',' . $cil['pos']->getY()] : [];
+        }
+        $cile = CoachHeuristics::cileHoduProAi(new RulesEngine(), $s, $s->requirePlayer(1));
         $hmp = array_filter($cile, fn($t) => $t['range'] === 'hail_mary');
         return array_values(array_map(fn($t) => $t['x'] . ',' . $t['y'], $hmp));
     }
 
     public function testBombaSHmpNaVzdalenehoSoupere(): void
     {
-        $this->assertSame(['22,7'], $this->hmpCile($this->bombaStav(true), true));
+        $cil = $this->hmpCile($this->bombaStav(true), true);
+        $this->assertCount(1, $cil);
+        [$x, $y] = array_map('intval', explode(',', $cil[0]));
+        // oba soupeři (22,7) a (22,8) v dosahu výbuchu
+        $this->assertLessThanOrEqual(1, max(abs($x - 22), abs($y - 7)));
+        $this->assertLessThanOrEqual(1, max(abs($x - 22), abs($y - 8)));
     }
 
     public function testBombaBezHmpNicMimoPravitko(): void
@@ -61,7 +75,7 @@ final class HailMaryAiTest extends TestCase
     public function testPravitkoZustava(): void
     {
         $s = $this->bombaStav(true);
-        $cile = CoachHeuristics::cileHoduProAi(new RulesEngine(), $s, $s->requirePlayer(1), true);
+        $cile = CoachHeuristics::cileHoduProAi(new RulesEngine(), $s, $s->requirePlayer(1));
         $this->assertContains('quick_pass', array_column($cile, 'range'));
     }
 

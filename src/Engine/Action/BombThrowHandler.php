@@ -14,6 +14,7 @@ use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
+use App\Engine\BombTarget;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
@@ -111,7 +112,7 @@ final class BombThrowHandler implements ActionHandlerInterface
         //   jehož týmu výbuch v cíli hrozí. Nepovedené ⇒ bomba letí dál (uživatel). Zachycená není turnover (r. 7955).
         if (!$hailMary) {
             $z = $this->passResolver->najdiZachycujiciho($state, $thrower, $throwerPos, $targetPos);
-            if ($z !== null && $this->tymuHroziVybuch($state, $z->getTeamSide(), $targetPos)
+            if ($z !== null && $state->maHraceDo($z->getTeamSide(), $targetPos, 1, false)
                 && $this->passResolver->hodZachyceni($state, $thrower, $z, $events)) {
                 return $this->hodDal($state, $z->getId(), $events, $skok + 1);
             }
@@ -165,8 +166,8 @@ final class BombThrowHandler implements ActionHandlerInterface
         if ($fumble) {
             // r. 7967-7968: fumble vybuchne v poli házeče
             $events[] = GameEvent::bombLanding((string) $throwerPos);
-            [$state, $events, $srazenNas] = $this->resolveExplosion($state, $throwerPos, $activeSide, $events);
-            return [$state, $events, $srazenNas || $thrower->getTeamSide() === $activeSide];
+            // turnover = sražený hráč týmu na tahu (r. 7956-7958); házeč ve středu výbuchu padne vždy (jako C++)
+            return $this->resolveExplosion($state, $throwerPos, $activeSide, $events);
         }
         $landingPos = $targetPos;
         if (!$accurate) {
@@ -181,33 +182,37 @@ final class BombThrowHandler implements ActionHandlerInterface
             return [$state, $events, false];
         }
 
-        // P264: hráč v poli dopadu bombu chytá jako míč (přesná +1, Diving Catch jen přesná; Catch přehodí neúspěch).
-        //   Pokus je vždy aspoň tak dobrý jako odmítnutí (obojí jinak = výbuch, r. 7964-7966). Rozhoduje engine.
+        // P264: hráč v poli dopadu bombu chytá jako míč (hodNaChyceni: přesná +1, Diving Catch jen přesná, Catch, Pro,
+        //   týmový přehoz jen tým na tahu — review M5). Pokus je vždy aspoň tak dobrý jako odmítnutí (obojí jinak =
+        //   výbuch, r. 7964-7966). Rozhoduje engine (P272).
         $chytajici = $state->getPlayerAtPosition($landingPos);
-        if ($chytajici !== null && $chytajici->getState() === PlayerState::STANDING
-            && !$chytajici->hasLostTacklezones() && !$chytajici->hasSkill(SkillName::NoHands)) {
-            $cil = $this->ballResolver->getCatchTarget($state, $chytajici, $accurate ? 1 : 0, $accurate);
-            $hod = $this->dice->rollD6();
-            $chytil = $hod >= $cil;
-            if (!$chytil && $chytajici->hasSkill(SkillName::Catch)) {
-                $events[] = GameEvent::rerollUsed($chytajici->getId(), 'Catch');
-                $hod = $this->dice->rollD6();
-                $chytil = $hod >= $cil;
+        if ($chytajici !== null && BombTarget::mozeChytit($chytajici)) {
+            $strana = $chytajici->getTeamSide();
+            $hod = $this->ballResolver->hodNaChyceni(
+                $state,
+                $chytajici,
+                $accurate ? 1 : 0,
+                $strana === $activeSide && $state->getTeamState($strana)->canUseReroll(),
+                $accurate,
+            );
+            $state = $hod['state'];
+            $events = array_merge($events, $hod['events']);
+            if ($hod['teamRerollUsed']) {
+                $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
             }
-            $events[] = GameEvent::catchAttempt($chytajici->getId(), $cil, $hod, $chytil);
-            if ($chytil) {
+            if ($hod['success']) {
                 return $this->hodDal($state, $chytajici->getId(), $events, $skok + 1);
             }
         }
 
         $events[] = GameEvent::bombLanding((string) $landingPos);
-        [$state, $events, $srazenNas] = $this->resolveExplosion($state, $landingPos, $activeSide, $events);
-        return [$state, $events, $srazenNas];
+        return $this->resolveExplosion($state, $landingPos, $activeSide, $events);
     }
 
     /**
      * P264: chycenou / zachycenou bombu hráč hned hodí dál (r. 7961-7963, mimořádná akce). Cíl volí engine za oba
-     * kouče (vyberCilHoduDal); když legální cíl není, vybuchne mu v ruce. C++ rethrowBomb.
+     * kouče (BombTarget::vyber, musí hodit). Výbuch v ruce jen jako pojistka: po MAX_PRESKOKU chyceních za sebou
+     * (pravidla strop nemají; v praxi nenastane) nebo bez legálního pole. C++ rethrowBomb.
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>, 2: bool}
@@ -215,90 +220,13 @@ final class BombThrowHandler implements ActionHandlerInterface
     private function hodDal(GameState $state, int $drziId, array $events, int $skok): array
     {
         $drzi = $state->requirePlayer($drziId);
-        $cil = $skok > self::MAX_PRESKOKU ? null : $this->vyberCilHoduDal($state, $drzi);
+        $cil = $skok > self::MAX_PRESKOKU ? null : BombTarget::vyber($state, $drzi, true, $this->ballResolver)['pos'] ?? null;
         if ($cil === null) {
             $pos = $drzi->requirePosition();
             $events[] = GameEvent::bombLanding((string) $pos);
             return $this->resolveExplosion($state, $pos, $state->getActiveTeam(), $events);
         }
         return $this->letBomby($state, $drziId, $cil, $events, $skok);
-    }
-
-    private function tymuHroziVybuch(GameState $state, TeamSide $strana, Position $cil): bool
-    {
-        foreach ($state->getPlayersOnPitch($strana) as $p) {
-            $pos = $p->getPosition();
-            if ($pos !== null && $pos->distanceTo($cil) <= 1) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Cena výbuchu na poli `$c` pro stranu `$strana` (C++ helpers.cpp bombSquareValue): cílové pole vždy, sousední
-     * na 4+; stojící soupeř +1 (ležící 0,3), náš −2 (turnover) × šance zásahu.
-     *
-     * @return array{0: float, 1: bool} cena, zasáhne našeho
-     */
-    private function cenaVybuchu(GameState $state, Position $c, TeamSide $strana): array
-    {
-        $v = 0.0;
-        $nas = false;
-        for ($dx = -1; $dx <= 1; $dx++) {
-            for ($dy = -1; $dy <= 1; $dy++) {
-                $q = new Position($c->getX() + $dx, $c->getY() + $dy);
-                if (!$q->isOnPitch()) {
-                    continue;
-                }
-                $p = $state->getPlayerAtPosition($q);
-                if ($p === null) {
-                    continue;
-                }
-                $zasah = ($dx === 0 && $dy === 0) ? 1.0 : 0.5;
-                if ($p->getTeamSide() === $strana) {
-                    $nas = true;
-                    $v -= 2.0 * $zasah;
-                    continue;
-                }
-                $v += $zasah * ($p->getState() === PlayerState::STANDING ? 1.0 : 0.3);
-            }
-        }
-        return [$v, $nas];
-    }
-
-    /** Cíl povinného hodu dál (C++ chooseBombRethrowTarget): nejvyšší cena, při shodě nejdál od našich. */
-    private function vyberCilHoduDal(GameState $state, MatchPlayerDTO $drzi): ?Position
-    {
-        $odkud = $drzi->requirePosition();
-        $nej = -1e9;
-        $nejDal = -1;
-        $cil = null;
-        for ($x = 0; $x < Position::PITCH_WIDTH; $x++) {
-            for ($y = 0; $y < Position::PITCH_HEIGHT; $y++) {
-                $c = new Position($x, $y);
-                if ($c->equals($odkud) || ThrowTarget::posud($state, $drzi, $odkud, $c)['chyba'] !== null) {
-                    continue;
-                }
-                [$v, $nas] = $this->cenaVybuchu($state, $c, $drzi->getTeamSide());
-                if ($nas && $v <= 0.0) {
-                    continue;
-                }
-                $dal = 99;
-                foreach ($state->getPlayersOnPitch($drzi->getTeamSide()) as $p) {
-                    $pp = $p->getPosition();
-                    if ($pp !== null) {
-                        $dal = min($dal, $pp->distanceTo($c));
-                    }
-                }
-                if ($v > $nej || ($v === $nej && $dal > $nejDal)) {
-                    $nej = $v;
-                    $nejDal = $dal;
-                    $cil = $c;
-                }
-            }
-        }
-        return $cil;
     }
 
     /**

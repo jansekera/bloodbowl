@@ -63,8 +63,10 @@ TEST(BombTtmMacros, P268BombMacroOfferedAtAnOpponent) {
     const auto ms = macros(bombState());
     const Macro* m = find(ms, MacroType::BOMB, 1);
     ASSERT_NE(m, nullptr);
-    // cíl na soupeři (shluk 12+13 ⇒ jeden z nich ve středu, druhý vedle)
-    EXPECT_TRUE((m->targetPos == Position{10, 7}) || (m->targetPos == Position{10, 8}));
+    // cíl u shluku 12+13: oba v dosahu výbuchu (review M2: stojící v cílovém poli by bombu spíš chytil, takže se
+    // míří i na prázdné pole vedle)
+    EXPECT_LE(m->targetPos.distanceTo(Position{10, 7}), 1);
+    EXPECT_LE(m->targetPos.distanceTo(Position{10, 8}), 1);
 }
 
 TEST(BombTtmMacros, P268NoBombWhereOurPlayerWouldBeHit) {

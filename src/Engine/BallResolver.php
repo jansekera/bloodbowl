@@ -234,6 +234,65 @@ final class BallResolver
     }
 
     /**
+     * Hod na chycení: cíl, Catch, Pro, týmový přehoz (Loner). Stav míče nemění. Sdílí resolveCatch a bomba (P264,
+     * review 9.11. M5 — bomba se chytá „using the same rules for catching the ball“, r. 7959-7961); C++ catchRoll.
+     *
+     * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
+     */
+    public function hodNaChyceni(GameState $state, MatchPlayerDTO $catcher, int $modifier, bool $teamRerollAvailable, bool $accuratePass): array
+    {
+        $target = $this->getCatchTarget($state, $catcher, $modifier, $accuratePass);
+        $roll = $this->dice->rollD6();
+        $success = $roll >= $target;
+        $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
+        $skillRerollUsed = false;
+        $teamRerollUsed = false;
+
+        // Catch skill: reroll failed catch
+        if (!$success && $catcher->hasSkill(SkillName::Catch)) {
+            $skillRerollUsed = true;
+            $roll = $this->dice->rollD6();
+            $success = $roll >= $target;
+            $events[] = GameEvent::rerollUsed($catcher->getId(), 'Catch');
+            $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
+        }
+
+        // ⛔ OPRAVA 18.09.2026: tataz pravidla Pro jako u zvedani (r. 8381-8387, 926).
+        $proUsed = false;
+        if (!$success && !$skillRerollUsed && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
+            $proUsed = true;
+            $catcher = $catcher->withProUsedThisTurn(true);
+            $state = $state->withPlayer($catcher);
+            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
+            $teamRerollUsed = $pro['teamRerollUsed'];
+            if ($pro['allowed']) {
+                $roll = $this->dice->rollD6();
+                $success = $roll >= $target;
+                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
+            }
+        }
+
+        // Team reroll (only if no skill reroll and no Pro was used)
+        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
+            $teamRerollUsed = true;
+            $lonerBlocked = false;
+            if ($catcher->hasSkill(SkillName::Loner)) {
+                $lonerRoll = $this->dice->rollD6();
+                $lonerBlocked = $lonerRoll < 4;
+                $events[] = GameEvent::lonerCheck($catcher->getId(), $lonerRoll, !$lonerBlocked);
+            }
+            if (!$lonerBlocked) {
+                $roll = $this->dice->rollD6();
+                $success = $roll >= $target;
+                $events[] = GameEvent::rerollUsed($catcher->getId(), 'Team Reroll');
+                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
+            }
+        }
+
+        return ['state' => $state, 'events' => $events, 'success' => $success, 'teamRerollUsed' => $teamRerollUsed];
+    }
+
+    /**
      * Attempt to catch ball (from pass, scatter landing, hand-off).
      * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
      */
@@ -282,53 +341,11 @@ final class BallResolver
             return ['state' => $bounceResult['state'], 'events' => $events, 'success' => false, 'teamRerollUsed' => false];
         }
 
-        $target = $this->getCatchTarget($state, $catcher, $modifier, $accuratePass);
-        $roll = $this->dice->rollD6();
-        $success = $roll >= $target;
-        $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
-        $skillRerollUsed = false;
-        $teamRerollUsed = false;
-
-        // Catch skill: reroll failed catch
-        if (!$success && $catcher->hasSkill(SkillName::Catch)) {
-            $skillRerollUsed = true;
-            $roll = $this->dice->rollD6();
-            $success = $roll >= $target;
-            $events[] = GameEvent::rerollUsed($catcher->getId(), 'Catch');
-            $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-        }
-
-        // ⛔ OPRAVA 18.09.2026: tataz pravidla Pro jako u zvedani (r. 8381-8387, 926).
-        $proUsed = false;
-        if (!$success && !$skillRerollUsed && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
-            $proUsed = true;
-            $catcher = $catcher->withProUsedThisTurn(true);
-            $state = $state->withPlayer($catcher);
-            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
-            $teamRerollUsed = $pro['teamRerollUsed'];
-            if ($pro['allowed']) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
-        }
-
-        // Team reroll (only if no skill reroll and no Pro was used)
-        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
-            $teamRerollUsed = true;
-            $lonerBlocked = false;
-            if ($catcher->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $lonerBlocked = $lonerRoll < 4;
-                $events[] = GameEvent::lonerCheck($catcher->getId(), $lonerRoll, !$lonerBlocked);
-            }
-            if (!$lonerBlocked) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::rerollUsed($catcher->getId(), 'Team Reroll');
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
-        }
+        $hod = $this->hodNaChyceni($state, $catcher, $modifier, $teamRerollAvailable, $accuratePass);
+        $state = $hod['state'];
+        $events = $hod['events'];
+        $success = $hod['success'];
+        $teamRerollUsed = $hod['teamRerollUsed'];
 
         if ($success) {
             $state = $state->withBall(BallState::carried($pos, $catcher->getId()));

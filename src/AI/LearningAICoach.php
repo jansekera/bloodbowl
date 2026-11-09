@@ -7,6 +7,7 @@ namespace App\AI;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\Engine\RulesEngine;
+use App\Engine\BombTarget;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
@@ -1556,7 +1557,7 @@ final class LearningAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, false);   // P266: i Hail Mary
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -1851,60 +1852,15 @@ final class LearningAICoach implements AICoachInterface
         if ($player === null || !$player->hasSkill(SkillName::Bombardier)) {
             return null;
         }
-
-        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, true);   // P266: i Hail Mary
-        if ($targets === []) {
+        // Review 9.11. (M4): cíl ze sdíleného BombTarget::vyber — parita s C++ makrem BOMB (viz GreedyAICoach).
+        $cil = BombTarget::vyber($state, $player, false, $this->ballResolver);
+        if ($cil === null) {
             return null;
         }
-
-        $enemies = $state->getPlayersOnPitch($side->opponent());
-        $myPlayers = $state->getPlayersOnPitch($side);
-
-        $bestScore = -PHP_FLOAT_MAX;
-        $bestTarget = null;
-
-        foreach ($targets as $target) {
-            $tx = $target['x'];
-            $ty = $target['y'];
-
-            $enemyCount = 0;
-            $allyCount = 0;
-
-            foreach ($enemies as $enemy) {
-                $ePos = $enemy->getPosition();
-                if ($ePos !== null && abs($ePos->getX() - $tx) <= 1 && abs($ePos->getY() - $ty) <= 1) {
-                    $enemyCount++;
-                }
-            }
-
-            foreach ($myPlayers as $ally) {
-                $aPos = $ally->getPosition();
-                if ($aPos !== null && abs($aPos->getX() - $tx) <= 1 && abs($aPos->getY() - $ty) <= 1) {
-                    $allyCount++;
-                }
-            }
-
-            if ($enemyCount === 0) {
-                continue;
-            }
-
-            $score = $baseScore + $enemyCount * 0.08 - $allyCount * 0.06
-                - ($target['range'] === 'hail_mary' ? 0.06 : 0.0);   // P266: HMP bomba vždy 3 rozptyly od cíle
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestTarget = $target;
-            }
-        }
-
-        if ($bestTarget === null) {
-            return null;
-        }
-
         return [
             'action' => ActionType::BOMB_THROW,
-            'params' => ['playerId' => $playerId, 'targetX' => $bestTarget['x'], 'targetY' => $bestTarget['y']],
-            'score' => $bestScore,
+            'params' => ['playerId' => $playerId, 'targetX' => $cil['pos']->getX(), 'targetY' => $cil['pos']->getY()],
+            'score' => $baseScore + $cil['cena'] * 0.08 - ($cil['hailMary'] ? 0.06 : 0.0),
         ];
     }
 

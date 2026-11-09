@@ -13,7 +13,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     Player& projectile = state.getPlayer(projectileId);
 
     // OPRAVENO 9.11.2026 (P268) — dosah se kontroloval až po označení házeče za hotového a spotřebování týmové
-    //   přihrávky, takže cíl mimo dosah stál hráče akci (a nabídky po mřížce takové cíle dávaly). Ř. 8597-8600:
+    //   přihrávky, takže cíl mimo dosah stál hráče akci (a nabídky po mřížce takové cíle dávaly). Ř. 8608-8609:
     //   „Long Pass or Long Bomb range passes are not possible“ ⇒ jen rychlá/krátká.
     PassRange range;
     if (!ttmTargetLegal(thrower, target, &range)) return ActionResult::fail();

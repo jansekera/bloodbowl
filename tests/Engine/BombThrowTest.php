@@ -382,9 +382,12 @@ final class BombThrowTest extends TestCase
     public function testP263HailMaryBombaNikdyNeniPresna(): void
     {
         // i šestka se rozptýlí: D8=7 (Z) ×3 z (23,7) → (20,7) ⇒ hráč 12 zůstane stát
-        $result = (new ActionResolver(new FixedDiceRoller([6, 7, 7, 7])))->resolve($this->bombaHmp(), ActionType::BOMB_THROW, [
+        // review 9.11. (M3): kontrola spotřeby kostek — s přesnou šestkou by 12 bombu chytil a hodil jinam
+        $kostky = new FixedDiceRoller([6, 7, 7, 7]);
+        $result = (new ActionResolver($kostky))->resolve($this->bombaHmp(), ActionType::BOMB_THROW, [
             'playerId' => 1, 'targetX' => 23, 'targetY' => 7,
         ]);
+        $this->assertFalse($kostky->hasRemainingRolls());
         $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(12)->getState());
     }
 
@@ -410,10 +413,11 @@ final class BombThrowTest extends TestCase
     // R. 7959-7966: bombu lze zachytit nebo chytit jako míč; kdo ji má, hned ji hodí dál; nepovedené chycení nebo
     // odmítnutí ⇒ výbuch. Zachycení před hodem (r. 1773-1774), nepovedené ⇒ letí dál (uživatel). Hail Mary zachytit
     // nejde (r. 8167). Zachycená bomba není turnover (r. 7955), sražený hráč týmu na tahu ano (r. 7956-7958).
-    private function bombaP264(bool $zachycujici = false, int $zx = 8, int $zy = 7, int $cilX = 10): \App\DTO\GameState
+    private function bombaP264(bool $zachycujici = false, int $zx = 8, int $zy = 7, int $cilX = 10, bool $bezRukou = false): \App\DTO\GameState
     {
+        // $bezRukou: házeč nechytá ani nezachytává ⇒ hod zpět míří přímo na něj (review M2: jinak vedle něj)
         $b = (new GameStateBuilder())
-            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: [SkillName::Bombardier])
+            ->addPlayer(TeamSide::HOME, 5, 7, id: 1, skills: $bezRukou ? [SkillName::Bombardier, SkillName::NoHands] : [SkillName::Bombardier])
             ->addPlayer(TeamSide::AWAY, $cilX, 7, id: 12)
             ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->withBallOffPitch();
@@ -425,9 +429,9 @@ final class BombThrowTest extends TestCase
 
     public function testP264ZachycenaBombaLetiZpetNaNas(): void
     {
-        // 6 = 13 zachytil (6+) ⇒ hází na 1 (5,7): rychlá 3+, hod 6; 1 chytá (3+), hodí 1 ⇒ výbuch v (5,7); zbroj 3+3
-        $kostky = new FixedDiceRoller([6, 6, 1, 3, 3]);
-        $r = (new ActionResolver($kostky))->resolve($this->bombaP264(true), ActionType::BOMB_THROW, ['playerId' => 1, 'targetX' => 10, 'targetY' => 7]);
+        // 6 = 13 zachytil (6+) ⇒ hází na 1 (5,7): rychlá 3+, hod 6 ⇒ výbuch v (5,7); zbroj 3+3
+        $kostky = new FixedDiceRoller([6, 6, 3, 3]);
+        $r = (new ActionResolver($kostky))->resolve($this->bombaP264(true, bezRukou: true), ActionType::BOMB_THROW, ['playerId' => 1, 'targetX' => 10, 'targetY' => 7]);
         $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(12)->getState());
         $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
         $this->assertTrue($r->isTurnover());
@@ -455,9 +459,9 @@ final class BombThrowTest extends TestCase
 
     public function testP264ChycenouBombuChytajiciHodiDal(): void
     {
-        // hod 6 přesně; 12 chytá (3+) hodí 6 ⇒ hází na 1 (5,7): krátká 4+, hod 6; 1 nechytí (1) ⇒ výbuch; zbroj 3+3
-        $kostky = new FixedDiceRoller([6, 6, 6, 1, 3, 3]);
-        $r = (new ActionResolver($kostky))->resolve($this->bombaP264(), ActionType::BOMB_THROW, ['playerId' => 1, 'targetX' => 10, 'targetY' => 7]);
+        // hod 6 přesně; 12 chytá (3+) hodí 6 ⇒ hází na 1 (5,7): krátká 4+, hod 6 ⇒ výbuch; zbroj 3+3
+        $kostky = new FixedDiceRoller([6, 6, 6, 3, 3]);
+        $r = (new ActionResolver($kostky))->resolve($this->bombaP264(bezRukou: true), ActionType::BOMB_THROW, ['playerId' => 1, 'targetX' => 10, 'targetY' => 7]);
         $this->assertSame(PlayerState::STANDING, $r->getNewState()->requirePlayer(12)->getState());
         $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(1)->getState());
         $this->assertTrue($r->isTurnover());
@@ -467,8 +471,6 @@ final class BombThrowTest extends TestCase
     public function testP264HailMaryBombuNelzeZachytit(): void
     {
         // jako testP263HailMaryBombaSeRozptyliTrikratOdCile, navíc soupeř 13 v dráze vedle cíle (19,7)
-        $s = $this->bombaHmp();
-        $s = $s->withPlayer($s->requirePlayer(12));
         $s2 = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 3, 7, id: 1, skills: [SkillName::Bombardier, SkillName::HailMaryPass])
             ->addPlayer(TeamSide::AWAY, 23, 7, id: 12)

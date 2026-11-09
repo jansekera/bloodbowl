@@ -11,6 +11,10 @@ namespace bb {
 bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
                    std::vector<GameEvent>* events);
 // `accuratePass` = chytá se PŘESNÁ PŘIHRÁVKA mířená na hráčovo pole (jen tehdy platí +1 z Diving Catch).
+// Hod na chycení (cíl, Catch, Pro, týmový přehoz přes attemptRoll); stav míče nemění. Sdílí resolveCatch a bomba
+// (P264, review 9.11. M5: bomba se chytá „using the same rules for catching the ball“, ř. 7959-7961).
+bool catchRoll(GameState& state, int catcherId, DiceRollerBase& dice, int modifier,
+               std::vector<GameEvent>* events, bool accuratePass);
 bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
                   int modifier, std::vector<GameEvent>* events, bool accuratePass = false);
 void resolveBounce(GameState& state, Position from, DiceRollerBase& dice,

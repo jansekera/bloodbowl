@@ -44,20 +44,16 @@ bool explodeBomb(GameState& state, Position at, int throwerId, DiceRollerBase& d
     return activeKnockedDown;
 }
 
-// Může hráč bombu chytit / zachytit? Jako míč: stojí, má zónu, má ruce (ř. 7959-7961 „same rules for catching“).
-bool canCatchBomb(const Player& p) {
-    return p.state == PlayerState::STANDING && !p.lostTacklezones && !p.hasSkill(SkillName::NoHands);
-}
-
 ActionResult throwBombFrom(GameState& state, int throwerId, Position target, DiceRollerBase& dice,
                            std::vector<GameEvent>* events, int hop);
 
 // Chycenou / zachycenou bombu hráč hned hodí dál (ř. 7961-7963, mimořádná akce mimo pořadí). Cíl volí engine za oba
-// kouče (chooseBombRethrowTarget); když legální cíl není, vybuchne mu v ruce.
+// kouče (chooseBombTarget, mustThrow). Výbuch v ruce jen jako pojistka: po kMaxBombHops chyceních za sebou (pravidla
+// strop nemají; v praxi nenastane) nebo když hráč nemá žádné legální pole (nemožné na hřišti 26×15).
 ActionResult rethrowBomb(GameState& state, int holderId, DiceRollerBase& dice, std::vector<GameEvent>* events,
                          int hop) {
     const Player& holder = state.getPlayer(holderId);
-    const Position t = hop > kMaxBombHops ? Position{-1, -1} : chooseBombRethrowTarget(state, holder);
+    const Position t = hop > kMaxBombHops ? Position{-1, -1} : chooseBombTarget(state, holder, true).pos;
     if (!t.isOnPitch())
         return explodeBomb(state, holder.position, holderId, dice, events) ? ActionResult::turnovr()
                                                                            : ActionResult::ok();
@@ -87,15 +83,10 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
     if (!hailMary) {
         const int interceptorId = pickInterceptor(state, thrower, target);
         if (interceptorId >= 0) {
-            bool threatened = false;
-            const TeamSide side = state.getPlayer(interceptorId).teamSide;
-            state.forEachOnPitch(side, [&](const Player& p) { if (p.position.distanceTo(target) <= 1) threatened = true; });
-            if (threatened && rollInterception(state, thrower, interceptorId, dice, events)) {
-                const Player& ic = state.getPlayer(interceptorId);
-                emitEvent(events, {GameEvent::Type::CATCH, ic.id, throwerId, ic.position, {},
-                                  interceptionTarget(state, ic), true});
+            const bool threatened =
+                sideHasPlayerWithin(state, state.getPlayer(interceptorId).teamSide, target, 1, false);
+            if (threatened && rollInterception(state, thrower, interceptorId, dice, events))
                 return rethrowBomb(state, interceptorId, dice, events, hop + 1);
-            }
         }
     }
 
@@ -118,11 +109,10 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
     // ZMĚNĚNO 7.11.2026 (P251b, uživatel: „přehoz bomby se má člověka ptát“) — dřív se živý kouč na bombu
     // neptal a fumble nechal stát (kromě Pass). Teď jako u přihrávky: Pass zdarma bez otázky, jinak se kouče
     // ptá CoachQuestion::BOMB_REROLL (nechat / tým / Pro); Loner omezení výše je volba AI, člověk volí sám.
-    // P264: hod chycené bomby soupeřem týmu, který není na tahu, týmový přehoz nesmí (přehozy jen ve vlastním tahu).
+    // P264: hod chycené bomby týmem, který není na tahu, týmový přehoz nesmí — hlídá rerollThrow (teamRerollAllowed).
     if (isFumble(roll)) {
         rerollThrow(state, thrower, dice, CoachQuestion::BOMB_REROLL, events, roll, passTarget, bombMods,
-                    /*teamAllowedForEngine=*/!thrower.hasSkill(SkillName::Loner) &&
-                        thrower.teamSide == state.activeTeam);
+                    /*teamAllowedForEngine=*/!thrower.hasSkill(SkillName::Loner));
     }
 
     // TA4, l. 7967-7968: "If the bomb is FUMBLED it explodes IN THE BOMB THROWER'S SQUARE."
@@ -141,21 +131,12 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
     }
     if (!landPos.isOnPitch()) return ActionResult::ok();   // Never turnover
 
-    // P264: hráč v poli dopadu bombu chytá jako míč (přesná +1, Diving Catch jen přesná; Catch přehodí neúspěch).
-    //   Pokus je vždy aspoň tak dobrý jako odmítnutí: nepovedené chycení i odmítnutí = výbuch v tom poli
-    //   (ř. 7964-7966), povedené ⇒ hod dál. Kouč-člověk se zatím neptá (rozhoduje engine).
+    // P264: hráč v poli dopadu bombu chytá jako míč (catchRoll: přesná +1, Diving Catch jen přesná, Catch, Pro,
+    //   týmový přehoz jen tým na tahu). Pokus je vždy aspoň tak dobrý jako odmítnutí: nepovedené chycení i odmítnutí
+    //   = výbuch v tom poli (ř. 7964-7966), povedené ⇒ hod dál. Kouč-člověk se zatím neptá (rozhoduje engine, P272).
     if (Player* catcher = state.getPlayerAtPosition(landPos); catcher && canCatchBomb(*catcher)) {
-        const int catchTarget = calculateCatchTarget(state, *catcher, accurate ? 1 : 0, accurate);
-        int croll = dice.rollD6();
-        bool caught = croll >= catchTarget;
-        if (!caught && catcher->hasSkill(SkillName::Catch)) {
-            emitEvent(events, {GameEvent::Type::SKILL_USED, catcher->id, -1, {}, {},
-                              static_cast<int>(SkillName::Catch), true});
-            croll = dice.rollD6();
-            caught = croll >= catchTarget;
-        }
-        emitEvent(events, {GameEvent::Type::CATCH, catcher->id, throwerId, landPos, {}, catchTarget, caught});
-        if (caught) return rethrowBomb(state, catcher->id, dice, events, hop + 1);
+        if (catchRoll(state, catcher->id, dice, accurate ? 1 : 0, events, accurate))
+            return rethrowBomb(state, catcher->id, dice, events, hop + 1);
     }
     return explodeBomb(state, landPos, throwerId, dice, events) ? ActionResult::turnovr() : ActionResult::ok();
 }

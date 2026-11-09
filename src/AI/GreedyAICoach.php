@@ -7,6 +7,11 @@ namespace App\AI;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\Engine\RulesEngine;
+use App\Engine\TacklezoneCalculator;
+use App\Engine\ScatterCalculator;
+use App\Engine\RandomDiceRoller;
+use App\Engine\BombTarget;
+use App\Engine\BallResolver;
 use App\Engine\StrengthCalculator;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
@@ -17,6 +22,7 @@ use App\ValueObject\Position;
 final class GreedyAICoach implements AICoachInterface
 {
     private readonly StrengthCalculator $strCalc;
+    private readonly BallResolver $ballResolver;
 
     /**
      * ⭐⭐ PHP40 (14.09.2026): CACHE POHYBOVYCH POLI NA JEDNO ROZHODNUTI.
@@ -42,6 +48,8 @@ final class GreedyAICoach implements AICoachInterface
     public function __construct()
     {
         $this->strCalc = new StrengthCalculator();
+        // jen kvůli cíli chytání v BombTarget::cena — kostkou se tu nehází
+        $this->ballResolver = new BallResolver(new RandomDiceRoller(), new TacklezoneCalculator(), new ScatterCalculator());
         $this->kontrolaCache = getenv('BB_CACHE_SELFCHECK') === '1';
         $this->cacheVypnuta = getenv('BB_CACHE_OFF') === '1';
     }
@@ -572,7 +580,7 @@ final class GreedyAICoach implements AICoachInterface
             return null;
         }
 
-        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, false);   // P266: i Hail Mary
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player);   // P266: i Hail Mary
         if ($targets === []) {
             return null;
         }
@@ -829,72 +837,20 @@ final class GreedyAICoach implements AICoachInterface
         if ($player === null || !$player->hasSkill(SkillName::Bombardier)) {
             return null;
         }
-
-        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, true);   // P266: i Hail Mary
-        if ($targets === []) {
+        // Review 9.11. (M4): cíl ze sdíleného BombTarget::vyber (pravítko, Hail Mary až potom, cena ≥ 1, náš mimo
+        //   výbuch, chytající v cíli jen × šance, že nechytí) — parita s C++ makrem BOMB. Dřív vlastní počty v 3×3.
+        $cil = BombTarget::vyber($state, $player, false, $this->ballResolver);
+        if ($cil === null) {
             return null;
         }
-
-        $enemies = $state->getPlayersOnPitch($side->opponent());
-        $myPlayers = $state->getPlayersOnPitch($side);
-
-        $bestScore = -1;
-        $bestTarget = null;
-
-        foreach ($targets as $target) {
-            $tx = $target['x'];
-            $ty = $target['y'];
-
-            // Count enemies and allies in 3x3 area around target
-            $enemyCount = 0;
-            $allyCount = 0;
-
-            foreach ($enemies as $enemy) {
-                $ePos = $enemy->getPosition();
-                if ($ePos !== null && abs($ePos->getX() - $tx) <= 1 && abs($ePos->getY() - $ty) <= 1) {
-                    $enemyCount++;
-                }
-            }
-
-            foreach ($myPlayers as $ally) {
-                $aPos = $ally->getPosition();
-                if ($aPos !== null && abs($aPos->getX() - $tx) <= 1 && abs($aPos->getY() - $ty) <= 1) {
-                    $allyCount++;
-                }
-            }
-
-            // Only consider targets that hit enemies without too many allies
-            if ($enemyCount === 0) {
-                continue;
-            }
-
-            // Prefer shorter range for accuracy
-            $rangePenalty = match ($target['range']) {
-                // ⛔ Tataz oprava klicu jako vys.
-                'quick_pass' => 0,
-                'short_pass' => 10,
-                'long_pass' => 25,
-                'long_bomb' => 50,
-                'hail_mary' => 60,   // P266: vždy 3 rozptyly od cíle
-                default => 15,
-            };
-
-            $score = 80 + $enemyCount * 40 - $allyCount * 30 - $rangePenalty;
-
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestTarget = $target;
-            }
-        }
-
-        if ($bestTarget === null || $bestScore <= 0) {
+        $score = 80 + $cil['cena'] * 40 - ($cil['hailMary'] ? 60 : 0);
+        if ($score <= 0) {
             return null;
         }
-
         return [
             'action' => ActionType::BOMB_THROW,
-            'params' => ['playerId' => $playerId, 'targetX' => $bestTarget['x'], 'targetY' => $bestTarget['y']],
-            'score' => $bestScore,
+            'params' => ['playerId' => $playerId, 'targetX' => $cil['pos']->getX(), 'targetY' => $cil['pos']->getY()],
+            'score' => $score,
         ];
     }
 

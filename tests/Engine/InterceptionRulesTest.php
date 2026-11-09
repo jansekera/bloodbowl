@@ -177,7 +177,7 @@ final class InterceptionRulesTest extends TestCase
 
     // ───── P271 (9.11.2026, nalezeno při P264): parita s C++ pass_handler.cpp (opraveno tam 10.08.) ─────
     // r. 1764-1769: zachycovat smí hráč, přes jehož pole přejde (široké) pravítko, a který je blíž k házeči i k cíli,
-    //   než je házeč od cíle. PHP bralo jen pole Bresenhamovy čáry. Catch přehodí nepovedené zachycení (r. 7935-7938
+    //   než je házeč od cíle. PHP bralo jen pole Bresenhamovy čáry. Catch přehodí nepovedené zachycení (r. 7993-7995
     //   „fails to make an interception“) — PHP nepřehazovalo.
 
     /**
@@ -226,5 +226,19 @@ final class InterceptionRulesTest extends TestCase
         $v = $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 11, 'targetY' => 5]);
         $this->assertTrue($v->isTurnover());
         $this->assertSame(10, $v->getNewState()->getBall()->getCarrierId());
+    }
+
+    /** Review 9.11.: při stejné šanci a stejném Catch zachytává nižší id (parita s C++, nezávisle na pořadí hráčů). */
+    public function testPriShodeZachytavaNizsiId(): void
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 5, id: 2)
+            ->addPlayer(TeamSide::AWAY, 8, 6, agility: 3, id: 14)   // přidán dřív
+            ->addPlayer(TeamSide::AWAY, 8, 4, agility: 3, id: 13)
+            ->withBallCarried(1)
+            ->build();
+        $z = $this->resolver()->najdiZachycujiciho($s, $s->requirePlayer(1), new \App\ValueObject\Position(5, 5), new \App\ValueObject\Position(11, 5));
+        $this->assertSame(13, $z?->getId());
     }
 }

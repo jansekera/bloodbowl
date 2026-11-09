@@ -221,7 +221,7 @@ final class RandomAICoach implements AICoachInterface
             return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }
 
-        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player, false);   // P266: i Hail Mary
+        $targets = CoachHeuristics::cileHoduProAi($rules, $state, $player);   // P266: i Hail Mary
         if ($targets === []) {
             return null;   // nenaslo se -- losuje se dal, kolo se NEUKONCUJE
         }

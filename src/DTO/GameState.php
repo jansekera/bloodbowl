@@ -239,6 +239,21 @@ final class GameState
         ));
     }
 
+    /**
+     * Je hráč strany `$side` nejvýš `$r` polí od `$c` (jen stojící, když `$jenStojici`)? Review 9.11. (L10): dřív kopie
+     * v BombThrowHandler a CoachHeuristics; C++ helpers.cpp sideHasPlayerWithin.
+     */
+    public function maHraceDo(TeamSide $side, Position $c, int $r, bool $jenStojici): bool
+    {
+        foreach ($this->getPlayersOnPitch($side) as $p) {
+            $pos = $p->getPosition();
+            if ($pos !== null && $pos->distanceTo($c) <= $r && (!$jenStojici || $p->getState() === PlayerState::STANDING)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // --- Wither methods ---
 
     public function withPhase(GamePhase $phase): self

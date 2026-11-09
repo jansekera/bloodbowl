@@ -145,17 +145,26 @@ PassLegality passTargetLegal(const GameState& state, const Player& thrower, Posi
 // do kHailMaryClearRadius polí od cíle nestojí soupeř — míč se 3× rozptýlí (ř. 8167-8168), takže dopadne nejvýš
 // 3 pole od cíle, a stojící soupeř tam by ho sebral. Ležící/omráčený míč nesebere.
 constexpr int kHailMaryClearRadius = 3;
-// P268: hod spoluhráčem jen rychlá/krátká (ř. 8597-8600 „Max. TTM“; vánice dovolí obě). Jedno místo pro nabídku
+// P268: hod spoluhráčem jen rychlá/krátká (ř. 8608-8609 „Long Pass or Long Bomb … not possible“; vánice dovolí obě). Jedno místo pro nabídku
 // (rules_engine, makro) i resolver (ttm_handler); `band` se vyplní, když je cíl na pravítku.
 bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band = nullptr);
 
+// Stojí (standingOnly) / je na hřišti hráč strany `side` nejvýš `r` polí od `c`? Review 9.11. (L10): dřív 4 kopie.
+bool sideHasPlayerWithin(const GameState& state, TeamSide side, Position c, int r, bool standingOnly);
+// P264: bombu smí chytit / zachytit jako míč stojící hráč se zónou a s rukama (ř. 7959-7961).
+bool canCatchBomb(const Player& p);
 // P268/P264: cena výbuchu bomby na poli `c` z pohledu strany `side` — cílové pole srazí vždy, sousední na 4+
 // (ř. 7968-7972): stojící soupeř +1 (ležící 0,3, jen zranění), náš −2 (turnover) × šance zásahu. `hitsUs` = v dosahu
-// výbuchu stojí/leží náš. Sdílí makro bomby (AI) a volba cíle při povinném hodu chycené bomby.
+// výbuchu stojí/leží náš. Review 9.11. (M2): soupeř v cílovém poli, který bombu chytit může, jen × šance, že
+// přesnou bombu nechytí (pak ji hodí dál, P264).
 double bombSquareValue(const GameState& state, Position c, TeamSide side, bool& hitsUs);
-// P264: hráč, který bombu chytil nebo zachytil, ji musí hned hodit dál (ř. 7961-7963). Cíl = legální pole s nejvyšší
-// cenou (bombSquareValue); když nic nevyjde kladně, pole bez našeho v dosahu výbuchu nejdál od našich. {-1,-1} = nikam.
-Position chooseBombRethrowTarget(const GameState& state, const Player& thrower);
+// Kam hodit bombu — jedno místo pro nabídku AI (makro BOMB) i povinný hod chycené bomby (P264, ř. 7961-7963).
+//   mustThrow = false (AI): nejlepší pole na pravítku s cenou ≥ 1 bez našeho v dosahu výbuchu; když žádné, Hail Mary
+//     (P263) se stejnou podmínkou a bez našeho do 4 polí od cíle (3 rozptyly + výbuch). Nic ⇒ pos {-1,-1}.
+//   mustThrow = true: hodit se musí ⇒ nejvyšší cena ze všech legálních polí, při shodě nejdál od našich
+//     (review L6: dřív při samých záporných cenách „vybuchne v ruce“, což pravidla nemají).
+struct BombChoice { Position pos{-1, -1}; double value = 0.0; bool hailMary = false; };
+BombChoice chooseBombTarget(const GameState& state, const Player& thrower, bool mustThrow);
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide);
 // Nabídka HMP přihrávky pro AI (rules_engine i makro): spoluhráč vpřed (HOME útočí na x = 25) a cíl volný.
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target);

@@ -28,6 +28,17 @@ bool resolvePickup(GameState& state, int playerId, DiceRollerBase& dice,
     return success;
 }
 
+bool catchRoll(GameState& state, int catcherId, DiceRollerBase& dice, int modifier,
+               std::vector<GameEvent>* events, bool accuratePass) {
+    const Player& catcher = state.getPlayer(catcherId);
+    int target = calculateCatchTarget(state, catcher, modifier, accuratePass);
+    // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
+    // Catch, l. 7992-7995: "allowed to re-roll the D6 if he fails a catch roll. It also allows
+    // the player to re-roll the D6 if he drops a hand-off or fails to make an interception."
+    return attemptRollLogged(state, catcherId, dice, target, SkillName::Catch, false, true,
+                             events, GameEvent::Type::CATCH, catcher.position, {});
+}
+
 bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
                   int modifier, std::vector<GameEvent>* events, bool accuratePass) {
     Player& catcher = state.getPlayer(catcherId);
@@ -53,13 +64,7 @@ bool resolveCatch(GameState& state, int catcherId, DiceRollerBase& dice,
         return false;
     }
 
-    int target = calculateCatchTarget(state, catcher, modifier, accuratePass);
-    // Týmový přehoz hlídá attemptRoll (jen tým na tahu, ne při výkopu; P64).
-    // Catch, l. 7992-7995: "allowed to re-roll the D6 if he fails a catch roll. It also allows
-    // the player to re-roll the D6 if he drops a hand-off or fails to make an interception."
-    bool success = attemptRollLogged(state, catcherId, dice, target, SkillName::Catch, false, true,
-                                     events, GameEvent::Type::CATCH, catcher.position, {});
-
+    const bool success = catchRoll(state, catcherId, dice, modifier, events, accuratePass);
     if (success) {
         state.ball = BallState::carried(catcher.position, catcherId);
     }

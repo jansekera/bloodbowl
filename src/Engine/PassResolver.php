@@ -348,8 +348,10 @@ final class PassResolver
                 continue;
             }
             $cil = $this->getInterceptionTarget($state, $p);
-            if ($cil < $nejCil || ($cil === $nejCil && $nej !== null
-                && $p->hasSkill(SkillName::Catch) && !$nej->hasSkill(SkillName::Catch))) {
+            // shoda: přednost Catch, pak nižší id (review 9.11.: výslovně, ať nerozhoduje pořadí hráčů — parita s C++)
+            $catchLepsi = $nej !== null && $p->hasSkill(SkillName::Catch) && !$nej->hasSkill(SkillName::Catch);
+            $stejnyCatch = $nej !== null && $p->hasSkill(SkillName::Catch) === $nej->hasSkill(SkillName::Catch);
+            if ($cil < $nejCil || ($cil === $nejCil && ($catchLepsi || ($stejnyCatch && $p->getId() < $nej->getId())))) {
                 $nej = $p;
                 $nejCil = $cil;
             }
@@ -358,7 +360,7 @@ final class PassResolver
     }
 
     /**
-     * Hod na zachycení: Catch přehodí neúspěch (r. 7935-7938 „fails to make an interception“, P271 — dřív ne),
+     * Hod na zachycení: Catch přehodí neúspěch (r. 7993-7995 „fails to make an interception“, P271 — dřív ne),
      * Safe Throw házeče může úspěch zrušit (r. 8434-8440; ne proti Very Long Legs, r. 8657-8659). Stav nemění.
      *
      * @param list<GameEvent> $events
@@ -407,8 +409,8 @@ final class PassResolver
     }
 
     /**
-     * Check for interceptions along the pass path.
-     * First eligible enemy standing in the path can attempt intercept (AG-2 roll).
+     * Zachycení přihrávky: kandidát z najdiZachycujiciho (pás pravítka, jen jeden s nejvyšší šancí), hod
+     * hodZachyceni; úspěch = míč u zachycujícího a turnover (r. 1761-1785).
      *
      * @return array{intercepted: bool, result: ?ActionResult, events: list<GameEvent>}
      */
