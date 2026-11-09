@@ -625,6 +625,15 @@ final class BallResolver
      */
     public function getCatchTarget(GameState $state, MatchPlayerDTO $catcher, int $modifier = 0, bool $accuratePass = false): int
     {
+        return self::cilChyceni($this->tzCalc, $state, $catcher, $modifier, $accuratePass);
+    }
+
+    /**
+     * Cíl chytání bez kostek a bez resolveru — pro odhady AI (BombTarget, simplify 9.11.: dřív si kouč kvůli tomu stavěl
+     * celý BallResolver s kostkou, kterou nehodil).
+     */
+    public static function cilChyceni(TacklezoneCalculator $tzCalc, GameState $state, MatchPlayerDTO $catcher, int $modifier = 0, bool $accuratePass = false): int
+    {
         $pos = $catcher->getPosition();
         if ($pos === null) {
             return 6;
@@ -633,7 +642,7 @@ final class BallResolver
         $ag = $catcher->getStats()->getAgility();
         $tz = $catcher->hasSkill(SkillName::NervesOfSteel)
             ? 0
-            : $this->tzCalc->countTacklezones($state, $pos, $catcher->getTeamSide());
+            : $tzCalc->countTacklezones($state, $pos, $catcher->getTeamSide());
 
         $target = 7 - $ag + $tz - $modifier;
 
@@ -650,7 +659,7 @@ final class BallResolver
         }
 
         // Disturbing Presence: +1 per DP enemy within 3 squares
-        $target += $this->tzCalc->countDisturbingPresence($state, $pos, $catcher->getTeamSide());
+        $target += $tzCalc->countDisturbingPresence($state, $pos, $catcher->getTeamSide());
 
         // Weather modifier: +1 for Pouring Rain
         // ⛔ OPRAVENO 15.09.2026 -- Blizzard sem nepatri (r. 1490-1494: jen GFI

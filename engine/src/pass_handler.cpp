@@ -93,9 +93,8 @@ int pickInterceptor(const GameState& state, const Player& passer, Position targe
 
 bool rollInterception(GameState& state, const Player& passer, int interceptorId, DiceRollerBase& dice,
                       std::vector<GameEvent>* events) {
-    const Player* interceptor = &state.getPlayer(interceptorId);
-    const int passerId = passer.id;
-    const int intTarget = interceptionTarget(state, *interceptor);
+    const Player& interceptor = state.getPlayer(interceptorId);
+    const int intTarget = interceptionTarget(state, interceptor);
     // Interception attempt
     int roll = dice.rollD6();
     bool success = (roll >= intTarget);
@@ -107,8 +106,8 @@ bool rollInterception(GameState& state, const Player& passer, int interceptorId,
     // never competes with the scarce team re-roll, so it is always taken
     // (user's rule, 2026-08-10: optional skills default ON when they
     // cost nothing).
-    if (!success && interceptor->hasSkill(SkillName::Catch)) {
-        emitEvent(events, {GameEvent::Type::SKILL_USED, interceptor->id, -1, {}, {},
+    if (!success && interceptor.hasSkill(SkillName::Catch)) {
+        emitEvent(events, {GameEvent::Type::SKILL_USED, interceptor.id, -1, {}, {},
                           static_cast<int>(SkillName::Catch), true});
         roll = dice.rollD6();
         success = (roll >= intTarget);
@@ -122,18 +121,18 @@ bool rollInterception(GameState& state, const Player& passer, int interceptorId,
     // na Obratnost HAZECE ("may make an unmodified Agility roll"), ne
     // prehoz kostky zachycujiciho proti jeho cili.
     if (success && passer.hasSkill(SkillName::SafeThrow) &&
-        !interceptor->hasSkill(SkillName::VeryLongLegs)) {
+        !interceptor.hasSkill(SkillName::VeryLongLegs)) {
         const int safeTarget = std::clamp(7 - passer.stats.agility, 2, 6);
         const int safeRoll = dice.rollD6();
         if (safeRoll != 1 && (safeRoll == 6 || safeRoll >= safeTarget)) {
             success = false;
-            emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
+            emitEvent(events, {GameEvent::Type::SKILL_USED, passer.id, -1, {}, {},
                               static_cast<int>(SkillName::SafeThrow), true});
         }
     }
     // Review 9.11. (L11): výsledek se zapisuje vždy, i nepovedený (dřív jen úspěch, a to u volajícího) — jako PHP
     //   hodZachyceni (událost interception).
-    emitEvent(events, {GameEvent::Type::CATCH, interceptor->id, passerId, interceptor->position, {}, intTarget, success});
+    emitEvent(events, {GameEvent::Type::CATCH, interceptor.id, passer.id, interceptor.position, {}, intTarget, success});
     return success;
 }
 

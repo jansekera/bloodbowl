@@ -67,11 +67,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         }
     }
 
-    // 2. Accuracy roll. Range comes from the ruler grid (rules parity,
-    // 2026-08-10), and CRP Throw Team-Mate caps it: "Long Pass or Long Bomb
-    // range passes are not possible" -- Short Pass is the ceiling, which is
-    // what the printed grid marks as "Max. TTM".
-    // (dosah ověřen na začátku — P268)
+    // 2. Accuracy roll (dosah ověřen na začátku, ttmTargetLegal — P268).
 
     // OPRAVENO 7.11.2026 (P256, review dávky) — „worked out exactly the same as … passing a ball, except the player
     // must subtract 1“ (ř. 8605-8607): modifikátory z téhož místa jako přihrávka (helpers.cpp throwRollMods: Strong

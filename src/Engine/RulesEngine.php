@@ -892,8 +892,8 @@ final class RulesEngine
                 if ($pos->equals($targetPos)) {
                     continue;
                 }
-                // P265 (9.11.2026): pole mimo pravítko s Hail Mary jen pro kouče-člověka ($sHailMary) —
-                //   kouči AI dostávají seznam jako dřív (HMP pro AI = nová volba, napřed představit uživateli).
+                // P265 (9.11.2026): pole mimo pravítko s Hail Mary jen na přání volajícího ($sHailMary) — člověk
+                //   (MatchService) vždy, kouči AI přes CoachHeuristics::cileHoduProAi (P266) jen jako poslední akci.
                 ['range' => $range, 'hailMary' => $hailMary, 'chyba' => $chyba] = ThrowTarget::posud($state, $player, $pos, $targetPos);
                 if ($chyba !== null || ($hailMary && !$sHailMary)) {
                     continue;
@@ -997,14 +997,8 @@ final class RulesEngine
         }
 
         $landing = new Position((int) $params['targetX'], (int) $params['targetY']);
-        $range = PassRange::fromOffset($landing->getX() - $playerPos->getX(), $landing->getY() - $playerPos->getY());
-        if ($range === null) {
-            return ['Target landing position is out of range'];
-        }
-        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8609-8610 -- u TTM
-        //   "Long Pass or Long Bomb range passes are not possible".
-        //   Nabidka nesmi takovy hod vubec obsahovat.
-        if ($range === PassRange::LONG_PASS || $range === PassRange::LONG_BOMB) {
+        // ⛔ OPRAVA 21.09.2026: `rules_bb2016.txt` r. 8608-8609 -- u TTM jen rychlá/krátká (ThrowTarget::ttm).
+        if (ThrowTarget::ttm($playerPos, $landing) === null) {
             return ['Throw Team-Mate: only quick or short pass range'];
         }
 

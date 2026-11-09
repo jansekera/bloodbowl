@@ -1651,19 +1651,19 @@ static void offerBombAndTtmMacros(const GameState& state, TeamSide mySide, std::
         }
         if (p.hasSkill(SkillName::ThrowTeamMate) && !myTeam.passUsedThisTurn && state.ball.isHeld) {
             const Player& carrier = state.getPlayer(state.ball.carrierId);
-            if (carrier.teamSide != mySide || carrier.id == p.id || carrier.state != PlayerState::STANDING ||
-                !carrier.hasSkill(SkillName::RightStuff) || carrier.position.distanceTo(p.position) != 1)
-                return;
+            if (!canBeThrownBy(p, carrier)) return;
             int bestDist = distToEndzone(carrier.position, mySide) - kTtmMinGain + 1;
             int bestTz = 99;
             Position bestPos{-1, -1};
             for (int dx = -7; dx <= 7; ++dx)
                 for (int dy = -7; dy <= 7; ++dy) {
                     const Position t{static_cast<int8_t>(p.position.x + dx), static_cast<int8_t>(p.position.y + dy)};
-                    if (!t.isOnPitch() || state.getPlayerAtPosition(t) || !ttmTargetLegal(p, t)) continue;
+                    // levné kontroly napřed (dosah tabulkou), zóny jen kandidátovi, který se s nejlepším porovná
+                    if (!t.isOnPitch() || !ttmTargetLegal(p, t)) continue;
                     const int d = distToEndzone(t, mySide);
+                    if (d > bestDist || state.getPlayerAtPosition(t)) continue;
                     const int tz = countTacklezones(state, t, mySide);
-                    if (d < bestDist || (d == bestDist && bestPos.x >= 0 && tz < bestTz)) {
+                    if (d < bestDist || (bestPos.x >= 0 && tz < bestTz)) {
                         bestDist = d; bestTz = tz; bestPos = t;
                     }
                 }

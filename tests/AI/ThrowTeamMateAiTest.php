@@ -40,7 +40,7 @@ final class ThrowTeamMateAiTest extends TestCase
     public function testHodiNosiceAsponCtyriSloupceVpred(): void
     {
         $s = $this->stav();
-        $p = CoachHeuristics::hodSpoluhraceProAi($s, $s->requirePlayer(1));
+        $p = CoachHeuristics::hodSpoluhraceProAi(new RulesEngine(), $s, $s->requirePlayer(1));
         $this->assertNotNull($p);
         $this->assertSame(2, $p['targetId']);
         $this->assertGreaterThanOrEqual(6 + 4, $p['targetX']);
@@ -52,9 +52,9 @@ final class ThrowTeamMateAiTest extends TestCase
     public function testBezRightStuffNebOPouzitePrihravceNic(): void
     {
         $s = $this->stav(rightStuff: false);
-        $this->assertNull(CoachHeuristics::hodSpoluhraceProAi($s, $s->requirePlayer(1)));
+        $this->assertNull(CoachHeuristics::hodSpoluhraceProAi(new RulesEngine(), $s, $s->requirePlayer(1)));
         $s = $this->stav(prihravkaPouzita: true);
-        $this->assertNull(CoachHeuristics::hodSpoluhraceProAi($s, $s->requirePlayer(1)));
+        $this->assertNull(CoachHeuristics::hodSpoluhraceProAi(new RulesEngine(), $s, $s->requirePlayer(1)));
     }
 
     /** Kouči akci opravdu zvolí (dřív `default => null`). */

@@ -13,17 +13,16 @@ namespace {
 // P264: řetěz chycení / zachycení je v praxi krátký (každý pokus může selhat); strop jen pojistka proti smyčce.
 constexpr int kMaxBombHops = 8;
 
-// Výbuch (ř. 7968-7974): cílové pole srazí vždy, sousední na 4+, i ležící a omráčené. Vrací, zda padl hráč týmu
-// na tahu (ř. 7956-7958 ⇒ turnover).
-bool explodeBomb(GameState& state, Position at, int throwerId, DiceRollerBase& dice, std::vector<GameEvent>* events) {
-    if (!at.isOnPitch()) return false;   // do davu: bez účinku (ř. 7967-7968)
+// Výbuch (ř. 7968-7974): cílové pole srazí vždy, sousední na 4+, i ležící a omráčené. Turnover, když padl hráč
+// týmu na tahu (ř. 7956-7958).
+ActionResult explodeBomb(GameState& state, Position at, int throwerId, DiceRollerBase& dice,
+                         std::vector<GameEvent>* events) {
+    if (!at.isOnPitch()) return ActionResult::ok();   // do davu: bez účinku (ř. 7967-7968)
     bool activeKnockedDown = false;
     for (int dx = -1; dx <= 1; dx++) {
         for (int dy = -1; dy <= 1; dy++) {
-            int px = at.x + dx;
-            int py = at.y + dy;
-            if (px < 0 || px > 25 || py < 0 || py > 14) continue;
-            Position checkPos{static_cast<int8_t>(px), static_cast<int8_t>(py)};
+            const Position checkPos{static_cast<int8_t>(at.x + dx), static_cast<int8_t>(at.y + dy)};
+            if (!checkPos.isOnPitch()) continue;
             Player* victim = state.getPlayerAtPosition(checkPos);
             if (!victim) continue;
             if (!isOnPitch(victim->state)) continue;
@@ -41,7 +40,7 @@ bool explodeBomb(GameState& state, Position at, int throwerId, DiceRollerBase& d
             handleBallOnPlayerDown(state, victim->id, dice, events);
         }
     }
-    return activeKnockedDown;
+    return activeKnockedDown ? ActionResult::turnovr() : ActionResult::ok();
 }
 
 ActionResult throwBombFrom(GameState& state, int throwerId, Position target, DiceRollerBase& dice,
@@ -55,8 +54,7 @@ ActionResult rethrowBomb(GameState& state, int holderId, DiceRollerBase& dice, s
     const Player& holder = state.getPlayer(holderId);
     const Position t = hop > kMaxBombHops ? Position{-1, -1} : chooseBombTarget(state, holder, true).pos;
     if (!t.isOnPitch())
-        return explodeBomb(state, holder.position, holderId, dice, events) ? ActionResult::turnovr()
-                                                                           : ActionResult::ok();
+        return explodeBomb(state, holder.position, holderId, dice, events);
     return throwBombFrom(state, holderId, t, dice, events, hop);
 }
 
@@ -83,9 +81,8 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
     if (!hailMary) {
         const int interceptorId = pickInterceptor(state, thrower, target);
         if (interceptorId >= 0) {
-            const bool threatened =
-                sideHasPlayerWithin(state, state.getPlayer(interceptorId).teamSide, target, 1, false);
-            if (threatened && rollInterception(state, thrower, interceptorId, dice, events))
+            if (shouldInterceptBomb(state, state.getPlayer(interceptorId).teamSide, target) &&
+                rollInterception(state, thrower, interceptorId, dice, events))
                 return rethrowBomb(state, interceptorId, dice, events, hop + 1);
         }
     }
@@ -117,8 +114,7 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
 
     // TA4, l. 7967-7968: "If the bomb is FUMBLED it explodes IN THE BOMB THROWER'S SQUARE."
     if (isFumble(roll))
-        return explodeBomb(state, thrower.position, throwerId, dice, events) ? ActionResult::turnovr()
-                                                                             : ActionResult::ok();
+        return explodeBomb(state, thrower.position, throwerId, dice, events);
 
     Position landPos = target;
     const bool accurate = !hailMary && roll >= passTarget;
@@ -138,7 +134,7 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
         if (catchRoll(state, catcher->id, dice, accurate ? 1 : 0, events, accurate))
             return rethrowBomb(state, catcher->id, dice, events, hop + 1);
     }
-    return explodeBomb(state, landPos, throwerId, dice, events) ? ActionResult::turnovr() : ActionResult::ok();
+    return explodeBomb(state, landPos, throwerId, dice, events);
 }
 
 }  // namespace

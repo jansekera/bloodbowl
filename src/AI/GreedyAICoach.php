@@ -7,11 +7,7 @@ namespace App\AI;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\Engine\RulesEngine;
-use App\Engine\TacklezoneCalculator;
-use App\Engine\ScatterCalculator;
-use App\Engine\RandomDiceRoller;
 use App\Engine\BombTarget;
-use App\Engine\BallResolver;
 use App\Engine\StrengthCalculator;
 use App\Enum\ActionType;
 use App\Enum\PlayerState;
@@ -22,7 +18,6 @@ use App\ValueObject\Position;
 final class GreedyAICoach implements AICoachInterface
 {
     private readonly StrengthCalculator $strCalc;
-    private readonly BallResolver $ballResolver;
 
     /**
      * ⭐⭐ PHP40 (14.09.2026): CACHE POHYBOVYCH POLI NA JEDNO ROZHODNUTI.
@@ -48,8 +43,6 @@ final class GreedyAICoach implements AICoachInterface
     public function __construct()
     {
         $this->strCalc = new StrengthCalculator();
-        // jen kvůli cíli chytání v BombTarget::cena — kostkou se tu nehází
-        $this->ballResolver = new BallResolver(new RandomDiceRoller(), new TacklezoneCalculator(), new ScatterCalculator());
         $this->kontrolaCache = getenv('BB_CACHE_SELFCHECK') === '1';
         $this->cacheVypnuta = getenv('BB_CACHE_OFF') === '1';
     }
@@ -275,8 +268,8 @@ final class GreedyAICoach implements AICoachInterface
             ActionType::FOUL => $this->scoreFoul($state, $rules, $playerId),
             ActionType::BALL_AND_CHAIN => $this->scoreBallAndChain($playerId),
             ActionType::HYPNOTIC_GAZE => $this->scoreHypnoticGaze($state, $rules, $playerId, $side),
-            ActionType::BOMB_THROW => $this->scoreBombThrow($state, $rules, $playerId, $side),
-            ActionType::THROW_TEAM_MATE => $this->scoreThrowTeamMate($state, $playerId),
+            ActionType::BOMB_THROW => $this->scoreBombThrow($state, $playerId),
+            ActionType::THROW_TEAM_MATE => $this->scoreThrowTeamMate($state, $rules, $playerId),
             ActionType::MULTIPLE_BLOCK => $this->scoreMultipleBlock($state, $playerId, $side),
             default => null,
         };
@@ -811,11 +804,14 @@ final class GreedyAICoach implements AICoachInterface
      *
      * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
-    private function scoreThrowTeamMate(GameState $state, int $playerId): ?array
+    private function scoreThrowTeamMate(GameState $state, RulesEngine $rules, int $playerId): ?array
     {
         $hazec = $state->getPlayer($playerId);
-        $hod = $hazec === null ? null : CoachHeuristics::hodSpoluhraceProAi($state, $hazec);
-        if ($hod === null || $hazec === null) {
+        if ($hazec === null) {
+            return null;
+        }
+        $hod = CoachHeuristics::hodSpoluhraceProAi($rules, $state, $hazec);
+        if ($hod === null) {
             return null;
         }
         $score = 150 - CoachHeuristics::doKoncoveZony($hazec->getTeamSide(), $hod['targetX']) * 5 - 60;
@@ -827,19 +823,15 @@ final class GreedyAICoach implements AICoachInterface
     /**
      * @return array{action: ActionType, params: array<string, mixed>, score: int|float}|null
      */
-    private function scoreBombThrow(
-        GameState $state,
-        RulesEngine $rules,
-        int $playerId,
-        TeamSide $side,
-    ): ?array {
+    private function scoreBombThrow(GameState $state, int $playerId): ?array
+    {
         $player = $state->getPlayer($playerId);
         if ($player === null || !$player->hasSkill(SkillName::Bombardier)) {
             return null;
         }
         // Review 9.11. (M4): cíl ze sdíleného BombTarget::vyber (pravítko, Hail Mary až potom, cena ≥ 1, náš mimo
         //   výbuch, chytající v cíli jen × šance, že nechytí) — parita s C++ makrem BOMB. Dřív vlastní počty v 3×3.
-        $cil = BombTarget::vyber($state, $player, false, $this->ballResolver);
+        $cil = BombTarget::vyber($state, $player, false);
         if ($cil === null) {
             return null;
         }

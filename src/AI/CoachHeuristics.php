@@ -9,6 +9,7 @@ use App\DTO\MatchPlayerDTO;
 use App\Engine\RulesEngine;
 use App\Engine\StrengthCalculator;
 use App\Engine\TacklezoneCalculator;
+use App\Engine\ThrowTarget;
 use App\Enum\ActionType;
 use App\Enum\PassRange;
 use App\Enum\PlayerState;
@@ -370,7 +371,8 @@ final class CoachHeuristics
             }
         }
         $cile = [];
-        foreach ($rules->getPassTargets($state, $hazec, sHailMary: true) as $t) {
+        // Hail Mary jen jako poslední akce ⇒ jinak ho RulesEngine vůbec nepočítá (simplify 9.11., výsledek stejný)
+        foreach ($rules->getPassTargets($state, $hazec, sHailMary: $posledni) as $t) {
             if ($t['range'] !== 'hail_mary') {
                 $cile[] = $t;
                 continue;
@@ -402,19 +404,15 @@ final class CoachHeuristics
      *
      * @return array{targetId: int, targetX: int, targetY: int}|null
      */
-    public static function hodSpoluhraceProAi(GameState $state, MatchPlayerDTO $hazec): ?array
+    public static function hodSpoluhraceProAi(RulesEngine $rules, GameState $state, MatchPlayerDTO $hazec): ?array
     {
         $odkud = $hazec->getPosition();
         $strana = $hazec->getTeamSide();
-        if ($odkud === null || !$hazec->canAct() || !$hazec->hasSkill(SkillName::ThrowTeamMate)
-            || $state->getTeamState($strana)->isPassUsedThisTurn()) {
-            return null;
-        }
         $nosic = self::nosic($state, $strana);
         $np = $nosic?->getPosition();
-        if ($nosic === null || $np === null || $nosic->getId() === $hazec->getId()
-            || $nosic->getState() !== PlayerState::STANDING || !$nosic->hasSkill(SkillName::RightStuff)
-            || $np->distanceTo($odkud) !== 1) {
+        // kdo smí koho hodit: RulesEngine::getThrowTeamMateTargets (simplify 9.11.: dřív tu vlastní kopie podmínek)
+        if ($odkud === null || $nosic === null || $np === null || $state->getTeamState($strana)->isPassUsedThisTurn()
+            || !in_array($nosic, $rules->getThrowTeamMateTargets($state, $hazec), true)) {
             return null;
         }
         $nejDal = self::doKoncoveZony($strana, $np->getX()) - self::TTM_MIN_ZISK + 1;
@@ -422,20 +420,17 @@ final class CoachHeuristics
         $cil = null;
         for ($dx = -7; $dx <= 7; $dx++) {
             for ($dy = -7; $dy <= 7; $dy++) {
-                $x = $odkud->getX() + $dx;
-                $y = $odkud->getY() + $dy;
-                if ($x < 0 || $y < 0 || $x >= Position::PITCH_WIDTH || $y >= Position::PITCH_HEIGHT) {
+                $t = new Position($odkud->getX() + $dx, $odkud->getY() + $dy);
+                // levné kontroly napřed; zóny jen kandidátovi, který se s nejlepším porovná
+                if (!$t->isOnPitch() || ThrowTarget::ttm($odkud, $t) === null) {
                     continue;
                 }
-                $t = new Position($x, $y);
-                $dosah = PassRange::fromOffset($dx, $dy);
-                if (($dosah !== PassRange::QUICK_PASS && $dosah !== PassRange::SHORT_PASS)
-                    || $state->getPlayerAtPosition($t) !== null) {
+                $d = self::doKoncoveZony($strana, $t->getX());
+                if ($d > $nejDal || $state->getPlayerAtPosition($t) !== null) {
                     continue;
                 }
-                $d = self::doKoncoveZony($strana, $x);
                 $z = self::zonyZachyceni($state, $t, $strana);
-                if ($d < $nejDal || ($d === $nejDal && $cil !== null && $z < $nejZony)) {
+                if ($d < $nejDal || ($cil !== null && $z < $nejZony)) {
                     $nejDal = $d;
                     $nejZony = $z;
                     $cil = $t;

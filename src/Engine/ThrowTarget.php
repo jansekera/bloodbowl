@@ -37,4 +37,15 @@ final class ThrowTarget
         }
         return ['range' => $range, 'hailMary' => false, 'chyba' => null];
     }
+
+    /**
+     * Hod spoluhráčem jen rychlou/krátkou přihrávkou (r. 8608-8609: „Long Pass or Long Bomb range passes are not
+     * possible“). Jedno místo pro validátor, handler i kouče AI (simplify 9.11.); C++ helpers.cpp ttmTargetLegal.
+     * Vrací pásmo, nebo null, když hod nejde.
+     */
+    public static function ttm(Position $from, Position $to): ?PassRange
+    {
+        $range = PassRange::fromOffset($to->getX() - $from->getX(), $to->getY() - $from->getY());
+        return $range === PassRange::QUICK_PASS || $range === PassRange::SHORT_PASS ? $range : null;
+    }
 }

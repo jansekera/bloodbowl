@@ -341,6 +341,11 @@ bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band) {
     return r == PassRange::QUICK_PASS || r == PassRange::SHORT_PASS;
 }
 
+bool canBeThrownBy(const Player& thrower, const Player& mate) {
+    return mate.teamSide == thrower.teamSide && mate.id != thrower.id && mate.state == PlayerState::STANDING &&
+           mate.hasSkill(SkillName::RightStuff) && mate.position.distanceTo(thrower.position) == 1;
+}
+
 bool sideHasPlayerWithin(const GameState& state, TeamSide side, Position c, int r, bool standingOnly) {
     bool found = false;
     state.forEachOnPitch(side, [&](const Player& p) {
@@ -353,14 +358,27 @@ bool canCatchBomb(const Player& p) {
     return p.state == PlayerState::STANDING && !p.lostTacklezones && !p.hasSkill(SkillName::NoHands);
 }
 
-double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
+namespace {
+// Obsazení hřiště pro výběr cíle bomby: 26×15 polí × 9 dotazů by jinak každý procházel všechny hráče
+// (getPlayerAtPosition). Při více hráčích na poli platí první, jako getPlayerAtPosition.
+struct Occupancy {
+    const Player* at[26][15] = {};
+    explicit Occupancy(const GameState& state) {
+        for (const auto& p : state.players)
+            if (p.isOnPitch() && p.position.isOnPitch() && !at[p.position.x][p.position.y]) at[p.position.x][p.position.y] = &p;
+    }
+    const Player* operator()(Position q) const { return at[q.x][q.y]; }
+};
+
+template <typename Lookup>
+double bombValueWith(const GameState& state, const Lookup& playerAt, Position c, TeamSide mySide, bool& hitsUs) {
     double v = 0.0;
     hitsUs = false;
     for (int dx = -1; dx <= 1; ++dx)
         for (int dy = -1; dy <= 1; ++dy) {
             const Position q{static_cast<int8_t>(c.x + dx), static_cast<int8_t>(c.y + dy)};
             if (!q.isOnPitch()) continue;
-            const Player* p = state.getPlayerAtPosition(q);
+            const Player* p = playerAt(q);
             if (!p) continue;
             const bool centre = dx == 0 && dy == 0;
             const double hit = centre ? 1.0 : 0.5;
@@ -377,39 +395,69 @@ double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool
     return v;
 }
 
+bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
+    return !sideHasPlayerWithin(state, opponent(throwerSide), target, kHailMaryClearRadius, true);
+}
+}  // namespace
+
+double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
+    return bombValueWith(state, [&](Position q) { return state.getPlayerAtPosition(q); }, c, mySide, hitsUs);
+}
+
+bool shouldInterceptBomb(const GameState& state, TeamSide interceptorSide, Position target) {
+    return sideHasPlayerWithin(state, interceptorSide, target, 1, false);
+}
+
 BombChoice chooseBombTarget(const GameState& state, const Player& thrower, bool mustThrow) {
+    const Occupancy occ(state);
+    const TeamSide side = thrower.teamSide;
+    if (mustThrow) {
+        // hodit se musí: nejvyšší cena ze všech legálních polí, při shodě nejdál od našich (vzdálenost jen při shodě)
+        BombChoice best;
+        best.value = -1e9;
+        int bestFar = -1;
+        for (int x = 0; x < 26; ++x)
+            for (int y = 0; y < 15; ++y) {
+                const Position c{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+                if (c == thrower.position) continue;
+                const PassLegality leg = passTargetLegal(state, thrower, c);
+                if (!leg.legal) continue;
+                bool hitsUs = false;
+                const double v = bombValueWith(state, occ, c, side, hitsUs);
+                if (v < best.value) continue;
+                int far = 99;
+                state.forEachOnPitch(side, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
+                if (v > best.value || far > bestFar) { best = {c, v, leg.hailMary}; bestFar = far; }
+            }
+        return best;
+    }
+    // AI: cena ≥ 1 jde jen na poli, které má v dosahu výbuchu soupeře (prázdné pole 0, naši jen ubírají)
+    bool nearEnemy[26][15] = {};
+    state.forEachOnPitch(opponent(side), [&](const Player& e) {
+        for (int dx = -1; dx <= 1; ++dx)
+            for (int dy = -1; dy <= 1; ++dy) {
+                const Position q{static_cast<int8_t>(e.position.x + dx), static_cast<int8_t>(e.position.y + dy)};
+                if (q.isOnPitch()) nearEnemy[q.x][q.y] = true;
+            }
+    });
     BombChoice best[2];            // [0] pravítko, [1] Hail Mary
-    best[0].value = best[1].value = mustThrow ? -1e9 : 0.999;
-    int bestFar = -1;
+    best[0].value = best[1].value = 0.999;
     for (int x = 0; x < 26; ++x)
         for (int y = 0; y < 15; ++y) {
+            if (!nearEnemy[x][y]) continue;
             const Position c{static_cast<int8_t>(x), static_cast<int8_t>(y)};
             if (c == thrower.position) continue;
             const PassLegality leg = passTargetLegal(state, thrower, c);
             if (!leg.legal) continue;
             bool hitsUs = false;
-            const double v = bombSquareValue(state, c, thrower.teamSide, hitsUs);
-            if (mustThrow) {
-                int far = 99;   // nejbližší náš od cíle — při shodě ceny čím dál, tím líp
-                state.forEachOnPitch(thrower.teamSide, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
-                if (v > best[0].value || (v == best[0].value && far > bestFar)) {
-                    best[0] = {c, v, leg.hailMary};
-                    bestFar = far;
-                }
-                continue;
-            }
-            if (hitsUs) continue;
-            if (leg.hailMary && sideHasPlayerWithin(state, thrower.teamSide, c, 4, false)) continue;
+            const double v = bombValueWith(state, occ, c, side, hitsUs);
             BombChoice& b = best[leg.hailMary ? 1 : 0];
-            if (v > b.value) b = {c, v, leg.hailMary};
+            if (hitsUs || v <= b.value) continue;
+            if (leg.hailMary && sideHasPlayerWithin(state, side, c, 4, false)) continue;
+            b = {c, v, leg.hailMary};
         }
-    if (mustThrow) return best[0];
     if (best[0].pos.x >= 0) return best[0];
     return best[1].pos.x >= 0 ? best[1] : BombChoice{};
-}
-
-bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
-    return !sideHasPlayerWithin(state, opponent(throwerSide), target, kHailMaryClearRadius, true);
 }
 
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target) {

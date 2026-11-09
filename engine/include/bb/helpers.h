@@ -165,7 +165,12 @@ double bombSquareValue(const GameState& state, Position c, TeamSide side, bool& 
 //     (review L6: dřív při samých záporných cenách „vybuchne v ruce“, což pravidla nemají).
 struct BombChoice { Position pos{-1, -1}; double value = 0.0; bool hailMary = false; };
 BombChoice chooseBombTarget(const GameState& state, const Player& thrower, bool mustThrow);
-bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide);
+// P264: zachytit bombu (volba kouče, ř. 7959-7961) zkusí jen hráč, jehož týmu výbuch v cíli hrozí — jinak by jen
+// přebíral riziko. Engine rozhoduje za oba kouče (P272); tady je jediné místo té volby.
+bool shouldInterceptBomb(const GameState& state, TeamSide interceptorSide, Position target);
+// Smí `thrower` (s Throw Team-Mate) hodit spoluhráče `mate`? Stojící spoluhráč s Right Stuff hned vedle (ř. 8599-8605).
+// Jedno místo pro nabídku akce (rules_engine) i makro (offerBombAndTtmMacros).
+bool canBeThrownBy(const Player& thrower, const Player& mate);
 // Nabídka HMP přihrávky pro AI (rules_engine i makro): spoluhráč vpřed (HOME útočí na x = 25) a cíl volný.
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target);
 

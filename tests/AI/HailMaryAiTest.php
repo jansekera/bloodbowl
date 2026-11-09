@@ -41,9 +41,7 @@ final class HailMaryAiTest extends TestCase
     {
         if ($bomba) {
             // review 9.11. (M4): cíl bomby ze sdíleného BombTarget::vyber (parita s C++ chooseBombTarget)
-            $tz = new \App\Engine\TacklezoneCalculator();
-            $ball = new \App\Engine\BallResolver(new \App\Engine\FixedDiceRoller([]), $tz, new \App\Engine\ScatterCalculator());
-            $cil = \App\Engine\BombTarget::vyber($s, $s->requirePlayer(1), false, $ball);
+            $cil = \App\Engine\BombTarget::vyber($s, $s->requirePlayer(1), false);
             return $cil !== null && $cil['hailMary'] ? [$cil['pos']->getX() . ',' . $cil['pos']->getY()] : [];
         }
         $cile = CoachHeuristics::cileHoduProAi(new RulesEngine(), $s, $s->requirePlayer(1));

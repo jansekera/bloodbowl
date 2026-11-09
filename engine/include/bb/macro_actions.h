@@ -196,6 +196,13 @@ enum class MacroType : uint8_t {
     MACRO_COUNT  // = 16
 };
 
+// Makro, kterým míč odejde od nosiče k jinému hráči (předání, přihrávka, hod nosiče spoluhráčem). Jedno místo pro
+// brzdy klece (one_cage.cpp P175/P180) — nový typ, který míč posílá dál, se přidá jen sem (simplify 9.11.).
+inline bool macroPassesBall(MacroType t) {
+    return t == MacroType::HAND_OFF_SCORE || t == MacroType::PASS_SCORE || t == MacroType::CHAIN_SCORE ||
+           t == MacroType::PASS_ACTION || t == MacroType::THROW_TEAM_MATE;
+}
+
 struct Macro {
     MacroType type = MacroType::END_TURN;
     int playerId = -1;      // primary player

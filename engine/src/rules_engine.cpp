@@ -196,7 +196,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                 // the ruler cannot actually reach.
                 // P257: legalita na jednom místě (helpers.cpp passTargetLegal).
                 // P266 (uživatel 9.11.2026): Hail Mary (mimo pravítko) jen vpřed a jen když u cíle nestojí soupeř
-                //   (hailMaryLandingClear) — dřív se HMP nenabízel vůbec.
+                //   (hailMaryPassWorthOffering) — dřív se HMP nenabízel vůbec.
                 const PassLegality leg = passTargetLegal(state, p, teammate.position);
                 if (!leg.legal) return;
                 if (leg.hailMary && !hailMaryPassWorthOffering(state, p, teammate)) return;
@@ -238,9 +238,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             for (auto& pos : adj) {
                 if (!pos.isOnPitch()) continue;
                 const Player* teammate = state.getPlayerAtPosition(pos);
-                if (teammate && teammate->teamSide == side &&
-                    teammate->state == PlayerState::STANDING &&
-                    teammate->hasSkill(SkillName::RightStuff)) {
+                if (teammate && canBeThrownBy(p, *teammate)) {
                     // Target positions: any square within pass range
                     // For simplicity, generate targets every 3 squares in each direction
                     for (int tx = 0; tx < 26; tx += 3) {
@@ -248,11 +246,8 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
                             // OPRAVENO 9.11.2026 (P268) — dřív Chebyshev ≤ 13, tedy i dlouhé hody, které
                             //   resolver odmítne (ř. 8608-8609); teď jen rychlá/krátká (ttmTargetLegal).
                             const Position t{static_cast<int8_t>(tx), static_cast<int8_t>(ty)};
-                            if (t != p.position && ttmTargetLegal(p, t)) {
-                                out.push_back({ActionType::THROW_TEAM_MATE, p.id,
-                                              teammate->id,
-                                              {static_cast<int8_t>(tx), static_cast<int8_t>(ty)}});
-                            }
+                            if (t != p.position && ttmTargetLegal(p, t))
+                                out.push_back({ActionType::THROW_TEAM_MATE, p.id, teammate->id, t});
                         }
                     }
                 }

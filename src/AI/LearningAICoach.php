@@ -957,8 +957,8 @@ final class LearningAICoach implements AICoachInterface
             ActionType::FOUL => $this->buildFoulAction($state, $rules, $playerId, $side, $baseScore),
             ActionType::BALL_AND_CHAIN => $this->buildBallAndChainAction($baseScore, $playerId),
             ActionType::HYPNOTIC_GAZE => $this->buildHypnoticGazeAction($state, $rules, $playerId, $side, $baseScore),
-            ActionType::BOMB_THROW => $this->buildBombThrowAction($state, $rules, $playerId, $side, $baseScore),
-            ActionType::THROW_TEAM_MATE => $this->buildThrowTeamMateAction($state, $playerId, $baseScore),
+            ActionType::BOMB_THROW => $this->buildBombThrowAction($state, $playerId, $baseScore),
+            ActionType::THROW_TEAM_MATE => $this->buildThrowTeamMateAction($state, $rules, $playerId, $baseScore),
             ActionType::MULTIPLE_BLOCK => $this->buildMultipleBlockAction($state, $rules, $playerId, $side, $baseScore),
             default => null,
         };
@@ -1823,11 +1823,14 @@ final class LearningAICoach implements AICoachInterface
      *
      * @return array{action: ActionType, params: array<string, mixed>, score: float}|null
      */
-    private function buildThrowTeamMateAction(GameState $state, int $playerId, float $baseScore): ?array
+    private function buildThrowTeamMateAction(GameState $state, RulesEngine $rules, int $playerId, float $baseScore): ?array
     {
         $hazec = $state->getPlayer($playerId);
-        $hod = $hazec === null ? null : CoachHeuristics::hodSpoluhraceProAi($state, $hazec);
-        if ($hod === null || $hazec === null) {
+        if ($hazec === null) {
+            return null;
+        }
+        $hod = CoachHeuristics::hodSpoluhraceProAi($rules, $state, $hazec);
+        if ($hod === null) {
             return null;
         }
         $nosic = $state->requirePlayer($hod['targetId']);
@@ -1846,14 +1849,14 @@ final class LearningAICoach implements AICoachInterface
     /**
      * @return array{action: ActionType, params: array<string, mixed>, score: float}|null
      */
-    private function buildBombThrowAction(GameState $state, RulesEngine $rules, int $playerId, TeamSide $side, float $baseScore): ?array
+    private function buildBombThrowAction(GameState $state, int $playerId, float $baseScore): ?array
     {
         $player = $state->getPlayer($playerId);
         if ($player === null || !$player->hasSkill(SkillName::Bombardier)) {
             return null;
         }
         // Review 9.11. (M4): cíl ze sdíleného BombTarget::vyber — parita s C++ makrem BOMB (viz GreedyAICoach).
-        $cil = BombTarget::vyber($state, $player, false, $this->ballResolver);
+        $cil = BombTarget::vyber($state, $player, false);
         if ($cil === null) {
             return null;
         }

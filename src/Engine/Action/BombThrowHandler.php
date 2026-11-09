@@ -112,7 +112,7 @@ final class BombThrowHandler implements ActionHandlerInterface
         //   jehož týmu výbuch v cíli hrozí. Nepovedené ⇒ bomba letí dál (uživatel). Zachycená není turnover (r. 7955).
         if (!$hailMary) {
             $z = $this->passResolver->najdiZachycujiciho($state, $thrower, $throwerPos, $targetPos);
-            if ($z !== null && $state->maHraceDo($z->getTeamSide(), $targetPos, 1, false)
+            if ($z !== null && BombTarget::zachytit($state, $z->getTeamSide(), $targetPos)
                 && $this->passResolver->hodZachyceni($state, $thrower, $z, $events)) {
                 return $this->hodDal($state, $z->getId(), $events, $skok + 1);
             }
@@ -165,9 +165,8 @@ final class BombThrowHandler implements ActionHandlerInterface
 
         if ($fumble) {
             // r. 7967-7968: fumble vybuchne v poli házeče
-            $events[] = GameEvent::bombLanding((string) $throwerPos);
             // turnover = sražený hráč týmu na tahu (r. 7956-7958); házeč ve středu výbuchu padne vždy (jako C++)
-            return $this->resolveExplosion($state, $throwerPos, $activeSide, $events);
+            return $this->vybuch($state, $throwerPos, $events);
         }
         $landingPos = $targetPos;
         if (!$accurate) {
@@ -205,8 +204,7 @@ final class BombThrowHandler implements ActionHandlerInterface
             }
         }
 
-        $events[] = GameEvent::bombLanding((string) $landingPos);
-        return $this->resolveExplosion($state, $landingPos, $activeSide, $events);
+        return $this->vybuch($state, $landingPos, $events);
     }
 
     /**
@@ -220,13 +218,23 @@ final class BombThrowHandler implements ActionHandlerInterface
     private function hodDal(GameState $state, int $drziId, array $events, int $skok): array
     {
         $drzi = $state->requirePlayer($drziId);
-        $cil = $skok > self::MAX_PRESKOKU ? null : BombTarget::vyber($state, $drzi, true, $this->ballResolver)['pos'] ?? null;
+        $cil = $skok > self::MAX_PRESKOKU ? null : BombTarget::vyber($state, $drzi, true)['pos'] ?? null;
         if ($cil === null) {
-            $pos = $drzi->requirePosition();
-            $events[] = GameEvent::bombLanding((string) $pos);
-            return $this->resolveExplosion($state, $pos, $state->getActiveTeam(), $events);
+            return $this->vybuch($state, $drzi->requirePosition(), $events);
         }
         return $this->letBomby($state, $drziId, $cil, $events, $skok);
+    }
+
+    /**
+     * Bomba vybuchne na `$pos` (záznam dopadu + výbuch); turnover = sražený hráč týmu na tahu (r. 7956-7958).
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>, 2: bool}
+     */
+    private function vybuch(GameState $state, Position $pos, array $events): array
+    {
+        $events[] = GameEvent::bombLanding((string) $pos);
+        return $this->resolveExplosion($state, $pos, $state->getActiveTeam(), $events);
     }
 
     /**

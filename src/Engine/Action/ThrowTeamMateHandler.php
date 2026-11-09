@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Engine\Action;
 
+use App\Engine\ThrowTarget;
 use App\DTO\ActionResult;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
@@ -71,6 +72,12 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         if ($throwerPos->distanceTo($projectilePos) !== 1) {
             throw new \InvalidArgumentException('Players must be adjacent');
         }
+        // OPRAVENO 9.11.2026 (simplify, parita s C++ P268) — dosah se kontroloval až po spotřebě přihrávky a hodu na
+        //   Always Hungry. r. 8608-8609: jen rychlá/krátká.
+        $range = ThrowTarget::ttm($throwerPos, $landingTarget);
+        if ($range === null) {
+            throw new \InvalidArgumentException('Throw Team-Mate: only quick or short pass range (r. 8608-8609)');
+        }
 
         // Mark pass used (shares slot with pass)
         $activeSide = $thrower->getTeamSide();
@@ -131,17 +138,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             }
         }
 
-        // Calculate range and accuracy
-        $range = PassRange::fromOffset($landingTarget->getX() - $throwerPos->getX(), $landingTarget->getY() - $throwerPos->getY());
-        if ($range === null) {
-            throw new \InvalidArgumentException('Target is out of range');
-        }
-
-        // ⛔ OPRAVA 21.09.2026 (1/3): `rules_bb2016.txt` r. 8609-8610 --
-        //   "**Long Pass or Long Bomb range passes are not possible**."
-        if ($range === PassRange::LONG_PASS || $range === PassRange::LONG_BOMB) {
-            throw new \InvalidArgumentException('Throw Team-Mate: only quick or short pass range (r. 8609-8610)');
-        }
+        // Accuracy ($range ověřen na začátku — ThrowTarget::ttm; OPRAVA 21.09.2026 1/3 tam)
 
         // ⛔ OPRAVA 21.09.2026 (2/3): r. 8607-8608 -- "The pass is worked out
         //   exactly the same as the player with Throw Team-Mate passing a ball,
