@@ -52,7 +52,15 @@ ActionResult throwBombFrom(GameState& state, int throwerId, Position target, Dic
 ActionResult rethrowBomb(GameState& state, int holderId, DiceRollerBase& dice, std::vector<GameEvent>* events,
                          int hop) {
     const Player& holder = state.getPlayer(holderId);
-    const Position t = hop > kMaxBombHops ? Position{-1, -1} : chooseBombTarget(state, holder, true).pos;
+    Position t = hop > kMaxBombHops ? Position{-1, -1} : chooseBombTarget(state, holder, true).pos;
+    // P272 (uživatel 9.11.): za hráče kouče-člověka se cíl hodu dál ptá (chytání je povinné, na to ne)
+    if (t.isOnPitch() && coachDecides(holder.teamSide)) {
+        const std::vector<Position> cand = bombRethrowCandidates(state, holder);
+        const int n = static_cast<int>(cand.size());
+        const int a = askCoach(CoachQuestion::BOMB_RETHROW_TARGET, holderId, -1, n,
+                               holder.position.x * 100 + holder.position.y, static_cast<int>((1u << (n + 1)) - 1u));
+        if (a > 0) t = cand[a - 1];
+    }
     if (!t.isOnPitch())
         return explodeBomb(state, holder.position, holderId, dice, events);
     return throwBombFrom(state, holderId, t, dice, events, hop);

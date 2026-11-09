@@ -406,6 +406,32 @@ double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool
     return bombValueWith(state, [&](Position q) { return state.getPlayerAtPosition(q); }, c, mySide, hitsUs);
 }
 
+std::vector<Position> bombRethrowCandidates(const GameState& state, const Player& holder, int maxN) {
+    struct Cand { double v; int far; Position p; };
+    std::vector<Cand> all;
+    const Occupancy occ(state);
+    for (int x = 0; x < 26; ++x)
+        for (int y = 0; y < 15; ++y) {
+            const Position c{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+            if (c == holder.position || !passTargetLegal(state, holder, c).legal) continue;
+            bool hitsUs = false;
+            const double v = bombValueWith(state, occ, c, holder.teamSide, hitsUs);
+            int far = 99;
+            state.forEachOnPitch(holder.teamSide, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
+            all.push_back({v, far, c});
+        }
+    // stabilní řazení zachová pořadí x, y při úplné shodě — jako průchod v chooseBombTarget
+    std::stable_sort(all.begin(), all.end(), [](const Cand& a, const Cand& b) {
+        return a.v != b.v ? a.v > b.v : a.far > b.far;
+    });
+    std::vector<Position> out;
+    for (const Cand& c : all) {
+        if (static_cast<int>(out.size()) >= maxN) break;
+        out.push_back(c.p);
+    }
+    return out;
+}
+
 bool shouldInterceptBomb(const GameState& state, TeamSide interceptorSide, Position target) {
     return sideHasPlayerWithin(state, interceptorSide, target, 1, false);
 }

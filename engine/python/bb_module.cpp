@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <functional>
 #include "bb/coach_choice.h"
+#include "bb/helpers.h"
 #include "bb/cage_advance.h"
 #include "bb/block_handler.h"
 #include <pybind11/stl.h>
@@ -536,7 +537,7 @@ PYBIND11_MODULE(bb_engine, m) {
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
                                           "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER",
-                                          "USE_GRAB", "USE_DIVING_CATCH", "BOMB_REROLL"};
+                                          "USE_GRAB", "USE_DIVING_CATCH", "BOMB_REROLL", "BOMB_RETHROW_TARGET"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;
@@ -548,6 +549,12 @@ PYBIND11_MODULE(bb_engine, m) {
                 py::list sq;
                 for (const bb::Position& p : bb::kickoffReturnSquares(
                          state, q.playerId, {static_cast<int8_t>(q.target / 100), static_cast<int8_t>(q.target % 100)}))
+                    sq.append(py::make_tuple(p.x, p.y));
+                d["squares"] = sq;
+            }
+            if (q.question == bb::CoachQuestion::BOMB_RETHROW_TARGET) {   // P272: kam hodit chycenou bombu
+                py::list sq;
+                for (const bb::Position& p : bb::bombRethrowCandidates(state, state.getPlayer(q.playerId)))
                     sq.append(py::make_tuple(p.x, p.y));
                 d["squares"] = sq;
             }

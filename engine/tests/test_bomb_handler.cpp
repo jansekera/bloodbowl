@@ -523,7 +523,7 @@ TEST(CoachChoiceBomb, P264RethrowByTheTeamNotOnTurnOffersNoTeamReroll) {
     placePlayer(gs, 13, {8, 7}, TeamSide::AWAY);
     gs.awayTeam.rerolls = 3;
     FixedDiceRoller dice({6, 1, 1, 3, 3});          // 13 zachytí; hod dál = fumble
-    CoachChoiceScope scope(TeamSide::AWAY, {});
+    CoachChoiceScope scope(TeamSide::AWAY, {0});     // P272: kam hodit — 0 = jako AI; pak otázka na přehoz
     try {
         resolveBombThrow(gs, 1, {10, 7}, dice, nullptr);
     } catch (const CoachChoicePending& p) {
@@ -542,4 +542,54 @@ TEST(Interception, TieGoesToTheLowerId) {
     placePlayer(gs, 14, {8, 6}, TeamSide::AWAY);
     placePlayer(gs, 13, {8, 4}, TeamSide::AWAY);
     EXPECT_EQ(pickInterceptor(gs, gs.getPlayer(1), {11, 5}), 13);
+}
+
+// ───────────── P272 (uživatel 9.11.2026): kouč-člověk volí, kam hodit chycenou bombu ─────────────
+// „player must try to catch and if success throw — na ptaní mi z toho vyplývá — kam hodit po chycení“. Chytání je
+// povinné (ř. 7964-7966), hod dál taky (ř. 7961-7963); volba je jen cíl.
+TEST(CoachChoiceBomb, P272HumanCatcherIsAskedWhereToThrow) {
+    GameState gs = bombP264();                       // HOME 1 hází na AWAY 12 (10,7)
+    FixedDiceRoller dice({6, 6});                     // přesně; 12 chytí
+    CoachChoiceScope scope(TeamSide::AWAY, {});
+    try {
+        resolveBombThrow(gs, 1, {10, 7}, dice, nullptr);
+        FAIL() << "kouč AWAY měl dostat otázku";
+    } catch (const CoachChoicePending& p) {
+        EXPECT_EQ(p.question, CoachQuestion::BOMB_RETHROW_TARGET);
+        EXPECT_EQ(p.playerId, 12);
+        EXPECT_EQ(p.target, 1007);
+        EXPECT_GT(p.roll, 1);
+        EXPECT_EQ(p.options, (1 << (p.roll + 1)) - 1);
+    }
+}
+
+TEST(CoachChoiceBomb, P272EngineSideIsNotAsked) {
+    GameState gs = bombP264();
+    gs.getPlayer(1).skills.add(SkillName::NoHands);   // hod zpět míří na 1 (5,7), výbuch, žádné chytání
+    FixedDiceRoller dice({6, 6, 6, 3, 3});
+    CoachChoiceScope scope(TeamSide::HOME, {});        // člověk hraje HOME, chytá AWAY (engine)
+    EXPECT_NO_THROW(resolveBombThrow(gs, 1, {10, 7}, dice, nullptr));
+}
+
+TEST(CoachChoiceBomb, P272AnswerPicksTheOfferedSquare) {
+    GameState base = bombP264();
+    const std::vector<Position> cand = bombRethrowCandidates(base, base.getPlayer(12));
+    ASSERT_GE(cand.size(), 2u);
+    EXPECT_EQ(cand[0], chooseBombTarget(base, base.getPlayer(12), true).pos) << "pole 1 = volba enginu";
+    auto thrownTo = [&](int answer) {
+        GameState gs = base;
+        std::vector<GameEvent> ev;
+        // přesně, 12 chytí, hod dál = fumble ⇒ výbuch u 12 (bez dalších voleb); zbytek jedničky na zbroj/sousedy
+        std::vector<int> d{6, 6, 1};
+        d.resize(40, 1);
+        FixedDiceRoller dice(d);
+        CoachChoiceScope scope(TeamSide::AWAY, {answer});
+        resolveBombThrow(gs, 1, {10, 7}, dice, &ev);
+        Position to{-1, -1};
+        for (const auto& e : ev) if (e.type == GameEvent::Type::PASS && e.playerId == 12) to = e.to;
+        return to;
+    };
+    EXPECT_EQ(thrownTo(2), cand[1]);
+    EXPECT_EQ(thrownTo(0), cand[0]);
+    EXPECT_EQ(thrownTo(1), cand[0]);
 }

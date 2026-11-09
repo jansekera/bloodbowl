@@ -53,7 +53,12 @@ enum class CoachQuestion : int {
     USE_DIVING_CATCH = 16,
     // P251b (uživatel 7.11.2026: „přehoz bomby se má člověka ptát“): fumble bomby (Bombardier). playerId = házeč,
     // roll = kostka, target = cíl hodu. Odpověď: nechat / tým / Pro (jako PASS_REROLL). Nepřesná bomba se neptá.
-    BOMB_REROLL = 17
+    BOMB_REROLL = 17,
+    // P272 (uživatel 9.11.2026: „player must try to catch and if success throw — na ptaní mi z toho vyplývá — kam hodit
+    // po chycení“): hráč kouče chytil / zachytil bombu a musí ji hned hodit dál (ř. 7961-7963). playerId = držitel,
+    // roll = počet nabízených polí (bombRethrowCandidates), target = jeho pole x*100+y. Odpověď 0 = jako AI (= pole 1),
+    // i = i-té pole nabídky. Chytání samo je povinné ⇒ na to se neptá.
+    BOMB_RETHROW_TARGET = 18
 };
 
 namespace CoachAnswer {

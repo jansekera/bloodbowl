@@ -165,6 +165,10 @@ double bombSquareValue(const GameState& state, Position c, TeamSide side, bool& 
 //     (review L6: dřív při samých záporných cenách „vybuchne v ruce“, což pravidla nemají).
 struct BombChoice { Position pos{-1, -1}; double value = 0.0; bool hailMary = false; };
 BombChoice chooseBombTarget(const GameState& state, const Player& thrower, bool mustThrow);
+// P272: nabídka cílů pro kouče-člověka u povinného hodu chycené bomby — legální pole seřazená jako chooseBombTarget
+// (mustThrow): cena sestupně, při shodě nejdál od našich, pak x, y vzestupně; nejvýš `maxN` (odpověď kouče ≤ 30).
+// První pole = to, které by zvolil engine.
+std::vector<Position> bombRethrowCandidates(const GameState& state, const Player& holder, int maxN = 29);
 // P264: zachytit bombu (volba kouče, ř. 7959-7961) zkusí jen hráč, jehož týmu výbuch v cíli hrozí — jinak by jen
 // přebíral riziko. Engine rozhoduje za oba kouče (P272); tady je jediné místo té volby.
 bool shouldInterceptBomb(const GameState& state, TeamSide interceptorSide, Position target);
