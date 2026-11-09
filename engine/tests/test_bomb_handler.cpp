@@ -25,7 +25,8 @@ TEST(BombHandler, AccurateExplosion) {
     // Distance 3 = quick pass. AG3: target = 7-3-1 = 3. Roll 5 >= 3 → accurate
     // Explosion: player 12 at (13,7) is in 3x3 around (13,7) → knocked down
     // Armor: 3+3=6 ≤ 8 not broken
-    FixedDiceRoller dice({5, 3, 3});
+    // P264 (9.11.2026): hráč 12 v cíli bombu zkouší chytit (ř. 7959-7961) — 1 = nechytí ⇒ výbuch.
+    FixedDiceRoller dice({5, 1, 3, 3});
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
     EXPECT_TRUE(result.success);
     EXPECT_FALSE(result.turnover); // Never turnover
@@ -199,7 +200,7 @@ TEST(BombHandler, P251FumbleIsRerolledByTeamReroll) {
     GameState gs = makeBombSetup(2);
     // 1 = fumble, tymovy prehoz -> 5 = presne; vybuch v cili, brneni 3+3 neprorazi.
     // Stary kod: fumble stoji, vybuch u hazece (hazec PRONE, prehoz neutracen).
-    FixedDiceRoller dice({1, 5, 3, 3});
+    FixedDiceRoller dice({1, 5, 1, 3, 3});   // P264: 1 = hráč 12 v cíli bombu nechytí
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
 
     EXPECT_EQ(gs.homeTeam.rerolls, 1) << "r. 929-936: tymovy prehoz se utratil";
@@ -225,7 +226,7 @@ TEST(BombHandler, P251InaccurateBombIsNotRerolled) {
 TEST(BombHandler, P251PassSkillRerollsFumbleWithoutSpendingTeamReroll) {
     GameState gs = makeBombSetup(2);
     gs.getPlayer(1).skills.add(SkillName::Pass);
-    FixedDiceRoller dice({1, 5, 3, 3});    // fumble -> Pass: 5 presne
+    FixedDiceRoller dice({1, 5, 1, 3, 3});    // fumble -> Pass: 5 presne; P264: 1 = 12 nechytí
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
 
     EXPECT_EQ(gs.homeTeam.rerolls, 2) << "r. 8336-8337: Pass je zdarma";
@@ -237,7 +238,7 @@ TEST(BombHandler, P251PassSkillRerollsFumbleWithoutSpendingTeamReroll) {
 TEST(BombHandler, P251ProRerollsFumbleBeforeTeamReroll) {
     GameState gs = makeBombSetup(2);
     gs.getPlayer(1).skills.add(SkillName::Pro);
-    FixedDiceRoller dice({1, 4, 5, 3, 3});  // fumble, Pro 4+ projde, novy hod 5
+    FixedDiceRoller dice({1, 4, 5, 1, 3, 3});  // fumble, Pro 4+ projde, novy hod 5; P264: 1 = 12 nechytí
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
 
     EXPECT_TRUE(gs.getPlayer(1).proUsedThisTurn);
@@ -278,7 +279,7 @@ TEST(BombHandler, P251LonerBomberWithPassSkillStillRerollsFumble) {
     GameState gs = makeBombSetup(2);
     gs.getPlayer(1).skills.add(SkillName::Loner);
     gs.getPlayer(1).skills.add(SkillName::Pass);
-    FixedDiceRoller dice({1, 5, 3, 3});
+    FixedDiceRoller dice({1, 5, 1, 3, 3});   // P264: 1 = 12 nechytí
     auto result = resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
 
     EXPECT_EQ(gs.homeTeam.rerolls, 2);
@@ -326,7 +327,7 @@ TEST(CoachChoiceBomb, P251bInaccurateBomb_CoachIsNotAsked) {
 
 TEST(CoachChoiceBomb, P251bTeamRerollOnFumble_BombHitsTheTarget) {
     GameState gs = bombCoachSetup();
-    FixedDiceRoller dice({1, 5, 3, 3});              // fumble → týmový přehoz 5 → přesná; zbroj 3+3
+    FixedDiceRoller dice({1, 5, 1, 3, 3});           // fumble → týmový přehoz 5 → přesná; P264: 12 nechytí (1); zbroj 3+3
     CoachChoiceScope scope(TeamSide::HOME, {CoachAnswer::TEAM});
     resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
     EXPECT_EQ(gs.homeTeam.rerolls, 2);
@@ -352,7 +353,7 @@ TEST(BombHandler, P256AccurateHelpsTheBomb) {
     GameState gs = bombP256();
     gs.getPlayer(1).skills.add(SkillName::Accurate);
     // cíl 7-3-1(rychlá)-1(Accurate) = 2: hod 2 = přesná ⇒ výbuch na (13,7); zbroj 3+3. Bez Accurate cíl 3 ⇒ rozptyl.
-    FixedDiceRoller dice({2, 3, 3});
+    FixedDiceRoller dice({2, 1, 3, 3});   // P264: 1 = 12 nechytí
     resolveBombThrow(gs, 1, {13, 7}, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
@@ -361,7 +362,7 @@ TEST(BombHandler, P256StrongArmHelpsAShortBomb) {
     GameState gs = bombP256();
     gs.getPlayer(1).skills.add(SkillName::StrongArm);
     gs.getPlayer(12).position = {15, 7};             // 5 polí = krátká (0); Strong Arm ⇒ jako rychlá (+1): cíl 3
-    FixedDiceRoller dice({3, 3, 3});                  // hod 3 = přesná (bez Strong Arm cíl 4 ⇒ rozptyl)
+    FixedDiceRoller dice({3, 1, 3, 3});               // hod 3 = přesná (bez Strong Arm cíl 4 ⇒ rozptyl); P264: 1 = nechytí
     resolveBombThrow(gs, 1, {15, 7}, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
 }
@@ -380,7 +381,7 @@ TEST(BombHandler, P262PassEventCarriesTheTargetAndTheDie) {
     // konvence P201/P145: roll = cílové číslo, die1 = kostka (dřív u bomby obráceně)
     GameState gs = bombP256();
     std::vector<GameEvent> ev;
-    FixedDiceRoller dice({5, 3, 3});                 // rychlá, cíl 3; hod 5
+    FixedDiceRoller dice({5, 1, 3, 3});              // rychlá, cíl 3; hod 5; P264: 1 = 12 nechytí
     resolveBombThrow(gs, 1, {13, 7}, dice, &ev);
     bool seen = false;
     for (const auto& e : ev) if (e.type == GameEvent::Type::PASS) { seen = true; EXPECT_EQ(e.roll, 3); EXPECT_EQ(e.die1, 5); }
@@ -406,7 +407,7 @@ static GameState bombHmp() {
 TEST(BombHandler, P263HailMaryBombScattersThreeTimesFromTheTarget) {
     GameState gs = bombHmp();
     // hod 2 (projde); rozptyly D8=3 (V) ×3 z (20,7) → (23,7) ⇒ výbuch na hráči 12; zbroj 3+3
-    FixedDiceRoller dice({2, 3, 3, 3, 3, 3});
+    FixedDiceRoller dice({2, 3, 3, 3, 1, 3, 3});      // P264: po rozptylech 1 = 12 nechytí
     auto result = resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
     EXPECT_TRUE(result.success);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
@@ -435,4 +436,76 @@ TEST(BombHandler, P263NoHailMaryBombInABlizzard) {
     FixedDiceRoller dice({});
     auto result = resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
     EXPECT_FALSE(result.success);
+}
+
+// ───────────── P264 (uživatel 9.11.2026: „přidej možnost intercept“): zachycení a chycení bomby ─────────────
+// Ř. 7959-7966: „A bomb may be intercepted or caught using the same rules for catching the ball, in which case the
+// player catching it must throw it again immediately … The bomb explodes when it lands in an empty square or an
+// opportunity to catch the bomb fails or is declined.“ Zachycení se hlásí před hodem (ř. 1773-1774); nepovedené
+// zachycení ⇒ bomba letí dál (uživatel). Hail Mary zachytit nejde (ř. 8167). Zachycená bomba není turnover (ř. 7955),
+// výbuch, který srazí hráče týmu na tahu, ano (ř. 7956-7958).
+static GameState bombP264() {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    gs.getPlayer(1).skills.add(SkillName::Bombardier);
+    placePlayer(gs, 12, {10, 7}, TeamSide::AWAY);     // cíl (5 polí = krátká)
+    return gs;
+}
+
+TEST(BombHandler, P264InterceptedBombIsThrownBackAtUs) {
+    GameState gs = bombP264();
+    placePlayer(gs, 13, {8, 7}, TeamSide::AWAY);      // v dráze; zachycení 7-3+2 = 6+
+    // 6 = zachytil ⇒ 13 hází na jediného našeho (5,7): rychlá, cíl 3, hod 6 přesně; 1 chytá na 3+ a hodí 1 ⇒ výbuch
+    // v (5,7); zbroj 3+3
+    FixedDiceRoller dice({6, 6, 1, 3, 3});
+    auto r = resolveBombThrow(gs, 1, {10, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "do cíle bomba nedoletěla";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(r.turnover) << "výbuch srazil hráče týmu na tahu";
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+TEST(BombHandler, P264FailedInterceptionLetsTheBombFlyOn) {
+    GameState gs = bombP264();
+    placePlayer(gs, 13, {8, 7}, TeamSide::AWAY);
+    // 1 = zachycení selhalo ⇒ hod 6 přesně; 12 v cíli chytá (3+), hodí 1 ⇒ výbuch v (10,7); zbroj 12 3+3
+    FixedDiceRoller dice({1, 6, 1, 3, 3});
+    auto r = resolveBombThrow(gs, 1, {10, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(13).state, PlayerState::STANDING);   // 2 pole od výbuchu
+    EXPECT_FALSE(r.turnover);
+}
+
+TEST(BombHandler, P264NobodyInterceptsABombThatDoesNotThreatenHisTeam) {
+    GameState gs = bombP264();
+    gs.getPlayer(12).position = {20, 1};
+    placePlayer(gs, 13, {8, 9}, TeamSide::AWAY);      // v dráze na prázdné (10,10), od cíle 2 pole
+    FixedDiceRoller dice({6});                         // jen hod na přesnost — žádný pokus o zachycení
+    auto r = resolveBombThrow(gs, 1, {10, 10}, dice, nullptr);
+    EXPECT_TRUE(r.success);
+    EXPECT_EQ(dice.remaining(), 0u);
+    EXPECT_EQ(gs.getPlayer(13).state, PlayerState::STANDING);
+}
+
+TEST(BombHandler, P264CaughtBombIsThrownOnByTheCatcher) {
+    GameState gs = bombP264();
+    // hod 6 přesně; 12 chytá (přesná +1 ⇒ 3+) hodí 6 ⇒ hází na 1 (5,7): krátká, cíl 4, hod 6; 1 nechytí (1) ⇒ výbuch
+    FixedDiceRoller dice({6, 6, 6, 1, 3, 3});
+    auto r = resolveBombThrow(gs, 1, {10, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(r.turnover);
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+TEST(BombHandler, P264HailMaryBombCannotBeIntercepted) {
+    GameState gs = bombHmp();
+    placePlayer(gs, 13, {19, 7}, TeamSide::AWAY);     // v dráze, vedle cíle (20,7) — u běžné bomby by zachytával
+    // tytéž kostky jako P263HailMaryBombScattersThreeTimesFromTheTarget: hod 2, 3× V ⇒ (23,7), 12 nechytí (1), zbroj
+    FixedDiceRoller dice({2, 3, 3, 3, 1, 3, 3});
+    resolveBombThrow(gs, 1, {20, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE);
+    EXPECT_EQ(gs.getPlayer(13).state, PlayerState::STANDING);
 }

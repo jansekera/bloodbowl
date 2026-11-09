@@ -1636,22 +1636,6 @@ int safetyDepthX(const GameState& state, TeamSide mySide) {
 // Cena pole = očekávaní sražení soupeři − 2× očekávaní sražení naši (turnover); stojící soupeř 1, ležící jen zranění
 // (0,3). Nabízí se nejlepší pole na soupeři s cenou ≥ 1 a bez našeho hráče v dosahu výbuchu; Hail Mary (mimo pravítko,
 // P263) jen když kolem cíle do 4 polí (3 rozptyly + výbuch) žádný náš není. Kolik to opravdu stojí, rozhodne hledání.
-static double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
-    double v = 0.0;
-    hitsUs = false;
-    for (int dx = -1; dx <= 1; ++dx)
-        for (int dy = -1; dy <= 1; ++dy) {
-            const Position q{static_cast<int8_t>(c.x + dx), static_cast<int8_t>(c.y + dy)};
-            if (!q.isOnPitch()) continue;
-            const Player* p = state.getPlayerAtPosition(q);
-            if (!p) continue;
-            const double hit = (dx == 0 && dy == 0) ? 1.0 : 0.5;
-            if (p->teamSide == mySide) { hitsUs = true; v -= 2.0 * hit; continue; }
-            v += hit * (p->state == PlayerState::STANDING ? 1.0 : 0.3);
-        }
-    return v;
-}
-
 static bool ownPlayerWithin(const GameState& state, Position c, TeamSide mySide, int radius) {
     bool near = false;
     state.forEachOnPitch(mySide, [&](const Player& p) { if (p.position.distanceTo(c) <= radius) near = true; });

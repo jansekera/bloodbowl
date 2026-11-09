@@ -148,6 +148,14 @@ constexpr int kHailMaryClearRadius = 3;
 // P268: hod spoluhráčem jen rychlá/krátká (ř. 8597-8600 „Max. TTM“; vánice dovolí obě). Jedno místo pro nabídku
 // (rules_engine, makro) i resolver (ttm_handler); `band` se vyplní, když je cíl na pravítku.
 bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band = nullptr);
+
+// P268/P264: cena výbuchu bomby na poli `c` z pohledu strany `side` — cílové pole srazí vždy, sousední na 4+
+// (ř. 7968-7972): stojící soupeř +1 (ležící 0,3, jen zranění), náš −2 (turnover) × šance zásahu. `hitsUs` = v dosahu
+// výbuchu stojí/leží náš. Sdílí makro bomby (AI) a volba cíle při povinném hodu chycené bomby.
+double bombSquareValue(const GameState& state, Position c, TeamSide side, bool& hitsUs);
+// P264: hráč, který bombu chytil nebo zachytil, ji musí hned hodit dál (ř. 7961-7963). Cíl = legální pole s nejvyšší
+// cenou (bombSquareValue); když nic nevyjde kladně, pole bez našeho v dosahu výbuchu nejdál od našich. {-1,-1} = nikam.
+Position chooseBombRethrowTarget(const GameState& state, const Player& thrower);
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide);
 // Nabídka HMP přihrávky pro AI (rules_engine i makro): spoluhráč vpřed (HOME útočí na x = 25) a cíl volný.
 bool hailMaryPassWorthOffering(const GameState& state, const Player& thrower, const Player& target);

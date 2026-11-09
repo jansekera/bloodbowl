@@ -288,51 +288,6 @@ final class PassResolver
     }
 
     /**
-     * Get squares along the pass path (simplified Bresenham).
-     * @return list<Position>
-     */
-    public function getPassPath(Position $from, Position $to): array
-    {
-        $path = [];
-        $x0 = $from->getX();
-        $y0 = $from->getY();
-        $x1 = $to->getX();
-        $y1 = $to->getY();
-
-        $dx = abs($x1 - $x0);
-        $dy = abs($y1 - $y0);
-        $sx = $x0 < $x1 ? 1 : -1;
-        $sy = $y0 < $y1 ? 1 : -1;
-        $err = $dx - $dy;
-
-        $cx = $x0;
-        $cy = $y0;
-
-        while (true) {
-            // Skip start and end positions
-            if (!($cx === $x0 && $cy === $y0) && !($cx === $x1 && $cy === $y1)) {
-                $path[] = new Position($cx, $cy);
-            }
-
-            if ($cx === $x1 && $cy === $y1) {
-                break;
-            }
-
-            $e2 = 2 * $err;
-            if ($e2 > -$dy) {
-                $err -= $dy;
-                $cx += $sx;
-            }
-            if ($e2 < $dx) {
-                $err += $dx;
-                $cy += $sy;
-            }
-        }
-
-        return $path;
-    }
-
-    /**
      * Cil hodu na intercepci: 7 - AG + 2 (pokus) + zony + DP + dest - skilly, 2-6.
      *
      * ⛔⛔ OPRAVENO 15.09.2026 -- do dneska tu bylo jen `7 - AG + 2` a Very Long Legs.
@@ -373,6 +328,85 @@ final class PassResolver
     }
 
     /**
+     * P271 (9.11.2026, nalezeno při P264; parita s C++ pass_handler.cpp pickInterceptor, tam opraveno 10.08.).
+     * Kdo smí zachytit (r. 1761-1771): stojí, má zónu, má ruce, přes jeho pole přejde pravítko (má šířku — střed pole
+     * nejvýš jedno pole od čáry házeč→cíl) a je blíž k házeči i k cíli, než je házeč od cíle. Zkusí jen jeden — ten
+     * s nejvyšší šancí (uživatel 15.09.), při shodě ten s Catch. OPRAVENO: dřív jen pole Bresenhamovy čáry a bez
+     * podmínky vzdáleností.
+     */
+    public function najdiZachycujiciho(GameState $state, MatchPlayerDTO $thrower, Position $from, Position $to): ?MatchPlayerDTO
+    {
+        $delka = $from->distanceTo($to);
+        $nej = null;
+        $nejCil = PHP_INT_MAX;
+        foreach ($state->getPlayersOnPitch($thrower->getTeamSide()->opponent()) as $p) {
+            $pos = $p->getPosition();
+            if ($pos === null || $p->getState() !== PlayerState::STANDING || $p->hasLostTacklezones()
+                || $p->hasSkill(SkillName::NoHands) || $pos->equals($from) || $pos->equals($to)
+                || $pos->distanceTo($from) >= $delka || $pos->distanceTo($to) >= $delka
+                || self::vzdalenostOdCary4($pos, $from, $to) > 4) {
+                continue;
+            }
+            $cil = $this->getInterceptionTarget($state, $p);
+            if ($cil < $nejCil || ($cil === $nejCil && $nej !== null
+                && $p->hasSkill(SkillName::Catch) && !$nej->hasSkill(SkillName::Catch))) {
+                $nej = $p;
+                $nejCil = $cil;
+            }
+        }
+        return $nej;
+    }
+
+    /**
+     * Hod na zachycení: Catch přehodí neúspěch (r. 7935-7938 „fails to make an interception“, P271 — dřív ne),
+     * Safe Throw házeče může úspěch zrušit (r. 8434-8440; ne proti Very Long Legs, r. 8657-8659). Stav nemění.
+     *
+     * @param list<GameEvent> $events
+     */
+    public function hodZachyceni(GameState $state, MatchPlayerDTO $thrower, MatchPlayerDTO $player, array &$events): bool
+    {
+        $target = $this->getInterceptionTarget($state, $player);
+        $roll = $this->dice->rollD6();
+        $success = $roll >= $target;
+        if (!$success && $player->hasSkill(SkillName::Catch)) {
+            $events[] = GameEvent::rerollUsed($player->getId(), 'Catch');
+            $roll = $this->dice->rollD6();
+            $success = $roll >= $target;
+        }
+        $events[] = GameEvent::interception($player->getId(), $target, $roll, $success);
+        if ($success && $thrower->hasSkill(SkillName::SafeThrow) && !$player->hasSkill(SkillName::VeryLongLegs)) {
+            $cilSafeThrow = max(2, min(6, 7 - $thrower->getStats()->getAgility()));
+            $hod = $this->dice->rollD6();
+            $saved = $hod >= $cilSafeThrow;
+            $events[] = GameEvent::safeThrow($thrower->getId(), $hod, $saved);
+            if ($saved) {
+                $success = false;
+            }
+        }
+        return $success;
+    }
+
+    /** Čtverec vzdálenosti středu pole od úsečky a→b, ×4 (celá čísla); jako C++ distSqToSegment4. */
+    private static function vzdalenostOdCary4(Position $p, Position $a, Position $b): int
+    {
+        $apx = 2 * ($p->getX() - $a->getX());
+        $apy = 2 * ($p->getY() - $a->getY());
+        $abx = 2 * ($b->getX() - $a->getX());
+        $aby = 2 * ($b->getY() - $a->getY());
+        $denom = $abx * $abx + $aby * $aby;
+        $t = $apx * $abx + $apy * $aby;
+        if ($denom === 0 || $t <= 0) {
+            return $apx * $apx + $apy * $apy;
+        }
+        if ($t >= $denom) {
+            $bpx = $apx - $abx;
+            $bpy = $apy - $aby;
+            return $bpx * $bpx + $bpy * $bpy;
+        }
+        return intdiv(($apx * $apx + $apy * $apy) * $denom - $t * $t, $denom);
+    }
+
+    /**
      * Check for interceptions along the pass path.
      * First eligible enemy standing in the path can attempt intercept (AG-2 roll).
      *
@@ -380,62 +414,13 @@ final class PassResolver
      */
     private function checkInterceptions(GameState $state, Position $from, Position $to, MatchPlayerDTO $thrower): array
     {
-        $passPath = $this->getPassPath($from, $to);
-        $enemySide = $thrower->getTeamSide()->opponent();
-
-        // ⭐ ZMENENO 15.09.2026: "only one player can attempt an interception,
-        //   no matter how many are eligible" a vybira ho SOUPERUV KOUC
-        //   (r. 1771-1773). Engine bral PRVNIHO NA DRAZE. Uzivatel: zachycuje
-        //   ten s NEJVYSSI SANCI (nejnizsi cil); pri shode prvni na draze.
-        $player = null;
-        $target = PHP_INT_MAX;
-        foreach ($passPath as $pathPos) {
-            $kandidat = $state->getPlayerAtPosition($pathPos);
-            if ($kandidat === null || $kandidat->getTeamSide() !== $enemySide || $kandidat->getState() !== PlayerState::STANDING) {
-                continue;
-            }
-            // ⛔ OPRAVENO 15.09.2026: zachycovat smi jen hrac, ktery MA ZONU
-            //   ZACHYCENI (r. 1764 "have a tackle zone"). Stat nestaci --
-            //   napr. po Hypnotic Gaze hrac stoji, ale zonu nema.
-            if ($kandidat->hasLostTacklezones()) {
-                continue;
-            }
-            // No Hands "is unable to ... intercept" (`rules_bb2016.txt` r. 8318-8320).
-            if ($kandidat->hasSkill(SkillName::NoHands)) {
-                continue;
-            }
-            $cilKandidata = $this->getInterceptionTarget($state, $kandidat);
-            if ($cilKandidata < $target) {
-                $player = $kandidat;
-                $target = $cilKandidata;
-            }
-        }
-
+        // OPRAVENO 9.11.2026 (P271) — výběr a hod jsou v najdiZachycujiciho / hodZachyceni (sdílí je bomba, P264).
+        $player = $this->najdiZachycujiciho($state, $thrower, $from, $to);
         if ($player !== null) {
             $pathPos = $player->getPosition();
             assert($pathPos !== null);
-            $roll = $this->dice->rollD6();
-            $success = $roll >= $target;
-
-            $events = [GameEvent::interception($player->getId(), $target, $roll, $success)];
-
-            // ⛔⛔ OPRAVENO 15.09.2026 -- Safe Throw NENI prehozeni hodu zachycujiciho.
-            //   r. 8434-8440: "the Safe Throw player may make an UNMODIFIED
-            //   AGILITY ROLL. If this is successful then the interception is
-            //   cancelled out and the passing sequence continues as normal."
-            //   ⇒ Hazi HAZEC na svou AG, bez modifikatoru.
-            //   r. 8657-8659: proti zachycujicimu s Very Long Legs se Safe Throw
-            //   pouzit NESMI.
-            if ($success && $thrower->hasSkill(SkillName::SafeThrow)
-                && !$player->hasSkill(SkillName::VeryLongLegs)) {
-                $cilSafeThrow = max(2, min(6, 7 - $thrower->getStats()->getAgility()));
-                $hod = $this->dice->rollD6();
-                $saved = $hod >= $cilSafeThrow;
-                $events[] = GameEvent::safeThrow($thrower->getId(), $hod, $saved);
-                if ($saved) {
-                    $success = false; // interception cancelled
-                }
-            }
+            $events = [];
+            $success = $this->hodZachyceni($state, $thrower, $player, $events);
 
             if ($success) {
                 // Intercepted! Ball caught by enemy

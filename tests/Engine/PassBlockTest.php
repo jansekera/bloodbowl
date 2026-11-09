@@ -151,7 +151,9 @@ final class PassBlockTest extends TestCase
 
         // PB: player 10 is closer to target (dist 3 vs 4) — only 10 moves
         // Accuracy: 7-3-0(short)=4+, roll 5; Catch with TZ: 7-3+1-1=4+, roll 5
-        $dice = new FixedDiceRoller([5, 5]);
+        // P271 (9.11.2026): hráč 10 po Pass Blocku stojí v pásu pravítka ⇒ zkusí zachytit (r. 1764-1769, parita
+        //   s C++); 1 = nezachytí. Dřív PHP bralo jen pole Bresenhamovy čáry.
+        $dice = new FixedDiceRoller([1, 5, 5]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::PASS, [

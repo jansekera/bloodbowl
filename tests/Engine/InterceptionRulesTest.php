@@ -174,4 +174,57 @@ final class InterceptionRulesTest extends TestCase
         $this->assertContains('interception', $typy);
         $this->assertSame(10, $result->getNewState()->getBall()->getCarrierId());
     }
+
+    // ───── P271 (9.11.2026, nalezeno při P264): parita s C++ pass_handler.cpp (opraveno tam 10.08.) ─────
+    // r. 1764-1769: zachycovat smí hráč, přes jehož pole přejde (široké) pravítko, a který je blíž k házeči i k cíli,
+    //   než je házeč od cíle. PHP bralo jen pole Bresenhamovy čáry. Catch přehodí nepovedené zachycení (r. 7935-7938
+    //   „fails to make an interception“) — PHP nepřehazovalo.
+
+    /**
+     * @param list<SkillName> $skilly
+     * @param list<int> $kostky
+     * @return array{0: \App\DTO\GameState, 1: ActionResolver}
+     */
+    private function prihravka(int $zx, int $zy, array $skilly, array $kostky): array
+    {
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::HOME, 11, 5, id: 2)
+            ->addPlayer(TeamSide::AWAY, $zx, $zy, agility: 3, skills: $skilly, id: 10)
+            ->withBallCarried(1)
+            ->build();
+        return [$s, new ActionResolver(new FixedDiceRoller($kostky))];
+    }
+
+    /** @return list<string> */
+    private function typy(\App\DTO\ActionResult $r): array
+    {
+        return array_map(fn($e) => $e->getType(), $r->getEvents());
+    }
+
+    public function testP271ZachycujeIHracVedleCary(): void
+    {
+        // (8,6) je jedno pole vedle čáry (5,5)→(11,5): pravítko přes něj přejde; Bresenham ne. Zachycení 7-3+2 = 6.
+        [$s, $r] = $this->prihravka(8, 6, [], [6, 6, 6, 6]);
+        $v = $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 11, 'targetY' => 5]);
+        $this->assertContains('interception', $this->typy($v));
+        $this->assertTrue($v->isTurnover());
+        $this->assertSame(10, $v->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testP271ZaCilemNezachycuje(): void
+    {
+        // (12,6): od házeče 7 ≥ délka hodu 6 ⇒ nesmí (r. 1766-1767)
+        [$s, $r] = $this->prihravka(12, 6, [], [6, 6, 6, 6]);
+        $v = $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 11, 'targetY' => 5]);
+        $this->assertNotContains('interception', $this->typy($v));
+    }
+
+    public function testP271CatchPrehodiNepovedeneZachyceni(): void
+    {
+        [$s, $r] = $this->prihravka(8, 5, [SkillName::Catch], [1, 6, 6, 6, 6]);
+        $v = $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 11, 'targetY' => 5]);
+        $this->assertTrue($v->isTurnover());
+        $this->assertSame(10, $v->getNewState()->getBall()->getCarrierId());
+    }
 }

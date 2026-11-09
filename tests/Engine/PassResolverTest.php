@@ -203,30 +203,6 @@ final class PassResolverTest extends TestCase
         $this->assertEquals(2, $result->getNewState()->getBall()->getCarrierId());
     }
 
-    public function testPassPathBresenham(): void
-    {
-        $resolver = new \App\Engine\PassResolver(
-            new FixedDiceRoller([]),
-            new \App\Engine\TacklezoneCalculator(),
-            new \App\Engine\ScatterCalculator(),
-            new \App\Engine\BallResolver(
-                new FixedDiceRoller([]),
-                new \App\Engine\TacklezoneCalculator(),
-                new \App\Engine\ScatterCalculator(),
-            ),
-        );
-
-        $path = $resolver->getPassPath(
-            new \App\ValueObject\Position(5, 5),
-            new \App\ValueObject\Position(10, 5),
-        );
-
-        // Should return squares between (5,5) and (10,5), excluding endpoints
-        $this->assertCount(4, $path); // (6,5), (7,5), (8,5), (9,5)
-        $this->assertEquals(6, $path[0]->getX());
-        $this->assertEquals(9, $path[3]->getX());
-    }
-
     public function testAccuracyTargetCalculation(): void
     {
         $state = (new GameStateBuilder())

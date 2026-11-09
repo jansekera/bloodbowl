@@ -341,6 +341,40 @@ bool ttmTargetLegal(const Player& thrower, Position target, PassRange* band) {
     return r == PassRange::QUICK_PASS || r == PassRange::SHORT_PASS;
 }
 
+double bombSquareValue(const GameState& state, Position c, TeamSide mySide, bool& hitsUs) {
+    double v = 0.0;
+    hitsUs = false;
+    for (int dx = -1; dx <= 1; ++dx)
+        for (int dy = -1; dy <= 1; ++dy) {
+            const Position q{static_cast<int8_t>(c.x + dx), static_cast<int8_t>(c.y + dy)};
+            if (!q.isOnPitch()) continue;
+            const Player* p = state.getPlayerAtPosition(q);
+            if (!p) continue;
+            const double hit = (dx == 0 && dy == 0) ? 1.0 : 0.5;
+            if (p->teamSide == mySide) { hitsUs = true; v -= 2.0 * hit; continue; }
+            v += hit * (p->state == PlayerState::STANDING ? 1.0 : 0.3);
+        }
+    return v;
+}
+
+Position chooseBombRethrowTarget(const GameState& state, const Player& thrower) {
+    double best = -1e9;
+    int bestFar = -1;
+    Position bestPos{-1, -1};
+    for (int x = 0; x < 26; ++x)
+        for (int y = 0; y < 15; ++y) {
+            const Position c{static_cast<int8_t>(x), static_cast<int8_t>(y)};
+            if (c == thrower.position || !passTargetLegal(state, thrower, c).legal) continue;
+            bool hitsUs = false;
+            const double v = bombSquareValue(state, c, thrower.teamSide, hitsUs);
+            if (hitsUs && v <= 0.0) continue;
+            int far = 99;   // nejbližší náš od cíle — při shodě ceny čím dál, tím líp
+            state.forEachOnPitch(thrower.teamSide, [&](const Player& p) { far = std::min(far, p.position.distanceTo(c)); });
+            if (v > best || (v == best && far > bestFar)) { best = v; bestFar = far; bestPos = c; }
+        }
+    return bestPos;
+}
+
 bool hailMaryLandingClear(const GameState& state, Position target, TeamSide throwerSide) {
     bool clear = true;
     state.forEachOnPitch(opponent(throwerSide), [&](const Player& p) {

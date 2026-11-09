@@ -42,10 +42,33 @@ static int distSqToSegment4(Position p, Position a, Position b) {
 // free choice with no downside is always used (user's rule, 2026-08-10).
 int checkInterception(GameState& state, int passerId, Position target,
                       DiceRollerBase& dice, std::vector<GameEvent>* events) {
-    Player& passer = state.getPlayer(passerId);
-    TeamSide enemySide = opponent(passer.teamSide);
+    // P264 (9.11.2026): výběr a hod rozděleny (pickInterceptor / rollInterception), ať je sdílí bomba.
+    const Player& passer = state.getPlayer(passerId);
+    const int interceptorId = pickInterceptor(state, passer, target);
+    if (interceptorId < 0 || !rollInterception(state, passer, interceptorId, dice, events)) return -1;
+    const Player& interceptor = state.getPlayer(interceptorId);
+    state.ball = BallState::carried(interceptor.position, interceptor.id);
+    emitEvent(events, {GameEvent::Type::CATCH, interceptor.id, passerId, interceptor.position, {},
+                      interceptionTarget(state, interceptor), true});
+    return interceptor.id;
+}
 
-    // Pick the single best eligible interceptor inside the ruler corridor.
+} // anonymous namespace
+
+// Cíl hodu na zachycení (ř. 1736-1737, 1800-1802): 7 − AG + 2, Very Long Legs a Extra Arms −1, zóny (ne s Nerves of
+// Steel), Disturbing Presence, liják; ořez 2..6. Jedno místo pro výběr i hod (L2: „musí být na OBOU místech“).
+int interceptionTarget(const GameState& state, const Player& p) {
+    int t = 7 - p.stats.agility + 2;
+    if (p.hasSkill(SkillName::VeryLongLegs)) t -= 1;
+    if (p.hasSkill(SkillName::ExtraArms)) t -= 1;
+    if (!p.hasSkill(SkillName::NervesOfSteel)) t += countTacklezones(state, p.position, p.teamSide);
+    t += countDisturbingPresence(state, p.position, p.teamSide);
+    if (state.weather == Weather::POURING_RAIN) t += 1;
+    return std::clamp(t, 2, 6);
+}
+
+int pickInterceptor(const GameState& state, const Player& passer, Position target) {
+    TeamSide enemySide = opponent(passer.teamSide);
     const Player* interceptor = nullptr;
     int bestTarget = 99;
     int throwLen = passer.position.distanceTo(target);
@@ -58,20 +81,7 @@ int checkInterception(GameState& state, int passerId, Position target,
         if (p.position.distanceTo(target) >= throwLen) return;
         // Ruler overlaps the square: centre within ~1 square of the line.
         if (distSqToSegment4(p.position, passer.position, target) > 4) return;
-
-        int t = 7 - p.stats.agility + 2;
-        if (p.hasSkill(SkillName::VeryLongLegs)) t -= 1;
-        if (p.hasSkill(SkillName::ExtraArms)) t -= 1;
-        if (!p.hasSkill(SkillName::NervesOfSteel)) {
-            t += countTacklezones(state, p.position, p.teamSide);
-        }
-        // L2 (09.09.2026): totéž Disturbing Presence jako v samotném hodu níž.
-        // ⛔ Musí být na OBOU místech: tenhle `t` vybírá "nejpravděpodobnějšího"
-        //   interceptora, a kdyby ho počítal jinou sazbou než hod, vybral by
-        //   podle ceny, která se pak nezahraje.
-        t += countDisturbingPresence(state, p.position, p.teamSide);
-        if (state.weather == Weather::POURING_RAIN) t += 1;
-        t = std::clamp(t, 2, 6);
+        const int t = interceptionTarget(state, p);
         if (t < bestTarget || (t == bestTarget && interceptor &&
                                p.hasSkill(SkillName::Catch) &&
                                !interceptor->hasSkill(SkillName::Catch))) {
@@ -79,87 +89,52 @@ int checkInterception(GameState& state, int passerId, Position target,
             interceptor = &p;
         }
     });
-
-    if (interceptor) {
-        // Interception target: 7 - AG + 2 (base modifier)
-        int intTarget = 7 - interceptor->stats.agility + 2;
-        if (interceptor->hasSkill(SkillName::VeryLongLegs)) intTarget -= 1;
-        if (interceptor->hasSkill(SkillName::ExtraArms)) intTarget -= 1;
-
-        if (!interceptor->hasSkill(SkillName::NervesOfSteel)) {
-            intTarget += countTacklezones(state, interceptor->position, interceptor->teamSide);
-        }
-
-        // L2 (09.09.2026): Disturbing Presence platí i na INTERCEPCI.
-        // r. 8054-8057: "any player must subtract 1 from the D6 when they
-        // pass, INTERCEPT or catch for each opposing player with Disturbing
-        // Presence that is within three squares of them, even if the
-        // Disturbing Presence player is Prone or Stunned."
-        // Engine to měl na přihrávce (`pass_handler.cpp`, passMods) i na
-        // chytání (`calculateCatchTarget`, helpers.cpp:180), na intercepci ne
-        // -- ze tří sloves v jedné větě chyběl jeden.
-        // ⭐ VNĚ `NervesOfSteel`, stejně jako u chytání: NoS (r. 8316-8317,
-        //   "ignores modifiers for enemy TACKLE ZONES when he attempts to
-        //   pass, catch or intercept") ruší jen tacklezóny, a Disturbing
-        //   Presence tacklezóna není -- působí na tři pole a i z lehu.
-        intTarget += countDisturbingPresence(state, interceptor->position,
-                                             interceptor->teamSide);
-
-        // Pouring Rain applies to interceptions too (rules parity,
-        // 2026-08-10). CRP: "A -1 modifier applies to all catch, intercept,
-        // or pick-up rolls." We had it on catch and pick-up but not here.
-        if (state.weather == Weather::POURING_RAIN) intTarget += 1;
-
-        intTarget = std::clamp(intTarget, 2, 6);
-
-        // Interception attempt
-        int roll = dice.rollD6();
-        bool success = (roll >= intTarget);
-
-        // Catch re-rolls a FAILED interception (rules parity, 2026-08-10).
-        // CRP Catch: "allowed to re-roll the D6 if he fails a catch roll.
-        // It also allows the player to re-roll the D6 if he drops a hand-off
-        // or fails to make an interception." A skill re-roll is free and
-        // never competes with the scarce team re-roll, so it is always taken
-        // (user's rule, 2026-08-10: optional skills default ON when they
-        // cost nothing).
-        if (!success && interceptor->hasSkill(SkillName::Catch)) {
-            emitEvent(events, {GameEvent::Type::SKILL_USED, interceptor->id, -1, {}, {},
-                              static_cast<int>(SkillName::Catch), true});
-            roll = dice.rollD6();
-            success = (roll >= intTarget);
-        }
-
-        // SafeThrow: if intercepted, passer can force a reroll -- but Very
-        // Long Legs blocks it (rules parity, 2026-08-10). CRP Very Long
-        // Legs: "the Safe Throw skill may not be used to affect any
-        // Interception rolls made by this player."
-        // P78 (30.09.2026), port PHP faef31f3: Safe Throw je NEMODIFIKOVANY hod
-        // na Obratnost HAZECE ("may make an unmodified Agility roll"), ne
-        // prehoz kostky zachycujiciho proti jeho cili.
-        if (success && passer.hasSkill(SkillName::SafeThrow) &&
-            !interceptor->hasSkill(SkillName::VeryLongLegs)) {
-            const int safeTarget = std::clamp(7 - passer.stats.agility, 2, 6);
-            const int safeRoll = dice.rollD6();
-            if (safeRoll != 1 && (safeRoll == 6 || safeRoll >= safeTarget)) {
-                success = false;
-                emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
-                                  static_cast<int>(SkillName::SafeThrow), true});
-            }
-        }
-
-        if (success) {
-            // Interceptor catches the ball
-            state.ball = BallState::carried(interceptor->position, interceptor->id);
-            emitEvent(events, {GameEvent::Type::CATCH, interceptor->id, passerId,
-                              interceptor->position, {}, intTarget, true});
-            return interceptor->id;
-        }
-    }
-    return -1;
+    return interceptor ? interceptor->id : -1;
 }
 
-} // anonymous namespace
+bool rollInterception(GameState& state, const Player& passer, int interceptorId, DiceRollerBase& dice,
+                      std::vector<GameEvent>* events) {
+    const Player* interceptor = &state.getPlayer(interceptorId);
+    const int passerId = passer.id;
+    const int intTarget = interceptionTarget(state, *interceptor);
+    // Interception attempt
+    int roll = dice.rollD6();
+    bool success = (roll >= intTarget);
+
+    // Catch re-rolls a FAILED interception (rules parity, 2026-08-10).
+    // CRP Catch: "allowed to re-roll the D6 if he fails a catch roll.
+    // It also allows the player to re-roll the D6 if he drops a hand-off
+    // or fails to make an interception." A skill re-roll is free and
+    // never competes with the scarce team re-roll, so it is always taken
+    // (user's rule, 2026-08-10: optional skills default ON when they
+    // cost nothing).
+    if (!success && interceptor->hasSkill(SkillName::Catch)) {
+        emitEvent(events, {GameEvent::Type::SKILL_USED, interceptor->id, -1, {}, {},
+                          static_cast<int>(SkillName::Catch), true});
+        roll = dice.rollD6();
+        success = (roll >= intTarget);
+    }
+
+    // SafeThrow: if intercepted, passer can force a reroll -- but Very
+    // Long Legs blocks it (rules parity, 2026-08-10). CRP Very Long
+    // Legs: "the Safe Throw skill may not be used to affect any
+    // Interception rolls made by this player."
+    // P78 (30.09.2026), port PHP faef31f3: Safe Throw je NEMODIFIKOVANY hod
+    // na Obratnost HAZECE ("may make an unmodified Agility roll"), ne
+    // prehoz kostky zachycujiciho proti jeho cili.
+    if (success && passer.hasSkill(SkillName::SafeThrow) &&
+        !interceptor->hasSkill(SkillName::VeryLongLegs)) {
+        const int safeTarget = std::clamp(7 - passer.stats.agility, 2, 6);
+        const int safeRoll = dice.rollD6();
+        if (safeRoll != 1 && (safeRoll == 6 || safeRoll >= safeTarget)) {
+            success = false;
+            emitEvent(events, {GameEvent::Type::SKILL_USED, passerId, -1, {}, {},
+                              static_cast<int>(SkillName::SafeThrow), true});
+        }
+    }
+    return success;
+}
+
 
 // BB2016 l. 735-737: "Roll for scatter THREE TIMES, ONE AFTER THE OTHER, to see
 // where the ball ends up. Note that each of the Scatter rolls is made
