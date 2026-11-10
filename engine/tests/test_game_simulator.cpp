@@ -4,6 +4,7 @@
 #include "bb/roster.h"
 #include "bb/policies.h"
 #include "bb/dice.h"
+#include "bb/coach_choice.h"
 #include <set>
 
 using namespace bb;
@@ -1468,4 +1469,42 @@ TEST(GameSimulator, P287SecretWeaponArguesThenBribesAtTheEndOfTheDrive) {
     setupDrive(state, *g, *g, TeamSide::AWAY, &dice);
     EXPECT_NE(state.getPlayer(sw).state, PlayerState::EJECTED);
     EXPECT_EQ(state.homeTeam.bribes, 0);
+}
+
+// P291: tajná zbraň kouče na konci drive — rozhodčí se zeptá (vzor P291 v test_foul_handler.cpp).
+TEST(GameSimulator, P291TajnaZbranKoucePtaSeRozhodci) {
+    GameState state;
+    setupHalf(state, getGoblinRoster(), getSkavenRoster());
+    state.getTeamState(TeamSide::HOME).bribes = 1;
+    int sw = -1;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (sw < 0 && p.hasSkill(SkillName::SecretWeapon) && p.isOnPitch()) sw = p.id;
+    });
+    ASSERT_GT(sw, 0) << "goblini mají na hřišti tajnou zbraň";
+    for (auto& p : state.players)
+        if (p.isOnPitch()) p.playedThisDrive = true;
+
+    class Fives : public DiceRollerBase {
+    public:
+        int rollD6() override { return 5; }
+        int rollD8() override { return 5; }
+        int roll2D6() override { return 10; }
+        BlockDiceFace rollBlockDie() override { return BlockDiceFace::PUSHED; }
+    } fives;
+    {
+        GameState s = state;
+        CoachChoiceScope scope(TeamSide::HOME, {});
+        try {
+            setupDrive(s, getGoblinRoster(), getSkavenRoster(), TeamSide::AWAY, &fives);
+            FAIL() << "čekala se otázka";
+        } catch (const CoachChoicePending& q) {
+            EXPECT_EQ(q.question, CoachQuestion::REFEREE_CALL);
+        }
+    }
+    // odpověď „nic“ na každého ⇒ všichni vyloučení, úplatek zůstal
+    GameState s = state;
+    CoachChoiceScope scope(TeamSide::HOME, std::vector<int>(10, 0));
+    setupDrive(s, getGoblinRoster(), getSkavenRoster(), TeamSide::AWAY, &fives);
+    EXPECT_EQ(s.getPlayer(sw).state, PlayerState::EJECTED);
+    EXPECT_EQ(s.getTeamState(TeamSide::HOME).bribes, 1);
 }

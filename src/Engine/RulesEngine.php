@@ -69,6 +69,23 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
             return ['No pending bomb rethrow question'];
         }
+        // P291: rozhodčí vylučuje hráče kouče-člověka — jen odpověď; volit smí jen to, co tým má
+        $rozhodci = $state->getPendingReferee();
+        if ($rozhodci !== null) {
+            if ($action !== ActionType::RESOLVE_REFEREE) {
+                return ['Must answer the referee first'];
+            }
+            if (!is_bool($params['bribe'] ?? null) || !is_bool($params['argue'] ?? null)) {
+                return ['bribe and argue must be booleans'];
+            }
+            if ($params['bribe'] && !$rozhodci->canBribe()) {
+                return ['No bribe available'];
+            }
+            return $params['argue'] && !$rozhodci->canArgue() ? ['Head coach was sent off and cannot argue'] : [];
+        }
+        if ($action === ActionType::RESOLVE_REFEREE) {
+            return ['No pending referee question'];
+        }
         // P206 (b), review 16.10.: čekající volba o lékárníkovi má přednost před VŠÍM (i před volbou kostky
         //   bloku a výkopem) — jinak by další odložené zranění přepsalo nabídku.
         if ($state->getPendingApothecary() !== null && $action !== ActionType::RESOLVE_APOTHECARY) {
@@ -177,6 +194,10 @@ final class RulesEngine
         // P272: kam hodit chycenou bombu — jen odpověď kouče
         if ($state->getPendingBombRethrow() !== null) {
             return [['type' => ActionType::RESOLVE_BOMB_RETHROW->value]];
+        }
+        // P291: rozhodčí — jen odpověď kouče
+        if ($state->getPendingReferee() !== null) {
+            return [['type' => ActionType::RESOLVE_REFEREE->value]];
         }
 
         // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče

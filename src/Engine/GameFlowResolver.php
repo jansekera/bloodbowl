@@ -7,6 +7,7 @@ namespace App\Engine;
 use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
+use App\DTO\PendingRefereeDTO;
 use App\DTO\MatchPlayerDTO;
 use App\Enum\GamePhase;
 use App\Enum\PlayerState;
@@ -17,9 +18,34 @@ use App\ValueObject\Position;
 
 final class GameFlowResolver
 {
+    /** @var list<TeamSide> P291: strany kouče-člověka — rozhodčí se ptá na úplatek / protest */
+    private array $interactiveReferee = [];
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
     ) {}
+
+    /** @param list<TeamSide> $sides */
+    public function setInteractiveReferee(array $sides): void
+    {
+        $this->interactiveReferee = $sides;
+    }
+
+    /**
+     * P291: odpověď kouče na otázku rozhodčího u tajné zbraně na konci drive; pak otázka na dalšího z fronty.
+     *
+     * @param array{bribe: bool, argue: bool} $volba
+     * @return array{state: GameState, events: list<GameEvent>}
+     */
+    public function resolveRefereeAnswer(GameState $state, array $volba): array
+    {
+        $pending = $state->getPendingReferee() ?? throw new \InvalidArgumentException('No pending referee question');
+        $events = [];
+        $state = $this->vyloucitTajnouZbran($state->withPendingReferee(null), $pending->getPlayerId(), $volba, $events);
+        $state = $this->dalsiOtazkaRozhodciho($state, $pending->getQueue(), $events);
+
+        return ['state' => $state, 'events' => $events];
+    }
 
     /**
      * Check if a touchdown has occurred.
@@ -289,23 +315,62 @@ final class GameFlowResolver
      */
     private function ejectSecretWeapons(GameState $state, array &$events): GameState
     {
+        $fronta = [];
         foreach ($state->getPlayers() as $player) {
             $stav = $player->getState();
             $hral = $stav->isOnPitch() || $player->isPlayedThisDrive();
             $jesteVeHre = $stav->isOnPitch() || $stav === PlayerState::KO || $stav === PlayerState::OFF_PITCH;
             if ($player->hasSkill(SkillName::SecretWeapon) && $hral && $jesteVeHre) {
-                // P287: protest, pak úplatek (RefereeCall, parita s C++). Zrušený výrok i protest 6 ⇒ zůstává ve hře.
-                $vyrok = RefereeCall::sendOff($state, $player->getId(), $player->getTeamSide(), false, $this->dice, $events);
-                $state = $vyrok['state'];
-                if ($vyrok['outcome'] !== RefereeCall::SENT_OFF) {
+                // P291: hráče kouče-člověka rozhodčí vyřídí až po jeho odpovědi (před setupem dalšího drive)
+                if (in_array($player->getTeamSide(), $this->interactiveReferee, true)) {
+                    $fronta[] = $player->getId();
                     continue;
                 }
-                $events[] = GameEvent::secretWeaponEjection($player->getId());
-                $state = $state->withPlayer(
-                    $player->withState(PlayerState::EJECTED)->withPosition(null),
-                );
+                $state = $this->vyloucitTajnouZbran($state, $player->getId(), null, $events);
             }
         }
+
+        return $this->dalsiOtazkaRozhodciho($state, $fronta, $events);
+    }
+
+    /**
+     * P287: protest, pak úplatek (RefereeCall, parita s C++). Zrušený výrok i protest 6 ⇒ zůstává ve hře.
+     *
+     * @param array{bribe: bool, argue: bool}|null $volba volba kouče-člověka (P291); null = AI
+     * @param list<GameEvent> $events
+     */
+    private function vyloucitTajnouZbran(GameState $state, int $playerId, ?array $volba, array &$events): GameState
+    {
+        $hrac = $state->requirePlayer($playerId);
+        $vyrok = RefereeCall::sendOff($state, $playerId, $hrac->getTeamSide(), false, $this->dice, $events, $volba);
+        $state = $vyrok['state'];
+        if ($vyrok['outcome'] !== RefereeCall::SENT_OFF) {
+            return $state;
+        }
+        $events[] = GameEvent::secretWeaponEjection($playerId);
+
+        return $state->withPlayer($state->requirePlayer($playerId)->withState(PlayerState::EJECTED)->withPosition(null));
+    }
+
+    /**
+     * P291: první hráč z fronty, u kterého je co volit, dostane otázku; kde volit nejde, vyloučí se rovnou.
+     *
+     * @param list<int> $fronta
+     * @param list<GameEvent> $events
+     */
+    private function dalsiOtazkaRozhodciho(GameState $state, array $fronta, array &$events): GameState
+    {
+        while ($fronta !== []) {
+            $id = array_shift($fronta);
+            $strana = $state->requirePlayer($id)->getTeamSide();
+            $uplatek = RefereeCall::canBribe($state, $strana);
+            $protest = RefereeCall::canArgue($state, $strana);
+            if ($uplatek || $protest) {
+                return $state->withPendingReferee(new PendingRefereeDTO($id, false, $uplatek, $protest, queue: $fronta));
+            }
+            $state = $this->vyloucitTajnouZbran($state, $id, null, $events);
+        }
+
         return $state;
     }
 

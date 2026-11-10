@@ -110,6 +110,22 @@ export interface PendingStandFirm {
 }
 
 /**
+ * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav stav PŘED akcí a server
+ * ji po odpovědi přehraje; u tajné zbraně na konci drive (`action` null) čekají další hráči ve frontě `queue`.
+ */
+export interface PendingReferee {
+    playerId: number;
+    foul: boolean;
+    canBribe: boolean;
+    canArgue: boolean;
+    action: string | null;
+    params: Record<string, unknown>;
+    dice: number[];
+    answers: Array<{ bribe: boolean; argue: boolean }>;
+    queue: number[];
+}
+
+/**
  * 30.10.2026: kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt` ř. 8065-8071).
  * Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje (`action`, `params`, `dice`, `answers`).
  */
@@ -166,6 +182,7 @@ export interface GameState {
     pendingStandFirm?: PendingStandFirm | null;
     pendingDivingCatch?: PendingDivingCatch | null;
     pendingBombRethrow?: PendingBombRethrow | null;
+    pendingReferee?: PendingReferee | null;
 }
 
 export interface TeamState {

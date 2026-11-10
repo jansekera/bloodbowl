@@ -21,6 +21,7 @@ import { ApothecaryModal } from './ui/ApothecaryModal';
 import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
 import { DivingCatchModal } from './ui/DivingCatchModal';
+import { RefereeModal } from './ui/RefereeModal';
 
 const api = new ApiClient();
 
@@ -89,6 +90,7 @@ const apothecaryModal = new ApothecaryModal(container);
 const grabModal = new GrabModal(container);
 const standFirmModal = new StandFirmModal(container);
 const divingCatchModal = new DivingCatchModal(container);
+const refereeModal = new RefereeModal(container);
 
 // Animation queue
 const animationQueue = new AnimationQueue(
@@ -211,6 +213,11 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         enterBombRethrow(result.state);
         return;
     }
+    // P291: rozhodčí vylučuje hráče kouče — úplatek / protest (i po TD soupeře před setupem)
+    if (result.state.pendingReferee) {
+        showRefereeModal(result.state);
+        return;
+    }
 
     // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
     if (result.state.pendingBlock && !result.state.pendingGrab && !result.state.pendingStandFirm
@@ -304,6 +311,27 @@ function showDivingCatchModal(state: import('./api/types').GameState): void {
             console.error(err);
             toast.error('Diving Catch choice failed');
             showDivingCatchModal(state); // otázka na serveru stále čeká
+        } finally {
+            isProcessing = false;
+        }
+    });
+}
+
+function showRefereeModal(state: import('./api/types').GameState): void {
+    const pending = state.pendingReferee;
+    if (!pending) return;
+    const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
+    refereeModal.show(pending, name, async params => {
+        isProcessing = true;
+        try {
+            const result = await api.submitAction(matchId, 'resolve_referee', params);
+            await handleActionResult(result);
+            clearAllTargets();
+            actionPanel.setSelectedMode(null);
+        } catch (err) {
+            console.error(err);
+            toast.error('Referee choice failed');
+            showRefereeModal(state); // otázka na serveru stále čeká
         } finally {
             isProcessing = false;
         }
@@ -1179,6 +1207,8 @@ async function init(): Promise<void> {
             showDivingCatchModal(state);
         } else if (state.pendingBombRethrow) {
             enterBombRethrow(state); // P272: i po obnovení stránky
+        } else if (state.pendingReferee) {
+            showRefereeModal(state); // P291: i po obnovení stránky
         } else {
             // Show block dice modal if there's a pending block on load
             if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {

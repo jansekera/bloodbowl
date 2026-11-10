@@ -530,16 +530,26 @@ bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vect
 
 RefOutcome refereeSendOff(GameState& state, int playerId, RefCall call, DiceRollerBase& dice,
                           std::vector<GameEvent>* events) {
-    TeamState& team = state.getTeamState(state.getPlayer(playerId).teamSide);
+    const TeamSide side = state.getPlayer(playerId).teamSide;
+    TeamState& team = state.getTeamState(side);
+    // P291: kouče se rozhodčí zeptá, když je co volit; AI (a kouč bez volby) použije, co jde
+    const bool canBribe = team.bribes > 0;
+    const bool canArgue = !team.headCoachEjected;
+    int choice = 3;
+    if (coachDecides(side) && (canBribe || canArgue)) {
+        const int opts = 1 | (canBribe ? 1 << 1 : 0) | (canArgue ? 1 << 2 : 0) | (canBribe && canArgue ? 1 << 3 : 0);
+        choice = askCoach(CoachQuestion::REFEREE_CALL, playerId, call == RefCall::FOUL ? 1 : 0, team.bribes,
+                          canArgue ? 1 : 0, opts);
+    }
     auto bribe = [&]() {
-        if (team.bribes <= 0) return false;
+        if (team.bribes <= 0 || !(choice & 1)) return false;
         --team.bribes;
         const int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::BRIBE, playerId, -1, {}, {}, roll, roll >= 2});
         return roll >= 2;
     };
     auto argue = [&]() {
-        if (team.headCoachEjected) return false;
+        if (team.headCoachEjected || !(choice & 2)) return false;
         const int roll = dice.rollD6();
         emitEvent(events, {GameEvent::Type::ARGUE_CALL, playerId, -1, {}, {}, roll, roll == 6});
         if (roll == 1) team.headCoachEjected = true;

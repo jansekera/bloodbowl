@@ -71,6 +71,8 @@ final class GameOrchestrator
         $resolver->setInteractiveDivingCatch($lide);
         // P272: kam hodit chycenou bombu se ptá kouč-člověk chytajícího hráče — i v tahu soupeře
         $resolver->setInteractiveBombRethrow($lide);
+        // P291: úplatek / protest, když rozhodčí vylučuje hráče kouče-člověka (faul, tajná zbraň na konci drive)
+        $resolver->setInteractiveReferee($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();

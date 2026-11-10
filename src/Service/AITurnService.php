@@ -41,6 +41,7 @@ final class AITurnService
         $resolver->setInteractiveStandFirm($this->interactiveApothecary);
         $resolver->setInteractiveDivingCatch($this->interactiveApothecary);
         $resolver->setInteractiveBombRethrow($this->interactiveApothecary);
+        $resolver->setInteractiveReferee($this->interactiveApothecary);
         $gameFlow = $resolver->getGameFlowResolver();
         $allEvents = [];
         $aiTeam = $state->getAiTeam();

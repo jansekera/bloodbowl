@@ -38,11 +38,12 @@ enum ActionType: string
     case RESOLVE_STAND_FIRM = 'resolve_stand_firm';   // P226: odpověď kouče, zda jeho hráč použije Stand Firm
     case RESOLVE_DIVING_CATCH = 'resolve_diving_catch'; // 30.10.2026: odpověď kouče, zda jeho hráč použije Diving Catch
     case RESOLVE_BOMB_RETHROW = 'resolve_bomb_rethrow'; // P272: odpověď kouče, kam jeho hráč hodí chycenou bombu
+    case RESOLVE_REFEREE = 'resolve_referee'; // P291: úplatek / protest, když rozhodčí vylučuje hráče kouče-člověka
 
     public function requiresPlayer(): bool
     {
         return match ($this) {
-            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY, self::RESOLVE_GRAB, self::RESOLVE_STAND_FIRM, self::RESOLVE_DIVING_CATCH, self::RESOLVE_BOMB_RETHROW => false,
+            self::END_TURN, self::END_SETUP, self::CHOOSE_BLOCK_DIE, self::REROLL_BLOCK, self::AUTO_SETUP, self::RESOLVE_REROLL, self::RESOLVE_APOTHECARY, self::RESOLVE_GRAB, self::RESOLVE_STAND_FIRM, self::RESOLVE_DIVING_CATCH, self::RESOLVE_BOMB_RETHROW, self::RESOLVE_REFEREE => false,
             default => true,
         };
     }

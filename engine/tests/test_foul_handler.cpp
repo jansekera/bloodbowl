@@ -2,6 +2,7 @@
 #include <algorithm>
 #include "bb/foul_handler.h"
 #include "bb/helpers.h"
+#include "bb/coach_choice.h"
 
 using namespace bb;
 
@@ -376,4 +377,73 @@ TEST(FoulHandler, P287ArgueTheCallOneEjectsTheHeadCoach) {
     resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
     EXPECT_TRUE(gs.homeTeam.headCoachEjected);
+}
+
+// P291 (uživatel 10.11.2026: „udělej ať se zeptá — člověk může některého hráče preferovat, ať zůstane“). Úplatek
+// (ř. 2871-2879 „may use“) a Argue the call (ř. 1091-1102 „may argue“) volí kouč. Odpověď: bit 1 = úplatek,
+// bit 2 = protest (0 nic, 1 úplatek, 2 protest, 3 obojí). Ptá se jen, když je co volit.
+static GameState refereeFoulState(int bribes) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.getTeamState(TeamSide::HOME).bribes = bribes;
+    return gs;
+}
+
+TEST(FoulHandler, P291RozhodciSeZeptaKouce) {
+    GameState gs = refereeFoulState(1);
+    FixedDiceRoller dice({3, 3});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveFoul(gs, 1, 12, dice, nullptr);
+        FAIL() << "čekala se otázka";
+    } catch (const CoachChoicePending& q) {
+        EXPECT_EQ(q.question, CoachQuestion::REFEREE_CALL);
+        EXPECT_EQ(q.playerId, 1);
+        EXPECT_EQ(q.options, 0b1111) << "nic / úplatek / protest / obojí";
+    }
+}
+
+TEST(FoulHandler, P291OdpovedNicHracVyloucenUplatekZustane) {
+    GameState gs = refereeFoulState(1);
+    FixedDiceRoller dice({3, 3});
+    CoachChoiceScope scope(TeamSide::HOME, {0});
+    auto r = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_TRUE(r.turnover);
+    EXPECT_EQ(gs.getTeamState(TeamSide::HOME).bribes, 1);
+}
+
+TEST(FoulHandler, P291OdpovedUplatekHracZustane) {
+    GameState gs = refereeFoulState(1);
+    FixedDiceRoller dice({3, 3, 4});
+    CoachChoiceScope scope(TeamSide::HOME, {1});
+    auto r = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_NE(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getTeamState(TeamSide::HOME).bribes, 0);
+}
+
+TEST(FoulHandler, P291BezUplatkuNabidneJenProtest) {
+    GameState gs = refereeFoulState(0);
+    FixedDiceRoller dice({3, 3});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    try {
+        resolveFoul(gs, 1, 12, dice, nullptr);
+        FAIL() << "čekala se otázka";
+    } catch (const CoachChoicePending& q) {
+        EXPECT_EQ(q.options, (1 << 0) | (1 << 2));
+    }
+}
+
+TEST(FoulHandler, P291SoupereSeNeptaAUplatekPouzije) {
+    GameState gs = refereeFoulState(0);
+    gs.getTeamState(TeamSide::AWAY).bribes = 1;
+    gs.getPlayer(1).teamSide = TeamSide::AWAY;   // faulující AWAY, kouč HOME
+    gs.getPlayer(12).teamSide = TeamSide::HOME;
+    FixedDiceRoller dice({3, 3, 4});
+    CoachChoiceScope scope(TeamSide::HOME, {});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getTeamState(TeamSide::AWAY).bribes, 0);
 }

@@ -537,7 +537,8 @@ PYBIND11_MODULE(bb_engine, m) {
                                           "USE_DODGE", "?", "USE_WRESTLE", "USE_STAND_FIRM",
                                           "USE_SIDE_STEP", "BLOCK_FACE", "USE_FOLLOW_UP", "USE_APOTHECARY",
                                           "APOTHECARY_PICK", "KICKOFF_RETURN", "KICKOFF_RETURN_PLAYER",
-                                          "USE_GRAB", "USE_DIVING_CATCH", "BOMB_REROLL", "BOMB_RETHROW_TARGET"};
+                                          "USE_GRAB", "USE_DIVING_CATCH", "BOMB_REROLL", "BOMB_RETHROW_TARGET",
+                                          "REFEREE_CALL"};
             const size_t k = static_cast<size_t>(q.question);
             d["question"] = k < sizeof(names) / sizeof(names[0]) ? names[k] : "?";
             d["player"] = q.playerId;
@@ -589,6 +590,26 @@ PYBIND11_MODULE(bb_engine, m) {
         });
     }, py::arg("state"), py::arg("dice"), py::arg("coach_side"), py::arg("answers"),
        py::arg("both_sides") = false);
+    // P291 (10.11.2026): rozestavení po konci drive s otázkami kouče — rozhodčí u tajné zbraně (úplatek / protest).
+    //   `second_half` = začátek 2. poločasu (jako setup_second_half), jinak jako setup_drive. Vrací (události,
+    //   otázka|None); při otázce se stav i kostky vrátí a volající zavolá znovu s odpovědí.
+    m.def("setup_coach", [runCoached](bb::GameState& state, const bb::TeamRoster& home, const bb::TeamRoster& away,
+                                      bb::TeamSide kickingTeam, bb::DiceRoller& dice, bool secondHalf,
+                                      bb::TeamSide coachSide, const std::vector<int>& answers, bool bothSides) {
+        py::tuple t = runCoached(state, dice, coachSide, answers, bothSides, [&](std::vector<bb::GameEvent>& ev) {
+            bb::DiceRollerBase& base = dice;
+            state.kickingTeam = kickingTeam;
+            if (secondHalf) {
+                state.half = 2;
+                bb::setupHalf(state, home, away, kickingTeam, &base, &ev);
+            } else {
+                bb::setupDrive(state, home, away, kickingTeam, &base, &ev);
+            }
+            return py::object(py::none());
+        });
+        return py::make_tuple(t[1], t[2]);
+    }, py::arg("state"), py::arg("home"), py::arg("away"), py::arg("kicking_team"), py::arg("dice"),
+       py::arg("second_half"), py::arg("coach_side"), py::arg("answers"), py::arg("both_sides") = false);
 
     // P146 (05.10.2026): „AI plánuje tah“ — jak by AI odehrála celý tah týmu, který je na tahu.
     // Běží NANEČISTO na kopii stavu a s VLASTNÍMI kostkami (politika i hody), takže se nedotkne

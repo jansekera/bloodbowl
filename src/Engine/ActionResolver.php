@@ -12,6 +12,7 @@ use App\DTO\PendingApothecaryDTO;
 use App\DTO\PendingBombRethrowDTO;
 use App\DTO\PendingDivingCatchDTO;
 use App\DTO\PendingRerollDTO;
+use App\DTO\PendingRefereeDTO;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
@@ -151,6 +152,17 @@ final class ActionResolver
         $this->bombThrowHandler->setInteractiveRethrow($sides);
     }
 
+    /**
+     * P291: kouče těchto stran se rozhodčí ptá na úplatek / protest (faul i tajná zbraň na konci drive).
+     *
+     * @param list<TeamSide> $sides
+     */
+    public function setInteractiveReferee(array $sides): void
+    {
+        $this->foulHandler->setInteractiveReferee($sides);
+        $this->gameFlowResolver->setInteractiveReferee($sides);
+    }
+
     public function setInteractiveRerolls(bool $interactive): void
     {
         $this->interactiveRerolls = $interactive;
@@ -264,6 +276,28 @@ final class ActionResolver
             );
         }
 
+        // P291: rozhodčí — u faulu přehrání jako výše, u tajné zbraně na konci drive odpověď hned
+        if ($action === ActionType::RESOLVE_REFEREE) {
+            $pending = $state->getPendingReferee() ?? throw new \InvalidArgumentException('No pending referee question');
+            $volba = ['bribe' => (bool) ($params['bribe'] ?? false), 'argue' => (bool) ($params['argue'] ?? false)];
+            $akce = $pending->getAction();
+            if ($akce === null) {
+                $r = $this->gameFlowResolver->resolveRefereeAnswer($state, $volba);
+
+                return ActionResult::success($r['state'], $r['events']);
+            }
+
+            return $this->resolveSPrehranim(
+                $state->withPendingReferee(null),
+                $akce,
+                $pending->getParams(),
+                $pending->getDice(),
+                [],
+                [],
+                [...$pending->getAnswers(), $volba],
+            );
+        }
+
         return $this->resolveSPrehranim($state, $action, $params, [], [], []);
     }
 
@@ -275,12 +309,14 @@ final class ActionResolver
      * @param list<int> $hody
      * @param list<bool> $odpovedi Diving Catch
      * @param list<array{x: int, y: int}> $cileBomby kam hodit chycenou bombu
+     * @param list<array{bribe: bool, argue: bool}> $rozhodci úplatek / protest u faulu (P291)
      */
-    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, array $odpovedi, array $cileBomby): ActionResult
+    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, array $odpovedi, array $cileBomby, array $rozhodci = []): ActionResult
     {
         $this->replayDice->begin($hody);
         $this->ballResolver->setDivingCatchAnswers($odpovedi);
         $this->bombThrowHandler->setRethrowAnswers($cileBomby);
+        $this->foulHandler->setRefereeAnswers($rozhodci);
         try {
             return $this->resolveJednou($state, $action, $params);
         } catch (DivingCatchQuestion $q) {
@@ -304,9 +340,21 @@ final class ActionResolver
                 $this->replayDice->getLog(),
                 $cileBomby,
             )), []);
+        } catch (RefereeQuestion $q) {
+            return ActionResult::success($state->withPendingReferee(new PendingRefereeDTO(
+                $q->playerId,
+                true,
+                $q->canBribe,
+                $q->canArgue,
+                $action,
+                $params,
+                $this->replayDice->getLog(),
+                $rozhodci,
+            )), []);
         } finally {
             $this->ballResolver->setDivingCatchAnswers([]);
             $this->bombThrowHandler->setRethrowAnswers([]);
+            $this->foulHandler->setRefereeAnswers([]);
         }
     }
 
@@ -521,6 +569,7 @@ final class ActionResolver
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
             ActionType::RESOLVE_DIVING_CATCH => throw new \LogicException('RESOLVE_DIVING_CATCH se vyřizuje v resolve()'),
             ActionType::RESOLVE_BOMB_RETHROW => throw new \LogicException('RESOLVE_BOMB_RETHROW se vyřizuje v resolve()'),
+            ActionType::RESOLVE_REFEREE => throw new \LogicException('RESOLVE_REFEREE se vyřizuje v resolve()'),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)

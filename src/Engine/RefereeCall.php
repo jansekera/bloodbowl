@@ -16,7 +16,9 @@ use App\Enum\TeamSide;
  * - Argue the call (ř. 1091-1102): D6 6 = hráč jen do rezerv (u faulu turnover zůstává), 1 = trenér vyhozen
  *   (dál neprotestuje).
  * - Pořadí (pravidla dovolují obojí): faul napřed úplatek (ruší i turnover), tajná zbraň napřed protest (úspěch =
- *   do rezerv a úplatek zůstane). Engine volí za oba týmy; dialog pro kouče-člověka je P289.
+ *   do rezerv a úplatek zůstane).
+ * - P291 (10.11.2026): kouč-člověk volí sám (`$volba`: úplatek ano/ne, protest ano/ne; pořadí výše platí dál). Bez
+ *   volby (AI) se použije, co jde.
  */
 final class RefereeCall
 {
@@ -24,8 +26,20 @@ final class RefereeCall
     public const RESERVES = 'reserves';
     public const SENT_OFF = 'sent_off';
 
+    /** Co tým může proti výroku udělat: úplatek v zásobě, trenér na lavičce (smí protestovat). */
+    public static function canBribe(GameState $state, TeamSide $side): bool
+    {
+        return $state->getTeamState($side)->getBribes() > 0;
+    }
+
+    public static function canArgue(GameState $state, TeamSide $side): bool
+    {
+        return !$state->getTeamState($side)->isHeadCoachEjected();
+    }
+
     /**
      * @param list<GameEvent> $events
+     * @param array{bribe: bool, argue: bool}|null $volba volba kouče-člověka; null = AI (použije, co jde)
      * @return array{state: GameState, outcome: string}
      */
     public static function sendOff(
@@ -35,10 +49,11 @@ final class RefereeCall
         bool $foul,
         DiceRollerInterface $dice,
         array &$events,
+        ?array $volba = null,
     ): array {
-        $bribe = static function () use (&$state, $side, $playerId, $dice, &$events): bool {
+        $bribe = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);
-            if ($team->getBribes() <= 0) {
+            if ($team->getBribes() <= 0 || ($volba !== null && !$volba['bribe'])) {
                 return false;
             }
             $state = $state->withTeamState($side, $team->withBribes($team->getBribes() - 1));
@@ -47,9 +62,9 @@ final class RefereeCall
 
             return $roll >= 2;
         };
-        $argue = static function () use (&$state, $side, $playerId, $dice, &$events): bool {
+        $argue = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);
-            if ($team->isHeadCoachEjected()) {
+            if ($team->isHeadCoachEjected() || ($volba !== null && !$volba['argue'])) {
                 return false;
             }
             $roll = $dice->rollD6();

@@ -58,7 +58,12 @@ enum class CoachQuestion : int {
     // po chycení“): hráč kouče chytil / zachytil bombu a musí ji hned hodit dál (ř. 7961-7963). playerId = držitel,
     // roll = počet nabízených polí (bombRethrowCandidates), target = jeho pole x*100+y. Odpověď 0 = jako AI (= pole 1),
     // i = i-té pole nabídky. Chytání samo je povinné ⇒ na to se neptá.
-    BOMB_RETHROW_TARGET = 18
+    BOMB_RETHROW_TARGET = 18,
+    // P291 (uživatel 10.11.2026: „udělej ať se zeptá — člověk může některého hráče preferovat, ať zůstane“): rozhodčí
+    // vylučuje hráče kouče (faul ř. 1878-1884, tajná zbraň na konci drive) — úplatek (ř. 2871-2879) / Argue the call
+    // (ř. 1091-1102)? playerId = hráč, otherId = 1 faul / 0 tajná zbraň, roll = úplatků v zásobě, target = 1 trenér smí
+    // protestovat. Odpověď = bitová volba: 0 nic, 1 úplatek, 2 protest, 3 obojí (pořadí určuje druh výroku).
+    REFEREE_CALL = 19
 };
 
 namespace CoachAnswer {

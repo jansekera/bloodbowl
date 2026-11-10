@@ -11,6 +11,8 @@ use App\DTO\GameState;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Engine\RefereeCall;
+use App\Engine\RefereeQuestion;
+use App\Enum\TeamSide;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
@@ -18,6 +20,23 @@ use App\Engine\StrengthCalculator;
 
 final class FoulHandler implements ActionHandlerInterface
 {
+    /** @var list<TeamSide> P291: strany kouče-člověka — rozhodčí se ptá na úplatek / protest */
+    private array $interactiveReferee = [];
+    /** @var list<array{bribe: bool, argue: bool}> odpovědi z dřívějších přerušení této akce (přehrání) */
+    private array $refereeAnswers = [];
+
+    /** @param list<TeamSide> $sides */
+    public function setInteractiveReferee(array $sides): void
+    {
+        $this->interactiveReferee = $sides;
+    }
+
+    /** @param list<array{bribe: bool, argue: bool}> $answers */
+    public function setRefereeAnswers(array $answers): void
+    {
+        $this->refereeAnswers = $answers;
+    }
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly InjuryResolver $injuryResolver,
@@ -138,7 +157,17 @@ final class FoulHandler implements ActionHandlerInterface
         if (($die1 === $die2 || $dubletNaZraneni) && !$attacker->hasSkill(SkillName::SneakyGit)) {
             // P287 (10.11.2026): úplatek / Argue the call (RefereeCall, parita s C++ refereeSendOff). Úplatek ⇒ zůstává
             //   a bez turnoveru; protest 6 ⇒ do rezerv, turnover zůstává (ř. 1100-1101).
-            $vyrok = RefereeCall::sendOff($state, $attackerId, $attacker->getTeamSide(), true, $this->dice, $events);
+            // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit); bez odpovědi se akce přeruší
+            $strana = $attacker->getTeamSide();
+            $volba = null;
+            if (in_array($strana, $this->interactiveReferee, true)) {
+                $uplatek = RefereeCall::canBribe($state, $strana);
+                $protest = RefereeCall::canArgue($state, $strana);
+                if ($uplatek || $protest) {
+                    $volba = array_shift($this->refereeAnswers) ?? throw new RefereeQuestion($attackerId, $uplatek, $protest);
+                }
+            }
+            $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, $volba);
             $state = $vyrok['state'];
             $vyloucen = $vyrok['outcome'] !== RefereeCall::CANCELLED;
             $doRezerv = $vyrok['outcome'] === RefereeCall::RESERVES;

@@ -50,6 +50,8 @@ final class GameState
         private ?PendingDivingCatchDTO $pendingDivingCatch = null,
         // P272, 10.11.2026: čekající otázka kouče, kam jeho hráč hodí chycenou bombu (viz PendingBombRethrowDTO).
         private ?PendingBombRethrowDTO $pendingBombRethrow = null,
+        // P291, 10.11.2026: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? (viz PendingRefereeDTO)
+        private ?PendingRefereeDTO $pendingReferee = null,
     ) {}
 
     /**
@@ -386,13 +388,25 @@ final class GameState
         return $clone;
     }
 
+    public function getPendingReferee(): ?PendingRefereeDTO
+    {
+        return $this->pendingReferee;
+    }
+
+    public function withPendingReferee(?PendingRefereeDTO $pending): self
+    {
+        $clone = clone $this;
+        $clone->pendingReferee = $pending;
+        return $clone;
+    }
+
     /**
-     * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu)? Stav je pak stav
-     * PŘED akcí — žádná jiná akce ani tah AI do odpovědi.
+     * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu, rozhodčí u faulu),
+     * nebo rozhodčí na konci drive (P291)? Žádná jiná akce ani tah AI do odpovědi.
      */
     public function hasPendingReplayQuestion(): bool
     {
-        return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null;
+        return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null;
     }
 
     public function getDeclaredBlitzerId(): ?int
@@ -560,6 +574,7 @@ final class GameState
             'pendingStandFirm' => $this->pendingStandFirm?->toArray(),
             'pendingDivingCatch' => $this->pendingDivingCatch?->toArray(),
             'pendingBombRethrow' => $this->pendingBombRethrow?->toArray(),
+            'pendingReferee' => $this->pendingReferee?->toArray(),
         ];
     }
 
@@ -596,6 +611,7 @@ final class GameState
             pendingStandFirm: isset($data['pendingStandFirm']) ? PendingStandFirmDTO::fromArray((array) $data['pendingStandFirm']) : null,
             pendingDivingCatch: isset($data['pendingDivingCatch']) ? PendingDivingCatchDTO::fromArray((array) $data['pendingDivingCatch']) : null,
             pendingBombRethrow: isset($data['pendingBombRethrow']) ? PendingBombRethrowDTO::fromArray((array) $data['pendingBombRethrow']) : null,
+            pendingReferee: isset($data['pendingReferee']) ? PendingRefereeDTO::fromArray((array) $data['pendingReferee']) : null,
         );
     }
 }
