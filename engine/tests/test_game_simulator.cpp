@@ -1508,3 +1508,34 @@ TEST(GameSimulator, P291TajnaZbranKoucePtaSeRozhodci) {
     EXPECT_EQ(s.getPlayer(sw).state, PlayerState::EJECTED);
     EXPECT_EQ(s.getTeamState(TeamSide::HOME).bribes, 1);
 }
+
+// Review 10.11. (P287): hráč s tajnou zbraní už vyloučený za faul nejde na konci drive před rozhodčího znovu —
+//   jinak by AI zbytečně protestovala (1 = trenér vyhozen) a spálila úplatek. PHP ho vynechává ($jesteVeHre).
+TEST(GameSimulator, P287VyloucenyZaFaulNejdeNaKonciDriveZnovuPredRozhodciho) {
+    GameState state;
+    setupHalf(state, getGoblinRoster(), getSkavenRoster());
+    state.getTeamState(TeamSide::HOME).bribes = 1;
+    int sw = -1;
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (sw < 0 && p.hasSkill(SkillName::SecretWeapon) && p.isOnPitch()) sw = p.id;
+    });
+    ASSERT_GT(sw, 0);
+    state.forEachPlayer(TeamSide::HOME, [&](const Player& p) {
+        if (p.hasSkill(SkillName::SecretWeapon) && p.id != sw) state.getPlayer(p.id).playedThisDrive = false;
+    });
+    Player& p = state.getPlayer(sw);
+    p.playedThisDrive = true;
+    p.setState(PlayerState::EJECTED);
+    p.position = {-1, -1};
+
+    class Ones : public DiceRollerBase {
+    public:
+        int rollD6() override { return 1; }
+        int rollD8() override { return 1; }
+        int roll2D6() override { return 2; }
+        BlockDiceFace rollBlockDie() override { return BlockDiceFace::PUSHED; }
+    } ones;
+    setupDrive(state, getGoblinRoster(), getSkavenRoster(), TeamSide::AWAY, &ones);
+    EXPECT_EQ(state.getTeamState(TeamSide::HOME).bribes, 1) << "úplatek se nespálil";
+    EXPECT_FALSE(state.getTeamState(TeamSide::HOME).headCoachEjected) << "neprotestovalo se";
+}

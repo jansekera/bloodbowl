@@ -414,8 +414,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // depend on that staying true.
     for (auto& p : state.players) {
         // OPRAVENO 10.11.2026 (P285) — přepisovalo i zraněné a mrtvé na EJECTED (PHP je nechává); zranění platí dál.
+        // Review 10.11.2026: ani hráče už vyloučeného (faul) — jinak znovu protest a úplatek naprázdno; PHP ho vynechává.
         if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive
-            && p.state != PlayerState::INJURED && p.state != PlayerState::DEAD) {
+            && p.state != PlayerState::INJURED && p.state != PlayerState::DEAD && p.state != PlayerState::EJECTED) {
             // P287: protest, pak úplatek (refereeSendOff). Zrušený výrok i protest 6 ⇒ hráč zůstává ve hře
             //   (bez kostek — dice == nullptr — jen vyloučení jako dřív).
             const RefOutcome call = dice ? refereeSendOff(state, p.id, RefCall::SECRET_WEAPON, *dice, events)

@@ -29,7 +29,6 @@ use App\Engine\Action\ThrowTeamMateHandler;
 use App\Enum\ActionType;
 use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
-use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 
@@ -671,9 +670,8 @@ final class ActionResolver
      */
     private function nabidkaPrehozuKontroly(GameState $state, MatchPlayerDTO $player, ActionType $action, array $params, array $hod): ?PendingRerollDTO
     {
-        $pro = $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn();
-        $tym = $state->getTeamState($player->getTeamSide())->canUseReroll();
-        if (!$pro && !$tym) {
+        $smi = ThrowReroll::available($state, $player);
+        if (!$smi['pro'] && !$smi['team']) {
             return null;
         }
         $pos = $player->getPosition();
@@ -683,8 +681,8 @@ final class ActionResolver
             $player->getId(),
             $hod['target'],
             $hod['roll'],
-            $pro,
-            $tym,
+            $smi['pro'],
+            $smi['team'],
             $pos?->getX() ?? 0,
             $pos?->getY() ?? 0,
             resumeAction: $action->value,

@@ -17,6 +17,7 @@ use App\DTO\PendingRerollDTO;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\ProCheck;
+use App\Engine\ThrowReroll;
 use App\Engine\Pathfinder;
 use App\Engine\InjuryResolver;
 use App\Engine\TacklezoneCalculator;
@@ -596,13 +597,12 @@ final class MoveHandler implements ActionHandlerInterface
         if (!$this->interactiveRerolls) {
             return null;
         }
-        $pro = $hrac->hasSkill(SkillName::Pro) && !$hrac->isProUsedThisTurn();
-        $tym = !$teamRerollUsed && $state->getTeamState($hrac->getTeamSide())->canUseReroll();
-        if (!$pro && !$tym) {
+        $smi = ThrowReroll::available($state, $hrac, !$teamRerollUsed);
+        if (!$smi['pro'] && !$smi['team']) {
             return null;
         }
 
-        return new PendingRerollDTO($druh, $hrac->getId(), $cil, $hod, $pro, $tym, $kam->getX(), $kam->getY(), gfiRemaining: $gfiZbyva);
+        return new PendingRerollDTO($druh, $hrac->getId(), $cil, $hod, $smi['pro'], $smi['team'], $kam->getX(), $kam->getY(), gfiRemaining: $gfiZbyva);
     }
 
     /**
@@ -740,29 +740,14 @@ final class MoveHandler implements ActionHandlerInterface
             return false;
         }
         $strana = $hrac->getTeamSide();
-        if ($hrac->hasSkill(SkillName::Pro) && !$hrac->isProUsedThisTurn()) {
-            $hrac = $hrac->withProUsedThisTurn(true);
-            $state = $state->withPlayer($hrac);
-            $pro = ProCheck::roll($this->dice, $hrac, !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll(), $events);
-            if ($pro['teamRerollUsed']) {
-                $teamRerollUsed = true;
-                $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
-            }
-            if (!$pro['allowed']) {
-                return false;
-            }
-        } elseif (!$teamRerollUsed && $state->getTeamState($strana)->canUseReroll()) {
+        $tymPred = $state->getTeamState($strana)->canUseReroll();
+        $res = ThrowReroll::proThenTeam($this->dice, $state, $hrac, $strana, !$teamRerollUsed, $events);
+        $state = $res['state'];
+        $hrac = $res['thrower'];
+        if ($tymPred && !$state->getTeamState($strana)->canUseReroll()) {
             $teamRerollUsed = true;
-            $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
-            if ($hrac->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $events[] = GameEvent::lonerCheck($hrac->getId(), $lonerRoll, $lonerRoll >= 4);
-                if ($lonerRoll < 4) {
-                    return false;
-                }
-            }
-            $events[] = GameEvent::rerollUsed($hrac->getId(), 'Team Reroll');
-        } else {
+        }
+        if (!$res['rerolled']) {
             return false;
         }
         $roll = $this->dice->rollD6();

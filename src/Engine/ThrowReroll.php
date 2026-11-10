@@ -11,8 +11,8 @@ use App\Enum\SkillName;
 use App\Enum\TeamSide;
 
 /**
- * Jediné místo žebříčku přehozu „Pro -> týmový přehoz s Lonerem" pro hody, které nejdou přes Pass skill
- * (přihrávka, bomba, Always Hungry u Throw Team-Mate). Parita s C++ `rerollThrow` (helpers.cpp, P258).
+ * Jediné místo žebříčku přehozu „Pro -> týmový přehoz s Lonerem" bez dialogu: hody, které nejdou přes Pass skill
+ * (přihrávka, bomba, Always Hungry u Throw Team-Mate) a přehozy AI u Leapu (MoveHandler::prehozAi). Parita s C++ `rerollThrow` (helpers.cpp, P258).
  *
  * Jeden hod = nejvýš jeden přehoz (r. 925-927): má-li hráč Pro a ještě ho nepoužil, jde Pro (po neúspěšném hodu
  * Pro smí týmový přehoz jen hod Pro, ProCheck); jinak týmový přehoz (r. 929-936, Loner 4+ r. 8287-8290).
@@ -21,6 +21,20 @@ use App\Enum\TeamSide;
  */
 final class ThrowReroll
 {
+    /**
+     * Co hráč smí na nepovedený hod použít: Pro (jednou za kolo, ř. 8381) a týmový přehoz (jednou za kolo, ř. 929-931).
+     * Jediné místo i pro nabídky kouči-člověku (P289: MoveHandler, ActionResolver).
+     *
+     * @return array{pro: bool, team: bool}
+     */
+    public static function available(GameState $state, MatchPlayerDTO $player, bool $teamAllowed = true): array
+    {
+        return [
+            'pro' => $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn(),
+            'team' => $teamAllowed && $state->getTeamState($player->getTeamSide())->canUseReroll(),
+        ];
+    }
+
     /**
      * @param list<GameEvent> $events doplní se události Pro / Loner / rerollUsed
      * @param bool $teamAllowed smí se vzít týmový přehoz (bomba s Lonerem ne)
