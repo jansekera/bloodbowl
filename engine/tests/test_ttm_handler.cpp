@@ -419,3 +419,38 @@ TEST(TTMHandler, P281LandingOnAnOwnTeamMateIsATurnover) {
     EXPECT_EQ(gs.getPlayer(3).state, PlayerState::PRONE);
     EXPECT_TRUE(result.turnover);
 }
+
+// P283 (audit goblinů 10.11.2026): ř. 929-931 týmový přehoz smí přehodit kterýkoli hod — i hod na přistání Right Stuff
+// a fumble hodu spoluhráčem. Dřív C++ obojí házel holým rollD6 bez přehozu.
+TEST(TTMHandler, P283TeamRerollSavesAFailedLanding) {
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 1;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    // hod 5, rozptyly 3/3/3 ⇒ (16,7); přistání AG3 4+: 1 ⇒ přehoz 6
+    FixedDiceRoller dice({5, 3, 3, 3, 1, 6});
+    auto result = resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}
+
+TEST(TTMHandler, P283TeamRerollSavesAFumbledThrow) {
+    auto gs = ttmSetup();
+    gs.homeTeam.rerolls = 1;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    // hod 1 = fumble ⇒ přehoz 5; rozptyly 3/3/3 ⇒ (16,7); přistání 6
+    FixedDiceRoller dice({1, 5, 3, 3, 3, 6});
+    auto result = resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{16, 7}));
+    EXPECT_EQ(gs.getPlayer(2).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.homeTeam.rerolls, 0);
+}

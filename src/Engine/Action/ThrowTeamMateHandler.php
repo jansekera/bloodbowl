@@ -154,6 +154,25 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
 
         $roll = $this->dice->rollD6();
         $fumble = $roll === 1 || ($roll + $modifikator) <= 1;
+        // P283 (audit goblinů 10.11.2026): ř. 929-931 týmový přehoz smí přehodit kterýkoli hod. Přesný hod je tu vždy
+        //   nepřesný (ř. 8609-8612), takže přehazuje se jen fumble — Pass, jinak Pro → týmový (Loner). Parita
+        //   s C++ ttm_handler.cpp (rerollThrow).
+        if ($fumble) {
+            $prehozeno = false;
+            if ($thrower->hasSkill(SkillName::Pass)) {
+                $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
+                $prehozeno = true;
+            } else {
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events);
+                $state = $res['state'];
+                $thrower = $res['thrower'];
+                $prehozeno = $res['rerolled'];
+            }
+            if ($prehozeno) {
+                $roll = $this->dice->rollD6();
+                $fumble = $roll === 1 || ($roll + $modifikator) <= 1;
+            }
+        }
         $accurate = !$fumble && $roll >= $accuracyTarget;
 
         $resultStr = $fumble ? 'fumble' : ($accurate ? 'accurate' : 'inaccurate');
@@ -308,7 +327,20 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         if (!$naHraci) {
             $landingRoll = $this->dice->rollD6();
             $landingSuccess = $landingRoll >= $landingTarget;
-            $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
+            // P283: týmový přehoz i na přistání (ř. 929-931) — Pro → týmový (Loner), parita s C++ attemptRoll
+            if (!$landingSuccess) {
+                $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, false);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $projectile, $projectile->getTeamSide(), true, $events);
+                $state = $res['state'];
+                $projectile = $res['thrower'];
+                if ($res['rerolled']) {
+                    $landingRoll = $this->dice->rollD6();
+                    $landingSuccess = $landingRoll >= $landingTarget;
+                    $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
+                }
+            } else {
+                $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, true);
+            }
         }
 
         if (!$landingSuccess) {

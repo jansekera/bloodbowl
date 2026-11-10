@@ -74,6 +74,8 @@ final class ThrowTeamMateTest extends TestCase
         //   nerozptyluje se od hazece. Test sam mereni nezmenil -- kontroluje
         //   jen, ze akce probehne a vyda udalosti.
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->withBallOffPitch()
@@ -97,6 +99,8 @@ final class ThrowTeamMateTest extends TestCase
     {
         // Failed landing roll → prone + armor check
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->withBallOffPitch()
@@ -144,6 +148,8 @@ final class ThrowTeamMateTest extends TestCase
     {
         // Fail landing with ball → ball bounces
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->withBallCarried(2)
@@ -296,6 +302,8 @@ final class ThrowTeamMateTest extends TestCase
     public function testModifikovanaJednickaJeFumble(): void
     {
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
             ->withBallOffPitch()
@@ -321,6 +329,8 @@ final class ThrowTeamMateTest extends TestCase
     public function testFumblovanyHracZustaneNaSvemPuvodnimPoli(): void
     {
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 7, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 7, skills: [SkillName::RightStuff], id: 2)
             ->withBallOffPitch()
@@ -510,6 +520,8 @@ final class ThrowTeamMateTest extends TestCase
     public function testP256DisturbingPresenceUdelaZHoduFumble(): void
     {
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->addPlayer(TeamSide::AWAY, 5, 8, skills: [SkillName::DisturbingPresence], id: 10)   // 3 pole, mimo zóny

@@ -50,6 +50,8 @@ final class TtmLandingRulesTest extends TestCase
     {
         // jako ThrowTeamMateTest::testFailLandingWithBallBounce: přistání 1 ⇒ leží, míč odskočí ⇒ turnover (ř. 8430-8431)
         $state = (new GameStateBuilder())
+            // bez týmových přehozů: test měří nepovedený hod, ne přehoz (P283)
+            ->withHomeTeam(\App\DTO\TeamStateDTO::create(1, 'Home', 'Human', TeamSide::HOME, 0))
             ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
             ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
             ->withBallCarried(2)
@@ -61,5 +63,44 @@ final class TtmLandingRulesTest extends TestCase
 
         $this->assertTrue($r->isTurnover());
         $this->assertNull($r->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testP283TymovyPrehozZachraniPristani(): void
+    {
+        // ř. 929-931 týmový přehoz na kterýkoli hod. Přesnost 4, rozptyly 3/3/7 ⇒ (9,5); přistání AG3 4+: 1 ⇒ přehoz 6
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $dice = new FixedDiceRoller([4, 3, 3, 7, 1, 6]);
+        $r = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
+        ]);
+
+        $s = $r->getNewState();
+        $this->assertSame(PlayerState::STANDING, $s->requirePlayer(2)->getState());
+        $this->assertSame(9, $s->requirePlayer(2)->requirePosition()->getX());
+        $this->assertSame(2, $s->getTeamState(TeamSide::HOME)->getRerolls());
+        $this->assertFalse($dice->hasRemainingRolls());
+    }
+
+    public function testP283TymovyPrehozZachraniFumbleHodu(): void
+    {
+        // přesnost 1 = fumble ⇒ přehoz 4; rozptyly 3/3/7 ⇒ (9,5); přistání 6
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, strength: 5, skills: [SkillName::ThrowTeamMate], id: 1)
+            ->addPlayer(TeamSide::HOME, 6, 5, skills: [SkillName::RightStuff], id: 2)
+            ->withBallOffPitch()
+            ->build();
+        $dice = new FixedDiceRoller([1, 4, 3, 3, 7, 6]);
+        $r = (new ActionResolver($dice))->resolve($state, ActionType::THROW_TEAM_MATE, [
+            'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,
+        ]);
+
+        $s = $r->getNewState();
+        $this->assertSame(9, $s->requirePlayer(2)->requirePosition()->getX());
+        $this->assertSame(PlayerState::STANDING, $s->requirePlayer(2)->getState());
+        $this->assertFalse($dice->hasRemainingRolls());
     }
 }

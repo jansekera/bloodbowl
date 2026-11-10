@@ -84,6 +84,13 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool fumble = forcedFumble;
     if (!forcedFumble) {
         int roll = dice.rollD6();
+        // P283 (audit goblinů 10.11.2026): ř. 929-931 týmový přehoz smí přehodit kterýkoli hod. U hodu spoluhráčem
+        //   je přesný hod vždy nepřesný (ř. 8609-8612), takže přehoz má smysl jen na fumble. Táž cesta jako
+        //   přihrávka a bomba (Pass, kouč, Pro, týmový přehoz s Loner).
+        if (isThrowFumble(roll, ttmMods)) {
+            rerollThrow(state, thrower, dice, CoachQuestion::PASS_REROLL, events, roll, /*target=*/2, ttmMods,
+                        /*teamAllowedForEngine=*/true);
+        }
         fumble = isThrowFumble(roll, ttmMods);
         // P262: roll = cíl, die1 = kostka (konvence P201/P145)
         emitEvent(events, {GameEvent::Type::PASS, throwerId, projectileId, thrower.position,
@@ -180,8 +187,10 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
         int landTarget = std::clamp(
             7 - projectile.stats.agility + countTacklezones(state, landPos, projectile.teamSide),
             2, 6);
-        int landRoll = dice.rollD6();
-        landedOnFeet = (landRoll >= landTarget);
+        // P283: týmový přehoz i na hod na přistání (ř. 929-931) — přes attemptRoll (kouč / Pro / týmový, Loner).
+        int landRoll = 0;
+        landedOnFeet = attemptRoll(state, projectileId, dice, landTarget, SkillName::SKILL_COUNT, false,
+                                   /*team=*/true, events, &landRoll);
         emitEvent(events, {GameEvent::Type::SKILL_USED, projectileId, -1, landPos, {},
                           static_cast<int>(SkillName::RightStuff), landedOnFeet});
     }
