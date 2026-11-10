@@ -216,6 +216,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         array $events,
         ?Position $scatterOrigin = null,
         bool $naHraci = false,
+        bool $srazenSpoluhrac = false,
     ): ActionResult {
         // Off pitch → crowd surf
         if (!$landingPos->isOnPitch()) {
@@ -258,11 +259,11 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             //   „A player **with the ball** is thrown ... and fails to land
             //   successfully."
             // ⇒ Hozeny hrac bez mice, ktery skonci u davu, kolo nekonci.
-            if (!$hadBall) {
+            if (!$hadBall && !$srazenSpoluhrac) {
                 return ActionResult::success($state, $events);
             }
 
-            $events[] = GameEvent::turnover('Thrown player off pitch');
+            $events[] = GameEvent::turnover($hadBall ? 'Thrown player off pitch' : 'Thrown player knocked down a team-mate');
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }
 
@@ -272,6 +273,8 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         $occupant = $state->getPlayerAtPosition($landingPos);
         if ($occupant !== null && $occupant->getId() !== $projectile->getId()) {
             if (!$naHraci) {
+                // P281: sražený spoluhráč = turnover (ř. 366-367) — vyhlásí se až na konci dopadu
+                $srazenSpoluhrac = $occupant->getTeamSide() === $state->getActiveTeam();
                 $srazen = $occupant->getState() === PlayerState::STUNNED ? $occupant : $occupant->withState(PlayerState::PRONE);
                 $events[] = GameEvent::playerFell($srazen->getId());
                 $inj = $this->injuryResolver->resolve($srazen, $this->dice);
@@ -280,7 +283,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                 [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $inj['player'], $events);
             }
             $newPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());
-            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos, true);
+            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos, true, $srazenSpoluhrac);
         }
 
         // Place player at landing position
@@ -337,6 +340,10 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             [$state, $events] = $this->ballResolver->bounceLooseBallUnderPlayer($state, $landingPos, $events);
         }
 
+        if ($srazenSpoluhrac) {
+            $events[] = GameEvent::turnover('Thrown player knocked down a team-mate');
+            return ActionResult::turnover($state->withTurnoverPending(true), $events);
+        }
         return ActionResult::success($state, $events);
     }
 }

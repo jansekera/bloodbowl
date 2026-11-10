@@ -403,3 +403,19 @@ TEST(TTMHandler, P282LandingOnFeetOnALooseBallBouncesIt) {
     EXPECT_FALSE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.position, (Position{17, 7}));
 }
+
+// P281: hozený dopadne na vlastního spoluhráče ⇒ ten je „treated as Knocked Down“ (ř. 8617-8619) a sražený hráč
+// týmu na tahu = turnover (ř. 366-367). Dřív ho C++ srazil bez turnoveru.
+TEST(TTMHandler, P281LandingOnAnOwnTeamMateIsATurnover) {
+    auto gs = ttmSetup();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    placePlayer(gs, 3, {16, 7}, TeamSide::HOME);    // na (16,7) dopadne
+    // hod 5, rozptyly 3/3/3 ⇒ (16,7): spoluhráč sražen, brnění 1+1; rozptyl o pole D8 3 ⇒ (17,7); hozený leží, brnění 1+1
+    FixedDiceRoller dice({5, 3, 3, 3, 1, 1, 3, 1, 1});
+    auto result = resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(3).state, PlayerState::PRONE);
+    EXPECT_TRUE(result.turnover);
+}

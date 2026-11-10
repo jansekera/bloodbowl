@@ -119,6 +119,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     // Hazeny hráč uz neni tam, kde byl.
     projectile.position = {-1, -1};
 
+    bool ownKnockedDown = false;   // P281: hozený srazil spoluhráče ⇒ turnover (ř. 366-367, 8617-8619)
     auto crowd = [&]() {
         // l. 8615-8617: "If the thrown player scatters off the pitch, he is
         // beaten up by the crowd in the same manner as a player who has been
@@ -133,7 +134,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
             resolveThrowIn(state, lastOnPitch, landPos, dice, events);
         }
         resolveCrowdSurf(state, projectileId, lastOnPitch, dice, events);
-        return projectileHadBall ? ActionResult::turnovr() : ActionResult::ok();
+        return projectileHadBall || ownKnockedDown ? ActionResult::turnovr() : ActionResult::ok();
     };
 
     if (!landPos.isOnPitch()) return crowd();
@@ -146,6 +147,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     bool landedOnSomeone = false;
     if (Player* under = state.getPlayerAtPosition(landPos)) {
         landedOnSomeone = true;
+        ownKnockedDown = under->teamSide == state.activeTeam;
         // P76: omraceny zustava omraceny (hod na brneni, ne otoceni) -- jako bomba.
         if (under->state != PlayerState::STUNNED) under->setState(PlayerState::PRONE);
         emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, under->id, projectileId,
@@ -198,7 +200,7 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
     handleBallOnPlayerDown(state, projectileId, dice, events);
 
     // l. 8430-8431: neuspesny dopad NENI turnover, ledaze nesl mic.
-    return projectileHadBall ? ActionResult::turnovr() : ActionResult::ok();
+    return projectileHadBall || ownKnockedDown ? ActionResult::turnovr() : ActionResult::ok();   // P281
 }
 
 } // namespace bb

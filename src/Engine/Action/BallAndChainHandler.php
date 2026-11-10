@@ -145,9 +145,22 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 // B&C zustava na svem poli a blokuje odtud (r. 7840-7842); lezici
                 //   nebo omraceny v ceste se misto bloku odtlaci a hazi na brneni (r. 7843-7845).
                 if ($occupant->getState()->canAct()) {
+                    $predBlokem = count($events);
                     [$state, $events, $player] = $this->resolveAutoBlock($state, $player, $occupant, $events, $step, $obnoveno);
                     if ($state->getPendingGrab() !== null || $state->getPendingStandFirm() !== null) {
                         return ActionResult::success($state, $events); // P224/P226: čeká otázka kouči
+                    }
+                    // OPRAVENO 10.11.2026 (P281) — sražený spoluhráč nebyl turnover. B&C blokuje „friend or foe“
+                    //   (ř. 7820-7822) a sražený hráč týmu na tahu = turnover (ř. 366-367; vytlačený do davu sražen není).
+                    if ($occupant->getTeamSide() === $player->getTeamSide()) {
+                        foreach (array_slice($events, $predBlokem) as $e) {
+                            if ($e->getType() === 'player_fell' && ($e->getData()['playerId'] ?? null) === $occupant->getId()) {
+                                $srazenPriBloku = true;
+                            }
+                        }
+                        if ($srazenPriBloku) {
+                            break;
+                        }
                     }
                 } else {
                     // OPRAVENO 26.10.2026 (review P226, LOW 2) -- odtlačení ležícího běželo bez otázky:
@@ -195,12 +208,16 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 $player = $player->withPosition($newPos);
                 $state = $state->withPlayer($player);
 
-                // Ball & Chain player cannot pick up the ball — ball bounces
+                // OPRAVENO 10.11.2026 (P280) — míč jen odskočil a B&C šel dál. Vstup na pole s míčem = pokus o zvednutí
+                //   (ř. 436-438); No Hands ⇒ „will bounce, and will cause a turnover if it is his team's turn“ (ř. 8320-8322).
                 $ball = $state->getBall();
                 if (!$ball->isHeld() && $ball->getPosition() !== null && $ball->getPosition()->equals($newPos)) {
                     $bounceResult = $this->ballResolver->resolveBounce($state, $newPos);
                     $events = array_merge($events, $bounceResult['events']);
                     $state = $bounceResult['state'];
+                    $events[] = GameEvent::turnover('Ball & Chain moved onto the ball (No Hands)');
+                    $state = $state->withPlayer($state->requirePlayer($playerId)->withHasActed(true)->withHasMoved(true));
+                    return ActionResult::turnover($state, $events);
                 }
             }
         }

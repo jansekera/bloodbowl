@@ -329,3 +329,35 @@ TEST(BallAndChain, P276MightyBlowGoesOnTheInjuryRoll) {
     resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
 }
+
+// P280 (audit goblinů 10.11.2026): B&C vstoupí na pole s míčem = pokus o zvednutí (ř. 436-438, „must attempt to pick
+// it up“); No Hands ⇒ „will bounce, and will cause a turnover if it is his team's turn“ (ř. 8320-8322). Dřív jen
+// odskok bez turnoveru a B&C šel dál.
+TEST(BallAndChainHandler, P280StepOntoTheBallIsANoHandsPickUpAndATurnover) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 2, 7);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);
+    gs.ball = BallState::onGround({11, 7});
+    FixedDiceRoller dice({3, 3, 3, 3});             // rovně na míč; odraz D8 3 = E; (druhý krok už ne)
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_TRUE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "pohyb končí";
+}
+
+// P281: B&C blokuje „friend or foe“ (ř. 7820-7822); sražený spoluhráč = „A player on the moving team is Knocked Down“
+// ⇒ turnover (ř. 366-367). Dřív turnover jen při pádu samotného B&C.
+TEST(BallAndChainHandler, P281KnockingDownAnOwnTeamMateIsATurnover) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);
+    placePlayer(gs, 12, {20, 7}, TeamSide::AWAY);
+    // naši ve všech čtyřech směrech ⇒ každé natočení stojí stejně; při shodě k soupeři (východ), rovně = (11,7)
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME);
+    placePlayer(gs, 3, {9, 7}, TeamSide::HOME);
+    placePlayer(gs, 4, {10, 6}, TeamSide::HOME);
+    placePlayer(gs, 5, {10, 8}, TeamSide::HOME);
+    // rovně ⇒ blok na 2 (útočník volí; všechny strany DD = vynucené), odtlačení na (12,7), brnění 1+1
+    FixedDiceRoller dice({3, 6, 6, 6, 1, 1, 1, 1});
+    auto r = resolveBallAndChain(gs, 1, dice, nullptr);
+    EXPECT_NE(gs.getPlayer(2).state, PlayerState::STANDING);
+    EXPECT_TRUE(r.turnover);
+}

@@ -88,7 +88,8 @@ BlockDiceFace chooseFace(const BlockDiceFace* faces, int n, bool ownTarget, bool
 }
 
 // Blok podle beznych pravidel (r. 7840-7842): kostky podle sily vc. asistenci.
-// Vraci true, kdyz byl sraženy B&C.
+// Vraci true = turnover: sražený B&C, nebo sražený spoluhráč (P281, ř. 366-367 „A player on the moving team is
+// Knocked Down“; B&C blokuje „friend or foe“, ř. 7820-7822). Vytlačený do davu sražen není.
 bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dice,
               std::vector<GameEvent>* events) {
     const int attAssists = countAssists(state, target.position, bcp.teamSide, bcp.id, target.id, target.id);
@@ -97,7 +98,8 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
                                                 target.stats.strength + defAssists);
     BlockDiceFace faces[3];
     for (int i = 0; i < info.count; ++i) faces[i] = dice.rollBlockDie();
-    const BlockDiceFace face = chooseFace(faces, info.count, target.teamSide == bcp.teamSide,
+    const bool ownTarget = target.teamSide == bcp.teamSide;
+    const BlockDiceFace face = chooseFace(faces, info.count, ownTarget,
                                           info.attackerChooses);
     emitEvent(events, {GameEvent::Type::BLOCK, bcp.id, target.id, bcp.position,
                       target.position, static_cast<int>(face), true});
@@ -108,9 +110,10 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
             return true;
         case BlockDiceFace::BOTH_DOWN: {
             const bool bcFalls = !bcp.hasSkill(SkillName::Block);
-            if (!target.hasSkill(SkillName::Block)) knockDownTarget(state, target, dice, events);
+            const bool targetFalls = !target.hasSkill(SkillName::Block);
+            if (targetFalls) knockDownTarget(state, target, dice, events);
             if (bcFalls) injureBnC(state, bcp.id, dice, events);
-            return bcFalls;
+            return bcFalls || (targetFalls && ownTarget);
         }
         case BlockDiceFace::PUSHED:
             pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
@@ -119,12 +122,12 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
             const bool down = !target.hasSkill(SkillName::Dodge) || bcp.hasSkill(SkillName::Tackle);
             const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
             if (down && !surfed) knockDownTarget(state, target, dice, events);
-            return false;
+            return down && !surfed && ownTarget;
         }
         default: {   // DEFENDER_DOWN
             const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
             if (!surfed) knockDownTarget(state, target, dice, events);
-            return false;
+            return !surfed && ownTarget;
         }
     }
 }
@@ -179,9 +182,11 @@ ActionResult resolveBallAndChain(GameState& state, int playerId,
         const Position oldPos = bcp.position;
         bcp.position = target;
         emitEvent(events, {GameEvent::Type::PLAYER_MOVE, playerId, -1, oldPos, target, 0, true});
-        // No Hands: mic na zemi se odrazi
+        // OPRAVENO 10.11.2026 (P280) — míč jen odskočil a B&C šel dál. Vstup na pole s míčem = pokus o zvednutí
+        //   (ř. 436-438); No Hands ⇒ „will bounce, and will cause a turnover if it is his team's turn“ (ř. 8320-8322).
         if (!state.ball.isHeld && state.ball.position == target) {
             resolveBounce(state, target, dice, 0, events);
+            return ActionResult::turnovr();
         }
     }
 
