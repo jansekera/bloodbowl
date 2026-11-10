@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "bb/ball_and_chain_handler.h"
 #include "bb/helpers.h"
+#include "bb/injury.h"
 #include "bb/coach_choice.h"
 #include "bb/game_simulator.h"
 #include "bb/roster.h"
@@ -295,4 +296,36 @@ TEST(BallAndChainHandler, LiveGameDoesNotAskAboutGrabAgainstATeammate) {
     }
     EXPECT_EQ(gs.getPlayer(1).position, (Position{11, 7})) << "fixture: B&C šel rovně na spoluhráče";
     EXPECT_EQ(gs.getPlayer(5).position.x, 12) << "spoluhráč: běžné odtlačení ⇒ řetěz, ne Grab";
+}
+
+// P276 (audit goblinů 10.11.2026): „If the player is ever Knocked Down or Placed Prone roll immediately for injury
+// (no Armour roll is required). Stunned results for any Injury rolls for the Ball & Chain player are always treated
+// as KO’d“ (rules_bb2016.txt ř. 7827-7830). Dřív to platilo jen v jeho vlastním pohybu (injureBnC); sražený
+// soupeřem, bombou apod. dostal běžný hod na brnění a omráčený zůstal ležet na hřišti. Místo, kudy jde každé
+// sražení: resolveArmourAndInjury.
+TEST(BallAndChain, P276KnockedDownByAnyoneSkipsArmourAndStunnedIsKo) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::AWAY;
+    makeBnC(gs, 1, {10, 7}, 3, 7);
+    gs.getPlayer(1).setState(PlayerState::PRONE);
+    // 3+3 = 6: jako brnění by AV8 držel (bez zranění); jako zranění = Stunned ⇒ KO a pryč z hřiště
+    FixedDiceRoller dice({3, 3});
+    resolveArmourAndInjury(gs, 1, dice, InjuryContext{}, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::KO);
+    EXPECT_FALSE(gs.getPlayer(1).isOnPitch());
+    EXPECT_EQ(dice.remaining(), 0u);
+}
+
+TEST(BallAndChain, P276MightyBlowGoesOnTheInjuryRoll) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    makeBnC(gs, 1, {10, 7}, 3, 7);
+    gs.getPlayer(1).setState(PlayerState::PRONE);
+    // 4+5 = 9 + MB 1 = 10 ⇒ Casualty (bez MB 9 = KO); Casualty D6 1 + D8 1 = Badly Hurt
+    FixedDiceRoller dice({4, 5, 1, 1});
+    InjuryContext ctx{};
+    ctx.mightyBlow = true;
+    resolveArmourAndInjury(gs, 1, dice, ctx, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::INJURED);
 }

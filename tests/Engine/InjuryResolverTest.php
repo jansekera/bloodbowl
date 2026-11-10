@@ -319,4 +319,29 @@ final class InjuryResolverTest extends TestCase
 
         $this->assertSame(PlayerState::STANDING, $result['player']->getState());
     }
+
+    // P276 (audit goblinů 10.11.2026): „If the player is ever Knocked Down or Placed Prone roll immediately for injury
+    //   (no Armour roll is required). Stunned results for any Injury rolls for the Ball & Chain player are always
+    //   treated as KO’d“ (rules_bb2016.txt ř. 7827-7830). Dřív jen v jeho vlastním pohybu (zranitBnc); sražený
+    //   soupeřem, bombou apod. dostal hod na brnění a omráčený ležel na hřišti. Parita s C++ resolveArmourAndInjury.
+    public function testP276BallAndChainBezBrneniAOmracenyJeKo(): void
+    {
+        $bnc = $this->makePlayer(armour: 7, skills: [SkillName::BallAndChain, SkillName::NoHands]);
+        // 3+3 = 6: jako brnění AV7 drží; jako zranění Stunned ⇒ KO a pryč z hřiště
+        $dice = new FixedDiceRoller([3, 3]);
+        $result = $this->resolver->resolve($bnc, $dice);
+
+        $this->assertSame(PlayerState::KO, $result['player']->getState());
+        $this->assertNull($result['player']->getPosition());
+        $this->assertFalse($dice->hasRemainingRolls());
+    }
+
+    public function testP276BallAndChainMightyBlowNaZraneni(): void
+    {
+        $bnc = $this->makePlayer(armour: 7, skills: [SkillName::BallAndChain, SkillName::NoHands]);
+        // 4+5 = 9 + MB = 10 ⇒ Casualty (bez MB KO); D6 1 + D8 1 = Badly Hurt
+        $result = $this->resolver->resolve($bnc, new FixedDiceRoller([4, 5, 1, 1]), mightyBlow: true);
+
+        $this->assertSame(PlayerState::INJURED, $result['player']->getState());
+    }
 }

@@ -57,6 +57,13 @@ final class InjuryResolver
         // Nositel pily srazeny z jakehokoli duvodu => souper +3 k brneni
         //   (`rules_bb2016.txt` r. 8009-8011). NE u hodu, ktery o srazeni teprve
         //   rozhoduje: Stab ("unmodified") a zasah pilou (ma vlastnich +3).
+        // OPRAVENO 10.11.2026 (P276, audit goblinů) — sražený Ball & Chain dostával hod na brnění, kdykoli ho srazil někdo
+        //   jiný (blok soupeře, Both Down, bomba, dopad hráče). Ř. 7827-7828: „If the player is ever Knocked Down or Placed
+        //   Prone roll immediately for injury (no Armour roll is required)“; Mighty Blow pak jde na zranění. C++ totéž.
+        if ($player->hasSkill(SkillName::BallAndChain)) {
+            return $this->resolveInjury($player, $dice, $injuryModifier + ($mightyBlow ? 1 : 0), $events, $hasStakes, $hasNurglesRot, $regenerace);
+        }
+
         if ($chainsawHolderBonus && $player->hasSkill(SkillName::Chainsaw)) {
             $armourModifier += self::CHAINSAW_ARMOUR_BONUS;
         }
@@ -316,6 +323,13 @@ final class InjuryResolver
         $stunty = $player->hasSkill(SkillName::Stunty);
         $modified = $roll + $modifier;
 
+        // P276: „Stunned results for any Injury rolls for the Ball & Chain player are always treated as KO’d“
+        //   (ř. 7829-7830) — dřív jen v jeho pohybu (BallAndChainHandler::zranitBnc). Bez lékárníka (omráčený = zase KO).
+        $omracen = $modified <= ($stunty ? 6 : 7) || ($modified === 8 && $player->hasSkill(SkillName::ThickSkull));
+        if ($omracen && $player->hasSkill(SkillName::BallAndChain)) {
+            $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
+            return ['player' => $player->withState(PlayerState::KO)->withPosition(null), 'events' => $events, 'dice' => [$die1, $die2]];
+        }
         if ($modified <= ($stunty ? 6 : 7)) {
             // ř. 706-707: v kole, kdy byl omráčen, se hráč neotáčí -- viz `withStunned()`.
             $player = $player->withStunned();

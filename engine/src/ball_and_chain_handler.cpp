@@ -56,11 +56,7 @@ void injureBnC(GameState& state, int id, DiceRollerBase& dice,
     handleBallOnPlayerDown(state, id, dice, events);
     bcp.setState(PlayerState::PRONE);
     InjuryContext ctx{};
-    resolveInjuryRoll(state, id, dice, ctx, events);
-    if (bcp.state == PlayerState::STUNNED) {
-        bcp.setState(PlayerState::KO);
-        bcp.position = {-1, -1};
-    }
+    resolveInjuryRoll(state, id, dice, ctx, events);   // Stunned = KO řeší resolveInjuryRoll (P276)
 }
 
 void knockDownTarget(GameState& state, Player& target, DiceRollerBase& dice,

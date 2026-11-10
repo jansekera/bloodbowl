@@ -283,8 +283,8 @@ final class BallAndChainHandler implements ActionHandlerInterface
         $hrac = $vysledek['player'];
         $events = array_merge($events, $vysledek['events']);
 
-        // Stunned = KO; u davu resolveCrowdSurf z Stunned udela rezervy -- u B&C taky KO.
-        if ($hrac->getState() === PlayerState::STUNNED || ($dav && $hrac->getState() === PlayerState::OFF_PITCH)) {
+        // Stunned = KO řeší InjuryResolver (P276); u davu resolveCrowdSurf z Stunned udělá rezervy -- u B&C taky KO.
+        if ($dav && $hrac->getState() === PlayerState::OFF_PITCH) {
             $hrac = $hrac->withState(PlayerState::KO)->withPosition(null);
         }
         if ($dav) {

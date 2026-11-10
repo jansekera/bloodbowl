@@ -48,6 +48,14 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
     //   9 + 1 = 10 ⇒ tabulka s 1/6 smrti); Thick Skull se ptá na nemodifikovanou 8.
     const bool stunty = player.hasSkill(SkillName::Stunty);
 
+    // P276 (10.11.2026): „Stunned results for any Injury rolls for the Ball & Chain player are always treated as KO’d“
+    //   (ř. 7829-7830) — dřív jen v jeho vlastním pohybu (injureBnC). Bez lékárníka: omráčený by byl zase KO.
+    if (player.hasSkill(SkillName::BallAndChain)
+        && (injuryRoll <= (stunty ? 6 : 7) || (player.hasSkill(SkillName::ThickSkull) && injuryRoll == 8))) {
+        emitEvent(events, {GameEvent::Type::INJURY, playerId, -1, player.position, {}, injuryRoll, false, d1, d2});
+        removeFromPitch(state, player.id, PlayerState::KO, dice, events);
+        return injuryRoll;
+    }
     if (injuryRoll <= (stunty ? 6 : 7)) {
         // Stunned
         player.setState(PlayerState::STUNNED);
@@ -226,6 +234,15 @@ int resolveInjuryRoll(GameState& state, int playerId, DiceRollerBase& dice,
 bool resolveArmourAndInjury(GameState& state, int playerId, DiceRollerBase& dice,
                             const InjuryContext& ctx, std::vector<GameEvent>* events) {
     Player& player = state.getPlayer(playerId);
+    // OPRAVENO 10.11.2026 (P276, audit goblinů) — sražený Ball & Chain dostával hod na brnění, kdykoli ho srazil
+    //   někdo jiný (blok soupeře, Both Down, bomba, dopad hráče). Ř. 7827-7828: „If the player is ever Knocked Down
+    //   or Placed Prone roll immediately for injury (no Armour roll is required)“. Mighty Blow pak jde na zranění.
+    if (player.hasSkill(SkillName::BallAndChain)) {
+        InjuryContext injCtx = ctx;
+        if (ctx.mightyBlow) injCtx.injuryModifier += 1;
+        resolveInjuryRoll(state, playerId, dice, injCtx, events);
+        return true;
+    }
     int av = player.stats.armour;
 
     int aD1 = dice.rollD6();
