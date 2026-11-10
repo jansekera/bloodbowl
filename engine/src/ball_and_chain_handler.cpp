@@ -59,13 +59,16 @@ void injureBnC(GameState& state, int id, DiceRollerBase& dice,
     resolveInjuryRoll(state, id, dice, ctx, events);   // Stunned = KO řeší resolveInjuryRoll (P276)
 }
 
+// P284 (10.11.2026): `mightyBlow` = blokující B&C má Mighty Blow a cíl je soupeř (ř. 8293-8295 „when an opponent is
+//   Knocked Down by this player during a block“); dřív se házelo vždy bez něj.
 void knockDownTarget(GameState& state, Player& target, DiceRollerBase& dice,
-                     std::vector<GameEvent>* events) {
+                     std::vector<GameEvent>* events, bool mightyBlow) {
     if (!target.isOnPitch()) return;
     target.setState(PlayerState::PRONE);
     emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, target.id, -1,
                       target.position, {}, 0, false});
     InjuryContext ctx;
+    ctx.mightyBlow = mightyBlow;
     resolveArmourAndInjury(state, target.id, dice, ctx, events);
     handleBallOnPlayerDown(state, target.id, dice, events);
 }
@@ -99,6 +102,7 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
     BlockDiceFace faces[3];
     for (int i = 0; i < info.count; ++i) faces[i] = dice.rollBlockDie();
     const bool ownTarget = target.teamSide == bcp.teamSide;
+    const bool mb = !ownTarget && bcp.hasSkill(SkillName::MightyBlow);   // P284
     const BlockDiceFace face = chooseFace(faces, info.count, ownTarget,
                                           info.attackerChooses);
     emitEvent(events, {GameEvent::Type::BLOCK, bcp.id, target.id, bcp.position,
@@ -111,7 +115,7 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
         case BlockDiceFace::BOTH_DOWN: {
             const bool bcFalls = !bcp.hasSkill(SkillName::Block);
             const bool targetFalls = !target.hasSkill(SkillName::Block);
-            if (targetFalls) knockDownTarget(state, target, dice, events);
+            if (targetFalls) knockDownTarget(state, target, dice, events, mb);
             if (bcFalls) injureBnC(state, bcp.id, dice, events);
             return bcFalls || (targetFalls && ownTarget);
         }
@@ -121,12 +125,12 @@ bool bncBlock(GameState& state, Player& bcp, Player& target, DiceRollerBase& dic
         case BlockDiceFace::DEFENDER_STUMBLES: {
             const bool down = !target.hasSkill(SkillName::Dodge) || bcp.hasSkill(SkillName::Tackle);
             const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
-            if (down && !surfed) knockDownTarget(state, target, dice, events);
+            if (down && !surfed) knockDownTarget(state, target, dice, events, mb);
             return down && !surfed && ownTarget;
         }
         default: {   // DEFENDER_DOWN
             const bool surfed = pushAwayFrom(state, bcp, target, /*isBlock=*/true, dice, events);
-            if (!surfed) knockDownTarget(state, target, dice, events);
+            if (!surfed) knockDownTarget(state, target, dice, events, mb);
             return !surfed && ownTarget;
         }
     }

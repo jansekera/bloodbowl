@@ -72,4 +72,18 @@ final class OwnKnockdownTurnoverTest extends TestCase
         $this->assertSame(PlayerState::PRONE, $r->getNewState()->requirePlayer(3)->getState());
         $this->assertTrue($r->isTurnover());
     }
+
+    public function testP284MightyBlowPlatiIProBlokBallAndChain(): void
+    {
+        // ř. 7820-7821 „normal blocking rules“ + Mighty Blow ř. 8293-8295. ST 7 proti 3 = 3 kostky (útočník volí) DD;
+        // odtlačení na (12,7); brnění 4+4 = 8 = AV ⇒ s MB 9 prorazí, zranění 3+3 = omráčen
+        $s = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 10, 7, movement: 1, strength: 7, id: 1, skills: [SkillName::BallAndChain, SkillName::NoHands, SkillName::MightyBlow])
+            ->addPlayer(TeamSide::AWAY, 11, 7, armour: 8, id: 12)
+            ->withBallOffPitch()
+            ->build();
+        $r = (new ActionResolver(new FixedDiceRoller([3, 6, 6, 6, 4, 4, 3, 3])))->resolve($s, ActionType::BALL_AND_CHAIN, ['playerId' => 1]);
+
+        $this->assertSame(PlayerState::STUNNED, $r->getNewState()->requirePlayer(12)->getState());
+    }
 }

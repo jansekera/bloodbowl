@@ -1420,3 +1420,20 @@ TEST(Roster, PositionalCountMatchesTheFilledRowsOfEveryRoster) {
             EXPECT_EQ(r->positionalCount, filled) << r->name << " (TV " << tv << ")";
         }
 }
+
+// P285 (audit goblinů 10.11.2026): zraněná / mrtvá tajná zbraň zůstává zraněná / mrtvá — vyloučení na konci drive
+// (ř. 8451-8454) se týká hráče, který je ještě ve hře. Dřív C++ přepsal INJURED/DEAD na EJECTED (PHP zranění nechá).
+TEST(GameSimulator, P285AnInjuredSecretWeaponStaysInjuredAtTheEndOfTheDrive) {
+    GameState state;
+    const TeamRoster* g = getDevelopedRoster("goblin", 1500);
+    setupHalf(state, *g, *g);
+    int sw = -1;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (sw < 0 && p.hasSkill(SkillName::SecretWeapon)) sw = p.id;
+    });
+    ASSERT_GE(sw, 0);
+    state.getPlayer(sw).state = PlayerState::INJURED;
+    state.getPlayer(sw).position = {-1, -1};
+    setupDrive(state, *g, *g, TeamSide::AWAY);
+    EXPECT_EQ(state.getPlayer(sw).state, PlayerState::INJURED);
+}

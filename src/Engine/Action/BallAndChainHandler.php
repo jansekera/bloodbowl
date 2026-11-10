@@ -426,14 +426,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
                     $bncPlayer = $state->requirePlayer($bncPlayer->getId());
                 }
                 if (!$target->hasSkill(SkillName::Block)) {
-                    $events[] = GameEvent::playerFell($target->getId());
-                    $target = $target->withState(PlayerState::PRONE);
-                    $state = $state->withPlayer($target);
-                    $injResult = $this->injuryResolver->resolve($target, $this->dice);
-                    $target = $injResult['player'];
-                    $state = $state->withPlayer($target);
-                    $events = array_merge($events, $injResult['events']);
-                    [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $target, $events);
+                    [$state, $events] = $this->srazitCil($state, $bncPlayer, $target, $events);
                 }
                 break;
 
@@ -451,14 +444,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 if ($knockdown) {
                     $target = $state->getPlayer($target->getId());
                     if ($target !== null && $target->getPosition() !== null) {
-                        $events[] = GameEvent::playerFell($target->getId());
-                        $target = $target->withState(PlayerState::PRONE);
-                        $state = $state->withPlayer($target);
-                        $injResult = $this->injuryResolver->resolve($target, $this->dice);
-                        $target = $injResult['player'];
-                        $state = $state->withPlayer($target);
-                        $events = array_merge($events, $injResult['events']);
-                        [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $target, $events);
+                        [$state, $events] = $this->srazitCil($state, $bncPlayer, $target, $events);
                     }
                 }
                 break;
@@ -470,19 +456,30 @@ final class BallAndChainHandler implements ActionHandlerInterface
                 [$state, $events] = $odtlaceno;
                 $target = $state->getPlayer($target->getId());
                 if ($target !== null && $target->getPosition() !== null) {
-                    $events[] = GameEvent::playerFell($target->getId());
-                    $target = $target->withState(PlayerState::PRONE);
-                    $state = $state->withPlayer($target);
-                    $injResult = $this->injuryResolver->resolve($target, $this->dice);
-                    $target = $injResult['player'];
-                    $state = $state->withPlayer($target);
-                    $events = array_merge($events, $injResult['events']);
-                    [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $target, $events);
+                    [$state, $events] = $this->srazitCil($state, $bncPlayer, $target, $events);
                 }
                 break;
         }
 
         return [$state, $events, $bncPlayer];
+    }
+
+    /**
+     * Cíl bloku B&C je sražen: pád, brnění a zranění, míč. P284 (10.11.2026) — Mighty Blow blokujícího se počítá, když
+     * je cíl soupeř (ř. 8293-8295 „when an opponent is Knocked Down by this player during a block“); dřív nikdy.
+     *
+     * @param list<GameEvent> $events
+     * @return array{0: GameState, 1: list<GameEvent>}
+     */
+    private function srazitCil(GameState $state, MatchPlayerDTO $bnc, MatchPlayerDTO $cil, array $events): array
+    {
+        $events[] = GameEvent::playerFell($cil->getId());
+        $cil = $cil->withState(PlayerState::PRONE);
+        $mb = $bnc->hasSkill(SkillName::MightyBlow) && $cil->getTeamSide() !== $bnc->getTeamSide();
+        $inj = $this->injuryResolver->resolve($cil, $this->dice, mightyBlow: $mb);
+        $state = $state->withPlayer($inj['player']);
+        $events = array_merge($events, $inj['events']);
+        return $this->ballResolver->handleBallOnPlayerDown($state, $inj['player'], $events);
     }
 
     /**

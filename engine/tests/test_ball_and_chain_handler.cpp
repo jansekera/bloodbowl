@@ -361,3 +361,21 @@ TEST(BallAndChainHandler, P281KnockingDownAnOwnTeamMateIsATurnover) {
     EXPECT_NE(gs.getPlayer(2).state, PlayerState::STANDING);
     EXPECT_TRUE(r.turnover);
 }
+
+// P284: blok B&C probíhá „following normal blocking rules“ (ř. 7820-7821) ⇒ Mighty Blow „Add 1 to any Armour or
+// Injury roll … when an opponent is Knocked Down by this player during a block“ (ř. 8293-8295) platí i pro něj. Dřív
+// knockDownTarget házel s prázdným InjuryContext. (Fanatic z BB2016 MB nemá — latentní, ale skill se učí.)
+TEST(BallAndChainHandler, P284MightyBlowCountsOnABallAndChainBlock) {
+    auto gs = bncState();
+    makeBnC(gs, 1, {10, 7}, 1, 7);
+    gs.getPlayer(1).skills.add(SkillName::MightyBlow);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY, 6, 3, 3, 8);
+    // rovně ⇒ ST 7 proti 3 = blok na 3 (útočník volí) DD; odtlačení na (12,7); brnění 4+4 = 8 = AV ⇒ s MB 9 prorazí
+    FixedDiceRoller dice({3, 6, 6, 6, 4, 4, 3, 3});
+    std::vector<GameEvent> ev;
+    resolveBallAndChain(gs, 1, dice, &ev);
+    bool broken = false;
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::ARMOR_BREAK && e.playerId == 12) broken = e.success;
+    EXPECT_TRUE(broken);
+}

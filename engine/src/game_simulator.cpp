@@ -407,7 +407,9 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
     // Bribes are not implemented yet; the flag costs nothing and does not
     // depend on that staying true.
     for (auto& p : state.players) {
-        if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive) {
+        // OPRAVENO 10.11.2026 (P285) — přepisovalo i zraněné a mrtvé na EJECTED (PHP je nechává); zranění platí dál.
+        if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive
+            && p.state != PlayerState::INJURED && p.state != PlayerState::DEAD) {
             p.setState(PlayerState::EJECTED);
             p.position = {-1, -1};
         }
