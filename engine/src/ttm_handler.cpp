@@ -184,7 +184,12 @@ ActionResult resolveThrowTeamMate(GameState& state, int throwerId, int projectil
                           static_cast<int>(SkillName::RightStuff), landedOnFeet});
     }
 
-    if (landedOnFeet) return ActionResult::ok();
+    if (landedOnFeet) {
+        // OPRAVENO 10.11.2026 (P282, audit goblinů) — míč pod hozeným zůstal ležet. Ř. 440-444: hráč hozený na pole
+        //   s míčem ho „cannot pick up … instead it will bounce one square. This does not cause a turnover“ (PHP totéž).
+        if (!state.ball.isHeld && state.ball.position == landPos) resolveBounce(state, landPos, dice, 0, events);
+        return ActionResult::ok();
+    }
 
     projectile.setState(PlayerState::PRONE);
     emitEvent(events, {GameEvent::Type::KNOCKED_DOWN, projectileId, -1, landPos, {}, 0, false});

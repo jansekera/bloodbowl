@@ -177,8 +177,9 @@ final class ThrowTeamMateTest extends TestCase
         //   D8=3 (vychod) na (9,5), D8=7 (zapad) zpet na (8,5), D8=3 na (9,5)? ne --
         //   volime 3 (vychod) -> (9,5), 7 (zapad) -> (8,5), 7 (zapad) -> (7,5)
         //   a cilem je obsazene pole (7,5), kde stoji hrac 3.
-        // Pak rozptyl z obsazeneho pole D8=3 (vychod) -> (8,5), pristani 5.
-        $dice = new FixedDiceRoller([4, 3, 7, 7, 3, 5]); // presnost, 3x rozptyl, rozptyl z obsazeneho, pristani
+        // P278 (10.11.2026, ř. 8617-8622): hráč 3 je sražen + brnění 2+2, pak rozptyl z obsazeného D8=3 (východ)
+        //   -> (8,5); na přistání se po dopadu na hráče nehází, hozený leží + brnění 2+2. Dřív test čekal hod 5.
+        $dice = new FixedDiceRoller([4, 3, 7, 7, 2, 2, 3, 2, 2]); // presnost, 3x rozptyl, brneni 3, rozptyl, brneni 2
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::THROW_TEAM_MATE, [
             'playerId' => 1, 'targetId' => 2, 'targetX' => 8, 'targetY' => 5,

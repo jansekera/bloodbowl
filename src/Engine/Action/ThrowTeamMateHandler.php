@@ -215,6 +215,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         bool $hadBall,
         array $events,
         ?Position $scatterOrigin = null,
+        bool $naHraci = false,
     ): ActionResult {
         // Off pitch → crowd surf
         if (!$landingPos->isOnPitch()) {
@@ -265,12 +266,21 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }
 
-        // Occupied square → scatter further
+        // OPRAVENO 10.11.2026 (P278, audit goblinů) — dopad na obsazené pole jen rozptýlil dál. Ř. 8617-8622: „treat the
+        //   player landed on as Knocked Down and roll for Armour (even if already Prone or Stunned), and then the player
+        //   being thrown will scatter one more square … he cannot land on more than one player“. C++ ttm_handler.cpp.
         $occupant = $state->getPlayerAtPosition($landingPos);
         if ($occupant !== null && $occupant->getId() !== $projectile->getId()) {
-            $direction = $this->dice->rollD8();
-            $newPos = $this->scatterCalc->scatterOnce($landingPos, $direction);
-            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos);
+            if (!$naHraci) {
+                $srazen = $occupant->getState() === PlayerState::STUNNED ? $occupant : $occupant->withState(PlayerState::PRONE);
+                $events[] = GameEvent::playerFell($srazen->getId());
+                $inj = $this->injuryResolver->resolve($srazen, $this->dice);
+                $state = $state->withPlayer($inj['player']);
+                $events = array_merge($events, $inj['events']);
+                [$state, $events] = $this->ballResolver->handleBallOnPlayerDown($state, $inj['player'], $events);
+            }
+            $newPos = $this->scatterCalc->scatterOnce($landingPos, $this->dice->rollD8());
+            return $this->resolveLanding($state, $projectile, $newPos, $hadBall, $events, $landingPos, true);
         }
 
         // Place player at landing position
@@ -290,9 +300,13 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
         $tz = $this->tzCalc->countTacklezones($state, $landingPos, $projectile->getTeamSide());
         $landingTarget = max(2, min(6, 7 - $ag + $tz));
 
-        $landingRoll = $this->dice->rollD6();
-        $landingSuccess = $landingRoll >= $landingTarget;
-        $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
+        // Right Stuff ř. 8421-8431: na přistání se nehází, když dopadl na hráče — pak rovnou leží (P278)
+        $landingSuccess = false;
+        if (!$naHraci) {
+            $landingRoll = $this->dice->rollD6();
+            $landingSuccess = $landingRoll >= $landingTarget;
+            $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
+        }
 
         if (!$landingSuccess) {
             // Failed landing: prone + armor roll
@@ -310,6 +324,10 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                 $bounceResult = $this->ballResolver->resolveBounce($state, $landingPos);
                 $events = array_merge($events, $bounceResult['events']);
                 $state = $bounceResult['state'];
+                // OPRAVENO 10.11.2026 (P279) — tady turnover chyběl. Ř. 8430-8431: „does not cause a turnover, unless
+                //   he was holding the ball“ (u davu větev výš už turnover měla). C++ totéž.
+                $events[] = GameEvent::turnover('Thrown player with the ball failed to land');
+                return ActionResult::turnover($state->withTurnoverPending(true), $events);
             }
         }
 

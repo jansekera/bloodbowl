@@ -383,3 +383,23 @@ TEST(TTMHandler, P76ThrowInAfterTheExtraScatterStartsFromTheLandedOnSquare) {
     EXPECT_FALSE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.position, (Position{15, 4}));
 }
+
+// P282 (audit goblinů 10.11.2026): hozený, který dopadne na pole s volným míčem, ho „cannot pick up … instead it will
+// bounce one square. This does not cause a turnover“ (rules_bb2016.txt ř. 440-444). Dřív C++ při dopadu na nohy
+// skončil hned a míč zůstal ležet pod stojícím hráčem (PHP odskakoval).
+TEST(TTMHandler, P282LandingOnFeetOnALooseBallBouncesIt) {
+    auto gs = ttmSetup();
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 5, 3, 9);
+    gs.getPlayer(1).skills.add(SkillName::ThrowTeamMate);
+    placePlayer(gs, 2, {11, 7}, TeamSide::HOME, 6, 2, 3, 7);
+    gs.getPlayer(2).skills.add(SkillName::RightStuff);
+    gs.ball = BallState::onGround({16, 7});
+    // jako výše: dopad na (16,7) na nohou; pak odskok D8 3 (východ) na (17,7)
+    FixedDiceRoller dice({5, 3, 3, 3, 5, 3});
+    auto result = resolveThrowTeamMate(gs, 1, 2, {13, 7}, dice, nullptr);
+
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(2).position, (Position{16, 7}));
+    EXPECT_FALSE(gs.ball.isHeld);
+    EXPECT_EQ(gs.ball.position, (Position{17, 7}));
+}
