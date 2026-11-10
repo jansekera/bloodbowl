@@ -11,6 +11,7 @@ use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
 use App\DTO\PendingBombRethrowDTO;
 use App\DTO\PendingDivingCatchDTO;
+use App\DTO\PendingRerollDTO;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
 use App\Engine\Action\BlitzHandler;
@@ -27,6 +28,7 @@ use App\Engine\Action\ThrowTeamMateHandler;
 use App\Enum\ActionType;
 use App\Enum\CasualtyResult;
 use App\Enum\PlayerState;
+use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 
@@ -379,8 +381,11 @@ final class ActionResolver
         return new ActionResult($st, $r->isSuccess(), $r->isTurnover(), $r->getEvents());
     }
 
-    /** @param array<string, mixed> $params */
-    private function resolveAkce(GameState $state, ActionType $action, array $params): ActionResult
+    /**
+     * @param array<string, mixed> $params
+     * @param bool $kontrolaProsla kontrola před akcí už prošla přehozem v dialogu (P289) -- znovu se nehází
+     */
+    private function resolveAkce(GameState $state, ActionType $action, array $params, bool $kontrolaProsla = false): ActionResult
     {
         // ⛔ P81 (30.09.2026): pokracovani blitzu po rane. Je to TAZ akce (Blitz),
         //   takze se neopakuje kontrola pred akci; a propadne, jakmile jedna jiny
@@ -430,7 +435,7 @@ final class ActionResolver
         //   ani Take Root. Kdyby se sem STAND_PAT pustil, stalo by "nic
         //   nedelat" tolik co akce -- a big guy by se mohl omracit tim, ze
         //   se rozhodl nehrat.
-        if ($action !== ActionType::STAND_PAT && !$isContinuation
+        if ($action !== ActionType::STAND_PAT && !$isContinuation && !$kontrolaProsla
             && $action->requiresPlayer() && isset($params['playerId'])) {
             $player = $state->getPlayer((int) $params['playerId']);
             // Ztracene zony (Hypnotic Gaze, Bone Head, Really Stupid) plati "until the
@@ -463,31 +468,15 @@ final class ActionResolver
                         $state = $checkResult['state'];
                         $preEvents = $checkResult['events'];
                     } else {
-                        $blockedState = $checkResult['state'];
-                        // ⛔ PHP15 (11.09.2026): r. 8398-8401 -- „The player
-                        //   can't do anything for the turn, and **the player's
-                        //   team loses the declared Action for that turn**
-                        //   (for example if a Really Stupid player declares
-                        //   a Blitz Action and fails the Really Stupid roll,
-                        //   then the team cannot declare another Blitz Action
-                        //   that turn)." U Wild Animal r. 8668-8669 stejne:
-                        //   „**the Action is wasted**."
-                        //   PHP to nedelalo u ZADNE ze ctyr dovednosti ⇒ Big
-                        //   Guy, ktery sel k zemi na blitzu, tym o blitz
-                        //   NEPRIPRAVIL a ten si ho zahral znovu jinym hracem.
-                        //   Odecita se TADY, protoze do `match` niz (kde se
-                        //   tymovy limit jinak nastavuje) uz se nedostaneme.
-                        // ⚠️ C++ to ma jako `wastesTeamAction`
-                        //   (`action_resolver.cpp:276-283`); PHP kopie ne.
-                        if (!empty($checkResult['wastesTeamAction'])) {
-                            $blockedState = $this->consumeDeclaredTeamAction(
-                                $blockedState,
-                                $player->getTeamSide(),
-                                $action,
-                            );
+                        // P289 (10.11.2026): kouč-člověk smí neúspěch přehodit (ř. 929-931); ohlášená akce čeká
+                        $nabidka = isset($checkResult['reroll']) && $this->interactiveRerolls
+                            ? $this->nabidkaPrehozuKontroly($state, $player, $action, $params, $checkResult['reroll'])
+                            : null;
+                        if ($nabidka !== null) {
+                            return ActionResult::success($state->withPendingReroll($nabidka), $checkResult['events']);
                         }
 
-                        return ActionResult::success($blockedState, $checkResult['events']);
+                        return $this->akcePropadla($checkResult, $player, $action, $checkResult['events']);
                     }
                 }
             }
@@ -526,7 +515,7 @@ final class ActionResolver
             ActionType::AUTO_SETUP => $this->setupHandler->resolveAutoSetup($state, $params),
             ActionType::CHOOSE_BLOCK_DIE => $this->blockHandler->resolveBlockChoice($state, $params),
             ActionType::REROLL_BLOCK => $this->blockHandler->resolveBlockReroll($state, $params),
-            ActionType::RESOLVE_REROLL => $this->rerollHandler->resolve($state, $params),
+            ActionType::RESOLVE_REROLL => $this->resolveReroll($state, $params),
             ActionType::RESOLVE_APOTHECARY => $this->resolveApothecary($state, $params),
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
@@ -590,6 +579,103 @@ final class ActionResolver
         }
 
         return $result;
+    }
+
+    /**
+     * Kontrola před akcí neprošla: hráč nedělá nic a tým přichází o ohlášenou akci.
+     *
+     * ⛔ PHP15 (11.09.2026): r. 8398-8401 -- „The player
+     * can't do anything for the turn, and **the player's
+     * team loses the declared Action for that turn**
+     * (for example if a Really Stupid player declares
+     * a Blitz Action and fails the Really Stupid roll,
+     * then the team cannot declare another Blitz Action
+     * that turn)." U Wild Animal r. 8668-8669 stejne:
+     * „**the Action is wasted**."
+     * PHP to nedelalo u ZADNE ze ctyr dovednosti ⇒ Big
+     * Guy, ktery sel k zemi na blitzu, tym o blitz
+     * NEPRIPRAVIL a ten si ho zahral znovu jinym hracem.
+     * Odecita se TADY, protoze do `match` niz (kde se
+     * tymovy limit jinak nastavuje) uz se nedostaneme.
+     * ⚠️ C++ to ma jako `wastesTeamAction`
+     * (`action_resolver.cpp:276-283`); PHP kopie ne.
+     *
+     * @param array{state: GameState, wastesTeamAction?: bool} $checkResult
+     * @param list<\App\DTO\GameEvent> $events
+     */
+    private function akcePropadla(array $checkResult, MatchPlayerDTO $player, ActionType $action, array $events): ActionResult
+    {
+        $blockedState = $checkResult['state'];
+        if (!empty($checkResult['wastesTeamAction'])) {
+            $blockedState = $this->consumeDeclaredTeamAction($blockedState, $player->getTeamSide(), $action);
+        }
+
+        return ActionResult::success($blockedState, $events);
+    }
+
+    /**
+     * P289: nabídka přehozu neúspěšné kontroly Bone Head / Really Stupid / Wild Animal. AI ji nedostane --
+     * hody velkých hráčů nepřehazuje (parita s C++ P130).
+     *
+     * @param array<string, mixed> $params
+     * @param array{type: string, target: int, roll: int} $hod
+     */
+    private function nabidkaPrehozuKontroly(GameState $state, MatchPlayerDTO $player, ActionType $action, array $params, array $hod): ?PendingRerollDTO
+    {
+        $pro = $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn();
+        $tym = $state->getTeamState($player->getTeamSide())->canUseReroll();
+        if (!$pro && !$tym) {
+            return null;
+        }
+        $pos = $player->getPosition();
+
+        return new PendingRerollDTO(
+            $hod['type'],
+            $player->getId(),
+            $hod['target'],
+            $hod['roll'],
+            $pro,
+            $tym,
+            $pos?->getX() ?? 0,
+            $pos?->getY() ?? 0,
+            resumeAction: $action->value,
+            resumeParams: $params,
+        );
+    }
+
+    /**
+     * Odpověď na nabídku přehozu. U velkého hráče (P289) se přehozený hod vyhodnotí kontrolou před akcí:
+     * projde-li, ohlášená akce doběhne; jinak (i při odmítnutí) akce propadne.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function resolveReroll(GameState $state, array $params): ActionResult
+    {
+        $pending = $state->getPendingReroll();
+        $resume = $pending?->getResumeAction();
+        if ($pending === null || $resume === null) {
+            return $this->rerollHandler->resolve($state, $params);
+        }
+        $akce = ActionType::from($resume);
+
+        $vyhodnotit = function (GameState $s, ?int $hod, array $events) use ($pending, $akce): ActionResult {
+            /** @var list<GameEvent> $events */
+            $hrac = $s->requirePlayer($pending->getPlayerId());
+            $kontrola = $this->bigGuyCheckResolver->judgeRerollableCheck($s, $hrac, $akce, $hod ?? $pending->getRoll());
+            if ($kontrola === null || !empty($kontrola['proceed'])) {
+                $r = $this->resolveAkce($kontrola['state'] ?? $s, $akce, $pending->getResumeParams(), true);
+
+                return new ActionResult($r->getNewState(), $r->isSuccess(), $r->isTurnover(), [...$events, ...$r->getEvents()]);
+            }
+            // odmítnutí: událost neúspěchu už zazněla s nabídkou
+            if ($hod !== null) {
+                $events = [...$events, ...$kontrola['events']];
+            }
+
+            return $this->akcePropadla($kontrola, $hrac, $akce, $events);
+        };
+
+        return $this->rerollHandler->resolve($state, $params, $vyhodnotit);
     }
 
     /**

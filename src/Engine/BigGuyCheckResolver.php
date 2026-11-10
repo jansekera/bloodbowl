@@ -48,7 +48,7 @@ final class BigGuyCheckResolver
      *   do switche, kde se limit jinak nastavuje, uz se nedostane. PHP kopie
      *   to nemela -- CTVRTY drift teze tridy.
      *
-     * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool}|null
+     * @return array{state: GameState, events: list<\App\DTO\GameEvent>, proceed?: bool, turnover?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
     public function resolvePreActionCheck(
         GameState $state,
@@ -56,16 +56,8 @@ final class BigGuyCheckResolver
         ActionType $action,
         DiceRollerInterface $dice,
     ): ?array {
-        if ($player->hasSkill(SkillName::BoneHead)) {
-            return $this->resolveBoneHead($state, $player, $dice);
-        }
-
-        if ($player->hasSkill(SkillName::ReallyStupid)) {
-            return $this->resolveReallyStupid($state, $player, $dice);
-        }
-
-        if ($player->hasSkill(SkillName::WildAnimal)) {
-            return $this->resolveWildAnimal($state, $player, $action, $dice);
+        if (self::hasRerollableCheck($player)) {
+            return $this->judgeRerollableCheck($state, $player, $action, $dice->rollD6());
         }
 
         // ⛔ OPRAVA 11.09.2026 (PHP15d): hod se hazel JEN NA `MOVE`.
@@ -84,18 +76,41 @@ final class BigGuyCheckResolver
         return null;
     }
 
+    /** Má hráč kontrolu před akcí, kterou kouč smí přehodit (Bone Head, Really Stupid, Wild Animal)? */
+    public static function hasRerollableCheck(MatchPlayerDTO $player): bool
+    {
+        return $player->hasSkill(SkillName::BoneHead) || $player->hasSkill(SkillName::ReallyStupid)
+            || $player->hasSkill(SkillName::WildAnimal);
+    }
+
+    /**
+     * Vyhodnotí hod `$roll` kontroly Bone Head / Really Stupid / Wild Animal. P289 (10.11.2026): týž výpočet
+     * pro první hod i pro přehoz kouče — neúspěch nese `reroll` (druh, cíl, hod) pro nabídku přehozu.
+     *
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
+     */
+    public function judgeRerollableCheck(GameState $state, MatchPlayerDTO $player, ActionType $action, int $roll): ?array
+    {
+        if ($player->hasSkill(SkillName::BoneHead)) {
+            return $this->resolveBoneHead($state, $player, $roll);
+        }
+        if ($player->hasSkill(SkillName::ReallyStupid)) {
+            return $this->resolveReallyStupid($state, $player, $roll);
+        }
+
+        return $this->resolveWildAnimal($state, $player, $action, $roll);
+    }
+
     /**
      * Bone-head: Roll D6, on 1 = lose action + lose tacklezones.
      *
-     * @return array{state: GameState, events: list<GameEvent>}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
     private function resolveBoneHead(
         GameState $state,
         MatchPlayerDTO $player,
-        DiceRollerInterface $dice,
+        int $roll,
     ): ?array {
-        $roll = $dice->rollD6();
-
         if ($roll >= 2) {
             // r. 7985-7986: „**until he manages to roll a 2 or better** at the
             //   start of a future Action" -- uspesny hod stav UKONCUJE.
@@ -123,6 +138,7 @@ final class BigGuyCheckResolver
             'events' => [GameEvent::boneHeadFail($player->getId(), $roll)],
             // ⭐ viz `wastesTeamAction` niz
             'wastesTeamAction' => true,
+            'reroll' => ['type' => 'bone_head', 'target' => 2, 'roll' => $roll],
         ];
     }
 
@@ -130,17 +146,15 @@ final class BigGuyCheckResolver
      * Really Stupid: Roll D6, need 2+ (adjacent ally) or 4+ (no ally).
      * On fail = lose action + lose tacklezones.
      *
-     * @return array{state: GameState, events: list<GameEvent>}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
     private function resolveReallyStupid(
         GameState $state,
         MatchPlayerDTO $player,
-        DiceRollerInterface $dice,
+        int $roll,
     ): ?array {
         $hasAdjacentAlly = $this->hasReallyStupidSupport($state, $player);
         $threshold = $hasAdjacentAlly ? 2 : 4;
-
-        $roll = $dice->rollD6();
 
         if ($roll >= $threshold && $player->isBigGuyStupefied()) {
             // r. 8403-8405: „until he manages to roll a **successful result**
@@ -164,6 +178,7 @@ final class BigGuyCheckResolver
                 'state' => $state,
                 'events' => [GameEvent::reallyStupidFail($player->getId(), $roll, $hasAdjacentAlly)],
                 'wastesTeamAction' => true,
+                'reroll' => ['type' => 'really_stupid', 'target' => $threshold, 'roll' => $roll],
             ];
         }
 
@@ -174,13 +189,13 @@ final class BigGuyCheckResolver
      * Wild Animal: Roll D6, on 1-2 = lose action (keeps tacklezones).
      * Block/Blitz = automatic success.
      *
-     * @return array{state: GameState, events: list<GameEvent>}|null
+     * @return array{state: GameState, events: list<GameEvent>, proceed?: bool, wastesTeamAction?: bool, reroll?: array{type: string, target: int, roll: int}}|null
      */
     private function resolveWildAnimal(
         GameState $state,
         MatchPlayerDTO $player,
         ActionType $action,
-        DiceRollerInterface $dice,
+        int $roll,
     ): ?array {
         // ⛔⛔⛔ OPRAVA 11.09.2026 -- DVĚ VADY NARÁZ, OBĚ PROTI TEXTU PRAVIDEL.
         //   `rules_bb2016.txt` r. 8666-8669: „immediately after declaring an
@@ -209,8 +224,6 @@ final class BigGuyCheckResolver
         $hitting = ($action === ActionType::BLOCK || $action === ActionType::BLITZ);
         $target = $hitting ? 2 : 4;
 
-        $roll = $dice->rollD6();
-
         if ($roll < $target) {
             // Wild Animal loses action but keeps tacklezones
             $player = $player
@@ -222,6 +235,7 @@ final class BigGuyCheckResolver
                 'state' => $state,
                 'events' => [GameEvent::wildAnimalFail($player->getId(), $roll)],
                 'wastesTeamAction' => true,
+                'reroll' => ['type' => 'wild_animal', 'target' => $target, 'roll' => $roll],
             ];
         }
 

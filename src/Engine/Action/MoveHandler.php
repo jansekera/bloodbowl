@@ -186,6 +186,11 @@ final class MoveHandler implements ActionHandlerInterface
                 $success = $roll >= $leapTarget;
                 $events[] = GameEvent::leap($playerId, $leapTarget, $roll, $success);
                 if (!$success) {
+                    // P289: kouč-člověk dostane nabídku přehozu (ř. 929-931)
+                    $nabidka = $this->nabidkaPrehozu($currentState, $currentPlayer, 'leap', $leapTarget, $roll, $to, $gfiSkoku, $teamRerollUsed);
+                    if ($nabidka !== null) {
+                        return ActionResult::success($currentState->withPendingReroll($nabidka), $events);
+                    }
                     $success = $this->prehozAi(
                         $currentState,
                         $currentPlayer,
@@ -195,91 +200,12 @@ final class MoveHandler implements ActionHandlerInterface
                         static fn(int $r, bool $ok) => GameEvent::leap($playerId, $leapTarget, $r, $ok),
                     );
                 }
-                for ($g = 0; $success && $g < $gfiSkoku; $g++) {
-                    $gfiCil = $currentState->getWeather() === Weather::BLIZZARD ? 3 : 2;
-                    $roll = $this->dice->rollD6();
-                    $success = $roll >= $gfiCil;
-                    $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
-                    if (!$success && $currentPlayer->hasSkill(SkillName::SureFeet) && !$currentPlayer->isSureFeetUsedThisTurn()) {
-                        $currentPlayer = $currentPlayer->withSureFeetUsedThisTurn(true);
-                        $currentState = $currentState->withPlayer($currentPlayer);
-                        $roll = $this->dice->rollD6();
-                        $success = $roll >= $gfiCil;
-                        $events[] = GameEvent::rerollUsed($playerId, 'Sure Feet');
-                        $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
-                    } elseif (!$success) {
-                        $success = $this->prehozAi(
-                            $currentState,
-                            $currentPlayer,
-                            $gfiCil,
-                            $teamRerollUsed,
-                            $events,
-                            static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
-                        );
-                    }
-                }
-
                 if (!$success) {
-                    // nepovedený skok i GFI: sražen v cílovém poli + brnění (ř. 8274-8276, 1702-1703)
-                    $events[] = GameEvent::playerFell($playerId);
-                    $events[] = GameEvent::turnover('Failed leap');
-
-                    [$currentState, $events] = $this->knockDownAt($currentState, $currentPlayer, $to, $events);
-
-                    return ActionResult::turnover(
-                        $currentState->withTurnoverPending(true),
-                        $events,
-                    );
+                    return $this->skokSelhal($currentState, $currentPlayer, $to, $events);
                 }
-
-                // Successful leap: move player
-                $fromStr = $from !== null ? (string) $from : '?';
-                $events[] = GameEvent::playerMove($playerId, $fromStr, (string) $to);
-
-                $currentPlayer = $currentPlayer
-                    ->withPosition($to)
-                    ->withMovementRemaining($currentPlayer->getMovementRemaining() - 2);
-                $currentState = $currentState->withPlayer($currentPlayer);
-                // Shadowing platí při opuštění zóny „for any reason“ (ř. 8456-8458), i po skoku
-                if ($from !== null) {
-                    $currentState = $this->stin($currentState, $currentPlayer, $from, $events);
-                }
-
-                if ($currentState->getBall()->getCarrierId() === $playerId) {
-                    $currentState = $currentState->withBall(BallState::carried($to, $playerId));
-                }
-
-                // Check pickup on landing
-                $ball = $currentState->getBall();
-                if (!$ball->isHeld() && $ball->getPosition() !== null && $ball->getPosition()->equals($to)) {
-                    $currentPlayer = $currentState->getPlayer($playerId) ?? $currentPlayer;
-                    $pickupRerollAvailable = !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
-                    $pickupResult = $this->ballResolver->resolvePickup($currentState, $currentPlayer, $pickupRerollAvailable);
-                    $events = array_merge($events, $pickupResult['events']);
-                    $currentState = $pickupResult['state'];
-
-                    if ($pickupResult['teamRerollUsed']) {
-                        $teamRerollUsed = true;
-                        $currentState = $currentState->withTeamState(
-                            $activeSide,
-                            $currentState->getTeamState($activeSide)->withRerollUsed(),
-                        );
-                    }
-
-                    if (!$pickupResult['success']) {
-                        $events[] = GameEvent::turnover('Failed pickup');
-                        $fallenPlayer = ($currentState->getPlayer($playerId) ?? $currentPlayer)
-                            ->withHasMoved(true)
-                            ->withHasActed(true);
-                        $currentState = $currentState->withPlayer($fallenPlayer);
-
-                        return ActionResult::turnover(
-                            $currentState->withTurnoverPending(true),
-                            $events,
-                        );
-                    }
-
-                    $currentPlayer = $currentState->getPlayer($playerId) ?? $currentPlayer;
+                $konec = $this->dokoncitSkok($currentState, $currentPlayer, $from, $to, $gfiSkoku, $teamRerollUsed, $events);
+                if ($konec !== null) {
+                    return $konec;
                 }
 
                 continue; // skip normal dodge/GFI for this step
@@ -662,9 +588,148 @@ final class MoveHandler implements ActionHandlerInterface
     }
 
     /**
+     * P289 (10.11.2026): nabídka přehozu kouči-člověku (Pro, týmový přehoz; ř. 929-931, 8381-8387). AI a kouč bez
+     * přehozu dostanou `null`.
+     */
+    private function nabidkaPrehozu(GameState $state, MatchPlayerDTO $hrac, string $druh, int $cil, int $hod, Position $kam, int $gfiZbyva, bool $teamRerollUsed): ?PendingRerollDTO
+    {
+        if (!$this->interactiveRerolls) {
+            return null;
+        }
+        $pro = $hrac->hasSkill(SkillName::Pro) && !$hrac->isProUsedThisTurn();
+        $tym = !$teamRerollUsed && $state->getTeamState($hrac->getTeamSide())->canUseReroll();
+        if (!$pro && !$tym) {
+            return null;
+        }
+
+        return new PendingRerollDTO($druh, $hrac->getId(), $cil, $hod, $pro, $tym, $kam->getX(), $kam->getY(), gfiRemaining: $gfiZbyva);
+    }
+
+    /**
+     * Nepovedený skok nebo jeho GFI: sražen v cílovém poli + brnění (ř. 8274-8276, 1702-1703), turnover.
+     *
+     * @param list<GameEvent> $events
+     */
+    public function skokSelhal(GameState $state, MatchPlayerDTO $hrac, Position $to, array $events): ActionResult
+    {
+        $events[] = GameEvent::playerFell($hrac->getId());
+        $events[] = GameEvent::turnover('Failed leap');
+        [$state, $events] = $this->knockDownAt($state, $hrac, $to, $events);
+
+        return ActionResult::turnover($state->withTurnoverPending(true), $events);
+    }
+
+    /**
+     * Po povedeném hodu na skok (i přehozeném v dialogu, P289): GFI skoku, dopad, Shadowing, míč.
+     *
+     * @param list<GameEvent> $events
+     */
+    public function dokoncitSkokPoPrehozu(GameState $state, int $playerId, Position $to, int $gfi, array $events): ActionResult
+    {
+        $hrac = $state->requirePlayer($playerId);
+        $teamRerollUsed = false;
+        $konec = $this->dokoncitSkok($state, $hrac, $hrac->getPosition(), $to, $gfi, $teamRerollUsed, $events);
+
+        return $konec ?? ActionResult::success($state, $events);
+    }
+
+    /**
+     * GFI skoku a dopad. Vrací výsledek, když tah skončí (pád, nabídka přehozu, nezvednutý míč), jinak `null`
+     * a stav s hráčem v cílovém poli.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function dokoncitSkok(GameState &$state, MatchPlayerDTO &$hrac, ?Position $from, Position $to, int $gfi, bool &$teamRerollUsed, array &$events): ?ActionResult
+    {
+        $playerId = $hrac->getId();
+        for ($g = 0; $g < $gfi; $g++) {
+            $gfiCil = $state->getWeather() === Weather::BLIZZARD ? 3 : 2;
+            $roll = $this->dice->rollD6();
+            $success = $roll >= $gfiCil;
+            $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
+            if (!$success && $hrac->hasSkill(SkillName::SureFeet) && !$hrac->isSureFeetUsedThisTurn()) {
+                $hrac = $hrac->withSureFeetUsedThisTurn(true);
+                $state = $state->withPlayer($hrac);
+                $roll = $this->dice->rollD6();
+                $success = $roll >= $gfiCil;
+                $events[] = GameEvent::rerollUsed($playerId, 'Sure Feet');
+                $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
+            } elseif (!$success) {
+                $nabidka = $this->nabidkaPrehozu($state, $hrac, 'leap_gfi', $gfiCil, $roll, $to, $gfi - $g - 1, $teamRerollUsed);
+                if ($nabidka !== null) {
+                    return ActionResult::success($state->withPendingReroll($nabidka), $events);
+                }
+                $success = $this->prehozAi(
+                    $state,
+                    $hrac,
+                    $gfiCil,
+                    $teamRerollUsed,
+                    $events,
+                    static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
+                );
+            }
+            if (!$success) {
+                return $this->skokSelhal($state, $hrac, $to, $events);
+            }
+        }
+
+        // Successful leap: move player
+        $fromStr = $from !== null ? (string) $from : '?';
+        $events[] = GameEvent::playerMove($playerId, $fromStr, (string) $to);
+
+        $hrac = $hrac
+            ->withPosition($to)
+            ->withMovementRemaining($hrac->getMovementRemaining() - 2);
+        $state = $state->withPlayer($hrac);
+        // Shadowing platí při opuštění zóny „for any reason“ (ř. 8456-8458), i po skoku
+        if ($from !== null) {
+            $state = $this->stin($state, $hrac, $from, $events);
+        }
+
+        if ($state->getBall()->getCarrierId() === $playerId) {
+            $state = $state->withBall(BallState::carried($to, $playerId));
+        }
+
+        // Check pickup on landing
+        $ball = $state->getBall();
+        if (!$ball->isHeld() && $ball->getPosition() !== null && $ball->getPosition()->equals($to)) {
+            $hrac = $state->getPlayer($playerId) ?? $hrac;
+            $pickupRerollAvailable = !$teamRerollUsed && $state->getTeamState($state->getActiveTeam())->canUseReroll();
+            $pickupResult = $this->ballResolver->resolvePickup($state, $hrac, $pickupRerollAvailable);
+            $events = array_merge($events, $pickupResult['events']);
+            $state = $pickupResult['state'];
+
+            if ($pickupResult['teamRerollUsed']) {
+                $teamRerollUsed = true;
+                $state = $state->withTeamState(
+                    $state->getActiveTeam(),
+                    $state->getTeamState($state->getActiveTeam())->withRerollUsed(),
+                );
+            }
+
+            if (!$pickupResult['success']) {
+                $events[] = GameEvent::turnover('Failed pickup');
+                $fallenPlayer = ($state->getPlayer($playerId) ?? $hrac)
+                    ->withHasMoved(true)
+                    ->withHasActed(true);
+                $state = $state->withPlayer($fallenPlayer);
+
+                return ActionResult::turnover(
+                    $state->withTurnoverPending(true),
+                    $events,
+                );
+            }
+
+            $hrac = $state->getPlayer($playerId) ?? $hrac;
+        }
+
+        return null;
+    }
+
+    /**
      * P277: přehoz nepovedeného hodu bez dialogu (AI; ř. 929-931) — Pro (ř. 8381-8387, ProCheck), jinak týmový přehoz
-     * (Loner 4+, ř. 8287-8290); jeden hod nejvýš jednou (ř. 925-927). Kouč-člověk (interaktivní přehozy) tu přehoz
-     * zatím nedostane — dialog umí jen úhyb, GFI a zvednutí (P283).
+     * (Loner 4+, ř. 8287-8290); jeden hod nejvýš jednou (ř. 925-927). Kouč-člověk (interaktivní přehozy) dostane
+     * místo toho nabídku (`nabidkaPrehozu`, P289).
      *
      * @param list<GameEvent> $events
      * @param callable(int, bool): GameEvent $udalost

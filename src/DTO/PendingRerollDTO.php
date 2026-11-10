@@ -6,6 +6,10 @@ namespace App\DTO;
 
 /**
  * Captures a failed roll awaiting player reroll decision (dodge, GFI, pickup).
+ *
+ * P289 (10.11.2026): i hody velkých hráčů (`bone_head`, `really_stupid`, `wild_animal`) a Leap (`leap`,
+ * `leap_gfi`). U velkého hráče nese ohlášenou akci (`resumeAction`, `resumeParams`), která po povedeném
+ * přehozu doběhne; u Leapu kolik GFI skoku ještě zbývá hodit (`gfiRemaining`).
  */
 final class PendingRerollDTO
 {
@@ -21,6 +25,10 @@ final class PendingRerollDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
+        private readonly ?string $resumeAction = null,
+        /** @var array<string, mixed> */
+        private readonly array $resumeParams = [],
+        private readonly int $gfiRemaining = 0,
     ) {}
 
     public function getRollType(): string
@@ -60,6 +68,22 @@ final class PendingRerollDTO
         return $this->proFailed;
     }
 
+    public function getResumeAction(): ?string
+    {
+        return $this->resumeAction;
+    }
+
+    /** @return array<string, mixed> */
+    public function getResumeParams(): array
+    {
+        return $this->resumeParams;
+    }
+
+    public function getGfiRemaining(): int
+    {
+        return $this->gfiRemaining;
+    }
+
     public function withProFailed(): self
     {
         return new self(
@@ -72,6 +96,9 @@ final class PendingRerollDTO
             $this->targetX,
             $this->targetY,
             true,
+            $this->resumeAction,
+            $this->resumeParams,
+            $this->gfiRemaining,
         );
     }
 
@@ -90,6 +117,9 @@ final class PendingRerollDTO
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
             'proFailed' => $this->proFailed,
+            'resumeAction' => $this->resumeAction,
+            'resumeParams' => $this->resumeParams,
+            'gfiRemaining' => $this->gfiRemaining,
         ];
     }
 
@@ -108,6 +138,9 @@ final class PendingRerollDTO
             targetX: (int) ($data['targetX'] ?? 0),
             targetY: (int) ($data['targetY'] ?? 0),
             proFailed: (bool) ($data['proFailed'] ?? false),
+            resumeAction: isset($data['resumeAction']) ? (string) $data['resumeAction'] : null,
+            resumeParams: (array) ($data['resumeParams'] ?? []),
+            gfiRemaining: (int) ($data['gfiRemaining'] ?? 0),
         );
     }
 }

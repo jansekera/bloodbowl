@@ -23,9 +23,13 @@ final class RerollHandler
     ) {}
 
     /**
+     * `$vyhodnotit` (P289): co znamená přehozený hod `int`, nebo konečný neúspěch `null` (platí původní hod).
+     * Bez něj úhyb, GFI, zvednutí a Leap; velký hráč si dodá vlastní (kontrola před akcí, pak akce).
+     *
      * @param array<string, mixed> $params
+     * @param (\Closure(GameState, ?int, list<GameEvent>): ActionResult)|null $vyhodnotit
      */
-    public function resolve(GameState $state, array $params): ActionResult
+    public function resolve(GameState $state, array $params, ?\Closure $vyhodnotit = null): ActionResult
     {
         $pending = $state->getPendingReroll();
         if ($pending === null) {
@@ -47,11 +51,12 @@ final class RerollHandler
         }
 
         $state = $state->withPendingReroll(null);
+        $vyhodnotit ??= $this->vychoziVyhodnoceni($pending);
 
         return match ($choice) {
-            'pro' => $this->resolveProReroll($state, $pending),
-            'team_reroll' => $this->resolveTeamReroll($state, $pending),
-            'decline' => $this->applyFailure($state, $pending),
+            'pro' => $this->resolveProReroll($state, $pending, $vyhodnotit),
+            'team_reroll' => $this->resolveTeamReroll($state, $pending, $vyhodnotit),
+            'decline' => $vyhodnotit($state, null, []),
             default => throw new \InvalidArgumentException("Invalid reroll choice: {$choice}"),
         };
     }
@@ -67,23 +72,42 @@ final class RerollHandler
         }
 
         $state = $state->withPendingReroll(null);
+        $vyhodnotit = $this->vychoziVyhodnoceni($pending);
 
         // AI: try Pro first, then Team Reroll
         if ($pending->isProAvailable()) {
-            return $this->resolveProReroll($state, $pending);
+            return $this->resolveProReroll($state, $pending, $vyhodnotit);
         }
         if ($pending->isTeamRerollAvailable()) {
-            return $this->resolveTeamReroll($state, $pending);
+            return $this->resolveTeamReroll($state, $pending, $vyhodnotit);
         }
 
-        return $this->applyFailure($state, $pending);
+        return $vyhodnotit($state, null, []);
     }
 
-    private function resolveProReroll(GameState $state, PendingRerollDTO $pending): ActionResult
+    /** @return \Closure(GameState, ?int, list<GameEvent>): ActionResult */
+    private function vychoziVyhodnoceni(PendingRerollDTO $pending): \Closure
+    {
+        return function (GameState $state, ?int $hod, array $events) use ($pending): ActionResult {
+            /** @var list<GameEvent> $events */
+            if ($hod === null) {
+                return $this->applyFailure($state, $pending, $events);
+            }
+            $success = $hod >= $pending->getTarget();
+            $events[] = $this->makeRollEvent($pending, $hod, $success);
+
+            return $success
+                ? $this->applySuccess($state, $pending, $events)
+                : $this->applyFailure($state, $pending, $events);
+        };
+    }
+
+    /** @param \Closure(GameState, ?int, list<GameEvent>): ActionResult $vyhodnotit */
+    private function resolveProReroll(GameState $state, PendingRerollDTO $pending, \Closure $vyhodnotit): ActionResult
     {
         $player = $state->getPlayer($pending->getPlayerId());
         if ($player === null) {
-            return $this->applyFailure($state, $pending);
+            return $vyhodnotit($state, null, []);
         }
 
         $player = $player->withProUsedThisTurn(true);
@@ -100,7 +124,7 @@ final class RerollHandler
                 return ActionResult::success($state->withPendingReroll($pending->withProFailed()), $events);
             }
 
-            return $this->applyFailure($state, $pending, $events);
+            return $vyhodnotit($state, null, $events);
         }
 
         $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, true, null);
@@ -108,35 +132,18 @@ final class RerollHandler
         // ⛔ OPRAVA 18.09.2026: po prehozu kostky Pro se uz tymovy prehoz
         //   NENABIZI -- r. 926: "you may never re-roll a single dice roll more
         //   than once." Driv se nabidl a kostka sla prehodit podruhe.
-        return $this->rerollDie($state, $pending, $events);
+        return $vyhodnotit($state, $this->dice->rollD6(), $events);
     }
 
-    /**
-     * Prehodi puvodni kostku (jedinkrat) a vyhodnoti vysledek.
-     *
-     * @param list<GameEvent> $events
-     */
-    private function rerollDie(GameState $state, PendingRerollDTO $pending, array $events): ActionResult
-    {
-        $newRoll = $this->dice->rollD6();
-        $success = $newRoll >= $pending->getTarget();
-        $events[] = $this->makeRollEvent($pending, $newRoll, $success);
-
-        if ($success) {
-            return $this->applySuccess($state, $pending, $events);
-        }
-
-        return $this->applyFailure($state, $pending, $events);
-    }
-
-    private function resolveTeamReroll(GameState $state, PendingRerollDTO $pending): ActionResult
+    /** @param \Closure(GameState, ?int, list<GameEvent>): ActionResult $vyhodnotit */
+    private function resolveTeamReroll(GameState $state, PendingRerollDTO $pending, \Closure $vyhodnotit): ActionResult
     {
         $side = $state->getActiveTeam();
         $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
 
         $player = $state->getPlayer($pending->getPlayerId());
         if ($player === null) {
-            return $this->applyFailure($state, $pending);
+            return $vyhodnotit($state, null, []);
         }
 
         $events = [];
@@ -146,7 +153,7 @@ final class RerollHandler
             $lonerRoll = $this->dice->rollD6();
             if ($lonerRoll < 4) {
                 $events[] = GameEvent::lonerCheck($pending->getPlayerId(), $lonerRoll, false);
-                return $this->applyFailure($state, $pending, $events);
+                return $vyhodnotit($state, null, $events);
             }
             $events[] = GameEvent::lonerCheck($pending->getPlayerId(), $lonerRoll, true);
         }
@@ -159,11 +166,11 @@ final class RerollHandler
             $proRoll = $this->dice->rollD6();
             $events[] = GameEvent::proReroll($pending->getPlayerId(), $proRoll, $proRoll >= 4, null);
             if ($proRoll < 4) {
-                return $this->applyFailure($state, $pending, $events);
+                return $vyhodnotit($state, null, $events);
             }
         }
 
-        return $this->rerollDie($state, $pending, $events);
+        return $vyhodnotit($state, $this->dice->rollD6(), $events);
     }
 
     /**
@@ -177,6 +184,11 @@ final class RerollHandler
         }
 
         $target = new Position($pending->getTargetX(), $pending->getTargetY());
+
+        // P289: povedený skok (nebo jeho GFI) -- zbylé GFI skoku a dopad
+        if ($pending->getRollType() === 'leap' || $pending->getRollType() === 'leap_gfi') {
+            return $this->moveHandler->dokoncitSkokPoPrehozu($state, $player->getId(), $target, $pending->getGfiRemaining(), $events);
+        }
 
         if ($pending->getRollType() === 'pickup') {
             $pos = $player->getPosition();
@@ -247,6 +259,10 @@ final class RerollHandler
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }
 
+        if ($pending->getRollType() === 'leap' || $pending->getRollType() === 'leap_gfi') {
+            return $this->moveHandler->skokSelhal($state, $player, new Position($pending->getTargetX(), $pending->getTargetY()), $events);
+        }
+
         // Dodge or GFI: player falls
         // OPRAVENO 08.10.2026 (audit parity, nalezy 4a a 4b) -- tady byla vlastni kopie padu:
         //   u uhybu nechavala hrace na VYCHOZIM poli (jen GFI slo na cilove) a po padu se
@@ -273,7 +289,8 @@ final class RerollHandler
     {
         return match ($pending->getRollType()) {
             'dodge' => GameEvent::dodgeAttempt($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
-            'gfi' => GameEvent::gfiAttempt($pending->getPlayerId(), $roll, $success),
+            'gfi', 'leap_gfi' => GameEvent::gfiAttempt($pending->getPlayerId(), $roll, $success),
+            'leap' => GameEvent::leap($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
             default => GameEvent::ballPickup($pending->getPlayerId(), $pending->getTarget(), $roll, $success),
         };
     }

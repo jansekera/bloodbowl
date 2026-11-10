@@ -4,6 +4,11 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
     dodge: 'Dodge',
     gfi: 'Going For It',
     pickup: 'Pickup',
+    leap: 'Leap',
+    leap_gfi: 'Going For It (Leap)',
+    bone_head: 'Bone Head',
+    really_stupid: 'Really Stupid',
+    wild_animal: 'Wild Animal',
 };
 
 export class RerollModal {
