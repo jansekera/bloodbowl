@@ -21,7 +21,6 @@ final class PendingRefereeDTO
     /**
      * @param array<string, mixed> $params
      * @param list<int> $dice
-     * @param list<array{bribe: bool, argue: bool}> $answers
      * @param list<int> $queue
      */
     public function __construct(
@@ -32,7 +31,7 @@ final class PendingRefereeDTO
         private readonly ?ActionType $action = null,
         private readonly array $params = [],
         private readonly array $dice = [],
-        private readonly array $answers = [],
+        private readonly ReplayAnswers $answers = new ReplayAnswers(),
         private readonly array $queue = [],
     ) {}
 
@@ -73,8 +72,8 @@ final class PendingRefereeDTO
         return $this->dice;
     }
 
-    /** @return list<array{bribe: bool, argue: bool}> */
-    public function getAnswers(): array
+    /** Odpovědi z dřívějších přerušení této akce (všechny druhy otázek, P292). */
+    public function getAnswers(): ReplayAnswers
     {
         return $this->answers;
     }
@@ -96,7 +95,7 @@ final class PendingRefereeDTO
             'action' => $this->action?->value,
             'params' => $this->params,
             'dice' => $this->dice,
-            'answers' => $this->answers,
+            'answers' => $this->answers->toArray(),
             'queue' => $this->queue,
         ];
     }
@@ -112,10 +111,7 @@ final class PendingRefereeDTO
             isset($data['action']) ? ActionType::from((string) $data['action']) : null,
             (array) ($data['params'] ?? []),
             array_values(array_map('intval', (array) ($data['dice'] ?? []))),
-            array_values(array_map(
-                static fn(mixed $a): array => ['bribe' => (bool) ((array) $a)['bribe'], 'argue' => (bool) ((array) $a)['argue']],
-                (array) ($data['answers'] ?? []),
-            )),
+            ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
             array_values(array_map('intval', (array) ($data['queue'] ?? []))),
         );
     }

@@ -9,6 +9,11 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
     bone_head: 'Bone Head',
     really_stupid: 'Really Stupid',
     wild_animal: 'Wild Animal',
+    pass: 'Pass',
+    bomb: 'Bomb Throw',
+    ttm: 'Throw Team-Mate',
+    ttm_landing: 'Landing (Right Stuff)',
+    always_hungry: 'Always Hungry',
 };
 
 export class RerollModal {
@@ -45,6 +50,7 @@ export class RerollModal {
             <div class="reroll-modal__content">
                 <div class="reroll-modal__title">${label} Failed!</div>
                 <div class="reroll-modal__info">${this.escape(playerName)} rolled <strong>${pending.roll}</strong> (needed ${pending.target}+)</div>
+                ${pending.proFailed ? '<div class="reroll-modal__info">Pro roll failed — a team re-roll may re-roll the Pro roll.</div>' : ''}
                 <div class="reroll-modal__buttons">${buttons}</div>
             </div>
         `;

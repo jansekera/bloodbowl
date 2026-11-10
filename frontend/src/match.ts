@@ -226,7 +226,8 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     }
 
     // Show reroll modal if there's a pending reroll
-    if (result.state.pendingReroll && result.state.aiTeam !== result.state.activeTeam) {
+    // P292: přehoz hodu (replayAction) se ptá kouče hráče i v tahu soupeře (bomba chycená jeho hráčem)
+    if (result.state.pendingReroll && (result.state.aiTeam !== result.state.activeTeam || result.state.pendingReroll.replayAction)) {
         showRerollModal(result.state);
     }
 
@@ -1213,6 +1214,10 @@ async function init(): Promise<void> {
             // Show block dice modal if there's a pending block on load
             if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {
                 showBlockDiceModal(state);
+            }
+            // P292: čekající přehoz i po obnovení stránky — server jinou akci nepřijme
+            if (state.pendingReroll && (state.aiTeam !== state.activeTeam || state.pendingReroll.replayAction)) {
+                showRerollModal(state);
             }
             // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme
             if (state.pendingGrab) {

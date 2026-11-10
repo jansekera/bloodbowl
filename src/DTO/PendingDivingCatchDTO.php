@@ -17,14 +17,13 @@ use App\ValueObject\Position;
  * a víc pokusů se ruší (ř. 8069-8071).
  *
  * Stav s touto otázkou je stav PŘED akcí `action` (`params`): po odpovědi se akce přehraje se
- * zapsanými hody `dice` a odpověďmi `answers` + novou (viz `ReplayDiceRoller`).
+ * zapsanými hody `dice` a odpověďmi `answers` (všech druhů, ReplayAnswers) + novou (viz `ReplayDiceRoller`).
  */
 final class PendingDivingCatchDTO
 {
     /**
      * @param array<string, mixed> $params
      * @param list<int> $dice
-     * @param list<bool> $answers
      */
     public function __construct(
         private readonly int $playerId,
@@ -32,7 +31,7 @@ final class PendingDivingCatchDTO
         private readonly ActionType $action,
         private readonly array $params,
         private readonly array $dice,
-        private readonly array $answers,
+        private readonly ReplayAnswers $answers,
         private readonly int $otherCandidates = 0,
         private readonly ?int $attemptingId = null,
     ) {}
@@ -64,8 +63,8 @@ final class PendingDivingCatchDTO
         return $this->dice;
     }
 
-    /** @return list<bool> */
-    public function getAnswers(): array
+    /** Odpovědi z dřívějších přerušení této akce (všechny druhy otázek, P292). */
+    public function getAnswers(): ReplayAnswers
     {
         return $this->answers;
     }
@@ -89,7 +88,7 @@ final class PendingDivingCatchDTO
             'action' => $this->action->value,
             'params' => $this->params,
             'dice' => $this->dice,
-            'answers' => $this->answers,
+            'answers' => $this->answers->toArray(),
             'otherCandidates' => $this->otherCandidates,
             'attemptingId' => $this->attemptingId,
         ];
@@ -106,7 +105,7 @@ final class PendingDivingCatchDTO
             ActionType::from((string) $data['action']),
             (array) ($data['params'] ?? []),
             array_values(array_map('intval', (array) ($data['dice'] ?? []))),
-            array_values(array_map('boolval', (array) ($data['answers'] ?? []))),
+            ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
             (int) ($data['otherCandidates'] ?? 0),
             isset($data['attemptingId']) ? (int) $data['attemptingId'] : null,
         );

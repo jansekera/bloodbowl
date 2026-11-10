@@ -73,6 +73,8 @@ final class GameOrchestrator
         $resolver->setInteractiveBombRethrow($lide);
         // P291: úplatek / protest, když rozhodčí vylučuje hráče kouče-člověka (faul, tajná zbraň na konci drive)
         $resolver->setInteractiveReferee($lide);
+        // P292: přehoz nepovedené přihrávky, bomby a hodu spoluhráčem
+        $resolver->setInteractiveThrowRerolls($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();

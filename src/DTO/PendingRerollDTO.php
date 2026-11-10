@@ -4,12 +4,18 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Enum\ActionType;
+
 /**
  * Captures a failed roll awaiting player reroll decision (dodge, GFI, pickup).
  *
  * P289 (10.11.2026): i hody velkých hráčů (`bone_head`, `really_stupid`, `wild_animal`) a Leap (`leap`,
  * `leap_gfi`). U velkého hráče nese ohlášenou akci (`resumeAction`, `resumeParams`), která po povedeném
  * přehozu doběhne; u Leapu kolik GFI skoku ještě zbývá hodit (`gfiRemaining`).
+ *
+ * P292 (10.11.2026): přehoz hodu přes ThrowReroll (přihrávka `pass`, bomba `bomb`, hod spoluhráčem `ttm`, přistání
+ * `ttm_landing`, Always Hungry `always_hungry`). Stav je pak stav PŘED akcí `replayAction` (`replayParams`); po
+ * odpovědi se akce přehraje se zapsanými hody `replayDice` a odpověďmi `replayAnswers` + novou (jako Diving Catch).
  */
 final class PendingRerollDTO
 {
@@ -29,6 +35,12 @@ final class PendingRerollDTO
         /** @var array<string, mixed> */
         private readonly array $resumeParams = [],
         private readonly int $gfiRemaining = 0,
+        private readonly ?ActionType $replayAction = null,
+        /** @var array<string, mixed> */
+        private readonly array $replayParams = [],
+        /** @var list<int> */
+        private readonly array $replayDice = [],
+        private readonly ReplayAnswers $replayAnswers = new ReplayAnswers(),
     ) {}
 
     public function getRollType(): string
@@ -84,6 +96,28 @@ final class PendingRerollDTO
         return $this->gfiRemaining;
     }
 
+    public function getReplayAction(): ?ActionType
+    {
+        return $this->replayAction;
+    }
+
+    /** @return array<string, mixed> */
+    public function getReplayParams(): array
+    {
+        return $this->replayParams;
+    }
+
+    /** @return list<int> */
+    public function getReplayDice(): array
+    {
+        return $this->replayDice;
+    }
+
+    public function getReplayAnswers(): ReplayAnswers
+    {
+        return $this->replayAnswers;
+    }
+
     public function withProFailed(): self
     {
         return new self(
@@ -99,6 +133,10 @@ final class PendingRerollDTO
             $this->resumeAction,
             $this->resumeParams,
             $this->gfiRemaining,
+            $this->replayAction,
+            $this->replayParams,
+            $this->replayDice,
+            $this->replayAnswers,
         );
     }
 
@@ -120,6 +158,10 @@ final class PendingRerollDTO
             'resumeAction' => $this->resumeAction,
             'resumeParams' => $this->resumeParams,
             'gfiRemaining' => $this->gfiRemaining,
+            'replayAction' => $this->replayAction?->value,
+            'replayParams' => $this->replayParams,
+            'replayDice' => $this->replayDice,
+            'replayAnswers' => $this->replayAnswers->toArray(),
         ];
     }
 
@@ -141,6 +183,10 @@ final class PendingRerollDTO
             resumeAction: isset($data['resumeAction']) ? (string) $data['resumeAction'] : null,
             resumeParams: (array) ($data['resumeParams'] ?? []),
             gfiRemaining: (int) ($data['gfiRemaining'] ?? 0),
+            replayAction: isset($data['replayAction']) ? ActionType::from((string) $data['replayAction']) : null,
+            replayParams: (array) ($data['replayParams'] ?? []),
+            replayDice: array_values(array_map('intval', (array) ($data['replayDice'] ?? []))),
+            replayAnswers: ReplayAnswers::fromArray((array) ($data['replayAnswers'] ?? [])),
         );
     }
 }

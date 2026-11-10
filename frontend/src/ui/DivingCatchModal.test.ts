@@ -36,7 +36,7 @@ function mockElement() {
 }
 
 const pending: PendingDivingCatch = {
-    playerId: 2, landing: { x: 10, y: 6 }, action: 'pass', params: {}, dice: [2, 2, 5, 3, 7], answers: [],
+    playerId: 2, landing: { x: 10, y: 6 }, action: 'pass', params: {}, dice: [2, 2, 5, 3, 7], answers: { divingCatch: [], bombTargets: [], referee: [], rerolls: [] },
     otherCandidates: 0, attemptingId: null,
 };
 

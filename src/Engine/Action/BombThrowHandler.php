@@ -20,12 +20,20 @@ use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
 use App\Engine\ThrowReroll;
+use App\Engine\CoachRerolls;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 use App\Engine\ThrowTarget;
 
 final class BombThrowHandler implements ActionHandlerInterface
 {
+    /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
+    private ?CoachRerolls $koucPrehozy = null;
+
+    public function setCoachRerolls(CoachRerolls $kouc): void
+    {
+        $this->koucPrehozy = $kouc;
+    }
     private readonly PassResolver $passResolver;
 
     /** @var list<TeamSide> strany kouče-člověka — jeho hráče se ptá, kam hodit chycenou bombu (P272) */
@@ -168,6 +176,10 @@ final class BombThrowHandler implements ActionHandlerInterface
                     $thrower->getTeamSide(),
                     !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
                     $events,
+                    $this->koucPrehozy,
+                    'bomb',
+                    $roll,
+                    max(2, 2 - $modifier),
                 );
                 $state = $res['state'];
                 $thrower = $res['thrower'];

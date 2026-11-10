@@ -402,11 +402,12 @@ final class GameState
 
     /**
      * Čeká otázka, po jejíž odpovědi se přerušená akce přehraje (Diving Catch, kam hodit bombu, rozhodčí u faulu),
-     * nebo rozhodčí na konci drive (P291)? Žádná jiná akce ani tah AI do odpovědi.
+     * přehoz hodu (P292), nebo rozhodčí na konci drive (P291)? Žádná jiná akce ani tah AI do odpovědi.
      */
     public function hasPendingReplayQuestion(): bool
     {
-        return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null;
+        return $this->pendingDivingCatch !== null || $this->pendingBombRethrow !== null || $this->pendingReferee !== null
+            || $this->pendingReroll?->getReplayAction() !== null;   // P292: přehoz hodu (i v tahu soupeře)
     }
 
     public function getDeclaredBlitzerId(): ?int

@@ -47,7 +47,15 @@ final class ThrowReroll
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
+        ?CoachRerolls $kouc = null,
+        string $druh = '',
+        int $hod = 0,
+        int $cil = 0,
     ): array {
+        // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog)
+        if ($kouc !== null && $kouc->decides($side)) {
+            return self::sKoucem($dice, $state, $thrower, $side, $teamAllowed, $events, $kouc, $druh, $hod, $cil);
+        }
         $teamAvailable = $teamAllowed && $state->getTeamState($side)->canUseReroll();
 
         if ($thrower->hasSkill(SkillName::Pro) && !$thrower->isProUsedThisTurn()) {
@@ -75,5 +83,57 @@ final class ThrowReroll
         $events[] = GameEvent::rerollUsed($thrower->getId(), 'Team Reroll');
 
         return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
+    }
+
+    /**
+     * P292: totéž jako výše, ale o Pro / týmovém přehozu rozhoduje kouč. Hody v témže pořadí jako u AI: hod Pro, po
+     * jeho neúspěchu druhá otázka (týmový přehoz hodu Pro, ř. 8385-8387), Loner, nový hod Pro.
+     *
+     * @param list<GameEvent> $events
+     * @return array{state: GameState, thrower: MatchPlayerDTO, rerolled: bool}
+     */
+    private static function sKoucem(
+        DiceRollerInterface $dice,
+        GameState $state,
+        MatchPlayerDTO $thrower,
+        TeamSide $side,
+        bool $teamAllowed,
+        array &$events,
+        CoachRerolls $kouc,
+        string $druh,
+        int $hod,
+        int $cil,
+    ): array {
+        $smi = self::available($state, $thrower, $teamAllowed);
+        if (!$smi['pro'] && !$smi['team']) {
+            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
+        }
+        $volba = $kouc->ask($thrower->getId(), $druh, $hod, $cil, $smi['pro'], $smi['team']);
+        if ($volba === 'decline') {
+            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
+        }
+        if ($volba === 'pro') {
+            $thrower = $thrower->withProUsedThisTurn(true);
+            $state = $state->withPlayer($thrower);
+            if (ProCheck::roll($dice, $thrower, false, $events)['allowed']) {
+                return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
+            }
+            if (!$smi['team'] || $kouc->ask($thrower->getId(), $druh, $hod, $cil, false, true, true) === 'decline') {
+                return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
+            }
+        }
+        $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
+        if ($thrower->hasSkill(SkillName::Loner)) {
+            $lonerRoll = $dice->rollD6();
+            $events[] = GameEvent::lonerCheck($thrower->getId(), $lonerRoll, $lonerRoll >= 4);
+            if ($lonerRoll < 4) {
+                return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
+            }
+        }
+        $events[] = GameEvent::rerollUsed($thrower->getId(), 'Team Reroll');
+        // po neúspěšném Pro přehazuje týmový přehoz HOD PRO (ř. 8387), ne původní kostku
+        $rerolled = $volba === 'pro' ? ProCheck::roll($dice, $thrower, false, $events)['allowed'] : true;
+
+        return ['state' => $state, 'thrower' => $thrower, 'rerolled' => $rerolled];
     }
 }

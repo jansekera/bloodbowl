@@ -19,10 +19,18 @@ use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\ScatterCalculator;
 use App\Engine\ThrowReroll;
+use App\Engine\CoachRerolls;
 use App\Engine\TacklezoneCalculator;
 
 final class ThrowTeamMateHandler implements ActionHandlerInterface
 {
+    /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
+    private ?CoachRerolls $koucPrehozy = null;
+
+    public function setCoachRerolls(CoachRerolls $kouc): void
+    {
+        $this->koucPrehozy = $kouc;
+    }
     private readonly \App\Engine\PassResolver $passResolver;
 
     public function __construct(
@@ -97,7 +105,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             // P259 (review dávky 7.11.2026): napřed Pro, teprve pak týmový přehoz s Lonerem — jako C++ (attemptRoll);
             //   společný žebříček ThrowReroll (jeden hod = jeden přehoz, r. 925-927).
             if ($eaten) {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'always_hungry', $hungryRoll, 2);
                 $state = $res['state'];
                 $thrower = $res['thrower'];
                 if ($res['rerolled']) {
@@ -163,7 +171,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                 $events[] = GameEvent::rerollUsed($throwerId, 'Pass');
                 $prehozeno = true;
             } else {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'ttm', $roll, max(2, 2 - $modifikator));
                 $state = $res['state'];
                 $thrower = $res['thrower'];
                 $prehozeno = $res['rerolled'];
@@ -330,7 +338,7 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             // P283: týmový přehoz i na přistání (ř. 929-931) — Pro → týmový (Loner), parita s C++ attemptRoll
             if (!$landingSuccess) {
                 $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, false);
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $projectile, $projectile->getTeamSide(), true, $events);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $projectile, $projectile->getTeamSide(), true, $events, $this->koucPrehozy, 'ttm_landing', $landingRoll, $landingTarget);
                 $state = $res['state'];
                 $projectile = $res['thrower'];
                 if ($res['rerolled']) {

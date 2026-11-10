@@ -36,7 +36,7 @@ function mockElement() {
 }
 
 const foul: PendingReferee = {
-    playerId: 1, foul: true, canBribe: true, canArgue: true, action: 'foul', params: {}, dice: [3, 3], answers: [], queue: [],
+    playerId: 1, foul: true, canBribe: true, canArgue: true, action: 'foul', params: {}, dice: [3, 3], answers: { divingCatch: [], bombTargets: [], referee: [], rerolls: [] }, queue: [],
 };
 
 describe('RefereeModal', () => {

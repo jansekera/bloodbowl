@@ -59,7 +59,8 @@ export interface PendingBlock {
 
 /** Pending reroll waiting for player choice (dodge/GFI/pickup, P289: Leap and big-guy checks) */
 export interface PendingReroll {
-    rollType: 'dodge' | 'gfi' | 'pickup' | 'leap' | 'leap_gfi' | 'bone_head' | 'really_stupid' | 'wild_animal';
+    rollType: 'dodge' | 'gfi' | 'pickup' | 'leap' | 'leap_gfi' | 'bone_head' | 'really_stupid' | 'wild_animal'
+        | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry';
     playerId: number;
     target: number;
     roll: number;
@@ -67,6 +68,10 @@ export interface PendingReroll {
     teamRerollAvailable: boolean;
     targetX: number;
     targetY: number;
+    /** Pro neprošel: týmový přehoz už jen hodu Pro (ř. 8385-8387) */
+    proFailed?: boolean;
+    /** P292: přehoz hodu (přihrávka, bomba, hod spoluhráčem) — stav je stav PŘED akcí, server ji přehraje */
+    replayAction?: string | null;
 }
 
 /** P206 (b): čekající volba o lékárníkovi */
@@ -109,6 +114,14 @@ export interface PendingStandFirm {
     pushToDependsOn?: number[];
 }
 
+/** P292: odpovědi kouče z dřívějších přerušení téže akce (všechny druhy otázek) */
+export interface ReplayAnswers {
+    divingCatch: boolean[];
+    bombTargets: { x: number; y: number }[];
+    referee: Array<{ bribe: boolean; argue: boolean }>;
+    rerolls: string[];
+}
+
 /**
  * P291: rozhodčí vylučuje hráče kouče-člověka — úplatek / protest? U faulu (`foul`) je stav stav PŘED akcí a server
  * ji po odpovědi přehraje; u tajné zbraně na konci drive (`action` null) čekají další hráči ve frontě `queue`.
@@ -121,7 +134,7 @@ export interface PendingReferee {
     action: string | null;
     params: Record<string, unknown>;
     dice: number[];
-    answers: Array<{ bribe: boolean; argue: boolean }>;
+    answers: ReplayAnswers;
     queue: number[];
 }
 
@@ -136,7 +149,7 @@ export interface PendingDivingCatch {
     action: string;
     params: Record<string, unknown>;
     dice: number[];
-    answers: boolean[];
+    answers: ReplayAnswers;
     /** varianta B (30.10.2026): počet DALŠÍCH hráčů s Diving Catch v dosahu dopadu */
     otherCandidates: number;
     /** hráč, který už se pokouší (null = nikdo); dva pokusy se ruší (ř. 8069-8071) */
@@ -156,7 +169,7 @@ export interface PendingBombRethrow {
     action: string;
     params: Record<string, unknown>;
     dice: number[];
-    answers: { x: number; y: number }[];
+    answers: ReplayAnswers;
 }
 
 /** Full game state sent from the server */

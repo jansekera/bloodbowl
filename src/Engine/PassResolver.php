@@ -17,6 +17,13 @@ use App\ValueObject\Position;
 
 final class PassResolver
 {
+    /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
+    private ?CoachRerolls $koucPrehozy = null;
+
+    public function setCoachRerolls(CoachRerolls $kouc): void
+    {
+        $this->koucPrehozy = $kouc;
+    }
     public function __construct(
         private readonly DiceRollerInterface $dice,
         private readonly TacklezoneCalculator $tzCalc,
@@ -136,7 +143,7 @@ final class PassResolver
             // Pro -> týmový přehoz: ThrowReroll (společné s bombou a Always Hungry; ⛔ OPRAVA 18.09.2026,
             //   r. 8381-8387, 926: Pro jen na nepřehozenou kostku, po Pro týmový přehoz jen hodu Pro).
             if (!$skillRerollUsed) {
-                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events);
+                $res = ThrowReroll::proThenTeam($this->dice, $state, $thrower, $activeSide, true, $events, $this->koucPrehozy, 'pass', $roll, $accuracyTarget);
                 $state = $res['state'];
                 $thrower = $res['thrower'];
                 if ($res['rerolled']) {

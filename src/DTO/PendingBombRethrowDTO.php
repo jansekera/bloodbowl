@@ -21,7 +21,6 @@ final class PendingBombRethrowDTO
      * @param array{x: int, y: int}|null $suggested volba enginu
      * @param array<string, mixed> $params
      * @param list<int> $dice
-     * @param list<array{x: int, y: int}> $answers cíle dřívějších hodů dál v téže akci
      */
     public function __construct(
         private readonly int $playerId,
@@ -30,7 +29,7 @@ final class PendingBombRethrowDTO
         private readonly ActionType $action,
         private readonly array $params,
         private readonly array $dice,
-        private readonly array $answers,
+        private readonly ReplayAnswers $answers,
     ) {}
 
     public function getPlayerId(): int
@@ -67,8 +66,8 @@ final class PendingBombRethrowDTO
         return $this->dice;
     }
 
-    /** @return list<array{x: int, y: int}> */
-    public function getAnswers(): array
+    /** Odpovědi z dřívějších přerušení této akce (všechny druhy otázek, P292). */
+    public function getAnswers(): ReplayAnswers
     {
         return $this->answers;
     }
@@ -93,7 +92,7 @@ final class PendingBombRethrowDTO
             'action' => $this->action->value,
             'params' => $this->params,
             'dice' => $this->dice,
-            'answers' => $this->answers,
+            'answers' => $this->answers->toArray(),
         ];
     }
 
@@ -113,7 +112,7 @@ final class PendingBombRethrowDTO
             ActionType::from((string) $data['action']),
             (array) ($data['params'] ?? []),
             array_values(array_map('intval', (array) ($data['dice'] ?? []))),
-            array_values(array_map($pole, (array) ($data['answers'] ?? []))),
+            ReplayAnswers::fromArray((array) ($data['answers'] ?? [])),
         );
     }
 }
