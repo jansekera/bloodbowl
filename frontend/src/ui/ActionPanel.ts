@@ -66,6 +66,9 @@ export class ActionPanel {
                 const passActive = this.selectedMode === 'pass' ? ' btn--active' : '';
                 const handoffActive = this.selectedMode === 'handoff' ? ' btn--active' : '';
                 const foulActive = this.selectedMode === 'foul' ? ' btn--active' : '';
+                const bombActive = this.selectedMode === 'bomb' ? ' btn--active' : '';
+                // P272: bomba nesdílí týmovou akci Pass (ř. 7950-7951) — jen u týmu s bombardierem, bez vypnutí
+                const hasBomber = state.players.some(p => p.teamSide === state.activeTeam && p.skills.includes('Bombardier'));
                 const blitzDisabled = teamState.blitzUsedThisTurn ? ' disabled' : '';
                 const passDisabled = teamState.passUsedThisTurn ? ' disabled' : '';
                 const foulDisabled = teamState.foulUsedThisTurn ? ' disabled' : '';
@@ -76,6 +79,9 @@ export class ActionPanel {
                 html += `<button class="btn btn--small btn--secondary${passActive}" data-action="toggle_pass"${passDisabled}>Pass</button>`;
                 html += `<button class="btn btn--small btn--secondary${handoffActive}" data-action="toggle_handoff">Hand-off</button>`;
                 html += `<button class="btn btn--small btn--secondary${foulActive}" data-action="toggle_foul"${foulDisabled}>Foul</button>`;
+                if (hasBomber) {
+                    html += `<button class="btn btn--small btn--secondary${bombActive}" data-action="toggle_bomb">Bomb</button>`;
+                }
                 html += `<button class="btn btn--small btn--danger" data-action="end_turn">End Turn</button>`;
             }
             if (phase === 'setup') {
@@ -111,6 +117,8 @@ export class ActionPanel {
             case 'pass': return 'Select your ball carrier, then click a target square';
             case 'handoff': return 'Select your ball carrier, then click an adjacent teammate';
             case 'foul': return 'Click your player, then click an adjacent prone/stunned enemy';
+            case 'bomb': return 'Select your Bombardier (before he moves), then click a target square';
+            case 'bomb_rethrow': return 'Your player caught the bomb: click a highlighted square to throw it (ringed = AI choice)';
             default: return `Click to ${mode}`;
         }
     }

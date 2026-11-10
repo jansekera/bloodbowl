@@ -14,6 +14,7 @@ use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
+use App\Engine\BombRethrowQuestion;
 use App\Engine\BombTarget;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
@@ -27,6 +28,12 @@ final class BombThrowHandler implements ActionHandlerInterface
 {
     private readonly PassResolver $passResolver;
 
+    /** @var list<TeamSide> strany kouče-člověka — jeho hráče se ptá, kam hodit chycenou bombu (P272) */
+    private array $rethrowSides = [];
+
+    /** @var list<array{x: int, y: int}> odpovědi na otázky „kam hodit“ v pořadí, v jakém v akci padnou */
+    private array $rethrowAnswers = [];
+
     public function __construct(
         private readonly DiceRollerInterface $dice,
         TacklezoneCalculator $tzCalc,
@@ -37,6 +44,18 @@ final class BombThrowHandler implements ActionHandlerInterface
         // Bomba se hazi "using the rules for throwing the ball" (r. Bombardier) --
         //   presnost, modifikatory a fumble bereme z prihravky.
         $this->passResolver = new PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver);
+    }
+
+    /** @param list<TeamSide> $sides */
+    public function setInteractiveRethrow(array $sides): void
+    {
+        $this->rethrowSides = $sides;
+    }
+
+    /** @param list<array{x: int, y: int}> $answers */
+    public function setRethrowAnswers(array $answers): void
+    {
+        $this->rethrowAnswers = $answers;
     }
 
     /**
@@ -183,7 +202,7 @@ final class BombThrowHandler implements ActionHandlerInterface
 
         // P264: hráč v poli dopadu bombu chytá jako míč (hodNaChyceni: přesná +1, Diving Catch jen přesná, Catch, Pro,
         //   týmový přehoz jen tým na tahu — review M5). Pokus je vždy aspoň tak dobrý jako odmítnutí (obojí jinak =
-        //   výbuch, r. 7964-7966). Rozhoduje engine (P272).
+        //   výbuch, r. 7964-7966). Chytání je povinné, zkouší se vždy (P272); kouče se ptá jen, kam hodit dál (hodDal).
         $chytajici = $state->getPlayerAtPosition($landingPos);
         if ($chytajici !== null && BombTarget::mozeChytit($chytajici)) {
             $strana = $chytajici->getTeamSide();
@@ -208,9 +227,13 @@ final class BombThrowHandler implements ActionHandlerInterface
     }
 
     /**
-     * P264: chycenou / zachycenou bombu hráč hned hodí dál (r. 7961-7963, mimořádná akce). Cíl volí engine za oba
-     * kouče (BombTarget::vyber, musí hodit). Výbuch v ruce jen jako pojistka: po MAX_PRESKOKU chyceních za sebou
+     * P264: chycenou / zachycenou bombu hráč hned hodí dál (r. 7961-7963, mimořádná akce). Cíl volí engine
+     * (BombTarget::vyber, musí hodit). Výbuch v ruce jen jako pojistka: po MAX_PRESKOKU chyceních za sebou
      * (pravidla strop nemají; v praxi nenastane) nebo bez legálního pole. C++ rethrowBomb.
+     *
+     * P272 (10.11.2026): hráče kouče-člověka se engine ptá, kam hodit (dřív volil i za něj). Bez odpovědi akci
+     *   přeruší `BombRethrowQuestion` (nabídka = všechna legální pole, doporučení = volba enginu); odpověď mimo
+     *   legální pole odmítne už validátor, tady ji zastaví letBomby.
      *
      * @param list<GameEvent> $events
      * @return array{0: GameState, 1: list<GameEvent>, 2: bool}
@@ -221,6 +244,14 @@ final class BombThrowHandler implements ActionHandlerInterface
         $cil = $skok > self::MAX_PRESKOKU ? null : BombTarget::vyber($state, $drzi, true)['pos'] ?? null;
         if ($cil === null) {
             return $this->vybuch($state, $drzi->requirePosition(), $events);
+        }
+        if (in_array($drzi->getTeamSide(), $this->rethrowSides, true)) {
+            $odpoved = array_shift($this->rethrowAnswers) ?? throw new BombRethrowQuestion(
+                $drziId,
+                ThrowTarget::cile($state, $drzi, true),
+                ['x' => $cil->getX(), 'y' => $cil->getY()],
+            );
+            $cil = new Position($odpoved['x'], $odpoved['y']);
         }
         return $this->letBomby($state, $drziId, $cil, $events, $skok);
     }

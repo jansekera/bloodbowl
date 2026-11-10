@@ -55,6 +55,20 @@ final class RulesEngine
         if ($action === ActionType::RESOLVE_DIVING_CATCH) {
             return ['No pending Diving Catch question'];
         }
+        // P272 (10.11.2026): kam hodit chycenou bombu — stejně přednostně; cíl jen z nabídnutých (legálních) polí.
+        $bomba = $state->getPendingBombRethrow();
+        if ($bomba !== null) {
+            if ($action !== ActionType::RESOLVE_BOMB_RETHROW) {
+                return ['Must choose where to throw the caught bomb first'];
+            }
+            if (!is_int($params['targetX'] ?? null) || !is_int($params['targetY'] ?? null)) {
+                return ['targetX and targetY must be integers'];
+            }
+            return $bomba->isTarget($params['targetX'], $params['targetY']) ? [] : ['Bomb cannot be thrown to that square'];
+        }
+        if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
+            return ['No pending bomb rethrow question'];
+        }
         // P206 (b), review 16.10.: čekající volba o lékárníkovi má přednost před VŠÍM (i před volbou kostky
         //   bloku a výkopem) — jinak by další odložené zranění přepsalo nabídku.
         if ($state->getPendingApothecary() !== null && $action !== ActionType::RESOLVE_APOTHECARY) {
@@ -159,6 +173,10 @@ final class RulesEngine
         // 30.10.2026: čekající otázka na Diving Catch — jen odpověď kouče (přednost před vším, viz validate)
         if ($state->getPendingDivingCatch() !== null) {
             return [['type' => ActionType::RESOLVE_DIVING_CATCH->value]];
+        }
+        // P272: kam hodit chycenou bombu — jen odpověď kouče
+        if ($state->getPendingBombRethrow() !== null) {
+            return [['type' => ActionType::RESOLVE_BOMB_RETHROW->value]];
         }
 
         // P206 (b): čekající volba o lékárníkovi — jen odpověď kouče
@@ -880,33 +898,9 @@ final class RulesEngine
      */
     public function getPassTargets(GameState $state, MatchPlayerDTO $player, bool $sHailMary = false): array
     {
-        $pos = $player->getPosition();
-        if ($pos === null) {
-            return [];
-        }
-
-        $targets = [];
-        for ($x = 0; $x < Position::PITCH_WIDTH; $x++) {
-            for ($y = 0; $y < Position::PITCH_HEIGHT; $y++) {
-                $targetPos = new Position($x, $y);
-                if ($pos->equals($targetPos)) {
-                    continue;
-                }
-                // P265 (9.11.2026): pole mimo pravítko s Hail Mary jen na přání volajícího ($sHailMary) — člověk
-                //   (MatchService) vždy, kouči AI přes CoachHeuristics::cileHoduProAi (P266) jen jako poslední akci.
-                ['range' => $range, 'hailMary' => $hailMary, 'chyba' => $chyba] = ThrowTarget::posud($state, $player, $pos, $targetPos);
-                if ($chyba !== null || ($hailMary && !$sHailMary)) {
-                    continue;
-                }
-                $targets[] = [
-                    'x' => $x,
-                    'y' => $y,
-                    'range' => $range === null ? 'hail_mary' : $range->value,
-                ];
-            }
-        }
-
-        return $targets;
+        // P265 (9.11.2026): pole mimo pravítko s Hail Mary jen na přání volajícího ($sHailMary) — člověk
+        //   (MatchService) vždy, kouči AI přes CoachHeuristics::cileHoduProAi (P266) jen jako poslední akci.
+        return ThrowTarget::cile($state, $player, $sHailMary);
     }
 
     /**

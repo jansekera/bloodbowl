@@ -9,6 +9,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
+use App\DTO\PendingBombRethrowDTO;
 use App\DTO\PendingDivingCatchDTO;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
@@ -137,6 +138,17 @@ final class ActionResolver
         $this->ballResolver->setInteractiveDivingCatch($sides);
     }
 
+    /**
+     * P272 (10.11.2026): strany kouče-člověka — když jeho hráč chytí / zachytí bombu, ptá se kouče, kam ji hodit dál
+     * (i v tahu soupeře); hráče AI rozhoduje engine jako dosud.
+     *
+     * @param list<TeamSide> $sides
+     */
+    public function setInteractiveBombRethrow(array $sides): void
+    {
+        $this->bombThrowHandler->setInteractiveRethrow($sides);
+    }
+
     public function setInteractiveRerolls(bool $interactive): void
     {
         $this->interactiveRerolls = $interactive;
@@ -233,21 +245,40 @@ final class ActionResolver
                 $pending->getParams(),
                 $pending->getDice(),
                 [...$pending->getAnswers(), (bool) ($params['use'] ?? false)],
+                [],
+            );
+        }
+        // P272 (10.11.2026): kam hodit chycenou bombu — stejné přehrání jako u Diving Catch.
+        if ($action === ActionType::RESOLVE_BOMB_RETHROW) {
+            $pending = $state->getPendingBombRethrow() ?? throw new \InvalidArgumentException('No pending bomb rethrow question');
+
+            return $this->resolveSPrehranim(
+                $state->withPendingBombRethrow(null),
+                $pending->getAction(),
+                $pending->getParams(),
+                $pending->getDice(),
+                [],
+                [...$pending->getAnswers(), ['x' => (int) ($params['targetX'] ?? -1), 'y' => (int) ($params['targetY'] ?? -1)]],
             );
         }
 
-        return $this->resolveSPrehranim($state, $action, $params, [], []);
+        return $this->resolveSPrehranim($state, $action, $params, [], [], []);
     }
 
     /**
+     * Akce s otázkami kouči uprostřed (Diving Catch, kam hodit bombu): hody `$hody` a odpovědi z dřívějších
+     * přerušení se přehrají, nová otázka akci přeruší a vrátí stav PŘED ní s čekající otázkou.
+     *
      * @param array<string, mixed> $params
      * @param list<int> $hody
-     * @param list<bool> $odpovedi
+     * @param list<bool> $odpovedi Diving Catch
+     * @param list<array{x: int, y: int}> $cileBomby kam hodit chycenou bombu
      */
-    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, array $odpovedi): ActionResult
+    private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, array $odpovedi, array $cileBomby): ActionResult
     {
         $this->replayDice->begin($hody);
         $this->ballResolver->setDivingCatchAnswers($odpovedi);
+        $this->bombThrowHandler->setRethrowAnswers($cileBomby);
         try {
             return $this->resolveJednou($state, $action, $params);
         } catch (DivingCatchQuestion $q) {
@@ -261,8 +292,19 @@ final class ActionResolver
                 $q->otherCandidates,
                 $q->attemptingId,
             )), []);
+        } catch (BombRethrowQuestion $q) {
+            return ActionResult::success($state->withPendingBombRethrow(new PendingBombRethrowDTO(
+                $q->playerId,
+                $q->targets,
+                $q->suggested,
+                $action,
+                $params,
+                $this->replayDice->getLog(),
+                $cileBomby,
+            )), []);
         } finally {
             $this->ballResolver->setDivingCatchAnswers([]);
+            $this->bombThrowHandler->setRethrowAnswers([]);
         }
     }
 
@@ -489,6 +531,7 @@ final class ActionResolver
             ActionType::RESOLVE_GRAB => $this->resolveGrab($state, $params),
             ActionType::RESOLVE_STAND_FIRM => $this->resolveStandFirm($state, $params),
             ActionType::RESOLVE_DIVING_CATCH => throw new \LogicException('RESOLVE_DIVING_CATCH se vyřizuje v resolve()'),
+            ActionType::RESOLVE_BOMB_RETHROW => throw new \LogicException('RESOLVE_BOMB_RETHROW se vyřizuje v resolve()'),
         };
 
         // Prepend pre-action events (e.g. Bloodlust bite)

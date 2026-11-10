@@ -109,6 +109,19 @@ function drawPathOverlay(sel: ReturnType<typeof stateManager.getSelection>): voi
     renderer.drawMovePath(player.position, target.path);
 }
 
+/** Režimy, ve kterých se kreslí cíle hodu z `passTargets` (přihrávka, bomba, hod chycené bomby — P272). */
+function isThrowMode(mode: string | null): boolean {
+    return mode === 'pass' || mode === 'bomb' || mode === 'bomb_rethrow';
+}
+
+/** P272: u hodu chycené bomby zakroužkovat pole, které by zvolil engine. */
+function drawBombSuggestion(state: import('./api/types').GameState): void {
+    const suggested = state.pendingBombRethrow?.suggested;
+    if (actionPanel.getSelectedMode() === 'bomb_rethrow' && suggested) {
+        renderer.drawSelectedTarget(suggested);
+    }
+}
+
 function renderFrame(): void {
     const state = stateManager.getGameState();
     if (!state) return;
@@ -135,9 +148,10 @@ function renderFrame(): void {
     if ((currentMode === 'block' || currentMode === 'blitz') && blockTargets.length > 0) {
         renderer.drawBlockTargets(blockTargets);
     }
-    // Pass target highlights
-    if (currentMode === 'pass' && passTargets.length > 0) {
+    // Pass target highlights (P272: i bomba a hod chycené bomby)
+    if (isThrowMode(currentMode) && passTargets.length > 0) {
         renderer.drawPassTargets(passTargets);
+        drawBombSuggestion(state);
     }
     // Handoff target highlights
     if (currentMode === 'handoff' && handoffTargets.length > 0) {
@@ -192,6 +206,11 @@ async function handleActionResult(result: ActionResult): Promise<void> {
         showDivingCatchModal(result.state);
         return;
     }
+    // P272: kam hodit chycenou bombu — stejně přednostně (i uprostřed tahu AI)
+    if (result.state.pendingBombRethrow) {
+        enterBombRethrow(result.state);
+        return;
+    }
 
     // Show block dice modal if there's a pending block (P224: ne, když kouč už kostku zvolil a čeká Grab)
     if (result.state.pendingBlock && !result.state.pendingGrab && !result.state.pendingStandFirm
@@ -218,6 +237,54 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     // P206 (b): lékárník — ptá se kouče-člověka i uprostřed tahu AI (server tah AI zastavil)
     if (result.state.pendingApothecary) {
         showApothecaryModal(result.state);
+    }
+}
+
+/** P272: hráč kouče chytil bombu ⇒ zvýraznit legální pole hodu; klik na pole odešle odpověď (canvas click). */
+function enterBombRethrow(state: import('./api/types').GameState): void {
+    const pending = state.pendingBombRethrow;
+    if (!pending) return;
+    actionPanel.setSelectedMode('bomb_rethrow');
+    stateManager.clearSelection();
+    clearAllTargets();
+    passTargets = pending.targets;
+    stateManager.selectPlayer(pending.playerId);
+    stateManager.setValidTargets('pass', passTargets.map(t => ({ x: t.x, y: t.y })));
+    const name = state.players.find(p => p.id === pending.playerId)?.name ?? `#${pending.playerId}`;
+    toast.info(`${name} caught the bomb — click a square to throw it on`);
+    stateManager.setGameState(state); // re-render s cíli
+}
+
+async function submitBombRethrow(targetX: number, targetY: number): Promise<void> {
+    isProcessing = true;
+    try {
+        const result = await api.submitAction(matchId, 'resolve_bomb_rethrow', { targetX, targetY });
+        clearAllTargets();
+        actionPanel.setSelectedMode(null);
+        stateManager.clearSelection();
+        await handleActionResult(result);
+    } catch (err) {
+        console.error(err);
+        toast.error('Bomb throw failed');
+        const state = stateManager.getGameState();
+        if (state) enterBombRethrow(state); // otázka na serveru stále čeká
+    } finally {
+        isProcessing = false;
+    }
+}
+
+async function submitBomb(playerId: number, targetX: number, targetY: number): Promise<void> {
+    isProcessing = true;
+    try {
+        const result = await api.submitAction(matchId, 'bomb_throw', { playerId, targetX, targetY });
+        clearAllTargets();
+        actionPanel.setSelectedMode(null);
+        await handleActionResult(result);
+    } catch (err) {
+        console.error(err);
+        toast.error('Bomb throw failed');
+    } finally {
+        isProcessing = false;
     }
 }
 
@@ -433,9 +500,10 @@ stateManager.onChange(() => {
     if ((currentMode2 === 'block' || currentMode2 === 'blitz') && blockTargets.length > 0) {
         renderer.drawBlockTargets(blockTargets);
     }
-    // Pass target highlights
-    if (currentMode2 === 'pass' && passTargets.length > 0) {
+    // Pass target highlights (P272: i bomba a hod chycené bomby)
+    if (isThrowMode(currentMode2) && passTargets.length > 0) {
         renderer.drawPassTargets(passTargets);
+        drawBombSuggestion(state);
     }
     // Handoff target highlights
     if (currentMode2 === 'handoff' && handoffTargets.length > 0) {
@@ -495,6 +563,14 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
 
     const sel = stateManager.getSelection();
     const mode = actionPanel.getSelectedMode();
+
+    // P272: čeká otázka, kam hodit chycenou bombu — jiný klik nic nedělá (server jinou akci nepřijme)
+    if (state.pendingBombRethrow) {
+        if (state.pendingBombRethrow.targets.some(t => t.x === gridPos.x && t.y === gridPos.y)) {
+            await submitBombRethrow(gridPos.x, gridPos.y);
+        }
+        return;
+    }
 
     // Setup mode: click pitch to place selected player
     if (state.phase === 'setup' && setupSelectedPlayerId !== null && stateManager.isPlayerTurn()) {
@@ -615,6 +691,30 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                         'pass',
                         passTargets.map(t => ({ x: t.x, y: t.y })),
                     );
+                } catch {
+                    passTargets = [];
+                }
+            }
+        }
+        return;
+    }
+
+    // P272 Bomb mode: select a Bombardier who has not moved, then click a target square (cíle jako u přihrávky)
+    if (mode === 'bomb') {
+        if (sel.selectedPlayerId) {
+            const target = passTargets.find(t => t.x === gridPos.x && t.y === gridPos.y);
+            if (target) {
+                await submitBomb(sel.selectedPlayerId, gridPos.x, gridPos.y);
+                return;
+            }
+        }
+        const player = stateManager.getPlayerAtPosition(gridPos);
+        if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
+            if (player.state === 'standing' && !player.hasActed && !player.hasMoved && player.skills.includes('Bombardier')) {
+                stateManager.selectPlayer(player.id);
+                try {
+                    passTargets = await api.getPassTargets(matchId, player.id);
+                    stateManager.setValidTargets('pass', passTargets.map(t => ({ x: t.x, y: t.y })));
                 } catch {
                     passTargets = [];
                 }
@@ -922,6 +1022,7 @@ async function handlePanelAction(action: string): Promise<void> {
         toggle_pass: 'pass',
         toggle_handoff: 'handoff',
         toggle_foul: 'foul',
+        toggle_bomb: 'bomb',
     };
 
     if (action in toggleModes) {
@@ -1076,6 +1177,8 @@ async function init(): Promise<void> {
         // 30.10.2026: čekající otázka na Diving Catch i po obnovení stránky — přednost před vším (viz handleActionResult)
         if (state.pendingDivingCatch) {
             showDivingCatchModal(state);
+        } else if (state.pendingBombRethrow) {
+            enterBombRethrow(state); // P272: i po obnovení stránky
         } else {
             // Show block dice modal if there's a pending block on load
             if (state.pendingBlock && !state.pendingGrab && !state.pendingStandFirm && state.aiTeam !== state.activeTeam) {

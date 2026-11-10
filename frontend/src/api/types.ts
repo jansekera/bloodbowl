@@ -127,6 +127,22 @@ export interface PendingDivingCatch {
     attemptingId: number | null;
 }
 
+/**
+ * P272 (10.11.2026): hráč kouče-člověka chytil / zachytil bombu a musí ji hned hodit dál (`rules_bb2016.txt`
+ * ř. 7959-7963); kouč volí kam. Stav je stav PŘED přerušenou akcí; po odpovědi ji server přehraje.
+ */
+export interface PendingBombRethrow {
+    playerId: number;
+    /** legální pole hodu z pole hráče (s pásmem pravítka) */
+    targets: PassTarget[];
+    /** pole, které by zvolil engine */
+    suggested: { x: number; y: number } | null;
+    action: string;
+    params: Record<string, unknown>;
+    dice: number[];
+    answers: { x: number; y: number }[];
+}
+
 /** Full game state sent from the server */
 export interface GameState {
     matchId: number;
@@ -149,6 +165,7 @@ export interface GameState {
     pendingGrab?: PendingGrab | null;
     pendingStandFirm?: PendingStandFirm | null;
     pendingDivingCatch?: PendingDivingCatch | null;
+    pendingBombRethrow?: PendingBombRethrow | null;
 }
 
 export interface TeamState {

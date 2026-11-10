@@ -40,6 +40,7 @@ final class AITurnService
         $resolver->setInteractiveApothecary($this->interactiveApothecary);
         $resolver->setInteractiveStandFirm($this->interactiveApothecary);
         $resolver->setInteractiveDivingCatch($this->interactiveApothecary);
+        $resolver->setInteractiveBombRethrow($this->interactiveApothecary);
         $gameFlow = $resolver->getGameFlowResolver();
         $allEvents = [];
         $aiTeam = $state->getAiTeam();
@@ -48,7 +49,7 @@ final class AITurnService
         for ($i = 0; $i < $maxActions; $i++) {
             if ($state->getActiveTeam() !== $aiTeam || !$state->getPhase()->isPlayable()
                 || $state->getPendingApothecary() !== null || $state->getPendingStandFirm() !== null
-                || $state->getPendingDivingCatch() !== null) {
+                || $state->hasPendingReplayQuestion()) {
                 break;
             }
 
@@ -68,9 +69,10 @@ final class AITurnService
             // P206 (b): zranil se hráč kouče-člověka ⇒ tah AI stojí, dokud kouč nerozhodne o lékárníkovi
             //   (turnover akce nese PendingApothecaryDTO a orchestrátor ho dořeší po odpovědi).
             // P226: kouč-člověk odpovídá na Stand Firm svého hráče ⇒ tah AI stojí (blok čeká v pendingBlock)
-            // 30.10.2026: kouč-člověk odpovídá na Diving Catch svého hráče ⇒ tah AI stojí (akce se po odpovědi přehraje)
+            // 30.10.2026: kouč-člověk odpovídá na Diving Catch svého hráče ⇒ tah AI stojí (akce se po odpovědi přehraje);
+            //   P272: totéž u otázky, kam hodit chycenou bombu
             if ($state->getPendingApothecary() !== null || $state->getPendingStandFirm() !== null
-                || $state->getPendingDivingCatch() !== null) {
+                || $state->hasPendingReplayQuestion()) {
                 break;
             }
 
