@@ -18,8 +18,8 @@ final class LeapTest extends TestCase
 {
     public function testLeapOverOccupiedSquare(): void
     {
-        // Leap 2 squares over an occupied square. AG3, TZ at dest=1 from enemy at (6,5)
-        // Target: 7-3+1=5+, roll 5 OK
+        // Leap 2 squares over an occupied square. AG3; zóna u cíle se nepočítá (P277, ř. 8270-8271)
+        // Target: 7-3=4+, roll 5 OK
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 5, 5, skills: [SkillName::Leap], id: 1)
             ->addPlayer(TeamSide::AWAY, 6, 5, id: 2) // blocking normal movement, exerts TZ at (7,5)
@@ -46,8 +46,8 @@ final class LeapTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // Leap: AG3 target 4+, roll 2 = fail, armor 3+3=6 not > 8
-        $dice = new FixedDiceRoller([2, 3, 3]);
+        // Leap: AG3 target 4+, roll 2 = fail; P277: AI přehodí týmovým přehozem (ř. 929-931) — 2 = fail; armor 3+3=6 not > 8
+        $dice = new FixedDiceRoller([2, 2, 3, 3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5]);
 

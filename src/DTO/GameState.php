@@ -491,6 +491,7 @@ final class GameState
                 ->withLostTacklezones($player->isBigGuyStupefied())
                 ->withProUsedThisTurn(false)
                 ->withSureFeetUsedThisTurn(false)
+                ->withLeapUsedThisTurn(false)   // P277: Leap 1× za kolo (ř. 8277)
                 // ⭐ 21.09.2026: r. 960-962 -- Dodge je "once per turn", tedy
                 //   za VLASTNI kolo (uhyba se jen ve svem kole).
                 ->withDodgeUsedThisTurn(false)

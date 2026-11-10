@@ -60,7 +60,8 @@ final class Pathfinder
         $maxRange = $ma + $gfiSquares;
         $isInTz = $this->tzCalc->isInTacklezone($state, $player);
 
-        $hasLeap = $player->hasSkill(SkillName::Leap);
+        // P277: Leap jen jednou za kolo (ř. 8277) — i přes víc akcí pohybu v kole (tah přerušený přehozem)
+        $hasLeap = $player->hasSkill(SkillName::Leap) && !$player->isLeapUsedThisTurn();
 
         // BFS
         /** @var array<string, array{cost: int, dodges: int, gfis: int, steps: list<MoveStep>, prev: ?string, hasLeaped: bool}> */
@@ -163,7 +164,7 @@ final class Pathfinder
                 $queue[] = ['pos' => $neighbor, 'key' => $neighborKey];
             }
 
-            // Leap moves: jump 2 squares in any of 8 directions (once per movement)
+            // Leap: skok na kterékoli prázdné pole do 2 polí (ř. 8268-8269), jednou za kolo
             if ($hasLeap && !$currentData['hasLeaped']) {
                 foreach ($this->getLeapDestinations($currentPos) as $leapDest) {
                     if (!$leapDest->isOnPitch()) {
@@ -180,12 +181,13 @@ final class Pathfinder
                     }
 
                     $isGfi = $newCost > $ma;
-                    // Leap requires AG roll (like dodge) at destination with TZ
-                    $leapTz = $this->tzCalc->countTacklezones($state, $leapDest, $player->getTeamSide());
-                    $leapTarget = max(2, min(6, 7 - $player->getStats()->getAgility() + $leapTz));
+                    // OPRAVENO 10.11.2026 (P277, audit goblinů) — přičítaly se zóny u cíle. Ř. 8270-8271: „No modifiers
+                    //   apply to this D6 roll unless he has Very Long Legs“ (VLL −1). C++ helpers.cpp calculateLeapTarget.
+                    $leapTarget = self::cilSkoku($player);
 
                     $newDodges = $currentData['dodges'] + 1; // count leap as a "dodge" for path scoring
-                    $newGfis = $currentData['gfis'] + ($isGfi ? 1 : 0);
+                    // P277: skok za 2 pole může stát 2 GFI (ř. 1701 „each extra square“)
+                    $newGfis = $currentData['gfis'] + max(0, $newCost - max($ma, $currentCost));
 
                     $step = new MoveStep(
                         position: $leapDest,
@@ -260,23 +262,28 @@ final class Pathfinder
         return $moves[$key] ?? null;
     }
 
+    /** Hod na skok: 7 − AG bez modifikátorů, Very Long Legs −1 (ř. 8270-8271, VLL). Parita s C++ calculateLeapTarget. */
+    public static function cilSkoku(MatchPlayerDTO $player): int
+    {
+        $cil = 7 - $player->getStats()->getAgility() - ($player->hasSkill(SkillName::VeryLongLegs) ? 1 : 0);
+        return max(2, min(6, $cil));
+    }
+
     /**
-     * Get leap destinations: 2 squares away in 8 directions.
+     * Pole, kam jde skočit: kterékoli do 2 polí (ř. 8268-8269 „any empty square 1 to 2 squares“; volnost a hřiště
+     * kontroluje volající). OPRAVENO 10.11.2026 (P277) — dřív jen 8 polí přesně 2 rovně / šikmo.
      *
      * @return list<Position>
      */
     private function getLeapDestinations(Position $pos): array
     {
-        $x = $pos->getX();
-        $y = $pos->getY();
-        $directions = [
-            [0, -2], [2, -2], [2, 0], [2, 2],
-            [0, 2], [-2, 2], [-2, 0], [-2, -2],
-        ];
-
         $destinations = [];
-        foreach ($directions as [$dx, $dy]) {
-            $destinations[] = new Position($x + $dx, $y + $dy);
+        for ($dx = -2; $dx <= 2; $dx++) {
+            for ($dy = -2; $dy <= 2; $dy++) {
+                if ($dx !== 0 || $dy !== 0) {
+                    $destinations[] = new Position($pos->getX() + $dx, $pos->getY() + $dy);
+                }
+            }
         }
         return $destinations;
     }

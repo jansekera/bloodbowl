@@ -32,11 +32,10 @@ final class VeryLongLegsTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // Leap to (7,7) — 2 squares SE
-        // Only enemy at (6,6) is adjacent to (7,7) → TZ=1 at landing
-        // leapTarget = max(2, 7-3+1) = 5+, with VLL → max(2, 5-1) = 4+
-        // Roll = 4 → success with VLL
-        $dice = new FixedDiceRoller([4]);
+        // Leap to (7,7) — 2 squares SE. P277 (10.11.2026): zóny u cíle se do hodu nepočítají (ř. 8270-8271 „No
+        // modifiers apply … unless he has Very Long Legs“) ⇒ 7-3 = 4+, s VLL 3+. Dřív test kódoval 5+ / 4+.
+        // Roll = 3 → success with VLL
+        $dice = new FixedDiceRoller([3]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7]);
 
@@ -66,10 +65,9 @@ final class VeryLongLegsTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        // Leap to (7,7) — TZ=1 from enemy at (6,6)
-        // Without VLL: leapTarget = max(2, 7-3+1) = 5+
-        // Roll = 4 → fails (4 < 5)
-        $dice = new FixedDiceRoller([4, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
+        // Leap to (7,7). Without VLL: 7-3 = 4+ (P277: zóny u cíle se nepočítají)
+        // Roll = 3 → fails, týmový přehoz AI (P277) 3 → fails
+        $dice = new FixedDiceRoller([3, 3, 1, 1 /* PHP27: hod na brneni po padu (2 = nikdy neprorazi) */]);
         $resolver = new ActionResolver($dice);
         $result = $resolver->resolve($state, ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 7]);
 

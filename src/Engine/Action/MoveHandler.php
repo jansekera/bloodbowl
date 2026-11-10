@@ -169,19 +169,58 @@ final class MoveHandler implements ActionHandlerInterface
             $from = $currentPlayer->getPosition();
             $to = $step->getPosition();
 
-            // Leap: special AG roll, skip dodge and normal movement
+            // Leap (ř. 8264-8277). OPRAVENO 10.11.2026 (P277, audit goblinů; parita s C++ move_handler.cpp resolveLeap):
+            //   dřív bez GFI, bez Tentacles / Shadowing, bez přehozu, zóny u cíle v hodu a skok jen v rámci jedné cesty.
             if ($step->isLeap()) {
-                $leapTarget = $step->getDodgeTarget();
-                // Very Long Legs: -1 to leap target
-                if ($currentPlayer->hasSkill(SkillName::VeryLongLegs)) {
-                    $leapTarget = max(2, $leapTarget - 1);
+                // Tentacles platí, když soupeř „attempts to dodge OR LEAP out of any of his tackle zones“ (ř. 8586-8587)
+                if ($from !== null && $this->chapadlaDrzi($currentState, $currentPlayer, $from, $events)) {
+                    return ActionResult::success($currentState->withPlayer($currentPlayer->withHasMoved(true)), $events);
                 }
+                $currentPlayer = $currentPlayer->withLeapUsedThisTurn(true);
+                $currentState = $currentState->withPlayer($currentPlayer);
+                // skok stojí 2 pole; každé pole nad zbylý pohyb = jeden GFI (ř. 1701)
+                $gfiSkoku = max(0, min(2, 2 - max(0, $currentPlayer->getMovementRemaining())));
+
+                $leapTarget = Pathfinder::cilSkoku($currentPlayer);
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $leapTarget;
                 $events[] = GameEvent::leap($playerId, $leapTarget, $roll, $success);
+                if (!$success) {
+                    $success = $this->prehozAi(
+                        $currentState,
+                        $currentPlayer,
+                        $leapTarget,
+                        $teamRerollUsed,
+                        $events,
+                        static fn(int $r, bool $ok) => GameEvent::leap($playerId, $leapTarget, $r, $ok),
+                    );
+                }
+                for ($g = 0; $success && $g < $gfiSkoku; $g++) {
+                    $gfiCil = $currentState->getWeather() === Weather::BLIZZARD ? 3 : 2;
+                    $roll = $this->dice->rollD6();
+                    $success = $roll >= $gfiCil;
+                    $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
+                    if (!$success && $currentPlayer->hasSkill(SkillName::SureFeet) && !$currentPlayer->isSureFeetUsedThisTurn()) {
+                        $currentPlayer = $currentPlayer->withSureFeetUsedThisTurn(true);
+                        $currentState = $currentState->withPlayer($currentPlayer);
+                        $roll = $this->dice->rollD6();
+                        $success = $roll >= $gfiCil;
+                        $events[] = GameEvent::rerollUsed($playerId, 'Sure Feet');
+                        $events[] = GameEvent::gfiAttempt($playerId, $roll, $success);
+                    } elseif (!$success) {
+                        $success = $this->prehozAi(
+                            $currentState,
+                            $currentPlayer,
+                            $gfiCil,
+                            $teamRerollUsed,
+                            $events,
+                            static fn(int $r, bool $ok) => GameEvent::gfiAttempt($playerId, $r, $ok),
+                        );
+                    }
+                }
 
                 if (!$success) {
-                    // Failed leap: same as failed dodge
+                    // nepovedený skok i GFI: sražen v cílovém poli + brnění (ř. 8274-8276, 1702-1703)
                     $events[] = GameEvent::playerFell($playerId);
                     $events[] = GameEvent::turnover('Failed leap');
 
@@ -201,6 +240,10 @@ final class MoveHandler implements ActionHandlerInterface
                     ->withPosition($to)
                     ->withMovementRemaining($currentPlayer->getMovementRemaining() - 2);
                 $currentState = $currentState->withPlayer($currentPlayer);
+                // Shadowing platí při opuštění zóny „for any reason“ (ř. 8456-8458), i po skoku
+                if ($from !== null) {
+                    $currentState = $this->stin($currentState, $currentPlayer, $from, $events);
+                }
 
                 if ($currentState->getBall()->getCarrierId() === $playerId) {
                     $currentState = $currentState->withBall(BallState::carried($to, $playerId));
@@ -249,26 +292,9 @@ final class MoveHandler implements ActionHandlerInterface
             //   a "only ONE of the opposing players may attempt to grab him".
             //   PHP hazel D6 proti D6 a zkousel to KAZDY chapadlar zvlast.
             //   Z vic chapadlaru zkousi ten nejsilnejsi (nejlepsi sance pro soupere).
-            if ($step->requiresDodge() && $from !== null) {
-                $grabber = null;
-                foreach ($this->tzCalc->getMarkingPlayers($currentState, $from, $currentPlayer->getTeamSide()) as $marker) {
-                    if ($marker->hasSkill(SkillName::Tentacles)
-                        && ($grabber === null || $marker->getStats()->getStrength() > $grabber->getStats()->getStrength())) {
-                        $grabber = $marker;
-                    }
-                }
-                if ($grabber !== null) {
-                    $roll = $this->dice->rollD6() + $this->dice->rollD6();
-                    $total = $roll + $currentPlayer->getStats()->getStrength() - $grabber->getStats()->getStrength();
-                    $escaped = $total > 5;
-                    $events[] = GameEvent::tentacles($playerId, $grabber->getId(), $roll, $total, $escaped);
-                    if (!$escaped) {
-                        // Movement ends, NOT a turnover
-                        $currentPlayer = $currentPlayer->withHasMoved(true);
-                        $currentState = $currentState->withPlayer($currentPlayer);
-                        return ActionResult::success($currentState, $events);
-                    }
-                }
+            if ($step->requiresDodge() && $from !== null && $this->chapadlaDrzi($currentState, $currentPlayer, $from, $events)) {
+                // Movement ends, NOT a turnover
+                return ActionResult::success($currentState->withPlayer($currentPlayer->withHasMoved(true)), $events);
             }
 
             // Dodge roll
@@ -422,26 +448,7 @@ final class MoveHandler implements ActionHandlerInterface
 
                 // Shadowing: opponent with Shadowing may follow after successful dodge
                 if ($from !== null) {
-                    foreach ($this->tzCalc->getMarkingPlayers($currentState, $from, $currentPlayer->getTeamSide()) as $marker) {
-                        if (!$marker->hasSkill(SkillName::Shadowing)) {
-                            continue;
-                        }
-                        // ⛔ P85 (30.09.2026), vzor C++ f17802d1 (`rules_bb2016.txt`
-                        //   r. 8458-8464): "rolls 2D6 adding their own player's MA and
-                        //   subtracting the Shadowing player's MA ... 7 or less" = nasleduje.
-                        //   PHP hazel jednu kostku s OBRACENYM znamenkem -- rychlejsi
-                        //   hrac se branil HUR.
-                        $shadowRoll = $this->dice->rollD6() + $this->dice->rollD6();
-                        $shadowMA = $marker->getStats()->getMovement();
-                        $moverMA = $currentPlayer->getStats()->getMovement();
-                        $followed = ($shadowRoll + $moverMA - $shadowMA) <= 7;
-                        $events[] = GameEvent::shadowing($marker->getId(), $currentPlayer->getId(), $shadowRoll, $followed);
-                        if ($followed) {
-                            $marker = $marker->withPosition($from);
-                            $currentState = $currentState->withPlayer($marker);
-                        }
-                        break; // only one Shadowing attempt per dodge step
-                    }
+                    $currentState = $this->stin($currentState, $currentPlayer, $from, $events);
                 }
             }
 
@@ -604,6 +611,99 @@ final class MoveHandler implements ActionHandlerInterface
         $currentState = $currentState->withPlayer($movedPlayer);
 
         return ActionResult::success($currentState, $events);
+    }
+
+    /**
+     * Tentacles (`rules_bb2016.txt` ř. 8586-8595): úhyb nebo skok z jeho zóny; 2D6 + ST soupeře − ST chapadláře,
+     * 5 a míň = drží (pohyb končí, ne turnover). Z víc chapadlářů zkouší nejsilnější. Vrací true = drží.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function chapadlaDrzi(GameState $state, MatchPlayerDTO $hrac, Position $from, array &$events): bool
+    {
+        $grabber = null;
+        foreach ($this->tzCalc->getMarkingPlayers($state, $from, $hrac->getTeamSide()) as $marker) {
+            if ($marker->hasSkill(SkillName::Tentacles)
+                && ($grabber === null || $marker->getStats()->getStrength() > $grabber->getStats()->getStrength())) {
+                $grabber = $marker;
+            }
+        }
+        if ($grabber === null) {
+            return false;
+        }
+        $roll = $this->dice->rollD6() + $this->dice->rollD6();
+        $total = $roll + $hrac->getStats()->getStrength() - $grabber->getStats()->getStrength();
+        $escaped = $total > 5;
+        $events[] = GameEvent::tentacles($hrac->getId(), $grabber->getId(), $roll, $total, $escaped);
+        return !$escaped;
+    }
+
+    /**
+     * Shadowing (ř. 8456-8464): po opuštění zóny ze `$from` jeden soupeř se Shadowing hodí 2D6 + MA hráče − své MA,
+     * 7 a míň = následuje na `$from`. P85 (30.09.2026), vzor C++ f17802d1.
+     *
+     * @param list<GameEvent> $events
+     */
+    private function stin(GameState $state, MatchPlayerDTO $hrac, Position $from, array &$events): GameState
+    {
+        foreach ($this->tzCalc->getMarkingPlayers($state, $from, $hrac->getTeamSide()) as $marker) {
+            if (!$marker->hasSkill(SkillName::Shadowing)) {
+                continue;
+            }
+            $shadowRoll = $this->dice->rollD6() + $this->dice->rollD6();
+            $followed = ($shadowRoll + $hrac->getStats()->getMovement() - $marker->getStats()->getMovement()) <= 7;
+            $events[] = GameEvent::shadowing($marker->getId(), $hrac->getId(), $shadowRoll, $followed);
+            if ($followed) {
+                $state = $state->withPlayer($marker->withPosition($from));
+            }
+            break; // jen jeden pokus
+        }
+        return $state;
+    }
+
+    /**
+     * P277: přehoz nepovedeného hodu bez dialogu (AI; ř. 929-931) — Pro (ř. 8381-8387, ProCheck), jinak týmový přehoz
+     * (Loner 4+, ř. 8287-8290); jeden hod nejvýš jednou (ř. 925-927). Kouč-člověk (interaktivní přehozy) tu přehoz
+     * zatím nedostane — dialog umí jen úhyb, GFI a zvednutí (P283).
+     *
+     * @param list<GameEvent> $events
+     * @param callable(int, bool): GameEvent $udalost
+     */
+    private function prehozAi(GameState &$state, MatchPlayerDTO &$hrac, int $cil, bool &$teamRerollUsed, array &$events, callable $udalost): bool
+    {
+        if ($this->interactiveRerolls) {
+            return false;
+        }
+        $strana = $hrac->getTeamSide();
+        if ($hrac->hasSkill(SkillName::Pro) && !$hrac->isProUsedThisTurn()) {
+            $hrac = $hrac->withProUsedThisTurn(true);
+            $state = $state->withPlayer($hrac);
+            $pro = ProCheck::roll($this->dice, $hrac, !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll(), $events);
+            if ($pro['teamRerollUsed']) {
+                $teamRerollUsed = true;
+                $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
+            }
+            if (!$pro['allowed']) {
+                return false;
+            }
+        } elseif (!$teamRerollUsed && $state->getTeamState($strana)->canUseReroll()) {
+            $teamRerollUsed = true;
+            $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
+            if ($hrac->hasSkill(SkillName::Loner)) {
+                $lonerRoll = $this->dice->rollD6();
+                $events[] = GameEvent::lonerCheck($hrac->getId(), $lonerRoll, $lonerRoll >= 4);
+                if ($lonerRoll < 4) {
+                    return false;
+                }
+            }
+            $events[] = GameEvent::rerollUsed($hrac->getId(), 'Team Reroll');
+        } else {
+            return false;
+        }
+        $roll = $this->dice->rollD6();
+        $ok = $roll >= $cil;
+        $events[] = $udalost($roll, $ok);
+        return $ok;
     }
 
     /**

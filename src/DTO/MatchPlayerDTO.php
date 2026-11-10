@@ -58,6 +58,9 @@ final class MatchPlayerDTO
         //   Action". Hráč se v tomto kole pohnul nebo vstal (`hasMoved` znamená něco jiného:
         //   pohyb je UKONČEN).
         private bool $movedThisTurn = false,
+        // P277 (10.11.2026): `rules_bb2016.txt` ř. 8277 -- „A player may only use the Leap skill once per turn“.
+        //   Dřív jen v rámci jedné cesty (Pathfinder), tah přerušený přehozem šel skočit znovu.
+        private bool $leapUsedThisTurn = false,
     ) {}
 
     /**
@@ -168,6 +171,18 @@ final class MatchPlayerDTO
     {
         return $this->proUsedThisTurn;
     }
+    public function isLeapUsedThisTurn(): bool
+    {
+        return $this->leapUsedThisTurn;
+    }
+
+    public function withLeapUsedThisTurn(bool $used): self
+    {
+        $clone = clone $this;
+        $clone->leapUsedThisTurn = $used;
+        return $clone;
+    }
+
     public function isSureFeetUsedThisTurn(): bool
     {
         return $this->sureFeetUsedThisTurn;
@@ -517,6 +532,7 @@ final class MatchPlayerDTO
             bloodlustHungry: $this->bloodlustHungry,
             stunnedThisTurn: $this->stunnedThisTurn,
             movedThisTurn: $this->movedThisTurn,
+            leapUsedThisTurn: $this->leapUsedThisTurn,
         );
     }
 
@@ -548,6 +564,7 @@ final class MatchPlayerDTO
             'playedThisDrive' => $this->playedThisDrive,
             'bloodlustHungry' => $this->bloodlustHungry,
             'stunnedThisTurn' => $this->stunnedThisTurn,
+            'leapUsedThisTurn' => $this->leapUsedThisTurn,
             'movedThisTurn' => $this->movedThisTurn,
             'rooted' => $this->rooted,
             'bigGuyStupefied' => $this->bigGuyStupefied,
@@ -597,6 +614,7 @@ final class MatchPlayerDTO
             // Stav uložený před 09.10.2026 klíč nemá: tehdy zákaz bloku stál na `hasMoved`,
             //   takže se z něj při načtení odvodí (rozehrané kolo se dohraje po staru).
             movedThisTurn: (bool) ($data['movedThisTurn'] ?? $data['hasMoved']),
+            leapUsedThisTurn: (bool) ($data['leapUsedThisTurn'] ?? false),
         );
     }
 }
