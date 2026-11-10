@@ -159,6 +159,23 @@ final class ActionResolver
     }
 
     /**
+     * Strany kouče-člověka: ptá se jich na všechno, na co se ptá i v tahu soupeře — lékárník, Stand Firm, Diving
+     * Catch, kam hodit bombu, rozhodčí, přehoz hodu. (Přehozy uprostřed tahu a volba kostky bloku zvlášť:
+     * `setInteractiveRerolls` / `setInteractiveBlocks` — jen na tahu člověka.)
+     *
+     * @param list<TeamSide> $sides
+     */
+    public function setHumanSides(array $sides): void
+    {
+        $this->setInteractiveApothecary($sides);
+        $this->setInteractiveStandFirm($sides);
+        $this->setInteractiveDivingCatch($sides);
+        $this->setInteractiveBombRethrow($sides);
+        $this->setInteractiveReferee($sides);
+        $this->setInteractiveThrowRerolls($sides);
+    }
+
+    /**
      * P292: kouče těchto stran se při nepovedeném hodu (přihrávka, bomba, hod spoluhráčem) ptá na přehoz.
      *
      * @param list<TeamSide> $sides
@@ -315,10 +332,7 @@ final class ActionResolver
         $prehozAkce = $prehoz?->getReplayAction();
         if ($action === ActionType::RESOLVE_REROLL && $prehoz !== null && $prehozAkce !== null) {
             $volba = (string) ($params['choice'] ?? 'decline');
-            if (($volba === 'pro' && !$prehoz->isProAvailable()) || ($volba === 'team_reroll' && !$prehoz->isTeamRerollAvailable())
-                || !in_array($volba, ['pro', 'team_reroll', 'decline'], true)) {
-                throw new \InvalidArgumentException("Reroll choice {$volba} not available");
-            }
+            $prehoz->assertChoice($volba);
 
             return $this->resolveSPrehranim(
                 $state->withPendingReroll(null),
@@ -565,9 +579,19 @@ final class ActionResolver
                         $state = $checkResult['state'];
                         $preEvents = $checkResult['events'];
                     } else {
-                        // P289 (10.11.2026): kouč-člověk smí neúspěch přehodit (ř. 929-931); ohlášená akce čeká
+                        // P289 (10.11.2026): kouč-člověk smí neúspěch přehodit (ř. 929-931); ohlášená akce čeká. AI hody
+                        //   velkých hráčů nepřehazuje (parita s C++ P130).
                         $nabidka = isset($checkResult['reroll']) && $this->interactiveRerolls
-                            ? $this->nabidkaPrehozuKontroly($state, $player, $action, $params, $checkResult['reroll'])
+                            ? ThrowReroll::offer(
+                                $state,
+                                $player,
+                                $checkResult['reroll']['type'],
+                                $checkResult['reroll']['target'],
+                                $checkResult['reroll']['roll'],
+                                $player->getPosition(),
+                                resumeAction: $action,
+                                resumeParams: $params,
+                            )
                             : null;
                         if ($nabidka !== null) {
                             return ActionResult::success($state->withPendingReroll($nabidka), $checkResult['events']);
@@ -712,35 +736,6 @@ final class ActionResolver
     }
 
     /**
-     * P289: nabídka přehozu neúspěšné kontroly Bone Head / Really Stupid / Wild Animal. AI ji nedostane --
-     * hody velkých hráčů nepřehazuje (parita s C++ P130).
-     *
-     * @param array<string, mixed> $params
-     * @param array{type: string, target: int, roll: int} $hod
-     */
-    private function nabidkaPrehozuKontroly(GameState $state, MatchPlayerDTO $player, ActionType $action, array $params, array $hod): ?PendingRerollDTO
-    {
-        $smi = ThrowReroll::available($state, $player);
-        if (!$smi['pro'] && !$smi['team']) {
-            return null;
-        }
-        $pos = $player->getPosition();
-
-        return new PendingRerollDTO(
-            $hod['type'],
-            $player->getId(),
-            $hod['target'],
-            $hod['roll'],
-            $smi['pro'],
-            $smi['team'],
-            $pos?->getX() ?? 0,
-            $pos?->getY() ?? 0,
-            resumeAction: $action->value,
-            resumeParams: $params,
-        );
-    }
-
-    /**
      * Odpověď na nabídku přehozu. U velkého hráče (P289) se přehozený hod vyhodnotí kontrolou před akcí:
      * projde-li, ohlášená akce doběhne; jinak (i při odmítnutí) akce propadne.
      *
@@ -749,11 +744,10 @@ final class ActionResolver
     private function resolveReroll(GameState $state, array $params): ActionResult
     {
         $pending = $state->getPendingReroll();
-        $resume = $pending?->getResumeAction();
-        if ($pending === null || $resume === null) {
+        $akce = $pending?->getResumeAction();
+        if ($pending === null || $akce === null) {
             return $this->rerollHandler->resolve($state, $params);
         }
-        $akce = ActionType::from($resume);
 
         $vyhodnotit = function (GameState $s, ?int $hod, array $events) use ($pending, $akce): ActionResult {
             /** @var list<GameEvent> $events */

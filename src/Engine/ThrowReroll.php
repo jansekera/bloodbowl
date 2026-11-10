@@ -7,6 +7,9 @@ namespace App\Engine;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\DTO\PendingRerollDTO;
+use App\Enum\ActionType;
+use App\ValueObject\Position;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
 
@@ -21,6 +24,44 @@ use App\Enum\TeamSide;
  */
 final class ThrowReroll
 {
+    /**
+     * P289: nabídka přehozu kouči-člověku (dialog uprostřed akce); null = není co nabídnout. Jediné místo stavby
+     * nabídky pro Leap (MoveHandler) i velké hráče (ActionResolver).
+     *
+     * @param array<string, mixed> $resumeParams
+     */
+    public static function offer(
+        GameState $state,
+        MatchPlayerDTO $player,
+        string $rollType,
+        int $target,
+        int $roll,
+        ?Position $at,
+        bool $teamAllowed = true,
+        int $gfiRemaining = 0,
+        ?ActionType $resumeAction = null,
+        array $resumeParams = [],
+    ): ?PendingRerollDTO {
+        $smi = self::available($state, $player, $teamAllowed);
+        if (!$smi['pro'] && !$smi['team']) {
+            return null;
+        }
+
+        return new PendingRerollDTO(
+            $rollType,
+            $player->getId(),
+            $target,
+            $roll,
+            $smi['pro'],
+            $smi['team'],
+            $at?->getX() ?? 0,
+            $at?->getY() ?? 0,
+            resumeAction: $resumeAction,
+            resumeParams: $resumeParams,
+            gfiRemaining: $gfiRemaining,
+        );
+    }
+
     /**
      * Co hráč smí na nepovedený hod použít: Pro (jednou za kolo, ř. 8381) a týmový přehoz (jednou za kolo, ř. 929-931).
      * Jediné místo i pro nabídky kouči-člověku (P289: MoveHandler, ActionResolver).
@@ -72,17 +113,30 @@ final class ThrowReroll
         if (!$teamAvailable) {
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
+        $tym = self::teamReroll($dice, $state, $thrower, $side, $events);
+
+        return ['state' => $tym['state'], 'thrower' => $thrower, 'rerolled' => $tym['ok']];
+    }
+
+    /**
+     * Spotřebuje týmový přehoz; s Lonerem napřed 4+ (ř. 8287-8290: na 1-3 přehoz propadne).
+     *
+     * @param list<GameEvent> $events
+     * @return array{state: GameState, ok: bool}
+     */
+    private static function teamReroll(DiceRollerInterface $dice, GameState $state, MatchPlayerDTO $thrower, TeamSide $side, array &$events): array
+    {
         $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
         if ($thrower->hasSkill(SkillName::Loner)) {
             $lonerRoll = $dice->rollD6();
             $events[] = GameEvent::lonerCheck($thrower->getId(), $lonerRoll, $lonerRoll >= 4);
             if ($lonerRoll < 4) {
-                return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
+                return ['state' => $state, 'ok' => false];
             }
         }
         $events[] = GameEvent::rerollUsed($thrower->getId(), 'Team Reroll');
 
-        return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
+        return ['state' => $state, 'ok' => true];
     }
 
     /**
@@ -122,15 +176,11 @@ final class ThrowReroll
                 return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
             }
         }
-        $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-        if ($thrower->hasSkill(SkillName::Loner)) {
-            $lonerRoll = $dice->rollD6();
-            $events[] = GameEvent::lonerCheck($thrower->getId(), $lonerRoll, $lonerRoll >= 4);
-            if ($lonerRoll < 4) {
-                return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
-            }
+        $tym = self::teamReroll($dice, $state, $thrower, $side, $events);
+        $state = $tym['state'];
+        if (!$tym['ok']) {
+            return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
-        $events[] = GameEvent::rerollUsed($thrower->getId(), 'Team Reroll');
         // po neúspěšném Pro přehazuje týmový přehoz HOD PRO (ř. 8387), ne původní kostku
         $rerolled = $volba === 'pro' ? ProCheck::roll($dice, $thrower, false, $events)['allowed'] : true;
 

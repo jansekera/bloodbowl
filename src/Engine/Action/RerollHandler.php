@@ -38,17 +38,7 @@ final class RerollHandler
 
         $choice = (string) ($params['choice'] ?? 'decline');
 
-        // ⛔ OPRAVA 18.09.2026 (review): volba klienta se musi kryt s nabidkou.
-        //   Driv sel 'pro' projit i bez skillu, podruhe v tomtez kole a po
-        //   neuspesnem hodu Pro (`rules_bb2016.txt` r. 8381, 8385-8386, 926);
-        //   'team_reroll' i bez nabidnuteho tymoveho prehozu. Stejne jako
-        //   `BlockHandler::resolveBlockReroll`.
-        if ($choice === 'pro' && !$pending->isProAvailable()) {
-            throw new \InvalidArgumentException('Pro not available');
-        }
-        if ($choice === 'team_reroll' && !$pending->isTeamRerollAvailable()) {
-            throw new \InvalidArgumentException('Team reroll not available');
-        }
+        $pending->assertChoice($choice);
 
         $state = $state->withPendingReroll(null);
         $vyhodnotit ??= $this->vychoziVyhodnoceni($pending);
@@ -186,7 +176,7 @@ final class RerollHandler
         $target = new Position($pending->getTargetX(), $pending->getTargetY());
 
         // P289: povedený skok (nebo jeho GFI) -- zbylé GFI skoku a dopad
-        if ($pending->getRollType() === 'leap' || $pending->getRollType() === 'leap_gfi') {
+        if ($pending->isLeap()) {
             return $this->moveHandler->dokoncitSkokPoPrehozu($state, $player->getId(), $target, $pending->getGfiRemaining(), $events);
         }
 
@@ -259,7 +249,7 @@ final class RerollHandler
             return ActionResult::turnover($state->withTurnoverPending(true), $events);
         }
 
-        if ($pending->getRollType() === 'leap' || $pending->getRollType() === 'leap_gfi') {
+        if ($pending->isLeap()) {
             return $this->moveHandler->skokSelhal($state, $player, new Position($pending->getTargetX(), $pending->getTargetY()), $events);
         }
 

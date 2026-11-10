@@ -62,6 +62,9 @@ final class Pathfinder
 
         // P277: Leap jen jednou za kolo (ř. 8277) — i přes víc akcí pohybu v kole (tah přerušený přehozem)
         $hasLeap = $player->hasSkill(SkillName::Leap) && !$player->isLeapUsedThisTurn();
+        // OPRAVENO 10.11.2026 (P277, audit goblinů) — přičítaly se zóny u cíle. Ř. 8270-8271: „No modifiers apply to
+        //   this D6 roll unless he has Very Long Legs“ (VLL −1). C++ helpers.cpp calculateLeapTarget. Pro hráče stálé.
+        $leapTarget = $hasLeap ? self::cilSkoku($player) : 0;
 
         // BFS
         /** @var array<string, array{cost: int, dodges: int, gfis: int, steps: list<MoveStep>, prev: ?string, hasLeaped: bool}> */
@@ -165,29 +168,19 @@ final class Pathfinder
             }
 
             // Leap: skok na kterékoli prázdné pole do 2 polí (ř. 8268-8269), jednou za kolo
-            if ($hasLeap && !$currentData['hasLeaped']) {
+            // Cena skoku nezávisí na cíli ⇒ počítá se jednou za uzel (a přes rozpočet se cíle vůbec neprochází)
+            $leapCost = $currentCost + 2;
+            if ($hasLeap && !$currentData['hasLeaped'] && $leapCost <= $maxRange) {
+                $newCost = $leapCost;
+                $isGfi = $newCost > $ma;
+                $newDodges = $currentData['dodges'] + 1; // count leap as a "dodge" for path scoring
+                // P277: skok za 2 pole může stát 2 GFI (ř. 1701 „each extra square“)
+                $newGfis = $currentData['gfis'] + max(0, $newCost - max($ma, $currentCost));
                 foreach ($this->getLeapDestinations($currentPos) as $leapDest) {
-                    if (!$leapDest->isOnPitch()) {
+                    if (!$leapDest->isOnPitch() || $state->getPlayerAtPosition($leapDest) !== null) {
                         continue;
                     }
-                    if ($state->getPlayerAtPosition($leapDest) !== null) {
-                        continue;
-                    }
-
                     $leapDestKey = $leapDest->getX() . ',' . $leapDest->getY();
-                    $newCost = $currentCost + 2;
-                    if ($newCost > $maxRange) {
-                        continue;
-                    }
-
-                    $isGfi = $newCost > $ma;
-                    // OPRAVENO 10.11.2026 (P277, audit goblinů) — přičítaly se zóny u cíle. Ř. 8270-8271: „No modifiers
-                    //   apply to this D6 roll unless he has Very Long Legs“ (VLL −1). C++ helpers.cpp calculateLeapTarget.
-                    $leapTarget = self::cilSkoku($player);
-
-                    $newDodges = $currentData['dodges'] + 1; // count leap as a "dodge" for path scoring
-                    // P277: skok za 2 pole může stát 2 GFI (ř. 1701 „each extra square“)
-                    $newGfis = $currentData['gfis'] + max(0, $newCost - max($ma, $currentCost));
 
                     $step = new MoveStep(
                         position: $leapDest,

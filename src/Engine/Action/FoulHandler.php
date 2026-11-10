@@ -160,12 +160,9 @@ final class FoulHandler implements ActionHandlerInterface
             // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit); bez odpovědi se akce přeruší
             $strana = $attacker->getTeamSide();
             $volba = null;
-            if (in_array($strana, $this->interactiveReferee, true)) {
-                $uplatek = RefereeCall::canBribe($state, $strana);
-                $protest = RefereeCall::canArgue($state, $strana);
-                if ($uplatek || $protest) {
-                    $volba = array_shift($this->refereeAnswers) ?? throw new RefereeQuestion($attackerId, $uplatek, $protest);
-                }
+            $moznosti = in_array($strana, $this->interactiveReferee, true) ? RefereeCall::options($state, $strana) : null;
+            if ($moznosti !== null) {
+                $volba = array_shift($this->refereeAnswers) ?? throw new RefereeQuestion($attackerId, $moznosti['bribe'], $moznosti['argue']);
             }
             $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, $volba);
             $state = $vyrok['state'];

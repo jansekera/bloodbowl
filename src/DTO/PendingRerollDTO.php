@@ -31,7 +31,7 @@ final class PendingRerollDTO
         // ⭐ 18.09.2026: hod Pro padl 1-3 => puvodni vysledek plati a tymovy
         //   prehoz smi prehodit uz jen HOD PRO (`rules_bb2016.txt` r. 8385-8387).
         private readonly bool $proFailed = false,
-        private readonly ?string $resumeAction = null,
+        private readonly ?ActionType $resumeAction = null,
         /** @var array<string, mixed> */
         private readonly array $resumeParams = [],
         private readonly int $gfiRemaining = 0,
@@ -80,7 +80,7 @@ final class PendingRerollDTO
         return $this->proFailed;
     }
 
-    public function getResumeAction(): ?string
+    public function getResumeAction(): ?ActionType
     {
         return $this->resumeAction;
     }
@@ -125,19 +125,41 @@ final class PendingRerollDTO
             $this->playerId,
             $this->target,
             $this->roll,
-            false,
-            $this->teamRerollAvailable,
-            $this->targetX,
-            $this->targetY,
-            true,
-            $this->resumeAction,
-            $this->resumeParams,
-            $this->gfiRemaining,
-            $this->replayAction,
-            $this->replayParams,
-            $this->replayDice,
-            $this->replayAnswers,
+            proAvailable: false,
+            teamRerollAvailable: $this->teamRerollAvailable,
+            targetX: $this->targetX,
+            targetY: $this->targetY,
+            proFailed: true,
+            resumeAction: $this->resumeAction,
+            resumeParams: $this->resumeParams,
+            gfiRemaining: $this->gfiRemaining,
+            replayAction: $this->replayAction,
+            replayParams: $this->replayParams,
+            replayDice: $this->replayDice,
+            replayAnswers: $this->replayAnswers,
         );
+    }
+
+    public function isLeap(): bool
+    {
+        return $this->rollType === 'leap' || $this->rollType === 'leap_gfi';
+    }
+
+    /**
+     * Volba kouče se musí krýt s nabídkou (oprava 18.09.2026: dřív šlo 'pro' i bez skillu a 'team_reroll' i bez
+     * nabídnutého přehozu; `rules_bb2016.txt` ř. 8381, 8385-8386, 926).
+     */
+    public function assertChoice(string $choice): void
+    {
+        if ($choice === 'pro' && !$this->proAvailable) {
+            throw new \InvalidArgumentException('Pro not available');
+        }
+        if ($choice === 'team_reroll' && !$this->teamRerollAvailable) {
+            throw new \InvalidArgumentException('Team reroll not available');
+        }
+        if (!in_array($choice, ['pro', 'team_reroll', 'decline'], true)) {
+            throw new \InvalidArgumentException("Invalid reroll choice: {$choice}");
+        }
     }
 
     /**
@@ -155,7 +177,7 @@ final class PendingRerollDTO
             'targetX' => $this->targetX,
             'targetY' => $this->targetY,
             'proFailed' => $this->proFailed,
-            'resumeAction' => $this->resumeAction,
+            'resumeAction' => $this->resumeAction?->value,
             'resumeParams' => $this->resumeParams,
             'gfiRemaining' => $this->gfiRemaining,
             'replayAction' => $this->replayAction?->value,
@@ -180,7 +202,7 @@ final class PendingRerollDTO
             targetX: (int) ($data['targetX'] ?? 0),
             targetY: (int) ($data['targetY'] ?? 0),
             proFailed: (bool) ($data['proFailed'] ?? false),
-            resumeAction: isset($data['resumeAction']) ? (string) $data['resumeAction'] : null,
+            resumeAction: isset($data['resumeAction']) ? ActionType::from((string) $data['resumeAction']) : null,
             resumeParams: (array) ($data['resumeParams'] ?? []),
             gfiRemaining: (int) ($data['gfiRemaining'] ?? 0),
             replayAction: isset($data['replayAction']) ? ActionType::from((string) $data['replayAction']) : null,

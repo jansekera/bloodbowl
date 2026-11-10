@@ -322,15 +322,16 @@ final class InjuryResolver
         //   (dřív 9 + 1 = 10 ⇒ tabulka s 1/6 smrti); Thick Skull se ptá na nemodifikovanou 8.
         $stunty = $player->hasSkill(SkillName::Stunty);
         $modified = $roll + $modifier;
+        $stunMax = $stunty ? 6 : 7;   // nejvyšší výsledek, který je jen omráčení
 
         // P276: „Stunned results for any Injury rolls for the Ball & Chain player are always treated as KO’d“
         //   (ř. 7829-7830) — dřív jen v jeho pohybu (BallAndChainHandler::zranitBnc). Bez lékárníka (omráčený = zase KO).
-        $omracen = $modified <= ($stunty ? 6 : 7) || ($modified === 8 && $player->hasSkill(SkillName::ThickSkull));
+        $omracen = $modified <= $stunMax || ($modified === 8 && $player->hasSkill(SkillName::ThickSkull));
         if ($omracen && $player->hasSkill(SkillName::BallAndChain)) {
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'ko');
             return ['player' => $player->withState(PlayerState::KO)->withPosition(null), 'events' => $events, 'dice' => [$die1, $die2]];
         }
-        if ($modified <= ($stunty ? 6 : 7)) {
+        if ($modified <= $stunMax) {
             // ř. 706-707: v kole, kdy byl omráčen, se hráč neotáčí -- viz `withStunned()`.
             $player = $player->withStunned();
             $events[] = GameEvent::injuryRoll($player->getId(), $roll, $modifier, 'stunned');

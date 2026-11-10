@@ -363,10 +363,9 @@ final class GameFlowResolver
         while ($fronta !== []) {
             $id = array_shift($fronta);
             $strana = $state->requirePlayer($id)->getTeamSide();
-            $uplatek = RefereeCall::canBribe($state, $strana);
-            $protest = RefereeCall::canArgue($state, $strana);
-            if ($uplatek || $protest) {
-                return $state->withPendingReferee(new PendingRefereeDTO($id, false, $uplatek, $protest, queue: $fronta));
+            $moznosti = RefereeCall::options($state, $strana);
+            if ($moznosti !== null) {
+                return $state->withPendingReferee(new PendingRefereeDTO($id, false, $moznosti['bribe'], $moznosti['argue'], queue: $fronta));
             }
             $state = $this->vyloucitTajnouZbran($state, $id, null, $events);
         }

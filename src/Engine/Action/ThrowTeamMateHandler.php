@@ -336,8 +336,8 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
             $landingRoll = $this->dice->rollD6();
             $landingSuccess = $landingRoll >= $landingTarget;
             // P283: týmový přehoz i na přistání (ř. 929-931) — Pro → týmový (Loner), parita s C++ attemptRoll
+            $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
             if (!$landingSuccess) {
-                $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, false);
                 $res = ThrowReroll::proThenTeam($this->dice, $state, $projectile, $projectile->getTeamSide(), true, $events, $this->koucPrehozy, 'ttm_landing', $landingRoll, $landingTarget);
                 $state = $res['state'];
                 $projectile = $res['thrower'];
@@ -346,8 +346,6 @@ final class ThrowTeamMateHandler implements ActionHandlerInterface
                     $landingSuccess = $landingRoll >= $landingTarget;
                     $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, $landingSuccess);
                 }
-            } else {
-                $events[] = GameEvent::ttmLanding($projectile->getId(), $landingRoll, true);
             }
         }
 

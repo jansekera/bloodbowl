@@ -38,6 +38,19 @@ final class RefereeCall
     }
 
     /**
+     * P291: co nabídnout kouči-člověku; null = není co volit (bez úplatku a s vyhozeným trenérem) ⇒ neptat se.
+     *
+     * @return array{bribe: bool, argue: bool}|null
+     */
+    public static function options(GameState $state, TeamSide $side): ?array
+    {
+        $bribe = self::canBribe($state, $side);
+        $argue = self::canArgue($state, $side);
+
+        return $bribe || $argue ? ['bribe' => $bribe, 'argue' => $argue] : null;
+    }
+
+    /**
      * @param list<GameEvent> $events
      * @param array{bribe: bool, argue: bool}|null $volba volba kouče-člověka; null = AI (použije, co jde)
      * @return array{state: GameState, outcome: string}
@@ -53,7 +66,7 @@ final class RefereeCall
     ): array {
         $bribe = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);
-            if ($team->getBribes() <= 0 || ($volba !== null && !$volba['bribe'])) {
+            if (!self::canBribe($state, $side) || ($volba !== null && !$volba['bribe'])) {
                 return false;
             }
             $state = $state->withTeamState($side, $team->withBribes($team->getBribes() - 1));
@@ -64,7 +77,7 @@ final class RefereeCall
         };
         $argue = static function () use (&$state, $side, $playerId, $dice, &$events, $volba): bool {
             $team = $state->getTeamState($side);
-            if ($team->isHeadCoachEjected() || ($volba !== null && !$volba['argue'])) {
+            if (!self::canArgue($state, $side) || ($volba !== null && !$volba['argue'])) {
                 return false;
             }
             $roll = $dice->rollD6();

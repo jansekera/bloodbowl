@@ -12,6 +12,7 @@ use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingGrabDTO;
 use App\DTO\PendingStandFirmDTO;
 use App\Enum\BlockDiceFace;
+use App\Enum\GameEventType;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\ValueObject\Position;
@@ -154,7 +155,7 @@ final class BallAndChainHandler implements ActionHandlerInterface
                     //   (ř. 7820-7822) a sražený hráč týmu na tahu = turnover (ř. 366-367; vytlačený do davu sražen není).
                     if ($occupant->getTeamSide() === $player->getTeamSide()) {
                         foreach (array_slice($events, $predBlokem) as $e) {
-                            if ($e->getType() === 'player_fell' && ($e->getData()['playerId'] ?? null) === $occupant->getId()) {
+                            if ($e->getType() === GameEventType::PLAYER_FELL->value && ($e->getData()['playerId'] ?? null) === $occupant->getId()) {
                                 $srazenPriBloku = true;
                             }
                         }

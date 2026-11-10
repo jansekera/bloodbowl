@@ -64,17 +64,9 @@ final class GameOrchestrator
         }
         // P206 (b): o lékárníkovi se ptá kouč-člověk — i když se jeho hráč zranil v tahu soupeře
         $lide = $aiTeam === null ? [TeamSide::HOME, TeamSide::AWAY] : [$aiTeam->opponent()];
-        $resolver->setInteractiveApothecary($lide);
-        // P226: na Stand Firm se ptá kouč-člověk bránícího hráče — i v tahu soupeře (tah AI se zastaví)
-        $resolver->setInteractiveStandFirm($lide);
-        // 30.10.2026: na Diving Catch se ptá kouč-člověk hráče — i v tahu soupeře a u výkopu (tah AI se zastaví)
-        $resolver->setInteractiveDivingCatch($lide);
-        // P272: kam hodit chycenou bombu se ptá kouč-člověk chytajícího hráče — i v tahu soupeře
-        $resolver->setInteractiveBombRethrow($lide);
-        // P291: úplatek / protest, když rozhodčí vylučuje hráče kouče-člověka (faul, tajná zbraň na konci drive)
-        $resolver->setInteractiveReferee($lide);
-        // P292: přehoz nepovedené přihrávky, bomby a hodu spoluhráčem
-        $resolver->setInteractiveThrowRerolls($lide);
+        //   Totéž u všech otázek kouči, i v tahu soupeře: Stand Firm (P226), Diving Catch, kam hodit bombu (P272),
+        //   rozhodčí (P291), přehoz hodu (P292) — `setHumanSides`.
+        $resolver->setHumanSides($lide);
 
         $result = $resolver->resolve($state, $action, $params);
         $allEvents = $result->getEvents();

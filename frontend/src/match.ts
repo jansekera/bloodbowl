@@ -226,8 +226,7 @@ async function handleActionResult(result: ActionResult): Promise<void> {
     }
 
     // Show reroll modal if there's a pending reroll
-    // P292: přehoz hodu (replayAction) se ptá kouče hráče i v tahu soupeře (bomba chycená jeho hráčem)
-    if (result.state.pendingReroll && (result.state.aiTeam !== result.state.activeTeam || result.state.pendingReroll.replayAction)) {
+    if (rerollIsForHuman(result.state)) {
         showRerollModal(result.state);
     }
 
@@ -454,6 +453,11 @@ function showBlockDiceModal(state: import('./api/types').GameState): void {
         },
         opponentPicks,
     );
+}
+
+/** Čekající přehoz patří kouči-člověku: na jeho tahu, nebo přehoz hodu (P292 replay) i v tahu soupeře (chycená bomba). */
+function rerollIsForHuman(state: import('./api/types').GameState): boolean {
+    return !!state.pendingReroll && (state.aiTeam !== state.activeTeam || !!state.pendingReroll.replayAction);
 }
 
 function showRerollModal(state: import('./api/types').GameState): void {
@@ -1216,7 +1220,7 @@ async function init(): Promise<void> {
                 showBlockDiceModal(state);
             }
             // P292: čekající přehoz i po obnovení stránky — server jinou akci nepřijme
-            if (state.pendingReroll && (state.aiTeam !== state.activeTeam || state.pendingReroll.replayAction)) {
+            if (rerollIsForHuman(state)) {
                 showRerollModal(state);
             }
             // P224: čekající otázka na Grab i po obnovení stránky — server jinou akci nepřijme

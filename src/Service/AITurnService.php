@@ -37,12 +37,7 @@ final class AITurnService
     public function playTurn(GameState $state, DiceRollerInterface $dice): array
     {
         $resolver = new ActionResolver($dice);
-        $resolver->setInteractiveApothecary($this->interactiveApothecary);
-        $resolver->setInteractiveStandFirm($this->interactiveApothecary);
-        $resolver->setInteractiveDivingCatch($this->interactiveApothecary);
-        $resolver->setInteractiveBombRethrow($this->interactiveApothecary);
-        $resolver->setInteractiveReferee($this->interactiveApothecary);
-        $resolver->setInteractiveThrowRerolls($this->interactiveApothecary);
+        $resolver->setHumanSides($this->interactiveApothecary);
         $gameFlow = $resolver->getGameFlowResolver();
         $allEvents = [];
         $aiTeam = $state->getAiTeam();

@@ -500,36 +500,9 @@ final class MoveHandler implements ActionHandlerInterface
             }
 
             // Check if player moved onto a loose ball
-            $ball = $currentState->getBall();
-            if (!$ball->isHeld() && $ball->getPosition() !== null && $ball->getPosition()->equals($to)) {
-                $currentPlayer = $currentState->getPlayer($playerId) ?? $currentPlayer;
-                $pickupRerollAvailable = !$teamRerollUsed && $currentState->getTeamState($activeSide)->canUseReroll();
-                $pickupResult = $this->ballResolver->resolvePickup($currentState, $currentPlayer, $pickupRerollAvailable);
-                $events = array_merge($events, $pickupResult['events']);
-                $currentState = $pickupResult['state'];
-
-                if ($pickupResult['teamRerollUsed']) {
-                    $teamRerollUsed = true;
-                    $currentState = $currentState->withTeamState(
-                        $activeSide,
-                        $currentState->getTeamState($activeSide)->withRerollUsed(),
-                    );
-                }
-
-                if (!$pickupResult['success']) {
-                    $events[] = GameEvent::turnover('Failed pickup');
-                    $fallenPlayer = ($currentState->getPlayer($playerId) ?? $currentPlayer)
-                        ->withHasMoved(true)
-                        ->withHasActed(true);
-                    $currentState = $currentState->withPlayer($fallenPlayer);
-
-                    return ActionResult::turnover(
-                        $currentState->withTurnoverPending(true),
-                        $events,
-                    );
-                }
-
-                $currentPlayer = $currentState->getPlayer($playerId) ?? $currentPlayer;
+            $konec = $this->zvednoutNaPoli($currentState, $currentPlayer, $to, $teamRerollUsed, $events);
+            if ($konec !== null) {
+                return $konec;
             }
         }
 
@@ -589,20 +562,44 @@ final class MoveHandler implements ActionHandlerInterface
     }
 
     /**
-     * P289 (10.11.2026): nabídka přehozu kouči-člověku (Pro, týmový přehoz; ř. 929-931, 8381-8387). AI a kouč bez
-     * přehozu dostanou `null`.
+     * Vstoupil hráč na pole s volným míčem ⇒ musí ho zvednout (`rules_bb2016.txt` ř. 436-438); týmový přehoz smí jen
+     * jednou za kolo. Nepovedené zvednutí = turnover (vrací výsledek), jinak `null` a hráč (případně s míčem) ve stavu.
+     *
+     * @param list<GameEvent> $events
      */
+    private function zvednoutNaPoli(GameState &$state, MatchPlayerDTO &$hrac, Position $to, bool &$teamRerollUsed, array &$events): ?ActionResult
+    {
+        $ball = $state->getBall();
+        if ($ball->isHeld() || $ball->getPosition() === null || !$ball->getPosition()->equals($to)) {
+            return null;
+        }
+        $playerId = $hrac->getId();
+        $strana = $state->getActiveTeam();
+        $hrac = $state->getPlayer($playerId) ?? $hrac;
+        $pickupResult = $this->ballResolver->resolvePickup($state, $hrac, !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll());
+        $events = array_merge($events, $pickupResult['events']);
+        $state = $pickupResult['state'];
+        if ($pickupResult['teamRerollUsed']) {
+            $teamRerollUsed = true;
+            $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
+        }
+        if (!$pickupResult['success']) {
+            $events[] = GameEvent::turnover('Failed pickup');
+            $state = $state->withPlayer(($state->getPlayer($playerId) ?? $hrac)->withHasMoved(true)->withHasActed(true));
+
+            return ActionResult::turnover($state->withTurnoverPending(true), $events);
+        }
+        $hrac = $state->getPlayer($playerId) ?? $hrac;
+
+        return null;
+    }
+
+    /** P289: nabídka přehozu kouči-člověku (jen v interaktivním režimu); AI dostane `null`. */
     private function nabidkaPrehozu(GameState $state, MatchPlayerDTO $hrac, string $druh, int $cil, int $hod, Position $kam, int $gfiZbyva, bool $teamRerollUsed): ?PendingRerollDTO
     {
-        if (!$this->interactiveRerolls) {
-            return null;
-        }
-        $smi = ThrowReroll::available($state, $hrac, !$teamRerollUsed);
-        if (!$smi['pro'] && !$smi['team']) {
-            return null;
-        }
-
-        return new PendingRerollDTO($druh, $hrac->getId(), $cil, $hod, $smi['pro'], $smi['team'], $kam->getX(), $kam->getY(), gfiRemaining: $gfiZbyva);
+        return $this->interactiveRerolls
+            ? ThrowReroll::offer($state, $hrac, $druh, $cil, $hod, $kam, !$teamRerollUsed, $gfiZbyva)
+            : null;
     }
 
     /**
@@ -691,36 +688,9 @@ final class MoveHandler implements ActionHandlerInterface
         }
 
         // Check pickup on landing
-        $ball = $state->getBall();
-        if (!$ball->isHeld() && $ball->getPosition() !== null && $ball->getPosition()->equals($to)) {
-            $hrac = $state->getPlayer($playerId) ?? $hrac;
-            $pickupRerollAvailable = !$teamRerollUsed && $state->getTeamState($state->getActiveTeam())->canUseReroll();
-            $pickupResult = $this->ballResolver->resolvePickup($state, $hrac, $pickupRerollAvailable);
-            $events = array_merge($events, $pickupResult['events']);
-            $state = $pickupResult['state'];
-
-            if ($pickupResult['teamRerollUsed']) {
-                $teamRerollUsed = true;
-                $state = $state->withTeamState(
-                    $state->getActiveTeam(),
-                    $state->getTeamState($state->getActiveTeam())->withRerollUsed(),
-                );
-            }
-
-            if (!$pickupResult['success']) {
-                $events[] = GameEvent::turnover('Failed pickup');
-                $fallenPlayer = ($state->getPlayer($playerId) ?? $hrac)
-                    ->withHasMoved(true)
-                    ->withHasActed(true);
-                $state = $state->withPlayer($fallenPlayer);
-
-                return ActionResult::turnover(
-                    $state->withTurnoverPending(true),
-                    $events,
-                );
-            }
-
-            $hrac = $state->getPlayer($playerId) ?? $hrac;
+        $konec = $this->zvednoutNaPoli($state, $hrac, $to, $teamRerollUsed, $events);
+        if ($konec !== null) {
+            return $konec;
         }
 
         return null;
