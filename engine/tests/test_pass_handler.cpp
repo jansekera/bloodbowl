@@ -852,3 +852,44 @@ TEST(PassHandler, P89ThrowInCaughtByTheOpponentIsStillATurnover) {
     ASSERT_EQ(gs.ball.carrierId, 13);
     EXPECT_TRUE(result.turnover);
 }
+
+// P275 (audit goblinů 10.11.2026): Stunty „must subtract 1 from the roll when they pass“ (rules_bb2016.txt
+// ř. 8533-8534). Dřív se Stunty při hodu nečetl ⇒ goblin házel jako AG3 bez postihu. Rychlá z (5,7) na (8,7):
+// bez Stunty cíl 7-3-1 = 3, se Stunty 4 ⇒ hod 3 je nepřesná; hod 2 s −1 = 1 ⇒ fumble (ř. 1742-1744).
+static const GameEvent* passEvent(const std::vector<GameEvent>& ev) {
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::PASS) return &e;
+    return nullptr;
+}
+
+TEST(PassHandler, P275StuntyPassesWithMinusOne) {
+    for (bool stunty : {false, true}) {
+        auto gs = makePassSetup();
+        gs.homeTeam.rerolls = 0;
+        placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+        placePlayer(gs, 2, {8, 7}, TeamSide::HOME);
+        if (stunty) gs.getPlayer(1).skills.add(SkillName::Stunty);
+        gs.ball = BallState::carried({5, 7}, 1);
+        FixedDiceRoller dice({3, 6, 1, 1, 1, 6, 6, 6});
+        std::vector<GameEvent> ev;
+        resolvePass(gs, 1, {8, 7}, dice, &ev);
+        const GameEvent* p = passEvent(ev);
+        ASSERT_NE(p, nullptr);
+        EXPECT_EQ(p->roll, stunty ? 4 : 3) << "cíl hodu";
+        EXPECT_EQ(p->success, !stunty) << "hod 3";
+    }
+}
+
+TEST(PassHandler, P275StuntyFumblesOnTwoAtShortRange) {
+    auto gs = makePassSetup();
+    gs.homeTeam.rerolls = 0;
+    placePlayer(gs, 1, {5, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {10, 7}, TeamSide::HOME);   // 5 polí = krátká (0)
+    gs.getPlayer(1).skills.add(SkillName::Stunty);
+    gs.ball = BallState::carried({5, 7}, 1);
+    FixedDiceRoller dice({2, 3, 4, 4, 4});          // 2 − 1 = 1 ⇒ fumble, odraz od házeče
+    auto result = resolvePass(gs, 1, {10, 7}, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    // fumble ⇒ odraz od HÁZEČE (D8 3 = východ) na (6,7); nepřesná by rozptýlila od cíle (10,7)
+    EXPECT_EQ(gs.ball.position, (Position{6, 7}));
+}

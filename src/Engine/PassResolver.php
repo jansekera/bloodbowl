@@ -252,6 +252,12 @@ final class PassResolver
             $modifier--;
         }
 
+        // OPRAVENO 10.11.2026 (P275, audit goblinů) — Stunty se tu nečetl. Ř. 8533-8534: „must subtract 1 from the
+        //   roll when they pass“; bomba se hází jako míč (ř. 7952-7953) ⇒ přihrávka, bomba i odhad AI. C++ throwRollMods.
+        if ($thrower->hasSkill(SkillName::Stunty)) {
+            $modifier--;
+        }
+
         // ⛔⛔ ODEBRANO 14.09.2026 -- SKILL `Pass` SE POCITAL DVAKRAT.
         //   `rules_bb2016.txt` r. 8335-8337: "A player with the Pass skill is
         //   allowed to RE-ROLL the D6 if he throws an inaccurate pass or

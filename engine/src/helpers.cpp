@@ -322,6 +322,9 @@ int throwRollMods(const GameState& state, const Player& thrower, PassRange band)
     if (!thrower.hasSkill(SkillName::NervesOfSteel)) mods -= countTacklezones(state, thrower.position, thrower.teamSide);
     mods -= countDisturbingPresence(state, thrower.position, thrower.teamSide);
     if (state.weather == Weather::VERY_SUNNY) mods -= 1;   // jen Very Sunny; déšť patří k chytání, vánice k dosahu
+    // OPRAVENO 10.11.2026 (P275, audit goblinů) — Stunty se tu nečetl. Ř. 8533-8534: „must subtract 1 from the roll
+    //   when they pass“; bomba se hází jako míč (ř. 7952-7953) ⇒ platí pro přihrávku, bombu i odhad AI.
+    if (thrower.hasSkill(SkillName::Stunty)) mods -= 1;
     return mods;
 }
 

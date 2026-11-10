@@ -593,3 +593,19 @@ TEST(CoachChoiceBomb, P272AnswerPicksTheOfferedSquare) {
     EXPECT_EQ(thrownTo(0), cand[0]);
     EXPECT_EQ(thrownTo(1), cand[0]);
 }
+
+// P275: bomba se hází „using the rules for throwing the ball“ (ř. 7952-7953) ⇒ i Stunty −1 (ř. 8533-8534).
+// Rychlá na (13,7): bez Stunty cíl 3 (hod 3 přesně ⇒ 12 v centru padne), se Stunty 4 ⇒ nepřesná, rozptyl 3× pryč.
+TEST(BombHandler, P275StuntyBombardierThrowsWithMinusOne) {
+    GameState gs = bombP256();
+    gs.getPlayer(1).skills.add(SkillName::Stunty);
+    std::vector<GameEvent> ev;
+    FixedDiceRoller dice({3, 2, 2, 2, 6, 6, 6, 6});   // rozptyl D8 2 = sever 3× ⇒ (13,4), daleko od 12
+    resolveBombThrow(gs, 1, {13, 7}, dice, &ev);
+    for (const auto& e : ev)
+        if (e.type == GameEvent::Type::PASS) {
+            EXPECT_EQ(e.roll, 4);
+            EXPECT_FALSE(e.success);
+        }
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING);
+}
