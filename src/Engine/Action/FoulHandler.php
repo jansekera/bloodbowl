@@ -10,6 +10,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
+use App\Engine\RefereeCall;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
@@ -135,11 +136,18 @@ final class FoulHandler implements ActionHandlerInterface
         // Check for ejection (doubles) — Sneaky Git avoids ejection
         $vyloucen = false;
         if (($die1 === $die2 || $dubletNaZraneni) && !$attacker->hasSkill(SkillName::SneakyGit)) {
-            $vyloucen = true;
-            $events[] = GameEvent::playerEjected($attackerId);
+            // P287 (10.11.2026): úplatek / Argue the call (RefereeCall, parita s C++ refereeSendOff). Úplatek ⇒ zůstává
+            //   a bez turnoveru; protest 6 ⇒ do rezerv, turnover zůstává (ř. 1100-1101).
+            $vyrok = RefereeCall::sendOff($state, $attackerId, $attacker->getTeamSide(), true, $this->dice, $events);
+            $state = $vyrok['state'];
+            $vyloucen = $vyrok['outcome'] !== RefereeCall::CANCELLED;
+            $doRezerv = $vyrok['outcome'] === RefereeCall::RESERVES;
+            if ($vyloucen && !$doRezerv) {
+                $events[] = GameEvent::playerEjected($attackerId);
+            }
 
             // Get fresh attacker from state
-            $freshAttacker = $state->getPlayer($attackerId);
+            $freshAttacker = $vyloucen ? $state->getPlayer($attackerId) : null;
             if ($freshAttacker !== null) {
                 $ejectedPos = $freshAttacker->getPosition();
                 $nesl = $state->getBall()->getCarrierId() === $attackerId;
@@ -148,7 +156,7 @@ final class FoulHandler implements ActionHandlerInterface
                 //   vyloučený ještě stál na poli: vrátil-li se odrazem zpět, chytil ho a odnesl ze
                 //   hřiště. Ř. 1882-1884 + 678-681: hráč je pryč, pak se jeho míč odrazí.
                 $state = $state->withPlayer(
-                    $freshAttacker->withState(PlayerState::EJECTED)->withPosition(null),
+                    $freshAttacker->withState($doRezerv ? PlayerState::OFF_PITCH : PlayerState::EJECTED)->withPosition(null),
                 );
                 if ($nesl && $ejectedPos !== null) {
                     $state = $state->withBall(BallState::onGround($ejectedPos));

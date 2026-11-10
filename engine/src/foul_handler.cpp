@@ -151,6 +151,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     }
 
     // Doubles: fouler ejected (SneakyGit prevents)
+    bool sentToReserves = false;
     if (isDoubles) {
         if (!fouler.hasSkill(SkillName::SneakyGit)) {
             // OPRAVENO 09.10.2026 (T5.26) — pozice se nastavila na (−1,−1) DŘÍV, než se míč
@@ -158,9 +159,17 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
             // off player was holding the ball, the ball bounces from the square he was standing
             // in when sent off.“
             // 13.10.2026: pořadí (hráč pryč, pak odraz) drží removeFromPitch.
-            removeFromPitch(state, fouler.id, PlayerState::EJECTED, dice, events);
-            emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},
-                              0, false});
+            // P287: úplatek / Argue the call (refereeSendOff). Úplatek ⇒ zůstává a bez turnoveru; protest 6 ⇒ do
+            //   rezerv, turnover zůstává (ř. 1100-1101).
+            const RefOutcome call = refereeSendOff(state, fouler.id, RefCall::FOUL, dice, events);
+            if (call == RefOutcome::RESERVES) {
+                removeFromPitch(state, fouler.id, PlayerState::OFF_PITCH, dice, events);
+                sentToReserves = true;
+            } else if (call == RefOutcome::SENT_OFF) {
+                removeFromPitch(state, fouler.id, PlayerState::EJECTED, dice, events);
+                emitEvent(events, {GameEvent::Type::EJECTED, fouler.id, -1, {}, {},
+                                  0, false});
+            }
         }
     }
 
@@ -173,7 +182,7 @@ ActionResult resolveFoul(GameState& state, int foulerId, int targetId,
     // 2026-08-11 this returned ok() either way, which made fouling cheaper
     // than the rules make it -- for both sides, and by the largest margin
     // for whoever fouls most.
-    if (fouler.state == PlayerState::EJECTED) {
+    if (fouler.state == PlayerState::EJECTED || sentToReserves) {
         return ActionResult::turnovr();
     }
     return ActionResult::ok();

@@ -294,6 +294,12 @@ final class GameFlowResolver
             $hral = $stav->isOnPitch() || $player->isPlayedThisDrive();
             $jesteVeHre = $stav->isOnPitch() || $stav === PlayerState::KO || $stav === PlayerState::OFF_PITCH;
             if ($player->hasSkill(SkillName::SecretWeapon) && $hral && $jesteVeHre) {
+                // P287: protest, pak úplatek (RefereeCall, parita s C++). Zrušený výrok i protest 6 ⇒ zůstává ve hře.
+                $vyrok = RefereeCall::sendOff($state, $player->getId(), $player->getTeamSide(), false, $this->dice, $events);
+                $state = $vyrok['state'];
+                if ($vyrok['outcome'] !== RefereeCall::SENT_OFF) {
+                    continue;
+                }
                 $events[] = GameEvent::secretWeaponEjection($player->getId());
                 $state = $state->withPlayer(
                     $player->withState(PlayerState::EJECTED)->withPosition(null),

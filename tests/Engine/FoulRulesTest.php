@@ -77,7 +77,7 @@ final class FoulRulesTest extends TestCase
     public function testUtocnaAsistencePridavaJedna(): void
     {
         // Spoluhrac faulujiciho vedle OBETI, mimo zony souperu => +1 => 9 > 8.
-        $r = $this->faul($this->stav([['side' => TeamSide::HOME, 'x' => 6, 'y' => 4, 'id' => 3]]), [4, 4, 1, 1]);
+        $r = $this->faul($this->stav([['side' => TeamSide::HOME, 'x' => 6, 'y' => 4, 'id' => 3]]), [4, 4, 1, 1, 3]); // + protest Argue the call 3 = nic (P287)
         $this->assertTrue($this->zbrojProlomena($r->getEvents()));
     }
 

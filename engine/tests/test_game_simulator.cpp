@@ -1009,7 +1009,7 @@ TEST(GameSimulator, KOdPlayerRecoversOnFourPlus) {
     state.getPlayer(id).state = PlayerState::KO;
     state.getPlayer(id).position = {-1, -1};
 
-    FixedDiceRoller good({4});   // 4+ -> back to Reserves, so he is set up
+    FixedDiceRoller good({3, 4});   // napřed protest za Deathrollera na konci drive (P287), 3 = nic   // 4+ -> back to Reserves, so he is set up
     setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &good);
     EXPECT_EQ(state.getPlayer(id).state, PlayerState::STANDING);
 }
@@ -1022,7 +1022,7 @@ TEST(GameSimulator, KOdPlayerStaysOutOnThreeOrLess) {
     state.getPlayer(id).state = PlayerState::KO;
     state.getPlayer(id).position = {-1, -1};
 
-    FixedDiceRoller bad({3});    // 1-3 -> stays in the KO'd box
+    FixedDiceRoller bad({3, 3});   // napřed protest za Deathrollera na konci drive (P287), 3 = nic    // 1-3 -> stays in the KO'd box
     setupDrive(state, getDwarfRoster(), getSkavenRoster(), TeamSide::AWAY, &bad);
     EXPECT_EQ(state.getPlayer(id).state, PlayerState::KO);
     EXPECT_FALSE(state.getPlayer(id).isOnPitch());
@@ -1436,4 +1436,36 @@ TEST(GameSimulator, P285AnInjuredSecretWeaponStaysInjuredAtTheEndOfTheDrive) {
     state.getPlayer(sw).position = {-1, -1};
     setupDrive(state, *g, *g, TeamSide::AWAY);
     EXPECT_EQ(state.getPlayer(sw).state, PlayerState::INJURED);
+}
+
+// P287 (10.11.2026): goblini TV1500 = 2 přehozy + 1 úplatek (uživatel 10.11.); tajná zbraň na konci drive: protest,
+// pak úplatek (ř. 1091-1102, 2871-2879).
+TEST(GameSimulator, P287GoblinRosterHasTwoRerollsAndABribe) {
+    GameState state;
+    const TeamRoster* g = getDevelopedRoster("goblin", 1500);
+    setupHalf(state, *g, *g);
+    EXPECT_EQ(state.homeTeam.rerolls, 2);
+    EXPECT_EQ(state.homeTeam.bribes, 1);
+    const TeamRoster* o = getDevelopedRoster("orc", 1500);
+    GameState s2;
+    setupHalf(s2, *o, *o);
+    EXPECT_EQ(s2.homeTeam.rerolls, 3);
+    EXPECT_EQ(s2.homeTeam.bribes, 0);
+}
+
+TEST(GameSimulator, P287SecretWeaponArguesThenBribesAtTheEndOfTheDrive) {
+    GameState state;
+    const TeamRoster* g = getDevelopedRoster("goblin", 1500);
+    setupHalf(state, *g, *g);
+    for (auto& p : state.players) p.playedThisDrive = false;
+    int sw = -1;
+    state.forEachOnPitch(TeamSide::HOME, [&](const Player& p) {
+        if (sw < 0 && p.hasSkill(SkillName::SecretWeapon)) sw = p.id;
+    });
+    ASSERT_GE(sw, 0);
+    state.getPlayer(sw).playedThisDrive = true;
+    FixedDiceRoller dice({3, 5});   // protest 3 = nic, úplatek 5 ⇒ zůstává
+    setupDrive(state, *g, *g, TeamSide::AWAY, &dice);
+    EXPECT_NE(state.getPlayer(sw).state, PlayerState::EJECTED);
+    EXPECT_EQ(state.homeTeam.bribes, 0);
 }

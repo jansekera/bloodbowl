@@ -1750,3 +1750,23 @@ TEST(KickoffLanding, AiReceiverChoiceIgnoresTheTeamRerollAtTheKickoff) {
     ASSERT_TRUE(gs.ball.isHeld);
     EXPECT_EQ(gs.ball.carrierId, firstId);
 }
+
+// P287 (10.11.2026): Get the Ref (ř. 1270-1282) — každý tým dostane úplatek; dřív bez účinku.
+TEST(KickoffHandler, P287GetTheRefGivesEachTeamABribe) {
+    auto gs = makeKickoffState();
+    FixedDiceRoller dice({4, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});   // rozptyl, tabulka 1+1 = 2
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.homeTeam.bribes, 1);
+    EXPECT_EQ(gs.awayTeam.bribes, 1);
+}
+
+// P287: vyhozený hlavní trenér −1 na Brilliant Coaching (ř. 1097-1099).
+TEST(KickoffHandler, P287EjectedHeadCoachLosesBrilliantCoachingTie) {
+    auto gs = makeKickoffState();
+    gs.homeTeam.headCoachEjected = true;
+    const int home = gs.homeTeam.rerolls, away = gs.awayTeam.rerolls;
+    FixedDiceRoller dice({4, 3, 4, 4, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1});   // tabulka 8; D3 3 a 3, domácí −1
+    resolveKickoff(gs, dice, nullptr);
+    EXPECT_EQ(gs.homeTeam.rerolls, home);
+    EXPECT_EQ(gs.awayTeam.rerolls, away + 1);
+}

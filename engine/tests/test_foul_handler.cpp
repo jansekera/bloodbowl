@@ -48,7 +48,7 @@ TEST(FoulHandler, DirtyPlayerBonus) {
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
     // Armor: 4+4+1(DP)=9 > 8, broken. Injury: 3+3=6 → stunned
-    FixedDiceRoller dice({4, 4, 3, 4});  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
+    FixedDiceRoller dice({4, 4, 3, 4, 3});   // + protest Argue the call 3 = nic (P287)  // 3,4 (ne 3,3): dublet na ZRANĚNÍ nově vylučuje, BB2016 l. 1878
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STUNNED);
 }
@@ -59,7 +59,7 @@ TEST(FoulHandler, DoublesEjection) {
     placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
     gs.getPlayer(12).state = PlayerState::PRONE;
     // Armor: 3+3=6 (doubles!), not broken. Fouler ejected.
-    FixedDiceRoller dice({3, 3});
+    FixedDiceRoller dice({3, 3, 3});   // + protest Argue the call 3 = nic (P287)
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
 }
@@ -173,7 +173,7 @@ TEST(FoulHandler, DoublesOnInjuryRollEjectsAndCausesTurnover) {
     gs.getPlayer(12).state = PlayerState::PRONE;
 
     // armour 5+4 = 9 > AV 8 => prorazí; zranění 3+3 = DUBLET
-    FixedDiceRoller dice({5, 4, 3, 3});
+    FixedDiceRoller dice({5, 4, 3, 3, 3});   // + protest Argue the call 3 = nic (P287)
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
 
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED) << "dublet na zranění vylučuje";
@@ -191,7 +191,7 @@ TEST(FoulHandler, GuardDoesNotAssistAFoul) {
     placePlayer(gs, 13, {12, 8}, TeamSide::AWAY);     // markuje našeho asistenta
 
     // armour 4+4 = 8, AV 8 => neprorazí BEZ asistence; s Guardem by bylo 9 a prorazilo
-    FixedDiceRoller dice({4, 4});
+    FixedDiceRoller dice({4, 4, 3});   // + protest Argue the call 3 = nic (P287)
     resolveFoul(gs, 1, 12, dice, nullptr);
     EXPECT_EQ(gs.getPlayer(12).state, PlayerState::PRONE)
         << "BB2016 ř. 8160: Guard se u faulu použít NESMÍ";
@@ -310,7 +310,7 @@ TEST(FoulHandler, T526EjectedCarriersBallBouncesFromHisSquare) {
     gs.getPlayer(12).state = PlayerState::PRONE;
     gs.ball = BallState::carried({10, 7}, 1);
 
-    FixedDiceRoller dice({3, 3, 7});
+    FixedDiceRoller dice({3, 3, 3, 7});   // + protest Argue the call 3 = nic (P287)
     auto result = resolveFoul(gs, 1, 12, dice, nullptr);
 
     ASSERT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
@@ -334,10 +334,46 @@ TEST(FoulHandler, P192BallBouncingBackToTheSquareOfASentOffCarrierIsNotCaughtByH
     // brnění 3+3 (dvojice => vyloučen). Odraz D8 = 3 (východ) -> (11,7), leží tam
     // faulovaný => odraz D8 = 7 (západ) -> (10,7), prázdné pole. (Kostka 6 je pro
     // starou mechaniku: vyloučený by chytal.)
-    FixedDiceRoller dice({3, 3, 3, 7, 6});
+    FixedDiceRoller dice({3, 3, 3, 3, 7, 6});   // + protest Argue the call 3 = nic (P287)
     resolveFoul(gs, 1, 12, dice, nullptr);
     ASSERT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
     EXPECT_FALSE(gs.ball.isHeld) << "vyloučený hráč míč nechytá";
     EXPECT_EQ(gs.ball.position, (Position{10, 7}));
     EXPECT_EQ(dice.remaining(), 1u);
+}
+
+// P287 (audit goblinů 10.11.2026): úplatek (ř. 2871-2879) a Argue the call (ř. 1091-1102) při vyloučení za faul.
+TEST(FoulHandler, P287BribeCancelsTheSendOffAndTheTurnover) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    gs.homeTeam.bribes = 1;
+    FixedDiceRoller dice({3, 3, 4});   // dublet, brnění drží; úplatek 4 ⇒ účinný
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_FALSE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.homeTeam.bribes, 0);
+}
+
+TEST(FoulHandler, P287ArgueTheCallSixSendsToReservesButStillTurnover) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    FixedDiceRoller dice({3, 3, 6});   // bez úplatku; protest 6 ⇒ do rezerv (ř. 1094-1096), turnover (ř. 1100-1101)
+    auto result = resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_TRUE(result.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::OFF_PITCH);
+}
+
+TEST(FoulHandler, P287ArgueTheCallOneEjectsTheHeadCoach) {
+    GameState gs;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    gs.getPlayer(12).state = PlayerState::PRONE;
+    FixedDiceRoller dice({3, 3, 1});
+    resolveFoul(gs, 1, 12, dice, nullptr);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::EJECTED);
+    EXPECT_TRUE(gs.homeTeam.headCoachEjected);
 }

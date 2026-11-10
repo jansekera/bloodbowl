@@ -180,9 +180,10 @@ void resolveRiot(GameState& state, TeamSide receiving, DiceRollerBase& dice) {
 // Cheering Fans (ř. 1309-1314) a Brilliant Coaching (ř. 1321-1326): D3 + FAME + roztleskávačky /
 // asistenti (vše 0), vyšší dostane přehoz, při remíze OBA. OPRAVENO 02.10. (Ž4, P90) — dřív D6 a
 // při remíze nikdo.
-void resolveRerollContest(GameState& state, DiceRollerBase& dice) {
-    const int home = rollD3(dice);
-    const int away = rollD3(dice);
+void resolveRerollContest(GameState& state, DiceRollerBase& dice, bool brilliantCoaching) {
+    // P287: vyhozený hlavní trenér −1 na Brilliant Coaching (ř. 1097-1099)
+    const int home = rollD3(dice) - (brilliantCoaching && state.homeTeam.headCoachEjected ? 1 : 0);
+    const int away = rollD3(dice) - (brilliantCoaching && state.awayTeam.headCoachEjected ? 1 : 0);
     if (home >= away) state.homeTeam.rerolls++;
     if (away >= home) state.awayTeam.rerolls++;
 }
@@ -291,7 +292,9 @@ bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
                          DiceRollerBase& dice, std::vector<GameEvent>* events) {
     switch (event) {
         case KickoffEvent::GET_THE_REF:
-            // ř. 1270-1282: úplatek každému týmu. Úplatky engine nemá ⇒ zatím bez účinku.
+            // ř. 1270-1282: „Each team receives 1 additional Bribe“ (P287, 10.11.2026; dřív bez účinku).
+            state.homeTeam.bribes++;
+            state.awayTeam.bribes++;
             return false;
         case KickoffEvent::RIOT:
             resolveRiot(state, receiving, dice);
@@ -303,8 +306,10 @@ bool resolveKickoffEvent(GameState& state, KickoffEvent event, TeamSide receivin
             resolveHighKick(state, receiving, landing);
             return false;
         case KickoffEvent::CHEERING:
+            resolveRerollContest(state, dice, /*brilliantCoaching=*/false);
+            return false;
         case KickoffEvent::BRILLIANT_COACHING:
-            resolveRerollContest(state, dice);
+            resolveRerollContest(state, dice, /*brilliantCoaching=*/true);
             return false;
         case KickoffEvent::CHANGING_WEATHER: {
             const int weatherRoll = dice.roll2D6();

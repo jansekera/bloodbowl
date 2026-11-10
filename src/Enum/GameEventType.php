@@ -90,6 +90,9 @@ enum GameEventType: string
     case REROLL                 = 'reroll';
     case SAFE_THROW             = 'safe_throw';
     case SECRET_WEAPON          = 'secret_weapon';
+    // P287 (10.11.2026): úplatek a Argue the call
+    case BRIBE                  = 'bribe';
+    case ARGUE_CALL             = 'argue_call';
     case SHADOWING              = 'shadowing';
     case SNEAKY_GIT             = 'sneaky_git';
     case STAB                   = 'stab';

@@ -528,6 +528,33 @@ bool lonerAllowsTeamReroll(const Player& player, DiceRollerBase& dice, std::vect
     return false;
 }
 
+RefOutcome refereeSendOff(GameState& state, int playerId, RefCall call, DiceRollerBase& dice,
+                          std::vector<GameEvent>* events) {
+    TeamState& team = state.getTeamState(state.getPlayer(playerId).teamSide);
+    auto bribe = [&]() {
+        if (team.bribes <= 0) return false;
+        --team.bribes;
+        const int roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::BRIBE, playerId, -1, {}, {}, roll, roll >= 2});
+        return roll >= 2;
+    };
+    auto argue = [&]() {
+        if (team.headCoachEjected) return false;
+        const int roll = dice.rollD6();
+        emitEvent(events, {GameEvent::Type::ARGUE_CALL, playerId, -1, {}, {}, roll, roll == 6});
+        if (roll == 1) team.headCoachEjected = true;
+        return roll == 6;
+    };
+    if (call == RefCall::FOUL) {
+        if (bribe()) return RefOutcome::CANCELLED;
+        if (argue()) return RefOutcome::RESERVES;
+        return RefOutcome::SENT_OFF;
+    }
+    if (argue()) return RefOutcome::RESERVES;
+    if (bribe()) return RefOutcome::CANCELLED;
+    return RefOutcome::SENT_OFF;
+}
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro) {

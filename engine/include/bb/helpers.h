@@ -197,6 +197,16 @@ void rerollThrow(GameState& state, Player& thrower, DiceRollerBase& dice, CoachQ
                  std::vector<GameEvent>* events, int& roll, int target, int fumbleMods,
                  bool teamAllowedForEngine);
 
+// P287 (10.11.2026): rozhodčí vylučuje hráče — za faul (ř. 1878-1884) nebo tajnou zbraň na konci drive.
+// Úplatek (ř. 2871-2879): D6 2-6 = výrok neplatí (u faulu i bez turnoveru), 1 = úplatek propadl.
+// Argue the call (ř. 1091-1102): D6 6 = hráč jen do rezerv (u faulu turnover zůstává), 1 = trenér vyhozen.
+// Pořadí (pravidla dovolují obojí): faul napřed úplatek (ruší i turnover), tajná zbraň napřed protest
+// (úspěch = do rezerv a úplatek zůstane). Engine volí sám za oba týmy; dialog pro kouče je P289.
+enum class RefCall : uint8_t { FOUL, SECRET_WEAPON };
+enum class RefOutcome : uint8_t { CANCELLED, RESERVES, SENT_OFF };
+RefOutcome refereeSendOff(GameState& state, int playerId, RefCall call, DiceRollerBase& dice,
+                          std::vector<GameEvent>* events);
+
 bool coachAskReroll(GameState& state, Player& player, DiceRollerBase& dice,
                     CoachQuestion question, int otherId, int shown, int target,
                     bool teamAllowed, std::vector<GameEvent>* events, bool& viaPro);

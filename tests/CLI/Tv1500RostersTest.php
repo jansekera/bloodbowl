@@ -127,4 +127,10 @@ final class Tv1500RostersTest extends TestCase
         $this->assertSame(2, $this->withSkill($players, SkillName::VeryLongLegs));
         $this->assertSame(8, $this->withSkill($players, SkillName::Stunty));   // 3 goblini, Bomma, Looney, Fanatic, Pogoer, Scrappa
     }
+
+    public function testP287GoblinoveMajiDvaPrehozyAJedenUplatek(): void
+    {
+        $this->assertSame(['rerolls' => 2, 'bribes' => 1], getTv1500TeamExtras('Goblin'));
+        $this->assertSame(['rerolls' => 3, 'bribes' => 0], getTv1500TeamExtras('Orc'));
+    }
 }

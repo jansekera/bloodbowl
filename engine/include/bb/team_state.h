@@ -24,6 +24,10 @@ struct TeamState {
     bool foulUsedThisTurn = false;
     bool hasApothecary = false;
     bool apothecaryUsed = false;
+    // P287 (10.11.2026): úplatky (ř. 2871-2879, Get the Ref ř. 1270-1282) — každý jednou za zápas;
+    // vyhozený hlavní trenér (Argue the call na 1, ř. 1091-1102) už neprotestuje a má −1 na Brilliant Coaching.
+    int bribes = 0;
+    bool headCoachEjected = false;
 
     bool canUseReroll() const {
         return rerolls > 0 && !rerollUsedThisTurn;

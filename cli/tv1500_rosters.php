@@ -82,7 +82,7 @@ const TV1500_ROSTERS = [
     ],
     // P288 (audit goblinů 10.11.2026): táž jedenáctka jako C++ getGoblinRoster1500 (P267, „u goblinů jde o ověření
     // pravidel“) — co nejvíc goblinních mechanik. Star playeři Ripper Bolgrot (ř. 7627-7631) a Scrappa Sorehead
-    // (ř. 7637-7641). 1270 + 3 rerolly 180 + lékárník 50 = 1500 (P287 změní na 2 rerolly + úplatek).
+    // (ř. 7637-7641). 1270 + 3 rerolly 180 + lékárník 50 = 1500 (P287: 2 rerolly + lékárník + 1 úplatek = 1490, getTv1500TeamExtras).
     'Goblin' => [
         ['Goblin',         2, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureFeet]],
         ['Goblin',         1, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureHands]],
@@ -96,6 +96,17 @@ const TV1500_ROSTERS = [
         ['Ripper Bolgrot', 1, [4, 6, 1, 9], [SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration, SkillName::ThrowTeamMate]],
     ],
 ];
+
+/**
+ * P287 (10.11.2026): týmové přehozy a úplatky na úrovni TV1500 — tatáž čísla jako C++ TeamRoster `rerolls`/`bribes`.
+ * Goblini 2 přehozy + 1 úplatek (uživatel 10.11.: „do týmu goblinů přidej do TV i nákup úplatků“); ostatní 3 a 0.
+ *
+ * @return array{rerolls: int, bribes: int}
+ */
+function getTv1500TeamExtras(string $race): array
+{
+    return $race === 'Goblin' ? ['rerolls' => 2, 'bribes' => 1] : ['rerolls' => 3, 'bribes' => 0];
+}
 
 /**
  * Jedenáctka úrovně TV1500.

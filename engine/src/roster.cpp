@@ -898,7 +898,8 @@ const TeamRoster& getHumanRoster1500() {
 // normal A (20), double GSP (30); Trollů normal S, double GAP.
 // Jedenáctka: Ripper 270 + Scrappa 150 + Troll +Block+Guard 170 + Troll +Block 140 + Fanatic 70
 //   + Pogoer +Sure Feet+Side Step 110 + Bomma +Hail Mary Pass 70 + Looney 40 + Goblin +Side Step+Sure Hands 90
-//   + 2× Goblin +Side Step+Sure Feet 160 = 1270; + 3 rerolly 180 + lékárník 50 = **1500**.
+//   + 2× Goblin +Side Step+Sure Feet 160 = 1270; + 2 rerolly 120 + lékárník 50 + 1 úplatek 50 = **1490**
+//   (P287, uživatel 10.11.: „do týmu goblinů přidej do TV i nákup úplatků“ — dřív 3 rerolly = 1500).
 const TeamRoster& getGoblinRoster1500() {
     static const TeamRoster roster = {
         "Goblin (TV1500)",
@@ -926,7 +927,7 @@ const TeamRoster& getGoblinRoster1500() {
             {{4, 6, 1, 9}, makeSkills({SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration,
                 SkillName::ThrowTeamMate}), 1, "Ripper Bolgrot (star)"},
         },
-        10, 60, true
+        10, 60, true, /*rerolls=*/2, /*bribes=*/1
     };
     return roster;
 }

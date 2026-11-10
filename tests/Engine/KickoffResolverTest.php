@@ -376,7 +376,9 @@ final class KickoffResolverTest extends TestCase
         $this->assertEquals($initialRerolls + 1, $result['state']->getHomeTeam()->getRerolls());
     }
 
-    public function testKickoffTableCheeringTieNoEffect(): void
+    // OPRAVENO 10.11.2026 (P290): ř. 1313-1314 „If both teams have the same score, then both teams get a re-roll“ —
+    //   test dřív kódoval opak (remíza bez účinku). D3 = (D6+1)/2: 3 ⇒ 2, 3 ⇒ 2.
+    public function testKickoffTableCheeringTieBothGetReroll(): void
     {
         $state = (new GameStateBuilder())
             ->addPlayer(TeamSide::HOME, 6, 5, id: 1)
@@ -392,8 +394,8 @@ final class KickoffResolverTest extends TestCase
 
         $result = $resolver->resolveKickoffTable($state, TeamSide::HOME);
 
-        $this->assertEquals($initialHomeRerolls, $result['state']->getHomeTeam()->getRerolls());
-        $this->assertEquals($initialAwayRerolls, $result['state']->getAwayTeam()->getRerolls());
+        $this->assertEquals($initialHomeRerolls + 1, $result['state']->getHomeTeam()->getRerolls());
+        $this->assertEquals($initialAwayRerolls + 1, $result['state']->getAwayTeam()->getRerolls());
     }
 
     public function testKickoffTableBrilliantCoachingAwayWins(): void

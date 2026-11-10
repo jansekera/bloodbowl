@@ -643,6 +643,33 @@ final class GameEvent
         ]);
     }
 
+    /** P287: úplatek rozhodčímu (ř. 2871-2879) — 2-6 výrok ruší. */
+    public static function bribe(int $playerId, int $roll, bool $success): self
+    {
+        $text = $success ? 'Bribe works! The referee looks the other way' : 'Bribe wasted! The call stands';
+        return new self('bribe', $text, [
+            'playerId' => $playerId,
+            'roll' => $roll,
+            'success' => $success,
+        ]);
+    }
+
+    /** P287: Argue the call (ř. 1091-1102) — 6 = do rezerv, 1 = trenér vyhozen. */
+    public static function argueTheCall(int $playerId, int $roll): self
+    {
+        $text = match (true) {
+            $roll === 6 => 'Argue the call: the referee agrees, player goes to the Reserves',
+            $roll === 1 => 'Argue the call: the head coach is ejected!',
+            default => 'Argue the call: the call stands',
+        };
+        return new self('argue_call', $text, [
+            'playerId' => $playerId,
+            'roll' => $roll,
+            'success' => $roll === 6,
+            'coachEjected' => $roll === 1,
+        ]);
+    }
+
     public static function secretWeaponEjection(int $playerId): self
     {
         return new self('secret_weapon', "Secret Weapon! Player ejected at drive end", [

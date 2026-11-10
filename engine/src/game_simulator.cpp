@@ -156,7 +156,8 @@ void placeTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     // Set team state
     TeamState& ts = state.getTeamState(side);
     ts.side = side;
-    ts.rerolls = 3;  // Standard starting rerolls
+    ts.rerolls = roster.rerolls;  // P287: ze soupisky (dřív napevno 3)
+    ts.bribes = roster.bribes;
     ts.hasApothecary = roster.hasApothecary;
     ts.apothecaryUsed = false;
 }
@@ -355,7 +356,12 @@ void buildTeam(GameState& state, TeamSide side, const TeamRoster& roster,
     ts.score = ts.score;  // preserve score across halves/drives
     ts.hasApothecary = roster.hasApothecary;
     if (resetHalfState) {
-        ts.rerolls = 3;
+        ts.rerolls = roster.rerolls;   // P287: ze soupisky (dřív napevno 3)
+        // P287: úplatky a vyhozený trenér platí celý zápas ⇒ nastavují se jen na začátku 1. poločasu
+        if (state.half <= 1) {
+            ts.bribes = roster.bribes;
+            ts.headCoachEjected = false;
+        }
         ts.turnNumber = 0;
         ts.apothecaryUsed = false;
     }
@@ -410,8 +416,14 @@ void setupHalfOrDrive(GameState& state, const TeamRoster& home, const TeamRoster
         // OPRAVENO 10.11.2026 (P285) — přepisovalo i zraněné a mrtvé na EJECTED (PHP je nechává); zranění platí dál.
         if (p.hasSkill(SkillName::SecretWeapon) && p.playedThisDrive
             && p.state != PlayerState::INJURED && p.state != PlayerState::DEAD) {
-            p.setState(PlayerState::EJECTED);
-            p.position = {-1, -1};
+            // P287: protest, pak úplatek (refereeSendOff). Zrušený výrok i protest 6 ⇒ hráč zůstává ve hře
+            //   (bez kostek — dice == nullptr — jen vyloučení jako dřív).
+            const RefOutcome call = dice ? refereeSendOff(state, p.id, RefCall::SECRET_WEAPON, *dice, events)
+                                         : RefOutcome::SENT_OFF;
+            if (call == RefOutcome::SENT_OFF) {
+                p.setState(PlayerState::EJECTED);
+                p.position = {-1, -1};
+            }
         }
     }
     for (auto& p : state.players) p.playedThisDrive = false;

@@ -57,7 +57,7 @@ final class MicPoOdchoduHraceTest extends TestCase
             ->addPronePlayer(TeamSide::AWAY, 6, 7, id: 2)
             ->withBallCarried(1)
             ->build();
-        $dice = new FixedDiceRoller([1, 1, 3, 7]);
+        $dice = new FixedDiceRoller([1, 1, 3, 3, 7]); // + protest Argue the call 3 = nic (P287)
         $r = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, ['playerId' => 1, 'targetId' => 2]);
         $po = $r->getNewState();
         $this->assertNull($po->requirePlayer(1)->getPosition(), 'vyloučený je mimo hřiště');

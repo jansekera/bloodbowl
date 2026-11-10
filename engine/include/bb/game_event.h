@@ -84,8 +84,11 @@ struct GameEvent {
              ,
         KICKOFF_TABLE, // P200 (14.10.2026): hod na vykopovou tabulku nemel ve
              // vypisu nic. `roll` = 2D6, `targetId` = KickoffEvent.
-        KO_RECOVERY // P201 (13), 14.10.2026: navrat z KO pred vykopem
+        KO_RECOVERY, // P201 (13), 14.10.2026: navrat z KO pred vykopem
              // (r. 1007-1012). `playerId`, `roll` = D6, `success` = 4+ (vraci se).
+        BRIBE,       // P287 (10.11.2026): úplatek (ř. 2871-2879). `playerId`, `roll` = D6, `success` = 2+.
+        ARGUE_CALL   // P287: Argue the call (ř. 1091-1102). `roll` = D6, `success` = 6 (do rezerv);
+             // na 1 je trenér vyhozen.
              // Nove typy pridavat ZA tenhle (bb_module.cpp mapuje poradim).
     };
 

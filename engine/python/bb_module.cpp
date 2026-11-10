@@ -44,7 +44,7 @@ static const char* const kEventNames[] = {
     "KNOCKED_DOWN", "ARMOR_BREAK", "CASUALTY", "REGENERATION",
     "EJECTED", "HAND_OFF", "STAND_UP", "LEAP", "FOLLOW_UP",
     "BLOODLUST_FEED", "REROLL", "APOTHECARY", "CROWD_SURF", "KICKOFF_TABLE",
-    "KO_RECOVERY"};
+    "KO_RECOVERY", "BRIBE", "ARGUE_CALL"};
 
 PYBIND11_MODULE(bb_engine, m) {
     m.doc() = "Blood Bowl C++ Engine - Python bindings";

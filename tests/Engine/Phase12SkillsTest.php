@@ -376,7 +376,7 @@ final class Phase12SkillsTest extends TestCase
             ->withBallOffPitch()
             ->build();
 
-        $dice = new FixedDiceRoller([]);
+        $dice = new FixedDiceRoller([3]); // + protest Argue the call 3 = nic (P287)
         $gfr = new GameFlowResolver($dice);
 
         $result = $gfr->resolvePostTouchdown($state);

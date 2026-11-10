@@ -23,6 +23,9 @@ struct TeamRoster {
     int positionalCount;
     int rerollCost;  // in thousands
     bool hasApothecary;
+    // P287 (10.11.2026): počet týmových přehozů a úplatků (ř. 2871-2879) ze soupisky; dřív všem napevno 3 přehozy.
+    int rerolls = 3;
+    int bribes = 0;
 };
 
 const TeamRoster& getHumanRoster();

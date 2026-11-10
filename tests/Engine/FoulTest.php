@@ -81,7 +81,7 @@ final class FoulTest extends TestCase
             ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([3, 3]); // doubles, armor holds
+        $dice = new FixedDiceRoller([3, 3, 3]); // + protest Argue the call 3 = nic (P287) // doubles, armor holds
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::FOUL, [
@@ -113,7 +113,7 @@ final class FoulTest extends TestCase
             ->addPronePlayer(TeamSide::AWAY, 6, 7, armour: 8, id: 2)
             ->build();
 
-        $dice = new FixedDiceRoller([5, 5, 4, 4]); // armor break + doubles + injury KO
+        $dice = new FixedDiceRoller([5, 5, 4, 4, 3]); // + protest Argue the call 3 = nic (P287) // armor break + doubles + injury KO
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::FOUL, [
@@ -206,7 +206,7 @@ final class FoulTest extends TestCase
             ->build();
 
         // Brneni 6+4 = 10 > 8, NENI dublet. Zraneni 3+3 = 6 = DUBLET (a stunned).
-        $dice = new FixedDiceRoller([6, 4, 3, 3]);
+        $dice = new FixedDiceRoller([6, 4, 3, 3, 3]); // + protest Argue the call 3 = nic (P287)
         $result = (new ActionResolver($dice))->resolve($state, ActionType::FOUL, [
             'playerId' => 1, 'targetId' => 2,
         ]);
@@ -415,7 +415,7 @@ final class FoulTest extends TestCase
 
         // Armor: 2+2 = 4 <= 8 → drzi. Dublet → vylouceni (a turnover).
         // Ball bounce: D8=1 (north)
-        $dice = new FixedDiceRoller([2, 2, 1]);
+        $dice = new FixedDiceRoller([2, 2, 3, 1]); // + protest Argue the call 3 = nic (P287)
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::FOUL, [

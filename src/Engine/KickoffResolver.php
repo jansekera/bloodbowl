@@ -165,15 +165,20 @@ final class KickoffResolver
     }
 
     /**
-     * Get the Ref! (2): Both teams gain a fouling bonus for this drive.
-     * Simplified: no-op (would need a per-drive flag for foul armour +1).
+     * Get the Ref! (2): ř. 1270-1282 „Each team receives 1 additional Bribe to use during this game.“
+     * P287 (10.11.2026) — dřív bez účinku (popis mluvil o faulech, což je jiná edice). Parita s C++ kickoff_handler.
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolveGetTheRef(GameState $state, int $roll): array
     {
+        foreach ([TeamSide::HOME, TeamSide::AWAY] as $side) {
+            $team = $state->getTeamState($side);
+            $state = $state->withTeamState($side, $team->withBribes($team->getBribes() + 1));
+        }
+
         return [
             'state' => $state,
-            'events' => [GameEvent::kickoffTableEvent($roll, 'Get the Ref!', 'Both teams get away with more fouls this drive')],
+            'events' => [GameEvent::kickoffTableEvent($roll, 'Get the Ref!', 'Each team receives 1 additional Bribe')],
         ];
     }
 
@@ -269,58 +274,53 @@ final class KickoffResolver
     }
 
     /**
-     * Cheering Fans (6): Random extra reroll for one team.
-     * Each team rolls D6, higher roll gets +1 reroll. Tie: no effect.
+     * Cheering Fans (6), ř. 1309-1314: každý kouč D3 (+ FAME + roztleskávačky — engine nemá, 0); vyšší dostane přehoz
+     * na poločas, při shodě OBA. OPRAVENO 10.11.2026 (P290) — bylo D6 a remíza bez účinku; parita s C++
+     * kickoff_handler.cpp resolveRerollContest.
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolveCheering(GameState $state, int $roll): array
     {
-        $homeRoll = $this->dice->rollD6();
-        $awayRoll = $this->dice->rollD6();
-
-        if ($homeRoll > $awayRoll) {
-            $teamState = $state->getHomeTeam();
-            $state = $state->withHomeTeam($teamState->withRerolls($teamState->getRerolls() + 1));
-            $effect = "Home fans cheer louder ({$homeRoll} vs {$awayRoll})! Home team gets +1 reroll";
-        } elseif ($awayRoll > $homeRoll) {
-            $teamState = $state->getAwayTeam();
-            $state = $state->withAwayTeam($teamState->withRerolls($teamState->getRerolls() + 1));
-            $effect = "Away fans cheer louder ({$homeRoll} vs {$awayRoll})! Away team gets +1 reroll";
-        } else {
-            $effect = "Fans equally loud ({$homeRoll} vs {$awayRoll}), no effect";
-        }
-
-        return [
-            'state' => $state,
-            'events' => [GameEvent::kickoffTableEvent($roll, 'Cheering Fans', $effect)],
-        ];
+        return $this->resolveRerollContest($state, $roll, 'Cheering Fans', false);
     }
 
     /**
-     * Brilliant Coaching (8): Random extra reroll for one team.
-     * Same mechanic as Cheering Fans.
+     * Brilliant Coaching (8), ř. 1321-1326: jako Cheering Fans (D3 + FAME + asistenti), shoda = oba. P287: vyhozený
+     * hlavní trenér −1 (ř. 1097-1099).
      * @return array{state: GameState, events: list<GameEvent>}
      */
     private function resolveBrilliantCoaching(GameState $state, int $roll): array
     {
-        $homeRoll = $this->dice->rollD6();
-        $awayRoll = $this->dice->rollD6();
+        return $this->resolveRerollContest($state, $roll, 'Brilliant Coaching', true);
+    }
 
-        if ($homeRoll > $awayRoll) {
-            $teamState = $state->getHomeTeam();
-            $state = $state->withHomeTeam($teamState->withRerolls($teamState->getRerolls() + 1));
-            $effect = "Home coach inspires ({$homeRoll} vs {$awayRoll})! Home team gets +1 reroll";
-        } elseif ($awayRoll > $homeRoll) {
-            $teamState = $state->getAwayTeam();
-            $state = $state->withAwayTeam($teamState->withRerolls($teamState->getRerolls() + 1));
-            $effect = "Away coach inspires ({$homeRoll} vs {$awayRoll})! Away team gets +1 reroll";
-        } else {
-            $effect = "Coaches equally brilliant ({$homeRoll} vs {$awayRoll}), no effect";
+    /**
+     * @return array{state: GameState, events: list<GameEvent>}
+     */
+    private function resolveRerollContest(GameState $state, int $roll, string $name, bool $brilliantCoaching): array
+    {
+        $d3 = fn(TeamSide $side): int => intdiv($this->dice->rollD6() + 1, 2)
+            - ($brilliantCoaching && $state->getTeamState($side)->isHeadCoachEjected() ? 1 : 0);
+        $homeRoll = $d3(TeamSide::HOME);
+        $awayRoll = $d3(TeamSide::AWAY);
+
+        if ($homeRoll >= $awayRoll) {
+            $team = $state->getHomeTeam();
+            $state = $state->withHomeTeam($team->withRerolls($team->getRerolls() + 1));
         }
+        if ($awayRoll >= $homeRoll) {
+            $team = $state->getAwayTeam();
+            $state = $state->withAwayTeam($team->withRerolls($team->getRerolls() + 1));
+        }
+        $effect = match (true) {
+            $homeRoll > $awayRoll => "Home team gets +1 reroll ({$homeRoll} vs {$awayRoll})",
+            $awayRoll > $homeRoll => "Away team gets +1 reroll ({$homeRoll} vs {$awayRoll})",
+            default => "Tie ({$homeRoll} vs {$awayRoll}) — both teams get +1 reroll",
+        };
 
         return [
             'state' => $state,
-            'events' => [GameEvent::kickoffTableEvent($roll, 'Brilliant Coaching', $effect)],
+            'events' => [GameEvent::kickoffTableEvent($roll, $name, $effect)],
         ];
     }
 

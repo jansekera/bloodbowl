@@ -26,6 +26,10 @@ final class TeamStateDTO
         // ⭐ 16.09.2026: vychozi pocet prehozu -- o polocase se na nej vraci
         //   (`rules_bb2016.txt` r. 941-943). `null` = doplni se z `rerolls`.
         private ?int $rerollsStart = null,
+        // P287 (10.11.2026): úplatky (ř. 2871-2879, Get the Ref ř. 1270-1282) a vyhozený hlavní trenér
+        //   (Argue the call na 1, ř. 1091-1102). Parita s C++ team_state.h.
+        private int $bribes = 0,
+        private bool $headCoachEjected = false,
     ) {
         $this->rerollsStart ??= $this->rerolls;
     }
@@ -37,6 +41,7 @@ final class TeamStateDTO
         TeamSide $side,
         int $rerolls,
         bool $hasApothecary = true,
+        int $bribes = 0,
     ): self {
         return new self(
             teamId: $teamId,
@@ -54,7 +59,34 @@ final class TeamStateDTO
             hasApothecary: $hasApothecary,
             apothecaryUsed: false,
             rerollsStart: $rerolls,
+            bribes: $bribes,
         );
+    }
+
+    public function getBribes(): int
+    {
+        return $this->bribes;
+    }
+
+    public function withBribes(int $bribes): self
+    {
+        $clone = clone $this;
+        $clone->bribes = $bribes;
+
+        return $clone;
+    }
+
+    public function isHeadCoachEjected(): bool
+    {
+        return $this->headCoachEjected;
+    }
+
+    public function withHeadCoachEjected(): self
+    {
+        $clone = clone $this;
+        $clone->headCoachEjected = true;
+
+        return $clone;
     }
 
     public function getTeamId(): int
@@ -237,6 +269,8 @@ final class TeamStateDTO
             'foulUsedThisTurn' => $this->foulUsedThisTurn,
             'hasApothecary' => $this->hasApothecary,
             'apothecaryUsed' => $this->apothecaryUsed,
+            'bribes' => $this->bribes,
+            'headCoachEjected' => $this->headCoachEjected,
         ];
     }
 
@@ -261,6 +295,8 @@ final class TeamStateDTO
             hasApothecary: (bool) ($data['hasApothecary'] ?? true),
             apothecaryUsed: (bool) ($data['apothecaryUsed'] ?? false),
             rerollsStart: isset($data['rerollsStart']) ? (int) $data['rerollsStart'] : null,
+            bribes: (int) ($data['bribes'] ?? 0),
+            headCoachEjected: (bool) ($data['headCoachEjected'] ?? false),
         );
     }
 }
