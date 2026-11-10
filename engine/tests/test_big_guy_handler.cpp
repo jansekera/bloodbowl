@@ -1017,3 +1017,60 @@ TEST(BigGuyHandler, M3bAProneAllyDoesNotPropHimUp) {
 
     EXPECT_TRUE(r.actionBlocked);
 }
+
+// P286 (audit goblinů 10.11.2026): ležícímu se Leap nenabízel. ř. 690-695 vstání stojí 3 pole „at the beginning of
+// an Action“, ř. 8270-8274 skok stojí 2 pole — ležící tedy smí vstát a skočit (PHP to umí přes cestu pohybu).
+TEST(RulesEngine, P286LeapIsOfferedToAPronePlayer) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    gs.getPlayer(1).setState(PlayerState::PRONE);
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    int leaps = 0;
+    for (const auto& a : actions) if (a.type == ActionType::LEAP) ++leaps;
+    EXPECT_GT(leaps, 0) << "ležící smí vstát a skočit";
+}
+
+TEST(ActionResolver, P286PronePlayerStandsUpAndLeaps) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 7, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    gs.getPlayer(1).setState(PlayerState::PRONE);
+
+    FixedDiceRoller dice({5});   // MA 7 ⇒ vstane bez hodu; AG4 ⇒ cíl 3, hod 5
+    Action a{ActionType::LEAP, 1, -1, {12, 7}};
+    auto result = resolveAction(gs, a, dice, nullptr);
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_EQ(gs.getPlayer(1).position, (Position{12, 7}));
+    EXPECT_EQ(gs.getPlayer(1).movementRemaining, 2);   // 7 − 3 vstání − 2 skok
+}
+
+TEST(RulesEngine, P286ProneLeapWithNoMovementLeftIsStillOfferedOnTwoGfis) {
+    // ř. 690-695: pod 3 pole vstane na 4+ a dál jen přes GFI ⇒ skok (2 pole) = 2 GFI, což je povolený strop.
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    gs.homeTeam.side = TeamSide::HOME;
+    gs.awayTeam.side = TeamSide::AWAY;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 2, 3, 4, 7);
+    gs.getPlayer(1).skills.add(SkillName::Leap);
+    gs.getPlayer(1).setState(PlayerState::PRONE);
+    gs.getPlayer(1).movementRemaining = 0;   // už nemá ani vstát z pohybu ⇒ 0 + 2 GFI
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    int leaps = 0;
+    for (const auto& a : actions) if (a.type == ActionType::LEAP) ++leaps;
+    EXPECT_GT(leaps, 0) << "vstání na 4+ a skok za dvě GFI pravidla dovolují (ř. 690-695)";
+}

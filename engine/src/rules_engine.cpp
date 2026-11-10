@@ -66,11 +66,10 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // ⛔ Tahle nabidka tu do 24.08.2026 nebyla, takze `resolveLeap` -- hotovy
         // a se tremi zelenymi testy -- nemel volajiciho a nikdo nikdy neskocil.
         // Je to tataz trida jako P45 vstavani: resolver bez nabidky.
-        // ⏰ Leap z lehu: rozpocet by musel odecist vstani a resolveLeap
-        //    vetev "stand up first" nema. Mimo M13.
-        if (p.hasSkill(SkillName::Leap) && !p.leapUsedThisTurn && !p.rooted && !prone) {
-            int maxGfi = p.hasSkill(SkillName::Sprint) ? 3 : 2;
-            if (p.movementRemaining - 2 >= -maxGfi) {
+        // P286 (10.11.2026): i z lehu -- vstani stoji 3 pole na zacatku akce (r. 690-695), pak skok 2;
+        //   action_resolver necha hrace vstat a pak skoci (PHP totez pres cestu pohybu).
+        if (p.hasSkill(SkillName::Leap) && !p.leapUsedThisTurn && !p.rooted) {
+            if (movementAfterStandUp(p) - 2 >= -maxGfiSquares(p)) {
                 for (int dx = -2; dx <= 2; ++dx) {
                     for (int dy = -2; dy <= 2; ++dy) {
                         if (dx == 0 && dy == 0) continue;

@@ -523,6 +523,18 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             // kolo, ac se zadny skok nekonal. Propaluje se az v resolveLeap,
             // tesne pred agility hodem -- tedy ve chvili, kdy se skok
             // SKUTECNE pokousi.
+            // P286 (10.11.2026): lezici napred vstane (r. 690-695), jako u MOVE. Cil se overi PRED vstanim,
+            // aby neplatny skok nespalil akci.
+            if (p.state == PlayerState::PRONE) {
+                const int dist = p.position.distanceTo(action.target);
+                if (dist < 1 || dist > 2 || !action.target.isOnPitch() ||
+                    state.getPlayerAtPosition(action.target) != nullptr) {
+                    return ActionResult::fail();
+                }
+                noteProneActionTaken();
+                ActionResult standResult = resolveStandUp(state, action.playerId, dice, events);
+                if (!standResult.success) return standResult;
+            }
             return resolveLeap(state, action.playerId, action.target, dice, events);
         }
 
