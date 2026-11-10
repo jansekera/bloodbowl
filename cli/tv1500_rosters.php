@@ -80,6 +80,21 @@ const TV1500_ROSTERS = [
         ['Ogre',     1, [5, 5, 2, 9], [SkillName::Loner, SkillName::BoneHead, SkillName::MightyBlow, SkillName::ThickSkull, SkillName::ThrowTeamMate, SkillName::Block]],
         ['Lineman',  2, [6, 3, 3, 8], [SkillName::Wrestle]],
     ],
+    // P288 (audit goblinů 10.11.2026): táž jedenáctka jako C++ getGoblinRoster1500 (P267, „u goblinů jde o ověření
+    // pravidel“) — co nejvíc goblinních mechanik. Star playeři Ripper Bolgrot (ř. 7627-7631) a Scrappa Sorehead
+    // (ř. 7637-7641). 1270 + 3 rerolly 180 + lékárník 50 = 1500 (P287 změní na 2 rerolly + úplatek).
+    'Goblin' => [
+        ['Goblin',         2, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureFeet]],
+        ['Goblin',         1, [6, 2, 3, 7], [SkillName::Dodge, SkillName::RightStuff, SkillName::Stunty, SkillName::SideStep, SkillName::SureHands]],
+        ['Bombardier',     1, [6, 2, 3, 7], [SkillName::Bombardier, SkillName::Dodge, SkillName::SecretWeapon, SkillName::Stunty, SkillName::HailMaryPass]],
+        ['Looney',         1, [6, 2, 3, 7], [SkillName::Chainsaw, SkillName::SecretWeapon, SkillName::Stunty]],
+        ['Fanatic',        1, [3, 7, 3, 7], [SkillName::BallAndChain, SkillName::NoHands, SkillName::SecretWeapon, SkillName::Stunty]],
+        ['Pogoer',         1, [7, 2, 3, 7], [SkillName::Dodge, SkillName::Leap, SkillName::VeryLongLegs, SkillName::Stunty, SkillName::SureFeet, SkillName::SideStep]],
+        ['Troll',          1, [4, 5, 1, 9], [SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block]],
+        ['Troll',          1, [4, 5, 1, 9], [SkillName::Loner, SkillName::AlwaysHungry, SkillName::MightyBlow, SkillName::ReallyStupid, SkillName::Regeneration, SkillName::ThrowTeamMate, SkillName::Block, SkillName::Guard]],
+        ['Scrappa Sorehead', 1, [7, 2, 3, 7], [SkillName::Loner, SkillName::DirtyPlayer, SkillName::Dodge, SkillName::Leap, SkillName::RightStuff, SkillName::Sprint, SkillName::Stunty, SkillName::SureFeet, SkillName::VeryLongLegs]],
+        ['Ripper Bolgrot', 1, [4, 6, 1, 9], [SkillName::Loner, SkillName::Grab, SkillName::MightyBlow, SkillName::Regeneration, SkillName::ThrowTeamMate]],
+    ],
 ];
 
 /**

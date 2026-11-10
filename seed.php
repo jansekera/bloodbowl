@@ -295,7 +295,7 @@ $positionals = [
 
     // Goblin
     [$raceIds['Goblin'], 'Goblin',      16, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Dodge', 'Right Stuff', 'Stunty']],
-    [$raceIds['Goblin'], 'Bombardier',    2, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Bombardier', 'Dodge', 'Secret Weapon', 'Stunty']],
+    [$raceIds['Goblin'], 'Bombardier',    1, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Bombardier', 'Dodge', 'Secret Weapon', 'Stunty']],
     [$raceIds['Goblin'], 'Looney',        1, 40000,  6, 2, 3, 7, 'A', 'GSP',    ['Chainsaw', 'Secret Weapon', 'Stunty']],
     [$raceIds['Goblin'], 'Fanatic',       1, 70000,  3, 7, 3, 7, 'S', 'GAP',    ['Ball & Chain', 'No Hands', 'Secret Weapon', 'Stunty']],
     [$raceIds['Goblin'], 'Pogoer',        1, 70000,  7, 2, 3, 7, 'A', 'GSP',    ['Dodge', 'Leap', 'Very Long Legs', 'Stunty']],

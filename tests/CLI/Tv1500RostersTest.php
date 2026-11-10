@@ -112,4 +112,19 @@ final class Tv1500RostersTest extends TestCase
             }
         }
     }
+
+    public function testP288GoblinTv1500JeTataJedenactkaJakoVCpp(): void
+    {
+        // C++ getGoblinRoster1500 (P267): 3 tajné zbraně, 2 trollové + Ripper s TTM, 2 Loner star playeři navíc
+        $players = getTv1500RaceRoster(TeamSide::HOME, 'Goblin');
+        $this->assertCount(11, $players);
+        $this->assertSame(3, $this->withSkill($players, SkillName::SecretWeapon));
+        $this->assertSame(3, $this->withSkill($players, SkillName::ThrowTeamMate));
+        $this->assertSame(4, $this->withSkill($players, SkillName::Loner));
+        $this->assertSame(1, $this->withSkill($players, SkillName::HailMaryPass));
+        $this->assertSame(1, $this->withSkill($players, SkillName::DirtyPlayer));
+        $this->assertSame(1, $this->withSkill($players, SkillName::Grab));
+        $this->assertSame(2, $this->withSkill($players, SkillName::VeryLongLegs));
+        $this->assertSame(8, $this->withSkill($players, SkillName::Stunty));   // 3 goblini, Bomma, Looney, Fanatic, Pogoer, Scrappa
+    }
 }
