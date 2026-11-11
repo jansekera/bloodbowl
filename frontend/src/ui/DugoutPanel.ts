@@ -1,4 +1,5 @@
 import type { GameState, MatchPlayer } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * Displays KO'd, Injured, and Dead players for both teams.
@@ -30,7 +31,7 @@ export class DugoutPanel {
             return '';
         }
 
-        let html = `<div class="dugout-panel__title">${this.escape(teamName)}</div>`;
+        let html = `<div class="dugout-panel__title">${escapeHtml(teamName)}</div>`;
 
         if (ko.length > 0) {
             html += this.renderSection('KO', 'ko', ko);
@@ -49,17 +50,12 @@ export class DugoutPanel {
         let html = `<div class="dugout-section">`;
         html += `<div class="dugout-section__label dugout-section__label--${cssClass}">${label} (${players.length})</div>`;
         for (const p of players) {
-            html += `<div class="dugout-player">#${p.number} ${this.escape(p.positionalName)}</div>`;
+            html += `<div class="dugout-player">#${p.number} ${escapeHtml(p.positionalName)}</div>`;
         }
         html += `</div>`;
         return html;
     }
 
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     destroy(): void {
         this.element.remove();

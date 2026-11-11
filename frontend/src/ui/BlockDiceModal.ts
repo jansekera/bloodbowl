@@ -1,4 +1,5 @@
 import type { PendingBlock } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 const DICE_DISPLAY: Record<string, { label: string; css: string; title: string }> = {
     'attacker_down': { label: 'AD', css: 'skull', title: 'Attacker Down' },
@@ -59,7 +60,7 @@ export class BlockDiceModal {
             <div class="block-dice-modal__backdrop"></div>
             <div class="block-dice-modal__content">
                 <div class="block-dice-modal__title">Block Dice${frenzyLabel}</div>
-                <div class="block-dice-modal__info">${this.escape(chooserLabel)} chooses</div>
+                <div class="block-dice-modal__info">${escapeHtml(chooserLabel)} chooses</div>
                 <div class="block-dice-modal__dice">${diceHtml}</div>
                 ${opponentPicks ? '<button class="block-dice-modal__accept">Continue (opponent picks the die)</button>' : ''}
                 <label class="block-dice-modal__followup"><input type="checkbox" class="block-dice-modal__followup-input" checked> Follow up if the defender is pushed</label>
@@ -107,11 +108,6 @@ export class BlockDiceModal {
         return this.container.style.display !== 'none';
     }
 
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     destroy(): void {
         this.container.remove();

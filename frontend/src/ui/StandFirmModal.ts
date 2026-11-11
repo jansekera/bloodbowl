@@ -1,4 +1,5 @@
 import type { PendingStandFirm } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * P226 (21.10.2026): kouč-člověk volí, jestli jeho hráč použije Stand Firm (`rules_bb2016.txt`
@@ -38,12 +39,12 @@ export class StandFirmModal {
         const notes = [
             pending.grabPossible ? 'The attacker may still choose another square with Grab.' : '',
             dependsOnNames.length > 0 ? `The square depends on Stand Firm of ${dependsOnNames.join(', ')} (not asked yet).` : '',
-        ].filter(n => n !== '').map(n => ' ' + this.escape(n)).join('');
+        ].filter(n => n !== '').map(n => ' ' + escapeHtml(n)).join('');
         this.container.innerHTML = `
             <div class="reroll-modal__backdrop"></div>
             <div class="reroll-modal__content">
-                <div class="reroll-modal__title">${this.escape(playerName)} has Stand Firm — ${this.escape(attackerName)}'s ${this.escape(what)}${chain}. Use Stand Firm?</div>
-                <div class="reroll-modal__text">Without Stand Firm he is pushed ${this.escape(target)}.${notes}</div>
+                <div class="reroll-modal__title">${escapeHtml(playerName)} has Stand Firm — ${escapeHtml(attackerName)}'s ${escapeHtml(what)}${chain}. Use Stand Firm?</div>
+                <div class="reroll-modal__text">Without Stand Firm he is pushed ${escapeHtml(target)}.${notes}</div>
                 <div class="reroll-modal__buttons">
                     <button class="reroll-modal__btn reroll-modal__btn--team" data-use="1">Stand Firm (stay)</button>
                     <button class="reroll-modal__btn reroll-modal__btn--decline" data-use="0">Be pushed back</button>
@@ -63,11 +64,5 @@ export class StandFirmModal {
     hide(): void {
         this.container.style.display = 'none';
         this.container.innerHTML = '';
-    }
-
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

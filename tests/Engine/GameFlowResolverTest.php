@@ -177,4 +177,24 @@ final class GameFlowResolverTest extends TestCase
         $this->assertEquals(PlayerState::OFF_PITCH, $player1->getState());
         $this->assertNull($player1->getPosition());
     }
+
+    /**
+     * Review P296 (11.11.2026): „pohnul se v tomto kole“ (`movedThisTurn`) a otevřený pohyb musí s koncem drivu zmizet.
+     * Dřív zůstaly ⇒ po touchdownu hráč, který se v posledním tahu pohnul, v prvním tahu nové série neblokoval
+     * (ř. 674-676 platí jen pro kolo, ve kterém se pohnul), neohlásil Blitz a jeho akce se brala jako pokračování.
+     */
+    public function testNovyDriveMazePohybVKole(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
+            ->addPlayer(TeamSide::AWAY, 10, 5, id: 2)
+            ->build();
+        $state = $state->withPlayer($state->requirePlayer(1)->withMovedThisTurn(true))->withMoveContinuation(1);
+
+        $result = (new GameFlowResolver(new FixedDiceRoller([])))->resetPlayersForSetup($state);
+
+        $this->assertFalse($result->requirePlayer(1)->hasMovedThisTurn());
+        $this->assertNull($result->getMoveContinuationPlayerId());
+        $this->assertNull($result->openMovePlayerId());
+    }
 }

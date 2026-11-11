@@ -1,5 +1,6 @@
 import type { MatchPlayer } from '../api/types';
 import { SKILL_DESCRIPTIONS } from './Tooltip';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * Persistent player detail card shown when a player is selected.
@@ -39,10 +40,10 @@ export class PlayerCard {
         this.element.innerHTML = `
             <div class="player-card__header">
                 <span class="player-card__number">#${player.number}</span>
-                <span class="player-card__name">${this.escape(player.name)}</span>
+                <span class="player-card__name">${escapeHtml(player.name)}</span>
                 <span class="player-card__close" title="Close">&times;</span>
             </div>
-            <div class="player-card__position">${this.escape(player.positionalName)}</div>
+            <div class="player-card__position">${escapeHtml(player.positionalName)}</div>
             <div class="player-card__stats">
                 <div class="player-card__stat">
                     <span class="player-card__stat-label">MA</span>
@@ -103,11 +104,6 @@ export class PlayerCard {
         return 'extraordinary';
     }
 
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     destroy(): void {
         this.element.remove();

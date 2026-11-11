@@ -1,4 +1,5 @@
 import type { PendingReroll } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 const ROLL_TYPE_LABELS: Record<string, string> = {
     dodge: 'Dodge',
@@ -49,7 +50,7 @@ export class RerollModal {
             <div class="reroll-modal__backdrop"></div>
             <div class="reroll-modal__content">
                 <div class="reroll-modal__title">${label} Failed!</div>
-                <div class="reroll-modal__info">${this.escape(playerName)} rolled <strong>${pending.roll}</strong> (needed ${pending.target}+)</div>
+                <div class="reroll-modal__info">${escapeHtml(playerName)} rolled <strong>${pending.roll}</strong> (needed ${pending.target}+)</div>
                 ${pending.proFailed ? '<div class="reroll-modal__info">Pro roll failed — a team re-roll may re-roll the Pro roll.</div>' : ''}
                 <div class="reroll-modal__buttons">${buttons}</div>
             </div>
@@ -76,11 +77,6 @@ export class RerollModal {
         return this.container.style.display !== 'none';
     }
 
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     destroy(): void {
         this.container.remove();

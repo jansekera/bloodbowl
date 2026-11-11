@@ -1,4 +1,5 @@
 import type { PendingApothecary } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /** P206 (b), 16.10.2026: volba kouče o lékárníkovi (ř. 1200-1210) — komu ho použít, u Casualty pak který výsledek. */
 const RESULT_LABELS: Record<string, string> = {
@@ -32,7 +33,7 @@ export class ApothecaryModal {
         let title: string;
         let buttons = '';
         if (pending.stage === 'choose') {
-            title = `Apothecary: ${this.escape(nameOf(pending.chosenPlayerId ?? 0))} — choose the result`;
+            title = `Apothecary: ${escapeHtml(nameOf(pending.chosenPlayerId ?? 0))} — choose the result`;
             for (const r of pending.options) {
                 buttons += `<button class="reroll-modal__btn reroll-modal__btn--team" data-result="${r}">${RESULT_LABELS[r] ?? r}</button>`;
             }
@@ -40,7 +41,7 @@ export class ApothecaryModal {
             title = 'Use the apothecary?';
             for (const o of pending.offers) {
                 const what = o.kind === 'ko' ? RESULT_LABELS.ko : (RESULT_LABELS[o.result ?? ''] ?? o.result);
-                buttons += `<button class="reroll-modal__btn reroll-modal__btn--team" data-player="${o.playerId}">${this.escape(nameOf(o.playerId))} (${what})</button>`;
+                buttons += `<button class="reroll-modal__btn reroll-modal__btn--team" data-player="${o.playerId}">${escapeHtml(nameOf(o.playerId))} (${what})</button>`;
             }
             buttons += '<button class="reroll-modal__btn reroll-modal__btn--decline" data-player="0">Do not use</button>';
         }
@@ -65,11 +66,5 @@ export class ApothecaryModal {
     hide(): void {
         this.container.style.display = 'none';
         this.container.innerHTML = '';
-    }
-
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

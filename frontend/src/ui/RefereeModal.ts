@@ -1,4 +1,5 @@
 import type { PendingReferee } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * P291 (uživatel 10.11.2026: „udělej ať se zeptá — člověk může některého hráče preferovat, ať zůstane“).
@@ -17,7 +18,7 @@ export class RefereeModal {
     }
 
     show(pending: PendingReferee, playerName: string, onChoice: (params: { bribe: boolean; argue: boolean }) => void): void {
-        const name = this.escape(playerName);
+        const name = escapeHtml(playerName);
         const why = pending.foul ? `The referee spotted the foul and sends ${name} off (turnover).` : `${name} has a Secret Weapon and is sent off at the end of the drive.`;
         const bribeText = pending.foul ? 'Bribe (2+): he stays and there is no turnover.' : 'Bribe (2+): he stays.';
         const argueText = 'Argue the call (6): he goes to the reserves instead' + (pending.foul ? ' (turnover stays)' : '') + '; on a 1 your head coach is sent off.';
@@ -60,11 +61,5 @@ export class RefereeModal {
     hide(): void {
         this.container.style.display = 'none';
         this.container.innerHTML = '';
-    }
-
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

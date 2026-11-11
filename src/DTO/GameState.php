@@ -322,6 +322,25 @@ final class GameState
         return $this->moveContinuationPlayerId;
     }
 
+    /**
+     * Review P296 (11.11.2026): hráč aktivního týmu, jehož pohyb je otevřený (smí táhnout dál) — JEDNO místo pro web i testy.
+     * Buď pokračování blitzu po ráně (P81, `moveContinuationPlayerId`), nebo kdo se v kole pohnul, pohyb neukončil
+     * a nejednal (dílčí krok kouče P296, přehozený úhyb / GFI / skok). Ležící ani ten, kdo pohyb ukončil, ne.
+     */
+    public function openMovePlayerId(): ?int
+    {
+        foreach ($this->getTeamPlayers($this->activeTeam) as $hrac) {
+            if ($hrac->getState() !== PlayerState::STANDING || $hrac->hasMoved()) {
+                continue;
+            }
+            if ($hrac->getId() === $this->moveContinuationPlayerId || ($hrac->hasMovedThisTurn() && !$hrac->hasActed())) {
+                return $hrac->getId();
+            }
+        }
+
+        return null;
+    }
+
     public function withMoveContinuation(?int $playerId): self
     {
         $clone = clone $this;
@@ -570,6 +589,7 @@ final class GameState
             'pendingBlock' => $this->pendingBlock?->toArray(),
             'pendingReroll' => $this->pendingReroll?->toArray(),
             'moveContinuationPlayerId' => $this->moveContinuationPlayerId,
+            'openMovePlayerId' => $this->openMovePlayerId(),   // jen pro web (odvozené, `fromArray` ho nečte)
             'declaredBlitzerId' => $this->declaredBlitzerId,
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
             'pendingGrab' => $this->pendingGrab?->toArray(),

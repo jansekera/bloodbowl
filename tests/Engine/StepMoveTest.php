@@ -49,14 +49,14 @@ final class StepMoveTest extends TestCase
         $this->assertSame(4, $p->requirePosition()->getX());
         $this->assertFalse($p->hasMoved(), 'pohyb není ukončen');
         $this->assertSame(5, $p->getMovementRemaining());
-        $this->assertSame(1, $s->getMoveContinuationPlayerId());
+        $this->assertSame(1, $s->openMovePlayerId());
         $this->assertSame([], (new RulesEngine())->validate($s, ActionType::MOVE, ['playerId' => 1, 'x' => 1, 'y' => 5]));
 
         $s = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 1, 'y' => 5])->getNewState();
         $this->assertSame(1, $s->requirePlayer(1)->requirePosition()->getX());
         $this->assertSame(2, $s->requirePlayer(1)->getMovementRemaining());
         $this->assertTrue($s->requirePlayer(1)->hasMoved(), 'celá zbylá cesta pohyb ukončí');
-        $this->assertNull($s->getMoveContinuationPlayerId());
+        $this->assertNull($s->openMovePlayerId());
     }
 
     public function testPokracovaniNehaziBoneHeadZnovu(): void
@@ -67,7 +67,7 @@ final class StepMoveTest extends TestCase
         $s = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 3, 'y' => 5, 'partial' => true])->getNewState();
 
         $this->assertSame(3, $s->requirePlayer(1)->requirePosition()->getX());
-        $this->assertSame(1, $s->getMoveContinuationPlayerId(), 'i po druhém dílčím kroku pohyb trvá');
+        $this->assertSame(1, $s->openMovePlayerId(), 'i po druhém dílčím kroku pohyb trvá');
     }
 
     public function testAkceJinehoHraceUzavrePohyb(): void
@@ -79,7 +79,7 @@ final class StepMoveTest extends TestCase
         $p = $s->requirePlayer(1);
         $this->assertTrue($p->hasMoved());
         $this->assertTrue($p->hasActed(), 'po jiné aktivaci už nepřihraje ani nepředá');
-        $this->assertNull($s->getMoveContinuationPlayerId());
+        $this->assertNull($s->openMovePlayerId());
         $this->assertNotSame([], (new RulesEngine())->validate($s, ActionType::MOVE, ['playerId' => 1, 'x' => 3, 'y' => 5]));
     }
 
@@ -100,7 +100,7 @@ final class StepMoveTest extends TestCase
         $s = $resolver->resolve($this->state([SkillName::BoneHead]), ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5])->getNewState();
         $this->assertNotNull($s->getPendingReroll());
         $s = $resolver->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll'])->getNewState();
-        $this->assertSame(1, $s->getMoveContinuationPlayerId());
+        $this->assertSame(1, $s->openMovePlayerId());
 
         $s = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 1, 'x' => 3, 'y' => 5])->getNewState();
         $this->assertSame(3, $s->requirePlayer(1)->requirePosition()->getX());
@@ -112,7 +112,7 @@ final class StepMoveTest extends TestCase
         $s = $resolver->resolve($this->state(), ActionType::MOVE, ['playerId' => 1, 'x' => 4, 'y' => 5, 'partial' => true])->getNewState();
         $s = $resolver->resolve($s, ActionType::END_TURN, [])->getNewState();
 
-        $this->assertNull($s->getMoveContinuationPlayerId());
+        $this->assertNull($s->openMovePlayerId());
     }
 
     /**
@@ -152,5 +152,16 @@ final class StepMoveTest extends TestCase
 
         $this->assertFalse($r->isTurnover());
         $this->assertSame(4, $r->getNewState()->getBall()->getCarrierId());
+    }
+
+    public function testPredaniPoDilcimKrokuPohybUzavre(): void
+    {
+        // review P296: po dílčím kroku a předání už hráč jednal — pohyb nesmí zůstat „otevřený“ (web by ho znovu vybral)
+        $resolver = new ActionResolver(new FixedDiceRoller([6]));
+        $s = $resolver->resolve($this->nosic(), ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5, 'partial' => true])->getNewState();
+        $this->assertSame(1, $s->openMovePlayerId(), 'fixtura: pohyb otevřený');
+        $s = $resolver->resolve($s, ActionType::HAND_OFF, ['playerId' => 1, 'targetId' => 4])->getNewState();
+
+        $this->assertNull($s->openMovePlayerId());
     }
 }

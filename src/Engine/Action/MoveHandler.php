@@ -511,14 +511,17 @@ final class MoveHandler implements ActionHandlerInterface
 
     /**
      * Konec pohybu k cíli. P296 (11.11.2026): dílčí krok kouče (`partial`) pohyb neukončí — hráč smí táhnout dál
-     * jako táž akce (pokračování, `GameState::moveContinuationPlayerId`); aktivace se uzavře, až jedná jiný hráč
-     * nebo skončí kolo (`rules_bb2016.txt` ř. 423-429). Jinak je pohyb ukončen.
+     * jako táž akce (`GameState::openMovePlayerId`); aktivace se uzavře, až jedná jiný hráč nebo skončí kolo
+     * (`rules_bb2016.txt` ř. 423-429, `ActionResolver::resolveAkce`). Jinak je pohyb ukončen (i pokračování P81).
      */
     private function ukoncitKrok(GameState $state, MatchPlayerDTO $hrac, bool $partial): GameState
     {
-        return $partial
-            ? $state->withPlayer($hrac)->withMoveContinuation($hrac->getId())
-            : $state->withPlayer($hrac->withHasMoved(true));
+        if ($partial) {
+            return $state->withPlayer($hrac);   // otevřený pohyb pozná `GameState::openMovePlayerId` (movedThisTurn, ne hasMoved)
+        }
+        $state = $state->withPlayer($hrac->withHasMoved(true));
+
+        return $state->getMoveContinuationPlayerId() === $hrac->getId() ? $state->withMoveContinuation(null) : $state;
     }
 
     /**
@@ -635,8 +638,8 @@ final class MoveHandler implements ActionHandlerInterface
         $teamRerollUsed = false;
         $konec = $this->dokoncitSkok($state, $hrac, $hrac->getPosition(), $to, $gfi, $teamRerollUsed, $events);
 
-        // P296: pohyb po skoku pokračuje (kouč smí táhnout dál, týž hráč, táž akce)
-        return $konec ?? ActionResult::success($state->withMoveContinuation($playerId), $events);
+        // P296: pohyb po skoku zůstává otevřený (movedThisTurn bez hasMoved) — kouč smí táhnout dál, táž akce
+        return $konec ?? ActionResult::success($state, $events);
     }
 
     /**

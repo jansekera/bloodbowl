@@ -509,8 +509,9 @@ final class ActionResolver
         if ($continuationId !== null) {
             $actorId = isset($params['playerId']) ? (int) $params['playerId'] : null;
             if ($action === ActionType::MOVE && $actorId === $continuationId) {
+                // review P296: id zůstává, dokud pohyb neskončí (`MoveHandler::ukoncitKrok`) nebo ho neuzavře jiný hráč —
+                //   dílčí krok kouče může pokračovat víckrát
                 $isContinuation = true;
-                $state = $state->withMoveContinuation(null);
             } elseif ($action === ActionType::END_TURN || ($action->requiresPlayer() && $actorId !== $continuationId)) {
                 $mover = $state->getPlayer($continuationId);
                 if ($mover !== null) {
@@ -527,7 +528,8 @@ final class ActionResolver
         if ($action->requiresPlayer() && isset($params['playerId'])) {
             $actorId = (int) $params['playerId'];
             foreach ($state->getTeamPlayers($state->getActiveTeam()) as $hrac) {
-                if ($hrac->getId() !== $actorId && $hrac->hasMovedThisTurn() && !$hrac->hasActed()) {
+                // i pokračování blitzu po ráně (už jednal, ale pohyb neukončil) — review P296
+                if ($hrac->getId() !== $actorId && $hrac->hasMovedThisTurn() && (!$hrac->hasActed() || !$hrac->hasMoved())) {
                     $state = $state->withPlayer($hrac->withHasMoved(true)->withHasActed(true));
                 }
             }

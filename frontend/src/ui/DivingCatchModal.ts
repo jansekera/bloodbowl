@@ -1,4 +1,5 @@
 import type { PendingDivingCatch } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * 30.10.2026 (uživatel): kouč-člověk volí, jestli jeho hráč použije Diving Catch (`rules_bb2016.txt`
@@ -33,12 +34,12 @@ export class DivingCatchModal {
             ? `<div class="reroll-modal__text">${pending.otherCandidates} other player${pending.otherCandidates > 1 ? 's' : ''} with Diving Catch can reach ${at} too. If two or more try, they get in each other's way and nobody catches.</div>`
             : '';
         const already = attemptingName !== null
-            ? `<div class="reroll-modal__text">${this.escape(attemptingName)} is already diving for it — if you dive too, nobody catches.</div>`
+            ? `<div class="reroll-modal__text">${escapeHtml(attemptingName)} is already diving for it — if you dive too, nobody catches.</div>`
             : '';
         this.container.innerHTML = `
             <div class="reroll-modal__backdrop"></div>
             <div class="reroll-modal__content">
-                <div class="reroll-modal__title">${this.escape(playerName)} has Diving Catch — the ball is landing on ${at}, next to him. Use Diving Catch?</div>
+                <div class="reroll-modal__title">${escapeHtml(playerName)} has Diving Catch — the ball is landing on ${at}, next to him. Use Diving Catch?</div>
                 <div class="reroll-modal__text">Yes: he tries to catch it from his own square (a failed catch bounces from there). No: the ball lands on ${at} and bounces.</div>
                 ${others}${already}
                 <div class="reroll-modal__buttons">
@@ -60,11 +61,5 @@ export class DivingCatchModal {
     hide(): void {
         this.container.style.display = 'none';
         this.container.innerHTML = '';
-    }
-
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

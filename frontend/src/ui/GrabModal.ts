@@ -1,4 +1,5 @@
 import type { PendingGrab } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 /**
  * P224 (21.10.2026): kouč-člověk volí, jestli útočník použije Grab (`rules_bb2016.txt` ř. 8147-8154:
@@ -38,7 +39,7 @@ export class GrabModal {
         this.container.innerHTML = `
             <div class="reroll-modal__backdrop"></div>
             <div class="reroll-modal__content">
-                <div class="reroll-modal__title">${this.escape(attackerName)} has Grab — block die: ${this.escape(dieFace)}. Choose where to push ${this.escape(defenderName)}</div>
+                <div class="reroll-modal__title">${escapeHtml(attackerName)} has Grab — block die: ${escapeHtml(dieFace)}. Choose where to push ${escapeHtml(defenderName)}</div>
                 ${followUpBox}
                 <div class="reroll-modal__buttons">${buttons}</div>
             </div>
@@ -59,11 +60,5 @@ export class GrabModal {
     hide(): void {
         this.container.style.display = 'none';
         this.container.innerHTML = '';
-    }
-
-    private escape(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

@@ -280,7 +280,16 @@ final class GameFlowResolver
      */
     public function resetPlayersForSetup(GameState $state): GameState
     {
+        // OPRAVENO 11.11.2026 (review P296) -- „pohnul se v tomto kole“ (`movedThisTurn`, P186), otevřený pohyb a ohlášený
+        //   blitz přežily konec drivu: po touchdownu hráč, který se v posledním tahu pohnul, v prvním tahu nové série
+        //   neblokoval (ř. 674-676 platí jen pro kolo, ve kterém se pohnul), neohlásil Blitz a jeho akce se brala
+        //   jako pokračování. Nový drive začíná bez nich.
+        $state = $state->withMoveContinuation(null)->withDeclaredBlitzer(null);
         foreach ($state->getPlayers() as $player) {
+            if ($player->hasMovedThisTurn()) {
+                $player = $player->withMovedThisTurn(false);
+                $state = $state->withPlayer($player);
+            }
             // Novy drive: "hral v drivu" plati jen pro ten, ktery prave skoncil.
             if ($player->isPlayedThisDrive()) {
                 $player = $player->withPlayedThisDrive(false);

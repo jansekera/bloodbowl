@@ -30,6 +30,8 @@ export interface MatchPlayer {
     position: Position | null;
     hasMoved: boolean;
     hasActed: boolean;
+    /** P186/P296: pohnul se v tomto kole (i dílčí krok) — pak už neohlásí Blitz, neblokuje, nehází bombu. */
+    movedThisTurn?: boolean;
     movementRemaining: number;
     teamSide: 'home' | 'away';
     lostTacklezones?: boolean;
@@ -190,8 +192,8 @@ export interface GameState {
     pendingReroll?: PendingReroll | null;
     /** P210: hráč, který ohlásil Blitz a ještě nedal ránu (chodí kamkoli, pak jedna rána). */
     declaredBlitzerId?: number | null;
-    /** P81/P296: hráč, jehož pohyb je otevřený (po ráně v Blitzu, po kroku kouče, po přehozeném úhybu) — smí táhnout dál. */
-    moveContinuationPlayerId?: number | null;
+    /** P296: hráč, jehož pohyb je otevřený (po ráně v Blitzu, po kroku kouče, po přehozeném úhybu) — smí táhnout dál. Server `GameState::openMovePlayerId`. */
+    openMovePlayerId?: number | null;
     pendingApothecary?: PendingApothecary | null;
     pendingGrab?: PendingGrab | null;
     pendingStandFirm?: PendingStandFirm | null;

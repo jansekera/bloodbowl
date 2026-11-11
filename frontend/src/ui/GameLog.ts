@@ -1,4 +1,5 @@
 import type { GameEvent } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 export class GameLog {
     private container: HTMLElement;
@@ -45,7 +46,7 @@ export class GameLog {
 
     private renderEvent(event: GameEvent): string {
         const cssClass = this.getEventClass(event.type);
-        let desc = this.escapeHtml(event.description);
+        let desc = escapeHtml(event.description);
 
         // Replace block dice names with icons
         if (event.type === 'block' || event.type === 'multiple_block') {
@@ -125,11 +126,5 @@ export class GameLog {
             case 'multiple_block': return 'block';
             default: return 'default';
         }
-    }
-
-    private escapeHtml(text: string): string {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 }

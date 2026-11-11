@@ -1,4 +1,5 @@
 import type { AvailableSkills, SkillInfo } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 export class LevelUpModal {
     private container: HTMLElement;
@@ -48,7 +49,7 @@ export class LevelUpModal {
         this.container.innerHTML =
             '<div class="level-up-modal__backdrop"></div>' +
             '<div class="level-up-modal__content">' +
-            `<h3>Level Up: ${this.escapeHtml(playerName)}</h3>` +
+            `<h3>Level Up: ${escapeHtml(playerName)}</h3>` +
             normalHtml +
             doubleHtml +
             '<div class="level-up-modal__actions">' +
@@ -79,10 +80,6 @@ export class LevelUpModal {
     }
 
     private renderSkill(skill: SkillInfo, type: 'normal' | 'double'): string {
-        return `<button class="level-up-modal__skill level-up-modal__skill--${type}" data-skill-id="${skill.id}">${this.escapeHtml(skill.name)}</button>`;
-    }
-
-    private escapeHtml(text: string): string {
-        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<button class="level-up-modal__skill level-up-modal__skill--${type}" data-skill-id="${skill.id}">${escapeHtml(skill.name)}</button>`;
     }
 }
