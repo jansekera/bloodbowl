@@ -19,6 +19,9 @@ use PHPUnit\Framework\TestCase;
  * kontrola před akcí (Bone Head ř. 7980-7986). Aktivace se uzavře, jakmile jedná jiný hráč nebo skončí kolo:
  * „a player must finish his Action before another player can take one" (`rules_bb2016.txt` ř. 423-429).
  * Po pohybu už hráč neohlásí Blitz (ř. 420-422: akce se ohlašuje napřed).
+ *
+ * P297 (uživatel 11.11.: „pokud nastane akce jiného hráče, původnímu se musí akce ukončit“): platí i po CELÉM pohybu;
+ * a přihrávka / předání po vlastním pohybu je táž akce — kontrola před akcí se znovu nehází.
  */
 final class StepMoveTest extends TestCase
 {
@@ -110,5 +113,44 @@ final class StepMoveTest extends TestCase
         $s = $resolver->resolve($s, ActionType::END_TURN, [])->getNewState();
 
         $this->assertNull($s->getMoveContinuationPlayerId());
+    }
+
+    /**
+     * P297: nosič 1 MA6 v (5,5) s míčem, spoluhráč 4 v (8,5), spoluhráč 3 daleko, soupeř daleko (bez úhybů).
+     *
+     * @param list<SkillName> $skills
+     */
+    private function nosic(array $skills = []): GameState
+    {
+        return (new GameStateBuilder())
+            ->addPlayer(TeamSide::HOME, 5, 5, skills: $skills, id: 1)
+            ->addPlayer(TeamSide::HOME, 1, 1, id: 3)
+            ->addPlayer(TeamSide::HOME, 8, 5, id: 4)
+            ->addPlayer(TeamSide::AWAY, 20, 10, id: 2)
+            ->withBallCarried(1)
+            ->build();
+    }
+
+    public function testPoCelemPohybuAkceJinehoHraceUkonciAkciPuvodniho(): void
+    {
+        // uživatel 11.11.: „pokud nastane akce jiného hráče, původnímu se musí akce ukončit“ (ř. 423-429)
+        $resolver = new ActionResolver(new FixedDiceRoller([]));
+        $s = $resolver->resolve($this->nosic(), ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5])->getNewState();
+        $this->assertSame([], (new RulesEngine())->validate($s, ActionType::HAND_OFF, ['playerId' => 1, 'targetId' => 4]), 'fixtura: předat ještě smí');
+
+        $s = $resolver->resolve($s, ActionType::MOVE, ['playerId' => 3, 'x' => 2, 'y' => 1])->getNewState();
+        $this->assertTrue($s->requirePlayer(1)->hasActed(), 'akce nosiče skončila');
+        $this->assertNotSame([], (new RulesEngine())->validate($s, ActionType::HAND_OFF, ['playerId' => 1, 'targetId' => 4]));
+    }
+
+    public function testPredaniPoVlastnimPohybuNehaziBoneHeadZnovu(): void
+    {
+        // pohyb a předání jsou táž akce: Bone Head 4 jen jednou, pak chytání 6 — další kostka by výjimkou spadla
+        $resolver = new ActionResolver(new FixedDiceRoller([4, 6]));
+        $s = $resolver->resolve($this->nosic([SkillName::BoneHead]), ActionType::MOVE, ['playerId' => 1, 'x' => 7, 'y' => 5])->getNewState();
+        $r = $resolver->resolve($s, ActionType::HAND_OFF, ['playerId' => 1, 'targetId' => 4]);
+
+        $this->assertFalse($r->isTurnover());
+        $this->assertSame(4, $r->getNewState()->getBall()->getCarrierId());
     }
 }

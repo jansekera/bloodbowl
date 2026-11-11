@@ -519,6 +519,24 @@ final class ActionResolver
                 $state = $state->withMoveContinuation(null);
             }
         }
+        // P297 (uzivatel 11.11.2026: „pokud nastane akce jineho hrace, puvodnimu se musi akce ukoncit“, r. 423-429).
+        //   OPRAVENO -- uzaviral se jen otevreny pohyb (P81/P296); hrac po CELEM pohybu (`hasMoved`, ale ne
+        //   `hasActed`) smel prihrat nebo predat i po aktivaci jineho hrace. Ted se uzavre kazdy, kdo se v kole
+        //   pohnul a akci jeste neukoncil. Akce TEHOZ hrace (pohyb pak prihravka / predani / faul) je tataz akce,
+        //   takze se kontrola pred akci (Bone Head …, r. 7980-7986) znovu nehazi.
+        if ($action->requiresPlayer() && isset($params['playerId'])) {
+            $actorId = (int) $params['playerId'];
+            foreach ($state->getTeamPlayers($state->getActiveTeam()) as $hrac) {
+                if ($hrac->getId() !== $actorId && $hrac->hasMovedThisTurn() && !$hrac->hasActed()) {
+                    $state = $state->withPlayer($hrac->withHasMoved(true)->withHasActed(true));
+                }
+            }
+            $actor = $state->getPlayer($actorId);
+            if ($actor !== null && $actor->hasMovedThisTurn() && !$actor->hasActed()) {
+                $isContinuation = true;
+            }
+        }
+
         // P210 (16.10.2026): ohlaseny blitz (cil se pri ohlaseni nerika, `rules_bb2016.txt` r. 346-349).
         //   Pohyb a rana blitzujiciho jsou TAZ akce -- kontrola pred akci (Wild Animal s +2, Bone-head …)
         //   probehla pri ohlaseni a neopakuje se. Jakmile jedna jiny hrac nebo tym ukonci kolo, aktivace
