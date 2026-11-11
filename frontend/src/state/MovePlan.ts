@@ -42,7 +42,7 @@ export function nextStep(plan: MovePlan | null, moveTargets: MoveTarget[]): Posi
 }
 
 /**
- * Po kroku: plán zůstává, když server nechal pohyb téhož hráče otevřený (`moveContinuationPlayerId`) a cíl je
+ * Po kroku: plán zůstává, když server nechal pohyb téhož hráče otevřený (`openMovePlayerId`) a cíl je
  * z nového pole pořád dosažitelný. Jinak (pád, turnover, cíl dosažen, jiný hráč) končí.
  */
 export function planAfterStep(plan: MovePlan | null, continuationId: number | null | undefined, moveTargets: MoveTarget[]): MovePlan | null {

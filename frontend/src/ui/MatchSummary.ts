@@ -1,4 +1,5 @@
 import type { GameState } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 export interface MatchSummaryData {
     homeTeamName: string;
@@ -45,16 +46,16 @@ export class MatchSummary {
                 <div class="match-summary__result">${resultText}</div>
                 <div class="match-summary__score">
                     <div class="match-summary__team">
-                        <span class="match-summary__team-name">${data.homeTeamName}</span>
+                        <span class="match-summary__team-name">${escapeHtml(data.homeTeamName)}</span>
                         <span class="match-summary__team-score">${data.homeScore}</span>
                     </div>
                     <span class="match-summary__vs">-</span>
                     <div class="match-summary__team">
                         <span class="match-summary__team-score">${data.awayScore}</span>
-                        <span class="match-summary__team-name">${data.awayTeamName}</span>
+                        <span class="match-summary__team-name">${escapeHtml(data.awayTeamName)}</span>
                     </div>
                 </div>
-                ${data.mvp ? `<div class="match-summary__mvp">MVP: ${data.mvp.name} (${data.mvp.team})</div>` : ''}
+                ${data.mvp ? `<div class="match-summary__mvp">MVP: ${escapeHtml(data.mvp.name)} (${escapeHtml(data.mvp.team)})</div>` : ''}
                 <button class="match-summary__close">Close</button>
             </div>
         `;

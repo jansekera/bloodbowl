@@ -1,4 +1,5 @@
 import type { MatchPlayer } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 export const SKILL_DESCRIPTIONS: Record<string, string> = {
     'Block': 'Prevents knockdown on Both Down',
@@ -114,12 +115,12 @@ export class Tooltip {
         const learned = new Set(player.learnedSkills ?? []);
         const skillsHtml = this.buildSkillsHtml(player.skills, learned);
 
-        const raceLabel = raceName ? ` <span class="pitch-tooltip__race">(${raceName})</span>` : '';
+        const raceLabel = raceName ? ` <span class="pitch-tooltip__race">(${escapeHtml(raceName)})</span>` : '';
 
         this.element.innerHTML = `
             <div class="pitch-tooltip__header">
-                <strong>#${player.number} ${player.name}</strong>
-                <span>${player.positionalName}${raceLabel}</span>
+                <strong>#${player.number} ${escapeHtml(player.name)}</strong>
+                <span>${escapeHtml(player.positionalName)}${raceLabel}</span>
             </div>
             <div class="pitch-tooltip__stats">
                 MA ${player.stats.movement} |

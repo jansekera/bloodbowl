@@ -1,4 +1,5 @@
 import type { GameState } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 const WEATHER_DISPLAY: Record<string, { label: string; color: string }> = {
     sweltering_heat: { label: 'Sweltering Heat', color: '#ff6b35' },
@@ -38,8 +39,8 @@ export class ScoreBoard {
         this.element.innerHTML = `
             <div class="scoreboard__team ${activeClass('home')}">
                 ${state.activeTeam === 'home' ? '<span class="scoreboard__arrow">&#9654;</span>' : ''}
-                <span class="scoreboard__name">${state.homeTeam.name}</span>
-                <span class="scoreboard__race">${state.homeTeam.raceName}</span>
+                <span class="scoreboard__name">${escapeHtml(state.homeTeam.name)}</span>
+                <span class="scoreboard__race">${escapeHtml(state.homeTeam.raceName)}</span>
                 <span class="scoreboard__score">${state.homeTeam.score}</span>
                 <span class="scoreboard__rerolls">RR: ${state.homeTeam.rerolls}${state.homeTeam.rerollUsedThisTurn ? ' <span class="scoreboard__used">(used)</span>' : ''}</span>
             </div>
@@ -55,8 +56,8 @@ export class ScoreBoard {
             </div>
             <div class="scoreboard__team ${activeClass('away')}">
                 ${state.activeTeam === 'away' ? '<span class="scoreboard__arrow">&#9654;</span>' : ''}
-                <span class="scoreboard__name">${state.awayTeam.name}</span>
-                <span class="scoreboard__race">${state.awayTeam.raceName}</span>
+                <span class="scoreboard__name">${escapeHtml(state.awayTeam.name)}</span>
+                <span class="scoreboard__race">${escapeHtml(state.awayTeam.raceName)}</span>
                 <span class="scoreboard__score">${state.awayTeam.score}</span>
                 <span class="scoreboard__rerolls">RR: ${state.awayTeam.rerolls}${state.awayTeam.rerollUsedThisTurn ? ' <span class="scoreboard__used">(used)</span>' : ''}</span>
             </div>

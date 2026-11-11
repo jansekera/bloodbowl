@@ -286,13 +286,9 @@ final class GameFlowResolver
         //   jako pokračování. Nový drive začíná bez nich.
         $state = $state->withMoveContinuation(null)->withDeclaredBlitzer(null);
         foreach ($state->getPlayers() as $player) {
-            if ($player->hasMovedThisTurn()) {
-                $player = $player->withMovedThisTurn(false);
-                $state = $state->withPlayer($player);
-            }
-            // Novy drive: "hral v drivu" plati jen pro ten, ktery prave skoncil.
-            if ($player->isPlayedThisDrive()) {
-                $player = $player->withPlayedThisDrive(false);
+            // Novy drive: "hral v drivu" plati jen pro ten, ktery prave skoncil; "pohnul se v kole" taky.
+            if ($player->hasMovedThisTurn() || $player->isPlayedThisDrive()) {
+                $player = $player->withMovedThisTurn(false)->withPlayedThisDrive(false);
                 $state = $state->withPlayer($player);
             }
             if ($player->getState()->isOnPitch()) {

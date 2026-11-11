@@ -106,15 +106,15 @@ function drawPathOverlay(sel: ReturnType<typeof stateManager.getSelection>): voi
     // review P296: trasa jen v pohybu a v Blitzu — jinde by klik znamenal přihrávku / faul, ne pohyb
     if (!sel.selectedPlayerId || moveTargets.length === 0 || (sel.mode !== 'move' && sel.mode !== 'blitz')) return;
     const hovered = sel.hoveredCell;
-    const target = planTarget(movePlan, moveTargets)
-        ?? (hovered ? moveTargets.find(t => t.x === hovered.x && t.y === hovered.y) : undefined);
+    const planned = planTarget(movePlan, moveTargets);
+    const target = planned ?? (hovered ? moveTargets.find(t => t.x === hovered.x && t.y === hovered.y) : undefined);
     if (!target?.path?.length) return;
     const state = stateManager.getGameState();
     if (!state) return;
     const player = state.players.find(p => p.id === sel.selectedPlayerId);
     if (!player?.position) return;
     renderer.drawMovePath(player.position, target.path);
-    if (planTarget(movePlan, moveTargets)) {
+    if (planned) {
         renderer.drawSelectedTarget(target);
     }
 }
@@ -522,62 +522,8 @@ canvas.addEventListener('dblclick', () => {
 stateManager.onChange(() => {
     const state = stateManager.getGameState();
     if (!state) return;
-
     const sel = stateManager.getSelection();
-
-    // Use risk highlights for move mode
-    const useRisk = sel.mode === 'move' && moveTargets.length > 0;
-    renderer.render(
-        state.players,
-        state.ball,
-        useRisk ? [] : sel.validTargets,
-        sel.selectedPlayerId,
-        sel.hoveredCell,
-    );
-    if (useRisk) {
-        renderer.drawRiskHighlights(moveTargets);
-    }
-    drawPathOverlay(sel);
-
-    // Draw setup zone overlay
-    if (state.phase === 'setup') {
-        renderer.drawSetupZone(state.activeTeam);
-    }
-
-    // Block/blitz target highlights
-    const currentMode2 = actionPanel.getSelectedMode();
-    if ((currentMode2 === 'block' || currentMode2 === 'blitz') && blockTargets.length > 0) {
-        renderer.drawBlockTargets(blockTargets);
-    }
-    // Pass target highlights (P272: i bomba a hod chycené bomby)
-    if (isThrowMode(currentMode2) && passTargets.length > 0) {
-        renderer.drawPassTargets(passTargets);
-        drawBombSuggestion(state);
-    }
-    // Handoff target highlights
-    if (currentMode2 === 'handoff' && handoffTargets.length > 0) {
-        renderer.drawHandoffTargets(handoffTargets);
-    }
-    // Foul target highlights
-    if (currentMode2 === 'foul' && foulTargets.length > 0) {
-        renderer.drawFoulTargets(foulTargets);
-    }
-
-    // Draw ball on carrier
-    if (state.ball.isHeld && state.ball.carrierId) {
-        const carrier = state.players.find(p => p.id === state.ball.carrierId);
-        if (carrier?.position) {
-            renderer.drawBallOnPlayer(carrier.position);
-        }
-    }
-
-    // Draw selected-target indicator for multiple block first target
-    if (sel.firstTargetId !== null) {
-        const firstTarget = state.players.find(p => p.id === sel.firstTargetId);
-        if (firstTarget?.position) {
-            renderer.drawSelectedTarget(firstTarget.position);
-        }
-    }
+    renderFrame();   // simplify P296: dřív tu byla celá kopie renderFrame (každá změna překryvu dvakrát)
 
     scoreboard.update(state);
     actionPanel.update(state, stateManager.isPlayerTurn());
@@ -1019,7 +965,7 @@ async function resumeMovePlan(mode: 'move' | 'blitz'): Promise<void> {
     } else {
         stateManager.setValidTargets('move', moveTargets.map(t => ({ x: t.x, y: t.y })));
     }
-    movePlan = planAfterStep(movePlan?.playerId === id ? movePlan : null, id, moveTargets);
+    movePlan = planAfterStep(movePlan, id, moveTargets);
     if (movePlan) {
         showMovePlanBar(mode);
     } else {
@@ -1030,7 +976,7 @@ async function resumeMovePlan(mode: 'move' | 'blitz'): Promise<void> {
 async function submitMove(playerId: number, x: number, y: number, partial = false): Promise<void> {
     isProcessing = true;
     try {
-        const result = await api.submitAction(matchId, 'move', partial ? { playerId, x, y, partial } : { playerId, x, y });
+        const result = await api.submitAction(matchId, 'move', { playerId, x, y, partial });
         await handleActionResult(result);
         clearAllTargets();
     } catch (err) {
@@ -1052,7 +998,7 @@ async function submitBlitzMove(playerId: number, x: number, y: number, partial =
                 return;   // ohlášení propadlo (Wild Animal, Bone-head …) -- výsledek ukázal handleActionResult
             }
         }
-        const result = await api.submitAction(matchId, 'move', partial ? { playerId, x, y, partial } : { playerId, x, y });
+        const result = await api.submitAction(matchId, 'move', { playerId, x, y, partial });
         await handleActionResult(result);
         clearAllTargets();
         stateManager.selectPlayer(playerId);

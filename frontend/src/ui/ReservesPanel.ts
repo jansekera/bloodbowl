@@ -1,4 +1,5 @@
 import type { GameState, MatchPlayer } from '../api/types';
+import { escapeHtml } from './escapeHtml';
 
 export type ReservesCallback = (playerId: number) => void;
 
@@ -94,8 +95,8 @@ export class ReservesPanel {
         const stats = player.stats;
         return `<div class="reserves-player${selectedClass}${cursor}" data-player-id="${player.id}"${draggable}>
             <span class="reserves-player__number">#${player.number}</span>
-            <span class="reserves-player__name">${player.name}</span>
-            <span class="reserves-player__pos">${player.positionalName}</span>
+            <span class="reserves-player__name">${escapeHtml(player.name)}</span>
+            <span class="reserves-player__pos">${escapeHtml(player.positionalName)}</span>
             <span class="reserves-player__stats">${stats.movement}/${stats.strength}/${stats.agility}/${stats.armour}</span>
         </div>`;
     }

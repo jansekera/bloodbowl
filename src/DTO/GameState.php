@@ -32,9 +32,8 @@ final class GameState
         private Weather $weather = Weather::NICE,
         private ?PendingBlockDTO $pendingBlock = null,
         private ?PendingRerollDTO $pendingReroll = null,
-        // P81 (30.09.2026): hrac, ktery po rane v blitzu smi jeste dojit
-        //   (`rules_bb2016.txt` r. 551-552). P296 (11.11.2026): i hrac po dilcim kroku kouce
-        //   (`partial`) nebo po prehozenem uhybu / GFI / skoku -- jeho pohyb je TAZ akce. Propadne,
+        // P81 (30.09.2026): hrac, ktery po rane v blitzu smi jeste dojit (`rules_bb2016.txt` r. 551-552) -- jen tento
+        //   pripad; dilci krok kouce a prehozeny uhyb se poznaji z `movedThisTurn` (`openMovePlayerId`). Propadne,
         //   jakmile jedna jiny hrac nebo skonci kolo (r. 423-429) -- viz `ActionResolver::resolveAkce`.
         private ?int $moveContinuationPlayerId = null,
         // P210 (16.10.2026): hrac, ktery OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt`
@@ -333,7 +332,7 @@ final class GameState
             if ($hrac->getState() !== PlayerState::STANDING || $hrac->hasMoved()) {
                 continue;
             }
-            if ($hrac->getId() === $this->moveContinuationPlayerId || ($hrac->hasMovedThisTurn() && !$hrac->hasActed())) {
+            if ($hrac->getId() === $this->moveContinuationPlayerId || $hrac->isMidAction()) {
                 return $hrac->getId();
             }
         }
