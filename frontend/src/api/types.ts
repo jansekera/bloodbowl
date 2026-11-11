@@ -30,8 +30,6 @@ export interface MatchPlayer {
     position: Position | null;
     hasMoved: boolean;
     hasActed: boolean;
-    /** P186/P296: pohnul se v tomto kole (i dílčí krok) — pak už neohlásí Blitz, neblokuje, nehází bombu. */
-    movedThisTurn?: boolean;
     movementRemaining: number;
     teamSide: 'home' | 'away';
     lostTacklezones?: boolean;

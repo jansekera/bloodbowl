@@ -654,8 +654,8 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                 }
                 // P210: blitzující, který ještě neběžel, dostane i pole pohybu
                 moveTargets = [];
-                // review P296: Blitz se ohlašuje před pohybem — po dílčím kroku už ne (server: hasMovedThisTurn); ohlášený běží dál
-                if (mode === 'blitz' && !player.hasMoved && (!player.movedThisTurn || state.declaredBlitzerId === player.id)) {
+                // P301b: pole pohybu jen tomu, komu server Blitz nabízí (ohlašuje se před pohybem; ohlášený běží dál)
+                if (mode === 'blitz' && !player.hasMoved && (await offeredTo(player.id)).has('blitz')) {
                     try {
                         moveTargets = await api.getValidMoves(matchId, player.id);
                     } catch {
@@ -707,7 +707,8 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         }
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed && !player.movedThisTurn && player.skills.includes('Bombardier')) {
+            // P301b: komu server hod bombou nabízí (Bombardier, nejednal, v kole se nehnul — RulesEngine)
+            if ((await offeredTo(player.id)).has('bomb_throw')) {
                 stateManager.selectPlayer(player.id);
                 try {
                     passTargets = await api.getPassTargets(matchId, player.id);
@@ -876,6 +877,16 @@ function clearAllTargets(): void {
     foulTargets = [];
 }
 
+/** P301b: které akce server hráči teď nabízí (`RulesEngine::getAvailableActions`) — pravidla nabídky jen na serveru. */
+async function offeredTo(playerId: number): Promise<Set<string>> {
+    try {
+        const actions = await api.getAvailableActions(matchId);
+        return new Set(actions.filter(a => a.playerId === playerId).map(a => a.type));
+    } catch {
+        return new Set();
+    }
+}
+
 function clearMovePlan(): void {
     movePlan = null;
     movePlanBar.hide();
@@ -946,8 +957,10 @@ async function resumeMovePlan(mode: 'move' | 'blitz'): Promise<void> {
         movePlanBar.hide();   // plán čeká na odpověď v dialogu přehozu (pokračuje se z něj)
         return;
     }
-    if (!state || id == null || !stateManager.isPlayerTurn() || state.pendingBlock
-        || state.pendingApothecary || state.pendingDivingCatch || state.pendingReferee || state.pendingBombRethrow) {
+    // P301b: pokračovat jen, když server hráči pohyb (v Blitzu i ránu) nabízí — čeká-li jakákoli otázka, nabízí jen
+    //   odpověď na ni (dřív tu byl vlastní seznam čekajících otázek a chyběly v něm Grab a Stand Firm)
+    const offered = state && id != null && stateManager.isPlayerTurn() ? await offeredTo(id) : new Set<string>();
+    if (!state || id == null || !(offered.has('move') || (mode === 'blitz' && offered.has('blitz')))) {
         clearMovePlan();
         return;
     }
