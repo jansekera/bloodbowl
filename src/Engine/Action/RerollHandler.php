@@ -197,7 +197,9 @@ final class RerollHandler
             ->withMovedThisTurn(true)
             ->withPosition($target)
             ->withMovementRemaining($player->getMovementRemaining() - 1);
-        $state = $state->withPlayer($player);
+        // P296: táž akce pokračuje -- další MOVE téhož hráče znovu nehází kontrolu před akcí (Bone Head …);
+        //   dřív tu pokračování chybělo a Bone Head se po přehozeném úhybu házel znovu (ř. 7980-7986, 423-429)
+        $state = $state->withPlayer($player)->withMoveContinuation($player->getId());
 
         // Move ball with carrier
         if ($state->getBall()->getCarrierId() === $player->getId()) {

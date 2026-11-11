@@ -299,7 +299,7 @@ final class RulesEngine
             //   aktivace -- kdo uz ohlasil pohyb (MOVE), blitz nedostane (r. 346-349, 414-427).
             if (!$teamState->isBlitzUsedThisTurn()) {
                 foreach ($state->getTeamPlayers($side) as $player) {
-                    if ($player->canAct() && !$player->hasMoved() && !$player->hasSkill(SkillName::BallAndChain)) {
+                    if ($player->canAct() && !$player->hasMovedThisTurn() && !$player->hasSkill(SkillName::BallAndChain)) {
                         $actions[] = ['type' => ActionType::BLITZ->value, 'playerId' => $player->getId()];
                     }
                 }
@@ -674,7 +674,9 @@ final class RulesEngine
                 return ['Blitz already used this turn'];
             }
             // Blitz se ohlasuje na zacatku aktivace; kdo ohlasil pohyb, z neho blitz neudela.
-            if ($player->hasMoved()) {
+            // OPRAVENO 11.11.2026 (P296) -- stalo tu `hasMoved()` ("pohyb ukoncen"): po dilcim kroku nebo
+            //   prehozenem uhybu sel blitz ohlasit uprostred pohybu (r. 420-422: akce se ohlasuje napred).
+            if ($player->hasMovedThisTurn()) {
                 return ['A player who has moved cannot declare a Blitz'];
             }
             if ($player->hasSkill(SkillName::BallAndChain)) {
@@ -733,7 +735,7 @@ final class RulesEngine
     public function getBlitzTargets(GameState $state, MatchPlayerDTO $player): array
     {
         $declared = $state->getDeclaredBlitzerId() === $player->getId();   // P210: ohlášený blitz
-        if (!$player->canAct() || (!$declared && ($player->hasMoved()
+        if (!$player->canAct() || (!$declared && ($player->hasMovedThisTurn()
                 || $state->getTeamState($player->getTeamSide())->isBlitzUsedThisTurn()))) {
             return [];   // bez ohlášení: blitz jen na začátku aktivace (P210)
         }

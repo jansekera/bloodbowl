@@ -102,6 +102,14 @@ final class MatchOwnershipTest extends TestCase
         $this->matches->createMatch($own, $foreign, $this->other);
     }
 
+    /** P296 (11.11.2026): týž tým na obou stranách padal až na omezení v databázi ⇒ stránka 500 místo hlášky. */
+    public function testTeamCannotPlayItself(): void
+    {
+        $a = $this->team($this->owner, 'A');
+        $this->expectException(ValidationException::class);
+        $this->matches->createMatch($a, $a, $this->owner, vsAi: true);
+    }
+
     public function testRetiredTeamCannotPlay(): void
     {
         $a = $this->team($this->owner, 'A');

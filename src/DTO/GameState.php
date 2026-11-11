@@ -33,9 +33,10 @@ final class GameState
         private ?PendingBlockDTO $pendingBlock = null,
         private ?PendingRerollDTO $pendingReroll = null,
         // P81 (30.09.2026): hrac, ktery po rane v blitzu smi jeste dojit
-        //   (`rules_bb2016.txt` r. 551-552). Propadne, jakmile jedna jiny hrac
-        //   nebo skonci kolo -- viz `ActionResolver::resolve`.
-        private ?int $blitzContinuationPlayerId = null,
+        //   (`rules_bb2016.txt` r. 551-552). P296 (11.11.2026): i hrac po dilcim kroku kouce
+        //   (`partial`) nebo po prehozenem uhybu / GFI / skoku -- jeho pohyb je TAZ akce. Propadne,
+        //   jakmile jedna jiny hrac nebo skonci kolo (r. 423-429) -- viz `ActionResolver::resolveAkce`.
+        private ?int $moveContinuationPlayerId = null,
         // P210 (16.10.2026): hrac, ktery OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt`
         //   r. 346-349: cil se pri ohlaseni nerika, rana kdykoli behem pohybu). Propadne jako
         //   pokracovani -- jakmile jedna jiny hrac nebo skonci kolo.
@@ -316,15 +317,15 @@ final class GameState
             : $this->withAwayTeam($team);
     }
 
-    public function getBlitzContinuationPlayerId(): ?int
+    public function getMoveContinuationPlayerId(): ?int
     {
-        return $this->blitzContinuationPlayerId;
+        return $this->moveContinuationPlayerId;
     }
 
-    public function withBlitzContinuation(?int $playerId): self
+    public function withMoveContinuation(?int $playerId): self
     {
         $clone = clone $this;
-        $clone->blitzContinuationPlayerId = $playerId;
+        $clone->moveContinuationPlayerId = $playerId;
         return $clone;
     }
 
@@ -470,7 +471,7 @@ final class GameState
     public function resetPlayersForNewTurn(TeamSide $side): self
     {
         $clone = clone $this;
-        $clone->blitzContinuationPlayerId = null;   // P81: pokracovani konci s kolem
+        $clone->moveContinuationPlayerId = null;   // P81/P296: pokracovani pohybu konci s kolem
         $clone->declaredBlitzerId = null;           // P210: ohlaseny blitz konci s kolem
         foreach ($clone->players as $id => $player) {
             // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
@@ -568,7 +569,7 @@ final class GameState
             'weather' => $this->weather->value,
             'pendingBlock' => $this->pendingBlock?->toArray(),
             'pendingReroll' => $this->pendingReroll?->toArray(),
-            'blitzContinuationPlayerId' => $this->blitzContinuationPlayerId,
+            'moveContinuationPlayerId' => $this->moveContinuationPlayerId,
             'declaredBlitzerId' => $this->declaredBlitzerId,
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
             'pendingGrab' => $this->pendingGrab?->toArray(),
@@ -605,7 +606,7 @@ final class GameState
             weather: Weather::from((string) ($data['weather'] ?? 'nice')),
             pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
-            blitzContinuationPlayerId: isset($data['blitzContinuationPlayerId']) ? (int) $data['blitzContinuationPlayerId'] : null,
+            moveContinuationPlayerId: isset($data['moveContinuationPlayerId']) ? (int) $data['moveContinuationPlayerId'] : null,
             declaredBlitzerId: isset($data['declaredBlitzerId']) ? (int) $data['declaredBlitzerId'] : null,
             pendingApothecary: isset($data['pendingApothecary']) ? PendingApothecaryDTO::fromArray((array) $data['pendingApothecary']) : null,
             pendingGrab: isset($data['pendingGrab']) ? PendingGrabDTO::fromArray((array) $data['pendingGrab']) : null,

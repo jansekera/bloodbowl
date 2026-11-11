@@ -117,6 +117,7 @@ final class MoveHandler implements ActionHandlerInterface
         $targetX = (int) $params['x'];
         $targetY = (int) $params['y'];
         $destination = new Position($targetX, $targetY);
+        $partial = (bool) ($params['partial'] ?? false);
 
         $player = $state->getPlayer($playerId);
         if ($player === null) {
@@ -149,8 +150,7 @@ final class MoveHandler implements ActionHandlerInterface
 
             // Stand in place only
             if ($player->getPosition() !== null && $player->getPosition()->equals($destination)) {
-                $state = $state->withPlayer($player->withHasMoved(true));
-                return ActionResult::success($state, $events);
+                return ActionResult::success($this->ukoncitKrok($state, $player, $partial), $events);
             }
         }
 
@@ -506,11 +506,19 @@ final class MoveHandler implements ActionHandlerInterface
             }
         }
 
-        // Mark player as moved
-        $movedPlayer = $currentPlayer->withHasMoved(true);
-        $currentState = $currentState->withPlayer($movedPlayer);
+        return ActionResult::success($this->ukoncitKrok($currentState, $currentPlayer, $partial), $events);
+    }
 
-        return ActionResult::success($currentState, $events);
+    /**
+     * Konec pohybu k cíli. P296 (11.11.2026): dílčí krok kouče (`partial`) pohyb neukončí — hráč smí táhnout dál
+     * jako táž akce (pokračování, `GameState::moveContinuationPlayerId`); aktivace se uzavře, až jedná jiný hráč
+     * nebo skončí kolo (`rules_bb2016.txt` ř. 423-429). Jinak je pohyb ukončen.
+     */
+    private function ukoncitKrok(GameState $state, MatchPlayerDTO $hrac, bool $partial): GameState
+    {
+        return $partial
+            ? $state->withPlayer($hrac)->withMoveContinuation($hrac->getId())
+            : $state->withPlayer($hrac->withHasMoved(true));
     }
 
     /**
@@ -627,7 +635,8 @@ final class MoveHandler implements ActionHandlerInterface
         $teamRerollUsed = false;
         $konec = $this->dokoncitSkok($state, $hrac, $hrac->getPosition(), $to, $gfi, $teamRerollUsed, $events);
 
-        return $konec ?? ActionResult::success($state, $events);
+        // P296: pohyb po skoku pokračuje (kouč smí táhnout dál, týž hráč, táž akce)
+        return $konec ?? ActionResult::success($state->withMoveContinuation($playerId), $events);
     }
 
     /**

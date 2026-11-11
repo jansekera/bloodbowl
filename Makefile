@@ -17,6 +17,9 @@ check-php:
 check-front:
 	npx tsc --noEmit -p .
 	npx vitest run
+	@# P296 (11.11.2026): web servíruje sestavený public/dist (v gitu) -- dřív se přestavoval ručně a od 26.10.
+	@#   v něm chyběly dialogy P291/P292. Sestavuje se při každé kontrole, takže commit nese aktuální bundle.
+	npx vite build --logLevel warn
 
 check-lint:
 	vendor/bin/php-cs-fixer fix --dry-run --diff

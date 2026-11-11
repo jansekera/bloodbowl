@@ -2027,3 +2027,51 @@ a:hover {
     opacity: 1;
 }
 
+
+/* P296: lišta naplánované trasy pohybu (Go / Step / Cancel) — nemodální, nad hřištěm */
+.move-plan {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    max-width: calc(100vw - 2rem);
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    color: var(--color-text);
+    font-size: 0.85rem;
+}
+
+.move-plan__text {
+    margin-right: 0.25rem;
+}
+
+.move-plan__btn {
+    padding: 0.35rem 0.85rem;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-secondary);
+    color: var(--color-text);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.move-plan__btn:hover {
+    background: var(--color-secondary-hover);
+}
+
+.move-plan__btn--go {
+    border-color: var(--color-success);
+}
+
+.move-plan__btn--cancel {
+    border-color: var(--color-error);
+    opacity: 0.8;
+}

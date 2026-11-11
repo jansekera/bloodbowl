@@ -561,7 +561,7 @@ final class BlockHandler implements ActionHandlerInterface
             && $attacker->getMovementRemaining() > $this->gfiPodlaha($attacker);
         $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(!$mayContinue));
 
-        return $mayContinue ? $state->withBlitzContinuation($attacker->getId()) : $state;
+        return $mayContinue ? $state->withMoveContinuation($attacker->getId()) : $state;
     }
 
     /**

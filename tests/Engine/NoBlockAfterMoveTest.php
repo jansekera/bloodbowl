@@ -178,8 +178,9 @@ final class NoBlockAfterMoveTest extends TestCase
             'ř. 675: "you may not move when you take a Block Action" -- i když pohyb prošel přehozem',
         );
         $this->assertNotContains(1, $this->nabidka($state, ActionType::BLOCK));
-        // Rána po pohybu je Blitz (ř. 347-350) a ten k dispozici zůstává.
-        $this->assertSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]));
+        // OPRAVENO 11.11.2026 (P296) -- tady stálo „Blitz k dispozici zůstává“ (ř. 347-350). Blitz se ale ohlašuje
+        //   před pohybem (ř. 420-422); kdo už táhl bez ohlášení, z pohybu blitz neudělá (jako po dokončeném pohybu).
+        $this->assertNotSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]));
     }
 
     public function testBlokPoGfiPrehozenemVDialoguValidaceOdmitne(): void
@@ -197,7 +198,7 @@ final class NoBlockAfterMoveTest extends TestCase
             'ř. 675: po pohybu (i s přehozeným GFI) Block nejde',
         );
         $this->assertNotContains(1, $this->nabidka($state, ActionType::BLOCK));
-        $this->assertSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]));
+        $this->assertNotSame([], (new RulesEngine())->validate($state, ActionType::BLITZ, ['playerId' => 1, 'targetId' => 2]), 'P296: blitz se ohlašuje před pohybem (ř. 420-422)');
     }
 
     public function testVPristimKoleSmiHracKteryseHnulZaseBlokovat(): void

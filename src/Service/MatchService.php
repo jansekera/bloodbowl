@@ -81,6 +81,10 @@ final class MatchService
         if ($awayTeam->getCoachId() !== ($awayCoachId ?? $coachId)) {
             throw new NotFoundException('Away team not found');
         }
+        // P296 (11.11.2026): týž tým proti sobě dřív prošel až k omezení `different_teams` v databázi (stránka 500)
+        if ($homeTeamId === $awayTeamId) {
+            throw new ValidationException(['Choose two different teams']);
+        }
         if ($homeTeam->getStatus() !== TeamStatus::ACTIVE || $awayTeam->getStatus() !== TeamStatus::ACTIVE) {
             throw new ValidationException(['A retired team cannot play']);
         }

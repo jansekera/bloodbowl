@@ -501,20 +501,22 @@ final class ActionResolver
         // ⛔ P81 (30.09.2026): pokracovani blitzu po rane. Je to TAZ akce (Blitz),
         //   takze se neopakuje kontrola pred akci; a propadne, jakmile jedna jiny
         //   hrac nebo tym ukonci kolo -- aktivace musi byt dokoncena, nez zacne
-        //   dalsi. Akce, ktere jen dohravaji odlozenou volbu, ho nerusi.
-        $continuationId = $state->getBlitzContinuationPlayerId();
+        //   dalsi (`rules_bb2016.txt` r. 423-429). Akce, ktere jen dohravaji odlozenou volbu, ho nerusi.
+        // P296 (11.11.2026): totez pro pohyb po krocich kouce. OPRAVENO -- uzavreni nastavovalo jen `hasMoved`;
+        //   hrac po dilcim pohybu by pak po aktivaci jineho hrace jeste prihral nebo predal. Ted i `hasActed`.
+        $continuationId = $state->getMoveContinuationPlayerId();
         $isContinuation = false;
         if ($continuationId !== null) {
             $actorId = isset($params['playerId']) ? (int) $params['playerId'] : null;
             if ($action === ActionType::MOVE && $actorId === $continuationId) {
                 $isContinuation = true;
-                $state = $state->withBlitzContinuation(null);
+                $state = $state->withMoveContinuation(null);
             } elseif ($action === ActionType::END_TURN || ($action->requiresPlayer() && $actorId !== $continuationId)) {
-                $blitzer = $state->getPlayer($continuationId);
-                if ($blitzer !== null) {
-                    $state = $state->withPlayer($blitzer->withHasMoved(true));
+                $mover = $state->getPlayer($continuationId);
+                if ($mover !== null) {
+                    $state = $state->withPlayer($mover->withHasMoved(true)->withHasActed(true));
                 }
-                $state = $state->withBlitzContinuation(null);
+                $state = $state->withMoveContinuation(null);
             }
         }
         // P210 (16.10.2026): ohlaseny blitz (cil se pri ohlaseni nerika, `rules_bb2016.txt` r. 346-349).

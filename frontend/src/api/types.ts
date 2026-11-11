@@ -190,6 +190,8 @@ export interface GameState {
     pendingReroll?: PendingReroll | null;
     /** P210: hráč, který ohlásil Blitz a ještě nedal ránu (chodí kamkoli, pak jedna rána). */
     declaredBlitzerId?: number | null;
+    /** P81/P296: hráč, jehož pohyb je otevřený (po ráně v Blitzu, po kroku kouče, po přehozeném úhybu) — smí táhnout dál. */
+    moveContinuationPlayerId?: number | null;
     pendingApothecary?: PendingApothecary | null;
     pendingGrab?: PendingGrab | null;
     pendingStandFirm?: PendingStandFirm | null;

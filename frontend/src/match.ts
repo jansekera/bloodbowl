@@ -22,6 +22,8 @@ import { GrabModal } from './ui/GrabModal';
 import { StandFirmModal } from './ui/StandFirmModal';
 import { DivingCatchModal } from './ui/DivingCatchModal';
 import { RefereeModal } from './ui/RefereeModal';
+import { MovePlanBar, type MovePlanChoice } from './ui/MovePlanBar';
+import { clickTarget, describePlan, nextStep, planAfterStep, planTarget, type MovePlan } from './state/MovePlan';
 
 const api = new ApiClient();
 
@@ -99,16 +101,21 @@ const animationQueue = new AnimationQueue(
 );
 renderer.setAnimationState(animationQueue.state);
 
+/** Trasa pohybu: naplánovaná (P296, drží se i bez myši), jinak ta pod myší — v pohybu i v Blitzu. */
 function drawPathOverlay(sel: ReturnType<typeof stateManager.getSelection>): void {
-    if (sel.mode !== 'move' || !sel.hoveredCell || !sel.selectedPlayerId) return;
+    if (!sel.selectedPlayerId || moveTargets.length === 0) return;
     const hovered = sel.hoveredCell;
-    const target = moveTargets.find(t => t.x === hovered.x && t.y === hovered.y);
+    const target = planTarget(movePlan, moveTargets)
+        ?? (hovered ? moveTargets.find(t => t.x === hovered.x && t.y === hovered.y) : undefined);
     if (!target?.path?.length) return;
     const state = stateManager.getGameState();
     if (!state) return;
     const player = state.players.find(p => p.id === sel.selectedPlayerId);
     if (!player?.position) return;
     renderer.drawMovePath(player.position, target.path);
+    if (planTarget(movePlan, moveTargets)) {
+        renderer.drawSelectedTarget(target);
+    }
 }
 
 /** Režimy, ve kterých se kreslí cíle hodu z `passTargets` (přihrávka, bomba, hod chycené bomby — P272). */
@@ -140,8 +147,8 @@ function renderFrame(): void {
     );
     if (useRisk) {
         renderer.drawRiskHighlights(moveTargets);
-        drawPathOverlay(sel);
     }
+    drawPathOverlay(sel);
     if (state.phase === 'setup') {
         renderer.drawSetupZone(state.activeTeam);
     }
@@ -473,10 +480,15 @@ function showRerollModal(state: import('./api/types').GameState): void {
         async (choice: string) => {
             isProcessing = true;
             try {
+                const plan = movePlan;
+                const blitz = actionPanel.getSelectedMode() === 'blitz';
                 const result = await api.submitAction(matchId, 'resolve_reroll', { choice });
                 await handleActionResult(result);
                 clearAllTargets();
                 actionPanel.setSelectedMode(null);
+                // P296: přehozený úhyb / GFI nechá pohyb otevřený — kouč táhne dál (plán trasy zůstává)
+                movePlan = plan;
+                await resumeMovePlan(blitz ? 'blitz' : 'move');
             } catch (err) {
                 console.error(err);
                 toast.error('Reroll failed');
@@ -493,6 +505,9 @@ let passTargets: PassTarget[] = [];
 let handoffTargets: HandOffTarget[] = [];
 let foulTargets: FoulTarget[] = [];
 let setupSelectedPlayerId: number | null = null;
+/** P296: naplánovaná trasa pohybu (první klik na cíl), kterou kouč proběhne celou nebo po krocích */
+let movePlan: MovePlan | null = null;
+const movePlanBar = new MovePlanBar(container);
 let isProcessing = false;
 
 // Skip animations on click during animation
@@ -520,8 +535,8 @@ stateManager.onChange(() => {
     );
     if (useRisk) {
         renderer.drawRiskHighlights(moveTargets);
-        drawPathOverlay(sel);
     }
+    drawPathOverlay(sel);
 
     // Draw setup zone overlay
     if (state.phase === 'setup') {
@@ -669,7 +684,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
             // P210 (16.10.2026): v Blitzu se běží kamkoli (ř. 346-349) -- klik na pole pohybu blitz
             // ohlásí (bez cíle) a hráč doběhne; rána pak z nového pole.
             if (mode === 'blitz' && moveTargets.some(t => t.x === gridPos.x && t.y === gridPos.y)) {
-                await submitBlitzMove(sel.selectedPlayerId, gridPos.x, gridPos.y);
+                await onMoveTargetClick(sel.selectedPlayerId, gridPos, 'blitz');
                 return;
             }
         }
@@ -678,6 +693,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
             if (player.state === 'standing' && !player.hasActed) {
+                clearMovePlan();
                 stateManager.selectPlayer(player.id);
                 // Fetch block targets
                 try {
@@ -818,7 +834,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
     if (sel.selectedPlayerId && sel.mode === 'move') {
         const isTarget = moveTargets.some(t => t.x === gridPos.x && t.y === gridPos.y);
         if (isTarget) {
-            await submitMove(sel.selectedPlayerId, gridPos.x, gridPos.y);
+            await onMoveTargetClick(sel.selectedPlayerId, gridPos, 'move');
             return;
         }
     }
@@ -827,6 +843,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
     const player = stateManager.getPlayerAtPosition(gridPos);
 
     if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
+        clearMovePlan();
         stateManager.selectPlayer(player.id);
 
         if (!player.hasMoved && (player.state === 'standing' || player.state === 'prone')) {
@@ -903,6 +920,7 @@ canvas.addEventListener('drop', async (e: DragEvent) => {
 });
 
 function clearAllTargets(): void {
+    clearMovePlan();
     moveTargets = [];
     blockTargets = [];
     passTargets = [];
@@ -910,10 +928,106 @@ function clearAllTargets(): void {
     foulTargets = [];
 }
 
-async function submitMove(playerId: number, x: number, y: number): Promise<void> {
+function clearMovePlan(): void {
+    movePlan = null;
+    movePlanBar.hide();
+}
+
+/**
+ * P296: klik na pole pohybu. Napoprvé trasu jen naplánuje a ukáže (lišta Go / Step / Cancel); druhý klik na týž
+ * cíl ji proběhne celou.
+ */
+async function onMoveTargetClick(playerId: number, cell: Position, mode: 'move' | 'blitz'): Promise<void> {
+    const click = clickTarget(movePlan, playerId, cell);
+    if (click.kind === 'go') {
+        await runMovePlan('go', mode);
+        return;
+    }
+    movePlan = click.plan;
+    showMovePlanBar(mode);
+    stateManager.setHoveredCell(stateManager.getSelection().hoveredCell);   // překreslit s trasou
+}
+
+function showMovePlanBar(mode: 'move' | 'blitz'): void {
+    const target = planTarget(movePlan, moveTargets);
+    const player = movePlan ? stateManager.getPlayerById(movePlan.playerId) : null;
+    if (!target || !player) {
+        clearMovePlan();
+        return;
+    }
+    movePlanBar.show(player.name, describePlan(target), (choice: MovePlanChoice) => {
+        if (isProcessing) return;
+        if (choice === 'cancel') {
+            clearMovePlan();
+            stateManager.setHoveredCell(stateManager.getSelection().hoveredCell);
+            return;
+        }
+        void runMovePlan(choice, mode);
+    });
+}
+
+/** Celá trasa, nebo jen její první pole (`partial` — server nechá pohyb otevřený a trasu spočítá znovu). */
+async function runMovePlan(choice: 'go' | 'step', mode: 'move' | 'blitz'): Promise<void> {
+    const plan = movePlan;
+    if (!plan) return;
+    const kam = choice === 'go' ? plan.target : nextStep(plan, moveTargets);
+    if (!kam) {
+        clearMovePlan();
+        return;
+    }
+    const partial = choice === 'step';
+    movePlanBar.hide();
+    if (mode === 'blitz') {
+        await submitBlitzMove(plan.playerId, kam.x, kam.y, partial);
+    } else {
+        await submitMove(plan.playerId, kam.x, kam.y, partial);
+    }
+    // i po „Go“: přerušil-li trasu dialog přehozu, po něm se k cíli pokračuje
+    movePlan = plan;
+    await resumeMovePlan(mode);
+}
+
+/**
+ * P296: po kroku (i po dialogu přehozu úhybu) — je-li pohyb hráče kouče pořád otevřený, znovu ho vybrat, načíst
+ * pole pohybu z nového místa a plán ponechat, dokud je cíl dosažitelný. Čeká-li jiná otázka, nic nedělat.
+ */
+async function resumeMovePlan(mode: 'move' | 'blitz'): Promise<void> {
+    const state = stateManager.getGameState();
+    const id = state?.moveContinuationPlayerId;
+    if (state?.pendingReroll) {
+        movePlanBar.hide();   // plán čeká na odpověď v dialogu přehozu (pokračuje se z něj)
+        return;
+    }
+    if (!state || id == null || !stateManager.isPlayerTurn() || state.pendingBlock
+        || state.pendingApothecary || state.pendingDivingCatch || state.pendingReferee || state.pendingBombRethrow) {
+        clearMovePlan();
+        return;
+    }
+    stateManager.selectPlayer(id);
+    try {
+        moveTargets = await api.getValidMoves(matchId, id);
+    } catch {
+        moveTargets = [];
+    }
+    if (mode === 'blitz') {
+        actionPanel.setSelectedMode('blitz');
+        blockTargets = await api.getBlockTargets(matchId, id, 'blitz').catch(() => []);
+        stateManager.setValidTargets('blitz', blockTargets.map(t => ({ x: t.x, y: t.y })));
+    } else {
+        stateManager.setValidTargets('move', moveTargets.map(t => ({ x: t.x, y: t.y })));
+    }
+    movePlan = planAfterStep(movePlan?.playerId === id ? movePlan : null, id, moveTargets);
+    if (movePlan) {
+        showMovePlanBar(mode);
+    } else {
+        movePlanBar.hide();
+    }
+}
+
+async function submitMove(playerId: number, x: number, y: number, partial = false): Promise<void> {
     isProcessing = true;
     try {
-        const result = await api.submitAction(matchId, 'move', { playerId, x, y });
+        const result = await api.submitAction(matchId, 'move', partial ? { playerId, x, y, partial } : { playerId, x, y });
         await handleActionResult(result);
         clearAllTargets();
     } catch (err) {
@@ -925,7 +1039,7 @@ async function submitMove(playerId: number, x: number, y: number): Promise<void>
 }
 
 /** P210: Blitz s volným pohybem -- napřed ohlásit (BLITZ bez cíle), pak doběhnout; cíle rány z nového pole. */
-async function submitBlitzMove(playerId: number, x: number, y: number): Promise<void> {
+async function submitBlitzMove(playerId: number, x: number, y: number, partial = false): Promise<void> {
     isProcessing = true;
     try {
         if (stateManager.getGameState()?.declaredBlitzerId !== playerId) {
@@ -935,7 +1049,7 @@ async function submitBlitzMove(playerId: number, x: number, y: number): Promise<
                 return;   // ohlášení propadlo (Wild Animal, Bone-head …) -- výsledek ukázal handleActionResult
             }
         }
-        const result = await api.submitAction(matchId, 'move', { playerId, x, y });
+        const result = await api.submitAction(matchId, 'move', partial ? { playerId, x, y, partial } : { playerId, x, y });
         await handleActionResult(result);
         clearAllTargets();
         stateManager.selectPlayer(playerId);

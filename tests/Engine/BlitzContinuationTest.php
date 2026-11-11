@@ -108,6 +108,6 @@ final class BlitzContinuationTest extends TestCase
     {
         $after = $this->blitzPow($this->state());
         $restored = GameState::fromArray($after->toArray());
-        $this->assertSame(1, $restored->getBlitzContinuationPlayerId());
+        $this->assertSame(1, $restored->getMoveContinuationPlayerId());
     }
 }
