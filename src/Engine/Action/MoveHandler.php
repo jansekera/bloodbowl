@@ -516,12 +516,8 @@ final class MoveHandler implements ActionHandlerInterface
      */
     private function ukoncitKrok(GameState $state, MatchPlayerDTO $hrac, bool $partial): GameState
     {
-        if ($partial) {
-            return $state->withPlayer($hrac);   // otevřený pohyb pozná `GameState::openMovePlayerId` (movedThisTurn, ne hasMoved)
-        }
-        $state = $state->withPlayer($hrac->withHasMoved(true));
-
-        return $state->getMoveContinuationPlayerId() === $hrac->getId() ? $state->withMoveContinuation(null) : $state;
+        // dílčí krok: pohyb zůstává otevřený (aktivní hráč bez `hasMoved`, `GameState::openMovePlayerId`)
+        return $state->withPlayer($partial ? $hrac : $hrac->withHasMoved(true));
     }
 
     /**

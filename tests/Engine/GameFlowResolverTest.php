@@ -189,12 +189,12 @@ final class GameFlowResolverTest extends TestCase
             ->addPlayer(TeamSide::HOME, 5, 5, id: 1)
             ->addPlayer(TeamSide::AWAY, 10, 5, id: 2)
             ->build();
-        $state = $state->withPlayer($state->requirePlayer(1)->withMovedThisTurn(true))->withMoveContinuation(1);
+        $state = $state->withPlayer($state->requirePlayer(1)->withMovedThisTurn(true))->withActivePlayer(1);
 
         $result = (new GameFlowResolver(new FixedDiceRoller([])))->resetPlayersForSetup($state);
 
         $this->assertFalse($result->requirePlayer(1)->hasMovedThisTurn());
-        $this->assertNull($result->getMoveContinuationPlayerId());
+        $this->assertNull($result->getActivePlayerId());
         $this->assertNull($result->openMovePlayerId());
     }
 }

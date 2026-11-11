@@ -506,42 +506,26 @@ final class ActionResolver
      */
     private function resolveAkce(GameState $state, ActionType $action, array $params, bool $kontrolaProsla = false): ActionResult
     {
-        // ⛔ Jedna aktivace najednou: „a player must finish his Action before another player can take one“
-        //   (`rules_bb2016.txt` r. 423-429). Akce, ktere jen dohravaji odlozenou volbu, nic neuzaviraji.
-        //   - P81 (30.09.2026): pokracovani blitzu po rane (`moveContinuationPlayerId`) -- MOVE tehoz hrace je TAZ
-        //     akce (kontrola pred akci se neopakuje); uzavre ho akce jineho hrace i konec kola.
-        //   - P297 (uzivatel 11.11.2026: „pokud nastane akce jineho hrace, puvodnimu se musi akce ukoncit“): akce
-        //     jineho hrace uzavre i kazdeho, kdo se v kole pohnul a akci neukoncil (dilci krok P296, cely pohyb pred
-        //     prihravkou). OPRAVENO -- dřív se uzaviral jen otevreny pohyb a jen `hasMoved`, takze hrac po pohybu
-        //     prihral nebo predal i po aktivaci jineho hrace. Akce TEHOZ hrace po vlastnim pohybu (pohyb, prihravka,
-        //     predani, faul) je tataz akce -- kontrola pred akci (Bone Head …, r. 7980-7986) se znovu nehazi.
+        // ⛔ P301 (11.11.2026): jedna aktivace najednou — „a player must finish his Action before another player can
+        //   take one“ (`rules_bb2016.txt` r. 423-429). Akce hrace otevre jeho aktivaci (`GameState::activePlayerId`);
+        //   akce JINEHO hrace nebo konec kola ji uzavre (pohyb i akce ukonceny, ohlaseny blitz propadne). Dalsi akce
+        //   TEHOZ hrace je tataz akce (pohyb po krocich P296, prihravka / predani po pohybu P297, pohyb po rane
+        //   v blitzu P81, rana ohlaseneho blitzu P210) -- kontrola pred akci (Bone Head …, r. 7980-7986) se znovu
+        //   nehazi. STAND_PAT („hrac se vedome neaktivuje“) aktivaci neotevira, jen uzavre tu probihajici.
+        //   Akce, ktere jen dohravaji odlozenou volbu (RESOLVE_*), nic neuzaviraji.
+        //   Nahrazuje tri odvozovani (pokracovani P81, uzavirani P210, smycka P297 pres `movedThisTurn`).
         $actorId = isset($params['playerId']) ? (int) $params['playerId'] : null;
-        $continuationId = $state->getMoveContinuationPlayerId();
-        $isContinuation = $action === ActionType::MOVE && $actorId !== null && $actorId === $continuationId;
-        if ($continuationId !== null && $actorId !== $continuationId
-            && ($action === ActionType::END_TURN || $action->requiresPlayer())) {
-            $state = $this->uzavritAktivaci($state, $continuationId)->withMoveContinuation(null);
-        }
-        if ($action->requiresPlayer() && $actorId !== null) {
-            foreach ($state->getTeamPlayers($state->getActiveTeam()) as $hrac) {
-                if ($hrac->getId() !== $actorId && ($hrac->isMidAction() || ($hrac->hasMovedThisTurn() && !$hrac->hasMoved()))) {
-                    $state = $this->uzavritAktivaci($state, $hrac->getId());
-                }
+        $activeId = $state->getActivePlayerId();
+        $opensActivation = $action->requiresPlayer() && $action !== ActionType::SETUP_PLAYER && $action !== ActionType::STAND_PAT;
+        $isContinuation = $opensActivation && $actorId !== null && $actorId === $activeId;
+        if (!$isContinuation && $activeId !== null && ($action === ActionType::END_TURN || $action->requiresPlayer())) {
+            $state = $this->uzavritAktivaci($state, $activeId)->withActivePlayer(null);
+            if ($state->getDeclaredBlitzerId() === $activeId) {
+                $state = $state->withDeclaredBlitzer(null);
             }
-            $isContinuation = $isContinuation || ($state->getPlayer($actorId)?->isMidAction() ?? false);
         }
-
-        // P210 (16.10.2026): ohlaseny blitz (cil se pri ohlaseni nerika, `rules_bb2016.txt` r. 346-349).
-        //   Pohyb a rana blitzujiciho jsou TAZ akce -- kontrola pred akci (Wild Animal s +2, Bone-head …)
-        //   probehla pri ohlaseni a neopakuje se. Jakmile jedna jiny hrac nebo tym ukonci kolo, aktivace
-        //   blitzujiciho je u konce (jako u pokracovani P81).
-        $declaredId = $state->getDeclaredBlitzerId();
-        if ($declaredId !== null) {
-            if (($action === ActionType::MOVE || $action === ActionType::BLITZ) && $actorId === $declaredId) {
-                $isContinuation = true;
-            } elseif ($action === ActionType::END_TURN || ($action->requiresPlayer() && $actorId !== $declaredId)) {
-                $state = $this->uzavritAktivaci($state, $declaredId)->withDeclaredBlitzer(null);
-            }
+        if ($opensActivation && $actorId !== null) {
+            $state = $state->withActivePlayer($actorId);
         }
 
         // Big Guy pre-action check for player actions

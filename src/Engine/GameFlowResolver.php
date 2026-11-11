@@ -284,7 +284,7 @@ final class GameFlowResolver
         //   blitz přežily konec drivu: po touchdownu hráč, který se v posledním tahu pohnul, v prvním tahu nové série
         //   neblokoval (ř. 674-676 platí jen pro kolo, ve kterém se pohnul), neohlásil Blitz a jeho akce se brala
         //   jako pokračování. Nový drive začíná bez nich.
-        $state = $state->withMoveContinuation(null)->withDeclaredBlitzer(null);
+        $state = $state->withActivePlayer(null)->withDeclaredBlitzer(null);
         foreach ($state->getPlayers() as $player) {
             // Novy drive: "hral v drivu" plati jen pro ten, ktery prave skoncil; "pohnul se v kole" taky.
             if ($player->hasMovedThisTurn() || $player->isPlayedThisDrive()) {

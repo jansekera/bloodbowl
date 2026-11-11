@@ -376,15 +376,6 @@ final class MatchPlayerDTO
         return $this->movedThisTurn;
     }
 
-    /**
-     * P297/P299: hráč je uprostřed své akce — v kole se pohnul a akci ještě neukončil. Další akce téhož hráče je
-     * pokračování (bez nové kontroly před akcí); akce jiného hráče ho uzavře (`rules_bb2016.txt` ř. 423-429).
-     */
-    public function isMidAction(): bool
-    {
-        return $this->movedThisTurn && !$this->hasActed;
-    }
-
     public function withMovedThisTurn(bool $movedThisTurn): self
     {
         $clone = clone $this;

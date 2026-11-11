@@ -32,10 +32,11 @@ final class GameState
         private Weather $weather = Weather::NICE,
         private ?PendingBlockDTO $pendingBlock = null,
         private ?PendingRerollDTO $pendingReroll = null,
-        // P81 (30.09.2026): hrac, ktery po rane v blitzu smi jeste dojit (`rules_bb2016.txt` r. 551-552) -- jen tento
-        //   pripad; dilci krok kouce a prehozeny uhyb se poznaji z `movedThisTurn` (`openMovePlayerId`). Propadne,
-        //   jakmile jedna jiny hrac nebo skonci kolo (r. 423-429) -- viz `ActionResolver::resolveAkce`.
-        private ?int $moveContinuationPlayerId = null,
+        // P301 (11.11.2026): hrac, jehoz aktivace prave probiha -- „a player must finish his Action before another
+        //   player can take one“ (`rules_bb2016.txt` r. 423-429). Nastavi ji akce hrace, uzavre akce jineho hrace
+        //   nebo konec kola (`ActionResolver::resolveAkce`). Nahrazuje tri odvozovani: pokracovani blitzu po rane
+        //   (P81), uzavirani ohlaseneho blitzu (P210) a smycku P297 pres `movedThisTurn`.
+        private ?int $activePlayerId = null,
         // P210 (16.10.2026): hrac, ktery OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt`
         //   r. 346-349: cil se pri ohlaseni nerika, rana kdykoli behem pohybu). Propadne jako
         //   pokracovani -- jakmile jedna jiny hrac nebo skonci kolo.
@@ -316,35 +317,31 @@ final class GameState
             : $this->withAwayTeam($team);
     }
 
-    public function getMoveContinuationPlayerId(): ?int
+    public function getActivePlayerId(): ?int
     {
-        return $this->moveContinuationPlayerId;
+        return $this->activePlayerId;
+    }
+
+    public function withActivePlayer(?int $playerId): self
+    {
+        $clone = clone $this;
+        $clone->activePlayerId = $playerId;
+        return $clone;
     }
 
     /**
-     * Review P296 (11.11.2026): hráč aktivního týmu, jehož pohyb je otevřený (smí táhnout dál) — JEDNO místo pro web i testy.
-     * Buď pokračování blitzu po ráně (P81, `moveContinuationPlayerId`), nebo kdo se v kole pohnul, pohyb neukončil
-     * a nejednal (dílčí krok kouče P296, přehozený úhyb / GFI / skok). Ležící ani ten, kdo pohyb ukončil, ne.
+     * Hráč, jehož pohyb je otevřený (smí táhnout dál) — pro web. Je to aktivní hráč, který stojí, pohyb neukončil
+     * (`hasMoved`) a už začal: pohnul se (dílčí krok kouče P296, přehozený úhyb / GFI / skok), nebo jednal (rána
+     * v blitzu, po které smí dojít — P81). Každá koncová akce i propadlá kontrola před akcí nastaví `hasMoved`.
      */
     public function openMovePlayerId(): ?int
     {
-        foreach ($this->getTeamPlayers($this->activeTeam) as $hrac) {
-            if ($hrac->getState() !== PlayerState::STANDING || $hrac->hasMoved()) {
-                continue;
-            }
-            if ($hrac->getId() === $this->moveContinuationPlayerId || $hrac->isMidAction()) {
-                return $hrac->getId();
-            }
+        $hrac = $this->activePlayerId !== null ? $this->getPlayer($this->activePlayerId) : null;
+        if ($hrac === null || $hrac->getState() !== PlayerState::STANDING || $hrac->hasMoved()) {
+            return null;
         }
 
-        return null;
-    }
-
-    public function withMoveContinuation(?int $playerId): self
-    {
-        $clone = clone $this;
-        $clone->moveContinuationPlayerId = $playerId;
-        return $clone;
+        return $hrac->hasMovedThisTurn() || $hrac->hasActed() ? $hrac->getId() : null;
     }
 
     public function getPendingApothecary(): ?PendingApothecaryDTO
@@ -489,7 +486,7 @@ final class GameState
     public function resetPlayersForNewTurn(TeamSide $side): self
     {
         $clone = clone $this;
-        $clone->moveContinuationPlayerId = null;   // P81/P296: pokracovani pohybu konci s kolem
+        $clone->activePlayerId = null;              // P301: aktivace konci s kolem
         $clone->declaredBlitzerId = null;           // P210: ohlaseny blitz konci s kolem
         foreach ($clone->players as $id => $player) {
             // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
@@ -587,7 +584,7 @@ final class GameState
             'weather' => $this->weather->value,
             'pendingBlock' => $this->pendingBlock?->toArray(),
             'pendingReroll' => $this->pendingReroll?->toArray(),
-            'moveContinuationPlayerId' => $this->moveContinuationPlayerId,
+            'activePlayerId' => $this->activePlayerId,
             'openMovePlayerId' => $this->openMovePlayerId(),   // jen pro web (odvozené, `fromArray` ho nečte)
             'declaredBlitzerId' => $this->declaredBlitzerId,
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
@@ -625,7 +622,7 @@ final class GameState
             weather: Weather::from((string) ($data['weather'] ?? 'nice')),
             pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
-            moveContinuationPlayerId: isset($data['moveContinuationPlayerId']) ? (int) $data['moveContinuationPlayerId'] : null,
+            activePlayerId: isset($data['activePlayerId']) ? (int) $data['activePlayerId'] : null,
             declaredBlitzerId: isset($data['declaredBlitzerId']) ? (int) $data['declaredBlitzerId'] : null,
             pendingApothecary: isset($data['pendingApothecary']) ? PendingApothecaryDTO::fromArray((array) $data['pendingApothecary']) : null,
             pendingGrab: isset($data['pendingGrab']) ? PendingGrabDTO::fromArray((array) $data['pendingGrab']) : null,

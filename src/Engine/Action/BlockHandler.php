@@ -559,9 +559,8 @@ final class BlockHandler implements ActionHandlerInterface
             && $attacker->getState() === PlayerState::STANDING
             && !$attacker->isRooted()
             && $attacker->getMovementRemaining() > $this->gfiPodlaha($attacker);
-        $state = $state->withPlayer($attacker->withHasActed(true)->withHasMoved(!$mayContinue));
-
-        return $mayContinue ? $state->withMoveContinuation($attacker->getId()) : $state;
+        // P301: smí-li dojít, zůstává aktivním hráčem s `hasMoved=false` (`GameState::openMovePlayerId`)
+        return $state->withPlayer($attacker->withHasActed(true)->withHasMoved(!$mayContinue));
     }
 
     /**
