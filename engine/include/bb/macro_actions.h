@@ -141,6 +141,7 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kP250Surround = 1ull << 33       // P250: obestoupit volný míč — přesuny bez hodu na pole vedle míče (převaha zón kolem něj)
     , kP250PushOntoBall = 1ull << 34   // P250: při převaze kolem volného míče odtlačit hráče (i našeho řetězem) na pole s míčem ⇒ odraz k našim
     , kP302SurroundWorst = 1ull << 36  // P302: obestoupit volný míč na pole s nejmenší šancí soupeře ho zvednout (`opponentPickupChance`), jen když ji sníží; vypnuto = nejbližší pole (P250b)
+    , kP302MarkPickers = 1ull << 37    // P302 krok 3: kandidáti obestoupení i pole vedle soupeřových zvedačů (dosáhnou na míč) — zóna ⇒ úhyb; vypnuto = jen pole u míče (krok 2)
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
 void setExtraFeaturesOff(uint64_t mask);
@@ -156,8 +157,8 @@ void takeP249CarrierBlitzFirst(long* out3);
 // P250: [0] zvedač změněn kvůli riziku cesty, [1] nabídnut přesun k obestoupení míče, [2] hráč odtlačen na volný míč. Kumulativní, nuluje se čtením.
 void noteP250(int i);
 void takeP250(long* out3);
-// P302: [0] obestoupení na jiné pole než nejbližší, [1] obestoupení nenabídnuto (šanci soupeře nesníží). Kumulativní, nuluje se čtením.
-void takeP302(long* out2);
+// P302: [0] obestoupení na jiné pole než nejbližší, [1] obestoupení nenabídnuto (šanci soupeře nesníží), [2] přesun ke zvedači (krok 3). Kumulativní, nuluje se čtením.
+void takeP302(long* out3);
 // P253: (nabídka přihrávky jen díky přehozům, nabídka vyřazena kvůli přednosti skillů); čte a nuluje
 void takeP253(long* out2);
 // P249b–f: [0] blok na nosiče nabídnut navíc (b), [1] přehoz kvůli nosiči (c), [2] nosič odsunut jinam než rovně (d),

@@ -69,8 +69,8 @@ static uint64_t g_extraFeaturesOff = 0;
 void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
 uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
 static long g_p250[3] = {0, 0, 0};
-static long g_p302[2] = {0, 0};   // P302: [0] obestoupení na jiné pole než nejbližší, [1] obestoupení nenabídnuto (šanci soupeře nesníží)
-void takeP302(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_p302[i]; g_p302[i] = 0; } }
+static long g_p302[3] = {0, 0, 0};   // P302: [0] jiné pole než nejbližší, [1] nenabídnuto (šanci nesníží), [2] přesun ke zvedači (krok 3)
+void takeP302(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p302[i]; g_p302[i] = 0; } }
 void noteP250(int i) { ++g_p250[i]; }
 void takeP250(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p250[i]; g_p250[i] = 0; } }
 static long g_p253[2] = {0, 0};
@@ -2771,6 +2771,19 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             const bool worst = extraFeatureOn(kP302SurroundWorst);
             const TeamSide oppSide = opponent(mySide);
             const double baseChance = worst ? opponentPickupChance(state, oppSide) : 0.0;
+            // P302 krok 3 (12.11.2026, uživatel: „přistoupíš k míči a k hráčům, co by mohli soupeři zvedat míč“): kandidáti
+            //   jsou i pole vedle soupeřů, kteří na míč dosáhnou — naše zóna na zvedači ⇒ úhyb cestou k míči.
+            std::vector<Position> pickers;
+            if (worst && extraFeatureOn(kP302MarkPickers)) {
+                state.forEachOnPitch(oppSide, [&](const Player& o) {
+                    if (o.state != PlayerState::STANDING && o.state != PlayerState::PRONE) return;
+                    if (o.position.distanceTo(state.ball.position) <= o.stats.movement + maxGfiSquares(o)) pickers.push_back(o.position);
+                });
+            }
+            auto nextToPicker = [&](Position q) {
+                for (const Position& o : pickers) if (q.distanceTo(o) == 1) return true;
+                return false;
+            };
             std::vector<std::pair<int, const Player*>> near;
             state.forEachOnPitch(mySide, [&](const Player& p) {
                 if (!isFreeToAct(p) || p.state != PlayerState::STANDING) return;
@@ -2787,9 +2800,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 int bestD = 99, nearestD = 99;
                 double bestChance = 2.0;
                 for (const Position& q : reach) {
-                    if (q.distanceTo(state.ball.position) != 1) continue;
+                    const bool byBall = q.distanceTo(state.ball.position) == 1;
+                    if (!byBall && !nextToPicker(q)) continue;
                     const int dq = p->position.distanceTo(q);
-                    if (dq < nearestD) { nearestD = dq; nearest = q; }
+                    if (byBall && dq < nearestD) { nearestD = dq; nearest = q; }
                     if (!worst) continue;
                     GameState t = state;                          // co kdyby tu stál
                     t.getPlayer(p->id).position = q;
@@ -2800,6 +2814,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 if (best.x < 0) continue;
                 if (worst && !(bestChance < baseChance - 1e-9)) { ++g_p302[1]; continue; }   // soupeři nic neztíží
                 if (worst && best != nearest) ++g_p302[0];
+                if (worst && best.distanceTo(state.ball.position) != 1) ++g_p302[2];
                 out.push_back({MacroType::REPOSITION, p->id, -1, best});
                 ++offeredSurround; ++g_p250[1];
             }

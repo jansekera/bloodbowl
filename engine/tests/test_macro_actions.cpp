@@ -6119,6 +6119,36 @@ TEST(MacroActions, P302NoSurroundWhenItDoesNotLowerTheOpponentsChance) {
     EXPECT_EQ(count(0), noSurround) << "P302: přesun, který soupeři nic neztíží, se nenabízí";
 }
 
+// P302 krok 3 (12.11.2026): přistoupit i k soupeřovu ZVEDAČI (uživatel: „přistoupíš k míči a k hráčům, co by mohli
+// soupeři zvedat míč“) — zóna na zvedači ⇒ úhyb cestou k míči. Pole vedle zvedačů jsou další kandidáti obestoupení.
+TEST(MacroActions, P302MarkTheOpponentsPickerWhenTheBallIsOutOfOurReach) {
+    GameState s = makeP302();
+    s.ball = BallState::onGround({5, 7});
+    s.getPlayer(13).position = {9, 7};                          // soupeřův zvedač 4 pole od míče
+    p248Put(s, 4, TeamSide::HOME, {15, 7}, {6, 3, 3, 8});      // k míči bez hodu nedojde, ke zvedači ano
+    auto marked = [&](uint64_t off) {
+        long c[3];
+        takeP302(c);
+        setExtraFeaturesOff(off);
+        std::vector<Macro> m;
+        getAvailableMacros(s, m);
+        setExtraFeaturesOff(0);
+        takeP302(c);
+        bool nextToPicker = false;
+        for (const auto& x : m)
+            if (x.type == MacroType::REPOSITION && x.playerId == 4 && x.targetPos.distanceTo(Position{9, 7}) == 1
+                && x.targetPos.distanceTo(s.ball.position) > 1) nextToPicker = true;
+        return std::make_pair(c[2], nextToPicker);
+    };
+    EXPECT_EQ(marked(kP302MarkPickers).first, 0) << "pozitivní kontrola: krok 2 zvedače neoznačuje";
+    const auto on = marked(0);
+    EXPECT_GE(on.first, 1) << "P302 krok 3: nabídnut přesun ke zvedači";
+    EXPECT_TRUE(on.second) << "přesun na pole vedle zvedače (mimo míč)";
+    GameState t = s;
+    t.getPlayer(4).position = {10, 7};
+    EXPECT_LT(opponentPickupChance(t, TeamSide::AWAY), opponentPickupChance(s, TeamSide::AWAY)) << "zóna na zvedači ⇒ úhyb";
+}
+
 // ===== P253 (uživatel 6.11.2026): přihrávka se cení s přehozy, přednost mají Pass a Catch =====
 // „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat má skill pass a catch, co mají
 // reroll bez týmového“. Dřív brána cenila hod × chycení BEZ přehozů, ačkoli engine (P247) přehazuje.

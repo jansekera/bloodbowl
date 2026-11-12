@@ -14,7 +14,8 @@ K = int(sys.argv[4]) if len(sys.argv) > 4 else 2
 NASI = os.environ.get("NASI", "skaven,woodelf,human").split(","); SOUPERI = ["orc", "human", "dwarf"]
 A_, B_, C_ = 1 << 32, 1 << 33, 1 << 34
 RAMENA = {"vse": 0, "bez_a": A_, "bez_b": B_, "bez_c": C_, "bez": A_ | B_ | C_,
-          "bez_302": 1 << 36}   # P302 krok 2 (12.11.): obestoupení na nejbližší pole (dřívější P250b)
+          "bez_302": 1 << 36,   # P302 krok 2 (12.11.): obestoupení na nejbližší pole (dřívější P250b)
+          "bez_mark": 1 << 37}  # P302 krok 3 (12.11.): bez přesunů ke soupeřovým zvedačům (jen krok 2)
 # P250c (6.11.): ověření části a — jen vybraná ramena (env RAMENA=vse,bez_a)
 RAMENA = {r: RAMENA[r] for r in os.environ.get("RAMENA", "vse,bez_b,bez_c").split(",")}
 sys.path.insert(0, KOREN)
