@@ -13,7 +13,8 @@ KOREN = sys.argv[1]; VYST = sys.argv[2]; N = int(sys.argv[3]) if len(sys.argv) >
 K = int(sys.argv[4]) if len(sys.argv) > 4 else 2
 NASI = os.environ.get("NASI", "skaven,woodelf,human").split(","); SOUPERI = ["orc", "human", "dwarf"]
 A_, B_, C_ = 1 << 32, 1 << 33, 1 << 34
-RAMENA = {"vse": 0, "bez_a": A_, "bez_b": B_, "bez_c": C_, "bez": A_ | B_ | C_}
+RAMENA = {"vse": 0, "bez_a": A_, "bez_b": B_, "bez_c": C_, "bez": A_ | B_ | C_,
+          "bez_302": 1 << 36}   # P302 krok 2 (12.11.): obestoupení na nejbližší pole (dřívější P250b)
 # P250c (6.11.): ověření části a — jen vybraná ramena (env RAMENA=vse,bez_a)
 RAMENA = {r: RAMENA[r] for r in os.environ.get("RAMENA", "vse,bez_b,bez_c").split(",")}
 sys.path.insert(0, KOREN)
@@ -31,8 +32,9 @@ def volny(s):
 
 def jeden_tah(kt, bb, s0, rameno, seed, H, A):
     bb.set_extra_features_off(RAMENA[rameno]); bb.take_p250()
+    bb.take_p302()
     kroky, po, _ = kt.plan_tahu(s0, ai="macro_mcts", seed=seed)
-    cx = bb.take_p250()
+    cx = tuple(bb.take_p250()) + tuple(bb.take_p302())
     bb.set_extra_features_off(0)
     o = dict(cx=cx, turnover=int(any(k["turnover"] for k in kroky)),
              mic_u_nas_po_nas=int(drzi(bb, po, H)), mic_u_soup_po_nas=int(drzi(bb, po, A)),

@@ -6069,6 +6069,56 @@ TEST(OpponentPickupChance, P302OutOfReachOrHeldBall) {
     EXPECT_LT(opponentPickupChance(s, TeamSide::AWAY), 0.0) << "míč není volný ⇒ −1 (neplatí)";
 }
 
+// P302 krok 2 (12.11.2026): obestoupit volný míč na pole, které soupeři zvednutí NEJVÍC ztíží (krok 1 změřil, že
+// obestoupení na nejbližší pole škodí: +0,022 šance soupeře, +2σ). A nabídnout ho jen, když šanci soupeře sníží.
+namespace {
+Position surroundTargetOf(const GameState& s, int playerId, uint64_t off) {
+    setExtraFeaturesOff(off);
+    std::vector<Macro> m;
+    getAvailableMacros(s, m);
+    setExtraFeaturesOff(0);
+    for (const auto& x : m)
+        if (x.type == MacroType::REPOSITION && x.playerId == playerId && x.targetPos.distanceTo(s.ball.position) == 1)
+            return x.targetPos;
+    return Position{-1, -1};
+}
+}  // namespace
+
+TEST(MacroActions, P302SurroundTakesTheSquareThatHurtsTheOpponentsPickupMost) {
+    GameState s = makeP302();                                   // míč (10,7), soupeřův zvedač 13 na (12,7)
+    p248Put(s, 4, TeamSide::HOME, {7, 7}, {6, 3, 3, 8});       // náš hráč tři pole západně od míče
+    const Position oldT = surroundTargetOf(s, 4, kP302SurroundWorst);
+    ASSERT_GE(oldT.x, 0) << "fixtura: obestoupení se nabízí";
+    EXPECT_EQ(oldT.distanceTo(Position{7, 7}), 2) << "pozitivní kontrola: dřív nejbližší pole u míče";
+    const Position newT = surroundTargetOf(s, 4, 0);
+    ASSERT_GE(newT.x, 0);
+    EXPECT_EQ(newT.distanceTo(Position{12, 7}), 1) << "P302: pole u míče i u soupeřova zvedače — zóna na míči a úhyb";
+    GameState t = s;
+    t.getPlayer(4).position = newT;
+    GameState u = s;
+    u.getPlayer(4).position = oldT;
+    EXPECT_LT(opponentPickupChance(t, TeamSide::AWAY), opponentPickupChance(u, TeamSide::AWAY));
+}
+
+TEST(MacroActions, P302NoSurroundWhenItDoesNotLowerTheOpponentsChance) {
+    GameState s = makeP302();
+    s.getPlayer(13).position = {25, 14};                        // soupeř na míč nedosáhne ⇒ šance 0, nic se nesníží
+    p248Put(s, 4, TeamSide::HOME, {7, 7}, {6, 3, 3, 8});
+    auto count = [&](uint64_t off) {   // přesuny hráče 4 na pole u míče (nabízí je i jiný generátor, proto počty)
+        setExtraFeaturesOff(off);
+        std::vector<Macro> m;
+        getAvailableMacros(s, m);
+        setExtraFeaturesOff(0);
+        int n = 0;
+        for (const auto& x : m)
+            if (x.type == MacroType::REPOSITION && x.playerId == 4 && x.targetPos.distanceTo(s.ball.position) == 1) ++n;
+        return n;
+    };
+    const int noSurround = count(kP250Surround);
+    EXPECT_EQ(count(kP302SurroundWorst), noSurround + 1) << "pozitivní kontrola: dřív se obestoupení nabízelo vždy";
+    EXPECT_EQ(count(0), noSurround) << "P302: přesun, který soupeři nic neztíží, se nenabízí";
+}
+
 // ===== P253 (uživatel 6.11.2026): přihrávka se cení s přehozy, přednost mají Pass a Catch =====
 // „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat má skill pass a catch, co mají
 // reroll bez týmového“. Dřív brána cenila hod × chycení BEZ přehozů, ačkoli engine (P247) přehazuje.

@@ -69,6 +69,8 @@ static uint64_t g_extraFeaturesOff = 0;
 void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
 uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
 static long g_p250[3] = {0, 0, 0};
+static long g_p302[2] = {0, 0};   // P302: [0] obestoupení na jiné pole než nejbližší, [1] obestoupení nenabídnuto (šanci soupeře nesníží)
+void takeP302(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_p302[i]; g_p302[i] = 0; } }
 void noteP250(int i) { ++g_p250[i]; }
 void takeP250(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p250[i]; g_p250[i] = 0; } }
 static long g_p253[2] = {0, 0};
@@ -2763,6 +2765,12 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
         // P250 (uživatel 5.11.2026: „pokud by se mělo zvedat s vysokým rizikem, je lepší míč obestoupit“): přesun bez hodu
         //   na pole vedle volného míče pro dva nejbližší volné hráče — nabídka vedle zvednutí, vybere MCTS.
         if (extraFeatureOn(kP250Surround)) {
+            // ⭐ P302 krok 2 (12.11.2026): krok 1 změřil, že obestoupení na NEJBLIŽŠÍ pole škodí (šance soupeře míč mít
+            //   +0,022, +2σ). Pole se vybírá podle šance soupeře míč zvednout (`opponentPickupChance` s hráčem na tom poli)
+            //   a přesun se nabídne jen, když ji proti dnešku sníží.
+            const bool worst = extraFeatureOn(kP302SurroundWorst);
+            const TeamSide oppSide = opponent(mySide);
+            const double baseChance = worst ? opponentPickupChance(state, oppSide) : 0.0;
             std::vector<std::pair<int, const Player*>> near;
             state.forEachOnPitch(mySide, [&](const Player& p) {
                 if (!isFreeToAct(p) || p.state != PlayerState::STANDING) return;
@@ -2775,14 +2783,23 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 if (offeredSurround >= 2) break;
                 std::vector<Position> reach;
                 diceFreeReach(state, *p, reach);
-                Position best{-1, -1};
-                int bestD = 99;
+                Position best{-1, -1}, nearest{-1, -1};
+                int bestD = 99, nearestD = 99;
+                double bestChance = 2.0;
                 for (const Position& q : reach) {
                     if (q.distanceTo(state.ball.position) != 1) continue;
                     const int dq = p->position.distanceTo(q);
-                    if (dq < bestD) { bestD = dq; best = q; }
+                    if (dq < nearestD) { nearestD = dq; nearest = q; }
+                    if (!worst) continue;
+                    GameState t = state;                          // co kdyby tu stál
+                    t.getPlayer(p->id).position = q;
+                    const double c = opponentPickupChance(t, oppSide);
+                    if (c < bestChance - 1e-12 || (c < bestChance + 1e-12 && dq < bestD)) { bestChance = c; bestD = dq; best = q; }
                 }
+                if (!worst) best = nearest;
                 if (best.x < 0) continue;
+                if (worst && !(bestChance < baseChance - 1e-9)) { ++g_p302[1]; continue; }   // soupeři nic neztíží
+                if (worst && best != nearest) ++g_p302[0];
                 out.push_back({MacroType::REPOSITION, p->id, -1, best});
                 ++offeredSurround; ++g_p250[1];
             }
