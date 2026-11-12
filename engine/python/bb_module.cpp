@@ -724,6 +724,9 @@ PYBIND11_MODULE(bb_engine, m) {
         const bb::CarrierOutlook o = bb::carrierNextTurnOutlook(s, s.getPlayer(carrierId), maxFail);
         return py::make_tuple(o.tdChance, o.bestDistance);
     }, py::arg("state"), py::arg("carrier_id"), py::arg("max_fail") = 1.0 / 3.0);
+    // P302 (11.11.2026): měřidlo A18 — nejlepší šance strany `side` zvednout volný míč v jejím příštím tahu (−1 = míč není volný)
+    m.def("opponent_pickup_chance", [](const bb::GameState& s, bb::TeamSide side) { return bb::opponentPickupChance(s, side); },
+          py::arg("state"), py::arg("side"));
     m.def("take_p220_stops", []() { return bb::takeP220RealStops(); });   // P220: jen skutečně hrané tahy; čte a nuluje
     m.def("take_dodge_cap_stops", []() {
         long v[2]; bb::takeDodgeCapStops(v);

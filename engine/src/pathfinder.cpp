@@ -760,6 +760,29 @@ void diceFreeReach(const GameState& state, const Player& player, std::vector<Pos
     }
 }
 
+// ⭐ P302 (uživatel 11.11.2026): šance soupeře zvednout volný míč v jeho příštím tahu — viz pathfinder.h.
+double opponentPickupChance(const GameState& state, TeamSide side) {
+    if (state.ball.isHeld || !state.ball.isOnPitch()) return -1.0;
+    const Position ball = state.ball.position;
+    double best = 0.0;
+    state.forEachOnPitch(side, [&](const Player& p) {
+        if (p.state != PlayerState::STANDING && p.state != PlayerState::PRONE) return;
+        if (p.hasSkill(SkillName::NoHands) || p.hasSkill(SkillName::BallAndChain)) return;
+        Player w = p;                                     // příští tah: plný pohyb, Break Tackle znovu (jako P245)
+        w.movementRemaining = static_cast<int8_t>(w.stats.movement);
+        w.breakTackleUsedThisTurn = false;
+        const int budget = movementAfterStandUp(w) + maxGfiSquares(w);
+        const int dist = w.position.distanceTo(ball);
+        if (dist > budget) return;
+        const double fail = (dist == 0) ? 0.0 : pathFailProb(state, w, ball, budget, Position{-1, -1});
+        if (fail < 0.0) return;                           // nedosažitelné
+        double pick = (7.0 - calculatePickupTargetAt(state, w, ball)) / 6.0;
+        if (w.hasSkill(SkillName::SureHands)) pick += (1.0 - pick) * pick;
+        best = std::max(best, (1.0 - fail) * pick);
+    });
+    return best;
+}
+
 // ⭐ P245 (uživatel 4.11.2026): výhled soupeřova nosiče na jeho příští tah — viz pathfinder.h.
 CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
                                       std::vector<Position>* route) {

@@ -6025,6 +6025,50 @@ TEST(MacroActions, P250SurroundTheLooseBallIsOffered) {
     EXPECT_EQ(surround(0), before + 1) << "P250: navíc přesun bez hodu na pole vedle volného míče (dřív " << before << ")";
 }
 
+// ===== P302 (uživatel 11.11.2026): „postupné změny a každou změřit — … můžeš následně spočítat zvednutí míče soupeřem“ =====
+// Měřidlo A18: nejlepší šance soupeře zvednout volný míč v jeho PŘÍŠTÍM tahu = doběh bez pádu (plný pohyb + GFI,
+// úhyby) × zvednutí (6 − AG + zóny na míči, Sure Hands = osobní přehoz). Týmový přehoz se nepočítá (jako P250a).
+namespace {
+GameState makeP302() {
+    GameState s = makeMinimalState();
+    s.activeTeam = TeamSide::HOME;
+    s.getPlayer(1).position = {2, 2};                         // makeMinimalState ho staví na (10,7) — na míč
+    p248Put(s, 13, TeamSide::AWAY, {12, 7}, {6, 3, 3, 8});   // dvě pole od míče, cesta bez hodu
+    s.ball = BallState::onGround({10, 7});
+    return s;
+}
+}  // namespace
+
+TEST(OpponentPickupChance, P302FreeBallWithoutZonesIsTheBarePickupRoll) {
+    GameState s = makeP302();
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 4.0 / 6.0, 1e-9) << "AG3 zvedá na 3+";
+}
+
+TEST(OpponentPickupChance, P302OurZoneOnTheBallMakesThePickupHarder) {
+    GameState s = makeP302();
+    p248Put(s, 1, TeamSide::HOME, {9, 7}, {6, 3, 3, 8});      // zóna na míči, ne na cestě soupeře
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 3.0 / 6.0, 1e-9) << "jedna zóna ⇒ 4+";
+    s.getPlayer(13).skills.add(SkillName::SureHands);
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 0.5 + 0.5 * 0.5, 1e-9) << "Sure Hands = osobní přehoz";
+}
+
+TEST(OpponentPickupChance, P302ADodgeOnTheWayLowersTheChance) {
+    GameState s = makeP302();
+    const double free = opponentPickupChance(s, TeamSide::AWAY);
+    p248Put(s, 1, TeamSide::HOME, {12, 8}, {6, 3, 3, 8});     // soupeř musí z naší zóny uhnout
+    const double marked = opponentPickupChance(s, TeamSide::AWAY);
+    EXPECT_LT(marked, free) << "úhyb cestou se počítá (zvednutí samo zůstává 3+)";
+    EXPECT_GT(marked, 0.0);
+}
+
+TEST(OpponentPickupChance, P302OutOfReachOrHeldBall) {
+    GameState s = makeP302();
+    s.getPlayer(13).position = {25, 7};                        // 15 polí > 6 + 2 GFI
+    EXPECT_EQ(opponentPickupChance(s, TeamSide::AWAY), 0.0);
+    s.ball = BallState::carried({25, 7}, 13);
+    EXPECT_LT(opponentPickupChance(s, TeamSide::AWAY), 0.0) << "míč není volný ⇒ −1 (neplatí)";
+}
+
 // ===== P253 (uživatel 6.11.2026): přihrávka se cení s přehozy, přednost mají Pass a Catch =====
 // „při klasické přihrávce ano — ať se zvýší pravděpodobnost úspěchu — ale preferovat má skill pass a catch, co mají
 // reroll bez týmového“. Dřív brána cenila hod × chycení BEZ přehozů, ačkoli engine (P247) přehazuje.

@@ -73,6 +73,11 @@ struct CarrierOutlook { double tdChance = 0.0; int bestDistance = 26; };
 // `route` (volitelně): pole té nejlepší cesty — k TD, jinak k nejbližšímu doběhu.
 CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
                                       std::vector<Position>* route = nullptr);
+// ⭐ P302 (uživatel 11.11.2026: „postupné změny a každou změřit — … spočítat zvednutí míče soupeřem“): měřidlo A18.
+//   Nejlepší šance strany `side` zvednout VOLNÝ míč v jejím PŘÍŠTÍM tahu: přes její hráče (stojící i ležící, ne No Hands,
+//   ne Ball & Chain) max P(doběh bez pádu — plný pohyb + GFI, úhyby i Dodge jako `pathFailProb`) × P(zvednutí na poli
+//   míče, Sure Hands = osobní přehoz). Týmový přehoz se nepočítá (sdílený, jako P250a). Míč není volný ⇒ −1.
+double opponentPickupChance(const GameState& state, TeamSide side);
 // P245: volná pole, kam hráč v tomto tahu dojde bez hodu (bez úhybu i GFI).
 void diceFreeReach(const GameState& state, const Player& player, std::vector<Position>& out);
 
