@@ -117,7 +117,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // se hybe) a `canReachAdjacentTo` uz dosah o vstani zkracuje.
         // ⭐ Odsud je uzivateluv tah z 27.08. ("zacal bych blitz z (14,2)")
         // vubec zahratelny -- do ted lezici hrac blitz NIKDY nedostal.
-        if (!team.blitzUsedThisTurn && !p.usedBlitz) {
+        // P298 (14.11.2026, parita s PHP P296): Blitz se ohlašuje na začátku akce (ř. 420-422) — hráč,
+        // který se v kole už pohnul, ho nedostane. Dřív tu byla jen brána týmového blitzu.
+        if (!team.blitzUsedThisTurn && !p.usedBlitz && !p.hasMoved) {
             // P156 (15.10.2026): blitz smí padnout i bez rány (ř. 347-350: „may make one block“).
             // Nabízí se jen hráči s Wild Animal — tomu ohlášení blitzu dá +2 na hod (ř. 8666-8669);
             // ostatním by jen spálilo týmový blitz. `targetId = -1`, cíl = vlastní pole (ohlášení).

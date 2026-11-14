@@ -616,3 +616,51 @@ TEST(ActionResolver, TouchdownInTheOpponentsTurnMovesTheScorersTurnMarker) {
     EXPECT_EQ(gs.awayTeam.turnNumber, 4) << "skórující v soupeřově kole posouvá svou značku";
     EXPECT_EQ(gs.homeTeam.turnNumber, 3);
 }
+
+// P298 (14.11.2026, parita s PHP P296/P301): BB2016 ř. 420-422 — Blitz se ohlašuje
+// na ZAČÁTKU akce; hráč, který se v kole už pohnul (rozběhnutý MOVE), ho ohlásit nesmí.
+// PHP to hlídá od 11.11. (`hasMovedThisTurn` v nabídce i validaci); C++ nabízel BLITZ i
+// hráči uprostřed pohybu, protože brána byla jen `blitzUsedThisTurn` / `usedBlitz`.
+TEST(ActionResolver, P298NoBlitzAfterTheSamePlayerAlreadyMoved) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 12, {14, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({});
+    ASSERT_TRUE(executeAction(gs, {ActionType::MOVE, 1, -1, {11, 7}}, dice, nullptr).success);
+    ASSERT_FALSE(gs.getPlayer(1).hasActed);   // pohyb běží dál
+
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) {
+        EXPECT_FALSE(a.playerId == 1 && a.type == ActionType::BLITZ) << "blitz nabídnut po pohybu";
+    }
+    // ani validace ho nepustí (cíl na dosah po dalším kroku)
+    auto r = executeAction(gs, {ActionType::BLITZ, 1, 12, {14, 7}}, dice, nullptr);
+    EXPECT_FALSE(r.success);
+    EXPECT_FALSE(gs.getTeamState(TeamSide::HOME).blitzUsedThisTurn);
+}
+
+// P298 (parita s PHP P301 `uzavritAktivaci`): ohlášený blitz bez pohybu je taky otevřená
+// aktivace — když začne jednat jiný hráč, je u konce (ř. 423-429) a ohlášený blitz propadne.
+// C++ uzavíral jen toho, kdo se pohnul (`hasMoved`), takže blitzer se mohl vrátit a dát ránu.
+TEST(ActionResolver, P298DeclaredBlitzLapsesWhenAnotherPlayerActs) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME);
+    placePlayer(gs, 2, {5, 5}, TeamSide::HOME);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+
+    FixedDiceRoller dice({});
+    ASSERT_TRUE(executeAction(gs, {ActionType::BLITZ, 1, -1, {10, 7}}, dice, nullptr).success);
+    ASSERT_TRUE(gs.getPlayer(1).usedBlitz);
+    ASSERT_TRUE(executeAction(gs, {ActionType::MOVE, 2, -1, {5, 6}}, dice, nullptr).success);
+
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    for (const auto& a : actions) EXPECT_NE(a.playerId, 1) << "blitzer znovu aktivní";
+}

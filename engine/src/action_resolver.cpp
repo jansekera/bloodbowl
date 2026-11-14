@@ -338,6 +338,8 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
 
         case ActionType::BLITZ: {
             Player& player = state.getPlayer(action.playerId);
+            // P298 (14.11.2026, parita s PHP P296): ohlášení jen bez pohybu v kole (ř. 420-422).
+            if (player.hasMoved) return ActionResult::fail();
             if (action.targetId < 0) {
                 // P156: ohlášení blitzu bez cíle (Wild Animal už hodil s +2 výš). Pak běžné kroky MOVE
                 // a nejvýš jeden blok (BLOCK po ohlášeném blitzu je blok blitzu, viz case BLOCK).
@@ -583,7 +585,9 @@ ActionResult executeAction(GameState& state, const Action& action,
         if (state.currentActivationId > 0 &&
             state.currentActivationId != action.playerId) {
             Player& prev = state.getPlayer(state.currentActivationId);
-            if (prev.hasMoved) prev.hasActed = true;
+            // P298 (14.11.2026, parita s PHP P301): uzavře se i ohlášený blitz bez pohybu — dřív jen
+            // `hasMoved`, takže blitzer se po akci jiného hráče vrátil a dal ránu (ř. 423-429).
+            if (prev.hasMoved || prev.usedBlitz) prev.hasActed = true;
             if (prev.bloodlustHungry && feedEndsTurn(prev.id)) return ActionResult::turnovr();
         }
         state.currentActivationId = action.playerId;

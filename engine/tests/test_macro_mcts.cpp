@@ -848,7 +848,7 @@ GameState makeHandBuiltMismatch() {
     weakBlitzer.id = 1;
     weakBlitzer.teamSide = TeamSide::HOME;
     weakBlitzer.state = PlayerState::STANDING;
-    weakBlitzer.position = {18, 7};
+    weakBlitzer.position = {6, 7};
     weakBlitzer.stats = {6, 3, 3, 8};
     weakBlitzer.movementRemaining = 6;
 
@@ -885,6 +885,10 @@ GameState makeHandBuiltMismatch() {
     // ale znamena to, ze **kazda pravidlova oprava ho muze shodit** -- a je to
     // signal k preladeni, ne k oslabeni aserce.
     //
+    // P298 (14.11.2026): přeladěno z x=18/19 a volného hráče (15,3) na x=6/7 a (6,1). Oprava pravidla
+    // (blitz jen bez pohybu v kole) vzala simulacím nelegální blitz hráčem, který už se hnul, a základ
+    // přestal volit BLITZ. Sken 18 × 40 postavení: na x=7 drží „základ BLITZ, strážce odloží za přesun 2“
+    // celá oblast volného hráče vlevo nahoře ((3..9, 1..3) i (3..6, 11..13)) ⇒ zvoleno uprostřed. Aserce beze změny.
     // Retuned 2026-08-21 from x=15/16 to x=12/13. The fixture sits on a knife
     // edge by construction, and the P45 stand-up fix moved the edge: a blitzer
     // who fails the ~70 % roll used to lie there for the rest of the drive
@@ -904,7 +908,7 @@ GameState makeHandBuiltMismatch() {
     strongDefender.id = 12;
     strongDefender.teamSide = TeamSide::AWAY;
     strongDefender.state = PlayerState::STANDING;
-    strongDefender.position = {19, 7};
+    strongDefender.position = {7, 7};
     strongDefender.stats = {6, 6, 3, 9};
     strongDefender.movementRemaining = 6;
 
@@ -912,7 +916,7 @@ GameState makeHandBuiltMismatch() {
     freePlayer.id = 2;
     freePlayer.teamSide = TeamSide::HOME;
     freePlayer.state = PlayerState::STANDING;
-    freePlayer.position = {15, 3};
+    freePlayer.position = {6, 1};
     freePlayer.stats = {6, 3, 3, 8};
     freePlayer.movementRemaining = 6;
 
@@ -1690,3 +1694,4 @@ TEST(MacroMCTS, P244bNotForTierTwoRisk) {
     ASSERT_EQ(riskTier(macroDirectRisk(s, p244Blitz())), 2);
     EXPECT_FALSE(blitzOpensPathWithBallSafe(s, p244Blitz()));
 }
+
