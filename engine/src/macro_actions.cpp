@@ -8,6 +8,7 @@
 #include "bb/cage_advance.h"   // P248: blitzThreat — nejhorší odpověď soupeře na lovce
 #include "bb/pathfinder.h"     // nextStepToward -- BFS pro movePlayerToward (09.09.2026)
 #include <algorithm>
+#include <optional>
 #include <tuple>
 #include <cmath>
 
@@ -2778,6 +2779,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                 near.push_back({p.position.distanceTo(state.ball.position), &p});
             });
             std::sort(near.begin(), near.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+            // P304 (review 16.11.2026): jedna kopie desky na celé hledání (dřív kopie celého GameState na každé pole
+            //   v horké cestě MCTS); hráč se na kandidáta jen přesune a po hledání vrátí.
+            std::optional<GameState> what;
+            if (worst) what.emplace(state);
             int offeredSurround = 0;
             for (const auto& [d, p] : near) {
                 if (offeredSurround >= 2) break;
@@ -2791,11 +2796,11 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
                     const int dq = p->position.distanceTo(q);
                     if (dq < nearestD) { nearestD = dq; nearest = q; }
                     if (!worst) continue;
-                    GameState t = state;                          // co kdyby tu stál
-                    t.getPlayer(p->id).position = q;
-                    const double c = opponentPickupChance(t, oppSide);
+                    what->getPlayer(p->id).position = q;          // co kdyby tu stál
+                    const double c = opponentPickupChance(*what, oppSide);
                     if (c < bestChance - 1e-12 || (c < bestChance + 1e-12 && dq < bestD)) { bestChance = c; bestD = dq; best = q; }
                 }
+                if (worst) what->getPlayer(p->id).position = p->position;
                 if (!worst) best = nearest;
                 if (best.x < 0) continue;
                 if (worst && !(bestChance < baseChance - 1e-9)) { ++g_p302[1]; continue; }   // soupeři nic neztíží
