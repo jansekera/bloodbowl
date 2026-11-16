@@ -93,6 +93,7 @@ final class ActionResolver
         $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
         $this->ttmHandler->setCoachRerolls($this->koucPrehozy);
         $this->bombThrowHandler->setCoachRerolls($this->koucPrehozy);
+        $this->blockHandler->setCoachRerolls($this->koucPrehozy);   // P303 Jump Up
         $this->hypnoticGazeHandler = new HypnoticGazeHandler($dice, $this->tzCalc);
         $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc, $this->blockHandler);
         $this->rerollHandler = new RerollHandler($dice, $this->ballResolver, $this->moveHandler);

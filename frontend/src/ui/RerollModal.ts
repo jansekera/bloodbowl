@@ -15,6 +15,7 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
     ttm: 'Throw Team-Mate',
     ttm_landing: 'Landing (Right Stuff)',
     always_hungry: 'Always Hungry',
+    jump_up: 'Jump Up (blok z lehu)',
 };
 
 export class RerollModal {

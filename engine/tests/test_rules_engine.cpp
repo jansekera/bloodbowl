@@ -490,18 +490,5 @@ TEST(RulesEngine, P75ChainsawHolderIsNotOfferedMultipleBlock) {
     EXPECT_GT(countActionsOfType(as, ActionType::BLOCK), 0) << "obycejny blok (pilou) ano";
 }
 
-// JUMP UP — hlídka (09.10.2026). Pravidla ř. 8200-8204: „The player may also declare a Block Action
-// while Prone which requires an Agility roll with a +2 modifier to see if he can complete the
-// Action. … A failed roll means the Block Action is wasted and the player may not stand up.“
-// Engine hod AG+2 neumí, takže blok z lehu NESMÍ nabídnout ani hráči s Jump Up (bez hodu by to byl
-// blok zdarma). Až resolver vznikne, tenhle test se nahradí testem hodu.
-TEST(RulesEngineProne, ProneJumpUpPlayerIsNotOfferedABlockWithoutTheAgilityRoll) {
-    GameState gs = makeProneState(/*ma=*/6, /*jumpUp=*/true);
-    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
-
-    std::vector<Action> as;
-    getAvailableActions(gs, as);
-
-    EXPECT_EQ(countActionsOfType(as, ActionType::BLOCK), 0);
-    EXPECT_GT(countActionsOfType(as, ActionType::MOVE), 0) << "pozitivní kontrola: nabídka není prázdná";
-}
+// JUMP UP: hlídka z 09.10.2026 („blok z lehu nenabízet, dokud chybí hod AG+2“) nahrazena testy hodu
+// `ActionResolver.P303*` (14.11.2026) — nabídka, neúspěšný hod a úspěšný hod s blokem.

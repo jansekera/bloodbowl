@@ -664,3 +664,52 @@ TEST(ActionResolver, P298DeclaredBlitzLapsesWhenAnotherPlayerActs) {
     getAvailableActions(gs, actions);
     for (const auto& a : actions) EXPECT_NE(a.playerId, 1) << "blitzer znovu aktivní";
 }
+
+// P303 (14.11.2026, parita s PHP): Jump Up — Block Action z lehu (ř. 8199-8203): hod AG s +2; úspěch = vstane zdarma
+// a blokuje, neúspěch = akce propadne a hráč leží (není turnover). C++ blok z lehu dřív vůbec nenabízel (T4.5).
+static GameState p303Fixture(bool multiple) {
+    GameState gs;
+    gs.phase = GamePhase::PLAY;
+    gs.activeTeam = TeamSide::HOME;
+    placePlayer(gs, 1, {10, 7}, TeamSide::HOME, 6, 4, 2);   // AG2 ⇒ 7 − 2 − 2 = 3+
+    gs.getPlayer(1).state = PlayerState::PRONE;
+    gs.getPlayer(1).skills.add(SkillName::JumpUp);
+    if (multiple) gs.getPlayer(1).skills.add(SkillName::MultipleBlock);
+    placePlayer(gs, 12, {11, 7}, TeamSide::AWAY);
+    if (multiple) placePlayer(gs, 13, {11, 8}, TeamSide::AWAY);
+    return gs;
+}
+
+TEST(ActionResolver, P303JumpUpBlockIsOfferedFromProne) {
+    GameState gs = p303Fixture(true);
+    std::vector<Action> actions;
+    getAvailableActions(gs, actions);
+    bool block = false, multi = false;
+    for (const auto& a : actions) {
+        if (a.playerId != 1) continue;
+        block |= a.type == ActionType::BLOCK && a.targetId == 12;
+        multi |= a.type == ActionType::MULTIPLE_BLOCK;
+    }
+    EXPECT_TRUE(block) << "ležící s Jump Up smí ohlásit Block Action";
+    EXPECT_TRUE(multi) << "i Multiple Block (je to Block Action)";
+}
+
+TEST(ActionResolver, P303JumpUpFailedRollWastesTheBlockAndStaysProne) {
+    GameState gs = p303Fixture(false);
+    FixedDiceRoller dice({2, 2, 2, 2});   // 2 < 3+ ⇒ neuspěl (bez přehozů)
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {11, 7}}, dice, nullptr);
+    EXPECT_TRUE(r.success);
+    EXPECT_FALSE(r.turnover);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+    EXPECT_TRUE(gs.getPlayer(1).hasActed);
+    EXPECT_EQ(gs.getPlayer(12).state, PlayerState::STANDING) << "blok se nekonal";
+}
+
+TEST(ActionResolver, P303JumpUpSuccessfulRollStandsAndBlocks) {
+    GameState gs = p303Fixture(false);
+    FixedDiceRoller dice({3, 6, 6, 3, 3, 3, 3});   // Jump Up 3 ⇒ vstane; kostky bloku 6, 6 (Def Down); brnění
+    auto r = executeAction(gs, {ActionType::BLOCK, 1, 12, {11, 7}}, dice, nullptr);
+    EXPECT_TRUE(r.success);
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
+    EXPECT_NE(gs.getPlayer(12).state, PlayerState::STANDING) << "blok proběhl";
+}

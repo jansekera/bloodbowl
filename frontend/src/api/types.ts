@@ -60,7 +60,7 @@ export interface PendingBlock {
 /** Pending reroll waiting for player choice (dodge/GFI/pickup, P289: Leap and big-guy checks) */
 export interface PendingReroll {
     rollType: 'dodge' | 'gfi' | 'pickup' | 'leap' | 'leap_gfi' | 'bone_head' | 'really_stupid' | 'wild_animal'
-        | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry';
+        | 'pass' | 'bomb' | 'ttm' | 'ttm_landing' | 'always_hungry' | 'jump_up';
     playerId: number;
     target: number;
     roll: number;

@@ -22,7 +22,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out);
 // aktivací JINÉHO hráče, takže hráč s rozehraným MOVE dostal BLOCK, který rozbalení nenašlo.
 // Blitz smí blokovat jen jednou (ř. 347-350, `blitzBlockThrown`).
 inline bool mayBlockNow(const Player& p) {
-    return p.state == PlayerState::STANDING && !(p.hasMoved && !p.usedBlitz) &&
+    // P303: ležící s Jump Up smí ohlásit Block Action (ř. 8199-8203; resolver hází AG +2), ne však v blitzu.
+    const bool jumpUp = p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp) && !p.usedBlitz;
+    return (p.state == PlayerState::STANDING || jumpUp) && !(p.hasMoved && !p.usedBlitz) &&
            !(p.usedBlitz && p.blitzBlockThrown);
 }
 

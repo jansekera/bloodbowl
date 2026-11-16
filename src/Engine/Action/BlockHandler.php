@@ -19,6 +19,8 @@ use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
+use App\Engine\CoachRerolls;
+use App\Engine\ThrowReroll;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
@@ -46,6 +48,46 @@ final class BlockHandler implements ActionHandlerInterface
         // Povinny (review P186, L7 -- tyz tvar): s nepovinnym se Dump-Off bez nej tise vynechal.
         private readonly PassResolver $passResolver,
     ) {}
+
+    /** P303: kouče-člověka se ptá na přehoz hodu Jump Up (`ActionResolver`); bez nastavení přehazuje jako AI */
+    private ?CoachRerolls $koucPrehozy = null;
+
+    public function setCoachRerolls(CoachRerolls $kouc): void
+    {
+        $this->koucPrehozy = $kouc;
+    }
+
+    /**
+     * P303 (14.11.2026): Block Action z lehu s Jump Up (`rules_bb2016.txt` ř. 8199-8203) — hod AG s +2; úspěch = vstane
+     * zdarma a blokuje, neúspěch = akce Blok propadne a hráč zůstane ležet (není turnover). Přehoz Pro / týmový
+     * (ř. 929-931), kouče-člověka se zeptá. OPRAVENO — dřív hráče postavilo zadarmo BEZ hodu.
+     * C++ `resolveJumpUpBlockRoll` (block_handler.cpp) stejně.
+     *
+     * @param list<GameEvent> $events
+     * @return array{state: GameState, attacker: MatchPlayerDTO, ok: bool}
+     */
+    private function jumpUpZLehu(GameState $state, MatchPlayerDTO $attacker, array &$events): array
+    {
+        $cil = max(2, min(6, 7 - $attacker->getStats()->getAgility() - 2));
+        $hod = $this->dice->rollD6();
+        if ($hod < $cil) {
+            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->koucPrehozy, 'jump_up', $hod, $cil);
+            $state = $prehoz['state'];
+            $attacker = $prehoz['thrower'];
+            if ($prehoz['rerolled']) {
+                $hod = $this->dice->rollD6();
+            }
+        }
+        $ok = $hod >= $cil;
+        $events[] = GameEvent::standUp($attacker->getId(), $hod, $ok, $cil);
+        if ($ok) {
+            $attacker = $attacker->withState(PlayerState::STANDING);
+        } else {
+            $attacker = $attacker->withHasActed(true)->withHasMoved(true);
+        }
+
+        return ['state' => $state->withPlayer($attacker), 'attacker' => $attacker, 'ok' => $ok];
+    }
 
     /** P224: ptá se kouče-člověka na Grab (`ActionResolver::setInteractiveBlocks`); AI se neptá */
     private bool $ptatSeNaGrab = false;
@@ -580,11 +622,14 @@ final class BlockHandler implements ActionHandlerInterface
 
         $events = [];
 
-        // Jump Up: stand up the prone attacker for free before blocking
+        // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)
         if ($attacker->getState() === PlayerState::PRONE && $attacker->hasSkill(SkillName::JumpUp)) {
-            $attacker = $attacker->withState(PlayerState::STANDING);
-            $state = $state->withPlayer($attacker);
-            $events[] = GameEvent::standUp($attackerId);
+            $vstal = $this->jumpUpZLehu($state, $attacker, $events);
+            $state = $vstal['state'];
+            $attacker = $vstal['attacker'];
+            if (!$vstal['ok']) {
+                return ActionResult::success($state, $events);
+            }
         }
 
         $attackerPos = $attacker->getPosition();
@@ -1062,11 +1107,14 @@ final class BlockHandler implements ActionHandlerInterface
 
         $events = [];
 
-        // Jump Up: stand up the prone attacker for free before blocking
+        // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)
         if ($attacker->getState() === PlayerState::PRONE && $attacker->hasSkill(SkillName::JumpUp)) {
-            $attacker = $attacker->withState(PlayerState::STANDING);
-            $state = $state->withPlayer($attacker);
-            $events[] = GameEvent::standUp($attackerId);
+            $vstal = $this->jumpUpZLehu($state, $attacker, $events);
+            $state = $vstal['state'];
+            $attacker = $vstal['attacker'];
+            if (!$vstal['ok']) {
+                return ActionResult::success($state, $events);
+            }
         }
 
         $events[] = GameEvent::multipleBlock($attackerId, $targetId1, $targetId2);

@@ -345,11 +345,12 @@ final class GameEvent
         ]);
     }
 
-    public static function standUp(int $playerId, ?int $roll = null, bool $success = true): self
+    /** @param int $target cíl hodu (vstání s MA < 3 = 4+, P303 Jump Up do bloku = 7 − AG − 2) */
+    public static function standUp(int $playerId, ?int $roll = null, bool $success = true, int $target = 4): self
     {
         if ($roll !== null) {
             $result = $success ? 'succeeded' : 'failed';
-            return new self('stand_up', "Stand up {$result} (needed 4+, rolled {$roll})", [
+            return new self('stand_up', "Stand up {$result} (needed {$target}+, rolled {$roll})", [
                 'playerId' => $playerId,
                 'roll' => $roll,
                 'success' => $success,

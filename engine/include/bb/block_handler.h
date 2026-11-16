@@ -30,6 +30,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           // duvod.
                           bool frenzyDisabled = false);
 
+// P303 (14.11.2026): Jump Up — Block Action z lehu (ř. 8199-8203): hod AG s +2 (přehoz Pro / týmový přes attemptRoll).
+// true = hráč vstal zdarma a smí blokovat; false = akce Blok propadla (hasActed), hráč leží, není turnover.
+bool resolveJumpUpBlockRoll(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events);
+
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,
                                   DiceRollerBase& dice, std::vector<GameEvent>* events);

@@ -327,6 +327,11 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             // Horns (ř. 8172-8175). Dřív `isBlitz = false` vždy; nastávalo to po blitzu, který
             // nedošel (blok potom dohrával `expandBlitzAndScore` krokem BLOCK zdarma).
             const Player& blocker = state.getPlayer(action.playerId);
+            // P303: z lehu jen s Jump Up a po hodu AG +2 (ř. 8199-8203); jinak blok z lehu nikdy (ř. 674-676).
+            if (blocker.state == PlayerState::PRONE) {
+                if (!blocker.hasSkill(SkillName::JumpUp) || blocker.usedBlitz) return ActionResult::fail();
+                if (!resolveJumpUpBlockRoll(state, action.playerId, dice, events)) return ActionResult::ok();
+            }
             const bool blitzBlock = blocker.usedBlitz && !blocker.blitzBlockThrown;
             BlockParams params;
             params.attackerId = action.playerId;
@@ -541,6 +546,11 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
         }
 
         case ActionType::MULTIPLE_BLOCK: {
+            // P303: Multiple Block je Block Action ⇒ z lehu taky jen s Jump Up po hodu AG +2.
+            if (state.getPlayer(action.playerId).state == PlayerState::PRONE) {
+                if (!state.getPlayer(action.playerId).hasSkill(SkillName::JumpUp)) return ActionResult::fail();
+                if (!resolveJumpUpBlockRoll(state, action.playerId, dice, events)) return ActionResult::ok();
+            }
             // targetId encodes first target, target.x/y encodes second target ID
             // We use targetId for first target and target position's x as second target ID
             return resolveMultipleBlock(state, action.playerId, action.targetId,

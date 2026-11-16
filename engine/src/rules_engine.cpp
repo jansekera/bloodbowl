@@ -91,8 +91,8 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // canAct() cannot carry this: it is also used for targeting checks.
         TeamSide enemySide = opponent(side);
         // ⛔ BLOK Z LEHU NIKDY (r. 674-676, vyslovne). Jedina vyjimka je
-        // Jump Up (r. 8200-8204: Block Action z lehu na AG roll +2) -- to je
-        // polozka A2 a resolver pro ni neexistuje, takze se nenabizi.
+        // Jump Up (r. 8199-8203: Block Action z lehu na AG roll +2) -- od P303
+        // (14.11.2026) ji pousti `mayBlockNow` a hod dela resolver.
         // ⚠️ Tahle straz musi byt VYSLOVNA: `p.hasMoved` je v okamziku
         // deklarace jeste false, takze zavor nize by blok lezicimu nezabranil.
         for (auto& pos : adj) {
@@ -177,13 +177,51 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         // (krok B). Vsechno nize je zamerne NEDOSTUPNE, a NENI to opatrnost,
         // je to spravnost:
         //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
-        //                 Jump Up (r. 8200-8204, AG roll +2) je polozka A2 a
-        //                 resolver pro ni neexistuje.
+        //                 Jump Up (r. 8199-8203, AG roll +2) je od P303 (14.11.2026)
+        //                 nabizena (mayBlockNow, Multiple Block vyse).
         //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB/MULTIPLE_BLOCK
         //              -- vetsina je z lehu podle pravidel legalni (r. 676),
         //                 ale jejich resolvery vetev "if prone, stand up first"
         //                 NEMAJI. Nabidnout je ted znamena zahrat je Z LEHU,
         //                 tedy vyrobit nelegalni tah misto opravy chybejiciho.
+        // MULTIPLE_BLOCK jako lambda: nabízí se stojícímu (níž) i ležícímu s Jump Up (P303, Block Action z lehu).
+        auto offerMultipleBlock = [&]() {
+            // MULTIPLE_BLOCK: player has MultipleBlock and 2+ adjacent enemies.
+            // ⭐ FRENZY UZ TU NENI PODMINKA (oprava 29.08.2026, nalez L6).
+            // r. 8302-8305: "...so Multiple Block can be used INSTEAD OF Frenzy,
+            // but both skills cannot be used TOGETHER." Pravidlo zakazuje
+            // KOMBINACI, ne drzeni obojiho -- `&& !p.hasSkill(Frenzy)` tedy hraci
+            // s obema dovednostmi bralo VOLBU, kterou pravidlo predpoklada.
+            // Vylouceni se resi na druhe strane: `resolveMultipleBlock` pousti oba
+            // bloky s `frenzyDisabled`, takze Frenzy uvnitr nezasahne.
+            // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
+            // 15.10.2026: jen „at the start of a Block Action“ (ř. 8299) — ne po pohybu a ne v blitzu
+            // (dřív se nabízel i hráči, který se už hnul; táž díra jako u BLOCK, viz mayBlockNow).
+            if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Chainsaw) &&
+                !p.hasMoved && !p.usedBlitz) {
+                // Collect adjacent standing enemies
+                int adjEnemies[8];
+                int nAdj = 0;
+                for (auto& pos : adj) {
+                    if (!pos.isOnPitch()) continue;
+                    const Player* enemy = state.getPlayerAtPosition(pos);
+                    if (enemy && enemy->teamSide == enemySide &&
+                        enemy->state == PlayerState::STANDING) {
+                        if (nAdj < 8) adjEnemies[nAdj++] = enemy->id;
+                    }
+                }
+                // Generate all pairs
+                for (int i = 0; i < nAdj; i++) {
+                    for (int j = i + 1; j < nAdj; j++) {
+                        // Encode: targetId=first target, target.x=second target ID
+                        out.push_back({ActionType::MULTIPLE_BLOCK, p.id, adjEnemies[i],
+                                      {static_cast<int8_t>(adjEnemies[j]), 0}});
+                    }
+                }
+            }
+        };
+        // P303: ležící s Jump Up smí i Multiple Block (je to Block Action, ř. 8199-8203); BLOCK výš přes mayBlockNow.
+        if (prone && p.hasSkill(SkillName::JumpUp)) offerMultipleBlock();
         if (prone) return;
 
         // PASS: if not used this turn, has ball, each standing teammate within range 13
@@ -285,39 +323,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             }
         }
 
-        // MULTIPLE_BLOCK: player has MultipleBlock and 2+ adjacent enemies.
-        // ⭐ FRENZY UZ TU NENI PODMINKA (oprava 29.08.2026, nalez L6).
-        // r. 8302-8305: "...so Multiple Block can be used INSTEAD OF Frenzy,
-        // but both skills cannot be used TOGETHER." Pravidlo zakazuje
-        // KOMBINACI, ne drzeni obojiho -- `&& !p.hasSkill(Frenzy)` tedy hraci
-        // s obema dovednostmi bralo VOLBU, kterou pravidlo predpoklada.
-        // Vylouceni se resi na druhe strane: `resolveMultipleBlock` pousti oba
-        // bloky s `frenzyDisabled`, takze Frenzy uvnitr nezasahne.
-        // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
-        // 15.10.2026: jen „at the start of a Block Action“ (ř. 8299) — ne po pohybu a ne v blitzu
-        // (dřív se nabízel i hráči, který se už hnul; táž díra jako u BLOCK, viz mayBlockNow).
-        if (p.hasSkill(SkillName::MultipleBlock) && !p.hasSkill(SkillName::Chainsaw) &&
-            !p.hasMoved && !p.usedBlitz) {
-            // Collect adjacent standing enemies
-            int adjEnemies[8];
-            int nAdj = 0;
-            for (auto& pos : adj) {
-                if (!pos.isOnPitch()) continue;
-                const Player* enemy = state.getPlayerAtPosition(pos);
-                if (enemy && enemy->teamSide == enemySide &&
-                    enemy->state == PlayerState::STANDING) {
-                    if (nAdj < 8) adjEnemies[nAdj++] = enemy->id;
-                }
-            }
-            // Generate all pairs
-            for (int i = 0; i < nAdj; i++) {
-                for (int j = i + 1; j < nAdj; j++) {
-                    // Encode: targetId=first target, target.x=second target ID
-                    out.push_back({ActionType::MULTIPLE_BLOCK, p.id, adjEnemies[i],
-                                  {static_cast<int8_t>(adjEnemies[j]), 0}});
-                }
-            }
-        }
+        offerMultipleBlock();
     });
 
     // Also allow standing up prone players

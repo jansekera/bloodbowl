@@ -1690,6 +1690,21 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     return turnover ? ActionResult::turnovr() : ActionResult::ok();
 }
 
+bool resolveJumpUpBlockRoll(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+    Player& p = state.getPlayer(playerId);
+    // „requires an Agility roll with a +2 modifier“ — 1 vždy neuspěje, 6 vždy uspěje. Parita s PHP BlockHandler::jumpUpZLehu.
+    const int target = std::max(2, std::min(6, 7 - p.stats.agility - 2));
+    const bool ok = attemptRollLogged(state, playerId, dice, target, SkillName::SKILL_COUNT, /*negated=*/false,
+                                      /*canUseTeamReroll=*/true, events, GameEvent::Type::STAND_UP, p.position, p.position);
+    if (ok) {
+        p.state = PlayerState::STANDING;   // vstává zdarma; pohyb to není (blok po pohybu nesmí, ř. 674-676)
+    } else {
+        p.hasActed = true;                  // „the Block Action is wasted and the player may not stand up“
+        p.hasMoved = true;
+    }
+    return ok;
+}
+
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,
                                   DiceRollerBase& dice, std::vector<GameEvent>* events) {

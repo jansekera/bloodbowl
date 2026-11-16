@@ -377,8 +377,8 @@ final class SkillModifiersTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
             ->build();
 
-        // 2-dice block (ST 5 vs 3): die1=6, die2=6 (both Def Down), armor 3+3=6 < 8 (not broken)
-        $dice = new FixedDiceRoller([6, 6, 3, 3]);
+        // P303: napřed hod Jump Up (AG3 +2 ⇒ 2+, padne 4), pak 2-dice block (ST 5 vs 3): 6, 6 (Def Down), armor 3+3=6 < 8
+        $dice = new FixedDiceRoller([4, 6, 6, 3, 3]);
         $resolver = new ActionResolver($dice);
 
         $result = $resolver->resolve($state, ActionType::BLOCK, [
@@ -393,6 +393,88 @@ final class SkillModifiersTest extends TestCase
         // Attacker should be standing after block
         $attacker = $result->getNewState()->requirePlayer(1);
         $this->assertEquals(PlayerState::STANDING, $attacker->getState());
+    }
+
+    /**
+     * P303 (14.11.2026): blok z lehu s Jump Up stojí hod AG s +2 (`rules_bb2016.txt` ř. 8199-8203: „requires an Agility
+     * roll with a +2 modifier … A failed roll means the Block Action is wasted and the player may not stand up“).
+     * Dřív PHP hráče postavilo zadarmo bez hodu a blok proběhl vždy.
+     */
+    public function testP303JumpUpBlockFailedRollWastesTheActionAndStaysProne(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->build();
+
+        // AG2 +2 ⇒ 3+; padne 2 (a 2 i na případný přehoz) ⇒ neuspěl. Kdyby hod nebyl, 2 a 2 by byly kostky bloku.
+        $result = (new ActionResolver(new FixedDiceRoller([2, 2, 2, 2])))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $this->assertTrue($result->isSuccess());
+        $this->assertFalse($result->isTurnover(), 'neúspěšný Jump Up není turnover');
+        $types = array_map(fn($e) => $e->getType(), $result->getEvents());
+        $this->assertNotContains('block', $types, 'blok se nekonal');
+        $attacker = $result->getNewState()->requirePlayer(1);
+        $this->assertSame(PlayerState::PRONE, $attacker->getState(), 'zůstává ležet');
+        $this->assertTrue($attacker->hasActed(), 'akce Blok propadla');
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState());
+    }
+
+    public function testP303JumpUpBlockRollsBeforeTheBlock(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->build();
+
+        // AG2 +2 ⇒ 3+; padne 3 ⇒ vstane; pak 2 kostky bloku 6, 6 a brnění 3+3
+        $result = (new ActionResolver(new FixedDiceRoller([3, 6, 6, 3, 3])))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+
+        $stand = array_values(array_filter($result->getEvents(), fn($e) => $e->getType() === 'stand_up'));
+        $this->assertCount(1, $stand);
+        $this->assertSame(3, $stand[0]->getData()['roll'] ?? null, 'Jump Up hází');
+        $this->assertSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertNotSame(PlayerState::STANDING, $result->getNewState()->requirePlayer(2)->getState(), 'blok proběhl (Defender Down)');
+    }
+
+    public function testP303JumpUpFailedRollAsksTheHumanCoachAndTheRerollFinishesTheBlock(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->build();
+        $r1 = new ActionResolver(new FixedDiceRoller([2]));
+        $r1->setInteractiveThrowRerolls([TeamSide::HOME]);
+        $s = $r1->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
+
+        $q = $s->getPendingReroll();
+        $this->assertNotNull($q, 'kouče-člověka se zeptá');
+        $this->assertSame('jump_up', $q->getRollType());
+        $this->assertSame(3, $q->getTarget());
+        $this->assertSame(PlayerState::PRONE, $s->requirePlayer(1)->getState(), 'stav před akcí');
+
+        // přehoz 3 ⇒ vstane; kostky bloku 6, 6; brnění 3+3
+        $r2 = new ActionResolver(new FixedDiceRoller([3, 6, 6, 3, 3]));
+        $r2->setInteractiveThrowRerolls([TeamSide::HOME]);
+        $res = $r2->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
+        $this->assertNull($res->getNewState()->getPendingReroll());
+        $this->assertSame(PlayerState::STANDING, $res->getNewState()->requirePlayer(1)->getState());
+        $this->assertFalse($res->getNewState()->getHomeTeam()->canUseReroll(), 'týmový přehoz spotřebován');
+    }
+
+    public function testP303JumpUpMultipleBlockFailedRollWastesTheAction(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp, SkillName::MultipleBlock])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 6, 8, strength: 3, id: 3)
+            ->build();
+
+        $result = (new ActionResolver(new FixedDiceRoller([2, 2, 2, 2, 2, 2])))->resolve($state, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3]);
+
+        $this->assertFalse($result->isTurnover());
+        $this->assertSame(PlayerState::PRONE, $result->getNewState()->requirePlayer(1)->getState());
+        $this->assertNotContains('block', array_map(fn($e) => $e->getType(), $result->getEvents()));
     }
 
     // === Sprint ===
