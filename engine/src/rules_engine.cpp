@@ -179,7 +179,9 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
         //   BLOCK      -- r. 674-676 ho lezicimu VYSLOVNE zakazuje. Vyjimka
         //                 Jump Up (r. 8199-8203, AG roll +2) je od P303 (14.11.2026)
         //                 nabizena (mayBlockNow, Multiple Block vyse).
-        //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB/MULTIPLE_BLOCK
+        //   MULTIPLE_BLOCK -- je Block Action ⇒ totez co BLOCK: lezicimu jen s Jump Up
+        //                 (od P303, lambda offerMultipleBlock nize; hod v proneBlockGate).
+        //   LEAP/PASS/HAND_OFF/FOUL/GAZE/TTM/BOMB
         //              -- vetsina je z lehu podle pravidel legalni (r. 676),
         //                 ale jejich resolvery vetev "if prone, stand up first"
         //                 NEMAJI. Nabidnout je ted znamena zahrat je Z LEHU,

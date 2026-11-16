@@ -477,6 +477,46 @@ final class SkillModifiersTest extends TestCase
         $this->assertNotContains('block', array_map(fn($e) => $e->getType(), $result->getEvents()));
     }
 
+    /**
+     * P304 (review 16.11.2026): nelegální blok (cíl nesousedí) se odmítne DŘÍV, než padne hod Jump Up
+     * (a případný přehoz). Dřív se hodilo a teprve pak vyhodilo „Players must be adjacent“.
+     */
+    public function testP304JumpUpBlockOnANonAdjacentTargetIsRejectedBeforeTheRoll(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp])
+            ->addPlayer(TeamSide::AWAY, 8, 7, strength: 3, id: 2)
+            ->build();
+        $kostky = new FixedDiceRoller([2, 2]);
+
+        try {
+            (new ActionResolver($kostky))->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2]);
+            $this->fail('blok na nesousedícího se musí odmítnout');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('adjacent', $e->getMessage());
+        }
+        $this->assertSame(0, $kostky->getRollCount(), 'žádná kostka nepadla');
+    }
+
+    /** P304: Multiple Block — oba cíle musí sousedit (dřív se nekontrolovalo vůbec), a to před hodem Jump Up. */
+    public function testP304MultipleBlockOnANonAdjacentTargetIsRejectedBeforeTheRoll(): void
+    {
+        $state = (new GameStateBuilder())
+            ->addPronePlayer(TeamSide::HOME, 5, 7, strength: 4, agility: 2, id: 1, skills: [SkillName::JumpUp, SkillName::MultipleBlock])
+            ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
+            ->addPlayer(TeamSide::AWAY, 9, 8, strength: 3, id: 3)
+            ->build();
+        $kostky = new FixedDiceRoller([2, 2, 2, 2]);
+
+        try {
+            (new ActionResolver($kostky))->resolve($state, ActionType::MULTIPLE_BLOCK, ['playerId' => 1, 'targetId' => 2, 'targetId2' => 3]);
+            $this->fail('Multiple Block na nesousedícího se musí odmítnout');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('adjacent', $e->getMessage());
+        }
+        $this->assertSame(0, $kostky->getRollCount(), 'žádná kostka nepadla');
+    }
+
     // === Sprint ===
 
     public function testSprintAllowsThreeGfi(): void

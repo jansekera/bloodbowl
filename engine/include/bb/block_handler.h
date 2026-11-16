@@ -30,9 +30,14 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
                           // duvod.
                           bool frenzyDisabled = false);
 
-// P303 (14.11.2026): Jump Up — Block Action z lehu (ř. 8199-8203): hod AG s +2 (přehoz Pro / týmový přes attemptRoll).
-// true = hráč vstal zdarma a smí blokovat; false = akce Blok propadla (hasActed), hráč leží, není turnover.
-bool resolveJumpUpBlockRoll(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events);
+// P303 (14.11.2026): Block Action z lehu jen s Jump Up a po hodu AG +2 (ř. 8199-8203; přehoz Pro / týmový přes
+// attemptRoll); jinak blok z lehu nikdy (ř. 674-676), v blitzu taky ne. P304 (16.11.): jediné místo pro BLOCK
+// i Multiple Block — dřív dvě kopie a Multiple Block nehlídal blitz. Volat až po všech ostatních kontrolách
+// legálnosti: nelegální blok se odmítne dřív, než padne kostka.
+// PROCEED = stojí, nebo vstal zdarma a blokuje; ILLEGAL = blok nejde (bez kostek); WASTED = hod nevyšel,
+// akce propadla (hasActed), leží, není turnover.
+enum class ProneBlockGate { PROCEED, ILLEGAL, WASTED };
+ProneBlockGate proneBlockGate(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,

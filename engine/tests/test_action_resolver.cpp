@@ -713,3 +713,25 @@ TEST(ActionResolver, P303JumpUpSuccessfulRollStandsAndBlocks) {
     EXPECT_EQ(gs.getPlayer(1).state, PlayerState::STANDING);
     EXPECT_NE(gs.getPlayer(12).state, PlayerState::STANDING) << "blok proběhl";
 }
+
+// P304 (review 16.11.2026): nelegální blok z lehu se odmítne DŘÍV, než padne hod Jump Up. Dřív MULTIPLE_BLOCK
+// nehlídal blitz (BLOCK ano) a pila (ř. 8014-8015) se kontrolovala až po hodu.
+TEST(ActionResolver, P304ProneMultipleBlockInABlitzIsRejectedBeforeTheRoll) {
+    GameState gs = p303Fixture(true);
+    gs.getPlayer(1).usedBlitz = true;
+    FixedDiceRoller dice({3, 3, 3, 3});
+    auto r = executeAction(gs, {ActionType::MULTIPLE_BLOCK, 1, 12, {13, 0}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "v blitzu blok z lehu ne (jako BLOCK)";
+    EXPECT_EQ(dice.remaining(), 4u) << "žádná kostka nepadla";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+}
+
+TEST(ActionResolver, P304ProneMultipleBlockWithAChainsawIsRejectedBeforeTheRoll) {
+    GameState gs = p303Fixture(true);
+    gs.getPlayer(1).skills.add(SkillName::Chainsaw);
+    FixedDiceRoller dice({3, 3, 3, 3});
+    auto r = executeAction(gs, {ActionType::MULTIPLE_BLOCK, 1, 12, {13, 0}}, dice, nullptr);
+    EXPECT_FALSE(r.success) << "pila s Multiple Block nejde (ř. 8014-8015)";
+    EXPECT_EQ(dice.remaining(), 4u) << "žádná kostka nepadla";
+    EXPECT_EQ(gs.getPlayer(1).state, PlayerState::PRONE);
+}

@@ -1690,8 +1690,10 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
     return turnover ? ActionResult::turnovr() : ActionResult::ok();
 }
 
-bool resolveJumpUpBlockRoll(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events) {
+ProneBlockGate proneBlockGate(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events) {
     Player& p = state.getPlayer(playerId);
+    if (p.state != PlayerState::PRONE) return ProneBlockGate::PROCEED;
+    if (!p.hasSkill(SkillName::JumpUp) || p.usedBlitz) return ProneBlockGate::ILLEGAL;
     // „requires an Agility roll with a +2 modifier“ — 1 vždy neuspěje, 6 vždy uspěje. Parita s PHP BlockHandler::jumpUpZLehu.
     const int target = std::max(2, std::min(6, 7 - p.stats.agility - 2));
     const bool ok = attemptRollLogged(state, playerId, dice, target, SkillName::SKILL_COUNT, /*negated=*/false,
@@ -1702,7 +1704,7 @@ bool resolveJumpUpBlockRoll(GameState& state, int playerId, DiceRollerBase& dice
         p.hasActed = true;                  // „the Block Action is wasted and the player may not stand up“
         p.hasMoved = true;
     }
-    return ok;
+    return ok ? ProneBlockGate::PROCEED : ProneBlockGate::WASTED;
 }
 
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
@@ -1711,6 +1713,12 @@ ActionResult resolveMultipleBlock(GameState& state, int attackerId,
     Player& att = state.getPlayer(attackerId);
     // P75: pila "cannot be used with ... Multiple Block" (r. 8014-8015).
     if (att.hasSkill(SkillName::Chainsaw)) return ActionResult::fail();
+    // P303/P304: Multiple Block je Block Action ⇒ z lehu jen s Jump Up po hodu AG +2 (až po kontrole pily).
+    switch (proneBlockGate(state, attackerId, dice, events)) {
+        case ProneBlockGate::ILLEGAL: return ActionResult::fail();
+        case ProneBlockGate::WASTED: return ActionResult::ok();
+        case ProneBlockGate::PROCEED: break;
+    }
 
     // Resolve first block (defender gets +2 ST, no follow-up)
     {

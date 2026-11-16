@@ -89,6 +89,22 @@ final class BlockHandler implements ActionHandlerInterface
         return ['state' => $state->withPlayer($attacker), 'attacker' => $attacker, 'ok' => $ok];
     }
 
+    /**
+     * P304 (review 16.11.2026): legálnost bloku se ověří DŘÍV, než padne kostka (hod Jump Up, přehoz). Dřív se
+     * u bloku z lehu hodilo a teprve pak vyhodilo „adjacent“; Multiple Block sousedství nekontroloval vůbec.
+     */
+    private function overitSousedstvi(MatchPlayerDTO $attacker, MatchPlayerDTO $defender): void
+    {
+        $attackerPos = $attacker->getPosition();
+        $defenderPos = $defender->getPosition();
+        if ($attackerPos === null || $defenderPos === null) {
+            throw new \InvalidArgumentException('Players must be on pitch');
+        }
+        if ($attackerPos->distanceTo($defenderPos) !== 1) {
+            throw new \InvalidArgumentException('Players must be adjacent to block');
+        }
+    }
+
     /** P224: ptá se kouče-člověka na Grab (`ActionResolver::setInteractiveBlocks`); AI se neptá */
     private bool $ptatSeNaGrab = false;
 
@@ -620,6 +636,7 @@ final class BlockHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Player not found');
         }
 
+        $this->overitSousedstvi($attacker, $defender);
         $events = [];
 
         // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)
@@ -630,17 +647,6 @@ final class BlockHandler implements ActionHandlerInterface
             if (!$vstal['ok']) {
                 return ActionResult::success($state, $events);
             }
-        }
-
-        $attackerPos = $attacker->getPosition();
-        $defenderPos = $defender->getPosition();
-
-        if ($attackerPos === null || $defenderPos === null) {
-            throw new \InvalidArgumentException('Players must be on pitch');
-        }
-
-        if ($attackerPos->distanceTo($defenderPos) !== 1) {
-            throw new \InvalidArgumentException('Players must be adjacent to block');
         }
 
         // P82: rana v blitzu stoji pole pohybu (pripadne GFI).
@@ -1105,6 +1111,8 @@ final class BlockHandler implements ActionHandlerInterface
             throw new \InvalidArgumentException('Player not found');
         }
 
+        $this->overitSousedstvi($attacker, $defender1);
+        $this->overitSousedstvi($attacker, $defender2);
         $events = [];
 
         // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)

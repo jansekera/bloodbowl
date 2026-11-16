@@ -599,7 +599,8 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select a player for multiple block
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed && player.skills.includes('Multiple Block')) {
+            // P304: komu server Multiple Block nabízí (i ležícímu s Jump Up, P303) — dřív jen stojícímu
+            if (!player.hasActed && (await offeredTo(player.id)).has('multiple_block')) {
                 stateManager.selectPlayer(player.id);
                 try {
                     blockTargets = await api.getBlockTargets(matchId, player.id, 'block');
@@ -639,10 +640,15 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select a player for block/blitz
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed) {
+            // P304: blok i ležícímu s Jump Up (P303), jak ho nabízí server; Blitz dál jen stojícímu, jak dřív
+            const muze = mode === 'block'
+                ? !player.hasActed && (await offeredTo(player.id)).has('block')
+                : player.state === 'standing' && !player.hasActed;
+            if (muze) {
                 clearMovePlan();
                 stateManager.selectPlayer(player.id);
-                // Fetch block targets
+                // Fetch block targets; P304: v Blitzu nabídku serveru souběžně (dřív dva dotazy po sobě)
+                const blitzNabidka = mode === 'blitz' && !player.hasMoved ? offeredTo(player.id) : Promise.resolve(new Set<string>());
                 try {
                     blockTargets = await api.getBlockTargets(matchId, player.id, mode);
                     stateManager.setValidTargets(
@@ -655,7 +661,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
                 // P210: blitzující, který ještě neběžel, dostane i pole pohybu
                 moveTargets = [];
                 // P301b: pole pohybu jen tomu, komu server Blitz nabízí (ohlašuje se před pohybem; ohlášený běží dál)
-                if (mode === 'blitz' && !player.hasMoved && (await offeredTo(player.id)).has('blitz')) {
+                if ((await blitzNabidka).has('blitz')) {
                     try {
                         moveTargets = await api.getValidMoves(matchId, player.id);
                     } catch {
@@ -879,10 +885,12 @@ function clearAllTargets(): void {
 
 /** P301b: které akce server hráči teď nabízí (`RulesEngine::getAvailableActions`) — pravidla nabídky jen na serveru. */
 async function offeredTo(playerId: number): Promise<Set<string>> {
+    // P304: chyba spojení není „nic nenabízí“ — kouč se o ní dozví (dřív se tiše smazal plán pohybu)
     try {
         const actions = await api.getAvailableActions(matchId);
         return new Set(actions.filter(a => a.playerId === playerId).map(a => a.type));
     } catch {
+        toast.error('Could not load available actions');
         return new Set();
     }
 }
@@ -959,17 +967,21 @@ async function resumeMovePlan(mode: 'move' | 'blitz'): Promise<void> {
     }
     // P301b: pokračovat jen, když server hráči pohyb (v Blitzu i ránu) nabízí — čeká-li jakákoli otázka, nabízí jen
     //   odpověď na ni (dřív tu byl vlastní seznam čekajících otázek a chyběly v něm Grab a Stand Firm)
-    const offered = state && id != null && stateManager.isPlayerTurn() ? await offeredTo(id) : new Set<string>();
-    if (!state || id == null || !(offered.has('move') || (mode === 'blitz' && offered.has('blitz')))) {
+    if (!state || id == null || !stateManager.isPlayerTurn()) {
+        clearMovePlan();
+        return;
+    }
+    // review P296 + P304: nabídka, pole pohybu i cíle rány naráz (dřív nabídka napřed, pak zbytek — po každém kroku)
+    const [offered, moves, blocks] = await Promise.all([
+        offeredTo(id),
+        api.getValidMoves(matchId, id).catch(() => [] as MoveTarget[]),
+        mode === 'blitz' ? api.getBlockTargets(matchId, id, 'blitz').catch(() => [] as BlockTarget[]) : Promise.resolve([] as BlockTarget[]),
+    ]);
+    if (!(offered.has('move') || (mode === 'blitz' && offered.has('blitz')))) {
         clearMovePlan();
         return;
     }
     stateManager.selectPlayer(id);
-    // review P296: obě nabídky naráz (dřív dva dotazy po sobě po každém kroku)
-    const [moves, blocks] = await Promise.all([
-        api.getValidMoves(matchId, id).catch(() => [] as MoveTarget[]),
-        mode === 'blitz' ? api.getBlockTargets(matchId, id, 'blitz').catch(() => [] as BlockTarget[]) : Promise.resolve([] as BlockTarget[]),
-    ]);
     moveTargets = moves;
     if (mode === 'blitz') {
         actionPanel.setSelectedMode('blitz');
