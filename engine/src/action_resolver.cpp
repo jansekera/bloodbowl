@@ -584,12 +584,14 @@ ActionResult executeAction(GameState& state, const Action& action,
     };
 
     if (requiresPlayer(action.type) && action.playerId > 0) {
-        if (state.currentActivationId > 0 &&
-            state.currentActivationId != action.playerId) {
+        if (state.currentActivationId > 0 && state.currentActivationId != action.playerId &&
+            action.type != ActionType::SETUP_PLAYER) {
             Player& prev = state.getPlayer(state.currentActivationId);
-            // P298 (14.11.2026, parita s PHP P301): uzavře se i ohlášený blitz bez pohybu — dřív jen
-            // `hasMoved`, takže blitzer se po akci jiného hráče vrátil a dal ránu (ř. 423-429).
-            if (prev.hasMoved || prev.usedBlitz) prev.hasActed = true;
+            // P305 (17.11.2026, jako PHP P301): akce JINÉHO hráče aktivaci předchozího uzavře vždy — „a player must
+            // finish his Action before another player can take one“ (ř. 423-429). Dřív se hádalo z příznaků
+            // (`hasMoved`, od P298 i `usedBlitz` — ohlášený blitz bez pohybu) a každý nový způsob, jak akci začít
+            // bez pohybu, potřeboval další podmínku. Rozestavení (SETUP_PLAYER) aktivaci nemá.
+            prev.hasActed = true;
             if (prev.bloodlustHungry && feedEndsTurn(prev.id)) return ActionResult::turnovr();
         }
         state.currentActivationId = action.playerId;
