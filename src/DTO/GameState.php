@@ -37,10 +37,11 @@ final class GameState
         //   nebo konec kola (`ActionResolver::resolveAkce`). Nahrazuje tri odvozovani: pokracovani blitzu po rane
         //   (P81), uzavirani ohlaseneho blitzu (P210) a smycku P297 pres `movedThisTurn`.
         private ?int $activePlayerId = null,
-        // P210 (16.10.2026): hrac, ktery OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt`
-        //   r. 346-349: cil se pri ohlaseni nerika, rana kdykoli behem pohybu). Propadne jako
-        //   pokracovani -- jakmile jedna jiny hrac nebo skonci kolo.
-        private ?int $declaredBlitzerId = null,
+        // P210 (16.10.2026): aktivni hrac OHLASIL blitz a jeste nedal ranu (`rules_bb2016.txt` r. 346-349: cil se
+        //   pri ohlaseni nerika, rana kdykoli behem pohybu). P305 (16.11.2026): vlastnost aktivace, ne samostatny
+        //   hrac -- propadne s ni (akce jineho hrace, konec kola); dřív pole `declaredBlitzerId` ručně mazané
+        //   na třech místech vedle `activePlayerId`.
+        private bool $blitzDeclared = false,
         // P206 (b), 16.10.2026: čekající volba kouče o lékárníkovi po akci (viz PendingApothecaryDTO).
         private ?PendingApothecaryDTO $pendingApothecary = null,
         // P224, 21.10.2026: čekající otázka kouče, jestli útočník použije Grab (viz PendingGrabDTO).
@@ -325,6 +326,9 @@ final class GameState
     public function withActivePlayer(?int $playerId): self
     {
         $clone = clone $this;
+        if ($playerId !== $this->activePlayerId) {
+            $clone->blitzDeclared = false;   // P305: ohlášený blitz patří k aktivaci, která právě skončila
+        }
         $clone->activePlayerId = $playerId;
         return $clone;
     }
@@ -428,13 +432,14 @@ final class GameState
 
     public function getDeclaredBlitzerId(): ?int
     {
-        return $this->declaredBlitzerId;
+        return $this->blitzDeclared ? $this->activePlayerId : null;
     }
 
+    /** Ohlášení blitzu otevře aktivaci toho hráče (P305); null = blitz se dohrál (rána padla). */
     public function withDeclaredBlitzer(?int $playerId): self
     {
-        $clone = clone $this;
-        $clone->declaredBlitzerId = $playerId;
+        $clone = $playerId === null ? clone $this : $this->withActivePlayer($playerId);
+        $clone->blitzDeclared = $playerId !== null;
         return $clone;
     }
 
@@ -486,8 +491,8 @@ final class GameState
     public function resetPlayersForNewTurn(TeamSide $side): self
     {
         $clone = clone $this;
-        $clone->activePlayerId = null;              // P301: aktivace konci s kolem
-        $clone->declaredBlitzerId = null;           // P210: ohlaseny blitz konci s kolem
+        $clone->activePlayerId = null;              // P301: aktivace (i ohlášený blitz) končí s kolem
+        $clone->blitzDeclared = false;
         foreach ($clone->players as $id => $player) {
             // ⛔ OPRAVA 18.09.2026: `rules_bb2016.txt` r. 8381 -- Pro "once per
             //   turn" plati pro KAZDE kolo, i souperovo (Pro jde pouzit i mimo
@@ -586,7 +591,7 @@ final class GameState
             'pendingReroll' => $this->pendingReroll?->toArray(),
             'activePlayerId' => $this->activePlayerId,
             'openMovePlayerId' => $this->openMovePlayerId(),   // jen pro web (odvozené, `fromArray` ho nečte)
-            'declaredBlitzerId' => $this->declaredBlitzerId,
+            'declaredBlitzerId' => $this->getDeclaredBlitzerId(),
             'pendingApothecary' => $this->pendingApothecary?->toArray(),
             'pendingGrab' => $this->pendingGrab?->toArray(),
             'pendingStandFirm' => $this->pendingStandFirm?->toArray(),
@@ -623,7 +628,7 @@ final class GameState
             pendingBlock: isset($data['pendingBlock']) ? PendingBlockDTO::fromArray((array) $data['pendingBlock']) : null,
             pendingReroll: isset($data['pendingReroll']) ? PendingRerollDTO::fromArray((array) $data['pendingReroll']) : null,
             activePlayerId: isset($data['activePlayerId']) ? (int) $data['activePlayerId'] : null,
-            declaredBlitzerId: isset($data['declaredBlitzerId']) ? (int) $data['declaredBlitzerId'] : null,
+            blitzDeclared: isset($data['declaredBlitzerId'], $data['activePlayerId']) && (int) $data['declaredBlitzerId'] === (int) $data['activePlayerId'],
             pendingApothecary: isset($data['pendingApothecary']) ? PendingApothecaryDTO::fromArray((array) $data['pendingApothecary']) : null,
             pendingGrab: isset($data['pendingGrab']) ? PendingGrabDTO::fromArray((array) $data['pendingGrab']) : null,
             pendingStandFirm: isset($data['pendingStandFirm']) ? PendingStandFirmDTO::fromArray((array) $data['pendingStandFirm']) : null,

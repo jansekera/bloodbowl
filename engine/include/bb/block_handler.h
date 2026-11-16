@@ -4,6 +4,7 @@
 #include "bb/dice.h"
 #include "bb/game_event.h"
 #include "bb/action_result.h"
+#include <optional>
 #include <vector>
 
 namespace bb {
@@ -34,10 +35,9 @@ ActionResult resolveBlock(GameState& state, const BlockParams& params,
 // attemptRoll); jinak blok z lehu nikdy (ř. 674-676), v blitzu taky ne. P304 (16.11.): jediné místo pro BLOCK
 // i Multiple Block — dřív dvě kopie a Multiple Block nehlídal blitz. Volat až po všech ostatních kontrolách
 // legálnosti: nelegální blok se odmítne dřív, než padne kostka.
-// PROCEED = stojí, nebo vstal zdarma a blokuje; ILLEGAL = blok nejde (bez kostek); WASTED = hod nevyšel,
-// akce propadla (hasActed), leží, není turnover.
-enum class ProneBlockGate { PROCEED, ILLEGAL, WASTED };
-ProneBlockGate proneBlockGate(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events);
+// nullopt = stojí, nebo vstal zdarma a blokuje; jinak výsledek akce: fail = blok nejde (bez kostek), ok = hod
+// nevyšel, akce propadla (hasActed), leží, není turnover.
+std::optional<ActionResult> proneBlockGate(GameState& state, int playerId, DiceRollerBase& dice, std::vector<GameEvent>* events);
 
 ActionResult resolveMultipleBlock(GameState& state, int attackerId,
                                   int target1Id, int target2Id,

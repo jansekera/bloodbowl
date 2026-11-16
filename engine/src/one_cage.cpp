@@ -521,10 +521,7 @@ void CageController::planStart(const GameState& state) {
             // skončil turnoverem v 65 %). Sure Hands = přehoz zvednutí (bez něj se s přehozem
             // nepočítá — týmový reroll je zdroj celého tahu).
             {
-                const int target = calculatePickupTargetAt(state, p, m.targetPos);
-                double pick = std::clamp((target - 1) / 6.0, 0.0, 1.0);
-                if (p.hasSkill(SkillName::SureHands)) pick *= pick;
-                fail = 1.0 - (1.0 - fail) * (1.0 - pick);
+                fail = 1.0 - (1.0 - fail) * pickupRollChance(state, p, m.targetPos);
             }
             if (!best || fail < bestFail - 1e-9 ||
                 (std::abs(fail - bestFail) <= 1e-9 &&

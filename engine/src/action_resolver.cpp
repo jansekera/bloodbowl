@@ -327,11 +327,7 @@ static ActionResult resolveActionInner(GameState& state, const Action& action,
             // Horns (ř. 8172-8175). Dřív `isBlitz = false` vždy; nastávalo to po blitzu, který
             // nedošel (blok potom dohrával `expandBlitzAndScore` krokem BLOCK zdarma).
             const Player& blocker = state.getPlayer(action.playerId);
-            switch (proneBlockGate(state, action.playerId, dice, events)) {   // P303/P304: blok z lehu
-                case ProneBlockGate::ILLEGAL: return ActionResult::fail();
-                case ProneBlockGate::WASTED: return ActionResult::ok();
-                case ProneBlockGate::PROCEED: break;
-            }
+            if (auto r = proneBlockGate(state, action.playerId, dice, events)) return *r;   // P303/P304: blok z lehu
             const bool blitzBlock = blocker.usedBlitz && !blocker.blitzBlockThrown;
             BlockParams params;
             params.attackerId = action.playerId;

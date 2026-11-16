@@ -223,7 +223,7 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out) {
             }
         };
         // P303: ležící s Jump Up smí i Multiple Block (je to Block Action, ř. 8199-8203); BLOCK výš přes mayBlockNow.
-        if (prone && p.hasSkill(SkillName::JumpUp)) offerMultipleBlock();
+        if (mayBlockFromProne(p)) offerMultipleBlock();
         if (prone) return;
 
         // PASS: if not used this turn, has ball, each standing teammate within range 13

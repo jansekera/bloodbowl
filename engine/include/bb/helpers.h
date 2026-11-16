@@ -85,6 +85,9 @@ int calculatePickupTarget(const GameState& state, const Player& player);
 // on the ball's square, not on the picker's current one).
 int calculatePickupTargetAt(const GameState& state, const Player& player,
                             Position at);
+// P305 (16.11.2026): šance, že hod na zvednutí na `at` vyjde, se Sure Hands jako vlastním přehozem (týmový přehoz
+// se nepočítá — sdílený zdroj tahu). Jediný vzorec pro P250 zvedače, řadič klece (planStart) i měřidlo P302.
+double pickupRollChance(const GameState& state, const Player& player, Position at);
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0,
                          bool accuratePass = false);
 

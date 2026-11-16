@@ -61,13 +61,17 @@ final class BlockHandler implements ActionHandlerInterface
      * P303 (14.11.2026): Block Action z lehu s Jump Up (`rules_bb2016.txt` ř. 8199-8203) — hod AG s +2; úspěch = vstane
      * zdarma a blokuje, neúspěch = akce Blok propadne a hráč zůstane ležet (není turnover). Přehoz Pro / týmový
      * (ř. 929-931), kouče-člověka se zeptá. OPRAVENO — dřív hráče postavilo zadarmo BEZ hodu.
-     * C++ `resolveJumpUpBlockRoll` (block_handler.cpp) stejně.
+     * C++ `proneBlockGate` (block_handler.cpp) stejně. P305: jediné místo pro Block i Multiple Block — stojící
+     * projde beze změny (`ok`), takže volající nic nepodmiňuje.
      *
      * @param list<GameEvent> $events
      * @return array{state: GameState, attacker: MatchPlayerDTO, ok: bool}
      */
     private function jumpUpZLehu(GameState $state, MatchPlayerDTO $attacker, array &$events): array
     {
+        if ($attacker->getState() !== PlayerState::PRONE || !$attacker->hasSkill(SkillName::JumpUp)) {
+            return ['state' => $state, 'attacker' => $attacker, 'ok' => true];
+        }
         $cil = max(2, min(6, 7 - $attacker->getStats()->getAgility() - 2));
         $hod = $this->dice->rollD6();
         if ($hod < $cil) {
@@ -640,13 +644,9 @@ final class BlockHandler implements ActionHandlerInterface
         $events = [];
 
         // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)
-        if ($attacker->getState() === PlayerState::PRONE && $attacker->hasSkill(SkillName::JumpUp)) {
-            $vstal = $this->jumpUpZLehu($state, $attacker, $events);
-            $state = $vstal['state'];
-            $attacker = $vstal['attacker'];
-            if (!$vstal['ok']) {
-                return ActionResult::success($state, $events);
-            }
+        ['state' => $state, 'attacker' => $attacker, 'ok' => $vstal] = $this->jumpUpZLehu($state, $attacker, $events);
+        if (!$vstal) {
+            return ActionResult::success($state, $events);
         }
 
         // P82: rana v blitzu stoji pole pohybu (pripadne GFI).
@@ -1116,13 +1116,9 @@ final class BlockHandler implements ActionHandlerInterface
         $events = [];
 
         // P303: Jump Up — z lehu jen po hodu AG +2 (ř. 8199-8203)
-        if ($attacker->getState() === PlayerState::PRONE && $attacker->hasSkill(SkillName::JumpUp)) {
-            $vstal = $this->jumpUpZLehu($state, $attacker, $events);
-            $state = $vstal['state'];
-            $attacker = $vstal['attacker'];
-            if (!$vstal['ok']) {
-                return ActionResult::success($state, $events);
-            }
+        ['state' => $state, 'attacker' => $attacker, 'ok' => $vstal] = $this->jumpUpZLehu($state, $attacker, $events);
+        if (!$vstal) {
+            return ActionResult::success($state, $events);
         }
 
         $events[] = GameEvent::multipleBlock($attackerId, $targetId1, $targetId2);

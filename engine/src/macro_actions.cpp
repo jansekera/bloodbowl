@@ -70,12 +70,31 @@ static uint64_t g_extraFeaturesOff = 0;
 void setExtraFeaturesOff(uint64_t mask) { g_extraFeaturesOff = mask; }
 uint64_t extraFeaturesOff() { return g_extraFeaturesOff; }
 static long g_p250[3] = {0, 0, 0};
+// P302 krok 2 / P305: pole z `squares`, na kterém má soupeř nejmenší šanci zvednout míč (shoda ⇒ bližší hráči);
+// `what` je kopie desky — hráč se na kandidáty jen přesune a na konci vrátí.
+static std::pair<Position, double> hardestSquareForOpponent(GameState& what, const Player& p,
+                                                          const std::vector<Position>& squares, TeamSide oppSide) {
+    Position best{-1, -1};
+    int bestD = 99;
+    double bestChance = 2.0;
+    for (const Position& q : squares) {
+        const int dq = p.position.distanceTo(q);
+        what.getPlayer(p.id).position = q;                // co kdyby tu stál
+        const double c = opponentPickupChance(what, oppSide);
+        if (c < bestChance - 1e-12 || (c < bestChance + 1e-12 && dq < bestD)) { bestChance = c; bestD = dq; best = q; }
+    }
+    what.getPlayer(p.id).position = p.position;
+    return {best, bestChance};
+}
+
+// P305: čítače měření — přečíst do `out` a vynulovat (velikost z pole, ne napsaná podruhé).
+template <size_t N> static void takeCounters(long (&g)[N], long* out) { for (size_t i = 0; i < N; ++i) { out[i] = g[i]; g[i] = 0; } }
 static long g_p302[2] = {0, 0};   // P302: [0] obestoupení na jiné pole než nejbližší, [1] obestoupení nenabídnuto (šanci soupeře nesníží)
-void takeP302(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_p302[i]; g_p302[i] = 0; } }
+void takeP302(long* out2) { takeCounters(g_p302, out2); }
 void noteP250(int i) { ++g_p250[i]; }
-void takeP250(long* out3) { for (int i = 0; i < 3; ++i) { out3[i] = g_p250[i]; g_p250[i] = 0; } }
+void takeP250(long* out3) { takeCounters(g_p250, out3); }
 static long g_p253[2] = {0, 0};
-void takeP253(long* out2) { for (int i = 0; i < 2; ++i) { out2[i] = g_p253[i]; g_p253[i] = 0; } }
+void takeP253(long* out2) { takeCounters(g_p253, out2); }
 thread_local bool g_foulOnlyLast = true;
 void setFoulOnlyLastEnabled(bool on) { g_foulOnlyLast = on; }
 void takeDodgeCapStops(long* out2) {
@@ -2722,11 +2741,7 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // is deliberately NOT assumed (shared scarce resource). Distance
             // stays secondary at ~1 square = 5 chance points, keeping the
             // old trade-off (1 AG pip ~ 3.3 squares).
-            int target = calculatePickupTargetAt(state, p, state.ball.position);
-            double chance = (7.0 - target) / 6.0;
-            if (p.hasSkill(SkillName::SureHands)) {
-                chance += (1.0 - chance) * chance;  // personal reroll
-            }
+            double chance = pickupRollChance(state, p, state.ball.position);
             // P250 (uživatel 5.11.2026; rozbor A18: z 21 turnoverů po vyraženém míči 15 padlo na úhybu cestou, 6 na
             //   zvednutí): cena zvedače je šance CELÉ akce — doběh bez pádu (úhyby a GFI) × zvednutí.
             if (extraFeatureOn(kP250PickerPathRisk) && dist > 0) {
@@ -2782,30 +2797,33 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
             // P304 (review 16.11.2026): jedna kopie desky na celé hledání (dřív kopie celého GameState na každé pole
             //   v horké cestě MCTS); hráč se na kandidáta jen přesune a po hledání vrátí.
             std::optional<GameState> what;
-            if (worst) what.emplace(state);
+            // P305: soupeř míč zvednout nemůže ⇒ žádné pole jeho šanci nesníží — po polích se nehledá (čítače stejné)
+            const bool search = worst && baseChance > 1e-9;
+            if (search) what.emplace(state);
             int offeredSurround = 0;
             for (const auto& [d, p] : near) {
                 if (offeredSurround >= 2) break;
                 std::vector<Position> reach;
                 diceFreeReach(state, *p, reach);
-                Position best{-1, -1}, nearest{-1, -1};
-                int bestD = 99, nearestD = 99;
-                double bestChance = 2.0;
+                std::vector<Position> squares;                    // pole vedle míče, kam dojde bez hodu
+                Position nearest{-1, -1};
+                int nearestD = 99;
                 for (const Position& q : reach) {
                     if (q.distanceTo(state.ball.position) != 1) continue;
+                    squares.push_back(q);
                     const int dq = p->position.distanceTo(q);
                     if (dq < nearestD) { nearestD = dq; nearest = q; }
-                    if (!worst) continue;
-                    what->getPlayer(p->id).position = q;          // co kdyby tu stál
-                    const double c = opponentPickupChance(*what, oppSide);
-                    if (c < bestChance - 1e-12 || (c < bestChance + 1e-12 && dq < bestD)) { bestChance = c; bestD = dq; best = q; }
                 }
-                if (worst) what->getPlayer(p->id).position = p->position;
-                if (!worst) best = nearest;
-                if (best.x < 0) continue;
-                if (worst && !(bestChance < baseChance - 1e-9)) { ++g_p302[1]; continue; }   // soupeři nic neztíží
-                if (worst && best != nearest) ++g_p302[0];
-                out.push_back({MacroType::REPOSITION, p->id, -1, best});
+                if (nearest.x < 0) continue;
+                Position pick = nearest;
+                if (worst) {
+                    const auto [best, bestChance] = search ? hardestSquareForOpponent(*what, *p, squares, oppSide)
+                                                           : std::pair<Position, double>{nearest, baseChance};
+                    if (!(bestChance < baseChance - 1e-9)) { ++g_p302[1]; continue; }   // soupeři nic neztíží
+                    if (best != nearest) ++g_p302[0];
+                    pick = best;
+                }
+                out.push_back({MacroType::REPOSITION, p->id, -1, pick});
                 ++offeredSurround; ++g_p250[1];
             }
         }

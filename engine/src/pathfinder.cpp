@@ -760,6 +760,14 @@ void diceFreeReach(const GameState& state, const Player& player, std::vector<Pos
     }
 }
 
+// Hráč na začátku svého příštího tahu: plný pohyb, Break Tackle znovu (P245, P302). P305: jedno místo pro obě měřidla.
+static Player nextTurnSelf(const Player& p) {
+    Player w = p;
+    w.movementRemaining = static_cast<int8_t>(w.stats.movement);
+    w.breakTackleUsedThisTurn = false;
+    return w;
+}
+
 // ⭐ P302 (uživatel 11.11.2026): šance soupeře zvednout volný míč v jeho příštím tahu — viz pathfinder.h.
 double opponentPickupChance(const GameState& state, TeamSide side) {
     if (state.ball.isHeld || !state.ball.isOnPitch()) return -1.0;
@@ -768,16 +776,14 @@ double opponentPickupChance(const GameState& state, TeamSide side) {
     state.forEachOnPitch(side, [&](const Player& p) {
         if (p.state != PlayerState::STANDING && p.state != PlayerState::PRONE) return;
         if (p.hasSkill(SkillName::NoHands) || p.hasSkill(SkillName::BallAndChain)) return;
-        Player w = p;                                     // příští tah: plný pohyb, Break Tackle znovu (jako P245)
-        w.movementRemaining = static_cast<int8_t>(w.stats.movement);
-        w.breakTackleUsedThisTurn = false;
+        const Player w = nextTurnSelf(p);
         const int budget = movementAfterStandUp(w) + maxGfiSquares(w);
         const int dist = w.position.distanceTo(ball);
         if (dist > budget) return;
+        const double pick = pickupRollChance(state, w, ball);
+        if (pick <= best) return;                         // P305: (1 − pád) × zvednutí ≤ zvednutí — trasu nehledat
         const double fail = (dist == 0) ? 0.0 : pathFailProb(state, w, ball, budget, Position{-1, -1});
         if (fail < 0.0) return;                           // nedosažitelné
-        double pick = (7.0 - calculatePickupTargetAt(state, w, ball)) / 6.0;
-        if (w.hasSkill(SkillName::SureHands)) pick += (1.0 - pick) * pick;
         best = std::max(best, (1.0 - fail) * pick);
     });
     return best;
@@ -787,9 +793,7 @@ double opponentPickupChance(const GameState& state, TeamSide side) {
 CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
                                       std::vector<Position>* route) {
     CarrierOutlook out;
-    Player w = carrier;                                   // příští tah: plný pohyb, Break Tackle znovu
-    w.movementRemaining = static_cast<int8_t>(w.stats.movement);
-    w.breakTackleUsedThisTurn = false;
+    const Player w = nextTurnSelf(carrier);
     const int budget = movementAfterStandUp(w) + maxGfiSquares(w);
     if (budget <= 0 || !w.isOnPitch()) { out.bestDistance = 26; return out; }
     const int ezX = (w.teamSide == TeamSide::HOME) ? 25 : 0;

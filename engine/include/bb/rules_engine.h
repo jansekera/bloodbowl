@@ -21,10 +21,14 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out);
 // primitivní BLOCK i pro makro BLOCK — nabídka makra hlídala jen `hasActed`, které se nastaví až
 // aktivací JINÉHO hráče, takže hráč s rozehraným MOVE dostal BLOCK, který rozbalení nenašlo.
 // Blitz smí blokovat jen jednou (ř. 347-350, `blitzBlockThrown`).
+// P303: ležící s Jump Up smí ohlásit Block Action (ř. 8199-8203; resolver hází AG +2), ne však v blitzu.
+// P305: jediné místo pravidla — nabídka BLOCK (mayBlockNow), nabídka Multiple Block i resolver (proneBlockGate).
+inline bool mayBlockFromProne(const Player& p) {
+    return p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp) && !p.usedBlitz;
+}
+
 inline bool mayBlockNow(const Player& p) {
-    // P303: ležící s Jump Up smí ohlásit Block Action (ř. 8199-8203; resolver hází AG +2), ne však v blitzu.
-    const bool jumpUp = p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp) && !p.usedBlitz;
-    return (p.state == PlayerState::STANDING || jumpUp) && !(p.hasMoved && !p.usedBlitz) &&
+    return (p.state == PlayerState::STANDING || mayBlockFromProne(p)) && !(p.hasMoved && !p.usedBlitz) &&
            !(p.usedBlitz && p.blitzBlockThrown);
 }
 

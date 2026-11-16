@@ -520,10 +520,7 @@ final class ActionResolver
         $opensActivation = $action->requiresPlayer() && $action !== ActionType::SETUP_PLAYER && $action !== ActionType::STAND_PAT;
         $isContinuation = $opensActivation && $actorId !== null && $actorId === $activeId;
         if (!$isContinuation && $activeId !== null && ($action === ActionType::END_TURN || $action->requiresPlayer())) {
-            $state = $this->uzavritAktivaci($state, $activeId)->withActivePlayer(null);
-            if ($state->getDeclaredBlitzerId() === $activeId) {
-                $state = $state->withDeclaredBlitzer(null);
-            }
+            $state = $this->uzavritAktivaci($state, $activeId)->withActivePlayer(null);   // i ohlášený blitz (P305)
         }
         if ($opensActivation && $actorId !== null) {
             $state = $state->withActivePlayer($actorId);

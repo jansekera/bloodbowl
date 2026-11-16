@@ -1,5 +1,5 @@
 import { ApiClient } from './api/client';
-import type { ActionResult, BlockTarget, FoulTarget, HandOffTarget, MoveTarget, PassTarget, Position } from './api/types';
+import type { ActionResult, AvailableAction, BlockTarget, FoulTarget, HandOffTarget, MoveTarget, PassTarget, Position } from './api/types';
 import { PitchRenderer } from './canvas/PitchRenderer';
 import { GameStateManager } from './state/GameStateManager';
 import { AnimationQueue } from './animation/AnimationQueue';
@@ -600,10 +600,12 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
             // P304: komu server Multiple Block nabízí (i ležícímu s Jump Up, P303) — dřív jen stojícímu
-            if (!player.hasActed && (await offeredTo(player.id)).has('multiple_block')) {
+            const cile = api.getBlockTargets(matchId, player.id, 'block');   // P305: souběžně s nabídkou
+            cile.catch(() => undefined);
+            if ((await offeredTo(player.id)).has('multiple_block')) {
                 stateManager.selectPlayer(player.id);
                 try {
-                    blockTargets = await api.getBlockTargets(matchId, player.id, 'block');
+                    blockTargets = await cile;
                     if (blockTargets.length >= 2) {
                         stateManager.setValidTargets(
                             'multiple_block',
@@ -640,34 +642,20 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select a player for block/blitz
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            // P304: blok i ležícímu s Jump Up (P303), jak ho nabízí server; Blitz dál jen stojícímu, jak dřív
-            const muze = mode === 'block'
-                ? !player.hasActed && (await offeredTo(player.id)).has('block')
-                : player.state === 'standing' && !player.hasActed;
-            if (muze) {
+            // P304/P305: komu server akci nabízí (blok i ležícímu s Jump Up, P303) — dřív stav a příznaky z klienta.
+            //   Nabídka, cíle i pole pohybu Blitzu souběžně.
+            const cile = api.getBlockTargets(matchId, player.id, mode).catch(() => [] as BlockTarget[]);
+            const pole = mode === 'blitz' ? api.getValidMoves(matchId, player.id).catch(() => [] as MoveTarget[]) : Promise.resolve([] as MoveTarget[]);
+            if ((await offeredTo(player.id)).has(mode)) {
                 clearMovePlan();
                 stateManager.selectPlayer(player.id);
-                // Fetch block targets; P304: v Blitzu nabídku serveru souběžně (dřív dva dotazy po sobě)
-                const blitzNabidka = mode === 'blitz' && !player.hasMoved ? offeredTo(player.id) : Promise.resolve(new Set<string>());
-                try {
-                    blockTargets = await api.getBlockTargets(matchId, player.id, mode);
-                    stateManager.setValidTargets(
-                        mode === 'block' ? 'block' : 'blitz',
-                        blockTargets.map(t => ({ x: t.x, y: t.y })),
-                    );
-                } catch {
-                    blockTargets = [];
-                }
-                // P210: blitzující, který ještě neběžel, dostane i pole pohybu
-                moveTargets = [];
-                // P301b: pole pohybu jen tomu, komu server Blitz nabízí (ohlašuje se před pohybem; ohlášený běží dál)
-                if ((await blitzNabidka).has('blitz')) {
-                    try {
-                        moveTargets = await api.getValidMoves(matchId, player.id);
-                    } catch {
-                        moveTargets = [];
-                    }
-                }
+                blockTargets = await cile;
+                stateManager.setValidTargets(
+                    mode === 'block' ? 'block' : 'blitz',
+                    blockTargets.map(t => ({ x: t.x, y: t.y })),
+                );
+                // P210: blitzující dostane i pole pohybu (ohlašuje se před pohybem; ohlášený běží dál)
+                moveTargets = await pole;
             }
         }
         return;
@@ -686,7 +674,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select ball carrier for pass
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed && state.ball.carrierId === player.id) {
+            if ((await offeredTo(player.id)).has('pass')) {   // P305: nabídka serveru (dřív stav/míč z klienta)
                 stateManager.selectPlayer(player.id);
                 try {
                     passTargets = await api.getPassTargets(matchId, player.id);
@@ -714,10 +702,12 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
             // P301b: komu server hod bombou nabízí (Bombardier, nejednal, v kole se nehnul — RulesEngine)
+            const cile = api.getPassTargets(matchId, player.id);   // P305: souběžně s nabídkou
+            cile.catch(() => undefined);
             if ((await offeredTo(player.id)).has('bomb_throw')) {
                 stateManager.selectPlayer(player.id);
                 try {
-                    passTargets = await api.getPassTargets(matchId, player.id);
+                    passTargets = await cile;
                     stateManager.setValidTargets('pass', passTargets.map(t => ({ x: t.x, y: t.y })));
                 } catch {
                     passTargets = [];
@@ -740,7 +730,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select ball carrier for hand-off
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed && state.ball.carrierId === player.id) {
+            if ((await offeredTo(player.id)).has('hand_off')) {   // P305: nabídka serveru
                 stateManager.selectPlayer(player.id);
                 try {
                     handoffTargets = await api.getHandOffTargets(matchId, player.id);
@@ -769,7 +759,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         // Select a player for foul
         const player = stateManager.getPlayerAtPosition(gridPos);
         if (player && player.teamSide === state.activeTeam && stateManager.isPlayerTurn()) {
-            if (player.state === 'standing' && !player.hasActed) {
+            if ((await offeredTo(player.id)).has('foul')) {   // P305: nabídka serveru
                 stateManager.selectPlayer(player.id);
                 try {
                     foulTargets = await api.getFoulTargets(matchId, player.id);
@@ -801,7 +791,7 @@ canvas.addEventListener('click', async (e: MouseEvent) => {
         clearMovePlan();
         stateManager.selectPlayer(player.id);
 
-        if (!player.hasMoved && (player.state === 'standing' || player.state === 'prone')) {
+        if ((await offeredTo(player.id)).has('move')) {   // P305: nabídka serveru (dřív stav a hasMoved z klienta)
             try {
                 moveTargets = await api.getValidMoves(matchId, player.id);
                 stateManager.setValidTargets(
@@ -883,13 +873,24 @@ function clearAllTargets(): void {
     foulTargets = [];
 }
 
-/** P301b: které akce server hráči teď nabízí (`RulesEngine::getAvailableActions`) — pravidla nabídky jen na serveru. */
+/** P305: nabídka serveru k danému stavu — stav se nemění na místě, nový přijde jako nový objekt. */
+let offerCache: { state: unknown; actions: Promise<AvailableAction[]> } | null = null;
+
+/**
+ * P301b: které akce server hráči teď nabízí (`RulesEngine::getAvailableActions`) — pravidla nabídky jen na serveru.
+ * P305: jeden dotaz na stav (dřív při každém kliku a kroku plánu).
+ */
 async function offeredTo(playerId: number): Promise<Set<string>> {
+    const state = stateManager.getGameState();
+    if (!offerCache || offerCache.state !== state) {
+        offerCache = { state, actions: api.getAvailableActions(matchId) };
+    }
     // P304: chyba spojení není „nic nenabízí“ — kouč se o ní dozví (dřív se tiše smazal plán pohybu)
     try {
-        const actions = await api.getAvailableActions(matchId);
+        const actions = await offerCache.actions;
         return new Set(actions.filter(a => a.playerId === playerId).map(a => a.type));
     } catch {
+        offerCache = null;
         toast.error('Could not load available actions');
         return new Set();
     }

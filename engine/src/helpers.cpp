@@ -188,6 +188,12 @@ int calculatePickupTarget(const GameState& state, const Player& player) {
     return calculatePickupTargetAt(state, player, player.position);
 }
 
+double pickupRollChance(const GameState& state, const Player& player, Position at) {
+    double chance = (7.0 - calculatePickupTargetAt(state, player, at)) / 6.0;
+    if (player.hasSkill(SkillName::SureHands)) chance += (1.0 - chance) * chance;   // vlastní přehoz
+    return chance;
+}
+
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier, bool accuratePass) {
     int target = 7 - catcher.stats.agility - modifier;
 
