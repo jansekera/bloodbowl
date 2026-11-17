@@ -33,6 +33,27 @@ abstract class CoachQuestion extends \RuntimeException
         return $this;
     }
 
+    /**
+     * P294 krok 5d: otázka položená hlouběji (zvednutí, chytání v `BallResolver`) zná jen události svého hodu; volající
+     * akce k nim přidá své dřívější (krok, předávka, přihrávka), aby kouč viděl průběh ve správném pořadí a po odpovědi
+     * se v logu nic neopakovalo. Spustí `$fn`; otázku z ní pošle dál s `$pred` napřed.
+     *
+     * @template T
+     * @param list<GameEvent> $pred
+     * @param \Closure(): T $fn
+     * @return T
+     */
+    public static function sPredchozimi(array $pred, \Closure $fn): mixed
+    {
+        try {
+            return $fn();
+        } catch (CoachQuestion $q) {
+            $q->events = [...$pred, ...$q->events];
+
+            throw $q;
+        }
+    }
+
     /** `$state` (stav k zobrazení) s čekající otázkou, která nese vše pro přehrání (`ReplayContext`). */
     abstract public function pending(GameState $state, ReplayContext $replay): GameState;
 }

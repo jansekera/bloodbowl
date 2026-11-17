@@ -13,6 +13,7 @@ use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
+use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\BombRethrowQuestion;
 use App\Engine\BombTarget;
@@ -203,18 +204,15 @@ final class BombThrowHandler implements ActionHandlerInterface
         $chytajici = $state->getPlayerAtPosition($landingPos);
         if ($chytajici !== null && BombTarget::mozeChytit($chytajici)) {
             $strana = $chytajici->getTeamSide();
-            $hod = $this->ballResolver->hodNaChyceni(
+            $hod = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->hodNaChyceni(
                 $state,
                 $chytajici,
                 $accurate ? 1 : 0,
                 $strana === $activeSide && $state->getTeamState($strana)->canUseReroll(),
                 $accurate,
-            );
+            ));
             $state = $hod['state'];
             $events = array_merge($events, $hod['events']);
-            if ($hod['teamRerollUsed']) {
-                $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
-            }
             if ($hod['success']) {
                 return $this->hodDal($state, $chytajici->getId(), $events, $skok + 1);
             }

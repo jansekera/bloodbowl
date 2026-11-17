@@ -5,6 +5,7 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
     dodge: 'Dodge',
     gfi: 'Going For It',
     pickup: 'Pickup',
+    catch: 'Catch',
     leap: 'Leap',
     leap_gfi: 'Going For It (Leap)',
     bone_head: 'Bone Head',
@@ -22,7 +23,17 @@ const ROLL_TYPE_LABELS: Record<string, string> = {
 const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
 
 /** P294 krok 5b (uživatel 17.11.: „je dobře označit správně situaci, která chce reroll“): odkud kam a co je v sázce. */
+/** P294 krok 5d: zvednutí a chytání — kde a co odmítnutí znamená (nepovedené zvednutí = turnover ř. 371-375, chytání ne ř. 376-378). */
+const BALL_ROLLS: Record<string, string> = {
+    pickup: 'Accept Failure = the ball bounces and the turn ends.',
+    catch: 'Accept Failure = the ball bounces.',
+};
+
 function situation(pending: PendingReroll, from: Position | null): string {
+    const mic = BALL_ROLLS[pending.rollType];
+    if (mic !== undefined) {
+        return `<div class="reroll-modal__info">at (${pending.targetX}, ${pending.targetY})</div><div class="reroll-modal__info">${mic}</div>`;
+    }
     if (!MOVE_ROLLS.has(pending.rollType)) return '';
     const odkud = from ? `from (${from.x}, ${from.y}) ` : '';
     return `<div class="reroll-modal__info">${odkud}to (${pending.targetX}, ${pending.targetY})</div>`

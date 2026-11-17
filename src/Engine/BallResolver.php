@@ -150,6 +150,7 @@ final class BallResolver
 
     /**
      * Attempt to pick up ball when player moves onto ball square.
+     * `teamRerollUsed` = týmový přehoz padl na tenhle hod (ve vráceném stavu už odečtený, P294 krok 5d).
      * @return array{state: GameState, events: list<GameEvent>, success: bool, teamRerollUsed: bool}
      */
     public function resolvePickup(GameState $state, MatchPlayerDTO $player, bool $teamRerollAvailable = false): array
@@ -183,36 +184,20 @@ final class BallResolver
             $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
         }
 
-        // ⛔ OPRAVA 18.09.2026 (`rules_bb2016.txt` r. 8381-8387, 926): Pro jen
-        //   na kostku, kterou jeste nic neprehodilo; pouziti se ZAPISE (1x za kolo);
-        //   po Pro uz tymovy prehoz kostky ne -- jen hodu Pro (`ProCheck`).
-        $proUsed = false;
-        if (!$success && !$skillRerollUsed && $player->hasSkill(SkillName::Pro) && !$player->isProUsedThisTurn()) {
-            $proUsed = true;
-            $player = $player->withProUsedThisTurn(true);
-            $state = $state->withPlayer($player);
-            $pro = ProCheck::roll($this->dice, $player, $teamRerollAvailable, $events);
-            $teamRerollUsed = $pro['teamRerollUsed'];
-            if ($pro['allowed']) {
+        // P294 krok 5d: Pro → týmový přehoz (Loner) jedním žebříčkem (`ThrowReroll`); kouče-člověka se zeptá přehráním.
+        //   OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku, která přehazovala i za člověka (dialog 'pickup' se
+        //   nikdy nenabídl), `rules_bb2016.txt` ř. 929-931: přehoz je volba kouče. Pro jen na kostku, kterou ještě nic
+        //   nepřehodilo (ř. 926, oprava 18.09.2026: po Sure Hands nic).
+        if (!$success && !$skillRerollUsed) {
+            $strana = $player->getTeamSide();
+            $tymPred = $state->getTeamState($strana)->canUseReroll();
+            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($player), $player, $strana, $teamRerollAvailable, $events, $this->coach(), 'pickup', $roll, $target, $pos);
+            $state = $res['state'];
+            $player = $res['thrower'];
+            $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
+            if ($res['rerolled']) {
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $target;
-                $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
-            }
-        }
-
-        // Team reroll (only if no skill reroll and no Pro was used)
-        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
-            $teamRerollUsed = true;
-            $lonerBlocked = false;
-            if ($player->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $lonerBlocked = $lonerRoll < 4;
-                $events[] = GameEvent::lonerCheck($player->getId(), $lonerRoll, !$lonerBlocked);
-            }
-            if (!$lonerBlocked) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::rerollUsed($player->getId(), 'Team Reroll');
                 $events[] = GameEvent::ballPickup($player->getId(), $target, $roll, $success);
             }
         }
@@ -253,34 +238,21 @@ final class BallResolver
             $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
         }
 
-        // ⛔ OPRAVA 18.09.2026: tataz pravidla Pro jako u zvedani (r. 8381-8387, 926).
-        $proUsed = false;
-        if (!$success && !$skillRerollUsed && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
-            $proUsed = true;
-            $catcher = $catcher->withProUsedThisTurn(true);
-            $state = $state->withPlayer($catcher);
-            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
-            $teamRerollUsed = $pro['teamRerollUsed'];
-            if ($pro['allowed']) {
+        // P294 krok 5d: Pro → týmový přehoz (Loner) jedním žebříčkem (`ThrowReroll`, přehoz se ve stavu odečte HNED);
+        //   kouče-člověka se zeptá přehráním. OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku (třetí ve
+        //   `resolveCatchFromBounce`), přehazovala i za člověka a týmový přehoz jen ohlásila příznakem; volající ho
+        //   odečetl až po odrazu nechyceného míče ⇒ spoluhráč chytal odraz s DRUHÝM týmovým přehozem v tahu
+        //   (`rules_bb2016.txt` ř. 934-935 „may not use more than one Re-roll counter per turn“).
+        if (!$success && !$skillRerollUsed) {
+            $strana = $catcher->getTeamSide();
+            $tymPred = $state->getTeamState($strana)->canUseReroll();
+            $res = ThrowReroll::proThenTeam($this->dice, $state->withPlayer($catcher), $catcher, $strana, $teamRerollAvailable, $events, $this->coach(), 'catch', $roll, $target, $catcher->getPosition());
+            $state = $res['state'];
+            $catcher = $res['thrower'];
+            $teamRerollUsed = $tymPred && !$state->getTeamState($strana)->canUseReroll();
+            if ($res['rerolled']) {
                 $roll = $this->dice->rollD6();
                 $success = $roll >= $target;
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
-        }
-
-        // Team reroll (only if no skill reroll and no Pro was used)
-        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
-            $teamRerollUsed = true;
-            $lonerBlocked = false;
-            if ($catcher->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $lonerBlocked = $lonerRoll < 4;
-                $events[] = GameEvent::lonerCheck($catcher->getId(), $lonerRoll, !$lonerBlocked);
-            }
-            if (!$lonerBlocked) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::rerollUsed($catcher->getId(), 'Team Reroll');
                 $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
             }
         }
@@ -415,10 +387,7 @@ final class BallResolver
             //   začínal od 0) ⇒ řetěz „vhazování → nechytí → odraz ven“ obcházel pojistku MAX_BOUNCES.
             depth: $depth,
         );
-        $state = $catchResult['state'];
-        if ($catchResult['teamRerollUsed']) {
-            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-        }
+        $state = $catchResult['state'];   // P294 krok 5d: týmový přehoz už odečetl `hodNaChyceni`
 
         return ['state' => $state, 'events' => array_merge($events, $catchResult['events'])];
     }
@@ -686,80 +655,20 @@ final class BallResolver
             return ['state' => $bounceResult['state'], 'events' => $events];
         }
 
-        $target = $this->getCatchTarget($state, $catcher);
-        $roll = $this->dice->rollD6();
-        $success = $roll >= $target;
-        $events = [GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success)];
-
-        // ⛔ OPRAVA 21.09.2026 (1/2): prehoz z Catch se tu delal POTICHU --
-        //   vydala se jen jedna udalost `catch` s uz prehozenym vysledkem,
-        //   takze prvni pokus ani pouziti skillu nebylo v zaznamu videt
-        //   (a zadny histogram je nemohl spocitat).
-        $skillRerollUsed = false;
-        if (!$success && $catcher->hasSkill(SkillName::Catch)) {
-            $skillRerollUsed = true;
-            $roll = $this->dice->rollD6();
-            $success = $roll >= $target;
-            $events[] = GameEvent::rerollUsed($catcher->getId(), 'Catch');
-            $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-        }
-
-        // ⛔ OPRAVA 21.09.2026 (2/2): `rules_bb2016.txt` r. 8381 -- Pro smi
-        //   prehodit "any one dice roll he has made other than Armour, Injury
-        //   or Casualty", tedy i chytani po odskoku a po vhazeni; r. 1263 to
-        //   rika u dopadajiciho mice vyslovne: "players may use the Catch or
-        //   Pro skill to try to re-roll the catch roll".
-        //   ⛔ Po prehozu z Catch uz Pro neprichazi (r. 925-926: tataz kostka
-        //   se neprehazuje dvakrat).
-        //
-        // ⭐ DOPLNENO 21.09.2026: tymovy prehoz. r. 929-933: "A coach may use a
-        //   team re-roll to re-roll any dice roll ... made by a player in their
-        //   own team and who is still on the pitch **during their own turn**."
-        //   ⇒ podminky: vlastni hrac, vlastni kolo, faze hry a volny prehoz.
-        //   ⛔ U mice DOPADAJICIHO po vykopu tymovy prehoz nejde (r. 1263) --
-        //   ten se resi v `resolveCatch()`, kam `teamRerollAvailable` posila
-        //   volajici a `KickoffResolver` ho necha na `false`.
+        // ⛔ OPRAVA 21.09.2026: Pro i týmový přehoz smí i chytání po odskoku (ř. 8381, 1263: "players may use the Catch
+        //   or Pro skill to try to re-roll the catch roll"); týmový jen vlastní hráč ve vlastním kole (ř. 929-933), u míče
+        //   dopadajícího po výkopu ne (ř. 1263). P294 krok 5d: týž hod jako jinde (`hodNaChyceni`), dřív vlastní kopie.
         $side = $catcher->getTeamSide();
-        $teamRerollAvailable = self::tymovyPrehozPoRuce(
+        $hod = $this->hodNaChyceni(
             $state,
-            $side,
-            $state->getPhase() === GamePhase::PLAY ? $state->getActiveTeam() : null,
+            $catcher,
+            0,
+            self::tymovyPrehozPoRuce($state, $side, $state->getPhase() === GamePhase::PLAY ? $state->getActiveTeam() : null),
+            false,
         );
-
-        $proUsed = false;
-        if (!$success && !$skillRerollUsed
-            && $catcher->hasSkill(SkillName::Pro) && !$catcher->isProUsedThisTurn()) {
-            $proUsed = true;
-            $catcher = $catcher->withProUsedThisTurn(true);
-            $state = $state->withPlayer($catcher);
-            $pro = ProCheck::roll($this->dice, $catcher, $teamRerollAvailable, $events);
-            if ($pro['teamRerollUsed']) {
-                $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-                $teamRerollAvailable = false;
-            }
-            if ($pro['allowed']) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
-        }
-
-        // Tymovy prehoz samotneho chytani (jen kdyz se neprehazovalo skillem ani Pro)
-        if (!$success && !$skillRerollUsed && !$proUsed && $teamRerollAvailable) {
-            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-            $lonerBlocked = false;
-            if ($catcher->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $lonerBlocked = $lonerRoll < 4;
-                $events[] = GameEvent::lonerCheck($catcher->getId(), $lonerRoll, !$lonerBlocked);
-            }
-            if (!$lonerBlocked) {
-                $roll = $this->dice->rollD6();
-                $success = $roll >= $target;
-                $events[] = GameEvent::rerollUsed($catcher->getId(), 'Team Reroll');
-                $events[] = GameEvent::catchAttempt($catcher->getId(), $target, $roll, $success);
-            }
-        }
+        $state = $hod['state'];
+        $events = $hod['events'];
+        $success = $hod['success'];
 
         if ($success) {
             $state = $state->withBall(BallState::carried($pos, $catcher->getId()));

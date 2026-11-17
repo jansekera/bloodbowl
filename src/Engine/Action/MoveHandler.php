@@ -14,6 +14,7 @@ use App\Enum\SkillName;
 use App\Enum\Weather;
 use App\ValueObject\Position;
 use App\DTO\PendingRerollDTO;
+use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Engine\ProCheck;
@@ -480,12 +481,12 @@ final class MoveHandler implements ActionHandlerInterface
         $playerId = $hrac->getId();
         $strana = $state->getActiveTeam();
         $hrac = $state->getPlayer($playerId) ?? $hrac;
-        $pickupResult = $this->ballResolver->resolvePickup($state, $hrac, !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll());
+        $prehozSmi = !$teamRerollUsed && $state->getTeamState($strana)->canUseReroll();
+        $pickupResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolvePickup($state, $hrac, $prehozSmi));
         $events = array_merge($events, $pickupResult['events']);
         $state = $pickupResult['state'];
         if ($pickupResult['teamRerollUsed']) {
-            $teamRerollUsed = true;
-            $state = $state->withTeamState($strana, $state->getTeamState($strana)->withRerollUsed());
+            $teamRerollUsed = true;   // P294 krok 5d: ve stavu ho už odečetl žebříček (`ThrowReroll`)
         }
         if (!$pickupResult['success']) {
             $events[] = GameEvent::turnover('Failed pickup');

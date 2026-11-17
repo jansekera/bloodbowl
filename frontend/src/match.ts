@@ -137,6 +137,10 @@ function drawBombSuggestion(state: import('./api/types').GameState): void {
 const MOVE_ROLLS = new Set(['dodge', 'gfi', 'leap', 'leap_gfi']);
 function drawRerollSituation(state: import('./api/types').GameState): void {
     const pending = state.pendingReroll;
+    if (pending && (pending.rollType === 'pickup' || pending.rollType === 'catch')) {
+        renderer.drawSelectedTarget({ x: pending.targetX, y: pending.targetY });   // P294 krok 5d: pole s míčem
+        return;
+    }
     if (!pending || !MOVE_ROLLS.has(pending.rollType)) return;
     const player = state.players.find(p => p.id === pending.playerId);
     const to = { x: pending.targetX, y: pending.targetY };

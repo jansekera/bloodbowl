@@ -182,7 +182,7 @@ final class PassResolver
             }
         }
         if ($landingPos->isOnPitch()) {
-            $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $activeSide);
+            $landingResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $activeSide));
             $events = array_merge($events, $landingResult['events']);
             $state = $landingResult['state'];
         }
@@ -473,7 +473,7 @@ final class PassResolver
             $events = array_merge($events, $throwInResult['events']);
             $state = $throwInResult['state'];
         } else {
-            $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, rerollSide: $activeSide);
+            $landingResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolveLanding($state, $landingPos, rerollSide: $activeSide));
             $events = array_merge($events, $landingResult['events']);
             $state = $landingResult['state'];
         }
@@ -545,7 +545,7 @@ final class PassResolver
         // Přesný Dump-Off = přesná přihrávka ("the normal throwing rules apply", ř. 8097-8098):
         //   chytání +1 (ř. 891) a Diving Catch na cílovém poli +1 (ř. 8063-8064). Do P223 jen +1
         //   bez Diving Catch.
-        $landingResult = $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $state->getActiveTeam());
+        $landingResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolveLanding($state, $landingPos, accuratePass: $accurate, rerollSide: $state->getActiveTeam()));
         return ['state' => $landingResult['state'], 'events' => array_merge($events, $landingResult['events'])];
     }
 

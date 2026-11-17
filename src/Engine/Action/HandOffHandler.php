@@ -9,6 +9,7 @@ use App\DTO\BallState;
 use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
+use App\Engine\CoachQuestion;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
 use App\Enum\SkillName;
@@ -123,13 +124,9 @@ final class HandOffHandler implements ActionHandlerInterface
         // Receiver attempts catch with +1 modifier
         $activeSide = $state->getActiveTeam();
         $teamRerollAvailable = $state->getTeamState($activeSide)->canUseReroll();
-        $catchResult = $this->ballResolver->resolveCatch($state, $receiver, modifier: 1, teamRerollAvailable: $teamRerollAvailable);
+        $catchResult = CoachQuestion::sPredchozimi($events, fn() => $this->ballResolver->resolveCatch($state, $receiver, modifier: 1, teamRerollAvailable: $teamRerollAvailable));
         $events = array_merge($events, $catchResult['events']);
-        $state = $catchResult['state'];
-
-        if ($catchResult['teamRerollUsed']) {
-            $state = $state->withTeamState($activeSide, $state->getTeamState($activeSide)->withRerollUsed());
-        }
+        $state = $catchResult['state'];   // P294 krok 5d: týmový přehoz už odečetl `hodNaChyceni`
 
         // ⛔⛔ OPRAVA 11.09.2026: TURNOVER SE VYHLASOVAL PRILIS BRZY.
         //   `rules_bb2016.txt` r. 371-373 (bod 2 uzavreneho katalogu):

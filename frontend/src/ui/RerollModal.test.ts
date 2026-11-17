@@ -51,6 +51,17 @@ describe('RerollModal', () => {
         expect(modalEl.innerHTML).toContain('falls');
     });
 
+    it('pickup: shows the ball square and that declining ends the turn; catch: only a bounce (P294 krok 5d)', () => {
+        new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'pickup' }, 'Gutter', { x: 6, y: 6 }, vi.fn());
+        expect(modalEl.innerHTML).toContain('Pickup Failed!');
+        expect(modalEl.innerHTML).toContain('at (6, 6)');
+        expect(modalEl.innerHTML).toContain('the ball bounces and the turn ends');
+        new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'catch' }, 'Catcher', { x: 6, y: 6 }, vi.fn());
+        expect(modalEl.innerHTML).toContain('Catch Failed!');
+        expect(modalEl.innerHTML).toContain('Accept Failure = the ball bounces.');
+        expect(modalEl.innerHTML).not.toContain('turn ends');
+    });
+
     it('pass: no move squares and no fall warning', () => {
         new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'pass' }, 'Thrower', { x: 5, y: 6 }, vi.fn());
         expect(modalEl.innerHTML).not.toContain('from (');
