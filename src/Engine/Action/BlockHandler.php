@@ -20,6 +20,7 @@ use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
 use App\Engine\Coach;
+use App\Engine\ProCheck;
 use App\Engine\ThrowReroll;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
@@ -517,31 +518,26 @@ final class BlockHandler implements ActionHandlerInterface
             $ok = $roll >= $threshold;
             $events[] = GameEvent::rerollUsed($id, 'Sure Feet');
             $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
-        } elseif (!$ok && $attacker->hasSkill(SkillName::Pro) && !$attacker->isProUsedThisTurn()) {
-            $attacker = $attacker->withProUsedThisTurn(true);
-            $pro = \App\Engine\ProCheck::roll($this->dice, $attacker, $state->getTeamState($side)->canUseReroll(), $events);
-            if ($pro['teamRerollUsed']) {
-                $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-            }
-            if ($pro['allowed']) {
-                $roll = $this->dice->rollD6();
-                $ok = $roll >= $threshold;
-                $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
-            }
-        } elseif (!$ok && $state->getTeamState($side)->canUseReroll()) {
-            $state = $state->withTeamState($side, $state->getTeamState($side)->withRerollUsed());
-            $lonerOk = true;
-            if ($attacker->hasSkill(SkillName::Loner)) {
-                $lonerRoll = $this->dice->rollD6();
-                $lonerOk = $lonerRoll >= 4;
-                $events[] = GameEvent::lonerCheck($id, $lonerRoll, $lonerOk);
-            }
-            if ($lonerOk) {
-                $roll = $this->dice->rollD6();
-                $ok = $roll >= $threshold;
-                $events[] = GameEvent::rerollUsed($id, 'Team Reroll');
-                $events[] = GameEvent::gfiAttempt($id, $roll, $ok);
-            }
+        } elseif (!$ok) {
+            // P294 /simplify (dávka 3): Pro → týmový přehoz (Loner) společným krokem; kouč-člověk otázkou jako u GFI
+            //   pohybu. OPRAVENO 17.11.2026 — dřív vlastní kopie žebříčku (ProCheck s týmovým přehozem, Loner ručně),
+            //   přehazovala i za člověka (ř. 929-931: přehoz je volba kouče). Po Sure Feet nic (ř. 926).
+            $res = ThrowReroll::prehoditNaCil(
+                $this->dice,
+                $state,
+                $attacker,
+                true,
+                $events,
+                $this->coach,
+                'gfi',
+                $roll,
+                $threshold,
+                $attacker->getPosition(),
+                static fn(int $r, bool $o): GameEvent => GameEvent::gfiAttempt($id, $r, $o),
+            );
+            $state = $res['state'];
+            $attacker = $res['thrower'];
+            $ok = $res['ok'];
         }
 
         if ($ok) {
@@ -985,27 +981,12 @@ final class BlockHandler implements ActionHandlerInterface
                 if (!$pending->isTeamRerollAvailable()) {
                     throw new \InvalidArgumentException('Team reroll not available');
                 }
-                $activeSide = $state->getActiveTeam();
-                $lonerBlocked = false;
-                if ($attacker->hasSkill(SkillName::Loner)) {
-                    $lonerRoll = $this->dice->rollD6();
-                    $lonerBlocked = $lonerRoll < 4;
-                    $events[] = GameEvent::lonerCheck($attacker->getId(), $lonerRoll, !$lonerBlocked);
-                }
-                // Consume the reroll regardless of Loner
-                $state = $state->withTeamState(
-                    $activeSide,
-                    $state->getTeamState($activeSide)->withRerollUsed(),
-                );
-                if (!$lonerBlocked) {
-                    $events[] = GameEvent::rerollUsed($attacker->getId(), 'Team Reroll');
+                // týmový přehoz s Lonerem jedním místem (`ThrowReroll::teamReroll`, P294 /simplify; dřív ruční kopie)
+                $tym = ThrowReroll::teamReroll($this->dice, $state, $attacker, $state->getActiveTeam(), $events);
+                $state = $tym['state'];
+                if ($tym['ok']) {
                     // po neuspesnem Pro se prehazuje HOD PRO (r. 8385-8387)
-                    $proAllowed = true;
-                    if ($pending->isProFailed()) {
-                        $proRoll = $this->dice->rollD6();
-                        $proAllowed = $proRoll >= 4;
-                        $events[] = GameEvent::proReroll($attacker->getId(), $proRoll, $proAllowed, null);
-                    }
+                    $proAllowed = !$pending->isProFailed() || ProCheck::roll($this->dice, $attacker, $events)['allowed'];
                     $pending = $proAllowed
                         ? $pending->withTeamRerollUsed()->withFaces($this->rollBlockDice(count($faces)))
                         : $pending->withTeamRerollUsed();

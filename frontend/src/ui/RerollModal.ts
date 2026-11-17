@@ -46,8 +46,11 @@ function situation(pending: PendingReroll, from: Position | null): string {
         return `<div class="reroll-modal__info">at (${pending.targetX}, ${pending.targetY})</div><div class="reroll-modal__info">${mic}</div>`;
     }
     if (!MOVE_ROLLS.has(pending.rollType)) return '';
-    const odkud = from ? `from (${from.x}, ${from.y}) ` : '';
-    return `<div class="reroll-modal__info">${odkud}to (${pending.targetX}, ${pending.targetY})</div>`
+    // GFI, kterým se v blitzu platí rána (P294 /simplify dávka 3): hráč se nehýbe ⇒ jen pole
+    const naMiste = from !== null && from.x === pending.targetX && from.y === pending.targetY;
+    const pole = naMiste ? `at (${pending.targetX}, ${pending.targetY})`
+        : `${from ? `from (${from.x}, ${from.y}) ` : ''}to (${pending.targetX}, ${pending.targetY})`;
+    return `<div class="reroll-modal__info">${pole}</div>`
         + '<div class="reroll-modal__info">Accept Failure = the player falls (armour roll) and the turn ends.</div>';
 }
 

@@ -190,7 +190,7 @@ final class ThrowReroll
         if ($vybral === 'pro') {
             $thrower = $thrower->withProUsedThisTurn(true);
             $state = $state->withPlayer($thrower);
-            if (ProCheck::roll($dice, $thrower, false, $events)['allowed']) {
+            if (ProCheck::roll($dice, $thrower, $events)['allowed']) {
                 return ['state' => $state, 'thrower' => $thrower, 'rerolled' => true];
             }
             if (!$smi['team'] || $volba(false, true, true, $state) === 'decline') {
@@ -203,7 +203,7 @@ final class ThrowReroll
             return ['state' => $state, 'thrower' => $thrower, 'rerolled' => false];
         }
         // po neúspěšném Pro přehazuje týmový přehoz HOD PRO (ř. 8387), ne původní kostku
-        $rerolled = $vybral === 'pro' ? ProCheck::roll($dice, $thrower, false, $events)['allowed'] : true;
+        $rerolled = $vybral === 'pro' ? ProCheck::roll($dice, $thrower, $events)['allowed'] : true;
 
         return ['state' => $state, 'thrower' => $thrower, 'rerolled' => $rerolled];
     }

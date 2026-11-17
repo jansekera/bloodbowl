@@ -69,6 +69,13 @@ describe('RerollModal', () => {
         expect(modalEl.innerHTML).not.toContain('from (');
     });
 
+    it('GFI on the spot (blitz block): only the square, still the fall warning', () => {
+        new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'gfi' }, 'Blitzer', { x: 6, y: 6 }, vi.fn());
+        expect(modalEl.innerHTML).toContain('at (6, 6)');
+        expect(modalEl.innerHTML).not.toContain('from (');
+        expect(modalEl.innerHTML).toContain('falls');
+    });
+
     it('pass: no move squares and no fall warning', () => {
         new RerollModal({ appendChild: vi.fn() } as unknown as HTMLElement).show({ ...dodge, rollType: 'pass' }, 'Thrower', { x: 5, y: 6 }, vi.fn());
         expect(modalEl.innerHTML).not.toContain('from (');

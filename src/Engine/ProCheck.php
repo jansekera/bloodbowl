@@ -6,7 +6,6 @@ namespace App\Engine;
 
 use App\DTO\GameEvent;
 use App\DTO\MatchPlayerDTO;
-use App\Enum\SkillName;
 
 /**
  * ⭐ PRIDANO 18.09.2026: hod na Pro podle `rules_bb2016.txt` r. 8381-8387.
@@ -26,35 +25,18 @@ use App\Enum\SkillName;
 final class ProCheck
 {
     /**
-     * @param list<GameEvent> $events doplni se udalosti hodu Pro (a Loner)
-     * @return array{allowed: bool, teamRerollUsed: bool}
+     * Jeden hod Pro. Týmový přehoz nepovedeného hodu Pro (ř. 8387) řeší žebříček `ThrowReroll` (P294 /simplify:
+     * dřív i tady, druhá kopie týmového přehozu s Lonerem).
+     *
+     * @param list<GameEvent> $events doplní se událost hodu Pro
+     * @return array{allowed: bool}
      */
-    public static function roll(
-        DiceRollerInterface $dice,
-        MatchPlayerDTO $player,
-        bool $teamRerollAvailable,
-        array &$events,
-    ): array {
-        $proRoll = $dice->rollD6();
-        $allowed = $proRoll >= 4;
-        $events[] = GameEvent::proReroll($player->getId(), $proRoll, $allowed, null);
-        if ($allowed || !$teamRerollAvailable) {
-            return ['allowed' => $allowed, 'teamRerollUsed' => false];
-        }
-
-        // r. 8387: tymovy prehoz HODU PRO (Loner plati jako u kazdeho tymoveho prehozu)
-        if ($player->hasSkill(SkillName::Loner)) {
-            $lonerRoll = $dice->rollD6();
-            $events[] = GameEvent::lonerCheck($player->getId(), $lonerRoll, $lonerRoll >= 4);
-            if ($lonerRoll < 4) {
-                return ['allowed' => false, 'teamRerollUsed' => true];
-            }
-        }
-        $events[] = GameEvent::rerollUsed($player->getId(), 'Team Reroll');
+    public static function roll(DiceRollerInterface $dice, MatchPlayerDTO $player, array &$events): array
+    {
         $proRoll = $dice->rollD6();
         $allowed = $proRoll >= 4;
         $events[] = GameEvent::proReroll($player->getId(), $proRoll, $allowed, null);
 
-        return ['allowed' => $allowed, 'teamRerollUsed' => true];
+        return ['allowed' => $allowed];
     }
 }
