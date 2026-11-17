@@ -11,7 +11,7 @@ use App\DTO\GameState;
 use App\Enum\PlayerState;
 use App\Enum\SkillName;
 use App\Engine\RefereeCall;
-use App\Engine\RefereeQuestion;
+use App\Engine\Coach;
 use App\Enum\TeamSide;
 use App\Engine\BallResolver;
 use App\Engine\DiceRollerInterface;
@@ -20,21 +20,17 @@ use App\Engine\StrengthCalculator;
 
 final class FoulHandler implements ActionHandlerInterface
 {
-    /** @var list<TeamSide> P291: strany kouče-člověka — rozhodčí se ptá na úplatek / protest */
-    private array $interactiveReferee = [];
-    /** @var list<array{bribe: bool, argue: bool}> odpovědi z dřívějších přerušení této akce (přehrání) */
-    private array $refereeAnswers = [];
+    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
+    private ?Coach $coach = null;
 
-    /** @param list<TeamSide> $sides */
-    public function setInteractiveReferee(array $sides): void
+    public function setCoach(Coach $coach): void
     {
-        $this->interactiveReferee = $sides;
+        $this->coach = $coach;
     }
 
-    /** @param list<array{bribe: bool, argue: bool}> $answers */
-    public function setRefereeAnswers(array $answers): void
+    private function coach(): Coach
     {
-        $this->refereeAnswers = $answers;
+        return $this->coach ??= new Coach();
     }
 
     public function __construct(
@@ -160,9 +156,9 @@ final class FoulHandler implements ActionHandlerInterface
             // P291: kouče-člověka se rozhodčí zeptá (jen když je co volit); bez odpovědi se akce přeruší
             $strana = $attacker->getTeamSide();
             $volba = null;
-            $moznosti = in_array($strana, $this->interactiveReferee, true) ? RefereeCall::options($state, $strana) : null;
+            $moznosti = $this->coach()->decides($strana) ? RefereeCall::options($state, $strana) : null;
             if ($moznosti !== null) {
-                $volba = array_shift($this->refereeAnswers) ?? throw new RefereeQuestion($attackerId, $moznosti['bribe'], $moznosti['argue']);
+                $volba = $this->coach()->referee($attackerId, $moznosti['bribe'], $moznosti['argue']);
             }
             $vyrok = RefereeCall::sendOff($state, $attackerId, $strana, true, $this->dice, $events, $volba);
             $state = $vyrok['state'];

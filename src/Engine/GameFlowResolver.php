@@ -18,17 +18,21 @@ use App\ValueObject\Position;
 
 final class GameFlowResolver
 {
-    /** @var list<TeamSide> P291: strany kouče-člověka — rozhodčí se ptá na úplatek / protest */
-    private array $interactiveReferee = [];
-
     public function __construct(
         private readonly DiceRollerInterface $dice,
     ) {}
 
-    /** @param list<TeamSide> $sides */
-    public function setInteractiveReferee(array $sides): void
+    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
+    private ?Coach $coach = null;
+
+    public function setCoach(Coach $coach): void
     {
-        $this->interactiveReferee = $sides;
+        $this->coach = $coach;
+    }
+
+    private function coach(): Coach
+    {
+        return $this->coach ??= new Coach();
     }
 
     /**
@@ -327,7 +331,7 @@ final class GameFlowResolver
             $jesteVeHre = $stav->isOnPitch() || $stav === PlayerState::KO || $stav === PlayerState::OFF_PITCH;
             if ($player->hasSkill(SkillName::SecretWeapon) && $hral && $jesteVeHre) {
                 // P291: hráče kouče-člověka rozhodčí vyřídí až po jeho odpovědi (před setupem dalšího drive)
-                if (in_array($player->getTeamSide(), $this->interactiveReferee, true)) {
+                if ($this->coach()->decides($player->getTeamSide())) {
                     $fronta[] = $player->getId();
                     continue;
                 }

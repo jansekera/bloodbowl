@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Engine;
 
+use App\Engine\Coach;
 use App\DTO\GameState;
 use App\DTO\TeamStateDTO;
 use App\Engine\ActionResolver;
@@ -41,7 +42,7 @@ final class RefereeQuestionTest extends TestCase
     private function resolver(FixedDiceRoller $dice): ActionResolver
     {
         $r = new ActionResolver($dice);
-        $r->setInteractiveReferee([TeamSide::HOME]);
+        $r->setCoachSides([TeamSide::HOME]);
 
         return $r;
     }
@@ -130,7 +131,7 @@ final class RefereeQuestionTest extends TestCase
     private function flow(FixedDiceRoller $dice): GameFlowResolver
     {
         $f = new GameFlowResolver($dice);
-        $f->setInteractiveReferee([TeamSide::HOME]);
+        $f->setCoach(new Coach([TeamSide::HOME]));
 
         return $f;
     }

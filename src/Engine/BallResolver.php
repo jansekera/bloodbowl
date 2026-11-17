@@ -19,10 +19,6 @@ final class BallResolver
 {
     private const MAX_BOUNCES = 5;
 
-    /** @var list<TeamSide> strany kouče-člověka -- jeho hráče se na Diving Catch ptá (i v tahu soupeře) */
-    private array $divingCatchSides = [];
-    /** @var list<bool> odpovědi na otázky Diving Catch v pořadí, v jakém je akce položí (přehrání) */
-    private array $divingCatchAnswers = [];
 
     public function __construct(
         private readonly DiceRollerInterface $dice,
@@ -30,16 +26,17 @@ final class BallResolver
         private readonly ScatterCalculator $scatterCalc,
     ) {}
 
-    /** @param list<TeamSide> $sides */
-    public function setInteractiveDivingCatch(array $sides): void
+    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
+    private ?Coach $coach = null;
+
+    public function setCoach(Coach $coach): void
     {
-        $this->divingCatchSides = $sides;
+        $this->coach = $coach;
     }
 
-    /** @param list<bool> $answers */
-    public function setDivingCatchAnswers(array $answers): void
+    private function coach(): Coach
     {
-        $this->divingCatchAnswers = $answers;
+        return $this->coach ??= new Coach();
     }
 
     /**
@@ -78,13 +75,12 @@ final class BallResolver
         $odmitli = 0; // recenze 30.10. D/2: kdo už odmítl, do „dalších kandidátů“ v otázce nepatří
         foreach ([$naTahu, $naTahu->opponent()] as $strana) {
             $svoji = array_values(array_filter($kandidati, static fn(MatchPlayerDTO $p) => $p->getTeamSide() === $strana));
-            if (in_array($strana, $this->divingCatchSides, true)) {
+            if ($this->coach()->decides($strana)) {
                 foreach ($svoji as $hrac) {
                     if (count($skacou) >= 2) {
                         break;
                     }
-                    $odpoved = array_shift($this->divingCatchAnswers)
-                        ?? throw new DivingCatchQuestion($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId());
+                    $odpoved = $this->coach()->divingCatch($hrac->getId(), $landing, count($kandidati) - 1 - $odmitli, ($skacou[0] ?? null)?->getId());
                     if ($odpoved) {
                         $skacou[] = $hrac;
                     } else {

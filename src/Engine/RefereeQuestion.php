@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Engine;
 
+use App\DTO\PendingRefereeDTO;
+use App\DTO\GameState;
+use App\DTO\ReplayAnswers;
+use App\Enum\ActionType;
+
 /**
  * P291: rozhodčí uprostřed faulu vylučuje hráče kouče-člověka a kouč ještě neřekl, jestli použije úplatek / protest
  * (viz `ReplayDiceRoller`). Chytá ji jen `ActionResolver::resolve`, který vrátí stav PŘED akcí s `PendingRefereeDTO`.
  */
-final class RefereeQuestion extends \RuntimeException
+final class RefereeQuestion extends CoachQuestion
 {
     public function __construct(
         public readonly int $playerId,
@@ -16,5 +21,19 @@ final class RefereeQuestion extends \RuntimeException
         public readonly bool $canArgue,
     ) {
         parent::__construct('Referee question pending');
+    }
+
+    public function pending(GameState $state, ActionType $action, array $params, array $dice, ReplayAnswers $answers): GameState
+    {
+        return $state->withPendingReferee(new PendingRefereeDTO(
+            $this->playerId,
+            true,
+            $this->canBribe,
+            $this->canArgue,
+            $action,
+            $params,
+            $dice,
+            $answers,
+        ));
     }
 }

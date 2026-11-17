@@ -20,7 +20,7 @@ use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
 use App\Engine\PassResolver;
 use App\Engine\ThrowReroll;
-use App\Engine\CoachRerolls;
+use App\Engine\Coach;
 use App\Engine\ScatterCalculator;
 use App\Engine\TacklezoneCalculator;
 use App\Engine\ThrowTarget;
@@ -28,19 +28,20 @@ use App\Engine\ThrowTarget;
 final class BombThrowHandler implements ActionHandlerInterface
 {
     /** P292: kouče-člověka se při nepovedeném hodu zeptá na přehoz (sdílený objekt z ActionResolveru) */
-    private ?CoachRerolls $koucPrehozy = null;
+    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
+    private ?Coach $coach = null;
 
-    public function setCoachRerolls(CoachRerolls $kouc): void
+    public function setCoach(Coach $coach): void
     {
-        $this->koucPrehozy = $kouc;
+        $this->coach = $coach;
+    }
+
+    private function coach(): Coach
+    {
+        return $this->coach ??= new Coach();
     }
     private readonly PassResolver $passResolver;
 
-    /** @var list<TeamSide> strany kouče-člověka — jeho hráče se ptá, kam hodit chycenou bombu (P272) */
-    private array $rethrowSides = [];
-
-    /** @var list<array{x: int, y: int}> odpovědi na otázky „kam hodit“ v pořadí, v jakém v akci padnou */
-    private array $rethrowAnswers = [];
 
     public function __construct(
         private readonly DiceRollerInterface $dice,
@@ -54,17 +55,6 @@ final class BombThrowHandler implements ActionHandlerInterface
         $this->passResolver = new PassResolver($dice, $tzCalc, $scatterCalc, $ballResolver);
     }
 
-    /** @param list<TeamSide> $sides */
-    public function setInteractiveRethrow(array $sides): void
-    {
-        $this->rethrowSides = $sides;
-    }
-
-    /** @param list<array{x: int, y: int}> $answers */
-    public function setRethrowAnswers(array $answers): void
-    {
-        $this->rethrowAnswers = $answers;
-    }
 
     /**
      * @param array<string, mixed> $params {playerId, targetX, targetY}
@@ -171,7 +161,7 @@ final class BombThrowHandler implements ActionHandlerInterface
                 $thrower->getTeamSide(),
                 !$thrower->hasSkill(SkillName::Loner) && $thrower->getTeamSide() === $activeSide,
                 $events,
-                $this->koucPrehozy,
+                $this->coach(),
                 'bomb',
                 $roll,
                 max(2, 2 - $modifier),
@@ -252,8 +242,8 @@ final class BombThrowHandler implements ActionHandlerInterface
         if ($cil === null) {
             return $this->vybuch($state, $drzi->requirePosition(), $events);
         }
-        if (in_array($drzi->getTeamSide(), $this->rethrowSides, true)) {
-            $odpoved = array_shift($this->rethrowAnswers) ?? throw new BombRethrowQuestion(
+        if ($this->coach()->decides($drzi->getTeamSide())) {
+            $odpoved = $this->coach()->bombTarget(
                 $drziId,
                 ThrowTarget::cile($state, $drzi, true),
                 ['x' => $cil->getX(), 'y' => $cil->getY()],

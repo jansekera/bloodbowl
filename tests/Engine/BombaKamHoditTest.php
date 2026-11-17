@@ -45,7 +45,7 @@ final class BombaKamHoditTest extends TestCase
     private function resolver(array $kostky, array $lide = [TeamSide::AWAY]): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
-        $r->setInteractiveBombRethrow($lide);
+        $r->setCoachSides($lide);
 
         return $r;
     }
@@ -79,7 +79,7 @@ final class BombaKamHoditTest extends TestCase
         // Přehrají se zapsané hody (6, 6), nový je jen hod 12 na (14,7): 6 přesně ⇒ výbuch v prázdnu, nikdo nepadne.
         $kostky = new FixedDiceRoller([6]);
         $r = new ActionResolver($kostky);
-        $r->setInteractiveBombRethrow([TeamSide::AWAY]);
+        $r->setCoachSides([TeamSide::AWAY]);
         $po = $r->resolve($q, ActionType::RESOLVE_BOMB_RETHROW, ['targetX' => 14, 'targetY' => 7]);
 
         $this->assertNull($po->getNewState()->getPendingBombRethrow());
@@ -109,7 +109,7 @@ final class BombaKamHoditTest extends TestCase
         // Člověk hraje HOME, chytá hráč AWAY (AI) ⇒ bez otázky, engine hodí zpět na 1: 6 přesně; zbroj 3+3.
         $kostky = new FixedDiceRoller([6, 6, 6, 3, 3]);
         $r = new ActionResolver($kostky);
-        $r->setInteractiveBombRethrow([TeamSide::HOME]);
+        $r->setCoachSides([TeamSide::HOME]);
         $po = $this->hod($this->scena(), $r);
 
         $this->assertNull($po->getNewState()->getPendingBombRethrow());

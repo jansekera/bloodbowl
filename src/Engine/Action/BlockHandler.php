@@ -19,7 +19,7 @@ use App\Enum\SkillName;
 use App\Enum\TeamSide;
 use App\ValueObject\Position;
 use App\Engine\BallResolver;
-use App\Engine\CoachRerolls;
+use App\Engine\Coach;
 use App\Engine\ThrowReroll;
 use App\Engine\DiceRollerInterface;
 use App\Engine\InjuryResolver;
@@ -50,11 +50,17 @@ final class BlockHandler implements ActionHandlerInterface
     ) {}
 
     /** P303: kouče-člověka se ptá na přehoz hodu Jump Up (`ActionResolver`); bez nastavení přehazuje jako AI */
-    private ?CoachRerolls $koucPrehozy = null;
+    /** P294 krok 3: kouč-člověk (strany + odpovědi z přehrání); bez nastavení nikdo, ptá se jen AI */
+    private ?Coach $coach = null;
 
-    public function setCoachRerolls(CoachRerolls $kouc): void
+    public function setCoach(Coach $coach): void
     {
-        $this->koucPrehozy = $kouc;
+        $this->coach = $coach;
+    }
+
+    private function coach(): Coach
+    {
+        return $this->coach ??= new Coach();
     }
 
     /**
@@ -75,7 +81,7 @@ final class BlockHandler implements ActionHandlerInterface
         $cil = max(2, min(6, 7 - $attacker->getStats()->getAgility() - 2));
         $hod = $this->dice->rollD6();
         if ($hod < $cil) {
-            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->koucPrehozy, 'jump_up', $hod, $cil);
+            $prehoz = ThrowReroll::proThenTeam($this->dice, $state, $attacker, $attacker->getTeamSide(), true, $events, $this->coach(), 'jump_up', $hod, $cil);
             $state = $prehoz['state'];
             $attacker = $prehoz['thrower'];
             if ($prehoz['rerolled']) {

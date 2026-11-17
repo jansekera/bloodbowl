@@ -444,7 +444,7 @@ final class SkillModifiersTest extends TestCase
             ->addPlayer(TeamSide::AWAY, 6, 7, strength: 3, id: 2)
             ->build();
         $r1 = new ActionResolver(new FixedDiceRoller([2]));
-        $r1->setInteractiveThrowRerolls([TeamSide::HOME]);
+        $r1->setCoachSides([TeamSide::HOME]);
         $s = $r1->resolve($state, ActionType::BLOCK, ['playerId' => 1, 'targetId' => 2])->getNewState();
 
         $q = $s->getPendingReroll();
@@ -455,7 +455,7 @@ final class SkillModifiersTest extends TestCase
 
         // přehoz 3 ⇒ vstane; kostky bloku 6, 6; brnění 3+3
         $r2 = new ActionResolver(new FixedDiceRoller([3, 6, 6, 3, 3]));
-        $r2->setInteractiveThrowRerolls([TeamSide::HOME]);
+        $r2->setCoachSides([TeamSide::HOME]);
         $res = $r2->resolve($s, ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
         $this->assertNull($res->getNewState()->getPendingReroll());
         $this->assertSame(PlayerState::STANDING, $res->getNewState()->requirePlayer(1)->getState());

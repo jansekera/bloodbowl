@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Engine;
 
+use App\DTO\ReplayAnswers;
+use App\Engine\Coach;
 use App\AI\AICoachInterface;
 use App\Container\Container;
 use App\Container\ServiceProvider;
@@ -50,7 +52,7 @@ final class DivingCatchKoucTest extends TestCase
     private function resolver(array $kostky, array $lide): ActionResolver
     {
         $r = new ActionResolver(new FixedDiceRoller($kostky));
-        $r->setInteractiveDivingCatch($lide);
+        $r->setCoachSides($lide);
 
         return $r;
     }
@@ -70,8 +72,9 @@ final class DivingCatchKoucTest extends TestCase
      */
     private function prihraj(GameState $s, array $lide, array $navic = []): ActionResult
     {
-        return $this->resolver(array_merge(self::HODY_PRIHRAVKY, $navic), $lide)
-            ->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]);
+        $r = $this->resolver(array_merge(self::HODY_PRIHRAVKY, $navic), $lide);
+
+        return self::sPrehozem($r, $r->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]));
     }
 
     /** @return list<string> */
@@ -155,7 +158,7 @@ final class DivingCatchKoucTest extends TestCase
             ->withBallOnGround(5, 6)
             ->build();
         $ball = new BallResolver(new FixedDiceRoller([5, 6]), new TacklezoneCalculator(), new ScatterCalculator());
-        $ball->setInteractiveDivingCatch([TeamSide::HOME]);
+        $ball->setCoach(new Coach([TeamSide::HOME]));
 
         $r = $ball->resolveBounce($s, new Position(5, 6));
 
@@ -174,10 +177,7 @@ final class DivingCatchKoucTest extends TestCase
             ->withBallOnGround(0, 7)
             ->build();
         $ball = new BallResolver(new FixedDiceRoller([3, 3, 3, 4]), new TacklezoneCalculator(), new ScatterCalculator());
-        $ball->setInteractiveDivingCatch([TeamSide::HOME]);
-        if ($odpoved !== null) {
-            $ball->setDivingCatchAnswers([$odpoved]);
-        }
+        $ball->setCoach(self::kouc([TeamSide::HOME], new ReplayAnswers($odpoved !== null ? [$odpoved] : [])));
 
         return $ball->resolveThrowIn($s, new Position(0, 7), new Position(-1, 7));
     }
@@ -212,8 +212,7 @@ final class DivingCatchKoucTest extends TestCase
         $dice = new FixedDiceRoller([3, 2, 3, 4, 3, 3, 7]);
         $scatter = new ScatterCalculator();
         $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
-        $ball->setInteractiveDivingCatch($lide);
-        $ball->setDivingCatchAnswers($odpovedi);
+        $ball->setCoach(self::kouc($lide, new ReplayAnswers($odpovedi)));
 
         return (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(10, 7));
     }
@@ -260,8 +259,7 @@ final class DivingCatchKoucTest extends TestCase
         $dice = new FixedDiceRoller([3, 1, 3, 4, 3, 3, 4]);
         $scatter = new ScatterCalculator();
         $ball = new BallResolver($dice, new TacklezoneCalculator(), $scatter);
-        $ball->setInteractiveDivingCatch([TeamSide::HOME]);
-        $ball->setDivingCatchAnswers($odpovedi);
+        $ball->setCoach(self::kouc([TeamSide::HOME], new ReplayAnswers($odpovedi)));
 
         return (new KickoffResolver($dice, $scatter, $ball, new InjuryResolver()))->resolveKickoff($s, new Position(6, 7));
     }
@@ -292,8 +290,8 @@ final class DivingCatchKoucTest extends TestCase
             ->withBallCarried(1)
             ->build();
 
-        $q1 = $this->resolver([2, 2, 1, 3, 7], [TeamSide::HOME])
-            ->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 1])->getNewState();
+        $r1 = $this->resolver([2, 2, 1, 3, 7], [TeamSide::HOME]);
+        $q1 = self::sPrehozem($r1, $r1->resolve($s, ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 1]))->getNewState();
         $this->assertSame(2, $q1->getPendingDivingCatch()?->getPlayerId());
 
         // Odpověď jiným resolverem jen s novými kostkami — hody přihrávky se přehrají ze záznamu.
@@ -360,13 +358,33 @@ final class DivingCatchKoucTest extends TestCase
         ServiceProvider::register($c);
         $c->set(DiceRollerInterface::class, fn() => new FixedDiceRoller(array_merge(self::HODY_PRIHRAVKY, [4], array_fill(0, 20, 3))));
         $r = $c->get(ActionResolver::class);
-        $r->setInteractiveDivingCatch([TeamSide::HOME]);
+        $r->setCoachSides([TeamSide::HOME]);
 
-        $q = $r->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5])->getNewState();
+        $q = self::sPrehozem($r, $r->resolve($this->prihravka(), ActionType::PASS, ['playerId' => 1, 'targetX' => 10, 'targetY' => 5]))->getNewState();
         $this->assertSame(2, $q->getPendingDivingCatch()?->getPlayerId());
 
         $po = $r->resolve($q, ActionType::RESOLVE_DIVING_CATCH, ['use' => true]);
         $this->assertContains('diving_catch', $this->udalosti($po));
         $this->assertSame(2, $po->getNewState()->getBall()->getCarrierId(), 'přehrání = tytéž hody, pak chytání 4');
+    }
+
+    /** @param list<TeamSide> $strany */
+    private static function kouc(array $strany, ReplayAnswers $odpovedi): Coach
+    {
+        $k = new Coach($strany);
+        $k->begin($odpovedi);
+
+        return $k;
+    }
+
+    /**
+     * P294 krok 3: kouč-člověk dostává i otázku na přehoz; na nepřesnou přihrávku odpoví týmovým přehozem — tytéž
+     * kostky, jaké dřív hodila AI (dokud otázky Diving Catch a přehozu šly zapnout zvlášť).
+     */
+    private static function sPrehozem(ActionResolver $r, ActionResult $v): ActionResult
+    {
+        return $v->getNewState()->getPendingReroll() === null
+            ? $v
+            : $r->resolve($v->getNewState(), ActionType::RESOLVE_REROLL, ['choice' => 'team_reroll']);
     }
 }

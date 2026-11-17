@@ -9,10 +9,7 @@ use App\DTO\GameEvent;
 use App\DTO\GameState;
 use App\DTO\MatchPlayerDTO;
 use App\DTO\PendingApothecaryDTO;
-use App\DTO\PendingBombRethrowDTO;
-use App\DTO\PendingDivingCatchDTO;
 use App\DTO\PendingRerollDTO;
-use App\DTO\PendingRefereeDTO;
 use App\DTO\ReplayAnswers;
 use App\DTO\BallState;
 use App\Engine\Action\BallAndChainHandler;
@@ -43,7 +40,7 @@ final class ActionResolver
     private readonly BlitzHandler $blitzHandler;
     private readonly FoulHandler $foulHandler;
     /** P292: otázky kouči na přehoz hodu (sdílí PassResolver, TTM, bomba) */
-    private readonly CoachRerolls $koucPrehozy;
+    private readonly Coach $coach;
     private readonly HandOffHandler $handOffHandler;
     private readonly SetupHandler $setupHandler;
     private readonly EndTurnHandler $endTurnHandler;
@@ -69,7 +66,7 @@ final class ActionResolver
         //   odpovědi se akce přehrála s novými hody. Proto se všechny resolvery staví tady nad `$replayDice`.
         $this->replayDice = new ReplayDiceRoller($dice);
         $dice = $this->replayDice;
-        $this->koucPrehozy = new CoachRerolls();
+        $this->coach = new Coach();
         $this->dice = $dice;
         $this->tzCalc = new TacklezoneCalculator();
         $this->scatterCalc = new ScatterCalculator();
@@ -91,9 +88,13 @@ final class ActionResolver
         $this->handOffHandler = new HandOffHandler($this->ballResolver, $dice);
         $this->ttmHandler = new ThrowTeamMateHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
         $this->bombThrowHandler = new BombThrowHandler($dice, $this->tzCalc, $this->scatterCalc, $injuryResolver, $this->ballResolver);
-        $this->ttmHandler->setCoachRerolls($this->koucPrehozy);
-        $this->bombThrowHandler->setCoachRerolls($this->koucPrehozy);
-        $this->blockHandler->setCoachRerolls($this->koucPrehozy);   // P303 Jump Up
+        // P294 krok 3: jeden kouč-člověk pro všechny otázky uprostřed akce
+        $this->ballResolver->setCoach($this->coach);
+        $this->gameFlowResolver->setCoach($this->coach);
+        $this->foulHandler->setCoach($this->coach);
+        $this->ttmHandler->setCoach($this->coach);
+        $this->bombThrowHandler->setCoach($this->coach);
+        $this->blockHandler->setCoach($this->coach);   // P303 Jump Up
         $this->hypnoticGazeHandler = new HypnoticGazeHandler($dice, $this->tzCalc);
         $this->ballAndChainHandler = new BallAndChainHandler($dice, $injuryResolver, $this->ballResolver, $this->scatterCalc, $this->blockHandler);
         $this->rerollHandler = new RerollHandler($dice, $this->ballResolver, $this->moveHandler);
@@ -105,7 +106,7 @@ final class ActionResolver
     {
         if ($this->passResolver === null) {
             $this->passResolver = new PassResolver($this->dice, $this->tzCalc, $this->scatterCalc, $this->ballResolver);
-            $this->passResolver->setCoachRerolls($this->koucPrehozy);
+            $this->passResolver->setCoach($this->coach);
         }
         return $this->passResolver;
     }
@@ -138,28 +139,6 @@ final class ActionResolver
     }
 
     /**
-     * 30.10.2026: strany kouče-člověka -- jeho hráče s Diving Catch se ptá, jestli skočí (i v tahu
-     * soupeře); hráče AI rozhoduje engine jako dosud.
-     *
-     * @param list<TeamSide> $sides
-     */
-    public function setInteractiveDivingCatch(array $sides): void
-    {
-        $this->ballResolver->setInteractiveDivingCatch($sides);
-    }
-
-    /**
-     * P272 (10.11.2026): strany kouče-člověka — když jeho hráč chytí / zachytí bombu, ptá se kouče, kam ji hodit dál
-     * (i v tahu soupeře); hráče AI rozhoduje engine jako dosud.
-     *
-     * @param list<TeamSide> $sides
-     */
-    public function setInteractiveBombRethrow(array $sides): void
-    {
-        $this->bombThrowHandler->setInteractiveRethrow($sides);
-    }
-
-    /**
      * Strany kouče-člověka: ptá se jich na všechno, na co se ptá i v tahu soupeře — lékárník, Stand Firm, Diving
      * Catch, kam hodit bombu, rozhodčí, přehoz hodu. (Přehozy uprostřed tahu a volba kostky bloku zvlášť:
      * `setInteractiveRerolls` / `setInteractiveBlocks` — jen na tahu člověka.)
@@ -170,31 +149,19 @@ final class ActionResolver
     {
         $this->setInteractiveApothecary($sides);
         $this->setInteractiveStandFirm($sides);
-        $this->setInteractiveDivingCatch($sides);
-        $this->setInteractiveBombRethrow($sides);
-        $this->setInteractiveReferee($sides);
-        $this->setInteractiveThrowRerolls($sides);
+        $this->setCoachSides($sides);
     }
 
     /**
-     * P292: kouče těchto stran se při nepovedeném hodu (přihrávka, bomba, hod spoluhráčem) ptá na přehoz.
+     * P294 krok 3: strany kouče-člověka pro otázky uprostřed akce, i v tahu soupeře — Diving Catch (30.10.), kam hodit
+     * chycenou bombu (P272), rozhodčí u faulu i tajné zbraně (P291), přehoz hodu (P292: přihrávka, bomba, hod
+     * spoluhráčem, Jump Up). Dřív zvlášť setter pro každý druh.
      *
      * @param list<TeamSide> $sides
      */
-    public function setInteractiveThrowRerolls(array $sides): void
+    public function setCoachSides(array $sides): void
     {
-        $this->koucPrehozy->setSides($sides);
-    }
-
-    /**
-     * P291: kouče těchto stran se rozhodčí ptá na úplatek / protest (faul i tajná zbraň na konci drive).
-     *
-     * @param list<TeamSide> $sides
-     */
-    public function setInteractiveReferee(array $sides): void
-    {
-        $this->foulHandler->setInteractiveReferee($sides);
-        $this->gameFlowResolver->setInteractiveReferee($sides);
+        $this->coach->setSides($sides);
     }
 
     public function setInteractiveRerolls(bool $interactive): void
@@ -358,67 +325,13 @@ final class ActionResolver
     private function resolveSPrehranim(GameState $state, ActionType $action, array $params, array $hody, ReplayAnswers $odpovedi): ActionResult
     {
         $this->replayDice->begin($hody);
-        $this->ballResolver->setDivingCatchAnswers($odpovedi->divingCatch);
-        $this->bombThrowHandler->setRethrowAnswers($odpovedi->bombTargets);
-        $this->foulHandler->setRefereeAnswers($odpovedi->referee);
-        $this->koucPrehozy->setAnswers($odpovedi->rerolls);
+        $this->coach->begin($odpovedi);
         try {
             return $this->resolveJednou($state, $action, $params);
-        } catch (DivingCatchQuestion $q) {
-            return ActionResult::success($state->withPendingDivingCatch(new PendingDivingCatchDTO(
-                $q->playerId,
-                $q->landing,
-                $action,
-                $params,
-                $this->replayDice->getLog(),
-                $odpovedi,
-                $q->otherCandidates,
-                $q->attemptingId,
-            )), []);
-        } catch (BombRethrowQuestion $q) {
-            return ActionResult::success($state->withPendingBombRethrow(new PendingBombRethrowDTO(
-                $q->playerId,
-                $q->targets,
-                $q->suggested,
-                $action,
-                $params,
-                $this->replayDice->getLog(),
-                $odpovedi,
-            )), []);
-        } catch (RefereeQuestion $q) {
-            return ActionResult::success($state->withPendingReferee(new PendingRefereeDTO(
-                $q->playerId,
-                true,
-                $q->canBribe,
-                $q->canArgue,
-                $action,
-                $params,
-                $this->replayDice->getLog(),
-                $odpovedi,
-            )), []);
-        } catch (RerollQuestion $q) {
-            $hrac = $state->getPlayer($q->playerId)?->getPosition();
-
-            return ActionResult::success($state->withPendingReroll(new PendingRerollDTO(
-                $q->rollType,
-                $q->playerId,
-                $q->target,
-                $q->roll,
-                $q->pro,
-                $q->team,
-                $hrac?->getX() ?? 0,
-                $hrac?->getY() ?? 0,
-                $q->proFailed,
-                replayAction: $action,
-                replayParams: $params,
-                replayDice: $this->replayDice->getLog(),
-                replayAnswers: $odpovedi,
-            )), []);
+        } catch (CoachQuestion $q) {
+            return ActionResult::success($q->pending($state, $action, $params, $this->replayDice->getLog(), $odpovedi), []);
         } finally {
-            $this->ballResolver->setDivingCatchAnswers([]);
-            $this->bombThrowHandler->setRethrowAnswers([]);
-            $this->foulHandler->setRefereeAnswers([]);
-            $this->koucPrehozy->setAnswers([]);
+            $this->coach->end();
         }
     }
 

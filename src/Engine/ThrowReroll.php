@@ -88,7 +88,7 @@ final class ThrowReroll
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
-        ?CoachRerolls $kouc = null,
+        ?Coach $kouc = null,
         string $druh = '',
         int $hod = 0,
         int $cil = 0,
@@ -96,7 +96,7 @@ final class ThrowReroll
         // P292: hráče kouče-člověka se zeptá (druh / hod / cíl jen pro dialog). P294: AI je „kouč“, který vždy bere
         //   Pro (bez Pro týmový přehoz) a po neúspěšném hodu Pro týmový přehoz — jeden žebříček pro oba.
         $volba = ($kouc !== null && $kouc->decides($side))
-            ? static fn(bool $pro, bool $team, bool $proFailed): string => $kouc->ask($thrower->getId(), $druh, $hod, $cil, $pro, $team, $proFailed)
+            ? static fn(bool $pro, bool $team, bool $proFailed): string => $kouc->reroll($thrower->getId(), $druh, $hod, $cil, $pro, $team, $proFailed)
             : static fn(bool $pro, bool $team, bool $proFailed): string => ($pro && !$proFailed) ? 'pro' : 'team_reroll';
 
         return self::zebricek($dice, $state, $thrower, $side, $teamAllowed, $events, $volba);
@@ -117,7 +117,7 @@ final class ThrowReroll
         TeamSide $side,
         bool $teamAllowed,
         array &$events,
-        ?CoachRerolls $kouc,
+        ?Coach $kouc,
         string $druh,
         int $hod,
         int $cil,
