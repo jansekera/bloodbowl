@@ -392,6 +392,48 @@ TEST(MacroActions, BlockNotAvailableWith1Die) {
     EXPECT_FALSE(hasMacroType(macros, MacroType::BLOCK));
 }
 
+// P304 bod 2 (uživatel 17.11.2026 „ano“): makro-AI nabídne blok z lehu s Jump Up (ř. 8199-8204: hod AG +2, neúspěch
+// = akce propadne a hráč zůstane ležet, NENÍ to turnover). Dřív nabídka začínala `canAct()` (jen stojící) ⇒ nikdy.
+TEST(MacroActions, P304ProneJumpUpPlayerIsOfferedTheBlock) {
+    GameState state = makeMinimalState();
+    Player& att = state.getPlayer(1);
+    att.stats.strength = 4;
+    att.position = {10, 7};
+    att.state = PlayerState::PRONE;
+    state.getPlayer(12).stats.strength = 3;
+    state.getPlayer(12).position = {11, 7};
+    auto offered = [&] {
+        std::vector<Macro> macros;
+        getAvailableMacros(state, macros);
+        return std::any_of(macros.begin(), macros.end(), [](const Macro& m) {
+            return m.type == MacroType::BLOCK && m.playerId == 1 && m.targetId == 12;
+        });
+    };
+    EXPECT_FALSE(offered()) << "ležící bez Jump Up blokovat nesmí";
+    att.skills.add(SkillName::JumpUp);
+    EXPECT_TRUE(offered()) << "ležící s Jump Up smí ohlásit Block Action";
+    att.usedBlitz = true;
+    EXPECT_FALSE(offered()) << "v blitzu z lehu ne (ř. 8197-8199: volné vstání jen při jiné akci než blok)";
+}
+
+TEST(MacroActions, P304ProneBlockRiskCountsOnlyTheBlockAfterAJumpUpThatWorks) {
+    GameState state = makeMinimalState();
+    Player& att = state.getPlayer(1);
+    att.stats = {6, 4, 3, 8};                       // AG3: Jump Up na 7 − 3 − 2 = 2+
+    att.position = {10, 7};
+    att.skills.add(SkillName::JumpUp);
+    state.getPlayer(12).stats.strength = 3;
+    state.getPlayer(12).position = {11, 7};
+    const Macro block{MacroType::BLOCK, 1, 12, {-1, -1}};
+    const double standing = macroDirectRisk(state, block);
+    ASSERT_GT(standing, 0.0);
+    att.state = PlayerState::PRONE;
+    EXPECT_NEAR(macroDirectRisk(state, block), 5.0 / 6.0 * standing, 1e-9)
+        << "neúspěšný Jump Up není turnover ⇒ riziko bloku jen po úspěšném hodu (2+)";
+    att.stats.agility = 1;                           // 7 − 1 − 2 = 4+
+    EXPECT_NEAR(macroDirectRisk(state, block), 3.0 / 6.0 * standing, 1e-9);
+}
+
 TEST(MacroActions, BlitzAvailable) {
     // P219 (agilní blitz jen při šanci srazit × odskočit ≥ 0,5) by tu blitz nenabídl — test hlídá jiné pravidlo
     GameState state = makeMinimalState();
@@ -5656,6 +5698,24 @@ TEST(MacroActions, P245OutlookCountsDodgesNotOnlyFreePaths) {
     EXPECT_GT(carrierNextTurnOutlook(s, c, 1.0 / 3.0).tdChance, ag4) << "Dodge = přehoz úhybu";
 }
 
+// P304 bod 5 (týž princip jako šance zvednutí): nosič s hodem velkého hráče na začátku akce nevyrazí vždy.
+TEST(MacroActions, P304OutlookCountsTheBigGuyRollBeforeTheRun) {
+    GameState s = makeP245Sideline();
+    Player& c = s.getPlayer(12);
+    c.position = {5, 0}; s.ball = BallState::carried({5, 0}, 12);
+    const int stay = carrierNextTurnOutlook(s, c, 1.0 / 3.0).bestDistance;
+    c.skills.add(SkillName::BoneHead);
+    const CarrierOutlook bone = carrierNextTurnOutlook(s, c, 1.0 / 3.0);
+    EXPECT_NEAR(bone.tdChance, 5.0 / 6.0, 1e-9) << "volná řada, ale Bone Head na 1 akci ztratí (ř. 7975-7986)";
+    EXPECT_EQ(bone.bestDistance, stay) << "1/6 je pod mezí 1/3 ⇒ doběh do zóny dál platí";
+    c.skills = SkillSet{};
+    c.skills.add(SkillName::ReallyStupid);         // sám ⇒ 4+, polovina > 1/3
+    const CarrierOutlook stupid = carrierNextTurnOutlook(s, c, 1.0 / 3.0);
+    EXPECT_NEAR(stupid.tdChance, 0.5, 1e-9);
+    EXPECT_EQ(stupid.bestDistance, std::abs(5 - (c.teamSide == TeamSide::HOME ? 25 : 0)))
+        << "s neúspěchem 1/2 nedojde nikam pod mezí 1/3 ⇒ zůstává jeho dnešní vzdálenost";
+}
+
 TEST(MacroActions, P245OutlookSidelineRunWithoutObstruction) {
     // pozitivní kontrola měřidla na pozici z partie 2: řada 0 volná ⇒ dojde do 2 sloupců od zóny bez hodu
     const GameState s = makeP245Sideline();
@@ -6067,6 +6127,53 @@ TEST(OpponentPickupChance, P302OutOfReachOrHeldBall) {
     EXPECT_EQ(opponentPickupChance(s, TeamSide::AWAY), 0.0);
     s.ball = BallState::carried({25, 7}, 13);
     EXPECT_LT(opponentPickupChance(s, TeamSide::AWAY), 0.0) << "míč není volný ⇒ −1 (neplatí)";
+}
+
+// P304 bod 5 (uživatel 17.11.2026 „ano“): soupeř v příštím tahu nevstává ani nevyráží zdarma — vstávání pod MA 3 na 4+
+// (ř. 690-695), Bone Head 2+ (ř. 7975-7986), Really Stupid 4+ / 2+ se spoluhráčem (ř. 8388-8396), Wild Animal 4+ na
+// pohyb (ř. 8662-8669), Take Root 2+ a zakořeněný stojí (ř. 8572-8584). Dřív měřidlo počítalo každého, jako by šel.
+TEST(OpponentPickupChance, P304BigGuyChecksScaleTheChance) {
+    const double bare = 4.0 / 6.0;
+    struct Case { SkillName skill; double pass; const char* what; };
+    for (const Case c : {Case{SkillName::BoneHead, 5.0 / 6.0, "Bone Head 2+"},
+                         Case{SkillName::ReallyStupid, 3.0 / 6.0, "Really Stupid sám 4+"},
+                         Case{SkillName::WildAnimal, 3.0 / 6.0, "Wild Animal na pohyb 4+"},
+                         Case{SkillName::TakeRoot, 5.0 / 6.0, "Take Root 2+"}}) {
+        GameState s = makeP302();
+        s.getPlayer(13).skills.add(c.skill);
+        EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), c.pass * bare, 1e-9) << c.what;
+        setExtraFeaturesOff(kP304bActivation);   // rameno měření: vypnuto = jako dřív
+        EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), bare, 1e-9) << c.what << " (rameno vypnuto)";
+        setExtraFeaturesOff(0);
+    }
+    GameState s = makeP302();
+    s.getPlayer(13).skills.add(SkillName::ReallyStupid);
+    p248Put(s, 14, TeamSide::AWAY, {12, 6}, {6, 3, 3, 8}).skills.add(SkillName::NoHands);   // stojí vedle, sám nezvedne
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 5.0 / 6.0 * bare, 1e-9) << "spoluhráč vedle ⇒ 2+";
+    s.getPlayer(14).skills.add(SkillName::ReallyStupid);
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 3.0 / 6.0 * bare, 1e-9) << "Really Stupid spoluhráč nepomáhá";
+}
+
+TEST(OpponentPickupChance, P304RootedPlayerDoesNotWalk) {
+    GameState s = makeP302();
+    s.getPlayer(13).skills.add(SkillName::TakeRoot);
+    s.getPlayer(13).rooted = true;
+    s.getPlayer(13).movementRemaining = 0;
+    EXPECT_EQ(opponentPickupChance(s, TeamSide::AWAY), 0.0) << "zakořeněný má MA 0 až do konce drivu";
+}
+
+TEST(OpponentPickupChance, P304ProneUnderThreeMovementRollsToStand) {
+    GameState s = makeP302();
+    p248Put(s, 13, TeamSide::AWAY, {11, 7}, {0, 3, 3, 8});     // stojí, MA 0 ⇒ k míči jen 1 GFI
+    const double gfiOnly = opponentPickupChance(s, TeamSide::AWAY);
+    ASSERT_GT(gfiOnly, 0.0);
+    p248Put(s, 13, TeamSide::AWAY, {11, 7}, {2, 3, 3, 8}).state = PlayerState::PRONE;   // vstane na 4+, pak 1 GFI
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 0.5 * gfiOnly, 1e-9) << "MA pod 3 vstává na 4+";
+    s.getPlayer(13).skills.add(SkillName::JumpUp);
+    EXPECT_NEAR(opponentPickupChance(s, TeamSide::AWAY), 4.0 / 6.0, 1e-9) << "Jump Up vstane zdarma, MA 2 stačí";
+    GameState t = makeP302();
+    t.getPlayer(13).state = PlayerState::PRONE;                 // MA 6: vstání za 3 pole bez hodu
+    EXPECT_NEAR(opponentPickupChance(t, TeamSide::AWAY), 4.0 / 6.0, 1e-9) << "od MA 3 se na vstání nehází";
 }
 
 // P302 krok 2 (12.11.2026): obestoupit volný míč na pole, které soupeři zvednutí NEJVÍC ztíží (krok 1 změřil, že

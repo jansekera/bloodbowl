@@ -761,11 +761,28 @@ void diceFreeReach(const GameState& state, const Player& player, std::vector<Pos
 }
 
 // Hráč na začátku svého příštího tahu: plný pohyb, Break Tackle znovu (P245, P302). P305: jedno místo pro obě měřidla.
+// OPRAVENO 17.11.2026 (P304 bod 5) — zakořeněnému se tu vracel plný pohyb. Pravidla ř. 8574-8576: zakořeněný má MA 0
+//   „for the rest of the drive“ (nebo do sražení).
 static Player nextTurnSelf(const Player& p) {
     Player w = p;
-    w.movementRemaining = static_cast<int8_t>(w.stats.movement);
+    w.movementRemaining = static_cast<int8_t>(w.rooted && extraFeatureOn(kP304bActivation) ? 0 : w.stats.movement);
     w.breakTackleUsedThisTurn = false;
     return w;
+}
+
+// P304 bod 5 (uživatel 17.11.2026): šance, že hráč `w` (z `nextTurnSelf`) v příštím tahu vůbec vykročí — hody velkého
+// hráče na začátku akce (ř. 8573 „immediately after declaring an Action“) a vstávání pod MA 3 na 4+ (ř. 690-695).
+// Přehoz se nepočítá (týmový je sdílený, jako u zvednutí). Blood Lust akci nezastaví (kousnutí až po ní) — bez vlivu.
+// Dřív se nepočítalo nic: ležící Treeman nebo Troll šel k míči jako lineman.
+static double nextTurnMoveChance(const GameState& state, const Player& w) {
+    if (!extraFeatureOn(kP304bActivation)) return 1.0;   // rameno měření
+    double c = 1.0;
+    if (w.hasSkill(SkillName::BoneHead)) c *= 5.0 / 6.0;                                            // ř. 7975-7986
+    if (w.hasSkill(SkillName::ReallyStupid)) c *= reallyStupidHasHelper(state, w) ? 5.0 / 6.0 : 0.5;  // ř. 8388-8396
+    if (w.hasSkill(SkillName::WildAnimal)) c *= 0.5;                                                // pohyb 4+, ř. 8662-8669
+    if (w.hasSkill(SkillName::TakeRoot) && !w.rooted) c *= 5.0 / 6.0;                               // 1 ⇒ MA 0, ř. 8572-8576
+    if (w.state == PlayerState::PRONE && !w.hasSkill(SkillName::JumpUp) && w.movementRemaining < 3) c *= 0.5;
+    return c;
 }
 
 // ⭐ P302 (uživatel 11.11.2026): šance soupeře zvednout volný míč v jeho příštím tahu — viz pathfinder.h.
@@ -780,7 +797,7 @@ double opponentPickupChance(const GameState& state, TeamSide side) {
         const int budget = movementAfterStandUp(w) + maxGfiSquares(w);
         const int dist = w.position.distanceTo(ball);
         if (dist > budget) return;
-        const double pick = pickupRollChance(state, w, ball);
+        const double pick = nextTurnMoveChance(state, w) * pickupRollChance(state, w, ball);
         if (pick <= best) return;                         // P305: (1 − pád) × zvednutí ≤ zvednutí — trasu nehledat
         const double fail = (dist == 0) ? 0.0 : pathFailProb(state, w, ball, budget, Position{-1, -1});
         if (fail < 0.0) return;                           // nedosažitelné
@@ -808,6 +825,7 @@ CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carr
                      return false;
                  });
     out.bestDistance = std::abs(w.position.x - ezX);
+    const double act = nextTurnMoveChance(state, w);
     int tdIdx = -1, distIdx = -1;
     for (int sq = 0; sq < GRID_SIZE; ++sq) {
         const int idx = bestLayerIdx(key, sq);
@@ -817,7 +835,8 @@ CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carr
         if (p2 != w.position && state.getPlayerAtPosition(p2)) continue;
         const int dist = std::abs(x - ezX);
         if (dist >= out.bestDistance && x != ezX) continue;   // nic nezlepší ⇒ cestu ani nepočítat
-        const double fail = (p2 == w.position) ? 0.0 : chainFailProb(state, w, parent, idx);
+        // P304 bod 5 (týž princip jako `opponentPickupChance`): nosič s hodem velkého hráče nevyrazí vždy
+        const double fail = (p2 == w.position) ? 0.0 : 1.0 - act * (1.0 - chainFailProb(state, w, parent, idx));
         if (x == ezX && 1.0 - fail > out.tdChance) { out.tdChance = 1.0 - fail; tdIdx = idx; }
         if (fail <= maxFail && dist < out.bestDistance) { out.bestDistance = dist; distIdx = idx; }
     }

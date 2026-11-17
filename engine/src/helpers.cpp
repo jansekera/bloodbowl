@@ -194,6 +194,18 @@ double pickupRollChance(const GameState& state, const Player& player, Position a
     return chance;
 }
 
+bool reallyStupidHasHelper(const GameState& state, const Player& player) {
+    for (const Position& pos : player.position.getAdjacent()) {
+        if (!pos.isOnPitch()) continue;
+        const Player* ally = state.getPlayerAtPosition(pos);
+        if (ally && ally->teamSide == player.teamSide && canAct(ally->state) &&
+            !ally->hasSkill(SkillName::ReallyStupid)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier, bool accuratePass) {
     int target = 7 - catcher.stats.agility - modifier;
 

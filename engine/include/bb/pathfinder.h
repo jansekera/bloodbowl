@@ -69,6 +69,7 @@ double pathFailProb(const GameState& state, const Player& player,
 //   jakou útok počítá vlastnímu nosiči): `tdChance` = nejlepší šance doběhnout do zóny (jakékoli riziko,
 //   „zoufalý“ nosič), `bestDistance` = nejmenší vzdálenost od zóny (sloupce), kam dojde s neúspěchem
 //   nejvýš `maxFail` (útok P213 bere útěk do 1/3). Stojí-li nosič, kde je, `bestDistance` je jeho dnešní.
+//   Neúspěch zahrnuje i hod velkého hráče na začátku akce (P304 bod 5).
 struct CarrierOutlook { double tdChance = 0.0; int bestDistance = 26; };
 // `route` (volitelně): pole té nejlepší cesty — k TD, jinak k nejbližšímu doběhu.
 CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carrier, double maxFail,
@@ -76,7 +77,8 @@ CarrierOutlook carrierNextTurnOutlook(const GameState& state, const Player& carr
 // ⭐ P302 (uživatel 11.11.2026: „postupné změny a každou změřit — … spočítat zvednutí míče soupeřem“): měřidlo A18.
 //   Nejlepší šance strany `side` zvednout VOLNÝ míč v jejím PŘÍŠTÍM tahu: přes její hráče (stojící i ležící, ne No Hands,
 //   ne Ball & Chain) max P(doběh bez pádu — plný pohyb + GFI, úhyby i Dodge jako `pathFailProb`) × P(zvednutí na poli
-//   míče, Sure Hands = osobní přehoz). Týmový přehoz se nepočítá (sdílený, jako P250a). Míč není volný ⇒ −1.
+//   míče, Sure Hands = osobní přehoz) × P(hráč vůbec vykročí: Bone Head, Really Stupid, Wild Animal, Take Root, zakořeněný,
+//   vstávání pod MA 3 na 4+ — P304 bod 5). Týmový přehoz se nepočítá (sdílený, jako P250a). Míč není volný ⇒ −1.
 double opponentPickupChance(const GameState& state, TeamSide side);
 // P245: volná pole, kam hráč v tomto tahu dojde bez hodu (bez úhybu i GFI).
 void diceFreeReach(const GameState& state, const Player& player, std::vector<Position>& out);

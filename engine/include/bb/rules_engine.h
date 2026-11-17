@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 
 #include "bb/game_state.h"
 #include "bb/enums.h"
@@ -25,6 +26,12 @@ void getAvailableActions(const GameState& state, std::vector<Action>& out);
 // P305: jediné místo pravidla — nabídka BLOCK (mayBlockNow), nabídka Multiple Block i resolver (proneBlockGate).
 inline bool mayBlockFromProne(const Player& p) {
     return p.state == PlayerState::PRONE && p.hasSkill(SkillName::JumpUp) && !p.usedBlitz;
+}
+
+// Hod Jump Up na blok z lehu: „Agility roll with a +2 modifier“ (ř. 8200-8201), 1 vždy neuspěje, 6 vždy uspěje.
+// P304 bod 2: jedno místo pro resolver (`proneBlockGate`) i odhad AI (`macroDirectRisk`).
+inline int jumpUpBlockTarget(const Player& p) {
+    return std::max(2, std::min(6, 7 - p.stats.agility - 2));
 }
 
 inline bool mayBlockNow(const Player& p) {

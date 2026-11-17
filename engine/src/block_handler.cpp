@@ -1695,8 +1695,8 @@ std::optional<ActionResult> proneBlockGate(GameState& state, int playerId, DiceR
     Player& p = state.getPlayer(playerId);
     if (p.state != PlayerState::PRONE) return std::nullopt;
     if (!mayBlockFromProne(p)) return ActionResult::fail();
-    // „requires an Agility roll with a +2 modifier“ — 1 vždy neuspěje, 6 vždy uspěje. Parita s PHP BlockHandler::jumpUpZLehu.
-    const int target = std::max(2, std::min(6, 7 - p.stats.agility - 2));
+    // „requires an Agility roll with a +2 modifier“ — `jumpUpBlockTarget`. Parita s PHP BlockHandler::jumpUpZLehu.
+    const int target = jumpUpBlockTarget(p);
     const bool ok = attemptRollLogged(state, playerId, dice, target, SkillName::SKILL_COUNT, /*negated=*/false,
                                       /*canUseTeamReroll=*/true, events, GameEvent::Type::STAND_UP, p.position, p.position);
     if (ok) {

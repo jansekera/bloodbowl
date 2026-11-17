@@ -88,6 +88,9 @@ int calculatePickupTargetAt(const GameState& state, const Player& player,
 // P305 (16.11.2026): šance, že hod na zvednutí na `at` vyjde, se Sure Hands jako vlastním přehozem (týmový přehoz
 // se nepočítá — sdílený zdroj tahu). Jediný vzorec pro P250 zvedače, řadič klece (planStart) i měřidlo P302.
 double pickupRollChance(const GameState& state, const Player& player, Position at);
+// Really Stupid: stojí vedle hráče spoluhráč, který sám Really Stupid není? (+2 k hodu, ř. 8393-8396). Hod (big_guy_handler)
+// i odhad AI (P304 bod 5) jedním místem.
+bool reallyStupidHasHelper(const GameState& state, const Player& player);
 int calculateCatchTarget(const GameState& state, const Player& catcher, int modifier = 0,
                          bool accuratePass = false);
 

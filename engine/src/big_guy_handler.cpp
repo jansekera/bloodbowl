@@ -61,25 +61,13 @@ BigGuyResult resolveBigGuyCheck(GameState& state, int playerId, ActionType actio
         // square, AND WHO AREN'T REALLY STUPID, then add 2 to the D6 roll."
         // We used to accept any ally, so two Really Stupid players propped
         // each other up.
-        bool hasAdjacentAlly = false;
-        auto adj = player.position.getAdjacent();
-        for (auto& pos : adj) {
-            if (!pos.isOnPitch()) continue;
-            const Player* ally = state.getPlayerAtPosition(pos);
-            // M3b (29.08.2026): `!ally->lostTacklezones` tu bylo NAVIC.
-            // r. 8393-8396 zada jen "players from the same team STANDING
-            // ADJACENT ... AND WHO AREN'T REALLY STUPID" -- o tacklezonach nic.
-            // Bone-headuv zakaz asistence je vyslovne jen "on a BLOCK OR FOUL"
-            // (r. 7984-7985), a bonus k hodu Really Stupid neni ani jedno.
-            // Podminka kousala vzacne, dokud se priznak cistil kazde kolo;
-            // M3 ho necha pretrvat, takze od ni bylo potreba se zbavit hned.
-            if (ally && ally->teamSide == player.teamSide &&
-                canAct(ally->state) &&
-                !ally->hasSkill(SkillName::ReallyStupid)) {
-                hasAdjacentAlly = true;
-                break;
-            }
-        }
+        // Spoluhráč vedle (ne Really Stupid) — jedno místo s odhadem AI, `reallyStupidHasHelper` (P304 bod 5).
+        // M3b (29.08.2026): `!ally->lostTacklezones` tu bylo NAVIC.
+        // r. 8393-8396 zada jen "players from the same team STANDING
+        // ADJACENT ... AND WHO AREN'T REALLY STUPID" -- o tacklezonach nic.
+        // Bone-headuv zakaz asistence je vyslovne jen "on a BLOCK OR FOUL"
+        // (r. 7984-7985), a bonus k hodu Really Stupid neni ani jedno.
+        const bool hasAdjacentAlly = reallyStupidHasHelper(state, player);
 
         int target = hasAdjacentAlly ? 2 : 4;
         int roll = bigGuyRoll(target, SkillName::ReallyStupid);

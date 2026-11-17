@@ -2635,7 +2635,10 @@ static void buildMacroOffer(const GameState& state, std::vector<Macro>& out,
 
     // BLOCK: favorable block (2+ dice, attacker chooses)
     state.forEachOnPitch(mySide, [&](const Player& att) {
-        if (!att.canAct() || att.hasActed) return;
+        // OPRAVENO 17.11.2026 (P304 bod 2, uživatel „ano“) — tu stálo `!att.canAct()` (jen STOJÍCÍ), takže ležící s Jump Up
+        //   blok z lehu (ř. 8199-8204) od AI nikdy nedostal, i když ho primitivní BLOCK nabízel. Stav hlídá `mayBlockNow`.
+        if (att.hasActed) return;
+        if (att.state != PlayerState::STANDING && !extraFeatureOn(kP304ProneBlock)) return;   // rameno měření
         if (!mayBlockNow(att)) return;   // P196: táž podmínka jako primitivní BLOCK (rules_engine.h)
         if (att.hasSkill(SkillName::BallAndChain)) return;
 
@@ -5267,8 +5270,12 @@ double macroDirectRisk(const GameState& state, const Macro& m) {
             const Player& def = state.getPlayer(m.targetId);
             // SSOT 5.11.2026: rozhodnutí obránce o Wrestle jako resolver (OPRAVENO — dřív zastaralá podmínka, viz estimateBlitzOdds).
             const bool defWrestle = defenderWouldWrestle(att, def, /*isBlitz=*/false);
-            return estimateBlockFailChance(getBlockDiceCount(state, att, def, false, false),
-                                           att.hasSkill(SkillName::Block), defWrestle);
+            const double blockFail = estimateBlockFailChance(getBlockDiceCount(state, att, def, false, false),
+                                                             att.hasSkill(SkillName::Block), defWrestle);
+            // P304 bod 2: z lehu napřed Jump Up (AG +2); neúspěch akci jen promarní, turnover to není (ř. 8203-8204)
+            //   ⇒ k turnoveru dojde jen po úspěšném hodu. Promarněnou akci oceňuje hledání hodem kostek při rozbalení.
+            if (att.state == PlayerState::PRONE) return (7.0 - jumpUpBlockTarget(att)) / 6.0 * blockFail;
+            return blockFail;
         }
         case MacroType::REPOSITION: {
             if (m.playerId <= 0) return -1.0;

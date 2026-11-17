@@ -141,6 +141,8 @@ enum ExtraFeature : uint64_t {   // 5.11.2026: 64 bitů (32 už nestačilo)
     , kP250Surround = 1ull << 33       // P250: obestoupit volný míč — přesuny bez hodu na pole vedle míče (převaha zón kolem něj)
     , kP250PushOntoBall = 1ull << 34   // P250: při převaze kolem volného míče odtlačit hráče (i našeho řetězem) na pole s míčem ⇒ odraz k našim
     , kP302SurroundWorst = 1ull << 36  // P302: obestoupit volný míč na pole s nejmenší šancí soupeře ho zvednout (`opponentPickupChance`), jen když ji sníží; vypnuto = nejbližší pole (P250b)
+    , kP304bActivation = 1ull << 38    // P304 bod 5: měřidla příštího tahu soupeře (zvednutí P302, výhled nosiče P245) počítají hod velkého hráče, vstávání pod MA 3 a zakořenění; vypnuto = vyrazí vždy (dřív)
+    , kP304ProneBlock = 1ull << 37     // P304 bod 2: makro BLOCK i ležícímu s Jump Up (hod AG +2, neúspěch není turnover); vypnuto = jen stojící (dřív)
     , kP253PassPricing = 1ull << 35    // P253: brána přihrávky cení s přehozy (Pass/Catch/týmový) a dává přednost nabídkám bez týmového přehozu; vypnuto = hod × chycení bez přehozů (dřív)
 };
 void setExtraFeaturesOff(uint64_t mask);
